@@ -380,6 +380,7 @@ public:
             repl::DurableOplogEntry(opTime ? *opTime : kDefaultOpTime,  // optime
                                     hash,                               // hash
                                     opType,                             // opType
+                                    boost::none,                        // tenant id
                                     nss,                                // namespace
                                     uuid,                               // uuid
                                     fromMigrate,                        // fromMigrate
@@ -1396,6 +1397,7 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
         repl::DurableOplogEntry(kDefaultOpTime,                   // optime
                                 1LL,                              // hash
                                 OpTypeEnum::kCommand,             // opType
+                                boost::none,                      // tenant id
                                 nss.getCommandNS(),               // namespace
                                 boost::none,                      // uuid
                                 boost::none,                      // fromMigrate
@@ -1823,6 +1825,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
         kDefaultOpTime,                   // optime
         1LL,                              // hash
         OpTypeEnum::kCommand,             // opType
+        boost::none,                      // tenant id
         nss.getCommandNS(),               // namespace
         boost::none,                      // uuid
         boost::none,                      // fromMigrate
@@ -1966,6 +1969,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
         kDefaultOpTime,                   // optime
         1LL,                              // hash
         OpTypeEnum::kCommand,             // opType
+        boost::none,                      // tenant id
         nss.getCommandNS(),               // namespace
         boost::none,                      // uuid
         boost::none,                      // fromMigrate

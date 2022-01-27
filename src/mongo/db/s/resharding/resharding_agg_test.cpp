@@ -1637,6 +1637,7 @@ TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
     repl::DurableOplogEntry oplog(opTime,
                                   boost::none /* hash */,
                                   repl::OpTypeEnum::kUpdate,
+                                  boost::none /* tenant id */,
                                   kCrudNs,
                                   kCrudUUID,
                                   false /* fromMigrate */,

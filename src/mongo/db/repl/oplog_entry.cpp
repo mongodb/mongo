@@ -49,6 +49,7 @@ namespace {
 BSONObj makeOplogEntryDoc(OpTime opTime,
                           const boost::optional<int64_t> hash,
                           OpTypeEnum opType,
+                          const boost::optional<TenantId>& tid,
                           const NamespaceString& nss,
                           const boost::optional<UUID>& uuid,
                           const boost::optional<bool>& fromMigrate,
@@ -74,6 +75,9 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
     builder.append(OplogEntryBase::kTermFieldName, opTime.getTerm());
     builder.append(OplogEntryBase::kVersionFieldName, version);
     builder.append(OplogEntryBase::kOpTypeFieldName, OpType_serializer(opType));
+    if (tid) {
+        builder.append(OplogEntryBase::kTidFieldName, tid.get().toString());
+    }
     builder.append(OplogEntryBase::kNssFieldName, nss.toString());
     builder.append(OplogEntryBase::kWallClockTimeFieldName, wallClockTime);
     if (hash) {
@@ -287,8 +291,8 @@ OpTime MutableOplogEntry::getOpTime() const {
 
 size_t DurableOplogEntry::getDurableReplOperationSize(const DurableReplOperation& op) {
     const auto stmtIds = variant_util::toVector<StmtId>(op.getStatementIds());
-    return sizeof(op) + op.getNss().size() + op.getObject().objsize() +
-        (op.getObject2() ? op.getObject2()->objsize() : 0) +
+    return sizeof(op) + (op.getTid() ? op.getTid()->toString().size() : 0) + op.getNss().size() +
+        op.getObject().objsize() + (op.getObject2() ? op.getObject2()->objsize() : 0) +
         (sizeof(std::vector<StmtId>) + (sizeof(StmtId) * stmtIds.size()));
 }
 
@@ -315,6 +319,7 @@ DurableOplogEntry::DurableOplogEntry(BSONObj rawInput) : _raw(std::move(rawInput
 DurableOplogEntry::DurableOplogEntry(OpTime opTime,
                                      const boost::optional<int64_t> hash,
                                      OpTypeEnum opType,
+                                     const boost::optional<TenantId>& tid,
                                      const NamespaceString& nss,
                                      const boost::optional<UUID>& uuid,
                                      const boost::optional<bool>& fromMigrate,
@@ -334,6 +339,7 @@ DurableOplogEntry::DurableOplogEntry(OpTime opTime,
     : DurableOplogEntry(makeOplogEntryDoc(opTime,
                                           hash,
                                           opType,
+                                          tid,
                                           nss,
                                           uuid,
                                           fromMigrate,
@@ -624,6 +630,10 @@ const DurableReplOperation& OplogEntry::getDurableReplOperation() const {
 
 mongo::repl::OpTypeEnum OplogEntry::getOpType() const {
     return _entry.getOpType();
+}
+
+const boost::optional<mongo::TenantId>& OplogEntry::getTid() const {
+    return _entry.getTid();
 }
 
 const mongo::NamespaceString& OplogEntry::getNss() const {

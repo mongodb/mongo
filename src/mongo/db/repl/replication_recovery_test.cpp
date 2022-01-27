@@ -253,6 +253,7 @@ repl::OplogEntry _makeOplogEntry(repl::OpTime opTime,
         repl::DurableOplogEntry(opTime,                           // optime
                                 boost::none,                      // hash
                                 opType,                           // opType
+                                boost::none,                      // tenant id
                                 testNs,                           // namespace
                                 boost::none,                      // uuid
                                 boost::none,                      // fromMigrate

@@ -1492,6 +1492,7 @@ RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
     DurableOplogEntry partialApplyOpsOplogEntry(partialApplyOpsOpTime,      // opTime
                                                 1LL,                        // hash
                                                 OpTypeEnum::kCommand,       // opType
+                                                boost::none,                // tenant id
                                                 adminCmdNss,                // nss
                                                 boost::none,                // uuid
                                                 boost::none,                // fromMigrate
@@ -1527,6 +1528,7 @@ RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
         commitApplyOpsOpTime,       // opTime
         1LL,                        // hash
         OpTypeEnum::kCommand,       // opType
+        boost::none,                // tenant id
         adminCmdNss,                // nss
         boost::none,                // uuid
         boost::none,                // fromMigrate

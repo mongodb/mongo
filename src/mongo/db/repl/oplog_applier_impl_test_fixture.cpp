@@ -408,6 +408,7 @@ OplogEntry makeOplogEntry(OpTypeEnum opType,
     return {DurableOplogEntry(OpTime(Timestamp(1, 1), 1),  // optime
                               boost::none,                 // hash
                               opType,                      // opType
+                              boost::none,                 // tenant id
                               nss,                         // namespace
                               uuid,                        // uuid
                               fromMigrate,                 // fromMigrate

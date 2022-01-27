@@ -314,6 +314,7 @@ BSONObj _makeOplogEntry(Timestamp ts, long long term) {
     return DurableOplogEntry(OpTime(ts, term),                 // optime
                              boost::none,                      // hash
                              OpTypeEnum::kNoop,                // op type
+                             boost::none,                      // tenant id
                              NamespaceString("a.a"),           // namespace
                              boost::none,                      // uuid
                              boost::none,                      // fromMigrate

@@ -199,6 +199,10 @@ public:
         getDurableReplOperation().setOpType(std::move(value));
     }
 
+    void setTid(boost::optional<mongo::TenantId> value) & {
+        getDurableReplOperation().setTid(std::move(value));
+    }
+
     void setNss(NamespaceString value) & {
         getDurableReplOperation().setNss(std::move(value));
     }
@@ -299,6 +303,7 @@ public:
     using MutableOplogEntry::kSessionIdFieldName;
     using MutableOplogEntry::kStatementIdsFieldName;
     using MutableOplogEntry::kTermFieldName;
+    using MutableOplogEntry::kTidFieldName;
     using MutableOplogEntry::kTimestampFieldName;
     using MutableOplogEntry::kTxnNumberFieldName;
     using MutableOplogEntry::kUpsertFieldName;
@@ -325,6 +330,7 @@ public:
     using MutableOplogEntry::getSessionId;
     using MutableOplogEntry::getStatementIds;
     using MutableOplogEntry::getTerm;
+    using MutableOplogEntry::getTid;
     using MutableOplogEntry::getTimestamp;
     using MutableOplogEntry::getTxnNumber;
     using MutableOplogEntry::getUpsert;
@@ -369,6 +375,7 @@ public:
     DurableOplogEntry(OpTime opTime,
                       boost::optional<int64_t> hash,
                       OpTypeEnum opType,
+                      const boost::optional<TenantId>& tid,
                       const NamespaceString& nss,
                       const boost::optional<UUID>& uuid,
                       const boost::optional<bool>& fromMigrate,
@@ -533,6 +540,7 @@ public:
     static constexpr auto kFromTenantMigrationFieldName =
         DurableOplogEntry::kFromTenantMigrationFieldName;
     static constexpr auto kHashFieldName = DurableOplogEntry::kHashFieldName;
+    static constexpr auto kTidFieldName = DurableOplogEntry::kTidFieldName;
     static constexpr auto kNssFieldName = DurableOplogEntry::kNssFieldName;
     static constexpr auto kObject2FieldName = DurableOplogEntry::kObject2FieldName;
     static constexpr auto kObjectFieldName = DurableOplogEntry::kObjectFieldName;
@@ -603,6 +611,7 @@ public:
     const boost::optional<std::int64_t> getTxnNumber() const;
     const DurableReplOperation& getDurableReplOperation() const;
     mongo::repl::OpTypeEnum getOpType() const;
+    const boost::optional<mongo::TenantId>& getTid() const;
     const mongo::NamespaceString& getNss() const;
     const boost::optional<mongo::UUID>& getUuid() const;
     const mongo::BSONObj& getObject() const;
