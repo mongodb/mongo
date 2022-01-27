@@ -93,4 +93,10 @@ assert.eq(result.map(sortSetFields), [
         equals: true
     },
 ]);
+
+// No sets to union should produce an empty set for all records so we only check the first one.
+assert.eq(coll.aggregate([{$project: {x: {$setUnion: []}}}]).toArray()[0]['x'], []);
+
+// No sets to intersect should produce an empty set for all records so we only check the first one.
+assert.eq(coll.aggregate([{$project: {x: {$setIntersection: []}}}]).toArray()[0]['x'], []);
 }());

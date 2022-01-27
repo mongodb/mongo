@@ -9,5 +9,7 @@ const coll = db.concat;
 coll.drop();
 
 assert.commandWorked(coll.insert({}));
+
 assert.eq(coll.findOne({}, {_id: false, "a": {$concat: [{$toLower: "$b"}]}}), {a: ""});
+assert.eq(coll.findOne({}, {_id: false, "a": {$concat: []}}), {a: ""});
 })();
