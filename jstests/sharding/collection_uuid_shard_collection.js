@@ -66,9 +66,10 @@ assert.eq(res.actualNamespace, coll.getFullName());
 // The command fails when the provided UUID corresponds to a different collection, even if the
 // provided namespace does not exist.
 coll2.drop();
-res =
-    assert.commandFailedWithCode(db.runCommand({find: coll2.getFullName(), collectionUUID: uuid()}),
-                                 ErrorCodes.CollectionUUIDMismatch);
+res = assert.commandFailedWithCode(
+    mongos.adminCommand(
+        {shardCollection: coll2.getFullName(), key: {_id: 1}, collectionUUID: uuid()}),
+    ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.collectionUUID, uuid());
 assert.eq(res.actualNamespace, coll.getFullName());
 
