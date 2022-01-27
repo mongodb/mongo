@@ -4111,3 +4111,30 @@ buildvariants:
     - name: ".stress-test-zseries-1"
     - name: ".stress-test-zseries-2"
     - name: ".stress-test-zseries-3"
+
+- name: ubuntu2004-tmp-s3-cmake
+  display_name: "* (Temporary) Ubuntu 20.04 S3 Extension CMake"
+  run_on:
+  - ubuntu2004-test
+  expansions:
+    test_env_vars:
+      WT_TOPDIR=$(git rev-parse --show-toplevel)
+      WT_BUILDDIR=$WT_TOPDIR/cmake_build
+      LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
+    posix_configure_flags:
+      -DCMAKE_C_FLAGS="-ggdb"
+      -DHAVE_DIAGNOSTIC=1
+      -DENABLE_PYTHON=1
+      -DENABLE_ZLIB=1
+      -DENABLE_SNAPPY=1
+      -DENABLE_STRICT=0
+      -DENABLE_TCMALLOC=1
+      -DENABLE_S3=1
+      -DCMAKE_PREFIX_PATH="$(pwd)/../TCMALLOC_LIB"
+      -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
+    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
+    smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
+    cmake_generator: Ninja
+    make_command: ninja
+  tasks:
+    - name: compile

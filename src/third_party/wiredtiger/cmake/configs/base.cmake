@@ -178,6 +178,12 @@ config_bool(
     DEPENDS_ERROR ON "Failed to find tcmalloc library"
 )
 
+config_bool(
+    ENABLE_S3
+    "Build the S3 storage extension"
+    DEFAULT OFF
+)
+
 set(default_optimize_level)
 if("${WT_OS}" STREQUAL "windows")
     set(default_optimize_level "/O2")

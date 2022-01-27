@@ -16,6 +16,7 @@ ARGS
 ASAN
 ASM
 AUS
+AWS
 Addr
 Ailamaki
 Alakuijala
@@ -26,6 +27,7 @@ Async
 AsyncOp
 Athanassoulis
 Athlon
+Aws
 Axxx
 BBBBB
 BBBBBB
@@ -385,6 +387,7 @@ Resize
 RocksDB
 Rogerio
 Runtime
+SDKOptions
 SIMD
 SLIST
 SLVG
