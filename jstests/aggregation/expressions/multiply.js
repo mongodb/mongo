@@ -165,6 +165,7 @@ const nAryTestCases = [
     {values: [undefined, 9223372036854, NumberDecimal(3.14)], expected: undefined},
     {values: [NumberInt(2147483647), Infinity, NumberLong(-9223372036854)], expected: -Infinity},
     {values: [-Infinity, NumberDecimal(-1.1), 1.0e+35], expected: NumberDecimal("Infinity")},
+    {values: [], expected: 1},
 ];
 
 nAryTestCases.forEach(function(testCase) {
