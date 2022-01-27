@@ -731,7 +731,6 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
         .until([this, self = shared_from_this(), token, cmdObj, isRecipientSyncDataCmd](
                    Status status) {
             if (isRecipientSyncDataCmd) {
-                stdx::lock_guard<Latch> lg(_mutex);
                 return shouldStopSendingRecipientSyncDataCommand(status, getProtocol());
             } else {
                 // If the recipient command is not 'recipientSyncData', it must be

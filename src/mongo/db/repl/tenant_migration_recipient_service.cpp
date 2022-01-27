@@ -39,6 +39,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_manager.h"
 #include "mongo/config.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -47,6 +48,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/cloner_utils.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
@@ -996,11 +998,13 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_getDonorFilenam
 
         auto uniqueOpCtx = cc().makeOperationContext();
         auto opCtx = uniqueOpCtx.get();
-        stdx::lock_guard lk(_mutex);
 
         const auto& data = dataStatus.getValue();
-        _donorFilenameBackupCursorId = data.cursorId;
-        _donorFilenameBackupCursorNamespaceString = data.nss;
+        {
+            stdx::lock_guard lk(_mutex);
+            _donorFilenameBackupCursorId = data.cursorId;
+            _donorFilenameBackupCursorNamespaceString = data.nss;
+        }
 
         for (const BSONObj& doc : data.documents) {
             if (doc["metadata"]) {
@@ -1014,14 +1018,14 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_getDonorFilenam
                 // _stateDoc.setStartFetchingDonorOpTime(startApplyingDonorOpTime);
                 LOGV2_INFO(6113001,
                            "Opened backup cursor on donor",
-                           "migrationId"_attr = _stateDoc.getId(),
+                           "migrationId"_attr = getMigrationUUID(),
                            "startApplyingDonorOpTime"_attr = startApplyingDonorOpTime,
                            "backupCursorId"_attr = data.cursorId);
             } else {
                 LOGV2_DEBUG(6113002,
                             1,
                             "Backup cursor entry",
-                            "migrationId"_attr = _stateDoc.getId(),
+                            "migrationId"_attr = getMigrationUUID(),
                             "filename"_attr = doc["filename"].String(),
                             "backupCursorId"_attr = data.cursorId);
 
@@ -1031,29 +1035,26 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_getDonorFilenam
                     "insertBackupCursorEntry",
                     donatedFilesNs.ns(),
                     [opCtx, donatedFilesNs, doc]() -> Status {
-                        Lock::GlobalWrite lk(opCtx);
-                        AutoGetDb autoDb(opCtx, donatedFilesNs.db(), mongo::MODE_X);
-                        auto db = autoDb.ensureDbExists(opCtx);
-                        CollectionPtr collection =
-                            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
-                                opCtx, donatedFilesNs);
-                        WriteUnitOfWork wuow(opCtx);
-                        if (!collection) {
-                            CollectionOptions emptyCollOptions;
-                            uassertStatusOK(
-                                db->userCreateNS(opCtx, donatedFilesNs, emptyCollOptions));
-                            collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
-                                opCtx, donatedFilesNs);
-                        }
-                        invariant(collection);
+                        // Disabling internal document validation because the fetcher batch size
+                        // can exceed the max data size limit BSONObjMaxUserSize with the
+                        // additional fields we add to documents.
+                        DisableDocumentValidation documentValidationDisabler(
+                            opCtx, DocumentValidationSettings::kDisableInternalValidation);
 
-                        auto obj =
-                            doc.addField(BSON("_id" << OID::gen()).firstElement()).getOwned();
+                        auto obj = std::vector<mongo::BSONObj>{
+                            doc.addField(BSON("_id" << OID::gen()).firstElement()).getOwned()};
+                        write_ops::InsertCommandRequest insertOp(donatedFilesNs);
+                        insertOp.setDocuments(std::move(obj));
+                        insertOp.setWriteCommandRequestBase([] {
+                            write_ops::WriteCommandRequestBase wcb;
+                            wcb.setOrdered(true);
+                            return wcb;
+                        }());
 
-                        OpDebug* const nullOpDebug = nullptr;
-                        uassertStatusOK(collection->insertDocument(
-                            opCtx, InsertStatement(obj), nullOpDebug, false));
-                        wuow.commit();
+                        auto writeResult = write_ops_exec::performInserts(opCtx, insertOp);
+                        invariant(!writeResult.results.empty());
+                        // Writes are ordered, check only the last writeOp result.
+                        uassertStatusOK(writeResult.results.back());
 
                         return Status::OK();
                     });
@@ -2584,11 +2585,12 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                    })
                    .then([this, self = shared_from_this()] {
                        if (_stateDoc.getProtocol() != MigrationProtocolEnum::kShardMerge) {
-                           return;
+                           return SemiFuture<void>::makeReady();
                        }
 
                        stdx::lock_guard lk(_mutex);
                        _stateDoc.setState(TenantMigrationRecipientStateEnum::kLearnedFilenames);
+                       return _updateStateDocForMajority(lk);
                    })
                    .then([this, self = shared_from_this()] {
                        // TODO (SERVER-61133) temporarily stop fetcher/backup cursor here for
