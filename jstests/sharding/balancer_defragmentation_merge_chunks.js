@@ -1,9 +1,11 @@
 /**
  * Test the configureCollectionBalancing command and balancerCollectionStatus command
  *
+ * // TODO (SERVER-63036): remove the 'does_not_support_stepdowns' tag
  * @tags: [
  *  requires_fcv_53,
  *  featureFlagPerCollBalancingSettings,
+ *  does_not_support_stepdowns,
  * ]
  */
 
