@@ -687,7 +687,7 @@ private:
             return chunkToMove->range.getMin();
         }
 
-        const uint64_t getMovedDataSizeBytes() const {
+        uint64_t getMovedDataSizeBytes() const {
             return chunkToMove->estimatedSizeBytes;
         }
 
