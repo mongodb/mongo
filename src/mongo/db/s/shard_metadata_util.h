@@ -42,13 +42,11 @@ namespace mongo {
 class ChunkType;
 class CollectionMetadata;
 class NamespaceString;
-class UUID;
 class OperationContext;
 class ShardCollectionType;
 class ShardDatabaseType;
 template <typename T>
 class StatusWith;
-enum class SupportingLongNameStatusEnum : std::int32_t;
 
 /**
  * Function helpers to locally, using a DBDirectClient, read and write sharding metadata on a shard.
@@ -162,15 +160,12 @@ Status updateShardDatabasesEntry(OperationContext* opCtx,
                                  bool upsert);
 
 /**
- * Reads the shard server's chunks collection corresponding to 'nss' or 'uuid' for chunks matching
- * 'query', returning at most 'limit' chunks in 'sort' order. 'epoch' populates the returned chunks'
- * version fields, because we do not yet have UUIDs to replace epochs nor UUIDs associated with
- * namespaces.
+ * Reads the shard server's chunks collection corresponding to 'nss' for chunks matching 'query',
+ * returning at most 'limit' chunks in 'sort' order. 'epoch' populates the returned chunks' version
+ * fields, because we do not yet have UUIDs to replace epochs nor UUIDs associated with namespaces.
  */
 StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
                                                    const NamespaceString& nss,
-                                                   const UUID& uuid,
-                                                   SupportingLongNameStatusEnum supportingLongName,
                                                    const BSONObj& query,
                                                    const BSONObj& sort,
                                                    boost::optional<long long> limit,
@@ -178,18 +173,15 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
                                                    const Timestamp& timestamp);
 
 /**
- * Takes a vector of 'chunks' and updates the shard's chunks collection for 'nss' or 'uuid'. Any
- * chunk documents in config.cache.chunks.nssOrUuid that overlap with a chunk in 'chunks' is removed
- * as the updated chunk document is inserted. If the epoch of a chunk in 'chunks' does not match
+ * Takes a vector of 'chunks' and updates the shard's chunks collection for 'nss'. Any chunk
+ * documents in config.cache.chunks.<ns> that overlap with a chunk in 'chunks' is removed as the
+ * updated chunk document is inserted. If the epoch of a chunk in 'chunks' does not match
  * 'currEpoch', a ConflictingOperationInProgress error is returned and no more updates are applied.
  *
  * Note: two threads running this function in parallel for the same collection can corrupt the
  * collection data!
  *
  * nss - the collection namespace for which chunk metadata is being updated.
- * uuid - the collection UUID for which chunk metadata is being updated.
- * supportingLongName - when enabled, chunks metadata is accessed by collection 'uuid' rather than
- *                      collection 'nss'.
  * chunks - chunks retrieved from the config server, sorted in ascending chunk version order.
  * currEpoch - what this shard server expects the collection epoch to be.
  *
@@ -200,17 +192,8 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
  */
 Status updateShardChunks(OperationContext* opCtx,
                          const NamespaceString& nss,
-                         const UUID& uuid,
-                         SupportingLongNameStatusEnum supportingLongName,
                          const std::vector<ChunkType>& chunks,
                          const OID& currEpoch);
-
-/**
- * Update the 'supportingLongName' field of the 'nss' entry in config.cache.collections.
- */
-void updateSupportingLongNameOnShardCollections(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                SupportingLongNameStatusEnum supportingLongName);
 
 /**
  * Deletes locally persisted chunk metadata associated with 'nss': drops the chunks collection
@@ -223,13 +206,9 @@ void updateSupportingLongNameOnShardCollections(OperationContext* opCtx,
 Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const NamespaceString& nss);
 
 /**
- * Drops locally persisted chunk metadata associated with 'nss' or 'uuid': only drops the chunks
- * collection.
+ * Drops locally persisted chunk metadata associated with 'nss': only drops the chunks collection.
  */
-void dropChunks(OperationContext* opCtx,
-                const NamespaceString& nss,
-                const UUID& uuid,
-                SupportingLongNameStatusEnum supportingLongName);
+void dropChunks(OperationContext* opCtx, const NamespaceString& nss);
 
 /**
  * Deletes locally persisted database metadata associated with 'dbName': removes the databases

@@ -2,7 +2,7 @@
  * Test all the possible succeed/fail cases around sharded collections renaming.
  */
 
-load('jstests/sharding/libs/catalog_cache_loader_helpers.js');
+load('jstests/libs/uuid_util.js');
 
 /**
  * Initialize a "from" sharded collection with 2 chunks - on 2 different nodes - each containing 1
@@ -50,22 +50,14 @@ function testRename(st, dbName, toNs, dropTarget, mustFail) {
     assert.eq(db.to.find({x: 0}).itcount(), 1, 'Expected exactly one document on the shard');
     assert.eq(toColl.find({x: 2}).itcount(), 1, 'Expected exactly one document on the shard');
 
-    // Infer whether the chunks cache collection names are based by collection UUID or collection
-    // namespace and get the actual chunks cache collection name of the target collection
-    const toConfigCollDoc = mongos.getDB('config').collections.findOne({_id: toNs});
-    const toChunksCollName = getCachedChunksCollectionName(toConfigCollDoc);
-
     // Validate the correctness of the collections metadata in the catalog cache on shards
     for (let db of [st.shard0.getDB('config'), st.shard1.getDB('config')]) {
         // Validate that the source collection metadata has been cleaned up
         assert.eq(db['cache.collections'].countDocuments({_id: fromNs}), 0);
-        if (!supportLongCollectionName(toConfigCollDoc)) {
-            assert(!db['cache.chunks.' + fromNs].exists());
-        }
 
         // Validate that the target collection metadata has been downloaded
         assert.eq(db['cache.collections'].countDocuments({_id: toNs}), 1);
-        assert(db[toChunksCollName].exists());
+        assert(db['cache.chunks.' + toNs].exists());
     }
 }
 

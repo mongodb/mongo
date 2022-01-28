@@ -46,7 +46,6 @@ public:
     using ShardCollectionTypeBase::kNssFieldName;
     using ShardCollectionTypeBase::kRefreshingFieldName;
     using ShardCollectionTypeBase::kReshardingFieldsFieldName;
-    using ShardCollectionTypeBase::kSupportingLongNameFieldName;
     using ShardCollectionTypeBase::kTimeseriesFieldsFieldName;
     using ShardCollectionTypeBase::kTimestampFieldName;
     using ShardCollectionTypeBase::kUniqueFieldName;
@@ -95,10 +94,6 @@ public:
         return getPre50CompatibleAllowMigrations().value_or(true);
     }
     void setAllowMigrations(bool allowMigrations);
-
-    SupportingLongNameStatusEnum getSupportingLongName() const;
-
-    void setSupportingLongName(SupportingLongNameStatusEnum value);
 };
 
 }  // namespace mongo

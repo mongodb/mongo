@@ -2,18 +2,17 @@
  * Verify that some metadata is properly changed after the upgrade and downgrade of a sharded
  * cluster. More specifically:
  *
- *	1. Create a sharded cluster in replica set running an old binary version
- *	2. Setup some data on cluster
- *	3. Upgrade binaries and FCV of the cluster to the latest version
- *	4. Verify the data consistency after the upgrade procedure
- *  5. Downgrade binaries and FCV of the cluster to an old version
- *	6. Verify the data consistency after the downgrade procedure
- *
+ *   1. Create a sharded cluster in replica set running an old binary version
+ *   2. Setup some data on cluster
+ *   3. Upgrade binaries and FCV of the cluster to the latest version
+ *   4. Verify the data consistency after the upgrade procedure
+ *   5. Downgrade binaries and FCV of the cluster to an old version
+ *   6. Verify the data consistency after the downgrade procedure
  */
+
 (function() {
 'use strict';
 
-load('jstests/libs/uuid_util.js');                   // For extractUUIDFromObject
 load('jstests/multiVersion/libs/multi_cluster.js');  // For upgradeCluster
 
 function setupClusterAndDatabase(binVersion) {
@@ -21,8 +20,12 @@ function setupClusterAndDatabase(binVersion) {
         mongos: 1,
         config: 1,
         shards: 2,
-        rs: {nodes: 2, binVersion: binVersion},
-        other: {mongosOptions: {binVersion: binVersion}, configOptions: {binVersion: binVersion}}
+        other: {
+            mongosOptions: {binVersion: binVersion},
+            configOptions: {binVersion: binVersion},
+            rsOptions: {binVersion: binVersion},
+            rs: {nodes: 2}
+        }
     });
     st.configRS.awaitReplication();
 
@@ -57,119 +60,24 @@ function checkConfigAndShardsFCV(expectedFCV) {
     }
 }
 
-var collIndex = 1;
-function createShardedCollection() {
-    const collNs = jsTestName() + '.sharded_coll' + collIndex++;
-    assert.commandWorked(st.s.adminCommand({shardCollection: collNs, key: {x: 1}}));
-
-    const coll = st.s.getCollection(collNs);
-    assert.commandWorked(coll.insert({x: -1}));
-    assert.commandWorked(coll.insert({x: 1}));
-
-    assert.commandWorked(st.s.adminCommand({split: collNs, middle: {x: 0}}));
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: collNs, find: {x: 1}, to: st.shard1.shardName}));
-
-    return collNs;
-}
-
-function testDisabledLongNameSupport(collNs) {
-    jsTest.log('Verify that long name support is properly disabled on collection ' + collNs);
-
-    const collConfigDoc = st.s.getDB('config').collections.findOne({_id: collNs});
-    assert.eq(collConfigDoc.supportingLongName, undefined);
-
-    const shard0Primary = st.rs0.getPrimary();
-    const shard0Secondary = st.rs0.getSecondary();
-    shard0Secondary.setSecondaryOk();
-
-    const shard1Primary = st.rs1.getPrimary();
-    const shard1Secondary = st.rs1.getSecondary();
-    shard1Secondary.setSecondaryOk();
-
-    for (const node of [shard0Primary, shard0Secondary, shard1Primary, shard1Secondary]) {
-        jsTest.log('Verify the consistency of the persisted cache on node ' + getNodeName(node));
-
-        const configDb = node.getDB('config');
-
-        const cachedCollDoc = configDb['cache.collections'].findOne({_id: collNs});
-        assert.neq(cachedCollDoc, null);
-
-        assert(configDb['cache.chunks.' + collNs].exists());
-        assert(!configDb['cache.chunks.' + extractUUIDFromObject(cachedCollDoc.uuid)].exists());
-    }
-}
-
-function testImplicitlyEnabledLongNameSupport(collNs) {
-    jsTest.log('Verify that long name support is properly enabled on collection ' + collNs);
-
-    const collConfigDoc = st.s.getDB('config').collections.findOne({_id: collNs});
-    assert.eq(collConfigDoc.supportingLongName, 'implicitly_enabled');
-
-    const shard0Primary = st.rs0.getPrimary();
-    const shard0Secondary = st.rs0.getSecondary();
-    shard0Secondary.setSecondaryOk();
-
-    const shard1Primary = st.rs1.getPrimary();
-    const shard1Secondary = st.rs1.getSecondary();
-    shard1Secondary.setSecondaryOk();
-
-    for (const node of [shard0Primary, shard0Secondary, shard1Primary, shard1Secondary]) {
-        jsTest.log('Verify the consistency of the persisted cache on node ' + getNodeName(node));
-
-        const configDb = node.getDB('config');
-
-        const cachedCollDoc = configDb['cache.collections'].findOne({_id: collNs});
-        assert.neq(cachedCollDoc, null);
-
-        assert(!configDb['cache.chunks.' + collNs].exists());
-        assert(configDb['cache.chunks.' + extractUUIDFromObject(cachedCollDoc.uuid)].exists());
-    }
-}
-
-function isFeatureFlagLongCollectionNamesEnabled() {
-    const getClusterLookupParam =
-        st.configRS.getPrimary().adminCommand({getParameter: 1, featureFlagLongCollectionNames: 1});
-    return getClusterLookupParam.hasOwnProperty('featureFlagLongCollectionNames') &&
-        getClusterLookupParam.featureFlagLongCollectionNames.value;
-}
-
-function checkClusterBeforeUpgrade(fcv, collNs) {
+function checkClusterBeforeUpgrade(fcv) {
     checkConfigAndShardsFCV(fcv);
-
-    if (isFeatureFlagLongCollectionNamesEnabled()) {
-        testImplicitlyEnabledLongNameSupport(collNs);
-    } else {
-        testDisabledLongNameSupport(collNs);
-    }
 }
 
 function checkClusterAfterBinaryUpgrade() {
     // To implement in the future, if necessary.
 }
 
-function checkClusterAfterFCVUpgrade(fcv, call1Ns, call2Ns) {
+function checkClusterAfterFCVUpgrade(fcv) {
     checkConfigAndShardsFCV(fcv);
-
-    if (isFeatureFlagLongCollectionNamesEnabled()) {
-        testImplicitlyEnabledLongNameSupport(call1Ns);
-        testImplicitlyEnabledLongNameSupport(call2Ns);
-    } else {
-        testDisabledLongNameSupport(call1Ns);
-        testDisabledLongNameSupport(call2Ns);
-    }
 }
 
 function checkClusterAfterFCVDowngrade() {
     // To implement in the future, if necessary.
 }
 
-function checkClusterAfterBinaryDowngrade(fcv, call1Ns, call2Ns, call3Ns) {
+function checkClusterAfterBinaryDowngrade(fcv) {
     checkConfigAndShardsFCV(fcv);
-
-    testDisabledLongNameSupport(call1Ns);
-    testDisabledLongNameSupport(call2Ns);
-    testDisabledLongNameSupport(call3Ns);
 }
 
 for (const oldVersion of [lastLTSFCV, lastContinuousFCV]) {
@@ -179,8 +87,7 @@ for (const oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     jsTest.log('Deploying cluster version ' + oldVersion);
     var st = setupClusterAndDatabase(oldVersion);
 
-    const collCreatedBeforeClusterUpgrade = createShardedCollection();
-    checkClusterBeforeUpgrade(oldVersion, collCreatedBeforeClusterUpgrade);
+    checkClusterBeforeUpgrade(oldVersion);
 
     //////////////////////////////
     // Setting and testing cluster using latest binaries in latest FCV mode
@@ -193,9 +100,7 @@ for (const oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     jsTest.log('Upgrading FCV to ' + latestFCV);
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
-    const collCreatedAfterClusterUpgrade = createShardedCollection();
-    checkClusterAfterFCVUpgrade(
-        latestFCV, collCreatedBeforeClusterUpgrade, collCreatedAfterClusterUpgrade);
+    checkClusterAfterFCVUpgrade(latestFCV);
 
     //////////////////////////////
     // Setting and testing cluster using old binaries in old FCV mode
@@ -208,11 +113,7 @@ for (const oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     jsTest.log('Downgrading binaries to version ' + oldVersion);
     st.upgradeCluster(oldVersion);
 
-    const collCreatedAfterClusterDowngrade = createShardedCollection();
-    checkClusterAfterBinaryDowngrade(oldVersion,
-                                     collCreatedBeforeClusterUpgrade,
-                                     collCreatedAfterClusterUpgrade,
-                                     collCreatedAfterClusterDowngrade);
+    checkClusterAfterBinaryDowngrade(oldVersion);
 
     st.stop();
 }

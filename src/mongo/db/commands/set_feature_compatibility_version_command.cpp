@@ -79,7 +79,6 @@
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/long_collection_names_gen.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/stdx/unordered_set.h"
@@ -407,9 +406,9 @@ public:
         invariant(!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kComplete);
 
         if (requestedVersion > actualVersion) {
-            _runUpgrade(opCtx, actualVersion, request, changeTimestamp);
+            _runUpgrade(opCtx, request, changeTimestamp);
         } else {
-            _runDowngrade(opCtx, actualVersion, request, changeTimestamp);
+            _runDowngrade(opCtx, request, changeTimestamp);
         }
 
         {
@@ -449,7 +448,6 @@ public:
 
 private:
     void _runUpgrade(OperationContext* opCtx,
-                     mongo::multiversion::FeatureCompatibilityVersion originalVersion,
                      const SetFeatureCompatibilityVersion& request,
                      boost::optional<Timestamp> changeTimestamp) {
         const auto requestedVersion = request.getCommandParameter();
@@ -534,14 +532,6 @@ private:
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
 
-            // TODO: Remove once FCV 6.0 becomes last-lts
-            if (!feature_flags::gFeatureFlagLongCollectionNames.isEnabledOnVersion(
-                    originalVersion) &&
-                feature_flags::gFeatureFlagLongCollectionNames.isEnabledOnVersion(
-                    requestedVersion)) {
-                ShardingCatalogManager::get(opCtx)->enableSupportForLongCollectionName(opCtx);
-            }
-
             // Always abort the reshardCollection regardless of version to ensure that it will run
             // on a consistent version from start to finish. This will ensure that it will be able
             // to apply the oplog entries correctly.
@@ -559,7 +549,6 @@ private:
     }
 
     void _runDowngrade(OperationContext* opCtx,
-                       mongo::multiversion::FeatureCompatibilityVersion originalVersion,
                        const SetFeatureCompatibilityVersion& request,
                        boost::optional<Timestamp> changeTimestamp) {
         const auto requestedVersion = request.getCommandParameter();
@@ -806,14 +795,6 @@ private:
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
-
-            // TODO: Remove once FCV 6.0 becomes last-lts
-            if (feature_flags::gFeatureFlagLongCollectionNames.isEnabledOnVersion(
-                    originalVersion) &&
-                !feature_flags::gFeatureFlagLongCollectionNames.isEnabledOnVersion(
-                    requestedVersion)) {
-                ShardingCatalogManager::get(opCtx)->disableSupportForLongCollectionName(opCtx);
-            }
         }
 
         hangWhileDowngrading.pauseWhileSet(opCtx);

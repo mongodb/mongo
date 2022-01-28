@@ -53,7 +53,6 @@ CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks(
     boost::optional<int64_t> maxChunkSizeBytes,
     bool allowAutoSplit,
     bool allowMigrations,
-    SupportingLongNameStatusEnum supportingLongName,
     std::vector<ChunkType> chunks)
     : epoch(std::move(epoch)),
       timestamp(std::move(timestamp)),
@@ -66,7 +65,6 @@ CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks(
       maxChunkSizeBytes(std::move(maxChunkSizeBytes)),
       allowAutoSplit(allowAutoSplit),
       allowMigrations(allowMigrations),
-      supportingLongName(supportingLongName),
       changedChunks(std::move(chunks)) {}
 
 void CatalogCacheLoader::set(ServiceContext* serviceContext,

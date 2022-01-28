@@ -7,8 +7,6 @@
 (function() {
 'use strict';
 
-load('jstests/sharding/libs/catalog_cache_loader_helpers.js');
-
 var st = new ShardingTest({
     shards: 1,
 });
@@ -55,8 +53,7 @@ chunks.forEach((chunk) => {
     assert(chunk.hasOwnProperty('historyIsAt40'),
            'test1.foo does not have a historyIsAt40 after repair');
 });
-chunks =
-    shardPrimaryConfigDB.getCollection(getCachedChunksCollectionName(collection)).find().toArray();
+chunks = shardPrimaryConfigDB.getCollection('cache.chunks.test1.foo').find().toArray();
 assert.eq(chunks.length, 4);
 chunks.forEach((chunk) => {
     assert.neq(null, chunk);

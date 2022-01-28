@@ -176,7 +176,6 @@ env.Library(
         'chunk_version.idl',
         'database_version.cpp',
         'database_version.idl',
-        'long_collection_names.idl',
         'mongod_and_mongos_server_parameters.idl',
         'pm2423_feature_flags.idl',
         'refine_collection_shard_key_coordinator_feature_flags.idl',

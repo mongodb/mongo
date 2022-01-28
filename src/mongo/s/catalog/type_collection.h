@@ -91,7 +91,6 @@ public:
     using CollectionTypeBase::kNssFieldName;
     using CollectionTypeBase::kPermitMigrationsFieldName;
     using CollectionTypeBase::kReshardingFieldsFieldName;
-    using CollectionTypeBase::kSupportingLongNameFieldName;
     using CollectionTypeBase::kTimeseriesFieldsFieldName;
     using CollectionTypeBase::kTimestampFieldName;
     using CollectionTypeBase::kUniqueFieldName;
@@ -177,10 +176,6 @@ public:
     bool getPermitMigrations() const {
         return CollectionTypeBase::getPermitMigrations().get_value_or(true);
     }
-
-    SupportingLongNameStatusEnum getSupportingLongName() const;
-
-    void setSupportingLongName(SupportingLongNameStatusEnum value);
 };
 
 }  // namespace mongo

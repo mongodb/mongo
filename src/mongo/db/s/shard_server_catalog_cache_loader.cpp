@@ -75,15 +75,13 @@ AtomicWord<unsigned long long> taskIdGenerator{0};
 void dropChunksIfEpochChanged(OperationContext* opCtx,
                               const ChunkVersion& maxLoaderVersion,
                               const OID& currentEpoch,
-                              const NamespaceString& nss,
-                              const UUID& uuid,
-                              SupportingLongNameStatusEnum supportingLongName) {
+                              const NamespaceString& nss) {
     if (maxLoaderVersion == ChunkVersion::UNSHARDED() || maxLoaderVersion.epoch() == currentEpoch) {
         return;
     }
 
-    // Drop the 'config.cache.chunks.<ns/uuid>' collection
-    dropChunks(opCtx, nss, uuid, supportingLongName);
+    // Drop the 'config.cache.chunks.<ns>' collection
+    dropChunks(opCtx, nss);
 
     if (MONGO_unlikely(hangPersistCollectionAndChangedChunksAfterDropChunks.shouldFail())) {
         LOGV2(22093, "Hit hangPersistCollectionAndChangedChunksAfterDropChunks failpoint");
@@ -91,7 +89,7 @@ void dropChunksIfEpochChanged(OperationContext* opCtx,
     }
 
     LOGV2(5990400,
-          "Dropped chunks cache due to epoch change",
+          "Dropped persisted chunk metadata due to epoch change",
           "namespace"_attr = nss,
           "currentEpoch"_attr = currentEpoch,
           "previousEpoch"_attr = maxLoaderVersion.epoch());
@@ -107,17 +105,7 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
                                          const NamespaceString& nss,
                                          const CollectionAndChangedChunks& collAndChunks,
                                          const ChunkVersion& maxLoaderVersion) {
-    // Retrieve the collection entry from 'config.cache.collections' if it exists
-    boost::optional<ShardCollectionType> collectionEntry{boost::none};
-    const auto statusWithCollectionEntry{readShardCollectionsEntry(opCtx, nss)};
-    if (statusWithCollectionEntry.getStatus() != ErrorCodes::NamespaceNotFound) {
-        uassertStatusOKWithContext(statusWithCollectionEntry,
-                                   str::stream()
-                                       << "Failed to read persisted collection entry for " << nss);
-        collectionEntry = statusWithCollectionEntry.getValue();
-    }
-
-    // Set the collection entry.
+    // Update the collection entry in case there are any updates.
     ShardCollectionType update(nss,
                                collAndChunks.epoch,
                                collAndChunks.timestamp,
@@ -130,10 +118,7 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
     update.setMaxChunkSizeBytes(collAndChunks.maxChunkSizeBytes);
     update.setAllowAutoSplit(collAndChunks.allowAutoSplit);
     update.setAllowMigrations(collAndChunks.allowMigrations);
-    update.setSupportingLongName(collAndChunks.supportingLongName);
-
-    // Mark the chunk metadata as refreshing, so that secondaries are aware of refresh.
-    update.setRefreshing(true);
+    update.setRefreshing(true);  // Mark as refreshing so secondaries are aware of it.
 
     Status status =
         updateShardCollectionsEntry(opCtx,
@@ -144,30 +129,14 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
         return status;
     }
 
-    // Update the chunks.
-    if (collectionEntry) {
-        // A collection entry already existed in the local cache, so drop the corresponding chunks
-        // collection if the epoch of the persisted collection metadata does not match that of the
-        // fresh collection metadata returned by the config server (for example, the collection has
-        // been dropped and then recreated with the same namespace).
-        try {
-            dropChunksIfEpochChanged(opCtx,
-                                     maxLoaderVersion,
-                                     collAndChunks.epoch,
-                                     collectionEntry->getNss(),
-                                     collectionEntry->getUuid(),
-                                     collectionEntry->getSupportingLongName());
-        } catch (const DBException& ex) {
-            return ex.toStatus();
-        }
+    // Update the chunk metadata.
+    try {
+        dropChunksIfEpochChanged(opCtx, maxLoaderVersion, collAndChunks.epoch, nss);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 
-    status = updateShardChunks(opCtx,
-                               nss,
-                               *collAndChunks.uuid,
-                               collAndChunks.supportingLongName,
-                               collAndChunks.changedChunks,
-                               collAndChunks.epoch);
+    status = updateShardChunks(opCtx, nss, collAndChunks.changedChunks, collAndChunks.epoch);
     if (!status.isOK()) {
         return status;
     }
@@ -179,7 +148,7 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
         return status;
     }
 
-    LOGV2(3463204, "Persisted collection and chunks caches", "namespace"_attr = nss);
+    LOGV2(3463204, "Persisted collection entry and chunk metadata", "namespace"_attr = nss);
 
     return Status::OK();
 }
@@ -205,23 +174,21 @@ Status persistDbVersion(OperationContext* opCtx, const DatabaseType& dbt) {
 /**
  * This function will throw on error!
  *
- * Retrieves the max chunk version and the lastest status of the the support for long names of the
- * persisted metadata. If there is no persisted collection entry or no chunks associated, returns
- * 'ChunkVersion::UNSHARDED()' version and 'SupportingLongNameStatusEnum::kDisabled' supporting long
- * name.
+ * Retrieves the persisted max chunk version for 'nss', if there are any persisted chunks. If there
+ * are none -- meaning there's no persisted metadata for 'nss' --, returns a
+ * ChunkVersion::UNSHARDED() version.
  *
  * It is unsafe to call this when a task for 'nss' is running concurrently because the collection
  * could be dropped and recreated or have its shard key refined between reading the collection epoch
  * and retrieving the chunk, which would make the returned ChunkVersion corrupt.
  */
-const auto getPersistedMaxChunkVersionAndLastestSupportingLongName(OperationContext* opCtx,
-                                                                   const NamespaceString& nss) {
+ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const NamespaceString& nss) {
     // Must read the collections entry to get the epoch to pass into ChunkType for shard's chunk
     // collection.
     auto statusWithCollection = readShardCollectionsEntry(opCtx, nss);
     if (statusWithCollection == ErrorCodes::NamespaceNotFound) {
         // There is no persisted metadata.
-        return std::make_tuple(ChunkVersion::UNSHARDED(), SupportingLongNameStatusEnum::kDisabled);
+        return ChunkVersion::UNSHARDED();
     }
 
     uassertStatusOKWithContext(statusWithCollection,
@@ -238,28 +205,23 @@ const auto getPersistedMaxChunkVersionAndLastestSupportingLongName(OperationCont
         // Therefore, we have no choice but to just throw away the cache and start from scratch.
         uassertStatusOK(dropChunksAndDeleteCollectionsEntry(opCtx, nss));
 
-        return std::make_tuple(ChunkVersion::UNSHARDED(), SupportingLongNameStatusEnum::kDisabled);
+        return ChunkVersion::UNSHARDED();
     }
 
-    auto statusWithChunk =
-        shardmetadatautil::readShardChunks(opCtx,
-                                           nss,
-                                           cachedCollection.getUuid(),
-                                           cachedCollection.getSupportingLongName(),
-                                           BSONObj(),
-                                           BSON(ChunkType::lastmod() << -1),
-                                           1LL,
-                                           cachedCollection.getEpoch(),
-                                           cachedCollection.getTimestamp());
+    auto statusWithChunk = shardmetadatautil::readShardChunks(opCtx,
+                                                              nss,
+                                                              BSONObj(),
+                                                              BSON(ChunkType::lastmod() << -1),
+                                                              1LL,
+                                                              cachedCollection.getEpoch(),
+                                                              cachedCollection.getTimestamp());
     uassertStatusOKWithContext(
         statusWithChunk,
         str::stream() << "Failed to read highest version persisted chunk for collection '"
                       << nss.ns() << "'.");
 
-    const auto maxChunkVersion = statusWithChunk.getValue().empty()
-        ? ChunkVersion::UNSHARDED()
-        : statusWithChunk.getValue().front().getVersion();
-    return std::make_tuple(maxChunkVersion, cachedCollection.getSupportingLongName());
+    return statusWithChunk.getValue().empty() ? ChunkVersion::UNSHARDED()
+                                              : statusWithChunk.getValue().front().getVersion();
 }
 
 /**
@@ -289,16 +251,13 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
 
     QueryAndSort diff = createShardChunkDiffQuery(startingVersion);
 
-    auto changedChunks =
-        uassertStatusOK(readShardChunks(opCtx,
-                                        nss,
-                                        shardCollectionEntry.getUuid(),
-                                        shardCollectionEntry.getSupportingLongName(),
-                                        diff.query,
-                                        diff.sort,
-                                        boost::none,
-                                        startingVersion.epoch(),
-                                        startingVersion.getTimestamp()));
+    auto changedChunks = uassertStatusOK(readShardChunks(opCtx,
+                                                         nss,
+                                                         diff.query,
+                                                         diff.sort,
+                                                         boost::none,
+                                                         startingVersion.epoch(),
+                                                         startingVersion.getTimestamp()));
 
     return CollectionAndChangedChunks{shardCollectionEntry.getEpoch(),
                                       shardCollectionEntry.getTimestamp(),
@@ -311,7 +270,6 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
                                       shardCollectionEntry.getMaxChunkSizeBytes(),
                                       shardCollectionEntry.getAllowAutoSplit(),
                                       shardCollectionEntry.getAllowMigrations(),
-                                      shardCollectionEntry.getSupportingLongName(),
                                       std::move(changedChunks)};
 }
 
@@ -709,60 +667,6 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_runSecond
         opCtx, nss, catalogCacheSinceVersion);
 }
 
-void ShardServerCatalogCacheLoader::_waitForTasksToCompleteAndRenameChunks(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const UUID& uuid,
-    SupportingLongNameStatusEnum supportingLongName) {
-
-    LOGV2_DEBUG(3463205,
-                1,
-                "Waiting for tasks to be complete and renaming the chunks cache collection",
-                "namespace"_attr = nss);
-
-    if (nss.isTemporaryReshardingCollection()) {
-        return;
-    }
-
-    waitForCollectionFlush(opCtx, nss);
-
-    // Determine the renaming logic according to the current collection setup. Namely:
-    //  - kImplicitlyEnabled or kExplicitlyEnabled: NS-based chunks collection to be converted to
-    //    UUID-based one
-    //  - kDisabled: UUID-based chunks collection to be converted to NS-based one
-    const auto fromChunksNss = supportingLongName == SupportingLongNameStatusEnum::kDisabled
-        ? NamespaceString{ChunkType::ShardNSPrefix + uuid.toString()}
-        : NamespaceString{ChunkType::ShardNSPrefix + nss.toString()};
-    const auto toChunksNss = supportingLongName == SupportingLongNameStatusEnum::kDisabled
-        ? NamespaceString{ChunkType::ShardNSPrefix + nss.toString()}
-        : NamespaceString{ChunkType::ShardNSPrefix + uuid.toString()};
-
-    // Before renaming the collection, ensure the target collection doesn't already exist. Otherwise
-    // the inconsistent data cleanup mechanism (based on the collection 'refresh' flag) did not work
-    // as expected.
-    invariant(!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toChunksNss),
-              str::stream() << "Cannot rename collection '" << fromChunksNss << "' to '"
-                            << toChunksNss
-                            << "' as the locally persisted data looks inconsistent (a target "
-                               "collection with the same name already exists)");
-    uassertStatusOK(renameCollection(opCtx, fromChunksNss, toChunksNss, {}));
-
-    // Update the support for long name of the specific shard collection to allow cache access
-    // using the correct namespace, i.e., by collection namespace or UUID.
-    updateSupportingLongNameOnShardCollections(opCtx, nss, supportingLongName);
-
-    WriteConcernResult ignoreResult;
-    const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-    uassertStatusOK(waitForWriteConcern(
-        opCtx, latestOpTime, ShardingCatalogClient::kMajorityWriteConcern, &ignoreResult));
-
-    LOGV2(3463206,
-          "Renamed chunks cache",
-          "collectionNamespace"_attr = nss,
-          "fromChunksNamespace"_attr = fromChunksNss,
-          "toChunksNamespace"_attr = toChunksNss);
-}
-
 StatusWith<CollectionAndChangedChunks>
 ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     OperationContext* opCtx,
@@ -771,7 +675,7 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     long long termScheduled) {
 
     // Get the max version the loader has.
-    const auto [maxLoaderVersion, lastSupportLongName] = [&] {
+    const auto maxLoaderVersion = [&] {
         {
             stdx::lock_guard<Latch> lock(_mutex);
             auto taskListIt = _collAndChunkTaskLists.find(nss);
@@ -779,13 +683,12 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
             if (taskListIt != _collAndChunkTaskLists.end() &&
                 taskListIt->second.hasTasksFromThisTerm(termScheduled)) {
                 // Enqueued tasks have the latest metadata
-                return std::make_tuple(taskListIt->second.getHighestVersionEnqueued(),
-                                       taskListIt->second.getLastSupportingLongNameEnqueued());
+                return taskListIt->second.getHighestVersionEnqueued();
             }
         }
 
         // If there are no enqueued tasks, get the max persisted
-        return getPersistedMaxChunkVersionAndLastestSupportingLongName(opCtx, nss);
+        return getPersistedMaxChunkVersion(opCtx, nss);
     }();
 
     // Refresh the loader's metadata from the config server. The caller's request will
@@ -825,20 +728,6 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
                           << "', but found a new timestamp '"
                           << collAndChunks.changedChunks.back().getVersion().getTimestamp()
                           << "'."};
-    }
-
-    if (maxLoaderVersion.isSameCollection(collAndChunks.timestamp) && maxLoaderVersion.isSet() &&
-        lastSupportLongName != collAndChunks.supportingLongName) {
-        _waitForTasksToCompleteAndRenameChunks(
-            opCtx, nss, *collAndChunks.uuid, collAndChunks.supportingLongName);
-
-        LOGV2_FOR_CATALOG_REFRESH(
-            5857500,
-            1,
-            "Chunks cache collection renamed due to a change of the long name support",
-            "namespace"_attr = nss,
-            "oldSupportingLongName"_attr = lastSupportLongName,
-            "newSupportingLongName"_attr = collAndChunks.supportingLongName);
     }
 
     if (collAndChunks.changedChunks.back().getVersion().isNotComparableWith(maxLoaderVersion) ||
@@ -1020,7 +909,6 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
         persisted.maxChunkSizeBytes = enqueued.maxChunkSizeBytes;
         persisted.allowAutoSplit = enqueued.allowAutoSplit;
         persisted.allowMigrations = enqueued.allowMigrations;
-        persisted.supportingLongName = enqueued.supportingLongName;
 
         return persisted;
     }
@@ -1521,14 +1409,6 @@ ChunkVersion ShardServerCatalogCacheLoader::CollAndChunkTaskList::getHighestVers
     return _tasks.back().maxQueryVersion;
 }
 
-SupportingLongNameStatusEnum
-ShardServerCatalogCacheLoader::CollAndChunkTaskList::getLastSupportingLongNameEnqueued() const {
-    invariant(!_tasks.empty());
-    const auto lastCollectionAndChangedChunks = _tasks.back().collectionAndChangedChunks;
-    return lastCollectionAndChangedChunks ? lastCollectionAndChangedChunks->supportingLongName
-                                          : SupportingLongNameStatusEnum::kDisabled;
-}
-
 CollectionAndChangedChunks
 ShardServerCatalogCacheLoader::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
     const long long term) const {
@@ -1571,7 +1451,6 @@ ShardServerCatalogCacheLoader::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
 
             // Keep the most recent version of these fields
             collAndChunks.allowMigrations = task.collectionAndChangedChunks->allowMigrations;
-            collAndChunks.supportingLongName = task.collectionAndChangedChunks->supportingLongName;
             collAndChunks.maxChunkSizeBytes = task.collectionAndChangedChunks->maxChunkSizeBytes;
             collAndChunks.allowAutoSplit = task.collectionAndChangedChunks->allowAutoSplit;
             collAndChunks.reshardingFields = task.collectionAndChangedChunks->reshardingFields;

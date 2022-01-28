@@ -8,8 +8,6 @@
 (function() {
 'use strict';
 
-load('jstests/sharding/libs/catalog_cache_loader_helpers.js');
-
 let st = new ShardingTest({shards: 1});
 
 let testDB = st.s.getDB('test');
@@ -30,7 +28,7 @@ assert.commandWorked(
     priConn.adminCommand({_flushRoutingTableCacheUpdates: 'test.user', syncFromConfig: true}));
 
 let collEntry = st.config.collections.findOne({_id: 'test.user'});
-let chunksCollName = getCachedChunksCollectionName(collEntry);
+let chunksCollName = "cache.chunks.test.user";
 let chunkCache = priConn.getDB('config').getCollection(chunksCollName);
 let preRefineChunks = chunkCache.find().toArray();
 assert.eq(3, preRefineChunks.length);

@@ -78,7 +78,6 @@ public:
             boost::optional<int64_t> maxChunkSizeBytes,
             bool allowAutoSplit,
             bool allowMigrations,
-            SupportingLongNameStatusEnum supportingLongName,
             std::vector<ChunkType> chunks);
 
         // Information about the entire collection
@@ -102,8 +101,6 @@ public:
         bool allowAutoSplit;
 
         bool allowMigrations;
-
-        SupportingLongNameStatusEnum supportingLongName;
 
         // The chunks which have changed sorted by their chunkVersion. This list might potentially
         // contain all the chunks in the collection.

@@ -70,21 +70,6 @@ Status getStatusFromWriteCommandResponse(const BSONObj& commandResult) {
     return batchResponse.toStatus();
 }
 
-/**
- * Returns the namespace of the shard server's chunks collection correspoding to the collection
- * namespace. The actual chunks collection namespace is based on the collection namespace or UUID
- * depending on the current collection configuration.
- */
-NamespaceString getShardChunksNss(const NamespaceString& collectionNss,
-                                  const UUID& collectionUuid,
-                                  SupportingLongNameStatusEnum supportingLongName) {
-    const auto chunksNsPostfix{supportingLongName == SupportingLongNameStatusEnum::kDisabled ||
-                                       collectionNss.isTemporaryReshardingCollection()
-                                   ? collectionNss.ns()
-                                   : collectionUuid.toString()};
-    return NamespaceString{ChunkType::ShardNSPrefix + chunksNsPostfix};
-}
-
 Status setPersistedRefreshFlags(OperationContext* opCtx, const NamespaceString& nss) {
     return updateShardCollectionsEntry(
         opCtx,
@@ -299,14 +284,12 @@ Status updateShardDatabasesEntry(OperationContext* opCtx,
 
 StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
                                                    const NamespaceString& nss,
-                                                   const UUID& uuid,
-                                                   SupportingLongNameStatusEnum supportingLongName,
                                                    const BSONObj& query,
                                                    const BSONObj& sort,
                                                    boost::optional<long long> limit,
                                                    const OID& epoch,
                                                    const Timestamp& timestamp) {
-    const auto chunksNss = getShardChunksNss(nss, uuid, supportingLongName);
+    const auto chunksNss = NamespaceString{ChunkType::ShardNSPrefix + nss.ns()};
 
     try {
         DBDirectClient client(opCtx);
@@ -343,13 +326,11 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
 
 Status updateShardChunks(OperationContext* opCtx,
                          const NamespaceString& nss,
-                         const UUID& uuid,
-                         SupportingLongNameStatusEnum supportingLongName,
                          const std::vector<ChunkType>& chunks,
                          const OID& currEpoch) {
     invariant(!chunks.empty());
 
-    const auto chunksNss = getShardChunksNss(nss, uuid, supportingLongName);
+    const auto chunksNss = NamespaceString{ChunkType::ShardNSPrefix + nss.ns()};
 
     try {
         DBDirectClient client(opCtx);
@@ -417,57 +398,10 @@ Status updateShardChunks(OperationContext* opCtx,
     }
 }
 
-void updateSupportingLongNameOnShardCollections(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                SupportingLongNameStatusEnum supportingLongName) {
-    write_ops::UpdateCommandRequest commandRequest(
-        NamespaceString::kShardConfigCollectionsNamespace, [&] {
-            BSONObj modifiers = supportingLongName != SupportingLongNameStatusEnum::kDisabled
-                ? BSON("$set" << BSON(CollectionType::kSupportingLongNameFieldName
-                                      << SupportingLongNameStatus_serializer(supportingLongName)))
-                : BSON("$unset" << BSON(CollectionType::kSupportingLongNameFieldName << 1));
-
-            write_ops::UpdateOpEntry updateOp;
-            updateOp.setQ(BSON(ShardCollectionType::kNssFieldName << nss.ns()));
-            updateOp.setU(write_ops::UpdateModification::parseFromClassicUpdate(modifiers));
-            return std::vector{updateOp};
-        }());
-
-    DBDirectClient dbClient(opCtx);
-    const auto commandResponse = dbClient.runCommand(commandRequest.serialize({}));
-    uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
-}
-
 Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const NamespaceString& nss) {
-    // Retrieve the collection entry from 'config.cache.collections' if available, otherwise return
-    // immediately
-    const auto statusWithCollectionEntry = readShardCollectionsEntry(opCtx, nss);
-    if (!statusWithCollectionEntry.isOK()) {
-        const auto status = statusWithCollectionEntry.getStatus();
-        if (status == ErrorCodes::NamespaceNotFound) {
-            return Status::OK();
-        }
-
-        LOGV2_ERROR(5966300,
-                    "Failed to read persisted collection entry",
-                    "namespace"_attr = nss,
-                    "error"_attr = redact(status));
-
-        return status;
-    }
-    const auto& collectionEntry = statusWithCollectionEntry.getValue();
-
     try {
-        // Mark the collection entry as refreshing to indicate that the persisted metadata is about
-        // to be dropped
-        if (!collectionEntry.getRefreshing() || !*collectionEntry.getRefreshing()) {
-            uassertStatusOK(setPersistedRefreshFlags(opCtx, nss));
-        }
 
-        // Drop the 'config.cache.chunks.<ns/uuid>' collection
-        dropChunks(opCtx, nss, collectionEntry.getUuid(), collectionEntry.getSupportingLongName());
-
-        // Delete the collection entry from 'config.cache.collections'
+        // Delete the collection entry from 'config.cache.collections'.
         DBDirectClient client(opCtx);
         auto deleteCommandResponse = client.runCommand([&] {
             write_ops::DeleteCommandRequest deleteOp(
@@ -482,38 +416,36 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
         }());
         uassertStatusOK(
             getStatusFromWriteCommandResponse(deleteCommandResponse->getCommandReply()));
+
+        // Drop the 'config.cache.chunks.<ns>' collection.
+        dropChunks(opCtx, nss);
     } catch (const DBException& ex) {
         LOGV2_ERROR(5966301,
-                    "Failed to drop chunks and collection entry",
+                    "Failed to drop persisted chunk metadata and collection entry",
                     "namespace"_attr = nss,
-                    "uuid"_attr = collectionEntry.getUuid(),
                     "error"_attr = redact(ex.toStatus()));
 
         return ex.toStatus();
     }
 
-    LOGV2(5966302,
-          "Dropped chunks and collection entry",
-          "namespace"_attr = nss,
-          "uuid"_attr = collectionEntry.getUuid());
+    LOGV2(5966302, "Dropped persisted chunk metadata and collection entry", "namespace"_attr = nss);
 
     return Status::OK();
 }
 
-void dropChunks(OperationContext* opCtx,
-                const NamespaceString& nss,
-                const UUID& uuid,
-                SupportingLongNameStatusEnum supportingLongName) {
-    const auto chunksNss = getShardChunksNss(nss, uuid, supportingLongName);
-
+void dropChunks(OperationContext* opCtx, const NamespaceString& nss) {
     DBDirectClient client(opCtx);
+
+    // Drop the 'config.cache.chunks.<ns>' collection.
     BSONObj result;
-    if (!client.dropCollection(chunksNss.ns(), kLocalWriteConcern, &result)) {
+    if (!client.dropCollection(ChunkType::ShardNSPrefix + nss.ns(), kLocalWriteConcern, &result)) {
         auto status = getStatusFromCommandResult(result);
         if (status != ErrorCodes::NamespaceNotFound) {
             uassertStatusOK(status);
         }
     }
+
+    LOGV2_DEBUG(22091, 1, "Dropped persisted chunk metadata", "namespace"_attr = nss);
 }
 
 Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName) {

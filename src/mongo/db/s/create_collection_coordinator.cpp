@@ -56,7 +56,6 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/long_collection_names_gen.h"
 
 namespace mongo {
 namespace {
@@ -839,24 +838,6 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
                         *_collectionUUID);
 
     coll.setKeyPattern(_shardKeyPattern->getKeyPattern());
-
-    // Prevent the FCV from changing before committing the new collection to the config server.
-    // This ensures that the 'supportingLongName' field is properly set (and committed) based on
-    // the current shard's FCV.
-    //
-    // TODO: Remove once FCV 6.0 becomes last-lts
-    std::shared_ptr<FixedFCVRegion> currentFCV;
-
-    // TODO SERVER-58368: Once we know that this feature will land in the next release we can
-    // simplify this code. Right now it's written to avoid acquiring the FixedFCVRegion if the long
-    // collection names support is not enabled.
-    // TODO: Remove condition once FCV 6.0 becomes last-lts
-    if (feature_flags::gFeatureFlagLongCollectionNames.isEnabledAndIgnoreFCV()) {
-        currentFCV = std::make_shared<FixedFCVRegion>(opCtx);
-        if (feature_flags::gFeatureFlagLongCollectionNames.isEnabled(*(*currentFCV))) {
-            coll.setSupportingLongName(SupportingLongNameStatusEnum::kImplicitlyEnabled);
-        }
-    }
 
     if (_doc.getCreateCollectionRequest().getTimeseries()) {
         TypeCollectionTimeseriesFields timeseriesFields;

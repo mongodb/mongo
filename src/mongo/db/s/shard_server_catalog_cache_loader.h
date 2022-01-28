@@ -220,12 +220,6 @@ private:
         ChunkVersion getHighestVersionEnqueued() const;
 
         /**
-         * Gets the last task's supporting long name status -- this is the most up to date
-         * supporting long name status.
-         */
-        SupportingLongNameStatusEnum getLastSupportingLongNameEnqueued() const;
-
-        /**
          * Iterates over the task list to retrieve the enqueued metadata. Only retrieves
          * collects data from tasks that have terms matching the specified 'term'.
          */
@@ -328,15 +322,6 @@ private:
     typedef std::map<std::string, DbTaskList> DbTaskLists;
 
     typedef std::map<NamespaceString, CollAndChunkTaskList> CollAndChunkTaskLists;
-
-    /**
-     * Waits for any pending task on the collection to be processed, then renames the chunks cache
-     * collection using the collection namespace or UUID.
-     */
-    void _waitForTasksToCompleteAndRenameChunks(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                const UUID& uuid,
-                                                SupportingLongNameStatusEnum supportingLongName);
 
     /**
      * Forces the primary to refresh its metadata for 'nss' and waits until this node's metadata
