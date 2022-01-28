@@ -733,8 +733,12 @@ const session = shardAdminDB.getMongo().startSession();
 
 // Run an operation prior to starting the transaction and save its operation time.
 const sessionDB = session.getDatabase(shardTestDB.getName());
-const res = assert.commandWorked(sessionDB.runCommand({insert: "test", documents: [{x: 1}]}));
-const operationTime = res.operationTime;
+var operationTime = undefined;
+assert.soonNoExcept(() => {
+    const res = assert.commandWorked(sessionDB.runCommand({insert: "test", documents: [{x: 1}]}));
+    operationTime = res.operationTime;
+    return true;
+});
 
 // Set and save the transaction's lifetime. We will use this later to assert that our
 // transaction's expiry time is equal to its start time + lifetime.

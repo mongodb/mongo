@@ -1,5 +1,5 @@
 /**
- * Test that write operations on orphaned documents (1) do not show up unexpected events in change
+ * Verify that write operations on orphaned documents (1) do not show up unexpected events in change
  * streams and (2) have no effect on the persisted data.
  *
  * The behavior is tested in the following scenarios:
@@ -56,6 +56,18 @@ assert.commandWorked(
 // Setup a change stream on the collection to receive real-time events on any data changes.
 const changeStream = coll.watch([]);
 
+jsTest.log('A direct insert to a shard of an orphaned document does not generate an insert event');
+{
+    // Direct insert to first shard of an orphaned document.
+    assert.commandWorked(st.shard0.getCollection(collNS).insert({_id: 6, name: 'ken', age: 50}));
+
+    // No event is notified.
+    assert(!changeStream.hasNext());
+
+    // The orphaned document on first shard has been inserted.
+    assert.neq(null, st.shard0.getCollection(collNS).findOne({_id: 6}));
+}
+
 jsTest.log('A direct update to a shard on an orphaned document generates an update event');
 {
     // Send a direct update to first shard on an orphaned document.
@@ -64,7 +76,7 @@ jsTest.log('A direct update to a shard on an orphaned document generates an upda
     // No change stream event is generated.
     assert(!changeStream.hasNext());
 
-    // The orphaned document on first shard has been touched.
+    // The orphaned document on first shard has been updated.
     assert.eq(21, st.shard0.getCollection(collNS).findOne({_id: 0}).age);
 }
 
@@ -76,7 +88,7 @@ jsTest.log('A direct delete to a shard on an orphaned document generates an upda
     // No change stream event is generated.
     assert(!changeStream.hasNext());
 
-    // The orphaned document on first shard has been touched.
+    // The orphaned document on first shard has been removed.
     assert.eq(null, st.shard0.getCollection(collNS).findOne({_id: 0}));
 }
 
@@ -91,7 +103,7 @@ jsTest.log('A distributed update on a single document generates an update event'
     assert.eq(changeStream.next().operationType, 'update');
     assert(!changeStream.hasNext());
 
-    // The orphaned document on first shard has not been touched, unlike the non-orphaned one on the
+    // The orphaned document on first shard has not been updated, unlike the non-orphaned one on the
     // second shard.
     assert.eq(25, st.shard0.getCollection(collNS).findOne({_id: 1}).age);
     assert.eq(26, st.shard1.getCollection(collNS).findOne({_id: 1}).age);
@@ -108,7 +120,7 @@ jsTest.log('A distributed delete on a single document generates a delete event')
     assert.eq(changeStream.next().operationType, 'delete');
     assert(!changeStream.hasNext());
 
-    // The orphaned document on first shard has not been touched, unlike the non-orphaned one on the
+    // The orphaned document on first shard has not been removed, unlike the non-orphaned one on the
     // second shard.
     assert.neq(null, st.shard0.getCollection(collNS).findOne({_id: 1}));
     assert.eq(null, st.shard1.getCollection(collNS).findOne({_id: 1}));
@@ -127,7 +139,7 @@ jsTest.log('A distributed update on multi-documents generates more update events
     assert.eq(changeStream.next().operationType, 'update');
     assert(!changeStream.hasNext());
 
-    // The orphaned documents on first shard have not been touched, unlike the non-orphaned ones on
+    // The orphaned documents on first shard have not been updated, unlike the non-orphaned ones on
     // the second shard.
     assert.eq(30, st.shard0.getCollection(collNS).findOne({_id: 2}).age);
     assert.eq(35, st.shard0.getCollection(collNS).findOne({_id: 3}).age);
@@ -148,7 +160,7 @@ jsTest.log('A distributed delete on multi-documents generates more delete events
     assert.eq(changeStream.next().operationType, 'delete');
     assert(!changeStream.hasNext());
 
-    // The orphaned documents on first shard have not been touched, unlike the non-orphaned ones on
+    // The orphaned documents on first shard have not been removed, unlike the non-orphaned ones on
     // the second shard.
     assert.neq(null, st.shard0.getCollection(collNS).findOne({_id: 2}));
     assert.neq(null, st.shard0.getCollection(collNS).findOne({_id: 3}));
@@ -176,7 +188,7 @@ jsTest.log('A distributed update via transaction on multi-documents generates mo
     assert.eq(changeStream.next().operationType, 'update');
     assert(!changeStream.hasNext());
 
-    // The orphaned documents on first shard have not been touched, unlike the non-orphaned ones on
+    // The orphaned documents on first shard have not been updated, unlike the non-orphaned ones on
     // the second shard.
     assert.eq(40, st.shard0.getCollection(collNS).findOne({_id: 4}).age);
     assert.eq(45, st.shard0.getCollection(collNS).findOne({_id: 5}).age);
@@ -204,7 +216,7 @@ jsTest.log('A distributed delete via transaction on multi-documents generates mo
     assert.eq(changeStream.next().operationType, 'delete');
     assert(!changeStream.hasNext());
 
-    // The orphaned documents on first shard have not been touched, unlike the non-orphaned ones on
+    // The orphaned documents on first shard have not been removed, unlike the non-orphaned ones on
     // the second shard.
     assert.neq(null, st.shard0.getCollection(collNS).findOne({_id: 4}));
     assert.neq(null, st.shard0.getCollection(collNS).findOne({_id: 5}));
