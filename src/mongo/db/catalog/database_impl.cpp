@@ -212,6 +212,60 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
         }
     }
 
+    // When in restore mode, views created on collections that weren't restored will be removed.
+    if (storageGlobalParams.restore) {
+        invariant(opCtx->lockState()->isW());
+
+        try {
+            auto viewCatalog = ViewCatalog::get(opCtx);
+            viewCatalog->iterate(_name, [&](const ViewDefinition& view) {
+                auto swResolvedView = viewCatalog->resolveView(opCtx, view.name(), boost::none);
+                if (!swResolvedView.isOK()) {
+                    LOGV2_WARNING(6260802,
+                                  "Could not resolve view during restore",
+                                  "view"_attr = view.name(),
+                                  "viewOn"_attr = view.viewOn(),
+                                  "reason"_attr = swResolvedView.getStatus().reason());
+                    return true;
+                }
+
+                // The name of the most resolved namespace, which is a collection.
+                auto resolvedNs = swResolvedView.getValue().getNamespace();
+
+                if (catalog->lookupCollectionByNamespace(opCtx, resolvedNs)) {
+                    // The collection exists for this view.
+                    return true;
+                }
+
+                LOGV2(6260803,
+                      "Removing view on collection not restored",
+                      "view"_attr = view.name(),
+                      "viewOn"_attr = view.viewOn(),
+                      "resolvedNs"_attr = resolvedNs);
+
+                WriteUnitOfWork wuow(opCtx);
+                Status status = viewCatalog->dropView(opCtx, view.name());
+                if (!status.isOK()) {
+                    LOGV2_WARNING(6260804,
+                                  "Failed to remove view on unrestored collection",
+                                  "view"_attr = view.name(),
+                                  "viewOn"_attr = view.viewOn(),
+                                  "resolvedNs"_attr = resolvedNs,
+                                  "reason"_attr = status.reason());
+                    return true;
+                }
+                wuow.commit();
+
+                return true;
+            });
+        } catch (const ExceptionFor<ErrorCodes::InvalidViewDefinition>& e) {
+            LOGV2_WARNING(6260805,
+                          "Failed to access the view catalog during restore",
+                          "db"_attr = _name,
+                          "reason"_attr = e.reason());
+        }
+    }
+
     return status;
 }
 
