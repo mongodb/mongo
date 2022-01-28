@@ -964,6 +964,20 @@ tasks:
         vars:
           test_control: "change_streams_latency"
 
+  - name: change_streams_preimage_throughput
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "change_streams_preimage_throughput"
+
+  - name: change_streams_preimage_latency
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "change_streams_preimage_latency"
+
   - name: change_streams_listen_throughput
     priority: 5
     commands:
@@ -1421,6 +1435,8 @@ buildvariants:
     tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
+      - name: change_streams_preimage_throughput
+      - name: change_streams_preimage_latency
 
   - name: linux-shard-single
     display_name: Linux Shard Single
@@ -1640,6 +1656,8 @@ buildvariants:
       - name: change_streams_throughput
       - name: change_streams_latency
       - name: change_streams_listen_throughput
+      - name: change_streams_preimage_throughput
+      - name: change_streams_preimage_latency
       - name: snapshot_reads
       - name: secondary_reads
       - name: tpcc
