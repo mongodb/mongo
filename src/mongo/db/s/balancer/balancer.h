@@ -179,6 +179,12 @@ public:
      */
     void notifyPersistedBalancerSettingsChanged();
 
+    /**
+     * Informs the balancer that the user has requested defragmentation to be stopped on a
+     * collection.
+     */
+    void abortCollectionDefragmentation(OperationContext* opCtx, const NamespaceString& nss);
+
     struct BalancerStatus {
         bool balancerCompliant;
         boost::optional<std::string> firstComplianceViolation;

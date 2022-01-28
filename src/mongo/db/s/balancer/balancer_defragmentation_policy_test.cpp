@@ -346,6 +346,24 @@ TEST_F(BalancerDefragmentationPolicyTest, TestRemoveCollectionEndsDefragmentatio
     ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
 }
 
+TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneUserCancellationBeginsPhase3) {
+    auto coll = makeConfigCollectionEntry();
+    makeConfigChunkEntry();
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+
+    // Collection should be in phase 1
+    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMergeAndMeasureChunks);
+
+    // User cancellation of defragmentation
+    _defragmentationPolicy.abortCollectionDefragmentation(operationContext(), kNss);
+
+    // Defragmentation should transition to phase 3
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kSplitChunks);
+    ASSERT_TRUE(future.isReady());
+    auto splitVectorAction = stdx::get<AutoSplitVectorInfo>(future.get());
+}
+
 TEST_F(BalancerDefragmentationPolicyTest, TestNonRetriableErrorRebuildsCurrentPhase) {
     auto coll = makeConfigCollectionEntry();
     makeConfigChunkEntry();
@@ -410,7 +428,6 @@ TEST_F(BalancerDefragmentationPolicyTest,
     DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(future.get());
     DataSizeInfo dataSizeAction2 = stdx::get<DataSizeInfo>(future2.get());
 }
-
 
 TEST_F(BalancerDefragmentationPolicyTest,
        TestPhaseOneAcknowledgeMergeChunkActionsTriggersDataSizeOnResultingRange) {

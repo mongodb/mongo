@@ -61,6 +61,8 @@ public:
     virtual BSONObj reportProgress() const = 0;
 
     virtual bool isComplete() const = 0;
+
+    virtual void userAbort() = 0;
 };
 
 class BalancerDefragmentationPolicyImpl : public BalancerDefragmentationPolicy {
@@ -108,6 +110,9 @@ public:
 
     void refreshCollectionDefragmentationStatus(OperationContext* opCtx,
                                                 const CollectionType& coll) override;
+
+    void abortCollectionDefragmentation(OperationContext* opCtx,
+                                        const NamespaceString& nss) override;
 
 private:
     static constexpr int kMaxConcurrentOperations = 50;

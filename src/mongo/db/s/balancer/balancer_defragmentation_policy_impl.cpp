@@ -291,6 +291,10 @@ public:
         return _pendingActionsByShards.empty() && _outstandingActions == 0;
     }
 
+    void userAbort() override {
+        _abort(DefragmentationPhaseEnum::kSplitChunks);
+    }
+
     BSONObj reportProgress() const override {
 
         size_t rangesToMerge = 0, rangesWithoutDataSize = 0;
@@ -585,6 +589,10 @@ public:
             _actionableMerges.empty() && _outstandingMerges.empty();
     }
 
+    void userAbort() override {
+        _abort(DefragmentationPhaseEnum::kSplitChunks);
+    }
+
     BSONObj reportProgress() const override {
         size_t numSmallChunks = 0;
         for (const auto& [shardId, smallChunks] : _smallChunksByShard) {
@@ -592,7 +600,6 @@ public:
         }
         return BSON(kRemainingChunksToProcess << static_cast<long long>(numSmallChunks));
     }
-
 
 private:
     // Internal representation of the chunk metadata required to generate a MoveAndMergeRequest
@@ -1058,6 +1065,10 @@ public:
         return _unmergedRangesByShard.empty() && _outstandingActions == 0;
     }
 
+    void userAbort() override {
+        _abort(DefragmentationPhaseEnum::kSplitChunks);
+    }
+
     BSONObj reportProgress() const override {
         size_t rangesToMerge = 0;
         for (const auto& [_, unmergedRanges] : _unmergedRangesByShard) {
@@ -1263,6 +1274,8 @@ public:
         return _pendingActionsByShards.empty() && _outstandingActions == 0;
     }
 
+    void userAbort() override {}
+
     BSONObj reportProgress() const override {
         size_t rangesToFindSplitPoints = 0, rangesToSplit = 0;
         for (const auto& [shardId, pendingActions] : _pendingActionsByShards) {
@@ -1315,9 +1328,20 @@ void BalancerDefragmentationPolicyImpl::refreshCollectionDefragmentationStatus(
     if (coll.getDefragmentCollection() && !_defragmentationStates.contains(uuid)) {
         _initializeCollectionState(lk, opCtx, coll);
         _yieldNextStreamingAction(lk, opCtx);
-    } else if (!coll.getDefragmentCollection() && _defragmentationStates.contains(uuid)) {
-        _transitionPhases(opCtx, coll, DefragmentationPhaseEnum::kFinished);
-        _defragmentationStates.erase(uuid);
+    }
+}
+
+void BalancerDefragmentationPolicyImpl::abortCollectionDefragmentation(OperationContext* opCtx,
+                                                                       const NamespaceString& nss) {
+    stdx::lock_guard<Latch> lk(_stateMutex);
+    auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss, {});
+    if (coll.getDefragmentCollection()) {
+        if (_defragmentationStates.contains(coll.getUuid())) {
+            // Notify phase to abort current phase
+            _defragmentationStates.at(coll.getUuid())->userAbort();
+        }
+        // Change persisted phase to kSplitChunks
+        _persistPhaseUpdate(opCtx, DefragmentationPhaseEnum::kSplitChunks, coll.getUuid());
     }
 }
 

@@ -569,7 +569,6 @@ void ShardingCatalogManager::configureCollectionBalancing(
             chunkSizeMB || defragmentCollection || enableAutoSplitter);
 
     short updatedFields = 0;
-    bool doMerge, doSplit = false;
     BSONObjBuilder updateCmd;
     {
         BSONObjBuilder setBuilder(updateCmd.subobjStart("$set"));
@@ -585,12 +584,17 @@ void ShardingCatalogManager::configureCollectionBalancing(
             updatedFields++;
         }
         if (defragmentCollection) {
-            doMerge = defragmentCollection.get();
-            setBuilder.append(CollectionType::kDefragmentCollectionFieldName, doMerge);
-            updatedFields++;
+            bool doDefragmentation = defragmentCollection.get();
+            if (doDefragmentation) {
+                setBuilder.append(CollectionType::kDefragmentCollectionFieldName,
+                                  doDefragmentation);
+                updatedFields++;
+            } else {
+                Balancer::get(opCtx)->abortCollectionDefragmentation(opCtx, nss);
+            }
         }
         if (enableAutoSplitter) {
-            doSplit = enableAutoSplitter.get();
+            bool doSplit = enableAutoSplitter.get();
             setBuilder.append(CollectionType::kNoAutoSplitFieldName, !doSplit);
             updatedFields++;
         }

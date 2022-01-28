@@ -929,6 +929,10 @@ void Balancer::notifyPersistedBalancerSettingsChanged() {
     _condVar.notify_all();
 }
 
+void Balancer::abortCollectionDefragmentation(OperationContext* opCtx, const NamespaceString& nss) {
+    _defragmentationPolicy->abortCollectionDefragmentation(opCtx, nss);
+}
+
 Balancer::BalancerStatus Balancer::getBalancerStatusForNs(OperationContext* opCtx,
                                                           const NamespaceString& ns) {
     try {

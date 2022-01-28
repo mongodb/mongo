@@ -55,6 +55,15 @@ function waitForBalanced(ns) {
     });
 }
 
+function waitForEndOfDefragmentation(ns) {
+    assert.soon(function() {
+        let balancerStatus =
+            assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: ns}));
+        return balancerStatus.balancerCompliant ||
+            balancerStatus.firstComplianceViolation != 'defragmentingChunks';
+    });
+}
+
 function setupCollection() {
     st.startBalancer();
     const coll = db[collName + collCounter];
@@ -161,8 +170,12 @@ jsTest.log("Begin and end defragmentation with balancer off.");
         defragmentCollection: false,
         chunkSize: chunkSize,
     }));
+    // Phase 3 still has to run
     let afterStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll1}));
-    assert.eq(afterStatus.balancerCompliant, true);
+    assert.eq(afterStatus.balancerCompliant, false);
+    assert.eq(afterStatus.firstComplianceViolation, 'defragmentingChunks');
+    st.startBalancer();
+    waitForEndOfDefragmentation(coll1);
 }
 
 jsTest.log("Begin and end defragmentation with balancer on");
@@ -185,10 +198,7 @@ jsTest.log("Begin and end defragmentation with balancer on");
     }));
     // Ensure that the policy completes the phase transition...
     clearFailPointOnConfigNodes("beforeTransitioningDefragmentationPhase");
-    st.awaitBalancerRound();
-    // ... then check
-    let afterStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll1}));
-    assert.neq(afterStatus.firstComplianceViolation, 'defragmentingChunks');
+    waitForEndOfDefragmentation(coll1);
     st.stopBalancer();
 }
 
@@ -213,10 +223,7 @@ jsTest.log("Begin defragmentation with balancer off, end with it on");
     }));
     // Ensure that the policy completes the phase transition...
     clearFailPointOnConfigNodes("beforeTransitioningDefragmentationPhase");
-    st.awaitBalancerRound();
-    // ... then check
-    let afterStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll2}));
-    assert.neq(afterStatus.firstComplianceViolation, 'defragmentingChunks');
+    waitForEndOfDefragmentation(coll2);
     st.stopBalancer();
 }
 
@@ -241,11 +248,7 @@ jsTest.log("Balancer on, begin defragmentation and let it complete");
     assert.lte(numChunksAfterMerging, initialNumChunks);
     // Turn fail point off, let phase 3 run and complete
     clearFailPointOnConfigNodes("beforeTransitioningDefragmentationPhase");
-    assert.soon(function() {
-        let balancerStatus =
-            assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll3}));
-        return balancerStatus.firstComplianceViolation != 'defragmentingChunks';
-    });
+    waitForEndOfDefragmentation(coll3);
     st.stopBalancer();
     const finalNumChunks = findChunksUtil.countChunksForNs(st.config, coll3);
     jsTest.log("Number of chunks after splitting " + finalNumChunks);
@@ -278,11 +281,7 @@ jsTest.log("Changed uuid causes defragmentation to restart");
         db.adminCommand({moveChunk: coll4, find: {key2: 1}, to: st.shard0.shardName}));
     // Let defragementation run
     clearFailPointOnConfigNodes("afterBuildingNextDefragmentationPhase");
-    assert.soon(function() {
-        let balancerStatus =
-            assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll4}));
-        return balancerStatus.firstComplianceViolation != 'defragmentingChunks';
-    });
+    waitForEndOfDefragmentation(coll4);
     st.stopBalancer();
     // Ensure the defragmentation succeeded
     const numChunksEnd = findChunksUtil.countChunksForNs(st.config, coll4);
@@ -313,11 +312,7 @@ jsTest.log("Refined shard key causes defragmentation to restart");
         db.adminCommand({refineCollectionShardKey: coll5, key: {key: 1, key2: 1}}));
     // Let defragementation run
     clearFailPointOnConfigNodes("afterBuildingNextDefragmentationPhase");
-    assert.soon(function() {
-        let balancerStatus =
-            assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll5}));
-        return balancerStatus.firstComplianceViolation != 'defragmentingChunks';
-    });
+    waitForEndOfDefragmentation(coll5);
     st.stopBalancer();
     // Ensure the defragmentation succeeded
     const numChunksEnd = findChunksUtil.countChunksForNs(st.config, coll5);
