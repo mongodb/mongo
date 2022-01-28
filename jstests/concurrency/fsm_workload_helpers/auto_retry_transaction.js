@@ -165,6 +165,15 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
                     continue;
                 }
 
+                // FailedToSatisfyReadPreference errors are not retryable.
+                // However, they should be because if there is no primary, there should be one soon.
+                // TODO SERVER-60706: Make FailedToSatisfyReadPreference a transient error
+                if (e.code == ErrorCodes.FailedToSatisfyReadPreference) {
+                    print("Retrying transaction due to a FailedToSatisfyReadPreference error.");
+                    hasTransientError = true;
+                    continue;
+                }
+
                 throw e;
             }
         } while (hasTransientError);
