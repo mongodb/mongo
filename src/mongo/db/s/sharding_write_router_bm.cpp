@@ -61,6 +61,7 @@ namespace mongo {
 namespace {
 
 const NamespaceString kNss("test", "foo");
+
 ShardId pessimalShardSelector(int i, int nShards, int nChunks) {
     return ShardId(str::stream() << "shard" << (i % nShards));
 }
@@ -93,6 +94,7 @@ std::pair<std::vector<mongo::ChunkType>, mongo::ChunkManager> createChunks(
     const auto shardKeyPattern = KeyPattern(BSON("_id" << 1));
     const auto reshardKeyPattern = KeyPattern(BSON("y" << 1));
     const auto collEpoch = OID::gen();
+    const auto collTimestamp = Timestamp(100, 5);
     const auto tempNss =
         NamespaceString(kNss.db(),
                         fmt::format("{}{}",
@@ -105,7 +107,7 @@ std::pair<std::vector<mongo::ChunkType>, mongo::ChunkManager> createChunks(
     for (uint32_t i = 0; i < nChunks; ++i) {
         chunks.emplace_back(collIdentifier,
                             getRangeForChunk(i, nChunks),
-                            ChunkVersion{i + 1, 0, collEpoch, Timestamp() /* timestamp */},
+                            ChunkVersion{i + 1, 0, collEpoch, collTimestamp},
                             pessimalShardSelector(i, nShards, nChunks));
     }
 
@@ -123,7 +125,7 @@ std::pair<std::vector<mongo::ChunkType>, mongo::ChunkManager> createChunks(
                                                      nullptr,
                                                      false,
                                                      collEpoch,
-                                                     Timestamp(),
+                                                     collTimestamp,
                                                      boost::none /* timeseriesFields */,
                                                      reshardingFields, /* reshardingFields */
                                                      boost::none /* chunkSizeBytes */,
@@ -131,19 +133,15 @@ std::pair<std::vector<mongo::ChunkType>, mongo::ChunkManager> createChunks(
                                                      chunks)),
                     boost::none);
 
-
     return std::make_pair(chunks, cm);
 }
 
-
 std::unique_ptr<CatalogCacheMock> createCatalogCacheMock(OperationContext* opCtx) {
-
     const size_t nShards = 1;
     const uint32_t nChunks = 60;
     const auto clusterId = OID::gen();
     const auto shards = std::vector<ShardId>{ShardId("shard0")};
     const auto originatorShard = shards[0];
-
 
     const auto [chunks, chunkManager] = createChunks(nShards, nChunks, shards);
 
@@ -174,7 +172,7 @@ std::unique_ptr<CatalogCacheMock> createCatalogCacheMock(OperationContext* opCtx
     return catalogCache;
 }
 
-static void BM_InsertGetDestinedRecipient(benchmark::State& state) {
+void BM_InsertGetDestinedRecipient(benchmark::State& state) {
     // ShardingWriteRouter currently requires the ShardServer cluster role.
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
 
@@ -194,7 +192,7 @@ static void BM_InsertGetDestinedRecipient(benchmark::State& state) {
     }
 }
 
-static void BM_UpdateGetDestinedRecipient(benchmark::State& state) {
+void BM_UpdateGetDestinedRecipient(benchmark::State& state) {
     // ShardingWriteRouter currently requires the ShardServer cluster role.
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
 
@@ -213,7 +211,7 @@ static void BM_UpdateGetDestinedRecipient(benchmark::State& state) {
     }
 }
 
-static void BM_UnshardedDestinedRecipient(benchmark::State& state) {
+void BM_UnshardedDestinedRecipient(benchmark::State& state) {
     serverGlobalParams.clusterRole = ClusterRole::None;
 
     auto serviceContext = ServiceContext::make();
@@ -242,5 +240,6 @@ BENCHMARK(BM_UpdateGetDestinedRecipient)
 BENCHMARK(BM_UnshardedDestinedRecipient)
     ->Range(1, 1 << 4)
     ->ThreadRange(1, ProcessInfo::getNumAvailableCores());
+
 }  // namespace
 }  // namespace mongo
