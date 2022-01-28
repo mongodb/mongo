@@ -177,7 +177,7 @@ Status validateMongodOptions(const moe::Environment& params) {
     if (params.count("storage.queryableBackupMode")) {
         // Command line options that are disallowed when --queryableBackupMode is specified.
         for (const auto& disallowedOption :
-             {"replication.replSet", "configsvr", "upgrade", "repair", "profile"}) {
+             {"replication.replSet", "configsvr", "upgrade", "repair", "profile", "restore"}) {
             if (params.count(disallowedOption)) {
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "Cannot specify both queryable backup mode and "
@@ -493,6 +493,11 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
     if (params.count("restore") && params["restore"].as<bool>() == true) {
         storageGlobalParams.restore = 1;
+
+        if (storageGlobalParams.repair) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Cannot specify both --repair and --restore");
+        }
     }
 
     repl::ReplSettings replSettings;
