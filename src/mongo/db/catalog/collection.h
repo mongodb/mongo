@@ -363,7 +363,8 @@ public:
                                 OpDebug* opDebug,
                                 bool fromMigrate = false,
                                 bool noWarn = false,
-                                StoreDeletedDoc storeDeletedDoc = StoreDeletedDoc::Off) const = 0;
+                                StoreDeletedDoc storeDeletedDoc = StoreDeletedDoc::Off,
+                                CheckRecordId checkRecordId = CheckRecordId::Off) const = 0;
 
     /**
      * Deletes the document from the collection.
@@ -376,6 +377,9 @@ public:
      * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
      * 'noWarn' if unindexing the record causes an error, if noWarn is true the error
      * will not be logged.
+     * 'storeDeletedDoc' whether to store the document deleted in the oplog.
+     * 'checkRecordId' whether to confirm the recordId matches the record we are removing when
+     * unindexing.
      */
     virtual void deleteDocument(OperationContext* opCtx,
                                 Snapshotted<BSONObj> doc,
@@ -384,7 +388,8 @@ public:
                                 OpDebug* opDebug,
                                 bool fromMigrate = false,
                                 bool noWarn = false,
-                                StoreDeletedDoc storeDeletedDoc = StoreDeletedDoc::Off) const = 0;
+                                StoreDeletedDoc storeDeletedDoc = StoreDeletedDoc::Off,
+                                CheckRecordId checkRecordId = CheckRecordId::Off) const = 0;
 
     /*
      * Inserts all documents inside one WUOW.

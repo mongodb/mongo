@@ -283,7 +283,8 @@ public:
                        const BSONObj& obj,
                        const RecordId& loc,
                        bool noWarn,
-                       int64_t* keysDeletedOut) const override;
+                       int64_t* keysDeletedOut,
+                       CheckRecordId checkRecordId = CheckRecordId::Off) const override;
 
     Status compactIndexes(OperationContext* opCtx) const override;
 
@@ -367,7 +368,8 @@ private:
                       const BSONObj& obj,
                       RecordId loc,
                       bool logIfError,
-                      int64_t* keysDeletedOut) const;
+                      int64_t* keysDeletedOut,
+                      CheckRecordId checkRecordId = CheckRecordId::Off) const;
 
     void _unindexRecord(OperationContext* opCtx,
                         const CollectionPtr& collection,
@@ -375,7 +377,8 @@ private:
                         const BSONObj& obj,
                         const RecordId& loc,
                         bool logIfError,
-                        int64_t* keysDeletedOut) const;
+                        int64_t* keysDeletedOut,
+                        CheckRecordId checkRecordId = CheckRecordId::Off) const;
 
     /**
      * Helper to remove the index from disk.

@@ -1652,7 +1652,8 @@ void IndexCatalogImpl::_unindexKeys(OperationContext* opCtx,
                                     const BSONObj& obj,
                                     RecordId loc,
                                     bool logIfError,
-                                    int64_t* const keysDeletedOut) const {
+                                    int64_t* const keysDeletedOut,
+                                    CheckRecordId checkRecordId) const {
     InsertDeleteOptions options;
     prepareInsertDeleteOptions(opCtx, collection->ns(), index->descriptor(), &options);
     options.logIfError = logIfError;
@@ -1683,10 +1684,12 @@ void IndexCatalogImpl::_unindexKeys(OperationContext* opCtx,
     // are allowed in unique indexes, WiredTiger does not do blind unindexing, and instead confirms
     // that the recordid matches the element we are removing.
     //
-    // We need to disable blind-deletes for in-progress indexes, in order to force recordid-matching
-    // for unindex operations, since initial sync can build an index over a collection with
-    // duplicates. See SERVER-17487 for more details.
-    options.dupsAllowed = options.dupsAllowed || !index->isReady(opCtx, collection);
+    // We need to disable blind-deletes if 'checkRecordId' is explicitly set 'On', or for
+    // in-progress indexes, in order to force recordid-matching for unindex operations, since
+    // initial sync can build an index over a collection with duplicates. See SERVER-17487 for more
+    // details.
+    options.dupsAllowed = options.dupsAllowed || !index->isReady(opCtx, collection) ||
+        (checkRecordId == CheckRecordId::On);
 
     int64_t removed = 0;
     Status status = index->accessMethod()->removeKeys(opCtx, keys, loc, options, &removed);
@@ -1711,7 +1714,8 @@ void IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
                                       const BSONObj& obj,
                                       const RecordId& loc,
                                       bool logIfError,
-                                      int64_t* keysDeletedOut) const {
+                                      int64_t* keysDeletedOut,
+                                      CheckRecordId checkRecordId) const {
     SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
     auto& executionCtx = StorageExecutionContext::get(opCtx);
 
@@ -1739,7 +1743,8 @@ void IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
             return;
         }
     }
-    _unindexKeys(opCtx, collection, entry, *keys, obj, loc, logIfError, keysDeletedOut);
+    _unindexKeys(
+        opCtx, collection, entry, *keys, obj, loc, logIfError, keysDeletedOut, checkRecordId);
 }
 
 Status IndexCatalogImpl::indexRecords(OperationContext* opCtx,
@@ -1804,7 +1809,8 @@ void IndexCatalogImpl::unindexRecord(OperationContext* opCtx,
                                      const BSONObj& obj,
                                      const RecordId& loc,
                                      bool noWarn,
-                                     int64_t* keysDeletedOut) const {
+                                     int64_t* keysDeletedOut,
+                                     CheckRecordId checkRecordId) const {
     if (keysDeletedOut) {
         *keysDeletedOut = 0;
     }
@@ -1815,7 +1821,8 @@ void IndexCatalogImpl::unindexRecord(OperationContext* opCtx,
         IndexCatalogEntry* entry = it->get();
 
         bool logIfError = !noWarn;
-        _unindexRecord(opCtx, collection, entry, obj, loc, logIfError, keysDeletedOut);
+        _unindexRecord(
+            opCtx, collection, entry, obj, loc, logIfError, keysDeletedOut, checkRecordId);
     }
 
     for (IndexCatalogEntryContainer::const_iterator it = _buildingIndexes.begin();
@@ -1825,7 +1832,8 @@ void IndexCatalogImpl::unindexRecord(OperationContext* opCtx,
 
         // If it's a background index, we DO NOT want to log anything.
         bool logIfError = entry->isReady(opCtx, collection) ? !noWarn : false;
-        _unindexRecord(opCtx, collection, entry, obj, loc, logIfError, keysDeletedOut);
+        _unindexRecord(
+            opCtx, collection, entry, obj, loc, logIfError, keysDeletedOut, checkRecordId);
     }
 }
 

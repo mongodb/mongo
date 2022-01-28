@@ -57,6 +57,14 @@ struct BsonRecord {
     const BSONObj* docPtr;
 };
 
+/**
+ * CheckRecordId indicates whether to confirm that the recordId matches the element we are
+ * removing when unindexing. When deleting documents, it is set to 'Off' by default to allow
+ * WiredTiger to do blind unindexing for efficacy. When set to 'On', disables blind deletes and
+ * forces recordid-matching for unindex operations.
+ */
+enum class CheckRecordId { Off, On };
+
 enum class IndexBuildMethod {
     /**
      * Use a collection scan to dump all keys into an external sorter. During this process,
@@ -507,7 +515,8 @@ public:
                                const BSONObj& obj,
                                const RecordId& loc,
                                bool noWarn,
-                               int64_t* keysDeletedOut) const = 0;
+                               int64_t* keysDeletedOut,
+                               CheckRecordId checkRecordId = CheckRecordId::Off) const = 0;
 
     /*
      * Attempt compaction on all ready indexes to regain disk space, if the storage engine's index

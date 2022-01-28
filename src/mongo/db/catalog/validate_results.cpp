@@ -69,6 +69,8 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj, bool debuggin
         resultObj->appendNumber("numRemovedCorruptRecords", numRemovedCorruptRecords);
         resultObj->appendNumber("numRemovedExtraIndexEntries", numRemovedExtraIndexEntries);
         resultObj->appendNumber("numInsertedMissingIndexEntries", numInsertedMissingIndexEntries);
+        resultObj->appendNumber("numDocumentsMovedToLostAndFound", numDocumentsMovedToLostAndFound);
+        resultObj->appendNumber("numOutdatedMissingIndexEntry", numOutdatedMissingIndexEntry);
     }
 }
 }  // namespace mongo

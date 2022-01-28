@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/index_consistency.h"
 
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_repair.h"
 #include "mongo/db/catalog/validate_gen.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
@@ -146,19 +147,10 @@ void IndexConsistency::repairMissingIndexEntries(OperationContext* opCtx,
     invariant(_validateState->getIndexes().size() > 0);
     std::shared_ptr<const IndexCatalogEntry> index = _validateState->getIndexes().front();
     for (auto it = _missingIndexEntries.begin(); it != _missingIndexEntries.end();) {
-        const IndexKey& key = it->first;
         const KeyString::Value& ks = it->second.keyString;
         const KeyFormat keyFormat = _validateState->getCollection()->getRecordStore()->keyFormat();
 
-        RecordId rid;
-        if (keyFormat == KeyFormat::Long) {
-            rid = KeyString::decodeRecordIdLongAtEnd(ks.getBuffer(), ks.getSize());
-        } else {
-            invariant(keyFormat == KeyFormat::String);
-            rid = KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize());
-        }
-
-        const std::string& indexName = key.first;
+        const std::string& indexName = it->first.first;
         if (indexName != index->descriptor()->indexName()) {
             // Assuming that _missingIndexEntries is sorted by indexName, this lookup should not
             // happen often.
@@ -169,43 +161,34 @@ void IndexConsistency::repairMissingIndexEntries(OperationContext* opCtx,
                 }
             }
         }
-        IndexAccessMethod* accessMethod = const_cast<IndexAccessMethod*>(index->accessMethod());
-        InsertDeleteOptions options;
-        options.dupsAllowed = !index->descriptor()->unique();
-        int64_t numInserted = 0;
-        writeConflictRetry(opCtx, "insertingMissingIndexEntries", _validateState->nss().ns(), [&] {
-            WriteUnitOfWork wunit(opCtx);
-            Status status =
-                accessMethod->insertKeysAndUpdateMultikeyPaths(opCtx,
-                                                               _validateState->getCollection(),
-                                                               {ks},
-                                                               {},
-                                                               {},
-                                                               rid,
-                                                               options,
-                                                               nullptr,
-                                                               &numInserted);
-            wunit.commit();
-        });
 
-        // InsertKeys may fail in the scenario where there are missing index entries for duplicate
-        // documents.
-        if (numInserted > 0) {
-            auto& indexResults = results->indexResultsMap[indexName];
-            indexResults.keysTraversed += numInserted;
-            results->numInsertedMissingIndexEntries += numInserted;
-            results->repaired = true;
-            getIndexInfo(indexName).numKeys += numInserted;
-            it = _missingIndexEntries.erase(it);
-        } else {
-            ++it;
-        }
+        int64_t numInserted = index_repair::repairMissingIndexEntry(opCtx,
+                                                                    index,
+                                                                    ks,
+                                                                    keyFormat,
+                                                                    _validateState->nss(),
+                                                                    _validateState->getCollection(),
+                                                                    results);
+        getIndexInfo(indexName).numKeys += numInserted;
+        it = _missingIndexEntries.erase(it);
     }
 
     if (results->numInsertedMissingIndexEntries > 0) {
         results->warnings.push_back(str::stream()
                                     << "Inserted " << results->numInsertedMissingIndexEntries
                                     << " missing index entries.");
+    }
+    if (results->numDocumentsMovedToLostAndFound > 0) {
+        const NamespaceString lostAndFoundNss =
+            NamespaceString(NamespaceString::kLocalDb,
+                            "lost_and_found." + _validateState->getCollection()->uuid().toString());
+        results->warnings.push_back(str::stream()
+                                    << "Removed " << results->numDocumentsMovedToLostAndFound
+                                    << " duplicate documents to resolve "
+                                    << results->numDocumentsMovedToLostAndFound +
+                                        results->numOutdatedMissingIndexEntry
+                                    << " missing index entries. Removed documents can be found in '"
+                                    << lostAndFoundNss.ns() << "'.");
     }
 }
 

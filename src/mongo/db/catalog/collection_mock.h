@@ -126,7 +126,8 @@ public:
                         OpDebug* opDebug,
                         bool fromMigrate,
                         bool noWarn,
-                        Collection::StoreDeletedDoc storeDeletedDoc) const {
+                        Collection::StoreDeletedDoc storeDeletedDoc,
+                        CheckRecordId checkRecordId) const {
         std::abort();
     }
 
@@ -138,7 +139,8 @@ public:
         OpDebug* opDebug,
         bool fromMigrate = false,
         bool noWarn = false,
-        Collection::StoreDeletedDoc storeDeletedDoc = Collection::StoreDeletedDoc::Off) const {
+        Collection::StoreDeletedDoc storeDeletedDoc = Collection::StoreDeletedDoc::Off,
+        CheckRecordId checkRecordId = CheckRecordId::Off) const {
         std::abort();
     }
 

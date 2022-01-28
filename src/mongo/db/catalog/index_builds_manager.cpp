@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_repair.h"
 #include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -243,7 +244,8 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
     Status status = [&] {
         if (repair == RepairData::kYes) {
             return builder->dumpInsertsFromBulk(opCtx, coll, [&](const RecordId& rid) {
-                auto moveStatus = _moveRecordToLostAndFound(opCtx, ns, lostAndFoundNss, rid);
+                auto moveStatus =
+                    mongo::index_repair::moveRecordToLostAndFound(opCtx, ns, lostAndFoundNss, rid);
                 if (moveStatus.isOK() && (moveStatus.getValue() > 0)) {
                     recordsRemoved++;
                     bytesRemoved += moveStatus.getValue();
@@ -398,74 +400,4 @@ StatusWith<MultiIndexBlock*> IndexBuildsManager::_getBuilder(const UUID& buildUU
     }
     return builderIt->second.get();
 }
-
-StatusWith<int> IndexBuildsManager::_moveRecordToLostAndFound(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const NamespaceString& lostAndFoundNss,
-    RecordId dupRecord) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX), nss.ns());
-    invariant(opCtx->lockState()->isCollectionLockedForMode(lostAndFoundNss, MODE_IX),
-              lostAndFoundNss.ns());
-
-    auto catalog = CollectionCatalog::get(opCtx);
-    auto originalCollection = catalog->lookupCollectionByNamespace(opCtx, nss);
-    CollectionPtr localCollection = catalog->lookupCollectionByNamespace(opCtx, lostAndFoundNss);
-
-    // Create the collection if it doesn't exist.
-    if (!localCollection) {
-        Status status =
-            writeConflictRetry(opCtx, "createLostAndFoundCollection", lostAndFoundNss.ns(), [&]() {
-                AutoGetCollection autoColl(opCtx, lostAndFoundNss, MODE_IX);
-
-                // Ensure the database exists.
-                auto db = autoColl.ensureDbExists(opCtx);
-                invariant(db, lostAndFoundNss.ns());
-
-                WriteUnitOfWork wuow(opCtx);
-
-                // Since we are potentially deleting a document with duplicate _id values, we need
-                // to be able to insert into the lost and found collection without generating any
-                // duplicate key errors on the _id value.
-                CollectionOptions collOptions;
-                collOptions.setNoIdIndex();
-                localCollection = db->createCollection(opCtx, lostAndFoundNss, collOptions);
-
-                // Ensure the collection exists.
-                invariant(localCollection, lostAndFoundNss.ns());
-
-                wuow.commit();
-                return Status::OK();
-            });
-        if (!status.isOK()) {
-            return status;
-        }
-    }
-
-    return writeConflictRetry(
-        opCtx, "writeDupDocToLostAndFoundCollection", nss.ns(), [&]() -> StatusWith<int> {
-            WriteUnitOfWork wuow(opCtx);
-            Snapshotted<BSONObj> doc;
-            int docSize = 0;
-
-            if (!originalCollection->findDoc(opCtx, dupRecord, &doc)) {
-                return docSize;
-            } else {
-                docSize = doc.value().objsize();
-            }
-
-            // Write document to lost_and_found collection and delete from original collection.
-            Status status =
-                localCollection->insertDocument(opCtx, InsertStatement(doc.value()), nullptr);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            originalCollection->deleteDocument(opCtx, kUninitializedStmtId, dupRecord, nullptr);
-
-            wuow.commit();
-            return docSize;
-        });
-}
-
 }  // namespace mongo

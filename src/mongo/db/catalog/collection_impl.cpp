@@ -1170,9 +1170,11 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
                                     OpDebug* opDebug,
                                     bool fromMigrate,
                                     bool noWarn,
-                                    Collection::StoreDeletedDoc storeDeletedDoc) const {
+                                    Collection::StoreDeletedDoc storeDeletedDoc,
+                                    CheckRecordId checkRecordId) const {
     Snapshotted<BSONObj> doc = docFor(opCtx, loc);
-    deleteDocument(opCtx, doc, stmtId, loc, opDebug, fromMigrate, noWarn, storeDeletedDoc);
+    deleteDocument(
+        opCtx, doc, stmtId, loc, opDebug, fromMigrate, noWarn, storeDeletedDoc, checkRecordId);
 }
 
 void CollectionImpl::deleteDocument(OperationContext* opCtx,
@@ -1182,7 +1184,8 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
                                     OpDebug* opDebug,
                                     bool fromMigrate,
                                     bool noWarn,
-                                    Collection::StoreDeletedDoc storeDeletedDoc) const {
+                                    Collection::StoreDeletedDoc storeDeletedDoc,
+                                    CheckRecordId checkRecordId) const {
     if (isCapped() && !isClustered() && opCtx->isEnforcingConstraints()) {
         // System operations such as tenant migration, secondary batch application or TTL on a
         // capped clustered collection can delete from capped collections.
@@ -1224,7 +1227,8 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
                                  doc.value(),
                                  loc,
                                  noWarn,
-                                 &keysDeleted);
+                                 &keysDeleted,
+                                 checkRecordId);
     _shared->_recordStore->deleteRecord(opCtx, loc);
     if (deletedDoc) {
         deleteArgs.deletedDoc = &(deletedDoc.get());

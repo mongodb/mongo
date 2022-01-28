@@ -639,6 +639,10 @@ void ValidateAdaptor::validateIndexKeyCount(OperationContext* opCtx,
     IndexInfo* indexInfo = &_indexConsistency->getIndexInfo(indexName);
     auto numTotalKeys = indexInfo->numKeys;
 
+    // Update numRecords by subtracting number of records removed from record store in repair mode
+    // when validating index consistency
+    _numRecords -= results.keysRemovedFromRecordStore;
+
     // Do not fail on finding too few index entries compared to collection entries when full:false.
     bool hasTooFewKeys = false;
     bool noErrorOnTooFewKeys = !_validateState->isFullIndexValidation();

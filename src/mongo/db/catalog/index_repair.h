@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,49 +29,35 @@
 
 #pragma once
 
-#include <map>
-#include <string>
-#include <vector>
-
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/record_id.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/catalog/validate_state.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
+namespace index_repair {
 
-// Per-index validate results.
-struct IndexValidateResults {
-    bool valid = true;
-    std::vector<std::string> errors;
-    std::vector<std::string> warnings;
-    int64_t keysTraversed = 0;
-    int64_t keysTraversedFromFullValidate = 0;
-    int64_t keysRemovedFromRecordStore = 0;
-};
+/**
+ * Deletes the record containing a duplicate key and inserts it into a local lost and found
+ * collection titled "local.lost_and_found.<original collection UUID>". Returns the size of the
+ * record removed.
+ */
+StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
+                                         const NamespaceString& ns,
+                                         const NamespaceString& lostAndFoundNss,
+                                         RecordId dupRecord);
 
-using ValidateResultsMap = std::map<std::string, IndexValidateResults>;
+/**
+ * If repair mode is enabled, tries the inserting missingIndexEntry into indexes. If the
+ * missingIndexEntry is a duplicate on a unique index, removes the duplicate document and keeps it
+ * in a local lost and found collection.
+ */
+int repairMissingIndexEntry(OperationContext* opCtx,
+                            std::shared_ptr<const IndexCatalogEntry>& index,
+                            const KeyString::Value& ks,
+                            const KeyFormat& keyFormat,
+                            const NamespaceString& nss,
+                            const CollectionPtr& coll,
+                            ValidateResults* results);
 
-// Validation results for an entire collection.
-struct ValidateResults {
-    bool valid = true;
-    bool repaired = false;
-    boost::optional<Timestamp> readTimestamp = boost::none;
-    std::vector<std::string> errors;
-    std::vector<std::string> warnings;
-    std::vector<BSONObj> extraIndexEntries;
-    std::vector<BSONObj> missingIndexEntries;
-    std::vector<RecordId> corruptRecords;
-    long long numRemovedCorruptRecords = 0;
-    long long numRemovedExtraIndexEntries = 0;
-    long long numInsertedMissingIndexEntries = 0;
-    long long numDocumentsMovedToLostAndFound = 0;
-    long long numOutdatedMissingIndexEntry = 0;
-
-    // Maps index names to index-specific validation results.
-    ValidateResultsMap indexResultsMap;
-
-    // Takes a bool that indicates the context of the caller and a BSONObjBuilder to append with
-    // validate results.
-    void appendToResultObj(BSONObjBuilder* resultObj, bool debugging) const;
-};
-
+}  // namespace index_repair
 }  // namespace mongo

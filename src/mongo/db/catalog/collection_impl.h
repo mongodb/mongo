@@ -151,7 +151,8 @@ public:
         OpDebug* opDebug,
         bool fromMigrate = false,
         bool noWarn = false,
-        Collection::StoreDeletedDoc storeDeletedDoc = Collection::StoreDeletedDoc::Off) const final;
+        Collection::StoreDeletedDoc storeDeletedDoc = Collection::StoreDeletedDoc::Off,
+        CheckRecordId checkRecordId = CheckRecordId::Off) const final;
 
     /**
      * Deletes the document from the collection.
@@ -164,10 +165,11 @@ public:
      * real delete.
      * 'loc' key to uniquely identify a record in a collection.
      * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
-     * 'cappedOK' if true, allows deletes on capped collections (Cloner::copyDB uses this).
      * 'noWarn' if unindexing the record causes an error, if noWarn is true the error
      * will not be logged.
      * 'storeDeletedDoc' whether to store the document deleted in the oplog.
+     * 'checkRecordId' whether to confirm the recordId matches the record we are removing when
+     * unindexing.
      */
     void deleteDocument(
         OperationContext* opCtx,
@@ -177,7 +179,8 @@ public:
         OpDebug* opDebug,
         bool fromMigrate = false,
         bool noWarn = false,
-        Collection::StoreDeletedDoc storeDeletedDoc = Collection::StoreDeletedDoc::Off) const final;
+        Collection::StoreDeletedDoc storeDeletedDoc = Collection::StoreDeletedDoc::Off,
+        CheckRecordId checkRecordId = CheckRecordId::Off) const final;
 
     /*
      * Inserts all documents inside one WUOW.
