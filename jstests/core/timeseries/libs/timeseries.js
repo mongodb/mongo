@@ -50,6 +50,12 @@ var TimeseriesTest = class {
             .featureFlagTimeseriesMetricIndexes.value;
     }
 
+    static bucketUnpackWithSortEnabled(conn) {
+        return assert
+            .commandWorked(conn.adminCommand({getParameter: 1, featureFlagBucketUnpackWithSort: 1}))
+            .featureFlagBucketUnpackWithSort.value;
+    }
+
     /**
      * Adjusts the values in 'fields' by a random amount.
      * Ensures that the new values stay in the range [0, 100].
