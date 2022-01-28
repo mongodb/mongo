@@ -351,4 +351,3 @@ components:
     release_monitoring_id: 12083
     local_directory_path: src/third_party/zstandard-1.4.4
     team_owner: "Execution"
-    upgrade_suppression: TODO SERVER-49230

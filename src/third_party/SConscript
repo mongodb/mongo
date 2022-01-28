@@ -10,7 +10,6 @@ Import("wiredtiger")
 
 snappySuffix = '-1.1.7'
 zlibSuffix = '-1.2.11'
-zstdSuffix = '-1.4.4'
 pcreSuffix = "-8.42"
 icuSuffix = '-57.1'
 timelibSuffix = '-2021.06'
@@ -125,7 +124,7 @@ if not use_system_version_of_library('zlib'):
 
 if not use_system_version_of_library('zstd'):
     thirdPartyEnvironmentModifications['zstd'] = {
-        'CPPPATH' : ['#/src/third_party/zstandard' + zstdSuffix + '/zstd/lib'],
+        'CPPPATH' : ['#/src/third_party/zstandard/zstd/lib'],
     }
 
 if not use_system_version_of_library('google-benchmark'):
@@ -443,10 +442,10 @@ if use_system_version_of_library("zstd"):
 else:
     zstdEnv = zstdEnv.Clone()
     zstdEnv.InjectThirdParty(libraries=['zstd'])
-    zstdEnv.SConscript('zstandard' + zstdSuffix + '/SConscript', exports={ 'env' : zstdEnv })
+    zstdEnv.SConscript('zstandard/SConscript', exports={ 'env' : zstdEnv })
     zstdEnv = zstdEnv.Clone(
         LIBDEPS_INTERFACE=[
-            'zstandard' + zstdSuffix + '/zstd',
+            'zstandard/zstd',
         ])
 
 zstdEnv.ShimLibrary(
