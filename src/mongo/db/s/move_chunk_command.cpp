@@ -131,6 +131,16 @@ public:
                         }
                         auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
                         auto opCtx = uniqueOpCtx.get();
+
+                        {
+                            // Ensure that opCtx will get interrupted in the event of a stepdown.
+                            // This is to ensure that the MigrationSourceManager checks that there
+                            // are no pending migrationCoordinators documents (under the
+                            // ActiveMigrationRegistry lock) on the same term during which the
+                            // migrationCoordinators document will be persisted.
+                            Lock::GlobalLock lk(opCtx, MODE_IX);
+                        }
+
                         // Note: This internal authorization is tied to the lifetime of the client.
                         AuthorizationSession::get(opCtx->getClient())
                             ->grantInternalAuthorization(opCtx->getClient());

@@ -951,17 +951,18 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
     store.forEach(
         opCtx,
         BSON(MigrationCoordinatorDocument::kNssFieldName << nss.toString()),
-        [&opCtx, &migrationRecoveryCount, acquireCSOnRecipient, &cancellationToken](
+        [&opCtx, &nss, &migrationRecoveryCount, acquireCSOnRecipient, &cancellationToken](
             const MigrationCoordinatorDocument& doc) {
             LOGV2_DEBUG(4798502,
                         2,
                         "Recovering migration",
                         "migrationCoordinatorDocument"_attr = redact(doc.toBSON()));
-            // ensure there is only one migrationCoordinatorDocument
-            // to be recovered for this namespace
-            invariant(++migrationRecoveryCount == 1,
-                      "Found more then one migration to recover for a single namespace");
 
+            // Ensure there is only one migrationCoordinator document to be recovered for this
+            // namespace.
+            invariant(++migrationRecoveryCount == 1,
+                      str::stream() << "Found more then one migration to recover for namespace '"
+                                    << nss << "'");
 
             // Create a MigrationCoordinator to complete the coordination.
             MigrationCoordinator coordinator(doc);
