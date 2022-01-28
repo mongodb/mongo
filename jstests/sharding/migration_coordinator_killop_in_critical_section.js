@@ -30,8 +30,8 @@ const recipientShard = st.shard1;
 const numDocs = 1000;
 const middle = numDocs / 2;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: donorShard.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: donorShard.shardName}));
 
 function testKillOpAfterFailPoint(failPointName, opToKillThreadName) {
     const [collName, ns] = getNewNs(dbName);
@@ -94,8 +94,6 @@ function testKillOpAfterFailPoint(failPointName, opToKillThreadName) {
 }
 
 testKillOpAfterFailPoint("hangInEnsureChunkVersionIsGreaterThanInterruptible",
-                         "RecoverRefreshThread");
-testKillOpAfterFailPoint("hangInRefreshFilteringMetadataUntilSuccessInterruptible",
                          "RecoverRefreshThread");
 testKillOpAfterFailPoint("hangInPersistMigrateCommitDecisionInterruptible", "RecoverRefreshThread");
 testKillOpAfterFailPoint("hangInDeleteRangeDeletionOnRecipientInterruptible",
