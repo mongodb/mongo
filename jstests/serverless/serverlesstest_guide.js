@@ -1,3 +1,6 @@
+/*
+ * @tags: [serverless]
+ */
 (function() {
 "use strict";
 

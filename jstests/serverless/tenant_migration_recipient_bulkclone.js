@@ -1,7 +1,7 @@
 /**
  * Tests the tenant migration recipient creates collections during the bulk clone.
  *
- * @tags: [requires_fcv_52]
+ * @tags: [requires_fcv_52, serverless]
  */
 
 (function() {

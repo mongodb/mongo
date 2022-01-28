@@ -2,7 +2,7 @@
  * Tests createIndexes returns the expected tenant migration error or succeeds when sent through
  * mongoq after a tenant migration commits or aborts.
  *
- * @tags: [requires_fcv_52]
+ * @tags: [requires_fcv_52, serverless]
  */
 
 (function() {

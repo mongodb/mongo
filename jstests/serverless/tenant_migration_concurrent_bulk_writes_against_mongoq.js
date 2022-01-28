@@ -1,7 +1,7 @@
 /**
  * Tests read and write access after a migration aborted and also test read and write after a
  * migration commmitted successfully.
- * @tags: [requires_fcv_52]
+ * @tags: [requires_fcv_52, serverless]
  */
 
 (function() {
