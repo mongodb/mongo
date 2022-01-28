@@ -82,17 +82,18 @@ useZlib = True
 useSnappy = True
 useZstd = True
 
-version_file = 'build_posix/aclocal/version-set.m4'
+version_file = 'cmake/configs/version.cmake'
 
 VERSION_MAJOR = None
 VERSION_MINOR = None
 VERSION_PATCH = None
 VERSION_STRING = None
 
-# Read the version information from the version-set.m4 file
+# Read the version information from the version.cmake file
 for l in open(File(version_file).srcnode().abspath):
-    if re.match(r'^VERSION_[A-Z]+', l):
-        exec(l)
+    m = re.match(r'^set\(WT_(VERSION_[A-Z]+) (.+)\)', l)
+    if m and len(m.groups()) == 2:
+        exec('%s=%s' % (m.group(1), m.group(2)))
 
 if (VERSION_MAJOR == None or
     VERSION_MINOR == None or
@@ -116,7 +117,7 @@ replacements = {
     '@VERSION_MAJOR@' : VERSION_MAJOR,
     '@VERSION_MINOR@' : VERSION_MINOR,
     '@VERSION_PATCH@' : VERSION_PATCH,
-    '@VERSION_STRING@' : VERSION_STRING,
+    '@VERSION_STRING@' : '"' + VERSION_STRING + '"',
     '@uintmax_t_decl@': "",
     '@uintptr_t_decl@': "",
     '@off_t_decl@' : 'typedef int64_t wt_off_t;' if env.TargetOSIs('windows')
