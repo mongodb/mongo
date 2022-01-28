@@ -1206,6 +1206,10 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
                 }
 
             } catch (const ExceptionForCat<ErrorCategory::Interruption>& ex) {
+                if (ex.code() == ErrorCodes::Interrupted) {
+                    LOGV2(6183600, "Timestamp monitor got interrupted, retrying");
+                    return;
+                }
                 if (!ErrorCodes::isCancellationError(ex))
                     throw;
                 // If we're interrupted at shutdown or after PeriodicRunner's client has been
