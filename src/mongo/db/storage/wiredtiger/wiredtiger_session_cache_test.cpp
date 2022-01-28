@@ -54,7 +54,7 @@ public:
         string config = ss.str();
         _fastClockSource = std::make_unique<SystemClockSource>();
         int ret = wiredtiger_open(dbpath.toString().c_str(), nullptr, config.c_str(), &_conn);
-        ASSERT_OK(wtRCToStatus(ret));
+        ASSERT_OK(wtRCToStatus(ret, nullptr));
         ASSERT(_conn);
     }
     ~WiredTigerConnection() {

@@ -56,7 +56,7 @@ WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch, uint64
       _cursorGen(0),
       _cursorsOut(0),
       _idleExpireTime(Date_t::min()) {
-    invariantWTOK(conn->open_session(conn, nullptr, "isolation=snapshot", &_session));
+    invariantWTOK(conn->open_session(conn, nullptr, "isolation=snapshot", &_session), nullptr);
 }
 
 WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
@@ -70,12 +70,12 @@ WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
       _cursorGen(0),
       _cursorsOut(0),
       _idleExpireTime(Date_t::min()) {
-    invariantWTOK(conn->open_session(conn, nullptr, "isolation=snapshot", &_session));
+    invariantWTOK(conn->open_session(conn, nullptr, "isolation=snapshot", &_session), nullptr);
 }
 
 WiredTigerSession::~WiredTigerSession() {
     if (_session) {
-        invariantWTOK(_session->close(_session, nullptr));
+        invariantWTOK(_session->close(_session, nullptr), nullptr);
     }
 }
 
@@ -92,7 +92,7 @@ void _openCursor(WT_SESSION* session,
     }
 
     if (ret != 0) {
-        auto status = wtRCToStatus(ret);
+        auto status = wtRCToStatus(ret, session);
         std::string cursorErrMsg = str::stream()
             << "Failed to open a WiredTiger cursor. Reason: " << status << ", uri: " << uri
             << ", config: " << config;
@@ -148,7 +148,7 @@ void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor, const std:
     invariant(cursor);
     _cursorsOut--;
 
-    invariantWTOK(cursor->reset(cursor));
+    invariantWTOK(cursor->reset(cursor), _session);
 
     // Cursors are pushed to the front of the list and removed from the back
     _cursors.push_front(WiredTigerCachedCursor(id, _cursorGen++, cursor, config));
@@ -159,7 +159,7 @@ void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor, const std:
     while (!_cursors.empty() && _cursorGen - _cursors.back()._gen > cacheSize) {
         cursor = _cursors.back()._cursor;
         _cursors.pop_back();
-        invariantWTOK(cursor->close(cursor));
+        invariantWTOK(cursor->close(cursor), _session);
     }
 }
 
@@ -168,7 +168,7 @@ void WiredTigerSession::closeCursor(WT_CURSOR* cursor) {
     invariant(cursor);
     _cursorsOut--;
 
-    invariantWTOK(cursor->close(cursor));
+    invariantWTOK(cursor->close(cursor), _session);
 }
 
 void WiredTigerSession::closeAllCursors(const std::string& uri) {
@@ -178,7 +178,7 @@ void WiredTigerSession::closeAllCursors(const std::string& uri) {
     for (auto i = _cursors.begin(); i != _cursors.end();) {
         WT_CURSOR* cursor = i->_cursor;
         if (cursor && (all || uri == cursor->uri)) {
-            invariantWTOK(cursor->close(cursor));
+            invariantWTOK(cursor->close(cursor), _session);
             i = _cursors.erase(i);
         } else
             ++i;
@@ -194,7 +194,7 @@ void WiredTigerSession::closeCursorsForQueuedDrops(WiredTigerKVEngine* engine) {
     for (auto i = toDrop.begin(); i != toDrop.end(); i++) {
         WT_CURSOR* cursor = i->_cursor;
         if (cursor) {
-            invariantWTOK(cursor->close(cursor));
+            invariantWTOK(cursor->close(cursor), _session);
         }
     }
 }
@@ -307,7 +307,7 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
 
             auto config = syncType == Fsync::kCheckpointStableTimestamp ? "use_timestamp=true"
                                                                         : "use_timestamp=false";
-            invariantWTOK(s->checkpoint(s, config));
+            invariantWTOK(s->checkpoint(s, config), s);
 
             if (token) {
                 journalListener->onDurable(token.get());
@@ -349,15 +349,18 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
     // Initialize on first use.
     if (!_waitUntilDurableSession) {
         invariantWTOK(
-            _conn->open_session(_conn, nullptr, "isolation=snapshot", &_waitUntilDurableSession));
+            _conn->open_session(_conn, nullptr, "isolation=snapshot", &_waitUntilDurableSession),
+            nullptr);
     }
 
     // Use the journal when available, or a checkpoint otherwise.
     if (_engine && _engine->isDurable()) {
-        invariantWTOK(_waitUntilDurableSession->log_flush(_waitUntilDurableSession, "sync=on"));
+        invariantWTOK(_waitUntilDurableSession->log_flush(_waitUntilDurableSession, "sync=on"),
+                      _waitUntilDurableSession);
         LOGV2_DEBUG(22419, 4, "flushed journal");
     } else {
-        invariantWTOK(_waitUntilDurableSession->checkpoint(_waitUntilDurableSession, nullptr));
+        invariantWTOK(_waitUntilDurableSession->checkpoint(_waitUntilDurableSession, nullptr),
+                      _waitUntilDurableSession);
         LOGV2_DEBUG(22420, 4, "created checkpoint");
     }
 
@@ -502,7 +505,7 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
         uint64_t range;
         // This checks that we are only caching idle sessions and not something which might hold
         // locks or otherwise prevent truncation.
-        invariantWTOK(ss->transaction_pinned_range(ss, &range));
+        invariantWTOK(ss->transaction_pinned_range(ss, &range), ss);
         invariant(range == 0);
 
         // Release resources in the session we're about to cache.
@@ -511,7 +514,7 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
         if (gWiredTigerCursorCacheSize.load() < 0) {
             session->closeAllCursors("");
         }
-        invariantWTOK(ss->reset(ss));
+        invariantWTOK(ss->reset(ss), ss);
     }
 
     // If the cursor epoch has moved on, close all cursors in the session.

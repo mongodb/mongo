@@ -63,7 +63,8 @@ WiredTigerSizeStorer::WiredTigerSizeStorer(WT_CONNECTION* conn,
 
     WiredTigerSession session(_conn);
     invariantWTOK(
-        session.getSession()->create(session.getSession(), _storageUri.c_str(), config.c_str()));
+        session.getSession()->create(session.getSession(), _storageUri.c_str(), config.c_str()),
+        session.getSession());
 }
 
 void WiredTigerSizeStorer::store(StringData uri, std::shared_ptr<SizeInfo> sizeInfo) {
@@ -107,11 +108,11 @@ std::shared_ptr<WiredTigerSizeStorer::SizeInfo> WiredTigerSizeStorer::load(Opera
         int ret = cursor->search(cursor.get());
         if (ret == WT_NOTFOUND)
             return std::make_shared<SizeInfo>();
-        invariantWTOK(ret);
+        invariantWTOK(ret, cursor->session);
     }
 
     WT_ITEM value;
-    invariantWTOK(cursor->get_value(cursor.get(), &value));
+    invariantWTOK(cursor->get_value(cursor.get(), &value), cursor->session);
     BSONObj data(reinterpret_cast<const char*>(value.data));
 
     LOGV2_DEBUG(
@@ -187,10 +188,11 @@ void WiredTigerSizeStorer::flush(bool syncToDisk) {
                 // skip flushing.
                 return;
             }
-            invariantWTOK(ret);
+            invariantWTOK(ret, cursor->session);
         }
         txnOpen.done();
-        invariantWTOK(session.getSession()->commit_transaction(session.getSession(), nullptr));
+        invariantWTOK(session.getSession()->commit_transaction(session.getSession(), nullptr),
+                      session.getSession());
         buffer.clear();
     }
 

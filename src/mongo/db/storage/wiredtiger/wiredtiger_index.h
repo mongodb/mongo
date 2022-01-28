@@ -82,12 +82,14 @@ public:
      * Creates a WiredTiger table suitable for implementing a MongoDB index.
      * 'config' should be created with generateCreateString().
      */
-    static int Create(OperationContext* opCtx, const std::string& uri, const std::string& config);
+    static Status Create(OperationContext* opCtx,
+                         const std::string& uri,
+                         const std::string& config);
 
     /**
      * Drops the specified WiredTiger table. This should only be used for resuming index builds.
      */
-    static int Drop(OperationContext* opCtx, const std::string& uri);
+    static Status Drop(OperationContext* opCtx, const std::string& uri);
 
     /**
      * Constructs an index. The rsKeyFormat is the RecordId key format of the related RecordStore.

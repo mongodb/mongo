@@ -89,7 +89,7 @@ public:
             WiredTigerRecoveryUnit* ru =
                 checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
             WT_SESSION* s = ru->getSession()->getSession();
-            invariantWTOK(s->create(s, uri.c_str(), config.c_str()));
+            invariantWTOK(s->create(s, uri.c_str(), config.c_str()), s);
             uow.commit();
         }
 
@@ -147,8 +147,9 @@ public:
 
     void getCursor(WiredTigerRecoveryUnit* ru, WT_CURSOR** cursor) {
         WT_SESSION* wt_session = ru->getSession()->getSession();
-        invariantWTOK(wt_session->create(wt_session, wt_uri, wt_config));
-        invariantWTOK(wt_session->open_cursor(wt_session, wt_uri, nullptr, nullptr, cursor));
+        invariantWTOK(wt_session->create(wt_session, wt_uri, wt_config), wt_session);
+        invariantWTOK(wt_session->open_cursor(wt_session, wt_uri, nullptr, nullptr, cursor),
+                      wt_session);
     }
 
     void setUp() override {
@@ -274,7 +275,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key");
     cursor->set_value(cursor, "value");
-    invariantWTOK(wiredTigerCursorInsert(clientAndCtx1.second.get(), cursor));
+    invariantWTOK(wiredTigerCursorInsert(clientAndCtx1.second.get(), cursor), cursor->session);
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
@@ -297,7 +298,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key");
     cursor->set_value(cursor, "value");
-    invariantWTOK(wiredTigerCursorInsert(clientAndCtx1.second.get(), cursor));
+    invariantWTOK(wiredTigerCursorInsert(clientAndCtx1.second.get(), cursor), cursor->session);
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
@@ -321,7 +322,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, WriteAllowedWhileIgnorePrepareFalse) {
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key1");
     cursor->set_value(cursor, "value1");
-    invariantWTOK(wiredTigerCursorInsert(clientAndCtx1.second.get(), cursor));
+    invariantWTOK(wiredTigerCursorInsert(clientAndCtx1.second.get(), cursor), cursor->session);
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
@@ -340,7 +341,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, WriteAllowedWhileIgnorePrepareFalse) {
     cursor->set_value(cursor, "value2");
 
     // The write is allowed.
-    invariantWTOK(wiredTigerCursorInsert(clientAndCtx2.second.get(), cursor));
+    invariantWTOK(wiredTigerCursorInsert(clientAndCtx2.second.get(), cursor), cursor->session);
 
     ru1->abortUnitOfWork();
     ru2->abortUnitOfWork();
@@ -353,7 +354,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, WriteOnADocumentBeingPreparedTriggersW
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key");
     cursor->set_value(cursor, "value");
-    invariantWTOK(wiredTigerCursorInsert(clientAndCtx1.second.get(), cursor));
+    invariantWTOK(wiredTigerCursorInsert(clientAndCtx1.second.get(), cursor), cursor->session);
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
@@ -789,13 +790,13 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, MultiTimestampConstraintsInternalState
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key");
     cursor->set_value(cursor, "value");
-    invariantWTOK(wiredTigerCursorInsert(opCtx, cursor));
+    invariantWTOK(wiredTigerCursorInsert(opCtx, cursor), cursor->session);
 
     // Perform a write at ts1.
     cursor->set_key(cursor, "key2");
     cursor->set_value(cursor, "value");
     ASSERT_OK(ru1->setTimestamp(ts1));
-    invariantWTOK(wiredTigerCursorInsert(opCtx, cursor));
+    invariantWTOK(wiredTigerCursorInsert(opCtx, cursor), cursor->session);
 
     // Setting the timestamp again to the same value should not fail.
     ASSERT_OK(ru1->setTimestamp(ts1));
@@ -809,7 +810,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, MultiTimestampConstraintsInternalState
     cursor->set_key(cursor, "key3");
     cursor->set_value(cursor, "value");
     ASSERT_OK(ru1->setTimestamp(ts2));
-    invariantWTOK(wiredTigerCursorInsert(opCtx, cursor));
+    invariantWTOK(wiredTigerCursorInsert(opCtx, cursor), cursor->session);
 
     ru1->commitUnitOfWork();
 }
@@ -828,13 +829,13 @@ DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixture,
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key");
     cursor->set_value(cursor, "value");
-    invariantWTOK(wiredTigerCursorInsert(opCtx, cursor));
+    invariantWTOK(wiredTigerCursorInsert(opCtx, cursor), cursor->session);
 
     // Perform a write at ts1.
     cursor->set_key(cursor, "key2");
     cursor->set_value(cursor, "value");
     ASSERT_OK(ru1->setTimestamp(ts1));
-    invariantWTOK(wiredTigerCursorInsert(opCtx, cursor));
+    invariantWTOK(wiredTigerCursorInsert(opCtx, cursor), cursor->session);
 
     // Setting the timestamp again to a different value should detect that we're trying to set
     // multiple timestamps with the first write being non timestamped.

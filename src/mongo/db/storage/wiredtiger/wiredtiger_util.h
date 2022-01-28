@@ -46,37 +46,49 @@ class WiredTigerConfigParser;
 class WiredTigerKVEngine;
 class WiredTigerSession;
 
-Status wtRCToStatus_slow(int retCode, const char* prefix);
+Status wtRCToStatus_slow(int retCode, WT_SESSION* session, const char* prefix);
 
 /**
  * converts wiredtiger return codes to mongodb statuses.
  */
-inline Status wtRCToStatus(int retCode, const char* prefix = nullptr) {
+inline Status wtRCToStatus(int retCode, WT_SESSION* session, const char* prefix = nullptr) {
     if (MONGO_likely(retCode == 0))
         return Status::OK();
 
-    return wtRCToStatus_slow(retCode, prefix);
+    return wtRCToStatus_slow(retCode, session, prefix);
 }
 
-#define MONGO_invariantWTOK_1(expression)                                               \
-    do {                                                                                \
-        int _invariantWTOK_retCode = expression;                                        \
-        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {                              \
-            invariantOKFailed(                                                          \
-                #expression, wtRCToStatus(_invariantWTOK_retCode), __FILE__, __LINE__); \
-        }                                                                               \
+template <typename ContextExpr>
+Status wtRCToStatus(int retCode, WT_SESSION* session, ContextExpr&& contextExpr) {
+    if (MONGO_likely(retCode == 0))
+        return Status::OK();
+
+    return wtRCToStatus_slow(retCode, session, std::forward<ContextExpr>(contextExpr)());
+}
+
+inline void uassertWTOK(int ret, WT_SESSION* session) {
+    uassertStatusOK(wtRCToStatus(ret, session));
+}
+
+#define MONGO_invariantWTOK_2(expression, session)                                               \
+    do {                                                                                         \
+        int _invariantWTOK_retCode = expression;                                                 \
+        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {                                       \
+            invariantOKFailed(                                                                   \
+                #expression, wtRCToStatus(_invariantWTOK_retCode, session), __FILE__, __LINE__); \
+        }                                                                                        \
     } while (false)
 
-#define MONGO_invariantWTOK_2(expression, contextExpr)                     \
-    do {                                                                   \
-        int _invariantWTOK_retCode = expression;                           \
-        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {                 \
-            invariantOKFailedWithMsg(#expression,                          \
-                                     wtRCToStatus(_invariantWTOK_retCode), \
-                                     contextExpr,                          \
-                                     __FILE__,                             \
-                                     __LINE__);                            \
-        }                                                                  \
+#define MONGO_invariantWTOK_3(expression, session, contextExpr)                     \
+    do {                                                                            \
+        int _invariantWTOK_retCode = expression;                                    \
+        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {                          \
+            invariantOKFailedWithMsg(#expression,                                   \
+                                     wtRCToStatus(_invariantWTOK_retCode, session), \
+                                     contextExpr,                                   \
+                                     __FILE__,                                      \
+                                     __LINE__);                                     \
+        }                                                                           \
     } while (false)
 
 #define invariantWTOK(...) \
@@ -314,16 +326,18 @@ class WiredTigerConfigParser {
 public:
     WiredTigerConfigParser(StringData config) {
         invariantWTOK(
-            wiredtiger_config_parser_open(nullptr, config.rawData(), config.size(), &_parser));
+            wiredtiger_config_parser_open(nullptr, config.rawData(), config.size(), &_parser),
+            nullptr);
     }
 
     WiredTigerConfigParser(const WT_CONFIG_ITEM& nested) {
         invariant(nested.type == WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRUCT);
-        invariantWTOK(wiredtiger_config_parser_open(nullptr, nested.str, nested.len, &_parser));
+        invariantWTOK(wiredtiger_config_parser_open(nullptr, nested.str, nested.len, &_parser),
+                      nullptr);
     }
 
     ~WiredTigerConfigParser() {
-        invariantWTOK(_parser->close(_parser));
+        invariantWTOK(_parser->close(_parser), nullptr);
     }
 
     int next(WT_CONFIG_ITEM* key, WT_CONFIG_ITEM* value) {

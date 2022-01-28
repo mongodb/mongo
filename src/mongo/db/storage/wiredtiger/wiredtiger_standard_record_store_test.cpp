@@ -135,7 +135,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         {
             WriteUnitOfWork uow(opCtx.get());
             WT_SESSION* s = ru->getSession()->getSession();
-            invariantWTOK(s->create(s, indexUri.c_str(), ""));
+            invariantWTOK(s->create(s, indexUri.c_str(), ""), s);
             uow.commit();
         }
 

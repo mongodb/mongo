@@ -85,7 +85,7 @@ void removeTableChecksFile() {
 
 using std::string;
 
-Status wtRCToStatus_slow(int retCode, const char* prefix) {
+Status wtRCToStatus_slow(int retCode, WT_SESSION* session, const char* prefix) {
     if (retCode == 0)
         return Status::OK();
 
@@ -149,12 +149,12 @@ StatusWith<std::string> _getMetadata(WT_CURSOR* cursor, StringData uri) {
         return StatusWith<std::string>(ErrorCodes::NoSuchKey,
                                        str::stream() << "Unable to find metadata for " << uri);
     } else if (ret != 0) {
-        return StatusWith<std::string>(wtRCToStatus(ret));
+        return StatusWith<std::string>(wtRCToStatus(ret, cursor->session));
     }
     const char* metadata = nullptr;
     ret = cursor->get_value(cursor, &metadata);
     if (ret != 0) {
-        return StatusWith<std::string>(wtRCToStatus(ret));
+        return StatusWith<std::string>(wtRCToStatus(ret, cursor->session));
     }
     invariant(metadata);
     return StatusWith<std::string>(metadata);
@@ -163,9 +163,9 @@ StatusWith<std::string> _getMetadata(WT_CURSOR* cursor, StringData uri) {
 
 StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WT_SESSION* session, StringData uri) {
     WT_CURSOR* cursor;
-    invariantWTOK(session->open_cursor(session, "metadata:create", nullptr, "", &cursor));
+    invariantWTOK(session->open_cursor(session, "metadata:create", nullptr, "", &cursor), session);
     invariant(cursor);
-    ON_BLOCK_EXIT([cursor] { invariantWTOK(cursor->close(cursor)); });
+    ON_BLOCK_EXIT([cursor, session] { invariantWTOK(cursor->close(cursor), session); });
 
     return _getMetadata(cursor, uri);
 }
@@ -194,9 +194,9 @@ StatusWith<std::string> WiredTigerUtil::getMetadataCreate(OperationContext* opCt
 
 StatusWith<std::string> WiredTigerUtil::getMetadata(WT_SESSION* session, StringData uri) {
     WT_CURSOR* cursor;
-    invariantWTOK(session->open_cursor(session, "metadata:", nullptr, "", &cursor));
+    invariantWTOK(session->open_cursor(session, "metadata:", nullptr, "", &cursor), session);
     invariant(cursor);
-    ON_BLOCK_EXIT([cursor] { invariantWTOK(cursor->close(cursor)); });
+    ON_BLOCK_EXIT([cursor, session] { invariantWTOK(cursor->close(cursor), session); });
 
     return _getMetadata(cursor, uri);
 }
@@ -270,7 +270,7 @@ Status WiredTigerUtil::getApplicationMetadata(OperationContext* opCtx,
         }
     }
     if (ret != WT_NOTFOUND) {
-        return wtRCToStatus(ret);
+        return wtRCToStatus(ret, nullptr);
     }
 
     return Status::OK();
@@ -362,7 +362,8 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
     }
 
     Status status = wtRCToStatus(
-        wiredtiger_config_validate(nullptr, &eventHandler, "WT_SESSION.create", config.rawData()));
+        wiredtiger_config_validate(nullptr, &eventHandler, "WT_SESSION.create", config.rawData()),
+        nullptr);
     if (!status.isOK()) {
         StringBuilder errorMsg;
         errorMsg << status.reason();
@@ -609,7 +610,7 @@ int WiredTigerUtil::verifyTable(OperationContext* opCtx,
     // Open a new session with custom error handlers.
     WT_CONNECTION* conn = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn();
     WT_SESSION* session;
-    invariantWTOK(conn->open_session(conn, &eventHandler, nullptr, &session));
+    invariantWTOK(conn->open_session(conn, &eventHandler, nullptr, &session), nullptr);
     ON_BLOCK_EXIT([&] { session->close(session, ""); });
 
     // Do the verify. Weird parens prevent treating "verify" as a macro.

@@ -78,6 +78,6 @@ WiredTigerCursor::~WiredTigerCursor() {
 }
 
 void WiredTigerCursor::reset() {
-    invariantWTOK(_cursor->reset(_cursor));
+    invariantWTOK(_cursor->reset(_cursor), _cursor->session);
 }
 }  // namespace mongo
