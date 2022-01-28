@@ -3,7 +3,7 @@
 
 -r components/compile.req
 -r components/lint.req
--r components/resmoke.req
+-r components/testing.req
 -r components/external_auth.req
 -r components/evergreen.req
 -r components/aws.req
