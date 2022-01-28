@@ -19,7 +19,7 @@ runtime_monitor=
     (
         max=497000,
         min=457000,
-        postrun=true,
+        postrun=false,
         save=true,
     ),
     # Seems to remove 160K records. Give it a similar margin.
@@ -27,7 +27,7 @@ runtime_monitor=
     (
         max=170000,
         min=150000,
-        postrun=true,
+        postrun=false,
         save=true,
     ),
     stat_cache_size=
@@ -41,7 +41,7 @@ runtime_monitor=
     stat_db_size=
     (
         max=1900000000,
-        runtime=true,
+        runtime=false,
         save=true,
     ),
 ),
