@@ -57,7 +57,6 @@ __btree_clear(WT_SESSION_IMPL *session)
 int
 __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 {
-    WT_BLOCK_FILE_OPENER *opener;
     WT_BM *bm;
     WT_BTREE *btree;
     WT_CKPT ckpt;
@@ -67,7 +66,6 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
     WT_DECL_RET;
     size_t root_addr_size;
     uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
-    const char *filename;
     bool creation, forced_salvage;
 
     btree = S2BT(session);
@@ -111,17 +109,9 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
     /* Initialize and configure the WT_BTREE structure. */
     WT_ERR(__btree_conf(session, &ckpt));
 
-    /*
-     * Get an opener abstraction that the block manager can use to open any of the files that
-     * represent a btree. In the case of a tiered Btree, that would allow opening different files
-     * according to an object id in a reference. For a non-tiered Btree, the opener will know to
-     * always open a single file (given by the filename).
-     */
-    WT_ERR(__wt_tiered_opener(session, dhandle, &opener, &filename));
-
     /* Connect to the underlying block manager. */
-    WT_ERR(__wt_block_manager_open(session, filename, opener, dhandle->cfg, forced_salvage,
-      F_ISSET(btree, WT_BTREE_READONLY), btree->allocsize, &btree->bm));
+    WT_ERR(__wt_blkcache_open(
+      session, dhandle->name, dhandle->cfg, forced_salvage, false, btree->allocsize, &btree->bm));
 
     bm = btree->bm;
 
@@ -1024,20 +1014,15 @@ __wt_btree_immediately_durable(WT_SESSION_IMPL *session)
  *     Switch to a writeable object for a tiered btree.
  */
 int
-__wt_btree_switch_object(WT_SESSION_IMPL *session, uint32_t object_id, uint32_t flags)
+__wt_btree_switch_object(WT_SESSION_IMPL *session, uint32_t objectid, uint32_t flags)
 {
     WT_BM *bm;
-    WT_DECL_RET;
-
-    bm = S2BT(session)->bm;
 
     /*
      * When initially opening a tiered Btree, a tier switch is done internally without the btree
      * being fully opened. That's okay, the btree will be told later about the current object
      * number.
      */
-    if (bm != NULL)
-        ret = bm->switch_object(bm, session, object_id, flags);
-
-    return (ret);
+    bm = S2BT(session)->bm;
+    return (bm == NULL ? 0 : bm->switch_object(bm, session, objectid, flags));
 }

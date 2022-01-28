@@ -113,7 +113,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
     WT_TRET(__wt_meta_track_destroy(session));
 
     /* Shut down the block cache */
-    __wt_block_cache_destroy(session);
+    __wt_blkcache_destroy(session);
 
     /*
      * Now that all data handles are closed, tell logging that a checkpoint has completed then shut

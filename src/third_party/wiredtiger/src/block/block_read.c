@@ -28,19 +28,13 @@ __wt_bm_read(
 
 #ifdef HAVE_DIAGNOSTIC
     /*
-     * In diagnostic mode, verify the user isn't trying to import a tiered object as a regular table
-     * file.
-     */
-    if (objectid != 0 && !WT_PREFIX_MATCH(block->name, "tiered:") &&
-      !WT_SUFFIX_MATCH(block->name, ".wtobj"))
-        WT_RET_MSG(session, ENOTSUP, "%s: is a tiered object", block->name);
-    /*
      * In diagnostic mode, verify the block we're about to read isn't on the available list, or for
      * live systems, the discard list.
      */
     WT_RET(__wt_block_misplaced(
       session, block, "read", offset, size, bm->is_live, __PRETTY_FUNCTION__, __LINE__));
 #endif
+
     /* Read the block. */
     __wt_capacity_throttle(session, size, WT_THROTTLE_READ);
     WT_RET(__wt_block_read_off(session, block, buf, objectid, offset, size, checksum));
@@ -159,7 +153,6 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uin
   wt_off_t offset, uint32_t size, uint32_t checksum)
 {
     WT_BLOCK_HEADER *blk, swap;
-    WT_FH *fh;
     size_t bufsize;
 
     __wt_verbose(session, WT_VERB_READ, "off %" PRIuMAX ", size %" PRIu32 ", checksum %#" PRIx32,
@@ -167,6 +160,10 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uin
 
     WT_STAT_CONN_INCR(session, block_read);
     WT_STAT_CONN_INCRV(session, block_byte_read, size);
+
+    /* Swap file handles if reading from a different object. */
+    if (block->objectid != objectid)
+        WT_RET(__wt_blkcache_get_handle(session, block, objectid, &block));
 
     /*
      * Grow the buffer as necessary and read the block. Buffers should be aligned for reading, but
@@ -192,9 +189,9 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uin
           block->name, size, block->allocsize);
 
     WT_RET(__wt_buf_init(session, buf, bufsize));
-    WT_RET(__wt_block_fh(session, block, objectid, &fh));
-    WT_RET(__wt_read(session, fh, offset, size, buf->mem));
     buf->size = size;
+
+    WT_RET(__wt_read(session, block->fh, offset, size, buf->mem));
 
     /*
      * We incrementally read through the structure before doing a checksum, do little- to big-endian

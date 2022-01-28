@@ -82,33 +82,31 @@ err:
 }
 
 /*
- * __block_destroy --
- *     Destroy a block handle.
+ * __wt_block_close --
+ *     Close a block handle.
  */
-static int
-__block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
+int
+__wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    uint64_t bucket;
-    u_int i;
+    uint64_t bucket, hash;
 
     conn = S2C(session);
-    bucket = block->name_hash & (conn->hash_size - 1);
+
+    __wt_verbose(session, WT_VERB_BLOCK, "close: %s", block->name == NULL ? "" : block->name);
+
+    hash = __wt_hash_city64(block->name, strlen(block->name));
+    bucket = hash & (conn->hash_size - 1);
     WT_CONN_BLOCK_REMOVE(conn, block, bucket);
 
     __wt_free(session, block->name);
+    __wt_free(session, block->related);
 
-    if (block->has_objects && block->ofh != NULL) {
-        for (i = 0; i < block->max_objectid; i++)
-            WT_TRET(__wt_close(session, &block->ofh[i]));
-        __wt_free(session, block->ofh);
-    }
-
-    if (block->fh != NULL)
-        WT_TRET(__wt_close(session, &block->fh));
+    WT_TRET(__wt_close(session, &block->fh));
 
     __wt_spin_destroy(session, &block->live_lock);
+    __wt_block_ckpt_destroy(session, &block->live);
 
     __wt_overwrite_and_free(session, block);
 
@@ -138,8 +136,9 @@ __wt_block_configure_first_fit(WT_BLOCK *block, bool on)
  *     Open a block handle.
  */
 int
-__wt_block_open(WT_SESSION_IMPL *session, const char *filename, WT_BLOCK_FILE_OPENER *opener,
-  const char *cfg[], bool forced_salvage, bool readonly, uint32_t allocsize, WT_BLOCK **blockp)
+__wt_block_open(WT_SESSION_IMPL *session, const char *filename, uint32_t objectid,
+  const char *cfg[], bool forced_salvage, bool readonly, bool fixed, uint32_t allocsize,
+  WT_BLOCK **blockp)
 {
     WT_BLOCK *block;
     WT_CONFIG_ITEM cval;
@@ -148,22 +147,23 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, WT_BLOCK_FILE_OP
     uint64_t bucket, hash;
     uint32_t flags;
 
-    *blockp = block = NULL;
+    *blockp = NULL;
 
     __wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename);
 
     conn = S2C(session);
+
+    /* Block objects can be shared (although there can be only one writer). */
     hash = __wt_hash_city64(filename, strlen(filename));
     bucket = hash & (conn->hash_size - 1);
     __wt_spin_lock(session, &conn->block_lock);
-    TAILQ_FOREACH (block, &conn->blockhash[bucket], hashq) {
-        if (strcmp(filename, block->name) == 0) {
+    TAILQ_FOREACH (block, &conn->blockhash[bucket], hashq)
+        if (block->objectid == objectid && strcmp(filename, block->name) == 0) {
             ++block->ref;
             *blockp = block;
             __wt_spin_unlock(session, &conn->block_lock);
             return (0);
         }
-    }
 
     /*
      * Basic structure allocation, initialization.
@@ -172,20 +172,21 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, WT_BLOCK_FILE_OP
      * block destroy code which uses that hash value to remove the block from the underlying linked
      * lists.
      */
-    WT_ERR(__wt_calloc_one(session, &block));
-    block->ref = 1;
-    block->name_hash = hash;
-    block->allocsize = allocsize;
-    block->opener = opener;
+    WT_RET(__wt_calloc_one(session, &block));
     WT_CONN_BLOCK_INSERT(conn, block, bucket);
-
     WT_ERR(__wt_strdup(session, filename, &block->name));
+    block->objectid = objectid;
+    block->ref = 1;
+
+    /* If not passed an allocation size, get one from the configuration. */
+    if (allocsize == 0) {
+        WT_ERR(__wt_config_gets(session, cfg, "allocation_size", &cval));
+        allocsize = (uint32_t)cval.val;
+    }
+    block->allocsize = allocsize;
 
     WT_ERR(__wt_config_gets(session, cfg, "block_allocation", &cval));
     block->allocfirst = WT_STRING_MATCH("first", cval.str, cval.len);
-    block->has_objects = (opener != NULL);
-    if (block->has_objects)
-        block->objectid = opener->current_object_id(opener);
 
     /* Configuration: optional OS buffer cache maximum size. */
     WT_ERR(__wt_config_gets(session, cfg, "os_cache_max", &cval));
@@ -210,17 +211,19 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, WT_BLOCK_FILE_OP
     else if (WT_STRING_MATCH("sequential", cval.str, cval.len))
         LF_SET(WT_FS_OPEN_ACCESS_SEQ);
 
+    if (fixed)
+        LF_SET(WT_FS_OPEN_FIXED);
     if (readonly && FLD_ISSET(conn->direct_io, WT_DIRECT_IO_CHECKPOINT))
         LF_SET(WT_FS_OPEN_DIRECTIO);
     if (!readonly && FLD_ISSET(conn->direct_io, WT_DIRECT_IO_DATA))
         LF_SET(WT_FS_OPEN_DIRECTIO);
-    block->file_flags = flags;
-    if (block->has_objects)
-        WT_ERR(opener->open(opener, session, WT_TIERED_CURRENT_ID, WT_FS_OPEN_FILE_TYPE_DATA,
-          block->file_flags, &block->fh));
-    else
-        WT_ERR(
-          __wt_open(session, filename, WT_FS_OPEN_FILE_TYPE_DATA, block->file_flags, &block->fh));
+    /*
+     * Tiered storage sets file permissions to readonly, but nobody else does. This flag means the
+     * underlying file is read-only, and NOT that the handle access pattern is read-only.
+     */
+    if (readonly)
+        LF_SET(WT_FS_OPEN_READONLY);
+    WT_ERR(__wt_open(session, filename, WT_FS_OPEN_FILE_TYPE_DATA, flags, &block->fh));
 
     /* Set the file's size. */
     WT_ERR(__wt_filesize(session, block->fh, &block->size));
@@ -244,41 +247,14 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, WT_BLOCK_FILE_OP
     if (!forced_salvage)
         WT_ERR(__desc_read(session, allocsize, block));
 
-    *blockp = block;
     __wt_spin_unlock(session, &conn->block_lock);
+
+    *blockp = block;
     return (0);
 
 err:
-    if (block != NULL)
-        WT_TRET(__block_destroy(session, block));
     __wt_spin_unlock(session, &conn->block_lock);
-    return (ret);
-}
-
-/*
- * __wt_block_close --
- *     Close a block handle.
- */
-int
-__wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
-{
-    WT_CONNECTION_IMPL *conn;
-    WT_DECL_RET;
-
-    if (block == NULL) /* Safety check */
-        return (0);
-
-    conn = S2C(session);
-
-    __wt_verbose(session, WT_VERB_BLOCK, "close: %s", block->name == NULL ? "" : block->name);
-
-    __wt_spin_lock(session, &conn->block_lock);
-
-    /* Reference count is initialized to 1. */
-    if (block->ref == 0 || --block->ref == 0)
-        ret = __block_destroy(session, block);
-
-    __wt_spin_unlock(session, &conn->block_lock);
+    WT_TRET(__wt_block_close(session, block));
 
     return (ret);
 }

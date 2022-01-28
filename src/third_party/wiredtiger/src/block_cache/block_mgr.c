@@ -183,6 +183,69 @@ __bm_checkpoint_unload(WT_BM *bm, WT_SESSION_IMPL *session)
 }
 
 /*
+ * __bm_close_block_remove --
+ *     Remove a single block handle.
+ */
+static int
+__bm_close_block_remove(WT_SESSION_IMPL *session, WT_BLOCK *block)
+{
+    u_int i;
+
+    /* Discard any references we're holding. */
+    for (i = 0; i < block->related_next; ++i) {
+        --block->related[i]->ref;
+        block->related[i] = NULL;
+    }
+
+    /* Discard the block structure. */
+    return (__wt_block_close(session, block));
+}
+
+/*
+ * __bm_close_block --
+ *     Close a single block handle, removing the handle if it's no longer useful.
+ */
+static int
+__bm_close_block(WT_SESSION_IMPL *session, WT_BLOCK *block)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    bool found;
+
+    __wt_verbose(session, WT_VERB_BLKCACHE, "close: %s", block->name);
+
+    conn = S2C(session);
+
+    /* You can't close files during a checkpoint. */
+    WT_ASSERT(
+      session, block->ckpt_state == WT_CKPT_NONE || block->ckpt_state == WT_CKPT_PANIC_ON_FAILURE);
+
+    __wt_spin_lock(session, &conn->block_lock);
+    if (block->ref > 0 && --block->ref > 0) {
+        __wt_spin_unlock(session, &conn->block_lock);
+        return (0);
+    }
+
+    /*
+     * Every time we remove a block, we may have sufficiently decremented other references to allow
+     * other blocks to be removed. It's unlikely for blocks to reference each other but it's not out
+     * of the question, either. Loop until we don't find anything to close.
+     */
+    do {
+        found = false;
+        TAILQ_FOREACH (block, &conn->blockqh, q)
+            if (block->ref == 0) {
+                found = true;
+                WT_TRET(__bm_close_block_remove(session, block));
+                break;
+            }
+    } while (found);
+    __wt_spin_unlock(session, &conn->block_lock);
+
+    return (ret);
+}
+
+/*
  * __bm_close --
  *     Close a file.
  */
@@ -194,7 +257,7 @@ __bm_close(WT_BM *bm, WT_SESSION_IMPL *session)
     if (bm == NULL) /* Safety check */
         return (0);
 
-    ret = __wt_block_close(session, bm->block);
+    ret = __bm_close_block(session, bm->block);
 
     __wt_overwrite_and_free(session, bm);
     return (ret);
@@ -494,22 +557,55 @@ __bm_stat(WT_BM *bm, WT_SESSION_IMPL *session, WT_DSRC_STATS *stats)
 
 /*
  * __bm_switch_object --
- *     Modify the tiered object.
+ *     Switch the tiered object.
  */
 static int
-__bm_switch_object(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t object_id, uint32_t flags)
+__bm_switch_object(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t objectid, uint32_t flags)
 {
-    return (__wt_block_switch_object(session, bm->block, object_id, flags));
+    WT_BLOCK *block;
+
+    block = bm->block;
+
+    /* Close out our current handle. */
+    WT_RET(__bm_close_block(session, block));
+    bm->block = NULL;
+
+    /*
+     * FIXME-WT-7596 the flags argument will be used in the future to perform various tasks,
+     * to efficiently mark objects in transition (that is during a switch):
+     *  - mark this file as the writeable file (what currently happens)
+     *  - disallow writes to this object (reads still allowed, we're about to switch)
+     *  - close this object (about to move it, don't allow reopens yet)
+     *  - allow opens on this object again
+     */
+    WT_UNUSED(flags);
+    WT_RET(__wt_blkcache_get_handle(session, NULL, objectid, &block));
+
+    /*
+     * KEITH XXX: We need to distinguish between tiered switch and loading a checkpoint. This is
+     * also discarding the extent list which isn't correct, because we can't know when to discard
+     * previous files if we don't have the extent list. This fixes the problem where we randomly
+     * write a new position in the new tiered object, but it's not OK.
+     */
+    WT_RET(__wt_block_ckpt_init(session, &block->live, "live"));
+
+    /*
+     * This isn't right: the new block handle will reasonably have different methods for objects in
+     * different backing sources. That's not the case today, but the current architecture lacks the
+     * ability to support multiple sources cleanly.
+     */
+    bm->block = block;
+    return (0);
 }
 
 /*
  * __bm_switch_object_readonly --
- *     Modify the tiered object; readonly version.
+ *     Switch the tiered object; readonly version.
  */
 static int
-__bm_switch_object_readonly(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t object_id, uint32_t flags)
+__bm_switch_object_readonly(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t objectid, uint32_t flags)
 {
-    WT_UNUSED(object_id);
+    WT_UNUSED(objectid);
     WT_UNUSED(flags);
 
     return (__bm_readonly(bm, session));
@@ -685,39 +781,44 @@ __bm_method_set(WT_BM *bm, bool readonly)
 }
 
 /*
- * __wt_block_manager_open --
+ * __wt_blkcache_open --
  *     Open a file.
  */
 int
-__wt_block_manager_open(WT_SESSION_IMPL *session, const char *filename,
-  WT_BLOCK_FILE_OPENER *opener, const char *cfg[], bool forced_salvage, bool readonly,
-  uint32_t allocsize, WT_BM **bmp)
+__wt_blkcache_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[],
+  bool forced_salvage, bool readonly, uint32_t allocsize, WT_BM **bmp)
 {
     WT_BM *bm;
     WT_DECL_RET;
 
     *bmp = NULL;
 
+    __wt_verbose(session, WT_VERB_BLOCK, "open: %s", uri);
+
     WT_RET(__wt_calloc_one(session, &bm));
     __bm_method_set(bm, false);
 
-    WT_ERR(__wt_block_open(
-      session, filename, opener, cfg, forced_salvage, readonly, allocsize, &bm->block));
+    if (WT_PREFIX_MATCH(uri, "file:")) {
+        uri += strlen("file:");
+        WT_ERR(__wt_block_open(session, uri, WT_TIERED_OBJECTID_NONE, cfg, forced_salvage, readonly,
+          false, allocsize, &bm->block));
+    } else
+        WT_ERR(__wt_blkcache_tiered_open(session, uri, 0, &bm->block));
 
     *bmp = bm;
     return (0);
 
 err:
-    WT_TRET(bm->close(bm, session));
+    __wt_free(session, bm);
     return (ret);
 }
 
 /*
- * __wt_block_set_readonly --
+ * __wt_blkcache_set_readonly --
  *     Set the block API to read-only.
  */
 void
-__wt_block_set_readonly(WT_SESSION_IMPL *session) WT_GCC_FUNC_ATTRIBUTE((cold))
+__wt_blkcache_set_readonly(WT_SESSION_IMPL *session) WT_GCC_FUNC_ATTRIBUTE((cold))
 {
     /* Switch the handle into read-only mode. */
     __bm_method_set(S2BT(session)->bm, true);

@@ -16,6 +16,8 @@
  */
 #define WT_BLOCK_INVALID_OFFSET 0
 
+#define WT_BLOCK_ISLOCAL(block) ((block)->objectid == WT_TIERED_OBJECTID_NONE)
+
 /*
  * The block manager maintains three per-checkpoint extent lists:
  *	alloc:	 the extents allocated in this checkpoint
@@ -222,14 +224,16 @@ struct __wt_bm {
  *	Block manager handle, references a single file.
  */
 struct __wt_block {
-    const char *name;             /* Name */
-    uint64_t name_hash;           /* Hash of name */
-    WT_BLOCK_FILE_OPENER *opener; /* how to open files/objects */
+    const char *name;  /* Name */
+    uint32_t objectid; /* Object id */
+    uint32_t ref;      /* References */
 
-    /* A list of block manager handles, sharing a file descriptor. */
-    uint32_t ref;                  /* References */
     TAILQ_ENTRY(__wt_block) q;     /* Linked list of handles */
     TAILQ_ENTRY(__wt_block) hashq; /* Hashed list of handles */
+
+    WT_BLOCK **related;       /* Related objects */
+    size_t related_allocated; /* Size of related object array */
+    u_int related_next;       /* Next open slot */
 
     WT_FH *fh;            /* Backing file handle */
     wt_off_t size;        /* File size */
@@ -247,19 +251,9 @@ struct __wt_block {
 
     u_int block_header; /* Header length */
 
-    /* Object file tracking. */
-    bool has_objects;      /* Address cookies contain object id */
-    uint32_t file_flags;   /* Flags for opening objects */
-    uint32_t objectid;     /* Current writeable object id */
-    uint32_t max_objectid; /* Size of object handle array */
-    WT_FH **ofh;           /* Object file handles */
-    size_t ofh_alloc;
-
     /*
-     * There is only a single checkpoint in a file that can be written. The information could
-     * logically live in the WT_BM structure, but then we would be re-creating it every time we
-     * opened a new checkpoint and I'd rather not do that. So, it's stored here, only accessed by
-     * one WT_BM handle.
+     * There is only a single checkpoint in a file that can be written; stored here, only accessed
+     * by one WT_BM handle.
      */
     WT_SPINLOCK live_lock; /* Live checkpoint lock */
     WT_BLOCK_CKPT live;    /* Live checkpoint */
@@ -318,20 +312,6 @@ struct __wt_block_desc {
  * of the file for this information, but it would be worth investigation, regardless).
  */
 #define WT_BLOCK_DESC_SIZE 16
-
-/*
- * WT_BLOCK_FILE_OPENER --
- *	An open callback for the block manager.  This hides details about how to access the
- * different objects that make up a tiered file.
- */
-struct __wt_block_file_opener {
-    /* An id to be used with the open call to reference the current object. */
-#define WT_TIERED_CURRENT_ID UINT32_MAX
-    int (*open)(
-      WT_BLOCK_FILE_OPENER *, WT_SESSION_IMPL *, uint32_t, WT_FS_OPEN_FILE_TYPE, u_int, WT_FH **);
-    uint32_t (*current_object_id)(WT_BLOCK_FILE_OPENER *);
-    void *cookie; /* Used in open call */
-};
 
 /*
  * __wt_block_desc_byteswap --

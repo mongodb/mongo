@@ -109,9 +109,6 @@ list_init_block(WT_SESSION *session, const char *key, WT_BLOCK *block)
     else if (ret != WT_NOTFOUND)
         WT_ERR(util_err(session, ret, "WT_CONFIG_PARSER.get"));
 
-    if (WT_PREFIX_MATCH(key, "tiered:"))
-        block->has_objects = true;
-
 err:
     if (parser != NULL && (tret = parser->close(parser)) != 0) {
         tret = util_err(session, tret, "WT_CONFIG_PARSER.close");

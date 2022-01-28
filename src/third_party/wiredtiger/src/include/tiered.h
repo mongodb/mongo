@@ -103,6 +103,8 @@ struct __wt_tiered_tiers {
     uint32_t flags; /* Flags including operations */
 };
 
+#define WT_TIERED_OBJECTID_NONE 0
+
 /*
  * WT_TIERED --
  *	Handle for a tiered data source. This data structure is used as the basis for metadata
@@ -123,8 +125,6 @@ struct __wt_tiered {
     WT_BUCKET_STORAGE *bstorage;
 
     WT_TIERED_TIERS tiers[WT_TIERED_MAX_TIERS]; /* Tiers array */
-
-    WT_BLOCK_FILE_OPENER opener;
 
     uint32_t current_id; /* Current object id number */
     uint32_t next_id;    /* Next object number */

@@ -63,11 +63,11 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint
         ci = &_ci;
         WT_ERR(__wt_block_ckpt_init(session, ci, "checkpoint"));
     } else {
-/*
- * We depend on the btree level for locking: things will go bad fast if we open the live system in
- * two handles, or salvage, truncate or verify the live/running file.
- */
 #ifdef HAVE_DIAGNOSTIC
+        /*
+         * We depend on the btree level for locking: things will go bad fast if we open the live
+         * system in two handles, or salvage, truncate or verify the live/running file.
+         */
         __wt_spin_lock(session, &block->live_lock);
         WT_ASSERT(session, block->live_open == false);
         block->live_open = true;
@@ -113,7 +113,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint
      * the end of the file, that was done when the checkpoint was first written (re-writing the
      * checkpoint might possibly make it relevant here, but it's unlikely enough I don't bother).
      */
-    if (!checkpoint && !block->has_objects)
+    if (!checkpoint && WT_BLOCK_ISLOCAL(block))
         WT_ERR(__wt_block_truncate(session, block, ci->file_size));
 
     if (0) {
@@ -200,7 +200,7 @@ __wt_block_checkpoint_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
           "%s: an unexpected checkpoint start: the checkpoint has already started or was "
           "configured for salvage",
           block->name);
-        __wt_block_set_readonly(session);
+        __wt_blkcache_set_readonly(session);
         break;
     case WT_CKPT_NONE:
         block->ckpt_state = WT_CKPT_INPROGRESS;
@@ -513,7 +513,7 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
           "%s: an unexpected checkpoint attempt: the checkpoint was never started or has already "
           "completed",
           block->name);
-        __wt_block_set_readonly(session);
+        __wt_blkcache_set_readonly(session);
         break;
     case WT_CKPT_SALVAGE:
         /* Salvage doesn't use the standard checkpoint APIs. */
@@ -610,7 +610,8 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
      * lists, and the freed blocks will then be included when writing the live extent lists.
      */
     WT_CKPT_FOREACH (ckptbase, ckpt) {
-        if (F_ISSET(ckpt, WT_CKPT_FAKE) || !F_ISSET(ckpt, WT_CKPT_DELETE) || block->has_objects)
+        if (F_ISSET(ckpt, WT_CKPT_FAKE) || !F_ISSET(ckpt, WT_CKPT_DELETE) ||
+          !WT_BLOCK_ISLOCAL(block))
             continue;
 
         if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT))
@@ -762,7 +763,7 @@ live_update:
 err:
     if (ret != 0 && fatal) {
         ret = __wt_panic(session, ret, "%s: fatal checkpoint failure", block->name);
-        __wt_block_set_readonly(session);
+        __wt_blkcache_set_readonly(session);
     }
 
     if (locked)
@@ -919,14 +920,14 @@ __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session, WT_BLOCK *block, bool fa
           "%s: an unexpected checkpoint resolution: the checkpoint was never started or completed, "
           "or configured for salvage",
           block->name);
-        __wt_block_set_readonly(session);
+        __wt_blkcache_set_readonly(session);
         break;
     case WT_CKPT_PANIC_ON_FAILURE:
         if (!failed)
             break;
         ret = __wt_panic(
           session, EINVAL, "%s: the checkpoint failed, the system must restart", block->name);
-        __wt_block_set_readonly(session);
+        __wt_blkcache_set_readonly(session);
         break;
     }
     WT_ERR(ret);
@@ -934,7 +935,7 @@ __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session, WT_BLOCK *block, bool fa
     if ((ret = __wt_block_extlist_merge(session, block, &ci->ckpt_avail, &ci->avail)) != 0) {
         ret = __wt_panic(
           session, ret, "%s: fatal checkpoint failure during extent list merge", block->name);
-        __wt_block_set_readonly(session);
+        __wt_blkcache_set_readonly(session);
     }
     __wt_spin_unlock(session, &block->live_lock);
 

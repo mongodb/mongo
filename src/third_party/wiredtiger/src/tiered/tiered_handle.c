@@ -630,7 +630,7 @@ __tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ERR_NOTFOUND_OK(ret, true);
 
     /* Open tiers if we have them, otherwise initialize. */
-    if (tiered->current_id != 0)
+    if (tiered->current_id != WT_TIERED_OBJECTID_NONE)
         WT_ERR(__tiered_init_tiers(session, tiered, &tierconf));
     else {
         /*

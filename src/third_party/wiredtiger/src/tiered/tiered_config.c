@@ -118,7 +118,7 @@ __wt_tiered_bucket_config(
     WT_ERR(__wt_strndup(session, auth.str, auth.len, &new->auth_token));
     WT_ERR(__wt_strndup(session, bucket.str, bucket.len, &new->bucket));
     WT_ERR(__wt_strndup(session, prefix.str, prefix.len, &new->bucket_prefix));
-    WT_ERR(__wt_strndup(session, cachedir.str, auth.len, &new->cache_directory));
+    WT_ERR(__wt_strndup(session, cachedir.str, cachedir.len, &new->cache_directory));
 
     storage = nstorage->storage_source;
     if (cachedir.len != 0)

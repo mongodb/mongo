@@ -10,13 +10,13 @@ src/block/block_open.c
 src/block/block_read.c
 src/block/block_session.c
 src/block/block_slvg.c
-src/block/block_tiered.c
 src/block/block_vrfy.c
 src/block/block_write.c
 src/block_cache/block_cache.c
 src/block_cache/block_io.c
 src/block_cache/block_map.c
 src/block_cache/block_mgr.c
+src/block_cache/block_tier.c
 src/bloom/bloom.c
 src/btree/bt_compact.c
 src/btree/bt_curnext.c
@@ -215,7 +215,6 @@ src/support/timestamp.c
 src/support/update_vector.c
 src/tiered/tiered_config.c
 src/tiered/tiered_handle.c
-src/tiered/tiered_opener.c
 src/tiered/tiered_work.c
 src/txn/txn.c
 src/txn/txn_ckpt.c

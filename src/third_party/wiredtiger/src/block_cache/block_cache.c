@@ -595,11 +595,11 @@ __blkcache_init(WT_SESSION_IMPL *session, size_t cache_size, u_int hash_size, u_
 }
 
 /*
- * __wt_block_cache_destroy --
+ * __wt_blkcache_destroy --
  *     Destroy the block cache and free all memory.
  */
 void
-__wt_block_cache_destroy(WT_SESSION_IMPL *session)
+__wt_blkcache_destroy(WT_SESSION_IMPL *session)
 {
     WT_BLKCACHE *blkcache;
     WT_BLKCACHE_ITEM *blkcache_item;
@@ -701,11 +701,11 @@ __blkcache_reconfig(WT_SESSION_IMPL *session, bool reconfig, size_t cache_size, 
 }
 
 /*
- * __wt_block_cache_setup --
+ * __wt_blkcache_setup --
  *     Set up the block cache.
  */
 int
-__wt_block_cache_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
+__wt_blkcache_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
 {
     WT_BLKCACHE *blkcache;
     WT_CONFIG_ITEM cval;

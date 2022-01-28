@@ -81,8 +81,6 @@ struct __wt_block_ckpt;
 typedef struct __wt_block_ckpt WT_BLOCK_CKPT;
 struct __wt_block_desc;
 typedef struct __wt_block_desc WT_BLOCK_DESC;
-struct __wt_block_file_opener;
-typedef struct __wt_block_file_opener WT_BLOCK_FILE_OPENER;
 struct __wt_block_header;
 typedef struct __wt_block_header WT_BLOCK_HEADER;
 struct __wt_block_mods;
