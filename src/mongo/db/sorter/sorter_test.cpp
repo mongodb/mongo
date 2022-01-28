@@ -874,6 +874,149 @@ TEST_F(SorterMakeFromExistingRangesTest, RoundTrip) {
     }
 }
 
+class BoundedSorterTest : public unittest::Test {
+public:
+    using Key = int;
+    struct Doc {
+        Key time;
+
+        bool operator==(const Doc& other) {
+            return time == other.time;
+        }
+    };
+    struct Comparator {
+        int operator()(Key x, Key y) const {
+            return x - y;
+        }
+    };
+    struct BoundMaker {
+        Key operator()(Key k) const {
+            return k - 10;
+        }
+    };
+    using S = BoundedSorter<Key, Doc, Comparator, BoundMaker>;
+
+    /**
+     * Feed the input into the sorter one-by-one, taking any output as soon as it's available.
+     */
+    std::vector<Doc> sort(std::vector<Doc> input) {
+        std::vector<Doc> output;
+        auto push = [&](Doc doc) { output.push_back(doc); };
+
+        for (auto&& doc : input) {
+            sorter.add(doc.time, doc);
+            while (sorter.getState() == S::State::kReady)
+                push(sorter.next().second);
+        }
+        sorter.done();
+
+        while (sorter.getState() == S::State::kReady)
+            push(sorter.next().second);
+        ASSERT(sorter.getState() == S::State::kDone);
+
+        ASSERT(output.size() == input.size());
+        return output;
+    }
+
+    static void assertSorted(const std::vector<Doc>& docs) {
+        for (size_t i = 1; i < docs.size(); ++i) {
+            Doc prev = docs[i - 1];
+            Doc curr = docs[i];
+            ASSERT_LTE(prev.time, curr.time);
+        }
+    }
+
+    S sorter{{}, {}};
+};
+TEST_F(BoundedSorterTest, Empty) {
+    ASSERT(sorter.getState() == S::State::kWait);
+
+    sorter.done();
+    ASSERT(sorter.getState() == S::State::kDone);
+}
+TEST_F(BoundedSorterTest, Sorted) {
+    auto output = sort({
+        {0},
+        {3},
+        {10},
+        {11},
+        {12},
+        {13},
+        {14},
+        {15},
+        {16},
+    });
+    assertSorted(output);
+}
+
+TEST_F(BoundedSorterTest, SortedExceptOne) {
+    auto output = sort({
+        {0},
+        {3},
+        {10},
+        // Swap 11 and 12.
+        {12},
+        {11},
+        {13},
+        {14},
+        {15},
+        {16},
+    });
+    assertSorted(output);
+}
+
+TEST_F(BoundedSorterTest, AlmostSorted) {
+    auto output = sort({
+        // 0 and 11 cannot swap.
+        {0},
+        {11},
+        {13},
+        {10},
+        {12},
+        // 3 and 14 cannot swap.
+        {3},
+        {14},
+        {15},
+        {16},
+    });
+    assertSorted(output);
+}
+
+TEST_F(BoundedSorterTest, WrongInput) {
+    std::vector<Doc> input = {
+        {3},
+        {4},
+        {5},
+        {10},
+        {15},
+        // This 1 is too far out of order: it's more than 10 away from 15.
+        // So it will appear too late in the output.
+        // We will still be hanging on to anything in the range [5, inf).
+        // So we will have already returned 3, 4.
+        {1},
+        {16},
+    };
+
+    // Disable input order checking so we can see what happens.
+    sorter.checkInput = false;
+    auto output = sort(input);
+    ASSERT_EQ(output.size(), 7);
+
+    ASSERT_EQ(output[0].time, 3);
+    ASSERT_EQ(output[1].time, 4);
+    ASSERT_EQ(output[2].time, 1);  // Out of order.
+    ASSERT_EQ(output[3].time, 5);
+    ASSERT_EQ(output[4].time, 10);
+    ASSERT_EQ(output[5].time, 15);
+    ASSERT_EQ(output[6].time, 16);
+
+    // Test that by default, bad input like this would be detected.
+    sorter = S{{}, {}};
+    ASSERT(sorter.checkInput);
+    ASSERT_THROWS_CODE(sort(input), DBException, 6369910);
+}
+
+
 }  // namespace
 }  // namespace sorter
 }  // namespace mongo

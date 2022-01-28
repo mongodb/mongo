@@ -111,6 +111,12 @@ public:
     }
 
     /**
+     * Parse a stage that uses BoundedSorter.
+     */
+    static boost::intrusive_ptr<DocumentSourceSort> parseBoundedSort(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    /**
      * Returns the the limit, if a subsequent $limit stage has been coalesced with this $sort stage.
      * Otherwise, returns boost::none.
      */
@@ -187,6 +193,21 @@ private:
     boost::optional<SortExecutor<Document>> _sortExecutor;
 
     boost::optional<SortKeyGenerator> _sortKeyGen;
+
+    struct BoundMaker {
+        Seconds bound;
+
+        Date_t operator()(Date_t key) {
+            return key - bound;
+        }
+    };
+    struct Comp {
+        int operator()(Date_t x, Date_t y) const {
+            return x.toMillisSinceEpoch() - y.toMillisSinceEpoch();
+        }
+    };
+    using TimeSorter = BoundedSorter<Date_t, Document, Comp, BoundMaker>;
+    std::unique_ptr<TimeSorter> _timeSorter;
 };
 
 }  // namespace mongo

@@ -35,6 +35,7 @@
 #include <deque>
 #include <fstream>
 #include <memory>
+#include <queue>
 #include <string>
 #include <utility>
 #include <vector>
@@ -42,6 +43,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/sorter/sorter_gen.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 
 /**
@@ -386,6 +388,124 @@ protected:
     std::shared_ptr<File> _file;
 
     std::vector<std::shared_ptr<Iterator>> _iters;  // Data that has already been spilled.
+};
+
+/**
+ * Sorts data that is already "almost sorted", meaning we can put a bound on how out-of-order
+ * any two input elements are. For example, maybe we are sorting by {time: 1} and we know that no
+ * two documents are more than an hour out of order. This means as soon as we see {time: t}, we know
+ * that any document earlier than {time: t - 1h} is safe to return.
+ *
+ * Note what's bounded is the difference in sort-key values, not the number of inversions.
+ * This means we don't know how much space we'll need.
+ *
+ * This is not a subclass of Sorter because the interface is different: Sorter has a strict
+ * separation between reading input and returning results, while BoundedSorter can alternate
+ * between the two.
+ *
+ * Comparator does a 3-way comparison between two Keys: comp(x, y) < 0 iff x < y.
+ *
+ * BoundMaker takes a Key from the input, and computes a bound. The bound is a Key that is
+ * less-or-equal to all future Keys that will be seen in the input.
+ */
+template <typename Key, typename Value, typename Comparator, typename BoundMaker>
+class BoundedSorter {
+public:
+    // 'Comparator' is a 3-way comparison, but std::priority_queue wants a '<' comparison.
+    // But also, std::priority_queue is a max-heap, and we want a min-heap.
+    // And also, 'Comparator' compares Keys, but std::priority_queue calls its comparator
+    // on whole elements.
+    struct Greater {
+        bool operator()(const std::pair<Key, Value>& p1, const std::pair<Key, Value>& p2) const {
+            return compare(p1.first, p2.first) > 0;
+        }
+        Comparator compare;
+    };
+
+    BoundedSorter(Comparator comp, BoundMaker makeBound)
+        : compare(comp), makeBound(makeBound), _heap(Greater{comp}) {}
+
+    // Feed one item of input to the sorter.
+    // Together, add() and done() represent the input stream.
+    void add(Key key, Value value) {
+        invariant(!_done);
+        // If a new value violates what we thought was our min bound, something has gone wrong.
+        if (checkInput && _min)
+            uassert(6369910, "BoundedSorter input is too out-of-order.", compare(*_min, key) <= 0);
+
+        // Each new item can potentially give us a tighter bound (a higher min).
+        Key newMin = makeBound(key);
+        if (!_min || compare(*_min, newMin) < 0)
+            _min = newMin;
+
+        _heap.emplace(std::move(key), std::move(value));
+    }
+
+    // Indicate that no more input will arrive.
+    // Together, add() and done() represent the input stream.
+    void done() {
+        invariant(!_done);
+        _done = true;
+    }
+
+    enum class State {
+        // An output document is not available yet, but this may change as more input arrives.
+        kWait,
+        // An output document is available now: you may call next() once.
+        kReady,
+        // All output has been returned.
+        kDone,
+    };
+    // Together, state() and next() represent the output stream.
+    // See BoundedSorter::State for the meaning of each case.
+    State getState() const {
+        if (_done) {
+            // No more input will arrive, so we're never in state kWait.
+            return _heap.empty() ? State::kDone : State::kReady;
+        } else {
+            if (_heap.empty())
+                return State::kWait;
+            dassert(_min);
+
+            // _heap.top() is the min of _heap, but we also need to consider whether a smaller input
+            // will arrive later. So _heap.top() is safe to return only if heap.top() < _min.
+            if (compare(_heap.top().first, *_min) < 0)
+                return State::kReady;
+
+            // A later call to add() may improve _min. Or in the worst case, after done() is called
+            // we will return everything in _heap.
+            return State::kWait;
+        }
+    }
+
+    // Remove and return one item of output.
+    // Only valid to call when getState() == kReady.
+    // Together, state() and next() represent the output stream.
+    std::pair<Key, Value> next() {
+        dassert(getState() == State::kReady);
+        auto result = _heap.top();
+        _heap.pop();
+        return result;
+    }
+
+    size_t size() const {
+        return _heap.size();
+    }
+
+    // By default, uassert that the input meets our assumptions of being almost-sorted.
+    // But if _checkInput is false, don't do that check.
+    // The output will be in the wrong order but otherwise it should work.
+    bool checkInput = true;
+
+    Comparator compare;
+    BoundMaker makeBound;
+
+private:
+    using KV = std::pair<Key, Value>;
+    std::priority_queue<KV, std::vector<KV>, Greater> _heap;
+
+    boost::optional<Key> _min;
+    bool _done = false;
 };
 
 /**

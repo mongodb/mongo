@@ -36,6 +36,13 @@ var TimeseriesTest = class {
             .featureFlagShardedTimeSeriesUpdateDelete.value;
     }
 
+    static bucketUnpackWithSortEnabled(conn) {
+        return assert
+            .commandWorked(
+                conn.adminCommand({getParameter: 1, featureFlagBucketUnpackWithSort50: 1}))
+            .featureFlagBucketUnpackWithSort50.value;
+    }
+
     /**
      * Adjusts the values in 'fields' by a random amount.
      * Ensures that the new values stay in the range [0, 100].
