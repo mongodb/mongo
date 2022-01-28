@@ -70,6 +70,7 @@ public:
         StorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;
+        options.forRestore = params.restore;
         options.lockFileCreatedByUncleanShutdown = lockFile && lockFile->createdByUncleanShutdown();
         return std::make_unique<StorageEngineImpl>(opCtx, std::move(kv), options);
     }
