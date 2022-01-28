@@ -118,15 +118,13 @@ var FSMShardingTest = class {
      * Public Functions.
      */
 
-    shardColl(coll, shardKey) {
+    shardColl(coll, shardKey, unique) {
         assert.commandWorked(this.s(0).adminCommand({
             enableSharding: coll.getDB().toString(),
         }));
 
-        assert.commandWorked(this.s(0).adminCommand({
-            shardCollection: coll.toString(),
-            key: shardKey,
-        }));
+        assert.commandWorked(this.s(0).adminCommand(
+            {shardCollection: coll.toString(), key: shardKey, unique: unique || false}));
     }
 
     /*

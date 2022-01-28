@@ -6,8 +6,7 @@
  *
  * @tags: [
  *  requires_fcv_51,
- *  featureFlagClusteredIndexes,
- *  assumes_unsharded_collection,
+ *  featureFlagClusteredIndexes
  *  ]
  */
 
@@ -15,11 +14,6 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWo
 load('jstests/concurrency/fsm_workloads/CRUD_and_commands.js');  // for $config
 
 var $config = extendWorkload($config, function($config, $super) {
-    // Force the collection to be clustered upon creation.
-    $config.data.createCommand = (collName) => {
-        return {create: collName, clusteredIndex: {key: {_id: 1}, unique: true}};
-    };
-
     // Exclude dropCollection to prevent implicit collection creation of a non-clustered
     // collection.
     const newStates = $super.states;
@@ -40,6 +34,31 @@ var $config = extendWorkload($config, function($config, $super) {
         },
     },
                                    newStates);
+
+    $config.setup = function(db, coll, cluster) {
+        // As the default collection created by runner.js won't be clustered we need to recreate it.
+        db[coll].drop();
+
+        cluster.executeOnMongodNodes(function(nodeAdminDB) {
+            assert.commandWorked(nodeAdminDB.runCommand(
+                {configureFailPoint: 'clusterAllCollectionsByDefault', mode: 'alwaysOn'}));
+        });
+
+        $super.setup.apply(this, [db, coll, cluster]);
+
+        if (cluster.isSharded()) {
+            cluster.shardCollection(db[coll], {_id: 1}, true);
+        }
+    };
+
+    $config.teardown = function(db, collName, cluster) {
+        $super.teardown.apply(this, [db, collName, cluster]);
+
+        cluster.executeOnMongodNodes(function(nodeAdminDB) {
+            assert.commandWorked(nodeAdminDB.runCommand(
+                {configureFailPoint: 'clusterAllCollectionsByDefault', mode: 'off'}));
+        });
+    };
 
     // Exclude dropCollection to prevent implicit collection creation of a non-clustered
     // collection.
