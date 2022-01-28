@@ -126,8 +126,9 @@ assert.commandFailed(restoreNode.adminCommand({fsync: 1}));
 jsTestLog("Doing more write on the primary");
 assert.commandWorked(db.runCommand({insert: sentinelCollName, documents: [{_id: "s3"}]}));
 
-// Make sure we can read the new write on the restore node.
-rst.awaitReplication(undefined, undefined, [restoreNode]);
+// Make sure we can read the new write on the restore node.  Must be durable because we're about
+// to crash this node with no checkpoints.
+rst.awaitReplication(undefined, ReplSetTest.OpTimeType.LAST_DURABLE, [restoreNode]);
 assert.eq(3, restoreNode.getDB(dbName)[sentinelCollName].find({}).itcount());
 
 jsTestLog("Crashing restore node before it takes the first stable checkpoint");
