@@ -10,6 +10,7 @@
  *   requires_fcv_52,
  *   requires_majority_read_concern,
  *   requires_persistence,
+ *   serverless,
  * ]
  */
 

@@ -8,6 +8,7 @@
  *   incompatible_with_shard_merge,
  *   requires_majority_read_concern,
  *   requires_persistence,
+ *   serverless,
  * ]
  */
 

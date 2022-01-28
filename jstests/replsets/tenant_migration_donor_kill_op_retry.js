@@ -8,6 +8,7 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   multiversion_incompatible,
+ *   serverless,
  * ]
  */
 

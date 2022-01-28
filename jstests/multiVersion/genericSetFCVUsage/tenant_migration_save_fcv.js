@@ -4,6 +4,7 @@
  * @tags: [
  *  requires_majority_read_concern,
  *  incompatible_with_windows_tls,
+ *  serverless,
  *  ]
  */
 

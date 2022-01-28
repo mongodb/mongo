@@ -1,7 +1,11 @@
 /**
  * Tests that restarting a migration attempt after a failover fails if the donor and recipient no
  * longer share the same FCV.
- * @tags: [requires_majority_read_concern, incompatible_with_windows_tls]
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   incompatible_with_windows_tls,
+ *   serverless,
+ * ]
  */
 
 (function() {

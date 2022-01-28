@@ -1,6 +1,10 @@
 /**
  * Tests that the recipient cancels all migrations when its FCV changes.
- * @tags: [requires_majority_read_concern, incompatible_with_windows_tls]
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   incompatible_with_windows_tls,
+ *   serverless,
+ * ]
  */
 
 (function() {

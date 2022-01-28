@@ -15,6 +15,7 @@
  *   requires_replication,
  *   requires_persistence,
  *   requires_wiredtiger,
+ *   serverless,
  * ]
  */
 (function() {
