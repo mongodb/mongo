@@ -1,6 +1,7 @@
 /**
  * Tests that multi-documment transactions no longer race with stepdown over
  * "setAlwaysInterruptAtStepDownOrUp".
+ * @tags: [uses_transactions]
  */
 
 (function() {
