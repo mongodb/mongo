@@ -115,7 +115,7 @@ const testCollModConvertUniqueWithSideWrites = function(performCrudOpsFunc, expe
                                                     connectionId: {$exists: true},
                                                     ns: `${coll.getDB().$cmd.getFullName()}`,
                                                     'command.collMod': coll.getName(),
-                                                    'locks.Collection': 'r'
+                                                    'locks.Collection': 'w'
                                                 }
                                             },
                                         ],
@@ -129,7 +129,7 @@ const testCollModConvertUniqueWithSideWrites = function(performCrudOpsFunc, expe
         assert(collModOp.hasOwnProperty('locks'),
                'no lock info in collMod op from db.currentOp(): ' + tojson(collModOp));
         assert.eq(collModOp.locks.Collection,
-                  'r',
+                  'w',
                   'collMod is not holding collection lock in read mode: ' + tojson(collModOp));
 
         jsTestLog('Performing CRUD ops on collection while collMod is paused: ' +

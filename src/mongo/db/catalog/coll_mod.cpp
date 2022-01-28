@@ -75,7 +75,6 @@ MONGO_FAIL_POINT_DEFINE(hangAfterDatabaseLock);
 MONGO_FAIL_POINT_DEFINE(hangAfterCollModIndexUniqueSideWriteTracker);
 
 void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
-    Lock::DBLock dblock(opCtx, nss.db(), MODE_IS);
     auto dss = DatabaseShardingState::get(opCtx, nss.db().toString());
     if (!dss) {
         return;
@@ -548,7 +547,10 @@ Status _processCollModDryRunMode(OperationContext* opCtx,
 
 StatusWith<std::unique_ptr<CollModWriteOpsTracker::Token>> _setUpCollModIndexUnique(
     OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID, const CollMod& cmd) {
-    AutoGetCollection coll(opCtx, nsOrUUID, MODE_IS);
+    // Acquires the MODE_IX lock with the intent to write to the collection later in the collMod
+    // operation while still allowing concurrent writes. This also makes sure the operation is
+    // killed during a stepdown.
+    AutoGetCollection coll(opCtx, nsOrUUID, MODE_IX);
     auto nss = coll.getNss();
 
     const auto& collection = coll.getCollection();
