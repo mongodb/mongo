@@ -81,6 +81,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/long_collection_names_gen.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
@@ -393,8 +394,10 @@ public:
                     // the FCV value to kDowngrading. Wait for the ongoing collMod coordinators to
                     // finish.
                     ShardingDDLCoordinatorService::getService(opCtx)
-                        ->waitForCollModCoordinatorsToComplete(opCtx);
+                        ->waitForCoordinatorsOfGivenTypeToComplete(
+                            opCtx, DDLCoordinatorTypeEnum::kCollMod);
                 }
+
                 // If we are only running phase-1, then we are done
                 return true;
             }
@@ -769,6 +772,20 @@ private:
             _cleanupInternalSessions(newOpCtx);
 
             LOGV2(5876101, "Completed removal of internal sessions from config.transactions.");
+        }
+
+        // TODO SERVER-62338 Remove when 6.0 branches-out
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+            !resharding::gFeatureFlagRecoverableShardsvrReshardCollectionCoordinator
+                 .isEnabledOnVersion(requestedVersion)) {
+            // No more (recoverable) ReshardCollectionCoordinators will start because we
+            // have already switched the FCV value to kDowngrading. Wait for the ongoing
+            // ReshardCollectionCoordinators to finish. The fact that the the configsvr has already
+            // executed 'abortAllReshardCollection' after switching to kDowngrading FCV ensures that
+            // ReshardCollectionCoordinators will finish (Interrupted) promptly.
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kReshardCollection);
         }
 
         uassert(ErrorCodes::Error(549181),

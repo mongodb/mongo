@@ -118,10 +118,14 @@ std::shared_ptr<ShardingDDLCoordinatorService::Instance>
 ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) {
     auto coord = constructShardingDDLCoordinatorInstance(this, std::move(initialState));
 
-    bool isCollMod = coord->operationType() == DDLCoordinatorTypeEnum::kCollMod;
-    if (isCollMod) {
-        stdx::lock_guard lg(_collModCompletionMutex);
-        ++_numActiveCollModCoordinators;
+    {
+        stdx::lock_guard lg(_mutex);
+        const auto it = _numActiveCoordinatorsPerType.find(coord->operationType());
+        if (it != _numActiveCoordinatorsPerType.end()) {
+            it->second++;
+        } else {
+            _numActiveCoordinatorsPerType.emplace(coord->operationType(), 1);
+        }
     }
 
     coord->getConstructionCompletionFuture()
@@ -134,29 +138,31 @@ ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) {
             invariant(_numCoordinatorsToWait > 0);
             if (--_numCoordinatorsToWait == 0) {
                 _state = State::kRecovered;
-                _recoveredCV.notify_all();
+                _recoveredOrCoordinatorCompletedCV.notify_all();
             }
         });
 
-    if (isCollMod) {
-        coord->getCompletionFuture()
-            .thenRunOn(getInstanceCleanupExecutor())
-            .getAsync([this](auto status) {
-                stdx::lock_guard lg(_collModCompletionMutex);
-                if (--_numActiveCollModCoordinators == 0) {
-                    _allCollModCompletedCV.notify_all();
-                }
-            });
-    }
+    coord->getCompletionFuture()
+        .thenRunOn(getInstanceCleanupExecutor())
+        .getAsync([this, coordinatorType = coord->operationType()](auto status) {
+            stdx::lock_guard lg(_mutex);
+            const auto it = _numActiveCoordinatorsPerType.find(coordinatorType);
+            invariant(it != _numActiveCoordinatorsPerType.end());
+            it->second--;
+            _recoveredOrCoordinatorCompletedCV.notify_all();
+        });
+
     return coord;
 }
 
-void ShardingDDLCoordinatorService::waitForCollModCoordinatorsToComplete(
-    OperationContext* opCtx) const {
-    _waitForRecoveryCompletion(opCtx);
-    stdx::unique_lock lk(_collModCompletionMutex);
-    opCtx->waitForConditionOrInterrupt(
-        _allCollModCompletedCV, lk, [this]() { return _numActiveCollModCoordinators == 0; });
+void ShardingDDLCoordinatorService::waitForCoordinatorsOfGivenTypeToComplete(
+    OperationContext* opCtx, DDLCoordinatorTypeEnum type) const {
+    stdx::unique_lock lk(_mutex);
+    opCtx->waitForConditionOrInterrupt(_recoveredOrCoordinatorCompletedCV, lk, [this, type]() {
+        const auto it = _numActiveCoordinatorsPerType.find(type);
+        return _state == State::kRecovered &&
+            (it == _numActiveCoordinatorsPerType.end() || it->second == 0);
+    });
 }
 
 void ShardingDDLCoordinatorService::_afterStepDown() {
@@ -195,7 +201,7 @@ size_t ShardingDDLCoordinatorService::_countCoordinatorDocs(OperationContext* op
 void ShardingDDLCoordinatorService::_waitForRecoveryCompletion(OperationContext* opCtx) const {
     stdx::unique_lock lk(_mutex);
     opCtx->waitForConditionOrInterrupt(
-        _recoveredCV, lk, [this]() { return _state == State::kRecovered; });
+        _recoveredOrCoordinatorCompletedCV, lk, [this]() { return _state == State::kRecovered; });
 }
 
 ExecutorFuture<void> ShardingDDLCoordinatorService::_rebuildService(
@@ -216,7 +222,7 @@ ExecutorFuture<void> ShardingDDLCoordinatorService::_rebuildService(
                 _numCoordinatorsToWait = numCoordinators;
             } else {
                 _state = State::kRecovered;
-                _recoveredCV.notify_all();
+                _recoveredOrCoordinatorCompletedCV.notify_all();
             }
         })
         .onError([this](const Status& status) {

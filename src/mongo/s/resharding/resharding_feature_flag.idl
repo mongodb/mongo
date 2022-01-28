@@ -46,4 +46,5 @@ feature_flags:
             ShardingDDLCoordinator that ensures proper serialization of resharding and other DDL
             operations even in the event of primary shard stepdowns.
         cpp_varname: gFeatureFlagRecoverableShardsvrReshardCollectionCoordinator
-        default: false
+        default: true
+        version: 5.3

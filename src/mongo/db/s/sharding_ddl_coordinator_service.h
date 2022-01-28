@@ -31,6 +31,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 
 namespace mongo {
 
@@ -71,7 +72,8 @@ public:
 
     std::shared_ptr<executor::TaskExecutor> getInstanceCleanupExecutor() const;
 
-    void waitForCollModCoordinatorsToComplete(OperationContext* opCtx) const;
+    void waitForCoordinatorsOfGivenTypeToComplete(OperationContext* opCtx,
+                                                  DDLCoordinatorTypeEnum type) const;
 
 private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -80,11 +82,6 @@ private:
     void _waitForRecoveryCompletion(OperationContext* opCtx) const;
     void _afterStepDown() override;
     size_t _countCoordinatorDocs(OperationContext* opCtx);
-
-    mutable Mutex _collModCompletionMutex =
-        MONGO_MAKE_LATCH("ShardingDDLCoordinatorService::_collModCompletionMutex");
-    size_t _numActiveCollModCoordinators{0};
-    mutable stdx::condition_variable _allCollModCompletedCV;
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardingDDLCoordinatorService::_mutex");
 
@@ -100,11 +97,13 @@ private:
 
     State _state = State::kPaused;
 
-    mutable stdx::condition_variable _recoveredCV;
+    mutable stdx::condition_variable _recoveredOrCoordinatorCompletedCV;
 
     // This counter is set up at stepUp and reprensent the number of coordinator instances
     // that needs to be recovered from disk.
     size_t _numCoordinatorsToWait{0};
+
+    stdx::unordered_map<DDLCoordinatorTypeEnum, size_t> _numActiveCoordinatorsPerType;
 };
 
 }  // namespace mongo
