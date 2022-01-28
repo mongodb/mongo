@@ -671,10 +671,7 @@ variables:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars:
-            CC="/opt/mongodbtoolchain/v3/bin/clang -fsanitize=address"
-            PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC -fno-omit-frame-pointer" CXXFLAGS="-fsanitize=address -fno-omit-frame-pointer -ggdb -fPIC"
-          posix_configure_flags: --enable-strict --enable-diagnostic --with-builtins=lz4,snappy,zlib,zstd
+          posix_configure_flags: -DENABLE_STRICT=1 -DHAVE_DIAGNOSTIC=1 -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1 -DHAVE_BUILTIN_EXTENSION_ZSTD=1
       - func: "format test script"
         vars:
           format_test_script_args: -R -t 360
@@ -1972,7 +1969,6 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
           posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake -DCMAKE_BUILD_TYPE=Coverage -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1 -DHAVE_DIAGNOSTIC=1 -DENABLE_STRICT=1 -DENABLE_PYTHON=1 -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_ZSTD=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1
       - func: "make check all"
       - func: "unit test"
@@ -3855,7 +3851,6 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
-    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
     doc_update_branches: develop,mongodb-5.0,mongodb-4.4,mongodb-4.2,mongodb-4.0
   tasks:
     - name: doc-update
