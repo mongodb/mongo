@@ -30,6 +30,7 @@
 
 #include "mongo/db/s/balancer/balancer_defragmentation_policy_impl.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/balancer/cluster_statistics.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/logv2/log.h"
@@ -137,6 +138,15 @@ bool areMergeable(const ChunkType& firstChunk,
         collectionZones.getZoneForChunk(firstChunk.getRange()) ==
         collectionZones.getZoneForChunk(secondChunk.getRange()) &&
         SimpleBSONObjComparator::kInstance.evaluate(firstChunk.getMax() == secondChunk.getMin());
+}
+
+void checkForWriteErrors(const write_ops::UpdateCommandReply& response) {
+    const auto& writeErrors = response.getWriteErrors();
+    if (writeErrors) {
+        BSONObj firstWriteError = writeErrors->front();
+        uasserted(ErrorCodes::Error(firstWriteError.getIntField("code")),
+                  firstWriteError.getStringField("errmsg"));
+    }
 }
 
 class MergeAndMeasureChunksPhase : public DefragmentationPhase {
@@ -1586,10 +1596,17 @@ std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transi
                 nextPhaseObject = SplitChunksPhase::build(opCtx, coll);
                 break;
             case DefragmentationPhaseEnum::kFinished:
-                _clearDataSizeInformation(opCtx, coll.getUuid());
+                _clearDefragmentationState(opCtx, coll.getUuid());
                 break;
         }
         afterBuildingNextDefragmentationPhase.pauseWhileSet();
+        LOGV2(6172702,
+              "Collection defragmentation transitioning to new phase",
+              "namespace"_attr = coll.getNss(),
+              "phase"_attr = nextPhaseObject
+                  ? DefragmentationPhase_serializer(nextPhaseObject->getType())
+                  : kNoPhase,
+              "details"_attr = nextPhaseObject ? nextPhaseObject->reportProgress() : BSONObj());
     } catch (const DBException& e) {
         LOGV2_ERROR(6153101,
                     "Error while building defragmentation phase on collection",
@@ -1598,13 +1615,6 @@ std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transi
                     "phase"_attr = nextPhase,
                     "error"_attr = e);
     }
-    LOGV2(6172702,
-          "Collection defragmentation transitioning to new phase",
-          "namespace"_attr = coll.getNss(),
-          "phase"_attr = nextPhaseObject
-              ? DefragmentationPhase_serializer(nextPhaseObject->getType())
-              : kNoPhase,
-          "details"_attr = nextPhaseObject ? nextPhaseObject->reportProgress() : BSONObj());
     return nextPhaseObject;
 }
 
@@ -1634,34 +1644,28 @@ void BalancerDefragmentationPolicyImpl::_persistPhaseUpdate(OperationContext* op
     updateOp.setUpdates({[&] {
         write_ops::UpdateOpEntry entry;
         entry.setQ(BSON(CollectionType::kUuidFieldName << uuid));
-        if (phase != DefragmentationPhaseEnum::kFinished) {
-            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-                BSON("$set" << BSON(CollectionType::kDefragmentationPhaseFieldName
-                                    << DefragmentationPhase_serializer(phase)))));
-        } else {
-            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON(
-                "$unset" << BSON(CollectionType::kDefragmentCollectionFieldName
-                                 << "" << CollectionType::kDefragmentationPhaseFieldName << ""))));
-        }
+        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$set" << BSON(CollectionType::kDefragmentationPhaseFieldName
+                                << DefragmentationPhase_serializer(phase)))));
         return entry;
     }()});
     auto response = dbClient.update(updateOp);
-    auto writeErrors = response.getWriteErrors();
-    if (writeErrors) {
-        BSONObj firstWriteError = writeErrors->front();
-        uasserted(ErrorCodes::Error(firstWriteError.getIntField("code")),
-                  firstWriteError.getStringField("errmsg"));
-    }
+    checkForWriteErrors(response);
     uassert(ErrorCodes::NoMatchingDocument,
             "Collection {} not found while persisting phase change"_format(uuid.toString()),
             response.getN() > 0);
+    WriteConcernResult ignoreResult;
+    const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    uassertStatusOK(waitForWriteConcern(
+        opCtx, latestOpTime, WriteConcerns::kMajorityWriteConcernShardingTimeout, &ignoreResult));
 }
 
-void BalancerDefragmentationPolicyImpl::_clearDataSizeInformation(OperationContext* opCtx,
-                                                                  const UUID& uuid) {
+void BalancerDefragmentationPolicyImpl::_clearDefragmentationState(OperationContext* opCtx,
+                                                                   const UUID& uuid) {
     DBDirectClient dbClient(opCtx);
-    write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
-    updateOp.setUpdates({[&] {
+    // Clear datasize estimates from chunks
+    write_ops::UpdateCommandRequest removeDataSize(ChunkType::ConfigNS);
+    removeDataSize.setUpdates({[&] {
         write_ops::UpdateOpEntry entry;
         entry.setQ(BSON(CollectionType::kUuidFieldName << uuid));
         entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
@@ -1669,7 +1673,23 @@ void BalancerDefragmentationPolicyImpl::_clearDataSizeInformation(OperationConte
         entry.setMulti(true);
         return entry;
     }()});
-    dbClient.update(updateOp);
+    checkForWriteErrors(dbClient.update(removeDataSize));
+    // Clear defragmentation phase and defragmenting flag from collection
+    write_ops::UpdateCommandRequest removeCollectionFlags(CollectionType::ConfigNS);
+    removeCollectionFlags.setUpdates({[&] {
+        write_ops::UpdateOpEntry entry;
+        entry.setQ(BSON(CollectionType::kUuidFieldName << uuid));
+        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$unset" << BSON(CollectionType::kDefragmentCollectionFieldName
+                                  << "" << CollectionType::kDefragmentationPhaseFieldName << ""))));
+        return entry;
+    }()});
+    auto response = dbClient.update(removeCollectionFlags);
+    checkForWriteErrors(response);
+    WriteConcernResult ignoreResult;
+    const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    uassertStatusOK(waitForWriteConcern(
+        opCtx, latestOpTime, WriteConcerns::kMajorityWriteConcernShardingTimeout, &ignoreResult));
 }
 
 }  // namespace mongo

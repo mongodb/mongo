@@ -164,7 +164,7 @@ private:
      * Remove all datasize fields from config.chunks for the given namespace.
      * Must be called while holding the _stateMutex.
      */
-    void _clearDataSizeInformation(OperationContext* opCtx, const UUID& uuid);
+    void _clearDefragmentationState(OperationContext* opCtx, const UUID& uuid);
 
     void _processEndOfAction(WithLock, OperationContext* opCtx);
 
