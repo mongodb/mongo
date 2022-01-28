@@ -685,21 +685,21 @@ public:
             wiredTigerPrepareConflictRetry(_opCtx, [&] { return _cursor->next(_cursor); });
         if (advanceRet == WT_NOTFOUND)
             return {};
-        invariantWTOK(advanceRet);
+        invariantWTOK(advanceRet, _cursor->session);
 
         RecordId id;
         if (_rs->keyFormat() == KeyFormat::String) {
             WT_ITEM item;
-            invariantWTOK(_cursor->get_key(_cursor, &item));
+            invariantWTOK(_cursor->get_key(_cursor, &item), _cursor->session);
             id = RecordId(static_cast<const char*>(item.data), item.size);
         } else {
             int64_t key;
-            invariantWTOK(_cursor->get_key(_cursor, &key));
+            invariantWTOK(_cursor->get_key(_cursor, &key), _cursor->session);
             id = RecordId(key);
         }
 
         WT_ITEM value;
-        invariantWTOK(_cursor->get_value(_cursor, &value));
+        invariantWTOK(_cursor->get_value(_cursor, &value), _cursor->session);
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
 
@@ -726,8 +726,10 @@ public:
         WT_SESSION* session = WiredTigerRecoveryUnit::get(_opCtx)->getSession()->getSession();
 
         if (!_cursor) {
-            auto status = wtRCToStatus(session->open_cursor(
-                session, _rs->_uri.c_str(), nullptr, _config.c_str(), &_cursor));
+            auto status =
+                wtRCToStatus(session->open_cursor(
+                                 session, _rs->_uri.c_str(), nullptr, _config.c_str(), &_cursor),
+                             session);
             if (status == ErrorCodes::ObjectIsBusy) {
                 // This can happen if you try to open a cursor on the oplog table and a verify is
                 // currently running on it.
@@ -745,7 +747,7 @@ public:
         invariant(_opCtx);
         _opCtx = nullptr;
         if (_cursor && !_saveStorageCursorOnDetachFromOperationContext) {
-            invariantWTOK(_cursor->close(_cursor));
+            invariantWTOK(_cursor->close(_cursor), _cursor->session);
             _cursor = nullptr;
         }
     }
@@ -1085,7 +1087,7 @@ int64_t WiredTigerRecordStore::freeStorageSize(OperationContext* opCtx) const {
 // Retrieve the value from a positioned cursor.
 RecordData WiredTigerRecordStore::_getData(const WiredTigerCursor& cursor) const {
     WT_ITEM value;
-    invariantWTOK(cursor->get_value(cursor.get(), &value));
+    invariantWTOK(cursor->get_value(cursor.get(), &value), cursor->session);
     return RecordData(static_cast<const char*>(value.data), value.size).getOwned();
 }
 
@@ -1103,7 +1105,7 @@ bool WiredTigerRecordStore::findRecord(OperationContext* opCtx,
     if (ret == WT_NOTFOUND) {
         return false;
     }
-    invariantWTOK(ret);
+    invariantWTOK(ret, c->session);
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementOneCursorSeek();
@@ -1131,19 +1133,19 @@ void WiredTigerRecordStore::deleteRecord(OperationContext* opCtx, const RecordId
     CursorKey key = makeCursorKey(id, _keyFormat);
     setKey(c, &key);
     int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
-    invariantWTOK(ret);
+    invariantWTOK(ret, c->session);
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementOneCursorSeek();
 
     WT_ITEM old_value;
     ret = c->get_value(c, &old_value);
-    invariantWTOK(ret);
+    invariantWTOK(ret, c->session);
 
     int64_t old_length = old_value.size;
 
     ret = WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c));
-    invariantWTOK(ret);
+    invariantWTOK(ret, c->session);
 
     auto keyLength = computeRecordIdSize(id);
     metricsCollector.incrementOneDocWritten(old_length + keyLength);
@@ -1221,7 +1223,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
 
             // The first record in the oplog should be within the truncate range.
             int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return cursor->next(cursor); });
-            invariantWTOK(ret);
+            invariantWTOK(ret, cursor->session);
             RecordId firstRecord = getKey(cursor);
             if (firstRecord < _oplogStones->firstRecord || firstRecord > stone->lastRecord) {
                 LOGV2_WARNING(22407,
@@ -1240,7 +1242,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
             int cmp;
             ret = wiredTigerPrepareConflictRetry(opCtx,
                                                  [&] { return cursor->search_near(cursor, &cmp); });
-            invariantWTOK(ret);
+            invariantWTOK(ret, cursor->session);
 
             // Check 'cmp' to determine if we landed on the requested record. While it is often the
             // case that stones represent a perfect partitioning of the oplog, it's not guaranteed.
@@ -1256,7 +1258,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
                     LOGV2_DEBUG(5140900, 0, "Will not truncate entire oplog");
                     return;
                 }
-                invariantWTOK(ret);
+                invariantWTOK(ret, cursor->session);
             }
             RecordId nextRecord = getKey(cursor);
             if (static_cast<std::uint64_t>(nextRecord.getLong()) > mayTruncateUpTo.asULL()) {
@@ -1271,9 +1273,9 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
 
             // After checking whether or not we should truncate, reposition the cursor back to the
             // current stone's lastRecord.
-            invariantWTOK(cursor->reset(cursor));
+            invariantWTOK(cursor->reset(cursor), cursor->session);
             setKey(cursor, &truncateUpToKey);
-            invariantWTOK(session->truncate(session, nullptr, nullptr, cursor, nullptr));
+            invariantWTOK(session->truncate(session, nullptr, nullptr, cursor, nullptr), session);
             _changeNumRecords(opCtx, -stone->records);
             _increaseDataSize(opCtx, -stone->bytes);
 
@@ -1393,7 +1395,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
         }
 
         if (ret)
-            return wtRCToStatus(ret, "WiredTigerRecordStore::insertRecord");
+            return wtRCToStatus(ret, c->session, "WiredTigerRecordStore::insertRecord");
 
         // Increment metrics for each insert separately, as opposed to outside of the loop. The API
         // requires that each record be accounted for separately.
@@ -1454,7 +1456,7 @@ StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
     if (ret == WT_NOTFOUND) {
         return Status(ErrorCodes::CollectionIsEmpty, "oplog is empty");
     }
-    invariantWTOK(ret);
+    invariantWTOK(ret, cursor->session);
 
     RecordId recordId = getKey(cursor);
 
@@ -1479,7 +1481,7 @@ StatusWith<Timestamp> WiredTigerRecordStore::getEarliestOplogTimestamp(Operation
         if (ret == WT_NOTFOUND) {
             return Status(ErrorCodes::CollectionIsEmpty, "oplog is empty");
         }
-        invariantWTOK(ret);
+        invariantWTOK(ret, cursor->session);
 
         _oplogFirstRecord = getKey(cursor);
     }
@@ -1503,6 +1505,7 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
     int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
 
     invariantWTOK(ret,
+                  c->session,
                   str::stream() << "Namespace: " << ns() << "; Key: " << getKey(c)
                                 << "; Read Timestamp: "
                                 << opCtx->recoveryUnit()
@@ -1515,7 +1518,7 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
 
     WT_ITEM old_value;
     ret = c->get_value(c, &old_value);
-    invariantWTOK(ret);
+    invariantWTOK(ret, c->session);
 
     int64_t old_length = old_value.size;
 
@@ -1543,9 +1546,10 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
         if ((ret = wiredtiger_calc_modify(
                  c->session, &old_value, value.Get(), kMaxDiffBytes, entries.data(), &nentries)) ==
             0) {
-            invariantWTOK(WT_OP_CHECK(
-                nentries == 0 ? c->reserve(c)
-                              : wiredTigerCursorModify(opCtx, c, entries.data(), nentries)));
+            invariantWTOK(WT_OP_CHECK(nentries == 0 ? c->reserve(c)
+                                                    : wiredTigerCursorModify(
+                                                          opCtx, c, entries.data(), nentries)),
+                          c->session);
 
             size_t modifiedDataSize = 0;
             // Don't perform a range-based for loop because there may be fewer calculated entries
@@ -1565,7 +1569,7 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
                      memcmp(data, new_value.data, len) == 0));
             skip_update = true;
         } else if (ret != WT_NOTFOUND) {
-            invariantWTOK(ret);
+            invariantWTOK(ret, c->session);
         }
     }
 
@@ -1576,7 +1580,7 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
         auto keyLength = computeRecordIdSize(id);
         metricsCollector.incrementOneDocWritten(value.size + keyLength);
     }
-    invariantWTOK(ret);
+    invariantWTOK(ret, c->session);
 
     _increaseDataSize(opCtx, len - old_length);
     return Status::OK();
@@ -1618,9 +1622,10 @@ StatusWith<RecordData> WiredTigerRecordStore::updateWithDamages(
 
     // The test harness calls us with empty damage vectors which WiredTiger doesn't allow.
     if (nentries == 0)
-        invariantWTOK(WT_OP_CHECK(c->search(c)));
+        invariantWTOK(WT_OP_CHECK(c->search(c)), c->session);
     else
-        invariantWTOK(WT_OP_CHECK(wiredTigerCursorModify(opCtx, c, entries.data(), nentries)));
+        invariantWTOK(WT_OP_CHECK(wiredTigerCursorModify(opCtx, c, entries.data(), nentries)),
+                      c->session);
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
 
@@ -1628,7 +1633,7 @@ StatusWith<RecordData> WiredTigerRecordStore::updateWithDamages(
     metricsCollector.incrementOneDocWritten(modifiedDataSize + keyLength);
 
     WT_ITEM value;
-    invariantWTOK(c->get_value(c, &value));
+    invariantWTOK(c->get_value(c, &value), c->session);
 
     return RecordData(static_cast<const char*>(value.data), value.size).getOwned();
 }
@@ -1659,7 +1664,7 @@ void WiredTigerRecordStore::printRecordMetadata(OperationContext* opCtx,
 
     int ret = cursor->search(cursor);
     while (ret != WT_NOTFOUND) {
-        invariantWTOK(ret);
+        invariantWTOK(ret, cursor->session);
 
         uint64_t startTs = 0, startDurableTs = 0, stopTs = 0, stopDurableTs = 0;
         uint64_t startTxnId = 0, stopTxnId = 0;
@@ -1677,7 +1682,8 @@ void WiredTigerRecordStore::printRecordMetadata(OperationContext* opCtx,
                                         &prepare,
                                         &flags,
                                         &location,
-                                        &value));
+                                        &value),
+                      cursor->session);
 
         RecordData recordData(static_cast<const char*>(value.data), value.size);
         LOGV2(6120301,
@@ -1712,10 +1718,11 @@ Status WiredTigerRecordStore::truncate(OperationContext* opCtx) {
     if (ret == WT_NOTFOUND) {
         return Status::OK();
     }
-    invariantWTOK(ret);
+    invariantWTOK(ret, start->session);
 
     WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
-    invariantWTOK(WT_OP_CHECK(session->truncate(session, nullptr, start, nullptr, nullptr)));
+    invariantWTOK(WT_OP_CHECK(session->truncate(session, nullptr, start, nullptr, nullptr)),
+                  session);
     _changeNumRecords(opCtx, -numRecords(opCtx));
     _increaseDataSize(opCtx, -dataSize(opCtx));
 
@@ -1743,7 +1750,7 @@ Status WiredTigerRecordStore::compact(OperationContext* opCtx) {
                           str::stream() << "Compaction interrupted on " << getURI().c_str()
                                         << " due to cache eviction pressure");
         }
-        invariantWTOK(ret);
+        invariantWTOK(ret, s);
     }
     return Status::OK();
 }
@@ -1915,7 +1922,7 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
     // we don't re-use RecordIds that are not visible.
     int ret = cursor->largest_key(cursor);
     if (ret != WT_NOTFOUND) {
-        invariantWTOK(ret);
+        invariantWTOK(ret, cursor->session);
         auto recordId = getKey(cursor);
         nextId = recordId.getLong() + 1;
     }
@@ -2053,7 +2060,7 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
     setKey(start, &key);
 
     WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
-    invariantWTOK(session->truncate(session, nullptr, start, nullptr, nullptr));
+    invariantWTOK(session->truncate(session, nullptr, start, nullptr, nullptr), session);
 
     _changeNumRecords(opCtx, -recordsRemoved);
     _increaseDataSize(opCtx, -bytesRemoved);
@@ -2076,7 +2083,7 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
         } else {
             auto conn = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn();
             auto durableTSConfigString = "durable_timestamp={:x}"_format(truncTs.asULL());
-            invariantWTOK(conn->set_timestamp(conn, durableTSConfigString.c_str()));
+            invariantWTOK(conn->set_timestamp(conn, durableTSConfigString.c_str()), session);
         }
 
         _kvEngine->getOplogManager()->setOplogReadTimestamp(truncTs);
@@ -2147,7 +2154,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
             _eof = true;
             return {};
         }
-        invariantWTOK(advanceRet);
+        invariantWTOK(advanceRet, c->session);
         id = getKey(c);
     }
 
@@ -2178,7 +2185,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
     }
 
     WT_ITEM value;
-    invariantWTOK(c->get_value(c, &value));
+    invariantWTOK(c->get_value(c, &value), c->session);
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
 
@@ -2211,13 +2218,13 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordI
         _eof = true;
         return {};
     }
-    invariantWTOK(seekRet);
+    invariantWTOK(seekRet, c->session);
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
     metricsCollector.incrementOneCursorSeek();
 
     WT_ITEM value;
-    invariantWTOK(c->get_value(c, &value));
+    invariantWTOK(c->get_value(c, &value), c->session);
 
     auto keyLength = computeRecordIdSize(id);
     metricsCollector.incrementOneDocRead(value.size + keyLength);
@@ -2249,7 +2256,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId
         _eof = true;
         return boost::none;
     }
-    invariantWTOK(ret);
+    invariantWTOK(ret, c->session);
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
     metricsCollector.incrementOneCursorSeek();
@@ -2275,7 +2282,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId
             ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->prev(c); });
         }
     }
-    invariantWTOK(ret);
+    invariantWTOK(ret, c->session);
 
     curId = getKey(c);
 
@@ -2287,7 +2294,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId
     }
 
     WT_ITEM value;
-    invariantWTOK(c->get_value(c, &value));
+    invariantWTOK(c->get_value(c, &value), c->session);
 
     auto keyLength = computeRecordIdSize(id);
     metricsCollector.incrementOneDocRead(value.size + keyLength);
@@ -2355,7 +2362,7 @@ bool WiredTigerRecordStoreCursorBase::restore(bool tolerateCappedRepositioning) 
         }
         return true;
     }
-    invariantWTOK(ret);
+    invariantWTOK(ret, c->session);
 
     if (cmp == 0)
         return true;  // Landed right where we left off.
@@ -2403,11 +2410,11 @@ StandardWiredTigerRecordStore::StandardWiredTigerRecordStore(WiredTigerKVEngine*
 RecordId StandardWiredTigerRecordStore::getKey(WT_CURSOR* cursor) const {
     if (_keyFormat == KeyFormat::String) {
         WT_ITEM item;
-        invariantWTOK(cursor->get_key(cursor, &item));
+        invariantWTOK(cursor->get_key(cursor, &item), cursor->session);
         return RecordId(static_cast<const char*>(item.data), item.size);
     } else {
         std::int64_t recordId;
-        invariantWTOK(cursor->get_key(cursor, &recordId));
+        invariantWTOK(cursor->get_key(cursor, &recordId), cursor->session);
         return RecordId(recordId);
     }
 }
@@ -2451,11 +2458,11 @@ void WiredTigerRecordStoreStandardCursor::setKey(
 RecordId WiredTigerRecordStoreStandardCursor::getKey(WT_CURSOR* cursor) const {
     if (_rs.keyFormat() == KeyFormat::String) {
         WT_ITEM item;
-        invariantWTOK(cursor->get_key(cursor, &item));
+        invariantWTOK(cursor->get_key(cursor, &item), cursor->session);
         return RecordId(static_cast<const char*>(item.data), item.size);
     } else {
         std::int64_t recordId;
-        invariantWTOK(cursor->get_key(cursor, &recordId));
+        invariantWTOK(cursor->get_key(cursor, &recordId), cursor->session);
         return RecordId(recordId);
     }
 }

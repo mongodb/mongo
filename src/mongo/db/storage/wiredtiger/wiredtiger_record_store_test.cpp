@@ -1092,7 +1092,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
         WiredTigerRecoveryUnit* ru =
             checked_cast<WiredTigerRecoveryUnit*>(opCtx.get()->recoveryUnit());
         WT_SESSION* s = ru->getSession()->getSession();
-        invariantWTOK(s->create(s, uri.c_str(), config.c_str()));
+        invariantWTOK(s->create(s, uri.c_str(), config.c_str()), s);
         uow.commit();
     }
 

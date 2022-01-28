@@ -104,7 +104,7 @@ void WiredTigerIndex::setKey(WT_CURSOR* cursor, const WT_ITEM* item) {
 }
 
 void WiredTigerIndex::getKey(OperationContext* opCtx, WT_CURSOR* cursor, WT_ITEM* key) {
-    invariantWTOK(cursor->get_key(cursor, key));
+    invariantWTOK(cursor->get_key(cursor, key), cursor->session);
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementOneIdxEntryRead(key->size);
@@ -223,22 +223,22 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(
     return StatusWith<std::string>(ss);
 }
 
-int WiredTigerIndex::Create(OperationContext* opCtx,
-                            const std::string& uri,
-                            const std::string& config) {
+Status WiredTigerIndex::Create(OperationContext* opCtx,
+                               const std::string& uri,
+                               const std::string& config) {
     // Don't use the session from the recovery unit: create should not be used in a transaction
     WiredTigerSession session(WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn());
     WT_SESSION* s = session.getSession();
     LOGV2_DEBUG(
         51780, 1, "create uri: {uri} config: {config}", "uri"_attr = uri, "config"_attr = config);
-    return s->create(s, uri.c_str(), config.c_str());
+    return wtRCToStatus(s->create(s, uri.c_str(), config.c_str()), s);
 }
 
-int WiredTigerIndex::Drop(OperationContext* opCtx, const std::string& uri) {
+Status WiredTigerIndex::Drop(OperationContext* opCtx, const std::string& uri) {
     WiredTigerSession session(WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn());
     WT_SESSION* s = session.getSession();
 
-    return s->drop(s, uri.c_str(), nullptr);
+    return wtRCToStatus(s->drop(s, uri.c_str(), nullptr), s);
 }
 
 WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
@@ -449,7 +449,7 @@ bool WiredTigerIndex::isEmpty(OperationContext* opCtx) {
     int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->next(c); });
     if (ret == WT_NOTFOUND)
         return true;
-    invariantWTOK(ret);
+    invariantWTOK(ret, c->session);
     return false;
 }
 
@@ -522,7 +522,7 @@ Status WiredTigerIndex::compact(OperationContext* opCtx) {
                           str::stream() << "Compaction interrupted on " << uri().c_str()
                                         << " due to cache eviction pressure");
         }
-        invariantWTOK(ret);
+        invariantWTOK(ret, s);
     }
     return Status::OK();
 }
@@ -544,7 +544,7 @@ bool WiredTigerIndex::_keyExists(OperationContext* opCtx,
 
     if (ret == WT_NOTFOUND)
         return false;
-    invariantWTOK(ret);
+    invariantWTOK(ret, c->session);
 
     if (cmp == 0)
         return true;
@@ -568,7 +568,7 @@ bool WiredTigerIndex::_keyExists(OperationContext* opCtx,
     if (ret == WT_NOTFOUND) {
         return false;
     }
-    invariantWTOK(ret);
+    invariantWTOK(ret, c->session);
 
     getKey(opCtx, c, &item);
     return std::memcmp(buffer, item.data, std::min(size, item.size)) == 0;
@@ -599,6 +599,7 @@ Status WiredTigerIndex::_checkDups(OperationContext* opCtx,
             key, _desc->getEntry()->getNSSFromCatalog(opCtx), _indexName, _keyPattern, _collation);
     }
     invariantWTOK(ret,
+                  c->session,
                   fmt::format("WiredTigerIndex::_insert: insert: {}; uri: {}", _indexName, _uri));
 
     // Remove the prefix key, our entry will continue to conflict with any concurrent
@@ -607,6 +608,7 @@ Status WiredTigerIndex::_checkDups(OperationContext* opCtx,
     setKey(c, prefixKeyItem.Get());
     ret = WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c));
     invariantWTOK(ret,
+                  c->session,
                   fmt::format("WiredTigerIndex::_insert: remove: {}; uri: {}", _indexName, _uri));
 
     // Second phase looks up for existence of key to avoid insertion of duplicate key
@@ -720,7 +722,8 @@ protected:
                       "error"_attr = wiredtiger_strerror(err),
                       "index"_attr = idx->uri());
 
-        invariantWTOK(session->open_cursor(session, idx->uri().c_str(), nullptr, nullptr, &cursor));
+        invariantWTOK(session->open_cursor(session, idx->uri().c_str(), nullptr, nullptr, &cursor),
+                      session);
         return cursor;
     }
 
@@ -757,7 +760,7 @@ public:
 
         _cursor->set_value(_cursor, valueItem.Get());
 
-        invariantWTOK(wiredTigerCursorInsert(_opCtx, _cursor));
+        invariantWTOK(wiredTigerCursorInsert(_opCtx, _cursor), _cursor->session);
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
         metricsCollector.incrementOneIdxEntryWritten(item.size);
@@ -825,7 +828,7 @@ public:
 
         _cursor->set_value(_cursor, valueItem.Get());
 
-        invariantWTOK(wiredTigerCursorInsert(_opCtx, _cursor));
+        invariantWTOK(wiredTigerCursorInsert(_opCtx, _cursor), _cursor->session);
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
         metricsCollector.incrementOneIdxEntryWritten(keyItem.size);
@@ -877,7 +880,7 @@ public:
         setKey(_cursor, keyItem.Get());
         _cursor->set_value(_cursor, valueItem.Get());
 
-        invariantWTOK(wiredTigerCursorInsert(_opCtx, _cursor));
+        invariantWTOK(wiredTigerCursorInsert(_opCtx, _cursor), _cursor->session);
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
         metricsCollector.incrementOneIdxEntryWritten(keyItem.size);
@@ -1049,7 +1052,7 @@ protected:
         // Don't expect WT_PREPARE_CONFLICT either.
         auto ret = c->get_value(c, &item);
         invariant(ret != WT_ROLLBACK && ret != WT_PREPARE_CONFLICT);
-        invariantWTOK(ret);
+        invariantWTOK(ret, c->session);
         BufReader br(item.data, item.size);
         _typeBits.resetFromBuffer(&br);
     }
@@ -1059,7 +1062,7 @@ protected:
     }
 
     void getKey(WT_CURSOR* cursor, WT_ITEM* key) {
-        invariantWTOK(cursor->get_key(cursor, key));
+        invariantWTOK(cursor->get_key(cursor, key), cursor->session);
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
         metricsCollector.incrementOneIdxEntryRead(key->size);
@@ -1113,7 +1116,7 @@ protected:
             _cursorAtEof = true;
             return;
         }
-        invariantWTOK(ret);
+        invariantWTOK(ret, c->session);
         _cursorAtEof = false;
     }
 
@@ -1134,7 +1137,7 @@ protected:
             LOGV2_TRACE_CURSOR(20088, "not found");
             return false;
         }
-        invariantWTOK(ret);
+        invariantWTOK(ret, c->session);
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
         metricsCollector.incrementOneCursorSeek();
@@ -1412,7 +1415,7 @@ private:
         // Don't expect WT_PREPARE_CONFLICT either.
         auto ret = c->get_value(c, &item);
         invariant(ret != WT_ROLLBACK && ret != WT_PREPARE_CONFLICT);
-        invariantWTOK(ret);
+        invariantWTOK(ret, c->session);
 
         BufReader br(item.data, item.size);
         _id = KeyString::decodeRecordIdLong(&br);
@@ -1447,7 +1450,7 @@ public:
         WT_ITEM item;
         auto ret = c->get_value(c, &item);
         invariant(ret != WT_ROLLBACK && ret != WT_PREPARE_CONFLICT);
-        invariantWTOK(ret);
+        invariantWTOK(ret, c->session);
 
         BufReader br(item.data, item.size);
         _id = KeyString::decodeRecordIdLong(&br);
@@ -1522,7 +1525,7 @@ bool WiredTigerIndexUnique::isDup(OperationContext* opCtx,
         return false;
     }
 
-    fassertFailedWithStatus(40685, wtRCToStatus(ret));
+    fassertFailedWithStatus(40685, wtRCToStatus(ret, c->session));
     MONGO_UNREACHABLE;
 }
 
@@ -1570,7 +1573,7 @@ StatusWith<bool> WiredTigerIdIndex::_insert(OperationContext* opCtx,
     if (!ret) {
         return true;
     } else if (ret != WT_DUPLICATE_KEY) {
-        return wtRCToStatus(ret, [this]() {
+        return wtRCToStatus(ret, c->session, [this]() {
             return fmt::format("WiredTigerIdIndex::_insert: index: {}; uri: {}", _indexName, _uri);
         });
     }
@@ -1620,6 +1623,7 @@ StatusWith<bool> WiredTigerIndexUnique::_insert(OperationContext* opCtx,
 
     invariantWTOK(
         ret,
+        c->session,
         fmt::format("WiredTigerIndexUnique::_insert: duplicate: {}; uri: {}", _indexName, _uri));
 
     return true;
@@ -1646,7 +1650,7 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
         if (ret == WT_NOTFOUND) {
             return;
         }
-        invariantWTOK(ret);
+        invariantWTOK(ret, c->session);
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
         metricsCollector.incrementOneIdxEntryWritten(keyItem.size);
@@ -1660,13 +1664,13 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
     if (ret == WT_NOTFOUND) {
         return;
     }
-    invariantWTOK(ret);
+    invariantWTOK(ret, c->session);
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementOneCursorSeek();
 
     WT_ITEM old;
-    invariantWTOK(c->get_value(c, &old));
+    invariantWTOK(c->get_value(c, &old), c->session);
 
     BufReader br(old.data, old.size);
     invariant(br.remaining());
@@ -1685,7 +1689,7 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
 
     // The RecordId matches, so remove the entry.
     if (id == idInIndex) {
-        invariantWTOK(WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c)));
+        invariantWTOK(WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c)), c->session);
         metricsCollector.incrementOneIdxEntryWritten(keyItem.size);
         return;
     }
@@ -1716,7 +1720,7 @@ void WiredTigerIndexUnique::_unindex(OperationContext* opCtx,
     metricsCollector.incrementOneIdxEntryWritten(item.size);
 
     if (ret != WT_NOTFOUND) {
-        invariantWTOK(ret);
+        invariantWTOK(ret, c->session);
         return;
     }
 
@@ -1739,7 +1743,7 @@ void WiredTigerIndexUnique::_unindex(OperationContext* opCtx,
     if (ret == WT_NOTFOUND) {
         return;
     }
-    invariantWTOK(ret);
+    invariantWTOK(ret, c->session);
 }
 // ------------------------------
 
@@ -1797,7 +1801,7 @@ StatusWith<bool> WiredTigerIndexStandard::_insert(OperationContext* opCtx,
     if (ret == WT_DUPLICATE_KEY) {
         return false;
     } else if (ret) {
-        return wtRCToStatus(ret, [this]() {
+        return wtRCToStatus(ret, c->session, [this]() {
             return fmt::format(
                 "WiredTigerIndexStandard::_insert: index: {}; uri: {}", _indexName, _uri);
         });
@@ -1818,7 +1822,7 @@ void WiredTigerIndexStandard::_unindex(OperationContext* opCtx,
     if (ret == WT_NOTFOUND) {
         return;
     }
-    invariantWTOK(ret);
+    invariantWTOK(ret, c->session);
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementOneIdxEntryWritten(item.size);

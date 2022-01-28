@@ -63,7 +63,7 @@ public:
 
         const char* config = "create,cache_size=1G,";
         int ret = wiredtiger_open(_dbpath.path().c_str(), nullptr, config, &_conn);
-        invariantWTOK(ret);
+        invariantWTOK(ret, nullptr);
 
         _fastClockSource = std::make_unique<SystemClockSource>();
         _sessionCache = new WiredTigerSessionCache(_conn, _fastClockSource.get());
@@ -97,7 +97,7 @@ public:
         ASSERT_OK(result.getStatus());
 
         string uri = "table:" + ns;
-        invariantWTOK(WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
+        invariant(Status::OK() == WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
 
         return std::make_unique<WiredTigerIdIndex>(&opCtx, uri, "" /* ident */, &desc);
     }
@@ -130,7 +130,7 @@ public:
         ASSERT_OK(result.getStatus());
 
         string uri = "table:" + ns;
-        invariantWTOK(WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
+        invariant(Status::OK() == WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
 
         if (unique) {
             return std::make_unique<WiredTigerIndexUnique>(

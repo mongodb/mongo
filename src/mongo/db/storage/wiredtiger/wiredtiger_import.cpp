@@ -60,7 +60,8 @@ void debugDump(WT_SESSION* session, const std::string& ident) {
                              "{}{}"_format(WiredTigerKVEngine::kTableUriPrefix, ident).c_str(),
                              nullptr,
                              nullptr,
-                             &cursor));
+                             &cursor),
+        session);
 
     BSONArrayBuilder bab;
     while (true) {
@@ -68,9 +69,9 @@ void debugDump(WT_SESSION* session, const std::string& ident) {
         if (ret == WT_NOTFOUND) {
             break;
         }
-        uassertWTOK(ret);
+        uassertWTOK(ret, session);
         WT_ITEM value;
-        uassertWTOK(cursor->get_value(cursor, &value));
+        uassertWTOK(cursor->get_value(cursor, &value), session);
         bab.append(BSONObj(static_cast<const char*>(value.data)));
     }
 
@@ -128,7 +129,7 @@ SizeInfo getSizeInfo(const NamespaceString& ns,
     }
 
     WT_ITEM item;
-    uassertWTOK(sizeStorerCursor->get_value(sizeStorerCursor, &item));
+    uassertWTOK(sizeStorerCursor->get_value(sizeStorerCursor, &item), sizeStorerCursor->session);
     BSONObj obj{static_cast<const char*>(item.data)};
     return {obj["numRecords"].safeNumberLong(), obj["dataSize"].safeNumberLong()};
 }
@@ -162,24 +163,27 @@ std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
         wiredtiger_open(importPath.c_str(),
                         nullptr,
                         "config_base=false,log=(enabled=true,path=journal,compressor=snappy)",
-                        &conn));
+                        &conn),
+        nullptr);
 
     ON_BLOCK_EXIT([&] {
-        uassertWTOK(conn->close(conn, nullptr));
+        uassertWTOK(conn->close(conn, nullptr), nullptr);
         LOGV2_DEBUG(6113704, 1, "Closed donor WiredTiger database");
     });
 
     LOGV2_DEBUG(6113700, 1, "Opened donor WiredTiger database");
     WT_SESSION* session;
-    uassertWTOK(conn->open_session(conn, nullptr, nullptr, &session));
+    uassertWTOK(conn->open_session(conn, nullptr, nullptr, &session), nullptr);
     debugDump(session, "_mdb_catalog");
     debugDump(session, "sizeStorer");
     WT_CURSOR* mdbCatalogCursor;
     WT_CURSOR* sizeStorerCursor;
     uassertWTOK(
-        session->open_cursor(session, "table:_mdb_catalog", nullptr, nullptr, &mdbCatalogCursor));
+        session->open_cursor(session, "table:_mdb_catalog", nullptr, nullptr, &mdbCatalogCursor),
+        session);
     uassertWTOK(
-        session->open_cursor(session, "table:sizeStorer", nullptr, nullptr, &sizeStorerCursor));
+        session->open_cursor(session, "table:sizeStorer", nullptr, nullptr, &sizeStorerCursor),
+        session);
 
     std::vector<CollectionImportMetadata> metadatas;
 
@@ -188,10 +192,10 @@ std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
         if (ret == WT_NOTFOUND) {
             break;
         }
-        uassertWTOK(ret);
+        uassertWTOK(ret, session);
 
         WT_ITEM catalogValue;
-        uassertWTOK(mdbCatalogCursor->get_value(mdbCatalogCursor, &catalogValue));
+        uassertWTOK(mdbCatalogCursor->get_value(mdbCatalogCursor, &catalogValue), session);
         BSONObj rawCatalogEntry(static_cast<const char*>(catalogValue.data));
         NamespaceString ns{rawCatalogEntry["ns"].String()};
         if (!shouldImport(ns)) {

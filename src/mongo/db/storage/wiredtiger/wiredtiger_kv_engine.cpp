@@ -470,11 +470,11 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
             if (ret == EINVAL) {
                 fassertFailedNoTrace(28717);
             } else if (ret != 0) {
-                Status s(wtRCToStatus(ret));
+                Status s(wtRCToStatus(ret, nullptr));
                 msgasserted(28718, s.reason());
             }
             start = Date_t::now();
-            invariantWTOK(_conn->close(_conn, nullptr));
+            invariantWTOK(_conn->close(_conn, nullptr), nullptr);
             LOGV2(4795910,
                   "WiredTiger closed. Removing journal files",
                   "duration"_attr = Date_t::now() - start);
@@ -507,7 +507,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 
     {
         char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
-        invariantWTOK(_conn->query_timestamp(_conn, buf, "get=recovery"));
+        invariantWTOK(_conn->query_timestamp(_conn, buf, "get=recovery"), nullptr);
 
         std::uint64_t tmp;
         fassert(50758, NumberParser().base(16)(buf, &tmp));
@@ -522,7 +522,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
         int ret = _conn->query_timestamp(_conn, buf, "get=oldest");
         if (ret != WT_NOTFOUND) {
-            invariantWTOK(ret);
+            invariantWTOK(ret, nullptr);
 
             std::uint64_t tmp;
             fassert(5380107, NumberParser().base(16)(buf, &tmp));
@@ -727,7 +727,8 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
     }
 
     if (!_inRepairMode) {
-        LOGV2_FATAL_NOTRACE(28595, "Terminating.", "reason"_attr = wtRCToStatus(ret).reason());
+        LOGV2_FATAL_NOTRACE(
+            28595, "Terminating.", "reason"_attr = wtRCToStatus(ret, nullptr).reason());
     }
 
     // Always attempt to salvage metadata regardless of error code when in repair mode.
@@ -742,7 +743,7 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
 
     LOGV2_FATAL_NOTRACE(50947,
                         "Failed to salvage WiredTiger metadata",
-                        "details"_attr = wtRCToStatus(ret).reason());
+                        "details"_attr = wtRCToStatus(ret, nullptr).reason());
 }
 
 void WiredTigerKVEngine::cleanShutdown() {
@@ -816,23 +817,26 @@ void WiredTigerKVEngine::cleanShutdown() {
         LOGV2(22324,
               "Closing WiredTiger in preparation for reconfiguring",
               "closeConfig"_attr = closeConfig);
-        invariantWTOK(_conn->close(_conn, closeConfig.c_str()));
+        invariantWTOK(_conn->close(_conn, closeConfig.c_str()), nullptr);
         LOGV2(4795905, "WiredTiger closed", "duration"_attr = Date_t::now() - startTime);
 
         startTime = Date_t::now();
-        invariantWTOK(wiredtiger_open(
-            _path.c_str(), _eventHandler.getWtEventHandler(), _wtOpenConfig.c_str(), &_conn));
+        invariantWTOK(
+            wiredtiger_open(
+                _path.c_str(), _eventHandler.getWtEventHandler(), _wtOpenConfig.c_str(), &_conn),
+            nullptr);
         LOGV2(4795904, "WiredTiger re-opened", "duration"_attr = Date_t::now() - startTime);
 
         startTime = Date_t::now();
         LOGV2(22325, "Reconfiguring", "newConfig"_attr = _fileVersion.getDowngradeString());
-        invariantWTOK(_conn->reconfigure(_conn, _fileVersion.getDowngradeString().c_str()));
+        invariantWTOK(_conn->reconfigure(_conn, _fileVersion.getDowngradeString().c_str()),
+                      nullptr);
         LOGV2(4795903, "Reconfigure complete", "duration"_attr = Date_t::now() - startTime);
     }
 
     auto startTime = Date_t::now();
     LOGV2(4795902, "Closing WiredTiger", "closeConfig"_attr = closeConfig);
-    invariantWTOK(_conn->close(_conn, closeConfig.c_str()));
+    invariantWTOK(_conn->close(_conn, closeConfig.c_str()), nullptr);
     LOGV2(4795901, "WiredTiger closed", "duration"_attr = Date_t::now() - startTime);
     _conn = nullptr;
 }
@@ -886,7 +890,7 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
     }
 
     LOGV2(22328, "Verify failed. Running a salvage operation.", "uri"_attr = uri);
-    auto status = wtRCToStatus(session->salvage(session, uri, nullptr), "Salvage failed:");
+    auto status = wtRCToStatus(session->salvage(session, uri, nullptr), session, "Salvage failed:");
     if (status.isOK()) {
         return {ErrorCodes::DataModifiedByRepair, str::stream() << "Salvaged data for " << uri};
     }
@@ -939,7 +943,7 @@ Status WiredTigerKVEngine::_rebuildIdent(WT_SESSION* session, const char* uri) {
 
     int rc = session->drop(session, uri, nullptr);
     if (rc != 0) {
-        auto status = wtRCToStatus(rc);
+        auto status = wtRCToStatus(rc, session);
         LOGV2_ERROR(22358,
                     "Failed to drop {uri}",
                     "Rebuilding ident failed: failed to drop",
@@ -950,7 +954,7 @@ Status WiredTigerKVEngine::_rebuildIdent(WT_SESSION* session, const char* uri) {
 
     rc = session->create(session, uri, swMetadata.getValue().c_str());
     if (rc != 0) {
-        auto status = wtRCToStatus(rc);
+        auto status = wtRCToStatus(rc, session);
         LOGV2_ERROR(22359,
                     "Failed to create {uri} with config: {config}",
                     "Rebuilding ident failed: failed to create with config",
@@ -1013,7 +1017,7 @@ Status WiredTigerKVEngine::beginBackup(OperationContext* opCtx) {
     WT_SESSION* s = session->getSession();
     int ret = WT_OP_CHECK(s->open_cursor(s, "backup:", nullptr, nullptr, &c));
     if (ret != 0) {
-        return wtRCToStatus(ret);
+        return wtRCToStatus(ret, s);
     }
     _backupSession = std::move(session);
     return Status::OK();
@@ -1042,7 +1046,7 @@ Status WiredTigerKVEngine::disableIncrementalBackup(OperationContext* opCtx) {
         session->open_cursor(session, "backup:", nullptr, "incremental=(force_stop=true)", &cursor);
     if (wtRet != 0) {
         LOGV2_ERROR(22360, "Could not open a backup cursor to disable incremental backups");
-        return wtRCToStatus(wtRet);
+        return wtRCToStatus(wtRet, session);
     }
 
     return Status::OK();
@@ -1108,7 +1112,8 @@ public:
             }
 
             const char* filename;
-            invariantWTOK((_wtBackup->cursor)->get_key(_wtBackup->cursor, &filename));
+            invariantWTOK((_wtBackup->cursor)->get_key(_wtBackup->cursor, &filename),
+                          _wtBackup->cursor->session);
             const boost::filesystem::path filePath = constructFilePath(_path, {filename});
 
             const auto wiredTigerLogFilePrefix = "WiredTigerLog";
@@ -1154,7 +1159,7 @@ public:
         }
 
         if (wtRet != WT_NOTFOUND && backupBlocks.size() != batchSize) {
-            return wtRCToStatus(wtRet);
+            return wtRCToStatus(wtRet, _session);
         }
 
         return backupBlocks;
@@ -1177,7 +1182,7 @@ private:
             wtRet = (_session)->open_cursor(
                 _session, nullptr, _wtBackup->cursor, config.c_str(), &_wtBackup->dupCursor);
             if (wtRet != 0) {
-                return wtRCToStatus(wtRet);
+                return wtRCToStatus(wtRet, _session);
             }
             fileUnchangedFlag = true;
         }
@@ -1187,12 +1192,13 @@ private:
             if (wtRet == WT_NOTFOUND) {
                 break;
             }
-            invariantWTOK(wtRet);
+            invariantWTOK(wtRet, _wtBackup->dupCursor->session);
             fileUnchangedFlag = false;
 
             uint64_t offset, size, type;
             invariantWTOK(
-                (_wtBackup->dupCursor)->get_key(_wtBackup->dupCursor, &offset, &size, &type));
+                (_wtBackup->dupCursor)->get_key(_wtBackup->dupCursor, &offset, &size, &type),
+                _wtBackup->dupCursor->session);
             LOGV2_DEBUG(22311,
                         2,
                         "Block to copy for incremental backup: filename: {filePath_string}, "
@@ -1216,7 +1222,7 @@ private:
         if (wtRet != 0) {
             if (wtRet != WT_NOTFOUND ||
                 (wtRet = (_wtBackup->dupCursor)->close(_wtBackup->dupCursor)) != 0) {
-                return wtRCToStatus(wtRet);
+                return wtRCToStatus(wtRet, _session);
             }
             _wtBackup->dupCursor = nullptr;
             (_wtBackup->wtBackupDupCursorCV).notify_one();
@@ -1270,7 +1276,7 @@ WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
     const std::string config = ss.str();
     int wtRet = session->open_cursor(session, "backup:", nullptr, config.c_str(), &cursor);
     if (wtRet != 0) {
-        return wtRCToStatus(wtRet);
+        return wtRCToStatus(wtRet, session);
     }
 
     // A nullptr indicates that no duplicate cursor is open during an incremental backup.
@@ -1323,14 +1329,14 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::extendBackupCursor(
     int wtRet =
         session->open_cursor(session, nullptr, _wtBackup.cursor, "target=(\"log:\")", &cursor);
     if (wtRet != 0) {
-        return wtRCToStatus(wtRet);
+        return wtRCToStatus(wtRet, session);
     }
 
     const char* filename;
     std::vector<std::string> filePaths;
 
     while ((wtRet = cursor->next(cursor)) == 0) {
-        invariantWTOK(cursor->get_key(cursor, &filename));
+        invariantWTOK(cursor->get_key(cursor, &filename), cursor->session);
         std::string name(filename);
         const boost::filesystem::path filePath = constructFilePath(_path, name);
         filePaths.push_back(filePath.string());
@@ -1338,12 +1344,12 @@ StatusWith<std::vector<std::string>> WiredTigerKVEngine::extendBackupCursor(
     }
 
     if (wtRet != WT_NOTFOUND) {
-        return wtRCToStatus(wtRet);
+        return wtRCToStatus(wtRet, session);
     }
 
     wtRet = cursor->close(cursor);
     if (wtRet != 0) {
-        return wtRCToStatus(wtRet);
+        return wtRCToStatus(wtRet, session);
     }
 
     // Once all the backup cursors have been opened on a sharded cluster, we need to ensure that the
@@ -1416,7 +1422,7 @@ Status WiredTigerKVEngine::createRecordStore(OperationContext* opCtx,
                 logAttrs(NamespaceString(ns)),
                 "uri"_attr = uri,
                 "config"_attr = config);
-    return wtRCToStatus(s->create(s, uri.c_str(), config.c_str()));
+    return wtRCToStatus(s->create(s, uri.c_str(), config.c_str()), s);
 }
 
 Status WiredTigerKVEngine::importRecordStore(OperationContext* opCtx,
@@ -1445,7 +1451,7 @@ Status WiredTigerKVEngine::importRecordStore(OperationContext* opCtx,
                 "uri"_attr = uri,
                 "config"_attr = config);
 
-    return wtRCToStatus(s->create(s, uri.c_str(), config.c_str()));
+    return wtRCToStatus(s->create(s, uri.c_str(), config.c_str()), s);
 }
 
 Status WiredTigerKVEngine::recoverOrphanedIdent(OperationContext* opCtx,
@@ -1514,8 +1520,8 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(OperationContext* opCtx,
 
     WiredTigerSession sessionWrapper(_conn);
     WT_SESSION* session = sessionWrapper.getSession();
-    status =
-        wtRCToStatus(session->salvage(session, _uri(ident).c_str(), nullptr), "Salvage failed: ");
+    status = wtRCToStatus(
+        session->salvage(session, _uri(ident).c_str(), nullptr), session, "Salvage failed: ");
     LOGV2(4795907, "Salvage complete", "duration"_attr = Date_t::now() - start);
     if (status.isOK()) {
         return {ErrorCodes::DataModifiedByRepair,
@@ -1615,7 +1621,7 @@ Status WiredTigerKVEngine::createSortedDataInterface(OperationContext* opCtx,
         "collection_uuid"_attr = collOptions.uuid,
         "ident"_attr = ident,
         "config"_attr = config);
-    return wtRCToStatus(WiredTigerIndex::Create(opCtx, _uri(ident), config));
+    return WiredTigerIndex::Create(opCtx, _uri(ident), config);
 }
 
 Status WiredTigerKVEngine::importSortedDataInterface(OperationContext* opCtx,
@@ -1640,11 +1646,11 @@ Status WiredTigerKVEngine::importSortedDataInterface(OperationContext* opCtx,
                 "WiredTigerKVEngine::importSortedDataInterface",
                 "ident"_attr = ident,
                 "config"_attr = config);
-    return wtRCToStatus(WiredTigerIndex::Create(opCtx, _uri(ident), config));
+    return WiredTigerIndex::Create(opCtx, _uri(ident), config);
 }
 
 Status WiredTigerKVEngine::dropSortedDataInterface(OperationContext* opCtx, StringData ident) {
-    return wtRCToStatus(WiredTigerIndex::Drop(opCtx, _uri(ident)));
+    return WiredTigerIndex::Drop(opCtx, _uri(ident));
 }
 
 std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getSortedDataInterface(
@@ -1687,7 +1693,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
                 "WiredTigerKVEngine::makeTemporaryRecordStore",
                 "uri"_attr = uri,
                 "config"_attr = config);
-    uassertStatusOK(wtRCToStatus(session->create(session, uri.c_str(), config.c_str())));
+    uassertStatusOK(wtRCToStatus(session->create(session, uri.c_str(), config.c_str()), session));
 
     WiredTigerRecordStore::Params params;
     params.ns = "";
@@ -1723,7 +1729,8 @@ void WiredTigerKVEngine::alterIdentMetadata(OperationContext* opCtx,
     std::string alterString =
         WiredTigerIndex::generateAppMetadataString(*desc) + "exclusive_refreshed=false,";
     invariantWTOK(
-        session.getSession()->alter(session.getSession(), uri.c_str(), alterString.c_str()));
+        session.getSession()->alter(session.getSession(), uri.c_str(), alterString.c_str()),
+        session.getSession());
 }
 
 Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
@@ -1759,7 +1766,7 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
         return Status::OK();
     }
 
-    invariantWTOK(ret);
+    invariantWTOK(ret, session.getSession());
     return Status::OK();
 }
 
@@ -1796,7 +1803,7 @@ void WiredTigerKVEngine::dropIdentForImport(OperationContext* opCtx, StringData 
                       "config"_attr = config,
                       "ret"_attr = ret);
     } while (ret == EBUSY);
-    invariantWTOK(ret);
+    invariantWTOK(ret, session.getSession());
 }
 
 std::list<WiredTigerCachedCursor> WiredTigerKVEngine::filterCursorsWithQueuedDrops(
@@ -1879,7 +1886,7 @@ void WiredTigerKVEngine::dropSomeQueuedIdents() {
             stdx::lock_guard<Latch> lk(_identToDropMutex);
             _identToDrop.push_back(std::move(identToDrop));
         } else {
-            invariantWTOK(ret);
+            invariantWTOK(ret, session.getSession());
             if (identToDrop.callback) {
                 identToDrop.callback();
             }
@@ -1925,7 +1932,7 @@ void WiredTigerKVEngine::checkpoint() {
         if (initialDataTimestamp.asULL() <= 1) {
             UniqueWiredTigerSession session = _sessionCache->getSession();
             WT_SESSION* s = session->getSession();
-            invariantWTOK(s->checkpoint(s, "use_timestamp=false"));
+            invariantWTOK(s->checkpoint(s, "use_timestamp=false"), s);
             LOGV2_FOR_RECOVERY(5576602,
                                2,
                                "Completed unstable checkpoint.",
@@ -1948,7 +1955,7 @@ void WiredTigerKVEngine::checkpoint() {
 
             UniqueWiredTigerSession session = _sessionCache->getSession();
             WT_SESSION* s = session->getSession();
-            invariantWTOK(s->checkpoint(s, "use_timestamp=true"));
+            invariantWTOK(s->checkpoint(s, "use_timestamp=true"), s);
 
             if (oplogNeededForRollback.isOK()) {
                 // Now that the checkpoint is durable, publish the oplog needed to recover from it.
@@ -1973,7 +1980,7 @@ bool WiredTigerKVEngine::_hasUri(WT_SESSION* session, const std::string& uri) co
     int ret = session->open_cursor(session, "metadata:", nullptr, nullptr, &c);
     if (ret == ENOENT)
         return false;
-    invariantWTOK(ret);
+    invariantWTOK(ret, session);
     ON_BLOCK_EXIT([&] { c->close(c); });
 
     c->set_key(c, uri.c_str());
@@ -2069,7 +2076,7 @@ uint64_t _fetchAllDurableValue(WT_CONNECTION* conn) {
         // (timestamped) data.
         return StorageEngine::kMinimumTimestamp;
     } else {
-        invariantWTOK(wtStatus);
+        invariantWTOK(wtStatus, nullptr);
     }
 
     uint64_t tmp;
@@ -2130,7 +2137,7 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
     } else {
         stableTSConfigString = "stable_timestamp={:x}"_format(ts);
     }
-    invariantWTOK(_conn->set_timestamp(_conn, stableTSConfigString.c_str()));
+    invariantWTOK(_conn->set_timestamp(_conn, stableTSConfigString.c_str()), nullptr);
 
     // After publishing a stable timestamp to WT, we can record the updated stable timestamp value
     // for the necessary oplog to keep.
@@ -2199,7 +2206,7 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool f
         auto oldestTSConfigString =
             "force=true,oldest_timestamp={0:x},durable_timestamp={0:x}"_format(
                 newOldestTimestamp.asULL());
-        invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString.c_str()));
+        invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString.c_str()), nullptr);
         _oldestTimestamp.store(newOldestTimestamp.asULL());
         stdx::lock_guard<Latch> lk(_highestDurableTimestampMutex);
         _highestSeenDurableTimestamp = newOldestTimestamp.asULL();
@@ -2209,7 +2216,7 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool f
                     "newOldestTimestamp"_attr = newOldestTimestamp);
     } else {
         auto oldestTSConfigString = "oldest_timestamp={:x}"_format(newOldestTimestamp.asULL());
-        invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString.c_str()));
+        invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString.c_str()), nullptr);
         // set_timestamp above ignores backwards in time if 'force' is not set.
         if (_oldestTimestamp.load() < newOldestTimestamp.asULL())
             _oldestTimestamp.store(newOldestTimestamp.asULL());
@@ -2597,7 +2604,7 @@ Timestamp WiredTigerKVEngine::getCheckpointTimestamp() const {
 
 std::uint64_t WiredTigerKVEngine::_getCheckpointTimestamp() const {
     char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
-    invariantWTOK(_conn->query_timestamp(_conn, buf, "get=last_checkpoint"));
+    invariantWTOK(_conn->query_timestamp(_conn, buf, "get=last_checkpoint"), nullptr);
 
     std::uint64_t tmp;
     fassert(50963, NumberParser().base(16)(buf, &tmp));
@@ -2606,7 +2613,7 @@ std::uint64_t WiredTigerKVEngine::_getCheckpointTimestamp() const {
 
 void WiredTigerKVEngine::dump() const {
     int ret = _conn->debug_info(_conn, "cursors=true,handles=true,log=true,sessions=true,txn=true");
-    auto status = wtRCToStatus(ret, "WiredTigerKVEngine::dump()");
+    auto status = wtRCToStatus(ret, nullptr, "WiredTigerKVEngine::dump()");
     if (status.isOK()) {
         LOGV2(6117700, "WiredTigerKVEngine::dump() completed successfully");
     } else {
@@ -2616,7 +2623,7 @@ void WiredTigerKVEngine::dump() const {
 
 Status WiredTigerKVEngine::reconfigureLogging() {
     auto verboseConfig = WiredTigerUtil::generateWTVerboseConfiguration();
-    return wtRCToStatus(_conn->reconfigure(_conn, verboseConfig.c_str()));
+    return wtRCToStatus(_conn->reconfigure(_conn, verboseConfig.c_str()), nullptr);
 }
 
 }  // namespace mongo

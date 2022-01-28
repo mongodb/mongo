@@ -72,14 +72,14 @@ WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
     }
 
     const std::string beginTxnConfigString = builder;
-    invariantWTOK(_session->begin_transaction(_session, beginTxnConfigString.c_str()));
+    invariantWTOK(_session->begin_transaction(_session, beginTxnConfigString.c_str()), _session);
     _rollback = true;
 }
 
 WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(WT_SESSION* session, const char* config)
     : _session(session) {
     invariant(!_rollback);
-    invariantWTOK(_session->begin_transaction(_session, config));
+    invariantWTOK(_session->begin_transaction(_session, config), _session);
     _rollback = true;
 }
 
@@ -93,7 +93,8 @@ Status WiredTigerBeginTxnBlock::setReadSnapshot(Timestamp readTimestamp) {
     invariant(_rollback);
     std::string readTSConfigString = "read_timestamp={:x}"_format(readTimestamp.asULL());
 
-    return wtRCToStatus(_session->timestamp_transaction(_session, readTSConfigString.c_str()));
+    return wtRCToStatus(_session->timestamp_transaction(_session, readTSConfigString.c_str()),
+                        _session);
 }
 
 void WiredTigerBeginTxnBlock::done() {

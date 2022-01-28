@@ -62,7 +62,7 @@ public:
         string config = ss.str();
         _fastClockSource = std::make_unique<SystemClockSource>();
         int ret = wiredtiger_open(dbpath.toString().c_str(), eventHandler, config.c_str(), &_conn);
-        ASSERT_OK(wtRCToStatus(ret));
+        ASSERT_OK(wtRCToStatus(ret, nullptr));
         ASSERT(_conn);
     }
     ~WiredTigerConnection() {
@@ -136,7 +136,7 @@ protected:
     void createSession(const char* config) {
         WT_SESSION* wtSession =
             WiredTigerRecoveryUnit::get(_opCtx.get())->getSession()->getSession();
-        ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, getURI(), config)));
+        ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, getURI(), config), wtSession));
     }
 
 private:
@@ -315,7 +315,7 @@ TEST(WiredTigerUtilTest, GetStatisticsValueStatisticsDisabled) {
                                         harnessHelper.getOplogManager());
     WiredTigerSession* session = recoveryUnit.getSession();
     WT_SESSION* wtSession = session->getSession();
-    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr)));
+    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
     auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
                                                      "statistics:table:mytable",
                                                      "statistics=(fast)",
@@ -330,7 +330,7 @@ TEST(WiredTigerUtilTest, GetStatisticsValueInvalidKey) {
                                         harnessHelper.getOplogManager());
     WiredTigerSession* session = recoveryUnit.getSession();
     WT_SESSION* wtSession = session->getSession();
-    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr)));
+    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
     // Use connection statistics key which does not apply to a table.
     auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
                                                      "statistics:table:mytable",
@@ -346,7 +346,7 @@ TEST(WiredTigerUtilTest, GetStatisticsValueValidKey) {
                                         harnessHelper.getOplogManager());
     WiredTigerSession* session = recoveryUnit.getSession();
     WT_SESSION* wtSession = session->getSession();
-    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr)));
+    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
     // Use connection statistics key which does not apply to a table.
     auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
                                                      "statistics:table:mytable",
@@ -375,7 +375,7 @@ TEST(WiredTigerUtilTest, ParseAPIMessages) {
 
     // Perform simple WiredTiger operations while capturing the generated logs.
     startCapturingLogMessages();
-    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:ev_api", nullptr)));
+    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:ev_api", nullptr), wtSession));
     stopCapturingLogMessages();
 
     // Verify there is at least one message from WiredTiger and their content.
@@ -403,14 +403,16 @@ TEST(WiredTigerUtilTest, ParseCompactMessages) {
 
     // Create a session.
     WT_SESSION* wtSession;
-    ASSERT_OK(wtRCToStatus(harnessHelper.getSessionCache()->conn()->open_session(
-        harnessHelper.getSessionCache()->conn(), nullptr, nullptr, &wtSession)));
+    ASSERT_OK(
+        wtRCToStatus(harnessHelper.getSessionCache()->conn()->open_session(
+                         harnessHelper.getSessionCache()->conn(), nullptr, nullptr, &wtSession),
+                     nullptr));
 
     // Perform simple WiredTiger operations while capturing the generated logs.
     const std::string uri = "table:ev_compact";
     startCapturingLogMessages();
-    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, uri.c_str(), nullptr)));
-    ASSERT_OK(wtRCToStatus(wtSession->compact(wtSession, uri.c_str(), nullptr)));
+    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, uri.c_str(), nullptr), wtSession));
+    ASSERT_OK(wtRCToStatus(wtSession->compact(wtSession, uri.c_str(), nullptr), wtSession));
     stopCapturingLogMessages();
 
     // Verify there is at least one message from WiredTiger and their content.
