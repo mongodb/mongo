@@ -1465,6 +1465,7 @@ env.Library(
         'index_builds_coordinator_interface',
         'rebuild_indexes',
         'repair',
+        'server_feature_flags',
     ],
 )
 

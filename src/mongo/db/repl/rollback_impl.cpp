@@ -355,7 +355,7 @@ void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
 
     // Get a list of all databases.
     StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    std::vector<std::string> dbs;
+    std::vector<TenantDatabaseName> dbs;
     {
         Lock::GlobalLock lk(opCtx, MODE_IS);
         dbs = storageEngine->listDatabases();
@@ -364,10 +364,10 @@ void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
     // Wait for all background operations to complete by waiting on each database. Single-phase
     // index builds are not stopped before rollback, so we must wait for these index builds to
     // complete.
-    std::vector<StringData> dbNames(dbs.begin(), dbs.end());
+    std::vector<TenantDatabaseName> tenantDbNames(dbs.begin(), dbs.end());
     LOGV2(21595, "Waiting for all background operations to complete before starting rollback");
-    for (auto db : dbNames) {
-        auto numInProg = IndexBuildsCoordinator::get(opCtx)->numInProgForDb(db);
+    for (auto tenantDbName : tenantDbNames) {
+        auto numInProg = IndexBuildsCoordinator::get(opCtx)->numInProgForDb(tenantDbName.dbName());
         if (numInProg > 0) {
             LOGV2_DEBUG(21596,
                         1,
@@ -375,8 +375,9 @@ void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
                         "background operations to complete on database '{db}'",
                         "Waiting for background operations to complete",
                         "numBackgroundOperationsInProgress"_attr = numInProg,
-                        "db"_attr = db);
-            IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(opCtx, db);
+                        "db"_attr = tenantDbName);
+            IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(opCtx,
+                                                                       tenantDbName.dbName());
         }
     }
 
@@ -1360,11 +1361,11 @@ void RollbackImpl::_resetDropPendingState(OperationContext* opCtx) {
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     storageEngine->clearDropPendingState();
 
-    std::vector<std::string> dbNames = storageEngine->listDatabases();
+    std::vector<TenantDatabaseName> tenantDbNames = storageEngine->listDatabases();
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    for (const auto& dbName : dbNames) {
-        Lock::DBLock dbLock(opCtx, dbName, MODE_X);
-        auto db = databaseHolder->openDb(opCtx, dbName);
+    for (const auto& tenantDbName : tenantDbNames) {
+        Lock::DBLock dbLock(opCtx, tenantDbName.dbName(), MODE_X);
+        auto db = databaseHolder->openDb(opCtx, tenantDbName.dbName());
         db->checkForIdIndexesAndDropPendingCollections(opCtx);
     }
 }

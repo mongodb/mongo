@@ -60,13 +60,13 @@ void reopenAllDatabasesAndReloadCollectionCatalog(
     catalogBatchWriter.emplace(opCtx);
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    std::vector<std::string> databasesToOpen = storageEngine->listDatabases();
-    for (auto&& dbName : databasesToOpen) {
+    std::vector<TenantDatabaseName> databasesToOpen = storageEngine->listDatabases();
+    for (auto&& tenantDbName : databasesToOpen) {
         LOGV2_FOR_RECOVERY(
-            23992, 1, "openCatalog: dbholder reopening database", "db"_attr = dbName);
-        auto db = databaseHolder->openDb(opCtx, dbName);
-        invariant(db, str::stream() << "failed to reopen database " << dbName);
-        for (auto&& collNss : catalog->getAllCollectionNamesFromDb(opCtx, dbName)) {
+            23992, 1, "openCatalog: dbholder reopening database", "db"_attr = tenantDbName);
+        auto db = databaseHolder->openDb(opCtx, tenantDbName.dbName());
+        invariant(db, str::stream() << "failed to reopen database " << tenantDbName.toString());
+        for (auto&& collNss : catalog->getAllCollectionNamesFromDb(opCtx, tenantDbName.dbName())) {
             // Note that the collection name already includes the database component.
             auto collection = catalog->lookupCollectionByNamespaceForMetadataWrite(
                 opCtx, CollectionCatalog::LifetimeMode::kInplace, collNss);
@@ -118,13 +118,15 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgress();
 
     MinVisibleTimestampMap minVisibleTimestampMap;
-    std::vector<std::string> allDbs =
+    std::vector<TenantDatabaseName> allDbs =
         opCtx->getServiceContext()->getStorageEngine()->listDatabases();
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto catalog = CollectionCatalog::get(opCtx);
-    for (auto&& dbName : allDbs) {
-        for (auto collIt = catalog->begin(opCtx, dbName); collIt != catalog->end(opCtx); ++collIt) {
+    for (auto&& tenantDbName : allDbs) {
+        for (auto collIt = catalog->begin(opCtx, tenantDbName.dbName());
+             collIt != catalog->end(opCtx);
+             ++collIt) {
             auto coll = *collIt;
             if (!coll) {
                 break;

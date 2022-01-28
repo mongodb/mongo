@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/index_builds.h"
 #include "mongo/db/resumable_index_builds_gen.h"
 #include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/db/tenant_database_name.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/str.h"
 
@@ -201,7 +202,7 @@ public:
     /**
      * List the databases stored in this storage engine.
      */
-    virtual std::vector<std::string> listDatabases() const = 0;
+    virtual std::vector<TenantDatabaseName> listDatabases() const = 0;
 
     /**
      * Returns whether the storage engine supports capped collections.

@@ -257,10 +257,10 @@ void openDatabases(OperationContext* opCtx, const StorageEngine* storageEngine, 
     invariant(opCtx->lockState()->isW());
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto dbNames = storageEngine->listDatabases();
-    for (const auto& dbName : dbNames) {
-        LOGV2_DEBUG(21010, 1, "    Opening database: {dbName}", "dbName"_attr = dbName);
-        auto db = databaseHolder->openDb(opCtx, dbName);
+    auto tenantDbNames = storageEngine->listDatabases();
+    for (const auto& tenantDbName : tenantDbNames) {
+        LOGV2_DEBUG(21010, 1, "    Opening database: {dbName}", "dbName"_attr = tenantDbName);
+        auto db = databaseHolder->openDb(opCtx, tenantDbName.dbName());
         invariant(db);
 
         onDatabase(db);
@@ -482,19 +482,21 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
     // The local database should be repaired before any other replicated collections so we know
     // whether not to rebuild unfinished two-phase index builds if this is a replica set node
     // running in standalone mode.
-    auto dbNames = storageEngine->listDatabases();
-    if (auto it = std::find(dbNames.begin(), dbNames.end(), NamespaceString::kLocalDb);
-        it != dbNames.end()) {
-        fassertNoTrace(4805001, repair::repairDatabase(opCtx, storageEngine, *it));
+    auto tenantDbNames = storageEngine->listDatabases();
+    if (auto it = std::find(tenantDbNames.begin(),
+                            tenantDbNames.end(),
+                            TenantDatabaseName(boost::none, NamespaceString::kLocalDb));
+        it != tenantDbNames.end()) {
+        fassertNoTrace(4805001, repair::repairDatabase(opCtx, storageEngine, it->dbName()));
 
         // This must be set before rebuilding index builds on replicated collections.
         setReplSetMemberInStandaloneMode(opCtx, StartupRecoveryMode::kAuto);
-        dbNames.erase(it);
+        tenantDbNames.erase(it);
     }
 
     // Repair the remaining databases.
-    for (const auto& dbName : dbNames) {
-        fassertNoTrace(18506, repair::repairDatabase(opCtx, storageEngine, dbName));
+    for (const auto& tenantDbName : tenantDbNames) {
+        fassertNoTrace(18506, repair::repairDatabase(opCtx, storageEngine, tenantDbName.dbName()));
     }
 
     openDatabases(opCtx, storageEngine, [&](auto db) {

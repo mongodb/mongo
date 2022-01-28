@@ -122,13 +122,13 @@ public:
                 filter = std::move(matcher);
             }
 
-            std::vector<std::string> dbNames;
+            std::vector<TenantDatabaseName> tenantDbNames;
             StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
             {
                 Lock::GlobalLock lk(opCtx, MODE_IS);
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &hangBeforeListDatabases, opCtx, "hangBeforeListDatabases", []() {});
-                dbNames = storageEngine->listDatabases();
+                tenantDbNames = storageEngine->listDatabases();
             }
 
             std::vector<ListDatabasesReplyItem> items;
@@ -137,14 +137,14 @@ public:
                 filter->getCategory() == MatchExpression::MatchCategory::kLeaf &&
                 filter->path() == kName;
             long long totalSize = 0;
-            for (const auto& itemName : dbNames) {
+            for (const auto& tenantDbName : tenantDbNames) {
                 if (authorizedDatabases &&
-                    !as->isAuthorizedForAnyActionOnAnyResourceInDB(itemName)) {
+                    !as->isAuthorizedForAnyActionOnAnyResourceInDB(tenantDbName.dbName())) {
                     // We don't have listDatabases on the cluster or find on this database.
                     continue;
                 }
 
-                ListDatabasesReplyItem item(itemName);
+                ListDatabasesReplyItem item(tenantDbName.dbName());
 
                 long long size = 0;
                 if (!nameOnly) {
@@ -153,18 +153,18 @@ public:
                         continue;
                     }
 
-                    AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, itemName);
+                    AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, tenantDbName.dbName());
                     // The database could have been dropped since we called 'listDatabases()' above.
-                    if (!DatabaseHolder::get(opCtx)->dbExists(opCtx, itemName)) {
+                    if (!DatabaseHolder::get(opCtx)->dbExists(opCtx, tenantDbName.dbName())) {
                         continue;
                     }
 
-                    writeConflictRetry(opCtx, "sizeOnDisk", itemName, [&] {
-                        size = storageEngine->sizeOnDiskForDb(opCtx, itemName);
+                    writeConflictRetry(opCtx, "sizeOnDisk", tenantDbName.dbName(), [&] {
+                        size = storageEngine->sizeOnDiskForDb(opCtx, tenantDbName.dbName());
                     });
                     item.setSizeOnDisk(size);
                     item.setEmpty(CollectionCatalog::get(opCtx)
-                                      ->getAllCollectionUUIDsFromDb(itemName)
+                                      ->getAllCollectionUUIDsFromDb(tenantDbName.dbName())
                                       .empty());
                 }
                 if (!filter || filter->matchesBSON(item.toBSON())) {

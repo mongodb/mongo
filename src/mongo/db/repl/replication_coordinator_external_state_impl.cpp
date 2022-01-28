@@ -999,20 +999,23 @@ void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationC
     Lock::GlobalLock lk(opCtx, MODE_IS);
 
     StorageEngine* storageEngine = _service->getStorageEngine();
-    std::vector<std::string> dbNames = storageEngine->listDatabases();
+    std::vector<TenantDatabaseName> tenantDbNames = storageEngine->listDatabases();
 
-    for (std::vector<std::string>::iterator it = dbNames.begin(); it != dbNames.end(); ++it) {
+    for (std::vector<TenantDatabaseName>::iterator it = tenantDbNames.begin();
+         it != tenantDbNames.end();
+         ++it) {
         // The local db is special because it isn't replicated. It is cleared at startup even on
         // replica set members.
-        if (*it == "local")
+        if (it->dbName() == "local")
             continue;
         LOGV2_DEBUG(21309,
                     2,
                     "Removing temporary collections from {db}",
                     "Removing temporary collections",
                     "db"_attr = *it);
-        AutoGetDb autoDb(opCtx, *it, MODE_IX);
-        invariant(autoDb.getDb(), str::stream() << "Unable to get reference to database " << *it);
+        AutoGetDb autoDb(opCtx, it->dbName(), MODE_IX);
+        invariant(autoDb.getDb(),
+                  str::stream() << "Unable to get reference to database " << it->dbName());
         autoDb.getDb()->clearTmpCollections(opCtx);
     }
 }

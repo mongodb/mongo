@@ -41,7 +41,7 @@ public:
     RecoveryUnit* newRecoveryUnit() final {
         return nullptr;
     }
-    std::vector<std::string> listDatabases() const final {
+    std::vector<TenantDatabaseName> listDatabases() const final {
         return {};
     }
     bool supportsCappedCollections() const final {

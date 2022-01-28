@@ -773,8 +773,15 @@ RecoveryUnit* StorageEngineImpl::newRecoveryUnit() {
     return _engine->newRecoveryUnit();
 }
 
-std::vector<std::string> StorageEngineImpl::listDatabases() const {
-    return CollectionCatalog::get(getGlobalServiceContext())->getAllDbNames();
+std::vector<TenantDatabaseName> StorageEngineImpl::listDatabases() const {
+    // TODO SERVER-61988 Return instead the result of CollectionCatalog::getAllDbNames() directly.
+    std::vector<TenantDatabaseName> tenantDbNames;
+    std::vector<std::string> dbNames =
+        CollectionCatalog::get(getGlobalServiceContext())->getAllDbNames();
+    for (auto dbName : dbNames) {
+        tenantDbNames.push_back(TenantDatabaseName(boost::none, dbName));
+    }
+    return tenantDbNames;
 }
 
 Status StorageEngineImpl::closeDatabase(OperationContext* opCtx, StringData db) {
