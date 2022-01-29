@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,40 +26,46 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #pragma once
 
-/**
- * Mongo exit codes.
- */
+#include <functional>
+#include <vector>
+
+#include "mongo/db/process_health/health_observer.h"
+
+#include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
+namespace process_health {
 
-enum ExitCode : int {
-    EXIT_CLEAN = 0,
-    EXIT_BADOPTIONS = 2,
-    EXIT_REPLICATION_ERROR = 3,
-    EXIT_NEED_UPGRADE = 4,
-    EXIT_SHARDING_ERROR = 5,
-    EXIT_KILL = 12,
-    EXIT_ABRUPT = 14,
-    EXIT_NTSERVICE_ERROR = 20,
-    EXIT_JAVA = 21,
-    EXIT_OOM_MALLOC = 42,
-    EXIT_OOM_REALLOC = 43,
-    EXIT_FS = 45,
-    EXIT_CLOCK_SKEW = 47,  // OpTime clock skew, deprecated
-    EXIT_NET_ERROR = 48,
-    EXIT_WINDOWS_SERVICE_STOP = 49,
-    EXIT_POSSIBLE_CORRUPTION =
-        60,  // this means we detected a possible corruption situation, like a buf overflow
-    EXIT_WATCHDOG = 61,  // Internal Watchdog has terminated mongod
-    EXIT_NEED_DOWNGRADE =
-        62,  // The current binary version is not appropriate to run on the existing datafiles.
-    EXIT_THREAD_SANITIZER = 66,      // Default Exit code for Thread Sanitizer failures
-    EXIT_PROCESS_HEALTH_CHECK = 67,  // Process health check triggered the crash.
-    EXIT_UNCAUGHT = 100,             // top level exception that wasn't caught
-    EXIT_TEST = 101
+/**
+ * Registration mechanism for all health observers.
+ * This is static class not requiring an instance to work.
+ */
+class HealthObserverRegistration {
+public:
+    /**
+     * Registers a factory method, which will be invoked later to instantiate the observer.
+     * This must be invoked by static initializers, the code is not internally synchronized.
+     *
+     * @param factoryCallback creates observer instance when invoked.
+     */
+    static void registerObserverFactory(
+        std::function<std::unique_ptr<HealthObserver>(ServiceContext* svcCtx)> factoryCallback);
+
+    /**
+     * Invokes all registered factories and returns new instances.
+     * The ownership of all observers is transferred to the invoker.
+     */
+    static std::vector<std::unique_ptr<HealthObserver>> instantiateAllObservers(
+        ServiceContext* svcCtx);
+
+    /**
+     * Test-only method to cleanup the list of registered factories.
+     */
+    static void resetObserverFactoriesForTest();
 };
 
+}  // namespace process_health
 }  // namespace mongo

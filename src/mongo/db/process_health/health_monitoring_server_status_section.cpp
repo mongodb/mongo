@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,39 +27,41 @@
  *    it in the license file.
  */
 
-#pragma once
-
-/**
- * Mongo exit codes.
- */
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/server_status.h"
+#include "mongo/db/process_health/fault_manager.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
 
-enum ExitCode : int {
-    EXIT_CLEAN = 0,
-    EXIT_BADOPTIONS = 2,
-    EXIT_REPLICATION_ERROR = 3,
-    EXIT_NEED_UPGRADE = 4,
-    EXIT_SHARDING_ERROR = 5,
-    EXIT_KILL = 12,
-    EXIT_ABRUPT = 14,
-    EXIT_NTSERVICE_ERROR = 20,
-    EXIT_JAVA = 21,
-    EXIT_OOM_MALLOC = 42,
-    EXIT_OOM_REALLOC = 43,
-    EXIT_FS = 45,
-    EXIT_CLOCK_SKEW = 47,  // OpTime clock skew, deprecated
-    EXIT_NET_ERROR = 48,
-    EXIT_WINDOWS_SERVICE_STOP = 49,
-    EXIT_POSSIBLE_CORRUPTION =
-        60,  // this means we detected a possible corruption situation, like a buf overflow
-    EXIT_WATCHDOG = 61,  // Internal Watchdog has terminated mongod
-    EXIT_NEED_DOWNGRADE =
-        62,  // The current binary version is not appropriate to run on the existing datafiles.
-    EXIT_THREAD_SANITIZER = 66,      // Default Exit code for Thread Sanitizer failures
-    EXIT_PROCESS_HEALTH_CHECK = 67,  // Process health check triggered the crash.
-    EXIT_UNCAUGHT = 100,             // top level exception that wasn't caught
-    EXIT_TEST = 101
-};
+class HealthMonitoringServerStatus : public ServerStatusSection {
+public:
+    HealthMonitoringServerStatus() : ServerStatusSection("health") {}
+
+    bool includeByDefault() const override {
+        return true;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        auto* fault_manager = process_health::FaultManager::get(getGlobalServiceContext());
+        if (!fault_manager) {
+            return BSONObj();
+        }
+
+        BSONObjBuilder result;
+
+        bool appendDetails = false;
+        if (configElement.type() == BSONType::Object && configElement.Obj().hasElement("details")) {
+            appendDetails = configElement.Obj()["details"].trueValue();
+        }
+
+        fault_manager->appendDescription(&result, appendDetails);
+
+        return result.obj();
+    }
+
+} healthMonitoringServerStatus;
 
 }  // namespace mongo
