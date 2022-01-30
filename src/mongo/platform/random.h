@@ -131,6 +131,16 @@ public:
         return std::uniform_int_distribution<int64_t>(0, max - 1)(_urbg);
     }
 
+    /**
+     A number uniformly distributed over all possible values that can be safely represented as
+     double without loosing precision.
+    */
+    int64_t nextInt64SafeDoubleRepresentable() {
+        const int64_t maxRepresentableLimit =
+            static_cast<int64_t>(std::ldexp(1, std::numeric_limits<double>::digits)) + 1;
+        return nextInt64(maxRepresentableLimit);
+    }
+
     /** Fill array `buf` with `n` random bytes. */
     void fill(void* buf, size_t n) {
         const auto p = static_cast<uint8_t*>(buf);
