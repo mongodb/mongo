@@ -20,8 +20,10 @@ var $config = extendWorkload($config, function($config, $super) {
     const originalSetup = $config.setup;
     const originalTeardown = $config.teardown;
 
+    $config.data.test_name = 'auth_privilege_cache_miss';
+
     $config.setup = function(db, collName, cluster) {
-        originalSetup(db, collName, cluster);
+        originalSetup.call(this, db, collName, cluster);
 
         const cacheBypass = {configureFailPoint: 'authUserCacheBypass', mode: 'alwaysOn'};
         const getUser = {
@@ -53,7 +55,7 @@ var $config = extendWorkload($config, function($config, $super) {
             assert.commandWorked(nodeAdminDB.runCommand(getUser));
         });
 
-        originalTeardown(db, collName, cluster);
+        originalTeardown.call(this, db, collName, cluster);
     };
 
     return $config;

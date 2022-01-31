@@ -11,25 +11,22 @@
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropRoles
 
 var $config = (function() {
-    const kTestNamePrefix = 'auth_privilege_consistency';
-    const kTestUserName = kTestNamePrefix + '_user';
     const kTestUserPassword = 'secret';
-    const kTestRoleNamePrefix = kTestNamePrefix + '_role_';
     const kMaxCmdTimeMs = 60000;
     const kMaxTxnLockReqTimeMs = 100;
     const kDefaultTxnLockReqTimeMs = 5;
 
     const states = (function() {
-        let roleName = kTestRoleNamePrefix;
         let roleWithDB = {};
         let privilege = {actions: ['insert', 'update', 'remove', 'find']};
         let RSnodes = [];
 
-        function getTestUser(node, dbName) {
-            const users = assert
-                              .commandWorked(node.getDB(dbName).runCommand(
-                                  {usersInfo: kTestUserName, showPrivileges: 1}))
-                              .users;
+        function getTestUser(node, userName) {
+            const users =
+                assert
+                    .commandWorked(node.getDB(userName.db)
+                                       .runCommand({usersInfo: userName.user, showPrivileges: 1}))
+                    .users;
             assert.eq(users.length, 1, tojson(users));
             return users[0];
         }
@@ -39,7 +36,7 @@ var $config = (function() {
 
             mutateInit: function(db, collName) {
                 privilege.resource = {db: db.getName(), collection: ''};
-                roleName += this.tid;
+                const roleName = this.getRoleName(this.tid);
                 roleWithDB = {role: roleName, db: db.getName()};
                 db.createRole({role: roleName, privileges: [privilege], roles: []});
             },
@@ -47,6 +44,7 @@ var $config = (function() {
             mutate: function(db, collName) {
                 // Revoke privs from intermediate role,
                 // then give that, now empty, role to the user.
+                const roleName = this.getRoleName(this.tid);
 
                 db.runCommand({
                     revokePrivilegesFromRole: roleName,
@@ -55,7 +53,7 @@ var $config = (function() {
                 });
 
                 db.runCommand({
-                    grantRolesToUser: kTestUserName,
+                    grantRolesToUser: this.getUserName(),
                     roles: [roleWithDB],
                     maxTimeMS: kMaxCmdTimeMs
                 });
@@ -63,7 +61,7 @@ var $config = (function() {
                 // Take the role away from the user, and give it privs.
 
                 db.runCommand({
-                    revokeRolesFromUser: kTestUserName,
+                    revokeRolesFromUser: this.getUserName(),
                     roles: [roleWithDB],
                     maxTimeMS: kMaxCmdTimeMs
                 });
@@ -79,7 +77,7 @@ var $config = (function() {
                 // Drop privileges to normal user.
                 // The workload runner disallows `db.logout()` for reasons we're okay with.
                 assert.commandWorked(db.runCommand({logout: 1}));
-                assert(db.auth(kTestUserName, kTestUserPassword));
+                assert(db.auth(this.getUserName(), kTestUserPassword));
 
                 // Setup a connection to every member host if this is a replica set
                 // so that we can confirm secondary state during observe().
@@ -103,10 +101,11 @@ var $config = (function() {
                     });
 
                     // Wait for user to replicate to all nodes.
+                    const userName = {user: this.getUserName(), db: db.getName()};
                     RSnodes.forEach(function(node) {
                         assert.soon(function() {
                             try {
-                                getTestUser(node, db.getName());
+                                getTestUser(node, userName);
                                 return true;
                             } catch (e) {
                                 return false;
@@ -123,14 +122,15 @@ var $config = (function() {
                     assert.commandWorked(db.runCommand({connectionStatus: 1, showPrivileges: true}))
                         .authInfo;
                 assert.eq(info.authenticatedUsers.length, 1, tojson(info));
-                assert.eq(info.authenticatedUsers[0].user, kTestUserName, tojson(info));
+                assert.eq(info.authenticatedUsers[0].user, this.getUserName(), tojson(info));
                 assert.eq(info.authenticatedUserPrivileges.length, 0, tojson(info));
 
                 // If this is a ReplSet, iterate nodes and check usersInfo.
+                const userName = {user: this.getUserName(), db: db.getName()};
                 RSnodes.forEach(function(node) {
-                    const user = getTestUser(node, db.getName());
+                    const user = getTestUser(node, userName);
                     jsTest.log(node + ' userInfo: ' + tojson(user));
-                    assert.eq(user.user, kTestUserName, tojson(user));
+                    assert.eq(user.user, user.user, tojson(user));
                     assert.eq(user.inheritedPrivileges.length, 0, tojson(user));
                 });
             },
@@ -156,13 +156,15 @@ var $config = (function() {
                 {setParameter: 1, maxTransactionLockRequestTimeoutMillis: kMaxTxnLockReqTimeMs});
         });
 
-        db.createUser({user: kTestUserName, pwd: kTestUserPassword, roles: []});
+        db.createUser({user: this.getUserName(), pwd: kTestUserPassword, roles: []});
     }
 
     function teardown(db, collName, cluster) {
-        const pattern = new RegExp('^' + kTestRoleNamePrefix + '\\d+$');
+        // Calling getRoleName() with an empty string allows us to just get the prefix
+        // and match any thread id by pattern.
+        const pattern = new RegExp('^' + this.getRoleName('') + '\\d+$');
         dropRoles(db, pattern);
-        db.dropUser(kTestUserName);
+        db.dropUser(this.getUserName());
 
         cluster.executeOnMongodNodes(function(db) {
             db.adminCommand({
@@ -186,5 +188,18 @@ var $config = (function() {
         transitions: transitions,
         setup: setup,
         teardown: teardown,
+        data: {
+            // Tests which extend this must provide their own unique name.
+            // So that 'simultaneous' runs will not step over each other.
+            test_name: 'auth_privilege_consistency',
+
+            getUserName: function() {
+                return this.test_name + '_user';
+            },
+
+            getRoleName: function(id) {
+                return this.test_name + '_role_' + id;
+            },
+        },
     };
 })();
