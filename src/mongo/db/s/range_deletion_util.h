@@ -72,6 +72,6 @@ SharedSemiFuture<void> removeDocumentsInRange(
     const ChunkRange& range,
     boost::optional<UUID> migrationId,
     int numDocsToRemovePerBatch,
-    Seconds delayForActiveQueriesOnSecondariesToComplete,
-    Milliseconds delayBetweenBatches);
+    Seconds delayForActiveQueriesOnSecondariesToComplete);
+
 }  // namespace mongo
