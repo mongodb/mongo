@@ -84,6 +84,7 @@ constexpr StringData DocumentSourceChangeStream::kNamespaceField;
 constexpr StringData DocumentSourceChangeStream::kUuidField;
 constexpr StringData DocumentSourceChangeStream::kReshardingUuidField;
 constexpr StringData DocumentSourceChangeStream::kUpdateDescriptionField;
+constexpr StringData DocumentSourceChangeStream::kRawUpdateDescriptionField;
 constexpr StringData DocumentSourceChangeStream::kOperationTypeField;
 constexpr StringData DocumentSourceChangeStream::kStageName;
 constexpr StringData DocumentSourceChangeStream::kClusterTimeField;
@@ -372,6 +373,12 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
             "'showEnhancedEvents:true' in the change stream spec",
             feature_flags::gFeatureFlagChangeStreamsVisibility.isEnabledAndIgnoreFCV() ||
                 !spec.getShowExpandedEvents());
+
+    uassert(6189400,
+            "the 'featureFlagChangeStreamsVisibility' should be enabled to use "
+            "'showRawUpdateDescription:true' in the change stream spec",
+            feature_flags::gFeatureFlagChangeStreamsVisibility.isEnabledAndIgnoreFCV() ||
+                !spec.getShowRawUpdateDescription());
 
     uassert(31123,
             "Change streams from mongos may not show migration events",
