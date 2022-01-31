@@ -56,24 +56,11 @@ const std::string kProgress("progress");
 const std::string kNoPhase("none");
 const std::string kRemainingChunksToProcess("remainingChunksToProcess");
 
-// TODO (SERVER-62617) Avoid access to disk on each invocation
-ChunkVersion getShardVersion(OperationContext* opCtx, const ShardId& shardId, const UUID& uuid) {
-    auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, uuid);
-    auto chunkVector = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getChunks(
-        opCtx,
-        BSON(ChunkType::collectionUUID()
-             << coll.getUuid() << ChunkType::shard(shardId.toString())) /*query*/,
-        BSON(ChunkType::lastmod << -1) /*sort*/,
-        1 /*limit*/,
-        nullptr /*opTime*/,
-        coll.getEpoch(),
-        coll.getTimestamp(),
-        repl::ReadConcernLevel::kLocalReadConcern,
-        boost::none));
-    uassert(ErrorCodes::BadValue,
-            "No chunks or chunk version in collection",
-            !chunkVector.empty() && chunkVector.front().isVersionSet());
-    return chunkVector.front().getVersion();
+ChunkVersion getShardVersion(OperationContext* opCtx,
+                             const ShardId& shardId,
+                             const NamespaceString& nss) {
+    auto cm = Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfo(opCtx, nss);
+    return cm.getVersion(shardId);
 }
 
 std::vector<ChunkType> getCollectionChunks(OperationContext* opCtx, const CollectionType& coll) {
@@ -107,7 +94,8 @@ bool isRetriableForDefragmentation(const Status& error) {
             error == ErrorCodes::StaleShardVersion || error == ErrorCodes::StaleConfig);
 }
 
-void handleActionResult(const NamespaceString& nss,
+void handleActionResult(OperationContext* opCtx,
+                        const NamespaceString& nss,
                         const UUID& uuid,
                         const DefragmentationPhaseEnum currentPhase,
                         const Status& status,
@@ -118,7 +106,24 @@ void handleActionResult(const NamespaceString& nss,
         onSuccess();
         return;
     }
+
+    if (status.isA<ErrorCategory::StaleShardVersionError>()) {
+        if (auto staleInfo = status.extraInfo<StaleConfigInfo>()) {
+            Grid::get(opCtx)
+                ->catalogCache()
+                ->invalidateShardOrEntireCollectionEntryForShardedCollection(
+                    nss, staleInfo->getVersionWanted(), staleInfo->getShardId());
+        }
+    }
+
     if (isRetriableForDefragmentation(status)) {
+        LOGV2_DEBUG(6261701,
+                    1,
+                    "Hit retriable error while defragmenting collection",
+                    "namespace"_attr = nss,
+                    "uuid"_attr = uuid,
+                    "currentPhase"_attr = currentPhase,
+                    "error"_attr = redact(status));
         onRetriableError();
     } else {
         LOGV2_ERROR(6258601,
@@ -126,7 +131,7 @@ void handleActionResult(const NamespaceString& nss,
                     "namespace"_attr = nss,
                     "uuid"_attr = uuid,
                     "currentPhase"_attr = currentPhase,
-                    "error"_attr = status);
+                    "error"_attr = redact(status));
         onNonRetriableError();
     }
 }
@@ -199,7 +204,7 @@ public:
         if (!_pendingActionsByShards.empty()) {
             // TODO (SERVER-61635) improve fairness if needed
             auto& [shardId, pendingActions] = *_pendingActionsByShards.begin();
-            auto shardVersion = getShardVersion(opCtx, shardId, _uuid);
+            auto shardVersion = getShardVersion(opCtx, shardId, _nss);
 
             if (pendingActions.rangesWithoutDataSize.size() > pendingActions.rangesToMerge.size()) {
                 const auto& rangeToMeasure = pendingActions.rangesWithoutDataSize.back();
@@ -241,6 +246,7 @@ public:
                     auto& mergeResponse = stdx::get<Status>(response);
                     auto& shardingPendingActions = _pendingActionsByShards[mergeAction.shardId];
                     handleActionResult(
+                        opCtx,
                         _nss,
                         _uuid,
                         getType(),
@@ -258,6 +264,7 @@ public:
                 [&](const DataSizeInfo& dataSizeAction) {
                     auto& dataSizeResponse = stdx::get<StatusWith<DataSizeResponse>>(response);
                     handleActionResult(
+                        opCtx,
                         _nss,
                         _uuid,
                         getType(),
@@ -395,7 +402,7 @@ public:
         _outstandingMerges.push_back(_actionableMerges.front());
         _actionableMerges.pop_front();
         const auto& nextRequest = _outstandingMerges.back();
-        auto version = getShardVersion(opCtx, nextRequest.getDestinationShard(), _uuid);
+        auto version = getShardVersion(opCtx, nextRequest.getDestinationShard(), _nss);
         return boost::optional<DefragmentationAction>(
             nextRequest.asMergeInfo(_uuid, _nss, version));
     }
@@ -436,7 +443,7 @@ public:
             targetSibling->busyInOperation = true;
             usedShards->insert(nextSmallChunk->shard);
             usedShards->insert(targetSibling->shard);
-            auto smallChunkVersion = getShardVersion(opCtx, nextSmallChunk->shard, _uuid);
+            auto smallChunkVersion = getShardVersion(opCtx, nextSmallChunk->shard, _nss);
             _outstandingMigrations.emplace_back(nextSmallChunk, targetSibling);
             return _outstandingMigrations.back().asMigrateInfo(_uuid, _nss, smallChunkVersion);
         }
@@ -467,6 +474,11 @@ public:
                     }
 
                     if (migrationResponse.isOK()) {
+                        Grid::get(opCtx)
+                            ->catalogCache()
+                            ->invalidateShardOrEntireCollectionEntryForShardedCollection(
+                                _nss, boost::none, moveRequest.getDestinationShard());
+
                         auto transferredAmount = moveRequest.getMovedDataSizeBytes();
                         _shardInfos.at(moveRequest.getSourceShard()).currentSizeBytes -=
                             transferredAmount;
@@ -540,6 +552,12 @@ public:
                     auto onSuccess = [&] {
                         // The sequence is complete; update the state of the merged chunk...
                         auto& mergedChunk = mergeRequest.chunkToMergeWith;
+
+                        Grid::get(opCtx)
+                            ->catalogCache()
+                            ->invalidateShardOrEntireCollectionEntryForShardedCollection(
+                                _nss, boost::none, mergedChunk->shard);
+
                         auto& chunkToDelete = mergeRequest.chunkToMove;
                         mergedChunk->range = mergeRequest.asMergedRange();
                         mergedChunk->estimatedSizeBytes += chunkToDelete->estimatedSizeBytes;
@@ -570,7 +588,8 @@ public:
                     };
 
                     if (!_aborted) {
-                        handleActionResult(_nss,
+                        handleActionResult(opCtx,
+                                           _nss,
                                            _uuid,
                                            getType(),
                                            mergeResponse,
@@ -1011,7 +1030,7 @@ public:
 
         auto& [shardId, unmergedRanges] = *_unmergedRangesByShard.begin();
         invariant(!unmergedRanges.empty());
-        auto shardVersion = getShardVersion(opCtx, shardId, _uuid);
+        auto shardVersion = getShardVersion(opCtx, shardId, _nss);
         const auto& rangeToMerge = unmergedRanges.back();
         boost::optional<DefragmentationAction> nextAction = boost::optional<DefragmentationAction>(
             MergeInfo(shardId, _nss, _uuid, shardVersion, rangeToMerge));
@@ -1045,7 +1064,8 @@ public:
                             mergeAction.chunkRange);
                     };
                     auto onNonretriableError = [this] { _abort(getType()); };
-                    handleActionResult(_nss,
+                    handleActionResult(opCtx,
+                                       _nss,
                                        _uuid,
                                        getType(),
                                        mergeResponse,
@@ -1159,7 +1179,7 @@ public:
         boost::optional<DefragmentationAction> nextAction = boost::none;
         if (!_pendingActionsByShards.empty()) {
             auto& [shardId, pendingActions] = *_pendingActionsByShards.begin();
-            auto shardVersion = getShardVersion(opCtx, shardId, _uuid);
+            auto shardVersion = getShardVersion(opCtx, shardId, _nss);
 
             if (!pendingActions.rangesToSplit.empty()) {
                 const auto& [rangeToSplit, splitPoints] = pendingActions.rangesToSplit.back();
@@ -1226,6 +1246,7 @@ public:
                 [&](const AutoSplitVectorInfo& autoSplitVectorAction) {
                     auto& splitVectorResponse = stdx::get<StatusWith<SplitPoints>>(response);
                     handleActionResult(
+                        opCtx,
                         _nss,
                         _uuid,
                         getType(),
@@ -1257,6 +1278,7 @@ public:
                 [&](const SplitInfoWithKeyPattern& splitAction) {
                     auto& splitResponse = stdx::get<Status>(response);
                     handleActionResult(
+                        opCtx,
                         _nss,
                         _uuid,
                         getType(),
