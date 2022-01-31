@@ -4844,64 +4844,6 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
-  name: tenant_migration_jscore_passthrough_gen
-  tags: ["tenant_migration"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
-
-- <<: *gen_task_template
-  name: tenant_migration_causally_consistent_jscore_passthrough_gen
-  tags: ["tenant_migration"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
-
-- <<: *gen_task_template
-  name: tenant_migration_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["tenant_migration", "txn"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
-
-- <<: *gen_task_template
-  name: tenant_migration_stepdown_jscore_passthrough_gen
-  tags: ["tenant_migration"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
-
-- <<: *gen_task_template
-  name: tenant_migration_terminate_primary_jscore_passthrough_gen
-  tags: ["tenant_migration"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      depends_on: jsCore
-      use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
-      fallback_num_sub_suites: 10
-
-- <<: *gen_task_template
-  name: tenant_migration_kill_primary_jscore_passthrough_gen
-  tags: ["tenant_migration"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      depends_on: jsCore
-      use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
-      fallback_num_sub_suites: 10
-
-- <<: *gen_task_template
   name: parallel_gen
   tags: ["misc_js", "parallel"]
   commands:
@@ -8874,9 +8816,6 @@ buildvariants:
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
-  - name: .tenant_migration
-    distros:
-      - rhel80-xlarge
   - name: server_selection_json_test_TG
     distros:
       - rhel80-xlarge
@@ -8966,9 +8905,6 @@ buildvariants:
     - name: .stitch
     - name: .updatefuzzer
     - name: secondary_reads_passthrough_gen
-    - name: .tenant_migration
-      distros:
-        - rhel80-xlarge
 
 - name: enterprise-rhel-80-64-bit-large-txns-format
   display_name: "Enterprise RHEL 8.0 (large transactions format)"
@@ -10608,7 +10544,6 @@ buildvariants:
   - name: snmp
   - name: .watchdog
   - name: .stitch
-  - name: .tenant_migration
   - name: unittest_shell_hang_analyzer_gen
   - name: .updatefuzzer
   - name: server_discovery_and_monitoring_json_test_TG
@@ -10700,7 +10635,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .updatefuzzer
-  - name: .tenant_migration
   - name: watchdog_wiredtiger
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG

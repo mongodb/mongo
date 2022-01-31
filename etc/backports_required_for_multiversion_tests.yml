@@ -24,32 +24,14 @@ last-continuous:
   all:
     - ticket: SERVER-57262
       test_file: jstests/replsets/catchup_takeover_with_higher_config.js
-    - ticket: SERVER-58353
-      test_file: jstests/replsets/tenant_migration_aborted_buildindex.js
     - ticket: SERVER-58898
       test_file: jstests/replsets/write_concern_write_to_local.js
     - ticket: SERVER-59197
       test_file: jstests/replsets/sessions_collection_reaping.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_recipient_fetches_retryable_writes_oplog_entries.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_recipient_fetches_synthetic_find_and_modify_oplog_entries.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_retryable_write_retry.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_retryable_write_retry_on_recipient.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_find_and_modify_retry.js
     - ticket: SERVER-59057
       test_file: jstests/replsets/rollback_transaction_table.js
-    - ticket: SERVER-59525
-      test_file: jstests/replsets/tenant_migration_recipient_access_blocker_rollback.js
     - ticket: SERVER-59023
       test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
-    - ticket: SERVER-51943
-      test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
     - ticket: SERVER-56887
       test_file: jstests/sharding/database_versioning_all_commands.js
     - ticket: SERVER-59108
@@ -114,8 +96,6 @@ last-lts:
   all:
     - ticket: SERVER-49471
       test_file: jstests/replsets/apply_prepare_txn_write_conflict_robustness.js
-    - ticket: SERVER-58353
-      test_file: jstests/replsets/tenant_migration_aborted_buildindex.js
     - ticket: SERVER-47645
       test_file: jstests/replsets/invalidate_sessions_on_stepdown.js
     - ticket: SERVER-47773
@@ -272,30 +252,14 @@ last-lts:
       test_file: jstests/replsets/write_concern_write_to_local.js
     - ticket: SERVER-59197
       test_file: jstests/replsets/sessions_collection_reaping.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_recipient_fetches_retryable_writes_oplog_entries.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_recipient_fetches_synthetic_find_and_modify_oplog_entries.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_retryable_write_retry.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_retryable_write_retry_on_recipient.js
-    - ticket: SERVER-57617
-      test_file: jstests/replsets/tenant_migration_find_and_modify_retry.js
     - ticket: SERVER-57321
       test_file: jstests/core/mod_special_values.js
     - ticket: SERVER-59057
       test_file: jstests/replsets/rollback_transaction_table.js
-    - ticket: SERVER-59525
-      test_file: jstests/replsets/tenant_migration_recipient_access_blocker_rollback.js
     - ticket: SERVER-59023
       test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
     - ticket: SERVER-59765
       test_file: jstests/aggregation/expressions/date_add_subtract.js
-    - ticket: SERVER-51943
-      test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
     - ticket: SERVER-59108
       test_file: jstests/replsets/stepdown_race_with_transaction.js
     - ticket: SERVER-59613

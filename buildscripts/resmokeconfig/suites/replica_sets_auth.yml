@@ -18,8 +18,6 @@ selector:
   - jstests/replsets/emptycapped.js
   - jstests/replsets/localhostAuthBypass.js
   - jstests/replsets/rollback_auth.js
-  - jstests/replsets/tenant_migration_concurrent_writes_on_donor.js
-  - jstests/replsets/tenant_migration_external_cluster_validation.js
   - jstests/replsets/user_management_wc.js
   - jstests/replsets/replsetinitiate_works_with_keyfile_profile_verbose_options.js
   # Also skip tests that require a Thread, because Threads don't inherit credentials.
