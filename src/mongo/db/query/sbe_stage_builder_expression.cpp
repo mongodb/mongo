@@ -1155,6 +1155,13 @@ public:
         auto numChildren = expr->getChildren().size();
         _context->ensureArity(numChildren);
 
+        // If there are no children, return an empty array.
+        if (numChildren == 0) {
+            auto [emptyArrTag, emptyArrValue] = sbe::value::makeNewArray();
+            _context->pushExpr(makeConstant(emptyArrTag, emptyArrValue));
+            return;
+        }
+
         sbe::EExpression::Vector nullChecks;
         std::vector<EvalStage> unionBranches;
         std::vector<sbe::value::SlotVector> unionInputSlots;
