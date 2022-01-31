@@ -51,6 +51,7 @@
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
@@ -317,7 +318,12 @@ public:
                                              extensionsCallback,
                                              MatchExpressionParser::kAllowAllSpecialFeatures));
 
-            if (ctx->getView()) {
+            // If we are running a query against a view, or if we are trying to test the new
+            // optimizer, redirect this query through the aggregation system.
+            if (ctx->getView() ||
+                (feature_flags::gfeatureFlagCommonQueryFramework.isEnabled(
+                     serverGlobalParams.featureCompatibility) &&
+                 internalQueryEnableCascadesOptimizer.load())) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 ctx.reset();
 
@@ -521,7 +527,12 @@ public:
                                              extensionsCallback,
                                              MatchExpressionParser::kAllowAllSpecialFeatures));
 
-            if (ctx->getView()) {
+            // If we are running a query against a view, or if we are trying to test the new
+            // optimizer, redirect this query through the aggregation system.
+            if (ctx->getView() ||
+                (feature_flags::gfeatureFlagCommonQueryFramework.isEnabled(
+                     serverGlobalParams.featureCompatibility) &&
+                 internalQueryEnableCascadesOptimizer.load())) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 ctx.reset();
 

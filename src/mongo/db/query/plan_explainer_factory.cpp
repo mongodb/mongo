@@ -47,25 +47,32 @@ std::unique_ptr<PlanExplainer> make(PlanStage* root, const PlanEnumeratorExplain
 std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
                                     const stage_builder::PlanStageData* data,
                                     const QuerySolution* solution) {
-    return make(root, data, solution, {}, false);
+    return make(root, data, solution, {}, {}, false);
 }
 
 std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
                                     const stage_builder::PlanStageData* data,
                                     const QuerySolution* solution,
+                                    std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
                                     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
                                     bool isMultiPlan) {
     // Pre-compute Debugging info for explain use.
     auto debugInfoSBE = std::make_unique<plan_cache_debug_info::DebugInfoSBE>(
         plan_cache_util::buildDebugInfo(solution));
-    return std::make_unique<PlanExplainerSBE>(
-        root, data, solution, std::move(rejectedCandidates), isMultiPlan, std::move(debugInfoSBE));
+    return std::make_unique<PlanExplainerSBE>(root,
+                                              data,
+                                              solution,
+                                              std::move(optimizerData),
+                                              std::move(rejectedCandidates),
+                                              isMultiPlan,
+                                              std::move(debugInfoSBE));
 }
 
 std::unique_ptr<PlanExplainer> make(
     sbe::PlanStage* root,
     const stage_builder::PlanStageData* data,
     const QuerySolution* solution,
+    std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
     bool isMultiPlan,
     std::unique_ptr<plan_cache_debug_info::DebugInfoSBE> debugInfoSBE) {
@@ -77,7 +84,12 @@ std::unique_ptr<PlanExplainer> make(
             plan_cache_util::buildDebugInfo(solution));
     }
 
-    return std::make_unique<PlanExplainerSBE>(
-        root, data, solution, std::move(rejectedCandidates), isMultiPlan, std::move(debugInfoSBE));
+    return std::make_unique<PlanExplainerSBE>(root,
+                                              data,
+                                              solution,
+                                              std::move(optimizerData),
+                                              std::move(rejectedCandidates),
+                                              isMultiPlan,
+                                              std::move(debugInfoSBE));
 }
 }  // namespace mongo::plan_explainer_factory

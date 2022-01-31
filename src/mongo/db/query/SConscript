@@ -6,8 +6,10 @@ env = env.Clone()
 
 env.SConscript(
     dirs=[
+        "ce",
         "collation",
         "datetime",
+        'optimizer',
     ],
     exports=[
         'env'

@@ -41,6 +41,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/commands/cqf/cqf_aggregate.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
@@ -66,6 +67,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/oplog.h"
@@ -129,7 +131,6 @@ bool handleCursorCommand(OperationContext* opCtx,
         request.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize);
 
     if (cursors.size() > 1) {
-
         uassert(
             ErrorCodes::BadValue, "the exchange initial batch size must be zero", batchSize == 0);
 
@@ -535,6 +536,74 @@ void performValidationChecks(const OperationContext* opCtx,
     aggregation_request_helper::validateRequestForAPIVersion(opCtx, request);
 }
 
+std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyExecutor(
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    const LiteParsedPipeline& liteParsedPipeline,
+    const NamespaceString& nss,
+    const MultiCollection& collections,
+    const AggregateCommandRequest& request,
+    CurOp* curOp,
+    const std::function<void(void)>& resetContextFn) {
+    const auto expCtx = pipeline->getContext();
+    // Check if the pipeline has a $geoNear stage, as it will be ripped away during the build query
+    // executor phase below (to be replaced with a $geoNearCursorStage later during the executor
+    // attach phase).
+    auto hasGeoNearStage = !pipeline->getSources().empty() &&
+        dynamic_cast<DocumentSourceGeoNear*>(pipeline->peekFront());
+
+    // Prepare a PlanExecutor to provide input into the pipeline, if needed.
+    auto attachExecutorCallback =
+        PipelineD::buildInnerQueryExecutor(collections, nss, &request, pipeline.get());
+
+    std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
+    if (canOptimizeAwayPipeline(pipeline.get(),
+                                attachExecutorCallback.second.get(),
+                                request,
+                                hasGeoNearStage,
+                                liteParsedPipeline.hasChangeStream())) {
+        // Mark that this query does not use DocumentSource.
+        curOp->debug().documentSourceUsed = false;
+
+        // This pipeline is currently empty, but once completed it will have only one source,
+        // which is a DocumentSourceCursor. Instead of creating a whole pipeline to do nothing
+        // more than forward the results of its cursor document source, we can use the
+        // PlanExecutor by itself. The resulting cursor will look like what the client would
+        // have gotten from find command.
+        execs.emplace_back(std::move(attachExecutorCallback.second));
+    } else {
+        // Mark that this query uses DocumentSource.
+        curOp->debug().documentSourceUsed = true;
+
+        // Complete creation of the initial $cursor stage, if needed.
+        PipelineD::attachInnerQueryExecutorToPipeline(collections,
+                                                      attachExecutorCallback.first,
+                                                      std::move(attachExecutorCallback.second),
+                                                      pipeline.get());
+
+        auto pipelines = createExchangePipelinesIfNeeded(
+            expCtx->opCtx, expCtx, request, std::move(pipeline), expCtx->uuid);
+        for (auto&& pipelineIt : pipelines) {
+            // There are separate ExpressionContexts for each exchange pipeline, so make sure to
+            // pass the pipeline's ExpressionContext to the plan executor factory.
+            auto pipelineExpCtx = pipelineIt->getContext();
+
+            execs.emplace_back(
+                plan_executor_factory::make(std::move(pipelineExpCtx),
+                                            std::move(pipelineIt),
+                                            aggregation_request_helper::getResumableScanType(
+                                                request, liteParsedPipeline.hasChangeStream())));
+        }
+
+        // With the pipelines created, we can relinquish locks as they will manage the locks
+        // internally further on. We still need to keep the lock for an optimized away pipeline
+        // though, as we will be changing its lock policy to 'kLockExternally' (see details
+        // below), and in order to execute the initial getNext() call in 'handleCursorCommand',
+        // we need to hold the collection lock.
+        resetContextFn();
+    }
+    return execs;
+}
+
 }  // namespace
 
 Status runAggregate(OperationContext* opCtx,
@@ -604,6 +673,7 @@ Status runAggregate(OperationContext* opCtx,
     std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     boost::intrusive_ptr<ExpressionContext> expCtx;
     auto curOp = CurOp::get(opCtx);
+
     {
         // If we are in a transaction, check whether the parsed pipeline supports being in
         // a transaction and if the transaction's read concern is supported.
@@ -812,59 +882,29 @@ Status runAggregate(OperationContext* opCtx,
         constexpr bool alreadyOptimized = true;
         pipeline->validateCommon(alreadyOptimized);
 
-        // Check if the pipeline has a $geoNear stage, as it will be ripped away during the build
-        // query executor phase below (to be replaced with a $geoNearCursorStage later during the
-        // executor attach phase).
-        auto hasGeoNearStage = !pipeline->getSources().empty() &&
-            dynamic_cast<DocumentSourceGeoNear*>(pipeline->peekFront());
+        if (feature_flags::gfeatureFlagCommonQueryFramework.isEnabled(
+                serverGlobalParams.featureCompatibility) &&
+            internalQueryEnableCascadesOptimizer.load()) {
+            uassert(6624344,
+                    "Exchanging is not supported in the Cascades optimizer",
+                    !request.getExchange().has_value());
 
-        // Prepare a PlanExecutor to provide input into the pipeline, if needed.
-        auto attachExecutorCallback =
-            PipelineD::buildInnerQueryExecutor(collections, nss, &request, pipeline.get());
-
-        if (canOptimizeAwayPipeline(pipeline.get(),
-                                    attachExecutorCallback.second.get(),
-                                    request,
-                                    hasGeoNearStage,
-                                    liteParsedPipeline.hasChangeStream())) {
-            // This pipeline is currently empty, but once completed it will have only one source,
-            // which is a DocumentSourceCursor. Instead of creating a whole pipeline to do nothing
-            // more than forward the results of its cursor document source, we can use the
-            // PlanExecutor by itself. The resulting cursor will look like what the client would
-            // have gotten from find command.
-            execs.emplace_back(std::move(attachExecutorCallback.second));
-            // Mark that this query does not use DocumentSource.
-            curOp->debug().documentSourceUsed = false;
+            auto timeBegin = Date_t::now();
+            execs.emplace_back(getSBEExecutorViaCascadesOptimizer(
+                opCtx, expCtx, nss, collections.getMainCollection(), *pipeline));
+            auto elapsed =
+                (Date_t::now().toMillisSinceEpoch() - timeBegin.toMillisSinceEpoch()) / 1000.0;
+            std::cerr << "Optimization took: " << elapsed << " s.\n";
         } else {
-            // Mark that this query uses DocumentSource.
-            curOp->debug().documentSourceUsed = true;
-            // Complete creation of the initial $cursor stage, if needed.
-            PipelineD::attachInnerQueryExecutorToPipeline(collections,
-                                                          attachExecutorCallback.first,
-                                                          std::move(attachExecutorCallback.second),
-                                                          pipeline.get());
-
-            auto pipelines =
-                createExchangePipelinesIfNeeded(opCtx, expCtx, request, std::move(pipeline), uuid);
-            for (auto&& pipelineIt : pipelines) {
-                // There are separate ExpressionContexts for each exchange pipeline, so make sure to
-                // pass the pipeline's ExpressionContext to the plan executor factory.
-                auto pipelineExpCtx = pipelineIt->getContext();
-
-                execs.emplace_back(plan_executor_factory::make(
-                    std::move(pipelineExpCtx),
-                    std::move(pipelineIt),
-                    aggregation_request_helper::getResumableScanType(
-                        request, liteParsedPipeline.hasChangeStream())));
-            }
-
-            // With the pipelines created, we can relinquish locks as they will manage the locks
-            // internally further on. We still need to keep the lock for an optimized away pipeline
-            // though, as we will be changing its lock policy to 'kLockExternally' (see details
-            // below), and in order to execute the initial getNext() call in 'handleCursorCommand',
-            // we need to hold the collection lock.
-            resetContext();
+            execs = createLegacyExecutor(std::move(pipeline),
+                                         liteParsedPipeline,
+                                         nss,
+                                         collections,
+                                         request,
+                                         curOp,
+                                         resetContext);
         }
+        tassert(6624353, "No executors", !execs.empty());
 
         {
             auto planSummary = execs[0]->getPlanExplainer().getPlanSummary();

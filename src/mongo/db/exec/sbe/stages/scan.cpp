@@ -55,7 +55,8 @@ ScanStage::ScanStage(UUID collectionUuid,
                      bool forward,
                      PlanYieldPolicy* yieldPolicy,
                      PlanNodeId nodeId,
-                     ScanCallbacks scanCallbacks)
+                     ScanCallbacks scanCallbacks,
+                     bool useRandomCursor)
     : PlanStage(seekKeySlot ? "seek"_sd : "scan"_sd, yieldPolicy, nodeId),
       _collUuid(collectionUuid),
       _recordSlot(recordSlot),
@@ -69,7 +70,8 @@ ScanStage::ScanStage(UUID collectionUuid,
       _vars(std::move(vars)),
       _seekKeySlot(seekKeySlot),
       _forward(forward),
-      _scanCallbacks(std::move(scanCallbacks)) {
+      _scanCallbacks(std::move(scanCallbacks)),
+      _useRandomCursor(useRandomCursor) {
     invariant(_fields.size() == _vars.size());
     invariant(!_seekKeySlot || _forward);
     tassert(5567202,
@@ -77,6 +79,8 @@ ScanStage::ScanStage(UUID collectionUuid,
             !_oplogTsSlot ||
                 (std::find(_fields.begin(), _fields.end(), repl::OpTime::kTimestampFieldName) !=
                  _fields.end()));
+    // We cannot use a random cursor if we are seeking or requesting a reverse scan.
+    invariant(!_useRandomCursor || (!_seekKeySlot && _forward));
 }
 
 std::unique_ptr<PlanStage> ScanStage::clone() const {
@@ -197,12 +201,12 @@ void ScanStage::doSaveState(bool relinquishCursor) {
 #endif
 
 
-    if (_cursor && relinquishCursor) {
-        _cursor->save();
+    if (auto cursor = getActiveCursor(); cursor != nullptr && relinquishCursor) {
+        cursor->save();
     }
 
-    if (_cursor) {
-        _cursor->setSaveStorageCursorOnDetachFromOperationContext(!relinquishCursor);
+    if (auto cursor = getActiveCursor()) {
+        cursor->setSaveStorageCursorOnDetachFromOperationContext(!relinquishCursor);
     }
 
     _coll.reset();
@@ -220,10 +224,10 @@ void ScanStage::doRestoreState(bool relinquishCursor) {
     tassert(5777408, "Catalog epoch should be initialized", _catalogEpoch);
     _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
 
-    if (_cursor) {
+    if (auto cursor = getActiveCursor(); cursor != nullptr) {
         if (relinquishCursor) {
             const auto tolerateCappedCursorRepositioning = false;
-            const bool couldRestore = _cursor->restore(tolerateCappedCursorRepositioning);
+            const bool couldRestore = cursor->restore(tolerateCappedCursorRepositioning);
             uassert(
                 ErrorCodes::CappedPositionLost,
                 str::stream()
@@ -262,14 +266,14 @@ void ScanStage::doRestoreState(bool relinquishCursor) {
 }
 
 void ScanStage::doDetachFromOperationContext() {
-    if (_cursor) {
-        _cursor->detachFromOperationContext();
+    if (auto cursor = getActiveCursor()) {
+        cursor->detachFromOperationContext();
     }
 }
 
 void ScanStage::doAttachToOperationContext(OperationContext* opCtx) {
-    if (_cursor) {
-        _cursor->reattachToOperationContext(opCtx);
+    if (auto cursor = getActiveCursor()) {
+        cursor->reattachToOperationContext(opCtx);
     }
 }
 
@@ -283,6 +287,10 @@ PlanStage::TrialRunTrackerAttachResultMask ScanStage::doAttachToTrialRunTracker(
     return childrenAttachResult | TrialRunTrackerAttachResultFlags::AttachedToStreamingStage;
 }
 
+RecordCursor* ScanStage::getActiveCursor() const {
+    return _useRandomCursor ? _randomCursor.get() : _cursor.get();
+}
+
 void ScanStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
 
@@ -292,13 +300,13 @@ void ScanStage::open(bool reOpen) {
     if (_open) {
         tassert(5071001, "reopened ScanStage but reOpen=false", reOpen);
         tassert(5071002, "ScanStage is open but _coll is not null", _coll);
-        tassert(5071003, "ScanStage is open but don't have _cursor", _cursor);
+        tassert(5071003, "ScanStage is open but doesn't have a cursor", getActiveCursor());
     } else {
         tassert(5071004, "first open to ScanStage but reOpen=true", !reOpen);
         if (!_coll) {
             // We're being opened after 'close()'. We need to re-acquire '_coll' in this case and
             // make some validity checks (the collection has not been dropped, renamed, etc.).
-            tassert(5071005, "ScanStage is not open but have _cursor", !_cursor);
+            tassert(5071005, "ScanStage is not open but has a cursor", !getActiveCursor());
             tassert(5777401, "Collection name should be initialized", _collName);
             tassert(5777402, "Catalog epoch should be initialized", _catalogEpoch);
             _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
@@ -321,7 +329,11 @@ void ScanStage::open(bool reOpen) {
         }
 
         if (!_cursor || !_seekKeyAccessor) {
-            _cursor = _coll->getCursor(_opCtx, _forward);
+            if (_useRandomCursor) {
+                _randomCursor = _coll->getRecordStore()->getRandomCursor(_opCtx);
+            } else {
+                _cursor = _coll->getCursor(_opCtx, _forward);
+            }
         }
     } else {
         MONGO_UNREACHABLE_TASSERT(5959701);
@@ -355,7 +367,8 @@ PlanState ScanStage::getNext() {
     }
 
     auto res = _firstGetNext && _seekKeyAccessor;
-    auto nextRecord = res ? _cursor->seekExact(_key) : _cursor->next();
+    auto nextRecord = _useRandomCursor ? _randomCursor->next()
+                                       : (res ? _cursor->seekExact(_key) : _cursor->next());
     _firstGetNext = false;
 
     if (!nextRecord) {
@@ -445,6 +458,7 @@ void ScanStage::close() {
 
     trackClose();
     _cursor.reset();
+    _randomCursor.reset();
     _coll.reset();
     _open = false;
 }
@@ -530,6 +544,10 @@ std::vector<DebugPrinter::Block> ScanStage::debugPrint() const {
         DebugPrinter::addIdentifier(ret, _indexKeyPatternSlot.get());
     } else {
         DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
+
+    if (_useRandomCursor) {
+        DebugPrinter::addKeyword(ret, "random");
     }
 
     ret.emplace_back(DebugPrinter::Block("[`"));

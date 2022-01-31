@@ -1387,7 +1387,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDropFields(Arit
     }
 
     // Build the set of fields to drop.
-    StringDataSet restrictFieldsSet;
+    StringSet restrictFieldsSet;
     for (ArityType idx = 1; idx < arity; ++idx) {
         auto [owned, tag, val] = getFromStack(idx);
 
@@ -1463,7 +1463,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinKeepFields(Arit
     }
 
     // Build the set of fields to keep.
-    StringDataSet keepFieldsSet;
+    StringSet keepFieldsSet;
     for (uint8_t idx = 1; idx < arity; ++idx) {
         auto [owned, tag, val] = getFromStack(idx);
 

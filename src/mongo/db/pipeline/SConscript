@@ -262,6 +262,11 @@ pipelineEnv.InjectThirdParty(libraries=['snappy'])
 pipelineEnv.Library(
     target='pipeline',
     source=[
+        'abt/abt_document_source_visitor.cpp',
+        'abt/agg_expression_visitor.cpp',
+        'abt/expr_algebrizer_context.cpp',
+        'abt/match_expression_visitor.cpp',
+        'abt/utils.cpp',
         'document_source.cpp',
         'document_source_add_fields.cpp',
         'document_source_bucket.cpp',
@@ -315,6 +320,8 @@ pipelineEnv.Library(
         'sequential_document_cache.cpp',
         'skip_and_limit.cpp',
         'tee_buffer.cpp',
+        'visitors/document_source_walker.cpp',
+        'visitors/transformer_interface_walker.cpp',
         'window_function/partition_iterator.cpp',
         'window_function/spillable_cache.cpp',
         'window_function/window_function_exec.cpp',
@@ -344,6 +351,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',
         '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
+        '$BUILD_DIR/mongo/db/query/optimizer/optimizer',
         '$BUILD_DIR/mongo/db/query/query_knobs',
         '$BUILD_DIR/mongo/db/query/sort_pattern',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
@@ -487,6 +495,7 @@ env.Library(
 env.CppUnitTest(
     target='db_pipeline_test',
     source=[
+        'abt/pipeline_test.cpp',
         'accumulator_js_test.cpp' if get_option('js-engine') != 'none' else [],
         'accumulator_test.cpp',
         'aggregation_request_test.cpp',
@@ -598,6 +607,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/exec/document_value/document_value_test_util',
         '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/mongo/db/query/optimizer/unit_test_utils',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/repl/image_collection_entry',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',

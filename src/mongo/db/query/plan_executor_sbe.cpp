@@ -48,6 +48,7 @@ extern FailPoint planExecutorHangBeforeShouldWaitForInserts;
 
 PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                  std::unique_ptr<CanonicalQuery> cq,
+                                 std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
                                  sbe::CandidatePlans candidates,
                                  const CollectionPtr& collection,
                                  bool returnOwnedBson,
@@ -103,8 +104,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
 
     const auto isMultiPlan = candidates.plans.size() > 1;
 
-    uassert(5088500, "Query does not have a valid CanonicalQuery", _cq);
-    if (!_cq->getExpCtx()->explain) {
+    if (!_cq || !_cq->getExpCtx()->explain) {
         // If we're not in explain mode, there is no need to keep rejected candidate plans around.
         candidates.plans.clear();
     } else {
@@ -115,6 +115,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
     _planExplainer = plan_explainer_factory::make(_root.get(),
                                                   &_rootData,
                                                   _solution.get(),
+                                                  std::move(optimizerData),
                                                   std::move(candidates.plans),
                                                   isMultiPlan,
                                                   std::move(_rootData.debugInfo));

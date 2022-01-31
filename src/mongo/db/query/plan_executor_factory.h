@@ -35,6 +35,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
+#include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_solution.h"
@@ -106,12 +107,14 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
 /**
  * Constructs a PlanExecutor for the query 'cq' which will execute the SBE plan 'root'. A yield
  * policy can optionally be provided if the plan should automatically yield during execution.
+ * "optimizerData" is used to print optimizer ABT plans, and may be empty.
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
     std::unique_ptr<QuerySolution> solution,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
+    std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
     const CollectionPtr* collection,
     size_t plannerOptions,
     NamespaceString nss,

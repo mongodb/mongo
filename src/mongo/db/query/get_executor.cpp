@@ -1318,6 +1318,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                        std::move(cq),
                                        std::move(solutions[0]),
                                        std::move(roots[0]),
+                                       {},
                                        mainColl,
                                        plannerOptions,
                                        std::move(nss),

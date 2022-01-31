@@ -33,6 +33,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 
 namespace mongo::sbe {
@@ -389,7 +390,10 @@ void ExchangeConsumer::close() {
 
 std::unique_ptr<PlanStageStats> ExchangeConsumer::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
-    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
+    if (!_children.empty()) {
+        // TODO: handle empty _children.
+        ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
+    }
     return ret;
 }
 
@@ -428,8 +432,11 @@ std::vector<DebugPrinter::Block> ExchangeConsumer::debugPrint() const {
             uasserted(4822835, "policy not yet implemented");
     }
 
-    DebugPrinter::addNewLine(ret);
-    DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+    if (!_children.empty()) {
+        // TODO: handle empty _children.
+        DebugPrinter::addNewLine(ret);
+        DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+    }
 
     return ret;
 }
@@ -496,6 +503,9 @@ void ExchangeProducer::start(OperationContext* opCtx,
                              CompileCtx& ctx,
                              std::unique_ptr<PlanStage> producer) {
     ExchangeProducer* p = static_cast<ExchangeProducer*>(producer.get());
+
+    // TODO: SERVER-62925. Rationalize this lock.
+    Lock::GlobalLock lock(opCtx, MODE_IS);
 
     p->attachToOperationContext(opCtx);
 

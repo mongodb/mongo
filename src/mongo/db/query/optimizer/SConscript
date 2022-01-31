@@ -1,0 +1,76 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+env.SConscript(
+    dirs=[
+        "algebra",
+    ],
+    exports=[
+        'env'
+    ],
+)
+
+env.Library(
+    target="optimizer",
+    source=[
+        "cascades/ce_heuristic.cpp",
+        "cascades/ce_hinted.cpp",
+        "cascades/cost_derivation.cpp",
+        "cascades/enforcers.cpp",
+        "cascades/implementers.cpp",
+        "cascades/logical_props_derivation.cpp",
+        "cascades/logical_rewriter.cpp",
+        "cascades/memo.cpp",
+        "cascades/physical_rewriter.cpp",
+        "cascades/rewrite_queues.cpp",
+        "defs.cpp",
+        "explain.cpp",
+        "index_bounds.cpp",
+        "metadata.cpp",
+        "node.cpp",
+        "opt_phase_manager.cpp",
+        "props.cpp",
+        "reference_tracker.cpp",
+        "rewrites/const_eval.cpp",
+        "rewrites/path.cpp",
+        "rewrites/path_lower.cpp",
+        "syntax/expr.cpp",
+        "utils/abt_hash.cpp",
+        "utils/interval_utils.cpp",
+        "utils/memo_utils.cpp",
+        "utils/utils.cpp"
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/exec/sbe/query_sbe_values",
+    ],
+)
+
+env.Library(
+    target="unit_test_utils",
+    source=[
+        "utils/unit_test_utils.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/pipeline/pipeline",
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/unittest/unittest",
+    ],
+)
+
+env.CppUnitTest(
+    target='optimizer_test',
+    source=[
+        "logical_rewriter_optimizer_test.cpp",
+        "optimizer_test.cpp",
+        "physical_rewriter_optimizer_test.cpp",
+        "rewrites/path_optimizer_test.cpp",
+        "interval_intersection_test.cpp",
+    ],
+    LIBDEPS=[
+        "optimizer",
+        "unit_test_utils",
+    ]
+)

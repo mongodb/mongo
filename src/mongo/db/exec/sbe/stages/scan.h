@@ -107,7 +107,8 @@ public:
               bool forward,
               PlanYieldPolicy* yieldPolicy,
               PlanNodeId nodeId,
-              ScanCallbacks scanCallbacks);
+              ScanCallbacks scanCallbacks,
+              bool useRandomCursor = false);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -132,6 +133,9 @@ protected:
         TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) override;
 
 private:
+    // Returns the primary cursor or the random cursor depending on whether _useRandomCursor is set.
+    RecordCursor* getActiveCursor() const;
+
     const UUID _collUuid;
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;
@@ -168,6 +172,9 @@ private:
     value::SlotAccessor* _indexKeyPatternAccessor{nullptr};
     RuntimeEnvironment::Accessor* _oplogTsAccessor{nullptr};
 
+    // Used to return a random sample of the collection.
+    const bool _useRandomCursor;
+
     value::FieldAccessorMap _fieldAccessors;
     value::SlotAccessorMap _varAccessors;
     value::SlotAccessor* _seekKeyAccessor{nullptr};
@@ -177,6 +184,10 @@ private:
     bool _open{false};
 
     std::unique_ptr<SeekableRecordCursor> _cursor;
+
+    // TODO: SERVER-62647. Consider removing random cursor when no longer needed.
+    std::unique_ptr<RecordCursor> _randomCursor;
+
     RecordId _key;
     bool _firstGetNext{false};
 

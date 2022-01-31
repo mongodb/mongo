@@ -641,3 +641,66 @@ server_parameters:
     cpp_varname: "internalEnableMultipleAutoGetCollections"
     cpp_vartype: AtomicWord<bool>
     default: false
+
+  internalQueryEnableSamplingCardinalityEstimator:
+    description: "Set to use the sampling-based method for estimating cardinality."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryEnableSamplingCardinalityEstimator"
+    cpp_vartype: AtomicWord<bool>
+    default: true
+
+  internalQueryEnableCascadesOptimizer:
+    description: "Set to use the new optimizer path, must be used in conjunction with the feature flag."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryEnableCascadesOptimizer"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
+  internalCascadesOptimizerDisableScan:
+    description: "Disable full collection scans."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerDisableScan"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
+  internalCascadesOptimizerDisableIndexes:
+    description: "Disable index scan plans."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerDisableIndexes"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
+  internalCascadesOptimizerDisableMergeJoinRIDIntersect:
+    description: "Disable index RID intersection via merge join."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerDisableMergeJoinRIDIntersect"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
+  internalCascadesOptimizerDisableHashJoinRIDIntersect:
+    description: "Disable index RID intersection via hash join."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerDisableHashJoinRIDIntersect"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
+  internalCascadesOptimizerDisableGroupByAndUnionRIDIntersect:
+    description: "Disable index RID intersection via group by and union."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerDisableGroupByAndUnionRIDIntersect"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
+  internalCascadesOptimizerKeepRejectedPlans:
+    description: "Keep track of rejected plans in the memo."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerKeepRejectedPlans"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
+  internalCascadesOptimizerDisableBranchAndBound:
+    description: "Disable cascades branch-and-bound strategy, and fully evaluate all plans."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerDisableBranchAndBound"
+    cpp_vartype: AtomicWord<bool>
+    default: false

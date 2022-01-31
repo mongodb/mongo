@@ -114,6 +114,18 @@ env.Library(
     )
 
 env.Library(
+    target='query_sbe_abt',
+    source=[
+        'abt/abt_lower.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/optimizer/optimizer',
+        'query_sbe',
+        'query_sbe_storage'
+        ]
+    )
+
+env.Library(
     target='sbe_plan_stage_test',
     source=[
         'sbe_plan_stage_test.cpp',
@@ -189,5 +201,22 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         'query_sbe_parser',
         'sbe_plan_stage_test',
+    ],
+)
+
+env.CppUnitTest(
+    target='sbe_abt_test',
+    source=[
+        'abt/sbe_abt_diff_test.cpp',
+        'abt/sbe_abt_test.cpp',
+        'abt/sbe_abt_test_util.cpp',
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/auth/authmocks",
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/db/query_exec',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'query_sbe_abt',
     ],
 )

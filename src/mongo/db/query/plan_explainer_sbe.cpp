@@ -36,6 +36,8 @@
 #include "mongo/db/exec/plan_stats_walker.h"
 #include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/query/optimizer/explain_interface.h"
+#include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/query/projection_ast_util.h"
@@ -305,12 +307,13 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     const QuerySolution* solution,
     const sbe::PlanStageStats* stats,
     const boost::optional<BSONObj>& execPlanDebugInfo,
+    const boost::optional<BSONObj>& optimizerExplain,
     ExplainOptions::Verbosity verbosity) {
     BSONObjBuilder bob;
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
         auto summary = collectExecutionStatsSummary(stats);
-        if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
+        if (solution != nullptr && verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
             summary.score = solution->score;
         }
         statsToBSON(stats, &bob, &bob);
@@ -323,9 +326,18 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
         return {bob.obj(), std::move(summary)};
     }
 
-    statsToBSON(solution->root(), &bob, &bob);
+    if (solution != nullptr) {
+        statsToBSON(solution->root(), &bob, &bob);
+    }
+
     invariant(execPlanDebugInfo);
-    return {BSON("queryPlan" << bob.obj() << "slotBasedPlan" << *execPlanDebugInfo), boost::none};
+    if (optimizerExplain) {
+        return {BSON("optimizerPlan" << *optimizerExplain << "slotBasedPlan" << *execPlanDebugInfo),
+                boost::none};
+    } else {
+        return {BSON("queryPlan" << bob.obj() << "slotBasedPlan" << *execPlanDebugInfo),
+                boost::none};
+    }
 }
 }  // namespace
 
@@ -369,10 +381,12 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
 PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(
     ExplainOptions::Verbosity verbosity) const {
     invariant(_root);
-    invariant(_solution);
     auto stats = _root->getStats(true /* includeDebugInfo  */);
-    return buildPlanStatsDetails(
-        _solution, stats.get(), buildExecPlanDebugInfo(_root, _rootData), verbosity);
+    return buildPlanStatsDetails(_solution,
+                                 stats.get(),
+                                 buildExecPlanDebugInfo(_root, _rootData),
+                                 buildCascadesPlan(),
+                                 verbosity);
 }
 
 PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanTrialStats() const {
@@ -384,6 +398,7 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanTrialStats() con
             _rootData->savedStatsOnEarlyExit.get(),
             // This parameter is not used in `buildPlanStatsDetails` if the last parameter is
             // `ExplainOptions::Verbosity::kExecAllPlans`, as is the case here.
+            boost::none,
             boost::none,
             ExplainOptions::Verbosity::kExecAllPlans);
     }
@@ -405,7 +420,7 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansS
         auto stats = candidate.root->getStats(true /* includeDebugInfo  */);
         auto execPlanDebugInfo = buildExecPlanDebugInfo(candidate.root.get(), &candidate.data);
         res.push_back(buildPlanStatsDetails(
-            candidate.solution.get(), stats.get(), execPlanDebugInfo, verbosity));
+            candidate.solution.get(), stats.get(), execPlanDebugInfo, boost::none, verbosity));
     }
     return res;
 }
@@ -418,7 +433,8 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getCachedPlanStat
     auto&& stats = decision.getStats<mongo::sbe::PlanStageStats>();
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
         for (auto&& planStats : stats.candidatePlanStats) {
-            res.push_back(buildPlanStatsDetails(nullptr, planStats.get(), boost::none, verbosity));
+            res.push_back(buildPlanStatsDetails(
+                nullptr, planStats.get(), boost::none, boost::none, verbosity));
         }
     } else {
         // At the "queryPlanner" verbosity we only need to provide details about the winning plan
@@ -429,4 +445,12 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getCachedPlanStat
 
     return res;
 }
+
+boost::optional<BSONObj> PlanExplainerSBE::buildCascadesPlan() const {
+    if (_optimizerData) {
+        return _optimizerData->explainBSON();
+    }
+    return {};
+}
+
 }  // namespace mongo

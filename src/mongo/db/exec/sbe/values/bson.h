@@ -40,6 +40,12 @@ std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
                                                      const char* end,
                                                      size_t fieldNameSize);
 
+template <bool View>
+std::pair<value::TypeTags, value::Value> convertFrom(const BSONElement& elem) {
+    return convertFrom<View>(
+        elem.rawdata(), elem.rawdata() + elem.size(), elem.fieldNameSize() - 1);
+}
+
 const char* advance(const char* be, size_t fieldNameSize);
 
 inline auto fieldNameView(const char* be) noexcept {

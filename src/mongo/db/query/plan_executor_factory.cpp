@@ -122,6 +122,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<CanonicalQuery> cq,
     std::unique_ptr<QuerySolution> solution,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
+    std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
     const CollectionPtr* collection,
     size_t plannerOptions,
     NamespaceString nss,
@@ -140,6 +141,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     return {{new PlanExecutorSBE(
                  opCtx,
                  std::move(cq),
+                 std::move(optimizerData),
                  {makeVector<sbe::plan_ranker::CandidatePlan>(sbe::plan_ranker::CandidatePlan{
                       std::move(solution), std::move(rootStage), std::move(data)}),
                   0},
@@ -169,6 +171,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
 
     return {{new PlanExecutorSBE(opCtx,
                                  std::move(cq),
+                                 {},
                                  std::move(candidates),
                                  *collection,
                                  plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,

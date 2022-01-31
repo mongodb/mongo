@@ -815,6 +815,45 @@ class SbeCodeFragmentPrinter(object):
             instr_count if not error else '? (successfully parsed {})'.format(instr_count)
 
 
+def eval_print_fn(val, print_fn_name):
+    """Evaluate a print function, and return the resulting string."""
+    print_fn_symbol = gdb.lookup_symbol(print_fn_name)[0]
+    print_fn = print_fn_symbol.value()
+    # The generated output from explain contains the string "\n" (two characters)
+    # replace them with a single EOL character so that GDB prints multi-line
+    # explains nicely.
+    pp_result = print_fn(val)
+    pp_str = str(pp_result).replace("\"", "").replace("\\n", "\n")
+    return pp_str
+
+
+class ABTPrinter(object):
+    """Pretty-printer for mongo::optimizer::ABT."""
+
+    def __init__(self, val):
+        """Initialize ABTPrinter."""
+        self.val = val
+
+    @staticmethod
+    def display_hint():
+        """Display hint."""
+        return 'ABT'
+
+    def to_string(self):
+        """Return ABT for printing."""
+        # Python will truncate/compress certain strings that contain many repeated characters.
+        # For an ABT, this is quite common when indenting nodes to represent children, so
+        # disable it for now.
+        prior_repeats = gdb.parameter("print repeats")
+        prior_elements = gdb.parameter("print elements")
+        gdb.execute("set print repeats 0")  # for "<repeats N times>"
+        gdb.execute("set print elements 0")  # for ... on long strings
+        res = eval_print_fn(self.val, "_printNode")
+        gdb.execute("set print repeats " + str(prior_repeats))
+        gdb.execute("set print elements " + str(prior_elements))
+        return res
+
+
 def build_pretty_printer():
     """Build a pretty printer."""
     pp = MongoPrettyPrinterCollection()
@@ -836,6 +875,12 @@ def build_pretty_printer():
     pp.add('__wt_txn', '__wt_txn', False, WtTxnPrinter)
     pp.add('__wt_update', '__wt_update', False, WtUpdateToBsonPrinter)
     pp.add('CodeFragment', 'mongo::sbe::vm::CodeFragment', False, SbeCodeFragmentPrinter)
+
+    # TODO: enable with SERVER-62044.
+    # Optimizer/ABT related pretty printers that can be used only with a running process.
+    # abt_type = gdb.lookup_type("mongo::optimizer::ABT").strip_typedefs()
+    # pp.add("ABT", abt_type.name, True, ABTPrinter)
+
     return pp
 
 

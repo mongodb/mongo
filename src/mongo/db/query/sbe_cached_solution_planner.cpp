@@ -73,6 +73,7 @@ CandidatePlans CachedSolutionPlanner::plan(
         candidate.root.get(),
         &candidate.data,
         candidate.solution.get(),
+        {},    /* optimizedData */
         {},    /* rejectedCandidates */
         false, /* isMultiPlan */
         candidate.data.debugInfo

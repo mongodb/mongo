@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_solution.h"
@@ -49,12 +50,14 @@ std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
 std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
                                     const stage_builder::PlanStageData* data,
                                     const QuerySolution* solution,
+                                    std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
                                     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
                                     bool isMultiPlan);
 
 std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
                                     const stage_builder::PlanStageData* data,
                                     const QuerySolution* solution,
+                                    std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
                                     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
                                     bool isMultiPlan,
                                     std::unique_ptr<plan_cache_debug_info::DebugInfoSBE> debugInfo);

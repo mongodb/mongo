@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_solution.h"
@@ -44,6 +45,7 @@ public:
     PlanExplainerSBE(const sbe::PlanStage* root,
                      const stage_builder::PlanStageData* data,
                      const QuerySolution* solution,
+                     std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
                      std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
                      bool isMultiPlan,
                      std::unique_ptr<plan_cache_debug_info::DebugInfoSBE> debugInfo)
@@ -51,6 +53,7 @@ public:
           _root{root},
           _rootData{data},
           _solution{solution},
+          _optimizerData(std::move(optimizerData)),
           _rejectedCandidates{std::move(rejectedCandidates)},
           _isMultiPlan{isMultiPlan},
           _debugInfo{std::move(debugInfo)} {
@@ -81,10 +84,14 @@ private:
         return boost::none;
     }
 
+    boost::optional<BSONObj> buildCascadesPlan() const;
+
     // These fields are are owned elsewhere (e.g. the PlanExecutor or CandidatePlan).
     const sbe::PlanStage* _root{nullptr};
     const stage_builder::PlanStageData* _rootData{nullptr};
     const QuerySolution* _solution{nullptr};
+
+    const std::unique_ptr<optimizer::AbstractABTPrinter> _optimizerData;
 
     const std::vector<sbe::plan_ranker::CandidatePlan> _rejectedCandidates;
     const bool _isMultiPlan{false};

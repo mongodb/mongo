@@ -124,6 +124,7 @@ public:
                                                            std::move(cq),
                                                            nullptr,
                                                            {std::move(root), std::move(data)},
+                                                           {},
                                                            &CollectionPtr::null,
                                                            false, /* returnOwnedBson */
                                                            nss,

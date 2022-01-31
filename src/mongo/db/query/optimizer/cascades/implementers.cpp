@@ -1,0 +1,1441 @@
+/**
+ *    Copyright (C) 2022-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#include "mongo/db/query/optimizer/cascades/implementers.h"
+
+#include "mongo/db/query/optimizer/utils/memo_utils.h"
+
+namespace mongo::optimizer::cascades {
+using namespace properties;
+
+template <class P, class T>
+static bool propertyAffectsProjections(const PhysProps& props, const T& projections) {
+    if (!hasProperty<P>(props)) {
+        return false;
+    }
+
+    const ProjectionNameSet& propProjections =
+        getPropertyConst<P>(props).getAffectedProjectionNames();
+    for (const ProjectionName& projectionName : projections) {
+        if (propProjections.find(projectionName) != propProjections.cend()) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+template <class P>
+static bool propertyAffectsProjection(const PhysProps& props,
+                                      const ProjectionName& projectionName) {
+    return propertyAffectsProjections<P>(props, ProjectionNameVector{projectionName});
+}
+
+/**
+ * Implement physical nodes based on existing logical nodes.
+ */
+class ImplementationVisitor {
+public:
+    void operator()(const ABT& /*n*/, const ScanNode& node) {
+        if (hasProperty<LimitSkipRequirement>(_physProps)) {
+            // Cannot satisfy limit-skip.
+            return;
+        }
+        if (hasProperty<CollationRequirement>(_physProps)) {
+            // Regular scan cannot satisfy any collation requirement.
+            // TODO: consider rid?
+            return;
+        }
+
+        const auto& indexReq = getPropertyConst<IndexingRequirement>(_physProps);
+        const IndexReqTarget indexReqTarget = indexReq.getIndexReqTarget();
+        switch (indexReqTarget) {
+            case IndexReqTarget::Index:
+                // At this point cannot only satisfy index-only.
+                return;
+
+            case IndexReqTarget::Seek:
+                if (_hints._disableIndexes == DisableIndexOptions::DisableAll) {
+                    return;
+                }
+                uassert(6624102, "RID projection is required for seek", indexReq.getNeedsRID());
+                // Fall through to code below.
+                break;
+
+            case IndexReqTarget::Complete:
+                if (_hints._disableScan) {
+                    return;
+                }
+                // Fall through to code below.
+                break;
+
+            default:
+                MONGO_UNREACHABLE;
+        }
+
+        // Handle complete indexing requirement.
+        bool canUseParallelScan = false;
+        if (!distributionsCompatible(
+                indexReqTarget,
+                _memo.getMetadata()._scanDefs.at(node.getScanDefName()).getDistributionAndPaths(),
+                node.getProjectionName(),
+                _logicalProps,
+                {},
+                canUseParallelScan)) {
+            return;
+        }
+
+        FieldProjectionMap fieldProjectionMap;
+        for (const ProjectionName& required :
+             getPropertyConst<ProjectionRequirement>(_physProps).getAffectedProjectionNames()) {
+            if (required == node.getProjectionName()) {
+                fieldProjectionMap._rootProjection = node.getProjectionName();
+            } else {
+                // Regular scan node can satisfy only using its root projection (not fields).
+                return;
+            }
+        }
+
+        const ProjectionName& ridProjName = _ridProjections.at(
+            getPropertyConst<IndexingAvailability>(_logicalProps).getScanDefName());
+        if (indexReqTarget == IndexReqTarget::Seek) {
+            NodeCEMap nodeCEMap;
+
+            ABT physicalSeek =
+                make<SeekNode>(ridProjName, std::move(fieldProjectionMap), node.getScanDefName());
+            // If optimizing a Seek, override CE to 1.0.
+            nodeCEMap.emplace(physicalSeek.cast<Node>(), 1.0);
+
+            ABT limitSkip =
+                make<LimitSkipNode>(LimitSkipRequirement{1, 0}, std::move(physicalSeek));
+            nodeCEMap.emplace(limitSkip.cast<Node>(), 1.0);
+
+            optimizeChildrenNoAssert(
+                _queue, kDefaultPriority, std::move(limitSkip), {}, std::move(nodeCEMap));
+        } else {
+            if (indexReq.getNeedsRID()) {
+                fieldProjectionMap._ridProjection = ridProjName;
+            }
+            ABT physicalScan = make<PhysicalScanNode>(
+                std::move(fieldProjectionMap), node.getScanDefName(), canUseParallelScan);
+            optimizeChild<PhysicalScanNode>(_queue, kDefaultPriority, std::move(physicalScan));
+        }
+    }
+
+    void operator()(const ABT& n, const ValueScanNode& node) {
+        if (hasProperty<LimitSkipRequirement>(_physProps)) {
+            // Cannot satisfy limit-skip.
+            return;
+        }
+        if (hasProperty<CollationRequirement>(_physProps)) {
+            // Cannot satisfy any collation requirement.
+            return;
+        }
+
+        NodeCEMap nodeCEMap;
+        ABT physNode = make<CoScanNode>();
+        const auto& requiredProjections =
+            getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
+
+        if (node.getArraySize() == 0) {
+            nodeCEMap.emplace(physNode.cast<Node>(), 0.0);
+
+            physNode =
+                make<LimitSkipNode>(properties::LimitSkipRequirement{0, 0}, std::move(physNode));
+            nodeCEMap.emplace(physNode.cast<Node>(), 0.0);
+
+            for (const ProjectionName& projectionName : requiredProjections.getVector()) {
+                physNode =
+                    make<EvaluationNode>(projectionName, Constant::nothing(), std::move(physNode));
+                nodeCEMap.emplace(physNode.cast<Node>(), 0.0);
+            }
+        } else {
+            nodeCEMap.emplace(physNode.cast<Node>(), 1.0);
+
+            physNode =
+                make<LimitSkipNode>(properties::LimitSkipRequirement{1, 0}, std::move(physNode));
+            nodeCEMap.emplace(physNode.cast<Node>(), 1.0);
+
+            const ProjectionName valueScanProj = _prefixId.getNextId("valueScan");
+            physNode =
+                make<EvaluationNode>(valueScanProj, node.getValueArray(), std::move(physNode));
+            nodeCEMap.emplace(physNode.cast<Node>(), 1.0);
+
+            // Unwind the combined array constant and pick an element for each required projection
+            // in sequence.
+            physNode = make<UnwindNode>(valueScanProj,
+                                        _prefixId.getNextId("valueScanPid"),
+                                        false /*retainNonArrays*/,
+                                        std::move(physNode));
+            nodeCEMap.emplace(physNode.cast<Node>(), node.getArraySize());
+
+            /**
+             * Iterate over the bound projections here as opposed to the required projections, since
+             * the array elements are ordered accordingly.
+             */
+            const ProjectionNameVector& boundProjNames = node.binder().names();
+            for (size_t i = 0; i < boundProjNames.size(); i++) {
+                const ProjectionName& boundProjName = boundProjNames.at(i);
+                if (requiredProjections.find(boundProjName).second) {
+                    physNode = make<EvaluationNode>(
+                        boundProjName,
+                        make<FunctionCall>(
+                            "getElement",
+                            makeSeq(make<Variable>(valueScanProj), Constant::int32(i))),
+                        std::move(physNode));
+                    nodeCEMap.emplace(physNode.cast<Node>(), node.getArraySize());
+                }
+            }
+        }
+
+        optimizeChildrenNoAssert(
+            _queue, kDefaultPriority, std::move(physNode), {}, std::move(nodeCEMap));
+    }
+
+    void operator()(const ABT& /*n*/, const MemoLogicalDelegatorNode& /*node*/) {
+        uasserted(6624041,
+                  "Must not have logical delegator nodes in the list of the logical nodes");
+    }
+
+    void operator()(const ABT& n, const FilterNode& node) {
+        if (hasProperty<LimitSkipRequirement>(_physProps)) {
+            // We cannot satisfy here.
+            return;
+        }
+
+        VariableNameSetType references = collectVariableReferences(n);
+        if (checkIntroducesScanProjectionUnderIndexOnly(references)) {
+            // Reject if under indexing requirements and now we introduce dependence on scan
+            // projection.
+            return;
+        }
+
+        PhysProps newProps = _physProps;
+        // Add projections we depend on to the requirement.
+        addProjectionsToProperties(newProps, std::move(references));
+        getProperty<DistributionRequirement>(newProps).setDisableExchanges(true);
+
+        ABT physicalFilter = n;
+        optimizeChild<FilterNode>(
+            _queue, kDefaultPriority, std::move(physicalFilter), std::move(newProps));
+    }
+
+    void operator()(const ABT& n, const EvaluationNode& node) {
+        const ProjectionName& projectionName = node.getProjectionName();
+
+        if (const auto* varPtr = node.getProjection().cast<Variable>(); varPtr != nullptr) {
+            // Special case of evaluation node: rebinds to a different variable.
+            const ProjectionName& newProjName = varPtr->name();
+            PhysProps newProps = _physProps;
+
+            {
+                // Update required projections.
+                auto& reqProjections =
+                    getProperty<ProjectionRequirement>(newProps).getProjections();
+                reqProjections.erase(projectionName);
+                reqProjections.emplace_back(newProjName);
+            }
+
+            if (hasProperty<CollationRequirement>(newProps)) {
+                // Update the collation specification to use the input variable.
+                auto& collationReq = getProperty<CollationRequirement>(newProps);
+                for (auto& [projName, op] : collationReq.getCollationSpec()) {
+                    if (projName == projectionName) {
+                        projName = newProjName;
+                    }
+                }
+            }
+
+            {
+                // Update the distribution specification to use the input variable;
+                auto& distribReq = getProperty<DistributionRequirement>(newProps);
+                for (auto& projName : distribReq.getDistributionAndProjections()._projectionNames) {
+                    if (projName == projectionName) {
+                        projName = newProjName;
+                    }
+                }
+            }
+
+            ABT physicalEval = n;
+            optimizeChild<EvaluationNode>(
+                _queue, kDefaultPriority, std::move(physicalEval), std::move(newProps));
+            return;
+        }
+
+        if (propertyAffectsProjection<DistributionRequirement>(_physProps, projectionName)) {
+            // We cannot satisfy distribution on the projection we output.
+            return;
+        }
+        if (propertyAffectsProjection<CollationRequirement>(_physProps, projectionName)) {
+            // In general, we cannot satisfy collation on the projection we output.
+            // TODO consider x = y+1, we can propagate the collation requirement from x to y.
+            return;
+        }
+        if (!propertyAffectsProjection<ProjectionRequirement>(_physProps, projectionName)) {
+            // We do not require the projection. Do not place a physical evaluation node and
+            // continue optimizing the child.
+            optimizeUnderNewProperties(_queue, kDefaultPriority, node.getChild(), _physProps);
+            return;
+        }
+
+        // Remove our projection from requirement, and add projections we depend on to the
+        // requirement.
+        PhysProps newProps = _physProps;
+
+        VariableNameSetType references = collectVariableReferences(n);
+        if (checkIntroducesScanProjectionUnderIndexOnly(references)) {
+            // Reject if under indexing requirements and now we introduce dependence on scan
+            // projection.
+            return;
+        }
+
+        addRemoveProjectionsToProperties(
+            newProps, std::move(references), ProjectionNameVector{projectionName});
+        getProperty<DistributionRequirement>(newProps).setDisableExchanges(true);
+
+        ABT physicalEval = n;
+        optimizeChild<EvaluationNode>(
+            _queue, kDefaultPriority, std::move(physicalEval), std::move(newProps));
+    }
+
+    void operator()(const ABT& n, const SargableNode& node) {
+        if (hasProperty<LimitSkipRequirement>(_physProps)) {
+            // Cannot satisfy limit-skip.
+            return;
+        }
+
+        const IndexingAvailability& indexingAvailability =
+            getPropertyConst<IndexingAvailability>(_logicalProps);
+        if (node.getChild().cast<MemoLogicalDelegatorNode>()->getGroupId() !=
+            indexingAvailability.getScanGroupId()) {
+            // To optimize a sargable predicate, we must have the scan group as a child.
+            return;
+        }
+
+        const std::string& scanDefName = indexingAvailability.getScanDefName();
+        const auto& scanDef = _memo.getMetadata()._scanDefs.at(scanDefName);
+
+
+        // We do not check indexDefs to be empty here. We want to allow evaluations to be covered
+        // via a physical scan even in the absence of indexes.
+
+        const IndexingRequirement& requirements = getPropertyConst<IndexingRequirement>(_physProps);
+        const IndexReqTarget indexReqTarget = requirements.getIndexReqTarget();
+        switch (indexReqTarget) {
+            case IndexReqTarget::Complete:
+                if (_hints._disableScan) {
+                    return;
+                }
+                break;
+
+            case IndexReqTarget::Index:
+            case IndexReqTarget::Seek:
+                if (_hints._disableIndexes == DisableIndexOptions::DisableAll) {
+                    return;
+                }
+                break;
+
+            default:
+                MONGO_UNREACHABLE;
+        }
+        const auto& satisfiedPartialIndexes =
+            getPropertyConst<IndexingAvailability>(
+                _memo.getGroup(requirements.getSatisfiedPartialIndexesGroupId())._logicalProperties)
+                .getSatisfiedPartialIndexes();
+
+        const bool needsRID = requirements.getNeedsRID();
+        const ProjectionName& ridProjName = _ridProjections.at(scanDefName);
+
+        const ProjectionName& scanProjectionName = indexingAvailability.getScanProjection();
+        const GroupIdType scanGroupId = indexingAvailability.getScanGroupId();
+        const LogicalProps& scanLogicalProps = _memo.getGroup(scanGroupId)._logicalProperties;
+        const CEType scanGroupCE =
+            getPropertyConst<CardinalityEstimate>(scanLogicalProps).getEstimate();
+
+        const PartialSchemaRequirements& reqMap = node.getReqMap();
+
+        if (indexReqTarget != IndexReqTarget::Index &&
+            hasProperty<CollationRequirement>(_physProps)) {
+            // PhysicalScan or Seek cannot satisfy any collation requirement.
+            // TODO: consider rid?
+            return;
+        }
+
+        for (const auto& [key, req] : reqMap) {
+            if (key.emptyPath()) {
+                // We cannot satisfy without a field.
+                return;
+            }
+            if (key._projectionName != scanProjectionName) {
+                // We can only satisfy partial schema requirements using our root projection.
+                return;
+            }
+        }
+
+        const auto& requiredProjections =
+            getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
+        bool requiresRootProjection = false;
+        {
+            auto projectionsLeftToSatisfy = requiredProjections;
+            if (indexReqTarget != IndexReqTarget::Index) {
+                // Deliver root projection if required.
+                requiresRootProjection = projectionsLeftToSatisfy.erase(scanProjectionName);
+            }
+
+            for (const auto& entry : reqMap) {
+                if (entry.second.hasBoundProjectionName()) {
+                    // Project field only if it required.
+                    const ProjectionName& projectionName = entry.second.getBoundProjectionName();
+                    projectionsLeftToSatisfy.erase(projectionName);
+                }
+            }
+            if (!projectionsLeftToSatisfy.getVector().empty()) {
+                // Unknown projections remain. Reject.
+                return;
+            }
+        }
+
+        const auto& ceProperty = getPropertyConst<CardinalityEstimate>(_logicalProps);
+        const CEType currentCE = ceProperty.getEstimate();
+        const PartialSchemaKeyCE& partialSchemaKeyCEMap = ceProperty.getPartialSchemaKeyCEMap();
+
+        ProjectionRenames projectionRenames;
+        if (indexReqTarget == IndexReqTarget::Index) {
+            ProjectionCollationSpec requiredCollation;
+            if (hasProperty<CollationRequirement>(_physProps)) {
+                requiredCollation =
+                    getPropertyConst<CollationRequirement>(_physProps).getCollationSpec();
+            }
+
+            // Consider all candidate indexes, and check if they satisfy the collation and
+            // distribution requirements.
+            for (const auto& [indexDefName, candidateIndexEntry] : node.getCandidateIndexMap()) {
+                const auto& indexDef = scanDef.getIndexDefs().at(indexDefName);
+                if (!indexDef.getPartialReqMap().empty() &&
+                    (_hints._disableIndexes == DisableIndexOptions::DisablePartialOnly ||
+                     satisfiedPartialIndexes.count(indexDefName) == 0)) {
+                    // Consider only indexes for which we satisfy partial requirements.
+                    continue;
+                }
+
+                {
+                    bool canUseParallelScanUnused = false;
+                    if (!distributionsCompatible(IndexReqTarget::Index,
+                                                 indexDef.getDistributionAndPaths(),
+                                                 scanProjectionName,
+                                                 scanLogicalProps,
+                                                 reqMap,
+                                                 canUseParallelScanUnused)) {
+                        return;
+                    }
+                }
+
+                const auto availableDirections = indexSatisfiesCollation(
+                    indexDef.getCollationSpec(), candidateIndexEntry, requiredCollation);
+                if (!availableDirections._forward && !availableDirections._backward) {
+                    // Failed to satisfy collation.
+                    continue;
+                }
+
+                uassert(6624103,
+                        "Either forward or backward direction must be available.",
+                        availableDirections._forward || availableDirections._backward);
+
+                auto indexProjectionMap = candidateIndexEntry._fieldProjectionMap;
+                indexProjectionMap._ridProjection = needsRID ? ridProjName : "";
+
+                {
+                    // Remove unused projections from the field projection map.
+                    auto& fieldProjMap = indexProjectionMap._fieldProjections;
+                    for (auto it = fieldProjMap.begin(); it != fieldProjMap.end();) {
+                        const ProjectionName& projName = it->second;
+                        if (!requiredProjections.find(projName).second &&
+                            candidateIndexEntry._residualRequirementsTempProjections.count(
+                                projName) == 0) {
+                            fieldProjMap.erase(it++);
+                        } else {
+                            it++;
+                        }
+                    }
+                }
+
+                CEType indexCE = currentCE;
+                ResidualRequirements residualRequirements;
+                if (!candidateIndexEntry._residualRequirements.empty()) {
+                    SelectivityType residualSelectivity = 1.0;
+                    SelectivityType currentSelectivity = currentCE / scanGroupCE;
+
+                    for (const auto& [residualKey, residualReq] :
+                         candidateIndexEntry._residualRequirements) {
+                        const auto& queryKey = candidateIndexEntry._residualKeyMap.at(residualKey);
+                        const CEType ce = partialSchemaKeyCEMap.at(queryKey);
+                        if (scanGroupCE > 0.0) {
+                            residualSelectivity *= ce / scanGroupCE;
+                        }
+                        residualRequirements.emplace_back(residualKey, residualReq, ce);
+                    }
+                    if (residualSelectivity > 0.0) {
+                        indexCE = scanGroupCE * (currentSelectivity / residualSelectivity);
+                    }
+                }
+
+                const auto& intervals = candidateIndexEntry._intervals;
+                ABT physNode = make<Blackhole>();
+                NodeCEMap nodeCEMap;
+
+                // TODO: consider pre-computing as part of the candidateIndexes structure.
+                const auto singularInterval = MultiKeyIntervalReqExpr::getSingularDNF(intervals);
+                const bool needsUniqueStage = singularInterval &&
+                    !areMultiKeyIntervalsEqualities(*singularInterval) && indexDef.isMultiKey() &&
+                    requirements.getDedupRID();
+
+                if (singularInterval) {
+                    physNode =
+                        make<IndexScanNode>(std::move(indexProjectionMap),
+                                            IndexSpecification{scanDefName,
+                                                               indexDefName,
+                                                               *singularInterval,
+                                                               !availableDirections._forward});
+                    nodeCEMap.emplace(physNode.cast<Node>(), indexCE);
+                } else {
+                    physNode = lowerIntervals(_prefixId,
+                                              ridProjName,
+                                              std::move(indexProjectionMap),
+                                              scanDefName,
+                                              indexDefName,
+                                              intervals,
+                                              !availableDirections._forward,
+                                              indexCE,
+                                              scanGroupCE,
+                                              nodeCEMap);
+                }
+
+                applyProjectionRenames(projectionRenames, physNode, [&](const ABT& node) {
+                    nodeCEMap.emplace(node.cast<Node>(), indexCE);
+                });
+
+                lowerPartialSchemaRequirements(
+                    indexCE, scanGroupCE, residualRequirements, physNode, nodeCEMap);
+
+                if (needsUniqueStage) {
+                    // Insert unique stage if we need to, after the residual requirements.
+                    physNode =
+                        make<UniqueNode>(ProjectionNameVector{ridProjName}, std::move(physNode));
+                    nodeCEMap.emplace(physNode.cast<Node>(), currentCE);
+                }
+
+                optimizeChildrenNoAssert(
+                    _queue, kDefaultPriority, std::move(physNode), {}, std::move(nodeCEMap));
+            }
+        } else {
+            bool canUseParallelScan = false;
+            if (!distributionsCompatible(indexReqTarget,
+                                         scanDef.getDistributionAndPaths(),
+                                         scanProjectionName,
+                                         scanLogicalProps,
+                                         reqMap,
+                                         canUseParallelScan)) {
+                return;
+            }
+
+            FieldProjectionMap fieldProjectionMap;
+            if (indexReqTarget == IndexReqTarget::Complete && needsRID) {
+                fieldProjectionMap._ridProjection = ridProjName;
+            }
+
+            ResidualRequirements residualRequirements;
+            computePhysicalScanParams(_prefixId,
+                                      reqMap,
+                                      partialSchemaKeyCEMap,
+                                      requiredProjections,
+                                      residualRequirements,
+                                      projectionRenames,
+                                      fieldProjectionMap,
+                                      requiresRootProjection);
+            if (requiresRootProjection) {
+                fieldProjectionMap._rootProjection = scanProjectionName;
+            }
+
+            NodeCEMap nodeCEMap;
+            ABT physNode = make<Blackhole>();
+            CEType baseCE = 0.0;
+
+            if (indexReqTarget == IndexReqTarget::Complete) {
+                baseCE = scanGroupCE;
+
+                // Return a physical scan with field map.
+                physNode = make<PhysicalScanNode>(
+                    std::move(fieldProjectionMap), scanDefName, canUseParallelScan);
+                nodeCEMap.emplace(physNode.cast<Node>(), baseCE);
+            } else {
+                baseCE = 1.0;
+
+                // Try Seek with Limit 1.
+                physNode = make<SeekNode>(ridProjName, std::move(fieldProjectionMap), scanDefName);
+                nodeCEMap.emplace(physNode.cast<Node>(), baseCE);
+
+                physNode = make<LimitSkipNode>(LimitSkipRequirement{1, 0}, std::move(physNode));
+                nodeCEMap.emplace(physNode.cast<Node>(), baseCE);
+            }
+
+            applyProjectionRenames(std::move(projectionRenames), physNode, [&](const ABT& node) {
+                nodeCEMap.emplace(node.cast<Node>(), baseCE);
+            });
+
+            lowerPartialSchemaRequirements(
+                baseCE, scanGroupCE, residualRequirements, physNode, nodeCEMap);
+            optimizeChildrenNoAssert(
+                _queue, kDefaultPriority, std::move(physNode), {}, std::move(nodeCEMap));
+        }
+    }
+
+    void operator()(const ABT& /*n*/, const RIDIntersectNode& node) {
+        const auto& indexingAvailability = getPropertyConst<IndexingAvailability>(_logicalProps);
+        const std::string& scanDefName = indexingAvailability.getScanDefName();
+        {
+            const auto& scanDef = _memo.getMetadata()._scanDefs.at(scanDefName);
+            if (scanDef.getIndexDefs().empty()) {
+                // Reject if we do not have any indexes.
+                return;
+            }
+        }
+
+        if (hasProperty<LimitSkipRequirement>(_physProps)) {
+            // Cannot satisfy limit-skip.
+            return;
+        }
+
+        const IndexingRequirement& requirements = getPropertyConst<IndexingRequirement>(_physProps);
+        const bool dedupRID = requirements.getDedupRID();
+        const IndexReqTarget indexReqTarget = requirements.getIndexReqTarget();
+        if (indexReqTarget == IndexReqTarget::Seek) {
+            return;
+        }
+        const bool isIndex = indexReqTarget == IndexReqTarget::Index;
+        if (isIndex && (!node.hasLeftIntervals() || !node.hasRightIntervals())) {
+            // We need to have proper intervals on both sides.
+            return;
+        }
+
+        const auto& distribRequirement = getPropertyConst<DistributionRequirement>(_physProps);
+        const auto& distrAndProjections = distribRequirement.getDistributionAndProjections();
+        if (isIndex) {
+            switch (distrAndProjections._type) {
+                case DistributionType::UnknownPartitioning:
+                case DistributionType::RoundRobin:
+                    // Cannot satisfy unknown or round-robin distributions.
+                    return;
+
+                default:
+                    break;
+            }
+        }
+
+        const GroupIdType leftGroupId =
+            node.getLeftChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
+        const GroupIdType rightGroupId =
+            node.getRightChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
+
+        const LogicalProps& leftLogicalProps = _memo.getGroup(leftGroupId)._logicalProperties;
+        const LogicalProps& rightLogicalProps = _memo.getGroup(rightGroupId)._logicalProperties;
+
+        const CEType intersectedCE =
+            getPropertyConst<CardinalityEstimate>(_logicalProps).getEstimate();
+        const CEType leftCE = getPropertyConst<CardinalityEstimate>(leftLogicalProps).getEstimate();
+        const CEType rightCE =
+            getPropertyConst<CardinalityEstimate>(rightLogicalProps).getEstimate();
+        const ProjectionNameSet& leftProjections =
+            getPropertyConst<ProjectionAvailability>(leftLogicalProps).getProjections();
+        const ProjectionNameSet& rightProjections =
+            getPropertyConst<ProjectionAvailability>(rightLogicalProps).getProjections();
+
+        // Split required projections between inner and outer side.
+        ProjectionNameOrderPreservingSet leftChildProjections;
+        ProjectionNameOrderPreservingSet rightChildProjections;
+        for (const ProjectionName& projectionName :
+             getPropertyConst<ProjectionRequirement>(_physProps).getProjections().getVector()) {
+            if (projectionName != node.getScanProjectionName() &&
+                leftProjections.count(projectionName) > 0) {
+                leftChildProjections.emplace_back(projectionName);
+            } else if (rightProjections.count(projectionName) > 0) {
+                if (isIndex && projectionName == node.getScanProjectionName()) {
+                    return;
+                }
+                rightChildProjections.emplace_back(projectionName);
+            } else {
+                uasserted(6624104,
+                          "Required projection must appear in either the left or the right child "
+                          "projections");
+                return;
+            }
+        }
+
+        ProjectionCollationSpec collationSpec;
+        if (hasProperty<CollationRequirement>(_physProps)) {
+            collationSpec = getPropertyConst<CollationRequirement>(_physProps).getCollationSpec();
+        }
+
+        // Split collation between inner and outer side.
+        const CollationSplitResult& collationLeftRightSplit =
+            splitCollationSpec(collationSpec, leftProjections, rightProjections);
+        const CollationSplitResult& collationRightLeftSplit =
+            splitCollationSpec(collationSpec, rightProjections, leftProjections);
+
+        // We are propagating the distribution requirements to both sides.
+        PhysProps leftPhysProps = _physProps;
+        PhysProps rightPhysProps = _physProps;
+
+        // Specifically do not propagate limit-skip.
+        // TODO: handle similarly to physical join.
+        removeProperty<LimitSkipRequirement>(leftPhysProps);
+        removeProperty<LimitSkipRequirement>(rightPhysProps);
+
+        getProperty<DistributionRequirement>(leftPhysProps).setDisableExchanges(false);
+        getProperty<DistributionRequirement>(rightPhysProps).setDisableExchanges(false);
+
+        const ProjectionName& ridProjName = _ridProjections.at(
+            getPropertyConst<IndexingAvailability>(_logicalProps).getScanDefName());
+        setPropertyOverwrite<IndexingRequirement>(
+            leftPhysProps,
+            {IndexReqTarget::Index,
+             true /*needRID*/,
+             !isIndex && dedupRID,
+             requirements.getSatisfiedPartialIndexesGroupId()});
+        setPropertyOverwrite<IndexingRequirement>(
+            rightPhysProps,
+            {isIndex ? IndexReqTarget::Index : IndexReqTarget::Seek,
+             true /*needRID*/,
+             !isIndex && dedupRID,
+             requirements.getSatisfiedPartialIndexesGroupId()});
+
+        setPropertyOverwrite<ProjectionRequirement>(leftPhysProps, std::move(leftChildProjections));
+        setPropertyOverwrite<ProjectionRequirement>(rightPhysProps,
+                                                    std::move(rightChildProjections));
+
+        if (!isIndex) {
+            // Add repeated execution property to inner side.
+            CEType estimatedRepetitions = hasProperty<RepetitionEstimate>(_physProps)
+                ? getPropertyConst<RepetitionEstimate>(_physProps).getEstimate()
+                : 1.0;
+            estimatedRepetitions *=
+                getPropertyConst<CardinalityEstimate>(leftLogicalProps).getEstimate();
+            setPropertyOverwrite<RepetitionEstimate>(rightPhysProps,
+                                                     RepetitionEstimate{estimatedRepetitions});
+        }
+
+        const auto& optimizeFn = std::bind(&ImplementationVisitor::optimizeRIDIntersect,
+                                           this,
+                                           isIndex,
+                                           dedupRID,
+                                           indexingAvailability.getPossiblyEqPredsOnly(),
+                                           std::cref(ridProjName),
+                                           std::cref(collationLeftRightSplit),
+                                           std::cref(collationRightLeftSplit),
+                                           intersectedCE,
+                                           leftCE,
+                                           rightCE,
+                                           std::cref(leftPhysProps),
+                                           std::cref(rightPhysProps),
+                                           std::cref(node.getLeftChild()),
+                                           std::cref(node.getRightChild()));
+
+        // Always optimize under same distributions on left and on right.
+        optimizeFn();
+
+        if (isIndex) {
+            switch (distrAndProjections._type) {
+                case DistributionType::HashPartitioning:
+                case DistributionType::RangePartitioning: {
+                    // Specifically for index intersection, try propagating the requirement on one
+                    // side and replicating the other.
+
+                    const auto& leftDistributions =
+                        getPropertyConst<DistributionAvailability>(leftLogicalProps)
+                            .getDistributionSet();
+                    const auto& rightDistributions =
+                        getPropertyConst<DistributionAvailability>(rightLogicalProps)
+                            .getDistributionSet();
+
+                    if (leftDistributions.count(distrAndProjections) > 0) {
+                        setPropertyOverwrite<DistributionRequirement>(leftPhysProps,
+                                                                      distribRequirement);
+                        setPropertyOverwrite<DistributionRequirement>(
+                            rightPhysProps, DistributionRequirement{DistributionType::Replicated});
+                        optimizeFn();
+                    }
+
+                    if (rightDistributions.count(distrAndProjections) > 0) {
+                        setPropertyOverwrite<DistributionRequirement>(
+                            leftPhysProps, DistributionRequirement{DistributionType::Replicated});
+                        setPropertyOverwrite<DistributionRequirement>(rightPhysProps,
+                                                                      distribRequirement);
+                        optimizeFn();
+                    }
+                    break;
+                }
+
+                default:
+                    break;
+            }
+        }
+    }
+
+    void operator()(const ABT& /*n*/, const BinaryJoinNode& node) {
+        // TODO: optimize binary joins
+        uasserted(6624105, "not implemented");
+    }
+
+    void operator()(const ABT& n, const UnionNode& node) {
+        if (hasProperty<LimitSkipRequirement>(_physProps)) {
+            // We cannot satisfy limit-skip requirements.
+            return;
+        }
+        if (hasProperty<CollationRequirement>(_physProps)) {
+            // In general we cannot satisfy collation requirements.
+            // TODO: This may be possible with a merge sort type of node.
+            return;
+        }
+
+        // Only need to propagate the required projection set.
+        ABT physicalUnion = make<UnionNode>(
+            getPropertyConst<ProjectionRequirement>(_physProps).getProjections().getVector(),
+            node.nodes());
+
+        // Optimize each child under the same physical properties.
+        ChildPropsType childProps;
+        for (auto& child : physicalUnion.cast<UnionNode>()->nodes()) {
+            PhysProps newProps = _physProps;
+            childProps.emplace_back(&child, std::move(newProps));
+        }
+
+        optimizeChildren<UnionNode>(
+            _queue, kDefaultPriority, std::move(physicalUnion), std::move(childProps));
+    }
+
+    void operator()(const ABT& n, const GroupByNode& node) {
+        if (hasProperty<LimitSkipRequirement>(_physProps)) {
+            // We cannot satisfy limit-skip requirements.
+            // TODO: consider an optimization where we keep track of at most "limit" groups.
+            return;
+        }
+        if (hasProperty<CollationRequirement>(_physProps)) {
+            // In general we cannot satisfy collation requirements.
+            // TODO: consider stream group-by.
+            return;
+        }
+
+        if (propertyAffectsProjections<DistributionRequirement>(
+                _physProps, node.getAggregationProjectionNames())) {
+            // We cannot satisfy distribution on the aggregations.
+            return;
+        }
+
+        const ProjectionNameVector& groupByProjections = node.getGroupByProjectionNames();
+
+        const bool isLocal = node.getType() == GroupNodeType::Local;
+        if (!isLocal) {
+            // We are constrained in terms of distribution only if we are a global or complete agg.
+
+            const auto& distribAndProjections =
+                getPropertyConst<DistributionRequirement>(_physProps)
+                    .getDistributionAndProjections();
+            switch (distribAndProjections._type) {
+                case DistributionType::UnknownPartitioning:
+                case DistributionType::RoundRobin:
+                    // Cannot satisfy unknown or round-robin partitioning.
+                    return;
+
+                case DistributionType::HashPartitioning: {
+                    ProjectionNameSet groupByProjectionSet;
+                    for (const ProjectionName& projectionName : groupByProjections) {
+                        groupByProjectionSet.insert(projectionName);
+                    }
+                    for (const ProjectionName& projectionName :
+                         distribAndProjections._projectionNames) {
+                        if (groupByProjectionSet.count(projectionName) == 0) {
+                            // We can only be partitioned on projections on which we group.
+                            return;
+                        }
+                    }
+                    break;
+                }
+
+                case DistributionType::RangePartitioning:
+                    if (distribAndProjections._projectionNames != groupByProjections) {
+                        // For range partitioning we need to be partitioned exactly in the same
+                        // order as our group-by projections.
+                        return;
+                    }
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
+        PhysProps newProps = _physProps;
+
+        // TODO: remove RepetitionEstimate if the subtree does not use bound variables.
+        // TODO: this is not the case for stream group-by.
+
+        // Specifically do not propagate limit-skip.
+        removeProperty<LimitSkipRequirement>(newProps);
+
+        getProperty<DistributionRequirement>(newProps).setDisableExchanges(isLocal);
+
+        // Iterate over the aggregation expressions and only add those required.
+        ABTVector aggregationProjections;
+        ProjectionNameVector aggregationProjectionNames;
+        VariableNameSetType projectionsToAdd;
+        for (const ProjectionName& groupByProjName : groupByProjections) {
+            projectionsToAdd.insert(groupByProjName);
+        }
+
+        const auto& requiredProjections =
+            getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
+        for (size_t aggIndex = 0; aggIndex < node.getAggregationExpressions().size(); aggIndex++) {
+            const ProjectionName& aggProjectionName =
+                node.getAggregationProjectionNames().at(aggIndex);
+
+            if (requiredProjections.find(aggProjectionName).second) {
+                // We require this agg expression.
+                aggregationProjectionNames.push_back(aggProjectionName);
+                const ABT& aggExpr = node.getAggregationExpressions().at(aggIndex);
+                aggregationProjections.push_back(aggExpr);
+
+                for (const auto& var : VariableEnvironment::getVariables(aggExpr)._variables) {
+                    // Add all references this expression requires.
+                    projectionsToAdd.insert(var->name());
+                }
+            }
+        }
+
+        addRemoveProjectionsToProperties(
+            newProps, projectionsToAdd, node.getAggregationProjectionNames());
+
+        ABT physicalGroupBy = make<GroupByNode>(groupByProjections,
+                                                std::move(aggregationProjectionNames),
+                                                std::move(aggregationProjections),
+                                                node.getType(),
+                                                node.getChild());
+        optimizeChild<GroupByNode>(
+            _queue, kDefaultPriority, std::move(physicalGroupBy), std::move(newProps));
+    }
+
+    void operator()(const ABT& n, const UnwindNode& node) {
+        const ProjectionName& pidProjectionName = node.getPIDProjectionName();
+        const ProjectionNameVector& projectionNames = {(node.getProjectionName()),
+                                                       pidProjectionName};
+
+        if (propertyAffectsProjections<DistributionRequirement>(_physProps, projectionNames)) {
+            // We cannot satisfy distribution on the unwound output, or pid.
+            return;
+        }
+        if (propertyAffectsProjections<CollationRequirement>(_physProps, projectionNames)) {
+            // We cannot satisfy collation on the output.
+            return;
+        }
+        if (hasProperty<LimitSkipRequirement>(_physProps)) {
+            // Cannot satisfy limit-skip.
+            return;
+        }
+
+        PhysProps newProps = _physProps;
+        addRemoveProjectionsToProperties(
+            newProps, collectVariableReferences(n), ProjectionNameVector{pidProjectionName});
+
+        // Specifically do not propagate limit-skip.
+        removeProperty<LimitSkipRequirement>(newProps);
+        // Keep collation property if given it does not affect output.
+
+        getProperty<DistributionRequirement>(newProps).setDisableExchanges(false);
+
+        ABT physicalUnwind = n;
+        optimizeChild<UnwindNode>(
+            _queue, kDefaultPriority, std::move(physicalUnwind), std::move(newProps));
+    }
+
+    void operator()(const ABT& /*n*/, const CollationNode& node) {
+        if (getPropertyConst<DistributionRequirement>(_physProps)
+                .getDistributionAndProjections()
+                ._type != DistributionType::Centralized) {
+            // We can only pick up collation under centralized (but we can enforce under any
+            // distribution).
+            return;
+        }
+
+        optimizeSimplePropertyNode<CollationNode, CollationRequirement>(node);
+    }
+
+    void operator()(const ABT& /*n*/, const LimitSkipNode& node) {
+        // We can pick-up limit-skip under any distribution (but enforce under centralized or
+        // replicated).
+
+        PhysProps newProps = _physProps;
+        LimitSkipRequirement newProp = node.getProperty();
+
+        removeProperty<LimitEstimate>(newProps);
+
+        if (hasProperty<LimitSkipRequirement>(_physProps)) {
+            const LimitSkipRequirement& required =
+                getPropertyConst<LimitSkipRequirement>(_physProps);
+            LimitSkipRequirement merged(required.getLimit(), required.getSkip());
+
+            combineLimitSkipProperties(merged, newProp);
+            // Continue with new unenforced requirement.
+            newProp = std::move(merged);
+        }
+
+        setPropertyOverwrite<LimitSkipRequirement>(newProps, std::move(newProp));
+        getProperty<DistributionRequirement>(newProps).setDisableExchanges(false);
+
+        optimizeUnderNewProperties(_queue, kDefaultPriority, node.getChild(), std::move(newProps));
+    }
+
+    void operator()(const ABT& /*n*/, const ExchangeNode& node) {
+        optimizeSimplePropertyNode<ExchangeNode, DistributionRequirement>(node);
+    }
+
+    void operator()(const ABT& n, const RootNode& node) {
+        PhysProps newProps = _physProps;
+        setPropertyOverwrite<ProjectionRequirement>(newProps, node.getProperty());
+        getProperty<DistributionRequirement>(newProps).setDisableExchanges(false);
+
+        ABT rootNode = n;
+        optimizeChild<RootNode>(_queue, kDefaultPriority, std::move(rootNode), std::move(newProps));
+    }
+
+    template <typename T>
+    void operator()(const ABT& /*n*/, const T& /*node*/) {
+        static_assert(!canBeLogicalNode<T>(), "Logical node must implement its visitor.");
+    }
+
+    ImplementationVisitor(const Memo& memo,
+                          const QueryHints& hints,
+                          const opt::unordered_map<std::string, ProjectionName>& ridProjections,
+                          PrefixId& prefixId,
+                          PhysRewriteQueue& queue,
+                          const PhysProps& physProps,
+                          const LogicalProps& logicalProps)
+        : _memo(memo),
+          _hints(hints),
+          _ridProjections(ridProjections),
+          _prefixId(prefixId),
+          _queue(queue),
+          _physProps(physProps),
+          _logicalProps(logicalProps) {}
+
+private:
+    template <class NodeType, class PropType>
+    void optimizeSimplePropertyNode(const NodeType& node) {
+        const PropType& nodeProp = node.getProperty();
+        PhysProps newProps = _physProps;
+        setPropertyOverwrite<PropType>(newProps, nodeProp);
+
+        getProperty<DistributionRequirement>(newProps).setDisableExchanges(false);
+        optimizeUnderNewProperties(_queue, kDefaultPriority, node.getChild(), std::move(newProps));
+    }
+
+    struct IndexAvailableDirections {
+        // Keep track if we can match against forward or backward direction.
+        bool _forward = true;
+        bool _backward = true;
+    };
+
+    IndexAvailableDirections indexSatisfiesCollation(
+        const IndexCollationSpec& indexCollationSpec,
+        const CandidateIndexEntry& candidateIndexEntry,
+        const ProjectionCollationSpec& requiredCollationSpec) {
+        if (requiredCollationSpec.empty()) {
+            return {true, true};
+        }
+
+        IndexAvailableDirections result;
+        size_t collationSpecIndex = 0;
+        bool indexSuitable = true;
+        const auto& fieldProjections = candidateIndexEntry._fieldProjectionMap._fieldProjections;
+
+        // Verify the index is compatible with our collation requirement, and can deliver the right
+        // order of paths.
+        for (size_t indexField = 0; indexField < indexCollationSpec.size(); indexField++) {
+            const bool needsCollation = candidateIndexEntry._fieldsToCollate.count(indexField) > 0;
+
+            auto it = fieldProjections.find(encodeIndexKeyName(indexField));
+            if (it == fieldProjections.cend()) {
+                // No bound projection for this index field.
+                if (needsCollation) {
+                    // We cannot satisfy the rest of the collation requirements.
+                    indexSuitable = false;
+                    break;
+                }
+                continue;
+            }
+            const ProjectionName& projName = it->second;
+
+            if (!needsCollation) {
+                // We do not need to collate this field because of equality.
+                if (requiredCollationSpec.at(collationSpecIndex).first == projName) {
+                    // We can satisfy the next collation requirement independent of collation op.
+                    if (++collationSpecIndex >= requiredCollationSpec.size()) {
+                        break;
+                    }
+                }
+                continue;
+            }
+
+            // Check if we can satisfy the next collation requirement.
+            const auto& collationEntry = requiredCollationSpec.at(collationSpecIndex);
+            if (collationEntry.first != projName) {
+                indexSuitable = false;
+                break;
+            }
+
+            const auto& indexCollationEntry = indexCollationSpec.at(indexField);
+            if (result._forward &&
+                !collationOpsCompatible(indexCollationEntry._op, collationEntry.second)) {
+                result._forward = false;
+            }
+            if (result._backward &&
+                !collationOpsCompatible(reverseCollationOp(indexCollationEntry._op),
+                                        collationEntry.second)) {
+                result._backward = false;
+            }
+            if (!result._forward && !result._backward) {
+                indexSuitable = false;
+                break;
+            }
+            if (++collationSpecIndex >= requiredCollationSpec.size()) {
+                break;
+            }
+        }
+
+        if (!indexSuitable || collationSpecIndex < requiredCollationSpec.size()) {
+            return {false, false};
+        }
+        return result;
+    }
+
+    /**
+     * Check if we are under index-only requirements and expression introduces dependency on scan
+     * projection.
+     */
+    bool checkIntroducesScanProjectionUnderIndexOnly(const VariableNameSetType& references) {
+        return hasProperty<IndexingAvailability>(_logicalProps) &&
+            getPropertyConst<IndexingRequirement>(_physProps).getIndexReqTarget() ==
+            IndexReqTarget::Index &&
+            references.find(
+                getPropertyConst<IndexingAvailability>(_logicalProps).getScanProjection()) !=
+            references.cend();
+    }
+
+    bool distributionsCompatible(const IndexReqTarget target,
+                                 const DistributionAndPaths& distributionAndPaths,
+                                 const ProjectionName& scanProjection,
+                                 const LogicalProps& scanLogicalProps,
+                                 const PartialSchemaRequirements& reqMap,
+                                 bool& canUseParallelScan) {
+        const DistributionRequirement& required =
+            getPropertyConst<DistributionRequirement>(_physProps);
+        const auto& distribAndProjections = required.getDistributionAndProjections();
+
+        const auto& scanDistributions =
+            getPropertyConst<DistributionAvailability>(scanLogicalProps).getDistributionSet();
+
+        switch (distribAndProjections._type) {
+            case DistributionType::Centralized:
+                return scanDistributions.count({DistributionType::Centralized}) > 0 ||
+                    scanDistributions.count({DistributionType::Replicated}) > 0;
+
+            case DistributionType::Replicated:
+                return scanDistributions.count({DistributionType::Replicated}) > 0;
+
+            case DistributionType::RoundRobin:
+                if (target == IndexReqTarget::Seek) {
+                    // We can satisfy Seek with RoundRobin if we can scan the collection in
+                    // parallel.
+                    return scanDistributions.count({DistributionType::UnknownPartitioning}) > 0;
+                }
+
+                // TODO: Are two round robin distributions compatible?
+                return false;
+
+            case DistributionType::UnknownPartitioning:
+                if (target == IndexReqTarget::Index) {
+                    // We cannot satisfy unknown partitioning with an index as (unlike parallel
+                    // collection scan) we currently cannot perform a parallel index scan.
+                    return false;
+                }
+
+                if (scanDistributions.count({DistributionType::UnknownPartitioning}) > 0) {
+                    canUseParallelScan = true;
+                    return true;
+                }
+                return false;
+
+            case DistributionType::HashPartitioning:
+            case DistributionType::RangePartitioning: {
+                if (distribAndProjections._type != distributionAndPaths._type) {
+                    return false;
+                }
+
+                size_t distributionPartitionIndex = 0;
+                const ProjectionNameVector& requiredProjections =
+                    distribAndProjections._projectionNames;
+
+                for (const ABT& partitioningPath : distributionAndPaths._paths) {
+                    auto it = reqMap.find(PartialSchemaKey{scanProjection, partitioningPath});
+                    if (it == reqMap.cend()) {
+                        return false;
+                    }
+
+                    if (it->second.getBoundProjectionName() !=
+                        requiredProjections.at(distributionPartitionIndex)) {
+                        return false;
+                    }
+                    distributionPartitionIndex++;
+                }
+
+                return distributionPartitionIndex == requiredProjections.size();
+            }
+
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+
+    void setCollationForRIDIntersect(const CollationSplitResult& collationSplit,
+                                     PhysProps& leftPhysProps,
+                                     PhysProps& rightPhysProps) {
+        if (collationSplit._leftCollation.empty()) {
+            removeProperty<CollationRequirement>(leftPhysProps);
+        } else {
+            setPropertyOverwrite<CollationRequirement>(leftPhysProps,
+                                                       collationSplit._leftCollation);
+        }
+
+        if (collationSplit._rightCollation.empty()) {
+            removeProperty<CollationRequirement>(rightPhysProps);
+        } else {
+            setPropertyOverwrite<CollationRequirement>(rightPhysProps,
+                                                       collationSplit._rightCollation);
+        }
+    }
+
+    void optimizeRIDIntersect(const bool isIndex,
+                              const bool dedupRID,
+                              const bool useMergeJoin,
+                              const ProjectionName& ridProjectionName,
+                              const CollationSplitResult& collationLeftRightSplit,
+                              const CollationSplitResult& collationRightLeftSplit,
+                              const CEType intersectedCE,
+                              const CEType leftCE,
+                              const CEType rightCE,
+                              const PhysProps& leftPhysProps,
+                              const PhysProps& rightPhysProps,
+                              const ABT& leftChild,
+                              const ABT& rightChild) {
+        if (isIndex && collationRightLeftSplit._validSplit &&
+            (!collationLeftRightSplit._validSplit || leftCE > rightCE)) {
+            // Need to reverse the left and right side as the left collation split is not valid, or
+            // to use the larger CE as the other side.
+            optimizeRIDIntersect(true /*isIndex*/,
+                                 dedupRID,
+                                 useMergeJoin,
+                                 ridProjectionName,
+                                 collationRightLeftSplit,
+                                 {},
+                                 intersectedCE,
+                                 rightCE,
+                                 leftCE,
+                                 rightPhysProps,
+                                 leftPhysProps,
+                                 rightChild,
+                                 leftChild);
+            return;
+        }
+        if (!collationLeftRightSplit._validSplit) {
+            return;
+        }
+
+        if (isIndex) {
+            if (useMergeJoin && !_hints._disableMergeJoinRIDIntersect) {
+                // Try a merge join on RID since both of our children only have equality
+                // predicates.
+
+                NodeCEMap nodeCEMap;
+                ChildPropsType childProps;
+                PhysProps leftPhysPropsLocal = leftPhysProps;
+                PhysProps rightPhysPropsLocal = rightPhysProps;
+
+                setCollationForRIDIntersect(
+                    collationLeftRightSplit, leftPhysPropsLocal, rightPhysPropsLocal);
+                if (dedupRID) {
+                    getProperty<IndexingRequirement>(leftPhysPropsLocal)
+                        .setDedupRID(true /*dedupRID*/);
+                    getProperty<IndexingRequirement>(rightPhysPropsLocal)
+                        .setDedupRID(true /*dedupRID*/);
+                }
+
+                ABT physNode = lowerRIDIntersectMergeJoin(_prefixId,
+                                                          ridProjectionName,
+                                                          intersectedCE,
+                                                          leftCE,
+                                                          rightCE,
+                                                          leftPhysPropsLocal,
+                                                          rightPhysPropsLocal,
+                                                          leftChild,
+                                                          rightChild,
+                                                          nodeCEMap,
+                                                          childProps);
+                optimizeChildrenNoAssert(_queue,
+                                         kDefaultPriority,
+                                         std::move(physNode),
+                                         std::move(childProps),
+                                         std::move(nodeCEMap));
+            } else {
+                if (!_hints._disableHashJoinRIDIntersect) {
+                    // Try a HashJoin. Propagate dedupRID on left and right indexing
+                    // requirements.
+
+                    NodeCEMap nodeCEMap;
+                    ChildPropsType childProps;
+                    PhysProps leftPhysPropsLocal = leftPhysProps;
+                    PhysProps rightPhysPropsLocal = rightPhysProps;
+
+                    setCollationForRIDIntersect(
+                        collationLeftRightSplit, leftPhysPropsLocal, rightPhysPropsLocal);
+                    if (dedupRID) {
+                        getProperty<IndexingRequirement>(leftPhysPropsLocal)
+                            .setDedupRID(true /*dedupRID*/);
+                        getProperty<IndexingRequirement>(rightPhysPropsLocal)
+                            .setDedupRID(true /*dedupRID*/);
+                    }
+
+                    ABT physNode = lowerRIDIntersectHashJoin(_prefixId,
+                                                             ridProjectionName,
+                                                             intersectedCE,
+                                                             leftCE,
+                                                             rightCE,
+                                                             leftPhysPropsLocal,
+                                                             rightPhysPropsLocal,
+                                                             leftChild,
+                                                             rightChild,
+                                                             nodeCEMap,
+                                                             childProps);
+                    optimizeChildrenNoAssert(_queue,
+                                             kDefaultPriority,
+                                             std::move(physNode),
+                                             std::move(childProps),
+                                             std::move(nodeCEMap));
+                }
+
+                // We can only attempt this strategy if we have no collation requirements.
+                if (!_hints._disableGroupByAndUnionRIDIntersect && dedupRID &&
+                    collationLeftRightSplit._leftCollation.empty() &&
+                    collationLeftRightSplit._rightCollation.empty()) {
+                    // Try a Union+GroupBy. left and right indexing requirements are already
+                    // initialized to not dedup.
+
+                    NodeCEMap nodeCEMap;
+                    ChildPropsType childProps;
+                    PhysProps leftPhysPropsLocal = leftPhysProps;
+                    PhysProps rightPhysPropsLocal = rightPhysProps;
+
+                    setCollationForRIDIntersect(
+                        collationLeftRightSplit, leftPhysPropsLocal, rightPhysPropsLocal);
+
+                    ABT physNode = lowerRIDIntersectGroupBy(_prefixId,
+                                                            ridProjectionName,
+                                                            intersectedCE,
+                                                            leftCE,
+                                                            rightCE,
+                                                            _physProps,
+                                                            leftPhysPropsLocal,
+                                                            rightPhysPropsLocal,
+                                                            leftChild,
+                                                            rightChild,
+                                                            nodeCEMap,
+                                                            childProps);
+                    optimizeChildrenNoAssert(_queue,
+                                             kDefaultPriority,
+                                             std::move(physNode),
+                                             std::move(childProps),
+                                             std::move(nodeCEMap));
+                }
+            }
+        } else {
+            ABT physicalJoin = make<BinaryJoinNode>(JoinType::Inner,
+                                                    ProjectionNameSet{ridProjectionName},
+                                                    Constant::boolean(true),
+                                                    leftChild,
+                                                    rightChild);
+
+            PhysProps leftPhysPropsLocal = leftPhysProps;
+            PhysProps rightPhysPropsLocal = rightPhysProps;
+            setCollationForRIDIntersect(
+                collationLeftRightSplit, leftPhysPropsLocal, rightPhysPropsLocal);
+
+            optimizeChildren<BinaryJoinNode>(_queue,
+                                             kDefaultPriority,
+                                             std::move(physicalJoin),
+                                             std::move(leftPhysPropsLocal),
+                                             std::move(rightPhysPropsLocal));
+        }
+    }
+
+    // We don't own any of those;
+    const Memo& _memo;
+    const QueryHints& _hints;
+    const opt::unordered_map<std::string, ProjectionName>& _ridProjections;
+    PrefixId& _prefixId;
+    PhysRewriteQueue& _queue;
+    const PhysProps& _physProps;
+    const LogicalProps& _logicalProps;
+};
+
+void addImplementers(const Memo& memo,
+                     const QueryHints& hints,
+                     const opt::unordered_map<std::string, ProjectionName>& ridProjections,
+                     PrefixId& prefixId,
+                     PhysOptimizationResult& bestResult,
+                     const properties::LogicalProps& logicalProps,
+                     const OrderPreservingABTSet& logicalNodes) {
+    ImplementationVisitor visitor(memo,
+                                  hints,
+                                  ridProjections,
+                                  prefixId,
+                                  bestResult._queue,
+                                  bestResult._physProps,
+                                  logicalProps);
+    while (bestResult._lastImplementedNodePos < logicalNodes.size()) {
+        logicalNodes.at(bestResult._lastImplementedNodePos++).visit(visitor);
+    }
+}
+
+}  // namespace mongo::optimizer::cascades

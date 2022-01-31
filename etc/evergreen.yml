@@ -7081,6 +7081,20 @@ tasks:
     vars:
       resmoke_jobs_max: 1
 
+- <<: *task_template
+  name: cqf
+  tags: []
+  commands:
+    - func: "do setup"
+    - func: "run tests"
+
+- <<: *task_template
+  name: cqf_parallel
+  tags: []
+  commands:
+    - func: "do setup"
+    - func: "run tests"
+
 - name: shared_scons_cache_pruning
   tags: []
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
@@ -8918,6 +8932,8 @@ buildvariants:
         --excludeWithAnyTags=incompatible_with_windows_tls
         --excludeWithAnyTags=incompatible_with_shard_merge
   tasks:
+    - name: cqf
+    - name: cqf_parallel
     - name: compile_and_archive_dist_test_then_package_TG
       distros:
         - windows-vsCurrent-xlarge
@@ -9790,6 +9806,8 @@ buildvariants:
       --runAllFeatureFlagTests
       --excludeWithAnyTags=incompatible_with_shard_merge
   tasks: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-tasks
+  - name: cqf
+  - name: cqf_parallel
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
       - rhel80-large
@@ -11614,6 +11632,8 @@ buildvariants:
         --excludeWithAnyTags=incompatible_with_shard_merge
     separate_debug: off
   tasks:
+  - name: cqf
+  - name: cqf_parallel
   - name: compile_and_archive_dist_test_then_package_TG
   - name: compile_benchmarks
   - name: build_variant_gen
@@ -11856,6 +11876,8 @@ buildvariants:
     scons_cache_scope: shared
     separate_debug: off
   tasks:
+  - name: cqf
+  - name: cqf_parallel
   - name: compile_and_archive_dist_test_then_package_TG
   - name: compile_benchmarks
   - name: build_variant_gen

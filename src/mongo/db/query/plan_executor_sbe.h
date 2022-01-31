@@ -32,6 +32,7 @@
 #include <queue>
 
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer_sbe.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
@@ -44,6 +45,7 @@ class PlanExecutorSBE final : public PlanExecutor {
 public:
     PlanExecutorSBE(OperationContext* opCtx,
                     std::unique_ptr<CanonicalQuery> cq,
+                    std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
                     sbe::CandidatePlans candidates,
                     const CollectionPtr& collection,
                     bool returnOwnedBson,

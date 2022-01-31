@@ -134,6 +134,10 @@ public:
         return &_stats;
     }
 
+    const Pipeline& getPipeline() const {
+        return *_pipeline;
+    }
+
     boost::intrusive_ptr<DocumentSource> clone() const final;
 
 protected:
