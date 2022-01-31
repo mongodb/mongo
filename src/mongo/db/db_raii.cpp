@@ -238,14 +238,21 @@ AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
                                    Top::LockType lockType,
                                    LogMode logMode,
                                    int dbProfilingLevel,
-                                   Date_t deadline)
-    : _opCtx(opCtx), _lockType(lockType), _nss(nss), _logMode(logMode) {
+                                   Date_t deadline,
+                                   const std::vector<NamespaceString>& secondaryNssVector)
+    : _opCtx(opCtx), _lockType(lockType), _logMode(logMode) {
+    // Deduplicate all namespaces for Top reporting on destruct.
+    _nssSet.insert(nss);
+    for (auto&& secondaryNss : secondaryNssVector) {
+        _nssSet.insert(secondaryNss);
+    }
+
     if (_logMode == LogMode::kUpdateTop) {
         return;
     }
 
     stdx::lock_guard<Client> clientLock(*_opCtx->getClient());
-    CurOp::get(_opCtx)->enter_inlock(_nss.ns().c_str(), dbProfilingLevel);
+    CurOp::get(_opCtx)->enter_inlock(nss.ns().c_str(), dbProfilingLevel);
 }
 
 AutoStatsTracker::~AutoStatsTracker() {
@@ -253,10 +260,11 @@ AutoStatsTracker::~AutoStatsTracker() {
         return;
     }
 
+    // Update stats for each namespace.
     auto curOp = CurOp::get(_opCtx);
     Top::get(_opCtx->getServiceContext())
         .record(_opCtx,
-                _nss.ns(),
+                _nssSet,
                 curOp->getLogicalOp(),
                 _lockType,
                 durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()),

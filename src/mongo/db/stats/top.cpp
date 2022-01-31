@@ -88,6 +88,18 @@ void Top::record(OperationContext* opCtx,
     _record(opCtx, coll, logicalOp, lockType, micros, readWriteType);
 }
 
+void Top::record(OperationContext* opCtx,
+                 const std::set<NamespaceString>& nssSet,
+                 LogicalOp logicalOp,
+                 LockType lockType,
+                 long long micros,
+                 bool command,
+                 Command::ReadWriteType readWriteType) {
+    for (const auto& nss : nssSet) {
+        record(opCtx, nss.ns(), logicalOp, lockType, micros, command, readWriteType);
+    }
+}
+
 void Top::_record(OperationContext* opCtx,
                   CollectionData& c,
                   LogicalOp logicalOp,

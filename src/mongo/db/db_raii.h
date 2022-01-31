@@ -69,7 +69,8 @@ public:
                      Top::LockType lockType,
                      LogMode logMode,
                      int dbProfilingLevel,
-                     Date_t deadline = Date_t::max());
+                     Date_t deadline = Date_t::max(),
+                     const std::vector<NamespaceString>& secondaryNssVector = {});
 
     /**
      * Records stats about the current operation via Top, if 'logMode' is 'kUpdateTop' or
@@ -80,8 +81,8 @@ public:
 private:
     OperationContext* _opCtx;
     Top::LockType _lockType;
-    const NamespaceString _nss;
     const LogMode _logMode;
+    std::set<NamespaceString> _nssSet;
 };
 
 /**

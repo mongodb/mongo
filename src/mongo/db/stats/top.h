@@ -104,6 +104,17 @@ public:
                 bool command,
                 Command::ReadWriteType readWriteType);
 
+    /**
+     * Same as the above, but for multiple namespaces.
+     */
+    void record(OperationContext* opCtx,
+                const std::set<NamespaceString>& nssSet,
+                LogicalOp logicalOp,
+                LockType lockType,
+                long long micros,
+                bool command,
+                Command::ReadWriteType readWriteType);
+
     void append(BSONObjBuilder& b);
 
     void cloneMap(UsageMap& out) const;
