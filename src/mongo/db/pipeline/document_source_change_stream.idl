@@ -109,3 +109,12 @@ structs:
                              deletes may appear that do not reflect actual deletions or insertions
                              of data. Instead they reflect this data moving from one shard to
                              another.
+
+            showRawUpdateDescription:
+                cpp_name: showRawUpdateDescription
+                type: optionalBool
+                description: An internal flag indicating whether each update event in a change
+                             stream should contain a "rawUpdateDescription" field that exposes the
+                             raw update description from the oplog entry for the corresponding
+                             update command. When this flag is set to true, the standard
+                             "updateDescription" field in update events will be omitted.
