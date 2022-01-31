@@ -10,6 +10,7 @@
  *   does_not_support_transactions,
  *   requires_getmore,
  *   requires_non_retryable_writes,
+ *   requires_fcv_52,
  * ]
  */
 (function() {
