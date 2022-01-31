@@ -216,8 +216,7 @@ TEST_F(RangeDeleterTest,
                                range,
                                boost::none,
                                numDocsToRemovePerBatch,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
     ASSERT_EQUALS(dbclient.count(kNss, BSONObj()), 0);
@@ -247,8 +246,7 @@ TEST_F(RangeDeleterTest,
                                range,
                                boost::none,
                                numDocsToRemovePerBatch,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
     ASSERT_EQUALS(dbclient.count(kNss, BSONObj()), 0);
@@ -272,8 +270,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeInsertsDocumentToNotifySecondarie
                                range,
                                boost::none,
                                numDocsToRemovePerBatch,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
 
@@ -307,8 +304,7 @@ TEST_F(
                                range,
                                boost::none,
                                numDocsToRemovePerBatch,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
     ASSERT_EQUALS(dbclient.count(NamespaceString::kServerConfigurationNamespace,
@@ -341,8 +337,7 @@ TEST_F(RangeDeleterTest,
                                range,
                                boost::none,
                                1 /* numDocsToRemovePerBatch */,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
     // No documents should have been deleted.
@@ -374,8 +369,7 @@ TEST_F(RangeDeleterTest,
                                range,
                                boost::none,
                                1 /* numDocsToRemovePerBatch */,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
     // No documents should have been deleted.
@@ -403,8 +397,7 @@ TEST_F(RangeDeleterTest,
                                ChunkRange(BSON(kShardKey << 0), BSON(kShardKey << 10)),
                                boost::none,
                                10 /* numDocsToRemovePerBatch*/,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
 
     ASSERT_THROWS_CODE(cleanupComplete.get(),
@@ -424,8 +417,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeThrowsErrorWhenCollectionDoesNotE
                                ChunkRange(BSON(kShardKey << 0), BSON(kShardKey << 10)),
                                boost::none,
                                10 /* numDocsToRemovePerBatch*/,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
 
     ASSERT_THROWS_CODE(cleanupComplete.get(),
@@ -469,8 +461,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeLeavesDocumentsWhenTaskDocumentDo
                                range,
                                UUID::gen(),
                                10 /*numDocsToRemovePerBatch*/,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     cleanupComplete.get();
 
@@ -520,8 +511,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationAfterDeletingS
                                range,
                                t.getId(),
                                numDocsToRemovePerBatch,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
 
@@ -571,8 +561,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationOnlyOnceAfterS
                                range,
                                t.getId(),
                                numDocsToRemovePerBatch,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     cleanupComplete.get();
 
@@ -620,8 +609,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotWaitForReplicationIfErrorD
                                range,
                                t.getId(),
                                numDocsToRemovePerBatch,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     ASSERT_THROWS_CODE(cleanupComplete.get(), DBException, ErrorCodes::PrimarySteppedDown);
     ASSERT_EQ(numTimesWaitedForReplication, 0);
@@ -652,8 +640,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRetriesOnWriteConflictException) 
                                range,
                                t.getId(),
                                10 /*numDocsToRemovePerBatch*/,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     cleanupComplete.get();
 
@@ -685,8 +672,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRetriesOnUnexpectedError) {
                                range,
                                t.getId(),
                                10 /*numDocsToRemovePerBatch*/,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     cleanupComplete.get();
 
@@ -699,15 +685,22 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRespectsDelayInBetweenBatches) {
     // More documents than the batch size.
     const auto numDocsToInsert = 3;
     const auto numDocsToRemovePerBatch = 1;
-    const auto delayBetweenBatches = Milliseconds(10);
     auto queriesComplete = SemiFuture<void>::makeReady();
-
     // Insert documents in range.
     setFilteringMetadataWithUUID(uuid());
     DBDirectClient dbclient(operationContext());
     for (auto i = 0; i < numDocsToInsert; ++i) {
         dbclient.insert(kNss.toString(), BSON(kShardKey << i));
     }
+
+    // The deletion of a document in unit tests with ephemeral storage engine is usually
+    // extremely fast (less than 5ms), so setting the delay to 1 second ensures the test
+    // is relevant: it is very improbable for a deletion to last so much, even on slow
+    // machines.
+    const auto delayBetweenBatchesMS = 1000 /* 1 second */;
+    rangeDeleterBatchDelayMS.store(delayBetweenBatchesMS);
+
+    auto beforeRangeDeletion = Date_t::now();
 
     auto cleanupComplete =
         removeDocumentsInRange(executor(),
@@ -718,23 +711,13 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRespectsDelayInBetweenBatches) {
                                range,
                                boost::none,
                                numDocsToRemovePerBatch,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */,
-                               delayBetweenBatches);
-
-    // A best-effort check that cleanup has not completed without advancing the clock.
-    sleepsecs(1);
-    ASSERT_FALSE(cleanupComplete.isReady());
-
-    // Advance the time until cleanup is complete. This explicit advancement of the clock is
-    // required in order to allow the delay between batches to complete. This cannot be made exact
-    // because there's no way to tell when the sleep operation gets hit exactly, so instead we
-    // incrementally advance time until it's ready.
-    while (!cleanupComplete.isReady()) {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(network());
-        network()->advanceTime(network()->now() + Milliseconds(1));
-    }
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     cleanupComplete.get();
+    auto afterRangeDeletion = Date_t::now();
+    auto rangeDeletionTimeMS =
+        afterRangeDeletion.toMillisSinceEpoch() - beforeRangeDeletion.toMillisSinceEpoch();
+    ASSERT(rangeDeletionTimeMS >= delayBetweenBatchesMS * numDocsToInsert);
     ASSERT_EQUALS(dbclient.count(kNss, BSONObj()), 0);
 }
 
@@ -761,8 +744,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRespectsOrphanCleanupDelay) {
                                                   range,
                                                   boost::none,
                                                   numDocsToRemovePerBatch,
-                                                  orphanCleanupDelay,
-                                                  Milliseconds(0) /* delayBetweenBatches */);
+                                                  orphanCleanupDelay);
 
     // A best-effort check that cleanup has not completed without advancing the clock.
     sleepsecs(1);
@@ -801,8 +783,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRemovesRangeDeletionTaskOnSuccess
                                range,
                                t.getId(),
                                10 /*numDocsToRemovePerBatch*/,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     cleanupComplete.get();
     // Document should have been deleted.
@@ -833,8 +814,7 @@ TEST_F(RangeDeleterTest,
                                range,
                                t.getId(),
                                10 /*numDocsToRemovePerBatch*/,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     ASSERT_THROWS_CODE(cleanupComplete.get(),
                        DBException,
@@ -872,8 +852,7 @@ TEST_F(RangeDeleterTest,
                                range,
                                t.getId(),
                                10 /*numDocsToRemovePerBatch*/,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     ASSERT_THROWS_CODE(cleanupComplete.get(), DBException, ErrorCodes::PrimarySteppedDown);
 
@@ -901,8 +880,7 @@ DEATH_TEST_F(RangeDeleterTest, RemoveDocumentsInRangeCrashesIfInputFutureHasErro
                                ChunkRange(BSON(kShardKey << 0), BSON(kShardKey << 10)),
                                boost::none,
                                10 /* numDocsToRemovePerBatch */,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
 
     // Should cause an invariant failure.
@@ -924,8 +902,7 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotCrashWhenShardKeyIndexDoes
                                ChunkRange(BSON("x" << 0), BSON("x" << 10)),
                                boost::none,
                                10 /* numDocsToRemovePerBatch*/,
-                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/,
-                               Milliseconds(0) /* delayBetweenBatches */);
+                               Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     // Range deleter will keep on retrying when it encounters non-stepdown errors. Make it run
     // a few iterations and then create the index to make it exit the retry loop.

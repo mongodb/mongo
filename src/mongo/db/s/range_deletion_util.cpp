@@ -326,7 +326,6 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                                                                          keyPattern,
                                                                          range,
                                                                          numDocsToRemovePerBatch));
-
                        LOGV2_DEBUG(
                            23769,
                            1,
@@ -337,6 +336,13 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                            "namespace"_attr = nss.ns(),
                            "collectionUUID"_attr = collectionUuid,
                            "range"_attr = range.toString());
+
+                       if (numDeleted > 0) {
+                           // (SERVER-62368) The range-deleter executor is mono-threaded, so
+                           // sleeping synchronously for `delayBetweenBatches` ensures that no other
+                           // batch is going to be cleared up before the expected delay.
+                           opCtx->sleepFor(delayBetweenBatches);
+                       }
 
                        return numDeleted;
                    },
@@ -354,7 +360,6 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                 ErrorCodes::isShutdownError(swNumDeleted.getStatus()) ||
                 ErrorCodes::isNotPrimaryError(swNumDeleted.getStatus());
         })
-        .withDelayBetweenIterations(delayBetweenBatches)
         .on(executor, CancellationToken::uncancelable())
         .ignoreValue();
 }
@@ -495,8 +500,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
     const ChunkRange& range,
     boost::optional<UUID> migrationId,
     int numDocsToRemovePerBatch,
-    Seconds delayForActiveQueriesOnSecondariesToComplete,
-    Milliseconds delayBetweenBatches) {
+    Seconds delayForActiveQueriesOnSecondariesToComplete) {
     return std::move(waitForActiveQueriesToComplete)
         .thenRunOn(executor)
         .onError([&](Status s) {
@@ -529,7 +533,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
                                         range,
                                         migrationId,
                                         numDocsToRemovePerBatch,
-                                        delayBetweenBatches)
+                                        Milliseconds(rangeDeleterBatchDelayMS.load()))
                 .onCompletion([=](Status s) {
                     if (!s.isOK() &&
                         s.code() !=

@@ -388,8 +388,7 @@ SharedSemiFuture<void> MetadataManager::_submitRangeForDeletion(
                                range,
                                std::move(migrationId),
                                maxToDelete,
-                               delayForActiveQueriesOnSecondariesToComplete,
-                               Milliseconds(rangeDeleterBatchDelayMS.load()));
+                               delayForActiveQueriesOnSecondariesToComplete);
 
     _rangesScheduledForDeletion.emplace_front(range, cleanupComplete);
     // Attach a continuation so that once the range has been deleted, we will remove the deletion
