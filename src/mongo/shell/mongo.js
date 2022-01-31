@@ -699,6 +699,11 @@ Mongo.prototype._extractChangeStreamOptions = function(options) {
         delete options.allChangesForCluster;
     }
 
+    if (options.hasOwnProperty("showRawUpdateDescription")) {
+        changeStreamOptions.showRawUpdateDescription = options.showRawUpdateDescription;
+        delete options.showRawUpdateDescription;
+    }
+
     return [{$changeStream: changeStreamOptions}, options];
 };
 

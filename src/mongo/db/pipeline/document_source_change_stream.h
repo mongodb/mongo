@@ -121,8 +121,14 @@ public:
     static constexpr StringData kNamespaceField = "ns"_sd;
 
     // Name of the field which stores information about updates. Only applies when OperationType
-    // is "update".
+    // is "update". Note that this field will be omitted if the 'showRawUpdateDescription' option
+    // is enabled in the change stream spec.
     static constexpr StringData kUpdateDescriptionField = "updateDescription"_sd;
+
+    // Name of the field which stores the raw update description from the oplog about updates.
+    // Only applies when OperationType is "update". Note that this field is only present when
+    // the 'showRawUpdateDescription' option is enabled in the change stream spec.
+    static constexpr StringData kRawUpdateDescriptionField = "rawUpdateDescription"_sd;
 
     // The name of the subfield of '_id' where the UUID of the namespace will be located after the
     // transformation.

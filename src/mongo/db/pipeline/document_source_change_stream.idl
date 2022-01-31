@@ -148,3 +148,12 @@ structs:
                              'config' database, which is usually banned. This flag is used
                              internally to allow mongoS to open a stream on 'config.shards', in
                              order to monitor for the addition of new shards to the cluster.
+
+            showRawUpdateDescription:
+                cpp_name: showRawUpdateDescription
+                type: optionalBool
+                description: An internal flag indicating whether each update event in a change
+                             stream should contain a "rawUpdateDescription" field that exposes the
+                             raw update description from the oplog entry for the corresponding
+                             update command. When this flag is set to true, the standard
+                             "updateDescription" field in update events will be omitted.

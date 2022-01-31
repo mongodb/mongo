@@ -95,6 +95,9 @@ DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
     _includePreImageOptime =
         (spec.getFullDocumentBeforeChange() != FullDocumentBeforeChangeModeEnum::kOff);
 
+    // If the change stream spec requested raw update descriptions, make sure we honor that request.
+    _showRawUpdateDescription = spec.getShowRawUpdateDescription();
+
     // If the change stream spec includes a resumeToken with a shard key, populate the document key
     // cache with the field paths.
     auto resumeAfter = spec.getResumeAfter();
@@ -243,21 +246,28 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
                 checkValueType(input[repl::OplogEntry::kObjectFieldName],
                                repl::OplogEntry::kObjectFieldName,
                                BSONType::Object);
-                Document opObject = input[repl::OplogEntry::kObjectFieldName].getDocument();
-                Value updatedFields = opObject["$set"];
-                Value removedFields = opObject["$unset"];
 
-                // Extract the field names of $unset document.
-                vector<Value> removedFieldsVector;
-                if (removedFields.getType() == BSONType::Object) {
-                    auto iter = removedFields.getDocument().fieldIterator();
-                    while (iter.more()) {
-                        removedFieldsVector.push_back(Value(iter.next().first));
+                if (_showRawUpdateDescription) {
+                    updateDescription = input[repl::OplogEntry::kObjectFieldName];
+                } else {
+                    Document opObject = input[repl::OplogEntry::kObjectFieldName].getDocument();
+                    Value updatedFields = opObject["$set"];
+                    Value removedFields = opObject["$unset"];
+
+                    // Extract the field names of $unset document.
+                    vector<Value> removedFieldsVector;
+                    if (removedFields.getType() == BSONType::Object) {
+                        auto iter = removedFields.getDocument().fieldIterator();
+                        while (iter.more()) {
+                            removedFieldsVector.push_back(Value(iter.next().first));
+                        }
                     }
+
+                    updateDescription = Value(
+                        Document{{"updatedFields",
+                                  updatedFields.missing() ? Value(Document()) : updatedFields},
+                                 {"removedFields", removedFieldsVector}});
                 }
-                updateDescription = Value(Document{
-                    {"updatedFields", updatedFields.missing() ? Value(Document()) : updatedFields},
-                    {"removedFields", removedFieldsVector}});
             } else {
                 operationType = DocumentSourceChangeStream::kReplaceOpType;
                 fullDocument = input[repl::OplogEntry::kObjectFieldName];
@@ -355,9 +365,13 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
                      : Value(Document{{"db", nss.db()}, {"coll", nss.coll()}}));
     doc.addField(DocumentSourceChangeStream::kDocumentKeyField, documentKey);
 
-    // Note that 'updateDescription' might be the 'missing' value, in which case it will not be
-    // serialized.
-    doc.addField("updateDescription", updateDescription);
+    // Note that the update description field might be the 'missing' value, in which case it will
+    // not be serialized.
+    auto updateDescriptionFieldName = _showRawUpdateDescription
+        ? DocumentSourceChangeStream::kRawUpdateDescriptionField
+        : DocumentSourceChangeStream::kUpdateDescriptionField;
+    doc.addField(updateDescriptionFieldName, updateDescription);
+
     return doc.freeze();
 }
 

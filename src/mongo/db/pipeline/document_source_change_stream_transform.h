@@ -219,6 +219,10 @@ private:
     // Set to true if the pre-image optime should be included in output documents.
     bool _includePreImageOptime = false;
 
+    // Set to true if update events should contain the "rawUpdateDescription" field. When this flag
+    // is set to true, the standard "updateDescription" field in update events will be omitted.
+    bool _showRawUpdateDescription = false;
+
     // '_fcv' is used to determine which version of the resume token to generate for each change.
     // This is a snapshot of what the feature compatibility version was at the time the stream was
     // opened or resumed.
