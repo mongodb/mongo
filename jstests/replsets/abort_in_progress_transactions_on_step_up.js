@@ -82,8 +82,13 @@ const startOpTime = testDB.getSiblingDB("local").oplog.rs.findOne({ts: commitOpT
 jsTestLog("Wait for the new primary to block on fail point.");
 stopReplProducerOnDocumentFailPoint.wait();
 
-jsTestLog("Wait for the new primary to apply the first op of transaction.");
-assert.soon(() => getLastOpTime(newPrimary) >= startOpTime);
+jsTestLog("Wait for the new primary to apply the first op of transaction at timestamp: " +
+          tojson(startOpTime));
+assert.soon(() => {
+    const lastOpTime = getLastOpTime(newPrimary);
+    jsTestLog("Current lastOpTime on the new primary: " + tojson(lastOpTime));
+    return lastOpTime >= startOpTime;
+});
 
 // Now the transaction should be in-progress on newPrimary.
 txnTableEntry = getTxnTableEntry(newTestDB);
