@@ -50,10 +50,10 @@ common_runtime_config = [
         type='category', subconfig= [
         Config('commit_timestamp', 'none', r'''
             this option is no longer supported, retained for backward compatibility''',
-            choices=['always', 'key_consistent', 'never', 'none'], undoc=True),
+            choices=['always', 'never', 'none'], undoc=True),
         Config('durable_timestamp', 'none', r'''
             this option is no longer supported, retained for backward compatibility''',
-            choices=['always', 'key_consistent', 'never', 'none'], undoc=True),
+            choices=['always', 'never', 'none'], undoc=True),
         Config('read_timestamp', 'none', r'''
             verify that timestamps should \c always or \c never be used on
             reads with this table.  Verification should be set to \c none
@@ -75,18 +75,17 @@ common_runtime_config = [
         corresponding \c write_timestamp configuration under the \c assert and
         \c verbose options to provide logging and assertions for incorrect
         timestamp usage. The choices are \c always which ensures a timestamp is
-        used for every operation on a table, \c key_consistent to ensure that
-        once timestamps are used for a key, they are always used, \c ordered is
-        like \c key_consistent except it also enforces that subsequent updates
-        to each key must use increasing timestamps, \c mixed_mode is like
-        \c ordered except that updates with no timestamp are allowed and have
-        the effect of resetting the chain of updates once the transaction ID
-        based snapshot is no longer relevant, \c never enforces that timestamps
-        are never used for a table and \c none does not enforce any expectation
-        on timestamp usage meaning that no log message or assertions will be
-        produced regardless of the corresponding \c assert and \c verbose
-        settings''',
-        choices=['always', 'key_consistent', 'mixed_mode', 'never', 'none', 'ordered']),
+        used for every operation on a table, \c ordered which ensures that
+        once timestamps are used for a key, they are always used, and also
+        that subsequent updates to each key must use increasing timestamps,
+        \c mixed_mode is like \c ordered except that updates with no timestamp
+        are allowed and have the effect of resetting the chain of updates
+        once the transaction ID based snapshot is no longer relevant, \c
+        never enforces that timestamps are never used for a table and \c
+        none does not enforce any expectation on timestamp usage meaning
+        that no log message or assertions will be produced regardless of the
+        corresponding \c assert and \c verbose settings''', choices=['always',
+        'mixed_mode', 'never', 'none', 'ordered']),
 ]
 
 # Metadata shared by all schema objects

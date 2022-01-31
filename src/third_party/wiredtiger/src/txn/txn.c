@@ -887,7 +887,7 @@ __txn_commit_timestamps_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_
      * Exit abnormally as the key consistency mode dictates all updates must use timestamps once
      * they have been used.
      */
-    if (FLD_ISSET(ts_flags, WT_DHANDLE_TS_KEY_CONSISTENT) && prev_op_durable_ts != WT_TS_NONE &&
+    if (FLD_ISSET(ts_flags, WT_DHANDLE_TS_ORDERED) && prev_op_durable_ts != WT_TS_NONE &&
       !txn_has_ts) {
         __wt_verbose_error(session, WT_VERB_TRANSACTION, "%s",
           WT_COMMIT_TS_VERB_PREFIX
@@ -1430,7 +1430,7 @@ __txn_commit_timestamps_assert(WT_SESSION_IMPL *session)
     /*
      * If we're not doing any key consistency checking, we're done.
      */
-    if (!F_ISSET(txn, WT_TXN_TS_WRITE_KEY_CONSISTENT))
+    if (!F_ISSET(txn, WT_TXN_TS_WRITE_ORDERED))
         return (0);
 
     /*
@@ -1523,8 +1523,7 @@ __txn_commit_timestamps_assert(WT_SESSION_IMPL *session)
          * comparing commit timestamps would be.
          */
         WT_ASSERT(session, txn->durable_timestamp >= op_ts && prev_op_durable_ts >= prev_op_ts);
-        if (F_ISSET(txn, WT_TXN_TS_WRITE_KEY_CONSISTENT) &&
-          txn->durable_timestamp < prev_op_durable_ts)
+        if (F_ISSET(txn, WT_TXN_TS_WRITE_ORDERED) && txn->durable_timestamp < prev_op_durable_ts)
             WT_ERR_MSG(session, EINVAL, "out of order commit timestamps");
     }
 

@@ -87,8 +87,6 @@ __wt_txn_timestamp_flags(WT_SESSION_IMPL *session)
 
     if (FLD_ISSET(dhandle->ts_flags, WT_DHANDLE_TS_ALWAYS))
         F_SET(session->txn, WT_TXN_TS_WRITE_ALWAYS);
-    if (FLD_ISSET(dhandle->ts_flags, WT_DHANDLE_TS_KEY_CONSISTENT))
-        F_SET(session->txn, WT_TXN_TS_WRITE_KEY_CONSISTENT);
     if (FLD_ISSET(dhandle->ts_flags, WT_DHANDLE_TS_MIXED_MODE))
         F_SET(session->txn, WT_TXN_TS_WRITE_MIXED_MODE);
     if (FLD_ISSET(dhandle->ts_flags, WT_DHANDLE_TS_NEVER))

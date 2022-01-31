@@ -1079,17 +1079,16 @@ struct __wt_session {
 	 * modifications to the table.  This option should be used in conjunction with the
 	 * corresponding \c write_timestamp configuration under the \c assert and \c verbose options
 	 * to provide logging and assertions for incorrect timestamp usage.  The choices are \c
-	 * always which ensures a timestamp is used for every operation on a table\, \c
-	 * key_consistent to ensure that once timestamps are used for a key\, they are always used\,
-	 * \c ordered is like \c key_consistent except it also enforces that subsequent updates to
-	 * each key must use increasing timestamps\, \c mixed_mode is like \c ordered except that
-	 * updates with no timestamp are allowed and have the effect of resetting the chain of
-	 * updates once the transaction ID based snapshot is no longer relevant\, \c never enforces
-	 * that timestamps are never used for a table and \c none does not enforce any expectation
-	 * on timestamp usage meaning that no log message or assertions will be produced regardless
-	 * of the corresponding \c assert and \c verbose settings., a string\, chosen from the
-	 * following options: \c "always"\, \c "key_consistent"\, \c "mixed_mode"\, \c "never"\, \c
-	 * "none"\, \c "ordered"; default \c none.}
+	 * always which ensures a timestamp is used for every operation on a table\, \c ordered
+	 * which ensures that once timestamps are used for a key\, they are always used\, and also
+	 * that subsequent updates to each key must use increasing timestamps\, \c mixed_mode is
+	 * like \c ordered except that updates with no timestamp are allowed and have the effect of
+	 * resetting the chain of updates once the transaction ID based snapshot is no longer
+	 * relevant\, \c never enforces that timestamps are never used for a table and \c none does
+	 * not enforce any expectation on timestamp usage meaning that no log message or assertions
+	 * will be produced regardless of the corresponding \c assert and \c verbose settings., a
+	 * string\, chosen from the following options: \c "always"\, \c "mixed_mode"\, \c "never"\,
+	 * \c "none"\, \c "ordered"; default \c none.}
 	 * @configend
 	 * @errors
 	 */
@@ -1365,17 +1364,16 @@ struct __wt_session {
 	 * modifications to the table.  This option should be used in conjunction with the
 	 * corresponding \c write_timestamp configuration under the \c assert and \c verbose options
 	 * to provide logging and assertions for incorrect timestamp usage.  The choices are \c
-	 * always which ensures a timestamp is used for every operation on a table\, \c
-	 * key_consistent to ensure that once timestamps are used for a key\, they are always used\,
-	 * \c ordered is like \c key_consistent except it also enforces that subsequent updates to
-	 * each key must use increasing timestamps\, \c mixed_mode is like \c ordered except that
-	 * updates with no timestamp are allowed and have the effect of resetting the chain of
-	 * updates once the transaction ID based snapshot is no longer relevant\, \c never enforces
-	 * that timestamps are never used for a table and \c none does not enforce any expectation
-	 * on timestamp usage meaning that no log message or assertions will be produced regardless
-	 * of the corresponding \c assert and \c verbose settings., a string\, chosen from the
-	 * following options: \c "always"\, \c "key_consistent"\, \c "mixed_mode"\, \c "never"\, \c
-	 * "none"\, \c "ordered"; default \c none.}
+	 * always which ensures a timestamp is used for every operation on a table\, \c ordered
+	 * which ensures that once timestamps are used for a key\, they are always used\, and also
+	 * that subsequent updates to each key must use increasing timestamps\, \c mixed_mode is
+	 * like \c ordered except that updates with no timestamp are allowed and have the effect of
+	 * resetting the chain of updates once the transaction ID based snapshot is no longer
+	 * relevant\, \c never enforces that timestamps are never used for a table and \c none does
+	 * not enforce any expectation on timestamp usage meaning that no log message or assertions
+	 * will be produced regardless of the corresponding \c assert and \c verbose settings., a
+	 * string\, chosen from the following options: \c "always"\, \c "mixed_mode"\, \c "never"\,
+	 * \c "none"\, \c "ordered"; default \c none.}
 	 * @configend
 	 * @errors
 	 */

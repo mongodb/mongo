@@ -497,8 +497,6 @@ __conn_dhandle_config_parse(WT_SESSION_IMPL *session)
     WT_RET(__wt_config_gets(session, cfg, "write_timestamp_usage", &cval));
     if (WT_STRING_MATCH("always", cval.str, cval.len))
         FLD_SET(dhandle->ts_flags, WT_DHANDLE_TS_ALWAYS);
-    else if (WT_STRING_MATCH("key_consistent", cval.str, cval.len))
-        FLD_SET(dhandle->ts_flags, WT_DHANDLE_TS_KEY_CONSISTENT);
     else if (WT_STRING_MATCH("mixed_mode", cval.str, cval.len))
         FLD_SET(dhandle->ts_flags, WT_DHANDLE_TS_MIXED_MODE);
     else if (WT_STRING_MATCH("never", cval.str, cval.len))

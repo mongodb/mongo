@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_assert06.py
-#   Timestamps: verify key consistent setting for durable timestamps
+#   Timestamps: verify ordered setting for durable timestamps
 #
 
 from suite_subprocess import suite_subprocess
@@ -53,7 +53,7 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
     def test_timestamp_alter(self):
         base = 'assert06'
         uri = 'file:' + base
-        cfg_on = 'write_timestamp_usage=key_consistent,assert=(write_timestamp=on)'
+        cfg_on = 'write_timestamp_usage=ordered,assert=(write_timestamp=on)'
         cfg_off = 'write_timestamp_usage=never,assert=(write_timestamp=off)'
         msg_ooo='/out of order/'
         msg_usage='/used inconsistently/'
@@ -203,7 +203,7 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
         # That checking will verify any individual key is always or never
         # used with a timestamp. And if it is used with a timestamp that
         # the timestamps are in increasing order for that key.
-        self.session.create(uri, 'key_format={},value_format=S,verbose=(write_timestamp),write_timestamp_usage=key_consistent,assert=(write_timestamp=on)'.format(self.key_format))
+        self.session.create(uri, 'key_format={},value_format=S,verbose=(write_timestamp),write_timestamp_usage=ordered,assert=(write_timestamp=on)'.format(self.key_format))
 
         # Insert a data item at timestamp 2.
         c = self.session.open_cursor(uri)
