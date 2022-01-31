@@ -707,6 +707,11 @@ Mongo.prototype._extractChangeStreamOptions = function(options) {
         delete options.allowToRunOnSystemNS;
     }
 
+    if (options.hasOwnProperty("showRawUpdateDescription")) {
+        changeStreamOptions.showRawUpdateDescription = options.showRawUpdateDescription;
+        delete options.showRawUpdateDescription;
+    }
+
     return [{$changeStream: changeStreamOptions}, options];
 };
 

@@ -276,32 +276,44 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
                                    update_oplog_entry::kDiffObjectFieldName,
                                BSONType::Object);
 
-                const auto& deltaDesc =
-                    change_stream_document_diff_parser::parseDiff(diffObj.getDocument().toBson());
+                if (_changeStreamSpec.getShowRawUpdateDescription()) {
+                    updateDescription = input[repl::OplogEntry::kObjectFieldName];
+                } else {
+                    const auto& deltaDesc = change_stream_document_diff_parser::parseDiff(
+                        diffObj.getDocument().toBson());
 
-                updateDescription = Value(Document{{"updatedFields", deltaDesc.updatedFields},
-                                                   {"removedFields", deltaDesc.removedFields},
-                                                   {"truncatedArrays", deltaDesc.truncatedArrays}});
+                    updateDescription =
+                        Value(Document{{"updatedFields", deltaDesc.updatedFields},
+                                       {"removedFields", deltaDesc.removedFields},
+                                       {"truncatedArrays", deltaDesc.truncatedArrays}});
+                }
             } else if (id.missing()) {
                 operationType = DocumentSourceChangeStream::kUpdateOpType;
                 checkValueType(input[repl::OplogEntry::kObjectFieldName],
                                repl::OplogEntry::kObjectFieldName,
                                BSONType::Object);
-                Document opObject = input[repl::OplogEntry::kObjectFieldName].getDocument();
-                Value updatedFields = opObject["$set"];
-                Value removedFields = opObject["$unset"];
 
-                // Extract the field names of $unset document.
-                vector<Value> removedFieldsVector;
-                if (removedFields.getType() == BSONType::Object) {
-                    auto iter = removedFields.getDocument().fieldIterator();
-                    while (iter.more()) {
-                        removedFieldsVector.push_back(Value(iter.next().first));
+                if (_changeStreamSpec.getShowRawUpdateDescription()) {
+                    updateDescription = input[repl::OplogEntry::kObjectFieldName];
+                } else {
+                    Document opObject = input[repl::OplogEntry::kObjectFieldName].getDocument();
+                    Value updatedFields = opObject["$set"];
+                    Value removedFields = opObject["$unset"];
+
+                    // Extract the field names of $unset document.
+                    vector<Value> removedFieldsVector;
+                    if (removedFields.getType() == BSONType::Object) {
+                        auto iter = removedFields.getDocument().fieldIterator();
+                        while (iter.more()) {
+                            removedFieldsVector.push_back(Value(iter.next().first));
+                        }
                     }
+
+                    updateDescription = Value(
+                        Document{{"updatedFields",
+                                  updatedFields.missing() ? Value(Document()) : updatedFields},
+                                 {"removedFields", removedFieldsVector}});
                 }
-                updateDescription = Value(Document{
-                    {"updatedFields", updatedFields.missing() ? Value(Document()) : updatedFields},
-                    {"removedFields", removedFieldsVector}});
             } else {
                 operationType = DocumentSourceChangeStream::kReplaceOpType;
                 fullDocument = input[repl::OplogEntry::kObjectFieldName];
@@ -430,9 +442,13 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
                      : Value(Document{{"db", nss.db()}, {"coll", nss.coll()}}));
     doc.addField(DocumentSourceChangeStream::kDocumentKeyField, std::move(documentKey));
 
-    // Note that 'updateDescription' might be the 'missing' value, in which case it will not be
-    // serialized.
-    doc.addField("updateDescription", std::move(updateDescription));
+    // Note that the update description field might be the 'missing' value, in which case it will
+    // not be serialized.
+    auto updateDescriptionFieldName = _changeStreamSpec.getShowRawUpdateDescription()
+        ? DocumentSourceChangeStream::kRawUpdateDescriptionField
+        : DocumentSourceChangeStream::kUpdateDescriptionField;
+    doc.addField(updateDescriptionFieldName, std::move(updateDescription));
+
     return doc.freeze();
 }
 
