@@ -294,8 +294,6 @@ struct __wt_cursor_hs {
     uint32_t btree_id;
     WT_ITEM *datastore_key;
 
-    bool insert_success;
-
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_HS_CUR_BTREE_ID_SET 0x1u
 #define WT_HS_CUR_COUNTER_SET 0x2u

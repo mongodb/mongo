@@ -318,17 +318,19 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
     WT_TIME_WINDOW tw;
     wt_off_t hs_size;
     uint64_t insert_cnt, max_hs_size, modify_cnt;
+    uint64_t cache_hs_insert_full_update, cache_hs_insert_reverse_modify, cache_hs_write_squash;
     uint32_t i;
     uint8_t *p;
     int nentries;
     bool enable_reverse_modify, error_on_ooo_ts, hs_inserted, squashed;
 
-    error_on_ooo_ts = F_ISSET(r, WT_REC_CHECKPOINT_RUNNING);
     r->cache_write_hs = false;
     btree = S2BT(session);
     prev_upd = NULL;
-    insert_cnt = 0;
     WT_TIME_WINDOW_INIT(&tw);
+    insert_cnt = 0;
+    error_on_ooo_ts = F_ISSET(r, WT_REC_CHECKPOINT_RUNNING);
+    cache_hs_insert_full_update = cache_hs_insert_reverse_modify = cache_hs_write_squash = 0;
 
     WT_RET(__wt_curhs_open(session, NULL, &hs_cursor));
     F_SET(hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
@@ -498,7 +500,7 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
                     else
                         newest_hs = upd;
                     if (squashed) {
-                        WT_STAT_CONN_DATA_INCR(session, cache_hs_write_squash);
+                        ++cache_hs_write_squash;
                         squashed = false;
                     }
                 } else if (upd != ref_upd)
@@ -553,7 +555,7 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
         if (newest_hs == NULL || F_ISSET(newest_hs, WT_UPDATE_HS)) {
             /* The onpage value is squashed. */
             if (newest_hs == NULL && squashed)
-                WT_STAT_CONN_DATA_INCR(session, cache_hs_write_squash);
+                ++cache_hs_write_squash;
             continue;
         }
 
@@ -684,10 +686,6 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
             else
                 WT_ASSERT(session, __txn_visible_id(session, upd->txnid));
 #endif
-
-            /* Clear out the insert success flag prior to our insert attempt. */
-            __wt_curhs_clear_insert_success(hs_cursor);
-
             /*
              * Calculate reverse modify and clear the history store records with timestamps when
              * inserting the first update. Always write the newest update in the history store as a
@@ -707,37 +705,27 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
               __wt_calc_modify(session, prev_full_value, full_value, prev_full_value->size / 10,
                 entries, &nentries) == 0) {
                 WT_ERR(__wt_modify_pack(hs_cursor, entries, nentries, &modify_value));
-                ret = __hs_insert_record(session, hs_cursor, btree, key, WT_UPDATE_MODIFY,
-                  modify_value, &tw, error_on_ooo_ts);
-                WT_STAT_CONN_DATA_INCR(session, cache_hs_insert_reverse_modify);
+                WT_ERR(__hs_insert_record(session, hs_cursor, btree, key, WT_UPDATE_MODIFY,
+                  modify_value, &tw, error_on_ooo_ts));
+                ++cache_hs_insert_reverse_modify;
                 __wt_scr_free(session, &modify_value);
                 ++modify_cnt;
             } else {
                 modify_cnt = 0;
-                ret = __hs_insert_record(session, hs_cursor, btree, key, WT_UPDATE_STANDARD,
-                  full_value, &tw, error_on_ooo_ts);
-                WT_STAT_CONN_DATA_INCR(session, cache_hs_insert_full_update);
+                WT_ERR(__hs_insert_record(session, hs_cursor, btree, key, WT_UPDATE_STANDARD,
+                  full_value, &tw, error_on_ooo_ts));
+                ++cache_hs_insert_full_update;
             }
 
-            /*
-             * Flag the update as now in the history store.
-             *
-             * Ensure that we don't use `WT_ERR` for the insertions above. Insertion can return
-             * non-zero even when the update made it into the history store. In those cases we need
-             * to write the flag to mark the update as having been written to the history store
-             * before jumping to the error handling.
-             */
-            if (__wt_curhs_check_insert_success(hs_cursor)) {
-                F_SET(upd, WT_UPDATE_HS);
-                if (tombstone != NULL)
-                    F_SET(tombstone, WT_UPDATE_HS);
-            }
-            WT_ERR(ret);
+            /* Flag the update as now in the history store. */
+            F_SET(upd, WT_UPDATE_HS);
+            if (tombstone != NULL)
+                F_SET(tombstone, WT_UPDATE_HS);
 
             hs_inserted = true;
             ++insert_cnt;
             if (squashed) {
-                WT_STAT_CONN_DATA_INCR(session, cache_hs_write_squash);
+                ++cache_hs_write_squash;
                 squashed = false;
             }
 
@@ -785,6 +773,12 @@ err:
     __wt_scr_free(session, &prev_full_value);
 
     WT_TRET(hs_cursor->close(hs_cursor));
+
+    WT_STAT_CONN_DATA_INCRV(session, cache_hs_insert_full_update, cache_hs_insert_full_update);
+    WT_STAT_CONN_DATA_INCRV(
+      session, cache_hs_insert_reverse_modify, cache_hs_insert_reverse_modify);
+    WT_STAT_CONN_DATA_INCRV(session, cache_hs_write_squash, cache_hs_write_squash);
+
     return (ret);
 }
 
@@ -855,6 +849,7 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
     WT_ITEM hs_key, hs_value;
     WT_TIME_WINDOW hs_insert_tw, tw, *twp;
     wt_timestamp_t hs_ts;
+    uint64_t cache_hs_order_lose_durable_timestamp, cache_hs_order_reinsert, cache_hs_order_remove;
     uint64_t hs_counter, hs_upd_type;
     uint32_t hs_btree_id;
 #ifdef HAVE_DIAGNOSTIC
@@ -866,6 +861,7 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
     hs_cbt = __wt_curhs_get_cbt(hs_cursor);
     WT_CLEAR(hs_key);
     WT_CLEAR(hs_value);
+    cache_hs_order_lose_durable_timestamp = cache_hs_order_reinsert = cache_hs_order_remove = 0;
 
 #ifndef HAVE_DIAGNOSTIC
     WT_UNUSED(key);
@@ -997,7 +993,7 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
              */
             if (hs_cbt->upd_value->tw.start_ts != hs_cbt->upd_value->tw.durable_start_ts ||
               hs_cbt->upd_value->tw.stop_ts != hs_cbt->upd_value->tw.durable_stop_ts)
-                WT_STAT_CONN_DATA_INCR(session, cache_hs_order_lose_durable_timestamp);
+                ++cache_hs_order_lose_durable_timestamp;
 
             __wt_verbose(session, WT_VERB_TIMESTAMP,
               "fixing existing out-of-order updates by moving them; start_ts=%s, "
@@ -1041,19 +1037,23 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
               &hs_value);
             WT_ERR(hs_insert_cursor->insert(hs_insert_cursor));
             ++(*counter);
-            WT_STAT_CONN_INCR(session, cache_hs_order_reinsert);
-            WT_STAT_DATA_INCR(session, cache_hs_order_reinsert);
+            ++cache_hs_order_reinsert;
         }
 
         /* Delete the out-of-order entry. */
         WT_ERR(hs_cursor->remove(hs_cursor));
-        WT_STAT_CONN_INCR(session, cache_hs_order_remove);
-        WT_STAT_DATA_INCR(session, cache_hs_order_remove);
+        ++cache_hs_order_remove;
     }
     if (ret == WT_NOTFOUND)
         ret = 0;
 err:
     if (hs_insert_cursor != NULL)
         hs_insert_cursor->close(hs_insert_cursor);
+
+    WT_STAT_CONN_DATA_INCRV(
+      session, cache_hs_order_lose_durable_timestamp, cache_hs_order_lose_durable_timestamp);
+    WT_STAT_CONN_DATA_INCRV(session, cache_hs_order_reinsert, cache_hs_order_reinsert);
+    WT_STAT_CONN_DATA_INCRV(session, cache_hs_order_remove, cache_hs_order_remove);
+
     return (ret);
 }
