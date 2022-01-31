@@ -88,12 +88,12 @@ __curversion_get_value(WT_CURSOR *cursor, ...)
 
     version_cursor = (WT_CURSOR_VERSION *)cursor;
     file_cursor = version_cursor->file_cursor;
+    va_start(ap, cursor);
 
     CURSOR_API_CALL(cursor, session, get_value, NULL);
     WT_ERR(__cursor_checkvalue(cursor));
     WT_ERR(__cursor_checkvalue(file_cursor));
 
-    va_start(ap, cursor);
     if (F_ISSET(cursor, WT_CURSTD_RAW)) {
         /* Extract metadata and value separately as raw data. */
         metadata = va_arg(ap, WT_ITEM *);
