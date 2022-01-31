@@ -42,7 +42,7 @@ if sys.version_info[0] <= 2:
     print('WiredTiger requires Python version 3.0 or above')
     sys.exit(1)
 
-# After importing the SWIG-generated file, copy all symbols from from it
+# After importing the SWIG-generated file, copy all symbols from it
 # to this module so they will appear in the wiredtiger namespace.
 me = sys.modules[__name__]
 sys.path.append(os.path.dirname(__file__))

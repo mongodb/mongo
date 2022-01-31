@@ -182,8 +182,8 @@ class suite_subprocess:
                     WiredTigerTestCase.prout(out)
 
     # Run a method as a subprocess using the run.py machinery.
-    # Return the process exit status and the the WiredTiger
-    # home directory used by the subprocess.
+    # Return the process exit status and the WiredTiger home
+    # directory used by the subprocess.
     def run_subprocess_function(self, directory, funcname):
         testparts = funcname.split('.')
         if len(testparts) != 3:

@@ -361,7 +361,7 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Create a read session.
         session1.begin_transaction('read_timestamp=2')
-        # Confirm oldest reader is 2 and the the value we read is 1.
+        # Confirm oldest reader is 2 and the value we read is 1.
         self.assertTimestampsEqual(
             self.conn.query_timestamp('get=oldest_reader'), "2")
 

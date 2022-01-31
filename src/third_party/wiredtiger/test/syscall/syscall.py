@@ -526,7 +526,7 @@ class Runner:
             return False
         return True
 
-    # func(args);  is shorthand for for ASSERT_EQ(func(args), xxx);
+    # func(args);  is shorthand for ASSERT_EQ(func(args), xxx);
     # where xxx may be 0 or may be derived from one of the args.
     def call_compare(self, callname, result, eargs, errline):
         if callname in calls_returning_zero:

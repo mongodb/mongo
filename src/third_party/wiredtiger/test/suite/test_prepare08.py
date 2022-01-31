@@ -286,7 +286,7 @@ class test_prepare08(wttest.WiredTigerTestCase):
         # Checkpoint
         self.session.checkpoint()
 
-        # Remove the updates from a prepare session and and keep it open.
+        # Remove the updates from a prepare session and keep it open.
         session_p = self.conn.open_session()
         cursor_p = session_p.open_cursor(uri_1)
         session_p.begin_transaction()

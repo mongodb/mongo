@@ -284,8 +284,8 @@ class test_cursor13_reopens(test_cursor13_base):
                 # reopen the second cached cursor, see the data handle now
                 # open and will succeed the reopen.
                 #
-                # This test checks that reopens of cursor using a an
-                # already reopened data handle will work.
+                # This test checks that reopens of cursor using an already
+                # reopened data handle will work.
                 c = self.session.open_cursor(self.uri)
                 ds.check()
                 c.close()

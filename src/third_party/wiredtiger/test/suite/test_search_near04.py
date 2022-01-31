@@ -53,7 +53,7 @@ class test_search_near04(wttest.WiredTigerTestCase):
         self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
 
         # Make the keys big enough to span over multiple pages.
-        # key_size can be set to to a lower value so only one page is used and search_near works.
+        # key_size can be set to a lower value so only one page is used and search_near works.
         key_size = 200
 
         cursor = self.session.open_cursor(uri)
