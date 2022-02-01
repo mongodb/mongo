@@ -39,4 +39,5 @@ feature_flags:
         description: Feature flag for enabling the recoverable RefineCollectionShardKeyCoordinator which
             disallows migrations during its execution.
         cpp_varname: gFeatureFlagRecoverableRefineCollectionShardKeyCoordinator
-        default: false
+        default: true
+        version: 5.3

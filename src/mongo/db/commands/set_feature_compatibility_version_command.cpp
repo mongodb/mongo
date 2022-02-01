@@ -80,6 +80,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
+#include "mongo/s/refine_collection_shard_key_coordinator_feature_flags_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/exit.h"
@@ -395,6 +396,18 @@ public:
                     ShardingDDLCoordinatorService::getService(opCtx)
                         ->waitForCoordinatorsOfGivenTypeToComplete(
                             opCtx, DDLCoordinatorTypeEnum::kCollMod);
+                }
+
+                // TODO SERVER-62850 Remove when 6.0 branches-out
+                if (actualVersion > requestedVersion &&
+                    !feature_flags::gFeatureFlagRecoverableRefineCollectionShardKeyCoordinator
+                         .isEnabledOnVersion(requestedVersion)) {
+                    // No more (recoverable) ReshardCollectionCoordinators will start because we
+                    // have already switched the FCV value to kDowngrading. Wait for the ongoing
+                    // RefineCollectionCoordinators to finish.
+                    ShardingDDLCoordinatorService::getService(opCtx)
+                        ->waitForCoordinatorsOfGivenTypeToComplete(
+                            opCtx, DDLCoordinatorTypeEnum::kRefineCollectionShardKey);
                 }
 
                 // If we are only running phase-1, then we are done
