@@ -254,6 +254,9 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
 
                 continue;
             }
+
+            // A collection being restored needs to also restore all of its indexes.
+            _checkForIndexFiles(opCtx, entry, identsKnownToStorageEngine);
         }
 
         if (loadingFromUncleanShutdownOrRepair) {
@@ -426,6 +429,27 @@ Status StorageEngineImpl::_recoverOrphanedCollection(OperationContext* opCtx,
     }
     wuow.commit();
     return Status::OK();
+}
+
+void StorageEngineImpl::_checkForIndexFiles(
+    OperationContext* opCtx,
+    const DurableCatalog::Entry& entry,
+    std::vector<std::string>& identsKnownToStorageEngine) const {
+    std::vector<std::string> indexIdents = _catalog->getIndexIdents(opCtx, entry.catalogId);
+    for (const std::string& indexIdent : indexIdents) {
+        bool restoredIndexIdent = std::binary_search(
+            identsKnownToStorageEngine.begin(), identsKnownToStorageEngine.end(), indexIdent);
+
+        if (restoredIndexIdent) {
+            continue;
+        }
+
+        LOGV2_FATAL_NOTRACE(6261000,
+                            "Collection is missing an index file",
+                            logAttrs(entry.tenantNs.getNss()),
+                            "collectionIdent"_attr = entry.ident,
+                            "missingIndexIdent"_attr = indexIdent);
+    }
 }
 
 bool StorageEngineImpl::_handleInternalIdent(OperationContext* opCtx,

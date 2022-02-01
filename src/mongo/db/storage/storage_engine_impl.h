@@ -390,6 +390,14 @@ private:
                                       const NamespaceString& collectionName,
                                       StringData collectionIdent);
 
+    /**
+     * Throws a fatal assertion if there are any missing index idents from the storage engine for
+     * the given catalog entry.
+     */
+    void _checkForIndexFiles(OperationContext* opCtx,
+                             const DurableCatalog::Entry& entry,
+                             std::vector<std::string>& identsKnownToStorageEngine) const;
+
     void _dumpCatalog(OperationContext* opCtx);
 
     /**
