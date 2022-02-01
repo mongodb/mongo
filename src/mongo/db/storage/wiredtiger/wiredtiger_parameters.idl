@@ -197,3 +197,11 @@ server_parameters:
       cpp_vartype: 'bool'
       cpp_varname: gWiredTigerSkipTableLoggingChecksOnStartup
       default: false
+
+    wiredTigerStressConfig:
+      description: >-
+        Encourage more interesting races in WiredTiger.
+      set_at: startup
+      cpp_vartype: bool
+      cpp_varname: gWiredTigerStressConfig
+      default: false

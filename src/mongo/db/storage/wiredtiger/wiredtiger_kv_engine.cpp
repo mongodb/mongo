@@ -444,6 +444,9 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         // testing is enabled, keep around some of these files for investigative purposes.
         ss << "debug_mode=(table_logging=true,checkpoint_retention=4),";
     }
+    if (gWiredTigerStressConfig) {
+        ss << "timing_stress_for_test=[history_store_checkpoint_delay,checkpoint_slow],";
+    }
 
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
               ->getTableCreateConfig("system");
