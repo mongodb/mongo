@@ -424,6 +424,9 @@ void IndexConsistency::addDocKey(OperationContext* opCtx,
         invariant(_missingIndexEntries.count(key) == 0);
         _missingIndexEntries.insert(
             std::make_pair(key, IndexEntryInfo(*indexInfo, recordId, idKeyBuilder.obj(), ks)));
+
+        // Prints the collection document's metadata.
+        _validateState->getCollection()->getRecordStore()->printRecordMetadata(opCtx, recordId);
     }
 }
 
@@ -495,6 +498,10 @@ void IndexConsistency::addIndexKey(OperationContext* opCtx,
             if (search == _extraIndexEntries.end()) {
                 SimpleBSONObjSet infoSet = {info};
                 _extraIndexEntries.insert(std::make_pair(key, infoSet));
+
+                // Prints the collection document's metadata.
+                _validateState->getCollection()->getRecordStore()->printRecordMetadata(opCtx,
+                                                                                       recordId);
                 return;
             }
             search->second.insert(info);
