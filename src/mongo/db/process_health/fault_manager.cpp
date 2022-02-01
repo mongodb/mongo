@@ -365,6 +365,10 @@ void FaultManager::logMessageReceived(FaultState state, const HealthCheckStatus&
 }
 
 void FaultManager::logCurrentState(FaultState, FaultState newState, const OptionalMessageType&) {
+    {
+        stdx::lock_guard<Latch> lk(_stateMutex);
+        _lastTransitionTime = _svcCtx->getFastClockSource()->now();
+    }
     if (_fault) {
         LOGV2(5939703,
               "Fault manager changed state ",
