@@ -117,6 +117,17 @@ public:
         return uassertStatusOK(readAndAdvanceNoThrow<T>());
     }
 
+    /**
+     * Return a ConstDataRange based on `splitPoint`
+     * and advance the cursor past there.
+     */
+    template <typename ByteLike>
+    ConstDataRange sliceAndAdvance(const ByteLike& splitPoint) {
+        auto ret = slice(splitPoint);
+        advance(ret.length());
+        return ret;
+    }
+
 private:
     Status makeAdvanceStatus(size_t advance) const;
 };
@@ -218,6 +229,17 @@ public:
     template <typename T>
     void writeAndAdvance(const T& value) {
         uassertStatusOK(writeAndAdvanceNoThrow(value));
+    }
+
+    /**
+     * Return a DataRange based on `splitPoint`
+     * and advance the cursor past there.
+     */
+    template <typename ByteLike>
+    DataRange sliceAndAdvance(const ByteLike& splitPoint) {
+        auto ret = slice(splitPoint);
+        advance(ret.length());
+        return ret;
     }
 
 private:

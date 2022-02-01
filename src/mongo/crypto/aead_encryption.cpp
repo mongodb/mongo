@@ -47,10 +47,6 @@ constexpr size_t kIVSize = 16;
 // object, a value of 1<<16 was decided to cap the maximum size of AssociatedData.
 constexpr int kMaxAssociatedDataLength = 1 << 16;
 
-std::uint8_t* asUint8(DataRange buffer) {
-    return const_cast<std::uint8_t*>(buffer.data<std::uint8_t>());
-}
-
 size_t aesCBCCipherOutputLength(size_t plainTextLen) {
     return aesBlockSize * (1 + plainTextLen / aesBlockSize);
 }
@@ -64,7 +60,7 @@ void aeadGenerateIV(const SymmetricKey* key, DataRange buffer) {
         fassert(51235, "IV buffer is too small for selected mode");
     }
 
-    auto status = engineRandBytes({asUint8(buffer), aesCBCIVSize});
+    auto status = engineRandBytes(buffer.slice(aesCBCIVSize));
     if (!status.isOK()) {
         fassert(51236, status);
     }
@@ -79,8 +75,7 @@ StatusWith<std::size_t> _aesEncrypt(const SymmetricKey& key,
     }
 
     DataRangeCursor out(outRange);
-    DataRange iv(asUint8(out), aesCBCIVSize);
-    out.advance(aesCBCIVSize);
+    DataRange iv = out.sliceAndAdvance(aesCBCIVSize);
 
     auto encryptor = uassertStatusOK(SymmetricEncryptor::create(key, aesMode::cbc, iv));
 
@@ -122,8 +117,7 @@ StatusWith<std::size_t> _aesDecrypt(const SymmetricKey& key,
 
 
     ConstDataRangeCursor in(inRange);
-    ConstDataRange iv(inRange.data(), aesCBCIVSize);
-    in.advance(aesCBCIVSize);
+    auto iv = in.sliceAndAdvance(aesCBCIVSize);
 
     auto decryptor = uassertStatusOK(SymmetricDecryptor::create(key, aesMode::cbc, iv));
 
@@ -294,7 +288,7 @@ Status aeadEncryptWithIV(ConstDataRange key,
     SymmetricKey symEncKey(encKey, sym256KeySize, aesAlgorithm, "aesKey", 1);
     std::size_t aesOutLen = out.length() - kHmacOutSize;
 
-    auto swEncrypt = _aesEncrypt(symEncKey, in, {asUint8(out), aesOutLen}, ivProvided);
+    auto swEncrypt = _aesEncrypt(symEncKey, in, {out.data(), aesOutLen}, ivProvided);
     if (!swEncrypt.isOK()) {
         return swEncrypt.getStatus();
     }
@@ -302,15 +296,16 @@ Status aeadEncryptWithIV(ConstDataRange key,
     // Split `out` into two separate ranges.
     // One for the just written ciphertext,
     // and another for the HMAC signature on the end.
-    ConstDataRange cipherTextRange(out.data(), swEncrypt.getValue());
-    DataRange hmacRange(asUint8(out) + cipherTextRange.length(), kHmacOutSize);
+    DataRangeCursor outCursor(out);
+    auto cipherTextRange = outCursor.sliceAndAdvance(swEncrypt.getValue());
 
     SHA512Block hmacOutput = SHA512Block::computeHmac(
         macKey, sym256KeySize, {associatedData, cipherTextRange, dataLenBitsEncoded});
 
     // We intentionally only write the first 256 bits of the digest produced by SHA512.
     ConstDataRange truncatedHash(hmacOutput.data(), kHmacOutSize);
-    hmacRange.write(truncatedHash);
+    outCursor.writeAndAdvance(truncatedHash);
+
     return Status::OK();
 }
 
@@ -347,10 +342,7 @@ StatusWith<std::size_t> aeadDecrypt(const SymmetricKey& key,
     const uint8_t* encKey = key.getKey() + sym256KeySize;
 
     // Split input into actual ciphertext, and the HMAC bit at the end.
-    const auto* inEnd = in.data() + in.length();
-    const auto* hmacStart = inEnd - kHmacOutSize;
-    ConstDataRange cipherText(in.data(), hmacStart);
-    ConstDataRange hmacRange(hmacStart, inEnd);
+    auto [cipherText, hmacRange] = in.split(in.length() - kHmacOutSize);
 
     // According to the rfc on AES encryption, the associatedDataLength is defined as the
     // number of bits in associatedData in BigEndian format. This is what the code segment
@@ -365,7 +357,7 @@ StatusWith<std::size_t> aeadDecrypt(const SymmetricKey& key,
     // Note that while we produce a 512bit digest with SHA512,
     // we only store and validate the first 256 bits (32 bytes).
     if (consttimeMemEqual(reinterpret_cast<const unsigned char*>(hmacOutput.data()),
-                          reinterpret_cast<const unsigned char*>(hmacRange.data()),
+                          hmacRange.data<unsigned char>(),
                           kHmacOutSize) == false) {
         return Status(ErrorCodes::BadValue, "HMAC data authentication failed.");
     }

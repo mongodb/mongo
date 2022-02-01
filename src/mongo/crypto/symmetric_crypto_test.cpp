@@ -386,10 +386,6 @@ SymmetricKey aesGeneratePredictableKey256(StringData stringKey, StringData keyId
 }
 
 // Convenience wrappers to avoid line-wraps later.
-const std::uint8_t* asUint8(const char* str) {
-    return reinterpret_cast<const std::uint8_t*>(str);
-};
-
 const char* asChar(const std::uint8_t* data) {
     return reinterpret_cast<const char*>(data);
 };

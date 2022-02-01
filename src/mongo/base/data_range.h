@@ -32,6 +32,7 @@
 #include <cstring>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 
 #include "mongo/base/data_type.h"
 #include "mongo/base/error_codes.h"
@@ -162,6 +163,24 @@ public:
         return uassertStatusOK(readNoThrow<T>(offset));
     }
 
+    /**
+     * Split this ConstDataRange into two parts at `splitPoint`.
+     * May provide either a pointer within the range or an offset from the beginning.
+     */
+    template <typename T>
+    auto split(const T& splitPoint) const {
+        return doSplit<ConstDataRange>(splitPoint);
+    }
+
+    /**
+     * Create a smaller chunk of the original ConstDataRange.
+     * May provide either a pointer within the range or an offset from the beginning.
+     */
+    template <typename T>
+    auto slice(const T& splitPoint) const {
+        return doSlice<ConstDataRange>(splitPoint);
+    }
+
     friend bool operator==(const ConstDataRange& lhs, const ConstDataRange& rhs) {
         return std::tie(lhs._begin, lhs._end) == std::tie(rhs._begin, rhs._end);
     }
@@ -170,6 +189,34 @@ public:
         return !(lhs == rhs);
     }
 
+protected:
+    // Shared implementation of split() logic between DataRange and ConstDataRange.
+    template <typename RangeT,
+              typename ByteLike,
+              typename std::enable_if_t<isByteV<ByteLike>, int> = 0>
+    std::pair<RangeT, RangeT> doSplit(const ByteLike* splitPoint) const {
+        const auto* typedPoint = reinterpret_cast<const byte_type*>(splitPoint);
+        uassert(ErrorCodes::BadValue,
+                "Invalid split point",
+                (typedPoint >= _begin) && (typedPoint <= _end));
+        // RangeT will enforce constness, so use common-denominator for args to ctor.
+        auto* begin = const_cast<byte_type*>(_begin);
+        auto* split = const_cast<byte_type*>(typedPoint);
+        auto* end = const_cast<byte_type*>(_end);
+        return {{begin, split}, {split, end}};
+    }
+
+    template <typename RangeT>
+    auto doSplit(std::size_t splitPoint) const {
+        return doSplit<RangeT>(data() + splitPoint);
+    }
+
+    // Convenience wrapper to just grab the first half of a split.
+    template <typename RangeT, typename T>
+    RangeT doSlice(const T& splitPoint) const {
+        auto parts = doSplit<RangeT>(splitPoint);
+        return parts.first;
+    }
 
 protected:
     const byte_type* _begin;
@@ -245,6 +292,24 @@ public:
     template <typename T>
     void write(const T& value, std::size_t offset = 0) {
         uassertStatusOK(writeNoThrow(value, offset));
+    }
+
+    using ConstDataRange::data;
+    template <typename ByteLike = byte_type>
+    ByteLike* data() noexcept {
+        return reinterpret_cast<ByteLike*>(const_cast<byte_type*>(_begin));
+    }
+
+    using ConstDataRange::split;
+    template <typename T>
+    auto split(const T& splitPoint) {
+        return doSplit<DataRange>(splitPoint);
+    }
+
+    using ConstDataRange::slice;
+    template <typename T>
+    auto slice(const T& splitPoint) {
+        return doSlice<DataRange>(splitPoint);
     }
 };
 

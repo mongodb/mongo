@@ -49,13 +49,6 @@ namespace mongo {
 namespace crypto {
 
 namespace {
-// Convenience wrapper to get a mutable uint8_t*
-// since DataRange returns a const pointer,
-// and all those casts get ugly.
-std::uint8_t* asUint8(DataRange dr) {
-    return const_cast<std::uint8_t*>(dr.data<std::uint8_t>());
-}
-
 template <typename Init>
 void initCipherContext(
     EVP_CIPHER_CTX* ctx, const SymmetricKey& key, aesMode mode, ConstDataRange iv, Init init) {
@@ -90,7 +83,7 @@ public:
         int len = 0;
         if (1 !=
             EVP_EncryptUpdate(
-                _ctx.get(), asUint8(out), &len, in.data<std::uint8_t>(), in.length())) {
+                _ctx.get(), out.data<std::uint8_t>(), &len, in.data<std::uint8_t>(), in.length())) {
             return Status(ErrorCodes::UnknownError,
                           str::stream()
                               << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
@@ -118,7 +111,7 @@ public:
 
     StatusWith<std::size_t> finalize(DataRange out) final {
         int len = 0;
-        if (1 != EVP_EncryptFinal_ex(_ctx.get(), asUint8(out), &len)) {
+        if (1 != EVP_EncryptFinal_ex(_ctx.get(), out.data<std::uint8_t>(), &len)) {
             return Status(ErrorCodes::UnknownError,
                           str::stream()
                               << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
@@ -130,7 +123,8 @@ public:
         if (_mode == aesMode::gcm) {
 #ifdef EVP_CTRL_GCM_GET_TAG
             if (1 !=
-                EVP_CIPHER_CTX_ctrl(_ctx.get(), EVP_CTRL_GCM_GET_TAG, out.length(), asUint8(out))) {
+                EVP_CIPHER_CTX_ctrl(
+                    _ctx.get(), EVP_CTRL_GCM_GET_TAG, out.length(), out.data<std::uint8_t>())) {
                 return Status(ErrorCodes::UnknownError,
                               str::stream()
                                   << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
@@ -161,7 +155,7 @@ public:
         int len = 0;
         if (1 !=
             EVP_DecryptUpdate(
-                _ctx.get(), asUint8(out), &len, in.data<std::uint8_t>(), in.length())) {
+                _ctx.get(), out.data<std::uint8_t>(), &len, in.data<std::uint8_t>(), in.length())) {
             return Status(ErrorCodes::UnknownError,
                           str::stream()
                               << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
@@ -189,7 +183,7 @@ public:
 
     StatusWith<std::size_t> finalize(DataRange out) final {
         int len = 0;
-        if (1 != EVP_DecryptFinal_ex(_ctx.get(), asUint8(out), &len)) {
+        if (1 != EVP_DecryptFinal_ex(_ctx.get(), out.data<std::uint8_t>(), &len)) {
             return Status(ErrorCodes::UnknownError,
                           str::stream()
                               << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
@@ -237,7 +231,7 @@ std::set<std::string> getSupportedSymmetricAlgorithms() {
 }
 
 Status engineRandBytes(DataRange buffer) {
-    if (RAND_bytes(asUint8(buffer), buffer.length()) == 1) {
+    if (RAND_bytes(buffer.data<std::uint8_t>(), buffer.length()) == 1) {
         return Status::OK();
     }
     return {ErrorCodes::UnknownError,

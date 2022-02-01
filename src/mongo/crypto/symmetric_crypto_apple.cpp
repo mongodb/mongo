@@ -46,11 +46,6 @@ namespace mongo {
 namespace crypto {
 
 namespace {
-// Convenience wrapper for getting mutable pointer from DataRange.
-std::uint8_t* asUint8(DataRange out) {
-    return const_cast<std::uint8_t*>(out.data<std::uint8_t>());
-}
-
 template <typename Parent>
 class SymmetricImplApple : public Parent {
 public:
@@ -93,7 +88,7 @@ public:
     StatusWith<std::size_t> update(ConstDataRange in, DataRange out) final {
         std::size_t outUsed = 0;
         const auto status = CCCryptorUpdate(
-            _ctx.get(), in.data(), in.length(), asUint8(out), out.length(), &outUsed);
+            _ctx.get(), in.data(), in.length(), out.data<std::uint8_t>(), out.length(), &outUsed);
         if (status != kCCSuccess) {
             return Status(ErrorCodes::UnknownError,
                           str::stream() << "Unable to perform CCCryptorUpdate: " << status);
@@ -108,7 +103,8 @@ public:
 
     StatusWith<size_t> finalize(DataRange out) final {
         size_t outUsed = 0;
-        const auto status = CCCryptorFinal(_ctx.get(), asUint8(out), out.length(), &outUsed);
+        const auto status =
+            CCCryptorFinal(_ctx.get(), out.data<std::uint8_t>(), out.length(), &outUsed);
         if (status != kCCSuccess) {
             return Status(ErrorCodes::UnknownError,
                           str::stream() << "Unable to perform CCCryptorFinal: " << status);
@@ -151,7 +147,8 @@ std::set<std::string> getSupportedSymmetricAlgorithms() {
 }
 
 Status engineRandBytes(DataRange buffer) {
-    auto result = SecRandomCopyBytes(kSecRandomDefault, buffer.length(), asUint8(buffer));
+    auto result =
+        SecRandomCopyBytes(kSecRandomDefault, buffer.length(), buffer.data<std::uint8_t>());
     if (result != errSecSuccess) {
         return {ErrorCodes::UnknownError,
                 str::stream() << "Failed generating random bytes: " << result};

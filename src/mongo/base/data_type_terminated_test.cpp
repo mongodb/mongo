@@ -230,7 +230,7 @@ TEST(DataTypeTerminated, ThroughDataRangeCursor) {
             Terminated<'\0', ConstDataRange> tcdr(ConstDataRange(s.data(), s.data() + s.size()));
             ASSERT_OK(buf_writer.writeAndAdvanceNoThrow(tcdr));
         }
-        const auto written = std::string(static_cast<const char*>(buf), buf_writer.data());
+        const auto written = std::string(static_cast<char*>(buf), buf_writer.data());
         ASSERT_EQUALS(written, serialized);
     }
     {
