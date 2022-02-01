@@ -100,28 +100,17 @@ pipeline = [
 result = coll.aggregate(pipeline).toArray();
 
 expected = [
-    {"val": 0, "toFill": 1, "part": 1},
-    {"part": 1, "val": 1, "toFill": 1},
-    {"part": 1, "val": 2, "toFill": 1},
-    {"part": 1, "val": 3, "toFill": 1},
-    {"part": 1, "val": 4, "toFill": 1},
-    {"val": 5, "toFill": 3, "part": 1},
-    {"part": 1, "val": 6, "toFill": 3},
-    {"part": 1, "val": 7, "toFill": 3},
-    {"part": 1, "val": 8, "toFill": 3},
-    {"part": 1, "val": 9, "toFill": 3},
-    {"val": 10, "toFill": 5, "part": 1},
-    {"part": 2, "val": 0},
-    {"part": 2, "val": 1},
-    {"part": 2, "val": 2},
-    {"val": 3, "toFill": 10, "part": 2},
-    {"part": 2, "val": 4, "toFill": 10},
-    {"part": 2, "val": 5, "toFill": 10},
-    {"val": 6, "toFill": 13, "part": 2},
-    {"part": 2, "val": 7, "toFill": 13},
-    {"part": 2, "val": 8, "toFill": 13},
-    {"val": 9, "toFill": 16, "part": 2},
-    {"part": 2, "val": 10, "toFill": 16}
+    {"val": 0, "toFill": 1, "part": 1},    {"part": 1, "val": 1, "toFill": 1},
+    {"part": 1, "val": 2, "toFill": 1},    {"part": 1, "val": 3, "toFill": 1},
+    {"part": 1, "val": 4, "toFill": 1},    {"val": 5, "toFill": 3, "part": 1},
+    {"part": 1, "val": 6, "toFill": 3},    {"part": 1, "val": 7, "toFill": 3},
+    {"part": 1, "val": 8, "toFill": 3},    {"part": 1, "val": 9, "toFill": 3},
+    {"val": 10, "toFill": 5, "part": 1},   {"part": 2, "val": 0, "toFill": null},
+    {"part": 2, "val": 1, "toFill": null}, {"part": 2, "val": 2, "toFill": null},
+    {"val": 3, "toFill": 10, "part": 2},   {"part": 2, "val": 4, "toFill": 10},
+    {"part": 2, "val": 5, "toFill": 10},   {"val": 6, "toFill": 13, "part": 2},
+    {"part": 2, "val": 7, "toFill": 13},   {"part": 2, "val": 8, "toFill": 13},
+    {"val": 9, "toFill": 16, "part": 2},   {"part": 2, "val": 10, "toFill": 16}
 ];
 assertArrayEq({actual: result, expected: expected});
 

@@ -186,7 +186,7 @@ public:
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 
 private:
-    Value _lastNonNull;
+    Value _lastNonNull{BSONNULL};
 };
 
 }  // namespace mongo
