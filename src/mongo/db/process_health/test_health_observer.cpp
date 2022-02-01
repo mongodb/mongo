@@ -39,10 +39,15 @@ namespace process_health {
 MONGO_FAIL_POINT_DEFINE(hangTestHealthObserver);
 MONGO_FAIL_POINT_DEFINE(testHealthObserver);
 MONGO_FAIL_POINT_DEFINE(badConfigTestHealthObserver);
+MONGO_FAIL_POINT_DEFINE(statusFailureTestHealthObserver);
 Future<HealthCheckStatus> TestHealthObserver::periodicCheckImpl(
-    PeriodicHealthCheckContext&& periodicCheckContext) {
+    PeriodicHealthCheckContext&& periodicCheckContext) noexcept {
     LOGV2_DEBUG(5936801, 2, "Test health observer executing");
     hangTestHealthObserver.pauseWhileSet();
+
+    if (statusFailureTestHealthObserver.shouldFail()) {
+        return Status(ErrorCodes::BadValue, "Status failure in test health observer");
+    }
 
     auto result = Future<HealthCheckStatus>::makeReady(makeHealthyStatus());
 

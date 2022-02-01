@@ -50,7 +50,7 @@ protected:
     }
 
     Future<HealthCheckStatus> periodicCheckImpl(
-        PeriodicHealthCheckContext&& periodicCheckContext) override;
+        PeriodicHealthCheckContext&& periodicCheckContext) noexcept override;
 
     bool isConfigured() const override;
 };
