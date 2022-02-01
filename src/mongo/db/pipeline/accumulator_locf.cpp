@@ -64,7 +64,7 @@ Value AccumulatorLocf::getValue(bool toBeMerged) {
 }
 
 void AccumulatorLocf::reset() {
-    _lastNonNull = Value();
+    _lastNonNull = Value(BSONNULL);
     _memUsageBytes = sizeof(*this) + _lastNonNull.getApproximateSize();
 }
 

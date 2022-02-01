@@ -256,6 +256,6 @@ assert.commandWorked(run({$setWindowFields: {output: {v: {$max: {mergeObjects: {
 
 // However conflicting field paths is always an error.
 err = assert.commandFailedWithCode(
-    run({$setWindowFields: {output: {a: {$sum: 1}, 'a.b': {$sum: 1}}}}), 40176);
+    run({$setWindowFields: {output: {a: {$sum: 1}, 'a.b': {$sum: 1}}}}), 6307900);
 assert.includes(err.errmsg, 'specification contains two conflicting paths');
 })();

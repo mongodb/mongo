@@ -30,12 +30,14 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/add_fields_projection_executor.h"
+#include "mongo/db/field_ref_set.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
 #include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/sort_pattern.h"
@@ -110,8 +112,19 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
         sortBy.emplace(*sortSpec, expCtx);
     }
 
+    // Verify that the computed fields are valid and do not conflict with each other.
+    FieldRefSet fieldSet;
+    std::vector<FieldRef> backingRefs;
+
     std::vector<WindowFunctionStatement> outputFields;
-    for (auto&& outputElem : spec.getOutput()) {
+    const auto& output = spec.getOutput();
+    backingRefs.reserve(output.nFields());
+    for (auto&& outputElem : output) {
+        backingRefs.push_back(FieldRef(outputElem.fieldNameStringData()));
+        const FieldRef* conflict;
+        uassert(6307900,
+                "$setWindowFields 'output' specification contains two conflicting paths",
+                fieldSet.insert(&backingRefs.back(), &conflict));
         outputFields.push_back(WindowFunctionStatement::parse(outputElem, sortBy, expCtx.get()));
     }
 
@@ -458,16 +471,15 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
     }
 
     // Populate the output document with the result from each window function.
-    MutableDocument addFieldsSpec;
+    auto projSpec = std::make_unique<projection_executor::InclusionNode>(
+        ProjectionPolicies{ProjectionPolicies::DefaultIdPolicy::kIncludeId});
     for (auto&& [fieldName, function] : _executableOutputs) {
         try {
-            // Wrap the projected value in a $literal since there are limitations on a user-facing
-            // $addFields that we don't want to enforce here (e.g. empty object). If we hit a
-            // uassert while evaluating expressions on user data, delete the temporary table before
-            // aborting the operation.
-            if (auto res = function->getNext(); !res.missing()) {
-                addFieldsSpec.addField(fieldName, Value(DOC("$literal" << res)));
-            }
+            // If we hit a uassert while evaluating expressions on user data, delete the temporary
+            // table before aborting the operation.
+            projSpec->addExpressionForPath(
+                FieldPath(fieldName),
+                ExpressionConstant::create(pExpCtx.get(), function->getNext()));
         } catch (const DBException&) {
             _iterator.finalize();
             throw;
@@ -511,8 +523,9 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
             break;
     }
 
-    auto projExec = projection_executor::AddFieldsProjectionExecutor::create(
-        pExpCtx, addFieldsSpec.freeze().toBson());
+    // Avoid using the factory 'create' on the executor since we don't want to re-parse.
+    auto projExec = std::make_unique<projection_executor::AddFieldsProjectionExecutor>(
+        pExpCtx, std::move(projSpec));
 
     return projExec->applyProjection(*curDoc);
 }

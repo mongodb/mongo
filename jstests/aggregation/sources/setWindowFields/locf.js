@@ -53,7 +53,6 @@ let result = coll.aggregate([{
                      }
                  }])
                  .toArray();
-
 let expected = [
     {_id: 0, val: null},
     {_id: 1, val: 0},
@@ -77,7 +76,7 @@ result = coll.aggregate([{
              .toArray();
 
 expected = [
-    {_id: 0, val: null},
+    {_id: 0, val: null, newVal: null},
     {_id: 1, val: 0, newVal: 0},
     {_id: 2, val: 2, newVal: 2},
     {_id: 3, val: null, newVal: 2},
@@ -115,7 +114,7 @@ expected = [
 ];
 assertArrayEq({actual: result, expected: expected});
 
-// Values stay missing if all values are missing.
+// Defaults to null even with missing values.
 collection = [
     {_id: 1},
     {_id: 2},
@@ -124,7 +123,12 @@ collection = [
 ];
 coll.drop();
 assert.commandWorked(coll.insert(collection));
-expected = collection;
+expected = [
+    {_id: 1, val: null},
+    {_id: 2, val: null},
+    {_id: 3, val: null},
+    {_id: 4, val: null},
+];
 
 result = coll.aggregate([{
                  $setWindowFields: {
@@ -144,7 +148,6 @@ collection = [
 ];
 coll.drop();
 assert.commandWorked(coll.insert(collection));
-expected = collection;
 
 result = coll.aggregate([{
                  $setWindowFields: {
