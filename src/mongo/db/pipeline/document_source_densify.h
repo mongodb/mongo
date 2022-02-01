@@ -383,6 +383,12 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
+        deps->fields.insert(_field.fullPath());
+        // We don't need to traverse _partitionExpr because it was generated from _partitions.
+        // Every ExpressionFieldPath it contains is already covered by _partitions.
+        for (const auto& field : _partitions) {
+            deps->fields.insert(field.fullPath());
+        }
         return DepsTracker::State::SEE_NEXT;
     }
 
