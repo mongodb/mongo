@@ -895,14 +895,16 @@ std::vector<NamespaceString> CollectionCatalog::getAllCollectionNamesFromDb(
     return ret;
 }
 
-std::vector<std::string> CollectionCatalog::getAllDbNames() const {
-    std::vector<std::string> ret;
+std::vector<TenantDatabaseName> CollectionCatalog::getAllDbNames() const {
+    std::vector<TenantDatabaseName> ret;
     auto maxUuid = UUID::parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF").getValue();
     auto iter = _orderedCollections.upper_bound(std::make_pair("", maxUuid));
     while (iter != _orderedCollections.end()) {
         auto dbName = iter->first.first;
         if (iter->second->isCommitted()) {
-            ret.push_back(dbName);
+            // TODO SERVER-61988: Once iter->first.first has TenantDatabaseName object, we need not
+            // create the TenantDatabaseName here.
+            ret.push_back(TenantDatabaseName(boost::none, dbName));
         } else {
             // If the first collection found for `dbName` is not yet committed, increment the
             // iterator to find the next visible collection (possibly under a different `dbName`).
@@ -941,7 +943,9 @@ CollectionCatalog::Stats CollectionCatalog::getStats() const {
 CollectionCatalog::ViewCatalogSet CollectionCatalog::getViewCatalogDbNames() const {
     ViewCatalogSet results;
     for (const auto& dbNameViewSetPair : _views) {
-        results.insert(dbNameViewSetPair.first);
+        // TODO SERVER-61988: This should insert dbNameViewSetPair.first instead of creating a new
+        // TenantDatabaseName object.
+        results.insert(TenantDatabaseName(boost::none, dbNameViewSetPair.first));
     }
     return results;
 }

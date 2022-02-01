@@ -574,8 +574,12 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
     std::sort(res.begin(), res.end());
     ASSERT(res == dCollList);
 
-    std::vector<std::string> dbNames = {"dbA", "dbB", "dbC", "dbD", "testdb"};
-    ASSERT(catalog.getAllDbNames() == dbNames);
+    std::vector<TenantDatabaseName> tenantDbNames = {TenantDatabaseName(boost::none, "dbA"),
+                                                     TenantDatabaseName(boost::none, "dbB"),
+                                                     TenantDatabaseName(boost::none, "dbC"),
+                                                     TenantDatabaseName(boost::none, "dbD"),
+                                                     TenantDatabaseName(boost::none, "testdb")};
+    ASSERT(catalog.getAllDbNames() == tenantDbNames);
 
     catalog.deregisterAllCollectionsAndViews();
 }
@@ -628,8 +632,11 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
     auto res = catalog.getAllCollectionNamesFromDb(opCtx.get(), "dbA");
     ASSERT(res.empty());
 
-    std::vector<std::string> dbNames = {"dbB", "dbC", "dbD", "testdb"};
-    ASSERT(catalog.getAllDbNames() == dbNames);
+    std::vector<TenantDatabaseName> tenantDbNames = {TenantDatabaseName(boost::none, "dbB"),
+                                                     TenantDatabaseName(boost::none, "dbC"),
+                                                     TenantDatabaseName(boost::none, "dbD"),
+                                                     TenantDatabaseName(boost::none, "testdb")};
+    ASSERT(catalog.getAllDbNames() == tenantDbNames);
 
     // One dbName with both visible and invisible collections is still visible.
     std::vector<NamespaceString> dbDNss = {d1Coll, d2Coll, d3Coll};
@@ -648,7 +655,7 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
         std::sort(res.begin(), res.end());
         ASSERT(res == dCollList);
 
-        ASSERT(catalog.getAllDbNames() == dbNames);
+        ASSERT(catalog.getAllDbNames() == tenantDbNames);
         invisibleCollD->setCommitted(true);
     }
 
@@ -661,7 +668,7 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
         invisibleColl->setCommitted(false);
     }
 
-    std::vector<std::string> dbList = {"testdb"};
+    std::vector<TenantDatabaseName> dbList = {TenantDatabaseName(boost::none, "testdb")};
     ASSERT(catalog.getAllDbNames() == dbList);
 
     catalog.deregisterAllCollectionsAndViews();

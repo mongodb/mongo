@@ -774,14 +774,7 @@ RecoveryUnit* StorageEngineImpl::newRecoveryUnit() {
 }
 
 std::vector<TenantDatabaseName> StorageEngineImpl::listDatabases() const {
-    // TODO SERVER-61988 Return instead the result of CollectionCatalog::getAllDbNames() directly.
-    std::vector<TenantDatabaseName> tenantDbNames;
-    std::vector<std::string> dbNames =
-        CollectionCatalog::get(getGlobalServiceContext())->getAllDbNames();
-    for (auto dbName : dbNames) {
-        tenantDbNames.push_back(TenantDatabaseName(boost::none, dbName));
-    }
-    return tenantDbNames;
+    return CollectionCatalog::get(getGlobalServiceContext())->getAllDbNames();
 }
 
 Status StorageEngineImpl::closeDatabase(OperationContext* opCtx, StringData db) {
@@ -791,9 +784,10 @@ Status StorageEngineImpl::closeDatabase(OperationContext* opCtx, StringData db) 
 
 Status StorageEngineImpl::dropDatabase(OperationContext* opCtx, StringData db) {
     auto catalog = CollectionCatalog::get(opCtx);
+    const TenantDatabaseName tenantDbName(boost::none, db);
     {
-        auto dbs = catalog->getAllDbNames();
-        if (std::count(dbs.begin(), dbs.end(), db.toString()) == 0) {
+        auto tenantDbNames = catalog->getAllDbNames();
+        if (std::count(tenantDbNames.begin(), tenantDbNames.end(), tenantDbName) == 0) {
             return Status(ErrorCodes::NamespaceNotFound, "db not found to drop");
         }
     }

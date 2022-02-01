@@ -309,7 +309,7 @@ public:
      *
      * Unlike DatabaseHolder::getNames(), this does not return databases that are empty.
      */
-    std::vector<std::string> getAllDbNames() const;
+    std::vector<TenantDatabaseName> getAllDbNames() const;
 
     /**
      * Sets 'newProfileSettings' as the profiling settings for the database 'dbName'.
@@ -361,7 +361,7 @@ public:
     /**
      * Returns a set of databases, by name, that have view catalogs.
      */
-    using ViewCatalogSet = StringSet;
+    using ViewCatalogSet = absl::flat_hash_set<TenantDatabaseName>;
     ViewCatalogSet getViewCatalogDbNames() const;
 
     /**

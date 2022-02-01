@@ -81,9 +81,9 @@ public:
 
         const auto viewCatalogDbNames = catalog->getViewCatalogDbNames();
         if (const auto viewCatalog = ViewCatalog::get(opCtx)) {
-            for (const auto& dbName : viewCatalogDbNames) {
+            for (const auto& tenantDbName : viewCatalogDbNames) {
                 try {
-                    const auto viewStats = viewCatalog->getStats(dbName);
+                    const auto viewStats = viewCatalog->getStats(tenantDbName.dbName());
                     if (!viewStats) {
                         // The database may have been dropped between listing the database names and
                         // looking up the view catalog.
@@ -97,7 +97,7 @@ public:
                     LOGV2_DEBUG(5578400,
                                 2,
                                 "Failed to collect view catalog statistics",
-                                "db"_attr = dbName);
+                                "db"_attr = tenantDbName);
                 }
             }
         }

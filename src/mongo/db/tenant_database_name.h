@@ -78,12 +78,12 @@ public:
         return fullName();
     }
 
-    friend bool operator==(const TenantDatabaseName& l, const TenantDatabaseName& r) {
-        return l.tenantId() == r.tenantId() && l.dbName() == r.dbName();
-    }
-
-    friend bool operator!=(const TenantDatabaseName& l, const TenantDatabaseName& r) {
-        return !(l == r);
+    /**
+     * Returns -1, 0, or 1 if 'this' is less, equal, or greater than 'other' in
+     * lexicographical order.
+     */
+    int compare(const TenantDatabaseName& other) const {
+        return fullName().compare(other.fullName());
     }
 
     template <typename H>
@@ -100,4 +100,29 @@ private:
     std::string _dbName;
     boost::optional<std::string> _tenantDbName;
 };
+
+inline bool operator==(const TenantDatabaseName& lhs, const TenantDatabaseName& rhs) {
+    return lhs.compare(rhs) == 0;
+}
+
+inline bool operator!=(const TenantDatabaseName& lhs, const TenantDatabaseName& rhs) {
+    return !(lhs == rhs);
+}
+
+inline bool operator<(const TenantDatabaseName& lhs, const TenantDatabaseName& rhs) {
+    return lhs.compare(rhs) < 0;
+}
+
+inline bool operator>(const TenantDatabaseName& lhs, const TenantDatabaseName& rhs) {
+    return rhs < lhs;
+}
+
+inline bool operator<=(const TenantDatabaseName& lhs, const TenantDatabaseName& rhs) {
+    return !(lhs > rhs);
+}
+
+inline bool operator>=(const TenantDatabaseName& lhs, const TenantDatabaseName& rhs) {
+    return !(lhs < rhs);
+}
+
 }  // namespace mongo
