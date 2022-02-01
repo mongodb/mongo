@@ -230,6 +230,7 @@ struct __wt_block {
 
     TAILQ_ENTRY(__wt_block) q;     /* Linked list of handles */
     TAILQ_ENTRY(__wt_block) hashq; /* Hashed list of handles */
+    bool linked;
 
     WT_BLOCK **related;       /* Related objects */
     size_t related_allocated; /* Size of related object array */

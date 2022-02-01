@@ -94,11 +94,17 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
     conn = S2C(session);
 
+    if (block == NULL) /* Safety check, if failed to initialize. */
+        return (0);
+
     __wt_verbose(session, WT_VERB_BLOCK, "close: %s", block->name == NULL ? "" : block->name);
 
-    hash = __wt_hash_city64(block->name, strlen(block->name));
-    bucket = hash & (conn->hash_size - 1);
-    WT_CONN_BLOCK_REMOVE(conn, block, bucket);
+    /* If we failed during allocation, the block won't have been linked. */
+    if (block->linked) {
+        hash = __wt_hash_city64(block->name, strlen(block->name));
+        bucket = hash & (conn->hash_size - 1);
+        WT_CONN_BLOCK_REMOVE(conn, block, bucket);
+    }
 
     __wt_free(session, block->name);
     __wt_free(session, block->related);
@@ -151,6 +157,7 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, uint32_t objecti
 
     __wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename);
 
+    block = NULL;
     conn = S2C(session);
 
     /* Block objects can be shared (although there can be only one writer). */
@@ -165,18 +172,13 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, uint32_t objecti
             return (0);
         }
 
-    /*
-     * Basic structure allocation, initialization.
-     *
-     * Note: set the block's name-hash value before any work that can fail because cleanup calls the
-     * block destroy code which uses that hash value to remove the block from the underlying linked
-     * lists.
-     */
-    WT_RET(__wt_calloc_one(session, &block));
-    WT_CONN_BLOCK_INSERT(conn, block, bucket);
+    /* Basic structure allocation, initialization. */
+    WT_ERR(__wt_calloc_one(session, &block));
     WT_ERR(__wt_strdup(session, filename, &block->name));
     block->objectid = objectid;
     block->ref = 1;
+    WT_CONN_BLOCK_INSERT(conn, block, bucket);
+    block->linked = true;
 
     /* If not passed an allocation size, get one from the configuration. */
     if (allocsize == 0) {
