@@ -421,8 +421,22 @@ bool DBClientBase::auth(const string& dbname,
                         const string& username,
                         const string& password_text,
                         string& errmsg) {
+
+    UserName user{username, dbname};
+
+    StatusWith<string> mechResult =
+        auth::negotiateSaslMechanism(_makeAuthRunCommandHook(),
+                                     user,
+                                     boost::none,
+                                     auth::StepDownBehavior::kKeepConnectionOpen)
+            .getNoThrow();
+
+    // To prevent unexpected behavior for existing clients, default to SCRAM-SHA-1 if the SASL
+    // negotiation does not succeeed for some reason.
+    StringData mech = mechResult.isOK() ? mechResult.getValue() : "SCRAM-SHA-1";
+
     try {
-        const auto authParams = auth::buildAuthParams(dbname, username, password_text);
+        const auto authParams = auth::buildAuthParams(dbname, username, password_text, mech);
         auth(authParams);
         return true;
     } catch (const AssertionException& ex) {

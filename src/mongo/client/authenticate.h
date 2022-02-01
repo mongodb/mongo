@@ -160,8 +160,12 @@ Future<void> authenticateInternalClient(
  *     @dbname: The database target of the auth command.
  *     @username: The std::string name of the user to authenticate.
  *     @passwordText: The std::string representing the user's password.
+ *     @mechanism: The std::string authentication mechanism to be used
  */
-BSONObj buildAuthParams(StringData dbname, StringData username, StringData passwordText);
+BSONObj buildAuthParams(StringData dbname,
+                        StringData username,
+                        StringData passwordText,
+                        StringData mechanism);
 
 /**
  * Run an isMaster exchange to negotiate a SASL mechanism for authentication.
