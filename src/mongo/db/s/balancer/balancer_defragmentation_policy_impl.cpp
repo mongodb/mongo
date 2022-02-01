@@ -652,11 +652,12 @@ private:
         ShardInfo(uint64_t currentSizeBytes, uint64_t maxSizeBytes, bool draining)
             : currentSizeBytes(currentSizeBytes), maxSizeBytes(maxSizeBytes), draining(draining) {}
 
-        bool canReceiveNewChunks() const {
-            if (draining) {
-                return false;
-            }
-            return (maxSizeBytes == 0 || currentSizeBytes < maxSizeBytes);
+        bool isDraining() const {
+            return draining;
+        }
+
+        bool hasCapacityFor(uint64_t newDataSize) const {
+            return (maxSizeBytes == 0 || currentSizeBytes + newDataSize < maxSizeBytes);
         }
 
         uint64_t currentSizeBytes;
@@ -838,7 +839,7 @@ private:
             auto onSameZone = _zoneInfo.getZoneForChunk(chunkIt->range) ==
                 _zoneInfo.getZoneForChunk(siblingIt->range);
             auto destinationAvailable = chunkIt->shard == siblingIt->shard ||
-                _shardInfos.at(siblingIt->shard).canReceiveNewChunks();
+                !_shardInfos.at(siblingIt->shard).isDraining();
             return (onSameZone && destinationAvailable);
         };
 
@@ -949,9 +950,10 @@ private:
     uint32_t _rankMergeableSibling(const ChunkRangeInfo& chunkTobeMovedAndMerged,
                                    const ChunkRangeInfo& mergeableSibling) {
         static constexpr uint32_t kNoMoveRequired = 1 << 4;
-        static constexpr uint32_t kConvenientMove = 1 << 3;
-        static constexpr uint32_t kMergeSolvesTwoPendingChunks = 1 << 2;
-        static constexpr uint32_t kMergeSolvesOnePendingChunk = 1 << 1;
+        static constexpr uint32_t kDestinationNotMaxedOut = 1 << 3;
+        static constexpr uint32_t kConvenientMove = 1 << 2;
+        static constexpr uint32_t kMergeSolvesTwoPendingChunks = 1 << 1;
+        static constexpr uint32_t kMergeSolvesOnePendingChunk = 1;
         uint32_t ranking = 0;
         if (chunkTobeMovedAndMerged.shard == mergeableSibling.shard) {
             ranking += kNoMoveRequired;
@@ -965,6 +967,10 @@ private:
             ranking += mergeableSibling.estimatedSizeBytes < _smallChunkSizeThresholdBytes
                 ? kMergeSolvesTwoPendingChunks
                 : kMergeSolvesOnePendingChunk;
+        }
+        if (_shardInfos.at(mergeableSibling.shard)
+                .hasCapacityFor(chunkTobeMovedAndMerged.estimatedSizeBytes)) {
+            ranking += kDestinationNotMaxedOut;
         }
         return ranking;
     }
