@@ -72,6 +72,8 @@ public:
                               RecordId catalogId,
                               StringData idxName) const;
 
+    std::vector<std::string> getIndexIdents(OperationContext* opCtx, RecordId catalogId) const;
+
     BSONObj getCatalogEntry(OperationContext* opCtx, RecordId catalogId) const {
         return _findEntry(opCtx, catalogId);
     }

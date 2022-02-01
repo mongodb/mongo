@@ -403,6 +403,27 @@ std::string DurableCatalogImpl::getIndexIdent(OperationContext* opCtx,
     return idxIdent[idxName].String();
 }
 
+std::vector<std::string> DurableCatalogImpl::getIndexIdents(OperationContext* opCtx,
+                                                            RecordId catalogId) const {
+    std::vector<std::string> idents;
+
+    BSONObj obj = _findEntry(opCtx, catalogId);
+    if (obj["idxIdent"].eoo()) {
+        // No index entries for this catalog entry.
+        return idents;
+    }
+
+    BSONObj idxIdent = obj["idxIdent"].Obj();
+
+    BSONObjIterator it(idxIdent);
+    while (it.more()) {
+        BSONElement elem = it.next();
+        idents.push_back(elem.String());
+    }
+
+    return idents;
+}
+
 BSONObj DurableCatalogImpl::_findEntry(OperationContext* opCtx, RecordId catalogId) const {
     LOGV2_DEBUG(22208, 3, "looking up metadata for: {catalogId}", "catalogId"_attr = catalogId);
     RecordData data;
