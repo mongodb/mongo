@@ -62,7 +62,8 @@ public:
     // Implements the common logic for periodic checks.
     // Every observer should implement periodicCheckImpl() for specific tests.
     SharedSemiFuture<HealthCheckStatus> periodicCheck(
-        std::shared_ptr<executor::TaskExecutor> taskExecutor, CancellationToken token) override;
+        std::shared_ptr<executor::TaskExecutor> taskExecutor,
+        CancellationToken token) noexcept override;
 
     HealthCheckStatus makeHealthyStatus() const;
     static HealthCheckStatus makeHealthyStatusWithType(FaultFacetType type);
@@ -90,7 +91,7 @@ protected:
      * @return The result of a complete health check
      */
     virtual Future<HealthCheckStatus> periodicCheckImpl(
-        PeriodicHealthCheckContext&& periodicCheckContext) = 0;
+        PeriodicHealthCheckContext&& periodicCheckContext) noexcept = 0;
 
     HealthObserverLivenessStats getStatsLocked(WithLock) const;
 

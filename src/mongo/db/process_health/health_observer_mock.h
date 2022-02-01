@@ -67,7 +67,7 @@ protected:
     }
 
     Future<HealthCheckStatus> periodicCheckImpl(
-        PeriodicHealthCheckContext&& periodicCheckContext) override {
+        PeriodicHealthCheckContext&& periodicCheckContext) noexcept override {
 
         auto completionPf = makePromiseFuture<HealthCheckStatus>();
 
