@@ -220,6 +220,13 @@
     if (F_ISSET(cur, WT_CURSTD_CACHED))                                                    \
     WT_ERR(__wt_cursor_cached(cur))
 
+#define CURSOR_API_CALL_CONF(cur, s, n, config, cfg, bt)                                         \
+    (s) = CUR2S(cur);                                                                            \
+    SESSION_API_PREPARE_CHECK(s, WT_CURSOR, n);                                                  \
+    API_CALL(s, WT_CURSOR, n, ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle, config, cfg); \
+    if (F_ISSET(cur, WT_CURSTD_CACHED))                                                          \
+    WT_ERR(__wt_cursor_cached(cur))
+
 #define CURSOR_API_CALL_PREPARE_ALLOWED(cur, s, n, bt)                                     \
     (s) = CUR2S(cur);                                                                      \
     API_CALL_NOCONF(s, WT_CURSOR, n, ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle); \

@@ -97,5 +97,14 @@ class test_cursor06(wttest.WiredTigerTestCase):
                 cursor.update()
             cursor.close()
 
+    def test_reconfigure_invalid(self):
+        uri = self.type + self.name
+        self.populate(uri)
+        c = self.session.open_cursor(uri, None, None)
+        c.reconfigure("overwrite=1")
+        msg = '/Invalid argument/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: c.reconfigure("xxx=true"), msg)
+
 if __name__ == '__main__':
     wttest.run()

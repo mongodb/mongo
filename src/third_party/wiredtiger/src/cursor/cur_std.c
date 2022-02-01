@@ -1051,9 +1051,8 @@ __wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
     WT_CONFIG_ITEM cval;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    const char *cfg[] = {config, NULL};
 
-    CURSOR_API_CALL(cursor, session, reconfigure, NULL);
+    CURSOR_API_CALL_CONF(cursor, session, reconfigure, config, cfg, NULL);
 
     /* Reconfiguration resets the cursor. */
     WT_ERR(cursor->reset(cursor));
