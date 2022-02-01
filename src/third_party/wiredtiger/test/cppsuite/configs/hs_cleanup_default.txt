@@ -29,8 +29,9 @@ runtime_monitor=
     ),
     stat_cache_size=
     (
+        # FIXME-WT-8743: Re-enable cache usage check once cache exceed problem is fixed.
         max=100,
-        runtime=true,
+        runtime=false,
     ),
     stat_db_size=
     (

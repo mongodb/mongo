@@ -32,9 +32,8 @@ runtime_monitor=
     ),
     stat_cache_size=
     (
-        # FIXME-WT-7848: Enable cache usage check once cache exceed failure is fixed.
         max=110,
-        runtime=false,
+        runtime=true,
     ),
     # The data files compress to around 25MB per table at the end of a run so 250MB total.
     # +1.4GB for the history store. With an additional 150MB margin.
