@@ -129,6 +129,9 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    virtual void printRecordMetadata(OperationContext* opCtx, const RecordId& recordId) const {
+        MONGO_UNREACHABLE;
+    }
 
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                     bool forward) const final {

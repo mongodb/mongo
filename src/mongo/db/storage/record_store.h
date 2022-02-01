@@ -408,6 +408,11 @@ public:
                                                      const mutablebson::DamageVector& damages) = 0;
 
     /**
+     * Prints any storage engine provided metadata for the record with 'recordId'.
+     */
+    virtual void printRecordMetadata(OperationContext* opCtx, const RecordId& recordId) const = 0;
+
+    /**
      * Returns a new cursor over this record store.
      *
      * The cursor is logically positioned before the first (or last if !forward) Record in the

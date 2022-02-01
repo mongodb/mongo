@@ -1581,6 +1581,73 @@ StatusWith<RecordData> WiredTigerRecordStore::updateWithDamages(
     return RecordData(static_cast<const char*>(value.data), value.size).getOwned();
 }
 
+void WiredTigerRecordStore::printRecordMetadata(OperationContext* opCtx,
+                                                const RecordId& recordId) const {
+    LOGV2(6120300, "Printing record metadata", "recordId"_attr = recordId);
+
+    // Printing the record metadata requires a new session. We cannot open other cursors when there
+    // are open history store cursors in the session.
+    WiredTigerSession session(_kvEngine->getConnection());
+
+    // Per the version cursor API:
+    // - A version cursor can only be called with the read timestamp as the oldest timestamp.
+    // - If there is no oldest timestamp, the version cursor can only be called with a read
+    //   timestamp of 1.
+    Timestamp oldestTs = _kvEngine->getOldestTimestamp();
+    const std::string config = "read_timestamp={:x},roundup_timestamps=(read=true)"_format(
+        oldestTs.isNull() ? 1 : oldestTs.asULL());
+    WiredTigerBeginTxnBlock beginTxn(session.getSession(), config.c_str());
+
+    // Open a version cursor. This is a debug cursor that enables iteration through the history of
+    // values for a given record.
+    WT_CURSOR* cursor = session.getNewCursor(_uri, "debug=(dump_version=true)");
+
+    CursorKey key = makeCursorKey(recordId, _keyFormat);
+    setKey(cursor, &key);
+
+    int ret = cursor->search(cursor);
+    while (ret != WT_NOTFOUND) {
+        invariantWTOK(ret, session.getSession());
+
+        uint64_t startTs = 0, startDurableTs = 0, stopTs = 0, stopDurableTs = 0;
+        uint64_t startTxnId = 0, stopTxnId = 0;
+        uint8_t flags = 0, location = 0, prepare = 0, type = 0;
+        WT_ITEM value;
+
+        invariantWTOK(cursor->get_value(cursor,
+                                        &startTxnId,
+                                        &startTs,
+                                        &startDurableTs,
+                                        &stopTxnId,
+                                        &stopTs,
+                                        &stopDurableTs,
+                                        &type,
+                                        &prepare,
+                                        &flags,
+                                        &location,
+                                        &value),
+                      session.getSession());
+
+        RecordData recordData(static_cast<const char*>(value.data), value.size);
+        LOGV2(6120301,
+              "WiredTiger record metadata",
+              "recordId"_attr = recordId,
+              "startTxnId"_attr = startTxnId,
+              "startTs"_attr = Timestamp(startTs),
+              "startDurableTs"_attr = Timestamp(startDurableTs),
+              "stopTxnId"_attr = stopTxnId,
+              "stopTs"_attr = Timestamp(stopTs),
+              "stopDurableTs"_attr = Timestamp(stopDurableTs),
+              "type"_attr = type,
+              "prepare"_attr = prepare,
+              "flags"_attr = flags,
+              "location"_attr = location,
+              "value"_attr = redact(recordData.toBson()));
+
+        ret = cursor->next(cursor);
+    }
+}
+
 std::unique_ptr<RecordCursor> WiredTigerRecordStore::getRandomCursor(
     OperationContext* opCtx) const {
     const char* extraConfig = "";
