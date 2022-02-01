@@ -216,4 +216,13 @@ assert.commandFailedWithCode(run({$setWindowFields: {output: {v: {$mergeObjects:
 assert.commandFailedWithCode(run({$setWindowFields: {output: {v: {$accumulator: "$a"}}}}),
                              ErrorCodes.FailedToParse,
                              'No such window function: $accumulator');
+
+// Test that an empty object is a valid projected field.
+assert.commandWorked(coll.insert({}));
+assert.commandWorked(run({$setWindowFields: {output: {v: {$max: {mergeObjects: {}}}}}}));
+
+// However conflicting field paths is always an error.
+const err = assert.commandFailedWithCode(
+    run({$setWindowFields: {output: {a: {$sum: 1}, 'a.b': {$sum: 1}}}}), 6307900);
+assert.includes(err.errmsg, 'specification contains two conflicting paths');
 })();
