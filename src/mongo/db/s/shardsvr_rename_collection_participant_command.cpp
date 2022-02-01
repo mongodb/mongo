@@ -71,11 +71,8 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << Request::kCommandName
-                                  << " must be called with majority writeConcern, got "
-                                  << opCtx->getWriteConcern().wMode,
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
 
             auto const shardingState = ShardingState::get(opCtx);
             uassertStatusOK(shardingState->canAcceptShardedCommands());
@@ -167,11 +164,8 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << Request::kCommandName
-                                  << " must be called with majority writeConcern, got "
-                                  << opCtx->getWriteConcern().wMode,
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
 
             auto const shardingState = ShardingState::get(opCtx);
             uassertStatusOK(shardingState->canAcceptShardedCommands());

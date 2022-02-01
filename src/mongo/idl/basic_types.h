@@ -30,12 +30,15 @@
 #pragma once
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/visit_helper.h"
 #include <boost/optional.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/stdx/variant.h"
+
+using namespace fmt::literals;
 
 namespace mongo {
 
@@ -185,59 +188,54 @@ private:
     BSONObj _obj;
 };
 
-class WriteConcernW {
-public:
-    static WriteConcernW deserializeWriteConcernW(BSONElement wEl) {
-        if (wEl.isNumber()) {
-            return WriteConcernW{wEl.safeNumberLong()};
-        } else if (wEl.type() == BSONType::String) {
-            return WriteConcernW{wEl.str()};
-        } else if (wEl.type() == BSONType::Object) {
-            auto tags = wEl.Obj().getOwned();
-            auto valid =
-                std::all_of(tags.begin(), tags.end(), [](BSONElement e) { return e.isNumber(); });
-            uassert(ErrorCodes::FailedToParse,
-                    "tags must be a single level document with only number values",
-                    valid);
+using WTags = StringMap<int64_t>;
+using WriteConcernW = stdx::variant<std::string, std::int64_t, WTags>;
 
-            return WriteConcernW{std::move(tags)};
-        } else if (wEl.eoo() || wEl.type() == BSONType::jstNULL ||
-                   wEl.type() == BSONType::Undefined) {
-            return WriteConcernW{};
+inline static const int64_t kMaxMembers = 50;
+inline WriteConcernW deserializeWriteConcernW(BSONElement wEl) {
+    if (wEl.isNumber()) {
+        auto wNum = wEl.safeNumberLong();
+        if (wNum < 0 || wNum > kMaxMembers) {
+            uasserted(ErrorCodes::FailedToParse,
+                      "w has to be a non-negative number and not greater than {}; found: {}"_format(
+                          kMaxMembers, wNum));
         }
-        uasserted(ErrorCodes::FailedToParse, "w has to be a number, string, or object");
-    }
 
-    void serializeWriteConcernW(StringData fieldName, BSONObjBuilder* builder) const {
-        if (auto stringVal = stdx::get_if<std::string>(&_w)) {
-            builder->append(fieldName, *stringVal);
-        } else if (auto objVal = stdx::get_if<BSONObj>(&_w)) {
-            builder->append(fieldName, *objVal);
-        } else {
-            auto intVal = stdx::get_if<std::int64_t>(&_w);
-            invariant(intVal);
-            builder->appendNumber(fieldName, static_cast<long long>(*intVal));
+        return WriteConcernW{wNum};
+    } else if (wEl.type() == BSONType::String) {
+        return WriteConcernW{wEl.str()};
+    } else if (wEl.type() == BSONType::Object) {
+        WTags tags;
+        for (auto e : wEl.Obj()) {
+            uassert(
+                ErrorCodes::FailedToParse,
+                "tags must be a single level document with only number values; found: {}"_format(
+                    e.toString()),
+                e.isNumber());
+
+            tags.try_emplace(e.fieldName(), e.safeNumberInt());
         }
+
+        return WriteConcernW{std::move(tags)};
+    } else if (wEl.eoo() || wEl.type() == BSONType::jstNULL || wEl.type() == BSONType::Undefined) {
+        return WriteConcernW{};
     }
+    uasserted(ErrorCodes::FailedToParse,
+              "w has to be a number, string, or object; found: {}"_format(typeName(wEl.type())));
+}
 
-    WriteConcernW() : _w{1}, _usedDefaultConstructedW1{true} {};
-
-    bool usedDefaultConstructedW1() const {
-        return _usedDefaultConstructedW1;
-    }
-
-    stdx::variant<std::string, std::int64_t, BSONObj> getValue() const {
-        return _w;
-    }
-
-private:
-    WriteConcernW(std::int64_t w) : _w{w}, _usedDefaultConstructedW1{false} {};
-    WriteConcernW(std::string&& w) : _w(std::move(w)), _usedDefaultConstructedW1{false} {};
-    WriteConcernW(BSONObj&& tags) : _w(std::move(tags)), _usedDefaultConstructedW1{false} {};
-
-    stdx::variant<std::string, std::int64_t, BSONObj> _w;
-    bool _usedDefaultConstructedW1;
-};
+inline void serializeWriteConcernW(const WriteConcernW& w,
+                                   StringData fieldName,
+                                   BSONObjBuilder* builder) {
+    stdx::visit(
+        visit_helper::Overloaded{[&](int64_t wNumNodes) {
+                                     builder->appendNumber(fieldName,
+                                                           static_cast<long long>(wNumNodes));
+                                 },
+                                 [&](std::string wMode) { builder->append(fieldName, wMode); },
+                                 [&](WTags wTags) { builder->append(fieldName, wTags); }},
+        w);
+}
 
 inline std::int64_t parseWTimeoutFromBSON(BSONElement element) {
     constexpr std::array<mongo::BSONType, 4> validTypes{

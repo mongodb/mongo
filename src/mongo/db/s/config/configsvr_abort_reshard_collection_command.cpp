@@ -107,9 +107,8 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrAbortReshardCollection can only be run on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
-            uassert(ErrorCodes::InvalidOptions,
-                    "_configsvrAbortReshardCollection must be called with majority writeConcern",
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
 
             const auto reshardingUUID = retrieveReshardingUUID(opCtx, ns());
 

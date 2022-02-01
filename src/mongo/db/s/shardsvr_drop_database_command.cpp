@@ -69,11 +69,8 @@ public:
         void typedRun(OperationContext* opCtx) {
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << Request::kCommandName
-                                  << " must be called with majority writeConcern, got "
-                                  << opCtx->getWriteConcern().wMode,
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
 
             opCtx->setAlwaysInterruptAtStepDownOrUp();
 

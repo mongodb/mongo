@@ -56,7 +56,8 @@ MigrationSecondaryThrottleOptions MigrationSecondaryThrottleOptions::create(
 MigrationSecondaryThrottleOptions MigrationSecondaryThrottleOptions::createWithWriteConcern(
     const WriteConcernOptions& writeConcern) {
     // Optimize on write concern, which makes no difference
-    if (writeConcern.wNumNodes <= 1 && writeConcern.wMode.empty()) {
+    if (stdx::holds_alternative<int64_t>(writeConcern.w) &&
+        stdx::get<int64_t>(writeConcern.w) <= 1) {
         return MigrationSecondaryThrottleOptions(kOff, boost::none);
     }
 

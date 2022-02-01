@@ -64,7 +64,8 @@ Status waitForSpeculativeMajorityReadConcernImpl(
     return Status::OK();
 }
 
-Status waitForLinearizableReadConcernImpl(OperationContext* opCtx, int readConcernTimeout) {
+Status waitForLinearizableReadConcernImpl(OperationContext* opCtx,
+                                          Milliseconds readConcernTimeout) {
     return Status::OK();
 }
 

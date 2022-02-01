@@ -47,8 +47,8 @@ public:
     // Users can only provide OpTime condition, the others are used internally.
     enum class CheckCondition { OpTime, Config };
 
-    static constexpr int kNoTimeout = 0;
-    static constexpr int kNoWaiting = -1;
+    static constexpr Milliseconds kNoTimeout{0};
+    static constexpr Milliseconds kNoWaiting{-1};
 
     static const BSONObj Default;
     static const BSONObj Acknowledged;
@@ -64,24 +64,9 @@ public:
     static constexpr Seconds kWriteConcernTimeoutSharding{60};
     static constexpr Seconds kWriteConcernTimeoutUserCommand{60};
 
-    // It is assumed that a default-constructed WriteConcernOptions will be populated with the
-    // default options. If it is subsequently populated with non-default options, it is the caller's
-    // responsibility to set the usedDefaultConstructedWC and notExplicitWValue flag correctly.
-    WriteConcernOptions()
-        : syncMode(SyncMode::UNSET),
-          wNumNodes(1),
-          wMode(""),
-          wTimeout(0),
-          usedDefaultConstructedWC(true),
-          notExplicitWValue(true) {}
-
-    WriteConcernOptions(int numNodes, SyncMode sync, int timeout);
-
-    WriteConcernOptions(int numNodes, SyncMode sync, Milliseconds timeout);
-
-    WriteConcernOptions(const std::string& mode, SyncMode sync, int timeout);
-
-    WriteConcernOptions(const std::string& mode, SyncMode sync, Milliseconds timeout);
+    WriteConcernOptions() = default;
+    explicit WriteConcernOptions(int numNodes, SyncMode sync, Milliseconds timeout);
+    explicit WriteConcernOptions(const std::string& mode, SyncMode sync, Milliseconds timeout);
 
     static StatusWith<WriteConcernOptions> parse(const BSONObj& obj);
 
@@ -131,21 +116,33 @@ public:
     }
 
     bool hasCustomWriteMode() const {
-        return !wMode.empty() && wMode != WriteConcernOptions::kMajority;
+        return stdx::holds_alternative<std::string>(w) &&
+            stdx::get<std::string>(w) != WriteConcernOptions::kMajority;
     }
 
-    SyncMode syncMode;
+    /**
+     * Returns whether this write concern's w parameter is the number 0.
+     */
+    bool isUnacknowledged() const {
+        return stdx::holds_alternative<int64_t>(w) && stdx::get<int64_t>(w) < 1;
+    }
 
-    // The w parameter for this write concern. The wMode represents the string format and
-    // takes precedence over the numeric format wNumNodes.
-    int wNumNodes;
-    std::string wMode;
+    /**
+     * Returns whether this write concern's w parameter is the string "majority".
+     */
+    bool isMajority() const {
+        return stdx::holds_alternative<std::string>(w) && stdx::get<std::string>(w) == kMajority;
+    }
 
+    // The w parameter for this write concern.
+    WriteConcernW w{1};
+    // Corresponds to the `j` or `fsync` parameters for write concern.
+    SyncMode syncMode{SyncMode::UNSET};
     // Timeout in milliseconds.
-    int wTimeout;
+    Milliseconds wTimeout{kNoTimeout};
     // Deadline. If this is set to something other than Date_t::max(), this takes precedence over
     // wTimeout.
-    Date_t wDeadline = Date_t::max();
+    Date_t wDeadline{Date_t::max()};
 
     // True if the default constructed WC ({w:1}) was used.
     //      - Implicit default WC when value of w is {w:1}.
@@ -159,7 +156,7 @@ public:
     //      - Client-supplied WC.
     //          - with (w) value set, for example ({writeConcern: {w:1}}).
     //          - without (w) value set, for example ({writeConcern: {j: true}}).
-    bool usedDefaultConstructedWC = false;
+    bool usedDefaultConstructedWC{true};
 
     // Used only for tracking opWriteConcernCounters metric.
     // True if the (w) value of the write concern used is not set explicitly by client:
@@ -170,17 +167,12 @@ public:
     //          - without (w) value set, for example ({writeConcern: {j: true}}).
     //      - Client-supplied WC without (w) value set, for example ({writeConcern: {j: true}}).
     //      - Internal commands set empty WC ({writeConcern: {}}).
-    bool notExplicitWValue = false;
+    bool notExplicitWValue{true};
 
-    CheckCondition checkCondition = CheckCondition::OpTime;
-
-    boost::optional<BSONObj> wTags() const {
-        return _tags;
-    }
+    CheckCondition checkCondition{CheckCondition::OpTime};
 
 private:
     ReadWriteConcernProvenance _provenance;
-    boost::optional<BSONObj> _tags;
 };
 
 }  // namespace mongo

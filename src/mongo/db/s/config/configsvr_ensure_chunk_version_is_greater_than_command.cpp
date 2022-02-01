@@ -52,10 +52,8 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrEnsureChunkVersionIsGreaterThan can only be run on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
-            uassert(ErrorCodes::InvalidOptions,
-                    "_configsvrEnsureChunkVersionIsGreaterThan must be called with majority "
-                    "writeConcern",
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
             ShardingCatalogManager::get(opCtx)->ensureChunkVersionIsGreaterThan(
                 opCtx,
                 request().getCollectionUUID(),

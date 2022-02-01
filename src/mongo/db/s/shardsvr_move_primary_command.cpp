@@ -110,11 +110,7 @@ public:
                 str::stream() << "you have to specify where you want to move it",
                 !toShard.empty());
 
-        uassert(
-            ErrorCodes::InvalidOptions,
-            str::stream() << "_shardsvrMovePrimary must be called with majority writeConcern, got "
-                          << cmdObj,
-            opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+        CommandHelpers::uassertCommandRunWithMajority(getName(), opCtx->getWriteConcern());
 
         ON_BLOCK_EXIT(
             [opCtx, dbNss] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbNss.db()); });

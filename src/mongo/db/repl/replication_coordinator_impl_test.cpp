@@ -624,7 +624,7 @@ TEST_F(ReplCoordTest, NodeReturnsImmediatelyWhenAwaitReplicationIsRanAgainstASta
 
     WriteConcernOptions writeConcern;
     writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-    writeConcern.wNumNodes = 2;
+    writeConcern.w = 2;
 
     // Because we didn't set ReplSettings.replSet, it will think we're a standalone so
     // awaitReplication will always work.
@@ -652,10 +652,9 @@ TEST_F(ReplCoordTest, NodeReturnsNotPrimaryWhenRunningAwaitReplicationAgainstASe
 
     OpTimeWithTermOne time(100, 1);
 
-    WriteConcernOptions writeConcern;
-    writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-    writeConcern.wNumNodes = 0;  // Waiting for 0 nodes always works
-    writeConcern.wMode = "";
+    // Waiting for 0 nodes always works
+    WriteConcernOptions writeConcern(
+        0, WriteConcernOptions::SyncMode::UNSET, WriteConcernOptions::kNoWaiting);
 
     // Node should fail to awaitReplication when not primary.
     ReplicationCoordinator::StatusAndDuration statusAndDur =
@@ -680,10 +679,9 @@ TEST_F(ReplCoordTest, NodeReturnsOkWhenRunningAwaitReplicationAgainstPrimaryWith
 
     OpTimeWithTermOne time(100, 1);
 
-    WriteConcernOptions writeConcern;
-    writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-    writeConcern.wNumNodes = 0;  // Waiting for 0 nodes always works
-    writeConcern.wMode = "";
+    // Waiting for 0 nodes always works
+    WriteConcernOptions writeConcern(
+        0, WriteConcernOptions::SyncMode::UNSET, WriteConcernOptions::kNoWaiting);
 
     // Become primary.
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
@@ -727,7 +725,7 @@ TEST_F(ReplCoordTest,
 
     WriteConcernOptions writeConcern;
     writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-    writeConcern.wNumNodes = 1;
+    writeConcern.w = 1;
     writeConcern.syncMode = WriteConcernOptions::SyncMode::JOURNAL;
 
     auto opCtx = makeOperationContext();
@@ -741,7 +739,7 @@ TEST_F(ReplCoordTest,
     ASSERT_OK(statusAndDur.status);
 
     // 2 nodes waiting for time1
-    writeConcern.wNumNodes = 2;
+    writeConcern.w = 2;
     statusAndDur = getReplCoord()->awaitReplication(opCtx.get(), time1, writeConcern);
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
     // Applied is not durable and will not satisfy WriteConcern with SyncMode JOURNAL.
@@ -765,7 +763,7 @@ TEST_F(ReplCoordTest,
     ASSERT_OK(statusAndDur.status);
 
     // 3 nodes waiting for time2
-    writeConcern.wNumNodes = 3;
+    writeConcern.w = 3;
     statusAndDur = getReplCoord()->awaitReplication(opCtx.get(), time2, writeConcern);
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 3, time2));
@@ -801,7 +799,7 @@ TEST_F(ReplCoordTest, NodeReturnsWriteConcernFailedUntilASufficientNumberOfNodes
 
     WriteConcernOptions writeConcern;
     writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-    writeConcern.wNumNodes = 1;
+    writeConcern.w = 1;
 
     auto opCtx = makeOperationContext();
 
@@ -816,7 +814,7 @@ TEST_F(ReplCoordTest, NodeReturnsWriteConcernFailedUntilASufficientNumberOfNodes
     ASSERT_OK(statusAndDur.status);
 
     // 2 nodes waiting for time1
-    writeConcern.wNumNodes = 2;
+    writeConcern.w = 2;
     statusAndDur = getReplCoord()->awaitReplication(opCtx.get(), time1, writeConcern);
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 1, time1));
@@ -836,7 +834,7 @@ TEST_F(ReplCoordTest, NodeReturnsWriteConcernFailedUntilASufficientNumberOfNodes
     ASSERT_OK(statusAndDur.status);
 
     // 3 nodes waiting for time2
-    writeConcern.wNumNodes = 3;
+    writeConcern.w = 3;
     statusAndDur = getReplCoord()->awaitReplication(opCtx.get(), time2, writeConcern);
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 3, time2));
@@ -871,7 +869,7 @@ TEST_F(ReplCoordTest,
     // Test invalid write concern
     WriteConcernOptions invalidWriteConcern;
     invalidWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-    invalidWriteConcern.wMode = "fakemode";
+    invalidWriteConcern.w = "fakemode";
 
     auto opCtx = makeOperationContext();
     ReplicationCoordinator::StatusAndDuration statusAndDur =
@@ -936,16 +934,16 @@ TEST_F(
     // Set up valid write concerns for the rest of the test
     WriteConcernOptions majorityWriteConcern;
     majorityWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-    majorityWriteConcern.wMode = WriteConcernOptions::kMajority;
+    majorityWriteConcern.w = WriteConcernOptions::kMajority;
     majorityWriteConcern.syncMode = WriteConcernOptions::SyncMode::JOURNAL;
 
     WriteConcernOptions multiDCWriteConcern;
     multiDCWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-    multiDCWriteConcern.wMode = "multiDC";
+    multiDCWriteConcern.w = "multiDC";
 
     WriteConcernOptions multiRackWriteConcern;
     multiRackWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-    multiRackWriteConcern.wMode = "multiDCAndRack";
+    multiRackWriteConcern.w = "multiDCAndRack";
 
     auto opCtx = makeOperationContext();
     // Nothing satisfied
@@ -1090,7 +1088,7 @@ TEST_F(ReplCoordTest, NodeReturnsOkWhenAWriteConcernWithNoTimeoutHasBeenSatisfie
 
     WriteConcernOptions writeConcern;
     writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
-    writeConcern.wNumNodes = 2;
+    writeConcern.w = 2;
 
     // 2 nodes waiting for time1
     awaiter.setOpTime(time1);
@@ -1114,7 +1112,7 @@ TEST_F(ReplCoordTest, NodeReturnsOkWhenAWriteConcernWithNoTimeoutHasBeenSatisfie
     awaiter.reset();
 
     // 3 nodes waiting for time2
-    writeConcern.wNumNodes = 3;
+    writeConcern.w = 3;
     awaiter.setWriteConcern(writeConcern);
     awaiter.start();
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 2, time2));
@@ -1311,7 +1309,7 @@ TEST_F(ReplCoordTest, NodeReturnsWriteConcernFailedWhenAWriteConcernTimesOutBefo
 
     WriteConcernOptions writeConcern;
     writeConcern.wDeadline = getNet()->now() + Milliseconds(50);
-    writeConcern.wNumNodes = 2;
+    writeConcern.w = 2;
 
     // 2 nodes waiting for time2
     awaiter.setOpTime(time2);
@@ -1357,7 +1355,7 @@ TEST_F(ReplCoordTest,
 
     WriteConcernOptions writeConcern;
     writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
-    writeConcern.wNumNodes = 2;
+    writeConcern.w = 2;
 
     // 2 nodes waiting for time2
     awaiter.setOpTime(time2);
@@ -1453,7 +1451,7 @@ TEST_F(ReplCoordTest, NodeReturnsNotPrimaryWhenSteppingDownBeforeSatisfyingAWrit
 
     WriteConcernOptions writeConcern;
     writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
-    writeConcern.wNumNodes = 2;
+    writeConcern.w = 2;
 
     // 2 nodes waiting for time2
     awaiter.setOpTime(time2);
@@ -1492,7 +1490,7 @@ TEST_F(ReplCoordTest,
 
     WriteConcernOptions writeConcern;
     writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
-    writeConcern.wNumNodes = 2;
+    writeConcern.w = 2;
 
 
     // 2 nodes waiting for time2
@@ -5113,7 +5111,7 @@ TEST_F(ReplCoordTest, DoNotProcessSelfWhenUpdatePositionContainsInfoAboutSelf) {
 
     WriteConcernOptions writeConcern;
     writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-    writeConcern.wNumNodes = 1;
+    writeConcern.w = 1;
 
     auto opCtx = makeOperationContext();
 
@@ -5163,7 +5161,7 @@ TEST_F(ReplCoordTest, ProcessUpdatePositionWhenItsConfigVersionIsDifferent) {
 
     WriteConcernOptions writeConcern;
     writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-    writeConcern.wNumNodes = 1;
+    writeConcern.w = 1;
 
     // receive updatePosition with a different config version, 3
     replCoordSetMyLastAppliedOpTime(time2, Date_t() + Seconds(100));
@@ -5214,7 +5212,7 @@ TEST_F(ReplCoordTest, DoNotProcessUpdatePositionOfMembersWhoseIdsAreNotInTheConf
 
     WriteConcernOptions writeConcern;
     writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-    writeConcern.wNumNodes = 1;
+    writeConcern.w = 1;
 
     // receive updatePosition with nonexistent member id
     UpdatePositionArgs args;
@@ -5266,7 +5264,7 @@ TEST_F(ReplCoordTest,
 
     WriteConcernOptions writeConcern;
     writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-    writeConcern.wNumNodes = 1;
+    writeConcern.w = 1;
 
     // receive a good update position
     replCoordSetMyLastAppliedOpTime(time2, Date_t() + Seconds(100));
@@ -5299,7 +5297,7 @@ TEST_F(ReplCoordTest,
     ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args));
     ASSERT_OK(getReplCoord()->awaitReplication(opCtx.get(), time2, writeConcern).status);
 
-    writeConcern.wNumNodes = 3;
+    writeConcern.w = 3;
     ASSERT_OK(getReplCoord()->awaitReplication(opCtx.get(), time2, writeConcern).status);
 }
 
@@ -5414,7 +5412,7 @@ TEST_F(ReplCoordTest, AwaitReplicationShouldResolveAsNormalDuringAReconfig) {
     // 3 nodes waiting for time
     WriteConcernOptions writeConcern;
     writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
-    writeConcern.wNumNodes = 3;
+    writeConcern.w = 3;
     writeConcern.syncMode = WriteConcernOptions::SyncMode::NONE;
 
     ReplicationAwaiter awaiter(getReplCoord(), getServiceContext());
@@ -5423,7 +5421,7 @@ TEST_F(ReplCoordTest, AwaitReplicationShouldResolveAsNormalDuringAReconfig) {
     awaiter.start();
 
     ReplicationAwaiter awaiterJournaled(getReplCoord(), getServiceContext());
-    writeConcern.wMode = WriteConcernOptions::kMajority;
+    writeConcern.w = WriteConcernOptions::kMajority;
     awaiterJournaled.setOpTime(time);
     awaiterJournaled.setWriteConcern(writeConcern);
     awaiterJournaled.start();
@@ -5563,18 +5561,12 @@ TEST_F(
     // 3 nodes waiting for time
     WriteConcernOptions writeConcern;
     writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
-    writeConcern.wNumNodes = 3;
+    writeConcern.w = 3;
 
     ReplicationAwaiter awaiter(getReplCoord(), getServiceContext());
     awaiter.setOpTime(time);
     awaiter.setWriteConcern(writeConcern);
     awaiter.start();
-
-    ReplicationAwaiter awaiterJournaled(getReplCoord(), getServiceContext());
-    writeConcern.wMode = WriteConcernOptions::kMajority;
-    awaiterJournaled.setOpTime(time);
-    awaiterJournaled.setWriteConcern(writeConcern);
-    awaiterJournaled.start();
 
     // reconfig to fewer nodes
     Status status(ErrorCodes::InternalError, "Not Set");
@@ -5590,9 +5582,6 @@ TEST_F(
     ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
     ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern, statusAndDur.status);
     awaiter.reset();
-    ReplicationCoordinator::StatusAndDuration statusAndDurJournaled = awaiterJournaled.getResult();
-    ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern, statusAndDurJournaled.status);
-    awaiterJournaled.reset();
 }
 
 TEST_F(ReplCoordTest,
@@ -5637,7 +5626,7 @@ TEST_F(ReplCoordTest,
     // majority nodes waiting for time
     WriteConcernOptions writeConcern;
     writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
-    writeConcern.wMode = WriteConcernOptions::kMajority;
+    writeConcern.w = WriteConcernOptions::kMajority;
     writeConcern.syncMode = WriteConcernOptions::SyncMode::NONE;
 
 
@@ -5649,7 +5638,7 @@ TEST_F(ReplCoordTest,
     // demonstrate that majority cannot currently be satisfied
     WriteConcernOptions writeConcern2;
     writeConcern2.wTimeout = WriteConcernOptions::kNoWaiting;
-    writeConcern2.wMode = WriteConcernOptions::kMajority;
+    writeConcern2.w = WriteConcernOptions::kMajority;
     writeConcern.syncMode = WriteConcernOptions::SyncMode::NONE;
 
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed,
@@ -5702,7 +5691,7 @@ TEST_F(ReplCoordTest,
 
     WriteConcernOptions majorityWriteConcern;
     majorityWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-    majorityWriteConcern.wMode = WriteConcernOptions::kMajority;
+    majorityWriteConcern.w = WriteConcernOptions::kMajority;
     majorityWriteConcern.syncMode = WriteConcernOptions::SyncMode::JOURNAL;
 
     auto opCtx = makeOperationContext();
@@ -7414,7 +7403,7 @@ TEST_F(
                        HostAndPort("test1", 1234));
 
     WriteConcernOptions wc;
-    wc.wMode = WriteConcernOptions::kMajority;
+    wc.w = WriteConcernOptions::kMajority;
     wc.syncMode = WriteConcernOptions::SyncMode::UNSET;
     ASSERT(WriteConcernOptions::SyncMode::NONE ==
            getReplCoord()->populateUnsetWriteConcernOptionsSyncMode(wc).syncMode);
@@ -7434,7 +7423,7 @@ TEST_F(
                        HostAndPort("test1", 1234));
 
     WriteConcernOptions wc;
-    wc.wMode = WriteConcernOptions::kMajority;
+    wc.w = WriteConcernOptions::kMajority;
     wc.syncMode = WriteConcernOptions::SyncMode::UNSET;
     ASSERT(WriteConcernOptions::SyncMode::JOURNAL ==
            getReplCoord()->populateUnsetWriteConcernOptionsSyncMode(wc).syncMode);
@@ -7452,7 +7441,7 @@ TEST_F(ReplCoordTest, PopulateUnsetWriteConcernOptionsSyncModeReturnsInputIfSync
                        HostAndPort("test1", 1234));
 
     WriteConcernOptions wc;
-    wc.wMode = WriteConcernOptions::kMajority;
+    wc.w = WriteConcernOptions::kMajority;
     ASSERT(WriteConcernOptions::SyncMode::NONE ==
            getReplCoord()->populateUnsetWriteConcernOptionsSyncMode(wc).syncMode);
 
@@ -7478,11 +7467,11 @@ TEST_F(ReplCoordTest, PopulateUnsetWriteConcernOptionsSyncModeReturnsInputIfWMod
 
     WriteConcernOptions wc;
     wc.syncMode = WriteConcernOptions::SyncMode::UNSET;
-    wc.wMode = "not the value of kMajority";
+    wc.w = "not the value of kMajority";
     ASSERT(WriteConcernOptions::SyncMode::NONE ==
            getReplCoord()->populateUnsetWriteConcernOptionsSyncMode(wc).syncMode);
 
-    wc.wMode = "like literally anythingelse";
+    wc.w = "like literally anythingelse";
     ASSERT(WriteConcernOptions::SyncMode::NONE ==
            getReplCoord()->populateUnsetWriteConcernOptionsSyncMode(wc).syncMode);
 }

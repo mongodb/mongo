@@ -108,17 +108,22 @@ BSONObj ServerWriteConcernMetrics::toBSON() const {
 
 void ServerWriteConcernMetrics::WriteConcernCounters::recordWriteConcern(
     const WriteConcernOptions& writeConcernOptions, size_t numOps) {
-    if (!writeConcernOptions.wMode.empty()) {
-        if (writeConcernOptions.wMode == WriteConcernOptions::kMajority) {
+    if (auto wMode = stdx::get_if<std::string>(&writeConcernOptions.w)) {
+        if (writeConcernOptions.isMajority()) {
             wMajorityCount += numOps;
             return;
         }
 
-        wTagCounts[writeConcernOptions.wMode] += numOps;
+        wTagCounts[*wMode] += numOps;
         return;
     }
 
-    wNumCounts[writeConcernOptions.wNumNodes] += numOps;
+    if (stdx::holds_alternative<WTags>(writeConcernOptions.w)) {
+        // wTags is an internal feature that we don't track metrics for
+        return;
+    }
+
+    wNumCounts[stdx::get<int64_t>(writeConcernOptions.w)] += numOps;
 }
 
 void ServerWriteConcernMetrics::WriteConcernMetricsForOperationType::recordWriteConcern(

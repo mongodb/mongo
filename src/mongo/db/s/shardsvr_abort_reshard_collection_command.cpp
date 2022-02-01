@@ -61,9 +61,8 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "_shardsvrAbortReshardCollection can only be run on shard servers",
                     serverGlobalParams.clusterRole == ClusterRole::ShardServer);
-            uassert(ErrorCodes::InvalidOptions,
-                    "_shardsvrAbortReshardCollection must be called with majority writeConcern",
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
 
             std::vector<SharedSemiFuture<void>> futuresToWait;
 

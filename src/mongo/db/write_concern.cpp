@@ -56,7 +56,6 @@
 namespace mongo {
 
 using repl::OpTime;
-using repl::OpTimeAndWallTime;
 using std::string;
 
 static TimerStats gleWtimeStats;
@@ -132,8 +131,9 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
             }
             return writeConcern;
         })();
-        if (writeConcern.wNumNodes == 0 && writeConcern.wMode.empty()) {
-            writeConcern.wNumNodes = 1;
+
+        if (writeConcern.isUnacknowledged()) {
+            writeConcern.w = 1;
         }
 
         writeConcern.notExplicitWValue = true;
@@ -162,7 +162,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
         // Upconvert the writeConcern of any incoming requests from internal connections (i.e.,
         // from other nodes in the cluster) to "majority." This protects against internal code that
         // does not specify writeConcern when writing to the config server.
-        writeConcern = {
+        writeConcern = WriteConcernOptions{
             WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(30)};
         writeConcern.getProvenance().setSource(
             ReadWriteConcernProvenance::Source::internalWriteDefault);
@@ -185,15 +185,18 @@ Status validateWriteConcern(OperationContext* opCtx, const WriteConcernOptions& 
 
     const auto replMode = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
 
-    if (replMode == repl::ReplicationCoordinator::modeNone && writeConcern.wNumNodes > 1) {
+    if (replMode == repl::ReplicationCoordinator::modeNone &&
+        (stdx::holds_alternative<int64_t>(writeConcern.w) &&
+         stdx::get<int64_t>(writeConcern.w) > 1)) {
         return Status(ErrorCodes::BadValue, "cannot use 'w' > 1 when a host is not replicated");
     }
 
     if (replMode != repl::ReplicationCoordinator::modeReplSet &&
         writeConcern.hasCustomWriteMode()) {
         return Status(ErrorCodes::BadValue,
-                      string("cannot use custom 'w' mode ") + writeConcern.wMode +
-                          " when a host is not a member of a replica set");
+                      fmt::format("cannot use non-majority 'w' mode \"{}\" when a host is not a "
+                                  "member of a replica set",
+                                  stdx::get<std::string>(writeConcern.w)));
     }
 
     return Status::OK();

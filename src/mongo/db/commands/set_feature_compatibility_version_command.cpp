@@ -242,17 +242,15 @@ public:
         // TODO SERVER-25778: replace this with the general mechanism for specifying a default
         // writeConcern.
         ON_BLOCK_EXIT([&] {
-            // Propagate the user's wTimeout if one was given.
-            auto timeout = opCtx->getWriteConcern().isImplicitDefaultWriteConcern()
-                ? INT_MAX
-                : opCtx->getWriteConcern().wTimeout;
             WriteConcernResult res;
             auto waitForWCStatus = waitForWriteConcern(
                 opCtx,
                 repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                WriteConcernOptions(repl::ReplSetConfig::kMajorityWriteConcernModeName,
-                                    WriteConcernOptions::SyncMode::UNSET,
-                                    timeout),
+                WriteConcernOptions(
+                    repl::ReplSetConfig::kMajorityWriteConcernModeName,
+                    WriteConcernOptions::SyncMode::UNSET,
+                    // Propagate the user's wTimeout if one was given. Default is kNoTimeout.
+                    opCtx->getWriteConcern().wTimeout),
                 &res);
             CommandHelpers::appendCommandWCStatus(result, waitForWCStatus, res);
         });

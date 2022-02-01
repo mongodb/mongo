@@ -840,7 +840,7 @@ void deleteMigrationCoordinatorDocumentLocally(OperationContext* opCtx, const UU
         NamespaceString::kMigrationCoordinatorsNamespace);
     store.remove(opCtx,
                  BSON(MigrationCoordinatorDocument::kIdFieldName << migrationId),
-                 {1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)});
+                 WriteConcernOptions{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)});
 }
 
 void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,

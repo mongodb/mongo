@@ -239,8 +239,9 @@ SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* o
 
     auto opTimeToWait = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     WriteConcernResult result;
-    WriteConcernOptions majority(
-        WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, 0);
+    WriteConcernOptions majority{WriteConcernOptions::kMajority,
+                                 WriteConcernOptions::SyncMode::UNSET,
+                                 WriteConcernOptions::kNoTimeout};
     uassertStatusOK(waitForWriteConcern(opCtx, opTimeToWait, majority, &result));
 
     AutoGetCollection collection(

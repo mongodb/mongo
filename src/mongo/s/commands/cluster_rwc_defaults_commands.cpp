@@ -78,7 +78,7 @@ public:
                     "A custom write concern is being set as the default write concern in a sharded "
                     "cluster. This set is unchecked, but if the custom write concern does not "
                     "exist on all shards in the cluster, errors will occur upon writes",
-                    "customWriteConcern"_attr = optWC->wMode);
+                    "customWriteConcern"_attr = stdx::get<std::string>(optWC->w));
             }
         }
         ReadWriteConcernDefaults::get(opCtx).setDefault(opCtx, std::move(newDefaults));

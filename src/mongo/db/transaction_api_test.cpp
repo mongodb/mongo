@@ -257,9 +257,11 @@ TEST_F(TxnAPITest, OwnSession_AttachesTxnMetadata) {
 
 TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnCommit) {
     const std::vector<WriteConcernOptions> writeConcernOptions = {
-        WriteConcernOptions(1, WriteConcernOptions::SyncMode::JOURNAL, 100),
-        WriteConcernOptions("majority", WriteConcernOptions::SyncMode::FSYNC, 0),
-        WriteConcernOptions(2, WriteConcernOptions::SyncMode::NONE, -1)};
+        WriteConcernOptions{1, WriteConcernOptions::SyncMode::JOURNAL, Milliseconds{100}},
+        WriteConcernOptions{
+            "majority", WriteConcernOptions::SyncMode::FSYNC, WriteConcernOptions::kNoTimeout},
+        WriteConcernOptions{
+            2, WriteConcernOptions::SyncMode::NONE, WriteConcernOptions::kNoWaiting}};
 
     for (const auto& writeConcern : writeConcernOptions) {
         opCtx()->setWriteConcern(writeConcern);
@@ -321,9 +323,11 @@ TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnCommit) {
 
 TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnAbort) {
     const std::vector<WriteConcernOptions> writeConcernOptions = {
-        WriteConcernOptions(1, WriteConcernOptions::SyncMode::JOURNAL, 100),
-        WriteConcernOptions("majority", WriteConcernOptions::SyncMode::FSYNC, 0),
-        WriteConcernOptions(2, WriteConcernOptions::SyncMode::NONE, -1)};
+        WriteConcernOptions{1, WriteConcernOptions::SyncMode::JOURNAL, Milliseconds{100}},
+        WriteConcernOptions{
+            "majority", WriteConcernOptions::SyncMode::FSYNC, WriteConcernOptions::kNoTimeout},
+        WriteConcernOptions{
+            2, WriteConcernOptions::SyncMode::NONE, WriteConcernOptions::kNoWaiting}};
 
     for (const auto& writeConcern : writeConcernOptions) {
         opCtx()->setWriteConcern(writeConcern);

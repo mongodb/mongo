@@ -881,10 +881,8 @@ TEST_F(ReplCoordTest, ReconfigThatChangesIDWCFromW1toWMajWithoutCWWCSetFails) {
 
 TEST_F(ReplCoordTest, ReconfigThatChangesIDWCWMajToW1WithCWWCSetPasses) {
     RWConcernDefault newDefaults;
-    WriteConcernOptions wc;
-    wc.wMode = "majority";
-    wc.usedDefaultConstructedWC = false;
-    wc.notExplicitWValue = false;
+    WriteConcernOptions wc(
+        "majority", WriteConcernOptions::SyncMode::UNSET, WriteConcernOptions::kNoTimeout);
     newDefaults.setDefaultWriteConcern(wc);
     lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
@@ -944,10 +942,8 @@ TEST_F(ReplCoordTest, ReconfigThatChangesIDWCWMajToW1WithCWWCSetPasses) {
 
 TEST_F(ReplCoordTest, ReconfigThatChangesIDWCW1ToWMajWithCWWCSetPasses) {
     RWConcernDefault newDefaults;
-    WriteConcernOptions wc;
-    wc.wMode = "majority";
-    wc.usedDefaultConstructedWC = false;
-    wc.notExplicitWValue = false;
+    WriteConcernOptions wc(
+        "majority", WriteConcernOptions::SyncMode::UNSET, WriteConcernOptions::kNoTimeout);
     newDefaults.setDefaultWriteConcern(wc);
     lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
@@ -2270,10 +2266,8 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetHavePriorityZero) {
 
 TEST_F(ReplCoordReconfigTest, ArbiterNodesShouldNeverHaveNewlyAddedField) {
     RWConcernDefault newDefaults;
-    WriteConcernOptions wc;
-    wc.wMode = "majority";
-    wc.usedDefaultConstructedWC = false;
-    wc.notExplicitWValue = false;
+    WriteConcernOptions wc(
+        "majority", WriteConcernOptions::SyncMode::UNSET, WriteConcernOptions::kNoTimeout);
     newDefaults.setDefaultWriteConcern(wc);
     lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 

@@ -67,9 +67,8 @@ TEST(WriteConcernOptionsTest, ParseSetsSyncModeToJournelIfJIsTrue) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::JOURNAL == options.syncMode);
-    ASSERT_EQUALS(1, options.wNumNodes);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(0, options.wTimeout);
+    ASSERT_EQUALS(1, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(WriteConcernOptions::kNoTimeout, options.wTimeout);
 }
 
 TEST(WriteConcernOptionsTest, ParseSetsSyncModeToFSyncIfFSyncIsTrue) {
@@ -77,9 +76,8 @@ TEST(WriteConcernOptionsTest, ParseSetsSyncModeToFSyncIfFSyncIsTrue) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::FSYNC == options.syncMode);
-    ASSERT_EQUALS(1, options.wNumNodes);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(0, options.wTimeout);
+    ASSERT_EQUALS(1, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(WriteConcernOptions::kNoTimeout, options.wTimeout);
 }
 
 TEST(WriteConcernOptionsTest, ParseSetsSyncModeToNoneIfJIsFalse) {
@@ -87,9 +85,8 @@ TEST(WriteConcernOptionsTest, ParseSetsSyncModeToNoneIfJIsFalse) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::NONE == options.syncMode);
-    ASSERT_EQUALS(1, options.wNumNodes);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(0, options.wTimeout);
+    ASSERT_EQUALS(1, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(WriteConcernOptions::kNoTimeout, options.wTimeout);
 }
 
 TEST(WriteConcernOptionsTest, ParseLeavesSyncModeAsUnsetIfFSyncIsFalse) {
@@ -97,15 +94,14 @@ TEST(WriteConcernOptionsTest, ParseLeavesSyncModeAsUnsetIfFSyncIsFalse) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS(1, options.wNumNodes);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(0, options.wTimeout);
+    ASSERT_EQUALS(1, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(WriteConcernOptions::kNoTimeout, options.wTimeout);
 }
 
 TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseIfWIsNotNumberOrStringOrObject) {
     auto status = WriteConcernOptions::parse(BSON("w" << true)).getStatus();
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
-    ASSERT_EQUALS("w has to be a number, string, or object", status.reason());
+    ASSERT_STRING_CONTAINS(status.reason(), "w has to be a number, string, or object");
 }
 
 TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseIfWIsNegativeOrExceedsMaxMembers) {
@@ -114,7 +110,6 @@ TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseIfWIsNegativeOrExceedsMax
 
     auto st2 = WriteConcernOptions::parse(BSON("w" << -1)).getStatus();
     ASSERT_EQUALS(ErrorCodes::FailedToParse, st2);
-    ASSERT_EQUALS(st1.reason(), st2.reason());
 }
 
 TEST(WriteConcernOptionsTest, ParseSetsWNumNodesIfWIsANumber) {
@@ -122,9 +117,8 @@ TEST(WriteConcernOptionsTest, ParseSetsWNumNodesIfWIsANumber) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS(3, options.wNumNodes);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(0, options.wTimeout);
+    ASSERT_EQUALS(3, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(WriteConcernOptions::kNoTimeout, options.wTimeout);
 }
 
 TEST(WriteConcernOptionsTest, ParseSetsWTimeoutToZeroIfWTimeoutIsNotANumber) {
@@ -133,9 +127,8 @@ TEST(WriteConcernOptionsTest, ParseSetsWTimeoutToZeroIfWTimeoutIsNotANumber) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(1, options.wNumNodes);
-    ASSERT_EQUALS(0, options.wTimeout);
+    ASSERT_EQUALS(1, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(WriteConcernOptions::kNoTimeout, options.wTimeout);
 }
 
 TEST(WriteConcernOptionsTest, ParseWTimeoutAsNumber) {
@@ -143,9 +136,8 @@ TEST(WriteConcernOptionsTest, ParseWTimeoutAsNumber) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(1, options.wNumNodes);
-    ASSERT_EQUALS(123, options.wTimeout);
+    ASSERT_EQUALS(1, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(Milliseconds{123}, options.wTimeout);
 }
 
 TEST(WriteConcernOptionsTest, ParseWTimeoutAsNaNDouble) {
@@ -154,9 +146,8 @@ TEST(WriteConcernOptionsTest, ParseWTimeoutAsNaNDouble) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(1, options.wNumNodes);
-    ASSERT_EQUALS(0, options.wTimeout);
+    ASSERT_EQUALS(1, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(WriteConcernOptions::kNoTimeout, options.wTimeout);
 }
 
 TEST(WriteConcernOptionsTest, ParseWTimeoutAsDoubleLargerThanInt) {
@@ -165,9 +156,8 @@ TEST(WriteConcernOptionsTest, ParseWTimeoutAsDoubleLargerThanInt) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(1, options.wNumNodes);
-    ASSERT_LESS_THAN(options.wTimeout, 0);
+    ASSERT_EQUALS(1, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(options.wTimeout, Milliseconds{2999999999});
 }
 
 TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseOnUnknownField) {
@@ -180,9 +170,8 @@ void _testIgnoreWriteConcernField(const char* fieldName) {
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
     ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(1, options.wNumNodes);
-    ASSERT_EQUALS(0, options.wTimeout);
+    ASSERT_EQUALS(1, stdx::get<int64_t>(options.w));
+    ASSERT_EQUALS(WriteConcernOptions::kNoTimeout, options.wTimeout);
 }
 TEST(WriteConcernOptionsTest, ParseIgnoresSpecialFields) {
     _testIgnoreWriteConcernField("wElectionId");
@@ -195,20 +184,18 @@ TEST(WriteConcernOptionsTest, ParseWithTags) {
                                                               << "def")))
                       .getStatus();
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
-    ASSERT_EQUALS("tags must be a single level document with only number values", status.reason());
+    ASSERT_STRING_CONTAINS(status.reason(),
+                           "tags must be a single level document with only number values");
 
     auto sw = WriteConcernOptions::parse(BSON("w" << BSON("abc" << 1)));
     ASSERT_OK(sw.getStatus());
 
     WriteConcernOptions wc = sw.getValue();
-    ASSERT_EQ(wc.wNumNodes, 0);
-    ASSERT_TRUE(wc.wMode.empty());
     ASSERT_EQ(wc.wTimeout, WriteConcernOptions::kNoTimeout);
     ASSERT_TRUE(wc.needToWaitForOtherNodes());
 
-    auto tags = wc.wTags();
-    ASSERT(tags.has_value());
-    ASSERT_BSONOBJ_EQ(*tags, BSON("abc" << 1));
+    auto tags = stdx::get<WTags>(wc.w);
+    ASSERT(tags == (WTags{{"abc", 1}}));
     ASSERT_BSONOBJ_EQ(wc.toBSON(), BSON("w" << BSON("abc" << 1) << "wtimeout" << 0));
 
     auto wc2 = uassertStatusOK(WriteConcernOptions::parse(BSON("w" << BSON("abc" << 1))));

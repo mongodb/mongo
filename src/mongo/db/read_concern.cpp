@@ -48,7 +48,7 @@ Status waitForReadConcern(OperationContext* opCtx,
     return w(opCtx, readConcernArgs, dbName, allowAfterClusterTime);
 }
 
-Status waitForLinearizableReadConcern(OperationContext* opCtx, int readConcernTimeout) {
+Status waitForLinearizableReadConcern(OperationContext* opCtx, Milliseconds readConcernTimeout) {
     static auto w = MONGO_WEAK_FUNCTION_DEFINITION(waitForLinearizableReadConcern);
     return w(opCtx, readConcernTimeout);
 }

@@ -92,11 +92,7 @@ public:
         repl::ReadConcernArgs::get(opCtx) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "_configsvrRepairShardedCollectionChunksHistory must be called "
-                                 "with majority writeConcern, got "
-                              << cmdObj,
-                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+        CommandHelpers::uassertCommandRunWithMajority(getName(), opCtx->getWriteConcern());
 
         const NamespaceString nss{parseNs(unusedDbName, cmdObj)};
 

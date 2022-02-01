@@ -1895,17 +1895,19 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
     invariant(writeConcern.syncMode != WriteConcernOptions::SyncMode::UNSET);
 
     const bool useDurableOpTime = writeConcern.syncMode == WriteConcernOptions::SyncMode::JOURNAL;
-    if (writeConcern.wMode.empty()) {
-        if (writeConcern.wTags()) {
-            auto tagPattern = uassertStatusOK(_rsConfig.makeCustomWriteMode(*writeConcern.wTags()));
+    if (!stdx::holds_alternative<std::string>(writeConcern.w)) {
+        if (auto wTags = stdx::get_if<WTags>(&writeConcern.w)) {
+            auto tagPattern = uassertStatusOK(_rsConfig.makeCustomWriteMode(*wTags));
             return _topCoord->haveTaggedNodesReachedOpTime(opTime, tagPattern, useDurableOpTime);
         }
 
         return _topCoord->haveNumNodesReachedOpTime(
-            opTime, writeConcern.wNumNodes, useDurableOpTime);
+            opTime, stdx::get<int64_t>(writeConcern.w), useDurableOpTime);
     }
+
     StringData patternName;
-    if (writeConcern.wMode == WriteConcernOptions::kMajority) {
+    auto wMode = stdx::get<std::string>(writeConcern.w);
+    if (wMode == WriteConcernOptions::kMajority) {
         if (_externalState->snapshotsEnabled() && !gTestingSnapshotBehaviorInIsolation) {
             // Make sure we have a valid "committed" snapshot up to the needed optime.
             if (!_currentCommittedSnapshot) {
@@ -1955,8 +1957,9 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
         // *** Needed for J:True, writeConcernMajorityShouldJournal:False (appliedOpTime snapshot).
         patternName = ReplSetConfig::kMajorityWriteConcernModeName;
     } else {
-        patternName = writeConcern.wMode;
+        patternName = wMode;
     }
+
     auto tagPattern = uassertStatusOK(_rsConfig.findCustomWriteMode(patternName));
     if (writeConcern.checkCondition == WriteConcernOptions::CheckCondition::OpTime) {
         return _topCoord->haveTaggedNodesReachedOpTime(opTime, tagPattern, useDurableOpTime);
@@ -5921,8 +5924,7 @@ WriteConcernOptions ReplicationCoordinatorImpl::_populateUnsetWriteConcernOption
     WithLock lk, WriteConcernOptions wc) {
     WriteConcernOptions writeConcern(wc);
     if (writeConcern.syncMode == WriteConcernOptions::SyncMode::UNSET) {
-        if (writeConcern.wMode == WriteConcernOptions::kMajority &&
-            getWriteConcernMajorityShouldJournal_inlock()) {
+        if (writeConcern.isMajority() && getWriteConcernMajorityShouldJournal_inlock()) {
             writeConcern.syncMode = WriteConcernOptions::SyncMode::JOURNAL;
         } else {
             writeConcern.syncMode = WriteConcernOptions::SyncMode::NONE;

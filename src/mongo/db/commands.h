@@ -307,6 +307,12 @@ struct CommandHelpers {
                                           const OpMsgRequest& request);
 
     /**
+     * Asserts that a majority write concern was used for a command.
+     */
+    static void uassertCommandRunWithMajority(StringData commandName,
+                                              const WriteConcernOptions& wc);
+
+    /**
      * Verifies that command is allowed to run under a transaction in the given database or
      * namespace, and throws if that verification doesn't pass.
      */

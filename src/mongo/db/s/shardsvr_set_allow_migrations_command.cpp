@@ -72,11 +72,8 @@ public:
 
             opCtx->setAlwaysInterruptAtStepDownOrUp();
 
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << Request::kCommandName
-                                  << " must be called with majority writeConcern, got "
-                                  << request().toBSON(BSONObj()),
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
 
             SetAllowMigrationsRequest setAllowMigationsCmdRequest =
                 request().getSetAllowMigrationsRequest();

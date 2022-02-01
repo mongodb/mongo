@@ -93,8 +93,8 @@ TEST(ReplSetConfig, ParseMinimalConfigAndCheckDefaults) {
     ASSERT_EQUALS(1, config.getConfigTerm());
     ASSERT_EQUALS(1, config.getNumMembers());
     ASSERT_EQUALS(MemberId(0), config.membersBegin()->getId());
-    ASSERT_EQUALS(1, config.getDefaultWriteConcern().wNumNodes);
-    ASSERT_EQUALS("", config.getDefaultWriteConcern().wMode);
+    ASSERT(stdx::holds_alternative<int64_t>(config.getDefaultWriteConcern().w));
+    ASSERT_EQUALS(1, stdx::get<int64_t>(config.getDefaultWriteConcern().w));
     ASSERT_EQUALS(ReplSetConfig::kDefaultHeartbeatInterval, config.getHeartbeatInterval());
     ASSERT_EQUALS(ReplSetConfig::kDefaultHeartbeatTimeoutPeriod,
                   config.getHeartbeatTimeoutPeriod());
@@ -1272,8 +1272,7 @@ bool operator==(const ReplSetConfig& a, const ReplSetConfig& b) {
         a.getElectionTimeoutPeriod() == b.getElectionTimeoutPeriod() &&
         a.isChainingAllowed() == b.isChainingAllowed() &&
         a.getConfigServer() == b.getConfigServer() &&
-        a.getDefaultWriteConcern().wNumNodes == b.getDefaultWriteConcern().wNumNodes &&
-        a.getDefaultWriteConcern().wMode == b.getDefaultWriteConcern().wMode &&
+        a.getDefaultWriteConcern().w == b.getDefaultWriteConcern().w &&
         a.getProtocolVersion() == b.getProtocolVersion() &&
         a.getReplicaSetId() == b.getReplicaSetId();
 }
@@ -1476,34 +1475,34 @@ TEST(ReplSetConfig, CheckIfWriteConcernCanBeSatisfied) {
                             << BSON("dc" << 3) << "invalidNotEnoughNodes" << BSON("rack" << 6)))));
 
     WriteConcernOptions validNumberWC;
-    validNumberWC.wNumNodes = 5;
+    validNumberWC.w = 5;
     ASSERT_OK(configA.checkIfWriteConcernCanBeSatisfied(validNumberWC));
 
     WriteConcernOptions invalidNumberWC;
-    invalidNumberWC.wNumNodes = 6;
+    invalidNumberWC.w = 6;
     ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern,
                   configA.checkIfWriteConcernCanBeSatisfied(invalidNumberWC));
 
     WriteConcernOptions majorityWC;
-    majorityWC.wMode = "majority";
+    majorityWC.w = "majority";
     ASSERT_OK(configA.checkIfWriteConcernCanBeSatisfied(majorityWC));
 
     WriteConcernOptions validModeWC;
-    validModeWC.wMode = "valid";
+    validModeWC.w = "valid";
     ASSERT_OK(configA.checkIfWriteConcernCanBeSatisfied(validModeWC));
 
     WriteConcernOptions fakeModeWC;
-    fakeModeWC.wMode = "fake";
+    fakeModeWC.w = "fake";
     ASSERT_EQUALS(ErrorCodes::UnknownReplWriteConcern,
                   configA.checkIfWriteConcernCanBeSatisfied(fakeModeWC));
 
     WriteConcernOptions invalidModeNotEnoughValuesWC;
-    invalidModeNotEnoughValuesWC.wMode = "invalidNotEnoughValues";
+    invalidModeNotEnoughValuesWC.w = "invalidNotEnoughValues";
     ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern,
                   configA.checkIfWriteConcernCanBeSatisfied(invalidModeNotEnoughValuesWC));
 
     WriteConcernOptions invalidModeNotEnoughNodesWC;
-    invalidModeNotEnoughNodesWC.wMode = "invalidNotEnoughNodes";
+    invalidModeNotEnoughNodesWC.w = "invalidNotEnoughNodes";
     ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern,
                   configA.checkIfWriteConcernCanBeSatisfied(invalidModeNotEnoughNodesWC));
 }
@@ -2102,16 +2101,11 @@ TEST(ReplSetConfig, MakeCustomWriteMode) {
                                                                      << BSON("NYC"
                                                                              << "NY")))));
 
-    auto swPattern = config.makeCustomWriteMode(BSON("NYC"
-                                                     << "invalid value type"));
-    ASSERT_FALSE(swPattern.isOK());
-    ASSERT_EQ(swPattern.getStatus().code(), ErrorCodes::BadValue);
-
-    swPattern = config.makeCustomWriteMode(BSON("NonExistentTag" << 1));
+    auto swPattern = config.makeCustomWriteMode({{"NonExistentTag", 1}});
     ASSERT_FALSE(swPattern.isOK());
     ASSERT_EQ(swPattern.getStatus().code(), ErrorCodes::NoSuchKey);
 
-    swPattern = config.makeCustomWriteMode(BSON("NYC" << 1));
+    swPattern = config.makeCustomWriteMode({{"NYC", 1}});
     ASSERT_TRUE(swPattern.isOK());
 }
 

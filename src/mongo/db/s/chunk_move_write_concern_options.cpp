@@ -94,7 +94,7 @@ StatusWith<WriteConcernOptions> ChunkMoveWriteConcernOptions::getEffectiveWriteC
     if (writeConcern.needToWaitForOtherNodes() &&
         writeConcern.wTimeout == WriteConcernOptions::kNoTimeout) {
         // Don't allow no timeout
-        writeConcern.wTimeout = durationCount<Milliseconds>(kDefaultWriteTimeoutForMigration);
+        writeConcern.wTimeout = duration_cast<Milliseconds>(kDefaultWriteTimeoutForMigration);
     }
 
     return writeConcern;

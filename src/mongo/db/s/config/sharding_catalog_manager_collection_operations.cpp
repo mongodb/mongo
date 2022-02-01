@@ -495,8 +495,9 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
         // documents than a normal operation, so we override the write concern to not use a
         // wTimeout, matching the behavior before the API was introduced.
         WriteConcernOptions originalWC = opCtx->getWriteConcern();
-        opCtx->setWriteConcern(WriteConcernOptions(
-            WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, 0));
+        opCtx->setWriteConcern(WriteConcernOptions{WriteConcernOptions::kMajority,
+                                                   WriteConcernOptions::SyncMode::UNSET,
+                                                   WriteConcernOptions::kNoTimeout});
         ON_BLOCK_EXIT([opCtx, originalWC] { opCtx->setWriteConcern(originalWC); });
 
         withTransactionAPI(opCtx, nss, std::move(updateCollectionAndChunksWithAPIFn));

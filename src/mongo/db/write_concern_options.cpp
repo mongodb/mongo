@@ -65,8 +65,8 @@ constexpr StringData kWElectionIdFieldName = "wElectionId"_sd;
 
 }  // namespace
 
-constexpr int WriteConcernOptions::kNoTimeout;
-constexpr int WriteConcernOptions::kNoWaiting;
+constexpr Milliseconds WriteConcernOptions::kNoTimeout;
+constexpr Milliseconds WriteConcernOptions::kNoWaiting;
 
 constexpr StringData WriteConcernOptions::kWriteConcernField;
 const char WriteConcernOptions::kMajority[] = "majority";
@@ -86,55 +86,37 @@ constexpr Seconds WriteConcernOptions::kWriteConcernTimeoutMigration;
 constexpr Seconds WriteConcernOptions::kWriteConcernTimeoutSharding;
 constexpr Seconds WriteConcernOptions::kWriteConcernTimeoutUserCommand;
 
-
-WriteConcernOptions::WriteConcernOptions(int numNodes, SyncMode sync, int timeout)
-    : WriteConcernOptions(numNodes, sync, Milliseconds(timeout)) {}
-
-WriteConcernOptions::WriteConcernOptions(const std::string& mode, SyncMode sync, int timeout)
-    : WriteConcernOptions(mode, sync, Milliseconds(timeout)) {}
-
 WriteConcernOptions::WriteConcernOptions(int numNodes, SyncMode sync, Milliseconds timeout)
-    : syncMode(sync), wNumNodes(numNodes), wTimeout(durationCount<Milliseconds>(timeout)) {}
+    : w{numNodes},
+      syncMode{sync},
+      wTimeout(durationCount<Milliseconds>(timeout)),
+      usedDefaultConstructedWC{false},
+      notExplicitWValue{false} {}
 
 WriteConcernOptions::WriteConcernOptions(const std::string& mode,
                                          SyncMode sync,
                                          Milliseconds timeout)
-    : syncMode(sync), wNumNodes(0), wMode(mode), wTimeout(durationCount<Milliseconds>(timeout)) {}
+    : w{mode},
+      syncMode{sync},
+      wTimeout(durationCount<Milliseconds>(timeout)),
+      usedDefaultConstructedWC{false},
+      notExplicitWValue{false} {}
 
 StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) try {
     if (obj.isEmpty()) {
         return Status(ErrorCodes::FailedToParse, "write concern object cannot be empty");
     }
 
-    auto writeConcernIdl = WriteConcernIdl::parse(IDLParserErrorContext("writeConcern"), obj);
+    auto writeConcernIdl = WriteConcernIdl::parse({"WriteConcernOptions"}, obj);
     auto parsedW = writeConcernIdl.getWriteConcernW();
 
     WriteConcernOptions writeConcern;
-    writeConcern.usedDefaultConstructedWC = parsedW.usedDefaultConstructedW1() &&
-        !writeConcernIdl.getJ() && !writeConcernIdl.getFsync() &&
-        writeConcernIdl.getWtimeout() == 0;
+    writeConcern.usedDefaultConstructedWC = !parsedW && !writeConcernIdl.getJ() &&
+        !writeConcernIdl.getFsync() && writeConcernIdl.getWtimeout() == 0;
 
-    if (!parsedW.usedDefaultConstructedW1()) {
+    if (parsedW) {
         writeConcern.notExplicitWValue = false;
-        auto wVal = parsedW.getValue();
-        if (auto wNum = stdx::get_if<std::int64_t>(&wVal)) {
-            if (*wNum < 0 ||
-                *wNum >
-                    static_cast<std::decay_t<decltype(*wNum)>>(repl::ReplSetConfig::kMaxMembers)) {
-                uasserted(ErrorCodes::FailedToParse,
-                          str::stream() << "w has to be a non-negative number and not greater than "
-                                        << repl::ReplSetConfig::kMaxMembers << ", found: " << wNum);
-            }
-            writeConcern.wNumNodes = static_cast<decltype(writeConcern.wNumNodes)>(*wNum);
-        } else if (auto tags = stdx::get_if<BSONObj>(&wVal)) {
-            writeConcern.wNumNodes = 0;
-            writeConcern._tags = *tags;
-        } else {
-            auto wMode = stdx::get_if<std::string>(&wVal);
-            invariant(wMode);
-            writeConcern.wNumNodes = 0;  // Have to reset from default 1.
-            writeConcern.wMode = std::move(*wMode);
-        }
+        writeConcern.w = *parsedW;
     }
 
     auto j = writeConcernIdl.getJ();
@@ -153,7 +135,7 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) t
         writeConcern.syncMode = SyncMode::NONE;
     }
 
-    writeConcern.wTimeout = writeConcernIdl.getWtimeout();
+    writeConcern.wTimeout = Milliseconds{writeConcernIdl.getWtimeout()};
     if (auto source = writeConcernIdl.getSource()) {
         writeConcern._provenance = ReadWriteConcernProvenance(*source);
     }
@@ -196,14 +178,7 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(const 
 
 BSONObj WriteConcernOptions::toBSON() const {
     BSONObjBuilder builder;
-
-    if (_tags) {
-        builder.append("w", *_tags);
-    } else if (wMode.empty()) {
-        builder.append("w", wNumNodes);
-    } else {
-        builder.append("w", wMode);
-    }
+    serializeWriteConcernW(w, "w", &builder);
 
     if (syncMode == SyncMode::FSYNC) {
         builder.append("fsync", true);
@@ -213,7 +188,9 @@ BSONObj WriteConcernOptions::toBSON() const {
         builder.append("j", false);
     }
 
-    builder.append("wtimeout", wTimeout);
+    // Historically we have serialized this as a int32_t, even though it is defined as an
+    // int64_t in our IDL format.
+    builder.append("wtimeout", static_cast<int32_t>(durationCount<Milliseconds>(wTimeout)));
 
     _provenance.serialize(&builder);
 
@@ -221,14 +198,13 @@ BSONObj WriteConcernOptions::toBSON() const {
 }
 
 bool WriteConcernOptions::needToWaitForOtherNodes() const {
-    return !wMode.empty() || wNumNodes > 1 || _tags;
+    return stdx::holds_alternative<std::string>(w) || stdx::holds_alternative<WTags>(w) ||
+        (stdx::holds_alternative<std::int64_t>(w) && stdx::get<std::int64_t>(w) > 1);
 }
 
 bool WriteConcernOptions::operator==(const WriteConcernOptions& other) const {
-    return (_tags ? other._tags && _tags->woCompare(*other._tags) == 0
-                  : wMode == other.wMode && wNumNodes == other.wNumNodes) &&
-        syncMode == other.syncMode && wDeadline == other.wDeadline && wTimeout == other.wTimeout &&
-        _provenance == other._provenance;
+    return w == other.w && syncMode == other.syncMode && wDeadline == other.wDeadline &&
+        wTimeout == other.wTimeout && _provenance == other._provenance;
 }
 
 }  // namespace mongo

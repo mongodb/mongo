@@ -1598,7 +1598,8 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
     opCtx->setLogicalSessionId(lsid);
     opCtx->setTxnNumber(txnNum);
 
-    WriteConcernOptions writeConcern(10, WriteConcernOptions::SyncMode::NONE, 0);
+    WriteConcernOptions writeConcern(
+        10, WriteConcernOptions::SyncMode::NONE, WriteConcernOptions::kNoTimeout);
     opCtx->setWriteConcern(writeConcern);
 
     RouterOperationContextSession scopedSession(opCtx);
@@ -1669,7 +1670,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     auto opCtx = operationContext();
     opCtx->setTxnNumber(txnNum);
 
-    WriteConcernOptions writeConcern(10, WriteConcernOptions::SyncMode::NONE, 0);
+    WriteConcernOptions writeConcern(
+        10, WriteConcernOptions::SyncMode::NONE, WriteConcernOptions::kNoTimeout);
     opCtx->setWriteConcern(writeConcern);
 
     auto txnRouter = TransactionRouter::get(opCtx);
@@ -1764,7 +1766,8 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     auto opCtx = operationContext();
     opCtx->setTxnNumber(txnNum);
 
-    WriteConcernOptions writeConcern(10, WriteConcernOptions::SyncMode::NONE, 0);
+    WriteConcernOptions writeConcern(
+        10, WriteConcernOptions::SyncMode::NONE, WriteConcernOptions::kNoTimeout);
     opCtx->setWriteConcern(writeConcern);
 
     auto txnRouter = TransactionRouter::get(opCtx);
@@ -1861,7 +1864,8 @@ TEST_F(TransactionRouterTest, CommitWithEmptyRecoveryToken) {
     opCtx->setLogicalSessionId(lsid);
     opCtx->setTxnNumber(txnNum);
 
-    WriteConcernOptions writeConcern(10, WriteConcernOptions::SyncMode::NONE, 0);
+    WriteConcernOptions writeConcern(
+        10, WriteConcernOptions::SyncMode::NONE, WriteConcernOptions::kNoTimeout);
     opCtx->setWriteConcern(writeConcern);
 
     RouterOperationContextSession scopedSession(opCtx);
@@ -1883,7 +1887,8 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithUnknownShard) {
     opCtx->setLogicalSessionId(lsid);
     opCtx->setTxnNumber(txnNum);
 
-    WriteConcernOptions writeConcern(10, WriteConcernOptions::SyncMode::NONE, 0);
+    WriteConcernOptions writeConcern(
+        10, WriteConcernOptions::SyncMode::NONE, WriteConcernOptions::kNoTimeout);
     opCtx->setWriteConcern(writeConcern);
 
     RouterOperationContextSession scopedSession(opCtx);
@@ -1913,7 +1918,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, CommitWithRecoveryTokenAndTxnRet
 
     operationContext()->setTxnNumber(txnNum);
 
-    WriteConcernOptions writeConcern(10, WriteConcernOptions::SyncMode::NONE, 0);
+    WriteConcernOptions writeConcern(
+        10, WriteConcernOptions::SyncMode::NONE, WriteConcernOptions::kNoTimeout);
     operationContext()->setWriteConcern(writeConcern);
 
     auto txnRouter = TransactionRouter::get(operationContext());
@@ -2779,7 +2785,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, AbortPropagatesWriteConcern) {
     auto opCtx = operationContext();
     auto txnRouter = TransactionRouter::get(opCtx);
 
-    WriteConcernOptions writeConcern(10, WriteConcernOptions::SyncMode::NONE, 0);
+    WriteConcernOptions writeConcern(
+        10, WriteConcernOptions::SyncMode::NONE, WriteConcernOptions::kNoTimeout);
     opCtx->setWriteConcern(writeConcern);
 
     txnRouter.beginOrContinueTxn(

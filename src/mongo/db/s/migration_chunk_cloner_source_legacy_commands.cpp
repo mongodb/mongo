@@ -316,8 +316,9 @@ public:
         // in this batch may have been rolled back. In this case, we abort the migration.
         if (opTime) {
             WriteConcernResult wcResult;
-            WriteConcernOptions majorityWC(
-                WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, 0);
+            WriteConcernOptions majorityWC{WriteConcernOptions::kMajority,
+                                           WriteConcernOptions::SyncMode::UNSET,
+                                           WriteConcernOptions::kNoTimeout};
             uassertStatusOK(waitForWriteConcern(opCtx, opTime.get(), majorityWC, &wcResult));
 
             auto rollbackIdAtMigrationInit = [&]() {

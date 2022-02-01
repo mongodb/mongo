@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/duration.h"
+
 namespace mongo {
 
 class BSONObj;
@@ -75,7 +77,7 @@ Status waitForReadConcern(OperationContext* opCtx,
  * A readConcernTimeout of 0 indicates that the operation will block indefinitely waiting for read
  * concern.
  */
-Status waitForLinearizableReadConcern(OperationContext* opCtx, int readConcernTimeout);
+Status waitForLinearizableReadConcern(OperationContext* opCtx, Milliseconds readConcernTimeout);
 
 /**
  * Waits to satisfy a "speculative" majority read.

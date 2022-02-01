@@ -79,10 +79,8 @@ public:
                 ErrorCodes::IllegalOperation,
                 format(FMT_STRING("{} can only be run on config servers"), definition()->getName()),
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
-            uassert(ErrorCodes::InvalidOptions,
-                    format(FMT_STRING("{} must be called with majority writeConcern"),
-                           definition()->getName()),
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
 
             UUID reshardingUUID = retrieveReshardingUUID(opCtx, ns());
 

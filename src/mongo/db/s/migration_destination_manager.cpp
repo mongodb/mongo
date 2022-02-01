@@ -98,7 +98,7 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 // writeConcernMajorityJournalDefault is set to true
                                                 // in the ReplSetConfig.
                                                 WriteConcernOptions::SyncMode::UNSET,
-                                                -1);
+                                                WriteConcernOptions::kNoWaiting);
 
 BSONObj makeLocalReadConcernWithAfterClusterTime(Timestamp afterClusterTime) {
     return BSON(repl::ReadConcernArgs::kReadConcernFieldName
@@ -230,7 +230,7 @@ bool opReplicatedEnough(OperationContext* opCtx,
     // Enforce the user specified write concern after "majority" so it covers the union of the 2
     // write concerns in case the user's write concern is stronger than majority
     WriteConcernOptions userWriteConcern(writeConcern);
-    userWriteConcern.wTimeout = -1;
+    userWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
     writeConcernResult.wTimedOut = false;
 
     Status userStatus =

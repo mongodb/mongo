@@ -71,11 +71,8 @@ public:
             auto const shardingState = ShardingState::get(opCtx);
             uassertStatusOK(shardingState->canAcceptShardedCommands());
 
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "_shardsvrCreateCollectionParticipant must be called with "
-                                     "majority writeConcern, got "
-                                  << request().toBSON(BSONObj()),
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
 
             opCtx->setAlwaysInterruptAtStepDownOrUp();
 

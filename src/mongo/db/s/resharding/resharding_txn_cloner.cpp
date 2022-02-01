@@ -186,7 +186,7 @@ void ReshardingTxnCloner::_updateProgressDocument(OperationContext* opCtx,
         opCtx,
         BSON(ReshardingTxnClonerProgress::kSourceIdFieldName << _sourceId.toBSON()),
         BSON("$set" << BSON(ReshardingTxnClonerProgress::kProgressFieldName << progress.toBSON())),
-        {1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)});
+        WriteConcernOptions{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)});
 }
 
 SemiFuture<void> ReshardingTxnCloner::run(

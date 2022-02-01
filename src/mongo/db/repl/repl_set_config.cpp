@@ -35,6 +35,7 @@
 
 #include <algorithm>
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 #include <functional>
 
 #include "mongo/bson/util/bson_check.h"
@@ -427,40 +428,46 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
 
 Status ReplSetConfig::checkIfWriteConcernCanBeSatisfied(
     const WriteConcernOptions& writeConcern) const {
-    if (writeConcern.hasCustomWriteMode()) {
-        StatusWith<ReplSetTagPattern> tagPatternStatus = findCustomWriteMode(writeConcern.wMode);
-        if (!tagPatternStatus.isOK()) {
-            return tagPatternStatus.getStatus();
+    if (auto wNumNodes = stdx::get_if<int64_t>(&writeConcern.w)) {
+        if (*wNumNodes > getNumDataBearingMembers()) {
+            return Status(ErrorCodes::UnsatisfiableWriteConcern, "Not enough data-bearing nodes");
         }
 
-        ReplSetTagMatch matcher(tagPatternStatus.getValue());
-        for (size_t j = 0; j < getMembers().size(); ++j) {
-            const MemberConfig& memberConfig = getMembers()[j];
-            for (MemberConfig::TagIterator it = memberConfig.tagsBegin();
-                 it != memberConfig.tagsEnd();
-                 ++it) {
-                if (matcher.update(*it)) {
-                    return Status::OK();
-                }
-            }
-        }
-        // Even if all the nodes in the set had a given write it still would not satisfy this
-        // write concern mode.
-        return Status(ErrorCodes::UnsatisfiableWriteConcern,
-                      str::stream() << "Not enough nodes match write concern mode \""
-                                    << writeConcern.wMode << "\"");
-    } else {
-        int nodesRemaining = writeConcern.wNumNodes;
-        for (size_t j = 0; j < getMembers().size(); ++j) {
-            if (!getMembers()[j].isArbiter()) {  // Only count data-bearing nodes
-                --nodesRemaining;
-                if (nodesRemaining <= 0) {
-                    return Status::OK();
-                }
-            }
-        }
-        return Status(ErrorCodes::UnsatisfiableWriteConcern, "Not enough data-bearing nodes");
+        return Status::OK();
     }
+
+    StatusWith<ReplSetTagPattern> tagPatternStatus = [&]() {
+        auto wMode = stdx::get_if<std::string>(&writeConcern.w);
+        return wMode ? findCustomWriteMode(*wMode)
+                     : makeCustomWriteMode(stdx::get<WTags>(writeConcern.w));
+    }();
+
+    if (!tagPatternStatus.isOK()) {
+        return tagPatternStatus.getStatus();
+    }
+
+    ReplSetTagMatch matcher(tagPatternStatus.getValue());
+    for (size_t j = 0; j < getMembers().size(); ++j) {
+        const MemberConfig& memberConfig = getMembers()[j];
+        for (MemberConfig::TagIterator it = memberConfig.tagsBegin(); it != memberConfig.tagsEnd();
+             ++it) {
+            if (matcher.update(*it)) {
+                return Status::OK();
+            }
+        }
+    }
+
+    // Even if all the nodes in the set had a given write it still would not satisfy this
+    // write concern mode.
+    auto wModeForError = [&]() {
+        auto wMode = stdx::get_if<std::string>(&writeConcern.w);
+        return wMode ? fmt::format("\"{}\"", *wMode)
+                     : fmt::format("{}", stdx::get<WTags>(writeConcern.w));
+    }();
+
+    return Status(ErrorCodes::UnsatisfiableWriteConcern,
+                  str::stream() << "Not enough nodes match write concern mode \"" << wModeForError
+                                << "\"");
 }
 
 int ReplSetConfig::getNumDataBearingMembers() const {
@@ -534,31 +541,25 @@ ReplSetTag ReplSetConfig::findTag(StringData key, StringData value) const {
 }
 
 StatusWith<ReplSetTagPattern> ReplSetConfig::findCustomWriteMode(StringData patternName) const {
+    // The string "majority" corresponds to the internal "$majority" custom write mode
+    if (patternName == WriteConcernOptions::kMajority) {
+        patternName = kMajorityWriteConcernModeName;
+    }
+
     const StringMap<ReplSetTagPattern>::const_iterator iter =
         _customWriteConcernModes.find(patternName);
     if (iter == _customWriteConcernModes.end()) {
         return StatusWith<ReplSetTagPattern>(
             ErrorCodes::UnknownReplWriteConcern,
-            str::stream() << "No write concern mode named '" << str::escape(patternName.toString())
-                          << "' found in replica set configuration");
+            "No write concern mode named '{}' found in replica set configuration"_format(
+                str::escape(patternName.toString())));
     }
     return StatusWith<ReplSetTagPattern>(iter->second);
 }
 
-StatusWith<ReplSetTagPattern> ReplSetConfig::makeCustomWriteMode(const BSONObj& wTags) const {
+StatusWith<ReplSetTagPattern> ReplSetConfig::makeCustomWriteMode(const WTags& wTags) const {
     ReplSetTagPattern pattern = _tagConfig.makePattern();
-    for (auto e : wTags) {
-        const auto tagName = e.fieldNameStringData();
-        if (!e.isNumber()) {
-            return {
-                ErrorCodes::BadValue,
-                fmt::format(
-                    "Custom write mode only supports integer values, found: \"{}\" for tag: \"{}\"",
-                    e.toString(),
-                    tagName)};
-        }
-
-        const auto minNodesWithTag = e.safeNumberInt();
+    for (const auto& [tagName, minNodesWithTag] : wTags) {
         auto status = _tagConfig.addTagCountConstraintToPattern(&pattern, tagName, minNodesWithTag);
         if (!status.isOK()) {
             return status;
@@ -734,13 +735,19 @@ bool ReplSetConfig::containsCustomizedGetLastErrorDefaults() const {
     // Since the ReplSetConfig always has a WriteConcernOptions, the only way to know if it has been
     // customized through getLastErrorDefaults is if it's different from { w: 1, wtimeout: 0 }.
     const auto& getLastErrorDefaults = getDefaultWriteConcern();
-    return !(getLastErrorDefaults.wNumNodes == 1 && getLastErrorDefaults.wTimeout == 0 &&
-             getLastErrorDefaults.syncMode == WriteConcernOptions::SyncMode::UNSET);
+    if (auto wNumNodes = stdx::get_if<int64_t>(&getLastErrorDefaults.w);
+        !wNumNodes || *wNumNodes != 1)
+        return true;
+    if (getLastErrorDefaults.wTimeout != Milliseconds::zero())
+        return true;
+    if (getLastErrorDefaults.syncMode != WriteConcernOptions::SyncMode::UNSET)
+        return true;
+    return false;
 }
 
 Status ReplSetConfig::validateWriteConcern(const WriteConcernOptions& writeConcern) const {
     if (writeConcern.hasCustomWriteMode()) {
-        return findCustomWriteMode(writeConcern.wMode).getStatus();
+        return findCustomWriteMode(stdx::get<std::string>(writeConcern.w)).getStatus();
     }
     return Status::OK();
 }

@@ -83,11 +83,8 @@ public:
 
             opCtx->setAlwaysInterruptAtStepDownOrUp();
 
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << Request::kCommandName
-                                  << " must be called with majority writeConcern, got "
-                                  << opCtx->getWriteConcern().wMode,
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
 
             if (fromNss.db() != toNss.db()) {
                 sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);

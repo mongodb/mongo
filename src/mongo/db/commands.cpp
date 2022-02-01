@@ -67,6 +67,8 @@
 #include "mongo/util/invariant.h"
 #include "mongo/util/str.h"
 
+using namespace fmt::literals;
+
 namespace mongo {
 
 using logv2::LogComponent;
@@ -456,26 +458,21 @@ BSONObj CommandHelpers::appendGenericReplyFields(const BSONObj& replyObjWithGene
 BSONObj CommandHelpers::appendMajorityWriteConcern(const BSONObj& cmdObj,
                                                    WriteConcernOptions defaultWC) {
     WriteConcernOptions newWC = kMajorityWriteConcern;
-
     if (cmdObj.hasField(kWriteConcernField)) {
-        auto wc = cmdObj.getField(kWriteConcernField);
-        // The command has a writeConcern field and it's majority, so we can
-        // return it as-is.
-        if (wc["w"].ok() && wc["w"].str() == "majority") {
+        auto wc = uassertStatusOK(WriteConcernOptions::extractWCFromCommand(cmdObj));
+
+        // The command has a writeConcern field and it's majority, so we can return it as-is.
+        if (wc.isMajority()) {
             return cmdObj;
         }
 
-        if (wc["wtimeout"].ok()) {
-            // They set a timeout, but aren't using majority WC. We want to use their
-            // timeout along with majority WC.
-            newWC = WriteConcernOptions(WriteConcernOptions::kMajority,
-                                        WriteConcernOptions::SyncMode::UNSET,
-                                        wc["wtimeout"].Number());
-        }
+        newWC = WriteConcernOptions{
+            WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, wc.wTimeout};
     } else if (!defaultWC.usedDefaultConstructedWC) {
         auto minimumAcceptableWTimeout = newWC.wTimeout;
         newWC = defaultWC;
-        newWC.wMode = "majority";
+        newWC.w = "majority";
+
         if (defaultWC.wTimeout < minimumAcceptableWTimeout) {
             newWC.wTimeout = minimumAcceptableWTimeout;
         }
@@ -550,6 +547,13 @@ bool CommandHelpers::uassertShouldAttemptParse(OperationContext* opCtx,
     }
 }
 
+void CommandHelpers::uassertCommandRunWithMajority(StringData commandName,
+                                                   const WriteConcernOptions& writeConcern) {
+    uassert(ErrorCodes::InvalidOptions,
+            "\"{}\" must be called with majority writeConcern, got: {} "_format(
+                commandName, writeConcern.toBSON().toString()),
+            writeConcern.isMajority());
+}
 
 void CommandHelpers::canUseTransactions(const NamespaceString& nss,
                                         StringData cmdName,

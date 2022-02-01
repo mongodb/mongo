@@ -91,7 +91,7 @@ void ReadWriteConcernDefaults::checkSuitabilityAsDefault(const ReadConcern& rc) 
 void ReadWriteConcernDefaults::checkSuitabilityAsDefault(const WriteConcern& wc) {
     uassert(ErrorCodes::BadValue,
             "Unacknowledged write concern is not suitable for the default write concern",
-            !(wc.wMode.empty() && wc.wNumNodes < 1));
+            !wc.isUnacknowledged());
     uassert(ErrorCodes::BadValue,
             str::stream() << "'" << ReadWriteConcernProvenance::kSourceFieldName
                           << "' must be unset in default write concern",

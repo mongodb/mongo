@@ -114,7 +114,9 @@ TEST(BalanceChunkRequest, ParseFromConfigCommandWithSecondaryThrottle) {
 
     const auto& secondaryThrottle = request.getSecondaryThrottle();
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kOn, secondaryThrottle.getSecondaryThrottle());
-    ASSERT_EQ(2, secondaryThrottle.getWriteConcern().wNumNodes);
+
+    auto writeConcern = secondaryThrottle.getWriteConcern();
+    ASSERT_EQ(2, stdx::get<int64_t>(writeConcern.w));
 }
 
 }  // namespace

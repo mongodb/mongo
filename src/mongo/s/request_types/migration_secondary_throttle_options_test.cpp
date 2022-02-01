@@ -89,7 +89,8 @@ TEST(MigrationSecondaryThrottleOptions, EnabledInCommandBSONWithSimpleWriteConce
     ASSERT(options.isWriteConcernSpecified());
 
     WriteConcernOptions writeConcern = options.getWriteConcern();
-    ASSERT_EQ(2, writeConcern.wNumNodes);
+    ASSERT(stdx::holds_alternative<int64_t>(writeConcern.w));
+    ASSERT_EQ(2, stdx::get<int64_t>(writeConcern.w));
     ASSERT_EQ(static_cast<int>(WriteConcernOptions::SyncMode::UNSET),
               static_cast<int>(writeConcern.syncMode));
     ASSERT_EQ(WriteConcernOptions::kNoTimeout, writeConcern.wTimeout);
@@ -104,7 +105,8 @@ TEST(MigrationSecondaryThrottleOptions, EnabledInCommandBSONWithCompleteWriteCon
     ASSERT(options.isWriteConcernSpecified());
 
     WriteConcernOptions writeConcern = options.getWriteConcern();
-    ASSERT_EQ(3, writeConcern.wNumNodes);
+    ASSERT(stdx::holds_alternative<int64_t>(writeConcern.w));
+    ASSERT_EQ(3, stdx::get<int64_t>(writeConcern.w));
     ASSERT_EQ(static_cast<int>(WriteConcernOptions::SyncMode::JOURNAL),
               static_cast<int>(writeConcern.syncMode));
     ASSERT_EQ(WriteConcernOptions::kNoTimeout, writeConcern.wTimeout);
@@ -141,7 +143,8 @@ TEST(MigrationSecondaryThrottleOptions, EnabledInBalancerConfigWithSimpleWriteCo
     ASSERT(options.isWriteConcernSpecified());
 
     WriteConcernOptions writeConcern = options.getWriteConcern();
-    ASSERT_EQ(2, writeConcern.wNumNodes);
+    ASSERT(stdx::holds_alternative<int64_t>(writeConcern.w));
+    ASSERT_EQ(2, stdx::get<int64_t>(writeConcern.w));
     ASSERT_EQ(static_cast<int>(WriteConcernOptions::SyncMode::UNSET),
               static_cast<int>(writeConcern.syncMode));
     ASSERT_EQ(WriteConcernOptions::kNoTimeout, writeConcern.wTimeout);
@@ -155,7 +158,8 @@ TEST(MigrationSecondaryThrottleOptions, EnabledInBalancerConfigWithCompleteWrite
     ASSERT(options.isWriteConcernSpecified());
 
     WriteConcernOptions writeConcern = options.getWriteConcern();
-    ASSERT_EQ(3, writeConcern.wNumNodes);
+    ASSERT(stdx::holds_alternative<int64_t>(writeConcern.w));
+    ASSERT_EQ(3, stdx::get<int64_t>(writeConcern.w));
     ASSERT_EQ(static_cast<int>(WriteConcernOptions::SyncMode::JOURNAL),
               static_cast<int>(writeConcern.syncMode));
     ASSERT_EQ(WriteConcernOptions::kNoTimeout, writeConcern.wTimeout);
@@ -189,19 +193,19 @@ TEST(MigrationSecondaryThrottleOptions, IgnoreWriteConcernWhenSecondaryThrottleA
 }
 
 TEST(MigrationSecondaryThrottleOptions, EqualityOperatorSameValue) {
-    auto value1 = MigrationSecondaryThrottleOptions::createWithWriteConcern(
-        WriteConcernOptions("majority", WriteConcernOptions::SyncMode::JOURNAL, 30000));
-    auto value2 = MigrationSecondaryThrottleOptions::createWithWriteConcern(
-        WriteConcernOptions("majority", WriteConcernOptions::SyncMode::JOURNAL, 30000));
+    auto value1 = MigrationSecondaryThrottleOptions::createWithWriteConcern(WriteConcernOptions{
+        "majority", WriteConcernOptions::SyncMode::JOURNAL, Milliseconds{30000}});
+    auto value2 = MigrationSecondaryThrottleOptions::createWithWriteConcern(WriteConcernOptions{
+        "majority", WriteConcernOptions::SyncMode::JOURNAL, Milliseconds{30000}});
 
     ASSERT(value1 == value2);
 }
 
 TEST(MigrationSecondaryThrottleOptions, EqualityOperatorDifferentValues) {
-    auto value1 = MigrationSecondaryThrottleOptions::createWithWriteConcern(
-        WriteConcernOptions("majority", WriteConcernOptions::SyncMode::JOURNAL, 30000));
-    auto value2 = MigrationSecondaryThrottleOptions::createWithWriteConcern(
-        WriteConcernOptions("majority", WriteConcernOptions::SyncMode::JOURNAL, 60000));
+    auto value1 = MigrationSecondaryThrottleOptions::createWithWriteConcern(WriteConcernOptions{
+        "majority", WriteConcernOptions::SyncMode::JOURNAL, Milliseconds{30000}});
+    auto value2 = MigrationSecondaryThrottleOptions::createWithWriteConcern(WriteConcernOptions{
+        "majority", WriteConcernOptions::SyncMode::JOURNAL, Milliseconds{60000}});
 
     ASSERT(!(value1 == value2));
 }

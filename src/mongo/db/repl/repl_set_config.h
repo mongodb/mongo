@@ -436,7 +436,7 @@ public:
      * @returns `ErrorCodes::NoSuchKey` if a tag was provided which is not found in
      * the local tag config.
      */
-    StatusWith<ReplSetTagPattern> makeCustomWriteMode(const BSONObj& wTags) const;
+    StatusWith<ReplSetTagPattern> makeCustomWriteMode(const WTags& wTags) const;
 
     /**
      * Returns the "tags configuration" for this replicaset.

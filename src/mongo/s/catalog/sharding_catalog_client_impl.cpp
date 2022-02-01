@@ -811,8 +811,18 @@ Status ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext
             }
             writeConcern = sw.getValue();
 
-            if ((writeConcern.wNumNodes != 1) &&
-                (writeConcern.wMode != WriteConcernOptions::kMajority)) {
+            auto isValidUserManagementWriteConcern = stdx::visit(
+                [](auto&& arg) {
+                    using T = std::decay_t<decltype(arg)>;
+                    if constexpr (std::is_same_v<T, std::string>)
+                        return arg == WriteConcernOptions::kMajority;
+                    else if constexpr (std::is_same_v<T, int64_t>)
+                        return arg == 1;
+                    return false;
+                },
+                writeConcern.w);
+
+            if (!isValidUserManagementWriteConcern) {
                 return {ErrorCodes::InvalidOptions,
                         str::stream() << "Invalid replication write concern. User management write "
                                          "commands may only use w:1 or w:'majority', got: "
@@ -820,8 +830,7 @@ Status ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext
             }
         }
 
-        writeConcern.wMode = WriteConcernOptions::kMajority;
-        writeConcern.wNumNodes = 0;
+        writeConcern.w = WriteConcernOptions::kMajority;
 
         BSONObjBuilder modifiedCmd;
         if (!initialCmdHadWriteConcern) {
@@ -895,9 +904,9 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
                                                           const ChunkVersion& lastChunkVersion,
                                                           const WriteConcernOptions& writeConcern,
                                                           repl::ReadConcernLevel readConcern) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
-              (readConcern == repl::ReadConcernLevel::kMajorityReadConcern &&
-               writeConcern.wMode == WriteConcernOptions::kMajority));
+    invariant(
+        serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
+        (readConcern == repl::ReadConcernLevel::kMajorityReadConcern && writeConcern.isMajority()));
     BSONObj cmd =
         BSON("applyOps" << updateOps << "preCondition" << preCondition
                         << WriteConcernOptions::kWriteConcernField << writeConcern.toBSON());

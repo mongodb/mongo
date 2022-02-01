@@ -247,9 +247,8 @@ types:
             A string or integer representing the 'w' option in a document specifying write concern.
             See https://docs.mongodb.com/manual/reference/write-concern/"
         cpp_type: "mongo::WriteConcernW"
-        default: "mongo::WriteConcernW()"
-        serializer: "mongo::WriteConcernW::serializeWriteConcernW"
-        deserializer: "mongo::WriteConcernW::deserializeWriteConcernW"
+        serializer: "::mongo::serializeWriteConcernW"
+        deserializer: "::mongo::deserializeWriteConcernW"
 
     writeConcernWTimeout:
         bson_serialization_type: any
@@ -345,6 +344,7 @@ structs:
             w:
                 type: writeConcernW
                 cpp_name: writeConcernW
+                optional: true
                 unstable: false
             j:
                 type: safeBool

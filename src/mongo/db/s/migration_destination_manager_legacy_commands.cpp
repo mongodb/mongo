@@ -341,11 +341,7 @@ public:
              BSONObjBuilder& result) override {
         opCtx->setAlwaysInterruptAtStepDownOrUp();
 
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << getName() << " must be called with majority writeConcern, got "
-                              << opCtx->getWriteConcern().wMode,
-                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
-
+        CommandHelpers::uassertCommandRunWithMajority(getName(), opCtx->getWriteConcern());
         const auto sessionId = uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj));
 
         LOGV2_DEBUG(5899101, 2, "Received _recvChunkReleaseCritSec", "sessionId"_attr = sessionId);

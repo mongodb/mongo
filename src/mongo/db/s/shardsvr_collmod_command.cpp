@@ -96,11 +96,8 @@ public:
         auto const shardingState = ShardingState::get(opCtx);
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << Request::kCommandName
-                              << " must be called with majority writeConcern, got "
-                              << opCtx->getWriteConcern().wMode,
-                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+        CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                      opCtx->getWriteConcern());
 
         opCtx->setAlwaysInterruptAtStepDownOrUp();
 

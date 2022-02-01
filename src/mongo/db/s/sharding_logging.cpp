@@ -102,7 +102,7 @@ Status ShardingLogging::logChangeChecked(OperationContext* opCtx,
                                          const BSONObj& detail,
                                          const WriteConcernOptions& writeConcern) {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
-              writeConcern.wMode == WriteConcernOptions::kMajority);
+              writeConcern.isMajority());
     if (_changeLogCollectionCreated.load() == 0) {
         Status result = _createCappedConfigCollection(
             opCtx, kChangeLogCollectionName, kChangeLogCollectionSizeMB, writeConcern);

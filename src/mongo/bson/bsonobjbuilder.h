@@ -539,9 +539,17 @@ public:
      * Append a map of values as a sub-object.
      * Note: the keys of the map should be StringData-compatible (i.e. strings).
      */
-    template <class K, class T>
-    Derived& append(StringData fieldName, const std::map<K, T>& vals);
+    TEMPLATE(typename Map)
+    REQUIRES(std::is_convertible_v<decltype(std::declval<Map>().begin()->first), StringData>)
+    Derived& append(StringData fieldName, const Map& map) {
+        typename std::remove_reference<Derived>::type bob;
+        for (auto&& [k, v] : map) {
+            bob.append(k, v);
+        }
 
+        append(fieldName, bob.obj());
+        return static_cast<Derived&>(*this);
+    }
 
     /** Append a range of values between two iterators. */
     template <class It>
@@ -859,7 +867,6 @@ public:
 
     UniqueBSONObjBuilder(UniqueBSONObjBuilder&&) = default;
     UniqueBSONObjBuilder(const UniqueBSONObjBuilder&) = delete;
-    UniqueBSONObjBuilder& operator=(UniqueBSONObjBuilder&&) = default;
     UniqueBSONObjBuilder& operator=(const UniqueBSONObjBuilder&) = delete;
 
     ~UniqueBSONObjBuilder() {
@@ -1115,18 +1122,6 @@ template <class T>
 inline Derived& BSONObjBuilderBase<Derived, B>::append(StringData fieldName,
                                                        const std::set<T>& vals) {
     return append(fieldName, vals.begin(), vals.end());
-}
-
-template <class Derived, class BufBuilderType>
-template <class K, class T>
-inline Derived& BSONObjBuilderBase<Derived, BufBuilderType>::append(StringData fieldName,
-                                                                    const std::map<K, T>& vals) {
-    typename std::remove_reference<Derived>::type bob;
-    for (typename std::map<K, T>::const_iterator i = vals.begin(); i != vals.end(); ++i) {
-        bob.append(i->first, i->second);
-    }
-    append(fieldName, bob.obj());
-    return static_cast<Derived&>(*this);
 }
 
 template <class Derived, class B>

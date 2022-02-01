@@ -49,10 +49,11 @@ inline Status validateTrue(bool boolVal) {
 }
 
 inline Status validateDefaultWriteConcernHasMember(const WriteConcernOptions& defaultWriteConcern) {
-    if (defaultWriteConcern.wMode.empty() && defaultWriteConcern.wNumNodes == 0) {
+    if (defaultWriteConcern.isUnacknowledged()) {
         return Status(ErrorCodes::BadValue,
                       "Default write concern mode must wait for at least 1 member");
     }
+
     return Status::OK();
 }
 

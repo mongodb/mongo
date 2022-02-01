@@ -452,7 +452,8 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status waitForLinearizableReadConcernImpl(OperationContext* opCtx, const int readConcernTimeout) {
+Status waitForLinearizableReadConcernImpl(OperationContext* opCtx,
+                                          const Milliseconds readConcernTimeout) {
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangBeforeLinearizableReadConcern, opCtx, "hangBeforeLinearizableReadConcern", [opCtx]() {
             LOGV2(20994,
@@ -493,9 +494,8 @@ Status waitForLinearizableReadConcernImpl(OperationContext* opCtx, const int rea
                 uow.commit();
             });
     }
-    WriteConcernOptions wc = WriteConcernOptions(
-        WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, readConcernTimeout);
-
+    WriteConcernOptions wc = WriteConcernOptions{
+        WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, readConcernTimeout};
     repl::OpTime lastOpApplied = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     auto awaitReplResult = replCoord->awaitReplication(opCtx, lastOpApplied, wc);
 

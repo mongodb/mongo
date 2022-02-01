@@ -75,9 +75,8 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrRenameCollectionMetadata can only be run on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
-            uassert(ErrorCodes::InvalidOptions,
-                    "_configsvrRenameCollectionMetadata must be called with majority writeConcern",
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
 
             opCtx->setAlwaysInterruptAtStepDownOrUp();
 

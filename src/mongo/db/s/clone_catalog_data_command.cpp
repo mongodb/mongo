@@ -95,11 +95,7 @@ public:
                 str::stream() << "_shardsvrCloneCatalogData can only be run on shard servers",
                 serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream()
-                    << "_shardsvrCloneCatalogData must be called with majority writeConcern, got "
-                    << cmdObj,
-                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+        CommandHelpers::uassertCommandRunWithMajority(getName(), opCtx->getWriteConcern());
 
         const auto cloneCatalogDataRequest =
             CloneCatalogData::parse(IDLParserErrorContext("_shardsvrCloneCatalogData"), cmdObj);

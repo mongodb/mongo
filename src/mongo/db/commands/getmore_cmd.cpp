@@ -82,7 +82,7 @@ MONGO_FAIL_POINT_DEFINE(rsStopGetMoreCmd);
 MONGO_FAIL_POINT_DEFINE(getMoreHangAfterPinCursor);
 
 // The timeout when waiting for linearizable read concern on a getMore command.
-static constexpr int kLinearizableReadConcernTimeout = 15000;
+static constexpr Milliseconds kLinearizableReadConcernTimeout{15000};
 
 // getMore can run with any readConcern, because cursor-creating commands like find can run with any
 // readConcern.  However, since getMore automatically uses the readConcern of the command that
