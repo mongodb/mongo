@@ -52,6 +52,10 @@ public:
         ShardType(kShardId1.toString(), kShardHost1.toString())};
 
     const NamespaceString kNss{"testDb.testColl"};
+    const NamespaceString kNssWithCustomizedSize{"testDb.testCollCustomized"};
+
+    static constexpr int64_t kDefaultMaxChunkSizeBytes = 128;
+    static constexpr int64_t kCustomizedMaxChunkSizeBytes = 256;
 
     ChunkType makeChunk(long long min, const ShardId& shardId) {
         ChunkType chunk;
@@ -63,18 +67,18 @@ public:
         return chunk;
     }
 
-    MoveChunkSettings getDefaultMoveChunkSettings() {
+    MoveChunkSettings getMoveChunkSettings(int64_t maxChunkSize = kDefaultMaxChunkSizeBytes) {
         return MoveChunkSettings(
-            128,
+            maxChunkSize,
             MigrationSecondaryThrottleOptions::create(
                 MigrationSecondaryThrottleOptions::SecondaryThrottleOption::kDefault),
             false,
             MoveChunkRequest::ForceJumbo::kDoNotForce);
     }
 
-    MigrationsRecoveryConfiguration getMigrationRecoveryConfiguration() {
-        return MigrationsRecoveryConfiguration(
-            128,
+    MigrationsRecoveryDefaultValues getMigrationRecoveryDefaultValues() {
+        return MigrationsRecoveryDefaultValues(
+            kDefaultMaxChunkSizeBytes,
             MigrationSecondaryThrottleOptions::create(
                 MigrationSecondaryThrottleOptions::SecondaryThrottleOption::kDefault));
     }
@@ -120,7 +124,7 @@ protected:
 };
 
 TEST_F(BalancerCommandsSchedulerTest, StartAndStopScheduler) {
-    _scheduler.start(operationContext(), getMigrationRecoveryConfiguration());
+    _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
     _scheduler.stop();
 }
 
@@ -129,7 +133,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveChunkCommand) {
         globalFailPointRegistry().find("deferredCleanupCompletedCheckpoint");
     auto timesEnteredFailPoint =
         deferredCleanupCompletedCheckpoint->setMode(FailPoint::alwaysOn, 0);
-    _scheduler.start(operationContext(), getMigrationRecoveryConfiguration());
+    _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
     ChunkType moveChunk = makeChunk(0, kShardId0);
     auto networkResponseFuture = launchAsync([&]() {
         onCommand(
@@ -139,7 +143,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveChunkCommand) {
                                                       kNss,
                                                       moveChunk,
                                                       ShardId(kShardId1),
-                                                      getDefaultMoveChunkSettings(),
+                                                      getMoveChunkSettings(),
                                                       false /* issuedByRemoteUser */);
     ASSERT_OK(futureResponse.getNoThrow());
     networkResponseFuture.default_timed_get();
@@ -158,7 +162,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveChunkCommand) {
 }
 
 TEST_F(BalancerCommandsSchedulerTest, SuccessfulMergeChunkCommand) {
-    _scheduler.start(operationContext(), getMigrationRecoveryConfiguration());
+    _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
     auto networkResponseFuture = launchAsync([&]() {
         onCommand(
             [&](const executor::RemoteCommandRequest& request) { return BSON("ok" << true); });
@@ -174,7 +178,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMergeChunkCommand) {
 }
 
 TEST_F(BalancerCommandsSchedulerTest, MergeChunkNonexistentShard) {
-    _scheduler.start(operationContext(), getMigrationRecoveryConfiguration());
+    _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
     ChunkRange range(BSON("x" << 0), BSON("x" << 20));
     ChunkVersion version(1, 1, OID::gen(), Timestamp(10));
     auto futureResponse = _scheduler.requestMergeChunks(
@@ -185,7 +189,7 @@ TEST_F(BalancerCommandsSchedulerTest, MergeChunkNonexistentShard) {
 }
 
 TEST_F(BalancerCommandsSchedulerTest, SuccessfulAutoSplitVectorCommand) {
-    _scheduler.start(operationContext(), getMigrationRecoveryConfiguration());
+    _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
     ChunkType splitChunk = makeChunk(0, kShardId0);
     BSONObjBuilder autoSplitVectorResponse;
     autoSplitVectorResponse.append("ok", "1");
@@ -216,7 +220,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulAutoSplitVectorCommand) {
 }
 
 TEST_F(BalancerCommandsSchedulerTest, SuccessfulSplitChunkCommand) {
-    _scheduler.start(operationContext(), getMigrationRecoveryConfiguration());
+    _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
     ChunkType splitChunk = makeChunk(0, kShardId0);
     auto networkResponseFuture = launchAsync([&]() {
         onCommand(
@@ -236,7 +240,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulSplitChunkCommand) {
 }
 
 TEST_F(BalancerCommandsSchedulerTest, SuccessfulRequestChunkDataSizeCommand) {
-    _scheduler.start(operationContext(), getMigrationRecoveryConfiguration());
+    _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
     ChunkType chunk = makeChunk(0, kShardId0);
     BSONObjBuilder chunkSizeResponse;
     chunkSizeResponse.append("ok", "1");
@@ -268,7 +272,7 @@ TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenNetworkReturnsError) {
     auto timesEnteredFailPoint =
         deferredCleanupCompletedCheckpoint->setMode(FailPoint::alwaysOn, 0);
 
-    _scheduler.start(operationContext(), getMigrationRecoveryConfiguration());
+    _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
     ChunkType moveChunk = makeChunk(0, kShardId0);
     auto timeoutError = Status{ErrorCodes::NetworkTimeout, "Mock error: network timed out"};
     auto networkResponseFuture = launchAsync([&]() {
@@ -278,7 +282,7 @@ TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenNetworkReturnsError) {
                                                       kNss,
                                                       moveChunk,
                                                       ShardId(kShardId1),
-                                                      getDefaultMoveChunkSettings(),
+                                                      getMoveChunkSettings(),
                                                       false /* issuedByRemoteUser */);
     ASSERT_EQUALS(futureResponse.getNoThrow(), timeoutError);
     networkResponseFuture.default_timed_get();
@@ -303,7 +307,7 @@ TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenSchedulerIsStopped) {
                                                       kNss,
                                                       moveChunk,
                                                       ShardId(kShardId1),
-                                                      getDefaultMoveChunkSettings(),
+                                                      getMoveChunkSettings(),
                                                       false /* issuedByRemoteUser */);
     ASSERT_EQUALS(futureResponse.getNoThrow(),
                   Status(ErrorCodes::BalancerInterrupted,
@@ -323,13 +327,13 @@ TEST_F(BalancerCommandsSchedulerTest, CommandCanceledIfBalancerStops) {
     SemiFuture<void> futureResponse;
     {
         FailPointEnableBlock failPoint("pauseSubmissionsFailPoint");
-        _scheduler.start(operationContext(), getMigrationRecoveryConfiguration());
+        _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
         ChunkType moveChunk = makeChunk(0, kShardId0);
         futureResponse = _scheduler.requestMoveChunk(operationContext(),
                                                      kNss,
                                                      moveChunk,
                                                      ShardId(kShardId1),
-                                                     getDefaultMoveChunkSettings(),
+                                                     getMoveChunkSettings(),
                                                      false /* issuedByRemoteUser */);
         _scheduler.stop();
     }
@@ -349,9 +353,10 @@ TEST_F(BalancerCommandsSchedulerTest, CommandCanceledIfBalancerStops) {
 
 TEST_F(BalancerCommandsSchedulerTest, MoveChunkCommandGetsPersistedOnDiskWhenRequestIsSubmitted) {
     auto opCtx = operationContext();
-    _scheduler.start(opCtx, getMigrationRecoveryConfiguration());
+    auto defaultValues = getMigrationRecoveryDefaultValues();
+    _scheduler.start(opCtx, getMigrationRecoveryDefaultValues());
     ChunkType moveChunk = makeChunk(0, kShardId0);
-    auto requestSettings = getDefaultMoveChunkSettings();
+    auto requestSettings = getMoveChunkSettings(kCustomizedMaxChunkSizeBytes);
     auto const serviceContext = getServiceContext();
     auto networkResponseFuture = launchAsync([&]() {
         onCommand([&, serviceContext](const executor::RemoteCommandRequest& request) {
@@ -365,10 +370,8 @@ TEST_F(BalancerCommandsSchedulerTest, MoveChunkCommandGetsPersistedOnDiskWhenReq
 
             // ... with the needed info to reconstruct an equivalent command.
             ASSERT_OK(swPersistedCommand.getStatus());
-            auto recoveredCommand = MoveChunkCommandInfo::recoverFrom(
-                swPersistedCommand.getValue(),
-                MigrationsRecoveryConfiguration(requestSettings.maxChunkSizeBytes,
-                                                requestSettings.secondaryThrottle));
+            auto recoveredCommand =
+                MoveChunkCommandInfo::recoverFrom(swPersistedCommand.getValue(), defaultValues);
             ASSERT_EQ(kNss, recoveredCommand->getNameSpace());
             ASSERT_EQ(moveChunk.getShard(), recoveredCommand->getTarget());
             ASSERT_TRUE(recoveredCommand->requiresDistributedLock());
@@ -402,17 +405,19 @@ TEST_F(BalancerCommandsSchedulerTest, MoveChunkCommandGetsPersistedOnDiskWhenReq
 
 TEST_F(BalancerCommandsSchedulerTest, PersistedCommandsAreReissuedWhenRecoveringFromCrash) {
     auto opCtx = operationContext();
+    ChunkType chunkToMove = makeChunk(0, kShardId0);
     // 1. Insert a recovery document on an outstanding migration.
-    ChunkType moveChunk = makeChunk(0, kShardId0);
-    auto requestSettings = getDefaultMoveChunkSettings();
+    auto requestSettings = getMoveChunkSettings(kCustomizedMaxChunkSizeBytes);
     MigrationType recoveryInfo(kNss,
-                               moveChunk.getMin(),
-                               moveChunk.getMax(),
-                               moveChunk.getShard(),
+                               chunkToMove.getMin(),
+                               chunkToMove.getMax(),
+                               chunkToMove.getShard(),
                                kShardId1,
-                               moveChunk.getVersion(),
+                               chunkToMove.getVersion(),
                                requestSettings.waitForDelete,
-                               requestSettings.forceJumbo);
+                               requestSettings.forceJumbo,
+                               kCustomizedMaxChunkSizeBytes,
+                               boost::none /* secondaryTrottle */);
     ASSERT_OK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
         opCtx,
         MigrationType::ConfigNS,
@@ -420,11 +425,12 @@ TEST_F(BalancerCommandsSchedulerTest, PersistedCommandsAreReissuedWhenRecovering
         ShardingCatalogClient::kMajorityWriteConcern));
 
     // 2. Once started, the persisted document should trigger the remote execution of a request...
-    _scheduler.start(opCtx, getMigrationRecoveryConfiguration());
+    auto defaultValues = getMigrationRecoveryDefaultValues();
+    _scheduler.start(opCtx, defaultValues);
     auto networkResponseFuture = launchAsync([&]() {
         onCommand([&](const executor::RemoteCommandRequest& request) {
-            auto expectedCommandInfo = MoveChunkCommandInfo::recoverFrom(
-                recoveryInfo, getMigrationRecoveryConfiguration());
+            auto expectedCommandInfo =
+                MoveChunkCommandInfo::recoverFrom(recoveryInfo, defaultValues);
             // 3. ... Which content should match the recovery doc & configuration.
             ASSERT_BSONOBJ_EQ(expectedCommandInfo->serialise(), request.cmdObj);
             return BSON("ok" << true);
@@ -444,7 +450,7 @@ TEST_F(BalancerCommandsSchedulerTest, DistLockPreventsMoveChunkWithConcurrentDDL
     FailPoint* failpoint = globalFailPointRegistry().find("pauseSubmissionsFailPoint");
     failpoint->setMode(FailPoint::Mode::alwaysOn);
     {
-        _scheduler.start(operationContext(), getMigrationRecoveryConfiguration());
+        _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
         opCtx = Client::getCurrent()->getOperationContext();
         const std::string whyMessage(str::stream()
                                      << "Test acquisition of distLock for " << kNss.ns());
@@ -457,7 +463,7 @@ TEST_F(BalancerCommandsSchedulerTest, DistLockPreventsMoveChunkWithConcurrentDDL
                                                           kNss,
                                                           moveChunk,
                                                           ShardId(kShardId1),
-                                                          getDefaultMoveChunkSettings(),
+                                                          getMoveChunkSettings(),
                                                           false /* issuedByRemoteUser */);
         ASSERT_EQ(
             futureResponse.getNoThrow(),

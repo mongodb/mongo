@@ -47,30 +47,9 @@ const ShardId kFromShard("shard0000");
 const ShardId kToShard("shard0001");
 const bool kWaitForDelete{true};
 
-TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
-    const auto collUuid = UUID::gen();
-    const auto collEpoch = OID::gen();
-    const auto collTimestamp = Timestamp(1, 1);
-    const ChunkVersion version(1, 2, collEpoch, collTimestamp);
 
-    BSONObjBuilder chunkBuilder;
-    chunkBuilder.append(ChunkType::name(), OID::gen());
-    collUuid.appendToBuilder(&chunkBuilder, ChunkType::collectionUUID.name());
-    chunkBuilder.append(ChunkType::min(), kMin);
-    chunkBuilder.append(ChunkType::max(), kMax);
-    version.appendLegacyWithField(&chunkBuilder, ChunkType::lastmod());
-    chunkBuilder.append(ChunkType::shard(), kFromShard.toString());
-
-    ChunkType chunkType =
-        assertGet(ChunkType::fromConfigBSON(chunkBuilder.obj(), collEpoch, collTimestamp));
-    ASSERT_OK(chunkType.validate());
-
-    MigrateInfo migrateInfo(kToShard,
-                            NamespaceString(kNs),
-                            chunkType,
-                            MoveChunkRequest::ForceJumbo::kDoNotForce,
-                            MigrateInfo::chunksImbalance);
-    MigrationType migrationType(migrateInfo, kWaitForDelete);
+TEST(MigrationTypeTest, FromAndToBSONWithoutOptionalFields) {
+    const ChunkVersion version(1, 2, OID::gen(), Timestamp(1, 1));
 
     BSONObjBuilder builder;
     builder.append(MigrationType::ns(), kNs);
@@ -85,11 +64,15 @@ TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
 
     BSONObj obj = builder.obj();
 
+    MigrationType migrationType = assertGet(MigrationType::fromBSON(obj));
     ASSERT_BSONOBJ_EQ(obj, migrationType.toBSON());
 }
 
-TEST(MigrationTypeTest, FromAndToBSON) {
+TEST(MigrationTypeTest, FromAndToBSONWitOptionalFields) {
     const ChunkVersion version(1, 2, OID::gen(), Timestamp(1, 1));
+    const auto secondaryThrottle =
+        MigrationSecondaryThrottleOptions::createWithWriteConcern(WriteConcernOptions(
+            "majority", WriteConcernOptions::SyncMode::JOURNAL, Milliseconds(60000)));
 
     BSONObjBuilder builder;
     builder.append(MigrationType::ns(), kNs);
@@ -101,6 +84,9 @@ TEST(MigrationTypeTest, FromAndToBSON) {
     builder.append(MigrationType::waitForDelete(), kWaitForDelete);
     builder.append(MigrationType::forceJumbo(),
                    MoveChunkRequest::forceJumboToString(MoveChunkRequest::ForceJumbo::kDoNotForce));
+    builder.append(MigrationType::maxChunkSizeBytes(), 512 * 1024 * 1024);
+    secondaryThrottle.append(&builder);
+
 
     BSONObj obj = builder.obj();
 

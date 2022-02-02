@@ -48,17 +48,22 @@ const BSONField<std::string> MigrationType::toShard("toShard");
 const BSONField<bool> MigrationType::waitForDelete("waitForDelete");
 const BSONField<std::string> MigrationType::forceJumbo("forceJumbo");
 const BSONField<std::string> MigrationType::chunkVersion("chunkVersion");
+const BSONField<int64_t> MigrationType::maxChunkSizeBytes("maxChunkSizeBytes");
+
 
 MigrationType::MigrationType() = default;
 
-MigrationType::MigrationType(const NamespaceString& nss,
-                             const BSONObj& min,
-                             const BSONObj& max,
-                             const ShardId& fromShard,
-                             const ShardId& toShard,
-                             const ChunkVersion& chunkVersion,
-                             bool waitForDelete,
-                             MoveChunkRequest::ForceJumbo forceJumbo)
+MigrationType::MigrationType(
+    const NamespaceString& nss,
+    const BSONObj& min,
+    const BSONObj& max,
+    const ShardId& fromShard,
+    const ShardId& toShard,
+    const ChunkVersion& chunkVersion,
+    bool waitForDelete,
+    MoveChunkRequest::ForceJumbo forceJumbo,
+    const boost::optional<int64_t>& maxChunkSizeBytes,
+    const boost::optional<MigrationSecondaryThrottleOptions>& secondaryThrottle)
     : _nss(nss),
       _min(min),
       _max(max),
@@ -66,17 +71,9 @@ MigrationType::MigrationType(const NamespaceString& nss,
       _toShard(toShard),
       _chunkVersion(chunkVersion),
       _waitForDelete(waitForDelete),
-      _forceJumbo(MoveChunkRequest::forceJumboToString(forceJumbo)) {}
-
-MigrationType::MigrationType(const MigrateInfo& info, bool waitForDelete)
-    : _nss(info.nss),
-      _min(info.minKey),
-      _max(info.maxKey),
-      _fromShard(info.from),
-      _toShard(info.to),
-      _chunkVersion(info.version),
-      _waitForDelete(waitForDelete),
-      _forceJumbo(MoveChunkRequest::forceJumboToString(info.forceJumbo)) {}
+      _forceJumbo(MoveChunkRequest::forceJumboToString(forceJumbo)),
+      _maxChunkSizeBytes(maxChunkSizeBytes),
+      _secondaryThrottle(secondaryThrottle) {}
 
 StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
     MigrationType migrationType;
@@ -147,6 +144,26 @@ StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
         migrationType._forceJumbo = std::move(forceJumboVal);
     }
 
+    {
+        long long maxChunkSizeBytesVal;
+        Status status =
+            bsonExtractIntegerField(source, maxChunkSizeBytes.name(), &maxChunkSizeBytesVal);
+        if (status.isOK()) {
+            migrationType._maxChunkSizeBytes = maxChunkSizeBytesVal;
+        } else {
+            migrationType._maxChunkSizeBytes = boost::none;
+        }
+    }
+
+    {
+        auto swSecondaryThrottle = MigrationSecondaryThrottleOptions::createFromCommand(source);
+        if (swSecondaryThrottle.getStatus().isOK()) {
+            migrationType._secondaryThrottle = swSecondaryThrottle.getValue();
+        } else {
+            migrationType._secondaryThrottle = boost::none;
+        }
+    }
+
     return migrationType;
 }
 
@@ -165,22 +182,13 @@ BSONObj MigrationType::toBSON() const {
 
     builder.append(waitForDelete.name(), _waitForDelete);
     builder.append(forceJumbo.name(), _forceJumbo);
+    if (_maxChunkSizeBytes.is_initialized()) {
+        builder.appendNumber(maxChunkSizeBytes.name(), static_cast<long long>(*_maxChunkSizeBytes));
+    }
+    if (_secondaryThrottle.is_initialized()) {
+        _secondaryThrottle->append(&builder);
+    }
     return builder.obj();
-}
-
-MigrateInfo MigrationType::toMigrateInfo(const UUID& uuid) const {
-    ChunkType chunk;
-    chunk.setShard(_fromShard);
-    chunk.setCollectionUUID(uuid);
-    chunk.setMin(_min);
-    chunk.setMax(_max);
-    chunk.setVersion(_chunkVersion);
-
-    return MigrateInfo(_toShard,
-                       _nss,
-                       chunk,
-                       MoveChunkRequest::parseForceJumbo(_forceJumbo),
-                       MigrateInfo::chunksImbalance);
 }
 
 }  // namespace mongo

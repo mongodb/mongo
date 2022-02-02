@@ -323,7 +323,12 @@ Status Balancer::rebalanceSingleChunk(OperationContext* opCtx,
         return refreshStatus;
     }
 
-    MoveChunkSettings settings(balancerConfig->getMaxChunkSizeBytes(),
+    auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
+        opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
+    auto maxChunkSize =
+        coll.getMaxChunkSizeBytes().value_or(balancerConfig->getMaxChunkSizeBytes());
+
+    MoveChunkSettings settings(maxChunkSize,
                                balancerConfig->getSecondaryThrottle(),
                                balancerConfig->waitForDelete(),
                                migrateInfo->forceJumbo);
@@ -339,7 +344,7 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const ChunkType& chunk,
                                  const ShardId& newShardId,
-                                 uint64_t maxChunkSizeBytes,
+                                 int64_t maxChunkSizeBytesOverride,
                                  const MigrationSecondaryThrottleOptions& secondaryThrottle,
                                  bool waitForDelete,
                                  bool forceJumbo) {
@@ -348,7 +353,21 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
         return moveAllowedStatus;
     }
 
-    MoveChunkSettings settings(maxChunkSizeBytes,
+    auto maxChunkSize = maxChunkSizeBytesOverride;
+    if (maxChunkSize == 0) {
+        // No override has been specified through a remote command; inspect the stored configuration
+        auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
+        Status refreshStatus = balancerConfig->refreshAndCheck(opCtx);
+        if (!refreshStatus.isOK()) {
+            return refreshStatus;
+        }
+
+        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
+            opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
+        maxChunkSize = coll.getMaxChunkSizeBytes().value_or(balancerConfig->getMaxChunkSizeBytes());
+    }
+
+    MoveChunkSettings settings(maxChunkSize,
                                secondaryThrottle,
                                waitForDelete,
                                forceJumbo ? MoveChunkRequest::ForceJumbo::kForceManual
@@ -531,7 +550,7 @@ void Balancer::_mainThread() {
 
     _commandScheduler->start(
         opCtx.get(),
-        MigrationsRecoveryConfiguration(balancerConfig->getMaxChunkSizeBytes(),
+        MigrationsRecoveryDefaultValues(balancerConfig->getMaxChunkSizeBytes(),
                                         balancerConfig->getSecondaryThrottle()));
 
     _actionStreamConsumerThread = stdx::thread([&] { _consumeActionStreamLoop(); });
@@ -579,7 +598,14 @@ void Balancer::_mainThread() {
                     warnOnMultiVersion(uassertStatusOK(_clusterStats->getStats(opCtx.get())));
                 }
 
-                _initializeDefragmentations(opCtx.get());
+                // Collect and apply up-to-date configuration values on the cluster collections.
+                {
+                    OperationContext* ctx = opCtx.get();
+                    auto allCollections = Grid::get(ctx)->catalogClient()->getCollections(ctx, {});
+                    for (const auto& coll : allCollections) {
+                        _defragmentationPolicy->refreshCollectionDefragmentationStatus(ctx, coll);
+                    }
+                }
 
                 Status status = _splitChunksIfNeeded(opCtx.get());
                 if (!status.isOK()) {
@@ -793,13 +819,6 @@ bool Balancer::_checkOIDs(OperationContext* opCtx) {
     return true;
 }
 
-void Balancer::_initializeDefragmentations(OperationContext* opCtx) {
-    auto collections = Grid::get(opCtx)->catalogClient()->getCollections(opCtx, {});
-    for (const auto& coll : collections) {
-        _defragmentationPolicy->refreshCollectionDefragmentationStatus(opCtx, coll);
-    }
-}
-
 Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {
     auto chunksToSplitStatus = _chunkSelectionPolicy->selectChunksToSplit(opCtx);
     if (!chunksToSplitStatus.isOK()) {
@@ -858,7 +877,12 @@ int Balancer::_moveChunks(OperationContext* opCtx,
         chunk.setShard(migrateInfo.from);
         chunk.setVersion(migrateInfo.version);
 
-        MoveChunkSettings settings(balancerConfig->getMaxChunkSizeBytes(),
+        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
+            opCtx, migrateInfo.nss, repl::ReadConcernLevel::kMajorityReadConcern);
+        auto maxChunkSizeBytes =
+            coll.getMaxChunkSizeBytes().value_or(balancerConfig->getMaxChunkSizeBytes());
+
+        MoveChunkSettings settings(maxChunkSizeBytes,
                                    balancerConfig->getSecondaryThrottle(),
                                    balancerConfig->waitForDelete(),
                                    migrateInfo.forceJumbo);
@@ -898,7 +922,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
                   "error"_attr = redact(status));
 
             const CollectionType collection = catalogClient->getCollection(
-                opCtx, migrateInfo.uuid, repl::ReadConcernLevel::kLocalReadConcern);
+                opCtx, migrateInfo.uuid, repl::ReadConcernLevel::kMajorityReadConcern);
 
             ShardingCatalogManager::get(opCtx)->splitOrMarkJumbo(
                 opCtx, collection.getNss(), migrateInfo.minKey);

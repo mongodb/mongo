@@ -42,15 +42,26 @@ class KeyPattern;
 class MigrationSecondaryThrottleOptions;
 
 /**
- * Configuration be applied on every MoveChunkRequest that the Scheduler might recover from a prior
+ * Default values for MoveChunkRequests that the Scheduler might recover from a prior
  * step-down or crash as part of its self-initialisation
  */
-struct MigrationsRecoveryConfiguration {
-    MigrationsRecoveryConfiguration(int64_t maxChunkSizeBytes,
+class MigrationsRecoveryDefaultValues {
+public:
+    MigrationsRecoveryDefaultValues(int64_t maxChunkSizeBytes,
                                     const MigrationSecondaryThrottleOptions& secondaryThrottle)
-        : maxChunkSizeBytes(maxChunkSizeBytes), secondaryThrottle(secondaryThrottle) {}
-    int64_t maxChunkSizeBytes;
-    MigrationSecondaryThrottleOptions secondaryThrottle;
+        : _maxChunkSize(maxChunkSizeBytes), _secondaryThrottle(secondaryThrottle) {}
+
+    int64_t getMaxChunkSizeBytes() const {
+        return _maxChunkSize;
+    }
+
+    const MigrationSecondaryThrottleOptions& getSecondaryThrottle() const {
+        return _secondaryThrottle;
+    };
+
+private:
+    const int64_t _maxChunkSize;
+    const MigrationSecondaryThrottleOptions _secondaryThrottle;
 };
 
 /**
@@ -107,7 +118,7 @@ public:
      * which will start accepting request<Command>() invocations.
      */
     virtual void start(OperationContext* opCtx,
-                       const MigrationsRecoveryConfiguration& configuration) = 0;
+                       const MigrationsRecoveryDefaultValues& defaultValues) = 0;
 
     /**
      * Stops the scheduler and the processing of any outstanding and incoming request

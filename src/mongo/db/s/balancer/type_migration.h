@@ -56,6 +56,7 @@ public:
     static const BSONField<bool> waitForDelete;
     static const BSONField<std::string> forceJumbo;
     static const BSONField<std::string> chunkVersion;
+    static const BSONField<int64_t> maxChunkSizeBytes;
 
     MigrationType(const NamespaceString& nss,
                   const BSONObj& min,
@@ -64,13 +65,9 @@ public:
                   const ShardId& toShard,
                   const ChunkVersion& chunkVersion,
                   bool waitForDelete,
-                  MoveChunkRequest::ForceJumbo forceJumbo);
-
-    /**
-     * The Balancer encapsulates migration information in MigrateInfo objects, so this facilitates
-     * conversion to a config.migrations entry format.
-     */
-    MigrationType(const MigrateInfo& info, bool waitForDelete);
+                  MoveChunkRequest::ForceJumbo forceJumbo,
+                  const boost::optional<int64_t>& maxChunkSizeBytes,
+                  const boost::optional<MigrationSecondaryThrottleOptions>& secondaryTrottle);
 
     /**
      * Constructs a new MigrationType object from BSON. Expects all fields to be present, and errors
@@ -82,11 +79,6 @@ public:
      * Returns the BSON representation of the config.migrations document entry.
      */
     BSONObj toBSON() const;
-
-    /**
-     * Helper function for the Balancer that uses MigrateInfo objects to schedule migrations.
-     */
-    MigrateInfo toMigrateInfo(const UUID& uuid) const;
 
     const NamespaceString& getNss() const {
         return _nss;
@@ -116,6 +108,15 @@ public:
         return MoveChunkRequest::parseForceJumbo(_forceJumbo);
     }
 
+    const boost::optional<int64_t>& getMaxChunkSizeBytes() const {
+        return _maxChunkSizeBytes;
+    }
+
+    const boost::optional<MigrationSecondaryThrottleOptions>& getSecondaryThrottle() const {
+        return _secondaryThrottle;
+    }
+
+
 private:
     MigrationType();
 
@@ -128,6 +129,8 @@ private:
     ChunkVersion _chunkVersion;
     bool _waitForDelete{false};
     std::string _forceJumbo{0};
+    boost::optional<int64_t> _maxChunkSizeBytes;
+    boost::optional<MigrationSecondaryThrottleOptions> _secondaryThrottle;
 };
 
 }  // namespace mongo

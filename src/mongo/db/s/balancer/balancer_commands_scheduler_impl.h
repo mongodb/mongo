@@ -141,14 +141,18 @@ public:
           _requiresRecoveryOnCrash(requiresRecoveryOnCrash) {}
 
     static std::shared_ptr<MoveChunkCommandInfo> recoverFrom(
-        const MigrationType& migrationType, const MigrationsRecoveryConfiguration& configuration) {
+        const MigrationType& migrationType, const MigrationsRecoveryDefaultValues& defaultValues) {
+        auto maxChunkSize =
+            migrationType.getMaxChunkSizeBytes().value_or(defaultValues.getMaxChunkSizeBytes());
+        const auto& secondaryThrottle =
+            migrationType.getSecondaryThrottle().value_or(defaultValues.getSecondaryThrottle());
         return std::make_shared<MoveChunkCommandInfo>(migrationType.getNss(),
                                                       migrationType.getSource(),
                                                       migrationType.getDestination(),
                                                       migrationType.getMinKey(),
                                                       migrationType.getMaxKey(),
-                                                      configuration.maxChunkSizeBytes,
-                                                      configuration.secondaryThrottle,
+                                                      maxChunkSize,
+                                                      secondaryThrottle,
                                                       migrationType.getWaitForDelete(),
                                                       migrationType.getForceJumbo(),
                                                       migrationType.getChunkVersion(),
@@ -192,7 +196,9 @@ public:
                              _recipient,
                              _version,
                              _waitForDelete,
-                             _forceJumbo);
+                             _forceJumbo,
+                             _maxChunkSizeBytes,
+                             _secondaryThrottle);
     }
 
     BSONObj getRecoveryDocumentIdentifier() const {
@@ -521,7 +527,7 @@ public:
     ~BalancerCommandsSchedulerImpl();
 
     void start(OperationContext* opCtx,
-               const MigrationsRecoveryConfiguration& configuration) override;
+               const MigrationsRecoveryDefaultValues& defaultValues) override;
 
     void stop() override;
 
