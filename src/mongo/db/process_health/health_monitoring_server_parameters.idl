@@ -49,6 +49,7 @@ enums:
             kLdap: "ldap"
             kDns: "dns"
             kTest: "test"
+            kConfigServer: "configServer"
 
 structs:
     HealthObserverIntensitySetting:
@@ -142,3 +143,23 @@ server_parameters:
             expr: 120
         validator:
             gte: 0
+
+    reachableConfigReplicasRequiredByHealthMonitoring:
+        description: "Minimal count of reachable Config server replicas required to pass the health check"
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReachableConfigReplicasRequired
+        default:
+            expr: 1
+        validator:
+            gt: 0
+
+    configReplicasProbedByHealthMonitoring:
+        description: "Count of Config server replicas probed by the health check"
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gConfigReplicasProbed
+        default:
+            expr: 2
+        validator:
+            gt: 0

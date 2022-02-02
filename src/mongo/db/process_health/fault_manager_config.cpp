@@ -39,6 +39,7 @@ namespace process_health {
 namespace {
 constexpr auto inline kDefaultObserverInterval = Milliseconds{10000};
 constexpr auto inline kDefaultLdapObserverInterval = Milliseconds{30000};
+constexpr auto inline kDefaultConfigServerObserverInterval = Milliseconds{30000};
 constexpr auto inline kDefaultTestObserverInterval = Milliseconds{1000};
 }  // namespace
 
@@ -46,6 +47,8 @@ Milliseconds FaultManagerConfig::_getDefaultObserverInterval(FaultFacetType type
     switch (type) {
         case FaultFacetType::kLdap:
             return kDefaultLdapObserverInterval;
+        case FaultFacetType::kConfigServer:
+            return kDefaultConfigServerObserverInterval;
         case FaultFacetType::kMock1:
         case FaultFacetType::kMock2:
         case FaultFacetType::kTestObserver:
@@ -85,6 +88,8 @@ FaultFacetType toFaultFacetType(HealthObserverTypeEnum type) {
             return FaultFacetType::kDns;
         case HealthObserverTypeEnum::kTest:
             return FaultFacetType::kTestObserver;
+        case HealthObserverTypeEnum::kConfigServer:
+            return FaultFacetType::kConfigServer;
         default:
             MONGO_UNREACHABLE;
     }

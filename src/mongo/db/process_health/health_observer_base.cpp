@@ -83,15 +83,24 @@ SharedSemiFuture<HealthCheckStatus> HealthObserverBase::periodicCheck(
 }
 
 HealthCheckStatus HealthObserverBase::makeHealthyStatus() const {
-    return HealthCheckStatus(getType());
+    return makeHealthyStatusWithType(getType());
+}
+
+HealthCheckStatus HealthObserverBase::makeHealthyStatusWithType(FaultFacetType type) {
+    return HealthCheckStatus(type);
 }
 
 HealthCheckStatus HealthObserverBase::makeSimpleFailedStatus(Severity severity,
                                                              std::vector<Status>&& failures) const {
+    return makeSimpleFailedStatusWithType(getType(), severity, std::move(failures));
+}
+
+HealthCheckStatus HealthObserverBase::makeSimpleFailedStatusWithType(
+    FaultFacetType type, Severity severity, std::vector<Status>&& failures) {
     if (severity == Severity::kOk) {
         LOGV2_WARNING(6007903,
                       "Creating faulty health check status requires non-ok severity",
-                      "observerType"_attr = getType());
+                      "observerType"_attr = type);
     }
     StringBuilder sb;
     for (const auto& s : failures) {
@@ -99,7 +108,7 @@ HealthCheckStatus HealthObserverBase::makeSimpleFailedStatus(Severity severity,
         sb.append(" ");
     }
 
-    return HealthCheckStatus(getType(), severity, sb.stringData());
+    return HealthCheckStatus(type, severity, sb.stringData());
 }
 
 HealthObserverLivenessStats HealthObserverBase::getStats() const {
