@@ -32,6 +32,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/backup_block.h"
+#include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
 
@@ -61,6 +62,13 @@ bool BackupBlock::isRequired() const {
 
     // Check whether this is a required MongoDB file.
     if (kRequiredMDBFiles.find(filename) != kRequiredMDBFiles.end()) {
+        return true;
+    }
+
+    // All files for the encrypted storage engine are required.
+    boost::filesystem::path basePath(storageGlobalParams.dbpath);
+    boost::filesystem::path keystoreBasePath(basePath / "key.store");
+    if (StringData(path.string()).startsWith(keystoreBasePath.string())) {
         return true;
     }
 
