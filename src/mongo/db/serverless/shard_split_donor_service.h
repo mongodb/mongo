@@ -148,6 +148,9 @@ private:
                                                       repl::OpTime opTime,
                                                       const CancellationToken& token);
 
+    void _initiateTimeout(const ScopedTaskExecutorPtr& executor,
+                          const CancellationToken& abortToken);
+
     void _createReplicaSetMonitor(const ExecutorPtr& executor, const CancellationToken& abortToken);
 
     ExecutorFuture<DurableState> _handleErrorOrEnterAbortedState(

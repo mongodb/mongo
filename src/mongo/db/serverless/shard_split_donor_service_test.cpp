@@ -256,17 +256,6 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
     std::shared_ptr<TopologyDescription> topologyDescriptionNew =
         createTopologyDescription(_replSet);
 
-    // construct task executor
-    std::shared_ptr<executor::NetworkInterface> networkInterface = executor::makeNetworkInterface(
-        "SplitReplicaSetObserter-TestExecutor",
-        std::make_unique<ReplicaSetMonitorManagerNetworkConnectionHook>(),
-        std::make_unique<rpc::EgressMetadataHookList>());
-
-    auto pool = std::make_unique<executor::NetworkInterfaceThreadPool>(networkInterface.get());
-    auto executor =
-        std::make_shared<executor::ThreadPoolTaskExecutor>(std::move(pool), networkInterface);
-    executor->startup();
-
     // Wait until the RSM has been created by the instance.
     auto replicaSetMonitorCreatedFuture = serviceInstance->replicaSetMonitorCreatedFuture();
     replicaSetMonitorCreatedFuture.wait(opCtx.get());
@@ -284,6 +273,30 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
     auto result = completionFuture.get();
     ASSERT(!result.abortReason);
     ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kCommitted);
+}
+
+TEST_F(ShardSplitDonorServiceTest, ShardSplitDonorServiceTimeout) {
+    auto opCtx = makeOperationContext();
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+
+    auto document = test::shard_split::createDocument(
+        _uuid, ShardSplitDonorStateEnum::kUninitialized, _tenantIds, _connectionStr);
+
+    // Set a timeout of 200 ms.
+    repl::shardSplitTimeoutMS.store(200);
+
+    // Create and start the instance.
+    auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
+        opCtx.get(), _service, document.toBSON());
+    ASSERT(serviceInstance.get());
+    ASSERT_EQ(_uuid, serviceInstance->getId());
+
+    auto completionFuture = serviceInstance->completionFuture();
+
+    auto result = completionFuture.get();
+
+    ASSERT(result.abortReason);
+    ASSERT_EQ(result.abortReason->code(), ErrorCodes::ExceededTimeLimit);
 }
 
 // Abort scenario : abortSplit called before startSplit.

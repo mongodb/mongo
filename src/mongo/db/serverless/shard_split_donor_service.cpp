@@ -232,6 +232,8 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
         return _abortSource->token();
     }();
 
+    _initiateTimeout(executor, abortToken);
+
     LOGV2(6086506, "Starting shard split {id}", "id"_attr = _migrationId);
 
     auto cancelableExecutor = CancelableExecutor::make(**executor, abortToken);
@@ -519,6 +521,33 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForMajority
         .thenRunOn(**executor);
 }
 
+void ShardSplitDonorService::DonorStateMachine::_initiateTimeout(
+    const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken) {
+
+    auto timeoutFuture =
+        (*executor)->sleepFor(Milliseconds(repl::shardSplitTimeoutMS.load()), abortToken);
+
+    auto timeoutOrCompletionFuture =
+        whenAny(std::move(timeoutFuture),
+                completionFuture().semi().ignoreValue().thenRunOn(**executor))
+            .thenRunOn(**executor)
+            .then([this, executor, anchor = shared_from_this()](auto result) {
+                stdx::lock_guard<Latch> lg(_mutex);
+                if (_stateDoc.getState() != ShardSplitDonorStateEnum::kCommitted &&
+                    _stateDoc.getState() != ShardSplitDonorStateEnum::kAborted &&
+                    !_abortRequested) {
+                    LOGV2(6236500,
+                          "Timeout expired, aborting shard split.",
+                          "timeout"_attr = repl::shardSplitTimeoutMS.load(),
+                          "id"_attr = _migrationId);
+                    _abortReason = Status(ErrorCodes::ExceededTimeLimit,
+                                          "Aborting shard split as it exceeded its time limit.");
+                    _abortSource->cancel();
+                }
+            })
+            .semi();
+}
+
 void ShardSplitDonorService::DonorStateMachine::_createReplicaSetMonitor(
     const ExecutorPtr& executor, const CancellationToken& abortToken) {
 
@@ -527,7 +556,6 @@ void ShardSplitDonorService::DonorStateMachine::_createReplicaSetMonitor(
 
         return _stateDoc.getRecipientConnectionString();
     }();
-
 
     invariant(connectionString);
 
@@ -580,12 +608,18 @@ ShardSplitDonorService::DonorStateMachine::_handleErrorOrEnterAbortedState(
     {
         stdx::lock_guard<Latch> lg(_mutex);
 
-        LOGV2(6086508, "Shard split aborted {id}", "id"_attr = _migrationId);
+        if (!_abortReason) {
+            _abortReason = statusWithState.getStatus();
+        }
 
-        _abortReason = statusWithState.getStatus();
         BSONObjBuilder bob;
         _abortReason->serializeErrorToBSON(&bob);
         _stateDoc.setAbortReason(bob.obj());
+
+        LOGV2(6086508,
+              "Shard split aborted {id}",
+              "id"_attr = _migrationId,
+              "abortReason"_attr = _abortReason.get());
     }
 
     return ExecutorFuture<void>(**executor)
