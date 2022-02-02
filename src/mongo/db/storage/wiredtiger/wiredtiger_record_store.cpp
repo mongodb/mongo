@@ -1906,17 +1906,6 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
     // required by the largest_key API.
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     auto sessRaii = cache->getSession();
-
-    // We must limit the amount of time spent blocked on cache eviction to avoid a deadlock with
-    // ourselves. The calling operation may have a session open that has written a large amount of
-    // data, and by creating a new session, we are preventing WT from being able to roll back that
-    // transaction to free up cache space. If we do block on cache eviction here, we must consider
-    // that the other session owned by this thread may be the one that needs to be rolled back. If
-    // this does time out, we will receive a WT_CACHE_FULL and throw an error.
-    auto wtSession = sessRaii->getSession();
-    invariantWTOK(wtSession->reconfigure(wtSession, "cache_max_wait_ms=1000"));
-    ON_BLOCK_EXIT([&] { wtSession->reconfigure(wtSession, ""); });
-
     auto cachedCursor = sessRaii->getCachedCursor(_tableId, "");
     auto cursor = cachedCursor ? cachedCursor : sessRaii->getNewCursor(_uri);
     ON_BLOCK_EXIT([&] { sessRaii->releaseCursor(_tableId, cursor, ""); });
@@ -1925,13 +1914,7 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
     // largest_key API returns the largest key in the table regardless of visibility. This ensures
     // we don't re-use RecordIds that are not visible.
     int ret = cursor->largest_key(cursor);
-    if (ret == WT_CACHE_FULL) {
-        // Force the caller to rollback its transaction if we can't make progess with eviction.
-        // TODO (SERVER-60839): Convert this to a different error code that is distinguishable from
-        // a true write conflict.
-        throw WriteConflictException(
-            fmt::format("Cache full while performing initial write to '{}'", _ns));
-    } else if (ret != WT_NOTFOUND) {
+    if (ret != WT_NOTFOUND) {
         invariantWTOK(ret);
         auto recordId = getKey(cursor);
         nextId = recordId.getLong() + 1;
