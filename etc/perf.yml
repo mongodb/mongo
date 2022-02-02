@@ -62,7 +62,7 @@ modules:
   - name: genny
     repo: git@github.com:10gen/genny.git
     prefix: ${workdir}/src
-    branch: master
+    branch: microbenchmarks-stable
   - name: signal-processing
     repo: git@github.com:10gen/signal-processing.git
     prefix: ${workdir}/src
