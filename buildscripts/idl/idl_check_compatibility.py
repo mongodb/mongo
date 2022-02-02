@@ -512,8 +512,10 @@ def check_reply_fields(ctxt: IDLCompatibilityContext, old_reply: syntax.Struct,
             allow_name: str = cmd_name + "-reply-" + new_field.name
 
             new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
-            if isinstance(new_field_type,
-                          syntax.Type) and "any" in new_field_type.bson_serialization_type:
+            # If we encounter a bson_serialization_type of None, we skip checking if 'any' is used.
+            if isinstance(
+                    new_field_type, syntax.Type
+            ) and new_field_type.bson_serialization_type is not None and "any" in new_field_type.bson_serialization_type:
                 # If 'any' is not explicitly allowed as the bson_serialization_type.
                 if allow_name not in ALLOW_ANY_TYPE_LIST:
                     ctxt.add_reply_field_bson_any_not_allowed_error(
@@ -752,8 +754,10 @@ def check_command_params_or_type_struct_fields(
         if newly_added:
             allow_name: str = cmd_name + "-param-" + new_field.name if is_command_parameter else cmd_name
             new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
-            if isinstance(new_field_type,
-                          syntax.Type) and "any" in new_field_type.bson_serialization_type:
+            # If we encounter a bson_serialization_type of None, we skip checking if 'any' is used.
+            if isinstance(
+                    new_field_type, syntax.Type
+            ) and new_field_type.bson_serialization_type is not None and "any" in new_field_type.bson_serialization_type:
                 # If 'any' is not explicitly allowed as the bson_serialization_type.
                 if allow_name not in ALLOW_ANY_TYPE_LIST:
                     ctxt.add_command_or_param_type_bson_any_not_allowed_error(

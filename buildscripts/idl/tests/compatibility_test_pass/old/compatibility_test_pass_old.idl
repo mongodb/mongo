@@ -400,6 +400,20 @@ structs:
             ArrayCommandParameter:
                 type: array<string>
 
+    ReplyWithNewArrayTypeField:
+        description: "new field is of ArrayType"
+        fields:
+            ok:
+                type: bool
+                unstable: false
+
+    ReplyWithNewNestedArrayTypeField:
+        description: "new field is a struct with a field of ArrayType"
+        fields:
+            ok:
+                type: bool
+                unstable: false
+
 commands:
     testCommand:
         description: "old passing test command"
@@ -1366,3 +1380,23 @@ commands:
         strict: true
         api_version: ""
         reply_type: OkReply
+
+    commandWithNewArrayTypeParameterAndArrayTypeReply:
+        description: "new command adds a new ArrayType parameter and a reply type with an ArrayType"
+        command_name: commandWithNewArrayTypeParameterAndArrayTypeReply
+        namespace: type
+        type: array<int>
+        cpp_name: commandWithNewArrayTypeParameterAndArrayTypeReply
+        strict: true
+        api_version: "1"
+        reply_type: ReplyWithNewArrayTypeField
+
+    commandWithNewNestedArrayTypeParameterAndNestedArrayTypeReply:
+        description: "new command adds a new parameter with a nested ArrayType field and a reply type with a nested ArrayType"
+        command_name: commandWithNewNestedArrayTypeParameterAndNestedArrayTypeReply
+        namespace: type
+        type: ArrayTypeStruct
+        cpp_name: commandWithNewNestedArrayTypeParameterAndNestedArrayTypeReply
+        strict: true
+        api_version: "1"
+        reply_type: ReplyWithNewNestedArrayTypeField
