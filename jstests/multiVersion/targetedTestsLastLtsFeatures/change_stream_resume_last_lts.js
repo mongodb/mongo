@@ -90,6 +90,5 @@ function runTest(oldVersion) {
     st.stop();
 }
 
-runTest('last-continuous');
 runTest('last-lts');
 }());

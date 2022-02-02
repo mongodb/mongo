@@ -1,3 +1,13 @@
+- suite_name: multiversion_future_git_tag
+  base_suite: multiversion
+  overrides:
+    - "multiversion.multiversion_future_git_tag_exclude_files"
+
+- suite_name: multiversion_auth_future_git_tag
+  base_suite: multiversion_auth
+  overrides:
+    - "multiversion.multiversion_auth_future_git_tag_exclude_files"
+
 - suite_name: change_streams_last_continuous_new_new_old
   base_suite: change_streams
   overrides:
@@ -27,7 +37,6 @@
   base_suite: change_streams
   overrides:
     - "multiversion.replica_fixture_last_lts_old_new_new"
-
 
 - suite_name: change_streams_sharded_collections_passthrough_last_continuous_new_old_old_new
   base_suite: change_streams_sharded_collections_passthrough

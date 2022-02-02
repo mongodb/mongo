@@ -4282,6 +4282,22 @@ tasks:
     vars:
       suite: change_streams_sharded_collections_passthrough
 
+- <<: *gen_task_template
+  name: multiversion_future_git_tag_gen
+  tags: ["multiversion", "no_version_combination", "multiversion_future_git_tag"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      suite: multiversion_future_git_tag
+
+- <<: *gen_task_template
+  name: multiversion_auth_future_git_tag_gen
+  tags: ["auth", "multiversion", "no_version_combination", "multiversion_future_git_tag"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      suite: multiversion_auth_future_git_tag
+
 - <<: *task_template
   name: change_streams_whole_db_passthrough
   tags: ["change_streams"]
@@ -4857,13 +4873,13 @@ tasks:
 
 - <<: *gen_task_template
   name: multiversion_auth_gen
-  tags: ["auth", "multiversion", "no_version_combination"]
+  tags: ["auth", "multiversion", "no_version_combination", "future_git_tag_incompatible"]
   commands:
   - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
   name: multiversion_gen
-  tags: ["multiversion", "no_version_combination"]
+  tags: ["multiversion", "no_version_combination", "future_git_tag_incompatible"]
   commands:
   - func: "generate resmoke tasks"
 
@@ -10173,6 +10189,7 @@ buildvariants:
       - rhel80-xlarge
     - name: build_variant_gen
     - name: .multiversion !.future_git_tag_incompatible
+    - name: .multiversion_future_git_tag
 
 - name: rhel-80-64-bit-nossl
   display_name: "RHEL 8.0 Shared Library (No SSL)"
