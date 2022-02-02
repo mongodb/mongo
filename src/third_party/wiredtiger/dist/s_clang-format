@@ -42,7 +42,7 @@ fi
 case $# in
 0)
 	# Get all source files that aren't in s_clang-format.list.
-	search=`find bench examples ext src test -name '*.[ch]' -o -name '*.cxx'`
+	search=`find bench examples ext src test -name '*.[ch]' -o -name '*.cxx' -o -name '*.cpp'`
 	for f in `cat dist/s_clang-format.list`; do
 		search=`echo "$search" | sed "\#$f#d"`
 	done;;

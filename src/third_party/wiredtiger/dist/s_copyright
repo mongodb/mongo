@@ -108,6 +108,7 @@ fi
 # Search for files, skipping some well-known 3rd party directories.
 (cd .. && find [a-z]* -name '*.[ch]' \
 	-o -name '*.cxx' \
+	-o -name '*.cpp' \
 	-o -name '*.in' \
 	-o -name '*.py' \
 	-o -name '*.swig' |

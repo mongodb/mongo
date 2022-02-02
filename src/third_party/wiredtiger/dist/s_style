@@ -17,7 +17,7 @@ if [ $# -ne 1 ]; then
 	cd ..
 
 	find bench examples ext src test \
-	    -name '*.[chsy]' -o -name '*.in' -o -name '*.dox' -o -name '*.cxx' -o -name '*.py' -o -name '*.cmake' -o -name '*.i' |
+	    -name '*.[chsy]' -o -name '*.in' -o -name '*.dox' -o -name '*.cxx' -o -name '*.cpp' -o -name '*.py' -o -name '*.cmake' -o -name '*.i' |
 	sed -e '/Makefile.in/d' \
 	    -e '/test\/3rdparty/d' \
 	    -e '/checksum\/power8/d' \

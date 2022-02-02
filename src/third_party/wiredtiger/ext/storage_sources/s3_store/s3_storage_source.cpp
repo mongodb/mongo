@@ -30,73 +30,73 @@
 #include <wiredtiger_ext.h>
 
 #include <aws/core/Aws.h>
-#include "aws_bucket_conn.h"
+#include "s3_connection.h"
 
 #define UNUSED(x) (void)(x)
 
 /* S3 storage source structure. */
 typedef struct {
-    WT_STORAGE_SOURCE storage_source; /* Must come first */
-    WT_EXTENSION_API *wt_api;         /* Extension API */
+    WT_STORAGE_SOURCE storageSource; /* Must come first */
+    WT_EXTENSION_API *wtApi;         /* Extension API */
 } S3_STORAGE;
 
 typedef struct {
     /* Must come first - this is the interface for the file system we are implementing. */
-    WT_FILE_SYSTEM file_system;
-    S3_STORAGE *s3_storage;
-    aws_bucket_conn *conn;
+    WT_FILE_SYSTEM fileSystem;
+    S3_STORAGE *s3Storage;
+    S3Connection *conn;
 } S3_FILE_SYSTEM;
 
 /* Configuration variables for connecting to S3CrtClient. */
 const Aws::String region = Aws::Region::AP_SOUTHEAST_2;
-const double throughput_target_gbps = 5;
-const uint64_t part_size = 8 * 1024 * 1024; /* 8 MB. */
+const double throughputTargetGbps = 5;
+const uint64_t partSize = 8 * 1024 * 1024; /* 8 MB. */
 
 /* Setting SDK options. */
 Aws::SDKOptions options;
 
-static int s3_customize_file_system(
+static int S3CustomizeFileSystem(
   WT_STORAGE_SOURCE *, WT_SESSION *, const char *, const char *, const char *, WT_FILE_SYSTEM **);
-static int s3_add_reference(WT_STORAGE_SOURCE *);
-static int s3_fs_terminate(WT_FILE_SYSTEM *, WT_SESSION *);
+static int S3AddReference(WT_STORAGE_SOURCE *);
+static int S3FileSystemTerminate(WT_FILE_SYSTEM *, WT_SESSION *);
 
 /*
- * s3_customize_file_system --
+ * S3CustomizeFileSystem --
  *     Return a customized file system to access the s3 storage source objects.
  */
 static int
-s3_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
-  const char *bucket_name, const char *auth_token, const char *config,
-  WT_FILE_SYSTEM **file_systemp)
+S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, const char *bucketName,
+  const char *authToken, const char *config, WT_FILE_SYSTEM **fileSystem)
 {
     S3_FILE_SYSTEM *fs;
     int ret;
 
     /* Mark parameters as unused for now, until implemented. */
     UNUSED(session);
-    UNUSED(bucket_name);
-    UNUSED(auth_token);
+    UNUSED(bucketName);
+    UNUSED(authToken);
     UNUSED(config);
 
     Aws::S3Crt::ClientConfiguration aws_config;
     aws_config.region = region;
-    aws_config.throughputTargetGbps = throughput_target_gbps;
-    aws_config.partSize = part_size;
+    aws_config.throughputTargetGbps = throughputTargetGbps;
+    aws_config.partSize = partSize;
 
     if ((fs = (S3_FILE_SYSTEM *)calloc(1, sizeof(S3_FILE_SYSTEM))) == NULL)
         return (errno);
 
-    fs->s3_storage = (S3_STORAGE *)storage_source;
+    fs->s3Storage = (S3_STORAGE *)storageSource;
 
     /* New can fail; will deal with this later. */
-    fs->conn = new aws_bucket_conn(aws_config);
-    fs->file_system.terminate = s3_fs_terminate;
+    fs->conn = new S3Connection(aws_config);
+
+    fs->fileSystem.terminate = S3FileSystemTerminate;
 
     /* TODO: Move these into tests. Just testing here temporarily to show all functions work. */
     {
         /* List S3 buckets. */
         std::vector<std::string> buckets;
-        if (fs->conn->list_buckets(buckets)) {
+        if (fs->conn->ListBuckets(buckets)) {
             std::cout << "All buckets under my account:" << std::endl;
             for (const std::string &bucket : buckets) {
                 std::cout << "  * " << bucket << std::endl;
@@ -106,14 +106,14 @@ s3_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
 
         /* Have at least one bucket to use. */
         if (!buckets.empty()) {
-            const Aws::String first_bucket = buckets.at(0);
+            const Aws::String firstBucket = buckets.at(0);
 
             /* List objects. */
-            std::vector<std::string> bucket_objects;
-            if (fs->conn->list_objects(first_bucket, bucket_objects)) {
-                std::cout << "Objects in bucket '" << first_bucket << "':" << std::endl;
-                if (!bucket_objects.empty()) {
-                    for (const auto &object : bucket_objects) {
+            std::vector<std::string> bucketObjects;
+            if (fs->conn->ListObjects(firstBucket, bucketObjects)) {
+                std::cout << "Objects in bucket '" << firstBucket << "':" << std::endl;
+                if (!bucketObjects.empty()) {
+                    for (const auto &object : bucketObjects) {
                         std::cout << "  * " << object << std::endl;
                     }
                 } else {
@@ -123,14 +123,14 @@ s3_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
             }
 
             /* Put object. */
-            fs->conn->put_object(first_bucket, "WiredTiger.turtle", "WiredTiger.turtle");
+            fs->conn->PutObject(firstBucket, "WiredTiger.turtle", "WiredTiger.turtle");
 
             /* List objects again. */
-            bucket_objects.clear();
-            if (fs->conn->list_objects(first_bucket, bucket_objects)) {
-                std::cout << "Objects in bucket '" << first_bucket << "':" << std::endl;
-                if (!bucket_objects.empty()) {
-                    for (const auto &object : bucket_objects) {
+            bucketObjects.clear();
+            if (fs->conn->ListObjects(firstBucket, bucketObjects)) {
+                std::cout << "Objects in bucket '" << firstBucket << "':" << std::endl;
+                if (!bucketObjects.empty()) {
+                    for (const auto &object : bucketObjects) {
                         std::cout << "  * " << object << std::endl;
                     }
                 } else {
@@ -140,14 +140,14 @@ s3_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
             }
 
             /* Delete object. */
-            fs->conn->delete_object(first_bucket, "WiredTiger.turtle");
+            fs->conn->DeleteObject(firstBucket, "WiredTiger.turtle");
 
             /* List objects again. */
-            bucket_objects.clear();
-            if (fs->conn->list_objects(first_bucket, bucket_objects)) {
-                std::cout << "Objects in bucket '" << first_bucket << "':" << std::endl;
-                if (!bucket_objects.empty()) {
-                    for (const auto &object : bucket_objects) {
+            bucketObjects.clear();
+            if (fs->conn->ListObjects(firstBucket, bucketObjects)) {
+                std::cout << "Objects in bucket '" << firstBucket << "':" << std::endl;
+                if (!bucketObjects.empty()) {
+                    for (const auto &object : bucketObjects) {
                         std::cout << "  * " << object << std::endl;
                     }
                 } else {
@@ -160,46 +160,46 @@ s3_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
         }
     }
 
-    *file_systemp = &fs->file_system;
+    *fileSystem = &fs->fileSystem;
     return 0;
 }
 
 /*
- * s3_fs_terminate --
+ * S3FileSystemTerminate --
  *     Discard any resources on termination of the file system.
  */
 static int
-s3_fs_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *session)
+S3FileSystemTerminate(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session)
 {
-    S3_FILE_SYSTEM *s3_fs;
+    S3_FILE_SYSTEM *fs;
 
     UNUSED(session); /* unused */
 
-    s3_fs = (S3_FILE_SYSTEM *)file_system;
-    delete (s3_fs->conn);
-    free(s3_fs);
+    fs = (S3_FILE_SYSTEM *)fileSystem;
+    delete (fs->conn);
+    free(fs);
 
     return (0);
 }
 
 /*
- * s3_add_reference --
+ * S3AddReference --
  *     Add a reference to the storage source so we can reference count to know when to really
  *     terminate.
  */
 static int
-s3_add_reference(WT_STORAGE_SOURCE *storage_source)
+S3AddReference(WT_STORAGE_SOURCE *storageSource)
 {
-    UNUSED(storage_source);
+    UNUSED(storageSource);
     return (0);
 }
 
 /*
- * s3_terminate --
+ * S3Terminate --
  *     Discard any resources on termination.
  */
 static int
-s3_terminate(WT_STORAGE_SOURCE *storage, WT_SESSION *session)
+S3Terminate(WT_STORAGE_SOURCE *storage, WT_SESSION *session)
 {
     S3_STORAGE *s3;
     s3 = (S3_STORAGE *)storage;
@@ -223,7 +223,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
     if ((s3 = (S3_STORAGE *)calloc(1, sizeof(S3_STORAGE))) == NULL)
         return (errno);
 
-    s3->wt_api = connection->get_extension_api(connection);
+    s3->wtApi = connection->get_extension_api(connection);
     UNUSED(config);
 
     Aws::InitAPI(options);
@@ -232,12 +232,12 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
      * Allocate a S3 storage structure, with a WT_STORAGE structure as the first field, allowing us
      * to treat references to either type of structure as a reference to the other type.
      */
-    s3->storage_source.ss_customize_file_system = s3_customize_file_system;
-    s3->storage_source.ss_add_reference = s3_add_reference;
-    s3->storage_source.terminate = s3_terminate;
+    s3->storageSource.ss_customize_file_system = S3CustomizeFileSystem;
+    s3->storageSource.ss_add_reference = S3AddReference;
+    s3->storageSource.terminate = S3Terminate;
 
     /* Load the storage */
-    if ((ret = connection->add_storage_source(connection, "s3_store", &s3->storage_source, NULL)) !=
+    if ((ret = connection->add_storage_source(connection, "s3_store", &s3->storageSource, NULL)) !=
       0)
         free(s3);
 
