@@ -533,6 +533,11 @@ void ReplicationRecoveryImpl::_recoverFromStableTimestamp(OperationContext* opCt
         (startupRecoveryForRestore || _duringInitialSync)) {
         _storageInterface->setInitialDataTimestamp(opCtx->getServiceContext(),
                                                    topOfOplog.getTimestamp());
+        // Clear the appliedThrough so this reflects in the first stable checkpoint. See
+        // _recoverFromUnstableCheckpoint for details.
+        if (!gTakeUnstableCheckpointOnShutdown) {
+            _consistencyMarkers->clearAppliedThrough(opCtx);
+        }
     }
 }
 
