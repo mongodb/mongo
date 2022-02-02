@@ -681,6 +681,9 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
     // following $unwind stage.
     if (nextUnwind && !_unwindSrc && nextUnwind->getUnwindPath() == _as.fullPath()) {
         _unwindSrc = std::move(nextUnwind);
+
+        // We cannot push absorbed $unwind stages into SBE.
+        _sbeCompatible = false;
         container->erase(std::next(itr));
         return itr;
     }
@@ -765,7 +768,10 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
         return std::next(itr);
     }
 
-    // We can internalize the $match.
+    // We can internalize the $match. This $lookup should already be marked as SBE incompatible
+    // because a $match can only be internalized if an $unwind, which is SBE incompatible, was
+    // absorbed as well.
+    tassert(5843701, "This $lookup cannot be compatible with SBE", !_sbeCompatible);
     if (!_matchSrc) {
         _matchSrc = nextMatch;
     } else {
@@ -1249,12 +1255,17 @@ intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
                 "$lookup with a 'let' argument must also specify 'pipeline'",
                 !hasLet);
 
-        return new DocumentSourceLookUp(std::move(fromNs),
-                                        std::move(as),
-                                        std::move(localField),
-                                        std::move(foreignField),
-                                        std::move(fromCollator),
-                                        pExpCtx);
+        auto lookupStage = new DocumentSourceLookUp(std::move(fromNs),
+                                                    std::move(as),
+                                                    std::move(localField),
+                                                    std::move(foreignField),
+                                                    std::move(fromCollator),
+                                                    pExpCtx);
+
+        // $lookup stages with local/foreignField specified are eligible for pushdown into SBE if
+        // the context allows it.
+        lookupStage->_sbeCompatible = pExpCtx->sbeCompatible;
+        return lookupStage;
     }
 }
 

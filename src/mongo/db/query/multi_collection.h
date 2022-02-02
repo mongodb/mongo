@@ -80,6 +80,15 @@ public:
         return _secondaryColls;
     }
 
+    const CollectionPtr& lookupCollection(const NamespaceString& nss) const {
+        if (_mainCollName && nss == *_mainCollName) {
+            return *_mainColl;
+        } else if (auto itr = _secondaryColls.find(nss); itr != _secondaryColls.end()) {
+            return itr->second;
+        }
+        return CollectionPtr::null;
+    }
+
     void clear() {
         _mainColl = &CollectionPtr::null;
         _secondaryColls.clear();

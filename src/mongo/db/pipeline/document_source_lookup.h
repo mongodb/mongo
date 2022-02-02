@@ -223,6 +223,14 @@ public:
 
     boost::intrusive_ptr<DocumentSource> clone() const final;
 
+    bool sbeCompatible() const {
+        return _sbeCompatible;
+    }
+
+    const NamespaceString& getFromNs() {
+        return _fromNs;
+    }
+
 protected:
     GetNextResult doGetNext() final;
     void doDispose() final;
@@ -364,6 +372,9 @@ private:
     // default binary collation. We need to differentiate between the two to avoid serializing the
     // collation when not set explicitly.
     bool _hasExplicitCollation = false;
+
+    // Can this $lookup be pushed down into SBE?
+    bool _sbeCompatible = false;
 
     // The aggregation pipeline to perform against the '_resolvedNs' namespace. Referenced view
     // namespaces have been resolved.

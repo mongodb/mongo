@@ -659,8 +659,13 @@ Status runAggregate(OperationContext* opCtx,
     auto initContext = [&](AutoGetCollectionViewMode m) -> void {
         ctx.emplace(opCtx, nss, m);
         for (const auto& ns : secondaryExecNssList) {
-            secondaryCtx.emplace_back(
-                std::make_unique<AutoGetCollectionForReadCommandMaybeLockFree>(opCtx, ns, m));
+            // Avoid locking the main namespace multiple times (we can't lock a secondary
+            // namespace multiple times because 'secondaryExecNssList is a set already). This
+            // emulates the behavior of 'AutoGetCollectionMulti'.
+            if (ns != nss) {
+                secondaryCtx.emplace_back(
+                    std::make_unique<AutoGetCollectionForReadCommandMaybeLockFree>(opCtx, ns, m));
+            }
         }
         collections = MultiCollection(ctx, secondaryCtx);
     };

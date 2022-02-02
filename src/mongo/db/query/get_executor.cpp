@@ -962,7 +962,7 @@ public:
 
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> buildExecutableTree(
         const QuerySolution& solution) const final {
-        // TODO SERVER-58437 We don't pass '_collections' to the function below because at the
+        // TODO SERVER-62677 We don't pass '_collections' to the function below because at the
         // moment, no pushdown is actually happening. This should be changed once the logic for
         // pushdown is implemented.
         return stage_builder::buildSlotBasedExecutableTree(
