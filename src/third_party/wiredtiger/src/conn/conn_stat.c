@@ -649,6 +649,10 @@ __wt_statlog_create(WT_SESSION_IMPL *session, const char *cfg[])
 
     conn = S2C(session);
 
+    /* Readonly systems don't configure statistics logging. */
+    if (F_ISSET(conn, WT_CONN_READONLY))
+        return (0);
+
     /*
      * Stop any server that is already running. This means that each time reconfigure is called
      * we'll bounce the server even if there are no configuration changes. This makes our life
@@ -683,6 +687,10 @@ __wt_statlog_destroy(WT_SESSION_IMPL *session, bool is_close)
     WT_DECL_RET;
 
     conn = S2C(session);
+
+    /* Readonly systems don't configure statistics logging. */
+    if (F_ISSET(conn, WT_CONN_READONLY))
+        return (0);
 
     /* Stop the server thread. */
     FLD_CLR(conn->server_flags, WT_CONN_SERVER_STATISTICS);

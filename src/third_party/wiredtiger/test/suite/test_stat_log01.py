@@ -35,16 +35,16 @@ from wiredtiger import stat
 # test_stat_log01.py
 #    Statistics log
 class test_stat_log01(wttest.WiredTigerTestCase):
-    """
-    Test statistics log
-    """
-
     # Tests need to setup the connection in their own way.
     def setUpConnectionOpen(self, dir):
         return None
 
     def setUpSessionOpen(self, conn):
         return None
+
+    def check_stats_file(self, dir):
+        files = glob.glob(dir + '/' + 'WiredTigerStat.[0-9]*')
+        self.assertTrue(files)
 
     def test_stats_log_default(self):
         self.conn = self.wiredtiger_open(
@@ -76,9 +76,16 @@ class test_stat_log01(wttest.WiredTigerTestCase):
         self.close_conn()
         self.check_stats_file(".")
 
-    def check_stats_file(self, dir):
-        files = glob.glob(dir + '/' + 'WiredTigerStat.[0-9]*')
-        self.assertTrue(files)
+# Statistics log, test subsequent readonly open works.
+class test_stat_log01_readonly(wttest.WiredTigerTestCase):
+    # Configure statistics logging so it gets written into the base configuration file.
+    conn_config = 'log=(enabled),statistics=(all),statistics_log=(on_close=true)'
+
+    def test_stat_log01_readonly(self):
+        # Close and reopen in readonly mode.
+        self.close_conn()
+        conn = self.wiredtiger_open(self.home, "readonly")
+        conn.close()
 
 if __name__ == '__main__':
     wttest.run()
