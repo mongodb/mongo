@@ -75,9 +75,17 @@ public:
                     fromNss != toNss);
 
             RenameCollectionRequest renameCollReq(request().getTo());
-            renameCollReq.setDropTarget(request().getDropTarget());
             renameCollReq.setStayTemp(request().getStayTemp());
-            renameCollReq.setCollectionUUID(request().getCollectionUUID());
+            renameCollReq.setExpectedSourceUUID(request().getCollectionUUID());
+            stdx::visit(
+                visit_helper::Overloaded{
+                    [&renameCollReq](bool dropTarget) { renameCollReq.setDropTarget(dropTarget); },
+                    [&renameCollReq](const UUID& uuid) {
+                        renameCollReq.setDropTarget(true);
+                        renameCollReq.setExpectedTargetUUID(uuid);
+                    },
+                },
+                request().getDropTarget());
 
             ShardsvrRenameCollection renameCollRequest(fromNss);
             renameCollRequest.setDbName(fromNss.db());

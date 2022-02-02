@@ -46,9 +46,12 @@ commands:
                 description: "The new namespace for the collection being renamed."
                 type: namespacestring
             dropTarget:
-                description: "If true, mongod will drop the target of renameCollection prior to
-                renaming the collection."
-                type: bool
+                description: >-
+                  If true or a UUID, mongod will drop the target of renameCollection prior to
+                  renaming the collection. A UUID is the expected UUID of the target collection to
+                  be dropped.
+                type:
+                  variant: [bool, uuid]
                 default: false
             stayTemp:
                 description: "If true, the original collection will remain temp if it was temp

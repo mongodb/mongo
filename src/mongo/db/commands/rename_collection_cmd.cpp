@@ -102,9 +102,18 @@ public:
             ErrorCodes::IllegalOperation, "Can't rename a collection to itself", fromNss != toNss);
 
         RenameCollectionOptions options;
-        options.expectedSourceUUID = renameRequest.getCollectionUUID();
-        options.dropTarget = renameRequest.getDropTarget();
         options.stayTemp = renameRequest.getStayTemp();
+        options.expectedSourceUUID = renameRequest.getCollectionUUID();
+        stdx::visit(
+            visit_helper::Overloaded{
+                [&options](bool dropTarget) { options.dropTarget = dropTarget; },
+                [&options](const UUID& uuid) {
+                    options.dropTarget = true;
+                    options.expectedTargetUUID = uuid;
+                },
+            },
+            renameRequest.getDropTarget());
+
         validateAndRunRenameCollection(
             opCtx, renameRequest.getCommandParameter(), renameRequest.getTo(), options);
         return true;

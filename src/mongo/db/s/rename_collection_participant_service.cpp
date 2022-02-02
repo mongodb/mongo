@@ -279,8 +279,12 @@ SemiFuture<void> RenameParticipantInstance::run(
                 auto* opCtx = opCtxHolder.get();
                 _doc.getForwardableOpMetadata().setOn(opCtx);
 
-                const RenameCollectionOptions options{
-                    _doc.getCollectionUUID(), _doc.getDropTarget(), _doc.getStayTemp()};
+                RenameCollectionOptions options;
+                options.dropTarget = _doc.getDropTarget();
+                options.stayTemp = _doc.getStayTemp();
+                options.expectedSourceUUID = _doc.getExpectedSourceUUID();
+                options.expectedTargetUUID = _doc.getExpectedTargetUUID();
+
                 renameOrDropTarget(
                     opCtx, fromNss(), toNss(), options, _doc.getSourceUUID(), _doc.getTargetUUID());
 

@@ -320,6 +320,7 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     const auto targetColl = catalog->lookupCollectionByNamespace(opCtx, target);
 
     checkCollectionUUIDMismatch(opCtx, sourceColl, options.expectedSourceUUID);
+    checkCollectionUUIDMismatch(opCtx, targetColl, options.expectedTargetUUID);
 
     AutoStatsTracker statsTracker(
         opCtx,
@@ -463,8 +464,8 @@ Status renameBetweenDBs(OperationContext* opCtx,
                       << source << "; target: " << target);
 
     uassert(ErrorCodes::InvalidOptions,
-            "Cannot provide an expected source collection UUID when renaming between databases",
-            !options.expectedSourceUUID);
+            "Cannot provide an expected collection UUID when renaming between databases",
+            !options.expectedSourceUUID && !options.expectedTargetUUID);
 
     boost::optional<Lock::DBLock> sourceDbLock;
     boost::optional<Lock::CollectionLock> sourceCollLock;

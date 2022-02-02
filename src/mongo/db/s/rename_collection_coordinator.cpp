@@ -180,15 +180,15 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         _doc.setOptShardedCollInfo(optSourceCollType);
                     } else if (fromNss.db() != toNss.db()) {
                         uassert(ErrorCodes::InvalidOptions,
-                                "Cannot provide an expected source collection UUID when renaming "
-                                "between databases",
-                                !_doc.getCollectionUUID());
+                                "Cannot provide an expected collection UUID when renaming between "
+                                "databases",
+                                !_doc.getExpectedSourceUUID() && !_doc.getExpectedTargetUUID());
                         sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);
                     }
 
                     {
                         AutoGetCollection coll{opCtx, fromNss, MODE_IS};
-                        checkCollectionUUIDMismatch(opCtx, *coll, _doc.getCollectionUUID());
+                        checkCollectionUUIDMismatch(opCtx, *coll, _doc.getExpectedSourceUUID());
                     }
 
                     // Make sure the target namespace is not a view
@@ -210,6 +210,11 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                     sharding_ddl_util::checkShardedRenamePreconditions(
                         opCtx, toNss, _doc.getDropTarget());
+
+                    {
+                        AutoGetCollection coll{opCtx, toNss, MODE_IS};
+                        checkCollectionUUIDMismatch(opCtx, *coll, _doc.getExpectedTargetUUID());
+                    }
 
                 } catch (const DBException&) {
                     _completeOnError = true;
