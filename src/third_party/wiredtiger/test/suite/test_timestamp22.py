@@ -134,15 +134,11 @@ class test_timestamp22(wttest.WiredTigerTestCase):
                 config += ',durable_timestamp=' + self.timestamp_str(self.gen_ts(commit_ts))
                 ok = False
 
-            # ODDITY: if we set the durable timestamp (which is illegal at this point), and set a
-            # valid commit timestamp, the timestamp_transaction() call will fail, but apparently,
-            # only the durable part fails.  The evidence is that the commit timestamp is set,
-            # as we get a complaint to that effect at the prepare call.  The issue is described
-            # in WT-6995.  This seems wrong, and it's hard to work around the problem, so we'll just
-            # avoid testing that situation for now.  Hence the check for a blank configuration.
-            # When WT-6995 is fixed, remove the "and config = ''" part of the clause immediately
-            # below, and this entire comment.
-            if self.rand.rand32() % 2 == 0 and config == '':
+            # We don't do the next part if we set an illegal durable timestamp.  It turns out
+            # if we do set the durable timestamp illegally, with a valid commit timestamp,
+            # the timestamp_transaction() call will fail, but may set the commit timestamp.
+            # It makes testing more complex, so we just don't do it.
+            elif self.rand.rand32() % 2 == 0:
                 if self.do_illegal():
                     this_commit_ts = self.oldest_ts - 1
                 elif self.do_illegal():
@@ -215,20 +211,12 @@ class test_timestamp22(wttest.WiredTigerTestCase):
             if first_commit_ts < 0:
                 first_commit_ts = running_commit_ts
 
-        # WT-7011:
-        # ODDITY: If any setting of the timestamp fails, then an ASSERT will be hit in prepare.
-        # Avoid this, it will crash the test suite when diagnostic mode is enabled, and without
-        # diagnostic mode, the prepare appears to succeed!  Comment out the statement marked
-        # "AVOID ASSERT" below to see it happen. We should fix this to not assert in prepare,
-        # and either return an error in prepare, or fully succeed (forgiving the previous
-        # bad timestamp_transaction and allowing subsequent commit).  If the former,
-        # then just remove the "AVOID ASSERT" line below.  If the latter, then remove
-        # the entire if statement enclosing the "AVOID ASSERT".
+        # If a call to set a timestamp fails, a subsequent prepare may assert in diagnostic mode.
+        # We consider that acceptable, but we don't test it as it will crash the test suite.
         if not ok_tstxn1 or not ok_tstxn2:
-            # If a setting of the timestamp fails, the prepare and commit both fail.
+            do_prepare = False      # AVOID ASSERT
             ok_prepare = False
             ok_commit = False
-            do_prepare = False      # AVOID ASSERT
 
         if running_commit_ts >= 0 and do_prepare:
             # Cannot set prepare timestamp after commit timestamp is successfully set.
