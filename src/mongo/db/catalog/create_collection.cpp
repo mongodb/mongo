@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/create_gen.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
@@ -144,7 +145,7 @@ void _createSystemDotViewsIfNecessary(OperationContext* opCtx, const Database* d
 
 Status _createView(OperationContext* opCtx,
                    const NamespaceString& nss,
-                   CollectionOptions&& collectionOptions) {
+                   const CollectionOptions& collectionOptions) {
     // This must be checked before we take locks in order to avoid attempting to take multiple locks
     // on the <db>.system.views namespace: first a IX lock on 'ns' and then a X lock on the database
     // system.views collection.
@@ -443,8 +444,8 @@ Status _createTimeseries(OperationContext* opCtx,
 
 Status _createCollection(OperationContext* opCtx,
                          const NamespaceString& nss,
-                         CollectionOptions&& collectionOptions,
-                         boost::optional<BSONObj> idIndex) {
+                         const CollectionOptions& collectionOptions,
+                         const boost::optional<BSONObj>& idIndex) {
     return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
         AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
@@ -480,19 +481,6 @@ Status _createCollection(OperationContext* opCtx,
         if (!collectionOptions.clusteredIndex && collectionOptions.expireAfterSeconds) {
             return Status(ErrorCodes::InvalidOptions,
                           "'expireAfterSeconds' requires clustering to be enabled");
-        }
-
-        if (MONGO_unlikely(clusterAllCollectionsByDefault.shouldFail()) &&
-            !collectionOptions.clusteredIndex.is_initialized() &&
-            (!idIndex || idIndex->isEmpty()) && !collectionOptions.capped &&
-            !clustered_util::requiresLegacyFormat(nss) &&
-            feature_flags::gClusteredIndexes.isEnabled(serverGlobalParams.featureCompatibility)) {
-            // Capped, clustered collections different in behavior significantly from normal
-            // capped collections. Notably, they allow out-of-order insertion.
-            //
-            // Additionally, don't set the collection to be clustered in the default format if it
-            // requires legacy format.
-            collectionOptions.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
         }
 
         if (auto clusteredIndex = collectionOptions.clusteredIndex) {
@@ -575,8 +563,8 @@ Status _createCollection(OperationContext* opCtx,
  */
 Status createCollection(OperationContext* opCtx,
                         const NamespaceString& ns,
-                        CollectionOptions&& options,
-                        boost::optional<BSONObj> idIndex) {
+                        const CollectionOptions& options,
+                        const boost::optional<BSONObj>& idIndex) {
     auto status = userAllowedCreateNS(opCtx, ns);
     if (!status.isOK()) {
         return status;
@@ -591,7 +579,7 @@ Status createCollection(OperationContext* opCtx,
                 "The 'clusteredIndex' option is not supported with views",
                 !options.clusteredIndex);
 
-        return _createView(opCtx, ns, std::move(options));
+        return _createView(opCtx, ns, options);
     } else if (options.timeseries && !ns.isTimeseriesBucketsCollection()) {
         // This helper is designed for user-created time-series collections on primaries. If a
         // time-series buckets collection is created explicitly or during replication, treat this as
@@ -606,8 +594,26 @@ Status createCollection(OperationContext* opCtx,
                 str::stream() << "Cannot create system collection " << ns
                               << " within a transaction.",
                 !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
-        return _createCollection(opCtx, ns, std::move(options), idIndex);
+        return _createCollection(opCtx, ns, options, idIndex);
     }
+}
+
+CollectionOptions clusterByDefaultIfNecessary(const NamespaceString& nss,
+                                              CollectionOptions collectionOptions,
+                                              const boost::optional<BSONObj>& idIndex) {
+    if (MONGO_unlikely(clusterAllCollectionsByDefault.shouldFail()) &&
+        !collectionOptions.isView() && !collectionOptions.clusteredIndex.is_initialized() &&
+        (!idIndex || idIndex->isEmpty()) && !collectionOptions.capped &&
+        !clustered_util::requiresLegacyFormat(nss) &&
+        feature_flags::gClusteredIndexes.isEnabled(serverGlobalParams.featureCompatibility)) {
+        // Capped, clustered collections differ in behavior significantly from normal
+        // capped collections. Notably, they allow out-of-order insertion.
+        //
+        // Additionally, don't set the collection to be clustered in the default format if it
+        // requires legacy format.
+        collectionOptions.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+    }
+    return collectionOptions;
 }
 
 /**
@@ -617,7 +623,7 @@ Status createCollection(OperationContext* opCtx,
 Status createCollection(OperationContext* opCtx,
                         const NamespaceString& nss,
                         const BSONObj& cmdObj,
-                        boost::optional<BSONObj> idIndex,
+                        const boost::optional<BSONObj>& idIndex,
                         CollectionOptions::ParseKind kind) {
     BSONObjIterator it(cmdObj);
 
@@ -649,9 +655,15 @@ Status createCollection(OperationContext* opCtx,
             return statusWith.getStatus();
         }
         collectionOptions = statusWith.getValue();
+        bool hasExplicitlyDisabledClustering =
+            options["clusteredIndex"].isBoolean() && !options["clusteredIndex"].boolean();
+        if (!hasExplicitlyDisabledClustering) {
+            collectionOptions =
+                clusterByDefaultIfNecessary(nss, std::move(collectionOptions), idIndex);
+        }
     }
 
-    return createCollection(opCtx, nss, std::move(collectionOptions), idIndex);
+    return createCollection(opCtx, nss, collectionOptions, idIndex);
 }
 
 }  // namespace
@@ -672,7 +684,13 @@ Status createCollection(OperationContext* opCtx,
                         const CreateCommand& cmd) {
     auto options = CollectionOptions::fromCreateCommand(cmd);
     auto idIndex = std::exchange(options.idIndex, {});
-    return createCollection(opCtx, ns, std::move(options), idIndex);
+    bool hasExplicitlyDisabledClustering = cmd.getClusteredIndex() &&
+        stdx::holds_alternative<bool>(*cmd.getClusteredIndex()) &&
+        !stdx::get<bool>(*cmd.getClusteredIndex());
+    if (!hasExplicitlyDisabledClustering) {
+        options = clusterByDefaultIfNecessary(ns, std::move(options), idIndex);
+    }
+    return createCollection(opCtx, ns, options, idIndex);
 }
 
 void createChangeStreamPreImagesCollection(OperationContext* opCtx) {
@@ -686,8 +704,7 @@ void createChangeStreamPreImagesCollection(OperationContext* opCtx) {
     // Make the collection clustered by _id.
     preImagesCollectionOptions.clusteredIndex.emplace(
         clustered_util::makeCanonicalClusteredInfoForLegacyFormat());
-    const auto status =
-        _createCollection(opCtx, nss, std::move(preImagesCollectionOptions), BSONObj());
+    const auto status = _createCollection(opCtx, nss, preImagesCollectionOptions, BSONObj());
     uassert(status.code(),
             str::stream() << "Failed to create the pre-images collection: " << nss.coll()
                           << causedBy(status.reason()),
@@ -699,7 +716,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                    const boost::optional<UUID>& ui,
                                    const BSONObj& cmdObj,
                                    const bool allowRenameOutOfTheWay,
-                                   boost::optional<BSONObj> idIndex) {
+                                   const boost::optional<BSONObj>& idIndex) {
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
 
     const NamespaceString newCollName(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));

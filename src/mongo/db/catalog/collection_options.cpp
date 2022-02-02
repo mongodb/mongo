@@ -329,6 +329,8 @@ CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd)
                     if (isClustered) {
                         options.clusteredIndex =
                             clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
+                    } else {
+                        options.clusteredIndex = boost::none;
                     }
                 },
                 [&](const ClusteredIndexSpec& clusteredIndexSpec) {

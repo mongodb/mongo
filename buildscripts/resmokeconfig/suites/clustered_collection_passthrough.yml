@@ -44,8 +44,6 @@ selector:
   - jstests/core/list_indexes.js
   # Expects createIndex with 'clustered' option fails on a non-clustered collection.
   - jstests/core/clustered_collection_create_index_clustered.js
-  # Will do clustering on the explicitly non-clustered collections
-  - jstests/core/clustered_collection_creation.js
   # Tries to drop the clustered index.
   - jstests/core/drop_index.js
   - jstests/core/drop_indexes.js
