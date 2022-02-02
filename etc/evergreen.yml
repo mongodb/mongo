@@ -4920,6 +4920,7 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       resmoke_jobs_max: 1
+      use_large_distro: "true"
 
 - <<: *task_template
   name: serial_run
