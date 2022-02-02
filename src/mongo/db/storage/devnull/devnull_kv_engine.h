@@ -44,6 +44,8 @@ class JournalListener;
  */
 class DevNullKVEngine : public KVEngine {
 public:
+    DevNullKVEngine();
+
     virtual ~DevNullKVEngine() {}
 
     virtual RecoveryUnit* newRecoveryUnit() {
@@ -172,9 +174,7 @@ public:
 
 private:
     std::shared_ptr<void> _catalogInfo;
-
     int _cachePressureForTest;
-
-    std::vector<BackupBlock> _mockBackupBlocks = {BackupBlock("filename.wt")};
+    std::vector<BackupBlock> _mockBackupBlocks;
 };
 }  // namespace mongo

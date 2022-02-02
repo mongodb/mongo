@@ -246,6 +246,9 @@ public:
     }
 };
 
+DevNullKVEngine::DevNullKVEngine() {
+    _mockBackupBlocks.push_back(BackupBlock(/*opCtx=*/nullptr, "filename.wt"));
+}
 
 std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* opCtx,
                                                              StringData ns,

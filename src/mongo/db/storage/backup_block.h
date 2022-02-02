@@ -29,7 +29,11 @@
 
 #pragma once
 
+#include <boost/filesystem.hpp>
 #include <string>
+
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
@@ -47,16 +51,26 @@ namespace mongo {
  */
 class BackupBlock final {
 public:
-    explicit BackupBlock(std::string filename,
+    explicit BackupBlock(OperationContext* opCtx,
+                         std::string filePath,
                          std::uint64_t offset = 0,
                          std::uint64_t length = 0,
-                         std::uint64_t fileSize = 0)
-        : _filename(filename), _offset(offset), _length(length), _fileSize(fileSize) {}
+                         std::uint64_t fileSize = 0);
 
     ~BackupBlock() = default;
 
-    std::string filename() const {
-        return _filename;
+    std::string filePath() const {
+        return _filePath;
+    }
+
+    std::string ns() const {
+        // Remove "system.buckets." from time-series collection namespaces since it is an
+        // internal detail that is not intended to be visible externally.
+        if (_nss.isTimeseriesBucketsCollection()) {
+            return _nss.getTimeseriesViewNamespace().toString();
+        }
+
+        return _nss.toString();
     }
 
     std::uint64_t offset() const {
@@ -77,9 +91,20 @@ public:
     bool isRequired() const;
 
 private:
-    const std::string _filename;
+    /**
+     * Sets '_nss' for:
+     * - collections
+     * - indexes, to the NSS of their respective collection
+     * A null opCtx is ignored. A null opCtx is exercised by FCBIS unit tests.
+     */
+    void _setNamespaceString(OperationContext* opCtx);
+
+    const std::string _filePath;
     const std::uint64_t _offset;
     const std::uint64_t _length;
     const std::uint64_t _fileSize;
+
+    std::string _filenameStem;
+    NamespaceString _nss;
 };
 }  // namespace mongo

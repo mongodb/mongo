@@ -1082,11 +1082,13 @@ std::vector<std::string> getUniqueFiles(const std::vector<std::string>& files,
 class StreamingCursorImpl : public StorageEngine::StreamingCursor {
 public:
     StreamingCursorImpl() = delete;
-    explicit StreamingCursorImpl(WT_SESSION* session,
+    explicit StreamingCursorImpl(OperationContext* opCtx,
+                                 WT_SESSION* session,
                                  std::string path,
                                  StorageEngine::BackupOptions options,
                                  WiredTigerBackup* wtBackup)
         : StorageEngine::StreamingCursor(options),
+          _opCtx(opCtx),
           _session(session),
           _path(path),
           _wtBackup(wtBackup){};
@@ -1154,7 +1156,7 @@ public:
                 // are the initial incremental backup.
                 const std::uint64_t length = options.incrementalBackup ? fileSize : 0;
                 backupBlocks.push_back(
-                    BackupBlock(filePath.string(), 0 /* offset */, length, fileSize));
+                    BackupBlock(_opCtx, filePath.string(), 0 /* offset */, length, fileSize));
             }
         }
 
@@ -1207,14 +1209,14 @@ private:
                         "offset"_attr = offset,
                         "size"_attr = size,
                         "type"_attr = type);
-            backupBlocks->push_back(BackupBlock(filePath.string(), offset, size, fileSize));
+            backupBlocks->push_back(BackupBlock(_opCtx, filePath.string(), offset, size, fileSize));
         }
 
         // If the file is unchanged, push a BackupBlock with offset=0 and length=0. This allows us
         // to distinguish between an unchanged file and a deleted file in an incremental backup.
         if (fileUnchangedFlag) {
             backupBlocks->push_back(
-                BackupBlock(filePath.string(), 0 /* offset */, 0 /* length */, fileSize));
+                BackupBlock(_opCtx, filePath.string(), 0 /* offset */, 0 /* length */, fileSize));
         }
 
         // If the duplicate backup cursor has been exhausted, close it and set
@@ -1231,6 +1233,7 @@ private:
         return Status::OK();
     }
 
+    OperationContext* _opCtx;
     WT_SESSION* _session;
     std::string _path;
     WiredTigerBackup* _wtBackup;  // '_wtBackup' is an out parameter.
@@ -1286,7 +1289,7 @@ WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
     invariant(_wtBackup.logFilePathsSeenByExtendBackupCursor.empty());
     invariant(_wtBackup.logFilePathsSeenByGetNextBatch.empty());
     auto streamingCursor =
-        std::make_unique<StreamingCursorImpl>(session, _path, options, &_wtBackup);
+        std::make_unique<StreamingCursorImpl>(opCtx, session, _path, options, &_wtBackup);
 
     pinOplogGuard.dismiss();
     _backupSession = std::move(sessionRaii);

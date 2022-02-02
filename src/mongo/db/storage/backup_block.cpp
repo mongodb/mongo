@@ -27,11 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/db/storage/backup_block.h"
+
 #include <boost/filesystem.hpp>
 #include <set>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/storage/backup_block.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
@@ -45,9 +47,20 @@ const std::set<std::string> kRequiredMDBFiles = {"_mdb_catalog.wt", "sizeStorer.
 
 }  // namespace
 
+BackupBlock::BackupBlock(OperationContext* opCtx,
+                         std::string filePath,
+                         std::uint64_t offset,
+                         std::uint64_t length,
+                         std::uint64_t fileSize)
+    : _filePath(filePath), _offset(offset), _length(length), _fileSize(fileSize) {
+    boost::filesystem::path path(filePath);
+    _filenameStem = path.stem().string();
+    _setNamespaceString(opCtx);
+}
+
 bool BackupBlock::isRequired() const {
     // Extract the filename from the path.
-    boost::filesystem::path path(_filename);
+    boost::filesystem::path path(_filePath);
     const std::string filename = path.filename().string();
 
     // Check whether this is a required WiredTiger file.
@@ -72,11 +85,38 @@ bool BackupBlock::isRequired() const {
         return true;
     }
 
-    // TODO SERVER-62427: mark the following namespaces as required:
-    // - Any collection residing in an internal database (admin, local or config).
-    // - Each databases 'system.views' collection.
-    // - Collections with table logging enabled. See WiredTigerUtil::useTableLogging().
+    // Check if collection resides in an internal database (admin, local, or config).
+    if (_nss.isOnInternalDb()) {
+        return true;
+    }
+
+    // Check if collection is 'system.views'.
+    if (_nss.isSystemDotViews()) {
+        return true;
+    }
+
     return false;
+}
+
+void BackupBlock::_setNamespaceString(OperationContext* opCtx) {
+    if (!opCtx) {
+        return;
+    }
+
+    DurableCatalog* catalog = DurableCatalog::get(opCtx);
+    std::vector<DurableCatalog::Entry> catalogEntries = catalog->getAllCatalogEntries(opCtx);
+    for (const DurableCatalog::Entry& e : catalogEntries) {
+        if (StringData(_filenameStem).startsWith("index-"_sd) &&
+            catalog->isIndexInEntry(opCtx, e.catalogId, _filenameStem)) {
+            _nss = e.tenantNs.getNss();
+            return;
+        }
+
+        if (e.ident == _filenameStem) {
+            _nss = e.tenantNs.getNss();
+            return;
+        }
+    }
 }
 
 }  // namespace mongo
