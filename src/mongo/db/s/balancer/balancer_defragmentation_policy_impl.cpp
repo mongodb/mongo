@@ -46,7 +46,7 @@ namespace mongo {
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(beforeTransitioningDefragmentationPhase);
+MONGO_FAIL_POINT_DEFINE(skipDefragmentationPhaseTransition);
 MONGO_FAIL_POINT_DEFINE(afterBuildingNextDefragmentationPhase);
 
 using ShardStatistics = ClusterStatistics::ShardStatistics;
@@ -1491,7 +1491,8 @@ bool BalancerDefragmentationPolicyImpl::_refreshDefragmentationPhaseFor(Operatio
                                                                         const UUID& collUuid) {
     auto& currentPhase = _defragmentationStates.at(collUuid);
     auto currentPhaseCompleted = [&currentPhase] {
-        return currentPhase && currentPhase->isComplete();
+        return currentPhase && currentPhase->isComplete() &&
+            MONGO_likely(!skipDefragmentationPhaseTransition.shouldFail());
     };
 
     if (!currentPhaseCompleted()) {
@@ -1640,7 +1641,6 @@ std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transi
     const CollectionType& coll,
     DefragmentationPhaseEnum nextPhase,
     bool shouldPersistPhase) {
-    beforeTransitioningDefragmentationPhase.pauseWhileSet();
     std::unique_ptr<DefragmentationPhase> nextPhaseObject(nullptr);
     try {
         if (shouldPersistPhase) {
@@ -1688,12 +1688,16 @@ std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transi
 void BalancerDefragmentationPolicyImpl::_initializeCollectionState(WithLock,
                                                                    OperationContext* opCtx,
                                                                    const CollectionType& coll) {
+    if (MONGO_unlikely(skipDefragmentationPhaseTransition.shouldFail())) {
+        return;
+    }
     auto phaseToBuild = coll.getDefragmentationPhase()
         ? coll.getDefragmentationPhase().get()
         : DefragmentationPhaseEnum::kMergeAndMeasureChunks;
     auto collectionPhase = _transitionPhases(
         opCtx, coll, phaseToBuild, !coll.getDefragmentationPhase().is_initialized());
-    while (collectionPhase && collectionPhase->isComplete()) {
+    while (collectionPhase && collectionPhase->isComplete() &&
+           MONGO_likely(!skipDefragmentationPhaseTransition.shouldFail())) {
         collectionPhase = _transitionPhases(opCtx, coll, collectionPhase->getNextPhase());
     }
     if (collectionPhase) {

@@ -182,7 +182,7 @@ jsTest.log("Begin and end defragmentation with balancer on");
 {
     st.startBalancer();
     // Allow the first phase transition to build the initial defragmentation state
-    setFailPointOnConfigNodes("beforeTransitioningDefragmentationPhase", {skip: 1});
+    setFailPointOnConfigNodes("skipDefragmentationPhaseTransition", {skip: 1});
     assert.commandWorked(st.s.adminCommand({
         configureCollectionBalancing: coll1,
         defragmentCollection: true,
@@ -197,7 +197,7 @@ jsTest.log("Begin and end defragmentation with balancer on");
         chunkSize: chunkSize,
     }));
     // Ensure that the policy completes the phase transition...
-    clearFailPointOnConfigNodes("beforeTransitioningDefragmentationPhase");
+    clearFailPointOnConfigNodes("skipDefragmentationPhaseTransition");
     waitForEndOfDefragmentation(coll1);
     st.stopBalancer();
 }
@@ -206,7 +206,7 @@ const coll2 = setupCollection();
 jsTest.log("Begin defragmentation with balancer off, end with it on");
 {
     // Allow the first phase transition to build the initial defragmentation state
-    setFailPointOnConfigNodes("beforeTransitioningDefragmentationPhase", {skip: 1});
+    setFailPointOnConfigNodes("skipDefragmentationPhaseTransition", {skip: 1});
     assert.commandWorked(st.s.adminCommand({
         configureCollectionBalancing: coll2,
         defragmentCollection: true,
@@ -222,7 +222,7 @@ jsTest.log("Begin defragmentation with balancer off, end with it on");
         chunkSize: chunkSize,
     }));
     // Ensure that the policy completes the phase transition...
-    clearFailPointOnConfigNodes("beforeTransitioningDefragmentationPhase");
+    clearFailPointOnConfigNodes("skipDefragmentationPhaseTransition");
     waitForEndOfDefragmentation(coll2);
     st.stopBalancer();
 }
@@ -234,7 +234,7 @@ jsTest.log("Balancer on, begin defragmentation and let it complete");
     const initialNumChunks = findChunksUtil.countChunksForNs(st.config, coll3);
     jsTest.log("Initial number of chunks " + initialNumChunks);
     // Pause after phase 1 completes to check merging succeeded
-    setFailPointOnConfigNodes("beforeTransitioningDefragmentationPhase", {skip: 1});
+    setFailPointOnConfigNodes("skipDefragmentationPhaseTransition", {skip: 1});
     assert.commandWorked(st.s.adminCommand({
         configureCollectionBalancing: coll3,
         defragmentCollection: true,
@@ -242,12 +242,12 @@ jsTest.log("Balancer on, begin defragmentation and let it complete");
     }));
     st.startBalancer();
     // Wait for phase 1 to complete
-    waitForFailpointOnConfigNodes("beforeTransitioningDefragmentationPhase", 0);
+    waitForFailpointOnConfigNodes("skipDefragmentationPhaseTransition", 0);
     const numChunksAfterMerging = findChunksUtil.countChunksForNs(st.config, coll3);
     jsTest.log("Number of chunks after merging " + numChunksAfterMerging);
     assert.lte(numChunksAfterMerging, initialNumChunks);
     // Turn fail point off, let phase 3 run and complete
-    clearFailPointOnConfigNodes("beforeTransitioningDefragmentationPhase");
+    clearFailPointOnConfigNodes("skipDefragmentationPhaseTransition");
     waitForEndOfDefragmentation(coll3);
     st.stopBalancer();
     const finalNumChunks = findChunksUtil.countChunksForNs(st.config, coll3);
