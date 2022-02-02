@@ -8,23 +8,16 @@ functions and their timestamps. This article explains how to instrument
 WiredTiger, collect the XRay traces, and analyze them.  As an example, we will
 show how to trace \c wtperf.
 
-## Step 1: Configure the WiredTiger build with XRay instrumentation
-
-Select \c clang as your C compiler and provide the required flag to get it to
-instrument your \c wtperf binary.
+## Step 1: Configure and compile WiredTiger with XRay instrumentation
 
 @code
-$ ../configure CC="clang-8" CFLAGS="-fxray-instrument"
-@endcode
-
-## Step 2: Build as usual
-
-@code
-$ cd build_posix
+$ mkdir build
+$ cd build
+$ cmake -DCMAKE_C_FLAGS=-fxray-instrument -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION="8" -DCLANG_CXX_VERSION="8"  ../.
 $ make
 @endcode
 
-## Step 3: Run wtperf
+## Step 2: Run wtperf
 
 Use the script \c wtperf_xray.sh to launch \c wtperf from the directory
 containing the \c wtperf binary. The first argument to the script must be the
@@ -109,13 +102,15 @@ invoked instead.
 The \c llvm-config command line tool is used to supply the required compiler
 and linker flags to build programs such like \c xray_to_optrack on top of LLVM.
 
-## Step 3: Configure the WiredTiger build with LLVM flags
+## Step 3: Configure and build WiredTiger with LLVM flags
 
-Supply the \c --enable-llvm flag to your configuration to build anything with a
+Supply the \c -DENABLE_LLVM flag to your configuration to build anything with a
 dependency to LLVM.
 
 @code
-$ ../configure --enable-llvm
+$ cd build
+$ cmake -DENABLE_LLVM=1 -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION="8" -DCLANG_CXX_VERSION="8" ../.
+$ make
 @endcode
 
 Take care NOT to customize \c CC or \c CXX. Customizing either of these
@@ -123,14 +118,7 @@ variables will cause C++ programs such as \c workgen or \c xray_to_optrack to be
 skipped since we can't reliably link object files emitted by C and C++ compilers
 unless they are the system's default \c cc and \c c++.
 
-## Step 4: Build as usual
-
-@code
-$ cd build_posix
-$ make
-@endcode
-
-## Step 5: Process the traces
+## Step 4: Process the traces
 
 To process the traces, use the \c xray_to_optrack tool in the \c
 tools/xray_to_optrack directory.

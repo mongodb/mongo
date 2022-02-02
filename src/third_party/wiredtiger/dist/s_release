@@ -32,15 +32,6 @@ fi
 echo "Running 'dist/s_all' in the release tree"
 (cd "$DEST/dist" && env WT_RELEASE_BUILD=yes sh s_all -A > /dev/null)
 
-echo "Running swig to generate the Python API"
-(cd "$DEST/build_posix" &&
-    ../configure --enable-python &&
-    (cd lang/python && make ../../../lang/python/wiredtiger_wrap.c) &&
-    make distclean &&
-    find . -type d -a -empty | xargs rmdir &&
-    find . -type d -a -empty | xargs rmdir &&
-    find . -type d -a -empty | xargs rmdir) > /dev/null
-
 echo "Building documentation"
 (cd "$DEST/dist" && sh s_docs > /dev/null)
 

@@ -31,7 +31,7 @@
 # This script uses WiredTiger's integer unpacking library.  To load the
 # WiredTiger library built in a development tree, you may have to set
 # LD_LIBRARY_PATH or the equivalent for your system.  For example:
-#   $ export LD_LIBRARY_PATH=`pwd`/../build_posix/.libs
+#   $ export LD_LIBRARY_PATH=`pwd`/../build
 
 import os, sys, getopt
 
@@ -49,12 +49,17 @@ def err_usage(msg):
 
 # Set paths
 wt_disttop = sys.path[0]
-while not os.path.isdir(wt_disttop + '/build_posix'):
-    if wt_disttop == '/':
-        err_usage('current dir not in wiredtiger development directory')
-    wt_disttop = os.path.dirname(wt_disttop)
-    sys.path.insert(1, os.path.join(wt_disttop, 'build_posix', 'lang',
-        'python'))
+env_builddir = os.getenv('WT_BUILDDIR')
+curdir = os.getcwd()
+if env_builddir and os.path.isfile(os.path.join(env_builddir, 'wt')):
+    wt_builddir = env_builddir
+elif os.path.isfile(os.path.join(curdir, 'wt')):
+    wt_builddir = curdir
+else:
+    err_usage('Unable to find useable WiredTiger build.'
+            'Call the script from either the build directory root or set the \'WT_BUILDDIR\' environment variable')
+
+sys.path.insert(1, os.path.join(wt_builddir, 'lang', 'python'))
 
 from wiredtiger.packing import unpack
 

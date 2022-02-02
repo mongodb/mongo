@@ -57,11 +57,15 @@ def timed(seconds, op):
     result._timed = seconds
     return result
 
-# Check for a local build that contains the wt utility. First check in
-# current working directory, then in build_posix and finally in the disttop
-# directory. This isn't ideal - if a user has multiple builds in a tree we
-# could pick the wrong one.
+# Check for a local build that contains the wt utility. First check for a
+# user supplied 'WT_BUILDDIR' environment variable, then the current working
+# directory, then finally in in the disttop directory. This isn't
+# ideal - if a user has multiple builds in a tree we could pick the wrong one.
 def _wiredtiger_builddir():
+    env_builddir = os.getenv('WT_BUILDDIR')
+    if env_builddir and os.path.isfile(os.path.join(env_builddir, 'wt')):
+        return env_builddir
+
     if os.path.isfile(os.path.join(os.getcwd(), 'wt')):
         return os.getcwd()
 
@@ -71,8 +75,6 @@ def _wiredtiger_builddir():
         thisdir, os.pardir, os.pardir, os.pardir, os.pardir)
     if os.path.isfile(os.path.join(wt_disttop, 'wt')):
         return wt_disttop
-    if os.path.isfile(os.path.join(wt_disttop, 'build_posix', 'wt')):
-        return os.path.join(wt_disttop, 'build_posix')
     if os.path.isfile(os.path.join(wt_disttop, 'wt.exe')):
         return wt_disttop
     raise Exception('Unable to find useable WiredTiger build')

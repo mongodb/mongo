@@ -36,11 +36,6 @@ done
 echo "Updating files that include the package version" &&
     sh ./s_version $force
 
-test "$reconf" -eq 0 || {
-	(echo "Rebuilding GNU tools library support" &&
-	    cd ../build_posix && 2>&1 sh ./reconf | sed -e 's/^/    /')
-}
-
 errchk()
 {
 	if ! `test -s $2`; then
@@ -116,7 +111,6 @@ COMMANDS="
 2>&1 ./s_typedef -c > ${t_pfx}s_typedef_c
 2>&1 ./s_void > ${t_pfx}s_void
 2>&1 ./s_whitespace > ${t_pfx}s_whitespace
-2>&1 ./s_win > ${t_pfx}s_win
 2>&1 python function.py > ${t_pfx}py_function
 2>&1 python style.py > ${t_pfx}py_style"
 

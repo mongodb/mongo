@@ -971,7 +971,7 @@ wt_disttop = os.path.dirname(os.path.dirname(syscalldir))
 # Check for a local build that contains the wt utility. First check if the user
 # manually specified a local build through the 'WT_BUILDDIR' env variable. Otherwise
 # iterate through other possible locations. This including current working directory,
-# then in build_posix and finally in the dist directory. This isn't ideal - if a
+# and in the dist directory. This isn't ideal - if a
 # user has multiple builds in a tree we could pick the wrong one.
 env_builddir = os.getenv('WT_BUILDDIR')
 if env_builddir and os.path.isfile(os.path.join(env_builddir, 'wt')):
@@ -980,8 +980,6 @@ elif os.path.isfile(os.path.join(os.getcwd(), 'wt')):
     wt_builddir = os.getcwd()
 elif os.path.isfile(os.path.join(wt_disttop, 'wt')):
     wt_builddir = wt_disttop
-elif os.path.isfile(os.path.join(wt_disttop, 'build_posix', 'wt')):
-    wt_builddir = os.path.join(wt_disttop, 'build_posix')
 elif os.path.isfile(os.path.join(wt_disttop, 'wt.exe')):
     wt_builddir = wt_disttop
 else:

@@ -20,27 +20,27 @@ Compiling with Clang's Address Sanitizer isn't mandatory but it is recommended s
 exposes memory bugs.
 
 @code
-$ cd build_posix/
-$ ../configure --enable-libfuzzer CC="clang-8" CFLAGS="-fsanitize=address"
+$ mkdir build
+$ cd build
+$ cmake -DENABLE_LLVM=1 -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION="8" -DCLANG_CXX_VERSION="8" -DCMAKE_BUILD_TYPE=ASan ../.
 @endcode
 
 ## Step 2: Build as usual
 
 @code
-$ cd build_posix
 $ make
 @endcode
 
 ## Step 3: Run a fuzzer
 
-Each fuzzer is a program under \c build_posix/test/fuzz/. WiredTiger provides the
+Each fuzzer is a program under \c build/test/fuzz/. WiredTiger provides the
 \c test/fuzz/fuzz_run.sh script to quickly get started using a fuzzer. It performs a limited
 number of runs, automatically cleans up after itself in between runs and provides a sensible set of
 parameters which users can add to. For example:
 
 @code
-$ cd build_posix/test/fuzz/
-$ bash ../../../test/fuzz/fuzz_run.sh ./fuzz_modify
+$ cd build/test/fuzz/
+$ bash ../../../test/fuzz/fuzz_run.sh ./test_fuzz_modify
 @endcode
 
 In general the usage is:
@@ -77,8 +77,8 @@ supplied as the first positional argument to both \c fuzz_run.sh and the underly
 For example:
 
 @code
-$ cd build_posix/test/fuzz/
-$ bash ../../../test/fuzz/fuzz_run.sh ./fuzz_config ../../../test/fuzz/config/corpus/
+$ cd build/test/fuzz/
+$ bash ../../../test/fuzz/fuzz_run.sh ./test_fuzz_config ../../../test/fuzz/config/corpus/
 @endcode
 
 # Implementing an LLVM LibFuzzer fuzzer
@@ -152,8 +152,9 @@ with profiling information. It's important that these are added to both the \c C
 \c LINKFLAGS variables.
 
 @code
-$ cd build_posix/
-$ ../configure CC="clang-8" CFLAGS="-fprofile-instr-generate -fcoverage-mapping" LINKFLAGS="-fprofile-instr-generate -fcoverage-mapping"
+$ mkdir build
+$ cd build
+$ cmake -DENABLE_LLVM=1 -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION="8" -DCLANG_CXX_VERSION="8" -DCMAKE_BUILD_TYPE=Coverage ../.
 @endcode
 
 ## Step 2: Build and run fuzzer
@@ -170,8 +171,8 @@ a readable form. WiredTiger provides a script called \c fuzz_coverage.sh that ha
 expects to be called from the same directory that the fuzzer was executed in.
 
 @code
-$ cd build_posix/test/fuzz
-$ bash ../../../test/fuzz/fuzz_coverage.sh ./fuzz_modify
+$ cd build/test/fuzz
+$ bash ../../../test/fuzz/fuzz_coverage.sh ./test_fuzz_modify
 @endcode
 
 In general the usage is:

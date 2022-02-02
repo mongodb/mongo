@@ -190,7 +190,7 @@ function(define_c_test)
         "C_TEST"
         ""
         "TARGET;DIR_NAME;DEPENDS;EXEC_SCRIPT"
-        "SOURCES;FLAGS;ARGUMENTS;VARIANTS"
+        "SOURCES;FLAGS;ARGUMENTS;VARIANTS;ADDITIONAL_FILES"
     )
     if (NOT "${C_TEST_UNPARSED_ARGUMENTS}" STREQUAL "")
         message(FATAL_ERROR "Unknown arguments to define_c_test: ${C_TEST_UNPARSED_ARGUMENTS}")
@@ -213,8 +213,12 @@ function(define_c_test)
     eval_dependency("${C_TEST_DEPENDS}" enabled)
     if(enabled)
         set(additional_executable_args)
+        set(additional_file_args)
         if(NOT "${C_TEST_FLAGS}" STREQUAL "")
             list(APPEND additional_executable_args FLAGS ${C_TEST_FLAGS})
+        endif()
+        if(NOT "${C_TEST_ADDITIONAL_FILES}" STREQUAL "")
+            list(APPEND additional_file_args ${C_TEST_ADDITIONAL_FILES})
         endif()
         set(exec_wrapper)
         if(WT_WIN)
@@ -225,10 +229,11 @@ function(define_c_test)
         endif()
         set(test_cmd)
         if (C_TEST_EXEC_SCRIPT)
+            list(APPEND additional_file_args ${C_TEST_EXEC_SCRIPT})
             # Define the c test to be executed with a script, rather than invoking the binary directly.
             create_test_executable(${C_TEST_TARGET}
                 SOURCES ${C_TEST_SOURCES}
-                ADDITIONAL_FILES ${C_TEST_EXEC_SCRIPT}
+                ADDITIONAL_FILES ${additional_file_args}
                 BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}
                 ${additional_executable_args}
             )
@@ -237,6 +242,7 @@ function(define_c_test)
         else()
             create_test_executable(${C_TEST_TARGET}
                 SOURCES ${C_TEST_SOURCES}
+                ADDITIONAL_FILES ${additional_file_args}
                 BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}
                 ${additional_executable_args}
             )

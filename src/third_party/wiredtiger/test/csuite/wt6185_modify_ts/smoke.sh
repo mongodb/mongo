@@ -9,13 +9,15 @@ then
     # If the test binary is passed in manually.
     test_bin=$1
 else
-    # If $top_builddir/$top_srcdir aren't set, default to building in build_posix
-    # and running in test/csuite.
-    top_builddir=${top_builddir:-../../build_posix}
-    top_srcdir=${top_srcdir:-../..}
-    test_bin=$top_builddir/test/csuite/test_wt6185_modify_ts
+    # If $binary_dir isn't set, default to using the build directory
+    # this script resides under. Our CMake build will sync a copy of this
+    # script to the build directory. Note this assumes we are executing a
+    # copy of the script that lives under the build directory. Otherwise
+    # passing the binary path is required.
+    binary_dir=${binary_dir:-`dirname $0`}
+    test_bin=$binary_dir/test_wt6185_modify_ts
 fi
 
-$TEST_WRAPPER $test_bin 
+$TEST_WRAPPER $test_bin
 $TEST_WRAPPER $test_bin -C
 

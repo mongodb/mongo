@@ -16,27 +16,36 @@ Now proceed with @ref windows_building
 @section windows_building Building on Windows
 
 Building WiredTiger on Windows requires
-<a href="http://www.scons.org">SCons</a> as well as the Microsoft Visual
+<a href="https://cmake.org/">CMake</a> as well as the Microsoft Visual
 C++ compiler in Microsoft Visual Studio.
 
-Change directory to the top-level directory, then build the software:
+You can build WiredTiger from source using command-line tools.
+When compiling via command-line tools, we recommend a prompt/shell that has been appropriately
+configured with VS toolchain environment variables. We usually recommend using the
+<a href="https://docs.microsoft.com/en-us/visualstudio/ide/reference/command-prompt-powershell">Visual Studio Developer Command Prompt/Powershell</a> to
+ensure an appropriately configured environment.
+
+Change directory to the top-level directory, then create and configure a new directory to run your
+build from:
 
 @code
 cd wiredtiger
-scons
+mkdir build
+cd build
 @endcode
 
-To rebuild from scratch, discard any previous configuration by cleaning
-out the build area:
+Change into your newly created build directory and using CMake run the build configuration
+step to generate your build.
 
 @code
-scons -c
+cmake ..\.
 @endcode
 
-To see additional configuration options, run:
-
+In the absence of an explicit generator, CMake will generate Visual Studio project files
+(\c .vcxproj), representing build targets within WiredTiger. To compile the entire
+WiredTiger project, in the same directory we configured the build, run \c msbuild:
 @code
-scons --help
+msbuild ALL_BUILD.vcxproj
 @endcode
 
 To build the python language support, a 64-bit version of Python is
@@ -55,11 +64,10 @@ guidelines, and by default WiredTiger builds and installs a static library
 and dll version of the library.
 
 @code
-file <root directory>/package/bin/
+file <root directory>/bin/
 wt.exe:			x64 standalone executable
-wiredtiger.dll:		x64 dynamically linked library
 
-file <root directory>/package/lib/
+file <root directory>/lib/
 libwiredtiger.lib:	x64 static library
 wiredtiger.lib:		x64 import library for dll
 @endcode
@@ -67,42 +75,78 @@ wiredtiger.lib:		x64 import library for dll
 To install WiredTiger:
 
 @code
-scons install
+msbuild INSTALL.vcxproj
 @endcode
 
 To install WiredTiger's libraries or binaries into alternate locations,
-you can use the --prefix configuration option.
+you can use the \c -DCMAKE_INSTALL_PREFIX configuration option.
 
 @code
-scons --prefix=c:\wiredtiger install
+cmake -DCMAKE_INSTALL_PREFIX=c:\wiredtiger
 @endcode
 
 @section windows_configure Configuring WiredTiger
 
 The WiredTiger software supports some additional configuration options:
 
-@par \c --enable-attach
+@par \c -DHAVE_ATTACH=1
 Configure WiredTiger to sleep and wait for a debugger to attach on failure.
 <b>DO NOT</b> configure this option in production environments.
 
-@par \c --enable-diagnostic
+@par \c -DHAVE_DIAGNOSTIC=1
 Configure WiredTiger to perform various run-time diagnostic tests.
 <b>DO NOT</b> configure this option in production environments.
 
-@par \c --enable-python
-Build the WiredTiger <a href="http://www.python.org">Python</a> API,
-requires path to swig.exe on Windows.
+@par \c -DENABLE_LZ4=1
+Configure WiredTiger for <a href="https://github.com/Cyan4973/lz4">LZ4</a>
+compression; see @ref compression for more information.
 
-@par \c --enable-snappy
+@par \c -DENABLE_PYTHON=1
+Build the WiredTiger <a href="http://www.python.org">Python</a> API;
+requires <a href="http://swig.org">SWIG</a>.
+
+@par \c -DENABLE_SNAPPY=1
 Configure WiredTiger for <a href="http://code.google.com/p/snappy/">snappy</a>
 compression; see @ref compression for more information.
 
-@par \c --enable-zlib
+@par \c -DENABLE_ZLIB=1
 Configure WiredTiger for <a href="http://www.zlib.net/">zlib</a>
 compression; see @ref compression for more information.
 
-@par \c --disable-standalone-build
+@par \c -DENABLE_ZSTD=1
+Configure WiredTiger for <a href="https://github.com/facebook/zstd">Zstd</a>
+compression; see @ref compression for more information.
+
+@par \c -DWT_STANDALONE_BUILD=0
 Configure WiredTiger to disable standalone build. Standalone build is enabled
 by default.
+
+@section windows_ctest Running WiredTiger C/C++ Tests
+
+The WiredTiger CMake build makes available a suite of C/C++ based tests.
+To run the available tests you can use our smoke test alias (\c check). Ensure you're in the build directory and execute:
+
+@code
+ctest -C <Debug|Release> -L check
+@endcode
+
+Alternatively to just run all the tests available:
+
+@code
+ctest -C <Debug|Release>
+@endcode
+
+In addition, to get verbose output with your test run you can use the \c -VV flag:
+
+@code
+ctest -C <Debug|Release> -VV
+@endcode
+
+If you want to focus on running a specific test (i.e. run a test that may be failing) you can use the \c -R flag:
+
+@code
+# Note: -R specifies a regex, where any matching test will be run
+ctest -C <Debug|Release> -R test_name
+@endcode
 
  */

@@ -43,7 +43,15 @@ then
 fi
 
 # Locate Wiredtiger home directory.
-: ${RW_LOCK_FILE:=$(git rev-parse --show-toplevel)/build_posix/test/csuite/test_rwlock}
+# If RW_LOCK_FILE isn't set, default to using the build directory this script resides under
+# under. Our CMake build will sync a copy of this script to the build directory the 'test_rwlock'
+# binary is created under. Note this assumes we are executing a copy of the script that lives under
+# the build directory. Otherwise passing the binary path is required.
+: ${RW_LOCK_FILE:=$(dirname $0)/test_rwlock}
+[ -x ${RW_LOCK_FILE} ] || {
+    echo "fail: unable to locate rwlock test binary"
+    exit 1
+}
 
 SEC1=`date +%s`
 if [ "$RUN_OS" = "Darwin" ]

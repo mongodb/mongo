@@ -112,7 +112,7 @@ fi
 	-o -name '*.py' \
 	-o -name '*.swig' |
     sed	-e '/Makefile.in/d' \
-	-e '/^build_posix\//d' \
+	-e '/^cmake\//d' \
 	-e '/checksum\/power8\//d' \
 	-e '/checksum\/zseries\//d' \
 	-e '/\/3rdparty\//d' \

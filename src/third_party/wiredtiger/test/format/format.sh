@@ -44,6 +44,7 @@ usage() {
 	echo "    -a           configure format abort/recovery testing (defaults to off)"
 	echo "    -b binary    format binary (defaults to "./t")"
 	echo "    -c config    format configuration file (defaults to CONFIG.stress)"
+	echo "    -d directory directory of format binary"
 	echo "    -D directory directory of format configuration files (named \"CONFIG.*\")"
 	echo "    -E           skip known errors (defaults to off)"
 	echo "    -e envvar    Environment variable setting (default to none)"
@@ -107,6 +108,8 @@ quit=0
 skip_errors=0
 stress_split_test=0
 total_jobs=0
+# Default to format.sh directory (assumed to be in a WiredTiger build tree).
+format_bin_dir=`dirname $0`
 
 while :; do
 	case "$1" in
@@ -118,6 +121,9 @@ while :; do
 		shift ; shift ;;
 	-c)
 		config="$2"
+		shift ; shift ;;
+	-d)
+		format_bin_dir="$2"
 		shift ; shift ;;
 	-D)
 		# Format changes directories, get absolute paths to the CONFIG files.
@@ -222,7 +228,7 @@ config_found=0
 }
 
 # Move to the format.sh directory (assumed to be in a WiredTiger build tree).
-cd $(dirname $0) || exit 1
+cd $format_bin_dir || exit 1
 
 # If we haven't already found it, check for the config file (by default it's CONFIG.stress which
 # lives in the same directory of the WiredTiger build tree as format.sh. We're about to change
@@ -233,17 +239,14 @@ cd $(dirname $0) || exit 1
     config_found=1
 }
 
-# Find the last part of format_binary, which is format binary file. Builds are normally in the
-# WiredTiger source tree, in which case it's in the same directory as format.sh, else it's in
-# the build_posix tree. If the build is in the build_posix tree, move there, we have to run in
-# the directory where the format binary lives because the format binary "knows" the wt utility
-# is two directory levels above it.
-[[ -x ${format_binary##* } ]] || {
-	build_posix_directory="../../build_posix/test/format"
-	[[ ! -d $build_posix_directory ]] || cd $build_posix_directory || exit 1
-	[[ -x ${format_binary##* } ]] ||
-		fatal_msg "format program \"${format_binary##* }\" not found"
-}
+# Check for the existence of the format_binary. This script is usually copied by CMake into the
+# build directory, in which case we can expect to find the binary in the same directory as
+# format.sh (being the default path value assigned to 'format_bin_dir'). If we can't detect the format
+# binary, raise an error, as we expect the user to either execute the 'format.sh' script under the
+# build directory or by passing the format build directory as an argument.
+[[ -x ${format_binary##* } ]] ||
+	fatal_msg "format program \"${format_binary##* }\" not found"
+
 
 # Find the wt binary (required for abort/recovery testing).
 wt_binary="../../wt"

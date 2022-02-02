@@ -1,9 +1,11 @@
 #! /bin/sh
 
-t=__wt.$$
+t_out=__wt.$$.out
+t_err=__wt.$$.err
 a=__wt.$$.a
 b=__wt.$$.b
-trap 'rm -rf $a $b $t' 0 1 2 3 13 15
+t_build=__s_clang_scan_tmp_build
+trap 'rm -rf $a $b $t_out $t_err $t_build' 0 1 2 3 13 15
 
 # Find the top-level WiredTiger directory and move to there.
 top=`git rev-parse --show-toplevel` && cd $top || exit 1
@@ -32,26 +34,25 @@ echo "$0: scan-build: $scan"
 
 # Remove old reports.
 rm -rf clangScanBuildReports && mkdir clangScanBuildReports
+rm -rf ${t_build} && mkdir ${t_build}
 
-sh autogen.sh > /dev/null || exit 1
-
+cd ${t_build}
 args="-o clangScanBuildReports"
 args="$args --use-cc=$compiler"
 args="$args -disable-checker core.NullDereference"
-$scan $args ./configure 'CFLAGS=-g' \
-    --disable-shared --enable-diagnostic --enable-strict > /dev/null
-$scan $args make -j 8 wt 1>/dev/null 2>$t
+$scan $args cmake CMAKE_C_FLAGS=-g \
+    -DENABLE_STATIC=1 -DENABLE_SHARED=0 -DHAVE_DIAGNOSTIC=1 -DENABLE_STRICT=1 ../.> /dev/null
+$scan $args make -j 8 wt 1>../$t_out 2>../$t_err
+cd ..
 
-make -j 8 distclean > /dev/null
-
-grep 'No bugs found' $t > /dev/null && exit 0
+grep 'No bugs found' $t_out > /dev/null && exit 0
 
 # Compare the set of errors/warnings and exit success when they're expected.
 # clang-scan outputs errors/warnings with a leading file path followed by a
 # colon, followed by the string "error:" or "warning:".
 cat dist/s_clang-scan.diff |
     egrep '^[a-z\./].*error: |^[a-z\./].*warning: ' | sed -e 's/:.*:.*://' | sort > $a
-cat $t |
+cat $t_err |
     egrep '^[a-z\./].*error: |^[a-z\./].*warning: ' | sed -e 's/:.*:.*://' | sort > $b
 diff $a $b > /dev/null && exit 0
 
@@ -59,5 +60,5 @@ echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 echo 'scan-build output differs from expected:'
 echo '<<<<<<<<<< Expected >>>>>>>>>> Current'
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-diff dist/s_clang-scan.diff $t
+diff dist/s_clang-scan.diff $t_err
 exit 1

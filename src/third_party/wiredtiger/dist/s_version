@@ -3,9 +3,6 @@
 # Propagate version changes to the necessary files.
 . ../RELEASE_INFO
 
-m4dir=../build_posix/aclocal
-rpmspec=./package/wiredtiger.spec
-tmp_file=__tmp
 cmakedir=../cmake/configs
 
 force=no
@@ -18,48 +15,6 @@ while :
 		break;;
 	esac
 done
-
-GenAutoconfVersion(){
-	# If the version hasn't changed and we're not forcing the issue, we're done.
-	if test "$force" = no -a \
-		-f $m4dir/version.m4 -a \
-		-f $m4dir/version-set.m4 ; then
-		eval `grep '^VERSION_[A-Z]*=' $m4dir/version-set.m4`
-		if test x${WIREDTIGER_VERSION_MAJOR} = x${VERSION_MAJOR} -a \
-			x${WIREDTIGER_VERSION_MINOR} = x${VERSION_MINOR} -a \
-			x${WIREDTIGER_VERSION_PATCH} = x${VERSION_PATCH} ; then
-			return
-		fi
-	fi
-	dotted_version=${WIREDTIGER_VERSION_MAJOR}.${WIREDTIGER_VERSION_MINOR}.${WIREDTIGER_VERSION_PATCH}
-	echo "Building $m4dir/version.m4"
-	cat > $m4dir/version.m4 <<-END
-	dnl WiredTiger product version for AC_INIT.  Maintained by dist/s_version
-	${dotted_version}
-	END
-
-	echo "Building $m4dir/version-set.m4"
-	cat > $m4dir/version-set.m4 <<-END
-	dnl build by dist/s_version
-
-	VERSION_MAJOR=${WIREDTIGER_VERSION_MAJOR}
-	VERSION_MINOR=${WIREDTIGER_VERSION_MINOR}
-	VERSION_PATCH=${WIREDTIGER_VERSION_PATCH}
-	VERSION_STRING='"${WIREDTIGER_VERSION_STRING}"'
-
-	AC_SUBST(VERSION_MAJOR)
-	AC_SUBST(VERSION_MINOR)
-	AC_SUBST(VERSION_PATCH)
-	AC_SUBST(VERSION_STRING)
-
-	VERSION_NOPATCH=${WIREDTIGER_VERSION_MAJOR}.${WIREDTIGER_VERSION_MINOR}
-	AC_SUBST(VERSION_NOPATCH)
-	END
-
-    echo "Building $rpmspec"
-    sed -e "s/Version:	.*/Version:	${dotted_version}/" $rpmspec	\
-        > $tmp_file && mv $tmp_file $rpmspec
-}
 
 GenCmakeVersion(){
 	if test "$force" = no -a \
@@ -81,5 +36,4 @@ GenCmakeVersion(){
 	END
 }
 
-GenAutoconfVersion
 GenCmakeVersion

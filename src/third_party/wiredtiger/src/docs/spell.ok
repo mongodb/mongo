@@ -3,6 +3,7 @@ ACM
 ADDR
 APIs
 ASAN
+ASan
 ActiveState
 Adler's
 Atomicity
@@ -29,6 +30,7 @@ Cyclomatic
 DB's
 DBTs
 DCC
+DCLANG
 DCMAKE
 DENABLE
 DHANDLE
@@ -107,6 +109,7 @@ NUMA
 NoSQL
 OPTYPE
 PMU
+Powershell
 PPC
 PRELOAD
 PROFDATA
@@ -456,6 +459,7 @@ mkdir
 mmap
 mpool
 mpoolfile
+msbuild
 msec
 msg
 msgs
@@ -671,6 +675,7 @@ util
 valign
 valuefmt
 valuev
+vcxproj
 vec
 versa
 viewable

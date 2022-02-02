@@ -1,7 +1,5 @@
 /*! @page build-posix Building and installing WiredTiger on POSIX (Linux, *BSD, OS X):
 
-To read instructions on using the legacy autoconf build system, see  @subpage build-autoconf.
-
 @section posix_github Building using Git and GitHub
 
 Skip this step if you are building from a WiredTiger release package,
@@ -9,10 +7,9 @@ and proceed with @ref posix_building.
 
 To build from the WiredTiger GitHub repository requires
 <a href="http://git-scm.com/">git</a>,
-<a href="https://cmake.org/">CMake</a>,
-<a href="https://ninja-build.org/">Ninja</a>.
-We also suggest <a href="https://ccache.dev/">ccache</a> for improved build times
-and <a href="http://www.swig.org/">SWIG</a> for building with Python support.
+<a href="https://cmake.org/">CMake</a>.
+We also suggest <a href="https://ninja-build.org/">Ninja</a> and <a href="https://ccache.dev/">ccache</a> for improved
+incremental build times and <a href="http://www.swig.org/">SWIG</a> for building with Python support.
 
 First, clone the repository:
 
@@ -35,14 +32,17 @@ cd build
 @endcode
 
 Change into your newly created build directory and using CMake run the build configuration
-step to generate your ninja build.
+step to generate your build.
 @code
-cmake -G Ninja ../.
+cmake ../.
+# If using the Ninja build tool, you can additionally specify the generator '-G Ninja' to construct a
+# ninja build i.e 'cmake -G Ninja ../.'.
 @endcode
 
-Lastly, in the same directory you configured your build, run the ninja command to start the build:
+Lastly, in the same directory you configured your build, start the build:
 @code
-ninja
+make
+# Or 'ninja' if using the Ninja build tool.
 @endcode
 
 @section posix_installing Installing WiredTiger
@@ -70,7 +70,8 @@ In addition, WiredTiger installs a standalone utility program named
 To install WiredTiger:
 
 @code
-ninja install
+make install
+# Or 'ninja install' if using the Ninja build tool.
 @endcode
 
 To uninstall WiredTiger:
@@ -147,13 +148,13 @@ toolchain you can pass the \c -DCMAKE_TOOLCHAIN_FILE= to the CMake configuration
 For example, to explicitly specify the GCC toolchain:
 
 @code
-cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/gcc.cmake -G Ninja ../.
+cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/gcc.cmake ../.
 @endcode
 
 To explicitly specify the Clang toolchain:
 
 @code
-cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -G Ninja ../.
+cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake ../.
 @endcode
 
 By default, WiredTiger builds with the \c -O3 compiler optimization flag
@@ -161,7 +162,7 @@ unless manually specified through the \c -DCC_OPTIMIZE_LEVEL configuration optio
 a different level of optimization:
 
 @code
-cmake -DCC_OPTIMIZE_LEVEL=-O1 -G Ninja ../.
+cmake -DCC_OPTIMIZE_LEVEL=-O1 ../.
 @endcode
 
 @section posix_ctest Running WiredTiger C/C++ Tests

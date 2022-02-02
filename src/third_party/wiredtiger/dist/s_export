@@ -42,14 +42,12 @@ check()
 
 # This check would normally be done after the library is built, but this way
 # we don't forget about a symbol during development. We usually build in the
-# top-level or build_posix directories, check the previously built library,
+# top-level directories, check the previously built library,
 # if it exists. And, allow this script to be run from the top-level directory
 # as well as locally. (??? this last wasn't true before my changes and still
 # isn't)
 #
 # Check all library images that appear; typically they will be one of
-#    ../build_posix/.libs/libwiredtiger.$ext    (autotools build)
-#    ../.libs/libwiredtiger.$ext                (autotools build at top level)
 #    ../build/libwiredtiger.$ext                (cmake build)
 #    ../cmake_build/libwiredtiger.$ext          (cmake build)
 

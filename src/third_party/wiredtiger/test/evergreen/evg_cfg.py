@@ -30,7 +30,10 @@ CSUITE_TEST_SEARCH_STR = "  # End of csuite test tasks"
 # They are not expected to trigger any 'make check' testing.
 make_check_subdir_skips = [
     "test/csuite",  # csuite has its own set of Evergreen tasks, skip the checking here
-    "test/cppsuite"
+    "test/cppsuite",
+    "test/fuzz",
+    "test/syscall",
+    "ext/storage_sources/s3_store/test"
 ]
 
 prog=sys.argv[0]
@@ -132,22 +135,23 @@ def find_tests_missing_evg_cfg(test_type, dirs, evg_cfg_file):
 def get_make_check_dirs():
     """
     Figure out the 'make check' directories that are applicable for testing
-    Directories with Makefile.am containing 'TESTS =' are the ones require test.
+    Directories with CMakeLists.txt containing ctest declaration ('add_test',
+    'define_c_test', 'define_test_variants') are the ones require test.
     Skip a few known directories that do not require test or covered separately.
     """
 
     # Make sure we are under the repo top level directory
     os.chdir(run('git rev-parse --show-toplevel'))
 
-    # Search keyword in Makefile.am to identify directories that involve test configuration.
+    # Search keyword in CMakeLists.txt to identify directories that involve test configuration.
     # Need to use subprocess 'shell=True' to get the expected shell command output.
-    cmd = "find . -name Makefile.am -exec grep -H -e '^TESTS =' {} \; | cut -d: -f1 | cut -c3-"
+    cmd = "find . -name CMakeLists.txt -exec grep -H -e '\(add_test\|define_c_test|define_test_variants\)' {} \; | cut -d: -f1 | cut -c3- | uniq"
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
     mkfiles_with_tests = p.stdout.readlines()
 
     # Need some string manipulation work here against the subprocess output.
     # Cast elements to string, and strip the ending from the string to get directory names.
-    ending = '/Makefile.am\n'
+    ending = '/CMakeLists.txt\n'
     dirs_with_tests = [d.decode('utf-8')[:-len(ending)] for d in mkfiles_with_tests]
     debug("dirs_with_tests: %s" % dirs_with_tests)
 

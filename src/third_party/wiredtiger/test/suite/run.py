@@ -46,27 +46,22 @@ suitedir = sys.path[0]
 wt_disttop = os.path.dirname(os.path.dirname(suitedir))
 wt_3rdpartydir = os.path.join(wt_disttop, 'test', '3rdparty')
 
-# Check for a local build that contains the wt utility. First check in
-# current working directory, then in build_posix and finally in the disttop
-# directory. This isn't ideal - if a user has multiple builds in a tree we
+# Check for a local build that contains the wt utility. First check if the
+# supplied an explicit build directory ('WT_BUILDDIR'), then the current
+# working directory, and finally in the disttop directory.
+# This isn't ideal - if a user has multiple builds in a tree we
 # could pick the wrong one. We also need to account for the fact that there
-# may be an executable 'wt' file the build directory and a subordinate .libs
-# directory.
+# may be an executable 'wt' file the build directory.
 env_builddir = os.getenv('WT_BUILDDIR')
 curdir = os.getcwd()
 if env_builddir and os.path.isfile(os.path.join(env_builddir, 'wt')):
     wt_builddir = env_builddir
-elif os.path.basename(curdir) == '.libs' and \
-   os.path.isfile(os.path.join(curdir, os.pardir, 'wt')):
-    wt_builddir = os.path.join(curdir, os.pardir)
 elif os.path.isfile(os.path.join(curdir, 'wt')):
     wt_builddir = curdir
 elif os.path.isfile(os.path.join(curdir, 'wt.exe')):
     wt_builddir = curdir
 elif os.path.isfile(os.path.join(wt_disttop, 'wt')):
     wt_builddir = wt_disttop
-elif os.path.isfile(os.path.join(wt_disttop, 'build_posix', 'wt')):
-    wt_builddir = os.path.join(wt_disttop, 'build_posix')
 elif os.path.isfile(os.path.join(wt_disttop, 'wt.exe')):
     wt_builddir = wt_disttop
 else:
@@ -108,7 +103,7 @@ unittest = None
 
 def usage():
     print('Usage:\n\
-  $ cd build_posix\n\
+  $ cd build\n\
   $ python ../test/suite/run.py [ options ] [ tests ]\n\
 \n\
 Options:\n\

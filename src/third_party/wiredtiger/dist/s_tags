@@ -26,8 +26,10 @@ for i in -d -t -w --language-force=C '-I WT_GCC_FUNC_ATTRIBUTE+'; do
 	fi
 done
 
-# Generate a tags file for the standard build directory.
-(cd ../build_posix &&
+# If it exists, generate a tags file for the build directory. The user can have
+# any number of out-of-source build directories. We will just conventionally test
+# for a directory named 'build'.
+test -d ../build && (cd ../build &&
 rm -f tags &&
 ctags $flags ../src/include/*.in `find ../src -name '*.[ch]'` 2>/dev/null)
 

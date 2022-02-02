@@ -14,7 +14,7 @@
 #
 # If the fuzzer you're running has an existing corpus directory, you may want to run with the corpus
 # supplied:
-# e.g. fuzz_run.sh ../../build_posix/test/fuzz/fuzz_config corpus/
+# e.g. fuzz_run.sh ../../build/test/fuzz/fuzz_config corpus/
 #
 # Output
 # crash-<input-hash> --

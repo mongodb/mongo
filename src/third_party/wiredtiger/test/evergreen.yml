@@ -1694,7 +1694,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} WTPERF_DIR=$(pwd) ${python_binary|python3} ../../../test/wtperf/test_conf_dump.py 2>&1
+            ${test_env_vars|} ${python_binary|python3} ../../../test/wtperf/test_conf_dump.py -d $(pwd) 2>&1
 
   - name: fops
     tags: ["pull_request"]
