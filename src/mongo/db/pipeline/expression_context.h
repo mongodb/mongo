@@ -72,10 +72,13 @@ class ExpressionContext : public RefCountable {
 public:
     struct ResolvedNamespace {
         ResolvedNamespace() = default;
-        ResolvedNamespace(NamespaceString ns, std::vector<BSONObj> pipeline);
+        ResolvedNamespace(NamespaceString ns,
+                          std::vector<BSONObj> pipeline,
+                          boost::optional<UUID> uuid = boost::none);
 
         NamespaceString ns;
         std::vector<BSONObj> pipeline;
+        boost::optional<UUID> uuid = boost::none;
     };
 
     /**
@@ -260,12 +263,13 @@ public:
      * Returns an ExpressionContext that is identical to 'this' except for the 'subPipelineDepth'
      * and 'needsMerge' fields.
      */
-    boost::intrusive_ptr<ExpressionContext> copyForSubPipeline(NamespaceString nss) const {
+    boost::intrusive_ptr<ExpressionContext> copyForSubPipeline(
+        NamespaceString nss, boost::optional<UUID> uuid = boost::none) const {
         uassert(ErrorCodes::MaxSubPipelineDepthExceeded,
                 str::stream() << "Maximum number of nested sub-pipelines exceeded. Limit is "
                               << internalMaxSubPipelineViewDepth.load(),
                 subPipelineDepth < internalMaxSubPipelineViewDepth.load());
-        auto newCopy = copyWith(std::move(nss));
+        auto newCopy = copyWith(std::move(nss), uuid);
         newCopy->subPipelineDepth += 1;
         // The original expCtx might have been attached to an aggregation pipeline running on the
         // shards. We must reset 'needsMerge' in order to get fully merged results for the

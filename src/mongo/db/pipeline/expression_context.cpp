@@ -44,8 +44,9 @@ namespace mongo {
 using boost::intrusive_ptr;
 
 ExpressionContext::ResolvedNamespace::ResolvedNamespace(NamespaceString ns,
-                                                        std::vector<BSONObj> pipeline)
-    : ns(std::move(ns)), pipeline(std::move(pipeline)) {}
+                                                        std::vector<BSONObj> pipeline,
+                                                        boost::optional<UUID> collUUID)
+    : ns(std::move(ns)), pipeline(std::move(pipeline)), uuid(collUUID) {}
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      const AggregateCommandRequest& request,

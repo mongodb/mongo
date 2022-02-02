@@ -163,7 +163,8 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     const auto& resolvedNamespace = expCtx->getResolvedNamespace(_fromNs);
     _resolvedNs = resolvedNamespace.ns;
     _resolvedPipeline = resolvedNamespace.pipeline;
-    _fromExpCtx = expCtx->copyForSubPipeline(resolvedNamespace.ns);
+
+    _fromExpCtx = expCtx->copyForSubPipeline(resolvedNamespace.ns, resolvedNamespace.uuid);
     if (fromCollator) {
         _fromExpCtx->setCollator(std::move(fromCollator.get()));
         _hasExplicitCollation = true;
@@ -254,7 +255,8 @@ DocumentSourceLookUp::DocumentSourceLookUp(
 }
 
 DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original)
-    : DocumentSource(kStageName, original.pExpCtx->copyWith(original.pExpCtx->ns)),
+    : DocumentSource(kStageName,
+                     original.pExpCtx->copyWith(original.pExpCtx->ns, original.pExpCtx->uuid)),
       _fromNs(original._fromNs),
       _resolvedNs(original._resolvedNs),
       _as(original._as),
@@ -264,7 +266,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original)
       _fieldMatchPipelineIdx(original._fieldMatchPipelineIdx),
       _variables(original._variables),
       _variablesParseState(original._variablesParseState.copyWith(_variables.useIdGenerator())),
-      _fromExpCtx(original._fromExpCtx->copyWith(_resolvedNs)),
+      _fromExpCtx(original._fromExpCtx->copyWith(_resolvedNs, original._fromExpCtx->uuid)),
       _hasExplicitCollation(original._hasExplicitCollation),
       _resolvedPipeline(original._resolvedPipeline),
       _userPipeline(original._userPipeline),
@@ -513,7 +515,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipelineFr
 
     // Update the expression context with any new namespaces the resolved pipeline has introduced.
     LiteParsedPipeline liteParsedPipeline(resolvedNamespace.ns, resolvedNamespace.pipeline);
-    _fromExpCtx = _fromExpCtx->copyWith(resolvedNamespace.ns);
+    _fromExpCtx = _fromExpCtx->copyWith(resolvedNamespace.ns, resolvedNamespace.uuid);
     _fromExpCtx->addResolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces());
 
     return pipeline;

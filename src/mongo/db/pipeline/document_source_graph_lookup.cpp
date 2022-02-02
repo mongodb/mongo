@@ -617,7 +617,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _variables(expCtx->variables),
       _variablesParseState(expCtx->variablesParseState.copyWith(_variables.useIdGenerator())) {
     const auto& resolvedNamespace = pExpCtx->getResolvedNamespace(_from);
-    _fromExpCtx = pExpCtx->copyForSubPipeline(resolvedNamespace.ns);
+    _fromExpCtx = pExpCtx->copyForSubPipeline(resolvedNamespace.ns, resolvedNamespace.uuid);
 
     // We append an additional BSONObj to '_fromPipeline' as a placeholder for the $match stage
     // we'll eventually construct from the input document.
@@ -627,7 +627,8 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
 }
 
 DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(const DocumentSourceGraphLookUp& original)
-    : DocumentSource(kStageName, original.pExpCtx->copyWith(original.pExpCtx->ns)),
+    : DocumentSource(kStageName,
+                     original.pExpCtx->copyWith(original.pExpCtx->ns, original.pExpCtx->uuid)),
       _from(original._from),
       _as(original._as),
       _connectFromField(original._connectFromField),
@@ -636,7 +637,9 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(const DocumentSourceGraphLo
       _additionalFilter(original._additionalFilter),
       _depthField(original._depthField),
       _maxDepth(original._maxDepth),
-      _fromExpCtx(original._fromExpCtx->copyWith(original.pExpCtx->getResolvedNamespace(_from).ns)),
+      _fromExpCtx(
+          original._fromExpCtx->copyWith(original.pExpCtx->getResolvedNamespace(_from).ns,
+                                         original.pExpCtx->getResolvedNamespace(_from).uuid)),
       _fromPipeline(original._fromPipeline),
       _frontier(pExpCtx->getValueComparator().makeUnorderedValueSet()),
       _visited(ValueComparator::kInstance.makeUnorderedValueMap<Document>()),

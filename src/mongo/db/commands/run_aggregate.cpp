@@ -320,8 +320,11 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
                     str::stream() << "Failed to resolve view '" << involvedNs.ns());
             }
 
-            resolvedNamespaces[ns.coll()] = {resolvedView.getValue().getNamespace(),
-                                             resolvedView.getValue().getPipeline()};
+            auto&& underlyingNs = resolvedView.getValue().getNamespace();
+            // Attempt to acquire UUID of the underlying collection using lock free method.
+            auto uuid = CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, underlyingNs);
+            resolvedNamespaces[ns.coll()] = {
+                underlyingNs, resolvedView.getValue().getPipeline(), uuid};
 
             // We parse the pipeline corresponding to the resolved view in case we must resolve
             // other view namespaces that are also involved.
@@ -374,12 +377,14 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
             }
         } else if (!viewCatalog ||
                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, involvedNs)) {
+            // Attempt to acquire UUID of the collection using lock free method.
+            auto uuid = CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, involvedNs);
             // If the aggregation database exists and 'involvedNs' refers to a collection namespace,
             // then we resolve it as an empty pipeline in order to read directly from the underlying
             // collection. If the database doesn't exist, then we still resolve it as an empty
             // pipeline because 'involvedNs' doesn't refer to a view namespace in our consistent
             // snapshot of the view catalog.
-            resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
+            resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}, uuid};
         } else if (viewCatalog->lookup(opCtx, involvedNs)) {
             auto status = resolveViewDefinition(involvedNs, viewCatalog);
             if (!status.isOK()) {
