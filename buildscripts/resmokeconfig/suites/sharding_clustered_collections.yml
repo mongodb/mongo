@@ -8,10 +8,9 @@ selector:
   - jstests/sharding/load_balancer_support/*.js
   - jstests/sharding/health_monitor/*.js
   exclude_files:
-  # TODO (SERVER-62616): Investigate compatibility with resharding.
-  - jstests/sharding/*reshard*.js
-  # TODO (SERVER-62616): Calls reshardCollection.
-  - jstests/sharding/balancer_defragmentation_merge_chunks.js
+  # TODO (SERVER-60824): Support non-blocking sort() for resharding cloner.
+  - jstests/sharding/test_resharding_test_fixture_shutdown_retry_needed.js
+  - jstests/sharding/resharding_collection_cloner_resuming.js
   # TODO (SERVER-60824): Support non-blocking sort() to prevent 'Sort exceeded memory limit'.
   - jstests/sharding/shard6.js
   # Expects hint(_id) to yield an index scan instead of a table scan.
