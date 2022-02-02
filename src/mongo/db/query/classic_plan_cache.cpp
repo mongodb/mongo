@@ -34,8 +34,10 @@
 namespace mongo {
 namespace {
 ServerStatusMetricField<Counter64> totalPlanCacheSizeEstimateBytesMetric(
-    "query.planCacheTotalSizeEstimateBytes", &PlanCacheEntry::planCacheTotalSizeEstimateBytes);
+    "query.planCacheTotalSizeEstimateBytes", &mongo::planCacheTotalSizeEstimateBytes);
 }  // namespace
+
+Counter64 planCacheTotalSizeEstimateBytes;
 
 std::ostream& operator<<(std::ostream& stream, const PlanCacheKey& key) {
     stream << key.toString();

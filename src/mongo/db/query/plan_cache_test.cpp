@@ -1778,7 +1778,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {
     PlanCache planCache(5000);
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1, b: 1}"));
     auto qs = getQuerySolutionForCaching();
-    long long previousSize, originalSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+    long long previousSize, originalSize = planCacheTotalSizeEstimateBytes.get();
     auto key = makeKey(*cq);
     auto decisionPtr = createDecision(1U);
     auto decision = decisionPtr.get();
@@ -1788,7 +1788,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {
         callbacks{*cq};
 
     // Verify that the plan cache size increases after adding new entry to cache.
-    previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+    previousSize = planCacheTotalSizeEstimateBytes.get();
     ASSERT_OK(planCache.set(key,
                             qs->cacheData->clone(),
                             *decision,
@@ -1796,12 +1796,12 @@ TEST(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {
                             plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                             boost::none /* worksGrowthCoefficient */,
                             &callbacks));
-    ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+    ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), previousSize);
 
     decisionPtr = createDecision(1U);
     decision = decisionPtr.get();
     // Verify that trying to set the same entry won't change the plan cache size.
-    previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+    previousSize = planCacheTotalSizeEstimateBytes.get();
     ASSERT_OK(planCache.set(key,
                             qs->cacheData->clone(),
                             *decision,
@@ -1809,7 +1809,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {
                             plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                             boost::none /* worksGrowthCoefficient */,
                             &callbacks));
-    ASSERT_EQ(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+    ASSERT_EQ(planCacheTotalSizeEstimateBytes.get(), previousSize);
 
     decisionPtr = createDecision(2U);
     decision = decisionPtr.get();
@@ -1821,12 +1821,12 @@ TEST(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {
                             plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                             boost::none /* worksGrowthCoefficient */,
                             &callbacks));
-    ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+    ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), previousSize);
 
     decisionPtr = createDecision(1U);
     decision = decisionPtr.get();
     // Verify that the plan cache size decreases after updating the same entry with fewer solutions.
-    previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+    previousSize = planCacheTotalSizeEstimateBytes.get();
     ASSERT_OK(planCache.set(key,
                             qs->cacheData->clone(),
                             *decision,
@@ -1834,11 +1834,11 @@ TEST(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {
                             plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                             boost::none /* worksGrowthCoefficient */,
                             &callbacks));
-    ASSERT_LT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
-    ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), originalSize);
+    ASSERT_LT(planCacheTotalSizeEstimateBytes.get(), previousSize);
+    ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), originalSize);
 
     // Verify that adding multiple entries will increasing the cache size.
-    long long sizeWithOneEntry = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+    long long sizeWithOneEntry = planCacheTotalSizeEstimateBytes.get();
     std::string queryString = "{a: 1, c: 1}";
     for (int i = 0; i < 5; ++i) {
         decisionPtr = createDecision(1U);
@@ -1846,7 +1846,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {
         // Update the field name in the query string so that plan cache creates a new entry.
         queryString[1] = 'b' + i;
         unique_ptr<CanonicalQuery> query(canonicalize(queryString));
-        previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+        previousSize = planCacheTotalSizeEstimateBytes.get();
         ASSERT_OK(planCache.set(makeKey(*query),
                                 qs->cacheData->clone(),
                                 *decision,
@@ -1854,7 +1854,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {
                                 plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                                 boost::none /* worksGrowthCoefficient */,
                                 &callbacks));
-        ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+        ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
     // Verify that removing multiple entries will decreasing the cache size.
@@ -1862,23 +1862,23 @@ TEST(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {
         // Update the field name in the query to match the previously created plan cache entry key.
         queryString[1] = 'b' + i;
         unique_ptr<CanonicalQuery> query(canonicalize(queryString));
-        previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+        previousSize = planCacheTotalSizeEstimateBytes.get();
         planCache.remove(makeKey(*query));
-        ASSERT_LT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+        ASSERT_LT(planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
     // Verify that size is reset to the size when there is only entry.
-    ASSERT_EQ(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), sizeWithOneEntry);
+    ASSERT_EQ(planCacheTotalSizeEstimateBytes.get(), sizeWithOneEntry);
 
     // Verify that trying to remove a non-existing key won't change the plan cache size.
-    previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+    previousSize = planCacheTotalSizeEstimateBytes.get();
     unique_ptr<CanonicalQuery> newQuery(canonicalize("{a: 1}"));
     planCache.remove(makeKey(*newQuery));
-    ASSERT_EQ(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+    ASSERT_EQ(planCacheTotalSizeEstimateBytes.get(), previousSize);
 
     // Verify that the plan cache size goes back to original size when the entry is removed.
     planCache.remove(key);
     ASSERT_EQ(planCache.size(), 0U);
-    ASSERT_EQ(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), originalSize);
+    ASSERT_EQ(planCacheTotalSizeEstimateBytes.get(), originalSize);
 }
 
 TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
@@ -1886,8 +1886,8 @@ TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
     PlanCache planCache(kCacheSize);
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1, b: 1}"));
     auto qs = getQuerySolutionForCaching();
-    long long originalSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-    long long previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+    long long originalSize = planCacheTotalSizeEstimateBytes.get();
+    long long previousSize = planCacheTotalSizeEstimateBytes.get();
     auto key = makeKey(*cq);
 
     // Add entries until plan cache is full and verify that the size keeps increasing.
@@ -1898,7 +1898,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
         // Update the field name in the query string so that plan cache creates a new entry.
         queryString[1]++;
         unique_ptr<CanonicalQuery> query(canonicalize(queryString));
-        previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+        previousSize = planCacheTotalSizeEstimateBytes.get();
         PlanCacheLoggingCallbacks<PlanCacheKey,
                                   SolutionCacheData,
                                   mongo::plan_cache_debug_info::DebugInfo>
@@ -1910,7 +1910,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
                                 plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                                 boost::none /* worksGrowthCoefficient */,
                                 &callbacks));
-        ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+        ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
     // Verify that adding entry of same size as evicted entry wouldn't change the plan cache size.
@@ -1923,7 +1923,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
                                   SolutionCacheData,
                                   mongo::plan_cache_debug_info::DebugInfo>
             callbacks{*cq};
-        previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+        previousSize = planCacheTotalSizeEstimateBytes.get();
         ASSERT_EQ(planCache.size(), kCacheSize);
         ASSERT_OK(planCache.set(key,
                                 qs->cacheData->clone(),
@@ -1933,7 +1933,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
                                 boost::none /* worksGrowthCoefficient */,
                                 &callbacks));
         ASSERT_EQ(planCache.size(), kCacheSize);
-        ASSERT_EQ(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+        ASSERT_EQ(planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
     // Verify that adding entry with query bigger than the evicted entry's key should change the
@@ -1947,7 +1947,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
                                   SolutionCacheData,
                                   mongo::plan_cache_debug_info::DebugInfo>
             callbacks{*queryBiggerKey};
-        previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+        previousSize = planCacheTotalSizeEstimateBytes.get();
         ASSERT_OK(
             planCache.set(makeKey(*queryBiggerKey),
                           qs->cacheData->clone(),
@@ -1956,7 +1956,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
                           plan_cache_util::buildDebugInfo(*queryBiggerKey, std::move(decisionPtr)),
                           boost::none /* worksGrowthCoefficient */,
                           &callbacks));
-        ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+        ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
     // Verify that adding entry with query solutions larger than the evicted entry's query solutions
@@ -1970,7 +1970,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
                                   SolutionCacheData,
                                   mongo::plan_cache_debug_info::DebugInfo>
             callbacks{*cq};
-        previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+        previousSize = planCacheTotalSizeEstimateBytes.get();
         ASSERT_OK(planCache.set(key,
                                 qs->cacheData->clone(),
                                 *decision,
@@ -1978,7 +1978,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
                                 plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                                 boost::none /* worksGrowthCoefficient */,
                                 &callbacks));
-        ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+        ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
     // Verify that adding entry with query solutions smaller than the evicted entry's query
@@ -1992,7 +1992,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
                                   SolutionCacheData,
                                   mongo::plan_cache_debug_info::DebugInfo>
             callbacks{*cq};
-        previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+        previousSize = planCacheTotalSizeEstimateBytes.get();
         ASSERT_OK(planCache.set(key,
                                 qs->cacheData->clone(),
                                 *decision,
@@ -2000,11 +2000,11 @@ TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
                                 plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                                 boost::none /* worksGrowthCoefficient */,
                                 &callbacks));
-        ASSERT_LT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+        ASSERT_LT(planCacheTotalSizeEstimateBytes.get(), previousSize);
 
         // clear() should reset the size.
         planCache.clear();
-        ASSERT_EQ(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), originalSize);
+        ASSERT_EQ(planCacheTotalSizeEstimateBytes.get(), originalSize);
     }
 }
 
@@ -2013,7 +2013,7 @@ TEST(PlanCacheTest, PlanCacheSizeWithMultiplePlanCaches) {
     PlanCache planCache2(5000);
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1, b: 1}"));
     auto qs = getQuerySolutionForCaching();
-    long long previousSize, originalSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+    long long previousSize, originalSize = planCacheTotalSizeEstimateBytes.get();
 
     // Verify that adding entries to both plan caches will keep increasing the cache size.
     std::string queryString = "{a: 1, c: 1}";
@@ -2023,23 +2023,23 @@ TEST(PlanCacheTest, PlanCacheSizeWithMultiplePlanCaches) {
         // Update the field name in the query string so that plan cache creates a new entry.
         queryString[1] = 'b' + i;
         unique_ptr<CanonicalQuery> query(canonicalize(queryString));
-        previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+        previousSize = planCacheTotalSizeEstimateBytes.get();
         ASSERT_OK(planCache1.set(makeKey(*query),
                                  qs->cacheData->clone(),
                                  *decisionPtr,
                                  Date_t{},
                                  plan_cache_util::buildDebugInfo(*query, std::move(decision))));
-        ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+        ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), previousSize);
 
         decision = createDecision(1U);
         decisionPtr = decision.get();
-        previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+        previousSize = planCacheTotalSizeEstimateBytes.get();
         ASSERT_OK(planCache2.set(makeKey(*query),
                                  qs->cacheData->clone(),
                                  *decisionPtr,
                                  Date_t{},
                                  plan_cache_util::buildDebugInfo(*query, std::move(decision))));
-        ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+        ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
     // Verify that removing entries from one plan caches will keep decreasing the cache size.
@@ -2047,37 +2047,37 @@ TEST(PlanCacheTest, PlanCacheSizeWithMultiplePlanCaches) {
         // Update the field name in the query to match the previously created plan cache entry key.
         queryString[1] = 'b' + i;
         unique_ptr<CanonicalQuery> query(canonicalize(queryString));
-        previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+        previousSize = planCacheTotalSizeEstimateBytes.get();
         planCache1.remove(makeKey(*query));
-        ASSERT_LT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+        ASSERT_LT(planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
     // Verify for scoped PlanCache object.
-    long long sizeBeforeScopedPlanCache = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+    long long sizeBeforeScopedPlanCache = planCacheTotalSizeEstimateBytes.get();
     {
         auto decision = createDecision(1U);
         auto decisionPtr = decision.get();
         PlanCache planCache(5000);
-        previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+        previousSize = planCacheTotalSizeEstimateBytes.get();
         ASSERT_OK(planCache.set(makeKey(*cq),
                                 qs->cacheData->clone(),
                                 *decisionPtr,
                                 Date_t{},
                                 plan_cache_util::buildDebugInfo(*cq, std::move(decision))));
-        ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+        ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
     // Verify that size is reset to 'sizeBeforeScopedPlanCache' after the destructor of 'planCache'
     // is called.
-    ASSERT_EQ(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), sizeBeforeScopedPlanCache);
+    ASSERT_EQ(planCacheTotalSizeEstimateBytes.get(), sizeBeforeScopedPlanCache);
 
     // Clear 'planCache2' to remove all entries.
-    previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
+    previousSize = planCacheTotalSizeEstimateBytes.get();
     planCache2.clear();
-    ASSERT_LT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
+    ASSERT_LT(planCacheTotalSizeEstimateBytes.get(), previousSize);
 
     // Verify that size is reset to the original size after removing all entries.
-    ASSERT_EQ(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), originalSize);
+    ASSERT_EQ(planCacheTotalSizeEstimateBytes.get(), originalSize);
 }
 
 }  // namespace

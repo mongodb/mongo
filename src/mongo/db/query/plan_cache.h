@@ -44,6 +44,11 @@ template <class CachedPlanType, class DebugInfoType>
 class PlanCacheEntryBase;
 
 /**
+ * Tracks the approximate cumulative size of the plan cache entries across all the collections.
+ */
+extern Counter64 planCacheTotalSizeEstimateBytes;
+
+/**
  * Information returned from a get(...) query.
  */
 template <class CachedPlanType, class DebugInfoType>
@@ -180,11 +185,6 @@ public:
     // calculated by recursively incorporating the size of owned objects, the objects that they in
     // turn own, and so on.
     const uint64_t estimatedEntrySizeBytes;
-
-    /**
-     * Tracks the approximate cumulative size of the plan cache entries across all the collections.
-     */
-    inline static Counter64 planCacheTotalSizeEstimateBytes;
 
 private:
     /**
