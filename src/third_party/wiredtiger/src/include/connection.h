@@ -301,11 +301,12 @@ struct __wt_connection_impl {
 
     /* Locked: handles in each bucket */
     uint64_t *dh_bucket_count;
-    uint64_t dhandle_count;     /* Locked: handles in the queue */
-    u_int open_btree_count;     /* Locked: open writable btree count */
-    uint32_t next_file_id;      /* Locked: file ID counter */
-    uint32_t open_file_count;   /* Atomic: open file handle count */
-    uint32_t open_cursor_count; /* Atomic: open cursor handle count */
+    uint64_t dhandle_count;        /* Locked: handles in the queue */
+    u_int open_btree_count;        /* Locked: open writable btree count */
+    uint32_t next_file_id;         /* Locked: file ID counter */
+    uint32_t open_file_count;      /* Atomic: open file handle count */
+    uint32_t open_cursor_count;    /* Atomic: open cursor handle count */
+    uint32_t version_cursor_count; /* Atomic: open version cursor count */
 
     /*
      * WiredTiger allocates space for 50 simultaneous sessions (threads of control) by default.

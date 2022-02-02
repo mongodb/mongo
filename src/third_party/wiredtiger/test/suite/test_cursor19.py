@@ -127,7 +127,7 @@ class test_cursor19(wttest.WiredTigerTestCase):
         self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(30))
 
         # Open a version cursor
-        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(1))
+        self.session.begin_transaction()
         version_cursor = self.session.open_cursor(self.uri, None, "debug=(dump_version=true)")
         version_cursor.set_key(1)
         self.assertEquals(version_cursor.search(), 0)

@@ -134,6 +134,7 @@ struct __wt_txn_global {
     wt_timestamp_t pinned_timestamp;
     wt_timestamp_t recovery_timestamp;
     wt_timestamp_t stable_timestamp;
+    wt_timestamp_t version_cursor_pinned_timestamp;
     bool has_durable_timestamp;
     bool has_oldest_timestamp;
     bool has_pinned_timestamp;
