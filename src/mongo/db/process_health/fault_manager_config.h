@@ -61,9 +61,9 @@ std::ostream& operator<<(std::ostream& os, const FaultState& state);
 /**
  * Types of health observers available.
  */
-enum class FaultFacetType { kSystem, kMock1, kMock2, kTestObserver, kLdap, kDns };
+enum class FaultFacetType { kSystem, kMock1, kMock2, kTestObserver, kLdap, kDns, kConfigServer };
 static const StringData FaultFacetTypeStrings[] = {
-    "systemObserver", "mock1", "mock2", "testObserver", "LDAP", "DNS"};
+    "systemObserver", "mock1", "mock2", "testObserver", "LDAP", "DNS", "configServer"};
 
 FaultFacetType toFaultFacetType(HealthObserverTypeEnum type);
 
@@ -95,6 +95,8 @@ public:
                 return HealthObserverTypeEnum::kLdap;
             case FaultFacetType::kDns:
                 return HealthObserverTypeEnum::kDns;
+            case FaultFacetType::kConfigServer:
+                return HealthObserverTypeEnum::kConfigServer;
             case FaultFacetType::kTestObserver:
                 return HealthObserverTypeEnum::kTest;
             default:
@@ -105,20 +107,7 @@ public:
     HealthObserverIntensityEnum getHealthObserverIntensity(FaultFacetType type) const {
         auto intensities = _getHealthObserverIntensities();
 
-        auto toObserverType = [](FaultFacetType type) -> boost::optional<HealthObserverTypeEnum> {
-            switch (type) {
-                case FaultFacetType::kLdap:
-                    return HealthObserverTypeEnum::kLdap;
-                case FaultFacetType::kDns:
-                    return HealthObserverTypeEnum::kDns;
-                case FaultFacetType::kTestObserver:
-                    return HealthObserverTypeEnum::kTest;
-                default:
-                    return boost::none;
-            }
-        };
-
-        auto getIntensity = [this, intensities, &toObserverType](FaultFacetType type) {
+        auto getIntensity = [this, intensities](FaultFacetType type) {
             auto observerType = toObserverType(type);
             if (observerType) {
                 auto x = intensities->_data->getValues();
@@ -217,7 +206,6 @@ private:
 
     template <typename T, typename R>
     R _getPropertyByType(FaultFacetType type, synchronized_value<T>* data, R defaultValue) const {
-        // TODO: update this function with additional fault facets when they are added
         boost::optional<R> result;
         switch (type) {
             case FaultFacetType::kLdap:
@@ -228,6 +216,9 @@ private:
                 break;
             case FaultFacetType::kTestObserver:
                 result = (*data)->getTest();
+                break;
+            case FaultFacetType::kConfigServer:
+                result = (*data)->getConfigServer();
                 break;
             case FaultFacetType::kSystem:
                 result = defaultValue;

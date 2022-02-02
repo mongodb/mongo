@@ -34,6 +34,22 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='config_server_health_observer',
+    source=[
+        'config_server_health_observer.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/query/query_request',
+        '$BUILD_DIR/mongo/db/repl/read_concern_args',
+        '$BUILD_DIR/mongo/s/grid',
+        'fault_manager',
+    ],
+    LIBDEPS_DEPENDENTS=[
+        '$BUILD_DIR/mongo/s/mongos_initializers',
+    ],
+)
+
 env.CppUnitTest(
     target='fault_base_classes_test',
     source=[
