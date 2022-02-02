@@ -358,8 +358,6 @@ Transaction::ErrorHandlingStep Transaction::handleError(
 }
 
 void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
-    // TODO SERVER-61780 Determine if apiVersion should be set.
-
     _sessionInfo.serialize(cmdBuilder);
 
     if (_state == TransactionState::kInit) {
