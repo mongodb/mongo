@@ -269,12 +269,6 @@ CONFIG configuration_list[] = {
   {"stress.failpoint_hs_delete_key_from_ts", "stress failpoint history store delete key from ts",
     C_BOOL, 30, 0, 0, V_GLOBAL_STRESS_FAILPOINT_HS_DELETE_KEY_FROM_TS},
 
-  {"stress.failpoint_hs_insert_1", "stress failpoint history store insert (#1)",
-    C_BOOL, 30, 0, 0, V_GLOBAL_STRESS_FAILPOINT_HS_INSERT_1},
-
-  {"stress.failpoint_hs_insert_2", "stress failpoint history store insert (#2)",
-    C_BOOL, 30, 0, 0, V_GLOBAL_STRESS_FAILPOINT_HS_INSERT_2},
-
   {"stress.hs_checkpoint_delay", "stress history store checkpoint delay",
     C_BOOL, 2, 0, 0, V_GLOBAL_STRESS_HS_CHECKPOINT_DELAY},
 

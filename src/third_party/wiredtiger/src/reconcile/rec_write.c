@@ -10,7 +10,7 @@
 
 static void __rec_cleanup(WT_SESSION_IMPL *, WT_RECONCILE *);
 static void __rec_destroy(WT_SESSION_IMPL *, void *);
-static int __rec_destroy_session(WT_SESSION_IMPL *);
+static void __rec_destroy_session(WT_SESSION_IMPL *);
 static int __rec_init(WT_SESSION_IMPL *, WT_REF *, uint32_t, WT_SALVAGE_COOKIE *, void *);
 static int __rec_hs_wrapup(WT_SESSION_IMPL *, WT_RECONCILE *);
 static int __rec_root_write(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
@@ -18,8 +18,8 @@ static int __rec_split_discard(WT_SESSION_IMPL *, WT_PAGE *);
 static int __rec_split_row_promote(WT_SESSION_IMPL *, WT_RECONCILE *, WT_ITEM *, uint8_t);
 static int __rec_split_write(WT_SESSION_IMPL *, WT_RECONCILE *, WT_REC_CHUNK *, WT_ITEM *, bool);
 static void __rec_write_page_status(WT_SESSION_IMPL *, WT_RECONCILE *);
+static int __rec_write_err(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int __rec_write_wrapup(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
-static int __rec_write_wrapup_err(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int __reconcile(WT_SESSION_IMPL *, WT_REF *, WT_SALVAGE_COOKIE *, uint32_t, bool *);
 
 /*
@@ -222,13 +222,23 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
 #ifdef HAVE_DIAGNOSTIC
     addr = ref->addr;
 #endif
-    /* Wrap up the page reconciliation. */
-    if (ret == 0 && (ret = __rec_write_wrapup(session, r, page)) == 0)
-        __rec_write_page_status(session, r);
-    else {
+
+    /*
+     * If we fail the reconciliation prior to calling __rec_write_wrapup then we can clean up our
+     * state and return an error.
+     *
+     * If we fail the reconciliation after calling __rec_write_wrapup then we must panic as
+     * inserting updates to the history store and then failing can leave us in a bad state.
+     */
+    if (ret != 0) {
         /* Make sure that reconciliation doesn't free the page that has been written to disk. */
         WT_ASSERT(session, addr == NULL || ref->addr != NULL);
-        WT_TRET(__rec_write_wrapup_err(session, r, page));
+        WT_TRET(__rec_write_err(session, r, page));
+    } else {
+        /* Wrap up the page reconciliation. Panic on failure. */
+        if ((ret = __rec_write_wrapup(session, r, page)) != 0)
+            goto panic;
+        __rec_write_page_status(session, r);
     }
 
     /* Release the reconciliation lock. */
@@ -270,11 +280,19 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
          * discarding reconciliation structures want to clean up the block manager's structures as
          * well, and there's no obvious place to do that.
          */
-        if (session->block_manager_cleanup != NULL)
-            WT_TRET(session->block_manager_cleanup(session));
+        if (session->block_manager_cleanup != NULL) {
+            if (ret == 0 && (ret = session->block_manager_cleanup(session)) != 0) {
+                goto panic;
+            } else
+                WT_TRET(session->block_manager_cleanup(session));
+        }
 
-        WT_TRET(__rec_destroy_session(session));
+        __rec_destroy_session(session);
     }
+    /*
+     * This return statement covers non-panic error scenarios, any failure beyond this point is a
+     * panic.
+     */
     WT_RET(ret);
 
     /*
@@ -283,7 +301,9 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
      */
     if (__wt_ref_is_root(ref)) {
         WT_WITH_PAGE_INDEX(session, ret = __rec_root_write(session, page, flags));
-        return (ret);
+        if (ret != 0)
+            goto panic;
+        return (0);
     }
 
     /*
@@ -291,7 +311,11 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
      * in service of a checkpoint, it's cleared the tree's dirty flag, and we don't want to set it
      * again as part of that walk.
      */
-    return (__wt_page_parent_modify_set(session, ref, true));
+    if ((ret = __wt_page_parent_modify_set(session, ref, true)) == 0)
+        return (0);
+
+panic:
+    WT_RET_PANIC(session, ret, "reconciliation failed after building the disk image");
 }
 
 /*
@@ -739,11 +763,10 @@ __rec_destroy(WT_SESSION_IMPL *session, void *reconcilep)
  * __rec_destroy_session --
  *     Clean up the reconciliation structure, session version.
  */
-static int
+static void
 __rec_destroy_session(WT_SESSION_IMPL *session)
 {
     __rec_destroy(session, &session->reconcile);
-    return (0);
 }
 
 /*
@@ -2267,11 +2290,11 @@ split:
 }
 
 /*
- * __rec_write_wrapup_err --
+ * __rec_write_err --
  *     Finish the reconciliation on error.
  */
 static int
-__rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
+__rec_write_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 {
     WT_DECL_RET;
     WT_MULTI *multi;

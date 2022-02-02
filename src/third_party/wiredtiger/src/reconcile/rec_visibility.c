@@ -477,12 +477,14 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
          * update chain.
          *
          * Also, if an earlier reconciliation performed an update-restore eviction and this update
-         * was restored from disk, we can select this update irrespective of visibility. This
+         * was restored from disk, or, we rolled back a prepared transaction and restored an update
+         * from the history store, we can select this update irrespective of visibility. This
          * scenario can happen if the current reconciliation has a limited visibility of updates
          * compared to one of the previous reconciliations.
          */
         if (!F_ISSET(upd,
-              WT_UPDATE_DS | WT_UPDATE_PREPARE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_DS) &&
+              WT_UPDATE_DS | WT_UPDATE_PREPARE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_DS |
+                WT_UPDATE_RESTORED_FROM_HS) &&
           !is_hs_page &&
           (F_ISSET(r, WT_REC_VISIBLE_ALL) ? WT_TXNID_LE(r->last_running, txnid) :
                                             !__txn_visible_id(session, txnid))) {
@@ -790,7 +792,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
       !vpack->tw.prepare && (upd_saved || F_ISSET(vpack, WT_CELL_UNPACK_OVERFLOW)))
         WT_ERR(__rec_append_orig_value(session, page, upd_select->upd, vpack));
 
-    __wt_rec_time_window_clear_obsolete(session, &upd_select->tw, r);
+    __wt_rec_time_window_clear_obsolete(session, upd_select, NULL, r);
 err:
     __wt_scr_free(session, &tmp);
     return (ret);

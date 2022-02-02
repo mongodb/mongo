@@ -751,6 +751,9 @@ record_loop:
                 }
                 twp = &vpack->tw;
 
+                /* Clear the on-disk cell time window if it is obsolete. */
+                __wt_rec_time_window_clear_obsolete(session, NULL, vpack, r);
+
                 /*
                  * If we are handling overflow items, use the overflow item itself exactly once,
                  * after which we have to copy it into a buffer and from then on use a complete copy
@@ -838,6 +841,12 @@ record_loop:
                          */
                         WT_ERR(__wt_hs_delete_key_from_ts(
                           session, hs_cursor, btree->id, &hs_recno_key, WT_TS_NONE, false, false));
+
+                        /* Fail 0.01% of the time. */
+                        if (F_ISSET(r, WT_REC_EVICT) &&
+                          __wt_failpoint(session,
+                            WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_DELETE_KEY_FROM_TS, 0.01))
+                            WT_ERR(EBUSY);
 
                         WT_STAT_CONN_INCR(session, cache_hs_key_truncate_onpage_removal);
                         WT_STAT_DATA_INCR(session, cache_hs_key_truncate_onpage_removal);

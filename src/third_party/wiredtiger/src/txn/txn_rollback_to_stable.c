@@ -1504,7 +1504,7 @@ __rollback_to_stable_btree_apply(
      * 2. Table has timestamped updates without a stable timestamp.
      */
     if ((F_ISSET(S2C(session), WT_CONN_RECOVERING) ||
-          F_ISSET(S2C(session), WT_CONN_CLOSING_TIMESTAMP)) &&
+          F_ISSET(S2C(session), WT_CONN_CLOSING_CHECKPOINT)) &&
       (addr_size == 0 ||
         (txn_global->stable_timestamp == WT_TS_NONE && max_durable_ts != WT_TS_NONE))) {
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),

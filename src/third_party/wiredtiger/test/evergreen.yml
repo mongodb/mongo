@@ -618,7 +618,7 @@ functions:
           set -o errexit
           ${virtualenv_binary} -p ${python_binary} venv
           source venv/bin/activate
-          ${pip3_binary} install pymongo[srv]
+          ${pip3_binary} install pymongo[srv]==3.12.2
           git clone git@github.com:wiredtiger/automation-scripts.git
           ${python_binary} automation-scripts/evergreen/upload_stats_atlas.py -u ${atlas_wt_perf_test_user} -p ${atlas_wt_perf_pass} -f test_stats/atlas_out.json -b ${branch_name}
     - command: perf.send
@@ -2659,34 +2659,6 @@ tasks:
             set -o verbose
             ${test_env_vars|} ../../../tools/run_parallel.sh 'nice ../../../test/checkpoint/recovery-test.sh "${data_validation_stress_test_args} -s 5" WT_TEST.$t' 120
 
-  - name: data-validation-stress-test-checkpoint-fp-hs-insert-s6
-    depends_on:
-    - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix/test/checkpoint"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-            ${test_env_vars|} ../../../tools/run_parallel.sh 'nice ../../../test/checkpoint/recovery-test.sh "${data_validation_stress_test_args} -s 6" WT_TEST.$t' 120
-
-  - name: data-validation-stress-test-checkpoint-fp-hs-insert-s7
-    depends_on:
-    - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix/test/checkpoint"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-            ${test_env_vars|} ../../../tools/run_parallel.sh 'nice ../../../test/checkpoint/recovery-test.sh "${data_validation_stress_test_args} -s 7" WT_TEST.$t' 120
-
   - name: format-failure-configs-test
     depends_on:
     - name: compile
@@ -2921,7 +2893,7 @@ tasks:
             export "PATH=/opt/mongodbtoolchain/v3/bin:$PATH"
             virtualenv -p python3 venv
             source venv/bin/activate
-            pip3 install lorem pymongo
+            pip3 install lorem pymongo==3.12.2
             ./run_many_coll.sh ../../mongo/build/opt/install/bin/mongod mongodb.log config/many-collection-testing many-collection clean-and-populate
 
       - command: shell.exec
@@ -2934,7 +2906,7 @@ tasks:
             set -o verbose
             virtualenv -p python3 venv
             source venv/bin/activate
-            pip3 install "pymongo[srv]"
+            pip3 install "pymongo[srv]==3.12.2"
             res_dir=`find ./ -type d -name "many-collection-[0-9]*" -print`
             ./upload-results-atlas.py ${atlas_wt_perf_test_user} ${atlas_wt_perf_pass} wt-perf-tests many-collection-test ${branch_name} $res_dir/results/results.json
 
@@ -3658,8 +3630,6 @@ buildvariants:
     - name: data-validation-stress-test-checkpoint-fp-hs-insert-s3
     - name: data-validation-stress-test-checkpoint-fp-hs-insert-s4
     - name: data-validation-stress-test-checkpoint-fp-hs-insert-s5
-    - name: data-validation-stress-test-checkpoint-fp-hs-insert-s6
-    - name: data-validation-stress-test-checkpoint-fp-hs-insert-s7
 
 - name: ubuntu2004-cmake
   display_name: "* Ubuntu 20.04 CMake"
@@ -4162,6 +4132,7 @@ buildvariants:
       top_dir=$(git rev-parse --show-toplevel)
       top_builddir=$top_dir/build_posix
       LD_LIBRARY_PATH=$top_builddir/.libs
+    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
   tasks:
   - name: compile
   - name: generate-datafile-little-endian
