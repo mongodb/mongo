@@ -208,8 +208,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     _doc.setTargetUUID(getCollectionUUID(
                         opCtx, toNss, optTargetCollType, /*throwNotFound*/ false));
 
-                    sharding_ddl_util::checkShardedRenamePreconditions(
-                        opCtx, toNss, _doc.getDropTarget());
+                    sharding_ddl_util::checkRenamePreconditions(
+                        opCtx, sourceIsSharded, toNss, _doc.getDropTarget());
 
                     {
                         AutoGetCollection coll{opCtx, toNss, MODE_IS};

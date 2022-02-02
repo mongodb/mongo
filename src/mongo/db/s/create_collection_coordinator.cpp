@@ -610,6 +610,11 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
             str::stream() << "sharding not enabled for db " << nss().db(),
             dbEnabledForSharding);
 
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Namespace too long. Namespace: " << nss()
+                          << " Max: " << NamespaceString::MaxNsShardedCollectionLen,
+            nss().size() <= NamespaceString::MaxNsShardedCollectionLen);
+
     if (nss().db() == NamespaceString::kConfigDb) {
         // Only allowlisted collections in config may be sharded (unless we are in test mode)
         uassert(ErrorCodes::IllegalOperation,
