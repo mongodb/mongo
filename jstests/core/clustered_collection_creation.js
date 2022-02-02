@@ -6,7 +6,7 @@
  * non-replicated collections.
  *
  * @tags: [
- *   requires_fcv_52,
+ *   requires_fcv_53,
  *   assumes_against_mongod_not_mongos,
  *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
@@ -36,6 +36,12 @@ const validateCompoundSecondaryIndexes = function(db, coll, clusterKey) {
     // not as a prefix.
     assert.commandWorked(coll.createIndex({secondaryKey0: 1, [clusterKeyField]: 1}));
     coll.drop();
+};
+
+const overrideIndexType = function(clusterKey, indexType) {
+    for (const field of Object.keys(clusterKey)) {
+        return Object.assign(Object.assign({}, clusterKey), {[field]: indexType});
+    }
 };
 
 // Tests it is legal to call createIndex on the cluster key with or without {'clustered': true} as
@@ -75,6 +81,15 @@ const validateCreateIndexOnClusterKey = function(db, collName, fullCreateOptions
     const listIndexes1 = assert.commandWorked(db[collName].runCommand("listIndexes"));
     assert.eq(listIndexes1.cursor.firstBatch.length, 1);
     assert.docEq(listIndexes1.cursor.firstBatch[0], listIndexes0.cursor.firstBatch[0]);
+
+    // It's possible to create 'hashed','2d','2dsphere' and 'text' indexes on the cluster key.
+    assert.commandWorked(db[collName].createIndex(overrideIndexType(clusterKey, 'hashed')));
+    assert.commandWorked(db[collName].createIndex(overrideIndexType(clusterKey, '2d')));
+    assert.commandWorked(db[collName].createIndex(overrideIndexType(clusterKey, '2dsphere')));
+    assert.commandWorked(db[collName].createIndex(overrideIndexType(clusterKey, 'text')));
+
+    const finalIndexes = assert.commandWorked(db[collName].runCommand("listIndexes"));
+    assert.eq(finalIndexes.cursor.firstBatch.length, 5);
 };
 
 // It is illegal to drop the clusteredIndex. Verify that the various ways of dropping the

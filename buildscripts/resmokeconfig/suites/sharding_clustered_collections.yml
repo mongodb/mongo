@@ -16,12 +16,8 @@ selector:
   - jstests/sharding/shard6.js
   # Expects hint(_id) to yield an index scan instead of a table scan.
   - jstests/sharding/shard2.js
-  # TODO (SERVER-62811): Establish intended behavior.
-  - jstests/sharding/query/collation_shard_targeting_hashed_shard_key.js
   # TODO (SERVER-62874): Investigate the following test failures.
-  - jstests/sharding/transactions_reject_writes_for_moved_chunks.js
   - jstests/sharding/internal_sessions_partial_index.js
-  - jstests/sharding/change_stream_chunk_migration.js
   - jstests/sharding/change_stream_show_migration_events.js
   - jstests/sharding/move_primary_with_writes.js
   exclude_with_any_tags:

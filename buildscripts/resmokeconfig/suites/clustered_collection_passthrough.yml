@@ -7,8 +7,6 @@ selector:
   - jstests/core/**/*.js
   exclude_files:
 
-  # Creates a hashed index on _id that conflicts with cluster key.
-  - jstests/core/single_field_hashed_index.js
   # Assumes the _id index is real.
   - jstests/core/collmod_convert_to_ttl.js
   - jstests/core/index_create_too_many.js

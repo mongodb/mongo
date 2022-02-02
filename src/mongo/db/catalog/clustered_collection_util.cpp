@@ -136,6 +136,12 @@ bool matchesClusterKey(const BSONObj& keyPatternObj,
         // Clustered key cannot be compound.
         return false;
     }
+
+    if (!keyPatternObj.firstElement().isNumber()) {
+        // Clustered index can't be of any special type.
+        return false;
+    }
+
     return keyPatternObj.firstElement().fieldNameStringData() ==
         collInfo->getIndexSpec().getKey().firstElement().fieldNameStringData();
 }
