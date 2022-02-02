@@ -753,8 +753,7 @@ void ExpressionKeysPrivate::getS2Keys(SharedBufferFragmentBuilder& pooledBufferB
                                 fieldElements.clear();
                             } else if (elt.isABSONObj()) {
                                 // And this is the :[] case.
-                                BSONObj obj = elt.Obj();
-                                if (0 == obj.nFields()) {
+                                if (0 == elt.Obj().nFields()) {
                                     fieldElements.clear();
                                 }
                             }
