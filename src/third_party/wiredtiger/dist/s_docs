@@ -13,6 +13,10 @@ type doxygen > /dev/null 2>&1 || {
 	exit 0
 }
 
+# Don't create Python bytecode files, we don't run this regularly and it gets flagged by git as an
+# untracked file.
+export PYTHONDONTWRITEBYTECODE=1
+
 . ../RELEASE_INFO
 
 e=0
