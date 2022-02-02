@@ -560,13 +560,13 @@ void ShardingCatalogManager::configureCollectionBalancing(
     // Hold the FCV region to serialize with the setFeatureCompatibilityVersion command
     FixedFCVRegion fcvRegion(opCtx);
     uassert(ErrorCodes::IllegalOperation,
-            "_configsvrConfigureAutoSplit can only be run when the cluster is in feature "
+            "_configsvrConfigureCollectionBalancing can only be run when the cluster is in feature "
             "compatibility versions greater or equal than 5.3.",
             serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
                 multiversion::FeatureCompatibilityVersion::kVersion_5_3));
 
     uassert(ErrorCodes::InvalidOptions,
-            "invalid collection auto splitter config update",
+            "invalid configure collection balancing update",
             chunkSizeMB || defragmentCollection || enableAutoSplitter);
 
     short updatedFields = 0;
