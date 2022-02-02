@@ -205,14 +205,14 @@ void ProgramRegistry::registerProgram(ProcessId pid, int port) {
 
 void ProgramRegistry::unregisterProgram(ProcessId pid) {
     stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
-    invariant(isPidRegistered(pid));
+    if (isPidRegistered(pid)) {
+        _outputReaderThreads[pid].join();
 
-    _outputReaderThreads[pid].join();
-
-    // Remove the PID from the registry.
-    _outputReaderThreads.erase(pid);
-    _portToPidMap.erase(portForPid(pid));
-    _registeredPids.erase(pid);
+        // Remove the PID from the registry.
+        _outputReaderThreads.erase(pid);
+        _portToPidMap.erase(portForPid(pid));
+        _registeredPids.erase(pid);
+    }
 }
 
 void ProgramRegistry::registerReaderThread(ProcessId pid, stdx::thread reader) {
@@ -291,6 +291,12 @@ bool ProgramRegistry::waitForPid(const ProcessId pid, const bool block, int* con
         ret = waitpid(pid.toNative(), &status, (block ? 0 : WNOHANG));
     } while (ret == -1 && errno == EINTR);
     if (ret) {
+        // It's possible for waitpid to return -1 if the waidpid was already
+        // run on the pid. We're not sure if this issue can actually happen
+        // due to the locking/single threaded nature of JS, so we're adding
+        // this invariant to trigger a failure if this ever happens.
+        // See SERVER-63022.
+        invariant(ret > 0);
         int code;
         if (WIFEXITED(status)) {
             code = WEXITSTATUS(status);
