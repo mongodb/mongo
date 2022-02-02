@@ -84,19 +84,25 @@ private:
         return ret;
     }
 
-    // Set of variables coming from the outer side.
+    void openInner();
+
+    // Set of variables coming from the outer side. These are _not_ visible to the inner side,
+    // unless also added to '_outerCorrelated'.
     const value::SlotVector _outerProjects;
+
     // Set of correlated variables from the outer side that are visible on the inner side.
     const value::SlotVector _outerCorrelated;
-    // If not set then this is a cross product.
+
+    // Predicate to filter the joint set. If not set then the result is a cross product.
+    // Note: the predicate resolves the slots it's using through this stage's public accessors,
+    // meaning that if they are coming from the 'outer', they must be projected by the 'outer'.
     const std::unique_ptr<EExpression> _predicate;
-
-    value::SlotSet _outerRefs;
-
-    std::vector<value::SlotAccessor*> _correlatedAccessors;
+    vm::ByteCode _bytecode;
     std::unique_ptr<vm::CodeFragment> _predicateCode;
 
-    vm::ByteCode _bytecode;
+    // '_outerProjects' as a set (for faster checking of accessors, provided by the 'outer' child).
+    value::SlotSet _outerRefs;
+
     bool _reOpenInner{false};
     bool _outerGetNext{false};
     LoopJoinStats _specificStats;
@@ -104,7 +110,5 @@ private:
     // Tracks whether or not we're reading from the left child or the right child.
     // This is necessary for yielding.
     bool _isReadingLeftSide = false;
-
-    void openInner();
 };
 }  // namespace mongo::sbe

@@ -177,6 +177,7 @@ env.CppUnitTest(
         'sbe_hash_join_test.cpp',
         'sbe_key_string_test.cpp',
         'sbe_limit_skip_test.cpp',
+        'sbe_loop_join_test.cpp',
         'sbe_math_builtins_test.cpp',
         'sbe_merge_join_test.cpp',
         'sbe_mkobj_test.cpp',
