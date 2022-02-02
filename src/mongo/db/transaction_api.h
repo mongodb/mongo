@@ -282,7 +282,7 @@ public:
 
     /**
      * Handles the given transaction result based on where the transaction is in its lifecycle and
-     * its execution context, e.g. by updating its txnNumber, and returns the next step for the
+     * its execution context, e.g. by updating its txnNumber, returning the next step for the
      * transaction runner.
      */
     ErrorHandlingStep handleError(const StatusWith<CommitResult>& swResult) const;

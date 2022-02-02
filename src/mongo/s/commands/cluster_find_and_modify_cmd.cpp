@@ -144,7 +144,8 @@ void handleWouldChangeOwningShardErrorRetryableWrite(
             auto res = txnClient.runCommand(nss.db(), cmdObj).get();
             uassertStatusOK(getStatusFromCommandResult(res));
 
-            result->appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(res));
+            result->appendElementsUnique(
+                CommandHelpers::filterCommandReplyForPassthrough(res.removeField("recoveryToken")));
 
             return SemiFuture<void>::makeReady();
         });

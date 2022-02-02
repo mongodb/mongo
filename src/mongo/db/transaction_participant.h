@@ -539,11 +539,6 @@ public:
         void stashTransactionResources(OperationContext* opCtx);
 
         /**
-         * Resets the retryable writes state.
-         */
-        void resetRetryableWriteState(OperationContext* opCtx);
-
-        /**
          * Transfers management of transaction resources from the Session to the currently
          * checked-out OperationContext.
          */
@@ -780,6 +775,12 @@ public:
         void addCommittedStmtIds(OperationContext* opCtx,
                                  const std::vector<StmtId>& stmtIdsCommitted,
                                  const repl::OpTime& writeOpTime);
+
+        /**
+         * Handles a WouldChangeOwningShard error based on whether the operation that triggered it
+         * was a retryable write or in a retryable transaction.
+         */
+        void handleWouldChangeOwningShardError(OperationContext* opCtx);
 
     private:
         // Checks whether the given statementId for the specified transaction has already executed

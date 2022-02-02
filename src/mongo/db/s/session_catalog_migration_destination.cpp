@@ -315,6 +315,10 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
                 // entry wallTime when replicating.
                 sessionTxnRecord.setLastWriteDate(oplogEntry.getWallClockTime());
 
+                if (isInternalSessionForRetryableWrite(result.sessionId)) {
+                    sessionTxnRecord.setParentSessionId(*getParentSessionId(result.sessionId));
+                }
+
                 // We do not migrate transaction oplog entries so don't set the txn state.
                 txnParticipant.onRetryableWriteCloningCompleted(opCtx, stmtIds, sessionTxnRecord);
             }

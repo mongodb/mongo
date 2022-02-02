@@ -38,6 +38,8 @@ namespace mongo {
 class BSONObjBuilder;
 class OperationContext;
 
+const BSONObj kWouldChangeOwningShardSentinel(BSON("$wouldChangeOwningShard" << 1));
+
 /**
  * Returns the single write result corresponding to the given oplog entry for document update. I.e.,
  * the single write result that would have been returned by the statement that would have resulted

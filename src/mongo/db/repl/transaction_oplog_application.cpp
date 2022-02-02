@@ -68,6 +68,10 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
     // Apply each the operations via repl::applyOperation.
     for (const auto& op : ops) {
         try {
+            if (op.getOpType() == repl::OpTypeEnum::kNoop) {
+                continue;
+            }
+
             // Presently, it is not allowed to run a prepared transaction with a command
             // inside. TODO(SERVER-46105)
             invariant(!op.isCommand());
@@ -407,6 +411,10 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     // a secondary if a prepared transaction blocks on an index build, but the index build can't
     // re-acquire its X lock because of the transaction.
     for (const auto& op : ops) {
+        if (op.getOpType() == repl::OpTypeEnum::kNoop) {
+            continue;
+        }
+
         auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
         auto ns = op.getNss();
         auto uuid = *op.getUuid();

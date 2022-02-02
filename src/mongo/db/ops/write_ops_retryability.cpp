@@ -265,12 +265,23 @@ SingleWriteResult parseOplogEntryForUpdate(const repl::OplogEntry& entry) {
     return res;
 }
 
+static constexpr StringData kFindAndModifyRetryContext =
+    "findAndModify operation was converted into a distributed transaction "
+    "because the modified document would move shards and succeeded but "
+    "transaction history was not generated so the original reply "
+    "cannot be recreated."_sd;
+
 write_ops::FindAndModifyCommandReply parseOplogEntryForFindAndModify(
     OperationContext* opCtx,
     const write_ops::FindAndModifyCommandRequest& request,
     const repl::OplogEntry& oplogEntry) {
-    // Migrated op case.
+
+    // Migrated op and WouldChangeOwningShard sentinel case.
     if (oplogEntry.getOpType() == repl::OpTypeEnum::kNoop) {
+        if (oplogEntry.getObject().woCompare(kWouldChangeOwningShardSentinel) == 0) {
+            uasserted(ErrorCodes::IncompleteTransactionHistory, kFindAndModifyRetryContext);
+        }
+
         return parseOplogEntryForFindAndModify(
             opCtx, request, getInnerNestedOplogEntry(oplogEntry), oplogEntry);
     }

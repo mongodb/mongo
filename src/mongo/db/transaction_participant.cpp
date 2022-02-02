@@ -56,6 +56,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -1317,17 +1318,6 @@ void TransactionParticipant::Participant::stashTransactionResources(OperationCon
     }
 }
 
-void TransactionParticipant::Participant::resetRetryableWriteState(OperationContext* opCtx) {
-    if (opCtx->getClient()->isInDirectClient()) {
-        return;
-    }
-    invariant(opCtx->getTxnNumber());
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
-    if (o().txnState.isNone() && p().autoCommit == boost::none) {
-        _resetRetryableWriteState();
-    }
-}
-
 void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
     OperationContext* opCtx, MaxLockTimeout maxLockTimeout, AcquireTicket acquireTicket) {
     // Transaction resources already exist for this transaction.  Transfer them from the
@@ -1544,6 +1534,12 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
     // collection multiple times: it is a costly check.
     stdx::unordered_set<UUID, UUID::Hash> transactionOperationUuids;
     for (const auto& transactionOp : completedTransactionOperations) {
+        if (transactionOp.getOpType() == repl::OpTypeEnum::kNoop) {
+            // No-ops can't modify data, so there's no need to check if they involved a temporary
+            // collection.
+            continue;
+        }
+
         transactionOperationUuids.insert(transactionOp.getUuid().get());
     }
     auto catalog = CollectionCatalog::get(opCtx);
@@ -3067,6 +3063,40 @@ void TransactionParticipant::Participant::addCommittedStmtIds(
     stdx::lock_guard<Client> lg(*opCtx->getClient());
     for (auto stmtId : stmtIdsCommitted) {
         p().activeTxnCommittedStatements.emplace(stmtId, writeOpTime);
+    }
+}
+
+void TransactionParticipant::Participant::handleWouldChangeOwningShardError(
+    OperationContext* opCtx) {
+    if (o().txnState.isNone() && p().autoCommit == boost::none) {
+        // If this was a retryable write, reset the transaction state so this participant can be
+        // reused for the transaction mongos will use to handle the WouldChangeOwningShard error.
+
+        if (opCtx->getClient()->isInDirectClient()) {
+            return;
+        }
+
+        invariant(opCtx->getTxnNumber());
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        _resetRetryableWriteState();
+    } else if (_isInternalSessionForRetryableWrite()) {
+        // If this was a retryable transaction, add a sentinel noop to the transaction's operations
+        // so retries can detect that a WouldChangeOwningShard error was thrown and know to throw
+        // IncompleteTransactionHistory.
+
+        uassert(5918601,
+                "Expected retryable internal session to have a transaction, not a retryable write",
+                p().autoCommit != boost::none);
+        repl::ReplOperation operation;
+        operation.setOpType(repl::OpTypeEnum::kNoop);
+        operation.setNss(NamespaceString());
+        operation.setObject(kWouldChangeOwningShardSentinel);
+
+        // The operation that triggers WouldChangeOwningShard should always be the first in its
+        // transaction.
+        operation.setInitializedStatementIds({0});
+
+        addTransactionOperation(opCtx, operation);
     }
 }
 

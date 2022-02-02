@@ -989,8 +989,8 @@ void CheckoutSessionAndInvokeCommand::_tapError(Status status) {
         // in the transaction's participant list, so it is guaranteed to learn its outcome.
         _stashTransaction();
     } else if (status.code() == ErrorCodes::WouldChangeOwningShard) {
+        _txnParticipant->handleWouldChangeOwningShardError(opCtx);
         _stashTransaction();
-        _txnParticipant->resetRetryableWriteState(opCtx);
     }
 }
 

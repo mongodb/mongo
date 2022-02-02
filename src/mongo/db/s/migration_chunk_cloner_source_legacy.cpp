@@ -165,6 +165,11 @@ void LogTransactionOperationsForShardingHandler::commit(boost::optional<Timestam
     std::set<NamespaceString> namespacesTouchedByTransaction;
 
     for (const auto& stmt : _stmts) {
+        auto opType = stmt.getOpType();
+        if (opType == repl::OpTypeEnum::kNoop) {
+            continue;
+        }
+
         const auto& nss = stmt.getNss();
         auto opCtx = cc().getOperationContext();
 
@@ -178,7 +183,6 @@ void LogTransactionOperationsForShardingHandler::commit(boost::optional<Timestam
         }
         auto* const cloner = dynamic_cast<MigrationChunkClonerSourceLegacy*>(clonerPtr.get());
 
-        auto opType = stmt.getOpType();
         auto documentKey = getDocumentKeyFromReplOperation(stmt, opType);
 
         auto idElement = documentKey["_id"];

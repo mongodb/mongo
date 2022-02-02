@@ -82,10 +82,39 @@ test("Updating shard key in retryable write receives error on retry", () => {
     const shardKeyValueOnShard0 = -100;
     const shardKeyValueOnShard1 = 0;
 
-    // Insert a single document on shard 0.
-    testColl.insert({x: shardKeyValueOnShard0});
+    function runTest(cmdObj) {
+        // Insert a single document on shard 0. Skip in the upsert case to get coverage where there
+        // is no pre-image.
+        if (!cmdObj.upsert) {
+            testColl.insert({x: shardKeyValueOnShard0});
+        }
 
-    const cmdObj = {
+        // Update the document shard key. The document should now be on shard 1.
+        const result = assert.commandWorked(testDB.runCommand(cmdObj));
+        if (cmdObj.findAndModify) {
+            if (!cmdObj.upsert) {
+                assert.eq(result.lastErrorObject.n, 1, tojson(result));
+                assert.eq(result.lastErrorObject.updatedExisting, true, tojson(result));
+            } else {
+                assert.eq(result.lastErrorObject.n, 1, tojson(result));
+                assert.eq(result.lastErrorObject.updatedExisting, false, tojson(result));
+                assert(result.lastErrorObject.upserted, tojson(result));
+            }
+        } else {  // update
+            assert.eq(result.n, 1, tojson(result));
+            assert.eq(result.nModified, 1, tojson(result));
+        }
+        assert.eq(testColl.find({x: shardKeyValueOnShard1}).itcount(), 1);
+
+        // Retry the command. This should retry against shard 0, which should throw
+        // IncompleteTransactionHistory.
+        assert.commandFailedWithCode(testDB.runCommand(cmdObj),
+                                     ErrorCodes.IncompleteTransactionHistory);
+
+        assert.commandWorked(testColl.deleteMany({}));  // Clean up for the next test case.
+    }
+
+    const updateCmdObj = {
         update: collName,
         updates: [
             {q: {x: shardKeyValueOnShard0}, u: {$set: {x: shardKeyValueOnShard1}}},
@@ -94,17 +123,29 @@ test("Updating shard key in retryable write receives error on retry", () => {
         lsid: {id: UUID()},
         txnNumber: NumberLong(35),
     };
+    runTest(updateCmdObj);
 
-    // Update the document shard key. The document should now be on shard 1.
-    const result = assert.commandWorked(testDB.runCommand(cmdObj));
-    assert.eq(result.n, 1);
-    assert.eq(result.nModified, 1);
-    assert.eq(testColl.find({x: shardKeyValueOnShard1}).itcount(), 1);
+    const findAndModifyUpdateCmd = {
+        findAndModify: collName,
+        query: {x: shardKeyValueOnShard0},
+        update: {$set: {x: shardKeyValueOnShard1}},
+        lsid: {id: UUID()},
+        txnNumber: NumberLong(35),
+    };
+    runTest(findAndModifyUpdateCmd);
 
-    // Retry the command. This should retry against shard 0, which should throw
-    // IncompleteTransactionHistory.
-    assert.commandFailedWithCode(testDB.runCommand(cmdObj),
-                                 ErrorCodes.IncompleteTransactionHistory);
+    const findAndModifyUpsertCmd = {
+        findAndModify: collName,
+        query: {x: shardKeyValueOnShard0},
+        update: {$set: {x: shardKeyValueOnShard1}},
+        upsert: true,
+        lsid: {id: UUID()},
+        txnNumber: NumberLong(35),
+    };
+    runTest(findAndModifyUpsertCmd);
+
+    // Note we don't test the remove:true case because the document can't move shards if it is being
+    // delete.
 });
 
 test(
@@ -125,6 +166,15 @@ test(
             lsid: {id: UUID()},
             txnNumber: NumberLong(35),
         };
+
+        // TODO SERVER-58758: Enable the findAndModify case for this test and all the tests below.
+        // const cmdObj = {
+        // findAndModify: collName,
+        // query: {x: shardKeyValueOnShard0},
+        // update: {$set: {x: shardKeyValueOnShard1}},
+        // lsid: {id: UUID()},
+        // txnNumber: NumberLong(35),
+        // };
 
         // Update the document shard key. The document should now be on shard 1.
         const result = assert.commandWorked(testDB.runCommand(cmdObj));

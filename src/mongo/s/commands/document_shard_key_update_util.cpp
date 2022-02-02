@@ -110,6 +110,7 @@ write_ops::DeleteCommandRequest createShardKeyDeleteOp(const NamespaceString& ns
         entry.setMulti(false);
         return entry;
     }()});
+    deleteOp.getWriteCommandRequestBase().setStmtId(1);
 
     return deleteOp;
 }
@@ -121,6 +122,7 @@ write_ops::InsertCommandRequest createShardKeyInsertOp(const NamespaceString& ns
                                                        const BSONObj& updatePostImage) {
     write_ops::InsertCommandRequest insertOp(nss);
     insertOp.setDocuments({updatePostImage});
+    insertOp.getWriteCommandRequestBase().setStmtId(2);
     return insertOp;
 }
 
