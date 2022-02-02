@@ -1038,7 +1038,7 @@ const operations = [
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
             assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 100);
-            assert.eq(profileDoc.sorterSpills, 100);
+            assert.eq(profileDoc.sorterSpills, 201);
             assert.eq(profileDoc.docUnitsReturned, 100);
         },
     },

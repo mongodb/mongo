@@ -459,6 +459,19 @@ public:
             ASSERT(boost::filesystem::is_empty(tempDir.path()));
         } else {
             ASSERT(!boost::filesystem::is_empty(tempDir.path()));
+            auto path = boost::filesystem::path(tempDir.path());
+            auto directoryIterator = boost::filesystem::directory_iterator(path);
+            auto numFiles = std::count_if(
+                directoryIterator, boost::filesystem::directory_iterator(), [](const auto& elem) {
+                    return boost::filesystem::is_regular_file(elem);
+                });
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+            // Two sorters have executed
+            ASSERT_EQ(numFiles, 2);
+#else
+            // Six sorters have executed
+            ASSERT_EQ(numFiles, 6);
+#endif
         }
     }
 
@@ -489,6 +502,10 @@ public:
         return 0;
     }
 
+    virtual size_t correctNumSpills() const {
+        return 0;
+    }
+
     // It is safe to ignore / overwrite any part of options
     virtual SortOptions adjustSortOptions(SortOptions opts) {
         return opts;
@@ -509,11 +526,13 @@ private:
         if (numRanges == 0)
             return;
 
+        auto numSpillsOccurred = correctNumSpills();
         auto state = sorter->persistDataForShutdown();
         if (opts.extSortAllowed) {
             ASSERT_NE(state.fileName, "");
         }
         ASSERT_EQ(state.ranges.size(), numRanges);
+        ASSERT_EQ(sorter->numSpills(), numSpillsOccurred);
     }
 };
 
@@ -609,9 +628,26 @@ public:
     }
 
     size_t correctNumRanges() const override {
+        return std::max(static_cast<std::size_t>(MEM_LIMIT / kSortedFileBufferSize),
+                        static_cast<std::size_t>(2));
+    }
+
+    size_t correctNumSpills() const override {
         // We add 1 to the calculation since the call to persistDataForShutdown() spills the
         // remaining in-memory Sorter data to disk, adding one extra range.
-        return NUM_ITEMS * sizeof(IWPair) / MEM_LIMIT + 1;
+        std::size_t spillsToMerge = NUM_ITEMS * sizeof(IWPair) / MEM_LIMIT + 1;
+        // As the spills may get merged we'll account for the intermediate spills that happen.
+        std::size_t spillsDone = spillsToMerge;
+        std::size_t targetRanges = correctNumRanges();
+        while (spillsToMerge > targetRanges) {
+            auto newSpills = spillsToMerge / targetRanges;
+            spillsDone += newSpills;
+            if ((spillsToMerge % targetRanges) > 0) {
+                spillsDone++;
+            }
+            spillsToMerge = newSpills;
+        }
+        return spillsDone;
     }
 
     enum Constants {

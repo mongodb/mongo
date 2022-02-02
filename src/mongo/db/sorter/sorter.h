@@ -337,7 +337,7 @@ public:
     virtual ~Sorter() {}
 
     size_t numSpills() const {
-        return _iters.size();
+        return _numSpills;
     }
 
     size_t numSorted() const {
@@ -362,6 +362,7 @@ protected:
 
     std::shared_ptr<File> _file;
 
+    std::size_t _numSpills = 0;  // Keeps track of the number of spills that have happened.
     std::vector<std::shared_ptr<Iterator>> _iters;  // Data that has already been spilled.
 };
 
