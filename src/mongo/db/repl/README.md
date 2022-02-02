@@ -303,9 +303,7 @@ endless loop doing the following:
    optime (before this batch) to aid in [startup recovery](#startup-recovery) if the node shuts down
    in the middle of writing entries to the oplog.
 4. Write the batch of oplog entries into the oplog.
-5. Clear the `oplogTruncateAfterPoint` and set the [**`minValid`**](#replication-timestamp-glossary)
-   document to be the optime of the last entry in the batch. Until the node applies entries through
-   the optime set in this document, the data will not be consistent with the oplog.
+5. Clear the `oplogTruncateAfterPoint`.
 6. Use multiple threads to apply the batch in parallel. This means that oplog entries within the
    same batch are not necessarily applied in order. The operations in each batch will be divided
    among the writer threads. The only restriction for creating the vector of operations that each
@@ -315,14 +313,11 @@ endless loop doing the following:
    **group** together insert operations for improved performance and will apply all other operations
    individually.
 7. Tell the storage engine to flush the journal.
-8. Persist the node's "applied through" optime (the optime of the last oplog entry in this oplog
-   applier batch) to disk. This will update the `minValid` document now that the batch has been
-   applied in its entirety.
-9. Update [**oplog visibility**](../catalog/README.md#oplog-visibility) by notifying the storage
+8. Update [**oplog visibility**](../catalog/README.md#oplog-visibility) by notifying the storage
    engine of the new oplog entries. Since entries in an oplog applier batch are applied in
    parallel, it is only safe to make these entries visible once all the entries in this batch are
    applied, otherwise an oplog hole could be made visible.
-10. Finalize the batch by advancing the global timestamp (and the node's last applied optime) to the
+9. Finalize the batch by advancing the global timestamp (and the node's last applied optime) to the
    last optime in the batch.
 
 ## Replication and Topology Coordinators
@@ -2121,6 +2116,26 @@ still in the prepare state.
 
 Finally, the node will finish loading the replica set configuration, set its `lastApplied` and
 `lastDurable` timestamps to the top of the oplog and start steady state replication.
+
+## Recover from Unstable Checkpoint
+We may not have a recovery timestamp if we need to recover from an **unstable checkpoint**. MongoDB
+takes unstable checkpoints by setting the [`initialDataTimestamp`](#replication-timestamp-glossary)
+to the `kAllowUnstableCheckpointsSentinel`. Recovery from an unstable checkpoint replays the oplog
+from [the "appliedThrough" value in the `minValid` document](https://github.com/mongodb/mongo/blob/d8f3983e6976589cd9fa47c254cae015d9dbbd1a/src/mongo/db/repl/replication_recovery.cpp#L550-L563)
+to [the end of oplog](https://github.com/mongodb/mongo/blob/d8f3983e6976589cd9fa47c254cae015d9dbbd1a/src/mongo/db/repl/replication_recovery.cpp#L591-L594).
+Therefore, when the last checkpoint is an unstable checkpoint, we must have a valid "appliedThrough"
+reflected in that checkpoint so that replication recovery can run correctly in case the node
+crashes. We transition from taking unstable checkpoints to stable checkpoints by setting a valid
+`initialDataTimestamp`. The first stable checkpoint is taken
+[when the stable timestamp is >= the `initialDataTimestamp` set](https://github.com/mongodb/mongo/blob/d8f3983e6976589cd9fa47c254cae015d9dbbd1a/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.cpp#L1928-L1934).
+To avoid the confusion of having an "appliedThrough" conflicting with the stable recovery timestamp,
+the "appliedThrough" is cleared after we set a valid `initialDataTimestamp`. This is safe
+because we will no longer take unstable checkpoints from now on. This means that no unstable
+checkpoint will be taken with the "appliedThrough" cleared and all future stable checkpoints are
+guaranteed to be taken with the "appliedThrough" cleared. Therefore, if this node crashes before
+the first stable checkpoint, it can safely recover from the last unstable checkpoint with a correct
+appliedThrough value. Otherwise, if this node crashes after the first stable checkpoint is taken,
+it can safely recover from a stable checkpoint (with a cleared "appliedThrough").
 
 # Dropping Collections and Databases
 
