@@ -39,6 +39,7 @@
 
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands/cqf/cqf_aggregate.h"
@@ -770,10 +771,11 @@ Status runAggregate(OperationContext* opCtx,
         if (ctx && ctx->getView() && !liteParsedPipeline.startsWithCollStats()) {
             invariant(nss != NamespaceString::kRsOplogNamespace);
             invariant(!nss.isCollectionlessAggregateNS());
-            uassert(ErrorCodes::OptionNotSupportedOnView,
-                    str::stream() << AggregateCommandRequest::kCollectionUUIDFieldName
-                                  << " is not supported against a view",
-                    !request.getCollectionUUID());
+
+            checkCollectionUUIDMismatch(opCtx,
+                                        collections.getMainCollection(),
+                                        request.getCollectionUUID(),
+                                        false /* checkFeatureFlag */);
 
             uassert(ErrorCodes::CommandNotSupportedOnView,
                     "mapReduce on a view is not supported",
@@ -851,13 +853,11 @@ Status runAggregate(OperationContext* opCtx,
             return status;
         }
 
-        if (request.getCollectionUUID()) {
-            // If the namespace is not a view and collectionUUID was provided, verify the collection
-            // exists and has the expected UUID.
-            uassert(ErrorCodes::NamespaceNotFound,
-                    "No collection found with the given namespace and UUID",
-                    uuid && uuid == *request.getCollectionUUID());
-        }
+        // If collectionUUID was provided, verify the collection exists and has the expected UUID.
+        checkCollectionUUIDMismatch(opCtx,
+                                    collections.getMainCollection(),
+                                    request.getCollectionUUID(),
+                                    false /* checkFeatureFlag */);
 
         invariant(collatorToUse);
         expCtx = makeExpressionContext(

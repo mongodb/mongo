@@ -34,5 +34,6 @@
 namespace mongo {
 void checkCollectionUUIDMismatch(OperationContext* opCtx,
                                  const CollectionPtr& coll,
-                                 const boost::optional<UUID>& uuid);
+                                 const boost::optional<UUID>& uuid,
+                                 bool checkFeatureFlag = true);
 }  // namespace mongo
