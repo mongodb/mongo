@@ -79,18 +79,21 @@ Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
     WT_SESSION* session,
     PrepareConflictBehavior prepareConflictBehavior,
     RoundUpPreparedTimestamps roundUpPreparedTimestamps) const {
+
+    auto committedSnapshot = [this]() {
+        stdx::lock_guard<Latch> lock(_committedSnapshotMutex);
+        uassert(ErrorCodes::ReadConcernMajorityNotAvailableYet,
+                "Committed view disappeared while running operation",
+                _committedSnapshot);
+        return _committedSnapshot.get();
+    }();
+
     WiredTigerBeginTxnBlock txnOpen(session, prepareConflictBehavior, roundUpPreparedTimestamps);
-
-    stdx::lock_guard<Latch> lock(_committedSnapshotMutex);
-    uassert(ErrorCodes::ReadConcernMajorityNotAvailableYet,
-            "Committed view disappeared while running operation",
-            _committedSnapshot);
-
-    auto status = txnOpen.setReadSnapshot(_committedSnapshot.get());
+    auto status = txnOpen.setReadSnapshot(committedSnapshot);
     fassert(30635, status);
 
     txnOpen.done();
-    return *_committedSnapshot;
+    return committedSnapshot;
 }
 
 }  // namespace mongo
