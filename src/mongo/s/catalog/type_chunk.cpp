@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/catalog/type_chunk.h"
@@ -39,6 +41,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -58,7 +61,7 @@ const BSONField<Date_t> ChunkType::lastmod("lastmod");
 const BSONField<OID> ChunkType::epoch("lastmodEpoch");
 const BSONField<Timestamp> ChunkType::timestamp("lastmodTimestamp");
 const BSONField<BSONObj> ChunkType::history("history");
-const BSONField<long long> ChunkType::estimatedSizeBytes("estimatedDataSizeBytes");
+const BSONField<int64_t> ChunkType::estimatedSizeBytes("estimatedDataSizeBytes");
 const BSONField<bool> ChunkType::historyIsAt40("historyIsAt40");
 
 namespace {
@@ -336,6 +339,13 @@ StatusWith<ChunkType> ChunkType::fromConfigBSON(const BSONObj& source,
     auto elem = source.getField(estimatedSizeBytes.name());
     if (!elem.eoo()) {
         chunk._estimatedSizeBytes = elem.safeNumberLong();
+        if (chunk._estimatedSizeBytes.get() < 0) {
+            LOGV2_WARNING(6251200,
+                          "estimatedSizeBytes cannot be negative",
+                          "_id"_attr = chunk._id,
+                          "uuid"_attr = chunk._collectionUUID);
+            chunk._estimatedSizeBytes = boost::none;
+        }
     }
 
     return chunk;
@@ -356,7 +366,8 @@ BSONObj ChunkType::toConfigBSON() const {
     if (_version)
         builder.appendTimestamp(lastmod.name(), _version->toLong());
     if (_estimatedSizeBytes)
-        builder.appendNumber(estimatedSizeBytes.name(), *_estimatedSizeBytes);
+        builder.appendNumber(estimatedSizeBytes.name(),
+                             static_cast<long long>(*_estimatedSizeBytes));
     if (_jumbo)
         builder.append(jumbo.name(), getJumbo());
     addHistoryToBSON(builder);
@@ -476,7 +487,10 @@ void ChunkType::setShard(const ShardId& shard) {
     _shard = shard;
 }
 
-void ChunkType::setEstimatedSizeBytes(const boost::optional<long long>& estimatedSize) {
+void ChunkType::setEstimatedSizeBytes(const boost::optional<int64_t>& estimatedSize) {
+    uassert(ErrorCodes::BadValue,
+            "estimatedSizeBytes cannot be negative",
+            !estimatedSize.is_initialized() || estimatedSize.get() >= 0);
     _estimatedSizeBytes = estimatedSize;
 }
 

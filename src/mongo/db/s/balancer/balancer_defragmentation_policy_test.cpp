@@ -108,7 +108,7 @@ protected:
             ->getCollection(operationContext(), kUuid);
     }
 
-    ChunkType makeConfigChunkEntry(const boost::optional<long long>& estimatedSize = boost::none) {
+    ChunkType makeConfigChunkEntry(const boost::optional<int64_t>& estimatedSize = boost::none) {
         ChunkType chunk(kUuid, ChunkRange(kKeyAtMin, kKeyAtMax), kCollectionVersion, kShardId0);
         chunk.setEstimatedSizeBytes(estimatedSize);
         return chunk;
