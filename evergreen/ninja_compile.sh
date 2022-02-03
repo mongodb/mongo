@@ -10,8 +10,11 @@ python -m pip install ninja
 if [ "Windows_NT" = "$OS" ]; then
   vcvars="$(vswhere -latest -property installationPath | tr '\\' '/' | dos2unix.exe)/VC/Auxiliary/Build/"
   echo "call \"$vcvars/vcvarsall.bat\" amd64" > msvc.bat
+  for i in "${compile_env[@]}"; do
+    echo "set $i" >> msvc.bat
+  done
   echo "ninja install-core" >> msvc.bat
   cmd /C msvc.bat
 else
-  ninja install-core
+  eval ${compile_env} ninja install-core
 fi

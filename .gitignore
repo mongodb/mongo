@@ -10,6 +10,7 @@
 /perf.data
 /perf.data.old
 /massif.out.*
+venv
 
 *~
 *.swp

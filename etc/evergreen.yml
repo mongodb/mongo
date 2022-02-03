@@ -7785,18 +7785,12 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - ubuntu1804-build
-  - name: compile_ninja_next_TG
-    distros:
-    - ubuntu1804-build
   - name: compile_build_tools_next_TG
     distros:
     - ubuntu1804-build
   - name: libdeps_graph_linting_TG
     distros:
       - ubuntu1804-build
-  - name: compile_ninja_TG
-    distros:
-    - ubuntu1804-build
   - name: build_variant_gen
   - name: .csfle
   - name: .publish_csfle
@@ -7842,6 +7836,27 @@ buildvariants:
     timeout_secs: 345600 # 4 days
   tasks:
   - name: tla_plus
+
+- name: enterprise-ubuntu1804-64-ninja
+  display_name: "Ninja Build: Enterprise Ubuntu 18.04"
+  cron: "0 0 * * *" # Every day starting at midnight
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu1804-test
+  stepback: false
+  expansions:
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    repo_edition: enterprise
+    has_packages: false
+  tasks:
+  - name: compile_ninja_next_TG
+    distros:
+    - ubuntu1804-build
+  - name: compile_ninja_TG
+    distros:
+    - ubuntu1804-build
+
 
 - name: enterprise-ubuntu1804-arm64
   display_name: Enterprise Ubuntu 18.04 arm64
@@ -9119,6 +9134,21 @@ buildvariants:
     <<: *enterprise-windows-nopush-expansions-template
     use_wt_develop: true
 
+- name: enterprise-windows-ninja
+  display_name: "Ninja Build: Enterprise Windows"
+  cron: "0 0 * * *" # Every day starting at midnight
+  modules:
+  - enterprise
+  expansions:
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")  --win-version-min=win10
+  tasks:
+  - name: compile_ninja_next_TG
+    distros:
+    - windows-vsCurrent-large
+  - name: compile_ninja_TG
+    distros:
+    - windows-vsCurrent-large
+
 - name: enterprise-windows-inmem
   display_name: Enterprise Windows (inMemory)
   cron: "0 12 * * *" # Every day starting at 12:00
@@ -9376,9 +9406,6 @@ buildvariants:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - windows-vsCurrent-large
-  - name: compile_ninja_next_TG
-    distros:
-    - windows-vsCurrent-large
   - name: compile_build_tools_next_TG
     distros:
     - windows-vsCurrent-large
@@ -9490,7 +9517,6 @@ buildvariants:
     resmoke_jobs_max: 6
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: compile_ninja_next_TG
   - name: compile_build_tools_next_TG
   - name: libdeps_graph_linting_TG
   - name: build_variant_gen
@@ -9512,6 +9538,20 @@ buildvariants:
   - name: .publish_csfle
     distros:
     - rhel70-small
+
+- name: macos-enterprise-ninja
+  display_name: "Ninja Build: macOS Enterprise"
+  cron: "0 0 * * *" # Every day starting at midnight
+  modules:
+  - enterprise
+  run_on:
+  - macos-1100
+  expansions:
+    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
+  tasks:
+  - name: compile_ninja_next_TG
+  - name: compile_ninja_TG
 
 - name: enterprise-macos-rosetta-2
   display_name: "Enterprise macOS Via Rosetta 2"
@@ -9892,6 +9932,24 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
       - rhel80-xlarge
+
+- name: enterprise-rhel-80-64-bit-dynamic-required-ninja
+  display_name: "Ninja Build: Enterprise RHEL 8.0"
+  cron: "0 0 * * *" # Every day at midnight
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-small
+  expansions:
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    has_packages: false
+  tasks:
+  - name: compile_ninja_next_TG
+    distros:
+    - rhel80-xlarge
+  - name: compile_ninja_TG
+    distros:
+    - rhel80-xlarge
 
 - &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
   name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required
