@@ -2579,15 +2579,14 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                                   return _getDonorFilenames(token);
                               })
                            .until([](Status status) {
-                               if (status.code() == 50915) {
+                               if (status.code() ==
+                                   ErrorCodes::BackupCursorOpenConflictWithCheckpoint) {
                                    LOGV2_DEBUG(6113008,
                                                1,
                                                "Retrying backup cursor creation after error",
                                                "status"_attr = status);
-                                   // In the event of 50915: A checkpoint took place while
-                                   // opening a backup cursor, we should retry and *not* cancel
-                                   // migration. See https://jira.mongodb.org/browse/SERVER-61964
-                                   // TODO (SERVER-61964): remove retry
+                                   // A checkpoint took place while opening a backup cursor.  We
+                                   // should retry and *not* cancel migration.
                                    return false;
                                }
 
