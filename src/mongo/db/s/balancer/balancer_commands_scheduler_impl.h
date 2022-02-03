@@ -143,9 +143,9 @@ public:
     static std::shared_ptr<MoveChunkCommandInfo> recoverFrom(
         const MigrationType& migrationType, const MigrationsRecoveryDefaultValues& defaultValues) {
         auto maxChunkSize =
-            migrationType.getMaxChunkSizeBytes().value_or(defaultValues.getMaxChunkSizeBytes());
+            migrationType.getMaxChunkSizeBytes().value_or(defaultValues.maxChunkSizeBytes);
         const auto& secondaryThrottle =
-            migrationType.getSecondaryThrottle().value_or(defaultValues.getSecondaryThrottle());
+            migrationType.getSecondaryThrottle().value_or(defaultValues.secondaryThrottle);
         return std::make_shared<MoveChunkCommandInfo>(migrationType.getNss(),
                                                       migrationType.getSource(),
                                                       migrationType.getDestination(),

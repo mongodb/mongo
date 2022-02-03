@@ -113,7 +113,6 @@ public:
                                                                   nss,
                                                                   request.getChunk(),
                                                                   request.getToShardId(),
-                                                                  request.getMaxChunkSizeBytes(),
                                                                   request.getSecondaryThrottle(),
                                                                   request.getWaitForDelete(),
                                                                   request.getForceJumbo()));

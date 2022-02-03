@@ -45,23 +45,12 @@ class MigrationSecondaryThrottleOptions;
  * Default values for MoveChunkRequests that the Scheduler might recover from a prior
  * step-down or crash as part of its self-initialisation
  */
-class MigrationsRecoveryDefaultValues {
-public:
+struct MigrationsRecoveryDefaultValues {
     MigrationsRecoveryDefaultValues(int64_t maxChunkSizeBytes,
                                     const MigrationSecondaryThrottleOptions& secondaryThrottle)
-        : _maxChunkSize(maxChunkSizeBytes), _secondaryThrottle(secondaryThrottle) {}
-
-    int64_t getMaxChunkSizeBytes() const {
-        return _maxChunkSize;
-    }
-
-    const MigrationSecondaryThrottleOptions& getSecondaryThrottle() const {
-        return _secondaryThrottle;
-    };
-
-private:
-    const int64_t _maxChunkSize;
-    const MigrationSecondaryThrottleOptions _secondaryThrottle;
+        : maxChunkSizeBytes(maxChunkSizeBytes), secondaryThrottle(secondaryThrottle) {}
+    const int64_t maxChunkSizeBytes;
+    const MigrationSecondaryThrottleOptions secondaryThrottle;
 };
 
 /**

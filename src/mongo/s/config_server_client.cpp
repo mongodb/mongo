@@ -48,7 +48,6 @@ Status moveChunk(OperationContext* opCtx,
                  const NamespaceString& nss,
                  const ChunkType& chunk,
                  const ShardId& newShardId,
-                 int64_t maxChunkSizeBytes,
                  const MigrationSecondaryThrottleOptions& secondaryThrottle,
                  bool waitForDelete,
                  bool forceJumbo) {
@@ -58,13 +57,8 @@ Status moveChunk(OperationContext* opCtx,
         shard->runCommand(opCtx,
                           kPrimaryOnlyReadPreference,
                           "admin",
-                          BalanceChunkRequest::serializeToMoveCommandForConfig(nss,
-                                                                               chunk,
-                                                                               newShardId,
-                                                                               maxChunkSizeBytes,
-                                                                               secondaryThrottle,
-                                                                               waitForDelete,
-                                                                               forceJumbo),
+                          BalanceChunkRequest::serializeToMoveCommandForConfig(
+                              nss, chunk, newShardId, secondaryThrottle, waitForDelete, forceJumbo),
                           Shard::RetryPolicy::kIdempotent);
     if (!cmdResponseStatus.isOK()) {
         return cmdResponseStatus.getStatus();

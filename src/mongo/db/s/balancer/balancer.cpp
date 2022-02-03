@@ -344,7 +344,6 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const ChunkType& chunk,
                                  const ShardId& newShardId,
-                                 int64_t maxChunkSizeBytesOverride,
                                  const MigrationSecondaryThrottleOptions& secondaryThrottle,
                                  bool waitForDelete,
                                  bool forceJumbo) {
@@ -353,18 +352,17 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
         return moveAllowedStatus;
     }
 
-    auto maxChunkSize = maxChunkSizeBytesOverride;
-    if (maxChunkSize == 0) {
-        // No override has been specified through a remote command; inspect the stored configuration
+    auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
+        opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
+    auto maxChunkSize = coll.getMaxChunkSizeBytes().value_or(-1);
+    if (maxChunkSize <= 0) {
         auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
         Status refreshStatus = balancerConfig->refreshAndCheck(opCtx);
         if (!refreshStatus.isOK()) {
             return refreshStatus;
         }
 
-        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
-            opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
-        maxChunkSize = coll.getMaxChunkSizeBytes().value_or(balancerConfig->getMaxChunkSizeBytes());
+        maxChunkSize = balancerConfig->getMaxChunkSizeBytes();
     }
 
     MoveChunkSettings settings(maxChunkSize,

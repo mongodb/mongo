@@ -41,7 +41,6 @@ namespace {
 
 const char kConfigSvrMoveChunk[] = "_configsvrMoveChunk";
 const char kNS[] = "ns";
-const char kMaxChunkSizeBytes[] = "maxChunkSizeBytes";
 const char kToShardId[] = "toShard";
 const char kSecondaryThrottle[] = "secondaryThrottle";
 const char kWaitForDelete[] = "waitForDelete";
@@ -120,17 +119,6 @@ StatusWith<BalanceChunkRequest> BalanceChunkRequest::parseFromConfigCommand(cons
     }
 
     {
-        long long maxChunkSizeBytes;
-        Status status =
-            bsonExtractIntegerFieldWithDefault(obj, kMaxChunkSizeBytes, 0, &maxChunkSizeBytes);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        request._maxChunkSizeBytes = static_cast<int64_t>(maxChunkSizeBytes);
-    }
-
-    {
         std::string toShardId;
         Status status = bsonExtractStringField(obj, kToShardId, &toShardId);
         if (status.isOK()) {
@@ -159,7 +147,6 @@ BSONObj BalanceChunkRequest::serializeToMoveCommandForConfig(
     const NamespaceString& nss,
     const ChunkType& chunk,
     const ShardId& newShardId,
-    int64_t maxChunkSizeBytes,
     const MigrationSecondaryThrottleOptions& secondaryThrottle,
     bool waitForDelete,
     bool forceJumbo) {
@@ -173,7 +160,6 @@ BSONObj BalanceChunkRequest::serializeToMoveCommandForConfig(
     cmdBuilder.append(ChunkType::lastmod() + "Epoch", chunk.getVersion().epoch());
     cmdBuilder.append(ChunkType::lastmod() + "Timestamp", chunk.getVersion().getTimestamp());
     cmdBuilder.append(kToShardId, newShardId.toString());
-    cmdBuilder.append(kMaxChunkSizeBytes, static_cast<long long>(maxChunkSizeBytes));
     {
         BSONObjBuilder secondaryThrottleBuilder(cmdBuilder.subobjStart(kSecondaryThrottle));
         secondaryThrottle.append(&secondaryThrottleBuilder);

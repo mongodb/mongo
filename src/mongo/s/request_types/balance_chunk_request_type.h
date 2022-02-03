@@ -65,7 +65,6 @@ public:
         const NamespaceString& nss,
         const ChunkType& chunk,
         const ShardId& newShardId,
-        int64_t maxChunkSizeBytes,
         const MigrationSecondaryThrottleOptions& secondaryThrottle,
         bool waitForDelete,
         bool forceJumbo);
@@ -100,10 +99,6 @@ public:
         return *_toShardId;
     }
 
-    int64_t getMaxChunkSizeBytes() const {
-        return _maxChunkSizeBytes;
-    }
-
     const MigrationSecondaryThrottleOptions& getSecondaryThrottle() const {
         return _secondaryThrottle;
     }
@@ -126,10 +121,6 @@ private:
 
     // Id of the shard to which it should be moved (if specified)
     boost::optional<ShardId> _toShardId;
-
-    // This value is used by the migration source to determine the data size threshold above which a
-    // chunk would be considered jumbo and migrations will not proceed.
-    int64_t _maxChunkSizeBytes;
 
     // The parsed secondary throttle options
     MigrationSecondaryThrottleOptions _secondaryThrottle;

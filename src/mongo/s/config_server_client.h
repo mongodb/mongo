@@ -51,7 +51,6 @@ Status moveChunk(OperationContext* opCtx,
                  const NamespaceString& nss,
                  const ChunkType& chunk,
                  const ShardId& newShardId,
-                 int64_t maxChunkSizeBytes,
                  const MigrationSecondaryThrottleOptions& secondaryThrottle,
                  bool waitForDelete,
                  bool forceJumbo);
