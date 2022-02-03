@@ -433,7 +433,7 @@ bool DBClientBase::auth(const string& dbname,
 
     // To prevent unexpected behavior for existing clients, default to SCRAM-SHA-1 if the SASL
     // negotiation does not succeeed for some reason.
-    StringData mech = mechResult.isOK() ? mechResult.getValue() : "SCRAM-SHA-1";
+    StringData mech = mechResult.isOK() ? mechResult.getValue() : "SCRAM-SHA-1"_sd;
 
     try {
         const auto authParams = auth::buildAuthParams(dbname, username, password_text, mech);
