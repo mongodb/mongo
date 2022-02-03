@@ -8,6 +8,7 @@ import atexit
 import logging
 import os
 import os.path
+import signal
 import subprocess
 import sys
 import threading
@@ -275,6 +276,14 @@ class Process(object):
         sb.extend(map(quote, self.args))
 
         return " ".join(sb)
+
+    def pause(self):
+        """Send the SIGSTOP signal to the process."""
+        self._process.send_signal(signal.SIGSTOP)
+
+    def resume(self):
+        """Send the SIGCONT signal to the process."""
+        self._process.send_signal(signal.SIGCONT)
 
     def __str__(self):
         if self.pid is None:

@@ -4589,6 +4589,16 @@ tasks:
       resmoke_args: --fuzzMongodConfigs
 
 - <<: *task_template
+  name: config_fuzzer_simulate_crash_concurrency_replication
+  tags: []
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      suite: simulate_crash_concurrency_replication
+      resmoke_args: --fuzzMongodConfigs
+
+- <<: *task_template
   name: config_fuzzer_concurrency_replication
   tags: []
   commands:
@@ -8334,6 +8344,9 @@ buildvariants:
     distros:
     - rhel80-medium
   - name: config_fuzzer_concurrency
+  - name: config_fuzzer_simulate_crash_concurrency_replication
+    distros:
+    - rhel80-large
   - name: config_fuzzer_concurrency_replication
     distros:
     - rhel80-large
@@ -9760,6 +9773,9 @@ buildvariants:
     distros:
     - rhel80-medium
   - name: config_fuzzer_concurrency
+  - name: config_fuzzer_simulate_crash_concurrency_replication
+    distros:
+    - rhel80-large
   - name: config_fuzzer_concurrency_replication
     distros:
     - rhel80-large
@@ -10316,6 +10332,9 @@ buildvariants:
   - name: auth_gen
   - name: causally_consistent_jscore_txns_passthrough
   - name: config_fuzzer_concurrency
+  - name: config_fuzzer_simulate_crash_concurrency_replication
+    distros:
+    - rhel70-large
   - name: config_fuzzer_concurrency_replication
     distros:
     - rhel70-large
