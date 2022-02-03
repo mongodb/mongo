@@ -4125,6 +4125,7 @@ buildvariants:
       -DENABLE_STRICT=0
       -DENABLE_TCMALLOC=1
       -DENABLE_S3=1
+      -DIMPORT_S3_SDK=external
       -DCMAKE_PREFIX_PATH="$(pwd)/../TCMALLOC_LIB"
       -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
