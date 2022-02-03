@@ -2,7 +2,7 @@
  * Tests that writeConcern 'majority' writes succeed and are visible in a replica set that has one
  * data-bearing node and two arbiters.
  *
- * @tags: [requires_majority_read_concern]
+ * @tags: [requires_majority_read_concern, requires_fcv_53]
  */
 (function() {
 "use strict";
@@ -16,7 +16,7 @@ var name = "read_majority_two_arbs";
 var replTest =
     new ReplSetTest({name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ''}});
 
-replTest.startSet();
+replTest.startSet({setParameter: {allowMultipleArbiters: true}});
 var nodes = replTest.nodeList();
 var config = {
     "_id": name,

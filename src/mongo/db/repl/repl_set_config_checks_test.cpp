@@ -40,6 +40,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/unittest.h"
@@ -1075,6 +1076,7 @@ TEST_F(ServiceContextTest, ValidateForReconfig_SimultaneousAddAndRemoveOfArbiter
 }
 
 TEST_F(ServiceContextTest, ValidateForReconfig_MultiNodeAdditionOfArbitersDisallowed) {
+    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
     BSONArray oldMembers = BSON_ARRAY(m1 << m2);
     BSONArray newMembers = BSON_ARRAY(m1 << m2 << m3_Arbiter << m4_Arbiter);  // add two arbiters.
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,

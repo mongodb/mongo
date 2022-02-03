@@ -1,8 +1,13 @@
-// This test causes node 2 to enter rollback and then fail with a SocketException before updating
-// MinValid or altering durable state in any way. It will then choose a sync source from which it
-// is able to stitch the oplog and therefore doesn't need to roll back. Prior to SERVER-27282, the
-// node would be "stuck" with state=ROLLBACK while it was doing steady-state replication, with no
-// way to reach SECONDARY without restarting the process.
+/**
+ * This test causes node 2 to enter rollback and then fail with a SocketException before updating
+ * MinValid or altering durable state in any way. It will then choose a sync source from which it
+ * is able to stitch the oplog and therefore doesn't need to roll back. Prior to SERVER-27282, the
+ * node would be "stuck" with state=ROLLBACK while it was doing steady-state replication, with no
+ * way to reach SECONDARY without restarting the process.
+ *
+ * @tags: [requires_fcv_53]
+ */
+
 (function() {
 'use strict';
 
@@ -26,7 +31,7 @@ var rst = new ReplSetTest({
     ],
     useBridge: true
 });
-var nodes = rst.startSet();
+var nodes = rst.startSet({setParameter: {allowMultipleArbiters: true}});
 rst.initiate();
 
 // The default WC is majority and stopServerReplication could prevent satisfying any majority

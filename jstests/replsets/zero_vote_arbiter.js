@@ -39,7 +39,7 @@ TestData.skipCheckDBHashes = true;
  */
 (function reconfigArbiterZeroVotes() {
     var replTest = new ReplSetTest({nodes: 4});
-    replTest.startSet();
+    replTest.startSet({setParameter: {allowMultipleArbiters: true}});
     var config = replTest.getReplSetConfig();
     config.members[2].arbiterOnly = true;
     config.members[3].arbiterOnly = true;

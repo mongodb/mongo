@@ -418,6 +418,12 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
                       "their config");
     }
 
+    if (!allowMultipleArbiters && arbiterCount > 1) {
+        return Status(ErrorCodes::BadValue,
+                      "Multiple arbiters are not allowed unless all nodes were started with "
+                      "with --setParameter 'allowMultipleArbiters=true'");
+    }
+
     if (!_connectionString.isValid()) {
         return Status(ErrorCodes::BadValue,
                       "ReplSetConfig represented an invalid replica set ConnectionString");

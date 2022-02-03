@@ -45,6 +45,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -2025,6 +2026,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
 TEST_F(TopoCoordTest, ReplSetGetStatusWriteMajorityDifferentFromMajorityVoteCount) {
     // This tests that writeMajorityCount differs from majorityVoteCount in replSetGetStatus when
     // the number of non-arbiter voters is less than majorityVoteCount.
+    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
     Date_t startupTime = Date_t::fromMillisSinceEpoch(100);
     Date_t heartbeatTime = Date_t::fromMillisSinceEpoch(5000);
     Seconds uptimeSecs(10);
@@ -2067,6 +2069,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatusVotingMembersCountAndWritableVotingMembers
     // This test verifies that `votingMembersCount` and `writableVotingMembersCount` in
     // replSetGetStatus are set correctly when arbiters and non-voting nodes are included in the
     // replica set.
+    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
     updateConfig(BSON("_id"
                       << "mySet"
                       << "version" << 1 << "members"
@@ -6321,6 +6324,7 @@ TEST_F(TopoCoordTest, ArbiterNotIncludedInW3WriteInPSSAReplSet) {
 TEST_F(TopoCoordTest, ArbitersNotIncludedInW2WriteInPSSAAReplSet) {
     // In a PSSAA set, a w:2 write should only be acknowledged if at least one of the secondaries
     // can satisfy it.
+    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
     updateConfig(BSON("_id"
                       << "rs0"
                       << "version" << 2 << "members"

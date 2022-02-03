@@ -37,6 +37,7 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/serverless/shard_split_utils.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 
@@ -189,6 +190,7 @@ TEST(ReplSetConfig, MajorityCalculationThreeVotersNoArbiters) {
 }
 
 TEST(ReplSetConfig, MajorityCalculationNearlyHalfArbiters) {
+    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
     ReplSetConfig config(
         ReplSetConfig::parse(BSON("_id"
                                   << "mySet"
@@ -1987,6 +1989,8 @@ TEST(ReplSetConfig, ConfigVersionAndTermToString) {
     ASSERT_EQ(ConfigVersionAndTerm(1, -1).toString(), "{version: 1, term: -1}");
 }
 TEST(ReplSetConfig, IsImplicitDefaultWriteConcernMajority) {
+    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
+
     ReplSetConfig config(ReplSetConfig::parse(createConfigDocWithArbiters(1, 0)));
     ASSERT_OK(config.validate());
     ASSERT(config.isImplicitDefaultWriteConcernMajority());

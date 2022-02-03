@@ -42,6 +42,7 @@
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/log_test.h"
@@ -162,6 +163,7 @@ TEST_F(ReplCoordTest, NodeReturnsNotPrimaryErrorWhenReconfigCmdReceivedWhileInDr
 
 TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWithInvalidConfig) {
     // start up, become primary, receive uninitializable config
+    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "version" << 2 << "members"
@@ -1002,6 +1004,7 @@ TEST_F(ReplCoordTest, ReconfigThatChangesIDWCW1ToWMajWithCWWCSetPasses) {
 }
 
 TEST_F(ReplCoordTest, ReconfigThatKeepsIDWCAtW1WithoutCWWCSetPasses) {
+    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "version" << 2 << "members"
@@ -1192,6 +1195,42 @@ public:
         // Advance your optime.
         replCoordSetMyLastAppliedAndDurableOpTime(OpTime(Timestamp(2, 1), 1));
         respondToAllHeartbeats();
+    }
+
+    void multipleArbiterTest(bool allowMultipleArbiters) {
+        LOGV2(60696, "multipleArbiterTest", "allowMultipleArbiters"_attr = allowMultipleArbiters);
+        init();
+        auto configVersion = 2;
+        assertStartSuccess(configWithMembers(configVersion,
+                                             0,
+                                             BSON_ARRAY(member(1, "n1:1")
+                                                        << member(2, "n2:1")
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "n3:1"
+                                                                      << "arbiterOnly" << true))),
+                           HostAndPort("n1", 1));
+
+        auto opCtx = makeOperationContext();
+        BSONObjBuilder result;
+        ReplSetReconfigArgs args;
+        args.force = true;
+        args.newConfigObj = configWithMembers(2,
+                                              0,
+                                              BSON_ARRAY(member(1, "n1:1")
+                                                         << member(2, "n2:1")
+                                                         << BSON("_id" << 3 << "host"
+                                                                       << "n3:1"
+                                                                       << "arbiterOnly" << true)
+                                                         << BSON("_id" << 4 << "host"
+                                                                       << "n4:1"
+                                                                       << "arbiterOnly" << true)));
+        if (allowMultipleArbiters) {
+            ASSERT_EQUALS(ErrorCodes::OK,
+                          getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+        } else {
+            ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                          getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+        }
     }
 
     void respondToNHeartbeats(int n) {
@@ -2318,6 +2357,15 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigShouldThrowIfArbiterNodesHaveNewlyAdd
 
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
                   getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
+}
+
+TEST_F(ReplCoordReconfigTest, MultipleArbitersShouldFailWithoutServerParameter) {
+    multipleArbiterTest(false);
+}
+
+TEST_F(ReplCoordReconfigTest, MultipleArbitersShouldSucceedWithServerParameter) {
+    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
+    multipleArbiterTest(true);
 }
 
 TEST_F(ReplCoordTest, StepUpReconfigConcurrentWithHeartbeatReconfig) {

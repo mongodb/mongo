@@ -617,6 +617,20 @@ server_parameters:
         validator:
             gte: 0
 
+    allowMultipleArbiters:
+        description: >-
+            Allow multiple arbiters. Default is false as it can put data at risk by allowing a
+            replica set to accept writes without a sufficient number of secondaries being available
+            for data replication.
+            For example, a PSSAA replica set (primary, 2 secondaries, 2 arbiters) would still be
+            available for writes after the two secondaries fail.
+            In that case, only one copy of the data, on the primary, would be actively updated.
+            The replica set would have a majority of nodes available for election purposes,
+            but no active replication until at least one healthy secondary is available.
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: allowMultipleArbiters
+        default: false
 
 feature_flags:
     featureFlagRetryableFindAndModify:

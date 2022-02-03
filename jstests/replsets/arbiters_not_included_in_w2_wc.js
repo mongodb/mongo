@@ -7,6 +7,8 @@
  * A w:2 write would thus require only one additional member to fully satisfy the write concern
  * after committing. This test therefore shuts down the both secondaries and verifies that neither
  * of the arbiters gets picked in its place and the w:2 write times out instead.
+ *
+ * @tags: [requires_fcv_53]
  */
 
 (function() {
@@ -16,7 +18,7 @@ const name = "arbiters_not_included_in_w2_wc";
 const rst = new ReplSetTest({name: name, nodes: 5});
 const nodes = rst.nodeList();
 
-rst.startSet();
+rst.startSet({setParameter: {allowMultipleArbiters: true}});
 rst.initiate({
     "_id": name,
     "members": [

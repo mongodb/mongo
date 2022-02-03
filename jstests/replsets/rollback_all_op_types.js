@@ -7,6 +7,8 @@
  * will mock many system components, and sometimes will mock behaviors that don't necessarily match
  * true system behavior i.e. mocking an oplog entry with an incorrect format. So, this integration
  * test provides an additional verification of rollback's correctness within a real replica set.
+ *
+ * @tags: [requires_fcv_53]
  */
 
 (function() {

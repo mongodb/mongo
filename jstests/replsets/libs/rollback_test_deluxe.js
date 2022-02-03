@@ -152,7 +152,7 @@ function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet) {
         }
 
         let replSet = new ReplSetTest({name, nodes: 5, useBridge: true, nodeOptions: nodeOptions});
-        replSet.startSet();
+        replSet.startSet({setParameter: {allowMultipleArbiters: true}});
 
         const nodes = replSet.nodeList();
         replSet.initiate({

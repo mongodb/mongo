@@ -3,7 +3,7 @@
  * snapshots be dropped during rollback, therefore committed reads will block until a new committed
  * snapshot is available.
  *
- * @tags: [requires_majority_read_concern]
+ * @tags: [requires_majority_read_concern, requires_fcv_53]
  */
 
 (function() {
@@ -27,7 +27,7 @@ function doDirtyRead(coll) {
 var name = "read_committed_after_rollback";
 var replTest = new ReplSetTest(
     {name: name, nodes: 5, useBridge: true, nodeOptions: {enableMajorityReadConcern: ''}});
-replTest.startSet();
+replTest.startSet({setParameter: {allowMultipleArbiters: true}});
 
 var nodes = replTest.nodeList();
 var config = {

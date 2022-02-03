@@ -1,6 +1,8 @@
 /**
  * Tests that collMod commands during every stage of rollback are tracked correctly.
  * This especially targets collection validators that begin partially or fully uninitialized.
+ *
+ * @tags: [requires_fcv_53]
  */
 
 (function() {
