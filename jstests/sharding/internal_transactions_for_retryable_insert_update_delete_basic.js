@@ -1,5 +1,6 @@
 /*
- * Tests that retryable internal transactions are retryable and that other transactions are not.
+ * Tests that retryable internal transactions for insert, update and delete are retryable and
+ * other kinds of transactions for insert, update and delete are not retryable.
  *
  * @tags: [requires_fcv_51, featureFlagInternalTransactions]
  */
@@ -15,7 +16,6 @@ const transactionTest = new RetryableInternalTransactionTest();
     const lsid = {id: UUID()};
     const testOptions = {expectRetryToSucceed: false};
     transactionTest.runInsertUpdateDeleteTests(lsid, testOptions);
-    transactionTest.runFindAndModifyTests(lsid, testOptions);
 }
 
 {
@@ -23,15 +23,12 @@ const transactionTest = new RetryableInternalTransactionTest();
     const lsid = {id: UUID(), txnUUID: UUID()};
     const testOptions = {expectRetryToSucceed: false};
     transactionTest.runInsertUpdateDeleteTests(lsid, testOptions);
-    transactionTest.runFindAndModifyTests(lsid, testOptions);
 }
 
 {
     jsTest.log("Test that retryable internal transactions can be retried");
     transactionTest.runTestsForAllRetryableInternalTransactionTypes(
-        transactionTest.runInsertUpdateDeleteTests);
-    transactionTest.runTestsForAllRetryableInternalTransactionTypes(
-        transactionTest.runFindAndModifyTests);
+        transactionTest.runInsertUpdateDeleteTests, transactionTest.TestMode.kNonRecovery);
 }
 
 transactionTest.stop();
