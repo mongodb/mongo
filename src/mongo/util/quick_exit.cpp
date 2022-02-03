@@ -65,6 +65,8 @@
 
 #ifdef MONGO_GCOV
 extern "C" void __gcov_flush();
+extern "C" void __gcov_dump();
+extern "C" void __gcov_reset();
 #endif
 
 namespace mongo {
@@ -80,7 +82,12 @@ void quickExitWithoutLogging(int code) {
         quickExitMutex->lock();
 
 #ifdef MONGO_GCOV
+#if (defined(__clang__) && __clang_major__ >= 12) || __GNUC__ >= 11
+    __gcov_dump();
+    __gcov_reset();
+#else
     __gcov_flush();
+#endif
 #endif
 
 #if __has_feature(address_sanitizer)

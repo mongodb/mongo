@@ -106,7 +106,7 @@ if has_option('gcov'):
             'MONGO_GCOV',
         ],
     )
-quick_exit_obj = baseEnv.LibraryObject(
+quick_exit_obj = quick_exit_env.LibraryObject(
     target='quick_exit',
     source=[
         'util/quick_exit.cpp',
