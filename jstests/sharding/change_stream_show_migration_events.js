@@ -154,17 +154,29 @@ assert.commandWorked(mongosColl.insert({_id: -4}, {writeConcern: {w: "majority"}
 assert.commandWorked(mongosColl.insert({_id: 4}, {writeConcern: {w: "majority"}}));
 assert.commandWorked(mongosColl.insert({_id: 24}, {writeConcern: {w: "majority"}}));
 
+// Inserts for a given migration are ordered by `RecordId` in the recipient shard. For normal
+// collections that's the insertion order but for clustered colls that's the cluster key order.
+const clustered = mongosColl.getIndexes()[0].clustered;
+
 // Check that each change stream returns the expected events.
 shardZeroEvents = [
     makeEvent(-3, "insert"),
     makeEvent(-3, "delete"),
     makeEvent(-2, "delete"),
 ];
-shardOneEvents = [
+shardOneEvents = clustered ? [
+    makeEvent(3, "insert"),
+    makeEvent(23, "insert"),
+    makeEvent(-3, "insert"), // Clustered order.
+    makeEvent(-2, "insert"),
+    makeEvent(-4, "insert"),
+    makeEvent(4, "insert"),
+    makeEvent(24, "insert"),
+] : [
     makeEvent(3, "insert"),
     makeEvent(23, "insert"),
     makeEvent(-2, "insert"),
-    makeEvent(-3, "insert"),
+    makeEvent(-3, "insert"), // Non-clustered order.
     makeEvent(-4, "insert"),
     makeEvent(4, "insert"),
     makeEvent(24, "insert"),
@@ -224,14 +236,23 @@ let shardOneEventsAfterNewShard = [
     makeEvent(-6, "insert"),
     makeEvent(6, "insert"),
 ];
-let newShardEvents = [
+let newShardEvents = clustered ? [
+    makeEvent(16, "insert"), // Clustered order.
     makeEvent(20, "insert"),
     makeEvent(21, "insert"),
     makeEvent(22, "insert"),
     makeEvent(23, "insert"),
     makeEvent(24, "insert"),
     makeEvent(25, "insert"),
-    makeEvent(16, "insert"),
+    makeEvent(26, "insert"),
+] : [
+    makeEvent(20, "insert"),
+    makeEvent(21, "insert"),
+    makeEvent(22, "insert"),
+    makeEvent(23, "insert"),
+    makeEvent(24, "insert"),
+    makeEvent(25, "insert"),
+    makeEvent(16, "insert"), // Non-clustered order.
     makeEvent(26, "insert"),
 ];
 

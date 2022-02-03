@@ -15,9 +15,7 @@ selector:
   - jstests/sharding/shard6.js
   # Expects hint(_id) to yield an index scan instead of a table scan.
   - jstests/sharding/shard2.js
-  # TODO (SERVER-62874): Investigate the following test failures.
-  - jstests/sharding/internal_sessions_partial_index.js
-  - jstests/sharding/change_stream_show_migration_events.js
+  # Expects the collection creation options not to change.
   - jstests/sharding/move_primary_with_writes.js
   exclude_with_any_tags:
   - expects_explicit_underscore_id_index
@@ -31,5 +29,4 @@ executor:
           setParameters:
             featureFlagClusteredIndexes: true
             enableTestCommands: 1
-            internalQueryForceClassicEngine: 1
             failpoint.clusterAllCollectionsByDefault: "{mode: 'alwaysOn'}"
