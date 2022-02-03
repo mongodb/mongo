@@ -690,6 +690,15 @@ void AuthorizationManagerImpl::invalidateUsersFromDB(OperationContext* opCtx, St
         [&](const UserRequest& userRequest) { return userRequest.name.getDB() == dbname; });
 }
 
+void AuthorizationManagerImpl::invalidateUsersByTenant(OperationContext* opCtx,
+                                                       const TenantId& tenant) {
+    LOGV2_DEBUG(6323600, 2, "Invalidating tenant users", "tenant"_attr = tenant);
+    _updateCacheGeneration();
+    _authSchemaVersionCache.invalidateAll();
+    _userCache.invalidateKeyIf(
+        [&](const UserRequest& userRequest) { return userRequest.name.getTenant() == tenant; });
+}
+
 void AuthorizationManagerImpl::invalidateUserCache(OperationContext* opCtx) {
     LOGV2_DEBUG(20237, 2, "Invalidating user cache");
     _updateCacheGeneration();

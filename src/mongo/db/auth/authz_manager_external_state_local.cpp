@@ -847,6 +847,8 @@ void _invalidateUserCache(OperationContext* opCtx,
         }
         UserName userName(id.substr(splitPoint + 1), id.substr(0, splitPoint), coll.getTenant());
         authzManager->invalidateUserByName(opCtx, userName);
+    } else if (const auto& tenant = coll.getTenant()) {
+        authzManager->invalidateUsersByTenant(opCtx, tenant.get());
     } else {
         authzManager->invalidateUserCache(opCtx);
     }

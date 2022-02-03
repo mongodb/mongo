@@ -107,6 +107,8 @@ public:
 
     void invalidateUsersFromDB(OperationContext* opCtx, StringData dbname) override;
 
+    void invalidateUsersByTenant(OperationContext* opCtx, const TenantId& tenant) override;
+
     /**
      * Verify role information for users in the $external database and insert updated information
      * into the cache if necessary. Currently, this is only used to refresh LDAP users.

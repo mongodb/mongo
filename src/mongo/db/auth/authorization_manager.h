@@ -41,6 +41,7 @@
 #include "mongo/db/auth/user.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/tenant_id.h"
 
 namespace mongo {
 
@@ -328,6 +329,11 @@ public:
      * Invalidates all users who's source is "dbname" and removes them from the user cache.
      */
     virtual void invalidateUsersFromDB(OperationContext* opCtx, StringData dbname) = 0;
+
+    /**
+     * Invalidate all users associated with a given tenant.
+     */
+    virtual void invalidateUsersByTenant(OperationContext* opCtx, const TenantId& tenant) = 0;
 
     /**
      * Retrieves all users whose source is "$external" and checks if the corresponding user in the
