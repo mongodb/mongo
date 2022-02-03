@@ -52,38 +52,38 @@ if [ -n "${antithesis_image_tag}" ]; then
 fi
 
 cd antithesis/base_images/mongo_binaries
-docker build . -t mongo-binaries:$tag
+sudo docker build . -t mongo-binaries:$tag
 
 cd ../workload
-docker build . -t workload:$tag
+sudo docker build . -t workload:$tag
 
 cd ../../topologies/replica_set
 sed -i s/evergreen-latest-master/$tag/ docker-compose.yml
-docker build . -t repl-set-config:$tag
+sudo docker build . -t repl-set-config:$tag
 
 cd ../sharded_cluster
 sed -i s/evergreen-latest-master/$tag/ docker-compose.yml
-docker build . -t sharded-cluster-config:$tag
+sudo docker build . -t sharded-cluster-config:$tag
 
 # login, push, and logout
 echo "${antithesis_repo_key}" > mongodb.key.json
-cat mongodb.key.json | docker login -u _json_key https://us-central1-docker.pkg.dev --password-stdin
+cat mongodb.key.json | sudo docker login -u _json_key https://us-central1-docker.pkg.dev --password-stdin
 rm mongodb.key.json
 
 # tag and push to the registry
-docker tag "mongo-binaries:$tag" "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/mongo-binaries:$tag"
-docker push "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/mongo-binaries:$tag"
+sudo docker tag "mongo-binaries:$tag" "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/mongo-binaries:$tag"
+sudo docker push "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/mongo-binaries:$tag"
 
-docker tag "workload:$tag" "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/workload:$tag"
-docker push "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/workload:$tag"
+sudo docker tag "workload:$tag" "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/workload:$tag"
+sudo docker push "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/workload:$tag"
 
-docker tag "repl-set-config:$tag" "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/repl-set-config:$tag"
-docker push "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/repl-set-config:$tag"
+sudo docker tag "repl-set-config:$tag" "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/repl-set-config:$tag"
+sudo docker push "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/repl-set-config:$tag"
 
-docker tag "sharded-cluster-config:$tag" "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/sharded-cluster-config:$tag"
-docker push "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/sharded-cluster-config:$tag"
+sudo docker tag "sharded-cluster-config:$tag" "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/sharded-cluster-config:$tag"
+sudo docker push "us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository/sharded-cluster-config:$tag"
 
-docker logout https://us-central1-docker.pkg.dev
+sudo docker logout https://us-central1-docker.pkg.dev
 
 if [ "${is_patch}" != "true" ]; then
   echo "$commit_date" > antithesis_next_push.txt
