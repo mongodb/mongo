@@ -1010,8 +1010,9 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
     // Make sure the UUID values in the Collection metadata, the Collection object, and the UUID
     // catalog are all present and equal.
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    const TenantDatabaseName tenantDbName(boost::none, nss.db());
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto db = databaseHolder->getDb(opCtx, nss.db());
+    auto db = databaseHolder->getDb(opCtx, tenantDbName);
     // Some unit tests call the op observer on an unregistered Database.
     if (!db) {
         return;

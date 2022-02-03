@@ -43,6 +43,8 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/rebuild_indexes.h"
+#include "mongo/db/tenant_database_name.h"
+#include "mongo/db/tenant_namespace.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -64,7 +66,7 @@ void reopenAllDatabasesAndReloadCollectionCatalog(
     for (auto&& tenantDbName : databasesToOpen) {
         LOGV2_FOR_RECOVERY(
             23992, 1, "openCatalog: dbholder reopening database", "db"_attr = tenantDbName);
-        auto db = databaseHolder->openDb(opCtx, tenantDbName.dbName());
+        auto db = databaseHolder->openDb(opCtx, tenantDbName);
         invariant(db, str::stream() << "failed to reopen database " << tenantDbName.toString());
         for (auto&& collNss : catalog->getAllCollectionNamesFromDb(opCtx, tenantDbName.dbName())) {
             // Note that the collection name already includes the database component.

@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/database_holder.h"
 
+#include "mongo/db/tenant_database_name.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/string_map.h"
@@ -41,29 +42,33 @@ class DatabaseHolderImpl : public DatabaseHolder {
 public:
     DatabaseHolderImpl() = default;
 
-    Database* getDb(OperationContext* opCtx, StringData ns) const override;
+    Database* getDb(OperationContext* opCtx, const TenantDatabaseName& tenantDbName) const override;
 
-    bool dbExists(OperationContext* opCtx, StringData ns) const override;
+    bool dbExists(OperationContext* opCtx, const TenantDatabaseName& tenantDbName) const override;
 
-    std::shared_ptr<const ViewCatalog> getViewCatalog(OperationContext* opCtx,
-                                                      StringData dbName) const override;
+    std::shared_ptr<const ViewCatalog> getViewCatalog(
+        OperationContext* opCtx, const TenantDatabaseName& tenantDbName) const override;
 
-    Database* openDb(OperationContext* opCtx, StringData ns, bool* justCreated = nullptr) override;
+    Database* openDb(OperationContext* opCtx,
+                     const TenantDatabaseName& tenantDbName,
+                     bool* justCreated = nullptr) override;
 
     void dropDb(OperationContext* opCtx, Database* db) override;
 
-    void close(OperationContext* opCtx, StringData ns) override;
+    void close(OperationContext* opCtx, const TenantDatabaseName& tenantDbName) override;
 
     void closeAll(OperationContext* opCtx) override;
 
-    std::set<std::string> getNamesWithConflictingCasing(StringData name) override;
+    std::set<TenantDatabaseName> getNamesWithConflictingCasing(
+        const TenantDatabaseName& tenantDbName) override;
 
-    std::vector<std::string> getNames() override;
+    std::vector<TenantDatabaseName> getNames() override;
 
 private:
-    std::set<std::string> _getNamesWithConflictingCasing_inlock(StringData name);
+    std::set<TenantDatabaseName> _getNamesWithConflictingCasing_inlock(
+        const TenantDatabaseName& tdb);
 
-    typedef StringMap<Database*> DBs;
+    typedef stdx::unordered_map<TenantDatabaseName, Database*> DBs;
     mutable SimpleMutex _m;
     mutable stdx::condition_variable _c;
     DBs _dbs;

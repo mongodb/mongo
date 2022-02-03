@@ -99,7 +99,10 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
         return {ErrorCodes::IllegalOperation,
                 "Cannot rename collections between a replicated and an unreplicated database"};
 
-    auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, source.db());
+    // TODO SERVER-63105 Make renameCollection accept TenantNamespace and create tenantDbName with
+    // the right tenant instead boost::none.
+    const TenantDatabaseName tenantDbName(boost::none, source.db());
+    auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, tenantDbName);
     if (!db || db->isDropPending(opCtx))
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream()
@@ -141,7 +144,7 @@ Status renameTargetCollectionToTmp(OperationContext* opCtx,
 
     // The generated unique collection name is only guaranteed to exist if the database is
     // exclusively locked.
-    invariant(opCtx->lockState()->isDbLockedForMode(targetDB->name(), LockMode::MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(targetDB->name().dbName(), LockMode::MODE_X));
     auto tmpNameResult = targetDB->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.rename");
     if (!tmpNameResult.isOK()) {
         return tmpNameResult.getStatus().withContext(
@@ -314,7 +317,8 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, source.db());
+    const TenantDatabaseName tenantDbName(boost::none, source.db());
+    auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, tenantDbName);
     auto catalog = CollectionCatalog::get(opCtx);
     const auto sourceColl = catalog->lookupCollectionByNamespace(opCtx, source);
     const auto targetColl = catalog->lookupCollectionByNamespace(opCtx, target);
@@ -359,7 +363,8 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, source.db());
+    const TenantDatabaseName tenantDbName(boost::none, source.db());
+    auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, tenantDbName);
     const auto sourceColl =
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, source);
 
@@ -490,7 +495,8 @@ Status renameBetweenDBs(OperationContext* opCtx,
 
     DisableDocumentValidation validationDisabler(opCtx);
 
-    auto sourceDB = DatabaseHolder::get(opCtx)->getDb(opCtx, source.db());
+    const TenantDatabaseName sourceTenantDbName(boost::none, source.db());
+    auto sourceDB = DatabaseHolder::get(opCtx)->getDb(opCtx, sourceTenantDbName);
     if (!sourceDB)
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
 
@@ -517,7 +523,8 @@ Status renameBetweenDBs(OperationContext* opCtx,
 
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(sourceColl->uuid());
 
-    auto targetDB = DatabaseHolder::get(opCtx)->getDb(opCtx, target.db());
+    const TenantDatabaseName targetTenantDbName(boost::none, target.db());
+    auto targetDB = DatabaseHolder::get(opCtx)->getDb(opCtx, targetTenantDbName);
 
     // Check if the target namespace exists and if dropTarget is true.
     // Return a non-OK status if target exists and dropTarget is not true or if the collection
@@ -542,12 +549,13 @@ Status renameBetweenDBs(OperationContext* opCtx,
     // Create a temporary collection in the target database. It will be removed if we fail to
     // copy the collection, or on restart, so there is no need to replicate these writes.
     if (!targetDB) {
-        targetDB = DatabaseHolder::get(opCtx)->openDb(opCtx, target.db());
+        const TenantDatabaseName tenantDbName(boost::none, target.db());
+        targetDB = DatabaseHolder::get(opCtx)->openDb(opCtx, tenantDbName);
     }
 
     // The generated unique collection name is only guaranteed to exist if the database is
     // exclusively locked.
-    invariant(opCtx->lockState()->isDbLockedForMode(targetDB->name(), LockMode::MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(targetDB->name().dbName(), LockMode::MODE_X));
 
     // Note that this temporary collection name is used by MongoMirror and thus must not be changed
     // without consultation.

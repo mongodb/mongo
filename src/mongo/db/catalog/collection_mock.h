@@ -74,7 +74,7 @@ public:
     }
 
     const TenantNamespace& tenantNs() const {
-        MONGO_UNREACHABLE;
+        return _tenantNs;
     }
 
     Status rename(OperationContext* opCtx, const TenantNamespace& tenantNs, bool stayTemp) final {

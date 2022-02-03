@@ -35,6 +35,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/tenant_database_name.h"
 
 namespace mongo {
 
@@ -63,25 +64,28 @@ public:
      * Retrieves an already opened database or returns nullptr. Must be called with the database
      * locked in at least IS-mode.
      */
-    virtual Database* getDb(OperationContext* opCtx, StringData ns) const = 0;
+    virtual Database* getDb(OperationContext* opCtx,
+                            const TenantDatabaseName& tenantDbName) const = 0;
 
     /**
      * Checks if a database exists without holding a database-level lock. This class' internal mutex
-     * provides concurrency protection around looking up the db name of 'ns'.
+     * provides concurrency protection around looking up the db name of 'tenantDbName'.
      */
-    virtual bool dbExists(OperationContext* opCtx, StringData ns) const = 0;
+    virtual bool dbExists(OperationContext* opCtx,
+                          const TenantDatabaseName& tenantDbName) const = 0;
 
     /**
-     * Fetches the ViewCatalog decorating the Database matching 'dbName', or returns nullptr if the
-     * database does not exist. The returned ViewCatalog is safe to access without a lock because it
-     * is held as a shared_ptr.
+     * Fetches the ViewCatalog decorating the Database matching 'tenantDbName', or returns nullptr
+     * if the database does not exist. The returned ViewCatalog is safe to access without a lock
+     * because it is held as a shared_ptr.
      *
      * The ViewCatalog must be fetched through this interface if the caller holds no database lock
      * to ensure the Database object is safe to access. This class' internal mutex provides
-     * concurrency protection around looking up and accessing the Database object matching 'dbName'.
+     * concurrency protection around looking up and accessing the Database object matching
+     * 'tenantDbName'.
      */
-    virtual std::shared_ptr<const ViewCatalog> getViewCatalog(OperationContext* opCtx,
-                                                              StringData dbName) const = 0;
+    virtual std::shared_ptr<const ViewCatalog> getViewCatalog(
+        OperationContext* opCtx, const TenantDatabaseName& tenantDbName) const = 0;
 
     /**
      * Retrieves a database reference if it is already opened, or opens it if it hasn't been
@@ -91,7 +95,7 @@ public:
      *          existed (false). Can be NULL if this information is not necessary.
      */
     virtual Database* openDb(OperationContext* opCtx,
-                             StringData ns,
+                             const TenantDatabaseName& tenantDbName,
                              bool* justCreated = nullptr) = 0;
 
     /**
@@ -108,7 +112,7 @@ public:
      * Closes the specified database. Must be called with the database locked in X-mode.
      * No background jobs must be in progress on the database when this function is called.
      */
-    virtual void close(OperationContext* opCtx, StringData ns) = 0;
+    virtual void close(OperationContext* opCtx, const TenantDatabaseName& tenantDbName) = 0;
 
     /**
      * Closes all opened databases. Must be called with the global lock acquired in X-mode.
@@ -121,14 +125,15 @@ public:
     /**
      * Returns the set of existing database names that differ only in casing.
      */
-    virtual std::set<std::string> getNamesWithConflictingCasing(StringData name) = 0;
+    virtual std::set<TenantDatabaseName> getNamesWithConflictingCasing(
+        const TenantDatabaseName& tenantDbName) = 0;
 
     /**
      * Returns all the database names (including those which are empty).
      *
      * Unlike CollectionCatalog::getAllDbNames(), this returns databases that are empty.
      */
-    virtual std::vector<std::string> getNames() = 0;
+    virtual std::vector<TenantDatabaseName> getNames() = 0;
 };
 
 }  // namespace mongo

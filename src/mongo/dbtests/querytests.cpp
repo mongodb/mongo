@@ -1169,7 +1169,7 @@ public:
         Lock::GlobalWrite lk(&_opCtx);
         OldClientContext ctx(&_opCtx, "unittests.DirectLocking");
         _client.remove("a.b", BSONObj());
-        ASSERT_EQUALS("unittests", ctx.db()->name());
+        ASSERT_EQUALS("unittests", ctx.db()->name().dbName());
     }
     const char* ns;
 };

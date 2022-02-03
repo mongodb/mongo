@@ -1087,7 +1087,7 @@ void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Datab
 
     // The generated unique collection name is only guaranteed to exist if the database is
     // exclusively locked.
-    invariant(opCtx->lockState()->isDbLockedForMode(db->name(), LockMode::MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(db->name().dbName(), LockMode::MODE_X));
     // Creates the oplog entry to temporarily rename the collection that is
     // preventing the renameCollection command from rolling back to a unique
     // namespace.
@@ -1139,6 +1139,7 @@ void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Datab
 void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollectionInfo info) {
 
     auto dbName = info.renameFrom.db();
+    const TenantDatabaseName tenantDbName(boost::none, dbName);
 
     LOGV2(21679,
           "Attempting to rename collection with UUID: {uuid}, from: {renameFrom}, to: "
@@ -1149,7 +1150,7 @@ void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollecti
           "renameTo"_attr = info.renameTo);
     Lock::DBLock dbLock(opCtx, dbName, MODE_X);
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto db = databaseHolder->openDb(opCtx, dbName);
+    auto db = databaseHolder->openDb(opCtx, tenantDbName);
     invariant(db);
 
     auto status = renameCollectionForRollback(opCtx, info.renameTo, uuid);
@@ -1576,10 +1577,11 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                   "namespace"_attr = *nss,
                   "uuid"_attr = uuid);
 
+            const TenantDatabaseName tenantDbName(boost::none, nss->db());
             Lock::DBLock dbLock(opCtx, nss->db(), MODE_X);
 
             auto databaseHolder = DatabaseHolder::get(opCtx);
-            auto db = databaseHolder->openDb(opCtx, nss->db().toString());
+            auto db = databaseHolder->openDb(opCtx, tenantDbName);
             invariant(db);
 
             CollectionWriter collection(opCtx, uuid);

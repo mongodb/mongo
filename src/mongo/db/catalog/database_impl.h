@@ -30,16 +30,17 @@
 #pragma once
 
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/tenant_database_name.h"
 
 namespace mongo {
 
 class DatabaseImpl final : public Database {
 public:
-    explicit DatabaseImpl(StringData name);
+    explicit DatabaseImpl(const TenantDatabaseName& tenantDbName);
 
     Status init(OperationContext*) final;
 
-    const std::string& name() const final {
+    const TenantDatabaseName& name() const final {
         return _name;
     }
 
@@ -142,7 +143,7 @@ private:
                                 const NamespaceString& nss,
                                 Collection* collection) const;
 
-    const std::string _name;  // "dbname"
+    const TenantDatabaseName _name;  // "dbname"
 
     const NamespaceString _viewsName;  // "dbname.system.views"
 

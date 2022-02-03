@@ -64,6 +64,8 @@
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/storage/remove_saver.h"
+#include "mongo/db/tenant_database_name.h"
+#include "mongo/db/tenant_namespace.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_config_version.h"
@@ -1365,7 +1367,7 @@ void RollbackImpl::_resetDropPendingState(OperationContext* opCtx) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
     for (const auto& tenantDbName : tenantDbNames) {
         Lock::DBLock dbLock(opCtx, tenantDbName.dbName(), MODE_X);
-        auto db = databaseHolder->openDb(opCtx, tenantDbName.dbName());
+        auto db = databaseHolder->openDb(opCtx, tenantDbName);
         db->checkForIdIndexesAndDropPendingCollections(opCtx);
     }
 }

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,40 +27,32 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <functional>
-#include <string>
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/record_id.h"
 #include "mongo/db/tenant_database_name.h"
 
+#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
+
 namespace mongo {
-class StorageEngine;
-class NamespaceString;
-class OperationContext;
-class Status;
 
-namespace repair {
+TenantDatabaseName::TenantDatabaseName(boost::optional<TenantId> tenantId, StringData dbName) {
+    // TODO SERVER-62114 Check instead if gMultitenancySupport is enabled.
+    if (gFeatureFlagRequireTenantID.isEnabledAndIgnoreFCV())
+        invariant(tenantId);
 
-/**
- * Repairs a database using a storage engine-specific, best-effort process. Some data may be lost or
- * modified in the process but the result will be readable collections consistent with their indexes
- * on a successful return.
- *
- * It is expected that the local database will be repaired first when running in repair mode.
- */
-Status repairDatabase(OperationContext* opCtx,
-                      StorageEngine* engine,
-                      const TenantDatabaseName& tenantDbName);
+    _tenantId = tenantId;
+    _dbName = dbName.toString();
 
-/**
- * Repairs a collection using a storage engine-specific, best-effort process.
- * Some data may be lost or modified in the process but the result will be a readable collection
- * consistent with its indexes on a successful return.
- */
-Status repairCollection(OperationContext* opCtx, StorageEngine* engine, const NamespaceString& nss);
+    _tenantDbName =
+        _tenantId ? boost::make_optional(_tenantId->toString() + "_" + _dbName) : boost::none;
+}
 
-}  // namespace repair
+TenantDatabaseName TenantDatabaseName::createSystemTenantDbName(StringData dbName) {
+    // TODO SERVER-62114 Check instead if gMultitenancySupport is enabled.
+    if (gFeatureFlagRequireTenantID.isEnabledAndIgnoreFCV()) {
+        return TenantDatabaseName(TenantId::kSystemTenantId, dbName);
+    }
+
+    return TenantDatabaseName(boost::none, dbName);
+}
+
 }  // namespace mongo

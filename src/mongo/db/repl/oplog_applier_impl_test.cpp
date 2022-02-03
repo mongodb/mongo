@@ -2111,7 +2111,8 @@ TEST_F(OplogApplierImplTest, ApplyGroupIgnoresUpdateOperationIfDocumentIsMissing
         Lock::GlobalWrite globalLock(_opCtx.get());
         bool justCreated = false;
         auto databaseHolder = DatabaseHolder::get(_opCtx.get());
-        auto db = databaseHolder->openDb(_opCtx.get(), nss.db(), &justCreated);
+        const TenantDatabaseName tenantDbName(boost::none, nss.db());
+        auto db = databaseHolder->openDb(_opCtx.get(), tenantDbName, &justCreated);
         ASSERT_TRUE(db);
         ASSERT_TRUE(justCreated);
     }

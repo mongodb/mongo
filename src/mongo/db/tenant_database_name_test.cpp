@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/multitenancy.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/tenant_database_name.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -39,11 +38,12 @@ namespace {
 
 TEST(TenantDatabaseNameTest, MultitenancySupportDisabled) {
     TenantDatabaseName tdnWithoutTenant1(boost::none, "a");
+
     ASSERT(!tdnWithoutTenant1.tenantId());
     ASSERT_EQUALS(std::string("a"), tdnWithoutTenant1.dbName());
     ASSERT_EQUALS(std::string("a"), tdnWithoutTenant1.fullName());
 
-    TenantId tenantId = TenantId(OID::gen());
+    TenantId tenantId(OID::gen());
     TenantDatabaseName tdnWithTenant(tenantId, "a");
     ASSERT(tdnWithTenant.tenantId());
     ASSERT_EQUALS(tenantId, *tdnWithTenant.tenantId());
@@ -60,7 +60,7 @@ TEST(TenantDatabaseNameTest, MultitenancySupportEnabledTenantIDNotRequired) {
     ASSERT_EQUALS(std::string("a"), tdnWithoutTenant.dbName());
     ASSERT_EQUALS(std::string("a"), tdnWithoutTenant.fullName());
 
-    TenantId tenantId = TenantId(OID::gen());
+    TenantId tenantId(OID::gen());
     TenantDatabaseName tdnWithTenant(tenantId, "a");
     ASSERT(tdnWithTenant.tenantId());
     ASSERT_EQUALS(tenantId, *tdnWithTenant.tenantId());
@@ -81,7 +81,7 @@ TEST(TenantDatabaseNameTest, TenantIDRequiredBasic) {
     // TODO SERVER-62114 Remove enabling this feature flag.
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
 
-    TenantId tenantId = TenantId(OID::gen());
+    TenantId tenantId(OID::gen());
     TenantDatabaseName tdn(tenantId, "a");
     ASSERT(tdn.tenantId());
     ASSERT_EQUALS(tenantId, *tdn.tenantId());
@@ -90,7 +90,7 @@ TEST(TenantDatabaseNameTest, TenantIDRequiredBasic) {
 }
 
 TEST(TenantDatabaseNameTest, VerifyEqualsOperator) {
-    TenantId tenantId = TenantId(OID::gen());
+    TenantId tenantId(OID::gen());
     TenantDatabaseName tdn(tenantId, "a");
     ASSERT_TRUE(TenantDatabaseName(tenantId, "a") == tdn);
     ASSERT_TRUE(TenantDatabaseName(tenantId, "b") != tdn);
@@ -101,8 +101,8 @@ TEST(TenantDatabaseNameTest, VerifyEqualsOperator) {
 }
 
 TEST(TenantDatabaseNameTest, VerifyHashFunction) {
-    TenantId tenantId1 = TenantId(OID::gen());
-    TenantId tenantId2 = TenantId(OID::gen());
+    TenantId tenantId1(OID::gen());
+    TenantId tenantId2(OID::gen());
     TenantDatabaseName tdn1 = TenantDatabaseName(tenantId1, "a");
     TenantDatabaseName tdn2 = TenantDatabaseName(tenantId2, "a");
     TenantDatabaseName tdn3 = TenantDatabaseName(boost::none, "a");

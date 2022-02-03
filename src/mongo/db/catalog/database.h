@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/tenant_database_name.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -79,7 +80,7 @@ public:
      */
     virtual Status init(OperationContext* opCtx) = 0;
 
-    virtual const std::string& name() const = 0;
+    virtual const TenantDatabaseName& name() const = 0;
 
     virtual void clearTmpCollections(OperationContext* opCtx) const = 0;
 

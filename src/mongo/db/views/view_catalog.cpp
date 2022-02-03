@@ -192,7 +192,7 @@ Status ViewCatalog::registerDatabase(OperationContext* opCtx,
 
 void ViewCatalog::unregisterDatabase(OperationContext* opCtx, Database* db) {
     auto catalog = getViewCatalog(opCtx->getServiceContext()).writer();
-    auto it = catalog.writable()->_viewsForDatabase.find(db->name());
+    auto it = catalog.writable()->_viewsForDatabase.find(db->name().dbName());
     if (it != catalog.writable()->_viewsForDatabase.end() && it->second.durable->belongsTo(db)) {
         catalog.writable()->_viewsForDatabase.erase(it);
         catalog.commit();

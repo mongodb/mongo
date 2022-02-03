@@ -213,7 +213,8 @@ Collection* RollbackTest::_createCollection(OperationContext* opCtx,
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
     mongo::WriteUnitOfWork wuow(opCtx);
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto db = databaseHolder->openDb(opCtx, nss.db());
+    const TenantDatabaseName tenantDbName(boost::none, nss.db());
+    auto db = databaseHolder->openDb(opCtx, tenantDbName);
     ASSERT_TRUE(db);
     db->dropCollection(opCtx, nss).transitional_ignore();
     auto coll = db->createCollection(opCtx, nss, options);

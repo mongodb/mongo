@@ -274,12 +274,14 @@ env.Library(
         'uncommitted_collections.cpp',
         'uncommitted_multikey.cpp',
     ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/multitenancy',
+    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/profile_filter',
-        '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
@@ -320,6 +322,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
+        '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/rebuild_indexes',
         '$BUILD_DIR/mongo/db/service_context',
         'collection',
@@ -336,6 +339,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/catalog_raii",
+        "$BUILD_DIR/mongo/db/multitenancy",
         "$BUILD_DIR/mongo/db/views/views",
         "$BUILD_DIR/mongo/util/fail_point",
         "collection_catalog",
@@ -415,6 +419,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/views/views',
         'database_holder',
     ]
@@ -501,6 +506,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/index_commands_idl',
+        '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
@@ -638,7 +644,6 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
             '$BUILD_DIR/mongo/db/repl/replmocks',
             '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
-            '$BUILD_DIR/mongo/db/server_feature_flags',
             '$BUILD_DIR/mongo/db/service_context',
             '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
             '$BUILD_DIR/mongo/db/service_context_test_fixture',

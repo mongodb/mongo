@@ -80,6 +80,8 @@
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/oplog_cap_maintainer_thread.h"
+#include "mongo/db/tenant_database_name.h"
+#include "mongo/db/tenant_namespace.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
@@ -429,7 +431,7 @@ Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
             continue;
         }
         writeConflictRetry(opCtx, "dropReplicatedDatabases", tenantDbName.dbName(), [&] {
-            if (auto db = databaseHolder->getDb(opCtx, tenantDbName.dbName())) {
+            if (auto db = databaseHolder->getDb(opCtx, tenantDbName)) {
                 databaseHolder->dropDb(opCtx, db);
             } else {
                 // This is needed since dropDatabase can't be rolled back.

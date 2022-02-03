@@ -37,34 +37,38 @@ class DatabaseHolderMock : public DatabaseHolder {
 public:
     DatabaseHolderMock() = default;
 
-    Database* getDb(OperationContext* opCtx, StringData ns) const override {
+    Database* getDb(OperationContext* opCtx,
+                    const TenantDatabaseName& tenantDbName) const override {
         return nullptr;
     }
 
-    bool dbExists(OperationContext* opCtx, StringData dbName) const override {
+    bool dbExists(OperationContext* opCtx, const TenantDatabaseName& tenantDbName) const override {
         return false;
     }
 
-    std::shared_ptr<const ViewCatalog> getViewCatalog(OperationContext* const opCtx,
-                                                      StringData dbName) const override {
+    std::shared_ptr<const ViewCatalog> getViewCatalog(
+        OperationContext* const opCtx, const TenantDatabaseName& tenantDbName) const override {
         return nullptr;
     }
 
-    Database* openDb(OperationContext* opCtx, StringData ns, bool* justCreated = nullptr) override {
+    Database* openDb(OperationContext* opCtx,
+                     const TenantDatabaseName& tenantDbName,
+                     bool* justCreated = nullptr) override {
         return nullptr;
     }
 
     void dropDb(OperationContext* opCtx, Database* db) override {}
 
-    void close(OperationContext* opCtx, StringData ns) override {}
+    void close(OperationContext* opCtx, const TenantDatabaseName& tenantDbName) override {}
 
     void closeAll(OperationContext* opCtx) override {}
 
-    std::set<std::string> getNamesWithConflictingCasing(StringData name) override {
-        return std::set<std::string>();
+    std::set<TenantDatabaseName> getNamesWithConflictingCasing(
+        const TenantDatabaseName& tenantDbName) override {
+        return std::set<TenantDatabaseName>();
     }
 
-    std::vector<std::string> getNames() override {
+    std::vector<TenantDatabaseName> getNames() override {
         return {};
     }
 };

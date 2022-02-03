@@ -43,6 +43,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/tenant_database_name.h"
+#include "mongo/db/tenant_namespace.h"
 
 namespace mongo {
 
@@ -155,7 +157,7 @@ public:
 
                     AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, tenantDbName.dbName());
                     // The database could have been dropped since we called 'listDatabases()' above.
-                    if (!DatabaseHolder::get(opCtx)->dbExists(opCtx, tenantDbName.dbName())) {
+                    if (!DatabaseHolder::get(opCtx)->dbExists(opCtx, tenantDbName)) {
                         continue;
                     }
 

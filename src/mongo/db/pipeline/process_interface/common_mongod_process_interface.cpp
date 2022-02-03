@@ -450,13 +450,15 @@ bool CommonMongodProcessInterface::fieldsHaveSupportingUniqueIndex(
     const NamespaceString& nss,
     const std::set<FieldPath>& fieldPaths) const {
     auto* opCtx = expCtx->opCtx;
+
     // We purposefully avoid a helper like AutoGetCollection here because we don't want to check the
     // db version or do anything else. We simply want to protect against concurrent modifications to
     // the catalog.
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
+    const TenantDatabaseName tenantDbName(boost::none, nss.db());
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto db = databaseHolder->getDb(opCtx, nss.db());
+    auto db = databaseHolder->getDb(opCtx, tenantDbName);
     auto collection =
         db ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss) : nullptr;
     if (!collection) {

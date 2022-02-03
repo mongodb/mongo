@@ -199,8 +199,9 @@ void createIndexForApplyOps(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(indexNss, MODE_X));
 
     // Check if collection exists.
+    const TenantDatabaseName tenantDbName(boost::none, indexNss.db());
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto db = databaseHolder->getDb(opCtx, indexNss.ns());
+    auto db = databaseHolder->getDb(opCtx, tenantDbName);
     auto indexCollection =
         db ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, indexNss) : nullptr;
     uassert(ErrorCodes::NamespaceNotFound,
@@ -1827,8 +1828,9 @@ Status applyCommand_inlock(OperationContext* opCtx,
         // Command application doesn't always acquire the global writer lock for transaction
         // commands, so we acquire its own locks here.
         Lock::DBLock lock(opCtx, nss.db(), MODE_IS);
+        const TenantDatabaseName tenantDbName(boost::none, nss.db());
         auto databaseHolder = DatabaseHolder::get(opCtx);
-        auto db = databaseHolder->getDb(opCtx, nss.ns());
+        auto db = databaseHolder->getDb(opCtx, tenantDbName);
         if (db && !CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss) &&
             ViewCatalog::get(opCtx)->lookup(opCtx, nss)) {
             return {ErrorCodes::CommandNotSupportedOnView,

@@ -489,7 +489,8 @@ private:
         // (Generic FCV reference): TODO SERVER-60912: When kLastLTS is 6.0, remove this FCV-gated
         // upgrade code.
         if (requestedVersion == multiversion::GenericFCV::kLatest) {
-            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+            for (const auto& tenantDbName : DatabaseHolder::get(opCtx)->getNames()) {
+                const auto& dbName = tenantDbName.dbName();
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
                 catalog::forEachCollectionFromDb(
                     opCtx,
@@ -603,7 +604,8 @@ private:
         // (Generic FCV reference): TODO SERVER-60912: When kLastLTS is 6.0, remove this FCV-gated
         // downgrade code.
         if (requestedVersion == multiversion::GenericFCV::kLastLTS) {
-            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+            for (const auto& tenantDbName : DatabaseHolder::get(opCtx)->getNames()) {
+                const auto& dbName = tenantDbName.dbName();
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
                 catalog::forEachCollectionFromDb(
                     opCtx,
@@ -662,7 +664,6 @@ private:
                             // downgrade process cannot be aborted at this point.
                             return true;
                         }
-
                         NamespaceStringOrUUID nsOrUUID(dbName, collection->uuid());
                         CollMod collModCmd(collection->ns());
                         BSONObjBuilder unusedBuilder;
@@ -690,7 +691,8 @@ private:
 
         if (serverGlobalParams.featureCompatibility
                 .isFCVDowngradingOrAlreadyDowngradedFromLatest()) {
-            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+            for (const auto& tenantDbName : DatabaseHolder::get(opCtx)->getNames()) {
+                const auto& dbName = tenantDbName.dbName();
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
                 catalog::forEachCollectionFromDb(
                     opCtx,
@@ -718,10 +720,10 @@ private:
 
             // TODO SERVER-63171: Only check on last-lts when FCV 5.3 becomes last-continuous.
             // TODO SERVER-63172: Remove once FCV 6.0 becomes last-lts.
-            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+            for (const auto& tenantDbName : DatabaseHolder::get(opCtx)->getNames()) {
+                Lock::DBLock dbLock(opCtx, tenantDbName.dbName(), MODE_IX);
                 catalog::forEachCollectionFromDb(
-                    opCtx, dbName, MODE_X, [&](const CollectionPtr& collection) {
+                    opCtx, tenantDbName.dbName(), MODE_X, [&](const CollectionPtr& collection) {
                         auto indexCatalog = collection->getIndexCatalog();
                         auto indexIt = indexCatalog->getIndexIterator(
                             opCtx, true /* includeUnfinishedIndexes */);

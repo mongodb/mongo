@@ -709,10 +709,13 @@ AutoGetCollectionMultiForReadCommandLockFree::AutoGetCollectionMultiForReadComma
 }
 
 OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& ns, bool doVersion)
-    : _opCtx(opCtx), _db(DatabaseHolder::get(opCtx)->getDb(opCtx, ns)) {
+    : _opCtx(opCtx) {
+    const auto dbName = nsToDatabaseSubstring(ns);
+    const TenantDatabaseName tenantDbName(boost::none, dbName);
+    _db = DatabaseHolder::get(opCtx)->getDb(opCtx, tenantDbName);
+
     if (!_db) {
-        const auto dbName = nsToDatabaseSubstring(ns);
-        _db = DatabaseHolder::get(opCtx)->openDb(_opCtx, dbName, &_justCreated);
+        _db = DatabaseHolder::get(opCtx)->openDb(_opCtx, tenantDbName, &_justCreated);
         invariant(_db);
     }
 
@@ -732,8 +735,8 @@ OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& n
     }
 
     stdx::lock_guard<Client> lk(*_opCtx->getClient());
-    currentOp->enter_inlock(ns.c_str(),
-                            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(_db->name()));
+    currentOp->enter_inlock(
+        ns.c_str(), CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(_db->name().dbName()));
 }
 
 AutoGetCollectionForReadCommandMaybeLockFree::AutoGetCollectionForReadCommandMaybeLockFree(

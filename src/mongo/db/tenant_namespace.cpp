@@ -45,6 +45,10 @@ TenantNamespace::TenantNamespace(boost::optional<mongo::TenantId> tenantId, Name
                              : boost::none;
 }
 
+TenantDatabaseName TenantNamespace::createTenantDatabaseName() const {
+    return TenantDatabaseName(_tenantId, _nss.db());
+}
+
 TenantNamespace TenantNamespace::parseTenantNamespaceFromDisk(StringData ns) {
     if (!gMultitenancySupport) {
         return TenantNamespace(boost::none, NamespaceString(ns));

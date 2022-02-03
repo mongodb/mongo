@@ -505,7 +505,7 @@ void _insertDocument(OperationContext* opCtx, const NamespaceString& nss, const 
 CollectionPtr _getCollection_inlock(OperationContext* opCtx, const NamespaceString& nss) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto* db = databaseHolder->getDb(opCtx, nss.db());
+    auto* db = databaseHolder->getDb(opCtx, TenantDatabaseName(boost::none, nss.db()));
     if (!db) {
         return nullptr;
     }

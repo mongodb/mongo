@@ -50,7 +50,8 @@ MONGO_FAIL_POINT_DEFINE(setAutoGetCollectionWait);
  * Returns true if 'nss' is a view. False if the namespace or view doesn't exist.
  */
 bool isSecondaryNssAView(OperationContext* opCtx, const NamespaceString& nss) {
-    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, nss.db());
+    TenantDatabaseName tenantDbName(boost::none, nss.db());
+    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, tenantDbName);
     return viewCatalog && viewCatalog->lookup(opCtx, nss);
 }
 
@@ -167,14 +168,16 @@ void acquireCollectionLocksInResourceIdOrder(
 
 }  // namespace
 
+// TODO SERVER-62918 Pass TenantDatabaseName instead of string for dbName.
 AutoGetDb::AutoGetDb(OperationContext* opCtx,
                      StringData dbName,
                      LockMode mode,
                      Date_t deadline,
                      const std::set<StringData>& secondaryDbNames)
     : _dbName(dbName), _dbLock(opCtx, dbName, mode, deadline), _db([&] {
+          const TenantDatabaseName tenantDbName(boost::none, dbName);
           auto databaseHolder = DatabaseHolder::get(opCtx);
-          return databaseHolder->getDb(opCtx, dbName);
+          return databaseHolder->getDb(opCtx, tenantDbName);
       }()) {
     // Locking multiple databases is only supported in intent read mode (MODE_IS).
     invariant(secondaryDbNames.empty() || mode == MODE_IS);
@@ -206,7 +209,8 @@ Database* AutoGetDb::ensureDbExists(OperationContext* opCtx) {
     }
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    _db = databaseHolder->openDb(opCtx, _dbName, nullptr);
+    const TenantDatabaseName tenantDbName(boost::none, _dbName);
+    _db = databaseHolder->openDb(opCtx, tenantDbName, nullptr);
 
     auto dss = DatabaseShardingState::get(opCtx, _dbName);
     auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
@@ -275,12 +279,14 @@ AutoGetCollection::AutoGetCollection(
         auto secondaryResolvedNss =
             catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID);
         auto secondaryColl = catalog->lookupCollectionByNamespace(opCtx, secondaryResolvedNss);
+        // TODO SERVER-62926 Change collection lock RAII types to use TenantNamespace
+        const TenantDatabaseName secondaryTenantDbName(boost::none, secondaryNssOrUUID.db());
         verifyDbAndCollection(opCtx,
                               MODE_IS,
                               secondaryNssOrUUID,
                               secondaryResolvedNss,
                               secondaryColl,
-                              databaseHolder->getDb(opCtx, secondaryNssOrUUID.db()));
+                              databaseHolder->getDb(opCtx, secondaryTenantDbName));
 
         // Flag if a secondary namespace is a view.
         if (!_secondaryNssIsView && isSecondaryNssAView(opCtx, secondaryResolvedNss)) {
@@ -401,7 +407,8 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
     }
 
     // Returns nullptr for 'viewCatalog' if db does not exist.
-    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, _resolvedNss.db());
+    const TenantDatabaseName tenantDbName(boost::none, _resolvedNss.db());
+    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, tenantDbName);
     if (!viewCatalog) {
         return;
     }

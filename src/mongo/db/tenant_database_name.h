@@ -29,14 +29,21 @@
 
 #pragma once
 #include <algorithm>
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/optional.hpp>
 #include <string>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/logv2/log_attr.h"
 
 namespace mongo {
+
+/**
+ * A TenantDatabaseName is a unique name for database.
+ * It holds a database name and tenant id, if one exists. In a serverless environment, a tenant id
+ * is expected to exist so that a database can be uniquely identified.
+ */
 class TenantDatabaseName {
 public:
     /**
@@ -46,17 +53,9 @@ public:
      *
      * If featureFlagRequireTenantID is set, tenantId is required.
      */
-    TenantDatabaseName(boost::optional<TenantId> tenantId, StringData dbName) {
-        // TODO SERVER-62114 Check instead if gMultitenancySupport is enabled.
-        if (gFeatureFlagRequireTenantID.isEnabledAndIgnoreFCV())
-            invariant(tenantId);
+    TenantDatabaseName(boost::optional<TenantId> tenantId, StringData dbName);
 
-        _tenantId = tenantId;
-        _dbName = dbName.toString();
-
-        _tenantDbName =
-            _tenantId ? boost::make_optional(_tenantId->toString() + "_" + _dbName) : boost::none;
-    }
+    static TenantDatabaseName createSystemTenantDbName(StringData dbName);
 
     const boost::optional<TenantId> tenantId() const {
         return _tenantId;
@@ -76,6 +75,10 @@ public:
 
     const std::string& toString() const {
         return fullName();
+    }
+
+    bool equalCaseInsensitive(const TenantDatabaseName& other) const {
+        return boost::iequals(fullName(), other.fullName());
     }
 
     /**
@@ -100,6 +103,14 @@ private:
     std::string _dbName;
     boost::optional<std::string> _tenantDbName;
 };
+
+inline std::ostream& operator<<(std::ostream& stream, const TenantDatabaseName& tdb) {
+    return stream << tdb.fullName();
+}
+
+inline StringBuilder& operator<<(StringBuilder& builder, const TenantDatabaseName& tdb) {
+    return builder << tdb.fullName();
+}
 
 inline bool operator==(const TenantDatabaseName& lhs, const TenantDatabaseName& rhs) {
     return lhs.compare(rhs) == 0;

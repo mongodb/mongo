@@ -386,7 +386,7 @@ int _testRollbackDelete(OperationContext* opCtx,
     Lock::DBLock dbLock(opCtx, "test", MODE_S);
     Lock::CollectionLock collLock(opCtx, NamespaceString("test.t"), MODE_S);
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto db = databaseHolder->getDb(opCtx, "test");
+    auto db = databaseHolder->getDb(opCtx, TenantDatabaseName(boost::none, "test"));
     ASSERT_TRUE(db);
     auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
         opCtx, NamespaceString("test.t"));
@@ -411,7 +411,7 @@ TEST_F(RSRollbackTest, RollbackDeleteDocCmdCollectionAtSourceDropped) {
     {
         Lock::DBLock dbLock(_opCtx.get(), nss.db(), MODE_X);
         auto databaseHolder = DatabaseHolder::get(_opCtx.get());
-        auto db = databaseHolder->openDb(_opCtx.get(), nss.db());
+        auto db = databaseHolder->openDb(_opCtx.get(), TenantDatabaseName(boost::none, nss.db()));
         ASSERT_TRUE(db);
     }
     ASSERT_EQUALS(-1,
@@ -1961,7 +1961,7 @@ TEST_F(RSRollbackTest, RollbackCreateCollectionCommand) {
     {
         Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
         auto databaseHolder = DatabaseHolder::get(_opCtx.get());
-        auto db = databaseHolder->getDb(_opCtx.get(), "test");
+        auto db = databaseHolder->getDb(_opCtx.get(), TenantDatabaseName(boost::none, "test"));
         ASSERT_TRUE(db);
         ASSERT_FALSE(CollectionCatalog::get(_opCtx.get())
                          ->lookupCollectionByNamespace(_opCtx.get(), NamespaceString("test.t")));

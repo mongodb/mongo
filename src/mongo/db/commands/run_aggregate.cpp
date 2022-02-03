@@ -296,8 +296,8 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
     // 'resolvedNamespaces' from changing relative to those in the acquired ViewCatalog. The
     // resolution of the view definitions below might lead into an endless cycle if any are allowed
     // to change.
-    auto viewCatalog =
-        DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, request.getNamespace().db());
+    const TenantDatabaseName tenantDbName(boost::none, request.getNamespace().db());
+    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, tenantDbName);
 
     std::deque<NamespaceString> involvedNamespacesQueue(pipelineInvolvedNamespaces.begin(),
                                                         pipelineInvolvedNamespaces.end());
@@ -348,8 +348,9 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
                 // require a lookup stage involving a view on the 'local' database.
                 // If the involved namespace is 'local.system.tenantMigration.oplogView', resolve
                 // its view definition.
+                const TenantDatabaseName involvedTenantDbName(boost::none, involvedNs.db());
                 auto involvedDbViewCatalog =
-                    DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, involvedNs.db());
+                    DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, involvedTenantDbName);
 
                 // It is safe to assume that the ViewCatalog for the `local` database always
                 // exists because replica sets forbid dropping the oplog and the `local` database.
@@ -408,7 +409,8 @@ Status collatorCompatibleWithPipeline(OperationContext* opCtx,
                                       StringData dbName,
                                       const CollatorInterface* collator,
                                       const LiteParsedPipeline& liteParsedPipeline) {
-    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, dbName);
+    const TenantDatabaseName tenantDbName(boost::none, dbName);
+    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, tenantDbName);
     if (!viewCatalog) {
         return Status::OK();
     }
@@ -714,8 +716,10 @@ Status runAggregate(OperationContext* opCtx,
 
             // Raise an error if 'origNss' is a view. We do not need to check this if we are opening
             // a stream on an entire db or across the cluster.
+            const TenantDatabaseName origTenantDbName(boost::none, origNss.db());
             if (!origNss.isCollectionlessAggregateNS()) {
-                auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, origNss.db());
+                auto viewCatalog =
+                    DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, origTenantDbName);
                 if (viewCatalog) {
                     auto view = viewCatalog->lookup(opCtx, origNss);
                     uassert(ErrorCodes::CommandNotSupportedOnView,
@@ -814,7 +818,8 @@ Status runAggregate(OperationContext* opCtx,
             // Check that the database/view catalog still exist, in case this is a lock-free
             // operation. It's possible for a view to disappear after we release locks below, so
             // it's safe to quit early if the view disappears while running lock-free.
-            auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, nss.db());
+            const TenantDatabaseName tenantDbName(boost::none, nss.db());
+            auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, tenantDbName);
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "Namespace '" << nss << "' no longer exists",
                     viewCatalog);

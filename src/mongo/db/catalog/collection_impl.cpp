@@ -58,7 +58,6 @@
 #include "mongo/db/matcher/doc_validation_error.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/multitenancy.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update_request.h"

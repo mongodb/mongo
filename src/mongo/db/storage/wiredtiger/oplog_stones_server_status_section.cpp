@@ -35,6 +35,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/tenant_database_name.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -68,8 +69,8 @@ public:
         AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
         const auto& oplog = oplogRead.getCollection();
         if (oplog) {
-            const auto localDb =
-                DatabaseHolder::get(opCtx)->getDb(opCtx, NamespaceString::kLocalDb);
+            const TenantDatabaseName tenantDbName(boost::none, NamespaceString::kLocalDb);
+            const auto localDb = DatabaseHolder::get(opCtx)->getDb(opCtx, tenantDbName);
             invariant(localDb);
             AutoStatsTracker statsTracker(
                 opCtx,

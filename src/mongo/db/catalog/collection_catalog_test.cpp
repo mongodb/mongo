@@ -35,7 +35,6 @@
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/multitenancy.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/death_test.h"

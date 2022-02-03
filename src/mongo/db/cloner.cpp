@@ -102,7 +102,9 @@ struct Cloner::Fun {
 
         // Make sure database still exists after we resume from the temp release
         auto databaseHolder = DatabaseHolder::get(opCtx);
-        auto db = databaseHolder->openDb(opCtx, _dbName);
+        // TODO SERVER-63111 use TenantDatabase in the Cloner.
+        const TenantDatabaseName tenantDbName(boost::none, _dbName);
+        auto db = databaseHolder->openDb(opCtx, tenantDbName);
         auto catalog = CollectionCatalog::get(opCtx);
         auto collection = catalog->lookupCollectionByNamespace(opCtx, nss);
         if (!collection) {
@@ -149,7 +151,7 @@ struct Cloner::Fun {
                         repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
                 }
 
-                db = databaseHolder->getDb(opCtx, _dbName);
+                db = databaseHolder->getDb(opCtx, tenantDbName);
                 uassert(28593,
                         str::stream() << "Database " << _dbName << " dropped while cloning",
                         db != nullptr);
@@ -338,7 +340,8 @@ Status Cloner::_createCollectionsForDb(
     const std::vector<CreateCollectionParams>& createCollectionParams,
     const std::string& dbName) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto db = databaseHolder->openDb(opCtx, dbName);
+    const TenantDatabaseName tenantDbName(boost::none, dbName);
+    auto db = databaseHolder->openDb(opCtx, tenantDbName);
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
 
     auto catalog = CollectionCatalog::get(opCtx);

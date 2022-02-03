@@ -194,7 +194,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     // Make sure the target namespace is not a view
                     {
                         Lock::DBLock dbLock(opCtx, toNss.db(), MODE_IS);
-                        const auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, toNss.db());
+                        const TenantDatabaseName tenantDbName(boost::none, toNss.db());
+                        const auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, tenantDbName);
                         if (db) {
                             uassert(ErrorCodes::CommandNotSupportedOnView,
                                     str::stream() << "Can't rename to target collection `" << toNss

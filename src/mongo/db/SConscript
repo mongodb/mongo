@@ -85,6 +85,7 @@ env.Library(
     source=[
         'multitenancy.cpp',
         'tenant_namespace.cpp',
+        'tenant_database_name.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -711,6 +712,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
         'catalog/database_holder',
+        'multitenancy',
         'storage/snapshot_helper',
     ],
 )
@@ -770,6 +772,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
         '$BUILD_DIR/mongo/db/s/sharding_api_d',
+        'multitenancy',
     ]
 )
 
@@ -807,6 +810,7 @@ env.Library(
         'index_builds_coordinator_interface',
         'index_commands_idl',
         'internal_transactions_feature_flag',
+        'multitenancy',
         'not_primary_error_tracker',
         'query_exec',
         'repl/apply_ops_command_info',
@@ -968,6 +972,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/change_stream_pre_image_helpers',
         'dbhelpers',
         'internal_transactions_feature_flag',
+        'multitenancy',
         'repl/image_collection_entry',
         'repl/repl_server_parameters',
         'transaction',
@@ -1148,6 +1153,7 @@ env.Library(
         'catalog/database_holder',
         'commands/list_collections_filter',
         'index_builds_coordinator_interface',
+        'multitenancy',
     ],
 )
 
@@ -1254,6 +1260,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         '$BUILD_DIR/mongo/db/storage/storage_util',
         'index_builds_coordinator_interface',
+        'multitenancy',
         'rebuild_indexes',
     ],
 )
@@ -1463,6 +1470,7 @@ env.Library(
         'dbdirectclient',
         'dbhelpers',
         'index_builds_coordinator_interface',
+        'multitenancy',
         'rebuild_indexes',
         'repair',
         'server_feature_flags',
@@ -2609,7 +2617,6 @@ if wiredtiger:
             'repl/storage_interface_impl',
             'rw_concern_d',
             's/shard_server_test_fixture',
-            'server_feature_flags',
             'server_options_core',
             'server_options_servers',
             'service_context',

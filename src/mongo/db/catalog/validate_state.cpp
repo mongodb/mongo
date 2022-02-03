@@ -298,7 +298,9 @@ void ValidateState::_relockDatabaseAndCollection(OperationContext* opCtx) {
         << " while validating collection: " << _nss << " (" << *_uuid << ")";
 
     _databaseLock.emplace(opCtx, _nss.db(), MODE_IS);
-    _database = DatabaseHolder::get(opCtx)->getDb(opCtx, _nss.db());
+    // TODO SERVER-63106 Have the ValidateState implementation use TenantNamespace
+    const TenantDatabaseName tenantDbName(boost::none, _nss.db());
+    _database = DatabaseHolder::get(opCtx)->getDb(opCtx, tenantDbName);
     uassert(ErrorCodes::Interrupted, dbErrMsg, _database);
     uassert(ErrorCodes::Interrupted, dbErrMsg, !_database->isDropPending(opCtx));
 

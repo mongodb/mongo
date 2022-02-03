@@ -472,7 +472,8 @@ void createDatabase(OperationContext* opCtx, StringData dbName) {
     Lock::GlobalWrite globalLock(opCtx);
     bool justCreated;
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto db = databaseHolder->openDb(opCtx, dbName, &justCreated);
+    const TenantDatabaseName tenantDbName(boost::none, dbName);
+    auto db = databaseHolder->openDb(opCtx, tenantDbName, &justCreated);
     ASSERT_TRUE(db);
     ASSERT_TRUE(justCreated);
 }

@@ -330,7 +330,8 @@ public:
                 // Acquire only the global lock and set up a consistent in-memory catalog and
                 // storage snapshot.
                 AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, dbName);
-                auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, dbName);
+                const TenantDatabaseName tenantDbName(boost::none, dbName);
+                auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, tenantDbName);
 
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(&hangBeforeListCollections,
                                                                  opCtx,

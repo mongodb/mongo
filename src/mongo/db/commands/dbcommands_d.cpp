@@ -178,7 +178,9 @@ protected:
                 // When setting the profiling level, create the database if it didn't already exist.
                 // When just reading the profiling level, we do not create the database.
                 auto databaseHolder = DatabaseHolder::get(opCtx);
-                db = databaseHolder->openDb(opCtx, dbName);
+                // TODO SERVER-63109 Make _setProfileSettings pass TenantDatabaseName.
+                const TenantDatabaseName tenantDbName(boost::none, dbName);
+                db = databaseHolder->openDb(opCtx, tenantDbName);
             }
 
             auto newSettings = oldSettings;

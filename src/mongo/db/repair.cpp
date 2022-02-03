@@ -59,6 +59,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/storage_util.h"
+#include "mongo/db/tenant_namespace.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/scopeguard.h"
@@ -128,31 +129,33 @@ Status repairCollections(OperationContext* opCtx,
 }  // namespace
 
 namespace repair {
-Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std::string& dbName) {
+Status repairDatabase(OperationContext* opCtx,
+                      StorageEngine* engine,
+                      const TenantDatabaseName& tenantDbName) {
     DisableDocumentValidation validationDisabler(opCtx);
 
     // We must hold some form of lock here
     invariant(opCtx->lockState()->isW());
-    invariant(dbName.find('.') == std::string::npos);
+    invariant(tenantDbName.dbName().find('.') == std::string::npos);
 
-    LOGV2(21029, "repairDatabase", "db"_attr = dbName);
+    LOGV2(21029, "repairDatabase", "db"_attr = tenantDbName);
 
 
     opCtx->checkForInterrupt();
 
     // Close the db and invalidate all current users and caches.
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    databaseHolder->close(opCtx, dbName);
+    databaseHolder->close(opCtx, tenantDbName);
 
     // Reopening db is necessary for repairCollections.
-    databaseHolder->openDb(opCtx, dbName);
+    databaseHolder->openDb(opCtx, tenantDbName);
 
-    auto status = repairCollections(opCtx, engine, dbName);
+    auto status = repairCollections(opCtx, engine, tenantDbName.dbName());
     if (!status.isOK()) {
         LOGV2_FATAL_CONTINUE(21030,
                              "Failed to repair database {dbName}: {status_reason}",
                              "Failed to repair database",
-                             "db"_attr = dbName,
+                             "db"_attr = tenantDbName,
                              "error"_attr = status);
     }
 

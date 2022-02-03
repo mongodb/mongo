@@ -53,6 +53,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog_mongod.h"
+#include "mongo/db/tenant_database_name.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -106,8 +107,10 @@ Status _applyOps(OperationContext* opCtx,
             // ApplyOps does not have the global writer lock when applying transaction
             // operations, so we need to acquire the DB and Collection locks.
             Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+            // TODO SERVER-62880 Parse the tenant id from the TenantNamespace.
+            const TenantDatabaseName tenantDbName(boost::none, nss.db());
             auto databaseHolder = DatabaseHolder::get(opCtx);
-            auto db = databaseHolder->getDb(opCtx, nss.ns());
+            auto db = databaseHolder->getDb(opCtx, tenantDbName);
             if (!db) {
                 // Retry in non-atomic mode, since MMAP cannot implicitly create a new database
                 // within an active WriteUnitOfWork.
@@ -296,8 +299,9 @@ Status _checkPrecondition(OperationContext* opCtx,
         BSONObj realres = cursor->more() ? cursor->nextSafe() : BSONObj{};
 
         // Get collection default collation.
+        const TenantDatabaseName tenantDbName(boost::none, nss.db());
         auto databaseHolder = DatabaseHolder::get(opCtx);
-        auto database = databaseHolder->getDb(opCtx, nss.db());
+        auto database = databaseHolder->getDb(opCtx, tenantDbName);
         if (!database) {
             return {ErrorCodes::NamespaceNotFound, "database in ns does not exist: " + nss.ns()};
         }

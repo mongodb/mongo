@@ -37,6 +37,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/tenant_database_name.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log_attr.h"
 
@@ -60,6 +61,11 @@ public:
      * If featureFlagRequireTenantID is set, tenantId is required.
      */
     TenantNamespace(boost::optional<mongo::TenantId> tenantId, NamespaceString nss);
+
+    /**
+     * Create a TenantDatabaseName from the TenantNamespace.
+     */
+    TenantDatabaseName createTenantDatabaseName() const;
 
     /**
      * Constructs a TenantNamespace from the string "ns". When the server parameter
