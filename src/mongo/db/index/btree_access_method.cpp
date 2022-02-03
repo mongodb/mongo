@@ -45,7 +45,7 @@ using std::vector;
 // Standard Btree implementation below.
 BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState,
                                      std::unique_ptr<SortedDataInterface> btree)
-    : AbstractIndexAccessMethod(btreeState, std::move(btree)) {
+    : SortedDataIndexAccessMethod(btreeState, std::move(btree)) {
     // The key generation wants these values.
     vector<const char*> fieldNames;
     vector<BSONElement> fixed;

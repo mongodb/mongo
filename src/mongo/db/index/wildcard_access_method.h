@@ -43,7 +43,7 @@ namespace mongo {
  * $** indexes store a special metadata key for each path in the index that is multikey. This class
  * provides an interface to access the multikey metadata: see getMultikeyPaths().
  */
-class WildcardAccessMethod final : public AbstractIndexAccessMethod {
+class WildcardAccessMethod final : public SortedDataIndexAccessMethod {
 public:
     WildcardAccessMethod(IndexCatalogEntry* wildcardState,
                          std::unique_ptr<SortedDataInterface> btree);

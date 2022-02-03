@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-class S2AccessMethod : public AbstractIndexAccessMethod {
+class S2AccessMethod : public SortedDataIndexAccessMethod {
 public:
     S2AccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree);
 

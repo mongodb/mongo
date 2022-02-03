@@ -49,7 +49,7 @@ static const string kIndexVersionFieldName("2dsphereIndexVersion");
 
 S2AccessMethod::S2AccessMethod(IndexCatalogEntry* btreeState,
                                std::unique_ptr<SortedDataInterface> btree)
-    : AbstractIndexAccessMethod(btreeState, std::move(btree)) {
+    : SortedDataIndexAccessMethod(btreeState, std::move(btree)) {
     const IndexDescriptor* descriptor = btreeState->descriptor();
 
     ExpressionParams::initialize2dsphereParams(

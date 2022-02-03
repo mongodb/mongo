@@ -110,8 +110,8 @@ struct BtreeExternalSortComparison {
     }
 };
 
-AbstractIndexAccessMethod::AbstractIndexAccessMethod(const IndexCatalogEntry* btreeState,
-                                                     std::unique_ptr<SortedDataInterface> btree)
+SortedDataIndexAccessMethod::SortedDataIndexAccessMethod(const IndexCatalogEntry* btreeState,
+                                                         std::unique_ptr<SortedDataInterface> btree)
     : _indexCatalogEntry(btreeState),
       _descriptor(btreeState->descriptor()),
       _newInterface(std::move(btree)) {
@@ -119,14 +119,14 @@ AbstractIndexAccessMethod::AbstractIndexAccessMethod(const IndexCatalogEntry* bt
 }
 
 // Find the keys for obj, put them in the tree pointing to loc.
-Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
-                                         SharedBufferFragmentBuilder& pooledBufferBuilder,
-                                         const CollectionPtr& coll,
-                                         const BSONObj& obj,
-                                         const RecordId& loc,
-                                         const InsertDeleteOptions& options,
-                                         KeyHandlerFn&& onDuplicateKey,
-                                         int64_t* numInserted) {
+Status SortedDataIndexAccessMethod::insert(OperationContext* opCtx,
+                                           SharedBufferFragmentBuilder& pooledBufferBuilder,
+                                           const CollectionPtr& coll,
+                                           const BSONObj& obj,
+                                           const RecordId& loc,
+                                           const InsertDeleteOptions& options,
+                                           KeyHandlerFn&& onDuplicateKey,
+                                           int64_t* numInserted) {
     invariant(options.fromIndexBuilder || !_indexCatalogEntry->isHybridBuilding());
 
     auto& executionCtx = StorageExecutionContext::get(opCtx);
@@ -157,7 +157,7 @@ Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
                                             numInserted);
 }
 
-Status AbstractIndexAccessMethod::insertKeysAndUpdateMultikeyPaths(
+Status SortedDataIndexAccessMethod::insertKeysAndUpdateMultikeyPaths(
     OperationContext* opCtx,
     const CollectionPtr& coll,
     const KeyStringSet& keys,
@@ -185,13 +185,13 @@ Status AbstractIndexAccessMethod::insertKeysAndUpdateMultikeyPaths(
     return Status::OK();
 }
 
-Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
-                                             const CollectionPtr& coll,
-                                             const KeyStringSet& keys,
-                                             const RecordId& loc,
-                                             const InsertDeleteOptions& options,
-                                             KeyHandlerFn&& onDuplicateKey,
-                                             int64_t* numInserted) {
+Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
+                                               const CollectionPtr& coll,
+                                               const KeyStringSet& keys,
+                                               const RecordId& loc,
+                                               const InsertDeleteOptions& options,
+                                               KeyHandlerFn&& onDuplicateKey,
+                                               int64_t* numInserted) {
     // Initialize the 'numInserted' out-parameter to zero in case the caller did not already do so.
     if (numInserted) {
         *numInserted = 0;
@@ -248,10 +248,10 @@ Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
     return Status::OK();
 }
 
-void AbstractIndexAccessMethod::removeOneKey(OperationContext* opCtx,
-                                             const KeyString::Value& keyString,
-                                             const RecordId& loc,
-                                             bool dupsAllowed) {
+void SortedDataIndexAccessMethod::removeOneKey(OperationContext* opCtx,
+                                               const KeyString::Value& keyString,
+                                               const RecordId& loc,
+                                               bool dupsAllowed) {
 
     try {
         _newInterface->unindex(opCtx, keyString, dupsAllowed);
@@ -270,21 +270,21 @@ void AbstractIndexAccessMethod::removeOneKey(OperationContext* opCtx,
     }
 }
 
-std::unique_ptr<SortedDataInterface::Cursor> AbstractIndexAccessMethod::newCursor(
+std::unique_ptr<SortedDataInterface::Cursor> SortedDataIndexAccessMethod::newCursor(
     OperationContext* opCtx, bool isForward) const {
     return _newInterface->newCursor(opCtx, isForward);
 }
 
-std::unique_ptr<SortedDataInterface::Cursor> AbstractIndexAccessMethod::newCursor(
+std::unique_ptr<SortedDataInterface::Cursor> SortedDataIndexAccessMethod::newCursor(
     OperationContext* opCtx) const {
     return newCursor(opCtx, true);
 }
 
-Status AbstractIndexAccessMethod::removeKeys(OperationContext* opCtx,
-                                             const KeyStringSet& keys,
-                                             const RecordId& loc,
-                                             const InsertDeleteOptions& options,
-                                             int64_t* numDeleted) {
+Status SortedDataIndexAccessMethod::removeKeys(OperationContext* opCtx,
+                                               const KeyStringSet& keys,
+                                               const RecordId& loc,
+                                               const InsertDeleteOptions& options,
+                                               int64_t* numDeleted) {
 
     for (const auto& key : keys) {
         removeOneKey(opCtx, key, loc, options.dupsAllowed);
@@ -294,13 +294,13 @@ Status AbstractIndexAccessMethod::removeKeys(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status AbstractIndexAccessMethod::initializeAsEmpty(OperationContext* opCtx) {
+Status SortedDataIndexAccessMethod::initializeAsEmpty(OperationContext* opCtx) {
     return _newInterface->initAsEmpty(opCtx);
 }
 
-RecordId AbstractIndexAccessMethod::findSingle(OperationContext* opCtx,
-                                               const CollectionPtr& collection,
-                                               const BSONObj& requestedKey) const {
+RecordId SortedDataIndexAccessMethod::findSingle(OperationContext* opCtx,
+                                                 const CollectionPtr& collection,
+                                                 const BSONObj& requestedKey) const {
     // Generate the key for this index.
     KeyString::Value actualKey = [&]() {
         if (_indexCatalogEntry->getCollator()) {
@@ -341,29 +341,29 @@ RecordId AbstractIndexAccessMethod::findSingle(OperationContext* opCtx,
     return RecordId();
 }
 
-void AbstractIndexAccessMethod::validate(OperationContext* opCtx,
-                                         int64_t* numKeys,
-                                         IndexValidateResults* fullResults) const {
+void SortedDataIndexAccessMethod::validate(OperationContext* opCtx,
+                                           int64_t* numKeys,
+                                           IndexValidateResults* fullResults) const {
     long long keys = 0;
     _newInterface->fullValidate(opCtx, &keys, fullResults);
     *numKeys = keys;
 }
 
-bool AbstractIndexAccessMethod::appendCustomStats(OperationContext* opCtx,
-                                                  BSONObjBuilder* output,
-                                                  double scale) const {
+bool SortedDataIndexAccessMethod::appendCustomStats(OperationContext* opCtx,
+                                                    BSONObjBuilder* output,
+                                                    double scale) const {
     return _newInterface->appendCustomStats(opCtx, output, scale);
 }
 
-long long AbstractIndexAccessMethod::getSpaceUsedBytes(OperationContext* opCtx) const {
+long long SortedDataIndexAccessMethod::getSpaceUsedBytes(OperationContext* opCtx) const {
     return _newInterface->getSpaceUsedBytes(opCtx);
 }
 
-long long AbstractIndexAccessMethod::getFreeStorageBytes(OperationContext* opCtx) const {
+long long SortedDataIndexAccessMethod::getFreeStorageBytes(OperationContext* opCtx) const {
     return _newInterface->getFreeStorageBytes(opCtx);
 }
 
-pair<KeyStringSet, KeyStringSet> AbstractIndexAccessMethod::setDifference(
+pair<KeyStringSet, KeyStringSet> SortedDataIndexAccessMethod::setDifference(
     const KeyStringSet& left, const KeyStringSet& right) {
     // Two iterators to traverse the two sets in sorted order.
     auto leftIt = left.begin();
@@ -402,14 +402,14 @@ pair<KeyStringSet, KeyStringSet> AbstractIndexAccessMethod::setDifference(
     return {{std::move(outLeft)}, {std::move(outRight)}};
 }
 
-void AbstractIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
-                                              const CollectionPtr& collection,
-                                              const IndexCatalogEntry* index,
-                                              const BSONObj& from,
-                                              const BSONObj& to,
-                                              const RecordId& record,
-                                              const InsertDeleteOptions& options,
-                                              UpdateTicket* ticket) const {
+void SortedDataIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
+                                                const CollectionPtr& collection,
+                                                const IndexCatalogEntry* index,
+                                                const BSONObj& from,
+                                                const BSONObj& to,
+                                                const RecordId& record,
+                                                const InsertDeleteOptions& options,
+                                                UpdateTicket* ticket) const {
     SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
     const MatchExpression* indexFilter = index->getFilterExpression();
     if (!indexFilter || indexFilter->matchesBSON(from)) {
@@ -455,11 +455,11 @@ void AbstractIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
     ticket->_isValid = true;
 }
 
-Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
-                                         const CollectionPtr& coll,
-                                         const UpdateTicket& ticket,
-                                         int64_t* numInserted,
-                                         int64_t* numDeleted) {
+Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
+                                           const CollectionPtr& coll,
+                                           const UpdateTicket& ticket,
+                                           int64_t* numInserted,
+                                           int64_t* numDeleted) {
     invariant(!_indexCatalogEntry->isHybridBuilding());
     invariant(ticket.newKeys.size() ==
               ticket.oldKeys.size() + ticket.added.size() - ticket.removed.size());
@@ -500,11 +500,11 @@ Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status AbstractIndexAccessMethod::compact(OperationContext* opCtx) {
+Status SortedDataIndexAccessMethod::compact(OperationContext* opCtx) {
     return this->_newInterface->compact(opCtx);
 }
 
-class AbstractIndexAccessMethod::BulkBuilderImpl : public IndexAccessMethod::BulkBuilder {
+class SortedDataIndexAccessMethod::BulkBuilderImpl : public IndexAccessMethod::BulkBuilder {
 public:
     BulkBuilderImpl(const IndexCatalogEntry* indexCatalogEntry,
                     size_t maxMemoryUsageBytes,
@@ -566,7 +566,7 @@ private:
     KeyStringSet _multikeyMetadataKeys;
 };
 
-std::unique_ptr<IndexAccessMethod::BulkBuilder> AbstractIndexAccessMethod::initiateBulk(
+std::unique_ptr<IndexAccessMethod::BulkBuilder> SortedDataIndexAccessMethod::initiateBulk(
     size_t maxMemoryUsageBytes,
     const boost::optional<IndexStateInfo>& stateInfo,
     StringData dbName) {
@@ -576,15 +576,15 @@ std::unique_ptr<IndexAccessMethod::BulkBuilder> AbstractIndexAccessMethod::initi
         : std::make_unique<BulkBuilderImpl>(_indexCatalogEntry, maxMemoryUsageBytes, dbName);
 }
 
-AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(const IndexCatalogEntry* index,
-                                                            size_t maxMemoryUsageBytes,
-                                                            StringData dbName)
+SortedDataIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(const IndexCatalogEntry* index,
+                                                              size_t maxMemoryUsageBytes,
+                                                              StringData dbName)
     : _indexCatalogEntry(index), _sorter(_makeSorter(maxMemoryUsageBytes, dbName)) {}
 
-AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(const IndexCatalogEntry* index,
-                                                            size_t maxMemoryUsageBytes,
-                                                            const IndexStateInfo& stateInfo,
-                                                            StringData dbName)
+SortedDataIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(const IndexCatalogEntry* index,
+                                                              size_t maxMemoryUsageBytes,
+                                                              const IndexStateInfo& stateInfo,
+                                                              StringData dbName)
     : _indexCatalogEntry(index),
       _sorter(
           _makeSorter(maxMemoryUsageBytes, dbName, stateInfo.getFileName(), stateInfo.getRanges())),
@@ -592,7 +592,7 @@ AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(const IndexCatalogEn
       _isMultiKey(stateInfo.getIsMultikey()),
       _indexMultikeyPaths(createMultikeyPaths(stateInfo.getMultikeyPaths())) {}
 
-Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(
+Status SortedDataIndexAccessMethod::BulkBuilderImpl::insert(
     OperationContext* opCtx,
     const CollectionPtr& collection,
     SharedBufferFragmentBuilder& pooledBuilder,
@@ -667,31 +667,31 @@ Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(
     return Status::OK();
 }
 
-const MultikeyPaths& AbstractIndexAccessMethod::BulkBuilderImpl::getMultikeyPaths() const {
+const MultikeyPaths& SortedDataIndexAccessMethod::BulkBuilderImpl::getMultikeyPaths() const {
     return _indexMultikeyPaths;
 }
 
-bool AbstractIndexAccessMethod::BulkBuilderImpl::isMultikey() const {
+bool SortedDataIndexAccessMethod::BulkBuilderImpl::isMultikey() const {
     return _isMultiKey;
 }
 
 IndexAccessMethod::BulkBuilder::Sorter::Iterator*
-AbstractIndexAccessMethod::BulkBuilderImpl::done() {
+SortedDataIndexAccessMethod::BulkBuilderImpl::done() {
     _insertMultikeyMetadataKeysIntoSorter();
     return _sorter->done();
 }
 
-int64_t AbstractIndexAccessMethod::BulkBuilderImpl::getKeysInserted() const {
+int64_t SortedDataIndexAccessMethod::BulkBuilderImpl::getKeysInserted() const {
     return _keysInserted;
 }
 
-AbstractIndexAccessMethod::BulkBuilder::Sorter::PersistedState
-AbstractIndexAccessMethod::BulkBuilderImpl::persistDataForShutdown() {
+SortedDataIndexAccessMethod::BulkBuilder::Sorter::PersistedState
+SortedDataIndexAccessMethod::BulkBuilderImpl::persistDataForShutdown() {
     _insertMultikeyMetadataKeysIntoSorter();
     return _sorter->persistDataForShutdown();
 }
 
-void AbstractIndexAccessMethod::BulkBuilderImpl::_insertMultikeyMetadataKeysIntoSorter() {
+void SortedDataIndexAccessMethod::BulkBuilderImpl::_insertMultikeyMetadataKeysIntoSorter() {
     for (const auto& keyString : _multikeyMetadataKeys) {
         _sorter->add(keyString, mongo::NullValue());
         ++_keysInserted;
@@ -702,15 +702,15 @@ void AbstractIndexAccessMethod::BulkBuilderImpl::_insertMultikeyMetadataKeysInto
     _multikeyMetadataKeys.clear();
 }
 
-AbstractIndexAccessMethod::BulkBuilderImpl::Sorter::Settings
-AbstractIndexAccessMethod::BulkBuilderImpl::_makeSorterSettings() const {
+SortedDataIndexAccessMethod::BulkBuilderImpl::Sorter::Settings
+SortedDataIndexAccessMethod::BulkBuilderImpl::_makeSorterSettings() const {
     return std::pair<KeyString::Value::SorterDeserializeSettings,
                      mongo::NullValue::SorterDeserializeSettings>(
         {_indexCatalogEntry->accessMethod()->getSortedDataInterface()->getKeyStringVersion()}, {});
 }
 
-AbstractIndexAccessMethod::BulkBuilderImpl::Sorter*
-AbstractIndexAccessMethod::BulkBuilderImpl::_makeSorter(
+SortedDataIndexAccessMethod::BulkBuilderImpl::Sorter*
+SortedDataIndexAccessMethod::BulkBuilderImpl::_makeSorter(
     size_t maxMemoryUsageBytes,
     StringData dbName,
     boost::optional<StringData> fileName,
@@ -725,9 +725,9 @@ AbstractIndexAccessMethod::BulkBuilderImpl::_makeSorter(
                                    _makeSorterSettings());
 }
 
-void AbstractIndexAccessMethod::_yieldBulkLoad(OperationContext* opCtx,
-                                               const Yieldable* yieldable,
-                                               const NamespaceString& ns) const {
+void SortedDataIndexAccessMethod::_yieldBulkLoad(OperationContext* opCtx,
+                                                 const Yieldable* yieldable,
+                                                 const NamespaceString& ns) const {
     // Releasing locks means a new snapshot should be acquired when restored.
     opCtx->recoveryUnit()->abandonSnapshot();
     yieldable->yield();
@@ -757,13 +757,13 @@ void AbstractIndexAccessMethod::_yieldBulkLoad(OperationContext* opCtx,
     yieldable->restore();
 }
 
-Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
-                                             const CollectionPtr& collection,
-                                             BulkBuilder* bulk,
-                                             bool dupsAllowed,
-                                             int32_t yieldIterations,
-                                             const KeyHandlerFn& onDuplicateKeyInserted,
-                                             const RecordIdHandlerFn& onDuplicateRecord) {
+Status SortedDataIndexAccessMethod::commitBulk(OperationContext* opCtx,
+                                               const CollectionPtr& collection,
+                                               BulkBuilder* bulk,
+                                               bool dupsAllowed,
+                                               int32_t yieldIterations,
+                                               const KeyHandlerFn& onDuplicateKeyInserted,
+                                               const RecordIdHandlerFn& onDuplicateRecord) {
     Timer timer;
 
     auto ns = _indexCatalogEntry->getNSSFromCatalog(opCtx);
@@ -886,24 +886,24 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
     return Status::OK();
 }
 
-void AbstractIndexAccessMethod::setIndexIsMultikey(OperationContext* opCtx,
-                                                   const CollectionPtr& collection,
-                                                   KeyStringSet multikeyMetadataKeys,
-                                                   MultikeyPaths paths) {
+void SortedDataIndexAccessMethod::setIndexIsMultikey(OperationContext* opCtx,
+                                                     const CollectionPtr& collection,
+                                                     KeyStringSet multikeyMetadataKeys,
+                                                     MultikeyPaths paths) {
     _indexCatalogEntry->setMultikey(opCtx, collection, multikeyMetadataKeys, paths);
 }
 
-void AbstractIndexAccessMethod::getKeys(OperationContext* opCtx,
-                                        const CollectionPtr& collection,
-                                        SharedBufferFragmentBuilder& pooledBufferBuilder,
-                                        const BSONObj& obj,
-                                        GetKeysMode mode,
-                                        GetKeysContext context,
-                                        KeyStringSet* keys,
-                                        KeyStringSet* multikeyMetadataKeys,
-                                        MultikeyPaths* multikeyPaths,
-                                        boost::optional<RecordId> id,
-                                        OnSuppressedErrorFn&& onSuppressedError) const {
+void SortedDataIndexAccessMethod::getKeys(OperationContext* opCtx,
+                                          const CollectionPtr& collection,
+                                          SharedBufferFragmentBuilder& pooledBufferBuilder,
+                                          const BSONObj& obj,
+                                          GetKeysMode mode,
+                                          GetKeysContext context,
+                                          KeyStringSet* keys,
+                                          KeyStringSet* multikeyMetadataKeys,
+                                          MultikeyPaths* multikeyPaths,
+                                          boost::optional<RecordId> id,
+                                          OnSuppressedErrorFn&& onSuppressedError) const {
     invariant(!id || _newInterface->rsKeyFormat() != KeyFormat::String || id->isStr(),
               fmt::format("RecordId is not in the same string format as its RecordStore; id: {}",
                           id->toString()));
@@ -958,18 +958,18 @@ void AbstractIndexAccessMethod::getKeys(OperationContext* opCtx,
     }
 }
 
-bool AbstractIndexAccessMethod::shouldMarkIndexAsMultikey(
+bool SortedDataIndexAccessMethod::shouldMarkIndexAsMultikey(
     size_t numberOfKeys,
     const KeyStringSet& multikeyMetadataKeys,
     const MultikeyPaths& multikeyPaths) const {
     return numberOfKeys > 1 || isMultikeyFromPaths(multikeyPaths);
 }
 
-void AbstractIndexAccessMethod::validateDocument(const CollectionPtr& collection,
-                                                 const BSONObj& obj,
-                                                 const BSONObj& keyPattern) const {}
+void SortedDataIndexAccessMethod::validateDocument(const CollectionPtr& collection,
+                                                   const BSONObj& obj,
+                                                   const BSONObj& keyPattern) const {}
 
-SortedDataInterface* AbstractIndexAccessMethod::getSortedDataInterface() const {
+SortedDataInterface* SortedDataIndexAccessMethod::getSortedDataInterface() const {
     return _newInterface.get();
 }
 
@@ -990,9 +990,10 @@ std::string nextFileName() {
                          << randomSuffix;
 }
 
-Status AbstractIndexAccessMethod::_handleDuplicateKey(OperationContext* opCtx,
-                                                      const KeyString::Value& dataKey,
-                                                      const RecordIdHandlerFn& onDuplicateRecord) {
+Status SortedDataIndexAccessMethod::_handleDuplicateKey(
+    OperationContext* opCtx,
+    const KeyString::Value& dataKey,
+    const RecordIdHandlerFn& onDuplicateRecord) {
     RecordId recordId = (KeyFormat::Long == _newInterface->rsKeyFormat())
         ? KeyString::decodeRecordIdLongAtEnd(dataKey.getBuffer(), dataKey.getSize())
         : KeyString::decodeRecordIdStrAtEnd(dataKey.getBuffer(), dataKey.getSize());

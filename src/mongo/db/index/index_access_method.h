@@ -476,9 +476,9 @@ struct InsertDeleteOptions {
  * for the initialization and core functionality of this abstract class. To avoid any circular
  * dependencies, it is important that IndexAccessMethod remain an interface.
  */
-class AbstractIndexAccessMethod : public IndexAccessMethod {
-    AbstractIndexAccessMethod(const AbstractIndexAccessMethod&) = delete;
-    AbstractIndexAccessMethod& operator=(const AbstractIndexAccessMethod&) = delete;
+class SortedDataIndexAccessMethod : public IndexAccessMethod {
+    SortedDataIndexAccessMethod(const SortedDataIndexAccessMethod&) = delete;
+    SortedDataIndexAccessMethod& operator=(const SortedDataIndexAccessMethod&) = delete;
 
 public:
     /**
@@ -492,8 +492,8 @@ public:
     static std::pair<KeyStringSet, KeyStringSet> setDifference(const KeyStringSet& left,
                                                                const KeyStringSet& right);
 
-    AbstractIndexAccessMethod(const IndexCatalogEntry* btreeState,
-                              std::unique_ptr<SortedDataInterface> btree);
+    SortedDataIndexAccessMethod(const IndexCatalogEntry* btreeState,
+                                std::unique_ptr<SortedDataInterface> btree);
 
     Status insert(OperationContext* opCtx,
                   SharedBufferFragmentBuilder& pooledBufferBuilder,

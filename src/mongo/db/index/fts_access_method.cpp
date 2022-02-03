@@ -36,7 +36,7 @@ namespace mongo {
 
 FTSAccessMethod::FTSAccessMethod(IndexCatalogEntry* btreeState,
                                  std::unique_ptr<SortedDataInterface> btree)
-    : AbstractIndexAccessMethod(btreeState, std::move(btree)),
+    : SortedDataIndexAccessMethod(btreeState, std::move(btree)),
       _ftsSpec(btreeState->descriptor()->infoObj()) {}
 
 void FTSAccessMethod::doGetKeys(OperationContext* opCtx,

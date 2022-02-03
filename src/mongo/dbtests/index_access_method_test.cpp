@@ -55,7 +55,7 @@ KeyStringSet makeKeyStringSet(std::initializer_list<BSONObj> objs) {
 TEST(IndexAccessMethodSetDifference, EmptyInputsShouldHaveNoDifference) {
     KeyStringSet left;
     KeyStringSet right;
-    auto diff = AbstractIndexAccessMethod::setDifference(left, right);
+    auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
     ASSERT_EQ(0UL, diff.first.size());
     ASSERT_EQ(0UL, diff.second.size());
 }
@@ -64,7 +64,7 @@ TEST(IndexAccessMethodSetDifference, EmptyLeftShouldHaveNoDifference) {
     KeyStringSet left;
     auto right = makeKeyStringSet({BSON("" << 0)});
 
-    auto diff = AbstractIndexAccessMethod::setDifference(left, right);
+    auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
     ASSERT_EQ(0UL, diff.first.size());
     ASSERT_EQ(1UL, diff.second.size());
 }
@@ -73,7 +73,7 @@ TEST(IndexAccessMethodSetDifference, EmptyRightShouldReturnAllOfLeft) {
     auto left = makeKeyStringSet({BSON("" << 0), BSON("" << 1)});
     KeyStringSet right;
 
-    auto diff = AbstractIndexAccessMethod::setDifference(left, right);
+    auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
     ASSERT_EQ(2UL, diff.first.size());
     ASSERT_EQ(0UL, diff.second.size());
 }
@@ -88,7 +88,7 @@ TEST(IndexAccessMethodSetDifference, IdenticalSetsShouldHaveNoDifference) {
                                         << "string"),
                                    BSON("" << BSONNULL)});
 
-    auto diff = AbstractIndexAccessMethod::setDifference(left, right);
+    auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
     ASSERT_EQ(0UL, diff.first.size());
     ASSERT_EQ(0UL, diff.second.size());
 }
@@ -100,7 +100,7 @@ TEST(IndexAccessMethodSetDifference, IdenticalSetsShouldHaveNoDifference) {
 void assertDistinct(BSONObj left, BSONObj right) {
     auto leftSet = makeKeyStringSet({left});
     auto rightSet = makeKeyStringSet({right});
-    auto diff = AbstractIndexAccessMethod::setDifference(leftSet, rightSet);
+    auto diff = SortedDataIndexAccessMethod::setDifference(leftSet, rightSet);
     ASSERT_EQ(1UL, diff.first.size());
     ASSERT_EQ(1UL, diff.second.size());
 }
@@ -153,7 +153,7 @@ TEST(IndexAccessMethodSetDifference, ShouldDetectOneDifferenceAmongManySimilarit
                                    BSON("" << BSON("sub"
                                                    << "document")),
                                    BSON("" << BSON_ARRAY(1 << "hi" << 42))});
-    auto diff = AbstractIndexAccessMethod::setDifference(left, right);
+    auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
     ASSERT_EQUALS(1UL, diff.first.size());
     ASSERT_EQUALS(1UL, diff.second.size());
 }
@@ -161,7 +161,7 @@ TEST(IndexAccessMethodSetDifference, ShouldDetectOneDifferenceAmongManySimilarit
 TEST(IndexAccessMethodSetDifference, SingleObjInLeftShouldFindCorrespondingObjInRight) {
     auto left = makeKeyStringSet({BSON("" << 2)});
     auto right = makeKeyStringSet({BSON("" << 1), BSON("" << 2), BSON("" << 3)});
-    auto diff = AbstractIndexAccessMethod::setDifference(left, right);
+    auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
     ASSERT_EQUALS(0UL, diff.first.size());
     ASSERT_EQUALS(2UL, diff.second.size());
 }
@@ -169,7 +169,7 @@ TEST(IndexAccessMethodSetDifference, SingleObjInLeftShouldFindCorrespondingObjIn
 TEST(IndexAccessMethodSetDifference, SingleObjInRightShouldFindCorrespondingObjInLeft) {
     auto left = makeKeyStringSet({BSON("" << 1), BSON("" << 2), BSON("" << 3)});
     auto right = makeKeyStringSet({BSON("" << 2)});
-    auto diff = AbstractIndexAccessMethod::setDifference(left, right);
+    auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
     ASSERT_EQUALS(2UL, diff.first.size());
     ASSERT_EQUALS(0UL, diff.second.size());
 }
@@ -177,7 +177,7 @@ TEST(IndexAccessMethodSetDifference, SingleObjInRightShouldFindCorrespondingObjI
 TEST(IndexAccessMethodSetDifference, LeftSetAllSmallerThanRightShouldBeDisjoint) {
     auto left = makeKeyStringSet({BSON("" << 1), BSON("" << 2), BSON("" << 3)});
     auto right = makeKeyStringSet({BSON("" << 4), BSON("" << 5), BSON("" << 6)});
-    auto diff = AbstractIndexAccessMethod::setDifference(left, right);
+    auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
     ASSERT_EQUALS(3UL, diff.first.size());
     ASSERT_EQUALS(3UL, diff.second.size());
     for (auto&& obj : diff.first) {
@@ -191,7 +191,7 @@ TEST(IndexAccessMethodSetDifference, LeftSetAllSmallerThanRightShouldBeDisjoint)
 TEST(IndexAccessMethodSetDifference, LeftSetAllLargerThanRightShouldBeDisjoint) {
     auto left = makeKeyStringSet({BSON("" << 4), BSON("" << 5), BSON("" << 6)});
     auto right = makeKeyStringSet({BSON("" << 1), BSON("" << 2), BSON("" << 3)});
-    auto diff = AbstractIndexAccessMethod::setDifference(left, right);
+    auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
     ASSERT_EQUALS(3UL, diff.first.size());
     ASSERT_EQUALS(3UL, diff.second.size());
     for (auto&& obj : diff.first) {
@@ -206,7 +206,7 @@ TEST(IndexAccessMethodSetDifference, ShouldNotReportOverlapsFromNonDisjointSets)
     auto left = makeKeyStringSet({BSON("" << 0), BSON("" << 1), BSON("" << 4), BSON("" << 6)});
     auto right = makeKeyStringSet(
         {BSON("" << -1), BSON("" << 1), BSON("" << 3), BSON("" << 4), BSON("" << 7)});
-    auto diff = AbstractIndexAccessMethod::setDifference(left, right);
+    auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
     ASSERT_EQUALS(2UL, diff.first.size());   // 0, 6.
     ASSERT_EQUALS(3UL, diff.second.size());  // -1, 3, 7.
     for (auto&& keyString : diff.first) {

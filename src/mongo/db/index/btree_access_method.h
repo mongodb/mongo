@@ -43,7 +43,7 @@ class IndexDescriptor;
  * The IndexAccessMethod for a Btree index.
  * Any index created with {field: 1} or {field: -1} uses this.
  */
-class BtreeAccessMethod : public AbstractIndexAccessMethod {
+class BtreeAccessMethod : public SortedDataIndexAccessMethod {
 public:
     BtreeAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree);
 

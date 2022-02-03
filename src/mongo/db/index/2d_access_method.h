@@ -40,7 +40,7 @@ class IndexCatalogEntry;
 class IndexDescriptor;
 struct TwoDIndexingParams;
 
-class TwoDAccessMethod : public AbstractIndexAccessMethod {
+class TwoDAccessMethod : public SortedDataIndexAccessMethod {
 public:
     TwoDAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree);
 

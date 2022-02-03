@@ -38,7 +38,7 @@ namespace mongo {
 
 HashAccessMethod::HashAccessMethod(IndexCatalogEntry* btreeState,
                                    std::unique_ptr<SortedDataInterface> btree)
-    : AbstractIndexAccessMethod(btreeState, std::move(btree)) {
+    : SortedDataIndexAccessMethod(btreeState, std::move(btree)) {
     const IndexDescriptor* descriptor = btreeState->descriptor();
 
     uassert(16764,
