@@ -1346,16 +1346,13 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
         invariant(isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId()));
     }
 
-    const bool areInternalTransactionsEnabled =
-        feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-            serverGlobalParams.featureCompatibility);
     const auto txnRetryCounter = *opCtx->getTxnRetryCounter();
 
     oplogEntry->setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry->setNss({"admin", "$cmd"});
     oplogEntry->setSessionId(opCtx->getLogicalSessionId());
     oplogEntry->setTxnNumber(opCtx->getTxnNumber());
-    if (areInternalTransactionsEnabled && !isDefaultTxnRetryCounter(txnRetryCounter)) {
+    if (!isDefaultTxnRetryCounter(txnRetryCounter)) {
         oplogEntry->getOperationSessionInfo().setTxnRetryCounter(txnRetryCounter);
     }
 
@@ -1369,7 +1366,7 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
             sessionTxnRecord.setLastWriteDate(times.wallClockTime);
             sessionTxnRecord.setState(txnState);
             sessionTxnRecord.setStartOpTime(startOpTime);
-            if (areInternalTransactionsEnabled && !isDefaultTxnRetryCounter(txnRetryCounter)) {
+            if (!isDefaultTxnRetryCounter(txnRetryCounter)) {
                 sessionTxnRecord.setTxnRetryCounter(txnRetryCounter);
             }
             onWriteOpCompleted(opCtx, std::move(stmtIdsWritten), sessionTxnRecord);
@@ -1587,16 +1584,13 @@ int logOplogEntriesForTransaction(
 void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
                                             MutableOplogEntry* oplogEntry,
                                             DurableTxnStateEnum durableState) {
-    const bool areInternalTransactionsEnabled =
-        feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-            serverGlobalParams.featureCompatibility);
     const auto txnRetryCounter = *opCtx->getTxnRetryCounter();
 
     oplogEntry->setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry->setNss({"admin", "$cmd"});
     oplogEntry->setSessionId(opCtx->getLogicalSessionId());
     oplogEntry->setTxnNumber(opCtx->getTxnNumber());
-    if (areInternalTransactionsEnabled && !isDefaultTxnRetryCounter(txnRetryCounter)) {
+    if (!isDefaultTxnRetryCounter(txnRetryCounter)) {
         oplogEntry->getOperationSessionInfo().setTxnRetryCounter(txnRetryCounter);
     }
     oplogEntry->setPrevWriteOpTimeInTransaction(
@@ -1624,7 +1618,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
             sessionTxnRecord.setLastWriteOpTime(oplogOpTime);
             sessionTxnRecord.setLastWriteDate(oplogEntry->getWallClockTime());
             sessionTxnRecord.setState(durableState);
-            if (areInternalTransactionsEnabled && !isDefaultTxnRetryCounter(txnRetryCounter)) {
+            if (!isDefaultTxnRetryCounter(txnRetryCounter)) {
                 sessionTxnRecord.setTxnRetryCounter(txnRetryCounter);
             }
             onWriteOpCompleted(opCtx, {}, sessionTxnRecord);

@@ -126,10 +126,6 @@ repl::OpTime persistParticipantListBlocking(
     sessionInfo.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
     if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
         txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
-        uassert(ErrorCodes::InvalidOptions,
-                "TxnRetryCounter is only supported when internal transactions are enabled",
-                feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                    serverGlobalParams.featureCompatibility));
         sessionInfo.setTxnRetryCounter(*txnNumberAndRetryCounter.getTxnRetryCounter());
     }
 
@@ -258,10 +254,9 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
                                    << txnNumberAndRetryCounter.getTxnNumber() << "autocommit"
                                    << false << WriteConcernOptions::kWriteConcernField
                                    << WriteConcernOptions::Majority));
-    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        bob.append(OperationSessionInfo::kTxnRetryCounterFieldName,
-                   *txnNumberAndRetryCounter.getTxnRetryCounter());
+    if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
+        txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
+        bob.append(OperationSessionInfo::kTxnRetryCounterFieldName, *txnRetryCounter);
     }
     apiParams.appendInfo(&bob);
     auto prepareObj = prepareTransaction.toBSON(bob.obj());
@@ -353,10 +348,6 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
     sessionInfo.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
     if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
         txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
-        uassert(ErrorCodes::InvalidOptions,
-                "TxnRetryCounter is only supported when internal transactions are enabled",
-                feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                    serverGlobalParams.featureCompatibility));
         sessionInfo.setTxnRetryCounter(*txnNumberAndRetryCounter.getTxnRetryCounter());
     }
 
@@ -469,10 +460,9 @@ Future<void> sendCommit(ServiceContext* service,
                                    << txnNumberAndRetryCounter.getTxnNumber() << "autocommit"
                                    << false << WriteConcernOptions::kWriteConcernField
                                    << WriteConcernOptions::Majority));
-    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        bob.append(OperationSessionInfo::kTxnRetryCounterFieldName,
-                   *txnNumberAndRetryCounter.getTxnRetryCounter());
+    if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
+        txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
+        bob.append(OperationSessionInfo::kTxnRetryCounterFieldName, *txnRetryCounter);
     }
     apiParams.appendInfo(&bob);
     auto commitObj = commitTransaction.toBSON(bob.obj());
@@ -514,10 +504,9 @@ Future<void> sendAbort(ServiceContext* service,
                                    << txnNumberAndRetryCounter.getTxnNumber() << "autocommit"
                                    << false << WriteConcernOptions::kWriteConcernField
                                    << WriteConcernOptions::Majority));
-    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        bob.append(OperationSessionInfo::kTxnRetryCounterFieldName,
-                   *txnNumberAndRetryCounter.getTxnRetryCounter());
+    if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
+        txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
+        bob.append(OperationSessionInfo::kTxnRetryCounterFieldName, *txnRetryCounter);
     }
     apiParams.appendInfo(&bob);
     auto abortObj = abortTransaction.toBSON(bob.obj());
@@ -568,10 +557,6 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
     sessionInfo.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
     if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
         txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
-        uassert(ErrorCodes::InvalidOptions,
-                "TxnRetryCounter is only supported when internal transactions are enabled",
-                feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                    serverGlobalParams.featureCompatibility));
         sessionInfo.setTxnRetryCounter(*txnNumberAndRetryCounter.getTxnRetryCounter());
     }
 

@@ -135,10 +135,6 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
 
         if (auto txnRetryCounter = osi.getTxnRetryCounter()) {
             uassert(ErrorCodes::InvalidOptions,
-                    "txnRetryCounter is not enabled",
-                    feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-            uassert(ErrorCodes::InvalidOptions,
                     "txnRetryCounter is only allowed for internal clients",
                     isAuthorizedForInternalClusterAction);
             uassert(ErrorCodes::InvalidOptions,

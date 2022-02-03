@@ -860,11 +860,21 @@ void TransactionParticipant::Participant::beginOrContinue(
     TxnNumberAndRetryCounter txnNumberAndRetryCounter,
     boost::optional<bool> autocommit,
     boost::optional<bool> startTransaction) {
-    if (_isInternalSession() && startTransaction) {
-        uassert(ErrorCodes::InternalTransactionNotSupported,
-                "Internal transactions are not enabled",
-                feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                    serverGlobalParams.featureCompatibility));
+    if (startTransaction) {
+        if (_isInternalSession()) {
+            uassert(ErrorCodes::InternalTransactionNotSupported,
+                    "Internal transactions are not enabled",
+                    feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                        serverGlobalParams.featureCompatibility));
+        }
+        if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
+            txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
+            // TODO: (SERVER-62375): Remove upgrade/downgrade code for internal transactions
+            uassert(ErrorCodes::TxnRetryCounterNotSupported,
+                    "TxnRetryCounter support is not enabled",
+                    feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                        serverGlobalParams.featureCompatibility));
+        }
     }
 
     if (_isInternalSessionForRetryableWrite()) {
@@ -2709,11 +2719,6 @@ void TransactionParticipant::Participant::_refreshSelfFromStorageIfNeeded(Operat
         o(lg).activeTxnNumberAndRetryCounter.setTxnRetryCounter([&] {
             if (lastTxnRecord->getState()) {
                 if (lastTxnRecord->getTxnRetryCounter().has_value()) {
-                    uassert(
-                        ErrorCodes::InvalidOptions,
-                        "TxnRetryCounter is only supported when internal transactions are enabled",
-                        feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                            serverGlobalParams.featureCompatibility));
                     return *lastTxnRecord->getTxnRetryCounter();
                 }
                 return 0;

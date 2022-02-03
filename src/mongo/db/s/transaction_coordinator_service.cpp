@@ -243,11 +243,6 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                         const auto txnNumber = *doc.getId().getTxnNumber();
                         const auto txnRetryCounter = [&] {
                             if (auto optTxnRetryCounter = doc.getId().getTxnRetryCounter()) {
-                                uassert(ErrorCodes::InvalidOptions,
-                                        "TxnRetryCounter is only supported when internal "
-                                        "transactions are enabled",
-                                        feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                                            serverGlobalParams.featureCompatibility));
                                 return *optTxnRetryCounter;
                             }
                             return 0;

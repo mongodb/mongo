@@ -43,7 +43,6 @@ structs:
                               write for it"
                 type: bool
 
-
     TxnRecoveryToken:
         description: "Contains info for retrying the commit of a sharded transaction"
         fields:

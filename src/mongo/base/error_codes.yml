@@ -467,6 +467,8 @@ error_codes:
 
     - {code: 363, name: RetryableTransactionInProgress}
 
+    - {code: 364, name: TxnRetryCounterNotSupported}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

@@ -640,7 +640,7 @@ TEST_F(TransactionCoordinatorDriverTest,
 }
 
 TEST_F(TransactionCoordinatorDriverTest,
-       SendPrepareAndDecisionDoesNotAttachTxnRetryCounterIfFeatureFlagIsNotEnabled) {
+       SendPrepareAndDecisionContinuesToUseTxnRetryCounterIfNotDefault) {
     RAIIServerParameterControllerForTest controller{"featureFlagInternalTransactions", false};
     txn::AsyncWorkScheduler aws(getServiceContext());
     auto prepareFuture = txn::sendPrepare(getServiceContext(),
@@ -650,7 +650,9 @@ TEST_F(TransactionCoordinatorDriverTest,
                                           APIParameters(),
                                           kOneShardIdList);
     onCommands({[&](const executor::RemoteCommandRequest& request) {
-        ASSERT_FALSE(request.cmdObj.hasField("txnRetryCounter"));
+        ASSERT_TRUE(request.cmdObj.hasField("txnRetryCounter"));
+        ASSERT_EQUALS(request.cmdObj.getIntField("txnRetryCounter"),
+                      *_txnNumberAndRetryCounter.getTxnRetryCounter());
         return kNoSuchTransaction;
     }});
     prepareFuture.get();
@@ -663,7 +665,9 @@ TEST_F(TransactionCoordinatorDriverTest,
                                         kOneShardIdList,
                                         {});
     onCommands({[&](const executor::RemoteCommandRequest& request) {
-        ASSERT_FALSE(request.cmdObj.hasField("txnRetryCounter"));
+        ASSERT_TRUE(request.cmdObj.hasField("txnRetryCounter"));
+        ASSERT_EQUALS(request.cmdObj.getIntField("txnRetryCounter"),
+                      *_txnNumberAndRetryCounter.getTxnRetryCounter());
         return kNoSuchTransaction;
     }});
     commitFuture.get();
@@ -675,7 +679,9 @@ TEST_F(TransactionCoordinatorDriverTest,
                                       APIParameters(),
                                       kOneShardIdList);
     onCommands({[&](const executor::RemoteCommandRequest& request) {
-        ASSERT_FALSE(request.cmdObj.hasField("txnRetryCounter"));
+        ASSERT_TRUE(request.cmdObj.hasField("txnRetryCounter"));
+        ASSERT_EQUALS(request.cmdObj.getIntField("txnRetryCounter"),
+                      *_txnNumberAndRetryCounter.getTxnRetryCounter());
         return kNoSuchTransaction;
     }});
     abortFuture.get();

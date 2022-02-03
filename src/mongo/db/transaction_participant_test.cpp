@@ -5147,5 +5147,50 @@ TEST_F(ShardTxnParticipantTest, CannotModifyParentLsidOfNonChildSession) {
     }
 }
 
+TEST_F(TxnParticipantTest,
+       ThrowIfTxnRetryCounterIsSpecifiedOnStartTransactionWithFeatureFlagDisabled) {
+    MongoDOperationContextSession opCtxSession(opCtx());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
+                                                      {*opCtx()->getTxnNumber(), 1},
+                                                      false /* autocommit */,
+                                                      true /* startTransaction */),
+                       AssertionException,
+                       ErrorCodes::TxnRetryCounterNotSupported);
+}
+
+TEST_F(ShardTxnParticipantTest,
+       TxnRetryCounterShouldNotThrowIfWeContinueATransactionAfterDisablingFeatureFlag) {
+    // We swap in a new opCtx in order to set a new active txnRetryCounter for this test.
+    auto newClientOwned = getServiceContext()->makeClient("newClient");
+    AlternativeClientRegion acr(newClientOwned);
+    auto newOpCtx = cc().makeOperationContext();
+
+    const auto newSessionId = makeLogicalSessionIdForTest();
+
+    newOpCtx.get()->setLogicalSessionId(newSessionId);
+    newOpCtx.get()->setTxnNumber(20);
+    newOpCtx.get()->setTxnRetryCounter(1);
+    newOpCtx.get()->setInMultiDocumentTransaction();
+    MongoDOperationContextSession newOpCtxSession(newOpCtx.get());
+    auto txnParticipant = TransactionParticipant::get(newOpCtx.get());
+
+    txnParticipant.beginOrContinue(newOpCtx.get(),
+                                   {*newOpCtx.get()->getTxnNumber(), 1},
+                                   false /* autocommit */,
+                                   true /* startTransaction */);
+
+    // We need to unstash and stash transaction resources so that we can continue the transaction in
+    // the following statements.
+    txnParticipant.unstashTransactionResources(newOpCtx.get(), "insert");
+    txnParticipant.stashTransactionResources(newOpCtx.get());
+
+    RAIIServerParameterControllerForTest controller{"featureFlagInternalTransactions", false};
+
+    txnParticipant.beginOrContinue(newOpCtx.get(),
+                                   {*newOpCtx.get()->getTxnNumber(), 1},
+                                   false /* autocommit */,
+                                   boost::none /* startTransaction */);
+}
 }  // namespace
 }  // namespace mongo

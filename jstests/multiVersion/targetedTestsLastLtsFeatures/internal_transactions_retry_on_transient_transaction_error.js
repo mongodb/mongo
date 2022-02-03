@@ -55,15 +55,6 @@ function runTest(downgradeFCV) {
     jsTest.log("Verify retries only work in FCV latest");
     const lsid1 = {id: UUID()};
     const txnNumber1 = NumberLong(1);
-    configureFailPoint(shard0Primary,
-                       "failCommand",
-                       {
-                           failInternalCommands: true,
-                           failCommands: ["insert"],
-                           errorCode: ErrorCodes.LockBusy,
-                           namespace: kNs
-                       },
-                       {times: 1});
     const insertCmdObj = {
         insert: kCollName,
         documents: [{x: 1}],
@@ -71,14 +62,13 @@ function runTest(downgradeFCV) {
         txnNumber: txnNumber1,
         startTransaction: true,
         autocommit: false,
-        txnRetryCounter: NumberInt(0)
+        txnRetryCounter: NumberInt(1)
     };
-    assert.commandFailedWithCode(testDB.runCommand(insertCmdObj), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(testDB.runCommand(insertCmdObj),
+                                 ErrorCodes.TxnRetryCounterNotSupported);
 
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-
-    assert.commandFailedWithCode(testDB.runCommand(insertCmdObj), ErrorCodes.LockBusy);
-    insertCmdObj.txnRetryCounter = NumberInt(1);
+    insertCmdObj.txnRetryCounter = NumberInt(2);
     assert.commandWorked(testDB.runCommand(insertCmdObj));
     assert.commandWorked(testDB.adminCommand({
         commitTransaction: 1,

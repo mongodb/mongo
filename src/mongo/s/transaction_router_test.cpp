@@ -247,8 +247,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
                                           << "snapshot"
                                           << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
                                   << "startTransaction" << true << "coordinator" << true
-                                  << "autocommit" << false << "txnNumber" << txnNum
-                                  << "txnRetryCounter" << 0);
+                                  << "autocommit" << false << "txnNumber" << txnNum);
 
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -266,7 +265,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
                                << "coordinator" << true << "autocommit" << false << "txnNumber"
-                               << txnNum << "txnRetryCounter" << 0),
+                               << txnNum),
                           newCmd);
     }
 }
@@ -287,8 +286,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, BasicStartTxnWithAtClusterTime) 
                                           << "snapshot"
                                           << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
                                   << "startTransaction" << true << "coordinator" << true
-                                  << "autocommit" << false << "txnNumber" << txnNum
-                                  << "txnRetryCounter" << 0);
+                                  << "autocommit" << false << "txnNumber" << txnNum);
 
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -306,7 +304,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, BasicStartTxnWithAtClusterTime) 
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
                                << "coordinator" << true << "autocommit" << false << "txnNumber"
-                               << txnNum << "txnRetryCounter" << 0),
+                               << txnNum),
                           newCmd);
     }
 }
@@ -339,8 +337,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NewParticipantMustAttachTxnAndRe
                                           << "snapshot"
                                           << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
                                   << "startTransaction" << true << "coordinator" << true
-                                  << "autocommit" << false << "txnNumber" << txnNum
-                                  << "txnRetryCounter" << 0);
+                                  << "autocommit" << false << "txnNumber" << txnNum);
 
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -358,7 +355,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NewParticipantMustAttachTxnAndRe
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
                                << "coordinator" << true << "autocommit" << false << "txnNumber"
-                               << txnNum << "txnRetryCounter" << 0),
+                               << txnNum),
                           newCmd);
     }
 
@@ -369,7 +366,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NewParticipantMustAttachTxnAndRe
                                   << "snapshot"
                                   << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
                           << "startTransaction" << true << "autocommit" << false << "txnNumber"
-                          << txnNum << "txnRetryCounter" << 0);
+                          << txnNum);
 
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -386,8 +383,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NewParticipantMustAttachTxnAndRe
                                                              << "test"));
         ASSERT_BSONOBJ_EQ(BSON("update"
                                << "test"
-                               << "autocommit" << false << "txnNumber" << txnNum
-                               << "txnRetryCounter" << 0),
+                               << "autocommit" << false << "txnNumber" << txnNum),
                           newCmd);
     }
 }
@@ -413,8 +409,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartingNewTxnShouldClearState) 
                                        << "snapshot"
                                        << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
                                << "startTransaction" << true << "coordinator" << true
-                               << "autocommit" << false << "txnNumber" << txnNum
-                               << "txnRetryCounter" << 0),
+                               << "autocommit" << false << "txnNumber" << txnNum),
                           newCmd);
     }
 
@@ -431,8 +426,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartingNewTxnShouldClearState) 
                                           << "snapshot"
                                           << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
                                   << "startTransaction" << true << "coordinator" << true
-                                  << "autocommit" << false << "txnNumber" << txnNum2
-                                  << "txnRetryCounter" << 0);
+                                  << "autocommit" << false << "txnNumber" << txnNum2);
 
     {
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
@@ -452,6 +446,46 @@ DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.beginOrContinueTxn(operationContext(),
                                  TxnNumberAndRetryCounter(txnNum, -1),
                                  TransactionRouter::TransactionActions::kStart);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       DoNotAttachTxnRetryCounterIfTxnRetryCounterIsDefault) {
+    TxnNumber txnNum{3};
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(operationContext(),
+                                 TxnNumberAndRetryCounter(txnNum, 0),
+                                 TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
+
+    auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                                    shard1,
+                                                    BSON("insert"
+                                                         << "test"
+                                                         << "txnNumber" << txnNum));
+    ASSERT_EQ(newCmd.hasField("txnRetryCounter"), false);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       AttachTxnRetryCounterIfTxnRetryCounterIsNotDefault) {
+    TxnNumber txnNum{3};
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(operationContext(),
+                                 TxnNumberAndRetryCounter(txnNum, 1),
+                                 TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, {});
+    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
+
+    auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                                    shard1,
+                                                    BSON("insert"
+                                                         << "test"
+                                                         << "txnNumber" << txnNum));
+    ASSERT_EQ(newCmd.hasField("txnRetryCounter"), true);
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession, NotAttachTxnRetryCounterIfFeatureFlagIsNotEnabled) {
@@ -498,7 +532,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
                                  TxnNumberAndRetryCounter(txnNum, 0),
                                  TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
-    ASSERT_BSONOBJ_EQ(expectedCmd.addFields(BSON("txnRetryCounter" << 0)),
+    ASSERT_BSONOBJ_EQ(expectedCmd,
                       txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                                         shard1,
                                                         BSON("insert"
@@ -532,7 +566,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
                                  TxnNumberAndRetryCounter(txnNum, 0),
                                  TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
-    ASSERT_BSONOBJ_EQ(expectedCmd.addFields(BSON("txnRetryCounter" << 0)),
+    ASSERT_BSONOBJ_EQ(expectedCmd,
                       txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                                         shard1,
                                                         BSON("insert"
@@ -1042,7 +1076,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, DoesNotAttachTxnNumIfAlreadyTher
                                           << "snapshot"
                                           << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
                                   << "startTransaction" << true << "coordinator" << true
-                                  << "autocommit" << false << "txnRetryCounter" << 0);
+                                  << "autocommit" << false);
 
     auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                                     shard1,
@@ -1094,8 +1128,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, AttachTxnValidatesReadConcernIfA
                                        << "snapshot"
                                        << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
                                << "startTransaction" << true << "coordinator" << true
-                               << "autocommit" << false << "txnNumber" << txnNum
-                               << "txnRetryCounter" << 0),
+                               << "autocommit" << false << "txnNumber" << txnNum),
                           newCmd);
     }
 }
@@ -1197,7 +1230,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, PassesThroughEmptyReadConcernToP
                                   << "test"
                                   << "readConcern" << BSONObj() << "startTransaction" << true
                                   << "coordinator" << true << "autocommit" << false << "txnNumber"
-                                  << txnNum << "txnRetryCounter" << 0);
+                                  << txnNum);
 
     auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                                     shard1,
@@ -1225,8 +1258,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
                                   << "readConcern"
                                   << BSON("afterClusterTime" << kAfterClusterTime.asTimestamp())
                                   << "startTransaction" << true << "coordinator" << true
-                                  << "autocommit" << false << "txnNumber" << txnNum
-                                  << "txnRetryCounter" << 0);
+                                  << "autocommit" << false << "txnNumber" << txnNum);
 
     auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                                     shard1,
@@ -1310,8 +1342,9 @@ void checkSessionDetails(const BSONObj& cmdObj,
     ASSERT(osi.getAutocommit());
     ASSERT_FALSE(*osi.getAutocommit());
 
-    ASSERT(osi.getTxnRetryCounter());
-    ASSERT_EQ(txnRetryCounter, *osi.getTxnRetryCounter());
+    if (osi.getTxnRetryCounter()) {
+        ASSERT_EQ(txnRetryCounter, *osi.getTxnRetryCounter());
+    }
 
     if (isCoordinator) {
         ASSERT_EQ(*isCoordinator, cmdObj["coordinator"].trueValue());
@@ -5639,6 +5672,5 @@ TEST_F(TransactionRouterMetricsTest, IsTrackingOverIfTxnImplicitlyAborted) {
     implicitAbortInProgress();
     ASSERT(txnRouter().isTrackingOver());
 }
-
 }  // unnamed namespace
 }  // namespace mongo
