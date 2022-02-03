@@ -170,7 +170,7 @@ void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx) {
         "createIndexBuildCollection",
         NamespaceString::kIndexBuildEntryNamespace.ns(),
         [&]() -> void {
-            AutoGetDb autoDb(opCtx, NamespaceString::kIndexBuildEntryNamespace.db(), MODE_X);
+            AutoGetDb autoDb(opCtx, NamespaceString::kIndexBuildEntryNamespace.db(), MODE_IX);
             auto db = autoDb.ensureDbExists(opCtx);
 
             // Ensure the database exists.
@@ -180,6 +180,8 @@ void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx) {
             if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
                     opCtx, NamespaceString::kIndexBuildEntryNamespace)) {
                 WriteUnitOfWork wuow(opCtx);
+                AutoGetCollection autoColl(
+                    opCtx, NamespaceString::kIndexBuildEntryNamespace, LockMode::MODE_IX);
                 CollectionOptions defaultCollectionOptions;
                 CollectionPtr collection = db->createCollection(
                     opCtx, NamespaceString::kIndexBuildEntryNamespace, defaultCollectionOptions);
