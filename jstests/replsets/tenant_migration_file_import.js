@@ -2,8 +2,6 @@
  * Test the shard merge rollback-to-stable algorithm. This test was written before we implemented
  * file copy, so the script opens a backup cursor and copies files itself.
  *
- * TODO (SERVER-61133): Adapt or delete this test once file copy works.
- *
  * @tags: [
  *   does_not_support_encrypted_storage_engine,
  *   featureFlagShardMerge,
@@ -31,12 +29,19 @@ const migrationId = UUID();
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
+
+if (!TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
+    tenantMigrationTest.stop();
+    jsTestLog("Skipping Shard Merge-specific test");
+    return;
+}
+
 const kDataDir =
     `${recipientPrimary.dbpath}/migrationTmpFiles.${extractUUIDFromObject(migrationId)}`;
 assert.eq(runNonMongoProgram("mkdir", "-p", kDataDir), 0);
 
 (function() {
-jsTestLog("Generate test data: open a backup cursor on the donor and copy files");
+jsTestLog("Generate test data");
 
 const db = donorPrimary.getDB("myDatabase");
 const collection = db["myCollection"];
@@ -54,35 +59,6 @@ assert.commandWorked(db.runCommand({
 
 // Ensure our new collections appear in the backup cursor's checkpoint.
 assert.commandWorked(db.adminCommand({fsync: 1}));
-
-const reply = assert.commandWorked(
-    donorPrimary.adminCommand({aggregate: 1, cursor: {}, pipeline: [{"$backupCursor": {}}]}));
-const cursor = reply.cursor;
-
-jsTestLog(`Backup cursor metadata: ${tojson(cursor.firstBatch[0].metadata)}`);
-jsTestLog("Copy files to local data dir");
-for (let f of cursor.firstBatch) {
-    if (!f.hasOwnProperty("filename")) {
-        continue;
-    }
-
-    assert(f.filename.startsWith(donorPrimary.dbpath));
-    const suffix = f.filename.slice(donorPrimary.dbpath.length);
-
-    /*
-     * Create directories as needed, e.g. copy
-     * /data/db/job0/mongorunner/test-0/journal/WiredTigerLog.01 to
-     * /data/db/job0/mongorunner/test-1/migrationTmpFiles.migrationId/journal/WiredTigerLog.01,
-     * by passing "--relative /data/db/job0/mongorunner/test-0/./journal/WiredTigerLog.01".
-     * Note the "/./" marker.
-     */
-    assert.eq(runNonMongoProgram(
-                  "rsync", "-a", "--relative", `${donorPrimary.dbpath}/.${suffix}`, kDataDir),
-              0);
-}
-
-jsTestLog("Kill backup cursor");
-donorPrimary.adminCommand({killCursors: "$cmd.aggregate", cursors: [cursor.id]});
 })();
 
 jsTestLog("Run migration");
@@ -94,6 +70,9 @@ const migrationOpts = {
     tenantId: kTenantId,
 };
 TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
+
+// TODO SERVER-61144: Check on all recipient nodes that the collection documents got imported
+// successfully.
 for (let collectionName of ["myCollection", "myCappedCollection"]) {
     jsTestLog(`Checking ${collectionName}`);
     // Use "countDocuments" to check actual docs, "count" to check sizeStorer data.

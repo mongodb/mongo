@@ -1347,7 +1347,9 @@ env.Library(
 env.Library(
     target='tenant_migration_recipient_service',
     source=[
+        'tenant_file_cloner.cpp',
         'tenant_migration_recipient_coordinator.cpp',
+        'tenant_migration_recipient_op_observer.cpp',
         'tenant_migration_recipient_service.cpp',
         'tenant_migration_shard_merge_util.cpp',
         'vote_commit_migration_progress.cpp',
@@ -1372,6 +1374,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/transaction',
         'cloner_utils',
         'oplog',
+        'oplog_application_interface',
         'oplog_buffer_collection',
         'oplog_entry',
         'oplog_fetcher',
@@ -1391,9 +1394,7 @@ env.Library(
         'tenant_migration_access_blocker_server_status_section.cpp',
         'tenant_migration_access_blocker_util.cpp',
         'tenant_migration_donor_access_blocker.cpp',
-        'tenant_migration_donor_op_observer.cpp',
         'tenant_migration_recipient_access_blocker.cpp',
-        'tenant_migration_recipient_op_observer.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -1421,6 +1422,7 @@ env.Library(
 env.Library(
     target='tenant_migration_donor_service',
     source=[
+        'tenant_migration_donor_op_observer.cpp',
         'tenant_migration_donor_service.cpp',
     ],
     LIBDEPS=[

@@ -31,8 +31,8 @@ const tenantMigrationTest = new TenantMigrationTest({
 });
 
 const donorRst = tenantMigrationTest.getDonorRst();
+const donorPrimary = donorRst.getPrimary();
 
-const primary = donorRst.getPrimary();
 const kCollName = "testColl";
 
 const kTenantDefinedDbName = "0";
@@ -205,6 +205,16 @@ function makeTestOptions(
     };
 }
 
+function cleanUp(dbName) {
+    const donorDB = donorPrimary.getDB(dbName);
+
+    assert.commandWorked(donorDB.dropDatabase());
+    donorRst.awaitLastOpCommitted();
+    // TODO SERVER-62934: Remove this fsync once we run fsync command before the migration
+    // start for shard merge protocol.
+    assert.commandWorked(donorPrimary.adminCommand({fsync: 1}));
+}
+
 function runTest(
     primary, testCase, testFunc, dbName, collName, {testInTransaction, testAsRetryableWrite} = {}) {
     const testOpts = makeTestOptions(
@@ -220,6 +230,9 @@ function runTest(
     }
 
     testFunc(testCase, testOpts);
+
+    // This cleanup step is necessary for the shard merge protocol to work correctly.
+    cleanUp(dbName);
 }
 
 function runCommand(testOpts, expectedError) {
@@ -1015,11 +1028,14 @@ for (const [testName, testFunc] of Object.entries(testFuncs)) {
             continue;
         }
 
-        runTest(
-            primary, testCase, testFunc, baseDbName + "Basic_" + kTenantDefinedDbName, kCollName);
+        runTest(donorPrimary,
+                testCase,
+                testFunc,
+                baseDbName + "Basic_" + kTenantDefinedDbName,
+                kCollName);
 
         if (testCase.testInTransaction) {
-            runTest(primary,
+            runTest(donorPrimary,
                     testCase,
                     testFunc,
                     baseDbName + "Txn_" + kTenantDefinedDbName,
@@ -1028,7 +1044,7 @@ for (const [testName, testFunc] of Object.entries(testFuncs)) {
         }
 
         if (testCase.testAsRetryableWrite) {
-            runTest(primary,
+            runTest(donorPrimary,
                     testCase,
                     testFunc,
                     baseDbName + "Retryable_" + kTenantDefinedDbName,

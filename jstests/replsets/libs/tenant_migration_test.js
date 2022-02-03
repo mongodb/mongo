@@ -306,7 +306,14 @@ function TenantMigrationTest({
         recipientNodes.forEach(node => {
             const configRecipientsColl =
                 node.getCollection(TenantMigrationTest.kConfigRecipientsNS);
-            assert.soon(() => 0 === configRecipientsColl.count({_id: migrationId}));
+            assert.soon(() => 0 === configRecipientsColl.count({_id: migrationId}), tojson(node));
+
+            let mtab;
+            assert.soon(() => {
+                mtab =
+                    this.getTenantMigrationAccessBlocker({recipientNode: node, tenantId: tenantId});
+                return !mtab;
+            }, tojson(mtab));
         });
     };
 
@@ -350,6 +357,11 @@ function TenantMigrationTest({
         return (mtab.donor.state === expectedAccessState);
     };
 
+    function buildErrorMsg(
+        migrationId, expectedState, expectedAccessState, configDoc, recipientMtab) {
+        return tojson({migrationId, expectedState, expectedAccessState, configDoc, recipientMtab});
+    }
+
     /**
      * Asserts that the migration 'migrationId' and 'tenantId' eventually goes to the expected state
      * on all the given recipient nodes.
@@ -357,8 +369,21 @@ function TenantMigrationTest({
     this.waitForRecipientNodesToReachState = function(
         nodes, migrationId, tenantId, expectedState, expectedAccessState) {
         nodes.forEach(node => {
-            assert.soon(() => this.isRecipientNodeInExpectedState(
-                            node, migrationId, tenantId, expectedState, expectedAccessState));
+            let result = {};
+            assert.soon(
+                () => {
+                    result = this.isRecipientNodeInExpectedState(
+                        node, migrationId, tenantId, expectedState, expectedAccessState);
+                    return result.value;
+                },
+                () => {
+                    return "waitForRecipientNodesToReachState failed: " +
+                        buildErrorMsg(migrationId,
+                                      expectedState,
+                                      expectedAccessState,
+                                      result.configDoc,
+                                      result.recipientMtab);
+                });
         });
     };
 
@@ -369,8 +394,16 @@ function TenantMigrationTest({
     this.assertRecipientNodesInExpectedState = function(
         nodes, migrationId, tenantId, expectedState, expectedAccessState) {
         nodes.forEach(node => {
-            assert(this.isRecipientNodeInExpectedState(
-                node, migrationId, tenantId, expectedState, expectedAccessState));
+            let result = this.isRecipientNodeInExpectedState(
+                node, migrationId, tenantId, expectedState, expectedAccessState);
+            assert(result.value, () => {
+                return "assertRecipientNodesInExpectedState failed: " +
+                    buildErrorMsg(migrationId,
+                                  expectedState,
+                                  expectedAccessState,
+                                  result.configDoc,
+                                  result.recipientMtab);
+            });
         });
     };
 
@@ -383,12 +416,16 @@ function TenantMigrationTest({
         const configRecipientsColl =
             this.getRecipientPrimary().getCollection("config.tenantMigrationRecipients");
         const configDoc = configRecipientsColl.findOne({_id: migrationId});
-        if (!configDoc || configDoc.state !== expectedState) {
-            return false;
-        }
-
         const mtab = this.getTenantMigrationAccessBlocker({recipientNode: node, tenantId});
-        return (mtab.recipient.state === expectedAccessState);
+
+        let checkStates = () => {
+            if (!configDoc || configDoc.state !== expectedState) {
+                return false;
+            }
+            return (mtab.recipient.state === expectedAccessState);
+        };
+
+        return {value: checkStates(), configDoc: configDoc, recipientMtab: mtab.recipient};
     };
 
     function loadDummyData() {

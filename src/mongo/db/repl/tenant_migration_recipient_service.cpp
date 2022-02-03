@@ -90,17 +90,11 @@ using namespace fmt;
 const std::string kTTLIndexName = "TenantMigrationRecipientTTLIndex";
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 constexpr StringData kOplogBufferPrefix = "repl.migration.oplog_"_sd;
-constexpr StringData kDonatedFilesPrefix = "donatedFiles."_sd;
 constexpr int kBackupCursorFileFetcherRetryAttempts = 10;
 
 NamespaceString getOplogBufferNs(const UUID& migrationUUID) {
     return NamespaceString(NamespaceString::kConfigDb,
                            kOplogBufferPrefix + migrationUUID.toString());
-}
-
-NamespaceString getDonatedFilesNs(const UUID& migrationUUID) {
-    return NamespaceString(NamespaceString::kConfigDb,
-                           kDonatedFilesPrefix + migrationUUID.toString());
 }
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* opCtx) {
@@ -139,11 +133,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* 
 bool isRetriableOplogFetcherError(Status oplogFetcherStatus) {
     return oplogFetcherStatus == ErrorCodes::InvalidSyncSource ||
         oplogFetcherStatus == ErrorCodes::ShutdownInProgress;
-}
-
-boost::filesystem::path fileClonerTempDir(UUID migrationId) {
-    return boost::filesystem::path(storageGlobalParams.dbpath) /
-        ("migrationTmpFiles.{}"_format(migrationId.toString()));
 }
 
 }  // namespace
@@ -981,10 +970,14 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_getDonorFilenam
     }();
 
     auto fetchStatus = std::make_shared<boost::optional<Status>>();
-    auto fetcherCallback = [this, self = shared_from_this(), fetchStatus, token](
-                               const Fetcher::QueryResponseStatus& dataStatus,
-                               Fetcher::NextAction* nextAction,
-                               BSONObjBuilder* getMoreBob) {
+    auto uniqueMetadataInfo = std::make_unique<boost::optional<shard_merge_utils::MetadataInfo>>();
+    auto fetcherCallback = [this,
+                            self = shared_from_this(),
+                            fetchStatus,
+                            metadataInfoPtr = uniqueMetadataInfo.get(),
+                            token](const Fetcher::QueryResponseStatus& dataStatus,
+                                   Fetcher::NextAction* nextAction,
+                                   BSONObjBuilder* getMoreBob) {
         if (!dataStatus.isOK()) {
             *fetchStatus = dataStatus.getStatus();
             LOGV2_ERROR(6113003, "backup cursor failed", "error"_attr = dataStatus.getStatus());
@@ -1012,7 +1005,13 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_getDonorFilenam
                 const auto& metadata = doc["metadata"].Obj();
                 auto startApplyingDonorOpTime =
                     OpTime(metadata["checkpointTimestamp"].timestamp(), OpTime::kUninitializedTerm);
-                // TODO (SERVER-61133) Uncomment the following lines when we skip
+
+
+                invariant(metadataInfoPtr && !*metadataInfoPtr);
+                (*metadataInfoPtr) = shard_merge_utils::MetadataInfo::constructMetadataInfo(
+                    getMigrationUUID(), _client->getServerAddress(), metadata);
+
+                // TODO (SERVER-61145) Uncomment the following lines when we skip
                 // _getStartopTimesFromDonor entirely
                 // _stateDoc.setStartApplyingDonorOpTime(startApplyingDonorOpTime);
                 // _stateDoc.setStartFetchingDonorOpTime(startApplyingDonorOpTime);
@@ -1029,36 +1028,28 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_getDonorFilenam
                             "filename"_attr = doc["filename"].String(),
                             "backupCursorId"_attr = data.cursorId);
 
-                auto donatedFilesNs = getDonatedFilesNs(getMigrationUUID());
-                auto status = writeConflictRetry(
-                    opCtx,
-                    "insertBackupCursorEntry",
-                    donatedFilesNs.ns(),
-                    [opCtx, donatedFilesNs, doc]() -> Status {
-                        // Disabling internal document validation because the fetcher batch size
-                        // can exceed the max data size limit BSONObjMaxUserSize with the
-                        // additional fields we add to documents.
-                        DisableDocumentValidation documentValidationDisabler(
-                            opCtx, DocumentValidationSettings::kDisableInternalValidation);
+                invariant(metadataInfoPtr && *metadataInfoPtr);
+                auto docs = std::vector<mongo::BSONObj>{(*metadataInfoPtr)->toBSON(doc).getOwned()};
 
-                        auto obj = std::vector<mongo::BSONObj>{
-                            doc.addField(BSON("_id" << OID::gen()).firstElement()).getOwned()};
-                        write_ops::InsertCommandRequest insertOp(donatedFilesNs);
-                        insertOp.setDocuments(std::move(obj));
-                        insertOp.setWriteCommandRequestBase([] {
-                            write_ops::WriteCommandRequestBase wcb;
-                            wcb.setOrdered(true);
-                            return wcb;
-                        }());
+                // Disabling internal document validation because the fetcher batch size
+                // can exceed the max data size limit BSONObjMaxUserSize with the
+                // additional fields we add to documents.
+                DisableDocumentValidation documentValidationDisabler(
+                    opCtx, DocumentValidationSettings::kDisableInternalValidation);
 
-                        auto writeResult = write_ops_exec::performInserts(opCtx, insertOp);
-                        invariant(!writeResult.results.empty());
-                        // Writes are ordered, check only the last writeOp result.
-                        uassertStatusOK(writeResult.results.back());
+                write_ops::InsertCommandRequest insertOp(
+                    shard_merge_utils::getDonatedFilesNs(getMigrationUUID()));
+                insertOp.setDocuments(std::move(docs));
+                insertOp.setWriteCommandRequestBase([] {
+                    write_ops::WriteCommandRequestBase wcb;
+                    wcb.setOrdered(true);
+                    return wcb;
+                }());
 
-                        return Status::OK();
-                    });
-                uassertStatusOK(status);
+                auto writeResult = write_ops_exec::performInserts(opCtx, insertOp);
+                invariant(!writeResult.results.empty());
+                // Writes are ordered, check only the last writeOp result.
+                uassertStatusOK(writeResult.results.back());
             }
         }
 
@@ -1092,7 +1083,7 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_getDonorFilenam
 
     return _donorFilenameBackupCursorFileFetcher->onCompletion()
         .thenRunOn(**_scopedExecutor)
-        .then([fetchStatus] {
+        .then([fetchStatus, uniqueMetadataInfo = std::move(uniqueMetadataInfo)] {
             if (!*fetchStatus) {
                 // the callback was never invoked
                 uasserted(6113007, "Internal error running cursor callback in command");
@@ -1112,7 +1103,7 @@ void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLo
 
     // We only expect to already have start optimes populated if we are not
     // resuming a migration and this is a multitenant migration.
-    // TODO (SERVER-61133) Eventually we'll skip _getStartopTimesFromDonor entirely
+    // TODO (SERVER-61145) Eventually we'll skip _getStartopTimesFromDonor entirely
     // for shard merge, but currently _getDonorFilenames will populate optimes for
     // the shard merge case. We can just overwrite here since we aren't doing anything
     // with the backup cursor results yet.
@@ -1902,7 +1893,6 @@ TenantMigrationRecipientService::Instance::_advanceStableTimestampToStartApplyin
 
             // We do not have a mechanism to wait on the stableTimestamp reaching a specific ts, so
             // we wait on the majority commit point instead.
-            // TODO SERVER-61731 Retry importing donor collections on failure
             return WaitForMajorityService::get(opCtx->getServiceContext())
                 .waitUntilMajority(noOpTs, CancellationToken::uncancelable());
         })
@@ -1947,25 +1937,42 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_importCopiedFiles()
         return SemiFuture<void>::makeReady();
     }
 
-    stdx::lock_guard lk(_mutex);
-
     return ExecutorFuture(**_scopedExecutor)
-        .then([this, self = shared_from_this(), stateDoc = _stateDoc] {
-            auto tempWTDirectory = fileClonerTempDir(stateDoc.getId());
-            if (!boost::filesystem::exists(tempWTDirectory)) {
-                // TODO (SERVER-61133): Abort the merge if no files.
-                LOGV2_WARNING(6113701,
-                              "No temp directory of donor files to import",
-                              "tempDirectory"_attr = tempWTDirectory.string());
-                return SemiFuture<void>::makeReady();
-            }
+        .then([this, self = shared_from_this()] {
+            auto tempWTDirectory = shard_merge_utils::fileClonerTempDir(getMigrationUUID());
+
+            uassert(6113315,
+                    str::stream() << "Missing file cloner's temporary dbpath directory: "
+                                  << tempWTDirectory.string(),
+                    boost::filesystem::exists(tempWTDirectory));
+
+            // TODO SERVER-63204: Reevaluate if this is the correct place to remove the temporary
+            // WT dbpath.
+            ON_BLOCK_EXIT([&tempWTDirectory, &migrationId = getMigrationUUID()] {
+                LOGV2_DEBUG(6113324,
+                            1,
+                            "Done importing files, removing the temporary WT dbpath",
+                            "migrationId"_attr = migrationId,
+                            "tempDbPath"_attr = tempWTDirectory.string());
+                boost::system::error_code ec;
+                boost::filesystem::remove_all(tempWTDirectory, ec);
+            });
 
             auto opCtx = cc().makeOperationContext();
             // TODO (SERVER-62054): do this after file-copy, on primary and secondaries.
             auto metadatas =
                 wiredTigerRollbackToStableAndGetMetadata(opCtx.get(), tempWTDirectory.string());
 
-            wiredTigerImportFromBackupCursor(opCtx.get(), metadatas, tempWTDirectory.string());
+            // TODO SERVER-63122: Remove the try-catch block once logical cloning is removed for
+            // shard merge protocol.
+            try {
+                shard_merge_utils::wiredTigerImportFromBackupCursor(
+                    opCtx.get(), metadatas, tempWTDirectory.string());
+            } catch (const ExceptionFor<ErrorCodes::NamespaceExists>& ex) {
+                LOGV2_WARNING(
+                    6113314, "Temporarily ignoring the error", "error"_attr = ex.toStatus());
+            }
+
             return SemiFuture<void>::makeReady();
         })
         .semi();
@@ -2264,6 +2271,29 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_updateStateDocForMa
             auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             return WaitForMajorityService::get(opCtx->getServiceContext())
                 .waitUntilMajority(writeOpTime, CancellationToken::uncancelable());
+        })
+        .semi();
+}
+
+SemiFuture<void> TenantMigrationRecipientService::Instance::_updateStateDocForAllVotingNodes(
+    WithLock lk, const CancellationToken& abortToken) const {
+    return ExecutorFuture(**_scopedExecutor)
+        .then([this, self = shared_from_this(), stateDoc = _stateDoc, abortToken] {
+            auto opCtx = cc().makeOperationContext();
+            uassertStatusOK(
+                tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), stateDoc));
+
+            auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+
+            auto votingMembersWriteConcern =
+                WriteConcernOptions(repl::ReplSetConfig::kConfigAllWriteConcernName,
+                                    WriteConcernOptions::SyncMode::NONE,
+                                    WriteConcernOptions::kNoTimeout);
+
+            auto writeConcernFuture =
+                repl::ReplicationCoordinator::get(opCtx->getServiceContext())
+                    ->awaitReplicationAsyncNoWTimeout(writeOpTime, votingMembersWriteConcern);
+            return future_util::withCancellation(std::move(writeConcernFuture), abortToken);
         })
         .semi();
 }
@@ -2576,24 +2606,30 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                                    "backup cursor alive.");
                        stdx::lock_guard lk(_mutex);
                        _backupCursorKeepAliveCancellation = CancellationSource(token);
-                       _backupCursorKeepAliveFuture =
-                           keepBackupCursorAlive(_backupCursorKeepAliveCancellation,
-                                                 **_scopedExecutor,
-                                                 _client->getServerHostAndPort(),
-                                                 _donorFilenameBackupCursorId,
-                                                 _donorFilenameBackupCursorNamespaceString);
+                       _backupCursorKeepAliveFuture = shard_merge_utils::keepBackupCursorAlive(
+                           _backupCursorKeepAliveCancellation,
+                           **_scopedExecutor,
+                           _client->getServerHostAndPort(),
+                           _donorFilenameBackupCursorId,
+                           _donorFilenameBackupCursorNamespaceString);
                    })
-                   .then([this, self = shared_from_this()] {
+                   .then([this, self = shared_from_this(), token] {
                        if (_stateDoc.getProtocol() != MigrationProtocolEnum::kShardMerge) {
                            return SemiFuture<void>::makeReady();
                        }
 
                        stdx::lock_guard lk(_mutex);
                        _stateDoc.setState(TenantMigrationRecipientStateEnum::kLearnedFilenames);
-                       return _updateStateDocForMajority(lk);
+                       // Since we are doing synchronous file cloning via op-observer, no need to
+                       // wait explicitly for shard merge commit votes from all nodes to
+                       // move to next step in this chain. Just waiting for the state doc with state
+                       // "TenantMigrationRecipientStateEnum::kLearnedFilenames" to get replicated
+                       // to all nodes should be sufficient to safely move to next step in this
+                       // chain.
+                       return _updateStateDocForAllVotingNodes(lk, token);
                    })
                    .then([this, self = shared_from_this()] {
-                       // TODO (SERVER-61133) temporarily stop fetcher/backup cursor here for
+                       // TODO (SERVER-62734) temporarily stop fetcher/backup cursor here for
                        // now. We'll need to move this call elsewhere eventually to shut down
                        // the backup cursor and/or keepalive.
                        // Some tests fail unless we do this here, punting on dealing with those

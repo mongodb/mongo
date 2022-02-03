@@ -44,6 +44,9 @@
 #include "mongo/db/cursor_server_params_gen.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/multitenancy.h"
+#include "mongo/db/repl/oplog_applier.h"
+#include "mongo/db/repl/tenant_file_cloner.h"
+#include "mongo/db/repl/tenant_migration_shared_data.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_import.h"
 #include "mongo/db/views/view_catalog.h"
@@ -54,7 +57,7 @@
 // cursor timeout.
 constexpr int kBackupCursorKeepAliveIntervalMillis = mongo::kCursorTimeoutMillisDefault / 2;
 
-namespace mongo::repl {
+namespace mongo::repl::shard_merge_utils {
 namespace {
 using namespace fmt::literals;
 
@@ -88,7 +91,110 @@ std::string constructDestinationPath(const std::string& ident) {
     filePath /= (ident + kTableExtension);
     return filePath.string();
 }
+
+/**
+ * Computes a boost::filesystem::path generic-style relative path (always uses slashes)
+ * from a base path and a relative path.
+ */
+std::string _getPathRelativeTo(const std::string& path, const std::string& basePath) {
+    if (basePath.empty() || path.find(basePath) != 0) {
+        uasserted(6113319,
+                  str::stream() << "The file " << path << " is not a subdirectory of " << basePath);
+    }
+
+    auto result = path.substr(basePath.size());
+    // Skip separators at the beginning of the relative part.
+    if (!result.empty() && (result[0] == '/' || result[0] == '\\')) {
+        result.erase(result.begin());
+    }
+
+    std::replace(result.begin(), result.end(), '\\', '/');
+    return result;
+}
+
+/**
+ * Makes a connection to the provided 'source'.
+ */
+Status connect(const HostAndPort& source, DBClientConnection* client) {
+    Status status = client->connect(source, "TenantFileCloner", boost::none);
+    if (!status.isOK())
+        return status;
+    return replAuthenticate(client).withContext(str::stream()
+                                                << "Failed to authenticate to " << source);
+}
 }  // namespace
+
+Status cloneFiles(OperationContext* opCtx,
+                  std::vector<InsertStatement>::const_iterator first,
+                  std::vector<InsertStatement>::const_iterator last) {
+
+    std::unique_ptr<DBClientConnection> client;
+    std::unique_ptr<TenantMigrationSharedData> sharedData;
+    auto writerPool =
+        makeReplWriterPool(tenantApplierThreadCount, "TenantMigrationFileClonerWriter"_sd);
+
+    ON_BLOCK_EXIT([&] {
+        client->shutdownAndDisallowReconnect();
+
+        writerPool->shutdown();
+        writerPool->join();
+    });
+
+    for (auto it = first; it != last; it++) {
+        const auto& metadataDoc = it->doc;
+        auto fileName = metadataDoc["filename"].str();
+        auto migrationId = UUID(uassertStatusOK(UUID::parse(metadataDoc[kMigrationIdFieldName])));
+
+        LOGV2_DEBUG(6113320, 1, "Attempting to clone file", "metadata"_attr = metadataDoc);
+
+        auto backupId = UUID(uassertStatusOK(UUID::parse(metadataDoc[kBackupIdFieldName])));
+        auto remoteDbpath = metadataDoc["remoteDbpath"].str();
+        size_t fileSize = metadataDoc["fileSize"].safeNumberLong();
+        auto relativePath = _getPathRelativeTo(fileName, metadataDoc[kDonorDbPathFieldName].str());
+        invariant(!relativePath.empty());
+
+        // Connect the client.
+        if (!client) {
+            auto donor = HostAndPort::parseThrowing(metadataDoc[kDonorFieldName].str());
+            client = std::make_unique<DBClientConnection>(true /* autoReconnect */);
+            uassertStatusOK(connect(donor, client.get()));
+        }
+
+        if (!sharedData) {
+            sharedData = std::make_unique<TenantMigrationSharedData>(
+                getGlobalServiceContext()->getFastClockSource(), migrationId);
+        }
+
+        auto currentBackupFileCloner = std::make_unique<TenantFileCloner>(
+            backupId,
+            migrationId,
+            fileName,
+            fileSize,
+            relativePath,
+            sharedData.get(),
+            client->getServerHostAndPort(),
+            client.get(),
+            repl::StorageInterface::get(cc().getServiceContext()),
+            writerPool.get());
+
+        auto cloneStatus = currentBackupFileCloner->run();
+        if (!cloneStatus.isOK()) {
+            LOGV2_WARNING(6113321,
+                          "Failed to clone file ",
+                          "migrationUUID"_attr = migrationId,
+                          "fileName"_attr = fileName,
+                          "error"_attr = cloneStatus);
+            return cloneStatus;
+        } else {
+            LOGV2_DEBUG(6113322,
+                        1,
+                        "Successfully cloned file",
+                        "migrationUUID"_attr = migrationId,
+                        "fileName"_attr = fileName);
+        }
+    }
+    return Status::OK();
+}
 
 void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
                                       const std::vector<CollectionImportMetadata>& metadatas,
@@ -194,4 +300,4 @@ SemiFuture<void> keepBackupCursorAlive(CancellationSource cancellationSource,
         .onCompletion([](auto&&) {})
         .semi();
 }
-}  // namespace mongo::repl
+}  // namespace mongo::repl::shard_merge_utils

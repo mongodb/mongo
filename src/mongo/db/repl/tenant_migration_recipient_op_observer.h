@@ -83,7 +83,7 @@ public:
                    const UUID& uuid,
                    std::vector<InsertStatement>::const_iterator first,
                    std::vector<InsertStatement>::const_iterator last,
-                   bool fromMigrate) final {}
+                   bool fromMigrate) final;
 
     void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) final;
 
@@ -113,7 +113,7 @@ public:
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
                             const BSONObj& idIndex,
-                            const OplogSlot& createOpTime) final {}
+                            const OplogSlot& createOpTime) final;
 
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,

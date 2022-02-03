@@ -34,6 +34,7 @@
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_recipient_op_observer.h"
+#include "mongo/db/repl/tenant_migration_shard_merge_util.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/tenant_migration_util.h"
 #include "mongo/logv2/log.h"
@@ -84,8 +85,71 @@ void onSetRejectReadsBeforeTimestamp(OperationContext* opCtx,
 
     mtab->startRejectingReadsBefore(recipientStateDoc.getRejectReadsBeforeTimestamp().get());
 }
-
 }  // namespace
+
+void TenantMigrationRecipientOpObserver::onCreateCollection(OperationContext* opCtx,
+                                                            const CollectionPtr& coll,
+                                                            const NamespaceString& collectionName,
+                                                            const CollectionOptions& options,
+                                                            const BSONObj& idIndex,
+                                                            const OplogSlot& createOpTime) {
+    if (!shard_merge_utils::isDonatedFilesCollection(collectionName))
+        return;
+
+    auto collString = collectionName.coll().toString();
+    auto migrationUUID =
+        UUID(uassertStatusOK(UUID::parse(collString.substr(collString.find('.') + 1))));
+    auto fileClonerTempDirPath = shard_merge_utils::fileClonerTempDir(migrationUUID);
+
+    // This is possible when a secondary restarts or rollback and the donated files collection
+    // is created as part of oplog replay.
+    if (boost::filesystem::exists(fileClonerTempDirPath)) {
+        LOGV2_DEBUG(6113316,
+                    1,
+                    "File cloner temp directory already exists",
+                    "directory"_attr = fileClonerTempDirPath.generic_string());
+
+        // Ignoring the errors because if this step fails, then the following step
+        // create_directory() will fail and that will throw an exception.
+        boost::system::error_code ec;
+        boost::filesystem::remove_all(fileClonerTempDirPath, ec);
+    }
+
+    try {
+        boost::filesystem::create_directory(fileClonerTempDirPath);
+    } catch (std::exception& e) {
+        LOGV2_ERROR(6113317,
+                    "Error creating file cloner temp directory",
+                    "directory"_attr = fileClonerTempDirPath.generic_string(),
+                    "error"_attr = e.what());
+        throw;
+    }
+}
+
+void TenantMigrationRecipientOpObserver::onInserts(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const UUID& uuid,
+    std::vector<InsertStatement>::const_iterator first,
+    std::vector<InsertStatement>::const_iterator last,
+    bool fromMigrate) {
+
+    if (!shard_merge_utils::isDonatedFilesCollection(nss))
+        return;
+
+    try {
+        uassertStatusOK(shard_merge_utils::cloneFiles(opCtx, first, last));
+    } catch (const DBException& ex) {
+        invariant(first != last);
+        auto migrationId = UUID(
+            uassertStatusOK(UUID::parse(first->doc[shard_merge_utils::kMigrationIdFieldName])));
+        LOGV2_ERROR(6113318,
+                    "Error cloning files",
+                    "migrationUUID"_attr = migrationId,
+                    "error"_attr = ex.toStatus());
+        // TODO SERVER-63120: On error, vote shard merge abort to recipient primary.
+    }
+}
 
 void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
                                                   const OplogUpdateEntryArgs& args) {

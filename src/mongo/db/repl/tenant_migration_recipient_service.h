@@ -509,6 +509,13 @@ public:
          */
         SemiFuture<void> _updateStateDocForMajority(WithLock lk) const;
 
+        /**
+         * Updates the state doc in the database and waits for that to be propagated to all nodes in
+         * the replica set.
+         */
+        SemiFuture<void> _updateStateDocForAllVotingNodes(
+            WithLock lk, const CancellationToken& abortToken) const;
+
         /*
          * Returns the majority OpTime on the donor node that 'client' is connected to.
          */

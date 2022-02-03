@@ -1,5 +1,5 @@
 /**
- * Tests recipient behavior for shard merge
+ * Tests that recipient is able to learn files to be imported from donor for shard merge protocol.
  *
  * @tags: [
  *   incompatible_with_eft,
@@ -8,6 +8,7 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
+ *   featureFlagShardMerge,
  * ]
  */
 
@@ -41,15 +42,22 @@ load("jstests/replsets/libs/tenant_migration_util.js");
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
     const donorSecondary = donorRst.getSecondary();
 
+    // Do a majority write.
     tenantMigrationTest.insertDonorDB(tenantDB, collName);
+
+    // Ensure our new collections appear in the backup cursor's checkpoint.
+    assert.commandWorked(donorPrimary.adminCommand({fsync: 1}));
 
     const failpoint = "fpAfterRetrievingStartOpTimesMigrationRecipientInstance";
     const waitInFailPoint = configureFailPoint(recipientPrimary, failpoint, {action: "hang"});
 
+    // In order to prevent the copying of "testTenantId" databases via logical cloning from donor to
+    // recipient, start migration on a tenant id which is non-existent on the donor.
     const migrationUuid = UUID();
+    const kDummyTenantId = "nonExistentTenantId";
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationUuid),
-        tenantId,
+        tenantId: kDummyTenantId,
         readPreference: {mode: 'primary'}
     };
 
@@ -58,15 +66,27 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 
     waitInFailPoint.wait();
 
-    const res =
-        recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient migration"});
-    assert.eq(res.inprog.length, 1);
-    const [currOp] = res.inprog;
-    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kLearnedFilenames, res);
+    tenantMigrationTest.assertRecipientNodesInExpectedState(
+        tenantMigrationTest.getRecipientRst().nodes,
+        migrationUuid,
+        kDummyTenantId,
+        TenantMigrationTest.RecipientState.kLearnedFilenames,
+        TenantMigrationTest.RecipientAccessState.kReject);
+
     waitInFailPoint.off();
 
     TenantMigrationTest.assertCommitted(
         tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+
+    // TODO SERVER-61144: Check on all recipient nodes that the collection documents got imported
+    // successfully.
+    // Use "countDocuments" to check actual docs, "count" to check sizeStorer data.
+    assert.eq(donorPrimary.getDB(tenantDB)[collName].countDocuments({}),
+              recipientPrimary.getDB(tenantDB)[collName].countDocuments({}),
+              "countDocuments");
+    assert.eq(donorPrimary.getDB(tenantDB)[collName].count(),
+              recipientPrimary.getDB(tenantDB)[collName].count(),
+              "count");
 
     tenantMigrationTest.stop();
 })();

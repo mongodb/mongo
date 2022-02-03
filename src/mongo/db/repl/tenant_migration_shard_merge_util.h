@@ -30,15 +30,85 @@
 #include <string>
 #include <vector>
 
+
+#include <boost/filesystem/operations.hpp>
+#include <fmt/format.h>
+
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_import.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/util/cancellation.h"
 
-namespace mongo::repl {
+namespace mongo::repl::shard_merge_utils {
+
+inline constexpr StringData kDonatedFilesPrefix = "donatedFiles."_sd;
+inline constexpr StringData kMigrationTmpDirPrefix = "migrationTmpFiles"_sd;
+inline constexpr StringData kMigrationIdFieldName = "migrationId"_sd;
+inline constexpr StringData kBackupIdFieldName = "backupId"_sd;
+inline constexpr StringData kDonorFieldName = "donor"_sd;
+inline constexpr StringData kDonorDbPathFieldName = "dbpath"_sd;
+
+inline bool isDonatedFilesCollection(const NamespaceString& ns) {
+    return ns.isConfigDB() && ns.coll().startsWith(kDonatedFilesPrefix);
+}
+
+inline NamespaceString getDonatedFilesNs(const UUID& migrationUUID) {
+    return NamespaceString(NamespaceString::kConfigDb,
+                           kDonatedFilesPrefix + migrationUUID.toString());
+}
+
+inline boost::filesystem::path fileClonerTempDir(const UUID& migrationId) {
+    return boost::filesystem::path(storageGlobalParams.dbpath) /
+        fmt::format("{}.{}", kMigrationTmpDirPrefix.toString(), migrationId.toString());
+}
+
+/**
+ * Represents the document structure of config.donatedFiles_<MigrationUUID> collection.
+ */
+struct MetadataInfo {
+    explicit MetadataInfo(const UUID& backupId,
+                          const UUID& migrationId,
+                          const std::string& donor,
+                          const std::string& donorDbPath)
+        : backupId(backupId), migrationId(migrationId), donor(donor), donorDbPath(donorDbPath) {}
+    UUID backupId;
+    UUID migrationId;
+    std::string donor;
+    std::string donorDbPath;
+
+    static MetadataInfo constructMetadataInfo(const UUID& migrationId,
+                                              const std::string& donor,
+                                              const BSONObj& obj) {
+        auto backupId = UUID(uassertStatusOK(UUID::parse(obj[kBackupIdFieldName])));
+        auto donorDbPath = obj[kDonorDbPathFieldName].String();
+        return MetadataInfo{backupId, migrationId, donor, donorDbPath};
+    }
+
+    BSONObj toBSON(const BSONObj& extraFields) const {
+        BSONObjBuilder bob;
+
+        migrationId.appendToBuilder(&bob, kMigrationIdFieldName);
+        backupId.appendToBuilder(&bob, kBackupIdFieldName);
+        bob.append(kDonorFieldName, donor);
+        bob.append(kDonorDbPathFieldName, donorDbPath);
+        bob.append("_id", OID::gen());
+        bob.appendElements(extraFields);
+
+        return bob.obj();
+    }
+};
+
+/**
+ * Uses the TenantFileCloner to copy the files from the donor.
+ */
+Status cloneFiles(OperationContext* opCtx,
+                  std::vector<InsertStatement>::const_iterator first,
+                  std::vector<InsertStatement>::const_iterator last);
+
 /**
  * After calling wiredTigerRollbackToStableAndGetMetadata, use this function to import files.
  */
@@ -51,4 +121,4 @@ SemiFuture<void> keepBackupCursorAlive(CancellationSource cancellationSource,
                                        HostAndPort hostAndPort,
                                        CursorId cursorId,
                                        NamespaceString namespaceString);
-}  // namespace mongo::repl
+}  // namespace mongo::repl::shard_merge_utils
