@@ -73,8 +73,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
     const ChunkRange& range,
     boost::optional<UUID> migrationId,
     int numDocsToRemovePerBatch,
-    Seconds delayForActiveQueriesOnSecondariesToComplete,
-    Milliseconds delayBetweenBatches);
+    Seconds delayForActiveQueriesOnSecondariesToComplete);
 
 /**
  * - Retrieves source collection's persistent range deletion tasks from `config.rangeDeletions`
