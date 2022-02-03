@@ -7269,6 +7269,11 @@ tasks:
 #######################################
 task_groups:
 - <<: *compile_task_group_template
+  name: compile_dist_test_TG
+  tasks:
+  - compile_dist_test
+
+- <<: *compile_task_group_template
   name: compile_and_archive_dist_test_TG
   tasks:
   - compile_dist_test
@@ -12650,6 +12655,16 @@ buildvariants:
     scons_cache_mode: all
   tasks:
   - name: visibility_test_TG
+    distros:
+    - windows-vsCurrent-large
+
+### QO & QE Patch-Specific Build Variants ###
+- <<: *enterprise-windows-nopush-template
+  name: windows-compile-query-patch-only
+  display_name: "~ Windows Compile Query Patch Only"
+  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday . This is a patch-only variant but we run on mainline to pick up task history.
+  tasks:
+  - name: compile_dist_test_TG
     distros:
     - windows-vsCurrent-large
 
