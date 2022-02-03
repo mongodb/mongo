@@ -54,8 +54,8 @@ TimeseriesTest.run((insert) => {
             }
         }));
 
-        assert(dates[5], getPlanStage(expl, "COLLSCAN").minRecord);
-        assert(dates[5], getPlanStage(expl, "COLLSCAN").maxRecord);
+        assert(dates[5], getPlanStage(expl, "CLUSTERED_IXSCAN").minRecord);
+        assert(dates[5], getPlanStage(expl, "CLUSTERED_IXSCAN").maxRecord);
     })();
 
     (function testLTE() {
@@ -66,8 +66,8 @@ TimeseriesTest.run((insert) => {
         assert.eq(0, res.length);
 
         let expl = coll.explain("executionStats").aggregate(pipeline);
-        assert(getAggPlanStage(expl, "COLLSCAN"), expl);
-        assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("maxRecord"), expl);
+        assert(getAggPlanStage(expl, "CLUSTERED_IXSCAN"), expl);
+        assert(getAggPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("maxRecord"), expl);
         assert.eq(0, expl.stages[0].$cursor.executionStats.executionStages.nReturned);
 
         for (let i = 0; i < dates.length; i++) {
@@ -88,7 +88,7 @@ TimeseriesTest.run((insert) => {
         assert.eq(0, res.length);
 
         let expl = coll.explain("executionStats").aggregate(pipeline);
-        assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("maxRecord"));
+        assert(getAggPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("maxRecord"));
         assert.eq(0, expl.stages[0].$cursor.executionStats.executionStages.nReturned);
 
         for (let i = 0; i < dates.length; i++) {
@@ -109,7 +109,7 @@ TimeseriesTest.run((insert) => {
         assert.eq(0, res.length);
 
         let expl = coll.explain("executionStats").aggregate(pipeline);
-        assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("minRecord"));
+        assert(getAggPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("minRecord"));
         assert.eq(0, expl.stages[0].$cursor.executionStats.executionStages.nReturned);
 
         for (let i = 0; i < dates.length; i++) {
@@ -130,7 +130,7 @@ TimeseriesTest.run((insert) => {
         assert.eq(0, res.length);
 
         let expl = coll.explain("executionStats").aggregate(pipeline);
-        assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("minRecord"));
+        assert(getAggPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("minRecord"));
         assert.eq(0, expl.stages[0].$cursor.executionStats.executionStages.nReturned);
 
         for (let i = 0; i < dates.length; i++) {
@@ -152,8 +152,8 @@ TimeseriesTest.run((insert) => {
         assert.eq(0, res.length);
 
         let expl = coll.explain("executionStats").aggregate(pipeline);
-        assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("minRecord"));
-        assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("maxRecord"));
+        assert(getAggPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("minRecord"));
+        assert(getAggPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("maxRecord"));
         assert.eq(0, expl.stages[0].$cursor.executionStats.executionStages.nReturned);
 
         for (let i = 0; i < dates.length; i++) {
@@ -175,8 +175,8 @@ TimeseriesTest.run((insert) => {
         assert.eq(0, res.length);
 
         let expl = coll.explain("executionStats").aggregate(pipeline);
-        assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("minRecord"));
-        assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("maxRecord"));
+        assert(getAggPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("minRecord"));
+        assert(getAggPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("maxRecord"));
         assert.eq(0, expl.stages[0].$cursor.executionStats.executionStages.nReturned);
 
         for (let i = 0; i < dates.length; i++) {
@@ -198,8 +198,8 @@ TimeseriesTest.run((insert) => {
         assert.eq(0, res.length);
 
         let expl = coll.explain("executionStats").aggregate(pipeline);
-        assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("minRecord"));
-        assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("maxRecord"));
+        assert(getAggPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("minRecord"));
+        assert(getAggPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("maxRecord"));
         assert.eq(0, expl.stages[0].$cursor.executionStats.executionStages.nReturned);
 
         for (let i = 0; i < dates.length; i++) {
@@ -221,8 +221,8 @@ TimeseriesTest.run((insert) => {
         assert.eq(0, res.length);
 
         let expl = coll.explain("executionStats").aggregate(pipeline);
-        assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("minRecord"));
-        assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("maxRecord"));
+        assert(getAggPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("minRecord"));
+        assert(getAggPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("maxRecord"));
         assert.eq(0, expl.stages[0].$cursor.executionStats.executionStages.nReturned);
 
         for (let i = 0; i < dates.length; i++) {

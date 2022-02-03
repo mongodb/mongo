@@ -51,8 +51,13 @@ namespace mongo {
 using std::unique_ptr;
 using std::vector;
 
-// static
-const char* CollectionScan::kStageType = "COLLSCAN";
+namespace {
+const char* getStageName(const CollectionPtr& coll, const CollectionScanParams& params) {
+    return (!coll->ns().isOplog() && (params.minRecord || params.maxRecord)) ? "CLUSTERED_IXSCAN"
+                                                                             : "COLLSCAN";
+}
+}  // namespace
+
 
 CollectionScan::CollectionScan(ExpressionContext* expCtx,
                                const CollectionPtr& collection,
@@ -60,7 +65,8 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
                                WorkingSet* workingSet,
                                const MatchExpression* filter,
                                bool relaxCappedConstraints)
-    : RequiresCollectionStage(kStageType, expCtx, collection, relaxCappedConstraints),
+    : RequiresCollectionStage(
+          getStageName(collection, params), expCtx, collection, relaxCappedConstraints),
       _workingSet(workingSet),
       _filter((filter && !filter->isTriviallyTrue()) ? filter : nullptr),
       _params(params) {

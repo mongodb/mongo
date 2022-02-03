@@ -367,6 +367,10 @@ function isCollscan(db, root) {
     return planHasStage(db, root, "COLLSCAN");
 }
 
+function isClusteredIxscan(db, root) {
+    return planHasStage(db, root, "CLUSTERED_IXSCAN");
+}
+
 /**
  * Returns true if the BSON representation of a plan rooted at 'root' is using the aggregation
  * framework, and false otherwise.

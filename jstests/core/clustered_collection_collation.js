@@ -195,7 +195,7 @@ validateClusteredCollectionHint(collated, {
     expectedNReturned: 2,
     cmd: {find: collatedName, hint: {_id: 1}, min: {_id: "a"}, max: {_id: "C"}},
     expectedWinningPlanStats: {
-        stage: "COLLSCAN",
+        stage: "CLUSTERED_IXSCAN",
         direction: "forward",
         minRecord: collatedEncodings["a"],
         maxRecord: collatedEncodings["C"]
@@ -209,7 +209,7 @@ validateClusteredCollectionHint(noncollated, {
     expectedNReturned: 3,  // "a", "b" and "B"
     cmd: {find: noncollatedName, hint: {_id: 1}, min: {_id: "A"}, max: {_id: "c"}},
     expectedWinningPlanStats:
-        {stage: "COLLSCAN", direction: "forward", minRecord: "A", maxRecord: "c"}
+        {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: "A", maxRecord: "c"}
 });
 
 // Strings with incompatible collation.
@@ -241,12 +241,14 @@ assert.commandFailedWithCode(
 validateClusteredCollectionHint(collated, {
     expectedNReturned: 2,
     cmd: {find: collatedName, hint: {_id: 1}, min: {_id: 5}, max: {_id: 11}},
-    expectedWinningPlanStats: {stage: "COLLSCAN", direction: "forward", minRecord: 5, maxRecord: 11}
+    expectedWinningPlanStats:
+        {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: 5, maxRecord: 11}
 });
 validateClusteredCollectionHint(noncollated, {
     expectedNReturned: 2,
     cmd: {find: noncollatedName, hint: {_id: 1}, min: {_id: 5}, max: {_id: 11}},
-    expectedWinningPlanStats: {stage: "COLLSCAN", direction: "forward", minRecord: 5, maxRecord: 11}
+    expectedWinningPlanStats:
+        {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: 5, maxRecord: 11}
 });
 
 // Numeric with incompatible collation.
@@ -259,7 +261,8 @@ validateClusteredCollectionHint(collated, {
         max: {_id: 11},
         collation: incompatibleCollation
     },
-    expectedWinningPlanStats: {stage: "COLLSCAN", direction: "forward", minRecord: 5, maxRecord: 11}
+    expectedWinningPlanStats:
+        {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: 5, maxRecord: 11}
 });
 validateClusteredCollectionHint(noncollated, {
     expectedNReturned: 2,
@@ -270,6 +273,7 @@ validateClusteredCollectionHint(noncollated, {
         max: {_id: 11},
         collation: incompatibleCollation
     },
-    expectedWinningPlanStats: {stage: "COLLSCAN", direction: "forward", minRecord: 5, maxRecord: 11}
+    expectedWinningPlanStats:
+        {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: 5, maxRecord: 11}
 });
 })();

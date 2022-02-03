@@ -52,8 +52,6 @@ class OperationContext;
  */
 class CollectionScan final : public RequiresCollectionStage {
 public:
-    static const char* kStageType;
-
     CollectionScan(ExpressionContext* expCtx,
                    const CollectionPtr& collection,
                    const CollectionScanParams& params,

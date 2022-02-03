@@ -163,8 +163,8 @@ assert.commandWorked(explain);
 const winningPlan = getWinningPlan(explain.queryPlanner);
 const collectionIsClustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
 if (collectionIsClustered) {
-    assert(isCollscan(db, getWinningPlan(explain.queryPlanner)),
-           "Expected collscan: " + tojson(explain));
+    assert(isClusteredIxscan(db, getWinningPlan(explain.queryPlanner)),
+           "Expected clustered ixscan: " + tojson(explain));
 } else {
     engineSpecificAssertion(
         isIdhack(db, winningPlan), isIdIndexScan(db, winningPlan, "FETCH"), db, winningPlan);

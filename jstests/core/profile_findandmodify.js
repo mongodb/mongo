@@ -115,7 +115,7 @@ for (var i = 0; i < 3; i++) {
 }
 
 const expectedKeysExamined = collectionIsClustered ? 0 : 1;
-const expectedPlan = collectionIsClustered ? "COLLSCAN" : "IDHACK";
+const expectedPlan = collectionIsClustered ? "CLUSTERED_IXSCAN" : "IDHACK";
 
 assert.eq({_id: 2, a: 2}, coll.findAndModify({query: {_id: 2}, update: {$inc: {b: 1}}}));
 profileObj = getLatestProfilerEntry(testDB);
