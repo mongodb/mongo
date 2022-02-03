@@ -458,6 +458,9 @@ void populateReply(OperationContext* opCtx,
 
     auto& replyBase = cmdReply->getWriteCommandReplyBase();
     replyBase.setN(nVal);
+    if (!result.retriedStmtIds.empty()) {
+        replyBase.setRetriedStmtIds(result.retriedStmtIds);
+    }
 
     if (!errors.empty()) {
         replyBase.setWriteErrors(errors);

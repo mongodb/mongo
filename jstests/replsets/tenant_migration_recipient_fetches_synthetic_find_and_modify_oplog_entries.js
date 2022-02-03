@@ -107,6 +107,8 @@ delete cmdResponse.$clusterTime;
 delete retryResponse.$clusterTime;
 delete cmdResponse.operationTime;
 delete retryResponse.operationTime;
+// The retry response contains the "retriedStmtId" field but the initial response does not.
+delete retryResponse.retriedStmtId;
 assert.eq(0, bsonWoCompare(cmdResponse, retryResponse), retryResponse);
 
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));

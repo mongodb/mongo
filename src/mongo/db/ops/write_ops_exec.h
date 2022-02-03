@@ -56,6 +56,10 @@ struct WriteResult {
      */
     std::vector<StatusWith<SingleWriteResult>> results;
 
+    // Stores the statement ids for the ops that had already been executed, thus were not executed
+    // by this write.
+    std::vector<StmtId> retriedStmtIds;
+
     // In case of an error, whether the operation can continue.
     bool canContinue = true;
 };

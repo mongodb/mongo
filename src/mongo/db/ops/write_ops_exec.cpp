@@ -724,6 +724,7 @@ WriteResult performInserts(OperationContext* opCtx,
         } else if (wasAlreadyExecuted) {
             containsRetry = true;
             RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+            out.retriedStmtIds.push_back(stmtId);
             out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());
         }
     }
@@ -1022,6 +1023,7 @@ WriteResult performUpdates(OperationContext* opCtx,
                 containsRetry = true;
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                 out.results.emplace_back(parseOplogEntryForUpdate(*entry));
+                out.retriedStmtIds.push_back(stmtId);
                 continue;
             }
         }
@@ -1247,6 +1249,7 @@ WriteResult performDeletes(OperationContext* opCtx,
             containsRetry = true;
             RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
             out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());
+            out.retriedStmtIds.push_back(stmtId);
             continue;
         }
 

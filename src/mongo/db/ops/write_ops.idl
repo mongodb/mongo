@@ -91,6 +91,12 @@ structs:
                 type: array<object_owned>
                 optional: true
                 unstable: false
+            retriedStmtIds:
+                description: "The statement numbers for the write statements that had already been
+                              executed, thus were not executed by this command."
+                type: array<int>
+                optional: true
+                unstable: true
 
     InsertCommandReply:
         description: "Contains information related to insert command reply."
@@ -298,6 +304,12 @@ structs:
                 description: "The document after the write, if the 'new' field of the request is
                               true. Otherwise, the document before the write."
                 unstable: false
+            retriedStmtId:
+                description: "The statement number for this findAndModify statement if it had
+                              already been executed, thus was not executed by this command."
+                type: int
+                optional: true
+                unstable: true
 
 commands:
 

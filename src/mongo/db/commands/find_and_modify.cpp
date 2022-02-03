@@ -645,6 +645,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
             RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
             RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
             auto findAndModifyReply = parseOplogEntryForFindAndModify(opCtx, req, *entry);
+            findAndModifyReply.setRetriedStmtId(stmtId);
 
             // Make sure to wait for writeConcern on the opTime that will include this
             // write. Needs to set to the system last opTime to get the latest term in an
