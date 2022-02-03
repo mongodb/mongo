@@ -124,7 +124,7 @@ valid_build()
 	}
 	classf=`ls ../docs/struct___* 2>/dev/null`
 	for c in $classf; do
-		echo "$c: Add class to PREDEFINED in src/docs/Doxyfile, then remove docs/*.{html,js} and rebuild"
+		echo "$c: Add class to PREDEFINED in src/docs/$doxyfile, then remove docs/*.{html,js} and rebuild"
 
 	done
 }
@@ -152,7 +152,7 @@ build()
 	# by swig does not have named arguments, but we want to document them
 	# as if they do.
 	(cd ../src/docs &&
-	    (eval cat Doxyfile $filter ; cat <<EOF
+	    (eval cat $doxyfile $filter ; cat <<EOF
 QUIET=YES
 EOF
 ) | doxygen -
@@ -189,6 +189,16 @@ EOF
 	fi
 }
 
+# Do not build the documentation if doxygen version is not compatible.
+v=$(doxygen --version)
+case "$v" in
+    1.8.17) doxyfile="Doxyfile";;
+    1.9.*) doxyfile="Doxyfile.9";;
+    *)
+        echo "$0 skipped: unsupported version of doxygen: $v, not 1.8.17 or 1.9.XX"
+        exit 0
+esac
+
 clean=0
 additional_languages=1
 filter="|sed '/PROJECT_BRIEF/s,=.*,=\"$WIREDTIGER_VERSION\",'"
@@ -200,7 +210,7 @@ while :
 		shift;;
 	-l)	# Generate the top-level landing page in ../docs/top
 		filter="$filter| sed '/GENERATE_MAN/s,=.*,=NO,';"
-		filter="$filter cat top/Doxyfile"
+		filter="$filter cat top/$doxyfile"
 		additional_languages=0
 		shift;;
 	-p)	# Generate PDFs
@@ -238,13 +248,6 @@ check_docs_data
 # Do not build the doc if we get warnings.
 if [ $e != 0 ]; then
     exit $e
-fi
-
-# Do not build the documentation if Doxygen version is not compatible.
-v=$(doxygen --version)
-if [ "$v" != "1.8.17" ]; then
-    echo "$0 skipped: unsupported version of doxygen"
-    exit 0
 fi
 
 # Build the documentation.

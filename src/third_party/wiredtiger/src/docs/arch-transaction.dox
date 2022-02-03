@@ -143,6 +143,8 @@ minimum timestamp that a new operation can commit at.
 
 Only transactions running in snapshot isolation can run with timestamps.
 
+See @ref arch-timestamp for further discussion.
+
 @subsection Visibility
 
 The visibility of the transactions in WiredTiger considers both the operations' transaction ids and
@@ -164,7 +166,7 @@ has been successfully committed, the operation is guaranteed to survive restart.
 only survive across restart under checkpoint durability if it is included in the last successful
 checkpoint.
 
-@section Prepared Transactions
+@section arch-transaction-prepare Prepared Transactions
 
 WiredTiger introduces prepared transactions to meet the needs of implementing distributed
 transactions through two-phase commit. Prepared transactions only work under snapshot isolation.

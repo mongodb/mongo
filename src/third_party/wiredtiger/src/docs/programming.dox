@@ -9,23 +9,37 @@ value.  Tables may optionally have an associated schema, splitting the
 value into a set of columns.  Tables may also have associated indices,
 each of which is ordered by one or more columns.
 
-<h2>Using the API</h2>
+<h2>The WiredTiger API</h2>
 - @subpage basic_api
 - @subpage config_strings
 - @subpage cursors
-- @subpage transactions
+- @subpage schema
 - @subpage error_handling
-- @subpage message_handling
-- @subpage verbose_messaging
+
+<h2>Transactions</h2>
+- @subpage transactions
+- @subpage transactions_api
+- @subpage checkpoint
+- @subpage durability
+- @subpage timestamp_model
+- @subpage timestamp_global_api
+- @subpage timestamp_txn_api
+- @subpage timestamp_prepare
+- @subpage timestamp_roundup
+- @subpage timestamp_misc
+- @subpage explain_acid
+- @subpage explain_durability
+- @subpage explain_isolation
 
 <h2>Storage options</h2>
-- @subpage schema
 - @subpage lsm
 - @subpage file_formats
 - @subpage compression
 - @subpage encryption
 
 <h2>Programming notes</h2>
+- @subpage message_handling
+- @subpage verbose_messaging
 - @subpage threads
 - @subpage namespace
 - @subpage readonly
@@ -34,10 +48,8 @@ each of which is ordered by one or more columns.
 <h2>Advanced topics</h2>
 - @subpage backup
 - @subpage compact
-- @subpage checkpoint
-- @subpage eviction
-- @subpage durability
 - @subpage in_memory
+- @subpage eviction
 - @subpage cursor_join
 - @subpage cursor_log
 - @subpage operation_tracking

@@ -56,6 +56,7 @@ Encryptors
 FSTREAM
 Facebook
 Facebook's
+FIXME
 FlameGraph
 FlameGraphs
 FlexeLint
@@ -127,6 +128,7 @@ SYSV
 Sanitizer
 Seward's
 SiH
+Timestamping
 TSC
 TXID
 TXT
@@ -635,7 +637,9 @@ thang
 tid
 timeline
 timelines
+timespan
 timestamp
+timestamping
 timestamps
 toc
 todo

@@ -14,7 +14,7 @@ required for this feature.
 By default, log records are written to an in-memory buffer before
 WT_SESSION::commit_transaction returns, giving highest performance but
 not ensuring durability.  The durability guarantees can be stricter but
-will impact performance.
+this will impact performance.
 
 If \c transaction_sync=(enabled=false) is configured to ::wiredtiger_open,
 log records may be buffered in memory, and only flushed to disk by
@@ -31,13 +31,13 @@ system's \c fsync call (of \c fdatasync if available) as each commit completes.
 
 If the value is set to \c dsync, the \c O_DSYNC or \c O_SYNC
 flag to the operating system's \c open call will be specified when the
-file is opened.  (The durability guarantee of the \c fsync and \c dsync
+file is opened.  (The durability guarantees of the \c fsync and \c dsync
 configurations are the same, and in our experience the \c open flags are
-slower, this configuration is only included for systems where that may
+slower; this configuration is only included for systems where that may
 not be the case.)
 
 If the value is set to \c none, the operating system's \c write call
-will be called as each commit completes but does not flush to disk.
+will be called as each commit completes but no explicit disk flush is made.
 This setting gives durability at the application level but not at
 the system level.
 
@@ -91,7 +91,8 @@ forces the data out via \c fsync.
 
 If \c sync=off is configured then this flush operation will force the
 logging subsystem to write any outstanding in-memory buffers to the
-file system before returning.
+operating system before returning, but not explicitly ask the OS to
+flush them.
 
  */
 

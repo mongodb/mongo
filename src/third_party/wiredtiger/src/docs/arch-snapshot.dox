@@ -48,7 +48,7 @@ smallest transaction ID value found from the list of concurrent transactions.
 An example of building out the aforementioned components of a snapshot can be seen in the below figure. This figure illustrates constructing a snapshot for a transaction with
 ID \c 8. Consider that at the given time, the concurrent running transactions are \c 3, \c 5, \c 7, \c 8 and the global current transaction ID is \c 9.
 
-@plantuml_start{snapshot.png}
+@plantuml_start{snapshot.png }
 @startuml{snapshot.png}
 digraph g {
 graph [

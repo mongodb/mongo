@@ -10,7 +10,7 @@ and storage of column subsets) and log-structured merge trees (LSM), for sustain
 under random insert workloads.
 
 WiredTiger includes ACID transactions with standard isolation levels and durability at both
-checkpoint and fine-grained granularity.
+checkpoint and commit-level granularity.
 
 WiredTiger can be used as a simple key/value store, but also has a complete schema layer,
 including indices and projections.
@@ -30,8 +30,8 @@ For more information about building and installing WiredTiger, see:
 
 For more information about writing WiredTiger applications, see:
 
-- @ref wt "WiredTiger API reference manual"
 - @subpage programming
+- @ref wt "WiredTiger API reference manual"
 
 For more information about administrating WiredTiger databases, see:
 

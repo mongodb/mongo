@@ -1,288 +1,50 @@
-/*! @page transactions Transactions
+/*! @page transactions Transactional applications
 
-@section transactions_acid ACID properties
+WiredTiger offers standard ACID-style transaction support where operations are
+done at snapshot isolation and subsequently become durable. (Readers not
+already familiar with these concepts may wish to see @ref explain_acid for a brief
+discussion of ACID and @ref explain_isolation for a brief discussion of isolation
+levels.)
 
-Transactions provide a powerful abstraction for multiple threads to
-operate on data concurrently because they have the following properties:
+There are three approaches to writing transactional programs in WiredTiger:
+-# Applications supporting \b checkpoint-level durability, intended for
+applications with simple transactions where updates become durable when
+the last reference to the object is closed or at the next database checkpoint.
 
-- Atomicity: all or none of a transaction is completed.
-- Consistency: if each transaction maintains some property when considered
-  separately, then the combined effect of executing the transactions
-  concurrently will maintain the same property.
-- Isolation: developers can reason about transactions as if they run
-  single-threaded.
-- Durability: once a transaction commits, its updates cannot be lost.
+-# Applications supporting \b commit-level durability, which extends checkpoint-level
+durability, adding logging to the database so updates are durable as
+soon as their transaction successfully commits.
 
-WiredTiger supports transactions with the following caveats to the ACID
-properties:
+-# Applications using timestamps for fine-grained control of the database,
+extending commit-level durability. This allows applications to do things like
+enforce a transactional commit order, read historical data and define stability
+points for the entire database. Use of timestamps changes both the consistency
+and durability models.
 
-- the maximum level of isolation supported is snapshot isolation and all updates must be done at
-  snapshot isolation. See @ref transaction_isolation for more details.
-- transactional updates are made durable by a combination of checkpoints
-  and logging.  See @ref checkpoint for information on checkpoint durability
-  and @ref durability for information on commit-level durability.
+The first two approaches are relatively simple and have APIs which will be
+familiar to database developers. The principal difference is that in the second
+approach, applications may need to enclose operations in explicit transactional
+API calls and must additionally configure and manage the log files required for
+commit-level durability. The third approach is complex, has non-standard APIs,
+and requires more database knowledge to successfully build applications. The
+functionality and programmatic changes in each approach are additive. If this is
+your first database application, building a complex application by starting at
+the first approach and iterating to a complete application is recommended.
 
-@section transactions_api Transactional API
+We will discuss these approaches in order, from the simplest to the most
+complex.
 
-In WiredTiger, transaction operations are methods off the WT_SESSION
-class.
+If this is your first WiredTiger application, please read @ref explain_durability
+for a discussion of WiredTiger durability models, so you can select the application
+architecture that's appropriate for your needs.
 
-Applications call WT_SESSION::begin_transaction to start a new transaction.
-Operations subsequently performed using that WT_SESSION handle, including
-operations on any cursors open in that WT_SESSION handle (whether opened
-before or after the WT_SESSION::begin_transaction call), are part of the
-transaction and their effects committed by calling
-WT_SESSION::commit_transaction, or discarded by calling
-WT_SESSION::rollback_transaction. Applications that use
-@ref transaction_timestamps can utilize the WT_SESSION::prepare_transaction API
-as a basis for implementing a two phase commit protocol.
+\warning
+Recovery is the process of restoring the database to a consistent state after
+failure. Recovery is automatically performed by WiredTiger, as necessary, when a
+database is opened. Recovery is required after the failure of any thread of
+control in the application, where the failed thread might have been executing
+inside of the WiredTiger library or open WiredTiger handles have been lost. If
+any application thread of control exits unexpectedly while holding any database
+resources of any kind, the application should close and re-open the database.
 
-If WT_SESSION::commit_transaction returns an error for any reason, the
-transaction was rolled back, not committed.
-
-When transactions are used, data operations can encounter a conflict and
-fail with the ::WT_ROLLBACK error.  If this error occurs, transactions
-should be rolled back with WT_SESSION::rollback_transaction and the
-operation retried.
-
-The WT_SESSION::rollback_transaction method implicitly resets all
-cursors in the session as if the WT_CURSOR::reset method was called,
-discarding any cursor position as well as any key and value.
-
-@snippet ex_all.c transaction commit/rollback
-
-Applications can call WT_SESSION::reset_snapshot to reset snapshots for
-snapshot isolation transactions to update their existing snapshot. It raises
-an error when this API is used for isolation other than snapshot isolation mode
-or when the session has performed any write operations.
-This API internally releases the current snapshot and gets the new running
-transactions snapshot to avoid pinning the content in the database that is no
-longer needed. Applications that don't use read_timestamp for the search may
-see different results compared to earlier with the updated snapshot.
-
-@snippet ex_all.c reset snapshot
-
-@section transactions_implicit Implicit transactions
-
-If a cursor is used when no explicit transaction is active in a session,
-reads are performed at the isolation level of the session, set with the
-\c isolation key to WT_CONNECTION::open_session, and successful updates
-are automatically committed before the update operation returns.
-
-Any operation consisting of multiple related updates should be enclosed
-in an explicit transaction to ensure the updates are applied atomically.
-
-If an implicit transaction successfully commits, the cursors in the
-WT_SESSION remain positioned.  If an implicit transaction fails, all
-cursors in the WT_SESSION are reset, as if WT_CURSOR::reset were called,
-discarding any position or key/value information they may have.
-
-See @ref cursors_transactions for more information.
-
-@section transactions_concurrency Concurrency control
-
-WiredTiger uses optimistic concurrency control algorithms.  This avoids
-the bottleneck of a centralized lock manager and ensures transactional
-operations do not block: reads do not block writes, and vice versa.
-
-Further, writes do not block writes, although concurrent transactions
-updating the same value will fail with ::WT_ROLLBACK.  Some applications
-may benefit from application-level synchronization to avoid repeated
-attempts to rollback and update the same value.
-
-Operations in transactions may also fail with the ::WT_ROLLBACK error if
-some resource cannot be allocated after repeated attempts.  For example, if
-the cache is not large enough to hold the updates required to satisfy
-transactional readers, an operation may fail and return ::WT_ROLLBACK.
-
-@section transaction_isolation Isolation levels
-
-WiredTiger supports <code>read-uncommitted</code>,
-<code>read-committed</code> and <code>snapshot</code> isolation levels; the default isolation
-level is <code>snapshot</code>, and all updates must be done at snapshot isolation.
-
-- <code>read-uncommitted</code>:
-Transactions can see changes made by other transactions before those
-transactions are committed.  Dirty reads, non-repeatable reads and
-phantoms are possible.
-
-- <code>read-committed</code>:
-Transactions cannot see changes made by other transactions before those
-transactions are committed.  Dirty reads are not possible;
-non-repeatable reads and phantoms are possible.  Committed changes from
-concurrent transactions become visible when no cursor is positioned in
-the read-committed transaction.
-
-- <code>snapshot</code>:
-Transactions read the versions of records committed before the transaction
-started.  Dirty reads and non-repeatable reads are not possible; phantoms
-are possible.<br><br>
-Snapshot isolation is a strong guarantee, but not equivalent to a
-single-threaded execution of the transactions, known as serializable
-isolation.  Concurrent transactions T1 and T2 running under snapshot
-isolation may both commit and produce a state that neither (T1 followed
-by T2) nor (T2 followed by T1) could have produced, if there is overlap
-between T1's reads and T2's writes, and between T1's writes and T2's
-reads.
-
-The transaction isolation level can be configured on a per-transaction
-basis:
-
-@snippet ex_all.c transaction isolation
-
-Additionally, the default transaction isolation can be configured and
-re-configured on a per-session basis:
-
-@snippet ex_all.c session isolation configuration
-
-@snippet ex_all.c session isolation re-configuration
-
-@section transaction_timestamps Application-specified Transaction Timestamps
-
-@subsection timestamp_overview Timestamp overview
-
-Some applications have their own notion of time, including an expected commit
-order for transactions that may be inconsistent with the order assigned by
-WiredTiger. We assume applications can represent their notion of a timestamp
-as an unsigned 64-bit integral value that generally increases over time. For
-example, a counter could be incremented to generate transaction timestamps,
-if that is sufficient for the application.
-
-Applications can assign explicit commit timestamps to transactions, then read
-"as of" a timestamp. The timestamp mechanism operates in parallel with
-WiredTiger's internal transaction ID management. It is recommended that once
-timestamps are in use for a particular table, all subsequent updates also use
-timestamps.
-
-@subsection timestamp_transactions Using transactions with timestamps
-
-Applications that use timestamps will generally provide a timestamp at
-WT_SESSION::transaction_commit that will be assigned to all updates that are
-part of the transaction. WiredTiger also provides the ability to set a different
-commit timestamp for different updates in a single transaction. This can
-be done by calling WT_SESSION::timestamp_transaction repeatedly to set a new
-commit timestamp between a set of updates for the current transaction. This
-gives the ability to commit updates with different read "as of" timestamps in a
-single transaction.
-
-Setting a read timestamp in WT_SESSION::begin_transaction forces a transaction
-to run at snapshot isolation and ignore any commits with a newer timestamp.
-
-Commit timestamps cannot be set in the past of any read timestamp that has
-been used.  This is enforced by assertions in diagnostic builds, if
-applications violate this rule, data consistency can be violated.
-
-The commits to a particular data item must be performed in timestamp
-order.  If applications violate this rule, data consistency can be
-violated. Committing an update without a timestamp truncates the update's
-timestamp history and limits repeatable reads: no earlier version of the
-update will be returned regardless of the setting of the read timestamp.
-
-The WT_SESSION::prepare_transaction API is designed to be used in conjunction
-with timestamps and assigns a prepare timestamp to the transaction, which will
-be used for visibility checks until the transaction is committed or aborted.
-Once a transaction has been prepared the only other operations that can be
-completed are WT_SESSION::commit_transaction or
-WT_SESSION::rollback_transaction. The WT_SESSION::prepare_transaction API only
-guarantees that transactional conflicts will not cause the transaction to
-rollback - it does not guarantee that the transactions updates are durable. If
-a read operation encounters an update from a prepared transaction a
-WT_PREPARE_CONFLICT error will be returned indicating that it is not possible
-to choose a version of data to return until a prepared transaction is resolved,
-it is reasonable to retry such operations.
-
-Durability of the data updates performed by a prepared transaction, on tables
-configured with log=(enabled=false), can be controlled by specifying a durable
-timestamp during WT_SESSION::commit_transaction. Checkpoint will consider the
-durable timestamp, instead of commit timestamp for persisting the data updates.
-If the durable timestamp is not specified, then the commit timestamp will be
-considered as the durable timestamp.
-
-There are a number of constraints around assigning timestamps for running
-transactions - the table below summarizes those constraints:
-
-| API     | Prepared | Constraint | Enforced | Description |
-|---------|----------|------------|----------|-------------|
-| Prepare | During | prepare_timestamp >= stable_timestamp | Y | None |
-| Commit  | No | commit_timestamp > stable_timestamp | Y | None |
-| Commit  | Yes | commit_timestamp >= prepare_timestamp | Y | The commit timestamp may be older than the oldest timestamp at the time of commit. |
-| Commit  | Yes | durable_timestamp > stable_timestamp | Y | None |
-| Commit  | Yes | durable_timestamp != 0 \|\| commit_timestamp > stable_timestamp | N | If no durable timestamp is given when committing a prepared transaction, the commit timestamp must be greater than the stable timestamp. |
-
-@subsection timestamp_roundup Automatic rounding of timestamps
-Applications setting timestamps for a transaction have to comply with the
-constraints based on the global timestamp state. In order to be compliant with
-the constraints applications need to query the global timestamp state and
-check their timestamps for compliance and adjust timestamps if required.
-To simplify the burden on applications related to rounding up timestamps
-WiredTiger supports automatic rounding of timestamps in some scenarios.
-
-Applications can configure
-<code>roundup_timestamps=(prepared=true,read=true)</code> with
-WT_SESSION::begin_transaction.
-
-The configuration <code>roundup_timestamps=(prepared=true)</code> will be valid
-only for prepared transactions. It indicates that the prepare timestamp could be
-rounded up to the oldest timestamp, if the prepare timestamp is less than the
-oldest timestamp. This setting also indicates that the commit timestamp of the
-transaction could be rounded up to the prepare timestamp, if the commit
-timestamp is less than the prepare timestamp. Based on the timestamps values
-and constraints, enabling this configuration could result in only one of
-timestamps being rounded up. For example, for the timestamp values
-<code>prepare_timestamp=100, commit_timestamp=300, oldest_timestamp=200</code>
-with configuration <code>roundup_timestamps=(prepared=true)</code> only the
-prepare timestamp will be rounded up to the oldest timestamp and the commit
-timestamp will not be adjusted and the result will be
-<code>prepare_timestamp=200, commit_timestamp=300, oldest_timestamp=200</code>.
-For cases where both the prepare timestamp and the commit timestamp needs to be
-rounded up, first the prepare timestamp will be rounded to the oldest timestamp
-and then the commit timestamp will be rounded up to the new prepare timestamp.
-For example, for the timestamp values <code>prepare_timestamp=100,
-    commit_timestamp=150, oldest_timestamp=200</code> with configuration
-    <code>roundup_timestamps=(prepared=true)</code>, the prepare timestamp is
-    rounded up to the oldest timestamp, as part of the
-    WT_SESSION::prepare_transaction, as <code>prepare_timestamp=200</code> and
-    subsequently as part of WT_SESSION::commit_transaction, the commit
-    timestamp is rounded up to the new prepare timestamp as
-    <code>commit_timestamp=200</code>.
-
-Configuring <code>roundup_timestamps=(read=true)</code> causes the read
-timestamp to be rounded up to the oldest timestamp, if the read timestamp is
-greater than the oldest timestamp no change will be made.
-
-@subsection timestamp_connection Managing global timestamp state
-
-Applications that use timestamps need to manage some global state in order
-to allow WiredTiger to clean up old updates, and not make new updates durable
-until it is safe to do so. That state is managed using the
-WT_CONNECTION::set_timestamp API.
-
-Setting an oldest timestamp in WT_CONNECTION::set_timestamp indicates that
-future read timestamps will be at least as recent as the oldest timestamp, so
-WiredTiger can discard history before the specified point.  It is critical
-that the oldest timestamp update frequently or the cache can become full of
-updates, reducing performance.
-
-Setting a stable timestamp in WT_CONNECTION::set_timestamp indicates a
-known stable location that is sufficient for durability.  During a checkpoint
-the state of a table will be saved only as of the stable timestamp.  Newer
-updates after that stable timestamp will not be included in the checkpoint.
-That can be overridden in the call to WT_SESSION::checkpoint.  It is expected
-that the stable timestamp is updated frequently. Setting a stable location
-provides the ability, if needed, to rollback to this location by placing a call
-to WT_CONNECTION::rollback_to_stable. With the rollback, however, WiredTiger
-does not automatically reset the maximum commit timestamp it is tracking. The
-application should explicitly do so by setting a commit timestamp in
-WT_CONNECTION::set_timestamp.
-
-| Timestamp | Description | Constraint |
-|-----------|-------------|------------|
-| all_committed | The oldest timestamp at which all previous write transactions have committed. | |
-| last_checkpoint | The point at which the last checkpoint ran. If no checkpoint has run it's value will be 0. | last_checkpoint <= stable timestamp |
-| oldest | Point in time readers cannot be created using a timestamp older than the oldest timestamp, as explained above modification history is discarded prior to the oldest timestamp. This timestamp can be set via the API. | 0 <= oldest <= stable |
-| oldest_reader | The timestamp of the oldest currently active read transaction, if there is no current read transaction then querying for the oldest_reader with WT_CONNECTION::query_timestamp will return WT_NOTFOUND. | |
-| pinned | Minimum of the oldest_reader and oldest timestamp. | |
-| recovery | The stable timestamp used, if any, in the most recent checkpoint prior to the last shutdown. | |
-| stable | Any active transaction with a commit timestamp less than or equal to the current stable timestamp will not be able to modify data, except in the instance of prepared transactions. This timestamp can be set via the API. | stable >= oldest |
-
- */
+*/

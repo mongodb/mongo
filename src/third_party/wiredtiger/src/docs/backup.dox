@@ -1,12 +1,13 @@
 /*! @class doc_bulk_durability
 
-Bulk-loads are not commit-level durable, that is, the creation and
+Bulk loads are not commit-level durable, that is, the creation and
 bulk-load of an object will not appear in the database log files.\  For
 this reason, applications doing incremental backups after a full backup
-should repeat the full backup step after doing a bulk-load to make the
-bulk-load durable.\ In addition, incremental backups after a bulk-load
+should repeat the full backup step after doing a bulk load to make the
+bulk load durable.\ In addition, incremental backups after a bulk load
+(without an intervening full backup)
 can cause recovery to report errors because there are log records that
-apply to data files which don't appear in the backup.
+apply to data files which do not appear in the backup.
 
 */
 

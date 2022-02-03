@@ -1718,20 +1718,16 @@ struct __wt_session {
 	 * greater than or equal to 1; default \c 0.}
 	 * @config{priority, priority of the transaction for resolving conflicts.  Transactions with
 	 * higher values are less likely to abort., an integer between -100 and 100; default \c 0.}
-	 * @config{read_before_oldest, allows the caller to specify a read timestamp less than the
-	 * oldest timestamp but newer than or equal to the pinned timestamp.  Cannot be set to true
-	 * while also rounding up the read timestamp.  See @ref transaction_timestamps., a boolean
-	 * flag; default \c false.}
 	 * @config{read_timestamp, read using the specified timestamp.  The supplied value must not
-	 * be older than the current oldest timestamp.  See @ref transaction_timestamps., a string;
+	 * be older than the current oldest timestamp.  See @ref timestamp_txn_api., a string;
 	 * default empty.}
 	 * @config{roundup_timestamps = (, round up timestamps of the transaction.  This setting
-	 * alters the visibility expected in a transaction.  See @ref transaction_timestamps., a set
-	 * of related configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * prepared, applicable only for prepared transactions.  Indicates if the prepare timestamp
-	 * and the commit timestamp of this transaction can be rounded up.  If the prepare timestamp
-	 * is less than the oldest timestamp\, the prepare timestamp will be rounded to the oldest
+	 * alters the visibility expected in a transaction.  See @ref timestamp_roundup., a set of
+	 * related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;prepared,
+	 * applicable only for prepared transactions.  Indicates if the prepare timestamp and the
+	 * commit timestamp of this transaction can be rounded up.  If the prepare timestamp is less
+	 * than the stable timestamp\, the prepare timestamp will be rounded to the stable
 	 * timestamp.  If the commit timestamp is less than the prepare timestamp\, the commit
 	 * timestamp will be rounded up to the prepare timestamp., a boolean flag; default \c
 	 * false.}
@@ -1761,13 +1757,17 @@ struct __wt_session {
 	 * @param session the session handle
 	 * @configstart{WT_SESSION.commit_transaction, see dist/api_data.py}
 	 * @config{commit_timestamp, set the commit timestamp for the current transaction.  The
-	 * supplied value must not be older than the first commit timestamp set for the current
-	 * transaction.  The value must also not be older than the current oldest and stable
-	 * timestamps.  See @ref transaction_timestamps., a string; default empty.}
-	 * @config{durable_timestamp, set the durable timestamp for the current transaction.  The
+	 * supplied value must not be older than the first commit timestamp already set for the
+	 * current transaction\, if any.  The value must also not be older than the current oldest
+	 * and stable timestamps.  A commit timestamp is required for the commit of a prepared
+	 * transaction.  If the prepare timestamp has been set (because the transaction has been
+	 * prepared)\, the commit timestamp must not be older than it.  See @ref timestamp_txn_api.,
+	 * a string; default empty.}
+	 * @config{durable_timestamp, set the durable timestamp for the current transaction.
+	 * Required for the commit of a prepared transaction\, and otherwise not permitted.  The
 	 * supplied value must not be older than the commit timestamp set for the current
-	 * transaction.  The value must also not be older than the current stable timestamp.  See
-	 * @ref transaction_timestamps., a string; default empty.}
+	 * transaction.  The value must also not be older than the current oldest and stable
+	 * timestamps.  See @ref timestamp_prepare., a string; default empty.}
 	 * @config{operation_timeout_ms, when non-zero\, a requested limit on the time taken to
 	 * complete operations in this transaction.  Time is measured in real time milliseconds from
 	 * the start of each WiredTiger API call.  There is no guarantee any operation will not take
@@ -1776,7 +1776,7 @@ struct __wt_session {
 	 * greater than or equal to 1; default \c 0.}
 	 * @config{sync, override whether to sync log records when the transaction commits\,
 	 * inherited from ::wiredtiger_open \c transaction_sync.  The \c off setting does not wait
-	 * for record to be written or synchronized.  The \c on setting forces log records to be
+	 * for records to be written or synchronized.  The \c on setting forces log records to be
 	 * written to the storage device., a string\, chosen from the following options: \c "off"\,
 	 * \c "on"; default empty.}
 	 * @configend
@@ -1802,8 +1802,9 @@ struct __wt_session {
 	 * @param session the session handle
 	 * @configstart{WT_SESSION.prepare_transaction, see dist/api_data.py}
 	 * @config{prepare_timestamp, set the prepare timestamp for the updates of the current
-	 * transaction.  The supplied value must not be older than any active read timestamps.  See
-	 * @ref transaction_timestamps., a string; default empty.}
+	 * transaction.  The supplied value must not be older than any active read timestamps\, must
+	 * not be older than the current stable timestamp\, and must not be newer than any commit
+	 * timestamps already set.  See @ref timestamp_prepare., a string; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1866,19 +1867,27 @@ struct __wt_session {
 	 * @param session the session handle
 	 * @configstart{WT_SESSION.timestamp_transaction, see dist/api_data.py}
 	 * @config{commit_timestamp, set the commit timestamp for the current transaction.  The
-	 * supplied value must not be older than the first commit timestamp set for the current
-	 * transaction.  The value must also not be older than the current oldest and stable
-	 * timestamps.  See @ref transaction_timestamps., a string; default empty.}
-	 * @config{durable_timestamp, set the durable timestamp for the current transaction.  The
-	 * supplied value must not be older than the commit timestamp set for the current
-	 * transaction.  The value must also not be older than the current stable timestamp.  See
-	 * @ref transaction_timestamps., a string; default empty.}
+	 * supplied value must not be older than the first commit timestamp already set for the
+	 * current transaction\, if any.  The value must also not be older than the current oldest
+	 * and stable timestamps.  A commit timestamp is required for the commit of a prepared
+	 * transaction.  If the prepare timestamp has already been set\, the commit timestamp must
+	 * not be older than it.  See @ref timestamp_txn_api., a string; default empty.}
+	 * @config{durable_timestamp, set the durable timestamp for the current transaction.
+	 * Required for the commit of a prepared transaction\, and otherwise not permitted.  Can
+	 * only be set once the current transaction has been prepared\, and a commit timestamp has
+	 * been set.  The supplied value must not be older than the commit timestamp.  The value
+	 * must also not be older than the current oldest and stable timestamps.  See @ref
+	 * timestamp_prepare., a string; default empty.}
 	 * @config{prepare_timestamp, set the prepare timestamp for the updates of the current
-	 * transaction.  The supplied value must not be older than any active read timestamps.  See
-	 * @ref transaction_timestamps., a string; default empty.}
+	 * transaction.  The supplied value must not be older than any active read timestamps\, and
+	 * must not be older than the current stable timestamp.  May be set only once per
+	 * transaction\, and must be set before setting the commit timestamp.  Setting the prepare
+	 * timestamp does not by itself prepare the transaction\, but does oblige the application to
+	 * eventually prepare the transaction before committing it.  See @ref timestamp_prepare., a
+	 * string; default empty.}
 	 * @config{read_timestamp, read using the specified timestamp.  The supplied value must not
 	 * be older than the current oldest timestamp.  This can only be set once for a transaction.
-	 * See @ref transaction_timestamps., a string; default empty.}
+	 * See @ref timestamp_txn_api., a string; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1897,8 +1906,8 @@ struct __wt_session {
 	 * @config{get, specify which timestamp to query: \c commit returns the most recently set
 	 * commit_timestamp.  \c first_commit returns the first set commit_timestamp.  \c prepare
 	 * returns the timestamp used in preparing a transaction.  \c read returns the timestamp at
-	 * which the transaction is reading at.  See @ref transaction_timestamps., a string\, chosen
-	 * from the following options: \c "commit"\, \c "first_commit"\, \c "prepare"\, \c "read";
+	 * which the transaction is reading at.  See @ref timestamp_txn_api., a string\, chosen from
+	 * the following options: \c "commit"\, \c "first_commit"\, \c "prepare"\, \c "read";
 	 * default \c read.}
 	 * @configend
 	 * @errors
@@ -2162,11 +2171,12 @@ struct __wt_connection {
 	 * processing., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
 	 * table_logging, if true\, write transaction related information to the log for all
-	 * operations\, even operations for tables with logging turned off.  This setting introduces
-	 * a log format change that may break older versions of WiredTiger.  These operations are
-	 * informational and skipped in recovery., a boolean flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;update_restore_evict, if true\, control all dirty page
-	 * evictions through forcing update restore eviction., a boolean flag; default \c false.}
+	 * operations\, even operations for tables with logging turned off.  This additional logging
+	 * information is intended for debugging and is informational only\, that is\, it is ignored
+	 * during recovery., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+	 * update_restore_evict, if true\, control all dirty page evictions through forcing update
+	 * restore eviction., a boolean flag; default \c false.}
 	 * @config{ ),,}
 	 * @config{error_prefix, prefix string for error messages., a string; default empty.}
 	 * @config{eviction = (, eviction configuration options., a set of related configuration
@@ -2480,8 +2490,8 @@ struct __wt_connection {
 	 * most recent stable checkpoint taken prior to a shutdown and \c stable_timestamp returns
 	 * the most recent \c stable_timestamp set with WT_CONNECTION::set_timestamp.  (The \c
 	 * oldest and \c stable arguments are deprecated short-hand for \c oldest_timestamp and \c
-	 * stable_timestamp\, respectively.) See @ref transaction_timestamps., a string\, chosen
-	 * from the following options: \c "all_durable"\, \c "last_checkpoint"\, \c "oldest"\, \c
+	 * stable_timestamp\, respectively.) See @ref timestamp_global_api., a string\, chosen from
+	 * the following options: \c "all_durable"\, \c "last_checkpoint"\, \c "oldest"\, \c
 	 * "oldest_reader"\, \c "oldest_timestamp"\, \c "pinned"\, \c "recovery"\, \c "stable"\, \c
 	 * "stable_timestamp"; default \c all_durable.}
 	 * @configend
@@ -2508,21 +2518,21 @@ struct __wt_connection {
 	 * timestamps greater than the specified value until the next durable timestamp moves the
 	 * tracked durable timestamp forwards.  This is only intended for use where the application
 	 * is rolling back locally committed transactions.  The supplied value must not be older
-	 * than the current oldest and stable timestamps.  See @ref transaction_timestamps., a
-	 * string; default empty.}
+	 * than the current oldest and stable timestamps.  See @ref timestamp_global_api., a string;
+	 * default empty.}
 	 * @config{force, set timestamps even if they violate normal ordering requirements.  For
 	 * example allow the \c oldest_timestamp to move backwards., a boolean flag; default \c
 	 * false.}
 	 * @config{oldest_timestamp, future commits and queries will be no earlier than the
 	 * specified timestamp.  Supplied values must be monotonically increasing\, any attempt to
 	 * set the value to older than the current is silently ignored.  The supplied value must not
-	 * be newer than the current stable timestamp.  See @ref transaction_timestamps., a string;
+	 * be newer than the current stable timestamp.  See @ref timestamp_global_api., a string;
 	 * default empty.}
 	 * @config{stable_timestamp, checkpoints will not include commits that are newer than the
 	 * specified timestamp in tables configured with \c log=(enabled=false). Supplied values
 	 * must be monotonically increasing\, any attempt to set the value to older than the current
 	 * is silently ignored.  The supplied value must not be older than the current oldest
-	 * timestamp.  See @ref transaction_timestamps., a string; default empty.}
+	 * timestamp.  See @ref timestamp_global_api., a string; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -2530,19 +2540,14 @@ struct __wt_connection {
 	    WT_CONNECTION *connection, const char *config);
 
 	/*!
-	 * Rollback in-memory non-logged state to an earlier point in time.
+	 * Rollback tables to an earlier point in time, discarding all updates to checkpoint durable
+	 * tables that have commit times more recent than the current global stable timestamp.
 	 *
-	 * This method uses a timestamp to define the rollback point, and requires the application
-	 * use timestamps, the stable_timestamp have been set via a call to
-	 * WT_CONNECTION::set_timestamp, and a checkpoint operating on the last stable timestamp
-	 * to have completed. Any updates to checkpoint durable tables that are more recent than
-	 * the stable timestamp are removed.
+	 * No updates made to logged tables or updates made without an associated commit timestamp
+	 * will be discarded. See @ref timestamp_misc.
 	 *
-	 * This method requires that there are no open cursors or active operations for the duration
-	 * of the call.
-	 *
-	 * Any updates made to logged tables will not be rolled back. Any updates made without an
-	 * associated timestamp will not be rolled back. See @ref transaction_timestamps.
+	 * Applications should close or reset all open cursors before the call, and no other API
+	 * calls should be made for the duration of the call.
 	 *
 	 * @snippet ex_all.c rollback to stable
 	 *
@@ -2883,11 +2888,12 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;slow_checkpoint, if true\, slow down checkpoint
  * creation by slowing down internal page processing., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if true\, write transaction related information to
- * the log for all operations\, even operations for tables with logging turned off.  This setting
- * introduces a log format change that may break older versions of WiredTiger.  These operations are
- * informational and skipped in recovery., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;update_restore_evict, if true\, control all dirty page evictions
- * through forcing update restore eviction., a boolean flag; default \c false.}
+ * the log for all operations\, even operations for tables with logging turned off.  This additional
+ * logging information is intended for debugging and is informational only\, that is\, it is ignored
+ * during recovery., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * update_restore_evict, if true\, control all dirty page evictions through forcing update restore
+ * eviction., a boolean flag; default \c false.}
  * @config{ ),,}
  * @config{direct_io, Use \c O_DIRECT on POSIX systems\, and \c FILE_FLAG_NO_BUFFERING on Windows to
  * access files.  Options are given as a list\, such as <code>"direct_io=[data]"</code>. Configuring

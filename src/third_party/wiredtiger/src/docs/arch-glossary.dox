@@ -75,7 +75,7 @@ they are used in other settings.
 <tr><td>page split<td>btree<td>the process of breaking up a large page in a Btree into multiple smaller pages.  This may occur with either leaf pages or internal pages.
 <tr><td>pthread<td>general<td>a thread implementation used on POSIX systems
 <tr><td>raw<td>schema<td>data as it appears on-disk, typically in a packed format.
-<tr><td>read timestamp<td>transactions<td>a timestamp that specifies what data should be visible.
+<tr><td>read timestamp<td>transactions<td>a timestamp that specifies the time for reading data and thus what data should be visible.
 <tr><td>recno<td>general<td>a 64 bit integer. When used as a key, the Btree is said to be a column store, and the keys are assigned incrementally by WiredTiger when new records are inserted.
 <tr><td>reconcile<td>general<td>convert the in-memory version of a page to a more compact form for file storage.
 <tr><td>recovery<td>general<td>a procedure used on opening WiredTiger whereby, starting at the last checkpoint written, log records are played back to bring the database up to date.
@@ -88,7 +88,7 @@ they are used in other settings.
 <tr><td>skip list<td>general<td>a variation of a sorted linked list that allows for faster (O(log(N))) searching. It is used in WiredTiger as a lock-free data structure for keys inserted on a page.
 <tr><td>spin lock<td>general<td>a simple locking algorithm that continually attempts to acquire a lock, appropriate for resources that are likely to be available and may be held for a short time.  This lock is CPU intensive while it is waiting.  Contrast with mutex
 <tr><td>split<td>btree<td>see page split
-<tr><td>stable timestamp<td>transactions<td>a connection-wide value, checkpoints will not include commits newer than this value.
+<tr><td>stable timestamp<td>transactions<td>a connection-wide value. Checkpoints will not include commits newer than this value.
 <tr><td>table<td>schema<td>an abstraction that allows one or more btrees to be used in a coordinated way, which is specified by the schema.  The table coordinates indices and column groups.
 <tr><td>thread<td>general<td>a thread of control.  WiredTiger uses pthreads for POSIX systems.
 <tr><td>thread group<td>general<td>a group of threads that perform a common task.  Eviction is performed by a thread group.

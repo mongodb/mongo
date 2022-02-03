@@ -651,9 +651,8 @@ connection_runtime_config = [
         Config('table_logging', 'false', r'''
             if true, write transaction related information to the log for all
             operations, even operations for tables with logging turned off.
-            This setting introduces a log format change that may break older
-            versions of WiredTiger. These operations are informational and
-            skipped in recovery.''',
+            This additional logging information is intended for debugging and
+            is informational only, that is, it is ignored during recovery''',
             type='boolean'),
         Config('update_restore_evict', 'false', r'''
             if true, control all dirty page evictions through forcing update restore eviction.''',
@@ -1651,7 +1650,7 @@ methods = {
         set commit_timestamp.  \c first_commit returns the first set
         commit_timestamp.  \c prepare returns the timestamp used in preparing a
         transaction.  \c read returns the timestamp at which the transaction is
-        reading at.  See @ref transaction_timestamps''',
+        reading at.  See @ref timestamp_txn_api''',
         choices=['commit', 'first_commit', 'prepare', 'read']),
 ]),
 
@@ -1759,21 +1758,21 @@ methods = {
     Config('read_before_oldest', 'false', r'''
         allows the caller to specify a read timestamp less than the oldest timestamp but newer
         than or equal to the pinned timestamp. Cannot be set to true while also rounding up the read
-        timestamp. See @ref transaction_timestamps''', type='boolean'),
+        timestamp.''', type='boolean', undoc=True),
     Config('read_timestamp', '', r'''
         read using the specified timestamp.  The supplied value must not be
         older than the current oldest timestamp.  See
-        @ref transaction_timestamps'''),
+        @ref timestamp_txn_api'''),
     Config('roundup_timestamps', '', r'''
         round up timestamps of the transaction. This setting alters the
         visibility expected in a transaction. See @ref
-        transaction_timestamps''',
+        timestamp_roundup''',
         type='category', subconfig= [
         Config('prepared', 'false', r'''
             applicable only for prepared transactions. Indicates if the prepare
             timestamp and the commit timestamp of this transaction can be
-            rounded up. If the prepare timestamp is less than the oldest
-            timestamp, the prepare timestamp  will be rounded to the oldest
+            rounded up. If the prepare timestamp is less than the stable
+            timestamp, the prepare timestamp will be rounded to the stable
             timestamp. If the commit timestamp is less than the prepare
             timestamp, the commit timestamp will be rounded up to the prepare
             timestamp''', type='boolean'),
@@ -1789,18 +1788,23 @@ methods = {
 ]),
 
 'WT_SESSION.commit_transaction' : Method([
+    # FIXME-WT-8630: needs to be updated with the resolution of WT-8630. (XXX)
+    # (Maybe will need to be updated to say that for a prepared transaction only one
+    # commit timestamp may be set; otherwise likely unchanged.)
     Config('commit_timestamp', '', r'''
-        set the commit timestamp for the current transaction.  The supplied
-        value must not be older than the first commit timestamp set for the
-        current transaction.  The value must also not be older than the
-        current oldest and stable timestamps.  See
-        @ref transaction_timestamps'''),
+        set the commit timestamp for the current transaction. The supplied value
+        must not be older than the first commit timestamp already set for the
+        current transaction, if any. The value must also not be older than the
+        current oldest and stable timestamps. A commit timestamp is required for
+        the commit of a prepared transaction. If the prepare timestamp has been
+        set (because the transaction has been prepared), the commit timestamp must
+        not be older than it. See @ref timestamp_txn_api'''),
     Config('durable_timestamp', '', r'''
-        set the durable timestamp for the current transaction.  The supplied
-        value must not be older than the commit timestamp set for the
-        current transaction.  The value must also not be older than the
-        current stable timestamp.  See
-        @ref transaction_timestamps'''),
+        set the durable timestamp for the current transaction. Required for the
+        commit of a prepared transaction, and otherwise not permitted. The
+        supplied value must not be older than the commit timestamp set for the
+        current transaction. The value must also not be older than the current
+        oldest and stable timestamps. See @ref timestamp_prepare'''),
     Config('operation_timeout_ms', '0', r'''
         when non-zero, a requested limit on the time taken to complete operations in this
         transaction. Time is measured in real time milliseconds from the start of each WiredTiger
@@ -1811,39 +1815,57 @@ methods = {
     Config('sync', '', r'''
         override whether to sync log records when the transaction commits,
         inherited from ::wiredtiger_open \c transaction_sync.  The \c off setting does not
-        wait for record to be written or synchronized.  The
+        wait for records to be written or synchronized.  The
         \c on setting forces log records to be written to the storage device''',
         choices=['off', 'on']),
 ]),
 
 'WT_SESSION.prepare_transaction' : Method([
+    # FIXME-WT-8630: needs to be updated with the resolution of WT-8630. (XXX)
+    # (Looks like: either at most one commit timestamp may be set, or the commit
+    # timestamp may not be set before prepare, which of these TBD.)
     Config('prepare_timestamp', '', r'''
         set the prepare timestamp for the updates of the current transaction.
-        The supplied value must not be older than any active read timestamps.
-        See @ref transaction_timestamps'''),
+        The supplied value must not be older than any active read timestamps, must
+        not be older than the current stable timestamp, and must not be newer than
+        any commit timestamps already set. See @ref timestamp_prepare'''),
 ]),
 
 'WT_SESSION.timestamp_transaction' : Method([
+    # FIXME-WT-8630: needs to be updated with the resolution of WT-8630. (XXX)
+    # (Looks like: for a prepared transaction, either at most one commit timestamp
+    # may be set, or the commit timestamp may not be set before prepare, which of
+    # these TBD.)
     Config('commit_timestamp', '', r'''
-        set the commit timestamp for the current transaction.  The supplied
-        value must not be older than the first commit timestamp set for the
-        current transaction.  The value must also not be older than the
-        current oldest and stable timestamps.  See
-        @ref transaction_timestamps'''),
+        set the commit timestamp for the current transaction. The supplied value
+        must not be older than the first commit timestamp already set for the
+        current transaction, if any. The value must also not be older than the
+        current oldest and stable timestamps. A commit timestamp is required for
+        the commit of a prepared transaction.  If the prepare timestamp has
+        already been set, the commit timestamp must not be older than it. See
+        @ref timestamp_txn_api'''),
     Config('durable_timestamp', '', r'''
-        set the durable timestamp for the current transaction.  The supplied
-        value must not be older than the commit timestamp set for the
-        current transaction.  The value must also not be older than the
-        current stable timestamp.  See
-        @ref transaction_timestamps'''),
+        set the durable timestamp for the current transaction. Required for the
+        commit of a prepared transaction, and otherwise not permitted. Can only
+        be set once the current transaction has been prepared, and a commit
+        timestamp has been set. The supplied value must not be older than the
+        commit timestamp. The value must also not be older than the current
+        oldest and stable timestamps. See @ref timestamp_prepare'''),
+    # FIXME-WT-8630: needs to be updated with the resolution of WT-8630. (XXX)
+    # (One possible resolution is to prohibit setting the prepare timestamp before
+    # actually committing the transaction.)
     Config('prepare_timestamp', '', r'''
         set the prepare timestamp for the updates of the current transaction.
-        The supplied value must not be older than any active read timestamps.
-        See @ref transaction_timestamps'''),
+        The supplied value must not be older than any active read timestamps,
+        and must not be older than the current stable timestamp.
+        May be set only once per transaction, and must be set before setting the
+        commit timestamp. Setting the prepare timestamp does not by itself
+        prepare the transaction, but does oblige the application to eventually
+        prepare the transaction before committing it. See @ref timestamp_prepare'''),
     Config('read_timestamp', '', r'''
         read using the specified timestamp.  The supplied value must not be
         older than the current oldest timestamp.  This can only be set once
-        for a transaction. See @ref transaction_timestamps'''),
+        for a transaction. See @ref timestamp_txn_api'''),
 ]),
 
 'WT_SESSION.rollback_transaction' : Method([
@@ -1958,7 +1980,7 @@ methods = {
         shutdown and \c stable_timestamp returns the most recent \c stable_timestamp set with
         WT_CONNECTION::set_timestamp. (The \c oldest and \c stable arguments are deprecated
         short-hand for \c oldest_timestamp and \c stable_timestamp, respectively.) See @ref
-        transaction_timestamps''',
+        timestamp_global_api''',
         choices=['all_durable','last_checkpoint','oldest',
             'oldest_reader','oldest_timestamp','pinned','recovery','stable','stable_timestamp']),
 ]),
@@ -1971,7 +1993,7 @@ methods = {
         timestamp moves the tracked durable timestamp forwards.  This is only
         intended for use where the application is rolling back locally committed
         transactions. The supplied value must not be older than the current
-        oldest and stable timestamps.  See @ref transaction_timestamps'''),
+        oldest and stable timestamps.  See @ref timestamp_global_api'''),
     Config('force', 'false', r'''
         set timestamps even if they violate normal ordering requirements.
         For example allow the \c oldest_timestamp to move backwards''',
@@ -1981,14 +2003,14 @@ methods = {
         timestamp.  Supplied values must be monotonically increasing, any
         attempt to set the value to older than the current is silently ignored.
         The supplied value must not be newer than the current
-        stable timestamp.  See @ref transaction_timestamps'''),
+        stable timestamp.  See @ref timestamp_global_api'''),
     Config('stable_timestamp', '', r'''
         checkpoints will not include commits that are newer than the specified
         timestamp in tables configured with \c log=(enabled=false).  Supplied
         values must be monotonically increasing, any attempt to set the value to
         older than the current is silently ignored.  The supplied value must
         not be older than the current oldest timestamp.  See
-        @ref transaction_timestamps'''),
+        @ref timestamp_global_api'''),
 ]),
 
 'WT_CONNECTION.rollback_to_stable' : Method([]),

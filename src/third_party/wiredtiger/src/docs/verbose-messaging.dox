@@ -1,4 +1,4 @@
-/*! @page verbose_messaging Verbose Messaging
+/*! @page verbose_messaging Verbose messaging
 
 As part of normal operation, WiredTiger will produce verbose messages
 around various events, actions and possible issues/errors. Verbose

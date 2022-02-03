@@ -138,6 +138,7 @@ of the documentation.
     - @ref arch-session
     - @ref arch-cursor
     - @ref arch-transaction
+    - @ref arch-timestamp
     - @ref arch-snapshot
     - @ref arch-rts
 
@@ -195,6 +196,10 @@ of the documentation.
 @subpage arch-transaction
 - Transactions provide a powerful abstraction for multiple threads to
 operate on data concurrently.
+
+@subpage arch-timestamp
+- Timestamping and the timestamped data model is a facility for
+supporting distributed applications.
 
 @subpage arch-snapshot
 - Snapshots are implemented by storing transaction ids committed before

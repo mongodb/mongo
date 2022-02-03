@@ -41,39 +41,6 @@ which are the values of the index), the data can be read from the index
 without accessing any column groups.  See @ref schema_index_projections for
 more information.
 
-@section cursors_transactions Cursors and Transactions
-
-If there is a transaction active in a session, cursors operate in the
-context of that transaction.  Reads performed while a transaction is
-active inherit the isolation level of the transaction, and updates
-performed within a transaction are made durable by calling
-WT_SESSION::commit_transaction, or discarded by calling
-WT_SESSION::rollback_transaction.
-
-If no transaction is active, cursor reads are performed at the isolation
-level of the session, set with the \c isolation configuration key to
-WT_CONNECTION::open_session and successful updates are automatically
-committed before the update operation completes.
-
-Any operation that consists of multiple related updates should be
-enclosed in an explicit transaction to ensure that the updates are
-applied atomically.
-
-At \c snapshot (the default) or \c read-committed isolation levels,
-committed changes from concurrent transactions become visible when no
-cursor is positioned.  In other words, at these isolation levels, all
-cursors in a session read from a stable snapshot while any cursor in the
-session remains positioned. A call to WT_CURSOR::next or WT_CURSOR::prev
-on a positioned cursor will not update the snapshot.
-
-Cursor positions survive transaction boundaries, unless a transaction
-is rolled back. When a transaction is rolled-back either implicitly
-or explicitly, all cursors in the session are reset as if the
-WT_CURSOR::reset method was called, discarding any cursor position as
-well as any key and value.
-
-See @ref transactions for more information.
-
 @section cursors_eviction Cursors and Eviction
 
 Cursor positions hold resources that can inhibit the eviction of memory
