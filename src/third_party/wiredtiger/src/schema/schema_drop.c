@@ -234,7 +234,7 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
         WT_ERR(__wt_tiered_name(session, &tiered->iface, i, WT_TIERED_NAME_OBJECT, &name));
         __wt_verbose(session, WT_VERB_TIERED, "DROP_TIERED: remove object %s from metadata", name);
         WT_ERR_NOTFOUND_OK(__wt_metadata_remove(session, name), false);
-        if (remove_files)
+        if (remove_files && tier != NULL)
             WT_TRET(__wt_meta_track_drop(session, tier->name));
         __wt_free(session, name);
     }
