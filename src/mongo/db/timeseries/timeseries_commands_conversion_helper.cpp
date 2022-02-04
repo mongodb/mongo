@@ -103,7 +103,7 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
                 // ($gt, $lt, etc).
                 if (auto collatorSpec = origIndex[NewIndexSpec::kCollationFieldName]) {
                     uasserted(
-                        5916300,
+                        ErrorCodes::IndexOptionsConflict,
                         std::string{"On a time-series collection, partialFilterExpression and "} +
                             NewIndexSpec::kCollationFieldName + " arguments are incompatible"_sd);
                 }

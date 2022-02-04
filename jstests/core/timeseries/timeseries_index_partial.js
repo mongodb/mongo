@@ -253,7 +253,7 @@ assert.docEq(buckets.getIndexes(), extraBucketIndexes.concat([
         collation: {locale: "simple"},
         partialFilterExpression: {a: {$lt: "25"}}
     }),
-                                 [5916300]);
+                                 [ErrorCodes.IndexOptionsConflict]);
     assert.commandFailedWithCode(
         coll.createIndex({a: 1}, {
             name: "a_lt_25_numeric",
@@ -261,7 +261,7 @@ assert.docEq(buckets.getIndexes(), extraBucketIndexes.concat([
             partialFilterExpression: {a: {$lt: "25"}}
         }),
         // The default collation is also numeric, so this index is equivalent to the previous.
-        [5916300]);
+        [ErrorCodes.IndexOptionsConflict]);
 
     assert.commandWorked(coll.createIndex(
         {a: 1}, {name: "a_lt_25_default", partialFilterExpression: {a: {$lt: "25"}}}));
