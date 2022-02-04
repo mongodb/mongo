@@ -718,33 +718,6 @@ private:
                     });
             }
 
-            // TODO SERVER-63171: Only check on last-lts when FCV 5.3 becomes last-continuous.
-            // TODO SERVER-63172: Remove once FCV 6.0 becomes last-lts.
-            for (const auto& tenantDbName : DatabaseHolder::get(opCtx)->getNames()) {
-                Lock::DBLock dbLock(opCtx, tenantDbName.dbName(), MODE_IX);
-                catalog::forEachCollectionFromDb(
-                    opCtx, tenantDbName.dbName(), MODE_X, [&](const CollectionPtr& collection) {
-                        auto indexCatalog = collection->getIndexCatalog();
-                        auto indexIt = indexCatalog->getIndexIterator(
-                            opCtx, true /* includeUnfinishedIndexes */);
-                        while (indexIt->more()) {
-                            auto indexEntry = indexIt->next();
-                            uassert(
-                                ErrorCodes::CannotDowngrade,
-                                fmt::format(
-                                    "Cannot downgrade the cluster when there are indexes that have "
-                                    "the 'comment' field. Use listIndexes to find them and drop "
-                                    "the indexes or use collMod to manually remove the field "
-                                    "before downgrading. First detected incompatible index name: "
-                                    "'{}' on collection: '{}'",
-                                    indexEntry->descriptor()->indexName(),
-                                    collection->ns().toString()),
-                                indexEntry->descriptor()->comment().isEmpty());
-                        }
-                        return true;
-                    });
-            }
-
             // Drop the pre-images collection if 'changeStreamPreAndPostImages' feature flag is not
             // enabled on the downgrade version.
             // TODO SERVER-61770: Remove once FCV 6.0 becomes last-lts.

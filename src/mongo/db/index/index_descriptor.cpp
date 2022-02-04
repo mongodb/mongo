@@ -41,7 +41,6 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 
 namespace mongo {
 
@@ -137,10 +136,6 @@ IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj in
     }
 
     if (BSONElement commentElement = _infoObj[kCommentFieldName]) {
-        uassert(
-            ErrorCodes::InvalidOptions,
-            "createIndex does not support the 'comment' field",
-            feature_flags::gCollModIndexUnique.isEnabled(serverGlobalParams.featureCompatibility));
         invariant(commentElement.isABSONObj());
         _comment = commentElement.Obj().getOwned();
     }
