@@ -27,14 +27,25 @@ const sessionDB = session.getDatabase(dbName);
 const sessionColl = sessionDB.getCollection(collName);
 
 // Test committing an unprepared large transaction with two 10MB inserts.
-let doc1 = createLargeDocument(1);
-let doc2 = createLargeDocument(2);
-session.startTransaction();
-assert.commandWorked(sessionColl.insert(doc1));
-assert.commandWorked(sessionColl.insert(doc2));
+try {
+    let doc1 = createLargeDocument(1);
+    let doc2 = createLargeDocument(2);
 
-assert.commandWorked(session.commitTransaction_forTesting());
-assert.sameMembers(sessionColl.find().toArray(), [doc1, doc2]);
+    session.startTransaction();
+    assert.commandWorked(sessionColl.insert(doc1));
+    assert.commandWorked(sessionColl.insert(doc2));
+    assert.commandWorked(session.commitTransaction_forTesting());
+    assert.sameMembers(sessionColl.find().toArray(), [doc1, doc2]);
+} catch (e) {
+    // It may be possible for this test to run in a passthrough where such a large transaction fills
+    // up the cache and cannot commit. The transaction will be rolled-back with a WriteConflict as a
+    // result.
+    if (e.code === ErrorCodes.WriteConflict && e.errmsg.startsWith("Cache full")) {
+        jsTestLog("Ignoring WriteConflict due to large transaction's size");
+    } else {
+        throw e;
+    }
+}
 
 // Test aborting an unprepared large transaction with two 10MB inserts.
 let doc3 = createLargeDocument(3);
