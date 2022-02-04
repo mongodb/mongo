@@ -4,7 +4,7 @@
 (function() {
 'use strict';
 
-load('jstests/sharding/libs/sharded_transactions_helpers.js');
+load('jstests/libs/fail_point_util.js');
 
 let st = new ShardingTest({
     mongos: 2,
@@ -177,15 +177,18 @@ function buildDDLCommands(collName) {
 }
 
 function testMovePrimary(failpoint, fromShard, toShard, db, shouldFail, sharded) {
+    jsTestLog("Testing move primary with FP: " + failpoint + " shouldFail: " + shouldFail +
+              " sharded: " + sharded);
+
     let codeToRunInParallelShell = '{ db.getSiblingDB("admin").runCommand({movePrimary: "' +
         dbName + '", to: "' + toShard.name + '"}); }';
 
-    assert.commandWorked(fromShard.adminCommand({configureFailPoint: failpoint, mode: 'alwaysOn'}));
+    let fp = configureFailPoint(fromShard, failpoint);
 
     let awaitShell = startParallelShell(codeToRunInParallelShell, st.s.port);
 
     jsTestLog("Waiting for failpoint " + failpoint);
-    waitForFailpoint("Hit " + failpoint, 1);
+    fp.wait();
     clearRawMongoProgramOutput();
 
     // Test DML
@@ -216,21 +219,24 @@ function testMovePrimary(failpoint, fromShard, toShard, db, shouldFail, sharded)
         }
     });
 
-    assert.commandWorked(fromShard.adminCommand({configureFailPoint: failpoint, mode: 'off'}));
+    fp.off();
 
     awaitShell();
 }
 
 function testMovePrimaryDDL(failpoint, fromShard, toShard, db, shouldFail, sharded) {
+    jsTest.log("Testing move primary DDL with FP: " + failpoint + " shouldFail: " + shouldFail +
+               " sharded: " + sharded);
+
     let codeToRunInParallelShell = '{ db.getSiblingDB("admin").runCommand({movePrimary: "' +
         dbName + '", to: "' + toShard.name + '"}); }';
 
-    assert.commandWorked(fromShard.adminCommand({configureFailPoint: failpoint, mode: 'alwaysOn'}));
+    let fp = configureFailPoint(fromShard, failpoint);
 
     let awaitShell = startParallelShell(codeToRunInParallelShell, st.s.port);
 
     jsTestLog("Waiting for failpoint " + failpoint);
-    waitForFailpoint("Hit " + failpoint, 1);
+    fp.wait();
     clearRawMongoProgramOutput();
 
     let collName;
@@ -253,10 +259,23 @@ function testMovePrimaryDDL(failpoint, fromShard, toShard, db, shouldFail, shard
         }
     });
 
-    assert.commandWorked(fromShard.adminCommand({configureFailPoint: failpoint, mode: 'off'}));
+    fp.off();
 
     awaitShell();
 }
+
+// Reduce DDL lock timeout to half a second to speedup testing command that are expected to fail
+// with lockbusy error
+let overrideDDLLockTimeoutFPs = [];
+st.forEachConnection(shard => {
+    try {
+        overrideDDLLockTimeoutFPs.push(
+            configureFailPoint(shard, "overrideDDLLockTimeout", {'timeoutMillisecs': 500}));
+    } catch (e) {
+        // The failpoint has been added in 5.3 so multiversion suite will fail to set this failpoint
+        jsTestLog("Failed to override DDL lock timeout: " + e);
+    }
+});
 
 createCollections();
 let fromShard = st.getPrimaryShard(dbName);
@@ -283,6 +302,8 @@ createCollections();
 fromShard = st.getPrimaryShard(dbName);
 toShard = st.getOther(fromShard);
 testMovePrimary('hangInCleanStaleDataStage', fromShard, toShard, st.s.getDB(dbName), false, false);
+
+overrideDDLLockTimeoutFPs.forEach(fp => fp.off());
 
 st.stop();
 })();

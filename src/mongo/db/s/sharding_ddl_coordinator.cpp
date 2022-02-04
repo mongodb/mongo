@@ -50,6 +50,7 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeRunningCoordinatorInstance);
+MONGO_FAIL_POINT_DEFINE(overrideDDLLockTimeout);
 
 namespace {
 
@@ -143,12 +144,23 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
 
                const auto coorName = DDLCoordinatorType_serializer(_coordId.getOperationType());
 
-               auto distLock = distLockManager->lockDirectLocally(
-                   opCtx, resource, DistLockManager::kDefaultLockTimeout);
+               const auto lockTimeOut = [&]() -> Milliseconds {
+                   if (auto sfp = overrideDDLLockTimeout.scoped(); MONGO_unlikely(sfp.isActive())) {
+                       if (auto timeoutElem = sfp.getData()["timeoutMillisecs"]; timeoutElem.ok()) {
+                           const auto timeoutMillisecs = Milliseconds(timeoutElem.safeNumberLong());
+                           LOGV2(6320700,
+                                 "Overriding DDL lock timeout",
+                                 "timeout"_attr = timeoutMillisecs);
+                           return timeoutMillisecs;
+                       }
+                   }
+                   return DistLockManager::kDefaultLockTimeout;
+               }();
+
+               auto distLock = distLockManager->lockDirectLocally(opCtx, resource, lockTimeOut);
                _scopedLocks.emplace(std::move(distLock));
 
-               uassertStatusOK(distLockManager->lockDirect(
-                   opCtx, resource, coorName, DistLockManager::kDefaultLockTimeout));
+               uassertStatusOK(distLockManager->lockDirect(opCtx, resource, coorName, lockTimeOut));
            })
         .until([this](Status status) { return (!_recoveredFromDisk) || status.isOK(); })
         .withBackoffBetweenIterations(kExponentialBackoff)
