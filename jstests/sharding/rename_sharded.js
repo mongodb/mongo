@@ -48,7 +48,7 @@ function testRename(st, dbName, toNs, dropTarget, mustFail) {
     assert(chunk0.shard != chunk1.shard, 'Chunks expected to be on different shards');
 
     const toColl = mongos.getCollection(toNs);
-    assert.eq(db.to.find({x: 0}).itcount(), 1, 'Expected exactly one document on the shard');
+    assert.eq(toColl.find({x: 0}).itcount(), 1, 'Expected exactly one document on the shard');
     assert.eq(toColl.find({x: 2}).itcount(), 1, 'Expected exactly one document on the shard');
 
     // Validate the correctness of the collections metadata in the catalog cache on shards
@@ -236,6 +236,22 @@ if (isDDLFeatureFlagEnabled) {
         const fromColl = mongos.getCollection(fromNs);
         fromColl.insert({x: 1});
         assert.commandFailed(fromColl.renameCollection(toNs.split('.')[1], false /* dropTarget*/));
+    }
+}
+
+// Rename to target collection with very a long name
+{
+    const dbName = 'testRenameToCollectionWithVeryLongName';
+
+    const testDB = st.rs0.getPrimary().getDB(dbName);
+    const fcvDoc = testDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, '5.0') >= 0) {
+        const longEnoughNs = dbName + '.' +
+            'x'.repeat(235 - dbName.length - 1);
+        testRename(st, dbName, longEnoughNs, false /* dropTarget */, false /* mustFail */);
+
+        const tooLongNs = longEnoughNs + 'x';
+        testRename(st, dbName, tooLongNs, false /* dropTarget */, true /* mustFail */);
     }
 }
 

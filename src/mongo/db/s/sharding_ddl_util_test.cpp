@@ -177,14 +177,16 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
     }
 }
 
-// Test all combinations of sharded rename acceptable preconditions:
-// (1) Target collection doesn't exist and doesn't have no associated tags
-// (2) Target collection exists and doesn't have associated tags
-TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionsAreMet) {
+// Test all combinations of rename acceptable preconditions:
+// (1) Namespace of target collection is not too long
+// (2) Target collection doesn't exist and doesn't have no associated tags
+// (3) Target collection exists and doesn't have associated tags
+TEST_F(ShardingDDLUtilTest, RenamePreconditionsAreMet) {
     auto opCtx = operationContext();
 
     // No exception is thrown if the TO collection does not exist and has no associated tags
-    sharding_ddl_util::checkShardedRenamePreconditions(opCtx, kToNss, false /* dropTarget */);
+    sharding_ddl_util::checkRenamePreconditions(
+        opCtx, false /* sourceIsSharded */, kToNss, false /* dropTarget */);
 
     // Initialize a chunk
     ChunkVersion chunkVersion(1, 1, OID::gen(), boost::none);
@@ -200,10 +202,31 @@ TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionsAreMet) {
     // Initialize the sharded TO collection
     setupCollection(kToNss, KeyPattern(BSON("x" << 1)), {chunk});
 
-    sharding_ddl_util::checkShardedRenamePreconditions(opCtx, kToNss, true /* dropTarget */);
+    sharding_ddl_util::checkRenamePreconditions(
+        opCtx, false /* sourceIsSharded */, kToNss, true /* dropTarget */);
 }
 
-TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionsTargetCollectionExists) {
+TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetNamespaceIsTooLong) {
+    auto opCtx{operationContext()};
+
+    const std::string dbName{"test"};
+
+    // Check that no exception is thrown if the namespace of the target collection is long enough
+    const NamespaceString longEnoughNss{
+        dbName + "." +
+        std::string(NamespaceString::MaxNsShardedCollectionLen - dbName.length() - 1, 'x')};
+    sharding_ddl_util::checkRenamePreconditions(
+        opCtx, true /* sourceIsSharded */, longEnoughNss, false /* dropTarget */);
+
+    // Check that an exception is thrown if the namespace of the target collection is too long
+    const NamespaceString tooLongNss{longEnoughNss.ns() + 'x'};
+    ASSERT_THROWS_CODE(sharding_ddl_util::checkRenamePreconditions(
+                           opCtx, true /* sourceIsSharded */, tooLongNss, false /* dropTarget */),
+                       AssertionException,
+                       ErrorCodes::InvalidNamespace);
+}
+
+TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetCollectionExists) {
     auto opCtx = operationContext();
 
     // Initialize a chunk
@@ -221,13 +244,13 @@ TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionsTargetCollectionExists) {
     setupCollection(kToNss, KeyPattern(BSON("x" << 1)), {chunk});
 
     // Check that an exception is thrown if the target collection exists and dropTarget is not set
-    ASSERT_THROWS_CODE(
-        sharding_ddl_util::checkShardedRenamePreconditions(opCtx, kToNss, false /* dropTarget */),
-        AssertionException,
-        ErrorCodes::NamespaceExists);
+    ASSERT_THROWS_CODE(sharding_ddl_util::checkRenamePreconditions(
+                           opCtx, false /* sourceIsSharded */, kToNss, false /* dropTarget */),
+                       AssertionException,
+                       ErrorCodes::NamespaceExists);
 }
 
-TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionTargetCollectionHasTags) {
+TEST_F(ShardingDDLUtilTest, RenamePreconditionTargetCollectionHasTags) {
     auto opCtx = operationContext();
 
     // Associate a tag to the target collection
@@ -239,10 +262,10 @@ TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionTargetCollectionHasTags) {
     ASSERT_OK(insertToConfigCollection(operationContext(), TagsType::ConfigNS, tagDoc.toBSON()));
 
     // Check that an exception is thrown if some tag is associated to the target collection
-    ASSERT_THROWS_CODE(
-        sharding_ddl_util::checkShardedRenamePreconditions(opCtx, kToNss, false /* dropTarget */),
-        AssertionException,
-        ErrorCodes::CommandFailed);
+    ASSERT_THROWS_CODE(sharding_ddl_util::checkRenamePreconditions(
+                           opCtx, false /* sourceIsSharded */, kToNss, false /* dropTarget */),
+                       AssertionException,
+                       ErrorCodes::CommandFailed);
 }
 
 }  // namespace

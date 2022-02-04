@@ -102,13 +102,15 @@ void shardedRenameMetadata(OperationContext* opCtx,
                            const WriteConcernOptions& writeConcern);
 
 /**
- * Ensures rename preconditions for sharded collections are met:
+ * Ensures rename preconditions for collections are met:
+ * - Check that the namespace of the destination collection is not too long
  * - Check that `dropTarget` is true if the destination collection exists
  * - Check that no tags exist for the destination collection
  */
-void checkShardedRenamePreconditions(OperationContext* opCtx,
-                                     const NamespaceString& toNss,
-                                     const bool dropTarget);
+void checkRenamePreconditions(OperationContext* opCtx,
+                              bool sourceIsSharded,
+                              const NamespaceString& toNss,
+                              bool dropTarget);
 
 /**
  * Throws if the DB primary shards of the provided namespaces differs.

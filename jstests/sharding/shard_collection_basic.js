@@ -67,6 +67,20 @@ assert.commandFailed(mongos.adminCommand({shardCollection: 'foo', key: {_id: 1}}
 
 assert.commandFailed(mongos.adminCommand({shardCollection: kDbName + '.foo', key: "aaa"}));
 
+const testDB = st.rs0.getPrimary().getDB(kDbName);
+const fcvDoc = testDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, '5.0') >= 0) {
+    jsTestLog('Verify namespace length limit.');
+
+    const longEnoughNs = kDbName + '.' +
+        'x'.repeat(235 - kDbName.length - 1);
+    assert.commandWorked(mongos.adminCommand({shardCollection: longEnoughNs, key: {_id: 1}}));
+
+    const tooLongNs = longEnoughNs + 'x';
+    assert.commandFailedWithCode(mongos.adminCommand({shardCollection: tooLongNs, key: {_id: 1}}),
+                                 ErrorCodes.InvalidNamespace);
+}
+
 jsTestLog('shardCollection may only be run against admin database.');
 assert.commandFailed(
     mongos.getDB('test').runCommand({shardCollection: kDbName + '.foo', key: {_id: 1}}));

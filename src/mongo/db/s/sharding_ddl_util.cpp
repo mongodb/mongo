@@ -320,9 +320,17 @@ void shardedRenameMetadata(OperationContext* opCtx,
         opCtx, CollectionType::ConfigNS, fromCollType.toBSON(), writeConcern));
 }
 
-void checkShardedRenamePreconditions(OperationContext* opCtx,
-                                     const NamespaceString& toNss,
-                                     const bool dropTarget) {
+void checkRenamePreconditions(OperationContext* opCtx,
+                              bool sourceIsSharded,
+                              const NamespaceString& toNss,
+                              bool dropTarget) {
+    if (sourceIsSharded) {
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Namespace of target collection too long. Namespace: " << toNss
+                              << " Max: " << NamespaceString::MaxNsShardedCollectionLen,
+                toNss.size() <= NamespaceString::MaxNsShardedCollectionLen);
+    }
+
     auto catalogClient = Grid::get(opCtx)->catalogClient();
     if (!dropTarget) {
         // Check that the sharded target collection doesn't exist
