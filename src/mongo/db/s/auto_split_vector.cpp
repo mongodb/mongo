@@ -82,49 +82,6 @@ const std::tuple<BSONObj, BSONObj> getMinMaxExtendedBounds(const IndexDescriptor
 }
 
 /*
- * Returns true if the final key in the range is the same as the first key, false otherwise.
- */
-bool maxKeyEqualToMinKey(OperationContext* opCtx,
-                         const CollectionPtr* collection,
-                         const IndexDescriptor* shardKeyIdx,
-                         const BSONObj& minBound,
-                         const BSONObj& maxBound,
-                         const BSONObj& minKeyInChunk) {
-    BSONObj maxKeyInChunk;
-    {
-        auto backwardIdxScanner =
-            InternalPlanner::indexScan(opCtx,
-                                       collection,
-                                       shardKeyIdx,
-                                       maxBound,
-                                       minBound,
-                                       BoundInclusion::kIncludeEndKeyOnly,
-                                       PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                       InternalPlanner::BACKWARD);
-
-        PlanExecutor::ExecState state = backwardIdxScanner->getNext(&maxKeyInChunk, nullptr);
-        uassert(ErrorCodes::OperationFailed,
-                "can't open a cursor to find final key in range (desired range is possibly empty)",
-                state == PlanExecutor::ADVANCED);
-    }
-
-    if (minKeyInChunk.woCompare(maxKeyInChunk) == 0) {
-        // Range contains only documents with a single key value.  So we cannot possibly find a
-        // split point, and there is no need to scan any further.
-        LOGV2_WARNING(
-            5865001,
-            "Possible low cardinality key detected in range. Range contains only a single key.",
-            "namespace"_attr = collection->get()->ns(),
-            "minKey"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), minBound)),
-            "maxKey"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), maxBound)),
-            "key"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), minKeyInChunk)));
-        return true;
-    }
-
-    return false;
-}
-
-/*
  * Reshuffle fields according to the shard key pattern.
  */
 auto orderShardKeyFields(const BSONObj& keyPattern, BSONObj& key) {
@@ -150,7 +107,9 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
     {
         AutoGetCollection collection(opCtx, nss, MODE_IS);
 
-        uassert(ErrorCodes::NamespaceNotFound, "ns not found", collection);
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "namespace " << nss << " does not exists",
+                collection);
 
         // Get the size estimate for this namespace
         const long long totalLocalCollDocuments = collection->numRecords(opCtx);
@@ -189,23 +148,46 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
         {
             PlanExecutor::ExecState state =
                 forwardIdxScanner->getNext(&minKeyInOriginalChunk, nullptr);
-            uassert(ErrorCodes::OperationFailed,
-                    "can't open a cursor to scan the range (desired range is possibly empty)",
-                    state == PlanExecutor::ADVANCED);
+            if (state == PlanExecutor::IS_EOF) {
+                // Range is empty
+                return {};
+            }
         }
 
-        // Return empty vector if chunk's min and max keys are the same.
-        if (maxKeyEqualToMinKey(opCtx,
-                                &collection.getCollection(),
-                                shardKeyIdx,
-                                minKey,
-                                maxKey,
-                                minKeyInOriginalChunk)) {
+        BSONObj maxKeyInChunk;
+        {
+            auto backwardIdxScanner =
+                InternalPlanner::indexScan(opCtx,
+                                           &(*collection),
+                                           shardKeyIdx,
+                                           maxKey,
+                                           minKey,
+                                           BoundInclusion::kIncludeEndKeyOnly,
+                                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                           InternalPlanner::BACKWARD);
+
+            PlanExecutor::ExecState state = backwardIdxScanner->getNext(&maxKeyInChunk, nullptr);
+            if (state == PlanExecutor::IS_EOF) {
+                // Range is empty
+                return {};
+            }
+        }
+
+        if (minKeyInOriginalChunk.woCompare(maxKeyInChunk) == 0) {
+            // Range contains only documents with a single key value.  So we cannot possibly find a
+            // split point, and there is no need to scan any further.
+            LOGV2_WARNING(
+                5865001,
+                "Possible low cardinality key detected in range. Range contains only a single key.",
+                "namespace"_attr = collection.getNss(),
+                "minKey"_attr = redact(prettyKey(keyPattern, minKey)),
+                "maxKey"_attr = redact(prettyKey(keyPattern, maxKey)),
+                "key"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), minKeyInOriginalChunk)));
             return {};
         }
 
         LOGV2(5865000,
-              "Requested split points lookup for chunk",
+              "Requested split points lookup for range",
               "namespace"_attr = nss,
               "minKey"_attr = redact(prettyKey(keyPattern, minKey)),
               "maxKey"_attr = redact(prettyKey(keyPattern, maxKey)));
