@@ -32,8 +32,12 @@ const st = new ShardingTest({
 // setup the database for the test
 assert.commandWorked(st.s.adminCommand({enableSharding: 'db'}));
 const db = st.getDB('db');
-const collName = 'testColl';
+const collNamePrefix = 'testColl';
 let collCounter = 0;
+
+function getNewColl() {
+    return db[collNamePrefix + '_' + collCounter++];
+}
 
 // Shorten time between balancer rounds for faster initial balancing
 st.forEachConfigServer((conn) => {
@@ -48,26 +52,29 @@ const chunkSize = 2;
 const bigString = "X".repeat(32 * 1024);  // 32 KB
 
 function waitForBalanced(ns) {
+    jsTest.log("Waiting for collection to be balanced " + ns);
     assert.soon(function() {
         let balancerStatus =
             assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: ns}));
         return balancerStatus.balancerCompliant;
     });
+    jsTest.log("Balancing completed for " + ns);
 }
 
 function waitForEndOfDefragmentation(ns) {
+    jsTest.log("Waiting end of defragmentation for " + ns);
     assert.soon(function() {
         let balancerStatus =
             assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: ns}));
         return balancerStatus.balancerCompliant ||
             balancerStatus.firstComplianceViolation != 'defragmentingChunks';
     });
+    jsTest.log("Defragmentation completed for " + ns);
 }
 
 function setupCollection() {
     st.startBalancer();
-    const coll = db[collName + collCounter];
-    collCounter++;
+    const coll = getNewColl();
     const fullNs = coll.getFullName();
     assert.commandWorked(st.s.adminCommand({shardCollection: fullNs, key: {key: 1}}));
 
@@ -108,9 +115,13 @@ function clearFailPointOnConfigNodes(failpoint) {
 }
 
 function waitForFailpointOnConfigNodes(failpoint, timesEntered) {
+    jsTest.log("Waiting for failpoint " + failpoint + ", times entered " + timesEntered);
     assert.soon(function() {
         let hitFailpoint = false;
-        st.forEachConfigServer((config) => {
+        let csrs_nodes = [st.configRS.getPrimary()];
+        csrs_nodes.concat(st.configRS.getSecondaries());
+
+        csrs_nodes.forEach((config) => {
             let res = assert.commandWorkedOrFailedWithCode(config.adminCommand({
                 waitForFailPoint: failpoint,
                 timesEntered: timesEntered + 1,
@@ -121,6 +132,7 @@ function waitForFailpointOnConfigNodes(failpoint, timesEntered) {
         });
         return hitFailpoint;
     });
+    jsTest.log("Failpoint " + failpoint + " hit " + timesEntered + " times");
 }
 
 // Setup collection for first tests
@@ -202,120 +214,118 @@ jsTest.log("Begin and end defragmentation with balancer on");
     st.stopBalancer();
 }
 
-const coll2 = setupCollection();
 jsTest.log("Begin defragmentation with balancer off, end with it on");
 {
+    const coll = setupCollection();
+    st.stopBalancer();
     // Allow the first phase transition to build the initial defragmentation state
     setFailPointOnConfigNodes("skipDefragmentationPhaseTransition", {skip: 1});
     assert.commandWorked(st.s.adminCommand({
-        configureCollectionBalancing: coll2,
+        configureCollectionBalancing: coll,
         defragmentCollection: true,
         chunkSize: chunkSize,
     }));
     st.startBalancer();
-    let beforeStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll2}));
+    let beforeStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll}));
     assert.eq(beforeStatus.balancerCompliant, false);
     assert.eq(beforeStatus.firstComplianceViolation, 'defragmentingChunks');
     assert.commandWorked(st.s.adminCommand({
-        configureCollectionBalancing: coll2,
+        configureCollectionBalancing: coll,
         defragmentCollection: false,
         chunkSize: chunkSize,
     }));
     // Ensure that the policy completes the phase transition...
     clearFailPointOnConfigNodes("skipDefragmentationPhaseTransition");
-    waitForEndOfDefragmentation(coll2);
+    waitForEndOfDefragmentation(coll);
     st.stopBalancer();
 }
 
-const coll3 = setupCollection();
 jsTest.log("Balancer on, begin defragmentation and let it complete");
 {
+    const coll = setupCollection();
     // Reset collection before starting
-    const initialNumChunks = findChunksUtil.countChunksForNs(st.config, coll3);
+    const initialNumChunks = findChunksUtil.countChunksForNs(st.config, coll);
     jsTest.log("Initial number of chunks " + initialNumChunks);
     // Pause after phase 1 completes to check merging succeeded
     setFailPointOnConfigNodes("skipDefragmentationPhaseTransition", {skip: 1});
     assert.commandWorked(st.s.adminCommand({
-        configureCollectionBalancing: coll3,
+        configureCollectionBalancing: coll,
         defragmentCollection: true,
         chunkSize: chunkSize,
     }));
     st.startBalancer();
     // Wait for phase 1 to complete
     waitForFailpointOnConfigNodes("skipDefragmentationPhaseTransition", 0);
-    const numChunksAfterMerging = findChunksUtil.countChunksForNs(st.config, coll3);
+    const numChunksAfterMerging = findChunksUtil.countChunksForNs(st.config, coll);
     jsTest.log("Number of chunks after merging " + numChunksAfterMerging);
     assert.lte(numChunksAfterMerging, initialNumChunks);
     // Turn fail point off, let phase 3 run and complete
     clearFailPointOnConfigNodes("skipDefragmentationPhaseTransition");
-    waitForEndOfDefragmentation(coll3);
+    waitForEndOfDefragmentation(coll);
     st.stopBalancer();
-    const finalNumChunks = findChunksUtil.countChunksForNs(st.config, coll3);
+    const finalNumChunks = findChunksUtil.countChunksForNs(st.config, coll);
     jsTest.log("Number of chunks after splitting " + finalNumChunks);
     assert.lte(finalNumChunks, initialNumChunks);
 }
 
-const collection4 = db[collName + collCounter];
-const coll4 = collection4.getFullName();
-collCounter++;
-assert.commandWorked(st.s.adminCommand({shardCollection: coll4, key: {key: 1}}));
 jsTest.log("Changed uuid causes defragmentation to restart");
 {
+    const coll = getNewColl();
+    const nss = coll.getFullName();
+    assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {key: 1}}));
     // Create two chunks on shard0
-    collection4.insertOne({key: -1, key2: -1});
-    collection4.insertOne({key: 1, key2: 1});
-    assert.commandWorked(db.adminCommand({split: coll4, middle: {key: 1}}));
+    coll.insertOne({key: -1, key2: -1});
+    coll.insertOne({key: 1, key2: 1});
+    assert.commandWorked(db.adminCommand({split: nss, middle: {key: 1}}));
     // Pause defragmentation after initialization but before phase 1 runs
     setFailPointOnConfigNodes("afterBuildingNextDefragmentationPhase", "alwaysOn");
     assert.commandWorked(st.s.adminCommand({
-        configureCollectionBalancing: coll4,
+        configureCollectionBalancing: nss,
         defragmentCollection: true,
         chunkSize: chunkSize,
     }));
     st.startBalancer();
     // Reshard collection
-    assert.commandWorked(db.adminCommand({reshardCollection: coll4, key: {key2: 1}}));
+    assert.commandWorked(db.adminCommand({reshardCollection: nss, key: {key2: 1}}));
     assert.commandWorked(
-        db.adminCommand({moveChunk: coll4, find: {key2: MinKey}, to: st.shard0.shardName}));
+        db.adminCommand({moveChunk: nss, find: {key2: MinKey}, to: st.shard0.shardName}));
     assert.commandWorked(
-        db.adminCommand({moveChunk: coll4, find: {key2: 1}, to: st.shard0.shardName}));
+        db.adminCommand({moveChunk: nss, find: {key2: 1}, to: st.shard0.shardName}));
     // Let defragementation run
     clearFailPointOnConfigNodes("afterBuildingNextDefragmentationPhase");
-    waitForEndOfDefragmentation(coll4);
+    waitForEndOfDefragmentation(nss);
     st.stopBalancer();
     // Ensure the defragmentation succeeded
-    const numChunksEnd = findChunksUtil.countChunksForNs(st.config, coll4);
+    const numChunksEnd = findChunksUtil.countChunksForNs(st.config, nss);
     assert.eq(numChunksEnd, 1);
 }
 
-const collection5 = db[collName + collCounter];
-const coll5 = collection5.getFullName();
-collCounter++;
-assert.commandWorked(st.s.adminCommand({shardCollection: coll5, key: {key: 1}}));
 jsTest.log("Refined shard key causes defragmentation to restart");
 {
+    const coll = getNewColl();
+    const nss = coll.getFullName();
+    assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {key: 1}}));
     // Create two chunks on shard0
-    collection5.insertOne({key: -1, key2: -1});
-    collection5.insertOne({key: 1, key2: 1});
-    assert.commandWorked(db.adminCommand({split: coll5, middle: {key: 1}}));
+    coll.insertOne({key: -1, key2: -1});
+    coll.insertOne({key: 1, key2: 1});
+    assert.commandWorked(db.adminCommand({split: nss, middle: {key: 1}}));
     // Pause defragmentation after initialization but before phase 1 runs
     setFailPointOnConfigNodes("afterBuildingNextDefragmentationPhase", "alwaysOn");
     assert.commandWorked(st.s.adminCommand({
-        configureCollectionBalancing: coll5,
+        configureCollectionBalancing: nss,
         defragmentCollection: true,
         chunkSize: chunkSize,
     }));
     st.startBalancer();
     // Refine shard key - shouldn't change uuid
-    assert.commandWorked(collection5.createIndex({key: 1, key2: 1}));
-    assert.commandWorked(
-        db.adminCommand({refineCollectionShardKey: coll5, key: {key: 1, key2: 1}}));
+    assert.commandWorked(coll.createIndex({key: 1, key2: 1}));
+    assert.commandWorked(db.adminCommand({refineCollectionShardKey: nss, key: {key: 1, key2: 1}}));
     // Let defragementation run
     clearFailPointOnConfigNodes("afterBuildingNextDefragmentationPhase");
-    waitForEndOfDefragmentation(coll5);
+    waitForEndOfDefragmentation(nss);
     st.stopBalancer();
     // Ensure the defragmentation succeeded
-    const numChunksEnd = findChunksUtil.countChunksForNs(st.config, coll5);
+    const numChunksEnd = findChunksUtil.countChunksForNs(st.config, nss);
     assert.eq(numChunksEnd, 1);
 }
 
