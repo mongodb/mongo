@@ -188,7 +188,6 @@ class WindowsDumper(Dumper):
         self._root_logger.info("Debugger %s, analyzing %s processes with PIDs %s", dbg, pinfo.name,
                                str(pinfo.pidv))
 
-        # TODO: SERVER-48449
         for pid in pinfo.pidv:
             logger = _get_process_logger(self._dbg_output, pinfo.name, pid=pid)
 
