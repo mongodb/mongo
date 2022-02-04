@@ -470,11 +470,13 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
     /*
      * The read of the transaction ID pinned by a checkpoint needs to be carefully ordered: if a
      * checkpoint is starting and we have to start checking the pinned ID, we take the minimum of it
-     * with the oldest ID, which is what we want.
+     * with the oldest ID, which is what we want. The logged tables are excluded as part of RTS, so
+     * there is no need of holding their oldest_id
      */
     WT_READ_BARRIER();
 
-    if (!F_ISSET(conn, WT_CONN_RECOVERING)) {
+    if (!F_ISSET(conn, WT_CONN_RECOVERING) || session->dhandle == NULL ||
+      __wt_btree_immediately_durable(session)) {
         /*
          * Checkpoint transactions often fall behind ordinary application threads. If there is an
          * active checkpoint, keep changes until checkpoint is finished.
