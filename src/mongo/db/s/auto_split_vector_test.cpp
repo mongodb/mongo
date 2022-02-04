@@ -121,25 +121,45 @@ class AutoSplitVectorTest10MB : public AutoSplitVectorTest {
 
         auto opCtx = operationContext();
 
-        DBDirectClient client(opCtx);
-        client.createIndex(kNss.ns(), BSON(kPattern << 1));
-
         insertNDocsOf1MB(opCtx, 10 /* nDocs */);
+
+        DBDirectClient client(opCtx);
         ASSERT_EQUALS(10, client.count(kNss));
     }
 };
 
 // Throw exception upon calling autoSplitVector on dropped/unexisting collection
-TEST_F(AutoSplitVectorTest10MB, NoCollection) {
+TEST_F(AutoSplitVectorTest, NoCollection) {
     ASSERT_THROWS_CODE(autoSplitVector(operationContext(),
                                        NamespaceString("dummy", "collection"),
                                        BSON(kPattern << 1) /* shard key pattern */,
-                                       BSON(kPattern << 0) /* min */,
-                                       BSON(kPattern << 100) /* max */,
+                                       BSON(kPattern << kMinBSONKey) /* min */,
+                                       BSON(kPattern << kMaxBSONKey) /* max */,
                                        1 * 1024 * 1024 /* max chunk size in bytes*/),
                        DBException,
                        ErrorCodes::NamespaceNotFound);
 }
+
+TEST_F(AutoSplitVectorTest, EmptyCollection) {
+    const auto splitKey = autoSplitVector(operationContext(),
+                                          kNss,
+                                          BSON(kPattern << 1) /* shard key pattern */,
+                                          BSON(kPattern << kMinBSONKey) /* min */,
+                                          BSON(kPattern << kMaxBSONKey) /* max */,
+                                          1 * 1024 * 1024 /* max chunk size in bytes*/);
+    ASSERT_EQ(0, splitKey.size());
+}
+
+TEST_F(AutoSplitVectorTest10MB, EmptyRange) {
+    const auto splitKey = autoSplitVector(operationContext(),
+                                          kNss,
+                                          BSON(kPattern << 1) /* shard key pattern */,
+                                          BSON(kPattern << kMinBSONKey) /* min */,
+                                          BSON(kPattern << -10) /* max */,
+                                          1 * 1024 * 1024 /* max chunk size in bytes*/);
+    ASSERT_EQ(0, splitKey.size());
+}
+
 
 // No split points if estimated `data size < max chunk size`
 TEST_F(AutoSplitVectorTest10MB, NoSplitIfDataLessThanMaxChunkSize) {
