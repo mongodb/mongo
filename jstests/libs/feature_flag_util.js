@@ -14,7 +14,7 @@ var FeatureFlagUtil = class {
                 flagDoc.featureFlag${featureFlag}.value &&
                 (!fcvDoc.hasOwnProperty("featureCompatibilityVersion") ||
                 MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
-                                            flagDoc.featureFlag${featureFlag}.fcv) >= 0);`
+                                            flagDoc.featureFlag${featureFlag}.version) >= 0);`
         );
     }
 };
