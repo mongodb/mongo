@@ -43,15 +43,16 @@ function testIpAllowlistRuntime(description, allowlistString, authResult) {
     print("Runtime: " + description);
 
     const conn = MongoRunner.runMongod({keyFile: "jstests/libs/key1"});
+    const admin = conn.getDB('admin');
+    const local = conn.getDB('local');
 
     // Must create a user to verify that we don't fallback to localhost exception for auth.
-    assert.commandWorked(
-        conn.getDB('admin').runCommand({createUser: 'admin', pwd: 'admin', roles: ['root']}));
+    assert.commandWorked(admin.runCommand({createUser: 'admin', pwd: 'admin', roles: ['root']}));
 
-    assert.eq(true, conn.getDB("local").auth("__system", "foopdedoop"));
+    assert(local.auth("__system", "foopdedoop"));
 
     print("Testing whether __system can login after set to: " + allowlistString);
-    assert.commandWorked(conn.adminCommand(
+    assert.commandWorked(admin.runCommand(
         {setParameter: 1, "clusterIpSourceAllowlist": allowlistString.split(",")}));
     if (!authResult) {
         // At this time we have no valid authentication, and existing session should reset.
@@ -60,18 +61,21 @@ function testIpAllowlistRuntime(description, allowlistString, authResult) {
         assert.commandFailed(conn.adminCommand({fsync: 1}));
     }
 
-    assert.eq(authResult, conn.getDB("local").auth("__system", "foopdedoop"));
+    let authDB = local;
+    assert.eq(authResult, local.auth("__system", "foopdedoop"));
     emitWarningAuthErrorIsExpected(authResult);
 
     if (!authResult) {
         print("Authenticating with admin user since __system is barred");
-        conn.getDB('admin').auth('admin', 'admin');
+        assert(admin.auth('admin', 'admin'));
+        authDB = admin;
     }
 
     print("Testing that __system can login after reset to null");
-    assert.commandWorked(conn.adminCommand({setParameter: 1, "clusterIpSourceAllowlist": null}));
-    conn.getDB("local").logout();
-    assert.eq(true, conn.getDB("local").auth("__system", "foopdedoop"));
+    assert.commandWorked(admin.runCommand({setParameter: 1, "clusterIpSourceAllowlist": null}));
+    authDB.logout();
+
+    assert.eq(true, local.auth("__system", "foopdedoop"));
     MongoRunner.stopMongod(conn);
 }
 

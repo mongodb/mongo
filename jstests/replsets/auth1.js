@@ -105,6 +105,7 @@ print("unauthorized:");
 printjson(primary.adminCommand({replSetGetStatus: 1}));
 
 doQueryOn(primary);
+primary.getDB("admin").logout();
 
 result = secondary.getDB("test").auth("bar", "baz");
 assert.eq(result, 1);
@@ -119,6 +120,7 @@ for (var i = 0; i < 1000; i++) {
     bulk.insert({x: i, foo: "bar"});
 }
 assert.commandWorked(bulk.execute({w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}));
+primary.getDB("test").logout();
 
 print("fail over");
 rs.stop(mId);
@@ -132,17 +134,21 @@ for (var i = 0; i < 1000; i++) {
     bulk.insert({x: i, foo: "bar"});
 }
 assert.commandWorked(bulk.execute({w: 2}));
+primary.getDB("test").logout();
 
 print("resync");
 rs.restart(mId, {"keyFile": key1_600});
+rs.keyFile = key1_600;
 primary = rs.getPrimary();
 
 print("add some more data 2");
+primary.getDB("test").auth("bar", "baz");
 bulk = primary.getDB("test").foo.initializeUnorderedBulkOp();
 for (var i = 0; i < 1000; i++) {
     bulk.insert({x: i, foo: "bar"});
 }
 bulk.execute({w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS});
+primary.getDB("test").logout();
 
 print("add member with wrong key");
 var conn = MongoRunner.runMongod({
@@ -162,6 +168,8 @@ try {
 } catch (e) {
     print("error: " + e);
 }
+primary.getDB("admin").logout();
+
 primary = rs.getPrimary();
 primary.getDB("admin").auth("foo", "bar");
 
@@ -173,6 +181,7 @@ for (var i = 0; i < 10; i++) {
     assert(results.members[3].state != 2);
     sleep(1000);
 }
+primary.getDB("admin").logout();
 
 print("stop member");
 MongoRunner.stopMongod(conn);
@@ -186,6 +195,7 @@ var conn = MongoRunner.runMongod({
     keyFile: key1_600
 });
 
+primary.getDB('admin').auth("foo", "bar");
 wait(function() {
     try {
         var results = primary.adminCommand({replSetGetStatus: 1});
@@ -196,6 +206,7 @@ wait(function() {
     }
     return false;
 });
+primary.getDB('admin').logout();
 
 print("make sure it has the config, too");
 assert.soon(function() {
@@ -203,6 +214,7 @@ assert.soon(function() {
         rs.nodes[i].setSecondaryOk();
         rs.nodes[i].getDB("admin").auth("foo", "bar");
         config = rs.nodes[i].getDB("local").system.replset.findOne();
+        rs.nodes[i].getDB("admin").logout();
         // We expect the config version to be 3 due to the initial config and then the
         // 'newlyAdded' removal reconfig.
         if (config.version !== 3) {

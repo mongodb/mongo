@@ -12,6 +12,8 @@
 
 load('jstests/ssl/libs/ssl_helpers.js');
 
+TestData.disableImplicitSessions = true;
+
 (function() {
 'use strict';
 var dbName = 'upgradeToX509';
@@ -47,10 +49,15 @@ assert.commandWorked(testDB.a.insert({a: 1, str: 'TESTTESTTEST'}));
 assert.eq(2, testDB.a.count(), 'Error interacting with replSet');
 
 print('=== UPGRADE transition to x509/preferSSL -> x509/requireSSL ===');
+
+// Pre-logout so that upgradeSet() can authenticate for itself.
+rst.nodes.forEach((node) => node.getDB('admin').logout());
 rst.upgradeSet(x509RequireSSL, 'root', 'root');
 
-// upgradeSet leaves its connections logged in as root
-testDB = rst.getPrimary().getDB(dbName);
+// Reauth and commit one last write.
+const finalPrimary = rst.getPrimary();
+assert(finalPrimary.getDB('admin').auth('root', 'root'));
+testDB = finalPrimary.getDB(dbName);
 assert.commandWorked(testDB.a.insert({a: 1, str: 'TESTTESTTEST'}));
 assert.eq(3, testDB.a.count(), 'Error interacting with replSet');
 

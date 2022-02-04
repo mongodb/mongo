@@ -20,33 +20,39 @@ var testRole = "userDefinedRolesTestRole";
 load("jstests/auth/lib/commands_lib.js");
 load("jstests/libs/fail_point_util.js");
 
+function doTestSetup(conn, t, testcase, privileges) {
+    const admin = conn.getDB('admin');
+    const runOnDb = conn.getDB(testcase.runOnDb);
+    const state = authCommandsLib.setup(conn, t, runOnDb);
+
+    assert(admin.auth('admin', 'password'));
+    assert.commandWorked(admin.runCommand({updateRole: testRole, privileges: privileges}));
+    admin.logout();
+
+    return state;
+}
+
+function doTestTeardown(conn, t, testcase, res) {
+    const runOnDb = conn.getDB(testcase.runOnDb);
+    authCommandsLib.teardown(conn, t, runOnDb, res);
+}
+
 /**
  * Run the command specified in 't' with the privileges specified in 'privileges'.
  */
 function testProperAuthorization(conn, t, testcase, privileges) {
-    var out = "";
-
-    var runOnDb = conn.getDB(testcase.runOnDb);
-    var firstDb = conn.getDB(firstDbName);
-    var adminDb = conn.getDB(adminDbName);
-
-    var state = authCommandsLib.setup(conn, t, runOnDb);
-
-    adminDb.auth("admin", "password");
-    assert.commandWorked(adminDb.runCommand({updateRole: testRole, privileges: privileges}));
-    adminDb.logout();
-
-    assert(adminDb.auth(testUser, "password"));
-
+    const runOnDb = conn.getDB(testcase.runOnDb);
+    const state = doTestSetup(conn.sidechannel, t, testcase, privileges);
     authCommandsLib.authenticatedSetup(t, runOnDb);
 
-    var command = t.command;
+    let command = t.command;
     if (typeof (command) === "function") {
         command = t.command(state, testcase.commandArgs);
     }
-    var res = runOnDb.runCommand(command);
+    const res = runOnDb.runCommand(command);
 
-    if (!testcase.expectFail && res.ok != 1 && res.code != commandNotSupportedCode) {
+    let out = "";
+    if (!testcase.expectFail && (res.ok != 1) && (res.code != commandNotSupportedCode)) {
         // don't error if the test failed with code commandNotSupported since
         // some storage engines don't support some commands.
         out = "command failed with " + tojson(res) + " on db " + testcase.runOnDb +
@@ -57,47 +63,34 @@ function testProperAuthorization(conn, t, testcase, privileges) {
             tojson(privileges);
     }
 
-    firstDb.logout();
-    authCommandsLib.teardown(conn, t, runOnDb, res);
+    doTestTeardown(conn.sidechannel, t, testcase, res);
     return out;
 }
 
 function testInsufficientPrivileges(conn, t, testcase, privileges) {
-    var out = "";
-
-    var runOnDb = conn.getDB(testcase.runOnDb);
-    var firstDb = conn.getDB(firstDbName);
-    var adminDb = conn.getDB(adminDbName);
-
-    var state = authCommandsLib.setup(conn, t, runOnDb);
-
-    adminDb.auth("admin", "password");
-    assert.commandWorked(adminDb.runCommand({updateRole: testRole, privileges: privileges}));
-    adminDb.logout();
-
-    assert(adminDb.auth(testUser, "password"));
-
+    const runOnDb = conn.getDB(testcase.runOnDb);
+    const state = doTestSetup(conn.sidechannel, t, testcase, privileges);
     authCommandsLib.authenticatedSetup(t, runOnDb);
 
-    var command = t.command;
+    let command = t.command;
     if (typeof (command) === "function") {
         command = t.command(state, testcase.commandArgs);
     }
-    var res = runOnDb.runCommand(command);
+    const res = runOnDb.runCommand(command);
 
-    if (res.ok == 1 || res.code != authErrCode) {
+    let out = "";
+    if ((res.ok == 1) || (res.code != authErrCode)) {
         out = "expected authorization failure " +
             " but received " + tojson(res) + " with privileges " + tojson(privileges);
     }
 
-    firstDb.logout();
-    authCommandsLib.teardown(conn, t, runOnDb);
+    doTestTeardown(conn.sidechannel, t, testcase, res);
     return out;
 }
 
 function runOneTest(conn, t) {
-    var failures = [];
-    var msg;
+    const failures = [];
+    let msg;
 
     // Some tests requires mongot, however, setting this failpoint will make search queries to
     // return EOF, that way all the hassle of setting it up can be avoided.
@@ -106,8 +99,8 @@ function runOneTest(conn, t) {
         disableSearchFailpoint = configureFailPoint(conn.rs0 ? conn.rs0.getPrimary() : conn,
                                                     'searchReturnEofImmediately');
     }
-    for (var i = 0; i < t.testcases.length; i++) {
-        var testcase = t.testcases[i];
+    for (let i = 0; i < t.testcases.length; i++) {
+        const testcase = t.testcases[i];
         if (!("privileges" in testcase)) {
             continue;
         }
@@ -123,9 +116,9 @@ function runOneTest(conn, t) {
         if ((testcase.privileges.length == 1 && testcase.privileges[0].actions.length > 1) ||
             testcase.privileges.length > 1) {
             for (var j = 0; j < testcase.privileges.length; j++) {
-                var p = testcase.privileges[j];
-                var resource = p.resource;
-                var actions = p.actions;
+                const p = testcase.privileges[j];
+                const resource = p.resource;
+                const actions = p.actions;
 
                 // A particular privilege can explicitly specify that it should not be removed when
                 // testing for authorization failure. This accommodates special-case behavior for
@@ -134,8 +127,8 @@ function runOneTest(conn, t) {
                     continue;
                 }
 
-                for (var k = 0; k < actions.length; k++) {
-                    var privDoc = {resource: resource, actions: [actions[k]]};
+                for (let k = 0; k < actions.length; k++) {
+                    const privDoc = {resource: resource, actions: [actions[k]]};
                     msg = testInsufficientPrivileges(conn, t, testcase, [privDoc]);
                     if (msg) {
                         failures.push(t.testname + ": " + msg);
@@ -150,9 +143,10 @@ function runOneTest(conn, t) {
             failures.push(t.testname + ": " + msg);
         }
 
-        var specialResource = function(resource) {
-            if (!resource)
+        function specialResource(resource) {
+            if (!resource) {
                 return true;
+            }
 
             // Tests which use {db: "local", collection: "oplog.rs"} will not work with
             // {db: "", collection: "oplog.rs"}. oplog.rs is special, and does not match with
@@ -162,13 +156,13 @@ function runOneTest(conn, t) {
             // the same property as oplog.rs.
             return !resource.db || !resource.collection ||
                 resource.collection.startsWith("system.") || resource.db == "local";
-        };
+        }
 
         // Test for proper authorization with the test case's privileges where non-system
         // collections are modified to be the empty string.
         msg = testProperAuthorization(conn, t, testcase, testcase.privileges.map(function(priv) {
             // Make a copy of the privilege so as not to modify the original array.
-            var modifiedPrivilege = Object.extend({}, priv, true);
+            const modifiedPrivilege = Object.extend({}, priv, true);
             if (modifiedPrivilege.resource.collection && !specialResource(priv.resource)) {
                 modifiedPrivilege.resource.collection = "";
             }
@@ -182,7 +176,7 @@ function runOneTest(conn, t) {
         // empty string.
         msg = testProperAuthorization(conn, t, testcase, testcase.privileges.map(function(priv) {
             // Make a copy of the privilege so as not to modify the original array.
-            var modifiedPrivilege = Object.extend({}, priv, true);
+            const modifiedPrivilege = Object.extend({}, priv, true);
             if (!specialResource(priv.resource)) {
                 modifiedPrivilege.resource.db = "";
             }
@@ -201,8 +195,7 @@ function runOneTest(conn, t) {
 }
 
 function createUsers(conn) {
-    var adminDb = conn.getDB(adminDbName);
-    var firstDb = conn.getDB(firstDbName);
+    const adminDb = conn.getDB(adminDbName);
     adminDb.createUser({user: "admin", pwd: "password", roles: ["__system"]});
 
     assert(adminDb.auth("admin", "password"));
@@ -212,18 +205,41 @@ function createUsers(conn) {
         {createUser: testUser, pwd: "password", roles: [{role: testRole, db: adminDbName}]}));
 
     adminDb.logout();
+
+    // Primary connection will now act as test user only.
+    assert(adminDb.auth(testUser, "password"));
 }
 
-var opts = {auth: "", enableExperimentalStorageDetailsCmd: ""};
-var impls = {createUsers: createUsers, runOneTest: runOneTest};
+const opts = {
+    auth: "",
+    enableExperimentalStorageDetailsCmd: ""
+};
+const impls = {
+    createUsers: createUsers,
+    runOneTest: runOneTest
+};
 
 // run all tests standalone
-var conn = MongoRunner.runMongod(opts);
-authCommandsLib.runTests(conn, impls);
-MongoRunner.stopMongod(conn);
+{
+    const conn = MongoRunner.runMongod(opts);
+
+    // Create secondary connection to be intermittently authed
+    // with admin privileges for setup/teardown.
+    conn.sidechannel = new Mongo(conn.host);
+    authCommandsLib.runTests(conn, impls);
+    MongoRunner.stopMongod(conn);
+}
 
 // run all tests sharded
-conn = new ShardingTest(
-    {shards: 1, mongos: 1, config: 1, keyFile: "jstests/libs/key1", other: {shardOptions: opts}});
-authCommandsLib.runTests(conn, impls);
-conn.stop();
+{
+    const conn = new ShardingTest({
+        shards: 1,
+        mongos: 1,
+        config: 1,
+        keyFile: "jstests/libs/key1",
+        other: {shardOptions: opts}
+    });
+    conn.sidechannel = new Mongo(conn.s0.host);
+    authCommandsLib.runTests(conn, impls);
+    conn.stop();
+}

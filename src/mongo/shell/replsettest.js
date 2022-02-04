@@ -187,7 +187,7 @@ var ReplSetTest = function(opts) {
      * assume that it already has the correct privileges. It is up to the caller of this function to
      * ensure that the connection is appropriately authenticated.
      */
-    function asCluster(conn, fn, keyFileParam = self.keyFile) {
+    function asCluster(conn, fn, keyFileParam = undefined) {
         let connArray = conn;
         if (conn.length == null)
             connArray = [conn];
@@ -202,6 +202,7 @@ var ReplSetTest = function(opts) {
         const authMode = connOptions.clusterAuthMode || connArray[0].clusterAuthMode ||
             jsTest.options().clusterAuthMode;
 
+        keyFileParam = keyFileParam || connOptions.keyFile || self.keyFile;
         let needsAuth = (keyFileParam || authMode === "x509" || authMode === "sendX509" ||
                          authMode === "sendKeyFile") &&
             unauthenticatedConns.length > 0;
@@ -356,12 +357,22 @@ var ReplSetTest = function(opts) {
                 if (!conn)
                     return false;
 
+                if (reconnectNode instanceof Function) {
+                    // Allow caller to perform tasks on reconnect.
+                    reconnectNode(conn);
+                }
+
                 asCluster(conn, function() {
                     status = conn.getDB('admin').runCommand({replSetGetStatus: 1});
                 });
             } catch (ex) {
                 print("ReplSetTest waitForIndicator could not get status: " + tojson(ex));
                 return false;
+            }
+
+            if (status.code == ErrorCodes.Unauthorized) {
+                // If we're not authorized already, then we never will be.
+                assert.commandWorked(status);  // throws
             }
 
             var printStatus = false;

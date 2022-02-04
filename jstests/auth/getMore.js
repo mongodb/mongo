@@ -7,8 +7,8 @@
 TestData.disableImplicitSessions = true;
 
 function runTest(conn) {
-    let adminDB = conn.getDB("admin");
-    let hello = adminDB.runCommand("hello");
+    const adminDB = conn.getDB("admin");
+    const hello = adminDB.runCommand("hello");
     assert.commandWorked(hello);
     const isMongos = (hello.msg === "isdbgrid");
 
@@ -252,70 +252,15 @@ function runTest(conn) {
         adminDB.runCommand({createUser: "fooBarUser", pwd: "pwd", roles: ["readFooBar"]}));
 
     adminDB.logout();
-
-    // Test that a cursor created by "fooUser" and "fooBarUser" can be used by "fooUser".
-    assert.eq(1, testDB.auth("fooUser", "pwd"));
-    assert.eq(1, adminDB.auth("fooBarUser", "pwd"));
-    res = assert.commandWorked(testDB.runCommand({find: "foo", batchSize: 0}));
-    cursorId = res.cursor.id;
-    assert.neq(0, cursorId);
-    adminDB.logout();
-    assert.commandWorked(testDB.runCommand({getMore: cursorId, collection: "foo"}));
-    testDB.logout();
-
-    // Test that a cursor created by "fooUser" and "fooBarUser" cannot be used by "fooUser" if
-    // "fooUser" does not have the privilege to read the collection.
-    assert.eq(1, testDB.auth("fooUser", "pwd"));
-    assert.eq(1, adminDB.auth("fooBarUser", "pwd"));
-    res = assert.commandWorked(testDB.runCommand({find: "bar", batchSize: 0}));
-    cursorId = res.cursor.id;
-    assert.neq(0, cursorId);
-    adminDB.logout();
-    assert.commandFailedWithCode(testDB.runCommand({getMore: cursorId, collection: "bar"}),
-                                 ErrorCodes.Unauthorized,
-                                 "read from a cursor without required privileges");
-    testDB.logout();
-
-    // Test that an aggregate cursor created by "fooUser" and "fooBarUser" cannot be used by
-    // "fooUser" if "fooUser" does not have all privileges required by the pipeline.
-    assert.eq(1, testDB.auth("fooUser", "pwd"));
-    assert.eq(1, adminDB.auth("fooBarUser", "pwd"));
-    res = assert.commandWorked(testDB.runCommand({
-        aggregate: "foo",
-        pipeline: [
-            {$match: {_id: 0}},
-            {$lookup: {from: "bar", localField: "_id", foreignField: "_id", as: "bar"}}
-        ],
-        cursor: {batchSize: 0}
-    }));
-    cursorId = res.cursor.id;
-    assert.neq(0, cursorId);
-    assert.commandWorked(testDB.runCommand({getMore: cursorId, collection: "foo"}));
-
-    res = assert.commandWorked(testDB.runCommand({
-        aggregate: "foo",
-        pipeline: [
-            {$match: {_id: 0}},
-            {$lookup: {from: "bar", localField: "_id", foreignField: "_id", as: "bar"}}
-        ],
-        cursor: {batchSize: 0}
-    }));
-    cursorId = res.cursor.id;
-    assert.neq(0, cursorId);
-    adminDB.logout();
-    assert.commandFailedWithCode(testDB.runCommand({getMore: cursorId, collection: "foo"}),
-                                 ErrorCodes.Unauthorized,
-                                 "read from a cursor without required privileges");
-    testDB.logout();
 }
 
 // Run the test on a standalone.
-let conn = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
+const conn = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
 runTest(conn);
 MongoRunner.stopMongod(conn);
 
 // Run the test on a sharded cluster.
-let cluster = new ShardingTest(
+const cluster = new ShardingTest(
     {shards: 1, mongos: 1, keyFile: "jstests/libs/key1", other: {shardOptions: {auth: ""}}});
 runTest(cluster);
 cluster.stop();

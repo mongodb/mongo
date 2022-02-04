@@ -71,20 +71,16 @@ assert.commandWorked(admin.runCommand(
     {moveChunk: collSharded.toString(), find: {_id: -1}, to: st.shard0.shardName}));
 
 st.printShardingStatus();
-var shardedDBUser = "shardedDBUser";
-var unshardedDBUser = "unshardedDBUser";
+const dbUser = "dbUser";
 
 jsTest.log("Setting up database users...");
 
-// Create db users
-collSharded.getDB().createUser({user: shardedDBUser, pwd: password, roles: ["readWrite"]});
-collUnsharded.getDB().createUser({user: unshardedDBUser, pwd: password, roles: ["readWrite"]});
-
+// Create db user
+admin.createUser({user: dbUser, pwd: password, roles: ["readWriteAnyDatabase"]});
 admin.logout();
 
 function authDBUsers(conn) {
-    conn.getDB(collSharded.getDB().toString()).auth(shardedDBUser, password);
-    conn.getDB(collUnsharded.getDB().toString()).auth(unshardedDBUser, password);
+    assert(conn.getDB('admin').auth(dbUser, password));
     return conn;
 }
 
@@ -92,8 +88,7 @@ function authDBUsers(conn) {
 // is received, and refreshing requires communication with the primary to obtain the newest version.
 // Read from the secondaries once before taking down primaries to ensure they have loaded the
 // routing table into memory.
-var mongosSetupConn = new Mongo(mongos.host);
-authDBUsers(mongosSetupConn);
+var mongosSetupConn = authDBUsers(new Mongo(mongos.host));
 mongosSetupConn.setReadPref("secondary");
 assert(!mongosSetupConn.getCollection(collSharded.toString()).find({}).hasNext());
 
@@ -106,7 +101,6 @@ gc();  // Clean up connections
 jsTest.log("Inserting initial data...");
 
 var mongosConnActive = authDBUsers(new Mongo(mongos.host));
-authDBUsers(mongosConnActive);
 var mongosConnIdle = null;
 var mongosConnNew = null;
 

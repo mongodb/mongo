@@ -6,11 +6,14 @@
 //   requires_non_retryable_commands,
 // ]
 
+(function() {
+'use strict';
+
 // This test is a basic sanity check of the shell helpers for manipulating user objects
 // It is not a comprehensive test of the functionality of the user manipulation commands
 function assertHasRole(rolesArray, roleName, roleDB) {
-    for (i in rolesArray) {
-        var curRole = rolesArray[i];
+    for (let i in rolesArray) {
+        const curRole = rolesArray[i];
         if (curRole.role == roleName && curRole.db == roleDB) {
             return;
         }
@@ -19,7 +22,6 @@ function assertHasRole(rolesArray, roleName, roleDB) {
 }
 
 function runTest(db) {
-    var db = db.getSiblingDB("user_management_helpers");
     db.dropDatabase();
     db.dropAllUsers();
 
@@ -27,12 +29,12 @@ function runTest(db) {
     db.createUser({user: "andy", pwd: "password", roles: ['readWrite']});
 
     // Test getUser
-    var userObj = db.getUser('spencer');
+    let userObj = db.getUser('spencer');
     assert.eq(1, userObj.roles.length);
     assertHasRole(userObj.roles, "readWrite", db.getName());
 
     // Test getUsers
-    var users = db.getUsers();
+    let users = db.getUsers();
     assert.eq(2, users.length);
     assert(users[0].user == 'spencer' || users[1].user == 'spencer');
     assert(users[0].user == 'andy' || users[1].user == 'andy');
@@ -93,6 +95,21 @@ function runTest(db) {
         db.createUser({user: 'user1', pwd: 'x', roles: [], passwordDigestor: 'foo'});
     });
     db.createUser({user: 'user1', pwd: 'x', roles: [], passwordDigestor: "server"});
+    assert(db.auth('user1', 'x'));
+    assert.throws(function() {
+        db.updateUser('user1', {pwd: 'y', digestPassword: true});
+    });
+    assert.throws(function() {
+        db.updateUser('user1', {pwd: 'y', digestPassword: false});
+    });
+    assert.throws(function() {
+        db.updateUser('user1', {pwd: 'y', passwordDigestor: 'foo'});
+    });
+
+    // Change password and reauth using new credentials.
+    db.updateUser('user1', {pwd: 'y', passwordDigestor: 'server'});
+    assert(db.auth('user1', 'y'));
+    db.logout();
 
     // Note that as of SERVER-32974, client-side digestion is only permitted under the SCRAM-SHA-1
     // mechanism.
@@ -103,22 +120,10 @@ function runTest(db) {
         mechanisms: ['SCRAM-SHA-1'],
         passwordDigestor: "client"
     });
-    assert(db.auth('user1', 'x'));
     assert(db.auth('user2', 'x'));
-
-    assert.throws(function() {
-        db.updateUser('user1', {pwd: 'y', digestPassword: true});
-    });
-    assert.throws(function() {
-        db.updateUser('user1', {pwd: 'y', digestPassword: false});
-    });
-    assert.throws(function() {
-        db.updateUser('user1', {pwd: 'y', passwordDigestor: 'foo'});
-    });
-    db.updateUser('user1', {pwd: 'y', passwordDigestor: 'server'});
     db.updateUser('user2', {pwd: 'y', mechanisms: ['SCRAM-SHA-1'], passwordDigestor: 'client'});
-    assert(db.auth('user1', 'y'));
     assert(db.auth('user2', 'y'));
+    db.logout();
 
     // Test createUser requires 'user' field
     assert.throws(function() {
@@ -132,9 +137,10 @@ function runTest(db) {
 }
 
 try {
-    runTest(db);
+    runTest(db.getSiblingDB('user_management_helpers'));
 } catch (x) {
     // BF-836 Print current users on failure to aid debugging
     db.getSiblingDB('admin').system.users.find().forEach(printjson);
     throw x;
 }
+})();

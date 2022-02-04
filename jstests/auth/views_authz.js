@@ -11,12 +11,12 @@ TestData.disableImplicitSessions = true;
 
 function runTest(conn) {
     // Create the admin user.
-    let adminDB = conn.getDB("admin");
+    const adminDB = conn.getDB("admin");
     assert.commandWorked(adminDB.runCommand({createUser: "admin", pwd: "admin", roles: ["root"]}));
-    assert.eq(1, adminDB.auth("admin", "admin"));
+    assert(adminDB.auth("admin", "admin"));
 
     const viewsDBName = "views_authz";
-    let viewsDB = adminDB.getSiblingDB(viewsDBName);
+    const viewsDB = adminDB.getSiblingDB(viewsDBName);
     viewsDB.dropAllUsers();
     viewsDB.logout();
 
@@ -38,7 +38,7 @@ function runTest(conn) {
         viewsDB.runCommand({createUser: "viewUser", pwd: "pwd", roles: ["readWriteView"]}));
 
     adminDB.logout();
-    assert.eq(1, viewsDB.auth("viewUser", "pwd"));
+    assert(viewsDB.auth("viewUser", "pwd"));
 
     const lookupStage = {$lookup: {from: "forbidden", localField: "x", foreignField: "x", as: "y"}};
     const graphLookupStage = {
@@ -104,6 +104,7 @@ function runTest(conn) {
     assert.commandFailedWithCode(viewsDB.runCommand({collMod: "view", viewOn: "other"}),
                                  ErrorCodes.InvalidOptions,
                                  "modified a view without having to specify 'pipeline'");
+    viewsDB.logout();
 
     // Create a view on a forbidden collection and populate it.
     assert.eq(1, adminDB.auth("admin", "admin"));
@@ -115,25 +116,27 @@ function runTest(conn) {
 
     // Performing a find on a readable view returns a cursor that allows us to perform a getMore
     // even if the underlying collection is unreadable.
+    assert(viewsDB.auth("viewUser", "pwd"));
     assert.commandFailedWithCode(viewsDB.runCommand({find: "forbidden"}),
                                  ErrorCodes.Unauthorized,
                                  "successfully performed a find on an unreadable namespace");
-    let res = viewsDB.runCommand({find: "view2", batchSize: 1});
+    const res = viewsDB.runCommand({find: "view2", batchSize: 1});
     assert.commandWorked(res, "could not perform a find on a readable view");
     assert.eq(res.cursor.ns,
               "views_authz.view2",
               "performing find on a view does not return a cursor on the view namespace");
     assert.commandWorked(viewsDB.runCommand({getMore: res.cursor.id, collection: "view2"}),
                          "could not perform getMore on a readable view");
+    viewsDB.logout();
 }
 
 // Run the test on a standalone.
-let mongod = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
+const mongod = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
 runTest(mongod);
 MongoRunner.stopMongod(mongod);
 
 // Run the test on a sharded cluster.
-let cluster = new ShardingTest(
+const cluster = new ShardingTest(
     {shards: 1, mongos: 1, keyFile: "jstests/libs/key1", other: {shardOptions: {auth: ""}}});
 runTest(cluster);
 cluster.stop();

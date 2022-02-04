@@ -272,20 +272,6 @@ TEST_F(LogicalSessionIdTest, GenWithUser) {
     ASSERT_EQ(lsid.getUid(), user->getDigest());
 }
 
-TEST_F(LogicalSessionIdTest, GenWithMultipleAuthedUsers) {
-    addSimpleUser(UserName("simple", "test"));
-    addSimpleUser(UserName("simple", "test2"));
-
-    ASSERT_THROWS_WITH_CHECK(makeLogicalSessionId(_opCtx.get()),
-                             AssertionException,
-                             [](const AssertionException& exception) {
-                                 ASSERT_EQ(exception.code(), ErrorCodes::Unauthorized);
-                                 ASSERT_STRING_CONTAINS(
-                                     exception.reason(),
-                                     "docs.mongodb.com/manual/core/authentication");
-                             });
-}
-
 TEST_F(LogicalSessionIdTest, GenWithoutAuthedUser) {
     ASSERT_THROWS(makeLogicalSessionId(_opCtx.get()), AssertionException);
 }
@@ -459,23 +445,6 @@ TEST_F(LogicalSessionIdTest, ConstructorFromClientWithTooLongName) {
     req.setId(id);
 
     ASSERT_THROWS(makeLogicalSessionId(req, _opCtx.get()), AssertionException);
-}
-
-TEST_F(LogicalSessionIdTest, MultipleUsersPerSessionIsNotAllowed) {
-    addSimpleUser(UserName("simple", "test"));
-    addSimpleUser(UserName("simple", "test2"));
-
-    LogicalSessionFromClient lsid;
-    lsid.setId(UUID::gen());
-
-    ASSERT_THROWS_CODE(initializeOperationSessionInfo(
-                           _opCtx.get(),
-                           BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL),
-                           true,
-                           true,
-                           true),
-                       AssertionException,
-                       ErrorCodes::Unauthorized);
 }
 
 }  // namespace

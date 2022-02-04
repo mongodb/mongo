@@ -28,10 +28,12 @@ function runTest(conn) {
 
         const vanillaConn = new Mongo(conn.host);
         assert(vanillaConn.getDB(db1).auth(user1, pass), "Initial authN should succeed");
-        assert(vanillaConn.getDB(db2).auth(user2, pass), "AuthN on another db should succeed");
+        assert(!vanillaConn.getDB(db2).auth(user2, pass), "AuthN on another db should not succeed");
         assert(vanillaConn.getDB(db1).auth(user1, pass), "Re-authN as first user should succeed");
-        assert(vanillaConn.getDB(db3).auth(user3, pass),
-               "AuthN as a new user on the first database should succeed");
+        assert(!vanillaConn.getDB(db3).auth(user3, pass),
+               "AuthN as a new user on the first database should not succeed");
+
+        vanillaConn.getDB(db1).logout();
     }
 
     {
@@ -39,10 +41,12 @@ function runTest(conn) {
 
         const laxConn = new Mongo(conn.host, undefined, {api: {version: '1', strict: false}});
         assert(laxConn.getDB(db1).auth(user1, pass), "Initial authN should succeed");
-        assert(laxConn.getDB(db2).auth(user2, pass), "AuthN on another db should succeed");
+        assert(!laxConn.getDB(db2).auth(user2, pass), "AuthN on another db should not succeed");
         assert(laxConn.getDB(db1).auth(user1, pass), "Re-authN as first user should succeed");
-        assert(laxConn.getDB(db3).auth(user3, pass),
-               "AuthN as a new user on the first database should succeed");
+        assert(!laxConn.getDB(db3).auth(user3, pass),
+               "AuthN as a new user on the first database should not succeed");
+
+        laxConn.getDB(db1).logout();
     }
 
     {
@@ -54,6 +58,8 @@ function runTest(conn) {
         assert(!strictConn.getDB(db1).auth(user1, pass), "Re-authN as first user should fail");
         assert(!strictConn.getDB(db3).auth(user3, pass),
                "AuthN as a new user on the first database should fail");
+
+        strictConn.getDB(db1).logout();
     }
 
     {
@@ -64,11 +70,13 @@ function runTest(conn) {
         const strictishConn = new Mongo(conn.host, undefined, {api: {version: '1', strict: true}});
 
         assert(strictishConn.getDB(db1).auth(user1, pass), "Initial authN should succeed");
-        assert(strictishConn.getDB(db2).auth(user2, pass), "AuthN on another db should succeed");
+        assert(!strictishConn.getDB(db2).auth(user2, pass),
+               "AuthN on another db should not succeed");
         assert(strictishConn.getDB(db1).auth(user1, pass), "Re-authN as first user should succeed");
-        assert(strictishConn.getDB(db3).auth(user3, pass),
-               "AuthN as a new user on the first database should succeed");
+        assert(!strictishConn.getDB(db3).auth(user3, pass),
+               "AuthN as a new user on the first database should not succeed");
 
+        strictishConn.getDB(db1).logout();
         fp.off();
     }
 }

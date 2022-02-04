@@ -30,6 +30,7 @@ assert.commandWorked(testDB.runCommand({
     pwd: 'pwd',
     roles: [{role: 'advanceClusterTimeRole', db: 'admin'}, 'readWrite']
 }));
+adminDB.logout();
 assert.eq(1, testDB.auth("NotTrusted", "pwd"));
 
 let res = testDB.runCommand({insert: "foo", documents: [{_id: 0}]});
@@ -49,6 +50,7 @@ jsTestLog("running NonTrusted. command: " + tojson(cmdObj));
 res = testDB.runCommand(cmdObj);
 assert.commandFailedWithCode(
     res, ErrorCodes.TimeProofMismatch, "Command request was: " + tojsononeline(cmdObj));
+testDB.logout();
 
 assert.eq(1, testDB.auth("Trusted", "pwd"));
 jsTestLog("running Trusted. command: " + tojson(cmdObj));

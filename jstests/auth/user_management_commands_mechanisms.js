@@ -6,7 +6,6 @@
 
 let mongod = MongoRunner.runMongod(
     {auth: "", setParameter: "authenticationMechanisms=SCRAM-SHA-1,SCRAM-SHA-256,PLAIN"});
-assert(mongod);
 const admin = mongod.getDB('admin');
 const test = mongod.getDB('test');
 
@@ -32,6 +31,7 @@ function checkUser(userid, passwd, haveSCRAMSHA1, haveSCRAMSHA256) {
         }
     }
 
+    assert(admin.auth('admin', 'pass'));
     const user = admin.system.users.findOne({_id: ('test.' + userid)});
     assert.eq(user.credentials.hasOwnProperty('SCRAM-SHA-1'), haveSCRAMSHA1);
     assert.eq(user.credentials.hasOwnProperty('SCRAM-SHA-256'), haveSCRAMSHA256);
@@ -54,6 +54,7 @@ function checkUser(userid, passwd, haveSCRAMSHA1, haveSCRAMSHA256) {
     assert.eq(userInfoWithCredentials.users[0].mechanisms.includes('SCRAM-SHA-1'), haveSCRAMSHA1);
     assert.eq(userInfoWithCredentials.users[0].mechanisms.includes('SCRAM-SHA-256'),
               haveSCRAMSHA256);
+    admin.logout();
 
     if (haveSCRAMSHA1) {
         checkCredentialRecord(user.credentials['SCRAM-SHA-1'], 28, 24, 10000);
@@ -70,45 +71,53 @@ function checkUser(userid, passwd, haveSCRAMSHA1, haveSCRAMSHA256) {
 admin.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
 assert(admin.auth('admin', 'pass'));
 
+function createUser(db, user) {
+    assert(admin.auth('admin', 'pass'));
+    db.createUser(user);
+    admin.logout();
+}
+
+function createUserThrows(db, user) {
+    assert(admin.auth('admin', 'pass'));
+    assert.throws(() => db.createUser(user));
+    admin.logout();
+}
+
 // Unknown mechanism.
-assert.throws(function() {
-    test.createUser({
-        user: 'shalala',
-        pwd: 'pass',
-        roles: jsTest.basicUserRoles,
-        mechanisms: ['SCRAM-SHA-1', 'SCRAM-SHA-LA-LA'],
-    });
+createUserThrows(test, {
+    user: 'shalala',
+    pwd: 'pass',
+    roles: jsTest.basicUserRoles,
+    mechanisms: ['SCRAM-SHA-1', 'SCRAM-SHA-LA-LA'],
 });
 
 // By default, users are created with both SCRAM variants.
-test.createUser({user: 'user', pwd: 'pass', roles: jsTest.basicUserRoles});
+createUser(test, {user: 'user', pwd: 'pass', roles: jsTest.basicUserRoles});
 checkUser('user', 'pass', true, true);
 
 // Request SHA1 only.
-test.createUser(
+createUser(
+    test,
     {user: 'sha1user', pwd: 'pass', roles: jsTest.basicUserRoles, mechanisms: ['SCRAM-SHA-1']});
 checkUser('sha1user', 'pass', true, false);
 
 // Request SHA256 only.
-test.createUser(
+createUser(
+    test,
     {user: 'sha256user', pwd: 'pass', roles: jsTest.basicUserRoles, mechanisms: ['SCRAM-SHA-256']});
 checkUser('sha256user', 'pass', false, true);
 
 // Fail passing an empty mechanisms field.
-assert.throws(function() {
-    test.createUser(
-        {user: 'userNoMech', pwd: 'pass', roles: jsTest.basicUserRoles, mechanisms: []});
-});
+createUserThrows(test,
+                 {user: 'userNoMech', pwd: 'pass', roles: jsTest.basicUserRoles, mechanisms: []});
 
 // Repeat above, but request client-side digesting.
 // Only the SCRAM-SHA-1 exclusive version should succeed.
 
-assert.throws(function() {
-    test.createUser(
-        {user: 'user2', pwd: 'pass', roles: jsTest.basicUserRoles, passwordDisgestor: 'client'});
-});
+createUserThrows(
+    test, {user: 'user2', pwd: 'pass', roles: jsTest.basicUserRoles, passwordDisgestor: 'client'});
 
-test.createUser({
+createUser(test, {
     user: 'sha1user2',
     pwd: 'pass',
     roles: jsTest.basicUserRoles,
@@ -117,46 +126,54 @@ test.createUser({
 });
 checkUser('sha1user2', 'pass', true, false);
 
-assert.throws(function() {
-    test.createUser({
-        user: 'sha256user2',
-        pwd: 'pass',
-        roles: jsTest.basicUserRoles,
-        mechanisms: ['SCRAM-SHA-256'],
-        passwordDigestor: 'client'
-    });
+createUserThrows(test, {
+    user: 'sha256user2',
+    pwd: 'pass',
+    roles: jsTest.basicUserRoles,
+    mechanisms: ['SCRAM-SHA-256'],
+    passwordDigestor: 'client'
 });
 
+function updateUser(db, user, props) {
+    assert(admin.auth('admin', 'pass'));
+    db.updateUser(user, props);
+    admin.logout();
+}
+
+function updateUserThrows(db, user, props) {
+    assert(admin.auth('admin', 'pass'));
+    assert.throws(() => db.updateUser(user, props));
+    admin.logout();
+}
+
 // Update original 1/256 user to just sha-1.
-test.updateUser('user', {pwd: 'pass1', mechanisms: ['SCRAM-SHA-1']});
+updateUser(test, 'user', {pwd: 'pass1', mechanisms: ['SCRAM-SHA-1']});
 checkUser('user', 'pass1', true, false);
 
 // Then flip to 256-only
-test.updateUser('user', {pwd: 'pass256', mechanisms: ['SCRAM-SHA-256']});
+updateUser(test, 'user', {pwd: 'pass256', mechanisms: ['SCRAM-SHA-256']});
 checkUser('user', 'pass256', false, true);
 
 // And back to (default) all.
-test.updateUser('user', {pwd: 'passAll'});
+updateUser(test, 'user', {pwd: 'passAll'});
 checkUser('user', 'passAll', true, true);
 
 // Trim out mechanisms without changing password.
-test.updateUser('user', {mechanisms: ['SCRAM-SHA-256']});
+updateUser(test, 'user', {mechanisms: ['SCRAM-SHA-256']});
 checkUser('user', 'passAll', false, true);
 
 // Fail when mechanisms is not a subset of the current user.
-assert.throws(function() {
-    test.updateUser('user', {mechanisms: ['SCRAM-SHA-1']});
-});
+updateUserThrows(test, 'user', {mechanisms: ['SCRAM-SHA-1']});
 
 // Fail when passing an empty mechanisms field.
-assert.throws(function() {
-    test.updateUser('user', {pwd: 'passEmpty', mechanisms: []});
-});
+updateUserThrows(test, 'user', {pwd: 'passEmpty', mechanisms: []});
 
 // Succeed if we're using SHA-1 only.
-test.createUser(
-    {user: "\u2168", pwd: 'pass', roles: jsTest.basicUserRoles, mechanisms: ['SCRAM-SHA-1']});
+createUser(
+    test, {user: "\u2168", pwd: 'pass', roles: jsTest.basicUserRoles, mechanisms: ['SCRAM-SHA-1']});
 checkUser("\u2168", 'pass', true, false);
+
+assert(admin.auth('admin', 'pass'));
 
 // Demonstrate that usersInfo returns all users with mechanisms lists
 const allUsersInfo = assert.commandWorked(test.runCommand({usersInfo: 1}));
@@ -195,22 +212,29 @@ assert.eq(["sha256user", "user"], foundUsers);
 MongoRunner.stopMongod(mongod);
 
 // Ensure mechanisms can be enabled and disabled.
-mongod = MongoRunner.runMongod({
-    auth: "",
-    setParameter: "authenticationMechanisms=SCRAM-SHA-1",
-    restart: mongod,
-    noCleanData: true
-});
-assert(mongod.getDB("test").auth("sha1user", "pass"));
-assert(!mongod.getDB("test").auth("sha256user", "pass"));
-MongoRunner.stopMongod(mongod);
-mongod = MongoRunner.runMongod({
-    auth: "",
-    setParameter: "authenticationMechanisms=SCRAM-SHA-256",
-    restart: mongod,
-    noCleanData: true
-});
-assert(!mongod.getDB("test").auth("sha1user", "pass"));
-assert(mongod.getDB("test").auth("sha256user", "pass"));
-MongoRunner.stopMongod(mongod);
+function restartWithOneMech(mech) {
+    const sha1ok = (mech === 'SCRAM-SHA-1');
+    const sha256ok = (mech === 'SCRAM-SHA-256');
+    mongod = MongoRunner.runMongod({
+        auth: "",
+        setParameter: "authenticationMechanisms=" + mech,
+        restart: mongod,
+        noCleanData: true
+    });
+
+    const test = mongod.getDB('test');
+    assert.eq(test.auth("sha1user", "pass"), sha1ok);
+    if (sha1ok) {
+        test.logout();
+    }
+    assert.eq(test.auth("sha256user", "pass"), sha256ok);
+    if (sha256ok) {
+        test.logout();
+    }
+    assert(mongod.getDB('admin').auth('admin', 'pass'));
+    MongoRunner.stopMongod(mongod);
+}
+
+restartWithOneMech('SCRAM-SHA-1');
+restartWithOneMech('SCRAM-SHA-256');
 })();

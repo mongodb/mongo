@@ -54,6 +54,7 @@ function createUsers(primary) {
         pwd: kUserWithAdvanceClusterTimePrivilege.pwd,
         roles: [{role: "advanceClusterTimeRole", db: "admin"}, "readWrite"]
     }));
+    adminDB.logout();
 }
 
 const rst1 = new ReplSetTest({
@@ -103,6 +104,9 @@ const rst2TestDB = rst2Primary.getDB(kDbName);
     assert.commandFailedWithCode(
         rst1TestDB.runCommand({find: kCollName, $clusterTime: rst2ClusterTime}),
         [ErrorCodes.TimeProofMismatch, ErrorCodes.KeyNotFound]);
+
+    rst1TestDB.logout();
+    rst2TestDB.logout();
 })();
 
 // Test clusterTime gossip when the client does have advanceClusterTime privilege.
@@ -123,6 +127,9 @@ const rst2TestDB = rst2Primary.getDB(kDbName);
     jsTest.log("rst2's clusterTime " + tojson(rst2ClusterTime));
 
     assert.commandWorked(rst1TestDB.runCommand({find: kCollName, $clusterTime: rst2ClusterTime}));
+
+    rst1TestDB.logout();
+    rst2TestDB.logout();
 })();
 
 rst1.stopSet();

@@ -15,7 +15,7 @@ const admin = mongod.getDB('admin');
 const external = mongod.getDB('$external');
 
 admin.createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
-admin.auth('admin', 'pwd');
+assert(admin.auth('admin', 'pwd'));
 
 const X509USER = 'CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US';
 external.createUser({user: X509USER, roles: []});
@@ -24,10 +24,19 @@ external.createUser({user: X509USER, roles: []});
 // For those, see jstests/auth/auth-counters.js
 const expected = assert.commandWorked(admin.runCommand({serverStatus: 1}))
                      .security.authentication.mechanisms[x509];
+admin.logout();
+
+function asAdmin(cmd, db = admin) {
+    // Does not interfere with stats since we only care about X509.
+    assert(admin.auth('admin', 'pwd'));
+    const result = assert.commandWorked(db.runCommand(cmd));
+    admin.logout();
+    return result;
+}
 
 function assertStats() {
-    const mechStats = assert.commandWorked(admin.runCommand({serverStatus: 1}))
-                          .security.authentication.mechanisms[x509];
+    const mechStats = asAdmin({serverStatus: 1}).security.authentication.mechanisms[x509];
+
     try {
         assert.eq(mechStats.authenticate.received, expected.authenticate.received);
         assert.eq(mechStats.authenticate.successful, expected.authenticate.successful);
@@ -90,11 +99,10 @@ assertSuccess({user: X509USER, mechanism: x509});
 assertSuccessInternal();
 
 // Fails once the user no longer exists.
-external.dropUser(X509USER);
+asAdmin({dropUser: X509USER}, external);
 assertFailure({mechanism: x509});
 
-const finalStats =
-    assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms;
+const finalStats = asAdmin({serverStatus: 1}).security.authentication.mechanisms;
 MongoRunner.stopMongod(mongod);
 printjson(finalStats);
 })();

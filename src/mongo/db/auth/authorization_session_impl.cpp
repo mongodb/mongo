@@ -206,40 +206,29 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
             // This is the first authentication.
             return;
         }
+        invariant(userCount == 1);
 
-        auto previousUser = _authenticatedUsers.lookupByDBName(userName.getDB());
-        if (previousUser) {
-            const auto& previousUserName = previousUser->getName();
-            if (previousUserName.getUser() == userName.getUser()) {
-                LOGV2_WARNING(5626700,
-                              "Client has attempted to reauthenticate as a single user",
-                              "user"_attr = userName);
-            } else {
-                LOGV2_WARNING(5626701,
-                              "Client has attempted to authenticate as multiple users on the "
-                              "same database",
-                              "previousUser"_attr = previousUserName,
-                              "user"_attr = userName);
-            }
-        } else {
-            LOGV2_WARNING(5626702,
-                          "Client has attempted to authenticate on multiple databases",
-                          "previousUsers"_attr = _authenticatedUsers.toBSON(),
+        auto previousUser = _authenticatedUsers.begin()->get()->getName();
+        if (previousUser == userName) {
+            // Allow reauthenticating as the same user, but warn.
+            LOGV2_WARNING(5626700,
+                          "Client has attempted to reauthenticate as a single user",
                           "user"_attr = userName);
-        }
 
-        const auto hasStrictAPI = APIParameters::get(opCtx).getAPIStrict().value_or(false);
-        if (!hasStrictAPI) {
-            // We're allowed to skip the uassert because we're not so strict.
-            return;
+            // Strict API requires no reauth, even as same user, unless FP is enabled.
+            const bool hasStrictAPI = APIParameters::get(opCtx).getAPIStrict().value_or(false);
+            uassert(5626703,
+                    "Each client connection may only be authenticated once",
+                    !hasStrictAPI || allowMultipleUsersWithApiStrict.shouldFail());
+        } else {
+            uassert(5626701,
+                    str::stream() << "Each client connection may only be authenticated once. "
+                                  << "Previously authenticated as: " << previousUser,
+                    previousUser.getDB() == userName.getDB());
+            uasserted(5626702,
+                      str::stream() << "Client has attempted to authenticate on multiple databases."
+                                    << "Already authenticated as: " << previousUser);
         }
-
-        if (allowMultipleUsersWithApiStrict.shouldFail()) {
-            // We've explicitly allowed this for testing.
-            return;
-        }
-
-        uasserted(5626703, "Each client connection may only be authenticated once");
     };
 
     // Check before we start to reveal as little as possible. Note that we do not need the lock
@@ -394,6 +383,16 @@ RoleNameIterator AuthorizationSessionImpl::getAuthenticatedRoleNames() {
 
 void AuthorizationSessionImpl::grantInternalAuthorization(Client* client) {
     stdx::lock_guard<Client> lk(*client);
+    if (MONGO_unlikely(_authenticatedUsers.count() > 0)) {
+        invariant(_authenticatedUsers.count() == 1);
+        auto previousUser = _authenticatedUsers.begin()->get()->getName();
+        uassert(ErrorCodes::Unauthorized,
+                str::stream() << "Unable to grant internal authorization, previously authorized as "
+                              << previousUser.getUnambiguousName(),
+                previousUser == internalSecurity.getUser()->get()->getName());
+        return;
+    }
+
     _authenticatedUsers.add(*internalSecurity.getUser());
     _updateInternalAuthorizationState();
 }

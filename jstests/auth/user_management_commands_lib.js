@@ -5,39 +5,42 @@
 function runAllUserManagementCommandsTests(conn, writeConcern) {
     'use strict';
 
-    var hasAuthzError = function(result) {
+    function hasAuthzError(result) {
         assert(result instanceof WriteCommandError);
         assert.eq(ErrorCodes.Unauthorized, result.code);
-    };
+    }
 
-    conn.getDB('admin').createUser({user: 'admin', pwd: 'pwd', roles: ['root']}, writeConcern);
-    conn.getDB('admin').auth('admin', 'pwd');
-    conn.getDB('admin').createUser({
+    const admin = conn.getDB('admin');
+
+    admin.createUser({user: 'admin', pwd: 'pwd', roles: ['root']}, writeConcern);
+    assert(admin.auth('admin', 'pwd'));
+    admin.createUser({
         user: 'userAdmin',
         pwd: 'pwd',
         roles: ['userAdminAnyDatabase'],
         customData: {userAdmin: true}
     },
-                                   writeConcern);
-    conn.getDB('admin').logout();
+                     writeConcern);
+    admin.logout();
 
-    var userAdminConn = new Mongo(conn.host);
-    userAdminConn.getDB('admin').auth('userAdmin', 'pwd');
-    var testUserAdmin = userAdminConn.getDB('test');
+    const userAdminConn = new Mongo(conn.host);
+    const userAdmin = userAdminConn.getDB('admin');
+    assert(userAdmin.auth('userAdmin', 'pwd'));
+    const testUserAdmin = userAdminConn.getDB('test');
     testUserAdmin.createRole({
         role: 'testRole',
         roles: [],
         privileges: [{resource: {db: 'test', collection: ''}, actions: ['viewRole']}],
     },
                              writeConcern);
-    userAdminConn.getDB('admin').createRole({
+    userAdmin.createRole({
         role: 'adminRole',
         roles: [],
         privileges: [{resource: {cluster: true}, actions: ['connPoolSync']}]
     },
-                                            writeConcern);
+                         writeConcern);
 
-    var db = conn.getDB('test');
+    const db = conn.getDB('test');
 
     // At this point there are 2 handles to the "test" database in use - "testUserAdmin" and "db".
     // "testUserAdmin" is on a connection which has been auth'd as a user with the
@@ -58,7 +61,7 @@ function runAllUserManagementCommandsTests(conn, writeConcern) {
                                  writeConcern);
         testUserAdmin.createUser({user: "andy", pwd: "pwd", roles: []}, writeConcern);
 
-        var user = testUserAdmin.getUser('spencer');
+        const user = testUserAdmin.getUser('spencer');
         assert.eq(10028, user.customData.zipCode);
         assert(db.auth('spencer', 'pwd'));
         assert.commandWorked(db.foo.insert({a: 1}));
@@ -69,6 +72,7 @@ function runAllUserManagementCommandsTests(conn, writeConcern) {
         assert.commandWorked(db.adminCommand('connPoolSync'));
 
         db.logout();
+
         assert(db.auth('andy', 'pwd'));
         hasAuthzError(db.foo.insert({a: 1}));
         assert.throws(function() {
@@ -77,20 +81,21 @@ function runAllUserManagementCommandsTests(conn, writeConcern) {
         assert.throws(function() {
             db.getRole('testRole');
         });
+        db.logout();
     })();
 
     (function testUpdateUser() {
         jsTestLog("Testing updateUser");
 
         testUserAdmin.updateUser('spencer', {pwd: 'password', customData: {}}, writeConcern);
-        var user = testUserAdmin.getUser('spencer');
-        assert.eq(null, user.customData.zipCode);
+        const user1 = testUserAdmin.getUser('spencer');
+        assert.eq(null, user1.customData.zipCode);
         assert(!db.auth('spencer', 'pwd'));
         assert(db.auth('spencer', 'password'));
 
         testUserAdmin.updateUser(
             'spencer', {customData: {zipCode: 10036}, roles: ["read", "testRole"]}, writeConcern);
-        var user = testUserAdmin.getUser('spencer');
+        const user = testUserAdmin.getUser('spencer');
         assert.eq(10036, user.customData.zipCode);
         hasAuthzError(db.foo.insert({a: 1}));
         assert.eq(1, db.foo.findOne().a);
@@ -217,7 +222,7 @@ function runAllUserManagementCommandsTests(conn, writeConcern) {
         jsTestLog("Testing usersInfo");
 
         jsTestLog("Running exact usersInfo with default options on username only");
-        var res = testUserAdmin.runCommand({usersInfo: 'spencer'});
+        let res = testUserAdmin.runCommand({usersInfo: 'spencer'});
         printjson(res);
         assert.eq(1, res.users.length);
         assert.eq(10036, res.users[0].customData.zipCode);
@@ -424,12 +429,14 @@ function runAllUserManagementCommandsTests(conn, writeConcern) {
         jsTestLog("Testing dropUser");
 
         assert(db.auth('spencer', 'password'));
+        db.logout();
         assert(db.auth('andy', 'pwd'));
 
         testUserAdmin.dropUser('spencer', writeConcern);
 
         assert(!db.auth('spencer', 'password'));
         assert(db.auth('andy', 'pwd'));
+        db.logout();
 
         assert.eq(1, testUserAdmin.getUsers().length);
     })();
@@ -439,6 +446,7 @@ function runAllUserManagementCommandsTests(conn, writeConcern) {
 
         assert.eq(1, testUserAdmin.getUsers().length);
         assert(db.auth('andy', 'pwd'));
+        db.logout();
 
         testUserAdmin.dropAllUsers(writeConcern);
 

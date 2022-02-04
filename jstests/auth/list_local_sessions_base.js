@@ -47,6 +47,7 @@ function runListLocalSessionsTest(mongod) {
     assert.eq(bsonWoCompare(resultArray, resultArrayMine), 0);
 
     // Ensure that changing users hides the session.
+    db.logout();
     assert(db.auth('user2', 'pass'));
     const otherArray = assert.doesNotThrow(listLocalSessions).toArray();
     assert.eq(otherArray.length, 0);

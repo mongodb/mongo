@@ -5,21 +5,24 @@
  * @tags: [requires_sharding]
  */
 
+(function() {
+'use strict';
+
 function runTest(conn) {
-    var authzErrorCode = 13;
+    const authzErrorCode = 13;
 
     conn.getDB('admin').createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
 
-    var adminConn = new Mongo(conn.host);
-    adminConn.getDB('admin').auth('admin', 'pwd');
-    var admin = adminConn.getDB('admin');
+    const adminConn = new Mongo(conn.host);
+    const admin = adminConn.getDB('admin');
+
+    assert(admin.auth('admin', 'pwd'));
     admin.createRole({role: 'myRole', roles: [], privileges: []});
     admin.createUser({user: 'spencer', pwd: 'pwd', roles: ['myRole']});
+    const arbitraryShard = admin.getSiblingDB("config").shards.findOne();
 
-    var db = conn.getDB('admin');
-    db.auth('admin', 'pwd');
-    var arbitraryShard = db.getSiblingDB("config").shards.findOne();
-    db.auth('spencer', 'pwd');
+    const db = conn.getDB('admin');
+    assert(db.auth('spencer', 'pwd'));
 
     /**
      * Tests that a single operation has the proper authorization.  The operation is run by invoking
@@ -30,7 +33,7 @@ function runTest(conn) {
      */
     function testProperAuthorization(testFunc, roles, privilege) {
         // Test built-in roles first
-        for (role in roles) {
+        for (let role in roles) {
             admin.updateRole("myRole", {roles: [role]});
             testFunc(roles[role]);
         }
@@ -197,3 +200,4 @@ jsTest.log('Test sharding');
 var st = new ShardingTest({shards: 2, config: 3, keyFile: 'jstests/libs/key1'});
 runTest(st.s);
 st.stop();
+})();

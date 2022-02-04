@@ -703,6 +703,7 @@ function runIdleSessionsTests(conn, adminDB, txnDB, useLocalOps) {
                   ])
                   .itcount(),
               0);
+    adminDB.logout();
 
     // Cancel all transactions and close the associated sessions.
     for (let i in userNames) {
@@ -714,6 +715,7 @@ function runIdleSessionsTests(conn, adminDB, txnDB, useLocalOps) {
             writeConcern: {w: 'majority'}
         }));
         sessions[i].endSession();
+        adminDB.logout();
     }
 }
 

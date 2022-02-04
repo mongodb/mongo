@@ -136,9 +136,12 @@ const adminDB = db.getSiblingDB("admin");
         roles: [],
         privileges: [{resource: {cluster: true}, actions: ["changeStream"]}]
     });
+    adminDB.logout();
 }());
 
 (function createUsers() {
+    assert(adminDB.auth("userAdmin", password));
+
     // Create some users for a specific collection. Use the name of the role as the name of the
     // user.
     for (let role of ["write", "find_only", "find_and_change_stream", "change_stream_only"]) {
@@ -177,6 +180,8 @@ const adminDB = db.getSiblingDB("admin");
                       "cluster_change_stream_only"]) {
         adminDB.createUser({user: role, pwd: password, roles: [role]});
     }
+
+    adminDB.logout();
 }());
 
 (function testPrivilegesForSingleCollection() {

@@ -38,6 +38,7 @@ function runListAllSessionsTest(mongod) {
     assertErrorCode(config.system.sessions, viewAdminPipeline, ErrorCodes.Unauthorized);
 
     // Ensure that the cache now contains the session and is visible by admin
+    admin.logout();
     assert(admin.auth('admin', 'pass'));
     const resultArray =
         config.system.sessions

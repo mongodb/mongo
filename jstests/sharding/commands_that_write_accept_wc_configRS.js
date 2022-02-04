@@ -20,7 +20,7 @@ load('jstests/multiVersion/libs/auth_helpers.js');
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 
-var st = new ShardingTest({
+const st = new ShardingTest({
     // Set priority of secondaries to zero to prevent spurious elections.
     shards: {
         rs0: {
@@ -36,15 +36,35 @@ var st = new ShardingTest({
     mongos: 1
 });
 
-var mongos = st.s;
-var dbName = "wc-test-configRS";
-var db = mongos.getDB(dbName);
-var adminDB = mongos.getDB('admin');
+const mongos = st.s;
+const dbName = "wc-test-configRS";
+const adminDB = mongos.getDB('admin');
 // A database connection on a local shard, rather than through the mongos.
-var localDB = st.shard0.getDB('localWCTest');
-var collName = 'leaves';
-var coll = db[collName];
-var counter = 0;
+const localDB = st.shard0.getDB('localWCTest');
+
+// Separate unauthenticated channel for use in confirmFunc().
+// The sharding_auth suite will stealth-authenticate us,
+// using the local.__system account, so we must explicitly deauth.
+// Since mongos has no 'local' database, we use the test-mode workaround
+// via admin DB found in the implementation of the LogoutCommand.
+const noauthConn = new Mongo(mongos.host);
+noauthConn.getDB('admin').logout();
+
+// We get new databases because we do not want to reuse dropped databases that may be in a
+// bad state. This test calls dropDatabase when config server secondary nodes are down, so the
+// command fails after only the database metadata is dropped from the config servers, but the
+// data on the shards still remains. This makes future operations, such as moveChunk, fail.
+let db = mongos.getDB(dbName);
+let noauthDB = noauthConn.getDB(dbName);
+let counter = 0;
+const collName = 'leaves';
+let coll = db[collName];
+function getNewDB() {
+    db = mongos.getDB(dbName + counter);
+    noauthDB = noauthConn.getDB(dbName + counter);
+    counter++;
+    coll = db[collName];
+}
 
 function dropTestData() {
     st.configRS.awaitReplication();
@@ -53,28 +73,19 @@ function dropTestData() {
     db.dropUser('username');
     db.dropUser('user1');
     localDB.dropUser('user2');
-    assert(!db.auth("username", "password"), "auth should have failed");
+    assert(!noauthDB.auth("username", "password"), "auth should have failed");
     getNewDB();
 }
 
-// We get new databases because we do not want to reuse dropped databases that may be in a
-// bad state. This test calls dropDatabase when config server secondary nodes are down, so the
-// command fails after only the database metadata is dropped from the config servers, but the
-// data on the shards still remains. This makes future operations, such as moveChunk, fail.
-function getNewDB() {
-    db = mongos.getDB(dbName + counter);
-    counter++;
-    coll = db[collName];
-}
-
 // Commands in 'commands' will accept any valid writeConcern.
-var commands = [];
+const commands = [];
 
 commands.push({
     req: {createUser: 'username', pwd: 'password', roles: jsTest.basicUserRoles},
     setupFunc: function() {},
     confirmFunc: function() {
-        assert(db.auth("username", "password"), "auth failed");
+        assert(noauthDB.auth("username", "password"), "auth failed");
+        noauthDB.logout();
     },
     requiresMajority: true,
     runsOnShards: false,
@@ -88,8 +99,9 @@ commands.push({
         db.runCommand({createUser: 'username', pwd: 'password', roles: jsTest.basicUserRoles});
     },
     confirmFunc: function() {
-        assert(!db.auth("username", "password"), "auth should have failed");
-        assert(db.auth("username", "password2"), "auth failed");
+        assert(!noauthDB.auth("username", "password"), "auth should have failed");
+        assert(noauthDB.auth("username", "password2"), "auth failed");
+        noauthDB.logout();
     },
     requiresMajority: true,
     runsOnShards: false,
@@ -99,11 +111,13 @@ commands.push({
 commands.push({
     req: {dropUser: 'tempUser'},
     setupFunc: function() {
-        db.runCommand({createUser: 'tempUser', pwd: 'password', roles: jsTest.basicUserRoles});
-        assert(db.auth("tempUser", "password"), "auth failed");
+        assert.commandWorked(
+            db.runCommand({createUser: 'tempUser', pwd: 'password', roles: jsTest.basicUserRoles}));
+        assert(noauthDB.auth("tempUser", "password"), "auth failed");
+        noauthDB.logout();
     },
     confirmFunc: function() {
-        assert(!db.auth("tempUser", "password"), "auth should have failed");
+        assert(!noauthDB.auth("tempUser", "password"), "auth should have failed");
     },
     requiresMajority: true,
     runsOnShards: false,
@@ -120,7 +134,7 @@ function testInvalidWriteConcern(wc, cmd) {
 
     dropTestData();
     cmd.setupFunc();
-    var res = runCommandCheckAdmin(db, cmd);
+    const res = runCommandCheckAdmin(db, cmd);
     assert.commandFailed(res);
     assert(!res.writeConcernError,
            'bad writeConcern on config server had writeConcernError. ' +
@@ -128,8 +142,6 @@ function testInvalidWriteConcern(wc, cmd) {
 }
 
 function runCommandFailOnShardsPassOnConfigs(cmd) {
-    var req = cmd.req;
-    var res;
     // This command is run on the shards in addition to the config servers.
     if (cmd.runsOnShards) {
         if (cmd.failsOnShards) {
@@ -137,8 +149,8 @@ function runCommandFailOnShardsPassOnConfigs(cmd) {
             // We set the timeout high enough that the command should not time out against the
             // config server, but not exorbitantly high, because it will always time out against
             // shards and so will increase the runtime of this test.
-            req.writeConcern.wtimeout = 15 * 1000;
-            res = runCommandCheckAdmin(db, cmd);
+            cmd.req.writeConcern.wtimeout = 15 * 1000;
+            const res = runCommandCheckAdmin(db, cmd);
             restartReplicationOnAllShards(st);
             assert.commandFailed(res);
             assert(!res.writeConcernError,
@@ -150,8 +162,8 @@ function runCommandFailOnShardsPassOnConfigs(cmd) {
             // We set the timeout high enough that the command should not time out against the
             // config server, but not exorbitantly high, because it will always time out against
             // shards and so will increase the runtime of this test.
-            req.writeConcern.wtimeout = 15 * 1000;
-            res = runCommandCheckAdmin(db, cmd);
+            cmd.req.writeConcern.wtimeout = 15 * 1000;
+            const res = runCommandCheckAdmin(db, cmd);
             restartReplicationOnAllShards(st);
             assert.commandWorked(res);
             cmd.confirmFunc();
@@ -160,7 +172,7 @@ function runCommandFailOnShardsPassOnConfigs(cmd) {
     } else {
         // This command is only run on the config servers and so should pass when shards are
         // not replicating.
-        res = runCommandCheckAdmin(db, cmd);
+        const res = runCommandCheckAdmin(db, cmd);
         restartReplicationOnAllShards(st);
         assert.commandWorked(res);
         cmd.confirmFunc();
@@ -171,25 +183,23 @@ function runCommandFailOnShardsPassOnConfigs(cmd) {
 }
 
 function testValidWriteConcern(wc, cmd) {
-    var req = cmd.req;
-    var setupFunc = cmd.setupFunc;
-    var confirmFunc = cmd.confirmFunc;
-
-    req.writeConcern = wc;
-    jsTest.log("Testing " + tojson(req));
+    cmd.req.writeConcern = wc;
+    jsTest.log("Testing " + tojson(cmd.req));
 
     dropTestData();
-    setupFunc();
+    cmd.setupFunc();
 
     // Command with a full cluster should succeed.
-    var res = runCommandCheckAdmin(db, cmd);
+    let res = runCommandCheckAdmin(db, cmd);
     assert.commandWorked(res);
     assert(!res.writeConcernError,
            'command on a full cluster had writeConcernError: ' + tojson(res));
-    confirmFunc();
+
+    cmd.confirmFunc();
 
     dropTestData();
-    setupFunc();
+    cmd.setupFunc();
+
     // Stop replication at all shard secondaries.
     stopReplicationOnSecondariesOfAllShards(st);
 
@@ -198,14 +208,15 @@ function testValidWriteConcern(wc, cmd) {
     runCommandFailOnShardsPassOnConfigs(cmd);
 
     dropTestData();
-    setupFunc();
+    cmd.setupFunc();
+
     // Stop replication at all config server secondaries and all shard secondaries.
     stopReplicationOnSecondariesOfAllShards(st);
     st.configRS.awaitReplication();
     stopReplicationOnSecondaries(st.configRS, false /* changeReplicaSetDefaultWCToLocal */);
 
     // Command should fail after two config servers are not replicating.
-    req.writeConcern.wtimeout = 3000;
+    cmd.req.writeConcern.wtimeout = 3000;
     res = runCommandCheckAdmin(db, cmd);
     restartReplicationOnAllShards(st);
     assert.commandFailed(res);
@@ -214,10 +225,13 @@ function testValidWriteConcern(wc, cmd) {
         'command on config servers with a paused replicaset had writeConcernError: ' + tojson(res));
 }
 
-var majorityWC = {w: 'majority', wtimeout: ReplSetTest.kDefaultTimeoutMS};
+const majorityWC = {
+    w: 'majority',
+    wtimeout: ReplSetTest.kDefaultTimeoutMS
+};
 
 // Config server commands require w: majority writeConcerns.
-var nonMajorityWCs = [{w: 'invalid'}, {w: 2}];
+const nonMajorityWCs = [{w: 'invalid'}, {w: 2}];
 
 commands.forEach(function(cmd) {
     nonMajorityWCs.forEach(function(wc) {

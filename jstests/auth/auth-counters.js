@@ -25,8 +25,14 @@ test.createUser(
 // Count the number of authentications performed during setup
 const expected =
     assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms;
+admin.logout();
 
 function assertStats() {
+    // Need to be authenticated to run serverStatus.
+    assert(admin.auth('admin', 'pwd'));
+    ++expected['SCRAM-SHA-256'].authenticate.successful;
+    ++expected['SCRAM-SHA-256'].authenticate.received;
+
     const mechStats = assert.commandWorked(admin.runCommand({serverStatus: 1}))
                           .security.authentication.mechanisms;
     Object.keys(expected).forEach(function(mech) {
@@ -45,13 +51,13 @@ function assertStats() {
             throw e;
         }
     });
+
+    admin.logout();
 }
 
 function assertSuccess(creds, mech, db = test) {
     assert.eq(db.auth(creds), true);
-    if (db !== admin) {
-        db.logout();
-    }
+    db.logout();
     ++expected[mech].authenticate.received;
     ++expected[mech].authenticate.successful;
     assertStats();

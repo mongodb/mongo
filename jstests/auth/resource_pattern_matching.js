@@ -8,26 +8,33 @@
 // authenticating as the __system user.
 TestData.disableImplicitSessions = true;
 
+(function() {
+'use strict';
+
 function setup_users(granter) {
-    var admindb = granter.getSiblingDB("admin");
-    admindb.runCommand({
+    const admin = granter.getSiblingDB("admin");
+    assert.commandWorked(admin.runCommand({
         createUser: "admin",
         pwd: "admin",
         roles:
-            ["userAdminAnyDatabase", "dbAdminAnyDatabase", "clusterAdmin", "readWriteAnyDatabase"]
-    });
+            ["userAdminAnyDatabase",
+             "dbAdminAnyDatabase",
+             "clusterAdmin",
+             "readWriteAnyDatabase"]
+    }));
 
-    admindb.auth("admin", "admin");
-
-    printjson(admindb.runCommand({createRole: "test_role", privileges: [], roles: []}));
-
-    printjson(admindb.runCommand({createUser: "test_user", pwd: "password", roles: ["test_role"]}));
+    assert(admin.auth("admin", "admin"));
+    printjson(admin.runCommand({createRole: "test_role", privileges: [], roles: []}));
+    printjson(admin.runCommand({createUser: "test_user", pwd: "password", roles: ["test_role"]}));
+    admin.logout();
 }
 
 function setup_dbs_and_cols(db) {
-    var test_db_a = db.getSiblingDB("a");
-    var test_db_b = db.getSiblingDB("b");
+    const admin = db.getSiblingDB('admin');
+    const test_db_a = db.getSiblingDB('a');
+    const test_db_b = db.getSiblingDB('b');
 
+    assert(admin.auth('admin', 'admin'));
     assert.commandWorked(test_db_a.dropDatabase({w: 'majority'}));
     assert.commandWorked(test_db_b.dropDatabase({w: 'majority'}));
 
@@ -36,45 +43,40 @@ function setup_dbs_and_cols(db) {
 
     assert.commandWorked(test_db_b.createCollection("a", {writeConcern: {w: 'majority'}}));
     assert.commandWorked(test_db_b.createCollection("b", {writeConcern: {w: 'majority'}}));
+    admin.logout();
 }
 
 function grant_privileges(granter, privileges) {
-    var admindb = granter.getSiblingDB("admin");
+    const admin = granter.getSiblingDB("admin");
 
-    admindb.auth("admin", "admin");
-
-    var result = admindb.runCommand({
+    assert(admin.auth("admin", "admin"));
+    const result = admin.runCommand({
         grantPrivilegesToRole: "test_role",
         privileges: privileges,
         writeConcern: {w: 'majority'}
     });
-
-    admindb.logout();
-
+    admin.logout();
     return result;
 }
 
 function revoke_privileges(granter, privileges) {
-    var admindb = granter.getSiblingDB("admin");
+    const admin = granter.getSiblingDB("admin");
 
-    admindb.auth("admin", "admin");
-
-    var result = admindb.runCommand({
+    assert(admin.auth("admin", "admin"));
+    const result = admin.runCommand({
         revokePrivilegesFromRole: "test_role",
         privileges: privileges,
         writeConcern: {w: 'majority'}
     });
-
-    admindb.logout();
-
+    admin.logout();
     return result;
 }
 
 function invalidateUserCache(verifier) {
-    var admindb = verifier.getSiblingDB("admin");
-    admindb.auth('admin', 'admin');
-    admindb.runCommand("invalidateUserCache");
-    admindb.logout();
+    const admin = verifier.getSiblingDB("admin");
+    assert(admin.auth('admin', 'admin'));
+    assert.commandWorked(admin.runCommand("invalidateUserCache"));
+    admin.logout();
 }
 
 function run_test(name, granter, verifier, privileges, collections) {
@@ -84,25 +86,24 @@ function run_test(name, granter, verifier, privileges, collections) {
     invalidateUserCache(verifier);
 
     const verifierDB = verifier.getSiblingDB('admin');
-    verifierDB.auth("test_user", "password");
+    assert(verifierDB.auth("test_user", "password"));
 
     for (var key in collections) {
-        var parts = key.split(".");
-        var testdb = verifier.getSiblingDB(parts[0]);
-        var col = testdb.getCollection(parts[1]);
+        const parts = key.split(".");
+        const testdb = verifier.getSiblingDB(parts[0]);
+        const col = testdb.getCollection(parts[1]);
 
-        var cb = collections[key];
+        const cb = collections[key];
 
         cb(testdb, col);
     }
+    verifierDB.logout();
 
     revoke_privileges(granter, privileges);
-    verifierDB.logout();
 }
 
 function run_test_bad_resource(name, granter, resource) {
     print("\n=== testing resource fail " + name + "() ===\n");
-    var admindb = granter.getSiblingDB("admin");
     assert.commandFailed(grant_privileges(granter, [{resource: resource, actions: ["find"]}]));
 }
 
@@ -221,35 +222,45 @@ function run_tests(granter, verifier) {
              });
 }
 
-var keyfile = "jstests/libs/key1";
+const keyfile = "jstests/libs/key1";
 
-print('--- standalone node test ---');
-var conn = MongoRunner.runMongod({auth: null, keyFile: keyfile});
-run_tests(conn.getDB('test'), conn.getDB('test'));
-MongoRunner.stopMongod(conn);
-print('--- done standalone node test ---');
+{
+    print('--- standalone node test ---');
+    const conn = MongoRunner.runMongod({auth: null, keyFile: keyfile});
+    run_tests(conn.getDB('test'), conn.getDB('test'));
+    MongoRunner.stopMongod(conn);
+    print('--- done standalone node test ---');
+}
 
-print('--- replica set test ---');
-var rst =
-    new ReplSetTest({name: 'testset', nodes: 2, nodeOptions: {'auth': null}, keyFile: keyfile});
+{
+    print('--- replica set test ---');
+    const rst =
+        new ReplSetTest({name: 'testset', nodes: 2, nodeOptions: {'auth': null}, keyFile: keyfile});
 
-rst.startSet();
-rst.initiate();
-var primary = rst.getPrimary().getDB('admin');
-rst.awaitSecondaryNodes();
-var secondary = rst.getSecondaries()[0].getDB('admin');
-run_tests(primary, secondary);
-rst.stopSet();
-print('--- done with the rs tests ---');
+    rst.startSet();
+    rst.initiate();
+    const primary = rst.getPrimary().getDB('admin');
+    rst.awaitSecondaryNodes();
+    const secondary = rst.getSecondaries()[0].getDB('admin');
+    run_tests(primary, secondary);
+    rst.stopSet();
+    print('--- done with the rs tests ---');
+}
 
-print('--- sharding test ---');
-var st = new ShardingTest({
-    mongos: 2,
-    shard: 1,
-    keyFile: keyfile,
-    other:
-        {mongosOptions: {'auth': null}, configOptions: {'auth': null}, shardOptions: {'auth': null}}
-});
-run_tests(st.s0.getDB('admin'), st.s1.getDB('admin'));
-st.stop();
-print('--- sharding test done ---');
+{
+    print('--- sharding test ---');
+    const st = new ShardingTest({
+        mongos: 2,
+        shard: 1,
+        keyFile: keyfile,
+        other: {
+            mongosOptions: {'auth': null},
+            configOptions: {'auth': null},
+            shardOptions: {'auth': null}
+        }
+    });
+    run_tests(st.s0.getDB('admin'), st.s1.getDB('admin'));
+    st.stop();
+    print('--- sharding test done ---');
+}
+})();

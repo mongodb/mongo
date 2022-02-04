@@ -12,31 +12,23 @@
 
 load("jstests/ssl/libs/ssl_helpers.js");
 
-function authAllNodes() {
-    for (var n = 0; n < rst.nodes.length; n++) {
-        var status = rst.nodes[n].getDB("admin").auth("root", "pwd");
-        assert.eq(status, 1);
-    }
-}
+(function() {
+'use strict';
 
 // The mongo shell cannot authenticate as the internal __system user in tests that use x509 for
 // cluster authentication. Choosing the default value for wcMajorityJournalDefault in
 // ReplSetTest cannot be done automatically without the shell performing such authentication, so
 // in this test we must make the choice explicitly, based on the global test options.
-var wcMajorityJournalDefault;
-if (jsTestOptions().noJournal || jsTestOptions().storageEngine == "ephemeralForTest" ||
-    jsTestOptions().storageEngine == "inMemory") {
-    wcMajorityJournalDefault = false;
-} else {
-    wcMajorityJournalDefault = true;
-}
+const wcMajorityJournalDefault = !jsTestOptions().noJournal &&
+    (jsTestOptions().storageEngine != "ephemeralForTest") &&
+    (jsTestOptions().storageEngine != "inMemory");
 
-opts = {
+const opts = {
     sslMode: "disabled",
     clusterAuthMode: "keyFile",
 };
-var NUM_NODES = 3;
-var rst = new ReplSetTest(
+const NUM_NODES = 3;
+const rst = new ReplSetTest(
     {name: 'sslSet', nodes: NUM_NODES, waitForKeys: false, keyFile: KEYFILE, nodeOptions: opts});
 rst.startSet();
 
@@ -45,16 +37,55 @@ rst.startSet();
 rst.initiateWithAnyNodeAsPrimary(Object.extend(
     rst.getReplSetConfig(), {writeConcernMajorityJournalDefault: wcMajorityJournalDefault}));
 
-// Connect to master and do some basic operations
-var rstConn1 = rst.getPrimary();
-rstConn1.getDB("admin").createUser({user: "root", pwd: "pwd", roles: ["root"]}, {w: NUM_NODES});
-rstConn1.getDB("admin").auth("root", "pwd");
-rstConn1.getDB("test").a.insert({a: 1, str: "TESTTESTTEST"});
-assert.eq(1, rstConn1.getDB("test").a.find().itcount(), "Error interacting with replSet");
+// Make administrative user other than local.__system
+rst.getPrimary().getDB("admin").createUser({user: "root", pwd: "pwd", roles: ["root"]},
+                                           {w: NUM_NODES});
 
-print("===== UPGRADE disabled,keyFile -> allowSSL,sendKeyfile =====");
-authAllNodes();
-rst.upgradeSet({
+let entriesWritten = 0;
+function testWrite(str) {
+    const entry = ++entriesWritten;
+
+    const conn = rst.getPrimary();
+    assert(conn.getDB('admin').auth('root', 'pwd'));
+    const test = conn.getDB('test');
+    assert.writeOK(test.a.insert({a: entry, str: str}));
+    assert.eq(entry, test.a.find().itcount(), "Error interacting with replSet");
+}
+
+function authAllNodes(nodes) {
+    for (let n = 0; n < nodes.length; n++) {
+        assert(rst.nodes[n].getDB("admin").auth("root", "pwd"));
+    }
+}
+
+function upgradeAndWrite(newOpts, str) {
+    authAllNodes(rst.nodes);
+    rst.upgradeSet(newOpts, 'root', 'pwd');
+    authAllNodes(rst.nodes);
+    rst.awaitReplication();
+    testWrite(str);
+}
+
+function upgradeWriteAndConnect(newOpts, str) {
+    upgradeAndWrite(newOpts, str);
+
+    assert.eq(0,
+              runMongoProgram("mongo",
+                              "--port",
+                              rst.ports[0],
+                              "--ssl",
+                              "--sslAllowInvalidCertificates",
+                              "--sslPEMKeyFile",
+                              CLIENT_CERT,
+                              "--eval",
+                              ";"),
+              "SSL Connection attempt failed when it should succeed");
+}
+
+testWrite(rst.getPrimary(), 'TESTTESTTEST');
+
+jsTest.log("===== UPGRADE disabled,keyFile -> allowSSL,sendKeyfile =====");
+upgradeAndWrite({
     sslMode: "allowSSL",
     sslPEMKeyFile: SERVER_CERT,
     sslAllowInvalidCertificates: "",
@@ -62,17 +93,10 @@ rst.upgradeSet({
     keyFile: KEYFILE,
     sslCAFile: CA_CERT
 },
-               "root",
-               "pwd");
-authAllNodes();
-rst.awaitReplication();
+                'CHECKCHECKCHECK');
 
-var rstConn2 = rst.getPrimary();
-rstConn2.getDB("test").a.insert({a: 2, str: "CHECKCHECKCHECK"});
-assert.eq(2, rstConn2.getDB("test").a.find().itcount(), "Error interacting with replSet");
-
-print("===== UPGRADE allowSSL,sendKeyfile -> preferSSL,sendX509 =====");
-rst.upgradeSet({
+jsTest.log("===== UPGRADE allowSSL,sendKeyfile -> preferSSL,sendX509 =====");
+upgradeWriteAndConnect({
     sslMode: "preferSSL",
     sslPEMKeyFile: SERVER_CERT,
     sslAllowInvalidCertificates: "",
@@ -80,29 +104,11 @@ rst.upgradeSet({
     keyFile: KEYFILE,
     sslCAFile: CA_CERT
 },
-               "root",
-               "pwd");
-authAllNodes();
-rst.awaitReplication();
+                       'PEASandCARROTS');
 
-var rstConn3 = rst.getPrimary();
-rstConn3.getDB("test").a.insert({a: 3, str: "PEASandCARROTS"});
-assert.eq(3, rstConn3.getDB("test").a.find().itcount(), "Error interacting with replSet");
-
-var canConnectSSL = runMongoProgram("mongo",
-                                    "--port",
-                                    rst.ports[0],
-                                    "--ssl",
-                                    "--sslAllowInvalidCertificates",
-                                    "--sslPEMKeyFile",
-                                    CLIENT_CERT,
-                                    "--eval",
-                                    ";");
-assert.eq(0, canConnectSSL, "SSL Connection attempt failed when it should succeed");
-
-print("===== UPGRADE preferSSL,sendX509 -> preferSSL,x509 =====");
+jsTest.log("===== UPGRADE preferSSL,sendX509 -> preferSSL,x509 =====");
 // we cannot upgrade past preferSSL here because it will break the test client
-rst.upgradeSet({
+upgradeWriteAndConnect({
     sslMode: "preferSSL",
     sslPEMKeyFile: SERVER_CERT,
     sslAllowInvalidCertificates: "",
@@ -110,24 +116,7 @@ rst.upgradeSet({
     keyFile: KEYFILE,
     sslCAFile: CA_CERT
 },
-               "root",
-               "pwd");
-authAllNodes();
-rst.awaitReplication();
-var rstConn4 = rst.getPrimary();
-rstConn4.getDB("test").a.insert({a: 4, str: "BEEP BOOP"});
-rst.awaitReplication();
-assert.eq(4, rstConn4.getDB("test").a.find().itcount(), "Error interacting with replSet");
+                       'BEEP BOOP');
 
-// Test that an ssl connection can still be made
-var canConnectSSL = runMongoProgram("mongo",
-                                    "--port",
-                                    rst.ports[0],
-                                    "--ssl",
-                                    "--sslAllowInvalidCertificates",
-                                    "--sslPEMKeyFile",
-                                    CLIENT_CERT,
-                                    "--eval",
-                                    ";");
-assert.eq(0, canConnectSSL, "SSL Connection attempt failed when it should succeed");
 rst.stopSet();
+})();

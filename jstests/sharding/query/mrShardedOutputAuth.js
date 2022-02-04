@@ -12,22 +12,16 @@ const st = new ShardingTest(
     {name: "mrShardedOutputAuth", shards: 1, mongos: 1, other: {keyFile: 'jstests/libs/key1'}});
 
 // Setup the users to the input, output and admin databases
-const mongos = st.s;
-let adminDb = mongos.getDB("admin");
-adminDb.createUser({user: "user", pwd: "pass", roles: jsTest.adminUserRoles});
+const authenticatedConn = st.s;
+const adminDb = authenticatedConn.getDB('admin');
+adminDb.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
+assert(adminDb.auth('admin', 'pass'));
 
-const authenticatedConn = new Mongo(mongos.host);
-authenticatedConn.getDB('admin').auth("user", "pass");
-adminDb = authenticatedConn.getDB("admin");
 assert.commandWorked(adminDb.adminCommand({enablesharding: "output"}));
 
 const configDb = authenticatedConn.getDB("config");
-
 const inputDb = authenticatedConn.getDB("input");
-inputDb.createUser({user: "user", pwd: "pass", roles: jsTest.basicUserRoles});
-
 const outputDb = authenticatedConn.getDB("output");
-outputDb.createUser({user: "user", pwd: "pass", roles: jsTest.basicUserRoles});
 assert.commandWorked(adminDb.runCommand({enableSharding: outputDb.getName()}));
 
 const nDocs = 50;
@@ -73,24 +67,23 @@ function assertFailure(cmdResponse, configDb, outputDb) {
     assert.eq(outputDb.numbers_out.count(), 0, "map/reduce should not have succeeded");
 }
 
+function runTest(user, roles, assertion) {
+    authenticatedConn.getDB(user.db).createUser({user: user.user, pwd: 'pass', roles: roles});
+
+    const conn = new Mongo(st.s.host);
+    assert(conn.getDB(user.db).auth(user.user, 'pass'));
+    const response = doMapReduce(conn, outputDb);
+    assertion(response, configDb, outputDb);
+}
+
 // Setup a connection authenticated to both input and output db
-const inputOutputAuthConn = new Mongo(mongos.host);
-inputOutputAuthConn.getDB('input').auth("user", "pass");
-inputOutputAuthConn.getDB('output').auth("user", "pass");
-let cmdResponse = doMapReduce(inputOutputAuthConn, outputDb);
-assertSuccess(cmdResponse, configDb, outputDb);
+runTest({user: 'inout', db: 'admin'}, ['readWriteAnyDatabase'], assertSuccess);
 
 // setup a connection authenticated to only input db
-const inputAuthConn = new Mongo(mongos.host);
-inputAuthConn.getDB('input').auth("user", "pass");
-cmdResponse = doMapReduce(inputAuthConn, outputDb);
-assertFailure(cmdResponse, configDb, outputDb);
+runTest({user: 'inonly', db: 'input'}, ['readWrite'], assertFailure);
 
 // setup a connection authenticated to only output db
-const outputAuthConn = new Mongo(mongos.host);
-outputAuthConn.getDB('output').auth("user", "pass");
-cmdResponse = doMapReduce(outputAuthConn, outputDb);
-assertFailure(cmdResponse, configDb, outputDb);
+runTest({user: 'outOnly', db: 'output'}, ['readWrite'], assertFailure);
 
 st.stop();
 })();

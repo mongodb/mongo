@@ -19,7 +19,7 @@ const backdoorUserDoc = {
 
 adminDB.createUser({user: 'userAdmin', pwd: 'password', roles: ['userAdminAnyDatabase']});
 
-adminDB.auth('userAdmin', 'password');
+assert(adminDB.auth('userAdmin', 'password'));
 adminDB.createUser({user: 'readWriteAdmin', pwd: 'password', roles: ['readWriteAnyDatabase']});
 adminDB.createUser({
     user: 'readWriteAndUserAdmin',
@@ -31,8 +31,8 @@ adminDB.createUser({user: 'rootier', pwd: 'password', roles: ['__system']});
 adminDB.logout();
 
 jsTestLog("Test that a readWrite user can't rename system.profile to something they can read");
-adminDB.auth('readWriteAdmin', 'password');
-var res = adminDB.system.profile.renameCollection("profile");
+assert(adminDB.auth('readWriteAdmin', 'password'));
+let res = adminDB.system.profile.renameCollection("profile");
 assert.eq(0, res.ok);
 assert.eq(CodeUnauthorized, res.code);
 
@@ -51,13 +51,15 @@ adminDB.users.drop();
 
 jsTestLog("Test that a userAdmin can't rename system.users without readWrite");
 adminDB.logout();
-adminDB.auth('userAdmin', 'password');
+
+assert(adminDB.auth('userAdmin', 'password'));
 res = adminDB.system.users.renameCollection("users");
 assert.eq(0, res.ok);
 assert.eq(CodeUnauthorized, res.code);
 assert.eq(5, adminDB.system.users.count());
+adminDB.logout();
 
-adminDB.auth('readWriteAndUserAdmin', 'password');
+assert(adminDB.auth('readWriteAndUserAdmin', 'password'));
 assert.eq(0, adminDB.users.count());
 
 jsTestLog("Test that even with userAdmin AND dbAdmin you CANNOT rename to/from system.users");
@@ -74,8 +76,9 @@ assert.eq(CodeUnauthorized, res.code);
 
 assert.eq(null, adminDB.system.users.findOne({user: backdoorUserDoc.user}));
 assert.neq(null, adminDB.system.users.findOne({user: 'userAdmin'}));
+adminDB.logout();
 
-adminDB.auth('rootier', 'password');
+assert(adminDB.auth('rootier', 'password'));
 
 // Test permissions against the configDB and localDB
 
@@ -102,12 +105,14 @@ assert.writeError(res, 13, "not authorized on config to execute command");
 res = localDB.test2.renameCollection('test');
 assert.eq(0, res.ok);
 assert.eq(CodeUnauthorized, res.code);
+adminDB.logout();
 
 // Test renaming system.users collection with __system
 assert(adminDB.auth('rootier', 'password'));
 jsTestLog("Test that with __system you CAN rename to/from system.users");
 res = adminDB.system.users.renameCollection("users", true);
 assert.eq(1, res.ok, tojson(res));
+
 // At this point, all the user documents are gone, so further activity may be unauthorized,
 // depending on cluster configuration.  So, this is the end of the test.
 MongoRunner.stopMongod(conn, {user: 'userAdmin', pwd: 'password'});

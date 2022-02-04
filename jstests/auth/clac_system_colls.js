@@ -26,6 +26,7 @@ function runTest(admindb) {
     admindb.createUser({user: "user", pwd: "pwd", roles: ["FindInDB"]});
 
     // Verify the find on all collections exludes system collections
+    admindb.logout();
     assert.eq(1, admindb.auth("user", "pwd"));
 
     assert.doesNotThrow(function() {
@@ -36,6 +37,7 @@ function runTest(admindb) {
     }
 
     // Verify that find on system collections gives find permissions
+    admindb.logout();
     assert.eq(1, admindb.auth("sysUser", "pwd"));
 
     assert.throws(function() {

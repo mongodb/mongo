@@ -78,20 +78,21 @@ ReplSetTest.prototype.upgradeArbiters = function(options, user, pwd) {
 };
 
 ReplSetTest.prototype.upgradePrimary = function(primary, options, user, pwd) {
+    function authNode(node) {
+        if (user !== undefined) {
+            assert(node.getDB('admin').auth(user, pwd));
+        } else {
+            jsTest.authenticate(node);
+        }
+    }
+
     // Merge new options into node settings.
     this.nodeOptions = mergeNodeOptions(this.nodeOptions, options);
 
-    jsTest.authenticate(primary);
+    authNode(primary);
 
     let oldPrimary = this.stepdown(primary);
-    this.waitForState(oldPrimary, ReplSetTest.State.SECONDARY);
-
-    // stepping down the node can close the connection and lose the authentication state, so
-    // re-authenticate here before calling awaitNodesAgreeOnPrimary().
-    if (user != undefined) {
-        oldPrimary.getDB('admin').auth(user, pwd);
-    }
-    jsTest.authenticate(oldPrimary);
+    this.waitForState(oldPrimary, ReplSetTest.State.SECONDARY, undefined, authNode);
 
     // waitForState() runs the logout command via asCluster() on either the current primary or the
     // first node in the replica set so we re-authenticate on all connections before calling
@@ -105,10 +106,7 @@ ReplSetTest.prototype.upgradePrimary = function(primary, options, user, pwd) {
             continue;
         }
 
-        if (user != undefined) {
-            node.getDB('admin').auth(user, pwd);
-        }
-        jsTest.authenticate(node);
+        authNode(node);
     }
 
     this.awaitNodesAgreeOnPrimary();
@@ -126,7 +124,7 @@ ReplSetTest.prototype.upgradePrimary = function(primary, options, user, pwd) {
 };
 
 ReplSetTest.prototype.upgradeNode = function(node, opts = {}, user, pwd) {
-    if (user != undefined) {
+    if (user !== undefined) {
         assert.eq(1, node.getDB("admin").auth(user, pwd));
     }
     jsTest.authenticate(node);
@@ -145,13 +143,17 @@ ReplSetTest.prototype.upgradeNode = function(node, opts = {}, user, pwd) {
     }
 
     var newNode = this.restart(node, opts);
-    if (user != undefined) {
+    if (user !== undefined) {
         newNode.getDB("admin").auth(user, pwd);
     }
 
     var waitForStates =
         [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY, ReplSetTest.State.ARBITER];
     this.waitForState(newNode, waitForStates);
+
+    if (user !== undefined) {
+        newNode.getDB('admin').logout();
+    }
 
     return newNode;
 };

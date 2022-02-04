@@ -282,6 +282,7 @@ checkWriteOps(false);
 
 // Authenticate as read-write user
 jsTestLog("Checking commands with read-write auth credentials");
+assert(testDB.logout().ok);
 assert(testDB.auth(rwUser, password));
 checkReadOps(true);
 checkWriteOps(true);
