@@ -342,6 +342,7 @@ executor:
     hooks:
       - CheckReplDBHash
       - ValidateCollections
+    tests: true
   config:
     shell_options:
       eval: >-
