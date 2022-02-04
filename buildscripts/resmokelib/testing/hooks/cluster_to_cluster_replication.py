@@ -87,12 +87,14 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
 
     def after_suite(self, test_report, teardown_flag=None):
         """After suite."""
-        # Stop the replicator only if it hasn't been stopped already.
-        if self._test_num % self._tests_per_cycle != 0 or not self._restart_every_cycle:
-            self._run_replicator_action(test_report, self._replicator.stop)
+        # Perform the following actions only if some tests have been run.
+        if self._test_num > 0:
+            # Stop the replicator only if it hasn't been stopped already.
+            if self._test_num % self._tests_per_cycle != 0 or not self._restart_every_cycle:
+                self._run_replicator_action(test_report, self._replicator.stop)
 
-        self._run_data_consistency_check(self._last_test, test_report)
-        self._run_check_repl_db_hash(self._last_test, test_report)
+            self._run_data_consistency_check(self._last_test, test_report)
+            self._run_check_repl_db_hash(self._last_test, test_report)
 
     def before_test(self, test, test_report):
         """Before test."""
