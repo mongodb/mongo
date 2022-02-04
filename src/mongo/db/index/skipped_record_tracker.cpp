@@ -125,7 +125,8 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
 
     // This should only be called when constraints are being enforced, on a primary. It does not
     // make sense, nor is it necessary for this to be called on a secondary.
-    invariant(options.getKeysMode == IndexAccessMethod::GetKeysMode::kEnforceConstraints);
+    invariant(options.getKeysMode ==
+              InsertDeleteOptions::ConstraintEnforcementMode::kEnforceConstraints);
 
     static const char* curopMessage = "Index Build: retrying skipped records";
     ProgressMeterHolder progress;
@@ -162,36 +163,30 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
             auto keys = executionCtx.keys();
             auto multikeyMetadataKeys = executionCtx.multikeyMetadataKeys();
             auto multikeyPaths = executionCtx.multikeyPaths();
+            auto iam = _indexCatalogEntry->accessMethod()->asSortedData();
 
             try {
                 // Because constraint enforcement is set, this will throw if there are any indexing
                 // errors, instead of writing back to the skipped records table, which would
                 // normally happen if constraints were relaxed.
-                _indexCatalogEntry->accessMethod()->getKeys(
-                    opCtx,
-                    collection,
-                    pooledBuilder,
-                    skippedDoc,
-                    options.getKeysMode,
-                    IndexAccessMethod::GetKeysContext::kAddingKeys,
-                    keys.get(),
-                    multikeyMetadataKeys.get(),
-                    multikeyPaths.get(),
-                    skippedRecordId);
+                iam->getKeys(opCtx,
+                             collection,
+                             pooledBuilder,
+                             skippedDoc,
+                             options.getKeysMode,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             keys.get(),
+                             multikeyMetadataKeys.get(),
+                             multikeyPaths.get(),
+                             skippedRecordId);
 
-                auto status = _indexCatalogEntry->accessMethod()->insertKeys(
-                    opCtx, collection, *keys, skippedRecordId, options, nullptr, nullptr);
+                auto status = iam->insertKeys(opCtx, collection, *keys, options, nullptr, nullptr);
                 if (!status.isOK()) {
                     return status;
                 }
 
-                status = _indexCatalogEntry->accessMethod()->insertKeys(opCtx,
-                                                                        collection,
-                                                                        *multikeyMetadataKeys,
-                                                                        skippedRecordId,
-                                                                        options,
-                                                                        nullptr,
-                                                                        nullptr);
+                status = iam->insertKeys(
+                    opCtx, collection, *multikeyMetadataKeys, options, nullptr, nullptr);
                 if (!status.isOK()) {
                     return status;
                 }
@@ -199,7 +194,7 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
                 return ex.toStatus();
             }
 
-            if (_indexCatalogEntry->accessMethod()->shouldMarkIndexAsMultikey(
+            if (iam->shouldMarkIndexAsMultikey(
                     keys->size(), *multikeyMetadataKeys, *multikeyPaths)) {
                 if (!_multikeyPaths) {
                     _multikeyPaths = *multikeyPaths;

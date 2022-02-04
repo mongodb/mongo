@@ -184,8 +184,8 @@ bool Helpers::findById(OperationContext* opCtx,
         return false;
     }
 
-    auto recordId =
-        catalog->getEntry(desc)->accessMethod()->findSingle(opCtx, collection, query["_id"].wrap());
+    auto recordId = catalog->getEntry(desc)->accessMethod()->asSortedData()->findSingle(
+        opCtx, collection, query["_id"].wrap());
     if (recordId.isNull())
         return false;
     result = collection->docFor(opCtx, recordId).value();
@@ -206,7 +206,7 @@ RecordId Helpers::findById(OperationContext* opCtx,
     }
 
     uassert(13430, "no _id index", desc);
-    return catalog->getEntry(desc)->accessMethod()->findSingle(
+    return catalog->getEntry(desc)->accessMethod()->asSortedData()->findSingle(
         opCtx, collection, idquery["_id"].wrap());
 }
 

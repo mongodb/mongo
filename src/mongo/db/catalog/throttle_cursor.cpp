@@ -71,9 +71,8 @@ boost::optional<Record> SeekableRecordThrottleCursor::next(OperationContext* opC
     return record;
 }
 
-SortedDataInterfaceThrottleCursor::SortedDataInterfaceThrottleCursor(OperationContext* opCtx,
-                                                                     const IndexAccessMethod* iam,
-                                                                     DataThrottle* dataThrottle) {
+SortedDataInterfaceThrottleCursor::SortedDataInterfaceThrottleCursor(
+    OperationContext* opCtx, const SortedDataIndexAccessMethod* iam, DataThrottle* dataThrottle) {
     _cursor = iam->newCursor(opCtx, /*forward=*/true);
     _dataThrottle = dataThrottle;
 }

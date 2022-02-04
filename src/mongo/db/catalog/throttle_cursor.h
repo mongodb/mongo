@@ -85,7 +85,7 @@ private:
 class SortedDataInterfaceThrottleCursor {
 public:
     SortedDataInterfaceThrottleCursor(OperationContext* opCtx,
-                                      const IndexAccessMethod* iam,
+                                      const SortedDataIndexAccessMethod* iam,
                                       DataThrottle* dataThrottle);
 
     boost::optional<IndexKeyEntry> seek(OperationContext* opCtx, const KeyString::Value& key);

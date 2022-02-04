@@ -86,7 +86,10 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx, const KeyString::
     // we exclude it from the serialization.
     BufBuilder builder;
     if (KeyFormat::Long ==
-        _indexCatalogEntry->accessMethod()->getSortedDataInterface()->rsKeyFormat()) {
+        _indexCatalogEntry->accessMethod()
+            ->asSortedData()
+            ->getSortedDataInterface()
+            ->rsKeyFormat()) {
         key.serializeWithoutRecordIdLong(builder);
     } else {
         key.serializeWithoutRecordIdStr(builder);
@@ -116,7 +119,7 @@ Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx) const {
     auto constraintsCursor = _keyConstraintsTable->rs()->getCursor(opCtx);
     auto record = constraintsCursor->next();
 
-    auto index = _indexCatalogEntry->accessMethod()->getSortedDataInterface();
+    auto index = _indexCatalogEntry->accessMethod()->asSortedData()->getSortedDataInterface();
 
     static const char* curopMessage = "Index Build: checking for duplicate keys";
     ProgressMeterHolder progress;

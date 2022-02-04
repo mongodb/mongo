@@ -329,17 +329,6 @@ private:
      */
     std::string _getAccessMethodName(const BSONObj& keyPattern) const;
 
-    Status _indexKeys(OperationContext* opCtx,
-                      const CollectionPtr& coll,
-                      const IndexCatalogEntry* index,
-                      const KeyStringSet& keys,
-                      const KeyStringSet& multikeyMetadataKeys,
-                      const MultikeyPaths& multikeyPaths,
-                      const BSONObj& obj,
-                      RecordId loc,
-                      const InsertDeleteOptions& options,
-                      int64_t* keysInsertedOut) const;
-
     Status _indexFilteredRecords(OperationContext* opCtx,
                                  const CollectionPtr& coll,
                                  const IndexCatalogEntry* index,
@@ -360,16 +349,6 @@ private:
                          const RecordId& recordId,
                          int64_t* keysInsertedOut,
                          int64_t* keysDeletedOut) const;
-
-    void _unindexKeys(OperationContext* opCtx,
-                      const CollectionPtr& collection,
-                      const IndexCatalogEntry* index,
-                      const KeyStringSet& keys,
-                      const BSONObj& obj,
-                      RecordId loc,
-                      bool logIfError,
-                      int64_t* keysDeletedOut,
-                      CheckRecordId checkRecordId = CheckRecordId::Off) const;
 
     void _unindexRecord(OperationContext* opCtx,
                         const CollectionPtr& collection,

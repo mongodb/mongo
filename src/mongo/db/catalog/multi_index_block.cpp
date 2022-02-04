@@ -326,7 +326,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                 opCtx, collection->ns(), descriptor, &index.options);
 
             // Index builds always relax constraints and check for violations at commit-time.
-            index.options.getKeysMode = IndexAccessMethod::GetKeysMode::kRelaxConstraints;
+            index.options.getKeysMode =
+                InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints;
             index.options.dupsAllowed = true;
             index.options.fromIndexBuilder = true;
 
@@ -782,13 +783,12 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                     "index"_attr = entry->descriptor()->indexName(),
                     "buildUUID"_attr = _buildUUID);
 
-        // SERVER-41918 This call to commitBulk() results in file I/O that may result in an
+        // SERVER-41918 This call to bulk->commit() results in file I/O that may result in an
         // exception.
         try {
-            Status status = _indexes[i].real->commitBulk(
+            Status status = _indexes[i].bulk->commit(
                 opCtx,
                 collection,
-                _indexes[i].bulk.get(),
                 dupsAllowed,
                 kYieldIterations,
                 [=](const KeyString::Value& duplicateKey) {
@@ -1087,18 +1087,7 @@ BSONObj MultiIndexBlock::_constructStateObject(OperationContext* opCtx,
         if (_phase != IndexBuildPhaseEnum::kDrainWrites) {
             // Persist the data to disk so that we see all of the data that has been inserted into
             // the Sorter.
-            auto state = index.bulk->persistDataForShutdown();
-
-            indexInfo.append("fileName", state.fileName);
-            indexInfo.append("numKeys", index.bulk->getKeysInserted());
-
-            BSONArrayBuilder ranges(indexInfo.subarrayStart("ranges"));
-            for (const auto& rangeInfo : state.ranges) {
-                BSONObjBuilder range(ranges.subobjStart());
-                range.append("startOffset", rangeInfo.getStartOffset());
-                range.append("endOffset", rangeInfo.getEndOffset());
-                range.append("checksum", rangeInfo.getChecksum());
-            }
+            index.bulk->persistDataForShutdown(indexInfo);
         }
 
         auto indexBuildInterceptor =

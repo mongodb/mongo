@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 
 namespace mongo {
@@ -74,7 +75,7 @@ protected:
         return _indexDescriptor;
     }
 
-    const IndexAccessMethod* indexAccessMethod() const {
+    const SortedDataIndexAccessMethod* indexAccessMethod() const {
         return _indexAccessMethod;
     }
 
@@ -93,7 +94,7 @@ private:
     std::weak_ptr<const IndexCatalogEntry> _weakIndexCatalogEntry;
 
     const IndexDescriptor* _indexDescriptor;
-    const IndexAccessMethod* _indexAccessMethod;
+    const SortedDataIndexAccessMethod* _indexAccessMethod;
 
     std::string _indexName;
 

@@ -42,7 +42,7 @@ RequiresIndexStage::RequiresIndexStage(const char* stageType,
       _weakIndexCatalogEntry(indexDescriptor->getEntry()->shared_from_this()) {
     auto indexCatalogEntry = _weakIndexCatalogEntry.lock();
     _indexDescriptor = indexCatalogEntry->descriptor();
-    _indexAccessMethod = indexCatalogEntry->accessMethod();
+    _indexAccessMethod = indexCatalogEntry->accessMethod()->asSortedData();
     invariant(_indexDescriptor);
     invariant(_indexAccessMethod);
     _indexName = _indexDescriptor->indexName();
@@ -70,7 +70,7 @@ void RequiresIndexStage::doRestoreStateRequiresCollection() {
     // access the catalog entry by raw pointer when the query is active, as its validity is
     // protected by at least MODE_IS collection locks.
     _indexDescriptor = indexCatalogEntry->descriptor();
-    _indexAccessMethod = indexCatalogEntry->accessMethod();
+    _indexAccessMethod = indexCatalogEntry->accessMethod()->asSortedData();
     invariant(_indexDescriptor);
     invariant(_indexAccessMethod);
 

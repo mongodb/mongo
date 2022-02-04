@@ -122,11 +122,11 @@ Status S2GetKeysForElement(const BSONElement& element,
 void appendToS2Keys(const std::vector<KeyString::HeapBuilder>& existingKeys,
                     std::vector<KeyString::HeapBuilder>* out,
                     KeyString::Version keyStringVersion,
-                    IndexAccessMethod::GetKeysContext context,
+                    SortedDataIndexAccessMethod::GetKeysContext context,
                     Ordering ordering,
                     size_t maxKeys,
                     const std::function<void(KeyString::HeapBuilder&)>& fn) {
-    if (context == IndexAccessMethod::GetKeysContext::kAddingKeys &&
+    if (context == SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys &&
         existingKeys.size() + out->size() > maxKeys) {
         if (!relaxIndexMaxNumGeneratedKeysPerDocument.shouldFail()) {
             throw MaxKeysExceededException();
@@ -160,7 +160,7 @@ bool getS2GeoKeys(const BSONObj& document,
                   const std::vector<KeyString::HeapBuilder>& keysToAdd,
                   std::vector<KeyString::HeapBuilder>* out,
                   KeyString::Version keyStringVersion,
-                  IndexAccessMethod::GetKeysContext context,
+                  SortedDataIndexAccessMethod::GetKeysContext context,
                   Ordering ordering,
                   size_t maxKeys) {
     bool everGeneratedMultipleCells = false;
@@ -177,7 +177,7 @@ bool getS2GeoKeys(const BSONObj& document,
 
         // We'll be taking the cartesian product of cells and keysToAdd, make sure the output won't
         // be too big.
-        if (context == IndexAccessMethod::GetKeysContext::kAddingKeys &&
+        if (context == SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys &&
             cells.size() * keysToAdd.size() > maxKeys) {
             if (!relaxIndexMaxNumGeneratedKeysPerDocument.shouldFail()) {
                 throw MaxKeysExceededException();
@@ -216,7 +216,7 @@ bool getS2BucketGeoKeys(const BSONObj& document,
                         const std::vector<KeyString::HeapBuilder>& keysToAdd,
                         std::vector<KeyString::HeapBuilder>* out,
                         KeyString::Version keyStringVersion,
-                        IndexAccessMethod::GetKeysContext context,
+                        SortedDataIndexAccessMethod::GetKeysContext context,
                         Ordering ordering,
                         size_t maxKeys) {
     bool generatedMultipleCells = false;
@@ -271,7 +271,7 @@ bool getS2BucketGeoKeys(const BSONObj& document,
 
         // We'll be taking the cartesian product of cells and keysToAdd, make sure the output won't
         // be too big.
-        if (context == IndexAccessMethod::GetKeysContext::kAddingKeys &&
+        if (context == SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys &&
             cells.size() * keysToAdd.size() > maxKeys) {
             if (!relaxIndexMaxNumGeneratedKeysPerDocument.shouldFail()) {
                 throw MaxKeysExceededException();
@@ -307,7 +307,7 @@ void getS2LiteralKeysArray(const BSONObj& obj,
                            const std::vector<KeyString::HeapBuilder>& keysToAdd,
                            std::vector<KeyString::HeapBuilder>* out,
                            KeyString::Version keyStringVersion,
-                           IndexAccessMethod::GetKeysContext context,
+                           SortedDataIndexAccessMethod::GetKeysContext context,
                            Ordering ordering,
                            size_t maxKeys) {
     BSONObjIterator objIt(obj);
@@ -354,7 +354,7 @@ bool getS2OneLiteralKey(const BSONElement& elt,
                         const std::vector<KeyString::HeapBuilder>& keysToAdd,
                         std::vector<KeyString::HeapBuilder>* out,
                         KeyString::Version keyStringVersion,
-                        IndexAccessMethod::GetKeysContext context,
+                        SortedDataIndexAccessMethod::GetKeysContext context,
                         Ordering ordering,
                         size_t maxKeys) {
     if (Array == elt.type()) {
@@ -394,7 +394,7 @@ bool getS2LiteralKeys(const BSONElementSet& elements,
                       const std::vector<KeyString::HeapBuilder>& keysToAdd,
                       std::vector<KeyString::HeapBuilder>* out,
                       KeyString::Version keyStringVersion,
-                      IndexAccessMethod::GetKeysContext context,
+                      SortedDataIndexAccessMethod::GetKeysContext context,
                       Ordering ordering,
                       size_t maxKeys) {
     bool foundIndexedArrayValue = false;
@@ -659,7 +659,7 @@ void ExpressionKeysPrivate::getS2Keys(SharedBufferFragmentBuilder& pooledBufferB
                                       KeyStringSet* keys,
                                       MultikeyPaths* multikeyPaths,
                                       KeyString::Version keyStringVersion,
-                                      IndexAccessMethod::GetKeysContext context,
+                                      SortedDataIndexAccessMethod::GetKeysContext context,
                                       Ordering ordering,
                                       boost::optional<RecordId> id) {
     std::vector<KeyString::HeapBuilder> keysToAdd;

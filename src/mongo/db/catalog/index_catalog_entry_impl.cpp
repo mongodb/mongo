@@ -118,8 +118,7 @@ void IndexCatalogEntryImpl::init(std::unique_ptr<IndexAccessMethod> accessMethod
     _accessMethod = std::move(accessMethod);
 }
 
-bool IndexCatalogEntryImpl::isReady(OperationContext* opCtx,
-                                    const CollectionPtr& collection) const {
+bool IndexCatalogEntryImpl::isReady(OperationContext* opCtx) const {
     // For multi-document transactions, we can open a snapshot prior to checking the
     // minimumSnapshotVersion on a collection.  This means we are unprotected from reading
     // out-of-sync index catalog entries.  To fix this, we uassert if we detect that the
@@ -246,8 +245,8 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     // not have to account for potential dupes, since all metadata keys are indexed against a single
     // RecordId. An attempt to write a duplicate key will therefore be ignored.
     if (!multikeyMetadataKeys.empty()) {
-        uassertStatusOK(accessMethod()->insertKeys(
-            opCtx, collection, multikeyMetadataKeys, {}, {}, {}, nullptr));
+        uassertStatusOK(accessMethod()->asSortedData()->insertKeys(
+            opCtx, collection, multikeyMetadataKeys, {}, {}, nullptr));
     }
 
     // Mark the catalog as multikey, and record the multikey paths if applicable.
@@ -346,7 +345,7 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
 }
 
 std::shared_ptr<Ident> IndexCatalogEntryImpl::getSharedIdent() const {
-    return {shared_from_this(), _accessMethod->getSortedDataInterface()};  // aliasing constructor
+    return {shared_from_this(), _accessMethod->getIdentPtr()};  // aliasing constructor
 }
 
 // ----

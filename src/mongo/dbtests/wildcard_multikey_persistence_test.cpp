@@ -238,10 +238,12 @@ protected:
         return collection->getIndexCatalog()->findIndexByName(opCtx(), indexName);
     }
 
-    const IndexAccessMethod* getIndex(const CollectionPtr& collection, const StringData indexName) {
+    const SortedDataIndexAccessMethod* getIndex(const CollectionPtr& collection,
+                                                const StringData indexName) {
         return collection->getIndexCatalog()
             ->getEntry(getIndexDesc(collection, indexName))
-            ->accessMethod();
+            ->accessMethod()
+            ->asSortedData();
     }
 
     std::unique_ptr<SortedDataInterface::Cursor> getIndexCursor(const CollectionPtr& collection,

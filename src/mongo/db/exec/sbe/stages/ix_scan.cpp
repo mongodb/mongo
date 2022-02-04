@@ -275,7 +275,7 @@ void IndexScanStage::open(bool reOpen) {
             str::stream() << "expected IndexCatalogEntry for index named: " << _indexName,
             static_cast<bool>(entry));
     if (!_cursor) {
-        _cursor = entry->accessMethod()->getSortedDataInterface()->newCursor(_opCtx, _forward);
+        _cursor = entry->accessMethod()->asSortedData()->newCursor(_opCtx, _forward);
     }
 
     if (_seekKeyLowAccessor && _seekKeyHiAccessor) {
@@ -301,7 +301,7 @@ void IndexScanStage::open(bool reOpen) {
                 tagLow == value::TypeTags::ksValue);
         _seekKeyLowHolder->reset(false, tagLow, valLow);
     } else {
-        auto sdi = entry->accessMethod()->getSortedDataInterface();
+        auto sdi = entry->accessMethod()->asSortedData()->getSortedDataInterface();
         KeyString::Builder kb(sdi->getKeyStringVersion(),
                               sdi->getOrdering(),
                               KeyString::Discriminator::kExclusiveBefore);

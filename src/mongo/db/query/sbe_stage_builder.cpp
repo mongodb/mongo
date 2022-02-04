@@ -579,9 +579,10 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
                     str::stream() << "IndexAccessMethod not found for index " << indexId,
                     it != iamTable.end());
 
-            auto iam = it->second;
+            auto iam = it->second->asSortedData();
             tassert(5290709,
-                    str::stream() << "Expected to find IndexAccessMethod for index " << indexId,
+                    str::stream() << "Expected to find SortedDataIndexAccessMethod for index "
+                                  << indexId,
                     iam);
 
             auto& executionCtx = StorageExecutionContext::get(opCtx);
@@ -598,8 +599,8 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
                          collection,
                          pooledBuilder,
                          nextRecord.data.toBson(),
-                         IndexAccessMethod::GetKeysMode::kEnforceConstraints,
-                         IndexAccessMethod::GetKeysContext::kValidatingKeys,
+                         InsertDeleteOptions::ConstraintEnforcementMode::kEnforceConstraints,
+                         SortedDataIndexAccessMethod::GetKeysContext::kValidatingKeys,
                          keys.get(),
                          multikeyMetadataKeys,
                          multikeyPaths,

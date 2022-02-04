@@ -131,7 +131,7 @@ public:
                           KeyStringSet* keys,
                           MultikeyPaths* multikeyPaths,
                           KeyString::Version keyStringVersion,
-                          IndexAccessMethod::GetKeysContext context,
+                          SortedDataIndexAccessMethod::GetKeysContext context,
                           Ordering ordering,
                           boost::optional<RecordId> id = boost::none);
 };

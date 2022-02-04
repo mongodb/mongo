@@ -848,13 +848,12 @@ public:
         // Replace a correct index entry with a bad one and check it's invalid.
         const IndexCatalog* indexCatalog = coll->getIndexCatalog();
         auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-        auto iam =
-            const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
+        auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
 
         {
             WriteUnitOfWork wunit(&_opCtx);
-            int64_t numDeleted;
-            int64_t numInserted;
+            int64_t numDeleted = 0;
+            int64_t numInserted = 0;
             const BSONObj actualKey = BSON("a" << 1);
             const BSONObj badKey = BSON("a" << -1);
             InsertDeleteOptions options;
@@ -862,26 +861,27 @@ public:
             options.logIfError = true;
 
             KeyStringSet keys;
-            iam->getKeys(&_opCtx,
-                         coll,
-                         pooledBuilder,
-                         actualKey,
-                         IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                         IndexAccessMethod::GetKeysContext::kAddingKeys,
-                         &keys,
-                         nullptr,
-                         nullptr,
-                         id1);
+            iam->getKeys(
+                &_opCtx,
+                coll,
+                pooledBuilder,
+                actualKey,
+                InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
+                SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                &keys,
+                nullptr,
+                nullptr,
+                id1);
 
             auto removeStatus =
-                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, id1, options, &numDeleted);
+                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
             auto insertStatus = iam->insert(
-                &_opCtx, pooledBuilder, coll, badKey, id1, options, nullptr, &numInserted);
+                &_opCtx, pooledBuilder, coll, {{id1, Timestamp(), &badKey}}, options, &numInserted);
 
-            ASSERT_EQUALS(numDeleted, 1);
-            ASSERT_EQUALS(numInserted, 1);
             ASSERT_OK(removeStatus);
             ASSERT_OK(insertStatus);
+            ASSERT_EQUALS(numDeleted, 1);
+            ASSERT_EQUALS(numInserted, 1);
             wunit.commit();
         }
         releaseDb();
@@ -964,8 +964,7 @@ public:
             record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::Long));
         const IndexCatalog* indexCatalog = coll->getIndexCatalog();
         auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-        auto accessMethod =
-            const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
+        auto accessMethod = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
         auto sortedDataInterface = accessMethod->getSortedDataInterface();
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -1080,8 +1079,7 @@ public:
         lockDb(MODE_X);
         const IndexCatalog* indexCatalog = coll->getIndexCatalog();
         auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-        auto accessMethod =
-            const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
+        auto accessMethod = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
         auto sortedDataInterface = accessMethod->getSortedDataInterface();
 
         // Removing a multikey metadata path for a path included in the projection causes validate
@@ -1255,8 +1253,7 @@ public:
 
             const IndexCatalog* indexCatalog = coll->getIndexCatalog();
             auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-            auto iam =
-                const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
+            auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
 
             WriteUnitOfWork wunit(&_opCtx);
             int64_t numDeleted;
@@ -1266,18 +1263,19 @@ public:
             options.dupsAllowed = true;
 
             KeyStringSet keys;
-            iam->getKeys(&_opCtx,
-                         coll,
-                         pooledBuilder,
-                         actualKey,
-                         IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                         IndexAccessMethod::GetKeysContext::kRemovingKeys,
-                         &keys,
-                         nullptr,
-                         nullptr,
-                         rid);
+            iam->getKeys(
+                &_opCtx,
+                coll,
+                pooledBuilder,
+                actualKey,
+                InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
+                SortedDataIndexAccessMethod::GetKeysContext::kRemovingKeys,
+                &keys,
+                nullptr,
+                nullptr,
+                rid);
             auto removeStatus =
-                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
+                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
@@ -1639,8 +1637,7 @@ public:
 
             const IndexCatalog* indexCatalog = coll->getIndexCatalog();
             auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-            auto iam =
-                const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
+            auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
 
             WriteUnitOfWork wunit(&_opCtx);
             int64_t numDeleted;
@@ -1650,18 +1647,19 @@ public:
             options.dupsAllowed = true;
 
             KeyStringSet keys;
-            iam->getKeys(&_opCtx,
-                         coll,
-                         pooledBuilder,
-                         actualKey,
-                         IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                         IndexAccessMethod::GetKeysContext::kRemovingKeys,
-                         &keys,
-                         nullptr,
-                         nullptr,
-                         rid);
+            iam->getKeys(
+                &_opCtx,
+                coll,
+                pooledBuilder,
+                actualKey,
+                InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
+                SortedDataIndexAccessMethod::GetKeysContext::kRemovingKeys,
+                &keys,
+                nullptr,
+                nullptr,
+                rid);
             auto removeStatus =
-                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
+                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
@@ -1993,7 +1991,7 @@ public:
             {
                 auto descriptor = indexCatalog->findIdIndex(&_opCtx);
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
-                auto iam = entry->accessMethod();
+                auto iam = entry->accessMethod()->asSortedData();
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
 
                 KeyStringSet keys;
@@ -2001,8 +1999,8 @@ public:
                              coll,
                              pooledBuilder,
                              dupObj,
-                             IndexAccessMethod::GetKeysMode::kRelaxConstraints,
-                             IndexAccessMethod::GetKeysContext::kAddingKeys,
+                             InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                              &keys,
                              nullptr,
                              nullptr,
@@ -2019,7 +2017,6 @@ public:
                         {keys.begin(), keys.end()},
                         {},
                         MultikeyPaths{},
-                        swRecordId.getValue(),
                         options,
                         [this, &interceptor](const KeyString::Value& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
@@ -2230,7 +2227,7 @@ public:
             {
                 auto descriptor = indexCatalog->findIdIndex(&_opCtx);
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
-                auto iam = entry->accessMethod();
+                auto iam = entry->accessMethod()->asSortedData();
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
 
                 KeyStringSet keys;
@@ -2238,8 +2235,8 @@ public:
                              coll,
                              pooledBuilder,
                              dupObj,
-                             IndexAccessMethod::GetKeysMode::kRelaxConstraints,
-                             IndexAccessMethod::GetKeysContext::kAddingKeys,
+                             InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                              &keys,
                              nullptr,
                              nullptr,
@@ -2256,7 +2253,6 @@ public:
                         {keys.begin(), keys.end()},
                         {},
                         MultikeyPaths{},
-                        swRecordId.getValue(),
                         options,
                         [this, &interceptor](const KeyString::Value& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
@@ -2455,26 +2451,26 @@ public:
 
             {
                 auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexNameB);
-                auto iam = const_cast<IndexAccessMethod*>(
-                    indexCatalog->getEntry(descriptor)->accessMethod());
+                auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
 
                 WriteUnitOfWork wunit(&_opCtx);
                 int64_t numDeleted;
                 const BSONObj actualKey = BSON("b" << 1);
 
                 KeyStringSet keys;
-                iam->getKeys(&_opCtx,
-                             coll,
-                             pooledBuilder,
-                             actualKey,
-                             IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                             IndexAccessMethod::GetKeysContext::kRemovingKeys,
-                             &keys,
-                             nullptr,
-                             nullptr,
-                             rid1);
-                auto removeStatus = iam->removeKeys(
-                    &_opCtx, {keys.begin(), keys.end()}, rid1, options, &numDeleted);
+                iam->getKeys(
+                    &_opCtx,
+                    coll,
+                    pooledBuilder,
+                    actualKey,
+                    InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
+                    SortedDataIndexAccessMethod::GetKeysContext::kRemovingKeys,
+                    &keys,
+                    nullptr,
+                    nullptr,
+                    rid1);
+                auto removeStatus =
+                    iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
 
                 ASSERT_EQUALS(numDeleted, 1);
                 ASSERT_OK(removeStatus);
@@ -2512,7 +2508,7 @@ public:
             {
                 auto descriptor = indexCatalog->findIdIndex(&_opCtx);
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
-                auto iam = entry->accessMethod();
+                auto iam = entry->accessMethod()->asSortedData();
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
 
                 KeyStringSet keys;
@@ -2520,8 +2516,8 @@ public:
                              coll,
                              pooledBuilder,
                              dupObj,
-                             IndexAccessMethod::GetKeysMode::kRelaxConstraints,
-                             IndexAccessMethod::GetKeysContext::kAddingKeys,
+                             InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                              &keys,
                              nullptr,
                              nullptr,
@@ -2538,7 +2534,6 @@ public:
                         {keys.begin(), keys.end()},
                         {},
                         MultikeyPaths{},
-                        swRecordId.getValue(),
                         options,
                         [this, &interceptor](const KeyString::Value& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
@@ -2558,7 +2553,7 @@ public:
             {
                 auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexNameB);
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
-                auto iam = entry->accessMethod();
+                auto iam = entry->accessMethod()->asSortedData();
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
 
                 KeyStringSet keys;
@@ -2566,8 +2561,8 @@ public:
                              coll,
                              pooledBuilder,
                              dupObj,
-                             IndexAccessMethod::GetKeysMode::kRelaxConstraints,
-                             IndexAccessMethod::GetKeysContext::kAddingKeys,
+                             InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                              &keys,
                              nullptr,
                              nullptr,
@@ -2584,7 +2579,6 @@ public:
                         {keys.begin(), keys.end()},
                         {},
                         MultikeyPaths{},
-                        swRecordId.getValue(),
                         options,
                         [this, &interceptor](const KeyString::Value& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
@@ -2754,8 +2748,7 @@ public:
             lockDb(MODE_X);
             const IndexCatalog* indexCatalog = coll->getIndexCatalog();
             auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-            auto iam =
-                const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
+            auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
             InsertDeleteOptions options;
             options.dupsAllowed = true;
             options.logIfError = true;
@@ -2764,21 +2757,22 @@ public:
             {
                 WriteUnitOfWork wunit(&_opCtx);
                 KeyStringSet keys;
-                iam->getKeys(&_opCtx,
-                             coll,
-                             pooledBuilder,
-                             doc,
-                             IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                             IndexAccessMethod::GetKeysContext::kRemovingKeys,
-                             &keys,
-                             nullptr,
-                             nullptr,
-                             id1);
+                iam->getKeys(
+                    &_opCtx,
+                    coll,
+                    pooledBuilder,
+                    doc,
+                    InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
+                    SortedDataIndexAccessMethod::GetKeysContext::kRemovingKeys,
+                    &keys,
+                    nullptr,
+                    nullptr,
+                    id1);
                 ASSERT_EQ(keys.size(), 1);
 
                 int64_t numDeleted;
                 auto removeStatus =
-                    iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, id1, options, &numDeleted);
+                    iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
                 ASSERT_OK(removeStatus);
                 ASSERT_EQUALS(numDeleted, 1);
                 wunit.commit();
@@ -2958,8 +2952,7 @@ public:
             const IndexCatalog* indexCatalog = coll->getIndexCatalog();
             const std::string indexName = "a";
             auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-            auto iam =
-                const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
+            auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
 
             WriteUnitOfWork wunit(&_opCtx);
             int64_t numDeleted;
@@ -2969,18 +2962,19 @@ public:
             options.dupsAllowed = true;
 
             KeyStringSet keys;
-            iam->getKeys(&_opCtx,
-                         coll,
-                         pooledBuilder,
-                         actualKey,
-                         IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                         IndexAccessMethod::GetKeysContext::kRemovingKeys,
-                         &keys,
-                         nullptr,
-                         nullptr,
-                         rid);
+            iam->getKeys(
+                &_opCtx,
+                coll,
+                pooledBuilder,
+                actualKey,
+                InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
+                SortedDataIndexAccessMethod::GetKeysContext::kRemovingKeys,
+                &keys,
+                nullptr,
+                nullptr,
+                rid);
             auto removeStatus =
-                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
+                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
@@ -2996,8 +2990,7 @@ public:
             const IndexCatalog* indexCatalog = coll->getIndexCatalog();
             const std::string indexName = "b";
             auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-            auto iam =
-                const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
+            auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
 
             WriteUnitOfWork wunit(&_opCtx);
             int64_t numDeleted;
@@ -3007,18 +3000,19 @@ public:
             options.dupsAllowed = true;
 
             KeyStringSet keys;
-            iam->getKeys(&_opCtx,
-                         coll,
-                         pooledBuilder,
-                         actualKey,
-                         IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                         IndexAccessMethod::GetKeysContext::kRemovingKeys,
-                         &keys,
-                         nullptr,
-                         nullptr,
-                         rid);
+            iam->getKeys(
+                &_opCtx,
+                coll,
+                pooledBuilder,
+                actualKey,
+                InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
+                SortedDataIndexAccessMethod::GetKeysContext::kRemovingKeys,
+                &keys,
+                nullptr,
+                nullptr,
+                rid);
             auto removeStatus =
-                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
+                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
@@ -3118,7 +3112,7 @@ public:
             {
                 auto descriptor = indexCatalog->findIdIndex(&_opCtx);
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
-                auto iam = entry->accessMethod();
+                auto iam = entry->accessMethod()->asSortedData();
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
 
                 KeyStringSet keys;
@@ -3126,8 +3120,8 @@ public:
                              coll,
                              pooledBuilder,
                              dupObj,
-                             IndexAccessMethod::GetKeysMode::kRelaxConstraints,
-                             IndexAccessMethod::GetKeysContext::kAddingKeys,
+                             InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                              &keys,
                              nullptr,
                              nullptr,
@@ -3144,7 +3138,6 @@ public:
                         {keys.begin(), keys.end()},
                         {},
                         MultikeyPaths{},
-                        swRecordId.getValue(),
                         options,
                         [this, &interceptor](const KeyString::Value& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
@@ -3164,7 +3157,7 @@ public:
             {
                 auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
-                auto iam = entry->accessMethod();
+                auto iam = entry->accessMethod()->asSortedData();
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
 
                 KeyStringSet keys;
@@ -3172,8 +3165,8 @@ public:
                              coll,
                              pooledBuilder,
                              dupObj,
-                             IndexAccessMethod::GetKeysMode::kRelaxConstraints,
-                             IndexAccessMethod::GetKeysContext::kAddingKeys,
+                             InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                              &keys,
                              nullptr,
                              nullptr,
@@ -3190,7 +3183,6 @@ public:
                         {keys.begin(), keys.end()},
                         {},
                         MultikeyPaths{},
-                        swRecordId.getValue(),
                         options,
                         [this, &interceptor](const KeyString::Value& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
@@ -3503,8 +3495,7 @@ public:
             lockDb(MODE_X);
             const IndexCatalog* indexCatalog = coll->getIndexCatalog();
             auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-            auto iam =
-                const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
+            auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
             InsertDeleteOptions options;
             options.dupsAllowed = true;
             options.logIfError = true;
@@ -3513,21 +3504,22 @@ public:
             {
                 WriteUnitOfWork wunit(&_opCtx);
                 KeyStringSet keys;
-                iam->getKeys(&_opCtx,
-                             coll,
-                             pooledBuilder,
-                             doc,
-                             IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                             IndexAccessMethod::GetKeysContext::kRemovingKeys,
-                             &keys,
-                             nullptr,
-                             nullptr,
-                             id1);
+                iam->getKeys(
+                    &_opCtx,
+                    coll,
+                    pooledBuilder,
+                    doc,
+                    InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
+                    SortedDataIndexAccessMethod::GetKeysContext::kRemovingKeys,
+                    &keys,
+                    nullptr,
+                    nullptr,
+                    id1);
                 ASSERT_EQ(keys.size(), 1);
 
                 int64_t numDeleted;
                 auto removeStatus =
-                    iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, id1, options, &numDeleted);
+                    iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
                 ASSERT_OK(removeStatus);
                 ASSERT_EQUALS(numDeleted, 1);
                 wunit.commit();
@@ -3548,16 +3540,17 @@ public:
                 WriteUnitOfWork wunit(&_opCtx);
                 KeyStringSet keys;
                 MultikeyPaths multikeyPaths;
-                iam->getKeys(&_opCtx,
-                             coll,
-                             pooledBuilder,
-                             mkDoc,
-                             IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                             IndexAccessMethod::GetKeysContext::kAddingKeys,
-                             &keys,
-                             nullptr,
-                             &multikeyPaths,
-                             id1);
+                iam->getKeys(
+                    &_opCtx,
+                    coll,
+                    pooledBuilder,
+                    mkDoc,
+                    InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
+                    SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                    &keys,
+                    nullptr,
+                    &multikeyPaths,
+                    id1);
                 ASSERT_EQ(keys.size(), 2);
                 ASSERT_EQ(multikeyPaths.size(), 1);
 
@@ -3570,7 +3563,6 @@ public:
                                                                           {*keysIterator},
                                                                           {},
                                                                           MultikeyPaths{},
-                                                                          id1,
                                                                           options,
                                                                           nullptr,
                                                                           &numInserted);
@@ -3584,7 +3576,6 @@ public:
                                                                      {*keysIterator},
                                                                      {},
                                                                      MultikeyPaths{},
-                                                                     id1,
                                                                      options,
                                                                      nullptr,
                                                                      &numInserted);
@@ -3729,8 +3720,7 @@ public:
 
             const IndexCatalog* indexCatalog = coll->getIndexCatalog();
             auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-            auto iam =
-                const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
+            auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
             InsertDeleteOptions options;
             options.dupsAllowed = true;
             options.logIfError = true;
@@ -3740,21 +3730,22 @@ public:
             {
                 WriteUnitOfWork wunit(&_opCtx);
                 KeyStringSet keys;
-                iam->getKeys(&_opCtx,
-                             coll,
-                             pooledBuilder,
-                             doc1,
-                             IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                             IndexAccessMethod::GetKeysContext::kRemovingKeys,
-                             &keys,
-                             nullptr,
-                             &oldMultikeyPaths,
-                             id1);
+                iam->getKeys(
+                    &_opCtx,
+                    coll,
+                    pooledBuilder,
+                    doc1,
+                    InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
+                    SortedDataIndexAccessMethod::GetKeysContext::kRemovingKeys,
+                    &keys,
+                    nullptr,
+                    &oldMultikeyPaths,
+                    id1);
                 ASSERT_EQ(keys.size(), 2);
 
                 int64_t numDeleted;
                 auto removeStatus =
-                    iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, id1, options, &numDeleted);
+                    iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, options, &numDeleted);
                 ASSERT_OK(removeStatus);
                 ASSERT_EQ(numDeleted, 2);
                 wunit.commit();
@@ -3776,21 +3767,22 @@ public:
             {
                 WriteUnitOfWork wunit(&_opCtx);
                 KeyStringSet keys;
-                iam->getKeys(&_opCtx,
-                             coll,
-                             pooledBuilder,
-                             doc2,
-                             IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                             IndexAccessMethod::GetKeysContext::kAddingKeys,
-                             &keys,
-                             nullptr,
-                             nullptr,
-                             id1);
+                iam->getKeys(
+                    &_opCtx,
+                    coll,
+                    pooledBuilder,
+                    doc2,
+                    InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
+                    SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                    &keys,
+                    nullptr,
+                    nullptr,
+                    id1);
                 ASSERT_EQ(keys.size(), 2);
 
                 int64_t numInserted;
                 auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
-                    &_opCtx, coll, keys, {}, oldMultikeyPaths, id1, options, nullptr, &numInserted);
+                    &_opCtx, coll, keys, {}, oldMultikeyPaths, options, nullptr, &numInserted);
 
                 ASSERT_EQUALS(numInserted, 2);
                 ASSERT_OK(insertStatus);

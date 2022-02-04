@@ -133,7 +133,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
 
     for (const auto& index : _validateState->getIndexes()) {
         const IndexDescriptor* descriptor = index->descriptor();
-        const IndexAccessMethod* iam = index->accessMethod();
+        auto iam = index->accessMethod()->asSortedData();
 
         if (descriptor->isPartial() && !index->getFilterExpression()->matchesBSON(recordBson))
             continue;
@@ -146,8 +146,8 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                      coll,
                      pool,
                      recordBson,
-                     IndexAccessMethod::GetKeysMode::kEnforceConstraints,
-                     IndexAccessMethod::GetKeysContext::kAddingKeys,
+                     InsertDeleteOptions::ConstraintEnforcementMode::kEnforceConstraints,
+                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                      documentKeySet.get(),
                      multikeyMetadataKeys.get(),
                      documentMultikeyPaths.get(),
@@ -317,7 +317,7 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
     }
 
     const KeyString::Version version =
-        index->accessMethod()->getSortedDataInterface()->getKeyStringVersion();
+        index->accessMethod()->asSortedData()->getSortedDataInterface()->getKeyStringVersion();
 
     KeyString::Builder firstKeyStringBuilder(
         version, BSONObj(), indexInfo.ord, KeyString::Discriminator::kExclusiveBefore);
@@ -344,7 +344,8 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
         throw;
     }
 
-    const auto keyFormat = index->accessMethod()->getSortedDataInterface()->rsKeyFormat();
+    const auto keyFormat =
+        index->accessMethod()->asSortedData()->getSortedDataInterface()->rsKeyFormat();
     const RecordId kWildcardMultikeyMetadataRecordId = record_id_helpers::reservedIdFor(
         record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, keyFormat);
     while (indexEntry) {

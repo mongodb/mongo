@@ -283,24 +283,13 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
     int keyLen;
     const char* binKey = operation["key"].binData(keyLen);
     BufReader reader(binKey, keyLen);
+    auto accessMethod = _indexCatalogEntry->accessMethod()->asSortedData();
     const KeyString::Value keyString = KeyString::Value::deserialize(
-        reader,
-        _indexCatalogEntry->accessMethod()->getSortedDataInterface()->getKeyStringVersion());
+        reader, accessMethod->getSortedDataInterface()->getKeyStringVersion());
 
     const Op opType = operation.getStringField("op") == "i"_sd ? Op::kInsert : Op::kDelete;
 
     const KeyStringSet keySet{keyString};
-    const RecordId opRecordId = [&]() {
-        auto keyFormat = coll->getRecordStore()->keyFormat();
-        if (keyFormat == KeyFormat::Long) {
-            return KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
-        } else {
-            invariant(keyFormat == KeyFormat::String);
-            return KeyString::decodeRecordIdStrAtEnd(keyString.getBuffer(), keyString.getSize());
-        }
-    }();
-
-    auto accessMethod = _indexCatalogEntry->accessMethod();
     if (opType == Op::kInsert) {
         int64_t numInserted;
         auto status = accessMethod->insertKeysAndUpdateMultikeyPaths(
@@ -309,7 +298,6 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
             {keySet.begin(), keySet.end()},
             {},
             MultikeyPaths{},
-            opRecordId,
             options,
             [=](const KeyString::Value& duplicateKey) {
                 return trackDups == TrackDuplicates::kTrack
@@ -330,8 +318,8 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
             invariant(operation.getStringField("op") == "d"_sd);
 
         int64_t numDeleted;
-        Status s = accessMethod->removeKeys(
-            opCtx, {keySet.begin(), keySet.end()}, opRecordId, options, &numDeleted);
+        Status s =
+            accessMethod->removeKeys(opCtx, {keySet.begin(), keySet.end()}, options, &numDeleted);
         if (!s.isOK()) {
             return s;
         }
@@ -426,7 +414,6 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
                                         const KeyStringSet& keys,
                                         const KeyStringSet& multikeyMetadataKeys,
                                         const MultikeyPaths& multikeyPaths,
-                                        RecordId loc,
                                         Op op,
                                         int64_t* const numKeysOut) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
@@ -437,7 +424,7 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
 
     // Maintain parity with IndexAccessMethod's handling of whether keys could change the multikey
     // state on the index.
-    bool isMultikey = _indexCatalogEntry->accessMethod()->shouldMarkIndexAsMultikey(
+    bool isMultikey = _indexCatalogEntry->accessMethod()->asSortedData()->shouldMarkIndexAsMultikey(
         keys.size(), multikeyMetadataKeys, multikeyPaths);
 
     // No need to take the multikeyPaths mutex if this would not change any multikey state.

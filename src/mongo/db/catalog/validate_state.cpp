@@ -263,10 +263,13 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
         const IndexCatalogEntry* entry = it->next();
         const IndexDescriptor* desc = entry->descriptor();
 
-        _indexCursors.emplace(desc->indexName(),
-                              std::make_unique<SortedDataInterfaceThrottleCursor>(
-                                  opCtx, entry->accessMethod(), &_dataThrottle));
+        auto iam = entry->accessMethod()->asSortedData();
+        if (!iam)
+            continue;
 
+        _indexCursors.emplace(
+            desc->indexName(),
+            std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, &_dataThrottle));
 
         _indexes.push_back(indexCatalog->getEntryShared(desc));
     }

@@ -97,7 +97,6 @@ public:
                      const KeyStringSet& keys,
                      const KeyStringSet& multikeyMetadataKeys,
                      const MultikeyPaths& multikeyPaths,
-                     RecordId loc,
                      Op op,
                      int64_t* numKeysOut);
 

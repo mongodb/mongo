@@ -136,7 +136,7 @@ struct S2KeyGeneratorTest : public unittest::Test {
                                          &keys,
                                          multikeyPaths,
                                          KeyString::Version::kLatestVersion,
-                                         IndexAccessMethod::GetKeysContext::kAddingKeys,
+                                         SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                          Ordering::make(BSONObj()));
 
         ASSERT_EQUALS(1U, keys.size());
@@ -165,7 +165,7 @@ TEST_F(S2KeyGeneratorTest, GetS2KeysFromSubobjectWithArrayOfGeoAndNonGeoSubobjec
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
-                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
+                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     KeyString::HeapBuilder keyString1(KeyString::Version::kLatestVersion,
@@ -207,7 +207,7 @@ TEST_F(S2KeyGeneratorTest, GetS2KeysFromArrayOfNonGeoSubobjectsWithArrayValues) 
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
-                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
+                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     KeyString::HeapBuilder keyString1(KeyString::Version::kLatestVersion,
@@ -243,7 +243,7 @@ TEST_F(S2KeyGeneratorTest, GetS2KeysFromMultiPointInGeoField) {
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
-                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
+                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     const bool multiPoint = true;
@@ -279,7 +279,7 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldAfterGeoField) {
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
-                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
+                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
@@ -310,7 +310,7 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldBeforeGeoField) {
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
-                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
+                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
@@ -342,7 +342,7 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToAllNonGeoStringFields) {
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
-                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
+                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
@@ -376,7 +376,7 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldWithMultiplePathCo
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
-                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
+                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
@@ -407,7 +407,7 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToStringsInArray) {
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
-                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
+                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     KeyString::HeapBuilder keyString1(KeyString::Version::kLatestVersion,
@@ -442,7 +442,7 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToStringsInAllArrays) {
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
-                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
+                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     KeyString::HeapBuilder keyString1(KeyString::Version::kLatestVersion,
@@ -493,7 +493,7 @@ TEST_F(S2KeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
-                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
+                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
@@ -523,7 +523,7 @@ TEST_F(S2KeyGeneratorTest, CollationAppliedToStringsInNestedObjects) {
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
-                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
+                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
@@ -555,7 +555,7 @@ TEST_F(S2KeyGeneratorTest, NoCollation) {
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
-                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
+                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
@@ -586,7 +586,7 @@ TEST_F(S2KeyGeneratorTest, EmptyArrayForLeadingFieldIsConsideredMultikey) {
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
-                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
+                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
@@ -615,7 +615,7 @@ TEST_F(S2KeyGeneratorTest, EmptyArrayForTrailingFieldIsConsideredMultikey) {
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
-                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
+                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
@@ -644,7 +644,7 @@ TEST_F(S2KeyGeneratorTest, SingleElementTrailingArrayIsConsideredMultikey) {
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
-                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
+                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
@@ -673,7 +673,7 @@ TEST_F(S2KeyGeneratorTest, MidPathSingleElementArrayIsConsideredMultikey) {
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
-                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
+                                     SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,

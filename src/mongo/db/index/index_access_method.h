@@ -51,6 +51,7 @@ class BSONObjBuilder;
 class MatchExpression;
 struct UpdateTicket;
 struct InsertDeleteOptions;
+class SortedDataIndexAccessMethod;
 
 /**
  * An IndexAccessMethod is the interface through which all the mutation, lookup, and
@@ -73,106 +74,49 @@ public:
     IndexAccessMethod() = default;
     virtual ~IndexAccessMethod() = default;
 
+    /**
+     * Equivalent to (but shorter and faster than): dynamic_cast<SortedDataIndexAccessMethod*>(this)
+     */
+    virtual SortedDataIndexAccessMethod* asSortedData() {
+        return nullptr;
+    }
+    virtual const SortedDataIndexAccessMethod* asSortedData() const {
+        return nullptr;
+    }
+
     //
     // Lookup, traversal, and mutation support
     //
 
     /**
-     * Internally generate the keys {k1, ..., kn} for 'obj'.  For each key k, insert (k ->
-     * 'loc') into the index.  'obj' is the object at the location 'loc'.
-     * If 'result' is not null, 'numInserted' will be set to the number of keys added to the index
-     * for the document and the number of duplicate keys will be appended to 'dupsInserted' if this
-     * is a unique index and duplicates are allowed.
-     *
-     * If there is more than one key for 'obj', either all keys will be inserted or none will.
-     *
-     * The behavior of the insertion can be specified through 'options'.
+     * Informs the index of inserts, updates, and deletes of records from the indexed collection.
      */
     virtual Status insert(OperationContext* opCtx,
                           SharedBufferFragmentBuilder& pooledBufferBuilder,
                           const CollectionPtr& coll,
-                          const BSONObj& obj,
-                          const RecordId& loc,
+                          const std::vector<BsonRecord>& bsonRecords,
                           const InsertDeleteOptions& options,
-                          KeyHandlerFn&& onDuplicateKey,
                           int64_t* numInserted) = 0;
 
-    /**
-     * Inserts the specified keys into the index. and determines whether these keys should cause the
-     * index to become multikey. If so, this method also handles the task of marking the index as
-     * multikey in the catalog, and sets the path-level multikey information if applicable.
-     */
-    virtual Status insertKeysAndUpdateMultikeyPaths(OperationContext* opCtx,
-                                                    const CollectionPtr& coll,
-                                                    const KeyStringSet& keys,
-                                                    const KeyStringSet& multikeyMetadataKeys,
-                                                    const MultikeyPaths& multikeyPaths,
-                                                    const RecordId& loc,
-                                                    const InsertDeleteOptions& options,
-                                                    KeyHandlerFn&& onDuplicateKey,
-                                                    int64_t* numInserted) = 0;
+    virtual void remove(OperationContext* opCtx,
+                        SharedBufferFragmentBuilder& pooledBufferBuilder,
+                        const CollectionPtr& coll,
+                        const BSONObj& obj,
+                        const RecordId& loc,
+                        bool logIfError,
+                        const InsertDeleteOptions& options,
+                        int64_t* numDeleted,
+                        CheckRecordId checkRecordId) = 0;
 
-    /**
-     * Inserts the specified keys into the index. Does not attempt to determine whether the
-     * insertion of these keys should cause the index to become multikey. The 'numInserted' output
-     * parameter, if non-nullptr, will be reset to the number of keys inserted by this function
-     * call, or to zero in the case of either a non-OK return Status or an empty 'keys' argument.
-     */
-    virtual Status insertKeys(OperationContext* opCtx,
-                              const CollectionPtr& coll,
-                              const KeyStringSet& keys,
-                              const RecordId& loc,
-                              const InsertDeleteOptions& options,
-                              KeyHandlerFn&& onDuplicateKey,
-                              int64_t* numInserted) = 0;
-
-    /**
-     * Analogous to insertKeys above, but remove the keys instead of inserting them.
-     * 'numDeleted' will be set to the number of keys removed from the index for the provided keys.
-     */
-    virtual Status removeKeys(OperationContext* opCtx,
-                              const KeyStringSet& keys,
-                              const RecordId& loc,
-                              const InsertDeleteOptions& options,
-                              int64_t* numDeleted) = 0;
-
-    /**
-     * Gets the keys of the documents 'from' and 'to' and prepares them for the update.
-     * Provides a ticket for actually performing the update.
-     */
-    virtual void prepareUpdate(OperationContext* opCtx,
-                               const CollectionPtr& collection,
-                               const IndexCatalogEntry* index,
-                               const BSONObj& from,
-                               const BSONObj& to,
-                               const RecordId& loc,
-                               const InsertDeleteOptions& options,
-                               UpdateTicket* ticket) const = 0;
-
-    /**
-     * Perform a validated update.  The keys for the 'from' object will be removed, and the keys
-     * for the object 'to' will be added.  Returns OK if the update succeeded, failure if it did
-     * not.  If an update does not succeed, the index will be unmodified, and the keys for
-     * 'from' will remain.  Assumes that the index has not changed since prepareUpdate was
-     * called.  If the index was changed, we may return an error, as our ticket may have been
-     * invalidated.
-     *
-     * 'numInserted' will be set to the number of keys inserted into the index for the document.
-     * 'numDeleted' will be set to the number of keys removed from the index for the document.
-     */
     virtual Status update(OperationContext* opCtx,
+                          SharedBufferFragmentBuilder& pooledBufferBuilder,
+                          const BSONObj& oldDoc,
+                          const BSONObj& newDoc,
+                          const RecordId& loc,
                           const CollectionPtr& coll,
-                          const UpdateTicket& ticket,
+                          const InsertDeleteOptions& options,
                           int64_t* numInserted,
                           int64_t* numDeleted) = 0;
-
-    /**
-     * Returns an unpositioned cursor over 'this' index.
-     */
-    virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
-                                                                   bool isForward) const = 0;
-    virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(
-        OperationContext* opCtx) const = 0;
 
     // ------ index level operations ------
 
@@ -214,23 +158,13 @@ public:
      */
     virtual long long getFreeStorageBytes(OperationContext* opCtx) const = 0;
 
-    virtual RecordId findSingle(OperationContext* opCtx,
-                                const CollectionPtr& collection,
-                                const BSONObj& key) const = 0;
-
     /**
      * Attempt compaction to regain disk space if the indexed record store supports
      * compaction-in-place.
      */
     virtual Status compact(OperationContext* opCtx) = 0;
 
-    /**
-     * Sets this index as multikey with the provided paths.
-     */
-    virtual void setIndexIsMultikey(OperationContext* opCtx,
-                                    const CollectionPtr& collection,
-                                    KeyStringSet multikeyMetadataKeys,
-                                    MultikeyPaths paths) = 0;
+    virtual Ident* getIdentPtr() const = 0;
 
     //
     // Bulk operations support
@@ -238,8 +172,6 @@ public:
 
     class BulkBuilder {
     public:
-        using Sorter = mongo::Sorter<KeyString::Value, mongo::NullValue>;
-
         virtual ~BulkBuilder() = default;
 
         /**
@@ -262,31 +194,38 @@ public:
                               const std::function<void()>& saveCursorBeforeWrite,
                               const std::function<void()>& restoreCursorAfterWrite) = 0;
 
+        /**
+         * Call this when you are ready to finish your bulk work.
+         * @param dupsAllowed - If false and 'dupRecords' is not null, append with the RecordIds of
+         *                      the uninserted duplicates.
+         * @param yieldIterations - The number of iterations run before each yielding. Will not
+         * yield if zero.
+         * @param onDuplicateKeyInserted - Will be called for each duplicate key inserted into the
+         * index.
+         * @param onDuplicateRecord - If not nullptr, will be called for each RecordId of uninserted
+         * duplicate keys.
+         */
+        virtual Status commit(OperationContext* opCtx,
+                              const CollectionPtr& collection,
+                              bool dupsAllowed,
+                              int32_t yieldIterations,
+                              const KeyHandlerFn& onDuplicateKeyInserted,
+                              const RecordIdHandlerFn& onDuplicateRecord) = 0;
+
         virtual const MultikeyPaths& getMultikeyPaths() const = 0;
 
         virtual bool isMultikey() const = 0;
 
         /**
-         * Inserts all multikey metadata keys cached during the BulkBuilder's lifetime into the
-         * underlying Sorter, finalizes it, and returns an iterator over the sorted dataset.
+         * Persists on disk the keys that have been inserted using this BulkBuilder.
+         * Appends necessary information to resume building to passed-in builder.
          */
-        virtual Sorter::Iterator* done() = 0;
-
-        /**
-         * Returns number of keys inserted using this BulkBuilder.
-         */
-        virtual int64_t getKeysInserted() const = 0;
-
-        /**
-         * Persists on disk the keys that have been inserted using this BulkBuilder. Returns the
-         * state of the underlying Sorter.
-         */
-        virtual Sorter::PersistedState persistDataForShutdown() = 0;
+        virtual void persistDataForShutdown(BSONObjBuilder& builder) = 0;
     };
 
     /**
      * Starts a bulk operation.
-     * You work on the returned BulkBuilder and then call commitBulk.
+     * You work on the returned BulkBuilder and then call bulk->commit().
      * This can return NULL, meaning bulk mode is not available.
      *
      * It is only legal to initiate bulk when the index is new and empty, or when resuming an index
@@ -301,94 +240,6 @@ public:
         size_t maxMemoryUsageBytes,
         const boost::optional<IndexStateInfo>& stateInfo,
         StringData dbName) = 0;
-
-    /**
-     * Call this when you are ready to finish your bulk work.
-     * Pass in the BulkBuilder returned from initiateBulk.
-     * @param bulk - Something created from initiateBulk
-     * @param dupsAllowed - If false and 'dupRecords' is not null, append with the RecordIds of
-     *                      the uninserted duplicates.
-     * @param yieldIterations - The number of iterations run before each yielding. Will not yield if
-     * zero.
-     * @param onDuplicateKeyInserted - Will be called for each duplicate key inserted into the
-     * index.
-     * @param onDuplicateRecord - If not nullptr, will be called for each RecordId of uninserted
-     * duplicate keys.
-     */
-    virtual Status commitBulk(OperationContext* opCtx,
-                              const CollectionPtr& collection,
-                              BulkBuilder* bulk,
-                              bool dupsAllowed,
-                              int32_t yieldIterations,
-                              const KeyHandlerFn& onDuplicateKeyInserted,
-                              const RecordIdHandlerFn& onDuplicateRecord) = 0;
-
-    /**
-     * Specifies whether getKeys should relax the index constraints or not, in order of most
-     * permissive to least permissive.
-     */
-    enum class GetKeysMode {
-        // Relax all constraints.
-        kRelaxConstraints,
-        // Relax all constraints on documents that don't apply to a partial index.
-        kRelaxConstraintsUnfiltered,
-        // Enforce all constraints.
-        kEnforceConstraints
-    };
-
-    /**
-     * Specifies whether getKeys is being used in the context of creating new keys, deleting
-     * or validating existing keys.
-     */
-    enum class GetKeysContext { kRemovingKeys, kAddingKeys, kValidatingKeys };
-
-    /**
-     * Fills 'keys' with the keys that should be generated for 'obj' on this index.
-     * Based on 'mode', it will honor or ignore index constraints, e.g. duplicated key, key too
-     * long, and geo index parsing errors. The ignoring of constraints is for replication due to
-     * idempotency reasons. In those cases, the generated 'keys' will be empty.
-     *
-     * If the 'multikeyPaths' pointer is non-null, then it must point to an empty vector. If this
-     * index type supports tracking path-level multikey information, then this function resizes
-     * 'multikeyPaths' to have the same number of elements as the index key pattern and fills each
-     * element with the prefixes of the indexed field that would cause this index to be multikey as
-     * a result of inserting 'keys'.
-     *
-     * If the 'multikeyMetadataKeys' pointer is non-null, then the function will populate the
-     * BSONObjSet with any multikey metadata keys generated while processing the document. These
-     * keys are not associated with the document itself, but instead represent multi-key path
-     * information that must be stored in a reserved keyspace within the index.
-     *
-     * If any key generation errors are encountered and suppressed due to the provided GetKeysMode,
-     * 'onSuppressedErrorFn' is called.
-     */
-    using OnSuppressedErrorFn =
-        std::function<void(Status status, const BSONObj& obj, boost::optional<RecordId> loc)>;
-    virtual void getKeys(OperationContext* opCtx,
-                         const CollectionPtr& collection,
-                         SharedBufferFragmentBuilder& pooledBufferBuilder,
-                         const BSONObj& obj,
-                         GetKeysMode mode,
-                         GetKeysContext context,
-                         KeyStringSet* keys,
-                         KeyStringSet* multikeyMetadataKeys,
-                         MultikeyPaths* multikeyPaths,
-                         boost::optional<RecordId> id,
-                         OnSuppressedErrorFn&& onSuppressedError = nullptr) const = 0;
-
-    /**
-     * Given the set of keys, multikeyMetadataKeys and multikeyPaths generated by a particular
-     * document, return 'true' if the index should be marked as multikey and 'false' otherwise.
-     */
-    virtual bool shouldMarkIndexAsMultikey(size_t numberOfKeys,
-                                           const KeyStringSet& multikeyMetadataKeys,
-                                           const MultikeyPaths& multikeyPaths) const = 0;
-
-    /**
-     * Provides direct access to the SortedDataInterface. This should not be used to insert
-     * documents into an index, except for testing purposes.
-     */
-    virtual SortedDataInterface* getSortedDataInterface() const = 0;
 
     void setEnforceDuplicateConstraints(bool enforceDuplicateConstraints) {
         _enforceDuplicateConstraints.swap(enforceDuplicateConstraints);
@@ -463,9 +314,21 @@ struct InsertDeleteOptions {
     // index builder should set this to 'true'.
     bool fromIndexBuilder = false;
 
+    /**
+     * Specifies whether getKeys should relax the index constraints or not, in order of most
+     * permissive to least permissive.
+     */
+    enum class ConstraintEnforcementMode {
+        // Relax all constraints.
+        kRelaxConstraints,
+        // Relax all constraints on documents that don't apply to a partial index.
+        kRelaxConstraintsUnfiltered,
+        // Enforce all constraints.
+        kEnforceConstraints
+    };
+
     // Should we relax the index constraints?
-    IndexAccessMethod::GetKeysMode getKeysMode =
-        IndexAccessMethod::GetKeysMode::kEnforceConstraints;
+    ConstraintEnforcementMode getKeysMode = ConstraintEnforcementMode::kEnforceConstraints;
 };
 
 /**
@@ -481,6 +344,10 @@ class SortedDataIndexAccessMethod : public IndexAccessMethod {
     SortedDataIndexAccessMethod& operator=(const SortedDataIndexAccessMethod&) = delete;
 
 public:
+    //
+    // SortedData-specific functions
+    //
+
     /**
      * Splits the sets 'left' and 'right' into two sets, the first containing the elements that
      * only appeared in 'left', and the second containing only elements that appeared in 'right'.
@@ -495,57 +362,176 @@ public:
     SortedDataIndexAccessMethod(const IndexCatalogEntry* btreeState,
                                 std::unique_ptr<SortedDataInterface> btree);
 
-    Status insert(OperationContext* opCtx,
-                  SharedBufferFragmentBuilder& pooledBufferBuilder,
-                  const CollectionPtr& coll,
-                  const BSONObj& obj,
-                  const RecordId& loc,
-                  const InsertDeleteOptions& options,
-                  KeyHandlerFn&& onDuplicateKey,
-                  int64_t* numInserted) final;
+    /**
+     * Specifies whether getKeys is being used in the context of creating new keys, deleting
+     * or validating existing keys.
+     */
+    enum class GetKeysContext { kRemovingKeys, kAddingKeys, kValidatingKeys };
 
+    /**
+     * Fills 'keys' with the keys that should be generated for 'obj' on this index.
+     * Based on 'mode', it will honor or ignore index constraints, e.g. duplicated key, key too
+     * long, and geo index parsing errors. The ignoring of constraints is for replication due to
+     * idempotency reasons. In those cases, the generated 'keys' will be empty.
+     *
+     * If the 'multikeyPaths' pointer is non-null, then it must point to an empty vector. If this
+     * index type supports tracking path-level multikey information, then this function resizes
+     * 'multikeyPaths' to have the same number of elements as the index key pattern and fills each
+     * element with the prefixes of the indexed field that would cause this index to be multikey as
+     * a result of inserting 'keys'.
+     *
+     * If the 'multikeyMetadataKeys' pointer is non-null, then the function will populate the
+     * BSONObjSet with any multikey metadata keys generated while processing the document. These
+     * keys are not associated with the document itself, but instead represent multi-key path
+     * information that must be stored in a reserved keyspace within the index.
+     *
+     * If any key generation errors are encountered and suppressed due to the provided GetKeysMode,
+     * 'onSuppressedErrorFn' is called.
+     */
+    using OnSuppressedErrorFn =
+        std::function<void(Status status, const BSONObj& obj, boost::optional<RecordId> loc)>;
+    void getKeys(OperationContext* opCtx,
+                 const CollectionPtr& collection,
+                 SharedBufferFragmentBuilder& pooledBufferBuilder,
+                 const BSONObj& obj,
+                 InsertDeleteOptions::ConstraintEnforcementMode mode,
+                 GetKeysContext context,
+                 KeyStringSet* keys,
+                 KeyStringSet* multikeyMetadataKeys,
+                 MultikeyPaths* multikeyPaths,
+                 boost::optional<RecordId> id,
+                 OnSuppressedErrorFn&& onSuppressedError = nullptr) const;
+
+    /**
+     * Inserts the specified keys into the index. Does not attempt to determine whether the
+     * insertion of these keys should cause the index to become multikey. The 'numInserted' output
+     * parameter, if non-nullptr, will be reset to the number of keys inserted by this function
+     * call, or to zero in the case of either a non-OK return Status or an empty 'keys' argument.
+     */
     Status insertKeys(OperationContext* opCtx,
                       const CollectionPtr& coll,
                       const KeyStringSet& keys,
-                      const RecordId& loc,
                       const InsertDeleteOptions& options,
                       KeyHandlerFn&& onDuplicateKey,
-                      int64_t* numInserted) final;
+                      int64_t* numInserted);
 
+    /**
+     * Inserts the specified keys into the index. and determines whether these keys should cause the
+     * index to become multikey. If so, this method also handles the task of marking the index as
+     * multikey in the catalog, and sets the path-level multikey information if applicable.
+     */
     Status insertKeysAndUpdateMultikeyPaths(OperationContext* opCtx,
                                             const CollectionPtr& coll,
                                             const KeyStringSet& keys,
                                             const KeyStringSet& multikeyMetadataKeys,
                                             const MultikeyPaths& multikeyPaths,
-                                            const RecordId& loc,
                                             const InsertDeleteOptions& options,
                                             KeyHandlerFn&& onDuplicateKey,
-                                            int64_t* numInserted) final;
+                                            int64_t* numInserted);
 
+    /**
+     * Analogous to insertKeys above, but remove the keys instead of inserting them.
+     * 'numDeleted' will be set to the number of keys removed from the index for the provided keys.
+     */
     Status removeKeys(OperationContext* opCtx,
                       const KeyStringSet& keys,
-                      const RecordId& loc,
                       const InsertDeleteOptions& options,
-                      int64_t* numDeleted) final;
+                      int64_t* numDeleted);
 
+    /**
+     * Gets the keys of the documents 'from' and 'to' and prepares them for the update.
+     * Provides a ticket for actually performing the update.
+     */
     void prepareUpdate(OperationContext* opCtx,
                        const CollectionPtr& collection,
-                       const IndexCatalogEntry* index,
                        const BSONObj& from,
                        const BSONObj& to,
                        const RecordId& loc,
                        const InsertDeleteOptions& options,
-                       UpdateTicket* ticket) const final;
+                       UpdateTicket* ticket) const;
+
+    /**
+     * Perform a validated update.  The keys for the 'from' object will be removed, and the keys
+     * for the object 'to' will be added.  Returns OK if the update succeeded, failure if it did
+     * not.  If an update does not succeed, the index will be unmodified, and the keys for
+     * 'from' will remain.  Assumes that the index has not changed since prepareUpdate was
+     * called.  If the index was changed, we may return an error, as our ticket may have been
+     * invalidated.
+     *
+     * 'numInserted' will be set to the number of keys inserted into the index for the document.
+     * 'numDeleted' will be set to the number of keys removed from the index for the document.
+     */
+    Status doUpdate(OperationContext* opCtx,
+                    const CollectionPtr& coll,
+                    const UpdateTicket& ticket,
+                    int64_t* numInserted,
+                    int64_t* numDeleted);
+
+    RecordId findSingle(OperationContext* opCtx,
+                        const CollectionPtr& collection,
+                        const BSONObj& key) const;
+
+    /**
+     * Returns an unpositioned cursor over 'this' index.
+     */
+    std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
+                                                           bool isForward = true) const;
+
+
+    /**
+     * Given the set of keys, multikeyMetadataKeys and multikeyPaths generated by a particular
+     * document, return 'true' if the index should be marked as multikey and 'false' otherwise.
+     */
+    virtual bool shouldMarkIndexAsMultikey(size_t numberOfKeys,
+                                           const KeyStringSet& multikeyMetadataKeys,
+                                           const MultikeyPaths& multikeyPaths) const;
+
+    /**
+     * Provides direct access to the SortedDataInterface. This should not be used to insert
+     * documents into an index, except for testing purposes.
+     */
+    SortedDataInterface* getSortedDataInterface() const {
+        return _newInterface.get();
+    }
+
+
+    //
+    // Implementations of general IndexAccessMethod API.
+    //
+
+    SortedDataIndexAccessMethod* asSortedData() final {
+        return this;
+    }
+    const SortedDataIndexAccessMethod* asSortedData() const final {
+        return this;
+    }
+
+    Status insert(OperationContext* opCtx,
+                  SharedBufferFragmentBuilder& pooledBufferBuilder,
+                  const CollectionPtr& coll,
+                  const std::vector<BsonRecord>& bsonRecords,
+                  const InsertDeleteOptions& options,
+                  int64_t* numInserted) final;
+
+    void remove(OperationContext* opCtx,
+                SharedBufferFragmentBuilder& pooledBufferBuilder,
+                const CollectionPtr& coll,
+                const BSONObj& obj,
+                const RecordId& loc,
+                bool logIfError,
+                const InsertDeleteOptions& options,
+                int64_t* numDeleted,
+                CheckRecordId checkRecordId) final;
 
     Status update(OperationContext* opCtx,
+                  SharedBufferFragmentBuilder& pooledBufferBuilder,
+                  const BSONObj& oldDoc,
+                  const BSONObj& newDoc,
+                  const RecordId& loc,
                   const CollectionPtr& coll,
-                  const UpdateTicket& ticket,
+                  const InsertDeleteOptions& options,
                   int64_t* numInserted,
                   int64_t* numDeleted) final;
-
-    std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
-                                                           bool isForward) const final;
-    std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx) const final;
 
     Status initializeAsEmpty(OperationContext* opCtx) final;
 
@@ -561,46 +547,13 @@ public:
 
     long long getFreeStorageBytes(OperationContext* opCtx) const final;
 
-    RecordId findSingle(OperationContext* opCtx,
-                        const CollectionPtr& collection,
-                        const BSONObj& key) const final;
-
     Status compact(OperationContext* opCtx) final;
 
-    void setIndexIsMultikey(OperationContext* opCtx,
-                            const CollectionPtr& collection,
-                            KeyStringSet multikeyMetadataKeys,
-                            MultikeyPaths paths) final;
+    Ident* getIdentPtr() const final;
 
     std::unique_ptr<BulkBuilder> initiateBulk(size_t maxMemoryUsageBytes,
                                               const boost::optional<IndexStateInfo>& stateInfo,
                                               StringData dbName) final;
-
-    Status commitBulk(OperationContext* opCtx,
-                      const CollectionPtr& collection,
-                      BulkBuilder* bulk,
-                      bool dupsAllowed,
-                      int32_t yieldIterations,
-                      const KeyHandlerFn& onDuplicateKeyInserted,
-                      const RecordIdHandlerFn& onDuplicateRecord) final;
-
-    void getKeys(OperationContext* opCtx,
-                 const CollectionPtr& collection,
-                 SharedBufferFragmentBuilder& pooledBufferBuilder,
-                 const BSONObj& obj,
-                 GetKeysMode mode,
-                 GetKeysContext context,
-                 KeyStringSet* keys,
-                 KeyStringSet* multikeyMetadataKeys,
-                 MultikeyPaths* multikeyPaths,
-                 boost::optional<RecordId> id,
-                 OnSuppressedErrorFn&& onSuppressedError = nullptr) const final;
-
-    bool shouldMarkIndexAsMultikey(size_t numberOfKeys,
-                                   const KeyStringSet& multikeyMetadataKeys,
-                                   const MultikeyPaths& multikeyPaths) const override;
-
-    SortedDataInterface* getSortedDataInterface() const override final;
 
 protected:
     /**
@@ -646,10 +599,8 @@ private:
      *
      * Used by remove() only.
      */
-    void removeOneKey(OperationContext* opCtx,
-                      const KeyString::Value& keyString,
-                      const RecordId& loc,
-                      bool dupsAllowed);
+    void removeOneKey(OperationContext* opCtx, const KeyString::Value& keyString, bool dupsAllowed);
+
     /**
      * While inserting keys into index (from external sorter), if a duplicate key is detected
      * (when duplicates are not allowed), 'onDuplicateRecord' will be called if passed, otherwise a
@@ -659,9 +610,23 @@ private:
                                const KeyString::Value& dataKey,
                                const RecordIdHandlerFn& onDuplicateRecord);
 
-    void _yieldBulkLoad(OperationContext* opCtx,
-                        const Yieldable* yieldable,
-                        const NamespaceString& ns) const;
+    Status _indexKeysOrWriteToSideTable(OperationContext* opCtx,
+                                        const CollectionPtr& coll,
+                                        const KeyStringSet& keys,
+                                        const KeyStringSet& multikeyMetadataKeys,
+                                        const MultikeyPaths& multikeyPaths,
+                                        const BSONObj& obj,
+                                        const InsertDeleteOptions& options,
+                                        int64_t* keysInsertedOut);
+
+    void _unindexKeysOrWriteToSideTable(OperationContext* opCtx,
+                                        const NamespaceString& ns,
+                                        const KeyStringSet& keys,
+                                        const BSONObj& obj,
+                                        bool logIfError,
+                                        int64_t* keysDeletedOut,
+                                        InsertDeleteOptions options,
+                                        CheckRecordId checkRecordId);
 
     const std::unique_ptr<SortedDataInterface> _newInterface;
 };

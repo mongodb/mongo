@@ -68,7 +68,13 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
     while (it->more()) {
         const auto indexCatalogEntry = it->next();
         const auto indexDescriptor = indexCatalogEntry->descriptor();
-        const auto iam = indexCatalogEntry->accessMethod();
+        const auto iam = indexCatalogEntry->accessMethod()->asSortedData();
+        if (!iam) {
+            LOGV2(6325100,
+                  "[Debugging] skipping index {index_name} because it isn't SortedData",
+                  "index_name"_attr = indexDescriptor->indexName());
+            continue;
+        }
         auto indexCursor = iam->newCursor(opCtx, /*forward*/ true);
 
         const BSONObj& keyPattern = indexDescriptor->keyPattern();

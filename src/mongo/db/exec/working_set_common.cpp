@@ -145,13 +145,13 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
             // index to be multikey when ensuring the keyData is still valid.
             KeyStringSet* multikeyMetadataKeys = nullptr;
             MultikeyPaths* multikeyPaths = nullptr;
-            auto* iam = workingSet->retrieveIndexAccessMethod(memberKey.indexId);
+            auto* iam = workingSet->retrieveIndexAccessMethod(memberKey.indexId)->asSortedData();
             iam->getKeys(opCtx,
                          collection,
                          pool,
                          member->doc.value().toBson(),
-                         IndexAccessMethod::GetKeysMode::kEnforceConstraints,
-                         IndexAccessMethod::GetKeysContext::kValidatingKeys,
+                         InsertDeleteOptions::ConstraintEnforcementMode::kEnforceConstraints,
+                         SortedDataIndexAccessMethod::GetKeysContext::kValidatingKeys,
                          keys.get(),
                          multikeyMetadataKeys,
                          multikeyPaths,

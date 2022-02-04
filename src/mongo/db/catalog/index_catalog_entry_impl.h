@@ -162,7 +162,7 @@ public:
                           bool isMultikey,
                           const MultikeyPaths& multikeyPaths) const final;
 
-    bool isReady(OperationContext* opCtx, const CollectionPtr& collection) const final;
+    bool isReady(OperationContext* opCtx) const final;
 
     bool isFrozen() const final;
 

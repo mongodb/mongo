@@ -1668,8 +1668,6 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
             '$BUILD_DIR/mongo/db/dbdirectclient',
             '$BUILD_DIR/mongo/db/index/index_access_methods',
-            '$BUILD_DIR/mongo/db/index/index_build_interceptor',
-            '$BUILD_DIR/mongo/db/index/skipped_record_tracker',
             '$BUILD_DIR/mongo/db/index_build_entry_helpers',
             '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
             '$BUILD_DIR/mongo/db/logical_session_id_helpers',

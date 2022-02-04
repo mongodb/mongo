@@ -37,6 +37,7 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/validate_gen.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/time_support.h"
@@ -110,7 +111,7 @@ int64_t ThrottleCursorTest::getDifferenceInMillis(Date_t start, Date_t end) {
 SortedDataInterfaceThrottleCursor ThrottleCursorTest::getIdIndex(const CollectionPtr& coll) {
     const IndexDescriptor* idDesc = coll->getIndexCatalog()->findIdIndex(operationContext());
     const IndexCatalogEntry* idEntry = coll->getIndexCatalog()->getEntry(idDesc);
-    const IndexAccessMethod* iam = idEntry->accessMethod();
+    auto iam = idEntry->accessMethod()->asSortedData();
 
     return SortedDataInterfaceThrottleCursor(operationContext(), iam, _dataThrottle.get());
 }

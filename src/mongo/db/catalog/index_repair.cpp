@@ -118,15 +118,7 @@ int repairMissingIndexEntry(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const CollectionPtr& coll,
                             ValidateResults* results) {
-    RecordId rid;
-    if (keyFormat == KeyFormat::Long) {
-        rid = KeyString::decodeRecordIdLongAtEnd(ks.getBuffer(), ks.getSize());
-    } else {
-        invariant(keyFormat == KeyFormat::String);
-        rid = KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize());
-    }
-
-    IndexAccessMethod* accessMethod = const_cast<IndexAccessMethod*>(index->accessMethod());
+    auto accessMethod = const_cast<IndexAccessMethod*>(index->accessMethod())->asSortedData();
     InsertDeleteOptions options;
     options.dupsAllowed = !index->descriptor()->unique();
     int64_t numInserted = 0;
@@ -136,7 +128,7 @@ int repairMissingIndexEntry(OperationContext* opCtx,
         // Ignore return status because we will use numInserted to verify success.
         accessMethod
             ->insertKeysAndUpdateMultikeyPaths(
-                opCtx, coll, {ks}, {}, {}, rid, options, nullptr, &numInserted)
+                opCtx, coll, {ks}, {}, {}, options, nullptr, &numInserted)
             .ignore();
         wunit.commit();
     });
@@ -151,6 +143,14 @@ int repairMissingIndexEntry(OperationContext* opCtx,
         results->numInsertedMissingIndexEntries += numInserted;
         results->repaired = true;
     } else {
+        RecordId rid;
+        if (keyFormat == KeyFormat::Long) {
+            rid = KeyString::decodeRecordIdLongAtEnd(ks.getBuffer(), ks.getSize());
+        } else {
+            invariant(keyFormat == KeyFormat::String);
+            rid = KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize());
+        }
+
         // Move the duplicate document of the missing index entry from the record store to the lost
         // and found.
         Snapshotted<BSONObj> doc;

@@ -93,7 +93,6 @@ MONGO_FAIL_POINT_DEFINE(skipIndexNewRecords);
 // This failpoint causes the check for TTL indexes on capped collections to be ignored.
 MONGO_FAIL_POINT_DEFINE(ignoreTTLIndexCappedCollectionCheck);
 
-using std::endl;
 using std::string;
 using std::unique_ptr;
 using std::vector;
@@ -222,19 +221,19 @@ Status IndexCatalogImpl::init(OperationContext* opCtx, Collection* collection) {
                 auto flags = CreateIndexEntryFlags::kInitFromDisk | CreateIndexEntryFlags::kFrozen;
                 IndexCatalogEntry* entry =
                     createIndexEntry(opCtx, collection, std::move(descriptor), flags);
-                fassert(31433, !entry->isReady(opCtx, collection));
+                fassert(31433, !entry->isReady(opCtx));
             } else {
                 // Initializing with unfinished indexes may occur during rollback or startup.
                 auto flags = CreateIndexEntryFlags::kInitFromDisk;
                 IndexCatalogEntry* entry =
                     createIndexEntry(opCtx, collection, std::move(descriptor), flags);
-                fassert(4505500, !entry->isReady(opCtx, collection));
+                fassert(4505500, !entry->isReady(opCtx));
             }
         } else {
             auto flags = CreateIndexEntryFlags::kInitFromDisk | CreateIndexEntryFlags::kIsReady;
             IndexCatalogEntry* entry =
                 createIndexEntry(opCtx, collection, std::move(descriptor), flags);
-            fassert(17340, entry->isReady(opCtx, collection));
+            fassert(17340, entry->isReady(opCtx));
 
             // When initializing indexes from disk, we conservatively set the minimumVisibleSnapshot
             // to non _id indexes to the recovery timestamp. The _id index is left visible. It's
@@ -1171,7 +1170,7 @@ Status IndexCatalogImpl::dropIndex(OperationContext* opCtx,
     if (!entry)
         return Status(ErrorCodes::InternalError, "cannot find index to delete");
 
-    if (!entry->isReady(opCtx, collection))
+    if (!entry->isReady(opCtx))
         return Status(ErrorCodes::InternalError, "cannot delete not ready index");
 
     return dropIndexEntry(opCtx, collection, entry);
@@ -1185,7 +1184,7 @@ Status IndexCatalogImpl::dropUnfinishedIndex(OperationContext* opCtx,
     if (!entry)
         return Status(ErrorCodes::InternalError, "cannot find index to delete");
 
-    if (entry->isReady(opCtx, collection))
+    if (entry->isReady(opCtx))
         return Status(ErrorCodes::InternalError, "expected unfinished index, but it is ready");
 
     return dropIndexEntry(opCtx, collection, entry);
@@ -1448,7 +1447,7 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     // to the CollectionIndexUsageTrackerDecoration (shared state among Collection instances).
     auto newDesc = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
     auto newEntry = createIndexEntry(opCtx, collection, std::move(newDesc), flags);
-    invariant(newEntry->isReady(opCtx, collection));
+    invariant(newEntry->isReady(opCtx));
     newEntry->accessMethod()->setEnforceDuplicateConstraints(enforceDuplicateConstraints);
     auto desc = newEntry->descriptor();
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
@@ -1469,58 +1468,6 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
 
 // ---------------------------
 
-Status IndexCatalogImpl::_indexKeys(OperationContext* opCtx,
-                                    const CollectionPtr& coll,
-                                    const IndexCatalogEntry* index,
-                                    const KeyStringSet& keys,
-                                    const KeyStringSet& multikeyMetadataKeys,
-                                    const MultikeyPaths& multikeyPaths,
-                                    const BSONObj& obj,
-                                    RecordId loc,
-                                    const InsertDeleteOptions& options,
-                                    int64_t* keysInsertedOut) const {
-    Status status = Status::OK();
-    if (index->isHybridBuilding()) {
-        // The side table interface accepts only records that meet the criteria for this partial
-        // index.
-        // For non-hybrid builds, the decision to use the filter for the partial index is left to
-        // the IndexAccessMethod. See SERVER-28975 for details.
-        if (auto filter = index->getFilterExpression()) {
-            if (!filter->matchesBSON(obj)) {
-                return Status::OK();
-            }
-        }
-
-        int64_t inserted = 0;
-        status = index->indexBuildInterceptor()->sideWrite(opCtx,
-                                                           keys,
-                                                           multikeyMetadataKeys,
-                                                           multikeyPaths,
-                                                           loc,
-                                                           IndexBuildInterceptor::Op::kInsert,
-                                                           &inserted);
-        if (keysInsertedOut) {
-            *keysInsertedOut += inserted;
-        }
-    } else {
-        int64_t numInserted = 0;
-        status = index->accessMethod()->insertKeysAndUpdateMultikeyPaths(
-            opCtx,
-            coll,
-            keys,
-            {multikeyMetadataKeys.begin(), multikeyMetadataKeys.end()},
-            multikeyPaths,
-            loc,
-            options,
-            nullptr,
-            &numInserted);
-        if (keysInsertedOut) {
-            *keysInsertedOut += numInserted;
-        }
-    }
-
-    return status;
-}
 
 Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
                                                const CollectionPtr& coll,
@@ -1528,51 +1475,12 @@ Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
                                                const std::vector<BsonRecord>& bsonRecords,
                                                int64_t* keysInsertedOut) const {
     SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
-    auto& executionCtx = StorageExecutionContext::get(opCtx);
 
     InsertDeleteOptions options;
     prepareInsertDeleteOptions(opCtx, coll->ns(), index->descriptor(), &options);
 
-    for (auto bsonRecord : bsonRecords) {
-        invariant(bsonRecord.id != RecordId());
-
-        if (!bsonRecord.ts.isNull()) {
-            Status status = opCtx->recoveryUnit()->setTimestamp(bsonRecord.ts);
-            if (!status.isOK())
-                return status;
-        }
-
-        auto keys = executionCtx.keys();
-        auto multikeyMetadataKeys = executionCtx.multikeyMetadataKeys();
-        auto multikeyPaths = executionCtx.multikeyPaths();
-
-        index->accessMethod()->getKeys(opCtx,
-                                       coll,
-                                       pooledBuilder,
-                                       *bsonRecord.docPtr,
-                                       options.getKeysMode,
-                                       IndexAccessMethod::GetKeysContext::kAddingKeys,
-                                       keys.get(),
-                                       multikeyMetadataKeys.get(),
-                                       multikeyPaths.get(),
-                                       bsonRecord.id);
-
-        Status status = _indexKeys(opCtx,
-                                   coll,
-                                   index,
-                                   *keys,
-                                   *multikeyMetadataKeys,
-                                   *multikeyPaths,
-                                   *bsonRecord.docPtr,
-                                   bsonRecord.id,
-                                   options,
-                                   keysInsertedOut);
-        if (!status.isOK()) {
-            return status;
-        }
-    }
-
-    return Status::OK();
+    return index->accessMethod()->insert(
+        opCtx, pooledBuilder, coll, bsonRecords, options, keysInsertedOut);
 }
 
 Status IndexCatalogImpl::_indexRecords(OperationContext* opCtx,
@@ -1605,36 +1513,16 @@ Status IndexCatalogImpl::_updateRecord(OperationContext* const opCtx,
                                        const RecordId& recordId,
                                        int64_t* const keysInsertedOut,
                                        int64_t* const keysDeletedOut) const {
-    IndexAccessMethod* iam = index->accessMethod();
+    SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
 
     InsertDeleteOptions options;
     prepareInsertDeleteOptions(opCtx, coll->ns(), index->descriptor(), &options);
 
-    UpdateTicket updateTicket;
-
-    iam->prepareUpdate(opCtx, coll, index, oldDoc, newDoc, recordId, options, &updateTicket);
-
     int64_t keysInserted = 0;
     int64_t keysDeleted = 0;
 
-    auto status = Status::OK();
-    if (index->isHybridBuilding() || !index->isReady(opCtx, coll)) {
-        bool logIfError = false;
-        _unindexKeys(
-            opCtx, coll, index, updateTicket.removed, oldDoc, recordId, logIfError, &keysDeleted);
-        status = _indexKeys(opCtx,
-                            coll,
-                            index,
-                            updateTicket.added,
-                            updateTicket.newMultikeyMetadataKeys,
-                            updateTicket.newMultikeyPaths,
-                            newDoc,
-                            recordId,
-                            options,
-                            &keysInserted);
-    } else {
-        status = iam->update(opCtx, coll, updateTicket, &keysInserted, &keysDeleted);
-    }
+    auto status = index->accessMethod()->update(
+        opCtx, pooledBuilder, oldDoc, newDoc, recordId, coll, options, &keysInserted, &keysDeleted);
 
     if (!status.isOK())
         return status;
@@ -1645,69 +1533,6 @@ Status IndexCatalogImpl::_updateRecord(OperationContext* const opCtx,
     return Status::OK();
 }
 
-void IndexCatalogImpl::_unindexKeys(OperationContext* opCtx,
-                                    const CollectionPtr& collection,
-                                    const IndexCatalogEntry* index,
-                                    const KeyStringSet& keys,
-                                    const BSONObj& obj,
-                                    RecordId loc,
-                                    bool logIfError,
-                                    int64_t* const keysDeletedOut,
-                                    CheckRecordId checkRecordId) const {
-    InsertDeleteOptions options;
-    prepareInsertDeleteOptions(opCtx, collection->ns(), index->descriptor(), &options);
-    options.logIfError = logIfError;
-
-    if (index->isHybridBuilding()) {
-        // The side table interface accepts only records that meet the criteria for this partial
-        // index.
-        // For non-hybrid builds, the decision to use the filter for the partial index is left to
-        // the IndexAccessMethod. See SERVER-28975 for details.
-        if (auto filter = index->getFilterExpression()) {
-            if (!filter->matchesBSON(obj)) {
-                return;
-            }
-        }
-
-        int64_t removed = 0;
-        fassert(31155,
-                index->indexBuildInterceptor()->sideWrite(
-                    opCtx, keys, {}, {}, loc, IndexBuildInterceptor::Op::kDelete, &removed));
-        if (keysDeletedOut) {
-            *keysDeletedOut += removed;
-        }
-
-        return;
-    }
-
-    // On WiredTiger, we do blind unindexing of records for efficiency.  However, when duplicates
-    // are allowed in unique indexes, WiredTiger does not do blind unindexing, and instead confirms
-    // that the recordid matches the element we are removing.
-    //
-    // We need to disable blind-deletes if 'checkRecordId' is explicitly set 'On', or for
-    // in-progress indexes, in order to force recordid-matching for unindex operations, since
-    // initial sync can build an index over a collection with duplicates. See SERVER-17487 for more
-    // details.
-    options.dupsAllowed = options.dupsAllowed || !index->isReady(opCtx, collection) ||
-        (checkRecordId == CheckRecordId::On);
-
-    int64_t removed = 0;
-    Status status = index->accessMethod()->removeKeys(opCtx, keys, loc, options, &removed);
-
-    if (!status.isOK()) {
-        LOGV2(20362,
-              "Couldn't unindex record {obj} from collection {namespace}: {error}",
-              "Couldn't unindex record",
-              "record"_attr = redact(obj),
-              "namespace"_attr = collection->ns(),
-              "error"_attr = redact(status));
-    }
-
-    if (keysDeletedOut) {
-        *keysDeletedOut += removed;
-    }
-}
-
 void IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
                                       const CollectionPtr& collection,
                                       const IndexCatalogEntry* entry,
@@ -1716,24 +1541,6 @@ void IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
                                       bool logIfError,
                                       int64_t* keysDeletedOut,
                                       CheckRecordId checkRecordId) const {
-    SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
-    auto& executionCtx = StorageExecutionContext::get(opCtx);
-
-    // There's no need to compute the prefixes of the indexed fields that cause the index to be
-    // multikey when removing a document since the index metadata isn't updated when keys are
-    // deleted.
-    auto keys = executionCtx.keys();
-    entry->accessMethod()->getKeys(opCtx,
-                                   collection,
-                                   pooledBuilder,
-                                   obj,
-                                   IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                                   IndexAccessMethod::GetKeysContext::kRemovingKeys,
-                                   keys.get(),
-                                   nullptr,
-                                   nullptr,
-                                   loc);
-
     // Tests can enable this failpoint to produce index corruption scenarios where an index has
     // extra keys.
     if (auto failpoint = skipUnindexingDocumentWhenDeleted.scoped();
@@ -1743,8 +1550,21 @@ void IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
             return;
         }
     }
-    _unindexKeys(
-        opCtx, collection, entry, *keys, obj, loc, logIfError, keysDeletedOut, checkRecordId);
+
+    SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+
+    InsertDeleteOptions options;
+    prepareInsertDeleteOptions(opCtx, collection->ns(), entry->descriptor(), &options);
+
+    entry->accessMethod()->remove(opCtx,
+                                  pooledBuilder,
+                                  collection,
+                                  obj,
+                                  loc,
+                                  logIfError,
+                                  options,
+                                  keysDeletedOut,
+                                  checkRecordId);
 }
 
 Status IndexCatalogImpl::indexRecords(OperationContext* opCtx,
@@ -1831,7 +1651,7 @@ void IndexCatalogImpl::unindexRecord(OperationContext* opCtx,
         IndexCatalogEntry* entry = it->get();
 
         // If it's a background index, we DO NOT want to log anything.
-        bool logIfError = entry->isReady(opCtx, collection) ? !noWarn : false;
+        bool logIfError = entry->isReady(opCtx) ? !noWarn : false;
         _unindexRecord(
             opCtx, collection, entry, obj, loc, logIfError, keysDeletedOut, checkRecordId);
     }
@@ -1886,9 +1706,9 @@ void IndexCatalogImpl::prepareInsertDeleteOptions(OperationContext* opCtx,
                                                   InsertDeleteOptions* options) const {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->shouldRelaxIndexConstraints(opCtx, ns)) {
-        options->getKeysMode = IndexAccessMethod::GetKeysMode::kRelaxConstraints;
+        options->getKeysMode = InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints;
     } else {
-        options->getKeysMode = IndexAccessMethod::GetKeysMode::kEnforceConstraints;
+        options->getKeysMode = InsertDeleteOptions::ConstraintEnforcementMode::kEnforceConstraints;
     }
 
     // Don't allow dups for Id key. Allow dups for non-unique keys or when constraints relaxed.
@@ -1896,7 +1716,8 @@ void IndexCatalogImpl::prepareInsertDeleteOptions(OperationContext* opCtx,
         options->dupsAllowed = false;
     } else {
         options->dupsAllowed = !desc->unique() ||
-            options->getKeysMode == IndexAccessMethod::GetKeysMode::kRelaxConstraints;
+            options->getKeysMode ==
+                InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints;
     }
 }
 

@@ -405,8 +405,8 @@ void IndexConsistency::addIndexKey(OperationContext* opCtx,
                 writeConflictRetry(
                     opCtx, "removingExtraIndexEntries", _validateState->nss().ns(), [&] {
                         WriteUnitOfWork wunit(opCtx);
-                        Status status = indexInfo->accessMethod->removeKeys(
-                            opCtx, {ks}, recordId, options, &numDeleted);
+                        Status status = indexInfo->accessMethod->asSortedData()->removeKeys(
+                            opCtx, {ks}, options, &numDeleted);
                         wunit.commit();
                     });
                 auto& indexResults = results->indexResultsMap[indexInfo->indexName];

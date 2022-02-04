@@ -902,7 +902,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     auto keyPattern = descriptor->keyPattern();
 
     // Find the IndexAccessMethod which corresponds to the 'indexName'.
-    auto accessMethod = collection->getIndexCatalog()->getEntry(descriptor)->accessMethod();
+    auto accessMethod =
+        collection->getIndexCatalog()->getEntry(descriptor)->accessMethod()->asSortedData();
     auto intervals =
         makeIntervalsFromIndexBounds(ixn->bounds,
                                      ixn->direction == 1,

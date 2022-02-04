@@ -110,7 +110,7 @@ void _processCollModIndexRequestHidden(OperationContext* opCtx,
  */
 void getKeysForIndex(OperationContext* opCtx,
                      const CollectionPtr& collection,
-                     const IndexAccessMethod* accessMethod,
+                     const SortedDataIndexAccessMethod* accessMethod,
                      const BSONObj& doc,
                      KeyStringSet* keys) {
     SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
@@ -119,8 +119,8 @@ void getKeysForIndex(OperationContext* opCtx,
                           collection,
                           pooledBuilder,
                           doc,
-                          IndexAccessMethod::GetKeysMode::kEnforceConstraints,
-                          IndexAccessMethod::GetKeysContext::kAddingKeys,
+                          InsertDeleteOptions::ConstraintEnforcementMode::kEnforceConstraints,
+                          SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                           keys,
                           nullptr,       //  multikeyMetadataKeys
                           nullptr,       //  multikeyPaths
@@ -146,7 +146,7 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
     std::list<std::set<RecordId>> duplicateRecordsList;
     if (!mode) {
         auto entry = idx->getEntry();
-        auto accessMethod = entry->accessMethod();
+        auto accessMethod = entry->accessMethod()->asSortedData();
 
         invariant(docsForUniqueIndex,
                   fmt::format("Unique index conversion requires valid set of changed docs from "
@@ -330,7 +330,7 @@ std::list<std::set<RecordId>> scanIndexForDuplicates(
     const IndexDescriptor* idx,
     boost::optional<KeyString::Value> firstKeyString) {
     auto entry = idx->getEntry();
-    auto accessMethod = entry->accessMethod();
+    auto accessMethod = entry->accessMethod()->asSortedData();
     // Only scans for the duplicates on one key if 'firstKeyString' is provided.
     bool scanOneKey = static_cast<bool>(firstKeyString);
 
