@@ -943,9 +943,7 @@ CollectionCatalog::Stats CollectionCatalog::getStats() const {
 CollectionCatalog::ViewCatalogSet CollectionCatalog::getViewCatalogDbNames() const {
     ViewCatalogSet results;
     for (const auto& dbNameViewSetPair : _views) {
-        // TODO SERVER-61988: This should insert dbNameViewSetPair.first instead of creating a new
-        // TenantDatabaseName object.
-        results.insert(TenantDatabaseName(boost::none, dbNameViewSetPair.first));
+        results.insert(dbNameViewSetPair.first);
     }
     return results;
 }
@@ -953,15 +951,16 @@ CollectionCatalog::ViewCatalogSet CollectionCatalog::getViewCatalogDbNames() con
 void CollectionCatalog::registerCollection(OperationContext* opCtx,
                                            const UUID& uuid,
                                            std::shared_ptr<Collection> coll) {
-    auto ns = coll->ns();
-    if (auto it = _views.find(ns.db()); it != _views.end()) {
+    auto tenantNs = coll->tenantNs();
+    auto tenantDbName = tenantNs.createTenantDatabaseName();
+    if (auto it = _views.find(tenantDbName); it != _views.end()) {
         uassert(ErrorCodes::NamespaceExists,
-                str::stream() << "View already exists. NS: " << ns,
-                !it->second.contains(ns));
+                str::stream() << "View already exists. NS: " << tenantNs,
+                !it->second.contains(tenantNs.getNss()));
     }
-    if (_collections.find(ns) != _collections.end()) {
+    if (_collections.find(tenantNs.getNss()) != _collections.end()) {
         auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-        auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookup(ns);
+        auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookup(tenantNs.getNss());
         // If we have an uncommitted drop of this collection we can defer the creation, the register
         // will happen in the same catalog write as the drop.
         if (found && !uncommittedPtr) {
@@ -980,10 +979,10 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
                 1,
                 "Registering collection {namespace} with UUID {uuid}",
                 "Registering collection",
-                logAttrs(ns),
+                logAttrs(tenantNs),
                 "uuid"_attr = uuid);
 
-    auto dbName = ns.db().toString();
+    auto dbName = tenantDbName.dbName();
     auto dbIdPair = std::make_pair(dbName, uuid);
 
     // Make sure no entry related to this uuid.
@@ -991,10 +990,10 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
     invariant(_orderedCollections.find(dbIdPair) == _orderedCollections.end());
 
     _catalog[uuid] = coll;
-    _collections[ns] = coll;
+    _collections[tenantNs.getNss()] = coll;
     _orderedCollections[dbIdPair] = coll;
 
-    if (!ns.isOnInternalDb() && !ns.isSystem()) {
+    if (!tenantNs.getNss().isOnInternalDb() && !tenantNs.getNss().isSystem()) {
         _stats.userCollections += 1;
         if (coll->isCapped()) {
             _stats.userCapped += 1;
@@ -1008,8 +1007,8 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
     auto dbRid = ResourceId(RESOURCE_DATABASE, dbName);
     addResource(dbRid, dbName);
 
-    auto collRid = ResourceId(RESOURCE_COLLECTION, ns.ns());
-    addResource(collRid, ns.ns());
+    auto collRid = ResourceId(RESOURCE_COLLECTION, tenantNs.getNss().ns());
+    addResource(collRid, tenantNs.getNss().ns());
 }
 
 std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationContext* opCtx,
@@ -1078,10 +1077,12 @@ void CollectionCatalog::registerView(const NamespaceString& ns) {
         throw WriteConflictException();
     }
 
-    _views[ns.db()].insert(ns);
+    const TenantDatabaseName tenantDbName(boost::none, ns.db());
+    _views[tenantDbName].insert(ns);
 }
 void CollectionCatalog::deregisterView(const NamespaceString& ns) {
-    auto it = _views.find(ns.db());
+    const TenantDatabaseName tenantDbName(boost::none, ns.db());
+    auto it = _views.find(tenantDbName);
     if (it == _views.end()) {
         return;
     }
@@ -1093,12 +1094,12 @@ void CollectionCatalog::deregisterView(const NamespaceString& ns) {
     }
 }
 
-void CollectionCatalog::replaceViewsForDatabase(StringData dbName,
+void CollectionCatalog::replaceViewsForDatabase(const TenantDatabaseName& tenantDbName,
                                                 absl::flat_hash_set<NamespaceString> views) {
     if (views.empty())
-        _views.erase(dbName);
+        _views.erase(tenantDbName);
     else {
-        _views[dbName] = std::move(views);
+        _views[tenantDbName] = std::move(views);
     }
 }
 

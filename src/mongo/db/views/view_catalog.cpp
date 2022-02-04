@@ -282,7 +282,9 @@ Status ViewCatalog::_reload(OperationContext* opCtx,
             CollectionCatalog::write(
                 opCtx,
                 [&dbName, viewsForDb = std::move(viewNamesForDb)](CollectionCatalog& catalog) {
-                    catalog.replaceViewsForDatabase(dbName, std::move(viewsForDb));
+                    // TODO SERVER-63206: Use instead TenantDatabaseName passed in by caller.
+                    catalog.replaceViewsForDatabase(TenantDatabaseName(boost::none, dbName),
+                                                    std::move(viewsForDb));
                 });
         }
     } catch (const DBException& ex) {
@@ -318,8 +320,9 @@ void ViewCatalog::clear(OperationContext* opCtx, StringData dbName) {
     vfdb.valid = true;
     vfdb.viewGraphNeedsRefresh = false;
     vfdb.stats = {};
+    // TODO SERVER-63206: Use instead TenantDatabaseName passed in by caller.
     CollectionCatalog::write(opCtx, [db = dbName.toString()](CollectionCatalog& catalog) {
-        catalog.replaceViewsForDatabase(db, {});
+        catalog.replaceViewsForDatabase(TenantDatabaseName(boost::none, db), {});
     });
     catalog.commit();
 }

@@ -200,7 +200,8 @@ public:
      * Collections. When creating new view its namespace should be registered with registerView()
      * above.
      */
-    void replaceViewsForDatabase(StringData dbName, absl::flat_hash_set<NamespaceString> views);
+    void replaceViewsForDatabase(const TenantDatabaseName& tenantDbName,
+                                 absl::flat_hash_set<NamespaceString> views);
 
     /**
      * This function gets the Collection pointer that corresponds to the UUID.
@@ -437,7 +438,7 @@ private:
     NamespaceCollectionMap _collections;
 
     // Map of database names to a set of their views. Only databases with views are present.
-    StringMap<absl::flat_hash_set<NamespaceString>> _views;
+    absl::flat_hash_map<TenantDatabaseName, absl::flat_hash_set<NamespaceString>> _views;
 
     // Incremented whenever the CollectionCatalog gets closed and reopened (onCloseCatalog and
     // onOpenCatalog).
