@@ -38,7 +38,8 @@ feature_flags:
   featureFlagPerCollBalancingSettings:
     description: "Add capability to configure per collection balancing settings."
     cpp_varname: feature_flags::gPerCollBalancingSettings
-    default: false
+    default: true
+    version: 5.3
 
 structs:
     configure_coll_balancing_params:
