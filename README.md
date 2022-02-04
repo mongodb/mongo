@@ -2,6 +2,8 @@
 
 Welcome to MongoDB!
 
+Hello World
+
 ## Components
 
   - `mongod` - The database server.
