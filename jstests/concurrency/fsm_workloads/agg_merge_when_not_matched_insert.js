@@ -10,7 +10,6 @@
  *  requires_sharding,
  *  assumes_balancer_off,
  *  requires_non_retryable_writes,
- *  incompatible_with_gcov,
  *]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');                 // for extendWorkload
