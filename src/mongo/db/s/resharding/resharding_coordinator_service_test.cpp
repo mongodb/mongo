@@ -526,12 +526,11 @@ public:
 
     using TransitionFunctionMap = stdx::unordered_map<CoordinatorStateEnum, std::function<void()>>;
 
-    void runReshardingToCompletion(const std::shared_ptr<ReshardingCoordinator>& coordinator) {
-        runReshardingToCompletion(coordinator, TransitionFunctionMap{});
+    void runReshardingToCompletion() {
+        runReshardingToCompletion(TransitionFunctionMap{});
     }
 
-    void runReshardingToCompletion(const std::shared_ptr<ReshardingCoordinator>& coordinator,
-                                   const TransitionFunctionMap& transitionFunctions) {
+    void runReshardingToCompletion(const TransitionFunctionMap& transitionFunctions) {
         auto runFunctionForState = [&](CoordinatorStateEnum state) {
             auto it = transitionFunctions.find(state);
             if (it == transitionFunctions.end()) {
@@ -544,10 +543,11 @@ public:
                                                        CoordinatorStateEnum::kCloning,
                                                        CoordinatorStateEnum::kApplying,
                                                        CoordinatorStateEnum::kBlockingWrites,
-                                                       CoordinatorStateEnum::kCommitting,
-                                                       CoordinatorStateEnum::kDone};
+                                                       CoordinatorStateEnum::kCommitting};
         PauseDuringStateTransitions stateTransitionsGuard{controller(), states};
+
         auto opCtx = operationContext();
+        auto coordinator = initializeAndGetCoordinator();
 
         stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
         runFunctionForState(CoordinatorStateEnum::kPreparingToDonate);
@@ -626,14 +626,13 @@ public:
 };
 
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfullyTransitionsTokDone) {
-    runReshardingToCompletion(initializeAndGetCoordinator());
+    runReshardingToCompletion();
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorTransitionsTokDoneWithInterrupt) {
 
     const auto interrupt = [this] { killAllReshardingCoordinatorOps(); };
     runReshardingToCompletion(
-        initializeAndGetCoordinator(),
         TransitionFunctionMap{{CoordinatorStateEnum::kPreparingToDonate, interrupt},
                               {CoordinatorStateEnum::kCloning, interrupt},
                               {CoordinatorStateEnum::kApplying, interrupt},
@@ -647,19 +646,17 @@ TEST_F(ReshardingCoordinatorServiceTest,
             .find("shardingCatalogManagerWithTransactionFailWCAfterCommit")
             ->setMode(FailPoint::nTimes, 1);
     };
-    auto coordinator = initializeAndGetCoordinator();
-    // PauseDuringStateTransitions relies on the coordinator state document on disk to decide when
-    // to unpause. kInitializing is never written to disk, but we still want to verify correct
-    // behavior if the transaction to transition to kInitializing fails, so call
-    // failNextTransaction() before calling runReshardingToCompletion().
+    // PauseDuringStateTransitions relies on updates to the coordinator state document on disk to
+    // decide when to unpause. kInitializing is the initial state written to disk (i.e. not an
+    // update), but we still want to verify correct behavior if the transaction to transition to
+    // kInitializing fails, so call failNextTransaction() before calling
+    // runReshardingToCompletion().
     failNextTransaction();
     runReshardingToCompletion(
-        coordinator,
         TransitionFunctionMap{{CoordinatorStateEnum::kPreparingToDonate, failNextTransaction},
                               {CoordinatorStateEnum::kCloning, failNextTransaction},
                               {CoordinatorStateEnum::kApplying, failNextTransaction},
-                              {CoordinatorStateEnum::kBlockingWrites, failNextTransaction},
-                              {CoordinatorStateEnum::kDone, failNextTransaction}});
+                              {CoordinatorStateEnum::kBlockingWrites, failNextTransaction}});
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpDuringInitializing) {
