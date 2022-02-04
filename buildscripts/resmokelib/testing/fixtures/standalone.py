@@ -236,6 +236,11 @@ class MongodLauncher(object):
                 "logComponentVerbosity"] = self.get_default_log_component_verbosity_for_mongod(
                     executable)
 
+        # receiveChunkWaitForRangeDeleterTimeoutMS is available from 5.0 onwards.
+        if "receiveChunkWaitForRangeDeleterTimeoutMS" in suite_set_parameters:
+            if executable == self.config.LAST_LTS_MONGOD_BINARY:
+                suite_set_parameters.pop("receiveChunkWaitForRangeDeleterTimeoutMS", None)
+
         # minNumChunksForSessionsCollection controls the minimum number of chunks the balancer will
         # enforce for the sessions collection. If the actual number of chunks is less, the balancer will
         # issue split commands to create more chunks. As a result, the balancer will also end up moving
