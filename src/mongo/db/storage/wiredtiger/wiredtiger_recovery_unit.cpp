@@ -45,9 +45,6 @@
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/testing_proctor.h"
 
-#include <fmt/compile.h>
-#include <fmt/format.h>
-
 namespace mongo {
 namespace {
 
@@ -471,39 +468,27 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
 
     int wtRet;
     if (commit) {
-        // Avoid heap allocation in favour of a stack allocation for the commit string.
-        constexpr auto commitTimestampFmtString = "commit_timestamp={:X},";
-        constexpr auto durableTimestampFmtString = "durable_timestamp={:X}";
-        constexpr auto bytesRequired = std::char_traits<char>::length(commitTimestampFmtString) +
-            (sizeof(decltype(_commitTimestamp.asULL())) * 2) +
-            std::char_traits<char>::length(durableTimestampFmtString) +
-            (sizeof(decltype(_durableTimestamp.asULL())) * 2) + 1;
-        std::array<char, bytesRequired> conf;
-        auto end = conf.begin();
+        StringBuilder conf;
         if (!_commitTimestamp.isNull()) {
             // There is currently no scenario where it is intentional to commit before the current
             // read timestamp.
             invariant(_readAtTimestamp.isNull() || _commitTimestamp >= _readAtTimestamp);
 
             if (MONGO_likely(!doUntimestampedWritesForIdempotencyTests.shouldFail())) {
-                end = fmt::format_to(
-                    conf.begin(), FMT_STRING(commitTimestampFmtString), _commitTimestamp.asULL());
+                conf << "commit_timestamp=" << unsignedHex(_commitTimestamp.asULL()) << ",";
             }
             _isTimestamped = true;
         }
 
         if (!_durableTimestamp.isNull()) {
-            end = fmt::format_to(
-                end, FMT_STRING(durableTimestampFmtString), _durableTimestamp.asULL());
+            conf << "durable_timestamp=" << unsignedHex(_durableTimestamp.asULL());
         }
 
         if (_mustBeTimestamped) {
             invariant(_isTimestamped);
         }
 
-        *end = '\0';
-
-        wtRet = s->commit_transaction(s, conf.begin());
+        wtRet = s->commit_transaction(s, conf.str().c_str());
 
         LOGV2_DEBUG(
             22412, 3, "WT commit_transaction", "snapshotId"_attr = getSnapshotId().toNumber());
@@ -849,15 +834,8 @@ Status WiredTigerRecoveryUnit::setTimestamp(Timestamp timestamp) {
         return Status::OK();
     }
 
-    // Avoid heap allocation in favour of a stack allocation.
-    constexpr auto formatString = "commit_timestamp={:X}";
-    constexpr auto bytesToAllocate = std::char_traits<char>::length(formatString) +
-        (sizeof(decltype(timestamp.asULL())) * 2) + 1;
-    std::array<char, bytesToAllocate> conf;
-    auto end = fmt::format_to(conf.begin(), FMT_COMPILE(formatString), timestamp.asULL());
-    // Manual null-termination
-    *end = '\0';
-    auto rc = session->timestamp_transaction(session, conf.begin());
+    const std::string conf = "commit_timestamp=" + unsignedHex(timestamp.asULL());
+    auto rc = session->timestamp_transaction(session, conf.c_str());
     if (rc == 0) {
         _isTimestamped = true;
     }
