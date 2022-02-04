@@ -484,6 +484,10 @@ public:
         return ReadSource::kNoTimestamp;
     };
 
+    virtual boost::optional<int64_t> getOplogVisibilityTs() {
+        return boost::none;
+    }
+
     /**
      * Pinning informs callers not to change the ReadSource on this RecoveryUnit. Callers are
      * expected to first check isReadSourcePinned before attempting to change the ReadSource. An

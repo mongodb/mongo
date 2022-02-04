@@ -271,6 +271,34 @@ TEST(RecordStoreTestHarness, SeekNearOnNonOplog) {
     ASSERT_EQ(rec->id, RecordId(1));
 }
 
+/**
+ * Stringifies the current 'record', as well as any more records in the 'cursor'. Additionally adds
+ * the latest oplog visibitility timestamp (this is the current oplog read timestamp, but may not
+ * have been the timestamp used by the cursor).
+ */
+std::string stringifyForDebug(OperationContext* opCtx,
+                              boost::optional<Record> record,
+                              SeekableRecordCursor* cursor) {
+    str::stream output;
+
+    auto optOplogReadTimestampInt = opCtx->recoveryUnit()->getOplogVisibilityTs();
+    if (optOplogReadTimestampInt) {
+        output << "Latest oplog visibility timestamp: "
+               << Timestamp(optOplogReadTimestampInt.get());
+    }
+
+    if (record) {
+        output << ". Current record: " << record->id << ", " << record->data.toBson();
+        while (auto nextRecord = cursor->next()) {
+            if (nextRecord) {
+                output << ". Cursor Record: " << nextRecord->id << ", "
+                       << nextRecord->data.toBson();
+            }
+        }
+    }
+
+    return output;
+}
 
 TEST(RecordStoreTestHarness, OplogOrder) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
@@ -343,9 +371,10 @@ TEST(RecordStoreTestHarness, OplogOrder) {
             auto opCtx = harnessHelper->newOperationContext(client2.get());
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seekExact(id1);
-            ASSERT(record);
-            ASSERT_EQ(id1, record->id);
-            ASSERT(!cursor->next());
+            ASSERT(record) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            ASSERT_EQ(id1, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            auto nextRecord = cursor->next();
+            ASSERT(!nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
         }
 
         {
@@ -353,9 +382,10 @@ TEST(RecordStoreTestHarness, OplogOrder) {
             auto opCtx = harnessHelper->newOperationContext(client2.get());
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seekNear(id2);
-            ASSERT(record);
-            ASSERT_EQ(id1, record->id);
-            ASSERT(!cursor->next());
+            ASSERT(record) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            ASSERT_EQ(id1, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            auto nextRecord = cursor->next();
+            ASSERT(!nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
         }
 
         {
@@ -363,9 +393,10 @@ TEST(RecordStoreTestHarness, OplogOrder) {
             auto opCtx = harnessHelper->newOperationContext(client2.get());
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seekNear(id3);
-            ASSERT(record);
-            ASSERT_EQ(id1, record->id);
-            ASSERT(!cursor->next());
+            ASSERT(record) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            ASSERT_EQ(id1, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            auto nextRecord = cursor->next();
+            ASSERT(!nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
         }
 
         w1.commit();
@@ -378,10 +409,13 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         auto opCtx = harnessHelper->newOperationContext(client2.get());
         auto cursor = rs->getCursor(opCtx.get());
         auto record = cursor->seekExact(id1);
-        ASSERT_EQ(id1, record->id);
-        ASSERT(cursor->next());
-        ASSERT(cursor->next());
-        ASSERT(!cursor->next());
+        ASSERT_EQ(id1, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
+        auto nextRecord = cursor->next();
+        ASSERT(nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
+        nextRecord = cursor->next();
+        ASSERT(nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
+        nextRecord = cursor->next();
+        ASSERT(!nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
     }
 
     // Rollback the last two oplog entries, then insert entries with older optimes and ensure that
@@ -430,8 +464,9 @@ TEST(RecordStoreTestHarness, OplogOrder) {
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seekExact(id1);
             ASSERT(record);
-            ASSERT_EQ(id1, record->id);
-            ASSERT(!cursor->next());
+            ASSERT_EQ(id1, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            auto nextRecord = cursor->next();
+            ASSERT(!nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
         }
 
         {
@@ -440,8 +475,9 @@ TEST(RecordStoreTestHarness, OplogOrder) {
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seekNear(id2);
             ASSERT(record);
-            ASSERT_EQ(id1, record->id);
-            ASSERT(!cursor->next());
+            ASSERT_EQ(id1, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            auto nextRecord = cursor->next();
+            ASSERT(!nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
         }
 
         {
@@ -450,8 +486,9 @@ TEST(RecordStoreTestHarness, OplogOrder) {
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seekNear(id3);
             ASSERT(record);
-            ASSERT_EQ(id1, record->id);
-            ASSERT(!cursor->next());
+            ASSERT_EQ(id1, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            auto nextRecord = cursor->next();
+            ASSERT(!nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
         }
 
         w1.commit();
@@ -464,9 +501,12 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         auto cursor = rs->getCursor(opCtx.get());
         auto record = cursor->seekExact(id1);
         ASSERT_EQ(id1, record->id);
-        ASSERT(cursor->next());
-        ASSERT(cursor->next());
-        ASSERT(!cursor->next());
+        auto nextRecord = cursor->next();
+        ASSERT(nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
+        nextRecord = cursor->next();
+        ASSERT(nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
+        nextRecord = cursor->next();
+        ASSERT(!nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
     }
 }
 }  // namespace

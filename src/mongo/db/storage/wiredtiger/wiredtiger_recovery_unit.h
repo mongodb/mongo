@@ -220,7 +220,7 @@ public:
      */
     void setTxnModified();
 
-    boost::optional<int64_t> getOplogVisibilityTs();
+    boost::optional<int64_t> getOplogVisibilityTs() override;
 
     static WiredTigerRecoveryUnit* get(OperationContext* opCtx) {
         return checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
