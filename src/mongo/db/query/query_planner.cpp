@@ -1193,6 +1193,18 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         }
     }
 
+    // Check whether we're eligible to use the columnar index, assuming no other indexes can be
+    // used.
+    if (out.empty() && !params.columnarIndexes.empty() && query.getProj() &&
+        !query.getProj()->requiresDocument()) {
+        // TODO SERVER-63123: Check if the columnar index actually provides the fields we need.
+        auto columnScan = std::make_unique<ColumnIndexScanNode>(params.columnarIndexes.front());
+        columnScan->fields = query.getProj()->getRequiredFields();
+        columnScan->filter = query.root()->shallowClone();
+        auto plan = QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(columnScan));
+        out.push_back(std::move(plan));
+    }
+
     // The caller can explicitly ask for a collscan.
     bool collscanRequested = (params.options & QueryPlannerParams::INCLUDE_COLLSCAN);
 

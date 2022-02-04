@@ -142,6 +142,9 @@ struct QueryPlannerParams {
     // What indices are available for planning?
     std::vector<IndexEntry> indices;
 
+    // Columnar indexes available.
+    std::vector<ColumnIndexEntry> columnarIndexes;
+
     // What's our shard key?  If INCLUDE_SHARD_FILTER is set we will create a shard filtering
     // stage.  If we know the shard key, we can perform covering analysis instead of always
     // forcing a fetch.

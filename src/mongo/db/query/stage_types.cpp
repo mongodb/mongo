@@ -39,6 +39,7 @@ StringData stageTypeToString(StageType stageType) {
         {STAGE_AND_SORTED, "AND_SORTED"_sd},
         {STAGE_CACHED_PLAN, "CACHED_PLAN"},
         {STAGE_COLLSCAN, "COLLSCAN"_sd},
+        {STAGE_COLUMN_IXSCAN, "COLUMN_IXSCAN"_sd},
         {STAGE_COUNT, "COUNT"_sd},
         {STAGE_COUNT_SCAN, "COUNT_SCAN"_sd},
         {STAGE_DELETE, "DELETE"_sd},

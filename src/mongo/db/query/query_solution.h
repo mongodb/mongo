@@ -482,6 +482,43 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     bool stopApplyingFilterAfterFirstMatch = false;
 };
 
+struct ColumnIndexScanNode : public QuerySolutionNode {
+    ColumnIndexScanNode(ColumnIndexEntry);
+
+    virtual StageType getType() const {
+        return STAGE_COLUMN_IXSCAN;
+    }
+
+    void appendToString(str::stream* ss, int indent) const override;
+
+    bool fetched() const {
+        return false;
+    }
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        for (const auto& availableField : fields) {
+            if (field == availableField) {
+                return FieldAvailability::kFullyProvided;
+            }
+        }
+        return FieldAvailability::kNotProvided;
+    }
+    bool sortedByDiskLoc() const {
+        return true;
+    }
+
+    const ProvidedSortSet& providedSorts() const {
+        return kEmptySet;
+    }
+
+    QuerySolutionNode* clone() const {
+        return new ColumnIndexScanNode(indexEntry);
+    }
+
+    ColumnIndexEntry indexEntry;
+
+    std::vector<std::string> fields;
+};
+
 /**
  * A VirtualScanNode is similar to a collection or an index scan except that it doesn't depend on an
  * underlying storage implementation. It can be used to represent a virtual

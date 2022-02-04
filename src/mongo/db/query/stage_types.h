@@ -51,6 +51,7 @@ enum StageType {
     STAGE_AND_SORTED,
     STAGE_CACHED_PLAN,
     STAGE_COLLSCAN,
+    STAGE_COLUMN_IXSCAN,
 
     // A virtual scan stage that simulates a collection scan and doesn't depend on underlying
     // storage.

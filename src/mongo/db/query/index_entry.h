@@ -254,6 +254,17 @@ struct IndexEntry : CoreIndexInfo {
     BSONObj infoObj;
 };
 
+/**
+ * Represents a columnar index.
+ */
+struct ColumnIndexEntry {
+    ColumnIndexEntry(std::string catalogName) : catalogName(std::move(catalogName)) {}
+
+    std::string catalogName;
+
+    // TODO SERVER-63123: Projection, probably need some kind of disambiguator.
+};
+
 std::ostream& operator<<(std::ostream& stream, const IndexEntry::Identifier& ident);
 StringBuilder& operator<<(StringBuilder& builder, const IndexEntry::Identifier& ident);
 }  // namespace mongo
