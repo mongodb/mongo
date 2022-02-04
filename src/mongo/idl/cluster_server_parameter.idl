@@ -44,9 +44,13 @@ structs:
                 type: string
                 # Always present on disk, but provided as optional for command processing.
                 optional: true
-            generation:
-                description: Unique identifier for this version of the setting
-                type: objectid
+            clusterParameterTime:
+                description: > 
+                    LogicalTime representing the time at which the current version of the CSP was
+                    updated. Newer versions of the CSP will have later clusterParameterTimes than older ones.
+                    In normal operation, the clusterParameterTime will increase as the CSP is updated via 
+                    setClusterParameter, but may decrease to a previously-seen value on rollback. 
+                type: logicalTime
 
 feature_flags:
     featureFlagClusterWideConfig:

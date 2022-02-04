@@ -30,6 +30,7 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
+        - "mongo/db/logical_time.h"
         - "mongo/db/namespace_string.h"
         - "mongo/idl/basic_types.h"
         - "mongo/util/uuid.h"
@@ -203,6 +204,13 @@ types:
         description: "A BSON UTC DateTime"
         cpp_type: "mongo::Date_t"
         deserializer: "mongo::BSONElement::date"
+
+    logicalTime:
+        bson_serialization_type: any
+        description: "A MongoDB LogicalTime."
+        cpp_type: LogicalTime
+        serializer: LogicalTime::serializeToBSON
+        deserializer: LogicalTime::parseFromBSON
 
     timestamp:
         bson_serialization_type: timestamp

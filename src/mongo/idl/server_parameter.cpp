@@ -42,20 +42,18 @@ MONGO_INITIALIZER_GROUP(EndServerParameterRegistration,
                         ("BeginStartupOptionHandling"))
 
 ServerParameter::ServerParameter(StringData name, ServerParameterType spt, NoRegistrationTag)
-    : _name(name.toString()), _type(spt) {
-    _generation.clear();
-}
+    : _name(name.toString()), _type(spt) {}
 
 ServerParameter::ServerParameter(StringData name, ServerParameterType spt)
     : ServerParameter(name, spt, NoRegistrationTag{}) {
     ServerParameterSet::getParameterSet(spt)->add(this);
 }
 
-void ServerParameter::setGeneration(const OID& generation) {
+void ServerParameter::setClusterParameterTime(const LogicalTime& clusterParameterTime) {
     uassert(6225101,
-            "Invalid call to setGeneration on locally scoped server parameter",
+            "Invalid call to setClusterParameterTime on locally scoped server parameter",
             isClusterWide());
-    _generation = generation;
+    _clusterParameterTime = clusterParameterTime;
 }
 
 namespace {

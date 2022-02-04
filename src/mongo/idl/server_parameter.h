@@ -42,7 +42,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/oid.h"
+#include "mongo/db/logical_time.h"
 
 #define MONGO_SERVER_PARAMETER_REGISTER(name) \
     MONGO_INITIALIZER_GENERAL(                \
@@ -130,11 +130,11 @@ public:
         return (_type != ServerParameterType::kClusterWide);
     }
 
-    OID getGeneration() const {
-        return _generation;
+    LogicalTime getClusterParameterTime() const {
+        return _clusterParameterTime;
     }
 
-    void setGeneration(const OID& generation);
+    void setClusterParameterTime(const LogicalTime& clusterParameterTime);
 
     virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) = 0;
 
@@ -170,7 +170,7 @@ protected:
 
 private:
     std::string _name;
-    OID _generation;
+    LogicalTime _clusterParameterTime;
     ServerParameterType _type;
     bool _testOnly = false;
 };
