@@ -61,7 +61,8 @@ public:
             const auto& cmd = request();
             auto stateDoc = ShardSplitDonorDocument(cmd.getMigrationId());
             stateDoc.setTenantIds(cmd.getTenantIds());
-            stateDoc.setRecipientConnectionString(cmd.getRecipientConnectionString());
+            stateDoc.setRecipientTagName(cmd.getRecipientTagName());
+            stateDoc.setRecipientSetName(cmd.getRecipientSetName());
 
             opCtx->setAlwaysInterruptAtStepDownOrUp();
 

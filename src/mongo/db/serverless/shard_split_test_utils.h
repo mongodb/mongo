@@ -29,26 +29,21 @@
 
 #pragma once
 
-#include "mongo/db/serverless/shard_split_state_machine_gen.h"
-#include "mongo/util/uuid.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+class OperationContext;
+class ServiceContext;
+
 namespace test {
 namespace shard_split {
-
-std::vector<StringData> toStringData(const std::vector<std::string>& data);
-
-ShardSplitDonorDocument createDocument(UUID id,
-                                       ShardSplitDonorStateEnum state,
-                                       const std::vector<std::string>& tenantIds,
-                                       const std::string& connectionStr);
 
 // Scoped guard to ensure tenant blockers are removed in case a test case fails and throws an
 // exception. If we do not remove the blockers, it triggers an invariant upon destruction of the
 // test fixture, which introduces additional errors in the test and makes debugging harder.
 class ScopedTenantAccessBlocker {
 public:
-    ScopedTenantAccessBlocker(std::vector<std::string> tenants, OperationContext* opCtx);
+    ScopedTenantAccessBlocker(const std::vector<std::string>& tenants, OperationContext* opCtx);
     ~ScopedTenantAccessBlocker();
 
     void dismiss();
@@ -57,6 +52,14 @@ private:
     std::vector<std::string> _tenants;
     OperationContext* _opCtx;
 };
+
+/**
+ * Build a new configuration with tagged nodes, and install it in ReplicationCoordinatorMock
+ */
+void reconfigToAddRecipientNodes(ServiceContext* serviceContext,
+                                 const std::string& recipientTagName,
+                                 const std::vector<HostAndPort>& nodes);
+
 
 }  // namespace shard_split
 }  // namespace test

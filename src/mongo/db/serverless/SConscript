@@ -50,9 +50,11 @@ env.Library(
     source=[
         'shard_split_donor_service.cpp',
         'shard_split_donor_op_observer.cpp',
+        'shard_split_utils.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/repl/primary_only_service',
+        '$BUILD_DIR/mongo/db/repl/replica_set_messages',
         'shard_split_state_machine',
     ],
     LIBDEPS_PRIVATE=[
@@ -70,6 +72,7 @@ env.CppUnitTest(
     source=[
         'shard_split_donor_op_observer_test.cpp',
         'shard_split_donor_service_test.cpp',
+        'shard_split_utils_test.cpp',
         'shard_split_test_utils.cpp',
     ],
     LIBDEPS=[

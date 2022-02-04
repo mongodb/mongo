@@ -28,39 +28,18 @@
  */
 
 #include "mongo/db/serverless/shard_split_test_utils.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
+#include "mongo/db/serverless/shard_split_state_machine_gen.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace test {
 namespace shard_split {
 
-std::vector<StringData> toStringData(const std::vector<std::string>& data) {
-    std::vector<StringData> out;
-    out.reserve(data.size());
-
-    std::transform(data.begin(),
-                   data.end(),
-                   std::back_inserter(out),
-                   [](const std::string& tenant) { return StringData(tenant); });
-
-    return out;
-}
-
-ShardSplitDonorDocument createDocument(UUID id,
-                                       ShardSplitDonorStateEnum state,
-                                       const std::vector<std::string>& tenantIds,
-                                       const std::string& connectionStr) {
-    ShardSplitDonorDocument document(id);
-    document.setState(state);
-    document.setTenantIds(toStringData(tenantIds));
-    document.setRecipientConnectionString(StringData(connectionStr));
-
-    return document;
-}
-
-ScopedTenantAccessBlocker::ScopedTenantAccessBlocker(std::vector<std::string> tenants,
+ScopedTenantAccessBlocker::ScopedTenantAccessBlocker(const std::vector<std::string>& tenants,
                                                      OperationContext* opCtx)
-    : _tenants(std::move(tenants)), _opCtx(opCtx) {}
+    : _tenants(tenants), _opCtx(opCtx) {}
 
 ScopedTenantAccessBlocker::~ScopedTenantAccessBlocker() {
     for (const auto& tenant : _tenants) {
@@ -71,6 +50,24 @@ ScopedTenantAccessBlocker::~ScopedTenantAccessBlocker() {
 
 void ScopedTenantAccessBlocker::dismiss() {
     _tenants.clear();
+}
+
+void reconfigToAddRecipientNodes(ServiceContext* serviceContext,
+                                 const std::string& recipientTagName,
+                                 const std::vector<HostAndPort>& nodes) {
+    BSONArrayBuilder members;
+    for (auto node : nodes) {
+        members.append(BSON("_id" << 1 << "host" << node.toString() << "tags"
+                                  << BSON(recipientTagName << UUID::gen().toString())));
+    }
+
+    auto newConfig = repl::ReplSetConfig::parse(BSON("_id"
+                                                     << "donor"
+                                                     << "version" << 1 << "protocolVersion" << 1
+                                                     << "members" << members.arr()));
+
+    auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
+    dynamic_cast<repl::ReplicationCoordinatorMock*>(replCoord)->setGetConfigReturnValue(newConfig);
 }
 
 }  // namespace shard_split

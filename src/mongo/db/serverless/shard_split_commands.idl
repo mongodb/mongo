@@ -59,11 +59,12 @@ commands:
       migrationId:
         description: "Unique identifier for the shard split operation."
         type: uuid
-      recipientConnectionString:
-        description: "The connection string for the recipient slice."
+      recipientSetName:
+        description: "The replica set name for the recipient."
         type: string
-        validator:
-          callback: "tenant_migration_util::validateConnectionString"
+      recipientTagName:
+        description: "The replica set tag that identifies recipient nodes."
+        type: string
       tenantIds:
         description: "The identifier for the list of tenants being migrated."
         type: array<string>

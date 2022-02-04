@@ -35,57 +35,31 @@
 namespace mongo {
 namespace repl {
 
-static ReplSetConfig makeSplitConfig(const ReplSetConfig& config,
-                                     const std::string& recipientSetName,
-                                     const std::string& recipientTagName) {
-    dassert(!recipientSetName.empty() && recipientSetName != config.getReplSetName());
-    uassert(6201800,
-            "We can not make a split config on an existing split config.",
-            !config.isSplitConfig());
+/**
+ * @returns A list of `MemberConfig` for member nodes which match a provided replica set tag name
+ */
+std::vector<MemberConfig> getRecipientMembers(const ReplSetConfig& config,
+                                              const StringData& recipientTagName);
 
-    const auto& tagConfig = config.getTagConfig();
-    std::vector<BSONObj> recipientMembers, donorMembers;
-    int donorIndex = 0, recipientIndex = 0;
-    for (const auto& member : config.members()) {
-        bool isRecipient =
-            std::any_of(member.tagsBegin(), member.tagsEnd(), [&](const ReplSetTag& tag) {
-                return tagConfig.getTagKey(tag) == recipientTagName;
-            });
-        if (isRecipient) {
-            BSONObjBuilder bob(
-                member.toBSON().removeField("votes").removeField("priority").removeField("_id"));
-            bob.appendNumber("_id", recipientIndex);
-            recipientMembers.push_back(bob.obj());
-            recipientIndex++;
-        } else {
-            BSONObjBuilder bob(member.toBSON().removeField("_id"));
-            bob.appendNumber("_id", donorIndex);
-            donorMembers.push_back(bob.obj());
-            donorIndex++;
-        }
-    }
 
-    uassert(6201801, "No recipient members found for split config.", !recipientMembers.empty());
-    uassert(6201802, "No donor members found for split config.", !donorMembers.empty());
+/**
+ * Builds a connection string for a shard split recipient by filtering local member nodes by
+ * `recipientTagName`. The `recipientSetName` is the `replSet` parameter of the recipient
+ * connection string.
+ */
+ConnectionString makeRecipientConnectionString(const ReplSetConfig& config,
+                                               const StringData& recipientTagName,
+                                               const StringData& recipientSetName);
 
-    const auto configNoMembersBson = config.toBSON().removeField("members");
+/**
+ * Builds a split config, which is a ReplSetConfig with a subdocument identifying a recipient config
+ * to be applied to a recipient shard during a shard split operation. The `recipientTagName` is used
+ * to filter the local member list for recipient nodes. The `recipientSetName` is used to validate
+ * that we are indeed generating a config for a recipient set with a new name.
+ */
+ReplSetConfig makeSplitConfig(const ReplSetConfig& config,
+                              const std::string& recipientSetName,
+                              const std::string& recipientTagName);
 
-    BSONObjBuilder recipientConfigBob(
-        configNoMembersBson.removeField("_id").removeField("settings"));
-    recipientConfigBob.append("_id", recipientSetName).append("members", recipientMembers);
-    if (configNoMembersBson.hasField("settings") &&
-        configNoMembersBson.getField("settings").isABSONObj()) {
-        BSONObj settings = configNoMembersBson.getField("settings").Obj();
-        if (settings.hasField("replicaSetId")) {
-            recipientConfigBob.append("settings", settings.removeField("replicaSetId"));
-        }
-    }
-
-    BSONObjBuilder splitConfigBob(configNoMembersBson);
-    splitConfigBob.append("members", donorMembers);
-    splitConfigBob.append("recipientConfig", recipientConfigBob.obj());
-
-    return ReplSetConfig::parse(splitConfigBob.obj());
-}
 }  // namespace repl
 }  // namespace mongo

@@ -5,6 +5,7 @@
 
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallel_shell_helpers.js');
+load("jstests/serverless/libs/basic_serverless_test.js");
 
 const kMaxTimeMS = 1 * 1000;
 
@@ -19,16 +20,6 @@ function assertDocumentState(primary, uuid, state) {
     assert.eq(migrationDoc.state, state);
 }
 
-function startReplica(name, numNodes) {
-    const replTest = new ReplSetTest({name, nodes: numNodes});
-
-    jsTestLog("Starting replica set for test");
-    const donorNodes = replTest.startSet();
-    replTest.initiate();
-
-    return replTest;
-}
-
 function runAbort() {
     "use strict";
 
@@ -37,21 +28,24 @@ function runAbort() {
     // Skip db hash check because secondary is left with a different config.
     TestData.skipCheckDBHashes = true;
 
-    const donorSet = startReplica("donorSet", 3);
-    const primary = donorSet.getPrimary();
-    const adminDb = primary.getDB("admin");
+    const test =
+        new BasicServerlessTest({recipientTagName: "recipientNode", recipientSetName: "recipient"});
+    test.addRecipientNodes();
+
+    const donorPrimary = test.donor.getPrimary();
+    const adminDb = donorPrimary.getDB("admin");
     const migrationId = UUID();
 
     jsTestLog("Asserting no state document exist before command");
-    assert.isnull(findMigration(primary, migrationId));
+    assert.isnull(findMigration(donorPrimary, migrationId));
 
     jsTestLog("Running abortShardSplit command");
-    assert.commandWorked(adminDb.runCommand({abortShardSplit: 1, migrationId: migrationId}));
+    assert.commandWorked(adminDb.runCommand({abortShardSplit: 1, migrationId}));
 
     jsTestLog("Asserting state document exist after command");
-    assertDocumentState(primary, migrationId, "aborted");
+    assertDocumentState(donorPrimary, migrationId, "aborted");
 
-    donorSet.stopSet();
+    test.stop();
 }
 
 function runBlocking() {
@@ -62,65 +56,71 @@ function runBlocking() {
     // Skip db hash check because secondary is left with a different config.
     TestData.skipCheckDBHashes = true;
 
-    const donorSet = startReplica("donorSet", 3);
-    const recipientSet = startReplica("recipientSet", 3);
-    const primary = donorSet.getPrimary();
-    const adminDb = primary.getDB("admin");
-    const migrationId = UUID();
+    const test =
+        new BasicServerlessTest({recipientTagName: "recipientNode", recipientSetName: "recipient"});
+    test.addRecipientNodes();
 
-    const tenantId1 = "test_tenant_1";
-    const tenantId2 = "test_tenant_2";
-    const tenants = [tenantId1, tenantId2];
+    const donorPrimary = test.donor.getPrimary();
+    const migrationId = UUID();
+    const tenantIds = ["test_tenant_1", "test_tenant_2"];
 
     jsTestLog("Asserting no state document exist before command");
-    assert.isnull(findMigration(primary, migrationId));
+    assert.isnull(findMigration(donorPrimary, migrationId));
 
     jsTestLog("Asserting we can write before the migration");
-    tenants.forEach(id => {
-        const tenantDB = primary.getDB(id + "_data");
+    tenantIds.forEach(id => {
+        const tenantDB = donorPrimary.getDB(id + "_data");
         let insertedObj = {name: id + "1", payload: "testing_data"};
         assert.commandWorked(tenantDB.runCommand(
             {insert: "testing_collection", documents: [insertedObj], maxTimeMS: kMaxTimeMS}));
     });
 
-    jsTestLog("Inserting failpoint after blocking");
-    let blockingFailPoint = configureFailPoint(adminDb, "pauseShardSplitAfterBlocking");
+    // configure failpoints
+    const adminDb = donorPrimary.getDB("admin");
+    const blockingFailPoint = configureFailPoint(adminDb, "pauseShardSplitAfterBlocking");
+
+    // TODO(SERVER-63091): remove this when we actually split recipients
+    configureFailPoint(adminDb, "skipShardSplitWaitForSplitAcceptance");
 
     jsTestLog("Running commitShardSplit command");
     const awaitCommand = startParallelShell(
-        funWithArgs(function(migrationId, url, tenants) {
-            assert.commandWorked(db.adminCommand({
-                commitShardSplit: 1,
-                migrationId: migrationId,
-                recipientConnectionString: url,
-                "tenantIds": tenants
-            }));
-        }, migrationId, recipientSet.getURL(), [tenantId1, tenantId2]), donorSet.getPrimary().port);
+        funWithArgs(
+            function(migrationId, recipientTagName, recipientSetName, tenantIds) {
+                assert.commandWorked(db.adminCommand({
+                    commitShardSplit: 1,
+                    migrationId,
+                    recipientTagName,
+                    recipientSetName,
+                    tenantIds
+                }));
+            },
+            migrationId,
+            test.recipientTagName,
+            test.recipientSetName,
+            tenantIds),
+        donorPrimary.port);
 
     blockingFailPoint.wait();
 
     jsTestLog("Asserting state document is in blocking state");
-    assertDocumentState(primary, migrationId, "blocking");
+    assertDocumentState(donorPrimary, migrationId, "blocking");
 
     jsTestLog("Asserting we cannot write in blocking state");
-    tenants.forEach(id => {
-        const tenantDB = primary.getDB(id + "_data");
+    tenantIds.forEach(id => {
+        const tenantDB = donorPrimary.getDB(id + "_data");
         let insertedObj = {name: id + "2", payload: "testing_data2"};
         let res = tenantDB.runCommand(
             {insert: "testing_collection", documents: [insertedObj], maxTimeMS: kMaxTimeMS});
         assert.commandFailedWithCode(res, ErrorCodes.MaxTimeMSExpired);
     });
 
+    jsTestLog("Disabling failpoints and waiting for command to complete");
     blockingFailPoint.off();
     awaitCommand();
 
     jsTestLog("Asserting state document exist after command");
-    assertDocumentState(primary, migrationId, "committed");
-
-    // If we validate, it will try to list all collections and the migrated collections will return
-    // a TenantMigrationCommitted error.
-    donorSet.stopSet(undefined /* signal */, false /* forRestart */, {skipValidation: 1});
-    recipientSet.stopSet();
+    assertDocumentState(donorPrimary, migrationId, "committed");
+    test.stop();
 }
 
 runAbort();

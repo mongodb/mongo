@@ -38,6 +38,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/serverless/shard_split_utils.h"
 #include "mongo/executor/cancelable_executor.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -101,27 +102,34 @@ void setMtabToBlockingForTenants(ServiceContext* context,
 
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterInitialSync);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterBlocking);
+MONGO_FAIL_POINT_DEFINE(skipShardSplitWaitForSplitAcceptance);
 
 }  // namespace
 
+namespace detail {
 std::function<bool(const std::vector<sdam::ServerDescriptionPtr>&)>
-makeRecipientAcceptSplitPredicate(std::string name, int expectedSize) {
-    return [name = std::move(name),
-            expectedSize](const std::vector<sdam::ServerDescriptionPtr>& servers) {
-        return expectedSize ==
+makeRecipientAcceptSplitPredicate(const ConnectionString& recipientConnectionString) {
+    return [recipientConnectionString](const std::vector<sdam::ServerDescriptionPtr>& servers) {
+        auto recipientNodeCount =
+            static_cast<uint32_t>(recipientConnectionString.getServers().size());
+        auto nodesReportingRecipientSetName =
             std::count_if(servers.begin(), servers.end(), [&](const auto& server) {
-                   return server->getSetName() && *(server->getSetName()) == name;
-               });
+                return server->getSetName() &&
+                    *(server->getSetName()) == recipientConnectionString.getSetName();
+            });
+
+        return nodesReportingRecipientSetName == recipientNodeCount;
     };
 }
 
-SemiFuture<void> getRecipientAcceptSplitFuture(ExecutorPtr executor,
-                                               const CancellationToken& token,
-                                               MongoURI recipientConnectionString) {
+SemiFuture<void> makeRecipientAcceptSplitFuture(ExecutorPtr executor,
+                                                const CancellationToken& token,
+                                                const StringData& recipientTagName,
+                                                const StringData& recipientSetName) {
     class RecipientAcceptSplitListener : public sdam::TopologyListener {
     public:
-        RecipientAcceptSplitListener(int expectedSize, std::string rsName)
-            : _predicate(makeRecipientAcceptSplitPredicate(std::move(rsName), expectedSize)) {}
+        RecipientAcceptSplitListener(const ConnectionString& recipientConnectionString)
+            : _predicate(makeRecipientAcceptSplitPredicate(recipientConnectionString)) {}
         void onTopologyDescriptionChangedEvent(TopologyDescriptionPtr previousDescription,
                                                TopologyDescriptionPtr newDescription) final {
             stdx::lock_guard<Latch> lg(_mutex);
@@ -148,18 +156,23 @@ SemiFuture<void> getRecipientAcceptSplitFuture(ExecutorPtr executor,
             MONGO_MAKE_LATCH("ShardSplitDonorService::getRecipientAcceptSplitFuture::_mutex");
     };
 
-    auto monitor = ReplicaSetMonitor::createIfNeeded(recipientConnectionString);
+    auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
+    invariant(replCoord);
+    auto recipientConnectionString = repl::makeRecipientConnectionString(
+        replCoord->getConfig(), recipientTagName, recipientSetName);
+    auto monitor = ReplicaSetMonitor::createIfNeeded(MongoURI{recipientConnectionString});
     invariant(monitor);
 
     // Only StreamableReplicaSetMonitor derives ReplicaSetMonitor.  Therefore static cast is
     // possible
     auto streamableMonitor = checked_pointer_cast<StreamableReplicaSetMonitor>(monitor);
 
-    auto listener = std::make_shared<RecipientAcceptSplitListener>(
-        recipientConnectionString.getServers().size(),
-        recipientConnectionString.getReplicaSetName());
-
+    auto listener = std::make_shared<RecipientAcceptSplitListener>(recipientConnectionString);
     streamableMonitor->getEventsPublisher()->registerListener(listener);
+
+    LOGV2(6142508,
+          "Monitoring recipient nodes for split acceptance.",
+          "recipientConnectionString"_attr = recipientConnectionString);
 
     return future_util::withCancellation(listener->getFuture(), token)
         .thenRunOn(executor)
@@ -171,6 +184,7 @@ SemiFuture<void> getRecipientAcceptSplitFuture(ExecutorPtr executor,
         })
         .semi();
 }
+}  // namespace detail
 
 ThreadPool::Limits ShardSplitDonorService::getThreadPoolLimits() const {
     return ThreadPool::Limits();
@@ -209,7 +223,8 @@ Status ShardSplitDonorService::DonorStateMachine::checkIfOptionsConflict(
     invariant(stateDoc.getId() == _stateDoc.getId());
 
     if (_stateDoc.getTenantIds() == stateDoc.getTenantIds() &&
-        _stateDoc.getRecipientConnectionString() == stateDoc.getRecipientConnectionString()) {
+        _stateDoc.getRecipientTagName() == stateDoc.getRecipientTagName() &&
+        _stateDoc.getRecipientSetName() == stateDoc.getRecipientSetName()) {
         return Status::OK();
     }
 
@@ -550,24 +565,23 @@ void ShardSplitDonorService::DonorStateMachine::_initiateTimeout(
 
 void ShardSplitDonorService::DonorStateMachine::_createReplicaSetMonitor(
     const ExecutorPtr& executor, const CancellationToken& abortToken) {
-
-    auto connectionString = [&]() {
+    auto future = [&]() {
         stdx::lock_guard<Latch> lg(_mutex);
+        if (MONGO_unlikely(skipShardSplitWaitForSplitAcceptance.shouldFail())) {  // Test-only.
+            return SemiFuture<void>::makeReady();
+        }
 
-        return _stateDoc.getRecipientConnectionString();
+        auto recipientTagName = _stateDoc.getRecipientTagName();
+        auto recipientSetName = _stateDoc.getRecipientSetName();
+        invariant(recipientTagName);
+        invariant(recipientSetName);
+
+        return detail::makeRecipientAcceptSplitFuture(
+            executor, abortToken, *recipientTagName, *recipientSetName);
     }();
 
-    invariant(connectionString);
-
-    _recipientAcceptedSplit.setFrom(
-        getRecipientAcceptSplitFuture(
-            executor, abortToken, MongoURI::parse(connectionString.get()).getValue())
-            .unsafeToInlineFuture());
+    _recipientAcceptedSplit.setFrom(std::move(future).unsafeToInlineFuture());
     _replicaSetMonitorCreatedPromise.emplaceValue();
-
-    LOGV2(6142508,
-          "Monitoring recipient nodes for split acceptance.",
-          "recipientConnectionString"_attr = connectionString.get());
 }
 
 ExecutorFuture<ShardSplitDonorService::DonorStateMachine::DurableState>

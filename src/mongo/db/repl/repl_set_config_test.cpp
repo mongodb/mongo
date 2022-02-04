@@ -35,8 +35,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/repl_set_config_test.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/serverless/shard_split_utils.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
@@ -1210,75 +1210,6 @@ TEST(ReplSetConfig, HeartbeatTimeoutField) {
                   DBException);
 }
 
-bool operator==(const MemberConfig& a, const MemberConfig& b) {
-    // do tag comparisons
-    for (MemberConfig::TagIterator itrA = a.tagsBegin(); itrA != a.tagsEnd(); ++itrA) {
-        if (std::find(b.tagsBegin(), b.tagsEnd(), *itrA) == b.tagsEnd()) {
-            return false;
-        }
-    }
-    return a.getId() == b.getId() && a.getHostAndPort() == b.getHostAndPort() &&
-        a.getPriority() == b.getPriority() && a.getSecondaryDelay() == b.getSecondaryDelay() &&
-        a.isVoter() == b.isVoter() && a.isArbiter() == b.isArbiter() &&
-        a.isNewlyAdded() == b.isNewlyAdded() && a.isHidden() == b.isHidden() &&
-        a.shouldBuildIndexes() == b.shouldBuildIndexes() && a.getNumTags() == b.getNumTags() &&
-        a.getHorizonMappings() == b.getHorizonMappings() &&
-        a.getHorizonReverseHostMappings() == b.getHorizonReverseHostMappings();
-}
-
-bool operator==(const ReplSetConfig& a, const ReplSetConfig& b) {
-    // compare WriteConcernModes
-    std::vector<std::string> modeNames = a.getWriteConcernNames();
-    for (std::vector<std::string>::iterator it = modeNames.begin(); it != modeNames.end(); it++) {
-        ReplSetTagPattern patternA = a.findCustomWriteMode(*it).getValue();
-        ReplSetTagPattern patternB = b.findCustomWriteMode(*it).getValue();
-        for (ReplSetTagPattern::ConstraintIterator itrA = patternA.constraintsBegin();
-             itrA != patternA.constraintsEnd();
-             itrA++) {
-            bool same = false;
-            for (ReplSetTagPattern::ConstraintIterator itrB = patternB.constraintsBegin();
-                 itrB != patternB.constraintsEnd();
-                 itrB++) {
-                if (itrA->getKeyIndex() == itrB->getKeyIndex() &&
-                    itrA->getMinCount() == itrB->getMinCount()) {
-                    same = true;
-                    break;
-                }
-            }
-            if (!same) {
-                return false;
-            }
-        }
-    }
-
-    // compare the members
-    for (ReplSetConfig::MemberIterator memA = a.membersBegin(); memA != a.membersEnd(); memA++) {
-        bool same = false;
-        for (ReplSetConfig::MemberIterator memB = b.membersBegin(); memB != b.membersEnd();
-             memB++) {
-            if (*memA == *memB) {
-                same = true;
-                break;
-            }
-        }
-        if (!same) {
-            return false;
-        }
-    }
-
-    // simple comparisons
-    return a.getReplSetName() == b.getReplSetName() &&
-        a.getConfigVersion() == b.getConfigVersion() && a.getNumMembers() == b.getNumMembers() &&
-        a.getHeartbeatInterval() == b.getHeartbeatInterval() &&
-        a.getHeartbeatTimeoutPeriod() == b.getHeartbeatTimeoutPeriod() &&
-        a.getElectionTimeoutPeriod() == b.getElectionTimeoutPeriod() &&
-        a.isChainingAllowed() == b.isChainingAllowed() &&
-        a.getConfigServer() == b.getConfigServer() &&
-        a.getDefaultWriteConcern().w == b.getDefaultWriteConcern().w &&
-        a.getProtocolVersion() == b.getProtocolVersion() &&
-        a.getReplicaSetId() == b.getReplicaSetId();
-}
-
 TEST(ReplSetConfig, toBSONRoundTripAbility) {
     ReplSetConfig configA;
     ReplSetConfig configB;
@@ -1301,45 +1232,6 @@ TEST(ReplSetConfig, toBSONRoundTripAbility) {
                                                 << "replicaSetId" << donorReplSetId)));
     configB = ReplSetConfig::parse(configA.toBSON());
     ASSERT_TRUE(configA == configB);
-
-    // here we will test that the result from the method `makeSplitConfig` matches the hardcoded
-    // resultSplitConfigBSON. We will also check that the recipient from the splitConfig matches
-    // the hardcoded recipientConfig.
-    const std::string recipientConfigSetName{"newSet"};
-    BSONObj resultRecipientConfigBSON = BSON(
-        "_id" << recipientConfigSetName << "version" << 1 << "protocolVersion" << 1 << "members"
-              << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                       << "localhost:20002"
-                                       << "priority" << 1 << "votes" << 1 << "tags"
-                                       << BSON(recipientTagName << "one")))
-              << "settings"
-              << BSON("heartbeatIntervalMillis" << 5000 << "heartbeatTimeoutSecs" << 20));
-
-    BSONObj resultSplitConfigBSON = BSON("_id"
-                                         << "rs0"
-                                         << "version" << 1 << "protocolVersion" << 1 << "members"
-                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                  << "localhost:12345"))
-                                         << "settings"
-                                         << BSON("heartbeatIntervalMillis"
-                                                 << 5000 << "heartbeatTimeoutSecs" << 20
-                                                 << "replicaSetId" << donorReplSetId)
-                                         << "recipientConfig" << resultRecipientConfigBSON);
-
-    const ReplSetConfig splitConfigResult =
-        repl::makeSplitConfig(configA, recipientConfigSetName, recipientTagName);
-
-    ASSERT_OK(splitConfigResult.validate());
-    ASSERT_TRUE(splitConfigResult == ReplSetConfig::parse(splitConfigResult.toBSON()));
-
-    auto resultSplitConfig = ReplSetConfig::parse(resultSplitConfigBSON);
-    ASSERT_OK(resultSplitConfig.validate());
-    ASSERT_TRUE(splitConfigResult == resultSplitConfig);
-
-    auto recipientConfigResultPtr = splitConfigResult.getRecipientConfig();
-    // we use getReplicaSetId to match the newly replicaSetId created from makeSplitConfig on the
-    // recipientConfig since configA had a replicaSetId in its config.
-    ASSERT_TRUE(*recipientConfigResultPtr == ReplSetConfig::parse(resultRecipientConfigBSON));
 }
 
 TEST(ReplSetConfig, toBSONRoundTripAbilityWithHorizon) {
@@ -2020,80 +1912,6 @@ TEST(ReplSetConfig, IsImplicitDefaultWriteConcernMajority) {
     ASSERT_FALSE(config.isImplicitDefaultWriteConcernMajority());
 }
 
-TEST(ReplSetConfig, ValidateSplitConfigIntegrityTest) {
-    const std::string recipientTagName{"recipient"};
-    const std::string donorConfigSetName{"rs0"};
-    const std::string recipientConfigSetName{"newSet"};
-    const ReplSetConfig config = ReplSetConfig::parse(
-        BSON("_id" << donorConfigSetName << "version" << 1 << "protocolVersion" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                            << "localhost:20001"
-                                            << "priority" << 1 << "tags"
-                                            << BSON("NYC"
-                                                    << "NY"))
-                                 << BSON("_id" << 1 << "host"
-                                               << "localhost:20002"
-                                               << "priority" << 0 << "votes" << 0 << "tags"
-                                               << BSON(recipientTagName << "one"))
-                                 << BSON("_id" << 2 << "host"
-                                               << "localhost:20003"
-                                               << "priority" << 6))
-                   << "settings" << BSON("electionTimeoutMillis" << 1000)));
-
-
-    const ReplSetConfig splitConfig =
-        repl::makeSplitConfig(config, recipientConfigSetName, recipientTagName);
-    ASSERT_OK(splitConfig.validate());
-    ASSERT_EQ(splitConfig.getReplSetName(), donorConfigSetName);
-    ASSERT_TRUE(splitConfig.toBSON().hasField("members"));
-    ASSERT_EQUALS(2, splitConfig.getNumMembers());
-    ASSERT_TRUE(splitConfig.isSplitConfig());
-
-    auto recipientConfigPtr = splitConfig.getRecipientConfig();
-    ASSERT_OK(recipientConfigPtr->validate());
-    ASSERT_TRUE(recipientConfigPtr->toBSON().hasField("members"));
-    ASSERT_EQUALS(1, recipientConfigPtr->getNumMembers());
-
-    ASSERT_FALSE(recipientConfigPtr->isSplitConfig());
-    ASSERT_TRUE(recipientConfigPtr->getRecipientConfig() == nullptr);
-    ASSERT_EQ(recipientConfigPtr->getReplSetName(), recipientConfigSetName);
-
-    ASSERT_THROWS_CODE(repl::makeSplitConfig(splitConfig, recipientConfigSetName, recipientTagName),
-                       AssertionException,
-                       6201800 /*calling on a splitconfig*/);
-}
-
-TEST(ReplSetConfig, SplitConfigAssertionsTest) {
-    const std::string recipientConfigSetName{"newSet"};
-    const std::string recipientTagName{"recipient"};
-    auto baseConfigBSON = BSON("_id"
-                               << "rs0"
-                               << "version" << 1 << "protocolVersion" << 1 << "members"
-                               << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                        << "localhost:20002"
-                                                        << "priority" << 0 << "votes" << 0)));
-
-    ASSERT_THROWS_CODE(repl::makeSplitConfig(ReplSetConfig::parse(baseConfigBSON),
-                                             recipientConfigSetName,
-                                             recipientTagName),
-                       AssertionException,
-                       6201801 /*no recipient members created*/);
-
-    baseConfigBSON = BSON("_id"
-                          << "rs0"
-                          << "version" << 1 << "protocolVersion" << 1 << "members"
-                          << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                   << "localhost:20002"
-                                                   << "priority" << 0 << "votes" << 0 << "tags"
-                                                   << BSON(recipientTagName << "one")))
-                          << "settings" << BSON("electionTimeoutMillis" << 1000));
-
-    ASSERT_THROWS_CODE(repl::makeSplitConfig(ReplSetConfig::parse(baseConfigBSON),
-                                             recipientConfigSetName,
-                                             recipientTagName),
-                       AssertionException,
-                       6201802 /*no donor members created*/);
-}
 TEST(ReplSetConfig, MakeCustomWriteMode) {
     auto config = ReplSetConfig::parse(BSON("_id"
                                             << "rs0"

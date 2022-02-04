@@ -65,6 +65,7 @@ void PrimaryOnlyServiceMongoDTest::setUp() {
         _opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
         _opObserverRegistry->addObserver(
             std::make_unique<repl::PrimaryOnlyServiceOpObserver>(serviceContext));
+        setUpOpObserverRegistry(_opObserverRegistry);
 
         _registry = repl::PrimaryOnlyServiceRegistry::get(serviceContext);
         auto service = makeService(serviceContext);

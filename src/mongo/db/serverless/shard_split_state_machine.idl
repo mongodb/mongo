@@ -54,12 +54,14 @@ structs:
                 type: uuid
                 description: "Unique identifier for the shard split operation."
                 cpp_name: id
-            recipientConnectionString:
+            recipientSetName:
                 type: string
-                description: "The connection string for the recipient slice."
+                description: "The replica set name for the recipient."
                 optional: true
-                validator:
-                    callback: "tenant_migration_util::validateConnectionString"
+            recipientTagName:
+                type: string
+                description: "The replica set tag that identifies recipient nodes."
+                optional: true
             tenantIds:
                 type: array<string>
                 optional: true

@@ -56,15 +56,9 @@ void startBlockingWrites(
     }
 }
 
-/**
- * This test suite validates that when the default OpObserver chain is set up (which happens to
- * include the ShardingMongodOpObserver), writes to the 'admin.system.version' collection (and the
- * shardIdentity document specifically) will invoke the sharding initialization code.
- */
 class ShardSplitDonorOpObserverTest : public ServiceContextMongoDTest {
 public:
     void setUp() override {
-        // Set up mongod.
         ServiceContextMongoDTest::setUp();
 
         auto service = getServiceContext();
@@ -99,12 +93,12 @@ public:
 
 protected:
     void runInsertTestCase(
-        ShardSplitDonorDocument document,
-        std::vector<std::string> tenants,
+        ShardSplitDonorDocument stateDocument,
+        const std::vector<std::string>& tenants,
         std::function<void(std::shared_ptr<TenantMigrationAccessBlocker>)> mtabVerifier) {
 
         std::vector<InsertStatement> inserts;
-        inserts.emplace_back(_oplogSlot++, document.toBSON());
+        inserts.emplace_back(_oplogSlot++, stateDocument.toBSON());
 
         WriteUnitOfWork wow(_opCtx.get());
         _observer->onInserts(_opCtx.get(), _nss, _uuid, inserts.begin(), inserts.end(), false);
@@ -114,8 +108,8 @@ protected:
     }
 
     void runUpdateTestCase(
-        ShardSplitDonorDocument document,
-        std::vector<std::string> tenants,
+        ShardSplitDonorDocument stateDocument,
+        const std::vector<std::string>& tenants,
         std::vector<std::shared_ptr<TenantMigrationDonorAccessBlocker>> blockers,
         std::function<void(std::shared_ptr<TenantMigrationAccessBlocker>)> mtabVerifier) {
         ASSERT_EQ(tenants.size(), blockers.size());
@@ -131,12 +125,12 @@ protected:
 
         CollectionUpdateArgs updateArgs;
         updateArgs.stmtIds = {};
-        updateArgs.updatedDoc = document.toBSON();
+        updateArgs.updatedDoc = stateDocument.toBSON();
         updateArgs.update =
             BSON("$set" << BSON(ShardSplitDonorDocument::kStateFieldName
-                                << ShardSplitDonorState_serializer(document.getState())));
-        updateArgs.criteria = BSON("_id" << document.getId());
-        OplogUpdateEntryArgs update(&updateArgs, _nss, document.getId());
+                                << ShardSplitDonorState_serializer(stateDocument.getState())));
+        updateArgs.criteria = BSON("_id" << stateDocument.getId());
+        OplogUpdateEntryArgs update(&updateArgs, _nss, stateDocument.getId());
 
         WriteUnitOfWork wuow(_opCtx.get());
         _observer->onUpdate(_opCtx.get(), update);
@@ -164,6 +158,12 @@ protected:
         return blockers;
     }
 
+    ShardSplitDonorDocument defaultStateDocument() const {
+        return ShardSplitDonorDocument::parse(
+            {"donor.document"},
+            BSON("_id" << _uuid << "tenantIds" << _tenantIds << "recipientTagName"
+                       << _recipientTagName << "recipientSetName" << _recipientSetName));
+    }
 
 protected:
     MockReplicaSet _replSet =
@@ -172,6 +172,8 @@ protected:
     std::vector<std::string> _tenantIds = {"tenant1", "tenantAB"};
     std::string _connectionStr = _replSet.getConnectionString();
     UUID _uuid = UUID::gen();
+    std::string _recipientTagName{"$recipientNode"};
+    std::string _recipientSetName{_replSet.getURI().getSetName()};
 
     std::unique_ptr<ShardSplitDonorOpObserver> _observer;
     std::shared_ptr<OperationContext> _opCtx;
@@ -225,28 +227,28 @@ TEST_F(ShardSplitDonorOpObserverTest, InitialInsertInvalidState) {
                                                     ShardSplitDonorStateEnum::kDataSync};
 
     for (auto state : states) {
-        auto document = test::shard_split::createDocument(_uuid, state, _tenantIds, _connectionStr);
+        auto stateDocument = defaultStateDocument();
+        stateDocument.setState(state);
 
         auto mtabVerifier = [](std::shared_ptr<TenantMigrationAccessBlocker>) {};
 
-        ASSERT_THROWS(runInsertTestCase(document, _tenantIds, mtabVerifier), DBException);
+        ASSERT_THROWS(runInsertTestCase(stateDocument, _tenantIds, mtabVerifier), DBException);
     }
 }
 
 TEST_F(ShardSplitDonorOpObserverTest, InsertValidAbortedDocument) {
-
-    auto document = test::shard_split::createDocument(
-        _uuid, ShardSplitDonorStateEnum::kAborted, _tenantIds, _connectionStr);
+    auto stateDocument = defaultStateDocument();
+    stateDocument.setState(ShardSplitDonorStateEnum::kAborted);
 
     Status status(ErrorCodes::CallbackCanceled, "Split has been aborted");
     BSONObjBuilder bob;
     status.serializeErrorToBSON(&bob);
-    document.setAbortReason(bob.obj());
+    stateDocument.setAbortReason(bob.obj());
 
-    document.setCommitOrAbortOpTime(repl::OpTime(Timestamp(1), 1));
+    stateDocument.setCommitOrAbortOpTime(repl::OpTime(Timestamp(1), 1));
 
     std::vector<InsertStatement> inserts;
-    inserts.emplace_back(_oplogSlot++, document.toBSON());
+    inserts.emplace_back(_oplogSlot++, stateDocument.toBSON());
 
     WriteUnitOfWork wow(_opCtx.get());
     _observer->onInserts(_opCtx.get(), _nss, _uuid, inserts.begin(), inserts.end(), false);
@@ -260,9 +262,10 @@ TEST_F(ShardSplitDonorOpObserverTest, InsertValidAbortedDocument) {
 }
 
 TEST_F(ShardSplitDonorOpObserverTest, InsertDocument) {
-    auto document = test::shard_split::createDocument(
-        _uuid, ShardSplitDonorStateEnum::kUninitialized, _tenantIds, _connectionStr);
+    test::shard_split::reconfigToAddRecipientNodes(
+        getServiceContext(), _recipientTagName, _replSet.getHosts());
 
+    auto stateDocument = defaultStateDocument();
     auto mtabVerifier = [opCtx = _opCtx.get()](std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
         ASSERT_TRUE(mtab);
         ASSERT_OK(mtab->checkIfCanWrite(Timestamp(1)).code());
@@ -270,12 +273,12 @@ TEST_F(ShardSplitDonorOpObserverTest, InsertDocument) {
         ASSERT_EQ(mtab->checkIfCanBuildIndex().code(), ErrorCodes::TenantMigrationConflict);
     };
 
-    runInsertTestCase(document, _tenantIds, mtabVerifier);
+    runInsertTestCase(stateDocument, _tenantIds, mtabVerifier);
 }
 
 TEST_F(ShardSplitDonorOpObserverTest, TransitionToDataSync) {
-    auto document = test::shard_split::createDocument(
-        _uuid, ShardSplitDonorStateEnum::kDataSync, _tenantIds, _connectionStr);
+    auto stateDocument = defaultStateDocument();
+    stateDocument.setState(ShardSplitDonorStateEnum::kDataSync);
 
     auto blockers = createBlockers(_tenantIds, _opCtx.get(), _connectionStr);
 
@@ -287,13 +290,13 @@ TEST_F(ShardSplitDonorOpObserverTest, TransitionToDataSync) {
         ASSERT_EQ(mtab->checkIfCanBuildIndex().code(), ErrorCodes::TenantMigrationConflict);
     };
 
-    runUpdateTestCase(document, _tenantIds, blockers, mtabVerifier);
+    runUpdateTestCase(stateDocument, _tenantIds, blockers, mtabVerifier);
 }
 
 TEST_F(ShardSplitDonorOpObserverTest, TransitionToBlockingPrimary) {
-    auto document = test::shard_split::createDocument(
-        _uuid, ShardSplitDonorStateEnum::kBlocking, _tenantIds, _connectionStr);
-    document.setBlockTimestamp(Timestamp(1, 1));
+    auto stateDocument = defaultStateDocument();
+    stateDocument.setState(ShardSplitDonorStateEnum::kBlocking);
+    stateDocument.setBlockTimestamp(Timestamp(1, 1));
 
     auto blockers = createBlockers(_tenantIds, _opCtx.get(), _connectionStr);
     for (auto& blocker : blockers) {
@@ -311,16 +314,16 @@ TEST_F(ShardSplitDonorOpObserverTest, TransitionToBlockingPrimary) {
         ASSERT_EQ(mtab->checkIfCanBuildIndex().code(), ErrorCodes::TenantMigrationConflict);
     };
 
-    runUpdateTestCase(document, _tenantIds, blockers, mtabVerifier);
+    runUpdateTestCase(stateDocument, _tenantIds, blockers, mtabVerifier);
 }
 
 TEST_F(ShardSplitDonorOpObserverTest, TransitionToBlockingSecondary) {
     // This indicates the instance is secondary for the OpObserver.
     repl::UnreplicatedWritesBlock setSecondary(_opCtx.get());
 
-    auto document = test::shard_split::createDocument(
-        _uuid, ShardSplitDonorStateEnum::kBlocking, _tenantIds, _connectionStr);
-    document.setBlockTimestamp(Timestamp(1, 1));
+    auto stateDocument = defaultStateDocument();
+    stateDocument.setState(ShardSplitDonorStateEnum::kBlocking);
+    stateDocument.setBlockTimestamp(Timestamp(1, 1));
 
     auto blockers = createBlockers(_tenantIds, _opCtx.get(), _connectionStr);
 
@@ -334,7 +337,7 @@ TEST_F(ShardSplitDonorOpObserverTest, TransitionToBlockingSecondary) {
         ASSERT_EQ(mtab->checkIfCanBuildIndex().code(), ErrorCodes::TenantMigrationConflict);
     };
 
-    runUpdateTestCase(document, _tenantIds, blockers, mtabVerifier);
+    runUpdateTestCase(stateDocument, _tenantIds, blockers, mtabVerifier);
 }
 
 TEST_F(ShardSplitDonorOpObserverTest, TransitionToCommit) {
@@ -342,10 +345,10 @@ TEST_F(ShardSplitDonorOpObserverTest, TransitionToCommit) {
     auto commitOpTime = mongo::repl::OpTime(Timestamp(1, 3), 2);
     _replicationCoordinatorMock->setCurrentCommittedSnapshotOpTime(commitOpTime);
 
-    auto document = test::shard_split::createDocument(
-        _uuid, ShardSplitDonorStateEnum::kCommitted, _tenantIds, _connectionStr);
-    document.setBlockTimestamp(Timestamp(1, 2));
-    document.setCommitOrAbortOpTime(commitOpTime);
+    auto stateDocument = defaultStateDocument();
+    stateDocument.setState(ShardSplitDonorStateEnum::kCommitted);
+    stateDocument.setBlockTimestamp(Timestamp(1, 2));
+    stateDocument.setCommitOrAbortOpTime(commitOpTime);
 
     auto blockers = createBlockers(_tenantIds, _opCtx.get(), _connectionStr);
     startBlockingWrites(blockers);
@@ -362,7 +365,7 @@ TEST_F(ShardSplitDonorOpObserverTest, TransitionToCommit) {
         ASSERT_EQ(mtab->checkIfCanBuildIndex().code(), ErrorCodes::TenantMigrationCommitted);
     };
 
-    runUpdateTestCase(document, _tenantIds, blockers, mtabVerifier);
+    runUpdateTestCase(stateDocument, _tenantIds, blockers, mtabVerifier);
 }
 
 TEST_F(ShardSplitDonorOpObserverTest, TransitionToAbort) {
@@ -374,11 +377,11 @@ TEST_F(ShardSplitDonorOpObserverTest, TransitionToAbort) {
     BSONObjBuilder bob;
     status.serializeErrorToBSON(&bob);
 
-    auto document = test::shard_split::createDocument(
-        _uuid, ShardSplitDonorStateEnum::kAborted, _tenantIds, _connectionStr);
-    document.setBlockTimestamp(Timestamp(1, 2));
-    document.setCommitOrAbortOpTime(commitOpTime);
-    document.setAbortReason(bob.obj());
+    auto stateDocument = defaultStateDocument();
+    stateDocument.setState(ShardSplitDonorStateEnum::kAborted);
+    stateDocument.setBlockTimestamp(Timestamp(1, 2));
+    stateDocument.setCommitOrAbortOpTime(commitOpTime);
+    stateDocument.setAbortReason(bob.obj());
 
     auto blockers = createBlockers(_tenantIds, _opCtx.get(), _connectionStr);
     startBlockingWrites(blockers);
@@ -394,7 +397,7 @@ TEST_F(ShardSplitDonorOpObserverTest, TransitionToAbort) {
         ASSERT_OK(mtab->checkIfCanBuildIndex().code());
     };
 
-    runUpdateTestCase(document, _tenantIds, blockers, mtabVerifier);
+    runUpdateTestCase(stateDocument, _tenantIds, blockers, mtabVerifier);
 }
 
 }  // namespace

@@ -50,9 +50,6 @@ class PrimaryOnlyServiceRegistry;
 
 class PrimaryOnlyServiceMongoDTest : public ServiceContextMongoDTest {
 public:
-    virtual std::unique_ptr<repl::PrimaryOnlyService> makeService(
-        ServiceContext* serviceContext) = 0;
-
     void setUp() override;
     void tearDown() override;
 
@@ -62,6 +59,10 @@ protected:
 
     void stepUp(OperationContext* opCtx);
     void stepDown();
+
+    virtual std::unique_ptr<repl::PrimaryOnlyService> makeService(
+        ServiceContext* serviceContext) = 0;
+    virtual void setUpOpObserverRegistry(OpObserverRegistry* opObserverRegistry){};
 
     OpObserverRegistry* _opObserverRegistry = nullptr;
     repl::PrimaryOnlyServiceRegistry* _registry = nullptr;

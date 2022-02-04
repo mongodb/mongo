@@ -33,6 +33,7 @@
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/serverless/shard_split_donor_op_observer.h"
 #include "mongo/db/serverless/shard_split_state_machine_gen.h"
+#include "mongo/db/serverless/shard_split_utils.h"
 
 namespace mongo {
 namespace {
@@ -88,12 +89,21 @@ void onBlockerInitialization(OperationContext* opCtx,
     auto optionalTenants = donorStateDoc.getTenantIds();
     invariant(optionalTenants);
 
+    auto recipientTagName = donorStateDoc.getRecipientTagName();
+    auto recipientSetName = donorStateDoc.getRecipientSetName();
+    invariant(recipientTagName);
+    invariant(recipientSetName);
+
+    auto config = repl::ReplicationCoordinator::get(cc().getServiceContext())->getConfig();
+    auto recipientConnectionString =
+        repl::makeRecipientConnectionString(config, *recipientTagName, *recipientSetName);
+
     for (const auto& tenantId : optionalTenants.get()) {
         auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
             opCtx->getServiceContext(),
             tenantId.toString(),
             MigrationProtocolEnum::kMultitenantMigrations,
-            donorStateDoc.getRecipientConnectionString()->toString());
+            recipientConnectionString.toString());
 
         TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext()).add(tenantId, mtab);
 
