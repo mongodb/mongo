@@ -57,7 +57,7 @@ var defragmentationUtil = (function() {
             let chunkSize = Random.randInt(maxChunkFillMB);
             let docsPerChunk = (chunkSize * 1024 * 1024) / docSizeBytes;
             if (docsPerChunk === 0) {
-                docsPerChunk = 1;
+                return;
             }
             let minKey = chunk["min"]["key"];
             if (minKey === MinKey)
