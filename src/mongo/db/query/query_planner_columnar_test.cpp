@@ -45,6 +45,9 @@ protected:
     void setUp() final {
         QueryPlannerTest::setUp();
 
+        // Treat all queries as SBE compatible for this test.
+        QueryPlannerTest::setMarkQueriesSbeCompatible(true);
+
         // We're interested in testing plans that use a columnar index, so don't generate collection
         // scans.
         params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;

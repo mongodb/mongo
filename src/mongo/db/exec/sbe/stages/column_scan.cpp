@@ -40,6 +40,7 @@ ColumnScanStage::ColumnScanStage(UUID collectionUuid,
                                  value::SlotVector fieldSlots,
                                  std::vector<std::string> paths,
                                  boost::optional<value::SlotId> recordSlot,
+                                 boost::optional<value::SlotId> recordIdSlot,
                                  PlanYieldPolicy* yieldPolicy,
                                  PlanNodeId nodeId)
     : PlanStage("columnscan"_sd, yieldPolicy, nodeId),
@@ -47,7 +48,8 @@ ColumnScanStage::ColumnScanStage(UUID collectionUuid,
       _columnIndexName(columnIndexName),
       _fieldSlots(std::move(fieldSlots)),
       _paths(std::move(paths)),
-      _recordSlot(recordSlot) {
+      _recordSlot(recordSlot),
+      _recordIdSlot(recordIdSlot) {
     invariant(_fieldSlots.size() == _paths.size());
 }
 
@@ -57,6 +59,7 @@ std::unique_ptr<PlanStage> ColumnScanStage::clone() const {
                                              _fieldSlots,
                                              _paths,
                                              _recordSlot,
+                                             _recordIdSlot,
                                              _yieldPolicy,
                                              _commonStats.nodeId);
 }
@@ -72,12 +75,23 @@ void ColumnScanStage::prepare(CompileCtx& ctx) {
     if (_recordSlot) {
         _recordAccessor = std::make_unique<value::OwnedValueAccessor>();
     }
+    if (_recordIdSlot) {
+        _recordIdAccessor = std::make_unique<value::OwnedValueAccessor>();
+    }
 
     tassert(6298602, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
     std::tie(_coll, _collName, _catalogEpoch) = acquireCollection(_opCtx, _collUuid);
 }
 
 value::SlotAccessor* ColumnScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
+    if (_recordSlot && slot == *_recordSlot) {
+        return _recordAccessor.get();
+    }
+
+    if (_recordIdSlot && slot == *_recordIdSlot) {
+        return _recordIdAccessor.get();
+    }
+
     if (auto it = _outputFieldsMap.find(slot); it != _outputFieldsMap.end()) {
         return it->second;
     }
@@ -229,6 +243,18 @@ std::vector<DebugPrinter::Block> ColumnScanStage::debugPrint() const {
         DebugPrinter::addIdentifier(ret, _fieldSlots[idx]);
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
+
+    if (_recordSlot) {
+        DebugPrinter::addIdentifier(ret, _recordSlot.get());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
+
+    if (_recordIdSlot) {
+        DebugPrinter::addIdentifier(ret, _recordIdSlot.get());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
 
     // Print out paths.
     ret.emplace_back(DebugPrinter::Block("[`"));

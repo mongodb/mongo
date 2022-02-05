@@ -46,6 +46,7 @@ public:
                     value::SlotVector fieldSlots,
                     std::vector<std::string> paths,
                     boost::optional<value::SlotId> recordSlot,
+                    boost::optional<value::SlotId> recordIdSlot,
                     PlanYieldPolicy* yieldPolicy,
                     PlanNodeId nodeId);
 
@@ -77,10 +78,12 @@ private:
     const value::SlotVector _fieldSlots;
     const std::vector<std::string> _paths;
     const boost::optional<value::SlotId> _recordSlot;
+    const boost::optional<value::SlotId> _recordIdSlot;
 
     std::vector<value::OwnedValueAccessor> _outputFields;
     value::SlotAccessorMap _outputFieldsMap;
     std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
+    std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
 
     // These members are default constructed to boost::none and are initialized when 'prepare()'
     // is called. Once they are set, they are never modified again.

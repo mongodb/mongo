@@ -105,6 +105,7 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
+MONGO_FAIL_POINT_DEFINE(includeFakeColumnarIndex);
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
     OperationContext* opCtx, const BSONObj& requestCollation, const NamespaceString& nss) {
@@ -306,6 +307,10 @@ void fillOutPlannerParams(OperationContext* opCtx,
 
     // If it's not NULL, we may have indices. Access the catalog and fill out IndexEntry(s)
     fillOutIndexEntries(opCtx, apiStrict, canonicalQuery, collection, plannerParams->indices);
+
+    if (includeFakeColumnarIndex.shouldFail()) {
+        plannerParams->columnarIndexes.push_back(ColumnIndexEntry{"fakeColumnIndex"});
+    }
 
     // If query supports index filters, filter params.indices by indices in query settings.
     // Ignore index filters when it is possible to use the id-hack.

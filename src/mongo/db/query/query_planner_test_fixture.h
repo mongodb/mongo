@@ -242,6 +242,10 @@ protected:
     std::unique_ptr<MatchExpression> parseMatchExpression(
         const BSONObj& obj, const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr);
 
+    void setMarkQueriesSbeCompatible(bool sbeCompatible) {
+        markQueriesSbeCompatible = sbeCompatible;
+    }
+
     //
     // Data members.
     //
@@ -259,6 +263,7 @@ protected:
     std::vector<std::unique_ptr<QuerySolution>> solns;
 
     bool relaxBoundsCheck = false;
+    bool markQueriesSbeCompatible = false;
 };
 
 }  // namespace mongo

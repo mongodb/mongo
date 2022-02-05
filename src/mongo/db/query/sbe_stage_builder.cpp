@@ -37,6 +37,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
+#include "mongo/db/exec/sbe/stages/column_scan.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/hash_join.h"
@@ -865,6 +866,37 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     } else {
         outputs.setIndexKeySlots(boost::none);
     }
+
+    return {std::move(stage), std::move(outputs)};
+}
+
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildColumnScan(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    invariant(!reqs.getIndexKeyBitset());
+
+    auto csn = static_cast<const ColumnIndexScanNode*>(root);
+
+    PlanStageSlots outputs;
+
+    auto recordSlot = _slotIdGenerator.generate();
+    outputs.set(kResult, recordSlot);
+
+    boost::optional<sbe::value::SlotId> ridSlot;
+
+    if (reqs.has(kRecordId)) {
+        ridSlot = _slotIdGenerator.generate();
+        outputs.set(kRecordId, *ridSlot);
+    }
+
+    auto fieldSlotIds = _slotIdGenerator.generateMultiple(csn->fields.size());
+    auto stage = std::make_unique<sbe::ColumnScanStage>(_collection->uuid(),
+                                                        csn->indexEntry.catalogName,
+                                                        fieldSlotIds,
+                                                        csn->fields,
+                                                        recordSlot,
+                                                        ridSlot,
+                                                        _yieldPolicy,
+                                                        csn->nodeId());
 
     return {std::move(stage), std::move(outputs)};
 }
@@ -2941,6 +2973,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             {STAGE_COLLSCAN, &SlotBasedStageBuilder::buildCollScan},
             {STAGE_VIRTUAL_SCAN, &SlotBasedStageBuilder::buildVirtualScan},
             {STAGE_IXSCAN, &SlotBasedStageBuilder::buildIndexScan},
+            {STAGE_COLUMN_IXSCAN, &SlotBasedStageBuilder::buildColumnScan},
             {STAGE_FETCH, &SlotBasedStageBuilder::buildFetch},
             {STAGE_LIMIT, &SlotBasedStageBuilder::buildLimit},
             {STAGE_SKIP, &SlotBasedStageBuilder::buildSkip},

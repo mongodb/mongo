@@ -1196,7 +1196,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     // Check whether we're eligible to use the columnar index, assuming no other indexes can be
     // used.
     if (out.empty() && !params.columnarIndexes.empty() && query.getProj() &&
-        !query.getProj()->requiresDocument()) {
+        !query.getProj()->requiresDocument() && query.isSbeCompatible() &&
+        !query.getForceClassicEngine()) {
         // TODO SERVER-63123: Check if the columnar index actually provides the fields we need.
         auto columnScan = std::make_unique<ColumnIndexScanNode>(params.columnarIndexes.front());
         columnScan->fields = query.getProj()->getRequiredFields();

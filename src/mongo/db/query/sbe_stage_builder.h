@@ -349,6 +349,9 @@ private:
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildIndexScan(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildColumnScan(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildFetch(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 

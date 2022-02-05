@@ -363,6 +363,7 @@ void QueryPlannerTest::runQueryFull(
                                      std::move(pipeline));
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
+    cq->setSbeCompatible(markQueriesSbeCompatible);
 
     auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, params);
     ASSERT_OK(statusWithMultiPlanSolns.getStatus());
@@ -439,6 +440,7 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
                                      MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
+    cq->setSbeCompatible(markQueriesSbeCompatible);
 
     auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, params);
     plannerStatus = statusWithMultiPlanSolns.getStatus();
@@ -467,6 +469,7 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
                                      MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
+    cq->setSbeCompatible(markQueriesSbeCompatible);
 
     auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, params);
     ASSERT_OK(statusWithMultiPlanSolns.getStatus());
@@ -494,6 +497,7 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
                                      MatchExpressionParser::kAllowAllSpecialFeatures);
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
+    cq->setSbeCompatible(markQueriesSbeCompatible);
 
     auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, params);
     plannerStatus = statusWithMultiPlanSolns.getStatus();

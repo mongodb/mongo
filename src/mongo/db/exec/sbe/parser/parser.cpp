@@ -130,6 +130,7 @@ static constexpr auto kSyntax = R"(
                 COLUMNSCAN <- 'columnscan' STRING_LIST # paths
                                            IDENT_LIST # output variables
                                            IDENT # output record
+                                           IDENT # output RID
                                            IDENT # collection name
                                            IDENT # index name to scan
 
@@ -956,14 +957,16 @@ void Parser::walkColumnScan(AstQuery& ast) {
     auto paths = ast.nodes[0]->identifiers;
     auto outputs = lookupSlots(ast.nodes[1]->identifiers);
     auto record = lookupSlot(ast.nodes[2]->identifier);
-    auto collName = ast.nodes[3]->identifier;
-    auto indexName = ast.nodes[4]->identifier;
+    auto recordId = lookupSlot(ast.nodes[3]->identifier);
+    auto collName = ast.nodes[4]->identifier;
+    auto indexName = ast.nodes[5]->identifier;
 
     ast.stage = makeS<ColumnScanStage>(getCollectionUuid(collName),
                                        indexName,
                                        std::move(outputs),
                                        std::move(paths),
                                        record,
+                                       recordId,
                                        nullptr,
                                        getCurrentPlanNodeId());
 }
