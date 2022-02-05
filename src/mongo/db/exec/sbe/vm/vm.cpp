@@ -1619,59 +1619,78 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinKeyStringToStri
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewKeyString(ArityType arity) {
-    auto [_, tagInVersion, valInVersion] = getFromStack(0);
+    tassert(6333000,
+            str::stream() << "Unsupported number of arguments passed to ks(): " << arity,
+            arity >= 3 && arity <= Ordering::kMaxCompoundIndexKeys + 3);
 
-    if (!value::isNumber(tagInVersion) ||
-        !(value::numericCast<int64_t>(tagInVersion, valInVersion) == 0 ||
-          value::numericCast<int64_t>(tagInVersion, valInVersion) == 1)) {
+    auto [_, tagVersion, valVersion] = getFromStack(0);
+    auto [__, tagOrdering, valOrdering] = getFromStack(1);
+    auto [___, tagDiscriminator, valDiscriminator] = getFromStack(arity - 1u);
+    if (!value::isNumber(tagVersion) || !value::isNumber(tagOrdering) ||
+        !value::isNumber(tagDiscriminator)) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    KeyString::Version version =
-        static_cast<KeyString::Version>(value::numericCast<int64_t>(tagInVersion, valInVersion));
 
-    auto [__, tagInOrdering, valInOrdering] = getFromStack(1);
-    if (!value::isNumber(tagInOrdering)) {
+    auto version = value::numericCast<int64_t>(tagVersion, valVersion);
+    auto discriminator = value::numericCast<int64_t>(tagDiscriminator, valDiscriminator);
+    if ((version < 0 || version > 1) || (discriminator < 0 || discriminator > 2)) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    auto orderingBits = value::numericCast<int32_t>(tagInOrdering, valInOrdering);
+
+    auto ksVersion = static_cast<KeyString::Version>(version);
+    auto ksDiscriminator = static_cast<KeyString::Discriminator>(discriminator);
+
+    uint32_t orderingBits = value::numericCast<int32_t>(tagOrdering, valOrdering);
     BSONObjBuilder bb;
-    for (size_t i = 0; i < Ordering::kMaxCompoundIndexKeys; ++i) {
-        bb.append(""_sd, (orderingBits & (1 << i)) ? 1 : 0);
+    for (size_t i = 0; orderingBits != 0 && i < arity - 3u; ++i, orderingBits >>= 1) {
+        bb.append(""_sd, (orderingBits & 1) ? 1 : 0);
     }
 
-    KeyString::HeapBuilder kb{version, Ordering::make(bb.done())};
+    KeyString::HeapBuilder kb{ksVersion, Ordering::make(bb.done())};
 
     for (size_t idx = 2; idx < arity - 1u; ++idx) {
         auto [_, tag, val] = getFromStack(idx);
-        if (value::isNumber(tag)) {
-            auto num = value::numericCast<int64_t>(tag, val);
-            kb.appendNumberLong(num);
-        } else if (value::isString(tag)) {
-            auto str = value::getStringView(tag, val);
-            kb.appendString(str);
-        } else if (tag == value::TypeTags::MinKey || tag == value::TypeTags::MaxKey) {
-            BSONObjBuilder bob;
-            if (tag == value::TypeTags::MinKey) {
+        // This is needed so that we can use 'tag' in the uassert() below without getting a
+        // "Reference to local binding declared in enclosing function" compile error on clang.
+        auto tagCopy = tag;
+
+        switch (tag) {
+            case value::TypeTags::NumberInt32:
+                kb.appendNumberInt(value::bitcastTo<int32_t>(val));
+                break;
+            case value::TypeTags::NumberInt64:
+                kb.appendNumberLong(value::bitcastTo<int64_t>(val));
+                break;
+            case value::TypeTags::NumberDouble:
+                kb.appendNumberDouble(value::bitcastTo<double>(val));
+                break;
+            case value::TypeTags::NumberDecimal:
+                kb.appendNumberDecimal(value::bitcastTo<Decimal128>(val));
+                break;
+            case value::TypeTags::StringSmall:
+            case value::TypeTags::StringBig:
+            case value::TypeTags::bsonString:
+                kb.appendString(value::getStringView(tag, val));
+                break;
+            case value::TypeTags::MinKey: {
+                BSONObjBuilder bob;
                 bob.appendMinKey("");
-            } else {
-                bob.appendMaxKey("");
+                kb.appendBSONElement(bob.obj().firstElement(), nullptr);
+                break;
             }
-            kb.appendBSONElement(bob.obj().firstElement(), nullptr);
-        } else {
-            uasserted(4822802, "unsuppored key string type");
+            case value::TypeTags::MaxKey: {
+                BSONObjBuilder bob;
+                bob.appendMaxKey("");
+                kb.appendBSONElement(bob.obj().firstElement(), nullptr);
+                break;
+            }
+            default:
+                uasserted(4822802, str::stream() << "Unsuppored key string type: " << tagCopy);
+                break;
         }
     }
 
-    auto [___, tagInDisrim, valInDiscrim] = getFromStack(arity - 1);
-    if (!value::isNumber(tagInDisrim)) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-    auto discrimNum = value::numericCast<int64_t>(tagInDisrim, valInDiscrim);
-    if (discrimNum < 0 || discrimNum > 2) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-
-    kb.appendDiscriminator(static_cast<KeyString::Discriminator>(discrimNum));
+    kb.appendDiscriminator(ksDiscriminator);
 
     return {true,
             value::TypeTags::ksValue,
