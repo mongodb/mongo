@@ -11,18 +11,56 @@ coll.drop();
 // We need at least one document in the collection in order to test expressions, add it here.
 assert.commandWorked(coll.insert({}));
 
+// Run a pipeline with `op` and check that the result of operation against the `expResult` value. If
+// the actual or expected result is non-numeric (NaN or infinite), this function asserts that they
+// match and returns 0 if they do. If they are both numeric, this function returns the difference
+// between them as a double.
+function testOpReturningDifference(op, expResult) {
+    const pipeline = [
+        {$project: {_id: 0, result: op, expected: {$literal: expResult}}},
+        {
+            $addFields: {
+                resultType: {$type: "$result"},
+                expType: {$type: "$expected"},
+                resultAsString: {$convert: {input: "$result", to: "string"}},
+                expAsString: {$convert: {input: "$expected", to: "string"}},
+                difference:
+                    {$abs: {$convert: {input: {$subtract: ["$result", "$expected"]}, to: "double"}}}
+            }
+        }
+    ];
+    const {result, resultType, expType, resultAsString, expAsString, difference} = function() {
+        const resultArray = coll.aggregate(pipeline).toArray();
+        assert.eq(resultArray.length, 1, resultArray);
+        return resultArray[0];
+    }();
+
+    assert.eq(resultType, expType);
+
+    // We don't want to do direct comparisons with non-real values, because they can have unexpected
+    // semantics. String comparisons gives us the desired equality semantics for the purposes of
+    // this test.
+    const nonRealValues = ["NaN", "Infinity", "-Infinity"];
+    if (nonRealValues.includes(expAsString) || nonRealValues.includes(resultAsString)) {
+        assert.eq(expAsString, resultAsString, tojson(result));
+        return 0;
+    }
+
+    return difference;
+}
+
 // Helper for testing that op returns expResult.
 function testOp(op, expResult) {
-    const pipeline = [{$project: {_id: 0, result: op}}];
-    assert.eq(coll.aggregate(pipeline).toArray(), [{result: expResult}]);
+    const diff = testOpReturningDifference(op, expResult);
+    assert.eq(0, diff);
 }
 
 // Helper for testing that the aggregation expression 'op' returns expResult, approximately,
 // since NumberDecimal has so many representations for a given number (0 versus 0e-40 for
 // instance).
 function testOpApprox(op, expResult) {
-    const pipeline = [{$project: {_id: 0, result: {$abs: {$subtract: [op, expResult]}}}}];
-    assert.lt(coll.aggregate(pipeline).toArray(), [{result: NumberDecimal("0.00000005")}]);
+    const diff = testOpReturningDifference(op, expResult);
+    assert.lt(diff, 0.00000005);
 }
 
 // Simple successful int input.
@@ -150,7 +188,7 @@ testOp({$sinh: -Infinity}, -Infinity);
 
 // Infinity produces finite output (due to asymptotic bounds).
 testOpApprox({$atan: NumberDecimal('Infinity')}, NumberDecimal(Math.PI / 2));
-testOpApprox({$atan: NumberDecimal('-Infinity')}, NumberDecimal(Math.Pi / 2));
+testOpApprox({$atan: NumberDecimal('-Infinity')}, NumberDecimal(-Math.PI / 2));
 testOpApprox({$atan: Infinity}, Math.PI / 2);
 testOpApprox({$atan: -Infinity}, -Math.PI / 2);
 
