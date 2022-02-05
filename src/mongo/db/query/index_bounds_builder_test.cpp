@@ -153,7 +153,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateLteCode) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "[, function(){ return 0; }]");
+    ASSERT_EQUALS(oil.intervals[0].toString(false), "[, function(){ return 0; }]");
     ASSERT_TRUE(oil.intervals[0].startInclusive);
     ASSERT_TRUE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
@@ -169,7 +169,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateLteCodeWScope) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(),
+    ASSERT_EQUALS(oil.intervals[0].toString(false),
                   "[CodeWScope( , {}), CodeWScope( this.b == c, { c: 1 })]");
     ASSERT_TRUE(oil.intervals[0].startInclusive);
     ASSERT_TRUE(oil.intervals[0].endInclusive);
@@ -186,7 +186,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateLteMinKey) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "[MinKey, MinKey]");
+    ASSERT_EQUALS(oil.intervals[0].toString(false), "[MinKey, MinKey]");
     ASSERT_TRUE(oil.intervals[0].startInclusive);
     ASSERT_TRUE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
@@ -202,7 +202,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateLteMaxKey) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "[MinKey, MaxKey]");
+    ASSERT_EQUALS(oil.intervals[0].toString(false), "[MinKey, MaxKey]");
     ASSERT_TRUE(oil.intervals[0].startInclusive);
     ASSERT_TRUE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
@@ -296,7 +296,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateLtCode) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "[, function(){ return 0; })");
+    ASSERT_EQUALS(oil.intervals[0].toString(false), "[, function(){ return 0; })");
     ASSERT_TRUE(oil.intervals[0].startInclusive);
     ASSERT_FALSE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
@@ -312,7 +312,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateLtCodeWScope) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(),
+    ASSERT_EQUALS(oil.intervals[0].toString(false),
                   "[CodeWScope( , {}), CodeWScope( this.b == c, { c: 1 }))");
     ASSERT_TRUE(oil.intervals[0].startInclusive);
     ASSERT_FALSE(oil.intervals[0].endInclusive);
@@ -343,7 +343,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateLtMaxKey) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "[MinKey, MaxKey)");
+    ASSERT_EQUALS(oil.intervals[0].toString(false), "[MinKey, MaxKey)");
     ASSERT_TRUE(oil.intervals[0].startInclusive);
     ASSERT_FALSE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
@@ -455,7 +455,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateGtCode) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "(function(){ return 0; }, CodeWScope( , {}))");
+    ASSERT_EQUALS(oil.intervals[0].toString(false), "(function(){ return 0; }, CodeWScope( , {}))");
     ASSERT_FALSE(oil.intervals[0].startInclusive);
     ASSERT_FALSE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
@@ -471,7 +471,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateGtCodeWScope) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "(CodeWScope( this.b == c, { c: 1 }), MaxKey)");
+    ASSERT_EQUALS(oil.intervals[0].toString(false), "(CodeWScope( this.b == c, { c: 1 }), MaxKey)");
     ASSERT_FALSE(oil.intervals[0].startInclusive);
     ASSERT_FALSE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
@@ -487,7 +487,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateGtMinKey) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "(MinKey, MaxKey]");
+    ASSERT_EQUALS(oil.intervals[0].toString(false), "(MinKey, MaxKey]");
     ASSERT_FALSE(oil.intervals[0].startInclusive);
     ASSERT_TRUE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
@@ -581,7 +581,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateGteCode) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "[function(){ return 0; }, CodeWScope( , {}))");
+    ASSERT_EQUALS(oil.intervals[0].toString(false), "[function(){ return 0; }, CodeWScope( , {}))");
     ASSERT_TRUE(oil.intervals[0].startInclusive);
     ASSERT_FALSE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
@@ -597,7 +597,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateGteCodeWScope) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "[CodeWScope( this.b == c, { c: 1 }), MaxKey)");
+    ASSERT_EQUALS(oil.intervals[0].toString(false), "[CodeWScope( this.b == c, { c: 1 }), MaxKey)");
     ASSERT_TRUE(oil.intervals[0].startInclusive);
     ASSERT_FALSE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
@@ -613,7 +613,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateGteMinKey) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "[MinKey, MaxKey]");
+    ASSERT_EQUALS(oil.intervals[0].toString(false), "[MinKey, MaxKey]");
     ASSERT_TRUE(oil.intervals[0].startInclusive);
     ASSERT_TRUE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
@@ -629,7 +629,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateGteMaxKey) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "[MaxKey, MaxKey]");
+    ASSERT_EQUALS(oil.intervals[0].toString(false), "[MaxKey, MaxKey]");
     ASSERT_TRUE(oil.intervals[0].startInclusive);
     ASSERT_TRUE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
@@ -1386,7 +1386,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGTNull) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "(null, MaxKey]");
+    ASSERT_EQUALS(oil.intervals[0].toString(false), "(null, MaxKey]");
     ASSERT_FALSE(oil.intervals[0].startInclusive);
     ASSERT_TRUE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
@@ -1480,7 +1480,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGTENull) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "[null, MaxKey]");
+    ASSERT_EQUALS(oil.intervals[0].toString(false), "[null, MaxKey]");
     ASSERT_TRUE(oil.intervals[0].startInclusive);
     ASSERT_TRUE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
@@ -1497,7 +1497,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateInternalExprGTEMaxKeyGeneratesBounds) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "[MaxKey, MaxKey]");
+    ASSERT_EQUALS(oil.intervals[0].toString(false), "[MaxKey, MaxKey]");
     ASSERT_TRUE(oil.intervals[0].startInclusive);
     ASSERT_TRUE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
@@ -1577,7 +1577,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTNull) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "[MinKey, null]");
+    ASSERT_EQUALS(oil.intervals[0].toString(false), "[MinKey, null]");
     ASSERT_TRUE(oil.intervals[0].startInclusive);
     ASSERT_TRUE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
@@ -1671,7 +1671,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTENull) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "[MinKey, null]");
+    ASSERT_EQUALS(oil.intervals[0].toString(false), "[MinKey, null]");
     ASSERT_TRUE(oil.intervals[0].startInclusive);
     ASSERT_TRUE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
@@ -1688,7 +1688,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateInternalExprLTEMinKeyGeneratesBounds) {
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
-    ASSERT_EQUALS(oil.intervals[0].toString(), "[MinKey, MinKey]");
+    ASSERT_EQUALS(oil.intervals[0].toString(false), "[MinKey, MinKey]");
     ASSERT_TRUE(oil.intervals[0].startInclusive);
     ASSERT_TRUE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);

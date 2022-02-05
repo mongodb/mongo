@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -52,17 +53,30 @@ struct Interval {
     /** Creates an empty interval */
     Interval();
 
-    std::string toString() const {
+    /**
+     * Generates a debug string for an interval. If interval 'hasNonSimpleCollation', then string
+     * bounds are hex-encoded.
+     */
+    std::string toString(bool hasNonSimpleCollation) const {
         str::stream ss;
         if (startInclusive) {
             ss << "[";
         } else {
             ss << "(";
         }
-        // false means omit the field name
-        ss << start.toString(false);
+        auto boundToString = [&](BSONElement bound) {
+            if (bound.type() == BSONType::String && hasNonSimpleCollation) {
+                ss << "CollationKey(";
+                // False means omit the field name.
+                ss << "0x" << hexblob::encodeLower(bound.valueStringData());
+                ss << ")";
+            } else {
+                ss << bound.toString(false);
+            }
+        };
+        boundToString(start);
         ss << ", ";
-        ss << end.toString(false);
+        boundToString(end);
         if (endInclusive) {
             ss << "]";
         } else {

@@ -971,7 +971,8 @@ void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntr
 
     // All fields are filled out with bounds, nothing to do.
     if (firstEmptyField == bounds->fields.size()) {
-        return IndexBoundsBuilder::alignBounds(bounds, nodeIndex->keyPattern);
+        return IndexBoundsBuilder::alignBounds(
+            bounds, nodeIndex->keyPattern, nodeIndex->collator != nullptr);
     }
 
     // Skip ahead to the firstEmptyField-th element, where we begin filling in bounds.
@@ -998,7 +999,7 @@ void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntr
 
     // We create bounds assuming a forward direction but can easily reverse bounds to align
     // according to our desired direction.
-    IndexBoundsBuilder::alignBounds(bounds, nodeIndex->keyPattern);
+    IndexBoundsBuilder::alignBounds(bounds, nodeIndex->keyPattern, nodeIndex->collator != nullptr);
 }
 
 void QueryPlannerAccess::findElemMatchChildren(const MatchExpression* node,
@@ -1698,7 +1699,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(
     isn->addKeyMetadata = query.metadataDeps()[DocumentMetadataFields::kIndexKey];
     isn->queryCollator = query.getCollator();
 
-    IndexBoundsBuilder::allValuesBounds(index.keyPattern, &isn->bounds);
+    IndexBoundsBuilder::allValuesBounds(index.keyPattern, &isn->bounds, index.collator != nullptr);
 
     if (-1 == direction) {
         QueryPlannerCommon::reverseScans(isn.get());

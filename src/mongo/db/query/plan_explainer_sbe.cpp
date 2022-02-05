@@ -114,7 +114,7 @@ void statsToBSON(const QuerySolutionNode* node,
             bob->append("indexVersion", static_cast<int>(ixn->index.version));
             bob->append("direction", ixn->direction > 0 ? "forward" : "backward");
 
-            auto bounds = ixn->bounds.toBSON();
+            auto bounds = ixn->bounds.toBSON(!collation.isEmpty());
             if (topLevelBob->len() + bounds.objsize() >
                 internalQueryExplainSizeThresholdBytes.load()) {
                 bob->append("warning", "index bounds omitted due to BSON size limit for explain");

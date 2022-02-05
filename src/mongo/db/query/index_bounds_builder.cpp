@@ -1325,7 +1325,9 @@ void IndexBoundsBuilder::translateEquality(const BSONElement& data,
 }
 
 // static
-void IndexBoundsBuilder::allValuesBounds(const BSONObj& keyPattern, IndexBounds* bounds) {
+void IndexBoundsBuilder::allValuesBounds(const BSONObj& keyPattern,
+                                         IndexBounds* bounds,
+                                         bool hasNonSimpleCollation) {
     bounds->fields.resize(keyPattern.nFields());
 
     BSONObjIterator it(keyPattern);
@@ -1335,11 +1337,14 @@ void IndexBoundsBuilder::allValuesBounds(const BSONObj& keyPattern, IndexBounds*
         ++field;
     }
 
-    alignBounds(bounds, keyPattern);
+    alignBounds(bounds, keyPattern, hasNonSimpleCollation);
 }
 
 // static
-void IndexBoundsBuilder::alignBounds(IndexBounds* bounds, const BSONObj& kp, int scanDir) {
+void IndexBoundsBuilder::alignBounds(IndexBounds* bounds,
+                                     const BSONObj& kp,
+                                     bool hasNonSimpleCollation,
+                                     int scanDir) {
     BSONObjIterator it(kp);
     size_t oilIdx = 0;
     while (it.more()) {
@@ -1357,7 +1362,7 @@ void IndexBoundsBuilder::alignBounds(IndexBounds* bounds, const BSONObj& kp, int
     if (!bounds->isValidFor(kp, scanDir)) {
         LOGV2(20933,
               "Invalid bounds",
-              "bounds"_attr = redact(bounds->toString()),
+              "bounds"_attr = redact(bounds->toString(hasNonSimpleCollation)),
               "keyPattern"_attr = redact(kp),
               "scanDirection"_attr = scanDir);
         MONGO_UNREACHABLE;

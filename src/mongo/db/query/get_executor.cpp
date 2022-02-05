@@ -2413,7 +2413,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
 
     auto dn = std::make_unique<DistinctNode>(plannerParams.indices[distinctNodeIndex]);
     dn->direction = 1;
-    IndexBoundsBuilder::allValuesBounds(dn->index.keyPattern, &dn->bounds);
+    IndexBoundsBuilder::allValuesBounds(
+        dn->index.keyPattern, &dn->bounds, dn->index.collator != nullptr);
     dn->queryCollator = collator;
     dn->fieldNo = 0;
 

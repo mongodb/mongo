@@ -91,8 +91,8 @@ protected:
                     oil.intervals[i].compare(expectedOil.intervals[i])) {
                     LOGV2(22676,
                           "Found mismatching field interval",
-                          "queryFieldInterval"_attr = oil.intervals[i],
-                          "expectedFieldInterval"_attr = expectedOil.intervals[i]);
+                          "queryFieldInterval"_attr = oil.intervals[i].toString(false),
+                          "expectedFieldInterval"_attr = expectedOil.intervals[i].toString(false));
                 }
                 ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
                               oil.intervals[i].compare(expectedOil.intervals[i]));
@@ -114,8 +114,8 @@ protected:
         if (oil.intervals.size() != expectedOil.intervals.size()) {
             LOGV2(22677,
                   "Found mismatching field intervals",
-                  "queryFieldInterval"_attr = oil,
-                  "expectedFieldInterval"_attr = expectedOil);
+                  "queryFieldInterval"_attr = oil.toString(false),
+                  "expectedFieldInterval"_attr = expectedOil.toString(false));
         }
 
         ASSERT_EQUALS(oil.intervals.size(), expectedOil.intervals.size());

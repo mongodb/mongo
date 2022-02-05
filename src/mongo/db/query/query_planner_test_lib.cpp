@@ -151,8 +151,8 @@ Status intervalMatches(const BSONObj& testInt, const Interval trueInt) {
         return Status::OK();
     }
     return {ErrorCodes::Error{5619217},
-            str::stream() << "provided interval did not match. Expected: " << toCompare.toString()
-                          << " Found: " << trueInt.toString()};
+            str::stream() << "provided interval did not match. Expected: "
+                          << toCompare.toString(false) << " Found: " << trueInt.toString(false)};
 }
 
 bool bsonObjFieldsAreInSet(BSONObj obj, const std::set<std::string>& allowedFields) {

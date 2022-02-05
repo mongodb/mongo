@@ -289,7 +289,7 @@ std::unique_ptr<PlanStageStats> IndexScan::getStats() {
     if (_specificStats.indexType.empty()) {
         _specificStats.indexType = "BtreeCursor";  // TODO amName;
 
-        _specificStats.indexBounds = _bounds.toBSON();
+        _specificStats.indexBounds = _bounds.toBSON(!_specificStats.collation.isEmpty());
 
         _specificStats.direction = _direction;
     }

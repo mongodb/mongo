@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 #include "mongo/db/query/expression_index.h"
 
 #include <iostream>
@@ -37,6 +39,7 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/query/expression_index_knobs_gen.h"
+#include "mongo/logv2/log.h"
 #include "third_party/s2/s2cellid.h"
 #include "third_party/s2/s2region.h"
 #include "third_party/s2/s2regioncoverer.h"
@@ -175,8 +178,10 @@ void ExpressionMapping::S2CellIdsToIntervals(const std::vector<S2CellId>& interv
     // Make sure that our intervals don't overlap each other and are ordered correctly.
     // This perhaps should only be done in debug mode.
     if (!oilOut->isValidFor(1)) {
-        std::cout << "check your assumptions! OIL = " << oilOut->toString() << std::endl;
-        verify(0);
+        LOGV2(6029801,
+              "invalid OrderedIntervalList",
+              "orderedIntervalList"_attr = oilOut->toString(false));
+        MONGO_UNREACHABLE;
     }
 }
 
@@ -222,8 +227,10 @@ void ExpressionMapping::S2CellIdsToIntervalsWithParents(const std::vector<S2Cell
     // Make sure that our intervals don't overlap each other and are ordered correctly.
     // This perhaps should only be done in debug mode.
     if (!oilOut->isValidFor(1)) {
-        std::cout << "check your assumptions! OIL = " << oilOut->toString() << std::endl;
-        verify(0);
+        LOGV2(6029802,
+              "invalid OrderedIntervalList",
+              "orderedIntervalList"_attr = oilOut->toString(false));
+        MONGO_UNREACHABLE;
     }
 }
 

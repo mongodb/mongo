@@ -50,7 +50,8 @@ void QueryPlannerCommon::reverseScans(QuerySolutionNode* node) {
         isn->bounds = isn->bounds.reverse();
 
         invariant(isn->bounds.isValidFor(isn->index.keyPattern, isn->direction),
-                  str::stream() << "Invalid bounds: " << redact(isn->bounds.toString()));
+                  str::stream() << "Invalid bounds: "
+                                << redact(isn->bounds.toString(isn->index.collator != nullptr)));
 
         // TODO: we can just negate every value in the already computed properties.
         isn->computeProperties();
@@ -61,7 +62,8 @@ void QueryPlannerCommon::reverseScans(QuerySolutionNode* node) {
         dn->bounds = dn->bounds.reverse();
 
         invariant(dn->bounds.isValidFor(dn->index.keyPattern, dn->direction),
-                  str::stream() << "Invalid bounds: " << redact(dn->bounds.toString()));
+                  str::stream() << "Invalid bounds: "
+                                << redact(dn->bounds.toString(dn->index.collator != nullptr)));
 
         dn->computeProperties();
     } else if (STAGE_SORT_MERGE == type) {

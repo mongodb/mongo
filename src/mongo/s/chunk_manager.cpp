@@ -567,7 +567,7 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
     //       the query { a: 2, $text: { ... } } will only target to {a: 2}.
     if (QueryPlannerCommon::hasNode(canonicalQuery.root(), MatchExpression::TEXT)) {
         IndexBounds bounds;
-        IndexBoundsBuilder::allValuesBounds(key, &bounds);  // [minKey, maxKey]
+        IndexBoundsBuilder::allValuesBounds(key, &bounds, false);  // [minKey, maxKey]
         return bounds;
     }
 
@@ -589,7 +589,7 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
 
         if (!geoIdx) {
             IndexBounds bounds;
-            IndexBoundsBuilder::allValuesBounds(key, &bounds);
+            IndexBoundsBuilder::allValuesBounds(key, &bounds, false);
             return bounds;
         }
 
@@ -640,7 +640,7 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
 
     // We cannot plan the query without collection scan, so target to all shards.
     IndexBounds bounds;
-    IndexBoundsBuilder::allValuesBounds(key, &bounds);  // [minKey, maxKey]
+    IndexBoundsBuilder::allValuesBounds(key, &bounds, false);  // [minKey, maxKey]
     return bounds;
 }
 

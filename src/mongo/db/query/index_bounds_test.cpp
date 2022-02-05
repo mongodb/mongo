@@ -621,6 +621,38 @@ TEST(IndexBoundsTest, ForwardizeOnNonSimpleRangeShouldOnlyReverseDescendingRange
     ASSERT(expectedBounds == forwardizedBounds);
 }
 
+TEST(IndexBoundsTest, BoundsDebugStringFormatTest) {
+    // The bounds consist of a string and a non-string interval:
+    // {a: [["string", "string"]], b: [[1,1]]}.
+    OrderedIntervalList stringInterval;
+    stringInterval.name = "a";
+    stringInterval.intervals.push_back(Interval(BSON(""
+                                                     << "string"
+                                                     << ""
+                                                     << "string"),
+                                                true,
+                                                true));
+
+    OrderedIntervalList nonStringInterval;
+    nonStringInterval.name = "b";
+    nonStringInterval.intervals.push_back(Interval(BSON("" << 1 << "" << 1), true, true));
+
+    IndexBounds bounds;
+    bounds.fields.push_back(stringInterval);
+    bounds.fields.push_back(nonStringInterval);
+
+    // First test the debug format pretending there is no non-simple collation preset.
+    bool hasNonSimpleCollation = false;
+    ASSERT_EQ(stringInterval.toString(hasNonSimpleCollation), "['a']: [\"string\", \"string\"]");
+    ASSERT_EQ(nonStringInterval.toString(hasNonSimpleCollation), "['b']: [1, 1]");
+
+    // Now test pretending there is a non-simple collation.
+    hasNonSimpleCollation = true;
+    ASSERT_EQ(stringInterval.toString(true),
+              "['a']: [CollationKey(0x737472696e67), CollationKey(0x737472696e67)]");
+    ASSERT_EQ(nonStringInterval.toString(true), "['b']: [1, 1]");
+}
+
 //
 // Iteration over
 //
@@ -991,7 +1023,7 @@ void testFindIntervalForField(int key,
     if (expectedLocation != location) {
         str::stream ss;
         ss << "Unexpected location from findIntervalForField: key=" << keyElt
-           << "; intervals=" << oil.toString() << "; direction=" << expectedDirection
+           << "; intervals=" << oil.toString(false) << "; direction=" << expectedDirection
            << ". Expected: " << toString(expectedLocation) << ". Actual: " << toString(location);
         FAIL(ss);
     }
@@ -1001,7 +1033,7 @@ void testFindIntervalForField(int key,
         expectedIntervalIndex != intervalIndex) {
         str::stream ss;
         ss << "Unexpected interval index from findIntervalForField: key=" << keyElt
-           << "; intervals=" << oil.toString() << "; direction=" << expectedDirection
+           << "; intervals=" << oil.toString(false) << "; direction=" << expectedDirection
            << "; location= " << toString(location) << ". Expected: " << expectedIntervalIndex
            << ". Actual: " << intervalIndex;
         FAIL(ss);

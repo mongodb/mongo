@@ -192,14 +192,19 @@ public:
      * Fills out 'bounds' with the bounds for an index scan over all values of the
      * index described by 'keyPattern' in the default forward direction.
      */
-    static void allValuesBounds(const BSONObj& keyPattern, IndexBounds* bounds);
+    static void allValuesBounds(const BSONObj& keyPattern,
+                                IndexBounds* bounds,
+                                bool hasNonSimpleCollation);
 
     /**
      * Assumes each OIL in 'bounds' is increasing.
      *
      * Aligns OILs (and bounds) according to the 'kp' direction * the scanDir.
      */
-    static void alignBounds(IndexBounds* bounds, const BSONObj& kp, int scanDir = 1);
+    static void alignBounds(IndexBounds* bounds,
+                            const BSONObj& kp,
+                            bool hasNonSimpleCollation,
+                            int scanDir = 1);
 
     /**
      * Returns 'true' if the bounds 'bounds' can be represented as one interval between

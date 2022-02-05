@@ -504,7 +504,7 @@ void finalizeWildcardIndexScanConfiguration(IndexScanNode* scan) {
         }
     }
     // Ensure that the bounds' intervals are correctly aligned.
-    IndexBoundsBuilder::alignBounds(bounds, index->keyPattern);
+    IndexBoundsBuilder::alignBounds(bounds, index->keyPattern, index->collator != nullptr);
 }
 
 bool isWildcardObjectSubpathScan(const IndexScanNode* node) {

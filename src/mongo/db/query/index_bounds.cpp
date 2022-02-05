@@ -126,11 +126,11 @@ bool IndexBounds::operator!=(const IndexBounds& other) const {
     return !(*this == other);
 }
 
-string OrderedIntervalList::toString() const {
+string OrderedIntervalList::toString(bool hasNonSimpleCollation) const {
     str::stream ss;
     ss << "['" << name << "']: ";
     for (size_t j = 0; j < intervals.size(); ++j) {
-        ss << intervals[j].toString();
+        ss << intervals[j].toString(hasNonSimpleCollation);
         if (j < intervals.size() - 1) {
             ss << ", ";
         }
@@ -305,7 +305,7 @@ void OrderedIntervalList::complement() {
     intervals.insert(intervals.end(), newIntervals.begin(), newIntervals.end());
 }
 
-string IndexBounds::toString() const {
+string IndexBounds::toString(bool hasNonSimpleCollation) const {
     str::stream ss;
     if (isSimpleRange) {
         if (IndexBounds::isStartIncludedInBound(boundInclusion)) {
@@ -330,13 +330,13 @@ string IndexBounds::toString() const {
         if (i > 0) {
             ss << ", ";
         }
-        ss << "field #" << i << fields[i].toString();
+        ss << "field #" << i << fields[i].toString(hasNonSimpleCollation);
     }
 
     return ss;
 }
 
-BSONObj IndexBounds::toBSON() const {
+BSONObj IndexBounds::toBSON(bool hasNonSimpleCollation) const {
     BSONObjBuilder bob;
     vector<OrderedIntervalList>::const_iterator itField;
     for (itField = fields.begin(); itField != fields.end(); ++itField) {
@@ -345,8 +345,7 @@ BSONObj IndexBounds::toBSON() const {
         vector<Interval>::const_iterator itInterval;
         for (itInterval = itField->intervals.begin(); itInterval != itField->intervals.end();
              ++itInterval) {
-            std::string intervalStr = itInterval->toString();
-
+            std::string intervalStr = itInterval->toString(hasNonSimpleCollation);
             // Insulate against hitting BSON size limit.
             if ((bob.len() + (int)intervalStr.size()) > BSONObjMaxUserSize) {
                 fieldBuilder.append("warning: bounds truncated due to BSON size limit");

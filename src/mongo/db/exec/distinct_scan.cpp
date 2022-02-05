@@ -167,7 +167,7 @@ unique_ptr<PlanStageStats> DistinctScan::getStats() {
     // the constructor in order to avoid the expensive serialization operation unless the distinct
     // command is being explained.
     if (_specificStats.indexBounds.isEmpty()) {
-        _specificStats.indexBounds = _bounds.toBSON();
+        _specificStats.indexBounds = _bounds.toBSON(!_specificStats.collation.isEmpty());
     }
 
     unique_ptr<PlanStageStats> ret =

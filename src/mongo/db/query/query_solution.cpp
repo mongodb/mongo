@@ -599,7 +599,7 @@ void IndexScanNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent + 1);
     *ss << "direction = " << direction << '\n';
     addIndent(ss, indent + 1);
-    *ss << "bounds = " << bounds.toString() << '\n';
+    *ss << "bounds = " << bounds.toString(index.collator != nullptr) << '\n';
     addCommon(ss, indent);
 }
 
@@ -1304,7 +1304,7 @@ void GeoNear2DSphereNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent + 1);
     *ss << "keyPattern = " << index.keyPattern.toString() << '\n';
     addCommon(ss, indent);
-    *ss << "baseBounds = " << baseBounds.toString() << '\n';
+    *ss << "baseBounds = " << baseBounds.toString(index.collator != nullptr) << '\n';
     addIndent(ss, indent + 1);
     *ss << "nearQuery = " << nq->toString() << '\n';
     if (nullptr != filter) {
@@ -1365,7 +1365,7 @@ void DistinctNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent + 1);
     *ss << "direction = " << direction << '\n';
     addIndent(ss, indent + 1);
-    *ss << "bounds = " << bounds.toString() << '\n';
+    *ss << "bounds = " << bounds.toString(index.collator != nullptr) << '\n';
 }
 
 QuerySolutionNode* DistinctNode::clone() const {
