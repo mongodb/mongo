@@ -530,12 +530,12 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
-        '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/idl/idl_parser',
         'optime',
         'optime_base',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/namespace_string',
     ],
 )
