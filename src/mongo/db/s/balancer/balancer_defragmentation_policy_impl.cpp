@@ -39,6 +39,7 @@
 #include "mongo/s/grid.h"
 
 #include <fmt/format.h>
+#include <tuple>
 
 using namespace fmt::literals;
 
@@ -685,9 +686,10 @@ private:
         // Small chunks are ordered by decreasing order of estimatedSizeBytes
         // except the ones that we failed to move due to temporary constraints that will be at the
         // end of the list ordered by last attempt time
-        return lhs->lastFailedAttemptTime.value_or(Date_t::min()) <=
-            rhs->lastFailedAttemptTime.value_or(Date_t::min()) &&
-            lhs->estimatedSizeBytes < rhs->estimatedSizeBytes;
+        auto lhsLastFailureTime = lhs->lastFailedAttemptTime.value_or(Date_t::min());
+        auto rhsLastFailureTime = rhs->lastFailedAttemptTime.value_or(Date_t::min());
+        return std::tie(lhsLastFailureTime, lhs->estimatedSizeBytes) <
+            std::tie(rhsLastFailureTime, rhs->estimatedSizeBytes);
     }
 
     // Helper class to generate the Migration and Merge actions required to join together the chunks
