@@ -161,6 +161,10 @@ structs:
                 type: KeyPattern
                 description: "The index specification document to use as the new shard key."
                 optional: false
+            collectionUUID:
+                type: uuid
+                description: "The expected UUID of the collection."
+                optional: true
 
     ReshardCollectionRequest:
         description: "Parameters for the reshard collection command"

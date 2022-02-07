@@ -68,6 +68,7 @@ public:
             // Send it to the primary shard
             RefineCollectionShardKeyRequest requestParamObj;
             requestParamObj.setNewShardKey(request().getKey());
+            requestParamObj.setCollectionUUID(request().getCollectionUUID());
             ShardsvrRefineCollectionShardKey refineCollectionShardKeyCommand(nss);
             refineCollectionShardKeyCommand.setRefineCollectionShardKeyRequest(requestParamObj);
 

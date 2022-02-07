@@ -31,7 +31,9 @@
 
 #include "mongo/db/s/refine_collection_shard_key_coordinator.h"
 
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/logv2/log.h"
@@ -132,6 +134,11 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
 
                 if (_persistCoordinatorDocument) {
                     sharding_ddl_util::stopMigrations(opCtx, nss(), boost::none);
+                }
+
+                {
+                    AutoGetCollection coll{opCtx, nss(), MODE_IS};
+                    checkCollectionUUIDMismatch(opCtx, *coll, _doc.getCollectionUUID());
                 }
 
                 const auto cmdResponse = uassertStatusOK(configShard->runCommand(
