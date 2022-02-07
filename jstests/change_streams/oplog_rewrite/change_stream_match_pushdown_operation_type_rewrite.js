@@ -113,19 +113,17 @@ verifyNonInvalidatingOps(resumeAfterToken,
                          [] /* expectedOps */,
                          0 /* expectedOplogRetDocsForEachShard */);
 
-// Ensure that the '$match' on an unknown operation type cannot be rewritten to the oplog format.
-// The oplog cursor should return '4' documents.
+// Ensure that the '$match' on the operation type unknown is rewritten correctly.
 verifyNonInvalidatingOps(resumeAfterToken,
                          {$match: {operationType: "unknown"}},
                          [] /* expectedOps */,
-                         4 /* expectedOplogRetDocsForEachShard */);
+                         0 /* expectedOplogRetDocsForEachShard */);
 
-// Ensure that the '$match' on an empty string operation type cannot be rewritten to the oplog
-// format. The oplog cursor should return '4' documents for each shard.
+// Ensure that the '$match' on an empty string operation type is rewritten correctly.
 verifyNonInvalidatingOps(resumeAfterToken,
                          {$match: {operationType: ""}},
                          [] /* expectedOps */,
-                         4 /* expectedOplogRetDocsForEachShard */);
+                         0 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' on operation type with inequality operator cannot be rewritten to the
 // oplog format. The oplog cursor should return '4' documents for each shard.
@@ -154,19 +152,17 @@ verifyNonInvalidatingOps(resumeAfterToken,
                          ["insert", "update"],
                          2 /* expectedOplogRetDocsForEachShard */);
 
-// Ensure that for the '$in' with one valid and one invalid operation type, rewrite to the oplog
-// format will be abandoned. The oplog cursor should return '4' documents for each shard.
+// Ensure that for the '$in' with one valid and one invalid operation type is rewritten correctly.
 verifyNonInvalidatingOps(resumeAfterToken,
                          {$match: {operationType: {$in: ["insert", "unknown"]}}},
                          ["insert"],
-                         4 /* expectedOplogRetDocsForEachShard */);
+                         1 /* expectedOplogRetDocsForEachShard */);
 
-// Ensure that the '$match' with '$in' on an unknown operation type cannot be rewritten. The oplog
-// cursor should return '4' documents for each shard.
+// Ensure that the '$match' with '$in' on an unknown operation type is rewritten correctly.
 verifyNonInvalidatingOps(resumeAfterToken,
                          {$match: {operationType: {$in: ["unknown"]}}},
                          [] /* expectedOps */,
-                         4 /* expectedOplogRetDocsForEachShard */);
+                         0 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' with '$in' with operation type as number is rewritten correctly.
 verifyNonInvalidatingOps(resumeAfterToken,
@@ -187,12 +183,11 @@ verifyNonInvalidatingOps(resumeAfterToken,
                          ["update", "replace", "delete"],
                          3 /* expectedOplogRetDocsForEachShard */);
 
-// Ensure that for the '$nin' with one valid and one invalid operation type, rewrite to the oplog
-// format will be abandoned. The oplog cursor should return '4' documents for each shard.
+// Ensure that for the '$nin' with one valid and one invalid operation type is rewritten correctly.
 verifyNonInvalidatingOps(resumeAfterToken,
                          {$match: {operationType: {$nin: ["insert", "unknown"]}}},
                          ["update", "replace", "delete"],
-                         4 /* expectedOplogRetDocsForEachShard */);
+                         3 /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$match' with '$nin' with operation type as number is rewritten correctly.
 verifyNonInvalidatingOps(resumeAfterToken,

@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/change_stream_helpers_legacy.h"
 
+#include "mongo/db/pipeline/change_stream_filter_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
@@ -82,6 +83,12 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
 
     // We must always check that the shard is capable of resuming from the specified point.
     stages.push_back(DocumentSourceChangeStreamCheckResumability::create(expCtx, spec));
+
+    // If 'showExpandedEvents' is NOT set, add a filter that returns only classic change events.
+    if (!spec.getShowExpandedEvents()) {
+        stages.push_back(DocumentSourceMatch::create(
+            change_stream_filter::getMatchFilterForClassicOperationTypes(), expCtx));
+    }
 
     return stages;
 }

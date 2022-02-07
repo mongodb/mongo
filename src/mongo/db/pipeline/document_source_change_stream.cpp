@@ -36,6 +36,7 @@
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
+#include "mongo/db/pipeline/change_stream_filter_helpers.h"
 #include "mongo/db/pipeline/change_stream_helpers_legacy.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
@@ -307,6 +308,11 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
         stages.push_back(DocumentSourceChangeStreamEnsureResumeTokenPresent::create(expCtx, spec));
     }
 
+    // If 'showExpandedEvents' is NOT set, add a filter that returns only classic change events.
+    if (!spec.getShowExpandedEvents()) {
+        stages.push_back(DocumentSourceMatch::create(
+            change_stream_filter::getMatchFilterForClassicOperationTypes(), expCtx));
+    }
     return stages;
 }
 

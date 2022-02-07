@@ -92,5 +92,12 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
  */
 std::unique_ptr<MatchExpression> buildInternalOpFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const MatchExpression* userMatch);
+
+/**
+ * Returns the match filter for the classic changestream operationTypes i.e. the operations that
+ * are NOT guarded behind the 'showExpandedEvents' flag.
+ */
+BSONObj getMatchFilterForClassicOperationTypes();
+
 }  // namespace change_stream_filter
 }  // namespace mongo

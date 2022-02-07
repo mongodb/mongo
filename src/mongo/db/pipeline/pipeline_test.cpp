@@ -63,6 +63,7 @@
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 
@@ -2647,8 +2648,13 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupSwapsWithIndependentMatch) {
     expCtx->uuid = UUID::gen();
     setMockReplicationCoordinatorOnOpCtx(expCtx->opCtx);
 
-    auto spec = BSON("$changeStream" << BSON("fullDocument"
-                                             << "updateLookup"));
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
+    auto spec = BSON("$changeStream" << BSON(
+                         "fullDocument"
+                         << "updateLookup"
+                         << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true));
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
     ASSERT_EQ(stages.size(), getChangeStreamStageSize());
     // Make sure the change lookup is at the end.
@@ -2674,8 +2680,13 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMatchOnPostImage
     expCtx->uuid = UUID::gen();
     setMockReplicationCoordinatorOnOpCtx(expCtx->opCtx);
 
-    auto spec = BSON("$changeStream" << BSON("fullDocument"
-                                             << "updateLookup"));
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
+    auto spec = BSON("$changeStream" << BSON(
+                         "fullDocument"
+                         << "updateLookup"
+                         << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true));
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
     ASSERT_EQ(stages.size(), getChangeStreamStageSize());
     // Make sure the change lookup is at the end.
@@ -2699,8 +2710,13 @@ TEST(PipelineOptimizationTest, FullDocumentBeforeChangeLookupSwapsWithIndependen
     expCtx->uuid = UUID::gen();
     setMockReplicationCoordinatorOnOpCtx(expCtx->opCtx);
 
-    auto spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
-                                             << "required"));
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
+    auto spec = BSON("$changeStream" << BSON(
+                         "fullDocumentBeforeChange"
+                         << "required"
+                         << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true));
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
     ASSERT_EQ(stages.size(), getChangeStreamStageSize());
     // Make sure the pre-image lookup is at the end.
@@ -2726,8 +2742,13 @@ TEST(PipelineOptimizationTest, FullDocumentBeforeChangeDoesNotSwapWithMatchOnPre
     expCtx->uuid = UUID::gen();
     setMockReplicationCoordinatorOnOpCtx(expCtx->opCtx);
 
-    auto spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
-                                             << "required"));
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
+    auto spec = BSON("$changeStream" << BSON(
+                         "fullDocumentBeforeChange"
+                         << "required"
+                         << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true));
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
     ASSERT_EQ(stages.size(), getChangeStreamStageSize());
     // Make sure the pre-image lookup is at the end.

@@ -241,5 +241,20 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
                                                          << "$or" << internalOpTypeOrBuilder.arr()),
                                                     expCtx);
 }
+
+BSONObj getMatchFilterForClassicOperationTypes() {
+    return BSON(DocumentSourceChangeStream::kOperationTypeField << BSON(
+                    "$in" << BSON_ARRAY(DocumentSourceChangeStream::kUpdateOpType
+                                        << DocumentSourceChangeStream::kDeleteOpType
+                                        << DocumentSourceChangeStream::kReplaceOpType
+                                        << DocumentSourceChangeStream::kInsertOpType
+                                        << DocumentSourceChangeStream::kDropCollectionOpType
+                                        << DocumentSourceChangeStream::kRenameCollectionOpType
+                                        << DocumentSourceChangeStream::kDropDatabaseOpType
+                                        << DocumentSourceChangeStream::kInvalidateOpType
+                                        << DocumentSourceChangeStream::kReshardBeginOpType
+                                        << DocumentSourceChangeStream::kReshardDoneCatchUpOpType
+                                        << DocumentSourceChangeStream::kNewShardDetectedOpType)));
+}
 }  // namespace change_stream_filter
 }  // namespace mongo

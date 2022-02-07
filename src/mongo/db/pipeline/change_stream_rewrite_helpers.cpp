@@ -113,13 +113,15 @@ std::unique_ptr<MatchExpression> matchRewriteOperationType(
 
     // Helper to convert a BSONElement opType into a rewritten MatchExpression.
     auto getRewrittenOpType = [&](auto& opType) -> std::unique_ptr<MatchExpression> {
-        if (BSONType::String != opType.type()) {
+        // If the operand is not a string, then this predicate will never match. If a rewrite rule
+        // does not exist for the specified operation type, then it is either handled elsewhere or
+        // it's an invalid type. In either case, return $alwaysFalse so that this predicate is
+        // ignored.
+        if (BSONType::String != opType.type() || !kOpTypeRewriteMap.count(opType.str())) {
             return std::make_unique<AlwaysFalseMatchExpression>();
-        } else if (kOpTypeRewriteMap.count(opType.str())) {
-            return MatchExpressionParser::parseAndNormalize(
-                kOpTypeRewriteMap.at(opType.str()).toBson(), expCtx);
         }
-        return nullptr;
+        return MatchExpressionParser::parseAndNormalize(kOpTypeRewriteMap.at(opType.str()).toBson(),
+                                                        expCtx);
     };
 
     switch (predicate->matchType()) {
