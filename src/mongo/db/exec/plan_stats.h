@@ -38,6 +38,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
 #include "mongo/util/container_size_helper.h"
@@ -297,10 +298,10 @@ struct CollectionScanStats : public SpecificStats {
     bool tailable{false};
 
     // The start location of a forward scan and end location for a reverse scan.
-    boost::optional<RecordId> minRecord;
+    boost::optional<RecordIdBound> minRecord;
 
     // The end location of a reverse scan and start location for a forward scan.
-    boost::optional<RecordId> maxRecord;
+    boost::optional<RecordIdBound> maxRecord;
 };
 
 struct CountStats : public SpecificStats {

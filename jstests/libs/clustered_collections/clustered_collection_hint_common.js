@@ -138,8 +138,12 @@ function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 filter: {[clusterKeyFieldName]: {$lt: arbitraryDocId}},
                 hint: clusterKey,
             },
-            expectedWinningPlanStats:
-                {stage: "CLUSTERED_IXSCAN", direction: "forward", maxRecord: arbitraryDocId}
+            expectedWinningPlanStats: {
+                stage: "CLUSTERED_IXSCAN",
+                direction: "forward",
+                minRecord: NaN,
+                maxRecord: arbitraryDocId
+            }
         });
         validateClusteredCollectionHint(coll, {
             expectedNReturned: batchSize - arbitraryDocId,
@@ -148,8 +152,12 @@ function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 filter: {[clusterKeyFieldName]: {$gte: arbitraryDocId}},
                 hint: clusterKey,
             },
-            expectedWinningPlanStats:
-                {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: arbitraryDocId}
+            expectedWinningPlanStats: {
+                stage: "CLUSTERED_IXSCAN",
+                direction: "forward",
+                minRecord: arbitraryDocId,
+                maxRecord: Infinity
+            }
         });
 
         // Find with $natural hints.
@@ -282,15 +290,15 @@ function validateClusteredCollectionHint(coll,
     assert.neq(null, stageOfInterest);
 
     for (const [key, value] of Object.entries(expectedWinningPlanStats)) {
-        assert(stageOfInterest[key], tojson(explain));
+        assert(stageOfInterest[key] !== undefined, tojson(explain));
         assert.eq(stageOfInterest[key], value, tojson(explain));
     }
 
     // Explicitly check that the plan is not bounded by default.
     if (!expectedWinningPlanStats.hasOwnProperty("minRecord")) {
-        assert(!actualWinningPlan["minRecord"], tojson(explain));
+        assert(!actualWinningPlan.hasOwnProperty("minRecord"), tojson(explain));
     }
     if (!expectedWinningPlanStats.hasOwnProperty("maxRecord")) {
-        assert(!actualWinningPlan["maxRecord"], tojson(explain));
+        assert(!actualWinningPlan.hasOwnProperty("maxRecord"), tojson(explain));
     }
 }

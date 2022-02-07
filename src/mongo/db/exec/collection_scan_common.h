@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {
@@ -54,7 +55,7 @@ struct CollectionScanParams {
     // be used for scans on clustered collections and forward oplog scans. If exclusive
     // bounds are required, a MatchExpression must be passed to the CollectionScan stage. This field
     // cannot be used in conjunction with 'resumeAfterRecordId'
-    boost::optional<RecordId> minRecord;
+    boost::optional<RecordIdBound> minRecord;
 
     // If present, this parameter sets the start point of a reverse scan or the end point of a
     // forward scan. A forward scan will stop and return EOF on the first document with a RecordId
@@ -63,7 +64,7 @@ struct CollectionScanParams {
     // only be used for scans on clustered collections and forward oplog scans. If exclusive
     // bounds are required, a MatchExpression must be passed to the CollectionScan stage. This field
     // cannot be used in conjunction with 'resumeAfterRecordId'.
-    boost::optional<RecordId> maxRecord;
+    boost::optional<RecordIdBound> maxRecord;
 
     // If true, the collection scan will return a token that can be used to resume the scan.
     bool requestResumeToken = false;

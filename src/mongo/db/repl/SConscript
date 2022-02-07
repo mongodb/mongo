@@ -22,6 +22,9 @@ env.Library(
     source=[
         'tenant_migration_decoration.cpp',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+    ]
 )
 
 env.Library(

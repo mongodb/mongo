@@ -79,12 +79,12 @@ CollectionScanParams convertIndexScanParamsToCollScanParams(
             clustered_util::matchesClusterKey(keyPattern, collection->getClusteredInfo()));
     invariant(collection->getDefaultCollator() == nullptr);
 
-    boost::optional<RecordId> startRecord, endRecord;
+    boost::optional<RecordIdBound> startRecord, endRecord;
     if (!startKey.isEmpty()) {
-        startRecord = RecordId(record_id_helpers::keyForElem(startKey.firstElement(), nullptr));
+        startRecord = RecordIdBound(record_id_helpers::keyForElem(startKey.firstElement()));
     }
     if (!endKey.isEmpty()) {
-        endRecord = RecordId(record_id_helpers::keyForElem(endKey.firstElement(), nullptr));
+        endRecord = RecordIdBound(record_id_helpers::keyForElem(endKey.firstElement()));
     }
 
     // For a forward scan, the startKey is the minRecord. For a backward scan, it is the maxRecord.
@@ -93,7 +93,7 @@ CollectionScanParams convertIndexScanParamsToCollScanParams(
 
     if (minRecord && maxRecord) {
         // Regardless of direction, the minRecord should always be less than the maxRecord
-        dassert(minRecord < maxRecord,
+        dassert(minRecord->recordId() < maxRecord->recordId(),
                 str::stream() << "Expected the minRecord " << minRecord
                               << " to be less than the maxRecord " << maxRecord
                               << " on a bounded collection scan. Original startKey and endKey for "
@@ -105,6 +105,7 @@ CollectionScanParams convertIndexScanParamsToCollScanParams(
     CollectionScanParams params;
     params.minRecord = minRecord;
     params.maxRecord = maxRecord;
+
     if (InternalPlanner::FORWARD == direction) {
         params.direction = CollectionScanParams::FORWARD;
     } else {
@@ -120,8 +121,8 @@ CollectionScanParams createCollectionScanParams(
     const CollectionPtr* coll,
     InternalPlanner::Direction direction,
     boost::optional<RecordId> resumeAfterRecordId,
-    boost::optional<RecordId> minRecord,
-    boost::optional<RecordId> maxRecord) {
+    boost::optional<RecordIdBound> minRecord,
+    boost::optional<RecordIdBound> maxRecord) {
     const auto& collection = *coll;
     invariant(collection);
 
@@ -146,8 +147,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     const Direction direction,
     boost::optional<RecordId> resumeAfterRecordId,
-    boost::optional<RecordId> minRecord,
-    boost::optional<RecordId> maxRecord) {
+    boost::optional<RecordIdBound> minRecord,
+    boost::optional<RecordIdBound> maxRecord) {
     const auto& collection = *coll;
     invariant(collection);
 
@@ -205,8 +206,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     std::unique_ptr<DeleteStageParams> params,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     Direction direction,
-    boost::optional<RecordId> minRecord,
-    boost::optional<RecordId> maxRecord) {
+    boost::optional<RecordIdBound> minRecord,
+    boost::optional<RecordIdBound> maxRecord) {
     const auto& collection = *coll;
     invariant(collection);
     auto ws = std::make_unique<WorkingSet>();

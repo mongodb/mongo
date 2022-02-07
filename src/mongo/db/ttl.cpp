@@ -446,24 +446,24 @@ private:
      * delete entries of type 'ObjectId'. All other collections must only delete entries of type
      * 'Date'.
      */
-    RecordId makeCollScanEndBound(const CollectionPtr& collection, Date_t expirationDate) {
+    RecordIdBound makeCollScanEndBound(const CollectionPtr& collection, Date_t expirationDate) {
         if (collection->getTimeseriesOptions()) {
             auto endOID = OID();
             endOID.init(expirationDate, true /* max */);
-            return record_id_helpers::keyForOID(endOID);
+            return RecordIdBound(record_id_helpers::keyForOID(endOID));
         }
 
-        return record_id_helpers::keyForDate(expirationDate);
+        return RecordIdBound(record_id_helpers::keyForDate(expirationDate));
     }
 
-    RecordId makeCollScanStartBound(const CollectionPtr& collection, const Date_t startDate) {
+    RecordIdBound makeCollScanStartBound(const CollectionPtr& collection, const Date_t startDate) {
         if (collection->getTimeseriesOptions()) {
             auto startOID = OID();
             startOID.init(startDate, false /* max */);
-            return record_id_helpers::keyForOID(startOID);
+            return RecordIdBound(record_id_helpers::keyForOID(startOID));
         }
 
-        return record_id_helpers::keyForDate(startDate);
+        return RecordIdBound(record_id_helpers::keyForDate(startDate));
     }
 
     /*

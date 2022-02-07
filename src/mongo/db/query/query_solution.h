@@ -40,6 +40,7 @@
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_enumerator_explain_info.h"
+#include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/util/id_generator.h"
 
@@ -444,11 +445,11 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
 
     // If present, this parameter sets the start point of a forward scan or the end point of a
     // reverse scan.
-    boost::optional<RecordId> minRecord;
+    boost::optional<RecordIdBound> minRecord;
 
     // If present, this parameter sets the start point of a reverse scan or the end point of a
     // forward scan.
-    boost::optional<RecordId> maxRecord;
+    boost::optional<RecordIdBound> maxRecord;
 
     // If true, the collection scan will return a token that can be used to resume the scan.
     bool requestResumeToken = false;

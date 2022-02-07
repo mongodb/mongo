@@ -46,6 +46,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/record_id_helpers.h"
@@ -174,7 +175,7 @@ bool Helpers::findById(OperationContext* opCtx,
     if (collection->isClustered()) {
         Snapshotted<BSONObj> doc;
         if (collection->findDoc(opCtx,
-                                RecordId(record_id_helpers::keyForElem(
+                                record_id_helpers::keyForObj(IndexBoundsBuilder::objFromElement(
                                     query["_id"], collection->getDefaultCollator())),
                                 &doc)) {
             result = std::move(doc.value());
@@ -200,8 +201,8 @@ RecordId Helpers::findById(OperationContext* opCtx,
     if (!desc && clustered_util::isClusteredOnId(collection->getClusteredInfo())) {
         // There is no explicit IndexDescriptor for _id on a collection clustered by _id. However,
         // the RecordId can be constructed directly from the input.
-        return RecordId(
-            record_id_helpers::keyForElem(idquery["_id"], collection->getDefaultCollator()));
+        return record_id_helpers::keyForObj(
+            IndexBoundsBuilder::objFromElement(idquery["_id"], collection->getDefaultCollator()));
     }
 
     uassert(13430, "no _id index", desc);

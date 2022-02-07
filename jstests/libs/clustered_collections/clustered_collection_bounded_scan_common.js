@@ -50,8 +50,9 @@ const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
 
         assert(getPlanStage(expl, "CLUSTERED_IXSCAN"));
         assert(getPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("maxRecord"));
-        assert(!getPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("minRecord"));
+        assert(getPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("minRecord"));
         assert.eq(10, getPlanStage(expl, "CLUSTERED_IXSCAN").maxRecord);
+        assert.eq(NaN, getPlanStage(expl, "CLUSTERED_IXSCAN").minRecord);
 
         assert.eq(expectedNReturned, expl.executionStats.executionStages.nReturned);
         assert.eq(expectedDocsExamined, expl.executionStats.executionStages.docsExamined);
@@ -65,8 +66,9 @@ const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         }));
 
         assert(getPlanStage(expl, "CLUSTERED_IXSCAN"));
-        assert(!getPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("maxRecord"));
+        assert(getPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("maxRecord"));
         assert(getPlanStage(expl, "CLUSTERED_IXSCAN").hasOwnProperty("minRecord"));
+        assert.eq(Infinity, getPlanStage(expl, "CLUSTERED_IXSCAN").maxRecord);
         assert.eq(89, getPlanStage(expl, "CLUSTERED_IXSCAN").minRecord);
 
         assert.eq(expectedNReturned, expl.executionStats.executionStages.nReturned);

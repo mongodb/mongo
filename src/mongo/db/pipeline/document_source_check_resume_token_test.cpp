@@ -170,7 +170,7 @@ public:
         _filter = MatchExpressionParser::parseAndNormalize(_filterExpr, pExpCtx);
         _params.assertTsHasNotFallenOffOplog = Timestamp(0);
         _params.shouldTrackLatestOplogTimestamp = true;
-        _params.minRecord = RecordId(0);
+        _params.minRecord = RecordIdBound(RecordId(0));
         _params.tailable = true;
     }
 
@@ -178,7 +178,7 @@ public:
         invariant(!_collScan);
         _filterExpr = BSON("ns" << kTestNs << "ts" << BSON("$gte" << resumeToken.clusterTime));
         _filter = MatchExpressionParser::parseAndNormalize(_filterExpr, pExpCtx);
-        _params.minRecord = RecordId(resumeToken.clusterTime.asLL());
+        _params.minRecord = RecordIdBound(RecordId(resumeToken.clusterTime.asLL()));
         _params.assertTsHasNotFallenOffOplog = resumeToken.clusterTime;
     }
 

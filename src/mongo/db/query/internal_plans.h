@@ -78,8 +78,8 @@ public:
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         Direction direction = FORWARD,
         boost::optional<RecordId> resumeAfterRecordId = boost::none,
-        boost::optional<RecordId> minRecord = boost::none,
-        boost::optional<RecordId> maxRecord = boost::none);
+        boost::optional<RecordIdBound> minRecord = boost::none,
+        boost::optional<RecordIdBound> maxRecord = boost::none);
 
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> collectionScan(
         OperationContext* opCtx,
@@ -96,8 +96,8 @@ public:
         std::unique_ptr<DeleteStageParams> deleteStageParams,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         Direction direction = FORWARD,
-        boost::optional<RecordId> minRecord = boost::none,
-        boost::optional<RecordId> maxRecord = boost::none);
+        boost::optional<RecordIdBound> minRecord = boost::none,
+        boost::optional<RecordIdBound> maxRecord = boost::none);
 
     /**
      * Returns an index scan.  Caller owns returned pointer.

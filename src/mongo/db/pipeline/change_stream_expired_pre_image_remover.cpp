@@ -49,7 +49,7 @@ namespace mongo {
 namespace {
 RecordId toRecordId(ChangeStreamPreImageId id) {
     return record_id_helpers::keyForElem(
-        BSON(ChangeStreamPreImage::kIdFieldName << id.toBSON()).firstElement(), nullptr);
+        BSON(ChangeStreamPreImage::kIdFieldName << id.toBSON()).firstElement());
 }
 
 /**
@@ -153,10 +153,10 @@ public:
             while (true) {
                 // Fetch the first pre-image from the next collection, that has pre-images enabled.
                 auto planExecutor = _previousCollectionUUID
-                    ? createCollectionScan(
+                    ? createCollectionScan(RecordIdBound(
                           toRecordId(ChangeStreamPreImageId(*_previousCollectionUUID,
                                                             Timestamp::max(),
-                                                            std::numeric_limits<int64_t>::max())))
+                                                            std::numeric_limits<int64_t>::max()))))
                     : createCollectionScan(boost::none);
                 auto preImageAttributes = getNextPreImageAttributes(planExecutor);
 
@@ -185,10 +185,10 @@ public:
                     // '_earliestOplogEntryTimestamp', as the pre-images with smaller or equal
                     // timestamp are guaranteed to be expired.
                     Timestamp lastExpiredPreimageTs(_earliestOplogEntryTimestamp.asULL() - 1);
-                    auto planExecutor = createCollectionScan(
+                    auto planExecutor = createCollectionScan(RecordIdBound(
                         toRecordId(ChangeStreamPreImageId(currentCollectionUUID,
                                                           lastExpiredPreimageTs,
-                                                          std::numeric_limits<int64_t>::max())));
+                                                          std::numeric_limits<int64_t>::max()))));
 
                     // Iterate over all the expired pre-images in the collection in order to find
                     // the max RecordId.
@@ -233,9 +233,10 @@ public:
                 preImageAttributes.operationTime <= expirationTime;
         }
 
+
         // Set up the new collection scan to start from the 'minKey'.
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createCollectionScan(
-            boost::optional<RecordId> minKey) const {
+            boost::optional<RecordIdBound> minKey) const {
             return InternalPlanner::collectionScan(_opCtx,
                                                    _preImagesCollPtr,
                                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
@@ -315,6 +316,7 @@ void deleteExpiredChangeStreamPreImages(Client* client) {
     // TODO SERVER-58693: pass expiration duration parameter to the iterator.
     ChangeStreamExpiredPreImageIterator expiredPreImages(
         opCtx.get(), &preImagesColl, currentEarliestOplogEntryTs);
+
     for (const auto& collectionRange : expiredPreImages) {
         writeConflictRetry(opCtx.get(),
                            "ChangeStreamExpiredPreImagesRemover",
@@ -329,8 +331,8 @@ void deleteExpiredChangeStreamPreImages(Client* client) {
                                    std::move(params),
                                    PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                    InternalPlanner::Direction::FORWARD,
-                                   collectionRange.first,
-                                   collectionRange.second);
+                                   RecordIdBound(collectionRange.first),
+                                   RecordIdBound(collectionRange.second));
                                numberOfRemovals += exec->executeDelete();
                            });
     }

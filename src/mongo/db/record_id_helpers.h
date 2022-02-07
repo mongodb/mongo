@@ -39,6 +39,7 @@
 namespace mongo {
 class Timestamp;
 class RecordId;
+
 namespace record_id_helpers {
 
 /**
@@ -53,7 +54,8 @@ StatusWith<RecordId> keyForOptime(const Timestamp& opTime);
 StatusWith<RecordId> keyForDoc(const BSONObj& doc,
                                const ClusteredIndexSpec& indexSpec,
                                const CollatorInterface* collator);
-RecordId keyForElem(const BSONElement& elem, const CollatorInterface* collator);
+RecordId keyForElem(const BSONElement& elem);
+RecordId keyForObj(const BSONObj& obj);
 RecordId keyForOID(OID oid);
 RecordId keyForDate(Date_t date);
 

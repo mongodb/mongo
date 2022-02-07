@@ -85,8 +85,8 @@ public:
     }
 
     /**
-     * Construct a RecordId that holds a small binary string. The raw value for RecordStore storage
-     * may be retrieved using getStr().
+     * Construct a RecordId that holds a binary string. The raw value for RecordStore storage may be
+     * retrieved using getStr().
      */
     explicit RecordId(const char* str, int32_t size) {
         invariant(size > 0, "key size must be greater than 0");
@@ -209,8 +209,8 @@ public:
     }
 
     /**
-     * Compares two RecordIds. Requires that both RecordIds are of the same format, unless one or
-     * both are null. Null always compares less than every other RecordId format.
+     * Compares two RecordIds. Requires that both RecordIds are of the same "type" (long or string).
+     * Null is always comparable and is less than every other RecordId format.
      */
     int compare(const RecordId& rhs) const {
         switch (_format) {

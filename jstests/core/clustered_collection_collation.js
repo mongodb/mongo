@@ -138,6 +138,18 @@ const verifyNoBoundsAndFindsN = function(coll, expected, predicate, queryCollati
     assert.eq(expected, coll.find(predicate).count(), "Didn't find the expected records");
 };
 
+const verifyNoTightBoundsAndFindsN = function(coll, expected, predicate, queryCollation) {
+    const res = queryCollation === undefined
+        ? assert.commandWorked(coll.find(predicate).explain())
+        : assert.commandWorked(coll.find(predicate).collation(queryCollation).explain());
+    const min = res.queryPlanner.winningPlan.minRecord;
+    const max = res.queryPlanner.winningPlan.maxRecord;
+    assert.neq(null, min, "No min bound");
+    assert.neq(null, max, "No max bound");
+    assert.neq(min, max, "COLLSCAN bounds are equal");
+    assert.eq(expected, coll.find(predicate).count(), "Didn't find the expected records");
+};
+
 const testBounds = function(coll, expected, defaultCollation) {
     // Test non string types.
     verifyHasBoundsAndFindsN(coll, 1, {_id: 5});
@@ -160,10 +172,10 @@ const testBounds = function(coll, expected, defaultCollation) {
     verifyNoBoundsAndFindsN(coll, expected, {data: ["a", "B"]});
 
     // Test non compatible query collations don't generate bounds
-    verifyNoBoundsAndFindsN(coll, expected, {_id: "A"}, incompatibleCollation);
-    verifyNoBoundsAndFindsN(coll, expected, {_id: {str: "A"}}, incompatibleCollation);
-    verifyNoBoundsAndFindsN(coll, expected, {_id: {strs: ["A", "b"]}}, incompatibleCollation);
-    verifyNoBoundsAndFindsN(coll, expected, {_id: {strs: ["a", "B"]}}, incompatibleCollation);
+    verifyNoTightBoundsAndFindsN(coll, expected, {_id: "A"}, incompatibleCollation);
+    verifyNoTightBoundsAndFindsN(coll, expected, {_id: {str: "A"}}, incompatibleCollation);
+    verifyNoTightBoundsAndFindsN(coll, expected, {_id: {strs: ["A", "b"]}}, incompatibleCollation);
+    verifyNoTightBoundsAndFindsN(coll, expected, {_id: {strs: ["a", "B"]}}, incompatibleCollation);
 
     // Test compatible query collations generate bounds
     verifyHasBoundsAndFindsN(coll, expected, {_id: "A"}, defaultCollation);

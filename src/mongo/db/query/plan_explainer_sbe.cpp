@@ -73,10 +73,10 @@ void statsToBSON(const QuerySolutionNode* node,
             auto csn = static_cast<const CollectionScanNode*>(node);
             bob->append("direction", csn->direction > 0 ? "forward" : "backward");
             if (csn->minRecord) {
-                record_id_helpers::appendToBSONAs(*csn->minRecord, bob, "minRecord");
+                csn->minRecord->appendToBSONAs(bob, "minRecord");
             }
             if (csn->maxRecord) {
-                record_id_helpers::appendToBSONAs(*csn->maxRecord, bob, "maxRecord");
+                csn->maxRecord->appendToBSONAs(bob, "maxRecord");
             }
             break;
         }

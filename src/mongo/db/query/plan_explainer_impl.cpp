@@ -257,10 +257,10 @@ void statsToBSON(const PlanStageStats& stats,
         CollectionScanStats* spec = static_cast<CollectionScanStats*>(stats.specific.get());
         bob->append("direction", spec->direction > 0 ? "forward" : "backward");
         if (spec->minRecord) {
-            record_id_helpers::appendToBSONAs(*spec->minRecord, bob, "minRecord");
+            spec->minRecord->appendToBSONAs(bob, "minRecord");
         }
         if (spec->maxRecord) {
-            record_id_helpers::appendToBSONAs(*spec->maxRecord, bob, "maxRecord");
+            spec->maxRecord->appendToBSONAs(bob, "maxRecord");
         }
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("docsExamined", static_cast<long long>(spec->docsTested));

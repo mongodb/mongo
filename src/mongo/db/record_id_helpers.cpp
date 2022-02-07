@@ -51,19 +51,20 @@ StatusWith<RecordId> keyForOptime(const Timestamp& opTime) {
     // don't sort differently when put in a RecordId. It also avoids issues with Null/Invalid
     // RecordIds
     if (opTime.getSecs() > uint32_t(std::numeric_limits<int32_t>::max()))
-        return StatusWith<RecordId>(ErrorCodes::BadValue, "ts secs too high");
+        return {ErrorCodes::BadValue, "ts secs too high"};
 
     if (opTime.getInc() > uint32_t(std::numeric_limits<int32_t>::max()))
-        return StatusWith<RecordId>(ErrorCodes::BadValue, "ts inc too high");
+        return {ErrorCodes::BadValue, "ts inc too high"};
 
-    const RecordId out = RecordId(opTime.getSecs(), opTime.getInc());
+    const auto out = RecordId(opTime.getSecs(), opTime.getInc());
     if (out <= RecordId::minLong())
-        return StatusWith<RecordId>(ErrorCodes::BadValue, "ts too low");
+        return {ErrorCodes::BadValue, "ts too low"};
     if (out >= RecordId::maxLong())
-        return StatusWith<RecordId>(ErrorCodes::BadValue, "ts too high");
+        return {ErrorCodes::BadValue, "ts too high"};
 
-    return StatusWith<RecordId>(out);
+    return out;
 }
+
 
 /**
  * data and len must be the arguments from RecordStore::insert() on an oplog collection.
@@ -77,9 +78,9 @@ StatusWith<RecordId> extractKeyOptime(const char* data, int len) {
     const BSONObj obj(data);
     const BSONElement elem = obj["ts"];
     if (elem.eoo())
-        return StatusWith<RecordId>(ErrorCodes::BadValue, "no ts field");
+        return {ErrorCodes::BadValue, "no ts field"};
     if (elem.type() != bsonTimestamp)
-        return StatusWith<RecordId>(ErrorCodes::BadValue, "ts must be a Timestamp");
+        return {ErrorCodes::BadValue, "ts must be a Timestamp"};
 
     return keyForOptime(elem.timestamp());
 }
@@ -96,23 +97,26 @@ StatusWith<RecordId> keyForDoc(const BSONObj& doc,
                 str::stream() << "Document " << redact(doc) << " is missing the '"
                               << clusterKeyField << "' field"};
     }
+    if (collator) {
+        BSONObjBuilder out;
+        CollationIndexKey::collationAwareIndexKeyAppend(keyElement, collator, &out);
+        return keyForElem(out.done().firstElement());
+    }
 
-    return keyForElem(keyElement, collator);
+    return keyForElem(keyElement);
 }
 
-RecordId keyForElem(const BSONElement& elem, const CollatorInterface* collator) {
+RecordId keyForElem(const BSONElement& elem) {
     // Intentionally discard the TypeBits since the type information will be stored in the cluster
     // key of the original document. The consequence of this behavior is that cluster key values
     // that compare similarly, but are of different types may not be used concurrently.
     KeyString::Builder keyBuilder(KeyString::Version::kLatestVersion);
-    if (collator) {
-        BSONObjBuilder out;
-        CollationIndexKey::collationAwareIndexKeyAppend(elem, collator, &out);
-        keyBuilder.appendBSONElement(out.done().firstElement());
-    } else {
-        keyBuilder.appendBSONElement(elem);
-    }
+    keyBuilder.appendBSONElement(elem);
     return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
+}
+
+RecordId keyForObj(const BSONObj& obj) {
+    return keyForElem(obj.firstElement());
 }
 
 RecordId keyForOID(OID oid) {

@@ -45,6 +45,7 @@
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
 #include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 
@@ -272,7 +273,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
             return {state.slotId(), makeConstant(tag, val)};
         } else if (csn->minRecord) {
             auto cursor = collection->getRecordStore()->getCursor(state.opCtx);
-            auto startRec = cursor->seekNear(*csn->minRecord);
+            auto startRec = cursor->seekNear(csn->minRecord->recordId());
             if (startRec) {
                 LOGV2_DEBUG(205841, 3, "Using direct oplog seek");
                 auto [tag, val] = sbe::value::makeCopyRecordId(startRec->id);
@@ -437,7 +438,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
             std::move(stage),
             makeBinaryOp(sbe::EPrimBinary::lessEq,
                          makeVariable(*tsSlot),
-                         makeConstant(sbe::value::TypeTags::Timestamp, csn->maxRecord->getLong())),
+                         makeConstant(sbe::value::TypeTags::Timestamp,
+                                      csn->maxRecord->recordId().getLong())),
             csn->nodeId());
     }
 
