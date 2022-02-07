@@ -218,6 +218,13 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
     }
 }
 
+boost::optional<Document> MongosProcessInterface::lookupSingleDocumentLocally(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& nss,
+    const Document& documentKey) {
+    MONGO_UNREACHABLE_TASSERT(6148001);
+}
+
 BSONObj MongosProcessInterface::_reportCurrentOpForClient(
     OperationContext* opCtx,
     Client* client,

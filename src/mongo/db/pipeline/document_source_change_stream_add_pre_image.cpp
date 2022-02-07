@@ -134,34 +134,22 @@ boost::optional<Document> DocumentSourceChangeStreamAddPreImage::lookupPreImage(
         return change_stream_legacy::legacyLookupPreImage(pExpCtx, preImageId);
     }
 
-    // We need the pre-images UUID for lookup, so obtain the collection info via
-    // MongoProcessInterface.
-    auto preImagesCollectionInfo = pExpCtx->mongoProcessInterface->getCollectionOptions(
-        pExpCtx->opCtx, NamespaceString::kChangeStreamPreImagesNamespace);
-
-    // Return boost::none if pre-images collection doesn't exist.
-    if (preImagesCollectionInfo.isEmpty()) {
-        return boost::none;
-    }
-
-    // Extract the UUID from the collection information. We should always have a valid uuid here.
-    auto preImagesCollectionUUID = invariantStatusOK(UUID::parse(preImagesCollectionInfo["uuid"]));
-
-    // Look up the pre-image using the pre-image id as the query filter.
-    auto lookedUpDoc = pExpCtx->mongoProcessInterface->lookupSingleDocument(
+    // Look up the pre-image document on the local node by id.
+    auto lookedUpDoc = pExpCtx->mongoProcessInterface->lookupSingleDocumentLocally(
         pExpCtx,
         NamespaceString::kChangeStreamPreImagesNamespace,
-        preImagesCollectionUUID,
-        Document{{"_id", Value(preImageId)}},
-        boost::none);
+        Document{{ChangeStreamPreImage::kIdFieldName, preImageId}});
 
     // Return boost::none to signify that we failed to find the pre-image.
     if (!lookedUpDoc) {
         return boost::none;
     }
 
-    // Return preImage field from the document.
-    return lookedUpDoc->getField(ChangeStreamPreImage::kPreImageFieldName).getDocument().getOwned();
+    // Return "preImage" field value from the document.
+    auto preImageField = lookedUpDoc->getField(ChangeStreamPreImage::kPreImageFieldName);
+    tassert(
+        6148000, "Pre-image document must contain the 'preImage' field", !preImageField.nullish());
+    return preImageField.getDocument().getOwned();
 }
 
 Value DocumentSourceChangeStreamAddPreImage::serialize(

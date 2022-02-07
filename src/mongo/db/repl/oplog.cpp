@@ -1553,15 +1553,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     // document.
                     invariant(op.getObject2());
                     auto&& documentId = *op.getObject2();
-
-                    // Assume that either an index on _id exists or the collection is clustered by
-                    // _id.
-                    const bool requireIndex{false};
-
-                    // TODO: SERVER-61480 use a more efficient implementation - bypass the find
-                    // component.
-                    auto documentFound = Helpers::findOne(
-                        opCtx, collection, documentId, changeStreamPreImage, requireIndex);
+                    auto documentFound = Helpers::findById(
+                        opCtx, db, collection->ns().ns(), documentId, changeStreamPreImage);
                     invariant(documentFound);
                 }
 

@@ -198,6 +198,13 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    boost::optional<Document> lookupSingleDocumentLocally(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        const Document& documentKey) {
+        MONGO_UNREACHABLE_TASSERT(6148002);
+    }
+
     std::vector<GenericCursor> getIdleCursors(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               CurrentOpUserMode userMode) const {
         MONGO_UNREACHABLE;

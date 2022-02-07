@@ -120,6 +120,11 @@ public:
     void truncateRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                              RecordStore* rs) const final;
 
+    boost::optional<Document> lookupSingleDocumentLocally(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        const Document& documentKey) final;
+
 protected:
     BSONObj getCollectionOptionsLocally(OperationContext* opCtx, const NamespaceString& nss);
 

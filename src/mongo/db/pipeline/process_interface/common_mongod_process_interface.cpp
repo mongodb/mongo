@@ -48,6 +48,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
@@ -732,6 +733,19 @@ void CommonMongodProcessInterface::truncateRecordStore(
         tassert(5643000, "Unable to clear record store", status.isOK());
         wuow.commit();
     });
+}
+
+boost::optional<Document> CommonMongodProcessInterface::lookupSingleDocumentLocally(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& nss,
+    const Document& documentKey) {
+    AutoGetCollectionForRead autoColl(expCtx->opCtx, nss);
+    BSONObj document;
+    if (!Helpers::findById(
+            expCtx->opCtx, autoColl.getDb(), nss.ns(), documentKey.toBson(), document)) {
+        return boost::none;
+    }
+    return Document(document).getOwned();
 }
 
 }  // namespace mongo
