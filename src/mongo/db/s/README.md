@@ -813,7 +813,7 @@ four steps to this process:
 ### Periodic cleanup of the session catalog and transactions table
 
 The logical session cache class holds the periodic job to clean up the
-[session catalog](#the-logical-session-catalog) and [transactions table](#the-transactions-table].
+[session catalog](#the-logical-session-catalog) and [transactions table](#the-transactions-table).
 Inside the class, this is known as the "reap" function. Every five (5) minutes (user-configurable),
 the following steps will be performed:
 
