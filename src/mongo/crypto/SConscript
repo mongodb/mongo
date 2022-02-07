@@ -84,6 +84,17 @@ if get_option('ssl') == 'on':
         ],
     )
 
+env.Library(
+    target="encrypted_field_config",
+    source=[
+        "encryption_fields.idl",
+    ],
+    LIBDEPS=[
+         '$BUILD_DIR/mongo/idl/feature_flag',
+         '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
 env.CppUnitTest(
     target='crypto_test',
     source=[
