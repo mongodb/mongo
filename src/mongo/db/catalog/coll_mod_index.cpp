@@ -140,8 +140,9 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
     invariant(!idx->unique(), str::stream() << "Index is already unique: " << idx->infoObj());
     const auto& collection = autoColl->getCollection();
 
-    // Checks for duplicates on the primary or for the 'applyOps' command.
-    // TODO(SERVER-61356): revisit this condition for tenant migration, which uses kInitialSync.
+    // Checks for duplicates on the primary or for the 'applyOps' command. In the
+    // tenant migration case, assumes similarly to initial sync that we don't need to perform this
+    // check in the destination cluster.
     std::list<std::set<RecordId>> duplicateRecordsList;
     if (!mode) {
         auto entry = idx->getEntry();
