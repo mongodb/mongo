@@ -2195,13 +2195,19 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
         uncommittedMultikeys = std::make_shared<UncommittedMultikey::MultikeyMap>();
     }
     BSONCollectionCatalogEntry::MetaData* metadata = nullptr;
+    bool hasSetMultikey = false;
     if (auto it = uncommittedMultikeys->find(this); it != uncommittedMultikeys->end()) {
         metadata = &it->second;
+        hasSetMultikey = setMultikey(*metadata);
     } else {
-        metadata = &uncommittedMultikeys->emplace(this, *_metadata).first->second;
+        BSONCollectionCatalogEntry::MetaData metadataLocal(*_metadata);
+        hasSetMultikey = setMultikey(metadataLocal);
+        if (hasSetMultikey) {
+            metadata = &uncommittedMultikeys->emplace(this, std::move(metadataLocal)).first->second;
+        }
     }
 
-    if (!setMultikey(*metadata))
+    if (!hasSetMultikey)
         return false;
 
     opCtx->recoveryUnit()->onRollback(
