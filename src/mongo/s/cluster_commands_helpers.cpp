@@ -62,16 +62,21 @@
 
 namespace mongo {
 
-void appendWriteConcernErrorToCmdResponse(const ShardId& shardId,
-                                          const BSONElement& wcErrorElem,
-                                          BSONObjBuilder& responseBuilder) {
-    WriteConcernErrorDetail wcError = getWriteConcernErrorDetail(wcErrorElem);
-
+void appendWriteConcernErrorDetailToCmdResponse(const ShardId& shardId,
+                                                WriteConcernErrorDetail wcError,
+                                                BSONObjBuilder& responseBuilder) {
     auto status = wcError.toStatus();
     wcError.setStatus(
         status.withReason(str::stream() << status.reason() << " at " << shardId.toString()));
 
     responseBuilder.append("writeConcernError", wcError.toBSON());
+}
+
+void appendWriteConcernErrorToCmdResponse(const ShardId& shardId,
+                                          const BSONElement& wcErrorElem,
+                                          BSONObjBuilder& responseBuilder) {
+    WriteConcernErrorDetail wcError = getWriteConcernErrorDetail(wcErrorElem);
+    appendWriteConcernErrorDetailToCmdResponse(shardId, wcError, responseBuilder);
 }
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTargeter(

@@ -124,7 +124,7 @@ function runFindAndModifyCmdSuccess(st,
             if (upsert) {
                 assert.eq(null, res);
             } else {
-                assert(resultsEq([res], oldDoc));
+                assert(resultsEq([res], oldDoc), tojson([res, oldDoc]));
             }
         }
     }

@@ -48,6 +48,7 @@
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/reply_interface.h"
+#include "mongo/s/is_mongos.h"
 #include "mongo/stdx/future.h"
 #include "mongo/transport/service_entry_point.h"
 
@@ -297,7 +298,7 @@ SemiFuture<BSONObj> Transaction::_commitOrAbort(StringData dbName, StringData cm
 
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append(cmdName, 1);
-    cmdBuilder.append(WriteConcernOptions::kWriteConcernField, _writeConcern.toBSON());
+    cmdBuilder.append(WriteConcernOptions::kWriteConcernField, _writeConcern);
     auto cmdObj = cmdBuilder.obj();
 
     return _txnClient->runCommand(dbName, cmdObj).semi();
@@ -363,7 +364,7 @@ void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
     if (_state == TransactionState::kInit) {
         _state = TransactionState::kStarted;
         _sessionInfo.setStartTransaction(boost::none);
-        cmdBuilder->append(_readConcern.toBSON().firstElement());
+        cmdBuilder->append(repl::ReadConcernArgs::kReadConcernFieldName, _readConcern);
     }
 
     _latestResponseHasTransientTransactionErrorLabel = false;
@@ -379,32 +380,19 @@ void Transaction::processResponse(const BSONObj& reply) {
     }
 }
 
-void Transaction::_setSessionInfo(LogicalSessionId lsid,
-                                  TxnNumber txnNumber,
-                                  boost::optional<TxnRetryCounter> txnRetryCounter) {
+void Transaction::_setSessionInfo(LogicalSessionId lsid, TxnNumber txnNumber) {
     _sessionInfo.setSessionId(lsid);
     _sessionInfo.setTxnNumber(txnNumber);
-    _sessionInfo.setTxnRetryCounter(txnRetryCounter ? *txnRetryCounter : 0);
 }
 
 void Transaction::primeForTransactionRetry() {
     _latestResponseHasTransientTransactionErrorLabel = false;
     switch (_execContext) {
         case ExecutionContext::kOwnSession:
+        case ExecutionContext::kClientSession:
+        case ExecutionContext::kClientRetryableWrite:
             // Advance txnNumber.
             _sessionInfo.setTxnNumber(*_sessionInfo.getTxnNumber() + 1);
-            _sessionInfo.setStartTransaction(true);
-            _state = TransactionState::kInit;
-            return;
-        case ExecutionContext::kClientSession:
-            // Advance txnRetryCounter.
-            _sessionInfo.setTxnRetryCounter(*_sessionInfo.getTxnRetryCounter() + 1);
-            _sessionInfo.setStartTransaction(true);
-            _state = TransactionState::kInit;
-            return;
-        case ExecutionContext::kClientRetryableWrite:
-            // Advance txnRetryCounter.
-            _sessionInfo.setTxnRetryCounter(*_sessionInfo.getTxnRetryCounter() + 1);
             _sessionInfo.setStartTransaction(true);
             _state = TransactionState::kInit;
             return;
@@ -431,27 +419,27 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
     auto clientSession = opCtx->getLogicalSessionId();
     auto clientTxnNumber = opCtx->getTxnNumber();
     auto clientInMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
-    auto clientTxnRetryCounter = opCtx->getTxnRetryCounter();
 
     if (!clientSession) {
         // TODO SERVER-61783: Integrate session pool.
-        _setSessionInfo(makeLogicalSessionId(opCtx), 0, 0);
+        _setSessionInfo(makeLogicalSessionId(opCtx), 0 /* txnNumber */);
         _execContext = ExecutionContext::kOwnSession;
     } else if (!clientTxnNumber) {
-        _setSessionInfo(makeLogicalSessionIdWithTxnUUID(*clientSession), 0, 0);
+        _setSessionInfo(makeLogicalSessionIdWithTxnUUID(*clientSession), 0 /* txnNumber */);
         _execContext = ExecutionContext::kClientSession;
 
         // TODO SERVER-59186: Handle client session case.
         MONGO_UNREACHABLE;
     } else if (!clientInMultiDocumentTransaction) {
-        _setSessionInfo(
-            makeLogicalSessionIdWithTxnNumberAndUUID(*clientSession, *clientTxnNumber), 0, 0);
+        _setSessionInfo(makeLogicalSessionIdWithTxnNumberAndUUID(*clientSession, *clientTxnNumber),
+                        0 /* txnNumber */);
         _execContext = ExecutionContext::kClientRetryableWrite;
 
-        // TODO SERVER-59186: Handle client retryable write case.
-        MONGO_UNREACHABLE;
+        // TODO SERVER-59186: Handle client retryable write case on mongod. This is different from
+        // mongos because only mongod checks out a transaction session for retryable writes.
+        invariant(isMongos(), "This case is not yet supported on a mongod");
     } else {
-        _setSessionInfo(*clientSession, *clientTxnNumber, clientTxnRetryCounter);
+        _setSessionInfo(*clientSession, *clientTxnNumber);
         _execContext = ExecutionContext::kClientTransaction;
 
         // TODO SERVER-59186: Handle client transaction case.
@@ -460,9 +448,12 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
     _sessionInfo.setStartTransaction(true);
     _sessionInfo.setAutocommit(false);
 
-    // Extract non-session options.
-    _readConcern = repl::ReadConcernArgs::get(opCtx);
-    _writeConcern = opCtx->getWriteConcern();
+    // Extract non-session options. Strip provenance so it can be correctly inferred for the
+    // generated commands as if it came from an external client.
+    _readConcern = repl::ReadConcernArgs::get(opCtx).toBSONInner().removeField(
+        ReadWriteConcernProvenanceBase::kSourceFieldName);
+    _writeConcern = opCtx->getWriteConcern().toBSON().removeField(
+        ReadWriteConcernProvenanceBase::kSourceFieldName);
 
     LOGV2_DEBUG(5875901,
                 0,  // TODO SERVER-61781: Raise verbosity.

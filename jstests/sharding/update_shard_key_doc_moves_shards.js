@@ -201,8 +201,9 @@ changeShardKeyOptions.forEach(function(updateConfig) {
         if (!isFindAndModify) {
             assertCannotUpdateWithMultiTrue(
                 st, kDbName, ns, session, sessionDB, runInTxn, {"x": 300}, {"$set": {"x": 30}});
+
+            changeShardKeyWhenFailpointsSet(session, sessionDB, runInTxn, isFindAndModify);
         }
-        changeShardKeyWhenFailpointsSet(session, sessionDB, runInTxn, isFindAndModify);
     }
 });
 

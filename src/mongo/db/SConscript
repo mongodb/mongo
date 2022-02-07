@@ -839,7 +839,6 @@ env.Library(
         'repl/repl_coordinator_interface',
         'service_context',
         'shared_request_handling',
-        'write_ops',
     ],
 )
 

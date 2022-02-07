@@ -282,8 +282,8 @@ public:
 
     /**
      * Handles the given transaction result based on where the transaction is in its lifecycle and
-     * its execution context, e.g. by updating its txnNumber or txnRetryCounter, and returns the
-     * next step for the transaction runner.
+     * its execution context, e.g. by updating its txnNumber, and returns the next step for the
+     * transaction runner.
      */
     ErrorHandlingStep handleError(const StatusWith<CommitResult>& swResult) const;
 
@@ -318,9 +318,7 @@ private:
         return std::make_unique<TxnMetadataHooks>(*this);
     }
 
-    void _setSessionInfo(LogicalSessionId lsid,
-                         TxnNumber txnNumber,
-                         boost::optional<TxnRetryCounter> txnRetryCounter);
+    void _setSessionInfo(LogicalSessionId lsid, TxnNumber txnNumber);
 
     SemiFuture<BSONObj> _commitOrAbort(StringData dbName, StringData cmdName);
 
@@ -337,8 +335,8 @@ private:
     bool _latestResponseHasTransientTransactionErrorLabel{false};
 
     OperationSessionInfo _sessionInfo;
-    repl::ReadConcernArgs _readConcern;
-    WriteConcernOptions _writeConcern;
+    BSONObj _writeConcern;
+    BSONObj _readConcern;
     ExecutionContext _execContext;
     TransactionState _state{TransactionState::kInit};
 };

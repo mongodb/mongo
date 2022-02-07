@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/status_with.h"
@@ -38,9 +40,13 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/update_metrics.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/transaction_api.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog_cache.h"
@@ -120,6 +126,41 @@ BSONObj getShardKey(OperationContext* opCtx,
             "Query for sharded findAndModify must contain the shard key",
             !shardKey.isEmpty());
     return shardKey;
+}
+
+void handleWouldChangeOwningShardErrorRetryableWrite(
+    OperationContext* opCtx,
+    const ShardId& shardId,
+    const NamespaceString& nss,
+    const write_ops::FindAndModifyCommandRequest& request,
+    BSONObjBuilder* result) {
+    auto txn = std::make_shared<txn_api::TransactionWithRetries>(
+        opCtx, Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
+
+    auto swResult = txn->runSyncNoThrow(
+        opCtx,
+        [cmdObj = request.toBSON({}), nss, result](const txn_api::TransactionClient& txnClient,
+                                                   ExecutorPtr txnExec) {
+            auto res = txnClient.runCommand(nss.db(), cmdObj).get();
+            uassertStatusOK(getStatusFromCommandResult(res));
+
+            result->appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(res));
+
+            return SemiFuture<void>::makeReady();
+        });
+
+    auto cmdStatus = swResult.getStatus();
+    if (cmdStatus != ErrorCodes::DuplicateKey ||
+        (cmdStatus == ErrorCodes::DuplicateKey &&
+         !cmdStatus.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id"))) {
+        cmdStatus.addContext(documentShardKeyUpdateUtil::kNonDuplicateKeyErrorContext);
+    };
+    uassertStatusOK(cmdStatus);
+
+    const auto& wcError = swResult.getValue().wcError;
+    if (!wcError.toStatus().isOK()) {
+        appendWriteConcernErrorDetailToCmdResponse(shardId, wcError, *result);
+    }
 }
 
 void updateShardKeyValueOnWouldChangeOwningShardError(OperationContext* opCtx,
@@ -402,47 +443,23 @@ private:
 
         if (responseStatus.code() == ErrorCodes::WouldChangeOwningShard) {
             if (isRetryableWrite) {
-                RouterOperationContextSession routerSession(opCtx);
-                try {
-                    auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-                    readConcernArgs =
-                        repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-
-                    // Re-run the findAndModify command that will change the shard key value in a
-                    // transaction. We call _runCommand recursively, and this second time through
-                    // since it will be run as a transaction it will take the other code path to
-                    // updateShardKeyValueOnWouldChangeOwningShardError.  We ensure the retried
-                    // operation does not include WC inside the transaction by stripping it from the
-                    // cmdObj.  The transaction commit will still use the WC, because it uses the WC
-                    // from the opCtx (which has been set previously in Strategy).
-                    documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
-                    _runCommand(opCtx,
-                                shardId,
-                                shardVersion,
-                                dbVersion,
-                                nss,
-                                stripWriteConcern(cmdObj),
-                                result);
-                    uassertStatusOK(getStatusFromCommandResult(result->asTempObj()));
-                    auto commitResponse =
-                        documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(opCtx);
-
-                    uassertStatusOK(getStatusFromCommandResult(commitResponse));
-                    if (auto wcErrorElem = commitResponse["writeConcernError"]) {
-                        appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, *result);
-                    }
-                } catch (DBException& e) {
-                    if (e.code() != ErrorCodes::DuplicateKey ||
-                        (e.code() == ErrorCodes::DuplicateKey &&
-                         !e.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id"))) {
-                        e.addContext(documentShardKeyUpdateUtil::kNonDuplicateKeyErrorContext);
-                    };
-
-                    auto txnRouterForAbort = TransactionRouter::get(opCtx);
-                    if (txnRouterForAbort)
-                        txnRouterForAbort.implicitlyAbortTransaction(opCtx, e.toStatus());
-
-                    throw;
+                if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
+                    auto parsedRequest = write_ops::FindAndModifyCommandRequest::parse(
+                        IDLParserErrorContext("ClusterFindAndModify"), cmdObj);
+                    // Strip write concern because this command will be sent as part of a
+                    // transaction and the write concern has already been loaded onto the opCtx and
+                    // will be picked up by the transaction API.
+                    //
+                    // Strip runtime constants because they will be added again when this command is
+                    // recursively sent through the service entry point.
+                    parsedRequest.setWriteConcern(boost::none);
+                    parsedRequest.setLegacyRuntimeConstants(boost::none);
+                    handleWouldChangeOwningShardErrorRetryableWrite(
+                        opCtx, shardId, nss, parsedRequest, result);
+                } else {
+                    _handleWouldChangeOwningShardErrorRetryableWriteLegacy(
+                        opCtx, shardId, shardVersion, dbVersion, nss, cmdObj, result);
                 }
             } else {
                 updateShardKeyValueOnWouldChangeOwningShardError(
@@ -460,6 +477,53 @@ private:
 
         result->appendElementsUnique(
             CommandHelpers::filterCommandReplyForPassthrough(response.data));
+    }
+
+    // TODO SERVER-62375: Remove after 6.0 is released.
+    static void _handleWouldChangeOwningShardErrorRetryableWriteLegacy(
+        OperationContext* opCtx,
+        const ShardId& shardId,
+        const boost::optional<ChunkVersion>& shardVersion,
+        const boost::optional<DatabaseVersion>& dbVersion,
+        const NamespaceString& nss,
+        const BSONObj& cmdObj,
+        BSONObjBuilder* result) {
+        RouterOperationContextSession routerSession(opCtx);
+        try {
+            auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+            readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
+            // Re-run the findAndModify command that will change the shard key value in a
+            // transaction. We call _runCommand recursively, and this second time through
+            // since it will be run as a transaction it will take the other code path to
+            // updateShardKeyValueOnWouldChangeOwningShardError.  We ensure the retried
+            // operation does not include WC inside the transaction by stripping it from the
+            // cmdObj.  The transaction commit will still use the WC, because it uses the WC
+            // from the opCtx (which has been set previously in Strategy).
+            documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
+            _runCommand(
+                opCtx, shardId, shardVersion, dbVersion, nss, stripWriteConcern(cmdObj), result);
+            uassertStatusOK(getStatusFromCommandResult(result->asTempObj()));
+            auto commitResponse =
+                documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(opCtx);
+
+            uassertStatusOK(getStatusFromCommandResult(commitResponse));
+            if (auto wcErrorElem = commitResponse["writeConcernError"]) {
+                appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, *result);
+            }
+        } catch (DBException& e) {
+            if (e.code() != ErrorCodes::DuplicateKey ||
+                (e.code() == ErrorCodes::DuplicateKey &&
+                 !e.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id"))) {
+                e.addContext(documentShardKeyUpdateUtil::kNonDuplicateKeyErrorContext);
+            };
+
+            auto txnRouterForAbort = TransactionRouter::get(opCtx);
+            if (txnRouterForAbort)
+                txnRouterForAbort.implicitlyAbortTransaction(opCtx, e.toStatus());
+
+            throw;
+        }
     }
 
     // Update related command execution metrics.
