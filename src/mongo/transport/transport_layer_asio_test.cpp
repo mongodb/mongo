@@ -41,6 +41,7 @@
 
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/config.h"
+#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
@@ -744,6 +745,181 @@ TEST_F(TransportLayerASIOWithServiceContextTest, ShutdownDuringSSLHandshake) {
 }
 #endif  // _WIN32
 #endif  // MONGO_CONFIG_SSL
+
+#ifdef __linux__
+
+/**
+ * Creates a connection between a client and a server, then runs tests against the `BatonASIO`
+ * associated with the server-side of the connection (i.e., `Client`). The client-side of this
+ * connection is associated with `_connThread`, and the server-side is wrapped inside `_client`.
+ */
+class BatonASIOLinuxTest : public LockerNoopServiceContextTest {
+    // A service entry point that accepts one, and only one, connection.
+    class SingleSessionSEP : public ServiceEntryPoint {
+    public:
+        explicit SingleSessionSEP(Promise<transport::SessionHandle> promise)
+            : _promise(std::move(promise)) {}
+
+        Status start() override {
+            return Status::OK();
+        }
+
+        void appendStats(BSONObjBuilder*) const override {}
+
+        Future<DbResponse> handleRequest(OperationContext*, const Message&) noexcept override {
+            MONGO_UNREACHABLE;
+        }
+
+        void startSession(transport::SessionHandle session) override {
+            _promise.emplaceValue(std::move(session));
+        }
+
+        void endAllSessions(transport::Session::TagMask) override {}
+
+        bool shutdown(Milliseconds) override {
+            return true;
+        }
+
+        size_t numOpenSessions() const override {
+            MONGO_UNREACHABLE;
+        }
+
+    private:
+        Promise<transport::SessionHandle> _promise;
+    };
+
+public:
+    void setUp() override {
+        auto pf = makePromiseFuture<transport::SessionHandle>();
+        auto servCtx = getServiceContext();
+        servCtx->setServiceEntryPoint(std::make_unique<SingleSessionSEP>(std::move(pf.promise)));
+
+        auto tla = makeTLA(servCtx->getServiceEntryPoint());
+        const auto listenerPort = tla->listenerPort();
+        servCtx->setTransportLayer(std::move(tla));
+
+        _connThread = std::make_unique<ConnectionThread>(listenerPort);
+        _client = servCtx->makeClient("NetworkBatonTest", pf.future.get());
+    }
+
+    void tearDown() override {
+        _connThread.reset();
+        getServiceContext()->getTransportLayer()->shutdown();
+    }
+
+    Client& client() {
+        return *_client;
+    }
+
+    ConnectionThread& connection() {
+        return *_connThread;
+    }
+
+private:
+    ServiceContext::UniqueClient _client;
+    std::unique_ptr<ConnectionThread> _connThread;
+};
+
+TEST_F(BatonASIOLinuxTest, CanWait) {
+    auto opCtx = client().makeOperationContext();
+    BatonHandle baton = opCtx->getBaton();  // ensures the baton outlives its opCtx.
+
+    auto netBaton = baton->networking();
+    ASSERT(netBaton);
+    ASSERT_TRUE(netBaton->canWait());
+
+    opCtx.reset();  // detaches the baton, so it's no longer associated with an opCtx.
+    ASSERT_FALSE(netBaton->canWait());
+}
+
+TEST_F(BatonASIOLinuxTest, MarkKillOnClientDisconnect) {
+    auto opCtx = client().makeOperationContext();
+    opCtx->markKillOnClientDisconnect();
+    ASSERT_FALSE(opCtx->isKillPending());
+    connection().wait();
+    connection().close();
+
+    // Once the connection is closed, `sleepFor` is expected to throw this exception.
+    ASSERT_THROWS_CODE(opCtx->sleepFor(Seconds(5)), DBException, ErrorCodes::ClientDisconnect);
+    ASSERT_EQ(opCtx->getKillStatus(), ErrorCodes::ClientDisconnect);
+}
+
+TEST_F(BatonASIOLinuxTest, Schedule) {
+    // Note that the baton runs all scheduled jobs on the main test thread, so it's safe to use
+    // assertions inside tasks scheduled on the baton.
+    auto opCtx = client().makeOperationContext();
+    auto baton = opCtx->getBaton();
+
+    // Schedules a task on the baton, runs `func`, and expects the baton to run the scheduled task
+    // and provide it with the `expected` status.
+    auto runTest = [&](Status expected, std::function<void()> func) {
+        bool pending = true;
+        baton->schedule([&](Status status) {
+            ASSERT_EQ(status, expected);
+            pending = false;
+        });
+        ASSERT_TRUE(pending);
+        func();
+        ASSERT_FALSE(pending);
+    };
+
+    // 1) Baton runs the scheduled task when current thread blocks on `opCtx`.
+    runTest(Status::OK(), [&] { opCtx->sleepFor(Milliseconds(1)); });
+
+    // 2) Baton must run pending tasks on detach.
+    const Status detachedError{ErrorCodes::ShutdownInProgress, "Baton detached"};
+    runTest(detachedError, [&] { opCtx.reset(); });
+
+    // 3) A detached baton immediately runs scheduled tasks.
+    bool pending = true;
+    baton->schedule([&](Status status) {
+        ASSERT_EQ(status, detachedError);
+        pending = false;
+    });
+    ASSERT_FALSE(pending);
+}
+
+TEST_F(BatonASIOLinuxTest, AddAndRemoveSession) {
+    auto opCtx = client().makeOperationContext();
+    auto baton = opCtx->getBaton()->networking();
+
+    auto session = client().session();
+    auto future = baton->addSession(*session, transport::NetworkingBaton::Type::In);
+    ASSERT_TRUE(baton->cancelSession(*session));
+    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(BatonASIOLinuxTest, AddAndRemoveSessionWhileInPoll) {
+    // Attempts to add and remove a session while the baton is polling. This, for example, could
+    // happen on `mongos` while an operation is blocked, waiting for `AsyncDBClient` to create an
+    // egress connection, and then the connection has to be ended for some reason before the baton
+    // returns from polling.
+    auto opCtx = client().makeOperationContext();
+    Notification<bool> cancelSessionResult;
+
+    stdx::thread thread([&] {
+        auto baton = opCtx->getBaton()->networking();
+        auto session = client().session();
+
+        FailPointEnableBlock fp("blockBatonASIOBeforePoll");
+        fp->waitForTimesEntered(1);
+
+        // This thread is an external observer to the baton, so the expected behavior is for
+        // `cancelSession` to happen after `addSession`, and thus it must return `true`.
+        baton->addSession(*session, transport::NetworkingBaton::Type::In).getAsync([](Status) {});
+        cancelSessionResult.set(baton->cancelSession(*session));
+    });
+
+    ScopeGuard joinGuard = [&] { thread.join(); };
+
+    // TODO SERVER-61192 Change the following to `ASSERT_TRUE` once the underlying issue is fixed.
+    ASSERT_FALSE(cancelSessionResult.get(opCtx.get()));
+}
+
+// TODO SERVER-61192 Test setting and canceling timers on the baton.
+// TODO SERVER-61192 Test `run`, `notify`, and `run_until` on `BatonASIO`.
+
+#endif  // __linux__
 
 }  // namespace
 }  // namespace mongo
