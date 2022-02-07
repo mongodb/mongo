@@ -65,7 +65,7 @@ assert.eq(faultInformation.numFacets, 1);
 assert(faultInformation.facets.testObserver);
 
 const kTestObserverFacet = faultInformation.facets.testObserver;
-assert.eq(kTestObserverFacet.duration, faultInformation.duration);
+assert.lte(kTestObserverFacet.duration, faultInformation.duration);
 assert(kTestObserverFacet.description.includes("InternalError: test msg"));
 
 // Check server status after test health observer enabled and failpoint returns success.
