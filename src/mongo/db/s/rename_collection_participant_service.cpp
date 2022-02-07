@@ -265,8 +265,10 @@ SemiFuture<void> RenameParticipantInstance::run(
                 service->promoteRecoverableCriticalSectionToBlockAlsoReads(
                     opCtx, toNss(), reason, ShardingCatalogClient::kLocalWriteConcern);
 
-                // Clear the filtering metadata to safely create new range deletion tasks: the
-                // submission will serialize on the renamed collection's metadata refresh.
+                // Clear the filtering metadata before releasing the critical section (it will be
+                // recovered the next time is accessed) and to safely create new range deletion
+                // tasks (the submission will serialize on the renamed collection's metadata
+                // refresh).
                 clearFilteringMetadata(opCtx, fromNss());
                 clearFilteringMetadata(opCtx, toNss());
 
@@ -321,23 +323,6 @@ SemiFuture<void> RenameParticipantInstance::run(
             [this, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
-
-                // Force the refresh of the catalog cache for both source and destination
-                // collections to purge outdated information.
-                //
-                // (SERVER-58465) Note that we have to wait for the asynchronous tasks submitted to
-                // the background thread of the ShardServerCatalogCacheLoader because those tasks
-                // might conflict with the next refresh if the loader relies on UUID-based
-                // config.cache.chunks.* collections.
-                const auto catalog = Grid::get(opCtx)->catalogCache();
-                uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, fromNss()));
-                CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, fromNss());
-
-                uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, toNss()));
-                CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, toNss());
-
-                repl::ReplClientInfo::forClient(opCtx->getClient())
-                    .setLastOpToSystemLastOpTime(opCtx);
 
                 // Release source/target critical sections
                 const auto reason =
