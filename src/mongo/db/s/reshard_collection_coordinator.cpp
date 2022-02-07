@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/s/reshard_collection_coordinator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -115,6 +117,12 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
+
+                {
+                    AutoGetCollection coll{
+                        opCtx, nss(), MODE_IS, AutoGetCollectionViewMode::kViewsPermitted};
+                    checkCollectionUUIDMismatch(opCtx, *coll, _doc.getCollectionUUID());
+                }
 
                 ConfigsvrReshardCollection configsvrReshardCollection(nss(), _doc.getKey());
                 configsvrReshardCollection.setDbName(nss().db());

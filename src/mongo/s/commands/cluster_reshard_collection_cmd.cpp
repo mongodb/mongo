@@ -67,6 +67,7 @@ public:
                 request().get_presetReshardedChunks());
             reshardCollectionRequest.setZones(request().getZones());
             reshardCollectionRequest.setNumInitialChunks(request().getNumInitialChunks());
+            reshardCollectionRequest.setCollectionUUID(request().getCollectionUUID());
 
             shardsvrReshardCollection.setReshardCollectionRequest(
                 std::move(reshardCollectionRequest));

@@ -68,6 +68,10 @@ commands:
         type: array<ReshardedChunk>
         description: "Mapping of chunk ranges. This is only for testing purposes."
         optional: true
+      collectionUUID:
+        type: uuid
+        description: "The expected UUID of the collection."
+        optional: true
 
   _configsvrReshardCollection:
     command_name: _configsvrReshardCollection

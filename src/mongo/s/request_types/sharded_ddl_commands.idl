@@ -196,6 +196,10 @@ structs:
                     "Mapping of chunk ranges to be used as the initial split output. This is only
                     for testing purposes."
                 optional: true
+            collectionUUID:
+                type: uuid
+                description: "The expected UUID of the collection."
+                optional: true
 
     SetAllowMigrationsRequest:
         description: "Parameters sent for the set allow migrations command"
