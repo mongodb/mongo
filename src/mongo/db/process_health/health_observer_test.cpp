@@ -69,39 +69,49 @@ TEST_F(FaultManagerTest, InitialHealthCheckDoesNotRunIfFeatureFlagNotEnabled) {
 
 TEST_F(FaultManagerTest, Stats) {
     RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
+    resetManager(std::make_unique<FaultManagerConfig>());
     auto faultFacetType = FaultFacetType::kMock1;
-    registerMockHealthObserver(faultFacetType, [] { return Severity::kFailure; });
+    AtomicWord<Severity> mockResult(Severity::kFailure);
+    registerMockHealthObserver(faultFacetType, [&mockResult] { return mockResult.load(); });
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
     auto observer = manager().getHealthObserversTest()[0];
-    manager().healthCheckTest(observer, CancellationToken::uncancelable());
 
-    assertSoon([this] { return static_cast<bool>(manager().currentFault()); });
-    assertSoon([&observer] { return !observer->getStats().currentlyRunningHealthCheck; });
+    // Initial checks should fail; There must have been at least 1 to generate the fault.
+    assertSoon([this, &observer] {
+        return hasFault() && !observer->getStats().currentlyRunningHealthCheck;
+    });
 
-    auto stats = observer->getStats();
+    // Make sure we are still in startup check state.
+    waitForTransitionIntoState(FaultState::kStartupCheck);
+
+    auto initialStats = observer->getStats();
+    LOGV2_DEBUG(6331901, 0, "stats after detecting fault", "stats"_attr = initialStats);
     ASSERT_TRUE(manager().getConfig().isHealthObserverEnabled(observer->getType()));
-    ASSERT_EQ(stats.lastTimeCheckStarted, clockSource().now());
-    ASSERT_EQ(stats.lastTimeCheckCompleted, stats.lastTimeCheckStarted);
-    ASSERT_GTE(stats.completedChecksCount, 1);
-    ASSERT_GTE(stats.completedChecksWithFaultCount, 1);
+    ASSERT_EQ(initialStats.lastTimeCheckStarted, clockSource().now());
+    ASSERT_EQ(initialStats.lastTimeCheckCompleted, initialStats.lastTimeCheckStarted);
+    ASSERT_GTE(initialStats.completedChecksCount, 1);
+    ASSERT_GTE(initialStats.completedChecksWithFaultCount, 1);
 
     // To complete initial health check.
-    manager().acceptTest(HealthCheckStatus(faultFacetType));
+    mockResult.store(Severity::kOk);
 
-    advanceTime(Milliseconds(200));
-    auto prevStats = stats;
-    do {
-        manager().healthCheckTest(observer, CancellationToken::uncancelable());
-        sleepmillis(1);
-        observer = manager().getHealthObserversTest()[0];
-        stats = observer->getStats();
-    } while (stats.completedChecksCount <= prevStats.completedChecksCount);
+    waitForTransitionIntoState(FaultState::kOk);
+    auto okStats = observer->getStats();
+    LOGV2_DEBUG(6331902, 0, "stats after ok state", "stats"_attr = okStats);
+    advanceTime(Milliseconds(100));
 
-    ASSERT_GT(stats.lastTimeCheckStarted, prevStats.lastTimeCheckStarted);
-    ASSERT_GT(stats.lastTimeCheckCompleted, prevStats.lastTimeCheckCompleted);
-    ASSERT_GTE(stats.completedChecksCount, 2);
-    ASSERT_GTE(stats.completedChecksWithFaultCount, 2);
+    assertSoon([observer, okStats]() {
+        auto stats = observer->getStats();
+        return stats.completedChecksCount > okStats.completedChecksCount;
+    });
+
+    auto finalStats = observer->getStats();
+    LOGV2_DEBUG(6331903, 0, "stats after final state", "stats"_attr = finalStats);
+    ASSERT_GT(finalStats.lastTimeCheckStarted, okStats.lastTimeCheckStarted);
+    ASSERT_GT(finalStats.lastTimeCheckCompleted, okStats.lastTimeCheckCompleted);
+    ASSERT_GTE(finalStats.completedChecksCount, okStats.completedChecksCount);
+    ASSERT_GTE(finalStats.completedChecksWithFaultCount, okStats.completedChecksWithFaultCount);
 }
 
 TEST_F(FaultManagerTest, ProgressMonitorCheck) {

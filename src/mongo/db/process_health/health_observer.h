@@ -52,6 +52,16 @@ struct HealthObserverLivenessStats {
     // Incremented when check completed with fault.
     // This doesn't take into account critical vs non-critical.
     int completedChecksWithFaultCount = 0;
+
+    BSONObj toBSON() const {
+        BSONObjBuilder builder;
+        builder.append("currentlyRunningHealthCheck", currentlyRunningHealthCheck);
+        builder.append("lastTimeCheckStarted", lastTimeCheckStarted);
+        builder.append("lastTimeCheckCompleted", lastTimeCheckCompleted);
+        builder.append("completedChecksCount", completedChecksCount);
+        builder.append("completedChecksWithFaultCount", completedChecksWithFaultCount);
+        return builder.obj();
+    }
 };
 
 /**
