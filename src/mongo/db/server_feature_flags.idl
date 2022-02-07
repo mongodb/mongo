@@ -41,3 +41,7 @@ feature_flags:
             require tenantID to be a part of TenantNamespace and TenantDatabase.
         cpp_varname: gFeatureFlagRequireTenantID
         default: false
+    featureFlagUserWriteBlocking:
+        description: "Enable user write blocking for C2C replication"
+        cpp_varname: gFeatureFlagUserWriteBlocking
+        default: false
