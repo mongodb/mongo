@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/config.h"
+#include "mongo/db/exec/sbe/stages/collection_helpers.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 
 namespace mongo {
@@ -42,8 +43,9 @@ class ColumnScanStage final : public PlanStage {
 public:
     ColumnScanStage(UUID collectionUuid,
                     StringData columnIndexName,
-                    std::vector<value::SlotId> fieldSlots,
+                    value::SlotVector fieldSlots,
                     std::vector<std::string> paths,
+                    boost::optional<value::SlotId> recordSlot,
                     PlanYieldPolicy* yieldPolicy,
                     PlanNodeId nodeId);
 
@@ -72,11 +74,25 @@ protected:
 private:
     const UUID _collUuid;
     const std::string _columnIndexName;
-    const std::vector<value::SlotId> _fieldSlots;
+    const value::SlotVector _fieldSlots;
     const std::vector<std::string> _paths;
+    const boost::optional<value::SlotId> _recordSlot;
 
     std::vector<value::OwnedValueAccessor> _outputFields;
     value::SlotAccessorMap _outputFieldsMap;
+    std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
+
+    // These members are default constructed to boost::none and are initialized when 'prepare()'
+    // is called. Once they are set, they are never modified again.
+    boost::optional<NamespaceString> _collName;
+    boost::optional<uint64_t> _catalogEpoch;
+
+    CollectionPtr _coll;
+
+    std::unique_ptr<SeekableRecordCursor> _cursor;
+
+    bool _open{false};
+    bool _firstGetNext{false};
 
     // If provided, used during a trial run to accumulate certain execution stats. Once the trial
     // run is complete, this pointer is reset to nullptr.

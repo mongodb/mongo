@@ -175,6 +175,7 @@ private:
     void walkChildren(AstQuery& ast);
     void walkIdent(AstQuery& ast);
     void walkIdentList(AstQuery& ast);
+    void walkStringList(AstQuery& ast);
     void walkIdentWithRename(AstQuery& ast);
     void walkIdentListWithRename(AstQuery& ast);
     void walkIxKeyWithRename(AstQuery& ast);
@@ -202,6 +203,7 @@ private:
     void walkSeek(AstQuery& ast);
     void walkIndexScan(AstQuery& ast);
     void walkIndexSeek(AstQuery& ast);
+    void walkColumnScan(AstQuery& ast);
     void walkProject(AstQuery& ast);
     void walkFilter(AstQuery& ast);
     void walkCFilter(AstQuery& ast);

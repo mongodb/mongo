@@ -36,6 +36,7 @@
 
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
+#include "mongo/db/exec/sbe/stages/column_scan.h"
 #include "mongo/db/exec/sbe/stages/exchange.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
@@ -70,7 +71,7 @@ static constexpr auto kSyntax = R"(
                 OPERATOR <- PLAN_NODE_ID? (SCAN / PSCAN / SEEK / IXSCAN / IXSEEK / PROJECT / FILTER / CFILTER /
                             MKOBJ / MKBSON / GROUP / HJOIN / NLJOIN / LIMIT / SKIP / COSCAN / TRAVERSE /
                             EXCHANGE / SORT / UNWIND / UNION / BRANCH / SIMPLE_PROJ / PFO /
-                            ESPOOL / LSPOOL / CSPOOL / SSPOOL / UNIQUE / SORTED_MERGE)
+                            ESPOOL / LSPOOL / CSPOOL / SSPOOL / UNIQUE / SORTED_MERGE / COLUMNSCAN)
 
                 FORWARD_FLAG <- <'true'> / <'false'>
 
@@ -125,6 +126,12 @@ static constexpr auto kSyntax = R"(
                                    IDENT # collection name
                                    IDENT # index name to scan
                                    FORWARD_FLAG # forward seek or not
+
+                COLUMNSCAN <- 'columnscan' STRING_LIST # paths
+                                           IDENT_LIST # output variables
+                                           IDENT # output record
+                                           IDENT # collection name
+                                           IDENT # index name to scan
 
                 PROJECT <- 'project' PROJECT_LIST OPERATOR
                 SIMPLE_PROJ <- '$p' IDENT # output
@@ -365,6 +372,12 @@ void Parser::walkIdentList(AstQuery& ast) {
     walkChildren(ast);
     for (auto& node : ast.nodes) {
         ast.identifiers.emplace_back(std::move(node->identifier));
+    }
+}
+
+void Parser::walkStringList(AstQuery& ast) {
+    for (auto& node : ast.nodes) {
+        ast.identifiers.emplace_back(std::move(node->token));
     }
 }
 
@@ -935,6 +948,24 @@ void Parser::walkIndexSeek(AstQuery& ast) {
                                       lookupSlot(ast.nodes[1]->identifier),
                                       nullptr,
                                       getCurrentPlanNodeId());
+}
+
+void Parser::walkColumnScan(AstQuery& ast) {
+    walkChildren(ast);
+
+    auto paths = ast.nodes[0]->identifiers;
+    auto outputs = lookupSlots(ast.nodes[1]->identifiers);
+    auto record = lookupSlot(ast.nodes[2]->identifier);
+    auto collName = ast.nodes[3]->identifier;
+    auto indexName = ast.nodes[4]->identifier;
+
+    ast.stage = makeS<ColumnScanStage>(getCollectionUuid(collName),
+                                       indexName,
+                                       std::move(outputs),
+                                       std::move(paths),
+                                       record,
+                                       nullptr,
+                                       getCurrentPlanNodeId());
 }
 
 void Parser::walkProject(AstQuery& ast) {
@@ -1703,6 +1734,9 @@ void Parser::walk(AstQuery& ast) {
         case "IXSEEK"_:
             walkIndexSeek(ast);
             break;
+        case "COLUMNSCAN"_:
+            walkColumnScan(ast);
+            break;
         case "PROJECT"_:
             walkProject(ast);
             break;
@@ -1769,6 +1803,9 @@ void Parser::walk(AstQuery& ast) {
             break;
         case "IDENT_LIST"_:
             walkIdentList(ast);
+            break;
+        case "STRING_LIST"_:
+            walkStringList(ast);
             break;
         case "IDENT_WITH_RENAME"_:
             walkIdentWithRename(ast);
