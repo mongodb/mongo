@@ -10,7 +10,7 @@
 function waitFailedToStart(pid, exitCode) {
     assert.soon(function() {
         return !checkProgram(pid).alive;
-    }, `Failed to wait for ${pid} to die`, 30 * 1000);
+    }, `Failed to wait for ${pid} to die`, 3 * 60 * 1000);
 
     assert.eq(exitCode,
               checkProgram(pid).exitCode,
