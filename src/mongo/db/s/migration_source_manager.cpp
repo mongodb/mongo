@@ -411,7 +411,7 @@ void MigrationSourceManager::commitChunkOnRecipient() {
     invariant(_state == kCriticalSection);
     ScopeGuard scopedGuard([&] {
         _cleanupOnError();
-        migrationutil::recoverMigrationUntilSuccess(_opCtx, _args.getNss());
+        migrationutil::asyncRecoverMigrationUntilSuccessOrStepDown(_opCtx, _args.getNss());
     });
 
     // Tell the recipient shard to fetch the latest changes.
@@ -436,7 +436,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     invariant(_state == kCloneCompleted);
     ScopeGuard scopedGuard([&] {
         _cleanupOnError();
-        migrationutil::recoverMigrationUntilSuccess(_opCtx, _args.getNss());
+        migrationutil::asyncRecoverMigrationUntilSuccessOrStepDown(_opCtx, _args.getNss());
     });
 
     // If we have chunks left on the FROM shard, bump the version of one of them as well. This will
@@ -496,7 +496,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
         }
         scopedGuard.dismiss();
         _cleanup(false);
-        migrationutil::recoverMigrationUntilSuccess(_opCtx, _args.getNss());
+        migrationutil::asyncRecoverMigrationUntilSuccessOrStepDown(_opCtx, _args.getNss());
         uassertStatusOK(migrationCommitStatus);
     }
 

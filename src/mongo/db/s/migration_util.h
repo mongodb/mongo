@@ -263,9 +263,10 @@ void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx);
 void drainMigrationsPendingRecovery(OperationContext* opCtx);
 
 /**
- * Recovers the migration until it succeeds or the node steps down.
+ * Submits an asynchronous task to recover the migration until it succeeds or the node steps down.
  */
-void recoverMigrationUntilSuccess(OperationContext* opCtx, const NamespaceString& nss) noexcept;
+void asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* opCtx,
+                                                 const NamespaceString& nss) noexcept;
 
 }  // namespace migrationutil
 }  // namespace mongo

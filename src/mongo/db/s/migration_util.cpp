@@ -243,6 +243,8 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
 }
 
 void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const NamespaceString& nss) {
+    hangBeforeFilteringMetadataRefresh.pauseWhileSet();
+
     retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
         opCtx, "refreshFilteringMetadataUntilSuccess", [&nss](OperationContext* newOpCtx) {
             hangInRefreshFilteringMetadataUntilSuccessInterruptible.pauseWhileSet(newOpCtx);
@@ -905,26 +907,7 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
                           CollectionShardingRuntime::get(opCtx, nss)->clearFilteringMetadata(opCtx);
                       }
 
-                      ExecutorFuture<void>(getMigrationUtilExecutor(opCtx->getServiceContext()))
-                          .then([serviceContext = opCtx->getServiceContext(), nss] {
-                              ThreadClient tc("TriggerMigrationRecovery", serviceContext);
-                              {
-                                  stdx::lock_guard<Client> lk(*tc.get());
-                                  tc->setSystemOperationKillableByStepdown(lk);
-                              }
-
-                              auto opCtx = tc->makeOperationContext();
-
-                              hangBeforeFilteringMetadataRefresh.pauseWhileSet();
-
-                              recoverMigrationUntilSuccess(opCtx.get(), nss);
-                          })
-                          .onError([](const Status& status) {
-                              LOGV2_WARNING(4798512,
-                                            "Error on deferred shardVersion recovery execution",
-                                            "error"_attr = redact(status));
-                          })
-                          .getAsync([](auto) {});
+                      asyncRecoverMigrationUntilSuccessOrStepDown(opCtx, nss);
 
                       return true;
                   });
@@ -1195,24 +1178,29 @@ void drainMigrationsPendingRecovery(OperationContext* opCtx) {
     }
 }
 
-void recoverMigrationUntilSuccess(OperationContext* opCtx, const NamespaceString& nss) noexcept {
-    try {
-        {
-            AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-            auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
-            if (csr->getCurrentMetadataIfKnown()) {
-                return;
+void asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* opCtx,
+                                                 const NamespaceString& nss) noexcept {
+    ExecutorFuture<void>{Grid::get(opCtx)->getExecutorPool()->getFixedExecutor()}
+        .then([svcCtx{opCtx->getServiceContext()}, nss] {
+            ThreadClient tc{"MigrationRecovery", svcCtx};
+            {
+                stdx::lock_guard<Client> lk{*tc.get()};
+                tc->setSystemOperationKillableByStepdown(lk);
             }
-        }
+            auto uniqueOpCtx{tc->makeOperationContext()};
+            auto opCtx{uniqueOpCtx.get()};
 
-        refreshFilteringMetadataUntilSuccess(opCtx, nss);
-    } catch (const DBException& ex) {
-        LOGV2_DEBUG(6228200,
-                    2,
-                    "Interrupted migration recovery",
-                    "namespace"_attr = nss,
-                    "error"_attr = redact(ex));
-    }
+            try {
+                refreshFilteringMetadataUntilSuccess(opCtx, nss);
+            } catch (const DBException& ex) {
+                // This is expected in the event of a stepdown.
+                LOGV2(6316100,
+                      "Interrupted deferred migration recovery",
+                      "namespace"_attr = nss,
+                      "error"_attr = redact(ex));
+            }
+        })
+        .getAsync([](auto) {});
 }
 
 }  // namespace migrationutil

@@ -7,6 +7,16 @@
 (function() {
 'use strict';
 
+function waitAndGetShardVersion(conn, collNs) {
+    var shardVersion = undefined;
+    assert.soon(() => {
+        shardVersion = conn.adminCommand({getShardVersion: collNs}).global;
+        return !(typeof shardVersion == 'string' && shardVersion == 'UNKNOWN');
+    });
+
+    return shardVersion;
+}
+
 var st = new ShardingTest({shards: 2, mongos: 1});
 
 var mongos = st.s0;
@@ -30,12 +40,12 @@ var newVersion = null;
 assert.commandWorked(st.shard0.getDB("admin").runCommand(
     {configureFailPoint: 'failMigrationCommit', mode: 'alwaysOn'}));
 
-oldVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
+oldVersion = waitAndGetShardVersion(st.shard0, coll.toString());
 
 assert.commandFailed(
     admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName}));
 
-newVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
+newVersion = waitAndGetShardVersion(st.shard0, coll.toString());
 
 assert.eq(oldVersion.t,
           newVersion.t,
@@ -55,24 +65,24 @@ assert.commandWorked(st.shard0.getDB("admin").runCommand(
 
 // Run a migration where there will still be chunks in the collection remaining on the shard
 // afterwards. This will cause the collection's shardVersion to be bumped higher.
-oldVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
+oldVersion = waitAndGetShardVersion(st.shard0, coll.toString());
 
 assert.commandWorked(
     admin.runCommand({moveChunk: coll + "", find: {_id: 1}, to: st.shard1.shardName}));
 
-newVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
+newVersion = waitAndGetShardVersion(st.shard0, coll.toString());
 
 assert.lt(oldVersion.t, newVersion.t, "The major value in the shard version should have increased");
 assert.eq(1, newVersion.i, "The minor value in the shard version should be 1");
 
 // Run a migration to move off the shard's last chunk in the collection. The collection's
 // shardVersion will be reset.
-oldVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
+oldVersion = waitAndGetShardVersion(st.shard0, coll.toString());
 
 assert.commandWorked(
     admin.runCommand({moveChunk: coll + "", find: {_id: -1}, to: st.shard1.shardName}));
 
-newVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
+newVersion = waitAndGetShardVersion(st.shard0, coll.toString());
 
 assert.gt(oldVersion.t,
           newVersion.t,
