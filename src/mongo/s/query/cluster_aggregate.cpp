@@ -242,10 +242,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                           << AggregateCommandRequest::kFromMongosFieldName
                           << "] cannot be set to 'true' when sent to mongos",
             !request.getNeedsMerge() && !request.getFromMongos());
-    uassert(4928902,
-            str::stream() << AggregateCommandRequest::kCollectionUUIDFieldName
-                          << " is not supported on a mongos",
-            !request.getCollectionUUID());
 
     const auto isSharded = [](OperationContext* opCtx, const NamespaceString& nss) {
         const auto resolvedNsCM = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
@@ -256,6 +252,12 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         opCtx, isSharded, request.getExplain(), serverGlobalParams.enableMajorityReadConcern);
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
     auto involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
+
+    uassert(6256300,
+            str::stream() << "On mongos, " << AggregateCommandRequest::kCollectionUUIDFieldName
+                          << " is only supported for $collStats and $indexStats aggregation.",
+            !request.getCollectionUUID() || liteParsedPipeline.startsWithCollStats() ||
+                liteParsedPipeline.startsWithIndexStats());
 
     // If the routing table is valid, we obtain a reference to it. If the table is not valid, then
     // either the database does not exist, or there are no shards in the cluster. In the latter

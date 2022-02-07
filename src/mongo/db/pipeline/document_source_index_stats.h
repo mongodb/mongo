@@ -52,6 +52,10 @@ public:
         explicit LiteParsed(std::string parseTimeName, NamespaceString nss)
             : LiteParsedDocumentSource(std::move(parseTimeName)), _nss(std::move(nss)) {}
 
+        bool isIndexStats() const final {
+            return true;
+        }
+
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();
         }

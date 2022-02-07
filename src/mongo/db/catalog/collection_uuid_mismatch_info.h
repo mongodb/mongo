@@ -46,6 +46,10 @@ public:
 
     void serialize(BSONObjBuilder* builder) const override;
 
+    const auto& actualNamespace() const {
+        return _actualNamespace;
+    }
+
 private:
     UUID _collectionUUID;
     NamespaceString _actualNamespace;

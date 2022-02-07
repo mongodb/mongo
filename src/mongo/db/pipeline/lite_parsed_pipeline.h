@@ -114,6 +114,13 @@ public:
     }
 
     /**
+     * Returns true if the pipeline begins with a $indexStats stage.
+     */
+    bool startsWithIndexStats() const {
+        return !_stageSpecs.empty() && _stageSpecs.front()->isIndexStats();
+    }
+
+    /**
      * Returns true if the pipeline has a $changeStream stage.
      */
     bool hasChangeStream() const {

@@ -21,12 +21,12 @@ const validateErrorResponse = function(res, collectionUUID, actualNamespace) {
     assert.eq(res.actualNamespace, actualNamespace);
 };
 
+// On mongos, collectionUUID is only supported for $collStats and $indexStats aggregations.
 if (FixtureHelpers.isMongos(db)) {
-    // TODO (SERVER-62563): Add the mongos support.
     assert.commandFailedWithCode(
         testDB.runCommand(
             {aggregate: 1, collectionUUID: UUID(), pipeline: [{$match: {}}], cursor: {}}),
-        4928902);
+        6256300);
     return;
 }
 

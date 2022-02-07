@@ -38,6 +38,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/kill_cursors_gen.h"
@@ -107,6 +108,12 @@ private:
                                 std::shared_ptr<executor::TaskExecutor> executor,
                                 OperationKey opKey,
                                 std::set<HostAndPort> remotes) noexcept;
+
+    /**
+     * Favors the status with 'CollectionUUIDMismatch' error to be saved in '_maybeFailure' to be
+     * returned to caller.
+     */
+    void _favorCollectionUUIDMismatchError(Status newError) noexcept;
 
     OperationContext* const _opCtx;
     const std::shared_ptr<executor::TaskExecutor> _executor;
@@ -231,12 +238,33 @@ void CursorEstablisher::checkForFailedRequests() {
     uassertStatusOK(*_maybeFailure);
 }
 
+void CursorEstablisher::_favorCollectionUUIDMismatchError(Status newError) noexcept {
+    invariant(!newError.isOK());
+    invariant(!_maybeFailure->isOK());
+
+    if (newError.code() != ErrorCodes::CollectionUUIDMismatch) {
+        return;
+    }
+
+    if (_maybeFailure->code() != ErrorCodes::CollectionUUIDMismatch) {
+        _maybeFailure = std::move(newError);
+        return;
+    }
+
+    // Favor 'CollectionUUIDMismatchError' that has a non empty 'actualNamespace'.
+    auto errorInfo = _maybeFailure->extraInfo<CollectionUUIDMismatchInfo>();
+    invariant(errorInfo);
+    if (errorInfo->actualNamespace().ns().empty()) {
+        _maybeFailure = std::move(newError);
+    }
+}
+
 void CursorEstablisher::_handleFailure(const AsyncRequestsSender::Response& response,
                                        Status status) noexcept {
     LOGV2_DEBUG(
         4674000, 3, "Experienced a failure while establishing cursors", "error"_attr = status);
     if (_maybeFailure) {
-        // If we've already failed, just log and move on.
+        _favorCollectionUUIDMismatchError(std::move(status));
         return;
     }
 

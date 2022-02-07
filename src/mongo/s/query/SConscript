@@ -84,6 +84,9 @@ env.Library(
         "$BUILD_DIR/mongo/s/client/sharding_client",
         "$BUILD_DIR/mongo/s/sharding_router_api",
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
+    ]
 )
 
 env.Library(

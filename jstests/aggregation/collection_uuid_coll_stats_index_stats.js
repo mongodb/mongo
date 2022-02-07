@@ -5,13 +5,6 @@
 (function() {
 'use strict';
 
-load("jstests/libs/fixture_helpers.js");  // For 'isMongos'
-
-if (FixtureHelpers.isMongos(db)) {
-    // TODO (SERVER-62563): Add the mongos test coverage.
-    return;
-}
-
 const validateErrorResponse = function(res, collectionUUID, actualNamespace) {
     assert.eq(res.collectionUUID, collectionUUID);
     assert.eq(res.actualNamespace, actualNamespace);
@@ -59,9 +52,11 @@ const testCommand = function(cmd, cmdObj) {
     validateErrorResponse(res, uuid, coll.getFullName());
 
     jsTestLog("The command '" + cmd + "' succeeds on view when no UUID is provided.");
-    const view = testDB['view'];
-    assert.commandWorked(testDB.createView(view.getName(), coll.getName(), []));
-    cmdObj[cmd] = view.getName();
+    const viewName = "view";
+    assert.commandWorked(testDB.runCommand(
+        {create: viewName, viewOn: coll.getName(), pipeline: [], writeConcern: {w: "majority"}}));
+
+    cmdObj[cmd] = viewName;
     delete cmdObj.collectionUUID;
     assert.commandWorked(testDB.runCommand(cmdObj));
 
@@ -72,13 +67,14 @@ const testCommand = function(cmd, cmdObj) {
     res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
     validateErrorResponse(res, uuid, coll.getFullName());
+    assert.commandWorked(testDB.runCommand({drop: viewName, writeConcern: {w: "majority"}}));
 
     jsTestLog("The command '" + cmd +
               "' succeeds on timeseries collection when no UUID is provided.");
-    const tsColl = testDB["ts_coll"];
-    assert.commandWorked(
-        testDB.createCollection(tsColl.getName(), {timeseries: {timeField: 'time'}}));
-    cmdObj[cmd] = tsColl.getName();
+    const tsCollName = "ts_coll";
+    assert.commandWorked(testDB.runCommand(
+        {create: tsCollName, timeseries: {timeField: 'time'}, writeConcern: {w: "majority"}}));
+    cmdObj[cmd] = tsCollName;
     delete cmdObj.collectionUUID;
     assert.commandWorked(testDB.runCommand(cmdObj));
 
@@ -89,6 +85,7 @@ const testCommand = function(cmd, cmdObj) {
     res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
     validateErrorResponse(res, uuid, coll.getFullName());
+    assert.commandWorked(testDB.runCommand({drop: tsCollName, writeConcern: {w: "majority"}}));
 };
 
 testCommand("aggregate", {aggregate: "", pipeline: [{$indexStats: {}}], cursor: {}});

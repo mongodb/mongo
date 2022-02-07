@@ -157,6 +157,13 @@ public:
     }
 
     /**
+     * Returns true if this is a $indexStats stage.
+     */
+    virtual bool isIndexStats() const {
+        return false;
+    }
+
+    /**
      * Returns true if this is a $changeStream stage.
      */
     virtual bool isChangeStream() const {
