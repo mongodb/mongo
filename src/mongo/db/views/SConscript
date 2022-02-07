@@ -36,6 +36,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/audit',
+        '$BUILD_DIR/mongo/db/multitenancy',
     ]
 )
 
