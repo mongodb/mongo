@@ -146,13 +146,10 @@ res = assert.commandWorked(testDB.runCommand({
 foreignCollection.drop();
 getMoreCollName = res.cursor.ns.substr(res.cursor.ns.indexOf('.') + 1);
 res = testDB.runCommand({getMore: res.cursor.id, collection: getMoreCollName});
-assert.commandWorked(res,
-                     'expected getMore to succeed despite the foreign collection being dropped');
-res.cursor.nextBatch.forEach(function(aggResult) {
-    assert.eq(aggResult.results,
-              [],
-              'expected results of $lookup into non-existent collection to be empty');
-});
+assert.commandFailedWithCode(
+    res,
+    ErrorCodes.NamespaceNotFound,
+    'expected getMore to fail when the foreign collection has been dropped');
 
 // Make sure the cursors were cleaned up.
 assertNoOpenCursorsOnSourceCollection();
@@ -217,9 +214,10 @@ res = assert.commandWorked(testDB.runCommand({
 foreignCollection.drop();
 getMoreCollName = res.cursor.ns.substr(res.cursor.ns.indexOf('.') + 1);
 res = testDB.runCommand({getMore: res.cursor.id, collection: getMoreCollName});
-assert.commandWorked(res,
-                     'expected getMore to succeed despite the foreign collection being dropped');
-
+assert.commandFailedWithCode(
+    res,
+    ErrorCodes.NamespaceNotFound,
+    'expected getMore to fail when the foreign collection has been dropped');
 // Make sure the cursors were cleaned up.
 assertNoOpenCursorsOnSourceCollection();
 
@@ -248,8 +246,10 @@ res = assert.commandWorked(testDB.runCommand({
 foreignCollection.drop();
 getMoreCollName = res.cursor.ns.substr(res.cursor.ns.indexOf('.') + 1);
 res = testDB.runCommand({getMore: res.cursor.id, collection: getMoreCollName});
-assert.commandWorked(res,
-                     'expected getMore to succeed despite the foreign collection being dropped');
+assert.commandFailedWithCode(
+    res,
+    ErrorCodes.NamespaceNotFound,
+    'expected getMore to fail when the foreign collection has been dropped');
 
 // Make sure the cursors were cleaned up.
 assertNoOpenCursorsOnSourceCollection();
