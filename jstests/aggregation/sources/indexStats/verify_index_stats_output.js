@@ -40,9 +40,10 @@ const indexName = "testIndex";
 
 // Enable 'hangAfterStartingIndexBuild' failpoint on each of the primaries. This will make index
 // building process infinite.
-const failPoints = FixtureHelpers.mapOnEachPrimary({
+const failPoints = FixtureHelpers.mapOnEachShardNode({
     db: db.getSiblingDB("admin"),
-    func: (db) => configureFailPoint(db, "hangAfterStartingIndexBuild")
+    func: (db) => configureFailPoint(db, "hangAfterStartingIndexBuild"),
+    primaryNodeOnly: true,
 });
 
 const join = startParallelShell(() => {

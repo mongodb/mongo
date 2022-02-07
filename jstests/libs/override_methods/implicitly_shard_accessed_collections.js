@@ -136,12 +136,26 @@ DB.prototype.createCollection = function() {
         return createCollResult;
     }
 
-    const parameterResults = FixtureHelpers.runCommandOnEachPrimary({
-        db: this.getSiblingDB('admin'),
-        cmdObj: {getParameter: 1, featureFlagShardedTimeSeries: 1}
-    });
-    const isTimeseriesShardingEnabled =
-        parameterResults.every(result => result.ok && result.featureFlagShardedTimeSeries.value);
+    // We check feature flags on both primary and secondaries in case a step down happens after this
+    // check.
+    const featureResults = FixtureHelpers
+                               .runCommandOnAllShards({
+                                   db: this.getSiblingDB('admin'),
+                                   cmdObj: {getParameter: 1, featureFlagShardedTimeSeries: 1}
+                               })
+                               .map(result => assert.commandWorked(result));
+
+    // The feature can only be used if the version associated with the feature is greater than or
+    // equal to the FCV version. The getParameter does not consider the FCV value when checking for
+    // whether the feature flag is enabled. So we run an additional getParameter command to fetch
+    // the FCV state.
+    const fcvResult =
+        assert.commandWorked(FixtureHelpers.getPrimaryForNodeHostingDatabase(this).adminCommand(
+            {getParameter: 1, featureCompatibilityVersion: 1}));
+    const isTimeseriesShardingEnabled = featureResults.every(
+        result => result.featureFlagShardedTimeSeries.value &&
+            MongoRunner.compareBinVersions(fcvResult.featureCompatibilityVersion.version,
+                                           result.featureFlagShardedTimeSeries.version) >= 0);
     if (!isTimeseriesShardingEnabled) {
         return createCollResult;
     }
