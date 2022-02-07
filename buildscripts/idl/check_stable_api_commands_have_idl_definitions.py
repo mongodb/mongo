@@ -24,7 +24,7 @@
 # delete this exception statement from your version. If you delete this
 # exception statement from all source files in the program, then also delete
 # it in the license file.
-"""Check that mongod's and mongos's Versioned API commands are defined in IDL.
+"""Check that mongod's and mongos's Stable API commands are defined in IDL.
 
 Call listCommands on mongod and mongos to assert they have the same set of commands in the given API
 version, and assert all these commands are defined in IDL.

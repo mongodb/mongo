@@ -7,7 +7,7 @@ set -o errexit
 set -o verbose
 activate_venv
 
-$python buildscripts/idl/check_versioned_api_commands_have_idl_definitions.py -v --include src --include src/mongo/db/modules/enterprise/src --installDir dist-test/bin 1
+$python buildscripts/idl/check_stable_api_commands_have_idl_definitions.py -v --include src --include src/mongo/db/modules/enterprise/src --installDir dist-test/bin 1
 $python buildscripts/idl/checkout_idl_files_from_past_releases.py -v idls
 find idls -maxdepth 1 -mindepth 1 -type d | while read dir; do
   echo "Performing idl check compatibility with release: $dir:"

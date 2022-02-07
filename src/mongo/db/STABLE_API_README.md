@@ -1,4 +1,4 @@
-# MongoDB Versioned API
+# MongoDB Stable API
 
 The MongoDB API is the user-visible behavior of all commands, including their parameters and reply
 fields. An "API version" is a subset of the API for which we make an especially strong promise: For
@@ -84,7 +84,7 @@ This also applies to any `unstable` fields. This is to prevent unexpected errors
 a field from `unstable` to `stable`. By intentionally opting in, we assume the implementer
 understands the implications and has valid reasons to use `any`.
 
-## Versioned API implementation
+## Stable API implementation
 
 All `Command` subclasses implement `apiVersions()`, which returns the set of API versions the
 command is part of. By default, a command is not included in any API version, meaning it has no

@@ -83,11 +83,11 @@ configs:
     arg_vartype: String
     cpp_varname: shellGlobalParams.apiVersion
   "apiStrict":
-    description: "disable all features not included in the MongoDB Versioned API"
+    description: "disable all features not included in the MongoDB Stable API"
     arg_vartype: Switch
     cpp_varname: shellGlobalParams.apiStrict
   "apiDeprecationErrors":
-    description: "disable all features deprecated in the MongoDB Versioned API"
+    description: "disable all features deprecated in the MongoDB Stable API"
     arg_vartype: Switch
     cpp_varname: shellGlobalParams.apiDeprecationErrors
   "objcheck":

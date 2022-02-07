@@ -1,5 +1,5 @@
 /**
- * Test the shell's --apiVersion and other options related to the MongoDB Versioned API, and
+ * Test the shell's --apiVersion and other options related to the MongoDB Stable API, and
  * test passing API parameters to the Mongo() constructor.
  *
  * @tags: [

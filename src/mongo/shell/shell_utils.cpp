@@ -577,7 +577,7 @@ ConnectionRegistry::ConnectionRegistry() = default;
 void ConnectionRegistry::registerConnection(DBClientBase& client, StringData uri) {
     BSONObj info;
     BSONObj command;
-    // If apiStrict is set override it, whatsmyuri is not in the Versioned API.
+    // If apiStrict is set override it, whatsmyuri is not in the Stable API.
     if (client.getApiParameters().getStrict()) {
         command = BSON("whatsmyuri" << 1 << "apiStrict" << false);
     } else {

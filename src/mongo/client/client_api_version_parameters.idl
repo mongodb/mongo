@@ -37,7 +37,7 @@ structs:
   # is like MongoClient(uri, api={version: "1", strict: true, deprecationErrors: true}).
 
   ClientAPIVersionParameters:
-    description: "Parser for Versioned API parameters passed to 'new Mongo()' in the mongo shell"
+    description: "Parser for Stable API parameters passed to 'new Mongo()' in the mongo shell"
     strict: true
     fields:
       version:
