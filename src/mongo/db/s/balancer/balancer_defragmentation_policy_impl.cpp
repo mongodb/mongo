@@ -91,7 +91,7 @@ ZoneInfo getCollectionZones(OperationContext* opCtx, const CollectionType& coll)
 
 bool isRetriableForDefragmentation(const Status& error) {
     return (ErrorCodes::isA<ErrorCategory::RetriableError>(error) ||
-            error == ErrorCodes::StaleShardVersion || error == ErrorCodes::StaleConfig);
+            error == ErrorCodes::StaleConfig);
 }
 
 void handleActionResult(OperationContext* opCtx,
@@ -107,7 +107,7 @@ void handleActionResult(OperationContext* opCtx,
         return;
     }
 
-    if (status.isA<ErrorCategory::StaleShardVersionError>()) {
+    if (status == ErrorCodes::StaleConfig) {
         if (auto staleInfo = status.extraInfo<StaleConfigInfo>()) {
             Grid::get(opCtx)
                 ->catalogCache()
@@ -1668,7 +1668,7 @@ std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transi
         }
         afterBuildingNextDefragmentationPhase.pauseWhileSet();
         LOGV2(6172702,
-              "Collection defragmentation transitioning to new phase",
+              "Collection defragmentation transitioned to new phase",
               "namespace"_attr = coll.getNss(),
               "phase"_attr = nextPhaseObject
                   ? DefragmentationPhase_serializer(nextPhaseObject->getType())
