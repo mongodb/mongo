@@ -96,7 +96,7 @@ public:
 
     boost::optional<ReadPreferenceSetting> getReadPreference() const final;
 
-    boost::optional<ReadConcernArgs> getReadConcern() const final;
+    boost::optional<repl::ReadConcernArgs> getReadConcern() const final;
 
     Date_t getCreatedDate() const final;
 

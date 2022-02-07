@@ -35,22 +35,22 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_count.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/sharding_ddl_coordinator.h"
-#include "mongo/logv2/log.h"
-
 #include "mongo/db/s/collmod_coordinator.h"
 #include "mongo/db/s/create_collection_coordinator.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/drop_database_coordinator.h"
 #include "mongo/db/s/move_primary_coordinator.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/refine_collection_shard_key_coordinator.h"
 #include "mongo/db/s/rename_collection_coordinator.h"
 #include "mongo/db/s/reshard_collection_coordinator.h"
 #include "mongo/db/s/set_allow_migrations_coordinator.h"
+#include "mongo/db/s/sharding_ddl_coordinator.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 namespace {

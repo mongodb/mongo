@@ -50,14 +50,9 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
-namespace executor {
-class TaskExecutor;
-}
 
 class OperationContext;
 class RouterExecStage;
-
-using repl::ReadConcernArgs;
 
 /**
  * The resulting ClusterClientCursor will take ownership of the existing remote cursor, generating
@@ -71,7 +66,7 @@ struct ClusterClientCursorParams {
     ClusterClientCursorParams(NamespaceString nss,
                               APIParameters apiParameters,
                               boost::optional<ReadPreferenceSetting> readPref = boost::none,
-                              boost::optional<ReadConcernArgs> readConcernArgs = boost::none)
+                              boost::optional<repl::ReadConcernArgs> readConcernArgs = boost::none)
         : nsString(std::move(nss)), apiParameters(std::move(apiParameters)) {
         if (readPref) {
             readPreference = std::move(readPref.get());
@@ -156,7 +151,7 @@ struct ClusterClientCursorParams {
     boost::optional<ReadPreferenceSetting> readPreference;
 
     // Set if a readConcern must be respected throughout the lifetime of the cursor.
-    boost::optional<ReadConcernArgs> readConcern;
+    boost::optional<repl::ReadConcernArgs> readConcern;
 
     // Whether the client indicated that it is willing to receive partial results in the case of an
     // unreachable host.

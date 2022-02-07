@@ -711,7 +711,6 @@ void BatchWriteOp::noteBatchError(const TargetedWriteBatch& targetedBatch,
         emulatedResponse.addToErrDetails(errorClone.release());
     }
 
-    dassert(emulatedResponse.isValid(nullptr));
     noteBatchResponse(targetedBatch, emulatedResponse, nullptr);
 }
 
@@ -766,7 +765,6 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
 
     // For non-verbose, it's all we need.
     if (!_clientRequest.isVerboseWC()) {
-        dassert(batchResp->isValid(nullptr));
         return;
     }
 
@@ -844,8 +842,6 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
         _numModified >= 0) {
         batchResp->setNModified(_numModified);
     }
-
-    dassert(batchResp->isValid(nullptr));
 }
 
 int BatchWriteOp::numWriteOpsIn(WriteOpState opState) const {

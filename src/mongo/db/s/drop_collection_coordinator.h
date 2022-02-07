@@ -33,7 +33,6 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/drop_collection_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
-#include "mongo/s/grid.h"
 
 namespace mongo {
 

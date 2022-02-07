@@ -29,21 +29,9 @@
 
 #pragma once
 
-#include <atomic>
-
-#include "mongo/client/connection_string.h"
-#include "mongo/db/query/explain_options.h"
 #include "mongo/db/request_execution_context.h"
-#include "mongo/s/client/shard.h"
 
 namespace mongo {
-
-class DbMessage;
-struct DbResponse;
-class Message;
-class NamespaceString;
-class OperationContext;
-class FindCommandRequest;
 
 /**
  * Legacy interface for processing client read/write/cmd requests.

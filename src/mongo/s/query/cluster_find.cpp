@@ -228,7 +228,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // Construct the query and parameters. Defer setting skip and limit here until
     // we determine if the query is targeting multi-shards or a single shard below.
     ClusterClientCursorParams params(
-        query.nss(), APIParameters::get(opCtx), readPref, ReadConcernArgs::get(opCtx));
+        query.nss(), APIParameters::get(opCtx), readPref, repl::ReadConcernArgs::get(opCtx));
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.batchSize = findCommand.getBatchSize();
     params.tailableMode = query_request_helper::getTailableMode(findCommand);
@@ -417,7 +417,7 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
 
     if (auto readConcern = cursor->getReadConcern()) {
         // Used to return "atClusterTime" in cursor replies to clients for snapshot reads.
-        ReadConcernArgs::get(opCtx) = *readConcern;
+        repl::ReadConcernArgs::get(opCtx) = *readConcern;
     }
 
     auto apiParamsFromClient = APIParameters::get(opCtx);

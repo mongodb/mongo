@@ -286,8 +286,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 if (responseStatus.isOK()) {
                     std::string errMsg;
                     if (!batchedCommandResponse.parseBSON(response.swResponse.getValue().data,
-                                                          &errMsg) ||
-                        !batchedCommandResponse.isValid(&errMsg)) {
+                                                          &errMsg)) {
                         responseStatus = {ErrorCodes::FailedToParse, errMsg};
                     }
                 }

@@ -36,8 +36,8 @@
 namespace mongo {
 
 /**
- * This class represents the layout and content of an idem inside the 'upserted' array
- * of a write command's response (see batched_command_response.h)
+ * This class represents the layout and content of an idem inside the 'upserted' array of a write
+ * command's response (see BatchedCommandResponse).
  */
 class BatchedUpsertDetail {
     BatchedUpsertDetail(const BatchedUpsertDetail&) = delete;

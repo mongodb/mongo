@@ -98,8 +98,6 @@
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
 
-using namespace fmt::literals;
-
 namespace mongo {
 namespace {
 
@@ -884,7 +882,7 @@ void ParseAndRunCommand::RunAndRetry::_setup() {
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern &&
         !TransactionRouter::get(opCtx) &&
         (!readConcernArgs.getArgsAtClusterTime() || readConcernArgs.wasAtClusterTimeSelected())) {
-        auto atClusterTime = [](OperationContext* opCtx, ReadConcernArgs& readConcernArgs) {
+        auto atClusterTime = [](OperationContext* opCtx, repl::ReadConcernArgs& readConcernArgs) {
             const auto latestKnownTime = VectorClock::get(opCtx)->getTime();
             // Choose a time after the user-supplied afterClusterTime.
             auto afterClusterTime = readConcernArgs.getArgsAfterClusterTime();
@@ -1025,7 +1023,7 @@ void ParseAndRunCommand::RunAndRetry::_onSnapshotError(Status& status) {
 
     auto opCtx = _parc->_rec->getOpCtx();
     if (auto txnRouter = TransactionRouter::get(opCtx);
-        !txnRouter && !ReadConcernArgs::get(opCtx).wasAtClusterTimeSelected()) {
+        !txnRouter && !repl::ReadConcernArgs::get(opCtx).wasAtClusterTimeSelected()) {
         // Non-transaction snapshot read. The client sent readConcern: {level: "snapshot",
         // atClusterTime: T}, where T is older than minSnapshotHistoryWindowInSeconds, retrying
         // won't succeed.
@@ -1282,4 +1280,5 @@ Future<DbResponse> Strategy::clientCommand(std::shared_ptr<RequestExecutionConte
         return runner->run();
     });
 }
+
 }  // namespace mongo

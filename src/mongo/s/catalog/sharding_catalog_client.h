@@ -34,16 +34,15 @@
 #include <string>
 #include <vector>
 
+#include "mongo/client/read_preference.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/repl/optime_with.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard.h"
 
 namespace mongo {
 
-class BatchedCommandRequest;
-class BatchedCommandResponse;
 struct BSONArray;
 class BSONArrayBuilder;
 class BSONObj;
@@ -54,13 +53,8 @@ class CollectionType;
 class ConnectionString;
 class DatabaseType;
 class LogicalTime;
-class NamespaceString;
 class OperationContext;
-class ShardingCatalogManager;
 class ShardKeyPattern;
-class Status;
-template <typename T>
-class StatusWith;
 class TagsType;
 class VersionType;
 

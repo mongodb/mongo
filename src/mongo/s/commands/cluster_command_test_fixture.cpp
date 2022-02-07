@@ -41,6 +41,7 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/s/commands/strategy.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/tick_source_mock.h"

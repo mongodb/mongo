@@ -33,8 +33,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/tailable_mode.h"
-#include "mongo/s/client/shard.h"
 #include "mongo/s/query/owned_remote_cursor.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
 

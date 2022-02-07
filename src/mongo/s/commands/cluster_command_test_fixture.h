@@ -33,7 +33,6 @@
 
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
-#include "mongo/s/commands/strategy.h"
 
 namespace mongo {
 

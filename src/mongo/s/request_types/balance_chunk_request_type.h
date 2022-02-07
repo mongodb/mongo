@@ -32,8 +32,8 @@
 #include <boost/optional.hpp>
 
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/client/shard.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
 

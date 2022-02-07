@@ -50,10 +50,6 @@ class BatchedCommandResponse {
     BatchedCommandResponse& operator=(const BatchedCommandResponse&) = delete;
 
 public:
-    //
-    // schema declarations
-    //
-
     static const BSONField<long long> n;
     static const BSONField<long long> nModified;
     static const BSONField<std::vector<BatchedUpsertDetail*>> upsertDetails;
@@ -64,14 +60,13 @@ public:
 
     BatchedCommandResponse();
     ~BatchedCommandResponse();
+
     BatchedCommandResponse(BatchedCommandResponse&&) = default;
     BatchedCommandResponse& operator=(BatchedCommandResponse&&) = default;
 
-    bool isValid(std::string* errMsg) const;
     BSONObj toBSON() const;
     bool parseBSON(const BSONObj& source, std::string* errMsg);
     void clear();
-    std::string toString() const;
 
     //
     // individual field accessors
@@ -92,14 +87,15 @@ public:
         return _status.isOK();
     }
 
+    /**
+     * Converts the specified command response into a status, based on all of its contents.
+     */
+    Status toStatus() const;
+
     void setNModified(long long n);
-    void unsetNModified();
-    bool isNModified() const;
     long long getNModified() const;
 
     void setN(long long n);
-    void unsetN();
-    bool isNSet() const;
     long long getN() const;
 
     void setUpsertDetails(const std::vector<BatchedUpsertDetail*>& upsertDetails);
@@ -111,12 +107,10 @@ public:
     const BatchedUpsertDetail* getUpsertDetailsAt(std::size_t pos) const;
 
     void setLastOp(repl::OpTime lastOp);
-    void unsetLastOp();
     bool isLastOpSet() const;
     repl::OpTime getLastOp() const;
 
     void setElectionId(const OID& electionId);
-    void unsetElectionId();
     bool isElectionIdSet() const;
     OID getElectionId() const;
 
@@ -129,17 +123,11 @@ public:
     const WriteErrorDetail* getErrDetailsAt(std::size_t pos) const;
 
     void setWriteConcernError(WriteConcernErrorDetail* error);
-    void unsetWriteConcernError();
     bool isWriteConcernErrorSet() const;
     const WriteConcernErrorDetail* getWriteConcernError() const;
 
     bool isErrorLabelsSet() const;
     const std::vector<std::string>& getErrorLabels() const;
-
-    /**
-     * Converts the specified command response into a status, based on all of its contents.
-     */
-    Status toStatus() const;
 
 private:
     // Convention: (M)andatory, (O)ptional
@@ -155,11 +143,6 @@ private:
     // (O)  number of documents updated
     long long _nModified;
     bool _isNModifiedSet;
-
-    // (O)  "promoted" _upserted, if the corresponding request contained only one batch item
-    //      Should only be present if _upserted is not.
-    BSONObj _singleUpserted;
-    bool _isSingleUpsertedSet;
 
     // (O)  Array of upserted items' _id's
     //      Should only be present if _singleUpserted is not.

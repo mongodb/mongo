@@ -189,7 +189,7 @@ public:
     /**
      * Returns the readConcern for this cursor.
      */
-    virtual boost::optional<ReadConcernArgs> getReadConcern() const = 0;
+    virtual boost::optional<repl::ReadConcernArgs> getReadConcern() const = 0;
 
     /**
      * Returns the creation date of the cursor.

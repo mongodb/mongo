@@ -33,7 +33,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/client/shard.h"
 
 namespace mongo {
 

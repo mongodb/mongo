@@ -233,7 +233,7 @@ boost::optional<ReadPreferenceSetting> ClusterClientCursorImpl::getReadPreferenc
     return _params.readPreference;
 }
 
-boost::optional<ReadConcernArgs> ClusterClientCursorImpl::getReadConcern() const {
+boost::optional<repl::ReadConcernArgs> ClusterClientCursorImpl::getReadConcern() const {
     return _params.readConcern;
 }
 

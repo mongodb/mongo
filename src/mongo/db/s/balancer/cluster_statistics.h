@@ -29,19 +29,18 @@
 
 #pragma once
 
-#include <memory>
 #include <set>
 #include <string>
 #include <vector>
 
-#include "mongo/s/client/shard.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
 
 class BSONObj;
 class OperationContext;
-template <typename T>
-class StatusWith;
 
 /**
  * This interface serves as means for obtaining data distribution and shard utilization statistics

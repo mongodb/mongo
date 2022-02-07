@@ -86,14 +86,12 @@ void buildResponse(int n, BatchedCommandResponse* response) {
     response->clear();
     response->setStatus(Status::OK());
     response->setN(n);
-    ASSERT(response->isValid(nullptr));
 }
 
 void buildErrResponse(int code, const std::string& message, BatchedCommandResponse* response) {
     response->clear();
     response->setN(0);
     response->setStatus({ErrorCodes::Error(code), message});
-    ASSERT(response->isValid(nullptr));
 }
 
 void addError(int code, const std::string& message, int index, BatchedCommandResponse* response) {

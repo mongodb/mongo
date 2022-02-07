@@ -37,7 +37,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/s/chunk.h"
-#include "mongo/s/client/shard.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/shard_key_pattern.h"

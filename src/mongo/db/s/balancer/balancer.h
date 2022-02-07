@@ -33,7 +33,6 @@
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
 #include "mongo/db/s/balancer/balancer_random.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/s/grid.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 

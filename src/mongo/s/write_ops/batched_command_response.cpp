@@ -64,21 +64,6 @@ BatchedCommandResponse::~BatchedCommandResponse() {
     unsetUpsertDetails();
 }
 
-bool BatchedCommandResponse::isValid(std::string* errMsg) const {
-    std::string dummy;
-    if (errMsg == nullptr) {
-        errMsg = &dummy;
-    }
-
-    // All the mandatory fields must be present.
-    if (!_isStatusSet) {
-        *errMsg = stream() << "missing status fields";
-        return false;
-    }
-
-    return true;
-}
-
 BSONObj BatchedCommandResponse::toBSON() const {
     BSONObjBuilder builder;
 
@@ -257,9 +242,6 @@ void BatchedCommandResponse::clear() {
     _n = 0;
     _isNSet = false;
 
-    _singleUpserted = BSONObj();
-    _isSingleUpsertedSet = false;
-
     if (_upsertDetails.get()) {
         for (std::vector<BatchedUpsertDetail*>::const_iterator it = _upsertDetails->begin();
              it != _upsertDetails->end();
@@ -287,10 +269,6 @@ void BatchedCommandResponse::clear() {
     _wcErrDetails.reset();
 }
 
-std::string BatchedCommandResponse::toString() const {
-    return toBSON().toString();
-}
-
 void BatchedCommandResponse::setStatus(Status status) {
     _status = std::move(status);
     _isStatusSet = true;
@@ -299,14 +277,6 @@ void BatchedCommandResponse::setStatus(Status status) {
 void BatchedCommandResponse::setNModified(long long n) {
     _nModified = n;
     _isNModifiedSet = true;
-}
-
-void BatchedCommandResponse::unsetNModified() {
-    _isNModifiedSet = false;
-}
-
-bool BatchedCommandResponse::isNModified() const {
-    return _isNModifiedSet;
 }
 
 long long BatchedCommandResponse::getNModified() const {
@@ -320,14 +290,6 @@ long long BatchedCommandResponse::getNModified() const {
 void BatchedCommandResponse::setN(long long n) {
     _n = n;
     _isNSet = true;
-}
-
-void BatchedCommandResponse::unsetN() {
-    _isNSet = false;
-}
-
-bool BatchedCommandResponse::isNSet() const {
-    return _isNSet;
 }
 
 long long BatchedCommandResponse::getN() const {
@@ -393,10 +355,6 @@ void BatchedCommandResponse::setLastOp(repl::OpTime lastOp) {
     _isLastOpSet = true;
 }
 
-void BatchedCommandResponse::unsetLastOp() {
-    _isLastOpSet = false;
-}
-
 bool BatchedCommandResponse::isLastOpSet() const {
     return _isLastOpSet;
 }
@@ -409,10 +367,6 @@ repl::OpTime BatchedCommandResponse::getLastOp() const {
 void BatchedCommandResponse::setElectionId(const OID& electionId) {
     _electionId = electionId;
     _isElectionIdSet = true;
-}
-
-void BatchedCommandResponse::unsetElectionId() {
-    _isElectionIdSet = false;
 }
 
 bool BatchedCommandResponse::isElectionIdSet() const {
@@ -464,10 +418,6 @@ const WriteErrorDetail* BatchedCommandResponse::getErrDetailsAt(size_t pos) cons
 
 void BatchedCommandResponse::setWriteConcernError(WriteConcernErrorDetail* error) {
     _wcErrDetails.reset(error);
-}
-
-void BatchedCommandResponse::unsetWriteConcernError() {
-    _wcErrDetails.reset();
 }
 
 bool BatchedCommandResponse::isWriteConcernErrorSet() const {
