@@ -91,48 +91,58 @@ var FixtureHelpers = (function() {
     }
 
     /**
-     * Runs the function given by 'func' passing the database given by 'db' from each replica set in
+     * Runs the function given by 'func' passing the database given by 'db' from each shard nodes in
      * the fixture (besides the config servers). Returns the array of return values from executed
      * functions. If the fixture is a standalone, will run the function on the database directly.
      */
-    function mapOnEachPrimary({db, func}) {
-        function getConnToPrimaryOrStandalone(host) {
+    function mapOnEachShardNode({db, func, primaryNodeOnly}) {
+        function getRequestedConns(host) {
             const conn = new Mongo(host);
             const isMaster = conn.getDB("test").isMaster();
 
             if (isMaster.hasOwnProperty("setName")) {
                 // It's a repl set.
                 const rs = new ReplSetTest(host);
-                return rs.getPrimary();
+                return primaryNodeOnly ? [rs.getPrimary()] : rs.nodes;
             } else {
                 // It's a standalone.
-                return conn;
+                return [conn];
             }
         }
 
-        const connList = [];
+        let connList = [];
         if (isMongos(db)) {
             const shardObjs = db.getSiblingDB("config").shards.find().sort({_id: 1}).toArray();
 
             for (let shardObj of shardObjs) {
-                connList.push(getConnToPrimaryOrStandalone(shardObj.host));
+                connList = connList.concat(getRequestedConns(shardObj.host));
             }
         } else {
-            connList.push(getConnToPrimaryOrStandalone(db.getMongo().host));
+            connList = connList.concat(getRequestedConns(db.getMongo().host));
         }
 
         return connList.map((conn) => func(conn.getDB(db.getName())));
     }
 
     /**
-     * Runs the command given by 'cmdObj' on the database given by 'db' on each replica set in
+     * Runs the command given by 'cmdObj' on the database given by 'db' on each shard nodes in
      * the fixture (besides the config servers). Asserts that each command works, and returns an
      * array with the responses from each shard, or with a single element if the fixture was a
      * replica set. If the fixture is a standalone, will run the command directly.
      */
+    function runCommandOnAllShards({db, cmdObj, primaryNodeOnly}) {
+        return mapOnEachShardNode({
+            db,
+            func: (primaryDb) => assert.commandWorked(primaryDb.runCommand(cmdObj)),
+            primaryNodeOnly
+        });
+    }
+
+    /**
+     * A helper function for 'runCommandOnAllShards' to only run command on the primary nodes.
+     */
     function runCommandOnEachPrimary({db, cmdObj}) {
-        return mapOnEachPrimary(
-            {db, func: (primaryDb) => assert.commandWorked(primaryDb.runCommand(cmdObj))});
+        return runCommandOnAllShards({db, cmdObj, primaryNodeOnly: true});
     }
 
     /**
@@ -186,7 +196,8 @@ var FixtureHelpers = (function() {
         numberOfShardsForCollection: numberOfShardsForCollection,
         awaitReplication: awaitReplication,
         awaitLastOpCommitted: awaitLastOpCommitted,
-        mapOnEachPrimary: mapOnEachPrimary,
+        mapOnEachShardNode: mapOnEachShardNode,
+        runCommandOnAllShards: runCommandOnAllShards,
         runCommandOnEachPrimary: runCommandOnEachPrimary,
         getAllReplicas: getAllReplicas,
         getPrimaries: getPrimaries,
