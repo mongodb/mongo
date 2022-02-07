@@ -61,7 +61,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     const auto collNss =
         (isTimeseries && !nss.isTimeseriesBucketsCollection()) ? std::move(bucketNss) : nss;
 
-    boost::optional<AutoGetCollectionForReadCommand> autoColl;
+    boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> autoColl;
     try {
         autoColl.emplace(opCtx,
                          collNss,
@@ -73,7 +73,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     }
 
     const auto& collection = autoColl->getCollection();  // Will be set if present
-    if (!autoColl->getDb() || !collection) {
+    if (!collection) {
         result->appendNumber("size", 0);
         result->appendNumber("count", 0);
         result->appendNumber("storageSize", 0);
@@ -83,10 +83,8 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
         result->append("indexDetails", BSONObj());
         result->append("indexSizes", BSONObj());
         result->append("scaleFactor", scale);
-        std::string errmsg = !autoColl->getDb()
-            ? "Database [" + collNss.db().toString() + "] not found."
-            : "Collection [" + collNss.toString() + "] not found.";
-        return {ErrorCodes::NamespaceNotFound, errmsg};
+        return {ErrorCodes::NamespaceNotFound,
+                "Collection [" + collNss.toString() + "] not found."};
     }
 
     long long size = collection->dataSize(opCtx) / scale;
@@ -177,12 +175,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
 Status appendCollectionRecordCount(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    BSONObjBuilder* result) {
-    AutoGetCollectionForReadCommand collection(opCtx, nss);
-    if (!collection.getDb()) {
-        return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "Database [" << nss.db().toString() << "] not found."};
-    }
-
+    AutoGetCollectionForReadCommandMaybeLockFree collection(opCtx, nss);
     if (!collection) {
         return {ErrorCodes::NamespaceNotFound,
                 str::stream() << "Collection [" << nss.toString() << "] not found."};

@@ -72,6 +72,13 @@ public:
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) const {}
 
+    /**
+     * An empty 'ns' causes the global lock to be taken.
+     * A 'ns' that contains <db> causes only the rstl/global/database locks to be taken.
+     * A complete 'ns' <coll>.<db> causes the rstl/global/database/collection locks to be taken.
+     *
+     * Any higher level locks are taken in the appropriate MODE_IS or MODE_IX to match 'mode'.
+     */
     void _sleepInLock(mongo::OperationContext* opCtx,
                       long long millis,
                       LockMode mode,
@@ -111,6 +118,13 @@ public:
         pbwm.lock(nullptr, MODE_X);
         opCtx->sleepFor(Milliseconds(millis));
         pbwm.unlock();
+    }
+
+    void _sleepInRSTL(mongo::OperationContext* opCtx, long long millis) {
+        Lock::ResourceLock rstl(opCtx->lockState(), resourceIdReplicationStateTransitionLock);
+        rstl.lock(nullptr, MODE_X);
+        opCtx->sleepFor(Milliseconds(millis));
+        rstl.unlock();
     }
 
     CmdSleep() : BasicCommand("sleep") {}
@@ -168,6 +182,11 @@ public:
 
             if (lockTarget == "ParallelBatchWriterMode") {
                 _sleepInPBWM(opCtx, msRemaining.count());
+                continue;
+            }
+
+            if (lockTarget == "RSTL") {
+                _sleepInRSTL(opCtx, msRemaining.count());
                 continue;
             }
 
