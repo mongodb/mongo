@@ -155,7 +155,10 @@ Pipeline::SourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
     // asNearQuery() is something like '{fieldName: {$near: ...}}'.
     // GeoNearExpression seems to want something like '{$near: ...}'.
     auto nearQuery = asNearQuery(keyFieldPath->fullPath()).firstElement().Obj().getOwned();
-    tassert(nearExpr.parseFrom(nearQuery));
+    auto exprStatus = nearExpr.parseFrom(nearQuery);
+    uassert(6330900,
+            str::stream() << "Unable to parse geoNear query: " << exprStatus.reason(),
+            exprStatus.isOK());
     tassert(5860204,
             "Unexpected GeoNearExpression field name after asNearQuery(): "_sd + nearExpr.field,
             nearExpr.field == ""_sd);
