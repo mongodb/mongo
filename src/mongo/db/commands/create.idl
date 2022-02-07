@@ -32,6 +32,7 @@ global:
     - "mongo/db/commands/create_command_validation.h"
 
 imports:
+    - "mongo/crypto/encryption_fields.idl"
     - "mongo/db/auth/access_checks.idl"
     - "mongo/db/auth/action_type.idl"
     - "mongo/db/catalog/collection_options.idl"
@@ -194,6 +195,11 @@ commands:
             expireAfterSeconds:
                 description: "The number of seconds after which old data should be deleted."
                 type: safeInt64
+                optional: true
+                unstable: false
+            encryptedFields:
+                description: "The number of seconds after which old data should be deleted."
+                type: EncryptedFieldConfig
                 optional: true
                 unstable: false
             temp:

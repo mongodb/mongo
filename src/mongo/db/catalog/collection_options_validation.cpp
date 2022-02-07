@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/catalog/collection_options_validation.h"
+#include "mongo/crypto/encryption_fields_util.h"
 
 namespace mongo::collection_options_validation {
 Status validateStorageEngineOptions(const BSONObj& storageEngine) {
@@ -54,4 +55,62 @@ Status validateStorageEngineOptions(const BSONObj& storageEngine) {
     }
     return Status::OK();
 }
+
+EncryptedFieldConfig processAndValidateEncryptedFields(EncryptedFieldConfig config) {
+
+    if (!gFeatureFlagFLE2.isEnabledAndIgnoreFCV()) {
+        uasserted(6338408, "Feature flag FLE2 is not enabled");
+    }
+
+    stdx::unordered_set<UUID, UUID::Hash> keys(config.getFields().size());
+    std::vector<std::string> fieldPaths;
+    fieldPaths.reserve(config.getFields().size());
+
+    for (const auto& field : config.getFields()) {
+        UUID keyId = field.getKeyId();
+
+        // Duplicate key ids are bad, it breaks the design
+        uassert(6338401, "Duplicate key ids are not allowed", keys.count(keyId) == 0);
+        keys.insert(keyId);
+
+        BSONType type = typeFromName(field.getBsonType());
+
+        for (const auto& path : fieldPaths) {
+            uassert(6338402, "Duplicate paths are not allowed", field.getPath() != path);
+            // Cannot have indexes on "a" and "a.b"
+            uassert(6338403,
+                    str::stream() << "Conflicting index paths found as one is a prefix of another '"
+                                  << field.getPath() << "' and '" << path << "'",
+                    !field.getPath().startsWith(path) &&
+                        !StringData(path).startsWith(field.getPath()));
+        }
+        fieldPaths.push_back(field.getPath().toString());
+
+        if (field.getQueries().has_value()) {
+            auto queriesVariant = field.getQueries().get();
+
+            auto queries = stdx::get_if<std::vector<mongo::QueryTypeConfig>>(&queriesVariant);
+            if (queries) {
+                // If the user specified multiple queries, verify they are unique
+                // TODO - once other index types are added we will need to enhance this check
+                uassert(6338404,
+                        "Only 1 equality queryType can be specified per field",
+                        queries->size() == 1);
+            }
+
+            uassert(6338405,
+                    str::stream() << "Type '" << typeName(type)
+                                  << "' is not a supported equality indexed type",
+                    isFLE2EqualityIndexedSupportedType(type));
+        } else {
+            uassert(6338406,
+                    str::stream() << "Type '" << typeName(type)
+                                  << "' is not a supported unindexed type",
+                    isFLE2UnindexedSupportedType(type));
+        }
+    }
+
+    return config;
+}
+
 }  // namespace mongo::collection_options_validation

@@ -667,7 +667,6 @@ Status createCollection(OperationContext* opCtx,
 
     return createCollection(opCtx, nss, collectionOptions, idIndex);
 }
-
 }  // namespace
 
 Status createCollection(OperationContext* opCtx,
@@ -684,7 +683,7 @@ Status createCollection(OperationContext* opCtx,
 Status createCollection(OperationContext* opCtx,
                         const NamespaceString& ns,
                         const CreateCommand& cmd) {
-    auto options = CollectionOptions::fromCreateCommand(cmd);
+    auto options = CollectionOptions::fromCreateCommand(ns, cmd);
     auto idIndex = std::exchange(options.idIndex, {});
     bool hasExplicitlyDisabledClustering = cmd.getClusteredIndex() &&
         stdx::holds_alternative<bool>(*cmd.getClusteredIndex()) &&

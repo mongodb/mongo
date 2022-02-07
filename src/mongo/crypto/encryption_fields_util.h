@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,16 +26,56 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/crypto/encryption_fields_gen.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/util/assert_util.h"
 
-namespace mongo::collection_options_validation {
-Status validateStorageEngineOptions(const BSONObj& storageEngine);
+namespace mongo {
 
-EncryptedFieldConfig processAndValidateEncryptedFields(EncryptedFieldConfig config);
+inline bool isFLE2EqualityIndexedSupportedType(BSONType type) {
+    switch (type) {
+        case BinData:
+        case Code:
+        case RegEx:
+        case String:
 
-}  // namespace mongo::collection_options_validation
+        case NumberInt:
+        case NumberLong:
+        case Bool:
+        case bsonTimestamp:
+        case Date:
+        case jstOID:
+            return true;
+
+        // Deprecated
+        case Symbol:
+        case CodeWScope:
+        case DBRef:
+
+        // Non-deterministic
+        case Array:
+        case Object:
+        case NumberDecimal:
+        case NumberDouble:
+
+        // Singletons
+        case EOO:
+        case jstNULL:
+        case MaxKey:
+        case MinKey:
+        case Undefined:
+            return false;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+// Unindexed is the same as equality
+inline bool isFLE2UnindexedSupportedType(BSONType type) {
+    return isFLE2EqualityIndexedSupportedType(type);
+}
+
+}  // namespace mongo

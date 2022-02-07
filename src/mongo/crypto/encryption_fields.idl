@@ -31,8 +31,81 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
 
+enums:
+    QueryType:
+        description: "query types"
+        type: string
+        values:
+            Equality: "equality"
+            # Range: "range"
+
 feature_flags:
     featureFlagFLE2:
         description: "Enable FLE2 support"
         cpp_varname: gFeatureFlagFLE2
         default: false
+
+structs:
+
+    QueryTypeConfig:
+        description: "Information about query support for a field"
+        strict: true
+        fields:
+            queryType:
+                description: "Type of supported queries"
+                type: QueryType
+                unstable: true
+            contention:
+                description: "Contention factor for field, 0 means it has extremely high set number of distinct values"
+                type: long
+                default: 0
+                unstable: true
+                validator: { gte: 0 }
+
+    EncryptedField:
+        description: "Information about encrypted fields"
+        strict: true
+        fields:
+            keyId:
+                description: "UUID of key in key vault to use for encryption"
+                type: uuid
+                unstable: true
+            path:
+                description: "Path to field to encrypt"
+                type: string
+                unstable: true
+            bsonType:
+                description: "BSON type of field to encrypt"
+                type: string
+                validator: { callback: "isValidBSONTypeName" }
+                unstable: true
+            queries:
+                description: "List of supported query types"
+                type:
+                    variant: [QueryTypeConfig, array<QueryTypeConfig>]
+                optional: true
+                unstable: true
+
+    EncryptedFieldConfig:
+        description: "Information about encrypted fields and state collections"
+        strict: true
+        fields:
+            escCollection:
+                description: "Encrypted State Collection name, defaults to <collection>.esc"
+                type: string
+                optional: true
+                unstable: true
+            eccCollection:
+                description: "Encrypted Cache Collection name, defaults to <collection>.ecc"
+                type: string
+                optional: true
+                unstable: true
+            ecocCollection:
+                description: "Encrypted Compaction Collection name, defaults to <collection>.ecoc"
+                type: string
+                optional: true
+                unstable: true
+            fields:
+                description: "Array of encrypted fields"
+                type: array<EncryptedField>
+                unstable: true

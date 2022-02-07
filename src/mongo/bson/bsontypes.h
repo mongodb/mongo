@@ -135,6 +135,12 @@ std::ostream& operator<<(std::ostream& stream, BSONType type);
  */
 bool isValidBSONType(int type);
 
+/**
+ * IDL callback validator
+ */
+Status isValidBSONTypeName(StringData typeName);
+
+
 inline bool isNumericBSONType(BSONType type) {
     switch (type) {
         case NumberDouble:

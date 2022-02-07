@@ -59,6 +59,24 @@ long long adjustCappedMaxDocs(long long cappedMaxDocs) {
     }
     return cappedMaxDocs;
 }
+
+void setEncryptedDefaultEncryptedCollectionNames(const NamespaceString& ns,
+                                                 EncryptedFieldConfig* config) {
+    auto prefix = std::string("fle2.") + ns.coll();
+
+    if (!config->getEscCollection()) {
+        config->setEscCollection(StringData(prefix + ".esc"));
+    }
+
+    if (!config->getEccCollection()) {
+        config->setEccCollection(StringData(prefix + ".ecc"));
+    }
+
+    if (!config->getEcocCollection()) {
+        config->setEcocCollection(StringData(prefix + ".ecoc"));
+    }
+}
+
 }  // namespace
 
 bool CollectionOptions::isView() const {
@@ -258,6 +276,18 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }
+        } else if (fieldName == "encryptedFields") {
+            if (e.type() != mongo::Object) {
+                return {ErrorCodes::TypeMismatch, "'encryptedFields' must be a document"};
+            }
+
+            try {
+                collectionOptions.encryptedFieldConfig =
+                    collection_options_validation::processAndValidateEncryptedFields(
+                        EncryptedFieldConfig::parse({"CollectionOptions::parse"}, e.Obj()));
+            } catch (const DBException& ex) {
+                return ex.toStatus();
+            }
         } else if (!createdOn24OrEarlier && !mongo::isGenericArgument(fieldName)) {
             return Status(ErrorCodes::InvalidOptions,
                           str::stream()
@@ -273,7 +303,8 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
     return collectionOptions;
 }
 
-CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd) {
+CollectionOptions CollectionOptions::fromCreateCommand(const NamespaceString& nss,
+                                                       const CreateCommand& cmd) {
     CollectionOptions options;
 
     options.validationLevel = cmd.getValidationLevel();
@@ -344,6 +375,10 @@ CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd)
     }
     if (auto temp = cmd.getTemp()) {
         options.temp = *temp;
+    }
+    if (auto encryptedFieldConfig = cmd.getEncryptedFields()) {
+        options.encryptedFieldConfig = std::move(*encryptedFieldConfig);
+        setEncryptedDefaultEncryptedCollectionNames(nss, options.encryptedFieldConfig.get_ptr());
     }
 
     return options;
@@ -448,6 +483,10 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder,
     if (timeseries && shouldAppend(CreateCommand::kTimeseriesFieldName)) {
         builder->append(CreateCommand::kTimeseriesFieldName, timeseries->toBSON());
     }
+
+    if (encryptedFieldConfig && shouldAppend(CreateCommand::kEncryptedFieldsFieldName)) {
+        builder->append(CreateCommand::kEncryptedFieldsFieldName, encryptedFieldConfig->toBSON());
+    }
 }
 
 bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
@@ -529,6 +568,12 @@ bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
     if ((clusteredIndex && other.clusteredIndex &&
          clusteredIndex->toBSON().woCompare(other.clusteredIndex->toBSON()) != 0) ||
         (clusteredIndex == boost::none) != (other.clusteredIndex == boost::none)) {
+        return false;
+    }
+
+    if ((encryptedFieldConfig && other.encryptedFieldConfig &&
+         encryptedFieldConfig->toBSON().woCompare(other.encryptedFieldConfig->toBSON()) != 0) ||
+        (encryptedFieldConfig == boost::none) != (other.encryptedFieldConfig == boost::none)) {
         return false;
     }
 

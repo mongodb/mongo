@@ -34,6 +34,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/status.h"
+#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/collection_options_gen.h"
 #include "mongo/db/jsobj.h"
@@ -79,7 +80,8 @@ struct CollectionOptions {
     /**
      * Converts a client "create" command invocation.
      */
-    static CollectionOptions fromCreateCommand(const CreateCommand& cmd);
+    static CollectionOptions fromCreateCommand(const NamespaceString& nss,
+                                               const CreateCommand& cmd);
 
     /**
      * Serialize to BSON. The 'includeUUID' parameter is used for the listCollections command to do
@@ -161,5 +163,8 @@ struct CollectionOptions {
     // The options that define the time-series collection, or boost::none if not a time-series
     // collection.
     boost::optional<TimeseriesOptions> timeseries;
+
+    // The options for collections with encrypted fields
+    boost::optional<EncryptedFieldConfig> encryptedFieldConfig;
 };
 }  // namespace mongo

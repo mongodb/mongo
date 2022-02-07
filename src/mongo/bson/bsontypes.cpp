@@ -137,6 +137,16 @@ BSONType typeFromName(StringData name) {
     return *typeAlias;
 }
 
+Status isValidBSONTypeName(StringData typeName) {
+    try {
+        typeFromName(typeName);
+    } catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
+        return ex.toStatus();
+    }
+
+    return Status::OK();
+}
+
 std::ostream& operator<<(std::ostream& stream, BSONType type) {
     return stream << typeName(type);
 }
