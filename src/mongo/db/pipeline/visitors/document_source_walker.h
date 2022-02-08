@@ -37,7 +37,7 @@ namespace mongo {
 
 /**
  * A document source walker.
- * TODO: SERVER-62657. Implement a hash-table based resolution instead of sequential dynamic casts.
+ * TODO: SERVER-62027. Implement a hash-table based resolution instead of sequential dynamic casts.
  */
 class DocumentSourceWalker final {
 public:
