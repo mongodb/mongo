@@ -1501,6 +1501,16 @@ tasks:
         vars:
           test_name: wt8246_compact_rts_data_correctness
 
+  - name: csuite-wt8659-reconstruct-database-from-logs-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "csuite test"
+        vars:
+          test_name: wt8659_reconstruct_database_from_logs
+
   # End of csuite test tasks
 
   # Start of Python unit test tasks
