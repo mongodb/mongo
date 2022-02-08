@@ -257,21 +257,6 @@ public:
         ASSERT(false);
     }
 
-    static inline const Milliseconds kCheckTimeIncrement{100};
-    void assertSoonWithHealthCheck(std::function<bool()> predicate,
-                                   Milliseconds timeout = kWaitTimeout) {
-        auto predicate2 = [=]() {
-            if (predicate())
-                return true;
-            else {
-                advanceTime(kCheckTimeIncrement);
-                manager().schedulePeriodicHealthCheckThreadTest();
-                return false;
-            }
-        };
-        assertSoon(predicate2, timeout);
-    }
-
     bool hasFault() {
         return static_cast<bool>(manager().currentFault());
     }
@@ -285,7 +270,7 @@ public:
     }
 
     void waitForTransitionIntoState(FaultState state) {
-        assertSoonWithHealthCheck([=]() { return manager().getFaultState() == state; });
+        assertSoon([=]() { return manager().getFaultState() == state; });
     }
 
 private:
