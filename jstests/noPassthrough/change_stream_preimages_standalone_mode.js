@@ -10,8 +10,6 @@
  *   requires_replication,
  *   requires_fcv_52,
  *   featureFlagChangeStreamPreAndPostImages,
- *   # TODO SERVER-58694: remove this tag.
- *   change_stream_does_not_expect_txns,
  * ]
  */
 

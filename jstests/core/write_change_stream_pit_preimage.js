@@ -7,6 +7,7 @@
 //  requires_capped,
 //  requires_replication,
 //  requires_getmore,
+//  no_selinux,
 // ]
 (function() {
 "use strict";

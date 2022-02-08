@@ -1084,10 +1084,11 @@ void writeChangeStreamPreImage(OperationContext* opCtx,
                                const CollectionPtr& collection,
                                const mongo::repl::OplogEntry& oplogEntry,
                                const BSONObj& preImage) {
-    ChangeStreamPreImageId preImageId{
-        collection->uuid(), oplogEntry.getTimestamp(), 0 /*applyOpsIndex*/};
+    ChangeStreamPreImageId preImageId{collection->uuid(),
+                                      oplogEntry.getTimestampForPreImage(),
+                                      static_cast<int64_t>(oplogEntry.getApplyOpsIndex())};
     ChangeStreamPreImage preImageDocument{
-        std::move(preImageId), oplogEntry.getWallClockTime(), preImage};
+        std::move(preImageId), oplogEntry.getWallClockTimeForPreImage(), preImage};
     writeToChangeStreamPreImagesCollection(opCtx, preImageDocument);
 }
 }  // namespace
@@ -1739,7 +1740,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     writeChangeStreamPreImage(opCtx, collection, op, *(result.requestedPreImage));
                 }
 
-                if (result.nDeleted == 0 && mode == OplogApplication::Mode::kSecondary) {
+                // It is legal for a delete operation on the pre-images collection to delete zero
+                // documents - pre-image collections are not guaranteed to contain the same set of
+                // documents at all times.
+                if (result.nDeleted == 0 && mode == OplogApplication::Mode::kSecondary &&
+                    !requestNss.isChangeStreamPreImagesCollection()) {
                     LOGV2_WARNING(2170002,
                                   "Applied a delete which did not delete anything in steady state "
                                   "replication",

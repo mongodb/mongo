@@ -107,11 +107,30 @@ var TransactionsUtil = (function() {
             res.errorLabels.includes('TransientTransactionError');
     }
 
+    // Runs a function 'func()' in a transaction on database 'db'. Invokes function
+    // 'beforeTransactionFunc()' before the transaction (can be used to get references to
+    // collections etc.).
+    //
+    // Function 'beforeTransactionFunc(db, session)' accepts database in session 'db' and the
+    // session 'session'.
+    // Function 'func(db, state)' accepts database in session 'db' and an object returned by
+    // 'beforeTransactionFunc()' - 'state'.
+    // 'transactionOptions' - parameters for the transaction.
+    function runInTransaction(db, beforeTransactionFunc, func, transactionOptions = {}) {
+        const session = db.getMongo().startSession();
+        const sessionDb = session.getDatabase(db.getName());
+        const state = beforeTransactionFunc(sessionDb, session);
+        session.startTransaction(transactionOptions);
+        func(sessionDb, state);
+        session.commitTransaction_forTesting();
+    }
+
     return {
         commandIsNonTxnAggregation,
         commandSupportsTxn,
         commandTypeCanSupportTxn,
         deepCopyObject,
         isTransientTransactionError,
+        runInTransaction,
     };
 })();

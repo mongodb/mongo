@@ -130,6 +130,7 @@ void ApplyOps::extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
     auto operationDocs = info.getOperations();
     bool alwaysUpsert = info.getAlwaysUpsert() && !applyOpsOplogEntry.getTxnNumber();
 
+    uint64_t applyOpsIdx{0};
     for (const auto& operationDoc : operationDocs) {
         // Make sure that the inner ops are not malformed or over-specified.
         ReplOperation::parse(IDLParserErrorContext("extractOperations"), operationDoc);
@@ -145,11 +146,19 @@ void ApplyOps::extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
         builder.appendElementsUnique(topLevelDoc);
         auto operation = builder.obj();
 
-        OplogEntry oplogEntry{operation};
-        if (oplogEntry.getNeedsRetryImage()) {
-            oplogEntry.setTimestampForRetryImage(applyOpsOplogEntry.getTimestamp());
+        operations->emplace_back(operation);
+
+        // Preserve index of operation in the "applyOps" oplog entry, timestamp, and wall clock time
+        // of the "applyOps" entry.
+        auto& lastOperation = operations->back();
+        lastOperation.setApplyOpsIndex(applyOpsIdx);
+        lastOperation.setApplyOpsTimestamp(applyOpsOplogEntry.getTimestamp());
+        lastOperation.setApplyOpsWallClockTime(applyOpsOplogEntry.getWallClockTime());
+        ++applyOpsIdx;
+
+        if (lastOperation.getNeedsRetryImage()) {
+            lastOperation.setTimestampForRetryImage(applyOpsOplogEntry.getTimestamp());
         }
-        operations->emplace_back(std::move(oplogEntry));
     }
 }
 
