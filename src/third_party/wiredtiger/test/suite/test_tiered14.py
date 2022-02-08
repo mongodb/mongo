@@ -41,25 +41,25 @@ class test_tiered14(wttest.WiredTigerTestCase):
     bucket_prefix = "pfx_"
     extension_name = "local_store"
 
-    # FIXME-WT-8758: enable the commented scenarios, they all seem to
-    # hit the same WT assertion.
+    # FIXME-WT-8781: enable the commented scenarios and run the
+    # test with the --long option.
 
     # The multiplier makes the size of keys and values progressively larger.
     # A multipler of 0 makes the keys and values a single length.
     multiplier = [
         ('0', dict(multiplier=0)),
-#        ('S', dict(multiplier=1)),
-#        ('M', dict(multiplier=10)),
-#        ('L', dict(multiplier=100)),
-#        ('XL', dict(multiplier=1000)),
+        ('S', dict(multiplier=1)),
+        ('M', dict(multiplier=10)),
+        #('L', dict(multiplier=100, long_only=True)),
+        #('XL', dict(multiplier=1000, long_only=True)),
     ]
     keyfmt = [
-#        ('integer', dict(keyfmt='i')),
+        ('integer', dict(keyfmt='i')),
         ('string', dict(keyfmt='S')),
     ]
     dataset = [
         ('simple', dict(dataset='simple')),
-#        ('complex', dict(dataset='complex')),
+        ('complex', dict(dataset='complex', long_only=True)),
     ]
     scenarios = wtscenario.make_scenarios(multiplier, keyfmt, dataset)
 
@@ -160,9 +160,7 @@ class test_tiered14(wttest.WiredTigerTestCase):
             s = ''.join(random.choices('aaaaauuuuufcr.', k=100))
             self.playback(testnum, s)
 
-        # FIXME-WT-8758: test disabled for now.
-        if False:
-         for i in range(0, 10):
+        for i in range(0, 10):
             testnum += 1
             # Generate a sequence of 100 operations that is has a greater mix of 'operational' functions.
             s = ''.join(random.choices('aufcr.', k=100))

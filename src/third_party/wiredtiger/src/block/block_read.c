@@ -29,10 +29,11 @@ __wt_bm_read(
 #ifdef HAVE_DIAGNOSTIC
     /*
      * In diagnostic mode, verify the block we're about to read isn't on the available list, or for
-     * live systems, the discard list.
+     * live systems, the discard list. This only applies if the block is in this object.
      */
-    WT_RET(__wt_block_misplaced(
-      session, block, "read", offset, size, bm->is_live, __PRETTY_FUNCTION__, __LINE__));
+    if (objectid == block->objectid)
+        WT_RET(__wt_block_misplaced(
+          session, block, "read", offset, size, bm->is_live, __PRETTY_FUNCTION__, __LINE__));
 #endif
 
     /* Read the block. */
