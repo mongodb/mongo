@@ -60,8 +60,7 @@ const dbName = 'TestDB';
 
     // Remove shard0.
     assert.soon(() => {
-        const removeRes =
-            assert.commandWorked(st.s0.adminCommand({removeShard: st.shard0.shardName}));
+        const removeRes = st.s0.adminCommand({removeShard: st.shard0.shardName});
         if (!removeRes.ok && removeRes.code === ErrorCodes.ShardNotFound) {
             // If the config server primary steps down right after removing the config.shards doc
             // for the shard but before responding with "state": "completed", the mongos would retry
@@ -134,9 +133,8 @@ const dbName = 'TestDB';
     // Remove shard0. We need assert.soon since chunks in the sessions collection may need to be
     // migrated off by the balancer.
     assert.soon(() => {
-        const removeRes =
-            assert.commandWorked(st.s0.adminCommand({removeShard: st.shard0.shardName}));
-        if (!removeRes.code && removeRes.code === ErrorCodes.ShardNotFound) {
+        const removeRes = st.s0.adminCommand({removeShard: st.shard0.shardName});
+        if (!removeRes.ok && removeRes.code === ErrorCodes.ShardNotFound) {
             // If the config server primary steps down after removing the config.shards doc for the
             // shard being removed but before completing the _configsvrRemoveShard command, the
             // mongos would retry the command on the new config server primary which would not find
