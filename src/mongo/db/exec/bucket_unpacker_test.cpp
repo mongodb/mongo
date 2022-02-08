@@ -600,65 +600,148 @@ TEST_F(BucketUnpackerTest, UnpackerResetThrowsOnEmptyBucket) {
 TEST_F(BucketUnpackerTest, EraseMetaFromFieldSetAndDetermineIncludeMeta) {
     // Tests a missing 'metaField' in the spec.
     std::set<std::string> empFields{};
-    auto spec = BucketSpec{kUserDefinedTimeName.toString(), boost::none, std::move(empFields)};
-    ASSERT_FALSE(
-        eraseMetaFromFieldSetAndDetermineIncludeMeta(BucketUnpacker::Behavior::kInclude, &spec));
+    auto bucket = fromjson(R"(
+{
+    control: {version: 1},
+    data: {
+        _id: {'0':4, '1':5, '2':6},
+        time: {'0':4, '1': 5, '2': 6}
+    }
+})");
+    auto unpacker = makeBucketUnpacker(empFields,
+                                       BucketUnpacker::Behavior::kInclude,
+                                       std::move(bucket),
+                                       kUserDefinedMetaName.toString());
 
     // Tests a spec with 'metaField' in include list.
     std::set<std::string> fields{kUserDefinedMetaName.toString()};
+
     auto specWithMetaInclude = BucketSpec{
         kUserDefinedTimeName.toString(), kUserDefinedMetaName.toString(), std::move(fields)};
-    ASSERT_TRUE(eraseMetaFromFieldSetAndDetermineIncludeMeta(BucketUnpacker::Behavior::kInclude,
-                                                             &specWithMetaInclude));
-    ASSERT_EQ(specWithMetaInclude.fieldSet.count(kUserDefinedMetaName.toString()), 0);
+    // This calls eraseMetaFromFieldSetAndDetermineIncludeMeta.
+    unpacker.setBucketSpecAndBehavior(std::move(specWithMetaInclude),
+                                      BucketUnpacker::Behavior::kInclude);
+    ASSERT_TRUE(unpacker.includeMetaField());
+    ASSERT_EQ(unpacker.bucketSpec().fieldSet().count(kUserDefinedMetaName.toString()), 0);
 
-    std::set<std::string> fieldsNoMeta{"foo"};
-    auto specWithFooInclude = BucketSpec{
-        kUserDefinedTimeName.toString(), kUserDefinedMetaName.toString(), std::move(fieldsNoMeta)};
-    ASSERT_TRUE(eraseMetaFromFieldSetAndDetermineIncludeMeta(BucketUnpacker::Behavior::kExclude,
-                                                             &specWithFooInclude));
-    ASSERT_FALSE(eraseMetaFromFieldSetAndDetermineIncludeMeta(BucketUnpacker::Behavior::kInclude,
-                                                              &specWithFooInclude));
+    std::set<std::string> fieldsNoMetaInclude{"foo"};
+    auto specWithFooInclude = BucketSpec{kUserDefinedTimeName.toString(),
+                                         kUserDefinedMetaName.toString(),
+                                         std::move(fieldsNoMetaInclude)};
+
+    std::set<std::string> fieldsNoMetaExclude{"foo"};
+    auto specWithFooExclude = BucketSpec{kUserDefinedTimeName.toString(),
+                                         kUserDefinedMetaName.toString(),
+                                         std::move(fieldsNoMetaExclude)};
+
+    unpacker.setBucketSpecAndBehavior(std::move(specWithFooExclude),
+                                      BucketUnpacker::Behavior::kExclude);
+    ASSERT_TRUE(unpacker.includeMetaField());
+    unpacker.setBucketSpecAndBehavior(std::move(specWithFooInclude),
+                                      BucketUnpacker::Behavior::kInclude);
+    ASSERT_FALSE(unpacker.includeMetaField());
 
     // Tests a spec with 'metaField' not in exclude list.
     std::set<std::string> excludeFields{};
-    auto specWithMetaExclude = BucketSpec{
+    auto specMetaExclude = BucketSpec{
         kUserDefinedTimeName.toString(), kUserDefinedMetaName.toString(), std::move(excludeFields)};
-    ASSERT_TRUE(eraseMetaFromFieldSetAndDetermineIncludeMeta(BucketUnpacker::Behavior::kExclude,
-                                                             &specWithMetaExclude));
-    ASSERT_FALSE(eraseMetaFromFieldSetAndDetermineIncludeMeta(BucketUnpacker::Behavior::kInclude,
-                                                              &specWithMetaExclude));
+    auto specMetaInclude = specMetaExclude;
+    unpacker.setBucketSpecAndBehavior(std::move(specMetaExclude),
+                                      BucketUnpacker::Behavior::kExclude);
+    ASSERT_TRUE(unpacker.includeMetaField());
+    unpacker.setBucketSpecAndBehavior(std::move(specMetaInclude),
+                                      BucketUnpacker::Behavior::kInclude);
+    ASSERT_FALSE(unpacker.includeMetaField());
 }
 
 TEST_F(BucketUnpackerTest, DetermineIncludeTimeField) {
-    std::set<std::string> fields{kUserDefinedTimeName.toString()};
-    auto spec = BucketSpec{
-        kUserDefinedTimeName.toString(), kUserDefinedMetaName.toString(), std::move(fields)};
-    ASSERT_TRUE(determineIncludeTimeField(BucketUnpacker::Behavior::kInclude, &spec));
-    ASSERT_FALSE(determineIncludeTimeField(BucketUnpacker::Behavior::kExclude, &spec));
+    auto bucket = fromjson(R"(
+{
+    control: {version: 1},
+    data: {
+        _id: {'0':4, '1':5, '2':6},
+        time: {'0':4, '1': 5, '2': 6}
+    }
+})");
+    std::set<std::string> unpackerFields{kUserDefinedTimeName.toString()};
+    auto unpacker = makeBucketUnpacker(unpackerFields,
+                                       BucketUnpacker::Behavior::kInclude,
+                                       std::move(bucket),
+                                       kUserDefinedMetaName.toString());
+
+    std::set<std::string> includeFields{kUserDefinedTimeName.toString()};
+    auto includeSpec = BucketSpec{
+        kUserDefinedTimeName.toString(), kUserDefinedMetaName.toString(), std::move(includeFields)};
+    // This calls determineIncludeTimeField.
+    unpacker.setBucketSpecAndBehavior(std::move(includeSpec), BucketUnpacker::Behavior::kInclude);
+    ASSERT_TRUE(unpacker.includeTimeField());
+
+    std::set<std::string> excludeFields{kUserDefinedTimeName.toString()};
+    auto excludeSpec = BucketSpec{
+        kUserDefinedTimeName.toString(), kUserDefinedMetaName.toString(), std::move(excludeFields)};
+    unpacker.setBucketSpecAndBehavior(std::move(excludeSpec), BucketUnpacker::Behavior::kExclude);
+    ASSERT_FALSE(unpacker.includeTimeField());
 }
 
-TEST_F(BucketUnpackerTest, DetermineIncludeField) {
+TEST_F(BucketUnpackerTest, DetermineIncludeFieldIncludeMode) {
     std::string includedMeasurementField = "measurementField1";
     std::string excludedMeasurementField = "measurementField2";
     std::set<std::string> fields{kUserDefinedTimeName.toString(), includedMeasurementField};
+
+    auto bucket = Document{{"_id", 1},
+                           {"control", Document{{"version", 1}}},
+                           {"meta", Document{{"m1", 999}, {"m2", 9999}}},
+                           {"data", Document{}}}
+                      .toBson();
+
     auto spec = BucketSpec{
         kUserDefinedTimeName.toString(), kUserDefinedMetaName.toString(), std::move(fields)};
 
-    ASSERT_TRUE(determineIncludeField(
-        kUserDefinedTimeName.toString(), BucketUnpacker::Behavior::kInclude, spec));
-    ASSERT_FALSE(determineIncludeField(
-        kUserDefinedTimeName.toString(), BucketUnpacker::Behavior::kExclude, spec));
+    BucketUnpacker includeUnpacker;
+    includeUnpacker.setBucketSpecAndBehavior(std::move(spec), BucketUnpacker::Behavior::kInclude);
+    // Need to call reset so that the private method calculateFieldsToIncludeExcludeDuringUnpack()
+    // is called, and _unpackFieldsToIncludeExclude gets filled with fields.
+    includeUnpacker.reset(std::move(bucket));
+    // Now the spec knows which fields to include/exclude.
 
-    ASSERT_TRUE(
-        determineIncludeField(includedMeasurementField, BucketUnpacker::Behavior::kInclude, spec));
-    ASSERT_FALSE(
-        determineIncludeField(includedMeasurementField, BucketUnpacker::Behavior::kExclude, spec));
+    ASSERT_TRUE(determineIncludeField(kUserDefinedTimeName,
+                                      BucketUnpacker::Behavior::kInclude,
+                                      includeUnpacker.fieldsToIncludeExcludeDuringUnpack()));
+    ASSERT_TRUE(determineIncludeField(includedMeasurementField,
+                                      BucketUnpacker::Behavior::kInclude,
+                                      includeUnpacker.fieldsToIncludeExcludeDuringUnpack()));
+    ASSERT_FALSE(determineIncludeField(excludedMeasurementField,
+                                       BucketUnpacker::Behavior::kInclude,
+                                       includeUnpacker.fieldsToIncludeExcludeDuringUnpack()));
+}
 
-    ASSERT_FALSE(
-        determineIncludeField(excludedMeasurementField, BucketUnpacker::Behavior::kInclude, spec));
-    ASSERT_TRUE(
-        determineIncludeField(excludedMeasurementField, BucketUnpacker::Behavior::kExclude, spec));
+TEST_F(BucketUnpackerTest, DetermineIncludeFieldExcludeMode) {
+    std::string includedMeasurementField = "measurementField1";
+    std::string excludedMeasurementField = "measurementField2";
+    std::set<std::string> fields{kUserDefinedTimeName.toString(), includedMeasurementField};
+
+    auto bucket = Document{{"_id", 1},
+                           {"control", Document{{"version", 1}}},
+                           {"meta", Document{{"m1", 999}, {"m2", 9999}}},
+                           {"data", Document{}}}
+                      .toBson();
+
+    auto spec = BucketSpec{
+        kUserDefinedTimeName.toString(), kUserDefinedMetaName.toString(), std::move(fields)};
+
+    BucketUnpacker excludeUnpacker;
+    excludeUnpacker.setBucketSpecAndBehavior(std::move(spec), BucketUnpacker::Behavior::kExclude);
+    excludeUnpacker.reset(std::move(bucket));
+
+    ASSERT_FALSE(determineIncludeField(kUserDefinedTimeName,
+                                       BucketUnpacker::Behavior::kExclude,
+                                       excludeUnpacker.fieldsToIncludeExcludeDuringUnpack()));
+    ASSERT_FALSE(determineIncludeField(includedMeasurementField,
+                                       BucketUnpacker::Behavior::kExclude,
+                                       excludeUnpacker.fieldsToIncludeExcludeDuringUnpack()));
+    ASSERT_TRUE(determineIncludeField(excludedMeasurementField,
+                                      BucketUnpacker::Behavior::kExclude,
+                                      excludeUnpacker.fieldsToIncludeExcludeDuringUnpack()));
 }
 
 /**

@@ -238,7 +238,7 @@ TEST_F(InternalUnpackBucketExecTest, UnpackNeitherIncludeNorExcludeDefaultsToEmp
     auto source = DocumentSourceMock::createForTest(
         {
             R"({
-    control: {'version': 1}, 
+    control: {'version': 1},
     meta: {'m1': 999, 'm2': 9999},
     data: {
         _id: {'0':1, '1':2},
@@ -248,7 +248,7 @@ TEST_F(InternalUnpackBucketExecTest, UnpackNeitherIncludeNorExcludeDefaultsToEmp
     }
 })",
             R"({
-    control: {'version': 1}, 
+    control: {'version': 1},
     meta: {m1: 9, m2: 9, m3: 9},
     data: {
         _id: {'0':3, '1':4},
@@ -662,7 +662,7 @@ TEST_F(InternalUnpackBucketExecTest, BucketUnpackerHandlesMissingMetadata) {
         {
             R"(
 {
-    control: {'version': 1}, 
+    control: {'version': 1},
     meta: {
         'm1': 999, 'm2': 9999
     },
@@ -673,7 +673,7 @@ TEST_F(InternalUnpackBucketExecTest, BucketUnpackerHandlesMissingMetadata) {
 })",
             R"(
 {
-    control: {'version': 1}, 
+    control: {'version': 1},
     data: {
         _id: {'1':4, '0':5, '2':6},
         time: {'1':4, '0': 5, '2': 6}
@@ -883,10 +883,30 @@ TEST_F(InternalUnpackBucketExecTest, ParserRoundtripsIncludeMeta) {
     ASSERT_BSONOBJ_EQ(array[0].getDocument().toBson(), bson);
 }
 
-TEST_F(InternalUnpackBucketExecTest, ParserRoundtripsComputedMetaProjFields) {
+TEST_F(InternalUnpackBucketExecTest, ParserRoundtripsComputedMetaProjFieldsInclude) {
+    auto bson = fromjson(
+        "{$_internalUnpackBucket: {include: [], timeField: 'time', metaField: 'meta', "
+        "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['a', 'b', 'c']}}");
+    auto array = std::vector<Value>{};
+    DocumentSourceInternalUnpackBucket::createFromBsonInternal(bson.firstElement(), getExpCtx())
+        ->serializeToArray(array);
+    ASSERT_BSONOBJ_EQ(array[0].getDocument().toBson(), bson);
+}
+
+TEST_F(InternalUnpackBucketExecTest, ParserRoundtripsComputedMetaProjFieldsIncludeWithCompute) {
+    auto bson = fromjson(
+        "{$_internalUnpackBucket: {include: ['a', 'b', 'c'], timeField: 'time', metaField: 'meta', "
+        "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['a', 'b', 'c']}}");
+    auto array = std::vector<Value>{};
+    DocumentSourceInternalUnpackBucket::createFromBsonInternal(bson.firstElement(), getExpCtx())
+        ->serializeToArray(array);
+    ASSERT_BSONOBJ_EQ(array[0].getDocument().toBson(), bson);
+}
+
+TEST_F(InternalUnpackBucketExecTest, ParserRoundtripsComputedMetaProjFieldsExclude) {
     auto bson = fromjson(
         "{$_internalUnpackBucket: {exclude: [], timeField: 'time', metaField: 'meta', "
-        "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['a', 'b', 'c']}}");
+        "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['a']}}");
     auto array = std::vector<Value>{};
     DocumentSourceInternalUnpackBucket::createFromBsonInternal(bson.firstElement(), getExpCtx())
         ->serializeToArray(array);
