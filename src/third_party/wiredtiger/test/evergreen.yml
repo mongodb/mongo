@@ -4107,6 +4107,47 @@ buildvariants:
     - name: ".stress-test-zseries-2"
     - name: ".stress-test-zseries-3"
 
+- name: ubuntu2004-arm64
+  display_name: "~ Ubuntu 20.04 ARM64"
+  run_on:
+  - ubuntu2004-arm64-small
+  batchtime: 1440 # 24 hours
+  expansions:
+    test_env_vars:
+      WT_TOPDIR=$(git rev-parse --show-toplevel)
+      WT_BUILDDIR=$WT_TOPDIR/cmake_build
+      LD_LIBRARY_PATH=$WT_BUILDDIR
+    posix_configure_flags:
+      -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake
+      -DCMAKE_C_FLAGS="-ggdb"
+      -DHAVE_DIAGNOSTIC=1
+      -DENABLE_PYTHON=1
+      -DENABLE_ZLIB=1
+      -DENABLE_SNAPPY=1
+      -DENABLE_STRICT=1
+      -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
+    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
+    smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
+    cmake_generator: Ninja
+    make_command: ninja
+  tasks:
+    - name: compile
+    - name: make-check-test
+    - name: unit-test
+    - name: fops
+    - name: linux-directio
+    - name: checkpoint-filetypes-test
+    - name: unit-test-zstd
+    - name: unit-test-long
+    - name: spinlock-gcc-test
+    - name: spinlock-pthread-adaptive-test
+    - name: compile-wtperf
+    - name: wtperf-test
+    - name: ftruncate-test
+    - name: long-test
+    - name: configure-combinations
+    - name: format-smoke-test
+
 - name: ubuntu2004-tmp-s3-cmake
   display_name: "* (Temporary) Ubuntu 20.04 S3 Extension CMake"
   run_on:
