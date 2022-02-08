@@ -28,6 +28,9 @@
 
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
+#include <sys/stat.h>
+#include <fstream>
+#include <errno.h>
 
 #include "s3_connection.h"
 #include "s3_log_system.h"
@@ -36,6 +39,7 @@
 #include <aws/core/utils/logging/AWSLogging.h>
 
 #define UNUSED(x) (void)(x)
+#define FS2S3(fs) (((S3_FILE_SYSTEM *)(fs))->storage)
 
 /* S3 storage source structure. */
 typedef struct {
@@ -47,9 +51,12 @@ typedef struct {
 typedef struct {
     /* Must come first - this is the interface for the file system we are implementing. */
     WT_FILE_SYSTEM fileSystem;
-    S3_STORAGE *storage;
     S3Connection *connection;
     S3LogSystem *log;
+    S3_STORAGE *storage;
+    std::string bucketName;
+    std::string cacheDir; /* Directory for cached objects */
+    std::string homeDir;  /* Owned by the connection */
 } S3_FILE_SYSTEM;
 
 /* Configuration variables for connecting to S3CrtClient. */
@@ -60,10 +67,105 @@ const uint64_t partSize = 8 * 1024 * 1024; /* 8 MB. */
 /* Setting SDK options. */
 Aws::SDKOptions options;
 
+static int S3GetDirectory(const std::string &, const std::string &, bool, std::string &);
+static bool S3CacheExists(WT_FILE_SYSTEM *, const std::string &);
+static std::string S3Path(const std::string &, const std::string &);
+static int S3Exist(WT_FILE_SYSTEM *, WT_SESSION *, const char *, bool *);
 static int S3CustomizeFileSystem(
   WT_STORAGE_SOURCE *, WT_SESSION *, const char *, const char *, const char *, WT_FILE_SYSTEM **);
 static int S3AddReference(WT_STORAGE_SOURCE *);
 static int S3FileSystemTerminate(WT_FILE_SYSTEM *, WT_SESSION *);
+
+/*
+ * S3Exist --
+ *     Return if the file exists. First checks the cache, and then the S3 Bucket.
+ */
+static int
+S3Exist(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *name, bool *existp)
+{
+    S3_STORAGE *s3;
+    int ret;
+    *existp = false;
+    s3 = FS2S3(fileSystem);
+    S3_FILE_SYSTEM *fs = (S3_FILE_SYSTEM *)fileSystem;
+    bool exists;
+
+    /* First check to see if the file exists in the cache. */
+    exists = S3CacheExists(fileSystem, name);
+
+    /* It's not in the cache, try the s3 bucket. */
+    if (!exists)
+        ret = fs->connection->ObjectExists(fs->bucketName, name, exists);
+
+    *existp = exists;
+    return (ret);
+}
+
+/*
+ * S3Path --
+ *     Construct a pathname from the directory and the object name.
+ */
+static std::string
+S3Path(const std::string &dir, const std::string &name)
+{
+    /* Skip over "./" and variations (".//", ".///./././//") at the beginning of the name. */
+    int i = 0;
+    while (name[i] == '.') {
+        if (name[1] != '/')
+            break;
+        i += 2;
+        while (name[i] == '/')
+            i++;
+    }
+    std::string strippedName = name.substr(i, name.length() - i);
+    return (dir + "/" + strippedName);
+}
+
+/*
+ * S3CacheExists --
+ *     Checks whether the given file exists in the cache.
+ */
+static bool
+S3CacheExists(WT_FILE_SYSTEM *fileSystem, const std::string &name)
+{
+    std::string path = S3Path(((S3_FILE_SYSTEM *)fileSystem)->cacheDir, name);
+    std::ifstream f(path);
+    return (f.good());
+}
+
+/*
+ * S3GetDirectory --
+ *     Return a copy of a directory name after verifying that it is a directory.
+ */
+static int
+S3GetDirectory(const std::string &home, const std::string &name, bool create, std::string &copy)
+{
+    copy = "";
+
+    struct stat sb;
+    int ret;
+    std::string dirName;
+
+    /* For relative pathnames, the path is considered to be relative to the home directory. */
+    if (name[0] == '/')
+        dirName = name;
+    else
+        dirName = home + "/" + name;
+
+    ret = stat(dirName.c_str(), &sb);
+    if (ret != 0 && errno == ENOENT && create) {
+        (void)mkdir(dirName.c_str(), 0777);
+        ret = stat(dirName.c_str(), &sb);
+    }
+
+    if (ret != 0)
+        ret = errno;
+    else if ((sb.st_mode & S_IFMT) != S_IFDIR)
+        ret = EINVAL;
+
+    copy = dirName;
+    return (ret);
+}
 
 /*
  * S3CustomizeFileSystem --
@@ -73,34 +175,57 @@ static int
 S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, const char *bucketName,
   const char *authToken, const char *config, WT_FILE_SYSTEM **fileSystem)
 {
-    S3_FILE_SYSTEM *fs;
     S3_STORAGE *s3;
-    WT_CONFIG_ITEM v;
+    S3_FILE_SYSTEM *fs;
+    int ret;
+    WT_CONFIG_ITEM cacheDir;
+    std::string cacheStr;
+
     s3 = (S3_STORAGE *)storageSource;
 
     /* Mark parameters as unused for now, until implemented. */
-    UNUSED(session);
-    UNUSED(bucketName);
     UNUSED(authToken);
-    UNUSED(config);
 
     Aws::S3Crt::ClientConfiguration awsConfig;
     awsConfig.region = region;
     awsConfig.throughputTargetGbps = throughputTargetGbps;
     awsConfig.partSize = partSize;
 
+    /* Parse configuration string. */
+    ret = s3->wtApi->config_get_string(s3->wtApi, session, config, "cache_directory", &cacheDir);
+    if (ret == 0)
+        cacheStr = cacheDir.str;
+    else if (ret == WT_NOTFOUND)
+        ret = 0;
+    else
+        return (ret);
+
     Aws::Utils::Logging::InitializeAWSLogging(
       Aws::MakeShared<S3LogSystem>("storage", s3->wtApi, s3->verbose));
 
     if ((fs = (S3_FILE_SYSTEM *)calloc(1, sizeof(S3_FILE_SYSTEM))) == NULL)
         return (errno);
+    fs->storage = s3;
 
-    fs->storage = (S3_STORAGE *)storageSource;
+    /* Store a copy of the home directory and bucket name in the file system. */
+    fs->homeDir = session->connection->get_home(session->connection);
+    fs->bucketName = bucketName;
+
+    /*
+     * The default cache directory is named "cache-<name>", where name is the last component of the
+     * bucket name's path. We'll create it if it doesn't exist.
+     */
+    if (cacheStr.empty()) {
+        cacheStr = "cache-" + fs->bucketName;
+        fs->cacheDir = cacheStr;
+    }
+    if ((ret = S3GetDirectory(fs->homeDir, cacheStr, true, fs->cacheDir)) != 0)
+        return (ret);
 
     /* New can fail; will deal with this later. */
     fs->connection = new S3Connection(awsConfig);
-
     fs->fileSystem.terminate = S3FileSystemTerminate;
+    fs->fileSystem.fs_exist = S3Exist;
 
     /* TODO: Move these into tests. Just testing here temporarily to show all functions work. */
     {

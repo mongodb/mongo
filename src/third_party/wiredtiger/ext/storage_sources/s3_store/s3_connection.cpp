@@ -2,6 +2,8 @@
 #include <aws/s3-crt/model/DeleteObjectRequest.h>
 #include <aws/s3-crt/model/ListObjectsRequest.h>
 #include <aws/s3-crt/model/PutObjectRequest.h>
+#include <aws/s3-crt/model/HeadObjectRequest.h>
+
 #include "s3_connection.h"
 
 #include <fstream>
@@ -97,6 +99,34 @@ S3Connection::DeleteObject(const std::string &bucketName, const std::string &obj
         std::cerr << "Error in DeleteObject: " << outcome.GetError().GetMessage() << std::endl;
         return false;
     }
+}
+
+/*
+ * ObjectExists --
+ *     Checks whether an object with the given key exists in the S3 bucket.
+ */
+int
+S3Connection::ObjectExists(
+  const std::string &bucketName, const std::string &objectKey, bool &exists) const
+{
+    exists = false;
+
+    Aws::S3Crt::Model::HeadObjectRequest request;
+    request.SetBucket(bucketName);
+    request.SetKey(objectKey);
+    Aws::S3Crt::Model::HeadObjectOutcome outcome = m_S3CrtClient.HeadObject(request);
+
+    /*
+     * If an object with the given key does not exist the HEAD request will return a 404.
+     * https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadObject.html Do not fail in this case.
+     */
+    if (outcome.IsSuccess()) {
+        exists = true;
+        return (0);
+    } else if (outcome.GetError().GetResponseCode() == Aws::Http::HttpResponseCode::NOT_FOUND)
+        return (0);
+    else
+        return (-1);
 }
 
 /*
