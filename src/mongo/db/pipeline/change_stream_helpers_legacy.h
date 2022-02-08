@@ -55,4 +55,21 @@ boost::optional<Document> legacyLookupPreImage(boost::intrusive_ptr<ExpressionCo
 boost::optional<std::pair<UUID, std::vector<FieldPath>>> buildDocumentKeyCache(
     const ResumeTokenData& data);
 
+/**
+ * Represents the change stream operation types that are NOT guarded behind the 'showExpandedEvents'
+ * flag.
+ */
+static const std::set<StringData> kClassicOperationTypes =
+    std::set<StringData>{DocumentSourceChangeStream::kUpdateOpType,
+                         DocumentSourceChangeStream::kDeleteOpType,
+                         DocumentSourceChangeStream::kReplaceOpType,
+                         DocumentSourceChangeStream::kInsertOpType,
+                         DocumentSourceChangeStream::kDropCollectionOpType,
+                         DocumentSourceChangeStream::kRenameCollectionOpType,
+                         DocumentSourceChangeStream::kDropDatabaseOpType,
+                         DocumentSourceChangeStream::kInvalidateOpType,
+                         DocumentSourceChangeStream::kReshardBeginOpType,
+                         DocumentSourceChangeStream::kReshardDoneCatchUpOpType,
+                         DocumentSourceChangeStream::kNewShardDetectedOpType};
+
 }  // namespace mongo::change_stream_legacy

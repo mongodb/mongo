@@ -47,9 +47,10 @@ namespace {
 TEST(ResumeToken, EncodesFullTokenFromData) {
     Timestamp ts(1000, 2);
     UUID testUuid = UUID::gen();
-    Document documentKey{{"_id"_sd, "stuff"_sd}, {"otherkey"_sd, Document{{"otherstuff"_sd, 2}}}};
+    Document eventIdentifier{{"_id"_sd, "stuff"_sd},
+                             {"otherkey"_sd, Document{{"otherstuff"_sd, 2}}}};
 
-    ResumeTokenData resumeTokenDataIn(ts, 0, 0, testUuid, Value(documentKey));
+    ResumeTokenData resumeTokenDataIn(ts, 0, 0, testUuid, Value(eventIdentifier));
     ResumeToken token(resumeTokenDataIn);
     ResumeTokenData tokenData = token.getData();
     ASSERT_EQ(resumeTokenDataIn, tokenData);
@@ -68,9 +69,10 @@ TEST(ResumeToken, EncodesTimestampOnlyTokenFromData) {
 TEST(ResumeToken, ShouldRoundTripThroughHexEncoding) {
     Timestamp ts(1000, 2);
     UUID testUuid = UUID::gen();
-    Document documentKey{{"_id"_sd, "stuff"_sd}, {"otherkey"_sd, Document{{"otherstuff"_sd, 2}}}};
+    Document eventIdentifier{{"_id"_sd, "stuff"_sd},
+                             {"otherkey"_sd, Document{{"otherstuff"_sd, 2}}}};
 
-    ResumeTokenData resumeTokenDataIn(ts, 0, 0, testUuid, Value(documentKey));
+    ResumeTokenData resumeTokenDataIn(ts, 0, 0, testUuid, Value(eventIdentifier));
 
     // Test serialization/parsing through Document.
     auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument());
@@ -88,6 +90,27 @@ TEST(ResumeToken, TimestampOnlyTokenShouldRoundTripThroughHexEncoding) {
 
     ResumeTokenData resumeTokenDataIn;
     resumeTokenDataIn.clusterTime = ts;
+
+    // Test serialization/parsing through Document.
+    auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
+    ResumeTokenData tokenData = rtToken.getData();
+    ASSERT_EQ(resumeTokenDataIn, tokenData);
+
+    // Test serialization/parsing through BSON.
+    rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
+    tokenData = rtToken.getData();
+    ASSERT_EQ(resumeTokenDataIn, tokenData);
+}
+
+TEST(ResumeToken, NonDocumentKeyResumeTokenRoundTripsThroughHexEncoding) {
+    Timestamp ts(1001, 3);
+
+    ResumeTokenData resumeTokenDataIn;
+    resumeTokenDataIn.clusterTime = ts;
+    resumeTokenDataIn.uuid = UUID::gen();
+    resumeTokenDataIn.eventIdentifier = Value(BSON("operationType"
+                                                   << "create"
+                                                   << "operationDescription" << BSONObj()));
 
     // Test serialization/parsing through Document.
     auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument().toBson());
@@ -118,8 +141,8 @@ TEST(ResumeToken, TestMissingTypebitsOptimization) {
     auto rtNoTypeBitsData = ResumeToken::parse(noTypeBitsDoc).getData();
     ASSERT_EQ(hasTypeBitsData, rtHasTypeBitsData);
     ASSERT_EQ(noTypeBitsData, rtNoTypeBitsData);
-    ASSERT_EQ(BSONType::NumberDouble, rtHasTypeBitsData.documentKey["_id"].getType());
-    ASSERT_EQ(BSONType::NumberInt, rtNoTypeBitsData.documentKey["_id"].getType());
+    ASSERT_EQ(BSONType::NumberDouble, rtHasTypeBitsData.eventIdentifier["_id"].getType());
+    ASSERT_EQ(BSONType::NumberInt, rtNoTypeBitsData.eventIdentifier["_id"].getType());
 }
 
 TEST(ResumeToken, FailsToParseForInvalidTokenFormats) {
@@ -277,7 +300,7 @@ TEST(ResumeToken, InvalidTxnOpIndex) {
 
 TEST(ResumeToken, StringEncodingSortsCorrectly) {
     // Make sure that the string encoding of the resume tokens will compare in the correct order,
-    // namely timestamp, version, txnOpIndex, uuid, then documentKey.
+    // namely timestamp, version, txnOpIndex, uuid, then eventIdentifier.
     Timestamp ts2_2(2, 2);
     Timestamp ts10_4(10, 4);
     Timestamp ts10_5(10, 5);
@@ -309,7 +332,8 @@ TEST(ResumeToken, StringEncodingSortsCorrectly) {
     assertLt({ts2_2, 0, 0, boost::none, Value()}, {ts2_2, 1, 0, boost::none, Value()});
     assertLt({ts10_4, 5, 0, boost::none, Value()}, {ts10_4, 10, 0, boost::none, Value()});
 
-    // Test that the Timestamp is more important than the version, txnOpIndex, UUID and documentKey.
+    // Test that the Timestamp is more important than the version, txnOpIndex, UUID and
+    // eventIdentifier.
     assertLt({ts10_4, 0, 0, lower_uuid, Value(Document{{"_id", 0}})},
              {ts10_5, 0, 0, lower_uuid, Value(Document{{"_id", 0}})});
     assertLt({ts2_2, 0, 0, lower_uuid, Value(Document{{"_id", 0}})},
@@ -347,7 +371,7 @@ TEST(ResumeToken, StringEncodingSortsCorrectly) {
     assertLt({ts10_4, 0, 0, lower_uuid, Value(Document{{"_id", 1}})},
              {ts10_4, 0, 0, higher_uuid, Value(Document{{"_id", 2}})});
 
-    // Test that when the Timestamp, version, txnOpIndex, and UUID are the same, the documentKey
+    // Test that when the Timestamp, version, txnOpIndex, and UUID are the same, the eventIdentifier
     // breaks the tie.
     assertLt({ts2_2, 0, 0, lower_uuid, Value(Document{{"_id", 0}})},
              {ts2_2, 0, 0, lower_uuid, Value(Document{{"_id", 1}})});

@@ -94,8 +94,7 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const MatchExpression* userMatch);
 
 /**
- * Returns the match filter for the classic changestream operationTypes i.e. the operations that
- * are NOT guarded behind the 'showExpandedEvents' flag.
+ * Returns the match filter for the classic changestream operations.
  */
 BSONObj getMatchFilterForClassicOperationTypes();
 

@@ -62,16 +62,21 @@ struct ResumeTokenData {
                     int versionIn,
                     size_t txnOpIndexIn,
                     const boost::optional<UUID>& uuidIn,
-                    Value documentKeyIn)
+                    Value eventIdentifierIn)
         : clusterTime(clusterTimeIn),
           version(versionIn),
           txnOpIndex(txnOpIndexIn),
           uuid(uuidIn),
-          documentKey(std::move(documentKeyIn)){};
+          eventIdentifier(std::move(eventIdentifierIn)){};
 
     bool operator==(const ResumeTokenData& other) const;
     bool operator!=(const ResumeTokenData& other) const {
         return !(*this == other);
+    }
+
+    static Value makeEventIdentifierFromOpDescription(StringData opType, Value opDescription) {
+        return Value(
+            Document{{"operationType"_sd, opType}, {"operationDescription"_sd, opDescription}});
     }
 
     Timestamp clusterTime;
@@ -87,7 +92,10 @@ struct ResumeTokenData {
     // notification itself.
     FromInvalidate fromInvalidate = FromInvalidate::kNotFromInvalidate;
     boost::optional<UUID> uuid;
-    Value documentKey;
+
+    // The eventIdentifier can be either be a document key for CRUD operations, or a more
+    // descriptive operation details for non-CRUD operations.
+    Value eventIdentifier;
 };
 
 std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData);
@@ -119,6 +127,11 @@ public:
     }
 
     static ResumeToken parse(const Document& document);
+
+    /**
+     * Generates an appropriate event identifier for the given operationType.
+     */
+    static Value makeEventIdentifier(StringData opType, Value documentKey, Value opDescription);
 
     /**
      * Generate a high-water-mark token for 'clusterTime', with no UUID or documentKey.

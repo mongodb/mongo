@@ -73,11 +73,6 @@ private:
     DocumentSourceChangeStreamTransform(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                         DocumentSourceChangeStreamSpec spec);
 
-    /**
-     * Helper used for determining what resume token to return.
-     */
-    ResumeTokenData getResumeToken(Value ts, Value uuid, Value documentKey, Value txnOpIndex);
-
     DocumentSourceChangeStreamSpec _changeStreamSpec;
 
     // Records the documentKey fields from the client's resume token, if present.

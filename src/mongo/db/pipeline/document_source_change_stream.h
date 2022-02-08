@@ -133,6 +133,10 @@ public:
     // after the transformation.
     static constexpr StringData kDocumentKeyField = "documentKey"_sd;
 
+    // The name of the field where the operation description of the non-CRUD operations will be
+    // located. This is complementary to the 'documentKey' for CRUD operations.
+    static constexpr StringData kOperationDescriptionField = "operationDescription"_sd;
+
     // The name of the field where the pre-image document will be found, if requested and available.
     static constexpr StringData kFullDocumentBeforeChangeField = "fullDocumentBeforeChange"_sd;
 
@@ -199,10 +203,11 @@ public:
     // UUID of a collection corresponding to the event (if applicable).
     static constexpr StringData kCollectionUuidField = "collectionUUID"_sd;
 
-    // Object with additional description of operation.
-    static constexpr StringData kOperationDescriptionField = "operationDescription"_sd;
-
+    //
     // The different types of operations we can use for the operation type.
+    //
+
+    // The classic change events.
     static constexpr StringData kUpdateOpType = "update"_sd;
     static constexpr StringData kDeleteOpType = "delete"_sd;
     static constexpr StringData kReplaceOpType = "replace"_sd;
@@ -211,10 +216,15 @@ public:
     static constexpr StringData kRenameCollectionOpType = "rename"_sd;
     static constexpr StringData kDropDatabaseOpType = "dropDatabase"_sd;
     static constexpr StringData kInvalidateOpType = "invalidate"_sd;
+
+    // The internal change events that are not exposed to the users.
     static constexpr StringData kReshardBeginOpType = "reshardBegin"_sd;
     static constexpr StringData kReshardDoneCatchUpOpType = "reshardDoneCatchUp"_sd;
     // Internal op type to signal mongos to open cursors on new shards.
     static constexpr StringData kNewShardDetectedOpType = "kNewShardDetected"_sd;
+
+    // These events are guarded behind the 'showExpandedEvents' flag.
+    static constexpr StringData kCreateOpType = "create"_sd;
 
     static constexpr StringData kRegexAllCollections = R"((?!(\$|system\.)))"_sd;
     static constexpr StringData kRegexAllDBs = R"(^(?!(admin|config|local)\.)[^.]+)"_sd;

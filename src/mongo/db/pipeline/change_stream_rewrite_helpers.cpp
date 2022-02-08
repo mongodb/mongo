@@ -108,6 +108,7 @@ std::unique_ptr<MatchExpression> matchRewriteOperationType(
         {"update", {{"op", "u"_sd}, {"o._id"_sd, kExistsFalse}}},
         {"replace", {{"op", "u"_sd}, {"o._id"_sd, kExistsTrue}}},
         {"drop", {{"op", "c"_sd}, {"o.drop"_sd, kExistsTrue}}},
+        {"create", {{"op", "c"_sd}, {"o.create"_sd, kExistsTrue}}},
         {"rename", {{"op", "c"_sd}, {"o.renameCollection"_sd, kExistsTrue}}},
         {"dropDatabase", {{"op", "c"_sd}, {"o.dropDatabase"_sd, kExistsTrue}}}};
 
@@ -207,6 +208,7 @@ boost::intrusive_ptr<Expression> exprRewriteOperationType(
         fromjson("{case: {$ne: ['$o.dropDatabase', '$$REMOVE']}, then: 'dropDatabase'}"));
     opCases.push_back(
         fromjson("{case: {$ne: ['$o.renameCollection', '$$REMOVE']}, then: 'rename'}"));
+    opCases.push_back(fromjson("{case: {$ne: ['$o.create', '$$REMOVE']}, then: 'create'}"));
 
     // The default case, if nothing matches.
     auto defaultCase = ExpressionConstant::create(expCtx.get(), Value())->serialize(false);
@@ -1005,6 +1007,12 @@ std::unique_ptr<MatchExpression> matchRewriteNs(
     tassert(5554104, "Unexpected rewrite failure", dropNsRewrite);
     cmdCases->add(std::move(dropNsRewrite));
 
+    // The 'create' event is rewritten to the cmdNs in 'ns' and the collection name in 'o.create'.
+    auto createNsRewrite = matchRewriteGenericNamespace(
+        expCtx, predicate, "ns"_sd, true /* nsFieldIsCmdNs */, "o.create"_sd);
+    tassert(6280101, "Unexpected rewrite failure", createNsRewrite);
+    cmdCases->add(std::move(createNsRewrite));
+
     // The 'dropDatabase' event is rewritten to the cmdNs in 'ns'. It does not have a collection
     // field.
     auto dropDbNsRewrite =
@@ -1094,6 +1102,7 @@ boost::intrusive_ptr<Expression> exprRewriteNs(
     collCases.push_back(fromjson(str::stream()
                                  << "{case: {$ne: ['$o.renameCollection', '$$REMOVE']}, then: "
                                  << getCollFromNSField("o.renameCollection") << "}"));
+    collCases.push_back(fromjson("{case: {$ne: ['$o.create', '$$REMOVE']}, then: '$o.create'}"));
 
     // The default case, if nothing matches.
     auto defaultCase = ExpressionConstant::create(expCtx.get(), Value())->serialize(false);

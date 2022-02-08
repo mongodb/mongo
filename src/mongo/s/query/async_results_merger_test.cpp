@@ -63,7 +63,7 @@ BSONObj makeResumeToken(Timestamp clusterTime, UUID uuid, BSONObj docKey) {
     ResumeTokenData data;
     data.clusterTime = clusterTime;
     data.uuid = uuid;
-    data.documentKey = Value(Document{docKey});
+    data.eventIdentifier = Value(Document{docKey});
     return ResumeToken(data).toDocument().toBson();
 }
 

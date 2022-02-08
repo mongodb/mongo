@@ -535,7 +535,7 @@ TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfTokenHasSubsetOfDocumen
 
 TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfDocumentKeyIsNonObject) {
     // Verify that a resume token whose documentKey is not a valid object will neither succeed nor
-    // cause an invariant when we perform the relaxed documentKey._id check when running in a
+    // cause an invariant when we perform the relaxed eventIdentifier._id check when running in a
     // sharded context.
     Timestamp resumeTimestamp(100, 1);
     getExpCtx()->inMongos = true;
@@ -551,8 +551,8 @@ TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfDocumentKeyIsNonObject)
 
 TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfDocumentKeyOmitsId) {
     // Verify that a resume token whose documentKey omits the _id field will neither succeed nor
-    // cause an invariant when we perform the relaxed documentKey._id, even when compared against an
-    // artificial stream token whose _id is also missing.
+    // cause an invariant when we perform the relaxed eventIdentifier._id, even when compared
+    // against an artificial stream token whose _id is also missing.
     Timestamp resumeTimestamp(100, 1);
     getExpCtx()->inMongos = true;
 
@@ -607,7 +607,7 @@ TEST_F(CheckResumeTokenTest,
         ResumeToken::parse(firstDocAfterResume.getDocument()["_id"].getDocument()).getData();
 
     ASSERT_EQ(tokenFromFirstDocAfterResume.clusterTime, resumeTimestamp);
-    ASSERT_DOCUMENT_EQ(tokenFromFirstDocAfterResume.documentKey.getDocument(), expectedDocKey);
+    ASSERT_DOCUMENT_EQ(tokenFromFirstDocAfterResume.eventIdentifier.getDocument(), expectedDocKey);
 }
 
 TEST_F(CheckResumeTokenTest,
@@ -674,7 +674,7 @@ TEST_F(CheckResumeTokenTest, ShouldSwallowInvalidateFromEachShardForStartAfterIn
         ResumeToken::parse(firstDocAfterResume.getDocument()["_id"].getDocument()).getData();
 
     ASSERT_EQ(tokenFromFirstDocAfterResume.clusterTime, firstEventAfter);
-    ASSERT_DOCUMENT_EQ(tokenFromFirstDocAfterResume.documentKey.getDocument(), expectedDocKey);
+    ASSERT_DOCUMENT_EQ(tokenFromFirstDocAfterResume.eventIdentifier.getDocument(), expectedDocKey);
 }
 
 TEST_F(CheckResumeTokenTest, ShouldNotSwallowUnrelatedInvalidateForStartAfterInvalidate) {
@@ -750,7 +750,7 @@ TEST_F(CheckResumeTokenTest, ShouldSkipResumeTokensWithEarlierTxnOpIndex) {
         ResumeToken::parse(firstDocAfterResume.getDocument()["_id"].getDocument()).getData();
 
     ASSERT_EQ(tokenFromFirstDocAfterResume.clusterTime, resumeTimestamp);
-    ASSERT_DOCUMENT_EQ(tokenFromFirstDocAfterResume.documentKey.getDocument(), expectedDocKey);
+    ASSERT_DOCUMENT_EQ(tokenFromFirstDocAfterResume.eventIdentifier.getDocument(), expectedDocKey);
 }
 
 /**

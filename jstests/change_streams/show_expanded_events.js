@@ -1,7 +1,12 @@
 /**
  * Tests the behavior of change streams in the presence of 'showExpandedEvents' flag.
  *
- * @tags: [ requires_fcv_53, ]
+ * @tags: [
+ *   requires_fcv_60,
+ *   # The test assumes certain ordering of the events. The chunk migrations on a sharded collection
+ *   # could break the test.
+ *   assumes_unsharded_collection,
+ * ]
  */
 (function() {
 "use strict";
@@ -152,6 +157,12 @@ cursor = openChangeStreamCursor();
 // Test change stream event for 'rename' operation with 'dropTarget: true' when target collection
 // exists.
 assertCreateCollection(testDB, renamedCollName);
+assertNextChangeEvent({
+    ns: renamedNs,
+    operationType: 'create',
+    operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}}
+
+});
 assertChangeEvent(() => assert.commandWorked(coll.renameCollection(renamedCollName, true)), {
     ns,
     operationType: 'rename',

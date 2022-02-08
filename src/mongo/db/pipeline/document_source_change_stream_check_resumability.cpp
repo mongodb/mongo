@@ -109,16 +109,16 @@ DocumentSourceChangeStreamCheckResumability::compareAgainstClientResumeToken(
     }
 
     // If all the fields match exactly, then we have found the token.
-    if (ValueComparator::kInstance.evaluate(tokenDataFromResumedStream.documentKey ==
-                                            tokenDataFromClient.documentKey)) {
+    if (ValueComparator::kInstance.evaluate(tokenDataFromResumedStream.eventIdentifier ==
+                                            tokenDataFromClient.eventIdentifier)) {
         return ResumeStatus::kFoundToken;
     }
 
-    // At this point, we know that the tokens differ only by documentKey. The status we return will
-    // depend on whether the stream token is logically before or after the client token. If the
+    // At this point, we know that the tokens differ only by eventIdentifier. The status we return
+    // will depend on whether the stream token is logically before or after the client token. If the
     // latter, then we will never see the resume token and the stream cannot be resumed.
-    return ValueComparator::kInstance.evaluate(tokenDataFromResumedStream.documentKey >
-                                               tokenDataFromClient.documentKey)
+    return ValueComparator::kInstance.evaluate(tokenDataFromResumedStream.eventIdentifier >
+                                               tokenDataFromClient.eventIdentifier)
         ? ResumeStatus::kSurpassedToken
         : ResumeStatus::kCheckNextDoc;
 }

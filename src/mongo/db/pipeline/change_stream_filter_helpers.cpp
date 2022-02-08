@@ -32,6 +32,7 @@
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/pipeline/change_stream_helpers_legacy.h"
 #include "mongo/db/pipeline/change_stream_rewrite_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -104,11 +105,13 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     auto renameFromEvent = BSON("o.renameCollection" << BSONRegEx(nsRegex));
     auto renameToEvent =
         BSON("o.renameCollection" << BSON("$exists" << true) << "o.to" << BSONRegEx(nsRegex));
+    const auto createEvent = BSON("o.create" << BSONRegEx(collRegex));
 
     auto orCmdEvents = std::make_unique<OrMatchExpression>();
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(dropEvent, expCtx));
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(renameFromEvent, expCtx));
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(renameToEvent, expCtx));
+    orCmdEvents->add(MatchExpressionParser::parseAndNormalize(createEvent, expCtx));
 
     // Omit dropDatabase on single-collection streams. While the stream will be invalidated before
     // it sees this event, the user will incorrectly see it if they startAfter the invalidate.
@@ -182,12 +185,20 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
         // 'prevOpTime' link to another 'applyOps' command, indicating a multi-entry transaction.
         BSONArrayBuilder orBuilder(applyOpsBuilder.subarrayStart("$or"));
         {
-            {
-                BSONObjBuilder nsMatchBuilder(orBuilder.subobjStart());
-                nsMatchBuilder.append(
-                    "o.applyOps.ns"_sd,
-                    BSONRegEx(DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx->ns)));
-            }
+            // Regexes for full-namespace, collection, and command-namespace matching.
+            auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx->ns);
+            auto collRegex = DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx->ns);
+            auto cmdNsRegex = DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx->ns);
+
+            // Match relevant CRUD events on the monitored namespaces.
+            orBuilder.append(BSON("o.applyOps.ns" << BSONRegEx(nsRegex)));
+
+            // Match relevant command events on the monitored namespaces.
+            orBuilder.append(BSON(
+                "o.applyOps" << BSON(
+                    "$elemMatch" << BSON("ns" << BSONRegEx(cmdNsRegex)
+                                              << OR(BSON("o.create" << BSONRegEx(collRegex)))))));
+
             // The default repl::OpTime is the value used to indicate a null "prevOpTime" link.
             orBuilder.append(BSON(repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName
                                   << BSON("$ne" << repl::OpTime().toBSON())));
@@ -243,18 +254,9 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
 }
 
 BSONObj getMatchFilterForClassicOperationTypes() {
-    return BSON(DocumentSourceChangeStream::kOperationTypeField << BSON(
-                    "$in" << BSON_ARRAY(DocumentSourceChangeStream::kUpdateOpType
-                                        << DocumentSourceChangeStream::kDeleteOpType
-                                        << DocumentSourceChangeStream::kReplaceOpType
-                                        << DocumentSourceChangeStream::kInsertOpType
-                                        << DocumentSourceChangeStream::kDropCollectionOpType
-                                        << DocumentSourceChangeStream::kRenameCollectionOpType
-                                        << DocumentSourceChangeStream::kDropDatabaseOpType
-                                        << DocumentSourceChangeStream::kInvalidateOpType
-                                        << DocumentSourceChangeStream::kReshardBeginOpType
-                                        << DocumentSourceChangeStream::kReshardDoneCatchUpOpType
-                                        << DocumentSourceChangeStream::kNewShardDetectedOpType)));
+    return BSON(DocumentSourceChangeStream::kOperationTypeField
+                << BSON("$in" << change_stream_legacy::kClassicOperationTypes));
 }
+
 }  // namespace change_stream_filter
 }  // namespace mongo

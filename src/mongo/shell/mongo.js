@@ -595,6 +595,11 @@ Mongo.prototype._extractChangeStreamOptions = function(options) {
         delete options.allowToRunOnSystemNS;
     }
 
+    if (options.hasOwnProperty("showExpandedEvents")) {
+        changeStreamOptions.showExpandedEvents = options.showExpandedEvents;
+        delete options.showExpandedEvents;
+    }
+
     return [{$changeStream: changeStreamOptions}, options];
 };
 

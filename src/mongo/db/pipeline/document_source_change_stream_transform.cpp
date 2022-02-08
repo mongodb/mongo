@@ -35,6 +35,7 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/pipeline/change_stream_document_diff_parser.h"
+#include "mongo/db/pipeline/change_stream_filter_helpers.h"
 #include "mongo/db/pipeline/change_stream_helpers_legacy.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/pipeline/document_path_support.h"
@@ -64,6 +65,34 @@ using std::vector;
 
 namespace {
 constexpr auto checkValueType = &DocumentSourceChangeStream::checkValueType;
+
+Document copyDocExceptFields(const Document& source, const std::set<StringData>& fieldNames) {
+    MutableDocument doc(source);
+    for (auto fieldName : fieldNames) {
+        doc.remove(fieldName);
+    }
+    return doc.freeze();
+}
+
+ResumeTokenData makeResumeToken(Value ts,
+                                Value txnOpIndex,
+                                Value uuid,
+                                StringData operationType,
+                                Value documentKey,
+                                Value opDescription) {
+    ResumeTokenData resumeTokenData;
+    resumeTokenData.clusterTime = ts.getTimestamp();
+    if (!uuid.missing()) {
+        resumeTokenData.uuid = uuid.getUuid();
+    }
+    if (!txnOpIndex.missing()) {
+        resumeTokenData.txnOpIndex = txnOpIndex.getLong();
+    }
+    resumeTokenData.eventIdentifier =
+        ResumeToken::makeEventIdentifier(operationType, documentKey, opDescription);
+
+    return resumeTokenData;
+}
 }  // namespace
 
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamTransform,
@@ -134,26 +163,6 @@ StageConstraints DocumentSourceChangeStreamTransform::constraints(
     return constraints;
 }
 
-ResumeTokenData DocumentSourceChangeStreamTransform::getResumeToken(Value ts,
-                                                                    Value uuid,
-                                                                    Value documentKey,
-                                                                    Value txnOpIndex) {
-    ResumeTokenData resumeTokenData;
-
-    resumeTokenData.clusterTime = ts.getTimestamp();
-    resumeTokenData.documentKey = documentKey;
-
-    if (!uuid.missing()) {
-        resumeTokenData.uuid = uuid.getUuid();
-    }
-
-    if (!txnOpIndex.missing()) {
-        resumeTokenData.txnOpIndex = txnOpIndex.getLong();
-    }
-
-    return resumeTokenData;
-}
-
 Document DocumentSourceChangeStreamTransform::applyTransformation(const Document& input) {
     // If we're executing a change stream pipeline that was forwarded from mongos, then we expect it
     // to "need merge"---we expect to be executing the shards part of a split pipeline. It is never
@@ -193,6 +202,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     Value fullDocument;
     Value updateDescription;
     Value documentKey;
+    Value operationDescription;
 
     switch (opType) {
         case repl::OpTypeEnum::kInsert: {
@@ -289,20 +299,20 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
             break;
         }
         case repl::OpTypeEnum::kCommand: {
-            if (!input.getNestedField("o.drop").missing()) {
+            const auto oField = input[repl::OplogEntry::kObjectFieldName].getDocument();
+            if (auto nssField = oField.getField("drop"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kDropCollectionOpType;
 
                 // The "o.drop" field will contain the actual collection name.
-                nss = NamespaceString(nss.db(), input.getNestedField("o.drop").getString());
-            } else if (!input.getNestedField("o.renameCollection").missing()) {
+                nss = NamespaceString(nss.db(), nssField.getString());
+            } else if (auto nssField = oField.getField("renameCollection"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kRenameCollectionOpType;
 
                 // The "o.renameCollection" field contains the namespace of the original collection.
-                nss = NamespaceString(input.getNestedField("o.renameCollection").getString());
+                nss = NamespaceString(nssField.getString());
 
-                // The "o.to" field contains the target namespace for the rename.
-                const auto renameTargetNss =
-                    NamespaceString(input.getNestedField("o.to").getString());
+                // The "to" field contains the target namespace for the rename.
+                const auto renameTargetNss = NamespaceString(oField["to"].getString());
                 const Value renameTarget(Document{
                     {"db", renameTargetNss.db()},
                     {"coll", renameTargetNss.coll()},
@@ -315,27 +325,22 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
                 // If 'showExpandedEvents' is set, include full details of the rename in
                 // 'operationDescription'.
                 if (_changeStreamSpec.getShowExpandedEvents()) {
-                    MutableDocument operationDescription;
-                    operationDescription.addField(DocumentSourceChangeStream::kRenameTargetNssField,
-                                                  renameTarget);
-
-                    // If present, 'dropTarget' is the UUID of the collection that previously owned
-                    // the target namespace and was dropped during the rename operation.
-                    const auto dropTarget = input.getNestedField("o.dropTarget");
-                    if (!dropTarget.missing()) {
-                        checkValueType(dropTarget, "o.dropTarget", BSONType::BinData);
-                        operationDescription.addField("dropTarget", dropTarget);
-                    }
-
-                    doc.addField(DocumentSourceChangeStream::kOperationDescriptionField,
-                                 operationDescription.freezeToValue());
+                    MutableDocument opDescBuilder(
+                        copyDocExceptFields(oField, {"renameCollection"_sd, "stayTemp"_sd}));
+                    opDescBuilder.setField(DocumentSourceChangeStream::kRenameTargetNssField,
+                                           renameTarget);
+                    operationDescription = opDescBuilder.freezeToValue();
                 }
-            } else if (!input.getNestedField("o.dropDatabase").missing()) {
+            } else if (!oField.getField("dropDatabase").missing()) {
                 operationType = DocumentSourceChangeStream::kDropDatabaseOpType;
 
                 // Extract the database name from the namespace field and leave the collection name
                 // empty.
                 nss = NamespaceString(nss.db());
+            } else if (auto nssField = oField.getField("create"); !nssField.missing()) {
+                operationType = DocumentSourceChangeStream::kCreateOpType;
+                nss = NamespaceString(nss.db(), nssField.getString());
+                operationDescription = Value(copyDocExceptFields(oField, {"create"_sd}));
             } else {
                 // All other commands will invalidate the stream.
                 operationType = DocumentSourceChangeStream::kInvalidateOpType;
@@ -402,7 +407,8 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     }
 
     // Generate the resume token. Note that only 'ts' is always guaranteed to be present.
-    auto resumeTokenData = getResumeToken(ts, uuid, documentKey, txnOpIndex);
+    auto resumeTokenData =
+        makeResumeToken(ts, txnOpIndex, uuid, operationType, documentKey, operationDescription);
     auto resumeToken = ResumeToken(resumeTokenData).toDocument();
 
     doc.addField(DocumentSourceChangeStream::kIdField, Value(resumeToken));
@@ -463,7 +469,13 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
                  operationType == DocumentSourceChangeStream::kDropDatabaseOpType
                      ? Value(Document{{"db", nss.db()}})
                      : Value(Document{{"db", nss.db()}, {"coll", nss.coll()}}));
+
+    // The event may have a documentKey OR an operationDescription, but not both. We already
+    // validated this while creating the resume token.
     doc.addField(DocumentSourceChangeStream::kDocumentKeyField, std::move(documentKey));
+    if (_changeStreamSpec.getShowExpandedEvents()) {
+        doc.addField(DocumentSourceChangeStream::kOperationDescriptionField, operationDescription);
+    }
 
     // Note that the update description field might be the 'missing' value, in which case it will
     // not be serialized.

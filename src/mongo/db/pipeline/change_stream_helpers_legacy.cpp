@@ -131,10 +131,16 @@ boost::optional<Document> legacyLookupPreImage(boost::intrusive_ptr<ExpressionCo
 
 boost::optional<std::pair<UUID, std::vector<FieldPath>>> buildDocumentKeyCache(
     const ResumeTokenData& tokenData) {
-    if (!tokenData.documentKey.missing() && tokenData.uuid) {
-        std::vector<FieldPath> docKeyFields;
-        auto docKey = tokenData.documentKey.getDocument();
+    if (!tokenData.eventIdentifier.missing() && tokenData.uuid) {
+        auto docKey = tokenData.eventIdentifier.getDocument();
 
+        // Newly added events store their operationType and operationDescription as the
+        // eventIdentifier, not a documentKey.
+        if (docKey["_id"].missing()) {
+            return {};
+        }
+
+        std::vector<FieldPath> docKeyFields;
         auto iter = docKey.fieldIterator();
         while (iter.more()) {
             auto fieldPair = iter.next();
