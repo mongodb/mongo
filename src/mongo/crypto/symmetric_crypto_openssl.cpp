@@ -59,6 +59,8 @@ void initCipherContext(
             cipher = EVP_get_cipherbyname("aes-256-cbc");
         } else if (mode == crypto::aesMode::gcm) {
             cipher = EVP_get_cipherbyname("aes-256-gcm");
+        } else if (mode == crypto::aesMode::ctr) {
+            cipher = EVP_get_cipherbyname("aes-256-ctr");
         }
     }
     uassert(ErrorCodes::BadValue,
@@ -224,9 +226,9 @@ private:
 
 std::set<std::string> getSupportedSymmetricAlgorithms() {
 #if defined(EVP_CTRL_GCM_GET_TAG) && !defined(__APPLE__)
-    return {aes256CBCName, aes256GCMName};
+    return {aes256CBCName, aes256GCMName, aes256CTRName};
 #else
-    return {aes256CBCName};
+    return {aes256CBCName, aes256CTRName};
 #endif
 }
 

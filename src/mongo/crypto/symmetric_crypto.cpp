@@ -55,6 +55,8 @@ size_t aesGetIVSize(crypto::aesMode mode) {
             return crypto::aesCBCIVSize;
         case crypto::aesMode::gcm:
             return crypto::aesGCMIVSize;
+        case crypto::aesMode::ctr:
+            return crypto::aesCTRIVSize;
         default:
             fassertFailed(4053);
     }
@@ -65,6 +67,8 @@ aesMode getCipherModeFromString(const std::string& mode) {
         return aesMode::cbc;
     } else if (mode == aes256GCMName) {
         return aesMode::gcm;
+    } else if (mode == aes256CTRName) {
+        return aesMode::ctr;
     } else {
         MONGO_UNREACHABLE;
     }
@@ -75,6 +79,8 @@ std::string getStringFromCipherMode(aesMode mode) {
         return aes256CBCName;
     } else if (mode == aesMode::gcm) {
         return aes256GCMName;
+    } else if (mode == aesMode::ctr) {
+        return aes256CTRName;
     } else {
         MONGO_UNREACHABLE;
     }

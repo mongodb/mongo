@@ -491,6 +491,21 @@ public:
         std::string tag;
     };
 
+    class CTRTestVector {
+    public:
+        CTRTestVector(StringData key, StringData plaintext, StringData iv, StringData ciphertext) {
+            this->key = hexblob::decode(key);
+            this->plaintext = hexblob::decode(plaintext);
+            this->iv = hexblob::decode(iv);
+            this->ciphertext = hexblob::decode(ciphertext);
+        }
+
+        std::string key;
+        std::string plaintext;
+        std::string iv;
+        std::string ciphertext;
+    };
+
     void evaluate(GCMTestVector test) {
         constexpr auto mode = crypto::aesMode::gcm;
 
@@ -563,6 +578,49 @@ public:
             ASSERT_NOT_OK(decryptor->finalize(decryptionResultCursor));
         }
     }
+
+    void evaluate(CTRTestVector test) {
+        constexpr auto mode = crypto::aesMode::ctr;
+
+        if (getSupportedSymmetricAlgorithms().count(getStringFromCipherMode(mode)) == 0) {
+            return;
+        }
+
+        SymmetricKey key = aesGeneratePredictableKey256(test.key, "testID");
+
+        // Validate encryption
+        auto encryptor = uassertStatusOK(crypto::SymmetricEncryptor::create(key, mode, test.iv));
+
+        const size_t kBufferSize = test.plaintext.size();
+        {
+            // Validate encryption
+            std::vector<uint8_t> encryptionResult(kBufferSize);
+            auto cipherLen = uassertStatusOK(encryptor->update(test.plaintext, encryptionResult));
+            cipherLen += uassertStatusOK(encryptor->finalize(
+                {encryptionResult.data() + cipherLen, encryptionResult.size() - cipherLen}));
+
+            ASSERT_EQ(test.ciphertext.size(), cipherLen);
+            ASSERT_EQ(hexblob::encode(test.ciphertext),
+                      hexblob::encode(
+                          StringData(asChar(encryptionResult.data()), encryptionResult.size())));
+        }
+        {
+            // Validate decryption
+            auto decryptor =
+                uassertStatusOK(crypto::SymmetricDecryptor::create(key, mode, test.iv));
+
+            std::vector<uint8_t> decryptionResult(kBufferSize);
+            auto decipherLen =
+                uassertStatusOK(decryptor->update(test.ciphertext, decryptionResult));
+            decipherLen += uassertStatusOK(decryptor->finalize(
+                {decryptionResult.data() + decipherLen, decryptionResult.size() - decipherLen}));
+
+            ASSERT_EQ(test.plaintext.size(), decipherLen);
+            ASSERT_EQ(hexblob::encode(StringData(test.plaintext.data(), test.plaintext.size())),
+                      hexblob::encode(
+                          StringData(asChar(decryptionResult.data()), decryptionResult.size())));
+        }
+    }
 };
 
 /** Test vectors drawn from
@@ -625,6 +683,62 @@ TEST_F(AESGCMTestVectors, TestCase16) {
                       "76fc6ece0f4e1768cddf8853bb2d551b"_sd));
 }
 
+// AES-CTR test vectors are obtained here:
+// https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38a.pdf
+
+TEST_F(AESGCMTestVectors, CTRTestCase1) {
+    evaluate(
+        CTRTestVector("603deb1015ca71be2b73aef0857d7781"
+                      "1f352c073b6108d72d9810a30914dff4",
+                      "6bc1bee22e409f96e93d7e117393172a",
+                      "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+                      "601ec313775789a5b7a7f504bbf3d228"));
+}
+
+TEST_F(AESGCMTestVectors, CTRTestCase2) {
+    evaluate(
+        CTRTestVector("603deb1015ca71be2b73aef0857d7781"
+                      "1f352c073b6108d72d9810a30914dff4",
+                      "ae2d8a571e03ac9c9eb76fac45af8e51",
+                      "f0f1f2f3f4f5f6f7f8f9fafbfcfdff00",
+                      "f443e3ca4d62b59aca84e990cacaf5c5"));
+}
+
+TEST_F(AESGCMTestVectors, CTRTestCase3) {
+    evaluate(
+        CTRTestVector("603deb1015ca71be2b73aef0857d7781"
+                      "1f352c073b6108d72d9810a30914dff4",
+                      "30c81c46a35ce411e5fbc1191a0a52ef",
+                      "f0f1f2f3f4f5f6f7f8f9fafbfcfdff01",
+                      "2b0930daa23de94ce87017ba2d84988d"));
+}
+
+TEST_F(AESGCMTestVectors, CTRTestCase4) {
+    evaluate(
+        CTRTestVector("603deb1015ca71be2b73aef0857d7781"
+                      "1f352c073b6108d72d9810a30914dff4",
+                      "f69f2445df4f9b17ad2b417be66c3710",
+                      "f0f1f2f3f4f5f6f7f8f9fafbfcfdff02",
+                      "dfc9c58db67aada613c2dd08457941a6"));
+}
+
+TEST_F(AESGCMTestVectors, CTRTestCase1234) {
+    evaluate(
+        CTRTestVector("603deb1015ca71be2b73aef0857d7781"
+                      "1f352c073b6108d72d9810a30914dff4",
+
+                      "6bc1bee22e409f96e93d7e117393172a"
+                      "ae2d8a571e03ac9c9eb76fac45af8e51"
+                      "30c81c46a35ce411e5fbc1191a0a52ef"
+                      "f69f2445df4f9b17ad2b417be66c3710",
+
+                      "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+
+                      "601ec313775789a5b7a7f504bbf3d228"
+                      "f443e3ca4d62b59aca84e990cacaf5c5"
+                      "2b0930daa23de94ce87017ba2d84988d"
+                      "dfc9c58db67aada613c2dd08457941a6"));
+}
 
 }  // namespace crypto
 }  // namespace mongo

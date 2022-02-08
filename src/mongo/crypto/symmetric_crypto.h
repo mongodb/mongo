@@ -71,15 +71,21 @@ constexpr size_t aesGCMTagSize = 12;
 constexpr size_t aesGCMIVSize = 12;
 
 /**
+ * CTR tunable parameters
+ */
+constexpr size_t aesCTRIVSize = 16;
+
+/**
  * Encryption mode identifiers
  */
-enum class aesMode : uint8_t { cbc, gcm };
+enum class aesMode : uint8_t { cbc, gcm, ctr };
 
 /**
  * Algorithm names which this module recognizes
  */
 const std::string aes256CBCName = "AES256-CBC";
 const std::string aes256GCMName = "AES256-GCM";
+const std::string aes256CTRName = "AES256-CTR";
 
 aesMode getCipherModeFromString(const std::string& mode);
 std::string getStringFromCipherMode(aesMode);
