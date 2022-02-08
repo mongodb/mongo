@@ -409,7 +409,7 @@ void Balancer::_consumeActionStreamLoop() {
         // Non-blocking call, assumes the requests are returning a SemiFuture<>
         stdx::visit(
             visit_helper::Overloaded{
-                [&](MergeInfo mergeAction) {
+                [&](MergeInfo&& mergeAction) {
                     applyThrottling();
                     auto result =
                         _commandScheduler
@@ -419,16 +419,17 @@ void Balancer::_consumeActionStreamLoop() {
                                                  mergeAction.chunkRange,
                                                  mergeAction.collectionVersion)
                             .thenRunOn(*executor)
-                            .onCompletion([this, mergeAction](const Status& status) {
-                                ThreadClient tc(
-                                    "BalancerDefragmentationPolicy::acknowledgeMergeResult",
-                                    getGlobalServiceContext());
-                                auto opCtx = tc->makeOperationContext();
-                                _defragmentationPolicy->acknowledgeMergeResult(
-                                    opCtx.get(), mergeAction, status);
-                            });
+                            .onCompletion(
+                                [this, command = std::move(mergeAction)](const Status& status) {
+                                    ThreadClient tc(
+                                        "BalancerDefragmentationPolicy::acknowledgeMergeResult",
+                                        getGlobalServiceContext());
+                                    auto opCtx = tc->makeOperationContext();
+                                    _defragmentationPolicy->acknowledgeMergeResult(
+                                        opCtx.get(), command, status);
+                                });
                 },
-                [&](DataSizeInfo dataSizeAction) {
+                [&](DataSizeInfo&& dataSizeAction) {
                     auto result =
                         _commandScheduler
                             ->requestDataSize(opCtx.get(),
@@ -439,17 +440,17 @@ void Balancer::_consumeActionStreamLoop() {
                                               dataSizeAction.keyPattern,
                                               dataSizeAction.estimatedValue)
                             .thenRunOn(*executor)
-                            .onCompletion([this, dataSizeAction](
+                            .onCompletion([this, command = std::move(dataSizeAction)](
                                               const StatusWith<DataSizeResponse>& swDataSize) {
                                 ThreadClient tc(
                                     "BalancerDefragmentationPolicy::acknowledgeDataSizeResult",
                                     getGlobalServiceContext());
                                 auto opCtx = tc->makeOperationContext();
                                 _defragmentationPolicy->acknowledgeDataSizeResult(
-                                    opCtx.get(), dataSizeAction, swDataSize);
+                                    opCtx.get(), command, swDataSize);
                             });
                 },
-                [&](AutoSplitVectorInfo splitVectorAction) {
+                [&](AutoSplitVectorInfo&& splitVectorAction) {
                     auto result =
                         _commandScheduler
                             ->requestAutoSplitVector(opCtx.get(),
@@ -460,7 +461,7 @@ void Balancer::_consumeActionStreamLoop() {
                                                      splitVectorAction.maxKey,
                                                      splitVectorAction.maxChunkSizeBytes)
                             .thenRunOn(*executor)
-                            .onCompletion([this, splitVectorAction](
+                            .onCompletion([this, command = std::move(splitVectorAction)](
                                               const StatusWith<std::vector<BSONObj>>&
                                                   swSplitPoints) {
                                 ThreadClient tc(
@@ -468,10 +469,10 @@ void Balancer::_consumeActionStreamLoop() {
                                     getGlobalServiceContext());
                                 auto opCtx = tc->makeOperationContext();
                                 _defragmentationPolicy->acknowledgeAutoSplitVectorResult(
-                                    opCtx.get(), splitVectorAction, swSplitPoints);
+                                    opCtx.get(), command, swSplitPoints);
                             });
                 },
-                [&](SplitInfoWithKeyPattern splitAction) {
+                [&](SplitInfoWithKeyPattern&& splitAction) {
                     applyThrottling();
                     auto result =
                         _commandScheduler
@@ -484,21 +485,22 @@ void Balancer::_consumeActionStreamLoop() {
                                                 splitAction.info.maxKey,
                                                 splitAction.info.splitKeys)
                             .thenRunOn(*executor)
-                            .onCompletion([this, splitAction](const Status& status) {
-                                ThreadClient tc(
-                                    "BalancerDefragmentationPolicy::acknowledgeSplitResult",
-                                    getGlobalServiceContext());
-                                auto opCtx = tc->makeOperationContext();
-                                _defragmentationPolicy->acknowledgeSplitResult(
-                                    opCtx.get(), splitAction, status);
-                            });
+                            .onCompletion(
+                                [this, command = std::move(splitAction)](const Status& status) {
+                                    ThreadClient tc(
+                                        "BalancerDefragmentationPolicy::acknowledgeSplitResult",
+                                        getGlobalServiceContext());
+                                    auto opCtx = tc->makeOperationContext();
+                                    _defragmentationPolicy->acknowledgeSplitResult(
+                                        opCtx.get(), command, status);
+                                });
                 },
-                [](MigrateInfo _) {
+                [](MigrateInfo&& _) {
                     uasserted(ErrorCodes::BadValue,
                               "Migrations cannot be processed as Streaming Actions");
                 },
                 [](EndOfActionStream eoa) {}},
-            action);
+            std::move(action));
     }
 }
 
