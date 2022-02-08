@@ -1184,7 +1184,8 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
             invariant(IndexBuildProtocol::kTwoPhase == replState->protocol);
             // This signal can be received during primary (drain phase), secondary,
             // startup (startup recovery) and startup2 (initial sync).
-            bool isMaster = replCoord->canAcceptWritesFor(opCtx, nss);
+            bool isMaster = replCoord->canAcceptWritesFor(opCtx, nss) &&
+                !replCoord->getSettings().shouldRecoverFromOplogAsStandalone();
             invariant(!isMaster, str::stream() << "Index build: " << replState->buildUUID);
             invariant(replState->indexBuildState.isAborted(),
                       str::stream()
