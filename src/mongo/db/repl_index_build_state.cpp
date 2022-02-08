@@ -175,7 +175,8 @@ void ReplIndexBuildState::abortForShutdown(OperationContext* opCtx) {
 
 void ReplIndexBuildState::onOplogAbort(OperationContext* opCtx, const NamespaceString& nss) const {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    bool isPrimary = replCoord->canAcceptWritesFor(opCtx, nss);
+    bool isPrimary = replCoord->canAcceptWritesFor(opCtx, nss) &&
+        !replCoord->getSettings().shouldRecoverFromOplogAsStandalone();
     invariant(!isPrimary, str::stream() << "Index build: " << buildUUID);
 
     stdx::unique_lock<Latch> lk(_mutex);
