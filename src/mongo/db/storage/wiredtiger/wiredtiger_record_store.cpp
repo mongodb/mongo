@@ -2139,7 +2139,7 @@ WiredTigerRecordStoreCursorBase::WiredTigerRecordStoreCursorBase(OperationContex
                                                                  bool forward)
     : _rs(rs), _opCtx(opCtx), _forward(forward) {
     if (_rs._isOplog) {
-        _oplogVisibleTs = WiredTigerRecoveryUnit::get(opCtx)->getOplogVisibilityTs();
+        initOplogVisibility(_opCtx);
     }
     _cursor.emplace(rs.getURI(), rs.tableId(), true, opCtx);
 }
@@ -2174,6 +2174,27 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
     _skipNextAdvance = false;
     if (!id.isValid()) {
         id = getKey(c);
+    }
+
+    // If we're using a read timestamp and we're a reverse cursor positioned outside of that bound,
+    // walk backwards until we find a suitable record. This is exercised when doing a reverse
+    // natural order collection scan.
+    if (_readTimestampForOplog && !_forward) {
+        invariant(_rs._isOplog);
+        while (id.getLong() > *_readTimestampForOplog) {
+            int advanceRet = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->prev(c); });
+            if (advanceRet == WT_NOTFOUND) {
+                _eof = true;
+                return {};
+            }
+            invariantWTOK(advanceRet, c->session);
+            id = getKey(c);
+        }
+    }
+
+    if (_readTimestampForOplog && id.getLong() > *_readTimestampForOplog) {
+        _eof = true;
+        return {};
     }
 
     if (_forward && _oplogVisibleTs && id.getLong() > *_oplogVisibleTs) {
@@ -2211,6 +2232,11 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
 
 boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordId& id) {
     invariant(_hasRestored);
+    if (_readTimestampForOplog && id.getLong() > *_readTimestampForOplog) {
+        _eof = true;
+        return {};
+    }
+
     if (_forward && _oplogVisibleTs && id.getLong() > *_oplogVisibleTs) {
         _eof = true;
         return {};
@@ -2250,8 +2276,13 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordI
 boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId& id) {
     dassert(_opCtx->lockState()->isReadLocked());
 
-    // Forward scans on the oplog must round down to the oplog visibility timestamp.
+    // Oplog queries must manually implement read_timestamp visibility.
     RecordId start = id;
+    if (_readTimestampForOplog && start.getLong() > *_readTimestampForOplog) {
+        start = RecordId(*_readTimestampForOplog);
+    }
+
+    // Additionally, forward scanning oplog cursors must not see past holes.
     if (_forward && _oplogVisibleTs && start.getLong() > *_oplogVisibleTs) {
         start = RecordId(*_oplogVisibleTs);
     }
@@ -2299,8 +2330,12 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId
 
     curId = getKey(c);
 
-    // For forward cursors on the oplog, the oplog visible timestamp is treated as the end of the
-    // record store. So if we are positioned past this point, then there are no visible records.
+    // After we've positioned to the first document to return, apply visibility rules again.
+    if (_readTimestampForOplog && curId.getLong() > *_readTimestampForOplog) {
+        _eof = true;
+        return boost::none;
+    }
+
     if (_forward && _oplogVisibleTs && curId.getLong() > *_oplogVisibleTs) {
         _eof = true;
         return boost::none;
@@ -2322,10 +2357,25 @@ void WiredTigerRecordStoreCursorBase::save() {
         if (_cursor)
             _cursor->reset();
         _oplogVisibleTs = boost::none;
+        _readTimestampForOplog = boost::none;
         _hasRestored = false;
     } catch (const WriteConflictException&) {
         // Ignore since this is only called when we are about to kill our transaction
         // anyway.
+    }
+}
+
+void WiredTigerRecordStoreCursorBase::initOplogVisibility(OperationContext* opCtx) {
+    auto wtRu = WiredTigerRecoveryUnit::get(opCtx);
+    wtRu->setIsOplogReader();
+    if (_forward) {
+        _oplogVisibleTs = wtRu->getOplogVisibilityTs();
+    }
+    boost::optional<Timestamp> readTs = wtRu->getPointInTimeReadTimestamp(opCtx);
+    if (readTs && readTs->asLL() != 0) {
+        // One cannot pass a read_timestamp of 0 to WT, but a "0" is commonly understand as every
+        // time is visible.
+        _readTimestampForOplog = readTs->asInt64();
     }
 }
 
@@ -2335,10 +2385,8 @@ void WiredTigerRecordStoreCursorBase::saveUnpositioned() {
 }
 
 bool WiredTigerRecordStoreCursorBase::restore(bool tolerateCappedRepositioning) {
-    if (_rs._isOplog && _forward) {
-        auto wtRu = WiredTigerRecoveryUnit::get(_opCtx);
-        wtRu->setIsOplogReader();
-        _oplogVisibleTs = wtRu->getOplogVisibilityTs();
+    if (_rs._isOplog) {
+        initOplogVisibility(_opCtx);
     }
 
     if (!_cursor)

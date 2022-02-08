@@ -41,9 +41,11 @@
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/global_settings.h"
 #include "mongo/db/index/index_access_method_factory_impl.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
 #include "mongo/db/op_observer_registry.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/service_entry_point_mongod.h"
 #include "mongo/db/storage/control/storage_control.h"
@@ -51,6 +53,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/periodic_runner_factory.h"
 
 namespace mongo {
@@ -63,8 +66,17 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine)
 
 ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine,
                                                    RepairAction repair,
-                                                   StorageEngineInitFlags initFlags)
+                                                   StorageEngineInitFlags initFlags,
+                                                   bool useReplSettings,
+                                                   bool useMockClock)
     : _tempDir("service_context_d_test_fixture") {
+
+    if (useReplSettings) {
+        repl::ReplSettings replSettings;
+        replSettings.setOplogSizeBytes(10 * 1024 * 1024);
+        replSettings.setReplSetString("rs0");
+        setGlobalReplSettings(replSettings);
+    }
 
     _stashedStorageParams.engine = std::exchange(storageGlobalParams.engine, std::move(engine));
     _stashedStorageParams.engineSetByUser =
@@ -83,6 +95,25 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine,
     }
 
     auto const serviceContext = getServiceContext();
+    if (useMockClock) {
+        // Copied from dbtests.cpp. DBTests sets up a controlled mock clock while
+        // ServiceContextMongoDTest uses the system clock. Tests moved from dbtests to unittests may
+        // depend on a deterministic clock.
+        auto fastClock = std::make_unique<ClockSourceMock>();
+        // Timestamps are split into two 32-bit integers, seconds and "increments". Currently
+        // (but maybe not for eternity), a Timestamp with a value of `0` seconds is always
+        // considered "null" by `Timestamp::isNull`, regardless of its increment value. Ticking
+        // the `ClockSourceMock` only bumps the "increment" counter, thus by default, generating
+        // "null" timestamps. Bumping by one second here avoids any accidental interpretations.
+        fastClock->advance(Seconds(1));
+        serviceContext->setFastClockSource(std::move(fastClock));
+
+        auto preciseClock = std::make_unique<ClockSourceMock>();
+        // See above.
+        preciseClock->advance(Seconds(1));
+        serviceContext->setPreciseClockSource(std::move(preciseClock));
+    }
+
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(serviceContext));
 
     // Set up the periodic runner to allow background job execution for tests that require it.

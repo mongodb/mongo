@@ -54,7 +54,9 @@ protected:
     explicit ServiceContextMongoDTest(std::string engine);
     ServiceContextMongoDTest(std::string engine,
                              RepairAction repair,
-                             StorageEngineInitFlags initFlags = kDefaultStorageEngineInitFlags);
+                             StorageEngineInitFlags initFlags = kDefaultStorageEngineInitFlags,
+                             bool useReplSettings = false,
+                             bool useMockClock = false);
     virtual ~ServiceContextMongoDTest();
 
     void tearDown() override;

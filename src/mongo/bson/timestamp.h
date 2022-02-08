@@ -92,6 +92,10 @@ public:
         return static_cast<long long>(asULL());
     }
 
+    std::int64_t asInt64() const {
+        return static_cast<std::int64_t>(asLL());
+    }
+
     bool isNull() const {
         return secs == 0;
     }

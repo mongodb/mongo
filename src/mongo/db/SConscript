@@ -2018,6 +2018,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/storage_ephemeral_for_test',
         '$BUILD_DIR/mongo/db/storage/storage_control',
         '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
         'index_builds_coordinator_mongod',
         'service_context_d',
     ],

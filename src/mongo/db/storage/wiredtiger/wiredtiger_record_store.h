@@ -432,6 +432,7 @@ protected:
 
 private:
     bool isVisible(const RecordId& id);
+    void initOplogVisibility(OperationContext* opCtx);
 
     /**
      * This value is used for visibility calculations on what oplog entries can be returned to a
@@ -439,6 +440,15 @@ private:
      * established.
      */
     boost::optional<std::int64_t> _oplogVisibleTs = boost::none;
+
+    /**
+     * With WT-8601, WiredTiger no longer maintains commit_timestamp information on writes to logged
+     * tables, such as the oplog. There are occasions where the server applies a TimestampReadsource
+     * (e.g: majority) and expects the storage engine to obey the prior semantics. When a cursor is
+     * opened against the oplog, we will populate this variable with the recovery unit's read
+     * timestamp to apply a visibility check.
+     */
+    boost::optional<std::int64_t> _readTimestampForOplog = boost::none;
     bool _saveStorageCursorOnDetachFromOperationContext = false;
 };
 
