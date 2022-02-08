@@ -52,6 +52,7 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
@@ -59,6 +60,7 @@
 #include "mongo/db/ttl_gen.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/log_with_sampling.h"
@@ -217,6 +219,44 @@ private:
                                   "wait"_attr = Milliseconds(Seconds(ttlMonitorSleepSecs.load())));
                     return;
                 } catch (const DBException& ex) {
+                    if (ex.isA<ErrorCategory::StaleShardVersionError>()) {
+                        // The TTL index tried to delete some information from a sharded collection
+                        // through a direct operation against the shard but the filtering metadata
+                        // was not available.
+                        //
+                        // The current TTL task cannot be completed. However, if the critical
+                        // section is not held the code below will fire an asynchronous refresh,
+                        // hoping that the next time this task is re-executed the filtering
+                        // information is already present.
+                        if (auto staleInfo = ex.extraInfo<StaleConfigInfo>();
+                            staleInfo && !staleInfo->getCriticalSectionSignal()) {
+                            auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+                            ExecutorFuture<void>(executor)
+                                .then(
+                                    [serviceContext = opCtx->getServiceContext(), nss, staleInfo] {
+                                        ThreadClient tc("TTLShardVersionRecovery", serviceContext);
+                                        {
+                                            stdx::lock_guard<Client> lk(*tc.get());
+                                            tc->setSystemOperationKillableByStepdown(lk);
+                                        }
+
+                                        auto uniqueOpCtx = tc->makeOperationContext();
+                                        auto opCtx = uniqueOpCtx.get();
+
+                                        onShardVersionMismatchNoExcept(
+                                            opCtx, *nss, staleInfo->getVersionWanted())
+                                            .ignore();
+                                    })
+                                .onError([](const Status& status) {
+                                    LOGV2_WARNING(
+                                        5803600,
+                                        "Error on deferred shardVersion recovery execution",
+                                        "error"_attr = redact(status));
+                                })
+                                .getAsync([](auto) {});
+                        }
+                    }
+
                     LOGV2_ERROR(5400703,
                                 "Error running TTL job on collection",
                                 logAttrs(*nss),
