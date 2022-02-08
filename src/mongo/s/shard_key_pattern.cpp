@@ -655,7 +655,7 @@ size_t ShardKeyPattern::getApproximateSize() const {
     auto size = sizeof(ShardKeyPattern);
     size += _keyPattern.getApproximateSize() - sizeof(KeyPattern);
     size += computeVectorSize(_keyPatternPaths);
-    return 0;
+    return size;
 }
 
 }  // namespace mongo
