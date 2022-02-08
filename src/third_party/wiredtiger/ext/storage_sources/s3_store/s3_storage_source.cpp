@@ -93,12 +93,12 @@ S3Exist(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *name, bool 
 {
     S3_STORAGE *s3;
     int ret;
-    *exist = false;
     s3 = FS2S3(fileSystem);
     S3_FILE_SYSTEM *fs = (S3_FILE_SYSTEM *)fileSystem;
 
     /* It's not in the cache, try the S3 bucket. */
-    if (*exist = !S3CacheExists(fileSystem, name))
+    *exist = S3CacheExists(fileSystem, name);
+    if (!*exist)
         ret = fs->connection->ObjectExists(fs->bucketName, name, *exist);
 
     return (ret);
