@@ -32,6 +32,7 @@ var ReshardingTest = class {
         periodicNoopIntervalSecs: periodicNoopIntervalSecs = undefined,
         writePeriodicNoops: writePeriodicNoops = undefined,
         enableElections: enableElections = false,
+        logComponentVerbosity: logComponentVerbosity = undefined,
     } = {}) {
         // The @private JSDoc comments cause VS Code to not display the corresponding properties and
         // methods in its autocomplete list. This makes it simpler for test authors to know what the
@@ -56,6 +57,8 @@ var ReshardingTest = class {
         this._writePeriodicNoops = writePeriodicNoops;
         /** @private */
         this._enableElections = enableElections;
+        /** @private */
+        this._logComponentVerbosity = logComponentVerbosity;
 
         // Properties set by setup().
         /** @private */
@@ -141,6 +144,12 @@ var ReshardingTest = class {
 
         if (this._writePeriodicNoops !== undefined) {
             rsOptions.setParameter.writePeriodicNoops = this._writePeriodicNoops;
+        }
+
+        if (this._logComponentVerbosity !== undefined) {
+            rsOptions.setParameter.logComponentVerbosity = this._logComponentVerbosity;
+            configOptions.setParameter.logComponentVerbosity = this._logComponentVerbosity;
+            mongosOptions.setParameter.logComponentVerbosity = this._logComponentVerbosity;
         }
 
         this._st = new ShardingTest({
