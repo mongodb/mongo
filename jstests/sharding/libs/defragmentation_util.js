@@ -28,7 +28,7 @@ var defragmentationUtil = (function() {
     };
 
     let createRandomZones = function(mongos, testColl, numZones, chunkSpacing) {
-        for (let i = -Math.floor(numZones / 2); i <= Math.floor(numZones / 2); i++) {
+        for (let i = -Math.floor(numZones / 2); i < Math.ceil(numZones / 2); i++) {
             let zoneName = "Zone" + i;
             let shardForZone = findChunksUtil
                                    .findOneChunkByNs(mongos.getDB('config'),
@@ -130,12 +130,14 @@ var defragmentationUtil = (function() {
     };
 
     let waitForEndOfDefragmentation = function(mongos, ns) {
+        jsTest.log("Waiting end of defragmentation for " + ns);
         assert.soon(function() {
             let balancerStatus =
                 assert.commandWorked(mongos.adminCommand({balancerCollectionStatus: ns}));
             return balancerStatus.balancerCompliant ||
                 balancerStatus.firstComplianceViolation !== 'defragmentingChunks';
         });
+        jsTest.log("Defragmentation completed for " + ns);
     };
 
     return {
