@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import os, wttest
 
 # test_s3_store01.py
 #   Test minimal S3 extension with basic interactions with AWS S3CrtClient.
@@ -45,13 +45,34 @@ class test_s3_store01(wttest.WiredTigerTestCase):
     def test_local_basic(self):
         # Test some basic functionality of the storage source API, calling
         # each supported method in the API at least once.
+        bucket_name = "rubysfirstbucket"
+        cache_prefix = "cache-"
+        filename = "foobar"
+        object_name = "foobar"
+    
         session = self.session
         s3_store = self.get_s3_storage_source()
+        fs = s3_store.ss_customize_file_system(session, bucket_name, "Secret", None)
+       
+        # Test flush functionality and flushing to cache and checking if file exists.
+        f = open(filename, 'wb')
+        outbytes = ('Ruby\n'*100).encode()
+        f.write(outbytes)
+        f.close()
 
-        fs = s3_store.ss_customize_file_system(session, "wt-bucket", "Secret", None)
-        _ = fs.fs_directory_list(session, self.bucket_name, '')
+        s3_store.ss_flush(session, fs, filename, object_name)
+        s3_store.ss_flush_finish(session, fs, filename, object_name)
+        self.assertTrue(fs.fs_exist(session, filename))
+
+        # Checking that the file still exists in S3 after removing it from the cache.
+        os.remove(cache_prefix + bucket_name + '/' + filename)
+        self.assertTrue(fs.fs_exist(session, filename))
+
+        fs2 = s3_store.ss_customize_file_system(session, "wt-bucket", "Secret", None)
+        _ = fs2.fs_directory_list(session, self.bucket_name, '')
 
         fs.terminate(session)
+        fs2.terminate(session)
 
 if __name__ == '__main__':
     wttest.run()

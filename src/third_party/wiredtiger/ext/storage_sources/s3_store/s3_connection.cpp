@@ -84,17 +84,15 @@ int
 S3Connection::PutObject(
   const std::string &bucketName, const std::string &objectKey, const std::string &fileName) const
 {
-    Aws::S3Crt::Model::PutObjectRequest request;
-    request.SetBucket(bucketName);
-    request.SetKey(objectKey);
-
     std::shared_ptr<Aws::IOStream> inputData = Aws::MakeShared<Aws::FStream>(
       "s3-source", fileName.c_str(), std::ios_base::in | std::ios_base::binary);
 
+    Aws::S3Crt::Model::PutObjectRequest request;
+    request.SetBucket(bucketName);
+    request.SetKey(objectKey);
     request.SetBody(inputData);
 
     Aws::S3Crt::Model::PutObjectOutcome outcome = s3CrtClient.PutObject(request);
-
     if (outcome.IsSuccess()) {
         return (0);
     } else {
