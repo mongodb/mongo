@@ -3,7 +3,8 @@
  *
  * @tags: [
  *   requires_persistence,
- *   requires_replication
+ *   requires_replication,
+ *   requires_fcv_53
  * ]
  */
 
@@ -14,7 +15,6 @@
     load('jstests/noPassthrough/libs/hybrid_geo_index.js');
 
     const rsOptions = {
-        setParameter: "featureFlagClusteredIndexes=true",
         wiredTigerEngineConfigString: 'eviction_dirty_trigger=80'  // needed for larger recordIds
     };
     const createOptions = {clusteredIndex: {key: {'_id': 1}, unique: true}};
@@ -29,11 +29,7 @@
 (function testDuplicateKeyErrorsForLargeKeys() {
     'use strict';
 
-    const rst = new ReplSetTest({
-        name: 'testName',
-        nodes: 1,
-        nodeOptions: {setParameter: "featureFlagClusteredIndexes=true"}
-    });
+    const rst = new ReplSetTest({name: 'testName', nodes: 1, nodeOptions: {}});
     const nodes = rst.startSet();
     rst.initiate();
 

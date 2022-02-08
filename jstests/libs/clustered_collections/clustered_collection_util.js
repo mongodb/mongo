@@ -15,18 +15,6 @@ var ClusteredCollectionUtil = class {
             return false;
     }
 
-    static areClusteredIndexesEnabled(conn) {
-        const clusteredIndexesEnabled =
-            assert
-                .commandWorked(conn.adminCommand({getParameter: 1, featureFlagClusteredIndexes: 1}))
-                .featureFlagClusteredIndexes.value;
-
-        if (!clusteredIndexesEnabled) {
-            return false;
-        }
-        return true;
-    }
-
     static isArbitraryKeySupportEnabled(conn) {
         const arbitraryKeySupportEnabled =
             assert

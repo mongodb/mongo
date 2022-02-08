@@ -5,8 +5,7 @@
  * to prevent implicit creation of a non-clustered collection.
  *
  * @tags: [
- *  requires_fcv_51,
- *  featureFlagClusteredIndexes
+ *  requires_fcv_53
  *  ]
  */
 

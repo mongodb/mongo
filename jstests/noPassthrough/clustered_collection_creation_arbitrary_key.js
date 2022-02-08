@@ -6,7 +6,7 @@
  * non-replicated collections.
  *
  * @tags: [
- *   requires_fcv_52,
+ *   requires_fcv_53,
  *   assumes_against_mongod_not_mongos,
  *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
@@ -18,12 +18,6 @@
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 
 const conn = MongoRunner.runMongod({setParameter: {supportArbitraryClusterKeyIndex: true}});
-
-if (ClusteredCollectionUtil.areClusteredIndexesEnabled(conn) == false) {
-    jsTestLog('Skipping test because the clustered indexes feature flag is disabled');
-    MongoRunner.stopMongod(conn);
-    return;
-}
 
 const validateCompoundSecondaryIndexes = function(db, coll, clusterKey) {
     const clusterKeyField = Object.keys(clusterKey)[0];
