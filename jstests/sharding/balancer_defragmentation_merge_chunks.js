@@ -56,7 +56,7 @@ function setupCollection() {
     const coll = getNewColl();
     assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {key: 1}}));
     defragmentationUtil.createFragmentedCollection(st.s,
-                                                   coll,
+                                                   coll.getFullName(),
                                                    10 /* numChunks */,
                                                    targetChunkSizeMB / 2 /* maxChunkFillMB */,
                                                    0 /* numZones */,

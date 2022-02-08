@@ -1440,37 +1440,62 @@ MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
     OperationContext* opCtx, stdx::unordered_set<ShardId>* usedShards) {
     MigrateInfoVector chunksToMove;
     stdx::lock_guard<Latch> lk(_stateMutex);
-    // TODO (SERVER-61635) evaluate fairness
-    bool done = false;
-    while (!done) {
-        auto selectedChunksFromPreviousRound = chunksToMove.size();
-        for (auto it = _defragmentationStates.begin(); it != _defragmentationStates.end();) {
+
+    std::vector<UUID> collectionUUIDs;
+    collectionUUIDs.reserve(_defragmentationStates.size());
+    for (const auto& defragState : _defragmentationStates) {
+        collectionUUIDs.push_back(defragState.first);
+    }
+    std::shuffle(collectionUUIDs.begin(), collectionUUIDs.end(), _random);
+
+    auto popCollectionUUID = [&](std::vector<UUID>::iterator elemIt) {
+        if (std::next(elemIt) != collectionUUIDs.end()) {
+            *elemIt = std::move(collectionUUIDs.back());
+        }
+        collectionUUIDs.pop_back();
+    };
+
+    while (!collectionUUIDs.empty()) {
+        for (auto it = collectionUUIDs.begin(); it != collectionUUIDs.end();) {
+
+            const auto& collUUID = *it;
+
             try {
-                const auto phaseAdvanced = _refreshDefragmentationPhaseFor(opCtx, it->first);
-                auto& collDefragmentationPhase = it->second;
+                auto defragStateIt = _defragmentationStates.find(collUUID);
+                if (defragStateIt == _defragmentationStates.end()) {
+                    popCollectionUUID(it);
+                    continue;
+                };
+
+                const auto phaseAdvanced = _refreshDefragmentationPhaseFor(opCtx, collUUID);
+                auto& collDefragmentationPhase = defragStateIt->second;
                 if (!collDefragmentationPhase) {
-                    it = _defragmentationStates.erase(it, std::next(it));
+                    _defragmentationStates.erase(defragStateIt);
+                    popCollectionUUID(it);
                     continue;
                 }
                 auto actionableMigration =
                     collDefragmentationPhase->popNextMigration(opCtx, usedShards);
-                if (actionableMigration.has_value()) {
-                    chunksToMove.push_back(std::move(*actionableMigration));
-                } else if (phaseAdvanced) {
-                    _yieldNextStreamingAction(lk, opCtx);
+                if (!actionableMigration.has_value()) {
+                    if (phaseAdvanced) {
+                        _yieldNextStreamingAction(lk, opCtx);
+                    }
+                    popCollectionUUID(it);
+                    continue;
                 }
+                chunksToMove.push_back(std::move(*actionableMigration));
                 ++it;
             } catch (DBException& e) {
                 // Catch getCollection and getShardVersion errors. Should only occur if collection
                 // has been removed.
                 LOGV2_ERROR(6172700,
                             "Error while getting next migration",
-                            "uuid"_attr = it->first,
+                            "uuid"_attr = collUUID,
                             "error"_attr = redact(e));
-                it = _defragmentationStates.erase(it, std::next(it));
+                _defragmentationStates.erase(collUUID);
+                popCollectionUUID(it);
             }
         }
-        done = (chunksToMove.size() == selectedChunksFromPreviousRound);
     }
     return chunksToMove;
 }
@@ -1511,29 +1536,45 @@ bool BalancerDefragmentationPolicyImpl::_refreshDefragmentationPhaseFor(Operatio
 
 boost::optional<DefragmentationAction> BalancerDefragmentationPolicyImpl::_nextStreamingAction(
     OperationContext* opCtx) {
-    // TODO (SERVER-61635) validate fairness through collections
-    for (auto it = _defragmentationStates.begin(); it != _defragmentationStates.end();) {
+
+    // Visit the defrag state in round robin fashion starting from a random one
+
+    auto stateIt = [&] {
+        auto it = _defragmentationStates.begin();
+        if (_defragmentationStates.size() > 1) {
+            std::uniform_int_distribution<size_t> uniDist{0, _defragmentationStates.size() - 1};
+            std::advance(it, uniDist(_random));
+        }
+        return it;
+    }();
+
+    for (auto stateToVisit = _defragmentationStates.size(); stateToVisit != 0; --stateToVisit) {
         try {
-            _refreshDefragmentationPhaseFor(opCtx, it->first);
-            auto& currentCollectionDefragmentationState = it->second;
-            if (!currentCollectionDefragmentationState) {
-                it = _defragmentationStates.erase(it, std::next(it));
-                continue;
+            _refreshDefragmentationPhaseFor(opCtx, stateIt->first);
+            auto& currentCollectionDefragmentationState = stateIt->second;
+            if (currentCollectionDefragmentationState) {
+                // Get next action
+                auto nextAction =
+                    currentCollectionDefragmentationState->popNextStreamableAction(opCtx);
+                if (nextAction) {
+                    return nextAction;
+                }
+                ++stateIt;
+            } else {
+                stateIt = _defragmentationStates.erase(stateIt, std::next(stateIt));
             }
-            // Get next action
-            auto nextAction = currentCollectionDefragmentationState->popNextStreamableAction(opCtx);
-            if (nextAction) {
-                return nextAction;
-            }
-            ++it;
         } catch (DBException& e) {
             // Catch getCollection and getShardVersion errors. Should only occur if collection has
             // been removed.
             LOGV2_ERROR(6153301,
                         "Error while getting next defragmentation action",
-                        "uuid"_attr = it->first,
+                        "uuid"_attr = stateIt->first,
                         "error"_attr = redact(e));
-            it = _defragmentationStates.erase(it, std::next(it));
+            stateIt = _defragmentationStates.erase(stateIt, std::next(stateIt));
+        }
+
+        if (stateIt == _defragmentationStates.end()) {
+            stateIt = _defragmentationStates.begin();
         }
     }
 

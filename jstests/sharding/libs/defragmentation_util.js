@@ -4,41 +4,38 @@ var defragmentationUtil = (function() {
     // This function creates a randomized, fragmented collection. It does not necessarily make a
     // collection with exactly numChunks chunks nor exactly numZones zones.
     let createFragmentedCollection = function(
-        mongos, testColl, numChunks, maxChunkFillMB, numZones, docSizeBytes, chunkSpacing) {
-        createAndDistributeChunks(mongos, testColl, numChunks, chunkSpacing);
-        createRandomZones(mongos, testColl, numZones, chunkSpacing);
-        fillChunksToRandomSize(testColl, docSizeBytes, maxChunkFillMB);
+        mongos, ns, numChunks, maxChunkFillMB, numZones, docSizeBytes, chunkSpacing) {
+        assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {key: 1}}));
+
+        createAndDistributeChunks(mongos, ns, numChunks, chunkSpacing);
+        createRandomZones(mongos, ns, numZones, chunkSpacing);
+        fillChunksToRandomSize(mongos, ns, docSizeBytes, maxChunkFillMB);
     };
 
-    let createAndDistributeChunks = function(mongos, testColl, numChunks, chunkSpacing) {
+    let createAndDistributeChunks = function(mongos, ns, numChunks, chunkSpacing) {
         const shards = mongos.getCollection('config.shards').find().toArray();
         for (let i = -Math.floor(numChunks / 2); i <= Math.floor(numChunks / 2); i++) {
-            assert.commandWorked(testColl.getDB().adminCommand(
-                {split: testColl.getFullName(), middle: {key: i * chunkSpacing}}));
+            assert.commandWorked(mongos.adminCommand({split: ns, middle: {key: i * chunkSpacing}}));
             assert.soon(() => {
                 let toShard = Random.randInt(shards.length);
-                let res = testColl.getDB().adminCommand({
-                    moveChunk: testColl.getFullName(),
-                    find: {key: i * chunkSpacing},
-                    to: shards[toShard]._id
-                });
+                let res = mongos.adminCommand(
+                    {moveChunk: ns, find: {key: i * chunkSpacing}, to: shards[toShard]._id});
                 return res.ok;
             });
         }
     };
 
-    let createRandomZones = function(mongos, testColl, numZones, chunkSpacing) {
+    let createRandomZones = function(mongos, ns, numZones, chunkSpacing) {
         for (let i = -Math.floor(numZones / 2); i < Math.ceil(numZones / 2); i++) {
             let zoneName = "Zone" + i;
-            let shardForZone = findChunksUtil
-                                   .findOneChunkByNs(mongos.getDB('config'),
-                                                     testColl.getFullName(),
-                                                     {min: {key: i * chunkSpacing}})
-                                   .shard;
+            let shardForZone =
+                findChunksUtil
+                    .findOneChunkByNs(mongos.getDB('config'), ns, {min: {key: i * chunkSpacing}})
+                    .shard;
             assert.commandWorked(
                 mongos.adminCommand({addShardToZone: shardForZone, zone: zoneName}));
             assert.commandWorked(mongos.adminCommand({
-                updateZoneKeyRange: testColl.getFullName(),
+                updateZoneKeyRange: ns,
                 min: {key: i * chunkSpacing},
                 max: {key: i * chunkSpacing + chunkSpacing},
                 zone: zoneName
@@ -46,13 +43,11 @@ var defragmentationUtil = (function() {
         }
     };
 
-    let fillChunksToRandomSize = function(testColl, docSizeBytes, maxChunkFillMB) {
-        const chunks =
-            findChunksUtil
-                .findChunksByNs(testColl.getDB().getSiblingDB('config'), testColl.getFullName())
-                .toArray();
+    let fillChunksToRandomSize = function(mongos, ns, docSizeBytes, maxChunkFillMB) {
+        const chunks = findChunksUtil.findChunksByNs(mongos.getDB('config'), ns).toArray();
         const bigString = "X".repeat(docSizeBytes);
-        let bulk = testColl.initializeUnorderedBulkOp();
+        const coll = mongos.getCollection(ns);
+        let bulk = coll.initializeUnorderedBulkOp();
         chunks.forEach((chunk) => {
             let chunkSize = Random.randInt(maxChunkFillMB);
             let docsPerChunk = (chunkSize * 1024 * 1024) / docSizeBytes;
@@ -75,17 +70,17 @@ var defragmentationUtil = (function() {
         assert.commandWorked(bulk.execute());
     };
 
-    let checkPostDefragmentationState = function(mongos, testColl, maxChunkSizeMB, shardKey) {
+    let checkPostDefragmentationState = function(mongos, ns, maxChunkSizeMB, shardKey) {
         const oversizedChunkThreshold = maxChunkSizeMB * 1024 * 1024 * 4 / 3;
-        const ns = testColl.getFullName();
         const chunks =
             findChunksUtil.findChunksByNs(mongos.getDB('config'), ns).sort({shardKey: 1}).toArray();
-        const collStats = assert.commandWorked(testColl.getDB().runCommand({collStats: ns}));
+        const coll = mongos.getCollection(ns);
+        const collStats = assert.commandWorked(coll.getDB().runCommand({collStats: ns}));
         const avgObjSize = collStats.avgObjSize;
         let checkForOversizedChunk = function(
-            testColl, chunk, shardKey, avgObjSize, oversizedChunkThreshold) {
-            let chunkSize = testColl.countDocuments(
-                                {key: {$gte: chunk.min[shardKey], $lt: chunk.max[shardKey]}}) *
+            coll, chunk, shardKey, avgObjSize, oversizedChunkThreshold) {
+            let chunkSize =
+                coll.countDocuments({key: {$gte: chunk.min[shardKey], $lt: chunk.max[shardKey]}}) *
                 avgObjSize;
             assert.lte(
                 chunkSize,
@@ -101,7 +96,7 @@ var defragmentationUtil = (function() {
                 let chunk1Zone = getZoneForRange(mongos, ns, chunk1.min, chunk1.max);
                 let chunk2Zone = getZoneForRange(mongos, ns, chunk2.min, chunk2.max);
                 if (chunk1Zone === chunk2Zone) {
-                    let combinedDataSize = testColl.countDocuments({
+                    let combinedDataSize = coll.countDocuments({
                         shardKey: {$gte: chunk1.min[shardKey], $lt: chunk2.max[shardKey]}
                     }) * avgObjSize;
                     assert.lte(
@@ -112,10 +107,10 @@ var defragmentationUtil = (function() {
                 }
             }
             // Check for oversized chunks
-            checkForOversizedChunk(testColl, chunk1, shardKey, avgObjSize, oversizedChunkThreshold);
+            checkForOversizedChunk(coll, chunk1, shardKey, avgObjSize, oversizedChunkThreshold);
         }
         const lastChunk = chunks[chunks.length - 1];
-        checkForOversizedChunk(testColl, lastChunk, shardKey, avgObjSize, oversizedChunkThreshold);
+        checkForOversizedChunk(coll, lastChunk, shardKey, avgObjSize, oversizedChunkThreshold);
     };
 
     let getZoneForRange = function(mongos, ns, minKey, maxKey) {

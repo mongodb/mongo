@@ -17,11 +17,9 @@ Random.setRandomSeed();
 
 // Test parameters
 const numShards = Random.randInt(7) + 1;
-const numChunks = Random.randInt(28) + 2;
-const numZones = Random.randInt(numChunks / 2);
+const numCollections = 3;
 const maxChunkFillMB = 20;
 const maxChunkSizeMB = 30;
-const docSizeBytes = Random.randInt(1024 * 1024) + 50;
 const chunkSpacing = 1000;
 
 const st = new ShardingTest({
@@ -36,28 +34,50 @@ const st = new ShardingTest({
 // setup the database for the test
 assert.commandWorked(st.s.adminCommand({enableSharding: 'db'}));
 const db = st.getDB('db');
-const coll = db["testColl"];
-const ns = coll.getFullName();
-assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {key: 1}}));
+const coll_prefix = "testColl_";
 
-defragmentationUtil.createFragmentedCollection(
-    st.s, coll, numChunks, maxChunkFillMB, numZones, docSizeBytes, chunkSpacing);
+let collections = [];
 
-let beginningNumberChunks = findChunksUtil.countChunksForNs(st.s.getDB('config'), ns);
-jsTest.log("Beginning defragmentation of collection with " + beginningNumberChunks + " chunks.");
+for (let i = 0; i < numCollections; ++i) {
+    const numChunks = Random.randInt(28) + 2;
+    const numZones = Random.randInt(numChunks / 2);
+    const docSizeBytes = Random.randInt(1024 * 1024) + 50;
+
+    const coll = db[coll_prefix + i];
+
+    defragmentationUtil.createFragmentedCollection(
+        st.s, coll.getFullName(), numChunks, maxChunkFillMB, numZones, docSizeBytes, chunkSpacing);
+
+    const beginningNumberChunks =
+        findChunksUtil.countChunksForNs(st.s.getDB('config'), coll.getFullName());
+    jsTest.log("Create collection " + coll + " with " + beginningNumberChunks + " chunks.");
+
+    collections.push(coll);
+}
+
 st.printShardingStatus();
-assert.commandWorked(st.s.adminCommand({
-    configureCollectionBalancing: ns,
-    defragmentCollection: true,
-    chunkSize: maxChunkSizeMB,
-}));
+
+collections.forEach((coll) => {
+    assert.commandWorked(st.s.adminCommand({
+        configureCollectionBalancing: coll.getFullName(),
+        defragmentCollection: true,
+        chunkSize: maxChunkSizeMB,
+    }));
+});
+
 st.startBalancer();
 
-// Wait for defragmentation to end and check collection final state
-defragmentationUtil.waitForEndOfDefragmentation(st.s, ns);
-let finalNumberChunks = findChunksUtil.countChunksForNs(st.s.getDB('config'), ns);
-jsTest.log("Finished defragmentation of collection with " + finalNumberChunks + " chunks.");
-defragmentationUtil.checkPostDefragmentationState(st.s, coll, maxChunkSizeMB, "key");
+collections.forEach((coll) => {
+    const ns = coll.getFullName();
+
+    // Wait for defragmentation to end and check collection final state
+    defragmentationUtil.waitForEndOfDefragmentation(st.s, ns);
+    const finalNumberChunks = findChunksUtil.countChunksForNs(st.s.getDB('config'), ns);
+    jsTest.log("Finished defragmentation of collection " + coll + " with " + finalNumberChunks +
+               " chunks.");
+    defragmentationUtil.checkPostDefragmentationState(st.s, ns, maxChunkSizeMB, "key");
+});
+
 st.printShardingStatus();
 
 st.stop();

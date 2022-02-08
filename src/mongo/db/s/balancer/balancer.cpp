@@ -223,7 +223,7 @@ Balancer::Balancer()
           std::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get(), _random)),
       _commandScheduler(std::make_unique<BalancerCommandsSchedulerImpl>()),
       _defragmentationPolicy(
-          std::make_unique<BalancerDefragmentationPolicyImpl>(_clusterStats.get())) {}
+          std::make_unique<BalancerDefragmentationPolicyImpl>(_clusterStats.get(), _random)) {}
 
 Balancer::~Balancer() {
     // Terminate the balancer thread so it doesn't leak memory.

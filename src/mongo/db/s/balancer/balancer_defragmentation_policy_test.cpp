@@ -71,7 +71,10 @@ protected:
         ShardType(kShardId2.toString(), kShardHost2.toString()),
         ShardType(kShardId3.toString(), kShardHost3.toString())};
 
-    BalancerDefragmentationPolicyTest() : _clusterStats(), _defragmentationPolicy(&_clusterStats) {}
+    BalancerDefragmentationPolicyTest()
+        : _clusterStats(),
+          _random(std::random_device{}()),
+          _defragmentationPolicy(&_clusterStats, _random) {}
 
     CollectionType setupCollectionWithPhase(
         const std::vector<ChunkType>& chunkList,
@@ -131,6 +134,7 @@ protected:
     }
 
     ClusterStatisticsMock _clusterStats;
+    BalancerRandomSource _random;
     BalancerDefragmentationPolicyImpl _defragmentationPolicy;
 
     ShardStatistics buildShardStats(ShardId id,

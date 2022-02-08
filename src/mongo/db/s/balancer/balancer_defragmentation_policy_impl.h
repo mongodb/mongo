@@ -31,6 +31,7 @@
 
 #include "mongo/db/s/balancer/balancer_defragmentation_policy.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
+#include "mongo/db/s/balancer/balancer_random.h"
 #include "mongo/s/catalog/type_collection.h"
 
 namespace mongo {
@@ -70,8 +71,8 @@ class BalancerDefragmentationPolicyImpl : public BalancerDefragmentationPolicy {
     BalancerDefragmentationPolicyImpl& operator=(const BalancerDefragmentationPolicyImpl&) = delete;
 
 public:
-    BalancerDefragmentationPolicyImpl(ClusterStatistics* clusterStats)
-        : _clusterStats(clusterStats) {}
+    BalancerDefragmentationPolicyImpl(ClusterStatistics* clusterStats, BalancerRandomSource& random)
+        : _clusterStats(clusterStats), _random(random) {}
 
     ~BalancerDefragmentationPolicyImpl() {}
 
@@ -179,6 +180,8 @@ private:
     bool _streamClosed{false};
 
     ClusterStatistics* const _clusterStats;
+
+    BalancerRandomSource& _random;
 
     stdx::unordered_map<UUID, std::unique_ptr<DefragmentationPhase>, UUID::Hash>
         _defragmentationStates;
