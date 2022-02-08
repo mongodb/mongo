@@ -656,6 +656,11 @@ public:
                 str::stream() << "sharding not enabled for db " << nss.db(),
                 dbType.getSharded());
 
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Namespace too long. Namespace: " << nss
+                              << " Max: " << NamespaceString::MaxNsShardedCollectionLen,
+                nss.size() <= NamespaceString::MaxNsShardedCollectionLen);
+
         // Get variables required throughout this command.
 
         auto proposedKey(request.getKey().getOwned());

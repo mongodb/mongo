@@ -174,6 +174,11 @@ public:
         // Maximum allowed length of fully qualified namespace name of any real collection.
         // Does not include NUL so it can be directly compared to std::string lengths.
         MaxNsCollectionLen = MaxNsLen - 7 /*strlen(".$extra")*/,
+
+        // The maximum namespace length of sharded collections is less than that of unsharded ones
+        // since the namespace of the cached chunks metadata, local to each shard, is composed by
+        // the namespace of the related sharded collection (i.e., config.cache.chunks.<ns>).
+        MaxNsShardedCollectionLen = 100 /* MaxNsCollectionLen - len(ChunkType::ShardNSPrefix) */,
     };
 
     /**
