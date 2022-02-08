@@ -1,8 +1,5 @@
 /**
  * Confirms that the limit on number of aggregragation pipeline stages is respected.
- * @tags: [
- *   disabled_due_to_server_60490,
- * ]
  */
 (function() {
 "use strict";
