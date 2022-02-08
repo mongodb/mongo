@@ -427,13 +427,20 @@ void doSpeculativeAuthenticate(OperationContext* opCtx,
     // but coming from the Hello command has it in the "db" field.
     // Rewrite it for handling here.
     BSONObjBuilder cmd;
+    bool hasDBField = false;
     for (const auto& elem : cmdObj) {
-        if (elem.fieldName() != kDBFieldName) {
+        if (elem.fieldName() == kDBFieldName) {
+            cmd.appendAs(elem, AuthenticateCommand::kDbNameFieldName);
+            hasDBField = true;
+        } else {
             cmd.append(elem);
         }
     }
 
-    cmd.append(AuthenticateCommand::kDbNameFieldName, kExternalDB);
+    if (!hasDBField) {
+        // No "db" field was provided, so default to "$external"
+        cmd.append(AuthenticateCommand::kDbNameFieldName, kExternalDB);
+    }
 
     auto authCmdObj = AuthenticateCommand::parse(
         IDLParserErrorContext("speculative X509 Authenticate"), cmd.obj());
