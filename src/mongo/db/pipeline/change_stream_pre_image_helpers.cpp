@@ -44,10 +44,6 @@ namespace mongo {
 void writeToChangeStreamPreImagesCollection(OperationContext* opCtx,
                                             const ChangeStreamPreImage& preImage) {
     const auto collectionNamespace = NamespaceString::kChangeStreamPreImagesNamespace;
-    tassert(5869404,
-            str::stream() << "Invalid pre-image document applyOpsIndex: "
-                          << preImage.getId().getApplyOpsIndex(),
-            preImage.getId().getApplyOpsIndex() >= 0);
 
     // This lock acquisition can block on a stronger lock held by another operation modifying the
     // pre-images collection. There are no known cases where an operation holding an exclusive lock
@@ -56,9 +52,7 @@ void writeToChangeStreamPreImagesCollection(OperationContext* opCtx,
     AutoGetCollection preimagesCollectionRaii(opCtx, collectionNamespace, LockMode::MODE_IX);
     UpdateResult res = Helpers::upsert(opCtx, collectionNamespace.toString(), preImage.toBSON());
     tassert(5868601,
-            str::stream() << "Failed to insert a new document into the pre-images collection: ts: "
-                          << preImage.getId().getTs().toString()
-                          << ", applyOpsIndex: " << preImage.getId().getApplyOpsIndex(),
+            "Failed to insert a new document into pre-images collection",
             !res.existing && !res.upsertedId.isEmpty());
 }
 }  // namespace mongo

@@ -2,6 +2,8 @@
 // with different arguments for collections with 'changeStreamPreAndPostImages' being enabled.
 // @tags: [
 //   requires_fcv_52,
+//   # TODO SERVER-58694: remove this tag.
+//   change_stream_does_not_expect_txns,
 // ]
 (function() {
 "use strict";

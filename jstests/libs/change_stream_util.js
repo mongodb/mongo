@@ -103,9 +103,6 @@ function canonicalizeEventForTesting(event, expected) {
     if (!expected.hasOwnProperty("lsid"))
         delete event.lsid;
 
-    if (!expected.hasOwnProperty("updateDescription"))
-        delete event.updateDescription;
-
     // TODO SERVER-50301: The 'truncatedArrays' field may not appear in the updateDescription
     // depending on whether $v:2 update oplog entries are enabled. When the expected event has an
     // empty 'truncatedFields' we do not require that the actual event contain the field. This
@@ -553,9 +550,6 @@ function assertInvalidChangeStreamNss(dbName, collName = "test", options) {
             res, [ErrorCodes.InvalidNamespace, ErrorCodes.InvalidOptions]));
 }
 
-const kPreImagesCollectionDatabase = "config";
-const kPreImagesCollectionName = "system.preimages";
-
 /**
  * Asserts that 'changeStreamPreAndPostImages' collection option is present and is enabled for
  * collection.
@@ -575,50 +569,22 @@ function assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent(db, collName
 
 // Returns the pre-images written while performing the write operations.
 function preImagesForOps(db, writeOps) {
-    const preImagesColl =
-        db.getSiblingDB(kPreImagesCollectionDatabase).getCollection(kPreImagesCollectionName);
-    const preImagesCollSortSpec = {"_id.ts": 1, "_id.applyOpsIndex": 1};
-
-    // Determine the id of the last pre-image document written to be able to determine the pre-image
-    // documents written by 'writeOps()'. The pre-image purging job may concurrently remove some
-    // pre-image documents while this function is executing.
-    const preImageIdsBefore =
-        preImagesColl.find({}, {}).sort(preImagesCollSortSpec).allowDiskUse().toArray();
-    const lastPreImageId = (preImageIdsBefore.length > 0)
-        ? preImageIdsBefore[preImageIdsBefore.length - 1]._id
-        : undefined;
+    const preImagesColl = db.getSiblingDB('config').getCollection("system.preimages");
+    const numberOfPreImagesBefore = preImagesColl.find().itcount();
 
     // Perform the write operations.
     writeOps();
 
     // Return only newly written pre-images.
-    const preImageFilter = lastPreImageId ? {"_id.ts": {$gt: lastPreImageId.ts}} : {};
-    const result =
-        preImagesColl.find(preImageFilter).sort(preImagesCollSortSpec).allowDiskUse().toArray();
-
-    // Verify that the result is correct by checking if the last pre-image still exists. However, if
-    // no pre-image document existed before 'writeOps()' invocation, the result may be incorrect.
-    assert(lastPreImageId === undefined || preImagesColl.find({_id: lastPreImageId}).itcount() == 1,
-           "Last pre-image document has been removed by the pre-image purging job.");
-    return result;
-}
-
-/**
- * Returns documents from the pre-images collection from 'connection' ordered by _id.ts,
- * _id.applyOpsIndex ascending.
- */
-function getPreImages(connection) {
-    return connection.getDB(kPreImagesCollectionDatabase)[kPreImagesCollectionName]
-        .find()
+    return preImagesColl.find()
         .sort({"_id.ts": 1, "_id.applyOpsIndex": 1})
-        .allowDiskUse()
+        .skip(numberOfPreImagesBefore)
         .toArray();
 }
 
 function findPreImagesCollectionDescriptions(db) {
-    return db.getSiblingDB(kPreImagesCollectionDatabase).runCommand("listCollections", {
-        filter: {name: kPreImagesCollectionName}
-    });
+    return db.getSiblingDB("config").runCommand("listCollections",
+                                                {filter: {name: "system.preimages"}});
 }
 
 /**

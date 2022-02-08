@@ -52,4 +52,4 @@ executor:
       bind_ip_all: ''
       set_parameters:
         enableTestCommands: 1
-    num_nodes: 2
+    num_nodes: 1

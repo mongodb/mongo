@@ -6,7 +6,6 @@ selector:
   exclude_files:
   # Operations within a transaction do not support write concern.
   - jstests/core/txns/**/*.js
-  - jstests/core/write_change_stream_pit_preimage_in_transaction.js
 
   # Parallel shell is not causally consistent
   - jstests/core/benchrun_pipeline_updates.js

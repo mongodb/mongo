@@ -13,23 +13,29 @@
  */
 (function() {
 "use strict";
-load("jstests/core/txns/libs/prepare_helpers.js");  // For PrepareHelpers.prepareTransaction.
-load("jstests/libs/change_stream_util.js");         // For getPreImages().
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/retryable_writes_util.js");
-load("jstests/libs/transactions_util.js");  // For TransactionsUtil.runInTransaction.
 
 const testName = jsTestName();
+const preImagesCollectionDatabase = "config";
+const preImagesCollectionName = "system.preimages";
 const replTest = new ReplSetTest({
     name: testName,
     nodes: [{}, {rsConfig: {priority: 0}}],
-    nodeOptions: {
-        setParameter: {logComponentVerbosity: tojsononeline({replication: {initialSync: 5}})},
-        oplogSize: 1024
-    }
+    nodeOptions:
+        {setParameter: {logComponentVerbosity: tojsononeline({replication: {initialSync: 5}})}}
 });
 replTest.startSet();
 replTest.initiate();
+
+// Returns documents from the pre-images collection from 'node' ordered by _id.ts, _id.applyOpsIndex
+// ascending.
+function getPreImages(node) {
+    return node.getDB(preImagesCollectionDatabase)[preImagesCollectionName]
+        .find()
+        .sort({"_id.ts": 1, "_id.applyOpsIndex": 1})
+        .toArray();
+}
 
 // Asserts that documents in the pre-images collection on the primary node are the same as on a
 // secondary node.
@@ -78,62 +84,7 @@ for (const [collectionName, collectionOptions] of [
             {_id: 5, v: 3});
     }
 
-    function issueWriteCommandsInTransaction(testDB) {
-        assert.commandWorked(coll.deleteMany({$and: [{_id: {$gte: 6}}, {_id: {$lte: 10}}]}));
-        assert.commandWorked(coll.insert([{_id: 6, a: 1}, {_id: 7, a: 1}, {_id: 8, a: 1}]));
-
-        const transactionOptions = {readConcern: {level: "majority"}, writeConcern: {w: 2}};
-
-        // Issue commands in a single "applyOps" transaction.
-        TransactionsUtil.runInTransaction(testDB, () => {}, function(db, state) {
-            const coll = db[collectionName];
-            assert.commandWorked(coll.updateOne({_id: 6}, {$inc: {a: 1}}));
-            assert.commandWorked(coll.replaceOne({_id: 7}, {a: "Long string"}));
-            assert.commandWorked(coll.deleteOne({_id: 8}));
-        }, transactionOptions);
-
-        // Issue commands in a multiple-"applyOps" transaction.
-        assert.commandWorked(coll.insert({_id: 8, a: 1}));
-        TransactionsUtil.runInTransaction(testDB, () => {}, function(db, state) {
-            const coll = db[collectionName];
-            const largeString = "a".repeat(15 * 1024 * 1024);
-            assert.commandWorked(coll.updateOne({_id: 6}, {$inc: {a: 1}}));
-            assert.commandWorked(coll.insert({_id: 9, a: largeString}));
-            assert.commandWorked(coll.insert(
-                {_id: 10, a: largeString}));  // Should go to the second "applyOps" entry.
-            assert.commandWorked(coll.replaceOne({_id: 7}, {a: "String"}));
-            assert.commandWorked(coll.deleteOne({_id: 8}));
-        }, transactionOptions);
-
-        // Issue commands in a transaction that gets prepared before a commit.
-        assert.commandWorked(coll.deleteMany({$and: [{_id: {$gte: 6}}, {_id: {$lte: 10}}]}));
-        assert.commandWorked(coll.insert([{_id: 6, a: 1}, {_id: 7, a: 1}, {_id: 8, a: 1}]));
-        const session = testDB.getMongo().startSession();
-        const sessionDb = session.getDatabase(testDB.getName());
-        session.startTransaction();
-        const collInner = sessionDb[coll.getName()];
-        assert.commandWorked(collInner.updateOne({_id: 6}, {$inc: {a: 1}}));
-        assert.commandWorked(collInner.replaceOne({_id: 7}, {a: "Long string"}));
-        assert.commandWorked(collInner.deleteOne({_id: 8}));
-        let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
-        assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
-    }
-
-    function issueNonAtomicApplyOpsCommand(testDB) {
-        assert.commandWorked(coll.deleteMany({$and: [{_id: {$gte: 9}}, {_id: {$lte: 10}}]}));
-        assert.commandWorked(coll.insert([{_id: 9, a: 1}, {_id: 10, a: 1}]));
-        assert.commandWorked(testDB.runCommand({
-            applyOps: [
-                {op: "u", ns: coll.getFullName(), o2: {_id: 9}, o: {$set: {a: 2}}},
-                {op: "d", ns: coll.getFullName(), o: {_id: 10}}
-            ],
-            allowAtomic: false,
-        }));
-    }
-
     (function testSteadyStateReplication() {
-        jsTestLog("Testing pre-image replication to secondaries.");
-
         // Insert a document.
         assert.commandWorked(coll.insert({_id: 1, v: 1, largeField: "AAAAAAAAAAAAAAAAAAAAAAAA"}));
 
@@ -155,26 +106,12 @@ for (const [collectionName, collectionOptions] of [
         // Issue retryable "findAndModify" commands.
         issueRetryableFindAndModifyCommands(testDB);
 
-        // Verify that related change stream pre-images were replicated to the secondary.
-        replTest.awaitReplication();
-        assertPreImagesCollectionOnPrimaryMatchesSecondary();
-
-        issueWriteCommandsInTransaction(testDB);
-
-        // Verify that related change stream pre-images were replicated to the secondary.
-        replTest.awaitReplication();
-        assertPreImagesCollectionOnPrimaryMatchesSecondary();
-
-        issueNonAtomicApplyOpsCommand(testDB);
-
-        // Verify that related change stream pre-images were replicated to the secondary.
+        // Verify that a related change stream pre-images were replicated to the secondary.
         replTest.awaitReplication();
         assertPreImagesCollectionOnPrimaryMatchesSecondary();
     })();
 
     (function testInitialSync() {
-        jsTestLog("Testing pre-image replication during the logical initial sync.");
-
         // Insert a document for deletion test.
         assert.commandWorked(coll.insert({_id: 3, field: "A"}, {writeConcern: {w: 2}}));
 
@@ -202,9 +139,8 @@ for (const [collectionName, collectionOptions] of [
         // Delete the document on the primary node.
         assert.commandWorked(coll.deleteOne({_id: 3}, {writeConcern: {w: 2}}));
 
+        // Issue retryable "findAndModify" commands.
         issueRetryableFindAndModifyCommands(testDB);
-        issueNonAtomicApplyOpsCommand(testDB);
-        issueWriteCommandsInTransaction(testDB);
 
         // Resume the initial sync process.
         assert.commandWorked(initialSyncNode.adminCommand(
@@ -231,8 +167,6 @@ for (const [collectionName, collectionOptions] of [
     })();
 
     (function testStartupRecovery() {
-        jsTestLog("Testing pre-image writing during startup recovery.");
-
         // Pause check-pointing on the primary node to ensure new pre-images are not flushed to the
         // disk.
         const pauseCheckpointThreadFailPoint =
@@ -246,9 +180,8 @@ for (const [collectionName, collectionOptions] of [
         assert.commandWorked(coll.insert({_id: 4, field: "A"}));
         assert.commandWorked(coll.deleteOne({_id: 4}, {writeConcern: {w: 2}}));
 
+        // Issue retryable "findAndModify" commands.
         issueRetryableFindAndModifyCommands(testDB);
-        issueNonAtomicApplyOpsCommand(testDB);
-        issueWriteCommandsInTransaction(testDB);
 
         // Do an unclean shutdown of the primary node, and then restart.
         replTest.stop(0, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
@@ -261,5 +194,6 @@ for (const [collectionName, collectionOptions] of [
         assertPreImagesCollectionOnPrimaryMatchesSecondary();
     })();
 }
+
 replTest.stopSet();
 })();

@@ -239,10 +239,6 @@ if (typeof _threadInject != "undefined") {
             "collection_uuid_coll_mod.js",
             "collection_uuid_rename_collection.js",
             "collection_uuid_index_commands.js",
-
-            // These tests rely on no writes happening that would force oplog truncation.
-            "write_change_stream_pit_preimage_in_transaction.js",
-            "write_change_stream_pit_preimage.js",
         ]);
 
         // Get files, including files in subdirectories.

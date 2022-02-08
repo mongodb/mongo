@@ -14,6 +14,8 @@ selector:
   - assumes_write_concern_unchanged
   # Exclude any that assume sharding is disabled
   - assumes_against_mongod_not_mongos
+  exclude_files:
+  - jstests/change_streams/change_stream_lookup_preimage_with_resharding.js
 
 executor:
   archive:

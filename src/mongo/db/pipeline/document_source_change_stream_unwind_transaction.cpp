@@ -268,7 +268,6 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::TransactionO
 
     // Initialize iterators at the beginning of the transaction.
     _currentApplyOpsIt = _currentApplyOps.getArray().begin();
-    _currentApplyOpsTs = firstTimestamp.getTimestamp();
     _currentApplyOpsIndex = 0;
     _txnOpIndex = 0;
 }
@@ -305,7 +304,6 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::getNextTrans
                 BSONType::Array == bsonOp["applyOps"].type());
 
         _currentApplyOps = Value(bsonOp["applyOps"]);
-        _currentApplyOpsTs = applyOpsEntry.getTimestamp();
         _currentApplyOpsIt = _currentApplyOps.getArray().begin();
         _currentApplyOpsIndex = 0;
     }
@@ -340,7 +338,6 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::_addRequired
     // the current entry.
     newDoc.addField(DocumentSourceChangeStream::kApplyOpsIndexField,
                     Value(static_cast<long long>(applyOpsIndex())));
-    newDoc.addField(DocumentSourceChangeStream::kApplyOpsTsField, Value(applyOpsTs()));
 
     newDoc.addField(repl::OplogEntry::kTimestampFieldName, Value(_clusterTime));
     newDoc.addField(repl::OplogEntry::kSessionIdFieldName, Value(_lsid));

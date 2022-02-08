@@ -350,7 +350,6 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     // unwinding a transaction.
     auto txnOpIndex = input[DocumentSourceChangeStream::kTxnOpIndexField];
     auto applyOpsIndex = input[DocumentSourceChangeStream::kApplyOpsIndexField];
-    auto applyOpsEntryTs = input[DocumentSourceChangeStream::kApplyOpsTsField];
 
     // Add some additional fields only relevant to transactions.
     if (!txnOpIndex.missing()) {
@@ -406,10 +405,10 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
         } else {
             // Set 'kPreImageIdField' to the 'ChangeStreamPreImageId'. The DSCSAddPreImage stage
             // will use the id in order to fetch the pre-image from the pre-images collection.
-            const auto preImageId = ChangeStreamPreImageId(
-                uuid.getUuid(),
-                applyOpsEntryTs.missing() ? ts.getTimestamp() : applyOpsEntryTs.getTimestamp(),
-                applyOpsIndex.missing() ? 0 : applyOpsIndex.getLong());
+            const auto preImageId =
+                ChangeStreamPreImageId(uuid.getUuid(),
+                                       ts.getTimestamp(),
+                                       applyOpsIndex.missing() ? 0 : applyOpsIndex.getLong());
             doc.addField(DocumentSourceChangeStream::kPreImageIdField, Value(preImageId.toBSON()));
         }
     }
@@ -448,10 +447,9 @@ DepsTracker::State DocumentSourceChangeStreamTransform::getDependencies(DepsTrac
     deps->fields.insert(repl::OplogEntry::kTxnNumberFieldName.toString());
     deps->fields.insert(DocumentSourceChangeStream::kTxnOpIndexField.toString());
 
-    if (_preImageRequested || _postImageRequested) {
+    if (_preImageRequested) {
         deps->fields.insert(repl::OplogEntry::kPreImageOpTimeFieldName.toString());
         deps->fields.insert(DocumentSourceChangeStream::kApplyOpsIndexField.toString());
-        deps->fields.insert(DocumentSourceChangeStream::kApplyOpsTsField.toString());
     }
     return DepsTracker::State::EXHAUSTIVE_ALL;
 }

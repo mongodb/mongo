@@ -31,7 +31,7 @@ function getOplogEntriesForTxnWithRetries(rs, lsid, txnNumber) {
     return oplogEntries;
 }
 
-function RetryableInternalTransactionTest(collectionOptions = {}) {
+function RetryableInternalTransactionTest() {
     // Set a large oplogSize since this test runs a find command to get the oplog entries for
     // every transaction that it runs including large transactions and with the default oplogSize,
     // oplog reading done by the find command may not be able to keep up with the oplog truncation,
@@ -51,8 +51,9 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
     const kDbName = "testDb";
     const kCollName = "testColl";
     const mongosTestDB = st.s.getDB(kDbName);
-    assert.commandWorked(mongosTestDB.createCollection(kCollName, collectionOptions));
     const mongosTestColl = mongosTestDB.getCollection(kCollName);
+
+    assert.commandWorked(mongosTestDB.createCollection(kCollName));
 
     function makeSessionIdForRetryableInternalTransaction() {
         return {id: UUID(), txnNumber: NumberLong(0), txnUUID: UUID()};
