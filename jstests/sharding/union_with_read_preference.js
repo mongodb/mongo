@@ -99,16 +99,6 @@ const secondTargetColl = mongosDB.second_union_target;
 st.shardColl(secondTargetColl, {_id: 1}, {_id: 0}, {_id: -1});
 assert.commandWorked(secondTargetColl.insert([{_id: -1, docNum: 4}, {_id: 1, docNum: 5}],
                                              {writeConcern: {w: "majority"}}));
-// This find triggers a refresh on the secondaries so the following union is able to find all the
-// documents in `second_union_target`. Without the find, the router is seeing this collection for
-// the first time and so presumes UNSHARDED, which does not cause mismatch against the shard's
-// UNKNOWN version due to SERVER-32198.
-// TODO SERVER-32198: Update this test to not depend on the find for refresh.
-assert.eq(new DBCommandCursor(mongosDB, assert.commandWorked(mongosDB.runCommand({
-              query: {find: secondTargetColl.getName(), readConcern: {level: "local"}},
-              $readPreference: {mode: "secondary"}
-          }))).itcount(),
-          2);
 unionWithComment = 'complex union against secondary';
 let runAgg = () => mongosColl
                        .aggregate(
