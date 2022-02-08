@@ -28,6 +28,9 @@ const donorRst = new ReplSetTest({
     name: 'donor',
     nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().donor, {
         setParameter:
+            // In order to deterministically validate that in-memory state is preserved during
+            // recovery, this failpoint prevents active migrations from continuing on process
+            // restart.
             {"failpoint.PrimaryOnlyServiceSkipRebuildingInstances": tojson({mode: "alwaysOn"})}
     })
 });
@@ -106,8 +109,8 @@ if (donorDoc) {
                                                     {donorNode: donorPrimary, tenantId: kTenantId})
                                                 .donor.blockTimestamp,
                                             donorDoc.blockTimestamp) == 0);
-            assert.commandWorked(
-                tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+            // Don't run donorForgetMigration because the fail point above prevents instances from
+            // being rebuilt on step up.
             break;
         case TenantMigrationTest.DonorState.kAborted:
             assert.soon(() => tenantMigrationTest
@@ -124,8 +127,8 @@ if (donorDoc) {
                                                     {donorNode: donorPrimary, tenantId: kTenantId})
                                                 .donor.blockTimestamp,
                                             donorDoc.blockTimestamp) == 0);
-            assert.commandWorked(
-                tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+            // Don't run donorForgetMigration because the fail point above prevents instances from
+            // being rebuilt on step up.
             break;
         default:
             throw new Error(`Invalid state "${state}" from donor doc.`);
