@@ -33,6 +33,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 
@@ -75,4 +76,24 @@ EvalStage generateIndexFilter(StageBuilderState& state,
                               sbe::value::SlotVector keySlots,
                               std::vector<std::string> keyFields,
                               PlanNodeId planNodeId);
+
+/**
+ * Converts the list of equalities inside the given $in expression ('expr') into an SBE array, which
+ * is returned as a (typeTag, value) pair. The caller owns the resulting value.
+ *
+ * The returned tuple also includes two booleans, in this order:
+ *  - 'hasArray': True if at least one of the values inside the $in equality list is an array.
+ *  - 'hasNull': True if at least one of the values inside the $in equality list is a literal null
+ * value.
+ */
+std::tuple<sbe::value::TypeTags, sbe::value::Value, bool, bool> convertInExpressionEqualities(
+    const InMatchExpression* expr);
+
+/**
+ * Converts the list of bit positions inside of any of the bit-test match expressions
+ * ($bitsAllClear, $bitsAllSet, $bitsAnyClear, and $bitsAnySet) to an SBE array, returned as a
+ * (typeTag, value) pair. The caller owns the resulting value.
+ */
+std::pair<sbe::value::TypeTags, sbe::value::Value> convertBitTestBitPositions(
+    const BitTestMatchExpression* expr);
 }  // namespace mongo::stage_builder

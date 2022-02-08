@@ -70,17 +70,6 @@ public:
      */
     virtual StringData name() const = 0;
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
-        auto expr = std::make_unique<T>(path(), _typeSet, _errorAnnotation);
-        if (getTag()) {
-            expr->setTag(getTag()->clone());
-        }
-        if (getInputParamId()) {
-            expr->setInputParamId(*getInputParamId());
-        }
-        return expr;
-    }
-
     bool matchesSingleElement(const BSONElement& elem, MatchDetails* details = nullptr) const {
         return _typeSet.hasType(elem.type());
     }
@@ -125,14 +114,6 @@ public:
         return _typeSet;
     }
 
-    void setInputParamId(InputParamId paramId) {
-        _inputParamId = paramId;
-    }
-
-    boost::optional<InputParamId> getInputParamId() const {
-        return _inputParamId;
-    }
-
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) { return expression; };
@@ -140,8 +121,6 @@ private:
 
     // The set of matching types.
     MatcherTypeSet _typeSet;
-
-    boost::optional<InputParamId> _inputParamId;
 };
 
 class TypeMatchExpression final : public TypeMatchExpressionBase<TypeMatchExpression> {
@@ -161,6 +140,17 @@ public:
         return kName;
     }
 
+    std::unique_ptr<MatchExpression> shallowClone() const final {
+        auto expr = std::make_unique<TypeMatchExpression>(path(), typeSet(), _errorAnnotation);
+        if (getTag()) {
+            expr->setTag(getTag()->clone());
+        }
+        if (getInputParamId()) {
+            expr->setInputParamId(*getInputParamId());
+        }
+        return expr;
+    }
+
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
     }
@@ -168,6 +158,17 @@ public:
     void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
         visitor->visit(this);
     }
+
+    void setInputParamId(InputParamId paramId) {
+        _inputParamId = paramId;
+    }
+
+    boost::optional<InputParamId> getInputParamId() const {
+        return _inputParamId;
+    }
+
+private:
+    boost::optional<InputParamId> _inputParamId;
 };
 
 /**
@@ -191,6 +192,15 @@ public:
 
     StringData name() const final {
         return kName;
+    }
+
+    std::unique_ptr<MatchExpression> shallowClone() const final {
+        auto expr =
+            std::make_unique<InternalSchemaTypeExpression>(path(), typeSet(), _errorAnnotation);
+        if (getTag()) {
+            expr->setTag(getTag()->clone());
+        }
+        return expr;
     }
 
     MatchCategory getCategory() const final {
@@ -306,6 +316,15 @@ public:
 
     StringData name() const {
         return kName;
+    }
+
+    std::unique_ptr<MatchExpression> shallowClone() const final {
+        auto expr = std::make_unique<InternalSchemaBinDataEncryptedTypeExpression>(
+            path(), typeSet(), _errorAnnotation);
+        if (getTag()) {
+            expr->setTag(getTag()->clone());
+        }
+        return expr;
     }
 
     MatchCategory getCategory() const final {

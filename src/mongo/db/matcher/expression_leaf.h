@@ -812,12 +812,20 @@ public:
 
     std::string name() const;
 
-    void setInputParamId(InputParamId paramId) {
-        _inputParamId = paramId;
+    void setBitPositionsParamId(InputParamId paramId) {
+        _bitPositionsParamId = paramId;
     }
 
-    boost::optional<InputParamId> getInputParamId() const {
-        return _inputParamId;
+    void setBitMaskParamId(InputParamId paramId) {
+        _bitMaskParamId = paramId;
+    }
+
+    boost::optional<InputParamId> getBitPositionsParamId() const {
+        return _bitPositionsParamId;
+    }
+
+    boost::optional<InputParamId> getBitMaskParamId() const {
+        return _bitMaskParamId;
     }
 
 private:
@@ -852,7 +860,11 @@ private:
     // Used to perform bit tests against numbers using a single bitwise operation.
     uint64_t _bitMask = 0;
 
-    boost::optional<InputParamId> _inputParamId;
+    // When this expression is parameterized, we require two parmeter markers, not one: a parameter
+    // marker for the vector of bit positions and a second for the bitmask. The runtime plan
+    // needs both values so that it can operate against either BinData or numerical inputs.
+    boost::optional<InputParamId> _bitPositionsParamId;
+    boost::optional<InputParamId> _bitMaskParamId;
 };
 
 class BitsAllSetMatchExpression : public BitTestMatchExpression {
@@ -881,8 +893,11 @@ public:
         if (getTag()) {
             bitTestMatchExpression->setTag(getTag()->clone());
         }
-        if (getInputParamId()) {
-            bitTestMatchExpression->setInputParamId(*getInputParamId());
+        if (getBitPositionsParamId()) {
+            bitTestMatchExpression->setBitPositionsParamId(*getBitPositionsParamId());
+        }
+        if (getBitMaskParamId()) {
+            bitTestMatchExpression->setBitMaskParamId(*getBitMaskParamId());
         }
         return bitTestMatchExpression;
     }
@@ -922,8 +937,11 @@ public:
         if (getTag()) {
             bitTestMatchExpression->setTag(getTag()->clone());
         }
-        if (getInputParamId()) {
-            bitTestMatchExpression->setInputParamId(*getInputParamId());
+        if (getBitPositionsParamId()) {
+            bitTestMatchExpression->setBitPositionsParamId(*getBitPositionsParamId());
+        }
+        if (getBitMaskParamId()) {
+            bitTestMatchExpression->setBitMaskParamId(*getBitMaskParamId());
         }
         return bitTestMatchExpression;
     }
@@ -963,8 +981,11 @@ public:
         if (getTag()) {
             bitTestMatchExpression->setTag(getTag()->clone());
         }
-        if (getInputParamId()) {
-            bitTestMatchExpression->setInputParamId(*getInputParamId());
+        if (getBitPositionsParamId()) {
+            bitTestMatchExpression->setBitPositionsParamId(*getBitPositionsParamId());
+        }
+        if (getBitMaskParamId()) {
+            bitTestMatchExpression->setBitMaskParamId(*getBitMaskParamId());
         }
         return bitTestMatchExpression;
     }
@@ -1004,8 +1025,11 @@ public:
         if (getTag()) {
             bitTestMatchExpression->setTag(getTag()->clone());
         }
-        if (getInputParamId()) {
-            bitTestMatchExpression->setInputParamId(*getInputParamId());
+        if (getBitPositionsParamId()) {
+            bitTestMatchExpression->setBitPositionsParamId(*getBitPositionsParamId());
+        }
+        if (getBitMaskParamId()) {
+            bitTestMatchExpression->setBitMaskParamId(*getBitMaskParamId());
         }
         return bitTestMatchExpression;
     }

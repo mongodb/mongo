@@ -217,6 +217,8 @@ void PlanStageSlots::forEachSlot(const PlanStageReqs& reqs,
     }
 }
 
+using InputParamToSlotMap = stdx::unordered_map<MatchExpression::InputParamId, sbe::value::SlotId>;
+
 /**
  * Some auxiliary data returned by a 'SlotBasedStageBuilder' along with a PlanStage tree root, which
  * is needed to execute the PlanStage tree.
@@ -270,6 +272,20 @@ struct PlanStageData {
     // Stores plan cache entry information used as debug information or for "explain" purpose.
     // Note that 'debugInfo' is present only if this PlanStageData is recovered from the plan cache.
     std::unique_ptr<plan_cache_debug_info::DebugInfoSBE> debugInfo;
+
+    // If the query has been auto-parameterized, then the mapping from input parameter id to the
+    // id of a slot in the runtime environment is maintained here. This mapping is established
+    // during stage building and stored in the cache. When a cached plan is used for a subsequent
+    // query, this mapping is used to set the new constant value associated with each input
+    // parameter id in the runtime environment.
+    //
+    // For example, imagine an auto-parameterized query {a: <p1>, b: <p2>} is present in the SBE
+    // plan cache. Also present in the cache is this mapping:
+    //    p1 -> s3
+    //    p2 -> s4
+    //
+    // A new query {a: 5, b: 6} runs. Using this mapping, we set a value of 5 in s3 and 6 in s4.
+    InputParamToSlotMap inputParamToSlotMap;
 
 private:
     // This copy function copies data from 'other' but will not create a copy of its

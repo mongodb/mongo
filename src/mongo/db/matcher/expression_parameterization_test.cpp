@@ -71,40 +71,40 @@ TEST(MatchExpressionParameterizationVisitor, AlwaysTrueMatchExpressionSetsNoPara
     ASSERT_EQ(0, context.inputParamIds.size());
 }
 
-TEST(MatchExpressionParameterizationVisitor, BitsAllClearMatchExpressionSetsOneParamId) {
+TEST(MatchExpressionParameterizationVisitor, BitsAllClearMatchExpressionSetsTwoParamIds) {
     std::vector<uint32_t> bitPositions;
     BitsAllClearMatchExpression expr{"a", bitPositions};
     MatchExpressionParameterizationTestVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(1, context.inputParamIds.size());
+    ASSERT_EQ(2, context.inputParamIds.size());
 }
 
-TEST(MatchExpressionParameterizationVisitor, BitsAllSetMatchExpressionSetsOneParamId) {
+TEST(MatchExpressionParameterizationVisitor, BitsAllSetMatchExpressionSetsTwoParamIds) {
     std::vector<uint32_t> bitPositions;
     BitsAllSetMatchExpression expr{"a", bitPositions};
     MatchExpressionParameterizationTestVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(1, context.inputParamIds.size());
+    ASSERT_EQ(2, context.inputParamIds.size());
 }
 
-TEST(MatchExpressionParameterizationVisitor, BitsAnyClearMatchExpressionSetsOneParamId) {
+TEST(MatchExpressionParameterizationVisitor, BitsAnyClearMatchExpressionSetsTwoParamIds) {
     std::vector<uint32_t> bitPositions{0, 1, 8};
     BitsAnyClearMatchExpression expr{"a", bitPositions};
     MatchExpressionParameterizationTestVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(1, context.inputParamIds.size());
+    ASSERT_EQ(2, context.inputParamIds.size());
 }
 
-TEST(MatchExpressionParameterizationVisitor, BitsAnySetMatchExpressionSetsOneParamId) {
+TEST(MatchExpressionParameterizationVisitor, BitsAnySetMatchExpressionSetsTwoParamIds) {
     std::vector<uint32_t> bitPositions{0, 1, 8};
     BitsAnySetMatchExpression expr{"a", bitPositions};
     MatchExpressionParameterizationTestVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     expr.acceptVisitor(&visitor);
-    ASSERT_EQ(1, context.inputParamIds.size());
+    ASSERT_EQ(2, context.inputParamIds.size());
 }
 
 TEST(MatchExpressionParameterizationVisitor,

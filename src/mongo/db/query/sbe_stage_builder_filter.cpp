@@ -46,7 +46,6 @@
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
-#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/matcher/expression_text_noop.h"
 #include "mongo/db/matcher/expression_tree.h"
@@ -834,25 +833,7 @@ void generateBitTest(MatchExpressionVisitorContext* context,
                      const sbe::BitTestBehavior& bitOp) {
     auto makePredicate = [expr, bitOp](sbe::value::SlotId inputSlot,
                                        EvalStage inputStage) -> EvalExprStagePair {
-        auto bitPositions = expr->getBitPositions();
-
-        // Build an array set of bit positions for the bitmask, and remove duplicates in the
-        // bitPositions vector since duplicates aren't handled in the match expression parser by
-        // checking if an item has already been seen.
-        auto [bitPosTag, bitPosVal] = sbe::value::makeNewArray();
-        auto arr = sbe::value::getArrayView(bitPosVal);
-        if (bitPositions.size()) {
-            arr->reserve(bitPositions.size());
-
-            std::set<uint32_t> seenBits;
-            for (size_t index = 0; index < bitPositions.size(); ++index) {
-                auto currentBit = bitPositions[index];
-                if (auto result = seenBits.insert(currentBit); result.second) {
-                    arr->push_back(sbe::value::TypeTags::NumberInt64,
-                                   sbe::value::bitcastFrom<int64_t>(currentBit));
-                }
-            }
-        }
+        auto [bitPosTag, bitPosVal] = convertBitTestBitPositions(expr);
 
         // An EExpression for the BinData and position list for the binary case of
         // BitTestMatchExpressions. This function will be applied to values carrying BinData
@@ -1435,33 +1416,8 @@ public:
     void visit(const GeoNearMatchExpression* expr) final {}
 
     void visit(const InMatchExpression* expr) final {
-        auto equalities = expr->getEqualities();
-
-        // Build an ArraySet for testing membership of the field in the equalities vector of the
-        // InMatchExpression.
-        auto [arrSetTag, arrSetVal] = sbe::value::makeNewArraySet();
+        auto&& [arrSetTag, arrSetVal, hasArray, hasNull] = convertInExpressionEqualities(expr);
         sbe::value::ValueGuard arrSetGuard{arrSetTag, arrSetVal};
-
-        auto arrSet = sbe::value::getArraySetView(arrSetVal);
-
-        auto hasArray = false;
-        auto hasNull = false;
-        if (equalities.size()) {
-            arrSet->reserve(equalities.size());
-            for (auto&& equality : equalities) {
-                auto [tagView, valView] =
-                    sbe::bson::convertFrom<true>(equality.rawdata(),
-                                                 equality.rawdata() + equality.size(),
-                                                 equality.fieldNameSize() - 1);
-
-                hasNull |= tagView == sbe::value::TypeTags::Null;
-                hasArray |= sbe::value::isArray(tagView);
-
-                // An ArraySet assumes ownership of it's values so we have to make a copy here.
-                auto [tag, val] = sbe::value::copyValue(tagView, valView);
-                arrSet->push_back(tag, val);
-            }
-        }
 
         const auto traversalMode = hasArray ? LeafTraversalMode::kArrayAndItsElements
                                             : LeafTraversalMode::kArrayElementsOnly;
@@ -1469,9 +1425,9 @@ public:
         // If the InMatchExpression doesn't carry any regex patterns, we can just check if the value
         // in bound to the inputSlot is a member of the equalities set.
         if (expr->getRegexes().size() == 0) {
-            auto makePredicate = [&, arrSetTag = arrSetTag, arrSetVal = arrSetVal](
-                                     sbe::value::SlotId inputSlot,
-                                     EvalStage inputStage) -> EvalExprStagePair {
+            auto makePredicate =
+                [&, arrSetTag = arrSetTag, arrSetVal = arrSetVal, hasNull = hasNull](
+                    sbe::value::SlotId inputSlot, EvalStage inputStage) -> EvalExprStagePair {
                 // We have to match nulls and undefined if a 'null' is present in equalities.
                 auto inputExpr = !hasNull
                     ? makeVariable(inputSlot)
@@ -1497,6 +1453,7 @@ public:
             // exhaust the equalities 'isMember' check, and then if no match is found it executes
             // the regex-only traversal stage.
             auto& regexes = expr->getRegexes();
+            auto& equalities = expr->getEqualities();
 
             auto [arrTag, arrVal] = sbe::value::makeNewArray();
             sbe::value::ValueGuard arrGuard{arrTag, arrVal};
@@ -1513,9 +1470,13 @@ public:
                 }
             }
 
-            auto makePredicate =
-                [&, arrSetTag = arrSetTag, arrSetVal = arrSetVal, arrTag = arrTag, arrVal = arrVal](
-                    sbe::value::SlotId inputSlot, EvalStage inputStage) -> EvalExprStagePair {
+            auto makePredicate = [&,
+                                  arrSetTag = arrSetTag,
+                                  arrSetVal = arrSetVal,
+                                  arrTag = arrTag,
+                                  arrVal = arrVal,
+                                  hasNull = hasNull](sbe::value::SlotId inputSlot,
+                                                     EvalStage inputStage) -> EvalExprStagePair {
                 auto regexArraySlot{_context->state.slotId()};
                 auto regexInputSlot{_context->state.slotId()};
                 auto regexOutputSlot{_context->state.slotId()};
@@ -1976,4 +1937,64 @@ EvalStage generateIndexFilter(StageBuilderState& state,
     tassert(5273411, "Index filter must not track a matching element index", !resultSlot);
     return std::move(resultStage);
 }
+
+std::tuple<sbe::value::TypeTags, sbe::value::Value, bool, bool> convertInExpressionEqualities(
+    const InMatchExpression* expr) {
+    auto& equalities = expr->getEqualities();
+    auto [arrSetTag, arrSetVal] = sbe::value::makeNewArraySet();
+    sbe::value::ValueGuard arrSetGuard{arrSetTag, arrSetVal};
+
+    auto arrSet = sbe::value::getArraySetView(arrSetVal);
+
+    auto hasArray = false;
+    auto hasNull = false;
+    if (equalities.size()) {
+        arrSet->reserve(equalities.size());
+        for (auto&& equality : equalities) {
+            auto [tagView, valView] =
+                sbe::bson::convertFrom<true>(equality.rawdata(),
+                                             equality.rawdata() + equality.size(),
+                                             equality.fieldNameSize() - 1);
+
+            hasNull |= tagView == sbe::value::TypeTags::Null;
+            hasArray |= sbe::value::isArray(tagView);
+
+            // An ArraySet assumes ownership of it's values so we have to make a copy here.
+            auto [tag, val] = sbe::value::copyValue(tagView, valView);
+            arrSet->push_back(tag, val);
+        }
+    }
+
+    arrSetGuard.reset();
+    return {arrSetTag, arrSetVal, hasArray, hasNull};
+}
+
+std::pair<sbe::value::TypeTags, sbe::value::Value> convertBitTestBitPositions(
+    const BitTestMatchExpression* expr) {
+    auto bitPositions = expr->getBitPositions();
+
+    // Build an array set of bit positions for the bitmask, and remove duplicates in the
+    // bitPositions vector since duplicates aren't handled in the match expression parser by
+    // checking if an item has already been seen.
+    auto [bitPosTag, bitPosVal] = sbe::value::makeNewArray();
+    sbe::value::ValueGuard arrGuard{bitPosTag, bitPosVal};
+
+    auto arr = sbe::value::getArrayView(bitPosVal);
+    if (bitPositions.size()) {
+        arr->reserve(bitPositions.size());
+
+        std::set<uint32_t> seenBits;
+        for (size_t index = 0; index < bitPositions.size(); ++index) {
+            auto currentBit = bitPositions[index];
+            if (auto result = seenBits.insert(currentBit); result.second) {
+                arr->push_back(sbe::value::TypeTags::NumberInt64,
+                               sbe::value::bitcastFrom<int64_t>(currentBit));
+            }
+        }
+    }
+
+    arrGuard.reset();
+    return {bitPosTag, bitPosVal};
+}
+
 }  // namespace mongo::stage_builder

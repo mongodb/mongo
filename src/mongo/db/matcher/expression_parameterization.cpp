@@ -32,20 +32,25 @@
 #include <cmath>
 
 namespace mongo {
+void MatchExpressionParameterizationVisitor::visitBitTestExpression(BitTestMatchExpression* expr) {
+    expr->setBitPositionsParamId(_context->nextInputParamId());
+    expr->setBitMaskParamId(_context->nextInputParamId());
+}
+
 void MatchExpressionParameterizationVisitor::visit(BitsAllClearMatchExpression* expr) {
-    expr->setInputParamId(_context->nextInputParamId());
+    visitBitTestExpression(expr);
 }
 
 void MatchExpressionParameterizationVisitor::visit(BitsAllSetMatchExpression* expr) {
-    expr->setInputParamId(_context->nextInputParamId());
+    visitBitTestExpression(expr);
 }
 
 void MatchExpressionParameterizationVisitor::visit(BitsAnyClearMatchExpression* expr) {
-    expr->setInputParamId(_context->nextInputParamId());
+    visitBitTestExpression(expr);
 }
 
 void MatchExpressionParameterizationVisitor::visit(BitsAnySetMatchExpression* expr) {
-    expr->setInputParamId(_context->nextInputParamId());
+    visitBitTestExpression(expr);
 }
 
 void MatchExpressionParameterizationVisitor::visit(EqualityMatchExpression* expr) {

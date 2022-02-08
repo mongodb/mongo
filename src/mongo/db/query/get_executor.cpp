@@ -61,6 +61,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/classic_plan_cache.h"
@@ -1069,6 +1070,10 @@ protected:
         auto sbeYieldPolicy = dynamic_cast<PlanYieldPolicySBE*>(_yieldPolicy);
         invariant(sbeYieldPolicy);
         sbeYieldPolicy->registerPlan(root.get());
+
+        // If the cached plan is parameterized, bind new values for the parameters into the runtime
+        // environment.
+        input_params::bind(*_cq, stageData.inputParamToSlotMap, stageData.env);
 
         auto result = makeResult();
         result->setDecisionWorks(cacheEntry->decisionWorks);

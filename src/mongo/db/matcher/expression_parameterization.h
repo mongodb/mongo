@@ -141,6 +141,8 @@ public:
 private:
     void visitComparisonMatchExpression(ComparisonMatchExpressionBase* expr);
 
+    void visitBitTestExpression(BitTestMatchExpression* expr);
+
     MatchExpressionParameterizationVisitorContext* _context;
 };
 
