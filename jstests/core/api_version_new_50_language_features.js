@@ -3,16 +3,14 @@
  * yet. This test should be updated or removed in a future release when we have more confidence that
  * the behavior and syntax is stable.
  *
- *  TODO: SERVER-58962 remove requires_fcv_51 from this file or change the test code.
- *
  * @tags: [
- *   requires_fcv_51,
  *   uses_api_parameters,
  * ]
  */
 
 (function() {
 "use strict";
+load("jstests/libs/api_version_helpers.js");  // For 'APIVersionHelpers'.
 
 const collName = "api_version_new_50_language_features";
 const coll = db[collName];
@@ -26,40 +24,15 @@ const unstablePipelines = [
     [{$set: {x: {$dateDiff: {startDate: "$date", endDate: "$date", unit: "day"}}}}],
     [{$set: {x: {$getField: {input: "$$ROOT", field: "x"}}}}],
     [{$set: {x: {$setField: {input: "$$ROOT", field: "x", value: "foo"}}}}],
-    [{$set: {x: {$tsSecond: new Timestamp(0, 0)}}}],
-    [{$set: {x: {$tsIncrement: new Timestamp(0, 0)}}}],
 ];
-
-function assertAggregateFailsWithAPIStrict(pipeline, errorCodes) {
-    assert.commandFailedWithCode(db.runCommand({
-        aggregate: collName,
-        pipeline: pipeline,
-        cursor: {},
-        apiStrict: true,
-        apiVersion: "1"
-    }),
-                                 errorCodes,
-                                 pipeline);
-}
-
-function assertViewFailsWithAPIStrict(pipeline) {
-    assert.commandFailedWithCode(db.runCommand({
-        create: 'new_50_feature_view',
-        viewOn: collName,
-        pipeline: pipeline,
-        apiStrict: true,
-        apiVersion: "1"
-    }),
-                                 ErrorCodes.APIStrictError,
-                                 pipeline);
-}
 
 for (let pipeline of unstablePipelines) {
     // Assert error thrown when running a pipeline with stages not in API Version 1.
-    assertAggregateFailsWithAPIStrict(pipeline, ErrorCodes.APIStrictError);
+    APIVersionHelpers.assertAggregateFailsWithAPIStrict(
+        pipeline, collName, ErrorCodes.APIStrictError);
 
     // Assert error thrown when creating a view on a pipeline with stages not in API Version 1.
-    assertViewFailsWithAPIStrict(pipeline);
+    APIVersionHelpers.assertViewFailsWithAPIStrict(pipeline, collName);
 
     // Assert error is not thrown when running without apiStrict=true.
     assert.commandWorked(db.runCommand({
@@ -78,13 +51,13 @@ const setWindowFieldsPipeline = [{
         output: {runningCount: {$sum: 1, window: {documents: ["unbounded", "current"]}}}
     }
 }];
-assertAggregateFailsWithAPIStrict(setWindowFieldsPipeline, [
+APIVersionHelpers.assertAggregateFailsWithAPIStrict(setWindowFieldsPipeline, collName, [
     ErrorCodes.APIStrictError,
     ErrorCodes.InvalidOptions,
     ErrorCodes.OperationNotSupportedInTransaction
 ]);
 
-assertViewFailsWithAPIStrict(setWindowFieldsPipeline);
+APIVersionHelpers.assertViewFailsWithAPIStrict(setWindowFieldsPipeline, collName);
 
 // Creating a collection with the unstable validator is not allowed with apiStrict:true.
 assert.commandFailedWithCode(db.runCommand({
