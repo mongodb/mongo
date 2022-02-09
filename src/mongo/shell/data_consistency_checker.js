@@ -321,6 +321,7 @@ var {DataConsistencyChecker} = (function() {
             }
 
             const nonCappedCollNames = sourceCollInfos.getNonCappedCollNames();
+            let didIgnoreFailure = false;
             // Only compare the dbhashes of non-capped collections because capped
             // collections are not necessarily truncated at the same points between the source and
             // syncing nodes.
@@ -342,6 +343,7 @@ var {DataConsistencyChecker} = (function() {
                             restart scenarios.`);
                     }
                     success = shouldIgnoreFailure && success;
+                    didIgnoreFailure = shouldIgnoreFailure || didIgnoreFailure;
                 }
             });
 
@@ -496,6 +498,14 @@ var {DataConsistencyChecker} = (function() {
                 if (sourceDBHash.md5 !== syncingDBHash.md5) {
                     prettyPrint(`the two nodes have a different has for the ${dbName} database: ${
                         dbHashesMsg}`);
+                    if (didIgnoreFailure) {
+                        // We only expect database hash mismatches on the config db, where
+                        // config.image_collection is expected to have inconsistencies in certain
+                        // scenarios.
+                        prettyPrint(`Ignoring hash mismatch for the ${dbName} database since
+                            inconsistencies in 'config.image_collection' can be expected`);
+                        return success;
+                    }
                     success = false;
                 }
             }
