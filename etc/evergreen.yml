@@ -5107,7 +5107,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_jobs_max: 1
 
 - <<: *gen_task_template
   name: sharding_clustered_collections_gen
@@ -5116,7 +5115,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_jobs_max: 1
 
 - <<: *gen_task_template
   name: parallel_gen
