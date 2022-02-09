@@ -79,7 +79,7 @@ repl::OpTime opTimeParser(BSONElement elem);
 
 class UpdateModification {
 public:
-    enum class Type { kClassic, kPipeline, kDelta, kTransform };
+    enum class Type { kReplacement, kModifier, kPipeline, kDelta, kTransform };
     using TransformFunc = std::function<boost::optional<BSONObj>(const BSONObj&)>;
 
     /**
@@ -109,6 +109,7 @@ public:
     // Creates an transform-style update. The transform function MUST preserve the _id element.
     UpdateModification(TransformFunc transform);
     // This constructor exists only to provide a fast-path for constructing classic-style updates.
+    UpdateModification(const BSONObj& update, ClassicTag, bool isReplacement);
     UpdateModification(const BSONObj& update, ClassicTag);
 
     /**
@@ -129,9 +130,14 @@ public:
 
     Type type() const;
 
-    BSONObj getUpdateClassic() const {
-        invariant(type() == Type::kClassic);
-        return stdx::get<ClassicUpdate>(_update).bson;
+    BSONObj getUpdateReplacement() const {
+        invariant(type() == Type::kReplacement);
+        return stdx::get<ReplacementUpdate>(_update).bson;
+    }
+
+    BSONObj getUpdateModifier() const {
+        invariant(type() == Type::kModifier);
+        return stdx::get<ModifierUpdate>(_update).bson;
     }
 
     const std::vector<BSONObj>& getUpdatePipeline() const {
@@ -159,8 +165,11 @@ public:
 
         stdx::visit(
             visit_helper::Overloaded{
-                [&sb](const ClassicUpdate& classic) {
-                    sb << "{type: Classic, update: " << classic.bson << "}";
+                [&sb](const ReplacementUpdate& replacement) {
+                    sb << "{type: Replacement, update: " << replacement.bson << "}";
+                },
+                [&sb](const ModifierUpdate& modifier) {
+                    sb << "{type: Modifier, update: " << modifier.bson << "}";
                 },
                 [&sb](const PipelineUpdate& pipeline) {
                     sb << "{type: Pipeline, update: " << Value(pipeline).toString() << "}";
@@ -176,7 +185,10 @@ public:
 
 private:
     // Wrapper class used to avoid having a variant where multiple alternatives have the same type.
-    struct ClassicUpdate {
+    struct ReplacementUpdate {
+        BSONObj bson;
+    };
+    struct ModifierUpdate {
         BSONObj bson;
     };
     using PipelineUpdate = std::vector<BSONObj>;
@@ -187,7 +199,8 @@ private:
     struct TransformUpdate {
         TransformFunc transform;
     };
-    stdx::variant<ClassicUpdate, PipelineUpdate, DeltaUpdate, TransformUpdate> _update;
+    stdx::variant<ReplacementUpdate, ModifierUpdate, PipelineUpdate, DeltaUpdate, TransformUpdate>
+        _update;
 };
 
 }  // namespace write_ops

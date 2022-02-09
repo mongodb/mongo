@@ -34,12 +34,6 @@
 
 namespace mongo::timeseries {
 namespace {
-/**
- * Returns whether the given document is a replacement document.
- */
-bool isDocReplacement(const BSONObj& doc) {
-    return doc.isEmpty() || (doc.firstElementFieldNameStringData().find("$") == std::string::npos);
-}
 
 /**
  * Returns whether the given metaField is the first element of the dotted path in the given
@@ -157,10 +151,11 @@ write_ops::UpdateModification translateUpdate(const write_ops::UpdateModificatio
             "Cannot perform an update on a time-series collection using a pipeline update",
             updateMod.type() != write_ops::UpdateModification::Type::kPipeline);
 
-    const auto& document = updateMod.getUpdateClassic();
     uassert(ErrorCodes::InvalidOptions,
             "Cannot perform an update on a time-series collection using a replacement document",
-            !isDocReplacement(document));
+            updateMod.type() != write_ops::UpdateModification::Type::kReplacement);
+
+    const auto& document = updateMod.getUpdateModifier();
 
     // Make a mutable copy of the update document in order to replace all occurrences of the
     // metaField with "meta".

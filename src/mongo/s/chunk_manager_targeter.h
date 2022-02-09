@@ -58,7 +58,6 @@ using StaleShardVersionMap = std::map<ShardId, ChunkVersion>;
  */
 class ChunkManagerTargeter : public NSTargeter {
 public:
-    enum class UpdateType { kReplacement, kOpStyle, kUnknown };
     enum class LastErrorType { kCouldNotTarget, kStaleShardVersion, kStaleDbVersion };
     /**
      * Initializes the targeter with the latest routing information for the namespace, which means

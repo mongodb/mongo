@@ -1084,7 +1084,7 @@ TEST_F(ShardingCatalogClientTest, UpdateDatabase) {
         ASSERT(update.getUpsert());
         ASSERT(!update.getMulti());
         ASSERT_BSONOBJ_EQ(update.getQ(), BSON(DatabaseType::name(dbt.getName())));
-        ASSERT_BSONOBJ_EQ(update.getU().getUpdateClassic(), dbt.toBSON());
+        ASSERT_BSONOBJ_EQ(update.getU().getUpdateReplacement(), dbt.toBSON());
 
         BatchedCommandResponse response;
         response.setStatus(Status::OK());

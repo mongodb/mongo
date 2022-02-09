@@ -226,8 +226,8 @@ protected:
                 ASSERT_EQ(itExpected->getUpsert(), itActual->getUpsert());
                 ASSERT_EQ(itExpected->getMulti(), itActual->getMulti());
                 ASSERT_BSONOBJ_EQ(itExpected->getQ(), itActual->getQ());
-                ASSERT_BSONOBJ_EQ(itExpected->getU().getUpdateClassic(),
-                                  itActual->getU().getUpdateClassic());
+                ASSERT_BSONOBJ_EQ(itExpected->getU().getUpdateReplacement(),
+                                  itActual->getU().getUpdateReplacement());
             }
 
             BatchedCommandResponse response;
@@ -268,8 +268,8 @@ protected:
                 ASSERT_EQ(itExpected->getUpsert(), itActual->getUpsert());
                 ASSERT_EQ(itExpected->getMulti(), itActual->getMulti());
                 ASSERT_BSONOBJ_EQ(itExpected->getQ(), itActual->getQ());
-                ASSERT_BSONOBJ_EQ(itExpected->getU().getUpdateClassic(),
-                                  itActual->getU().getUpdateClassic());
+                ASSERT_BSONOBJ_EQ(itExpected->getU().getUpdateReplacement(),
+                                  itActual->getU().getUpdateReplacement());
             }
 
             return statusToReturn;
