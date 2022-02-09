@@ -142,8 +142,6 @@ TransportLayerASIO::ASIOSession::ASIOSession(
     throw;
 } catch (const asio::system_error&) {
     throw;
-} catch (...) {
-    uasserted(50797, str::stream() << "Unknown exception while configuring socket.");
 }
 
 void TransportLayerASIO::ASIOSession::end() {
