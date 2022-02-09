@@ -12,6 +12,7 @@ const conn = MongoRunner.runMongod();
 const testDB = conn.getDB("admin");
 const expectedParamDefaults = {
     internalQueryPlanEvaluationWorks: 10000,
+    internalQueryPlanEvaluationWorksSbe: 10000,
     internalQueryPlanEvaluationCollFraction: 0.3,
     internalQueryPlanEvaluationCollFractionSbe: 0.0,
     internalQueryPlanEvaluationMaxResults: 101,
@@ -86,9 +87,11 @@ assert.eq(getParamRes["internalPipelineLengthLimit"],
 // Verify that the default values are set as expected when the server starts up.
 assertDefaultParameterValues();
 
-assertSetParameterSucceeds("internalQueryPlanEvaluationWorks", 11);
-assertSetParameterFails("internalQueryPlanEvaluationWorks", 0);
-assertSetParameterFails("internalQueryPlanEvaluationWorks", -1);
+for (let paramName of ["internalQueryPlanEvaluationWorks", "internalQueryPlanEvaluationWorksSbe"]) {
+    assertSetParameterSucceeds(paramName, 11);
+    assertSetParameterFails(paramName, 0);
+    assertSetParameterFails(paramName, -1);
+}
 
 for (let paramName of ["internalQueryPlanEvaluationCollFraction",
                        "internalQueryPlanEvaluationCollFractionSbe"]) {

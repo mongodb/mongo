@@ -18,6 +18,7 @@ assert.commandWorked(coll.createIndex({b: 1}));
 
 // Configure the server such that the trial period should end after doing 10 reads from storage.
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 10}));
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorksSbe: 10}));
 
 assert.commandWorked(coll.insert(Array.from({length: 20}, (v, i) => {
     return {a: 1, b: 1, c: i};

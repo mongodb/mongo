@@ -36,13 +36,12 @@
 namespace mongo::trial_period {
 size_t getTrialPeriodMaxWorks(OperationContext* opCtx,
                               const CollectionPtr& collection,
+                              int maxWorksParam,
                               double collFraction) {
-    // Run each plan some number of times. This number is at least as great as
-    // 'internalQueryPlanEvaluationWorks', but may be larger for big collections.
-    size_t numWorks = internalQueryPlanEvaluationWorks.load();
+    size_t numWorks = static_cast<size_t>(maxWorksParam);
     if (collection) {
-        numWorks = std::max(static_cast<size_t>(internalQueryPlanEvaluationWorks.load()),
-                            static_cast<size_t>(collFraction * collection->numRecords(opCtx)));
+        numWorks =
+            std::max(numWorks, static_cast<size_t>(collFraction * collection->numRecords(opCtx)));
     }
 
     return numWorks;

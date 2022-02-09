@@ -49,8 +49,10 @@ CandidatePlans MultiPlanner::plan(
     auto candidates = collectExecutionStats(
         std::move(solutions),
         std::move(roots),
-        trial_period::getTrialPeriodMaxWorks(
-            _opCtx, _collection, internalQueryPlanEvaluationCollFractionSbe.load()));
+        trial_period::getTrialPeriodMaxWorks(_opCtx,
+                                             _collection,
+                                             internalQueryPlanEvaluationWorksSbe.load(),
+                                             internalQueryPlanEvaluationCollFractionSbe.load()));
     auto decision = uassertStatusOK(mongo::plan_ranker::pickBestPlan<PlanStageStats>(candidates));
     return finalizeExecutionPlans(std::move(decision), std::move(candidates));
 }

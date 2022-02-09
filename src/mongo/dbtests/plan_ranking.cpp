@@ -211,17 +211,13 @@ public:
     }
 
     void run() {
-        // We get the number of works done during the trial period in order to make sure that there
-        // are more documents in the collection than works done in the trial period. This ensures
-        // neither of the plans reach EOF or produce results.
-        size_t numWorks = trial_period::getTrialPeriodMaxWorks(opCtx(), nullptr, 0);
-        size_t smallNumber = 10;
-        // The following condition must be met in order for the following test to work. Specifically
-        // this condition guarantees that the score of the plan using the index on d will score
-        // higher than the the plan using the index on a.
-        ASSERT(smallNumber < numWorks);
-        for (size_t i = 0; i < numWorks * 2; ++i) {
-            insert(BSON("a" << static_cast<int>(i >= ((numWorks * 2) - smallNumber)) << "d"
+        const size_t numDocs = 1000;
+        const size_t smallNumber = 10;
+
+        // Insert 'numDocs' documents. A number of documents given by 'smallNumber' should have
+        // a==1, while all other docs have a==0.
+        for (size_t i = 0; i < numDocs; ++i) {
+            insert(BSON("a" << static_cast<int>(i >= (numDocs - smallNumber)) << "d"
                             << static_cast<int>(i)));
         }
 
@@ -230,6 +226,10 @@ public:
         addIndex(BSON("a" << 1));
         addIndex(BSON("d" << 1));
 
+        // Run a query where we expect the most efficient plan to fail due to exhausting the
+        // blocking sort memory limit during multi-planning. We expect this error to be swallowed
+        // and the less efficient plan using index {d: 1} to be chosen instead.
+        //
         // Query: find({a: 1}).sort({d: 1})
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(BSON("a" << 1));
