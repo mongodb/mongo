@@ -57,7 +57,7 @@ commands:
         description: "The threshold, in milliseconds, at which ops are profiled and logged."
         optional: true
       sampleRate:
-        type: double
+        type: safeDouble
         description: "The fraction of eligible ops, in the range [0,1), to be logged/profiled."
         optional: true
       filter:
