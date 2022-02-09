@@ -6,7 +6,7 @@ set -euo pipefail
 cd src
 commit_date=$(date -d "$(git log -1 -s --format=%ci)" "+%s")
 last_run_date=$(cat ../antithesis_last_push.txt || echo 0)
-if [ "${is_patch}" != "true" && $last_run_date -gt $commit_date ]; then
+if [ "${is_patch}" != "true" ] && [ "${last_run_date}" -gt "${commit_date}" ]; then
   echo -e "Refusing to push new antithesis images because this commit is older\nthan the last pushed commit"
   exit 0
 fi
@@ -25,6 +25,17 @@ mkdir -p antithesis/topologies/replica_set/{logs,data}/workload
 mkdir -p antithesis/topologies/sharded_cluster/{logs,data}/database{1,2,3,4,5,6}
 mkdir -p antithesis/topologies/sharded_cluster/{logs,data}/configsvr{1,2,3}
 mkdir -p antithesis/topologies/sharded_cluster/{logs,data}/{mongos,workload}
+
+# extract debug symbols into usr/bin and have directory structure mimic Docker container
+mkdir -p antithesis/topologies/sharded_cluster/debug/usr/bin
+tar -zxvf src/mongo-debugsymbols.tgz -C antithesis/topologies/sharded_cluster/debug
+cp antithesis/topologies/sharded_cluster/debug/dist-test/bin/* antithesis/topologies/sharded_cluster/debug/usr/bin
+rm -rf antithesis/topologies/sharded_cluster/debug/dist-test
+
+# recompress debug symbols
+tar -czvf antithesis/topologies/sharded_cluster/debug/mongo-debugsymbols.tgz -C antithesis/topologies/sharded_cluster/debug/ usr
+rm -rf antithesis/topologies/sharded_cluster/debug/usr
+
 echo "${revision}" > antithesis/topologies/sharded_cluster/data/workload/mongo_version.txt
 
 # copy ... to the build context

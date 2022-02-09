@@ -7220,7 +7220,7 @@ tasks:
   # antithesis_image_tag build parameter to override this if required.
   patchable: false
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
   commands:
   - *f_expansions_write
   - func: "git get project no modules"
@@ -7236,7 +7236,13 @@ tasks:
       local_file: antithesis_last_push.txt
       bucket: mciuploads
   - func: "do setup"
-  # TODO SERVER-60619 download debug symbols and put them where needed.
+  - command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${mongo_debugsymbols}
+      bucket: mciuploads
+      local_file: src/mongo-debugsymbols.tgz
   - command: subprocess.exec
     params:
       binary: bash
