@@ -1451,11 +1451,15 @@ MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
     }
     std::shuffle(collectionUUIDs.begin(), collectionUUIDs.end(), _random);
 
-    auto popCollectionUUID = [&](std::vector<UUID>::iterator elemIt) {
-        if (std::next(elemIt) != collectionUUIDs.end()) {
-            *elemIt = std::move(collectionUUIDs.back());
+    auto popCollectionUUID =
+        [&](std::vector<UUID>::iterator elemIt) -> std::vector<UUID>::iterator {
+        if (std::next(elemIt) == collectionUUIDs.end()) {
+            return collectionUUIDs.erase(elemIt);
         }
+
+        *elemIt = std::move(collectionUUIDs.back());
         collectionUUIDs.pop_back();
+        return elemIt;
     };
 
     while (!collectionUUIDs.empty()) {
@@ -1466,7 +1470,7 @@ MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
             try {
                 auto defragStateIt = _defragmentationStates.find(collUUID);
                 if (defragStateIt == _defragmentationStates.end()) {
-                    popCollectionUUID(it);
+                    it = popCollectionUUID(it);
                     continue;
                 };
 
@@ -1474,7 +1478,7 @@ MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
                 auto& collDefragmentationPhase = defragStateIt->second;
                 if (!collDefragmentationPhase) {
                     _defragmentationStates.erase(defragStateIt);
-                    popCollectionUUID(it);
+                    it = popCollectionUUID(it);
                     continue;
                 }
                 auto actionableMigration =
@@ -1487,7 +1491,7 @@ MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
                     if (phaseAdvanced || usedShards->empty()) {
                         _yieldNextStreamingAction(lk, opCtx);
                     }
-                    popCollectionUUID(it);
+                    it = popCollectionUUID(it);
                     continue;
                 }
                 chunksToMove.push_back(std::move(*actionableMigration));
@@ -1500,7 +1504,7 @@ MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
                             "uuid"_attr = collUUID,
                             "error"_attr = redact(e));
                 _defragmentationStates.erase(collUUID);
-                popCollectionUUID(it);
+                it = popCollectionUUID(it);
             }
         }
     }
