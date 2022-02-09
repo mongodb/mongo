@@ -40,6 +40,14 @@ for (let i = 0; i < 2; i++) {
     assert.commandWorked(coll.update({_id: 2, key: 2}, {key: 2, foo: 'bar'}, {upsert: true}));
     assert.commandWorked(coll.update({_id: 3, key: 3}, {$set: {foo: 'bar'}}, {upsert: true}));
 
+    // Mixing operator & non-operator fields in updates is not allowed.
+    assert.commandFailedWithCode(
+        coll.update({_id: 4, key: 4}, {key: 4, $baz: {foo: 'bar'}}, {upsert: true}),
+        ErrorCodes.UnsupportedFormat);
+    assert.commandFailedWithCode(
+        coll.update({_id: 5, key: 5}, {$baz: {foo: 'bar'}, key: 5}, {upsert: true}),
+        ErrorCodes.UnsupportedFormat);
+
     assert.eq(coll.count(), 3, "count A");
     assert.eq(coll.findOne({_id: 3}).key, 3, "findOne 3 key A");
     assert.eq(coll.findOne({_id: 3}).foo, 'bar', "findOne 3 foo A");

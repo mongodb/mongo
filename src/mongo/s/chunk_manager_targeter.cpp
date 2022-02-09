@@ -69,7 +69,7 @@ constexpr auto kIdFieldName = "_id"_sd;
 
 const ShardKeyPattern kVirtualIdShardKey(BSON(kIdFieldName << 1));
 
-using UpdateType = ChunkManagerTargeter::UpdateType;
+using UpdateType = write_ops::UpdateModification::Type;
 
 // Tracks the number of {multi:false} updates with an exact match on _id that are broadcasted to
 // multiple shards.
@@ -85,37 +85,33 @@ ServerStatusMetricField<Counter64> updateOneOpStyleBroadcastWithExactIDStats(
  *            or
  *          coll.update({x: 1}, [{$addFields: {y: 2}}])
  */
-UpdateType getUpdateExprType(const write_ops::UpdateOpEntry& updateDoc) {
+void validateUpdateDoc(const write_ops::UpdateOpEntry& updateDoc) {
     const auto& updateMod = updateDoc.getU();
     if (updateMod.type() == write_ops::UpdateModification::Type::kPipeline) {
-        return UpdateType::kOpStyle;
+        return;
     }
 
-    const auto& updateExpr = updateMod.getUpdateClassic();
-
-    // Empty update is replacement-style by default.
-    auto updateType = (updateExpr.isEmpty() ? UpdateType::kReplacement : UpdateType::kUnknown);
+    const auto updateType = updateMod.type();
+    invariant(updateType == UpdateType::kReplacement || updateType == UpdateType::kModifier);
+    const auto& updateExpr = updateType == UpdateType::kReplacement
+        ? updateMod.getUpdateReplacement()
+        : updateMod.getUpdateModifier();
 
     // Make sure that the update expression does not mix $op and non-$op fields.
     for (const auto& curField : updateExpr) {
-        const auto curFieldType =
-            (curField.fieldNameStringData()[0] == '$' ? UpdateType::kOpStyle
-                                                      : UpdateType::kReplacement);
-
-        // If the current field's type does not match the existing updateType, abort.
-        if (updateType == UpdateType::kUnknown)
-            updateType = curFieldType;
+        const auto updateTypeFromField = curField.fieldNameStringData()[0] != '$'
+            ? UpdateType::kReplacement
+            : UpdateType::kModifier;
 
         uassert(ErrorCodes::UnsupportedFormat,
                 str::stream() << "update document " << updateExpr
                               << " has mixed $operator and non-$operator style fields",
-                updateType == curFieldType);
+                updateType == updateTypeFromField);
     }
 
     uassert(ErrorCodes::InvalidOptions,
             "Replacement-style updates cannot be {multi:true}",
-            updateType == UpdateType::kOpStyle || !updateDoc.getMulti());
-    return updateType;
+            updateType == UpdateType::kModifier || !updateDoc.getMulti());
 }
 
 /**
@@ -128,25 +124,21 @@ UpdateType getUpdateExprType(const write_ops::UpdateOpEntry& updateDoc) {
  */
 BSONObj getUpdateExprForTargeting(const boost::intrusive_ptr<ExpressionContext> expCtx,
                                   const ShardKeyPattern& shardKeyPattern,
-                                  UpdateType updateType,
                                   const BSONObj& updateQuery,
                                   const write_ops::UpdateModification& updateMod) {
-    // We should never see an invalid update type here.
-    invariant(updateType != UpdateType::kUnknown);
-
     // If this is not a replacement update, then the update expression remains unchanged.
-    if (updateType != UpdateType::kReplacement) {
+    if (updateMod.type() != UpdateType::kReplacement) {
         BSONObjBuilder objBuilder;
         updateMod.serializeToBSON("u", &objBuilder);
         return objBuilder.obj();
     }
 
     // Extract the raw update expression from the request.
-    invariant(updateMod.type() == write_ops::UpdateModification::Type::kClassic);
+    invariant(updateMod.type() == UpdateType::kReplacement);
 
     // Replace any non-existent shard key values with a null value.
     auto updateExpr =
-        shardKeyPattern.emplaceMissingShardKeyValuesForDocument(updateMod.getUpdateClassic());
+        shardKeyPattern.emplaceMissingShardKeyValuesForDocument(updateMod.getUpdateReplacement());
 
     // If we aren't missing _id, return the update expression as-is.
     if (updateExpr.hasField(kIdFieldName)) {
@@ -443,9 +435,9 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(OperationContext* 
         }
     }
 
-    const auto updateType = getUpdateExprType(updateOp);
+    validateUpdateDoc(updateOp);
     const auto updateExpr =
-        getUpdateExprForTargeting(expCtx, shardKeyPattern, updateType, query, updateOp.getU());
+        getUpdateExprForTargeting(expCtx, shardKeyPattern, query, updateOp.getU());
 
     // Utility function to target an update by shard key, and to handle any potential error results.
     auto targetByShardKey = [this, &collation](StatusWith<BSONObj> swShardKey, std::string msg) {
@@ -473,7 +465,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(OperationContext* 
 
     // Replacement-style updates must always target a single shard. If we were unable to do so using
     // the query, we attempt to extract the shard key from the replacement and target based on it.
-    if (updateType == UpdateType::kReplacement) {
+    if (updateOp.getU().type() == write_ops::UpdateModification::Type::kReplacement) {
         return targetByShardKey(shardKeyPattern.extractShardKeyFromDoc(updateExpr),
                                 "Failed to target update by replacement document");
     }

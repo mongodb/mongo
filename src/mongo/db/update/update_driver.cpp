@@ -154,12 +154,12 @@ void UpdateDriver::parse(
     uassert(51198, "Constant values may only be specified for pipeline updates", !constants);
 
     // Check if the update expression is a full object replacement.
-    if (isDocReplacement(updateMod)) {
+    if (updateMod.type() == write_ops::UpdateModification::Type::kReplacement) {
         uassert(ErrorCodes::FailedToParse,
                 "multi update is not supported for replacement-style update",
                 !multi);
 
-        _updateExecutor = std::make_unique<ObjectReplaceExecutor>(updateMod.getUpdateClassic());
+        _updateExecutor = std::make_unique<ObjectReplaceExecutor>(updateMod.getUpdateReplacement());
 
         // Register the fact that this driver will only do full object replacements.
         _updateType = UpdateType::kReplacement;
@@ -185,7 +185,7 @@ void UpdateDriver::parse(
     // checked whether this is a delta update so we check that the $v field isn't present, or has a
     // value of 1.
 
-    auto updateExpr = updateMod.getUpdateClassic();
+    auto updateExpr = updateMod.getUpdateModifier();
     BSONElement versionElement = updateExpr[kUpdateOplogEntryVersionFieldName];
     if (versionElement) {
         uassert(ErrorCodes::FailedToParse,
@@ -319,12 +319,6 @@ void UpdateDriver::setCollator(const CollatorInterface* collator) {
     if (_updateExecutor) {
         _updateExecutor->setCollator(collator);
     }
-}
-
-bool UpdateDriver::isDocReplacement(const write_ops::UpdateModification& updateMod) {
-    return (updateMod.type() == write_ops::UpdateModification::Type::kClassic &&
-            *updateMod.getUpdateClassic().firstElementFieldName() != '$') ||
-        updateMod.type() == write_ops::UpdateModification::Type::kPipeline;
 }
 
 }  // namespace mongo

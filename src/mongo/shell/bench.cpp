@@ -1173,9 +1173,15 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                     BSONObjBuilder singleUpdate;
                     singleUpdate.append("q", query);
                     switch (this->update.type()) {
-                        case write_ops::UpdateModification::Type::kClassic: {
+                        case write_ops::UpdateModification::Type::kReplacement: {
                             singleUpdate.append("u",
-                                                fixQuery(this->update.getUpdateClassic(),
+                                                fixQuery(this->update.getUpdateReplacement(),
+                                                         *state->bsonTemplateEvaluator));
+                            break;
+                        }
+                        case write_ops::UpdateModification::Type::kModifier: {
+                            singleUpdate.append("u",
+                                                fixQuery(this->update.getUpdateModifier(),
                                                          *state->bsonTemplateEvaluator));
                             break;
                         }
