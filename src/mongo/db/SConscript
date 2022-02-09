@@ -363,6 +363,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/cluster_auth_mode',
+        '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         'server_options_core',
     ],

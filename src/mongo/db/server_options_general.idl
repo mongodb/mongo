@@ -37,6 +37,13 @@ global:
         initializer:
             register: addGeneralServerOptionDefinitions
 
+server_parameters:
+    'loadShedding':
+        description: 'Enable load shedding'
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: gLoadShedding
+
 configs:
     help:
         description: 'Show this usage information'
