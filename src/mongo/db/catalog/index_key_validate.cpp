@@ -94,6 +94,7 @@ static std::set<StringData> allowedFieldNames = {
     IndexDescriptor::kUniqueFieldName,
     IndexDescriptor::kWeightsFieldName,
     IndexDescriptor::kOriginalSpecFieldName,
+    IndexDescriptor::kDisallowNewDuplicateKeysFieldName,
     // Index creation under legacy writeMode can result in an index spec with an _id field.
     "_id"};
 
@@ -497,6 +498,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                     IndexDescriptor::k2dsphereCoarsestIndexedLevel == indexSpecElemFieldName ||
                     IndexDescriptor::k2dsphereFinestIndexedLevel == indexSpecElemFieldName ||
                     IndexDescriptor::kDropDuplicatesFieldName == indexSpecElemFieldName ||
+                    IndexDescriptor::kDisallowNewDuplicateKeysFieldName == indexSpecElemFieldName ||
                     "clustered" == indexSpecElemFieldName) &&
                    !indexSpecElem.isNumber() && !indexSpecElem.isBoolean()) {
             return {ErrorCodes::TypeMismatch,

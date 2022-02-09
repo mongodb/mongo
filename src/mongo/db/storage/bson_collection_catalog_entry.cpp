@@ -146,6 +146,23 @@ void BSONCollectionCatalogEntry::IndexMetaData::updateUniqueSetting() {
     spec = b.obj();
 }
 
+void BSONCollectionCatalogEntry::IndexMetaData::updateDisallowNewDuplicateKeysSetting(
+    bool disallowNewDuplicateKeys) {
+    // If disallowNewDuplicateKeys == false, we remove this field from catalog rather than add a
+    // field with false.
+    BSONObjBuilder b;
+    for (BSONObjIterator bi(spec); bi.more();) {
+        BSONElement e = bi.next();
+        if (e.fieldNameStringData() != "disallowNewDuplicateKeys") {
+            b.append(e);
+        }
+    }
+
+    if (disallowNewDuplicateKeys) {
+        b.append("disallowNewDuplicateKeys", disallowNewDuplicateKeys);
+    }
+    spec = b.obj();
+}
 
 // --------------------------
 

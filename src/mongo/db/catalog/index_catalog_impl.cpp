@@ -1433,7 +1433,6 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     // CollectionIndexUsageTrackerDecoration (shared state among Collection instances).
     auto oldEntry = _readyIndexes.release(oldDesc);
     invariant(oldEntry);
-    auto enforceDuplicateConstraints = oldEntry->accessMethod()->isEnforcingDuplicateConstraints();
     opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
         std::move(oldEntry), collection->getSharedDecorations()));
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
@@ -1448,7 +1447,6 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     auto newDesc = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
     auto newEntry = createIndexEntry(opCtx, collection, std::move(newDesc), flags);
     invariant(newEntry->isReady(opCtx));
-    newEntry->accessMethod()->setEnforceDuplicateConstraints(enforceDuplicateConstraints);
     auto desc = newEntry->descriptor();
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
         .registerIndex(desc->indexName(), desc->keyPattern());

@@ -43,7 +43,6 @@
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/yieldable.h"
-#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -240,23 +239,6 @@ public:
         size_t maxMemoryUsageBytes,
         const boost::optional<IndexStateInfo>& stateInfo,
         StringData dbName) = 0;
-
-    void setEnforceDuplicateConstraints(bool enforceDuplicateConstraints) {
-        _enforceDuplicateConstraints.swap(enforceDuplicateConstraints);
-    }
-
-    /**
-     * When `true`, disallows duplicates when inserting to or updating the index. Otherwise, sets
-     * `dupsAllowed` according to other options.
-     * Currently only temporarily set to `true` during collMod converting index to unique. This
-     * should always remain `false` otherwise.
-     */
-    bool isEnforcingDuplicateConstraints() const {
-        return _enforceDuplicateConstraints.load();
-    }
-
-private:
-    AtomicWord<bool> _enforceDuplicateConstraints{false};
 };
 
 /**

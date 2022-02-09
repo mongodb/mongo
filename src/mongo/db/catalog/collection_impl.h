@@ -443,6 +443,10 @@ public:
 
     void updateUniqueSetting(OperationContext* opCtx, StringData idxName) final;
 
+    void updateDisallowNewDuplicateKeysSetting(OperationContext* opCtx,
+                                               StringData idxName,
+                                               bool disallowNewDuplicateKeys) final;
+
     std::vector<std::string> removeInvalidIndexOptions(OperationContext* opCtx) final;
 
     void setIsTemp(OperationContext* opCtx, bool isTemp) final;

@@ -1980,6 +1980,17 @@ void CollectionImpl::updateUniqueSetting(OperationContext* opCtx, StringData idx
     });
 }
 
+void CollectionImpl::updateDisallowNewDuplicateKeysSetting(OperationContext* opCtx,
+                                                           StringData idxName,
+                                                           bool disallowNewDuplicateKeys) {
+    int offset = _metadata->findIndexOffset(idxName);
+    invariant(offset >= 0);
+
+    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+        md.indexes[offset].updateDisallowNewDuplicateKeysSetting(disallowNewDuplicateKeys);
+    });
+}
+
 std::vector<std::string> CollectionImpl::removeInvalidIndexOptions(OperationContext* opCtx) {
     std::vector<std::string> indexesWithInvalidOptions;
 

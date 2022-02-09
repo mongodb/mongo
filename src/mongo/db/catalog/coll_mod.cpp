@@ -175,7 +175,8 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
 
             if (cmdIndex.getUnique() || cmdIndex.getDisallowNewDuplicateKeys()) {
                 uassert(ErrorCodes::InvalidOptions,
-                        "collMod does not support converting an index to unique",
+                        "collMod does not support converting an index to 'unique' or to "
+                        "'disallowNewDuplicateKeys' mode",
                         feature_flags::gCollModIndexUnique.isEnabled(
                             serverGlobalParams.featureCompatibility));
             }
@@ -310,13 +311,17 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                 }
             }
 
-            // The 'disallowNewDuplicateKeys' option is an ephemeral setting. It is replicated but
-            // still susceptible to process restarts. We do not compare the requested change with
-            // the existing state, so there is no need for the no-op conversion logic that we have
-            // for 'hidden' or 'unique'.
             if (cmdIndex.getDisallowNewDuplicateKeys()) {
                 cmr.numModifications++;
-                cmrIndex->indexDisallowNewDuplicateKeys = cmdIndex.getDisallowNewDuplicateKeys();
+                // Attempting to modify with the same value should be treated as a no-op.
+                if (cmrIndex->idx->disallowNewDuplicateKeys() ==
+                    *cmdIndex.getDisallowNewDuplicateKeys()) {
+                    indexObjForOplog = indexObjForOplog.removeField(
+                        CollModIndex::kDisallowNewDuplicateKeysFieldName);
+                } else {
+                    cmrIndex->indexDisallowNewDuplicateKeys =
+                        cmdIndex.getDisallowNewDuplicateKeys();
+                }
             }
 
             // The index options doc must contain either the name or key pattern, but not both.

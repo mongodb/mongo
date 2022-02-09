@@ -413,6 +413,12 @@ public:
         std::abort();
     }
 
+    void updateDisallowNewDuplicateKeysSetting(OperationContext* opCtx,
+                                               StringData idxName,
+                                               bool disallowNewDuplicateKeys) {
+        std::abort();
+    }
+
     std::vector<std::string> removeInvalidIndexOptions(OperationContext* opCtx) {
         std::abort();
     }

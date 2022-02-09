@@ -41,6 +41,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 
 namespace mongo {
 
@@ -106,6 +107,7 @@ constexpr StringData IndexDescriptor::kTextVersionFieldName;
 constexpr StringData IndexDescriptor::kUniqueFieldName;
 constexpr StringData IndexDescriptor::kHiddenFieldName;
 constexpr StringData IndexDescriptor::kWeightsFieldName;
+constexpr StringData IndexDescriptor::kDisallowNewDuplicateKeysFieldName;
 
 IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj infoObj)
     : _accessMethodName(accessMethodName),
@@ -132,6 +134,15 @@ IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj in
     if (BSONElement collationElement = _infoObj[kCollationFieldName]) {
         invariant(collationElement.isABSONObj());
         _collation = collationElement.Obj().getOwned();
+    }
+
+    if (BSONElement disallowNewDuplicateKeysElement =
+            _infoObj[kDisallowNewDuplicateKeysFieldName]) {
+        uassert(
+            ErrorCodes::InvalidOptions,
+            "Index does not support the 'disallowNewDuplicateKeys' field",
+            feature_flags::gCollModIndexUnique.isEnabled(serverGlobalParams.featureCompatibility));
+        _disallowNewDuplicateKeys = disallowNewDuplicateKeysElement.trueValue();
     }
 }
 

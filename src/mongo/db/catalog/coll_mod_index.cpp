@@ -184,11 +184,12 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
 
     *newUnique = true;
     autoColl->getWritableCollection(opCtx)->updateUniqueSetting(opCtx, idx->indexName());
-    idx->getEntry()->accessMethod()->setEnforceDuplicateConstraints(false);
+    autoColl->getWritableCollection(opCtx)->updateDisallowNewDuplicateKeysSetting(
+        opCtx, idx->indexName(), false);
 }
 
 /**
- * Adjusts enforceDuplicateConstraints setting on an index.
+ * Adjusts disallowNewDuplicateKeys setting on an index.
  */
 void _processCollModIndexRequestDisallowNewDuplicateKeys(
     OperationContext* opCtx,
@@ -198,10 +199,10 @@ void _processCollModIndexRequestDisallowNewDuplicateKeys(
     boost::optional<bool>* newDisallowNewDuplicateKeys,
     boost::optional<bool>* oldDisallowNewDuplicateKeys) {
     *newDisallowNewDuplicateKeys = indexDisallowNewDuplicateKeys;
-    auto accessMethod = idx->getEntry()->accessMethod();
-    *oldDisallowNewDuplicateKeys = accessMethod->isEnforcingDuplicateConstraints();
+    *oldDisallowNewDuplicateKeys = idx->disallowNewDuplicateKeys();
     if (*oldDisallowNewDuplicateKeys != *newDisallowNewDuplicateKeys) {
-        accessMethod->setEnforceDuplicateConstraints(indexDisallowNewDuplicateKeys);
+        autoColl->getWritableCollection(opCtx)->updateDisallowNewDuplicateKeysSetting(
+            opCtx, idx->indexName(), indexDisallowNewDuplicateKeys);
     }
 }
 
@@ -269,8 +270,8 @@ void processCollModIndexRequest(OperationContext* opCtx,
                          newHidden,
                          oldHidden,
                          newUnique,
-                         oldDisallowNewDuplicateKeys,
                          newDisallowNewDuplicateKeys,
+                         oldDisallowNewDuplicateKeys,
                          idx->indexName()};
 
     // This matches the default for IndexCatalog::refreshEntry().
@@ -311,7 +312,6 @@ void processCollModIndexRequest(OperationContext* opCtx,
             result->appendBool("unique_new", true);
         }
         if (newDisallowNewDuplicateKeys) {
-            // Unlike other fields, 'disallowNewDuplicateKeys' can have the same old and new values.
             invariant(oldDisallowNewDuplicateKeys);
             result->append("disallowNewDuplicateKeys_old", *oldDisallowNewDuplicateKeys);
             result->append("disallowNewDuplicateKeys_new", *newDisallowNewDuplicateKeys);

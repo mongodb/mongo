@@ -156,6 +156,10 @@ structs:
                 type: safeBool
                 optional: true
                 unstable: false
+            disallowNewDuplicateKeys:
+                type: safeBool
+                optional: true
+                unstable: true
             #
             # Depending on the values of includeIndexBuildInfo and includeBuildUUIDs, indexes may
             # appear with a combination of these three fields. Specifically, if includeIndexBuildInfo 
