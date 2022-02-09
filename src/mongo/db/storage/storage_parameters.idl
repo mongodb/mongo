@@ -119,7 +119,8 @@ feature_flags:
     featureFlagClusteredIndexes:
         description: "When enabled, support non time-series collections with clustered indexes"
         cpp_varname: feature_flags::gClusteredIndexes
-        default: false
+        default: true
+        version: 5.3
     featureFlagTimeseriesUpdatesAndDeletes:
         description: "When enabled, support for updates and deletes on time-series collections"
         cpp_varname: feature_flags::gTimeseriesUpdatesAndDeletes

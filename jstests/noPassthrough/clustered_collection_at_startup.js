@@ -12,11 +12,7 @@ const testName = "clustered_collection_at_startup";
 const dbpath = MongoRunner.dataPath + testName;
 const coll = "clusteredCollection";
 
-const replSet = new ReplSetTest({
-    name: testName,
-    nodes: 1,
-    nodeOptions: {dbpath: dbpath, setParameter: "featureFlagClusteredIndexes=true"}
-});
+const replSet = new ReplSetTest({name: testName, nodes: 1, nodeOptions: {dbpath: dbpath}});
 replSet.startSet();
 replSet.initiate();
 

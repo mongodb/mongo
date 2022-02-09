@@ -3,9 +3,7 @@
  * tenant migration.
  *
  * @tags: [
- *   # Clustered collection specific.
- *   featureFlagClusteredIndexes,
- *   requires_fcv_52,
+ *   requires_fcv_53,
  *   assumes_against_mongod_not_mongos,
  *   assumes_unsharded_collection,
  *   # Basic tags for tenant migration tests.

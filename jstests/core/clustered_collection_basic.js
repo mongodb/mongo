@@ -6,7 +6,7 @@
  *   assumes_against_mongod_not_mongos,
  *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
- *   requires_fcv_51,
+ *   requires_fcv_53,
  *   requires_wiredtiger,
  *   tenant_migration_incompatible, #TODO: why is it incompatible?
  * ]
@@ -16,11 +16,6 @@
 "use strict";
 
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
-
-if (ClusteredCollectionUtil.areClusteredIndexesEnabled(db.getMongo()) == false) {
-    jsTestLog('Skipping test because the clustered indexes feature flag is disabled');
-    return;
-}
 
 const replicatedDB = db.getSiblingDB('replicated');
 const collName = 'clustered_collection';
