@@ -134,6 +134,11 @@ int32_t getStmtIdForWriteAt(const WriteCommandRequestBase& writeCommandBase, siz
     return kFirstStmtId + writePos;
 }
 
+bool isClassicalUpdateReplacement(const BSONObj& update) {
+    // An empty update object will be treated as replacement as firstElementFieldName() returns "".
+    return update.firstElementFieldName()[0] != '$';
+}
+
 }  // namespace write_ops
 
 write_ops::InsertCommandRequest InsertOp::parse(const OpMsgRequest& request) {
@@ -223,15 +228,20 @@ void DeleteOp::validate(const DeleteCommandRequest& deleteOp) {
 write_ops::UpdateModification write_ops::UpdateModification::parseFromOplogEntry(
     const BSONObj& oField, const DiffOptions& options) {
     BSONElement vField = oField[kUpdateOplogEntryVersionFieldName];
+    BSONElement idField = oField["_id"];
 
-    // If this field appears it should be an integer.
+    // If _id field is present, we're getting a replacement style update in which $v can be a user
+    // field. Otherwise, $v field has to be either missing or be one of the version flag $v:1 /
+    // $v:2.
     uassert(4772600,
-            str::stream() << "Expected $v field to be missing or an integer, but got type: "
-                          << vField.type(),
-            !vField.ok() ||
-                (vField.type() == BSONType::NumberInt || vField.type() == BSONType::NumberLong));
+            str::stream() << "Expected _id field or $v field missing or $v:1/$v:2, but got: "
+                          << vField,
+            idField.ok() || !vField.ok() ||
+                vField.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kUpdateNodeV1) ||
+                vField.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2));
 
-    if (vField.ok() && vField.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)) {
+    if (!idField.ok() && vField.ok() &&
+        vField.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)) {
         // Make sure there's a diff field.
         BSONElement diff = oField[update_oplog_entry::kDiffObjectFieldName];
         uassert(4772601,
@@ -240,18 +250,11 @@ write_ops::UpdateModification write_ops::UpdateModification::parseFromOplogEntry
                 diff.type() == BSONType::Object);
 
         return UpdateModification(doc_diff::Diff{diff.embeddedObject()}, options);
-    } else if (!vField.ok() ||
-               vField.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kUpdateNodeV1)) {
+    } else {
         // Treat it as a "classic" update which can either be a full replacement or a
-        // modifier-style update. Which variant it is will be determined when the update driver is
-        // constructed.
-        return UpdateModification(oField, ClassicTag{});
+        // modifier-style update. Use "_id" field to determine whether which style it is.
+        return UpdateModification(oField, ClassicTag{}, idField.ok());
     }
-
-    // The $v field must be present, but have some unsupported value.
-    uasserted(4772604,
-              str::stream() << "Unrecognized value for '$v' (Version) field: "
-                            << vField.numberInt());
 }
 
 write_ops::UpdateModification::UpdateModification(doc_diff::Diff diff, DiffOptions options)
@@ -263,7 +266,7 @@ write_ops::UpdateModification::UpdateModification(TransformFunc transform)
 write_ops::UpdateModification::UpdateModification(BSONElement update) {
     const auto type = update.type();
     if (type == BSONType::Object) {
-        _update = ClassicUpdate{update.Obj()};
+        _update = UpdateModification(update.Obj(), ClassicTag{})._update;
         return;
     }
 
@@ -274,18 +277,23 @@ write_ops::UpdateModification::UpdateModification(BSONElement update) {
     _update = PipelineUpdate{parsePipelineFromBSON(update)};
 }
 
-write_ops::UpdateModification::UpdateModification(const BSONObj& update, ClassicTag) {
-    // Do a sanity check that the $v field is either not provided or has value of 1.
-    const auto versionElem = update["$v"];
-    uassert(4772602,
-            str::stream() << "Expected classic update either contain no '$v' field, or "
-                          << "'$v' field with value 1, but found: " << versionElem,
-            !versionElem.ok() ||
-                versionElem.numberInt() ==
-                    static_cast<int>(UpdateOplogEntryVersion::kUpdateNodeV1));
-
-    _update = ClassicUpdate{update};
+// If we know whether the update is a replacement, use that value. For example, when we're parsing
+// the oplog entry, we know if the update is a replacement by checking whether there's an _id field.
+write_ops::UpdateModification::UpdateModification(const BSONObj& update,
+                                                  ClassicTag,
+                                                  bool isReplacement) {
+    if (isReplacement) {
+        _update = ReplacementUpdate{update};
+    } else {
+        _update = ModifierUpdate{update};
+    }
 }
+
+// If we don't know whether the update is a replacement, for example while we are parsing a user
+// request, we infer this by checking whether the first element is a $-field to distinguish modifier
+// style updates.
+write_ops::UpdateModification::UpdateModification(const BSONObj& update, ClassicTag)
+    : UpdateModification(update, ClassicTag{}, isClassicalUpdateReplacement(update)) {}
 
 write_ops::UpdateModification::UpdateModification(std::vector<BSONObj> pipeline)
     : _update{PipelineUpdate{std::move(pipeline)}} {}
@@ -301,7 +309,8 @@ write_ops::UpdateModification write_ops::UpdateModification::parseFromBSON(BSONE
 int write_ops::UpdateModification::objsize() const {
     return stdx::visit(
         visit_helper::Overloaded{
-            [](const ClassicUpdate& classic) -> int { return classic.bson.objsize(); },
+            [](const ReplacementUpdate& replacement) -> int { return replacement.bson.objsize(); },
+            [](const ModifierUpdate& modifier) -> int { return modifier.bson.objsize(); },
             [](const PipelineUpdate& pipeline) -> int {
                 int size = 0;
                 std::for_each(pipeline.begin(), pipeline.end(), [&size](const BSONObj& obj) {
@@ -319,7 +328,8 @@ int write_ops::UpdateModification::objsize() const {
 write_ops::UpdateModification::Type write_ops::UpdateModification::type() const {
     return stdx::visit(
         visit_helper::Overloaded{
-            [](const ClassicUpdate& classic) { return Type::kClassic; },
+            [](const ReplacementUpdate& replacement) { return Type::kReplacement; },
+            [](const ModifierUpdate& modifier) { return Type::kModifier; },
             [](const PipelineUpdate& pipelineUpdate) { return Type::kPipeline; },
             [](const DeltaUpdate& delta) { return Type::kDelta; },
             [](const TransformUpdate& transform) { return Type::kTransform; }},
@@ -335,7 +345,12 @@ void write_ops::UpdateModification::serializeToBSON(StringData fieldName,
 
     stdx::visit(
         visit_helper::Overloaded{
-            [fieldName, bob](const ClassicUpdate& classic) { *bob << fieldName << classic.bson; },
+            [fieldName, bob](const ReplacementUpdate& replacement) {
+                *bob << fieldName << replacement.bson;
+            },
+            [fieldName, bob](const ModifierUpdate& modifier) {
+                *bob << fieldName << modifier.bson;
+            },
             [fieldName, bob](const PipelineUpdate& pipeline) {
                 BSONArrayBuilder arrayBuilder(bob->subarrayStart(fieldName));
                 for (auto&& stage : pipeline) {

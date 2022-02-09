@@ -457,7 +457,7 @@ res = assert.commandFailed(db.adminCommand({
         }
     ]
 }));
-assert.eq(res.code, 4772604);
+assert.eq(res.code, 4772600);
 
 // When we explicitly specify {$v: 1}, we should get 'UpdateNode' update semantics, and $set
 // operations get performed in lexicographic order.
@@ -503,7 +503,7 @@ res = assert.commandFailed(db.adminCommand({
         }
     ]
 }));
-assert.eq(res.code, 4772604);
+assert.eq(res.code, 4772600);
 
 var insert_op1 = {_id: 13, x: 'inserted apply ops1'};
 var insert_op2 = {_id: 14, x: 'inserted apply ops2'};

@@ -60,7 +60,7 @@ protected:
     BSONObj _translateUpdate(const BSONObj& update) const {
         return timeseries::translateUpdate(
                    write_ops::UpdateModification::parseFromClassicUpdate(update), _metaField)
-            .getUpdateClassic();
+            .getUpdateModifier();
     }
 
     BSONObj _translateUpdate(const char* update) const {

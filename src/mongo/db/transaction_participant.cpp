@@ -353,7 +353,9 @@ void updateSessionEntry(OperationContext* opCtx,
                         const LogicalSessionId& sessionId,
                         TxnNumber txnNum) {
     // Current code only supports replacement update.
-    dassert(UpdateDriver::isDocReplacement(updateRequest.getUpdateModification()));
+    dassert(updateRequest.getUpdateModification().type() ==
+            write_ops::UpdateModification::Type::kReplacement);
+    const auto updateMod = updateRequest.getUpdateModification().getUpdateReplacement();
 
     // TODO SERVER-58243: evaluate whether this is safe or whether acquiring the lock can block.
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
@@ -385,7 +387,6 @@ void updateSessionEntry(OperationContext* opCtx,
     dassert(idToFetch.fieldNameStringData() == "_id"_sd);
     auto recordId = indexAccess->findSingle(opCtx, *collection, toUpdateIdDoc);
     auto startingSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
-    const auto updateMod = updateRequest.getUpdateModification().getUpdateClassic();
 
     if (recordId.isNull()) {
         // Upsert case.
