@@ -241,7 +241,14 @@ assert.commandFailedWithCode(nonReplicatedDB.createCollection(nonReplicatedColl.
                              ErrorCodes.InvalidIndexSpecificationOption);
 
 // Capped clustered collections creation.
-validateClusteredCappedCollections(replicatedDB, replicatedColl, {_id: 1});
+const hasTestCommandsEnabled =
+    assert.commandWorked(replicatedDB.adminCommand({getParameter: 1, enableTestCommands: 1}))
+        .enableTestCommands;
+
+if (hasTestCommandsEnabled) {
+    jsTestLog("Testing clustered capped collections");
+    validateClusteredCappedCollections(replicatedDB, replicatedColl, {_id: 1});
+}
 
 // Validate that the arguments aren't conflicting.
 assert.commandFailedWithCode(
