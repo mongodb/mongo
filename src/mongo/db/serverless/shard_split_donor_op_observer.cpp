@@ -229,8 +229,8 @@ void ShardSplitDonorOpObserver::onInserts(OperationContext* opCtx,
                                           std::vector<InsertStatement>::const_iterator first,
                                           std::vector<InsertStatement>::const_iterator last,
                                           bool fromMigrate) {
-    if (tenant_migration_access_blocker::inRecoveryMode(opCtx) ||
-        nss != NamespaceString::kTenantSplitDonorsNamespace) {
+    if (nss != NamespaceString::kTenantSplitDonorsNamespace ||
+        tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
     }
 
@@ -258,8 +258,8 @@ void ShardSplitDonorOpObserver::onInserts(OperationContext* opCtx,
 
 void ShardSplitDonorOpObserver::onUpdate(OperationContext* opCtx,
                                          const OplogUpdateEntryArgs& args) {
-    if (tenant_migration_access_blocker::inRecoveryMode(opCtx) ||
-        args.nss != NamespaceString::kTenantSplitDonorsNamespace) {
+    if (args.nss != NamespaceString::kTenantSplitDonorsNamespace ||
+        tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
     }
 
@@ -284,8 +284,8 @@ void ShardSplitDonorOpObserver::aboutToDelete(OperationContext* opCtx,
                                               NamespaceString const& nss,
                                               const UUID& uuid,
                                               BSONObj const& doc) {
-    if (tenant_migration_access_blocker::inRecoveryMode(opCtx) ||
-        nss != NamespaceString::kTenantSplitDonorsNamespace) {
+    if (nss != NamespaceString::kTenantSplitDonorsNamespace ||
+        tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
     }
 
@@ -313,9 +313,9 @@ void ShardSplitDonorOpObserver::onDelete(OperationContext* opCtx,
                                          const UUID& uuid,
                                          StmtId stmtId,
                                          const OplogDeleteEntryArgs& args) {
-    if (!tenantIdsToDeleteDecoration(opCtx) ||
-        tenant_migration_access_blocker::inRecoveryMode(opCtx) ||
-        nss != NamespaceString::kTenantSplitDonorsNamespace) {
+    if (nss != NamespaceString::kTenantSplitDonorsNamespace ||
+        !tenantIdsToDeleteDecoration(opCtx) ||
+        tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
     }
 

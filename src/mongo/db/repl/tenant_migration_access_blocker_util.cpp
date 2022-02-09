@@ -439,8 +439,9 @@ bool inRecoveryMode(OperationContext* opCtx) {
         return false;
     }
 
-    return replCoord->getMemberState().startup() || replCoord->getMemberState().startup2() ||
-        replCoord->getMemberState().rollback();
+    auto memberState = replCoord->getMemberState();
+
+    return memberState.startup() || memberState.startup2() || memberState.rollback();
 }
 
 }  // namespace tenant_migration_access_blocker
