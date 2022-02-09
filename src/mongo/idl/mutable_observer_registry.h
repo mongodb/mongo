@@ -56,7 +56,6 @@ public:
         _registry.emplace_back(std::move(observer));
     }
 
-    // TODO SERVER-40224: remove the Status return when on_update is changed to return void
     Status operator()(const T& t) {
         stdx::lock_guard lk(_mutex);
         for (const auto& observer : _registry) {

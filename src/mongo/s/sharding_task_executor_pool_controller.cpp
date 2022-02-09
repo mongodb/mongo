@@ -83,7 +83,6 @@ Status ShardingTaskExecutorPoolController::validatePendingTimeout(const int& pen
 }
 
 Status ShardingTaskExecutorPoolController::onUpdateMatchingStrategy(const std::string& str) {
-    // TODO Fix up after SERVER-40224
     if (str == "automatic") {
         if (isMongos()) {
             gParameters.matchingStrategy.store(MatchingStrategy::kMatchPrimaryNode);
