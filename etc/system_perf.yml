@@ -1081,6 +1081,24 @@ buildvariants:
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
 
+  - name: linux-standalone-all-feature-flags
+    display_name: Linux Standalone (all feature flags)
+    cron: "0 0 * * *" # Everyday at 00:00
+    modules: *modules
+    expansions:
+      mongodb_setup: standalone-all-feature-flags
+      infrastructure_provisioning: single
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks:
+      - name: schedule_variant_auto_tasks
+      - name: schedule_patch_auto_tasks
+
   - name: compile-rhel70
     display_name: Compile for Atlas-like
     modules: *modules
