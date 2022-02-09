@@ -394,6 +394,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentCollec
 
 TEST_F(OplogApplierImplTest, applyOplogEntryToRecordChangeStreamPreImages) {
     // Setup the pre-images collection.
+    RAIIServerParameterControllerForTest clusteredIndexes{"featureFlagClusteredIndexes", true};
     RAIIServerParameterControllerForTest changeStreamPreAndPostImages{
         "featureFlagChangeStreamPreAndPostImages", true};
     createChangeStreamPreImagesCollection(_opCtx.get());

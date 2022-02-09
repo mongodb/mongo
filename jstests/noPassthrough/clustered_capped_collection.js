@@ -2,7 +2,7 @@
  * Validate clustered capped collections.
  *
  * @tags: [
- *   requires_fcv_53,
+ *   requires_fcv_51,
  *   requires_replication,
  *   does_not_support_stepdowns,
  * ]
@@ -18,6 +18,12 @@ load("jstests/libs/clustered_collections/clustered_capped_utils.js");
     replSet.startSet({setParameter: {ttlMonitorSleepSecs: 1}});
     replSet.initiate();
 
+    if (ClusteredCollectionUtil.areClusteredIndexesEnabled(replSet.getPrimary().getDB("test")) ==
+        false) {
+        jsTestLog('Skipping test because the clustered indexes feature flag is disabled');
+        replSet.stopSet();
+        return;
+    }
     const replicatedDB = replSet.getPrimary().getDB('replicated');
     const nonReplicatedDB = replSet.getPrimary().getDB('local');
     const collName = 'clustered_collection';

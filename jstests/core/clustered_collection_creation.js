@@ -17,6 +17,11 @@
 
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 
+if (!ClusteredCollectionUtil.areClusteredIndexesEnabled(db.getMongo())) {
+    jsTestLog('Skipping test because the clustered indexes feature flag is disabled');
+    return;
+}
+
 const validateCompoundSecondaryIndexes = function(db, coll, clusterKey) {
     const clusterKeyField = Object.keys(clusterKey)[0];
     coll.drop();

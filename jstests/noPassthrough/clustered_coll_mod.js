@@ -2,7 +2,7 @@
  * Test collMod command on a clustered collection.
  *
  * @tags: [
- *   requires_fcv_53,
+ *   requires_fcv_51,
  * ]
  */
 
@@ -13,6 +13,12 @@ load("jstests/libs/clustered_collections/clustered_collection_util.js");
 
 // Run TTL monitor constantly to speed up this test.
 const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
+
+if (ClusteredCollectionUtil.areClusteredIndexesEnabled(conn) == false) {
+    jsTestLog('Skipping test because the clustered indexes feature flag is disabled');
+    MongoRunner.stopMongod(conn);
+    return;
+}
 
 function testCollMod(coll, clusterKey, clusterKeyName) {
     const collName = coll.getName();

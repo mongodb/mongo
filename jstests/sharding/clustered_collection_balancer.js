@@ -2,7 +2,8 @@
  * Test inserts into a sharded clustered collection with the balancer on.
  *
  * @tags: [
- *   requires_fcv_53,
+ *   requires_fcv_52,
+ *   featureFlagClusteredIndexes,
  *   # The inMemory variants may run out of memory while inserting large input objects.
  *   requires_persistence,
  * ]

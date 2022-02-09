@@ -27,5 +27,6 @@ executor:
       global_vars:
         TestData:
           setParameters:
+            featureFlagClusteredIndexes: true
             enableTestCommands: 1
             failpoint.clusterAllCollectionsByDefault: "{mode: 'alwaysOn'}"

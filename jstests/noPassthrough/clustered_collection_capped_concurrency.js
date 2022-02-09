@@ -5,7 +5,7 @@
  *   # hangAfterCollectionInserts failpoint not available on mongos.
  *   assumes_against_mongod_not_mongos,
  *   does_not_support_stepdowns,
- *   requires_fcv_53,
+ *   requires_fcv_52,
  *   requires_replication,
  * ]
  */
@@ -20,6 +20,13 @@ load('jstests/libs/parallel_shell_helpers.js');
 const replSet = new ReplSetTest({name: "clustered_capped_concurrency", nodes: 1});
 replSet.startSet();
 replSet.initiate();
+
+if (ClusteredCollectionUtil.areClusteredIndexesEnabled(replSet.getPrimary().getDB("test")) ==
+    false) {
+    jsTestLog('Skipping test because the clustered indexes feature flag is disabled');
+    replSet.stopSet();
+    return;
+}
 
 // Validate that inserts on a capped collection are serialized, whereas inserts
 // on a clustered capped collection are not serialized.

@@ -10,7 +10,7 @@
  *   assumes_unsharded_collection,
  *   does_not_support_causal_consistency,
  *   does_not_support_stepdowns,
- *   requires_fcv_53,
+ *   requires_fcv_51,
  *   requires_non_retryable_commands,
  *   requires_non_retryable_writes,
  *   requires_wiredtiger,
@@ -24,6 +24,12 @@
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 
 const conn = MongoRunner.runMongod({setParameter: {supportArbitraryClusterKeyIndex: true}});
+
+if (ClusteredCollectionUtil.areClusteredIndexesEnabled(conn) == false) {
+    jsTestLog('Skipping test because the clustered indexes feature flag is disabled');
+    MongoRunner.stopMongod(conn);
+    return;
+}
 
 const nonReplicatedDB = conn.getDB('local');
 const collName = 'clustered_collection';

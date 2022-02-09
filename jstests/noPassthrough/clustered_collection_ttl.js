@@ -2,7 +2,7 @@
  * Tests TTL deletions on a clustered collection delete expired entries of type 'date' only.
  *
  * @tags: [
- *   requires_fcv_53,
+ *   requires_fcv_51,
  *   does_not_support_stepdowns,
  * ]
  */
@@ -13,6 +13,12 @@ load('jstests/libs/dateutil.js');
 
 // Run TTL monitor constantly to speed up this test.
 const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
+
+if (ClusteredCollectionUtil.areClusteredIndexesEnabled(conn) == false) {
+    jsTestLog('Skipping test because the clustered indexes feature flag is disabled');
+    MongoRunner.stopMongod(conn);
+    return;
+}
 
 const dbName = jsTestName();
 const replicatedDB = conn.getDB(dbName);

@@ -3,8 +3,9 @@
  * update or delete an image comes from the chunk migration event.
  *
  *  @tags: [
- *    requires_fcv_53,
+ *    requires_fcv_52,
  *    featureFlagChangeStreamPreAndPostImages,
+ *    featureFlagClusteredIndexes,
  *    requires_sharding,
  *    uses_change_streams,
  *    change_stream_does_not_expect_txns,

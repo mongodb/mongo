@@ -9,7 +9,8 @@
  * TODO SERVER-61557: evaluate usefulness of this test.
  *
  * @tags: [
- *   requires_fcv_53,
+ *   requires_fcv_52,
+ *   featureFlagClusteredIndexes,
  * ]
  */
 (function() {

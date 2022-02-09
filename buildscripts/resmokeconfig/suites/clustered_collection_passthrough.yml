@@ -88,6 +88,7 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        featureFlagClusteredIndexes: 1
         # SBE is not compatible with clustered collections
         internalQueryForceClassicEngine: 1
         failpoint.clusterAllCollectionsByDefault: "{mode: 'alwaysOn'}"

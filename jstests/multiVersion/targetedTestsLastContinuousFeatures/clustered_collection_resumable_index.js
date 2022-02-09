@@ -14,7 +14,8 @@
 
     let mongodOptions5dot1 = Object.extend(
         {binVersion: '5.2', setParameter: 'featureFlagClusteredIndexes=true'}, defaultOptions);
-    let mongodOptionsLatest = Object.extend({binVersion: 'latest'}, defaultOptions);
+    let mongodOptionsLatest = Object.extend(
+        {binVersion: 'latest', setParameter: 'featureFlagClusteredIndexes=true'}, defaultOptions);
 
     load("jstests/noPassthrough/libs/index_build.js");
 

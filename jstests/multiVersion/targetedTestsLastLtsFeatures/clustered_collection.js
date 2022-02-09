@@ -29,7 +29,8 @@ let mongodOptions5dot0 = Object.extend({binVersion: '5.0'}, defaultOptions);
 let mongodOptionsLastContinuous =
     Object.extend({binVersion: 'last-continuous', setParameter: 'featureFlagClusteredIndexes=true'},
                   defaultOptions);
-let mongodOptionsLatest = Object.extend({binVersion: 'latest'}, defaultOptions);
+let mongodOptionsLatest = Object.extend(
+    {binVersion: 'latest', setParameter: 'featureFlagClusteredIndexes=true'}, defaultOptions);
 
 // Create a clustered collection with the server running version 'from', then downgrade to
 // 5.0 and validate that the server is unable to start up.
