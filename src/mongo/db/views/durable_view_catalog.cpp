@@ -95,7 +95,7 @@ const std::string& DurableViewCatalogImpl::getName() const {
     return _db->name().dbName();
 }
 
-const bool DurableViewCatalogImpl::belongsTo(const Database* db) const {
+bool DurableViewCatalogImpl::belongsTo(const Database* db) const {
     return _db == db;
 }
 
