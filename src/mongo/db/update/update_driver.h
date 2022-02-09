@@ -151,8 +151,6 @@ public:
         return _updateType;
     }
 
-    static bool isDocReplacement(const write_ops::UpdateModification& updateMod);
-
     bool modsAffectIndices() const {
         return _affectIndices;
     }

@@ -216,7 +216,9 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
 
 void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequest) {
     // Current code only supports replacement update.
-    dassert(UpdateDriver::isDocReplacement(updateRequest.getUpdateModification()));
+    dassert(updateRequest.getUpdateModification().type() ==
+            write_ops::UpdateModification::Type::kReplacement);
+    const auto updateMod = updateRequest.getUpdateModification().getUpdateReplacement();
 
     AutoGetCollection collection(
         opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IX);
@@ -245,7 +247,6 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
     dassert(idToFetch.fieldNameStringData() == "_id"_sd);
     auto recordId = indexAccess->findSingle(opCtx, toUpdateIdDoc);
     auto startingSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
-    const auto updateMod = updateRequest.getUpdateModification().getUpdateClassic();
 
     if (recordId.isNull()) {
         // Upsert case.

@@ -1246,7 +1246,7 @@ TEST_F(DistLockCatalogReplSetTest, BasicUnlockAll) {
         ASSERT(update.getMulti());
         ASSERT_BSONOBJ_EQ(BSON(LocksType::process("processID")), update.getQ());
         ASSERT_BSONOBJ_EQ(BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))),
-                          update.getU().getUpdateClassic());
+                          update.getU().getUpdateModifier());
 
         return BSON("ok" << 1);
     });

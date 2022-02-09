@@ -311,8 +311,8 @@ TEST(CommandWriteOpsParsers, UpdateCommandRequest) {
                 ASSERT_BSONOBJ_EQ(op.getUpdates()[0].getQ(), query);
 
                 const auto& updateMod = op.getUpdates()[0].getU();
-                ASSERT(updateMod.type() == write_ops::UpdateModification::Type::kClassic);
-                ASSERT_BSONOBJ_EQ(updateMod.getUpdateClassic(), update);
+                ASSERT(updateMod.type() == write_ops::UpdateModification::Type::kModifier);
+                ASSERT_BSONOBJ_EQ(updateMod.getUpdateModifier(), update);
 
                 ASSERT_BSONOBJ_EQ(write_ops::collationOf(op.getUpdates()[0]), collation);
                 ASSERT_EQ(write_ops::arrayFiltersOf(op.getUpdates()[0]).size(), 1u);
@@ -461,7 +461,7 @@ TEST(LegacyWriteOpsParsers, UpdateCommandRequest) {
             ASSERT_EQ(op.getWriteCommandRequestBase().getOrdered(), true);
             ASSERT_EQ(op.getUpdates().size(), 1u);
             ASSERT_BSONOBJ_EQ(op.getUpdates()[0].getQ(), query);
-            ASSERT_BSONOBJ_EQ(op.getUpdates()[0].getU().getUpdateClassic(), update);
+            ASSERT_BSONOBJ_EQ(op.getUpdates()[0].getU().getUpdateModifier(), update);
             ASSERT_EQ(op.getUpdates()[0].getUpsert(), upsert);
             ASSERT_EQ(op.getUpdates()[0].getMulti(), multi);
         }
@@ -490,8 +490,8 @@ TEST(LegacyWriteOpsParsers, UpdateWithArrayUpdateFieldIsParsedAsReplacementStyle
             ASSERT_EQ(op.getUpdates().size(), 1u);
             ASSERT_BSONOBJ_EQ(op.getUpdates()[0].getQ(), query);
             ASSERT(op.getUpdates()[0].getU().type() ==
-                   write_ops::UpdateModification::Type::kClassic);
-            ASSERT_BSONOBJ_EQ(op.getUpdates()[0].getU().getUpdateClassic(), update);
+                   write_ops::UpdateModification::Type::kReplacement);
+            ASSERT_BSONOBJ_EQ(op.getUpdates()[0].getU().getUpdateReplacement(), update);
             ASSERT_EQ(op.getUpdates()[0].getUpsert(), upsert);
             ASSERT_EQ(op.getUpdates()[0].getMulti(), multi);
         }

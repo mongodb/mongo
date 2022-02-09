@@ -1238,9 +1238,15 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                         BSONObjBuilder singleUpdate;
                         singleUpdate.append("q", query);
                         switch (this->update.type()) {
-                            case write_ops::UpdateModification::Type::kClassic: {
+                            case write_ops::UpdateModification::Type::kReplacement: {
                                 singleUpdate.append("u",
-                                                    fixQuery(this->update.getUpdateClassic(),
+                                                    fixQuery(this->update.getUpdateReplacement(),
+                                                             *state->bsonTemplateEvaluator));
+                                break;
+                            }
+                            case write_ops::UpdateModification::Type::kModifier: {
+                                singleUpdate.append("u",
+                                                    fixQuery(this->update.getUpdateModifier(),
                                                              *state->bsonTemplateEvaluator));
                                 break;
                             }
@@ -1282,13 +1288,18 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                     uassert(
                         30015,
                         "cannot use legacy write protocol for anything but classic style updates",
-                        this->update.type() == write_ops::UpdateModification::Type::kClassic);
-                    auto toSend = makeUpdateMessage(
-                        this->ns,
-                        query,
-                        fixQuery(this->update.getUpdateClassic(), *state->bsonTemplateEvaluator),
-                        (this->upsert ? UpdateOption_Upsert : 0) |
-                            (this->multi ? UpdateOption_Multi : 0));
+                        this->update.type() == write_ops::UpdateModification::Type::kReplacement ||
+                            this->update.type() == write_ops::UpdateModification::Type::kModifier);
+                    const auto updateObj =
+                        this->update.type() == write_ops::UpdateModification::Type::kReplacement
+                        ? this->update.getUpdateReplacement()
+                        : this->update.getUpdateModifier();
+                    auto toSend =
+                        makeUpdateMessage(this->ns,
+                                          query,
+                                          fixQuery(updateObj, *state->bsonTemplateEvaluator),
+                                          (this->upsert ? UpdateOption_Upsert : 0) |
+                                              (this->multi ? UpdateOption_Multi : 0));
                     conn->say(toSend);
                     if (this->safe)
                         result = conn->getLastErrorDetailed();
