@@ -83,6 +83,65 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                 path.join(dir_path, "compatibility_test_fail/abort/invalid_command_parameter_type"),
                 ["src"], ["src"])
 
+    # pylint: disable=invalid-name
+    def test_newly_added_commands_should_fail(self):
+        """Tests that incompatible newly added commands should fail."""
+        dir_path = path.dirname(path.realpath(__file__))
+        error_collection = idl_check_compatibility.check_compatibility(
+            path.join(dir_path, "compatibility_test_fail/newly_added_commands"),
+            path.join(dir_path, "compatibility_test_fail/newly_added_commands"), ["src"], ["src"])
+
+        self.assertTrue(error_collection.has_errors())
+        self.assertEqual(error_collection.count(), 6)
+
+        new_parameter_no_unstable_field_error = error_collection.get_error_by_command_name(
+            "newCommandParameterNoUnstableField")
+        self.assertTrue(new_parameter_no_unstable_field_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_PARAMETER_REQUIRES_UNSTABLE)
+        self.assertRegex(
+            str(new_parameter_no_unstable_field_error), "newCommandParameterNoUnstableField")
+
+        new_reply_no_unstable_field_error = error_collection.get_error_by_command_name(
+            "newCommandReplyNoUnstableField")
+        self.assertTrue(new_reply_no_unstable_field_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_REQUIRES_UNSTABLE)
+        self.assertRegex(str(new_reply_no_unstable_field_error), "newCommandReplyNoUnstableField")
+
+        new_command_type_struct_no_unstable_field_error = error_collection.get_error_by_command_name(
+            "newCommandTypeStructFieldNoUnstableField")
+        self.assertTrue(new_command_type_struct_no_unstable_field_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_FIELD_REQUIRES_UNSTABLE)
+        self.assertRegex(
+            str(new_command_type_struct_no_unstable_field_error),
+            "newCommandTypeStructFieldNoUnstableField")
+
+        new_parameter_bson_serialization_type_any_error = error_collection.get_error_by_command_name(
+            "newCommandParameterBsonSerializationTypeAny")
+        self.assertTrue(
+            new_parameter_bson_serialization_type_any_error.error_id == idl_compatibility_errors.
+            ERROR_ID_COMMAND_PARAMETER_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED)
+        self.assertRegex(
+            str(new_parameter_bson_serialization_type_any_error),
+            "newCommandParameterBsonSerializationTypeAny")
+
+        new_reply_bson_serialization_type_any_error = error_collection.get_error_by_command_name(
+            "newCommandReplyBsonSerializationTypeAny")
+        self.assertTrue(
+            new_reply_bson_serialization_type_any_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED)
+        self.assertRegex(
+            str(new_reply_bson_serialization_type_any_error),
+            "newCommandReplyBsonSerializationTypeAny")
+
+        new_command_type_struct_bson_serialization_type_any_error = error_collection.get_error_by_command_name(
+            "newCommandTypeStructFieldBsonSerializationTypeAny")
+        self.assertTrue(
+            new_command_type_struct_bson_serialization_type_any_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED)
+        self.assertRegex(
+            str(new_command_type_struct_bson_serialization_type_any_error),
+            "newCommandTypeStructFieldBsonSerializationTypeAny")
+
     # pylint: disable=too-many-locals,too-many-statements,invalid-name
     def test_should_fail(self):
         """Tests that incompatible old and new IDL commands should fail."""
