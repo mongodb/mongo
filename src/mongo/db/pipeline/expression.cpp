@@ -4694,33 +4694,80 @@ void ExpressionSetEquals::validateArguments(const ExpressionVector& args) const 
             args.size() >= 2);
 }
 
+namespace {
+bool setEqualsHelper(const ValueUnorderedSet& lhs,
+                     const ValueUnorderedSet& rhs,
+                     const ValueComparator& valueComparator) {
+    if (lhs.size() != rhs.size()) {
+        return false;
+    }
+    for (const auto& entry : lhs) {
+        if (!rhs.count(entry)) {
+            return false;
+        }
+    }
+    return true;
+}
+}  // namespace
+
 Value ExpressionSetEquals::evaluate(const Document& root, Variables* variables) const {
     const size_t n = _children.size();
     const auto& valueComparator = getExpressionContext()->getValueComparator();
-    ValueSet lhs = valueComparator.makeOrderedValueSet();
+
+    auto evaluateChild = [&](size_t index) {
+        const Value entry = _children[index]->evaluate(root, variables);
+        uassert(17044,
+                str::stream() << "All operands of $setEquals must be arrays. " << (index + 1)
+                              << "-th argument is of type: " << typeName(entry.getType()),
+                entry.isArray());
+        ValueUnorderedSet entrySet = valueComparator.makeUnorderedValueSet();
+        entrySet.insert(entry.getArray().begin(), entry.getArray().end());
+        return entrySet;
+    };
+
+    size_t lhsIndex = _cachedConstant ? _cachedConstant->first : 0;
+    // The $setEquals expression has at least two children, so accessing the first child without
+    // check is fine.
+    ValueUnorderedSet lhs = _cachedConstant ? _cachedConstant->second : evaluateChild(0);
 
     for (size_t i = 0; i < n; i++) {
-        const Value nextEntry = _children[i]->evaluate(root, variables);
-        uassert(17044,
-                str::stream() << "All operands of $setEquals must be arrays. One "
-                              << "argument is of type: " << typeName(nextEntry.getType()),
-                nextEntry.isArray());
-
-        if (i == 0) {
-            lhs.insert(nextEntry.getArray().begin(), nextEntry.getArray().end());
-        } else {
-            ValueSet rhs = valueComparator.makeOrderedValueSet();
-            rhs.insert(nextEntry.getArray().begin(), nextEntry.getArray().end());
-            if (lhs.size() != rhs.size()) {
-                return Value(false);
-            }
-
-            if (!std::equal(lhs.begin(), lhs.end(), rhs.begin(), valueComparator.getEqualTo())) {
+        if (i != lhsIndex) {
+            ValueUnorderedSet rhs = evaluateChild(i);
+            if (!setEqualsHelper(lhs, rhs, valueComparator)) {
                 return Value(false);
             }
         }
     }
     return Value(true);
+}
+
+/**
+ * If there's a constant set in the input, we can construct a hash set for the constant once during
+ * optimize() and compare other sets against it, which reduces the runtime to construct the constant
+ * sets over and over.
+ */
+intrusive_ptr<Expression> ExpressionSetEquals::optimize() {
+    const size_t n = _children.size();
+    const ValueComparator& valueComparator = getExpressionContext()->getValueComparator();
+
+    for (size_t i = 0; i < n; i++) {
+        _children[i] = _children[i]->optimize();
+        if (ExpressionConstant* ec = dynamic_cast<ExpressionConstant*>(_children[i].get())) {
+            const Value nextEntry = ec->getValue();
+            uassert(5887502,
+                    str::stream() << "All operands of $setEquals must be arrays. " << (i + 1)
+                                  << "-th argument is of type: " << typeName(nextEntry.getType()),
+                    nextEntry.isArray());
+
+            if (!_cachedConstant) {
+                _cachedConstant = std::make_pair(i, valueComparator.makeUnorderedValueSet());
+                _cachedConstant->second.insert(nextEntry.getArray().begin(),
+                                               nextEntry.getArray().end());
+            }
+        }
+    }
+
+    return this;
 }
 
 REGISTER_STABLE_EXPRESSION(setEquals, ExpressionSetEquals::parse);

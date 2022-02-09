@@ -2754,7 +2754,8 @@ public:
     ExpressionSetEquals(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionVariadic<ExpressionSetEquals>(expCtx, std::move(children)) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    boost::intrusive_ptr<Expression> optimize() override;
+    Value evaluate(const Document& root, Variables* variables) const override;
     const char* getOpName() const final;
     void validateArguments(const ExpressionVector& args) const final;
 
@@ -2765,6 +2766,11 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+private:
+    // The first element in the pair represent the position on the constant in the '_children'
+    // array. The second element is the constant set.
+    boost::optional<std::pair<size_t, ValueUnorderedSet>> _cachedConstant;
 };
 
 
