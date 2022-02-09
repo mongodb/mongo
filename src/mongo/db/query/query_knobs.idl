@@ -39,9 +39,25 @@ server_parameters:
   # multi-plan ranking
   #
   internalQueryPlanEvaluationWorks:
-    description: "Max number of times we call work() on plans before comparing them, for small collections."
+    description: "For small collections, the max number of times we call work() on plans during the
+    runtime plan selection trial period. Applies only to the classic execution engine. The complete
+    formula for calculating the maximum trial period works depends on
+    'internalQueryPlanEvaluationCollFraction' as well as this parameter."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryPlanEvaluationWorks"
+    cpp_vartype: AtomicWord<int>
+    default: 10000
+    validator:
+      gt: 0
+
+  internalQueryPlanEvaluationWorksSbe:
+    description: "The maximum number of individual storage cursor reads performed by any candidate
+    plan during the runtime plan selection trial period. Applies only to queries using the SBE
+    execution engine. This is the analog of the 'internalQueryPlanEvaluationWorks' knob above but
+    for SBE. When 'internalQueryPlanEvaluationCollFractionSbe' has its default value of 0, this
+    parameter acts as a hard limit on trial period length regardless of collection size."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryPlanEvaluationWorksSbe"
     cpp_vartype: AtomicWord<int>
     default: 10000
     validator:

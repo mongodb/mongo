@@ -12,6 +12,7 @@ const collName = "sbe_multiplanner_coll";
 const collFracKnob = "internalQueryPlanEvaluationCollFraction";
 const collFracKnobSbe = "internalQueryPlanEvaluationCollFractionSbe";
 const worksKnob = "internalQueryPlanEvaluationWorks";
+const worksKnobSbe = "internalQueryPlanEvaluationWorksSbe";
 
 const defaultCollFrac = 0.3;
 const trialLengthFromCollFrac = defaultCollFrac * numDocs;
@@ -46,7 +47,7 @@ for (let i = 0; i < numDocs; ++i) {
 // collection. Since the classic multiplanner takes either the works limit or 30% of the collection
 // size -- whichever is larger -- this should cause the trial period to run for about 0.3 * numDocs
 // work cycles.
-const getParamRes = assert.commandWorked(db.adminCommand({getParameter: 1, [collFracKnob]: 1}));
+let getParamRes = assert.commandWorked(db.adminCommand({getParameter: 1, [collFracKnob]: 1}));
 assert.eq(getParamRes[collFracKnob], defaultCollFrac);
 assert.commandWorked(db.adminCommand({setParameter: 1, [worksKnob]: trialLengthFromWorksKnob}));
 
@@ -62,21 +63,41 @@ for (let plan of allPlans) {
     assert.eq(executionStages.works, trialLengthFromCollFrac, plan);
 }
 
-// Verifies that for each SBE plan in the 'allPlans' array, the number of storage reads done by the
-// plan is equal to 'expectedNumReads'.
-function verifySbeNumReads(allPlans, expectedNumReads) {
+// For each SBE plan in the 'allPlans' array, verifies the number of storage reads
+// done by the plan with respect to 'expectedNumReads' by calling 'assertionFn(actualNumReads,
+// expectedNumReads)'.
+//
+// By default, 'assertionFn' is 'assert.eq()' -- meaning that the number of storage cursor reads
+// done by each candidate SBE plan is checked exactly -- but the caller can pass a different
+// assertion function to override this behavior.
+function verifySbeNumReads(allPlans, expectedNumReads, assertionFn = assert.eq) {
     for (let plan of allPlans) {
         // Infer the number of reads (SBE's equivalent of work units) as the sum of keys and
         // documents examined.
         assert(plan.hasOwnProperty("totalKeysExamined"), plan);
         assert(plan.hasOwnProperty("totalDocsExamined"), plan);
         const numReads = plan.totalKeysExamined + plan.totalDocsExamined;
-        assert.eq(numReads, expectedNumReads, plan);
+        assertionFn(numReads, expectedNumReads, plan);
     }
 }
 
-// Allow the query to use SBE. This time, the trial period should terminate based on the works knob.
+// Verify the default values of the SBE-specific knobs.
+getParamRes = assert.commandWorked(db.adminCommand({getParameter: 1, [collFracKnobSbe]: 1}));
+assert.eq(getParamRes[collFracKnobSbe], 0.0);
+getParamRes = assert.commandWorked(db.adminCommand({getParameter: 1, [worksKnobSbe]: 1}));
+assert.gt(getParamRes[worksKnobSbe], numDocs);
+
+// Allow the query to use SBE. Since we haven't modified any SBE-specific knobs yet, we expect the
+// length of the trial period to be determined by the default value of the SBE works knob. Since the
+// default value of SBE's works knob exceeds the size of the collection, we expect the number of
+// reads to exceed the collection size as well. By construction of the test, this also means that
+// the trial period length exceeds both 'trialLengthFromCollFrac' and 'trialLengthFromWorksKnob'.
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
+allPlans = getAllPlansExecution("2");
+verifySbeNumReads(allPlans, numDocs, assert.gt);
+
+// Setting the SBE works knob lower will reduce the length of the trial period.
+assert.commandWorked(db.adminCommand({setParameter: 1, [worksKnobSbe]: trialLengthFromWorksKnob}));
 allPlans = getAllPlansExecution("2");
 verifySbeNumReads(allPlans, trialLengthFromWorksKnob);
 
