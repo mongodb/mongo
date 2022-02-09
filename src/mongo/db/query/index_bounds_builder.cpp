@@ -1365,7 +1365,7 @@ void IndexBoundsBuilder::alignBounds(IndexBounds* bounds,
               "bounds"_attr = redact(bounds->toString(hasNonSimpleCollation)),
               "keyPattern"_attr = redact(kp),
               "scanDirection"_attr = scanDir);
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(6349900);
     }
 }
 

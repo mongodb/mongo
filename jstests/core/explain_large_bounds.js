@@ -8,7 +8,7 @@
 const coll = db.jstests_explain_large_bounds;
 coll.drop();
 
-coll.createIndex({a: 1});
+assert.commandWorked(coll.createIndex({a: 1}));
 
 let inClause = [];
 for (let i = 0; i < 1000000; i++) {
