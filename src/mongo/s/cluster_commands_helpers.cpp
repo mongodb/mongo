@@ -36,6 +36,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/error_labels.h"
@@ -622,13 +623,31 @@ RawResponsesResult appendRawResponses(
     }
 
     // There was an error. Choose the first error as the top-level error.
-    const auto& firstError = genericErrorsReceived.front().second;
+    auto& firstError = genericErrorsReceived.front().second;
+
+    if (firstError.code() == ErrorCodes::CollectionUUIDMismatch &&
+        firstError.extraInfo<CollectionUUIDMismatchInfo>()->actualNamespace().isEmpty()) {
+        // The first error is a CollectionUUIDMismatchInfo but it doesn't contain an actual
+        // namespace. It's possible that the acutal namespace is unsharded, in which case only the
+        // error from the primary shard will contain this information. Iterate through the errors to
+        // see if this is the case.
+        for (const auto& error : genericErrorsReceived) {
+            if (error.second.code() == ErrorCodes::CollectionUUIDMismatch &&
+                !error.second.extraInfo<CollectionUUIDMismatchInfo>()
+                     ->actualNamespace()
+                     .isEmpty()) {
+                firstError = error.second;
+                break;
+            }
+        }
+    }
+
     output->append("code", firstError.code());
     output->append("codeName", ErrorCodes::errorString(firstError.code()));
-    *errmsg = firstError.reason();
     if (auto extra = firstError.extraInfo()) {
         extra->serialize(output);
     }
+    *errmsg = firstError.reason();
 
     return {false, shardsWithSuccessResponses, successARSResponses, firstStaleConfigErrorReceived};
 }
