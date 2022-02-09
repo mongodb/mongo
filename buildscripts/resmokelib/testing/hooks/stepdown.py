@@ -14,6 +14,7 @@ from buildscripts.resmokelib.testing.fixtures import interface as fixture_interf
 from buildscripts.resmokelib.testing.fixtures import replicaset
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
 from buildscripts.resmokelib.testing.fixtures import tenant_migration
+from buildscripts.resmokelib.testing.fixtures import cluster_to_cluster
 from buildscripts.resmokelib.testing.hooks import interface
 
 
@@ -113,7 +114,7 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
         self._stepdown_thread.pause()
         self.logger.info("Paused the stepdown thread.")
 
-    def _add_fixture(self, fixture):
+    def _add_fixture(self, fixture):  # pylint: disable=too-many-branches
         if isinstance(fixture, replicaset.ReplicaSetFixture):
             if not fixture.all_nodes_electable:
                 raise ValueError(
@@ -137,6 +138,10 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
 
             for rs_fixture in fixture.get_replsets():
                 self._rs_fixtures.append(rs_fixture)
+        elif isinstance(fixture, cluster_to_cluster.ClusterToClusterFixture):
+            # Recursively call _add_fixture on the source and destination clusters.
+            for cluster_fixture in fixture.get_independent_clusters():
+                self._add_fixture(cluster_fixture)
 
 
 class FlagBasedStepdownLifecycle(object):
