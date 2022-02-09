@@ -232,8 +232,9 @@ public:
         std::set<std::string> cappedCollectionSet;
 
         bool noError = true;
+        const TenantDatabaseName tenantDbName(boost::none, dbname);
         catalog::forEachCollectionFromDb(
-            opCtx, dbname, MODE_IS, [&](const CollectionPtr& collection) {
+            opCtx, tenantDbName, MODE_IS, [&](const CollectionPtr& collection) {
                 auto collNss = collection->ns();
 
                 if (collNss.size() - 1 <= dbname.size()) {

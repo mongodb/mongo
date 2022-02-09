@@ -166,7 +166,7 @@ public:
                     });
                     item.setSizeOnDisk(size);
                     item.setEmpty(CollectionCatalog::get(opCtx)
-                                      ->getAllCollectionUUIDsFromDb(tenantDbName.dbName())
+                                      ->getAllCollectionUUIDsFromDb(tenantDbName)
                                       .empty());
                 }
                 if (!filter || filter->matchesBSON(item.toBSON())) {

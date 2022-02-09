@@ -494,7 +494,7 @@ private:
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
                 catalog::forEachCollectionFromDb(
                     opCtx,
-                    dbName,
+                    tenantDbName,
                     MODE_X,
                     [&](const CollectionPtr& collection) {
                         if (collection->getTimeseriesBucketsMayHaveMixedSchemaData()) {
@@ -609,7 +609,7 @@ private:
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
                 catalog::forEachCollectionFromDb(
                     opCtx,
-                    dbName,
+                    tenantDbName,
                     MODE_X,
                     [&](const CollectionPtr& collection) {
                         invariant(collection->getTimeseriesOptions());
@@ -696,7 +696,7 @@ private:
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
                 catalog::forEachCollectionFromDb(
                     opCtx,
-                    dbName,
+                    tenantDbName,
                     MODE_X,
                     [&](const CollectionPtr& collection) {
                         // Fail to downgrade if there exists a collection with

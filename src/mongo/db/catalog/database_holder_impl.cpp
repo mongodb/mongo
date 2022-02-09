@@ -170,7 +170,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
     // block.
     lk.unlock();
 
-    if (CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(tenantDbName.dbName()).empty()) {
+    if (CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(tenantDbName).empty()) {
         audit::logCreateDatabase(opCtx->getClient(), tenantDbName.dbName());
         if (justCreated)
             *justCreated = true;
@@ -238,8 +238,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
     invariant(opCtx->lockState()->isDbLockedForMode(name.dbName(), MODE_X));
 
     auto catalog = CollectionCatalog::get(opCtx);
-    for (auto collIt = catalog->begin(opCtx, name.dbName()); collIt != catalog->end(opCtx);
-         ++collIt) {
+    for (auto collIt = catalog->begin(opCtx, name); collIt != catalog->end(opCtx); ++collIt) {
         auto coll = *collIt;
         if (!coll) {
             break;
@@ -255,8 +254,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
 
     auto const serviceContext = opCtx->getServiceContext();
 
-    for (auto collIt = catalog->begin(opCtx, name.dbName()); collIt != catalog->end(opCtx);
-         ++collIt) {
+    for (auto collIt = catalog->begin(opCtx, name); collIt != catalog->end(opCtx); ++collIt) {
         auto coll = *collIt;
         if (!coll) {
             break;

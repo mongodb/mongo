@@ -261,8 +261,9 @@ public:
                         [collection = std::move(entry.collection)](CollectionCatalog& catalog) {
                             catalog._collections[collection->ns()] = collection;
                             catalog._catalog[collection->uuid()] = collection;
-                            auto dbIdPair = std::make_pair(collection->ns().db().toString(),
-                                                           collection->uuid());
+                            auto dbIdPair =
+                                std::make_pair(collection->tenantNs().createTenantDatabaseName(),
+                                               collection->uuid());
                             catalog._orderedCollections[dbIdPair] = collection;
                         });
                     break;
@@ -317,12 +318,12 @@ private:
 };
 
 CollectionCatalog::iterator::iterator(OperationContext* opCtx,
-                                      StringData dbName,
+                                      const TenantDatabaseName& tenantDbName,
                                       const CollectionCatalog& catalog)
-    : _opCtx(opCtx), _dbName(dbName), _catalog(&catalog) {
+    : _opCtx(opCtx), _tenantDbName(tenantDbName), _catalog(&catalog) {
     auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
 
-    _mapIter = _catalog->_orderedCollections.lower_bound(std::make_pair(_dbName, minUuid));
+    _mapIter = _catalog->_orderedCollections.lower_bound(std::make_pair(_tenantDbName, minUuid));
 
     // Start with the first collection that is visible outside of its transaction.
     while (!_exhausted() && !_mapIter->second->isCommitted()) {
@@ -334,10 +335,10 @@ CollectionCatalog::iterator::iterator(OperationContext* opCtx,
     }
 }
 
-CollectionCatalog::iterator::iterator(
-    OperationContext* opCtx,
-    std::map<std::pair<std::string, UUID>, std::shared_ptr<Collection>>::const_iterator mapIter,
-    const CollectionCatalog& catalog)
+CollectionCatalog::iterator::iterator(OperationContext* opCtx,
+                                      std::map<std::pair<TenantDatabaseName, UUID>,
+                                               std::shared_ptr<Collection>>::const_iterator mapIter,
+                                      const CollectionCatalog& catalog)
     : _opCtx(opCtx), _mapIter(mapIter), _catalog(&catalog) {}
 
 CollectionCatalog::iterator::value_type CollectionCatalog::iterator::operator*() {
@@ -398,7 +399,8 @@ bool CollectionCatalog::iterator::operator!=(const iterator& other) const {
 }
 
 bool CollectionCatalog::iterator::_exhausted() {
-    return _mapIter == _catalog->_orderedCollections.end() || _mapIter->first.first != _dbName;
+    return _mapIter == _catalog->_orderedCollections.end() ||
+        _mapIter->first.first != _tenantDbName;
 }
 
 std::shared_ptr<const CollectionCatalog> CollectionCatalog::get(ServiceContext* svcCtx) {
@@ -864,12 +866,13 @@ bool CollectionCatalog::checkIfCollectionSatisfiable(UUID uuid, CollectionInfoFn
     return predicate(collection.get());
 }
 
-std::vector<UUID> CollectionCatalog::getAllCollectionUUIDsFromDb(StringData dbName) const {
+std::vector<UUID> CollectionCatalog::getAllCollectionUUIDsFromDb(
+    const TenantDatabaseName& tenantDbName) const {
     auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
-    auto it = _orderedCollections.lower_bound(std::make_pair(dbName.toString(), minUuid));
+    auto it = _orderedCollections.lower_bound(std::make_pair(tenantDbName, minUuid));
 
     std::vector<UUID> ret;
-    while (it != _orderedCollections.end() && it->first.first == dbName) {
+    while (it != _orderedCollections.end() && it->first.first == tenantDbName) {
         if (it->second->isCommitted()) {
             ret.push_back(it->first.second);
         }
@@ -879,14 +882,14 @@ std::vector<UUID> CollectionCatalog::getAllCollectionUUIDsFromDb(StringData dbNa
 }
 
 std::vector<NamespaceString> CollectionCatalog::getAllCollectionNamesFromDb(
-    OperationContext* opCtx, StringData dbName) const {
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_S));
+    OperationContext* opCtx, const TenantDatabaseName& tenantDbName) const {
+    invariant(opCtx->lockState()->isDbLockedForMode(tenantDbName.dbName(), MODE_S));
 
     auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
 
     std::vector<NamespaceString> ret;
-    for (auto it = _orderedCollections.lower_bound(std::make_pair(dbName.toString(), minUuid));
-         it != _orderedCollections.end() && it->first.first == dbName;
+    for (auto it = _orderedCollections.lower_bound(std::make_pair(tenantDbName, minUuid));
+         it != _orderedCollections.end() && it->first.first == tenantDbName;
          ++it) {
         if (it->second->isCommitted()) {
             ret.push_back(it->second->ns());
@@ -898,21 +901,20 @@ std::vector<NamespaceString> CollectionCatalog::getAllCollectionNamesFromDb(
 std::vector<TenantDatabaseName> CollectionCatalog::getAllDbNames() const {
     std::vector<TenantDatabaseName> ret;
     auto maxUuid = UUID::parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF").getValue();
-    auto iter = _orderedCollections.upper_bound(std::make_pair("", maxUuid));
+    auto iter = _orderedCollections.upper_bound(std::make_pair(TenantDatabaseName(), maxUuid));
     while (iter != _orderedCollections.end()) {
-        auto dbName = iter->first.first;
+        auto tenantDbName = iter->first.first;
         if (iter->second->isCommitted()) {
-            // TODO SERVER-61988: Once iter->first.first has TenantDatabaseName object, we need not
-            // create the TenantDatabaseName here.
-            ret.push_back(TenantDatabaseName(boost::none, dbName));
+            ret.push_back(tenantDbName);
         } else {
-            // If the first collection found for `dbName` is not yet committed, increment the
-            // iterator to find the next visible collection (possibly under a different `dbName`).
+            // If the first collection found for `tenantDbName` is not yet committed, increment the
+            // iterator to find the next visible collection (possibly under a different
+            // `tenantDbName`).
             iter++;
             continue;
         }
-        // Move on to the next database after `dbName`.
-        iter = _orderedCollections.upper_bound(std::make_pair(dbName, maxUuid));
+        // Move on to the next database after `tenantDbName`.
+        iter = _orderedCollections.upper_bound(std::make_pair(tenantDbName, maxUuid));
     }
     return ret;
 }
@@ -982,8 +984,7 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
                 logAttrs(tenantNs),
                 "uuid"_attr = uuid);
 
-    auto dbName = tenantDbName.dbName();
-    auto dbIdPair = std::make_pair(dbName, uuid);
+    auto dbIdPair = std::make_pair(tenantDbName, uuid);
 
     // Make sure no entry related to this uuid.
     invariant(_catalog.find(uuid) == _catalog.end());
@@ -1004,8 +1005,9 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
 
     invariant(static_cast<size_t>(_stats.internal + _stats.userCollections) == _collections.size());
 
-    auto dbRid = ResourceId(RESOURCE_DATABASE, dbName);
-    addResource(dbRid, dbName);
+    // TODO SERVER-62918 create ResourceId for db with TenantDatabaseName.
+    auto dbRid = ResourceId(RESOURCE_DATABASE, tenantDbName.dbName());
+    addResource(dbRid, tenantDbName.dbName());
 
     auto collRid = ResourceId(RESOURCE_COLLECTION, tenantNs.getNss().ns());
     addResource(collRid, tenantNs.getNss().ns());
@@ -1017,8 +1019,8 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationCon
 
     auto coll = std::move(_catalog[uuid]);
     auto ns = coll->ns();
-    auto dbName = ns.db().toString();
-    auto dbIdPair = std::make_pair(dbName, uuid);
+    auto tenantDbName = coll->tenantNs().createTenantDatabaseName();
+    auto dbIdPair = std::make_pair(tenantDbName, uuid);
 
     LOGV2_DEBUG(20281, 1, "Deregistering collection", logAttrs(ns), "uuid"_attr = uuid);
 
@@ -1054,8 +1056,6 @@ void CollectionCatalog::deregisterAllCollectionsAndViews() {
     for (auto& entry : _catalog) {
         auto uuid = entry.first;
         auto ns = entry.second->ns();
-        auto dbName = ns.db().toString();
-        auto dbIdPair = std::make_pair(dbName, uuid);
 
         LOGV2_DEBUG(20283, 1, "Deregistering collection", logAttrs(ns), "uuid"_attr = uuid);
 
@@ -1103,8 +1103,9 @@ void CollectionCatalog::replaceViewsForDatabase(const TenantDatabaseName& tenant
     }
 }
 
-CollectionCatalog::iterator CollectionCatalog::begin(OperationContext* opCtx, StringData db) const {
-    return iterator(opCtx, db, *this);
+CollectionCatalog::iterator CollectionCatalog::begin(OperationContext* opCtx,
+                                                     const TenantDatabaseName& tenantDbName) const {
+    return iterator(opCtx, tenantDbName, *this);
 }
 
 CollectionCatalog::iterator CollectionCatalog::end(OperationContext* opCtx) const {

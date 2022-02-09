@@ -39,13 +39,13 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeGettingNextCollection);
 namespace catalog {
 
 void forEachCollectionFromDb(OperationContext* opCtx,
-                             StringData dbName,
+                             const TenantDatabaseName& tenantDbName,
                              LockMode collLockMode,
                              CollectionCatalog::CollectionInfoFn callback,
                              CollectionCatalog::CollectionInfoFn predicate) {
 
     auto catalogForIteration = CollectionCatalog::get(opCtx);
-    for (auto collectionIt = catalogForIteration->begin(opCtx, dbName);
+    for (auto collectionIt = catalogForIteration->begin(opCtx, tenantDbName);
          collectionIt != catalogForIteration->end(opCtx);
          ++collectionIt) {
         auto uuid = collectionIt.uuid().get();

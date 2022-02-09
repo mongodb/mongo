@@ -527,6 +527,7 @@ env.Library(
         'storage_util.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/multitenancy',
         'durable_catalog_impl',
         'kv/kv_drop_pending_ident_reaper',
     ],

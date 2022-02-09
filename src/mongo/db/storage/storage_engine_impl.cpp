@@ -839,7 +839,7 @@ Status StorageEngineImpl::dropDatabase(OperationContext* opCtx, StringData db) {
         }
     }
 
-    std::vector<UUID> toDrop = catalog->getAllCollectionUUIDsFromDb(db);
+    std::vector<UUID> toDrop = catalog->getAllCollectionUUIDsFromDb(tenantDbName);
 
     // Do not timestamp any of the following writes. This will remove entries from the catalog as
     // well as drop any underlying tables. It's not expected for dropping tables to be reversible
@@ -1313,14 +1313,17 @@ int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, StringData d
         return true;
     };
 
+    // TODO SERVER-63187: Change StorageEngine APIs to accept TenantDatabaseName.
+    const TenantDatabaseName tenantDbName(boost::none, dbName);
     if (opCtx->isLockFreeReadsOp()) {
         auto collectionCatalog = CollectionCatalog::get(opCtx);
-        for (auto it = collectionCatalog->begin(opCtx, dbName); it != collectionCatalog->end(opCtx);
+        for (auto it = collectionCatalog->begin(opCtx, tenantDbName);
+             it != collectionCatalog->end(opCtx);
              ++it) {
             perCollectionWork(*it);
         }
     } else {
-        catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, perCollectionWork);
+        catalog::forEachCollectionFromDb(opCtx, tenantDbName, MODE_IS, perCollectionWork);
     };
 
     return size;

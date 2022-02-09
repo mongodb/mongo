@@ -47,6 +47,11 @@ namespace mongo {
 class TenantDatabaseName {
 public:
     /**
+     * Constructs an empty TenantDatabaseName.
+     */
+    TenantDatabaseName() : _tenantId(boost::none), _dbName(""), _tenantDbName(boost::none){};
+
+    /**
      * Constructs a TenantDatabaseName from the given tenantId and database name.
      * "dbName" is expected only consist of a db name. It is the caller's responsibility to ensure
      * the dbName is a valid db name.

@@ -150,7 +150,7 @@ public:
                                          });
                 }
 
-                for (auto collIt = collectionCatalog->begin(opCtx, tenantDbName.dbName());
+                for (auto collIt = collectionCatalog->begin(opCtx, tenantDbName);
                      collIt != collectionCatalog->end(opCtx);
                      ++collIt) {
                     if (!_validateNamespace(

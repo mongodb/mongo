@@ -53,7 +53,7 @@ namespace catalog {
  * Iterating through the remaining collections stops when the callback returns false.
  */
 void forEachCollectionFromDb(OperationContext* opCtx,
-                             StringData dbName,
+                             const TenantDatabaseName& tenantDbName,
                              LockMode collLockMode,
                              CollectionCatalog::CollectionInfoFn callback,
                              CollectionCatalog::CollectionInfoFn predicate = nullptr);

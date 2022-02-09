@@ -361,8 +361,7 @@ std::vector<CollectionState> IdempotencyTest::validateAllCollections() {
             std::vector<NamespaceString> collectionNames;
             {
                 Lock::DBLock lk(_opCtx.get(), tenantDbName.dbName(), MODE_S);
-                collectionNames =
-                    catalog->getAllCollectionNamesFromDb(_opCtx.get(), tenantDbName.dbName());
+                collectionNames = catalog->getAllCollectionNamesFromDb(_opCtx.get(), tenantDbName);
             }
             for (const auto& nss : collectionNames) {
                 collStates.push_back(validate(nss));

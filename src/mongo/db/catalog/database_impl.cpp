@@ -173,7 +173,7 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
     }
 
     auto catalog = CollectionCatalog::get(opCtx);
-    for (const auto& uuid : catalog->getAllCollectionUUIDsFromDb(_name.dbName())) {
+    for (const auto& uuid : catalog->getAllCollectionUUIDsFromDb(_name)) {
         CollectionWriter collection(
             opCtx,
             uuid,
@@ -300,7 +300,7 @@ void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
         return collection->getCollectionOptions().temp;
     };
 
-    catalog::forEachCollectionFromDb(opCtx, name().dbName(), MODE_X, callback, predicate);
+    catalog::forEachCollectionFromDb(opCtx, name(), MODE_X, callback, predicate);
 }
 
 void DatabaseImpl::setDropPending(OperationContext* opCtx, bool dropPending) {
@@ -332,7 +332,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx,
     invariant(opCtx->lockState()->isDbLockedForMode(name().dbName(), MODE_IS));
 
     catalog::forEachCollectionFromDb(
-        opCtx, name().dbName(), MODE_IS, [&](const CollectionPtr& collection) -> bool {
+        opCtx, name(), MODE_IS, [&](const CollectionPtr& collection) -> bool {
             nCollections += 1;
             objects += collection->numRecords(opCtx);
             size += collection->dataSize(opCtx);
@@ -924,7 +924,7 @@ void DatabaseImpl::checkForIdIndexesAndDropPendingCollections(OperationContext* 
     }
 
     auto catalog = CollectionCatalog::get(opCtx);
-    for (const auto& nss : catalog->getAllCollectionNamesFromDb(opCtx, _name.dbName())) {
+    for (const auto& nss : catalog->getAllCollectionNamesFromDb(opCtx, _name)) {
         if (nss.isDropPendingNamespace()) {
             auto dropOpTime = fassert(40459, nss.getDropPendingNamespaceOpTime());
             LOGV2(20321,

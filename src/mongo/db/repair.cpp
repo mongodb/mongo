@@ -115,8 +115,8 @@ Status dropUnfinishedIndexes(OperationContext* opCtx, Collection* collection) {
 
 Status repairCollections(OperationContext* opCtx,
                          StorageEngine* engine,
-                         const std::string& dbName) {
-    auto colls = CollectionCatalog::get(opCtx)->getAllCollectionNamesFromDb(opCtx, dbName);
+                         const TenantDatabaseName& tenantDbName) {
+    auto colls = CollectionCatalog::get(opCtx)->getAllCollectionNamesFromDb(opCtx, tenantDbName);
 
     for (const auto& nss : colls) {
         auto status = repair::repairCollection(opCtx, engine, nss);
@@ -150,7 +150,7 @@ Status repairDatabase(OperationContext* opCtx,
     // Reopening db is necessary for repairCollections.
     databaseHolder->openDb(opCtx, tenantDbName);
 
-    auto status = repairCollections(opCtx, engine, tenantDbName.dbName());
+    auto status = repairCollections(opCtx, engine, tenantDbName);
     if (!status.isOK()) {
         LOGV2_FATAL_CONTINUE(21030,
                              "Failed to repair database {dbName}: {status_reason}",

@@ -222,7 +222,9 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
         result->push_back(info);
         return true;
     };
-    mongo::catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, perCollectionWork);
+    // TODO SERVER-63353: Change dbcheck command to use TenantDatabaseName
+    mongo::catalog::forEachCollectionFromDb(
+        opCtx, TenantDatabaseName(boost::none, dbName), MODE_IS, perCollectionWork);
 
     return result;
 }

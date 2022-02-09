@@ -68,7 +68,7 @@ void reopenAllDatabasesAndReloadCollectionCatalog(
             23992, 1, "openCatalog: dbholder reopening database", "db"_attr = tenantDbName);
         auto db = databaseHolder->openDb(opCtx, tenantDbName);
         invariant(db, str::stream() << "failed to reopen database " << tenantDbName.toString());
-        for (auto&& collNss : catalog->getAllCollectionNamesFromDb(opCtx, tenantDbName.dbName())) {
+        for (auto&& collNss : catalog->getAllCollectionNamesFromDb(opCtx, tenantDbName)) {
             // Note that the collection name already includes the database component.
             auto collection = catalog->lookupCollectionByNamespaceForMetadataWrite(
                 opCtx, CollectionCatalog::LifetimeMode::kInplace, collNss);
@@ -126,8 +126,7 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto catalog = CollectionCatalog::get(opCtx);
     for (auto&& tenantDbName : allDbs) {
-        for (auto collIt = catalog->begin(opCtx, tenantDbName.dbName());
-             collIt != catalog->end(opCtx);
+        for (auto collIt = catalog->begin(opCtx, tenantDbName); collIt != catalog->end(opCtx);
              ++collIt) {
             auto coll = *collIt;
             if (!coll) {

@@ -383,7 +383,7 @@ bool FeatureCompatibilityVersion::hasNoReplicatedCollections(OperationContext* o
     auto catalog = CollectionCatalog::get(opCtx);
     for (auto&& tenantDbName : tenantDbNames) {
         Lock::DBLock dbLock(opCtx, tenantDbName.dbName(), MODE_S);
-        for (auto&& collNss : catalog->getAllCollectionNamesFromDb(opCtx, tenantDbName.dbName())) {
+        for (auto&& collNss : catalog->getAllCollectionNamesFromDb(opCtx, tenantDbName)) {
             if (collNss.isReplicated()) {
                 return false;
             }

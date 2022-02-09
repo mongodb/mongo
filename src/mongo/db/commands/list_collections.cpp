@@ -56,6 +56,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/list_collections_gen.h"
+#include "mongo/db/multitenancy.h"
 #include "mongo/db/query/cursor_request.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
@@ -307,6 +308,7 @@ public:
 
             const auto listCollRequest = request();
             const auto dbName = listCollRequest.getDbName();
+            const TenantDatabaseName tenantDbName(getActiveTenant(opCtx), dbName);
             const bool nameOnly = listCollRequest.getNameOnly();
             const bool authorizedCollections = listCollRequest.getAuthorizedCollections();
 
@@ -330,7 +332,6 @@ public:
                 // Acquire only the global lock and set up a consistent in-memory catalog and
                 // storage snapshot.
                 AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, dbName);
-                const TenantDatabaseName tenantDbName(boost::none, dbName);
                 auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, tenantDbName);
 
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(&hangBeforeListCollections,
@@ -435,14 +436,14 @@ public:
                         // needing to yield as we don't take any locks.
                         if (opCtx->isLockFreeReadsOp()) {
                             auto collectionCatalog = CollectionCatalog::get(opCtx);
-                            for (auto it = collectionCatalog->begin(opCtx, dbName);
+                            for (auto it = collectionCatalog->begin(opCtx, tenantDbName);
                                  it != collectionCatalog->end(opCtx);
                                  ++it) {
                                 perCollectionWork(*it);
                             }
                         } else {
                             mongo::catalog::forEachCollectionFromDb(
-                                opCtx, dbName, MODE_IS, perCollectionWork);
+                                opCtx, tenantDbName, MODE_IS, perCollectionWork);
                         }
                     }
 
