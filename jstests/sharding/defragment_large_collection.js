@@ -3,7 +3,6 @@
  * @tags: [
  *  requires_fcv_53,
  *  featureFlagPerCollBalancingSettings,
- *  does_not_support_stepdowns,
  * ]
  */
 

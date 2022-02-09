@@ -126,15 +126,10 @@ private:
     boost::optional<DefragmentationAction> _nextStreamingAction(OperationContext* opCtx);
 
     /**
-     * Returns the phase that should run after the input phase.
-     */
-    DefragmentationPhaseEnum _getNextPhase(DefragmentationPhaseEnum currentPhase);
-
-    /**
      * Advances the defragmentation state of the specified collection to the next actionable phase
      * (or sets the related DefragmentationPhase object to nullptr if nothing more can be done).
      */
-    bool _refreshDefragmentationPhaseFor(OperationContext* opCtx, const UUID& collUuid);
+    bool _advanceToNextActionablePhase(OperationContext* opCtx, const UUID& collUuid);
 
     /**
      * Move to the next phase and persist the phase change. This will end defragmentation if the

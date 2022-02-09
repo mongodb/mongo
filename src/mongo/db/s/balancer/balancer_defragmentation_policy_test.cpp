@@ -230,26 +230,17 @@ TEST_F(BalancerDefragmentationPolicyTest,
 
     auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_FALSE(future.isReady());
-
     verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMoveAndMergeChunks);
 
+    // A single migration request should advance the defragmentation state to the end of the
+    // algorithm
     stdx::unordered_set<ShardId> usedShards;
 
-    // Two invocations are required to advance the status of the collection defragmentation beyond
-    // kMoveAndMergeChunks
     auto pendingMigrations =
         _defragmentationPolicy.selectChunksToMove(operationContext(), &usedShards);
+
     ASSERT_TRUE(pendingMigrations.empty());
-
     ASSERT_FALSE(future.isReady());
-
-    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMoveAndMergeChunks);
-
-    pendingMigrations = _defragmentationPolicy.selectChunksToMove(operationContext(), &usedShards);
-    ASSERT_TRUE(pendingMigrations.empty());
-
-    ASSERT_FALSE(future.isReady());
-
     verifyExpectedDefragmentationPhaseOndisk(boost::none);
     ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
 }

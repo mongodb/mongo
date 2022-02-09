@@ -886,6 +886,8 @@ private:
         if (matchingShardInfo == _smallChunksByShard.end()) {
             return false;
         }
+
+        smallChunkSiblings->clear();
         auto& smallChunksInShard = matchingShardInfo->second;
         for (auto candidateIt = smallChunksInShard.begin();
              candidateIt != smallChunksInShard.end();) {
@@ -982,7 +984,8 @@ private:
                 ? kMergeSolvesTwoPendingChunks
                 : kMergeSolvesOnePendingChunk;
         }
-        if (_shardInfos.at(mergeableSibling.shard)
+        if (chunkTobeMovedAndMerged.shard == mergeableSibling.shard ||
+            _shardInfos.at(mergeableSibling.shard)
                 .hasCapacityFor(chunkTobeMovedAndMerged.estimatedSizeBytes)) {
             ranking += kDestinationNotMaxedOut;
         }
@@ -1467,7 +1470,7 @@ MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
                     continue;
                 };
 
-                const auto phaseAdvanced = _refreshDefragmentationPhaseFor(opCtx, collUUID);
+                const auto phaseAdvanced = _advanceToNextActionablePhase(opCtx, collUUID);
                 auto& collDefragmentationPhase = defragStateIt->second;
                 if (!collDefragmentationPhase) {
                     _defragmentationStates.erase(defragStateIt);
@@ -1477,7 +1480,11 @@ MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
                 auto actionableMigration =
                     collDefragmentationPhase->popNextMigration(opCtx, usedShards);
                 if (!actionableMigration.has_value()) {
-                    if (phaseAdvanced) {
+                    // The following check aims at reducing the amount of unneeded invocations to
+                    // _yieldNextStreamingAction() (which resolve into no-ops, but with a
+                    // non-negligible time cost)
+                    // TODO (SERVER-63416) minimise the performance impact
+                    if (phaseAdvanced || usedShards->empty()) {
                         _yieldNextStreamingAction(lk, opCtx);
                     }
                     popCollectionUUID(it);
@@ -1514,8 +1521,8 @@ SemiFuture<DefragmentationAction> BalancerDefragmentationPolicyImpl::getNextStre
     return std::move(future).semi();
 }
 
-bool BalancerDefragmentationPolicyImpl::_refreshDefragmentationPhaseFor(OperationContext* opCtx,
-                                                                        const UUID& collUuid) {
+bool BalancerDefragmentationPolicyImpl::_advanceToNextActionablePhase(OperationContext* opCtx,
+                                                                      const UUID& collUuid) {
     auto& currentPhase = _defragmentationStates.at(collUuid);
     auto currentPhaseCompleted = [&currentPhase] {
         return currentPhase && currentPhase->isComplete() &&
@@ -1550,7 +1557,7 @@ boost::optional<DefragmentationAction> BalancerDefragmentationPolicyImpl::_nextS
 
     for (auto stateToVisit = _defragmentationStates.size(); stateToVisit != 0; --stateToVisit) {
         try {
-            _refreshDefragmentationPhaseFor(opCtx, stateIt->first);
+            _advanceToNextActionablePhase(opCtx, stateIt->first);
             auto& currentCollectionDefragmentationState = stateIt->second;
             if (currentCollectionDefragmentationState) {
                 // Get next action
