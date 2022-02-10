@@ -62,7 +62,7 @@ class Spec(object):
     def is_nightly(self):
         """Return True if nightly."""
         return bool(re.search("-$", self.version())) or bool(
-            re.search(r"\d-\d+-g[0-9a-f]+$", self.version()))
+            re.search(r"-g[0-9a-f]+$", self.version()))
 
     def is_patch(self):
         """Return True if patch."""
