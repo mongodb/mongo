@@ -179,9 +179,11 @@ public:
     static std::vector<StatusWith<CursorResponse>> parseFromBSONMany(const BSONObj& cmdResponse);
 
     /**
-     * Constructs a CursorResponse from the command BSON response.
+     * Constructs a CursorResponse from the command BSON response. If 'cmdResponse' is not owned,
+     * the second argument should be the object that owns the response.
      */
-    static StatusWith<CursorResponse> parseFromBSON(const BSONObj& cmdResponse);
+    static StatusWith<CursorResponse> parseFromBSON(const BSONObj& cmdResponse,
+                                                    const BSONObj* ownedObj = nullptr);
 
     /**
      * A throwing version of 'parseFromBSON'.

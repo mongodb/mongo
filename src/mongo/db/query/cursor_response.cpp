@@ -159,7 +159,7 @@ std::vector<StatusWith<CursorResponse>> CursorResponse::parseFromBSONMany(
                                        << "Cursors array element contains non-object element: "
                                        << elt});
             } else {
-                cursors.push_back(parseFromBSON(elt.Obj()));
+                cursors.push_back(parseFromBSON(elt.Obj(), &cmdResponse));
             }
         }
     }
@@ -167,7 +167,8 @@ std::vector<StatusWith<CursorResponse>> CursorResponse::parseFromBSONMany(
     return cursors;
 }
 
-StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdResponse) {
+StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdResponse,
+                                                         const BSONObj* ownedObj) {
     Status cmdStatus = getStatusFromCommandResult(cmdResponse);
     if (!cmdStatus.isOK()) {
         return cmdStatus;
@@ -231,8 +232,16 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
         batch.push_back(elt.Obj());
     }
 
+    tassert(6253102,
+            "Must own one of the two arguments if there are documents in the batch",
+            batch.size() == 0 || cmdResponse.isOwned() || (ownedObj && ownedObj->isOwned()));
+
     for (auto& doc : batch) {
-        doc.shareOwnershipWith(cmdResponse);
+        if (ownedObj) {
+            doc.shareOwnershipWith(*ownedObj);
+        } else {
+            doc.shareOwnershipWith(cmdResponse);
+        }
     }
 
     auto postBatchResumeTokenElem = cursorObj[kPostBatchResumeTokenField];

@@ -96,6 +96,41 @@ public:
         return rcr.cmdObj.getOwned();
     }
 
+    BSONObj scheduleSuccessfulMultiCursorResponse(StringData fieldName,
+                                                  size_t start,
+                                                  size_t end,
+                                                  std::vector<size_t> cursorIds) {
+        NetworkInterfaceMock::InNetworkGuard ing(getNet());
+
+        BSONObjBuilder bob;
+        {
+            BSONArrayBuilder cursors;
+            int baseCursorValue = 1;
+            for (auto cursorId : cursorIds) {
+                BSONObjBuilder cursor;
+                BSONArrayBuilder batch;
+                ASSERT(start < end && end < INT_MAX);
+                for (size_t i = start; i <= end; ++i) {
+                    batch.append(BSON("x" << static_cast<int>(i) * baseCursorValue).getOwned());
+                }
+                cursor.append(fieldName, batch.arr());
+                cursor.append("id", (long long)(cursorId));
+                cursor.append("ns", "test.test");
+                auto cursorObj = BSON("cursor" << cursor.done() << "ok" << 1);
+                cursors.append(cursorObj.getOwned());
+                ++baseCursorValue;
+            }
+            bob.append("cursors", cursors.arr());
+        }
+        bob.append("ok", 1);
+
+        ASSERT(getNet()->hasReadyRequests());
+        auto rcr = getNet()->scheduleSuccessfulResponse(bob.obj());
+        getNet()->runReadyNetworkOperations();
+
+        return rcr.cmdObj.getOwned();
+    }
+
     BSONObj scheduleSuccessfulKillCursorResponse(size_t cursorId) {
         NetworkInterfaceMock::InNetworkGuard ing(getNet());
 
@@ -141,6 +176,106 @@ TEST_F(TaskExecutorCursorFixture, SingleBatchWorks) {
     ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 2);
 
     ASSERT_FALSE(tec.getNext(opCtx.get()));
+}
+
+/**
+ * Ensure the firstBatch can be read correctly when multiple cursors are returned.
+ */
+TEST_F(TaskExecutorCursorFixture, MultipleCursorsSingleBatchSucceeds) {
+    const auto aggCmd = BSON("aggregate"
+                             << "test"
+                             << "pipeline" << BSON_ARRAY(BSON("returnMultipleCursors" << true)));
+
+    RemoteCommandRequest rcr(HostAndPort("localhost"), "test", aggCmd, opCtx.get());
+
+    TaskExecutorCursor tec(&getExecutor(), rcr);
+
+    ASSERT_BSONOBJ_EQ(aggCmd, scheduleSuccessfulMultiCursorResponse("firstBatch", 1, 2, {0, 0}));
+
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 1);
+
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 2);
+
+    ASSERT_FALSE(tec.getNext(opCtx.get()));
+
+    auto cursorVec = tec.releaseAdditionalCursors();
+    ASSERT_EQUALS(cursorVec.size(), 1);
+    auto secondCursor = std::move(cursorVec[0]);
+
+    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).get()["x"].Int(), 2);
+    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).get()["x"].Int(), 4);
+    ASSERT_FALSE(hasReadyRequests());
+
+    ASSERT_FALSE(secondCursor.getNext(opCtx.get()));
+}
+
+TEST_F(TaskExecutorCursorFixture, MultipleCursorsGetMoreWorks) {
+    const auto aggCmd = BSON("aggregate"
+                             << "test"
+                             << "pipeline" << BSON_ARRAY(BSON("returnMultipleCursors" << true)));
+
+    std::vector<size_t> cursorIds{1, 2};
+    RemoteCommandRequest rcr(HostAndPort("localhost"), "test", aggCmd, opCtx.get());
+
+    TaskExecutorCursor tec(&getExecutor(), rcr);
+
+    ASSERT_BSONOBJ_EQ(aggCmd, scheduleSuccessfulMultiCursorResponse("firstBatch", 1, 2, cursorIds));
+
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 1);
+
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 2);
+
+    auto cursorVec = tec.releaseAdditionalCursors();
+    ASSERT_EQUALS(cursorVec.size(), 1);
+
+    // If we try to getNext() at this point, we are interruptible and can timeout
+    ASSERT_THROWS_CODE(opCtx->runWithDeadline(Date_t::now() + Milliseconds(100),
+                                              ErrorCodes::ExceededTimeLimit,
+                                              [&] { tec.getNext(opCtx.get()); }),
+                       DBException,
+                       ErrorCodes::ExceededTimeLimit);
+
+    // We can pick up after that interruption though
+    ASSERT_BSONOBJ_EQ(BSON("getMore" << 1LL << "collection"
+                                     << "test"),
+                      scheduleSuccessfulCursorResponse("nextBatch", 3, 5, cursorIds[0]));
+
+    // Repeat for second cursor.
+    auto secondCursor = std::move(cursorVec[0]);
+
+    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).get()["x"].Int(), 2);
+    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).get()["x"].Int(), 4);
+
+    ASSERT_THROWS_CODE(opCtx->runWithDeadline(Date_t::now() + Milliseconds(100),
+                                              ErrorCodes::ExceededTimeLimit,
+                                              [&] { secondCursor.getNext(opCtx.get()); }),
+                       DBException,
+                       ErrorCodes::ExceededTimeLimit);
+
+    ASSERT_BSONOBJ_EQ(BSON("getMore" << 2LL << "collection"
+                                     << "test"),
+                      scheduleSuccessfulCursorResponse("nextBatch", 6, 8, cursorIds[1]));
+    // Read second batch on both cursors.
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 3);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 4);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 5);
+    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).get()["x"].Int(), 6);
+    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).get()["x"].Int(), 7);
+    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).get()["x"].Int(), 8);
+
+    // Schedule EOF on both cursors.
+    scheduleSuccessfulCursorResponse("nextBatch", 6, 6, 0);
+    scheduleSuccessfulCursorResponse("nextBatch", 12, 12, 0);
+
+    // Read final document.
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 6);
+    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).get()["x"].Int(), 12);
+
+    // Shouldn't have any more requests, both cursors are closed.
+    ASSERT_FALSE(hasReadyRequests());
+
+    ASSERT_FALSE(tec.getNext(opCtx.get()));
+    ASSERT_FALSE(secondCursor.getNext(opCtx.get()));
 }
 
 /**

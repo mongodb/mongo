@@ -34,7 +34,6 @@
 #include "mongo/executor/task_executor_cursor.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/kill_cursors_gen.h"
 #include "mongo/util/scopeguard.h"
@@ -53,6 +52,44 @@ TaskExecutorCursor::TaskExecutorCursor(executor::TaskExecutor* executor,
     }
 
     _runRemoteCommand(_createRequest(_rcr.opCtx, _rcr.cmdObj));
+}
+
+TaskExecutorCursor::TaskExecutorCursor(executor::TaskExecutor* executor,
+                                       CursorResponse&& response,
+                                       RemoteCommandRequest& rcr,
+                                       Options&& options)
+    : _executor(executor), _rcr(rcr), _options(std::move(options)), _batchIter(_batch.end()) {
+
+    tassert(6253101, "rcr must have an opCtx to use construct cursor from response", rcr.opCtx);
+    _lsid = rcr.opCtx->getLogicalSessionId();
+    _processResponse(rcr.opCtx, std::move(response));
+}
+
+TaskExecutorCursor::TaskExecutorCursor(TaskExecutorCursor&& other)
+    : _executor(other._executor),
+      _rcr(other._rcr),
+      _options(std::move(other._options)),
+      _lsid(other._lsid),
+      _cbHandle(std::move(other._cbHandle)),
+      _cursorId(other._cursorId),
+      _millisecondsWaiting(other._millisecondsWaiting),
+      _ns(other._ns),
+      _batchNum(other._batchNum),
+      _pipe(std::move(other._pipe)),
+      _additionalCursors(std::move(other._additionalCursors)) {
+    // Copy the status of the batch.
+    auto batchIterIndex = other._batchIter - other._batch.begin();
+    _batch = std::move(other._batch);
+    _batchIter = _batch.begin() + batchIterIndex;
+
+    // Get owned copy of the vars.
+    if (other._cursorVars) {
+        _cursorVars = other._cursorVars->getOwned();
+    }
+    // Other is no longer responsible for this cursor id.
+    other._cursorId = 0;
+    // Other should not cancel the callback on destruction.
+    other._cbHandle = boost::none;
 }
 
 TaskExecutorCursor::~TaskExecutorCursor() {
@@ -129,6 +166,26 @@ void TaskExecutorCursor::_runRemoteCommand(const RemoteCommandRequest& rcr) {
             }
         }));
 }
+void TaskExecutorCursor::_processResponse(OperationContext* opCtx, CursorResponse&& response) {
+    // If this was our first batch.
+    if (_cursorId == kUnitializedCursorId) {
+        _ns = response.getNSS();
+        _rcr.dbname = _ns.db().toString();
+        // 'vars' are only included in the first batch.
+        _cursorVars = response.getVarsField();
+    }
+
+    _cursorId = response.getCursorId();
+    _batch = response.releaseBatch();
+    _batchIter = _batch.begin();
+
+    // If we got a cursor id back, pre-fetch the next batch
+    if (_cursorId) {
+        GetMoreCommandRequest getMoreRequest(_cursorId, _ns.coll().toString());
+        getMoreRequest.setBatchSize(_options.batchSize);
+        _runRemoteCommand(_createRequest(opCtx, getMoreRequest.toBSON({})));
+    }
+}
 
 void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
     invariant(_cbHandle, "_getNextBatch() requires an async request to have already been sent.");
@@ -154,25 +211,18 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
     // is done.
     _cbHandle.reset();
 
-    auto cr = uassertStatusOK(CursorResponse::parseFromBSON(out.getValue()));
-
-    // If this was our first batch
-    if (_cursorId == kUnitializedCursorId) {
-        _ns = cr.getNSS();
-        _rcr.dbname = _ns.db().toString();
-        // 'vars' are only included in the first batch.
-        _cursorVars = cr.getVarsField();
-    }
-
-    _cursorId = cr.getCursorId();
-    _batch = cr.releaseBatch();
-    _batchIter = _batch.begin();
-
-    // If we got a cursor id back, pre-fetch the next batch
-    if (_cursorId) {
-        GetMoreCommandRequest getMoreRequest(_cursorId, _ns.coll().toString());
-        getMoreRequest.setBatchSize(_options.batchSize);
-        _runRemoteCommand(_createRequest(opCtx, getMoreRequest.toBSON({})));
+    // Parse into a vector in case the remote sent back multiple cursors.
+    auto cursorResponses = CursorResponse::parseFromBSONMany(out.getValue());
+    tassert(6253100, "Expected at least one response for cursor", cursorResponses.size() > 0);
+    CursorResponse cr = uassertStatusOK(std::move(cursorResponses[0]));
+    _processResponse(opCtx, std::move(cr));
+    // If we have more responses, build them into cursors then hold them until a caller accesses
+    // them. Skip the first response, we used it to populate this cursor.
+    for (unsigned int i = 1; i < cursorResponses.size(); ++i) {
+        _additionalCursors.emplace_back(_executor,
+                                        uassertStatusOK(std::move(cursorResponses[i])),
+                                        _rcr,
+                                        TaskExecutorCursor::Options());
     }
 }
 

@@ -37,6 +37,7 @@
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/duration.h"
@@ -82,6 +83,22 @@ public:
                                 Options&& options = {});
 
     /**
+     * Construct the cursor from a cursor response from a previously executed RemoteCommandRequest.
+     * The executor is used for subsequent getMore calls. Uses the original RemoteCommandRequest
+     * to build subsequent commands. Takes ownership of the CursorResponse and gives it to the new
+     * cursor.
+     */
+    TaskExecutorCursor(executor::TaskExecutor* executor,
+                       CursorResponse&& response,
+                       RemoteCommandRequest& rcr,
+                       Options&& options = {});
+
+    /**
+     * Move constructor to enable storing cursors in vectors.
+     */
+    TaskExecutorCursor(TaskExecutorCursor&& other);
+
+    /**
      * Asynchronously kills async ops and kills the underlying cursor on destruction.
      */
     ~TaskExecutorCursor();
@@ -115,6 +132,18 @@ public:
         return _batchNum;
     }
 
+    /**
+     * Returns the vector of cursors that were returned alongside this one. Calling this claims
+     * ownership of the cursors and will return an empty vector on subsequent calls.
+     */
+    std::vector<TaskExecutorCursor> releaseAdditionalCursors() {
+        return std::move(_additionalCursors);
+    }
+
+    auto getNumAdditionalCursors() {
+        return _additionalCursors.size();
+    }
+
 private:
     /**
      * Runs a remote command and pipes the output back to this object
@@ -125,6 +154,14 @@ private:
      * Gets the next batch with interruptibility via the opCtx
      */
     void _getNextBatch(OperationContext* opCtx);
+
+    /**
+     * Helper for '_getNextBatch' that handles the reading of the 'CursorResponse' object and
+     * storing of relevant values. This is also responsible for issuing a getMore request if it
+     * is required to populate the next batch.
+     */
+    void _processResponse(OperationContext* opCtx, CursorResponse&& response);
+
 
     /**
      * Create a new request, annotating with lsid and current opCtx
@@ -163,6 +200,9 @@ private:
     // Multi producer because we hold onto the producer side in this object, as well as placing it
     // into callbacks for the task executor
     MultiProducerSingleConsumerQueue<StatusWith<BSONObj>>::Pipe _pipe;
+
+    // Cursors built from the responses returned alongside the results for this cursor.
+    std::vector<TaskExecutorCursor> _additionalCursors;
 };
 
 }  // namespace executor
