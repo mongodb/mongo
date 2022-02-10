@@ -43,11 +43,12 @@ namespace mongo::sbe {
 class MultiPlanner final : public BaseRuntimePlanner {
 public:
     MultiPlanner(OperationContext* opCtx,
-                 const CollectionPtr& collection,
+                 const MultiCollection& collections,
                  const CanonicalQuery& cq,
+                 const QueryPlannerParams& qpp,
                  PlanCachingMode cachingMode,
                  PlanYieldPolicySBE* yieldPolicy)
-        : BaseRuntimePlanner{opCtx, collection, cq, yieldPolicy}, _cachingMode{cachingMode} {}
+        : BaseRuntimePlanner{opCtx, collections, cq, qpp, yieldPolicy}, _cachingMode{cachingMode} {}
 
     CandidatePlans plan(
         std::vector<std::unique_ptr<QuerySolution>> solutions,

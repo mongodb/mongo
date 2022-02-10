@@ -6,10 +6,16 @@
 
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-function runTest(coll, pipeline, expectedToPushdown) {
-    const cmd = () => coll.aggregate(pipeline).toArray();
-    if (expectedToPushdown) {
-        assert.throwsWithCode(cmd, 5843700);
+const JoinAlgorithm = {
+    HJ: 5842602,
+    INLJ: 5842603,
+    NLJ: 5842604,
+};
+
+function runTest(coll, pipeline, expectedCode, aggOptions = {}) {
+    const cmd = () => coll.aggregate(pipeline, aggOptions).toArray();
+    if (expectedCode) {
+        assert.throwsWithCode(cmd, expectedCode);
     } else {
         assert.doesNotThrow(cmd);
     }
@@ -32,35 +38,35 @@ const viewName = "view_lookup_pushdown";
 let coll = db[name];
 assert.commandWorked(coll.insert({_id: 1, a: 2}));
 let foreignColl = db[foreignCollName];
-assert.commandWorked(foreignColl.insert({_id: 0, b: 2}));
+assert.commandWorked(foreignColl.insert({_id: 0, b: 2, c: 2}));
 assert.commandWorked(db.createView(viewName, foreignCollName, [{$match: {b: {$gte: 0}}}]));
 let view = db[viewName];
 
 // Basic $lookup.
 runTest(coll,
         [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        true /* expectedToPushdown */);
+        JoinAlgorithm.NLJ /* expectedCode */);
 
 // Self join $lookup, no views.
 runTest(coll,
         [{$lookup: {from: name, localField: "a", foreignField: "a", as: "out"}}],
-        true /* expectedToPushdown */);
+        JoinAlgorithm.NLJ /* expectedCode */);
 
 // Self join $lookup; left hand is a view. This is expected to be pushed down because the view
 // pipeline itself is a $match, which is eligible for pushdown.
 runTest(view,
         [{$lookup: {from: name, localField: "a", foreignField: "a", as: "out"}}],
-        true /* expectedToPushdown */);
+        JoinAlgorithm.NLJ /* expectedCode */);
 
 // Self join $lookup; right hand is a view.
 runTest(coll,
         [{$lookup: {from: viewName, localField: "a", foreignField: "a", as: "out"}}],
-        false /* expectedToPushdown */);
+        false /* expectedCode */);
 
 // Self join $lookup; both namespaces are views.
 runTest(view,
         [{$lookup: {from: viewName, localField: "a", foreignField: "a", as: "out"}}],
-        false /* expectedToPushdown */);
+        false /* expectedCode */);
 
 // $lookup preceded by $match.
 runTest(coll,
@@ -68,7 +74,7 @@ runTest(coll,
             {$match: {a: {$gte: 0}}},
             {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}
         ],
-        true /* expectedToPushdown */);
+        JoinAlgorithm.NLJ /* expectedCode */);
 
 // $lookup preceded by $project.
 runTest(coll,
@@ -76,7 +82,7 @@ runTest(coll,
             {$project: {a: 1}},
             {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}
         ],
-        true /* expectedToPushdown */);
+        JoinAlgorithm.NLJ /* expectedCode */);
 
 // $lookup preceded by $project which features an SBE-incompatible expression.
 // TODO SERVER-51542: Update or remove this test case once $pow is implemented in SBE.
@@ -85,7 +91,7 @@ runTest(coll,
             {$project: {exp: {$pow: ["$a", 3]}}},
             {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}
         ],
-        false /* expectedToPushdown */);
+        false /* expectedCode */);
 
 // $lookup preceded by $group.
 runTest(coll,
@@ -93,7 +99,7 @@ runTest(coll,
             {$group: {_id: "$a", sum: {$sum: 1}}},
             {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}
         ],
-        true /* expectedToPushdown */);
+        JoinAlgorithm.NLJ /* expectedCode */);
 
 // Consecutive $lookups (first is against view).
 runTest(coll,
@@ -101,7 +107,7 @@ runTest(coll,
             {$lookup: {from: viewName, localField: "a", foreignField: "b", as: "out"}},
             {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}
         ],
-        false /* expectedToPushdown */);
+        false /* expectedCode */);
 
 // Consecutive $lookups (first is against regular collection).
 runTest(coll,
@@ -109,12 +115,12 @@ runTest(coll,
             {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
             {$lookup: {from: viewName, localField: "a", foreignField: "b", as: "out"}}
         ],
-        true /* expectedToPushdown */);
+        JoinAlgorithm.NLJ /* expectedCode */);
 
 // $lookup with pipeline.
 runTest(coll,
     [{$lookup: {from: foreignCollName, let: {foo: "$b"}, pipeline: [{$match: {$expr: {$eq: ["$$foo",
-2]}}}], as: "out"}}], false /* expectedToPushdown */);
+2]}}}], as: "out"}}], false /* expectedCode */);
 
 // $lookup that absorbs $unwind.
 runTest(coll,
@@ -122,7 +128,7 @@ runTest(coll,
             {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
             {$unwind: "$out"}
         ],
-        false /* expectedToPushdown */);
+        false /* expectedCode */);
 
 // $lookup that absorbs $match.
 runTest(coll,
@@ -131,7 +137,7 @@ runTest(coll,
             {$unwind: "$out"},
             {$match: {out: {$gte: 0}}}
         ],
-        false /* expectedToPushdown */);
+        false /* expectedCode */);
 
 // $lookup that does not absorb $match.
 runTest(coll,
@@ -139,7 +145,53 @@ runTest(coll,
             {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
             {$match: {out: {$gte: 0}}}
         ],
-        true /* expectedToPushdown */);
+        JoinAlgorithm.NLJ /* expectedCode */);
+
+// Run a $lookup with 'allowDiskUse' enabled. Because the foreign collection is very small, we
+// should select hash join.
+runTest(coll,
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        JoinAlgorithm.HJ /* expectedCode */,
+        {allowDiskUse: true});
+
+// Build an index on the foreign collection that matches the foreignField. This should cause us
+// to choose an indexed nested loop join.
+assert.commandWorked(foreignColl.createIndex({b: 1}));
+runTest(coll,
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        JoinAlgorithm.INLJ /* expectedCode */);
+
+// Build a compound index that is prefixed with the foreignField. We should use an indexed
+// nested loop join.
+assert.commandWorked(foreignColl.dropIndexes());
+assert.commandWorked(foreignColl.createIndex({b: 1, c: 1, a: 1}));
+runTest(coll,
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        JoinAlgorithm.INLJ /* expectedCode */);
+
+// Build a compound index containing the foreignField, but not as the first field. In this case,
+// we should use regular nested loop join.
+assert.commandWorked(foreignColl.dropIndexes());
+assert.commandWorked(foreignColl.createIndex({a: 1, b: 1, c: 1}));
+runTest(coll,
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        JoinAlgorithm.NLJ /* expectedCode */);
+
+// Multiple $lookup stages in a pipeline that should pick different physical joins.
+assert.commandWorked(foreignColl.dropIndexes());
+assert.commandWorked(foreignColl.createIndex({b: 1}));
+runTest(coll,
+        [
+            {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "b_out"}},
+            {$lookup: {from: foreignCollName, localField: "a", foreignField: "c", as: "c_out"}}
+        ],
+        JoinAlgorithm.NLJ /* expectedCode for the second stage, because it's built first */);
+runTest(coll,
+        [
+            {$lookup: {from: foreignCollName, localField: "a", foreignField: "c", as: "c_out"}},
+            {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "b_out"}}
+        ],
+        JoinAlgorithm.INLJ /* expectedCode for the second stage, because it's built first */);
 
 MongoRunner.stopMongod(conn);
 
@@ -169,32 +221,32 @@ assert.commandWorked(db.createView(shardedViewName, name, [{$match: {b: {$gte: 0
 // Both collections are unsharded.
 runTest(foreignColl,
         [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        true /* expectedToPushdown */);
+        JoinAlgorithm.NLJ /* expectedCode */);
 
 // Sharded main collection, unsharded right side. This is not expected to be eligible for pushdown
 // because the $lookup will be preceded by a $mergeCursors stage on the merging shard.
 runTest(coll,
         [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        false /* expectedToPushdown */);
+        false /* expectedCode */);
 
 // Both collections are sharded.
 runTest(coll,
         [{$lookup: {from: name, localField: "a", foreignField: "b", as: "out"}}],
-        false /* expectedToPushdown */);
+        false /* expectedCode */);
 
 // Unsharded main collection, sharded right side.
 runTest(foreignColl,
         [{$lookup: {from: name, localField: "a", foreignField: "b", as: "out"}}],
-        false /* expectedToPushdown */);
+        false /* expectedCode */);
 
 // Unsharded main collection, unsharded view right side.
 runTest(foreignColl,
         [{$lookup: {from: viewName, localField: "a", foreignField: "b", as: "out"}}],
-        false /* expectedToPushdown */);
+        false /* expectedCode */);
 
 // Unsharded main collection, sharded view on the right side.
 runTest(foreignColl,
         [{$lookup: {from: shardedViewName, localField: "a", foreignField: "b", as: "out"}}],
-        false /* expectedToPushdown */);
+        false /* expectedCode */);
 st.stop();
 }());

@@ -45,6 +45,7 @@
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/pipeline/document_source_group.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collation/collation_index_key.h"
@@ -1252,7 +1253,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
  * and later attach the agg portion of the plan to the solution(s) for the "find" part of the query.
  */
 std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
-    const CanonicalQuery& query, std::unique_ptr<QuerySolution>&& solution) {
+    const CanonicalQuery& query,
+    std::unique_ptr<QuerySolution>&& solution,
+    const std::map<NamespaceString, SecondaryCollectionInfo>& secondaryCollInfos) {
     if (query.pipeline().empty()) {
         return nullptr;
     }
@@ -1260,15 +1263,35 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
     std::unique_ptr<QuerySolutionNode> solnForAgg = std::make_unique<SentinelNode>();
     for (auto& innerStage : query.pipeline()) {
         auto groupStage = dynamic_cast<DocumentSourceGroup*>(innerStage->documentSource());
-        tassert(5842400,
-                "Cannot support pushdown of a stage other than $group at the moment",
-                groupStage != nullptr);
+        if (groupStage) {
+            solnForAgg = std::make_unique<GroupNode>(std::move(solnForAgg),
+                                                     groupStage->getIdExpression(),
+                                                     groupStage->getAccumulatedFields(),
+                                                     groupStage->doingMerge());
+            continue;
+        }
 
-        solnForAgg = std::make_unique<GroupNode>(std::move(solnForAgg),
-                                                 groupStage->getIdExpression(),
-                                                 groupStage->getAccumulatedFields(),
-                                                 groupStage->doingMerge());
+        auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(innerStage->documentSource());
+        if (lookupStage) {
+            tassert(5842409,
+                    "Only $lookup that use local/foreign field syntax should be lowered",
+                    lookupStage->getLocalField() && lookupStage->getForeignField());
+            auto eqLookupNode =
+                std::make_unique<EqLookupNode>(std::move(solnForAgg),
+                                               lookupStage->getFromNs().toString(),
+                                               lookupStage->getLocalField()->fullPath(),
+                                               lookupStage->getForeignField()->fullPath(),
+                                               lookupStage->getAsField().fullPath());
+            QueryPlannerAnalysis::determineLookupStrategy(
+                eqLookupNode.get(), secondaryCollInfos, query.getExpCtx()->allowDiskUse);
+            solnForAgg = std::move(eqLookupNode);
+            continue;
+        }
+
+        tasserted(5842400,
+                  "Cannot support pushdown of a stage other than $group or $lookup at the moment");
     }
+
     solution->extendWith(std::move(solnForAgg));
     return QueryPlannerAnalysis::removeProjectSimpleBelowGroup(std::move(solution));
 }

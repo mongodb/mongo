@@ -613,6 +613,45 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::removeProjectSimpleBelowGro
 }
 
 // static
+void QueryPlannerAnalysis::determineLookupStrategy(
+    EqLookupNode* eqLookupNode,
+    const std::map<NamespaceString, SecondaryCollectionInfo>& collectionsInfo,
+    bool allowDiskUse) {
+    const auto& foreignCollName = eqLookupNode->foreignCollection;
+    auto foreignCollItr = collectionsInfo.find(NamespaceString(foreignCollName));
+    tassert(5842600,
+            str::stream() << "Expected collection info, but found none; target collection: "
+                          << foreignCollName,
+            foreignCollItr != collectionsInfo.end());
+
+    // Does an eligible index exist?
+    // TODO SERVER-62913: finalize the logic for indexes analysis.
+    const auto& foreignField = eqLookupNode->joinFieldForeign;
+    IndexEntry* prefixedIndex = nullptr;
+    for (auto idxEntry : foreignCollItr->second.indexes) {
+        tassert(5842601, "index key pattern should not be empty", !idxEntry.keyPattern.isEmpty());
+        if (idxEntry.keyPattern.firstElement().fieldName() == foreignField) {
+            prefixedIndex = &idxEntry;
+            break;
+        }
+    }
+
+    // TODO SERVER-63449: make this setting configurable and tighten the HJ check to cover the
+    // number of records and the storage size of the collection.
+    static constexpr auto kMaxHashJoinCollectionSize = 100 * 1024 * 1024;
+
+    if (prefixedIndex) {
+        eqLookupNode->lookupStrategy = EqLookupNode::LookupStrategy::kIndexedLoopJoin;
+        eqLookupNode->idxEntry = *prefixedIndex;
+    } else if (allowDiskUse &&
+               foreignCollItr->second.approximateCollectionSizeBytes < kMaxHashJoinCollectionSize) {
+        eqLookupNode->lookupStrategy = EqLookupNode::LookupStrategy::kHashJoin;
+    } else {
+        eqLookupNode->lookupStrategy = EqLookupNode::LookupStrategy::kNestedLoopJoin;
+    }
+}
+
+// static
 void QueryPlannerAnalysis::analyzeGeo(const QueryPlannerParams& params,
                                       QuerySolutionNode* solnRoot) {
     // Get field names of all 2dsphere indexes with version >= 3.

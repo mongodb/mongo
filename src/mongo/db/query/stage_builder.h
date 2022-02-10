@@ -40,11 +40,8 @@ namespace mongo::stage_builder {
 template <typename PlanStageType>
 class StageBuilder {
 public:
-    StageBuilder(OperationContext* opCtx,
-                 const CollectionPtr& collection,
-                 const CanonicalQuery& cq,
-                 const QuerySolution& solution)
-        : _opCtx(opCtx), _collection(collection), _cq(cq), _solution(solution) {}
+    StageBuilder(OperationContext* opCtx, const CanonicalQuery& cq, const QuerySolution& solution)
+        : _opCtx(opCtx), _cq(cq), _solution(solution) {}
 
     virtual ~StageBuilder() = default;
 
@@ -56,7 +53,6 @@ public:
 
 protected:
     OperationContext* _opCtx;
-    const CollectionPtr& _collection;
     const CanonicalQuery& _cq;
     const QuerySolution& _solution;
 };

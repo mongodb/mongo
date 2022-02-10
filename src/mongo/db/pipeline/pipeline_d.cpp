@@ -171,8 +171,11 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
                 feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV() &&
                 internalEnableMultipleAutoGetCollections.load() && lookupStage->sbeCompatible() &&
                 !isForeignSharded && !isForeignView;
-            uassert(
-                5843700, "$lookup push down logic worked correctly", !lookupEligibleForPushdown);
+            if (lookupEligibleForPushdown) {
+                stagesForPushdown.push_back(std::make_unique<InnerPipelineStageImpl>(lookupStage));
+                sources.erase(itr++);
+                continue;
+            }
             break;
         }
 

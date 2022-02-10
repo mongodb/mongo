@@ -44,11 +44,8 @@ namespace mongo {
  * $lookup) useful for query planning.
  */
 struct SecondaryCollectionInfo {
-    NamespaceString nss;
     std::vector<IndexEntry> indexes{};
     bool exists{true};
-    bool isSharded{false};
-    bool isView{false};
 
     // The approximate size of the collection in bytes.
     long long approximateCollectionSizeBytes{0};
@@ -167,7 +164,7 @@ struct QueryPlannerParams {
     const CollatorInterface* clusteredCollectionCollator;
 
     // List of information about any secondary collections that can be executed against.
-    std::vector<SecondaryCollectionInfo> secondaryCollectionsInfo;
+    std::map<NamespaceString, SecondaryCollectionInfo> secondaryCollectionsInfo;
 };
 
 }  // namespace mongo

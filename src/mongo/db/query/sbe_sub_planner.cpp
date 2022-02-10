@@ -46,12 +46,13 @@ CandidatePlans SubPlanner::plan(
             return plan_cache_key_factory::make<mongo::PlanCacheKey>(cq, coll);
         };
 
+    const auto& mainColl = _collections.getMainCollection();
     // Plan each branch of the $or.
     auto subplanningStatus =
         QueryPlanner::planSubqueries(_opCtx,
-                                     CollectionQueryInfo::get(_collection).getPlanCache(),
+                                     CollectionQueryInfo::get(mainColl).getPlanCache(),
                                      createPlanCacheKey,
-                                     _collection,
+                                     mainColl,
                                      _cq,
                                      _queryParams);
     if (!subplanningStatus.isOK()) {
@@ -71,7 +72,7 @@ CandidatePlans SubPlanner::plan(
         std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots;
         for (auto&& solution : solutions) {
             roots.push_back(stage_builder::buildSlotBasedExecutableTree(
-                _opCtx, _collection, *cq, *solution, _yieldPolicy));
+                _opCtx, _collections, *cq, *solution, _yieldPolicy));
         }
 
         // Clear any plans registered to yield once multiplanning is done for this branch. We don't
@@ -83,7 +84,7 @@ CandidatePlans SubPlanner::plan(
         // not use the 'CachedSolutionPlanner' eviction mechanism. We therefore are more
         // conservative about putting a potentially bad plan into the cache in the subplan path.
         MultiPlanner multiPlanner{
-            _opCtx, _collection, *cq, PlanCachingMode::SometimesCache, _yieldPolicy};
+            _opCtx, _collections, *cq, _queryParams, PlanCachingMode::SometimesCache, _yieldPolicy};
         auto&& [candidates, winnerIdx] = multiPlanner.plan(std::move(solutions), std::move(roots));
         invariant(winnerIdx < candidates.size());
         return std::move(candidates[winnerIdx].solution);
@@ -111,11 +112,12 @@ CandidatePlans SubPlanner::plan(
 
     // If some agg pipeline stages are being pushed down, extend the solution with them.
     if (!_cq.pipeline().empty()) {
-        compositeSolution = QueryPlanner::extendWithAggPipeline(_cq, std::move(compositeSolution));
+        compositeSolution = QueryPlanner::extendWithAggPipeline(
+            _cq, std::move(compositeSolution), _queryParams.secondaryCollectionsInfo);
     }
 
     auto&& [root, data] = stage_builder::buildSlotBasedExecutableTree(
-        _opCtx, _collection, _cq, *compositeSolution, _yieldPolicy);
+        _opCtx, _collections, _cq, *compositeSolution, _yieldPolicy);
     auto status = prepareExecutionPlan(root.get(), &data);
     uassertStatusOK(status);
     auto [result, recordId, exitedEarly] = status.getValue();
@@ -134,11 +136,12 @@ CandidatePlans SubPlanner::planWholeQuery() const {
     if (solutions.size() == 1) {
         // If some agg pipeline stages are being pushed down, extend the solution with them.
         if (!_cq.pipeline().empty()) {
-            solutions[0] = QueryPlanner::extendWithAggPipeline(_cq, std::move(solutions[0]));
+            solutions[0] = QueryPlanner::extendWithAggPipeline(
+                _cq, std::move(solutions[0]), _queryParams.secondaryCollectionsInfo);
         }
 
         auto&& [root, data] = stage_builder::buildSlotBasedExecutableTree(
-            _opCtx, _collection, _cq, *solutions[0], _yieldPolicy);
+            _opCtx, _collections, _cq, *solutions[0], _yieldPolicy);
         auto status = prepareExecutionPlan(root.get(), &data);
         uassertStatusOK(status);
         auto [result, recordId, exitedEarly] = status.getValue();
@@ -154,10 +157,11 @@ CandidatePlans SubPlanner::planWholeQuery() const {
     std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots;
     for (auto&& solution : solutions) {
         roots.push_back(stage_builder::buildSlotBasedExecutableTree(
-            _opCtx, _collection, _cq, *solution, _yieldPolicy));
+            _opCtx, _collections, _cq, *solution, _yieldPolicy));
     }
 
-    MultiPlanner multiPlanner{_opCtx, _collection, _cq, PlanCachingMode::AlwaysCache, _yieldPolicy};
+    MultiPlanner multiPlanner{
+        _opCtx, _collections, _cq, _queryParams, PlanCachingMode::AlwaysCache, _yieldPolicy};
     return multiPlanner.plan(std::move(solutions), std::move(roots));
 }
 }  // namespace mongo::sbe

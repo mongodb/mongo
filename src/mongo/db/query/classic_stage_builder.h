@@ -43,11 +43,12 @@ public:
                         const CanonicalQuery& cq,
                         const QuerySolution& solution,
                         WorkingSet* ws)
-        : StageBuilder<PlanStage>{opCtx, collection, cq, solution}, _ws{ws} {}
+        : StageBuilder<PlanStage>{opCtx, cq, solution}, _collection(collection), _ws{ws} {}
 
     std::unique_ptr<PlanStage> build(const QuerySolutionNode* root) final;
 
 private:
+    const CollectionPtr& _collection;
     WorkingSet* _ws;
 
     boost::optional<size_t> _ftsKeyPrefixSize;

@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_plan_cache.h"
+#include "mongo/db/query/multi_collection.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 
@@ -91,7 +92,9 @@ public:
     };
 
     static std::unique_ptr<QuerySolution> extendWithAggPipeline(
-        const CanonicalQuery& query, std::unique_ptr<QuerySolution>&& solution);
+        const CanonicalQuery& query,
+        std::unique_ptr<QuerySolution>&& solution,
+        const std::map<NamespaceString, SecondaryCollectionInfo>& secondaryCollInfos);
 
     /**
      * Returns the list of possible query solutions for the provided 'query' for multi-planning.

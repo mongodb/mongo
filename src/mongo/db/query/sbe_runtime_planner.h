@@ -33,6 +33,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/query/all_indices_required_checker.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/multi_collection.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
@@ -76,14 +77,16 @@ public:
 class BaseRuntimePlanner : public RuntimePlanner {
 public:
     BaseRuntimePlanner(OperationContext* opCtx,
-                       const CollectionPtr& collection,
+                       const MultiCollection& collections,
                        const CanonicalQuery& cq,
+                       const QueryPlannerParams& queryParams,
                        PlanYieldPolicySBE* yieldPolicy)
         : _opCtx(opCtx),
-          _collection(collection),
+          _collections(collections),
           _cq(cq),
+          _queryParams(queryParams),
           _yieldPolicy(yieldPolicy),
-          _indexExistenceChecker{collection} {
+          _indexExistenceChecker(collections.getMainCollection()) {
         invariant(_opCtx);
     }
 
@@ -130,9 +133,13 @@ protected:
         size_t maxTrialPeriodNumReads);
 
     OperationContext* const _opCtx;
-    const CollectionPtr& _collection;
+    const MultiCollection& _collections;
     const CanonicalQuery& _cq;
+    const QueryPlannerParams _queryParams;
     PlanYieldPolicySBE* const _yieldPolicy;
+
+    // TODO SERVER-62913: When support for indexed nested loop join is added, this member needs
+    //  to be extended to support checking for index existence on multiple collections.
     const AllIndicesRequiredChecker _indexExistenceChecker;
 };
 }  // namespace mongo::sbe

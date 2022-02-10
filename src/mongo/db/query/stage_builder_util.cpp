@@ -55,7 +55,7 @@ std::unique_ptr<PlanStage> buildClassicExecutableTree(OperationContext* opCtx,
 
 std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>
 buildSlotBasedExecutableTree(OperationContext* opCtx,
-                             const CollectionPtr& collection,
+                             const MultiCollection& collections,
                              const CanonicalQuery& cq,
                              const QuerySolution& solution,
                              PlanYieldPolicy* yieldPolicy) {
@@ -69,10 +69,11 @@ buildSlotBasedExecutableTree(OperationContext* opCtx,
     auto sbeYieldPolicy = dynamic_cast<PlanYieldPolicySBE*>(yieldPolicy);
     invariant(sbeYieldPolicy);
 
-    auto shardFilterer = std::make_unique<ShardFiltererFactoryImpl>(collection);
+    auto shardFilterer =
+        std::make_unique<ShardFiltererFactoryImpl>(collections.getMainCollection());
 
     auto builder = std::make_unique<SlotBasedStageBuilder>(
-        opCtx, collection, cq, solution, sbeYieldPolicy, shardFilterer.get());
+        opCtx, collections, cq, solution, sbeYieldPolicy, shardFilterer.get());
     auto root = builder->build(solution.root());
     auto data = builder->getPlanStageData();
 

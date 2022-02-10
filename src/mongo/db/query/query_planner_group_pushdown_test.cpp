@@ -79,7 +79,8 @@ TEST_F(QueryPlannerGroupPushdownTest, PushdownOfASingleGroup) {
 
     // Check the plan after lowering $group into the find subsystem.
     ASSERT(!cq->pipeline().empty());
-    auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]));
+    auto solution =
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
     ASSERT(QueryPlannerTestLib::solutionMatches(
                "{group: {key: {_id: '$_id'}, accs: [{count: {$sum: '$x'}}], node: "
                "{cscan: {dir:1, filter: {x:1}}}"
@@ -106,7 +107,8 @@ TEST_F(QueryPlannerGroupPushdownTest, PushdownOfTwoGroups) {
 
     // Check the plan after lowering $group into the find subsystem.
     ASSERT(!cq->pipeline().empty());
-    auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]));
+    auto solution =
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
     ASSERT(QueryPlannerTestLib::solutionMatches(
                "{group: {key: {_id: '$_id'}, accs: [{count: {$min: '$count'}}], node: "
                "{group: {key: {_id: '$_id'}, accs: [{count: {$sum: '$x'}}], node: "
@@ -134,7 +136,8 @@ TEST_F(QueryPlannerGroupPushdownTest, PushdownOfOneGroupWithMultipleAccumulators
 
     // Check the plan after lowering $group into the find subsystem.
     ASSERT(!cq->pipeline().empty());
-    auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]));
+    auto solution =
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
     ASSERT(
         QueryPlannerTestLib::solutionMatches(
             "{group: {key: {_id: '$_id'}, accs: [{count: {$sum: '$x'}}, {m: {$min: '$y'}}], node: "

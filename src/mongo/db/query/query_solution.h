@@ -1381,6 +1381,20 @@ struct GroupNode : public QuerySolutionNode {
  * by direct name rather than QuerySolutionNode.
  */
 struct EqLookupNode : public QuerySolutionNode {
+    /**
+     * Enum describing the possible algorithms that can be used to execute a pushed down $lookup.
+     */
+    enum class LookupStrategy {
+        // Execute the join by storing entries from the foreign collection in a hash table.
+        kHashJoin,
+
+        // Execute the join by doing an index lookup in the foreign collection.
+        kIndexedLoopJoin,
+
+        // Execute the join by iterating over the foreign collection for each local key.
+        kNestedLoopJoin,
+    };
+
     EqLookupNode(std::unique_ptr<QuerySolutionNode> child,
                  const std::string& foreignCollection,
                  const std::string& joinFieldLocal,
@@ -1445,6 +1459,18 @@ struct EqLookupNode : public QuerySolutionNode {
      * If the field already exists in the local (outer) document, the field will be overwritten.
      */
     std::string joinField;
+
+    /**
+     * The algorithm that will be used to execute this 'EqLookupNode'. Defaults to nested loop join
+     * as it's applicable independent of collection sizes or the availability of indexes.
+     */
+    LookupStrategy lookupStrategy = LookupStrategy::kNestedLoopJoin;
+
+    /**
+     * The index to be used if we can answer the join predicate with an index on the foreign
+     * collection. Set to 'boost::none' by default and if a non-indexed strategy is chosen.
+     */
+    boost::optional<IndexEntry> idxEntry = boost::none;
 };
 
 struct SentinelNode : public QuerySolutionNode {

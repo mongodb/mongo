@@ -45,11 +45,11 @@ namespace mongo::sbe {
 class SubPlanner final : public BaseRuntimePlanner {
 public:
     SubPlanner(OperationContext* opCtx,
-               const CollectionPtr& collection,
+               const MultiCollection& collections,
                const CanonicalQuery& cq,
                const QueryPlannerParams& queryParams,
                PlanYieldPolicySBE* yieldPolicy)
-        : BaseRuntimePlanner{opCtx, collection, cq, yieldPolicy}, _queryParams{queryParams} {}
+        : BaseRuntimePlanner{opCtx, collections, cq, queryParams, yieldPolicy} {}
 
     CandidatePlans plan(
         std::vector<std::unique_ptr<QuerySolution>> solutions,
@@ -58,8 +58,5 @@ public:
 
 private:
     CandidatePlans planWholeQuery() const;
-
-    // Query parameters used to create a query solution for each $or branch.
-    const QueryPlannerParams _queryParams;
 };
 }  // namespace mongo::sbe

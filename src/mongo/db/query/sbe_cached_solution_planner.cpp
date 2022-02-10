@@ -54,9 +54,10 @@ CandidatePlans CachedSolutionPlanner::plan(
     // during multiplanning even though multiplanning ran trials of pre-extended plans.
     if (!_cq.pipeline().empty()) {
         _yieldPolicy->clearRegisteredPlans();
-        solutions[0] = QueryPlanner::extendWithAggPipeline(_cq, std::move(solutions[0]));
+        solutions[0] = QueryPlanner::extendWithAggPipeline(
+            _cq, std::move(solutions[0]), _queryParams.secondaryCollectionsInfo);
         roots[0] = stage_builder::buildSlotBasedExecutableTree(
-            _opCtx, _collection, _cq, *solutions[0], _yieldPolicy);
+            _opCtx, _collections, _cq, *solutions[0], _yieldPolicy);
     }
 
     const size_t maxReadsBeforeReplan = internalQueryCacheEvictionRatio * _decisionReads;
@@ -172,16 +173,17 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
     // Therefore, if any of the collection's indexes have been dropped, the query should fail with
     // a 'QueryPlanKilled' error.
     _indexExistenceChecker.check();
+    const auto& mainColl = _collections.getMainCollection();
 
     if (shouldCache) {
         // Deactivate the current cache entry.
-        auto cache = CollectionQueryInfo::get(_collection).getPlanCache();
-        cache->deactivate(plan_cache_key_factory::make<mongo::PlanCacheKey>(_cq, _collection));
+        auto cache = CollectionQueryInfo::get(mainColl).getPlanCache();
+        cache->deactivate(plan_cache_key_factory::make<mongo::PlanCacheKey>(_cq, mainColl));
     }
 
     auto buildExecutableTree = [&](const QuerySolution& sol) {
         auto [root, data] = stage_builder::buildSlotBasedExecutableTree(
-            _opCtx, _collection, _cq, sol, _yieldPolicy);
+            _opCtx, _collections, _cq, sol, _yieldPolicy);
         data.replanReason.emplace(reason);
         return std::make_pair(std::move(root), std::move(data));
     };
@@ -225,7 +227,7 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
 
     const auto cachingMode =
         shouldCache ? PlanCachingMode::AlwaysCache : PlanCachingMode::NeverCache;
-    MultiPlanner multiPlanner{_opCtx, _collection, _cq, cachingMode, _yieldPolicy};
+    MultiPlanner multiPlanner{_opCtx, _collections, _cq, _queryParams, cachingMode, _yieldPolicy};
     auto&& [candidates, winnerIdx] = multiPlanner.plan(std::move(solutions), std::move(roots));
     auto explainer = plan_explainer_factory::make(candidates[winnerIdx].root.get(),
                                                   &candidates[winnerIdx].data,

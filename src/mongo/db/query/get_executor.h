@@ -84,10 +84,8 @@ void fillOutIndexEntries(OperationContext* opCtx,
 /**
  * Fills out information about secondary collections held by 'collections' in 'plannerParams'.
  */
-void fillOutSecondaryCollectionsInformation(OperationContext* opCtx,
-                                            const MultiCollection& collections,
-                                            CanonicalQuery* canonicalQuery,
-                                            QueryPlannerParams* plannerParams);
+std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsInformation(
+    OperationContext* opCtx, const MultiCollection& collections, CanonicalQuery* canonicalQuery);
 
 /**
  * Fill out the provided 'plannerParams' for the 'canonicalQuery' operating on the collection

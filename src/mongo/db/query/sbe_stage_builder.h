@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/trial_period_utils.h"
+#include "mongo/db/query/multi_collection.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/shard_filterer_factory_interface.h"
@@ -324,7 +325,7 @@ public:
     static constexpr StringData kIndexKeyPattern = PlanStageSlots::kIndexKeyPattern;
 
     SlotBasedStageBuilder(OperationContext* opCtx,
-                          const CollectionPtr& collection,
+                          const MultiCollection& collections,
                           const CanonicalQuery& cq,
                           const QuerySolution& solution,
                           PlanYieldPolicySBE* yieldPolicy,
@@ -432,9 +433,14 @@ private:
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildGroup(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildLookup(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;
     sbe::value::SpoolIdGenerator _spoolIdGenerator;
+
+    const MultiCollection& _collections;
 
     PlanYieldPolicySBE* const _yieldPolicy{nullptr};
 

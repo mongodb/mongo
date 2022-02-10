@@ -50,7 +50,7 @@ CandidatePlans MultiPlanner::plan(
         std::move(solutions),
         std::move(roots),
         trial_period::getTrialPeriodMaxWorks(_opCtx,
-                                             _collection,
+                                             _collections.getMainCollection(),
                                              internalQueryPlanEvaluationWorksSbe.load(),
                                              internalQueryPlanEvaluationCollFractionSbe.load()));
     auto decision = uassertStatusOK(mongo::plan_ranker::pickBestPlan<PlanStageStats>(candidates));
@@ -117,8 +117,12 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
     }
 
     // Writes a cache entry for the winning plan to the plan cache if possible.
-    plan_cache_util::updatePlanCache(
-        _opCtx, _collection, _cachingMode, _cq, std::move(decision), candidates);
+    plan_cache_util::updatePlanCache(_opCtx,
+                                     _collections.getMainCollection(),
+                                     _cachingMode,
+                                     _cq,
+                                     std::move(decision),
+                                     candidates);
 
     // Extend the winning candidate with the agg pipeline and rebuild the execution tree. Because
     // the trial was done with find-only part of the query, we cannot reuse the results. The
@@ -127,9 +131,10 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
     if (!_cq.pipeline().empty()) {
         winner.root->close();
         _yieldPolicy->clearRegisteredPlans();
-        auto solution = QueryPlanner::extendWithAggPipeline(_cq, std::move(winner.solution));
+        auto solution = QueryPlanner::extendWithAggPipeline(
+            _cq, std::move(winner.solution), _queryParams.secondaryCollectionsInfo);
         auto [rootStage, data] = stage_builder::buildSlotBasedExecutableTree(
-            _opCtx, _collection, _cq, *solution, _yieldPolicy);
+            _opCtx, _collections, _cq, *solution, _yieldPolicy);
         rootStage->prepare(data.ctx);
         candidates[winnerIdx] = sbe::plan_ranker::CandidatePlan{
             std::move(solution), std::move(rootStage), std::move(data)};
@@ -140,10 +145,10 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
                 if (i == winnerIdx)
                     continue;  // have already done the winner
 
-                auto solution =
-                    QueryPlanner::extendWithAggPipeline(_cq, std::move(candidates[i].solution));
+                auto solution = QueryPlanner::extendWithAggPipeline(
+                    _cq, std::move(candidates[i].solution), _queryParams.secondaryCollectionsInfo);
                 auto&& [rootStage, data] = stage_builder::buildSlotBasedExecutableTree(
-                    _opCtx, _collection, _cq, *solution, _yieldPolicy);
+                    _opCtx, _collections, _cq, *solution, _yieldPolicy);
                 candidates[i] = sbe::plan_ranker::CandidatePlan{
                     std::move(solution), std::move(rootStage), std::move(data)};
             }

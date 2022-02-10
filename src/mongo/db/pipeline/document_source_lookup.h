@@ -190,6 +190,13 @@ public:
         return _localField;
     }
 
+    /**
+     * "as" field must be present in all types of $lookup queries.
+     */
+    const FieldPath& getAsField() const {
+        return _as;
+    }
+
     const std::vector<LetVariable>& getLetVariables() const {
         return _letVariables;
     }

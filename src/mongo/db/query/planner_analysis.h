@@ -121,6 +121,20 @@ public:
      */
     static std::unique_ptr<QuerySolution> removeProjectSimpleBelowGroup(
         std::unique_ptr<QuerySolution> soln);
+
+    /**
+     * For the provided 'eqLookupNode', determines what join algorithm should be used to execute it
+     * and marks the node accordingly. In particular:
+     * - An indexed nested loop join is chosen if an index on the foreign collection can be used to
+     * answer the join predicate.
+     * - A hash join is chosen if disk use is allowed and if the foreign collection is sufficiently
+     * small.
+     * - A nested loop join is chosen in all other cases.
+     */
+    static void determineLookupStrategy(
+        EqLookupNode* eqLookupNode,
+        const std::map<NamespaceString, SecondaryCollectionInfo>& collectionsInfo,
+        bool allowDiskUse);
 };
 
 }  // namespace mongo

@@ -45,14 +45,13 @@ namespace mongo::sbe {
 class CachedSolutionPlanner final : public BaseRuntimePlanner {
 public:
     CachedSolutionPlanner(OperationContext* opCtx,
-                          const CollectionPtr& collection,
+                          const MultiCollection& collections,
                           const CanonicalQuery& cq,
                           const QueryPlannerParams& queryParams,
                           size_t decisionReads,
                           PlanYieldPolicySBE* yieldPolicy,
                           std::unique_ptr<plan_cache_debug_info::DebugInfoSBE> debugInfo)
-        : BaseRuntimePlanner{opCtx, collection, cq, yieldPolicy},
-          _queryParams{queryParams},
+        : BaseRuntimePlanner{opCtx, collections, cq, queryParams, yieldPolicy},
           _decisionReads{decisionReads},
           _debugInfo{std::move(debugInfo)} {}
 
@@ -97,10 +96,6 @@ private:
      * summary.
      */
     CandidatePlans replan(bool shouldCache, std::string reason) const;
-
-    // Query parameters used to create a query solution when the plan was first created. Used during
-    // replanning.
-    const QueryPlannerParams _queryParams;
 
     // The number of physical reads taken to decide on a winning plan when the plan was first
     // cached.
