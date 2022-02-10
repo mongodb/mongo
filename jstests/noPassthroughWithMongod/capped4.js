@@ -23,7 +23,6 @@ assert(!d.hasNext(), "C");
 assert(t.find().sort({i: 1}).hint({i: 1}).toArray().length > 10, "D");
 
 assert(t.findOne({i: i - 1}), "E");
-var res = assert.writeError(t.remove({i: i - 1}));
-assert(res.getWriteError().errmsg.indexOf("capped") >= 0, "F");
+assert(t.remove({i: i - 1}));
 
 assert(t.validate().valid, "G");

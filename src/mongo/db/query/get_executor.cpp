@@ -1484,11 +1484,16 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
         }
     }
 
-    if (collection && collection->isCapped() && opCtx->isEnforcingConstraints()) {
-        // System operations such as tenant migration or secondary batch application can delete
-        // from capped collections.
-        return Status(ErrorCodes::IllegalOperation,
-                      str::stream() << "cannot remove from a capped collection: " << nss.ns());
+    if (collection && collection->isCapped() && opCtx->inMultiDocumentTransaction()) {
+        // This check is duplicated from CollectionImpl::deleteDocument() for two reasons:
+        // - Performing a remove on an empty capped collection would not call
+        //   CollectionImpl::deleteDocument().
+        // - We can avoid doing lookups on documents and erroring later when trying to delete them.
+        return Status(
+            ErrorCodes::IllegalOperation,
+            str::stream()
+                << "Cannot remove from a capped collection in a multi-document transaction: "
+                << nss.ns());
     }
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
