@@ -60,6 +60,5 @@ private:
     DocumentBelongsResult keyBelongsToMeHelper(const BSONObj& doc) const;
 
     ScopedCollectionFilter _collectionFilter;
-    boost::optional<ShardKeyPattern> _keyPattern;
 };
 }  // namespace mongo
