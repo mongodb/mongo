@@ -175,7 +175,7 @@ public:
                                                    nss,
                                                    keyPatternObj,
                                                    chunkRange,
-                                                   splitKeys,
+                                                   std::move(splitKeys),
                                                    shardName,
                                                    expectedCollectionEpoch,
                                                    fromChunkSplitter));

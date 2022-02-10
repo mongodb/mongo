@@ -645,18 +645,18 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
 
     if (_doc.getNumInitialChunks()) {
         // Ensure numInitialChunks is within valid bounds.
-        // Cannot have more than 8192 initial chunks per shard. Setting a maximum of 1,000,000
-        // chunks in total to limit the amount of memory this command consumes so there is less
-        // danger of an OOM error.
+        // Cannot have more than kMaxSplitPoints initial chunks per shard. Setting a maximum of
+        // 1,000,000 chunks in total to limit the amount of memory this command consumes so there is
+        // less danger of an OOM error.
 
         const int maxNumInitialChunksForShards =
-            Grid::get(opCtx)->shardRegistry()->getNumShardsNoReload() * 8192;
+            Grid::get(opCtx)->shardRegistry()->getNumShardsNoReload() * shardutil::kMaxSplitPoints;
         const int maxNumInitialChunksTotal = 1000 * 1000;  // Arbitrary limit to memory consumption
         int numChunks = _doc.getNumInitialChunks().value();
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "numInitialChunks cannot be more than either: "
-                              << maxNumInitialChunksForShards << ", 8192 * number of shards; or "
-                              << maxNumInitialChunksTotal,
+                              << maxNumInitialChunksForShards << ", " << shardutil::kMaxSplitPoints
+                              << " * number of shards; or " << maxNumInitialChunksTotal,
                 numChunks >= 0 && numChunks <= maxNumInitialChunksForShards &&
                     numChunks <= maxNumInitialChunksTotal);
     }
