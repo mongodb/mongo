@@ -93,6 +93,10 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
 
         end = client->getServiceContext()->getPreciseClockSource()->now();
         subObjBuilder.appendDate(kFTDCCollectEndField, end);
+
+        // Ensure the collector did not set a read timestamp.
+        dassert(opCtx->recoveryUnit()->getTimestampReadSource() ==
+                RecoveryUnit::ReadSource::kNoTimestamp);
     }
 
     builder.appendDate(kFTDCCollectEndField, end);
