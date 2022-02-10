@@ -57,12 +57,14 @@ bool computeIsStandaloneOrPrimary(OperationContext* opCtx) {
 namespace write_stage_common {
 
 PreWriteFilter::PreWriteFilter(OperationContext* opCtx, NamespaceString nss)
-    : _opCtx(opCtx), _nss(std::move(nss)) {
-    _isStandaloneOrPrimary = computeIsStandaloneOrPrimary(_opCtx);
-    auto& fcv = serverGlobalParams.featureCompatibility;
-    _isEnabled = fcv.isVersionInitialized() &&
-        feature_flags::gFeatureFlagNoChangeStreamEventsDueToOrphans.isEnabled(fcv);
-}
+    : _opCtx(opCtx),
+      _nss(std::move(nss)),
+      _isEnabled([] {
+          auto& fcv = serverGlobalParams.featureCompatibility;
+          return fcv.isVersionInitialized() &&
+              feature_flags::gFeatureFlagNoChangeStreamEventsDueToOrphans.isEnabled(fcv);
+      }()),
+      _isStandaloneOrPrimary(computeIsStandaloneOrPrimary(_opCtx)) {}
 
 PreWriteFilter::Action PreWriteFilter::computeAction(const Document& doc) {
     // Skip the checks if the Filter is not enabled.
@@ -109,7 +111,6 @@ bool PreWriteFilter::_documentBelongsToMe(const BSONObj& doc) {
 }
 
 void PreWriteFilter::restoreState() {
-    _isStandaloneOrPrimary = computeIsStandaloneOrPrimary(_opCtx);
     _shardFilterer.reset();
 }
 
