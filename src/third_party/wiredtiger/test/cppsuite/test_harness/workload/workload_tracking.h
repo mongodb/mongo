@@ -105,6 +105,7 @@ class workload_tracking : public component {
 
     private:
     scoped_session _session;
+    scoped_session _sweep_session;
     scoped_cursor _schema_track_cursor;
     scoped_cursor _sweep_cursor;
     const std::string _operation_table_config;

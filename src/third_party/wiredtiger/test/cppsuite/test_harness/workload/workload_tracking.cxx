@@ -75,10 +75,11 @@ workload_tracking::load()
     logger::log_msg(LOG_TRACE, "Operations tracking created");
 
     /*
-     * Open sweep cursor. This cursor will be used to clear out obsolete data from the tracking
-     * table.
+     * Open sweep cursor in a dedicated sweep session. This cursor will be used to clear out
+     * obsolete data from the tracking table.
      */
-    _sweep_cursor = _session.open_scoped_cursor(_operation_table_name);
+    _sweep_session = connection_manager::instance().create_session();
+    _sweep_cursor = _sweep_session.open_scoped_cursor(_operation_table_name);
     logger::log_msg(LOG_TRACE, "Tracking table sweep initialized");
 }
 
