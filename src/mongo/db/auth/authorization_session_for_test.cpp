@@ -58,7 +58,7 @@ void AuthorizationSessionForTest::assumePrivilegesForDB(PrivilegeVector privileg
 
     _authenticatedUsers.add(userHandle);
     _testUsers.emplace_back(std::move(userHandle));
-    _buildAuthenticatedRolesVector();
+    _updateInternalAuthorizationState();
 }
 
 

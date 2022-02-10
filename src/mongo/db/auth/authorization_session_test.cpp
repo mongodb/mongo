@@ -1631,5 +1631,67 @@ TEST_F(SystemBucketsTest, CanCheckIfHasAnyPrivilegeInResourceDBForSystemBuckets)
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_other));
 }
 
+TEST_F(AuthorizationSessionTest, MayBypassWriteBlockingModeIsSetCorrectly) {
+    ASSERT_FALSE(authzSession->mayBypassWriteBlockingMode());
+
+    // Add a user without the restore role and ensure we can't bypass
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
+                                                    BSON("user"
+                                                         << "spencer"
+                                                         << "db"
+                                                         << "test"
+                                                         << "credentials" << credentials << "roles"
+                                                         << BSON_ARRAY(BSON("role"
+                                                                            << "readWrite"
+                                                                            << "db"
+                                                                            << "test"))),
+                                                    BSONObj()));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
+    ASSERT_FALSE(authzSession->mayBypassWriteBlockingMode());
+
+    // Add a user with restore role on admin db and ensure we can bypass
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
+                                                    BSON("user"
+                                                         << "gmarks"
+                                                         << "db"
+                                                         << "admin"
+                                                         << "credentials" << credentials << "roles"
+                                                         << BSON_ARRAY(BSON("role"
+                                                                            << "restore"
+                                                                            << "db"
+                                                                            << "admin"))),
+                                                    BSONObj()));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("gmarks", "admin")));
+    ASSERT_TRUE(authzSession->mayBypassWriteBlockingMode());
+
+    // Remove that user by logging out of the admin db and ensure we can't bypass anymore
+    authzSession->logoutDatabase(_client.get(), "admin", "");
+    ASSERT_FALSE(authzSession->mayBypassWriteBlockingMode());
+
+    // Add a user with the root role, which should confer restore role for cluster resource, and
+    // ensure we can bypass
+    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
+                                                    BSON("user"
+                                                         << "admin"
+                                                         << "db"
+                                                         << "admin"
+                                                         << "credentials" << credentials << "roles"
+                                                         << BSON_ARRAY(BSON("role"
+                                                                            << "root"
+                                                                            << "db"
+                                                                            << "admin"))),
+                                                    BSONObj()));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("admin", "admin")));
+    ASSERT_TRUE(authzSession->mayBypassWriteBlockingMode());
+
+    // Remove non-privileged user by logging out of test db and ensure we can still bypass
+    authzSession->logoutDatabase(_client.get(), "test", "");
+    ASSERT_TRUE(authzSession->mayBypassWriteBlockingMode());
+
+    // Remove privileged user by logging out of admin db and ensure we cannot bypass
+    authzSession->logoutDatabase(_client.get(), "admin", "");
+    ASSERT_FALSE(authzSession->mayBypassWriteBlockingMode());
+}
+
 }  // namespace
 }  // namespace mongo

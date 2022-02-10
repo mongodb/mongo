@@ -674,11 +674,14 @@ void addRestorePrivileges(PrivilegeVector* privileges) {
             ResourcePattern::forExactNamespace(AuthorizationManager::rolesCollectionNamespace),
             ActionType::createIndex));
 
-    // Need to be able to force UUID consistency in sharded restores
     Privilege::addPrivilegeToPrivilegeVector(
         privileges,
         Privilege(ResourcePattern::forClusterResource(),
-                  {ActionType::forceUUID, ActionType::useUUID}));
+                  {// Need to be able to force UUID consistency in sharded restores
+                   ActionType::forceUUID,
+                   ActionType::useUUID,
+                   // Need to be able to bypass write blocking mode for C2C replication
+                   ActionType::bypassWriteBlockingMode}));
 }
 
 void addRootRolePrivileges(PrivilegeVector* privileges) {

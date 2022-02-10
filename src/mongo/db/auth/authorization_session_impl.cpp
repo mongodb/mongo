@@ -151,11 +151,16 @@ void validateSecurityTokenUserPrivileges(const User::ResourcePrivilegeMap& privs
 }
 
 MONGO_FAIL_POINT_DEFINE(allowMultipleUsersWithApiStrict);
+
+const Privilege kBypassWriteBlockingModeOnClusterPrivilege(ResourcePattern::forClusterResource(),
+                                                           ActionType::bypassWriteBlockingMode);
 }  // namespace
 
 AuthorizationSessionImpl::AuthorizationSessionImpl(
     std::unique_ptr<AuthzSessionExternalState> externalState, InstallMockForTestingOrAuthImpl)
-    : _externalState(std::move(externalState)), _impersonationFlag(false) {}
+    : _externalState(std::move(externalState)),
+      _impersonationFlag(false),
+      _mayBypassWriteBlockingMode(false) {}
 
 AuthorizationSessionImpl::~AuthorizationSessionImpl() {
     invariant(_authenticatedUsers.count() == 0,
@@ -179,7 +184,7 @@ void AuthorizationSessionImpl::startRequest(OperationContext* opCtx) {
                         "security token based user still authenticated at start of request, "
                         "clearing from authentication state",
                         "user"_attr = users.getNames().get().toBSON(true /* encode tenant */));
-            _buildAuthenticatedRolesVector();
+            _updateInternalAuthorizationState();
         }
         _authenticationMode = AuthenticationMode::kNone;
     }
@@ -278,7 +283,7 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
     // If there are any users and roles in the impersonation data, clear it out.
     clearImpersonatedUserData();
 
-    _buildAuthenticatedRolesVector();
+    _updateInternalAuthorizationState();
     return Status::OK();
 
 } catch (const DBException& ex) {
@@ -332,7 +337,7 @@ void AuthorizationSessionImpl::logoutSecurityTokenUser(Client* client) {
     // Explicitly skip auditing the logout event,
     // security tokens don't represent a permanent login.
     clearImpersonatedUserData();
-    _buildAuthenticatedRolesVector();
+    _updateInternalAuthorizationState();
 }
 
 void AuthorizationSessionImpl::logoutAllDatabases(Client* client, StringData reason) {
@@ -350,7 +355,7 @@ void AuthorizationSessionImpl::logoutAllDatabases(Client* client, StringData rea
     audit::logLogout(client, reason, users.toBSON(), BSONArray());
 
     clearImpersonatedUserData();
-    _buildAuthenticatedRolesVector();
+    _updateInternalAuthorizationState();
 }
 
 
@@ -372,7 +377,7 @@ void AuthorizationSessionImpl::logoutDatabase(Client* client,
     std::swap(_authenticatedUsers, updatedUsers);
 
     clearImpersonatedUserData();
-    _buildAuthenticatedRolesVector();
+    _updateInternalAuthorizationState();
 }
 
 UserNameIterator AuthorizationSessionImpl::getAuthenticatedUserNames() {
@@ -390,7 +395,7 @@ RoleNameIterator AuthorizationSessionImpl::getAuthenticatedRoleNames() {
 void AuthorizationSessionImpl::grantInternalAuthorization(Client* client) {
     stdx::lock_guard<Client> lk(*client);
     _authenticatedUsers.add(*internalSecurity.getUser());
-    _buildAuthenticatedRolesVector();
+    _updateInternalAuthorizationState();
 }
 
 /**
@@ -788,22 +793,7 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
 
         ++it;
     }
-    _buildAuthenticatedRolesVector();
-}
-
-void AuthorizationSessionImpl::_buildAuthenticatedRolesVector() {
-    _authenticatedRoleNames.clear();
-    for (const auto& userHandle : _authenticatedUsers) {
-        RoleNameIterator roles = userHandle->getIndirectRoles();
-        while (roles.more()) {
-            RoleName roleName = roles.next();
-            _authenticatedRoleNames.push_back(RoleName(roleName.getRole(), roleName.getDB()));
-        }
-    }
-
-    if (_authenticatedUsers.count() == 0) {
-        _authenticationMode = AuthenticationMode::kNone;
-    }
+    _updateInternalAuthorizationState();
 }
 
 bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(StringData db) {
@@ -1104,9 +1094,36 @@ void AuthorizationSessionImpl::verifyContract(const AuthorizationContract* contr
     tempContract.addPrivilege(Privilege(ResourcePattern::forClusterResource(),
                                         {ActionType::advanceClusterTime, ActionType::internal}));
 
+    // Implicitly checked often to keep mayBypassWriteBlockingMode() fast
+    tempContract.addPrivilege(kBypassWriteBlockingModeOnClusterPrivilege);
+
     uassert(5452401,
             "Authorization Session contains more authorization checks then permitted by contract.",
             tempContract.contains(_contract));
+}
+
+void AuthorizationSessionImpl::_updateInternalAuthorizationState() {
+    // Update the authenticated role names vector to reflect current state.
+    _authenticatedRoleNames.clear();
+    for (const auto& userHandle : _authenticatedUsers) {
+        RoleNameIterator roles = userHandle->getIndirectRoles();
+        while (roles.more()) {
+            RoleName roleName = roles.next();
+            _authenticatedRoleNames.push_back(RoleName(roleName.getRole(), roleName.getDB()));
+        }
+    }
+
+    if (_authenticatedUsers.count() == 0) {
+        _authenticationMode = AuthenticationMode::kNone;
+    }
+
+    // Update cached _mayBypassWriteBlockingMode to reflect current state.
+    _mayBypassWriteBlockingMode =
+        _isAuthorizedForPrivilege(kBypassWriteBlockingModeOnClusterPrivilege);
+}
+
+bool AuthorizationSessionImpl::mayBypassWriteBlockingMode() const {
+    return MONGO_unlikely(_mayBypassWriteBlockingMode);
 }
 
 }  // namespace mongo

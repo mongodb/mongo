@@ -223,6 +223,10 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
+    bool mayBypassWriteBlockingMode() const override {
+        return true;
+    }
+
 protected:
     std::tuple<std::vector<UserName>*, std::vector<RoleName>*> _getImpersonations() override {
         UASSERT_NOT_IMPLEMENTED;

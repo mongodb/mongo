@@ -303,6 +303,10 @@ public:
     // Verify the authorization contract. If contract == nullptr, no check is performed.
     virtual void verifyContract(const AuthorizationContract* contract) const = 0;
 
+    // Returns true if any user has the privilege to bypass write blocking mode for the cluster
+    // resource.
+    virtual bool mayBypassWriteBlockingMode() const = 0;
+
 protected:
     virtual std::tuple<std::vector<UserName>*, std::vector<RoleName>*> _getImpersonations() = 0;
 };

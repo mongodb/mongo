@@ -157,13 +157,21 @@ public:
 
     void verifyContract(const AuthorizationContract* contract) const override;
 
+    bool mayBypassWriteBlockingMode() const override;
+
 protected:
     friend class AuthorizationSessionImplTestHelper;
 
-    // Builds a vector of all roles held by users who are authenticated on this connection. The
-    // vector is stored in _authenticatedRoleNames. This function is called when users are
-    // logged in or logged out, as well as when the user cache is determined to be out of date.
-    void _buildAuthenticatedRolesVector();
+    // Updates internal cached authorization state, i.e.:
+    // - _mayBypassWriteBlockingMode, reflecting whether the connection is authorized for the
+    // privilege of bypassing write blocking mode on cluster resource.
+    // - _authenticatedRoleNames, which stores all roles held by users who are authenticated on this
+    // connection.
+    // - _authenticationMode -- we just update this to None if there are no users on the connection.
+    // This function is called whenever the user state changes to keep the internal state up to
+    // date.
+    void _updateInternalAuthorizationState();
+
 
     // All Users who have been authenticated on this connection.
     UserSet _authenticatedUsers;
@@ -212,5 +220,7 @@ private:
     // of authorization checks they perform. After a command completes running, MongoDB verifies the
     // set of checks performed is a subset of the checks declared in the contract.
     AuthorizationContract _contract;
+
+    bool _mayBypassWriteBlockingMode;
 };
 }  // namespace mongo

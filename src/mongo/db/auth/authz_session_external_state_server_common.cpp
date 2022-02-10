@@ -82,6 +82,9 @@ bool AuthzSessionExternalStateServerCommon::serverIsArbiter() const {
 }
 
 bool AuthzSessionExternalStateServerCommon::shouldAllowLocalhost() const {
+    if (!haveClient()) {
+        return false;
+    }
     Client* client = Client::getCurrent();
     return _allowLocalhost && client->getIsLocalHostConnection();
 }

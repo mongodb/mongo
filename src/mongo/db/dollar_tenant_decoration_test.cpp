@@ -58,7 +58,7 @@ public:
         auto* as =
             dynamic_cast<AuthorizationSessionImpl*>(AuthorizationSession::get(opCtx->getClient()));
         as->_authenticatedUsers.add(std::move(user));
-        as->_buildAuthenticatedRolesVector();
+        as->_updateInternalAuthorizationState();
     }
 };
 

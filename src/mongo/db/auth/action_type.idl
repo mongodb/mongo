@@ -54,6 +54,7 @@ enums:
            authenticate :  "authenticate"    # ID only
            authSchemaUpgrade :  "authSchemaUpgrade"
            bypassDocumentValidation :  "bypassDocumentValidation"
+           bypassWriteBlockingMode :  "bypassWriteBlockingMode"
            changeCustomData :  "changeCustomData"
            changePassword :  "changePassword"
            changeOwnPassword :  "changeOwnPassword"
