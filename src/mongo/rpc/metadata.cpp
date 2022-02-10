@@ -158,6 +158,9 @@ OpMsgRequest upconvertRequest(StringData db, BSONObj cmdObj, int queryFlags) {
     }
 
     if (!readPrefContainer.isEmpty()) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Duplicate readPreference found in command object.",
+                !cmdObj.hasField("$readPreference"));
         cmdObj = BSONObjBuilder(std::move(cmdObj)).appendElements(readPrefContainer).obj();
     } else if (!cmdObj.hasField("$readPreference") && (queryFlags & QueryOption_SecondaryOk)) {
         BSONObjBuilder bodyBuilder(std::move(cmdObj));

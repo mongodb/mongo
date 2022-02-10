@@ -149,6 +149,19 @@ TEST(Metadata, UpconvertInvalidMetadata) {
                   AssertionException);
 }
 
+TEST(Metadata, UpconvertDuplicateReadPreference) {
+    auto secondaryReadPref = BSON("mode"
+                                  << "secondary");
+    auto nearestReadPref = BSON("mode"
+                                << "nearest");
+
+    BSONObjBuilder bob;
+    bob.append("query", BSON("$readPreference" << secondaryReadPref));
+    bob.append("$readPreference", nearestReadPref);
+
+    ASSERT_THROWS_CODE(
+        rpc::upconvertRequest("db", bob.obj(), 0), AssertionException, ErrorCodes::InvalidOptions);
+}
 
 TEST(Metadata, UpconvertUsesDocumentSequecesCorrectly) {
     // These are cases where it is valid to use document sequences.
