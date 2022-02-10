@@ -1941,6 +1941,10 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
     if (!F_ISSET(txn, WT_TXN_HAS_TS_PREPARE))
         WT_RET_MSG(session, EINVAL, "prepare timestamp is not set");
 
+    if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT))
+        WT_RET_MSG(
+          session, EINVAL, "commit timestamp must not be set before transaction is prepared");
+
     /*
      * We are about to release the snapshot: copy values into any positioned cursors so they don't
      * point to updates that could be freed once we don't have a snapshot.

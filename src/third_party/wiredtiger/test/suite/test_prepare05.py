@@ -80,6 +80,15 @@ class test_prepare05(wttest.WiredTigerTestCase, suite_subprocess):
             "/should not have been set before/")
         self.session.rollback_transaction()
 
+        # This is also true even if the prepare timestamp was set first.
+        self.session.begin_transaction()
+        self.session.timestamp_transaction('prepare_timestamp=' + self.timestamp_str(2))
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda:
+                self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(3)),
+            "/commit timestamp must not be set/")
+        self.session.rollback_transaction()
+
         # It is illegal to set a prepare timestamp same as or earlier than an
         # active read timestamp.
         # Start a new reader to have an active read timestamp.
