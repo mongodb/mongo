@@ -657,14 +657,6 @@ public:
     void setPostImageOp(std::shared_ptr<DurableOplogEntry> postImageOp);
     void setPostImageOp(const BSONObj& postImageOp);
 
-    void setTimestampForRetryImage(Timestamp value) & {
-        _timestampForRetryImage = std::move(value);
-    }
-
-    boost::optional<Timestamp> getTimestampForRetryImage() const {
-        return _timestampForRetryImage;
-    }
-
     std::string toStringForLogging() const;
 
     /**
@@ -779,17 +771,6 @@ private:
     boost::optional<Date_t> _applyOpsWallClockTime{boost::none};
 
     bool _isForCappedCollection = false;
-
-    // During oplog application on secondaries, oplog entries extracted from each applyOps oplog
-    // entry for a transaction are given the timestamp of the terminal applyOps oplog entry.
-    // Similarly, during oplog replay, oplog entries extracted from each applyOps oplog entry for
-    // a transaction are given the timestamp of the commit oplog entry. As a result, some of those
-    // oplog entries may have timestamp that is not equal to the timestamp of applyOps oplog entry
-    // that they corresponds to, and it is incorrect to use that timestamp when writing image
-    // collection entries. As such, during transaction oplog application, _timestampForRetryImage
-    // will be used to store the timestamp of the applyOps oplog entry that this operation
-    // actually corresponds to if an image collection entry is expected to be written.
-    boost::optional<Timestamp> _timestampForRetryImage = boost::none;
 };
 
 std::ostream& operator<<(std::ostream& s, const DurableOplogEntry& o);

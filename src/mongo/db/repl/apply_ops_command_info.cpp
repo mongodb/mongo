@@ -155,10 +155,6 @@ void ApplyOps::extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
         lastOperation.setApplyOpsTimestamp(applyOpsOplogEntry.getTimestamp());
         lastOperation.setApplyOpsWallClockTime(applyOpsOplogEntry.getWallClockTime());
         ++applyOpsIdx;
-
-        if (lastOperation.getNeedsRetryImage()) {
-            lastOperation.setTimestampForRetryImage(applyOpsOplogEntry.getTimestamp());
-        }
     }
 }
 
