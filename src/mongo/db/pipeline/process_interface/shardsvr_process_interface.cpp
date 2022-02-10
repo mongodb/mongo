@@ -229,21 +229,31 @@ BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCt
         return BSONObj{};
     }
 
-    for (const BSONObj& element : resultCollections.docs) {
+    for (const BSONObj& bsonObj : resultCollections.docs) {
         // Return first element which matches on name and has options.
-        const BSONElement nameElement = element["name"];
+        const BSONElement nameElement = bsonObj["name"];
         if (!nameElement || nameElement.valueStringDataSafe() != nss.coll()) {
             continue;
         }
 
-        const BSONElement optionsElement = element["options"];
+        const BSONElement optionsElement = bsonObj["options"];
         if (optionsElement) {
-            return optionsElement.Obj().getOwned();
+            auto optionObj = optionsElement.Obj();
+
+            // If the BSON object has field 'info' and the BSON element 'info' has field 'uuid',
+            // then extract the uuid and add to the BSON object to be return. This will ensure that
+            // the BSON object is complaint with the BSON object returned for non-sharded namespace.
+            if (auto infoElement = bsonObj["info"]; infoElement && infoElement["uuid"]) {
+                return optionObj.addField(infoElement["uuid"]);
+            }
+
+            return optionObj.getOwned();
         }
 
-        invariant(resultCollections.docs.size() <= 1,
-                  str::stream() << "Expected at most one collection with the name " << nss << ": "
-                                << resultCollections.docs.size());
+        tassert(5983900,
+                str::stream() << "Expected at most one collection with the name " << nss << ": "
+                              << resultCollections.docs.size(),
+                resultCollections.docs.size() <= 1);
     }
 
     return BSONObj{};
