@@ -3,7 +3,8 @@
 /**
  * @tags: [
  *  featureFlagFLE2,
- *  assumes_against_mongod_not_mongos
+ *  assumes_against_mongod_not_mongos,
+ *  no_selinux
  * ]
  */
 (function() {
