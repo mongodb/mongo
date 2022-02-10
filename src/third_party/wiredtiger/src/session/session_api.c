@@ -1832,16 +1832,19 @@ static int
 __session_reset_snapshot(WT_SESSION *wt_session)
 {
     WT_SESSION_IMPL *session;
+    WT_TXN *txn;
 
     session = (WT_SESSION_IMPL *)wt_session;
+    txn = session->txn;
+
     /* Return error if the isolation mode is read committed. */
-    if (session->txn->isolation != WT_ISO_SNAPSHOT)
+    if (txn->isolation != WT_ISO_SNAPSHOT)
         WT_RET_MSG(
-          session, ENOTSUP, "not supported in read-committed or read-uncommitted transactions.");
+          session, ENOTSUP, "not supported in read-committed or read-uncommitted transactions");
 
     /* Return error if the session has performed any write operations. */
-    if (F_ISSET(session->txn, WT_TXN_HAS_ID))
-        WT_RET_MSG(session, ENOTSUP, "not supported in write transactions.");
+    if (txn->mod_count != 0)
+        WT_RET_MSG(session, ENOTSUP, "only supported before a transaction makes modifications");
 
     __wt_txn_release_snapshot(session);
     __wt_txn_get_snapshot(session);

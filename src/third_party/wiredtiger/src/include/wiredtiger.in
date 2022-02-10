@@ -1811,14 +1811,14 @@ struct __wt_session {
 	/*!
 	 * Reset the snapshot.
 	 *
-	 * This method resets snapshots for snapshot isolation transactions to
-	 * update their existing snapshot. It raises an error when this API
-	 * is used for isolation other than snapshot isolation mode or when the session
-	 * has performed any write operations.
-	 * This API internally releases the current snapshot and gets the new running
-	 * transactions snapshot to avoid pinning the content in the database that is no
-	 * longer needed. Applications that don't use read_timestamp for the search may
-	 * see different results compared to earlier with the updated snapshot.
+	 * This method resets snapshots for snapshot isolation transactions to update their existing
+	 * snapshot. It raises an error when this API is used in an isolation other than snapshot,
+	 * or when the transaction has performed any write operations.
+	 *
+	 * This API internally releases the current snapshot and gets the new running transactions
+	 * snapshot to avoid pinning the content in the database that is no longer needed.
+	 * Applications not using read timestamps for search may see different results after the
+	 * snapshot is updated.
 	 *
 	 * @requires_transaction
 	 *
