@@ -143,9 +143,11 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckInvalidate::doGetNe
 
         auto resumeTokenDoc = ResumeToken(resumeTokenData).toDocument();
 
+        // Note: if 'showExpandedEvents' is false, 'wallTime' will be missing in the input document.
         MutableDocument result(Document{{DSCS::kIdField, resumeTokenDoc},
                                         {DSCS::kOperationTypeField, DSCS::kInvalidateOpType},
-                                        {DSCS::kClusterTimeField, doc[DSCS::kClusterTimeField]}});
+                                        {DSCS::kClusterTimeField, doc[DSCS::kClusterTimeField]},
+                                        {DSCS::kWallTimeField, doc[DSCS::kWallTimeField]}});
         result.copyMetaDataFrom(doc);
 
         // We set the resume token as the document's sort key in both the sharded and non-sharded

@@ -20,23 +20,22 @@ ChangeStreamPassthroughHelpers.nsMatchFilter = function(db, collName) {
     // single-collection or whole-db stream.
     const isSingleCollectionStream = (typeof collName === 'string');
 
-    return {
-        $match: {
-            $or: [
-                {
-                    "ns.db": db.getName(),
-                    "ns.coll": (isSingleCollectionStream ? collName : {$exists: true})
-                },
-                // Add a clause to detect if the collection being watched is the target of a
-                // renameCollection command, since that is expected to return a "rename" entry.
-                {
-                    "to.db": db.getName(),
-                    "to.coll": (isSingleCollectionStream ? collName : {$exists: true})
-                },
-                {operationType: "invalidate"}
-            ]
-        }
-    };
+    const orBranches = [
+        {"ns.db": db.getName(), "ns.coll": (isSingleCollectionStream ? collName : {$exists: true})},
+        // Add a clause to detect if the collection being watched is the target of a
+        // renameCollection command, since that is expected to return a "rename" entry.
+        {"to.db": db.getName(), "to.coll": (isSingleCollectionStream ? collName : {$exists: true})},
+        {operationType: "invalidate"}
+    ];
+
+    if (!isSingleCollectionStream) {
+        orBranches.push({
+            operationType: "dropDatabase",
+            "ns.db": db.getName(),
+        });
+    }
+
+    return {$match: {$or: orBranches}};
 };
 
 ChangeStreamPassthroughHelpers.execDBName = function(db) {

@@ -45,6 +45,15 @@ function isChangeStreamsRewriteEnabled(db) {
 }
 
 /**
+ * Returns true if feature flag 'featureFlagChangeStreamsVisibility' is enabled, false otherwise.
+ */
+function isChangeStreamsVisibilityEnabled(db) {
+    const getParam = db.adminCommand({getParameter: 1, featureFlagChangeStreamsVisibility: 1});
+    return getParam.hasOwnProperty("featureFlagChangeStreamsVisibility") &&
+        getParam.featureFlagChangeStreamsVisibility.value;
+}
+
+/**
  * Helper function used internally by ChangeStreamTest. If no passthrough is active, it is exactly
  * the same as calling db.runCommand. If a passthrough is active and has defined a function
  * 'changeStreamPassthroughAwareRunCommand', then this method will be overridden to allow individual
@@ -91,17 +100,17 @@ function assertInvalidateOp({cursor, opType}) {
 }
 
 function canonicalizeEventForTesting(event, expected) {
-    if (!expected.hasOwnProperty("_id"))
-        delete event._id;
-
-    if (!expected.hasOwnProperty("clusterTime"))
-        delete event.clusterTime;
-
-    if (!expected.hasOwnProperty("txnNumber"))
-        delete event.txnNumber;
-
-    if (!expected.hasOwnProperty("lsid"))
-        delete event.lsid;
+    for (let fieldName of ["_id",
+                           "clusterTime",
+                           "txnNumber",
+                           "lsid",
+                           "collectionUUID",
+                           "wallTime",
+                           "operationDescription"]) {
+        if (!expected.hasOwnProperty(fieldName)) {
+            delete event[fieldName];
+        }
+    }
 
     if (!expected.hasOwnProperty("updateDescription"))
         delete event.updateDescription;

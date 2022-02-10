@@ -112,6 +112,7 @@ DepsTracker::State DocumentSourceChangeStreamUnwindTransaction::getDependencies(
     deps->fields.insert(repl::OplogEntry::kSessionIdFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kTermFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kTxnNumberFieldName.toString());
+    deps->fields.insert(repl::OplogEntry::kWallClockTimeFieldName.toString());
 
     return DepsTracker::State::SEE_NEXT;
 }
@@ -205,6 +206,11 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::TransactionO
                                                       << repl::OpTime::kTermFieldName
                                                       << input[repl::OpTime::kTermFieldName]));
     _clusterTime = txnOpTime.getTimestamp();
+
+    Value wallTime = input[repl::OplogEntry::kWallClockTimeFieldName];
+    DocumentSourceChangeStream::checkValueType(
+        wallTime, repl::OplogEntry::kWallClockTimeFieldName, BSONType::Date);
+    _wallTime = wallTime.getDate();
 
     auto commandObj = input["o"].getDocument();
     Value applyOps = commandObj["applyOps"];
@@ -346,6 +352,7 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::_addRequired
     newDoc.addField(repl::OplogEntry::kSessionIdFieldName, Value(_lsid));
     newDoc.addField(repl::OplogEntry::kTxnNumberFieldName,
                     Value(static_cast<long long>(_txnNumber)));
+    newDoc.addField(repl::OplogEntry::kWallClockTimeFieldName, Value(_wallTime));
 
     return newDoc.freeze();
 }

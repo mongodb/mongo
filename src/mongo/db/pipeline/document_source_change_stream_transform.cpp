@@ -303,9 +303,33 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
                 // The "o.to" field contains the target namespace for the rename.
                 const auto renameTargetNss =
                     NamespaceString(input.getNestedField("o.to").getString());
-                doc.addField(DocumentSourceChangeStream::kRenameTargetNssField,
-                             Value(Document{{"db", renameTargetNss.db()},
-                                            {"coll", renameTargetNss.coll()}}));
+                const Value renameTarget(Document{
+                    {"db", renameTargetNss.db()},
+                    {"coll", renameTargetNss.coll()},
+                });
+
+                // The 'to' field predates the 'operationDescription' field which was added in 5.3.
+                // We keep the top-level 'to' field for backwards-compatibility.
+                doc.addField(DocumentSourceChangeStream::kRenameTargetNssField, renameTarget);
+
+                // If 'showExpandedEvents' is set, include full details of the rename in
+                // 'operationDescription'.
+                if (_changeStreamSpec.getShowExpandedEvents()) {
+                    MutableDocument operationDescription;
+                    operationDescription.addField(DocumentSourceChangeStream::kRenameTargetNssField,
+                                                  renameTarget);
+
+                    // If present, 'dropTarget' is the UUID of the collection that previously owned
+                    // the target namespace and was dropped during the rename operation.
+                    const auto dropTarget = input.getNestedField("o.dropTarget");
+                    if (!dropTarget.missing()) {
+                        checkValueType(dropTarget, "o.dropTarget", BSONType::BinData);
+                        operationDescription.addField("dropTarget", dropTarget);
+                    }
+
+                    doc.addField(DocumentSourceChangeStream::kOperationDescriptionField,
+                                 operationDescription.freezeToValue());
+                }
             } else if (!input.getNestedField("o.dropDatabase").missing()) {
                 operationType = DocumentSourceChangeStream::kDropDatabaseOpType;
 
@@ -390,6 +414,16 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     const bool isSingleElementKey = true;
     doc.metadata().setSortKey(Value{resumeToken}, isSingleElementKey);
 
+    if (_changeStreamSpec.getShowExpandedEvents()) {
+        // Note: If the UUID is a missing value (which can be true for events like 'dropDatabase'),
+        // 'addField' will not add anything to the document.
+        doc.addField(DocumentSourceChangeStream::kCollectionUuidField, uuid);
+
+        const auto wallTime = input[repl::OplogEntry::kWallClockTimeFieldName];
+        checkValueType(wallTime, repl::OplogEntry::kWallClockTimeFieldName, BSONType::Date);
+        doc.addField(DocumentSourceChangeStream::kWallTimeField, wallTime);
+    }
+
     // Invalidation, topology change, and resharding events have fewer fields.
     if (operationType == DocumentSourceChangeStream::kInvalidateOpType ||
         operationType == DocumentSourceChangeStream::kNewShardDetectedOpType ||
@@ -463,6 +497,7 @@ DepsTracker::State DocumentSourceChangeStreamTransform::getDependencies(DepsTrac
     deps->fields.insert(repl::OplogEntry::kSessionIdFieldName.toString());
     deps->fields.insert(repl::OplogEntry::kTxnNumberFieldName.toString());
     deps->fields.insert(DocumentSourceChangeStream::kTxnOpIndexField.toString());
+    deps->fields.insert(repl::OplogEntry::kWallClockTimeFieldName.toString());
 
     if (_preImageRequested || _postImageRequested) {
         deps->fields.insert(repl::OplogEntry::kPreImageOpTimeFieldName.toString());

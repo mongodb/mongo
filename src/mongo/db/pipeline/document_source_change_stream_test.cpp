@@ -827,6 +827,36 @@ TEST_F(ChangeStreamStageTest, TransformUpdateFields) {
     checkTransformation(updateField, expectedUpdateField);
 }
 
+TEST_F(ChangeStreamStageTest, TransformUpdateFieldsShowExpandedEvents) {
+    // TODO SERVER-52254: Remove this feature flag.
+    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
+
+    BSONObj o = BSON("$set" << BSON("y" << 1));
+    BSONObj o2 = BSON("_id" << 1 << "x" << 2);
+    auto updateField = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
+                                      nss,                  // namespace
+                                      o,                    // o
+                                      testUuid(),           // uuid
+                                      boost::none,          // fromMigrate
+                                      o2);                  // o2
+
+    // Update fields
+    Document expectedUpdateField{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), o2)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
+        {
+            "updateDescription",
+            D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}},
+        },
+    };
+    checkTransformation(updateField, expectedUpdateField, kShowExpandedEventsSpec);
+}
+
 TEST_F(ChangeStreamStageTest, TransformSimpleDeltaOplogUpdatedFields) {
     BSONObj diff = BSON("u" << BSON("a" << 1 << "b"
                                         << "updated"));
@@ -1026,6 +1056,33 @@ TEST_F(ChangeStreamStageTest, TransformReplace) {
     checkTransformation(replace, expectedReplace);
 }
 
+TEST_F(ChangeStreamStageTest, TransformReplaceShowExpandedEvents) {
+    // TODO SERVER-52254: Remove this feature flag.
+    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
+
+    BSONObj o = BSON("_id" << 1 << "x" << 2 << "y" << 1);
+    BSONObj o2 = BSON("_id" << 1 << "x" << 2);
+    auto replace = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
+                                  nss,                  // namespace
+                                  o,                    // o
+                                  testUuid(),           // uuid
+                                  boost::none,          // fromMigrate
+                                  o2);                  // o2
+
+    // Replace
+    Document expectedReplace{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), o2)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kReplaceOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}, {"y", 1}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
+    };
+    checkTransformation(replace, expectedReplace, kShowExpandedEventsSpec);
+}
+
 TEST_F(ChangeStreamStageTest, TransformDelete) {
     BSONObj o = BSON("_id" << 1 << "x" << 2);
     auto deleteEntry = makeOplogEntry(OpTypeEnum::kDelete,  // op type
@@ -1054,6 +1111,41 @@ TEST_F(ChangeStreamStageTest, TransformDelete) {
                                        deleteEntry.getObject2());  // o2
 
     checkTransformation(deleteEntry2, expectedDelete);
+}
+
+TEST_F(ChangeStreamStageTest, TransformDeleteShowExpandedEvents) {
+    // TODO SERVER-52254: Remove this feature flag.
+    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
+
+    BSONObj o = BSON("_id" << 1 << "x" << 2);
+    auto deleteEntry = makeOplogEntry(OpTypeEnum::kDelete,  // op type
+                                      nss,                  // namespace
+                                      o,                    // o
+                                      testUuid(),           // uuid
+                                      boost::none,          // fromMigrate
+                                      boost::none);         // o2
+
+    // Delete
+    Document expectedDelete{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid(), o)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
+    };
+    checkTransformation(deleteEntry, expectedDelete, kShowExpandedEventsSpec);
+
+    bool fromMigrate = false;  // also check actual "fromMigrate: false" not filtered
+    auto deleteEntry2 = makeOplogEntry(deleteEntry.getOpType(),    // op type
+                                       deleteEntry.getNss(),       // namespace
+                                       deleteEntry.getObject(),    // o
+                                       deleteEntry.getUuid(),      // uuid
+                                       fromMigrate,                // fromMigrate
+                                       deleteEntry.getObject2());  // o2
+
+    checkTransformation(deleteEntry2, expectedDelete, kShowExpandedEventsSpec);
 }
 
 TEST_F(ChangeStreamStageTest, TransformDeleteFromMigrate) {
@@ -1110,6 +1202,32 @@ TEST_F(ChangeStreamStageTest, TransformDrop) {
     checkTransformation(dropColl, expectedDrop, kDefaultSpec, expectedInvalidate);
 }
 
+TEST_F(ChangeStreamStageTest, TransformDropShowExpandedEvents) {
+    // TODO SERVER-52254: Remove this feature flag.
+    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
+
+    OplogEntry dropColl = createCommand(BSON("drop" << nss.coll()), testUuid());
+
+    Document expectedDrop{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kDropCollectionOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+    };
+    Document expectedInvalidate{
+        {DSChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, testUuid(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
+    };
+
+    checkTransformation(dropColl, expectedDrop, kShowExpandedEventsSpec, expectedInvalidate);
+}
+
 TEST_F(ChangeStreamStageTest, TransformRename) {
     NamespaceString otherColl("test.bar");
     OplogEntry rename =
@@ -1132,6 +1250,43 @@ TEST_F(ChangeStreamStageTest, TransformRename) {
     };
 
     checkTransformation(rename, expectedRename, kDefaultSpec, expectedInvalidate);
+}
+
+TEST_F(ChangeStreamStageTest, TransformRenameShowExpandedEvents) {
+    // TODO SERVER-52254: Remove this feature flag.
+    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
+
+    NamespaceString otherColl("test.bar");
+    auto dropTarget = UUID::gen();
+    OplogEntry rename = createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()
+                                                              << "dropTarget" << dropTarget),
+                                      testUuid());
+
+    Document expectedRename{
+        {DSChangeStream::kRenameTargetNssField,
+         D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
+        {DSChangeStream::kOperationDescriptionField,
+         D{
+             {"to", D{{"db", otherColl.db()}, {"coll", otherColl.coll()}}},
+             {"dropTarget", dropTarget},
+         }},
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+    };
+    Document expectedInvalidate{
+        {DSChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, testUuid(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
+    };
+
+    checkTransformation(rename, expectedRename, kShowExpandedEventsSpec, expectedInvalidate);
 }
 
 TEST_F(ChangeStreamStageTest, TransformInvalidateFromMigrate) {
@@ -2658,6 +2813,31 @@ TEST_F(ChangeStreamStageDBTest, TransformInsert) {
     checkTransformation(insert, expectedInsert);
 }
 
+TEST_F(ChangeStreamStageDBTest, TransformInsertShowExpandedEvents) {
+    // TODO SERVER-52254: Remove this feature flag.
+    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
+
+    auto insert = makeOplogEntry(OpTypeEnum::kInsert,
+                                 nss,
+                                 BSON("_id" << 1 << "x" << 2),
+                                 testUuid(),
+                                 boost::none,
+                                 BSON("x" << 2 << "_id" << 1));
+
+    Document expectedInsert{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1))},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"x", 2}, {"_id", 1}}},  // Note _id <-> x reversal.
+    };
+    checkTransformation(insert, expectedInsert, kShowExpandedEventsSpec);
+}
+
 TEST_F(ChangeStreamStageDBTest, InsertOnOtherCollections) {
     NamespaceString otherNss("unittests.other_collection.");
     auto insertOtherColl = makeOplogEntry(OpTypeEnum::kInsert,
@@ -2912,6 +3092,32 @@ TEST_F(ChangeStreamStageDBTest, TransformDropDatabase) {
     };
 
     checkTransformation(dropDB, expectedDropDatabase, kDefaultSpec, expectedInvalidate);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformDropDatabaseShowExpandedEvents) {
+    // TODO SERVER-52254: Remove this feature flag.
+    RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsVisibility", true);
+
+    OplogEntry dropDB = createCommand(BSON("dropDatabase" << 1), boost::none, false);
+
+    // Drop database entry doesn't have a UUID.
+    Document expectedDropDatabase{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kDropDatabaseOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}}},
+    };
+    Document expectedInvalidate{
+        {DSChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, Value(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kWallTimeField, Date_t()},
+    };
+
+    checkTransformation(dropDB, expectedDropDatabase, kShowExpandedEventsSpec, expectedInvalidate);
 }
 
 TEST_F(ChangeStreamStageTest, TransformPreImageForDelete) {

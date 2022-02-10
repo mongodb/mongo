@@ -210,8 +210,9 @@ private:
         // arrays.
         size_t _txnOpIndex;
 
-        // The clusterTime of the _applyOps.
+        // Cluster time and wall-clock time of the oplog entry which committed the transaction.
         Timestamp _clusterTime;
+        Date_t _wallTime;
 
         // Fields that were taken from the '_applyOps' oplog entry.
         Document _lsid;

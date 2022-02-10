@@ -193,6 +193,15 @@ public:
     // The target namespace of a rename operation.
     static constexpr StringData kRenameTargetNssField = "to"_sd;
 
+    // Wall time of the corresponding oplog entry.
+    static constexpr StringData kWallTimeField = "wallTime"_sd;
+
+    // UUID of a collection corresponding to the event (if applicable).
+    static constexpr StringData kCollectionUuidField = "collectionUUID"_sd;
+
+    // Object with additional description of operation.
+    static constexpr StringData kOperationDescriptionField = "operationDescription"_sd;
+
     // The different types of operations we can use for the operation type.
     static constexpr StringData kUpdateOpType = "update"_sd;
     static constexpr StringData kDeleteOpType = "delete"_sd;
