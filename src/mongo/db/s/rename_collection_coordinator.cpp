@@ -188,7 +188,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                     {
                         AutoGetCollection coll{opCtx, fromNss, MODE_IS};
-                        checkCollectionUUIDMismatch(opCtx, *coll, _doc.getExpectedSourceUUID());
+                        checkCollectionUUIDMismatch(
+                            opCtx, fromNss, *coll, _doc.getExpectedSourceUUID());
                     }
 
                     // Make sure the target namespace is not a view
@@ -214,7 +215,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                     {
                         AutoGetCollection coll{opCtx, toNss, MODE_IS};
-                        checkCollectionUUIDMismatch(opCtx, *coll, _doc.getExpectedTargetUUID());
+                        checkCollectionUUIDMismatch(
+                            opCtx, toNss, *coll, _doc.getExpectedTargetUUID());
                     }
 
                 } catch (const DBException&) {

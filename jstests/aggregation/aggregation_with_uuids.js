@@ -16,8 +16,9 @@ const collName = "foo";
 const testDB = db.getSiblingDB(dbName);
 const testColl = testDB.getCollection(collName);
 
-const validateErrorResponse = function(res, collectionUUID, actualNamespace) {
+const validateErrorResponse = function(res, collectionUUID, expectedNamespace, actualNamespace) {
     assert.eq(res.collectionUUID, collectionUUID);
+    assert.eq(res.expectedNamespace, expectedNamespace);
     assert.eq(res.actualNamespace, actualNamespace);
 };
 
@@ -68,7 +69,7 @@ let res = assert.commandFailedWithCode(
     testDB.runCommand(
         {aggregate: "doesNotExist", collectionUUID: uuid, pipeline: [{$match: {}}], cursor: {}}),
     ErrorCodes.CollectionUUIDMismatch);
-validateErrorResponse(res, uuid, testColl.getFullName());
+validateErrorResponse(res, uuid, testDB.getName() + '.doesNotExist', testColl.getFullName());
 
 // Drop the collection.
 testColl.drop({writeConcern: {w: "majority"}});
@@ -78,7 +79,7 @@ res = assert.commandFailedWithCode(
     testDB.runCommand(
         {aggregate: collName, collectionUUID: uuid, pipeline: [{$match: {}}], cursor: {}}),
     ErrorCodes.CollectionUUIDMismatch);
-validateErrorResponse(res, uuid, "");
+validateErrorResponse(res, uuid, testColl.getFullName(), "");
 
 // Now recreate the collection.
 assert.commandWorked(testColl.insert(docs));
@@ -88,7 +89,7 @@ res = assert.commandFailedWithCode(
     testDB.runCommand(
         {aggregate: collName, collectionUUID: uuid, pipeline: [{$match: {}}], cursor: {}}),
     ErrorCodes.CollectionUUIDMismatch);
-validateErrorResponse(res, uuid, "");
+validateErrorResponse(res, uuid, testColl.getFullName(), "");
 
 collNameRes = assert.commandWorked(
     testDB.runCommand({aggregate: collName, pipeline: [{$match: {}}], cursor: {}}));
@@ -101,11 +102,11 @@ testView.drop({writeConcern: {w: "majority"}});
 assert.commandWorked(testView.runCommand(
     "create", {viewOn: testColl.getName(), pipeline: [], writeConcern: {w: "majority"}}));
 
-assert.commandFailedWithCode(
+res = assert.commandFailedWithCode(
     testDB.runCommand(
         {aggregate: "viewCollection", collectionUUID: uuid, pipeline: [{$match: {}}], cursor: {}}),
     ErrorCodes.CollectionUUIDMismatch);
-validateErrorResponse(res, uuid, "");
+validateErrorResponse(res, uuid, testDB.getName() + '.viewCollection', "");
 
 //
 // Tests for rejecting invalid collectionUUIDs and cases where collectionUUID is not allowed.

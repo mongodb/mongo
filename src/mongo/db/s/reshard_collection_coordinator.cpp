@@ -121,7 +121,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                 {
                     AutoGetCollection coll{
                         opCtx, nss(), MODE_IS, AutoGetCollectionViewMode::kViewsPermitted};
-                    checkCollectionUUIDMismatch(opCtx, *coll, _doc.getCollectionUUID());
+                    checkCollectionUUIDMismatch(opCtx, nss(), *coll, _doc.getCollectionUUID());
                 }
 
                 ConfigsvrReshardCollection configsvrReshardCollection(nss(), _doc.getKey());

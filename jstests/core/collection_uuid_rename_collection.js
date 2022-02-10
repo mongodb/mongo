@@ -69,6 +69,7 @@ let res = assert.commandFailedWithCode(testDB.adminCommand({
 }),
                                        ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.collectionUUID, nonexistentUUID);
+assert.eq(res.expectedNamespace, coll.getFullName());
 assert.eq(res.actualNamespace, "");
 
 res = assert.commandFailedWithCode(testDB.adminCommand({
@@ -78,6 +79,7 @@ res = assert.commandFailedWithCode(testDB.adminCommand({
 }),
                                    ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.collectionUUID, nonexistentUUID);
+assert.eq(res.expectedNamespace, coll.getFullName());
 assert.eq(res.actualNamespace, "");
 
 // The command fails when the provided UUID corresponds to a different collection.
@@ -89,6 +91,7 @@ res = assert.commandFailedWithCode(testDB.adminCommand({
 }),
                                    ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.collectionUUID, uuid(coll));
+assert.eq(res.expectedNamespace, coll2.getFullName());
 assert.eq(res.actualNamespace, coll.getFullName());
 
 res = assert.commandFailedWithCode(testDB.adminCommand({
@@ -98,6 +101,7 @@ res = assert.commandFailedWithCode(testDB.adminCommand({
 }),
                                    ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.collectionUUID, uuid(coll));
+assert.eq(res.expectedNamespace, coll2.getFullName());
 assert.eq(res.actualNamespace, coll.getFullName());
 
 res = assert.commandFailedWithCode(testDB.adminCommand({
@@ -108,6 +112,7 @@ res = assert.commandFailedWithCode(testDB.adminCommand({
 }),
                                    ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.collectionUUID, uuid(coll));
+assert.eq(res.expectedNamespace, coll2.getFullName());
 assert.eq(res.actualNamespace, coll.getFullName());
 
 // The collectionUUID parameter cannot be provided when renaming a collection between databases.

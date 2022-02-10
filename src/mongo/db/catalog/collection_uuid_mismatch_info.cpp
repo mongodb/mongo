@@ -40,11 +40,13 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(CollectionUUIDMismatchInfo);
 std::shared_ptr<const ErrorExtraInfo> CollectionUUIDMismatchInfo::parse(const BSONObj& obj) {
     return std::make_shared<CollectionUUIDMismatchInfo>(
         UUID::parse(obj["collectionUUID"]).getValue(),
+        NamespaceString{obj.getStringField("expectedNamespace")},
         NamespaceString{obj.getStringField("actualNamespace")});
 }
 
 void CollectionUUIDMismatchInfo::serialize(BSONObjBuilder* builder) const {
     _collectionUUID.appendToBuilder(builder, "collectionUUID");
+    builder->append("expectedNamespace", _expectedNamespace.ns());
     builder->append("actualNamespace", _actualNamespace.ns());
 }
 }  // namespace mongo

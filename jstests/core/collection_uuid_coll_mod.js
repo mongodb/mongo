@@ -28,6 +28,7 @@ let res = assert.commandFailedWithCode(
     testDB.runCommand({collMod: coll.getName(), collectionUUID: nonexistentUUID}),
     ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.collectionUUID, nonexistentUUID);
+assert.eq(res.expectedNamespace, coll.getFullName());
 assert.eq(res.actualNamespace, "");
 
 // 3. The command fails when the provided UUID corresponds to a different collection.
@@ -37,5 +38,6 @@ res = assert.commandFailedWithCode(
     testDB.runCommand({collMod: coll2.getName(), collectionUUID: uuid}),
     ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.collectionUUID, uuid);
+assert.eq(res.expectedNamespace, coll2.getFullName());
 assert.eq(res.actualNamespace, coll.getFullName());
 })();

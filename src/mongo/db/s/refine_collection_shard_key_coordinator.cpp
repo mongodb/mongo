@@ -138,7 +138,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
 
                 {
                     AutoGetCollection coll{opCtx, nss(), MODE_IS};
-                    checkCollectionUUIDMismatch(opCtx, *coll, _doc.getCollectionUUID());
+                    checkCollectionUUIDMismatch(opCtx, nss(), *coll, _doc.getCollectionUUID());
                 }
 
                 const auto cmdResponse = uassertStatusOK(configShard->runCommand(

@@ -485,7 +485,7 @@ public:
                     ctx || !findCommand->getNamespaceOrUUID().uuid());
 
             checkCollectionUUIDMismatch(
-                opCtx, ctx->getCollection(), findCommand->getCollectionUUID());
+                opCtx, nss, ctx->getCollection(), findCommand->getCollectionUUID());
 
             // Set the namespace if a collection was found, as opposed to nothing or a view.
             if (ctx) {

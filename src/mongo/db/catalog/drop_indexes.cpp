@@ -351,7 +351,7 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
     boost::optional<AutoGetCollection> collection;
     collection.emplace(opCtx, nss, MODE_IX);
 
-    checkCollectionUUIDMismatch(opCtx, collection->getCollection(), expectedUUID);
+    checkCollectionUUIDMismatch(opCtx, nss, collection->getCollection(), expectedUUID);
     uassertStatusOK(checkView(opCtx, nss, collection->getCollection()));
 
     const UUID collectionUUID = (*collection)->uuid();

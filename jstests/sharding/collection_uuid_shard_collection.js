@@ -41,6 +41,7 @@ let res = assert.commandFailedWithCode(
         {shardCollection: coll.getFullName(), key: {_id: 1}, collectionUUID: nonexistentUUID}),
     ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.collectionUUID, nonexistentUUID);
+assert.eq(res.expectedNamespace, coll.getFullName());
 assert.eq(res.actualNamespace, "");
 
 // The command fails when the provided UUID corresponds to a different collection.
@@ -51,6 +52,7 @@ res = assert.commandFailedWithCode(
         {shardCollection: coll2.getFullName(), key: {_id: 1}, collectionUUID: uuid()}),
     ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.collectionUUID, uuid());
+assert.eq(res.expectedNamespace, coll2.getFullName());
 assert.eq(res.actualNamespace, coll.getFullName());
 
 // The command fails when the collection is already sharded and the provided UUID corresponds to a
@@ -61,6 +63,7 @@ res = assert.commandFailedWithCode(
         {shardCollection: coll2.getFullName(), key: {_id: 1}, collectionUUID: uuid()}),
     ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.collectionUUID, uuid());
+assert.eq(res.expectedNamespace, coll2.getFullName());
 assert.eq(res.actualNamespace, coll.getFullName());
 
 // The command fails when the provided UUID corresponds to a different collection, even if the
@@ -71,6 +74,7 @@ res = assert.commandFailedWithCode(
         {shardCollection: coll2.getFullName(), key: {_id: 1}, collectionUUID: uuid()}),
     ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.collectionUUID, uuid());
+assert.eq(res.expectedNamespace, coll2.getFullName());
 assert.eq(res.actualNamespace, coll.getFullName());
 
 st.stop();

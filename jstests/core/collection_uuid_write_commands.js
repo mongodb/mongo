@@ -10,13 +10,14 @@
 (function() {
 'use strict';
 
-var validateErrorResponse = function(res, collectionUUID, actualNamespace) {
+var validateErrorResponse = function(res, collectionUUID, expectedNamespace, actualNamespace) {
     if (res.writeErrors) {
         // Sharded cluster scenario.
         res = res.writeErrors[0];
     }
 
     assert.eq(res.collectionUUID, collectionUUID);
+    assert.eq(res.expectedNamespace, expectedNamespace);
     assert.eq(res.actualNamespace, actualNamespace);
 };
 
@@ -40,7 +41,7 @@ var testCommand = function(cmd, cmdObj) {
     cmdObj["collectionUUID"] = nonexistentUUID;
     let res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(res, nonexistentUUID, "");
+    validateErrorResponse(res, nonexistentUUID, coll.getFullName(), "");
 
     jsTestLog("The command '" + cmd +
               "' fails when the provided UUID corresponds to a different collection.");
@@ -50,7 +51,7 @@ var testCommand = function(cmd, cmdObj) {
     cmdObj["collectionUUID"] = uuid;
     res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(res, uuid, coll.getFullName());
+    validateErrorResponse(res, uuid, coll2.getFullName(), coll.getFullName());
 
     jsTestLog("The command '" + cmd +
               "' fails when the provided UUID corresponds to a different collection, even if the " +
@@ -58,7 +59,7 @@ var testCommand = function(cmd, cmdObj) {
     coll2.drop();
     res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(res, uuid, coll.getFullName());
+    validateErrorResponse(res, uuid, coll2.getFullName(), coll.getFullName());
 };
 
 testCommand("insert", {insert: "", documents: [{inserted: true}]});

@@ -498,8 +498,10 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
     if (shouldProceedWithBatchInsert) {
         try {
             if (!collection->getCollection()->isCapped() && !inTxn && batch.size() > 1) {
-                checkCollectionUUIDMismatch(
-                    opCtx, collection->getCollection(), wholeOp.getCollectionUUID());
+                checkCollectionUUIDMismatch(opCtx,
+                                            wholeOp.getNamespace(),
+                                            collection->getCollection(),
+                                            wholeOp.getCollectionUUID());
 
                 // First try doing it all together. If all goes well, this is all we need to do.
                 // See Collection::_insertDocuments for why we do all capped inserts one-at-a-time.
@@ -543,8 +545,10 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                     // Transactions are not allowed to operate on capped collections.
                     uassertStatusOK(
                         checkIfTransactionOnCappedColl(opCtx, collection->getCollection()));
-                    checkCollectionUUIDMismatch(
-                        opCtx, collection->getCollection(), wholeOp.getCollectionUUID());
+                    checkCollectionUUIDMismatch(opCtx,
+                                                wholeOp.getNamespace(),
+                                                collection->getCollection(),
+                                                wholeOp.getCollectionUUID());
                     lastOpFixer->startingOp();
                     insertDocuments(opCtx,
                                     collection->getCollection(),
@@ -827,7 +831,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         uassertStatusOK(checkIfTransactionOnCappedColl(opCtx, coll));
     }
 
-    checkCollectionUUIDMismatch(opCtx, collection->getCollection(), opCollectionUUID);
+    checkCollectionUUIDMismatch(opCtx, ns, collection->getCollection(), opCollectionUUID);
 
     const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest->getNamespaceString());
     ParsedUpdate parsedUpdate(opCtx, updateRequest, extensionsCallback, forgoOpCounterIncrements);
@@ -1165,7 +1169,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
             timeseries::numMeasurementsForBucketCounter(timeseriesOptions->getTimeField());
     }
 
-    checkCollectionUUIDMismatch(opCtx, collection.getCollection(), opCollectionUUID);
+    checkCollectionUUIDMismatch(opCtx, ns, collection.getCollection(), opCollectionUUID);
 
     ParsedDelete parsedDelete(opCtx, &request);
     uassertStatusOK(parsedDelete.parseRequest());

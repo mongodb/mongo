@@ -323,8 +323,8 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     const auto sourceColl = catalog->lookupCollectionByNamespace(opCtx, source);
     const auto targetColl = catalog->lookupCollectionByNamespace(opCtx, target);
 
-    checkCollectionUUIDMismatch(opCtx, sourceColl, options.expectedSourceUUID);
-    checkCollectionUUIDMismatch(opCtx, targetColl, options.expectedTargetUUID);
+    checkCollectionUUIDMismatch(opCtx, source, sourceColl, options.expectedSourceUUID);
+    checkCollectionUUIDMismatch(opCtx, target, targetColl, options.expectedTargetUUID);
 
     AutoStatsTracker statsTracker(
         opCtx,

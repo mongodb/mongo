@@ -127,7 +127,7 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
     ParsedCollModRequest cmr;
 
     try {
-        checkCollectionUUIDMismatch(opCtx, coll, cmd.getCollModRequest().getCollectionUUID());
+        checkCollectionUUIDMismatch(opCtx, nss, coll, cmd.getCollModRequest().getCollectionUUID());
     } catch (const DBException& ex) {
         return ex.toStatus();
     }

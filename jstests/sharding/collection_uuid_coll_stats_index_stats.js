@@ -9,8 +9,9 @@
 
 load("jstests/libs/write_concern_util.js");  // For 'shardCollectionWithChunks'
 
-const validateErrorResponse = function(res, collectionUUID, actualNamespace) {
+const validateErrorResponse = function(res, collectionUUID, expectedNamespace, actualNamespace) {
     assert.eq(res.collectionUUID, collectionUUID);
+    assert.eq(res.expectedNamespace, expectedNamespace);
     assert.eq(res.actualNamespace, actualNamespace);
 };
 
@@ -64,14 +65,16 @@ const testCommand = function(cmd, cmdObj) {
     cmdObj["collectionUUID"] = sameShardUUID;
     let res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(res, sameShardUUID, sameShardColl.getFullName());
+    validateErrorResponse(
+        res, sameShardUUID, shardedCollection.getFullName(), sameShardColl.getFullName());
 
     jsTestLog("If the aggregation command hits all shards, then it should return the " +
               "actual namespace of the unsharded collection that has different primary shard.");
     cmdObj["collectionUUID"] = otherShardUUID;
     res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(res, otherShardUUID, otherShardColl.getFullName());
+    validateErrorResponse(
+        res, otherShardUUID, shardedCollection.getFullName(), otherShardColl.getFullName());
 
     jsTestLog(
         "If the aggregation command hits only one shards, then it can't find the actual namespace" +
@@ -81,7 +84,7 @@ const testCommand = function(cmd, cmdObj) {
     cmdObj["collectionUUID"] = otherShardUUID;
     res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(res, otherShardUUID, "");
+    validateErrorResponse(res, otherShardUUID, sameShardColl.getFullName(), "");
 };
 
 testCommand("aggregate", {aggregate: "", pipeline: [{$collStats: {latencyStats: {}}}], cursor: {}});

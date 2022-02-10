@@ -787,6 +787,7 @@ Status runAggregate(OperationContext* opCtx,
             invariant(!nss.isCollectionlessAggregateNS());
 
             checkCollectionUUIDMismatch(opCtx,
+                                        nss,
                                         collections.getMainCollection(),
                                         request.getCollectionUUID(),
                                         false /* checkFeatureFlag */);
@@ -870,6 +871,7 @@ Status runAggregate(OperationContext* opCtx,
 
         // If collectionUUID was provided, verify the collection exists and has the expected UUID.
         checkCollectionUUIDMismatch(opCtx,
+                                    nss,
                                     collections.getMainCollection(),
                                     request.getCollectionUUID(),
                                     false /* checkFeatureFlag */);

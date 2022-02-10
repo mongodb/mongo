@@ -35,6 +35,7 @@
 
 namespace mongo {
 void checkCollectionUUIDMismatch(OperationContext* opCtx,
+                                 const NamespaceString& ns,
                                  const CollectionPtr& coll,
                                  const boost::optional<UUID>& uuid,
                                  bool checkFeatureFlag) {
@@ -49,6 +50,7 @@ void checkCollectionUUIDMismatch(OperationContext* opCtx,
                     serverGlobalParams.featureCompatibility));
 
     uassert((CollectionUUIDMismatchInfo{*uuid,
+                                        ns,
                                         CollectionCatalog::get(opCtx)
                                             ->lookupNSSByUUID(opCtx, *uuid)
                                             .value_or(NamespaceString{})}),

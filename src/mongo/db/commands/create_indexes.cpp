@@ -442,7 +442,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
             AutoGetCollection collection(opCtx, ns, MODE_IS);
             CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx);
 
-            checkCollectionUUIDMismatch(opCtx, collection.getCollection(), cmd.getCollectionUUID());
+            checkCollectionUUIDMismatch(
+                opCtx, ns, collection.getCollection(), cmd.getCollectionUUID());
 
             // Before potentially taking an exclusive collection lock, check if all indexes already
             // exist while holding an intent lock.

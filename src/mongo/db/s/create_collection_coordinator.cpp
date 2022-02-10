@@ -684,7 +684,7 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
 
 void CreateCollectionCoordinator::_checkCollectionUUIDMismatch(OperationContext* opCtx) const {
     AutoGetCollection coll{opCtx, nss(), MODE_IS};
-    checkCollectionUUIDMismatch(opCtx, coll.getCollection(), _doc.getCollectionUUID());
+    checkCollectionUUIDMismatch(opCtx, nss(), coll.getCollection(), _doc.getCollectionUUID());
 }
 
 void CreateCollectionCoordinator::_createCollectionAndIndexes(OperationContext* opCtx) {
