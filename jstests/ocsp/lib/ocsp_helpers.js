@@ -61,6 +61,40 @@ var waitForServer = function(conn) {
     }
 };
 
+var clientConnect = function(conn) {
+    const exitCode = runMongoProgram("mongo",
+                                     "--host",
+                                     "localhost",
+                                     "--port",
+                                     conn.port,
+                                     "--tls",
+                                     "--tlsCAFile",
+                                     OCSP_CA_PEM,
+                                     "--tlsCertificateKeyFile",
+                                     OCSP_CLIENT_CERT,
+                                     "--tlsAllowInvalidHostnames",
+                                     "--verbose",
+                                     1,
+                                     "--eval",
+                                     ";");
+    return exitCode;
+};
+
+const OCSP_REVOKED = "OCSPCertificateStatusRevoked";
+
+var assertClientConnectFails = function(conn, reason) {
+    clearRawMongoProgramOutput();
+    assert.neq(clientConnect(conn), 0);
+    const errmsg = rawMongoProgramOutput();
+    if (typeof reason === 'string' || reason instanceof RegExp) {
+        assert.neq(errmsg.search(reason), -1);
+    }
+};
+
+var assertClientConnectSucceeds = function(conn) {
+    assert.eq(clientConnect(conn), 0);
+};
+
 var supportsStapling = function() {
     if (determineSSLProvider() !== "openssl") {
         return false;
