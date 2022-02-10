@@ -12,23 +12,13 @@
 #include <vector>
 
 /*
- * ListBuckets --
- *     Builds a list of buckets from AWS account into a vector. Returns 0 if success, otherwise
- *     1.
+ * S3Connection --
+ *     Constructor for AWS S3 bucket connection.
  */
-int
-S3Connection::ListBuckets(std::vector<std::string> &buckets) const
+S3Connection::S3Connection(const Aws::S3Crt::ClientConfiguration &config,
+  const std::string &bucketName, const std::string &objPrefix)
+    : _s3CrtClient(config), _bucketName(bucketName), _objectPrefix(objPrefix)
 {
-    auto outcome = s3CrtClient.ListBuckets();
-    if (outcome.IsSuccess()) {
-        for (const auto &bucket : outcome.GetResult().GetBuckets())
-            buckets.push_back(bucket.GetName());
-        return (0);
-    } else {
-        std::cerr << "Error in ListBuckets: " << outcome.GetError().GetMessage() << std::endl
-                  << std::endl;
-        return (1);
-    }
 }
 
 /*
@@ -38,20 +28,15 @@ S3Connection::ListBuckets(std::vector<std::string> &buckets) const
  *     to 1000. Returns 0 if success, otherwise 1.
  */
 int
-S3Connection::ListObjects(const std::string &bucketName, const std::string &prefix,
-  std::vector<std::string> &objects, uint32_t batchSize, bool listSingle) const
+S3Connection::ListObjects(const std::string &prefix, std::vector<std::string> &objects,
+  uint32_t batchSize, bool listSingle) const
 {
     Aws::S3Crt::Model::ListObjectsV2Request request;
-    request.SetBucket(bucketName);
-    request.SetPrefix(prefix);
+    request.SetBucket(_bucketName);
+    request.SetPrefix(_objectPrefix + prefix);
+    listSingle ? request.SetMaxKeys(1) : request.SetMaxKeys(batchSize);
 
-    if (listSingle)
-        request.SetMaxKeys(1);
-    else
-        request.SetMaxKeys(batchSize);
-
-    Aws::S3Crt::Model::ListObjectsV2Outcome outcomes = s3CrtClient.ListObjectsV2(request);
-
+    Aws::S3Crt::Model::ListObjectsV2Outcome outcomes = _s3CrtClient.ListObjectsV2(request);
     if (!outcomes.IsSuccess())
         return (1);
     auto result = outcomes.GetResult();
@@ -65,7 +50,7 @@ S3Connection::ListObjects(const std::string &bucketName, const std::string &pref
     std::string continuationToken = result.GetNextContinuationToken();
     while (continuationToken != "") {
         request.SetContinuationToken(continuationToken);
-        outcomes = s3CrtClient.ListObjectsV2(request);
+        outcomes = _s3CrtClient.ListObjectsV2(request);
         if (!outcomes.IsSuccess())
             return (1);
         result = outcomes.GetResult();
@@ -81,24 +66,23 @@ S3Connection::ListObjects(const std::string &bucketName, const std::string &pref
  *     Puts an object into an S3 bucket. Returns 0 if success, otherwise 1.
  */
 int
-S3Connection::PutObject(
-  const std::string &bucketName, const std::string &objectKey, const std::string &fileName) const
+S3Connection::PutObject(const std::string &objectKey, const std::string &fileName) const
 {
     std::shared_ptr<Aws::IOStream> inputData = Aws::MakeShared<Aws::FStream>(
       "s3-source", fileName.c_str(), std::ios_base::in | std::ios_base::binary);
 
     Aws::S3Crt::Model::PutObjectRequest request;
-    request.SetBucket(bucketName);
-    request.SetKey(objectKey);
+    request.SetBucket(_bucketName);
+    request.SetKey(_objectPrefix + objectKey);
     request.SetBody(inputData);
 
-    Aws::S3Crt::Model::PutObjectOutcome outcome = s3CrtClient.PutObject(request);
+    Aws::S3Crt::Model::PutObjectOutcome outcome = _s3CrtClient.PutObject(request);
     if (outcome.IsSuccess()) {
         return (0);
-    } else {
-        std::cerr << "Error in PutObject: " << outcome.GetError().GetMessage() << std::endl;
-        return (1);
     }
+
+    std::cerr << "Error in PutObject: " << outcome.GetError().GetMessage() << std::endl;
+    return (1);
 }
 
 /*
@@ -106,20 +90,18 @@ S3Connection::PutObject(
  *     Deletes an object from S3 bucket. Returns 0 if success, otherwise 1.
  */
 int
-S3Connection::DeleteObject(const std::string &bucketName, const std::string &objectKey) const
+S3Connection::DeleteObject(const std::string &objectKey) const
 {
     Aws::S3Crt::Model::DeleteObjectRequest request;
-    request.SetBucket(bucketName);
-    request.SetKey(objectKey);
+    request.SetBucket(_bucketName);
+    request.SetKey(_objectPrefix + objectKey);
 
-    Aws::S3Crt::Model::DeleteObjectOutcome outcome = s3CrtClient.DeleteObject(request);
-
-    if (outcome.IsSuccess()) {
+    Aws::S3Crt::Model::DeleteObjectOutcome outcome = _s3CrtClient.DeleteObject(request);
+    if (outcome.IsSuccess())
         return (0);
-    } else {
-        std::cerr << "Error in DeleteObject: " << outcome.GetError().GetMessage() << std::endl;
-        return (1);
-    }
+
+    std::cerr << "Error in DeleteObject: " << outcome.GetError().GetMessage() << std::endl;
+    return (1);
 }
 
 /*
@@ -127,15 +109,14 @@ S3Connection::DeleteObject(const std::string &bucketName, const std::string &obj
  *     Checks whether an object with the given key exists in the S3 bucket.
  */
 int
-S3Connection::ObjectExists(
-  const std::string &bucketName, const std::string &objectKey, bool &exists) const
+S3Connection::ObjectExists(const std::string &objectKey, bool &exists) const
 {
     exists = false;
 
     Aws::S3Crt::Model::HeadObjectRequest request;
-    request.SetBucket(bucketName);
-    request.SetKey(objectKey);
-    Aws::S3Crt::Model::HeadObjectOutcome outcome = s3CrtClient.HeadObject(request);
+    request.SetBucket(_bucketName);
+    request.SetKey(_objectPrefix + objectKey);
+    Aws::S3Crt::Model::HeadObjectOutcome outcome = _s3CrtClient.HeadObject(request);
 
     /*
      * If an object with the given key does not exist the HEAD request will return a 404.
@@ -146,12 +127,11 @@ S3Connection::ObjectExists(
         return (0);
     } else if (outcome.GetError().GetResponseCode() == Aws::Http::HttpResponseCode::NOT_FOUND)
         return (0);
-    else
-        return (-1);
-}
 
-/*
- * S3Connection --
- *     Constructor for AWS S3 bucket connection.
- */
-S3Connection::S3Connection(const Aws::S3Crt::ClientConfiguration &config) : s3CrtClient(config){};
+    /*
+     * Fix later, return a proper error code. Not sure if we always have
+     * outcome.GetError().GetResponseCode()
+     */
+    std::cerr << "Error in ObjectExists." << std::endl;
+    return (1);
+}
