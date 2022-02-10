@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/drop_collection.h"
 
 #include "mongo/db/audit.h"
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/client.h"
@@ -71,12 +72,21 @@ Status _checkNssAndReplState(OperationContext* opCtx, const CollectionPtr& coll)
 Status _dropView(OperationContext* opCtx,
                  Database* db,
                  const NamespaceString& collectionName,
+                 const boost::optional<UUID>& expectedUUID,
                  DropReply* reply) {
     if (!db) {
         Status status = Status(ErrorCodes::NamespaceNotFound, "ns not found");
         audit::logDropView(opCtx->getClient(), collectionName, "", {}, status.code());
         return status;
     }
+
+    // Views don't have UUIDs so if the expectedUUID is specified, we will always throw.
+    try {
+        checkCollectionUUIDMismatch(opCtx, collectionName, nullptr, expectedUUID);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+
     auto view = ViewCatalog::get(opCtx)->lookupWithoutValidatingDurableViews(opCtx, collectionName);
     if (!view) {
         Status status = Status(ErrorCodes::NamespaceNotFound, "ns not found");
@@ -128,6 +138,7 @@ Status _dropView(OperationContext* opCtx,
 Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
                                 AutoGetDb&& autoDb,
                                 const NamespaceString& startingNss,
+                                const boost::optional<UUID>& expectedUUID,
                                 std::function<Status(Database*, const NamespaceString&)>&& dropFn,
                                 DropReply* reply,
                                 bool appendNs = true,
@@ -147,6 +158,12 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
     Status status = _checkNssAndReplState(opCtx, coll);
     if (!status.isOK()) {
         return status;
+    }
+
+    try {
+        checkCollectionUUIDMismatch(opCtx, startingNss, coll, expectedUUID);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 
     if (MONGO_unlikely(hangDuringDropCollection.shouldFail())) {
@@ -286,6 +303,7 @@ Status _dropCollectionForApplyOps(OperationContext* opCtx,
 
 Status _dropCollection(OperationContext* opCtx,
                        const NamespaceString& collectionName,
+                       const boost::optional<UUID>& expectedUUID,
                        DropReply* reply,
                        DropCollectionSystemCollectionMode systemCollectionMode,
                        boost::optional<UUID> dropIfUUIDNotMatching = boost::none) {
@@ -303,6 +321,7 @@ Status _dropCollection(OperationContext* opCtx,
                     opCtx,
                     std::move(autoDb),
                     collectionName,
+                    expectedUUID,
                     [opCtx, systemCollectionMode](Database* db, const NamespaceString& resolvedNs) {
                         WriteUnitOfWork wuow(opCtx);
 
@@ -322,14 +341,21 @@ Status _dropCollection(OperationContext* opCtx,
                     dropIfUUIDNotMatching);
             }
 
-            auto dropTimeseries = [opCtx, &autoDb, &collectionName, &reply](
+            auto dropTimeseries = [opCtx, &expectedUUID, &autoDb, &collectionName, &reply](
                                       const NamespaceString& bucketNs, bool dropView) {
                 return _abortIndexBuildsAndDrop(
                     opCtx,
                     std::move(autoDb),
                     bucketNs,
-                    [opCtx, dropView, &collectionName, &reply](Database* db,
-                                                               const NamespaceString& bucketsNs) {
+                    expectedUUID,
+                    [opCtx, dropView, &expectedUUID, &collectionName, &reply](
+                        Database* db, const NamespaceString& bucketsNs) {
+                        // Disallow checking the expectedUUID when dropping time-series collections.
+                        uassert(ErrorCodes::InvalidOptions,
+                                "The collectionUUID parameter cannot be passed when dropping a "
+                                "time-series collection",
+                                !expectedUUID);
+
                         if (dropView) {
                             // Take a MODE_X lock when dropping timeseries view. This is to prevent
                             // a concurrent create collection on the same namespace that will
@@ -338,7 +364,7 @@ Status _dropCollection(OperationContext* opCtx,
                             // taking both these locks it needs to happen in this order to prevent a
                             // deadlock.
                             Lock::CollectionLock viewLock(opCtx, collectionName, MODE_X);
-                            auto status = _dropView(opCtx, db, collectionName, reply);
+                            auto status = _dropView(opCtx, db, collectionName, boost::none, reply);
                             if (!status.isOK()) {
                                 return status;
                             }
@@ -368,6 +394,12 @@ Status _dropCollection(OperationContext* opCtx,
                     return dropTimeseries(bucketsNs, false);
                 }
 
+                try {
+                    checkCollectionUUIDMismatch(opCtx, collectionName, nullptr, expectedUUID);
+                } catch (const DBException& ex) {
+                    return ex.toStatus();
+                }
+
                 Status status = Status(ErrorCodes::NamespaceNotFound, "ns not found");
                 audit::logDropView(opCtx->getClient(), collectionName, "", {}, status.code());
                 return status;
@@ -380,7 +412,7 @@ Status _dropCollection(OperationContext* opCtx,
             // Take a MODE_X lock when dropping a view. This is to prevent a concurrent create
             // collection on the same namespace that will reserve an OpTime before this drop.
             Lock::CollectionLock viewLock(opCtx, collectionName, MODE_X);
-            return _dropView(opCtx, db, collectionName, reply);
+            return _dropView(opCtx, db, collectionName, expectedUUID, reply);
         });
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // The shell requires that NamespaceNotFound error codes return the "ns not found"
@@ -391,6 +423,7 @@ Status _dropCollection(OperationContext* opCtx,
 
 Status dropCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
+                      const boost::optional<UUID>& expectedUUID,
                       DropReply* reply,
                       DropCollectionSystemCollectionMode systemCollectionMode) {
     if (!serverGlobalParams.quiet.load()) {
@@ -407,7 +440,14 @@ Status dropCollection(OperationContext* opCtx,
     const auto collectionName =
         nss.isTimeseriesBucketsCollection() ? nss.getTimeseriesViewNamespace() : nss;
 
-    return _dropCollection(opCtx, collectionName, reply, systemCollectionMode);
+    return _dropCollection(opCtx, collectionName, expectedUUID, reply, systemCollectionMode);
+}
+
+Status dropCollection(OperationContext* opCtx,
+                      const NamespaceString& nss,
+                      DropReply* reply,
+                      DropCollectionSystemCollectionMode systemCollectionMode) {
+    return dropCollection(opCtx, nss, boost::none, reply, systemCollectionMode);
 }
 
 Status dropCollectionIfUUIDNotMatching(OperationContext* opCtx,
@@ -426,6 +466,7 @@ Status dropCollectionIfUUIDNotMatching(OperationContext* opCtx,
         DropReply repl;
         return _dropCollection(opCtx,
                                ns,
+                               boost::none,
                                &repl,
                                DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops,
                                expectedUUID);
@@ -459,7 +500,7 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
         DropReply unusedReply;
         if (!coll) {
             Lock::CollectionLock viewLock(opCtx, collectionName, MODE_IX);
-            return _dropView(opCtx, db, collectionName, &unusedReply);
+            return _dropView(opCtx, db, collectionName, boost::none, &unusedReply);
         } else {
             return _dropCollectionForApplyOps(
                 opCtx, db, collectionName, dropOpTime, systemCollectionMode, &unusedReply);

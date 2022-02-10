@@ -70,4 +70,8 @@ structs:
                 description: "Information of the collection to drop, used only for sharded collection."
                 type: CollectionInfo
                 optional: true
+            collectionUUID:
+                type: uuid
+                description: "The expected UUID of the collection."
+                optional: true
 

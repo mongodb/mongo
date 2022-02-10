@@ -49,8 +49,14 @@ enum class DropCollectionSystemCollectionMode {
 /**
  * Drops the collection "collectionName" and populates "reply" with statistics about what
  * was removed. Aborts in-progress index builds on the collection if two phase index builds are
- * supported.
+ * supported. Throws if the expectedUUID does not match the UUID of the collection being dropped.
  */
+Status dropCollection(OperationContext* opCtx,
+                      const NamespaceString& collectionName,
+                      const boost::optional<UUID>& expectedUUID,
+                      DropReply* reply,
+                      DropCollectionSystemCollectionMode systemCollectionMode);
+
 Status dropCollection(OperationContext* opCtx,
                       const NamespaceString& collectionName,
                       DropReply* reply,

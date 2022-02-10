@@ -71,3 +71,9 @@ commands:
                 privilege:
                     resource_pattern: exact_namespace
                     action_type: dropCollection
+        fields:
+            collectionUUID:
+                description: "The expected UUID of the collection."
+                type: uuid
+                optional: true
+                unstable: true

@@ -97,6 +97,8 @@ public:
             auto coordinatorDoc = DropCollectionCoordinatorDocument();
             coordinatorDoc.setShardingDDLCoordinatorMetadata(
                 {{targetNs, DDLCoordinatorTypeEnum::kDropCollection}});
+            coordinatorDoc.setCollectionUUID(request().getCollectionUUID());
+
             auto service = ShardingDDLCoordinatorService::getService(opCtx);
             auto dropCollCoordinator = checked_pointer_cast<DropCollectionCoordinator>(
                 service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));

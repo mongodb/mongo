@@ -266,6 +266,11 @@ commands:
         api_version: ""
         cpp_name: ShardsvrDropCollection
         strict: false
+        fields:
+            collectionUUID:
+                type: uuid
+                description: "The expected UUID of the collection."
+                optional: true
 
     _shardsvrDropCollectionParticipant:
         description: "Parser for the _shardsvrDropCollectionParticipant command"

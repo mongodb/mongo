@@ -255,6 +255,7 @@ public:
             uassertStatusOK(
                 dropCollection(opCtx,
                                request().getNamespace(),
+                               request().getCollectionUUID(),
                                &reply,
                                DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
             return reply;

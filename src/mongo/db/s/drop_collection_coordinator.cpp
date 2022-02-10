@@ -31,6 +31,8 @@
 
 #include "mongo/db/s/drop_collection_coordinator.h"
 
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
@@ -126,6 +128,12 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                 } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                     // The collection is not sharded or doesn't exist.
                     _doc.setCollInfo(boost::none);
+                }
+
+                {
+                    AutoGetCollection coll{
+                        opCtx, nss(), MODE_IS, AutoGetCollectionViewMode::kViewsPermitted};
+                    checkCollectionUUIDMismatch(opCtx, nss(), *coll, _doc.getCollectionUUID());
                 }
 
                 BSONObjBuilder logChangeDetail;
