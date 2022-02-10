@@ -8,6 +8,7 @@
  *   assumes_unsharded_collection,
  *   does_not_support_transactions,
  *   requires_getmore,
+ *   requires_fcv_52,
  * ]
  */
 (function() {
