@@ -16,10 +16,10 @@ durability, adding logging to the database so updates are durable as
 soon as their transaction successfully commits.
 
 -# Applications using timestamps for fine-grained control of the database,
-extending commit-level durability. This allows applications to do things like
-enforce a transactional commit order, read historical data and define stability
-points for the entire database. Use of timestamps changes both the consistency
-and durability models.
+extending checkpoint-level durability. This allows applications to do things
+like enforce a transactional commit order, read historical data and define
+stability points for the entire database. Use of timestamps changes both the
+consistency and durability models.
 
 The first two approaches are relatively simple and have APIs which will be
 familiar to database developers. The principal difference is that in the second

@@ -7,9 +7,10 @@ and proceed with @ref posix_building.
 
 To build from the WiredTiger GitHub repository requires
 <a href="http://git-scm.com/">git</a>,
-<a href="https://cmake.org/">CMake</a>.
-We also suggest <a href="https://ninja-build.org/">Ninja</a> and <a href="https://ccache.dev/">ccache</a> for improved
-incremental build times and <a href="http://www.swig.org/">SWIG</a> for building with Python support.
+<a href="https://cmake.org/">CMake</a> and
+<a href="http://www.swig.org/">SWIG</a> (if building to support the Python API).
+We also suggest <a href="https://ninja-build.org/">Ninja</a> and
+<a href="https://ccache.dev/">ccache</a> for improved incremental build times.
 
 First, clone the repository:
 

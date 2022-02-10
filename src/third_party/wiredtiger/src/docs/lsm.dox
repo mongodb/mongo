@@ -1,5 +1,8 @@
 /*! @page lsm Log-Structured Merge Trees
 
+\warning The WiredTiger LSM support has not been developed, tested or tuned in
+production scenarios in some years, and should be viewed as experimental code.
+
 @section lsm_background Background
 
 A common requirement is sustained throughput under a workload that consists

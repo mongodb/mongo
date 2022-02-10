@@ -7,10 +7,10 @@ requires additional configuration.
 
 @section commit_durability_enable Enabling commit-level durability
 
-To enable commit-level durability, pass the \c log=(enabled)
-configuration string to ::wiredtiger_open.
-This gives all objects opened in the database commit-level durability.
-The transactional API does not otherwise change.
+To enable commit-level durability, pass the \c log=(enabled) configuration
+string to ::wiredtiger_open. This causes WiredTiger to write records into the
+log for each transaction, giving all objects opened in the database commit-level
+durability. The operational transactional API does not otherwise change.
 
 It is possible to enable commit-level durability for some database
 objects and not others.

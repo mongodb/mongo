@@ -383,19 +383,4 @@ and @ex_ref{ex_col_store.c}.
 @snippet ex_col_store.c col-store decl
 @snippet ex_col_store.c col-store main
 
-@section logged_non_logged_tables Logged and Non-logged tables
-
-- WiredTiger writes records to the log for each transaction when logging is enabled
-  on the tables using the \c log=(enabled) configuration to \c wiredtiger_open.
-- WiredTiger supports checkpoint durability on non-logged tables and logging
-  is disabled by default. See @ref checkpoint for information on checkpoint durability.
-- WiredTiger supports commit-level durability on logged tables. See @ref durability for
-  information on commit-level durability.
-
-@section diff_logged_non_logged_tables Other differences between Logged and Non-logged tables
-
-- Rollback to stable does not operate on logged tables as the updates on these
-  tables are stable when the transaction gets committed.
-- Prepared updates can only be done on the non-logged tables.
-
  */

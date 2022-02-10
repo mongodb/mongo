@@ -21,7 +21,7 @@
       NULL, /* key_format */                                                                    \
       NULL, /* value_format */                                                                  \
       get_key, get_value, set_key, set_value, compare, equals, next, prev, reset, search,       \
-      search_near, insert, modify, update, remove, reserve, close, reconfigure, largest_key,    \
+      search_near, insert, modify, update, remove, reserve, close, largest_key, reconfigure,    \
       cache, reopen, 0,      /* uri_hash */                                                     \
       {NULL, NULL},          /* TAILQ_ENTRY q */                                                \
       0,                     /* recno key */                                                    \

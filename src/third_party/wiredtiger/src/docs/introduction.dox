@@ -47,10 +47,6 @@ WiredTiger is distributed under Open Source licenses; for more information, see:
 
 - @subpage license
 
-WiredTiger releases are tested on a variety of systems; for more information on testing, see:
-
-- @subpage testing
-
 For more information on tools and techniques used during WiredTiger development, see:
 
 - @subpage tool-index
