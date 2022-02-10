@@ -123,7 +123,10 @@ class FuzzerGenTaskService:
             "require_multiversion_setup": params.require_multiversion_setup,
             "timeout_secs": params.timeout_secs,
             "task": params.task_name,
-            "gen_task_config_location": params.config_location,
+            # This expansion's name was shortened to reduce the overall size of
+            # the generated configuration file
+            # gtcl = gen_task_config_location
+            "gtcl": params.config_location,
             "suite": params.suite,
         }  # yapf: disable
 

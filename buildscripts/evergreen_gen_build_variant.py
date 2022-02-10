@@ -4,6 +4,8 @@ from concurrent.futures import ThreadPoolExecutor as Executor
 from datetime import datetime, timedelta
 from time import perf_counter
 from typing import Optional, Any, Set, Tuple
+import hashlib
+import os
 
 import click
 import inject
@@ -121,7 +123,11 @@ class EvgExpansions(BaseModel):
     def config_location(self) -> str:
         """Location where generated configuration is stored."""
         generated_task_name = remove_gen_suffix(self.task_name)
-        return f"{self.build_variant}/{self.revision}/generate_tasks/{generated_task_name}_gen-{self.build_id}.tgz"
+        file = f"{self.build_variant}/{self.revision}/generate_tasks/{generated_task_name}_gen-{self.build_id}"
+        # hash 'file' to shorten the file path dramatically
+        sha1 = hashlib.sha1()
+        sha1.update(file.encode('utf-8'))
+        return f"gtcl/{sha1.hexdigest()}.tgz"
 
 
 def translate_run_var(run_var: str, build_variant: Variant) -> Any:
@@ -279,6 +285,9 @@ class GenerateBuildVariantOrchestrator:
 
         generated_config = builder.build(output_file)
         generated_config.write_all_to_dir(self.gen_task_options.generated_config_dir)
+
+        with open('gtcl_update_expansions.yml', "w+") as fh:
+            fh.write(f"gtcl: {self.evg_expansions.config_location()}")
 
     # pylint: disable=too-many-locals
     def generate_build_variant(self, builder: EvgConfigBuilder,

@@ -211,7 +211,10 @@ class ResmokeGenTaskService:
         }
 
         if params.config_location is not None:
-            variables["gen_task_config_location"] = params.config_location
+            # This expansion's name was shortened to reduce the overall size of
+            # the generated configuration file
+            # gtcl = gen_task_config_location
+            variables["gtcl"] = params.config_location
 
         if params.resmoke_jobs_max:
             variables["resmoke_jobs_max"] = params.resmoke_jobs_max

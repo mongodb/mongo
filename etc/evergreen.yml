@@ -1036,7 +1036,11 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       bucket: mciuploads
-      remote_file: ${project}/${gen_task_config_location}
+      # This expansion's name was shortened to reduce the overall size of
+      # the generated configuration file
+      # gtcl = gen_task_config_location
+      # gtcl expansion is a variable included in the call of the parent function.
+      remote_file: ${project}/${gtcl}
       local_file: "generate_tasks_config.tgz"
 
   "extract generated test configuration": &extract_generated_test_configuration
@@ -1065,6 +1069,12 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/selected_tests_generate.sh"
+    # this sets the gtcl expansion
+    - command: expansions.update
+      params:
+        ignore_missing_file: false
+        file: src/gtcl_update_expansions.yml
+    - *f_expansions_write
     - command: archive.targz_pack
       params:
         target: generate_tasks_config.tgz
@@ -1076,7 +1086,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: generate_tasks_config.tgz
-        remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
+        remote_file: ${project}/${gtcl}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/gzip}
@@ -1097,6 +1107,12 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/generate_build_variant.sh"
+    # this sets the gtcl expansion
+    - command: expansions.update
+      params:
+        ignore_missing_file: false
+        file: src/gtcl_update_expansions.yml
+    - *f_expansions_write
     - command: archive.targz_pack
       params:
         target: generate_tasks_config.tgz
@@ -1108,7 +1124,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: generate_tasks_config.tgz
-        remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
+        remote_file: ${project}/${gtcl}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/gzip}

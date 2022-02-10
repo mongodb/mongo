@@ -3,6 +3,7 @@
 import os
 import re
 import sys
+import hashlib
 from datetime import datetime, timedelta
 from functools import partial
 from typing import Any, Dict, List, Set, Optional
@@ -144,7 +145,11 @@ class EvgExpansions(BaseModel):
 
     def get_config_location(self) -> str:
         """Get the location the generated configuration will be stored."""
-        return f"{self.build_variant}/{self.revision}/generate_tasks/{self.task_name}-{self.build_id}.tgz"
+        file = f"{self.build_variant}/{self.revision}/generate_tasks/{self.task_name}-{self.build_id}"
+        # hash 'file' to shorten the file path dramatically
+        sha1 = hashlib.sha1()
+        sha1.update(file.encode('utf-8'))
+        return f"gtcl/{sha1.hexdigest()}.tgz"
 
 
 class TaskConfigService:
@@ -425,6 +430,10 @@ class SelectedTestsOrchestrator:
         changed_files = self.find_changed_files(repos, task_id)
         generated_config = self.generate_version(changed_files)
         generated_config.write_all_to_dir(SELECTED_TESTS_CONFIG_DIR)
+
+        with open(os.path.join(SELECTED_TESTS_CONFIG_DIR, '..',
+                               'gtcl_update_expansions.yml')) as fh:
+            fh.write(f"gtcl: {self.evg_expansions.get_config_location()}")
 
     def generate_version(self, changed_files: Set[str]) -> GeneratedConfiguration:
         """
