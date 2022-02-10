@@ -635,6 +635,16 @@ private:
     }
 
     /**
+     * Returns true if ignoring interrupts other than repl state change and no repl state change
+     * has occurred.
+     */
+    bool _noReplStateChangeWhileIgnoringOtherInterrupts() const {
+        return _ignoreInterruptsExceptForReplStateChange &&
+            getKillStatus() != ErrorCodes::InterruptedDueToReplStateChange &&
+            !_killRequestedForReplStateChange.loadRelaxed();
+    }
+
+    /**
      * Returns true if this operation has a deadline and it has passed according to the fast clock
      * on ServiceContext.
      */
