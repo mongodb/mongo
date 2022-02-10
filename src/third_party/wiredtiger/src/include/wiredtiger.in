@@ -966,7 +966,8 @@ struct __wt_session {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;this_id, a string that identifies the
 	 * current system state as a future backup source for an incremental backup via 'src_id'.
 	 * This identifier is required when opening an incremental backup cursor and an error will
-	 * be returned if one is not provided., a string; default empty.}
+	 * be returned if one is not provided.  The identifiers can be any text string\, but should
+	 * be unique., a string; default empty.}
 	 * @config{ ),,}
 	 * @config{next_random, configure the cursor to return a pseudo-random record from the
 	 * object when the WT_CURSOR::next method is called; valid only for row-store cursors.  See

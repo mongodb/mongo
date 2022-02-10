@@ -1585,7 +1585,8 @@ methods = {
         Config('this_id', '', r'''
             a string that identifies the current system state  as a future backup source
             for an incremental backup via 'src_id'. This identifier is required when opening
-            an incremental backup cursor and an error will be returned if one is not provided'''),
+            an incremental backup cursor and an error will be returned if one is not provided.
+            The identifiers can be any text string, but should be unique'''),
         ]),
     Config('next_random', 'false', r'''
         configure the cursor to return a pseudo-random record from the

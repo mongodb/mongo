@@ -127,7 +127,7 @@ using block modifications:
 additional configuration \c incremental=(enabled=true,this_id="ID1").
 The identifier specified in \c this_id starts block tracking and that
 identifier can be used in the future as the source of an incremental
-backup.
+backup. Identifiers can be any text string, but should be unique.
 
 2. Begin the incremental backup by opening a backup cursor with the
 \c backup: URI and config string of \c incremental=(src_id="ID1",this_id="ID2").
