@@ -51,6 +51,8 @@ class StatusWith;
  */
 namespace shardutil {
 
+static constexpr size_t kMaxSplitPoints = 8192;
+
 /**
  * Executes the listDatabases command against the specified shard and obtains the total data
  * size across all databases in bytes (essentially, the totalSize field).

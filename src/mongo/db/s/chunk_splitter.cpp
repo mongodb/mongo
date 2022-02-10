@@ -52,6 +52,7 @@
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/shard_util.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -84,22 +85,23 @@ Status splitChunkAtMultiplePoints(OperationContext* opCtx,
                                   const ShardKeyPattern& shardKeyPattern,
                                   const ChunkVersion& collectionVersion,
                                   const ChunkRange& chunkRange,
-                                  const std::vector<BSONObj>& splitPoints) {
+                                  std::vector<BSONObj>&& splitPoints) {
     invariant(!splitPoints.empty());
 
-    const size_t kMaxSplitPoints = 8192;
-
-    if (splitPoints.size() > kMaxSplitPoints) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "Cannot split chunk in more than " << kMaxSplitPoints
-                              << " parts at a time."};
+    if (splitPoints.size() > shardutil::kMaxSplitPoints) {
+        LOGV2_WARNING(6320301,
+                      "Unable to apply all the split points received. Only the first "
+                      "kMaxSplitPoints will be processed",
+                      "numSplitPointsReceived"_attr = splitPoints.size(),
+                      "kMaxSplitPoints"_attr = shardutil::kMaxSplitPoints);
+        splitPoints.resize(shardutil::kMaxSplitPoints);
     }
 
     return splitChunk(opCtx,
                       nss,
                       shardKeyPattern.toBSON(),
                       chunkRange,
-                      splitPoints,
+                      std::move(splitPoints),
                       shardId.toString(),
                       collectionVersion.epoch())
         .getStatus()
@@ -386,13 +388,15 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
             }
         }
 
+        auto numSplitPoints = splitPoints.size();
+
         uassertStatusOK(splitChunkAtMultiplePoints(opCtx.get(),
                                                    chunk.getShardId(),
                                                    nss,
                                                    shardKeyPattern,
                                                    cm.getVersion(),
                                                    chunk.getRange(),
-                                                   splitPoints));
+                                                   std::move(splitPoints)));
         chunkSplitStateDriver->commitSplit();
 
         const bool shouldBalance = isAutoBalanceEnabled(opCtx.get(), nss, balancerConfig);
@@ -403,7 +407,7 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
               "autosplitted chunk",
               "namespace"_attr = nss,
               "chunk"_attr = redact(chunk.toString()),
-              "splitPoints"_attr = splitPoints.size(),
+              "splitPoints"_attr = numSplitPoints,
               "maxChunkSizeBytes"_attr = maxChunkSizeBytes,
               "extraInfo"_attr =
                   (topChunkMinKey.isEmpty() ? ""
