@@ -214,7 +214,7 @@ void optimizePrefix(Pipeline::SourceContainer::iterator itr, Pipeline::SourceCon
 // Returns whether 'field' depends on a pushed down $addFields or computed $project.
 bool fieldIsComputed(BucketSpec spec, std::string field) {
     return std::any_of(
-        spec.computedMetaProjFields.begin(), spec.computedMetaProjFields.end(), [&](auto& s) {
+        spec.computedMetaProjFields().begin(), spec.computedMetaProjFields().end(), [&](auto& s) {
             return s == field || expression::isPathPrefixOf(field, s) ||
                 expression::isPathPrefixOf(s, field);
         });
@@ -268,7 +268,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
                 uassert(5346503,
                         "include or exclude field element must be a single-element field path",
                         field.find('.') == std::string::npos);
-                bucketSpec.fieldSet.emplace(field);
+                bucketSpec.addIncludeExcludeField(field);
             }
             unpackerBehavior = fieldName == kInclude ? BucketUnpacker::Behavior::kInclude
                                                      : BucketUnpacker::Behavior::kExclude;
@@ -314,7 +314,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
                 uassert(5509902,
                         "computedMetaProjFields field element must be a single-element field path",
                         field.find('.') == std::string::npos);
-                bucketSpec.computedMetaProjFields.emplace_back(field);
+                bucketSpec.addComputedMetaProjFields(field);
             }
         } else {
             uasserted(5346506,
@@ -379,18 +379,18 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(
     MutableDocument out;
     auto behavior =
         _bucketUnpacker.behavior() == BucketUnpacker::Behavior::kInclude ? kInclude : kExclude;
-    auto&& spec = _bucketUnpacker.bucketSpec();
+    const auto& spec = _bucketUnpacker.bucketSpec();
     std::vector<Value> fields;
-    for (auto&& field : spec.fieldSet) {
+    for (auto&& field : spec.fieldSet()) {
         fields.emplace_back(field);
     }
     if (((_bucketUnpacker.includeMetaField() &&
           _bucketUnpacker.behavior() == BucketUnpacker::Behavior::kInclude) ||
          (!_bucketUnpacker.includeMetaField() &&
           _bucketUnpacker.behavior() == BucketUnpacker::Behavior::kExclude && spec.metaField())) &&
-        std::find(spec.computedMetaProjFields.cbegin(),
-                  spec.computedMetaProjFields.cend(),
-                  *spec.metaField()) == spec.computedMetaProjFields.cend())
+        std::find(spec.computedMetaProjFields().cbegin(),
+                  spec.computedMetaProjFields().cend(),
+                  *spec.metaField()) == spec.computedMetaProjFields().cend())
         fields.emplace_back(*spec.metaField());
 
     out.addField(behavior, Value{std::move(fields)});
@@ -400,11 +400,11 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(
     }
     out.addField(kBucketMaxSpanSeconds, Value{_bucketMaxSpanSeconds});
 
-    if (!spec.computedMetaProjFields.empty())
+    if (!spec.computedMetaProjFields().empty())
         out.addField("computedMetaProjFields", Value{[&] {
                          std::vector<Value> compFields;
-                         std::transform(spec.computedMetaProjFields.cbegin(),
-                                        spec.computedMetaProjFields.cend(),
+                         std::transform(spec.computedMetaProjFields().cbegin(),
+                                        spec.computedMetaProjFields().cend(),
                                         std::back_inserter(compFields),
                                         [](auto&& projString) { return Value{projString}; });
                          return compFields;
@@ -506,7 +506,7 @@ void DocumentSourceInternalUnpackBucket::internalizeProject(const BSONObj& proje
 
     // Update '_bucketUnpacker' state with the new fields and behavior.
     auto spec = _bucketUnpacker.bucketSpec();
-    spec.fieldSet = std::move(fields);
+    spec.setFieldSet(fields);
     _bucketUnpacker.setBucketSpecAndBehavior(std::move(spec),
                                              isInclusion ? BucketUnpacker::Behavior::kInclude
                                                          : BucketUnpacker::Behavior::kExclude);
@@ -514,7 +514,7 @@ void DocumentSourceInternalUnpackBucket::internalizeProject(const BSONObj& proje
 
 std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProjectToInternalize(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) const {
-    if (std::next(itr) == container->end() || !_bucketUnpacker.bucketSpec().fieldSet.empty()) {
+    if (std::next(itr) == container->end() || !_bucketUnpacker.bucketSpec().fieldSet().empty()) {
         // There is no project to internalize or there are already fields being included/excluded.
         return {BSONObj{}, false};
     }
