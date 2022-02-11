@@ -349,7 +349,11 @@ TransactionCoordinator::TransactionCoordinator(
                     _serviceContext->getPreciseClockSource()->now());
             }
 
-            return txn::deleteCoordinatorDoc(*_scheduler, _lsid, _txnNumberAndRetryCounter);
+            return txn::deleteCoordinatorDoc(*_scheduler, _lsid, _txnNumberAndRetryCounter)
+                .then([this] {
+                    invariant(!_coordinatorDocRemovalPromise.getFuture().isReady());
+                    _coordinatorDocRemovalPromise.emplaceValue();
+                });
         })
         .getAsync([this, deadlineFuture = std::move(deadlineFuture)](Status s) mutable {
             // Interrupt this coordinator's scheduler hierarchy and join the deadline task's future
@@ -462,6 +466,10 @@ void TransactionCoordinator::_done(Status status) {
 
     if (!_decisionPromise.getFuture().isReady()) {
         _decisionPromise.setError(status);
+    }
+
+    if (!_coordinatorDocRemovalPromise.getFuture().isReady()) {
+        _coordinatorDocRemovalPromise.setError(status);
     }
 
     if (!status.isOK()) {

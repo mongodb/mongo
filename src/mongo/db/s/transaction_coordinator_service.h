@@ -127,6 +127,14 @@ public:
      */
     void joinPreviousRound();
 
+    /**
+     * TODO: SERVER-62375 Remove upgrade/downgrade code for internal transactions.
+     * Returns a vector of futures that wait on the removal of transaction
+     * coordinators for internal transactions.
+     */
+    const std::vector<SharedSemiFuture<void>>
+    getAllRemovalFuturesForCoordinatorsForInternalTransactions(OperationContext* opCtx);
+
 private:
     struct CatalogAndScheduler {
         CatalogAndScheduler(ServiceContext* service) : scheduler(service) {}

@@ -71,6 +71,7 @@
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_util.h"
+#include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/session_txn_record_gen.h"
@@ -774,6 +775,24 @@ private:
             _cleanupInternalSessions(newOpCtx);
 
             LOGV2(5876101, "Completed removal of internal sessions from config.transactions.");
+        }
+
+        // TODO: SERVER-62375 Remove upgrade/downgrade code for internal transactions.
+        // We want to wait for all of the transaction coordinator entries related to internal
+        // transactions to be removed. This is because the corresponding coordinator document
+        // contains has a special lsid which downgraded binaries cannot properly parse.
+        if (serverGlobalParams.clusterRole != ClusterRole::None) {
+            auto coordinatorService = TransactionCoordinatorService::get(opCtx);
+            for (const auto& future :
+                 coordinatorService->getAllRemovalFuturesForCoordinatorsForInternalTransactions(
+                     opCtx)) {
+                auto status = future.getNoThrow(opCtx);
+                uassertStatusOKWithContext(status,
+                                           str::stream()
+                                               << "Unable to remove all "
+                                               << NamespaceString::kTransactionCoordinatorsNamespace
+                                               << " documents for internal transactions");
+            }
         }
 
         // TODO SERVER-62338 Remove when 6.0 branches-out
