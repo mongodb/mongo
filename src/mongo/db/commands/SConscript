@@ -163,6 +163,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/logical_session_cache',
         '$BUILD_DIR/mongo/db/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/logical_session_id',
+        '$BUILD_DIR/mongo/db/pipeline/document_source_internal_apply_oplog_update',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/repl/isself',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',

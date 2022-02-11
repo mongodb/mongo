@@ -226,6 +226,7 @@ if (typeof _threadInject != "undefined") {
         if (db.getMongo().readMode() === "legacy") {
             var requires_find_command = [
                 "apply_ops_system_dot_views.js",
+                "internal_apply_oplog_update.js",
                 "merge_sort_collation.js",
                 "update_pipeline_shell_helpers.js",
                 "update_with_pipeline.js",

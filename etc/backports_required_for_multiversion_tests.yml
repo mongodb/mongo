@@ -211,6 +211,10 @@ all:
     test_file: jstests/sharding/chunk_migration_with_schema_validation.js
   - ticket: SERVER-61894
     test_file: jstests/change_streams/show_raw_update_description_v1_oplog.js
+  - ticket: SERVER-63159
+    test_file: jstests/change_streams/show_raw_update_description_v1_oplog.js
+  - ticket: SERVER-63159
+    test_file: jstests/core/internal_apply_oplog_update.js
 
 
 suites:

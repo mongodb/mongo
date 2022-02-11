@@ -34,6 +34,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/update/log_builder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
