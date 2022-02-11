@@ -78,15 +78,17 @@ public:
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        return {StreamType::kStreaming,
-                PositionRequirement::kNone,
-                HostTypeRequirement::kNone,
-                DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kNotAllowed,
-                TransactionRequirement::kAllowed,
-                LookupRequirement::kAllowed,
-                UnionRequirement::kAllowed,
-                ChangeStreamRequirement::kDenylist};
+        StageConstraints constraints{StreamType::kStreaming,
+                                     PositionRequirement::kNone,
+                                     HostTypeRequirement::kNone,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kNotAllowed,
+                                     TransactionRequirement::kAllowed,
+                                     LookupRequirement::kAllowed,
+                                     UnionRequirement::kAllowed,
+                                     ChangeStreamRequirement::kDenylist};
+        constraints.canSwapWithMatch = true;
+        return constraints;
     }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
@@ -198,6 +200,8 @@ public:
      */
     std::pair<bool, Pipeline::SourceContainer::iterator> rewriteGroupByMinMax(
         Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
+
+    GetModPathsReturn getModifiedPaths() const final override;
 
 private:
     GetNextResult doGetNext() final;

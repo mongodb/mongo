@@ -41,210 +41,6 @@ namespace {
 
 using InternalUnpackBucketSplitMatchOnMetaAndRename = AggregationContextFixture;
 
-TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, DoesNotSplitWhenNoMetaFieldSpecified) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: "
-                 "3600}}")
-            .firstElement(),
-        getExpCtx());
-    auto matchToSplit = DocumentSourceMatch::create(fromjson("{meta: {$gt: 1}}"), getExpCtx());
-
-    auto [metaOnlyMatch, remainingMatch] =
-        dynamic_cast<DocumentSourceInternalUnpackBucket*>(unpack.get())
-            ->splitMatchOnMetaAndRename(matchToSplit.get());
-
-    // Can't split when there is no metaField specified in the stage.
-    ASSERT_FALSE(metaOnlyMatch);
-    ASSERT_TRUE(remainingMatch);
-    ASSERT_BSONOBJ_EQ(matchToSplit->getQuery(), remainingMatch->getQuery());
-}
-
-TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, DoesNotSplitWhenNoMatchOnMetaField) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
-                 "bucketMaxSpanSeconds: 3600}}")
-            .firstElement(),
-        getExpCtx());
-    auto matchToSplit = DocumentSourceMatch::create(fromjson("{a: {$gt: 1}}"), getExpCtx());
-
-    auto [metaOnlyMatch, remainingMatch] =
-        dynamic_cast<DocumentSourceInternalUnpackBucket*>(unpack.get())
-            ->splitMatchOnMetaAndRename(matchToSplit.get());
-
-    // Can't split when the match does not reference the metaField.
-    ASSERT_FALSE(metaOnlyMatch);
-    ASSERT_TRUE(remainingMatch);
-    ASSERT_BSONOBJ_EQ(matchToSplit->getQuery(), remainingMatch->getQuery());
-}
-
-TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, SplitsWhenEntireMatchIsOnMetaField) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
-                 "bucketMaxSpanSeconds: 3600}}")
-            .firstElement(),
-        getExpCtx());
-    auto matchToSplit = DocumentSourceMatch::create(
-        fromjson("{$or: [{myMeta: {$gt: 1}}, {'myMeta.a': {$lt: 1}}]}"), getExpCtx());
-
-    auto [metaOnlyMatch, remainingMatch] =
-        dynamic_cast<DocumentSourceInternalUnpackBucket*>(unpack.get())
-            ->splitMatchOnMetaAndRename(matchToSplit.get());
-
-    // Can split and rename when the match is entirely on the metaField.
-    ASSERT_TRUE(metaOnlyMatch);
-    ASSERT_BSONOBJ_EQ(fromjson("{$or: [{meta: {$gt: 1}}, {'meta.a': {$lt: 1}}]}"),
-                      metaOnlyMatch->getQuery());
-    ASSERT_FALSE(remainingMatch);
-}
-
-TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename,
-       SplitsWhenIndependentPartOfMatchIsOnMetaField) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
-                 "bucketMaxSpanSeconds: 3600}}")
-            .firstElement(),
-        getExpCtx());
-    auto matchToSplit = DocumentSourceMatch::create(
-        fromjson("{$and: [{'myMeta.a': {$gt: 1}}, {b: {$lt: 1}}]}"), getExpCtx());
-
-    auto [metaOnlyMatch, remainingMatch] =
-        dynamic_cast<DocumentSourceInternalUnpackBucket*>(unpack.get())
-            ->splitMatchOnMetaAndRename(matchToSplit.get());
-
-    // Can split and rename when an independent part of the match is on the metaField.
-    ASSERT_TRUE(metaOnlyMatch);
-    ASSERT_BSONOBJ_EQ(fromjson("{'meta.a': {$gt: 1}}"), metaOnlyMatch->getQuery());
-    ASSERT_TRUE(remainingMatch);
-    ASSERT_BSONOBJ_EQ(fromjson("{b: {$lt: 1}}"), remainingMatch->getQuery());
-}
-
-TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename,
-       DoesNotSplitsWhenDependentPartOfMatchIsOnMetaField) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'meta', "
-                 "bucketMaxSpanSeconds: 3600}}")
-            .firstElement(),
-        getExpCtx());
-    auto matchToSplit = DocumentSourceMatch::create(
-        fromjson("{$or: [{'meta.a': {$gt: 1}}, {metaXYZ: {$lt: 1}}]}"), getExpCtx());
-
-    auto [metaOnlyMatch, remainingMatch] =
-        dynamic_cast<DocumentSourceInternalUnpackBucket*>(unpack.get())
-            ->splitMatchOnMetaAndRename(matchToSplit.get());
-
-    // Can't split when the part of the match that is on the metaField is dependent on the rest.
-    // Even though 'metaXYZ' is prefixed by 'meta', it's not a subfield. The presence of a top-level
-    // $or means this match cannot be correctly split into two matches.
-    ASSERT_FALSE(metaOnlyMatch);
-    ASSERT_TRUE(remainingMatch);
-    ASSERT_BSONOBJ_EQ(matchToSplit->getQuery(), remainingMatch->getQuery());
-}
-
-TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, SplitsWhenSharedPrefixOfMetaIsNotSubfield) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
-                 "bucketMaxSpanSeconds: 3600}}")
-            .firstElement(),
-        getExpCtx());
-    auto matchToSplit = DocumentSourceMatch::create(
-        fromjson("{$and: [{myMeta: {$gt: 1}}, {myMetaXYZ: {$lt: 1}}]}"), getExpCtx());
-
-    auto [metaOnlyMatch, remainingMatch] =
-        dynamic_cast<DocumentSourceInternalUnpackBucket*>(unpack.get())
-            ->splitMatchOnMetaAndRename(matchToSplit.get());
-
-    // Can split and rename when an independent part of the match is on the metaField. Even though
-    // 'myMetaXYZ' is prefixed by 'myMeta', it's not a subfield, so it should not be pushed down.
-    ASSERT_TRUE(metaOnlyMatch);
-    ASSERT_BSONOBJ_EQ(fromjson("{meta: {$gt: 1}}"), metaOnlyMatch->getQuery());
-    ASSERT_TRUE(remainingMatch);
-    ASSERT_BSONOBJ_EQ(fromjson("{myMetaXYZ: {$lt: 1}}"), remainingMatch->getQuery());
-}
-
-TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, SplitsAndRenamesWithExpr) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
-                 "bucketMaxSpanSeconds: 3600}}")
-            .firstElement(),
-        getExpCtx());
-    auto matchToSplit =
-        DocumentSourceMatch::create(fromjson("{$expr: {$eq: ['$myMeta.a', 2]}}"), getExpCtx());
-
-    auto [metaOnlyMatch, remainingMatch] =
-        dynamic_cast<DocumentSourceInternalUnpackBucket*>(unpack.get())
-            ->splitMatchOnMetaAndRename(matchToSplit.get());
-
-    // Can split and rename when the $match includes a $expr.
-    ASSERT_TRUE(metaOnlyMatch);
-    ASSERT_BSONOBJ_EQ(fromjson("{$expr: {$eq: ['$meta.a', {$const: 2}]}}"),
-                      metaOnlyMatch->getQuery());
-    ASSERT_FALSE(remainingMatch);
-}
-
-TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, SplitsAndRenamesWithType) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
-                 "bucketMaxSpanSeconds: 3600}}")
-            .firstElement(),
-        getExpCtx());
-    auto matchToSplit =
-        DocumentSourceMatch::create(fromjson("{myMeta: {$type: [4]}}"), getExpCtx());
-
-    auto [metaOnlyMatch, remainingMatch] =
-        dynamic_cast<DocumentSourceInternalUnpackBucket*>(unpack.get())
-            ->splitMatchOnMetaAndRename(matchToSplit.get());
-
-    // Can split and rename when the $match includes a $type.
-    ASSERT_TRUE(metaOnlyMatch);
-    ASSERT_BSONOBJ_EQ(fromjson("{meta: {$type: [4]}}"), metaOnlyMatch->getQuery());
-    ASSERT_FALSE(remainingMatch);
-}
-
-TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, SplitsAndRenamesWhenMultiplePredicates) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
-                 "bucketMaxSpanSeconds: 3600}}")
-            .firstElement(),
-        getExpCtx());
-    auto matchToSplit = DocumentSourceMatch::create(
-        fromjson("{myMeta: {$gte: 0, $lte: 5}, l: {$type: [4]}}"), getExpCtx());
-
-    auto [metaOnlyMatch, remainingMatch] =
-        dynamic_cast<DocumentSourceInternalUnpackBucket*>(unpack.get())
-            ->splitMatchOnMetaAndRename(matchToSplit.get());
-
-    // Can split and rename when the $match includes multiple predicates.
-    ASSERT_TRUE(metaOnlyMatch);
-    ASSERT_BSONOBJ_EQ(fromjson("{$and: [{meta: {$gte: 0}}, {meta: {$lte: 5}}]}"),
-                      metaOnlyMatch->getQuery());
-    ASSERT_TRUE(remainingMatch);
-    ASSERT_BSONOBJ_EQ(fromjson("{l: {$type: [4]}}"), remainingMatch->getQuery());
-}
-
-TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, SplitsAndRenamesWhenSeveralFieldReferences) {
-    auto unpack = DocumentSourceInternalUnpackBucket::createFromBsonInternal(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
-                 "bucketMaxSpanSeconds: 3600}}")
-            .firstElement(),
-        getExpCtx());
-    auto matchToSplit = DocumentSourceMatch::create(
-        fromjson("{$and: [{myMeta: {$type: [3]}}, {'myMeta.a': {$gte: "
-                 "0}}, {'myMeta.b': {$type: [4]}}, {a: {$in: ['$b', '$c']}}]}"),
-        getExpCtx());
-
-    auto [metaOnlyMatch, remainingMatch] =
-        dynamic_cast<DocumentSourceInternalUnpackBucket*>(unpack.get())
-            ->splitMatchOnMetaAndRename(matchToSplit.get());
-
-    // Can split and rename when the $match includes several field references.
-    ASSERT_TRUE(metaOnlyMatch);
-    ASSERT_BSONOBJ_EQ(fromjson("{$and: [{meta: {$type: [3]}}, {'meta.a': {$gte: 0}}, "
-                               "{'meta.b': {$type: [4]}}]}"),
-                      metaOnlyMatch->getQuery());
-    ASSERT_TRUE(remainingMatch);
-    ASSERT_BSONOBJ_EQ(fromjson("{a: {$in: ['$b', '$c']}}"), remainingMatch->getQuery());
-}
-
 TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, OptimizeSplitsMatchAndMapsControlPredicates) {
     auto unpack = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
@@ -285,6 +81,30 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, OptimizeMovesMetaMatchBefo
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {meta: {$gte: 0}}}"), serialized[0]);
     ASSERT_BSONOBJ_EQ(unpack, serialized[1]);
+}
+
+TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename,
+       OptimizeDoesNotMoveMetaMatchBeforeUnpackWithExclusionOnMeta) {
+    auto unpack = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
+    auto unpackExcluded = fromjson(
+        "{$_internalUnpackBucket: { include: ['_id', 'data'], timeField: 'foo', metaField: "
+        "'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
+    auto pipeline = Pipeline::parse(makeVector(unpack,
+                                               fromjson("{$project: {data: 1}}"),
+                                               fromjson("{$match: {myMeta: {$gte: 0}}}")),
+                                    getExpCtx());
+    ASSERT_EQ(3u, pipeline->getSources().size());
+
+    pipeline->optimizePipeline();
+
+    // The $match on meta is not moved before $_internalUnpackBucket since the field is excluded.
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2u, serialized.size());
+    ASSERT_BSONOBJ_EQ(unpackExcluded, serialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {myMeta: {$gte: 0}}}"), serialized[1]);
 }
 
 TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename,
