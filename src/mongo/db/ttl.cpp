@@ -218,45 +218,42 @@ private:
                                   "TTLMonitor was interrupted, waiting before doing another pass",
                                   "wait"_attr = Milliseconds(Seconds(ttlMonitorSleepSecs.load())));
                     return;
-                } catch (const DBException& ex) {
-                    if (ex.isA<ErrorCategory::StaleShardVersionError>()) {
-                        // The TTL index tried to delete some information from a sharded collection
-                        // through a direct operation against the shard but the filtering metadata
-                        // was not available.
-                        //
-                        // The current TTL task cannot be completed. However, if the critical
-                        // section is not held the code below will fire an asynchronous refresh,
-                        // hoping that the next time this task is re-executed the filtering
-                        // information is already present.
-                        if (auto staleInfo = ex.extraInfo<StaleConfigInfo>();
-                            staleInfo && !staleInfo->getCriticalSectionSignal()) {
-                            auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-                            ExecutorFuture<void>(executor)
-                                .then(
-                                    [serviceContext = opCtx->getServiceContext(), nss, staleInfo] {
-                                        ThreadClient tc("TTLShardVersionRecovery", serviceContext);
-                                        {
-                                            stdx::lock_guard<Client> lk(*tc.get());
-                                            tc->setSystemOperationKillableByStepdown(lk);
-                                        }
+                } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
+                    // The TTL index tried to delete some information from a sharded collection
+                    // through a direct operation against the shard but the filtering metadata was
+                    // not available.
+                    //
+                    // The current TTL task cannot be completed. However, if the critical section is
+                    // not held the code below will fire an asynchronous refresh, hoping that the
+                    // next time this task is re-executed the filtering information is already
+                    // present.
+                    if (auto staleInfo = ex.extraInfo<StaleConfigInfo>();
+                        staleInfo && !staleInfo->getCriticalSectionSignal()) {
+                        auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+                        ExecutorFuture<void>(executor)
+                            .then([serviceContext = opCtx->getServiceContext(), nss, staleInfo] {
+                                ThreadClient tc("TTLShardVersionRecovery", serviceContext);
+                                {
+                                    stdx::lock_guard<Client> lk(*tc.get());
+                                    tc->setSystemOperationKillableByStepdown(lk);
+                                }
 
-                                        auto uniqueOpCtx = tc->makeOperationContext();
-                                        auto opCtx = uniqueOpCtx.get();
+                                auto uniqueOpCtx = tc->makeOperationContext();
+                                auto opCtx = uniqueOpCtx.get();
 
-                                        onShardVersionMismatchNoExcept(
-                                            opCtx, *nss, staleInfo->getVersionWanted())
-                                            .ignore();
-                                    })
-                                .onError([](const Status& status) {
-                                    LOGV2_WARNING(
-                                        5803600,
-                                        "Error on deferred shardVersion recovery execution",
-                                        "error"_attr = redact(status));
-                                })
-                                .getAsync([](auto) {});
-                        }
+                                onShardVersionMismatchNoExcept(
+                                    opCtx, *nss, staleInfo->getVersionWanted())
+                                    .ignore();
+                            })
+                            .getAsync([](auto) {});
                     }
-
+                    LOGV2_WARNING(6353000,
+                                  "Error running TTL job on collection: the shard should refresh "
+                                  "before being able to complete this task",
+                                  logAttrs(*nss),
+                                  "error"_attr = ex);
+                    continue;
+                } catch (const DBException& ex) {
                     LOGV2_ERROR(5400703,
                                 "Error running TTL job on collection",
                                 logAttrs(*nss),
