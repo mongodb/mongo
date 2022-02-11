@@ -5924,6 +5924,13 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
+  name: fle2
+  tags: ["encrypt"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
   name: ocsp
   tags: ["ssl", "encrypt", "ocsp"]
   commands:

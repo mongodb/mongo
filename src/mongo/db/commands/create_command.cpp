@@ -39,6 +39,7 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
@@ -172,6 +173,17 @@ public:
                 uassert(ErrorCodes::InvalidOptions,
                         "'pipeline' requires 'viewOn' to also be specified",
                         cmd.getViewOn());
+            }
+
+            if (cmd.getEncryptedFields()) {
+                uassert(6346401,
+                        "Encrypted fields cannot be used with views or timeseries collections",
+                        !(cmd.getViewOn() || cmd.getTimeseries()));
+
+                uassert(6346402,
+                        "Encrypted collections are not supported on standalone",
+                        repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
+                            repl::ReplicationCoordinator::Mode::modeReplSet);
             }
 
             if (auto timeseries = cmd.getTimeseries()) {

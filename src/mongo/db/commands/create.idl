@@ -198,7 +198,7 @@ commands:
                 optional: true
                 unstable: false
             encryptedFields:
-                description: "The number of seconds after which old data should be deleted."
+                description: "Specifies the fields that are encrypted by client-side FLE."
                 type: EncryptedFieldConfig
                 optional: true
                 unstable: false

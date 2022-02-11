@@ -1,0 +1,25 @@
+test_kind: js_test
+selector:
+  roots:
+  - jstests/fle2/**/*.js
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: "testingReplication = true;"
+  hooks:
+  # We don't execute dbHash or oplog consistency checks since there is only a single replica set
+  # node.
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    # Use a 1-node replica set.
+    num_nodes: 1
