@@ -929,11 +929,11 @@ public:
     const char* getOpName() const final;
 
     bool isAssociative() const final {
-        return true;
+        return false;
     }
 
     bool isCommutative() const final {
-        return true;
+        return false;
     }
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -2392,11 +2392,11 @@ public:
     const char* getOpName() const final;
 
     bool isAssociative() const final {
-        return true;
+        return false;
     }
 
     bool isCommutative() const final {
-        return true;
+        return false;
     }
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
