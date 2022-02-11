@@ -3,14 +3,14 @@
 
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode() and assertArrayEq().
 
-const collName = "jstests_aggregation_add"
+const collName = "jstests_aggregation_add";
 const coll = db["collName"];
 coll.drop();
 
 // TODO: SERVER-63099 Make sure that constant folding does not assume associativity or
 // commutativity, and that conversions to NumberDecimal are not different with/without optimization.
 
-const x = "$x"  // fieldpath to "block" constant folding
+const x = "$x";  // fieldpath to "block" constant folding
 
 /**
  * Verify constant folding with explain output.
@@ -23,15 +23,11 @@ const x = "$x"  // fieldpath to "block" constant folding
 function assertConstantFoldingResultForOp(op, input, expectedOutput, message) {
     const buildExpressionFromArguments = (arr, op) => {
         if (Array.isArray(arr)) {
-            return {
-                [op]: arr.map(elt => buildExpressionFromArguments(elt, op))
-            }
+            return {[op]: arr.map(elt => buildExpressionFromArguments(elt, op))};
         } else if (typeof arr === 'string' || arr instanceof String) {
             return arr;
         } else {
-            return {
-                $const: arr
-            }
+            return {$const: arr};
         }
     };
     const expected = buildExpressionFromArguments(expectedOutput, op);
@@ -97,8 +93,8 @@ assertConstantFoldingResults([x, 1, 2, 3],
 
 // Non-optimized comparisons -- make sure that non-optimized pipelines will give the same result as
 // optimized ones.
-coll.insert({_id: 0, v: NumberDecimal("917.6875119062092")})
-coll.insert({_id: 1, v: NumberDecimal("927.3345924210555")})
+coll.insert({_id: 0, v: NumberDecimal("917.6875119062092")});
+coll.insert({_id: 1, v: NumberDecimal("927.3345924210555")});
 
 const pipeline = [
     {$group: {_id: {$multiply: [-3.14159265859, "$v", -314159255]}, sum: {$sum: 1}}},
@@ -110,5 +106,5 @@ assertArrayEq({
         {"_id": NumberDecimal("915242528741.9469524422272990976000"), "sum": 1},
         {"_id": NumberDecimal("905721242210.0453137831269007622941"), "sum": 1}
     ]
-})
+});
 })();
