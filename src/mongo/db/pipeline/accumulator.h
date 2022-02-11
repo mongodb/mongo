@@ -110,8 +110,8 @@ public:
         return _needsInput;
     }
 
-    virtual bool isAssociative() const {
-        return false;
+    virtual ExpressionNary::Associativity getAssociativity() const {
+        return ExpressionNary::Associativity::kNone;
     }
 
     virtual bool isCommutative() const {
@@ -188,8 +188,8 @@ public:
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 
-    bool isAssociative() const final {
-        return true;
+    ExpressionNary::Associativity getAssociativity() const final {
+        return ExpressionNary::Associativity::kFull;
     }
 
     bool isCommutative() const final {
@@ -266,8 +266,8 @@ public:
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 
-    bool isAssociative() const final {
-        return true;
+    ExpressionNary::Associativity getAssociativity() const final {
+        return ExpressionNary::Associativity::kFull;
     }
 
     bool isCommutative() const final {
@@ -294,8 +294,8 @@ public:
     Value getValue(bool toBeMerged) final;
     void reset() final;
 
-    bool isAssociative() const final {
-        return true;
+    ExpressionNary::Associativity getAssociativity() const final {
+        return ExpressionNary::Associativity::kFull;
     }
 
     bool isCommutative() const final {

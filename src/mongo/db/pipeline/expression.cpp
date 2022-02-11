@@ -3964,7 +3964,7 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
     // If the expression is also commutative we can reorganize all the operands so that all of the
     // constant ones are together (arbitrarily at the back) and we can collapse all of them into
     // one.
-    if (isAssociative()) {
+    if (getAssociativity() == Associativity::kFull || getAssociativity() == Associativity::kLeft) {
         ExpressionVector constExpressions;
         ExpressionVector optimizedOperands;
         for (size_t i = 0; i < _children.size();) {
@@ -3981,7 +3981,8 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
             // is also associative, replace the expression for the operands it has.
             // E.g: sum(a, b, sum(c, d), e) => sum(a, b, c, d, e)
             ExpressionNary* nary = dynamic_cast<ExpressionNary*>(operand.get());
-            if (nary && !strcmp(nary->getOpName(), getOpName()) && nary->isAssociative()) {
+            if (nary && !strcmp(nary->getOpName(), getOpName()) &&
+                nary->getAssociativity() == Associativity::kFull) {
                 invariant(!nary->_children.empty());
                 _children[i] = std::move(nary->_children[0]);
                 _children.insert(
@@ -4010,6 +4011,14 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
                 constExpressions.clear();
             }
             optimizedOperands.push_back(operand);
+            // If the expression is left-associative, break out of the loop since we should only
+            // optimize until the first non-constant.
+            if (getAssociativity() == Associativity::kLeft) {
+                // Dump the remaining operands into the optimizedOperands vector.
+                optimizedOperands.insert(
+                    optimizedOperands.end(), _children.begin() + i + 1, _children.end());
+                break;
+            }
             ++i;
         }
 

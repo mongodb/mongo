@@ -74,20 +74,26 @@ assertConstantFoldingResults([1, 2, 3], 6, 6, "All constants should fold.");
 assertConstantFoldingResults(
     [[1, 2], 3, 4, 5], 15, 120, "Nested operations with all constants should be folded away.");
 
-// Verify that constant folding is disabled.
+// Left-associative test cases.
+assertConstantFoldingResults([1, 2, x],
+                             [3, x],
+                             [2, x],
+                             "Constants should fold left-to-right before the first non-constant.");
 assertConstantFoldingResults(
-    [1, 2, x], [1, 2, x], [1, 2, x], "Constants should not fold left-to-right.");
+    [x, 1, 2],
+    [x, 1, 2],
+    [x, 1, 2],
+    "Constants should not fold left-to-right after the first non-constant.");
 assertConstantFoldingResults(
-    [x, 1, 2], [x, 1, 2], [x, 1, 2], "Constants should not fold left-to-right.");
-assertConstantFoldingResults(
-    [1, x, 2], [1, x, 2], [1, x, 2], "Constants should not fold left-to-right.");
+    [1, x, 2], [1, x, 2], [1, x, 2], "Constants should not fold across non-constants.");
 
-/*
-assertConstantFoldingResult([1, 2, x], [3, x], "Constants should fold left-to-right.");
-assertConstantFoldingResult([1, 2, x, 3], [3, x, 3], "Constants can fold up until a variable.");
-assertConstantFoldingResult(
-    [x, 1, 2, 3], [x, 1, 2, 3], "Variable on the left blocks folding constants.");
-*/
+assertConstantFoldingResults(
+    [5, 2, x, 3, 4], [7, x, 3, 4], [10, x, 3, 4], "Constants should fold up until a non-constant.");
+
+assertConstantFoldingResults([x, 1, 2, 3],
+                             [x, 1, 2, 3],
+                             [x, 1, 2, 3],
+                             "Non-constant at start of operand list blocks folding constants.");
 
 // Non-optimized comparisons -- make sure that non-optimized pipelines will give the same result as
 // optimized ones.

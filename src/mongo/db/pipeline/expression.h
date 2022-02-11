@@ -385,8 +385,10 @@ public:
     */
     virtual void addOperand(const boost::intrusive_ptr<Expression>& pExpression);
 
-    virtual bool isAssociative() const {
-        return false;
+    enum class Associativity { kFull, kLeft, kNone };
+
+    virtual Associativity getAssociativity() const {
+        return Associativity::kNone;
     }
 
     virtual bool isCommutative() const {
@@ -517,13 +519,13 @@ public:
         return accum.getValue(false);
     }
 
-    bool isAssociative() const final {
+    ExpressionNary::Associativity getAssociativity() const final {
         // Return false if a single argument is given to avoid a single array argument being treated
         // as an array instead of as a list of arguments.
         if (this->_children.size() == 1) {
-            return false;
+            return ExpressionNary::Associativity::kNone;
         }
-        return AccumulatorState(this->getExpressionContext()).isAssociative();
+        return AccumulatorState(this->getExpressionContext()).getAssociativity();
     }
 
     bool isCommutative() const final {
@@ -928,12 +930,8 @@ public:
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
-    bool isAssociative() const final {
-        return false;
-    }
-
-    bool isCommutative() const final {
-        return false;
+    Associativity getAssociativity() const final {
+        return Associativity::kLeft;
     }
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -982,8 +980,8 @@ public:
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
-    bool isAssociative() const final {
-        return true;
+    Associativity getAssociativity() const final {
+        return Associativity::kFull;
     }
 
     bool isCommutative() const final {
@@ -1280,8 +1278,8 @@ public:
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
-    bool isAssociative() const final {
-        return true;
+    Associativity getAssociativity() const final {
+        return Associativity::kFull;
     }
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -1305,8 +1303,8 @@ public:
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
-    bool isAssociative() const final {
-        return true;
+    Associativity getAssociativity() const final {
+        return Associativity::kFull;
     }
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -2391,12 +2389,8 @@ public:
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
-    bool isAssociative() const final {
-        return false;
-    }
-
-    bool isCommutative() const final {
-        return false;
+    Associativity getAssociativity() const final {
+        return Associativity::kLeft;
     }
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -2525,8 +2519,8 @@ public:
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
-    bool isAssociative() const final {
-        return true;
+    Associativity getAssociativity() const final {
+        return Associativity::kFull;
     }
 
     bool isCommutative() const final {
@@ -2798,8 +2792,8 @@ public:
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
-    bool isAssociative() const final {
-        return true;
+    Associativity getAssociativity() const final {
+        return Associativity::kFull;
     }
 
     bool isCommutative() const final {
@@ -2853,8 +2847,8 @@ public:
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
-    bool isAssociative() const final {
-        return true;
+    Associativity getAssociativity() const final {
+        return Associativity::kFull;
     }
 
     bool isCommutative() const final {

@@ -140,8 +140,8 @@ public:
 
     void reset() final;
 
-    bool isAssociative() const final {
-        return true;
+    ExpressionNary::Associativity getAssociativity() const final {
+        return ExpressionNary::Associativity::kFull;
     }
 
     bool isCommutative() const final {
@@ -211,8 +211,8 @@ public:
 
     void reset() final;
 
-    bool isAssociative() const final {
-        return true;
+    ExpressionNary::Associativity getAssociativity() const final {
+        return ExpressionNary::Associativity::kFull;
     }
 
     bool isCommutative() const final {
@@ -326,8 +326,8 @@ public:
 
     void reset() final;
 
-    bool isAssociative() const final {
-        return true;
+    ExpressionNary::Associativity getAssociativity() const final {
+        return ExpressionNary::Associativity::kFull;
     }
 
     /**
