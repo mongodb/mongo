@@ -40,6 +40,9 @@
 #include "mongo/logv2/log.h"
 
 namespace mongo {
+namespace {
+MONGO_FAIL_POINT_DEFINE(hangBeforeMajorityReadTransactionStarted);
+}
 
 void WiredTigerSnapshotManager::setCommittedSnapshot(const Timestamp& timestamp) {
     stdx::lock_guard<Latch> lock(_committedSnapshotMutex);
@@ -88,7 +91,14 @@ Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
         return _committedSnapshot.get();
     }();
 
-    WiredTigerBeginTxnBlock txnOpen(session, prepareConflictBehavior, roundUpPreparedTimestamps);
+    if (MONGO_unlikely(hangBeforeMajorityReadTransactionStarted.shouldFail())) {
+        sleepmillis(100);
+    }
+
+    // We need to round up our read timestamp in case the oldest timestamp has advanced past the
+    // committedSnapshot we just read.
+    WiredTigerBeginTxnBlock txnOpen(
+        session, prepareConflictBehavior, roundUpPreparedTimestamps, RoundUpReadTimestamp::kRound);
     auto status = txnOpen.setReadSnapshot(committedSnapshot);
     fassert(30635, status);
 

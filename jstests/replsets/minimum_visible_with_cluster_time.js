@@ -2,7 +2,11 @@
  *  Tests that majority reads can complete successfully even when the cluster time is being
  *  increased rapidly while ddl operations are happening.
  *
- *  @tags: [requires_replication, requires_majority_read_concern]
+ *  @tags: [
+ *    requires_replication,
+ *    requires_majority_read_concern,
+ *    requires_fcv_53
+ *  ]
  */
 (function() {
 'use strict';
@@ -60,57 +64,65 @@ function doMajorityRead(coll, expectedCount) {
 const dbName = 'minimum_visible_with_cluster_time';
 const collName = 'foo';
 
-for (let i = 0; i < 10; i++) {
-    const collNameI = collName + i;
-    jsTestLog(`Testing ${dbName}.${collNameI}`);
+try {
+    assert.commandWorked(primary.getDB(dbName).adminCommand(
+        {'configureFailPoint': 'hangBeforeMajorityReadTransactionStarted', 'mode': 'alwaysOn'}));
 
-    assert.commandWorked(primary.getDB(dbName).createCollection(collNameI));
-    let coll = primary.getDB(dbName).getCollection(collNameI);
+    for (let i = 0; i < 10; i++) {
+        const collNameI = collName + i;
+        jsTestLog(`Testing ${dbName}.${collNameI}`);
 
-    doMajorityRead(coll, 0);
+        assert.commandWorked(primary.getDB(dbName).createCollection(collNameI));
+        let coll = primary.getDB(dbName).getCollection(collNameI);
 
-    assert.commandWorked(coll.insert({x: 7, y: 1}));
-    assert.commandWorked(
-        coll.createIndex({x: 1}, {'name': 'x_1', 'expireAfterSeconds': 60 * 60 * 23}));
+        doMajorityRead(coll, 0);
 
-    // Majority read should eventually see new documents because it will not block on the index
-    // build.
-    assert.soonNoExcept(() => {
-        doMajorityRead(coll, 1);
-        return true;
-    });
+        assert.commandWorked(coll.insert({x: 7, y: 1}));
+        assert.commandWorked(
+            coll.createIndex({x: 1}, {'name': 'x_1', 'expireAfterSeconds': 60 * 60 * 23}));
 
-    assert.commandWorked(coll.insert({x: 7, y: 2}));
-    assert.commandWorked(coll.runCommand(
-        'collMod', {'index': {'keyPattern': {x: 1}, 'expireAfterSeconds': 60 * 60 * 24}}));
-    // Majority read should eventually see new documents because it will not block on the index
-    // build.
-    assert.soonNoExcept(() => {
-        doMajorityRead(coll, 2);
-        return true;
-    });
+        // Majority read should eventually see new documents because it will not block on the index
+        // build.
+        assert.soonNoExcept(() => {
+            doMajorityRead(coll, 1);
+            return true;
+        });
 
-    assert.commandWorked(coll.insert({x: 7, y: 3}));
-    assert.commandWorked(coll.dropIndexes());
+        assert.commandWorked(coll.insert({x: 7, y: 2}));
+        assert.commandWorked(coll.runCommand(
+            'collMod', {'index': {'keyPattern': {x: 1}, 'expireAfterSeconds': 60 * 60 * 24}}));
+        // Majority read should eventually see new documents because it will not block on the index
+        // build.
+        assert.soonNoExcept(() => {
+            doMajorityRead(coll, 2);
+            return true;
+        });
 
-    // Majority read should eventually see new documents because it will not block on the drop.
-    assert.soonNoExcept(() => {
-        doMajorityRead(coll, 3);
-        return true;
-    });
+        assert.commandWorked(coll.insert({x: 7, y: 3}));
+        assert.commandWorked(coll.dropIndexes());
 
-    assert.commandWorked(coll.insert({x: 7, y: 4}));
-    const newCollNameI = collNameI + '_new';
-    assert.commandWorked(coll.renameCollection(newCollNameI));
+        // Majority read should eventually see new documents because it will not block on the drop.
+        assert.soonNoExcept(() => {
+            doMajorityRead(coll, 3);
+            return true;
+        });
 
-    coll = primary.getDB(dbName).getCollection(newCollNameI);
-    // Majority read should immediately see new documents because it blocks on the rename.
-    doMajorityRead(coll, 4);
+        assert.commandWorked(coll.insert({x: 7, y: 4}));
+        const newCollNameI = collNameI + '_new';
+        assert.commandWorked(coll.renameCollection(newCollNameI));
+
+        coll = primary.getDB(dbName).getCollection(newCollNameI);
+        // Majority read should immediately see new documents because it blocks on the rename.
+        doMajorityRead(coll, 4);
+    }
+
+    jsTestLog('Waiting for logical clock thread to stop.');
+    assert.commandWorked(syncColl.insert({t: 'after'}));
+    clusterTimeBumper();
+} finally {
+    assert.commandWorked(primary.getDB(dbName).adminCommand(
+        {'configureFailPoint': 'hangBeforeMajorityReadTransactionStarted', 'mode': 'off'}));
 }
-
-jsTestLog('Waiting for logical clock thread to stop.');
-assert.commandWorked(syncColl.insert({t: 'after'}));
-clusterTimeBumper();
 
 rst.stopSet();
 })();
