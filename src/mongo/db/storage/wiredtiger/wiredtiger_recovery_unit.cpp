@@ -372,10 +372,6 @@ void WiredTigerRecoveryUnit::preallocateSnapshotForOplogRead() {
 }
 
 void WiredTigerRecoveryUnit::refreshSnapshot() {
-    // First, start a new transaction at the same timestamp as the current one.  Then end the
-    // current transaction.  This overlap will prevent WT from cleaning up history required to serve
-    // the read timestamp.
-
     // Currently, this code only works for kNoOverlap or kNoTimestamp.
     invariant(_timestampReadSource == ReadSource::kNoOverlap ||
               _timestampReadSource == ReadSource::kNoTimestamp);
@@ -384,27 +380,10 @@ void WiredTigerRecoveryUnit::refreshSnapshot() {
     invariant(!_noEvictionAfterRollback);
     invariant(_abandonSnapshotMode == AbandonSnapshotMode::kAbort);
 
-    auto newSession = _sessionCache->getSession();
-    WiredTigerBeginTxnBlock txnOpen(newSession->getSession(),
-                                    _prepareConflictBehavior,
-                                    _roundUpPreparedTimestamps,
-                                    RoundUpReadTimestamp::kNoRoundForce);
-    if (_timestampReadSource != ReadSource::kNoTimestamp) {
-        auto status = txnOpen.setReadSnapshot(_readAtTimestamp);
-        fassert(5035300, status);
-    }
-    txnOpen.done();
-
-    // Now end the previous transaction.
-    auto wtSession = _session->getSession();
-    auto wtRet = wtSession->rollback_transaction(wtSession, nullptr);
-    invariantWTOK(wtRet, wtSession);
-    LOGV2_DEBUG(5035301,
-                3,
-                "WT begin_transaction & rollback_transaction",
-                "snapshotId"_attr = getSnapshotId().toNumber());
-
-    _session = std::move(newSession);
+    auto session = _session->getSession();
+    invariantWTOK(session->reset_snapshot(session), session);
+    LOGV2_DEBUG(
+        6235000, 3, "WT refreshed snapshot", "snapshotId"_attr = getSnapshotId().toNumber());
 }
 
 void WiredTigerRecoveryUnit::_txnClose(bool commit) {

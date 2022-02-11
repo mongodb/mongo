@@ -174,27 +174,8 @@ void ValidateState::_yieldCursors(OperationContext* opCtx) {
     _seekRecordStoreCursor->save();
 
     if (isBackground() && _validateTs) {
-        // End current transaction and begin a new one, to help ameliorate WiredTiger cache
-        // pressure.
-
-        // First, move all cursor objects off our operation context, which has the effect of closing
-        // all storage engine cursors in the active transaction.
-        for (const auto& indexCursor : _indexCursors) {
-            indexCursor.second->detachFromOperationContext();
-        }
-        _traverseRecordStoreCursor->detachFromOperationContext();
-        _seekRecordStoreCursor->detachFromOperationContext();
-
-        // This begins a new transaction and then ends the current transaction, in order to preserve
-        // the history required to construct the same snapshot as before.
+        // Reset snapshot to help ameliorate WiredTiger cache pressure.
         opCtx->recoveryUnit()->refreshSnapshot();
-
-        // Move the cursor objects back in preparation for restoring.
-        for (const auto& indexCursor : _indexCursors) {
-            indexCursor.second->reattachToOperationContext(opCtx);
-        }
-        _traverseRecordStoreCursor->reattachToOperationContext(opCtx);
-        _seekRecordStoreCursor->reattachToOperationContext(opCtx);
     }
 
     // Restore all the cursors.

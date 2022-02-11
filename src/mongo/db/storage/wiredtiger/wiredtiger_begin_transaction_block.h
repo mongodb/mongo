@@ -48,8 +48,6 @@ public:
     // Whether or not to round up to the oldest timestamp when the read timestamp is behind it.
     enum class RoundUpReadTimestamp {
         kNoRoundError,  // Do not round to the oldest timestamp. BadValue error may be returned.
-        kNoRoundForce,  // Do not round to the oldest timestamp. Reading older than the oldest
-                        // timestamp is permitted with no error.
         kRound          // Round the read timestamp up to the oldest timestamp when it is behind.
     };
 

@@ -413,8 +413,7 @@ public:
     }
 
     /**
-     * Refreshes a read transaction by starting a new one at the same read timestamp and then ending
-     * the current one.
+     * Refreshes a read transaction by resetting the snapshot in use
      */
     virtual void refreshSnapshot() {}
 

@@ -67,9 +67,6 @@ WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
         }
         builder << "),";
     }
-    if (roundUpReadTimestamp == RoundUpReadTimestamp::kNoRoundForce) {
-        builder << "read_before_oldest=true,";
-    }
 
     const std::string beginTxnConfigString = builder;
     invariantWTOK(_session->begin_transaction(_session, beginTxnConfigString.c_str()), _session);
