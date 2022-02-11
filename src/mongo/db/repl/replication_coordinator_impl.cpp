@@ -776,7 +776,7 @@ void ReplicationCoordinatorImpl::_initialSyncerCompletionFunction(
                   "error"_attr = opTimeStatus.getStatus());
             return;
         } else if (!opTimeStatus.isOK()) {
-            if (_inShutdown) {
+            if (_inShutdown || _inTerminalShutdown) {
                 LOGV2(21325,
                       "Initial Sync failed during shutdown due to {error}",
                       "Initial Sync failed during shutdown",
