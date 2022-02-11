@@ -81,7 +81,7 @@ Status waitForShardRegistryReload(OperationContext* opCtx);
  * Pre-caches mongod routing info for the calling process.
  */
 
-Status preCacheMongosRoutingInfo(OperationContext* opCtx);
+void preCacheMongosRoutingInfo(OperationContext* opCtx);
 
 /**
  * Warms up connections to shards with best effort strategy.
