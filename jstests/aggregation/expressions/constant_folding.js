@@ -19,7 +19,7 @@ const x = "$x"  // fieldpath to "block" constant folding
  * @param {string} message error message
  * @returns true if the explain output matches expectedOutput, and an assertion failure otherwise.
  */
-function assertConstantFoldingResult(op, input, expectedOutput, message) {
+function assertConstantFoldingResultForOp(op, input, expectedOutput, message) {
     const buildExpressionFromArguments = (arr, op) => {
         if (Array.isArray(arr)) {
             return {
@@ -41,25 +41,28 @@ function assertConstantFoldingResult(op, input, expectedOutput, message) {
         {explain: {aggregate: "coll", pipeline: pipeline, cursor: {}}, verbosity: 'queryPlanner'});
 
     assert(result.stages && result.stages[1] && result.stages[1].$group, result);
-    const expected = buildExpressionFromArguments(expectedOutput, "$add");
-    assert.eq(result.stages[1].$group._id,
-              expected,
-              message + ": " + tojson(result.stages[1].$group._id));
+    const expected = buildExpressionFromArguments(expectedOutput, op);
+    assert.eq(result.stages[1].$group._id, expected, message);
     return true;
 }
 
+function assertConstantFoldingResults(input, addOutput, multiplyOutput, message) {
+    assertConstantFoldingResultForOp("$add", input, addOutput, message);
+    assertConstantFoldingResultForOp("$multiply", input, multiplyOutput, message);
+}
+
 // Totally fold constants.
-assertConstantFoldingResult("$add", [1, 2, 3], 6, "All constants should fold.");
-assertConstantFoldingResult(
-    "$add", [[1, 2], 3, 4, 5], 15, "Nested $adds with all constants should be folded away.");
+assertConstantFoldingResults([1, 2, 3], 6, 6, "All constants should fold.");
+assertConstantFoldingResults(
+    [[1, 2], 3, 4, 5], 15, 120, "Nested operations with all constants should be folded away.");
 
 // Verify that constant folding is disabled.
-assertConstantFoldingResult(
-    "$add", [1, 2, x], [1, 2, x], "Constants should not fold left-to-right.");
-assertConstantFoldingResult(
-    "$add", [x, 1, 2], [x, 1, 2], "Constants should not fold left-to-right.");
-assertConstantFoldingResult(
-    "$add", [1, x, 2], [1, x, 2], "Constants should not fold left-to-right.");
+assertConstantFoldingResults(
+    [1, 2, x], [1, 2, x], [1, 2, x], "Constants should not fold left-to-right.");
+assertConstantFoldingResults(
+    [x, 1, 2], [x, 1, 2], [x, 1, 2], "Constants should not fold left-to-right.");
+assertConstantFoldingResults(
+    [1, x, 2], [1, x, 2], [1, x, 2], "Constants should not fold left-to-right.");
 
 /*
 assertConstantFoldingResult([1, 2, x], [3, x], "Constants should fold left-to-right.");
