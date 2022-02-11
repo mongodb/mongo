@@ -465,7 +465,7 @@ TEST(AES, GCMAdditionalAuthenticatedData) {
     GCMAdditionalAuthenticatedDataHelper(false);
 }
 
-class AESGCMTestVectors : public unittest::Test {
+class AESTestVectors : public unittest::Test {
 public:
     class GCMTestVector {
     public:
@@ -626,7 +626,7 @@ public:
 /** Test vectors drawn from
  *  https://csrc.nist.rip/groups/ST/toolkit/BCM/documents/proposedmodes/gcm/gcm-spec.pdf
  */
-TEST_F(AESGCMTestVectors, TestCase13) {
+TEST_F(AESTestVectors, GCMTestCase13) {
     evaluate(
         GCMTestVector("00000000000000000000000000000000"
                       "00000000000000000000000000000000"_sd,
@@ -637,7 +637,7 @@ TEST_F(AESGCMTestVectors, TestCase13) {
                       "530f8afbc74536b9a963b4f1c4cb738b"_sd));
 }
 
-TEST_F(AESGCMTestVectors, TestCase14) {
+TEST_F(AESTestVectors, GCMTestCase14) {
     evaluate(
         GCMTestVector("00000000000000000000000000000000"
                       "00000000000000000000000000000000"_sd,
@@ -648,7 +648,7 @@ TEST_F(AESGCMTestVectors, TestCase14) {
                       "d0d1c8a799996bf0265b98b5d48ab919"_sd));
 }
 
-TEST_F(AESGCMTestVectors, TestCase15) {
+TEST_F(AESTestVectors, GCMTestCase15) {
     evaluate(
         GCMTestVector("feffe9928665731c6d6a8f9467308308"
                       "feffe9928665731c6d6a8f9467308308"_sd,
@@ -665,7 +665,7 @@ TEST_F(AESGCMTestVectors, TestCase15) {
                       "b094dac5d93471bdec1a502270e3cc6c"_sd));
 }
 
-TEST_F(AESGCMTestVectors, TestCase16) {
+TEST_F(AESTestVectors, GCMTestCase16) {
     evaluate(
         GCMTestVector("feffe9928665731c6d6a8f9467308308"
                       "feffe9928665731c6d6a8f9467308308"_sd,
@@ -686,7 +686,7 @@ TEST_F(AESGCMTestVectors, TestCase16) {
 // AES-CTR test vectors are obtained here:
 // https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38a.pdf
 
-TEST_F(AESGCMTestVectors, CTRTestCase1) {
+TEST_F(AESTestVectors, CTRTestCase1) {
     evaluate(
         CTRTestVector("603deb1015ca71be2b73aef0857d7781"
                       "1f352c073b6108d72d9810a30914dff4",
@@ -695,7 +695,7 @@ TEST_F(AESGCMTestVectors, CTRTestCase1) {
                       "601ec313775789a5b7a7f504bbf3d228"));
 }
 
-TEST_F(AESGCMTestVectors, CTRTestCase2) {
+TEST_F(AESTestVectors, CTRTestCase2) {
     evaluate(
         CTRTestVector("603deb1015ca71be2b73aef0857d7781"
                       "1f352c073b6108d72d9810a30914dff4",
@@ -704,7 +704,7 @@ TEST_F(AESGCMTestVectors, CTRTestCase2) {
                       "f443e3ca4d62b59aca84e990cacaf5c5"));
 }
 
-TEST_F(AESGCMTestVectors, CTRTestCase3) {
+TEST_F(AESTestVectors, CTRTestCase3) {
     evaluate(
         CTRTestVector("603deb1015ca71be2b73aef0857d7781"
                       "1f352c073b6108d72d9810a30914dff4",
@@ -713,7 +713,7 @@ TEST_F(AESGCMTestVectors, CTRTestCase3) {
                       "2b0930daa23de94ce87017ba2d84988d"));
 }
 
-TEST_F(AESGCMTestVectors, CTRTestCase4) {
+TEST_F(AESTestVectors, CTRTestCase4) {
     evaluate(
         CTRTestVector("603deb1015ca71be2b73aef0857d7781"
                       "1f352c073b6108d72d9810a30914dff4",
@@ -722,7 +722,7 @@ TEST_F(AESGCMTestVectors, CTRTestCase4) {
                       "dfc9c58db67aada613c2dd08457941a6"));
 }
 
-TEST_F(AESGCMTestVectors, CTRTestCase1234) {
+TEST_F(AESTestVectors, CTRTestCase1234) {
     evaluate(
         CTRTestVector("603deb1015ca71be2b73aef0857d7781"
                       "1f352c073b6108d72d9810a30914dff4",
