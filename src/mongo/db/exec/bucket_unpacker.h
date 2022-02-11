@@ -144,6 +144,7 @@ public:
         ExpressionContext::CollationMatchesDefault collationMatchesDefault,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         bool haveComputedMetaField,
+        bool includeMetaField,
         bool assumeNoMixedSchemaData,
         IneligiblePredicatePolicy policy);
 
@@ -172,6 +173,7 @@ public:
         ExpressionContext::CollationMatchesDefault collationMatchesDefault,
         const BSONObj& predicate,
         bool haveComputedMetaField,
+        bool includeMetaField,
         bool assumeNoMixedSchemaData,
         IneligiblePredicatePolicy policy);
 

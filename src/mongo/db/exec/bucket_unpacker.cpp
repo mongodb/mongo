@@ -212,6 +212,7 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
     ExpressionContext::CollationMatchesDefault collationMatchesDefault,
     boost::intrusive_ptr<ExpressionContext> pExpCtx,
     bool haveComputedMetaField,
+    bool includeMetaField,
     bool assumeNoMixedSchemaData,
     IneligiblePredicatePolicy policy) {
     using namespace timeseries;
@@ -254,6 +255,9 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
 
         if (haveComputedMetaField)
             return handleIneligible(policy, matchExpr, "can't handle a computed meta field");
+
+        if (!includeMetaField)
+            return handleIneligible(policy, matchExpr, "cannot handle an excluded meta field");
 
         auto result = matchExpr->shallowClone();
         expression::applyRenamesToExpression(
@@ -447,6 +451,7 @@ std::unique_ptr<MatchExpression> BucketSpec::createPredicatesOnBucketLevelField(
     ExpressionContext::CollationMatchesDefault collationMatchesDefault,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     bool haveComputedMetaField,
+    bool includeMetaField,
     bool assumeNoMixedSchemaData,
     IneligiblePredicatePolicy policy) {
 
@@ -463,6 +468,7 @@ std::unique_ptr<MatchExpression> BucketSpec::createPredicatesOnBucketLevelField(
                                                                 collationMatchesDefault,
                                                                 pExpCtx,
                                                                 haveComputedMetaField,
+                                                                includeMetaField,
                                                                 assumeNoMixedSchemaData,
                                                                 policy)) {
                 andMatchExpr->add(std::move(child));
@@ -494,6 +500,7 @@ std::unique_ptr<MatchExpression> BucketSpec::createPredicatesOnBucketLevelField(
                                                             collationMatchesDefault,
                                                             pExpCtx,
                                                             haveComputedMetaField,
+                                                            includeMetaField,
                                                             assumeNoMixedSchemaData,
                                                             policy);
             if (child) {
@@ -522,6 +529,7 @@ std::unique_ptr<MatchExpression> BucketSpec::createPredicatesOnBucketLevelField(
             collationMatchesDefault,
             pExpCtx,
             haveComputedMetaField,
+            includeMetaField,
             assumeNoMixedSchemaData,
             policy);
     } else if (matchExpr->matchType() == MatchExpression::GEO) {
@@ -575,6 +583,7 @@ std::unique_ptr<MatchExpression> BucketSpec::createPredicatesOnBucketLevelField(
                                                    collationMatchesDefault,
                                                    pExpCtx,
                                                    haveComputedMetaField,
+                                                   includeMetaField,
                                                    assumeNoMixedSchemaData,
                                                    policy);
 
@@ -604,6 +613,7 @@ BSONObj BucketSpec::pushdownPredicate(
     ExpressionContext::CollationMatchesDefault collationMatchesDefault,
     const BSONObj& predicate,
     bool haveComputedMetaField,
+    bool includeMetaField,
     bool assumeNoMixedSchemaData,
     IneligiblePredicatePolicy policy) {
 
@@ -647,6 +657,7 @@ BSONObj BucketSpec::pushdownPredicate(
               collationMatchesDefault,
               expCtx,
               haveComputedMetaField,
+              includeMetaField,
               assumeNoMixedSchemaData,
               policy)
         : nullptr;

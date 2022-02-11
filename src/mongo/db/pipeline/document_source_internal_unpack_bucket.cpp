@@ -519,18 +519,9 @@ DocumentSourceInternalUnpackBucket::createPredicatesOnBucketLevelField(
         pExpCtx->collationMatchesDefault,
         pExpCtx,
         haveComputedMetaField(),
+        _bucketUnpacker.includeMetaField(),
         _assumeNoMixedSchemaData,
         BucketSpec::IneligiblePredicatePolicy::kIgnore);
-}
-
-std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
-DocumentSourceInternalUnpackBucket::splitMatchOnMetaAndRename(
-    boost::intrusive_ptr<DocumentSourceMatch> match) {
-    if (auto&& metaField = _bucketUnpacker.bucketSpec().metaField()) {
-        return std::move(*match).extractMatchOnFieldsAndRemainder(
-            {*metaField}, {{*metaField, timeseries::kBucketMetaFieldName.toString()}});
-    }
-    return {nullptr, match};
 }
 
 std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractProjectForPushDown(
@@ -752,6 +743,10 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         Pipeline::optimizeEndOfPipeline(itr, container);
         if (std::next(itr) == container->end()) {
             return container->end();
+        } else {
+            // Kick back out to optimizing this stage again a level up, so any matches that were
+            // moved to directly after this stage can be moved before it if possible.
+            return itr;
         }
     }
     {
@@ -774,25 +769,6 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
                                                      BucketUnpacker::Behavior::kInclude);
 
             // Keep going for next optimization.
-        }
-    }
-
-    // Attempt to push predicates on the metaField past $_internalUnpackBucket.
-    if (auto nextMatch = dynamic_cast<DocumentSourceMatch*>(std::next(itr)->get());
-        nextMatch && !haveComputedMetaField) {
-        auto [metaMatch, remainingMatch] = splitMatchOnMetaAndRename(nextMatch);
-
-        // The old $match can be removed and potentially replaced with 'remainingMatch'.
-        container->erase(std::next(itr));
-        if (remainingMatch) {
-            container->insert(std::next(itr), remainingMatch);
-        }
-
-        // 'metaMatch' can be pushed down and given a chance to optimize with other stages.
-        if (metaMatch) {
-            container->insert(itr, metaMatch);
-            return std::prev(itr) == container->begin() ? std::prev(itr)
-                                                        : std::prev(std::prev(itr));
         }
     }
 
@@ -853,4 +829,15 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
 
     return container->end();
 }
+
+DocumentSource::GetModPathsReturn DocumentSourceInternalUnpackBucket::getModifiedPaths() const {
+    if (_bucketUnpacker.includeMetaField()) {
+        StringMap<std::string> renames;
+        renames.emplace(*_bucketUnpacker.bucketSpec().metaField(),
+                        timeseries::kBucketMetaFieldName);
+        return {GetModPathsReturn::Type::kAllExcept, std::set<std::string>{}, std::move(renames)};
+    }
+    return {GetModPathsReturn::Type::kAllPaths, std::set<std::string>{}, {}};
+}
+
 }  // namespace mongo

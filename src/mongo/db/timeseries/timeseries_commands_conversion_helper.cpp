@@ -124,6 +124,10 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
                 // computed fields.
                 bool haveComputedMetaField = false;
 
+                // partialFilterExpression is evaluated against a collection, so there are no
+                // exclusions
+                bool includeMetaField = options.getMetaField().has_value();
+
                 // As part of building the index, we verify that the collection does not contain
                 // any mixed-schema buckets. So by the time the index is visible to the query
                 // planner, this will be true.
@@ -135,6 +139,7 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
                                                   collationMatchesDefault,
                                                   pred,
                                                   haveComputedMetaField,
+                                                  includeMetaField,
                                                   assumeNoMixedSchemaData,
                                                   BucketSpec::IneligiblePredicatePolicy::kError);
                 builder.append(IndexDescriptor::kPartialFilterExprFieldName, bucketPred);
