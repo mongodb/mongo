@@ -198,6 +198,9 @@ public:
     // Namespace used for storing retryable findAndModify images.
     static const NamespaceString kConfigImagesNamespace;
 
+    // Namespace used for persisting ConfigsvrCoordinator state documents.
+    static const NamespaceString kConfigsvrCoordinatorsNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

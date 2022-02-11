@@ -368,3 +368,12 @@ commands:
         namespace: concatenate_with_db
         chained_structs:
             CollModRequest: CollModRequest
+
+    _configsvrSetUserWriteBlockMode:
+        command_name: _configsvrSetUserWriteBlockMode
+        cpp_name: ConfigsvrSetUserWriteBlockMode
+        description: "internal _configsvrSetUserWriteBlockMode command"
+        namespace: type
+        api_version: ""
+        type: bool
+        strict: false

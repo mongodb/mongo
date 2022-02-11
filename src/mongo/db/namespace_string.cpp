@@ -142,6 +142,9 @@ const NamespaceString NamespaceString::kForceOplogBatchBoundaryNamespace(
 const NamespaceString NamespaceString::kConfigImagesNamespace(NamespaceString::kConfigDb,
                                                               "image_collection");
 
+const NamespaceString NamespaceString::kConfigsvrCoordinatorsNamespace(
+    NamespaceString::kConfigDb, "sharding_configsvr_coordinators");
+
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
 }
@@ -169,6 +172,8 @@ bool NamespaceString::isLegalClientSystemNS(
         if (coll().find(".system.resharding.") != std::string::npos)
             return true;
         if (coll() == kShardingDDLCoordinatorsNamespace.coll())
+            return true;
+        if (coll() == kConfigsvrCoordinatorsNamespace.coll())
             return true;
     } else if (db() == kLocalDb) {
         if (coll() == kSystemReplSetNamespace.coll())
