@@ -39,6 +39,7 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/multitenancy.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/db/write_block_bypass_propagation_egress_hook.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
@@ -59,6 +60,7 @@ void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRe
     BSONElement helloClientElem;
     BSONElement impersonationElem;
     BSONElement clientOperationKeyElem;
+    BSONElement mayBypassWriteBlockingElem;
 
     for (const auto& metadataElem : opMsg.body) {
         auto fieldName = metadataElem.fieldNameStringData();
@@ -72,6 +74,8 @@ void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRe
             impersonationElem = metadataElem;
         } else if (fieldName == "clientOperationKey"_sd) {
             clientOperationKeyElem = metadataElem;
+        } else if (fieldName == kMayBypassWriteBlockingFieldName) {
+            mayBypassWriteBlockingElem = metadataElem;
         }
     }
 
@@ -107,6 +111,14 @@ void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRe
         uassertStatusOK(TrackingMetadata::readFromMetadata(trackingElem));
 
     VectorClock::get(opCtx)->gossipIn(opCtx, opMsg.body, !cmdRequiresAuth);
+
+    if (mayBypassWriteBlockingElem) {
+        uassert(6317600,
+                "mayBypassWriteBlockingElem was not false",
+                !mayBypassWriteBlockingElem.Bool());
+        // TODO SERVER-63177: Change above to something like:
+        // WriteBlockBypass::get(opCtx)->setActive(mayBypassWriteBlockingElem.Bool());
+    }
 }
 
 namespace {

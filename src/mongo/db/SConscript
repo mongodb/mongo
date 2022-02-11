@@ -1972,6 +1972,16 @@ env.Library(
 )
 
 env.Library(
+    target='write_block_bypass_propagation_egress_hook',
+    source=[
+        'write_block_bypass_propagation_egress_hook.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/rpc/metadata',
+    ],
+)
+
+env.Library(
     target='vector_clock_test_fixture',
     source=[
         'vector_clock_test_fixture.cpp',
