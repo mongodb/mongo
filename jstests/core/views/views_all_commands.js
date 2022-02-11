@@ -223,6 +223,11 @@ let viewsCommandTests = {
     commitReshardCollection: {skip: isUnrelated},
     commitTransaction: {skip: isUnrelated},
     compact: {command: {compact: "view", force: true}, expectFailure: true, skipSharded: true},
+    compactStructuredEncryptionData: {
+        command: {compactStructuredEncryptionData: "view", compactionTokens: {}},
+        expectFailure: true,
+        skipSharded: true
+    },
     configureFailPoint: {skip: isUnrelated},
     configureCollectionAutoSplitter: {
         skip: isUnrelated

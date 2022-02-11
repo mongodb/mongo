@@ -2718,6 +2718,45 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "compactStructuredEncryptionData",
+          command: {compactStructuredEncryptionData: "foo", compactionTokens : {}},
+          skipSharded: true,
+          //skipUnlessReplicaSet: true,
+          skipTest:
+              (conn) => !TestData.setParameters.featureFlagFLE2,
+          setup: function(db) {
+              assert.commandWorked(db.createCollection("foo", {
+                encryptedFields: {
+                    "fields": [
+                        {
+                            "path": "firstName",
+                            "keyId": UUID("11d58b8a-0c6c-4d69-a0bd-70c6d9befae9"),
+                            "bsonType": "string",
+                            "queries": {"queryType": "equality"}
+                        },
+                    ]
+                }
+              }));
+          },
+          teardown: function(db) {
+              assert.commandWorked(db.dropDatabase());
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: { readWrite : 1, readWriteAnyDatabase : 1, dbOwner : 1, root : 1, __system : 1 },
+                privileges:
+                    [{resource: {db: firstDbName, collection: "foo"}, actions: ["compactStructuredEncryptionData"]}]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: { readWriteAnyDatabase : 1, root : 1, __system : 1 },
+                privileges:
+                    [{resource: {db: secondDbName, collection: "foo"}, actions: ["compactStructuredEncryptionData"]}]
+              }
+          ]
+        },
+        {
           testname: "connectionStatus",
           command: {connectionStatus: 1},
           testcases: [

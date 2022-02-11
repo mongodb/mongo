@@ -67,6 +67,7 @@ enums:
            collMod :  "collMod"
            collStats :  "collStats"
            compact :  "compact"
+           compactStructuredEncryptionData: "compactStructuredEncryptionData"
            connPoolStats :  "connPoolStats"
            connPoolSync :  "connPoolSync"
            convertToCapped :  "convertToCapped"
@@ -221,6 +222,7 @@ enums:
                         - changeStream
                         - collMod
                         - collStats
+                        - compactStructuredEncryptionData
                         - convertToCapped
                         - createCollection
                         - createIndex
@@ -258,6 +260,7 @@ enums:
                         - changeStream
                         - collMod
                         - collStats
+                        - compactStructuredEncryptionData
                         - convertToCapped
                         - createCollection
                         - createIndex

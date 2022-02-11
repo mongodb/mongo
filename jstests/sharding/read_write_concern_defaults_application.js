@@ -270,6 +270,7 @@ let testCases = {
         useLogs: true,
     },
     compact: {skip: "does not accept read or write concern"},
+    compactStructuredEncryptionData: {skip: "does not accept read or write concern"},
     configureCollectionAutoSplitter: {
         skip: "does not accept read or write concern"
     },  // TODO SERVER-62374: remove this once 5.3 becomes last continuos release

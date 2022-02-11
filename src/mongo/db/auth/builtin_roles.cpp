@@ -123,11 +123,12 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
     // Read-write role
     readWriteRoleActions += readRoleActions;
     readWriteRoleActions
+        << ActionType::compactStructuredEncryptionData
         << ActionType::convertToCapped  // db admin gets this also
         << ActionType::createCollection  // db admin gets this also
+        << ActionType::createIndex
         << ActionType::dropCollection
         << ActionType::dropIndex
-        << ActionType::createIndex
         << ActionType::insert
         << ActionType::remove
         << ActionType::renameCollectionSameDB  // db admin gets this also

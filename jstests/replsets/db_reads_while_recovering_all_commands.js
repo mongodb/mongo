@@ -122,6 +122,7 @@ const allCommands = {
     commitReshardCollection: {skip: isPrimaryOnly},
     commitTransaction: {skip: isPrimaryOnly},
     compact: {skip: isNotAUserDataRead},
+    compactStructuredEncryptionData: {skip: isPrimaryOnly},
     configureFailPoint: {skip: isNotAUserDataRead},
     configureCollectionBalancing: {skip: isPrimaryOnly},
     connPoolStats: {skip: isNotAUserDataRead},

@@ -226,6 +226,19 @@ env.Library(
 )
 
 env.Library(
+    target="fle2_compact",
+    source=[
+        'fle2_compact.cpp',
+        'fle2_compact.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
+        '$BUILD_DIR/mongo/db/catalog_raii',
+        '$BUILD_DIR/mongo/db/commands',
+    ]
+)
+
+env.Library(
     target="mongod_fsync",
     source=[
         "fsync.cpp",
@@ -557,6 +570,7 @@ env.Library(
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
         'core',
+        'fle2_compact',
         'kill_common',
         'map_reduce_agg',
         'mongod_fcv',
