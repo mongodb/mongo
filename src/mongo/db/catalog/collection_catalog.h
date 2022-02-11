@@ -166,7 +166,7 @@ public:
      */
     void dropCollection(OperationContext* opCtx, Collection* coll) const;
 
-    void onCloseDatabase(OperationContext* opCtx, std::string dbName);
+    void onCloseDatabase(OperationContext* opCtx, TenantDatabaseName tenantDbName);
 
     /**
      * Register the collection with `uuid`.

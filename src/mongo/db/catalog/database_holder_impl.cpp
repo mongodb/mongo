@@ -319,9 +319,8 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, const TenantDatabaseName
 
     LOGV2_DEBUG(20311, 2, "DatabaseHolder::close", "db"_attr = tenantDbName);
 
-    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.onCloseDatabase(opCtx, tenantDbName.dbName());
-    });
+    CollectionCatalog::write(
+        opCtx, [&](CollectionCatalog& catalog) { catalog.onCloseDatabase(opCtx, tenantDbName); });
 
     delete db;
     db = nullptr;

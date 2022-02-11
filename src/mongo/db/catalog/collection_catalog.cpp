@@ -587,10 +587,10 @@ void CollectionCatalog::dropCollection(OperationContext* opCtx, Collection* coll
     PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
 }
 
-void CollectionCatalog::onCloseDatabase(OperationContext* opCtx, std::string dbName) {
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
-    auto rid = ResourceId(RESOURCE_DATABASE, dbName);
-    removeResource(rid, dbName);
+void CollectionCatalog::onCloseDatabase(OperationContext* opCtx, TenantDatabaseName tenantDbName) {
+    invariant(opCtx->lockState()->isDbLockedForMode(tenantDbName.dbName(), MODE_X));
+    auto rid = ResourceId(RESOURCE_DATABASE, tenantDbName.dbName());
+    removeResource(rid, tenantDbName.dbName());
 }
 
 void CollectionCatalog::onCloseCatalog(OperationContext* opCtx) {

@@ -66,7 +66,7 @@ public:
 
 private:
     std::set<TenantDatabaseName> _getNamesWithConflictingCasing_inlock(
-        const TenantDatabaseName& tdb);
+        const TenantDatabaseName& tenantDbName);
 
     typedef stdx::unordered_map<TenantDatabaseName, Database*> DBs;
     mutable SimpleMutex _m;
