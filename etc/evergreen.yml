@@ -6314,15 +6314,16 @@ tasks:
         build_variants: [rhel70, windows]
 
     # Put the debug symbols
+    # push directly to repo due to limitations in file size SERVER-63432
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
         aws_key: ${aws_key}
         permissions: public-read
         local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
-        bucket: build-push-testing
+        bucket: ${push_bucket}
         content_type: ${content_type|application/gzip}
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}
+        remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
         optional: true
 
     # Put the binaries tarball signature
@@ -6732,10 +6733,7 @@ tasks:
         aws_secret: ${aws_secret}
         optional: true
         s3_copy_files:
-            #Debug Symbols
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'}}
-
+            #Debug Symbols  temporarily removed - see SERVER-63432 - need to s3.push debugsymbols due to size limit
             #Debug Symbols Signature
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.sig', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig', 'bucket': '${push_bucket}'}}
