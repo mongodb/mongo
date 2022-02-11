@@ -171,6 +171,8 @@ public:
         _associativeOnly = Testable::create(&expCtx, ExpressionNary::Associativity::kFull, false);
         _associativeAndCommutative =
             Testable::create(&expCtx, ExpressionNary::Associativity::kFull, true);
+        _leftAssociativeOnly =
+            Testable::create(&expCtx, ExpressionNary::Associativity::kLeft, false);
     }
 
 protected:
@@ -206,6 +208,7 @@ protected:
     intrusive_ptr<Testable> _notAssociativeNorCommutative;
     intrusive_ptr<Testable> _associativeOnly;
     intrusive_ptr<Testable> _associativeAndCommutative;
+    intrusive_ptr<Testable> _leftAssociativeOnly;
 };
 
 TEST_F(ExpressionNaryTest, AddedConstantOperandIsSerialized) {
@@ -302,6 +305,27 @@ TEST_F(ExpressionNaryTest, GroupingOptimizationOnAssociativeOnlyFrontOperands) {
     assertContents(_associativeOnly, BSON_ARRAY(BSON_ARRAY(55 << 66) << "$path"));
 }
 
+TEST_F(ExpressionNaryTest, GroupingOptimizationOnLeftAssociativeOnlyFrontOperands) {
+    BSONArray spec = BSON_ARRAY(55 << 66 << "$path");
+    addOperandArrayToExpr(_leftAssociativeOnly, spec);
+    assertContents(_leftAssociativeOnly, spec);
+    intrusive_ptr<Expression> optimized = _leftAssociativeOnly->optimize();
+    ASSERT(_leftAssociativeOnly == optimized);
+    assertContents(_leftAssociativeOnly, BSON_ARRAY(BSON_ARRAY(55 << 66) << "$path"));
+}
+
+
+TEST_F(ExpressionNaryTest, GroupingOptimizationOnlyExecuteOnLeftAssociativeOnlyFrontConstants) {
+    BSONArray spec = BSON_ARRAY(55 << 66 << "$path" << 77 << 88 << "$path1" << 99 << 1010);
+    addOperandArrayToExpr(_leftAssociativeOnly, spec);
+    assertContents(_leftAssociativeOnly, spec);
+    intrusive_ptr<Expression> optimized = _leftAssociativeOnly->optimize();
+    ASSERT(_leftAssociativeOnly == optimized);
+    assertContents(
+        _leftAssociativeOnly,
+        BSON_ARRAY(BSON_ARRAY(55 << 66) << "$path" << 77 << 88 << "$path1" << 99 << 1010));
+}
+
 TEST_F(ExpressionNaryTest, GroupingOptimizationOnAssociativeOnlyMiddleOperands) {
     BSONArray spec = BSON_ARRAY("$path1" << 55 << 66 << "$path");
     addOperandArrayToExpr(_associativeOnly, spec);
@@ -309,6 +333,15 @@ TEST_F(ExpressionNaryTest, GroupingOptimizationOnAssociativeOnlyMiddleOperands) 
     intrusive_ptr<Expression> optimized = _associativeOnly->optimize();
     ASSERT(_associativeOnly == optimized);
     assertContents(_associativeOnly, BSON_ARRAY("$path1" << BSON_ARRAY(55 << 66) << "$path"));
+}
+
+TEST_F(ExpressionNaryTest, GroupingOptimizationNotExecuteOnLeftAssociativeOnlyMiddleOperands) {
+    BSONArray spec = BSON_ARRAY("$path1" << 55 << 66 << "$path");
+    addOperandArrayToExpr(_leftAssociativeOnly, spec);
+    assertContents(_leftAssociativeOnly, spec);
+    intrusive_ptr<Expression> optimized = _leftAssociativeOnly->optimize();
+    ASSERT(_leftAssociativeOnly == optimized);
+    assertContents(_leftAssociativeOnly, BSON_ARRAY("$path1" << 55 << 66 << "$path"));
 }
 
 TEST_F(ExpressionNaryTest, GroupingOptimizationOnAssociativeOnlyBackOperands) {
@@ -319,6 +352,16 @@ TEST_F(ExpressionNaryTest, GroupingOptimizationOnAssociativeOnlyBackOperands) {
     ASSERT(_associativeOnly == optimized);
     assertContents(_associativeOnly, BSON_ARRAY("$path" << BSON_ARRAY(55 << 66)));
 }
+
+TEST_F(ExpressionNaryTest, GroupingOptimizationNotExecuteOnLeftAssociativeOnlyBackOperands) {
+    BSONArray spec = BSON_ARRAY("$path" << 55 << 66);
+    addOperandArrayToExpr(_leftAssociativeOnly, spec);
+    assertContents(_leftAssociativeOnly, spec);
+    intrusive_ptr<Expression> optimized = _leftAssociativeOnly->optimize();
+    ASSERT(_leftAssociativeOnly == optimized);
+    assertContents(_leftAssociativeOnly, BSON_ARRAY("$path" << 55 << 66));
+}
+
 
 TEST_F(ExpressionNaryTest, GroupingOptimizationOnAssociativeOnlyNotExecuteOnSingleConstantsFront) {
     BSONArray spec = BSON_ARRAY(55 << "$path");
@@ -364,6 +407,7 @@ TEST_F(ExpressionNaryTest, FlattenOptimizationNotDoneOnOtherExpressionsForAssoci
     ASSERT(_associativeOnly == optimized);
     assertContents(_associativeOnly, spec);
 }
+
 
 TEST_F(ExpressionNaryTest, FlattenOptimizationNotDoneOnSameButNotAssociativeExpression) {
     BSONArrayBuilder specBuilder;
@@ -459,6 +503,30 @@ TEST_F(ExpressionNaryTest, FlattenInnerOperandsOptimizationOnAssociativeOnlyFron
 
     BSONArray expectedContent = BSON_ARRAY(100 << "$path1" << BSON_ARRAY(101 << 99) << "$path2");
     assertContents(_associativeOnly, expectedContent);
+}
+
+
+// Test that if there is an expression of the same type as the first operand
+// in a non-commutative but left-associative expression, the inner expression is not expanded.
+TEST_F(ExpressionNaryTest,
+       FlattenInnerOperandsOptimizationOnLeftAssociativeFrontOperandAndGroupIsNoOp) {
+    BSONArrayBuilder specBuilder;
+
+    intrusive_ptr<Testable> innerOperand =
+        Testable::create(&expCtx, ExpressionNary::Associativity::kLeft, false);
+    addOperandArrayToExpr(innerOperand, BSON_ARRAY("$path" << 100 << 200 << "$path1" << 101));
+    specBuilder.append(expressionToBson(innerOperand));
+    _leftAssociativeOnly->addOperand(innerOperand);
+
+    addOperandArrayToExpr(_leftAssociativeOnly, BSON_ARRAY(99 << "$path2"));
+    specBuilder << 99 << "$path2";
+
+    BSONArray spec = specBuilder.arr();
+    assertContents(_leftAssociativeOnly, spec);
+    intrusive_ptr<Expression> optimized = _leftAssociativeOnly->optimize();
+    ASSERT(_leftAssociativeOnly == optimized);
+
+    assertContents(_leftAssociativeOnly, spec);
 }
 
 // Test that if there is an expression of the same type in the middle of the operands

@@ -3962,6 +3962,10 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
             getExpressionContext(), evaluate(Document(), &(getExpressionContext()->variables))));
     }
 
+    // An operator cannot be left-associative and commutative, because left-associative
+    // operators need to preserve their order-of-operations.
+    invariant(!(getAssociativity() == Associativity::kLeft && isCommutative()));
+
     // If the expression is associative, we can collapse all the consecutive constant operands
     // into one by applying the expression to those consecutive constant operands. If the
     // expression is also commutative we can reorganize all the operands so that all of the
