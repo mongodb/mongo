@@ -312,11 +312,6 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
         sourceLock.emplace(opCtx, source, MODE_X);
     }
 
-    auto status = checkSourceAndTargetNamespaces(
-        opCtx, source, target, options, /* targetExistsAllowed */ false);
-    if (!status.isOK())
-        return status;
-
     const TenantDatabaseName tenantDbName(boost::none, source.db());
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, tenantDbName);
     auto catalog = CollectionCatalog::get(opCtx);
@@ -325,6 +320,11 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
 
     checkCollectionUUIDMismatch(opCtx, source, sourceColl, options.expectedSourceUUID);
     checkCollectionUUIDMismatch(opCtx, target, targetColl, options.expectedTargetUUID);
+
+    auto status = checkSourceAndTargetNamespaces(
+        opCtx, source, target, options, /* targetExistsAllowed */ false);
+    if (!status.isOK())
+        return status;
 
     AutoStatsTracker statsTracker(
         opCtx,

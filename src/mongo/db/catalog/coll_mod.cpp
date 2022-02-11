@@ -665,6 +665,7 @@ Status _collModInternal(OperationContext* opCtx,
             // the shardVersion is upto date before throwing an error.
             CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
         }
+        checkCollectionUUIDMismatch(opCtx, nss, nullptr, cmd.getCollectionUUID());
         return Status(ErrorCodes::NamespaceNotFound, "ns does not exist");
     }
 

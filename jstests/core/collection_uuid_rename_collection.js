@@ -115,6 +115,20 @@ assert.eq(res.collectionUUID, uuid(coll));
 assert.eq(res.expectedNamespace, coll2.getFullName());
 assert.eq(res.actualNamespace, coll.getFullName());
 
+// The command fails when the provided UUID corresponds to a different collection, even if the
+// provided source namespace does not exist.
+coll2.drop();
+res = assert.commandFailedWithCode(testDB.adminCommand({
+    renameCollection: coll2.getFullName(),
+    to: coll3.getFullName(),
+    dropTarget: true,
+    collectionUUID: uuid(coll),
+}),
+                                   ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.collectionUUID, uuid(coll));
+assert.eq(res.expectedNamespace, coll2.getFullName());
+assert.eq(res.actualNamespace, coll.getFullName());
+
 // The collectionUUID parameter cannot be provided when renaming a collection between databases.
 const otherDBColl = db.getSiblingDB(jsTestName() + '_2').coll;
 otherDBColl.drop();

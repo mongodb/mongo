@@ -124,6 +124,12 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
+                {
+                    AutoGetCollection coll{
+                        opCtx, nss(), MODE_IS, AutoGetCollectionViewMode::kViewsPermitted};
+                    checkCollectionUUIDMismatch(opCtx, nss(), *coll, _doc.getCollectionUUID());
+                }
+
                 const auto cm = uassertStatusOK(
                     Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
                         opCtx, nss()));
@@ -134,11 +140,6 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
 
                 if (_persistCoordinatorDocument) {
                     sharding_ddl_util::stopMigrations(opCtx, nss(), boost::none);
-                }
-
-                {
-                    AutoGetCollection coll{opCtx, nss(), MODE_IS};
-                    checkCollectionUUIDMismatch(opCtx, nss(), *coll, _doc.getCollectionUUID());
                 }
 
                 const auto cmdResponse = uassertStatusOK(configShard->runCommand(

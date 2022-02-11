@@ -68,6 +68,19 @@ assert.eq(res.collectionUUID, uuid());
 assert.eq(res.expectedNamespace, coll2.getFullName());
 assert.eq(res.actualNamespace, coll.getFullName());
 
+// The command fails when provided with a different collection's UUID, even if the provided
+// namespace does not exist.
+coll2.drop();
+res = assert.commandFailedWithCode(mongos.adminCommand({
+    reshardCollection: coll2.getFullName(),
+    key: newKeyDoc,
+    collectionUUID: uuid(),
+}),
+                                   ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.collectionUUID, uuid());
+assert.eq(res.expectedNamespace, coll2.getFullName());
+assert.eq(res.actualNamespace, coll.getFullName());
+
 // The command fails when the provided UUID corresponds to a different collection, even if the
 // provided namespace is a view.
 const view = db['view'];

@@ -166,6 +166,20 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 const auto& toNss = _doc.getTo();
 
                 try {
+                    uassert(ErrorCodes::InvalidOptions,
+                            "Cannot provide an expected collection UUID when renaming between "
+                            "databases",
+                            fromNss.db() == toNss.db() ||
+                                (!_doc.getExpectedSourceUUID() && !_doc.getExpectedTargetUUID()));
+
+                    {
+                        AutoGetCollection coll{
+                            opCtx, fromNss, MODE_IS, AutoGetCollectionViewMode::kViewsPermitted};
+                        checkCollectionUUIDMismatch(
+                            opCtx, fromNss, *coll, _doc.getExpectedSourceUUID());
+                    }
+
+
                     // Make sure the source collection exists
                     const auto optSourceCollType = getShardedCollection(opCtx, fromNss);
                     const bool sourceIsSharded = (bool)optSourceCollType;
@@ -179,17 +193,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                 fromNss.db() == toNss.db());
                         _doc.setOptShardedCollInfo(optSourceCollType);
                     } else if (fromNss.db() != toNss.db()) {
-                        uassert(ErrorCodes::InvalidOptions,
-                                "Cannot provide an expected collection UUID when renaming between "
-                                "databases",
-                                !_doc.getExpectedSourceUUID() && !_doc.getExpectedTargetUUID());
                         sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);
-                    }
-
-                    {
-                        AutoGetCollection coll{opCtx, fromNss, MODE_IS};
-                        checkCollectionUUIDMismatch(
-                            opCtx, fromNss, *coll, _doc.getExpectedSourceUUID());
                     }
 
                     // Make sure the target namespace is not a view
