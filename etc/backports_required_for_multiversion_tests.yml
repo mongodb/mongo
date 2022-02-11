@@ -94,6 +94,8 @@ last-continuous:
       test_file: jstests/change_streams/show_raw_update_description.js
     - ticket: SERVER-61894
       test_file: jstests/change_streams/show_raw_update_description_v1_oplog.js
+    - ticket: SERVER-63159
+      test_file: jstests/core/internal_apply_oplog_update.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -348,6 +350,8 @@ last-lts:
       test_file: jstests/change_streams/show_raw_update_description.js
     - ticket: SERVER-61894
       test_file: jstests/change_streams/show_raw_update_description_v1_oplog.js
+    - ticket: SERVER-63159
+      test_file: jstests/core/internal_apply_oplog_update.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

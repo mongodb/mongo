@@ -340,6 +340,20 @@ pipelineEnv.Library(
 )
 
 env.Library(
+    target="document_source_internal_apply_oplog_update",
+    source=[
+        'document_source_internal_apply_oplog_update.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
+        '$BUILD_DIR/mongo/db/update/update_driver',
+        '$BUILD_DIR/mongo/s/query/router_exec_stage',
+    ],
+)
+
+env.Library(
     target="change_stream_pipeline",
     source=[
         'change_stream_document_diff_parser.cpp',
@@ -379,6 +393,7 @@ env.Library(
     source=[
         'document_source_change_stream.idl',
         'document_source_coll_stats.idl',
+        'document_source_internal_apply_oplog_update.idl',
         'document_source_list_sessions.idl',
         'document_source_merge.idl',
         'document_source_merge_modes.idl',
@@ -424,6 +439,7 @@ env.CppUnitTest(
         'document_source_geo_near_test.cpp',
         'document_source_graph_lookup_test.cpp',
         'document_source_group_test.cpp',
+        'document_source_internal_apply_oplog_update_test.cpp',
         'document_source_internal_shard_filter_test.cpp',
         'document_source_internal_split_pipeline_test.cpp',
         'document_source_limit_test.cpp',
@@ -529,6 +545,7 @@ env.CppUnitTest(
         'accumulator',
         'aggregation_request_helper',
         'change_stream_pipeline',
+        'document_source_internal_apply_oplog_update',
         'document_source_mock',
         'document_sources_idl',
         'expression_context',

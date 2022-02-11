@@ -256,6 +256,7 @@ if (typeof _threadInject != "undefined") {
                 "apply_ops_system_dot_views.js",
                 "command_let_variables.js",
                 "doc_validation_error.js",
+                "internal_apply_oplog_update.js",
                 "merge_sort_collation.js",
                 "explode_for_sort_fetch.js",
                 "or_to_in.js",

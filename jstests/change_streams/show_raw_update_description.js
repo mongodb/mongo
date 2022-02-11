@@ -7,6 +7,7 @@
 (function() {
 "use strict";
 
+load("jstests/aggregation/extras/utils.js");       // For arrayEq.
 load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
 
@@ -20,6 +21,8 @@ if (!oplogV2Enabled) {
 // Drop and recreate the collections to be used in this set of tests.
 assertDropAndRecreateCollection(db, "t1");
 assertDropAndRecreateCollection(db, "t2");
+assertDropAndRecreateCollection(db, "t1Copy");
+assertDropAndRecreateCollection(db, "t2Copy");
 
 assert.commandWorked(db.t1.insert([
     {_id: 3, a: 5, b: 1},
@@ -121,6 +124,30 @@ cst.assertNextChangesEqualUnordered({cursor: cursor, expectedChanges: expected})
 // 'rawUpdateDescription'.
 //
 
+function assertCollectionsAreIdentical(coll1, coll2) {
+    const values1 = coll1.find().toArray();
+    const values2 = coll2.find().toArray();
+    assert(arrayEq(values1, values2),
+           () => "actual: " + tojson(values1) + "  expected: " + tojson(values2));
+}
+
+function assertCanApplyRawUpdate(origColl, copyColl, events) {
+    if (!Array.isArray(events)) {
+        events = [events];
+    }
+    for (let event of events) {
+        assert.commandWorked(copyColl.update(
+            event.documentKey,
+            [{$_internalApplyOplogUpdate: {oplogUpdate: event.rawUpdateDescription}}]));
+    }
+    assertCollectionsAreIdentical(origColl, copyColl);
+}
+
+assert.commandWorked(db.t1Copy.insert(db.t1.find().toArray()));
+assertCollectionsAreIdentical(db.t1, db.t1Copy);
+assert.commandWorked(db.t2Copy.insert(db.t2.find().toArray()));
+assertCollectionsAreIdentical(db.t2, db.t2Copy);
+
 //
 // Test op-style updates.
 //
@@ -130,9 +157,10 @@ expected = {
     documentKey: {_id: 3},
     ns: {db: "test", coll: "t1"},
     operationType: "update",
-    rawUpdateDescription: {"$v": 2, diff: {u: {b: 3}}}
+    rawUpdateDescription: {"$v": NumberInt(2), diff: {u: {b: 3}}}
 };
 cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
+assertCanApplyRawUpdate(db.t1, db.t1Copy, expected);
 
 jsTestLog("Testing op-style update with $set and multi:true");
 assert.commandWorked(db.t1.update({a: 0}, {$set: {b: 2}}, {multi: true}));
@@ -141,16 +169,17 @@ expected = [
         documentKey: {_id: 4},
         ns: {db: "test", coll: "t1"},
         operationType: "update",
-        rawUpdateDescription: {"$v": 2, diff: {u: {b: 2}}}
+        rawUpdateDescription: {"$v": NumberInt(2), diff: {u: {b: 2}}}
     },
     {
         documentKey: {_id: 5},
         ns: {db: "test", coll: "t1"},
         operationType: "update",
-        rawUpdateDescription: {"$v": 2, diff: {u: {b: 2}}}
+        rawUpdateDescription: {"$v": NumberInt(2), diff: {u: {b: 2}}}
     }
 ];
 cst.assertNextChangesEqualUnordered({cursor: cursor, expectedChanges: expected});
+assertCanApplyRawUpdate(db.t1, db.t1Copy, expected);
 
 jsTestLog("Testing op-style update with $unset");
 assert.commandWorked(db.t1.update({_id: 3}, {$unset: {b: ""}}));
@@ -158,9 +187,10 @@ expected = {
     documentKey: {_id: 3},
     ns: {db: "test", coll: "t1"},
     operationType: "update",
-    rawUpdateDescription: {"$v": 2, diff: {d: {b: false}}}
+    rawUpdateDescription: {"$v": NumberInt(2), diff: {d: {b: false}}}
 };
-cst.assertNextChangesEqualUnordered({cursor: cursor, expectedChanges: expected});
+cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
+assertCanApplyRawUpdate(db.t1, db.t1Copy, expected);
 
 jsTestLog("Testing op-style update with $set on nested field");
 assert.commandWorked(db.t1.update({_id: 8}, {$set: {"b.d": 2}}));
@@ -168,9 +198,10 @@ expected = {
     documentKey: {_id: 8},
     ns: {db: "test", coll: "t1"},
     operationType: "update",
-    rawUpdateDescription: {"$v": 2, diff: {sb: {i: {d: 2}}}}
+    rawUpdateDescription: {"$v": NumberInt(2), diff: {sb: {i: {d: 2}}}}
 };
 cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
+assertCanApplyRawUpdate(db.t1, db.t1Copy, expected);
 
 //
 // Test pipeline-style updates.
@@ -207,17 +238,18 @@ expected = {
     ns: {db: "test", coll: "t2"},
     operationType: "update",
     rawUpdateDescription: {
-        "$v": 2,
+        "$v": NumberInt(2),
         diff: {
             u: {a: 2, arrayForReplacement: [0]},
             i: {c: 3},
-            sarrayForSubdiff: {a: true, l: 2, s1: {i: {b: 3}}}
+            sarrayForSubdiff: {a: true, l: NumberInt(2), s1: {i: {b: 3}}}
         }
     }
 };
 cst.assertNextChangesEqual({cursor: fullDocCursor, expectedChanges: [expected]});
 delete expected.fullDocument;
 cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
+assertCanApplyRawUpdate(db.t2, db.t2Copy, expected);
 
 jsTestLog("Testing pipeline-style update with $unset");
 assert.commandWorked(db.t2.update({_id: 100}, [{$unset: ["a"]}]));
@@ -233,11 +265,12 @@ expected = {
     },
     ns: {db: "test", coll: "t2"},
     operationType: "update",
-    rawUpdateDescription: {"$v": 2, diff: {d: {a: false}}}
+    rawUpdateDescription: {"$v": NumberInt(2), diff: {d: {a: false}}}
 };
 cst.assertNextChangesEqual({cursor: fullDocCursor, expectedChanges: [expected]});
 delete expected.fullDocument;
 cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
+assertCanApplyRawUpdate(db.t2, db.t2Copy, expected);
 
 jsTestLog("Testing pipeline-style update with $replaceRoot");
 assert.commandWorked(
@@ -248,13 +281,14 @@ expected = {
     ns: {db: "test", coll: "t2"},
     operationType: "update",
     rawUpdateDescription: {
-        "$v": 2,
+        "$v": NumberInt(2),
         diff: {d: {c: false, arrayForReplacement: false, arrayForSubdiff: false, b: false}}
     }
 };
 cst.assertNextChangesEqual({cursor: fullDocCursor, expectedChanges: [expected]});
 delete expected.fullDocument;
 cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
+assertCanApplyRawUpdate(db.t2, db.t2Copy, expected);
 
 jsTestLog("Testing pipeline-style update with a complex pipeline");
 assert.commandWorked(db.t2.update({_id: 100}, [
@@ -303,7 +337,7 @@ expected = {
     ns: {db: "test", coll: "t2"},
     operationType: "update",
     rawUpdateDescription: {
-        "$v": 2,
+        "$v": NumberInt(2),
         diff: {
             i: {
                 arr: [{x: 1, y: kSmallStr}, kMediumStr],
@@ -320,6 +354,7 @@ expected = {
 cst.assertNextChangesEqual({cursor: fullDocCursor, expectedChanges: [expected]});
 delete expected.fullDocument;
 cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
+assertCanApplyRawUpdate(db.t2, db.t2Copy, expected);
 
 jsTestLog("Testing pipeline-style update with modifications to nested elements");
 assert.commandWorked(db.t2.update({_id: 100}, [{
@@ -349,20 +384,21 @@ expected = {
     ns: {db: "test", coll: "t2"},
     operationType: "update",
     rawUpdateDescription: {
-        "$v": 2,
+        "$v": NumberInt(2),
         diff: {
             d: {a: false, doc: false},
             sarr: {a: true, s0: {d: {x: false}}},
             sarr_a: {a: true, u0: 2},
             sarr_b: {a: true, s0: {a: true, u0: 2}},
-            sarr_c: {a: true, s0: {a: true, l: 1}},
-            sobj: {sx: {d: {a: false}, u: {b: 2}, sc: {a: true, l: 1}}}
+            sarr_c: {a: true, s0: {a: true, l: NumberInt(1)}},
+            sobj: {sx: {d: {a: false}, u: {b: 2}, sc: {a: true, l: NumberInt(1)}}}
         }
     }
 };
 cst.assertNextChangesEqual({cursor: fullDocCursor, expectedChanges: [expected]});
 delete expected.fullDocument;
 cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
+assertCanApplyRawUpdate(db.t2, db.t2Copy, expected);
 
 cst.cleanUp();
 }());
