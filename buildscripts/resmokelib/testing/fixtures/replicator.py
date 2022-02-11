@@ -67,10 +67,6 @@ class ReplicatorFixture(interface.Fixture):
 
     def stop(self, mode=None):
         """Stop the replicator binary."""
-        if not self._is_process_running():
-            self.logger.warning("The replicator has already been stopped.")
-            return
-
         self.logger.info("Sleeping for %d s to allow replicator to finish up.", self.quiesce_period)
         time.sleep(self.quiesce_period)
         self.logger.info("Done sleeping through quiesce period.")
@@ -88,17 +84,8 @@ class ReplicatorFixture(interface.Fixture):
 
         self.replicator.stop(mode)
         exit_code = self.replicator.wait()
-
-        # Python's subprocess module returns negative versions of system calls.
-        # pylint: disable=invalid-unary-operand-type
-        if exit_code == 0 or (mode is not None and exit_code == -(mode.value)):
-            self.logger.info("Successfully stopped the replicator.")
-        else:
-            self.logger.warning("Process exited with non-zero code {:d}.".format(exit_code))
-            self.fixture_is_running = False
-            raise self.fixturelib.ServerFailure(
-                "replicator with pid {:d} exited with non-zero code {:d}".format(
-                    self.replicator.pid, exit_code))
+        # TODO (SERVER-63544): Check to make sure the error code is correct.
+        self.logger.info("Process exited with error code {:d}.".format(exit_code))
 
     def resume(self):
         """NOOP."""

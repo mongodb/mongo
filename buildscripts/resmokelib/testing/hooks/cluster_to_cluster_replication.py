@@ -2,13 +2,13 @@
 
 import copy
 import math
+import random
 
+from buildscripts.resmokelib import config
 from buildscripts.resmokelib import errors
-from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures import cluster_to_cluster
 from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.hooks import cluster_to_cluster_data_consistency
-from buildscripts.resmokelib.testing.hooks import cluster_to_cluster_dummy_replicator
 from buildscripts.resmokelib.testing.hooks import dbhash
 
 
@@ -22,8 +22,8 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
     # consistency checks.
     DEFAULT_TESTS_PER_CYCLE = math.inf
 
-    def __init__(self, hook_logger, fixture, shell_options, restart_every_cycle=None,
-                 tests_per_cycle=DEFAULT_TESTS_PER_CYCLE):
+    def __init__(self, hook_logger, fixture, shell_options, tests_per_cycle=None,
+                 replicator_start_delay=None):
         """Initialize the ClusterToClusterReplication.
 
         Args:
@@ -43,7 +43,10 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
         self._test_num = 0
         # The number of tests we execute before running a data consistency check and restarting the
         # replicator.
-        self._tests_per_cycle = tests_per_cycle
+        self._tests_per_cycle = self.DEFAULT_TESTS_PER_CYCLE if tests_per_cycle is None else tests_per_cycle
+        # The replicator is not started until some number of tests are run first.
+        self._replicator_start_delay = replicator_start_delay
+        random.seed(config.RANDOM_SEED)
 
         self._source_cluster = None
         self._destination_cluster = None
@@ -52,15 +55,6 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
         self._last_test = None
 
         self._replicator = self._fixture.replicator
-
-        self._before_cycle_replicator_action = self._replicator.resume
-        self._after_cycle_replicator_action = self._replicator.pause
-
-        # When 'True', stops and starts the replicator every cycle instead of pausing and resuming.
-        self._restart_every_cycle = False if restart_every_cycle is None else restart_every_cycle
-        if self._restart_every_cycle:
-            self._before_cycle_replicator_action = self._replicator.start
-            self._after_cycle_replicator_action = self._replicator.stop
 
     def before_suite(self, test_report):
         """Before suite."""
@@ -85,26 +79,28 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
 
         self._replicator.set_cli_options({'sourceURI': source_url, 'destinationURI': dest_url})
 
+        if self._replicator_start_delay is None:
+            if math.isinf(self._tests_per_cycle):
+                self._replicator_start_delay = random.randint(0, 10)
+            else:
+                self._replicator_start_delay = random.randint(0, self._tests_per_cycle)
+        self.logger.info("Starting the replicator after %d tests are run.",
+                         self._replicator_start_delay)
+
     def after_suite(self, test_report, teardown_flag=None):
         """After suite."""
+        self.logger.info("Ran %d tests in total.", self._test_num)
         # Perform the following actions only if some tests have been run.
-        if self._test_num > 0:
-            # Stop the replicator only if it hasn't been stopped already.
-            if self._test_num % self._tests_per_cycle != 0 or not self._restart_every_cycle:
-                self._run_replicator_action(test_report, self._replicator.stop)
+        if self._test_num % self._tests_per_cycle > self._replicator_start_delay:
+            self._run_replicator_action(test_report, self._replicator.stop)
 
             self._run_data_consistency_check(self._last_test, test_report)
             self._run_check_repl_db_hash(self._last_test, test_report)
 
     def before_test(self, test, test_report):
         """Before test."""
-        if self._test_num == 0:
+        if self._test_num % self._tests_per_cycle == self._replicator_start_delay:
             self._run_replicator_action(test_report, self._replicator.start)
-            return
-
-        if self._test_num % self._tests_per_cycle == 0:
-            # The replicator should be told to start running once again.
-            self._run_replicator_action(test_report, self._before_cycle_replicator_action)
 
     def after_test(self, test, test_report):
         """After test."""
@@ -114,7 +110,10 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
         # Every 'n' tests, the replicator should be pause / stop the replicator and perform data
         # consistency checks.
         if self._test_num % self._tests_per_cycle == 0:
-            self._run_replicator_action(test_report, self._after_cycle_replicator_action)
+            if self._tests_per_cycle == self._replicator_start_delay:
+                self._run_replicator_action(test_report, self._replicator.start)
+
+            self._run_replicator_action(test_report, self._replicator.stop)
 
             self._run_data_consistency_check(test, test_report)
             self._run_check_repl_db_hash(test, test_report)
