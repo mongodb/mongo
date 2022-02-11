@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/chunk_version_gen.h"
 
 #include "mongo/util/str.h"
 
@@ -37,8 +38,18 @@ namespace mongo {
 
 constexpr StringData ChunkVersion::kShardVersionField;
 
-ChunkVersion ChunkVersion::parseArrayOrObjectPositionalFormat(const BSONElement& element) {
-    BSONObjIterator it(element.Obj());
+ChunkVersion ChunkVersion::_parse60Format(const BSONObj& obj) {
+    IDLParserErrorContext ctx("_parse60Format");
+    auto parsedVersion = ChunkVersion60Format::parse(ctx, obj);
+    auto version = parsedVersion.getVersion();
+    return ChunkVersion(version.getSecs(),
+                        version.getInc(),
+                        parsedVersion.getEpoch(),
+                        parsedVersion.getTimestamp());
+}
+
+ChunkVersion ChunkVersion::_parseArrayOrObjectPositionalFormat(const BSONObj& obj) {
+    BSONObjIterator it(obj);
     uassert(ErrorCodes::BadValue, "Unexpected empty version array", it.more());
 
     // Expect the major and minor versions (must be present)
@@ -92,7 +103,7 @@ ChunkVersion ChunkVersion::parseArrayOrObjectPositionalFormat(const BSONElement&
     return version;
 }
 
-StatusWith<ChunkVersion> ChunkVersion::parseLegacyWithField(const BSONObj& obj, StringData field) {
+StatusWith<ChunkVersion> ChunkVersion::_parseLegacyWithField(const BSONObj& obj, StringData field) {
     // Expect the major and minor (must always exist)
     uint64_t combined;
     {
@@ -164,6 +175,27 @@ StatusWith<ChunkVersion> ChunkVersion::parseLegacyWithField(const BSONObj& obj, 
     version._epoch = epoch.value_or(OID());
     version._timestamp = timestamp.value_or(Timestamp());
     return version;
+}
+
+ChunkVersion ChunkVersion::fromBSONLegacyOrNewerFormat(const BSONObj& obj, StringData field) {
+    // New format.
+    if (obj[field].isABSONObj()) {
+        return _parse60Format(obj[field].Obj());
+    }
+
+    // Legacy format.
+    return uassertStatusOK(ChunkVersion::_parseLegacyWithField(obj, field));
+}
+
+ChunkVersion ChunkVersion::fromBSONPositionalOrNewerFormat(const BSONElement& element) {
+    auto obj = element.Obj();
+    // Positional or wrongly encoded format.
+    if (obj.couldBeArray()) {
+        return ChunkVersion::_parseArrayOrObjectPositionalFormat(obj);
+    }
+
+    // New format.
+    return _parse60Format(obj);
 }
 
 void ChunkVersion::serializeToBSON(StringData field, BSONObjBuilder* builder) const {

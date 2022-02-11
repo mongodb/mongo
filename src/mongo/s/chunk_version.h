@@ -62,31 +62,21 @@ public:
     ChunkVersion() : ChunkVersion(0, 0, OID(), Timestamp()) {}
 
     /**
-     * The methods below parse the "positional" formats of:
-     *
-     *  [major, minor, epoch, <optional canThrowSSVOnIgnored> timestamp]
-     *      OR
-     *  {0: major, 1:minor, 2:epoch, 3:<optional canThrowSSVOnIgnored>, 4:timestamp}
-     *
-     * The latter format was introduced by mistake in 4.4 and is no longer generated from 5.3
-     * onwards, but it is backwards compatible with the 5.2 and older binaries.
+     * Allow parsing a chunk version with the following formats:
+     *  {<field>:(major, minor), <fieldEpoch>:epoch, <fieldTimestmap>:timestamp}
+     *  {<field>: {t:timestamp, e:epoch, v:(major, minor) }}
+     * TODO SERVER-63403: remove this function and only parse the new format.
      */
-    static ChunkVersion parseArrayOrObjectPositionalFormat(const BSONElement& element);
-    static ChunkVersion parseArrayPositionalFormat(const BSONElement& element) {
-        uassert(ErrorCodes::TypeMismatch,
-                "Invalid type for chunkVersion element. Expected an array",
-                element.type() == Array);
-        return parseArrayOrObjectPositionalFormat(element);
-    }
+    static ChunkVersion fromBSONLegacyOrNewerFormat(const BSONObj& obj, StringData field = "");
 
     /**
-     * NOTE: This format is being phased out. Use parseWithField instead.
-     *
-     * Parses the BSON formatted by appendLegacyWithField. If the field is missing, returns
-     * 'NoSuchKey', otherwise if the field is not properly formatted can return any relevant parsing
-     * error (BadValue, TypeMismatch, etc).
+     * Allow parsing a chunk version with the following formats:
+     *  [major, minor, epoch, <optional canThrowSSVOnIgnored>, timestamp]
+     *  {0:major, 1:minor, 2:epoch, 3:<optional canThrowSSVOnIgnored>, 4:timestamp}
+     *  {t:timestamp, e:epoch, v:(major, minor)}
+     * TODO SERVER-63403: remove this function and only parse the new format.
      */
-    static StatusWith<ChunkVersion> parseLegacyWithField(const BSONObj& obj, StringData field);
+    static ChunkVersion fromBSONPositionalOrNewerFormat(const BSONElement& element);
 
     /**
      * Indicates that the collection is not sharded.
@@ -234,6 +224,33 @@ public:
                                                               BSONObjBuilder* builder) const;
 
 private:
+    /**
+     * Parses future ChunkVersion BSON format (from 6.1+):
+     * {t: timestamp, e: epoch, v: (major, minor)}
+     */
+    static ChunkVersion _parse60Format(const BSONObj&);
+
+    // The following static functions will be deprecated. Only one function should be used to parse
+    // ChunkVersion and is fromBSON.
+    /**
+     * The method below parse the "positional" formats of:
+     *
+     *  [major, minor, epoch, <optional canThrowSSVOnIgnored> timestamp]
+     *      OR
+     *  {0: major, 1:minor, 2:epoch, 3:<optional canThrowSSVOnIgnored>, 4:timestamp}
+     *
+     * The latter format was introduced by mistake in 4.4 and is no longer generated from 5.3
+     * onwards, but it is backwards compatible with the 5.2 and older binaries.
+     */
+    static ChunkVersion _parseArrayOrObjectPositionalFormat(const BSONObj& obj);
+
+    /**
+     * Parses the BSON formatted by appendLegacyWithField. If the field is missing, returns
+     * 'NoSuchKey', otherwise if the field is not properly formatted can return any relevant parsing
+     * error (BadValue, TypeMismatch, etc).
+     */
+    static StatusWith<ChunkVersion> _parseLegacyWithField(const BSONObj& obj, StringData field);
+
     uint64_t _combined;
     OID _epoch;
 

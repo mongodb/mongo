@@ -612,7 +612,7 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogClientImpl::getChunks(
     std::vector<ChunkType> chunks;
     chunks.reserve(chunkDocsOpTimePair.value.size());
     for (const BSONObj& obj : chunkDocsOpTimePair.value) {
-        auto chunkRes = ChunkType::fromConfigBSON(obj, epoch, timestamp);
+        auto chunkRes = ChunkType::parseFromConfigBSON(obj, epoch, timestamp);
         if (!chunkRes.isOK()) {
             return chunkRes.getStatus().withContext(stream() << "Failed to parse chunk with id "
                                                              << obj[ChunkType::name()]);
@@ -706,7 +706,7 @@ std::pair<CollectionType, std::vector<ChunkType>> ShardingCatalogClientImpl::get
         for (const auto& elem : aggResult) {
             const auto chunkElem = elem.getField("chunks");
             if (chunkElem) {
-                auto chunkRes = uassertStatusOK(ChunkType::fromConfigBSON(
+                auto chunkRes = uassertStatusOK(ChunkType::parseFromConfigBSON(
                     chunkElem.Obj(), coll->getEpoch(), coll->getTimestamp()));
                 chunks.emplace_back(std::move(chunkRes));
             } else {

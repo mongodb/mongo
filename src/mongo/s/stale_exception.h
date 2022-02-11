@@ -91,19 +91,24 @@ public:
         const auto shardId = obj["shardId"].String();
         invariant(shardId != "");
 
-        auto extractOptionalChunkVersion = [&obj](StringData field) {
-            boost::optional<ChunkVersion> ret;
-            auto swChunkVersion = ChunkVersion::parseLegacyWithField(obj, field);
-            if (swChunkVersion != ErrorCodes::NoSuchKey)
-                ret = uassertStatusOK(std::move(swChunkVersion));
-            return ret;
+        auto extractOptionalChunkVersion =
+            [&obj](StringData field) -> boost::optional<ChunkVersion> {
+            try {
+                return boost::make_optional<ChunkVersion>(
+                    ChunkVersion::fromBSONLegacyOrNewerFormat(obj, field));
+            } catch (const DBException& ex) {
+                auto status = ex.toStatus();
+                if (status != ErrorCodes::NoSuchKey) {
+                    throw;
+                }
+            }
+            return boost::none;
         };
 
-        return StaleConfigInfo(
-            NamespaceString(obj["ns"].String()),
-            uassertStatusOK(ChunkVersion::parseLegacyWithField(obj, "vReceived")),
-            extractOptionalChunkVersion("vWanted"),
-            ShardId(shardId));
+        return StaleConfigInfo(NamespaceString(obj["ns"].String()),
+                               ChunkVersion::fromBSONLegacyOrNewerFormat(obj, "vReceived"),
+                               extractOptionalChunkVersion("vWanted"),
+                               ShardId(shardId));
     }
 
 protected:

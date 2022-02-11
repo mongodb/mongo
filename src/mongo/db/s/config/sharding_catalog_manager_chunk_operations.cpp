@@ -198,7 +198,7 @@ StatusWith<ChunkType> getCurrentChunk(OperationContext* opCtx,
     }
 
     return uassertStatusOK(
-        ChunkType::fromConfigBSON(findResponseWith.getValue().docs.front(), epoch, timestamp));
+        ChunkType::parseFromConfigBSON(findResponseWith.getValue().docs.front(), epoch, timestamp));
 }
 
 BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
@@ -279,7 +279,7 @@ boost::optional<ChunkType> getControlChunkForMigrate(OperationContext* opCtx,
         return boost::none;
     }
 
-    return uassertStatusOK(ChunkType::fromConfigBSON(response.docs.front(), epoch, timestamp));
+    return uassertStatusOK(ChunkType::parseFromConfigBSON(response.docs.front(), epoch, timestamp));
 }
 
 /**
@@ -300,7 +300,7 @@ StatusWith<ChunkVersion> getMaxChunkVersionFromQueryResponse(
     }
 
     const auto chunk = uassertStatusOK(
-        ChunkType::fromConfigBSON(chunksVector.front(), coll.getEpoch(), coll.getTimestamp()));
+        ChunkType::parseFromConfigBSON(chunksVector.front(), coll.getEpoch(), coll.getTimestamp()));
 
     return chunk.getVersion();
 }
@@ -403,8 +403,8 @@ void bumpCollectionMinorVersion(OperationContext* opCtx,
                           << ", but found no chunks",
             !findChunkResponse.docs.empty());
 
-    const auto newestChunk = uassertStatusOK(
-        ChunkType::fromConfigBSON(findChunkResponse.docs[0], coll.getEpoch(), coll.getTimestamp()));
+    const auto newestChunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
+        findChunkResponse.docs[0], coll.getEpoch(), coll.getTimestamp()));
     const auto targetVersion = [&]() {
         ChunkVersion version = newestChunk.getVersion();
         version.incMinor();
@@ -764,7 +764,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
 
     // Check if the chunk(s) have already been merged. If so, return success.
     if (shardChunksInRangeResponse.docs.size() == 1) {
-        auto chunk = uassertStatusOK(ChunkType::fromConfigBSON(
+        auto chunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
             shardChunksInRangeResponse.docs.back(), coll.getEpoch(), coll.getTimestamp()));
         uassert(
             ErrorCodes::IllegalOperation,
@@ -789,7 +789,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
     std::vector<ChunkType> chunksToMerge;
     for (const auto& chunkDoc : shardChunksInRangeResponse.docs) {
         auto chunk = uassertStatusOK(
-            ChunkType::fromConfigBSON(chunkDoc, coll.getEpoch(), coll.getTimestamp()));
+            ChunkType::parseFromConfigBSON(chunkDoc, coll.getEpoch(), coll.getTimestamp()));
         if (chunksToMerge.empty()) {
             uassert(ErrorCodes::IllegalOperation,
                     str::stream()
@@ -923,7 +923,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
             !findResponse.docs.empty());
 
     const auto chunk = uassertStatusOK(
-        ChunkType::fromConfigBSON(findResponse.docs[0], coll.getEpoch(), coll.getTimestamp()));
+        ChunkType::parseFromConfigBSON(findResponse.docs[0], coll.getEpoch(), coll.getTimestamp()));
     const auto& currentCollectionVersion = chunk.getVersion();
 
     if (MONGO_unlikely(migrationCommitVersionError.shouldFail())) {
@@ -1118,7 +1118,7 @@ StatusWith<ChunkType> ShardingCatalogManager::_findChunkOnConfig(OperationContex
                               << " and min key " << key.toString() << ", but found no chunks"};
     }
 
-    return ChunkType::fromConfigBSON(origChunks.front(), epoch, timestamp);
+    return ChunkType::parseFromConfigBSON(origChunks.front(), epoch, timestamp);
 }
 
 void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
@@ -1203,7 +1203,7 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
     std::set<ShardId> changedShardIds;
     for (const auto& chunk : allChunksVector) {
         auto upgradeChunk = uassertStatusOK(
-            ChunkType::fromConfigBSON(chunk, collVersion.epoch(), collVersion.getTimestamp()));
+            ChunkType::parseFromConfigBSON(chunk, collVersion.epoch(), collVersion.getTimestamp()));
         bool historyIsAt40 = chunk[ChunkType::historyIsAt40()].booleanSafe();
         if (historyIsAt40) {
             uassert(
@@ -1297,8 +1297,8 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
                           << " from ns: " << nss.ns(),
             !targetChunkVector.empty());
 
-    const auto targetChunk = uassertStatusOK(
-        ChunkType::fromConfigBSON(targetChunkVector.front(), coll.getEpoch(), coll.getTimestamp()));
+    const auto targetChunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
+        targetChunkVector.front(), coll.getEpoch(), coll.getTimestamp()));
 
     if (!targetChunk.getJumbo()) {
         return;
@@ -1323,7 +1323,7 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
             !chunksVector.empty());
 
     const auto highestVersionChunk = uassertStatusOK(
-        ChunkType::fromConfigBSON(chunksVector.front(), coll.getEpoch(), coll.getTimestamp()));
+        ChunkType::parseFromConfigBSON(chunksVector.front(), coll.getEpoch(), coll.getTimestamp()));
     const auto currentCollectionVersion = highestVersionChunk.getVersion();
 
     // It is possible for a migration to end up running partly without the protection of the
@@ -1444,7 +1444,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
             return;
         }
 
-        matchingChunk = uassertStatusOK(ChunkType::fromConfigBSON(
+        matchingChunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
             matchingChunksVector.front(), coll.getEpoch(), coll.getTimestamp()));
 
         if (version.isOlderThan(matchingChunk.getVersion())) {
@@ -1495,7 +1495,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
                   "epoch"_attr = version.epoch());
             return;
         }
-        highestChunk = uassertStatusOK(ChunkType::fromConfigBSON(
+        highestChunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
             highestChunksVector.front(), coll.getEpoch(), coll.getTimestamp()));
     }
 

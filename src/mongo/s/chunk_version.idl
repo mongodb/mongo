@@ -33,6 +33,29 @@ global:
     cpp_includes:
         - "mongo/s/chunk_version.h"
 
+imports:
+    - "mongo/idl/basic_types.idl"
+
+structs:
+    ChunkVersion60Format:
+        description: >
+            New chunk version format to be parsed on 6.0 binaries but only
+            generated on 6.1 binaries. DO NOT USE.
+        strict: false
+        fields:
+            t:
+                type: timestamp
+                description: "Collection timestamp"
+                cpp_name: Timestamp
+            e:
+                type: objectid
+                description: "Collection epoch"
+                cpp_name: Epoch
+            v:
+                type: timestamp
+                description: "Version component"
+                cpp_name: Version
+
 types:
     # The canonical serialisation format for ChunkVersions, which is written as:
     #   [ <major/minor>, <epoch>, <timestamp> ]
@@ -41,7 +64,7 @@ types:
         description: An object representing a chunk version for a collection.
         cpp_type: ChunkVersion
         serializer: ChunkVersion::serializeToBSON
-        deserializer: ChunkVersion::parseArrayPositionalFormat
+        deserializer: ChunkVersion::fromBSONPositionalOrNewerFormat
 
     # DO NOT add any new usages of this format, use ChunkVersion above instead
     #
@@ -53,4 +76,4 @@ types:
         description: An object representing a chunk version for a collection.
         cpp_type: ChunkVersion
         serializer: ChunkVersion::serializeToPositionalFormatWronglyEncodedAsBSON
-        deserializer: ChunkVersion::parseArrayOrObjectPositionalFormat
+        deserializer: ChunkVersion::fromBSONPositionalOrNewerFormat

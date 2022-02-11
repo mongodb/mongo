@@ -858,7 +858,7 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
         auto chunkCursor = client.find(std::move(findRequest));
         std::vector<ChunkType> foundChunks;
         while (chunkCursor->more()) {
-            auto d = uassertStatusOK(ChunkType::fromConfigBSON(
+            auto d = uassertStatusOK(ChunkType::parseFromConfigBSON(
                 chunkCursor->nextSafe().getOwned(), _originalEpoch, _originalTimestamp));
             foundChunks.push_back(d);
         }

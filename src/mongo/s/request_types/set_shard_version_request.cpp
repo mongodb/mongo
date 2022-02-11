@@ -96,11 +96,11 @@ StatusWith<SetShardVersionRequest> SetShardVersionRequest::parseFromBSON(const B
     }
 
     {
-        auto versionStatus = ChunkVersion::parseLegacyWithField(cmdObj, kVersion);
-        if (!versionStatus.isOK())
-            return versionStatus.getStatus();
-
-        request._version = versionStatus.getValue();
+        try {
+            request._version = ChunkVersion::fromBSONLegacyOrNewerFormat(cmdObj, kVersion);
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
     }
 
     {

@@ -47,7 +47,6 @@ const ShardId kFromShard("shard0000");
 const ShardId kToShard("shard0001");
 const bool kWaitForDelete{true};
 
-
 TEST(MigrationTypeTest, FromAndToBSONWithoutOptionalFields) {
     const ChunkVersion version(1, 2, OID::gen(), Timestamp(1, 1));
 

@@ -356,7 +356,7 @@ StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* opC
     if (!doc.isOK())
         return doc.getStatus();
 
-    return ChunkType::fromConfigBSON(doc.getValue(), collEpoch, collTimestamp);
+    return ChunkType::parseFromConfigBSON(doc.getValue(), collEpoch, collTimestamp);
 }
 
 StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* opCtx,
@@ -367,7 +367,7 @@ StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* opC
     if (!doc.isOK())
         return doc.getStatus();
 
-    return ChunkType::fromConfigBSON(doc.getValue(), collEpoch, collTimestamp);
+    return ChunkType::parseFromConfigBSON(doc.getValue(), collEpoch, collTimestamp);
 }
 
 StatusWith<ChunkVersion> ConfigServerTestFixture::getCollectionVersion(OperationContext* opCtx,
@@ -389,7 +389,7 @@ StatusWith<ChunkVersion> ConfigServerTestFixture::getCollectionVersion(Operation
         return chunkDoc.getStatus();
 
     const auto chunkType =
-        ChunkType::fromConfigBSON(chunkDoc.getValue(), coll.getEpoch(), coll.getTimestamp());
+        ChunkType::parseFromConfigBSON(chunkDoc.getValue(), coll.getEpoch(), coll.getTimestamp());
     if (!chunkType.isOK()) {
         return chunkType.getStatus();
     }

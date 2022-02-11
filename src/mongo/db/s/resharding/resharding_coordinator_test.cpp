@@ -428,8 +428,8 @@ protected:
 
         std::vector<ChunkType> foundChunks;
         while (cursor->more()) {
-            auto d = uassertStatusOK(
-                ChunkType::fromConfigBSON(cursor->nextSafe().getOwned(), collEpoch, collTimestamp));
+            auto d = uassertStatusOK(ChunkType::parseFromConfigBSON(
+                cursor->nextSafe().getOwned(), collEpoch, collTimestamp));
             foundChunks.push_back(d);
         }
 

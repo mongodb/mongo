@@ -59,11 +59,10 @@ StatusWith<ChunkType> extractChunk(const BSONObj& source, StringData field) {
         return rangeWith.getStatus();
 
     ChunkVersion version;
-    auto swVersion = ChunkVersion::parseLegacyWithField(fieldObj, ChunkType::lastmod());
-    if (!swVersion.isOK()) {
-        return swVersion.getStatus();
-    } else {
-        version = swVersion.getValue();
+    try {
+        version = ChunkVersion::fromBSONLegacyOrNewerFormat(fieldObj, ChunkType::lastmod());
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 
     ChunkType chunk;
@@ -126,7 +125,7 @@ StatusWith<CommitChunkMigrationRequest> CommitChunkMigrationRequest::createFromC
 
     try {
         auto fromShardVersion =
-            ChunkVersion::parseArrayPositionalFormat(obj[kFromShardCollectionVersion]);
+            ChunkVersion::fromBSONPositionalOrNewerFormat(obj[kFromShardCollectionVersion]);
         request._collectionEpoch = fromShardVersion.epoch();
     } catch (const DBException& ex) {
         return ex.toStatus();

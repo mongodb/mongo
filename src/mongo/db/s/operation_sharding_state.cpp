@@ -68,7 +68,7 @@ void OperationShardingState::initializeClientRoutingVersionsFromCommand(Namespac
     boost::optional<DatabaseVersion> dbVersion;
     const auto shardVersionElem = cmdObj.getField(ChunkVersion::kShardVersionField);
     if (!shardVersionElem.eoo()) {
-        shardVersion = ChunkVersion::parseArrayPositionalFormat(shardVersionElem);
+        shardVersion = ChunkVersion::fromBSONPositionalOrNewerFormat(shardVersionElem);
     }
 
     const auto dbVersionElem = cmdObj.getField(kDbVersionField);

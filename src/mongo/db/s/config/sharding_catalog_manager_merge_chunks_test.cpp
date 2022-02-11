@@ -96,8 +96,8 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
             ->commitChunksMerge(
                 operationContext(), _nss1, collUuid, rangeToBeMerged, _shardId, validAfter));
 
-    auto collVersion = ChunkVersion::parseArrayPositionalFormat(versions["collectionVersion"]);
-    auto shardVersion = ChunkVersion::parseArrayPositionalFormat(versions["shardVersion"]);
+    auto collVersion = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["collectionVersion"]);
+    auto shardVersion = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["shardVersion"]);
 
     ASSERT_TRUE(origVersion.isOlderThan(shardVersion));
     ASSERT_EQ(collVersion, shardVersion);
@@ -126,7 +126,7 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
     ASSERT_EQ(1u, chunksVector.size());
 
     // MergedChunk should have range [chunkMin, chunkMax]
-    auto mergedChunk = uassertStatusOK(ChunkType::fromConfigBSON(
+    auto mergedChunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
         chunksVector.front(), collVersion.epoch(), collVersion.getTimestamp()));
     ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
     ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
@@ -196,8 +196,8 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
     ASSERT_EQ(1u, chunksVector.size());
 
     // MergedChunk should have range [chunkMin, chunkMax]
-    auto mergedChunk =
-        uassertStatusOK(ChunkType::fromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
+    auto mergedChunk = uassertStatusOK(
+        ChunkType::parseFromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
     ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
     ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
 
@@ -274,8 +274,8 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
     ASSERT_EQ(2u, chunksVector.size());
 
     // MergedChunk should have range [chunkMin, chunkMax]
-    auto mergedChunk =
-        uassertStatusOK(ChunkType::fromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
+    auto mergedChunk = uassertStatusOK(
+        ChunkType::parseFromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
     ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
     ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
 
@@ -349,8 +349,8 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
     ASSERT_EQ(2u, chunksVector.size());
 
     // MergedChunk should have range [chunkMin, chunkMax]
-    auto mergedChunk =
-        uassertStatusOK(ChunkType::fromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
+    auto mergedChunk = uassertStatusOK(
+        ChunkType::parseFromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
     ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
     ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
 
@@ -361,8 +361,8 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
     }
 
     // OtherChunk should have been left alone
-    auto foundOtherChunk =
-        uassertStatusOK(ChunkType::fromConfigBSON(chunksVector.back(), collEpoch, collTimestamp));
+    auto foundOtherChunk = uassertStatusOK(
+        ChunkType::parseFromConfigBSON(chunksVector.back(), collEpoch, collTimestamp));
     ASSERT_BSONOBJ_EQ(otherChunk.getMin(), foundOtherChunk.getMin());
     ASSERT_BSONOBJ_EQ(otherChunk.getMax(), foundOtherChunk.getMax());
 }
@@ -491,8 +491,8 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceeds) {
     ASSERT_EQ(1u, chunksVector.size());
 
     // MergedChunk should have range [chunkMin, chunkMax]
-    ChunkType foundChunk =
-        uassertStatusOK(ChunkType::fromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
+    ChunkType foundChunk = uassertStatusOK(
+        ChunkType::parseFromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
     ASSERT_BSONOBJ_EQ(mergedChunk.toConfigBSON(), foundChunk.toConfigBSON());
 }
 
@@ -555,8 +555,8 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
     ASSERT_EQ(1u, chunksVector.size());
 
     // MergedChunk should have range [chunkMin, chunkMax]
-    auto mergedChunk =
-        uassertStatusOK(ChunkType::fromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
+    auto mergedChunk = uassertStatusOK(
+        ChunkType::parseFromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
     ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
     ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
 

@@ -145,7 +145,7 @@ void mergeChunks(OperationContext* opCtx,
     boost::optional<ChunkVersion> shardVersionReceived = [&]() -> boost::optional<ChunkVersion> {
         // old versions might not have the shardVersion field
         if (cmdResponse.response[ChunkVersion::kShardVersionField]) {
-            return ChunkVersion::parseArrayPositionalFormat(
+            return ChunkVersion::fromBSONPositionalOrNewerFormat(
                 cmdResponse.response[ChunkVersion::kShardVersionField]);
         }
         return boost::none;

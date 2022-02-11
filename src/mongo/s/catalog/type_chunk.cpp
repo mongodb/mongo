@@ -222,52 +222,8 @@ ChunkType::ChunkType(UUID collectionUUID, ChunkRange range, ChunkVersion version
       _version(std::move(version)),
       _shard(std::move(shardId)) {}
 
-StatusWith<ChunkType> ChunkType::parseFromConfigBSONCommand(const BSONObj& source,
-                                                            bool requireUUID) {
+StatusWith<ChunkType> ChunkType::_parseChunkBase(const BSONObj& source) {
     ChunkType chunk;
-
-    {
-        OID chunkID;
-        Status status = bsonExtractOIDField(source, name.name(), &chunkID);
-        if (status.isOK()) {
-            chunk._id = chunkID;
-        } else if (status == ErrorCodes::NoSuchKey) {
-            // Ignore NoSuchKey because when chunks are sent in commands they are not required to
-            // include it.
-        } else {
-            return status;
-        }
-    }
-
-    {
-        BSONElement collectionUUIDElem;
-        Status status = bsonExtractField(source, collectionUUID.name(), &collectionUUIDElem);
-        if (status.isOK()) {
-            auto swUUID = UUID::parse(collectionUUIDElem);
-            if (!swUUID.isOK()) {
-                return swUUID.getStatus();
-            }
-            chunk._collectionUUID = swUUID.getValue();
-        } else if (status == ErrorCodes::NoSuchKey) {
-            // Ignore NoSuchKey because before 5.0 chunks don't include a collectionUUID
-        } else {
-            return status;
-        }
-    }
-
-    if (requireUUID && !chunk._collectionUUID) {
-        return {ErrorCodes::FailedToParse, str::stream() << "There must be a UUID present"};
-    }
-
-    {
-        auto chunkRangeStatus = ChunkRange::fromBSON(source);
-        if (!chunkRangeStatus.isOK())
-            return chunkRangeStatus.getStatus();
-
-        const auto chunkRange = std::move(chunkRangeStatus.getValue());
-        chunk._min = chunkRange.getMin().getOwned();
-        chunk._max = chunkRange.getMax().getOwned();
-    }
 
     {
         std::string chunkShard;
@@ -275,26 +231,6 @@ StatusWith<ChunkType> ChunkType::parseFromConfigBSONCommand(const BSONObj& sourc
         if (!status.isOK())
             return status;
         chunk._shard = chunkShard;
-    }
-
-    {
-        bool chunkJumbo;
-        Status status = bsonExtractBooleanField(source, jumbo.name(), &chunkJumbo);
-        if (status.isOK()) {
-            chunk._jumbo = chunkJumbo;
-        } else if (status == ErrorCodes::NoSuchKey) {
-            // Jumbo status is missing, so it will be presumed false
-        } else {
-            return status;
-        }
-    }
-
-    {
-        auto versionStatus = ChunkVersion::parseLegacyWithField(source, ChunkType::lastmod());
-        if (!versionStatus.isOK()) {
-            return versionStatus.getStatus();
-        }
-        chunk._version = std::move(versionStatus.getValue());
     }
 
     {
@@ -316,17 +252,33 @@ StatusWith<ChunkType> ChunkType::parseFromConfigBSONCommand(const BSONObj& sourc
     return chunk;
 }
 
-StatusWith<ChunkType> ChunkType::fromConfigBSON(const BSONObj& source,
-                                                const OID& epoch,
-                                                const Timestamp& timestamp) {
-    StatusWith<ChunkType> chunkStatus = parseFromConfigBSONCommand(source);
+StatusWith<ChunkType> ChunkType::parseFromConfigBSON(const BSONObj& source,
+                                                     const OID& epoch,
+                                                     const Timestamp& timestamp) {
+    // Parse shard, and history
+    StatusWith<ChunkType> chunkStatus = _parseChunkBase(source);
     if (!chunkStatus.isOK()) {
         return chunkStatus.getStatus();
     }
-
     ChunkType chunk = chunkStatus.getValue();
 
-    if (!chunk._id) {
+    // Parse collectionUUID.
+    {
+        BSONElement collectionUUIDElem;
+        Status status = bsonExtractField(source, collectionUUID.name(), &collectionUUIDElem);
+        if (status.isOK()) {
+            auto swUUID = UUID::parse(collectionUUIDElem);
+            if (!swUUID.isOK()) {
+                return swUUID.getStatus();
+            }
+            chunk._collectionUUID = uassertStatusOK(UUID::parse(collectionUUIDElem));
+        } else {
+            return status;
+        }
+    }
+
+    // Parse id.
+    {
         OID chunkID;
         Status status = bsonExtractOIDField(source, name.name(), &chunkID);
         if (status.isOK()) {
@@ -336,21 +288,165 @@ StatusWith<ChunkType> ChunkType::fromConfigBSON(const BSONObj& source,
         }
     }
 
-    const ChunkVersion& version = chunk.getVersion();
-    chunk.setVersion(
-        ChunkVersion(version.majorVersion(), version.minorVersion(), epoch, timestamp));
-
-    auto elem = source.getField(estimatedSizeBytes.name());
-    if (!elem.eoo()) {
-        chunk._estimatedSizeBytes = elem.safeNumberLong();
-        if (chunk._estimatedSizeBytes.get() < 0) {
-            LOGV2_WARNING(6251200,
-                          "estimatedSizeBytes cannot be negative",
-                          "_id"_attr = chunk._id,
-                          "uuid"_attr = chunk._collectionUUID);
-            chunk._estimatedSizeBytes = boost::none;
+    // Parse lastmod.
+    {
+        auto versionElem = source[ChunkType::lastmod()];
+        if (versionElem.eoo())
+            return Status(ErrorCodes::NoSuchKey, "No version found");
+        if (versionElem.type() == bsonTimestamp || versionElem.type() == Date) {
+            auto chunkLastmod = Timestamp(versionElem._numberLong());
+            chunk._version =
+                ChunkVersion(chunkLastmod.getSecs(), chunkLastmod.getInc(), epoch, timestamp);
+        } else {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "The field " << ChunkType::lastmod() << " cannot be parsed."};
         }
     }
+
+    // Parse min and max.
+    {
+        auto chunkRangeStatus = ChunkRange::fromBSON(source);
+        if (!chunkRangeStatus.isOK())
+            return chunkRangeStatus.getStatus();
+
+        const auto chunkRange = std::move(chunkRangeStatus.getValue());
+        chunk._min = chunkRange.getMin().getOwned();
+        chunk._max = chunkRange.getMax().getOwned();
+    }
+
+    // Parse estimatedSizeBytes if present.
+    {
+        auto elem = source.getField(estimatedSizeBytes.name());
+        if (!elem.eoo()) {
+            chunk._estimatedSizeBytes = elem.safeNumberLong();
+        }
+    }
+
+    // Parse jumbo flag.
+    {
+        bool chunkJumbo;
+        Status status = bsonExtractBooleanField(source, jumbo.name(), &chunkJumbo);
+        if (status.isOK()) {
+            chunk._jumbo = chunkJumbo;
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // Jumbo status is missing, so it will be presumed false
+        } else {
+            return status;
+        }
+    }
+
+    return chunk;
+}
+
+StatusWith<ChunkType> ChunkType::parseFromShardBSON(const BSONObj& source,
+                                                    const OID& epoch,
+                                                    const Timestamp& timestamp) {
+    // Parse history and shard.
+    StatusWith<ChunkType> chunkStatus = _parseChunkBase(source);
+    if (!chunkStatus.isOK()) {
+        return chunkStatus.getStatus();
+    }
+
+    ChunkType chunk = chunkStatus.getValue();
+
+    // Parse min and max.
+    {
+        BSONElement minKey;
+        Status minKeyStatus = extractObject(source, minShardID.name(), &minKey);
+        if (!minKeyStatus.isOK()) {
+            return minKeyStatus;
+        }
+
+        BSONElement maxKey;
+        Status maxKeyStatus = extractObject(source, max.name(), &maxKey);
+        if (!maxKeyStatus.isOK()) {
+            return maxKeyStatus;
+        }
+
+        if (SimpleBSONObjComparator::kInstance.evaluate(minKey.Obj() >= maxKey.Obj())) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "min: " << minKey.Obj()
+                                  << " should be less than max: " << maxKey.Obj()};
+        }
+
+        chunk._min = minKey.Obj().getOwned();
+        chunk._max = maxKey.Obj().getOwned();
+    }
+
+    // Parse version.
+    {
+        auto lastmodElem = source[ChunkType::lastmod()];
+        if (lastmodElem.eoo())
+            return Status(ErrorCodes::NoSuchKey, "No version found");
+        if (lastmodElem.type() == bsonTimestamp || lastmodElem.type() == Date) {
+            auto chunkLastmod = Timestamp(lastmodElem._numberLong());
+            chunk._version =
+                ChunkVersion(chunkLastmod.getSecs(), chunkLastmod.getInc(), epoch, timestamp);
+        } else {
+            return {ErrorCodes::NoSuchKey,
+                    str::stream() << "Expected field " << ChunkType::lastmod() << " not found."};
+        }
+    }
+
+    return chunk;
+}
+
+StatusWith<ChunkType> ChunkType::parseFromNetworkRequest(const BSONObj& source, bool requireUUID) {
+    // Parse history and shard.
+    StatusWith<ChunkType> chunkStatus = _parseChunkBase(source);
+    if (!chunkStatus.isOK()) {
+        return chunkStatus.getStatus();
+    }
+
+    ChunkType chunk = chunkStatus.getValue();
+
+    // Parse UUID.
+    {
+        BSONElement collectionUUIDElem;
+        Status status = bsonExtractField(source, collectionUUID.name(), &collectionUUIDElem);
+        if (status.isOK()) {
+            auto swUUID = UUID::parse(collectionUUIDElem);
+            if (!swUUID.isOK()) {
+                return swUUID.getStatus();
+            }
+            chunk._collectionUUID = swUUID.getValue();
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // Ignore NoSuchKey because before 5.0 chunks don't include a collectionUUID
+        } else {
+            return status;
+        }
+    }
+
+    if (requireUUID && !chunk._collectionUUID) {
+        return {ErrorCodes::FailedToParse, str::stream() << "There must be a UUID present"};
+    }
+
+    // Parse min and max.
+    {
+        auto chunkRangeStatus = ChunkRange::fromBSON(source);
+        if (!chunkRangeStatus.isOK())
+            return chunkRangeStatus.getStatus();
+
+        const auto chunkRange = std::move(chunkRangeStatus.getValue());
+        chunk._min = chunkRange.getMin().getOwned();
+        chunk._max = chunkRange.getMax().getOwned();
+    }
+
+    // Parse jumbo.
+    {
+        bool chunkJumbo;
+        Status status = bsonExtractBooleanField(source, jumbo.name(), &chunkJumbo);
+        if (status.isOK()) {
+            chunk._jumbo = chunkJumbo;
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // Jumbo status is missing, so it will be presumed false
+        } else {
+            return status;
+        }
+    }
+
+    // Parse version.
+    chunk._version = ChunkVersion::fromBSONLegacyOrNewerFormat(source, ChunkType::lastmod());
 
     return chunk;
 }
@@ -376,72 +472,6 @@ BSONObj ChunkType::toConfigBSON() const {
         builder.append(jumbo.name(), getJumbo());
     addHistoryToBSON(builder);
     return builder.obj();
-}
-
-StatusWith<ChunkType> ChunkType::fromShardBSON(const BSONObj& source,
-                                               const OID& epoch,
-                                               const Timestamp& timestamp) {
-    ChunkType chunk;
-
-    {
-        BSONElement minKey;
-        Status minKeyStatus = extractObject(source, minShardID.name(), &minKey);
-        if (!minKeyStatus.isOK()) {
-            return minKeyStatus;
-        }
-
-        BSONElement maxKey;
-        Status maxKeyStatus = extractObject(source, max.name(), &maxKey);
-        if (!maxKeyStatus.isOK()) {
-            return maxKeyStatus;
-        }
-
-        if (SimpleBSONObjComparator::kInstance.evaluate(minKey.Obj() >= maxKey.Obj())) {
-            return {ErrorCodes::FailedToParse,
-                    str::stream() << "min: " << minKey.Obj()
-                                  << " should be less than max: " << maxKey.Obj()};
-        }
-
-        chunk._min = minKey.Obj().getOwned();
-        chunk._max = maxKey.Obj().getOwned();
-    }
-
-    {
-        std::string chunkShard;
-        Status status = bsonExtractStringField(source, shard.name(), &chunkShard);
-        if (!status.isOK())
-            return status;
-        chunk._shard = chunkShard;
-    }
-
-    {
-        auto statusWithChunkVersion =
-            ChunkVersion::parseLegacyWithField(source, ChunkType::lastmod());
-        if (!statusWithChunkVersion.isOK()) {
-            return statusWithChunkVersion.getStatus();
-        }
-        auto version = std::move(statusWithChunkVersion.getValue());
-        chunk._version =
-            ChunkVersion(version.majorVersion(), version.minorVersion(), epoch, timestamp);
-    }
-
-    {
-        BSONElement historyObj;
-        Status status = bsonExtractTypedField(source, history.name(), Array, &historyObj);
-        if (status.isOK()) {
-            auto history = ChunkHistory::fromBSON(BSONArray(historyObj.Obj()));
-            if (!history.isOK())
-                return history.getStatus();
-
-            chunk._history = std::move(history.getValue());
-        } else if (status == ErrorCodes::NoSuchKey) {
-            // History is missing, so it will be presumed empty
-        } else {
-            return status;
-        }
-    }
-
-    return chunk;
 }
 
 BSONObj ChunkType::toShardBSON() const {

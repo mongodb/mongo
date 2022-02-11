@@ -217,35 +217,37 @@ public:
     ChunkType(UUID collectionUUID, ChunkRange range, ChunkVersion version, ShardId shardId);
 
     /**
-     * Constructs a new ChunkType object from BSON that has the config server's config.chunks
-     * collection format.
-     *
-     * Also does validation of the contents. Note that 'parseFromConfigBSONCommand' does not return
-     * ErrorCodes::NoSuchKey if the '_id' field is missing while 'fromConfigBSON' does.
+     * Constructs a new ChunkType object from BSON with the following format:
+     * {min: <>, max: <>, shard: <>, uuid: <>, history: <>, jumbo: <>, lastmod: <>,
+     * lastmodEpoch: <>, lastmodTimestamp: <>}
      */
-    // TODO (SERVER-60792): Get rid of "requireUUID" once v6.0 branches out. Starting from v5.1, the
-    // collection UUID will always be present in the chunk.
-    static StatusWith<ChunkType> parseFromConfigBSONCommand(const BSONObj& source,
-                                                            bool requireUUID = true);
-    static StatusWith<ChunkType> fromConfigBSON(const BSONObj& source,
-                                                const OID& epoch,
-                                                const Timestamp& timestamp);
+    static StatusWith<ChunkType> parseFromNetworkRequest(const BSONObj& source, bool requireUUID);
+
+    /**
+     * Constructs a new ChunkType object from BSON with the following format:
+     * {_id: <>, min: <>, max: <>, shard: <>, uuid: <>, history: <>, jumbo: <>, lastmod: <>,
+     * estimatedSizeByte: <>}
+     *
+     * Returns ErrorCodes::NoSuchKey if the '_id' field is missing
+     */
+    static StatusWith<ChunkType> parseFromConfigBSON(const BSONObj& source,
+                                                     const OID& epoch,
+                                                     const Timestamp& timestamp);
+
+    /**
+     * Constructs a new ChunkType object from BSON with the following format:
+     * {_id: <>, max: <>, shard: <>, history: <>, lastmod: <>}
+     * Also does validation of the contents.
+     */
+    static StatusWith<ChunkType> parseFromShardBSON(const BSONObj& source,
+                                                    const OID& epoch,
+                                                    const Timestamp& timestamp);
 
     /**
      * Returns the BSON representation of the entry for the config server's config.chunks
      * collection.
      */
     BSONObj toConfigBSON() const;
-
-    /**
-     * Constructs a new ChunkType object from BSON that has a shard server's config.chunks.<epoch>
-     * collection format.
-     *
-     * Also does validation of the contents.
-     */
-    static StatusWith<ChunkType> fromShardBSON(const BSONObj& source,
-                                               const OID& epoch,
-                                               const Timestamp& timestamp);
 
     /**
      * Returns the BSON representation of the entry for a shard server's config.chunks.<epoch>
@@ -336,6 +338,13 @@ public:
     std::string toString() const;
 
 private:
+    /**
+     * Parses the base chunk data on all usages:
+     * {history: <>, shard: <>}
+     */
+    static StatusWith<ChunkType> _parseChunkBase(const BSONObj& source);
+
+
     // Convention: (M)andatory, (O)ptional, (S)pecial; (C)onfig, (S)hard.
 
     // (M)(C)     auto-generated object id

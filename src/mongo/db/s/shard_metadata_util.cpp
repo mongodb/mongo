@@ -309,7 +309,7 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
         std::vector<ChunkType> chunks;
         while (cursor->more()) {
             BSONObj document = cursor->nextSafe().getOwned();
-            auto statusWithChunk = ChunkType::fromShardBSON(document, epoch, timestamp);
+            auto statusWithChunk = ChunkType::parseFromShardBSON(document, epoch, timestamp);
             if (!statusWithChunk.isOK()) {
                 return statusWithChunk.getStatus().withContext(
                     str::stream() << "Failed to parse chunk '" << document.toString() << "'");

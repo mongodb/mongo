@@ -70,7 +70,7 @@ StatusWith<BalanceChunkRequest> BalanceChunkRequest::parseFromConfigCommand(cons
         nss = NamespaceString(ns);
     }
 
-    const auto chunkStatus = ChunkType::parseFromConfigBSONCommand(obj, requireUUID);
+    const auto chunkStatus = ChunkType::parseFromNetworkRequest(obj, requireUUID);
     if (!chunkStatus.isOK()) {
         return chunkStatus.getStatus();
     }

@@ -126,8 +126,8 @@ public:
                 nss.isValid());
 
         // Validate chunk version parameter.
-        const ChunkVersion requestedVersion = uassertStatusOK(
-            ChunkVersion::parseLegacyWithField(cmdObj, SetShardVersionRequest::kVersion));
+        const ChunkVersion requestedVersion =
+            ChunkVersion::fromBSONLegacyOrNewerFormat(cmdObj, SetShardVersionRequest::kVersion);
 
         // Step 3
 

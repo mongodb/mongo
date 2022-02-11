@@ -100,7 +100,7 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
                      << ChunkType::max(maxs[i]) << ChunkType::shard(kShardId.toString())
                      << ChunkType::lastmod(Date_t::fromMillisSinceEpoch(maxCollVersion.toLong())));
 
-            chunks.push_back(assertGet(ChunkType::fromShardBSON(
+            chunks.push_back(assertGet(ChunkType::parseFromShardBSON(
                 shardChunk, maxCollVersion.epoch(), maxCollVersion.getTimestamp())));
         }
 
@@ -147,7 +147,7 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
 
                 ASSERT(cursor->more());
                 BSONObj queryResult = cursor->nextSafe();
-                ChunkType foundChunk = assertGet(ChunkType::fromShardBSON(
+                ChunkType foundChunk = assertGet(ChunkType::parseFromShardBSON(
                     queryResult, chunk.getVersion().epoch(), chunk.getVersion().getTimestamp()));
                 ASSERT_BSONOBJ_EQ(chunk.getMin(), foundChunk.getMin());
                 ASSERT_BSONOBJ_EQ(chunk.getMax(), foundChunk.getMax());
@@ -287,7 +287,7 @@ TEST_F(ShardMetadataUtilTest, UpdateWithWriteNewChunks) {
     }
     splitChunkOneBuilder.append(ChunkType::shard(), lastChunk.getShard().toString());
     collVersion.appendLegacyWithField(&splitChunkOneBuilder, ChunkType::lastmod());
-    ChunkType splitChunkOne = assertGet(ChunkType::fromShardBSON(
+    ChunkType splitChunkOne = assertGet(ChunkType::parseFromShardBSON(
         splitChunkOneBuilder.obj(), collVersion.epoch(), collVersion.getTimestamp()));
     newChunks.push_back(splitChunkOne);
 
@@ -301,7 +301,7 @@ TEST_F(ShardMetadataUtilTest, UpdateWithWriteNewChunks) {
     splitChunkTwoMovedBuilder.append(ChunkType::max(), lastChunk.getMax());
     splitChunkTwoMovedBuilder.append(ChunkType::shard(), "altShard");
     collVersion.appendLegacyWithField(&splitChunkTwoMovedBuilder, ChunkType::lastmod());
-    ChunkType splitChunkTwoMoved = assertGet(ChunkType::fromShardBSON(
+    ChunkType splitChunkTwoMoved = assertGet(ChunkType::parseFromShardBSON(
         splitChunkTwoMovedBuilder.obj(), collVersion.epoch(), collVersion.getTimestamp()));
     newChunks.push_back(splitChunkTwoMoved);
 
