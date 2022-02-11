@@ -1,9 +1,10 @@
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode().
+load("jstests/aggregation/extras/utils.js");  // For assertErrorCode() and assertArrayEq().
 
-const coll = db.jstests_aggregation_add;
+const collName = "jstests_aggregation_add"
+const coll = db["collName"];
 coll.drop();
 
 // TODO: SERVER-63099 Make sure that constant folding does not assume associativity or
@@ -33,16 +34,33 @@ function assertConstantFoldingResultForOp(op, input, expectedOutput, message) {
             }
         }
     };
+    const expected = buildExpressionFromArguments(expectedOutput, op);
+
     let pipeline = [
         {$group: {_id: buildExpressionFromArguments(input, op), sum: {$sum: 1}}},
     ];
 
-    let result = db.runCommand(
-        {explain: {aggregate: "coll", pipeline: pipeline, cursor: {}}, verbosity: 'queryPlanner'});
+    let result = db.runCommand({
+        explain: {aggregate: collName, pipeline: pipeline, cursor: {}},
+        verbosity: 'queryPlanner'
+    });
 
     assert(result.stages && result.stages[1] && result.stages[1].$group, result);
-    const expected = buildExpressionFromArguments(expectedOutput, op);
     assert.eq(result.stages[1].$group._id, expected, message);
+
+    // TODO: Verify that SBE does the right thing when project is pushed down.
+    // pipeline = [{$project: {result: buildExpressionFromArguments(input, op)}}];
+    // result = db.runCommand({
+    //     explain: {aggregate: collName, pipeline: pipeline, cursor: {}},
+    //     verbosity: 'queryPlanner'
+    // });
+
+    // assert(result.queryPlanner && result.queryPlanner.winningPlan &&
+    //            result.queryPlanner.winningPlan.transformBy &&
+    //            result.queryPlanner.winningPlan.transformBy.result,
+    //        result);
+    // assert.eq(result.queryPlanner.winningPlan.transformBy.result, expected, message);
+
     return true;
 }
 
@@ -73,4 +91,18 @@ assertConstantFoldingResult(
 
 // Non-optimized comparisons -- make sure that non-optimized pipelines will give the same result as
 // optimized ones.
+coll.insert({_id: 0, v: NumberDecimal("917.6875119062092")})
+coll.insert({_id: 1, v: NumberDecimal("927.3345924210555")})
+
+const pipeline = [
+    {$group: {_id: {$multiply: [-3.14159265859, "$v", -314159255]}, sum: {$sum: 1}}},
+];
+const result = coll.aggregate(pipeline).toArray();
+assertArrayEq({
+    actual: result,
+    expected: [
+        {"_id": NumberDecimal("915242528741.9469524422272990976000"), "sum": 1},
+        {"_id": NumberDecimal("905721242210.0453137831269007622941"), "sum": 1}
+    ]
+})
 })();
