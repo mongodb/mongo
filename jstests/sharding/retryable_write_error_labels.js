@@ -303,12 +303,9 @@ retryableCodes.forEach(function(code) {
     testMongodError(code, true /* isWCError */);
 });
 
-// TODO (SERVER-57188): Remove mongos binVersion check in retryable_write_error_labels.js.
-if (jsTestOptions().mongosBinVersion != "last-lts") {
-    // mongos should attach RetryableWriteError labels when retryable writes fail due to local
-    // retryable errors.
-    testMongosError();
-}
+// mongos should attach RetryableWriteError labels when retryable writes fail due to local
+// retryable errors.
+testMongosError();
 
 st.s.adminCommand({"configureFailPoint": "overrideMaxAwaitTimeMS", "mode": "off"});
 
