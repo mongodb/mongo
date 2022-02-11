@@ -33,6 +33,7 @@
 #include <set>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_options.h"
 
@@ -103,6 +104,7 @@ void BackupBlock::_setNamespaceString(OperationContext* opCtx) {
         return;
     }
 
+    Lock::GlobalLock lk(opCtx, MODE_IS);
     DurableCatalog* catalog = DurableCatalog::get(opCtx);
     std::vector<DurableCatalog::Entry> catalogEntries = catalog->getAllCatalogEntries(opCtx);
     for (const DurableCatalog::Entry& e : catalogEntries) {
