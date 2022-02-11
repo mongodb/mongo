@@ -47,7 +47,7 @@ const testCommand = function(cmd, cmdObj) {
     cmdObj["collectionUUID"] = nonexistentUUID;
     let res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(res, nonexistentUUID, coll.getFullName(), "");
+    validateErrorResponse(res, nonexistentUUID, coll.getFullName(), null);
 
     jsTestLog("The command '" + cmd +
               "' fails when the provided UUID corresponds to a different collection.");

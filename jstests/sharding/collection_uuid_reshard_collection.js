@@ -53,7 +53,7 @@ let res = assert.commandFailedWithCode(mongos.adminCommand({
                                        ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.collectionUUID, nonexistentUUID);
 assert.eq(res.expectedNamespace, coll.getFullName());
-assert.eq(res.actualNamespace, "");
+assert.eq(res.actualNamespace, null);
 
 // The command fails when provided with a different collection's UUID.
 const coll2 = db['coll_2'];

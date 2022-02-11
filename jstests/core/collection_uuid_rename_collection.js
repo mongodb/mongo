@@ -70,7 +70,7 @@ let res = assert.commandFailedWithCode(testDB.adminCommand({
                                        ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.collectionUUID, nonexistentUUID);
 assert.eq(res.expectedNamespace, coll.getFullName());
-assert.eq(res.actualNamespace, "");
+assert.eq(res.actualNamespace, null);
 
 res = assert.commandFailedWithCode(testDB.adminCommand({
     renameCollection: coll2.getFullName(),
@@ -80,7 +80,7 @@ res = assert.commandFailedWithCode(testDB.adminCommand({
                                    ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.collectionUUID, nonexistentUUID);
 assert.eq(res.expectedNamespace, coll.getFullName());
-assert.eq(res.actualNamespace, "");
+assert.eq(res.actualNamespace, null);
 
 // The command fails when the provided UUID corresponds to a different collection.
 res = assert.commandFailedWithCode(testDB.adminCommand({

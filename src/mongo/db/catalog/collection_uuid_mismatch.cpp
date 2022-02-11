@@ -49,11 +49,8 @@ void checkCollectionUUIDMismatch(OperationContext* opCtx,
                 feature_flags::gCommandsAcceptCollectionUUID.isEnabled(
                     serverGlobalParams.featureCompatibility));
 
-    uassert((CollectionUUIDMismatchInfo{*uuid,
-                                        ns,
-                                        CollectionCatalog::get(opCtx)
-                                            ->lookupNSSByUUID(opCtx, *uuid)
-                                            .value_or(NamespaceString{})}),
+    uassert((CollectionUUIDMismatchInfo{
+                *uuid, ns, CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, *uuid)}),
             "Collection UUID does not match that specified",
             coll && coll->uuid() == *uuid);
 }

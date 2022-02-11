@@ -84,7 +84,7 @@ const testCommand = function(cmd, cmdObj) {
     cmdObj["collectionUUID"] = otherShardUUID;
     res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(res, otherShardUUID, sameShardColl.getFullName(), "");
+    validateErrorResponse(res, otherShardUUID, sameShardColl.getFullName(), null);
 };
 
 testCommand("aggregate", {aggregate: "", pipeline: [{$collStats: {latencyStats: {}}}], cursor: {}});

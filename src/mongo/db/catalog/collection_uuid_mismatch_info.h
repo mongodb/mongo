@@ -40,7 +40,7 @@ public:
 
     explicit CollectionUUIDMismatchInfo(const UUID& collectionUUID,
                                         const NamespaceString& expectedNamespace,
-                                        const NamespaceString& actualNamespace)
+                                        const boost::optional<NamespaceString>& actualNamespace)
         : _collectionUUID(collectionUUID),
           _expectedNamespace(expectedNamespace),
           _actualNamespace(actualNamespace) {}
@@ -56,6 +56,6 @@ public:
 private:
     UUID _collectionUUID;
     NamespaceString _expectedNamespace;
-    NamespaceString _actualNamespace;
+    boost::optional<NamespaceString> _actualNamespace;
 };
 }  // namespace mongo

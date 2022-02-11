@@ -29,7 +29,7 @@ let res = assert.commandFailedWithCode(
     ErrorCodes.CollectionUUIDMismatch);
 assert.eq(res.collectionUUID, nonexistentUUID);
 assert.eq(res.expectedNamespace, coll.getFullName());
-assert.eq(res.actualNamespace, "");
+assert.eq(res.actualNamespace, null);
 
 // 3. The command fails when the provided UUID corresponds to a different collection.
 const coll2 = testDB['coll_2'];

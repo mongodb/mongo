@@ -79,7 +79,7 @@ res = assert.commandFailedWithCode(
     testDB.runCommand(
         {aggregate: collName, collectionUUID: uuid, pipeline: [{$match: {}}], cursor: {}}),
     ErrorCodes.CollectionUUIDMismatch);
-validateErrorResponse(res, uuid, testColl.getFullName(), "");
+validateErrorResponse(res, uuid, testColl.getFullName(), null);
 
 // Now recreate the collection.
 assert.commandWorked(testColl.insert(docs));
@@ -89,7 +89,7 @@ res = assert.commandFailedWithCode(
     testDB.runCommand(
         {aggregate: collName, collectionUUID: uuid, pipeline: [{$match: {}}], cursor: {}}),
     ErrorCodes.CollectionUUIDMismatch);
-validateErrorResponse(res, uuid, testColl.getFullName(), "");
+validateErrorResponse(res, uuid, testColl.getFullName(), null);
 
 collNameRes = assert.commandWorked(
     testDB.runCommand({aggregate: collName, pipeline: [{$match: {}}], cursor: {}}));
@@ -106,7 +106,7 @@ res = assert.commandFailedWithCode(
     testDB.runCommand(
         {aggregate: "viewCollection", collectionUUID: uuid, pipeline: [{$match: {}}], cursor: {}}),
     ErrorCodes.CollectionUUIDMismatch);
-validateErrorResponse(res, uuid, testDB.getName() + '.viewCollection', "");
+validateErrorResponse(res, uuid, testDB.getName() + '.viewCollection', null);
 
 //
 // Tests for rejecting invalid collectionUUIDs and cases where collectionUUID is not allowed.

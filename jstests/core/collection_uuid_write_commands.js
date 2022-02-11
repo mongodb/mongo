@@ -10,7 +10,7 @@
 (function() {
 'use strict';
 
-var validateErrorResponse = function(res, collectionUUID, expectedNamespace, actualNamespace) {
+const validateErrorResponse = function(res, collectionUUID, expectedNamespace, actualNamespace) {
     if (res.writeErrors) {
         // Sharded cluster scenario.
         res = res.writeErrors[0];
@@ -41,7 +41,7 @@ var testCommand = function(cmd, cmdObj) {
     cmdObj["collectionUUID"] = nonexistentUUID;
     let res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(res, nonexistentUUID, coll.getFullName(), "");
+    validateErrorResponse(res, nonexistentUUID, coll.getFullName(), null);
 
     jsTestLog("The command '" + cmd +
               "' fails when the provided UUID corresponds to a different collection.");
