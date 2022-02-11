@@ -27,28 +27,39 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/s/sharding_data_transform_metrics.h"
-#include "mongo/util/uuid.h"
+#include "mongo/db/s/sharding_data_transform_metrics_observer.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/functional.h"
+#include <set>
 
 namespace mongo {
-class ShardingDataTransformMetricsObserverInterface {
-public:
-    virtual int64_t getRemainingTimeMillis() const = 0;
-    virtual int64_t getStartTimestamp() const = 0;
-    virtual const UUID& getUuid() const = 0;
-};
 
-class ShardingDataTransformMetricsObserver : public ShardingDataTransformMetricsObserverInterface {
+class ShardingDataTransformCumulativeMetrics {
 public:
-    ShardingDataTransformMetricsObserver(ShardingDataTransformInstanceMetrics* metrics);
-    int64_t getRemainingTimeMillis() const override;
-    int64_t getStartTimestamp() const override;
-    const UUID& getUuid() const override;
+    using InstanceObserver = ShardingDataTransformMetricsObserverInterface;
+    using DeregistrationFunction = unique_function<void()>;
+
+    [[nodiscard]] DeregistrationFunction registerInstanceMetrics(const InstanceObserver* metrics);
+    int64_t getOldestOperationRemainingTimeMillis() const;
+    size_t getObservedMetricsCount() const;
 
 private:
-    ShardingDataTransformInstanceMetrics* _metrics;
+    struct MetricsComparer {
+        inline bool operator()(const InstanceObserver* a, const InstanceObserver* b) const {
+            auto aTime = a->getStartTimestamp();
+            auto bTime = b->getStartTimestamp();
+            if (aTime == bTime) {
+                return a->getUuid() < b->getUuid();
+            }
+            return aTime < bTime;
+        }
+    };
+    using MetricsSet = std::set<const InstanceObserver*, MetricsComparer>;
+
+    MetricsSet::iterator insertMetrics(const InstanceObserver* metrics);
+
+    mutable Mutex _mutex;
+    MetricsSet _instanceMetrics;
 };
 
 }  // namespace mongo

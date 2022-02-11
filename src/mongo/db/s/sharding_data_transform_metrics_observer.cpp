@@ -31,11 +31,21 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-long ShardingDataTransformMetricsObserver::getRemainingTimeMillis() const {
+
+ShardingDataTransformMetricsObserver::ShardingDataTransformMetricsObserver(
+    ShardingDataTransformInstanceMetrics* metrics)
+    : _metrics(metrics) {}
+
+int64_t ShardingDataTransformMetricsObserver::getRemainingTimeMillis() const {
     MONGO_UNREACHABLE;
 }
 
-long ShardingDataTransformMetricsObserver::getTimeRunningMillis() const {
+int64_t ShardingDataTransformMetricsObserver::getStartTimestamp() const {
     MONGO_UNREACHABLE;
 }
+
+const UUID& ShardingDataTransformMetricsObserver::getUuid() const {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace mongo

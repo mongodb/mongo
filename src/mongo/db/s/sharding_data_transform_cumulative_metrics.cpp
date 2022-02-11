@@ -27,28 +27,40 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/s/sharding_data_transform_metrics.h"
-#include "mongo/util/uuid.h"
+#include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
-class ShardingDataTransformMetricsObserverInterface {
-public:
-    virtual int64_t getRemainingTimeMillis() const = 0;
-    virtual int64_t getStartTimestamp() const = 0;
-    virtual const UUID& getUuid() const = 0;
-};
 
-class ShardingDataTransformMetricsObserver : public ShardingDataTransformMetricsObserverInterface {
-public:
-    ShardingDataTransformMetricsObserver(ShardingDataTransformInstanceMetrics* metrics);
-    int64_t getRemainingTimeMillis() const override;
-    int64_t getStartTimestamp() const override;
-    const UUID& getUuid() const override;
+ShardingDataTransformCumulativeMetrics::DeregistrationFunction
+ShardingDataTransformCumulativeMetrics::registerInstanceMetrics(const InstanceObserver* metrics) {
+    auto it = insertMetrics(metrics);
+    return [=] {
+        stdx::unique_lock guard(_mutex);
+        _instanceMetrics.erase(it);
+    };
+}
 
-private:
-    ShardingDataTransformInstanceMetrics* _metrics;
-};
+int64_t ShardingDataTransformCumulativeMetrics::getOldestOperationRemainingTimeMillis() const {
+    stdx::unique_lock guard(_mutex);
+    if (_instanceMetrics.empty()) {
+        return 0;
+    }
+    return (*_instanceMetrics.begin())->getRemainingTimeMillis();
+}
+
+size_t ShardingDataTransformCumulativeMetrics::getObservedMetricsCount() const {
+    stdx::unique_lock guard(_mutex);
+    return _instanceMetrics.size();
+}
+
+ShardingDataTransformCumulativeMetrics::MetricsSet::iterator
+ShardingDataTransformCumulativeMetrics::insertMetrics(const InstanceObserver* metrics) {
+    stdx::unique_lock guard(_mutex);
+    auto before = _instanceMetrics.size();
+    auto it = _instanceMetrics.insert(_instanceMetrics.end(), metrics);
+    invariant(before + 1 == _instanceMetrics.size());
+    return it;
+}
 
 }  // namespace mongo
