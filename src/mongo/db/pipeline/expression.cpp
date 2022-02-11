@@ -3931,14 +3931,17 @@ const char* ExpressionInternalFLEEqual::getOpName() const {
  * Optimize a general Nary expression.
  *
  * The optimization has the following properties:
- *   1) Optimize each of the operators.
- *   2) If the operand is associative, flatten internal operators of the same type. I.e.:
+ *   1) Optimize each of the operands.
+ *   2) If the operator is fully associative, flatten internal operators of the same type. I.e.:
  *      A+B+(C+D)+E => A+B+C+D+E
- *   3) If the operand is commutative & associative, group all constant operators. For example:
+ *   3) If the operator is commutative & associative, group all constant operands. For example:
  *      c1 + c2 + n1 + c3 + n2 => n1 + n2 + c1 + c2 + c3
- *   4) If the operand is associative, execute the operation over all the contiguous constant
- *      operators and replacing them by the result. For example: c1 + c2 + n1 + c3 + c4 + n5 =>
+ *   4) If the operator is fully associative, execute the operation over all the contiguous constant
+ *      operands and replacing them by the result. For example: c1 + c2 + n1 + c3 + c4 + n5 =>
  *      c5 = c1 + c2, c6 = c3 + c4 => c5 + n1 + c6 + n5
+ *   5) If the operand is left-associative, execute the operation over all contiguous constant
+ *      operands that precede the first non-constant operand. For example: c1 + c2 + n1 + c3 + c4 +
+ *      n2 => c5 = c1 + c2, c5 + n1 + c3 + c4 + n5
  *
  * It returns the optimized expression. It can be exactly the same expression, a modified version
  * of the same expression or a completely different expression.
@@ -3959,11 +3962,12 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
             getExpressionContext(), evaluate(Document(), &(getExpressionContext()->variables))));
     }
 
-    // If the expression is associative, we can collapse all the consecutive constant operands into
-    // one by applying the expression to those consecutive constant operands.
-    // If the expression is also commutative we can reorganize all the operands so that all of the
+    // If the expression is associative, we can collapse all the consecutive constant operands
+    // into one by applying the expression to those consecutive constant operands. If the
+    // expression is also commutative we can reorganize all the operands so that all of the
     // constant ones are together (arbitrarily at the back) and we can collapse all of them into
-    // one.
+    // one. If the operation is left-associative, then we will stop folding constants together when
+    // we see the first non-constant operand.
     if (getAssociativity() == Associativity::kFull || getAssociativity() == Associativity::kLeft) {
         ExpressionVector constExpressions;
         ExpressionVector optimizedOperands;
@@ -4011,10 +4015,18 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
                 constExpressions.clear();
             }
             optimizedOperands.push_back(operand);
+
             // If the expression is left-associative, break out of the loop since we should only
             // optimize until the first non-constant.
             if (getAssociativity() == Associativity::kLeft) {
-                // Dump the remaining operands into the optimizedOperands vector.
+                // Dump the remaining operands into the optimizedOperands vector that will become
+                // the new _children vector.
+
+                // Note that if the operation is left-associative and
+                // commutative, all constants seen up until this point will be evaluated together
+                // and placed at the END of the operands list. There probably aren't any
+                // left-associative but commutative operators that are relevant to implement, but
+                // the semantics are well-defined.
                 optimizedOperands.insert(
                     optimizedOperands.end(), _children.begin() + i + 1, _children.end());
                 break;
