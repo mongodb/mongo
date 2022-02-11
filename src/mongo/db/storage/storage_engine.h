@@ -325,7 +325,8 @@ public:
 
         virtual ~StreamingCursor() = default;
 
-        virtual StatusWith<std::vector<BackupBlock>> getNextBatch(std::size_t batchSize) = 0;
+        virtual StatusWith<std::vector<BackupBlock>> getNextBatch(OperationContext* opCtx,
+                                                                  std::size_t batchSize) = 0;
 
     protected:
         BackupOptions options;

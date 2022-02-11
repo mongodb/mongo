@@ -290,7 +290,8 @@ public:
         return BSONObj();
     }
 
-    StatusWith<std::vector<BackupBlock>> getNextBatch(const std::size_t batchSize) {
+    StatusWith<std::vector<BackupBlock>> getNextBatch(OperationContext* opCtx,
+                                                      const std::size_t batchSize) {
         if (_exhaustCursor) {
             std::vector<BackupBlock> emptyVector;
             return emptyVector;
