@@ -134,5 +134,15 @@ TEST(TenantNamespaceTest, TenantNamespaceParseFromDiskMultitenancySupportEnabled
     ASSERT_EQUALS(std::string("b"), tenantNs.coll());
 }
 
+TEST(TenantNamespaceTest, TestCopyConstructor) {
+    TenantId tenantId(OID::gen());
+    TenantNamespace tenantNs(tenantId, NamespaceString("a.b"));
+    TenantNamespace clonedTenantNs(tenantNs);
+    ASSERT_EQUALS(tenantNs, clonedTenantNs);
+    ASSERT_EQUALS(*tenantNs.tenantId(), *clonedTenantNs.tenantId());
+    ASSERT_EQUALS(tenantNs.db(), clonedTenantNs.db());
+    ASSERT_EQUALS(tenantNs.coll(), clonedTenantNs.coll());
+}
+
 }  // namespace
 }  // namespace mongo

@@ -45,15 +45,12 @@ namespace mongo {
 
 class TenantNamespace {
 public:
-    TenantNamespace(const TenantNamespace& tenantNs)
-        : _tenantId(tenantNs.tenantId()),
-          _nss(tenantNs.getNss()),
-          _tenantNsStr(tenantNs.toString()) {}
+    TenantNamespace(const TenantNamespace& tenantNs) = default;
 
     /**
      * Constructs an empty TenantNamespace.
      */
-    TenantNamespace() : _tenantId(boost::none), _nss(), _tenantNsStr() {}
+    TenantNamespace() = default;
 
     /**
      * Constructs a TenantNamespace from the given tenantId and NamespaceString.
@@ -142,7 +139,7 @@ public:
 
 private:
     boost::optional<TenantId> _tenantId;
-    NamespaceString _nss;
+    NamespaceString _nss{};
     boost::optional<std::string> _tenantNsStr;  // Only set if _tenantId exists
 };
 
