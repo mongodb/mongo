@@ -33,6 +33,7 @@
 
 #include "mongo/db/commands/fle2_compact.h"
 
+#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog_raii.h"
@@ -154,6 +155,8 @@ StatusWith<CompactStats> compactEncryptedCompactionCollection(
         }
         return Status(ErrorCodes::NamespaceNotFound, "collection does not exist");
     }
+
+    uassert(6319903, "Feature flag FLE2 is not enabled", gFeatureFlagFLE2.isEnabledAndIgnoreFCV());
 
     auto swNamespaces = EncryptedStateCollectionsNamespaces::createFromDataCollection(*edc.get());
     if (!swNamespaces.isOK()) {

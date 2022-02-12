@@ -232,6 +232,7 @@ env.Library(
         'fle2_compact.idl',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/crypto/encrypted_field_config',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/commands',

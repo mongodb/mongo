@@ -2721,7 +2721,7 @@ var authCommandsLib = {
           testname: "compactStructuredEncryptionData",
           command: {compactStructuredEncryptionData: "foo", compactionTokens : {}},
           skipSharded: true,
-          //skipUnlessReplicaSet: true,
+          skipUnlessReplicaSet: true,
           skipTest:
               (conn) => !TestData.setParameters.featureFlagFLE2,
           setup: function(db) {
