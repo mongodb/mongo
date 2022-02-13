@@ -1,0 +1,159 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+    - "mongo/crypto/encryption_fields.idl"
+
+enums:
+    EncryptedBinDataType:
+        description: "Subtypes with an BinData 6, this is the first byte of the payload"
+        type: int
+        values:
+          # FLE 1 Payloads
+          kPayload : 0 # see FLEEncryptionPlaceholder
+          kDeterministic : 1
+          kRandom : 2
+          # FLE 2
+          # FLE 2 Client-side
+          kFLE2Placeholder : 3            # see FLE2EncryptionPlaceholder
+          kFLE2InsertUpdatePayload : 4    # see FLE2InsertUpdatePayload
+          kFLE2FindEqualityPayload : 5    # see FLE2FindEqualityPayload
+
+          # FLE 2 Server-side
+          kFLE2UnindexedEncryptedValue : 6 # see FLE2IndexedEqualityEncryptedValue
+          kFLE2EqualityIndexedValue : 7
+
+
+structs:
+
+    FLE2InsertUpdatePayload:
+        description: "Payload of an indexed field to insert or update"
+        strict: true
+        fields:
+          d:
+            description: "EDCDerivedFromDataTokenAndCounter"
+            type: bindata_generic
+            cpp_name: edcDerivedToken
+          s:
+            description: "ESCDerivedFromDataTokenAndCounter"
+            type: bindata_generic
+            cpp_name: escDerivedToken
+          c:
+            description: "ECCDerivedFromDataTokenAndCounter"
+            type: bindata_generic
+            cpp_name: eccDerivedToken
+          p:
+            description: "Encrypted tokens"
+            type: bindata_generic
+            cpp_name: encryptedTokens
+          u:
+            description: "Index KeyId"
+            type: uuid
+            cpp_name: indexKeyId
+          t:
+            description: "Encrypted type"
+            type: safeInt
+            cpp_name: type
+          v:
+            description: "Encrypted value"
+            type: bindata_generic
+            cpp_name: value
+          e:
+            description: "ServerDataEncryptionLevel1Token"
+            type: bindata_generic
+            cpp_name: serverEncryptionToken
+
+    FLE2DeletePayload:
+        description: "Payload of an indexed field to delete"
+        strict: true
+        fields:
+          o:
+            description: "ECOCToken"
+            type: bindata_generic
+            cpp_name: ecocToken
+          e:
+            description: "ServerDataEncryptionLevel1Token"
+            type: bindata_generic
+            cpp_name: serverEncryptionToken
+
+    FLE2FindEqualityPayload:
+        description: "Payload for an equality find"
+        strict: true
+        fields:
+          d:
+            description: "EDCDerivedFromDataToken"
+            type: bindata_generic
+            cpp_name: edcDerivedToken
+          s:
+            description: "ESCDerivedFromDataToken"
+            type: bindata_generic
+            cpp_name: escDerivedToken
+          c:
+            description: "ECCDerivedFromDataToken"
+            type: bindata_generic
+            cpp_name: eccDerivedToken
+          cm:
+            description: "FLE2 max counter"
+            type: long
+            cpp_name: maxCounter
+            optional: true
+
+    EncryptionInformation:
+        description: "Implements Encryption Information which includes the schema for FLE 2 that is consumed by query_analysis, queries and write_ops"
+        strict: true
+        fields:
+          type:
+            description: "The version number"
+            type: safeInt
+            default: 1
+          deleteTokens:
+            description: "A map of field paths to FLEDeletePayload"
+            type: object
+            optional: true
+          schema:
+            description: "A map of NamespaceString to EncryptedFieldConfig"
+            type: object
+
+    ecocDocument:
+        description: "foo"
+        strict: true
+        fields:
+          _id:
+            description: "Random id"
+            type: objectid
+            optional: true
+          fieldName:
+            description: "Name of field"
+            type: string
+          value:
+            description: "Encrypted value"
+            type: bindata_generic
+

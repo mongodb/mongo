@@ -92,6 +92,18 @@ env.Library(
     LIBDEPS=[
          '$BUILD_DIR/mongo/idl/feature_flag',
          '$BUILD_DIR/mongo/idl/idl_parser',
+    ]
+)
+
+env.Library(
+    target="fle_crypto",
+    source=[
+        "fle_crypto.cpp",
+        "fle_field_schema.idl",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        'sha_block_${MONGO_CRYPTO}',
     ],
 )
 
@@ -101,6 +113,7 @@ env.CppUnitTest(
         'aead_encryption_test.cpp' if "tom" not in env["MONGO_CRYPTO"] else [],
         'mechanism_scram_test.cpp',
         'sha1_block_test.cpp',
+        'fle_crypto_test.cpp',
         'sha256_block_test.cpp',
         'sha512_block_test.cpp',
         'symmetric_crypto_test.cpp' if "tom" not in env["MONGO_CRYPTO"] else [],
@@ -109,6 +122,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/base/secure_allocator',
         'aead_encryption' if "tom" not in env["MONGO_CRYPTO"] else [],
+        'fle_crypto',
         'sha_block_${MONGO_CRYPTO}',
     ],
 )

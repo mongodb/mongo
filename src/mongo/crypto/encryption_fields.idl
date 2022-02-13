@@ -37,7 +37,6 @@ enums:
         type: string
         values:
             Equality: "equality"
-            # Range: "range"
 
 feature_flags:
     featureFlagFLE2:

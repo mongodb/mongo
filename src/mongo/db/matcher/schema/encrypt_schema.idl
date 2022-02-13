@@ -34,6 +34,7 @@ global:
 
 imports:
     - "mongo/idl/basic_types.idl"
+    - "mongo/crypto/encryption_fields.idl"
 
 types:
     encryptSchemaKeyId:
@@ -64,6 +65,21 @@ enums:
         values:
             kDeterministic: 1
             kRandom: 2
+
+    Fle2AlgorithmInt:
+        description: "The algorithm used to encrypt fields for field level encryption represented
+            as an unsigned integer."
+        type: int
+        values:
+            kUnindexed: 1
+            kEquality: 2
+
+    Fle2PlaceholderType:
+        description: "The type of payload to generate from a placeholder"
+        type: int
+        values:
+            kInsert: 1
+            kFind: 2
 
 structs:
     # Maps to the encrypt keyword in JSON Schema.
@@ -125,3 +141,35 @@ structs:
             description: "value to encrypt"
             type: IDLAnyType
             cpp_name: value
+
+    FLE2EncryptionPlaceholder:
+        description: "Implements Encryption BinData (subtype 6) sub-subtype 0, the intent-to-encrypt
+            mapping. Contains a value to encrypt and a description of how it should be encrypted."
+        strict: true
+        fields:
+          t:
+            description: "The type number, determines what payload to replace the placeholder with"
+            type: Fle2PlaceholderType
+            cpp_name: type
+          a:
+            description: "The encryption algorithm to be used."
+            type: Fle2AlgorithmInt
+            cpp_name: algorithm
+          ki:
+            description: "IndexKeyId, Used to query the key vault by _id."
+            type: uuid
+            cpp_name: indexKeyId
+          ku:
+            description: "UserKeyId, Used to query the key vault by _id.,
+              Typically same as IndexKeyId unless explicit encryption is used."
+            type: uuid
+            cpp_name: userKeyId
+          v:
+            description: "value to encrypt"
+            type: IDLAnyType
+            cpp_name: value
+          cm:
+            description: "FLE2 max contention counter"
+            type: long
+            cpp_name: maxContentionCounter
+
