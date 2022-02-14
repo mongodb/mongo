@@ -241,7 +241,6 @@ __hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree,
     cursor->set_value(
       cursor, tw, tw->durable_stop_ts, tw->durable_start_ts, (uint64_t)type, hs_value);
     WT_ERR(cursor->insert(cursor));
-    WT_STAT_CONN_DATA_INCR(session, cache_hs_insert);
 
 err:
     if (!hs_read_all_flag)
@@ -774,6 +773,8 @@ err:
 
     WT_TRET(hs_cursor->close(hs_cursor));
 
+    /* Update the statistics. */
+    WT_STAT_CONN_DATA_INCRV(session, cache_hs_insert, insert_cnt);
     WT_STAT_CONN_DATA_INCRV(session, cache_hs_insert_full_update, cache_hs_insert_full_update);
     WT_STAT_CONN_DATA_INCRV(
       session, cache_hs_insert_reverse_modify, cache_hs_insert_reverse_modify);
