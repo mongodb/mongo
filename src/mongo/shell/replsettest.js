@@ -2965,6 +2965,18 @@ var ReplSetTest = function(opts) {
         }, `Failed to run replSetFreeze cmd on ${node.host}`);
     }));
 
+    /**
+     * Unfreeze a particular node or nodes.
+     *
+     * @param node is a single node or list of nodes, by id or conn
+     */
+    this.unfreeze = _nodeParamToSingleNode(_nodeParamToConn(function(node) {
+        // Ensure node is authenticated.
+        asCluster(node, () => {
+            assert.commandWorked(node.adminCommand({replSetFreeze: 0}));
+        });
+    }));
+
     this.stopPrimary = function(signal, opts) {
         var primary = this.getPrimary();
         var primary_id = this.getNodeId(primary);
