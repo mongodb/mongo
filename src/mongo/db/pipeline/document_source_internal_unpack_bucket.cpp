@@ -222,7 +222,7 @@ void optimizePrefix(Pipeline::SourceContainer::iterator itr, Pipeline::SourceCon
 }
 
 // Returns whether 'field' depends on a pushed down $addFields or computed $project.
-bool fieldIsComputed(BucketSpec spec, std::string field) {
+bool fieldIsComputed(const BucketSpec& spec, const std::string& field) {
     return std::any_of(
         spec.computedMetaProjFields.begin(), spec.computedMetaProjFields.end(), [&](auto& s) {
             return s == field || expression::isPathPrefixOf(field, s) ||
@@ -323,7 +323,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
                 uassert(5509902,
                         "computedMetaProjFields field element must be a single-element field path",
                         field.find('.') == std::string::npos);
-                bucketSpec.computedMetaProjFields.emplace_back(field);
+                bucketSpec.computedMetaProjFields.insert(field.toString());
             }
         } else {
             uasserted(5346506,

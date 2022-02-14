@@ -37,7 +37,16 @@
 
 namespace mongo {
 /**
- * Carries parameters for unpacking a bucket.
+ * Carries parameters for unpacking a bucket. The order of operations applied to determine which
+ * fields are in the final document are:
+ * If we are in include mode:
+ *   1. Unpack all fields from the bucket.
+ *   2. Remove any fields not in _fieldSet, since we are in include mode.
+ *   3. Add fields from _computedMetaProjFields.
+ * If we are in exclude mode:
+ *   1. Unpack all fields from the bucket.
+ *   2. Add fields from _computedMetaProjFields.
+ *   3. Remove any fields in _fieldSet, since we are in exclude mode.
  */
 struct BucketSpec {
     // The user-supplied timestamp field name specified during time-series collection creation.
@@ -53,7 +62,7 @@ struct BucketSpec {
 
     // Vector of computed meta field projection names. Added at the end of materialized
     // measurements.
-    std::vector<std::string> computedMetaProjFields;
+    std::set<std::string> computedMetaProjFields;
 };
 
 /**
@@ -140,9 +149,23 @@ public:
     // Add computed meta projection names to the bucket specification.
     void addComputedMetaProjFields(const std::vector<StringData>& computedFieldNames);
 
+    // Fill _spec.unpackFieldsToIncludeExclude with final list of fields to include/exclude during
+    // unpacking. Only calculates the list the first time it is called.
+    const std::set<std::string>& fieldsToIncludeExcludeDuringUnpack();
+
     class UnpackingImpl;
 
 private:
+    // Determines if timestamp values should be included in the materialized measurements.
+    void determineIncludeTimeField();
+
+    // Removes metaField from the field set and determines whether metaField should be
+    // included in the materialized measurements.
+    void eraseMetaFromFieldSetAndDetermineIncludeMeta();
+
+    // Erase computed meta projection fields if they are present in the exclusion field set.
+    void eraseExcludedComputedMetaProjFields();
+
     BucketSpec _spec;
     Behavior _unpackerBehavior;
 
@@ -171,44 +194,21 @@ private:
 
     // The number of measurements in the bucket.
     int32_t _numberOfMeasurements = 0;
+
+    // Final list of fields to include/exclude during unpacking. This is computed once during the
+    // first doGetNext call so we don't have to recalculate every time we reach a new bucket.
+    boost::optional<std::set<std::string>> _unpackFieldsToIncludeExclude = boost::none;
 };
-
-/**
- * Removes metaField from the field set and returns a boolean indicating whether metaField should be
- * included in the materialized measurements. Always returns false if metaField does not exist.
- */
-inline bool eraseMetaFromFieldSetAndDetermineIncludeMeta(BucketUnpacker::Behavior unpackerBehavior,
-                                                         BucketSpec* bucketSpec) {
-    if (!bucketSpec->metaField ||
-        std::find(bucketSpec->computedMetaProjFields.cbegin(),
-                  bucketSpec->computedMetaProjFields.cend(),
-                  *bucketSpec->metaField) != bucketSpec->computedMetaProjFields.cend()) {
-        return false;
-    } else if (auto itr = bucketSpec->fieldSet.find(*bucketSpec->metaField);
-               itr != bucketSpec->fieldSet.end()) {
-        bucketSpec->fieldSet.erase(itr);
-        return unpackerBehavior == BucketUnpacker::Behavior::kInclude;
-    } else {
-        return unpackerBehavior == BucketUnpacker::Behavior::kExclude;
-    }
-}
-
-/**
- * Determines if timestamp values should be included in the materialized measurements.
- */
-inline bool determineIncludeTimeField(BucketUnpacker::Behavior unpackerBehavior,
-                                      BucketSpec* bucketSpec) {
-    return (unpackerBehavior == BucketUnpacker::Behavior::kInclude) ==
-        (bucketSpec->fieldSet.find(bucketSpec->timeField) != bucketSpec->fieldSet.end());
-}
 
 /**
  * Determines if an arbitrary field should be included in the materialized measurements.
  */
 inline bool determineIncludeField(StringData fieldName,
                                   BucketUnpacker::Behavior unpackerBehavior,
-                                  const BucketSpec& bucketSpec) {
-    return (unpackerBehavior == BucketUnpacker::Behavior::kInclude) ==
-        (bucketSpec.fieldSet.find(fieldName.toString()) != bucketSpec.fieldSet.end());
+                                  const std::set<std::string>& unpackFieldsToIncludeExclude) {
+    const bool isInclude = unpackerBehavior == BucketUnpacker::Behavior::kInclude;
+    const bool unpackFieldsContains = unpackFieldsToIncludeExclude.find(fieldName.toString()) !=
+        unpackFieldsToIncludeExclude.cend();
+    return isInclude == unpackFieldsContains;
 }
 }  // namespace mongo
