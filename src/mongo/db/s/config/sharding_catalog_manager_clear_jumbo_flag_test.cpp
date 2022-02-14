@@ -111,7 +111,8 @@ TEST_F(ClearJumboFlagTest, ClearJumboShouldBumpVersion) {
         auto chunkDoc = uassertStatusOK(getChunkDoc(
             operationContext(), nssOrUuid, jumboChunk().getMin(), collEpoch, collTimestamp));
         ASSERT_FALSE(chunkDoc.getJumbo());
-        ASSERT_EQ(ChunkVersion(15, 0, collEpoch, collTimestamp), chunkDoc.getVersion());
+        auto chunkVersion = chunkDoc.getVersion();
+        ASSERT_EQ(ChunkVersion(15, 0, collEpoch, collTimestamp), chunkVersion);
     };
 
     test(_nss1, boost::none /* timestamp */);

@@ -1571,8 +1571,9 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
     BSONObjBuilder updateBuilder;
     updateBuilder.append("$unset", BSON(ChunkType::jumbo() << ""));
 
+    // Update the newest chunk to have the new (bumped) version
     BSONObjBuilder updateVersionClause(updateBuilder.subobjStart("$set"));
-    newVersion.appendLegacyWithField(&updateVersionClause, ChunkType::lastmod());
+    updateVersionClause.appendTimestamp(ChunkType::lastmod(), newVersion.toLong());
     updateVersionClause.doneFast();
 
     auto chunkUpdate = updateBuilder.obj();
