@@ -132,7 +132,7 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref)
     uint8_t previous_state;
     char tp_string[WT_TP_STRING_SIZE];
     const char *tag;
-    bool busy, hazard, obsolete, ovfl_items;
+    bool busy, obsolete, ovfl_items;
 
     /* Ignore root pages as they can never be deleted. */
     if (__wt_ref_is_root(ref)) {
@@ -222,7 +222,6 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref)
     WT_RET(__wt_hazard_set(session, ref, &busy));
     if (busy)
         return (0);
-    hazard = true;
 
     mod = ref->page == NULL ? NULL : ref->page->modify;
     if (mod != NULL && mod->rec_result == WT_PM_REC_EMPTY) {
@@ -293,8 +292,7 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref)
         newest_stop_ts, newest_stop_durable_ts, newest_stop_txn, tp_string));
 
 err:
-    if (hazard)
-        WT_TRET(__wt_hazard_clear(session, ref));
+    WT_TRET(__wt_hazard_clear(session, ref));
     return (ret);
 }
 
