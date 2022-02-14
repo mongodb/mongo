@@ -2,9 +2,11 @@
  * Test that a deletion triggered by a TTL index recovers the sharding filtering metadata
  *
  * * @tags: [
- *   # Needed since previous versions didn't require the sharding filtering information to filter
- *   # direct writes to shards.
+ * # Needed since previous versions didn't require the sharding filtering information to filter
+ * # direct writes to shards.
  * requires_fcv_53,
+ * # It requires persistence because it assumes shards will still have their data after restarting.
+ * requires_persistence
  * ]
  */
 
