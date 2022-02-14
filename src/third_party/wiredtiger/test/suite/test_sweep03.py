@@ -153,7 +153,7 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         sweep_baseline = stat_cursor[stat.conn.dh_sweeps][2]
         stat_cursor.close()
 
-        self.session.drop(drop_uri, None)
+        self.dropUntilSuccess(self.session, drop_uri)
 
         sweep_baseline = self.wait_for_sweep(sweep_baseline)
 

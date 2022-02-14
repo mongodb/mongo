@@ -65,7 +65,7 @@ class test_collator(wttest.WiredTigerTestCase):
 
     def drop_indices(self):
         for i in range(0, self.nindices):
-            self.session.drop("index:collator:x" + str(i))
+            self.dropUntilSuccess(self.session, "index:collator:x" + str(i))
 
     def csv(self, s, i):
         return s.split(',')[i]

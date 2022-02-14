@@ -64,7 +64,7 @@ class test_schema06(wttest.WiredTigerTestCase):
 
     def drop_index(self, inum):
         colname = "s" + str(inum)
-        self.session.drop("index:schema06:" + colname, None)
+        self.dropUntilSuccess(self.session, "index:schema06:" + colname)
 
     def test_index_stress(self):
         self.session.create("table:schema06",

@@ -59,4 +59,4 @@ class test_lsm03(wttest.WiredTigerTestCase):
         ds = SimpleDataSet(self, uri, 50000, config=self.config)
         ds.populate()
         # The drop should succeed even when LSM work units are active
-        self.session.drop(uri)
+        self.dropUntilSuccess(self.session, uri)

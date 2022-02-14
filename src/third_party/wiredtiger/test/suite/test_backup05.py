@@ -112,7 +112,7 @@ class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
             if i % self.freq == 0:
                 self.check_manual_backup(i, ".", "RESTART")
             else:
-                self.session.verify(self.uri)
+                self.verifyUntilSuccess(self.session, self.uri)
 
     def test_backup(self):
         with self.expectedStdoutPattern('recreating metadata'):

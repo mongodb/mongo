@@ -51,9 +51,9 @@ class test_bug005(wttest.WiredTigerTestCase):
         cursor.close()
 
         # Verify the object, force it to disk, and verify the on-disk version.
-        self.session.verify(self.uri)
+        self.verifyUntilSuccess(self.session, self.uri)
         self.reopen_conn()
-        self.session.verify(self.uri)
+        self.verifyUntilSuccess(self.session, self.uri)
 
         # Append random data to the end.
         f = open('test_bug005', 'a')
@@ -61,7 +61,7 @@ class test_bug005(wttest.WiredTigerTestCase):
         f.close()
 
         # Verify the object again.
-        self.session.verify(self.uri)
+        self.verifyUntilSuccess(self.session, self.uri)
 
 if __name__ == '__main__':
     wttest.run()

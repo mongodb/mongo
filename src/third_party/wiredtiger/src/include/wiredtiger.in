@@ -2974,13 +2974,6 @@ struct __wt_connection {
  * specified to a library extension are passed to WT_CONNECTION::load_extension as the \c config
  * parameter (for example\, <code>extensions=(/path/ext.so={entry=my_entry})</code>)., a list of
  * strings; default empty.}
- * @config{file_close_sync, control whether to flush modified files to storage independent of a
- * global checkpoint when closing file handles to acquire exclusive access to a table.  If set to
- * false\, and logging is disabled\, API calls that require exclusive access to tables will return
- * EBUSY if there have been changes made to the table since the last global checkpoint.  When
- * logging is enabled\, the value for <code>file_close_sync</code> has no effect\, and\, modified
- * file is always flushed to storage when closing file handles to acquire exclusive access to the
- * table., a boolean flag; default \c true.}
  * @config{file_extend, file extension configuration.  If set\, extend files of the set type in
  * allocations of the set size\, instead of a block at a time as each new block is written.  For
  * example\, <code>file_extend=(data=16MB)</code>. If set to 0\, disable the file extension for the

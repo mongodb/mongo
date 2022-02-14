@@ -119,7 +119,7 @@ class test_join03(wttest.WiredTigerTestCase):
         c1a.close()
         c1b.close()
         c0.close()
-        self.session.drop('table:join03')
+        self.dropUntilSuccess(self.session, 'table:join03')
 
     # Test joins using CSV fields that are interpreted as different types
     # to make sure all the extractor plumbing used in joins is working.

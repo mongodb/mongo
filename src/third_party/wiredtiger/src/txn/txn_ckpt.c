@@ -2101,13 +2101,10 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
         return (__wt_evict_file(session, WT_SYNC_DISCARD));
 
     /*
-     * Don't flush data from modified trees independent of system-wide checkpoint when either there
-     * is a stable timestamp set or the connection is configured to disallow such operation.
-     * Flushing trees can lead to files that are inconsistent on disk after a crash.
+     * Don't flush data from modified trees independent of system-wide checkpoint. Flushing trees
+     * can lead to files that are inconsistent on disk after a crash.
      */
-    if (btree->modified && !bulk && !__wt_btree_immediately_durable(session) &&
-      (S2C(session)->txn_global.has_stable_timestamp ||
-        (!F_ISSET(S2C(session), WT_CONN_FILE_CLOSE_SYNC) && !metadata)))
+    if (btree->modified && !bulk && !metadata)
         return (__wt_set_return(session, EBUSY));
 
     /*

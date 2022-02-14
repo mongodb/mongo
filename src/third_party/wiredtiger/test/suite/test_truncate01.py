@@ -96,13 +96,13 @@ class test_truncate_uri(wttest.WiredTigerTestCase):
         SimpleDataSet(self, uri, 100).populate()
         self.session.truncate(uri, None, None, None)
         confirm_empty(self, uri)
-        self.session.drop(uri, None)
+        self.dropUntilSuccess(self.session, uri)
 
         if self.type == "table:":
             ComplexDataSet(self, uri, 100).populate()
             self.session.truncate(uri, None, None, None)
             confirm_empty(self, uri)
-            self.session.drop(uri, None)
+            self.dropUntilSuccess(self.session, uri)
 
 # Test truncation of cursors in an illegal order.
 class test_truncate_cursor_order(wttest.WiredTigerTestCase):
@@ -165,7 +165,7 @@ class test_truncate_cursor_end(wttest.WiredTigerTestCase):
         self.session.truncate(None, c1, c2, None)
         self.assertEqual(c1.close(), 0)
         self.assertEqual(c2.close(), 0)
-        self.session.drop(uri)
+        self.dropUntilSuccess(self.session, uri)
 
         if self.type == "table:":
             ds = ComplexDataSet(self, uri, 100, key_format=self.keyfmt)
@@ -177,7 +177,7 @@ class test_truncate_cursor_end(wttest.WiredTigerTestCase):
             self.session.truncate(None, c1, c2, None)
             self.assertEqual(c1.close(), 0)
             self.assertEqual(c2.close(), 0)
-            self.session.drop(uri)
+            self.dropUntilSuccess(self.session, uri)
 
 # Test truncation of empty objects.
 class test_truncate_empty(wttest.WiredTigerTestCase):
@@ -428,7 +428,7 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
                 cursor.close()
 
                 self.truncateRangeAndCheck(ds, uri, begin, end, expected)
-                self.session.drop(uri, None)
+                self.dropUntilSuccess(self.session, uri)
 
     # Test truncation of complex tables using cursors.  We can't do the kind of
     # layout and detailed testing as we can with files, but this will at least
@@ -487,7 +487,7 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
                 self.reopen_conn()
 
             self.truncateRangeAndCheck(ds, uri, begin, end, expected)
-            self.session.drop(uri, None)
+            self.dropUntilSuccess(self.session, uri)
 
 if __name__ == '__main__':
     wttest.run()
