@@ -2,6 +2,7 @@
 #include <aws/s3-crt/model/DeleteObjectRequest.h>
 #include <aws/s3-crt/model/ListObjectsV2Request.h>
 #include <aws/s3-crt/model/PutObjectRequest.h>
+#include <aws/s3-crt/model/GetObjectRequest.h>
 #include <aws/s3-crt/model/HeadObjectRequest.h>
 
 #include "s3_connection.h"
@@ -11,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#define S3_ALLOCATION_TAG ""
 /*
  * S3Connection --
  *     Constructor for AWS S3 bucket connection.
@@ -102,6 +104,32 @@ S3Connection::DeleteObject(const std::string &objectKey) const
 
     std::cerr << "Error in DeleteObject: " << outcome.GetError().GetMessage() << std::endl;
     return (1);
+}
+
+/*
+ * GetObject --
+ *     Retrieves an object from S3. The object is downloaded to disk at the specified location.
+ */
+int
+S3Connection::GetObject(const std::string &objectKey, const std::string &path) const
+{
+    Aws::S3Crt::Model::GetObjectRequest request;
+    request.SetBucket(_bucketName);
+    request.SetKey(_objectPrefix + objectKey);
+    /*
+     * The S3 Object should be downloaded to disk rather than into an in-memory buffer. Use a custom
+     * response stream factory to specify how the response should be downloaded.
+     * https://sdk.amazonaws.com/cpp/api/0.14.3/class_aws_1_1_utils_1_1_stream_1_1_response_stream.html
+     */
+    request.SetResponseStreamFactory([=]() {
+        return (Aws::New<Aws::FStream>(
+          S3_ALLOCATION_TAG, path, std::ios_base::out | std::ios_base::binary));
+    });
+
+    if (!_s3CrtClient.GetObject(request).IsSuccess())
+        return (1);
+
+    return (0);
 }
 
 /*

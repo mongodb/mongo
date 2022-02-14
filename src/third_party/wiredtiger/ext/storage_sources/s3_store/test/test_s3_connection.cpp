@@ -15,6 +15,7 @@ static std::string objPrefix("s3test_artefacts/unit_"); // To be concatenated wi
 #define TEST_FAILURE 1
 
 int TestListObjects(const Aws::S3Crt::ClientConfiguration &config);
+int TestGetObject(const Aws::S3Crt::ClientConfiguration &config);
 int TestObjectExists(const Aws::S3Crt::ClientConfiguration &config);
 
 /* Wrapper for unit test functions. */
@@ -63,12 +64,12 @@ setupTestDefaults()
     const char *envBucket = std::getenv("WT_S3_EXT_BUCKET");
     if (envBucket != NULL)
         TestDefaults::bucketName = envBucket;
-    std::cout << "Bucket to be used for testing: " << TestDefaults::bucketName << std::endl;
+    std::cerr << "Bucket to be used for testing: " << TestDefaults::bucketName << std::endl;
 
     /* Append the prefix to be used for object names by a unique string. */
     if (randomizeTestPrefix() != 0)
         return (TEST_FAILURE);
-    std::cout << "Generated prefix: " << TestDefaults::objPrefix << std::endl;
+    std::cerr << "Generated prefix: " << TestDefaults::objPrefix << std::endl;
 
     return (TEST_SUCCESS);
 }
@@ -232,6 +233,54 @@ TestListObjects(const Aws::S3Crt::ClientConfiguration &config)
 }
 
 /*
+ * TestGetObject --
+ *     Unit test to get an object from an S3 Bucket.
+ */
+int
+TestGetObject(const Aws::S3Crt::ClientConfiguration &config)
+{
+    S3Connection conn(config, TestDefaults::bucketName, TestDefaults::objPrefix);
+    int ret = TEST_FAILURE;
+
+    const std::string objectName = "permanent_object";
+    const std::string path = "./" + objectName;
+
+    /* Create a file and upload to the bucket. */
+    std::ofstream File(objectName);
+    File << "Test payload";
+    File.close();
+    if ((ret = conn.PutObject(objectName, objectName)) != 0)
+        return (ret);
+
+    /* Delete the local copy of the file. */
+    if (std::remove(path.c_str()) != 0)
+        return (TEST_FAILURE);
+
+    /* Download the file from S3 */
+    if ((ret = conn.GetObject(objectName, path)) != 0) {
+        std::cerr << "TestGetObject: call to S3Connection:GetObject has failed." << std::endl;
+        return (ret);
+    }
+
+    /* The file should now be in the current directory. */
+    std::ifstream f(path);
+    if (!f.good()) {
+        std::cerr << "TestGetObject: target " << objectName
+                  << " has not been successfully downloaded." << std::endl;
+        return (TEST_FAILURE);
+    }
+
+    /* Clean up test artifacts. */
+    if (std::remove(path.c_str()) != 0)
+        return (TEST_FAILURE);
+
+    if ((ret = conn.DeleteObject(objectName)) != 0)
+        return (ret);
+
+    std::cout << "TestGetObject() succeeded." << std::endl;
+    return (TEST_SUCCESS);
+}
+/*
  * TestObjectExists --
  *     Unit test to check if an object exists in an AWS bucket.
  */
@@ -250,20 +299,21 @@ TestObjectExists(const Aws::S3Crt::ClientConfiguration &config)
     File << "Test payload";
     File.close();
 
-    if (ret = conn.ObjectExists(objectName, exists) != 0 || exists)
+    ret = conn.ObjectExists(objectName, exists);
+    if (ret != 0 || exists)
+        return (TEST_FAILURE);
+
+    if ((ret = conn.PutObject(objectName, fileName)) != 0)
         return (ret);
 
-    if (ret = conn.PutObject(objectName, fileName) != 0)
-        return (ret);
+    ret = conn.ObjectExists(objectName, exists);
+    if (ret != 0 || !exists)
+        return (TEST_FAILURE);
 
-    if (ret = conn.ObjectExists(objectName, exists) != 0 || !exists)
+    if ((ret = conn.DeleteObject(objectName)) != 0)
         return (ret);
-
-    if (ret = conn.DeleteObject(objectName) != 0)
-        return (ret);
-
-    std::cout << "TestObjectExists(): succeeded." << std::endl;
-    return (ret);
+    std::cout << "TestObjectExists() succeeded." << std::endl;
+    return (TEST_SUCCESS);
 }
 
 /*
@@ -289,6 +339,7 @@ main()
 
     TEST(TestObjectExists, awsConfig);
     TEST(TestListObjects, awsConfig);
+    TEST(TestGetObject, awsConfig);
 
     /* Shutdown the API at end of tests. */
     Aws::ShutdownAPI(options);

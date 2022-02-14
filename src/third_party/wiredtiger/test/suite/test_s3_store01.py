@@ -26,7 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import datetime, os, wttest, random
+import datetime, random, os, wiredtiger, wttest
+FileSystem = wiredtiger.FileSystem  # easy access to constants
 
 # test_s3_store01.py
 #   Test minimal S3 extension with basic interactions with AWS S3CrtClient.
@@ -67,13 +68,19 @@ class test_s3_store01(wttest.WiredTigerTestCase):
        
         # Test flush functionality and flushing to cache and checking if file exists.
         f = open(filename, 'wb')
-        outbytes = ('Ruby\n'*100).encode()
+        outbytes = ('MORE THAN ENOUGH DATA\n'*100000).encode()
         f.write(outbytes)
         f.close()
 
         s3_store.ss_flush(session, fs, filename, object_name)
         s3_store.ss_flush_finish(session, fs, filename, object_name)
         self.assertTrue(fs.fs_exist(session, filename))
+
+        fh = fs.fs_open_file(session, filename, FileSystem.open_file_type_data, FileSystem.open_readonly)
+        inbytes = bytes(1000000)         # An empty buffer with a million zero bytes.
+        fh.fh_read(session, 0, inbytes)  # Read into the buffer.
+        self.assertEquals(outbytes[0:1000000], inbytes)
+        fh.close(session)
 
         # Checking that the file still exists in S3 after removing it from the cache.
         os.remove(cache_prefix + self.bucket_name + '/' + filename)
