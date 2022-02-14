@@ -1762,19 +1762,6 @@ var ShardingTest = function(params) {
         throw e;
     }
 
-    // Ensure that all CSRS nodes are up to date. This is strictly needed for tests that use
-    // multiple mongoses. In those cases, the first mongos initializes the contents of the 'config'
-    // database, but without waiting for those writes to replicate to all the config servers then
-    // the secondary mongoses risk reading from a stale config server and seeing an empty config
-    // database.
-    this.configRS.awaitLastOpCommitted();
-
-    if (jsTestOptions().keyFile) {
-        jsTest.authenticate(configConnection);
-        jsTest.authenticateNodes(this._configServers);
-        jsTest.authenticateNodes(this._mongos);
-    }
-
     // Ensure that the sessions collection exists so jstests can run things with
     // logical sessions and test them. We do this by forcing an immediate cache refresh
     // on the config server, which auto-shards the collection for the cluster.
@@ -1786,6 +1773,19 @@ var ShardingTest = function(params) {
              lastStableBinVersion,
              MongoRunner.getBinVersionFor(otherParams.configOptions.binVersion)))) {
         this.configRS.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
+
+        // Ensure that all CSRS nodes are up to date. This is strictly needed for tests that use
+        // multiple mongoses. In those cases, the first mongos initializes the contents of the
+        // 'config' database, but without waiting for those writes to replicate to all the config
+        // servers then the secondary mongoses risk reading from a stale config server and seeing an
+        // empty config database.
+        this.configRS.awaitLastOpCommitted();
+
+        if (jsTestOptions().keyFile) {
+            jsTest.authenticate(configConnection);
+            jsTest.authenticateNodes(this._configServers);
+            jsTest.authenticateNodes(this._mongos);
+        }
 
         const x509AuthRequired = (mongosOptions[0] && mongosOptions[0].clusterAuthMode &&
                                   mongosOptions[0].clusterAuthMode === "x509");
