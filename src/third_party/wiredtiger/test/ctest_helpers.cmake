@@ -77,6 +77,25 @@ function(create_test_executable target)
         target_link_libraries(${target} ${CREATE_TEST_LIBS})
     endif()
 
+    if(WT_LINUX OR WT_DARWIN)
+        # Link the final test executable with a relative runpath to the
+        # top-level build directory. This being the build location of the
+        # WiredTiger library.
+        set(origin_linker_variable)
+        if(WT_LINUX)
+            set(origin_linker_variable "\\$ORIGIN")
+        elseif(WT_DARWIN)
+            set(origin_linker_variable "@loader_path")
+        endif()
+        file(RELATIVE_PATH relative_rpath ${test_binary_dir} ${CMAKE_BINARY_DIR})
+        set_target_properties(${target}
+            PROPERTIES
+                # Setting this variable to false adds the relative path to the list of RPATH.
+                BUILD_WITH_INSTALL_RPATH FALSE
+                LINK_FLAGS "-Wl,-rpath,${origin_linker_variable}/${relative_rpath}"
+        )
+    endif()
+
     # If compiling for windows, additionally link in the shim library.
     if(WT_WIN)
         target_include_directories(
