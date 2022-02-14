@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_cursor18.py
-#   Test dupicate key return values.
+#   Test duplicate key return values.
 
 from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet

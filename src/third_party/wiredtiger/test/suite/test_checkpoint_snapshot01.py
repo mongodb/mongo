@@ -31,10 +31,9 @@
 # [END_TAGS]
 
 from helper import copy_wiredtiger_home
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
-from wiredtiger import stat
 
 # test_checkpoint_snapshot01.py
 #   Checkpoint snapshot - Create multiple sessions which creates snapshots and

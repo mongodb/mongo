@@ -33,7 +33,7 @@
 #   manipulations.  Manually copy the directory and verify it.
 #
 
-import fnmatch, os, shutil, time
+import os
 from suite_subprocess import suite_subprocess
 from helper import copy_wiredtiger_home
 import wiredtiger, wttest

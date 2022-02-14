@@ -26,8 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import fnmatch, os, time
-import wiredtiger, wttest
+import time
+import wttest
 from wtdataset import SimpleDataSet
 
 # test_reconfig03.py

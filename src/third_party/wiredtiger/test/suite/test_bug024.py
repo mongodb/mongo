@@ -30,8 +30,7 @@
 # connection_api:turtle_file
 # [END_TAGS]
 
-from helper import copy_wiredtiger_home
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 import os, shutil
 

@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import wiredtiger, wttest, unittest
+import wiredtiger, wttest
 from wtscenario import make_scenarios
 
 # test_search_near02.py

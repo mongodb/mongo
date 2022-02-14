@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import fnmatch, os, shutil, threading, time
+import os, shutil
 import wiredtiger, wttest
 from wtbackup import backup_base
 from wtdataset import SimpleDataSet

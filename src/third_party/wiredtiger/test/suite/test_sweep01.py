@@ -31,7 +31,7 @@
 # with and without checkpoints.
 #
 
-import fnmatch, os, shutil, run, time
+import time
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 from wiredtiger import stat

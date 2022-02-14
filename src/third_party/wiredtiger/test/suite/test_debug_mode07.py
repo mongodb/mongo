@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wttest, wiredtiger
+import wttest
 
 # test_debug_mode07.py
 #   Test the debug mode settings. Test realloc_exact use (from WT-4919).

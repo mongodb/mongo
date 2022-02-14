@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import time, wiredtiger, wttest, unittest
+import wiredtiger, wttest
 from wiredtiger import stat
 
 # test_search_near01.py

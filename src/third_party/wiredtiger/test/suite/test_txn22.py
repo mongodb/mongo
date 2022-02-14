@@ -29,7 +29,7 @@
 # test_txn22.py
 #   Transactions: test salvage with removed
 
-import fnmatch, os, shutil, time
+import os, shutil
 from wtscenario import make_scenarios
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest

@@ -30,8 +30,7 @@
 # history_store
 # [END_TAGS]
 
-import wiredtiger, wttest
-from wiredtiger import stat
+import wttest
 from wtscenario import make_scenarios
 
 # test_hs09.py

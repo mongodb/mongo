@@ -30,8 +30,8 @@
 #    Tests packing using public methods
 #
 
-import wiredtiger, wttest
-import re, sys
+import wttest
+import re
 
 class test_pack(wttest.WiredTigerTestCase):
     name = 'test_pack'

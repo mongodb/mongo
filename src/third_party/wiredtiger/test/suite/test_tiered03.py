@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, re
-import wiredtiger, wtscenario, wttest
+import wtscenario, wttest
 from wtdataset import SimpleDataSet
 
 # test_tiered03.py

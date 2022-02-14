@@ -30,7 +30,7 @@
 #   Readonly: Test readonly mode.
 #
 
-import fnmatch, os, shutil, time
+import os
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 import wttest

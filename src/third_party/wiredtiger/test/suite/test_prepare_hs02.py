@@ -30,10 +30,9 @@
 #   Prepare updates can be resolved for both commit // rollback operations.
 #
 
-from helper import copy_wiredtiger_home
 import random
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 class test_prepare_hs02(wttest.WiredTigerTestCase, suite_subprocess):

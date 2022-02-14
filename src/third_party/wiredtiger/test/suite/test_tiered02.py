@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, wiredtiger, wtscenario, wttest
+import os, wttest
 from wtdataset import SimpleDataSet
 
 # test_tiered02.py

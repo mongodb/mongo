@@ -28,7 +28,6 @@
 
 import wiredtiger, wttest
 from suite_subprocess import suite_subprocess
-from wiredtiger import stat
 
 # test_txn12.py
 #    test of commit following failed op in a read only transaction.

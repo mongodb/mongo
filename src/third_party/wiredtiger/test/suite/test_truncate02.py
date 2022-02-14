@@ -30,7 +30,7 @@
 #       session level operations on tables
 #
 
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 

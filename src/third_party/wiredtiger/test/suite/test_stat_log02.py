@@ -31,8 +31,7 @@
 # [END_TAGS]
 
 import glob, json
-import helper, wiredtiger, wttest
-from wiredtiger import stat
+import wttest
 
 # test_stat_log02.py
 #    Statistics log sources argument and JSON testing.

@@ -32,7 +32,7 @@
 import fnmatch, os
 import wiredtiger, wttest
 from suite_subprocess import suite_subprocess
-from wtdataset import SimpleDataSet, simple_key
+from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 class test_compat01(wttest.WiredTigerTestCase, suite_subprocess):

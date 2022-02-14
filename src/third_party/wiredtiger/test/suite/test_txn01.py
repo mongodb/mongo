@@ -30,7 +30,7 @@
 # transactions
 # [END_TAGS]
 
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 # test_txn01.py

@@ -28,7 +28,7 @@
 
 import codecs, filecmp
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 # test_util18.py

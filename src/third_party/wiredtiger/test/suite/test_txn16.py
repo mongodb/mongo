@@ -31,7 +31,7 @@
 #   continue to generate more log files.
 #
 
-import fnmatch, os, shutil, time
+import fnmatch, os, shutil
 from suite_subprocess import suite_subprocess
 import wttest
 

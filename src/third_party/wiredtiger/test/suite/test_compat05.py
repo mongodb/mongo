@@ -29,10 +29,10 @@
 # test_compat05.py
 # Check log.archive compatibility API
 
-import fnmatch, os, time
-import wiredtiger, wttest
+import os, time
+import wttest
 from suite_subprocess import suite_subprocess
-from wtdataset import SimpleDataSet, simple_key
+from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 class test_compat05(wttest.WiredTigerTestCase, suite_subprocess):

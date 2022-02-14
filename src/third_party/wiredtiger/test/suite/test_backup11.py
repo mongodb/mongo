@@ -31,11 +31,8 @@
 # [END_TAGS]
 
 import wiredtiger, wttest
-import os, shutil
-from helper import compare_files
+import os
 from wtbackup import backup_base
-from wtdataset import simple_key
-from wtscenario import make_scenarios
 
 # test_backup11.py
 # Test cursor backup with a duplicate backup cursor.

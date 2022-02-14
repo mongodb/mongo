@@ -30,7 +30,6 @@
 #   Transactions: different sync modes
 #
 
-import fnmatch, os, shutil, time
 from suite_subprocess import suite_subprocess
 from wiredtiger import stat
 from wtscenario import make_scenarios

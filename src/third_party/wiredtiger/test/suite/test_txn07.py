@@ -30,7 +30,7 @@
 # Transactions: commits and rollbacks
 #
 
-import fnmatch, os, shutil, run, time
+import os
 from suite_subprocess import suite_subprocess
 from wiredtiger import stat
 from wtscenario import make_scenarios

@@ -31,7 +31,6 @@
 #
 
 import wttest
-from wiredtiger import stat
 
 class test_cursor15(wttest.WiredTigerTestCase):
     tablename = 'test_read_once'

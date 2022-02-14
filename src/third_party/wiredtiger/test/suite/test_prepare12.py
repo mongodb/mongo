@@ -30,7 +30,7 @@
 # eviction:prepare
 # [END_TAGS]
 
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 # test_prepare12.py

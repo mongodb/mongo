@@ -26,8 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import fnmatch, os, shutil, threading, time
-from wtthread import checkpoint_thread, op_thread
+import os, shutil, threading, time
+from wtthread import checkpoint_thread
 from helper import simulate_crash_restart
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet

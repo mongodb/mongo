@@ -30,9 +30,7 @@
 # Printlog: test Unicode output
 #
 
-import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
-from wiredtiger import stat
 import wttest
 from wtscenario import make_scenarios
 

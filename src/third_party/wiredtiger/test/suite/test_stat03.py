@@ -29,8 +29,7 @@
 # [TEST_TAGS]
 # cursors:statistics
 # [END_TAGS]
-import itertools, wiredtiger, wttest
-from suite_subprocess import suite_subprocess
+import wttest
 from wiredtiger import stat
 
 from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet

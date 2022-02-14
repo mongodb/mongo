@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import glob, os, shutil, string
+import os, shutil
 import wiredtiger
 from wtbackup import backup_base
 from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet

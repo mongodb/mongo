@@ -30,8 +30,8 @@
 #   Basic block encryption operations
 #
 
-import os, run, random
-import wiredtiger, wttest
+import random
+import wttest
 from wtscenario import make_scenarios
 
 # Test basic encryption

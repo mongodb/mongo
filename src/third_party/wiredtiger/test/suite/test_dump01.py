@@ -30,8 +30,7 @@
 # wt_util
 # [END_TAGS]
 
-import os, shutil
-import wiredtiger, wttest
+import wttest
 
 from suite_subprocess import suite_subprocess
 

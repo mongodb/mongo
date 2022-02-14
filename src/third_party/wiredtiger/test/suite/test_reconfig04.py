@@ -30,7 +30,7 @@
 # session_api:reconfigure
 # [END_TAGS]
 
-import wiredtiger, wttest
+import wttest
 
 # test_reconfig04.py
 #    Test WT_SESSION::reconfigure

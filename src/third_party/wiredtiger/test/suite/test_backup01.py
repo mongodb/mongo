@@ -32,10 +32,8 @@
 # [END_TAGS]
 #
 
-import glob
 import os
 import shutil
-import string
 import time
 from wtbackup import backup_base
 import wiredtiger

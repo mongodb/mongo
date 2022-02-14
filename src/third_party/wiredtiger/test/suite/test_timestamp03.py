@@ -33,7 +33,7 @@
 from helper import copy_wiredtiger_home
 import random
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):

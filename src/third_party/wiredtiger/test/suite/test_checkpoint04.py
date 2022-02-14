@@ -29,7 +29,7 @@
 # test_checkpoint04.py
 # Test that the checkpoints timing statistics are populated as expected.
 
-import wiredtiger, wttest
+import wttest
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 

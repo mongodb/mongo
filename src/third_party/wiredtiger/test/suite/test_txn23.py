@@ -30,7 +30,7 @@
 #   Transactions: ensure read timestamp is not cleared under cache pressure
 #
 
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 

@@ -29,7 +29,7 @@
 # test_truncate03.py
 #       session level operations on tables
 
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 
 # A standalone test case that exercises address-deleted cells.

@@ -31,7 +31,7 @@
 # [END_TAGS]
 #
 
-import time, wiredtiger, wttest
+import wiredtiger, wttest
 from wtscenario import make_scenarios
 
 # test_hs15.py

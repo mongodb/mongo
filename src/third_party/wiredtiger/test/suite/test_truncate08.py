@@ -30,7 +30,7 @@
 #   Check for prepare-conflict return after fast-truncate committed.
 #
 
-import wiredtiger, wttest
+import wttest
 from wtdataset import simple_key, simple_value
 from wtscenario import make_scenarios
 

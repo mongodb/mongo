@@ -26,8 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import queue, threading, time, wiredtiger, wttest
-from wtthread import backup_thread, checkpoint_thread, op_thread
+import queue, threading, time, wttest
+from wtthread import backup_thread, op_thread
 
 # test_backup02.py
 #   Run background checkpoints and backups repeatedly while doing inserts

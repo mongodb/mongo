@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 
 # test_bug020.py

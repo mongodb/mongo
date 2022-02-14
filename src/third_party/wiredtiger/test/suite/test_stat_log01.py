@@ -29,8 +29,7 @@
 import glob
 import os.path
 import time
-import helper, wiredtiger, wttest
-from wiredtiger import stat
+import wttest
 
 # test_stat_log01.py
 #    Statistics log

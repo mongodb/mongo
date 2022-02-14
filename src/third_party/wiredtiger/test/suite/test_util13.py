@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, re, string
+import os, re
 from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
 import wiredtiger, wttest

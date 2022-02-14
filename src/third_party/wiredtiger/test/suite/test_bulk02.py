@@ -29,11 +29,9 @@
 # test_bulk02.py
 #       Bulk-load testing.
 
-import shutil, os
 import wiredtiger, wttest
-from helper import confirm_empty
 from suite_subprocess import suite_subprocess
-from wtdataset import SimpleDataSet, simple_key, simple_value
+from wtdataset import simple_key, simple_value
 from wtscenario import make_scenarios
 
 # test_bulkload_checkpoint

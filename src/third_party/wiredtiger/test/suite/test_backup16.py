@@ -27,11 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-import os, shutil
-from helper import compare_files
 from wtbackup import backup_base
-from wtdataset import simple_key
-from wtscenario import make_scenarios
 
 # test_backup16.py
 # Ensure incremental backup doesn't copy unnecessary files.

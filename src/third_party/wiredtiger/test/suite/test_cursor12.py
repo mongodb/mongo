@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import random, string, sys
+import random, string
 import wiredtiger, wttest
 from helper import copy_wiredtiger_home
 from wtdataset import SimpleDataSet

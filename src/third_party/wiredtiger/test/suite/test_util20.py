@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet, ComplexDataSet
 
 # test_util20.py

@@ -30,8 +30,8 @@
 #   Test that encryption is effective, it leaves no clear text
 #
 
-import os, run, random
-import wiredtiger, wttest
+import os
+import wttest
 from wtscenario import make_scenarios
 
 # Test encryption, when on, does not leak any information

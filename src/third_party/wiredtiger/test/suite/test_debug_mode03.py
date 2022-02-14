@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import struct, wiredtiger, wttest
+import struct, wttest
 
 def timestamp(kind, ts):
     return "{}_timestamp={:X}".format(kind, ts)

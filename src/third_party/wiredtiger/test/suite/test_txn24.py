@@ -31,8 +31,7 @@
 #   cache stuck issue.
 #
 
-import wiredtiger, wttest
-import time
+import wttest
 from wtscenario import make_scenarios
 
 class test_txn24(wttest.WiredTigerTestCase):

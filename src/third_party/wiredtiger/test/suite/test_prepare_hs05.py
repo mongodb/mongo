@@ -26,9 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
-from wiredtiger import stat, WT_NOTFOUND
+from wiredtiger import WT_NOTFOUND
 
 # test_prepare_hs05.py
 # Test that after aborting prepare transaction, correct update from the history store is restored.

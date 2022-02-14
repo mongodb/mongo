@@ -31,7 +31,7 @@
 # [END_TAGS]
 #
 
-import queue, threading, time, wiredtiger, wttest
+import queue, threading, wttest
 from wtthread import checkpoint_thread, op_thread
 from wtscenario import make_scenarios
 

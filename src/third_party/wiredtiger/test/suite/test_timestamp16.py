@@ -31,9 +31,8 @@
 #   end of a txn.
 #
 
-import random
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import wttest
 
 class test_timestamp16(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_timestamp16'

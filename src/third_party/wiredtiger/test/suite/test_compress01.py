@@ -30,7 +30,7 @@
 #    Smoke-test compression
 #
 
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 # Smoke-test compression

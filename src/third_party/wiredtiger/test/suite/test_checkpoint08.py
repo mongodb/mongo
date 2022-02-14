@@ -33,9 +33,8 @@
 # test_checkpoint08.py
 # Test that the btree checkpoint is not skipped if there are obsolete pages.
 
-import wiredtiger, wttest
+import wttest
 from wiredtiger import stat
-from wtdataset import SimpleDataSet
 
 class test_checkpoint08(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,log=(enabled),statistics=(all)'

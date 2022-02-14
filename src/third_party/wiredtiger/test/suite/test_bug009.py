@@ -31,8 +31,7 @@
 #       when figuring out how to split pages
 #
 
-import wiredtiger, wttest
-from wiredtiger import stat
+import wttest
 
 class test_bug009(wttest.WiredTigerTestCase):
     name = 'test_bug009'

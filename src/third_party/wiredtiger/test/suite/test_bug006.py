@@ -30,7 +30,7 @@
 #       Regression tests.
 
 import wiredtiger, wttest
-from wtdataset import SimpleDataSet, simple_key, simple_value
+from wtdataset import simple_key, simple_value
 from wtscenario import make_scenarios
 
 # Check that verify and salvage both raise exceptions if there is an open

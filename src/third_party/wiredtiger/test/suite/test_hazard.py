@@ -29,7 +29,7 @@
 # test_hazard.py
 #       Hazard pointer tests.
 
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 
 # Regression tests.

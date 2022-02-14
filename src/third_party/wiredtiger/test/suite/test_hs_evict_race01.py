@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from time import sleep
-import wttest, threading, wiredtiger
+import wttest, threading
 from helper import simulate_crash_restart
 from wtscenario import make_scenarios
 

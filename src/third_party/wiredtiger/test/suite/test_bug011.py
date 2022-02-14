@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import random, wiredtiger, wttest
+import random, wttest
 from wtdataset import SimpleDataSet
 
 # test_bug011.py

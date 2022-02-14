@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import sys, wiredtiger, wtscenario, wttest
+import wttest
 
 # test_unicode01.py
 #   Make sure UTF8 config can be passed to WT_SESSION::create.

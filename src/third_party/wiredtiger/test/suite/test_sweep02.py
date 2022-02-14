@@ -30,7 +30,7 @@
 # Test configuring and reconfiguring sweep options.
 #
 
-import wiredtiger, wttest
+import wttest
 
 class test_sweep02(wttest.WiredTigerTestCase):
     base_config = 'create,'

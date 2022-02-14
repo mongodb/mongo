@@ -29,7 +29,7 @@
 # test_bug001.py
 #       Regression tests.
 
-import wiredtiger, wttest
+import wttest
 
 # Regression tests.
 class test_bug001(wttest.WiredTigerTestCase):

@@ -27,9 +27,8 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import fnmatch, os, time
-import wiredtiger, wttest
+import wttest
 from wiredtiger import stat
-from wtdataset import SimpleDataSet
 
 # test_bug019.py
 #    Test that pre-allocating log files only pre-allocates a small number.

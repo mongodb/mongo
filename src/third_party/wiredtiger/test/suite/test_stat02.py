@@ -27,9 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import itertools, wiredtiger, wttest
-from suite_subprocess import suite_subprocess
-from wtdataset import SimpleDataSet, SimpleLSMDataSet, ComplexDataSet, \
-    ComplexLSMDataSet
+from wtdataset import SimpleDataSet, SimpleLSMDataSet, ComplexDataSet, ComplexLSMDataSet
 from wtscenario import make_scenarios
 from wiredtiger import stat
 

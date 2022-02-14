@@ -30,7 +30,7 @@
 #    Tests integer packing using public methods
 #
 
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 class PackTester:

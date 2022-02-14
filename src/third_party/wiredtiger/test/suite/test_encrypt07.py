@@ -30,8 +30,8 @@
 #   Salvage encrypted databases
 #
 
-import os, run, string, codecs
-import wiredtiger, wttest
+import codecs
+import wttest
 
 # If removing this, update test_salvage to not reference here.
 import test_salvage

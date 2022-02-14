@@ -26,12 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import threading, time, wiredtiger
-import glob, os, shutil
+import os
 from wtbackup import backup_base
-from wtdataset import SimpleDataSet, simple_key
+from wtdataset import simple_key
 from wtscenario import make_scenarios
-from wtthread import op_thread
 
 # test_backup04.py
 #    Utilities: wt backup

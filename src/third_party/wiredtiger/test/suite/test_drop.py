@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, time
 import wiredtiger, wttest
 from helper import confirm_does_not_exist
 from wtdataset import SimpleDataSet, ComplexDataSet

@@ -26,8 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, json
-import wiredtiger, wttest
+import json
+import wttest
 from wtdataset import SimpleDataSet, SimpleLSMDataSet, SimpleIndexDataSet, \
     ComplexDataSet, ComplexLSMDataSet
 from helper import compare_files

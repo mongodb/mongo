@@ -29,10 +29,8 @@
 # test_compat02.py
 # Check compatibility API
 
-import fnmatch, os
 import wiredtiger, wttest
 from suite_subprocess import suite_subprocess
-from wtdataset import SimpleDataSet, simple_key
 from wtscenario import make_scenarios
 
 class test_compat02(wttest.WiredTigerTestCase, suite_subprocess):

@@ -32,7 +32,7 @@
 # [END_TAGS]
 #
 
-import os, threading, time, wiredtiger, wttest
+import os, threading, time, wttest
 from wiredtiger import stat
 from wtthread import checkpoint_thread, flush_tier_thread
 

@@ -28,7 +28,7 @@
 
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
-from wtscenario import filter_scenarios, make_scenarios
+from wtscenario import make_scenarios
 
 # Test cursor comparisons.
 class test_cursor_comparison(wttest.WiredTigerTestCase):

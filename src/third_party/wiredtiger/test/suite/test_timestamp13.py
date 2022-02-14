@@ -30,7 +30,6 @@
 #   Timestamps: session query_timestamp
 #
 
-import random
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 from wtscenario import make_scenarios

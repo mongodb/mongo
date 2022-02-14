@@ -30,11 +30,9 @@
 # rollback_to_stable
 # [END_TAGS]
 
-import os, shutil
 from helper import simulate_crash_restart
 import wiredtiger, wttest
 from wiredtiger import stat
-from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 # test_rollback_to_stable16.py

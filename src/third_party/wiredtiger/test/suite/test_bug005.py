@@ -33,8 +33,8 @@
 # test_bug005.py
 #       Regression tests.
 
-import wiredtiger, wttest
-from wtdataset import SimpleDataSet, simple_key, simple_value
+import wttest
+from wtdataset import simple_key, simple_value
 
 # Check that verify works when the file has additional data after the last
 # checkpoint.

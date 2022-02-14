@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os
-import wiredtiger, wttest, run
+import wttest
 from wtscenario import make_scenarios
 
 # test_join09.py

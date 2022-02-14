@@ -36,7 +36,7 @@
 from wtscenario import make_scenarios
 from wtdataset import simple_key
 from wiredtiger import stat
-import wiredtiger, wttest
+import wttest
 
 # Smoke test dictionary compression.
 class test_dictionary(wttest.WiredTigerTestCase):

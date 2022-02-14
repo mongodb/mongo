@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import random
-import wiredtiger, wttest
+import wttest
 
 # test_stat09.py
 #    Check oldest active read timestamp statistic

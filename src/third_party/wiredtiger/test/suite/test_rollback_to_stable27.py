@@ -27,7 +27,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from test_rollback_to_stable01 import test_rollback_to_stable_base
-from wiredtiger import stat, Modify, WT_NOTFOUND
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 

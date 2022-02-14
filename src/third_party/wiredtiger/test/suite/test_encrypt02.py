@@ -34,8 +34,8 @@
 #   Encryption using passwords
 #
 
-import os, run, random
-import wiredtiger, wttest
+import random
+import wttest
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 

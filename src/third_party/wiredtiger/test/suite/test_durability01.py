@@ -31,7 +31,6 @@
 #   cause files to be closed.
 #
 
-import fnmatch, os, shutil, time
 from helper import copy_wiredtiger_home
 from suite_subprocess import suite_subprocess
 import wttest

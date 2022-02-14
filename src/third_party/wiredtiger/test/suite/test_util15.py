@@ -28,7 +28,7 @@
 
 import os
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import wttest
 
 # test_util15.py
 #    Utilities: wt alter

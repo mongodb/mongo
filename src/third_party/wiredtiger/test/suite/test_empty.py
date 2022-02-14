@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 # test_empty.py

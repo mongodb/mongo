@@ -30,7 +30,6 @@
 # huffman_encoding
 # [END_TAGS]
 
-import os
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 import wiredtiger, wttest

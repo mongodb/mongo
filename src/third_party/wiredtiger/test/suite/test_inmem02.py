@@ -27,7 +27,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from time import sleep
 from wtdataset import SimpleDataSet
 
 # test_inmem02.py

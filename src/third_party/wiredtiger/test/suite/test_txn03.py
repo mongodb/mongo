@@ -30,7 +30,7 @@
 #   Transactions: using multiple cursor and session handles
 #
 
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 class test_txn03(wttest.WiredTigerTestCase):

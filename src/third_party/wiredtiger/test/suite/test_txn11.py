@@ -29,7 +29,7 @@
 # test_txn11.py
 #   Transactions: Empty checkpoints and log removal.
 
-import fnmatch, os, time
+import fnmatch, os
 from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet
 import wttest

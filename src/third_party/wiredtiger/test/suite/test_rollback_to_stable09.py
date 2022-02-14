@@ -28,7 +28,6 @@
 
 import os
 import wiredtiger
-from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 

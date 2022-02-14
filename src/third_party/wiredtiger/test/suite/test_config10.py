@@ -31,7 +31,6 @@
 #   WiredTiger version file.
 
 import wiredtiger, wttest
-from wiredtiger import stat
 import os
 
 class test_config10(wttest.WiredTigerTestCase):

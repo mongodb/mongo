@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest, time
-from wiredtiger import stat
+import wiredtiger, wttest
 from wtscenario import make_scenarios
 
 # test_hs10.py

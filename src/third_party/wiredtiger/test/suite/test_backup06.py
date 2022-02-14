@@ -27,8 +27,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os
-import shutil
-import string
 from wtbackup import backup_base
 import wiredtiger, wttest
 from wiredtiger import stat

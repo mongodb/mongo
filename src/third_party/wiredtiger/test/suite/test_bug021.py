@@ -29,7 +29,7 @@
 # test_bug021.py
 #       Fixed-length column store implicit record operations test.
 
-import wiredtiger, wttest
+import wttest
 
 # Fixed-length column store implicit record operations test.
 class test_bug021(wttest.WiredTigerTestCase):

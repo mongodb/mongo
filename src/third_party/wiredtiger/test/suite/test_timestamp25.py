@@ -30,7 +30,7 @@
 #   Timestamps: backward compatible oldest and stable names.
 #
 
-import wiredtiger, wttest
+import wttest
 from suite_subprocess import suite_subprocess
 
 class test_timestamp25(wttest.WiredTigerTestCase, suite_subprocess):

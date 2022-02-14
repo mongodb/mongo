@@ -30,7 +30,7 @@
 #       check that splits work as expected
 #
 
-import wiredtiger, wttest
+import wttest
 from wiredtiger import stat
 
 # Test splits

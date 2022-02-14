@@ -33,8 +33,7 @@
 
 import os
 import suite_random
-import wiredtiger, wtscenario, wttest
-from wtscenario import make_scenarios
+import wtscenario, wttest
 
 try:
     # Windows does not getrlimit/setrlimit so we must catch the resource

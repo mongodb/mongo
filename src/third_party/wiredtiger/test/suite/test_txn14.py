@@ -30,7 +30,6 @@
 #   Transactions: commits and rollbacks
 #
 
-import fnmatch, os, shutil, time
 from helper import simulate_crash_restart
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios

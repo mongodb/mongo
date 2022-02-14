@@ -27,7 +27,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-from suite_subprocess import suite_subprocess
 from contextlib import contextmanager
 import wiredtiger, wttest
 from test_verbose01 import test_verbose_base

@@ -35,7 +35,6 @@
 #
 from __future__ import print_function
 
-import os, sys
 from importlib import import_module
 from abc import ABC, abstractmethod
 import wiredtiger

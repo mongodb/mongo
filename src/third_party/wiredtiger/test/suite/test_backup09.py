@@ -30,7 +30,7 @@
 #   Verify opening a backup cursor forces a log file switch.
 #
 
-import os, shutil, stat
+import os, shutil
 import helper, wiredtiger, wttest
 from wtscenario import make_scenarios
 

@@ -30,7 +30,7 @@
 # Error conditions when trying to import files.
 
 import os, shutil
-import wiredtiger, wttest
+import wiredtiger
 from test_import01 import test_import_base
 
 class test_import02(test_import_base):

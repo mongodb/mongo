@@ -30,10 +30,8 @@
 # rollback_to_stable
 # [END_TAGS]
 
-import fnmatch, os, shutil, threading, time
-from wtthread import checkpoint_thread, op_thread
 from helper import simulate_crash_restart
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wiredtiger import stat

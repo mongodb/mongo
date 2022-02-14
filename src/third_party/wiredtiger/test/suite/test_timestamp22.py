@@ -28,7 +28,7 @@
 #
 # test_timestamp22.py
 # Misuse the timestamp API, making sure we don't crash.
-import wiredtiger, wttest, re, suite_random
+import wttest, re, suite_random
 from wtdataset import SimpleDataSet
 from contextlib import contextmanager
 from wtscenario import make_scenarios

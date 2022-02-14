@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, shutil
-import helper, wiredtiger, wttest
+import wttest
 from wiredtiger import stat
 
 # test_log03.py

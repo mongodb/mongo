@@ -26,8 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, re, run
-import wiredtiger, wttest, suite_random
+import re
+import wttest
 from wtscenario import make_scenarios
 
 class ParseException(Exception):

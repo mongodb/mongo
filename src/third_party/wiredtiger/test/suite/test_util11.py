@@ -30,9 +30,8 @@
 # wt_util
 # [END_TAGS]
 
-import os, struct
 from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
+import wttest
 
 # test_util11.py
 #    Utilities: wt list

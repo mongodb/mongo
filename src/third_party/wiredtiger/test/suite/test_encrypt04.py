@@ -30,8 +30,8 @@
 #   Test mismatches error conditions with encryption.
 #
 
-import os, run, random
-import wiredtiger, wttest
+import random
+import wttest
 from wtscenario import make_scenarios
 from suite_subprocess import suite_subprocess
 

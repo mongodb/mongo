@@ -30,7 +30,7 @@
 #       Smoke test empty row-store values.
 
 from wiredtiger import stat
-import wiredtiger, wttest, unittest
+import wttest
 
 # Smoke test empty row-store values.
 class test_row_store_empty_values(wttest.WiredTigerTestCase):

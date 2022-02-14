@@ -27,7 +27,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, time, wiredtiger, wttest
-from wiredtiger import stat
 StorageSource = wiredtiger.StorageSource  # easy access to constants
 
 # test_tiered05.py

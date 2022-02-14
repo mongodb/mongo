@@ -28,7 +28,7 @@
 #
 # test_timestamp19.py
 # Use the oldest timestamp in the metadata as the oldest timestamp on restart.
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 

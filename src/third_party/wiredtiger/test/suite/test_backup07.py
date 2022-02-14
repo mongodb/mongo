@@ -26,11 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
-import os, shutil
-from helper import compare_files
+import wttest
+import os
 from wtbackup import backup_base
-from wtdataset import simple_key
 from wtscenario import make_scenarios
 
 # test_backup07.py

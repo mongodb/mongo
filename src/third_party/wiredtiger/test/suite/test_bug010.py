@@ -31,8 +31,8 @@
 #       did not write all updates out.
 #
 
-import wiredtiger, wttest, wtthread
-import threading, time
+import wttest, wtthread
+import threading
 
 class test_bug010(wttest.WiredTigerTestCase):
     name = 'test_bug010'

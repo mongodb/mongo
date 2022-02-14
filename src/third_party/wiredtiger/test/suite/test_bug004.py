@@ -33,8 +33,8 @@
 # test_bug004.py
 #       Regression tests.
 
-import wiredtiger, wttest
-from wtdataset import SimpleDataSet, simple_key, simple_value
+import wttest
+from wtdataset import simple_key, simple_value
 from wtscenario import make_scenarios
 
 # Check to make sure we see the right versions of overflow keys and values

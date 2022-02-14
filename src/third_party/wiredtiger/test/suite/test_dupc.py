@@ -30,7 +30,6 @@
 #       test cursor duplication
 #
 
-import os, time
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios

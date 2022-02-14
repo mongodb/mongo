@@ -30,9 +30,7 @@
 # Log cursors with compression
 #
 
-import fnmatch, os, shutil, run, time
 from suite_subprocess import suite_subprocess
-from wiredtiger import stat, WiredTigerError
 from wtscenario import make_scenarios
 import wttest
 

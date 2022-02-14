@@ -30,8 +30,6 @@
 # checkpoint:garbage_collection
 # [END_TAGS]
 
-import time
-from helper import copy_wiredtiger_home
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wiredtiger import stat

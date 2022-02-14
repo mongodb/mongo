@@ -32,7 +32,7 @@
 # - The source database and destination database are the same.
 
 import os, random, re, shutil, string
-import wiredtiger, wttest
+import wttest
 
 # Shared base class used by import tests.
 class test_import_base(wttest.WiredTigerTestCase):

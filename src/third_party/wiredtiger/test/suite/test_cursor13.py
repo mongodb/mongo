@@ -31,7 +31,7 @@ from wiredtiger import stat
 from wtscenario import make_scenarios
 import test_cursor01, test_cursor02, test_cursor03
 import test_checkpoint01, test_checkpoint02
-from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
+from wtdataset import SimpleDataSet, ComplexDataSet
 from helper import confirm_does_not_exist
 from suite_random import suite_random
 

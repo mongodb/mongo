@@ -32,9 +32,9 @@
 # [END_TAGS]
 
 from helper import copy_wiredtiger_home
-import wiredtiger, wttest
+import wttest
 from wtdataset import SimpleDataSet
-import os, shutil
+import os
 from wtscenario import make_scenarios
 from wiredtiger import stat
 

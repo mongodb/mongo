@@ -28,7 +28,6 @@
 
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
-from wtscenario import make_scenarios
 
 # test_flcs01.py
 #

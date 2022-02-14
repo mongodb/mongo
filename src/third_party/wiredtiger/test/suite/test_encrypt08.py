@@ -30,7 +30,6 @@
 #   Test some error conditions with the libsodium encryption extension.
 #
 
-import os, run, random
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 

@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wttest
 
 # test_debug_info.py
 #    Test WT_CONNECTION::debug_info undocumented feature
@@ -42,7 +42,7 @@ class test_debug_info(wttest.WiredTigerTestCase):
             c[k] = 1
         c.close()
         c = self.session.open_cursor(self.uri, None)
-        val = c[50]
+        c[50]
         self.conn.debug_info('cursors')
         c.close()
 

@@ -35,7 +35,7 @@
 #
 
 import json
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 # Test configuration strings.

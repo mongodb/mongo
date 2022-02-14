@@ -26,10 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, struct
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
-import wiredtiger, wttest
+import wttest
 from wiredtiger import stat
 
 # test_stat04.py

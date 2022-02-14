@@ -30,7 +30,6 @@
 import os
 import shutil
 import wiredtiger, wttest
-from wttest import unittest
 
 # test_shared_cache02.py
 #    Shared cache tests

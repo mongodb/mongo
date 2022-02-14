@@ -31,7 +31,7 @@
 #   all return ENOTSUP.
 #
 
-import os, sys, wiredtiger, wttest
+import wiredtiger, wttest
 from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet
 
