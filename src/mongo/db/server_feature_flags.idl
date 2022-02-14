@@ -45,3 +45,7 @@ feature_flags:
         description: "Enable user write blocking for C2C replication"
         cpp_varname: gFeatureFlagUserWriteBlocking
         default: false
+    featureFlagOptionalCfgSvr:
+        description: "Optional config server for small clusters"
+        cpp_varname: gFeatureFlagOptionalCfgSvr
+        default: false
