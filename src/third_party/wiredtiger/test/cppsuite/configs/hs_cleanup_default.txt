@@ -29,9 +29,8 @@ runtime_monitor=
     ),
     stat_cache_size=
     (
-        # FIXME-WT-8743: Re-enable cache usage check once cache exceed problem is fixed.
         max=100,
-        runtime=false,
+        runtime=true,
     ),
     stat_db_size=
     (
@@ -61,7 +60,9 @@ workload_generator=
     update_config=
     (
         op_rate=10ms,
-        ops_per_transaction=(max=100,min=20),
+        # Be careful to not aim too high with this config, if we fill the dirty cache and
+        # all threads are trying to update, they'll get pulled into eviction and will get stuck.
+        ops_per_transaction=(max=20,min=0),
         thread_count=10,
         value_size=10000
     )
