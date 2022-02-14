@@ -9028,6 +9028,8 @@ buildvariants:
     distros:
       - windows-vsCurrent-large
   - name: .csfle
+    distros:
+    - windows-vsCurrent-large
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
   - name: external_auth
   - name: external_auth_aws
@@ -9321,6 +9323,8 @@ buildvariants:
       - windows-vsCurrent-large
   - name: .concurrency .common
   - name: .csfle
+    distros:
+    - windows-vsCurrent-large
   - name: .publish_csfle
     distros:
     - rhel70-small
