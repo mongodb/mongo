@@ -38,6 +38,7 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 
 namespace mongo {
 /**
@@ -73,17 +74,22 @@ void logNotCachingZeroResults(std::string&& query, double score, std::string win
 void logNotCachingNoData(std::string&& solution);
 }  // namespace log_detail
 
-/*
+/**
  * Builds "DebugInfo" for storing in the classic plan cache.
  */
 plan_cache_debug_info::DebugInfo buildDebugInfo(
     const CanonicalQuery& query, std::unique_ptr<const plan_ranker::PlanRankingDecision> decision);
 
-/*
+/**
  * Builds "DebugInfoSBE" for storing in the SBE plan cache. Pre-computes necessary debugging
  * information to build "PlanExplainerSBE" when recoverying the cached SBE plan from the cache.
  */
 plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution);
+
+/**
+ * Resets all the parameterized slots in the RuntimeEnvironment of 'data'.
+ */
+void resetRuntimeEnvironmentBeforeCaching(stage_builder::PlanStageData* data);
 
 /**
  * Caches the best candidate plan, chosen from the given 'candidates' based on the 'ranking'
@@ -202,6 +208,8 @@ void updatePlanCache(
                     // Clone the winning SBE plan and its auxiliary data.
                     auto cachedPlan = std::make_unique<sbe::CachedSbePlan>(
                         winningPlan.root->clone(), winningPlan.data);
+
+                    resetRuntimeEnvironmentBeforeCaching(&cachedPlan->planStageData);
 
                     PlanCacheLoggingCallbacks<sbe::PlanCacheKey,
                                               sbe::CachedSbePlan,

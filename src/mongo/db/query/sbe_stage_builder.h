@@ -420,11 +420,11 @@ private:
      * 'shardKeyPattern' are provided by 'childIxscan'. In this case, the SBE plan for the child
      * index scan node will fill out slots for the necessary components of the index key. These
      * slots can be read directly in order to determine the shard key that should be passed to the
-     * 'shardFilterer'.
+     * 'shardFiltererSlot'.
      */
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildShardFilterCovered(
         const ShardingFilterNode* filterNode,
-        std::unique_ptr<ShardFilterer> shardFilterer,
+        sbe::value::SlotId shardFiltererSlot,
         BSONObj shardKeyPattern,
         BSONObj indexKeyPattern,
         const QuerySolutionNode* child,

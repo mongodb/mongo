@@ -160,5 +160,21 @@ plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution
 
     return debugInfo;
 }
+
+void resetRuntimeEnvironmentBeforeCaching(stage_builder::PlanStageData* data) {
+    tassert(6183501, "PlanStageData should not be null", data);
+
+    // Manually reset "shardFilterer" to "Nothing" because we should not store
+    // "shardFilterer" which holds a "ScopedCollectionFilter" preventing data that
+    // may have been migrated from being deleted.
+    if (auto shardFiltererSlot = data->env->getSlotIfExists("shardFilterer"_sd)) {
+        data->env->resetSlot(*shardFiltererSlot, sbe::value::TypeTags::Nothing, 0, true);
+    }
+
+    // Reset all the parameterized slots.
+    for (auto [paramId, slotId] : data->inputParamToSlotMap) {
+        data->env->resetSlot(slotId, sbe::value::TypeTags::Nothing, 0, true);
+    }
+}
 }  // namespace plan_cache_util
 }  // namespace mongo

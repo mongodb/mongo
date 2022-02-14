@@ -2738,18 +2738,16 @@ namespace {
 /**
  * Given an SBE subtree 'childStage' which computes the shard key and puts it into the given
  * 'shardKeySlot', augments the SBE plan to actually perform shard filtering. Namely, a FilterStage
- * is added at the root of the tree whose filter expression uses 'shardFilterer' to determine
+ * is added at the root of the tree whose filter expression uses 'shardFiltererSlot' to determine
  * whether the shard key value in 'shardKeySlot' belongs to an owned range or not.
  */
 auto buildShardFilterGivenShardKeySlot(sbe::value::SlotId shardKeySlot,
                                        std::unique_ptr<sbe::PlanStage> childStage,
-                                       std::unique_ptr<ShardFilterer> shardFilterer,
+                                       sbe::value::SlotId shardFiltererSlot,
                                        PlanNodeId nodeId) {
-    auto shardFilterFn =
-        makeFunction("shardFilter",
-                     makeConstant(sbe::value::TypeTags::shardFilterer,
-                                  sbe::value::bitcastFrom<ShardFilterer*>(shardFilterer.release())),
-                     sbe::makeE<sbe::EVariable>(shardKeySlot));
+    auto shardFilterFn = makeFunction("shardFilter",
+                                      sbe::makeE<sbe::EVariable>(shardFiltererSlot),
+                                      sbe::makeE<sbe::EVariable>(shardKeySlot));
 
     return sbe::makeS<sbe::FilterStage<false>>(
         std::move(childStage), std::move(shardFilterFn), nodeId);
@@ -2758,7 +2756,7 @@ auto buildShardFilterGivenShardKeySlot(sbe::value::SlotId shardKeySlot,
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
 SlotBasedStageBuilder::buildShardFilterCovered(const ShardingFilterNode* filterNode,
-                                               std::unique_ptr<ShardFilterer> shardFilterer,
+                                               sbe::value::SlotId shardFiltererSlot,
                                                BSONObj shardKeyPattern,
                                                BSONObj indexKeyPattern,
                                                const QuerySolutionNode* child,
@@ -2865,7 +2863,7 @@ SlotBasedStageBuilder::buildShardFilterCovered(const ShardingFilterNode* filterN
                                                         filterNode->nodeId());
 
     auto filterStage = buildShardFilterGivenShardKeySlot(
-        shardKeySlot, std::move(mkObjStage), std::move(shardFilterer), filterNode->nodeId());
+        shardKeySlot, std::move(mkObjStage), shardFiltererSlot, filterNode->nodeId());
 
     outputs.setIndexKeySlots(!parentIndexKeyReqs ? boost::none
                                                  : boost::optional<sbe::value::SlotVector>{
@@ -2887,8 +2885,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // there are orphaned documents from aborted migrations. To check if the document is owned by
     // the shard, we need to own a 'ShardFilterer', and extract the document's shard key as a
     // BSONObj.
+    // TODO SERVER-61422: Should not construct the "ShardFilterer" here.
     auto shardFilterer = _shardFiltererFactory->makeShardFilterer(_opCtx);
     auto shardKeyPattern = shardFilterer->getKeyPattern().toBSON();
+    auto shardFiltererSlot =
+        _data.env->registerSlot("shardFilterer"_sd,
+                                sbe::value::TypeTags::shardFilterer,
+                                sbe::value::bitcastFrom<ShardFilterer*>(shardFilterer.release()),
+                                true,
+                                &_slotIdGenerator);
 
     // Determine if our child is an index scan and extract it's key pattern, or empty BSONObj if our
     // child is not an IXSCAN node.
@@ -2915,8 +2920,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto childReqs = reqs.copy().setIf(kResult, indexKeyPattern.isEmpty());
     if (!childReqs.has(kResult)) {
         return buildShardFilterCovered(filterNode,
-                                       std::move(shardFilterer),
-                                       std::move(shardKeyPattern),
+                                       shardFiltererSlot,
+                                       shardKeyPattern,
                                        std::move(indexKeyPattern),
                                        filterNode->children[0],
                                        std::move(childReqs));
@@ -2984,11 +2989,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto finalShardKeyObjStage = makeProjectStage(
         std::move(shardKeyObjStage), root->nodeId(), finalShardKeySlot, std::move(arrayChecks));
 
-    return {buildShardFilterGivenShardKeySlot(finalShardKeySlot,
-                                              std::move(finalShardKeyObjStage),
-                                              std::move(shardFilterer),
-                                              root->nodeId()),
-            std::move(outputs)};
+    return {
+        buildShardFilterGivenShardKeySlot(
+            finalShardKeySlot, std::move(finalShardKeyObjStage), shardFiltererSlot, root->nodeId()),
+        std::move(outputs)};
 }
 
 // Returns a non-null pointer to the root of a plan tree, or a non-OK status if the PlanStage tree

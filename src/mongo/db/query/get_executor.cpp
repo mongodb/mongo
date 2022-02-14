@@ -89,6 +89,7 @@
 #include "mongo/db/query/sbe_multi_planner.h"
 #include "mongo/db/query/sbe_sub_planner.h"
 #include "mongo/db/query/sbe_utils.h"
+#include "mongo/db/query/shard_filterer_factory_impl.h"
 #include "mongo/db/query/stage_builder_util.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
@@ -442,6 +443,29 @@ bool shouldWaitForOplogVisibility(OperationContext* opCtx,
     // batch that would never complete because it couldn't reacquire its own lock, the global lock
     // held by the waiting reader.
     return repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, "admin");
+}
+
+void prepareExecutionTree(OperationContext* opCtx,
+                          const CollectionPtr& collection,
+                          const CanonicalQuery& cq,
+                          stage_builder::PlanStageData* stageData) {
+    tassert(6183502, "PlanStageData should not be null", stageData);
+    // Populate/renew "shardFilterer" if there exists a "shardFilterer" slot. The slot value
+    // should have been reset to "Nothing" on caching.
+    //
+    // TODO SERVER-61422: Populate the "shardFilterer" when preparing SBE plan.
+    if (auto shardFiltererSlot = stageData->env->getSlotIfExists("shardFilterer"_sd)) {
+        auto shardFiltererFactory = std::make_unique<ShardFiltererFactoryImpl>(collection);
+        auto shardFilterer = shardFiltererFactory->makeShardFilterer(opCtx);
+        stageData->env->resetSlot(*shardFiltererSlot,
+                                  sbe::value::TypeTags::shardFilterer,
+                                  sbe::value::bitcastFrom<ShardFilterer*>(shardFilterer.release()),
+                                  true);
+    }
+
+    // If the cached plan is parameterized, bind new values for the parameters into the runtime
+    // environment.
+    input_params::bind(cq, stageData->inputParamToSlotMap, stageData->env);
 }
 
 namespace {
@@ -1074,9 +1098,7 @@ protected:
         invariant(sbeYieldPolicy);
         sbeYieldPolicy->registerPlan(root.get());
 
-        // If the cached plan is parameterized, bind new values for the parameters into the runtime
-        // environment.
-        input_params::bind(*_cq, stageData.inputParamToSlotMap, stageData.env);
+        prepareExecutionTree(_opCtx, _collections.getMainCollection(), *_cq, &stageData);
 
         auto result = makeResult();
         result->setDecisionWorks(cacheEntry->decisionWorks);
