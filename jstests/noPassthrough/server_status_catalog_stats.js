@@ -24,6 +24,7 @@ let internalCollectionsAtStart;
 let internalViewsAtStart;
 assertCatalogStats(db1, (stats) => {
     assert.eq(0, stats.capped);
+    assert.eq(0, stats.clustered);
     assert.eq(0, stats.collections);
     assert.eq(0, stats.timeseries);
     assert.eq(0, stats.views);
@@ -33,15 +34,18 @@ assertCatalogStats(db1, (stats) => {
 
 assert.commandWorked(db1.coll.insert({a: 1}));
 assert.commandWorked(db1.createCollection('capped', {capped: true, size: 1024}));
+assert.commandWorked(
+    db1.createCollection('clustered', {clusteredIndex: {unique: true, key: {_id: 1}}}));
 assert.commandWorked(db1.createCollection('view', {viewOn: 'coll', pipeline: []}));
 assert.commandWorked(db1.createCollection('ts', {timeseries: {timeField: 't'}}));
 
 assertCatalogStats(db1, (stats) => {
     assert.eq(1, stats.capped);
-    assert.eq(2, stats.collections);
+    assert.eq(1, stats.clustered);
+    assert.eq(3, stats.collections);
     assert.eq(1, stats.timeseries);
     assert.eq(1, stats.views);
-    // An system.views and system.buckets collection should have been created.
+    // A system.views and system.buckets collection should have been created.
     assert.eq(internalCollectionsAtStart + 2, stats.internalCollections);
     assert.eq(internalViewsAtStart, stats.internalViews);
 });
@@ -50,7 +54,8 @@ assertCatalogStats(db1, (stats) => {
 assert.commandWorked(db1.runCommand({collMod: 'view', pipeline: [{$match: {a: 1}}]}));
 assertCatalogStats(db1, (stats) => {
     assert.eq(1, stats.capped);
-    assert.eq(2, stats.collections);
+    assert.eq(1, stats.clustered);
+    assert.eq(3, stats.collections);
     assert.eq(1, stats.timeseries);
     assert.eq(1, stats.views);
     // An system.views and system.buckets collection should have been created.
@@ -60,12 +65,15 @@ assertCatalogStats(db1, (stats) => {
 
 assert.commandWorked(db2.coll.insert({a: 1}));
 assert.commandWorked(db2.createCollection('capped', {capped: true, size: 1024}));
+assert.commandWorked(
+    db2.createCollection('clustered', {clusteredIndex: {unique: true, key: {_id: 1}}}));
 assert.commandWorked(db2.createCollection('view', {viewOn: 'coll', pipeline: []}));
 assert.commandWorked(db2.createCollection('ts', {timeseries: {timeField: 't'}}));
 
 assertCatalogStats(db1, (stats) => {
     assert.eq(2, stats.capped);
-    assert.eq(4, stats.collections);
+    assert.eq(2, stats.clustered);
+    assert.eq(6, stats.collections);
     assert.eq(2, stats.timeseries);
     assert.eq(2, stats.views);
     // An system.views and system.buckets collection should have been created.
@@ -82,7 +90,8 @@ db2 = primary.getDB('db2');
 // Ensure stats are the same after restart.
 assertCatalogStats(db1, (stats) => {
     assert.eq(2, stats.capped);
-    assert.eq(4, stats.collections);
+    assert.eq(2, stats.clustered);
+    assert.eq(6, stats.collections);
     assert.eq(2, stats.timeseries);
     assert.eq(2, stats.views);
     assert.eq(internalCollectionsAtStart + 4, stats.internalCollections);
@@ -91,12 +100,14 @@ assertCatalogStats(db1, (stats) => {
 
 assert(db1.coll.drop());
 assert(db1.capped.drop());
+assert(db1.clustered.drop());
 assert(db1.view.drop());
 assert(db1.ts.drop());
 
 assertCatalogStats(db1, (stats) => {
     assert.eq(1, stats.capped);
-    assert.eq(2, stats.collections);
+    assert.eq(1, stats.clustered);
+    assert.eq(3, stats.collections);
     assert.eq(1, stats.timeseries);
     assert.eq(1, stats.views);
     // The system.views collection will stick around
@@ -108,7 +119,7 @@ db1.dropDatabase();
 
 assertCatalogStats(db1, (stats) => {
     assert.eq(1, stats.capped);
-    assert.eq(2, stats.collections);
+    assert.eq(3, stats.collections);
     assert.eq(1, stats.timeseries);
     assert.eq(1, stats.views);
     // The system.views collection should be dropped
@@ -120,6 +131,7 @@ db2.dropDatabase();
 
 assertCatalogStats(db1, (stats) => {
     assert.eq(0, stats.capped);
+    assert.eq(0, stats.clustered);
     assert.eq(0, stats.collections);
     assert.eq(0, stats.timeseries);
     assert.eq(0, stats.views);

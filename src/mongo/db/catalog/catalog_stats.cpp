@@ -54,6 +54,7 @@ public:
     struct Stats {
         int collections = 0;
         int capped = 0;
+        int clustered = 0;
         int views = 0;
         int timeseries = 0;
         int internalCollections = 0;
@@ -62,6 +63,7 @@ public:
         void toBson(BSONObjBuilder* builder) const {
             builder->append("collections", collections);
             builder->append("capped", capped);
+            builder->append("clustered", clustered);
             builder->append("timeseries", timeseries);
             builder->append("views", views);
             builder->append("internalCollections", internalCollections);
@@ -77,6 +79,7 @@ public:
         const auto catalogStats = catalog->getStats();
         stats.collections = catalogStats.userCollections;
         stats.capped = catalogStats.userCapped;
+        stats.clustered = catalogStats.userClustered;
         stats.internalCollections = catalogStats.internal;
 
         const auto viewCatalogDbNames = catalog->getViewCatalogDbNames();

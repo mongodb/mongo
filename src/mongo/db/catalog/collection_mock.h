@@ -257,7 +257,7 @@ public:
     }
 
     bool isClustered() const {
-        std::abort();
+        return false;
     }
 
     boost::optional<ClusteredCollectionInfo> getClusteredInfo() const {

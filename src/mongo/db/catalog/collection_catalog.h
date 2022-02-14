@@ -353,6 +353,8 @@ public:
         int userCollections = 0;
         // Non-system capped collections on non-internal databases
         int userCapped = 0;
+        // Non-system clustered collection on non-internal databases.
+        int userClustered = 0;
         // System collections or collections on internal databases
         int internal = 0;
     };

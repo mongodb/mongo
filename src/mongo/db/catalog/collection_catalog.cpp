@@ -999,6 +999,9 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
         if (coll->isCapped()) {
             _stats.userCapped += 1;
         }
+        if (coll->isClustered()) {
+            _stats.userClustered += 1;
+        }
     } else {
         _stats.internal += 1;
     }
@@ -1036,6 +1039,9 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationCon
         _stats.userCollections -= 1;
         if (coll->isCapped()) {
             _stats.userCapped -= 1;
+        }
+        if (coll->isClustered()) {
+            _stats.userClustered -= 1;
         }
     } else {
         _stats.internal -= 1;
