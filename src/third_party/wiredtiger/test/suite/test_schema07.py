@@ -47,7 +47,7 @@ class test_schema07(wttest.WiredTigerTestCase):
             # This will block if the metadata fills the cache
             c["key"] = "value"
             c.close()
-            self.dropUntilSuccess(self.session, uri, None)
+            self.session.drop(uri)
 
 if __name__ == '__main__':
     wttest.run()
