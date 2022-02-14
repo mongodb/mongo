@@ -305,8 +305,8 @@ private:
         return tla;
     }
 
-    MockSEP _sep;
     std::unique_ptr<transport::TransportLayerASIO> _tla;
+    MockSEP _sep;
 };
 
 TEST(TransportLayerASIO, ListenerPortZeroTreatedAsEphemeral) {
