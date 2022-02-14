@@ -18,13 +18,14 @@ function checkCollection(conn0, conn1, ns, shouldCheckShardKey) {
     const coll0 = conn0.getCollection(ns);
     const coll1 = conn1.getCollection(ns);
 
-    jsTestLog(`Checking indexes for namespace: ${ns}`);
-    const indexes0 = coll0.getIndexes().sort();
-    const indexes1 = coll1.getIndexes().sort();
-    assert.eq(indexes0,
-              indexes1,
-              `Indexes were not matching for: ${ns}. indexes0: ${tojson(indexes0)}, indexes1: ${
-                  tojson(indexes1)}`);
+    // TODO (SERVER-63492): Re-enable checking indexes.
+    // jsTestLog(`Checking indexes for namespace: ${ns}`);
+    // const indexes0 = coll0.getIndexes().sort();
+    // const indexes1 = coll1.getIndexes().sort();
+    // assert.eq(indexes0,
+    //           indexes1,
+    //           `Indexes were not matching for: ${ns}. indexes0: ${tojson(indexes0)}, indexes1: ${
+    //               tojson(indexes1)}`);
 
     // Ensure the shard keys match, if necessary.
     if (shouldCheckShardKey) {
