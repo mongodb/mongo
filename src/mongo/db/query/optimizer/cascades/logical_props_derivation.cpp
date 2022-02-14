@@ -330,6 +330,7 @@ public:
                             } else {
                                 distributions.erase(it++);
                             }
+                            break;
 
                         default:
                             it++;

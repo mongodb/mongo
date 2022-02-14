@@ -104,6 +104,7 @@ PhysOptimizationResult::PhysOptimizationResult(size_t index,
       _physProps(std::move(physProps)),
       _costLimit(std::move(costLimit)),
       _nodeInfo(),
+      _rejectedNodeInfo(),
       _lastImplementedNodePos(0),
       _queue() {}
 

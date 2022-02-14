@@ -317,6 +317,7 @@ public:
     ExplainPrinterImpl(ExplainPrinterImpl&& other) noexcept {
         _nextFieldName = std::move(other._nextFieldName);
         _initialized = other._initialized;
+        _canAppend = other._canAppend;
         _tag = other._tag;
         _val = other._val;
         _fieldNameSet = std::move(other._fieldNameSet);
