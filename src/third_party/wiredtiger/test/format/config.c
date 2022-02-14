@@ -251,10 +251,11 @@ config_table(TABLE *table, void *arg)
     table->max_mem_page = MEGABYTE(TV(BTREE_MEMORY_PAGE_MAX));
 
     /*
-     * Keep the number of rows and keys/values small for in-memory runs (overflow items aren't an
-     * issue for in-memory configurations and it helps prevents cache overflow).
+     * Keep the number of rows and keys/values small for in-memory and direct I/O runs (overflow
+     * items aren't an issue for in-memory configurations and it helps prevents cache overflow, and
+     * direct I/O can be so slow the additional I/O for overflow items causes eviction to stall).
      */
-    if (GV(RUNS_IN_MEMORY)) {
+    if (GV(RUNS_IN_MEMORY) || GV(DISK_DIRECT_IO)) {
         if (!config_explicit(table, "runs.rows") && TV(RUNS_ROWS) > 1000000)
             config_single(table, "runs.rows=1000000", false);
         if (!config_explicit(table, "btree.key_max"))
