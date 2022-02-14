@@ -473,7 +473,6 @@ rename_table(WT_SESSION *session, TABLE_INFO *tinfo, uint32_t slot)
 
     olduri = tinfo->table[slot].name;
     VERBOSE(3, "rename %s %s\n", olduri, uri);
-    testutil_check(session->checkpoint(session, NULL));
     testutil_check(session->rename(session, olduri, uri, NULL));
     free(olduri);
     tinfo->table[slot].name = uri;
@@ -492,7 +491,7 @@ drop_table(WT_SESSION *session, TABLE_INFO *tinfo, uint32_t slot)
     uri = tinfo->table[slot].name;
 
     VERBOSE(3, "drop %s\n", uri);
-    testutil_drop(session, uri, NULL);
+    testutil_check(session->drop(session, uri, NULL));
     free(uri);
     tinfo->table[slot].name = NULL;
     tinfo->table[slot].change_count = 0;

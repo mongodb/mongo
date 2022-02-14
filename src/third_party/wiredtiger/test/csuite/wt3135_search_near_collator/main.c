@@ -327,8 +327,8 @@ test_one_set(WT_SESSION *session, TEST_SET set)
         search_using_item(cursor, set, i);
     testutil_check(cursor->close(cursor));
 
-    testutil_drop(session, "table:main", NULL);
-    testutil_drop(session, "table:main2", NULL);
+    testutil_check(session->drop(session, "table:main", NULL));
+    testutil_check(session->drop(session, "table:main2", NULL));
 }
 
 /*

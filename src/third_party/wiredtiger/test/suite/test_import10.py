@@ -78,7 +78,7 @@ class test_import10(backup_base):
         self.session.create(table_uri, import_config)
 
         # Verify object.
-        self.verifyUntilSuccess(self.session, table_uri)
+        self.session.verify(table_uri)
 
         # Check that the data got imported correctly.
         cursor = self.session.open_cursor(table_uri)

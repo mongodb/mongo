@@ -745,8 +745,6 @@ session_ops(WT_SESSION *session)
             }
         }
 
-        error_check(session->checkpoint(session, NULL));
-
         /*! [Upgrade a table] */
         error_check(session->upgrade(session, "table:mytable", NULL));
         /*! [Upgrade a table] */

@@ -105,15 +105,11 @@ load(const char *name)
 void
 verify(const char *name)
 {
-    WT_DECL_RET;
     WT_SESSION *session;
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-    while ((ret = session->verify(session, name, NULL)) == EBUSY)
-        testutil_check(session->checkpoint(session, NULL));
-
-    testutil_check(ret);
+    testutil_check(session->verify(session, name, NULL));
 
     testutil_check(session->close(session, NULL));
 }

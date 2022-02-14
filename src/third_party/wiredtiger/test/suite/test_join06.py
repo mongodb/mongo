@@ -152,7 +152,7 @@ class test_join06(wttest.WiredTigerTestCase):
         c0.close()
         if self.isolation != '':
             self.session.commit_transaction()
-        self.dropUntilSuccess(self.session, 'table:join06')
+        self.session.drop('table:join06')
 
 if __name__ == '__main__':
     wttest.run()

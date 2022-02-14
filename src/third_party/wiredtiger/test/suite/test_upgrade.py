@@ -52,8 +52,8 @@ class test_upgrade(wttest.WiredTigerTestCase):
                 lambda: self.session.drop(uri, None))
             cursor.close()
 
-        self.upgradeUntilSuccess(self.session, uri)
-        self.dropUntilSuccess(self.session, uri)
+        self.session.upgrade(uri, None)
+        self.session.drop(uri)
 
     # Test upgrade of an object.
     def test_upgrade(self):

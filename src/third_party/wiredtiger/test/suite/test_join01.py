@@ -335,7 +335,7 @@ class test_join01(wttest.WiredTigerTestCase):
             nest2.close()
             for c in closeme:
                 c.close()
-        self.dropUntilSuccess(self.session, 'table:join01')
+        self.session.drop('table:join01')
 
 if __name__ == '__main__':
     wttest.run()

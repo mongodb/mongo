@@ -169,7 +169,7 @@ class test_import01(test_import_base):
         self.session.create(self.uri, import_config)
 
         # Verify object.
-        self.verifyUntilSuccess(self.session, self.uri, None)
+        self.session.verify(self.uri)
 
         # Check that the previously inserted values survived the import.
         self.check(self.uri, self.keys[:max_idx], self.values[:max_idx])
@@ -232,7 +232,7 @@ class test_import01(test_import_base):
         self.session.create(self.uri, import_config)
 
         # Verify object.
-        self.verifyUntilSuccess(self.session, self.uri, None)
+        self.session.verify(self.uri)
 
         # Check that the previously inserted values survived the import.
         self.check(self.uri, self.keys, self.values)

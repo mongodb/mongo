@@ -74,9 +74,9 @@ class test_bug004(wttest.WiredTigerTestCase):
         c1.close()
 
         # Verify the object, force it to disk, and verify the on-disk version.
-        self.verifyUntilSuccess(self.session, self.uri)
+        self.session.verify(self.uri)
         self.reopen_conn()
-        self.verifyUntilSuccess(self.session, self.uri)
+        self.session.verify(self.uri)
 
         # Create a new session and start a transaction to force the engine
         # to access old versions of the key/value pairs.

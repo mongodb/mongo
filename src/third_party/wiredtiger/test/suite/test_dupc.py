@@ -76,7 +76,7 @@ class test_duplicate_cursor(wttest.WiredTigerTestCase):
                 key_format=self.keyfmt, value_format=self.valfmt)
         ds.populate()
         self.iterate(uri, ds)
-        self.dropUntilSuccess(self.session, uri)
+        self.session.drop(uri, None)
 
         # A complex, multi-file table object.
         if self.uri == "table:" and self.valfmt != '8t':
@@ -84,7 +84,7 @@ class test_duplicate_cursor(wttest.WiredTigerTestCase):
                     key_format=self.keyfmt, value_format=self.valfmt)
             ds.populate()
             self.iterate(uri, ds)
-            self.dropUntilSuccess(self.session, uri)
+            self.session.drop(uri, None)
 
 if __name__ == '__main__':
     wttest.run()

@@ -74,7 +74,7 @@ class test_bug001(wttest.WiredTigerTestCase):
             self.assertEqual(cursor.prev(), 0)
 
         self.assertEquals(cursor.close(), 0)
-        self.dropUntilSuccess(self.session, uri)
+        self.session.drop(uri)
         cursor = self.create_implicit(uri, 20, 50, 0)
 
         # Check search inside leading implicit keys.
@@ -98,7 +98,7 @@ class test_bug001(wttest.WiredTigerTestCase):
             self.assertEqual(cursor.prev(), 0)
 
         self.assertEquals(cursor.close(), 0)
-        self.dropUntilSuccess(self.session, uri)
+        self.session.drop(uri)
 
     # Test a bug where cursor remove inside implicit records looped infinitely.
     def test_implicit_record_cursor_remove(self):
@@ -124,7 +124,7 @@ class test_bug001(wttest.WiredTigerTestCase):
             self.assertEquals(cursor.remove(), 0)
 
         self.assertEquals(cursor.close(), 0)
-        self.dropUntilSuccess(self.session, uri)
+        self.session.drop(uri)
         cursor = self.create_implicit(uri, 20, 50, 0)
 
         # Check cursor next/remove inside leading implicit keys.
@@ -146,7 +146,7 @@ class test_bug001(wttest.WiredTigerTestCase):
             self.assertEquals(cursor.remove(), 0)
 
         self.assertEquals(cursor.close(), 0)
-        self.dropUntilSuccess(self.session, uri)
+        self.session.drop(uri)
 
 if __name__ == '__main__':
     wttest.run()

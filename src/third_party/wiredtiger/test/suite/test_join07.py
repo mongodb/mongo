@@ -496,7 +496,7 @@ class test_join07(wttest.WiredTigerTestCase):
         self.iterate(jc, mbr)
 
         self.close_cursors(jc)
-        self.dropUntilSuccess(self.session, 'table:join07')
+        self.session.drop('table:join07')
 
     def test_join_string(self):
         self.interpret("[N=1000][key=r] 7 < A <= 500 && B < 150 && C > 17")

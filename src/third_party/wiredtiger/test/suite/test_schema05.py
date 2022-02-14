@@ -71,7 +71,7 @@ class test_schema05(wttest.WiredTigerTestCase):
 
     def drop_indices(self):
         for i in range(0, self.nindices):
-            self.dropUntilSuccess(self.session, "index:schema05:x" + str(i))
+            self.session.drop("index:schema05:x" + str(i))
 
     def csv(self, s, i):
         return s.split(',')[i]

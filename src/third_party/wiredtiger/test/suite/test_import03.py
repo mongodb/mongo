@@ -128,7 +128,7 @@ class test_import03(test_import_base):
         self.session.create(uri, import_config)
 
         # Verify object.
-        self.verifyUntilSuccess(self.session, uri, None)
+        self.session.verify(uri)
 
         # Check that the previously inserted values survived the import.
         self.check(uri, keys[:max_idx], values[:max_idx])

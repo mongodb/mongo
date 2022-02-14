@@ -142,7 +142,7 @@ class test_import08(test_import_base):
         self.session.create(self.uri, import_config)
 
         # Verify object.
-        self.verifyUntilSuccess(self.session, self.uri, None)
+        self.session.verify(self.uri)
 
         # Check the write generation of the new table.
         #

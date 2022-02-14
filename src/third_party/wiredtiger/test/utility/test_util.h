@@ -152,30 +152,6 @@ typedef struct {
     } while (0)
 
 /*
- * testutil_drop --
- *     Drop a table
- */
-#define testutil_drop(session, uri, config)                            \
-    do {                                                               \
-        int __ret;                                                     \
-        while ((__ret = session->drop(session, uri, config)) == EBUSY) \
-            testutil_check(session->checkpoint(session, NULL));        \
-        testutil_check(__ret);                                         \
-    } while (0)
-
-/*
- * testutil_verify --
- *     Verify a table
- */
-#define testutil_verify(session, uri, config)                            \
-    do {                                                                 \
-        int __ret;                                                       \
-        while ((__ret = session->verify(session, uri, config)) == EBUSY) \
-            testutil_check(session->checkpoint(session, NULL));          \
-        testutil_check(__ret);                                           \
-    } while (0)
-
-/*
  * error_sys_check --
  *     Complain and quit if a function call fails. A special name because it appears in the
  *     documentation. Allow any non-negative values.

@@ -65,7 +65,7 @@ class test_index03(wttest.WiredTigerTestCase):
         self.assertRaises(wiredtiger.WiredTigerError,
             lambda: session.drop(index2_uri))
         c1.close()
-        self.dropUntilSuccess(session, index2_uri)
+        session.drop(index2_uri)
 
 if __name__ == '__main__':
     wttest.run()

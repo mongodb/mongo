@@ -210,10 +210,10 @@ test_join(TEST_OPTS *opts, SHARED_OPTS *sharedopts, bool bloom, bool sometimes_r
           insert_args[i].inserts, insert_args[i].removes, insert_args[i].notfounds,
           insert_args[i].rollbacks);
 
-    testutil_drop(session, sharedopts->posturi, NULL);
-    testutil_drop(session, sharedopts->baluri, NULL);
-    testutil_drop(session, sharedopts->flaguri, NULL);
-    testutil_drop(session, opts->uri, NULL);
+    testutil_check(session->drop(session, sharedopts->posturi, NULL));
+    testutil_check(session->drop(session, sharedopts->baluri, NULL));
+    testutil_check(session->drop(session, sharedopts->flaguri, NULL));
+    testutil_check(session->drop(session, opts->uri, NULL));
     testutil_check(session->close(session, NULL));
 }
 

@@ -63,7 +63,7 @@ class test_drop(wttest.WiredTigerTestCase):
             drop_uri = ds.index_name(0)
         else:
             drop_uri = uri
-        self.dropUntilSuccess(self.session, drop_uri)
+        self.session.drop(drop_uri, None)
         confirm_does_not_exist(self, drop_uri)
 
     # Test drop of an object.

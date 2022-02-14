@@ -42,7 +42,7 @@ class test_autoclose(wttest.WiredTigerTestCase):
                             'key_format=S,value_format=S')
 
     def drop_table(self):
-        self.dropUntilSuccess(self.session, self.uri)
+        self.session.drop(self.uri, None)
 
     def open_cursor(self):
         cursor = self.session.open_cursor(self.uri, None, None)
