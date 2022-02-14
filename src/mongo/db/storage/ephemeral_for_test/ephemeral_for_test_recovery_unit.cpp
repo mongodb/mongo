@@ -42,6 +42,7 @@ namespace mongo {
 namespace ephemeral_for_test {
 namespace {
 MONGO_FAIL_POINT_DEFINE(EFTAlwaysThrowWCEOnWrite);
+MONGO_FAIL_POINT_DEFINE(EFTThrowWCEOnMerge);
 }  // namespace
 
 RecoveryUnit::RecoveryUnit(KVEngine* parentKVEngine, std::function<void()> cb)
@@ -62,6 +63,10 @@ void RecoveryUnit::doCommitUnitOfWork() {
 
     if (_dirty) {
         invariant(_forked);
+        if (MONGO_unlikely(EFTThrowWCEOnMerge.shouldFail())) {
+            throw WriteConflictException();
+        }
+
         while (true) {
             auto masterInfo = _KVEngine->getMasterInfo(_readAtTimestamp);
             try {
