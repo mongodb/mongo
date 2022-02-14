@@ -21,6 +21,9 @@ const maxChunkFillMB = 20;
 const maxChunkSizeMB = 30;
 const chunkSpacing = 1000;
 
+jsTest.log("Creating new test with " + numCollections + " collections over " + numShards +
+           " shards.");
+
 const st = new ShardingTest({
     mongos: 1,
     shards: numShards,
@@ -46,10 +49,6 @@ for (let i = 0; i < numCollections; ++i) {
 
     defragmentationUtil.createFragmentedCollection(
         st.s, coll.getFullName(), numChunks, maxChunkFillMB, numZones, docSizeBytes, chunkSpacing);
-
-    const beginningNumberChunks =
-        findChunksUtil.countChunksForNs(st.s.getDB('config'), coll.getFullName());
-    jsTest.log("Create collection " + coll + " with " + beginningNumberChunks + " chunks.");
 
     collections.push(coll);
 }

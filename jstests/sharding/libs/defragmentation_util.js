@@ -1,20 +1,32 @@
 var defragmentationUtil = (function() {
     load("jstests/sharding/libs/find_chunks_util.js");
 
-    // This function creates a randomized, fragmented collection. It does not necessarily make a
-    // collection with exactly numChunks chunks nor exactly numZones zones.
     let createFragmentedCollection = function(
         mongos, ns, numChunks, maxChunkFillMB, numZones, docSizeBytes, chunkSpacing) {
+        jsTest.log("Creating fragmented collection " + ns + " with parameters: numChunks = " +
+                   numChunks + ", numZones = " + numZones + ", docSizeBytes = " + docSizeBytes +
+                   ", maxChunkFillMB = " + maxChunkFillMB + ", chunkSpacing = " + chunkSpacing);
         assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {key: 1}}));
 
         createAndDistributeChunks(mongos, ns, numChunks, chunkSpacing);
         createRandomZones(mongos, ns, numZones, chunkSpacing);
         fillChunksToRandomSize(mongos, ns, docSizeBytes, maxChunkFillMB);
+
+        const beginningNumberChunks = findChunksUtil.countChunksForNs(mongos.getDB('config'), ns);
+        const beginningNumberZones = mongos.getDB('config').tags.countDocuments({ns: ns});
+        jsTest.log("Collection " + ns + " created with " + beginningNumberChunks + " chunks and " +
+                   beginningNumberZones + " zones.");
     };
 
     let createAndDistributeChunks = function(mongos, ns, numChunks, chunkSpacing) {
         const shards = mongos.getCollection('config.shards').find().toArray();
-        for (let i = -Math.floor(numChunks / 2); i <= Math.floor(numChunks / 2); i++) {
+        const existingNumChunks = findChunksUtil.countChunksForNs(mongos.getDB('config'), ns);
+        let numChunksToCreate = numChunks - existingNumChunks;
+        if (numChunksToCreate <= 0) {
+            return;
+        }
+        for (let i = -Math.floor(numChunksToCreate / 2); i < Math.ceil(numChunksToCreate / 2);
+             i++) {
             assert.commandWorked(mongos.adminCommand({split: ns, middle: {key: i * chunkSpacing}}));
             assert.soon(() => {
                 let toShard = Random.randInt(shards.length);
