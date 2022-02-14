@@ -53,25 +53,23 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
     scenarios = make_scenarios(format_values, prepare_values)
 
     def conn_config(self):
-        config = 'cache_size=25MB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true),timing_stress_for_test=[history_store_checkpoint_delay]'
+        config = 'cache_size=25MB,statistics=(all),statistics_log=(json,on_close,wait=1),timing_stress_for_test=[history_store_checkpoint_delay]'
         return config
 
     def test_rollback_to_stable(self):
         nrows = 1000
 
-        # Create a table without logging.
+        # Create a table.
         self.pr("create/populate tables")
         uri_1 = "table:rollback_to_stable10_1"
         ds_1 = SimpleDataSet(
-            self, uri_1, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+            self, uri_1, 0, key_format=self.key_format, value_format=self.value_format)
         ds_1.populate()
 
-        # Create another table without logging.
+        # Create another table.
         uri_2 = "table:rollback_to_stable10_2"
         ds_2 = SimpleDataSet(
-            self, uri_2, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+            self, uri_2, 0, key_format=self.key_format, value_format=self.value_format)
         ds_2.populate()
 
         if self.value_format == '8t':
@@ -190,19 +188,19 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
     def test_rollback_to_stable_prepare(self):
         nrows = 1000
 
-        # Create a table without logging.
+        # Create a table.
         self.pr("create/populate tables")
         uri_1 = "table:rollback_to_stable10_1"
         ds_1 = SimpleDataSet(
             self, uri_1, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)' + self.prepare_extraconfig)
+            config=self.prepare_extraconfig)
         ds_1.populate()
 
-        # Create another table without logging.
+        # Create another table.
         uri_2 = "table:rollback_to_stable10_2"
         ds_2 = SimpleDataSet(
             self, uri_2, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)' + self.prepare_extraconfig)
+            config=self.prepare_extraconfig)
         ds_2.populate()
 
         if self.value_format == '8t':

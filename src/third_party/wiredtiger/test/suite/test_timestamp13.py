@@ -45,8 +45,6 @@ class test_timestamp13(wttest.WiredTigerTestCase, suite_subprocess):
         ('row', dict(extra_config='')),
     ])
 
-    conn_config = 'log=(enabled)'
-
     def test_degenerate_timestamps(self):
         self.session.create(self.uri,
             'key_format=i,value_format=i' + self.extra_config)

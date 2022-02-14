@@ -39,12 +39,11 @@ from wtscenario import make_scenarios
 class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'ts07_ts_nologged'
     tablename2 = 'ts07_nots_logged'
-    tablename3 = 'ts07_ts_logged'
 
     format_values = [
-        ('string-row', dict(key_format='i', value_format='S')),
         ('column', dict(key_format='r', value_format='S')),
         ('column-fix', dict(key_format='r', value_format='8t')),
+        ('row', dict(key_format='i', value_format='S')),
     ]
 
     types = [
@@ -53,8 +52,7 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
     ]
 
     conncfg = [
-        ('nolog', dict(conn_config='create,cache_size=2M', using_log=False)),
-        ('log', dict(conn_config='create,log=(enabled,file_max=1M,remove=false),cache_size=2M', using_log=True)),
+        ('log', dict(conn_config='create,log=(enabled,file_max=1M,remove=false),cache_size=2M')),
     ]
 
     nkeys = [
@@ -76,8 +74,8 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
             self.value2 = u'\u0001\u0002dcba\u0007\u0004'
             self.value3 = u'\u0001\u0002cdef\u0007\u0004'
 
-    # Check that a cursor (optionally started in a new transaction), sees the
-    # expected value for a key
+    # Check that a cursor (optionally started in a new transaction), sees the expected value for a
+    # key.
     def check(self, session, txn_config, k, expected, flcs_expected):
         # In FLCS the table extends under uncommitted writes and we expect to
         # see zero rather than NOTFOUND.
@@ -101,11 +99,9 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
             session.begin_transaction(txn_config)
         c = session.open_cursor(self.uri + self.tablename, None)
         c2 = session.open_cursor(self.uri + self.tablename2, None)
-        c3 = session.open_cursor(self.uri + self.tablename3, None)
 
-        # In FLCS the values are bytes, which are numbers, but the tests below are via
-        # string inclusion rather than just equality of values. Not sure why that is, but
-        # I'm going to assume there's a reason for it and not change things. Compensate.
+        # In FLCS the values are bytes, which are numbers, but the tests below are via string
+        # inclusion rather than just equality of values.
         if self.value_format == '8t':
             check_value = str(check_value)
 
@@ -119,21 +115,13 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
             if check_value in str(v):
                 count2 += 1
         c2.close()
-        count3 = 0
-        for k, v in c3:
-            if check_value in str(v):
-                count3 += 1
-        c3.close()
         if txn_config:
             session.commit_transaction()
         self.assertEqual(count, valcnt)
         self.assertEqual(count2, valcnt2)
-        self.assertEqual(count3, valcnt3)
 
-    #
-    # Take a backup of the database and verify that the value we want to
-    # check exists in the tables the expected number of times.
-    #
+    # Take a backup of the database and verify that the value we want to check exists in the tables
+    # the expected number of times.
     def backup_check(self, check_value, valcnt, valcnt2, valcnt3):
         newdir = "BACKUP"
         copy_wiredtiger_home(self, '.', newdir, True)
@@ -142,11 +130,9 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         session = self.setUpSessionOpen(conn)
         c = session.open_cursor(self.uri + self.tablename, None)
         c2 = session.open_cursor(self.uri + self.tablename2, None)
-        c3 = session.open_cursor(self.uri + self.tablename3, None)
 
-        # In FLCS the values are bytes, which are numbers, but the tests below are via
-        # string inclusion rather than just equality of values. Not sure why that is, but
-        # I'm going to assume there's a reason for it and not change things. Compensate.
+        # In FLCS the values are bytes, which are numbers, but the tests below are via string
+        # inclusion rather than just equality of values.
         if self.value_format == '8t':
             check_value = str(check_value)
 
@@ -157,66 +143,51 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
                 # print "check_value found in key " + str(k)
                 count += 1
         c.close()
-        # Count how many times the second value is present in the
-        # non-timestamp table.
+
+        # Count how many times the second value is present in the non-timestamp table.
         count2 = 0
         for k, v in c2:
             if check_value in str(v):
                 # print "check_value found in key " + str(k)
                 count2 += 1
         c2.close()
-        # Count how many times the second value is present in the
-        # logged timestamp table.
-        count3 = 0
-        for k, v in c3:
-            if check_value in str(v):
-                count3 += 1
-        c3.close()
         conn.close()
-        # print "CHECK BACKUP: Count " + str(count) + " Count2 " + str(count2) + " Count3 " + str(count3)
+        # print "CHECK BACKUP: Count " +\
+        #     str(count) + " Count2 " + str(count2) + " Count3 " + str(count3)
         # print "CHECK BACKUP: Expect value2 count " + str(valcnt)
         # print "CHECK BACKUP: 2nd table Expect value2 count " + str(valcnt2)
         # print "CHECK BACKUP: 3rd table Expect value2 count " + str(valcnt3)
         self.assertEqual(count, valcnt)
         self.assertEqual(count2, valcnt2)
-        self.assertEqual(count3, valcnt3)
 
     # Check that a cursor sees the expected values after a checkpoint.
     def ckpt_backup(self, check_value, valcnt, valcnt2, valcnt3):
 
-        # Take a checkpoint.  Make a copy of the database.  Open the
-        # copy and verify whether or not the expected data is in there.
+        # Take a checkpoint.  Make a copy of the database.  Open the copy and verify whether or not
+        # the expected data is in there.
         ckptcfg = 'use_timestamp=true'
         self.session.checkpoint(ckptcfg)
         self.backup_check(check_value, valcnt, valcnt2, valcnt3)
 
     def check_stable(self, check_value, valcnt, valcnt2, valcnt3):
         self.ckpt_backup(check_value, valcnt, valcnt2, valcnt3)
-
-        # When reading as-of a timestamp, tables 1 and 3 should match (both
-        # use timestamps and we're not running recovery, so logging behavior
-        # should be irrelevant).
         self.check_reads(self.session, 'read_timestamp=' + self.stablets,
             check_value, valcnt, valcnt2, valcnt)
 
     def test_timestamp07(self):
-        uri = self.uri + self.tablename
-        uri2 = self.uri + self.tablename2
-        uri3 = self.uri + self.tablename3
         self.moreinit()
-        #
-        # Open three tables:
+
+        # Open two tables:
         # 1. Table is not logged and uses timestamps.
-        # 2. Table is logged and does not use timestamps.
-        # 3. Table is logged and uses timestamps.
+        # 2. Table is logged and so timestamps are ignored.
         #
         format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        uri = self.uri + self.tablename
         self.session.create(uri, format + ',log=(enabled=false)')
         c = self.session.open_cursor(uri)
+        uri2 = self.uri + self.tablename2
         self.session.create(uri2, format)
         c2 = self.session.open_cursor(uri2)
-        self.session.create(uri3, format)
-        c3 = self.session.open_cursor(uri3)
         # print "tables created"
 
         # Insert keys 1..nkeys each with timestamp=key, in some order.
@@ -228,13 +199,11 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
             c2[k] = self.value
             self.session.begin_transaction()
             c[k] = self.value
-            c3[k] = self.value
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(k))
 
         # print "value inserted in all tables, reading..."
 
-        # Now check that we see the expected state when reading at each
-        # timestamp.
+        # Now check that we see the expected state when reading at each timestamp.
         for k in orig_keys:
             self.check(self.session, 'read_timestamp=' + self.timestamp_str(k),
                 k, self.value, None)
@@ -261,10 +230,9 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
             # the last record written into the log.
             #
             # print "Key " + str(k) + " to value2"
-            c2[k] = self.value2
             self.session.begin_transaction()
             c[k] = self.value2
-            c3[k] = self.value2
+            c2[k] = self.value2
             ts = self.timestamp_str(k + self.nkeys)
             self.session.commit_transaction('commit_timestamp=' + ts)
             # print "Commit key " + str(k) + " ts " + ts
@@ -272,10 +240,10 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
 
         # print "Updated " + str(count) + " keys to value2"
 
-        # Take a checkpoint using the given configuration.  Then verify
-        # whether value2 appears in a copy of that data or not.
+        # Take a checkpoint using the given configuration.  Then verify the value doesn't appear
+        # in that copy of that data.
         # print "check_stable 1"
-        self.check_stable(self.value2, 0, self.nkeys, self.nkeys if self.using_log else 0)
+        self.check_stable(self.value2, 0, self.nkeys, 0)
 
         # Update the stable timestamp to the latest, but not the oldest
         # timestamp and make sure we can see the data.  Once the stable
@@ -284,10 +252,6 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         self.conn.set_timestamp('stable_timestamp=' + self.stablets)
         # print "check_stable 2"
         self.check_stable(self.value2, self.nkeys, self.nkeys, self.nkeys)
-
-        # If we're not using the log we're done.
-        if not self.using_log:
-            return
 
         # Update the key and retry.  This time take a backup and recover.
         random.shuffle(keys)
@@ -298,10 +262,9 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
             # the last record written into the log.
             #
             # print "Key " + str(k) + " to value3"
-            c2[k] = self.value3
             self.session.begin_transaction()
             c[k] = self.value3
-            c3[k] = self.value3
+            c2[k] = self.value3
             ts = self.timestamp_str(k + self.nkeys*2)
             self.session.commit_transaction('commit_timestamp=' + ts)
             # print "Commit key " + str(k) + " ts " + ts

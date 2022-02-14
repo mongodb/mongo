@@ -57,9 +57,7 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
 
         # Create a table without logging.
         uri = "table:rollback_to_stable21"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
         if self.value_format == '8t':
@@ -124,9 +122,7 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
 
         # Create a table without logging.
         uri = "table:rollback_to_stable21"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
         if self.value_format == '8t':
@@ -199,9 +195,7 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
 
         # Create a table without logging.
         uri = "table:rollback_to_stable21"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
         if self.value_format == '8t':

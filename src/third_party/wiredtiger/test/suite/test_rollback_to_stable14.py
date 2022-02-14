@@ -60,18 +60,16 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
     scenarios = make_scenarios(key_format_values, prepare_values)
 
     def conn_config(self):
-        config = 'cache_size=25MB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true),timing_stress_for_test=[history_store_checkpoint_delay]'
+        config = 'cache_size=25MB,statistics=(all),statistics_log=(json,on_close,wait=1),timing_stress_for_test=[history_store_checkpoint_delay]'
         return config
 
     def test_rollback_to_stable(self):
         nrows = 100
 
-        # Create a table without logging.
+        # Create a table.
         self.pr("create/populate table")
         uri = "table:rollback_to_stable14"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
@@ -178,12 +176,10 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
     def test_rollback_to_stable_same_ts(self):
         nrows = 100
 
-        # Create a table without logging.
+        # Create a table.
         self.pr("create/populate table")
         uri = "table:rollback_to_stable14"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
@@ -288,12 +284,10 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
     def test_rollback_to_stable_same_ts_append(self):
         nrows = 100
 
-        # Create a table without logging.
+        # Create a table.
         self.pr("create/populate table")
         uri = "table:rollback_to_stable14"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.

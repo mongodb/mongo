@@ -1704,8 +1704,12 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     }
 
     /* If we are logging, write a commit log record. */
-    if (txn->logrec != NULL && FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) &&
-      !F_ISSET(session, WT_SESSION_NO_LOGGING)) {
+    if (txn->logrec != NULL) {
+        /* Assert environment and tree are logging compatible, the fast-check is short-hand. */
+        WT_ASSERT(session,
+          FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) &&
+            !F_ISSET(session, WT_SESSION_NO_LOGGING));
+
         /*
          * We are about to block on I/O writing the log. Release our snapshot in case it is keeping
          * data pinned. This is particularly important for checkpoints.
@@ -1967,8 +1971,7 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
          * Logged table updates should never be prepared. As these updates are immediately durable,
          * it is not possible to roll them back if the prepared transaction is rolled back.
          */
-        if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED) &&
-          !F_ISSET(op->btree, WT_BTREE_NO_LOGGING))
+        if (!F_ISSET(op->btree, WT_BTREE_NO_LOGGING))
             WT_RET_MSG(session, EINVAL, "transaction prepare is not supported with logged tables");
         switch (op->type) {
         case WT_TXN_OP_NONE:

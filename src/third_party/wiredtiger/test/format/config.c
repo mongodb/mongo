@@ -1050,11 +1050,13 @@ config_transaction(void)
             testutil_die(EINVAL, "prepare is incompatible with logging");
     }
 
-    /* Transaction timestamps are incompatible with implicit transactions. */
+    /* Transaction timestamps are incompatible with implicit transactions and logging. */
     if (GV(TRANSACTION_TIMESTAMPS) && config_explicit(NULL, "transaction.timestamps")) {
         if (GV(TRANSACTION_IMPLICIT) && config_explicit(NULL, "transaction.implicit"))
             testutil_die(
               EINVAL, "transaction.timestamps is incompatible with implicit transactions");
+        if (GV(LOGGING) && config_explicit(NULL, "logging"))
+            testutil_die(EINVAL, "transaction.timestamps is incompatible with logging");
     }
 
     /*
@@ -1074,11 +1076,15 @@ config_transaction(void)
     if (GV(TRANSACTION_TIMESTAMPS)) {
         if (!config_explicit(NULL, "transaction.implicit"))
             config_off(NULL, "transaction.implicit");
+        if (!config_explicit(NULL, "logging"))
+            config_off(NULL, "logging");
         if (!config_explicit(NULL, "ops.salvage"))
             config_off(NULL, "ops.salvage");
     }
-    if (GV(LOGGING))
+    if (GV(LOGGING)) {
         config_off(NULL, "ops.prepare");
+        config_off(NULL, "transaction.timestamps");
+    }
     if (GV(TRANSACTION_IMPLICIT))
         config_off(NULL, "transaction.timestamps");
     if (GV(OPS_SALVAGE))

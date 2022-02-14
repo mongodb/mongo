@@ -63,8 +63,6 @@ class test_rollback_to_stable09(test_rollback_to_stable_base):
         config = 'cache_size=250MB'
         if self.in_memory:
             config += ',in_memory=true'
-        else:
-            config += ',log=(enabled),in_memory=false'
         return config
 
     def create_table(self, commit_ts):

@@ -40,12 +40,12 @@ from test_rollback_to_stable01 import test_rollback_to_stable_base
 # the proper write generation number and we don't end up reading stale
 # transaction ID's stored on the page.
 class test_rollback_to_stable28(test_rollback_to_stable_base):
-    conn_config = 'log=(enabled=true),statistics=(all)'
+    conn_config = 'statistics=(all)'
     # Recovery connection config: The debug mode is only effective on high cache pressure as WiredTiger can potentially decide
     # to do an update restore evict on a page when the cache pressure requirements are not met.
     # This means setting eviction target low and cache size low.
     conn_recon = ',eviction_updates_trigger=10,eviction_dirty_trigger=5,eviction_dirty_target=1,' \
-            'cache_size=1MB,debug_mode=(update_restore_evict=true),log=(recover=on)'
+            'cache_size=1MB,debug_mode=(update_restore_evict=true)'
 
     # In principle this test should be run on VLCS and FLCS; but it doesn't run reliably, in that
     # while it always works in the sense of producing the right values, it doesn't always trigger
@@ -93,7 +93,7 @@ class test_rollback_to_stable28(test_rollback_to_stable_base):
 
         # Create our table.
         ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)' + self.extraconfig)
+            config=self.extraconfig)
         ds.populate()
 
         if self.value_format == '8t':

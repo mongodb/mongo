@@ -32,11 +32,10 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 # test_hs07.py
-# Test that the history store sweep cleans the obsolete history store entries and gives expected results.
+# Test history store sweep cleans the obsolete history store entries and gives expected results.
 class test_hs07(wttest.WiredTigerTestCase):
     # Force a small cache.
-    conn_config = ('cache_size=50MB,eviction_updates_trigger=95,'
-                   'eviction_updates_target=80,log=(enabled)')
+    conn_config = ('cache_size=50MB,eviction_updates_trigger=95,eviction_updates_target=80')
 
     format_values = (
         ('column', dict(key_format='r', value_format='S')),
@@ -69,15 +68,12 @@ class test_hs07(wttest.WiredTigerTestCase):
     def test_hs(self):
         nrows = 10000
 
-        # Create a table without logging to ensure we get "skew_newest" history store eviction
-        # behavior.
-        uri = "table:las07_main"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        # Create a table.
+        uri = "table:hs07_main"
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
-        uri2 = "table:las07_extra"
+        uri2 = "table:hs07_extra"
         ds2 = SimpleDataSet(
             self, uri2, 0, key_format=self.key_format, value_format=self.value_format)
         ds2.populate()

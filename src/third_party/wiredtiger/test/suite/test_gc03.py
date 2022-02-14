@@ -33,7 +33,7 @@ from wtdataset import SimpleDataSet
 # test_gc03.py
 # Test that checkpoint cleans the obsolete history store pages that are in-memory.
 class test_gc03(test_gc_base):
-    conn_config = 'cache_size=4GB,log=(enabled),statistics=(all),statistics_log=(wait=0,on_close=true)'
+    conn_config = 'cache_size=4GB,statistics=(all),statistics_log=(wait=0,on_close=true)'
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')
@@ -44,16 +44,14 @@ class test_gc03(test_gc_base):
     def test_gc(self):
         nrows = 10000
 
-        # Create a table without logging.
+        # Create a table.
         uri = "table:gc03"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format="i", value_format="S", config='log=(enabled=false)')
+        ds = SimpleDataSet(self, uri, 0, key_format="i", value_format="S")
         ds.populate()
 
-        # Create an extra table without logging.
+        # Create an extra table.
         uri_extra = "table:gc03_extra"
-        ds_extra = SimpleDataSet(
-            self, uri_extra, 0, key_format="i", value_format="S", config='log=(enabled=false)')
+        ds_extra = SimpleDataSet(self, uri_extra, 0, key_format="i", value_format="S")
         ds_extra.populate()
 
         # Pin oldest and stable to timestamp 1.

@@ -40,10 +40,10 @@ class test_prepare_hs02(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablename
 
     types = [
-        ('col', dict(s_config='key_format=r,value_format=i,log=(enabled=false)')),
-        ('col-fix', dict(s_config='key_format=r,value_format=8t,log=(enabled=false)')),
-        ('row', dict(s_config='key_format=i,value_format=i,log=(enabled=false)')),
-        ('lsm', dict(s_config='key_format=i,value_format=i,log=(enabled=false),type=lsm')),
+        ('col', dict(s_config='key_format=r,value_format=i')),
+        ('col-fix', dict(s_config='key_format=r,value_format=8t')),
+        ('row', dict(s_config='key_format=i,value_format=i')),
+        ('lsm', dict(s_config='key_format=i,value_format=i,type=lsm')),
     ]
 
     # Transaction end types
@@ -71,7 +71,8 @@ class test_prepare_hs02(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(100))
         if self.txn_commit == True:
             self.session.commit_transaction(
-                'commit_timestamp=' + self.timestamp_str(101) + ',durable_timestamp=' + self.timestamp_str(101))
+                'commit_timestamp=' + self.timestamp_str(101) +\
+                ',durable_timestamp=' + self.timestamp_str(101))
         else:
             self.session.rollback_transaction()
 
@@ -93,7 +94,8 @@ class test_prepare_hs02(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(200))
         if self.txn_commit == True:
             self.session.commit_transaction(
-                'commit_timestamp=' + self.timestamp_str(201) + ',durable_timestamp=' + self.timestamp_str(201))
+                'commit_timestamp=' + self.timestamp_str(201) +\
+                ',durable_timestamp=' + self.timestamp_str(201))
         else:
             self.session.rollback_transaction()
 
@@ -120,7 +122,8 @@ class test_prepare_hs02(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(300))
         if self.txn_commit == True:
             self.session.commit_transaction(
-                'commit_timestamp=' + self.timestamp_str(301) + ',durable_timestamp=' + self.timestamp_str(301))
+                'commit_timestamp=' + self.timestamp_str(301) +\
+                ',durable_timestamp=' + self.timestamp_str(301))
         else:
             self.session.rollback_transaction()
 
@@ -158,7 +161,8 @@ class test_prepare_hs02(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(400))
         if self.txn_commit == True:
             self.session.commit_transaction(
-                'commit_timestamp=' + self.timestamp_str(401) + ',durable_timestamp=' + self.timestamp_str(401))
+                'commit_timestamp=' + self.timestamp_str(401) +\
+                ',durable_timestamp=' + self.timestamp_str(401))
         else:
             self.session.rollback_transaction()
 

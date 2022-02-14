@@ -34,7 +34,7 @@ from wtscenario import make_scenarios
 # Test that truncate with history store entries and timestamps gives expected results.
 class test_hs02(wttest.WiredTigerTestCase):
     # Force a small cache.
-    conn_config = 'cache_size=50MB,log=(enabled)'
+    conn_config = 'cache_size=50MB'
 
     format_values = [
         ('string-row', dict(key_format='S', value_format='S')),
@@ -76,15 +76,12 @@ class test_hs02(wttest.WiredTigerTestCase):
     def test_hs(self):
         nrows = 10000
 
-        # Create a table without logging to ensure we get "skew_newest" history store eviction
-        # behavior.
-        uri = "table:las02_main"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)')
+        # Create a table.
+        uri = "table:hs02_main"
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
 
-        uri2 = "table:las02_extra"
+        uri2 = "table:hs02_extra"
         ds2 = SimpleDataSet(
             self, uri2, 0, key_format=self.key_format, value_format=self.value_format)
         ds2.populate()

@@ -53,9 +53,9 @@ class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
     ]
 
     conncfg = [
-        ('nolog', dict(conn_config='create', using_log=False)),
-        ('V1', dict(conn_config='create,log=(enabled,remove=false),compatibility=(release="2.9")', using_log=True)),
-        ('V2', dict(conn_config='create,log=(enabled,remove=false)', using_log=True)),
+        ('V1',
+            dict(conn_config='create,log=(enabled,remove=false),compatibility=(release="2.9")')),
+        ('V2', dict(conn_config='create,log=(enabled,remove=false)')),
     ]
 
     scenarios = make_scenarios(conncfg, types, ckpt)
@@ -118,12 +118,13 @@ class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
         self.backup_check(check_value, valcnt_ts_log, valcnt_ts_nolog)
 
     def test_timestamp06(self):
-        # Open two timestamp tables:
-        # 1. Table is logged and uses timestamps.
+        # Open two tables:
+        # 1. Table is logged and so timestamps are ignored.
         # 2. Table is not logged and uses timestamps.
         self.session.create(self.table_ts_log, 'key_format=i,value_format=i' + self.extra_config)
         cur_ts_log = self.session.open_cursor(self.table_ts_log)
-        self.session.create(self.table_ts_nolog, 'key_format=i,value_format=i,log=(enabled=false)' + self.extra_config)
+        self.session.create(self.table_ts_nolog,
+            'key_format=i,value_format=i,log=(enabled=false)' + self.extra_config)
         cur_ts_nolog = self.session.open_cursor(self.table_ts_nolog)
 
         # Insert keys 1..100
@@ -154,17 +155,16 @@ class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
         cur_ts_nolog.close()
 
         # Scenario: 1
-        # Check that we see all the latest values (i.e. 3) as per transaction
-        # visibility when reading without the read timestamp.
-        # All tables should see all the values.
+        # Check that we see all the latest values (i.e. 3) as per transaction visibility when
+        # reading without the read timestamp. All tables should see all the values.
         self.check(self.session, "", self.table_ts_log,
             dict((k, 3) for k in orig_keys))
         self.check(self.session, "", self.table_ts_nolog,
             dict((k, 3) for k in orig_keys))
 
         # Scenario: 2
-        # Check that we see the values till correctly from checkpointed data
-        # files in case of multistep transactions.
+        # Check that we see the values correctly from checkpointed data files in case of multistep
+        # transactions.
         # Set oldest and stable timestamps
         old_ts = self.timestamp_str(100)
         # Set the stable timestamp such that last update is beyond it.
@@ -172,26 +172,18 @@ class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
         self.conn.set_timestamp('oldest_timestamp=' + old_ts)
         self.conn.set_timestamp('stable_timestamp=' + stable_ts)
 
-        # Check that we see the values correctly till stable timestamp.
+        # Logged tables always see the latest value, non-logged tables should see values at the
+        # specified timestamp.
         self.check(self.session, 'read_timestamp=' + stable_ts,
-            self.table_ts_log, dict((k, 2) for k in orig_keys))
+            self.table_ts_log, dict((k, 3) for k in orig_keys))
         self.check(self.session, 'read_timestamp=' + stable_ts,
             self.table_ts_nolog, dict((k, 2) for k in orig_keys))
 
-        # For logged table we should see latest values (i.e. 3) when logging
-        # is enabled.
-        if self.using_log == True:
-            valcnt_ts_log = nkeys
-        else:
-            # When logging is disabled, we should not see the values beyond the
-            # stable timestamp with timestamped checkpoints.
-            if self.ckpt_ts == True:
-                valcnt_ts_log = 0
-            else:
-                valcnt_ts_log = nkeys
+        # For logged table we should see latest values.
+        valcnt_ts_log = nkeys
 
-        # For non-logged table we should not see the values beyond the
-        # stable timestamp with timestamped checkpoints.
+        # For non-logged table we should not see the values beyond the stable timestamp with
+        # timestamped checkpoints.
         if self.ckpt_ts == True:
             valcnt_ts_nolog = 0
         else:
@@ -208,31 +200,19 @@ class test_timestamp06(wttest.WiredTigerTestCase, suite_subprocess):
                 return
         self.conn.rollback_to_stable()
 
-        # All tables should see the values correctly when read with
-        # read timestamp as stable timestamp.
+        # Logged tables see the latest value, non-logged tables should see the values as of the
+        # specified timestamp.
+        self.check(self.session, 'read_timestamp=' + stable_ts,
+            self.table_ts_log, dict((k, 3) for k in orig_keys))
         self.check(self.session, 'read_timestamp=' + stable_ts,
             self.table_ts_nolog, dict((k, 2) for k in orig_keys))
-        self.check(self.session, 'read_timestamp=' + stable_ts,
-            self.table_ts_log, dict((k, 2) for k in orig_keys))
 
         # Scenario: 4
-        # Check that we see the values correctly when read without any
-        # timestamp.
-        if self.using_log == True:
-            # For logged table we should see latest values (i.e. 3) when logging
-            # is enabled.
-            self.check(self.session, "",
-                self.table_ts_log, dict((k, 3) for k in orig_keys))
-        else:
-            # When logging is disabled, we should not see the values beyond the
-            # stable timestamp with timestamped checkpoints.
-            self.check(self.session, "",
-                self.table_ts_log, dict((k, 2) for k in orig_keys))
-
-        # For non-logged table we should not see the values beyond the
+        # Check that we see the values correctly when read without any timestamp. Logged tables
+        # always see the latest value, non-logged tables should not see the values beyond the
         # stable timestamp with timestamped checkpoints.
-        self.check(self.session, "",
-            self.table_ts_nolog, dict((k, 2) for k in orig_keys))
+        self.check(self.session, "", self.table_ts_log, dict((k, 3) for k in orig_keys))
+        self.check(self.session, "", self.table_ts_nolog, dict((k, 2) for k in orig_keys))
 
 if __name__ == '__main__':
     wttest.run()

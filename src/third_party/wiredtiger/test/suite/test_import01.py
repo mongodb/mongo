@@ -99,14 +99,12 @@ class test_import_base(wttest.WiredTigerTestCase):
     # Copy a file from a source directory to a destination directory.
     def copy_file(self, file_name, src_dir, dest_dir):
         src_path = os.path.join(src_dir, file_name)
-        if os.path.isfile(src_path) and "WiredTiger.lock" not in file_name and \
-            "Tmplog" not in file_name and "Preplog" not in file_name:
+        if os.path.isfile(src_path) and "WiredTiger.lock" not in file_name:
             shutil.copy(src_path, dest_dir)
 
 # test_import01
 class test_import01(test_import_base):
-
-    conn_config = 'cache_size=50MB,log=(enabled)'
+    conn_config = 'cache_size=50MB'
 
     original_db_file = 'original_db_file'
     uri = 'file:' + original_db_file
@@ -117,7 +115,7 @@ class test_import01(test_import_base):
     values = [b'\x01\x02aaa\x03\x04', b'\x01\x02bbb\x03\x04', b'\x01\x02ccc\x03\x04',
               b'\x01\x02ddd\x03\x04', b'\x01\x02eee\x03\x04', b'\x01\x02fff\x03\x04']
     ts = [10*k for k in range(1, len(keys)+1)]
-    create_config = 'allocation_size=512,key_format=u,log=(enabled=true),value_format=u'
+    create_config = 'allocation_size=512,key_format=u,value_format=u'
 
     def test_file_import(self):
         self.session.create(self.uri, self.create_config)

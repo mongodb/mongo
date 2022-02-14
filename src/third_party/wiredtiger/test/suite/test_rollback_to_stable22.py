@@ -57,8 +57,7 @@ class test_rollback_to_stable22(test_rollback_to_stable_base):
         ds_list = list()
         for i in range(0, nds):
             uri = 'table:rollback_to_stable22_{}'.format(i)
-            ds = SimpleDataSet(
-                self, uri, 0, key_format='i', value_format='S', config='log=(enabled=false)')
+            ds = SimpleDataSet(self, uri, 0, key_format='i', value_format='S')
             ds.populate()
             ds_list.append(ds)
         self.assertEqual(len(ds_list), nds)

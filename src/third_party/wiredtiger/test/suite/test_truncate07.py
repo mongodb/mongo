@@ -128,7 +128,7 @@ class test_truncate07(wttest.WiredTigerTestCase):
         uri = "table:truncate07"
         ds = SimpleDataSet(
             self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)' + self.extraconfig)
+            config=self.extraconfig)
         ds.populate()
 
         if self.value_format == '8t':

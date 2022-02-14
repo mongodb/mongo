@@ -30,24 +30,24 @@
 #   Test the write generation mechanism to ensure that transaction ids get wiped between runs.
 #
 
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 class test_txn25(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=50MB,log=(enabled)'
-
+    base_config = 'create,cache_size=50MB'
     format_values = [
-        ('string-row', dict(key_format='S', usestrings=True, value_format='S')),
-        ('column', dict(key_format='r', usestrings=False, value_format='S')),
-        ('column-fix', dict(key_format='r', usestrings=False, value_format='8t')),
+        ('fix', dict(key_format='r', usestrings=False, value_format='8t')),
+        ('row', dict(key_format='S', usestrings=True, value_format='S')),
+        ('var', dict(key_format='r', usestrings=False, value_format='S')),
     ]
-    scenarios = make_scenarios(format_values)
+    log_config = [
+        ('logging', dict(conn_config=base_config + ',log=(enabled)')),
+        ('no-logging', dict(conn_config=base_config)),
+    ]
+    scenarios = make_scenarios(format_values, log_config)
 
     def getkey(self, i):
-        if self.usestrings:
-            return str(i)
-        else:
-            return i
+        return str(i) if self.usestrings else i
 
     def test_txn25(self):
         uri = 'file:test_txn25'
@@ -88,14 +88,13 @@ class test_txn25(wttest.WiredTigerTestCase):
             cursor[self.getkey(i)] = value3
             self.session.commit_transaction()
 
-        session2.rollback_transaction()
-        session2.close()
+        # Force pages to be written with transaction IDs.
+        self.session.checkpoint()
 
-        # Close and re-open the connection.
-        cursor.close()
-        self.conn.close()
-        self.conn = wiredtiger.wiredtiger_open(self.home, self.conn_config)
-        self.session = self.conn.open_session(self.session_config)
+        session2.rollback_transaction()
+
+        # Reopen the connection.
+        self.reopen_conn()
 
         # Now that we've reopened, check that we can view the latest data from the previous run.
         #

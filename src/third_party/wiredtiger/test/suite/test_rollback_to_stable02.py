@@ -68,18 +68,15 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         config = 'cache_size=100MB,statistics=(all)'
         if self.in_memory:
             config += ',in_memory=true'
-        else:
-            config += ',log=(enabled),in_memory=false'
         return config
 
     def test_rollback_to_stable(self):
         nrows = 10000
 
-        # Create a table without logging.
+        # Create a table.
         uri = "table:rollback_to_stable02"
-        ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
-            config='log=(enabled=false)' + self.extraconfig)
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config=self.extraconfig)
         ds.populate()
 
         if self.value_format == '8t':
