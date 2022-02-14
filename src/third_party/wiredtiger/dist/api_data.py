@@ -1873,7 +1873,10 @@ methods = {
         if set, specify a name for the checkpoint (note that checkpoints
         including LSM trees may not be named)'''),
     Config('target', '', r'''
-        if non-empty, checkpoint the list of objects''', type='list'),
+        if non-empty, checkpoint the list of objects.  Checkpointing a list of objects separately
+        from a database-wide checkpoint can lead to data inconsistencies, see @ref checkpoint_target
+        for more information''',
+        type='list'),
     Config('use_timestamp', 'true', r'''
         if true (the default), create the checkpoint as of the last stable timestamp if timestamps
         are in use, or all current updates if there is no stable timestamp set. If false, this

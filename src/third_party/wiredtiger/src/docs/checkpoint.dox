@@ -46,6 +46,26 @@ checkpoint will not appear in the data source at checkpoint-level durability.
 If no checkpoint is found when the data source is opened, the data source will
 appear empty.
 
+@subsection checkpoint_target Checkpointing specific objects
+
+The WT_SESSION::checkpoint method supports checkpoint of a set of target objects
+(as opposed to a database-wide checkpoint), using the \c target configuration.
+
+\warning
+If objects are separately checkpointed from a database-wide checkpoint, it
+is obviously possible to introduce data consistency problems if the objects
+have related data. Additionally, because WiredTiger has a single database-wide
+file used to store data history and other transactional information related
+to the database objects, checkpointing a set of target objects without also
+checkpointing that database-wide store can also lead to data inconsistencies.
+In other words, it is difficult to safely use a targeted checkpoint in the
+current WiredTiger release. Future development directions for the WiredTiger
+library include splitting the database-wide history file into per-object files,
+which will then be automatically checkpointed any time a database object is
+checkpointed. For that reason, we anticipate checkpointing a set of objects
+will become useful again in the future, but extreme caution is warranted
+until those changes are made.
+
 @section checkpoint_cursors Checkpoint cursors
 
 Cursors are normally opened in the most recent version of a data source.
