@@ -758,7 +758,15 @@ __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t read_ts)
     txn_global = &S2C(session)->txn_global;
     txn_shared = WT_SESSION_TXN_SHARED(session);
 
-    WT_RET(__wt_txn_context_prepare_check(session));
+    /*
+     * Silently ignore attempts to set the read timestamp after a transaction is prepared (if we
+     * error, the system will panic because an operation on a prepared transaction cannot fail).
+     */
+    if (F_ISSET(session->txn, WT_TXN_PREPARE)) {
+        __wt_errx(session,
+          "attempt to set the read timestamp after the transaction is prepared silently ignored");
+        return (0);
+    }
 
     /* Read timestamps imply / require snapshot isolation. */
     if (!F_ISSET(txn, WT_TXN_RUNNING))
@@ -854,7 +862,7 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
     bool set_ts;
 
     set_ts = false;
-    commit_ts = durable_ts = prepare_ts = read_ts = 0;
+    commit_ts = durable_ts = prepare_ts = read_ts = WT_TS_NONE;
 
     WT_TRET(__wt_txn_context_check(session, true));
 
@@ -883,30 +891,30 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
             WT_RET(__wt_txn_parse_timestamp(session, "prepare", &prepare_ts, &cval));
             set_ts = true;
         } else if (WT_STRING_MATCH("read_timestamp", ckey.str, ckey.len)) {
-            WT_RET(__wt_txn_parse_timestamp(session, "durable", &read_ts, &cval));
+            WT_RET(__wt_txn_parse_timestamp(session, "read", &read_ts, &cval));
             set_ts = true;
         }
     }
     WT_RET_NOTFOUND_OK(ret);
 
     /* Look for a commit timestamp. */
-    if (commit_ts != 0)
+    if (commit_ts != WT_TS_NONE)
         WT_RET(__wt_txn_set_commit_timestamp(session, commit_ts));
 
     /*
      * Look for a durable timestamp. Durable timestamp should be set only after setting the commit
      * timestamp.
      */
-    if (durable_ts != 0)
+    if (durable_ts != WT_TS_NONE)
         WT_RET(__wt_txn_set_durable_timestamp(session, durable_ts));
     __wt_txn_publish_durable_timestamp(session);
 
     /* Look for a read timestamp. */
-    if (read_ts != 0)
+    if (read_ts != WT_TS_NONE)
         WT_RET(__wt_txn_set_read_timestamp(session, read_ts));
 
     /* Look for a prepare timestamp. */
-    if (prepare_ts != 0)
+    if (prepare_ts != WT_TS_NONE)
         WT_RET(__wt_txn_set_prepare_timestamp(session, prepare_ts));
 
     if (set_ts)
