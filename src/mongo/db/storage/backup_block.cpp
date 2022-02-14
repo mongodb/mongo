@@ -56,7 +56,7 @@ BackupBlock::BackupBlock(OperationContext* opCtx,
     : _filePath(filePath), _offset(offset), _length(length), _fileSize(fileSize) {
     boost::filesystem::path path(filePath);
     _filenameStem = path.stem().string();
-    _setNamespaceString(opCtx);
+    _initialize(opCtx);
 }
 
 bool BackupBlock::isRequired() const {
@@ -99,7 +99,14 @@ bool BackupBlock::isRequired() const {
     return false;
 }
 
-void BackupBlock::_setNamespaceString(OperationContext* opCtx) {
+void BackupBlock::_setUuid(OperationContext* opCtx, DurableCatalog* catalog, RecordId catalogId) {
+    // Caller controls lifetime of catalog and relevant lock
+    std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md =
+        catalog->getMetaData(opCtx, catalogId);
+    _uuid = md->options.uuid;
+}
+
+void BackupBlock::_initialize(OperationContext* opCtx) {
     if (!opCtx) {
         return;
     }
@@ -110,12 +117,14 @@ void BackupBlock::_setNamespaceString(OperationContext* opCtx) {
     for (const DurableCatalog::Entry& e : catalogEntries) {
         if (StringData(_filenameStem).startsWith("index-"_sd) &&
             catalog->isIndexInEntry(opCtx, e.catalogId, _filenameStem)) {
-            _nss = e.tenantNs.getNss();
+            _setUuid(opCtx, catalog, e.catalogId);
+            _setNamespaceString(opCtx, e.tenantNs.getNss());
             return;
         }
 
         if (e.ident == _filenameStem) {
-            _nss = e.tenantNs.getNss();
+            _setUuid(opCtx, catalog, e.catalogId);
+            _setNamespaceString(opCtx, e.tenantNs.getNss());
             return;
         }
     }

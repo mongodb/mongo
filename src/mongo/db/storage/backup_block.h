@@ -34,6 +34,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -85,6 +86,10 @@ public:
         return _fileSize;
     }
 
+    boost::optional<UUID> uuid() const {
+        return _uuid;
+    }
+
     /**
      * Returns whether the file must be copied regardless of choice for selective backups.
      */
@@ -92,12 +97,16 @@ public:
 
 private:
     /**
-     * Sets '_nss' for:
+     * Sets '_nss' and '_uuid' for:
      * - collections
-     * - indexes, to the NSS of their respective collection
+     * - indexes, to the NSS/UUID of their respective collection
      * A null opCtx is ignored. A null opCtx is exercised by FCBIS unit tests.
      */
-    void _setNamespaceString(OperationContext* opCtx);
+    void _initialize(OperationContext* opCtx);
+    void _setNamespaceString(OperationContext* opCtx, NamespaceString nss) {
+        _nss = nss;
+    }
+    void _setUuid(OperationContext* opCtx, DurableCatalog* catalog, RecordId catalogId);
 
     const std::string _filePath;
     const std::uint64_t _offset;
@@ -106,5 +115,6 @@ private:
 
     std::string _filenameStem;
     NamespaceString _nss;
+    boost::optional<UUID> _uuid;
 };
 }  // namespace mongo
