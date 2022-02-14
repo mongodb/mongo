@@ -498,7 +498,7 @@ public:
                         _shardInfos.at(moveRequest.getDestinationShard()).currentSizeBytes +=
                             transferredAmount;
                         _shardProcessingOrder.sort([this](const ShardId& lhs, const ShardId& rhs) {
-                            return _shardInfos.at(lhs).currentSizeBytes >=
+                            return _shardInfos.at(lhs).currentSizeBytes >
                                 _shardInfos.at(rhs).currentSizeBytes;
                         });
                         _actionableMerges.push_back(std::move(moveRequest));
@@ -830,7 +830,7 @@ private:
             _shardProcessingOrder.push_back(shardId);
         }
         _shardProcessingOrder.sort([this](const ShardId& lhs, const ShardId& rhs) {
-            return _shardInfos.at(lhs).currentSizeBytes >= _shardInfos.at(rhs).currentSizeBytes;
+            return _shardInfos.at(lhs).currentSizeBytes > _shardInfos.at(rhs).currentSizeBytes;
         });
     }
 
