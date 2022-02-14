@@ -45,6 +45,19 @@
 struct S3_FILE_HANDLE;
 struct S3_FILE_SYSTEM;
 
+/* Statistics to be collected for the S3 storage. */
+struct S3_STATISTICS {
+    /* Operations using AWS SDK. */
+    uint64_t listObjectsCount;  /* Number of S3 list objects requests */
+    uint64_t putObjectCount;    /* Number of S3 put object requests */
+    uint64_t getObjectCount;    /* Number of S3 get object requests */
+    uint64_t objectExistsCount; /* Number of S3 object exists requests */
+
+    /* Operations using WiredTiger's native file handle operations. */
+    uint64_t fhOps;     /* Number of non read/write file handle operations */
+    uint64_t fhReadOps; /* Number of file handle read operations */
+};
+
 /* S3 storage source structure. */
 struct S3_STORAGE {
     WT_STORAGE_SOURCE storageSource; /* Must come first */
@@ -55,8 +68,10 @@ struct S3_STORAGE {
     std::mutex fhMutex;                 /* Protect the file handle list*/
     std::list<S3_FILE_HANDLE *> fhList; /* List of open file handles */
 
-    uint32_t referenceCount; /* Number of references to this storge source */
+    uint32_t referenceCount; /* Number of references to this storage source */
     int32_t verbose;
+
+    S3_STATISTICS statistics;
 };
 
 struct S3_FILE_SYSTEM {
@@ -115,6 +130,8 @@ static int S3ObjectListAdd(
 static int S3ObjectListSingle(
   WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, char ***, uint32_t *);
 static int S3ObjectListFree(WT_FILE_SYSTEM *, WT_SESSION *, char **, uint32_t);
+static void S3ShowStatistics(const S3_STATISTICS &);
+
 static int S3FileClose(WT_FILE_HANDLE *, WT_SESSION *);
 /*
  * S3Path --
@@ -143,16 +160,19 @@ S3Path(const std::string &dir, const std::string &name)
 static int
 S3Exist(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *name, bool *exist)
 {
-    S3_STORAGE *s3;
-    s3 = FS2S3(fileSystem);
     S3_FILE_SYSTEM *fs = (S3_FILE_SYSTEM *)fileSystem;
+    int ret = 0;
+
+    /* Check if file exists in the cache. */
+    *exist = S3CacheExists(fileSystem, name);
+    if (*exist)
+        return (ret);
 
     /* It's not in the cache, try the S3 bucket. */
-    *exist = S3CacheExists(fileSystem, name);
-    if (!*exist)
-        return (fs->connection->ObjectExists(name, *exist));
-
-    return (0);
+    FS2S3(fileSystem)->statistics.objectExistsCount++;
+    if ((ret = fs->connection->ObjectExists(name, *exist)) != 0)
+        std::cerr << "S3Exist: ObjectExists request to S3 failed." << std::endl;
+    return (ret);
 }
 
 /*
@@ -222,7 +242,6 @@ S3FileClose(WT_FILE_HANDLE *fileHandle, WT_SESSION *session)
     S3_FILE_HANDLE *s3FileHandle = (S3_FILE_HANDLE *)fileHandle;
     S3_STORAGE *storage = s3FileHandle->storage;
     WT_FILE_HANDLE *wtFileHandle = s3FileHandle->wtFileHandle;
-
     /*
      * We require exclusive access to the list of file handles when removing file handles. The
      * lock_guard will be unlocked automatically once the scope is exited.
@@ -232,12 +251,8 @@ S3FileClose(WT_FILE_HANDLE *fileHandle, WT_SESSION *session)
         storage->fhList.remove(s3FileHandle);
     }
     if (wtFileHandle != NULL) {
+        storage->statistics.fhOps++;
         ret = wtFileHandle->close(wtFileHandle, session);
-        if (ret != 0) {
-            free(s3FileHandle->iface.name);
-            free(s3FileHandle);
-            return (ret);
-        }
     }
 
     free(s3FileHandle->iface.name);
@@ -255,9 +270,9 @@ S3Open(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *name,
   WT_FS_OPEN_FILE_TYPE fileType, uint32_t flags, WT_FILE_HANDLE **fileHandlePtr)
 {
     S3_FILE_HANDLE *s3FileHandle;
-    S3_FILE_SYSTEM *s3Fs = (S3_FILE_SYSTEM *)fileSystem;
-    S3_STORAGE *s3 = s3Fs->storage;
-    WT_FILE_SYSTEM *wtFileSystem = s3Fs->wtFileSystem;
+    S3_FILE_SYSTEM *fs = (S3_FILE_SYSTEM *)fileSystem;
+    S3_STORAGE *s3 = fs->storage;
+    WT_FILE_SYSTEM *wtFileSystem = fs->wtFileSystem;
     WT_FILE_HANDLE *wtFileHandle;
     int ret;
 
@@ -282,10 +297,11 @@ S3Open(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *name,
         return (ENOMEM);
 
     /* Make a copy from S3 if the file is not in the cache. */
-    const std::string cachePath = S3Path(s3Fs->cacheDir, name);
+    const std::string cachePath = S3Path(fs->cacheDir, name);
     if (!LocalFileExists(cachePath)) {
-        if ((ret = s3Fs->connection->GetObject(name, cachePath)) != 0) {
-            std::cerr << "ss_open_object: GetObject request to s3 failed" << std::endl;
+        s3->statistics.getObjectCount++;
+        if ((ret = fs->connection->GetObject(name, cachePath)) != 0) {
+            std::cerr << "ss_open_object: GetObject request to S3 failed." << std::endl;
             return (ret);
         }
     }
@@ -294,7 +310,7 @@ S3Open(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *name,
     ret = wtFileSystem->fs_open_file(
       wtFileSystem, session, cachePath.c_str(), fileType, flags, &wtFileHandle);
     if (ret != 0) {
-        std::cerr << "ss_open_objet: open " << name << std::endl;
+        std::cerr << "ss_open_object: fs_open_file failed." << name << std::endl;
         return (ret);
     }
 
@@ -342,10 +358,16 @@ S3Open(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *name,
  *     Read a file using WiredTiger's native file handle read.
  */
 static int
-S3FileRead(WT_FILE_HANDLE *file_handle, WT_SESSION *session, wt_off_t offset, size_t len, void *buf)
+S3FileRead(WT_FILE_HANDLE *fileHandle, WT_SESSION *session, wt_off_t offset, size_t len, void *buf)
 {
-    WT_FILE_HANDLE *wtFileHandle = ((S3_FILE_HANDLE *)file_handle)->wtFileHandle;
-    return (wtFileHandle->fh_read(wtFileHandle, session, offset, len, buf));
+    S3_FILE_HANDLE *s3FileHandle = (S3_FILE_HANDLE *)fileHandle;
+    S3_STORAGE *storage = s3FileHandle->storage;
+    WT_FILE_HANDLE *wtFileHandle = s3FileHandle->wtFileHandle;
+    int ret;
+    storage->statistics.fhReadOps++;
+    if ((ret = wtFileHandle->fh_read(wtFileHandle, session, offset, len, buf)) != 0)
+        std::cerr << "S3FileRead: fh_read failed." << std::endl;
+    return (ret);
 }
 
 /*
@@ -477,6 +499,8 @@ S3ObjectList(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *direct
   const char *prefix, char ***objectList, uint32_t *count)
 {
     S3_FILE_SYSTEM *fs = (S3_FILE_SYSTEM *)fileSystem;
+    S3_STORAGE *s3 = FS2S3(fileSystem);
+
     std::vector<std::string> objects;
     std::string completePrefix;
 
@@ -490,11 +514,14 @@ S3ObjectList(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *direct
         completePrefix += prefix;
 
     int ret;
-    if (ret = fs->connection->ListObjects(completePrefix, objects) != 0)
+    s3->statistics.listObjectsCount++;
+    if ((ret = fs->connection->ListObjects(completePrefix, objects)) != 0) {
+        std::cerr << "S3ObjectList: ListObjects request to S3 failed." << std::endl;
         return (ret);
+    }
     *count = objects.size();
 
-    S3ObjectListAdd(fs->storage, objectList, objects, *count);
+    S3ObjectListAdd(s3, objectList, objects, *count);
 
     return (ret);
 }
@@ -508,6 +535,8 @@ S3ObjectListSingle(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *
   const char *prefix, char ***objectList, uint32_t *count)
 {
     S3_FILE_SYSTEM *fs = (S3_FILE_SYSTEM *)fileSystem;
+    S3_STORAGE *s3 = FS2S3(fileSystem);
+
     std::vector<std::string> objects;
     std::string completePrefix;
 
@@ -521,11 +550,15 @@ S3ObjectListSingle(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *
         completePrefix += prefix;
 
     int ret;
-    if (ret = fs->connection->ListObjects(completePrefix, objects, 1, true) != 0)
+    s3->statistics.listObjectsCount++;
+    if ((ret = fs->connection->ListObjects(completePrefix, objects, 1, true)) != 0) {
+        std::cerr << "S3ObjectListSingle: ListObjects request to S3 failed." << std::endl;
         return (ret);
+    }
+
     *count = objects.size();
 
-    S3ObjectListAdd(fs->storage, objectList, objects, *count);
+    S3ObjectListAdd(s3, objectList, objects, *count);
 
     return (ret);
 }
@@ -617,6 +650,9 @@ S3Terminate(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session)
         S3FileSystemTerminate(&fs->fileSystem, session);
     }
 
+    /* Log collected statistics on termination. */
+    S3ShowStatistics(s3->statistics);
+
     Aws::Utils::Logging::ShutdownAWSLogging();
     Aws::ShutdownAPI(options);
 
@@ -633,7 +669,12 @@ S3Flush(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, WT_FILE_SYSTEM *f
   const char *source, const char *object, const char *config)
 {
     S3_FILE_SYSTEM *fs = (S3_FILE_SYSTEM *)fileSystem;
-    return (fs->connection->PutObject(object, source));
+
+    int ret;
+    FS2S3(fileSystem)->statistics.putObjectCount++;
+    if (ret = (fs->connection->PutObject(object, source)) != 0)
+        std::cerr << "S3Flush: PutObject request to S3 failed." << std::endl;
+    return (ret);
 }
 
 /*
@@ -656,6 +697,22 @@ S3FlushFinish(WT_STORAGE_SOURCE *storage, WT_SESSION *session, WT_FILE_SYSTEM *f
     if (ret == 0)
         ret = chmod(destPath.c_str(), 0444);
     return (ret);
+}
+
+/*
+ * S3ShowStatistics --
+ *     Log collected statistics.
+ */
+static void
+S3ShowStatistics(const S3_STATISTICS &statistics)
+{
+    std::cout << "S3 list objects count: " << statistics.listObjectsCount << std::endl;
+    std::cout << "S3 put object count: " << statistics.putObjectCount << std::endl;
+    std::cout << "S3 get object count: " << statistics.putObjectCount << std::endl;
+    std::cout << "S3 object exists count: " << statistics.objectExistsCount << std::endl;
+
+    std::cout << "Non read/write file handle operations: " << statistics.fhOps << std::endl;
+    std::cout << "File handle read operations: " << statistics.fhReadOps << std::endl;
 }
 
 /*
@@ -684,6 +741,9 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
         free(s3);
         return (ret != 0 ? ret : EINVAL);
     }
+
+    /* Set up statistics. */
+    s3->statistics = {0};
 
     /* Create a logger for this storage source, and then initialize the AWS SDK. */
     Aws::Utils::Logging::InitializeAWSLogging(
