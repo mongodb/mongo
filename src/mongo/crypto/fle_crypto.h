@@ -335,4 +335,167 @@ public:
         ECCDerivedFromDataTokenAndContentionFactorToken token);
 };
 
+
+/**
+ * ESC Collection schema
+ * {
+ *    _id : HMAC(ESCTwiceDerivedTagToken, type || pos )
+ *    value : Encrypt(ESCTwiceDerivedValueToken,  count_type || count)
+ * }
+ *
+ * where
+ *  type = uint64_t
+ *  pos = uint64_t
+ *  count_type = uint64_t
+ *  count = uint64_t
+ *
+ * where type
+ *   0 - null record
+ *   1 - insert record, positional record, or compaction record
+ *
+ * where count_type:
+ *   0 - regular count
+ *   [1, UINT64_MAX) = position
+ *   UINT64_MAX - compaction placeholder
+ *
+ * Record types:
+ *
+ * Document Counts
+ * Null: 0 or 1
+ * Insert: 0 or more
+ * Positional: 0 or more
+ * Compaction: 0 or 1
+ *
+ * Null record:
+ * {
+ *    _id : HMAC(ESCTwiceDerivedTagToken, null )
+ *    value : Encrypt(ESCTwiceDerivedValueToken,  pos || count)
+ * }
+ *
+ * Insert record:
+ * {
+ *    _id : HMAC(ESCTwiceDerivedTagToken, pos )
+ *    value : Encrypt(ESCTwiceDerivedValueToken,  0 || count)
+ * }
+ *
+ * Positional record:
+ * {
+ *    _id : HMAC(ESCTwiceDerivedTagToken, pos )
+ *    value : Encrypt(ESCTwiceDerivedValueToken,  pos' || count)
+ * }
+ *
+ * Compaction placeholder record:
+ * {
+ *    _id : HMAC(ESCTwiceDerivedTagToken, pos )
+ *    value : Encrypt(ESCTwiceDerivedValueToken,  UINT64_MAX || 0)
+ * }
+ *
+ * PlainText of _id
+ * struct {
+ *    uint64_t type;
+ *    uint64_t pos;
+ * }
+ *
+ * PlainText of value
+ * struct {
+ *    uint64_t count_type;
+ *    uint64_t count;
+ * }
+ */
+
+
+struct ESCNullDocument {
+    // Id is not included as it is HMAC generated and cannot be reversed
+    uint64_t pos;
+    uint64_t count;
+};
+
+
+struct ESCDocument {
+    // Id is not included as it is HMAC generated and cannot be reversed
+    bool compactionPlaceholder;
+    uint64_t position;
+    uint64_t count;
+};
+
+
+/**
+ * Interface for reading from a collection for the "EmuBinary" algorithm
+ */
+class FLEStateCollectionReader {
+public:
+    virtual ~FLEStateCollectionReader() = default;
+
+    /**
+     * Get a count of documents in the collection.
+     *
+     * TODO - how perfect does it need to be ? Is too high or too low ok if it is just an estimate?
+     */
+    virtual uint64_t getDocumentCount() = 0;
+
+    /**
+     * Get a document by its _id.
+     */
+    virtual BSONObj getById(PrfBlock block) = 0;
+};
+
+class ESCCollection {
+public:
+    /**
+     * Generate the _id value
+     */
+    static PrfBlock generateId(ESCTwiceDerivedTagToken tagToken, boost::optional<uint64_t> index);
+
+    /**
+     * Generate a null document which will be the "first" document for a given field.
+     */
+    static BSONObj generateNullDocument(ESCTwiceDerivedTagToken tagToken,
+                                        ESCTwiceDerivedValueToken valueToken,
+                                        uint64_t pos,
+                                        uint64_t count);
+
+    /**
+     * Generate a insert ESC document.
+     */
+    static BSONObj generateInsertDocument(ESCTwiceDerivedTagToken tagToken,
+                                          ESCTwiceDerivedValueToken valueToken,
+                                          uint64_t index,
+                                          uint64_t count);
+
+    /**
+     * Generate a positional ESC document.
+     */
+    static BSONObj generatePositionalDocument(ESCTwiceDerivedTagToken tagToken,
+                                              ESCTwiceDerivedValueToken valueToken,
+                                              uint64_t index,
+                                              uint64_t pos,
+                                              uint64_t count);
+
+    /**
+     * Generate a compaction placeholder ESC document.
+     */
+    static BSONObj generateCompactionPlaceholderDocument(ESCTwiceDerivedTagToken tagToken,
+                                                         ESCTwiceDerivedValueToken valueToken,
+                                                         uint64_t index);
+
+    /**
+     * Decrypt the null document.
+     */
+    static StatusWith<ESCNullDocument> decryptNullDocument(ESCTwiceDerivedValueToken valueToken,
+                                                           BSONObj& doc);
+
+    /**
+     * Decrypt a regular document.
+     */
+    static StatusWith<ESCDocument> decryptDocument(ESCTwiceDerivedValueToken valueToken,
+                                                   BSONObj& doc);
+
+    /**
+     * Search for the highest document id for a given field/value pair based on the token.
+     */
+    static uint64_t emuBinary(FLEStateCollectionReader* reader,
+                              ESCTwiceDerivedTagToken tagToken,
+                              ESCTwiceDerivedValueToken valueToken);
+};
+
 }  // namespace mongo

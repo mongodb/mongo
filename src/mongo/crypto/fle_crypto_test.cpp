@@ -118,6 +118,9 @@ constexpr auto kUserKeyId = "ABCDEFAB-1234-9876-1234-123456789012"_sd;
 static UUID indexKeyId = uassertStatusOK(UUID::parse(kIndexKeyId.toString()));
 static UUID userKeyId = uassertStatusOK(UUID::parse(kUserKeyId.toString()));
 
+std::vector<char> testValue = {0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19};
+std::vector<char> testValue2 = {0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29};
+
 TEST(FLETokens, TestVectors) {
 
 
@@ -229,5 +232,185 @@ TEST(FLETokens, TestVectors) {
                       "2d7e08d58afa9f5ad215636e566d38584cbb48467d1bc9ff376eeca01fbfda6f"_sd)),
                   eccTwiceValueToken);
 }
+
+
+TEST(FLE_ESC, RoundTrip) {
+
+    ConstDataRange value(testValue);
+
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey);
+    auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
+
+    ESCDerivedFromDataToken escDatakey =
+        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+
+    ESCDerivedFromDataTokenAndContentionFactorToken escDataCounterkey =
+        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
+            generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, 0);
+
+    auto escTwiceTag =
+        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escDataCounterkey);
+    auto escTwiceValue =
+        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escDataCounterkey);
+
+
+    {
+        BSONObj doc =
+            ESCCollection::generateNullDocument(escTwiceTag, escTwiceValue, 123, 123456789);
+        auto swDoc = ESCCollection::decryptNullDocument(escTwiceValue, doc);
+        ASSERT_OK(swDoc.getStatus());
+        ASSERT_EQ(swDoc.getValue().pos, 123);
+        ASSERT_EQ(swDoc.getValue().count, 123456789);
+    }
+
+
+    {
+        BSONObj doc =
+            ESCCollection::generateInsertDocument(escTwiceTag, escTwiceValue, 123, 123456789);
+        auto swDoc = ESCCollection::decryptDocument(escTwiceValue, doc);
+        ASSERT_OK(swDoc.getStatus());
+        ASSERT_EQ(swDoc.getValue().compactionPlaceholder, false);
+        ASSERT_EQ(swDoc.getValue().position, 0);
+        ASSERT_EQ(swDoc.getValue().count, 123456789);
+    }
+
+    {
+        BSONObj doc = ESCCollection::generatePositionalDocument(
+            escTwiceTag, escTwiceValue, 123, 456789, 123456789);
+        auto swDoc = ESCCollection::decryptDocument(escTwiceValue, doc);
+        ASSERT_OK(swDoc.getStatus());
+        ASSERT_EQ(swDoc.getValue().compactionPlaceholder, false);
+        ASSERT_EQ(swDoc.getValue().position, 456789);
+        ASSERT_EQ(swDoc.getValue().count, 123456789);
+    }
+
+    {
+        BSONObj doc =
+            ESCCollection::generateCompactionPlaceholderDocument(escTwiceTag, escTwiceValue, 123);
+        auto swDoc = ESCCollection::decryptDocument(escTwiceValue, doc);
+        ASSERT_OK(swDoc.getStatus());
+        ASSERT_EQ(swDoc.getValue().compactionPlaceholder, true);
+        ASSERT_EQ(swDoc.getValue().position, std::numeric_limits<uint64_t>::max());
+        ASSERT_EQ(swDoc.getValue().count, 0);
+    }
+}
+
+
+class TestDocumentCollection : public FLEStateCollectionReader {
+public:
+    void insert(BSONObj& obj) {
+        dassert(obj.firstElement().fieldNameStringData() == "_id"_sd);
+        _docs.push_back(obj);
+        // shuffle?
+        // std::sort(_docs.begin(), _docs.end());
+    }
+
+    BSONObj getById(PrfBlock id) override {
+        for (const auto& doc : _docs) {
+            auto el = doc.firstElement();
+            int len;
+            auto p = el.binData(len);
+            ASSERT_EQ(len, sizeof(PrfBlock));
+
+            if (memcmp(p, id.data(), sizeof(PrfBlock)) == 0) {
+                return doc;
+            }
+        }
+
+        return BSONObj();
+    }
+
+    uint64_t getDocumentCount() override {
+        return _docs.size();
+    }
+
+private:
+    std::vector<BSONObj> _docs;
+};
+
+// Test one new field in esc
+TEST(FLE_ESC, EmuBinary) {
+
+    TestDocumentCollection coll;
+    ConstDataRange value(testValue);
+
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey);
+    auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
+
+    ESCDerivedFromDataToken escDatakey =
+        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+
+    auto escDerivedToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
+        generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, 0);
+
+    auto escTwiceTag =
+        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escDerivedToken);
+    auto escTwiceValue =
+        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escDerivedToken);
+
+    for (int j = 1; j <= 5; j++) {
+        BSONObj doc = ESCCollection::generateInsertDocument(escTwiceTag, escTwiceValue, j, j);
+        coll.insert(doc);
+    }
+
+    uint64_t i = ESCCollection::emuBinary(&coll, escTwiceTag, escTwiceValue);
+
+    std::cout << "i: " << i << std::endl;
+    ASSERT_EQ(i, 5);
+}
+
+
+// Test two new fields in esc
+TEST(FLE_ESC, EmuBinary2) {
+
+    TestDocumentCollection coll;
+    ConstDataRange value(testValue);
+
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey);
+    auto escToken = FLECollectionTokenGenerator::generateESCToken(c1);
+
+
+    ESCDerivedFromDataToken escDatakey2 =
+        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, testValue2);
+
+    auto escDerivedToken2 = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
+        generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey2, 0);
+
+    auto escTwiceTag2 =
+        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escDerivedToken2);
+    auto escTwiceValue2 =
+        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escDerivedToken2);
+
+    for (int j = 1; j <= 5; j++) {
+        BSONObj doc = ESCCollection::generateInsertDocument(escTwiceTag2, escTwiceValue2, j, j);
+        coll.insert(doc);
+    }
+
+    ESCDerivedFromDataToken escDatakey =
+        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+
+    auto escDerivedToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
+        generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, 0);
+
+    auto escTwiceTag =
+        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escDerivedToken);
+    auto escTwiceValue =
+        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escDerivedToken);
+
+
+    for (int j = 1; j <= 13; j++) {
+        BSONObj doc = ESCCollection::generateInsertDocument(escTwiceTag, escTwiceValue, j, j);
+        coll.insert(doc);
+    }
+
+    uint64_t i = ESCCollection::emuBinary(&coll, escTwiceTag, escTwiceValue);
+
+    ASSERT_EQ(i, 13);
+
+    i = ESCCollection::emuBinary(&coll, escTwiceTag2, escTwiceValue2);
+
+    ASSERT_EQ(i, 5);
+}
+
 
 }  // namespace mongo
