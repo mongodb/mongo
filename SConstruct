@@ -2515,10 +2515,14 @@ if env.TargetOSIs('posix'):
     if has_option( "gcov" ):
         if not (env.TargetOSIs('linux') and env.ToolchainIs('gcc')):
             # TODO: This should become supported under: https://jira.mongodb.org/browse/SERVER-49877
-            env.FatalError("Coverage option 'gcov' is currently only supported on linux with gcc. See SERVER-49877.")
+            # TODO SERVER-63055: clang is not supported due to consistent
+            # failures in ValidateCollections when using gcov.
+            env.FatalError("Coverage option 'gcov' is currently only supported on linux with gcc. See SERVER-49877 and SERVER-63055.")
 
-        env.Append( CCFLAGS=["-fprofile-arcs", "-ftest-coverage", "-fprofile-update=single"] )
-        env.Append( LINKFLAGS=["-fprofile-arcs", "-ftest-coverage", "-fprofile-update=single"] )
+        env.AppendUnique(
+            CCFLAGS=['--coverage'],
+            LINKFLAGS=['--coverage'],
+        )
 
     if optBuild and not optBuildForSize:
         env.Append( CCFLAGS=["-O3" if "O3" in selected_experimental_optimizations else "-O2"] )
@@ -2935,6 +2939,9 @@ def doConfigure(myenv):
         else:
             if not AddToLINKFLAGSIfSupported(myenv, f'-fuse-ld={linker_ld}'):
                 myenv.FatalError(f"Linker {linker_ld} could not be configured.")
+
+        if has_option('gcov') and AddToCCFLAGSIfSupported(myenv, '-fprofile-update=single'):
+            myenv.AppendUnique(LINKFLAGS=['-fprofile-update=single'])
 
     detectCompiler = Configure(myenv, help=False, custom_tests = {
         'CheckForCXXLink': CheckForCXXLink,
