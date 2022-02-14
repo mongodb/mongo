@@ -900,12 +900,22 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     auto fieldSlotIds = _slotIdGenerator.generateMultiple(csn->fields.size());
+    auto internalSlotId = _slotIdGenerator.generate();
+    auto emptyExpr = sbe::makeE<sbe::EFunction>("newObj", sbe::EExpression::Vector{});
+    std::vector<std::unique_ptr<sbe::EExpression>> pathExprs;
+    for (size_t idx = 0; idx < csn->fields.size(); ++idx) {
+        pathExprs.emplace_back(emptyExpr->clone());
+    }
+
     auto stage = std::make_unique<sbe::ColumnScanStage>(_collections.getMainCollection()->uuid(),
                                                         csn->indexEntry.catalogName,
                                                         fieldSlotIds,
                                                         csn->fields,
                                                         recordSlot,
                                                         ridSlot,
+                                                        std::move(emptyExpr),
+                                                        std::move(pathExprs),
+                                                        internalSlotId,
                                                         _yieldPolicy,
                                                         csn->nodeId());
 

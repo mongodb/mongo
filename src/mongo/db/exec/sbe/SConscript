@@ -109,6 +109,7 @@ env.Library(
         ],
     LIBDEPS=[
         'query_sbe',
+        'query_sbe_abt',
         'query_sbe_storage'
         ]
     )

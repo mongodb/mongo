@@ -18,6 +18,7 @@ if (!isSBEEnabled) {
 
 const testDB = db;
 const coll = db.column_index_skeleton;
+coll.drop();
 
 assert.commandWorked(coll.insert({a: 1}));
 
@@ -28,8 +29,8 @@ try {
     const expl = coll.find({}, {a: 1}).explain();
     assert(planHasStage(db, expl, "COLUMN_IXSCAN"));
 
-    // Run a query (should return nothing).
-    assert.eq(coll.find({}, {a: 1}).itcount(), 0);
+    // Run a query.
+    assert.eq(coll.find({}, {a: 1}).itcount(), 1);
 } finally {
     failPoint.off();
 }

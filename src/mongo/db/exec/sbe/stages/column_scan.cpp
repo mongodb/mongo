@@ -41,6 +41,9 @@ ColumnScanStage::ColumnScanStage(UUID collectionUuid,
                                  std::vector<std::string> paths,
                                  boost::optional<value::SlotId> recordSlot,
                                  boost::optional<value::SlotId> recordIdSlot,
+                                 std::unique_ptr<EExpression> recordExpr,
+                                 std::vector<std::unique_ptr<EExpression>> pathExprs,
+                                 value::SlotId rowStoreSlot,
                                  PlanYieldPolicy* yieldPolicy,
                                  PlanNodeId nodeId)
     : PlanStage("columnscan"_sd, yieldPolicy, nodeId),
@@ -49,17 +52,28 @@ ColumnScanStage::ColumnScanStage(UUID collectionUuid,
       _fieldSlots(std::move(fieldSlots)),
       _paths(std::move(paths)),
       _recordSlot(recordSlot),
-      _recordIdSlot(recordIdSlot) {
+      _recordIdSlot(recordIdSlot),
+      _recordExpr(std::move(recordExpr)),
+      _pathExprs(std::move(pathExprs)),
+      _rowStoreSlot(rowStoreSlot) {
     invariant(_fieldSlots.size() == _paths.size());
+    invariant(_fieldSlots.size() == _pathExprs.size());
 }
 
 std::unique_ptr<PlanStage> ColumnScanStage::clone() const {
+    std::vector<std::unique_ptr<EExpression>> pathExprs;
+    for (auto& expr : _pathExprs) {
+        pathExprs.emplace_back(expr->clone());
+    }
     return std::make_unique<ColumnScanStage>(_collUuid,
                                              _columnIndexName,
                                              _fieldSlots,
                                              _paths,
                                              _recordSlot,
                                              _recordIdSlot,
+                                             _recordExpr ? _recordExpr->clone() : nullptr,
+                                             std::move(pathExprs),
+                                             _rowStoreSlot,
                                              _yieldPolicy,
                                              _commonStats.nodeId);
 }
@@ -79,6 +93,16 @@ void ColumnScanStage::prepare(CompileCtx& ctx) {
         _recordIdAccessor = std::make_unique<value::OwnedValueAccessor>();
     }
 
+    _rowStoreAccessor = std::make_unique<value::OwnedValueAccessor>();
+    if (_recordExpr) {
+        ctx.root = this;
+        _recordExprCode = _recordExpr->compile(ctx);
+    }
+    for (auto& expr : _pathExprs) {
+        ctx.root = this;
+        _pathExprsCode.emplace_back(expr->compile(ctx));
+    }
+
     tassert(6298602, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
     std::tie(_coll, _collName, _catalogEpoch) = acquireCollection(_opCtx, _collUuid);
 }
@@ -94,6 +118,10 @@ value::SlotAccessor* ColumnScanStage::getAccessor(CompileCtx& ctx, value::SlotId
 
     if (auto it = _outputFieldsMap.find(slot); it != _outputFieldsMap.end()) {
         return it->second;
+    }
+
+    if (_rowStoreSlot == slot) {
+        return _rowStoreAccessor.get();
     }
     return ctx.getAccessor(slot);
 }
@@ -195,9 +223,44 @@ PlanState ColumnScanStage::getNext() {
     // '_needsToCheckCappedPositionLost'.
     checkForInterrupt(_opCtx);
 
+    auto nextRecord = _cursor->next();
     _firstGetNext = false;
 
-    return trackPlanState(PlanState::IS_EOF);
+    if (!nextRecord) {
+        return trackPlanState(PlanState::IS_EOF);
+    }
+
+    if (_recordIdAccessor) {
+        _recordId = nextRecord->id;
+        _recordIdAccessor->reset(
+            false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_recordId));
+    }
+
+    _rowStoreAccessor->reset(false,
+                             value::TypeTags::bsonObject,
+                             value::bitcastFrom<const char*>(nextRecord->data.data()));
+
+    if (_recordExpr) {
+        auto [owned, tag, val] = _bytecode.run(_recordExprCode.get());
+        _recordAccessor->reset(owned, tag, val);
+    }
+
+    for (size_t idx = 0; idx < _outputFields.size(); ++idx) {
+        auto [owned, tag, val] = _bytecode.run(_pathExprsCode[idx].get());
+        _outputFields[idx].reset(owned, tag, val);
+    }
+
+    ++_specificStats.numReads;
+    if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumReads>(1)) {
+        // If we're collecting execution stats during multi-planning and reached the end of the
+        // trial period because we've performed enough physical reads, bail out from the trial run
+        // by raising a special exception to signal a runtime planner that this candidate plan has
+        // completed its trial run early. Note that a trial period is executed only once per a
+        // PlanStage tree, and once completed never run again on the same tree.
+        _tracker = nullptr;
+        uasserted(ErrorCodes::QueryTrialRunCompleted, "Trial run early exit in scan");
+    }
+    return trackPlanState(PlanState::ADVANCED);
 }
 
 void ColumnScanStage::close() {

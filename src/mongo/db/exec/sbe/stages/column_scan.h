@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/config.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 
@@ -47,6 +48,9 @@ public:
                     std::vector<std::string> paths,
                     boost::optional<value::SlotId> recordSlot,
                     boost::optional<value::SlotId> recordIdSlot,
+                    std::unique_ptr<EExpression> internalExpr,
+                    std::vector<std::unique_ptr<EExpression>> pathExprs,
+                    value::SlotId internalSlot,
                     PlanYieldPolicy* yieldPolicy,
                     PlanNodeId nodeId);
 
@@ -80,10 +84,23 @@ private:
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;
 
+    // An optional expression used to reconstruct the output document.
+    const std::unique_ptr<EExpression> _recordExpr;
+    // Expressions to get values from the row store document.
+    const std::vector<std::unique_ptr<EExpression>> _pathExprs;
+    // An internal slot that points to the row store document.
+    const value::SlotId _rowStoreSlot;
+
     std::vector<value::OwnedValueAccessor> _outputFields;
     value::SlotAccessorMap _outputFieldsMap;
     std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
     std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
+
+    std::unique_ptr<vm::CodeFragment> _recordExprCode;
+    std::vector<std::unique_ptr<vm::CodeFragment>> _pathExprsCode;
+    std::unique_ptr<value::OwnedValueAccessor> _rowStoreAccessor;
+
+    vm::ByteCode _bytecode;
 
     // These members are default constructed to boost::none and are initialized when 'prepare()'
     // is called. Once they are set, they are never modified again.
@@ -93,6 +110,8 @@ private:
     CollectionPtr _coll;
 
     std::unique_ptr<SeekableRecordCursor> _cursor;
+
+    RecordId _recordId;
 
     bool _open{false};
     bool _firstGetNext{false};

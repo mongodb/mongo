@@ -34,6 +34,7 @@
 
 #include <charconv>
 
+#include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/column_scan.h"
@@ -53,6 +54,8 @@
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
+#include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/query/optimizer/rewrites/path_lower.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 
@@ -378,7 +381,9 @@ void Parser::walkIdentList(AstQuery& ast) {
 
 void Parser::walkStringList(AstQuery& ast) {
     for (auto& node : ast.nodes) {
-        ast.identifiers.emplace_back(std::move(node->token));
+        auto str = node->token;
+        // Drop quotes.
+        ast.identifiers.emplace_back(str = str.substr(1, str.size() - 2));
     }
 }
 
@@ -951,6 +956,83 @@ void Parser::walkIndexSeek(AstQuery& ast) {
                                       getCurrentPlanNodeId());
 }
 
+namespace {
+struct StringTreeNode {
+    std::string value;
+    std::vector<StringTreeNode> children;
+
+    void append(const FieldRef& fr, size_t level) {
+        if (level < fr.numParts()) {
+            auto part = fr.getPart(level);
+            for (auto& child : children) {
+                if (child.value == part) {
+                    child.append(fr, level + 1);
+                    return;
+                }
+            }
+            children.emplace_back(StringTreeNode{part.toString()}).append(fr, level + 1);
+        }
+    }
+
+    bool isLeaf() const {
+        return children.empty();
+    }
+
+    // Convert a tree into ABT.
+    // example: paths "a.b" and "a.c" are transalted to:
+    //
+    // Field "a" * Keep "a"
+    //   |
+    //   Traverse
+    //     |
+    //     Obj * Keep "b", "c"
+    optimizer::ABT convertToABT(size_t level) {
+        // ABT is built bottom up.
+        // Non-root level requires Obj as it must operate only on objects. The top level is
+        // guaranteed to be an object so we do not need to check for it.
+        auto result = level ? optimizer::make<optimizer::PathObj>()
+                            : optimizer::make<optimizer::PathIdentity>();
+
+        // Stich together a vector of ABTs by using PathComposeM if needed.
+        optimizer::PathKeep::NameSet keepNames;
+        for (auto& child : children) {
+            if (!child.isLeaf()) {
+                optimizer::maybeComposePath(result, child.convertToABT(level + 1));
+            }
+            keepNames.insert(child.value);
+        }
+
+        // Keep only referenced fields.
+        optimizer::maybeComposePath(result, optimizer::make<optimizer::PathKeep>(keepNames));
+
+        if (level) {
+            result = optimizer::make<optimizer::PathField>(
+                value, optimizer::make<optimizer::PathTraverse>(std::move(result)));
+        }
+
+        return result;
+    }
+};
+
+std::unique_ptr<EExpression> abtToExpr(optimizer::ABT& abt, optimizer::SlotVarMap& slotMap) {
+    auto env = optimizer::VariableEnvironment::build(abt);
+
+    optimizer::PrefixId prefixId;
+    // Convert paths into ABT expressions.
+    optimizer::EvalPathLowering pathLower{prefixId, env};
+    pathLower.optimize(abt);
+
+    // Run the constant folding to eliminate lambda applications as they are not directly
+    // supported by the SBE VM.
+    optimizer::ConstEval constEval{env};
+    constEval.optimize(abt);
+
+    // And finally convert to the SBE expression.
+    optimizer::SBEExpressionLowering exprLower{env, slotMap};
+    return exprLower.optimize(abt);
+}
+}  // namespace
+
 void Parser::walkColumnScan(AstQuery& ast) {
     walkChildren(ast);
 
@@ -961,12 +1043,54 @@ void Parser::walkColumnScan(AstQuery& ast) {
     auto collName = ast.nodes[4]->identifier;
     auto indexName = ast.nodes[5]->identifier;
 
+    // Merge all path strings into a tree.
+    StringTreeNode pathTree;
+    for (auto& path : paths) {
+        FieldRef fr{path};
+        pathTree.append(fr, 0);
+    }
+
+    // Generate some unique-ish string.
+    auto rowStoreInput = std::string{"internal"} + std::to_string(ast.position);
+    auto rowStoreSlot = *lookupSlot(rowStoreInput);
+    optimizer::SlotVarMap slotMap{};
+    slotMap[rowStoreInput] = rowStoreSlot;
+
+    // Generate expression that reconstructs the whole object (runs against the row store bson for
+    // now).
+    auto evalPath = optimizer::make<optimizer::EvalPath>(
+        pathTree.convertToABT(0), optimizer::make<optimizer::Variable>(rowStoreInput));
+
+    auto evalPathExpr = abtToExpr(evalPath, slotMap);
+
+    // Generate expressions for individual paths (also run against the row store for now).
+    // example: path "a.b.c." is transalted to:
+    // Get "a" Traverse Get "b" Traverse Get "c" Id
+    std::vector<std::unique_ptr<EExpression>> pathExprs;
+    for (auto& path : paths) {
+        FieldRef fr{path};
+        auto temp = optimizer::make<optimizer::PathIdentity>();
+        for (size_t idx = fr.numParts(); idx-- > 0;) {
+            temp = optimizer::make<optimizer::PathGet>(fr.getPart(idx).toString(), std::move(temp));
+            if (idx) {
+                temp = optimizer::make<optimizer::PathTraverse>(std::move(temp));
+            }
+        }
+        auto evalPath = optimizer::make<optimizer::EvalPath>(
+            std::move(temp), optimizer::make<optimizer::Variable>(rowStoreInput));
+
+        pathExprs.emplace_back(abtToExpr(evalPath, slotMap));
+    }
+
     ast.stage = makeS<ColumnScanStage>(getCollectionUuid(collName),
                                        indexName,
                                        std::move(outputs),
                                        std::move(paths),
                                        record,
                                        recordId,
+                                       std::move(evalPathExpr),
+                                       std::move(pathExprs),
+                                       rowStoreSlot,
                                        nullptr,
                                        getCurrentPlanNodeId());
 }
