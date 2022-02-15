@@ -263,6 +263,18 @@ StatusWith<std::vector<uint8_t>> decryptData(ConstDataRange key, ConstDataRange 
 }
 
 
+StatusWith<uint64_t> decryptUInt64(ConstDataRange key, ConstDataRange cipherText) {
+    auto swPlainText = decryptData(key, cipherText);
+    if (!swPlainText.isOK()) {
+        return swPlainText.getStatus();
+    }
+
+    ConstDataRange cdr(swPlainText.getValue());
+
+    return cdr.readNoThrow<LittleEndian<uint64_t>>();
+}
+
+
 template <typename T>
 struct FLEStoragePackTypeHelper;
 
@@ -660,6 +672,122 @@ uint64_t ESCCollection::emuBinary(FLEStateCollectionReader* reader,
                                   ESCTwiceDerivedTagToken tagToken,
                                   ESCTwiceDerivedValueToken valueToken) {
     return emuBinaryCommon<ESCCollection, ESCTwiceDerivedTagToken, ESCTwiceDerivedValueToken>(
+        reader, tagToken, valueToken);
+}
+
+
+PrfBlock ECCCollection::generateId(ECCTwiceDerivedTagToken tagToken,
+                                   boost::optional<uint64_t> index) {
+    if (index.has_value()) {
+        return prf(tagToken.data, kECCNonNullId, index.value());
+    } else {
+        return prf(tagToken.data, kECCNullId, 0);
+    }
+}
+
+BSONObj ECCCollection::generateNullDocument(ECCTwiceDerivedTagToken tagToken,
+                                            ECCTwiceDerivedValueToken valueToken,
+                                            uint64_t count) {
+    auto block = ECCCollection::generateId(tagToken, boost::none);
+
+    auto swCipherText = encryptData(valueToken.data, count);
+    uassertStatusOK(swCipherText);
+
+    BSONObjBuilder builder;
+    toBinData(kId, block, &builder);
+    toBinData(kValue, swCipherText.getValue(), &builder);
+
+    return builder.obj();
+}
+
+BSONObj ECCCollection::generateDocument(ECCTwiceDerivedTagToken tagToken,
+                                        ECCTwiceDerivedValueToken valueToken,
+                                        uint64_t index,
+                                        uint64_t start,
+                                        uint64_t end) {
+    auto block = ECCCollection::generateId(tagToken, index);
+
+    auto swCipherText = packAndEncrypt(std::tie(start, end), valueToken);
+    uassertStatusOK(swCipherText);
+
+    BSONObjBuilder builder;
+    toBinData(kId, block, &builder);
+    toBinData(kValue, swCipherText.getValue(), &builder);
+
+    return builder.obj();
+}
+
+BSONObj ECCCollection::generateDocument(ECCTwiceDerivedTagToken tagToken,
+                                        ECCTwiceDerivedValueToken valueToken,
+                                        uint64_t index,
+                                        uint64_t count) {
+    return generateDocument(tagToken, valueToken, index, count, count);
+}
+
+BSONObj ECCCollection::generateCompactionDocument(ECCTwiceDerivedTagToken tagToken,
+                                                  ECCTwiceDerivedValueToken valueToken,
+                                                  uint64_t index) {
+    auto block = ECCCollection::generateId(tagToken, index);
+
+    auto swCipherText =
+        packAndEncrypt(std::tie(kECCompactionRecordValue, kECCompactionRecordValue), valueToken);
+    uassertStatusOK(swCipherText);
+
+    BSONObjBuilder builder;
+    toBinData(kId, block, &builder);
+    toBinData(kValue, swCipherText.getValue(), &builder);
+
+    return builder.obj();
+}
+
+
+StatusWith<ECCNullDocument> ECCCollection::decryptNullDocument(ECCTwiceDerivedValueToken valueToken,
+                                                               BSONObj& doc) {
+    BSONElement encryptedValue;
+    auto status = bsonExtractTypedField(doc, kValue, BinData, &encryptedValue);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    auto swUnpack = decryptUInt64(valueToken.data, binDataToCDR(encryptedValue));
+
+    if (!swUnpack.isOK()) {
+        return swUnpack.getStatus();
+    }
+
+    auto& value = swUnpack.getValue();
+
+    return ECCNullDocument{value};
+}
+
+
+StatusWith<ECCDocument> ECCCollection::decryptDocument(ECCTwiceDerivedValueToken valueToken,
+                                                       BSONObj& doc) {
+    BSONElement encryptedValue;
+    auto status = bsonExtractTypedField(doc, kValue, BinData, &encryptedValue);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    auto swUnpack = decryptAndUnpack<uint64_t, uint64_t>(binDataToCDR(encryptedValue), valueToken);
+
+    if (!swUnpack.isOK()) {
+        return swUnpack.getStatus();
+    }
+
+    auto& value = swUnpack.getValue();
+
+    return ECCDocument{std::get<0>(value) != kECCompactionRecordValue
+                           ? ECCValueType::kNormal
+                           : ECCValueType::kCompactionPlaceholder,
+                       std::get<0>(value),
+                       std::get<1>(value)};
+}
+
+uint64_t ECCCollection::emuBinary(FLEStateCollectionReader* reader,
+                                  ECCTwiceDerivedTagToken tagToken,
+                                  ECCTwiceDerivedValueToken valueToken) {
+    return emuBinaryCommon<ECCCollection, ECCTwiceDerivedTagToken, ECCTwiceDerivedValueToken>(
         reader, tagToken, valueToken);
 }
 

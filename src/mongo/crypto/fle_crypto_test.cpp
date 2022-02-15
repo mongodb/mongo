@@ -296,6 +296,60 @@ TEST(FLE_ESC, RoundTrip) {
 }
 
 
+TEST(FLE_ECC, RoundTrip) {
+
+    ConstDataRange value(testValue);
+
+    auto c1 = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey);
+    auto token = FLECollectionTokenGenerator::generateECCToken(c1);
+
+    ECCDerivedFromDataToken datakey =
+        FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(token, value);
+
+    ECCDerivedFromDataTokenAndContentionFactorToken dataCounterkey =
+        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
+            generateECCDerivedFromDataTokenAndContentionFactorToken(datakey, 0);
+
+    auto twiceTag = FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedTagToken(dataCounterkey);
+    auto twiceValue =
+        FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedValueToken(dataCounterkey);
+
+
+    {
+        BSONObj doc = ECCCollection::generateNullDocument(twiceTag, twiceValue, 123456789);
+        auto swDoc = ECCCollection::decryptNullDocument(twiceValue, doc);
+        ASSERT_OK(swDoc.getStatus());
+        ASSERT_EQ(swDoc.getValue().pos, 123456789);
+    }
+
+
+    {
+        BSONObj doc = ECCCollection::generateDocument(twiceTag, twiceValue, 123, 123456789);
+        auto swDoc = ECCCollection::decryptDocument(twiceValue, doc);
+        ASSERT_OK(swDoc.getStatus());
+        ASSERT(swDoc.getValue().valueType == ECCValueType::kNormal);
+        ASSERT_EQ(swDoc.getValue().start, 123456789);
+        ASSERT_EQ(swDoc.getValue().end, 123456789);
+    }
+
+    {
+        BSONObj doc =
+            ECCCollection::generateDocument(twiceTag, twiceValue, 123, 123456789, 983456789);
+        auto swDoc = ECCCollection::decryptDocument(twiceValue, doc);
+        ASSERT_OK(swDoc.getStatus());
+        ASSERT(swDoc.getValue().valueType == ECCValueType::kNormal);
+        ASSERT_EQ(swDoc.getValue().start, 123456789);
+        ASSERT_EQ(swDoc.getValue().end, 983456789);
+    }
+
+    {
+        BSONObj doc = ECCCollection::generateCompactionDocument(twiceTag, twiceValue, 123456789);
+        auto swDoc = ECCCollection::decryptDocument(twiceValue, doc);
+        ASSERT_OK(swDoc.getStatus());
+        ASSERT(swDoc.getValue().valueType == ECCValueType::kCompactionPlaceholder);
+    }
+}
+
 class TestDocumentCollection : public FLEStateCollectionReader {
 public:
     void insert(BSONObj& obj) {

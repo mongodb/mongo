@@ -498,4 +498,151 @@ public:
                               ESCTwiceDerivedValueToken valueToken);
 };
 
+
+/**
+ * ECC Collection
+ * - a record of deleted documents
+ *
+ * {
+ *    _id : HMAC(ECCTwiceDerivedTagToken, type || pos )
+ *    value : Encrypt(ECCTwiceDerivedValueToken,  count OR start || end)
+ * }
+ *
+ * where
+ *  type = uint64_t
+ *  pos = uint64_t
+ *  value is either:
+ *       count = uint64_t  // Null records
+ *    OR
+ *       start = uint64_t  // Other records
+ *       end = uint64_t
+ *
+ * where type:
+ *   0 - null record
+ *   1 - regular record or compaction record
+ *
+ * where start and end:
+ *   [0..UINT_64_MAX) - regular start and end
+ *   UINT64_MAX - compaction placeholder
+ *
+ * Record types:
+ *
+ * Document Counts
+ * Null: 0 or 1
+ * Regular: 0 or more
+ * Compaction: 0 or 1
+ *
+ * Null record:
+ * {
+ *    _id : HMAC(ECCTwiceDerivedTagToken, null )
+ *    value : Encrypt(ECCTwiceDerivedValueToken,  count)
+ * }
+ *
+ * Regular record:
+ * {
+ *    _id : HMAC(ECCTwiceDerivedTagToken, pos )
+ *    value : Encrypt(ECCTwiceDerivedValueToken,  start || end)
+ * }
+ *
+ * Compaction placeholder record:
+ * {
+ *    _id : HMAC(ECCTwiceDerivedTagToken, pos )
+ *    value : Encrypt(ECCTwiceDerivedValueToken,  UINT64_MAX || UINT64_MAX)
+ * }
+ *
+ * PlainText of tag
+ * struct {
+ *    uint64_t type;
+ *    uint64_t pos;
+ * }
+ *
+ * PlainText of value for null records
+ * struct {
+ *    uint64_t count;
+ * }
+ *
+ * PlainText of value for non-null records
+ * struct {
+ *    uint64_t start;
+ *    uint64_t end;
+ * }
+ */
+enum class ECCValueType : uint64_t {
+    kNormal = 0,
+    kCompactionPlaceholder = 1,
+};
+
+
+struct ECCNullDocument {
+    // Id is not included as it HMAC generated and cannot be reversed
+    uint64_t pos;
+};
+
+
+struct ECCDocument {
+    // Id is not included as it HMAC generated and cannot be reversed
+    ECCValueType valueType;
+    uint64_t start;
+    uint64_t end;
+};
+
+class ECCCollection {
+public:
+    /**
+     * Generate the _id value
+     */
+    static PrfBlock generateId(ECCTwiceDerivedTagToken tagToken, boost::optional<uint64_t> index);
+
+    /**
+     * Generate a null document which will be the "first" document for a given field.
+     */
+    static BSONObj generateNullDocument(ECCTwiceDerivedTagToken tagToken,
+                                        ECCTwiceDerivedValueToken valueToken,
+                                        uint64_t count);
+
+    /**
+     * Generate a regular ECC document for (count).
+     *
+     * Note: it is stored as (count, count)
+     */
+    static BSONObj generateDocument(ECCTwiceDerivedTagToken tagToken,
+                                    ECCTwiceDerivedValueToken valueToken,
+                                    uint64_t index,
+                                    uint64_t count);
+
+    /**
+     * Generate a regular ECC document for (start, end)
+     */
+    static BSONObj generateDocument(ECCTwiceDerivedTagToken tagToken,
+                                    ECCTwiceDerivedValueToken valueToken,
+                                    uint64_t index,
+                                    uint64_t start,
+                                    uint64_t end);
+
+    /**
+     * Generate a compaction ECC document.
+     */
+    static BSONObj generateCompactionDocument(ECCTwiceDerivedTagToken tagToken,
+                                              ECCTwiceDerivedValueToken valueToken,
+                                              uint64_t index);
+
+    /**
+     * Decrypt the null document.
+     */
+    static StatusWith<ECCNullDocument> decryptNullDocument(ECCTwiceDerivedValueToken valueToken,
+                                                           BSONObj& doc);
+
+    /**
+     * Decrypt a regular document.
+     */
+    static StatusWith<ECCDocument> decryptDocument(ECCTwiceDerivedValueToken valueToken,
+                                                   BSONObj& doc);
+
+    /**
+     * Search for the highest document id for a given field/value pair based on the token.
+     */
+    static uint64_t emuBinary(FLEStateCollectionReader* reader,
+                              ECCTwiceDerivedTagToken tagToken,
+                              ECCTwiceDerivedValueToken valueToken);
+};
 }  // namespace mongo
