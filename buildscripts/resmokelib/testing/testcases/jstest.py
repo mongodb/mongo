@@ -244,7 +244,7 @@ class JSTestCase(interface.ProcessTestCase):
         """Determine if a return code represents and unsafe exit."""
         # 252 and 253 may be returned in failed test executions.
         # (i.e. -4 and -3 in mongo_main.cpp)
-        if self.return_code not in (252, 253, 0):
+        if return_code not in (252, 253, 0):
             self.propagate_error = errors.UnsafeExitError(
                 f"Mongo shell exited with code {return_code} while running jstest {self.basename()}."
                 " Further test execution may be unsafe.")
