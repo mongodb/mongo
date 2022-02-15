@@ -394,17 +394,24 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
                                                     !_idIndexSpec.isEmpty() /* createIdIndex */,
                                                     _idIndexSpec);
         if (status == ErrorCodes::NamespaceExists && getSharedData()->isResuming()) {
-            // If we are resuming from a recipient failover and we have a collection on disk with
-            // the same namespace but a different uuid, it means this collection must have been
-            // dropped and re-created under a different uuid on the donor during the recipient
-            // failover. And the drop and the re-create will be covered by the oplog application
-            // phase.
+            // If we are resuming from a recipient failover we can get ErrorCodes::NamespaceExists
+            // due to following conditions:
+            //
+            // 1) We have a collection on disk with the same namespace but a different uuid. It
+            // means this collection must have been dropped and re-created under a different uuid on
+            // the donor during the recipient failover. And the drop and the re-create will be
+            // covered by the oplog application phase.
+            //
+            // 2) We have a [time series] view on disk with the same namespace. It means the view
+            // must have dropped and created a regular collection with the namespace same as the
+            // dropped view during the recipient failover. The drop view and create collection
+            // will be covered by the oplog application phase.
             LOGV2(5767200,
-                  "TenantCollectionCloner found same namespace with different uuid locally on "
-                  "resume, skipping cloning this collection.",
+                  "Tenant collection cloner: Skipping cloning this collection.",
                   "namespace"_attr = getSourceNss(),
                   "migrationId"_attr = getSharedData()->getMigrationId(),
-                  "tenantId"_attr = getTenantId());
+                  "tenantId"_attr = getTenantId(),
+                  "error"_attr = status);
             return kSkipRemainingStages;
         }
         uassertStatusOKWithContext(status, "Tenant collection cloner: create collection");
