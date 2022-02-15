@@ -87,8 +87,15 @@ var defragmentationUtil = (function() {
         const chunks =
             findChunksUtil.findChunksByNs(mongos.getDB('config'), ns).sort({shardKey: 1}).toArray();
         const coll = mongos.getCollection(ns);
-        const collStats = assert.commandWorked(coll.getDB().runCommand({collStats: ns}));
-        const avgObjSize = collStats.avgObjSize;
+        const pipeline = [
+            {'$collStats': {'storageStats': {}}},
+            {'$project': {'shard': true, 'storageStats': {'avgObjSize': true}}}
+        ];
+        const storageStats = coll.aggregate(pipeline).toArray();
+        let avgObjSizeByShard = {};
+        storageStats.forEach((storageStat) => {
+            avgObjSizeByShard[storageStat['shard']] = storageStat['storageStats']['avgObjSize'];
+        });
         let checkForOversizedChunk = function(
             coll, chunk, shardKey, avgObjSize, oversizedChunkThreshold) {
             let chunkSize =
@@ -110,7 +117,7 @@ var defragmentationUtil = (function() {
                 if (chunk1Zone === chunk2Zone) {
                     let combinedDataSize = coll.countDocuments({
                         shardKey: {$gte: chunk1.min[shardKey], $lt: chunk2.max[shardKey]}
-                    }) * avgObjSize;
+                    }) * avgObjSizeByShard[chunk1['shard']];
                     assert.lte(
                         combinedDataSize,
                         oversizedChunkThreshold,
@@ -119,10 +126,18 @@ var defragmentationUtil = (function() {
                 }
             }
             // Check for oversized chunks
-            checkForOversizedChunk(coll, chunk1, shardKey, avgObjSize, oversizedChunkThreshold);
+            checkForOversizedChunk(coll,
+                                   chunk1,
+                                   shardKey,
+                                   avgObjSizeByShard[chunk1['shard']],
+                                   oversizedChunkThreshold);
         }
         const lastChunk = chunks[chunks.length - 1];
-        checkForOversizedChunk(coll, lastChunk, shardKey, avgObjSize, oversizedChunkThreshold);
+        checkForOversizedChunk(coll,
+                               lastChunk,
+                               shardKey,
+                               avgObjSizeByShard[lastChunk['shard']],
+                               oversizedChunkThreshold);
     };
 
     let getZoneForRange = function(mongos, ns, minKey, maxKey) {
