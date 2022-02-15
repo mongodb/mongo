@@ -68,9 +68,10 @@ let res = assert.commandFailedWithCode(testDB.adminCommand({
     collectionUUID: nonexistentUUID,
 }),
                                        ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, testDB.getName());
 assert.eq(res.collectionUUID, nonexistentUUID);
-assert.eq(res.expectedNamespace, coll.getFullName());
-assert.eq(res.actualNamespace, null);
+assert.eq(res.expectedCollection, coll.getName());
+assert.eq(res.actualCollection, null);
 
 res = assert.commandFailedWithCode(testDB.adminCommand({
     renameCollection: coll2.getFullName(),
@@ -78,9 +79,10 @@ res = assert.commandFailedWithCode(testDB.adminCommand({
     dropTarget: nonexistentUUID,
 }),
                                    ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, testDB.getName());
 assert.eq(res.collectionUUID, nonexistentUUID);
-assert.eq(res.expectedNamespace, coll.getFullName());
-assert.eq(res.actualNamespace, null);
+assert.eq(res.expectedCollection, coll.getName());
+assert.eq(res.actualCollection, null);
 
 // The command fails when the provided UUID corresponds to a different collection.
 res = assert.commandFailedWithCode(testDB.adminCommand({
@@ -90,9 +92,10 @@ res = assert.commandFailedWithCode(testDB.adminCommand({
     collectionUUID: uuid(coll),
 }),
                                    ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, testDB.getName());
 assert.eq(res.collectionUUID, uuid(coll));
-assert.eq(res.expectedNamespace, coll2.getFullName());
-assert.eq(res.actualNamespace, coll.getFullName());
+assert.eq(res.expectedCollection, coll2.getName());
+assert.eq(res.actualCollection, coll.getName());
 
 res = assert.commandFailedWithCode(testDB.adminCommand({
     renameCollection: coll.getFullName(),
@@ -100,9 +103,10 @@ res = assert.commandFailedWithCode(testDB.adminCommand({
     dropTarget: uuid(coll),
 }),
                                    ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, testDB.getName());
 assert.eq(res.collectionUUID, uuid(coll));
-assert.eq(res.expectedNamespace, coll2.getFullName());
-assert.eq(res.actualNamespace, coll.getFullName());
+assert.eq(res.expectedCollection, coll2.getName());
+assert.eq(res.actualCollection, coll.getName());
 
 res = assert.commandFailedWithCode(testDB.adminCommand({
     renameCollection: coll2.getFullName(),
@@ -111,9 +115,51 @@ res = assert.commandFailedWithCode(testDB.adminCommand({
     collectionUUID: uuid(coll),
 }),
                                    ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, testDB.getName());
 assert.eq(res.collectionUUID, uuid(coll));
-assert.eq(res.expectedNamespace, coll2.getFullName());
-assert.eq(res.actualNamespace, coll.getFullName());
+assert.eq(res.expectedCollection, coll2.getName());
+assert.eq(res.actualCollection, coll.getName());
+
+// Only collections in the same database are specified by actualCollection.
+const otherDB = testDB.getSiblingDB(testDB.getName() + '_2');
+assert.commandWorked(otherDB.dropDatabase());
+const coll4 = otherDB['coll_4'];
+const coll5 = otherDB['coll_5'];
+assert.commandWorked(coll4.insert({_id: 2}));
+res = assert.commandFailedWithCode(otherDB.adminCommand({
+    renameCollection: coll4.getFullName(),
+    to: coll5.getFullName(),
+    dropTarget: true,
+    collectionUUID: uuid(coll),
+}),
+                                   ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, otherDB.getName());
+assert.eq(res.collectionUUID, uuid(coll));
+assert.eq(res.expectedCollection, coll4.getName());
+assert.eq(res.actualCollection, null);
+
+res = assert.commandFailedWithCode(otherDB.adminCommand({
+    renameCollection: coll4.getFullName(),
+    to: coll5.getFullName(),
+    dropTarget: uuid(coll),
+}),
+                                   ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, otherDB.getName());
+assert.eq(res.collectionUUID, uuid(coll));
+assert.eq(res.expectedCollection, coll5.getName());
+assert.eq(res.actualCollection, null);
+
+res = assert.commandFailedWithCode(otherDB.adminCommand({
+    renameCollection: coll4.getFullName(),
+    to: coll5.getFullName(),
+    dropTarget: uuid(coll2),
+    collectionUUID: uuid(coll),
+}),
+                                   ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, otherDB.getName());
+assert.eq(res.collectionUUID, uuid(coll));
+assert.eq(res.expectedCollection, coll4.getName());
+assert.eq(res.actualCollection, null);
 
 // The command fails when the provided UUID corresponds to a different collection, even if the
 // provided source namespace does not exist.
@@ -125,9 +171,10 @@ res = assert.commandFailedWithCode(testDB.adminCommand({
     collectionUUID: uuid(coll),
 }),
                                    ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, testDB.getName());
 assert.eq(res.collectionUUID, uuid(coll));
-assert.eq(res.expectedNamespace, coll2.getFullName());
-assert.eq(res.actualNamespace, coll.getFullName());
+assert.eq(res.expectedCollection, coll2.getName());
+assert.eq(res.actualCollection, coll.getName());
 
 // The collectionUUID parameter cannot be provided when renaming a collection between databases.
 const otherDBColl = db.getSiblingDB(jsTestName() + '_2').coll;

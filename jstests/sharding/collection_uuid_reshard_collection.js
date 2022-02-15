@@ -51,9 +51,10 @@ let res = assert.commandFailedWithCode(mongos.adminCommand({
     collectionUUID: nonexistentUUID,
 }),
                                        ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, db.getName());
 assert.eq(res.collectionUUID, nonexistentUUID);
-assert.eq(res.expectedNamespace, coll.getFullName());
-assert.eq(res.actualNamespace, null);
+assert.eq(res.expectedCollection, coll.getName());
+assert.eq(res.actualCollection, null);
 
 // The command fails when provided with a different collection's UUID.
 const coll2 = db['coll_2'];
@@ -64,9 +65,26 @@ res = assert.commandFailedWithCode(mongos.adminCommand({
     collectionUUID: uuid(),
 }),
                                    ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, db.getName());
 assert.eq(res.collectionUUID, uuid());
-assert.eq(res.expectedNamespace, coll2.getFullName());
-assert.eq(res.actualNamespace, coll.getFullName());
+assert.eq(res.expectedCollection, coll2.getName());
+assert.eq(res.actualCollection, coll.getName());
+
+// Only collections in the same database are specified by actualCollection.
+const otherDB = db.getSiblingDB(db.getName() + '_2');
+const coll3 = otherDB['coll_3'];
+assert.commandWorked(mongos.adminCommand({enableSharding: otherDB.getName()}));
+resetColl(coll3);
+res = assert.commandFailedWithCode(mongos.adminCommand({
+    reshardCollection: coll3.getFullName(),
+    key: newKeyDoc,
+    collectionUUID: uuid(),
+}),
+                                   ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, otherDB.getName());
+assert.eq(res.collectionUUID, uuid());
+assert.eq(res.expectedCollection, coll3.getName());
+assert.eq(res.actualCollection, null);
 
 // The command fails when provided with a different collection's UUID, even if the provided
 // namespace does not exist.
@@ -77,9 +95,10 @@ res = assert.commandFailedWithCode(mongos.adminCommand({
     collectionUUID: uuid(),
 }),
                                    ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, db.getName());
 assert.eq(res.collectionUUID, uuid());
-assert.eq(res.expectedNamespace, coll2.getFullName());
-assert.eq(res.actualNamespace, coll.getFullName());
+assert.eq(res.expectedCollection, coll2.getName());
+assert.eq(res.actualCollection, coll.getName());
 
 // The command fails when the provided UUID corresponds to a different collection, even if the
 // provided namespace is a view.
@@ -91,9 +110,10 @@ res = assert.commandFailedWithCode(mongos.adminCommand({
     collectionUUID: uuid(),
 }),
                                    ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, db.getName());
 assert.eq(res.collectionUUID, uuid());
-assert.eq(res.expectedNamespace, view.getFullName());
-assert.eq(res.actualNamespace, coll.getFullName());
+assert.eq(res.expectedCollection, view.getName());
+assert.eq(res.actualCollection, coll.getName());
 
 st.stop();
 })();

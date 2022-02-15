@@ -9,10 +9,12 @@
 
 load("jstests/libs/write_concern_util.js");  // For 'shardCollectionWithChunks'
 
-const validateErrorResponse = function(res, collectionUUID, expectedNamespace, actualNamespace) {
+const validateErrorResponse = function(
+    res, db, collectionUUID, expectedCollection, actualCollection) {
+    assert.eq(res.db, db);
     assert.eq(res.collectionUUID, collectionUUID);
-    assert.eq(res.expectedNamespace, expectedNamespace);
-    assert.eq(res.actualNamespace, actualNamespace);
+    assert.eq(res.expectedCollection, expectedCollection);
+    assert.eq(res.actualCollection, actualCollection);
 };
 
 const getUUID = function(database, collName) {
@@ -66,15 +68,14 @@ const testCommand = function(cmd, cmdObj) {
     let res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
     validateErrorResponse(
-        res, sameShardUUID, shardedCollection.getFullName(), sameShardColl.getFullName());
+        res, testDB.getName(), sameShardUUID, shardedCollection.getName(), sameShardColl.getName());
 
     jsTestLog("If the aggregation command hits all shards, then it should return the " +
               "actual namespace of the unsharded collection that has different primary shard.");
     cmdObj["collectionUUID"] = otherShardUUID;
     res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(
-        res, otherShardUUID, shardedCollection.getFullName(), otherShardColl.getFullName());
+    validateErrorResponse(res, testDB.getName(), otherShardUUID, shardedCollection.getName(), null);
 
     jsTestLog(
         "If the aggregation command hits only one shards, then it can't find the actual namespace" +
@@ -84,7 +85,7 @@ const testCommand = function(cmd, cmdObj) {
     cmdObj["collectionUUID"] = otherShardUUID;
     res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(res, otherShardUUID, sameShardColl.getFullName(), null);
+    validateErrorResponse(res, testDB.getName(), otherShardUUID, sameShardColl.getName(), null);
 };
 
 testCommand("aggregate", {aggregate: "", pipeline: [{$collStats: {latencyStats: {}}}], cursor: {}});

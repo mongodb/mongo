@@ -44,17 +44,19 @@ assert.commandWorked(mongos.adminCommand(
 let res = assert.commandFailedWithCode(
     db.runCommand({drop: shardedColl.getName(), collectionUUID: uuid(unshardedColl)}),
     ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, db.getName());
 assert.eq(res.collectionUUID, uuid(unshardedColl));
-assert.eq(res.expectedNamespace, shardedColl.getFullName());
-assert.eq(res.actualNamespace, unshardedColl.getFullName());
+assert.eq(res.expectedCollection, shardedColl.getName());
+assert.eq(res.actualCollection, unshardedColl.getName());
 
 // Run the drop command on the unsharded collection, which only exists on shard0.
 res = assert.commandFailedWithCode(
     db.runCommand({drop: unshardedColl.getName(), collectionUUID: uuid(shardedColl)}),
     ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, db.getName());
 assert.eq(res.collectionUUID, uuid(shardedColl));
-assert.eq(res.expectedNamespace, unshardedColl.getFullName());
-assert.eq(res.actualNamespace, shardedColl.getFullName());
+assert.eq(res.expectedCollection, unshardedColl.getName());
+assert.eq(res.actualCollection, shardedColl.getName());
 
 st.stop();
 })();

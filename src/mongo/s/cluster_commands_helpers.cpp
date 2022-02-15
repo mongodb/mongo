@@ -626,14 +626,14 @@ RawResponsesResult appendRawResponses(
     auto& firstError = genericErrorsReceived.front().second;
 
     if (firstError.code() == ErrorCodes::CollectionUUIDMismatch &&
-        !firstError.extraInfo<CollectionUUIDMismatchInfo>()->actualNamespace()) {
+        !firstError.extraInfo<CollectionUUIDMismatchInfo>()->actualCollection()) {
         // The first error is a CollectionUUIDMismatchInfo but it doesn't contain an actual
         // namespace. It's possible that the acutal namespace is unsharded, in which case only the
         // error from the primary shard will contain this information. Iterate through the errors to
         // see if this is the case.
         for (const auto& error : genericErrorsReceived) {
             if (error.second.code() == ErrorCodes::CollectionUUIDMismatch &&
-                error.second.extraInfo<CollectionUUIDMismatchInfo>()->actualNamespace()) {
+                error.second.extraInfo<CollectionUUIDMismatchInfo>()->actualCollection()) {
                 firstError = error.second;
                 break;
             }

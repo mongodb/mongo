@@ -10,15 +10,17 @@
 (function() {
 'use strict';
 
-const validateErrorResponse = function(res, collectionUUID, expectedNamespace, actualNamespace) {
+const validateErrorResponse = function(
+    res, db, collectionUUID, expectedCollection, actualCollection) {
     if (res.writeErrors) {
         // Sharded cluster scenario.
         res = res.writeErrors[0];
     }
 
+    assert.eq(res.db, db);
     assert.eq(res.collectionUUID, collectionUUID);
-    assert.eq(res.expectedNamespace, expectedNamespace);
-    assert.eq(res.actualNamespace, actualNamespace);
+    assert.eq(res.expectedCollection, expectedCollection);
+    assert.eq(res.actualCollection, actualCollection);
 };
 
 var testCommand = function(cmd, cmdObj) {
@@ -41,7 +43,7 @@ var testCommand = function(cmd, cmdObj) {
     cmdObj["collectionUUID"] = nonexistentUUID;
     let res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(res, nonexistentUUID, coll.getFullName(), null);
+    validateErrorResponse(res, testDB.getName(), nonexistentUUID, coll.getName(), null);
 
     jsTestLog("The command '" + cmd +
               "' fails when the provided UUID corresponds to a different collection.");
@@ -51,7 +53,7 @@ var testCommand = function(cmd, cmdObj) {
     cmdObj["collectionUUID"] = uuid;
     res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(res, uuid, coll2.getFullName(), coll.getFullName());
+    validateErrorResponse(res, testDB.getName(), uuid, coll2.getName(), coll.getName());
 
     jsTestLog("The command '" + cmd +
               "' fails when the provided UUID corresponds to a different collection, even if the " +
@@ -59,7 +61,17 @@ var testCommand = function(cmd, cmdObj) {
     coll2.drop();
     res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(res, uuid, coll2.getFullName(), coll.getFullName());
+    validateErrorResponse(res, testDB.getName(), uuid, coll2.getName(), coll.getName());
+
+    jsTestLog("Only collections in the same database are specified by actualCollection.");
+    const otherDB = testDB.getSiblingDB(testDB.getName() + '_2');
+    assert.commandWorked(otherDB.dropDatabase());
+    const coll3 = otherDB['coll_3'];
+    assert.commandWorked(coll3.insert({_id: 2}));
+    cmdObj[cmd] = coll3.getName();
+    res =
+        assert.commandFailedWithCode(otherDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
+    validateErrorResponse(res, otherDB.getName(), uuid, coll3.getName(), null);
 };
 
 testCommand("insert", {insert: "", documents: [{inserted: true}]});

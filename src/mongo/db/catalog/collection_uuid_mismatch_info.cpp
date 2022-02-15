@@ -36,28 +36,29 @@ namespace mongo {
 namespace {
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(CollectionUUIDMismatchInfo);
 
+constexpr StringData kDbFieldName = "db"_sd;
 constexpr StringData kCollectionUUIDFieldName = "collectionUUID"_sd;
-constexpr StringData kExpectedNamespaceFieldName = "expectedNamespace"_sd;
-constexpr StringData kActualNamespaceFieldName = "actualNamespace"_sd;
+constexpr StringData kExpectedCollectionFieldName = "expectedCollection"_sd;
+constexpr StringData kActualCollectionFieldName = "actualCollection"_sd;
 }  // namespace
 
 std::shared_ptr<const ErrorExtraInfo> CollectionUUIDMismatchInfo::parse(const BSONObj& obj) {
-    auto actualNamespace = obj[kActualNamespaceFieldName];
+    auto actualNamespace = obj[kActualCollectionFieldName];
     return std::make_shared<CollectionUUIDMismatchInfo>(
+        obj[kDbFieldName].str(),
         UUID::parse(obj[kCollectionUUIDFieldName]).getValue(),
-        NamespaceString{obj.getStringField(kExpectedNamespaceFieldName)},
-        actualNamespace.isNull()
-            ? boost::none
-            : boost::make_optional(NamespaceString{actualNamespace.valueStringData()}));
+        obj[kExpectedCollectionFieldName].str(),
+        actualNamespace.isNull() ? boost::none : boost::make_optional(actualNamespace.str()));
 }
 
 void CollectionUUIDMismatchInfo::serialize(BSONObjBuilder* builder) const {
+    builder->append(kDbFieldName, _db);
     _collectionUUID.appendToBuilder(builder, kCollectionUUIDFieldName);
-    builder->append(kExpectedNamespaceFieldName, _expectedNamespace.ns());
-    if (_actualNamespace) {
-        builder->append(kActualNamespaceFieldName, _actualNamespace->ns());
+    builder->append(kExpectedCollectionFieldName, _expectedCollection);
+    if (_actualCollection) {
+        builder->append(kActualCollectionFieldName, *_actualCollection);
     } else {
-        builder->appendNull(kActualNamespaceFieldName);
+        builder->appendNull(kActualCollectionFieldName);
     }
 }
 }  // namespace mongo

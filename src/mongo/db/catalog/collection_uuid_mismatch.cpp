@@ -49,9 +49,15 @@ void checkCollectionUUIDMismatch(OperationContext* opCtx,
                 feature_flags::gCommandsAcceptCollectionUUID.isEnabled(
                     serverGlobalParams.featureCompatibility));
 
-    uassert((CollectionUUIDMismatchInfo{
-                *uuid, ns, CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, *uuid)}),
-            "Collection UUID does not match that specified",
-            coll && coll->uuid() == *uuid);
+    auto actualNamespace = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, *uuid);
+    uassert(
+        (CollectionUUIDMismatchInfo{ns.db().toString(),
+                                    *uuid,
+                                    ns.coll().toString(),
+                                    actualNamespace && actualNamespace->db() == ns.db()
+                                        ? boost::make_optional(actualNamespace->coll().toString())
+                                        : boost::none}),
+        "Collection UUID does not match that specified",
+        coll && coll->uuid() == *uuid);
 }
 }  // namespace mongo

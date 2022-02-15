@@ -47,9 +47,10 @@ let res = assert.commandFailedWithCode(db.runCommand({
     collectionUUID: uuid(unshardedColl),
 }),
                                        ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, db.getName());
 assert.eq(res.collectionUUID, uuid(unshardedColl));
-assert.eq(res.expectedNamespace, shardedColl.getFullName());
-assert.eq(res.actualNamespace, unshardedColl.getFullName());
+assert.eq(res.expectedCollection, shardedColl.getName());
+assert.eq(res.actualCollection, unshardedColl.getName());
 
 // Run the command on the collection which is unsharded and exists only on shard0, while specifying
 // the UUID of the collection that is sharded.
@@ -59,9 +60,10 @@ res = assert.commandFailedWithCode(db.runCommand({
     collectionUUID: uuid(shardedColl),
 }),
                                    ErrorCodes.CollectionUUIDMismatch);
+assert.eq(res.db, db.getName());
 assert.eq(res.collectionUUID, uuid(shardedColl));
-assert.eq(res.expectedNamespace, unshardedColl.getFullName());
-assert.eq(res.actualNamespace, shardedColl.getFullName());
+assert.eq(res.expectedCollection, unshardedColl.getName());
+assert.eq(res.actualCollection, shardedColl.getName());
 
 st.stop();
 })();

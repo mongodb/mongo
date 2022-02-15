@@ -254,7 +254,7 @@ void CursorEstablisher::_favorCollectionUUIDMismatchError(Status newError) noexc
     // Favor 'CollectionUUIDMismatchError' that has a non empty 'actualNamespace'.
     auto errorInfo = _maybeFailure->extraInfo<CollectionUUIDMismatchInfo>();
     invariant(errorInfo);
-    if (!errorInfo->actualNamespace()) {
+    if (!errorInfo->actualCollection()) {
         _maybeFailure = std::move(newError);
     }
 }

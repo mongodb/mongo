@@ -31,31 +31,34 @@
 
 #include "mongo/base/error_extra_info.h"
 
-#include "mongo/db/namespace_string.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 class CollectionUUIDMismatchInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::CollectionUUIDMismatch;
 
-    explicit CollectionUUIDMismatchInfo(const UUID& collectionUUID,
-                                        const NamespaceString& expectedNamespace,
-                                        const boost::optional<NamespaceString>& actualNamespace)
-        : _collectionUUID(collectionUUID),
-          _expectedNamespace(expectedNamespace),
-          _actualNamespace(actualNamespace) {}
+    explicit CollectionUUIDMismatchInfo(std::string db,
+                                        UUID collectionUUID,
+                                        std::string expectedCollection,
+                                        boost::optional<std::string> actualCollection)
+        : _db(std::move(db)),
+          _collectionUUID(std::move(collectionUUID)),
+          _expectedCollection(std::move(expectedCollection)),
+          _actualCollection(std::move(actualCollection)) {}
 
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
 
     void serialize(BSONObjBuilder* builder) const override;
 
-    const auto& actualNamespace() const {
-        return _actualNamespace;
+    const auto& actualCollection() const {
+        return _actualCollection;
     }
 
 private:
+    std::string _db;
     UUID _collectionUUID;
-    NamespaceString _expectedNamespace;
-    boost::optional<NamespaceString> _actualNamespace;
+    std::string _expectedCollection;
+    boost::optional<std::string> _actualCollection;
 };
 }  // namespace mongo

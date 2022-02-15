@@ -5,10 +5,12 @@
 (function() {
 'use strict';
 
-const validateErrorResponse = function(res, collectionUUID, expectedNamespace, actualNamespace) {
+const validateErrorResponse = function(
+    res, db, collectionUUID, expectedCollection, actualCollection) {
+    assert.eq(res.db, db);
     assert.eq(res.collectionUUID, collectionUUID);
-    assert.eq(res.expectedNamespace, expectedNamespace);
-    assert.eq(res.actualNamespace, actualNamespace);
+    assert.eq(res.expectedCollection, expectedCollection);
+    assert.eq(res.actualCollection, actualCollection);
 };
 
 const testCommand = function(cmd, cmdObj) {
@@ -32,7 +34,7 @@ const testCommand = function(cmd, cmdObj) {
     cmdObj["collectionUUID"] = nonexistentUUID;
     let res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(res, nonexistentUUID, coll.getFullName(), null);
+    validateErrorResponse(res, testDB.getName(), nonexistentUUID, coll.getName(), null);
 
     jsTestLog("The command '" + cmd +
               "' fails when the provided UUID corresponds to a different collection.");
@@ -42,7 +44,7 @@ const testCommand = function(cmd, cmdObj) {
     cmdObj["collectionUUID"] = uuid;
     res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(res, uuid, coll2.getFullName(), coll.getFullName());
+    validateErrorResponse(res, testDB.getName(), uuid, coll2.getName(), coll.getName());
 
     jsTestLog("The command '" + cmd +
               "' fails when the provided UUID corresponds to a different collection, even if the " +
@@ -50,7 +52,7 @@ const testCommand = function(cmd, cmdObj) {
     coll2.drop();
     res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(res, uuid, coll2.getFullName(), coll.getFullName());
+    validateErrorResponse(res, testDB.getName(), uuid, coll2.getName(), coll.getName());
 
     jsTestLog("The command '" + cmd + "' succeeds on view when no UUID is provided.");
     const viewName = "view";
@@ -67,7 +69,7 @@ const testCommand = function(cmd, cmdObj) {
     cmdObj["collectionUUID"] = uuid;
     res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(res, uuid, testDB.getName() + '.' + viewName, coll.getFullName());
+    validateErrorResponse(res, testDB.getName(), uuid, viewName, coll.getName());
     assert.commandWorked(testDB.runCommand({drop: viewName, writeConcern: {w: "majority"}}));
 
     jsTestLog("The command '" + cmd +
@@ -85,8 +87,19 @@ const testCommand = function(cmd, cmdObj) {
     cmdObj["collectionUUID"] = uuid;
     res =
         assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
-    validateErrorResponse(res, uuid, testDB.getName() + '.' + tsCollName, coll.getFullName());
+    validateErrorResponse(res, testDB.getName(), uuid, tsCollName, coll.getName());
     assert.commandWorked(testDB.runCommand({drop: tsCollName, writeConcern: {w: "majority"}}));
+
+    jsTestLog("Only collections in the same database are specified by actualCollection.");
+    const otherDB = testDB.getSiblingDB(testDB.getName() + '_2');
+    assert.commandWorked(otherDB.dropDatabase());
+    assert.commandWorked(otherDB.dropDatabase());
+    const coll3 = otherDB['coll_3'];
+    assert.commandWorked(coll3.insert({_id: 2}));
+    cmdObj[cmd] = coll3.getName();
+    res =
+        assert.commandFailedWithCode(otherDB.runCommand(cmdObj), ErrorCodes.CollectionUUIDMismatch);
+    validateErrorResponse(res, otherDB.getName(), uuid, coll3.getName(), null);
 };
 
 testCommand("aggregate", {aggregate: "", pipeline: [{$indexStats: {}}], cursor: {}});
