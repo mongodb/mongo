@@ -176,8 +176,6 @@ selector:
   - requires_non_retryable_writes
   # mongos has no system.profile collection.
   - requires_profiling
-  # mongos does not support inserts on timeseries collections
-  - requires_timeseries
   - does_not_support_stepdowns
   - assumes_unsharded_collection
 

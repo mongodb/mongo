@@ -6,6 +6,8 @@
  *
  * @tags: [
  *   requires_timeseries,
+ *   # Timeseries do not support multi-document transactions with inserts.
+ *   does_not_support_transactions,
  * ]
  */
 
@@ -13,6 +15,10 @@ var $config = (function() {
     const timeFieldName = 'time';
     const metaFieldName = 'tag';
     const numDocs = 100;
+
+    function getCollectionName(collName) {
+        return jsTestName() + "_" + collName;
+    }
 
     const insert = function(db, collName, tid, ordered) {
         const docs = [];
@@ -28,16 +34,19 @@ var $config = (function() {
     const states = {
         init: function(db, collName) {},
 
-        insertOrdered: function(db, collName) {
+        insertOrdered: function(db, collNameSuffix) {
+            let collName = getCollectionName(collNameSuffix);
             insert(db, collName, this.tid, true);
         },
 
-        insertUnordered: function(db, collName) {
+        insertUnordered: function(db, collNameSuffix) {
+            let collName = getCollectionName(collNameSuffix);
             insert(db, collName, this.tid, false);
         },
     };
 
-    const setup = function(db, collName, cluster) {
+    const setup = function(db, collNameSuffix, cluster) {
+        let collName = getCollectionName(collNameSuffix);
         cluster.executeOnMongodNodes((db) => {
             assert.commandWorked(db.adminCommand(
                 {setParameter: 1, timeseriesIdleBucketExpiryMemoryUsageThreshold: 1024}));
@@ -47,8 +56,12 @@ var $config = (function() {
             collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
     };
 
-    const teardown = function(db, collName, cluster) {
-        jsTestLog(db.serverStatus().bucketCatalog);
+    const teardown = function(db, collNameSuffix, cluster) {
+        let collName = getCollectionName(collNameSuffix);
+        const bucketCatalog = db.serverStatus().bucketCatalog;
+        if (bucketCatalog !== undefined) {
+            jsTestLog(bucketCatalog);
+        }
         jsTestLog(db.runCommand({collStats: collName}).timeseries);
 
         cluster.executeOnMongodNodes((db) => {

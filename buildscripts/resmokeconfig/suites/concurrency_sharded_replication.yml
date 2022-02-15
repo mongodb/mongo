@@ -99,8 +99,6 @@ selector:
   - assumes_balancer_on
   # mongos has no system.profile collection.
   - requires_profiling
-  # mongos does not support inserts on timeseries collections
-  - requires_timeseries
   - assumes_unsharded_collection
 
 executor:

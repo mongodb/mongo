@@ -5,12 +5,22 @@
  *
  * @tags: [
  *   requires_timeseries,
+ *   # killOp does not support stepdowns.
+ *   does_not_support_stepdowns,
+ *   # Timeseries do not support multi-document transactions with inserts.
+ *   does_not_support_transactions,
+ *   # Kill operations do not propagate for writes on mongos.
+ *   assumes_unsharded_collection
  * ]
  */
 
 var $config = (function() {
     const timeFieldName = 'time';
     const metaFieldName = 'tag';
+
+    function getCollectionName(collName) {
+        return jsTestName() + "_" + collName;
+    }
 
     const insert = function(db, collName, ordered) {
         const docs = [];
@@ -31,15 +41,18 @@ var $config = (function() {
     const states = {
         init: function(db, collName) {},
 
-        insertOrdered: function(db, collName) {
+        insertOrdered: function(db, collNameSuffix) {
+            let collName = getCollectionName(collNameSuffix);
             insert(db, collName, true);
         },
 
-        insertUnordered: function(db, collName) {
+        insertUnordered: function(db, collNameSuffix) {
+            let collName = getCollectionName(collNameSuffix);
             insert(db, collName, false);
         },
 
-        killInsert: function(db, collName) {
+        killInsert: function(db, collNameSuffix) {
+            let collName = getCollectionName(collNameSuffix);
             const inprog =
                 assert.commandWorked(db.currentOp({ns: db[collName].getFullName(), op: 'insert'}))
                     .inprog;
@@ -50,7 +63,8 @@ var $config = (function() {
         },
     };
 
-    const setup = function(db, collName) {
+    const setup = function(db, collNameSuffix) {
+        let collName = getCollectionName(collNameSuffix);
         assert.commandWorked(db.createCollection(
             collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
     };
