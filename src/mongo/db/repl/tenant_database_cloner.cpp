@@ -49,6 +49,10 @@ namespace repl {
 // Failpoint which the tenant database cloner to hang after it has successully run listCollections
 // and recorded the results and the operationTime.
 MONGO_FAIL_POINT_DEFINE(tenantDatabaseClonerHangAfterGettingOperationTime);
+// Failpoint to skip comparing the list of collections that are already cloned, instead it will
+// resume the cloning from the beginning of the list, that's provided by
+// TenantDatabaseCloner::listCollectionsStage.
+MONGO_FAIL_POINT_DEFINE(skiplistExistingCollectionsStage);
 
 TenantDatabaseCloner::TenantDatabaseCloner(const std::string& dbName,
                                            TenantMigrationSharedData* sharedData,
@@ -173,6 +177,15 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
 }
 
 BaseCloner::AfterStageBehavior TenantDatabaseCloner::listExistingCollectionsStage() {
+    if (MONGO_unlikely(skiplistExistingCollectionsStage.shouldFail())) {
+        LOGV2(6312900,
+              "skiplistExistingCollectionsStage failpoint is enabled. "
+              "Tenant DatabaseCloner resumes cloning",
+              "migrationId"_attr = getSharedData()->getMigrationId(),
+              "tenantId"_attr = _tenantId,
+              "resumeFrom"_attr = _collections.front().first);
+        return kContinueNormally;
+    }
     auto opCtx = cc().makeOperationContext();
     DBDirectClient client(opCtx.get());
     tenantMigrationRecipientInfo(opCtx.get()) =

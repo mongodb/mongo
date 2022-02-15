@@ -39,6 +39,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/commands.h"
@@ -278,26 +279,16 @@ Status _createTimeseries(OperationContext* opCtx,
         writeConflictRetry(opCtx, "createBucketCollection", bucketsNs.ns(), [&]() -> Status {
             AutoGetDb autoDb(opCtx, bucketsNs.db(), MODE_IX);
             Lock::CollectionLock bucketsCollLock(opCtx, bucketsNs, MODE_IX);
+            auto db = autoDb.ensureDbExists(opCtx);
 
             // Check if there already exist a Collection on the namespace we will later create a
             // view on. We're not holding a Collection lock for this Collection so we may only check
             // if the pointer is null or not. The answer may also change at any point after this
             // call which is fine as we properly handle an orphaned bucket collection. This check is
             // just here to prevent it from being created in the common case.
-            if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, ns)) {
-                return Status(ErrorCodes::NamespaceExists,
-                              str::stream() << "Collection already exists. NS: " << ns);
-            }
-
-            auto db = autoDb.ensureDbExists(opCtx);
-            if (auto view = ViewCatalog::get(opCtx)->lookup(opCtx, ns); view) {
-                if (view->timeseries()) {
-                    return Status(ErrorCodes::NamespaceExists,
-                                  str::stream()
-                                      << "A timeseries collection already exists. NS: " << ns);
-                }
-                return Status(ErrorCodes::NamespaceExists,
-                              str::stream() << "A view already exists. NS: " << ns);
+            Status status = catalog::checkIfNamespaceExists(opCtx, ns);
+            if (!status.isOK()) {
+                return status;
             }
 
             if (opCtx->writesAreReplicated() &&
@@ -369,23 +360,14 @@ Status _createTimeseries(OperationContext* opCtx,
             opCtx,
             NamespaceString(ns.db(), NamespaceString::kSystemDotViewsCollectionName),
             MODE_X);
+        auto db = autoColl.ensureDbExists(opCtx);
 
         // This is a top-level handler for time-series creation name conflicts. New commands coming
         // in, or commands that generated a WriteConflict must return a NamespaceExists error here
         // on conflict.
-        if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, ns)) {
-            return Status(ErrorCodes::NamespaceExists,
-                          str::stream() << "Collection already exists. NS: " << ns);
-        }
-
-        auto db = autoColl.ensureDbExists(opCtx);
-        if (auto view = ViewCatalog::get(opCtx)->lookup(opCtx, ns)) {
-            if (view->timeseries()) {
-                return {ErrorCodes::NamespaceExists,
-                        str::stream() << "A timeseries collection already exists. NS: " << ns};
-            }
-            return {ErrorCodes::NamespaceExists,
-                    str::stream() << "A view already exists. NS: " << ns};
+        Status status = catalog::checkIfNamespaceExists(opCtx, ns);
+        if (!status.isOK()) {
+            return status;
         }
 
         if (opCtx->writesAreReplicated() &&
@@ -430,7 +412,7 @@ Status _createTimeseries(OperationContext* opCtx,
         viewOptions.pipeline = timeseries::generateViewPipeline(*options.timeseries, asArray);
 
         // Create the time-series view.
-        auto status = db->userCreateNS(opCtx, ns, viewOptions);
+        status = db->userCreateNS(opCtx, ns, viewOptions);
         if (!status.isOK()) {
             return status.withContext(str::stream() << "Failed to create view on " << bucketsNs
                                                     << " for time-series collection " << ns
@@ -451,23 +433,14 @@ Status _createCollection(OperationContext* opCtx,
     return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
         AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+        auto db = autoDb.ensureDbExists(opCtx);
+
         // This is a top-level handler for collection creation name conflicts. New commands coming
         // in, or commands that generated a WriteConflict must return a NamespaceExists error here
         // on conflict.
-        if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
-            return Status(ErrorCodes::NamespaceExists,
-                          str::stream() << "Collection already exists. NS: " << nss);
-        }
-
-        auto db = autoDb.ensureDbExists(opCtx);
-        if (auto view = ViewCatalog::get(opCtx)->lookup(opCtx, nss); view) {
-            if (view->timeseries()) {
-                return Status(ErrorCodes::NamespaceExists,
-                              str::stream()
-                                  << "A timeseries collection already exists. NS: " << nss);
-            }
-            return Status(ErrorCodes::NamespaceExists,
-                          str::stream() << "A view already exists. NS: " << nss);
+        Status status = catalog::checkIfNamespaceExists(opCtx, nss);
+        if (!status.isOK()) {
+            return status;
         }
 
         // If the FCV has changed while executing the command to the version, where the feature flag
@@ -544,7 +517,6 @@ Status _createCollection(OperationContext* opCtx,
 
         // Even though 'collectionOptions' is passed by rvalue reference, it is not safe to move
         // because 'userCreateNS' may throw a WriteConflictException.
-        Status status = Status::OK();
         if (idIndex == boost::none || collectionOptions.clusteredIndex) {
             status = db->userCreateNS(opCtx, nss, collectionOptions, /*createIdIndex=*/false);
         } else {

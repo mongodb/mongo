@@ -31,12 +31,33 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/views/view_catalog.h"
 
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeGettingNextCollection);
 
 namespace catalog {
+
+Status checkIfNamespaceExists(OperationContext* opCtx, const NamespaceString& nss) {
+    if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
+        return Status(ErrorCodes::NamespaceExists,
+                      str::stream() << "Collection " << nss.ns() << " already exists.");
+    }
+
+    auto view = ViewCatalog::get(opCtx)->lookup(opCtx, nss);
+    if (!view)
+        return Status::OK();
+
+    if (view->timeseries()) {
+        return Status(ErrorCodes::NamespaceExists,
+                      str::stream() << "A timeseries collection already exists. NS: " << nss);
+    }
+
+    return Status(ErrorCodes::NamespaceExists,
+                  str::stream() << "A view already exists. NS: " << nss);
+}
+
 
 void forEachCollectionFromDb(OperationContext* opCtx,
                              const TenantDatabaseName& tenantDbName,

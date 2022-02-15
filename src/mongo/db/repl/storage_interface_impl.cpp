@@ -47,6 +47,7 @@
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -481,19 +482,28 @@ Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,
         AutoGetDb databaseWriteGuard(opCtx, nss.db(), MODE_IX);
         auto db = databaseWriteGuard.ensureDbExists(opCtx);
         invariant(db);
-        if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
-            return Status(ErrorCodes::NamespaceExists,
-                          str::stream() << "Collection " << nss.ns() << " already exists.");
+
+        // Check if there already exist a Collection/view on the given namespace 'nss'. The answer
+        // may change at any point after this call as we make this call without holding the
+        // collection lock. But, it is fine as we properly handle while registering the uncommitted
+        // collection with CollectionCatalog. This check is just here to prevent it from being
+        // created in the common case.
+        Status status = mongo::catalog::checkIfNamespaceExists(opCtx, nss);
+        if (!status.isOK()) {
+            return status;
         }
+
         Lock::CollectionLock lk(opCtx, nss, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
         try {
             auto coll = db->createCollection(opCtx, nss, options, createIdIndex, idIndexSpec);
             invariant(coll);
+
+            // This commit call can throw if a view already exists while registering the collection.
+            wuow.commit();
         } catch (const AssertionException& ex) {
             return ex.toStatus();
         }
-        wuow.commit();
 
         return Status::OK();
     });

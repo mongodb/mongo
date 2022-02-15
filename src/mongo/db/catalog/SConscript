@@ -309,6 +309,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/views/views',
         'collection',
         'collection_catalog',
     ],
@@ -498,6 +499,9 @@ env.Library(
         'drop_indexes.cpp',
         'rename_collection.cpp',
         'list_indexes.cpp',
+    ],
+    LIBDEPS=[
+        'collection_catalog_helper',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
