@@ -12,25 +12,6 @@ if (determineSSLProvider() === "apple") {
 
 const INCLUDE_EXTRA_STATUS = true;
 
-function clientConnect(mongod, cafile) {
-    const exitCode = runMongoProgram("mongo",
-                                     "--host",
-                                     "localhost",
-                                     "--port",
-                                     mongod.port,
-                                     "--tls",
-                                     "--tlsCAFile",
-                                     OCSP_CA_PEM,
-                                     "--tlsCertificateKeyFile",
-                                     OCSP_CLIENT_CERT,
-                                     "--tlsAllowInvalidHostnames",
-                                     "--verbose",
-                                     1,
-                                     "--eval",
-                                     ";");
-    return exitCode;
-}
-
 /**
  * Tests OCSP status verification in the client-side ignores the statuses
  * of irrelevant certificates. No stapling is performed server-side.
@@ -62,7 +43,7 @@ function testClient(serverCert, caCert, responderCertPair, issuerDigest) {
         "Testing client can connect if OCSP response has extraneous statuses and the matching CertID is Good");
     mock_ocsp.start();
 
-    assert.eq(clientConnect(conn), 0);
+    assertClientConnectSucceeds(conn);
 
     mock_ocsp.stop();
 
@@ -72,7 +53,7 @@ function testClient(serverCert, caCert, responderCertPair, issuerDigest) {
         new MockOCSPServer(FAULT_REVOKED, 1, responderCertPair, INCLUDE_EXTRA_STATUS, issuerDigest);
     mock_ocsp.start();
 
-    assert.neq(clientConnect(conn), 0);
+    assertClientConnectFails(conn);
 
     MongoRunner.stopMongod(conn);
 
@@ -117,7 +98,7 @@ function testStapling(serverCert, caCert, responderCertPair, issuerDigest) {
     conn = MongoRunner.runMongod(ocsp_options);
     waitForServer(conn);
 
-    assert.eq(clientConnect(conn), 0);
+    assertClientConnectSucceeds(conn);
 
     MongoRunner.stopMongod(conn);
     sleep(1000);
@@ -133,12 +114,7 @@ function testStapling(serverCert, caCert, responderCertPair, issuerDigest) {
     conn = MongoRunner.runMongod(ocsp_options);
     waitForServer(conn);
 
-    clearRawMongoProgramOutput();
-    assert.neq(clientConnect(conn), 0);
-
-    assert.soon(function() {
-        return rawMongoProgramOutput().search("OCSPCertificateStatusRevoked") !== -1;
-    });
+    assertClientConnectFails(conn, OCSP_REVOKED);
 
     MongoRunner.stopMongod(conn);
 
