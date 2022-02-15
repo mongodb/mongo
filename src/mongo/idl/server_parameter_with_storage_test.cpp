@@ -37,8 +37,7 @@
 namespace mongo {
 AtomicWord<int> test::gStdIntPreallocated;
 AtomicWord<int> test::gStdIntPreallocatedUpdateCount;
-
-test::ChangeStreamOptionsClusterParam clusterParamStorage;
+size_t test::count;
 
 namespace {
 
@@ -180,15 +179,19 @@ TEST(ServerParameterWithStorage, BoundsTest) {
     ASSERT_EQ(status.reason(), "Invalid value for parameter BoundsTest: 25 is not less than 20");
 }
 
-ServerParameter* getServerParameter(const std::string& name) {
+ServerParameter* getNodeServerParameter(const std::string& name) {
     return ServerParameterSet::getNodeParameterSet()->get(name);
+}
+
+ServerParameter* getClusterServerParameter(const std::string& name) {
+    return ServerParameterSet::getClusterParameterSet()->get(name);
 }
 
 TEST(IDLServerParameterWithStorage, stdIntDeclared) {
     // 42 is set by "default" attribute in the IDL file.
     ASSERT_EQ(test::gStdIntDeclared.load(), 42);
 
-    auto* stdIntDeclared = getServerParameter("stdIntDeclared");
+    auto* stdIntDeclared = getNodeServerParameter("stdIntDeclared");
     ASSERT_OK(stdIntDeclared->setFromString("999"));
     ASSERT_EQ(test::gStdIntDeclared.load(), 999);
     ASSERT_NOT_OK(stdIntDeclared->setFromString("1000"));
@@ -206,7 +209,7 @@ TEST(IDLServerParameterWithStorage, stdIntPreallocated) {
     // The Default set counts as an update.
     ASSERT_EQ(test::gStdIntPreallocatedUpdateCount.load(), 1);
 
-    auto* stdIntPreallocated = getServerParameter("stdIntPreallocated");
+    auto* stdIntPreallocated = getNodeServerParameter("stdIntPreallocated");
     ASSERT_OK(stdIntPreallocated->setFromString("41"));
     ASSERT_EQ(test::gStdIntPreallocated.load(), 41);
     ASSERT_EQ(test::gStdIntPreallocatedUpdateCount.load(), 2);
@@ -223,7 +226,7 @@ TEST(IDLServerParameterWithStorage, stdIntPreallocated) {
 }
 
 TEST(IDLServerParameterWithStorage, startupString) {
-    auto* sp = getServerParameter("startupString");
+    auto* sp = getNodeServerParameter("startupString");
     ASSERT_EQ(sp->allowedToChangeAtStartup(), true);
     ASSERT_EQ(sp->allowedToChangeAtRuntime(), false);
     ASSERT_OK(sp->setFromString("New Value"));
@@ -235,7 +238,7 @@ TEST(IDLServerParameterWithStorage, startupString) {
 }
 
 TEST(IDLServerParameterWithStorage, runtimeBoostDouble) {
-    auto* sp = getServerParameter("runtimeBoostDouble");
+    auto* sp = getNodeServerParameter("runtimeBoostDouble");
     ASSERT_EQ(sp->allowedToChangeAtStartup(), false);
     ASSERT_EQ(sp->allowedToChangeAtRuntime(), true);
     ASSERT_OK(sp->setFromString("1.0"));
@@ -247,7 +250,7 @@ TEST(IDLServerParameterWithStorage, runtimeBoostDouble) {
 }
 
 TEST(IDLServerParameterWithStorage, startupStringRedacted) {
-    auto* sp = getServerParameter("startupStringRedacted");
+    auto* sp = getNodeServerParameter("startupStringRedacted");
     ASSERT_OK(sp->setFromString("Hello World"));
     ASSERT_EQ(test::gStartupStringRedacted, "Hello World");
 
@@ -264,7 +267,7 @@ TEST(IDLServerParameterWithStorage, startupStringRedacted) {
 
 TEST(IDLServerParameterWithStorage, startupIntWithExpressions) {
     auto* sp = dynamic_cast<IDLServerParameterWithStorage<SPT::kStartupOnly, std::int32_t>*>(
-        getServerParameter("startupIntWithExpressions"));
+        getNodeServerParameter("startupIntWithExpressions"));
     ASSERT_EQ(test::gStartupIntWithExpressions, test::kStartupIntWithExpressionsDefault);
 
     ASSERT_NOT_OK(sp->setValue(test::kStartupIntWithExpressionsMinimum - 1));
@@ -286,7 +289,7 @@ TEST(IDLServerParameterWithStorage, exportedDefaults) {
 // Test that the RAIIServerParameterControllerForTest works correctly on IDL-generated types.
 TEST(IDLServerParameterWithStorage, RAIIServerParameterController) {
     // Test int
-    auto* stdIntDeclared = getServerParameter("stdIntDeclared");
+    auto* stdIntDeclared = getNodeServerParameter("stdIntDeclared");
     ASSERT_OK(stdIntDeclared->setFromString("42"));
     ASSERT_EQ(test::gStdIntDeclared.load(), 42);
     {
@@ -296,7 +299,7 @@ TEST(IDLServerParameterWithStorage, RAIIServerParameterController) {
     ASSERT_EQ(test::gStdIntDeclared.load(), 42);
 
     // Test bool
-    auto* uglyComplicated = getServerParameter("ugly complicated-name.sp");
+    auto* uglyComplicated = getNodeServerParameter("ugly complicated-name.sp");
     ASSERT_OK(uglyComplicated->setFromString("false"));
     ASSERT_EQ(test::gUglyComplicatedNameSp, false);
     {
@@ -306,7 +309,7 @@ TEST(IDLServerParameterWithStorage, RAIIServerParameterController) {
     ASSERT_EQ(test::gUglyComplicatedNameSp, false);
 
     // Test string
-    auto* startupString = getServerParameter("startupString");
+    auto* startupString = getNodeServerParameter("startupString");
     const auto coolStartupString = "Cool startup string";
     ASSERT_OK(startupString->setFromString(coolStartupString));
     ASSERT_EQ(test::gStartupString, coolStartupString);
@@ -322,23 +325,17 @@ TEST(IDLServerParameterWithStorage, RAIIServerParameterController) {
  * IDLServerParameterWithStorage<SPT::kClusterWide> unit test.
  */
 TEST(IDLServerParameterWithStorage, CSPStorageTest) {
-    // Construct a new IDLClusterServerParameter with the already-defined storage.
-    // TO-DO: Instantiate this in the IDL file as part of testing SERVER-62253.
-    auto* clusterParam = makeIDLServerParameterWithStorage<ServerParameterType::kClusterWide>(
-        "changeStreamOptions", clusterParamStorage);
+    // Retrieve the cluster IDLServerParameterWithStorage.
+    auto* clusterParam =
+        dynamic_cast<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
+                                                   test::ChangeStreamOptionsClusterParam>*>(
+            getClusterServerParameter("changeStreamOptions"));
 
     // Check that current value is the default value.
     test::ChangeStreamOptionsClusterParam retrievedParam = clusterParam->getValue();
     ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 30);
     ASSERT_EQ(retrievedParam.getTestStringField(), "");
     ASSERT_EQ(clusterParam->getClusterParameterTime(), LogicalTime());
-
-    // Assert that onUpdate functions are fired after set and reset.
-    size_t count = 0;
-    clusterParam->setOnUpdate([&count](const test::ChangeStreamOptionsClusterParam& newVal) {
-        ++count;
-        return Status::OK();
-    });
 
     // Set to new value and check that the updated value is seen on get.
     test::ChangeStreamOptionsClusterParam updatedParam;
@@ -360,7 +357,7 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     ASSERT_EQ(retrievedParam.getTestStringField(), "testString");
     ASSERT_EQ(retrievedParam.getClusterParameterTime(), updateTime);
     ASSERT_EQ(clusterParam->getClusterParameterTime(), updateTime);
-    ASSERT_EQ(count, 1);
+    ASSERT_EQ(test::count, 1);
 
     // Append to BSONObj and verify that expected fields are present.
     BSONObjBuilder b;
@@ -382,7 +379,7 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     ASSERT_EQ(retrievedParam.getTestStringField(), "");
     ASSERT_EQ(retrievedParam.getClusterParameterTime(), LogicalTime());
     ASSERT_EQ(clusterParam->getClusterParameterTime(), LogicalTime());
-    ASSERT_EQ(count, 2);
+    ASSERT_EQ(test::count, 2);
 
     // Update the default value. The parameter should automatically reset to the new default value.
     test::ChangeStreamOptionsClusterParam newDefaultParam;
@@ -397,7 +394,7 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     ASSERT_EQ(retrievedParam.getTestStringField(), "default");
     ASSERT_EQ(retrievedParam.getClusterParameterTime(), LogicalTime());
     ASSERT_EQ(clusterParam->getClusterParameterTime(), LogicalTime());
-    ASSERT_EQ(count, 3);
+    ASSERT_EQ(test::count, 3);
 
     // Updating the default value a second time should have no effect.
     newDefaultPrePostImgs.setExpireAfterSeconds(45);
@@ -407,16 +404,8 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     retrievedParam = clusterParam->getValue();
     ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 35);
     ASSERT_EQ(retrievedParam.getTestStringField(), "default");
-    ASSERT_EQ(count, 3);
+    ASSERT_EQ(test::count, 3);
 
-    // Assert that validation works as expected both when called separately and implicitly during
-    // set.
-    clusterParam->addValidator([&](const test::ChangeStreamOptionsClusterParam& newVal) {
-        if (newVal.getPreAndPostImages().getExpireAfterSeconds() < 0) {
-            return Status(ErrorCodes::BadValue, "Should be positive value only");
-        }
-        return Status::OK();
-    });
     updatedPrePostImgs.setExpireAfterSeconds(-1);
     updatedParam.setPreAndPostImages(updatedPrePostImgs);
     updatedParam.setTestStringField("newTestString");
@@ -427,7 +416,7 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 35);
     ASSERT_EQ(retrievedParam.getTestStringField(), "default");
     ASSERT_EQ(clusterParam->getClusterParameterTime(), LogicalTime());
-    ASSERT_EQ(count, 3);
+    ASSERT_EQ(test::count, 3);
 }
 
 }  // namespace

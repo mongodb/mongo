@@ -31,12 +31,84 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/stdx/mutex.h"
+
 namespace mongo {
 namespace test {
 
 struct ExtraDataForServerParameter {
     std::string value = "start value";
     bool flag = true;
+};
+
+class SpecializedClusterServerParameterData {
+public:
+    SpecializedClusterServerParameterData()
+        : _clusterParameterTime(), _strData("default"), _intData(30){};
+
+    SpecializedClusterServerParameterData(const std::string& newStrData, std::uint32_t newIntData)
+        : _strData(newStrData), _intData(newIntData) {}
+
+    const LogicalTime getClusterParameterTime() const {
+        stdx::lock_guard<Latch> lg(_mutex);
+        return _clusterParameterTime;
+    }
+
+    const StringData getStrData() const {
+        stdx::lock_guard<Latch> lg(_mutex);
+        return _strData;
+    }
+
+    const std::uint32_t getIntData() const {
+        stdx::lock_guard<Latch> lg(_mutex);
+        return _intData;
+    }
+
+    void setClusterParameterTime(const LogicalTime& clusterParameterTime) {
+        stdx::lock_guard<Latch> lg(_mutex);
+        _clusterParameterTime = clusterParameterTime;
+    }
+
+    void setStrData(const std::string& strData) {
+        stdx::lock_guard<Latch> lg(_mutex);
+        _strData = strData;
+    }
+
+    void setIntData(std::int32_t intData) {
+        stdx::lock_guard<Latch> lg(_mutex);
+        _intData = intData;
+    }
+
+    void parse(const BSONObj& updatedObj) {
+        stdx::lock_guard<Latch> lg(_mutex);
+        _clusterParameterTime = LogicalTime(updatedObj["clusterParameterTime"].timestamp());
+        _strData = updatedObj["strData"].String();
+        _intData = updatedObj["intData"].Int();
+    }
+
+    const void serialize(BSONObjBuilder* builder) const {
+        stdx::lock_guard<Latch> lg(_mutex);
+        builder->append("clusterParameterTime"_sd, _clusterParameterTime.asTimestamp());
+        builder->append("strData"_sd, _strData);
+        builder->append("intData"_sd, _intData);
+    }
+
+    void reset() {
+        stdx::lock_guard<Latch> lg(_mutex);
+        _clusterParameterTime = LogicalTime();
+        _strData = "default";
+        _intData = 30;
+    }
+
+private:
+    LogicalTime _clusterParameterTime;
+    std::string _strData;
+    std::int32_t _intData;
+
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("SpecializedClusterServerParameterStorage::_mutex");
 };
 
 }  // namespace test

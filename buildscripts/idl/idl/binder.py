@@ -1283,7 +1283,10 @@ def _bind_server_parameter_class(ctxt, ast_param, param):
     ast_param.cpp_class.name = cls.name
     ast_param.cpp_class.data = cls.data
     ast_param.cpp_class.override_ctor = cls.override_ctor
-    ast_param.cpp_class.override_set = cls.override_set
+    ast_param.cpp_class.override_validate = cls.override_validate
+
+    # If set_at is cluster, then set must be overridden. Otherwise, use the parsed value.
+    ast_param.cpp_class.override_set = True if param.set_at == ['cluster'] else cls.override_set
 
     return ast_param
 
@@ -1323,6 +1326,11 @@ def _bind_server_parameter_set_at(ctxt, param):
         # Readonly may not be mixed with startup or runtime
         return "ServerParameterType::kReadOnly"
 
+    if param.set_at == ['cluster']:
+        # Cluster-wide parameters may not be mixed with startup or runtime.
+        # They are implicitly runtime-only.
+        return "ServerParameterType::kClusterWide"
+
     set_at = 0
     for psa in param.set_at:
         if psa.lower() == 'startup':
@@ -1333,16 +1341,18 @@ def _bind_server_parameter_set_at(ctxt, param):
             ctxt.add_bad_setat_specifier(param, psa)
             return None
 
-    if set_at == 1:
-        return "ServerParameterType::kStartupOnly"
-    elif set_at == 2:
-        return "ServerParameterType::kRuntimeOnly"
-    elif set_at == 3:
-        return "ServerParameterType::kStartupAndRuntime"
-    else:
-        # Can't happen based on above logic.
-        ctxt.add_bad_setat_specifier(param, ','.join(param.set_at))
-        return None
+    mask_to_text = {
+        1: "ServerParameterType::kStartupOnly",
+        2: "ServerParameterType::kRuntimeOnly",
+        3: "ServerParameterType::kStartupAndRuntime",
+    }
+
+    if set_at in mask_to_text:
+        return mask_to_text[set_at]
+
+    # Can't happen based on above logic.
+    ctxt.add_bad_setat_specifier(param, ','.join(param.set_at))
+    return None
 
 
 def _bind_server_parameter(ctxt, param):

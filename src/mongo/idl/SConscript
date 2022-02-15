@@ -139,6 +139,7 @@ env.CppUnitTest(
         'config_option_test.idl',
         'server_parameter_specialized_test.idl',
         'server_parameter_with_storage_test.idl',
+        'server_parameter_with_storage_test_structs.idl',
         'unittest.idl',
         'unittest_import.idl',
     ],

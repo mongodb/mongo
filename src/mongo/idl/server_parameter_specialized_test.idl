@@ -99,3 +99,18 @@ server_parameters:
             data: std::string
         redact: true
         test_only: false
+    specializedWithValidate:
+        description: "Has custom validation method"
+        set_at: runtime
+        cpp_class:
+            name: SpecializedWithValidateServerParameter
+            override_validate: true
+            data: std::int32_t
+    specializedCluster:
+        description: "Specialized cluster server parameter"
+        set_at: cluster
+        cpp_class:
+            name: SpecializedClusterServerParameter
+            override_set: true
+            override_validate: true
+            data: SpecializedClusterServerParameterData

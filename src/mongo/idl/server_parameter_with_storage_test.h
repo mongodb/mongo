@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/idl/server_parameter.h"
+#include "mongo/idl/server_parameter_with_storage_test_structs_gen.h"
 
 namespace mongo {
 namespace test {
@@ -45,6 +46,9 @@ extern AtomicWord<int> gStdIntPreallocated;
 // Counter for how many times gStdIntPreallocated has been modified.
 extern AtomicWord<int> gStdIntPreallocatedUpdateCount;
 
+// Counter for how many times changeStreamOptions has been modified.
+extern size_t count;
+
 /**
  * Validates that the proposed new value is odd.
  */
@@ -53,11 +57,29 @@ inline Status validateOdd(const std::int32_t& value) {
 }
 
 /**
+ * Validates that the new expireAfterSeconds is non-negative.
+ */
+inline Status validateNonNegativeExpireAfterSeconds(const ChangeStreamOptionsClusterParam& newVal) {
+    if (newVal.getPreAndPostImages().getExpireAfterSeconds() < 0) {
+        return Status(ErrorCodes::BadValue, "Should be non-negative value only");
+    }
+    return Status::OK();
+}
+
+/**
  * Bumps the count of gStdIntPreallocatedUpdateCount in response
  * to the successful update of gStdIntPreallocated.
  */
 inline Status onUpdateStdIntPreallocated(const std::int32_t&) {
     gStdIntPreallocatedUpdateCount.fetchAndAdd(1);
+    return Status::OK();
+}
+
+/**
+ * Bumps count in response to the successful update of changeStreamOptions.
+ */
+inline Status onUpdateChangeStreamOptions(const ChangeStreamOptionsClusterParam&) {
+    ++count;
     return Status::OK();
 }
 

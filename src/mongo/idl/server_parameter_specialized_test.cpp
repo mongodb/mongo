@@ -309,6 +309,8 @@ TEST(SpecializedServerParameter, withOptions) {
     ASSERT_APPENDED_STRING(dswo, "###");
 }
 
+// specializedRuntimeOnly
+
 void SpecializedRuntimeOnly::append(OperationContext*, BSONObjBuilder&, const std::string&) {}
 
 Status SpecializedRuntimeOnly::setFromString(const std::string& value) {
@@ -382,6 +384,147 @@ TEST(SpecializedServerParameter, withScope) {
         makeServerParameter<SpecializedRuntimeOnly>(kSpecializedRuntimeOnly, SPT::kClusterWide);
     ASSERT(nullptr != clusterSRO);
     // Pointer now belongs to ServerParameterSet, no need to delete.
+}
+
+// specializedWithValidateServerParameter
+
+void SpecializedWithValidateServerParameter::append(OperationContext*,
+                                                    BSONObjBuilder&,
+                                                    const std::string&) {}
+
+Status SpecializedWithValidateServerParameter::setFromString(const std::string& str) {
+    return NumberParser{}(str, &_data);
+}
+
+Status SpecializedWithValidateServerParameter::validate(const BSONElement& newValueElement) const {
+    try {
+        auto val = newValueElement.Int();
+        if (val < 0) {
+            return Status{ErrorCodes::BadValue,
+                          "specializedWithValidate must be a non-negative integer"};
+        }
+    } catch (const AssertionException&) {
+        return {ErrorCodes::BadValue, "Failed parsing specializedWithValidate"};
+    }
+
+    return Status::OK();
+}
+
+TEST(SpecializedServerParameter, withValidate) {
+    auto* nodeSet = ServerParameterSet::getNodeParameterSet();
+
+    constexpr auto kSpecializedWithValidate = "specializedWithValidate"_sd;
+    auto* validateSP = nodeSet->getIfExists(kSpecializedWithValidate);
+    ASSERT(nullptr != validateSP);
+
+    // Assert that validate works by itself.
+    ASSERT_OK(validateSP->validate(BSON(kSpecializedWithValidate << 5).firstElement()));
+    ASSERT_OK(validateSP->validate(BSON(kSpecializedWithValidate << 0).firstElement()));
+    ASSERT_NOT_OK(validateSP->validate(BSON(kSpecializedWithValidate << -1).firstElement()));
+
+    // Assert that validate works when called within set.
+    ASSERT_OK(validateSP->set(BSON(kSpecializedWithValidate << 5).firstElement()));
+    ASSERT_OK(validateSP->set(BSON(kSpecializedWithValidate << 0).firstElement()));
+    ASSERT_NOT_OK(validateSP->set(BSON(kSpecializedWithValidate << -1).firstElement()));
+}
+
+// specializedWithClusterServerParameter
+
+void SpecializedClusterServerParameter::append(OperationContext*,
+                                               BSONObjBuilder& builder,
+                                               const std::string& name) {
+    BSONObjBuilder subObjBuilder = builder.subobjStart(name);
+    _data.serialize(&subObjBuilder);
+    subObjBuilder.done();
+}
+
+Status SpecializedClusterServerParameter::set(const BSONElement& newValueElement) {
+    Status status = validate(newValueElement);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    _data.parse(newValueElement.Obj());
+    return Status::OK();
+}
+
+Status SpecializedClusterServerParameter::validate(const BSONElement& newValueElement) const {
+    try {
+        auto obj = newValueElement.Obj();
+        auto strValue = obj["strData"_sd].String();
+        auto intValue = obj["intData"_sd].Int();
+
+        if (strValue.size() == 0 || intValue < 0) {
+            return Status{ErrorCodes::BadValue,
+                          "Invalid fields provided to specializedCluster parameter"};
+        }
+    } catch (const AssertionException&) {
+        return {ErrorCodes::BadValue, "Failed parsing specializedCluster parameter"};
+    }
+
+    return Status::OK();
+}
+
+Status SpecializedClusterServerParameter::reset() {
+    _data.reset();
+    return Status::OK();
+}
+
+const LogicalTime SpecializedClusterServerParameter::getClusterParameterTime() const {
+    return _data.getClusterParameterTime();
+}
+
+TEST(SpecializedServerParameter, clusterServerParameter) {
+    auto* clusterSet = ServerParameterSet::getClusterParameterSet();
+    constexpr auto kSpecializedCSPName = "specializedCluster"_sd;
+
+    auto* specializedCsp = clusterSet->getIfExists(kSpecializedCSPName);
+    ASSERT(nullptr != specializedCsp);
+
+    // Assert that the parameter can be set.
+    BSONObjBuilder builder;
+    SpecializedClusterServerParameterData data;
+    LogicalTime updateTime = LogicalTime(Timestamp(Date_t::now()));
+    data.setClusterParameterTime(updateTime);
+    data.setIntData(50);
+    data.setStrData("hello");
+    data.serialize(&builder);
+    ASSERT_OK(specializedCsp->set(builder.asTempObj()));
+
+    // Assert that the parameter cannot be set from strings.
+    ASSERT_NOT_OK(specializedCsp->setFromString(""));
+
+    // Assert that the clusterParameterTime can be retrieved.
+    ASSERT_EQ(specializedCsp->getClusterParameterTime(), updateTime);
+
+    // Assert that the parameter can be appended to a builder.
+    builder.resetToEmpty();
+    specializedCsp->append(nullptr, builder, kSpecializedCSPName.toString());
+    auto obj = builder.asTempObj()["specializedCluster"_sd].Obj();
+    ASSERT_EQ(obj.nFields(), 3);
+    ASSERT_EQ(obj["clusterParameterTime"_sd].timestamp(), updateTime.asTimestamp());
+    ASSERT_EQ(obj["strData"_sd].String(), "hello");
+    ASSERT_EQ(obj["intData"_sd].Int(), 50);
+
+    // Assert that invalid parameter values fail validation directly and implicitly during set.
+    builder.resetToEmpty();
+    updateTime = LogicalTime(Timestamp(Date_t::now()));
+    data.setClusterParameterTime(updateTime);
+    data.setIntData(-1);
+    data.setStrData("");
+    data.serialize(&builder);
+    ASSERT_NOT_OK(specializedCsp->validate(builder.asTempObj()));
+    ASSERT_NOT_OK(specializedCsp->set(builder.asTempObj()));
+
+    // Assert that the parameter can be reset to its defaults.
+    builder.resetToEmpty();
+    ASSERT_OK(specializedCsp->reset());
+    specializedCsp->append(nullptr, builder, kSpecializedCSPName.toString());
+    obj = builder.asTempObj()["specializedCluster"_sd].Obj();
+    ASSERT_EQ(obj.nFields(), 3);
+    ASSERT_EQ(obj["clusterParameterTime"_sd].timestamp(), LogicalTime().asTimestamp());
+    ASSERT_EQ(obj["strData"_sd].String(), "default");
+    ASSERT_EQ(obj["intData"_sd].Int(), 30);
 }
 
 }  // namespace test

@@ -835,6 +835,7 @@ class ServerParameterClass(common.SourceLocation):
         self.data = None  # type: str
         self.override_ctor = False  # type: bool
         self.override_set = False  # type: bool
+        self.override_validate = False  # type: bool
 
         super(ServerParameterClass, self).__init__(file_name, line, column)
 

@@ -2019,7 +2019,7 @@ class TestBinder(testcase.IDLTestcase):
 
         # server parameter with storage.
         # Also try valid set_at values.
-        for set_at in ["startup", "runtime", "[ startup, runtime ]"]:
+        for set_at in ["startup", "runtime", "[ startup, runtime ]", "cluster"]:
             self.assert_bind(
                 textwrap.dedent("""
             server_parameters:
@@ -2038,6 +2038,24 @@ class TestBinder(testcase.IDLTestcase):
                 description: bar
                 cpp_varname: baz
                 default: 42
+                on_update: buzz
+                validator:
+                    gt: 0
+                    gte: 1
+                    lte: 999
+                    lt: 1000
+                    callback: qux
+            """))
+
+        # Cluster server parameter with storage.
+        self.assert_bind(
+            textwrap.dedent("""
+        server_parameters:
+            foo:
+                set_at: cluster
+                description: bar
+                cpp_varname: baz
+                cpp_vartype: bazStorage
                 on_update: buzz
                 validator:
                     gt: 0
@@ -2099,6 +2117,7 @@ class TestBinder(testcase.IDLTestcase):
                     data: bling
                     override_set: true
                     override_ctor: false
+                    override_validate: true
         """))
 
         self.assert_bind(
@@ -2108,6 +2127,21 @@ class TestBinder(testcase.IDLTestcase):
                 set_at: startup
                 description: bar
                 cpp_class: baz
+                condition: { expr: "true" }
+                redact: true
+                test_only: true
+                deprecated_name: bling
+        """))
+
+        self.assert_bind(
+            textwrap.dedent("""
+        server_parameters:
+            foo:
+                set_at: cluster
+                description: bar
+                cpp_class:
+                    name: baz
+                    override_validate: true
                 condition: { expr: "true" }
                 redact: true
                 test_only: true
@@ -2152,7 +2186,7 @@ class TestBinder(testcase.IDLTestcase):
 
     def test_config_option_positive(self):
         # type: () -> None
-        """Posative config option test cases."""
+        """Positive config option test cases."""
 
         # Every field.
         self.assert_bind(

@@ -33,30 +33,7 @@ global:
   
 imports:
   - "mongo/idl/basic_types.idl"
-  - "mongo/idl/cluster_server_parameter.idl"
-
-structs:
-  preAndPostImagesStruct:
-    description: "Test struct storing pre/post image config params"
-    fields:
-      expireAfterSeconds: 
-        description: "Amount of time before image should expire"
-        type: safeInt64
-        default: 30
-
-  changeStreamOptionsClusterParam:
-    description: "Test struct storing change stream options"
-    inline_chained_structs: true
-    chained_structs:
-      ClusterServerParameter: ClusterServerParameter
-    fields:
-      preAndPostImages: 
-        description: "Stores config about pre/post images"
-        type: preAndPostImagesStruct
-      testStringField:
-        description: "Field to test string parsing"
-        type: string
-        default: ""
+  - "mongo/idl/server_parameter_with_storage_test_structs.idl"
 
 server_parameters:
   stdIntPreallocated:
@@ -114,4 +91,13 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: gUglyComplicatedNameSp
     default: true
+
+  changeStreamOptions:
+    set_at: cluster
+    description: "IDL-generated cluster server parameter"
+    cpp_vartype: ChangeStreamOptionsClusterParam
+    cpp_varname: clusterParamStorage
+    validator:
+      callback: "validateNonNegativeExpireAfterSeconds"
+    on_update: "onUpdateChangeStreamOptions"
 

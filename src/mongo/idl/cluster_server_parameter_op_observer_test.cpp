@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
-#include "mongo/idl/cluster_server_parameter_op_observer_test.h"
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/dbdirectclient.h"
@@ -138,16 +136,6 @@ BSONObj makeClusterParametersDoc(const LogicalTime& cpTime, int intValue, String
     cspt.setStrValue(strValue);
 
     return cspt.toBSON();
-}
-
-// TO-DO: Make this IDL-generated in SERVER-62253.
-ClusterServerParameterTest cspTestStorage;
-MONGO_SERVER_PARAMETER_REGISTER(RegisterCSPTest)(InitializerContext*) {
-    [[maybe_unused]] auto* csp = ([]() -> ServerParameter* {
-        auto* ret = makeIDLServerParameterWithStorage<ServerParameterType::kClusterWide>(
-            kCSPTest, cspTestStorage);
-        return ret;
-    })();
 }
 
 class ClusterServerParameterOpObserverTest : public ServiceContextMongoDTest {

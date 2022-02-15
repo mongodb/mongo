@@ -50,3 +50,10 @@ structs:
                 description: String value
                 type: string
                 default: ""
+
+server_parameters:
+    cspTest:
+        set_at: cluster
+        description: "Cluster server parameter OpObserver test param"
+        cpp_vartype: ClusterServerParameterTest
+        cpp_varname: cspTestStorage

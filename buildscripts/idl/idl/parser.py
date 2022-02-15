@@ -872,6 +872,7 @@ def _parse_server_parameter_class(ctxt, node):
             "data": _RuleDesc('scalar'),
             "override_ctor": _RuleDesc('bool_scalar'),
             "override_set": _RuleDesc('bool_scalar'),
+            "override_validate": _RuleDesc('bool_scalar'),
         })
 
     return spc

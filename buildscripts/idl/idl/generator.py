@@ -842,6 +842,17 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 self._writer.write_line('Status set(const BSONElement&) final;')
             self._writer.write_line('Status setFromString(const std::string&) final;')
 
+            # If override_validate is set, provide an override definition. Otherwise, it will inherit
+            # from the base ServerParameter implementation.
+            if cls.override_validate:
+                self._writer.write_line('Status validate(const BSONElement&) const final;')
+
+            # The reset() and getClusterParameterTime() methods must be custom implemented for
+            # specialized cluster server parameters. Provide the declarations here.
+            if scp.set_at == 'ServerParameterType::kClusterWide':
+                self._writer.write_line('Status reset() final;')
+                self._writer.write_line('const LogicalTime getClusterParameterTime() const final;')
+
             if cls.data is not None:
                 self.write_empty_line()
                 if scp.default is not None:
@@ -2295,8 +2306,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # type: (ast.ServerParameter) -> None
         """Generate storage for default and/or append method for a specialized ServerParameter."""
         cls = param.cpp_class
+        is_cluster_param = (param.set_at == 'ServerParameterType::kClusterWide')
 
-        if param.default or param.redact:
+        if param.default or param.redact or is_cluster_param:
             self.gen_description_comment("%s: %s" % (param.name, param.description))
 
         if param.default:
@@ -2309,6 +2321,15 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     'void %s::append(OperationContext*, BSONObjBuilder& b, const std::string& name) {'
                     % (cls.name), '}'):
                 self._writer.write_line('b << name << "###";')
+            self.write_empty_line()
+
+        # Specialized cluster parameters should also provide the implementation of setFromString().
+        if is_cluster_param:
+            with self._block('Status %s::setFromString(const std::string& str) {' % (cls.name),
+                             '}'):
+                self._writer.write_line(
+                    'return {ErrorCodes::BadValue, "setFromString should never be used with cluster server parameters"};'
+                )
             self.write_empty_line()
 
     def _gen_server_parameter_with_storage(self, param):
@@ -2638,7 +2659,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         self.write_empty_line()
 
-        # Generate namesapce
+        # Generate namespace
         with self.gen_namespace_block(spec.globals.cpp_namespace):
             self.write_empty_line()
 

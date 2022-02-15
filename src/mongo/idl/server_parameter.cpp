@@ -49,6 +49,11 @@ ServerParameter::ServerParameter(StringData name, ServerParameterType spt)
     : _name{name}, _type(spt) {}
 
 Status ServerParameter::set(const BSONElement& newValueElement) {
+    auto validateStatus = validate(newValueElement);
+    if (!validateStatus.isOK()) {
+        return validateStatus;
+    }
+
     auto swValue = _coerceToString(newValueElement);
     if (!swValue.isOK())
         return swValue.getStatus();
