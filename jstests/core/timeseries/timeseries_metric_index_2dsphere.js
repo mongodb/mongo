@@ -92,12 +92,15 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(insert(timeseriescoll, twoDSphereDocs),
                          'Failed to insert twoDSphereDocs: ' + tojson(twoDSphereDocs));
 
-    const invalidDocs = [
-        {
-            _id: 6,
-            [timeFieldName]: ISODate(),
-            location: {type: "Polygon", coordinates: [[0, 0], [1, 0], [1, 1], [0, 0]]}
-        },
+    // Test invalid documents
+    const docWithInvalidCoordinates = {
+        _id: 6,
+        [timeFieldName]: ISODate(),
+        location: {type: "Polygon", coordinates: [[0, 0], [1, 0], [1, 1], [0, 0]]}
+    };
+    // Can't extract geo keys: GeoJSON coordinates must be an array
+    assert.commandFailedWithCode(insert(timeseriescoll, docWithInvalidCoordinates), 183934);
+    const docsWithTypeNotPoint = [
         {
             _id: 7,
             [timeFieldName]: ISODate(),
@@ -109,10 +112,10 @@ TimeseriesTest.run((insert) => {
             location: {type: "LineString", coordinates: [[0, 0], [1, 0], [1, 1], [0, 0]]}
         }
     ];
-    for (const invalidDoc in invalidDocs) {
-        assert.commandFailedWithCode(assert.throws(() => insert(timeseriescoll, invalidDoc)),
-                                                  ErrorCodes.BadValue);
-    }
+    docsWithTypeNotPoint.forEach((invalidDoc) => {
+        // Time-series collections '2dsphere' indexes only support point data
+        assert.commandFailedWithCode(insert(timeseriescoll, invalidDoc), 183493);
+    });
 
     // Assert that geoWithin queries use the index.
     const geoWithinPlan =
