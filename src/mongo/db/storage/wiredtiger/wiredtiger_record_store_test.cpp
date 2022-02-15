@@ -48,6 +48,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
@@ -993,6 +994,55 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
         ASSERT(cursor->seekExact(rid1));
         ASSERT_TRUE(ru->inActiveTxn());
     }
+}
+
+// Make sure numRecords is accurate after a delete rolls back and some other transaction deletes the
+// same rows before we have a chance of patching up the metadata.
+TEST(WiredTigerRecordStoreTest, NumRecordsAccurateAfterRollbackWithDelete) {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+
+    RecordId rid;  // This record will be deleted by two transactions.
+
+    ServiceContext::UniqueOperationContext ctx(harnessHelper->newOperationContext());
+    {
+        WriteUnitOfWork uow(ctx.get());
+        rid = rs->insertRecord(ctx.get(), "a", 2, Timestamp()).getValue();
+        uow.commit();
+    }
+
+    ASSERT_EQ(1, rs->numRecords(ctx.get()));
+
+    WriteUnitOfWork uow(ctx.get());
+
+    auto aborted = std::make_shared<unittest::Barrier>(2);
+    auto deleted = std::make_shared<unittest::Barrier>(2);
+
+    // This thread will delete the record and then rollback. We'll block the roll back process after
+    // rolling back the WT transaction and before running the rest of the registered changes,
+    // allowing the main thread to delete the same rows again.
+    stdx::thread abortedThread([&harnessHelper, &rs, &rid, aborted, deleted]() {
+        auto client = harnessHelper->serviceContext()->makeClient("c1");
+        auto ctx = harnessHelper->newOperationContext(client.get());
+        WriteUnitOfWork txn(ctx.get());
+        // Registered changes are executed in reverse order.
+        rs->deleteRecord(ctx.get(), rid);
+        ctx.get()->recoveryUnit()->onRollback([&]() { deleted->countDownAndWait(); });
+        ctx.get()->recoveryUnit()->onRollback([&]() { aborted->countDownAndWait(); });
+    });
+
+    // Wait for the other thread to abort.
+    aborted->countDownAndWait();
+
+    rs->deleteRecord(ctx.get(), rid);
+
+    // Notify the other thread we have deleted, let it complete the rollback.
+    deleted->countDownAndWait();
+
+    uow.commit();
+
+    abortedThread.join();
+    ASSERT_EQ(0, rs->numRecords(ctx.get()));
 }
 
 }  // namespace
