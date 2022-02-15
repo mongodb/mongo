@@ -38,25 +38,17 @@ var $config = extendWorkload($config, function($config, $super) {
         // As the default collection created by runner.js won't be clustered we need to recreate it.
         db[coll].drop();
 
-        cluster.executeOnMongodNodes(function(nodeAdminDB) {
-            assert.commandWorked(nodeAdminDB.runCommand(
-                {configureFailPoint: 'clusterAllCollectionsByDefault', mode: 'alwaysOn'}));
-        });
-
-        $super.setup.apply(this, [db, coll, cluster]);
+        assertAlways.commandWorked(
+            db.runCommand({create: coll, clusteredIndex: {key: {_id: 1}, unique: true}}));
+        for (let i = 0; i < this.numIds; i++) {
+            const res = db[coll].insert({_id: i, value: this.docValue, num: 1});
+            assertAlways.commandWorked(res);
+            assert.eq(1, res.nInserted);
+        }
 
         if (cluster.isSharded()) {
             cluster.shardCollection(db[coll], {_id: 1}, true);
         }
-    };
-
-    $config.teardown = function(db, collName, cluster) {
-        $super.teardown.apply(this, [db, collName, cluster]);
-
-        cluster.executeOnMongodNodes(function(nodeAdminDB) {
-            assert.commandWorked(nodeAdminDB.runCommand(
-                {configureFailPoint: 'clusterAllCollectionsByDefault', mode: 'off'}));
-        });
     };
 
     // Exclude dropCollection to prevent implicit collection creation of a non-clustered
