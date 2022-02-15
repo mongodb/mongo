@@ -105,6 +105,7 @@ env.Library(
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
         'aead_encryption',
         'sha_block_${MONGO_CRYPTO}',
     ],

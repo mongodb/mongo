@@ -645,4 +645,92 @@ public:
                               ECCTwiceDerivedTagToken tagToken,
                               ECCTwiceDerivedValueToken valueToken);
 };
+
+/**
+ * Type safe abstraction over the key vault to support unit testing. Used by the various decryption
+ * routines to retrieve the correct keys.
+ *
+ * Keys are identified by UUID in the key vault.
+ */
+class FLEKeyVault {
+public:
+    virtual ~FLEKeyVault();
+
+    FLEUserKeyAndId getUserKeyById(UUID uuid) {
+        return getKeyById<FLEKeyType::User>(uuid);
+    }
+
+    FLEIndexKeyAndId getIndexKeyById(UUID uuid) {
+        return getKeyById<FLEKeyType::Index>(uuid);
+    }
+
+protected:
+    virtual KeyMaterial getKey(UUID uuid) = 0;
+
+private:
+    template <FLEKeyType KeyT>
+    FLEKeyAndId<KeyT> getKeyById(UUID uuid) {
+        auto keyMaterial = getKey(uuid);
+        return FLEKeyAndId<KeyT>(keyMaterial, uuid);
+    }
+};
+
+
+class FLEClientCrypto {
+public:
+    /**
+     * Explicit encrypt a single value into a placeholder.
+     *
+     * Returns FLE2InsertUpdate payload
+     */
+    static std::vector<uint8_t> encrypt(BSONElement element,
+                                        FLEIndexKeyAndId indexKey,
+                                        FLEUserKeyAndId userKey,
+                                        FLECounter counter);
+
+    /**
+     * Generates a client-side payload that is sent to the server.
+     *
+     * Input is a document with FLE2EncryptionPlaceholder placeholders.
+     *
+     * For each field, transforms the field into BinData 6 with a prefix byte of 4
+     *
+     * {
+     *   d : EDCDerivedFromDataTokenAndCounter
+     *   s : ESCDerivedFromDataTokenAndCounter
+     *   c : ECCDerivedFromDataTokenAndCounter
+     *   p : Encrypt(ECOCToken, ESCDerivedFromDataTokenAndCounter ||
+     * ECCDerivedFromDataTokenAndCounter) v : Encrypt(K_KeyId, value),
+     *   e : ServerDataEncryptionLevel1Token,
+     * }
+     */
+    static BSONObj generateInsertOrUpdateFromPlaceholders(const BSONObj& obj,
+                                                          FLEKeyVault* keyVault);
+};
+
+/*
+ * Values of ECOC documents
+ *
+ * Encrypt(ECOCToken, ESCDerivedFromDataTokenAndCounter || ECCDerivedFromDataTokenAndCounter)
+ *
+ * struct {
+ *    uint8_t[64] esc;
+ *    uint8_t[64] ecc;
+ * }
+ */
+struct EncryptedStateCollectionTokens {
+public:
+    EncryptedStateCollectionTokens(ESCDerivedFromDataTokenAndContentionFactorToken s,
+                                   ECCDerivedFromDataTokenAndContentionFactorToken c)
+        : esc(s), ecc(c) {}
+
+    static StatusWith<EncryptedStateCollectionTokens> decryptAndParse(ECOCToken token,
+                                                                      ConstDataRange cdr);
+    StatusWith<std::vector<uint8_t>> serialize(ECOCToken token);
+
+    ESCDerivedFromDataTokenAndContentionFactorToken esc;
+    ECCDerivedFromDataTokenAndContentionFactorToken ecc;
+};
+
+
 }  // namespace mongo
