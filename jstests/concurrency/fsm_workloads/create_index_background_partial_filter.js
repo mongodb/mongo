@@ -2,9 +2,12 @@
 
 /**
  * Executes the create_index_background.js workload, but with a partial filter expression on the
- * indexed field
+ * indexed field.
  *
- * @tags: [creates_background_indexes]
+ * @tags: [
+ *   assumes_balancer_off,
+ *   creates_background_indexes
+ * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');               // For extendWorkload.
 load('jstests/concurrency/fsm_workloads/create_index_background.js');  // For $config.
