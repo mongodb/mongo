@@ -52,5 +52,19 @@ TEST(TickSourceTest, TicksToDurationConversion) {
     tsMicros.reset(1);
     ASSERT_EQ(tsMicros.ticksTo<Microseconds>(tsMicros.getTicks()).count(), 1);
 }
+
+TEST(TickSourceTest, SpansToDurationConversion) {
+    TickSourceMock<Seconds> tsSecs;
+    tsSecs.reset(0);
+    TickSource::Tick zero = tsSecs.getTicks();
+    tsSecs.reset(10);
+    TickSource::Tick ten = tsSecs.getTicks();
+    ASSERT_EQ(tsSecs.spanTo<Seconds>(zero, ten).count(), 10);
+    ASSERT_EQ(tsSecs.spanTo<Seconds>(ten, zero).count(), 0);
+    ASSERT_EQ(tsSecs.spanTo<Milliseconds>(zero, ten).count(), 10 * 1000);
+    ASSERT_EQ(tsSecs.spanTo<Milliseconds>(ten, zero).count(), 0);
+    ASSERT_EQ(tsSecs.spanTo<Microseconds>(zero, ten).count(), 10 * 1000 * 1000);
+    ASSERT_EQ(tsSecs.spanTo<Microseconds>(ten, zero).count(), 0);
+}
 }  // namespace
 }  // namespace mongo

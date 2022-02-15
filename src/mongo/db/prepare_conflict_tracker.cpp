@@ -51,14 +51,8 @@ void PrepareConflictTracker::endPrepareConflict(OperationContext* opCtx) {
         auto tickSource = opCtx->getServiceContext()->getTickSource();
         auto curTick = tickSource->getTicks();
 
-        invariant(_prepareConflictStartTime <= curTick,
-                  str::stream() << "Prepare conflict start time ("
-                                << tickSource->ticksTo<Microseconds>(_prepareConflictStartTime)
-                                << ") is somehow greater than current time ("
-                                << tickSource->ticksTo<Microseconds>(curTick) << ")");
-
         auto curConflictDuration =
-            tickSource->ticksTo<Microseconds>(curTick - _prepareConflictStartTime);
+            tickSource->spanTo<Microseconds>(_prepareConflictStartTime, curTick);
         _prepareConflictDuration.store(_prepareConflictDuration.load() + curConflictDuration);
         _prepareConflictStartTime = 0;
 
