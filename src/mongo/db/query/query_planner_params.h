@@ -55,7 +55,8 @@ struct QueryPlannerParams {
     QueryPlannerParams()
         : options(DEFAULT),
           indexFiltersApplied(false),
-          maxIndexedSolutions(internalQueryPlannerMaxIndexedSolutions.load()) {}
+          maxIndexedSolutions(internalQueryPlannerMaxIndexedSolutions.load()),
+          clusteredCollectionCollator(nullptr) {}
 
     enum Options {
         // You probably want to set this.
