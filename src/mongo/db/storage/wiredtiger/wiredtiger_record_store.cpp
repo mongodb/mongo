@@ -1050,7 +1050,8 @@ long long WiredTigerRecordStore::dataSize(OperationContext* opCtx) const {
 }
 
 long long WiredTigerRecordStore::numRecords(OperationContext* opCtx) const {
-    return _sizeInfo->numRecords.load();
+    auto numRecords = _sizeInfo->numRecords.load();
+    return numRecords > 0 ? numRecords : 0;
 }
 
 int64_t WiredTigerRecordStore::storageSize(OperationContext* opCtx,
@@ -1966,12 +1967,9 @@ void WiredTigerRecordStore::_changeNumRecords(OperationContext* opCtx, int64_t d
     opCtx->recoveryUnit()->onRollback([this, diff]() {
         LOGV2_DEBUG(
             22404, 3, "WiredTigerRecordStore: rolling back NumRecordsChange", "diff"_attr = -diff);
-        if (_sizeInfo->numRecords.addAndFetch(-diff) < 0) {
-            _sizeInfo->numRecords.store(0);
-        }
+        _sizeInfo->numRecords.addAndFetch(-diff);
     });
-    if (_sizeInfo->numRecords.addAndFetch(diff) < 0)
-        _sizeInfo->numRecords.store(0);
+    _sizeInfo->numRecords.addAndFetch(diff);
 }
 
 void WiredTigerRecordStore::_increaseDataSize(OperationContext* opCtx, int64_t amount) {
