@@ -44,6 +44,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
@@ -283,19 +284,37 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
             "tailable cursor unexpectedly has a sort",
             sortComparatorObj.isEmpty() || !findCommand.getTailable());
 
-    // Construct the requests that we will use to establish cursors on the targeted shards,
-    // attaching the shardVersion and txnNumber, if necessary.
+    auto establishCursorsOnShards = [&](const std::set<ShardId>& shardIds) {
+        return establishCursors(
+            opCtx,
+            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+            query.nss(),
+            readPref,
+            // Construct the requests that we will use to establish cursors on the targeted shards,
+            // attaching the shardVersion and txnNumber, if necessary.
+            constructRequestsForShards(opCtx, cm, shardIds, query, appendGeoNearDistanceProjection),
+            findCommand.getAllowPartialResults());
+    };
 
-    auto requests =
-        constructRequestsForShards(opCtx, cm, shardIds, query, appendGeoNearDistanceProjection);
+    try {
+        // Establish the cursors with a consistent shardVersion across shards.
+        params.remotes = establishCursorsOnShards(shardIds);
+    } catch (const DBException& ex) {
+        if (ex.code() == ErrorCodes::CollectionUUIDMismatch &&
+            !ex.extraInfo<CollectionUUIDMismatchInfo>()->actualCollection() &&
+            !shardIds.count(cm.dbPrimary())) {
+            // We received CollectionUUIDMismatchInfo but it does not contain the actual
+            // namespace, and we did not attempt to establish a cursor on the primary shard.
+            // Attempt to do so now in case the collection corresponding to the provided UUID is
+            // unsharded. This should throw CollectionUUIDMismatchInfo, StaleShardVersion, or
+            // StaleDbVersion.
+            establishCursorsOnShards({cm.dbPrimary()});
+            MONGO_UNREACHABLE;
+        }
 
-    // Establish the cursors with a consistent shardVersion across shards.
-    params.remotes = establishCursors(opCtx,
-                                      Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                                      query.nss(),
-                                      readPref,
-                                      requests,
-                                      findCommand.getAllowPartialResults());
+        throw;
+    }
+
 
     // Determine whether the cursor we may eventually register will be single- or multi-target.
 
