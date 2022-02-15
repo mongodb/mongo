@@ -32,6 +32,7 @@
 #include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
 #include "mongo/db/pipeline/abt/agg_expression_visitor.h"
+#include "mongo/db/pipeline/abt/field_map_builder.h"
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
 #include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/pipeline/document_source_bucket_auto.h"
@@ -128,10 +129,9 @@ private:
 };
 
 class ABTTransformerVisitor : public TransformerInterfaceConstVisitor {
-    static constexpr const char* kRootElement = "$root";
-
 public:
-    ABTTransformerVisitor(DSAlgebrizerContext& ctx) : _ctx(ctx) {}
+    ABTTransformerVisitor(DSAlgebrizerContext& ctx, FieldMapBuilder& builder)
+        : _ctx(ctx), _builder(builder) {}
 
     void visit(const projection_executor::AddFieldsProjectionExecutor* transformer) override {
         visitInclusionNode(transformer->getRoot(), true /*isAddingFields*/);
@@ -160,123 +160,18 @@ public:
     }
 
     void generateCombinedProjection() const {
-        auto it = _fieldMap.find(kRootElement);
-        if (it == _fieldMap.cend()) {
+        auto result = _builder.generateABT();
+        if (!result) {
             return;
         }
 
-        ABT result = generateABTForField(it->second);
         auto entry = _ctx.getNode();
         const ProjectionName projName = _ctx.getNextId("combinedProjection");
-        _ctx.setNode<EvaluationNode>(projName, projName, std::move(result), std::move(entry._node));
+        _ctx.setNode<EvaluationNode>(
+            projName, projName, std::move(*result), std::move(entry._node));
     }
 
 private:
-    struct FieldMapEntry {
-        FieldMapEntry(std::string fieldName) : _fieldName(std::move(fieldName)) {
-            uassert(6624200, "Empty field name", !_fieldName.empty());
-        }
-
-        std::string _fieldName;
-        bool _hasKeep = false;
-        bool _hasLeadingObj = false;
-        bool _hasTrailingDefault = false;
-        bool _hasDrop = false;
-        std::string _constVarName;
-
-        std::set<std::string> _childPaths;
-    };
-
-    ABT generateABTForField(const FieldMapEntry& entry) const {
-        const bool isRootEntry = entry._fieldName == kRootElement;
-
-        bool hasLeadingObj = false;
-        bool hasTrailingDefault = false;
-        std::set<std::string> keepSet;
-        std::set<std::string> dropSet;
-        std::map<std::string, std::string> varMap;
-
-        for (const std::string& childField : entry._childPaths) {
-            const FieldMapEntry& childEntry = _fieldMap.at(childField);
-            const std::string& childFieldName = childEntry._fieldName;
-
-            if (childEntry._hasKeep) {
-                keepSet.insert(childFieldName);
-            }
-            if (childEntry._hasDrop) {
-                dropSet.insert(childFieldName);
-            }
-            if (childEntry._hasLeadingObj) {
-                hasLeadingObj = true;
-            }
-            if (childEntry._hasTrailingDefault) {
-                hasTrailingDefault = true;
-            }
-            if (!childEntry._constVarName.empty()) {
-                varMap.emplace(childFieldName, childEntry._constVarName);
-            }
-        }
-
-        const auto& ctxEntry = _ctx.getNode();
-        const ProjectionName& rootProjName = ctxEntry._rootProjection;
-
-        ABT result = make<PathIdentity>();
-        if (hasLeadingObj && (!isRootEntry || rootProjName != _ctx.getScanProjName())) {
-            // We do not need a leading Obj if we are using the scan projection directly (scan
-            // delivers Objects).
-            maybeComposePath(result, make<PathObj>());
-        }
-        if (!keepSet.empty()) {
-            maybeComposePath(result, make<PathKeep>(toUnorderedFieldNameSet(std::move(keepSet))));
-        }
-        if (!dropSet.empty()) {
-            maybeComposePath(result, make<PathDrop>(toUnorderedFieldNameSet(std::move(dropSet))));
-        }
-
-        for (const auto& varMapEntry : varMap) {
-            maybeComposePath(
-                result,
-                make<PathField>(varMapEntry.first,
-                                make<PathConstant>(make<Variable>(varMapEntry.second))));
-        }
-
-        for (const std::string& childPath : entry._childPaths) {
-            const FieldMapEntry& childEntry = _fieldMap.at(childPath);
-
-            ABT childResult = generateABTForField(childEntry);
-            if (!childResult.is<PathIdentity>()) {
-                maybeComposePath(result,
-                                 make<PathField>(childEntry._fieldName,
-                                                 make<PathTraverse>(std::move(childResult))));
-            }
-        }
-
-        if (hasTrailingDefault) {
-            maybeComposePath(result, make<PathDefault>(Constant::emptyObject()));
-        }
-        if (!isRootEntry) {
-            return result;
-        }
-        return make<EvalPath>(std::move(result), make<Variable>(rootProjName));
-    }
-
-    void integrateFieldPath(
-        const FieldPath& fieldPath,
-        const std::function<void(const bool isLastElement, FieldMapEntry& entry)>& fn) {
-        std::string path = kRootElement;
-        auto it = _fieldMap.emplace(path, kRootElement);
-        const size_t fieldPathLength = fieldPath.getPathLength();
-
-        for (size_t i = 0; i < fieldPathLength; i++) {
-            const std::string& fieldName = fieldPath.getFieldName(i).toString();
-            path += '.' + fieldName;
-
-            it.first->second._childPaths.insert(path);
-            it = _fieldMap.emplace(path, fieldName);
-            fn(i == fieldPathLength - 1, it.first->second);
-        }
-    }
-
     void unsupportedTransformer(const TransformerInterface* transformer) const {
         uasserted(ErrorCodes::InternalErrorNotSupported,
                   str::stream() << "Transformer is not supported (code: "
@@ -288,11 +183,11 @@ private:
         node.reportProjectedPaths(&preservedPaths);
 
         for (const std::string& preservedPathStr : preservedPaths) {
-            integrateFieldPath(FieldPath(preservedPathStr),
-                               [](const bool isLastElement, FieldMapEntry& entry) {
-                                   entry._hasLeadingObj = true;
-                                   entry._hasKeep = true;
-                               });
+            _builder.integrateFieldPath(FieldPath(preservedPathStr),
+                                        [](const bool isLastElement, FieldMapEntry& entry) {
+                                            entry._hasLeadingObj = true;
+                                            entry._hasKeep = true;
+                                        });
         }
     }
 
@@ -322,17 +217,17 @@ private:
                 make<EvalPath>(std::move(path), make<Variable>(entry._rootProjection)),
                 std::move(entry._node));
 
-            integrateFieldPath(FieldPath(renamedPathEntry.first),
-                               [&renamedProjName, &isAddingFields](const bool isLastElement,
-                                                                   FieldMapEntry& entry) {
-                                   if (!isAddingFields) {
-                                       entry._hasKeep = true;
-                                   }
-                                   if (isLastElement) {
-                                       entry._constVarName = renamedProjName;
-                                       entry._hasTrailingDefault = true;
-                                   }
-                               });
+            _builder.integrateFieldPath(FieldPath(renamedPathEntry.first),
+                                        [&renamedProjName, &isAddingFields](
+                                            const bool isLastElement, FieldMapEntry& entry) {
+                                            if (!isAddingFields) {
+                                                entry._hasKeep = true;
+                                            }
+                                            if (isLastElement) {
+                                                entry._constVarName = renamedProjName;
+                                                entry._hasTrailingDefault = true;
+                                            }
+                                        });
         }
 
         // Handle general expression projection.
@@ -349,7 +244,7 @@ private:
                                          std::move(getExpr),
                                          std::move(entry._node));
 
-            integrateFieldPath(
+            _builder.integrateFieldPath(
                 computedPath,
                 [&getProjName, &isAddingFields](const bool isLastElement, FieldMapEntry& entry) {
                     if (!isAddingFields) {
@@ -377,18 +272,17 @@ private:
         node.reportProjectedPaths(&preservedPaths);
 
         for (const std::string& preservedPathStr : preservedPaths) {
-            integrateFieldPath(FieldPath(preservedPathStr),
-                               [](const bool isLastElement, FieldMapEntry& entry) {
-                                   if (isLastElement) {
-                                       entry._hasDrop = true;
-                                   }
-                               });
+            _builder.integrateFieldPath(FieldPath(preservedPathStr),
+                                        [](const bool isLastElement, FieldMapEntry& entry) {
+                                            if (isLastElement) {
+                                                entry._hasDrop = true;
+                                            }
+                                        });
         }
     }
 
     DSAlgebrizerContext& _ctx;
-
-    opt::unordered_map<std::string, FieldMapEntry> _fieldMap;
+    FieldMapBuilder& _builder;
 };
 
 class ABTDocumentSourceVisitor : public DocumentSourceConstVisitor {
@@ -655,7 +549,9 @@ public:
     }
 
     void visit(const DocumentSourceSingleDocumentTransformation* source) override {
-        ABTTransformerVisitor visitor(_ctx);
+        const ProjectionName& rootProjName = _ctx.getNode()._rootProjection;
+        FieldMapBuilder builder(rootProjName, rootProjName == _ctx.getScanProjName());
+        ABTTransformerVisitor visitor(_ctx, builder);
         TransformerInterfaceWalker walker(&visitor);
         walker.walk(&source->getTransformer());
         visitor.generateCombinedProjection();

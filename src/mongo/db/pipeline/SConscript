@@ -265,6 +265,7 @@ pipelineEnv.Library(
         'abt/abt_document_source_visitor.cpp',
         'abt/agg_expression_visitor.cpp',
         'abt/expr_algebrizer_context.cpp',
+        'abt/field_map_builder.cpp',
         'abt/match_expression_visitor.cpp',
         'abt/utils.cpp',
         'document_source.cpp',
