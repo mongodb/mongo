@@ -40,7 +40,9 @@
 
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/temporarily_unavailable_exception.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/server_options_general_gen.h"
 #include "mongo/db/snapshot_window_options_gen.h"
 #include "mongo/db/storage/storage_file_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -55,6 +57,9 @@
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
+
+// From src/third_party/wiredtiger/src/include/txn.h
+#define WT_TXN_ROLLBACK_REASON_CACHE "oldest pinned transaction ID rolled back for eviction"
 
 namespace mongo {
 
@@ -154,6 +159,27 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
         return Status::OK();
 
     if (retCode == WT_ROLLBACK) {
+        const auto reasonIsCachePressure = [&] {
+            if (session) {
+                const auto reason = session->get_rollback_reason(session);
+                if (reason) {
+                    return strncmp(WT_TXN_ROLLBACK_REASON_CACHE,
+                                   reason,
+                                   sizeof(WT_TXN_ROLLBACK_REASON_CACHE)) == 0;
+                }
+            }
+            return false;
+        }();
+
+        const bool loadShedding = gLoadShedding;
+        if (loadShedding && reasonIsCachePressure) {
+            str::stream s;
+            if (!prefix.empty())
+                s << prefix << " ";
+            s << retCode << ": " << WT_TXN_ROLLBACK_REASON_CACHE;
+            throw TemporarilyUnavailableException(s);
+        }
+
         throw WriteConflictException(prefix);
     }
 

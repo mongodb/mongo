@@ -1931,7 +1931,7 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
     int ret = cursor->largest_key(cursor);
     if (ret == WT_CACHE_FULL) {
         // Force the caller to rollback its transaction if we can't make progess with eviction.
-        // TODO (SERVER-60839): Convert this to a different error code that is distinguishable from
+        // TODO (SERVER-63620): Convert this to a different error code that is distinguishable from
         // a true write conflict.
         throw WriteConflictException(
             fmt::format("Cache full while performing initial write to '{}'", _ns));

@@ -105,6 +105,11 @@ public:
         void incrementWriteConflicts(long long n);
 
         /**
+         * Increments temporarilyUnavailableErrors by n.
+         */
+        void incrementTemporarilyUnavailableErrors(long long n);
+
+        /**
          * Increments keysInserted by n.
          */
         void incrementKeysInserted(long long n);
@@ -163,6 +168,7 @@ public:
         // Number of read conflicts caused by a prepared transaction.
         AtomicWord<long long> prepareReadConflicts{0};
         AtomicWord<long long> writeConflicts{0};
+        AtomicWord<long long> temporarilyUnavailableErrors{0};
     };
 
     OpDebug() = default;

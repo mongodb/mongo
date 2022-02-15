@@ -32,6 +32,7 @@
 #include <exception>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/concurrency/temporarily_unavailable_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -94,6 +95,7 @@ auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns
     }
 
     int attempts = 0;
+    int attemptsTempUnavailable = 0;
     while (true) {
         try {
             return f();
@@ -102,6 +104,9 @@ auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns
             WriteConflictException::logAndBackoff(attempts, opStr, ns);
             ++attempts;
             opCtx->recoveryUnit()->abandonSnapshot();
+        } catch (TemporarilyUnavailableException const& e) {
+            CurOp::get(opCtx)->debug().additiveMetrics.incrementTemporarilyUnavailableErrors(1);
+            TemporarilyUnavailableException::handle(opCtx, ++attemptsTempUnavailable, opStr, ns, e);
         }
     }
 }

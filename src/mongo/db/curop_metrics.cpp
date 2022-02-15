@@ -54,11 +54,14 @@ ServerStatusMetricField<Counter64> displayScannedObjects("queryExecutor.scannedO
 
 Counter64 scanAndOrderCounter;
 Counter64 writeConflictsCounter;
+Counter64 temporarilyUnavailableErrorsCounter;
 
 ServerStatusMetricField<Counter64> displayScanAndOrder("operation.scanAndOrder",
                                                        &scanAndOrderCounter);
 ServerStatusMetricField<Counter64> displayWriteConflicts("operation.writeConflicts",
                                                          &writeConflictsCounter);
+ServerStatusMetricField<Counter64> displayTemporarilyUnavailableErrors(
+    "operation.temporarilyUnavailableErrors", &temporarilyUnavailableErrorsCounter);
 
 }  // namespace
 
@@ -81,6 +84,8 @@ void recordCurOpMetrics(OperationContext* opCtx) {
         scanAndOrderCounter.increment();
     if (auto n = debug.additiveMetrics.writeConflicts.load(); n > 0)
         writeConflictsCounter.increment(n);
+    if (auto n = debug.additiveMetrics.temporarilyUnavailableErrors.load(); n > 0)
+        temporarilyUnavailableErrorsCounter.increment(n);
 
     queryEngineCounters.incrementQueryEngineCounters(CurOp::get(opCtx));
 }

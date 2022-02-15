@@ -704,6 +704,9 @@ void CurOp::reportState(OperationContext* opCtx, BSONObjBuilder* builder, bool t
     if (auto n = _debug.additiveMetrics.writeConflicts.load(); n > 0) {
         builder->append("writeConflicts", n);
     }
+    if (auto n = _debug.additiveMetrics.temporarilyUnavailableErrors.load(); n > 0) {
+        builder->append("temporarilyUnavailableErrors", n);
+    }
 
     builder->append("numYields", _numYields.load());
 
@@ -851,6 +854,8 @@ void OpDebug::report(OperationContext* opCtx,
     OPDEBUG_TOATTR_HELP_OPTIONAL("keysDeleted", additiveMetrics.keysDeleted);
     OPDEBUG_TOATTR_HELP_ATOMIC("prepareReadConflicts", additiveMetrics.prepareReadConflicts);
     OPDEBUG_TOATTR_HELP_ATOMIC("writeConflicts", additiveMetrics.writeConflicts);
+    OPDEBUG_TOATTR_HELP_ATOMIC("temporarilyUnavailableErrors",
+                               additiveMetrics.temporarilyUnavailableErrors);
 
     pAttrs->add("numYields", curop.numYields());
     OPDEBUG_TOATTR_HELP(nreturned);
@@ -1009,6 +1014,8 @@ void OpDebug::append(OperationContext* opCtx,
     OPDEBUG_APPEND_OPTIONAL(b, "keysDeleted", additiveMetrics.keysDeleted);
     OPDEBUG_APPEND_ATOMIC(b, "prepareReadConflicts", additiveMetrics.prepareReadConflicts);
     OPDEBUG_APPEND_ATOMIC(b, "writeConflicts", additiveMetrics.writeConflicts);
+    OPDEBUG_APPEND_ATOMIC(
+        b, "temporarilyUnavailableErrors", additiveMetrics.temporarilyUnavailableErrors);
 
     OPDEBUG_APPEND_OPTIONAL(b, "dataThroughputLastSecond", dataThroughputLastSecond);
     OPDEBUG_APPEND_OPTIONAL(b, "dataThroughputAverage", dataThroughputAverage);
@@ -1270,6 +1277,9 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     });
     addIfNeeded("writeConflicts", [](auto field, auto args, auto& b) {
         OPDEBUG_APPEND_ATOMIC(b, field, args.op.additiveMetrics.writeConflicts);
+    });
+    addIfNeeded("temporarilyUnavailableErrors", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_ATOMIC(b, field, args.op.additiveMetrics.temporarilyUnavailableErrors);
     });
 
     addIfNeeded("dataThroughputLastSecond", [](auto field, auto args, auto& b) {
@@ -1546,6 +1556,7 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
     keysDeleted = addOptionalLongs(keysDeleted, otherMetrics.keysDeleted);
     prepareReadConflicts.fetchAndAdd(otherMetrics.prepareReadConflicts.load());
     writeConflicts.fetchAndAdd(otherMetrics.writeConflicts.load());
+    temporarilyUnavailableErrors.fetchAndAdd(otherMetrics.temporarilyUnavailableErrors.load());
 }
 
 void OpDebug::AdditiveMetrics::reset() {
@@ -1560,6 +1571,7 @@ void OpDebug::AdditiveMetrics::reset() {
     keysDeleted = boost::none;
     prepareReadConflicts.store(0);
     writeConflicts.store(0);
+    temporarilyUnavailableErrors.store(0);
 }
 
 bool OpDebug::AdditiveMetrics::equals(const AdditiveMetrics& otherMetrics) const {
@@ -1569,11 +1581,16 @@ bool OpDebug::AdditiveMetrics::equals(const AdditiveMetrics& otherMetrics) const
         nUpserted == otherMetrics.nUpserted && keysInserted == otherMetrics.keysInserted &&
         keysDeleted == otherMetrics.keysDeleted &&
         prepareReadConflicts.load() == otherMetrics.prepareReadConflicts.load() &&
-        writeConflicts.load() == otherMetrics.writeConflicts.load();
+        writeConflicts.load() == otherMetrics.writeConflicts.load() &&
+        temporarilyUnavailableErrors.load() == otherMetrics.temporarilyUnavailableErrors.load();
 }
 
 void OpDebug::AdditiveMetrics::incrementWriteConflicts(long long n) {
     writeConflicts.fetchAndAdd(n);
+}
+
+void OpDebug::AdditiveMetrics::incrementTemporarilyUnavailableErrors(long long n) {
+    temporarilyUnavailableErrors.fetchAndAdd(n);
 }
 
 void OpDebug::AdditiveMetrics::incrementKeysInserted(long long n) {
@@ -1622,6 +1639,7 @@ string OpDebug::AdditiveMetrics::report() const {
     OPDEBUG_TOSTRING_HELP_OPTIONAL("keysDeleted", keysDeleted);
     OPDEBUG_TOSTRING_HELP_ATOMIC("prepareReadConflicts", prepareReadConflicts);
     OPDEBUG_TOSTRING_HELP_ATOMIC("writeConflicts", writeConflicts);
+    OPDEBUG_TOSTRING_HELP_ATOMIC("temporarilyUnavailableErrors", temporarilyUnavailableErrors);
 
     return s.str();
 }
@@ -1638,6 +1656,7 @@ void OpDebug::AdditiveMetrics::report(logv2::DynamicAttributes* pAttrs) const {
     OPDEBUG_TOATTR_HELP_OPTIONAL("keysDeleted", keysDeleted);
     OPDEBUG_TOATTR_HELP_ATOMIC("prepareReadConflicts", prepareReadConflicts);
     OPDEBUG_TOATTR_HELP_ATOMIC("writeConflicts", writeConflicts);
+    OPDEBUG_TOATTR_HELP_ATOMIC("temporarilyUnavailableErrors", temporarilyUnavailableErrors);
 }
 
 BSONObj OpDebug::AdditiveMetrics::reportBSON() const {
@@ -1653,6 +1672,7 @@ BSONObj OpDebug::AdditiveMetrics::reportBSON() const {
     OPDEBUG_APPEND_OPTIONAL(b, "keysDeleted", keysDeleted);
     OPDEBUG_APPEND_ATOMIC(b, "prepareReadConflicts", prepareReadConflicts);
     OPDEBUG_APPEND_ATOMIC(b, "writeConflicts", writeConflicts);
+    OPDEBUG_APPEND_ATOMIC(b, "temporarilyUnavailableErrors", temporarilyUnavailableErrors);
     return b.obj();
 }
 
