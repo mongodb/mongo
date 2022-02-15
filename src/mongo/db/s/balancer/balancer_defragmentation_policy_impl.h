@@ -76,9 +76,7 @@ public:
 
     ~BalancerDefragmentationPolicyImpl() {}
 
-    bool isDefragmentingCollection(const UUID& uuid) override {
-        return _defragmentationStates.contains(uuid);
-    }
+    bool isDefragmentingCollection(const UUID& uuid) override;
 
     virtual BSONObj reportProgressOn(const UUID& uuid) override;
 

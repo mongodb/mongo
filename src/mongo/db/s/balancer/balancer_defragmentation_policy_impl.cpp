@@ -412,7 +412,7 @@ public:
             return boost::none;
         }
 
-        _outstandingMerges.push_back(_actionableMerges.front());
+        _outstandingMerges.push_back(std::move(_actionableMerges.front()));
         _actionableMerges.pop_front();
         const auto& nextRequest = _outstandingMerges.back();
         auto version = getShardVersion(opCtx, nextRequest.getDestinationShard(), _nss);
@@ -575,10 +575,8 @@ public:
                         mergedChunk->range = mergeRequest.asMergedRange();
                         mergedChunk->estimatedSizeBytes += chunkToDelete->estimatedSizeBytes;
                         mergedChunk->busyInOperation = false;
-                        // the collection...
                         auto deletedChunkShard = chunkToDelete->shard;
-                        _collectionChunks.erase(chunkToDelete);
-                        //... and the lookup data structures.
+                        // the lookup data structures...
                         _removeIteratorFromSmallChunks(chunkToDelete, deletedChunkShard);
                         if (mergedChunk->estimatedSizeBytes > _smallChunkSizeThresholdBytes) {
                             _removeIteratorFromSmallChunks(mergedChunk, mergedChunk->shard);
@@ -590,6 +588,8 @@ public:
                                 smallChunksInRecipient.sort(compareChunkRangeInfoIterators);
                             }
                         }
+                        //... and the collection
+                        _collectionChunks.erase(chunkToDelete);
                     };
 
                     auto onRetriableError = [&] {
@@ -679,7 +679,7 @@ private:
     };
 
     using ChunkRangeInfos = std::list<ChunkRangeInfo>;
-    using ChunkRangeInfoIterator = std::list<ChunkRangeInfo>::iterator;
+    using ChunkRangeInfoIterator = ChunkRangeInfos::iterator;
 
     static bool compareChunkRangeInfoIterators(const ChunkRangeInfoIterator& lhs,
                                                const ChunkRangeInfoIterator& rhs) {
@@ -1426,6 +1426,12 @@ void BalancerDefragmentationPolicyImpl::abortCollectionDefragmentation(Operation
         _persistPhaseUpdate(opCtx, DefragmentationPhaseEnum::kSplitChunks, coll.getUuid());
     }
 }
+
+bool BalancerDefragmentationPolicyImpl::isDefragmentingCollection(const UUID& uuid) {
+    stdx::lock_guard<Latch> lk(_stateMutex);
+    return _defragmentationStates.contains(uuid);
+}
+
 
 BSONObj BalancerDefragmentationPolicyImpl::reportProgressOn(const UUID& uuid) {
     stdx::lock_guard<Latch> lk(_stateMutex);
