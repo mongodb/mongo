@@ -878,6 +878,12 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
 
     if (opDebug) {
         opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
+        // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
+        if (!opCtx->inMultiDocumentTransaction()) {
+            opCtx->recoveryUnit()->onRollback([opDebug, keysInserted]() {
+                opDebug->additiveMetrics.incrementKeysInserted(-keysInserted);
+            });
+        }
     }
 
     opCtx->getServiceContext()->getOpObserver()->onInserts(
@@ -1168,6 +1174,12 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
 
     if (opDebug) {
         opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
+        // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
+        if (!opCtx->inMultiDocumentTransaction()) {
+            opCtx->recoveryUnit()->onRollback([opDebug, keysDeleted]() {
+                opDebug->additiveMetrics.incrementKeysDeleted(-keysDeleted);
+            });
+        }
     }
 }
 
@@ -1280,6 +1292,13 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
         if (opDebug) {
             opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
             opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
+            // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
+            if (!opCtx->inMultiDocumentTransaction()) {
+                opCtx->recoveryUnit()->onRollback([opDebug, keysInserted, keysDeleted]() {
+                    opDebug->additiveMetrics.incrementKeysInserted(-keysInserted);
+                    opDebug->additiveMetrics.incrementKeysDeleted(-keysDeleted);
+                });
+            }
         }
     }
 
