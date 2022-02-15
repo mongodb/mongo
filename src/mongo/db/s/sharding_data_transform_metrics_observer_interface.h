@@ -27,27 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/sharding_data_transform_metrics_observer.h"
+#pragma once
 
-namespace {
-constexpr int64_t kPlaceholderTimeRemainingForTesting = 0;
-}
+#include "mongo/util/uuid.h"
+
 namespace mongo {
-
-ShardingDataTransformMetricsObserver::ShardingDataTransformMetricsObserver(
-    ShardingDataTransformInstanceMetrics* metrics)
-    : _metrics(metrics) {}
-
-int64_t ShardingDataTransformMetricsObserver::getRemainingTimeMillis() const {
-    return kPlaceholderTimeRemainingForTesting;
-}
-
-int64_t ShardingDataTransformMetricsObserver::getStartTimestamp() const {
-    return _metrics->getStartTimestamp();
-}
-
-const UUID& ShardingDataTransformMetricsObserver::getUuid() const {
-    return _metrics->getUuid();
-}
+class ShardingDataTransformMetricsObserverInterface {
+public:
+    virtual ~ShardingDataTransformMetricsObserverInterface() = default;
+    virtual int64_t getRemainingTimeMillis() const = 0;
+    virtual int64_t getStartTimestamp() const = 0;
+    virtual const UUID& getUuid() const = 0;
+};
 
 }  // namespace mongo

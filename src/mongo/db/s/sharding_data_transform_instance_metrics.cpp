@@ -27,6 +27,43 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/sharding_data_transform_metrics.h"
+#include "mongo/db/s/sharding_data_transform_instance_metrics.h"
+#include "mongo/db/s/sharding_data_transform_metrics_observer.h"
 
-namespace mongo {}
+namespace {
+constexpr int64_t kPlaceholderTimestampForTesting = 0;
+}
+
+namespace mongo {
+
+ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
+    ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
+    : ShardingDataTransformInstanceMetrics{
+          cumulativeMetrics, std::make_unique<ShardingDataTransformMetricsObserver>(this)} {}
+
+ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
+    ShardingDataTransformCumulativeMetrics* cumulativeMetrics, ObserverPtr observer)
+    : _observer{std::move(observer)},
+      _cumulativeMetrics{cumulativeMetrics},
+      _deregister{_cumulativeMetrics->registerInstanceMetrics(_observer.get())},
+      _placeholderUuidForTesting(UUID::gen()) {}
+
+ShardingDataTransformInstanceMetrics::~ShardingDataTransformInstanceMetrics() {
+    if (_deregister) {
+        _deregister();
+    }
+}
+
+int64_t ShardingDataTransformInstanceMetrics::getRemainingTimeMillis() const {
+    return _observer->getRemainingTimeMillis();
+}
+
+int64_t ShardingDataTransformInstanceMetrics::getStartTimestamp() const {
+    return kPlaceholderTimestampForTesting;
+}
+
+const UUID& ShardingDataTransformInstanceMetrics::getUuid() const {
+    return _placeholderUuidForTesting;
+}
+
+}  // namespace mongo

@@ -27,7 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/sharding_data_transform_metrics_observer.h"
+#pragma once
+
+#include "mongo/db/s/sharding_data_transform_metrics_observer_interface.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/functional.h"
 #include <set>

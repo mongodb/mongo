@@ -29,12 +29,30 @@
 
 #pragma once
 
+#include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
+#include "mongo/db/s/sharding_data_transform_metrics_observer_interface.h"
+
 namespace mongo {
 
-
 class ShardingDataTransformInstanceMetrics {
+public:
+    using ObserverPtr = std::unique_ptr<ShardingDataTransformMetricsObserverInterface>;
+
+    ShardingDataTransformInstanceMetrics(ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
+    ShardingDataTransformInstanceMetrics(ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+                                         ObserverPtr observer);
+    ~ShardingDataTransformInstanceMetrics();
+
+    int64_t getRemainingTimeMillis() const;
+    int64_t getStartTimestamp() const;
+    const UUID& getUuid() const;
 
 private:
+    ObserverPtr _observer;
+    ShardingDataTransformCumulativeMetrics* _cumulativeMetrics;
+    ShardingDataTransformCumulativeMetrics::DeregistrationFunction _deregister;
+
+    UUID _placeholderUuidForTesting;
 };
 
 }  // namespace mongo

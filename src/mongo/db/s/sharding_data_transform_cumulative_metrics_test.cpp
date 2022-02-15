@@ -32,7 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/s/sharding_data_transform_metrics_test_fixture.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
@@ -43,37 +43,14 @@
 namespace mongo {
 namespace {
 
-class ObserverMock : public ShardingDataTransformMetricsObserverInterface {
-public:
-    ObserverMock(int64_t startTime, int64_t timeRemaining)
-        : _uuid{UUID::gen()}, _startTime{startTime}, _timeRemaining{timeRemaining} {}
-
-    virtual const UUID& getUuid() const override {
-        return _uuid;
-    }
-
-    virtual int64_t getRemainingTimeMillis() const override {
-        return _timeRemaining;
-    }
-
-    virtual int64_t getStartTimestamp() const override {
-        return _startTime;
-    }
-
-private:
-    UUID _uuid;
-    int64_t _startTime;
-    int64_t _timeRemaining;
-};
-
 class ScopedObserverMock {
 public:
     using Ptr = std::unique_ptr<ScopedObserverMock>;
 
     ScopedObserverMock(int64_t startTime,
                        int64_t timeRemaining,
-                       ShardingDataTransformCumulativeMetrics& parent)
-        : _mock{startTime, timeRemaining}, _deregister{parent.registerInstanceMetrics(&_mock)} {}
+                       ShardingDataTransformCumulativeMetrics* parent)
+        : _mock{startTime, timeRemaining}, _deregister{parent->registerInstanceMetrics(&_mock)} {}
 
     ~ScopedObserverMock() {
         if (_deregister) {
@@ -86,158 +63,56 @@ private:
     ShardingDataTransformCumulativeMetrics::DeregistrationFunction _deregister;
 };
 
-class ShardingDataTransformCumulativeMetricsTest : public unittest::Test {
-protected:
-    constexpr static int64_t kYoungestTime = std::numeric_limits<int64_t>::max();
-    constexpr static int64_t kOldestTime = 1;
-
-    const ObserverMock* getYoungestObserver() {
-        static StaticImmortal<ObserverMock> youngest{kYoungestTime, kYoungestTime};
-        return &youngest.value();
-    }
-
-    const ObserverMock* getOldestObserver() {
-        static StaticImmortal<ObserverMock> oldest{kOldestTime, kOldestTime};
-        return &oldest.value();
-    }
-
-    using SpecialIndexBehaviorMap = stdx::unordered_map<int, std::function<void()>>;
-    const SpecialIndexBehaviorMap kNoSpecialBehavior{};
-    SpecialIndexBehaviorMap registerAtIndex(int index, const ObserverMock* mock) {
-        return SpecialIndexBehaviorMap{
-            {index, [=] { auto ignore = _metrics.registerInstanceMetrics(mock); }}};
-    }
-
-    void performRandomOperations(std::vector<ScopedObserverMock::Ptr>& inserted,
-                                 const int iterations,
-                                 const float removalOdds,
-                                 const int64_t seed,
-                                 const SpecialIndexBehaviorMap& specialBehaviors) {
-        constexpr auto kThresholdScale = 1000;
-        const auto kRemovalThreshold = kThresholdScale * removalOdds;
-        PseudoRandom rng(seed);
-        auto shouldPerformRemoval = [&] {
-            return (rng.nextInt32(kThresholdScale)) < kRemovalThreshold;
-        };
-        auto performInsertion = [&] {
-            auto time = rng.nextInt64(kYoungestTime - 1) + 1;
-            inserted.emplace_back(std::make_unique<ScopedObserverMock>(time, time, _metrics));
-        };
-        auto performRemoval = [&] {
-            auto i = rng.nextInt32(inserted.size());
-            inserted.erase(inserted.begin() + i);
-        };
-        for (auto i = 0; i < iterations; i++) {
-            auto it = specialBehaviors.find(i);
-            if (it != specialBehaviors.end()) {
-                it->second();
-                continue;
-            }
-            if (!inserted.empty() && shouldPerformRemoval()) {
-                performRemoval();
-            } else {
-                performInsertion();
-            }
-        }
-    }
-
-    ShardingDataTransformCumulativeMetrics _metrics;
+class ShardingDataTransformCumulativeMetricsTest : public ShardingDataTransformMetricsTestFixture {
 };
 
 TEST_F(ShardingDataTransformCumulativeMetricsTest, AddAndRemoveMetrics) {
-    auto deregister = _metrics.registerInstanceMetrics(getOldestObserver());
-    ASSERT_EQ(_metrics.getObservedMetricsCount(), 1);
+    auto deregister = _cumulativeMetrics.registerInstanceMetrics(getOldestObserver());
+    ASSERT_EQ(_cumulativeMetrics.getObservedMetricsCount(), 1);
     deregister();
-    ASSERT_EQ(_metrics.getObservedMetricsCount(), 0);
+    ASSERT_EQ(_cumulativeMetrics.getObservedMetricsCount(), 0);
 }
 
 TEST_F(ShardingDataTransformCumulativeMetricsTest, MetricsReportsOldestWhenInsertedFirst) {
-    auto deregisterOldest = _metrics.registerInstanceMetrics(getOldestObserver());
-    auto deregisterYoungest = _metrics.registerInstanceMetrics(getYoungestObserver());
-    ASSERT_EQ(_metrics.getOldestOperationRemainingTimeMillis(), kOldestTime);
+    auto deregisterOldest = _cumulativeMetrics.registerInstanceMetrics(getOldestObserver());
+    auto deregisterYoungest = _cumulativeMetrics.registerInstanceMetrics(getYoungestObserver());
+    ASSERT_EQ(_cumulativeMetrics.getOldestOperationRemainingTimeMillis(), kOldestTime);
 }
 
 TEST_F(ShardingDataTransformCumulativeMetricsTest, MetricsReportsOldestWhenInsertedLast) {
-    auto deregisterYoungest = _metrics.registerInstanceMetrics(getYoungestObserver());
-    auto deregisterOldest = _metrics.registerInstanceMetrics(getOldestObserver());
-    ASSERT_EQ(_metrics.getOldestOperationRemainingTimeMillis(), kOldestTime);
+    auto deregisterYoungest = _cumulativeMetrics.registerInstanceMetrics(getYoungestObserver());
+    auto deregisterOldest = _cumulativeMetrics.registerInstanceMetrics(getOldestObserver());
+    ASSERT_EQ(_cumulativeMetrics.getOldestOperationRemainingTimeMillis(), kOldestTime);
 }
 
 TEST_F(ShardingDataTransformCumulativeMetricsTest, RemainingTimeReports0WhenEmpty) {
-    ASSERT_EQ(_metrics.getObservedMetricsCount(), 0);
-    ASSERT_EQ(_metrics.getOldestOperationRemainingTimeMillis(), 0);
+    ASSERT_EQ(_cumulativeMetrics.getObservedMetricsCount(), 0);
+    ASSERT_EQ(_cumulativeMetrics.getOldestOperationRemainingTimeMillis(), 0);
 }
 
 TEST_F(ShardingDataTransformCumulativeMetricsTest, UpdatesOldestWhenOldestIsRemoved) {
-    auto deregisterYoungest = _metrics.registerInstanceMetrics(getYoungestObserver());
-    auto deregisterOldest = _metrics.registerInstanceMetrics(getOldestObserver());
-    ASSERT_EQ(_metrics.getOldestOperationRemainingTimeMillis(), kOldestTime);
+    auto deregisterYoungest = _cumulativeMetrics.registerInstanceMetrics(getYoungestObserver());
+    auto deregisterOldest = _cumulativeMetrics.registerInstanceMetrics(getOldestObserver());
+    ASSERT_EQ(_cumulativeMetrics.getOldestOperationRemainingTimeMillis(), kOldestTime);
     deregisterOldest();
-    ASSERT_EQ(_metrics.getOldestOperationRemainingTimeMillis(), kYoungestTime);
+    ASSERT_EQ(_cumulativeMetrics.getOldestOperationRemainingTimeMillis(), kYoungestTime);
 }
 
 TEST_F(ShardingDataTransformCumulativeMetricsTest, InsertsTwoWithSameStartTime) {
-    auto deregisterOldest = _metrics.registerInstanceMetrics(getOldestObserver());
+    auto deregisterOldest = _cumulativeMetrics.registerInstanceMetrics(getOldestObserver());
     ObserverMock sameAsOldest{kOldestTime, kOldestTime};
-    auto deregisterOldest2 = _metrics.registerInstanceMetrics(&sameAsOldest);
-    ASSERT_EQ(_metrics.getObservedMetricsCount(), 2);
-    ASSERT_EQ(_metrics.getOldestOperationRemainingTimeMillis(), kOldestTime);
+    auto deregisterOldest2 = _cumulativeMetrics.registerInstanceMetrics(&sameAsOldest);
+    ASSERT_EQ(_cumulativeMetrics.getObservedMetricsCount(), 2);
+    ASSERT_EQ(_cumulativeMetrics.getOldestOperationRemainingTimeMillis(), kOldestTime);
 }
 
 TEST_F(ShardingDataTransformCumulativeMetricsTest, StillReportsOldestAfterRandomOperations) {
-    constexpr auto kIterations = 10000;
-    constexpr auto kRemovalOdds = 0.10f;
-    const auto seed = SecureRandom().nextInt64();
-    LOGV2(6315200, "StillReportsOldestAfterRandomOperations", "seed"_attr = seed);
-    PseudoRandom rng(seed);
-    std::vector<ScopedObserverMock::Ptr> inserted;
-    performRandomOperations(inserted,
-                            kIterations,
-                            kRemovalOdds,
-                            rng.nextInt64(),
-                            registerAtIndex(rng.nextInt32(kIterations), getOldestObserver()));
-    ASSERT_EQ(_metrics.getOldestOperationRemainingTimeMillis(), kOldestTime);
+    doRandomOperationsTest<ScopedObserverMock>();
 }
 
 TEST_F(ShardingDataTransformCumulativeMetricsTest,
        StillReportsOldestAfterRandomOperationsMultithreaded) {
-    constexpr auto kIterations = 10000;
-    constexpr auto kRemovalOdds = 0.10f;
-    constexpr auto kThreadCount = 10;
-    const auto seed = SecureRandom().nextInt64();
-    LOGV2(6315201, "StillReportsOldestAfterRandomOperationsMultithreaded", "seed"_attr = seed);
-    PseudoRandom rng(seed);
-    const auto threadToInsertOldest = rng.nextInt32(kThreadCount);
-    std::vector<std::vector<ScopedObserverMock::Ptr>> threadStorage(kThreadCount);
-    std::vector<PromiseAndFuture<void>> threadPFs;
-    for (auto i = 0; i < kThreadCount; i++) {
-        threadPFs.emplace_back(makePromiseFuture<void>());
-    }
-    std::vector<stdx::thread> threads;
-    for (auto i = 0; i < kThreadCount; i++) {
-        auto& storage = threadStorage[i];
-        auto seed = rng.nextInt64();
-        auto specialBehavior = (i == threadToInsertOldest)
-            ? registerAtIndex(rng.nextInt32(kIterations), getOldestObserver())
-            : kNoSpecialBehavior;
-        auto& done = threadPFs[i].promise;
-        threads.emplace_back([=, &storage, specialBehavior = std::move(specialBehavior), &done] {
-            performRandomOperations(storage, kIterations, kRemovalOdds, seed, specialBehavior);
-            done.emplaceValue();
-        });
-    }
-    for (auto& pf : threadPFs) {
-        pf.future.wait();
-    }
-    ASSERT_EQ(_metrics.getOldestOperationRemainingTimeMillis(), kOldestTime);
-    size_t expectedCount = 1;  // Special insert for kOldest is not counted in vector size.
-    for (auto& v : threadStorage) {
-        expectedCount += v.size();
-    }
-    ASSERT_EQ(_metrics.getObservedMetricsCount(), expectedCount);
-    for (auto& t : threads) {
-        t.join();
-    }
+    doRandomOperationsMultithreadedTest<ScopedObserverMock>();
 }
 
 }  // namespace
