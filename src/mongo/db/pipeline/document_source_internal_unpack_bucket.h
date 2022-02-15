@@ -190,6 +190,31 @@ public:
     std::pair<bool, Pipeline::SourceContainer::iterator> rewriteGroupByMinMax(
         Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
 
+    /**
+     * If the current aggregation is a lastpoint-type query (ie. with a $sort on meta and time
+     * fields, and a $group with a meta _id and only $first or $last accumulators) we can rewrite
+     * it to avoid unpacking all buckets.
+     *
+     * Ex: user aggregation of
+     * [{_internalUnpackBucket: {...}},
+     *  {$sort: {myMeta.a: 1, myTime: -1}},
+     *  {$group: {_id: "$myMeta.a", otherFields: {$first: {$otherFields}}}}]
+     *
+     * will be rewritten into:
+     * [{$sort: {meta.a: 1, time: -1}},
+     *  {$group: {_id: "$meta.a": 1, bucket: {$first: "$_id"}}},
+     *  {$lookup: {
+     *      from: <bucketColl>,
+     *      as: "metrics",
+     *      localField: "bucket",
+     *      foreignField: "_id"
+     *      pipeline: [{$_internalUnpackBucket: {...}}, {$sort: {myTime: -1}}, {$limit: 1}]}},
+     *  {$unwind: "$metrics"},
+     *  {$replaceWith: {_id: "$_id", otherFields: {$metrics.otherFields}}}]
+     */
+    bool optimizeLastpoint(Pipeline::SourceContainer::iterator itr,
+                           Pipeline::SourceContainer* container);
+
     GetModPathsReturn getModifiedPaths() const final override;
 
 private:

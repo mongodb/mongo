@@ -71,7 +71,7 @@ let runMergeOnErrorTestCase = () => {
  */
 let runMergeOnTestCase = () => {
     var mergePipeline = [
-        {$project: {_id: 0, cpu: 1, idle: 1, "tags.hostid": 1, time: 1}},
+        {$project: {_id: 0, cpu: 1, idle_user: 1, "tags.hostid": 1, time: 1}},
         {$sort: {time: 1}},
         {
             $merge: {

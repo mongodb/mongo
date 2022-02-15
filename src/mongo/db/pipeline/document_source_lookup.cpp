@@ -1167,7 +1167,7 @@ intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
     for (auto&& argument : elem.Obj()) {
         const auto argName = argument.fieldNameStringData();
 
-        if (argName == "pipeline"_sd) {
+        if (argName == kPipelineField) {
             pipeline = parsePipelineFromBSON(argument);
             hasPipeline = true;
             continue;
@@ -1183,7 +1183,7 @@ intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
             continue;
         }
 
-        if (argName == "from"_sd) {
+        if (argName == kFromField) {
             fromNs = parseLookupFromAndResolveNamespace(argument, pExpCtx->ns.db());
             continue;
         }
@@ -1203,11 +1203,11 @@ intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
                               << argument << ": " << argument.type(),
                 argument.type() == BSONType::String);
 
-        if (argName == "as"_sd) {
+        if (argName == kAsField) {
             as = argument.String();
-        } else if (argName == "localField"_sd) {
+        } else if (argName == kLocalField) {
             localField = argument.String();
-        } else if (argName == "foreignField"_sd) {
+        } else if (argName == kForeignField) {
             foreignField = argument.String();
         } else {
             uasserted(ErrorCodes::FailedToParse,

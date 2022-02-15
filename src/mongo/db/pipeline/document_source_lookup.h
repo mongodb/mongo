@@ -49,6 +49,11 @@ namespace mongo {
 class DocumentSourceLookUp final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$lookup"_sd;
+    static constexpr StringData kFromField = "from"_sd;
+    static constexpr StringData kLocalField = "localField"_sd;
+    static constexpr StringData kForeignField = "foreignField"_sd;
+    static constexpr StringData kPipelineField = "pipeline"_sd;
+    static constexpr StringData kAsField = "as"_sd;
 
     struct LetVariable {
         LetVariable(std::string name, boost::intrusive_ptr<Expression> expression, Variables::Id id)
