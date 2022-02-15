@@ -5,6 +5,7 @@
  *   requires_fcv_53,
  *   requires_replication,
  *   does_not_support_stepdowns,
+ *   incompatible_with_eft
  * ]
  */
 (function() {
