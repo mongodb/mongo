@@ -719,6 +719,36 @@ private:
                     });
             }
 
+            // TODO SERVER-63563: Only check on last-lts when FCV 5.3 becomes last-continuous.
+            // TODO SERVER-63564: Remove once FCV 6.0 becomes last-lts.
+            for (const auto& tenantDbName : DatabaseHolder::get(opCtx)->getNames()) {
+                const auto& dbName = tenantDbName.dbName();
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+                catalog::forEachCollectionFromDb(
+                    opCtx, tenantDbName, MODE_X, [&](const CollectionPtr& collection) {
+                        auto indexCatalog = collection->getIndexCatalog();
+                        auto indexIt = indexCatalog->getIndexIterator(
+                            opCtx, true /* includeUnfinishedIndexes */);
+                        while (indexIt->more()) {
+                            auto indexEntry = indexIt->next();
+                            uassert(
+                                ErrorCodes::CannotDowngrade,
+                                fmt::format(
+                                    "Cannot downgrade the cluster when there are indexes that have "
+                                    "the 'disallowNewDuplicateKeys' field. Use listIndexes to find "
+                                    "them and drop "
+                                    "the indexes or use collMod to manually set it to false to "
+                                    "remove the field "
+                                    "before downgrading. First detected incompatible index name: "
+                                    "'{}' on collection: '{}'",
+                                    indexEntry->descriptor()->indexName(),
+                                    collection->ns().toString()),
+                                !indexEntry->descriptor()->disallowNewDuplicateKeys());
+                        }
+                        return true;
+                    });
+            }
+
             // Drop the pre-images collection if 'changeStreamPreAndPostImages' feature flag is not
             // enabled on the downgrade version.
             // TODO SERVER-61770: Remove once FCV 6.0 becomes last-lts.
