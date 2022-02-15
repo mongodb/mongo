@@ -17,6 +17,7 @@ var st = new ShardingTest({
     shards: 2,
     mongos: 1,
     useBridge: true,
+    bridgeOptions: {verbose: 'vvv'},
 });
 
 var testDB = st.s.getDB('BlackHoleDB');
