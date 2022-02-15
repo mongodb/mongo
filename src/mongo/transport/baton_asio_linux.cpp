@@ -29,9 +29,13 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
+#include <sys/eventfd.h>
+
 #include "mongo/transport/baton_asio_linux.h"
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -41,11 +45,6 @@
 
 namespace mongo {
 namespace transport {
-
-const Client::Decoration<TransportLayerASIO::BatonASIO::EventFDHolder>
-    TransportLayerASIO::BatonASIO::EventFDHolder::getForClient =
-        Client::declareDecoration<TransportLayerASIO::BatonASIO::EventFDHolder>();
-
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(blockBatonASIOBeforePoll);
@@ -59,13 +58,68 @@ Status getCanceledError() {
 }
 
 /**
- * We use this internal reactor timer to exit run_until calls (by forcing an early timeout for
- * ::poll).
- *
- * Its methods are all unreachable because we never actually use its timer-ness (we just need its
- * address for baton book keeping).
+ * RAII type that wraps up an `eventfd` and reading/writing to it.
+ * We don't use the counter portion and only use the file descriptor (i.e., `fd`) to notify and
+ * interrupt the client thread blocked polling (see `BatonASIO::run`).
  */
-class InternalReactorTimer : public ReactorTimer {
+struct EventFDHolder {
+    EventFDHolder(const EventFDHolder&) = delete;
+    EventFDHolder& operator=(const EventFDHolder&) = delete;
+
+    EventFDHolder() : fd(::eventfd(0, EFD_CLOEXEC)) {
+        // On error, -1 is returned and `errno` is set
+        if (fd < 0) {
+            const auto savedErrno = errno;
+            const auto errorCode = savedErrno == EMFILE || savedErrno == ENFILE
+                ? ErrorCodes::TooManyFilesOpen
+                : ErrorCodes::UnknownError;
+            Status status(errorCode,
+                          fmt::format("error in creating eventfd: {}, errno: {}",
+                                      errnoWithDescription(savedErrno),
+                                      savedErrno));
+            LOGV2_ERROR(6328201, "Unable to create eventfd object", "error"_attr = status);
+            iasserted(status);
+        }
+    }
+
+    ~EventFDHolder() {
+        ::close(fd);
+    }
+
+    void notify() {
+        while (::eventfd_write(fd, 1) != 0) {
+            const auto savedErrno = errno;
+            if (savedErrno == EINTR)
+                continue;
+            LOGV2_FATAL(6328202, "eventfd write failed", "fd"_attr = fd, "errno"_attr = savedErrno);
+        }
+    }
+
+    void wait() {
+        // If we have activity on the `eventfd`, pull the count out.
+        ::eventfd_t u;
+        while (::eventfd_read(fd, &u) != 0) {
+            const auto savedErrno = errno;
+            if (savedErrno == EINTR)
+                continue;
+            LOGV2_FATAL(6328203, "eventfd read failed", "fd"_attr = fd, "errno"_attr = savedErrno);
+        }
+    }
+
+    const int fd;
+};
+
+const auto getEventFDForClient = Client::declareDecoration<EventFDHolder>();
+
+EventFDHolder& efd(OperationContext* opCtx) {
+    return getEventFDForClient(opCtx->getClient());
+}
+
+/**
+ * This is only used by `run_until()`, and provides a unique timer id. This unique id is supplied by
+ * `ReactorTimer`, and used by `waitUntil()` for internal bookkeeping.
+ */
+class DummyTimer final : public ReactorTimer {
 public:
     void cancel(const BatonHandle& baton = nullptr) override {
         MONGO_UNREACHABLE;
@@ -79,74 +133,61 @@ public:
 }  // namespace
 
 void TransportLayerASIO::BatonASIO::schedule(Task func) noexcept {
-    stdx::unique_lock lk(_mutex);
-
-    if (!_opCtx) {
+    auto task = [this, func = std::move(func)](stdx::unique_lock<Mutex> lk) mutable {
+        auto status = _opCtx ? Status::OK() : getDetachedError();
         lk.unlock();
-        func(getDetachedError());
+        func(std::move(status));
+    };
 
+    stdx::unique_lock lk(_mutex);
+    if (!_opCtx) {
+        // Run the task inline if the baton is detached.
+        task(std::move(lk));
         return;
     }
 
-    _scheduled.push_back(
-        [ this, func = std::move(func) ](stdx::unique_lock<Mutex> lk) mutable noexcept {
-            auto status = Status::OK();
-            if (!_opCtx) {
-                status = getDetachedError();
-            }
-            lk.unlock();
-
-            func(status);
-        });
-
-    if (_inPoll) {
-        _efd().notify();
-    }
+    _scheduled.push_back(std::move(task));
+    if (_inPoll)
+        notify();
 }
 
 void TransportLayerASIO::BatonASIO::notify() noexcept {
-    _efd().notify();
+    efd(_opCtx).notify();
 }
 
-/**
- * We synthesize a run_until by creating a synthetic timer which we use to exit run early (we create
- * a regular waitUntil baton event off the timer, with the passed deadline).
- */
 Waitable::TimeoutState TransportLayerASIO::BatonASIO::run_until(ClockSource* clkSource,
                                                                 Date_t deadline) noexcept {
-    InternalReactorTimer irt;
-    auto future = waitUntil(irt, deadline);
+    // Set up a timer on the baton with the specified deadline. This synthetic timer is used by
+    // `_poll()`, which is called through `run()`, to enforce a deadline for the blocking `::poll`.
+    DummyTimer timer;
+    auto future = waitUntil(timer, deadline);
 
     run(clkSource);
 
-    // If the future is ready our timer has fired, in which case we timed out
+    // If the future is ready, our timer interrupted `run()`, in which case we timed out.
     if (future.isReady()) {
         future.get();
-
         return Waitable::TimeoutState::Timeout;
     } else {
-        cancelTimer(irt);
-
+        cancelTimer(timer);
         return Waitable::TimeoutState::NoTimeout;
     }
 }
 
 void TransportLayerASIO::BatonASIO::run(ClockSource* clkSource) noexcept {
-    std::vector<Promise<void>> toFulfill;
-
-    // We'll fulfill promises and run jobs on the way out, ensuring we don't hold any locks
+    // On the way out, fulfill promises and run scheduled jobs without holding the lock.
+    std::list<Promise<void>> toFulfill;
     const ScopeGuard guard([&] {
         for (auto& promise : toFulfill) {
             promise.emplaceValue();
         }
 
         auto lk = stdx::unique_lock(_mutex);
-        while (_scheduled.size()) {
+        while (!_scheduled.empty()) {
             auto scheduled = std::exchange(_scheduled, {});
             for (auto& job : scheduled) {
                 job(std::move(lk));
                 job = nullptr;
-
                 lk = stdx::unique_lock(_mutex);
             }
         }
@@ -154,109 +195,28 @@ void TransportLayerASIO::BatonASIO::run(ClockSource* clkSource) noexcept {
 
     stdx::unique_lock lk(_mutex);
 
-    // If anything was scheduled, run it now.  No need to poll
-    if (_scheduled.size()) {
+    // If anything was scheduled, run it now and skip polling and processing timers.
+    if (!_scheduled.empty())
         return;
-    }
 
-    boost::optional<Date_t> deadline;
-
-    // If we have a timer, poll no longer than that
-    if (_timers.size()) {
-        deadline = _timers.begin()->first;
-    }
-
-    _pollSessions.clear();
-    _pollSet.clear();
-    _pollSessions.reserve(_sessions.size());
-    _pollSet.reserve(_sessions.size() + 1);
-
-    _pollSet.push_back(pollfd{_efd().fd, POLLIN, 0});
-
-    for (auto iter = _sessions.begin(); iter != _sessions.end(); ++iter) {
-        _pollSet.push_back(pollfd{iter->second.fd, iter->second.type, 0});
-        _pollSessions.push_back(iter);
-    }
-
-    auto now = clkSource->now();
-
-    int rval = 0;
-    // If we don't have a timeout, or we have a timeout that's unexpired, run poll.
-    if (!deadline || (*deadline > now)) {
-        if (deadline && !clkSource->tracksSystemClock()) {
-            invariant(
-                clkSource->setAlarm(*deadline, [this, anchor = shared_from_this()] { notify(); }));
-
-            deadline.reset();
-        }
-
-        _inPoll = true;
-        lk.unlock();
-        blockBatonASIOBeforePoll.pauseWhileSet();
-        rval = ::poll(_pollSet.data(),
-                      _pollSet.size(),
-                      deadline ? Milliseconds(*deadline - now).count() : -1);
-        auto savedErrno = errno;
-        lk.lock();
-        _inPoll = false;
-
-        // If poll failed, it better be in EINTR
-        if (rval < 0 && savedErrno != EINTR) {
-            LOGV2_FATAL(50834,
-                        "error in poll: {error}",
-                        "error in poll",
-                        "error"_attr = errnoWithDescription(savedErrno));
-        }
-    }
-
-    now = clkSource->now();
+    toFulfill.splice(toFulfill.end(), _poll(lk, clkSource));
 
     // Fire expired timers
-    for (auto iter = _timers.begin(); iter != _timers.end() && iter->first <= now;) {
-        toFulfill.push_back(std::move(iter->second.promise));
-        _timersById.erase(iter->second.id);
-        iter = _timers.erase(iter);
+    const auto now = clkSource->now();
+    for (auto it = _timers.begin(); it != _timers.end() && it->first <= now;
+         it = _timers.erase(it)) {
+        toFulfill.push_back(std::move(it->second.promise));
+        _timersById.erase(it->second.id);
     }
-
-    // If poll found some activity
-    if (rval > 0) {
-        size_t remaining = rval;
-
-        auto pollIter = _pollSet.begin();
-
-        if (pollIter->revents) {
-            _efd().wait();
-
-            remaining--;
-        }
-
-        ++pollIter;
-
-        for (auto sessionIter = _pollSessions.begin();
-             sessionIter != _pollSessions.end() && remaining;
-             ++sessionIter, ++pollIter) {
-            if (pollIter->revents) {
-                toFulfill.push_back(std::move((*sessionIter)->second.promise));
-                _sessions.erase(*sessionIter);
-
-                remaining--;
-            }
-        }
-
-        invariant(remaining == 0);
-    }
-
-    return;
 }
 
 void TransportLayerASIO::BatonASIO::markKillOnClientDisconnect() noexcept {
-    if (_opCtx->getClient() && _opCtx->getClient()->session()) {
-        _addSession(*(_opCtx->getClient()->session()), POLLRDHUP).getAsync([this](Status s) {
-            if (!s.isOK()) {
-                return;
-            }
-
-            _opCtx->markKilled(ErrorCodes::ClientDisconnect);
+    auto client = _opCtx->getClient();
+    invariant(client);
+    if (auto session = client->session()) {
+        _addSession(*session, POLLRDHUP).getAsync([this](Status status) {
+            if (status.isOK())
+                _opCtx->markKilled(ErrorCodes::ClientDisconnect);
         });
     }
 }
@@ -265,19 +225,15 @@ Future<void> TransportLayerASIO::BatonASIO::addSession(Session& session, Type ty
     return _addSession(session, type == Type::In ? POLLIN : POLLOUT);
 }
 
-Future<void> TransportLayerASIO::BatonASIO::waitUntil(const ReactorTimer& timer,
+Future<void> TransportLayerASIO::BatonASIO::waitUntil(const ReactorTimer& reactorTimer,
                                                       Date_t expiration) noexcept try {
     auto pf = makePromiseFuture<void>();
-    auto id = timer.id();
-
-    stdx::unique_lock lk(_mutex);
-
-    _safeExecute(std::move(lk), [ expiration, timer = Timer{id, std::move(pf.promise)},
-                                  this ](stdx::unique_lock<Mutex>) mutable noexcept {
-        auto iter = _timers.emplace(expiration, std::move(timer));
-        _timersById[iter->second.id] = iter;
-    });
-
+    _safeExecute(stdx::unique_lock(_mutex),
+                 [this, expiration, timer = Timer{reactorTimer.id(), std::move(pf.promise)}](
+                     stdx::unique_lock<Mutex>) mutable {
+                     auto iter = _timers.emplace(expiration, std::move(timer));
+                     _timersById[iter->second.id] = iter;
+                 });
     return std::move(pf.future);
 } catch (const DBException& ex) {
     return ex.toStatus();
@@ -287,17 +243,15 @@ bool TransportLayerASIO::BatonASIO::cancelSession(Session& session) noexcept {
     const auto id = session.id();
 
     stdx::unique_lock lk(_mutex);
-
-    if (_sessions.find(id) == _sessions.end()) {
+    if (_sessions.find(id) == _sessions.end())
         return false;
-    }
 
-    _safeExecute(std::move(lk), [ id, this ](stdx::unique_lock<Mutex> lk) noexcept {
+    _safeExecute(std::move(lk), [this, id](stdx::unique_lock<Mutex> lk) {
         auto iter = _sessions.find(id);
-        if (iter == _sessions.end()) {
+        if (iter == _sessions.end())
             return;
-        }
-        auto session = std::exchange(iter->second, {});
+
+        TransportSession session = std::exchange(iter->second, {});
         _sessions.erase(iter);
         lk.unlock();
 
@@ -311,19 +265,15 @@ bool TransportLayerASIO::BatonASIO::cancelTimer(const ReactorTimer& timer) noexc
     const auto id = timer.id();
 
     stdx::unique_lock lk(_mutex);
-
-    if (_timersById.find(id) == _timersById.end()) {
+    if (_timersById.find(id) == _timersById.end())
         return false;
-    }
 
-    _safeExecute(std::move(lk), [ id, this ](stdx::unique_lock<Mutex> lk) noexcept {
+    _safeExecute(std::move(lk), [this, id](stdx::unique_lock<Mutex> lk) {
         auto iter = _timersById.find(id);
-
-        if (iter == _timersById.end()) {
+        if (iter == _timersById.end())
             return;
-        }
 
-        auto timer = std::exchange(iter->second->second, {});
+        Timer timer = std::exchange(iter->second->second, {});
         _timers.erase(iter->second);
         _timersById.erase(iter);
         lk.unlock();
@@ -339,22 +289,106 @@ bool TransportLayerASIO::BatonASIO::canWait() noexcept {
     return _opCtx;
 }
 
-TransportLayerASIO::BatonASIO::EventFDHolder& TransportLayerASIO::BatonASIO::_efd() {
-    return EventFDHolder::getForClient(_opCtx->getClient());
+void TransportLayerASIO::BatonASIO::_safeExecute(stdx::unique_lock<Mutex> lk,
+                                                 TransportLayerASIO::BatonASIO::Job job) {
+    if (!_opCtx) {
+        // If we're detached, no job can safely execute.
+        iasserted(getDetachedError());
+    }
+
+    if (_inPoll) {
+        _scheduled.push_back(std::move(job));
+        notify();
+    } else {
+        job(std::move(lk));
+    }
 }
 
-Future<void> TransportLayerASIO::BatonASIO::_addSession(Session& session, short type) noexcept try {
-    auto fd = checked_cast<ASIOSession&>(session).getSocket().native_handle();
-    auto id = session.id();
+std::list<Promise<void>> TransportLayerASIO::BatonASIO::_poll(stdx::unique_lock<Mutex>& lk,
+                                                              ClockSource* clkSource) {
+    const auto now = clkSource->now();
+
+    // If we have a timer, then use it to enforce a timeout for polling.
+    boost::optional<Date_t> deadline;
+    if (!_timers.empty()) {
+        deadline = _timers.begin()->first;
+
+        // Don't poll if we have already passed the deadline.
+        if (*deadline <= now)
+            return {};
+    }
+
+    if (deadline && !clkSource->tracksSystemClock()) {
+        // The clock source and `::poll` may track time differently, so use the clock source to
+        // enforce the timeout.
+        invariant(clkSource->setAlarm(*deadline, [self = shared_from_this()] { self->notify(); }));
+        deadline.reset();
+    }
+
+    _pollSet.clear();
+    _pollSet.reserve(_sessions.size() + 1);
+    _pollSet.push_back({efd(_opCtx).fd, POLLIN, 0});
+
+    _pollSessions.clear();
+    _pollSessions.reserve(_sessions.size());
+
+    for (auto iter = _sessions.begin(); iter != _sessions.end(); ++iter) {
+        _pollSet.push_back({iter->second.fd, iter->second.events, 0});
+        _pollSessions.push_back(iter);
+    }
+
+    int events = [&] {
+        _inPoll = true;
+        lk.unlock();
+
+        const ScopeGuard guard([&] {
+            lk.lock();
+            _inPoll = false;
+        });
+
+        blockBatonASIOBeforePoll.pauseWhileSet();
+        int timeout = deadline ? Milliseconds(*deadline - now).count() : -1;
+        int events = ::poll(_pollSet.data(), _pollSet.size(), timeout);
+        const auto savedErrno = errno;
+        if (events < 0 && savedErrno != EINTR) {
+            LOGV2_FATAL(50834, "error in poll", "error"_attr = errnoWithDescription(savedErrno));
+        }
+        return events;
+    }();
+
+    if (events <= 0)
+        return {};  // Polling was timed out or interrupted.
+
+    auto psit = _pollSet.begin();
+    // Consume the notification on the `eventfd` object if there is any.
+    if (psit->revents) {
+        efd(_opCtx).wait();
+        --events;
+    }
+    ++psit;
+
+    std::list<Promise<void>> promises;
+    for (auto sit = _pollSessions.begin(); events && sit != _pollSessions.end(); ++sit, ++psit) {
+        if (psit->revents) {
+            promises.push_back(std::move((*sit)->second.promise));
+            _sessions.erase(*sit);
+            --events;
+        }
+    }
+
+    invariant(events == 0, "Failed to process all events after going through registered sessions");
+    return promises;
+}
+
+Future<void> TransportLayerASIO::BatonASIO::_addSession(Session& session, short events) try {
     auto pf = makePromiseFuture<void>();
-
-    stdx::unique_lock lk(_mutex);
-
-    _safeExecute(std::move(lk),
-                 [ id, session = TransportSession{fd, type, std::move(pf.promise)},
-                   this ](stdx::unique_lock<Mutex>) mutable noexcept {
-                     auto ret = _sessions.emplace(id, std::move(session));
-                     invariant(ret.second);
+    TransportSession ts{checked_cast<ASIOSession&>(session).getSocket().native_handle(),
+                        events,
+                        std::move(pf.promise)};
+    _safeExecute(stdx::unique_lock(_mutex),
+                 [this, id = session.id(), ts = std::move(ts)](stdx::unique_lock<Mutex>) mutable {
+                     invariant(_sessions.emplace(id, std::move(ts)).second,
+                               "Adding session to baton failed");
                  });
     return std::move(pf.future);
 } catch (const DBException& ex) {

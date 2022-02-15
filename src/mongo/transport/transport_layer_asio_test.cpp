@@ -62,6 +62,7 @@
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/thread_context.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/waitable.h"
 
 namespace mongo {
 namespace {
@@ -788,6 +789,19 @@ class BatonASIOLinuxTest : public LockerNoopServiceContextTest {
         Promise<transport::SessionHandle> _promise;
     };
 
+    // Used for setting and canceling timers on the networking baton. Does not offer any timer
+    // functionality, and is only used for its unique id.
+    class DummyTimer final : public transport::ReactorTimer {
+    public:
+        void cancel(const BatonHandle& baton = nullptr) override {
+            MONGO_UNREACHABLE;
+        }
+
+        Future<void> waitUntil(Date_t timeout, const BatonHandle& baton = nullptr) override {
+            MONGO_UNREACHABLE;
+        }
+    };
+
 public:
     void setUp() override {
         auto pf = makePromiseFuture<transport::SessionHandle>();
@@ -813,6 +827,10 @@ public:
 
     ConnectionThread& connection() {
         return *_connThread;
+    }
+
+    std::unique_ptr<transport::ReactorTimer> makeDummyTimer() const {
+        return std::make_unique<DummyTimer>();
     }
 
 private:
@@ -897,7 +915,7 @@ TEST_F(BatonASIOLinuxTest, AddAndRemoveSessionWhileInPoll) {
     auto opCtx = client().makeOperationContext();
     Notification<bool> cancelSessionResult;
 
-    stdx::thread thread([&] {
+    JoinThread thread([&] {
         auto baton = opCtx->getBaton()->networking();
         auto session = client().session();
 
@@ -910,14 +928,103 @@ TEST_F(BatonASIOLinuxTest, AddAndRemoveSessionWhileInPoll) {
         cancelSessionResult.set(baton->cancelSession(*session));
     });
 
-    ScopeGuard joinGuard = [&] { thread.join(); };
-
     // TODO SERVER-61192 Change the following to `ASSERT_TRUE` once the underlying issue is fixed.
     ASSERT_FALSE(cancelSessionResult.get(opCtx.get()));
 }
 
-// TODO SERVER-61192 Test setting and canceling timers on the baton.
-// TODO SERVER-61192 Test `run`, `notify`, and `run_until` on `BatonASIO`.
+TEST_F(BatonASIOLinuxTest, WaitAndNotify) {
+    // Exercises the underlying `wait` and `notify` functionality through `BatonASIO::run` and
+    // `BatonASIO::schedule`, respectively. Here is how this is done:
+    // 1) The main thread starts polling (from inside `run`) when waiting on the notification.
+    // 2) Once the main thread is ready to poll, `thread` notifies it through `baton->schedule`.
+    // 3) `schedule` calls into `notify` internally, which should interrupt the polling.
+    // 4) Once polling is interrupted, `baton` runs the scheduled job and sets the notification.
+    auto opCtx = client().makeOperationContext();
+
+    Notification<void> notification;
+    JoinThread thread([&] {
+        auto baton = opCtx->getBaton()->networking();
+        FailPointEnableBlock fp("blockBatonASIOBeforePoll");
+        fp->waitForTimesEntered(1);
+        baton->schedule([&](Status) { notification.set(); });
+    });
+
+    notification.get(opCtx.get());
+}
+
+void blockIfBatonPolls(Client& client,
+                       std::function<void(const BatonHandle&, Notification<void>&)> modifyBaton) {
+    Notification<void> notification;
+    auto opCtx = client.makeOperationContext();
+
+    FailPointEnableBlock fp("blockBatonASIOBeforePoll");
+
+    modifyBaton(opCtx->getBaton(), notification);
+
+    // This will internally call into `BatonASIO::run()`, which will block forever (since the
+    // failpoint is enabled) if the baton starts polling.
+    notification.get(opCtx.get());
+}
+
+TEST_F(BatonASIOLinuxTest, BatonWithPendingTasksNeverPolls) {
+    blockIfBatonPolls(client(), [](const BatonHandle& baton, Notification<void>& notification) {
+        baton->schedule([&](Status) { notification.set(); });
+    });
+}
+
+TEST_F(BatonASIOLinuxTest, BatonWithAnExpiredTimerNeverPolls) {
+    auto timer = makeDummyTimer();
+    blockIfBatonPolls(client(), [&](const BatonHandle& baton, Notification<void>& notification) {
+        // Batons use the precise clock source internally. We use the current time (i.e., `now()`)
+        // as the deadline to schedule an expired timer on the baton.
+        auto clkSource = getServiceContext()->getPreciseClockSource();
+        baton->networking()->waitUntil(*timer, clkSource->now()).getAsync([&](Status) {
+            notification.set();
+        });
+    });
+}
+
+TEST_F(BatonASIOLinuxTest, NotifyInterruptsRunUntilBeforeTimeout) {
+    auto opCtx = client().makeOperationContext();
+    JoinThread thread([&] {
+        auto baton = opCtx->getBaton();
+        FailPointEnableBlock fp("blockBatonASIOBeforePoll");
+        fp->waitForTimesEntered(1);
+        baton->notify();
+    });
+
+    auto clkSource = getServiceContext()->getPreciseClockSource();
+    const auto state = opCtx->getBaton()->run_until(clkSource, Date_t::max());
+    ASSERT(state == Waitable::TimeoutState::NoTimeout);
+}
+
+TEST_F(BatonASIOLinuxTest, RunUntilProperlyTimesout) {
+    auto opCtx = client().makeOperationContext();
+    auto clkSource = getServiceContext()->getPreciseClockSource();
+    const auto state = opCtx->getBaton()->run_until(clkSource, clkSource->now() + Milliseconds(1));
+    ASSERT(state == Waitable::TimeoutState::Timeout);
+}
+
+TEST_F(BatonASIOLinuxTest, AddAndRemoveTimerWhileInPoll) {
+    auto opCtx = client().makeOperationContext();
+    Notification<bool> cancelTimerResult;
+
+    JoinThread thread([&] {
+        auto baton = opCtx->getBaton()->networking();
+
+        FailPointEnableBlock fp("blockBatonASIOBeforePoll");
+        fp->waitForTimesEntered(1);
+
+        // This thread is an external observer to the baton, so the expected behavior is for
+        // `cancelTimer` to happen after `waitUntil`, thus canceling the timer must return `true`.
+        auto timer = makeDummyTimer();
+        baton->waitUntil(*timer, Date_t::max()).getAsync([](Status) {});
+        cancelTimerResult.set(baton->cancelTimer(*timer));
+    });
+
+    // TODO SERVER-61192 Change the following to `ASSERT_TRUE` once the underlying issue is fixed.
+    ASSERT_FALSE(cancelTimerResult.get(opCtx.get()));
+}
 
 #endif  // __linux__
 

@@ -29,15 +29,13 @@
 
 #pragma once
 
+#include <list>
 #include <map>
 #include <memory>
 #include <vector>
 
 #include <poll.h>
-#include <sys/eventfd.h>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/baton.h"
@@ -56,60 +54,6 @@ namespace transport {
  * We implement our networking reactor on top of poll + eventfd for wakeups
  */
 class TransportLayerASIO::BatonASIO : public NetworkingBaton {
-    /**
-     * RAII type that wraps up an eventfd and reading/writing to it.  We don't actually need the
-     * counter portion, just the notify/wakeup
-     */
-    struct EventFDHolder {
-        EventFDHolder() : fd(::eventfd(0, EFD_CLOEXEC)) {
-            if (fd < 0) {
-                auto savedErrno = errno;
-                std::string reason = str::stream()
-                    << "error in creating eventfd: " << errnoWithDescription(savedErrno);
-
-                auto code = (savedErrno == EMFILE || savedErrno == ENFILE)
-                    ? ErrorCodes::TooManyFilesOpen
-                    : ErrorCodes::UnknownError;
-
-                uasserted(code, reason);
-            }
-        }
-
-        ~EventFDHolder() {
-            ::close(fd);
-        }
-
-        EventFDHolder(const EventFDHolder&) = delete;
-        EventFDHolder& operator=(const EventFDHolder&) = delete;
-
-        // Writes to the underlying eventfd
-        void notify() {
-            while (true) {
-                if (::eventfd_write(fd, 1) == 0) {
-                    break;
-                }
-
-                invariant(errno == EINTR);
-            }
-        }
-
-        void wait() {
-            while (true) {
-                // If we have activity on the eventfd, pull the count out
-                uint64_t u;
-                if (::eventfd_read(fd, &u) == 0) {
-                    break;
-                }
-
-                invariant(errno == EINTR);
-            }
-        }
-
-        const int fd;
-
-        static const Client::Decoration<EventFDHolder> getForClient;
-    };
-
 public:
     BatonASIO(OperationContext* opCtx) : _opCtx(opCtx) {}
 
@@ -146,50 +90,50 @@ public:
 
 private:
     struct Timer {
-        size_t id;
-        Promise<void> promise;  // Needs to be mutable to move from it while in std::set.
+        size_t id;  // Stores the unique identifier for the timer, provided by `ReactorTimer`.
+        Promise<void> promise;
     };
 
     struct TransportSession {
         int fd;
-        short type;
+        short events;  // Events to consider while polling for this session (e.g., `POLLIN`).
         Promise<void> promise;
     };
 
-    // Internally, the BatonASIO thinks in terms of synchronized units of work. This is because
-    // a Baton effectively represents a green thread with the potential to add or remove work (i.e.
-    // Jobs) at any time. Jobs with external notifications (OutOfLineExecutor::Tasks,
-    // TransportSession:promise, ReactorTimer::promise) are expected to release their lock before
-    // generating those notifications.
+    /*
+     * Internally, `BatonASIO` thinks in terms of synchronized units of work. This is because a
+     * baton effectively represents a green thread with the potential to add or remove work (i.e.,
+     * jobs) at any time. Thus, scheduled jobs must release their lock before executing any task
+     * external to the baton (e.g., `OutOfLineExecutor::Task`, `TransportSession:promise`, and
+     * `ReactorTimer::promise`).
+     */
     using Job = unique_function<void(stdx::unique_lock<Mutex>)>;
 
     /**
-     * Invoke a job with exclusive access to the Baton internals.
+     * Invokes a job with exclusive access to the baton's internals.
      *
-     * If we are currently _inPoll, the polling thread owns the Baton and thus we tell it to wake up
-     * and run our job. If we are not _inPoll, take exclusive access and run our job on the local
-     * thread. Note that _safeExecute() will throw if the Baton has been detached.
+     * If the baton is currently polling (i.e., `_inPoll` is `true`), the polling thread owns the
+     * baton, so we schedule the job and notify the polling thread to wake up and run the job.
+     *
+     * Otherwise, take exclusive access and run the job on the current thread.
+     *
+     * Note that `_safeExecute()` will throw if the baton has been detached.
+     *
+     * Also note that the job may not run inline, and may get scheduled to run by the baton, so it
+     * should never throw.
      */
-    TEMPLATE(typename Callback)
-    REQUIRES(std::is_nothrow_invocable_v<Callback, stdx::unique_lock<Mutex>>)
-    void _safeExecute(stdx::unique_lock<Mutex> lk, Callback&& job) {
-        if (!_opCtx) {
-            // If we're detached, no job can safely execute.
-            uassertStatusOK({ErrorCodes::ShutdownInProgress, "Baton detached"});
-        }
+    void _safeExecute(stdx::unique_lock<Mutex> lk, Job job);
 
-        if (_inPoll) {
-            _scheduled.push_back(std::forward<Callback>(job));
+    /**
+     * Blocks polling on the registered sessions until one of the following happens:
+     * - `notify()` is called, either directly or through other methods (e.g., `schedule()`).
+     * - One of the timers scheduled on this baton times out.
+     * - There is an event for at least one of the registered sessions (e.g., data is available).
+     * Returns the list of promises that must be fulfilled as the result of polling.
+     */
+    std::list<Promise<void>> _poll(stdx::unique_lock<Mutex>&, ClockSource*);
 
-            _efd().notify();
-        } else {
-            job(std::move(lk));
-        }
-    }
-
-    EventFDHolder& _efd();
-
-    Future<void> _addSession(Session& session, short type) noexcept;
+    Future<void> _addSession(Session& session, short events);
 
     void detachImpl() noexcept override;
 
@@ -199,25 +143,27 @@ private:
 
     bool _inPoll = false;
 
-    // This map stores the sessions we need to poll on. We unwind it into a pollset for every
-    // blocking call to run
+    // Stores the sessions we need to poll on.
     stdx::unordered_map<SessionId, TransportSession> _sessions;
 
-    // The set is used to find the next timer which will fire.  The unordered_map looks up the
-    // timers so we can remove them in O(1)
+    /**
+     * We use two structures to maintain timers:
+     * - `_timers` keeps a sorted list of timers according to their expiration date.
+     * - `_timersById` allows using the unique timer id to find and cancel a timer in constant time.
+     */
     std::multimap<Date_t, Timer> _timers;
-    stdx::unordered_map<size_t, decltype(_timers)::iterator> _timersById;
+    stdx::unordered_map<size_t, std::multimap<Date_t, Timer>::iterator> _timersById;
 
-    // For tasks that come in via schedule.  Or that were deferred because we were in poll
+    // Tasks scheduled for deferred execution.
     std::vector<Job> _scheduled;
 
-    // We hold the two following values at the object level to save on allocations when a baton is
-    // waited on many times over the course of its lifetime.
-
-    // Holds the pollset for ::poll
-    std::vector<pollfd> _pollSet;
-
-    // Mirrors the above pollset with mappings back to _sessions
+    /*
+     * We hold the following values at the object level to save on allocations when a baton is
+     * waited on many times over the course of its lifetime:
+     * `_pollSet`: the poll set for `::poll`.
+     * `_pollSessions`: maps members of `_pollSet` to their corresponding session in `_sessions`.
+     */
+    std::vector<::pollfd> _pollSet;
     std::vector<decltype(_sessions)::iterator> _pollSessions;
 };
 
