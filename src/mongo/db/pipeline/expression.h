@@ -931,7 +931,7 @@ public:
     const char* getOpName() const final;
 
     // ExpressionAdd is left associative because it processes its operands by iterating
-    // left-to-right through its _chilidren vector, but the order of operations impacts the result
+    // left-to-right through its _children vector, but the order of operations impacts the result
     // due to integer overflow, floating-point rounding and type promotion.
     Associativity getAssociativity() const final {
         return Associativity::kLeft;
@@ -2393,7 +2393,7 @@ public:
     const char* getOpName() const final;
 
     // ExpressionMultiply is left associative because it processes its operands by iterating
-    // left-to-right through its _chilidren vector, but the order of operations impacts the result
+    // left-to-right through its _children vector, but the order of operations impacts the result
     // due to integer overflow, floating-point rounding and type promotion.
     Associativity getAssociativity() const final {
         return Associativity::kLeft;
