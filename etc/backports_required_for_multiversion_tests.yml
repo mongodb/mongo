@@ -138,6 +138,8 @@ last-continuous:
       test_file: jstests/sharding/range_deleter_interacts_correctly_with_refine_shard_key.js
     - ticket: SERVER-63141
       test_file: jstests/aggregation/lookup_let_optimization.js
+    - ticket: SERVER-63129
+      test_file: jstests/replsets/tenant_migration_resume_collection_cloner_after_recipient_failover_with_dropped_views.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -419,6 +421,8 @@ last-lts:
       test_file: jstests/sharding/range_deleter_interacts_correctly_with_refine_shard_key.js
     - ticket: SERVER-63141
       test_file: jstests/aggregation/lookup_let_optimization.js
+    - ticket: SERVER-63129
+      test_file: jstests/replsets/tenant_migration_resume_collection_cloner_after_recipient_failover_with_dropped_views.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
