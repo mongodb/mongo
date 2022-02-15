@@ -197,6 +197,8 @@ all:
     test_file: jstests/core/exhaust.js
   - ticket: SERVER-61977
     test_file: jstests/replsets/rollback_during_step_up.js
+  - ticket: SERVER-63141
+    test_file: jstests/aggregation/lookup_let_optimization.js
 
 
 suites:

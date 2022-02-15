@@ -119,9 +119,8 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
 
     // Iterate through the pipeline stages until we find one which references an external variable.
     for (; prefixSplit != container->end(); ++prefixSplit) {
-        (*prefixSplit)->getDependencies(&deps);
-
-        if (deps.hasVariableReferenceTo(varIDs)) {
+        if (((*prefixSplit)->getDependencies(&deps) == DepsTracker::State::NOT_SUPPORTED) ||
+            deps.hasVariableReferenceTo(varIDs)) {
             break;
         }
     }
