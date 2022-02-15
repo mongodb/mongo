@@ -180,6 +180,10 @@ structs:
                 type: safeBool
                 optional: true
                 unstable: false
+            disallowNewDuplicateKeys:
+                type: safeBool
+                optional: true
+                unstable: true
 commands:
     createIndexes:
         description: "Command for creating indexes on a collection"

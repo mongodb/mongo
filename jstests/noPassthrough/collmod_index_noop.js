@@ -1,8 +1,8 @@
 /**
- * Validate that the 'collMod' command with 'hidden' or 'unique' fields will return expected result
- * document for the command and generate expected oplog entries in which the index modifications
- * (hiding/unhiding/convert to unique) will be no-ops if no other index option (TTL, for example)
- * is involved.
+ * Validate that the 'collMod' command with 'hidden,' 'unique,' or 'disallowNewDuplicateKeys' fields
+ * will return expected result document for the command and generate expected oplog entries in which
+ * the index modifications (hiding/unhiding/convert to unique/allowing duplicates/disallowing
+ * duplicates) will be no-ops if no other index option (TTL, for example) is involved.
  *
  * @tags: [
  *  # TODO(SERVER-61181): Fix validation errors under ephemeralForTest.
@@ -24,7 +24,7 @@ rst.startSet();
 rst.initiate();
 
 const dbName = jsTestName();
-const collName = "hidden_index";
+const collName = "collmod_index_noop";
 const primary = rst.getPrimary();
 const primaryDB = primary.getDB(dbName);
 const primaryColl = primaryDB[collName];
@@ -53,6 +53,10 @@ function validateResultForCollMod(result, expectedResult) {
     assert.eq(result.expireAfterSeconds_old, expectedResult.expireAfterSeconds_old, result);
     assert.eq(result.expireAfterSeconds_new, expectedResult.expireAfterSeconds_new, result);
     assert.eq(result.unique_new, expectedResult.unique_new, result);
+    assert.eq(
+        result.disallowNewDuplicateKeys_old, expectedResult.disallowNewDuplicateKeys_old, result);
+    assert.eq(
+        result.disallowNewDuplicateKeys_new, expectedResult.disallowNewDuplicateKeys_new, result);
 }
 
 primaryColl.drop();
@@ -64,6 +68,9 @@ assert.commandWorked(primaryColl.createIndex({e: 1}, {hidden: true, unique: true
 assert.commandWorked(primaryColl.createIndex({f: 1}, {unique: true, expireAfterSeconds: 15}));
 assert.commandWorked(
     primaryColl.createIndex({g: 1}, {hidden: true, unique: true, expireAfterSeconds: 25}));
+if (collModIndexUniqueEnabled) {
+    assert.commandWorked(primaryColl.createIndex({h: 1}, {disallowNewDuplicateKeys: true}));
+}
 
 // Hiding a non-hidden index will generate the oplog entry with a 'hidden_old: false'.
 let result = assert.commandWorked(primaryColl.hideIndex('a_1'));
@@ -213,6 +220,24 @@ if (collModIndexUniqueEnabled) {
     assert(idxSpec.hidden, tojson(idxSpec));
     assert.eq(idxSpec.expireAfterSeconds, 30);
     assert(idxSpec.unique, tojson(idxSpec));
+
+    // Validate that if the 'disallowNewDuplicateKeys' option is specified but is a no-op, the
+    // operation as a whole will be a no-op.
+    result = assert.commandWorked(primaryDB.runCommand({
+        "collMod": primaryColl.getName(),
+        "index": {"name": "h_1", "disallowNewDuplicateKeys": true},
+    }));
+    validateResultForCollMod(result, {});
+    validateCollModOplogEntryCount({
+        "o.index.name": "h_1",
+    },
+                                   0);
+
+    // Test that the index was unchanged.
+    idxSpec = GetIndexHelpers.findByName(primaryColl.getIndexes(), "h_1");
+    assert.eq(idxSpec.hidden, undefined);
+    assert.eq(idxSpec.expireAfterSeconds, undefined);
+    assert(idxSpec.disallowNewDuplicateKeys, tojson(idxSpec));
 }
 
 rst.stopSet();
