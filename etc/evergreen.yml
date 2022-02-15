@@ -1209,7 +1209,7 @@ functions:
     params:
       binary: bash
       args:
-        - "./src/evergreen/implicit_multiversions_tasks_generate.sh"
+        - "./src/evergreen/multiversion_exclude_tags_generate.sh"
   - *execute_resmoke_tests
   - *minimize_jstestfuzz
     # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
@@ -1253,6 +1253,12 @@ functions:
     - *determine_resmoke_jobs
     - *update_resmoke_jobs_expansions
     - *f_expansions_write
+    - *configure_evergreen_api_credentials
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/multiversion_exclude_tags_generate.sh"
     - *execute_resmoke_tests
       # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
       # directly actionable. We use type=setup rather than type=system or type=test for this command
@@ -3123,7 +3129,6 @@ tasks:
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "configure evergreen api credentials"
-  - *do_multiversion_setup
   - command: subprocess.exec
     type: test
     params:
@@ -4188,7 +4193,6 @@ tasks:
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "configure evergreen api credentials"
-  - func: "do multiversion setup"
   - func: "generate burn in tags"
     vars:
       max_revisions: 25

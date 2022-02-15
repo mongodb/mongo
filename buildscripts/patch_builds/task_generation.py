@@ -7,7 +7,7 @@ from shrub.v2 import FunctionCall, ShrubProject
 from shrub.v2.command import timeout_update, ShrubCommand
 from structlog import get_logger
 
-from buildscripts.task_generation.constants import CONFIGURE_EVG_CREDENTIALS
+from buildscripts.task_generation.constants import CONFIGURE_EVG_CREDENTIALS, DO_MULTIVERSION_SETUP
 
 LOGGER = get_logger(__name__)
 MAX_SHRUB_TASKS_FOR_SINGLE_TASK = 1000
@@ -47,7 +47,7 @@ def resmoke_commands(run_tests_fn_name: str, run_tests_vars: Dict[str, Any],
         FunctionCall("add git tag") if require_multiversion_setup else None,
         FunctionCall("do setup"),
         FunctionCall(CONFIGURE_EVG_CREDENTIALS),
-        FunctionCall("do multiversion setup") if require_multiversion_setup else None,
+        FunctionCall(DO_MULTIVERSION_SETUP) if require_multiversion_setup else None,
         FunctionCall(run_tests_fn_name, run_tests_vars),
     ]
 

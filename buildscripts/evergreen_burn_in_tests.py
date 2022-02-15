@@ -22,7 +22,7 @@ from buildscripts.patch_builds.evg_change_data import generate_revision_map_from
 from buildscripts.patch_builds.task_generation import TimeoutInfo, resmoke_commands, \
     validate_task_generation_limit
 from buildscripts.task_generation.constants import CONFIG_FILE, EVERGREEN_FILE, ARCHIVE_DIST_TEST_DEBUG_TASK, \
-    EXCLUDES_TAGS_FILE_PATH, BACKPORT_REQUIRED_TAG
+    BACKPORT_REQUIRED_TAG, RUN_TESTS, EXCLUDES_TAGS_FILE
 from buildscripts.task_generation.suite_split import SubSuite, GeneratedSuite
 from buildscripts.task_generation.task_types.resmoke_tasks import EXCLUDE_TAGS
 from buildscripts.util.fileops import write_file
@@ -215,26 +215,28 @@ class BurnInGenTaskService:
 
         return TimeoutInfo.default_timeout()
 
-    def _generate_resmoke_args(self, task_name: str, suite_name: str, params: BurnInGenTaskParams,
-                               test_arg: str) -> str:
+    def _generate_run_tests_vars(self, task_name: str, suite_name: str, params: BurnInGenTaskParams,
+                                 test_arg: str) -> Dict[str, str]:
+        run_test_vars = {"suite": suite_name}
+
         resmoke_args = f"{params.resmoke_args} {self.repeat_config.generate_resmoke_options()} {test_arg}"
 
         if params.require_multiversion_setup:
-            # TODO: inspect the suite for version instead of doing string parsing on the name.
-            tag_file_base_path = EXCLUDES_TAGS_FILE_PATH[:-4]
-            if "last_continuous" in suite_name:
-                tag_file = f"{tag_file_base_path}_last_continuous.yml"
-            elif "last_lts" in suite_name:
-                tag_file = f"{tag_file_base_path}_last_lts.yml"
-            else:
-                tag_file = None
+            run_test_vars["require_multiversion_setup"] = params.require_multiversion_setup
 
-            if tag_file is not None:
-                resmoke_args += f" --tagFile={tag_file}"
+            # TODO: inspect the suite for version instead of doing string parsing on the name.
+            if "last_continuous" in suite_name:
+                run_test_vars["multiversion_exclude_tags_version"] = "last_continuous"
+                resmoke_args += f" --tagFile={EXCLUDES_TAGS_FILE}"
+            elif "last_lts" in suite_name:
+                run_test_vars["multiversion_exclude_tags_version"] = "last_lts"
+                resmoke_args += f" --tagFile={EXCLUDES_TAGS_FILE}"
 
             resmoke_args += f" --excludeWithAnyTags={EXCLUDE_TAGS},{task_name}_{BACKPORT_REQUIRED_TAG} "
 
-        return resmoke_args
+        run_test_vars["resmoke_args"] = resmoke_args
+
+        return run_test_vars
 
     def _generate_task_name(self, gen_suite: GeneratedSuite, index: int) -> str:
         """
@@ -250,7 +252,7 @@ class BurnInGenTaskService:
         return name_generated_task(f"{prefix}:{task_name}", index, len(gen_suite),
                                    self.generate_config.run_build_variant)
 
-    def generate_tasks(self, gen_suite: GeneratedSuite, params: BurnInGenTaskParams) -> List[Task]:
+    def generate_tasks(self, gen_suite: GeneratedSuite, params: BurnInGenTaskParams) -> Set[Task]:
         """Create the task configuration for the given test using the given index."""
 
         tasks = set()
@@ -260,15 +262,11 @@ class BurnInGenTaskService:
                     f"Can only run one test per suite in burn-in; got {suite.test_list}")
             test_name = suite.test_list[0]
             test_unix_style = test_name.replace('\\', '/')
-            run_tests_vars = {
-                "suite":
-                    gen_suite.suite_name, "resmoke_args":
-                        self._generate_resmoke_args(gen_suite.task_name, gen_suite.suite_name,
-                                                    params, test_unix_style)
-            }
+            run_tests_vars = self._generate_run_tests_vars(
+                gen_suite.task_name, gen_suite.suite_name, params, test_unix_style)
 
             timeout_cmd = self.generate_timeouts(test_name)
-            commands = resmoke_commands("run tests", run_tests_vars, timeout_cmd,
+            commands = resmoke_commands(RUN_TESTS, run_tests_vars, timeout_cmd,
                                         params.require_multiversion_setup)
             dependencies = {TaskDependency(ARCHIVE_DIST_TEST_DEBUG_TASK)}
 

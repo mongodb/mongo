@@ -5,14 +5,11 @@ cd src
 
 set -o errexit
 set -o verbose
+
 activate_venv
 
-# Multiversion exclusions can be used when selecting tests.
-PATH="$PATH:/data/multiversion"
-$python buildscripts/resmoke.py generate-multiversion-exclude-tags --oldBinVersion=last_continuous --excludeTagsFilePath=multiversion_exclude_tags.yml
-
 # Capture a list of new and modified tests. The expansion macro burn_in_tests_build_variant
-# is used to for finding the associated tasks from a different build varaint than the
+# is used to for finding the associated tasks from a different build variant than the
 # burn_in_tests_gen task executes on.
 build_variant_opts="--build-variant=${build_variant}"
 if [ -n "${burn_in_tests_build_variant}" ]; then
