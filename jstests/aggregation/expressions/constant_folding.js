@@ -7,9 +7,6 @@ const collName = "jstests_aggregation_add";
 const coll = db["collName"];
 coll.drop();
 
-// TODO: SERVER-63099 Make sure that constant folding does not assume associativity or
-// commutativity, and that conversions to NumberDecimal are not different with/without optimization.
-
 const x = "$x";  // fieldpath to "block" constant folding
 
 /**

@@ -4025,12 +4025,6 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
             if (getAssociativity() == Associativity::kLeft) {
                 // Dump the remaining operands into the optimizedOperands vector that will become
                 // the new _children vector.
-
-                // Note that if the operation is left-associative and
-                // commutative, all constants seen up until this point will be evaluated together
-                // and placed at the END of the operands list. There probably aren't any
-                // left-associative but commutative operators that are relevant to implement, but
-                // the semantics are well-defined.
                 optimizedOperands.insert(
                     optimizedOperands.end(), _children.begin() + i + 1, _children.end());
                 break;
