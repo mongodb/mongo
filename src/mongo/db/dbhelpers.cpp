@@ -165,24 +165,29 @@ bool Helpers::findById(OperationContext* opCtx,
     const IndexCatalog* catalog = collection->getIndexCatalog();
     const IndexDescriptor* desc = catalog->findIdIndex(opCtx);
 
-    if (!desc && !clustered_util::isClusteredOnId(collection->getClusteredInfo())) {
+    if (!desc) {
+        if (clustered_util::isClusteredOnId(collection->getClusteredInfo())) {
+            if (indexFound) {
+                // A collection clustered on _id implicitly has an _id index but no explicit
+                // IndexDescriptor tied to it.
+                *indexFound = 1;
+            }
+
+            Snapshotted<BSONObj> doc;
+            if (collection->findDoc(opCtx,
+                                    record_id_helpers::keyForObj(IndexBoundsBuilder::objFromElement(
+                                        query["_id"], collection->getDefaultCollator())),
+                                    &doc)) {
+                result = std::move(doc.value());
+                return true;
+            }
+        }
+
         return false;
     }
 
     if (indexFound)
         *indexFound = 1;
-
-    if (collection->isClustered()) {
-        Snapshotted<BSONObj> doc;
-        if (collection->findDoc(opCtx,
-                                record_id_helpers::keyForObj(IndexBoundsBuilder::objFromElement(
-                                    query["_id"], collection->getDefaultCollator())),
-                                &doc)) {
-            result = std::move(doc.value());
-            return true;
-        }
-        return false;
-    }
 
     auto recordId = catalog->getEntry(desc)->accessMethod()->asSortedData()->findSingle(
         opCtx, collection, query["_id"].wrap());
