@@ -150,15 +150,9 @@ protected:
     friend TransportLayerASIO::BatonASIO;
 
 #ifdef MONGO_CONFIG_SSL
-    // The unique_lock here is held by TransportLayerASIO to synchronize with the asyncConnect
-    // timeout callback. It will be unlocked before the SSL actually handshake begins.
-    Future<void> handshakeSSLForEgressWithLock(stdx::unique_lock<Latch> lk,
-                                               const HostAndPort& target,
-                                               const ReactorHandle& reactor);
-
-    // For synchronous connections where we don't have an async timer, just take a dummy lock and
-    // pass it to the WithLock version of handshakeSSLForEgress
-    Future<void> handshakeSSLForEgress(const HostAndPort& target);
+    // Constructs a SSL socket required to initiate SSL handshake for egress connections.
+    Status buildSSLSocket(const HostAndPort& target);
+    Future<void> handshakeSSLForEgress(const HostAndPort& target, const ReactorHandle& reactor);
 #endif
 
     void ensureSync();

@@ -285,18 +285,18 @@ const std::shared_ptr<SSLManagerInterface> TransportLayerASIO::ASIOSession::getS
     return _sslContext->manager;
 }
 
-// The unique_lock here is held by TransportLayerASIO to synchronize with the timeout callback for
-// both connect and asyncConnect. It will be unlocked before the SSL handshake actually begins.
-Future<void> TransportLayerASIO::ASIOSession::handshakeSSLForEgressWithLock(
-    stdx::unique_lock<Latch> lk, const HostAndPort& target, const ReactorHandle& reactor) {
+Status TransportLayerASIO::ASIOSession::buildSSLSocket(const HostAndPort& target) {
+    invariant(!_sslSocket, "SSL socket is already constructed");
     if (!_sslContext->egress) {
-        return Future<void>::makeReady(
-            Status(ErrorCodes::SSLHandshakeFailed, "SSL requested but SSL support is disabled"));
+        return Status(ErrorCodes::SSLHandshakeFailed, "SSL requested but SSL support is disabled");
     }
-
     _sslSocket.emplace(std::move(_socket), *_sslContext->egress, removeFQDNRoot(target.host()));
-    lk.unlock();
+    return Status::OK();
+}
 
+Future<void> TransportLayerASIO::ASIOSession::handshakeSSLForEgress(const HostAndPort& target,
+                                                                    const ReactorHandle& reactor) {
+    invariant(_sslSocket, "SSL Socket expected to be built");
     auto doHandshake = [&] {
         if (_blockingMode == Sync) {
             std::error_code ec;
@@ -314,13 +314,6 @@ Future<void> TransportLayerASIO::ASIOSession::handshakeSSLForEgressWithLock(
                 _sslSocket->native_handle(), _sslSocket->get_sni(), target.host(), target, reactor)
             .then([this](SSLPeerInfo info) { SSLPeerInfo::forSession(shared_from_this()) = info; });
     });
-}
-
-// For synchronous connections where we don't have an async timer, just take a dummy lock and
-// pass it to the WithLock version of handshakeSSLForEgress
-Future<void> TransportLayerASIO::ASIOSession::handshakeSSLForEgress(const HostAndPort& target) {
-    auto mutex = MONGO_MAKE_LATCH();
-    return handshakeSSLForEgressWithLock(stdx::unique_lock<Latch>(mutex), target, nullptr);
 }
 #endif
 
