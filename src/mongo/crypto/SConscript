@@ -126,7 +126,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/base/secure_allocator',
         'aead_encryption' if "tom" not in env["MONGO_CRYPTO"] else [],
-        'fle_crypto',
+        'fle_crypto' if "tom" not in env["MONGO_CRYPTO"] else [],
         'sha_block_${MONGO_CRYPTO}',
     ],
 )
