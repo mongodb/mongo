@@ -1613,11 +1613,24 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
             hangAfterReservingPrepareTimestamp.pauseWhileSet();
         }
     }
+    auto opObserver = opCtx->getServiceContext()->getOpObserver();
+    const auto wallClockTime = opCtx->getServiceContext()->getFastClockSource()->now();
+    auto applyOpsOplogSlotAndOperationAssignment =
+        opObserver->preTransactionPrepare(opCtx,
+                                          reservedSlots,
+                                          p().numberOfPrePostImagesToWrite,
+                                          wallClockTime,
+                                          &completedTransactionOperations);
+
     opCtx->recoveryUnit()->setPrepareTimestamp(prepareOplogSlot.getTimestamp());
     opCtx->getWriteUnitOfWork()->prepare();
     p().needToWriteAbortEntry = true;
-    opCtx->getServiceContext()->getOpObserver()->onTransactionPrepare(
-        opCtx, reservedSlots, &completedTransactionOperations, p().numberOfPrePostImagesToWrite);
+    opObserver->onTransactionPrepare(opCtx,
+                                     reservedSlots,
+                                     &completedTransactionOperations,
+                                     applyOpsOplogSlotAndOperationAssignment.get(),
+                                     p().numberOfPrePostImagesToWrite,
+                                     wallClockTime);
 
     abortGuard.dismiss();
 

@@ -786,15 +786,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         repl::ReplicationCoordinator::get(serviceContext)->getReplicationMode() ==
         repl::ReplicationCoordinator::modeNone;
     if (!isStandalone) {
-        try {
-            PeriodicChangeStreamExpiredPreImagesRemover::get(serviceContext)->start();
-        } catch (ExceptionFor<ErrorCodes::PeriodicJobIsStopped>&) {
-            LOGV2_WARNING(5869107, "Not starting periodic jobs as shutdown is in progress");
-            // Shutdown has already started before initialization is complete. Wait for the
-            // shutdown task to complete and return.
-            MONGO_IDLE_THREAD_BLOCK;
-            return waitForShutdown();
-        }
+        startChangeStreamExpiredPreImagesRemover(serviceContext);
     }
 
     // Set up the logical session cache
@@ -1275,16 +1267,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         exec->join();
     }
 
-    const auto isStandalone =
-        repl::ReplicationCoordinator::get(serviceContext)->getReplicationMode() ==
-        repl::ReplicationCoordinator::modeNone;
-    if (!isStandalone) {
-        LOGV2_OPTIONS(5869108,
-                      {LogComponent::kQuery},
-                      "Shutting down the ChangeStreamExpiredPreImagesRemover");
-        PeriodicChangeStreamExpiredPreImagesRemover::get(serviceContext)->stop();
-    }
-
     if (auto storageEngine = serviceContext->getStorageEngine()) {
         if (storageEngine->supportsReadConcernSnapshot()) {
             LOGV2(4784908, "Shutting down the PeriodicThreadToAbortExpiredTransactions");
@@ -1418,6 +1400,9 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
     LOGV2(4784928, "Shutting down the TTL monitor");
     shutdownTTLMonitor(serviceContext);
+
+    LOGV2(6278511, "Shutting down the Change Stream Expired Pre-images Remover");
+    shutdownChangeStreamExpiredPreImagesRemover(serviceContext);
 
     // We should always be able to acquire the global lock at shutdown.
     // An OperationContext is not necessary to call lockGlobal() during shutdown, as it's only used

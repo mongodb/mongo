@@ -103,10 +103,20 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
 
 class OpObserverMock : public OpObserverNoop {
 public:
-    void onTransactionPrepare(OperationContext* opCtx,
-                              const std::vector<OplogSlot>& reservedSlots,
-                              std::vector<repl::ReplOperation>* statements,
-                              size_t numberOfPrePostImagesToWrite) override;
+    std::unique_ptr<OpObserver::ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
+        OperationContext* opCtx,
+        const std::vector<OplogSlot>& reservedSlots,
+        size_t numberOfPrePostImagesToWrite,
+        Date_t wallClockTime,
+        std::vector<repl::ReplOperation>* statements) override;
+
+    void onTransactionPrepare(
+        OperationContext* opCtx,
+        const std::vector<OplogSlot>& reservedSlots,
+        std::vector<repl::ReplOperation>* statements,
+        const ApplyOpsOplogSlotAndOperationAssignment* applyOpsOperationAssignment,
+        size_t numberOfPrePostImagesToWrite,
+        Date_t wallClockTime) override;
 
     bool onTransactionPrepareThrowsException = false;
     bool transactionPrepared = false;
@@ -148,13 +158,30 @@ public:
     const repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};
 };
 
-void OpObserverMock::onTransactionPrepare(OperationContext* opCtx,
-                                          const std::vector<OplogSlot>& reservedSlots,
-                                          std::vector<repl::ReplOperation>* statements,
-                                          size_t numberOfPrePostImagesToWrite) {
+std::unique_ptr<OpObserver::ApplyOpsOplogSlotAndOperationAssignment>
+OpObserverMock::preTransactionPrepare(OperationContext* opCtx,
+                                      const std::vector<OplogSlot>& reservedSlots,
+                                      size_t numberOfPrePostImagesToWrite,
+                                      Date_t wallClockTime,
+                                      std::vector<repl::ReplOperation>* statements) {
+    return std::make_unique<OpObserver::ApplyOpsOplogSlotAndOperationAssignment>(
+        OpObserver::ApplyOpsOplogSlotAndOperationAssignment{{}, {}});
+}
+
+void OpObserverMock::onTransactionPrepare(
+    OperationContext* opCtx,
+    const std::vector<OplogSlot>& reservedSlots,
+    std::vector<repl::ReplOperation>* statements,
+    const ApplyOpsOplogSlotAndOperationAssignment* applyOpsOperationAssignment,
+    size_t numberOfPrePostImagesToWrite,
+    Date_t wallClockTime) {
     ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
-    OpObserverNoop::onTransactionPrepare(
-        opCtx, reservedSlots, statements, numberOfPrePostImagesToWrite);
+    OpObserverNoop::onTransactionPrepare(opCtx,
+                                         reservedSlots,
+                                         statements,
+                                         applyOpsOperationAssignment,
+                                         numberOfPrePostImagesToWrite,
+                                         wallClockTime);
 
     uassert(ErrorCodes::OperationFailed,
             "onTransactionPrepare() failed",

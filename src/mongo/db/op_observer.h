@@ -414,6 +414,57 @@ public:
         const std::vector<repl::ReplOperation>& statements) noexcept = 0;
 
     /**
+     * Contains "applyOps" oplog entries and oplog slots to be used for writing pre- and post- image
+     * oplog entries for a transaction. "applyOps" entries are not actual "applyOps" entries to be
+     * written to the oplog, but comprise certain parts of those entries - BSON serialized
+     * operations, and the assigned oplog slot. The operations in field 'ApplyOpsEntry::operations'
+     * should be considered opaque outside the OpObserver.
+     */
+    struct ApplyOpsOplogSlotAndOperationAssignment {
+        struct ApplyOpsEntry {
+            OplogSlot oplogSlot;
+            std::vector<BSONObj> operations;
+        };
+
+        // Oplog slots to be used for writing pre- and post- image oplog entries.
+        std::vector<OplogSlot> prePostImageOplogEntryOplogSlots;
+
+        // Representation of "applyOps" oplog entries.
+        std::vector<ApplyOpsEntry> applyOpsEntries;
+
+        // Number of oplog slots utilized.
+        size_t numberOfOplogSlotsUsed;
+    };
+
+    /**
+     * This method is called before an atomic transaction is prepared. It must be called when a
+     * transaction is active.
+     *
+     * Optionally returns a representation of "applyOps" entries to be written and oplog slots to be
+     * used for writing pre- and post- image oplog entries for a transaction. Only one OpObserver in
+     * the system should return the representation of "applyOps" entries. The returned value is
+     * passed to 'onTransactionPrepare()'.
+     *
+     * The 'reservedSlots' is a list of oplog slots reserved for the oplog entries in a transaction.
+     * The last reserved slot represents the prepareOpTime used for the prepare oplog entry.
+     *
+     * The 'numberOfPrePostImagesToWrite' is the number of CRUD operations that have a pre-image
+     * to write as a noop oplog entry.
+     *
+     * The 'wallClockTime' is the time to record as wall clock time on oplog entries resulting from
+     * transaction preparation.
+     *
+     * The 'statements' are the list of CRUD operations to be applied in this transaction. The
+     * operations may be modified by setting pre-image and post-image oplog entry timestamps.
+     */
+    virtual std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
+        OperationContext* opCtx,
+        const std::vector<OplogSlot>& reservedSlots,
+        size_t numberOfPrePostImagesToWrite,
+        Date_t wallClockTime,
+        std::vector<repl::ReplOperation>* statements) = 0;
+
+    /**
      * The onTransactionPrepare method is called when an atomic transaction is prepared. It must be
      * called when a transaction is active.
      *
@@ -422,14 +473,24 @@ public:
      *
      * The 'statements' are the list of CRUD operations to be applied in this transaction.
      *
+     * The 'applyOpsOperationAssignment' contains a representation of "applyOps" entries and oplog
+     * slots to be used for writing pre- and post- image oplog entries for a transaction. A value
+     * returned by 'preTransactionPrepare()' should be passed as 'applyOpsOperationAssignment'.
+     *
      * The 'numberOfPrePostImagesToWrite' is the number of CRUD operations that have a pre-image
      * to write as a noop oplog entry. The op observer will reserve oplog slots for these
      * preimages in addition to the statements.
+     *
+     * The 'wallClockTime' is the time to record as wall clock time on oplog entries resulting from
+     * transaction preparation. The same time value should be passed to 'preTransactionPrepare()'.
      */
-    virtual void onTransactionPrepare(OperationContext* opCtx,
-                                      const std::vector<OplogSlot>& reservedSlots,
-                                      std::vector<repl::ReplOperation>* statements,
-                                      size_t numberOfPrePostImagesToWrite) = 0;
+    virtual void onTransactionPrepare(
+        OperationContext* opCtx,
+        const std::vector<OplogSlot>& reservedSlots,
+        std::vector<repl::ReplOperation>* statements,
+        const ApplyOpsOplogSlotAndOperationAssignment* applyOpsOperationAssignment,
+        size_t numberOfPrePostImagesToWrite,
+        Date_t wallClockTime) = 0;
 
     /**
      * The onTransactionAbort method is called when an atomic transaction aborts, before the

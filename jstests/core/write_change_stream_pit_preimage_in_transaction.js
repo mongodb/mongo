@@ -163,4 +163,21 @@ function getCollections(db) {
         assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
     }, [{_id: 1, a: 1}, {_id: 3, a: 1}]);
 })();
+
+(function testPreImageWritingForAbortedPreparedTransaction() {
+    assert.commandWorked(coll.deleteMany({}));
+    assert.commandWorked(coll.insert([{_id: 1, a: 1}, {_id: 3, a: 1}]));
+
+    // Verify that pre-images are not written for a transaction that is prepared and then aborted.
+    assertPreImagesWrittenForOps(db, function() {
+        const session = db.getMongo().startSession();
+        const sessionDb = session.getDatabase(jsTestName());
+        session.startTransaction({readConcern: {level: "majority"}});
+        const collInner = sessionDb[coll.getName()];
+        assert.commandWorked(collInner.updateOne({_id: 1}, {$inc: {a: 1}}));
+        assert.commandWorked(collInner.deleteOne({_id: 3}));
+        PrepareHelpers.prepareTransaction(session);
+        assert.commandWorked(session.abortTransaction_forTesting());
+    }, []);
+})();
 }());

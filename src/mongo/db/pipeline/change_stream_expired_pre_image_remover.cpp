@@ -33,18 +33,22 @@
 
 #include "change_stream_expired_pre_image_remover.h"
 
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/record_id_helpers.h"
-#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/util/background.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -374,66 +378,152 @@ void deleteExpiredChangeStreamPreImages(Client* client, Date_t currentTimeForTim
           "numberOfRemovals"_attr = numberOfRemovals,
           "jobDuration"_attr = (Date_t::now() - startTime).toString());
 }
+
+void performExpiredChangeStreamPreImagesRemovalPass(Client* client) {
+    try {
+        Date_t currentTimeForTimeBasedExpiration = Date_t::now();
+
+        changeStreamPreImageRemoverCurrentTime.execute([&](const BSONObj& data) {
+            // Populate the current time for time based expiration of pre-images.
+            if (auto currentTimeElem = data["currentTimeForTimeBasedExpiration"]) {
+                const BSONType bsonType = currentTimeElem.type();
+                tassert(5869300,
+                        str::stream() << "Expected type for 'currentTimeForTimeBasedExpiration' is "
+                                         "'date', but found: "
+                                      << bsonType,
+                        bsonType == BSONType::Date);
+
+                currentTimeForTimeBasedExpiration = currentTimeElem.Date();
+            }
+        });
+        deleteExpiredChangeStreamPreImages(client, currentTimeForTimeBasedExpiration);
+    } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+        LOGV2_WARNING(5869105, "Periodic expired pre-images removal job was interrupted");
+    } catch (const DBException& exception) {
+        LOGV2_ERROR(5869106,
+                    "Periodic expired pre-images removal job failed",
+                    "reason"_attr = exception.reason());
+    }
+}
 }  // namespace
 
-PeriodicChangeStreamExpiredPreImagesRemover& PeriodicChangeStreamExpiredPreImagesRemover::get(
-    ServiceContext* serviceContext) {
-    auto& jobContainer = _serviceDecoration(serviceContext);
-    jobContainer._init(serviceContext);
-    return jobContainer;
-}
+class ChangeStreamExpiredPreImagesRemover;
 
-PeriodicJobAnchor& PeriodicChangeStreamExpiredPreImagesRemover::operator*() const noexcept {
-    stdx::lock_guard lk(_mutex);
-    return *_anchor;
-}
+namespace {
+const auto getChangeStreamExpiredPreImagesRemover =
+    ServiceContext::declareDecoration<std::unique_ptr<ChangeStreamExpiredPreImagesRemover>>();
+}  // namespace
 
-PeriodicJobAnchor* PeriodicChangeStreamExpiredPreImagesRemover::operator->() const noexcept {
-    stdx::lock_guard lk(_mutex);
-    return _anchor.get();
-}
+/**
+ * A periodic background job that removes expired change stream pre-image documents from the
+ * 'system.preimages' collection. The period of the job is controlled by the server parameter
+ * "expiredChangeStreamPreImageRemovalJobSleepSecs".
+ */
+class ChangeStreamExpiredPreImagesRemover : public BackgroundJob {
+public:
+    explicit ChangeStreamExpiredPreImagesRemover() : BackgroundJob(false /* selfDelete */) {}
 
-void PeriodicChangeStreamExpiredPreImagesRemover::_init(ServiceContext* serviceContext) {
-    stdx::lock_guard lk(_mutex);
-    if (_anchor) {
-        return;
+    /**
+     * Retrieves ChangeStreamExpiredPreImagesRemover from the service context 'serviceCtx'.
+     */
+    static ChangeStreamExpiredPreImagesRemover* get(ServiceContext* serviceCtx) {
+        return getChangeStreamExpiredPreImagesRemover(serviceCtx).get();
     }
 
-    auto periodicRunner = serviceContext->getPeriodicRunner();
-    invariant(periodicRunner);
+    /**
+     * Sets ChangeStreamExpiredPreImagesRemover 'preImagesRemover' to the service context
+     * 'serviceCtx'.
+     */
+    static void set(ServiceContext* serviceCtx,
+                    std::unique_ptr<ChangeStreamExpiredPreImagesRemover> preImagesRemover) {
+        auto& changeStreamExpiredPreImagesRemover =
+            getChangeStreamExpiredPreImagesRemover(serviceCtx);
+        if (changeStreamExpiredPreImagesRemover) {
+            invariant(!changeStreamExpiredPreImagesRemover->running(),
+                      "Tried to reset the ChangeStreamExpiredPreImagesRemover without shutting "
+                      "down the original instance.");
+        }
 
-    PeriodicRunner::PeriodicJob job(
-        "ChangeStreamExpiredPreImagesRemover",
-        [](Client* client) {
-            try {
-                Date_t currentTimeForTimeBasedExpiration = Date_t::now();
+        invariant(preImagesRemover);
+        changeStreamExpiredPreImagesRemover = std::move(preImagesRemover);
+    }
 
-                changeStreamPreImageRemoverCurrentTime.execute([&](const BSONObj& data) {
-                    // Populate the current time for time based expiration of pre-images.
-                    if (auto currentTimeElem = data["currentTimeForTimeBasedExpiration"]) {
-                        const BSONType bsonType = currentTimeElem.type();
-                        tassert(5869300,
-                                str::stream()
-                                    << "Expected type for 'currentTimeForTimeBasedExpiration' is "
-                                       "'date', but found: "
-                                    << bsonType,
-                                bsonType == BSONType::Date);
+    std::string name() const {
+        return "ChangeStreamExpiredPreImagesRemover";
+    }
 
-                        currentTimeForTimeBasedExpiration = currentTimeElem.Date();
-                    }
-                });
+    void run() {
+        ThreadClient tc(name(), getGlobalServiceContext());
+        AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
 
-                deleteExpiredChangeStreamPreImages(client, currentTimeForTimeBasedExpiration);
-            } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
-                LOGV2_WARNING(5869105, "Periodic expired pre-images removal job was interrupted");
-            } catch (const DBException& exception) {
-                LOGV2_ERROR(5869106,
-                            "Periodic expired pre-images removal job failed",
-                            "reason"_attr = exception.reason());
+        {
+            stdx::lock_guard<Client> lk(*tc.get());
+            tc.get()->setSystemOperationKillableByStepdown(lk);
+        }
+
+        while (true) {
+            LOGV2_DEBUG(6278517, 3, "Thread awake");
+            auto iterationStartTime = Date_t::now();
+            performExpiredChangeStreamPreImagesRemovalPass(tc.get());
+            {
+                // Wait until either gExpiredChangeStreamPreImageRemovalJobSleepSecs passes or a
+                // shutdown is requested.
+                auto deadline = iterationStartTime +
+                    Seconds(gExpiredChangeStreamPreImageRemovalJobSleepSecs.load());
+                stdx::unique_lock<Latch> lk(_stateMutex);
+
+                MONGO_IDLE_THREAD_BLOCK;
+                _shuttingDownCV.wait_until(
+                    lk, deadline.toSystemTimePoint(), [&] { return _shuttingDown; });
+
+                if (_shuttingDown) {
+                    return;
+                }
             }
-        },
-        Seconds(gExpiredChangeStreamPreImageRemovalJobSleepSecs.load()));
+        }
+    }
 
-    _anchor = std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
+    /**
+     * Signals the thread to quit and then waits until it does.
+     */
+    void shutdown() {
+        LOGV2(6278515, "Shutting down Change Stream Expired Pre-images Remover thread");
+        {
+            stdx::lock_guard<Latch> lk(_stateMutex);
+            _shuttingDown = true;
+        }
+        _shuttingDownCV.notify_one();
+        wait();
+        LOGV2(6278516, "Finished shutting down Change Stream Expired Pre-images Remover thread");
+    }
+
+private:
+    // Protects the state below.
+    mutable Mutex _stateMutex = MONGO_MAKE_LATCH("ChangeStreamExpiredPreImagesRemoverStateMutex");
+
+    // Signaled to wake up the thread, if the thread is waiting. The thread will check whether
+    // _shuttingDown is set and stop accordingly.
+    mutable stdx::condition_variable _shuttingDownCV;
+
+    bool _shuttingDown = false;
+};
+
+void startChangeStreamExpiredPreImagesRemover(ServiceContext* serviceContext) {
+    std::unique_ptr<ChangeStreamExpiredPreImagesRemover> changeStreamExpiredPreImagesRemover =
+        std::make_unique<ChangeStreamExpiredPreImagesRemover>();
+    changeStreamExpiredPreImagesRemover->go();
+    ChangeStreamExpiredPreImagesRemover::set(serviceContext,
+                                             std::move(changeStreamExpiredPreImagesRemover));
 }
+
+void shutdownChangeStreamExpiredPreImagesRemover(ServiceContext* serviceContext) {
+    ChangeStreamExpiredPreImagesRemover* changeStreamExpiredPreImagesRemover =
+        ChangeStreamExpiredPreImagesRemover::get(serviceContext);
+    // We allow the ChangeStreamExpiredPreImagesRemover not to be set in case shutdown occurs before
+    // the thread has been initialized.
+    if (changeStreamExpiredPreImagesRemover) {
+        changeStreamExpiredPreImagesRemover->shutdown();
+    }
+}
+
 }  // namespace mongo

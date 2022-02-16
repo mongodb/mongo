@@ -31,12 +31,8 @@
 
 #include "mongo/db/commands/change_stream_options_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/util/hierarchical_acquisition.h"
-#include "mongo/util/periodic_runner.h"
 
 namespace mongo {
-
 namespace preImageRemoverInternal {
 
 /**
@@ -59,28 +55,14 @@ boost::optional<Date_t> getPreImageExpirationTime(OperationContext* opCtx, Date_
 
 }  // namespace preImageRemoverInternal
 
-class ServiceContext;
+/**
+ * Starts a periodic background job to remove expired documents from 'system.preimages' collection.
+ */
+void startChangeStreamExpiredPreImagesRemover(ServiceContext* serviceContext);
 
 /**
- * A periodic background job to remove expired documents from 'system.preimages' collection. A
- * document in this collection is considered expired if its corresponding oplog entry falls off the
- * oplog.
+ * Stops the periodic background job that removes expired documents from 'system.preimages'
+ * collection.
  */
-class PeriodicChangeStreamExpiredPreImagesRemover final {
-public:
-    static PeriodicChangeStreamExpiredPreImagesRemover& get(ServiceContext* serviceContext);
-
-    PeriodicJobAnchor& operator*() const noexcept;
-    PeriodicJobAnchor* operator->() const noexcept;
-
-private:
-    void _init(ServiceContext* serviceContext);
-
-    inline static const auto _serviceDecoration =
-        ServiceContext::declareDecoration<PeriodicChangeStreamExpiredPreImagesRemover>();
-
-    mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1),
-                                            "PeriodicChangeStreamExpiredPreImagesRemover::_mutex");
-    std::shared_ptr<PeriodicJobAnchor> _anchor;
-};
+void shutdownChangeStreamExpiredPreImagesRemover(ServiceContext* serviceContext);
 }  // namespace mongo

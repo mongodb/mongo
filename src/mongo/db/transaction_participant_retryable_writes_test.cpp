@@ -93,13 +93,20 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
 
 class OpObserverMock : public OpObserverNoop {
 public:
-    void onTransactionPrepare(OperationContext* opCtx,
-                              const std::vector<OplogSlot>& reservedSlots,
-                              std::vector<repl::ReplOperation>* statements,
-                              size_t numberOfPrePostImagesToWrite) override {
+    void onTransactionPrepare(
+        OperationContext* opCtx,
+        const std::vector<OplogSlot>& reservedSlots,
+        std::vector<repl::ReplOperation>* statements,
+        const ApplyOpsOplogSlotAndOperationAssignment* applyOpsOperationAssignment,
+        size_t numberOfPrePostImagesToWrite,
+        Date_t wallClockTime) override {
         ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
-        OpObserverNoop::onTransactionPrepare(
-            opCtx, reservedSlots, statements, numberOfPrePostImagesToWrite);
+        OpObserverNoop::onTransactionPrepare(opCtx,
+                                             reservedSlots,
+                                             statements,
+                                             applyOpsOperationAssignment,
+                                             numberOfPrePostImagesToWrite,
+                                             Date_t::now());
 
         uassert(ErrorCodes::OperationFailed,
                 "onTransactionPrepare() failed",
