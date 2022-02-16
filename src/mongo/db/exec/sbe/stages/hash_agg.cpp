@@ -272,10 +272,6 @@ void HashAggStage::spillValueToDisk(const RecordId& key,
 
     assertIgnorePrepareConflictsBehavior(_opCtx);
 
-    // Take a dummy lock to avoid tripping invariants in the storage layer. This is a noop because
-    // we aren't writing to a collection, just a temporary record store that only HashAgg will
-    // touch.
-    Lock::GlobalLock lk(_opCtx, MODE_IX);
     WriteUnitOfWork wuow(_opCtx);
 
     auto result = mongo::Status::OK();
@@ -298,7 +294,6 @@ void HashAggStage::spillValueToDisk(const RecordId& key,
 }
 
 boost::optional<value::MaterializedRow> HashAggStage::getFromRecordStore(const RecordId& rid) {
-    Lock::GlobalLock lk(_opCtx, MODE_IS);
     RecordData record;
     if (_recordStore->rs()->findRecord(_opCtx, rid, &record)) {
         auto valueReader = BufReader(record.data(), record.size());

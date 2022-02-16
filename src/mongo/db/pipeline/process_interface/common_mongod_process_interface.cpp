@@ -686,7 +686,7 @@ void CommonMongodProcessInterface::writeRecordsToRecordStore(
     tassert(5643012, "Attempted to write to record store with nullptr", records);
     assertIgnorePrepareConflictsBehavior(expCtx);
     writeConflictRetry(expCtx->opCtx, "MPI::writeRecordsToRecordStore", expCtx->ns.ns(), [&] {
-        AutoGetCollection autoColl(expCtx->opCtx, expCtx->ns, MODE_IX);
+        Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
         WriteUnitOfWork wuow(expCtx->opCtx);
         auto writeResult = rs->insertRecords(expCtx->opCtx, records, ts);
         tassert(5643002,
@@ -706,7 +706,7 @@ std::unique_ptr<TemporaryRecordStore> CommonMongodProcessInterface::createTempor
 Document CommonMongodProcessInterface::readRecordFromRecordStore(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, RecordStore* rs, RecordId rID) const {
     RecordData possibleRecord;
-    AutoGetCollection autoColl(expCtx->opCtx, expCtx->ns, MODE_IX);
+    Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
     auto foundDoc = rs->findRecord(expCtx->opCtx, RecordId(rID), &possibleRecord);
     tassert(775101, str::stream() << "Could not find document id " << rID, foundDoc);
     return Document(possibleRecord.toBson());
@@ -716,7 +716,7 @@ void CommonMongodProcessInterface::deleteRecordFromRecordStore(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, RecordStore* rs, RecordId rID) const {
     assertIgnorePrepareConflictsBehavior(expCtx);
     writeConflictRetry(expCtx->opCtx, "MPI::deleteFromRecordStore", expCtx->ns.ns(), [&] {
-        AutoGetCollection autoColl(expCtx->opCtx, expCtx->ns, MODE_IX);
+        Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
         WriteUnitOfWork wuow(expCtx->opCtx);
         rs->deleteRecord(expCtx->opCtx, rID);
         wuow.commit();
@@ -727,7 +727,7 @@ void CommonMongodProcessInterface::truncateRecordStore(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, RecordStore* rs) const {
     assertIgnorePrepareConflictsBehavior(expCtx);
     writeConflictRetry(expCtx->opCtx, "MPI::truncateRecordStore", expCtx->ns.ns(), [&] {
-        AutoGetCollection autoColl(expCtx->opCtx, expCtx->ns, MODE_IX);
+        Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
         WriteUnitOfWork wuow(expCtx->opCtx);
         auto status = rs->truncate(expCtx->opCtx);
         tassert(5643000, "Unable to clear record store", status.isOK());

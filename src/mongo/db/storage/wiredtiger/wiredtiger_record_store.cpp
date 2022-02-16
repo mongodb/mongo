@@ -1120,7 +1120,8 @@ bool WiredTigerRecordStore::findRecord(OperationContext* opCtx,
 }
 
 void WiredTigerRecordStore::deleteRecord(OperationContext* opCtx, const RecordId& id) {
-    dassert(opCtx->lockState()->isWriteLocked());
+    // Only check if a write lock is held for regular (non-temporary) record stores.
+    dassert(ns() == "" || opCtx->lockState()->isWriteLocked());
     invariant(opCtx->lockState()->inAWriteUnitOfWork() || opCtx->lockState()->isNoop());
     // SERVER-48453: Initialize the next record id counter before deleting. This ensures we won't
     // reuse record ids, which can be problematic for the _mdb_catalog.
@@ -1316,7 +1317,8 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
                                              Record* records,
                                              const Timestamp* timestamps,
                                              size_t nRecords) {
-    dassert(opCtx->lockState()->isWriteLocked());
+    // Only check if a write lock is held for regular (non-temporary) record stores.
+    dassert(ns() == "" || opCtx->lockState()->isWriteLocked());
     invariant(opCtx->lockState()->inAWriteUnitOfWork() || opCtx->lockState()->isNoop());
 
     int64_t totalLength = 0;
@@ -1494,7 +1496,8 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
                                            const RecordId& id,
                                            const char* data,
                                            int len) {
-    dassert(opCtx->lockState()->isWriteLocked());
+    // Only check if a write lock is held for regular (non-temporary) record stores.
+    dassert(ns() == "" || opCtx->lockState()->isWriteLocked());
     invariant(opCtx->lockState()->inAWriteUnitOfWork() || opCtx->lockState()->isNoop());
 
     WiredTigerCursor curwrap(_uri, _tableId, true, opCtx);
