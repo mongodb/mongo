@@ -275,25 +275,22 @@ reconciled page must be split into multiple smaller pages before being sent for
 compression and then be written to the disk. If the reconciled page can fit into
 a single on-disk page without the page growing beyond it's set max size,
 split_pct is ignored and the page isn't split.
- - an integer between 25 and 100
- - default : 75
+ - an integer between 50 and 100
+ - default : 90
  - Motivation to tune the value:
 \n Most applications should not need to tune the split percentage size.
-   - This value should be selected to avoid creating a large number of tiny
-pages or repeatedly splitting whenever new entries are inserted.
-\n For example, if the maximum page size is 1MB, a split_pct value of 10%
-would potentially result in creating a large number of 100KB pages, which may
-not be optimal for future I/O. Or, if the maximum page size is 1MB, a split_pct
-value of 90% would potentially result in repeatedly splitting pages as the split
-pages grow to 1MB over and over. The default value for split_pct is 75%,
-intended to keep large pages relatively large, while still giving split pages
-room to grow.
+   - This value should be selected based on the expected workload.  Workloads
+that perform many random updates benefit from values around 66%, leaving room
+on the newly split pages for future updates. Append-only workloads benefit from
+a value of 100%, as they will not add updates to the newly split pages.
+The default value for split_pct is 90%, intended as a balance between these two
+workload types.
  - Configuration:
 \n Specified as split_pct configuration option to WT_SESSION::create. An
 example of such a configuration string is as follows:
 
 <pre>
-     "key_format=S,value_format=S,split_pct=60"
+     "key_format=S,value_format=S,split_pct=80"
 </pre>
 
 @section compression_considerations Compression considerations
