@@ -2059,6 +2059,29 @@ tasks:
           display_name: " 1 Coverage report main page"
           remote_file: wiredtiger/${build_variant}/${revision}/coverage_report_${build_id}-${execution}/1_coverage_report_main.html
 
+  - name: s3-ext-test
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          posix_configure_flags: -DENABLE_STRICT=0 -DHAVE_DIAGNOSTIC=1 -DENABLE_S3=1 -DIMPORT_S3_SDK=external -DENABLE_PYTHON=1
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build"
+          shell: bash
+          silent: true
+          script: |
+            set -o errexit
+            export AWS_ACCESS_KEY_ID=${aws_sdk_s3_ext_access_key}
+            export AWS_SECRET_ACCESS_KEY=${aws_sdk_s3_ext_secret_key}
+
+            # Only set verbose after having put the AWS access credentials into the environment.
+            set -o verbose
+
+            # Run unit testing
+            ext/storage_sources/s3_store/test/run_s3_unit_tests
+            # Run Python testing
+            ${test_env_vars|} ${python_binary|python3} ../test/suite/run.py s3_store01
 
   - name: spinlock-gcc-test
     commands:
@@ -3572,6 +3595,7 @@ buildvariants:
     - name: data-validation-stress-test-checkpoint-fp-hs-insert-s5
     - name: data-validation-stress-test-checkpoint-fp-hs-insert-s5-no-timestamp
     - name: data-validation-stress-test-checkpoint-no-timestamp
+    - name: s3-ext-test
 
 - name: ubuntu2004-asan
   display_name: "! Ubuntu 20.04 ASAN"
@@ -4026,10 +4050,10 @@ buildvariants:
     make_command: ninja
     cmake_generator: Ninja
   tasks:
-  - name: compile
-  - name: generate-datafile-little-endian
-  - name: verify-datafile-little-endian
-  - name: verify-datafile-from-big-endian
+    - name: compile
+    - name: generate-datafile-little-endian
+    - name: verify-datafile-little-endian
+    - name: verify-datafile-from-big-endian
 
 - name: big-endian
   display_name: "~ Big-endian (s390x/zSeries)"
@@ -4049,10 +4073,10 @@ buildvariants:
     make_command: ninja
     cmake_generator: Ninja
   tasks:
-  - name: compile
-  - name: generate-datafile-big-endian
-  - name: verify-datafile-big-endian
-  - name: verify-datafile-from-little-endian
+    - name: compile
+    - name: generate-datafile-big-endian
+    - name: verify-datafile-big-endian
+    - name: verify-datafile-from-little-endian
 
 - name: ubuntu1804-ppc
   display_name: "~ Ubuntu 18.04 PPC"
@@ -4157,31 +4181,4 @@ buildvariants:
     - name: long-test
     - name: configure-combinations
     - name: format-smoke-test
-
-- name: ubuntu2004-tmp-s3-cmake
-  display_name: "* (Temporary) Ubuntu 20.04 S3 Extension CMake"
-  run_on:
-  - ubuntu2004-test
-  expansions:
-    test_env_vars:
-      WT_TOPDIR=$(git rev-parse --show-toplevel)
-      WT_BUILDDIR=$WT_TOPDIR/cmake_build
-      LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
-    posix_configure_flags:
-      -DCMAKE_C_FLAGS="-ggdb"
-      -DHAVE_DIAGNOSTIC=1
-      -DENABLE_PYTHON=1
-      -DENABLE_ZLIB=1
-      -DENABLE_SNAPPY=1
-      -DENABLE_STRICT=0
-      -DENABLE_TCMALLOC=1
-      -DENABLE_S3=1
-      -DIMPORT_S3_SDK=external
-      -DCMAKE_PREFIX_PATH="$(pwd)/../TCMALLOC_LIB"
-      -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
-    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
-    smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
-    cmake_generator: Ninja
-    make_command: ninja
-  tasks:
-    - name: compile
+    - name: s3-ext-test

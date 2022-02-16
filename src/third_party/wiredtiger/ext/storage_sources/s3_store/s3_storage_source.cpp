@@ -711,7 +711,7 @@ S3Flush(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, WT_FILE_SYSTEM *f
 
     int ret;
     FS2S3(fileSystem)->statistics.putObjectCount++;
-    if (ret = (fs->connection->PutObject(object, source)) != 0)
+    if ((ret = fs->connection->PutObject(object, source)) != 0)
         std::cerr << "S3Flush: PutObject request to S3 failed." << std::endl;
     return (ret);
 }
