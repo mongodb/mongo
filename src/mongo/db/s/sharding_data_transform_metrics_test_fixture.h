@@ -70,6 +70,8 @@ protected:
     constexpr static int64_t kYoungestTime = std::numeric_limits<int64_t>::max();
     constexpr static int64_t kOldestTime = 1;
 
+    ShardingDataTransformMetricsTestFixture() : _cumulativeMetrics{"testMetrics"} {}
+
     const ObserverMock* getYoungestObserver() {
         static StaticImmortal<ObserverMock> youngest{kYoungestTime, kYoungestTime};
         return &youngest.value();

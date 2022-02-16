@@ -29,7 +29,10 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/s/sharding_data_transform_metrics_observer_interface.h"
+#include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/functional.h"
 #include <set>
@@ -41,9 +44,14 @@ public:
     using InstanceObserver = ShardingDataTransformMetricsObserverInterface;
     using DeregistrationFunction = unique_function<void()>;
 
+    static ShardingDataTransformCumulativeMetrics* getForResharding(ServiceContext* context);
+    static ShardingDataTransformCumulativeMetrics* getForGlobalIndexes(ServiceContext* context);
+
+    ShardingDataTransformCumulativeMetrics(const std::string& rootSectionName);
     [[nodiscard]] DeregistrationFunction registerInstanceMetrics(const InstanceObserver* metrics);
     int64_t getOldestOperationRemainingTimeMillis() const;
     size_t getObservedMetricsCount() const;
+    void reportForServerStatus(BSONObjBuilder* bob) const;
 
 private:
     struct MetricsComparer {
@@ -58,10 +66,16 @@ private:
     };
     using MetricsSet = std::set<const InstanceObserver*, MetricsComparer>;
 
+    void reportActive(BSONObjBuilder* bob) const;
+    void reportOldestActive(BSONObjBuilder* bob) const;
+    void reportLatencies(BSONObjBuilder* bob) const;
+    void reportCurrentInSteps(BSONObjBuilder* bob) const;
     MetricsSet::iterator insertMetrics(const InstanceObserver* metrics);
 
     mutable Mutex _mutex;
+    const std::string _rootSectionName;
     MetricsSet _instanceMetrics;
+    AtomicWord<bool> _operationWasAttempted;
 };
 
 }  // namespace mongo
