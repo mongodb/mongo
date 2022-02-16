@@ -108,14 +108,15 @@ void logNextStep(Transaction::ErrorHandlingStep nextStep, const BSONObj& txnInfo
 }  // namespace details
 
 StatusWith<CommitResult> TransactionWithRetries::runSyncNoThrow(OperationContext* opCtx,
-                                                                TxnCallback func) noexcept {
+                                                                Callback callback) noexcept {
+
     // TODO SERVER-59566 Add a retry policy.
+    _internalTxn->setCallback(std::move(callback));
     while (true) {
         {
+
             auto bodyStatus = ExecutorFuture<void>(_executor)
-                                  .then([this, anchor = shared_from_this(), &func] {
-                                      return func(_internalTxn->getClient(), _executor);
-                                  })
+                                  .then([this] { return _internalTxn->runCallback(); })
                                   .getNoThrow(opCtx);
 
             if (!bodyStatus.isOK()) {
@@ -136,10 +137,9 @@ StatusWith<CommitResult> TransactionWithRetries::runSyncNoThrow(OperationContext
         }
 
         while (true) {
-            auto swResult =
-                ExecutorFuture<void>(_executor)
-                    .then([this, anchor = shared_from_this()] { return _internalTxn->commit(); })
-                    .getNoThrow(opCtx);
+            auto swResult = ExecutorFuture<void>(_executor)
+                                .then([this] { return _internalTxn->commit(); })
+                                .getNoThrow(opCtx);
 
             if (swResult.isOK() && swResult.getValue().getEffectiveStatus().isOK()) {
                 // Commit succeeded so return to the caller.
@@ -169,9 +169,7 @@ StatusWith<CommitResult> TransactionWithRetries::runSyncNoThrow(OperationContext
 
 void TransactionWithRetries::_bestEffortAbort(OperationContext* opCtx) {
     try {
-        ExecutorFuture<void>(_executor)
-            .then([this, anchor = shared_from_this()] { return _internalTxn->abort(); })
-            .get(opCtx);
+        ExecutorFuture<void>(_executor).then([this] { return _internalTxn->abort(); }).get(opCtx);
     } catch (const DBException& e) {
         LOGV2(5875900,
               "Unable to abort internal transaction",
@@ -207,7 +205,7 @@ SemiFuture<BSONObj> SEPTransactionClient::runCommand(StringData dbName, BSONObj 
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(dbName, cmdBuilder.obj());
     auto requestMessage = opMsgRequest.serialize();
     return sep->handleRequest(cancellableOpCtx.get(), requestMessage)
-        .then([this, anchor = shared_from_this()](DbResponse dbResponse) {
+        .then([this](DbResponse dbResponse) {
             auto reply = rpc::makeReply(&dbResponse.response)->getCommandReply().getOwned();
             _hooks->runReplyHook(reply);
             return reply;
@@ -219,7 +217,7 @@ SemiFuture<BatchedCommandResponse> SEPTransactionClient::runCRUDOp(
     const BatchedCommandRequest& cmd, std::vector<StmtId> stmtIds) const {
     return runCommand(cmd.getNS().db(), cmd.toBSON())
         .thenRunOn(_executor)
-        .then([this, anchor = shared_from_this()](BSONObj reply) {
+        .then([](BSONObj reply) {
             uassertStatusOK(getStatusFromCommandResult(reply));
 
             BatchedCommandResponse response;
@@ -240,7 +238,7 @@ SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
             cmd.getSingleBatch());
     return runCommand(cmd.getDbName(), cmd.toBSON({}))
         .thenRunOn(_executor)
-        .then([this, anchor = shared_from_this()](BSONObj reply) {
+        .then([](BSONObj reply) {
             // Will throw if the response has a non OK top level status.
             auto cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(reply));
             return cursorResponse.releaseBatch();
@@ -301,7 +299,20 @@ SemiFuture<BSONObj> Transaction::_commitOrAbort(StringData dbName, StringData cm
     cmdBuilder.append(WriteConcernOptions::kWriteConcernField, _writeConcern);
     auto cmdObj = cmdBuilder.obj();
 
-    return _txnClient->runCommand(dbName, cmdObj).semi();
+    // Safe to inline because the continuation only holds state.
+    return _txnClient->runCommand(dbName, cmdObj)
+        .unsafeToInlineFuture()
+        .tapAll([anchor = shared_from_this()](auto&&) {})
+        .semi();
+}
+
+SemiFuture<void> Transaction::runCallback() {
+    invariant(_callback);
+    // Safe to inline because the continuation only holds state.
+    return _callback(*_txnClient, _executor)
+        .unsafeToInlineFuture()
+        .tapAll([anchor = shared_from_this()](auto&&) {})
+        .semi();
 }
 
 Transaction::ErrorHandlingStep Transaction::handleError(

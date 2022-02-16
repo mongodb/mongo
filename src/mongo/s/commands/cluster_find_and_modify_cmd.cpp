@@ -134,10 +134,10 @@ void handleWouldChangeOwningShardErrorRetryableWrite(
     const NamespaceString& nss,
     const write_ops::FindAndModifyCommandRequest& request,
     BSONObjBuilder* result) {
-    auto txn = std::make_shared<txn_api::TransactionWithRetries>(
+    auto txn = txn_api::TransactionWithRetries(
         opCtx, Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
 
-    auto swResult = txn->runSyncNoThrow(
+    auto swResult = txn.runSyncNoThrow(
         opCtx,
         [cmdObj = request.toBSON({}), nss, result](const txn_api::TransactionClient& txnClient,
                                                    ExecutorPtr txnExec) {

@@ -178,11 +178,9 @@ public:
     // General utilities related to the ShardingCatalogManager
     //
 
-    static void withTransactionAPI(
-        OperationContext* opCtx,
-        const NamespaceString& namespaceForInitialFind,
-        unique_function<SemiFuture<void>(const txn_api::TransactionClient& txnClient,
-                                         ExecutorPtr txnExec)> func);
+    static void withTransactionAPI(OperationContext* opCtx,
+                                   const NamespaceString& namespaceForInitialFind,
+                                   txn_api::Callback callback);
 
     /**
      * Starts and commits a transaction on the config server, with a no-op find on the specified

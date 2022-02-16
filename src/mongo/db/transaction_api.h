@@ -102,15 +102,15 @@ public:
         const FindCommandRequest& cmd) const = 0;
 };
 
+using Callback =
+    unique_function<SemiFuture<void>(const TransactionClient& txnClient, ExecutorPtr txnExec)>;
+
 /**
  * Encapsulates the logic for executing an internal transaction based on the state in the given
  * OperationContext and automatically retrying on errors.
  */
-class TransactionWithRetries : public std::enable_shared_from_this<TransactionWithRetries> {
+class TransactionWithRetries {
 public:
-    using TxnCallback =
-        std::function<SemiFuture<void>(const TransactionClient& txnClient, ExecutorPtr txnExec)>;
-
     TransactionWithRetries(const TransactionWithRetries&) = delete;
     TransactionWithRetries operator=(const TransactionWithRetries&) = delete;
 
@@ -119,17 +119,17 @@ public:
      */
     TransactionWithRetries(OperationContext* opCtx, ExecutorPtr executor)
         : _executor(executor),
-          _internalTxn(std::make_unique<details::Transaction>(opCtx, executor)) {}
+          _internalTxn(std::make_shared<details::Transaction>(opCtx, executor)) {}
 
     /**
      * Alternate constructor that accepts a custom transaction client.
      */
     TransactionWithRetries(OperationContext* opCtx,
                            ExecutorPtr executor,
-                           std::shared_ptr<TransactionClient> txnClient)
+                           std::unique_ptr<TransactionClient> txnClient)
         : _executor(executor),
           _internalTxn(
-              std::make_unique<details::Transaction>(opCtx, executor, std::move(txnClient))) {}
+              std::make_shared<details::Transaction>(opCtx, executor, std::move(txnClient))) {}
 
     /**
      * Runs the given transaction callback synchronously.
@@ -143,14 +143,14 @@ public:
      * TODO SERVER-61782: Make this async.
      * TODO SERVER-61782: Allow returning a SemiFuture with any type.
      */
-    StatusWith<CommitResult> runSyncNoThrow(OperationContext* opCtx, TxnCallback func) noexcept;
+    StatusWith<CommitResult> runSyncNoThrow(OperationContext* opCtx, Callback callback) noexcept;
 
     /**
      * Same as above except will throw if the commit result has a non-ok command status or a write
      * concern error.
      */
-    void runSync(OperationContext* opCtx, TxnCallback func) {
-        auto result = uassertStatusOK(runSyncNoThrow(opCtx, std::move(func)));
+    void runSync(OperationContext* opCtx, Callback callback) {
+        auto result = uassertStatusOK(runSyncNoThrow(opCtx, std::move(callback)));
         uassertStatusOK(result.getEffectiveStatus());
     }
 
@@ -161,7 +161,7 @@ private:
     void _bestEffortAbort(OperationContext* opCtx);
 
     ExecutorPtr _executor;
-    std::unique_ptr<details::Transaction> _internalTxn;
+    std::shared_ptr<details::Transaction> _internalTxn;
 };
 
 /**
@@ -174,8 +174,7 @@ namespace details {
  * Default transaction client that runs given commands through the local process service entry
  * point.
  */
-class SEPTransactionClient : public TransactionClient,
-                             public std::enable_shared_from_this<SEPTransactionClient> {
+class SEPTransactionClient : public TransactionClient {
 public:
     SEPTransactionClient(OperationContext* opCtx, ExecutorPtr executor)
         : _serviceContext(opCtx->getServiceContext()), _executor(executor) {
@@ -210,7 +209,7 @@ private:
  * Encapsulates the logic for an internal transaction based on the state in the given
  * OperationContext.
  */
-class Transaction {
+class Transaction : public std::enable_shared_from_this<Transaction> {
 public:
     enum class ExecutionContext {
         kOwnSession,
@@ -243,7 +242,7 @@ public:
     Transaction(OperationContext* opCtx, ExecutorPtr executor)
         : _initialOpCtx(opCtx),
           _executor(executor),
-          _txnClient(std::make_shared<SEPTransactionClient>(opCtx, executor)) {
+          _txnClient(std::make_unique<SEPTransactionClient>(opCtx, executor)) {
         _primeTransaction(opCtx);
         _txnClient->injectHooks(_makeTxnMetadataHooks());
     }
@@ -253,18 +252,24 @@ public:
      */
     Transaction(OperationContext* opCtx,
                 ExecutorPtr executor,
-                std::shared_ptr<TransactionClient> txnClient)
+                std::unique_ptr<TransactionClient> txnClient)
         : _initialOpCtx(opCtx), _executor(executor), _txnClient(std::move(txnClient)) {
         _primeTransaction(opCtx);
         _txnClient->injectHooks(_makeTxnMetadataHooks());
     }
 
     /**
-     * Returns the client used to run transaction commands.
+     * Sets the callback to be used by this transaction.
      */
-    const TransactionClient& getClient() {
-        return *_txnClient;
+    void setCallback(Callback callback) {
+        invariant(!_callback);
+        _callback = std::move(callback);
     }
+
+    /**
+     * Runs the previously set callback with the TransactionClient owned by this transaction.
+     */
+    SemiFuture<void> runCallback();
 
     /**
      * Used by the transaction runner to commit the transaction. Returns a future with a non-OK
@@ -330,7 +335,8 @@ private:
 
     OperationContext* const _initialOpCtx;
     ExecutorPtr _executor;
-    std::shared_ptr<TransactionClient> _txnClient;
+    std::unique_ptr<TransactionClient> _txnClient;
+    Callback _callback;
 
     bool _latestResponseHasTransientTransactionErrorLabel{false};
 
