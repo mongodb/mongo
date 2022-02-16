@@ -32,6 +32,7 @@
 #include "mongo/db/s/collmod_coordinator.h"
 
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/db_raii.h"
@@ -150,6 +151,13 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
+
+                {
+                    AutoGetCollection coll{
+                        opCtx, nss(), MODE_IS, AutoGetCollectionViewMode::kViewsPermitted};
+                    checkCollectionUUIDMismatch(
+                        opCtx, nss(), *coll, _doc.getCollModRequest().getCollectionUUID());
+                }
 
                 const auto isTimeSeries = timeseries::getTimeseriesOptions(
                     opCtx, nss(), !nss().isTimeseriesBucketsCollection());
