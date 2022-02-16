@@ -71,15 +71,7 @@ public:
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
                     nss.isValid());
-            const auto& balancerStatus = Balancer::get(opCtx)->getBalancerStatusForNs(opCtx, nss);
-            Response response(balancerStatus.balancerCompliant);
-            response.setDetails(balancerStatus.details);
-            response.setFirstComplianceViolation(
-                balancerStatus.firstComplianceViolation.is_initialized()
-                    ? boost::optional<StringData>(
-                          StringData(*balancerStatus.firstComplianceViolation))
-                    : boost::optional<StringData>(boost::none));
-            return response;
+            return Balancer::get(opCtx)->getBalancerStatusForNs(opCtx, nss);
         }
 
     private:
