@@ -63,7 +63,6 @@ void setStateDocTimestamps(WithLock,
                            repl::OpTime time,
                            ShardSplitDonorDocument& stateDoc) {
     switch (nextState) {
-        case ShardSplitDonorStateEnum::kDataSync:
         case ShardSplitDonorStateEnum::kUninitialized:
             break;
         case ShardSplitDonorStateEnum::kBlocking:
@@ -100,7 +99,11 @@ void setMtabToBlockingForTenants(ServiceContext* context,
     }
 }
 
-MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterInitialSync);
+void checkForTokenInterrupt(const CancellationToken& token) {
+    uassert(ErrorCodes::CallbackCanceled, "Donor service interrupted", !token.isCanceled());
+}
+
+MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeBlocking);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterBlocking);
 MONGO_FAIL_POINT_DEFINE(skipShardSplitWaitForSplitAcceptance);
 
@@ -206,7 +209,14 @@ ShardSplitDonorService::DonorStateMachine::DonorStateMachine(
       _migrationId(initialState.getId()),
       _serviceContext(serviceContext),
       _shardSplitService(splitService),
-      _stateDoc(initialState) {}
+      _stateDoc(initialState),
+      _markKilledExecutor(std::make_shared<ThreadPool>([] {
+          ThreadPool::Options options;
+          options.poolName = "ShardSplitCancelableOpCtxPool";
+          options.minThreads = 1;
+          options.maxThreads = 1;
+          return options;
+      }())) {}
 
 void ShardSplitDonorService::DonorStateMachine::tryAbort() {
     LOGV2(6086502, "Aborting shard split", "id"_attr = _migrationId);
@@ -247,11 +257,14 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
         return _abortSource->token();
     }();
 
+    _markKilledExecutor->startup();
+    _cancelableOpCtxFactory.emplace(primaryToken, _markKilledExecutor);
     _initiateTimeout(executor, abortToken);
 
-    LOGV2(6086506, "Starting shard split {id}", "id"_attr = _migrationId);
-
-    auto cancelableExecutor = CancelableExecutor::make(**executor, abortToken);
+    LOGV2(6086506,
+          "Starting shard split.",
+          "id"_attr = _migrationId,
+          "timeout"_attr = repl::shardSplitTimeoutMS.load());
 
     _completionPromise.setWith([&] {
         return ExecutorFuture(**executor)
@@ -262,43 +275,35 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
 
                 return _writeInitialDocument(executor, primaryToken);
             })
-            // Once the initial write is done, use the abort token
-            .thenRunOn(cancelableExecutor)
-            .then([this, cancelableExecutor, abortToken] {
-                _createReplicaSetMonitor(cancelableExecutor, abortToken);
-            })
-            .then([this, executor, cancelableExecutor, abortToken] {
-                // Passing executor as a TaskExecutor is required by the downstream call to
-                // AsyncTryUntilWithDelay::on(...)
-                return _enterDataSyncState(executor, abortToken).thenRunOn(cancelableExecutor);
-            })
-            .then([this] { pauseShardSplitAfterInitialSync.pauseWhileSet(); })
-            .then([this, executor, cancelableExecutor, abortToken] {
-                // Passing executor as a TaskExecutor is required by the downstream call to
-                // AsyncTryUntilWithDelay::on(...)
-                return _enterBlockingState(executor, abortToken).thenRunOn(cancelableExecutor);
+            .then([this] { pauseShardSplitBeforeBlocking.pauseWhileSet(); })
+            .then([this, executor, abortToken] {
+                checkForTokenInterrupt(abortToken);
+                _cancelableOpCtxFactory.emplace(abortToken, _markKilledExecutor);
+                _createReplicaSetMonitor(executor, abortToken);
+                return _enterBlockingState(executor, abortToken);
             })
             .then([this] { pauseShardSplitAfterBlocking.pauseWhileSet(); })
-            .then([this, executor, cancelableExecutor, abortToken] {
-                // Passing executor as a TaskExecutor is required by the downstream call to
-                // AsyncTry::on(...)
-                return _waitForRecipientToAcceptSplit(executor, abortToken)
-                    .thenRunOn(cancelableExecutor);
+            .then([this, executor, abortToken] {
+                return _waitForRecipientToReachBlockTimestamp(executor, abortToken);
             })
-            .then([this, cancelableExecutor, abortToken] {
+            .then([this, executor, abortToken] {
+                return _waitForRecipientToAcceptSplit(executor, abortToken);
+            })
+            .then([this, executor, abortToken] {
                 LOGV2(6086503,
                       "Shard split completed",
                       "id"_attr = _migrationId,
                       "abortReason"_attr = _abortReason);
 
                 stdx::lock_guard<Latch> lg(_mutex);
-
                 return DurableState{_stateDoc.getState(), _abortReason};
             })
-            .thenRunOn(**executor)
             // anchor ensures the instance will still exists even if the primary stepped down
             .onError([this, executor, primaryToken, abortToken, anchor = shared_from_this()](
                          StatusWith<DurableState> statusWithState) {
+                // only cancel operations on stepdown from here out
+                _cancelableOpCtxFactory.emplace(primaryToken, _markKilledExecutor);
+
                 return _handleErrorOrEnterAbortedState(
                     statusWithState, executor, primaryToken, abortToken);
             })
@@ -320,25 +325,10 @@ boost::optional<BSONObj> ShardSplitDonorService::DonorStateMachine::reportForCur
     return bob.obj();
 }
 
-ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_enterDataSyncState(
-    const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken) {
-    {
-        stdx::lock_guard<Latch> lg(_mutex);
-        if (_stateDoc.getState() >= ShardSplitDonorStateEnum::kDataSync) {
-            return ExecutorFuture(**executor);
-        }
-    }
-
-    LOGV2(6086507, "Shard split entering data sync state {id}", "id"_attr = _migrationId);
-
-    return _updateStateDocument(executor, abortToken, ShardSplitDonorStateEnum::kDataSync)
-        .then([this, executor, abortToken](repl::OpTime opTime) {
-            return _waitForMajorityWriteConcern(executor, std::move(opTime), abortToken);
-        });
-}
-
 ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_enterBlockingState(
     const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken) {
+    checkForTokenInterrupt(abortToken);
+
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (_stateDoc.getState() >= ShardSplitDonorStateEnum::kBlocking) {
@@ -346,16 +336,49 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_enterBlockingSt
         }
     }
 
-    LOGV2(6177200, "Shard split entering blocking state {id}", "id"_attr = _migrationId);
-
+    LOGV2(6177200, "Entering blocking state.", "id"_attr = _migrationId);
     return _updateStateDocument(executor, abortToken, ShardSplitDonorStateEnum::kBlocking)
         .then([this, executor, abortToken](repl::OpTime opTime) {
             return _waitForMajorityWriteConcern(executor, std::move(opTime), abortToken);
         });
 }
 
+ExecutorFuture<void>
+ShardSplitDonorService::DonorStateMachine::_waitForRecipientToReachBlockTimestamp(
+    const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken) {
+    checkForTokenInterrupt(abortToken);
+
+    stdx::lock_guard<Latch> lg(_mutex);
+    if (_stateDoc.getState() > ShardSplitDonorStateEnum::kBlocking) {
+        return ExecutorFuture(**executor);
+    }
+
+    auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
+
+    invariant(_stateDoc.getBlockTimestamp());
+    auto blockTimestamp = *_stateDoc.getBlockTimestamp();
+    repl::OpTime blockOpTime = repl::OpTime(blockTimestamp, replCoord->getConfigTerm());
+
+    invariant(_stateDoc.getRecipientTagName());
+    auto recipientTagName = *_stateDoc.getRecipientTagName();
+    auto recipientNodes = getRecipientMembers(replCoord->getConfig(), recipientTagName);
+
+    WriteConcernOptions writeConcern;
+    writeConcern.w = WTags{{recipientTagName.toString(), recipientNodes.size()}};
+
+    LOGV2(
+        6177201, "Waiting for recipient nodes to reach block timestamp.", "id"_attr = _migrationId);
+
+    return ExecutorFuture(**executor).then([this, blockOpTime, writeConcern]() {
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+        auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
+        uassertStatusOK(replCoord->awaitReplication(opCtx.get(), blockOpTime, writeConcern).status);
+    });
+}
+
 ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForRecipientToAcceptSplit(
     const ScopedTaskExecutorPtr& executor, const CancellationToken& token) {
+    checkForTokenInterrupt(token);
 
     {
         stdx::lock_guard<Latch> lg(_mutex);
@@ -363,17 +386,21 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForRecipien
             return ExecutorFuture(**executor);
         }
 
-        LOGV2(6142501, "Waiting for recipient to accept the split.");
+        LOGV2(6142501, "Waiting for recipient to accept the split.", "id"_attr = _migrationId);
     }
 
-    return _recipientAcceptedSplit.getFuture().thenRunOn(**executor).then([this, executor, token] {
-        LOGV2(6142503, "Recipient has accepted the split, committing shard split decision");
+    return ExecutorFuture(**executor)
+        .then([&]() { return _recipientAcceptedSplit.getFuture(); })
+        .then([this, executor, token] {
+            LOGV2(6142503,
+                  "Recipient has accepted the split, committing decision.",
+                  "id"_attr = _migrationId);
 
-        return _updateStateDocument(executor, token, ShardSplitDonorStateEnum::kCommitted)
-            .then([this, executor, token](repl::OpTime opTime) {
-                return _waitForMajorityWriteConcern(executor, std::move(opTime), token);
-            });
-    });
+            return _updateStateDocument(executor, token, ShardSplitDonorStateEnum::kCommitted)
+                .then([this, executor, token](repl::OpTime opTime) {
+                    return _waitForMajorityWriteConcern(executor, std::move(opTime), token);
+                });
+        });
 }
 
 ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_writeInitialDocument(
@@ -387,8 +414,8 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_writeInitialDoc
     if (initialState == ShardSplitDonorStateEnum::kAborted) {
         stdx::lock_guard<Latch> lg(_mutex);
         if (isAbortedDocumentPersistent(lg, _stateDoc)) {
-            // Node has step up and created an instance using a document in abort state. No need to
-            // write the document as it already exists.
+            // Node has step up and created an instance using a document in abort state. No need
+            // to write the document as it already exists.
             return ExecutorFuture(**executor);
         }
 
@@ -399,18 +426,18 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_writeInitialDoc
         _stateDoc.setAbortReason(bob.obj());
 
     } else if (initialState != ShardSplitDonorStateEnum::kUninitialized) {
-        // Node has step up and resumed a shard split. No need to write the document as it already
-        // exists.
+        // Node has step up and resumed a shard split. No need to write the document as it
+        // already exists.
         return ExecutorFuture(**executor);
     }
 
     LOGV2(6086504,
-          "Inserting initial state document {id} {state}",
+          "Inserting initial state document.",
           "id"_attr = _migrationId,
           "state"_attr = initialState);
 
     return AsyncTry([this, nextState = initialState, uuid = _migrationId]() {
-               auto opCtxHolder = cc().makeOperationContext();
+               auto opCtxHolder = _cancelableOpCtxFactory->makeOperationContext(&cc());
                auto opCtx = opCtxHolder.get();
 
                AutoGetCollection collection(opCtx, _stateDocumentsNS, MODE_IX);
@@ -461,6 +488,11 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_writeInitialDoc
         .on(**executor, primaryServiceToken)
         .then([this, executor, primaryServiceToken](repl::OpTime opTime) {
             return _waitForMajorityWriteConcern(executor, std::move(opTime), primaryServiceToken);
+        })
+        .then([this, executor, nextState = initialState]() {
+            uassert(ErrorCodes::TenantMigrationAborted,
+                    "Shard split operation aborted",
+                    nextState != ShardSplitDonorStateEnum::kAborted);
         });
 }
 
@@ -468,14 +500,6 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
     const ScopedTaskExecutorPtr& executor,
     const CancellationToken& token,
     ShardSplitDonorStateEnum nextState) {
-    {
-        stdx::lock_guard<Latch> lg(_mutex);
-        LOGV2(6086505,
-              "Updating state document {id} {state}",
-              "id"_attr = _migrationId,
-              "state"_attr = _stateDoc.getState());
-    }
-
     auto tenantIds = [&]() {
         stdx::lock_guard<Latch> lg(_mutex);
         _stateDoc.setState(nextState);
@@ -484,7 +508,7 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
     }();
 
     return AsyncTry([this, tenantIds = std::move(tenantIds), uuid = _migrationId, nextState] {
-               auto opCtxHolder = cc().makeOperationContext();
+               auto opCtxHolder = _cancelableOpCtxFactory->makeOperationContext(&cc());
                auto opCtx = opCtxHolder.get();
 
                AutoGetCollection collection(opCtx, _stateDocumentsNS, MODE_IX);
@@ -553,8 +577,8 @@ void ShardSplitDonorService::DonorStateMachine::_initiateTimeout(
                     !_abortRequested) {
                     LOGV2(6236500,
                           "Timeout expired, aborting shard split.",
-                          "timeout"_attr = repl::shardSplitTimeoutMS.load(),
-                          "id"_attr = _migrationId);
+                          "id"_attr = _migrationId,
+                          "timeout"_attr = repl::shardSplitTimeoutMS.load());
                     _abortReason = Status(ErrorCodes::ExceededTimeLimit,
                                           "Aborting shard split as it exceeded its time limit.");
                     _abortSource->cancel();
@@ -564,7 +588,7 @@ void ShardSplitDonorService::DonorStateMachine::_initiateTimeout(
 }
 
 void ShardSplitDonorService::DonorStateMachine::_createReplicaSetMonitor(
-    const ExecutorPtr& executor, const CancellationToken& abortToken) {
+    const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken) {
     auto future = [&]() {
         stdx::lock_guard<Latch> lg(_mutex);
         if (MONGO_unlikely(skipShardSplitWaitForSplitAcceptance.shouldFail())) {  // Test-only.
@@ -577,7 +601,7 @@ void ShardSplitDonorService::DonorStateMachine::_createReplicaSetMonitor(
         invariant(recipientSetName);
 
         return detail::makeRecipientAcceptSplitFuture(
-            executor, abortToken, *recipientTagName, *recipientSetName);
+            **executor, abortToken, *recipientTagName, *recipientSetName);
     }();
 
     _recipientAcceptedSplit.setFrom(std::move(future).unsafeToInlineFuture());
@@ -590,11 +614,6 @@ ShardSplitDonorService::DonorStateMachine::_handleErrorOrEnterAbortedState(
     const ScopedTaskExecutorPtr& executor,
     const CancellationToken& primaryToken,
     const CancellationToken& abortToken) {
-    LOGV2(6086510,
-          "Shard split error handling {id} {status}",
-          "id"_attr = _migrationId,
-          "status"_attr = statusWithState.getStatus());
-
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (isAbortedDocumentPersistent(lg, _stateDoc)) {
@@ -631,7 +650,7 @@ ShardSplitDonorService::DonorStateMachine::_handleErrorOrEnterAbortedState(
         _stateDoc.setAbortReason(bob.obj());
 
         LOGV2(6086508,
-              "Shard split aborted {id}",
+              "Entering 'aborted' state.",
               "id"_attr = _migrationId,
               "abortReason"_attr = _abortReason.get());
     }

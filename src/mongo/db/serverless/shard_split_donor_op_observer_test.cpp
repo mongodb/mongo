@@ -223,8 +223,7 @@ TEST_F(ShardSplitDonorOpObserverTest, InsertWrongType) {
 TEST_F(ShardSplitDonorOpObserverTest, InitialInsertInvalidState) {
     std::vector<ShardSplitDonorStateEnum> states = {ShardSplitDonorStateEnum::kAborted,
                                                     ShardSplitDonorStateEnum::kBlocking,
-                                                    ShardSplitDonorStateEnum::kCommitted,
-                                                    ShardSplitDonorStateEnum::kDataSync};
+                                                    ShardSplitDonorStateEnum::kCommitted};
 
     for (auto state : states) {
         auto stateDocument = defaultStateDocument();
@@ -274,23 +273,6 @@ TEST_F(ShardSplitDonorOpObserverTest, InsertDocument) {
     };
 
     runInsertTestCase(stateDocument, _tenantIds, mtabVerifier);
-}
-
-TEST_F(ShardSplitDonorOpObserverTest, TransitionToDataSync) {
-    auto stateDocument = defaultStateDocument();
-    stateDocument.setState(ShardSplitDonorStateEnum::kDataSync);
-
-    auto blockers = createBlockers(_tenantIds, _opCtx.get(), _connectionStr);
-
-    auto mtabVerifier = [opCtx = _opCtx.get()](std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
-        ASSERT_TRUE(mtab);
-        ASSERT_OK(mtab->checkIfCanWrite(Timestamp(1)));
-        ASSERT_OK(mtab->checkIfCanWrite(Timestamp(3)));
-        ASSERT_OK(mtab->checkIfLinearizableReadWasAllowed(opCtx));
-        ASSERT_EQ(mtab->checkIfCanBuildIndex().code(), ErrorCodes::TenantMigrationConflict);
-    };
-
-    runUpdateTestCase(stateDocument, _tenantIds, blockers, mtabVerifier);
 }
 
 TEST_F(ShardSplitDonorOpObserverTest, TransitionToBlockingPrimary) {

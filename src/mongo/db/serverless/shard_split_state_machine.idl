@@ -40,7 +40,6 @@ enums:
         type: string
         values:
             kUninitialized: "uninitialized"
-            kDataSync: "data sync"
             kBlocking: "blocking"
             kCommitted: "committed"
             kAborted: "aborted"

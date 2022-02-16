@@ -48,7 +48,6 @@ ShardSplitDonorDocument parseAndValidateDonorDocument(const BSONObj& doc) {
 
     switch (donorStateDoc.getState()) {
         case ShardSplitDonorStateEnum::kUninitialized:
-        case ShardSplitDonorStateEnum::kDataSync:
             uassert(ErrorCodes::BadValue,
                     errmsg,
                     !donorStateDoc.getBlockTimestamp() && !donorStateDoc.getCommitOrAbortOpTime() &&
@@ -243,7 +242,6 @@ void ShardSplitDonorOpObserver::onInserts(OperationContext* opCtx,
             case ShardSplitDonorStateEnum::kAborted:
                 // If the operation starts aborted, do not do anything.
                 break;
-            case ShardSplitDonorStateEnum::kDataSync:
             case ShardSplitDonorStateEnum::kBlocking:
             case ShardSplitDonorStateEnum::kCommitted:
                 uasserted(ErrorCodes::IllegalOperation,
@@ -265,8 +263,6 @@ void ShardSplitDonorOpObserver::onUpdate(OperationContext* opCtx,
 
     auto donorStateDoc = parseAndValidateDonorDocument(args.updateArgs->updatedDoc);
     switch (donorStateDoc.getState()) {
-        case ShardSplitDonorStateEnum::kDataSync:
-            break;
         case ShardSplitDonorStateEnum::kBlocking:
             onTransitionToBlocking(opCtx, donorStateDoc);
             break;
@@ -290,22 +286,16 @@ void ShardSplitDonorOpObserver::aboutToDelete(OperationContext* opCtx,
     }
 
     auto donorStateDoc = parseAndValidateDonorDocument(doc);
+    if (donorStateDoc.getTenantIds()) {
+        auto tenantIds = *donorStateDoc.getTenantIds();
+        std::vector<std::string> result;
+        result.reserve(tenantIds.size());
+        for (const auto& tenantId : tenantIds) {
+            result.emplace_back(tenantId.toString());
+        }
 
-    // To support back-to-back migration retries, when a migration is aborted, we remove its
-    // TenantMigrationDonorAccessBlocker as soon as its donor state doc is marked as garbage
-    // collectable. So onDelete should skip removing the TenantMigrationDonorAccessBlocker for
-    // aborted migrations.
-    tenantIdsToDeleteDecoration(opCtx) =
-        donorStateDoc.getState() == ShardSplitDonorStateEnum::kAborted
-        ? boost::none
-        : [tenantIds = donorStateDoc.getTenantIds()]() {
-              std::vector<std::string> tenants;
-              for (auto& tenantId : *tenantIds) {
-                  tenants.push_back(tenantId.toString());
-              }
-
-              return boost::make_optional(tenants);
-          }();
+        tenantIdsToDeleteDecoration(opCtx) = boost::make_optional(result);
+    }
 }
 
 void ShardSplitDonorOpObserver::onDelete(OperationContext* opCtx,

@@ -31,6 +31,7 @@
 
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/serverless/shard_split_state_machine_gen.h"
 #include "mongo/executor/cancelable_executor.h"
@@ -130,11 +131,11 @@ public:
 
 private:
     // Tasks
-    ExecutorFuture<void> _enterDataSyncState(const ScopedTaskExecutorPtr& executor,
-                                             const CancellationToken& token);
-
     ExecutorFuture<void> _enterBlockingState(const ScopedTaskExecutorPtr& executor,
                                              const CancellationToken& token);
+
+    ExecutorFuture<void> _waitForRecipientToReachBlockTimestamp(
+        const ScopedTaskExecutorPtr& executor, const CancellationToken& token);
 
     ExecutorFuture<void> _waitForRecipientToAcceptSplit(const ScopedTaskExecutorPtr& executor,
                                                         const CancellationToken& token);
@@ -154,7 +155,8 @@ private:
     void _initiateTimeout(const ScopedTaskExecutorPtr& executor,
                           const CancellationToken& abortToken);
 
-    void _createReplicaSetMonitor(const ExecutorPtr& executor, const CancellationToken& abortToken);
+    void _createReplicaSetMonitor(const ScopedTaskExecutorPtr& executor,
+                                  const CancellationToken& abortToken);
 
     ExecutorFuture<DurableState> _handleErrorOrEnterAbortedState(
         StatusWith<DurableState> durableState,
@@ -170,6 +172,12 @@ private:
     ServiceContext* const _serviceContext;
     ShardSplitDonorService* const _shardSplitService;
     ShardSplitDonorDocument _stateDoc;
+
+    // ThreadPool used by CancelableOperationContext.
+    // CancelableOperationContext must have a thread that is always available to it to mark its
+    // opCtx as killed when the cancelToken has been cancelled.
+    const std::shared_ptr<ThreadPool> _markKilledExecutor;
+    boost::optional<CancelableOperationContextFactory> _cancelableOpCtxFactory;
 
     bool _abortRequested = false;
     boost::optional<CancellationSource> _abortSource;

@@ -59,6 +59,7 @@
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/unittest/log_test.h"
@@ -101,9 +102,6 @@ std::ostringstream& operator<<(std::ostringstream& builder,
             break;
         case mongo::ShardSplitDonorStateEnum::kCommitted:
             builder << "kCommitted";
-            break;
-        case mongo::ShardSplitDonorStateEnum::kDataSync:
-            builder << "kDataSync";
             break;
     }
 
@@ -149,7 +147,6 @@ protected:
             BSON("_id" << _uuid << "tenantIds" << _tenantIds << "recipientTagName"
                        << _recipientTagName << "recipientSetName" << _recipientSetName));
     }
-
 
     UUID _uuid = UUID::gen();
     MockReplicaSet _replSet{
@@ -208,11 +205,7 @@ TEST_F(ShardSplitDonorServiceTest, ShardSplitDonorServiceTimeout) {
     auto stateDocument = defaultStateDocument();
 
     // Set a timeout of 200 ms, and make sure we reset after this test is run
-    ON_BLOCK_EXIT([splitTimout = repl::shardSplitTimeoutMS.load()] {
-        repl::shardSplitTimeoutMS.store(splitTimout);
-    });
-
-    repl::shardSplitTimeoutMS.store(200);
+    RAIIServerParameterControllerForTest controller{"shardSplitTimeoutMS", 200};
 
     // Create and start the instance.
     auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
@@ -258,7 +251,7 @@ TEST_F(ShardSplitDonorServiceTest, CreateInstanceThenAbort) {
 
     std::shared_ptr<ShardSplitDonorService::DonorStateMachine> serviceInstance;
     {
-        FailPointEnableBlock fp("pauseShardSplitAfterInitialSync");
+        FailPointEnableBlock fp("pauseShardSplitBeforeBlocking");
         auto initialTimesEntered = fp.initialTimesEntered();
 
         serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
@@ -285,7 +278,7 @@ TEST_F(ShardSplitDonorServiceTest, StepDownTest) {
     std::shared_ptr<ShardSplitDonorService::DonorStateMachine> serviceInstance;
 
     {
-        FailPointEnableBlock fp("pauseShardSplitAfterInitialSync");
+        FailPointEnableBlock fp("pauseShardSplitBeforeBlocking");
         auto initialTimesEntered = fp.initialTimesEntered();
 
         serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
@@ -300,6 +293,44 @@ TEST_F(ShardSplitDonorServiceTest, StepDownTest) {
     auto result = serviceInstance->completionFuture().getNoThrow();
     ASSERT_FALSE(result.isOK());
     ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange, result.getStatus());
+}
+
+TEST_F(ShardSplitDonorServiceTest, TimeoutAbortsAwaitReplication) {
+    auto opCtx = makeOperationContext();
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::reconfigToAddRecipientNodes(
+        getServiceContext(), _recipientTagName, _replSet.getHosts());
+
+    RAIIServerParameterControllerForTest controller{"shardSplitTimeoutMS", 200};
+
+    AtomicWord<bool> sleptForWaitingForBlockTimestamp{false};
+    std::shared_ptr<ShardSplitDonorService::DonorStateMachine> serviceInstance;
+    {
+        FailPointEnableBlock fp("pauseShardSplitAfterBlocking");
+        serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
+            opCtx.get(), _service, defaultStateDocument().toBSON());
+        ASSERT(serviceInstance.get());
+
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+
+        auto replCoord = dynamic_cast<repl::ReplicationCoordinatorMock*>(
+            repl::ReplicationCoordinator::get(cc().getServiceContext()));
+        replCoord->setAwaitReplicationReturnValueFunction(
+            [&sleptForWaitingForBlockTimestamp](OperationContext* opCtx, const repl::OpTime&) {
+                bool alreadySlept = false;
+                if (sleptForWaitingForBlockTimestamp.compareAndSwap(&alreadySlept, true)) {
+                    opCtx->sleepFor(Hours{1});
+                }
+
+                return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(),
+                                                                       Milliseconds(0));
+            });
+    }
+
+    uassertStatusOK(serviceInstance->completionFuture().getNoThrow());
+    auto result = serviceInstance->completionFuture().get(opCtx.get());
+    ASSERT(result.abortReason);
+    ASSERT_EQ(result.abortReason->code(), ErrorCodes::ExceededTimeLimit);
 }
 
 class SplitReplicaSetObserverTest : public ServiceContextTest {

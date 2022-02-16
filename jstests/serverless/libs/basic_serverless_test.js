@@ -1,6 +1,6 @@
 class BasicServerlessTest {
-    constructor({recipientTagName, recipientSetName}) {
-        this.donor = new ReplSetTest({name: "donor", nodes: 3});
+    constructor({recipientTagName, recipientSetName, nodeOptions}) {
+        this.donor = new ReplSetTest({name: "donor", nodes: 3, nodeOptions});
         this.donor.startSet();
         this.donor.initiate();
 
@@ -52,4 +52,25 @@ class BasicServerlessTest {
         assert.commandWorked(admin.runCommand({replSetReconfig: config}));
         this.recipientNodes.forEach(node => donor.waitForState(node, ReplSetTest.State.SECONDARY));
     }
+}
+
+function findMigration(primary, uuid) {
+    const donorsCollection = primary.getDB("config").getCollection("tenantSplitDonors");
+    return donorsCollection.findOne({"_id": uuid});
+}
+
+function cleanupMigrationDocument(primary, uuid) {
+    const donorsCollection = primary.getDB("config").getCollection("tenantSplitDonors");
+    return donorsCollection.deleteOne({"_id": uuid}, {w: "majority"});
+}
+
+function assertMigrationState(primary, uuid, state) {
+    const migrationDoc = findMigration(primary, uuid);
+    assert(migrationDoc);
+
+    if (migrationDoc.state === 'aborted') {
+        print(tojson(migrationDoc));
+    }
+
+    assert.eq(migrationDoc.state, state);
 }
