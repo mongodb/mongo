@@ -158,7 +158,7 @@ functions:
             if [ -d cmake_build ]; then rm -r cmake_build; fi
             mkdir -p cmake_build
             cd cmake_build
-            $CMAKE -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_clang.cmake -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1 \
+            $CMAKE -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_clang.cmake -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1 \
               -DHAVE_DIAGNOSTIC=1 -DCMAKE_BUILD_TYPE=ASan \
               -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1 ${configure_python_setting|} \
               -G "${cmake_generator|Ninja}" ../.
@@ -2287,28 +2287,6 @@ tasks:
             ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
           format_test_script_args: -S
 
-  # FIXME-WT-8482: Replace this test with format-asan-smoke-test.
-  - name: format-asan-smoke-ppc-test
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          # FIXME-WT-8482: CC is set to the system default "clang" binary here as a workaround.
-          # Change it back to mongodbtoolchain "clang" binary.
-          posix_configure_flags:
-            -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
-            -DHAVE_DIAGNOSTIC=1
-            -DWITH_PIC=1
-            -DCMAKE_BUILD_TYPE=ASan
-            -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1
-      - func: "format test script"
-        # Run smoke tests, don't stop at failed tests, use default config
-        vars:
-          test_env_vars:
-            ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0:unmap_shadow_on_exit=1"
-            ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-6.0/bin/llvm-symbolizer
-          format_test_script_args: -S
-
   - name: format-wtperf-test
     commands:
       - func: "get project"
@@ -2567,34 +2545,6 @@ tasks:
           #run for 2 hours ( 2 * 60 = 120 minutes), use default config
           format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -t 120
 
-  # FIXME-WT-8482: Replace this test with format-stress-sanitizer-test.
-  - name: format-stress-sanitizer-ppc-test
-    tags: ["stress-test-ppc-1"]
-    # Set 2.5 hours timeout (60 * 60 * 2.5)
-    exec_timeout_secs: 9000
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          # FIXME-WT-8482: CC is set to the system default "clang" binary here as a workaround.
-          # Change it back to mongodbtoolchain "clang" binary.
-          posix_configure_flags:
-            -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
-            -DHAVE_DIAGNOSTIC=1
-            -DWITH_PIC=1
-            -DHAVE_BUILTIN_EXTENSION_LZ4=1
-            -DHAVE_BUILTIN_EXTENSION_SNAPPY=1
-            -DHAVE_BUILTIN_EXTENSION_ZLIB=1
-            -DCMAKE_BUILD_TYPE=ASan
-      - func: "format test script"
-        vars:
-          test_env_vars:
-            ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0:unmap_shadow_on_exit=1"
-            ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-6.0/bin/llvm-symbolizer
-          # Run for 2 hours (2 * 60 = 120 minutes), don't stop at failed tests, use default config
-          format_test_script_args: -t 120
-
-
   - <<: *format-stress-test
     name: format-stress-test-1
     tags: ["stress-test-1"]
@@ -2609,10 +2559,10 @@ tasks:
     tags: ["stress-test-4"]
   - <<: *format-stress-sanitizer-test
     name: format-stress-sanitizer-test-1
-    tags: ["stress-test-1"]
+    tags: ["stress-test-1", "stress-test-ppc-1"]
   - <<: *format-stress-sanitizer-test
     name: format-stress-sanitizer-test-2
-    tags: ["stress-test-2"]
+    tags: ["stress-test-2", "stress-test-ppc-2"]
   - <<: *format-stress-sanitizer-test
     name: format-stress-sanitizer-test-3
     tags: ["stress-test-3"]
@@ -4089,7 +4039,7 @@ buildvariants:
       WT_BUILDDIR=$(git rev-parse --show-toplevel)/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR
     posix_configure_flags:
-      -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake
+      -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_gcc.cmake
       -DCMAKE_C_FLAGS="-ggdb"
       -DHAVE_DIAGNOSTIC=1
       -DENABLE_PYTHON=1
@@ -4097,7 +4047,7 @@ buildvariants:
       -DENABLE_SNAPPY=1
       -DENABLE_STRICT=1
       -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
-    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
+    python_binary: '/opt/mongodbtoolchain/v4/bin/python3'
     # Use half number of vCPU to avoid OOM kill failure
     smp_command: -j $(echo $(grep -c ^processor /proc/cpuinfo) / 2 | bc)
     cmake_generator: Ninja
@@ -4106,9 +4056,10 @@ buildvariants:
     - name: compile
     - name: unit-test
     - name: format-smoke-test
-    - name: format-asan-smoke-ppc-test
+    - name: format-asan-smoke-test
     - name: format-wtperf-test
     - name: ".stress-test-ppc-1"
+    - name: ".stress-test-ppc-2"
 
 - name: ubuntu1804-zseries
   display_name: "~ Ubuntu 18.04 zSeries"
