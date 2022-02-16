@@ -69,6 +69,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/historical_ident_tracker.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
@@ -627,6 +628,16 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
+    opCtx->recoveryUnit()->onCommit(
+        [opCtx, nss, uuid, ident = collection->getSharedIdent()->getIdent()](
+            boost::optional<Timestamp> commitTime) {
+            if (!commitTime) {
+                return;
+            }
+
+            HistoricalIdentTracker::get(opCtx).recordDrop(ident, nss, uuid, commitTime.get());
+        });
+
     CollectionCatalog::get(opCtx)->dropCollection(opCtx, collection);
 
 
@@ -677,11 +688,26 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
 
     CollectionCatalog::get(opCtx)->onCollectionRename(opCtx, writableCollection, fromNss);
 
-    opCtx->recoveryUnit()->onCommit([writableCollection](boost::optional<Timestamp> commitTime) {
-        // Ban reading from this collection on committed reads on snapshots before now.
-        if (commitTime) {
-            writableCollection->setMinimumVisibleSnapshot(commitTime.get());
+    opCtx->recoveryUnit()->onCommit([opCtx, fromNss, writableCollection](
+                                        boost::optional<Timestamp> commitTime) {
+        if (!commitTime) {
+            return;
         }
+
+        HistoricalIdentTracker::get(opCtx).recordRename(
+            writableCollection->getSharedIdent()->getIdent(),
+            fromNss,
+            writableCollection->uuid(),
+            commitTime.get());
+
+        const auto readyIndexes = writableCollection->getIndexCatalog()->getAllReadyEntriesShared();
+        for (const auto& readyIndex : readyIndexes) {
+            HistoricalIdentTracker::get(opCtx).recordRename(
+                readyIndex->getIdent(), fromNss, writableCollection->uuid(), commitTime.get());
+        }
+
+        // Ban reading from this collection on committed reads on snapshots before now.
+        writableCollection->setMinimumVisibleSnapshot(commitTime.get());
     });
 
     return status;

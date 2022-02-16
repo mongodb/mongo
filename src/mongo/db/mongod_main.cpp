@@ -748,7 +748,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             tenant_migration_util::createOplogViewForTenantMigrations(startupOpCtx.get(), ctx.db());
         }
 
-        storageEngine->startDropPendingIdentReaper();
+        storageEngine->startTimestampMonitor();
     }
 
     startClientCursorMonitor();

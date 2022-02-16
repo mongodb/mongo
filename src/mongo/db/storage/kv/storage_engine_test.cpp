@@ -188,7 +188,7 @@ class StorageEngineTimestampMonitorTest : public StorageEngineTest {
 public:
     void setUp() {
         StorageEngineTest::setUp();
-        _storageEngine->startDropPendingIdentReaper();
+        _storageEngine->startTimestampMonitor();
     }
 
     void waitForTimestampMonitorPass() {
@@ -201,7 +201,7 @@ public:
             TimestampListener(TimestampType::kOldest, [promise = &pf.promise](Timestamp t) mutable {
                 promise->emplaceValue();
             });
-        timestampMonitor->addListener_forTestOnly(&listener);
+        timestampMonitor->addListener(&listener);
         pf.future.wait();
         timestampMonitor->removeListener_forTestOnly(&listener);
     }
@@ -556,7 +556,7 @@ public:
                                      /*lockFileCreatedByUncleanShutdown=*/false};
         _storageEngine = std::make_unique<StorageEngineImpl>(
             opCtx.get(), std::make_unique<TimestampMockKVEngine>(), options);
-        _storageEngine->startDropPendingIdentReaper();
+        _storageEngine->startTimestampMonitor();
     }
 
     void tearDown() {
@@ -587,14 +587,14 @@ TEST_F(TimestampKVEngineTest, TimestampListeners) {
     TimestampListener third(stable, [](Timestamp timestamp) {});
 
     // Can only register the listener once.
-    _storageEngine->getTimestampMonitor()->addListener_forTestOnly(&first);
+    _storageEngine->getTimestampMonitor()->addListener(&first);
 
     _storageEngine->getTimestampMonitor()->clearListeners();
-    _storageEngine->getTimestampMonitor()->addListener_forTestOnly(&first);
+    _storageEngine->getTimestampMonitor()->addListener(&first);
 
     // Can register all three types of listeners.
-    _storageEngine->getTimestampMonitor()->addListener_forTestOnly(&second);
-    _storageEngine->getTimestampMonitor()->addListener_forTestOnly(&third);
+    _storageEngine->getTimestampMonitor()->addListener(&second);
+    _storageEngine->getTimestampMonitor()->addListener(&third);
 
     _storageEngine->getTimestampMonitor()->clearListeners();
 }
@@ -637,10 +637,10 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
         }
     });
 
-    _storageEngine->getTimestampMonitor()->addListener_forTestOnly(&first);
-    _storageEngine->getTimestampMonitor()->addListener_forTestOnly(&second);
-    _storageEngine->getTimestampMonitor()->addListener_forTestOnly(&third);
-    _storageEngine->getTimestampMonitor()->addListener_forTestOnly(&fourth);
+    _storageEngine->getTimestampMonitor()->addListener(&first);
+    _storageEngine->getTimestampMonitor()->addListener(&second);
+    _storageEngine->getTimestampMonitor()->addListener(&third);
+    _storageEngine->getTimestampMonitor()->addListener(&fourth);
 
     // Wait until all 4 listeners get notified at least once.
     stdx::unique_lock<Latch> lk(mutex);
@@ -665,7 +665,7 @@ TEST_F(TimestampKVEngineTest, TimestampAdvancesOnNotification) {
         previous = timestamp;
         timesNotified.fetchAndAdd(1);
     });
-    _storageEngine->getTimestampMonitor()->addListener_forTestOnly(&listener);
+    _storageEngine->getTimestampMonitor()->addListener(&listener);
 
     // Let three rounds of notifications happen while ensuring that each new notification produces
     // an increasing timestamp.

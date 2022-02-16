@@ -1084,11 +1084,13 @@ public:
     StreamingCursorImpl() = delete;
     explicit StreamingCursorImpl(WT_SESSION* session,
                                  std::string path,
+                                 boost::optional<Timestamp> checkpointTimestamp,
                                  StorageEngine::BackupOptions options,
                                  WiredTigerBackup* wtBackup)
         : StorageEngine::StreamingCursor(options),
           _session(session),
           _path(path),
+          _checkpointTimestamp(checkpointTimestamp),
           _wtBackup(wtBackup){};
 
     ~StreamingCursorImpl() = default;
@@ -1154,8 +1156,12 @@ public:
                 // to an entire file. Full backups cannot open an incremental cursor, even if they
                 // are the initial incremental backup.
                 const std::uint64_t length = options.incrementalBackup ? fileSize : 0;
-                backupBlocks.push_back(
-                    BackupBlock(opCtx, filePath.string(), 0 /* offset */, length, fileSize));
+                backupBlocks.push_back(BackupBlock(opCtx,
+                                                   filePath.string(),
+                                                   _checkpointTimestamp,
+                                                   0 /* offset */,
+                                                   length,
+                                                   fileSize));
             }
         }
 
@@ -1209,14 +1215,19 @@ private:
                         "offset"_attr = offset,
                         "size"_attr = size,
                         "type"_attr = type);
-            backupBlocks->push_back(BackupBlock(opCtx, filePath.string(), offset, size, fileSize));
+            backupBlocks->push_back(BackupBlock(
+                opCtx, filePath.string(), _checkpointTimestamp, offset, size, fileSize));
         }
 
         // If the file is unchanged, push a BackupBlock with offset=0 and length=0. This allows us
         // to distinguish between an unchanged file and a deleted file in an incremental backup.
         if (fileUnchangedFlag) {
-            backupBlocks->push_back(
-                BackupBlock(opCtx, filePath.string(), 0 /* offset */, 0 /* length */, fileSize));
+            backupBlocks->push_back(BackupBlock(opCtx,
+                                                filePath.string(),
+                                                _checkpointTimestamp,
+                                                0 /* offset */,
+                                                0 /* length */,
+                                                fileSize));
         }
 
         // If the duplicate backup cursor has been exhausted, close it and set
@@ -1235,6 +1246,7 @@ private:
 
     WT_SESSION* _session;
     std::string _path;
+    boost::optional<Timestamp> _checkpointTimestamp;
     WiredTigerBackup* _wtBackup;  // '_wtBackup' is an out parameter.
 };
 
@@ -1242,6 +1254,7 @@ private:
 
 StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>>
 WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
+                                           boost::optional<Timestamp> checkpointTimestamp,
                                            const StorageEngine::BackupOptions& options) {
     uassert(51034, "Cannot open backup cursor with in-memory mode.", !isEphemeral());
 
@@ -1287,8 +1300,8 @@ WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
 
     invariant(_wtBackup.logFilePathsSeenByExtendBackupCursor.empty());
     invariant(_wtBackup.logFilePathsSeenByGetNextBatch.empty());
-    auto streamingCursor =
-        std::make_unique<StreamingCursorImpl>(session, _path, options, &_wtBackup);
+    auto streamingCursor = std::make_unique<StreamingCursorImpl>(
+        session, _path, checkpointTimestamp, options, &_wtBackup);
 
     pinOplogGuard.dismiss();
     _backupSession = std::move(sessionRaii);

@@ -94,7 +94,9 @@ public:
     virtual Status disableIncrementalBackup(OperationContext* opCtx) override;
 
     virtual StatusWith<std::unique_ptr<StreamingCursor>> beginNonBlockingBackup(
-        OperationContext* opCtx, const BackupOptions& options) override;
+        OperationContext* opCtx,
+        boost::optional<Timestamp> checkpointTimestamp,
+        const BackupOptions& options) override;
 
     virtual void endNonBlockingBackup(OperationContext* opCtx) override;
 
@@ -253,7 +255,7 @@ public:
         /**
          * Starts monitoring timestamp changes in the background with an initial listener.
          */
-        TimestampMonitor(KVEngine* engine, TimestampListener* listener, PeriodicRunner* runner);
+        TimestampMonitor(KVEngine* engine, PeriodicRunner* runner);
 
         ~TimestampMonitor();
 
@@ -266,7 +268,7 @@ public:
          * Adds a new listener to the monitor if it isn't already registered. A listener can only be
          * bound to one type of timestamp at a time.
          */
-        void addListener_forTestOnly(TimestampListener* listener);
+        void addListener(TimestampListener* listener);
 
         /**
          * Remove a listener.
@@ -317,7 +319,7 @@ public:
                              std::shared_ptr<Ident> ident,
                              DropIdentCallback&& onDrop) override;
 
-    void startDropPendingIdentReaper() override;
+    void startTimestampMonitor() override;
 
     void checkpoint() override;
 
@@ -432,6 +434,10 @@ private:
 
     // Listener for min of checkpoint and oldest timestamp changes.
     TimestampMonitor::TimestampListener _minOfCheckpointAndOldestTimestampListener;
+
+    // Listener for checkpoint timestamp changes to remove historical ident entries older than the
+    // checkpoint timestamp.
+    TimestampMonitor::TimestampListener _historicalIdentTimestampListener;
 
     const bool _supportsCappedCollections;
 

@@ -35,6 +35,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/historical_ident_tracker.h"
 #include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
@@ -50,13 +51,14 @@ const std::set<std::string> kRequiredMDBFiles = {"_mdb_catalog.wt", "sizeStorer.
 
 BackupBlock::BackupBlock(OperationContext* opCtx,
                          std::string filePath,
+                         boost::optional<Timestamp> checkpointTimestamp,
                          std::uint64_t offset,
                          std::uint64_t length,
                          std::uint64_t fileSize)
     : _filePath(filePath), _offset(offset), _length(length), _fileSize(fileSize) {
     boost::filesystem::path path(filePath);
     _filenameStem = path.stem().string();
-    _initialize(opCtx);
+    _initialize(opCtx, checkpointTimestamp);
 }
 
 bool BackupBlock::isRequired() const {
@@ -99,6 +101,17 @@ bool BackupBlock::isRequired() const {
     return false;
 }
 
+void BackupBlock::_setNamespaceString(const NamespaceString& nss) {
+    // Remove "system.buckets." from time-series collection namespaces since it is an internal
+    // detail that is not intended to be visible externally.
+    if (nss.isTimeseriesBucketsCollection()) {
+        _nss = nss.getTimeseriesViewNamespace();
+        return;
+    }
+
+    _nss = nss;
+}
+
 void BackupBlock::_setUuid(OperationContext* opCtx, DurableCatalog* catalog, RecordId catalogId) {
     // Caller controls lifetime of catalog and relevant lock
     std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md =
@@ -106,27 +119,46 @@ void BackupBlock::_setUuid(OperationContext* opCtx, DurableCatalog* catalog, Rec
     _uuid = md->options.uuid;
 }
 
-void BackupBlock::_initialize(OperationContext* opCtx) {
+void BackupBlock::_initialize(OperationContext* opCtx,
+                              boost::optional<Timestamp> checkpointTimestamp) {
     if (!opCtx) {
         return;
     }
 
-    Lock::GlobalLock lk(opCtx, MODE_IS);
-    DurableCatalog* catalog = DurableCatalog::get(opCtx);
-    std::vector<DurableCatalog::Entry> catalogEntries = catalog->getAllCatalogEntries(opCtx);
-    for (const DurableCatalog::Entry& e : catalogEntries) {
-        if (StringData(_filenameStem).startsWith("index-"_sd) &&
-            catalog->isIndexInEntry(opCtx, e.catalogId, _filenameStem)) {
-            _setUuid(opCtx, catalog, e.catalogId);
-            _setNamespaceString(opCtx, e.tenantNs.getNss());
-            return;
-        }
+    {
+        // Fetch the latest values for the ident.
+        Lock::GlobalLock lk(opCtx, MODE_IS);
+        DurableCatalog* catalog = DurableCatalog::get(opCtx);
+        std::vector<DurableCatalog::Entry> catalogEntries = catalog->getAllCatalogEntries(opCtx);
+        for (const DurableCatalog::Entry& e : catalogEntries) {
+            if (StringData(_filenameStem).startsWith("index-"_sd) &&
+                // Index idents will get the namespace and UUID of their respective collection.
+                catalog->isIndexInEntry(opCtx, e.catalogId, _filenameStem)) {
+                _setUuid(opCtx, catalog, e.catalogId);
+                _setNamespaceString(e.tenantNs.getNss());
+                break;
+            }
 
-        if (e.ident == _filenameStem) {
-            _setUuid(opCtx, catalog, e.catalogId);
-            _setNamespaceString(opCtx, e.tenantNs.getNss());
-            return;
+            if (e.ident == _filenameStem) {
+                // This ident represents the collection.
+                _setUuid(opCtx, catalog, e.catalogId);
+                _setNamespaceString(e.tenantNs.getNss());
+                break;
+            }
         }
+    }
+
+    if (!checkpointTimestamp) {
+        return;
+    }
+
+    // Check if the ident had a different value at the checkpoint timestamp. If so, we want to use
+    // that instead as that will be the ident's value when restoring from the backup.
+    boost::optional<std::pair<NamespaceString, UUID>> historicalEntry =
+        HistoricalIdentTracker::get(opCtx).lookup(_filenameStem, checkpointTimestamp.get());
+    if (historicalEntry) {
+        _uuid = historicalEntry->second;
+        _setNamespaceString(historicalEntry->first);
     }
 }
 

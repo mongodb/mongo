@@ -144,7 +144,9 @@ public:
     virtual void endBackup(OperationContext* opCtx) {}
 
     virtual StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>> beginNonBlockingBackup(
-        OperationContext* opCtx, const StorageEngine::BackupOptions& options) override;
+        OperationContext* opCtx,
+        boost::optional<Timestamp> checkpointTimestamp,
+        const StorageEngine::BackupOptions& options) override;
 
     virtual void endNonBlockingBackup(OperationContext* opCtx) override {}
 

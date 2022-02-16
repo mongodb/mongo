@@ -63,6 +63,7 @@
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/storage/historical_ident_tracker.h"
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/tenant_database_name.h"
 #include "mongo/db/tenant_namespace.h"
@@ -587,6 +588,9 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
 
     _rollbackStats.stableTimestamp = stableTimestamp;
     _listener->onRecoverToStableTimestamp(stableTimestamp);
+
+    // Rollback historical ident entries.
+    HistoricalIdentTracker::get(opCtx).rollbackTo(stableTimestamp);
 
     // Log the total number of insert and update operations that have been rolled back as a
     // result of recovering to the stable timestamp.

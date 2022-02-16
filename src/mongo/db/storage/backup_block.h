@@ -32,6 +32,7 @@
 #include <boost/filesystem.hpp>
 #include <string>
 
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/uuid.h"
@@ -54,6 +55,7 @@ class BackupBlock final {
 public:
     explicit BackupBlock(OperationContext* opCtx,
                          std::string filePath,
+                         boost::optional<Timestamp> checkpointTimestamp,
                          std::uint64_t offset = 0,
                          std::uint64_t length = 0,
                          std::uint64_t fileSize = 0);
@@ -65,12 +67,6 @@ public:
     }
 
     std::string ns() const {
-        // Remove "system.buckets." from time-series collection namespaces since it is an
-        // internal detail that is not intended to be visible externally.
-        if (_nss.isTimeseriesBucketsCollection()) {
-            return _nss.getTimeseriesViewNamespace().toString();
-        }
-
         return _nss.toString();
     }
 
@@ -97,15 +93,16 @@ public:
 
 private:
     /**
-     * Sets '_nss' and '_uuid' for:
+     * Sets '_nss' and '_uuid' that is representative of the ident at the checkpoint timestamp for:
      * - collections
      * - indexes, to the NSS/UUID of their respective collection
+     *
+     * The 'checkpointTimestamp' will be boost::none if the backup is being taken on a standalone
+     * node.
      * A null opCtx is ignored. A null opCtx is exercised by FCBIS unit tests.
      */
-    void _initialize(OperationContext* opCtx);
-    void _setNamespaceString(OperationContext* opCtx, NamespaceString nss) {
-        _nss = nss;
-    }
+    void _initialize(OperationContext* opCtx, boost::optional<Timestamp> checkpointTimestamp);
+    void _setNamespaceString(const NamespaceString& nss);
     void _setUuid(OperationContext* opCtx, DurableCatalog* catalog, RecordId catalogId);
 
     const std::string _filePath;

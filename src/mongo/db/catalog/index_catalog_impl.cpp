@@ -73,6 +73,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/execution_context.h"
+#include "mongo/db/storage/historical_ident_tracker.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -1193,11 +1194,23 @@ Status IndexCatalogImpl::dropUnfinishedIndex(OperationContext* opCtx,
 namespace {
 class IndexRemoveChange final : public RecoveryUnit::Change {
 public:
-    IndexRemoveChange(std::shared_ptr<IndexCatalogEntry> entry,
+    IndexRemoveChange(OperationContext* opCtx,
+                      const NamespaceString& nss,
+                      const UUID& uuid,
+                      std::shared_ptr<IndexCatalogEntry> entry,
                       SharedCollectionDecorations* collectionDecorations)
-        : _entry(std::move(entry)), _collectionDecorations(collectionDecorations) {}
+        : _opCtx(opCtx),
+          _nss(nss),
+          _uuid(uuid),
+          _entry(std::move(entry)),
+          _collectionDecorations(collectionDecorations) {}
 
     void commit(boost::optional<Timestamp> commitTime) final {
+        if (commitTime) {
+            HistoricalIdentTracker::get(_opCtx).recordDrop(
+                _entry->getIdent(), _nss, _uuid, commitTime.get());
+        }
+
         _entry->setDropped();
     }
 
@@ -1211,6 +1224,9 @@ public:
     }
 
 private:
+    OperationContext* _opCtx;
+    const NamespaceString _nss;
+    const UUID _uuid;
     std::shared_ptr<IndexCatalogEntry> _entry;
     SharedCollectionDecorations* _collectionDecorations;
 };
@@ -1229,13 +1245,21 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx,
     auto released = _readyIndexes.release(entry->descriptor());
     if (released) {
         invariant(released.get() == entry);
-        opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
-            std::move(released), collection->getSharedDecorations()));
+        opCtx->recoveryUnit()->registerChange(
+            std::make_unique<IndexRemoveChange>(opCtx,
+                                                collection->ns(),
+                                                collection->uuid(),
+                                                std::move(released),
+                                                collection->getSharedDecorations()));
     } else {
         released = _buildingIndexes.release(entry->descriptor());
         invariant(released.get() == entry);
-        opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
-            std::move(released), collection->getSharedDecorations()));
+        opCtx->recoveryUnit()->registerChange(
+            std::make_unique<IndexRemoveChange>(opCtx,
+                                                collection->ns(),
+                                                collection->uuid(),
+                                                std::move(released),
+                                                collection->getSharedDecorations()));
     }
 
     CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
@@ -1433,8 +1457,12 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     // CollectionIndexUsageTrackerDecoration (shared state among Collection instances).
     auto oldEntry = _readyIndexes.release(oldDesc);
     invariant(oldEntry);
-    opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
-        std::move(oldEntry), collection->getSharedDecorations()));
+    opCtx->recoveryUnit()->registerChange(
+        std::make_unique<IndexRemoveChange>(opCtx,
+                                            collection->ns(),
+                                            collection->uuid(),
+                                            std::move(oldEntry),
+                                            collection->getSharedDecorations()));
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
         .unregisterIndex(indexName);
 

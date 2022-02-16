@@ -191,7 +191,9 @@ public:
     Status disableIncrementalBackup(OperationContext* opCtx) override;
 
     StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>> beginNonBlockingBackup(
-        OperationContext* opCtx, const StorageEngine::BackupOptions& options) override;
+        OperationContext* opCtx,
+        boost::optional<Timestamp> checkpointTimestamp,
+        const StorageEngine::BackupOptions& options) override;
 
     void endNonBlockingBackup(OperationContext* opCtx) override;
 

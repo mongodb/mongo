@@ -47,6 +47,7 @@
 #include "mongo/db/storage/deferred_drop_record_store.h"
 #include "mongo/db/storage/durable_catalog_impl.h"
 #include "mongo/db/storage/durable_history_pin.h"
+#include "mongo/db/storage/historical_ident_tracker.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/storage_util.h"
@@ -67,6 +68,7 @@ using std::string;
 using std::vector;
 
 MONGO_FAIL_POINT_DEFINE(failToParseResumeIndexInfo);
+MONGO_FAIL_POINT_DEFINE(pauseTimestampMonitor);
 MONGO_FAIL_POINT_DEFINE(setMinVisibleForAllCollectionsToOldestOnStartup);
 
 namespace {
@@ -83,6 +85,11 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
       _minOfCheckpointAndOldestTimestampListener(
           TimestampMonitor::TimestampType::kMinOfCheckpointAndOldest,
           [this](Timestamp timestamp) { _onMinOfCheckpointAndOldestTimestampChanged(timestamp); }),
+      _historicalIdentTimestampListener(
+          TimestampMonitor::TimestampType::kCheckpoint,
+          [serviceContext = opCtx->getServiceContext()](Timestamp timestamp) {
+              HistoricalIdentTracker::get(serviceContext).removeEntriesOlderThan(timestamp);
+          }),
       _supportsCappedCollections(_engine->supportsCappedCollections()) {
     uassert(28601,
             "Storage engine does not support --directoryperdb",
@@ -796,17 +803,19 @@ void StorageEngineImpl::cleanShutdown() {
 
 StorageEngineImpl::~StorageEngineImpl() {}
 
-void StorageEngineImpl::startDropPendingIdentReaper() {
+void StorageEngineImpl::startTimestampMonitor() {
     if (storageGlobalParams.readOnly) {
         return;
     }
+
     // Unless explicitly disabled, all storage engines should create a TimestampMonitor for
     // drop-pending internal idents, even if they do not support pending drops for collections
     // and indexes.
-    _timestampMonitor =
-        std::make_unique<TimestampMonitor>(_engine.get(),
-                                           &_minOfCheckpointAndOldestTimestampListener,
-                                           getGlobalServiceContext()->getPeriodicRunner());
+    _timestampMonitor = std::make_unique<TimestampMonitor>(
+        _engine.get(), getGlobalServiceContext()->getPeriodicRunner());
+
+    _timestampMonitor->addListener(&_minOfCheckpointAndOldestTimestampListener);
+    _timestampMonitor->addListener(&_historicalIdentTimestampListener);
 }
 
 void StorageEngineImpl::notifyStartupComplete() {
@@ -936,8 +945,9 @@ Status StorageEngineImpl::disableIncrementalBackup(OperationContext* opCtx) {
 
 StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>>
 StorageEngineImpl::beginNonBlockingBackup(OperationContext* opCtx,
+                                          boost::optional<Timestamp> checkpointTimestamp,
                                           const StorageEngine::BackupOptions& options) {
-    return _engine->beginNonBlockingBackup(opCtx, options);
+    return _engine->beginNonBlockingBackup(opCtx, checkpointTimestamp, options);
 }
 
 void StorageEngineImpl::endNonBlockingBackup(OperationContext* opCtx) {
@@ -1177,11 +1187,8 @@ void StorageEngineImpl::_onMinOfCheckpointAndOldestTimestampChanged(const Timest
     }
 }
 
-StorageEngineImpl::TimestampMonitor::TimestampMonitor(KVEngine* engine,
-                                                      TimestampListener* listener,
-                                                      PeriodicRunner* runner)
+StorageEngineImpl::TimestampMonitor::TimestampMonitor(KVEngine* engine, PeriodicRunner* runner)
     : _engine(engine), _running(false), _periodicRunner(runner) {
-    _listeners.push_back(listener);
     _startup();
 }
 
@@ -1198,6 +1205,12 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
     PeriodicRunner::PeriodicJob job(
         "TimestampMonitor",
         [&](Client* client) {
+            if (MONGO_unlikely(pauseTimestampMonitor.shouldFail())) {
+                LOGV2(6321800,
+                      "Pausing the timestamp monitor due to the pauseTimestampMonitor fail point");
+                pauseTimestampMonitor.pauseWhileSet();
+            }
+
             {
                 stdx::lock_guard<Latch> lock(_monitorMutex);
                 if (_listeners.empty()) {
@@ -1279,7 +1292,7 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
     _running = true;
 }
 
-void StorageEngineImpl::TimestampMonitor::addListener_forTestOnly(TimestampListener* listener) {
+void StorageEngineImpl::TimestampMonitor::addListener(TimestampListener* listener) {
     stdx::lock_guard<Latch> lock(_monitorMutex);
     if (std::find(_listeners.begin(), _listeners.end(), listener) != _listeners.end()) {
         bool listenerAlreadyRegistered = true;

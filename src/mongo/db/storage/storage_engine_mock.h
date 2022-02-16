@@ -72,7 +72,9 @@ public:
                       "The current storage engine doesn't support backup mode");
     }
     StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>> beginNonBlockingBackup(
-        OperationContext* opCtx, const StorageEngine::BackupOptions& options) final {
+        OperationContext* opCtx,
+        boost::optional<Timestamp> checkpointTimestamp,
+        const StorageEngine::BackupOptions& options) final {
         return Status(ErrorCodes::CommandNotSupported,
                       "The current storage engine doesn't support backup mode");
     }
@@ -169,7 +171,7 @@ public:
     void addDropPendingIdent(const Timestamp& dropTimestamp,
                              std::shared_ptr<Ident> ident,
                              DropIdentCallback&& onDrop) final {}
-    void startDropPendingIdentReaper() final {}
+    void startTimestampMonitor() final {}
 
     void checkpoint() final {}
 

@@ -335,7 +335,9 @@ public:
     };
 
     virtual StatusWith<std::unique_ptr<StreamingCursor>> beginNonBlockingBackup(
-        OperationContext* opCtx, const BackupOptions& options) = 0;
+        OperationContext* opCtx,
+        boost::optional<Timestamp> checkpointTimestamp,
+        const BackupOptions& options) = 0;
 
     virtual void endNonBlockingBackup(OperationContext* opCtx) = 0;
 
@@ -457,9 +459,10 @@ public:
                                      DropIdentCallback&& onDrop = nullptr) = 0;
 
     /**
-     * Periodically drop idents queued by addDropPendingIdent.
+     * Starts the timestamp monitor. This periodically drops idents queued by addDropPendingIdent,
+     * and removes historical ident entries no longer necessary.
      */
-    virtual void startDropPendingIdentReaper() = 0;
+    virtual void startTimestampMonitor() = 0;
 
     /**
      * Called when the checkpoint thread instructs the storage engine to take a checkpoint. The
