@@ -301,6 +301,8 @@ variables:
   - name: buildscripts_test
   - name: causally_consistent_jscore_txns_passthrough
   - name: .csfle
+    distros:
+      - windows-vsCurrent-xlarge
   - name: .encrypt !.aggregation !.gcm
   - name: external_auth
   - name: external_auth_aws
@@ -9112,6 +9114,8 @@ buildvariants:
       distros:
         - windows-vsCurrent-large
     - name: .csfle
+      distros:
+        - windows-vsCurrent-xlarge
     - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
     - name: external_auth
     - name: external_auth_aws
