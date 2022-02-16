@@ -101,6 +101,8 @@ assert.commandWorked(b3.z.remove({z: 1}));
 nodeB.disconnect(arbiter);
 replTest.awaitNoPrimary();
 nodeA.reconnect(arbiter);
+assert.soon(() => replTest.getPrimary() == nodeA, "nodeA did not become primary as expected");
+// Ensure that the arbiter recognizes nodeA as primary.
 replTest.awaitNodesAgreeOnPrimary(replTest.kDefaultTimeoutMS, [nodeA, arbiter], nodeA);
 
 // A is now primary and will perform writes that must be copied by B after rollback.
