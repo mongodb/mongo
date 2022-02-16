@@ -38,7 +38,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/tenant_database_name.h"
-#include "mongo/db/tenant_id.h"
+#include "mongo/idl/tenant_id.h"
 #include "mongo/logv2/log_attr.h"
 
 namespace mongo {

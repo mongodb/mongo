@@ -38,6 +38,7 @@ imports:
   - "mongo/db/serverless/serverless_types.idl"
   - "mongo/idl/basic_types.idl"
   - "mongo/s/sharding_types.idl"
+  - "mongo/db/auth/security_token.idl"
 
 structs:
     DonorStartMigrationResponse:

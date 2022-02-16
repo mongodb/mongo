@@ -37,7 +37,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/tenant_id.h"
+#include "mongo/idl/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_detail.h"
 
@@ -70,8 +70,7 @@ MONGO_INITIALIZER(SecurityTokenOptionValidate)(InitializerContext*) {
 }
 }  // namespace
 
-SecurityTokenAuthenticationGuard::SecurityTokenAuthenticationGuard(OperationContext* opCtx) {
-    auto token = getSecurityToken(opCtx);
+SecurityTokenAuthenticationGuard::SecurityTokenAuthenticationGuard(OperationContext* opCtx, boost::optional<SecurityToken> token) {
     if (token == boost::none) {
         _client = nullptr;
         return;
@@ -79,7 +78,7 @@ SecurityTokenAuthenticationGuard::SecurityTokenAuthenticationGuard(OperationCont
 
     auto client = opCtx->getClient();
     uassertStatusOK(AuthorizationSession::get(client)->addAndAuthorizeUser(
-        opCtx, token->getAuthenticatedUser()));
+        opCtx, token->getAuthenticatedUser(), true));
     _client = client;
 }
 
@@ -107,27 +106,28 @@ BSONObj signSecurityToken(BSONObj obj) {
     return signedToken.obj();
 }
 
-SecurityToken verifySecurityToken(BSONObj obj) {
+SecurityToken verifySecurityToken(SecurityToken token, BSONObj tokenObj) {
     uassert(ErrorCodes::BadValue, "Multitenancy not enabled", gMultitenancySupport);
 
-    auto token = SecurityToken::parse({"Security Token"}, obj);
     auto authenticatedUser = token.getAuthenticatedUser();
     uassert(ErrorCodes::BadValue,
             "Security token authenticated user requires a valid Tenant ID",
             authenticatedUser.getTenant());
 
     // Use actual authenticatedUser object as passed to preserve hash input.
-    auto authUserObj = obj[SecurityToken::kAuthenticatedUserFieldName].Obj();
+    auto authUserObj = tokenObj[SecurityToken::kAuthenticatedUserFieldName].Obj();
     ConstDataRange authUserCDR(authUserObj.objdata(), authUserObj.objsize());
 
     // Placeholder algorithm.
     auto computed = SHA256Block::computeHash({authUserCDR});
 
     uassert(ErrorCodes::Unauthorized, "Token signature invalid", computed == token.getSig());
+    
+    LOGV2_DEBUG(5838100, 4, "Accepted security token", "token"_attr = tokenObj);
     return token;
 }
 
-void readSecurityTokenMetadata(OperationContext* opCtx, BSONObj securityToken) try {
+/*void readSecurityTokenMetadata(OperationContext* opCtx, BSONObj securityToken) try {
     if (securityToken.nFields() == 0) {
         return;
     }
@@ -136,7 +136,7 @@ void readSecurityTokenMetadata(OperationContext* opCtx, BSONObj securityToken) t
     LOGV2_DEBUG(5838100, 4, "Accepted security token", "token"_attr = securityToken);
 } catch (const DBException& ex) {
     uassertStatusOK(ex.toStatus().withContext("Unable to parse Security Token from Metadata"));
-}
+}*/
 
 MaybeSecurityToken getSecurityToken(OperationContext* opCtx) {
     return securityTokenDecoration(opCtx);

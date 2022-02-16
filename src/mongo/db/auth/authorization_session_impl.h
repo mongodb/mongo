@@ -77,7 +77,7 @@ public:
 
     void startContractTracking() override;
 
-    Status addAndAuthorizeUser(OperationContext* opCtx, const UserName& userName) override;
+    Status addAndAuthorizeUser(OperationContext* opCtx, const UserName& userName, bool fromSecurityToken = false) override;
 
     User* lookupUser(const UserName& name) override;
 

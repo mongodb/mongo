@@ -34,6 +34,7 @@ global:
 imports:
     - "mongo/db/auth/access_checks.idl"
     - "mongo/db/auth/action_type.idl"
+    - "mongo/db/auth/security_token.idl"
     - "mongo/db/write_concern_options.idl"
     - "mongo/idl/basic_types.idl"
 

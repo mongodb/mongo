@@ -199,7 +199,8 @@ void AuthorizationSessionImpl::startContractTracking() {
 }
 
 Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
-                                                     const UserName& userName) try {
+                                                     const UserName& userName,
+                                                     bool fromSecurityToken) try {
     auto checkForMultipleUsers = [&]() {
         const auto userCount = _authenticatedUsers.count();
         if (userCount == 0) {
@@ -265,14 +266,14 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
 
     stdx::lock_guard<Client> lk(*opCtx->getClient());
 
-    if (auto token = auth::getSecurityToken(opCtx)) {
+    if (fromSecurityToken) {
         uassert(
             6161501,
             "Attempt to authorize via security token on connection with established authentication",
             _authenticationMode != AuthenticationMode::kConnection);
-        uassert(6161502,
+        /*uassert(6161502,
                 "Attempt to authorize a user other than that present in the security token",
-                token->getAuthenticatedUser() == userName);
+                token->getAuthenticatedUser() == userName);*/
         validateSecurityTokenUserPrivileges(user->getPrivileges());
         _authenticationMode = AuthenticationMode::kSecurityToken;
     } else {

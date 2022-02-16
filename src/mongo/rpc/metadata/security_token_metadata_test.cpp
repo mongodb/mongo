@@ -36,7 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/multitenancy_gen.h"
-#include "mongo/db/tenant_id.h"
+#include "mongo/idl/tenant_id.h"
 #include "mongo/rpc/op_msg_test.h"
 #include "mongo/unittest/unittest.h"
 

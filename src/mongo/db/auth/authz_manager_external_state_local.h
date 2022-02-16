@@ -39,7 +39,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/tenant_id.h"
+#include "mongo/idl/tenant_id.h"
 #include "mongo/platform/mutex.h"
 
 namespace mongo {

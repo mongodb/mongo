@@ -32,7 +32,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/tenant_id.h"
+#include "mongo/idl/tenant_id.h"
 
 namespace mongo {
 
@@ -40,7 +40,7 @@ namespace mongo {
  * Parses the tenantId from the '$tenant' field in the request if it exists and
  * "multitenancySupport" is enabled. Then, sets the parsed tenantId on the opCtx.
  */
-void parseDollarTenantFromRequest(OperationContext* opCtx, const OpMsg& request);
+void verifyDollarTenantField(OperationContext* opCtx);
 
 /**
  * Extract the active TenantId for this operation.

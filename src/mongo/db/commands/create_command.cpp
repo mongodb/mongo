@@ -104,6 +104,10 @@ public:
             return request().getNamespace();
         }
 
+        boost::optional<auth::SecurityToken> securityToken() const final {
+            return request().getSecurityToken();
+        }
+
         CreateCommandReply typedRun(OperationContext* opCtx) final {
             auto cmd = request();
 
@@ -320,7 +324,7 @@ public:
                         "BSON field 'changeStreamPreAndPostImages' is an unknown field.",
                         !cmd.getChangeStreamPreAndPostImages().has_value());
             }
-
+        
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
                 unsafeCreateCollection(opCtx);
             uassertStatusOK(createCollection(opCtx, cmd.getNamespace(), cmd));

@@ -229,7 +229,7 @@ class StructTypeInfoBase(object, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def gen_namespace_check(self, indented_writer, db_name, element):
+    def gen_namespace_check(self, indented_writer, db_name, element, tenant_id=None):
         # type: (writer.IndentedTextWriter, str, str) -> None
         """Generate the namespace check predicate for a command."""
         pass
@@ -301,7 +301,7 @@ class _StructTypeInfo(StructTypeInfoBase):
         # type: (writer.IndentedTextWriter) -> None
         pass
 
-    def gen_namespace_check(self, indented_writer, db_name, element):
+    def gen_namespace_check(self, indented_writer, db_name, element, tenant_id=None):
         # type: (writer.IndentedTextWriter, str, str) -> None
         pass
 
@@ -364,7 +364,7 @@ class _IgnoredCommandTypeInfo(_CommandBaseTypeInfo):
         # type: (writer.IndentedTextWriter) -> None
         indented_writer.write_line('builder->append("%s"_sd, 1);' % (self._command.name))
 
-    def gen_namespace_check(self, indented_writer, db_name, element):
+    def gen_namespace_check(self, indented_writer, db_name, element, tenant_id=None):
         # type: (writer.IndentedTextWriter, str, str) -> None
         pass
 
@@ -437,7 +437,7 @@ class _CommandFromType(_CommandBaseTypeInfo):
         # type: (writer.IndentedTextWriter) -> None
         raise NotImplementedError
 
-    def gen_namespace_check(self, indented_writer, db_name, element):
+    def gen_namespace_check(self, indented_writer, db_name, element, tenant_id=None):
         # type: (writer.IndentedTextWriter, str, str) -> None
         # TODO: should the name of the first element be validated??
         raise NotImplementedError
@@ -512,7 +512,7 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
                 'builder->append("%s"_sd, _nss.coll());' % (self._command.name))
         indented_writer.write_empty_line()
 
-    def gen_namespace_check(self, indented_writer, db_name, element):
+    def gen_namespace_check(self, indented_writer, db_name, element, tenant_id=None):
         # type: (writer.IndentedTextWriter, str, str) -> None
         # TODO: should the name of the first element be validated??
         indented_writer.write_line('invariant(_nss.isEmpty());')
@@ -523,6 +523,96 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
             indented_writer.write_line(
                 '_nss = ctxt.parseNSCollectionRequired(%s, %s, false);' % (db_name, element))
 
+class _CommandWithTenantIdNamespaceTypeInfo(_CommandBaseTypeInfo):
+    """Class for command code generation."""
+
+    def __init__(self, command):
+        # type: (ast.Command) -> None
+        """Create a _CommandWithTenantIdNamespaceTypeInfo instance."""
+        self._command = command
+
+        super(_CommandWithTenantIdNamespaceTypeInfo, self).__init__(command)
+
+    @staticmethod
+    def _get_nss_param(gen_header):
+        nss_param = 'NamespaceString nss'
+        if not gen_header:
+            nss_param = 'const ' + nss_param
+        return nss_param
+
+    def get_constructor_method(self, gen_header=False):
+        # type: (bool) -> MethodInfo
+        class_name = common.title_case(self._struct.cpp_name)
+        return MethodInfo(class_name, class_name, [self._get_nss_param(gen_header)], explicit=True)
+
+    def get_required_constructor_method(self, gen_header=False):
+        # type: (bool) -> MethodInfo
+        class_name = common.title_case(self._struct.cpp_name)
+        return MethodInfo(
+            class_name, class_name,
+            [self._get_nss_param(gen_header)] + _get_required_parameters(self._struct))
+
+    def get_serializer_method(self):
+        # type: () -> MethodInfo
+        return MethodInfo(
+            common.title_case(self._struct.cpp_name), 'serialize',
+            ['const BSONObj& commandPassthroughFields', 'BSONObjBuilder* builder'], 'void',
+            const=True)
+
+    def get_to_bson_method(self):
+        # type: () -> MethodInfo
+        return MethodInfo(
+            common.title_case(self._struct.cpp_name), 'toBSON',
+            ['const BSONObj& commandPassthroughFields'], 'BSONObj', const=True)
+
+    def get_deserializer_method(self):
+        # type: () -> MethodInfo
+        return MethodInfo(
+            common.title_case(self._struct.cpp_name), 'parseProtected',
+            ['const IDLParserErrorContext& ctxt', 'const BSONObj& bsonObject'], 'void')
+
+    def gen_getter_method(self, indented_writer):
+        # type: (writer.IndentedTextWriter) -> None
+        indented_writer.write_line('const NamespaceString& getNamespace() const { return _nss; }')
+        if self._struct.non_const_getter:
+            indented_writer.write_line('NamespaceString& getNamespace() { return _nss; }')
+
+    def gen_member(self, indented_writer):
+        # type: (writer.IndentedTextWriter) -> None
+        indented_writer.write_line('NamespaceString _nss;')
+
+    def gen_serializer(self, indented_writer):
+        # type: (writer.IndentedTextWriter) -> None
+        if self._struct.allow_global_collection_name:
+            indented_writer.write_line(
+                '_nss.serializeCollectionName(builder, "%s"_sd);' % (self._command.name))
+        else:
+            indented_writer.write_line('invariant(!_nss.isEmpty());')
+            indented_writer.write_line(
+                'builder->append("%s"_sd, _nss.coll());' % (self._command.name))
+        indented_writer.write_empty_line()
+
+    def gen_namespace_check(self, indented_writer, db_name, element, tenant_id=None):
+        # type: (writer.IndentedTextWriter, str, str) -> None
+        # TODO: should the name of the first element be validated??
+        indented_writer.write_line('invariant(_nss.isEmpty());')
+
+        indented_writer.write_empty_line()
+
+        if self._struct.allow_global_collection_name:
+            if tenant_id:
+                indented_writer.write_line(
+                    '_nss = ctxt.parseNSCollectionRequired(%s, %s, true, %s);' % (db_name, element, tenant_id))
+            else:
+                indented_writer.write_line(
+                    '_nss = ctxt.parseNSCollectionRequired(%s, %s, true);' % (db_name, element))
+        else:
+            if tenant_id:
+                indented_writer.write_line(
+                    '_nss = ctxt.parseNSCollectionRequired(%s, %s, false, %s);' % (db_name, element, tenant_id))
+            else:
+                indented_writer.write_line(
+                    '_nss = ctxt.parseNSCollectionRequired(%s, %s, false);' % (db_name, element))
 
 class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
     """Class for command with namespace or UUID code generation."""
@@ -589,7 +679,7 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
         indented_writer.write_line('_nssOrUUID.serialize(builder, "%s"_sd);' % (self._command.name))
         indented_writer.write_empty_line()
 
-    def gen_namespace_check(self, indented_writer, db_name, element):
+    def gen_namespace_check(self, indented_writer, db_name, element, tenant_id=None):
         # type: (writer.IndentedTextWriter, str, str) -> None
         indented_writer.write_line('invariant(_nssOrUUID.nss() || _nssOrUUID.uuid());')
         indented_writer.write_line('_nssOrUUID = ctxt.parseNsOrUUID(%s, %s);' % (db_name, element))
@@ -606,6 +696,8 @@ def get_struct_info(struct):
             return _CommandWithNamespaceTypeInfo(struct)
         elif struct.namespace == common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB_OR_UUID:
             return _CommandWithUUIDNamespaceTypeInfo(struct)
+        elif struct.namespace == common.COMMAND_NAMESPACE_CONCATENATE_WITH_TENANTID_AND_DB:
+            return _CommandWithTenantIdNamespaceTypeInfo(struct)
         return _CommandFromType(struct)
 
     return _StructTypeInfo(struct)

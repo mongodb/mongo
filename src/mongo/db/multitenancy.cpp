@@ -33,7 +33,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/security_token.h"
 #include "mongo/db/multitenancy_gen.h"
-#include "mongo/db/tenant_id.h"
+#include "mongo/idl/tenant_id.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -43,13 +43,9 @@ namespace mongo {
 const auto dollarTenantDecoration =
     OperationContext::declareDecoration<boost::optional<mongo::TenantId>>();
 
-void parseDollarTenantFromRequest(OperationContext* opCtx, const OpMsg& request) {
+void verifyDollarTenantField(OperationContext* opCtx) {
     // The internal security user is allowed to run commands on behalf of a tenant by passing
     // the tenantId in the "$tenant" field.
-    auto tenantElem = request.body["$tenant"];
-    if (!tenantElem)
-        return;
-
     uassert(ErrorCodes::InvalidOptions,
             "Multitenancy not enabled, cannot set $tenant in command body",
             gMultitenancySupport);
@@ -59,8 +55,7 @@ void parseDollarTenantFromRequest(OperationContext* opCtx, const OpMsg& request)
             AuthorizationSession::get(opCtx->getClient())
                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                    ActionType::useTenant));
-
-    auto tenantId = TenantId::parseFromBSON(tenantElem);
+    /*auto tenantId = TenantId::parseFromBSON(tenantElem);
 
     uassert(6223901,
             str::stream() << "Cannot pass $tenant id if also passing securityToken, securityToken: "
@@ -71,7 +66,7 @@ void parseDollarTenantFromRequest(OperationContext* opCtx, const OpMsg& request)
 
     dollarTenantDecoration(opCtx) = std::move(tenantId);
     LOGV2_DEBUG(
-        6223900, 4, "Setting tenantId from $tenant request parameter", "tenantId"_attr = tenantId);
+        6223900, 4, "Setting tenantId from $tenant request parameter", "tenantId"_attr = tenantId);*/
 }
 
 boost::optional<TenantId> getActiveTenant(OperationContext* opCtx) {

@@ -145,7 +145,7 @@ public:
      * Adds the User identified by "UserName" to the authorization session, acquiring privileges
      * for it in the process.
      */
-    virtual Status addAndAuthorizeUser(OperationContext* opCtx, const UserName& userName) = 0;
+    virtual Status addAndAuthorizeUser(OperationContext* opCtx, const UserName& userName, bool fromSecurityToken = false) = 0;
 
     // Returns the authenticated user with the given name.  Returns NULL
     // if no such user is found.

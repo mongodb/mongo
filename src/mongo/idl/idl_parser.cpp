@@ -241,9 +241,16 @@ void IDLParserErrorContext::throwAPIStrictErrorIfApplicable(StringData fieldName
             !_apiStrict);
 }
 
+void IDLParserErrorContext::throwDuplicateTenantIdErrorIfApplicable(boost::optional<TenantId> dollarTenant) const {
+    uassert(6223901,
+            str::stream() << "Cannot pass $tenant id if also passing securityToken  $tenant: " << dollarTenant,
+            !dollarTenant);
+}
+
 NamespaceString IDLParserErrorContext::parseNSCollectionRequired(StringData dbName,
                                                                  const BSONElement& element,
-                                                                 bool allowGlobalCollectionName) {
+                                                                 bool allowGlobalCollectionName,
+                                                                 boost::optional<TenantId> tenantId) {
     const bool isUUID = (element.canonicalType() == canonicalizeBSONType(mongo::BinData) &&
                          element.binDataType() == BinDataType::newUUID);
     uassert(ErrorCodes::BadValue,
@@ -263,7 +270,19 @@ NamespaceString IDLParserErrorContext::parseNSCollectionRequired(StringData dbNa
             str::stream() << "collection name has invalid type " << typeName(element.type()),
             element.canonicalType() == canonicalizeBSONType(mongo::String));
 
-    const NamespaceString nss(dbName, element.valueStringData());
+    NamespaceString nss;
+    if (tenantId) {
+        std::cout<<"xxx expect tenant id in nss"<<std::endl;
+        nss = NamespaceString(*tenantId, dbName, element.valueStringData());
+    /*} else if (gMultitenancySupport) {
+        auto tenantDelim = dbName.find('_');
+        if (tenantDelim != std::string::npos) {
+            const TenantId tenantId(OID(dbName.substr(0, tenantDelim)));
+            const auto db = dbName.substr(tenantDelim + 1, dbName.size() - 1 - tenantDelim);
+            auto nss = NamespaceString(tenantId, db, element.valueStringData());*/
+    } else {
+        nss = NamespaceString(dbName, element.valueStringData());
+    }
 
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid namespace specified '" << nss.ns() << "'",

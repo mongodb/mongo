@@ -42,6 +42,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/security_token.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -664,6 +665,11 @@ public:
     virtual NamespaceString ns() const = 0;
 
     /**
+     * The primary namespace on which this command operates. May just be the db.
+     */
+    virtual boost::optional<auth::SecurityToken> securityToken() const { return boost::none; }
+
+    /**
      * Returns true if this command should be parsed for a writeConcern field and wait
      * for that write concern to be satisfied after the command runs.
      */
@@ -1196,7 +1202,6 @@ private:
     static RequestType _parseRequest(OperationContext* opCtx,
                                      const Command* command,
                                      const OpMsgRequest& opMsgRequest) {
-
         bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
 
         // A command with 'apiStrict' cannot be invoked with alias.

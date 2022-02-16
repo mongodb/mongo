@@ -816,7 +816,8 @@ def _parse_command(ctxt, spec, name, node):
 
     valid_commands = [
         common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB, common.COMMAND_NAMESPACE_IGNORED,
-        common.COMMAND_NAMESPACE_TYPE, common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB_OR_UUID
+        common.COMMAND_NAMESPACE_TYPE, common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB_OR_UUID,
+        common.COMMAND_NAMESPACE_CONCATENATE_WITH_TENANTID_AND_DB
     ]
 
     if not command.command_name:

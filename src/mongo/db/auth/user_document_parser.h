@@ -31,7 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/auth/user.h"
-#include "mongo/db/tenant_id.h"
+#include "mongo/idl/tenant_id.h"
 
 namespace mongo {
 

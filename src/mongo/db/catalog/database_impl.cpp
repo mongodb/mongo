@@ -808,6 +808,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
 
     // Create Collection object
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    std::cout<<"xxx calling into storage engine and catalog nss is " << nss.toString() <<std::endl;
     TenantNamespace tenantNs(boost::none, nss);
     std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
         uassertStatusOK(storageEngine->getCatalog()->createCollection(

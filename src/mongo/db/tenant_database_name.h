@@ -34,7 +34,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/tenant_id.h"
+#include "mongo/idl/tenant_id.h"
 #include "mongo/logv2/log_attr.h"
 
 namespace mongo {

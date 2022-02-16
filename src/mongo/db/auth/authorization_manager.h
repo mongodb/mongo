@@ -41,7 +41,7 @@
 #include "mongo/db/auth/user.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/tenant_id.h"
+#include "mongo/idl/tenant_id.h"
 
 namespace mongo {
 

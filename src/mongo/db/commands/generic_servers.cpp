@@ -81,6 +81,10 @@ public:
         NamespaceString ns() const final {
             return NamespaceString(request().getDbName(), "");
         }
+
+        boost::optional<auth::SecurityToken> securityToken() const final {
+            return request().getSecurityToken();
+        }
     };
 
     bool adminOnly() const final {
