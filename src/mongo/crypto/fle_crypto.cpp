@@ -1127,4 +1127,27 @@ uint64_t ECCCollection::emuBinary(FLEStateCollectionReader* reader,
         reader, tagToken, valueToken);
 }
 
+BSONObj ECOCollection::generateDocument(StringData fieldName, ConstDataRange payload) {
+    BSONObjBuilder builder;
+    builder.append(kFieldName, fieldName);
+    toBinData(kValue, payload, &builder);
+
+    return builder.obj();
+}
+
+ECOCCompactionDocument ECOCollection::parseAndDecrypt(BSONObj& doc, ECOCToken token) {
+    IDLParserErrorContext ctx("root");
+    auto ecocDoc = EcocDocument::parse(ctx, doc);
+
+    auto swTokens = EncryptedStateCollectionTokens::decryptAndParse(token, ecocDoc.getValue());
+    uassertStatusOK(swTokens);
+    auto& keys = swTokens.getValue();
+
+    ECOCCompactionDocument ret;
+    ret.fieldName = ecocDoc.getFieldName().toString();
+    ret.esc = keys.esc;
+    ret.ecc = keys.ecc;
+    return ret;
+}
+
 }  // namespace mongo

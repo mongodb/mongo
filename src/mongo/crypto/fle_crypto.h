@@ -696,11 +696,11 @@ public:
      * For each field, transforms the field into BinData 6 with a prefix byte of 4
      *
      * {
-     *   d : EDCDerivedFromDataTokenAndCounter
-     *   s : ESCDerivedFromDataTokenAndCounter
-     *   c : ECCDerivedFromDataTokenAndCounter
-     *   p : Encrypt(ECOCToken, ESCDerivedFromDataTokenAndCounter ||
-     * ECCDerivedFromDataTokenAndCounter) v : Encrypt(K_KeyId, value),
+     *   d : EDCDerivedFromDataTokenAndContentionFactorToken
+     *   s : ESCDerivedFromDataTokenAndContentionFactorToken
+     *   c : ECCDerivedFromDataTokenAndContentionFactorToken
+     *   p : Encrypt(ECOCToken, ESCDerivedFromDataTokenAndContentionFactorToken ||
+     * ECCDerivedFromDataTokenAndContentionFactorToken) v : Encrypt(K_KeyId, value),
      *   e : ServerDataEncryptionLevel1Token,
      * }
      */
@@ -711,7 +711,8 @@ public:
 /*
  * Values of ECOC documents
  *
- * Encrypt(ECOCToken, ESCDerivedFromDataTokenAndCounter || ECCDerivedFromDataTokenAndCounter)
+ * Encrypt(ECOCToken, ESCDerivedFromDataTokenAndContentionFactorToken ||
+ * ECCDerivedFromDataTokenAndContentionFactorToken)
  *
  * struct {
  *    uint8_t[64] esc;
@@ -730,6 +731,38 @@ public:
 
     ESCDerivedFromDataTokenAndContentionFactorToken esc;
     ECCDerivedFromDataTokenAndContentionFactorToken ecc;
+};
+
+
+struct ECOCCompactionDocument {
+    // Id is not included as it unimportant
+    std::string fieldName;
+    ESCDerivedFromDataTokenAndContentionFactorToken esc;
+    ECCDerivedFromDataTokenAndContentionFactorToken ecc;
+};
+
+
+/**
+ * ECOC Collection schema
+ * {
+ *    _id : ObjectId() -- omitted so MongoDB can auto choose it
+ *    fieldName : String,S
+ *    value : Encrypt(ECOCToken, ESCDerivedFromDataTokenAndContentionFactorToken ||
+ * ECCDerivedFromDataTokenAndContentionFactorToken)
+ * }
+ *
+ * where
+ *  value comes from client, see EncryptedStateCollectionTokens or
+ * FLE2InsertUpdatePayload.getEncryptedTokens()
+ *
+ * Note:
+ * - ECOC is a set of documents, they are unordered
+ */
+class ECOCollection {
+public:
+    static BSONObj generateDocument(StringData fieldName, ConstDataRange payload);
+
+    static ECOCCompactionDocument parseAndDecrypt(BSONObj& doc, ECOCToken token);
 };
 
 
