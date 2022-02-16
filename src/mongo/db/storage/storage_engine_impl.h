@@ -79,9 +79,11 @@ public:
         return _supportsCappedCollections;
     }
 
-    virtual Status closeDatabase(OperationContext* opCtx, StringData db) override;
+    virtual Status closeDatabase(OperationContext* opCtx,
+                                 const TenantDatabaseName& tenantDbName) override;
 
-    virtual Status dropDatabase(OperationContext* opCtx, StringData db) override;
+    virtual Status dropDatabase(OperationContext* opCtx,
+                                const TenantDatabaseName& tenantDbName) override;
 
     virtual void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) override;
 
@@ -322,7 +324,7 @@ public:
     StatusWith<ReconcileResult> reconcileCatalogAndIdents(
         OperationContext* opCtx, LastShutdownState lastShutdownState) override;
 
-    std::string getFilesystemPathForDb(const std::string& dbName) const override;
+    std::string getFilesystemPathForDb(const TenantDatabaseName& tenantDbName) const override;
 
     DurableCatalog* getCatalog() override;
 
@@ -343,7 +345,8 @@ public:
         return _dropPendingIdentReaper.getAllIdentNames();
     }
 
-    int64_t sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) override;
+    int64_t sizeOnDiskForDb(OperationContext* opCtx,
+                            const TenantDatabaseName& tenantDbName) override;
 
     bool isUsingDirectoryPerDb() const override {
         return _options.directoryPerDB;

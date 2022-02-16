@@ -235,12 +235,14 @@ public:
     /**
      * Closes all file handles associated with a database.
      */
-    virtual Status closeDatabase(OperationContext* opCtx, StringData db) = 0;
+    virtual Status closeDatabase(OperationContext* opCtx,
+                                 const TenantDatabaseName& tenantDbName) = 0;
 
     /**
      * Deletes all data and metadata for a database.
      */
-    virtual Status dropDatabase(OperationContext* opCtx, StringData db) = 0;
+    virtual Status dropDatabase(OperationContext* opCtx,
+                                const TenantDatabaseName& tenantDbName) = 0;
 
     /**
      * Checkpoints the data to disk.
@@ -621,9 +623,10 @@ public:
     /**
      * Returns the path to the directory which has the data files of database with `dbName`.
      */
-    virtual std::string getFilesystemPathForDb(const std::string& dbName) const = 0;
+    virtual std::string getFilesystemPathForDb(const TenantDatabaseName& tenantDbName) const = 0;
 
-    virtual int64_t sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) = 0;
+    virtual int64_t sizeOnDiskForDb(OperationContext* opCtx,
+                                    const TenantDatabaseName& tenantDbName) = 0;
 
     virtual bool isUsingDirectoryPerDb() const = 0;
 

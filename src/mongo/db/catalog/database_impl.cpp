@@ -382,7 +382,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx,
         // It does not matter whether _name.dbName() or _name.fullName() is passed in here since
         // directoryPerDB isn't supported in Serverless. We choose _name.dbName().
         boost::filesystem::path dbpath(
-            opCtx->getServiceContext()->getStorageEngine()->getFilesystemPathForDb(_name.dbName()));
+            opCtx->getServiceContext()->getStorageEngine()->getFilesystemPathForDb(_name));
         boost::system::error_code ec;
         boost::filesystem::space_info spaceInfo = boost::filesystem::space(dbpath, ec);
         if (!ec) {

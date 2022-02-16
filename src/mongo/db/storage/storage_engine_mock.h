@@ -55,10 +55,10 @@ public:
     }
     void loadCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) final {}
     void closeCatalog(OperationContext* opCtx) final {}
-    Status closeDatabase(OperationContext* opCtx, StringData db) final {
+    Status closeDatabase(OperationContext* opCtx, const TenantDatabaseName& tenantDbName) final {
         return Status::OK();
     }
-    Status dropDatabase(OperationContext* opCtx, StringData db) final {
+    Status dropDatabase(OperationContext* opCtx, const TenantDatabaseName& tenantDbName) final {
         return Status::OK();
     }
     void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) final {}
@@ -160,7 +160,7 @@ public:
     boost::optional<Timestamp> getOplogNeededForCrashRecovery() const final {
         return boost::none;
     }
-    std::string getFilesystemPathForDb(const std::string& dbName) const final {
+    std::string getFilesystemPathForDb(const TenantDatabaseName& tenantDbName) const final {
         return "";
     }
     std::set<std::string> getDropPendingIdents() const final {
@@ -173,7 +173,7 @@ public:
 
     void checkpoint() final {}
 
-    int64_t sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) final {
+    int64_t sizeOnDiskForDb(OperationContext* opCtx, const TenantDatabaseName& tenantDbName) final {
         return 0;
     }
     bool isUsingDirectoryPerDb() const final {

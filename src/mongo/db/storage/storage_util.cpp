@@ -63,7 +63,7 @@ auto removeEmptyDirectory = [](ServiceContext* svcCtx,
     }
 
     boost::system::error_code ec;
-    boost::filesystem::remove(storageEngine->getFilesystemPathForDb(tenantDbName.dbName()), ec);
+    boost::filesystem::remove(storageEngine->getFilesystemPathForDb(tenantDbName), ec);
 
     if (!ec) {
         LOGV2(4888200, "Removed empty database directory", "db"_attr = tenantDbName.dbName());

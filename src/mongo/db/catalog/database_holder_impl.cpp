@@ -285,8 +285,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
 
     auto const storageEngine = serviceContext->getStorageEngine();
     writeConflictRetry(opCtx, "dropDatabase", name.dbName(), [&] {
-        // TODO SERVER-63187 Call dropDatabase with name which is TenantDatabaseName.
-        storageEngine->dropDatabase(opCtx, name.fullName()).transitional_ignore();
+        storageEngine->dropDatabase(opCtx, name).transitional_ignore();
     });
 }
 
@@ -328,8 +327,7 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, const TenantDatabaseName
     _dbs.erase(it);
 
     auto* const storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    // TODO SERVER-63187 Call dropDatabase with name which is TenantDatabaseName.
-    storageEngine->closeDatabase(opCtx, tenantDbName.fullName()).transitional_ignore();
+    storageEngine->closeDatabase(opCtx, tenantDbName).transitional_ignore();
 }
 
 void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {

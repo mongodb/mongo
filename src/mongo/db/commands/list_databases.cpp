@@ -162,7 +162,7 @@ public:
                     }
 
                     writeConflictRetry(opCtx, "sizeOnDisk", tenantDbName.dbName(), [&] {
-                        size = storageEngine->sizeOnDiskForDb(opCtx, tenantDbName.dbName());
+                        size = storageEngine->sizeOnDiskForDb(opCtx, tenantDbName);
                     });
                     item.setSizeOnDisk(size);
                     item.setEmpty(CollectionCatalog::get(opCtx)

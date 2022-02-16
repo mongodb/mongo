@@ -771,8 +771,9 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
     return reconcileResult;
 }
 
-std::string StorageEngineImpl::getFilesystemPathForDb(const std::string& dbName) const {
-    return _catalog->getFilesystemPathForDb(dbName);
+std::string StorageEngineImpl::getFilesystemPathForDb(
+    const TenantDatabaseName& tenantDbName) const {
+    return _catalog->getFilesystemPathForDb(tenantDbName.dbName());
 }
 
 void StorageEngineImpl::cleanShutdown() {
@@ -824,14 +825,15 @@ std::vector<TenantDatabaseName> StorageEngineImpl::listDatabases() const {
     return CollectionCatalog::get(getGlobalServiceContext())->getAllDbNames();
 }
 
-Status StorageEngineImpl::closeDatabase(OperationContext* opCtx, StringData db) {
+Status StorageEngineImpl::closeDatabase(OperationContext* opCtx,
+                                        const TenantDatabaseName& tenantDbName) {
     // This is ok to be a no-op as there is no database layer in kv.
     return Status::OK();
 }
 
-Status StorageEngineImpl::dropDatabase(OperationContext* opCtx, StringData db) {
+Status StorageEngineImpl::dropDatabase(OperationContext* opCtx,
+                                       const TenantDatabaseName& tenantDbName) {
     auto catalog = CollectionCatalog::get(opCtx);
-    const TenantDatabaseName tenantDbName(boost::none, db);
     {
         auto tenantDbNames = catalog->getAllDbNames();
         if (std::count(tenantDbNames.begin(), tenantDbNames.end(), tenantDbName) == 0) {
@@ -1299,7 +1301,8 @@ void StorageEngineImpl::TimestampMonitor::clearListeners() {
     _listeners.clear();
 }
 
-int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) {
+int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx,
+                                           const TenantDatabaseName& tenantDbName) {
     int64_t size = 0;
 
     auto perCollectionWork = [&](const CollectionPtr& collection) {
@@ -1313,8 +1316,6 @@ int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, StringData d
         return true;
     };
 
-    // TODO SERVER-63187: Change StorageEngine APIs to accept TenantDatabaseName.
-    const TenantDatabaseName tenantDbName(boost::none, dbName);
     if (opCtx->isLockFreeReadsOp()) {
         auto collectionCatalog = CollectionCatalog::get(opCtx);
         for (auto it = collectionCatalog->begin(opCtx, tenantDbName);
