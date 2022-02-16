@@ -102,7 +102,6 @@ struct S3_FILE_HANDLE {
 };
 
 /* Configuration variables for connecting to S3CrtClient. */
-const Aws::String region = Aws::Region::AP_SOUTHEAST_2;
 const double throughputTargetGbps = 5;
 const uint64_t partSize = 8 * 1024 * 1024; /* 8 MB. */
 
@@ -442,12 +441,33 @@ S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, con
     std::string objPrefix;
     if ((ret = s3->wtApi->config_get_string(
            s3->wtApi, session, config, "prefix", &objPrefixConf)) == 0)
-        objPrefix = objPrefixConf.str;
+        objPrefix = std::string(objPrefixConf.str, objPrefixConf.len);
     else if (ret != WT_NOTFOUND) {
         std::cerr << "Error: customize_file_system: config parsing for object prefix";
-        return (1);
+        return (ret);
     }
 
+    /* Configure the AWS Client configuration. */
+    Aws::S3Crt::ClientConfiguration awsConfig;
+    awsConfig.throughputTargetGbps = throughputTargetGbps;
+    awsConfig.partSize = partSize;
+
+    /*
+     * Get the AWS region to be used. The allowable values for AWS region are listed here in the AWS
+     * documentation: http://sdk.amazonaws.com/cpp/api/LATEST/namespace_aws_1_1_region.html
+     */
+    WT_CONFIG_ITEM regionConf;
+    std::string region;
+    if ((ret = s3->wtApi->config_get_string(s3->wtApi, session, config, "region", &regionConf)) ==
+      0)
+        awsConfig.region = std::string(regionConf.str, regionConf.len);
+    else if (ret != WT_NOTFOUND) {
+        std::cerr << "Error: customize_file_system: config parsing for AWS region";
+        return (ret);
+    } else {
+        std::cerr << "Error: Region not specified" << std::endl;
+        return (EINVAL);
+    }
     /*
      * Get the directory to setup the cache, or use the default one. The default cache directory is
      * named "cache-<name>", where name is the last component of the bucket name's path. We'll
@@ -457,7 +477,7 @@ S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, con
     std::string cacheStr;
     if ((ret = s3->wtApi->config_get_string(
            s3->wtApi, session, config, "cache_directory", &cacheDirConf)) == 0)
-        cacheStr = cacheDirConf.str;
+        cacheStr = std::string(cacheDirConf.str, cacheDirConf.len);
     else if (ret == WT_NOTFOUND) {
         cacheStr = "cache-" + std::string(bucketName);
         ret = 0;
@@ -480,11 +500,6 @@ S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, con
     fs->wtFileSystem = wtFileSystem;
     fs->homeDir = homeDir;
     fs->cacheDir = cacheDir;
-
-    Aws::S3Crt::ClientConfiguration awsConfig;
-    awsConfig.region = region;
-    awsConfig.throughputTargetGbps = throughputTargetGbps;
-    awsConfig.partSize = partSize;
 
     /* New can fail; will deal with this later. */
     fs->connection = new S3Connection(awsConfig, bucketName, objPrefix);
