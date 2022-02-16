@@ -37,7 +37,7 @@ public:
     static WriteBlockBypass& get(OperationContext* opCtx);
 
     bool isWriteBlockBypassEnabled() const;
-    void enableWriteBlockBypass();
+    void setFromMetadata(OperationContext* opCtx, const BSONElement& elem);
 
 private:
     bool _writeBlockBypassEnabled = false;

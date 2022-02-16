@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/write_block_bypass.h"
 
 namespace mongo {
@@ -41,8 +42,21 @@ bool WriteBlockBypass::isWriteBlockBypassEnabled() const {
     return _writeBlockBypassEnabled;
 }
 
-void WriteBlockBypass::enableWriteBlockBypass() {
-    _writeBlockBypassEnabled = true;
+void WriteBlockBypass::setFromMetadata(OperationContext* opCtx, const BSONElement& elem) {
+    if (elem) {
+        // If the mayBypassWriteBlocking field is set, then (after ensuring the client is
+        // authorized) set our state from that field.
+        uassert(6317500,
+                "Client is not properly authorized to propagate mayBypassWriteBlocking",
+                AuthorizationSession::get(opCtx->getClient())
+                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                       ActionType::internal));
+        _writeBlockBypassEnabled = elem.Bool();
+    } else {
+        // Otherwise, set our state based on the AuthorizationSession state.
+        _writeBlockBypassEnabled =
+            AuthorizationSession::get(opCtx->getClient())->mayBypassWriteBlockingMode();
+    }
 }
 
 WriteBlockBypass& WriteBlockBypass::get(OperationContext* opCtx) {

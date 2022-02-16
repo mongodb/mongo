@@ -39,6 +39,7 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/multitenancy.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/db/write_block_bypass.h"
 #include "mongo/db/write_block_bypass_propagation_egress_hook.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
@@ -112,13 +113,7 @@ void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRe
 
     VectorClock::get(opCtx)->gossipIn(opCtx, opMsg.body, !cmdRequiresAuth);
 
-    if (mayBypassWriteBlockingElem) {
-        uassert(6317600,
-                "mayBypassWriteBlockingElem was not false",
-                !mayBypassWriteBlockingElem.Bool());
-        // TODO SERVER-63177: Change above to something like:
-        // WriteBlockBypass::get(opCtx)->setActive(mayBypassWriteBlockingElem.Bool());
-    }
+    WriteBlockBypass::get(opCtx).setFromMetadata(opCtx, mayBypassWriteBlockingElem);
 }
 
 namespace {
