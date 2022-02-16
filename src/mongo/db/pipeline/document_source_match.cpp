@@ -415,12 +415,6 @@ DocumentSourceMatch::splitSourceBy(const std::set<std::string>& fields,
 }
 
 pair<intrusive_ptr<DocumentSourceMatch>, intrusive_ptr<DocumentSourceMatch>>
-DocumentSourceMatch::extractMatchOnFieldsAndRemainder(const std::set<std::string>& fields,
-                                                      const StringMap<std::string>& renames) && {
-    return std::move(*this).splitSourceByFunc(fields, renames, expression::isOnlyDependentOn);
-}
-
-pair<intrusive_ptr<DocumentSourceMatch>, intrusive_ptr<DocumentSourceMatch>>
 DocumentSourceMatch::splitSourceByFunc(const std::set<std::string>& fields,
                                        const StringMap<std::string>& renames,
                                        expression::ShouldSplitExprFunc func) && {
