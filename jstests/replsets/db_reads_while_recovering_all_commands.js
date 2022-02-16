@@ -318,6 +318,7 @@ const allCommands = {
     setFreeMonitoring: {skip: isPrimaryOnly},
     setParameter: {skip: isNotAUserDataRead},
     setShardVersion: {skip: isNotAUserDataRead},
+    setUserWriteBlockMode: {skip: isPrimaryOnly},
     shardingState: {skip: isNotAUserDataRead},
     shutdown: {skip: isNotAUserDataRead},
     sleep: {skip: isNotAUserDataRead},

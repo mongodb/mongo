@@ -668,6 +668,7 @@ let testCases = {
     setIndexCommitQuorum: {skip: "does not accept read or write concern"},
     setParameter: {skip: "does not accept read or write concern"},
     setShardVersion: {skip: "internal command"},
+    setUserWriteBlockMode: {skip: "does not accept read or write concern"},
     shardCollection: {skip: "does not accept read or write concern"},
     shardingState: {skip: "does not accept read or write concern"},
     shutdown: {skip: "does not accept read or write concern"},

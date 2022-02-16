@@ -5607,6 +5607,17 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "setUserWriteBlockMode",
+          command: {setUserWriteBlockMode: 1, global: true},
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {backup: 1, restore: 1, root: 1, __system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["setUserWriteBlockMode"]}],
+              }
+          ]
+        },
+        {
           testname: "shardCollection",
           command: {shardCollection: "test.x"},
           skipUnlessSharded: true,

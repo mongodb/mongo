@@ -165,6 +165,7 @@ enums:
            setFeatureCompatibilityVersion :  "setFeatureCompatibilityVersion"
            setFreeMonitoring :  "setFreeMonitoring"
            setParameter :  "setParameter"
+           setUserWriteBlockMode: "setUserWriteBlockMode"
            shardCollection :  "shardCollection"  # ID only
            shardingState :  "shardingState"
            shutdown :  "shutdown"

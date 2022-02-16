@@ -459,6 +459,16 @@ env.Library(
 )
 
 env.Library(
+    target='set_user_write_block_mode_idl',
+    source=[
+        'set_user_write_block_mode.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
     target='rename_collection_idl',
     source=[
         'rename_collection.idl',
@@ -514,6 +524,7 @@ env.Library(
         'rwc_defaults_commands.cpp',
         "set_feature_compatibility_version_command.cpp",
         "set_index_commit_quorum_command.cpp",
+        'set_user_write_block_mode_command.cpp',
         "shutdown_d.cpp",
         "snapshot_management.cpp",
         "tenant_migration_donor_cmds.cpp",
@@ -582,6 +593,7 @@ env.Library(
         'servers',
         'set_feature_compatibility_version_idl',
         'set_index_commit_quorum_idl',
+        'set_user_write_block_mode_idl',
         'shell_protocol',
         'shutdown_idl',
         'standalone',

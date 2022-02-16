@@ -13,4 +13,5 @@ const commandsRemovedFromMongodSinceLastLTS = [
 // test defined without always existing on the mongod being used.
 const commandsAddedToMongodSinceLastLTS = [
     "rotateCertificates",
+    "setUserWriteBlockMode",
 ];

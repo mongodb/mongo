@@ -586,6 +586,7 @@ let viewsCommandTests = {
     setFreeMonitoring: {skip: isUnrelated},
     setParameter: {skip: isUnrelated},
     setShardVersion: {skip: isUnrelated},
+    setUserWriteBlockMode: {skip: isUnrelated},
     shardCollection: {
         command: {shardCollection: "test.view", key: {_id: 1}},
         setup: function(conn) {
