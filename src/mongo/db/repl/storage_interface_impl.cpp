@@ -1403,6 +1403,11 @@ Timestamp StorageInterfaceImpl::recoverToStableTimestamp(OperationContext* opCtx
     StorageControl::stopStorageControls(serviceContext, reason, /*forRestart=*/true);
 
     auto swStableTimestamp = serviceContext->getStorageEngine()->recoverToStableTimestamp(opCtx);
+    if (!swStableTimestamp.isOK()) {
+        // Dump storage engine contents (including transaction information) before fatally
+        // asserting.
+        serviceContext->getStorageEngine()->dump();
+    }
     fassert(31049, swStableTimestamp);
 
     StorageControl::startStorageControls(serviceContext);
