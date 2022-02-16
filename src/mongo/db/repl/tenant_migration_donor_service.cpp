@@ -1145,13 +1145,13 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                    .then([this, self = shared_from_this(), token](repl::OpTime lastKeyOpTime) {
                        pauseTenantMigrationDonorBeforeWaitingForKeysToReplicate.pauseWhileSet();
 
-                       auto votingMembersWriteConcern =
+                       auto allMembersWriteConcern =
                            WriteConcernOptions(repl::ReplSetConfig::kConfigAllWriteConcernName,
                                                WriteConcernOptions::SyncMode::NONE,
                                                WriteConcernOptions::kNoTimeout);
                        auto writeConcernFuture = repl::ReplicationCoordinator::get(_serviceContext)
                                                      ->awaitReplicationAsyncNoWTimeout(
-                                                         lastKeyOpTime, votingMembersWriteConcern);
+                                                         lastKeyOpTime, allMembersWriteConcern);
                        return future_util::withCancellation(std::move(writeConcernFuture), token);
                    });
            })

@@ -76,11 +76,13 @@ public:
                   "step"_attr = MigrationProgressStep_serializer(cmd.getStep()),
                   "success"_attr = cmd.getSuccess(),
                   "reason"_attr = cmd.getReason());
-            TenantMigrationRecipientCoordinator::get(opCtx)->voteForStep(cmd.getMigrationId(),
-                                                                         cmd.getStep(),
-                                                                         cmd.getFrom(),
-                                                                         cmd.getSuccess(),
-                                                                         cmd.getReason());
+
+            TenantMigrationRecipientCoordinator::get(opCtx)->receivedVoteForStep(
+                cmd.getMigrationId(),
+                cmd.getStep(),
+                cmd.getFrom(),
+                cmd.getSuccess(),
+                cmd.getReason());
         }
 
     private:

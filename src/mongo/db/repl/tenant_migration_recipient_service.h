@@ -509,13 +509,6 @@ public:
          */
         SemiFuture<void> _updateStateDocForMajority(WithLock lk) const;
 
-        /**
-         * Updates the state doc in the database and waits for that to be propagated to all nodes in
-         * the replica set.
-         */
-        SemiFuture<void> _updateStateDocForAllVotingNodes(
-            WithLock lk, const CancellationToken& abortToken) const;
-
         /*
          * Returns the majority OpTime on the donor node that 'client' is connected to.
          */
@@ -602,6 +595,10 @@ public:
         // Promise that is resolved Signaled when the instance has started tenant database cloner
         // and tenant oplog fetcher.
         SharedPromise<void> _dataSyncStartedPromise;  // (W)
+        // Future that is resolved when all recipient nodes have copied all donor files.
+        SharedSemiFuture<void> _copiedFilesFuture;  // (W)
+        // Future that is resolved when all recipient nodes have imported all donor files.
+        SharedSemiFuture<void> _importedFilesFuture;  // (W)
         // Promise that is resolved Signaled when the tenant data sync has reached consistent point.
         SharedPromise<OpTime> _dataConsistentPromise;  // (W)
         // Promise that is resolved when the data sync has completed.

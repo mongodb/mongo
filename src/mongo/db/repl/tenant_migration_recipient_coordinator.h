@@ -38,7 +38,7 @@ namespace mongo::repl {
 
 /**
  * Coordinate the nodes of the recipient shard during a multitenant migration that uses the "shard
- * merge" protocol.
+ * merge" protocol. Receives voteCommitMigrationProgress commands from all recipient nodes.
  */
 class TenantMigrationRecipientCoordinator {
 public:
@@ -50,17 +50,19 @@ public:
 
     // Begin a tenant migration step. The returned future is resolved when all replica set members
     // have completed the step, or there was an error.
-    SharedSemiFuture<void> step(UUID migrationId, MigrationProgressStepEnum step);
+    SharedSemiFuture<void> beginAwaitingVotesForStep(UUID migrationId,
+                                                     MigrationProgressStepEnum step);
     // TODO (SERVER-61144): use cancelStep, which is currently unused.
     void cancelStep(UUID migrationId, MigrationProgressStepEnum step);
-    void voteForStep(UUID migrationId,
-                     MigrationProgressStepEnum step,
-                     const HostAndPort& host,
-                     bool success,
-                     const boost::optional<StringData>& reason = boost::none);
+    void receivedVoteForStep(UUID migrationId,
+                             MigrationProgressStepEnum step,
+                             const HostAndPort& host,
+                             bool success,
+                             const boost::optional<StringData>& reason = boost::none);
     void reset();
 
 private:
+    void _reset(WithLock lk);
     Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationRecipientCoordinator::_mutex");
     boost::optional<UUID> _currentMigrationId;
     MigrationProgressStepEnum _currentStep = MigrationProgressStepEnum::kNoStep;

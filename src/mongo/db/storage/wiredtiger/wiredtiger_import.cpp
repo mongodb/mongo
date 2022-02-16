@@ -153,6 +153,7 @@ private:
 
 std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
     OperationContext* opCtx, const std::string& importPath) {
+    LOGV2_DEBUG(6113400, 1, "Opening donor WiredTiger database", "importPath"_attr = importPath);
     WT_CONNECTION* conn;
     // WT converts the imported WiredTiger.backup file to a fresh WiredTiger.wt file, rolls back to
     // stable, and takes a checkpoint. Accept WT's default checkpoint behavior: take a checkpoint

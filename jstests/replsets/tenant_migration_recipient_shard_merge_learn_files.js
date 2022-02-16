@@ -20,74 +20,71 @@ load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-(() => {
-    const tenantMigrationTest =
-        new TenantMigrationTest({name: jsTestName(), sharedOptions: {nodes: 3}});
+const tenantMigrationTest =
+    new TenantMigrationTest({name: jsTestName(), sharedOptions: {nodes: 3}});
 
-    const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
+const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
-    if (!TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
-        tenantMigrationTest.stop();
-        jsTestLog("Skipping Shard Merge-specific test");
-        return;
-    }
-
-    jsTestLog(
-        "Test that recipient state is correctly set to 'learned filenames' after creating the backup cursor");
-    const tenantId = "testTenantId";
-    const tenantDB = tenantMigrationTest.tenantDB(tenantId, "DB");
-    const collName = "testColl";
-
-    const donorRst = tenantMigrationTest.getDonorRst();
-    const donorPrimary = tenantMigrationTest.getDonorPrimary();
-    const donorSecondary = donorRst.getSecondary();
-
-    // Do a majority write.
-    tenantMigrationTest.insertDonorDB(tenantDB, collName);
-
-    // Ensure our new collections appear in the backup cursor's checkpoint.
-    assert.commandWorked(donorPrimary.adminCommand({fsync: 1}));
-
-    const failpoint = "fpAfterRetrievingStartOpTimesMigrationRecipientInstance";
-    const waitInFailPoint = configureFailPoint(recipientPrimary, failpoint, {action: "hang"});
-
-    // In order to prevent the copying of "testTenantId" databases via logical cloning from donor to
-    // recipient, start migration on a tenant id which is non-existent on the donor.
-    const migrationUuid = UUID();
-    const kDummyTenantId = "nonExistentTenantId";
-    const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(migrationUuid),
-        tenantId: kDummyTenantId,
-        readPreference: {mode: 'primary'}
-    };
-
-    jsTestLog(`Starting the tenant migration to wait in failpoint: ${failpoint}`);
-    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
-
-    waitInFailPoint.wait();
-
-    tenantMigrationTest.assertRecipientNodesInExpectedState(
-        tenantMigrationTest.getRecipientRst().nodes,
-        migrationUuid,
-        kDummyTenantId,
-        TenantMigrationTest.RecipientState.kLearnedFilenames,
-        TenantMigrationTest.RecipientAccessState.kReject);
-
-    waitInFailPoint.off();
-
-    TenantMigrationTest.assertCommitted(
-        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-
-    // TODO SERVER-61144: Check on all recipient nodes that the collection documents got imported
-    // successfully.
-    // Use "countDocuments" to check actual docs, "count" to check sizeStorer data.
-    assert.eq(donorPrimary.getDB(tenantDB)[collName].countDocuments({}),
-              recipientPrimary.getDB(tenantDB)[collName].countDocuments({}),
-              "countDocuments");
-    assert.eq(donorPrimary.getDB(tenantDB)[collName].count(),
-              recipientPrimary.getDB(tenantDB)[collName].count(),
-              "count");
-
+if (!TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
     tenantMigrationTest.stop();
-})();
+    jsTestLog("Skipping Shard Merge-specific test");
+    return;
+}
+
+jsTestLog(
+    "Test that recipient state is correctly set to 'learned filenames' after creating the backup cursor");
+const tenantId = "testTenantId";
+const tenantDB = tenantMigrationTest.tenantDB(tenantId, "DB");
+const collName = "testColl";
+
+const donorRst = tenantMigrationTest.getDonorRst();
+const donorPrimary = tenantMigrationTest.getDonorPrimary();
+const donorSecondary = donorRst.getSecondary();
+
+// Do a majority write.
+tenantMigrationTest.insertDonorDB(tenantDB, collName);
+
+// Ensure our new collections appear in the backup cursor's checkpoint.
+assert.commandWorked(donorPrimary.adminCommand({fsync: 1}));
+
+const failpoint = "fpAfterRetrievingStartOpTimesMigrationRecipientInstance";
+const waitInFailPoint = configureFailPoint(recipientPrimary, failpoint, {action: "hang"});
+
+// In order to prevent the copying of "testTenantId" databases via logical cloning from donor to
+// recipient, start migration on a tenant id which is non-existent on the donor.
+const migrationUuid = UUID();
+const kDummyTenantId = "nonExistentTenantId";
+const migrationOpts = {
+    migrationIdString: extractUUIDFromObject(migrationUuid),
+    tenantId: kDummyTenantId,
+    readPreference: {mode: 'primary'}
+};
+
+jsTestLog(`Starting the tenant migration to wait in failpoint: ${failpoint}`);
+assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
+
+waitInFailPoint.wait();
+
+tenantMigrationTest.assertRecipientNodesInExpectedState(
+    tenantMigrationTest.getRecipientRst().nodes,
+    migrationUuid,
+    kDummyTenantId,
+    TenantMigrationTest.RecipientState.kCopiedFiles,
+    TenantMigrationTest.RecipientAccessState.kReject);
+
+waitInFailPoint.off();
+
+TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+
+// TODO SERVER-61144: Check on all recipient nodes that the collection documents got imported
+// successfully.
+// Use "countDocuments" to check actual docs, "count" to check sizeStorer data.
+assert.eq(donorPrimary.getDB(tenantDB)[collName].countDocuments({}),
+          recipientPrimary.getDB(tenantDB)[collName].countDocuments({}),
+          "countDocuments");
+assert.eq(donorPrimary.getDB(tenantDB)[collName].count(),
+          recipientPrimary.getDB(tenantDB)[collName].count(),
+          "count");
+
+tenantMigrationTest.stop();
 })();

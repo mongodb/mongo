@@ -1356,6 +1356,7 @@ env.Library(
     target='tenant_migration_recipient_service',
     source=[
         'tenant_file_cloner.cpp',
+        'tenant_file_importer_service.cpp',
         'tenant_migration_recipient_coordinator.cpp',
         'tenant_migration_recipient_op_observer.cpp',
         'tenant_migration_recipient_service.cpp',
@@ -1380,6 +1381,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongo_process_interface',
         '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger_import',
         '$BUILD_DIR/mongo/db/transaction',
+        '$BUILD_DIR/mongo/executor/scoped_task_executor',
         'cloner_utils',
         'oplog',
         'oplog_application_interface',

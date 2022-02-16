@@ -919,6 +919,10 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_killBackupCurso
                 return;
             }
 
+            LOGV2_INFO(6113421,
+                       "Killing backup cursor",
+                       "migrationId"_attr = getMigrationUUID(),
+                       "cursorId"_attr = _donorFilenameBackupCursorId);
             executor::RemoteCommandRequest request(
                 _client->getServerHostAndPort(),
                 _donorFilenameBackupCursorNamespaceString.db().toString(),
@@ -938,7 +942,9 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_killBackupCurso
                                 return;
                             }
                             auto status = getStatusFromCommandResult(args.response.data);
-                            if (!status.isOK()) {
+                            if (status.isOK()) {
+                                LOGV2_INFO(6113415, "Killed backup cursor");
+                            } else {
                                 LOGV2_WARNING(6113006,
                                               "killCursors command failed",
                                               "error"_attr = redact(status));
@@ -2275,29 +2281,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_updateStateDocForMa
         .semi();
 }
 
-SemiFuture<void> TenantMigrationRecipientService::Instance::_updateStateDocForAllVotingNodes(
-    WithLock lk, const CancellationToken& abortToken) const {
-    return ExecutorFuture(**_scopedExecutor)
-        .then([this, self = shared_from_this(), stateDoc = _stateDoc, abortToken] {
-            auto opCtx = cc().makeOperationContext();
-            uassertStatusOK(
-                tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), stateDoc));
-
-            auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-
-            auto votingMembersWriteConcern =
-                WriteConcernOptions(repl::ReplSetConfig::kConfigAllWriteConcernName,
-                                    WriteConcernOptions::SyncMode::NONE,
-                                    WriteConcernOptions::kNoTimeout);
-
-            auto writeConcernFuture =
-                repl::ReplicationCoordinator::get(opCtx->getServiceContext())
-                    ->awaitReplicationAsyncNoWTimeout(writeOpTime, votingMembersWriteConcern);
-            return future_util::withCancellation(std::move(writeConcernFuture), abortToken);
-        })
-        .semi();
-}
-
 void TenantMigrationRecipientService::Instance::_fetchAndStoreDonorClusterTimeKeyDocs(
     const CancellationToken& token) {
     std::vector<ExternalKeysCollectionDocument> keyDocs;
@@ -2575,6 +2558,16 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                            return SemiFuture<void>::makeReady().thenRunOn(**_scopedExecutor);
                        }
 
+                       // Before we tell all nodes what files to copy, prepare to receive their
+                       // voteCommitMigrationProgress commands telling the primary when they finish.
+                       {
+                           stdx::lock_guard lk(_mutex);
+                           _copiedFilesFuture =
+                               TenantMigrationRecipientCoordinator::get(_serviceContext)
+                                   ->beginAwaitingVotesForStep(
+                                       getMigrationUUID(), MigrationProgressStepEnum::kCopiedFiles);
+                       }
+
                        return AsyncTry([this, self = shared_from_this(), token] {
                                   return _getDonorFilenames(token);
                               })
@@ -2619,21 +2612,27 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
 
                        stdx::lock_guard lk(_mutex);
                        _stateDoc.setState(TenantMigrationRecipientStateEnum::kLearnedFilenames);
-                       // Since we are doing synchronous file cloning via op-observer, no need to
-                       // wait explicitly for shard merge commit votes from all nodes to
-                       // move to next step in this chain. Just waiting for the state doc with state
-                       // "TenantMigrationRecipientStateEnum::kLearnedFilenames" to get replicated
-                       // to all nodes should be sufficient to safely move to next step in this
-                       // chain.
-                       return _updateStateDocForAllVotingNodes(lk, token);
+                       return _updateStateDocForMajority(lk);
                    })
                    .then([this, self = shared_from_this()] {
-                       // TODO (SERVER-62734) temporarily stop fetcher/backup cursor here for
-                       // now. We'll need to move this call elsewhere eventually to shut down
-                       // the backup cursor and/or keepalive.
-                       // Some tests fail unless we do this here, punting on dealing with those
-                       // tests until later ticket(s)
-                       return _killBackupCursor();
+                       if (_stateDoc.getProtocol() != MigrationProtocolEnum::kShardMerge) {
+                           return SemiFuture<void>::makeReady();
+                       }
+
+                       LOGV2_INFO(6113402,
+                                  "Waiting for all nodes to call voteCommitMigrationProgress with "
+                                  "step 'copied files'");
+                       return std::move(_copiedFilesFuture).semi();
+                   })
+                   .then([this, self = shared_from_this()] { return _killBackupCursor(); })
+                   .then([this, self = shared_from_this()] {
+                       stdx::lock_guard lk(_mutex);
+                       if (_stateDoc.getProtocol() == MigrationProtocolEnum::kShardMerge) {
+                           _stateDoc.setState(TenantMigrationRecipientStateEnum::kCopiedFiles);
+                           return _updateStateDocForMajority(lk);
+                       }
+
+                       return SemiFuture<void>::makeReady();
                    })
                    .then([this, self = shared_from_this()] {
                        stdx::lock_guard lk(_mutex);
@@ -2720,14 +2719,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                                                                 **_scopedExecutor,
                                                                 _writerPool.get(),
                                                                 resumeBatchingTs);
-
-                       if (_stateDoc.getProtocol() == MigrationProtocolEnum::kShardMerge) {
-                           // TODO (SERVER-61135): Store the future, wait on it, kill backup cursor.
-                           [[maybe_unused]] auto copiedFilesFuture =
-                               TenantMigrationRecipientCoordinator::get(_serviceContext)
-                                   ->step(getMigrationUUID(),
-                                          MigrationProgressStepEnum::kCopiedFiles);
-                       }
 
                        // Start the cloner.
                        auto clonerFuture = _startTenantAllDatabaseCloner(lk);

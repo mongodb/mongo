@@ -103,11 +103,9 @@ struct MetadataInfo {
 };
 
 /**
- * Uses the TenantFileCloner to copy the files from the donor.
+ * Uses the TenantFileCloner to copy a file from the donor.
  */
-Status cloneFiles(OperationContext* opCtx,
-                  std::vector<InsertStatement>::const_iterator first,
-                  std::vector<InsertStatement>::const_iterator last);
+void cloneFile(OperationContext* opCtx, const BSONObj& metadataDoc);
 
 /**
  * After calling wiredTigerRollbackToStableAndGetMetadata, use this function to import files.

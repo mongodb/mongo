@@ -124,10 +124,7 @@ Status connect(const HostAndPort& source, DBClientConnection* client) {
 }
 }  // namespace
 
-Status cloneFiles(OperationContext* opCtx,
-                  std::vector<InsertStatement>::const_iterator first,
-                  std::vector<InsertStatement>::const_iterator last) {
-
+void cloneFile(OperationContext* opCtx, const BSONObj& metadataDoc) {
     std::unique_ptr<DBClientConnection> client;
     std::unique_ptr<TenantMigrationSharedData> sharedData;
     auto writerPool =
@@ -140,60 +137,59 @@ Status cloneFiles(OperationContext* opCtx,
         writerPool->join();
     });
 
-    for (auto it = first; it != last; it++) {
-        const auto& metadataDoc = it->doc;
-        auto fileName = metadataDoc["filename"].str();
-        auto migrationId = UUID(uassertStatusOK(UUID::parse(metadataDoc[kMigrationIdFieldName])));
+    auto fileName = metadataDoc["filename"].str();
+    auto migrationId = UUID(uassertStatusOK(UUID::parse(metadataDoc[kMigrationIdFieldName])));
+    LOGV2_DEBUG(6113320,
+                1,
+                "Cloning file",
+                "migrationId"_attr = migrationId,
+                "metadata"_attr = metadataDoc);
+    auto backupId = UUID(uassertStatusOK(UUID::parse(metadataDoc[kBackupIdFieldName])));
+    auto remoteDbpath = metadataDoc["remoteDbpath"].str();
+    size_t fileSize = metadataDoc["fileSize"].safeNumberLong();
+    auto relativePath = _getPathRelativeTo(fileName, metadataDoc[kDonorDbPathFieldName].str());
+    invariant(!relativePath.empty());
 
-        LOGV2_DEBUG(6113320, 1, "Attempting to clone file", "metadata"_attr = metadataDoc);
-
-        auto backupId = UUID(uassertStatusOK(UUID::parse(metadataDoc[kBackupIdFieldName])));
-        auto remoteDbpath = metadataDoc["remoteDbpath"].str();
-        size_t fileSize = metadataDoc["fileSize"].safeNumberLong();
-        auto relativePath = _getPathRelativeTo(fileName, metadataDoc[kDonorDbPathFieldName].str());
-        invariant(!relativePath.empty());
-
-        // Connect the client.
-        if (!client) {
-            auto donor = HostAndPort::parseThrowing(metadataDoc[kDonorFieldName].str());
-            client = std::make_unique<DBClientConnection>(true /* autoReconnect */);
-            uassertStatusOK(connect(donor, client.get()));
-        }
-
-        if (!sharedData) {
-            sharedData = std::make_unique<TenantMigrationSharedData>(
-                getGlobalServiceContext()->getFastClockSource(), migrationId);
-        }
-
-        auto currentBackupFileCloner = std::make_unique<TenantFileCloner>(
-            backupId,
-            migrationId,
-            fileName,
-            fileSize,
-            relativePath,
-            sharedData.get(),
-            client->getServerHostAndPort(),
-            client.get(),
-            repl::StorageInterface::get(cc().getServiceContext()),
-            writerPool.get());
-
-        auto cloneStatus = currentBackupFileCloner->run();
-        if (!cloneStatus.isOK()) {
-            LOGV2_WARNING(6113321,
-                          "Failed to clone file ",
-                          "migrationUUID"_attr = migrationId,
-                          "fileName"_attr = fileName,
-                          "error"_attr = cloneStatus);
-            return cloneStatus;
-        } else {
-            LOGV2_DEBUG(6113322,
-                        1,
-                        "Successfully cloned file",
-                        "migrationUUID"_attr = migrationId,
-                        "fileName"_attr = fileName);
-        }
+    // Connect the client.
+    if (!client) {
+        auto donor = HostAndPort::parseThrowing(metadataDoc[kDonorFieldName].str());
+        client = std::make_unique<DBClientConnection>(true /* autoReconnect */);
+        uassertStatusOK(connect(donor, client.get()));
     }
-    return Status::OK();
+
+    if (!sharedData) {
+        sharedData = std::make_unique<TenantMigrationSharedData>(
+            getGlobalServiceContext()->getFastClockSource(), migrationId);
+    }
+
+    auto currentBackupFileCloner =
+        std::make_unique<TenantFileCloner>(backupId,
+                                           migrationId,
+                                           fileName,
+                                           fileSize,
+                                           relativePath,
+                                           sharedData.get(),
+                                           client->getServerHostAndPort(),
+                                           client.get(),
+                                           repl::StorageInterface::get(cc().getServiceContext()),
+                                           writerPool.get());
+
+    auto cloneStatus = currentBackupFileCloner->run();
+    if (!cloneStatus.isOK()) {
+        LOGV2_WARNING(6113321,
+                      "Failed to clone file ",
+                      "migrationId"_attr = migrationId,
+                      "fileName"_attr = fileName,
+                      "error"_attr = cloneStatus);
+    } else {
+        LOGV2_DEBUG(6113322,
+                    1,
+                    "Cloned file",
+                    "migrationId"_attr = migrationId,
+                    "fileName"_attr = fileName);
+    }
+
+    uassertStatusOK(cloneStatus);
 }
 
 void wiredTigerImportFromBackupCursor(OperationContext* opCtx,

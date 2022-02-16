@@ -29,11 +29,14 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/repl/tenant_migration_recipient_op_observer.h"
 
+#include <fmt/format.h>
+
+#include "mongo/db/repl/tenant_file_importer_service.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
-#include "mongo/db/repl/tenant_migration_recipient_op_observer.h"
+#include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_shard_merge_util.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/tenant_migration_util.h"
@@ -41,7 +44,7 @@
 
 namespace mongo {
 namespace repl {
-
+using namespace fmt;
 namespace {
 
 const auto tenantIdToDeleteDecoration =
@@ -97,8 +100,7 @@ void TenantMigrationRecipientOpObserver::onCreateCollection(OperationContext* op
         return;
 
     auto collString = collectionName.coll().toString();
-    auto migrationUUID =
-        UUID(uassertStatusOK(UUID::parse(collString.substr(collString.find('.') + 1))));
+    auto migrationUUID = uassertStatusOK(UUID::parse(collString.substr(collString.find('.') + 1)));
     auto fileClonerTempDirPath = shard_merge_utils::fileClonerTempDir(migrationUUID);
 
     // This is possible when a secondary restarts or rollback and the donated files collection
@@ -134,20 +136,16 @@ void TenantMigrationRecipientOpObserver::onInserts(
     std::vector<InsertStatement>::const_iterator last,
     bool fromMigrate) {
 
-    if (!shard_merge_utils::isDonatedFilesCollection(nss))
+    if (!shard_merge_utils::isDonatedFilesCollection(nss)) {
         return;
+    }
 
-    try {
-        uassertStatusOK(shard_merge_utils::cloneFiles(opCtx, first, last));
-    } catch (const DBException& ex) {
-        invariant(first != last);
-        auto migrationId = UUID(
-            uassertStatusOK(UUID::parse(first->doc[shard_merge_utils::kMigrationIdFieldName])));
-        LOGV2_ERROR(6113318,
-                    "Error cloning files",
-                    "migrationUUID"_attr = migrationId,
-                    "error"_attr = ex.toStatus());
-        // TODO SERVER-63120: On error, vote shard merge abort to recipient primary.
+    auto fileImporter = repl::TenantFileImporterService::get(opCtx->getServiceContext());
+    for (auto it = first; it != last; it++) {
+        const auto& metadataDoc = it->doc;
+        auto migrationId =
+            uassertStatusOK(UUID::parse(metadataDoc[shard_merge_utils::kMigrationIdFieldName]));
+        fileImporter->learnedFilename(migrationId, metadataDoc);
     }
 }
 
@@ -178,26 +176,33 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
 
             auto state = recipientStateDoc.getState();
             auto protocol = recipientStateDoc.getProtocol().value_or(kDefaultMigrationProtocol);
+            if (state == TenantMigrationRecipientStateEnum::kLearnedFilenames ||
+                state == TenantMigrationRecipientStateEnum::kCopiedFiles) {
+                tassert(6112900,
+                        "Bad state '{}' for protocol '{}'"_format(
+                            TenantMigrationRecipientState_serializer(state),
+                            MigrationProtocol_serializer(protocol)),
+                        protocol == MigrationProtocolEnum::kShardMerge);
+            }
+
             switch (state) {
                 case TenantMigrationRecipientStateEnum::kUninitialized:
-                case TenantMigrationRecipientStateEnum::kDone:
-                    break;
-                case TenantMigrationRecipientStateEnum::kLearnedFilenames:
-                case TenantMigrationRecipientStateEnum::kCopiedFiles:
-                    tassert(6112900,
-                            str::stream()
-                                << "Bad state " << TenantMigrationRecipientState_serializer(state)
-                                << " for protocol '" << MigrationProtocol_serializer(protocol)
-                                << "'",
-                            protocol == MigrationProtocolEnum::kShardMerge);
                     break;
                 case TenantMigrationRecipientStateEnum::kStarted:
                     createAccessBlockerIfNeeded(opCtx, recipientStateDoc);
+                    break;
+                case TenantMigrationRecipientStateEnum::kLearnedFilenames:
+                    repl::TenantFileImporterService::get(opCtx->getServiceContext())
+                        ->learnedAllFilenames(recipientStateDoc.getId());
+                    break;
+                case TenantMigrationRecipientStateEnum::kCopiedFiles:
                     break;
                 case TenantMigrationRecipientStateEnum::kConsistent:
                     if (recipientStateDoc.getRejectReadsBeforeTimestamp()) {
                         onSetRejectReadsBeforeTimestamp(opCtx, recipientStateDoc);
                     }
+                    break;
+                case TenantMigrationRecipientStateEnum::kDone:
                     break;
             }
         });
@@ -235,10 +240,12 @@ void TenantMigrationRecipientOpObserver::onDelete(OperationContext* opCtx,
     if (nss == NamespaceString::kTenantMigrationRecipientsNamespace &&
         tenantIdToDeleteDecoration(opCtx) &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
+        LOGV2_INFO(8423337, "Removing expired migration", "migrationId"_attr = uuid.toString());
         opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                 .remove(tenantIdToDeleteDecoration(opCtx).get(),
                         TenantMigrationAccessBlocker::BlockerType::kRecipient);
+            repl::TenantFileImporterService::get(opCtx->getServiceContext())->reset();
         });
     }
 }

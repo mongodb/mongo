@@ -209,11 +209,15 @@ bool NamespaceString::isLegalClientSystemNS(
  *
  * Process updates to 'admin.system.version' individually as well so the secondary's FCV when
  * processing each operation matches the primary's when committing that operation.
+ *
+ * Process updates to config.tenantMigrationRecipients individually so they serialize after inserts
+ * into config.donatedFiles.<migrationId>.
  */
 bool NamespaceString::mustBeAppliedInOwnOplogBatch() const {
     return isSystemDotViews() || isServerConfigurationCollection() || isPrivilegeCollection() ||
         _ns == kDonorReshardingOperationsNamespace.ns() ||
-        _ns == kForceOplogBatchBoundaryNamespace.ns();
+        _ns == kForceOplogBatchBoundaryNamespace.ns() ||
+        _ns == kTenantMigrationRecipientsNamespace.ns();
 }
 
 NamespaceString NamespaceString::makeListCollectionsNSS(StringData dbName) {

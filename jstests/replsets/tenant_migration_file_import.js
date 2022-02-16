@@ -1,6 +1,5 @@
 /**
- * Test the shard merge rollback-to-stable algorithm. This test was written before we implemented
- * file copy, so the script opens a backup cursor and copies files itself.
+ * Test the shard merge rollback-to-stable algorithm.
  *
  * @tags: [
  *   does_not_support_encrypted_storage_engine,

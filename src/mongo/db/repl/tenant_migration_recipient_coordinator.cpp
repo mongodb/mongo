@@ -31,7 +31,6 @@
 
 #include "tenant_migration_recipient_coordinator.h"
 
-#include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logv2/log.h"
 
@@ -51,8 +50,8 @@ TenantMigrationRecipientCoordinator* TenantMigrationRecipientCoordinator::get(
     return get(operationContext->getServiceContext());
 }
 
-SharedSemiFuture<void> TenantMigrationRecipientCoordinator::step(UUID migrationId,
-                                                                 MigrationProgressStepEnum step) {
+SharedSemiFuture<void> TenantMigrationRecipientCoordinator::beginAwaitingVotesForStep(
+    UUID migrationId, MigrationProgressStepEnum step) {
     stdx::lock_guard lk(_mutex);
     tassert(6112806,
             str::stream() << "Current tenant migration step is '"
@@ -119,11 +118,12 @@ void TenantMigrationRecipientCoordinator::cancelStep(UUID migrationId,
     reset();
 }
 
-void TenantMigrationRecipientCoordinator::voteForStep(UUID migrationId,
-                                                      MigrationProgressStepEnum step,
-                                                      const HostAndPort& host,
-                                                      bool success,
-                                                      const boost::optional<StringData>& reason) {
+void TenantMigrationRecipientCoordinator::receivedVoteForStep(
+    UUID migrationId,
+    MigrationProgressStepEnum step,
+    const HostAndPort& host,
+    bool success,
+    const boost::optional<StringData>& reason) {
     stdx::lock_guard lk(_mutex);
     uassert(6112804,
             str::stream() << "Received vote for step '" << MigrationProgressStep_serializer(step)
@@ -136,21 +136,26 @@ void TenantMigrationRecipientCoordinator::voteForStep(UUID migrationId,
                             str::stream()
                                 << "Migration step '" << MigrationProgressStep_serializer(step)
                                 << "' failed on " << host << ", error: " << reason});
+        _reset(lk);
         return;
     }
 
-    _readyMembers.insert(host);
-    std::vector<HostAndPort> readyMembersVector(_readyMembers.begin(), _readyMembers.end());
-    CommitQuorumOptions allVotingMembers{CommitQuorumOptions::kVotingMembers};
-    auto ready = repl::ReplicationCoordinator::get(getGlobalServiceContext())
-                     ->isCommitQuorumSatisfied(allVotingMembers, readyMembersVector);
+    // Not reconfig-safe, we must not do a reconfig concurrent with a migration.
+    auto isReady = [&]() -> bool {
+        return static_cast<int>(_readyMembers.size()) ==
+            repl::ReplicationCoordinator::get(getGlobalServiceContext())
+                ->getConfig()
+                .getNumDataBearingMembers();
+    };
 
-    if (ready) {
-        LOGV2_DEBUG(6112809,
-                    2,
-                    "Completing migration step",
-                    "step"_attr = MigrationProgressStep_serializer(step),
-                    "currentStep"_attr = MigrationProgressStep_serializer(_currentStep));
+    auto readyBefore = isReady();
+    _readyMembers.insert(host);
+    auto readyAfter = isReady();
+
+    if (readyAfter && !readyBefore) {
+        LOGV2_INFO(6112809,
+                   "Completing migration step",
+                   "step"_attr = MigrationProgressStep_serializer(step));
         // Fulfill the promise.
         _promise->emplaceValue();
     }
@@ -158,6 +163,10 @@ void TenantMigrationRecipientCoordinator::voteForStep(UUID migrationId,
 
 void TenantMigrationRecipientCoordinator::reset() {
     stdx::lock_guard lk(_mutex);
+    _reset(lk);
+}
+
+void TenantMigrationRecipientCoordinator::_reset(WithLock lk) {
     _currentMigrationId.reset();
     _currentStep = MigrationProgressStepEnum::kNoStep;
     _readyMembers.clear();
