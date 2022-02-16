@@ -237,5 +237,19 @@ void updatePlanCache(
         }
     }
 }
+
+/**
+ * Caches the SBE plan 'root' along with its accompanying 'data' if the 'query' is of a type that
+ * can be cached. Otherwise, does nothing.
+ *
+ * The given plan will be "pinned" to the cache and will be not subject to replanning. One put into
+ * the cache, the plan immediately becomes "active".
+ */
+void updatePlanCache(OperationContext* opCtx,
+                     const CollectionPtr& collection,
+                     const CanonicalQuery& query,
+                     const QuerySolution& solution,
+                     const sbe::PlanStage& root,
+                     const stage_builder::PlanStageData& data);
 }  // namespace plan_cache_util
 }  // namespace mongo

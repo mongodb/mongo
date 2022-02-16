@@ -32,6 +32,7 @@
 
 #include "mongo/db/query/sbe_cached_solution_planner.h"
 
+#include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
@@ -159,8 +160,6 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::collectExecutionStatsForCached
     candidate.root->attachToTrialRunTracker(tracker.get());
     executeCandidateTrial(&candidate, maxNumResults);
 
-    candidate.data.debugInfo = std::move(_debugInfo);
-
     return candidate;
 }
 
@@ -202,13 +201,12 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
             5323800, "cached planner unexpectedly exited early during prepare phase", !exitedEarly);
 
         auto explainer = plan_explainer_factory::make(root.get(), &data, solutions[0].get());
-        LOGV2_DEBUG(
-            2058101,
-            1,
-            "Replanning of query resulted in a single query solution, which will not be cached. ",
-            "query"_attr = redact(_cq.toStringShort()),
-            "planSummary"_attr = explainer->getPlanSummary(),
-            "shouldCache"_attr = (shouldCache ? "yes" : "no"));
+        LOGV2_DEBUG(2058101,
+                    1,
+                    "Replanning of query resulted in a single query solution",
+                    "query"_attr = redact(_cq.toStringShort()),
+                    "planSummary"_attr = explainer->getPlanSummary(),
+                    "shouldCache"_attr = (shouldCache ? "yes" : "no"));
         return {makeVector<plan_ranker::CandidatePlan>(plan_ranker::CandidatePlan{
                     std::move(solutions[0]), std::move(root), std::move(data)}),
                 0};

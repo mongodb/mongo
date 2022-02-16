@@ -47,10 +47,14 @@ namespace sbe {
  */
 class PlanCacheKey {
 public:
-    PlanCacheKey(PlanCacheKeyInfo&& info, UUID collectionUuid, size_t collectionVersion)
+    PlanCacheKey(PlanCacheKeyInfo&& info,
+                 UUID collectionUuid,
+                 size_t collectionVersion,
+                 bool isShardedCollection)
         : _info{std::move(info)},
           _collectionUuid{collectionUuid},
-          _collectionVersion{collectionVersion} {}
+          _collectionVersion{collectionVersion},
+          _isShardedCollection{isShardedCollection} {}
 
     const UUID& getCollectionUuid() const {
         return _collectionUuid;
@@ -60,9 +64,14 @@ public:
         return _collectionVersion;
     }
 
+    bool isShardedCollection() const {
+        return _isShardedCollection;
+    }
+
     bool operator==(const PlanCacheKey& other) const {
-        return other._info == _info && other._collectionUuid == _collectionUuid &&
-            other._collectionVersion == _collectionVersion;
+        return other._collectionVersion == _collectionVersion &&
+            other._isShardedCollection == _isShardedCollection &&
+            other._collectionUuid == _collectionUuid && other._info == _info;
     }
 
     bool operator!=(const PlanCacheKey& other) const {
@@ -77,6 +86,7 @@ public:
         size_t hash = _info.planCacheKeyHash();
         boost::hash_combine(hash, UUID::Hash{}(_collectionUuid));
         boost::hash_combine(hash, _collectionVersion);
+        boost::hash_combine(hash, _isShardedCollection);
         return hash;
     }
 
@@ -88,6 +98,7 @@ private:
     const PlanCacheKeyInfo _info;
     const UUID _collectionUuid;
     const size_t _collectionVersion;
+    const bool _isShardedCollection;
 };
 
 class PlanCacheKeyHasher {

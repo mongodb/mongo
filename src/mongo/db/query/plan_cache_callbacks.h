@@ -123,11 +123,12 @@ public:
         const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
         size_t newWorks) const final {
         invariant(oldEntry);
+        invariant(oldEntry->works);
         auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
         log_detail::logReplaceActiveCacheEntry(_cq.toStringShort(),
                                                std::move(queryHash),
                                                std::move(planCacheKey),
-                                               oldEntry->works,
+                                               oldEntry->works.get(),
                                                newWorks);
     }
 
@@ -135,11 +136,12 @@ public:
                                 const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
                                 size_t newWorks) const final {
         invariant(oldEntry);
+        invariant(oldEntry->works);
         auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
         log_detail::logNoop(_cq.toStringShort(),
                             std::move(queryHash),
                             std::move(planCacheKey),
-                            oldEntry->works,
+                            oldEntry->works.get(),
                             newWorks);
     }
 
@@ -147,11 +149,12 @@ public:
                                const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
                                size_t newWorks) const final {
         invariant(oldEntry);
+        invariant(oldEntry->works);
         auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
         log_detail::logIncreasingWorkValue(_cq.toStringShort(),
                                            std::move(queryHash),
                                            std::move(planCacheKey),
-                                           oldEntry->works,
+                                           oldEntry->works.get(),
                                            newWorks);
     }
 
@@ -159,11 +162,12 @@ public:
                              const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
                              size_t newWorks) const final {
         invariant(oldEntry);
+        invariant(oldEntry->works);
         auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
         log_detail::logPromoteCacheEntry(_cq.toStringShort(),
                                          std::move(queryHash),
                                          std::move(planCacheKey),
-                                         oldEntry->works,
+                                         oldEntry->works.get(),
                                          newWorks);
     }
 

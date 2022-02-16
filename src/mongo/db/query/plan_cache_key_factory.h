@@ -69,6 +69,9 @@ sbe::PlanCacheKey make(const CanonicalQuery& query,
 namespace plan_cache_key_factory {
 /**
  * A factory helper to make a plan cache key of the given type.
+ *
+ * Note: when requesting an SBE plan cache key, callers must have already established the shard
+ * version on the collection (if this is a sharded cluster).
  */
 template <typename Key>
 Key make(const CanonicalQuery& query, const CollectionPtr& collection) {

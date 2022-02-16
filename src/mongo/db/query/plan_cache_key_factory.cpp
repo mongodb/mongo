@@ -99,7 +99,10 @@ sbe::PlanCacheKey make(const CanonicalQuery& query,
                        PlanCacheKeyTag<sbe::PlanCacheKey>) {
     auto collectionVersion = CollectionQueryInfo::get(collection).getPlanCacheInvalidatorVersion();
 
-    return {makePlanCacheKeyInfo(query, collection), collection->uuid(), collectionVersion};
+    return {makePlanCacheKeyInfo(query, collection),
+            collection->uuid(),
+            collectionVersion,
+            collection.isSharded()};
 }
 }  // namespace plan_cache_detail
 }  // namespace mongo

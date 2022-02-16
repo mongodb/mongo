@@ -46,6 +46,7 @@
 #include "mongo/db/exec/eof.h"
 #include "mongo/db/exec/idhack.h"
 #include "mongo/db/exec/multi_plan.h"
+#include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/projection.h"
 #include "mongo/db/exec/projection_executor_utils.h"
 #include "mongo/db/exec/record_store_fast_count.h"
@@ -455,6 +456,10 @@ void prepareExecutionTree(OperationContext* opCtx,
     //
     // TODO SERVER-61422: Populate the "shardFilterer" when preparing SBE plan.
     if (auto shardFiltererSlot = stageData->env->getSlotIfExists("shardFilterer"_sd)) {
+        tassert(6108307,
+                "Setting shard filterer slot on un-sharded collection",
+                collection.isSharded());
+
         auto shardFiltererFactory = std::make_unique<ShardFiltererFactoryImpl>(collection);
         auto shardFilterer = shardFiltererFactory->makeShardFilterer(opCtx);
         stageData->env->resetSlot(*shardFiltererSlot,
@@ -530,12 +535,7 @@ public:
         _solutions.push_back(std::move(solution));
     }
 
-    void emplace(std::unique_ptr<plan_cache_debug_info::DebugInfoSBE> debugInfo,
-                 std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root) {
-        tassert(5968202,
-                "debugInfo should not be null and _debugInfo should",
-                debugInfo && !_debugInfo);
-        _debugInfo = std::move(debugInfo);
+    void emplace(std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root) {
         _roots.push_back(std::move(root));
         // Make sure we store an empty QuerySolution instead of a nullptr or nothing.
         _solutions.push_back(std::make_unique<QuerySolution>());
@@ -551,11 +551,8 @@ public:
         return explainer->getPlanSummary();
     }
 
-    std::tuple<PlanStageVector,
-               QuerySolutionVector,
-               std::unique_ptr<plan_cache_debug_info::DebugInfoSBE>>
-    extractResultData() {
-        return std::make_tuple(std::move(_roots), std::move(_solutions), std::move(_debugInfo));
+    std::pair<PlanStageVector, QuerySolutionVector> extractResultData() {
+        return std::make_pair(std::move(_roots), std::move(_solutions));
     }
 
     boost::optional<size_t> decisionWorks() const {
@@ -570,8 +567,16 @@ public:
         _needSubplanning = needsSubplanning;
     }
 
-    void setDecisionWorks(size_t decisionWorks) {
+    void setDecisionWorks(boost::optional<size_t> decisionWorks) {
         _decisionWorks = decisionWorks;
+    }
+
+    bool recoveredPinnedCacheEntry() const {
+        return _recoveredPinnedCacheEntry;
+    }
+
+    void setRecoveredPinnedCacheEntry(bool pinnedEntry) {
+        _recoveredPinnedCacheEntry = pinnedEntry;
     }
 
 private:
@@ -579,7 +584,7 @@ private:
     PlanStageVector _roots;
     boost::optional<size_t> _decisionWorks;
     bool _needSubplanning{false};
-    std::unique_ptr<plan_cache_debug_info::DebugInfoSBE> _debugInfo;
+    bool _recoveredPinnedCacheEntry{false};
 };
 
 /**
@@ -670,7 +675,7 @@ public:
             opDebug.queryHash = planCacheKey.queryHash();
         }
 
-        // Check that the query should be cached.
+        // Try recovering a plan from the cache.
         if (shouldCacheQuery(*_cq)) {
             auto result = buildCachedPlan(plannerParams, planCacheKey);
             if (result) {
@@ -724,7 +729,7 @@ public:
 
             LOGV2_DEBUG(20926,
                         2,
-                        "Only one plan is available; it will be run but will not be cached",
+                        "Only one plan is available",
                         "query"_attr = redact(_cq->toStringShort()),
                         "planSummary"_attr = result->getPlanSummary());
 
@@ -912,12 +917,13 @@ protected:
                 //
                 // 'decisionWorks' is used to determine whether the existing cache entry should
                 // be evicted, and the query replanned.
+                tassert(6108303, "Cached entry has no decisionWorks", cs->decisionWorks);
                 result->emplace(std::make_unique<CachedPlanStage>(_cq->getExpCtxRaw(),
                                                                   _collection,
                                                                   _ws,
                                                                   _cq,
                                                                   plannerParams,
-                                                                  cs->decisionWorks,
+                                                                  cs->decisionWorks.get(),
                                                                   std::move(root)),
                                 std::move(querySolution));
                 return result;
@@ -1063,9 +1069,12 @@ protected:
 
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildCachedPlan(
         const QueryPlannerParams& plannerParams, const sbe::PlanCacheKey& planCacheKey) final {
-        if (!feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+        if (!feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() ||
+            !_cq->pipeline().empty()) {
             // If the feature flag is off we fall back to use the classic plan cache just as what we
             // do in caching SBE plans.
+            // TODO SERVER-61507: remove _cq->pipeline().empty() check when $group pushdown is
+            // integrated with SBE plan cache.
             return buildCachedPlanFromClassicCache(plannerParams);
         }
 
@@ -1083,6 +1092,7 @@ protected:
         auto&& cachedPlan = std::move(cacheEntry->cachedPlan);
         auto root = std::move(cachedPlan->root);
         auto stageData = std::move(cachedPlan->planStageData);
+        stageData.debugInfo = std::move(cacheEntry->debugInfo);
 
         root->attachToOperationContext(_opCtx);
         root->attachNewYieldPolicy(_yieldPolicy);
@@ -1102,8 +1112,8 @@ protected:
 
         auto result = makeResult();
         result->setDecisionWorks(cacheEntry->decisionWorks);
-        result->emplace(std::move(cacheEntry->debugInfo),
-                        std::make_pair(std::move(root), std::move(stageData)));
+        result->setRecoveredPinnedCacheEntry(cacheEntry->isPinned());
+        result->emplace(std::make_pair(std::move(root), std::move(stageData)));
 
         return result;
     }
@@ -1218,9 +1228,7 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     boost::optional<size_t> decisionWorks,
     bool needsSubplanning,
     PlanYieldPolicySBE* yieldPolicy,
-    size_t plannerOptions,
-    std::unique_ptr<plan_cache_debug_info::DebugInfoSBE> debugInfo) {
-
+    size_t plannerOptions) {
     // If we have multiple solutions, we always need to do the runtime planning.
     if (numSolutions > 1) {
         invariant(!needsSubplanning && !decisionWorks);
@@ -1260,14 +1268,8 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
         QueryPlannerParams plannerParams;
         plannerParams.options = plannerOptions;
         fillOutPlannerParams(opCtx, collections, canonicalQuery, &plannerParams);
-
-        return std::make_unique<sbe::CachedSolutionPlanner>(opCtx,
-                                                            collections,
-                                                            *canonicalQuery,
-                                                            plannerParams,
-                                                            *decisionWorks,
-                                                            yieldPolicy,
-                                                            std::move(debugInfo));
+        return std::make_unique<sbe::CachedSolutionPlanner>(
+            opCtx, collections, *canonicalQuery, plannerParams, *decisionWorks, yieldPolicy);
     }
 
     // Runtime planning is not required.
@@ -1319,8 +1321,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     }
 
     auto&& planningResult = planningResultWithStatus.getValue();
-    auto&& [roots, solutions, debugInfo] = planningResult->extractResultData();
-
+    auto&& [roots, solutions] = planningResult->extractResultData();
     // In some circumstances (e.g. when have multiple candidate plans or using a cached one), we
     // might need to execute the plan(s) to pick the best one or to confirm the choice.
     if (auto planner = makeRuntimePlannerIfNeeded(opCtx,
@@ -1330,8 +1331,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                                   planningResult->decisionWorks(),
                                                   planningResult->needsSubplanning(),
                                                   yieldPolicy.get(),
-                                                  plannerOptions,
-                                                  std::move(debugInfo))) {
+                                                  plannerOptions)) {
         // Do the runtime planning and pick the best candidate plan.
         auto candidates = planner->plan(std::move(solutions), std::move(roots));
 
@@ -1343,7 +1343,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                            std::move(nss),
                                            std::move(yieldPolicy));
     }
-
+    // No need for runtime planning, just use the constructed plan stage tree.
     invariant(solutions.size() == 1);
     invariant(roots.size() == 1);
     if (!cq->pipeline().empty()) {
@@ -1353,6 +1353,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
             std::move(solutions[0]),
             fillOutSecondaryCollectionsInformation(opCtx, collections, cq.get()));
         roots[0] = helper.buildExecutableTree(*(solutions[0]));
+    }
+    if (!planningResult->recoveredPinnedCacheEntry()) {
+        auto&& [root, data] = roots[0];
+        plan_cache_util::updatePlanCache(
+            opCtx, collections.getMainCollection(), *cq, *solutions[0], *root, data);
     }
     return plan_executor_factory::make(opCtx,
                                        std::move(cq),

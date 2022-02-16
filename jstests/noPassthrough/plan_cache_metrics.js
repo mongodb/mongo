@@ -100,9 +100,6 @@ function verifyPlanCacheSizeDecrease(coll) {
 
 const originalPlanCacheSize = getPlanCacheSize();
 
-// Verify that the cache size is zero when the database is started.
-assert.eq(originalPlanCacheSize, 0);
-
 // Test plan cache size estimates using multiple collections.
 
 // Verify that the cache size increases when entires are added.

@@ -302,7 +302,7 @@ void appendBasicPlanCacheEntryInfoToBSON(const EntryType& entry, BSONObjBuilder*
     out->append("queryHash", zeroPaddedHex(entry.queryHash));
     out->append("planCacheKey", zeroPaddedHex(entry.planCacheKey));
     out->append("isActive", entry.isActive);
-    out->append("works", static_cast<long long>(entry.works));
+    out->append("works", static_cast<long long>(entry.works.value_or(0)));
     out->append("timeOfCreation", entry.timeOfCreation);
 }
 }  // namespace
@@ -472,7 +472,7 @@ void Explain::planCacheEntryToBSON(const sbe::PlanCacheEntry& entry, BSONObjBuil
     out->append("cachedPlan",
                 BSON("slots" << entry.cachedPlan->planStageData.debugString() << "stages"
                              << sbe::DebugPrinter().print(*entry.cachedPlan->root)));
-
+    out->append("isPinned", entry.isPinned());
     out->append("estimatedSizeBytes", static_cast<long long>(entry.estimatedEntrySizeBytes));
 }
 }  // namespace mongo

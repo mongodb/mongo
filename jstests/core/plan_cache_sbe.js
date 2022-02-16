@@ -22,14 +22,29 @@ load("jstests/libs/sbe_explain_helpers.js");  // For engineSpecificAssertion.
 
 const coll = db.plan_cache_sbe;
 coll.drop();
+const isSbePlanCacheEnabled = checkSBEEnabled(db, ["featureFlagSbePlanCache"]);
 
 assert.commandWorked(coll.insert({a: 1, b: 1}));
+
+// Check that a new entry is added to the plan cache even for single plans.
+if (isSbePlanCacheEnabled) {
+    assert.eq(1, coll.find({a: 1}).itcount());
+    // Validate sbe plan cache stats entry.
+    const allStats = coll.aggregate([{$planCacheStats: {}}]).toArray();
+    assert.eq(allStats.length, 1, allStats);
+    const stats = allStats[0];
+    assert(stats.hasOwnProperty("isPinned"), stats);
+    assert(stats.isPinned, stats);
+    assert(stats.hasOwnProperty("cachedPlan"), stats);
+    assert(stats.cachedPlan.hasOwnProperty("slots"), stats);
+    assert(stats.cachedPlan.hasOwnProperty("stages"), stats);
+    coll.getPlanCache().clear();
+}
 
 // We need two indexes so that the multi-planner is executed.
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
-// Run query.
 assert.eq(1, coll.find({a: 1}).itcount());
 
 // Validate plan cache stats entry.
@@ -38,7 +53,7 @@ assert.eq(allStats.length, 1, allStats);
 const stats = allStats[0];
 assert(stats.hasOwnProperty("cachedPlan"), stats);
 
-if (!checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+if (!isSbePlanCacheEnabled) {
     // TODO SERVER-61314: Please modify this branch when "featureFlagSbePlanCache" is removed.
     // Currently this branch will be taken if either 1) SBE is disabled, or 2) SBE is enabled but
     // the "featureFlagSbePlanCache" flag is disabled.

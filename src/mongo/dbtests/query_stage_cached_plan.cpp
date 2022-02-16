@@ -318,7 +318,8 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanAddsActiveCacheEntries) {
     // The works should be 1 for the entry since the query we ran should not have any results.
     auto entry = assertGet(cache->getEntry(planCacheKey));
     size_t works = 1U;
-    ASSERT_EQ(entry->works, works);
+    ASSERT_TRUE(entry->works);
+    ASSERT_EQ(entry->works.get(), works);
 
     const size_t kExpectedNumWorks = 10;
     for (int i = 0; i < std::ceil(std::log(kExpectedNumWorks) / std::log(2)); ++i) {
@@ -332,7 +333,8 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanAddsActiveCacheEntries) {
         ASSERT_EQ(cache->get(planCacheKey).state, PlanCache::CacheEntryState::kPresentInactive);
         // The works on the cache entry should have doubled.
         entry = assertGet(cache->getEntry(planCacheKey));
-        ASSERT_EQ(entry->works, works);
+        ASSERT_TRUE(entry->works);
+        ASSERT_EQ(entry->works.get(), works);
     }
 
     // Run another query which takes less time, and be sure an active entry is created.
@@ -344,7 +346,8 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanAddsActiveCacheEntries) {
     ASSERT_EQ(cache->get(planCacheKey).state, PlanCache::CacheEntryState::kPresentActive);
     entry = assertGet(cache->getEntry(planCacheKey));
     // This will query will match {a: 6} through {a:9} (4 works), plus one for EOF = 5 works.
-    ASSERT_EQ(entry->works, 5U);
+    ASSERT_TRUE(entry->works);
+    ASSERT_EQ(entry->works.get(), 5U);
 }
 
 
@@ -386,7 +389,8 @@ TEST_F(QueryStageCachedPlan, DeactivatesEntriesOnReplan) {
               PlanCache::CacheEntryState::kPresentActive);
     auto entry = assertGet(cache->getEntry(planCacheKey));
     size_t works = 1U;
-    ASSERT_EQ(entry->works, works);
+    ASSERT_TRUE(entry->works);
+    ASSERT_EQ(entry->works.get(), works);
 
     // Run another query which takes long enough to evict the active cache entry. The current
     // cache entry's works value is a very low number. When replanning is triggered, the cache
@@ -397,7 +401,9 @@ TEST_F(QueryStageCachedPlan, DeactivatesEntriesOnReplan) {
         canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 0}, b: {$gte:0}}"));
     forceReplanning(collection.getCollection(), highWorksCq.get());
     ASSERT_EQ(cache->get(planCacheKey).state, PlanCache::CacheEntryState::kPresentInactive);
-    ASSERT_EQ(assertGet(cache->getEntry(planCacheKey))->works, 2U);
+    entry = assertGet(cache->getEntry(planCacheKey));
+    ASSERT_TRUE(entry->works);
+    ASSERT_EQ(entry->works.get(), 2U);
 
     // Again, force replanning. This time run the initial query which finds no results. The multi
     // planner will choose a plan with works value lower than the existing inactive
@@ -405,7 +411,9 @@ TEST_F(QueryStageCachedPlan, DeactivatesEntriesOnReplan) {
     // inactive so this is a noop), then create a new entry with a works value of 1.
     forceReplanning(collection.getCollection(), noResultsCq.get());
     ASSERT_EQ(cache->get(planCacheKey).state, PlanCache::CacheEntryState::kPresentActive);
-    ASSERT_EQ(assertGet(cache->getEntry(planCacheKey))->works, 1U);
+    entry = assertGet(cache->getEntry(planCacheKey));
+    ASSERT_TRUE(entry->works);
+    ASSERT_EQ(entry->works.get(), 1U);
 }
 
 TEST_F(QueryStageCachedPlan, EntriesAreNotDeactivatedWhenInactiveEntriesDisabled) {

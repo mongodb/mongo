@@ -59,18 +59,36 @@ std::string getAuthenticatedUserNamesToken(Client* client) {
 JsFunction::JsFunction(OperationContext* opCtx,
                        const std::string& code,
                        const std::string& dbName) {
-    invariant(opCtx != nullptr);
-    uassert(
-        ErrorCodes::BadValue, "no globalScriptEngine in $where parsing", getGlobalScriptEngine());
+    _init(opCtx, code, dbName);
+}
 
-    uassert(ErrorCodes::BadValue, "ns for $where cannot be empty", dbName.size() != 0);
+JsFunction::JsFunction(const JsFunction& other) {
+    _init(Client::getCurrent()->getOperationContext(), other._code, other._dbName);
+}
+
+JsFunction& JsFunction::operator=(const JsFunction& other) {
+    if (this != &other) {
+        _init(Client::getCurrent()->getOperationContext(), other._code, other._dbName);
+    }
+    return *this;
+}
+
+void JsFunction::_init(OperationContext* opCtx,
+                       const std::string& code,
+                       const std::string& dbName) {
+    invariant(opCtx != nullptr);
+    uassert(6108304, "no globalScriptEngine in $where parsing", getGlobalScriptEngine());
+    uassert(6108305, "ns for $where cannot be empty", !dbName.empty());
+
+    _code = code;
+    _dbName = dbName;
 
     const auto userToken = getAuthenticatedUserNamesToken(opCtx->getClient());
-    _scope = getGlobalScriptEngine()->getPooledScope(opCtx, dbName, "where" + userToken);
+    _scope = getGlobalScriptEngine()->getPooledScope(opCtx, _dbName, "where" + userToken);
     const ScopeGuard guard([&] { _scope->unregisterOperation(); });
 
-    _func = _scope->createFunction(code.c_str());
-    uassert(ErrorCodes::BadValue, "$where compile error", _func);
+    _func = _scope->createFunction(_code.c_str());
+    uassert(6108306, "$where compile error", _func);
 }
 
 bool JsFunction::runAsPredicate(const BSONObj& obj) const {

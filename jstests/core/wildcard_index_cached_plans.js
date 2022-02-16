@@ -67,7 +67,7 @@ for (let i = 0; i < 2; i++) {
 }
 
 // The plan cache should no longer be empty. Check that the chosen plan uses the b.$** index.
-const cacheEntry = getCacheEntryForQuery(query);
+let cacheEntry = getCacheEntryForQuery(query);
 assert.neq(cacheEntry, null);
 assert.eq(cacheEntry.isActive, true);
 if (!checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
@@ -120,8 +120,16 @@ for (let i = 0; i < 2; i++) {
 assert.neq(getPlanCacheKeyFromShape({query: queryWithBNull, collection: coll, db: db}),
            getPlanCacheKeyFromShape({query: query, collection: coll, db: db}));
 
-// There should only have been one solution for the above query, so it would not get cached.
-assert.eq(getCacheEntryForQuery({a: 1, b: null}), null);
+// There should only have been one solution for the above query, so it would get cached only by the
+// SBE plan cache.
+cacheEntry = getCacheEntryForQuery({a: 1, b: null});
+if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    assert.neq(cacheEntry, null);
+    assert.eq(cacheEntry.isActive, true, cacheEntry);
+    assert.eq(cacheEntry.isPinned, true, cacheEntry);
+} else {
+    assert.eq(cacheEntry, null);
+}
 
 // Check that indexability discriminators work with collations.
 (function() {

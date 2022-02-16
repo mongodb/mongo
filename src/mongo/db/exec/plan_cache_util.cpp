@@ -70,6 +70,28 @@ void logNotCachingNoData(std::string&& solution) {
 }
 }  // namespace log_detail
 
+void updatePlanCache(OperationContext* opCtx,
+                     const CollectionPtr& collection,
+                     const CanonicalQuery& query,
+                     const QuerySolution& solution,
+                     const sbe::PlanStage& root,
+                     const stage_builder::PlanStageData& data) {
+    // TODO SERVER-61507: Integration between lowering parts of aggregation pipeline into the find
+    // subsystem and the new SBE cache isn't implemented yet. Remove cq->pipeline().empty() check
+    // once it's implemented.
+    if (shouldCacheQuery(query) && collection && query.pipeline().empty() &&
+        feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+        auto key = plan_cache_key_factory::make<sbe::PlanCacheKey>(query, collection);
+        auto plan = std::make_unique<sbe::CachedSbePlan>(root.clone(), data);
+        resetRuntimeEnvironmentBeforeCaching(&plan->planStageData);
+        sbe::getPlanCache(opCtx).setPinned(
+            std::move(key),
+            std::move(plan),
+            opCtx->getServiceContext()->getPreciseClockSource()->now(),
+            buildDebugInfo(&solution));
+    }
+}
+
 plan_cache_debug_info::DebugInfo buildDebugInfo(
     const CanonicalQuery& query, std::unique_ptr<const plan_ranker::PlanRankingDecision> decision) {
     // Strip projections on $-prefixed fields, as these are added by internal callers of the

@@ -64,13 +64,20 @@ public:
           debugInfo(entry.debugInfo ? std::make_unique<DebugInfoType>(*entry.debugInfo) : nullptr) {
     }
 
+    /**
+     * Indicates whether or not the cached plan is pinned to cache.
+     */
+    bool isPinned() const {
+        return !decisionWorks;
+    }
 
     // A cached plan that can be used to reconstitute the complete execution plan from cache.
     std::unique_ptr<CachedPlanType> cachedPlan;
 
     // The number of work cycles taken to decide on a winning plan when the plan was first
-    // cached.
-    const size_t decisionWorks;
+    // cached. The value of boost::none indicates that the plan is pinned to the cache and
+    // is not subject to replanning.
+    const boost::optional<size_t> decisionWorks;
 
     // Per-plan cache entry information that is used for debugging purpose.
     std::unique_ptr<DebugInfoType> debugInfo;
@@ -92,7 +99,6 @@ public:
                                          bool isActive,
                                          size_t works,
                                          DebugInfoType debugInfo) {
-
         // If the cumulative size of the plan caches is estimated to remain within a predefined
         // threshold, then then include additional debug info which is not strictly necessary for
         // the plan cache to be functional. Once the cumulative plan cache size exceeds this
@@ -121,8 +127,35 @@ public:
                                                 std::move(debugInfoOpt)));
     }
 
+    /**
+     * Create a cache entry without a plan ranking decision. Such entries contain plans for which
+     * there are no alternatives. As a result, these plans are pinned to the cache and are always
+     * active.
+     */
+    static std::unique_ptr<Entry> createPinned(std::unique_ptr<CachedPlanType> cachedPlan,
+                                               uint32_t queryHash,
+                                               uint32_t planCacheKey,
+                                               Date_t timeOfCreation,
+                                               DebugInfoType debugInfo) {
+        return std::unique_ptr<Entry>(new Entry(std::move(cachedPlan),
+                                                timeOfCreation,
+                                                queryHash,
+                                                planCacheKey,
+                                                true,         // isActive
+                                                boost::none,  // decisionWorks
+                                                std::move(debugInfo)));
+    }
+
     ~PlanCacheEntryBase() {
         planCacheTotalSizeEstimateBytes.decrement(estimatedEntrySizeBytes);
+    }
+
+    /**
+     * Indicates whether or not the cache entry is pinned to cache. Pinned entries are always active
+     * and are not subject to replanning.
+     */
+    bool isPinned() const {
+        return !works;
     }
 
     /**
@@ -175,7 +208,10 @@ public:
     // active. This value is also used to determine the number of works necessary in order to
     // trigger a replan. Running a query of the same shape while this cache entry is inactive may
     // cause this value to be increased.
-    size_t works = 0;
+    //
+    // If boost::none the cached entry is pinned to cached. Pinned entries are always active
+    // and are not subject to replanning.
+    boost::optional<size_t> works;
 
     // Optional debug info containing plan cache entry information that is used strictly as
     // debug information.
@@ -195,7 +231,7 @@ private:
                        uint32_t queryHash,
                        uint32_t planCacheKey,
                        bool isActive,
-                       size_t works,
+                       boost::optional<size_t> works,
                        boost::optional<DebugInfoType> debugInfo)
         : cachedPlan(std::move(cachedPlan)),
           timeOfCreation(timeOfCreation),
@@ -205,7 +241,8 @@ private:
           works(works),
           debugInfo(std::move(debugInfo)),
           estimatedEntrySizeBytes(_estimateObjectSizeInBytes()) {
-        invariant(this->cachedPlan);
+        tassert(6108300, "A plan cache entry should never be empty", this->cachedPlan);
+        tassert(6108301, "Pinned cache entry should always be active", !isPinned() || isActive);
         // Account for the object in the global metric for estimating the server's total plan cache
         // memory consumption.
         planCacheTotalSizeEstimateBytes.increment(estimatedEntrySizeBytes);
@@ -379,6 +416,23 @@ public:
 
         partition->add(key, newEntry.release());
         return Status::OK();
+    }
+
+    /**
+     * Adds a 'cachedPlan', resulting from a single QuerySolution, into the cache. A new cache entry
+     * is always created and always active in this scenario.
+     */
+    void setPinned(const KeyType& key,
+                   std::unique_ptr<CachedPlanType> plan,
+                   Date_t now,
+                   DebugInfoType debugInfo) {
+        invariant(plan);
+        auto entry = Entry::createPinned(
+            std::move(plan), key.queryHash(), key.planCacheKeyHash(), now, std::move(debugInfo));
+        auto partition = _partitionedCache->lockOnePartition(key);
+        // We're not interested in the number of evicted entries if the cache store exceeds the
+        // budget after add(), so we just ignore the return value.
+        partition->add(key, entry.release());
     }
 
     /**
@@ -588,7 +642,12 @@ private:
             return res;
         }
 
-        if (oldEntry->isActive && newWorks <= oldEntry->works) {
+        tassert(6108302,
+                "Works value is not present in the old cache entry (is it a pinned entry?)",
+                oldEntry->works);
+        auto oldWorks = oldEntry->works.get();
+
+        if (oldEntry->isActive && newWorks <= oldWorks) {
             // The new plan did better than the currently stored active plan. This case may
             // occur if many MultiPlanners are run simultaneously.
             if (callbacks) {
@@ -603,7 +662,7 @@ private:
             // There is already an active cache entry with a lower works value.
             // We do nothing.
             res.shouldBeCreated = false;
-        } else if (newWorks > oldEntry->works) {
+        } else if (newWorks > oldWorks) {
             // This plan performed worse than expected. Rather than immediately overwriting the
             // cache, lower the bar to what is considered good performance and keep the entry
             // inactive.
@@ -612,8 +671,8 @@ private:
             // value and 'internalQueryCacheWorksGrowthCoefficient' are low enough that
             // the old works * new works cast to size_t is the same as the previous value of
             // 'works'.
-            const double increasedWorks = std::max(
-                oldEntry->works + 1u, static_cast<size_t>(oldEntry->works * growthCoefficient));
+            const double increasedWorks =
+                std::max(oldWorks + 1u, static_cast<size_t>(oldWorks * growthCoefficient));
 
             if (callbacks) {
                 callbacks->onIncreasingWorkValue(key, oldEntry, increasedWorks);

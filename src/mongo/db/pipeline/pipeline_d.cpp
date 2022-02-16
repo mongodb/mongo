@@ -213,10 +213,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         findCommand->setLimit(static_cast<std::int64_t>(*limit));
     }
 
-    bool isExplain = false;
+    const bool isExplain = static_cast<bool>(expCtx->explain);
     if (aggRequest) {
+        findCommand->setAllowDiskUse(aggRequest->getAllowDiskUse());
         findCommand->setHint(aggRequest->getHint().value_or(BSONObj()).getOwned());
-        isExplain = static_cast<bool>(aggRequest->getExplain());
         // TODO SERVER-62100: No need to populate the "let" object to FindCommand for encoding.
         if (auto let = aggRequest->getLet()) {
             findCommand->setLet(let);
