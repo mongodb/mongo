@@ -71,7 +71,7 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
         self.logger.info("Ran %d tests in total.", self._test_num)
         # Perform the following actions only if some tests have been run.
         if self._test_num % self._tests_per_cycle > self._replicator_start_delay:
-            self._run_replicator_action(test_report, self._replicator.stop)
+            self._run_replicator_action(test_report, self._replicator.commit)
 
             self._run_data_consistency_check(self._last_test, test_report)
             self._run_check_repl_db_hash(self._last_test, test_report)
@@ -92,7 +92,7 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
             if self._tests_per_cycle == self._replicator_start_delay:
                 self._run_replicator_action(test_report, self._replicator.start)
 
-            self._run_replicator_action(test_report, self._replicator.stop)
+            self._run_replicator_action(test_report, self._replicator.commit)
 
             self._run_data_consistency_check(test, test_report)
             self._run_check_repl_db_hash(test, test_report)

@@ -9,6 +9,7 @@ from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing import testcases
 from buildscripts.resmokelib.testing.fixtures.interface import create_fixture_table
 from buildscripts.resmokelib.testing.hooks import stepdown
+from buildscripts.resmokelib.testing.hooks import cluster_to_cluster_kill_replicator
 from buildscripts.resmokelib.testing.testcases import fixture as _fixture
 from buildscripts.resmokelib.utils import queue as _queue
 
@@ -29,12 +30,14 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
         self.suite_options = suite_options
         self.manager = FixtureTestCaseManager(test_queue_logger, self.fixture, job_num, self.report)
 
-        # Don't check fixture.is_running() when using the ContinuousStepdown hook, which kills
-        # and restarts the primary. Even if the fixture is still running as expected, there is a
-        # race where fixture.is_running() could fail if called after the primary was killed but
-        # before it was restarted.
+        # Don't check fixture.is_running() when using hooks that kill and restart fixtures, such
+        # as ContinuousStepdown or KillReplicator. Even if the fixture is still running as
+        # expected, there is a race where fixture.is_running() could fail if called after the
+        # primary was killed but before it was restarted.
         self._check_if_fixture_running = not any(
-            isinstance(hook, stepdown.ContinuousStepdown) for hook in self.hooks)
+            isinstance(hook, (stepdown.ContinuousStepdown,
+                              cluster_to_cluster_kill_replicator.KillReplicator))
+            for hook in self.hooks)
 
     @property
     def job_num(self):

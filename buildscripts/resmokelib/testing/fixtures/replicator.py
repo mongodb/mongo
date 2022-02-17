@@ -27,7 +27,7 @@ class ReplicatorFixture(interface.Fixture):
         self.replicator = None
 
     def setup(self):
-        """Since launching the binary starts the replication, we do nothing here."""
+        """Launch the replicator webserver to begin accepting replicator commands."""
         self._launch_replicator_process()
 
     def pids(self):
@@ -83,12 +83,14 @@ class ReplicatorFixture(interface.Fixture):
             self.logger.exception(msg)
             raise self.fixturelib.ServerFailure(msg)
 
-    def stop(self, mode=None):
-        """Stop the replicator binary."""
+    def commit(self):
+        """Commit the migration. This currently will just sleep for a quiesce period."""
         self.logger.info("Sleeping for %d s to allow replicator to finish up.", self.quiesce_period)
         time.sleep(self.quiesce_period)
         self.logger.info("Done sleeping through quiesce period.")
 
+    def stop(self, mode=None):
+        """Stop the replicator binary."""
         mode = interface.TeardownMode.TERMINATE if mode is None else mode
 
         self.logger.info("Stopping replicator with pid %d...", self.replicator.pid)
