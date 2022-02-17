@@ -2653,24 +2653,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(outStage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildLookup(
-    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
-    const auto lookupStage = static_cast<const EqLookupNode*>(root);
-    switch (lookupStage->lookupStrategy) {
-        case EqLookupNode::LookupStrategy::kHashJoin:
-            uasserted(5842602, "$lookup planning logic picked hash join");
-            break;
-        case EqLookupNode::LookupStrategy::kIndexedLoopJoin:
-            uasserted(5842603, "$lookup planning logic picked indexed loop join");
-            break;
-        case EqLookupNode::LookupStrategy::kNestedLoopJoin:
-            uasserted(5842604, "$lookup planning logic picked nested loop join");
-            break;
-        default:
-            MONGO_UNREACHABLE_TASSERT(5842605);
-    }
-    MONGO_UNREACHABLE_TASSERT(5842606);
-}
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
 SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* root,
                                                     const PlanStageReqs& reqs) {

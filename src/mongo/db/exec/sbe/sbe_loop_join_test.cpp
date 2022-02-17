@@ -72,6 +72,7 @@ TEST_F(LoopJoinStageTest, LoopJoinNoPredicate) {
         auto [innerTag, innerVal] = inner->copyOrMoveValue();
         assertValuesEqual(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i].second);
     }
+    ASSERT_EQ(i, expected.size());
 }
 
 TEST_F(LoopJoinStageTest, LoopJoinConstTruePredicate) {
@@ -107,6 +108,7 @@ TEST_F(LoopJoinStageTest, LoopJoinConstTruePredicate) {
         auto [innerTag, innerVal] = inner->copyOrMoveValue();
         assertValuesEqual(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i].second);
     }
+    ASSERT_EQ(i, expected.size());
 }
 
 TEST_F(LoopJoinStageTest, LoopJoinConstFalsePredicate) {
@@ -162,5 +164,6 @@ TEST_F(LoopJoinStageTest, LoopJoinEqualityPredicate) {
         auto [innerTag, innerVal] = inner->copyOrMoveValue();
         assertValuesEqual(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i]);
     }
+    ASSERT_EQ(i, expected.size());
 }
 }  // namespace mongo::sbe

@@ -274,4 +274,81 @@ runTest({
     foreignField: "b",
     idsExpectedToMatch: [0]
 });
+
+runTest({
+    testDescription: "Path with arrays in local can match to empty array",
+    localData: [
+        {_id: 0, a: [{x: [[]]}]},
+
+        // Don't expect to match.
+        {_id: 10, a: [{y: 1}, {y: 2}]},
+        {_id: 11, a: [[]]},
+        {_id: 12, a: [{x: []}]},
+        {_id: 13, a: []},
+    ],
+    localField: "a.x",
+    foreignRecord: {_id: 0, b: []},
+    foreignField: "b",
+    idsExpectedToMatch: [0]
+});
+
+runTest({
+    testDescription: "Path with arrays in local can match to null",
+    localData: [
+        {_id: 0, a: [{y: 1}, {y: 2}]},
+        {_id: 1, a: [{x: []}]},
+        {_id: 2, a: []},
+        {_id: 3, a: [[]]},
+        {_id: 4, a: {x: []}},
+        {_id: 5, x: [1, 2]},
+
+        // Don't expect to match.
+        {_id: 10, a: [{x: 1}, {y: 2}]},
+        {_id: 11, a: [{x: []}, {x: 1}]},
+        {_id: 12, a: [{x: [[]]}]},
+    ],
+    localField: "a.x",
+    foreignRecord: {_id: 0, b: null},
+    foreignField: "b",
+    idsExpectedToMatch: [0, 1, 2, 3, 4, 5]
+});
+
+runTest({
+    testDescription: "Paths with numbers in local match to scalar",
+    localData: [
+        {_id: 0, a: [{x: 1}, {x: 2}]},
+        {_id: 1, a: [{x: [2, 3, 1]}]},
+
+        // Don't expect to match.
+        {_id: 10, a: [{x: 2}, {x: 1}]},
+        {_id: 11, a: [{x: [2, 3]}]},
+        {_id: 12, a: {x: 1}},
+        {_id: 13, a: {x: [1, 2]}},
+        {_id: 14, a: [{y: 1}, {x: 1}]},
+    ],
+    localField: "a.0.x",
+    foreignRecord: {_id: 0, b: 1},
+    foreignField: "b",
+    idsExpectedToMatch: [0, 1]
+});
+
+runTest({
+    testDescription: "Paths with numbers in local can match to null",
+    localData: [
+        {_id: 0, a: {x: 1}},
+        {_id: 1, a: {x: [1, 2]}},
+        {_id: 2, a: [{y: 1}, {x: 1}]},
+        {_id: 3, a: []},
+        {_id: 4, a: [[]]},
+        {_id: 5, x: [1, 2]},
+
+        // Don't expect to match.
+        {_id: 10, a: [{x: 1}, {x: 2}]},
+        {_id: 11, a: [{x: [1, 2]}]},
+    ],
+    localField: "a.0.x",
+    foreignRecord: {_id: 0, b: null},
+    foreignField: "b",
+    idsExpectedToMatch: [0, 1, 2, 3, 4, 5]
+});
 }());
