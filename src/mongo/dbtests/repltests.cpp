@@ -272,7 +272,13 @@ protected:
                 coll = db->createCollection(&_opCtx, nss);
             }
 
+            auto lastApplied = repl::ReplicationCoordinator::get(_opCtx.getServiceContext())
+                                   ->getMyLastAppliedOpTime()
+                                   .getTimestamp();
+            auto nextTimestamp = std::max(lastApplied + 1, Timestamp(1, 1));
+
             repl::UnreplicatedWritesBlock uwb(&_opCtx);
+            ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(nextTimestamp));
             ASSERT_OK(coll->truncate(&_opCtx));
             wunit.commit();
         });

@@ -172,9 +172,13 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(
     }
 
     // TODO (SERVER-60753): Remove special handling for index build.
-    if (TestingProctor::instance().isEnabled() &&
-        collectionNamespace.ns() != "config.system.indexBuilds") {
-        ss << "write_timestamp_usage=ordered,";
+    if (TestingProctor::instance().isEnabled()) {
+        if (  // TODO (SERVER-60753): Remove special handling for index build during recovery.
+            collectionNamespace.ns() == "config.system.indexBuilds") {
+            ss << "write_timestamp_usage=mixed_mode,";
+        } else {
+            ss << "write_timestamp_usage=ordered,";
+        }
         ss << "assert=(write_timestamp=on),";
         ss << "verbose=[write_timestamp],";
     }

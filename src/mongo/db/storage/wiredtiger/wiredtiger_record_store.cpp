@@ -790,17 +790,27 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     // for workloads where updates increase the size of documents.
     ss << "split_pct=90,";
     ss << "leaf_value_max=64MB,";
-    if (TestingProctor::instance().isEnabled() &&
-        // TODO (SERVER-60719): Remove special handling for index build side tables.
-        !ident.startsWith("internal-") &&
-        // TODO (SERVER-60754): Remove special handling for setting multikey.
-        !ident.startsWith("_mdb_catalog") &&
-        // TODO (SERVER-60753): Remove special handling for index build during recovery.
-        ns != "config.system.indexBuilds") {
-        ss << "write_timestamp_usage=ordered,";
+    if (TestingProctor::instance().isEnabled()) {
+        if (NamespaceString(ns).isOplog() ||
+            // TODO (SERVER-60754): Remove special handling for setting multikey.
+            ident.startsWith("_mdb_catalog")) {
+
+            // For the above clauses we do not assert any particular `write_timestamp_usage`. In
+            // particular for the oplog, WT removes all timestamp information. There's nothing in
+            // MDB's control to assert against.
+        } else if (
+            // Side table drains are not timestamped.
+            ident.startsWith("internal-") ||
+            // TODO (SERVER-60753): Remove special handling for index build during recovery.
+            ns == NamespaceString::kIndexBuildEntryNamespace.ns()) {
+            ss << "write_timestamp_usage=mixed_mode,";
+        } else {
+            ss << "write_timestamp_usage=ordered,";
+        }
         ss << "assert=(write_timestamp=on),";
         ss << "verbose=[write_timestamp],";
     }
+
     ss << "checksum=on,";
     if (wiredTigerGlobalOptions.useCollectionPrefixCompression) {
         ss << "prefix_compression,";

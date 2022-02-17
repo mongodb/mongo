@@ -102,8 +102,8 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit() {
     WiredTigerRecoveryUnit* ru = dynamic_cast<WiredTigerRecoveryUnit*>(_engine.newRecoveryUnit());
     OperationContextNoop opCtx(ru);
-    std::string ident = "a.b";
-    std::string uri = WiredTigerKVEngine::kTableUriPrefix + "a.b";
+    std::string ident = NamespaceString::kRsOplogNamespace.ns();
+    std::string uri = WiredTigerKVEngine::kTableUriPrefix + ident;
 
     CollectionOptions options;
     options.capped = true;
