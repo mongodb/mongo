@@ -101,7 +101,7 @@ public:
     const NodeToGroupPropsMap& getNodeToGroupPropsMap() const;
     NodeToGroupPropsMap& getNodeToGroupPropsMap();
 
-    const opt::unordered_map<std::string, ProjectionName>& getRIDProjections() const;
+    const RIDProjectionsMap& getRIDProjections() const;
 
 private:
     bool hasPhase(OptPhase phase) const;
@@ -172,7 +172,7 @@ private:
     /**
      * RID projection names we have generated for each scanDef. Used for physical rewriting.
      */
-    opt::unordered_map<std::string, ProjectionName> _ridProjections;
+    RIDProjectionsMap _ridProjections;
 
     // We don't own this.
     PrefixId& _prefixId;

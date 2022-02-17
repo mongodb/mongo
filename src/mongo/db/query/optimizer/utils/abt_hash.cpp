@@ -444,7 +444,6 @@ public:
     size_t operator()(const properties::PhysProperty&,
                       const properties::IndexingRequirement& prop) {
         return computeHashSeq<5>(std::hash<IndexReqTarget>()(prop.getIndexReqTarget()),
-                                 std::hash<bool>()(prop.getNeedsRID()),
                                  std::hash<bool>()(prop.getDedupRID()));
     }
 

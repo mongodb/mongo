@@ -173,14 +173,12 @@ void DistributionRequirement::setDisableExchanges(const bool disableExchanges) {
 }
 
 IndexingRequirement::IndexingRequirement()
-    : IndexingRequirement(IndexReqTarget::Complete, "", true /*dedupRID*/, {}) {}
+    : IndexingRequirement(IndexReqTarget::Complete, true /*dedupRID*/, {}) {}
 
 IndexingRequirement::IndexingRequirement(IndexReqTarget indexReqTarget,
-                                         bool needsRID,
                                          bool dedupRID,
                                          GroupIdType satisfiedPartialIndexesGroupId)
     : _indexReqTarget(indexReqTarget),
-      _needsRID(needsRID),
       _dedupRID(dedupRID),
       _satisfiedPartialIndexesGroupId(std::move(satisfiedPartialIndexesGroupId)) {
     uassert(6624097,
@@ -189,8 +187,7 @@ IndexingRequirement::IndexingRequirement(IndexReqTarget indexReqTarget,
 }
 
 bool IndexingRequirement::operator==(const IndexingRequirement& other) const {
-    return _indexReqTarget == other._indexReqTarget && _needsRID == other._needsRID &&
-        _dedupRID == other._dedupRID &&
+    return _indexReqTarget == other._indexReqTarget && _dedupRID == other._dedupRID &&
         _satisfiedPartialIndexesGroupId == other._satisfiedPartialIndexesGroupId;
 }
 
@@ -201,10 +198,6 @@ ProjectionNameSet IndexingRequirement::getAffectedProjectionNames() const {
 
 IndexReqTarget IndexingRequirement::getIndexReqTarget() const {
     return _indexReqTarget;
-}
-
-bool IndexingRequirement::getNeedsRID() const {
-    return _needsRID;
 }
 
 bool IndexingRequirement::getDedupRID() const {

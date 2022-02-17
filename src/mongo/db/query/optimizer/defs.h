@@ -51,6 +51,9 @@ using ProjectionNameOrderedSet = std::set<ProjectionName>;
 using ProjectionNameVector = std::vector<ProjectionName>;
 using ProjectionRenames = opt::unordered_map<ProjectionName, ProjectionName>;
 
+// Map from scanDefName to rid projection name.
+using RIDProjectionsMap = opt::unordered_map<std::string, ProjectionName>;
+
 class ProjectionNameOrderPreservingSet {
 public:
     ProjectionNameOrderPreservingSet() = default;

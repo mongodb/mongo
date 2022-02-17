@@ -184,10 +184,13 @@ bool OptPhaseManager::runMemoPhysicalRewrite(const OptPhase phase,
             return false;
         }
 
-        setProperty(
-            physProps,
-            IndexingRequirement(
-                IndexReqTarget::Complete, true /*needRID*/, true /*dedupRID*/, rootGroupId));
+        const auto& scanDefName =
+            getPropertyConst<IndexingAvailability>(rootLogicalProps).getScanDefName();
+        const auto& ridProjName = _ridProjections.at(scanDefName);
+        setProperty(physProps, ProjectionRequirement{ProjectionNameVector{ridProjName}});
+
+        setProperty(physProps,
+                    IndexingRequirement(IndexReqTarget::Complete, true /*dedupRID*/, rootGroupId));
     }
 
     PhysicalRewriter rewriter(_memo, _hints, _ridProjections, *_costDerivation, logicalRewriter);
@@ -325,7 +328,7 @@ NodeToGroupPropsMap& OptPhaseManager::getNodeToGroupPropsMap() {
     return _nodeToGroupPropsMap;
 }
 
-const opt::unordered_map<std::string, ProjectionName>& OptPhaseManager::getRIDProjections() const {
+const RIDProjectionsMap& OptPhaseManager::getRIDProjections() const {
     return _ridProjections;
 }
 

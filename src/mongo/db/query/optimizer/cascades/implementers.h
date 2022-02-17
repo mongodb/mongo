@@ -41,7 +41,7 @@ namespace mongo::optimizer::cascades {
  */
 void addImplementers(const Memo& memo,
                      const QueryHints& hints,
-                     const opt::unordered_map<std::string, ProjectionName>& ridProjections,
+                     const RIDProjectionsMap& ridProjections,
                      PrefixId& prefixId,
                      PhysOptimizationResult& bestResult,
                      const properties::LogicalProps& logicalProps,

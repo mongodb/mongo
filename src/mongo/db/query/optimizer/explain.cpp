@@ -1753,7 +1753,6 @@ public:
 
             printer.fieldName("target", ExplainVersion::V3)
                 .print(IndexReqTargetEnum::toString[static_cast<int>(prop.getIndexReqTarget())]);
-            printBooleanFlag(printer, "needsRID", prop.getNeedsRID());
             printBooleanFlag(printer, "dedupRID", prop.getDedupRID());
 
             // TODO: consider printing satisfied partial indexes.

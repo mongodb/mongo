@@ -54,7 +54,7 @@ public:
 
     PhysicalRewriter(Memo& memo,
                      const QueryHints& hints,
-                     const opt::unordered_map<std::string, ProjectionName>& ridProjections,
+                     const RIDProjectionsMap& ridProjections,
                      const CostingInterface& costDerivation,
                      std::unique_ptr<LogicalRewriter>& logicalRewriter);
 
@@ -85,7 +85,7 @@ private:
     Memo& _memo;
     const CostingInterface& _costDerivation;
     const QueryHints& _hints;
-    const opt::unordered_map<std::string, ProjectionName>& _ridProjections;
+    const RIDProjectionsMap& _ridProjections;
     // If set, we'll perform logical rewrites as part of OptimizeGroup().
     std::unique_ptr<LogicalRewriter>& _logicalRewriter;
 };

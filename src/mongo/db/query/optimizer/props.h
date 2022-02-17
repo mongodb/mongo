@@ -285,7 +285,6 @@ class IndexingRequirement final : public PhysPropertyTag {
 public:
     IndexingRequirement();
     IndexingRequirement(IndexReqTarget indexReqTarget,
-                        bool needsRID,
                         bool dedupRIDs,
                         GroupIdType satisfiedPartialIndexesGroupId);
 
@@ -294,7 +293,6 @@ public:
     ProjectionNameSet getAffectedProjectionNames() const;
 
     IndexReqTarget getIndexReqTarget() const;
-    bool getNeedsRID() const;
 
     bool getDedupRID() const;
     void setDedupRID(bool value);
@@ -303,9 +301,6 @@ public:
 
 private:
     const IndexReqTarget _indexReqTarget;
-
-    // Do we need to return an RID projection.
-    const bool _needsRID;
 
     // If target == Index, specifies if we need to dedup RIDs.
     // Prior RID intersection removes the need to dedup.

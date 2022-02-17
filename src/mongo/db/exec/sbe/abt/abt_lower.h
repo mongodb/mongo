@@ -94,7 +94,7 @@ public:
                     sbe::value::SlotIdGenerator& ids,
                     const Metadata& metadata,
                     const NodeToGroupPropsMap& nodeToGroupPropsMap,
-                    const opt::unordered_map<std::string, ProjectionName>& ridProjections,
+                    const RIDProjectionsMap& ridProjections,
                     const bool randomScan = false)
         : _env(env),
           _slotMap(slotMap),
@@ -180,7 +180,9 @@ private:
 
     sbe::value::SlotVector convertProjectionsToSlots(const ProjectionNameVector& projectionNames);
     sbe::value::SlotVector convertRequiredProjectionsToSlots(
-        const NodeProps& props, bool addRIDProjection, const ProjectionNameVector& toExclude = {});
+        const NodeProps& props,
+        bool removeRIDProjection,
+        const ProjectionNameVector& toExclude = {});
 
     std::unique_ptr<sbe::EExpression> convertBoundsToExpr(
         bool isLower, const IndexDefinition& indexDef, const MultiKeyIntervalRequirement& interval);
@@ -193,7 +195,7 @@ private:
 
     const Metadata& _metadata;
     const NodeToGroupPropsMap& _nodeToGroupPropsMap;
-    const opt::unordered_map<std::string, ProjectionName>& _ridProjections;
+    const RIDProjectionsMap& _ridProjections;
 
     // If true, will create scan nodes using a random cursor to support sampling.
     // Currently only supported for single-threaded (non parallel-scanned) mongod collections.

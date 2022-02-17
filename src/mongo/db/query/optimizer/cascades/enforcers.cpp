@@ -65,12 +65,14 @@ class PropEnforcerVisitor {
 public:
     PropEnforcerVisitor(const GroupIdType groupId,
                         const Metadata& metadata,
+                        const RIDProjectionsMap& ridProjections,
                         PrefixId& prefixId,
                         PhysRewriteQueue& queue,
                         const PhysProps& physProps,
                         const LogicalProps& logicalProps)
         : _groupId(groupId),
           _metadata(metadata),
+          _ridProjections(ridProjections),
           _prefixId(prefixId),
           _queue(queue),
           _physProps(physProps),
@@ -188,9 +190,18 @@ public:
         const ProjectionNameSet& availableProjections =
             getPropertyConst<ProjectionAvailability>(_logicalProps).getProjections();
 
-        // Verify we can satisfy the required projections using the logical projections.
+        ProjectionName ridProjName;
+        if (hasProperty<IndexingAvailability>(_logicalProps)) {
+            const auto& scanDefName =
+                getPropertyConst<IndexingAvailability>(_logicalProps).getScanDefName();
+            ridProjName = _ridProjections.at(scanDefName);
+        }
+
+        // Verify we can satisfy the required projections using the logical projections, or the rid
+        // projection if we have indexing availability.
         for (const ProjectionName& projectionName : prop.getProjections().getVector()) {
-            if (availableProjections.find(projectionName) == availableProjections.cend()) {
+            if (projectionName != ridProjName &&
+                availableProjections.find(projectionName) == availableProjections.cend()) {
                 uasserted(6624100, "Cannot satisfy all projections");
             }
         }
@@ -223,7 +234,6 @@ public:
             PhysProps newProps = _physProps;
             setPropertyOverwrite<IndexingRequirement>(newProps,
                                                       {IndexReqTarget::Index,
-                                                       prop.getNeedsRID(),
                                                        prop.getDedupRID(),
                                                        prop.getSatisfiedPartialIndexesGroupId()});
 
@@ -248,6 +258,7 @@ private:
 
     // We don't own any of those.
     const Metadata& _metadata;
+    const RIDProjectionsMap& _ridProjections;
     PrefixId& _prefixId;
     PhysRewriteQueue& _queue;
     const PhysProps& _physProps;
@@ -256,11 +267,13 @@ private:
 
 void addEnforcers(const GroupIdType groupId,
                   const Metadata& metadata,
+                  const RIDProjectionsMap& ridProjections,
                   PrefixId& prefixId,
                   PhysRewriteQueue& queue,
                   const PhysProps& physProps,
                   const LogicalProps& logicalProps) {
-    PropEnforcerVisitor visitor(groupId, metadata, prefixId, queue, physProps, logicalProps);
+    PropEnforcerVisitor visitor(
+        groupId, metadata, ridProjections, prefixId, queue, physProps, logicalProps);
     for (const auto& entry : physProps) {
         entry.second.visit(visitor);
     }

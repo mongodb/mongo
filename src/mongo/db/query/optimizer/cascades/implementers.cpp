@@ -73,6 +73,11 @@ public:
             return;
         }
 
+        const auto& requiredProjections =
+            getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
+        const ProjectionName& ridProjName = _ridProjections.at(node.getScanDefName());
+        const bool needsRID = requiredProjections.find(ridProjName).second;
+
         const auto& indexReq = getPropertyConst<IndexingRequirement>(_physProps);
         const IndexReqTarget indexReqTarget = indexReq.getIndexReqTarget();
         switch (indexReqTarget) {
@@ -84,7 +89,6 @@ public:
                 if (_hints._disableIndexes == DisableIndexOptions::DisableAll) {
                     return;
                 }
-                uassert(6624102, "RID projection is required for seek", indexReq.getNeedsRID());
                 // Fall through to code below.
                 break;
 
@@ -112,8 +116,7 @@ public:
         }
 
         FieldProjectionMap fieldProjectionMap;
-        for (const ProjectionName& required :
-             getPropertyConst<ProjectionRequirement>(_physProps).getAffectedProjectionNames()) {
+        for (const ProjectionName& required : requiredProjections.getVector()) {
             if (required == node.getProjectionName()) {
                 fieldProjectionMap._rootProjection = node.getProjectionName();
             } else {
@@ -122,8 +125,6 @@ public:
             }
         }
 
-        const ProjectionName& ridProjName = _ridProjections.at(
-            getPropertyConst<IndexingAvailability>(_logicalProps).getScanDefName());
         if (indexReqTarget == IndexReqTarget::Seek) {
             NodeCEMap nodeCEMap;
 
@@ -139,7 +140,7 @@ public:
             optimizeChildrenNoAssert(
                 _queue, kDefaultPriority, std::move(limitSkip), {}, std::move(nodeCEMap));
         } else {
-            if (indexReq.getNeedsRID()) {
+            if (needsRID) {
                 fieldProjectionMap._ridProjection = ridProjName;
             }
             ABT physicalScan = make<PhysicalScanNode>(
@@ -369,8 +370,10 @@ public:
                 _memo.getGroup(requirements.getSatisfiedPartialIndexesGroupId())._logicalProperties)
                 .getSatisfiedPartialIndexes();
 
-        const bool needsRID = requirements.getNeedsRID();
+        const auto& requiredProjections =
+            getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
         const ProjectionName& ridProjName = _ridProjections.at(scanDefName);
+        const bool needsRID = requiredProjections.find(ridProjName).second;
 
         const ProjectionName& scanProjectionName = indexingAvailability.getScanProjection();
         const GroupIdType scanGroupId = indexingAvailability.getScanGroupId();
@@ -398,11 +401,12 @@ public:
             }
         }
 
-        const auto& requiredProjections =
-            getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
         bool requiresRootProjection = false;
         {
             auto projectionsLeftToSatisfy = requiredProjections;
+            if (needsRID) {
+                projectionsLeftToSatisfy.erase(ridProjName);
+            }
             if (indexReqTarget != IndexReqTarget::Index) {
                 // Deliver root projection if required.
                 requiresRootProjection = projectionsLeftToSatisfy.erase(scanProjectionName);
@@ -625,6 +629,7 @@ public:
                 return;
             }
         }
+        const auto& ridProjName = _ridProjections.at(scanDefName);
 
         if (hasProperty<LimitSkipRequirement>(_physProps)) {
             // Cannot satisfy limit-skip.
@@ -678,8 +683,19 @@ public:
         // Split required projections between inner and outer side.
         ProjectionNameOrderPreservingSet leftChildProjections;
         ProjectionNameOrderPreservingSet rightChildProjections;
+
+        // If we are performing an intersection we need to obtain rids from both sides.
+        leftChildProjections.emplace_back(ridProjName);
+        if (isIndex) {
+            rightChildProjections.emplace_back(ridProjName);
+        }
+
         for (const ProjectionName& projectionName :
              getPropertyConst<ProjectionRequirement>(_physProps).getProjections().getVector()) {
+            if (projectionName == ridProjName) {
+                continue;
+            }
+
             if (projectionName != node.getScanProjectionName() &&
                 leftProjections.count(projectionName) > 0) {
                 leftChildProjections.emplace_back(projectionName);
@@ -719,18 +735,14 @@ public:
         getProperty<DistributionRequirement>(leftPhysProps).setDisableExchanges(false);
         getProperty<DistributionRequirement>(rightPhysProps).setDisableExchanges(false);
 
-        const ProjectionName& ridProjName = _ridProjections.at(
-            getPropertyConst<IndexingAvailability>(_logicalProps).getScanDefName());
         setPropertyOverwrite<IndexingRequirement>(
             leftPhysProps,
             {IndexReqTarget::Index,
-             true /*needRID*/,
              !isIndex && dedupRID,
              requirements.getSatisfiedPartialIndexesGroupId()});
         setPropertyOverwrite<IndexingRequirement>(
             rightPhysProps,
             {isIndex ? IndexReqTarget::Index : IndexReqTarget::Seek,
-             true /*needRID*/,
              !isIndex && dedupRID,
              requirements.getSatisfiedPartialIndexesGroupId()});
 
@@ -1024,7 +1036,16 @@ public:
 
     void operator()(const ABT& n, const RootNode& node) {
         PhysProps newProps = _physProps;
-        setPropertyOverwrite<ProjectionRequirement>(newProps, node.getProperty());
+
+        if (hasProperty<ProjectionRequirement>(newProps)) {
+            auto& projections = getProperty<ProjectionRequirement>(newProps).getProjections();
+            for (const auto& projName : node.getProperty().getProjections().getVector()) {
+                projections.emplace_back(projName);
+            }
+        } else {
+            setPropertyOverwrite<ProjectionRequirement>(newProps, node.getProperty());
+        }
+
         getProperty<DistributionRequirement>(newProps).setDisableExchanges(false);
 
         ABT rootNode = n;
@@ -1038,7 +1059,7 @@ public:
 
     ImplementationVisitor(const Memo& memo,
                           const QueryHints& hints,
-                          const opt::unordered_map<std::string, ProjectionName>& ridProjections,
+                          const RIDProjectionsMap& ridProjections,
                           PrefixId& prefixId,
                           PhysRewriteQueue& queue,
                           const PhysProps& physProps,
@@ -1110,20 +1131,17 @@ private:
             }
 
             // Check if we can satisfy the next collation requirement.
-            const auto& collationEntry = requiredCollationSpec.at(collationSpecIndex);
-            if (collationEntry.first != projName) {
+            const auto& [reqProjName, reqOp] = requiredCollationSpec.at(collationSpecIndex);
+            if (reqProjName != projName) {
                 indexSuitable = false;
                 break;
             }
 
-            const auto& indexCollationEntry = indexCollationSpec.at(indexField);
-            if (result._forward &&
-                !collationOpsCompatible(indexCollationEntry._op, collationEntry.second)) {
+            const CollationOp indexOp = indexCollationSpec.at(indexField)._op;
+            if (result._forward && !collationOpsCompatible(indexOp, reqOp)) {
                 result._forward = false;
             }
-            if (result._backward &&
-                !collationOpsCompatible(reverseCollationOp(indexCollationEntry._op),
-                                        collationEntry.second)) {
+            if (result._backward && !collationOpsCompatible(reverseCollationOp(indexOp), reqOp)) {
                 result._backward = false;
             }
             if (!result._forward && !result._backward) {
@@ -1412,7 +1430,7 @@ private:
     // We don't own any of those;
     const Memo& _memo;
     const QueryHints& _hints;
-    const opt::unordered_map<std::string, ProjectionName>& _ridProjections;
+    const RIDProjectionsMap& _ridProjections;
     PrefixId& _prefixId;
     PhysRewriteQueue& _queue;
     const PhysProps& _physProps;
@@ -1421,7 +1439,7 @@ private:
 
 void addImplementers(const Memo& memo,
                      const QueryHints& hints,
-                     const opt::unordered_map<std::string, ProjectionName>& ridProjections,
+                     const RIDProjectionsMap& ridProjections,
                      PrefixId& prefixId,
                      PhysOptimizationResult& bestResult,
                      const properties::LogicalProps& logicalProps,

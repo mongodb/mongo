@@ -72,7 +72,6 @@ public:
     bool operator()(const PhysProperty&, const IndexingRequirement& requiredProp) {
         const auto& available = getPropertyConst<IndexingRequirement>(_availableProps);
         return available.getIndexReqTarget() == requiredProp.getIndexReqTarget() &&
-            available.getNeedsRID() == requiredProp.getNeedsRID() &&
             (available.getDedupRID() || !requiredProp.getDedupRID()) &&
             available.getSatisfiedPartialIndexesGroupId() ==
             requiredProp.getSatisfiedPartialIndexesGroupId();
@@ -105,12 +104,11 @@ private:
     const PhysProps& _availableProps;
 };
 
-PhysicalRewriter::PhysicalRewriter(
-    Memo& memo,
-    const QueryHints& hints,
-    const opt::unordered_map<std::string, ProjectionName>& ridProjections,
-    const CostingInterface& costDerivation,
-    std::unique_ptr<LogicalRewriter>& logicalRewriter)
+PhysicalRewriter::PhysicalRewriter(Memo& memo,
+                                   const QueryHints& hints,
+                                   const RIDProjectionsMap& ridProjections,
+                                   const CostingInterface& costDerivation,
+                                   std::unique_ptr<LogicalRewriter>& logicalRewriter)
     : _memo(memo),
       _costDerivation(costDerivation),
       _hints(hints),
@@ -243,9 +241,7 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
         !hasProperty<IndexingRequirement>(physProps)) {
         // Re-optimize under complete scan indexing requirements.
         setPropertyOverwrite(
-            physProps,
-            IndexingRequirement{
-                IndexReqTarget::Complete, false /*needRID*/, true /*dedupRID*/, groupId});
+            physProps, IndexingRequirement{IndexReqTarget::Complete, true /*dedupRID*/, groupId});
     }
 
     auto& physicalNodes = group._physicalNodes;
@@ -340,6 +336,7 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
         // Verify properties can be enforced and add enforcers if necessary.
         addEnforcers(groupId,
                      _memo.getMetadata(),
+                     _ridProjections,
                      prefixId,
                      bestResult._queue,
                      bestResult._physProps,

@@ -504,8 +504,7 @@ public:
         PartialSchemaRequirements newMap;
 
         for (auto& entry : inputResult._reqMap) {
-            const ProjectionName& projectionName = entry.first._projectionName;
-            if (!projectionName.empty()) {
+            if (!entry.first._projectionName.empty()) {
                 return {};
             }
 
@@ -516,8 +515,7 @@ public:
             std::swap(appendedPath.cast<T>()->getPath(), path);
             std::swap(path, appendedPath);
 
-            newMap.emplace(PartialSchemaKey{projectionName, std::move(path)},
-                           std::move(entry.second));
+            newMap.emplace(PartialSchemaKey{"", std::move(path)}, std::move(entry.second));
         }
 
         inputResult._reqMap = std::move(newMap);
