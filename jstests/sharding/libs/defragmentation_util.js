@@ -94,7 +94,10 @@ var defragmentationUtil = (function() {
         const storageStats = coll.aggregate(pipeline).toArray();
         let avgObjSizeByShard = {};
         storageStats.forEach((storageStat) => {
-            avgObjSizeByShard[storageStat['shard']] = storageStat['storageStats']['avgObjSize'];
+            avgObjSizeByShard[storageStat['shard']] =
+                typeof (storageStat['storageStats']['avgObjSize']) === "undefined"
+                ? 0
+                : storageStat['storageStats']['avgObjSize'];
         });
         let checkForOversizedChunk = function(
             coll, chunk, shardKey, avgObjSize, oversizedChunkThreshold) {
