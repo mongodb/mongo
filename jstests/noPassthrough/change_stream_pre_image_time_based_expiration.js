@@ -11,7 +11,7 @@ load("jstests/libs/fail_point_util.js");  // For configureFailPoint.
 
 // Helper to verify if expected pre-images are present in pre-image collection.
 function verifyPreImages(preImageColl, expectedPreImages, collectionsInfo) {
-    const preImageDocs = preImageColl.find().toArray();
+    const preImageDocs = preImageColl.find().sort({"preImage._id": 1}).toArray();
 
     assert.eq(preImageDocs.length, expectedPreImages.length, preImageDocs);
 
@@ -33,7 +33,7 @@ function verifyPreImages(preImageColl, expectedPreImages, collectionsInfo) {
 
 // Tests time-based change stream pre-image retention policy.
 function testTimeBasedPreImageRetentionPolicy(conn, primary) {
-    // Annotations for pre-images that define if pre-image is expected to expire or not.
+    // Status for pre-images that define if pre-image is expected to expire or not.
     const shouldExpire = "shouldExpire";
     const shouldRetain = "shouldRetain";
 
@@ -45,10 +45,13 @@ function testTimeBasedPreImageRetentionPolicy(conn, primary) {
     const docsStatePerCollection = [
         [shouldRetain],
         [shouldExpire],
-        [shouldRetain, shouldExpire],
         [shouldExpire, shouldRetain],
+        [shouldExpire, shouldExpire],
+        [shouldExpire],
+        [shouldExpire, shouldExpire],
         [shouldRetain, shouldRetain],
-        [shouldExpire, shouldExpire]
+        [shouldRetain],
+        [shouldExpire]
     ];
 
     const collectionCount = docsStatePerCollection.length;
@@ -82,54 +85,36 @@ function testTimeBasedPreImageRetentionPolicy(conn, primary) {
     // Insert documents to each collection. Iterate through the documents and group them as
     // 'shouldExpire' or 'shouldRetain' based on the document states. Each element of these groups
     // is an array, where the first element is the collection index and the second is the document
-    // index.
+    // id.
+    let documentId = 0;
     for (let collIdx = 0; collIdx < collectionCount; collIdx++) {
         const collName = collectionsInfo[collIdx]["name"];
         const coll = testDB.getCollection(collName);
         const docs = docsStatePerCollection[collIdx];
 
         for (let docIdx = 0; docIdx < docs.length; docIdx++) {
-            assert.commandWorked(coll.insert({_id: docIdx}, {$set: {documentState: "inserted"}}));
+            assert.commandWorked(
+                coll.insert({_id: documentId}, {$set: {documentState: "inserted"}}));
 
             const documentState = docs[docIdx];
-            allDocs.push([collIdx, docIdx]);
+            allDocs.push([collIdx, documentId]);
             if (documentState !== shouldExpire) {
-                shouldRetainDocs.push([collIdx, docIdx]);
+                shouldRetainDocs.push([collIdx, documentId]);
             } else {
-                shouldExpireDocs.push([collIdx, docIdx]);
+                shouldExpireDocs.push([collIdx, documentId]);
             }
+
+            ++documentId;
         }
     }
 
-    // The test case will first update the documents with documentState as 'shouldExpire' and then
-    // with 'shouldRetain'. To correctly infer the ordering of the pre-images in the collection, the
-    // sorting has to be done in such a way that for a each document, the documentState
-    // 'shouldExpire' should come before the documentState 'shouldRetain'.
-    allDocs.sort((doc1, doc2) => {
-        const [collIdx1, docIdx1] = doc1;
-        const [collIdx2, docIdx2] = doc2;
-
-        const annotation1 = docsStatePerCollection[collIdx1][docIdx1];
-        const annotation2 = docsStatePerCollection[collIdx2][docIdx2];
-
-        // If documents are from different collections or if they are from the same collection but
-        // have same document states, the preserve the original ordering.
-        if (collIdx1 != collIdx2 || annotation1 == annotation2) {
-            return 0;
-        }
-
-        // If documents belong to the same collection and have different document states, then
-        // document with 'shouldExpire' should come first.
-        return annotation1 == shouldExpire ? -1 : 1;
-    });
-
     // Helper to update the document in the collection.
     const updateDocument = (docInfo) => {
-        const [collIdx, docIdx] = docInfo;
+        const [collIdx, docId] = docInfo;
         const collName = collectionsInfo[collIdx]["name"];
         const coll = testDB.getCollection(collName);
 
-        assert.commandWorked(coll.updateOne({_id: docIdx}, {$set: {documentState: "updated"}}));
+        assert.commandWorked(coll.updateOne({_id: docId}, {$set: {documentState: "updated"}}));
     };
 
     // Update each document that should expire, this will create pre-images.
@@ -155,8 +140,8 @@ function testTimeBasedPreImageRetentionPolicy(conn, primary) {
     // 1 ms.
     sleep(1);
 
-    // Update each document for which pre-images will be retain. These pre-images will be followed
-    // by pre-images that should expire for a particular collection.
+    // Update each document for which pre-images will be retained. These pre-images will be ordered
+    // after pre-images that should expire for a particular collection.
     shouldRetainDocs.forEach(updateDocument);
 
     // Verify that all pre-images are recorded.
