@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
@@ -265,8 +264,18 @@ boost::optional<SharedSemiFuture<void>> withSessionCheckedOut(OperationContext* 
     auto txnParticipant = TransactionParticipant::get(opCtx);
 
     try {
-        txnParticipant.beginOrContinue(
-            opCtx, {txnNumber}, boost::none /* autocommit */, boost::none /* startTransaction */);
+        // TODO (SERVER-63441): Remove if block once replaced with txnParticipant invalidation
+        // logic.
+        if (isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId())) {
+            opCtx->setInMultiDocumentTransaction();
+            txnParticipant.beginOrContinue(
+                opCtx, {txnNumber}, false /* autocommit */, true /* startTransaction */);
+        } else {
+            txnParticipant.beginOrContinue(opCtx,
+                                           {txnNumber},
+                                           boost::none /* autocommit */,
+                                           boost::none /* startTransaction */);
+        }
 
         if (stmtId && txnParticipant.checkStatementExecuted(opCtx, *stmtId)) {
             // Skip the incoming statement because it has already been logged locally.
@@ -341,6 +350,11 @@ void updateSessionRecord(OperationContext* opCtx,
                                                              *oplogEntry.getTxnNumber(),
                                                              std::move(opTime),
                                                              oplogEntry.getWallClockTime());
+
+                           if (isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId())) {
+                               sessionTxnRecord.setParentSessionId(
+                                   getParentSessionId(*opCtx->getLogicalSessionId()));
+                           }
 
                            txnParticipant.onRetryableWriteCloningCompleted(
                                opCtx, stmtIds, sessionTxnRecord);

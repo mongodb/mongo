@@ -2889,6 +2889,12 @@ void TransactionParticipant::Participant::onRetryableWriteCloningCompleted(
     updateSessionEntry(opCtx, updateRequest, _sessionId(), sessionTxnRecord.getTxnNum());
     _registerUpdateCacheOnCommit(
         opCtx, std::move(stmtIdsWritten), sessionTxnRecord.getLastWriteOpTime());
+
+    // TODO (SERVER-63441): Remove if block once we switch to invalidating the txnParticipant.
+    if (_isInternalSessionForRetryableWrite()) {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        o(lk).txnState.transitionTo(TransactionState::kCommitted);
+    }
 }
 
 void TransactionParticipant::Participant::_invalidate(WithLock wl) {

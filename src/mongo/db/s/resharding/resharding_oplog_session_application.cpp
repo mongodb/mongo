@@ -34,6 +34,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -81,13 +82,26 @@ boost::optional<SharedSemiFuture<void>> ReshardingOplogSessionApplication::tryAp
     OperationContext* opCtx, const repl::OplogEntry& op) const {
     auto lsid = *op.getSessionId();
     auto txnNumber = *op.getTxnNumber();
-    bool isRetryableWrite = op.isCrudOpType();
+    bool isRetryableWrite = op.isCrudOpType() || isInternalSessionForRetryableWrite(lsid);
 
     auto o2Field =
         isRetryableWrite ? op.getEntry().getRaw() : TransactionParticipant::kDeadEndSentinel;
 
-    auto stmtIds =
-        isRetryableWrite ? op.getStatementIds() : std::vector<StmtId>{kIncompleteHistoryStmtId};
+    auto stmtIds = [&] {
+        if (isInternalSessionForRetryableWrite(lsid)) {
+            std::vector<repl::OplogEntry> innerEntries;
+            repl::ApplyOps::extractOperationsTo(op, op.getEntry().toBSON(), &innerEntries);
+            std::vector<StmtId> stmtIds{};
+            for (const auto& innerEntry : innerEntries) {
+                for (auto stmtId : innerEntry.getStatementIds()) {
+                    stmtIds.push_back(stmtId);
+                }
+            }
+            return stmtIds;
+        }
+        return isRetryableWrite ? op.getStatementIds()
+                                : std::vector<StmtId>{kIncompleteHistoryStmtId};
+    }();
 
     boost::optional<repl::OpTime> preImageOpTime;
     if (auto preImageOp = op.getPreImageOp()) {
