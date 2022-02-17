@@ -32,9 +32,12 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/set_user_write_block_mode_gen.h"
+#include "mongo/db/s/global_user_write_block_state.h"
 #include "mongo/logv2/log.h"
+
 
 namespace mongo {
 namespace {
@@ -58,8 +61,14 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            auto req = request();
-            LOGV2(6345100, "In SetUserWriteBlockModeCommand", "global"_attr = req.getGlobal());
+            {
+                Lock::GlobalLock lk(opCtx, MODE_X);
+                if (request().getGlobal()) {
+                    GlobalUserWriteBlockState::get(opCtx)->enableUserWriteBlocking(opCtx);
+                } else {
+                    GlobalUserWriteBlockState::get(opCtx)->disableUserWriteBlocking(opCtx);
+                }
+            }
         }
 
     private:
