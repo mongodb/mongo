@@ -528,6 +528,7 @@ var _bulk_api_module = (function() {
         // Set max byte size
         var maxBatchSizeBytes = 1024 * 1024 * 16;
         var maxNumberOfDocsInBatch = (TestData && TestData.disableBatchWrites) ? 1 : 1000;
+        var idFieldOverhead = Object.bsonsize({_id: ObjectId()}) - Object.bsonsize({});
         var writeConcern = null;
         var letParams = null;
         var currentOp;
@@ -605,6 +606,11 @@ var _bulk_api_module = (function() {
             // Get the bsonSize
             var bsonSize = Object.bsonsize(document);
 
+            // If an _id will be added to the insert, adjust the bsonSize
+            if (docType === INSERT && documentNeedsId(document)) {
+                bsonSize += idFieldOverhead;
+            }
+
             // Create a new batch object if we don't have a current one
             if (currentBatch == null)
                 currentBatch = new Batch(docType, currentIndex);
@@ -625,11 +631,20 @@ var _bulk_api_module = (function() {
         };
 
         /**
+         *
+         * @param obj {Object} the document to check if an _id is present
+         * @returns true if the document needs an _id and false otherwise
+         */
+        var documentNeedsId = function(obj) {
+            return typeof (obj._id) == "undefined" && !Array.isArray(obj);
+        };
+
+        /**
          * @return {Object} a new document with an _id: ObjectId if _id is not present.
          *     Otherwise, returns the same object passed.
          */
         var addIdIfNeeded = function(obj) {
-            if (typeof (obj._id) == "undefined" && !Array.isArray(obj)) {
+            if (documentNeedsId(obj)) {
                 var tmp = obj;  // don't want to modify input
                 obj = {_id: new ObjectId()};
                 for (var key in tmp) {
