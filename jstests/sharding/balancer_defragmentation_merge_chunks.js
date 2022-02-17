@@ -272,10 +272,6 @@ jsTest.log("Changed uuid causes defragmentation to restart");
     st.startBalancer();
     // Reshard collection
     assert.commandWorked(db.adminCommand({reshardCollection: nss, key: {key2: 1}}));
-    assert.commandWorked(
-        db.adminCommand({moveChunk: nss, find: {key2: MinKey}, to: st.shard0.shardName}));
-    assert.commandWorked(
-        db.adminCommand({moveChunk: nss, find: {key2: 1}, to: st.shard0.shardName}));
     // Let defragementation run
     clearFailPointOnConfigNodes("afterBuildingNextDefragmentationPhase");
     defragmentationUtil.waitForEndOfDefragmentation(st.s, nss);
