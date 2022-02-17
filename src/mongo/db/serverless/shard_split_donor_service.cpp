@@ -34,6 +34,7 @@
 #include "mongo/client/streamable_replica_set_monitor.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
@@ -107,6 +108,8 @@ MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeBlocking);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterBlocking);
 MONGO_FAIL_POINT_DEFINE(skipShardSplitWaitForSplitAcceptance);
 
+const std::string kTTLIndexName = "ShardSplitDonorTTLIndex";
+
 }  // namespace
 
 namespace detail {
@@ -161,7 +164,7 @@ SemiFuture<void> makeRecipientAcceptSplitFuture(ExecutorPtr executor,
 
     auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
     invariant(replCoord);
-    auto recipientConnectionString = repl::makeRecipientConnectionString(
+    auto recipientConnectionString = serverless::makeRecipientConnectionString(
         replCoord->getConfig(), recipientTagName, recipientSetName);
     auto monitor = ReplicaSetMonitor::createIfNeeded(MongoURI{recipientConnectionString});
     invariant(monitor);
@@ -201,6 +204,36 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ShardSplitDonorService::cons
         ShardSplitDonorDocument::parse(IDLParserErrorContext("donorStateDoc"), initialState));
 }
 
+ExecutorFuture<void> ShardSplitDonorService::_createStateDocumentTTLIndex(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
+    return AsyncTry([this] {
+               auto nss = getStateDocumentsNS();
+
+               AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
+               auto opCtxHolder = cc().makeOperationContext();
+               auto opCtx = opCtxHolder.get();
+               DBDirectClient client(opCtx);
+
+               BSONObj result;
+               client.runCommand(
+                   nss.db().toString(),
+                   BSON("createIndexes"
+                        << nss.coll().toString() << "indexes"
+                        << BSON_ARRAY(BSON("key" << BSON("expireAt" << 1) << "name" << kTTLIndexName
+                                                 << "expireAfterSeconds" << 0))),
+                   result);
+               uassertStatusOK(getStatusFromCommandResult(result));
+           })
+        .until([](Status status) { return status.isOK(); })
+        .withBackoffBetweenIterations(kExponentialBackoff)
+        .on(**executor, token);
+}
+
+ExecutorFuture<void> ShardSplitDonorService::_rebuildService(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
+    return _createStateDocumentTTLIndex(executor, token);
+}
+
 ShardSplitDonorService::DonorStateMachine::DonorStateMachine(
     ServiceContext* serviceContext,
     ShardSplitDonorService* splitService,
@@ -225,6 +258,17 @@ void ShardSplitDonorService::DonorStateMachine::tryAbort() {
     if (_abortSource) {
         _abortSource->cancel();
     }
+}
+
+void ShardSplitDonorService::DonorStateMachine::tryForget() {
+    LOGV2(6236601, "Forgetting shard split", "id"_attr = _migrationId);
+
+    stdx::lock_guard<Latch> lg(_mutex);
+    if (_forgetShardSplitReceivedPromise.getFuture().isReady()) {
+        LOGV2(6236602, "Donor Forget Migration promise is already ready", "id"_attr = _migrationId);
+        return;
+    }
+    _forgetShardSplitReceivedPromise.emplaceValue();
 }
 
 Status ShardSplitDonorService::DonorStateMachine::checkIfOptionsConflict(
@@ -266,13 +310,12 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
           "id"_attr = _migrationId,
           "timeout"_attr = repl::shardSplitTimeoutMS.load());
 
-    _completionPromise.setWith([&] {
+    _decisionPromise.setWith([&] {
         return ExecutorFuture(**executor)
             .then([this, executor, primaryToken] {
                 // Note we do not use the abort split token here because the abortShardSplit
                 // command waits for a decision to be persisted which will not happen if
                 // inserting the initial state document fails.
-
                 return _writeInitialDocument(executor, primaryToken);
             })
             .then([this] { pauseShardSplitBeforeBlocking.pauseWhileSet(); })
@@ -310,7 +353,17 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
             .unsafeToInlineFuture();
     });
 
-    return _completionPromise.getFuture().semi().ignoreValue();
+    _completionPromise.setFrom(
+        _decisionPromise.getFuture()
+            .semi()
+            .ignoreValue()
+            .thenRunOn(**executor)
+            .then([this, anchor = shared_from_this(), executor, primaryToken] {
+                return _waitForForgetCmdThenMarkGarbageCollectible(executor, primaryToken);
+            })
+            .unsafeToInlineFuture());
+
+    return _completionPromise.getFuture().semi();
 }
 
 void ShardSplitDonorService::DonorStateMachine::interrupt(Status status) {}
@@ -361,7 +414,7 @@ ShardSplitDonorService::DonorStateMachine::_waitForRecipientToReachBlockTimestam
 
     invariant(_stateDoc.getRecipientTagName());
     auto recipientTagName = *_stateDoc.getRecipientTagName();
-    auto recipientNodes = getRecipientMembers(replCoord->getConfig(), recipientTagName);
+    auto recipientNodes = serverless::getRecipientMembers(replCoord->getConfig(), recipientTagName);
 
     WriteConcernOptions writeConcern;
     writeConcern.w = WTags{{recipientTagName.toString(), recipientNodes.size()}};
@@ -667,4 +720,54 @@ ShardSplitDonorService::DonorStateMachine::_handleErrorOrEnterAbortedState(
             return DurableState{_stateDoc.getState(), _abortReason};
         });
 }
+
+ExecutorFuture<repl::OpTime>
+ShardSplitDonorService::DonorStateMachine::_markStateDocAsGarbageCollectable(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
+    stdx::lock_guard<Latch> lg(_mutex);
+
+    _stateDoc.setExpireAt(_serviceContext->getFastClockSource()->now() +
+                          Milliseconds{repl::shardSplitGarbageCollectionDelayMS.load()});
+
+    return AsyncTry([this, self = shared_from_this()] {
+               auto opCtxHolder = cc().makeOperationContext();
+               auto opCtx = opCtxHolder.get();
+
+               uassertStatusOK(serverless::updateStateDoc(opCtx, _stateDoc));
+               return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+           })
+        .until([](StatusWith<repl::OpTime> swOpTime) { return swOpTime.getStatus().isOK(); })
+        .withBackoffBetweenIterations(kExponentialBackoff)
+        .on(**executor, token);
+}
+
+ExecutorFuture<void>
+ShardSplitDonorService::DonorStateMachine::_waitForForgetCmdThenMarkGarbageCollectible(
+    const ScopedTaskExecutorPtr& executor, const CancellationToken& token) {
+    LOGV2(6236603,
+          "Waiting to receive 'forgetShardSplit' command.",
+          "migrationId"_attr = _migrationId);
+    auto expiredAt = [&]() {
+        stdx::lock_guard<Latch> lg(_mutex);
+        return _stateDoc.getExpireAt();
+    }();
+
+    if (expiredAt) {
+        LOGV2(6236604, "expiredAt is already set", "migrationId"_attr = _migrationId);
+        return ExecutorFuture(**executor);
+    }
+
+    return std::move(_forgetShardSplitReceivedPromise.getFuture())
+        .thenRunOn(**executor)
+        .then([this, self = shared_from_this(), executor, token] {
+            LOGV2(6236606,
+                  "Marking shard split as garbage-collectable.",
+                  "migrationId"_attr = _migrationId);
+            return _markStateDocAsGarbageCollectable(executor, token);
+        })
+        .then([this, self = shared_from_this(), executor, token](repl::OpTime opTime) {
+            return _waitForMajorityWriteConcern(executor, std::move(opTime), token);
+        });
+}
+
 }  // namespace mongo

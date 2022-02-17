@@ -28,17 +28,23 @@
  */
 
 #include "mongo/db/serverless/shard_split_utils.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/repl_set_config.h"
 
 namespace mongo {
-namespace repl {
-std::vector<MemberConfig> getRecipientMembers(const ReplSetConfig& config,
-                                              const StringData& recipientTagName) {
-    std::vector<MemberConfig> result;
+
+namespace serverless {
+std::vector<repl::MemberConfig> getRecipientMembers(const repl::ReplSetConfig& config,
+                                                    const StringData& recipientTagName) {
+    std::vector<repl::MemberConfig> result;
     const auto& tagConfig = config.getTagConfig();
     for (auto member : config.members()) {
         auto matchesTag =
-            std::any_of(member.tagsBegin(), member.tagsEnd(), [&](const ReplSetTag& tag) {
+            std::any_of(member.tagsBegin(), member.tagsEnd(), [&](const repl::ReplSetTag& tag) {
                 return tagConfig.getTagKey(tag) == recipientTagName;
             });
 
@@ -51,7 +57,7 @@ std::vector<MemberConfig> getRecipientMembers(const ReplSetConfig& config,
 }
 
 
-ConnectionString makeRecipientConnectionString(const ReplSetConfig& config,
+ConnectionString makeRecipientConnectionString(const repl::ReplSetConfig& config,
                                                const StringData& recipientTagName,
                                                const StringData& recipientSetName) {
     auto recipientMembers = getRecipientMembers(config, recipientTagName);
@@ -59,14 +65,14 @@ ConnectionString makeRecipientConnectionString(const ReplSetConfig& config,
     std::transform(recipientMembers.cbegin(),
                    recipientMembers.cend(),
                    std::back_inserter(recipientNodes),
-                   [](const MemberConfig& member) { return member.getHostAndPort(); });
+                   [](const repl::MemberConfig& member) { return member.getHostAndPort(); });
 
     return ConnectionString::forReplicaSet(recipientSetName.toString(), recipientNodes);
 }
 
-ReplSetConfig makeSplitConfig(const ReplSetConfig& config,
-                              const std::string& recipientSetName,
-                              const std::string& recipientTagName) {
+repl::ReplSetConfig makeSplitConfig(const repl::ReplSetConfig& config,
+                                    const std::string& recipientSetName,
+                                    const std::string& recipientTagName) {
     dassert(!recipientSetName.empty() && recipientSetName != config.getReplSetName());
     uassert(6201800,
             "We can not make a split config of an existing split config.",
@@ -77,7 +83,7 @@ ReplSetConfig makeSplitConfig(const ReplSetConfig& config,
     int donorIndex = 0, recipientIndex = 0;
     for (const auto& member : config.members()) {
         bool isRecipient =
-            std::any_of(member.tagsBegin(), member.tagsEnd(), [&](const ReplSetTag& tag) {
+            std::any_of(member.tagsBegin(), member.tagsEnd(), [&](const repl::ReplSetTag& tag) {
                 return tagConfig.getTagKey(tag) == recipientTagName;
             });
         if (isRecipient) {
@@ -114,7 +120,89 @@ ReplSetConfig makeSplitConfig(const ReplSetConfig& config,
     splitConfigBob.append("members", donorMembers);
     splitConfigBob.append("recipientConfig", recipientConfigBob.obj());
 
-    return ReplSetConfig::parse(splitConfigBob.obj());
+    return repl::ReplSetConfig::parse(splitConfigBob.obj());
 }
-}  // namespace repl
+
+Status insertStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& stateDoc) {
+    const auto nss = NamespaceString::kTenantSplitDonorsNamespace;
+    AutoGetCollection collection(opCtx, nss, MODE_IX);
+
+    uassert(ErrorCodes::PrimarySteppedDown,
+            str::stream() << "No longer primary while attempting to insert shard split"
+                             " state document",
+            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
+
+    return writeConflictRetry(opCtx, "insertShardSplitStateDoc", nss.ns(), [&]() -> Status {
+        const auto filter = BSON(ShardSplitDonorDocument::kIdFieldName
+                                 << stateDoc.getId() << ShardSplitDonorDocument::kExpireAtFieldName
+                                 << BSON("$exists" << false));
+        const auto updateMod = BSON("$setOnInsert" << stateDoc.toBSON());
+        auto updateResult =
+            Helpers::upsert(opCtx, nss.ns(), filter, updateMod, /*fromMigrate=*/false);
+
+        invariant(!updateResult.numDocsModified);
+        if (updateResult.upsertedId.isEmpty()) {
+            return {ErrorCodes::ConflictingOperationInProgress,
+                    str::stream() << "Failed to insert the shard split state doc: "
+                                  << stateDoc.toBSON()};
+        }
+        return Status::OK();
+    });
+}
+
+Status updateStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& stateDoc) {
+    const auto nss = NamespaceString::kTenantSplitDonorsNamespace;
+    AutoGetCollection collection(opCtx, nss, MODE_IX);
+
+    if (!collection) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << nss.ns() << " does not exist");
+    }
+
+    return writeConflictRetry(opCtx, "updateShardSplitStateDoc", nss.ns(), [&]() -> Status {
+        auto updateResult =
+            Helpers::upsert(opCtx, nss.ns(), stateDoc.toBSON(), /*fromMigrate=*/false);
+        if (updateResult.numMatched == 0) {
+            return {ErrorCodes::NoSuchKey,
+                    str::stream() << "Existing shard split state document not found for id: "
+                                  << stateDoc.getId()};
+        }
+
+        return Status::OK();
+    });
+}
+
+StatusWith<ShardSplitDonorDocument> getStateDocument(OperationContext* opCtx,
+                                                     const UUID& shardSplitId) {
+    // Read the most up to date data.
+    ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
+    AutoGetCollectionForRead collection(opCtx, NamespaceString::kTenantSplitDonorsNamespace);
+    if (!collection) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Collection not found looking for state document: "
+                                    << NamespaceString::kTenantSplitDonorsNamespace.ns());
+    }
+
+    BSONObj result;
+    auto foundDoc = Helpers::findOne(
+        opCtx, collection.getCollection(), BSON("_id" << shardSplitId), result, true);
+
+    if (!foundDoc) {
+        return Status(ErrorCodes::NoMatchingDocument,
+                      str::stream()
+                          << "No matching state doc found with shard split id: " << shardSplitId);
+    }
+
+    try {
+        return ShardSplitDonorDocument::parse(IDLParserErrorContext("shardSplitStateDocument"),
+                                              result);
+    } catch (DBException& ex) {
+        return ex.toStatus(str::stream()
+                           << "Invalid BSON found for matching document with shard split id: "
+                           << shardSplitId << " , res: " << result);
+    }
+}
+
+
+}  // namespace serverless
 }  // namespace mongo

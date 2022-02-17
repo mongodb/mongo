@@ -167,6 +167,7 @@ const allCommands = {
     donorWaitForMigrationToCommit: {skip: isPrimaryOnly},
     abortShardSplit: {skip: isPrimaryOnly},
     commitShardSplit: {skip: isPrimaryOnly},
+    forgetShardSplit: {skip: isPrimaryOnly},
     driverOIDTest: {skip: isNotAUserDataRead},
     drop: {skip: isPrimaryOnly},
     dropAllRolesFromDatabase: {skip: isPrimaryOnly},

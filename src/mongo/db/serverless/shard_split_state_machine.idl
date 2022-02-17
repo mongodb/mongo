@@ -85,3 +85,9 @@ structs:
                 type: object_owned
                 description: "The error that caused the split to abort."
                 optional: true
+            expireAt:
+                type: date
+                description: >-
+                    The wall-clock time at which the state machine document should be
+                    removed by the TTL monitor.
+                optional: true

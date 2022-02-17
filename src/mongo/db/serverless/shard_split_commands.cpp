@@ -75,7 +75,7 @@ public:
 
             uassertStatusOK(donorPtr->checkIfOptionsConflict(stateDoc));
 
-            auto state = donorPtr->completionFuture().get(opCtx);
+            auto state = donorPtr->decisionFuture().get(opCtx);
 
             auto response = Response(state.state);
             if (state.abortReason) {
@@ -149,7 +149,7 @@ public:
 
             instance->tryAbort();
 
-            auto state = instance->completionFuture().get(opCtx);
+            auto state = instance->decisionFuture().get(opCtx);
 
             uassert(ErrorCodes::CommandFailed,
                     "Failed to abort shard split",
@@ -191,6 +191,81 @@ public:
         return BasicCommand::AllowedOnSecondary::kNever;
     }
 } abortShardSplitCmd;
+
+class ForgetShardSplitCmd : public TypedCommand<ForgetShardSplitCmd> {
+public:
+    using Request = ForgetShardSplit;
+
+    class Invocation : public InvocationBase {
+
+    public:
+        using InvocationBase::InvocationBase;
+
+        void typedRun(OperationContext* opCtx) {
+            uassert(6236600,
+                    "feature \"shard split\" not supported",
+                    repl::feature_flags::gShardSplit.isEnabled(
+                        serverGlobalParams.featureCompatibility));
+
+            const RequestType& cmd = request();
+
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
+
+            auto splitService = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                                    ->lookupServiceByName(ShardSplitDonorService::kServiceName);
+            auto optionalDonor = ShardSplitDonorService::DonorStateMachine::lookup(
+                opCtx, splitService, BSON("_id" << cmd.getMigrationId()));
+
+            uassert(ErrorCodes::NoSuchTenantMigration,
+                    str::stream() << "Could not find shard split with id " << cmd.getMigrationId(),
+                    optionalDonor);
+
+            auto donorPtr = optionalDonor.get();
+
+            auto decision = donorPtr->decisionFuture().get(opCtx);
+
+            uassert(
+                ErrorCodes::TenantMigrationInProgress,
+                "Could not forget migration with id {} since no decision has been made yet"_format(
+                    cmd.getMigrationId().toString()),
+                decision.state == ShardSplitDonorStateEnum::kCommitted ||
+                    decision.state == ShardSplitDonorStateEnum::kAborted);
+
+            donorPtr->tryForget();
+            donorPtr->completionFuture().get(opCtx);
+        }
+
+    private:
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                           ActionType::runTenantMigration));
+        }
+
+        bool supportsWriteConcern() const override {
+            return true;
+        }
+
+        NamespaceString ns() const {
+            return NamespaceString(request().getDbName(), "");
+        }
+    };
+
+    std::string help() const override {
+        return "Forget the shard split operation.";
+    }
+
+    bool adminOnly() const override {
+        return true;
+    }
+
+    BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return BasicCommand::AllowedOnSecondary::kNever;
+    }
+} forgetShardSplitCmd;
+
 
 }  // namespace
 }  // namespace mongo

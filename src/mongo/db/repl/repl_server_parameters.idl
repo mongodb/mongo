@@ -632,6 +632,16 @@ server_parameters:
         cpp_varname: allowMultipleArbiters
         default: false
 
+    shardSplitGarbageCollectionDelayMS:
+        description: >-
+            The amount of time in milliseconds that the donor should wait before
+            removing the shard split state document after receiving  forgetShardSplit.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: shardSplitGarbageCollectionDelayMS
+        default:
+            expr: 15 * 60 * 1000
+
 feature_flags:
     featureFlagRetryableFindAndModify:
         description: >-

@@ -89,5 +89,8 @@ const awaitSecondSplitOperation = startParallelShell(
 awaitSecondSplitOperation();
 assertMigrationState(donorPrimary, secondOperationId, "committed");
 
+jsTestLog("Running forgetShardSplit command");
+assert.commandWorked(adminDb.runCommand({forgetShardSplit: 1, migrationId}));
+
 test.stop();
 })();

@@ -81,3 +81,14 @@ commands:
       migrationId:
         description: "Unique identifier for the shard split operation."
         type: uuid
+  
+  forgetShardSplit:
+    description: "Parser for the `forgetShardSplit` command."
+    command_name: forgetShardSplit
+    strict: true
+    namespace: ignored
+    api_version: ""
+    fields:
+      migrationId:
+        description: "Unique identifier for the shard split operation."
+        type: uuid

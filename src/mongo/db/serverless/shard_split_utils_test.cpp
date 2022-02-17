@@ -82,7 +82,7 @@ TEST(MakeSplitConfig, toBSONRoundTripAbility) {
                                          << "recipientConfig" << resultRecipientConfigBSON);
 
     const ReplSetConfig splitConfigResult =
-        repl::makeSplitConfig(configA, recipientConfigSetName, recipientTagName);
+        serverless::makeSplitConfig(configA, recipientConfigSetName, recipientTagName);
 
     ASSERT_OK(splitConfigResult.validate());
     ASSERT_TRUE(splitConfigResult == ReplSetConfig::parse(splitConfigResult.toBSON()));
@@ -119,7 +119,7 @@ TEST(MakeSplitConfig, ValidateSplitConfigIntegrityTest) {
 
 
     const ReplSetConfig splitConfig =
-        repl::makeSplitConfig(config, recipientConfigSetName, recipientTagName);
+        serverless::makeSplitConfig(config, recipientConfigSetName, recipientTagName);
     ASSERT_OK(splitConfig.validate());
     ASSERT_EQ(splitConfig.getReplSetName(), donorConfigSetName);
     ASSERT_TRUE(splitConfig.toBSON().hasField("members"));
@@ -135,9 +135,10 @@ TEST(MakeSplitConfig, ValidateSplitConfigIntegrityTest) {
     ASSERT_TRUE(recipientConfigPtr->getRecipientConfig() == nullptr);
     ASSERT_EQ(recipientConfigPtr->getReplSetName(), recipientConfigSetName);
 
-    ASSERT_THROWS_CODE(repl::makeSplitConfig(splitConfig, recipientConfigSetName, recipientTagName),
-                       AssertionException,
-                       6201800 /*calling on a splitconfig*/);
+    ASSERT_THROWS_CODE(
+        serverless::makeSplitConfig(splitConfig, recipientConfigSetName, recipientTagName),
+        AssertionException,
+        6201800 /*calling on a splitconfig*/);
 }
 
 TEST(MakeSplitConfig, SplitConfigAssertionsTest) {
@@ -150,9 +151,9 @@ TEST(MakeSplitConfig, SplitConfigAssertionsTest) {
                                                         << "localhost:20002"
                                                         << "priority" << 0 << "votes" << 0)));
 
-    ASSERT_THROWS_CODE(repl::makeSplitConfig(ReplSetConfig::parse(baseConfigBSON),
-                                             recipientConfigSetName,
-                                             recipientTagName),
+    ASSERT_THROWS_CODE(serverless::makeSplitConfig(ReplSetConfig::parse(baseConfigBSON),
+                                                   recipientConfigSetName,
+                                                   recipientTagName),
                        AssertionException,
                        6201801 /*no recipient members created*/);
 
@@ -165,9 +166,9 @@ TEST(MakeSplitConfig, SplitConfigAssertionsTest) {
                                                    << BSON(recipientTagName << "one")))
                           << "settings" << BSON("electionTimeoutMillis" << 1000));
 
-    ASSERT_THROWS_CODE(repl::makeSplitConfig(ReplSetConfig::parse(baseConfigBSON),
-                                             recipientConfigSetName,
-                                             recipientTagName),
+    ASSERT_THROWS_CODE(serverless::makeSplitConfig(ReplSetConfig::parse(baseConfigBSON),
+                                                   recipientConfigSetName,
+                                                   recipientTagName),
                        AssertionException,
                        6201802 /*no donor members created*/);
 }

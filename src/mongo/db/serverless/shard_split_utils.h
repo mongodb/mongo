@@ -30,16 +30,16 @@
 #pragma once
 
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/serverless/shard_split_state_machine_gen.h"
 
 
 namespace mongo {
-namespace repl {
-
+namespace serverless {
 /**
  * @returns A list of `MemberConfig` for member nodes which match a provided replica set tag name
  */
-std::vector<MemberConfig> getRecipientMembers(const ReplSetConfig& config,
-                                              const StringData& recipientTagName);
+std::vector<repl::MemberConfig> getRecipientMembers(const repl::ReplSetConfig& config,
+                                                    const StringData& recipientTagName);
 
 
 /**
@@ -47,7 +47,7 @@ std::vector<MemberConfig> getRecipientMembers(const ReplSetConfig& config,
  * `recipientTagName`. The `recipientSetName` is the `replSet` parameter of the recipient
  * connection string.
  */
-ConnectionString makeRecipientConnectionString(const ReplSetConfig& config,
+ConnectionString makeRecipientConnectionString(const repl::ReplSetConfig& config,
                                                const StringData& recipientTagName,
                                                const StringData& recipientSetName);
 
@@ -57,9 +57,47 @@ ConnectionString makeRecipientConnectionString(const ReplSetConfig& config,
  * to filter the local member list for recipient nodes. The `recipientSetName` is used to validate
  * that we are indeed generating a config for a recipient set with a new name.
  */
-ReplSetConfig makeSplitConfig(const ReplSetConfig& config,
-                              const std::string& recipientSetName,
-                              const std::string& recipientTagName);
+repl::ReplSetConfig makeSplitConfig(const repl::ReplSetConfig& config,
+                                    const std::string& recipientSetName,
+                                    const std::string& recipientTagName);
 
-}  // namespace repl
+/**
+ * Inserts the shard split state document 'stateDoc' into
+ * 'config.tenantSplitDonors' collection. Also, creates the collection if not present
+ * before inserting the document.
+ *
+ * NOTE: A state doc might get inserted based on a decision made out of a stale read within a
+ * storage transaction. Callers are expected to have their own concurrency mechanism to handle
+ * write skew problem.
+ *
+ * @Returns 'ConflictingOperationInProgress' error code if an active shard split op found for the
+ * given state doc id provided in the 'stateDoc'.
+ *
+ * Throws 'DuplicateKey' error code if a document already exists on the disk with the same
+ * shardSplitId, irrespective of the document marked for garbage collect or not.
+ */
+Status insertStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& stateDoc);
+
+/**
+ * Updates the shard split state doc in the database.
+ *
+ * Returns 'NoSuchKey' error code if no state document already exists on the disk with the same
+ * shardSplitId.
+ */
+Status updateStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& stateDoc);
+
+/**
+ * Returns the state doc matching the document with shardSplitId from the disk if it
+ * exists. Reads at "no" timestamp i.e, reading with the "latest" snapshot reflecting up to date
+ * data.
+ *
+ * If the stored state doc on disk contains invalid BSON, the 'InvalidBSON' error code is
+ * returned.
+ *
+ * Returns 'NoMatchingDocument' error code if no document with 'shardSplitId' is found.
+ */
+StatusWith<ShardSplitDonorDocument> getStateDocument(OperationContext* opCtx,
+                                                     const UUID& shardSplitId);
+
+}  // namespace serverless
 }  // namespace mongo

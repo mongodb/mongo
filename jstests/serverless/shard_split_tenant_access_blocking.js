@@ -70,5 +70,9 @@ awaitCommand();
 
 jsTestLog("Asserting state document exist after command");
 assertMigrationState(donorPrimary, migrationId, "committed");
+
+jsTestLog("Running forgetShardSplit command");
+assert.commandWorked(adminDb.runCommand({forgetShardSplit: 1, migrationId}));
+
 test.stop();
 })();

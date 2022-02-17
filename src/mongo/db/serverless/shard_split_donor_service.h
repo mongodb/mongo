@@ -80,6 +80,12 @@ protected:
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override;
 
 private:
+    ExecutorFuture<void> _createStateDocumentTTLIndex(
+        std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token);
+
+    ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                         const CancellationToken& token) override;
+
     ServiceContext* const _serviceContext;
 };
 
@@ -103,6 +109,12 @@ public:
      */
     void tryAbort();
 
+    /**
+     * Try to forget the shard split operation. If the operation is not in a final state, the
+     * promise will be set but the garbage collection will be skipped.
+     */
+    void tryForget();
+
     Status checkIfOptionsConflict(const ShardSplitDonorDocument& stateDoc) const;
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -110,7 +122,11 @@ public:
 
     void interrupt(Status status) override;
 
-    SharedSemiFuture<DurableState> completionFuture() const {
+    SharedSemiFuture<DurableState> decisionFuture() const {
+        return _decisionPromise.getFuture();
+    }
+
+    SharedSemiFuture<void> completionFuture() const {
         return _completionPromise.getFuture();
     }
 
@@ -128,6 +144,14 @@ public:
     boost::optional<BSONObj> reportForCurrentOp(
         MongoProcessInterface::CurrentOpConnectionsMode connMode,
         MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
+
+    /**
+     * Returns true if the state doc was marked to expire (marked garbage collectable).
+     */
+    bool isGarbageCollectable() const {
+        stdx::lock_guard<Latch> lg(_mutex);
+        return !!_stateDoc.getExpireAt();
+    }
 
 private:
     // Tasks
@@ -164,6 +188,12 @@ private:
         const CancellationToken& instanceAbortToken,
         const CancellationToken& abortToken);
 
+    ExecutorFuture<repl::OpTime> _markStateDocAsGarbageCollectable(
+        std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token);
+
+    ExecutorFuture<void> _waitForForgetCmdThenMarkGarbageCollectible(
+        const ScopedTaskExecutorPtr& executor, const CancellationToken& token);
+
 private:
     const NamespaceString _stateDocumentsNS = NamespaceString::kTenantSplitDonorsNamespace;
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardSplitDonorService::_mutex");
@@ -186,11 +216,17 @@ private:
     // A promise fulfilled when the replicaSetMonitor has been created;
     SharedPromise<void> _replicaSetMonitorCreatedPromise;
 
-    // A promise fulfilled when the shard split operation has fully completed
-    SharedPromise<DurableState> _completionPromise;
+    // A promise fulfilled when the shard split has committed or aborted.
+    SharedPromise<DurableState> _decisionPromise;
+
+    // A promise fulfilled when the shard split operation has fully completed.
+    SharedPromise<void> _completionPromise;
 
     // A promise fulfilled when all recipient nodes have accepted the split.
     SharedPromise<void> _recipientAcceptedSplit;
+
+    // A promise fulfilled when tryForget is called.
+    SharedPromise<void> _forgetShardSplitReceivedPromise;
 };
 
 }  // namespace mongo
