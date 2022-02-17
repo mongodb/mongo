@@ -106,12 +106,18 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     auto renameToEvent =
         BSON("o.renameCollection" << BSON("$exists" << true) << "o.to" << BSONRegEx(nsRegex));
     const auto createEvent = BSON("o.create" << BSONRegEx(collRegex));
+    const auto createIndexesEvent = BSON("o.createIndexes" << BSONRegEx(collRegex));
+    const auto commitIndexBuildEvent = BSON("o.commitIndexBuild" << BSONRegEx(collRegex));
+    const auto dropIndexesEvent = BSON("o.dropIndexes" << BSONRegEx(collRegex));
 
     auto orCmdEvents = std::make_unique<OrMatchExpression>();
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(dropEvent, expCtx));
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(renameFromEvent, expCtx));
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(renameToEvent, expCtx));
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(createEvent, expCtx));
+    orCmdEvents->add(MatchExpressionParser::parseAndNormalize(createIndexesEvent, expCtx));
+    orCmdEvents->add(MatchExpressionParser::parseAndNormalize(commitIndexBuildEvent, expCtx));
+    orCmdEvents->add(MatchExpressionParser::parseAndNormalize(dropIndexesEvent, expCtx));
 
     // Omit dropDatabase on single-collection streams. While the stream will be invalidated before
     // it sees this event, the user will incorrectly see it if they startAfter the invalidate.

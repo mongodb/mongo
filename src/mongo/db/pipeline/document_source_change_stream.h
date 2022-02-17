@@ -225,6 +225,8 @@ public:
 
     // These events are guarded behind the 'showExpandedEvents' flag.
     static constexpr StringData kCreateOpType = "create"_sd;
+    static constexpr StringData kCreateIndexesOpType = "createIndexes"_sd;
+    static constexpr StringData kDropIndexesOpType = "dropIndexes"_sd;
 
     static constexpr StringData kRegexAllCollections = R"((?!(\$|system\.)))"_sd;
     static constexpr StringData kRegexAllDBs = R"(^(?!(admin|config|local)\.)[^.]+)"_sd;

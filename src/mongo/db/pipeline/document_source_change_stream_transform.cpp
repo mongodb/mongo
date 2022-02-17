@@ -341,6 +341,24 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
                 operationType = DocumentSourceChangeStream::kCreateOpType;
                 nss = NamespaceString(nss.db(), nssField.getString());
                 operationDescription = Value(copyDocExceptFields(oField, {"create"_sd}));
+            } else if (auto nssField = oField.getField("createIndexes"); !nssField.missing()) {
+                operationType = DocumentSourceChangeStream::kCreateIndexesOpType;
+                nss = NamespaceString(nss.db(), nssField.getString());
+                // Wrap the index spec in an "indexes" array for consistency with commitIndexBuild.
+                auto indexSpec = Value(copyDocExceptFields(oField, {"createIndexes"_sd}));
+                operationDescription = Value(Document{{"indexes", std::vector<Value>{indexSpec}}});
+            } else if (auto nssField = oField.getField("commitIndexBuild"); !nssField.missing()) {
+                operationType = DocumentSourceChangeStream::kCreateIndexesOpType;
+                nss = NamespaceString(nss.db(), nssField.getString());
+                operationDescription = Value(Document{{"indexes", oField.getField("indexes")}});
+            } else if (auto nssField = oField.getField("dropIndexes"); !nssField.missing()) {
+                const auto o2Field = input[repl::OplogEntry::kObject2FieldName].getDocument();
+                operationType = DocumentSourceChangeStream::kDropIndexesOpType;
+                nss = NamespaceString(nss.db(), nssField.getString());
+                // Wrap the index spec in an "indexes" array for consistency with createIndexes
+                // and commitIndexBuild.
+                auto indexSpec = Value(copyDocExceptFields(o2Field, {"dropIndexes"_sd}));
+                operationDescription = Value(Document{{"indexes", std::vector<Value>{indexSpec}}});
             } else {
                 // All other commands will invalidate the stream.
                 operationType = DocumentSourceChangeStream::kInvalidateOpType;

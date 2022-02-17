@@ -7,6 +7,7 @@
  *   # The test assumes certain ordering of the events. The chunk migrations on a sharded collection
  *   # could break the test.
  *   assumes_unsharded_collection,
+ *   assumes_against_mongod_not_mongos,
  * ]
  */
 (function() {
@@ -37,49 +38,92 @@ function runTest(collNameForChangeStream) {
         aggregateOptions: {cursor: {batchSize: 0}}
     });
 
-    //
-    // For 'create' event.
-    //
+    // Test the 'create' event.
     assert.commandWorked(testDB.createCollection(collName));
-    const createEvent = test.getOneChange(cursor);
+    const createEvent = test.assertNextChangesEqual({
+        cursor: cursor,
+        expectedChanges: {
+            operationType: "create",
+            ns: ns,
+            operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}}
+        }
+    })[0];
 
-    assertChangeStreamEventEq(createEvent, {
-        operationType: "create",
-        ns: ns,
-        operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}}
-    });
+    // Test the 'createIndexes' event on an empty collection.
+    assert.commandWorked(testDB[collName].createIndex({a: 1}));
+    const createIndexesEvent1 = test.assertNextChangesEqual({
+        cursor: cursor,
+        expectedChanges: {
+            operationType: "createIndexes",
+            ns: ns,
+            operationDescription: {indexes: [{v: 2, key: {a: 1}, name: "a_1"}]}
+        }
+    })[0];
 
-    // Insert a document before starting the next change stream so that we can validate the resuming
-    // behavior.
-    assert.commandWorked(testDB[collName].insert({_id: 1}));
-
-    // Resume with 'resumeAfter'.
-    pipeline = [{$changeStream: {showExpandedEvents: true, resumeAfter: createEvent._id}}];
-    cursor = test.startWatchingChanges({pipeline, collection: collNameForChangeStream});
-
-    test.assertNextChangesEqual({
-        cursor,
+    // Insert a document so that the collection is not empty so that we can get coverage for
+    // 'commitIndexBuild' when creating an index on field "b" below.
+    assert.commandWorked(testDB[collName].insert({_id: 1, a: 1, b: 1}));
+    const insertEvent1 = test.assertNextChangesEqual({
+        cursor: cursor,
         expectedChanges: {
             operationType: "insert",
             ns: ns,
-            fullDocument: {_id: 1},
+            fullDocument: {_id: 1, a: 1, b: 1},
             documentKey: {_id: 1},
         }
-    });
+    })[0];
 
-    // Resume with 'startAfter'.
-    pipeline = [{$changeStream: {showExpandedEvents: true, startAfter: createEvent._id}}];
-    cursor = test.startWatchingChanges({pipeline, collection: collNameForChangeStream});
+    // Test the 'createIndexes' event on a non-empty collection.
+    assert.commandWorked(testDB[collName].createIndex({b: -1}));
+    const createIndexesEvent2 = test.assertNextChangesEqual({
+        cursor: cursor,
+        expectedChanges: {
+            operationType: "createIndexes",
+            ns: ns,
+            operationDescription: {indexes: [{v: 2, key: {b: -1}, name: "b_-1"}]}
+        }
+    })[0];
 
-    test.assertNextChangesEqual({
-        cursor,
+    // Test the 'dropIndexes' event.
+    assert.commandWorked(testDB[collName].dropIndex({b: -1}));
+    const dropIndexesEvent = test.assertNextChangesEqual({
+        cursor: cursor,
+        expectedChanges: {
+            operationType: "dropIndexes",
+            ns: ns,
+            operationDescription: {indexes: [{v: 2, key: {b: -1}, name: "b_-1"}]}
+        }
+    })[0];
+
+    // Insert another document so that we can validate the resuming behavior for the
+    // dropIndexes event.
+    assert.commandWorked(testDB[collName].insert({_id: 2, a: 2, b: 2}));
+    const insertEvent2 = test.assertNextChangesEqual({
+        cursor: cursor,
         expectedChanges: {
             operationType: "insert",
             ns: ns,
-            fullDocument: {_id: 1},
-            documentKey: {_id: 1},
+            fullDocument: {_id: 2, a: 2, b: 2},
+            documentKey: {_id: 2},
         }
-    });
+    })[0];
+
+    function testResume(resumeOption) {
+        function testResumeForEvent(event, nextEventDesc) {
+            pipeline = [{$changeStream: {showExpandedEvents: true, [resumeOption]: event._id}}];
+            cursor = test.startWatchingChanges({pipeline, collection: collNameForChangeStream});
+            test.assertNextChangesEqual({cursor: cursor, expectedChanges: nextEventDesc});
+        }
+
+        testResumeForEvent(createEvent, createIndexesEvent1);
+        testResumeForEvent(createIndexesEvent1, insertEvent1);
+        testResumeForEvent(createIndexesEvent2, dropIndexesEvent);
+        testResumeForEvent(dropIndexesEvent, insertEvent2);
+    }
+
+    // Testing resuming with 'resumeAfter' and 'startAfter'.
+    testResume("resumeAfter");
+    testResume("startAfter");
 
     testDB[collName].drop();
 }

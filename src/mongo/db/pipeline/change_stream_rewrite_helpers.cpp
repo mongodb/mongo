@@ -109,6 +109,12 @@ std::unique_ptr<MatchExpression> matchRewriteOperationType(
         {"replace", {{"op", "u"_sd}, {"o._id"_sd, kExistsTrue}}},
         {"drop", {{"op", "c"_sd}, {"o.drop"_sd, kExistsTrue}}},
         {"create", {{"op", "c"_sd}, {"o.create"_sd, kExistsTrue}}},
+        {"createIndexes",
+         {{"op", "c"_sd},
+          {"$or"_sd,
+           std::vector<Value>{Value({{"o.createIndexes"_sd, kExistsTrue}}),
+                              Value({{"o.commitIndexBuild"_sd, kExistsTrue}})}}}},
+        {"dropIndexes", {{"op", "c"_sd}, {"o.dropIndexes"_sd, kExistsTrue}}},
         {"rename", {{"op", "c"_sd}, {"o.renameCollection"_sd, kExistsTrue}}},
         {"dropDatabase", {{"op", "c"_sd}, {"o.dropDatabase"_sd, kExistsTrue}}}};
 
@@ -209,6 +215,12 @@ boost::intrusive_ptr<Expression> exprRewriteOperationType(
     opCases.push_back(
         fromjson("{case: {$ne: ['$o.renameCollection', '$$REMOVE']}, then: 'rename'}"));
     opCases.push_back(fromjson("{case: {$ne: ['$o.create', '$$REMOVE']}, then: 'create'}"));
+    opCases.push_back(
+        fromjson("{case: {$ne: ['$o.createIndexes', '$$REMOVE']}, then: 'createIndexes'}"));
+    opCases.push_back(
+        fromjson("{case: {$ne: ['$o.commitIndexBuild', '$$REMOVE']}, then: 'createIndexes'}"));
+    opCases.push_back(
+        fromjson("{case: {$ne: ['$o.dropIndexes', '$$REMOVE']}, then: 'dropIndexes'}"));
 
     // The default case, if nothing matches.
     auto defaultCase = ExpressionConstant::create(expCtx.get(), Value())->serialize(false);
@@ -1013,6 +1025,27 @@ std::unique_ptr<MatchExpression> matchRewriteNs(
     tassert(6280101, "Unexpected rewrite failure", createNsRewrite);
     cmdCases->add(std::move(createNsRewrite));
 
+    // The 'createIndexes' event is rewritten to the cmdNs in 'ns' and the collection name in
+    // 'o.createIndexes'.
+    auto createIndexesNsRewrite = matchRewriteGenericNamespace(
+        expCtx, predicate, "ns"_sd, true /* nsFieldIsCmdNs */, "o.createIndexes"_sd);
+    tassert(6339400, "Unexpected rewrite failure", createIndexesNsRewrite);
+    cmdCases->add(std::move(createIndexesNsRewrite));
+
+    // The 'commitIndexBuild' event is rewritten to the cmdNs in 'ns' and the collection name in
+    // 'o.commitIndexBuild'.
+    auto commitIndexBuildNsRewrite = matchRewriteGenericNamespace(
+        expCtx, predicate, "ns"_sd, true /* nsFieldIsCmdNs */, "o.commitIndexBuild"_sd);
+    tassert(6339401, "Unexpected rewrite failure", commitIndexBuildNsRewrite);
+    cmdCases->add(std::move(commitIndexBuildNsRewrite));
+
+    // The 'dropIndexes' event is rewritten to the cmdNs in 'ns' and the collection name in
+    // 'o.dropIndexes'.
+    auto dropIndexesNsRewrite = matchRewriteGenericNamespace(
+        expCtx, predicate, "ns"_sd, true /* nsFieldIsCmdNs */, "o.dropIndexes"_sd);
+    tassert(6339402, "Unexpected rewrite failure", dropIndexesNsRewrite);
+    cmdCases->add(std::move(dropIndexesNsRewrite));
+
     // The 'dropDatabase' event is rewritten to the cmdNs in 'ns'. It does not have a collection
     // field.
     auto dropDbNsRewrite =
@@ -1103,6 +1136,12 @@ boost::intrusive_ptr<Expression> exprRewriteNs(
                                  << "{case: {$ne: ['$o.renameCollection', '$$REMOVE']}, then: "
                                  << getCollFromNSField("o.renameCollection") << "}"));
     collCases.push_back(fromjson("{case: {$ne: ['$o.create', '$$REMOVE']}, then: '$o.create'}"));
+    collCases.push_back(
+        fromjson("{case: {$ne: ['$o.createIndexes', '$$REMOVE']}, then: '$o.createIndexes'}"));
+    collCases.push_back(fromjson(
+        "{case: {$ne: ['$o.commitIndexBuild', '$$REMOVE']}, then: '$o.commitIndexBuild'}"));
+    collCases.push_back(
+        fromjson("{case: {$ne: ['$o.dropIndexes', '$$REMOVE']}, then: '$o.dropIndexes'}"));
 
     // The default case, if nothing matches.
     auto defaultCase = ExpressionConstant::create(expCtx.get(), Value())->serialize(false);
