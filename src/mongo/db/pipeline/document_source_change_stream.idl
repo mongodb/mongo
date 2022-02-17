@@ -150,6 +150,12 @@ structs:
                              of data. Instead they reflect this data moving from one shard to
                              another.
 
+            showSystemEvents:
+                cpp_name: showSystemEvents
+                type: optionalBool
+                description: A flag indicating whether the stream should report events on system
+                             collections.
+
             allowToRunOnConfigDB:
                 cpp_name: allowToRunOnConfigDB
                 type: optionalBool

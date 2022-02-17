@@ -192,6 +192,7 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
      * 'aggregateOptions' if provided and saves the cursor so that it can be cleaned up later.
      */
     self.startWatchingAllChangesForCluster = function(aggregateOptions) {
+        assert.eq(_db.getName(), "admin");
         return self.startWatchingChanges({
             pipeline: [{$changeStream: {allChangesForCluster: true}}],
             collection: 1,

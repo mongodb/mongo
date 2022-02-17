@@ -56,9 +56,9 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const MatchExpression* userMatch) {
 
     // Regexes to match each of the necessary namespace components for the current stream type.
-    auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx->ns);
-    auto collRegex = DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx->ns);
-    auto cmdNsRegex = DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx->ns);
+    auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx);
+    auto collRegex = DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx);
+    auto cmdNsRegex = DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx);
 
     auto streamType = DocumentSourceChangeStream::getChangeStreamType(expCtx->ns);
 
@@ -192,9 +192,9 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
         BSONArrayBuilder orBuilder(applyOpsBuilder.subarrayStart("$or"));
         {
             // Regexes for full-namespace, collection, and command-namespace matching.
-            auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx->ns);
-            auto collRegex = DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx->ns);
-            auto cmdNsRegex = DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx->ns);
+            auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx);
+            auto collRegex = DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx);
+            auto cmdNsRegex = DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx);
 
             // Match relevant CRUD events on the monitored namespaces.
             orBuilder.append(BSON("o.applyOps.ns" << BSONRegEx(nsRegex)));
@@ -253,7 +253,7 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
     }
 
     // Also filter for shardCollection events, which are recorded as {op: 'n'} in the oplog.
-    auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx->ns);
+    auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx);
     internalOpTypeOrBuilder.append(BSON("o2.shardCollection" << BSONRegEx(nsRegex)));
 
     // Finalize the array of $or filter predicates.

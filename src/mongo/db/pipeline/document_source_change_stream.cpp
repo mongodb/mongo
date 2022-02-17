@@ -105,6 +105,8 @@ constexpr StringData DocumentSourceChangeStream::kReshardDoneCatchUpOpType;
 constexpr StringData DocumentSourceChangeStream::kNewShardDetectedOpType;
 
 constexpr StringData DocumentSourceChangeStream::kRegexAllCollections;
+constexpr StringData DocumentSourceChangeStream::kRegexAllCollectionsShowSystemEvents;
+
 constexpr StringData DocumentSourceChangeStream::kRegexAllDBs;
 constexpr StringData DocumentSourceChangeStream::kRegexCmdColl;
 
@@ -127,28 +129,44 @@ DocumentSourceChangeStream::ChangeStreamType DocumentSourceChangeStream::getChan
                                                      : ChangeStreamType::kSingleCollection));
 }
 
-std::string DocumentSourceChangeStream::getNsRegexForChangeStream(const NamespaceString& nss) {
-    auto type = getChangeStreamType(nss);
+StringData DocumentSourceChangeStream::resolveAllCollectionsRegex(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // We never expect this method to be called except when building a change stream pipeline.
+    tassert(6189300,
+            "Expected change stream spec to be set on the expression context",
+            expCtx->changeStreamSpec);
+    // If 'showSystemEvents' is set, return a less stringent regex.
+    return (expCtx->changeStreamSpec->getShowSystemEvents()
+                ? DocumentSourceChangeStream::kRegexAllCollectionsShowSystemEvents
+                : DocumentSourceChangeStream::kRegexAllCollections);
+}
+
+std::string DocumentSourceChangeStream::getNsRegexForChangeStream(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto type = getChangeStreamType(expCtx->ns);
+    const auto& nss = expCtx->ns;
     switch (type) {
         case ChangeStreamType::kSingleCollection:
             // Match the target namespace exactly.
             return "^" + regexEscapeNsForChangeStream(nss.ns()) + "$";
         case ChangeStreamType::kSingleDatabase:
             // Match all namespaces that start with db name, followed by ".", then NOT followed by
-            // '$' or 'system.'
+            // '$' or 'system.' unless 'showSystemEvents' is set.
             return "^" + regexEscapeNsForChangeStream(nss.db().toString()) + "\\." +
-                kRegexAllCollections;
+                resolveAllCollectionsRegex(expCtx);
         case ChangeStreamType::kAllChangesForCluster:
             // Match all namespaces that start with any db name other than admin, config, or local,
-            // followed by ".", then NOT followed by '$' or 'system.'.
-            return kRegexAllDBs + "\\." + kRegexAllCollections;
+            // followed by ".", then NOT '$' or 'system.' unless 'showSystemEvents' is set.
+            return kRegexAllDBs + "\\." + resolveAllCollectionsRegex(expCtx);
         default:
             MONGO_UNREACHABLE;
     }
 }
 
-std::string DocumentSourceChangeStream::getCollRegexForChangeStream(const NamespaceString& nss) {
-    auto type = getChangeStreamType(nss);
+std::string DocumentSourceChangeStream::getCollRegexForChangeStream(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto type = getChangeStreamType(expCtx->ns);
+    const auto& nss = expCtx->ns;
     switch (type) {
         case ChangeStreamType::kSingleCollection:
             // Match the target collection exactly.
@@ -156,14 +174,16 @@ std::string DocumentSourceChangeStream::getCollRegexForChangeStream(const Namesp
         case ChangeStreamType::kSingleDatabase:
         case ChangeStreamType::kAllChangesForCluster:
             // Match any collection; database filtering will be done elsewhere.
-            return "^" + kRegexAllCollections;
+            return "^" + resolveAllCollectionsRegex(expCtx);
         default:
             MONGO_UNREACHABLE;
     }
 }
 
-std::string DocumentSourceChangeStream::getCmdNsRegexForChangeStream(const NamespaceString& nss) {
-    auto type = getChangeStreamType(nss);
+std::string DocumentSourceChangeStream::getCmdNsRegexForChangeStream(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto type = getChangeStreamType(expCtx->ns);
+    const auto& nss = expCtx->ns;
     switch (type) {
         case ChangeStreamType::kSingleCollection:
         case ChangeStreamType::kSingleDatabase:
@@ -231,6 +251,9 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
 
     // Make sure that it is legal to run this $changeStream before proceeding.
     DocumentSourceChangeStream::assertIsLegalSpecification(expCtx, spec);
+
+    // Save a copy of the spec on the expression context. Used when building the oplog filter.
+    expCtx->changeStreamSpec = spec;
 
     // If we see this stage on a shard, it means that the raw $changeStream stage was dispatched to
     // us from an old mongoS. Build a legacy shard pipeline.
@@ -376,7 +399,7 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
 
     uassert(6188501,
             "the 'featureFlagChangeStreamsVisibility' should be enabled to use "
-            "'showEnhancedEvents:true' in the change stream spec",
+            "'showExpandedEvents:true' in the change stream spec",
             feature_flags::gFeatureFlagChangeStreamsVisibility.isEnabledAndIgnoreFCV() ||
                 !spec.getShowExpandedEvents());
 
@@ -385,6 +408,12 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
             "'showRawUpdateDescription:true' in the change stream spec",
             feature_flags::gFeatureFlagChangeStreamsVisibility.isEnabledAndIgnoreFCV() ||
                 !spec.getShowRawUpdateDescription());
+
+    uassert(6189301,
+            "the 'featureFlagChangeStreamsVisibility' should be enabled to use "
+            "'showSystemEvents:true' in the change stream spec",
+            feature_flags::gFeatureFlagChangeStreamsVisibility.isEnabledAndIgnoreFCV() ||
+                !spec.getShowSystemEvents());
 
     uassert(31123,
             "Change streams from mongos may not show migration events",

@@ -600,6 +600,16 @@ Mongo.prototype._extractChangeStreamOptions = function(options) {
         delete options.showExpandedEvents;
     }
 
+    if (options.hasOwnProperty("showSystemEvents")) {
+        changeStreamOptions.showSystemEvents = options.showSystemEvents;
+        delete options.showSystemEvents;
+    }
+
+    if (options.hasOwnProperty("showRawUpdateDescription")) {
+        changeStreamOptions.showRawUpdateDescription = options.showRawUpdateDescription;
+        delete options.showRawUpdateDescription;
+    }
+
     return [{$changeStream: changeStreamOptions}, options];
 };
 

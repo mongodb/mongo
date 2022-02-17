@@ -820,7 +820,7 @@ std::unique_ptr<MatchExpression> matchRewriteGenericNamespace(
                     if (fieldName == "db") {
                         return "^" +
                             DocumentSourceChangeStream::regexEscapeNsForChangeStream(nsElem.str()) +
-                            "\\." + DocumentSourceChangeStream::kRegexAllCollections;
+                            "\\." + DocumentSourceChangeStream::resolveAllCollectionsRegex(expCtx);
                     }
                     return DocumentSourceChangeStream::kRegexAllDBs + "\\." +
                         DocumentSourceChangeStream::regexEscapeNsForChangeStream(nsElem.str()) +

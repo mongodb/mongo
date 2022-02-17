@@ -121,6 +121,12 @@ public:
                     "API Version 1",
                     _spec.Obj()[DocumentSourceChangeStreamSpec::kShowRawUpdateDescriptionFieldName]
                         .eoo());
+
+                uassert(
+                    ErrorCodes::APIStrictError,
+                    "The 'showSystemEvents' parameter to $changeStream is not supported in API "
+                    "Version 1",
+                    _spec.Obj()[DocumentSourceChangeStreamSpec::kShowSystemEventsFieldName].eoo());
             }
         }
 
@@ -229,7 +235,12 @@ public:
     static constexpr StringData kDropIndexesOpType = "dropIndexes"_sd;
     static constexpr StringData kShardCollectionOpType = "shardCollection"_sd;
 
+    // Default regex for collections match which prohibits system collections.
     static constexpr StringData kRegexAllCollections = R"((?!(\$|system\.)))"_sd;
+    // Regex matching all regular collections plus certain system collections.
+    static constexpr StringData kRegexAllCollectionsShowSystemEvents =
+        R"((?!(\$|system\.(?!(js$)))))"_sd;
+
     static constexpr StringData kRegexAllDBs = R"(^(?!(admin|config|local)\.)[^.]+)"_sd;
     static constexpr StringData kRegexCmdColl = R"(\$cmd$)"_sd;
 
@@ -239,9 +250,14 @@ public:
      * Helpers for Determining which regex to match a change stream against.
      */
     static ChangeStreamType getChangeStreamType(const NamespaceString& nss);
-    static std::string getNsRegexForChangeStream(const NamespaceString& nss);
-    static std::string getCollRegexForChangeStream(const NamespaceString& nss);
-    static std::string getCmdNsRegexForChangeStream(const NamespaceString& nss);
+    static std::string getNsRegexForChangeStream(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    static std::string getCollRegexForChangeStream(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    static std::string getCmdNsRegexForChangeStream(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    static StringData resolveAllCollectionsRegex(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     static std::string regexEscapeNsForChangeStream(StringData source);
 

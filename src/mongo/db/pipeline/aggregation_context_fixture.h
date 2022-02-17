@@ -56,6 +56,7 @@ public:
         _expCtx = make_intrusive<ExpressionContextForTest>(_opCtx.get(), nss);
         unittest::TempDir tempDir("AggregationContextFixture");
         _expCtx->tempDir = tempDir.path();
+        _expCtx->changeStreamSpec = DocumentSourceChangeStreamSpec();
     }
 
     auto getExpCtx() {

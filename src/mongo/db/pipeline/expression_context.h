@@ -41,6 +41,7 @@
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/javascript_execution.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
@@ -450,6 +451,9 @@ public:
 
     // When non-empty, contains the unmodified user provided aggregation command.
     BSONObj originalAggregateCommand;
+
+    // If present, the spec associated with the current change stream pipeline.
+    boost::optional<DocumentSourceChangeStreamSpec> changeStreamSpec;
 
     // True if the expression context is the original one for a given pipeline.
     // False if another context is created for the same pipeline. Used to disable duplicate
