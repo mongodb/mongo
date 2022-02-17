@@ -478,8 +478,6 @@ env.Library(
         'collection_catalog_helper.cpp',
         'coll_mod.cpp',
         'coll_mod_index.cpp',
-        'coll_mod_op_observer.cpp',
-        'coll_mod_write_ops_tracker.cpp',
         "collection_compact.cpp",
         'collection_uuid_mismatch.cpp',
         'create_collection.cpp',

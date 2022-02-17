@@ -117,6 +117,8 @@ assert.eq(idxSpec.expireAfterSeconds, 10);
 // option is a no-op, the operation as a whole will NOT be a no-op - instead, it will generate an
 // oplog entry with only 'unique'. Ditto for the command result returned to the user.
 if (collModIndexUniqueEnabled) {
+    assert.commandWorked(primaryDB.runCommand(
+        {collMod: collName, index: {keyPattern: {c: 1}, disallowNewDuplicateKeys: true}}));
     assert.commandFailedWithCode(primaryDB.runCommand({
         "collMod": primaryColl.getName(),
         "index": {"name": "c_1", "unique": false, "hidden": false},
@@ -140,6 +142,8 @@ if (collModIndexUniqueEnabled) {
 
     // Validate that if the 'unique' option is specified but is a no-op, the operation as a whole
     // will be a no-op.
+    assert.commandWorked(primaryDB.runCommand(
+        {collMod: collName, index: {keyPattern: {d: 1}, disallowNewDuplicateKeys: true}}));
     result = assert.commandWorked(primaryDB.runCommand({
         "collMod": primaryColl.getName(),
         "index": {"name": "d_1", "unique": true},
@@ -147,6 +151,7 @@ if (collModIndexUniqueEnabled) {
     validateResultForCollMod(result, {});
     validateCollModOplogEntryCount({
         "o.index.name": "d_1",
+        "o.index.disallowNewDuplicateKeys": {$exists: false},
     },
                                    0);
 
@@ -158,6 +163,8 @@ if (collModIndexUniqueEnabled) {
 
     // Validate that if both the 'hidden' and 'unique' options are specified but the
     // 'hidden' and 'unique' options are no-ops, the operation as a whole will be a no-op.
+    assert.commandWorked(primaryDB.runCommand(
+        {collMod: collName, index: {keyPattern: {e: 1}, disallowNewDuplicateKeys: true}}));
     result = assert.commandWorked(primaryDB.runCommand({
         "collMod": primaryColl.getName(),
         "index": {"name": "e_1", "hidden": true, "unique": true},
@@ -165,6 +172,7 @@ if (collModIndexUniqueEnabled) {
     validateResultForCollMod(result, {});
     validateCollModOplogEntryCount({
         "o.index.name": "e_1",
+        "o.index.disallowNewDuplicateKeys": {$exists: false},
     },
                                    0);
 
@@ -178,6 +186,8 @@ if (collModIndexUniqueEnabled) {
     // 'unique' option is a no-op, the operation as a whole will NOT be a no-op - instead, it will
     // generate an oplog entry with only 'expireAfterSeconds'. Ditto for the command result returned
     // to the user.
+    assert.commandWorked(primaryDB.runCommand(
+        {collMod: collName, index: {keyPattern: {f: 1}, disallowNewDuplicateKeys: true}}));
     result = assert.commandWorked(primaryDB.runCommand({
         "collMod": primaryColl.getName(),
         "index": {"name": "f_1", "expireAfterSeconds": 20, "unique": true},
@@ -201,6 +211,8 @@ if (collModIndexUniqueEnabled) {
     // 'hidden' and 'unique' options are no-ops, the operation as a whole will NOT be a no-op -
     // instead, it will generate an oplog entry with only 'expireAfterSeconds'. Ditto for the
     // command result returned to the user.
+    assert.commandWorked(primaryDB.runCommand(
+        {collMod: collName, index: {keyPattern: {g: 1}, disallowNewDuplicateKeys: true}}));
     result = assert.commandWorked(primaryDB.runCommand({
         "collMod": primaryColl.getName(),
         "index": {"name": "g_1", "expireAfterSeconds": 30, "hidden": true, "unique": true},

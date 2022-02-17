@@ -78,7 +78,7 @@ const testCollModConvertUniqueWithSideWrites = function(initialDocs,
 
     let awaitCollMod = () => {};
     const failPoint = configureFailPoint(
-        primary, 'hangAfterCollModIndexUniqueSideWriteTracker', {nss: coll.getFullName()});
+        primary, 'hangAfterCollModIndexUniqueFullIndexScan', {nss: coll.getFullName()});
     try {
         // Starts collMod unique index conversion.
         if (!expectedViolations) {

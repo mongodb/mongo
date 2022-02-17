@@ -38,7 +38,6 @@
 
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/coll_mod_index.h"
-#include "mongo/db/catalog/coll_mod_write_ops_tracker.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/create_collection.h"
@@ -72,7 +71,8 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterDatabaseLock);
-MONGO_FAIL_POINT_DEFINE(hangAfterCollModIndexUniqueSideWriteTracker);
+MONGO_FAIL_POINT_DEFINE(hangAfterCollModIndexUniqueFullIndexScan);
+MONGO_FAIL_POINT_DEFINE(hangAfterCollModIndexUniqueReleaseIXLock);
 
 void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
     auto dss = DatabaseShardingState::get(opCtx, nss.db().toString());
@@ -275,6 +275,14 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
             auto indexObjForOplog = indexObj;
 
             if (cmdIndex.getUnique()) {
+                // Disallow one-step unique convertion. The user has to set
+                // 'disallowNewDuplicateKeys' to true first.
+                if (!cmrIndex->idx->disallowNewDuplicateKeys()) {
+                    return Status(ErrorCodes::InvalidOptions,
+                                  "Cannot make index unique with 'disallowNewDuplicateKeys=false'. "
+                                  "Run collMod to set it first.");
+                }
+
                 cmr.numModifications++;
                 if (bool unique = *cmdIndex.getUnique(); !unique) {
                     return Status(ErrorCodes::BadValue, "Cannot make index non-unique");
@@ -566,8 +574,9 @@ Status _processCollModDryRunMode(OperationContext* opCtx,
     return Status::OK();
 }
 
-StatusWith<std::unique_ptr<CollModWriteOpsTracker::Token>> _setUpCollModIndexUnique(
-    OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID, const CollMod& cmd) {
+StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(OperationContext* opCtx,
+                                                            const NamespaceStringOrUUID& nsOrUUID,
+                                                            const CollMod& cmd) {
     // Acquires the MODE_IX lock with the intent to write to the collection later in the collMod
     // operation while still allowing concurrent writes. This also makes sure the operation is
     // killed during a stepdown.
@@ -580,10 +589,6 @@ StatusWith<std::unique_ptr<CollModWriteOpsTracker::Token>> _setUpCollModIndexUni
                       str::stream() << "ns does not exist for unique index conversion: " << nss);
     }
 
-    // Install side write tracker.
-    auto opsTracker = CollModWriteOpsTracker::get(opCtx->getServiceContext());
-    auto writeOpsToken = opsTracker->startTracking(collection->uuid());
-
     // Scan index for duplicates without exclusive access.
     BSONObjBuilder unused;
     auto statusW = parseCollModRequest(opCtx, nss, collection, cmd, &unused);
@@ -594,9 +599,9 @@ StatusWith<std::unique_ptr<CollModWriteOpsTracker::Token>> _setUpCollModIndexUni
     auto idx = cmr.indexRequest.idx;
     auto violatingRecordsList = scanIndexForDuplicates(opCtx, collection, idx);
 
-    CurOpFailpointHelpers::waitWhileFailPointEnabled(&hangAfterCollModIndexUniqueSideWriteTracker,
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(&hangAfterCollModIndexUniqueFullIndexScan,
                                                      opCtx,
-                                                     "hangAfterCollModIndexUniqueSideWriteTracker",
+                                                     "hangAfterCollModIndexUniqueFullIndexScan",
                                                      []() {},
                                                      nss);
 
@@ -605,7 +610,7 @@ StatusWith<std::unique_ptr<CollModWriteOpsTracker::Token>> _setUpCollModIndexUni
             buildDuplicateViolations(opCtx, collection, violatingRecordsList)));
     }
 
-    return std::move(writeOpsToken);
+    return idx;
 }
 
 Status _collModInternal(OperationContext* opCtx,
@@ -618,17 +623,23 @@ Status _collModInternal(OperationContext* opCtx,
     }
 
     // Before acquiring exclusive access to the collection for unique index conversion, we will
-    // track concurrent writes while performing a preliminary index scan here. After we obtain
-    // exclusive access for the actual conversion, we will reconcile the concurrent writes with
-    // the state of the index before updating the catalog.
-    std::unique_ptr<CollModWriteOpsTracker::Token> writeOpsToken;
+    // perform a preliminary index scan here. After we obtain exclusive access for the actual
+    // conversion, we will check if the index has ever been modified since the scan before updating
+    // the catalog.
+    const IndexDescriptor* idx_first = nullptr;
     if (cmd.getIndex() && cmd.getIndex()->getUnique().value_or(false) && !mode) {
         auto statusW = _setUpCollModIndexUnique(opCtx, nsOrUUID, cmd);
         if (!statusW.isOK()) {
             return statusW.getStatus();
         }
-        writeOpsToken = std::move(statusW.getValue());
+        idx_first = statusW.getValue();
     }
+
+    hangAfterCollModIndexUniqueReleaseIXLock.executeIf(
+        [](auto&&) { hangAfterCollModIndexUniqueReleaseIXLock.pauseWhileSet(); },
+        [&cmd, &mode](auto&&) {
+            return cmd.getIndex() && cmd.getIndex()->getUnique().value_or(false) && !mode;
+        });
 
     AutoGetCollection coll(opCtx, nsOrUUID, MODE_X, AutoGetCollectionViewMode::kViewsPermitted);
     auto nss = coll.getNss();
@@ -695,21 +706,18 @@ Status _collModInternal(OperationContext* opCtx,
 
     // Save both states of the ParsedCollModRequest to allow writeConflictRetries.
     ParsedCollModRequest cmrNew = std::move(statusW.getValue());
+    auto idx_second = cmrNew.indexRequest.idx;
+    if (idx_first && idx_first != idx_second) {
+        return Status(
+            ErrorCodes::CommandFailed,
+            "The index was modified by another thread. Please try to rerun the command and make "
+            "sure no other threads are modifying the index.");
+    }
     auto viewOn = cmrNew.viewOn;
     auto ts = cmd.getTimeseries();
 
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(5324200, "CMD: collMod", "cmdObj"_attr = cmd.toBSON(BSONObj()));
-    }
-
-    // With exclusive access to the collection, we can take ownership of the modified docs observed
-    // by the side write tracker if a unique index conversion is requested.
-    // This step releases the resources associated with the token and therefore should not be
-    // performed inside the write conflict retry loop.
-    std::unique_ptr<CollModWriteOpsTracker::Docs> docsForUniqueIndex;
-    if (writeOpsToken) {
-        auto opsTracker = CollModWriteOpsTracker::get(opCtx->getServiceContext());
-        docsForUniqueIndex = opsTracker->stopTracking(std::move(writeOpsToken));
     }
 
     return writeConflictRetry(opCtx, "collMod", nss.ns(), [&] {
@@ -780,13 +788,8 @@ Status _collModInternal(OperationContext* opCtx,
         }
 
         // Handle index modifications.
-        processCollModIndexRequest(opCtx,
-                                   &coll,
-                                   cmrNew.indexRequest,
-                                   docsForUniqueIndex.get(),
-                                   &indexCollModInfo,
-                                   result,
-                                   mode);
+        processCollModIndexRequest(
+            opCtx, &coll, cmrNew.indexRequest, &indexCollModInfo, result, mode);
 
         if (cmrNew.collValidator) {
             coll.getWritableCollection(opCtx)->setValidator(opCtx, *cmrNew.collValidator);

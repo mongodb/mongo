@@ -135,55 +135,24 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
                                        AutoGetCollection* autoColl,
                                        const IndexDescriptor* idx,
                                        boost::optional<repl::OplogApplication::Mode> mode,
-                                       const CollModWriteOpsTracker::Docs* docsForUniqueIndex,
                                        boost::optional<bool>* newUnique) {
     invariant(!idx->unique(), str::stream() << "Index is already unique: " << idx->infoObj());
     const auto& collection = autoColl->getCollection();
 
-    // Checks for duplicates on the primary or for the 'applyOps' command. In the
-    // tenant migration case, assumes similarly to initial sync that we don't need to perform this
-    // check in the destination cluster.
-    std::list<std::set<RecordId>> duplicateRecordsList;
-    if (!mode) {
-        auto entry = idx->getEntry();
-        auto accessMethod = entry->accessMethod()->asSortedData();
-
-        invariant(docsForUniqueIndex,
-                  fmt::format("Unique index conversion requires valid set of changed docs from "
-                              "side write tracker: {} {} {}",
-                              collection->ns().toString(),
-                              idx->indexName(),
-                              collection->uuid().toString()));
-
-
-        // Gather the keys for all the side write activity in a single set of unique keys.
-        KeyStringSet keys;
-        for (const auto& doc : *docsForUniqueIndex) {
-            // The OpObserver records CRUD events in transactions that are about to be committed.
-            // We should not assume that inserts/updates can be conflated with deletes.
-            getKeysForIndex(opCtx, collection, accessMethod, doc, &keys);
+    // Checks for duplicates for the 'applyOps' command. In the tenant migration case, assumes
+    // similarly to initial sync that we don't need to perform this check in the destination
+    // cluster.
+    if (mode && *mode == repl::OplogApplication::Mode::kApplyOpsCmd) {
+        auto duplicateRecordsList = scanIndexForDuplicates(opCtx, collection, idx);
+        if (!duplicateRecordsList.empty()) {
+            uassertStatusOK(buildConvertUniqueErrorStatus(
+                buildDuplicateViolations(opCtx, collection, duplicateRecordsList)));
         }
-
-        // Search the index for duplicates using keys derived from side write documents.
-        for (const auto& keyString : keys) {
-            // Inserts and updates should generally refer to existing index entries, but since we
-            // are recording uncommitted CRUD events, we should not always assume that searching
-            // for 'keyString' in the index must return a a valid index entry.
-            duplicateRecordsList.splice(duplicateRecordsList.end(),
-                                        scanIndexForDuplicates(opCtx, collection, idx, keyString));
-        }
-    } else if (*mode == repl::OplogApplication::Mode::kApplyOpsCmd) {
-        // We do not need to observe side writes under applyOps because applyOps runs under global
-        // write access.
-        duplicateRecordsList = scanIndexForDuplicates(opCtx, collection, idx);
-    }
-    if (!duplicateRecordsList.empty()) {
-        uassertStatusOK(buildConvertUniqueErrorStatus(
-            buildDuplicateViolations(opCtx, collection, duplicateRecordsList)));
     }
 
     *newUnique = true;
     autoColl->getWritableCollection(opCtx)->updateUniqueSetting(opCtx, idx->indexName());
+    // Resets 'disallowNewDuplicateKeys' to false after converting to unique index;
     autoColl->getWritableCollection(opCtx)->updateDisallowNewDuplicateKeysSetting(
         opCtx, idx->indexName(), false);
 }
@@ -211,7 +180,6 @@ void _processCollModIndexRequestDisallowNewDuplicateKeys(
 void processCollModIndexRequest(OperationContext* opCtx,
                                 AutoGetCollection* autoColl,
                                 const ParsedCollModIndexRequest& collModIndexRequest,
-                                const CollModWriteOpsTracker::Docs* docsForUniqueIndex,
                                 boost::optional<IndexCollModInfo>* indexCollModInfo,
                                 BSONObjBuilder* result,
                                 boost::optional<repl::OplogApplication::Mode> mode) {
@@ -251,8 +219,7 @@ void processCollModIndexRequest(OperationContext* opCtx,
     // User wants to convert an index to be unique.
     if (indexUnique) {
         invariant(*indexUnique);
-        _processCollModIndexRequestUnique(
-            opCtx, autoColl, idx, mode, docsForUniqueIndex, &newUnique);
+        _processCollModIndexRequestUnique(opCtx, autoColl, idx, mode, &newUnique);
     }
 
     if (indexDisallowNewDuplicateKeys) {

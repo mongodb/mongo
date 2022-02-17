@@ -47,18 +47,27 @@ function sortViolationsArray(arr) {
     });
 }
 
+const collName = 'collmod_convert_to_unique_violations';
+const coll = db.getCollection(collName);
+coll.drop();
+
 // Checks that the violations match what we expect.
-function assertFailedWithViolations(result, violations) {
+function assertFailedWithViolations(keyPattern, violations) {
+    // First sets 'disallowNewDuplicateKeys' before converting the index to unique.
+    assert.commandWorked(db.runCommand(
+        {collMod: collName, index: {keyPattern: keyPattern, disallowNewDuplicateKeys: true}}));
+    const result =
+        db.runCommand({collMod: collName, index: {keyPattern: keyPattern, unique: true}});
     assert.commandFailedWithCode(result, ErrorCodes.CannotConvertIndexToUnique);
     assert.eq(
         bsonWoCompare(sortViolationsArray(result.violations), sortViolationsArray(violations)),
         0,
         tojson(result));
+    // Resets 'disallowNewDuplicateKeys'.
+    assert.commandWorked(db.runCommand(
+        {collMod: collName, index: {keyPattern: keyPattern, disallowNewDuplicateKeys: false}}));
 }
 
-const collName = 'collmod_convert_to_unique_violations';
-const coll = db.getCollection(collName);
-coll.drop();
 assert.commandWorked(db.createCollection(collName));
 
 // Create regular indexes and try to use collMod to convert them to unique indexes.
@@ -69,43 +78,28 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 // violations.
 assert.commandWorked(coll.insert({_id: 1, a: 100, b: 1}));
 assert.commandWorked(coll.insert({_id: 2, a: 100, b: 2}));
-assertFailedWithViolations(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}), [{ids: [1, 2]}]);
+assertFailedWithViolations({a: 1}, [{ids: [1, 2]}]);
 
 assert.commandWorked(coll.insert({_id: 3, a: 100, b: 3}));
-assertFailedWithViolations(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}),
-    [{ids: [1, 2, 3]}]);
+assertFailedWithViolations({a: 1}, [{ids: [1, 2, 3]}]);
 
 assert.commandWorked(coll.insert({_id: 4, a: 101, b: 4}));
-assertFailedWithViolations(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}),
-    [{ids: [1, 2, 3]}]);
+assertFailedWithViolations({a: 1}, [{ids: [1, 2, 3]}]);
 
 assert.commandWorked(coll.insert({_id: 5, a: 105, b: 5}));
 assert.commandWorked(coll.insert({_id: 6, a: 105, b: 6}));
-assertFailedWithViolations(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}),
-    [{ids: [1, 2, 3]}, {ids: [5, 6]}]);
+assertFailedWithViolations({a: 1}, [{ids: [1, 2, 3]}, {ids: [5, 6]}]);
 
 // Test that compound indexes work as expected.
 assert.commandWorked(coll.insert({_id: 7, a: 105, b: 6}));
-assertFailedWithViolations(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1, b: 1}, unique: true}}),
-    [{ids: [6, 7]}]);
+assertFailedWithViolations({a: 1, b: 1}, [{ids: [6, 7]}]);
 
 assert.commandWorked(coll.insert({_id: 8, a: 105, b: 6}));
-assertFailedWithViolations(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1, b: 1}, unique: true}}),
-    [{ids: [6, 7, 8]}]);
+assertFailedWithViolations({a: 1, b: 1}, [{ids: [6, 7, 8]}]);
 
 assert.commandWorked(coll.insert({_id: 9, a: 101, b: 4}));
-assertFailedWithViolations(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1, b: 1}, unique: true}}),
-    [{ids: [4, 9]}, {ids: [6, 7, 8]}]);
+assertFailedWithViolations({a: 1, b: 1}, [{ids: [4, 9]}, {ids: [6, 7, 8]}]);
 
 assert.commandWorked(coll.insert({_id: "10", a: 101, b: 4}));
-assertFailedWithViolations(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1, b: 1}, unique: true}}),
-    [{ids: [4, 9, "10"]}, {ids: [6, 7, 8]}]);
+assertFailedWithViolations({a: 1, b: 1}, [{ids: [4, 9, "10"]}, {ids: [6, 7, 8]}]);
 })();

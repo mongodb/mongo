@@ -52,7 +52,6 @@
 #include "mongo/db/auth/auth_op_observer.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/catalog/coll_mod_op_observer.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_impl.h"
@@ -1131,8 +1130,6 @@ void setUpObservers(ServiceContext* serviceContext) {
     if (audit::opObserverRegistrar) {
         audit::opObserverRegistrar(opObserverRegistry.get());
     }
-
-    opObserverRegistry->addObserver(std::make_unique<CollModOpObserver>());
 
     serviceContext->setOpObserver(std::move(opObserverRegistry));
 }
