@@ -133,10 +133,10 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/index_repair',
         '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
+        'index_repair',
         'multi_index_block',
     ]
 )
@@ -201,7 +201,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/audit',
-        '$BUILD_DIR/mongo/db/catalog/collection_query_info',
         '$BUILD_DIR/mongo/db/collection_index_usage_tracker',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/index/index_access_method',
@@ -212,6 +211,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/vector_clock',
         'collection',
         'collection_catalog',
+        'collection_query_info',
     ]
 )
 
@@ -246,7 +246,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/collection_query_info',
         '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
         '$BUILD_DIR/mongo/db/curop',
@@ -263,6 +262,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/progress_meter',
         'collection',
         'collection_catalog',
+        'collection_query_info',
         'index_build_block',
         'index_catalog',
     ]
@@ -298,19 +298,6 @@ env.Benchmark(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/multitenancy',
-        'collection_catalog',
-    ],
-)
-
-env.Library(
-    target='collection_catalog_helper',
-    source=[
-        'collection_catalog_helper.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/views/views',
-        'collection',
         'collection_catalog',
     ],
 )
@@ -361,9 +348,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog_helper',
-        '$BUILD_DIR/mongo/db/catalog/index_repair',
         '$BUILD_DIR/mongo/db/collection_index_usage_tracker',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
@@ -392,10 +376,13 @@ env.Library(
         '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/db/ttl_collection_cache',
         '$BUILD_DIR/mongo/db/vector_clock',
+        '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/db/views/views_mongod',
+        'catalog_helpers',
         'catalog_stats',
         'clustered_collection_options',
         'collection',
+        'collection_catalog',
         'collection_options',
         'database_holder',
         'health_log',
@@ -403,6 +390,7 @@ env.Library(
         'index_catalog',
         'index_catalog_entry',
         'index_key_validate',
+        'index_repair',
         'local_oplog_info',
         'throttle_cursor',
         'validate_idl',
@@ -434,7 +422,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_column',
-        '$BUILD_DIR/mongo/db/catalog/index_key_validate',
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/db_raii',
@@ -449,6 +436,7 @@ env.Library(
         'catalog_impl',
         'collection_options',
         'index_catalog',
+        'index_key_validate',
         'throttle_cursor',
         'validate_state',
     ]
@@ -487,6 +475,7 @@ env.Library(
     target='catalog_helpers',
     source=[
         'capped_utils.cpp',
+        'collection_catalog_helper.cpp',
         'coll_mod.cpp',
         'coll_mod_index.cpp',
         'coll_mod_op_observer.cpp',
@@ -499,9 +488,6 @@ env.Library(
         'drop_indexes.cpp',
         'rename_collection.cpp',
         'list_indexes.cpp',
-    ],
-    LIBDEPS=[
-        'collection_catalog_helper',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
@@ -547,12 +533,12 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/index_catalog',
         '$BUILD_DIR/mongo/db/collection_index_usage_tracker',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/fts/base_fts',
         '$BUILD_DIR/mongo/db/service_context',
+        'index_catalog',
     ],
 )
 
@@ -660,7 +646,6 @@ if wiredtiger:
             'catalog_test_fixture',
             'collection',
             'collection_catalog',
-            'collection_catalog_helper',
             'collection_options',
             'collection_validation',
             'commit_quorum_options',
