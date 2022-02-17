@@ -627,11 +627,11 @@ void QueryPlannerAnalysis::determineLookupStrategy(
     // Does an eligible index exist?
     // TODO SERVER-62913: finalize the logic for indexes analysis.
     const auto& foreignField = eqLookupNode->joinFieldForeign;
-    IndexEntry* prefixedIndex = nullptr;
-    for (auto idxEntry : foreignCollItr->second.indexes) {
+    bool foundEligibleIndex = false;
+    for (const IndexEntry& idxEntry : foreignCollItr->second.indexes) {
         tassert(5842601, "index key pattern should not be empty", !idxEntry.keyPattern.isEmpty());
         if (idxEntry.keyPattern.firstElement().fieldName() == foreignField) {
-            prefixedIndex = &idxEntry;
+            foundEligibleIndex = true;
             break;
         }
     }
@@ -640,9 +640,8 @@ void QueryPlannerAnalysis::determineLookupStrategy(
     // number of records and the storage size of the collection.
     static constexpr auto kMaxHashJoinCollectionSize = 100 * 1024 * 1024;
 
-    if (prefixedIndex) {
+    if (foundEligibleIndex) {
         eqLookupNode->lookupStrategy = EqLookupNode::LookupStrategy::kIndexedLoopJoin;
-        eqLookupNode->idxEntry = *prefixedIndex;
     } else if (allowDiskUse &&
                foreignCollItr->second.approximateCollectionSizeBytes < kMaxHashJoinCollectionSize) {
         eqLookupNode->lookupStrategy = EqLookupNode::LookupStrategy::kHashJoin;
