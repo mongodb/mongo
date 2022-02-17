@@ -48,15 +48,21 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/config.h"
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/rpc/object_check.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/time_support.h"
 
+
+// TODO (SERVER-63780) - remove once we stop using AEAD for ECC crypto with empty associated data
+// Tomcrypt SHA implementation cannot accept it so we skip these tests for now
+#ifdef MONGO_CONFIG_SSL
 
 namespace mongo {
 
@@ -312,7 +318,6 @@ TEST(FLE_ESC, RoundTrip) {
         ASSERT_EQ(swDoc.getValue().count, 0);
     }
 }
-
 
 TEST(FLE_ECC, RoundTrip) {
 
@@ -891,3 +896,5 @@ TEST(FLE_EDC, DuplicateSafeContent_IncompatibleType) {
 }
 
 }  // namespace mongo
+
+#endif

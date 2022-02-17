@@ -2548,8 +2548,8 @@ void WiredTigerKVEngine::unpinOldestTimestamp(const std::string& requestingServi
     stdx::lock_guard<Latch> lock(_oldestTimestampPinRequestsMutex);
     auto it = _oldestTimestampPinRequests.find(requestingServiceName);
     if (it == _oldestTimestampPinRequests.end()) {
-        LOGV2_DEBUG(2,
-                    5380105,
+        LOGV2_DEBUG(5380105,
+                    2,
                     "The requested service had nothing to unpin",
                     "service"_attr = requestingServiceName);
         return;

@@ -33,7 +33,6 @@
 #include <cstdint>
 
 #include "mongo/crypto/fle_data_frames.h"
-#include "mongo/shell/kms_gen.h"
 
 #include "mongo/base/data_view.h"
 #include "mongo/base/status.h"
