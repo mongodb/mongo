@@ -31,6 +31,7 @@
 
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/chunk_version_gen.h"
+#include "mongo/s/pm2583_feature_flags_gen.h"
 
 #include "mongo/util/str.h"
 
@@ -196,6 +197,18 @@ ChunkVersion ChunkVersion::fromBSONPositionalOrNewerFormat(const BSONElement& el
 
     // New format.
     return _parse60Format(obj);
+}
+
+void ChunkVersion::serializeToPositionalWronlyEcondedOr60AsBSON(StringData field,
+                                                                BSONObjBuilder* builder) const {
+    if (feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        ChunkVersion60Format chunkVersion(
+            _timestamp, _epoch, Timestamp(majorVersion(), minorVersion()));
+        builder->append(field, chunkVersion.toBSON());
+    } else {
+        serializeToPositionalFormatWronglyEncodedAsBSON(field, builder);
+    }
 }
 
 void ChunkVersion::serializeToBSON(StringData field, BSONObjBuilder* builder) const {

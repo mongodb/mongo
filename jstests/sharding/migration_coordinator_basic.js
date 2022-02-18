@@ -43,8 +43,12 @@ function assertHasMigrationCoordinatorDoc({conn, ns, uuid, epoch}) {
         recipientShardId: st.shard1.shardName,
         "range.min._id": MinKey,
         "range.max._id": MaxKey,
-        "preMigrationChunkVersion.0": Timestamp(1, 0),
-        "preMigrationChunkVersion.1": epoch
+        $or: [
+            {"preMigrationChunkVersion.0": Timestamp(1, 0)},
+            {"preMigrationChunkVersion.1": epoch},
+            {"preMigrationChunkVersion.v": Timestamp(1, 0)},
+            {"preMigrationChunkVersion.e": epoch}
+        ]
     };
     assert.neq(
         null,

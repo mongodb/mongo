@@ -83,7 +83,7 @@ imports:
 types:
     ChunkVersionLegacy:
         bson_serialization_type: any
-        description: "An object representing a chunk version for a collection. Ignores the epoch
+        description: "An object representing a chunk version for a collection. Ignores the
                       component in the chunk version for legacy reasons."
         cpp_type: ChunkVersion
         serializer: ChunkVersion::serialiseMajorMinorVersionOnlyForShardCollectionType

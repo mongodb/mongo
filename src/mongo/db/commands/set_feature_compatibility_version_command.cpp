@@ -65,6 +65,7 @@
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
@@ -81,6 +82,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
+#include "mongo/s/pm2583_feature_flags_gen.h"
 #include "mongo/s/refine_collection_shard_key_coordinator_feature_flags_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/stdx/unordered_set.h"
@@ -334,10 +336,12 @@ public:
 
                 // Drain moveChunks if the actualVersion relies on the new migration protocol but
                 // the requestedVersion uses the old one (downgrading).
-                if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
-                        actualVersion) &&
-                    !feature_flags::gFeatureFlagMigrationRecipientCriticalSection
-                         .isEnabledOnVersion(requestedVersion)) {
+                if ((feature_flags::gFeatureFlagMigrationRecipientCriticalSection
+                         .isEnabledOnVersion(actualVersion) &&
+                     !feature_flags::gFeatureFlagMigrationRecipientCriticalSection
+                          .isEnabledOnVersion(requestedVersion)) ||
+                    feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabledOnVersion(
+                        actualVersion)) {
                     drainNewMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionDowngrade");
 
                     // At this point, because we are holding the MigrationBlockingGuard, no new
@@ -427,11 +431,14 @@ public:
             boost::optional<MigrationBlockingGuard> drainOldMoveChunks;
 
             // Drain moveChunks if the actualVersion relies on the old migration protocol but the
-            // requestedVersion uses the new one (upgrading).
-            if (!feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
-                    actualVersion) &&
-                feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
-                    requestedVersion)) {
+            // requestedVersion uses the new one (upgrading) or we're persisting the new chunk
+            // version format.
+            if ((!feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
+                     actualVersion) &&
+                 feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
+                     requestedVersion)) ||
+                feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabledOnVersion(
+                    actualVersion)) {
                 drainOldMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionUpgrade");
 
                 // At this point, because we are holding the MigrationBlockingGuard, no new
@@ -1020,7 +1027,6 @@ private:
         auto response = client.runCommand(deleteOp.serialize({}));
         uassertStatusOK(getStatusFromWriteCommandReply(response->getCommandReply()));
     }
-
 } setFeatureCompatibilityVersionCommand;
 
 }  // namespace
