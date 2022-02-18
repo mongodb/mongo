@@ -39,6 +39,7 @@
 #endif
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <fmt/format.h>
 #include <ios>
 #include <iostream>
 
@@ -48,6 +49,7 @@
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/idl/server_parameter.h"
+#include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_manager.h"
@@ -258,6 +260,38 @@ Status setupBaseOptions(const std::vector<std::string>& args) {
     return Status::OK();
 }
 
+namespace server_options_detail {
+StatusWith<BSONObj> applySetParameterOptions(const std::map<std::string, std::string>& toApply,
+                                             ServerParameterSet& parameterSet) {
+    using namespace fmt::literals;
+    auto saveValue = [](ServerParameter& sp) {
+        BSONObjBuilder bob;
+        sp.append(nullptr, bob, "default");
+        return bob.obj();
+    };
+    BSONObjBuilder summaryBuilder;
+    for (const auto& [name, value] : toApply) {
+        auto sp = parameterSet.getIfExists(name);
+        if (!sp)
+            return Status(ErrorCodes::BadValue,
+                          "Illegal --setParameter parameter: \"{}\""_format(name));
+        if (!sp->allowedToChangeAtStartup())
+            return Status(ErrorCodes::BadValue,
+                          "Cannot use --setParameter to set \"{}\" at startup"_format(name));
+        BSONObj oldValue = saveValue(*sp);
+        Status status = sp->setFromString(value);
+        if (!status.isOK())
+            return Status(ErrorCodes::BadValue,
+                          "Bad value for parameter \"{}\": {}"_format(name, status.reason()));
+        BSONObj newValue = saveValue(*sp);
+        BSONObjBuilder(summaryBuilder.subobjStart(name))
+            .appendAs(oldValue.firstElement(), "default")
+            .appendAs(newValue.firstElement(), "value");
+    }
+    return summaryBuilder.obj();
+}
+}  // namespace server_options_detail
+
 Status storeBaseOptions(const moe::Environment& params) {
     Status ret = setParsedOpts(params);
     if (!ret.isOK()) {
@@ -412,32 +446,13 @@ Status storeBaseOptions(const moe::Environment& params) {
     }
 
     if (params.count("setParameter")) {
-        std::map<std::string, std::string> parameters =
-            params["setParameter"].as<std::map<std::string, std::string>>();
-        for (std::map<std::string, std::string>::iterator parametersIt = parameters.begin();
-             parametersIt != parameters.end();
-             parametersIt++) {
-            auto* parameter =
-                ServerParameterSet::getNodeParameterSet()->getIfExists(parametersIt->first);
-            if (nullptr == parameter) {
-                StringBuilder sb;
-                sb << "Illegal --setParameter parameter: \"" << parametersIt->first << "\"";
-                return Status(ErrorCodes::BadValue, sb.str());
-            }
-            if (!parameter->allowedToChangeAtStartup()) {
-                StringBuilder sb;
-                sb << "Cannot use --setParameter to set \"" << parametersIt->first
-                   << "\" at startup";
-                return Status(ErrorCodes::BadValue, sb.str());
-            }
-            Status status = parameter->setFromString(parametersIt->second);
-            if (!status.isOK()) {
-                StringBuilder sb;
-                sb << "Bad value for parameter \"" << parametersIt->first
-                   << "\": " << status.reason();
-                return Status(ErrorCodes::BadValue, sb.str());
-            }
-        }
+        auto swObj = server_options_detail::applySetParameterOptions(
+            params["setParameter"].as<std::map<std::string, std::string>>(),
+            *ServerParameterSet::getNodeParameterSet());
+        if (!swObj.isOK())
+            return swObj.getStatus();
+        if (const BSONObj& obj = swObj.getValue(); !obj.isEmpty())
+            LOGV2(5760901, "Applied --setParameter options", "serverParameters"_attr = obj);
     }
 
     if (params.count("operationProfiling.slowOpThresholdMs")) {

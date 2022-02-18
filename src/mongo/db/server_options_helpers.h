@@ -29,7 +29,11 @@
 
 #pragma once
 
+#include <map>
+#include <string>
+
 #include "mongo/base/status.h"
+#include "mongo/idl/server_parameter.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 
@@ -41,6 +45,11 @@ class Environment;
 }  // namespace optionenvironment
 
 namespace moe = mongo::optionenvironment;
+
+namespace server_options_detail {
+StatusWith<BSONObj> applySetParameterOptions(const std::map<std::string, std::string>& toApply,
+                                             ServerParameterSet& parameterSet);
+}  // namespace server_options_detail
 
 /**
  * Handle custom validation of base options that can not currently be done by using
