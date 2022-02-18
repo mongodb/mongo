@@ -361,7 +361,6 @@ public:
     bool inMongos = false;
     bool allowDiskUse = false;
     bool bypassDocumentValidation = false;
-    bool inMultiDocumentTransaction = false;
     bool hasWhereClause = false;
 
     NamespaceString ns;

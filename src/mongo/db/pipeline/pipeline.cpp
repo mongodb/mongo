@@ -228,10 +228,11 @@ void Pipeline::validateCommon() const {
                 str::stream() << stage->getSourceName() << " can only be run on mongoS",
                 !(constraints.hostRequirement == HostTypeRequirement::kMongoS && !pCtx->inMongos));
 
-        uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream() << "Stage not supported inside of a multi-document transaction: "
-                              << stage->getSourceName(),
-                !(pCtx->inMultiDocumentTransaction && !constraints.isAllowedInTransaction()));
+        uassert(
+            ErrorCodes::OperationNotSupportedInTransaction,
+            str::stream() << "Stage not supported inside of a multi-document transaction: "
+                          << stage->getSourceName(),
+            !(pCtx->opCtx->inMultiDocumentTransaction() && !constraints.isAllowedInTransaction()));
     }
 }
 
