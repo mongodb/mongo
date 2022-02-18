@@ -1,7 +1,7 @@
 /**
  * Tests the collectionUUID parameter of the aggregate command for $indexStats and $collStats
  * pipelines on sharded collection.
- * @tags: [featureFlagCommandsAcceptCollectionUUID]
+ * @tags: [requires_fcv_60]
  */
 
 (function() {

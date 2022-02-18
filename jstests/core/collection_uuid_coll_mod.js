@@ -2,8 +2,7 @@
  * Tests the collectionUUID parameter of the collMod command.
  *
  * @tags: [
- *   featureFlagCommandsAcceptCollectionUUID,
- *   no_selinux,
+ *   requires_fcv_60,
  *   tenant_migration_incompatible,
  * ]
  */

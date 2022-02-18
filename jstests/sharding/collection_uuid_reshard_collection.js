@@ -2,7 +2,7 @@
  * Tests the collectionUUID parameter of the reshardCollection command.
  *
  * @tags: [
- *   featureFlagCommandsAcceptCollectionUUID,
+ *   requires_fcv_60,
  * ]
  */
 (function() {

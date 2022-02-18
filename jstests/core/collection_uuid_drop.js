@@ -2,9 +2,8 @@
  * Tests the collectionUUID parameter of the drop command.
  *
  * @tags: [
- *   featureFlagCommandsAcceptCollectionUUID,
+ *   requires_fcv_60,
  *   tenant_migration_incompatible,
- *   no_selinux,
  *   requires_non_retryable_commands,
  * ]
  */

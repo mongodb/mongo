@@ -232,15 +232,6 @@ if (typeof _threadInject != "undefined") {
             "timeseries/timeseries_delete_concurrent.js",
             "timeseries/timeseries_update_concurrent.js",
 
-            // TODO (SERVER-60185): Remove the collection_uuid_*.js exclusions once the feature flag
-            // is enabled by default.
-            "collection_uuid_find.js",
-            "collection_uuid_write_commands.js",
-            "collection_uuid_coll_mod.js",
-            "collection_uuid_rename_collection.js",
-            "collection_uuid_index_commands.js",
-            "collection_uuid_drop.js",
-
             // These tests rely on no writes happening that would force oplog truncation.
             "write_change_stream_pit_preimage_in_transaction.js",
             "write_change_stream_pit_preimage.js",

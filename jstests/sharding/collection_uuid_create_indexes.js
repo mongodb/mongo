@@ -3,7 +3,7 @@
  * and the other collection is unsharded.
  *
  * @tags: [
- *   featureFlagCommandsAcceptCollectionUUID,
+ *   requires_fcv_60,
  * ]
  */
 (function() {

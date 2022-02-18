@@ -2,9 +2,8 @@
  * Tests the collectionUUID parameter of the insert, update and delete commands.
  *
  * @tags: [
- *   featureFlagCommandsAcceptCollectionUUID,
+ *   requires_fcv_60,
  *   tenant_migration_incompatible,
- *   no_selinux,
  * ]
  */
 (function() {
