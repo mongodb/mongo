@@ -417,7 +417,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                               uassertStatusOK(resolveInvolvedNamespaces(opCtx, request)),
                               uuid);
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
-    expCtx->inMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
 
     return expCtx;
 }
