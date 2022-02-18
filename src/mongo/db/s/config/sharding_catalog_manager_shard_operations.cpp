@@ -935,6 +935,11 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     LOGV2(
         21949, "Going to remove shard: {shardId}", "Going to remove shard", "shardId"_attr = name);
 
+    // Synchronize the control shard selection, the shard's document removal, and the topology time
+    // update to exclude potential race conditions in case of concurrent add/remove shard
+    // operations.
+    shardLock.lock();
+
     // Find a controlShard to be updated.
     auto controlShardQueryStatus =
         configShard->exhaustiveFindOnConfig(opCtx,
@@ -974,6 +979,8 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     uassertStatusOKWithContext(applyOpsCommandResponse.getValue().commandStatus,
                                str::stream()
                                    << "error completing removeShard operation on: " << name);
+
+    shardLock.unlock();
 
     // The shard which was just removed must be reflected in the shard registry, before the replica
     // set monitor is removed, otherwise the shard would be referencing a dropped RSM.
