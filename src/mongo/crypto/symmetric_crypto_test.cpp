@@ -740,5 +740,9 @@ TEST_F(AESTestVectors, CTRTestCase1234) {
                       "dfc9c58db67aada613c2dd08457941a6"));
 }
 
+// The tests vectors below are generated using random data. Since they do not contain logic,
+// we will have them in a separate file so that they do not overtake the code space
+#include "symmetric_crypto_tests.gen"
+
 }  // namespace crypto
 }  // namespace mongo
