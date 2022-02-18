@@ -846,6 +846,12 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(
 
         resolvedNss = &view->viewOn();
 
+        if (storageGlobalParams.restore) {
+            // During a selective restore procedure, skip checking options as the collection may no
+            // longer exist.
+            continue;
+        }
+
         if (view->timeseries()) {
             // Use the lock-free collection lookup, to ensure compatibility with lock-free read
             // operations.
