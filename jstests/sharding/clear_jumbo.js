@@ -88,8 +88,13 @@ assert.lt(jumboMajorVersionBefore, jumboChunk.lastmod.getTime());
 ////////////////////////////////////////////////////////////////////////////
 // Ensure clear jumbo flag stores the correct chunk version
 
-assert.eq(undefined, jumboChunk.lastmodEpoch);
-assert.eq(undefined, jumboChunk.lastmodTimestamp);
+let version = st.configRS.getPrimary()
+                  .adminCommand({getParameter: 1, featureCompatibilityVersion: 1})
+                  .featureCompatibilityVersion.version;
+if (version === '5.0') {
+    assert.eq(undefined, jumboChunk.lastmodEpoch);
+    assert.eq(undefined, jumboChunk.lastmodTimestamp);
+}
 
 ////////////////////////////////////////////////////////////////////////////
 // Balancer with jumbo chunks behavior
