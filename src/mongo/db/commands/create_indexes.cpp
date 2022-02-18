@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
@@ -192,6 +193,74 @@ void validateTTLOptions(OperationContext* opCtx,
                 "TTL secondary indexes are not allowed on a capped clustered collection",
                 !(clusteredAndCapped && index_key_validate::isIndexTTL(index)));
         uassertStatusOK(index_key_validate::validateIndexSpecTTL(index));
+    }
+}
+
+void checkEncryptedFieldIndexRestrictions(OperationContext* opCtx,
+                                          const NamespaceString& ns,
+                                          const CreateIndexesCommand& cmd) {
+    if (!gFeatureFlagFLE2.isEnabledAndIgnoreFCV()) {
+        return;
+    }
+
+    AutoGetCollection collection(opCtx, ns, MODE_IS);
+    if (!collection) {
+        return;
+    }
+
+    const auto& encryptConfig = collection->getCollectionOptions().encryptedFieldConfig;
+    if (!encryptConfig) {
+        // this collection is not encrypted
+        return;
+    }
+
+    auto& encryptedFields = encryptConfig->getFields();
+    std::vector<FieldRef> encryptedFieldRefs;
+
+    for (const auto& index : cmd.getIndexes()) {
+
+        // Do not allow TTL indexes on encrypted collections because automatic
+        // deletion of encrypted documents would require the deletion tokens
+        // for each encrypted field, which the server does not have.
+        uassert(6346501,
+                "TTL indexes are not allowed on encrypted collections",
+                !index_key_validate::isIndexTTL(index));
+
+        if (!index.hasField(IndexDescriptor::kUniqueFieldName) ||
+            index.getBoolField(IndexDescriptor::kUniqueFieldName) == false) {
+            // skip if not attempting to create a unique index
+            continue;
+        }
+
+        // Create the FieldRefs for each encrypted field (if not already created)
+        if (encryptedFieldRefs.empty() && !encryptedFields.empty()) {
+            std::transform(encryptedFields.begin(),
+                           encryptedFields.end(),
+                           std::back_inserter(encryptedFieldRefs),
+                           [](auto& path) { return FieldRef(path.getPath()); });
+        }
+
+        // Do not allow unique indexes on encrypted fields, or prefixes of encrypted fields.
+        auto keyObject = index[IndexDescriptor::kKeyPatternFieldName].Obj();
+        for (const auto& keyElement : keyObject) {
+
+            FieldRef keyFieldRef(keyElement.fieldNameStringData());
+
+            for (const auto& encryptedFieldRef : encryptedFieldRefs) {
+                auto common = keyFieldRef.commonPrefixSize(encryptedFieldRef);
+                uassert(
+                    6346502,
+                    str::stream()
+                        << "Unique indexes are not allowed on, or a prefix of, the encrypted field "
+                        << encryptedFieldRef.dottedField(),
+                    common != keyFieldRef.numParts());
+                uassert(6346503,
+                        str::stream() << "Unique indexes are not allowed on keys whose prefix is "
+                                         "the encrypted field "
+                                      << encryptedFieldRef.dottedField(),
+                        common != encryptedFieldRef.numParts());
+            }
+        }
     }
 }
 
@@ -423,6 +492,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
     }
 
     validateTTLOptions(opCtx, ns, cmd);
+    checkEncryptedFieldIndexRestrictions(opCtx, ns, cmd);
 
     // Preliminary checks before handing control over to IndexBuildsCoordinator:
     // 1) We are in a replication mode that allows for index creation.
