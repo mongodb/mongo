@@ -54,7 +54,7 @@ public:
 
     std::string getNsCollRegexMatchExpr(const std::string& field, const std::string& regex) {
         if (field == "$o.drop" || field == "$o.create" || field == "$o.createIndexes" ||
-            field == "$o.commitIndexBuild" || field == "$o.dropIndexes") {
+            field == "$o.commitIndexBuild" || field == "$o.dropIndexes" || field == "$o.collMod") {
             return str::stream()
                 << "{$expr: {$let: {vars: {oplogField: {$cond: [{ $eq: [{ $type: ['" << field
                 << "']}, {$const: 'string'}]}, '" << field
@@ -675,6 +675,10 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteExprWithOperationType) {
                         {
                             case: {$ne: ['$o.dropIndexes', '$$REMOVE']},
                             then: {$const: 'dropIndexes'}
+                        },
+                        {
+                            case: {$ne: ['$o.collMod', '$$REMOVE']},
+                            then: {$const: 'modify'}
                         }
                     ],
                     default: '$$REMOVE'
@@ -1156,6 +1160,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteFullNamespaceObject) {
                                  BSON("o.commitIndexBuild" << BSON("$eq" << expCtx->ns.coll())))),
                         BSON(AND(BSON("ns" << BSON("$eq" << cmdNs)),
                                  BSON("o.dropIndexes" << BSON("$eq" << expCtx->ns.coll())))),
+                        BSON(AND(BSON("ns" << BSON("$eq" << cmdNs)),
+                                 BSON("o.collMod" << BSON("$eq" << expCtx->ns.coll())))),
                         BSON(AND(fromjson("{$alwaysFalse: 1}"),
                                  fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
 }
@@ -1181,6 +1187,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceObjectWithSwappedField) {
                                  fromjson("{$alwaysFalse: 1 }"),  // createIndexes.
                                  fromjson("{$alwaysFalse: 1 }"),  // commitIndexBuild.
                                  fromjson("{$alwaysFalse: 1 }"),  // dropIndexes.
+                                 fromjson("{$alwaysFalse: 1 }"),  // collMod.
                                  BSON(AND(fromjson("{$alwaysFalse: 1}"),
                                           fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
 }
@@ -1208,6 +1215,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceObjectWithOnlyDbField) {
                                  fromjson("{$alwaysFalse: 1 }"),  // createIndexes.
                                  fromjson("{$alwaysFalse: 1 }"),  // commitIndexBuild.
                                  fromjson("{$alwaysFalse: 1 }"),  // dropIndexes.
+                                 fromjson("{$alwaysFalse: 1 }"),  // collMod.
                                  BSON(AND(BSON(AND(BSON("ns" << BSON("$eq" << cmdNs)))),
                                           fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
 }
@@ -1233,6 +1241,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceObjectWithOnlyCollectionField
                                  fromjson("{$alwaysFalse: 1 }"),  // createIndexes.
                                  fromjson("{$alwaysFalse: 1 }"),  // commitIndexBuild.
                                  fromjson("{$alwaysFalse: 1 }"),  // dropIndexes.
+                                 fromjson("{$alwaysFalse: 1 }"),  // collMod.
                                  BSON(AND(fromjson("{$alwaysFalse: 1}"),
                                           fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
 }
@@ -1258,6 +1267,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceObjectWithInvalidDbField) {
                                  fromjson("{$alwaysFalse: 1 }"),  // createIndexes.
                                  fromjson("{$alwaysFalse: 1 }"),  // commitIndexBuild.
                                  fromjson("{$alwaysFalse: 1 }"),  // dropIndexes.
+                                 fromjson("{$alwaysFalse: 1 }"),  // collMod.
                                  BSON(AND(fromjson("{$alwaysFalse: 1}"),
                                           fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
 }
@@ -1283,6 +1293,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceObjectWithInvalidCollField) {
                                  fromjson("{$alwaysFalse: 1 }"),  // createIndexes.
                                  fromjson("{$alwaysFalse: 1 }"),  // commitIndexBuild.
                                  fromjson("{$alwaysFalse: 1 }"),  // dropIndexes.
+                                 fromjson("{$alwaysFalse: 1 }"),  // collMod.
                                  BSON(AND(fromjson("{$alwaysFalse: 1}"),
                                           fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
 }
@@ -1308,6 +1319,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceObjectWithExtraField) {
                                  fromjson("{$alwaysFalse: 1 }"),  // createIndexes.
                                  fromjson("{$alwaysFalse: 1 }"),  // commitIndexBuild.
                                  fromjson("{$alwaysFalse: 1 }"),  // dropIndexes.
+                                 fromjson("{$alwaysFalse: 1 }"),  // collMod.
                                  BSON(AND(fromjson("{$alwaysFalse: 1}"),
                                           fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
 }
@@ -1338,6 +1350,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithStringDbFieldPath) {
                                  BSON("ns" << BSON("$eq" << cmdNs)),  // createIndex.
                                  BSON("ns" << BSON("$eq" << cmdNs)),  // commitIndexBuild.
                                  BSON("ns" << BSON("$eq" << cmdNs)),  // dropIndex.
+                                 BSON("ns" << BSON("$eq" << cmdNs)),  // collMod.
                                  BSON(AND(BSON("ns" << BSON("$eq" << cmdNs)),
                                           fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
 }
@@ -1367,6 +1380,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithCollectionFieldPath) {
                                  BSON("o.createIndexes" << BSON("$eq" << expCtx->ns.coll())),
                                  BSON("o.commitIndexBuild" << BSON("$eq" << expCtx->ns.coll())),
                                  BSON("o.dropIndexes" << BSON("$eq" << expCtx->ns.coll())),
+                                 BSON("o.collMod" << BSON("$eq" << expCtx->ns.coll())),
                                  BSON(AND(fromjson("{$alwaysFalse: 1}"),
                                           fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
 }
@@ -1395,6 +1409,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithRegexDbFieldPath) {
                         fromjson(getNsDbRegexMatchExpr("$ns", R"(^unit.*$)")),  // createIndexes.
                         fromjson(getNsDbRegexMatchExpr("$ns", R"(^unit.*$)")),  // commitIndexBuild.
                         fromjson(getNsDbRegexMatchExpr("$ns", R"(^unit.*$)")),  // dropIndexes.
+                        fromjson(getNsDbRegexMatchExpr("$ns", R"(^unit.*$)")),  // collMod.
                         BSON(AND(fromjson(getNsDbRegexMatchExpr("$ns", R"(^unit.*$)")),
                                  fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
 }
@@ -1423,6 +1438,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithRegexCollectionFieldPath)
                         fromjson(getNsCollRegexMatchExpr("$o.createIndexes", R"(^pipeline.*$)")),
                         fromjson(getNsCollRegexMatchExpr("$o.commitIndexBuild", R"(^pipeline.*$)")),
                         fromjson(getNsCollRegexMatchExpr("$o.dropIndexes", R"(^pipeline.*$)")),
+                        fromjson(getNsCollRegexMatchExpr("$o.collMod", R"(^pipeline.*$)")),
                         BSON(AND(fromjson("{ $alwaysFalse: 1 }"),
                                  fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
 }
@@ -1469,6 +1485,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithExtraDbFieldPath) {
                                  fromjson("{$alwaysFalse: 1 }"),  // createIndexes
                                  fromjson("{$alwaysFalse: 1 }"),  // commitIndexBuild
                                  fromjson("{$alwaysFalse: 1 }"),  // dropIndexes
+                                 fromjson("{$alwaysFalse: 1 }"),  // collMod
                                  BSON(AND(fromjson("{$alwaysFalse: 1 }"),
                                           fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
 }
@@ -1495,6 +1512,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithExtraCollectionFieldPath)
                                  fromjson("{$alwaysFalse: 1 }"),  // createIndexes
                                  fromjson("{$alwaysFalse: 1 }"),  // commitIndexBuild
                                  fromjson("{$alwaysFalse: 1 }"),  // dropIndexes
+                                 fromjson("{$alwaysFalse: 1 }"),  // collMod
                                  BSON(AND(fromjson("{$alwaysFalse: 1 }"),
                                           fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
 }
@@ -1521,6 +1539,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithInvalidFieldPath) {
                                  fromjson("{$alwaysFalse: 1 }"),  // createIndexes
                                  fromjson("{$alwaysFalse: 1 }"),  // commitIndexBuild
                                  fromjson("{$alwaysFalse: 1 }"),  // dropIndexes
+                                 fromjson("{$alwaysFalse: 1 }"),  // collMod
                                  BSON(AND(fromjson("{$alwaysFalse: 1 }"),
                                           fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
 }
@@ -1561,6 +1580,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithInExpressionOnDb) {
                             BSON(OR(BSON("ns" << BSON("$eq" << firstCmdNs)),  // commitIndexBuild.
                                     BSON("ns" << BSON("$eq" << secondCmdNs)))),
                             BSON(OR(BSON("ns" << BSON("$eq" << firstCmdNs)),  // dropIndexes.
+                                    BSON("ns" << BSON("$eq" << secondCmdNs)))),
+                            BSON(OR(BSON("ns" << BSON("$eq" << firstCmdNs)),  // collMod.
                                     BSON("ns" << BSON("$eq" << secondCmdNs)))),
                             BSON(AND(BSON(OR(BSON("ns" << BSON("$eq" << firstCmdNs)),
                                              BSON("ns" << BSON("$eq" << secondCmdNs)))),
@@ -1604,6 +1625,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithNinExpressionOnDb) {
                              BSON(OR(BSON("ns" << BSON("$eq" << secondCmdNs)),  // commitIndexBuild.
                                      BSON("ns" << BSON("$eq" << firstCmdNs)))),
                              BSON(OR(BSON("ns" << BSON("$eq" << secondCmdNs)),  // dropIndexes.
+                                     BSON("ns" << BSON("$eq" << firstCmdNs)))),
+                             BSON(OR(BSON("ns" << BSON("$eq" << secondCmdNs)),  // collMod.
                                      BSON("ns" << BSON("$eq" << firstCmdNs)))),
                              BSON(AND(BSON(OR(BSON("ns" << BSON("$eq" << secondCmdNs)),
                                               BSON("ns" << BSON("$eq" << firstCmdNs)))),
@@ -1655,6 +1678,10 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithInExpressionOnCollection)
                                                                  << "news")),
                                     BSON("o.dropIndexes" << BSON("$eq"
                                                                  << "test")))),
+                            BSON(OR(BSON("o.collMod" << BSON("$eq"
+                                                             << "news")),
+                                    BSON("o.collMod" << BSON("$eq"
+                                                             << "test")))),
                             BSON(AND(BSON(OR(fromjson("{$alwaysFalse: 1}"),
                                              fromjson("{$alwaysFalse: 1}"))),
                                      fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
@@ -1706,6 +1733,10 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithNinExpressionOnCollection
                                                                   << "news")),
                                      BSON("o.dropIndexes" << BSON("$eq"
                                                                   << "test")))),
+                             BSON(OR(BSON("o.collMod" << BSON("$eq"
+                                                              << "news")),
+                                     BSON("o.collMod" << BSON("$eq"
+                                                              << "test")))),
                              BSON(AND(BSON(OR(fromjson("{$alwaysFalse: 1}"),
                                               fromjson("{$alwaysFalse: 1}"))),
                                       fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))))));
@@ -1744,6 +1775,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithInRegexExpressionOnDb) {
                         fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")),  // commitIndexBuild.
                         fromjson(getNsDbRegexMatchExpr("$ns", R"(^news$)")))),
                     BSON(OR(fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")),  // dropIndexes.
+                            fromjson(getNsDbRegexMatchExpr("$ns", R"(^news$)")))),
+                    BSON(OR(fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")),  // collMod.
                             fromjson(getNsDbRegexMatchExpr("$ns", R"(^news$)")))),
                     BSON(AND(BSON(OR(fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")),
                                      fromjson(getNsDbRegexMatchExpr("$ns", R"(^news$)")))),
@@ -1784,6 +1817,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithNinRegexExpressionOnDb) {
                         fromjson(getNsDbRegexMatchExpr("$ns", R"(^news$)")))),
                     BSON(OR(fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")),  // dropIndexes.
                             fromjson(getNsDbRegexMatchExpr("$ns", R"(^news$)")))),
+                    BSON(OR(fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")),  // collMod.
+                            fromjson(getNsDbRegexMatchExpr("$ns", R"(^news$)")))),
                     BSON(AND(BSON(OR(fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")),
                                      fromjson(getNsDbRegexMatchExpr("$ns", R"(^news$)")))),
                              fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))))));
@@ -1821,6 +1856,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithInRegexExpressionOnCollec
                             fromjson(getNsCollRegexMatchExpr("$o.commitIndexBuild", R"(^news$)")))),
                     BSON(OR(fromjson(getNsCollRegexMatchExpr("$o.dropIndexes", R"(^test.*$)")),
                             fromjson(getNsCollRegexMatchExpr("$o.dropIndexes", R"(^news$)")))),
+                    BSON(OR(fromjson(getNsCollRegexMatchExpr("$o.collMod", R"(^test.*$)")),
+                            fromjson(getNsCollRegexMatchExpr("$o.collMod", R"(^news$)")))),
                     BSON(AND(BSON(OR(fromjson("{$alwaysFalse: 1}"), fromjson("{$alwaysFalse: 1}"))),
                              fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
 }
@@ -1857,6 +1894,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithNinRegexExpressionOnColle
                             fromjson(getNsCollRegexMatchExpr("$o.commitIndexBuild", R"(^news$)")))),
                     BSON(OR(fromjson(getNsCollRegexMatchExpr("$o.dropIndexes", R"(^test.*$)")),
                             fromjson(getNsCollRegexMatchExpr("$o.dropIndexes", R"(^news$)")))),
+                    BSON(OR(fromjson(getNsCollRegexMatchExpr("$o.collMod", R"(^test.*$)")),
+                            fromjson(getNsCollRegexMatchExpr("$o.collMod", R"(^news$)")))),
                     BSON(AND(BSON(OR(fromjson("{$alwaysFalse: 1}"), fromjson("{$alwaysFalse: 1}"))),
                              fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))))));
 }
@@ -1900,6 +1939,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithInExpressionOnDbWithRegex
                     BSON(
                         OR(BSON("ns" << BSON("$eq" << secondCmdNs)),
                            fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")))),  // dropIndexes.
+                    BSON(OR(BSON("ns" << BSON("$eq" << secondCmdNs)),
+                            fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")))),  // collMod.
                     BSON(AND(BSON(OR(BSON("ns" << BSON("$eq" << secondCmdNs)),
                                      fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")))),
                              fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
@@ -1945,6 +1986,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithNinExpressionOnDbWithRege
                     BSON(
                         OR(BSON("ns" << BSON("$eq" << secondCmdNs)),
                            fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")))),  // dropIndexes.
+                    BSON(OR(BSON("ns" << BSON("$eq" << secondCmdNs)),
+                            fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")))),  // collMod.
                     BSON(AND(BSON(OR(BSON("ns" << BSON("$eq" << secondCmdNs)),
                                      fromjson(getNsDbRegexMatchExpr("$ns", R"(^test.*$)")))),
                              fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))))));
@@ -1994,6 +2037,9 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithInExpressionOnCollectionW
                        BSON(OR(BSON("o.dropIndexes" << BSON("$eq"
                                                             << "news")),
                                fromjson(getNsCollRegexMatchExpr("$o.dropIndexes", R"(^test.*$)")))),
+                       BSON(OR(BSON("o.collMod" << BSON("$eq"
+                                                        << "news")),
+                               fromjson(getNsCollRegexMatchExpr("$o.collMod", R"(^test.*$)")))),
                        BSON(AND(
                            BSON(OR(fromjson("{$alwaysFalse: 1}"), fromjson("{$alwaysFalse: 1}"))),
                            fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
@@ -2044,6 +2090,9 @@ TEST_F(ChangeStreamRewriteTest,
                        BSON(OR(BSON("o.dropIndexes" << BSON("$eq"
                                                             << "news")),
                                fromjson(getNsCollRegexMatchExpr("$o.dropIndexes", R"(^test.*$)")))),
+                       BSON(OR(BSON("o.collMod" << BSON("$eq"
+                                                        << "news")),
+                               fromjson(getNsCollRegexMatchExpr("$o.collMod", R"(^test.*$)")))),
                        BSON(AND(
                            BSON(OR(fromjson("{$alwaysFalse: 1}"), fromjson("{$alwaysFalse: 1}"))),
                            fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))))));
@@ -2114,6 +2163,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithEmptyInExpression) {
                                  fromjson("{$alwaysFalse: 1 }"),  // createIndexes.
                                  fromjson("{$alwaysFalse: 1 }"),  // commitIndexBuild.
                                  fromjson("{$alwaysFalse: 1 }"),  // dropIndexes.
+                                 fromjson("{$alwaysFalse: 1 }"),  // collMod.
                                  BSON(AND(fromjson("{$alwaysFalse: 1 }"),
                                           fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))));
 }
@@ -2140,6 +2190,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNamespaceWithEmptyNinExpression) {
                                      fromjson("{$alwaysFalse: 1 }"),  // createIndexes.
                                      fromjson("{$alwaysFalse: 1 }"),  // commitIndexBuild.
                                      fromjson("{$alwaysFalse: 1 }"),  // dropIndexes.
+                                     fromjson("{$alwaysFalse: 1 }"),  // collMod.
                                      BSON(AND(fromjson("{$alwaysFalse: 1 }"),
                                               fromjson("{'o.dropDatabase': {$eq: 1}}"))))))))))));
 }
@@ -2172,6 +2223,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnFullObject) {
     auto caseCommitIndexBuild =
         "{case: {$ne: ['$o.commitIndexBuild', '$$REMOVE']}, then: '$o.commitIndexBuild'}";
     auto caseDropIndexes = "{case: {$ne: ['$o.dropIndexes', '$$REMOVE']}, then: '$o.dropIndexes'}";
+    auto caseCollMod = "{case: {$ne: ['$o.collMod', '$$REMOVE']}, then: '$o.collMod'}";
 
     const auto cases = boost::algorithm::join(std::vector<std::string>{caseCRUD,
                                                                        caseNotCmd,
@@ -2181,7 +2233,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnFullObject) {
                                                                        caseCreate,
                                                                        caseCreateIndexes,
                                                                        caseCommitIndexBuild,
-                                                                       caseDropIndexes},
+                                                                       caseDropIndexes,
+                                                                       caseCollMod},
                                               ",");
 
     auto expectedExpr = fromjson(
@@ -2235,6 +2288,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnFullObjectWithOnlyDb) {
     auto caseCommitIndexBuild =
         "{case: {$ne: ['$o.commitIndexBuild', '$$REMOVE']}, then: '$o.commitIndexBuild'}";
     auto caseDropIndexes = "{case: {$ne: ['$o.dropIndexes', '$$REMOVE']}, then: '$o.dropIndexes'}";
+    auto caseCollMod = "{case: {$ne: ['$o.collMod', '$$REMOVE']}, then: '$o.collMod'}";
 
     const auto cases = boost::algorithm::join(std::vector<std::string>{caseCRUD,
                                                                        caseNotCmd,
@@ -2244,7 +2298,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnFullObjectWithOnlyDb) {
                                                                        caseCreate,
                                                                        caseCreateIndexes,
                                                                        caseCommitIndexBuild,
-                                                                       caseDropIndexes},
+                                                                       caseDropIndexes,
+                                                                       caseCollMod},
                                               ",");
 
     auto expectedExpr = fromjson(
@@ -2326,6 +2381,7 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnCollFieldPath) {
     auto caseCommitIndexBuild =
         "{case: {$ne: ['$o.commitIndexBuild', '$$REMOVE']}, then: '$o.commitIndexBuild'}";
     auto caseDropIndexes = "{case: {$ne: ['$o.dropIndexes', '$$REMOVE']}, then: '$o.dropIndexes'}";
+    auto caseCollMod = "{case: {$ne: ['$o.collMod', '$$REMOVE']}, then: '$o.collMod'}";
 
     const auto cases = boost::algorithm::join(std::vector<std::string>{caseCRUD,
                                                                        caseNotCmd,
@@ -2335,7 +2391,8 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteNsWithExprOnCollFieldPath) {
                                                                        caseCreate,
                                                                        caseCreateIndexes,
                                                                        caseCommitIndexBuild,
-                                                                       caseDropIndexes},
+                                                                       caseDropIndexes,
+                                                                       caseCollMod},
                                               ",");
 
     auto expectedExpr = fromjson(

@@ -490,8 +490,9 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
                                    << ValidationLevel_serializer(*oldCollOpts.validationLevel)
                                    << "validationAction"
                                    << ValidationAction_serializer(*oldCollOpts.validationAction))
-                           << "expireAfterSeconds_old"
-                           << durationCount<Seconds>(indexInfo.oldExpireAfterSeconds.get()));
+                           << "indexOptions_old"
+                           << BSON("expireAfterSeconds" << durationCount<Seconds>(
+                                       indexInfo.oldExpireAfterSeconds.get())));
 
     ASSERT_BSONOBJ_EQ(o2Expected, o2);
 }

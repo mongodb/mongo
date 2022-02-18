@@ -1040,19 +1040,21 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
         BSONObjBuilder o2Builder;
         o2Builder.append("collectionOptions_old", oldCollOptions.toBSON());
         if (indexInfo) {
+            BSONObjBuilder oldIndexOptions;
             if (indexInfo->oldExpireAfterSeconds) {
                 auto oldExpireAfterSeconds =
                     durationCount<Seconds>(indexInfo->oldExpireAfterSeconds.get());
-                o2Builder.append("expireAfterSeconds_old", oldExpireAfterSeconds);
+                oldIndexOptions.append("expireAfterSeconds", oldExpireAfterSeconds);
             }
             if (indexInfo->oldHidden) {
                 auto oldHidden = indexInfo->oldHidden.get();
-                o2Builder.append("hidden_old", oldHidden);
+                oldIndexOptions.append("hidden", oldHidden);
             }
             if (indexInfo->oldPrepareUnique) {
                 auto oldPrepareUnique = indexInfo->oldPrepareUnique.get();
-                o2Builder.append("prepareUnique_old", oldPrepareUnique);
+                oldIndexOptions.append("prepareUnique", oldPrepareUnique);
             }
+            o2Builder.append("indexOptions_old", oldIndexOptions.obj());
         }
 
         MutableOplogEntry oplogEntry;

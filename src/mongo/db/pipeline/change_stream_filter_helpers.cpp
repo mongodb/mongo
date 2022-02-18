@@ -109,6 +109,7 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     const auto createIndexesEvent = BSON("o.createIndexes" << BSONRegEx(collRegex));
     const auto commitIndexBuildEvent = BSON("o.commitIndexBuild" << BSONRegEx(collRegex));
     const auto dropIndexesEvent = BSON("o.dropIndexes" << BSONRegEx(collRegex));
+    const auto collModEvent = BSON("o.collMod" << BSONRegEx(collRegex));
 
     auto orCmdEvents = std::make_unique<OrMatchExpression>();
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(dropEvent, expCtx));
@@ -118,6 +119,7 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(createIndexesEvent, expCtx));
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(commitIndexBuildEvent, expCtx));
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(dropIndexesEvent, expCtx));
+    orCmdEvents->add(MatchExpressionParser::parseAndNormalize(collModEvent, expCtx));
 
     // Omit dropDatabase on single-collection streams. While the stream will be invalidated before
     // it sees this event, the user will incorrectly see it if they startAfter the invalidate.

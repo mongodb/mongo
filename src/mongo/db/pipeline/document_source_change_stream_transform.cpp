@@ -203,6 +203,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     Value updateDescription;
     Value documentKey;
     Value operationDescription;
+    Value stateBeforeChange;
 
     switch (opType) {
         case repl::OpTypeEnum::kInsert: {
@@ -359,6 +360,15 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
                 // and commitIndexBuild.
                 auto indexSpec = Value(copyDocExceptFields(o2Field, {"dropIndexes"_sd}));
                 operationDescription = Value(Document{{"indexes", std::vector<Value>{indexSpec}}});
+            } else if (auto nssField = oField.getField("collMod"); !nssField.missing()) {
+                operationType = DocumentSourceChangeStream::kModifyOpType;
+                nss = NamespaceString(nss.db(), nssField.getString());
+                operationDescription = Value(copyDocExceptFields(oField, {"collMod"_sd}));
+
+                const auto o2Field = input[repl::OplogEntry::kObject2FieldName].getDocument();
+                stateBeforeChange =
+                    Value(Document{{"collectionOptions", o2Field.getField("collectionOptions_old")},
+                                   {"indexOptions", o2Field.getField("indexOptions_old")}});
             } else {
                 // All other commands will invalidate the stream.
                 operationType = DocumentSourceChangeStream::kInvalidateOpType;
@@ -519,6 +529,9 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
         ? DocumentSourceChangeStream::kRawUpdateDescriptionField
         : DocumentSourceChangeStream::kUpdateDescriptionField;
     doc.addField(updateDescriptionFieldName, std::move(updateDescription));
+
+    // For a 'modify' event we add the state before modification if appropriate.
+    doc.addField(DocumentSourceChangeStream::kStateBeforeChangeField, stateBeforeChange);
 
     return doc.freeze();
 }

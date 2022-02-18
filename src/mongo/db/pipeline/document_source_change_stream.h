@@ -171,6 +171,10 @@ public:
     // the 'showRawUpdateDescription' option is enabled in the change stream spec.
     static constexpr StringData kRawUpdateDescriptionField = "rawUpdateDescription"_sd;
 
+    // Name of the field which stores information about the state of the collection before a
+    // 'modify' (i.e. collMod) operation.
+    static constexpr StringData kStateBeforeChangeField = "stateBeforeChange"_sd;
+
     // The name of the subfield of '_id' where the UUID of the namespace will be located after the
     // transformation.
     static constexpr StringData kUuidField = "uuid"_sd;
@@ -235,6 +239,7 @@ public:
     static constexpr StringData kDropIndexesOpType = "dropIndexes"_sd;
     static constexpr StringData kShardCollectionOpType = "shardCollection"_sd;
     static constexpr StringData kMigrateLastChunkFromShardOpType = "migrateLastChunkFromShard"_sd;
+    static constexpr StringData kModifyOpType = "modify"_sd;
 
     // Default regex for collections match which prohibits system collections.
     static constexpr StringData kRegexAllCollections = R"((?!(\$|system\.)))"_sd;

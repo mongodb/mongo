@@ -115,6 +115,7 @@ std::unique_ptr<MatchExpression> matchRewriteOperationType(
            std::vector<Value>{Value({{"o.createIndexes"_sd, kExistsTrue}}),
                               Value({{"o.commitIndexBuild"_sd, kExistsTrue}})}}}},
         {"dropIndexes", {{"op", "c"_sd}, {"o.dropIndexes"_sd, kExistsTrue}}},
+        {"modify", {{"op", "c"_sd}, {"o.collMod"_sd, kExistsTrue}}},
         {"rename", {{"op", "c"_sd}, {"o.renameCollection"_sd, kExistsTrue}}},
         {"dropDatabase", {{"op", "c"_sd}, {"o.dropDatabase"_sd, kExistsTrue}}}};
 
@@ -221,6 +222,7 @@ boost::intrusive_ptr<Expression> exprRewriteOperationType(
         fromjson("{case: {$ne: ['$o.commitIndexBuild', '$$REMOVE']}, then: 'createIndexes'}"));
     opCases.push_back(
         fromjson("{case: {$ne: ['$o.dropIndexes', '$$REMOVE']}, then: 'dropIndexes'}"));
+    opCases.push_back(fromjson("{case: {$ne: ['$o.collMod', '$$REMOVE']}, then: 'modify'}"));
 
     // The default case, if nothing matches.
     auto defaultCase = ExpressionConstant::create(expCtx.get(), Value())->serialize(false);
@@ -1046,6 +1048,13 @@ std::unique_ptr<MatchExpression> matchRewriteNs(
     tassert(6339402, "Unexpected rewrite failure", dropIndexesNsRewrite);
     cmdCases->add(std::move(dropIndexesNsRewrite));
 
+    // The 'modify' event is rewritten to the cmdNs in 'ns' and the collection name in
+    // 'o.collMod'.
+    auto collModNsRewrite = matchRewriteGenericNamespace(
+        expCtx, predicate, "ns"_sd, true /* nsFieldIsCmdNs */, "o.collMod"_sd);
+    tassert(6316200, "Unexpected rewrite failure", collModNsRewrite);
+    cmdCases->add(std::move(collModNsRewrite));
+
     // The 'dropDatabase' event is rewritten to the cmdNs in 'ns'. It does not have a collection
     // field.
     auto dropDbNsRewrite =
@@ -1142,6 +1151,7 @@ boost::intrusive_ptr<Expression> exprRewriteNs(
         "{case: {$ne: ['$o.commitIndexBuild', '$$REMOVE']}, then: '$o.commitIndexBuild'}"));
     collCases.push_back(
         fromjson("{case: {$ne: ['$o.dropIndexes', '$$REMOVE']}, then: '$o.dropIndexes'}"));
+    collCases.push_back(fromjson("{case: {$ne: ['$o.collMod', '$$REMOVE']}, then: '$o.collMod'}"));
 
     // The default case, if nothing matches.
     auto defaultCase = ExpressionConstant::create(expCtx.get(), Value())->serialize(false);
