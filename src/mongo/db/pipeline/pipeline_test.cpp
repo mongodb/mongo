@@ -4168,7 +4168,7 @@ public:
 
 TEST_F(PipelineValidateTest, TopLevelPipelineValidatedForStagesIllegalInTransactions) {
     auto ctx = getExpCtx();
-    ctx->inMultiDocumentTransaction = true;
+    ctx->opCtx->setInMultiDocumentTransaction();
 
     // Make a pipeline with a legal $match, and then an illegal mock stage, and verify that pipeline
     // creation fails with the expected error code.
@@ -4181,7 +4181,7 @@ TEST_F(PipelineValidateTest, TopLevelPipelineValidatedForStagesIllegalInTransact
 
 TEST_F(PipelineValidateTest, FacetPipelineValidatedForStagesIllegalInTransactions) {
     auto ctx = getExpCtx();
-    ctx->inMultiDocumentTransaction = true;
+    ctx->opCtx->setInMultiDocumentTransaction();
 
     const std::vector<BSONObj> rawPipeline = {
         fromjson("{$facet: {subPipe: [{$match: {}}, {$out: 'outColl'}]}}")};

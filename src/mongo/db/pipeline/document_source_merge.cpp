@@ -404,7 +404,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             "{} cannot be used in a transaction"_format(kStageName),
-            !expCtx->inMultiDocumentTransaction);
+            !expCtx->opCtx->inMultiDocumentTransaction());
 
     uassert(31319,
             "Cannot {} to special collection: {}"_format(kStageName, outputNs.coll()),
