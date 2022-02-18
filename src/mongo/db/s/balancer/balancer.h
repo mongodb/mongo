@@ -33,6 +33,7 @@
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
 #include "mongo/db/s/balancer/balancer_random.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/s/request_types/balancer_collection_status_gen.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 
@@ -183,16 +184,12 @@ public:
      */
     void abortCollectionDefragmentation(OperationContext* opCtx, const NamespaceString& nss);
 
-    struct BalancerStatus {
-        bool balancerCompliant;
-        boost::optional<std::string> firstComplianceViolation;
-        boost::optional<BSONObj> details;
-    };
     /**
      * Returns if a given collection is draining due to a removed shard, has chunks on an invalid
      * zone or the number of chunks is imbalanced across the cluster
      */
-    BalancerStatus getBalancerStatusForNs(OperationContext* opCtx, const NamespaceString& nss);
+    BalancerCollectionStatusResponse getBalancerStatusForNs(OperationContext* opCtx,
+                                                            const NamespaceString& nss);
 
 private:
     /**

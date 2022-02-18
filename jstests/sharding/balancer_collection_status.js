@@ -5,7 +5,15 @@
 (function() {
 'use strict';
 
-var st = new ShardingTest({mongos: 1, shards: 3});
+const chunkSizeMB = 1;
+
+let st = new ShardingTest({
+    shards: 3,
+    other: {
+        // Set global max chunk size to 1MB
+        chunkSize: chunkSizeMB
+    }
+});
 
 function runBalancer(rounds) {
     st.startBalancer();
@@ -28,7 +36,7 @@ assert.commandFailedWithCode(st.s0.adminCommand({balancerCollectionStatus: 'db'}
 
 // only sharded databases are allowed
 assert.commandFailedWithCode(st.s0.adminCommand({balancerCollectionStatus: 'db.col'}),
-                             ErrorCodes.NamespaceNotFound);
+                             ErrorCodes.NamespaceNotSharded);
 
 // setup the collection for the test
 assert.commandWorked(st.s0.adminCommand({enableSharding: 'db'}));
@@ -39,13 +47,13 @@ assert.commandWorked(st.s0.getDB('db').runCommand({create: "col2"}));
 assert.commandFailedWithCode(st.s0.adminCommand({balancerCollectionStatus: 'db.col2'}),
                              ErrorCodes.NamespaceNotSharded);
 
-var result = assert.commandWorked(st.s0.adminCommand({balancerCollectionStatus: 'db.col'}));
+let result = assert.commandWorked(st.s0.adminCommand({balancerCollectionStatus: 'db.col'}));
 
 // new collections must be balanced
 assert.eq(result.balancerCompliant, true);
 
 // get shardIds
-var shards = st.s0.getDB('config').shards.find().toArray();
+const shards = st.s0.getDB('config').shards.find().toArray();
 
 // manually split and place the 3 chunks on the same shard
 assert.commandWorked(st.s0.adminCommand({split: 'db.col', middle: {key: 10}}));
@@ -98,5 +106,11 @@ result = assert.commandWorked(st.s0.adminCommand({balancerCollectionStatus: 'db.
 // All chunks are balanced and in the correct zone
 assert.eq(result.balancerCompliant, true);
 
+const configDB = st.configRS.getPrimary().getDB('config');
+const fcvDoc = configDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, '5.3') >= 0) {
+    // Ensure that the expected chunk size is part of the response.
+    assert.eq(result.chunkSize, chunkSizeMB);
+}
 st.stop();
 })();

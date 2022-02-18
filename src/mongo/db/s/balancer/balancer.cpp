@@ -957,40 +957,67 @@ void Balancer::abortCollectionDefragmentation(OperationContext* opCtx, const Nam
     _defragmentationPolicy->abortCollectionDefragmentation(opCtx, nss);
 }
 
-Balancer::BalancerStatus Balancer::getBalancerStatusForNs(OperationContext* opCtx,
-                                                          const NamespaceString& ns) {
+BalancerCollectionStatusResponse Balancer::getBalancerStatusForNs(OperationContext* opCtx,
+                                                                  const NamespaceString& ns) {
+    CollectionType coll;
     try {
-        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, ns, {});
-        bool isDefragmenting = coll.getDefragmentCollection();
-        if (isDefragmenting) {
-            return {false,
-                    kBalancerPolicyStatusDefragmentingChunks.toString(),
-                    _defragmentationPolicy->reportProgressOn(coll.getUuid())};
+        coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, ns, {});
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        uasserted(ErrorCodes::NamespaceNotSharded, "Collection unsharded or undefined");
+    }
+
+    const auto maxChunkSizeMB = [&]() -> int64_t {
+        int64_t value = 0;
+        if (const auto& collOverride = coll.getMaxChunkSizeBytes(); collOverride.is_initialized()) {
+            value = *collOverride;
+        } else {
+            auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
+            uassertStatusOK(balancerConfig->refreshAndCheck(opCtx));
+            value = balancerConfig->getMaxChunkSizeBytes();
         }
-    } catch (DBException&) {
-        // Catch exceptions to keep consistency with errors thrown before defragmentation
+        return value / (1024 * 1024);
+    }();
+    BalancerCollectionStatusResponse response(maxChunkSizeMB, true /*balancerCompliant*/);
+    auto setViolationOnResponse = [&response](const StringData& reason,
+                                              const boost::optional<BSONObj>& details =
+                                                  boost::none) {
+        response.setBalancerCompliant(false);
+        response.setFirstComplianceViolation(reason);
+        response.setDetails(details);
+    };
+
+    bool isDefragmenting = coll.getDefragmentCollection();
+    if (isDefragmenting) {
+        setViolationOnResponse(kBalancerPolicyStatusDefragmentingChunks,
+                               _defragmentationPolicy->reportProgressOn(coll.getUuid()));
+        return response;
     }
 
     auto splitChunks = uassertStatusOK(_chunkSelectionPolicy->selectChunksToSplit(opCtx, ns));
     if (!splitChunks.empty()) {
-        return {false, kBalancerPolicyStatusZoneViolation.toString()};
+        setViolationOnResponse(kBalancerPolicyStatusZoneViolation);
+        return response;
     }
+
     auto chunksToMove = uassertStatusOK(_chunkSelectionPolicy->selectChunksToMove(opCtx, ns));
     if (chunksToMove.empty()) {
-        return {true, boost::none, boost::none};
+        return response;
     }
-    const auto& migrationInfo = chunksToMove.front();
 
+    const auto& migrationInfo = chunksToMove.front();
     switch (migrationInfo.reason) {
         case MigrateInfo::drain:
-            return {false, kBalancerPolicyStatusDraining.toString(), boost::none};
+            setViolationOnResponse(kBalancerPolicyStatusDraining);
+            break;
         case MigrateInfo::zoneViolation:
-            return {false, kBalancerPolicyStatusZoneViolation.toString(), boost::none};
+            setViolationOnResponse(kBalancerPolicyStatusZoneViolation);
+            break;
         case MigrateInfo::chunksImbalance:
-            return {false, kBalancerPolicyStatusChunksImbalance.toString(), boost::none};
+            setViolationOnResponse(kBalancerPolicyStatusChunksImbalance);
+            break;
     }
 
-    return {true, boost::none, boost::none};
+    return response;
 }
 
 }  // namespace mongo
