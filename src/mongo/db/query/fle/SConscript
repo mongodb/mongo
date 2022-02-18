@@ -1,0 +1,23 @@
+Import("env")
+
+env = env.Clone()
+
+env.Library(
+    target="query_fle_server",
+    source=[
+        'server_rewrite.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/matcher/expressions',
+    ]
+)
+
+env.CppUnitTest(
+    target="fle_server_rewrite_test",
+    source=[
+        "server_rewrite_test.cpp",
+    ],
+    LIBDEPS=[
+        "query_fle_server",
+    ],
+)
