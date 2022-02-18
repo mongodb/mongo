@@ -78,3 +78,7 @@ structs:
                 type: timestamp
                 description: "The timestamp the task was created."
                 optional: true
+            numOrphanDocs:
+                type: safeInt64
+                description: "The estimated number of orphaned documents in the range"
+                optional: true  ## TODO SERVER-63819 non-optional once 6.0 branches out
