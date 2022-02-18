@@ -180,7 +180,6 @@ assert.commandFailedWithCode(coll.update({x: 1}, [{$match: {x: 1}}]), ErrorCodes
 assert.commandFailedWithCode(coll.update({x: 1}, [{$sort: {x: 1}}]), ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(coll.update({x: 1}, [{$facet: {a: [{$match: {x: 1}}]}}]),
                              ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(coll.update({x: 1}, [{$indexStats: {}}]), ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(
     coll.update(
         {x: 1}, [{
@@ -197,6 +196,11 @@ assert.commandFailedWithCode(
                 {from: "foo", startWith: "$a", connectFromField: "a", connectToField: "b", as: "as"}
         }]),
     ErrorCodes.InvalidOptions);
+
+// $indexStats is not supported in a transaction passthrough and will fail with a different error.
+assert.commandFailedWithCode(
+    coll.update({x: 1}, [{$indexStats: {}}]),
+    [ErrorCodes.InvalidOptions, ErrorCodes.OperationNotSupportedInTransaction]);
 
 // Update fails when supported agg stage is specified outside of pipeline.
 assert.commandFailedWithCode(coll.update({_id: 1}, {$addFields: {x: 1}}), ErrorCodes.FailedToParse);

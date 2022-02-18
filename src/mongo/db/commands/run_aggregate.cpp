@@ -448,7 +448,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                               uuid,
                               CurOp::get(opCtx)->dbProfileLevel() > 0);
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
-    expCtx->inMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
     expCtx->collationMatchesDefault = collationMatchesDefault;
 
     return expCtx;

@@ -182,7 +182,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             "{} cannot be used in a transaction"_format(kStageName),
-            !expCtx->inMultiDocumentTransaction);
+            !expCtx->opCtx->inMultiDocumentTransaction());
 
     uassert(ErrorCodes::InvalidNamespace,
             "Invalid {} target namespace, {}"_format(kStageName, outputNs.ns()),
