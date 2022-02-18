@@ -169,15 +169,13 @@ BalancerCommandsSchedulerImpl::~BalancerCommandsSchedulerImpl() {
 
 void BalancerCommandsSchedulerImpl::start(OperationContext* opCtx,
                                           const MigrationsRecoveryDefaultValues& defaultValues) {
-    auto requestsToRecover = rebuildRequestsFromRecoveryInfo(opCtx, defaultValues);
-    LOGV2(5847200,
-          "Balancer command scheduler start requested",
-          "numRequestsToRecover"_attr = requestsToRecover.size());
+    LOGV2(5847200, "Balancer command scheduler start requested");
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(!_workerThreadHandle.joinable());
     if (!_executor) {
         _executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     }
+    auto requestsToRecover = rebuildRequestsFromRecoveryInfo(opCtx, defaultValues);
     _numRequestsToRecover = requestsToRecover.size();
     _state = _numRequestsToRecover == 0 ? SchedulerState::Running : SchedulerState::Recovering;
 
