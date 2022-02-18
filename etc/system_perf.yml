@@ -882,8 +882,8 @@ tasks:
         vars:
           test_control: "initialsync-logkeeper"
           mongodb_setup: "initialsync-logkeeper-short"
-          # Logkeeper dataset with FCV set to 5.0
-          mongodb_dataset: "https://s3-us-west-2.amazonaws.com/dsi-donot-remove/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-5.0.tgz"
+          # Logkeeper dataset with FCV set to 5.3
+          mongodb_dataset: "https://s3-us-west-2.amazonaws.com/dsi-donot-remove/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-5.3.tgz"
 
   - name: initialsync-logkeeper-short-fcbis
     priority: 5
@@ -892,8 +892,8 @@ tasks:
         vars:
           test_control: "initialsync-logkeeper"
           mongodb_setup: "initialsync-logkeeper-short-fcbis"
-          # Logkeeper dataset with FCV set to 5.0
-          mongodb_dataset: "https://s3-us-west-2.amazonaws.com/dsi-donot-remove/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-5.0.tgz"
+          # Logkeeper dataset with FCV set to 5.3
+          mongodb_dataset: "https://s3-us-west-2.amazonaws.com/dsi-donot-remove/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-5.3.tgz"
 
   - name: initialsync-logkeeper
     priority: 5
@@ -925,7 +925,7 @@ tasks:
           test_control: "initialsync-logkeeper-short-s3-update"
           mongodb_setup: "initialsync-logkeeper-short-s3-update"
           # Update this to Logkeeper dataset with FCV set to latest after each LTS release.
-          mongodb_dataset: "https://s3-us-west-2.amazonaws.com/dsi-donot-remove/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-5.0.tgz"
+          mongodb_dataset: "https://s3-us-west-2.amazonaws.com/dsi-donot-remove/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-5.3.tgz"
 
   - name: initialsync-logkeeper-snapshot-update
     priority: 5
@@ -1800,8 +1800,8 @@ buildvariants:
     expansions:
       mongodb_setup: initialsync-logkeeper
       infrastructure_provisioning: initialsync-logkeeper
-      # EBS logkeeper snapshot with FCV set to 5.0
-      snapshotId: snap-0cc5e61399e2e79f6
+      # EBS logkeeper snapshot with FCV set to 5.3
+      snapshotId: snap-012f25eea6e57b9b7
       platform: linux
       authentication: disabled
       storageEngine: wiredTiger
@@ -1825,7 +1825,7 @@ buildvariants:
   #    mongodb_setup: initialsync-logkeeper-snapshot-update
   #    infrastructure_provisioning: initialsync-logkeeper-snapshot-update
   #    # Update this to latest snapshot after each LTS release.
-  #    snapshotId: snap-0cc5e61399e2e79f6
+  #    snapshotId: snap-012f25eea6e57b9b7
   #    platform: linux
   #    authentication: disabled
   #    storageEngine: wiredTiger
