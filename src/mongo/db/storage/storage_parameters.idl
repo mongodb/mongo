@@ -129,8 +129,7 @@ feature_flags:
     featureFlagTimeseriesMetricIndexes:
         description: "When enabled, support secondary indexes on time-series measurements"
         cpp_varname: feature_flags::gTimeseriesMetricIndexes
-        default: true
-        version: 5.3
+        default: false
     featureFlagTimeseriesBucketCompression:
         description: "Enable bucket compression on time-series collections"
         cpp_varname: feature_flags::gTimeseriesBucketCompression
