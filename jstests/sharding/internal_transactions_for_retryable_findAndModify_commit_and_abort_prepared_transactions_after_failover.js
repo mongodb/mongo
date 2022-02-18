@@ -94,7 +94,10 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts = {
     jsTest.log("Test when the old primary steps up");
     const st = new ShardingTest({shards: 1, rs: {nodes: 1}});
     const stepDownShard0PrimaryFunc = () => {
-        assert.commandWorked(st.rs0.getPrimary().adminCommand({replSetStepDown: 1, force: true}));
+        const oldPrimary = st.rs0.getPrimary();
+        assert.commandWorked(
+            oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+        assert.commandWorked(oldPrimary.adminCommand({replSetFreeze: 0}));
     };
 
     // Test findAnModify without pre/post image.
