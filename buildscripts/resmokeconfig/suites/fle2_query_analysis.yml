@@ -3,7 +3,6 @@ test_kind: js_test
 selector:
   roots:
   - src/mongo/db/modules/*/jstests/fle/*.js
-
 executor:
   config:
     shell_options:
@@ -15,4 +14,4 @@ executor:
       tlsCertificateKeyFile: jstests/libs/client.pem
       global_vars:
         TestData:
-          useFle2Protocol: false
+          useFle2Protocol: true
