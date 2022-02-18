@@ -34,10 +34,14 @@
 #include <numeric>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/catalog/collection_uuid_mismatch_info.h"
+#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
@@ -248,6 +252,86 @@ void trackErrors(const ShardEndpoint& endpoint,
             trackedErrors->addError(ShardError(endpoint, *error));
         }
     }
+}
+
+/**
+ * Attempts to populate the actualCollection field of a CollectionUUIDMismatch error if it is not
+ * populated already, contacting the primary shard if necessary.
+ */
+void populateCollectionUUIDMismatch(OperationContext* opCtx,
+                                    WriteErrorDetail* error,
+                                    boost::optional<std::string>* actualCollection,
+                                    bool* hasContactedPrimaryShard) {
+    auto status = error->toStatus();
+    if (status.code() != ErrorCodes::CollectionUUIDMismatch) {
+        return;
+    }
+    auto info = status.extraInfo<CollectionUUIDMismatchInfo>();
+
+    if (info->actualCollection()) {
+        return;
+    }
+
+    auto setErrorStatus = [&] {
+        error->setStatus({CollectionUUIDMismatchInfo{info->db(),
+                                                     info->collectionUUID(),
+                                                     info->expectedCollection(),
+                                                     **actualCollection},
+                          status.reason()});
+    };
+
+    if (*actualCollection) {
+        setErrorStatus();
+        return;
+    }
+
+    if (*hasContactedPrimaryShard) {
+        return;
+    }
+
+    // The listCollections command cannot be run in multi-document transactions, so run it using an
+    // alterative client.
+    auto client = opCtx->getServiceContext()->makeClient("populateCollectionUUIDMismatch");
+    auto alternativeOpCtx = client->makeOperationContext();
+    opCtx = alternativeOpCtx.get();
+    AlternativeClientRegion acr{client};
+
+    auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, info->db());
+    if (!swDbInfo.isOK()) {
+        error->setStatus(swDbInfo.getStatus());
+        return;
+    }
+
+    ListCollections listCollections;
+    listCollections.setDbName(info->db());
+    listCollections.setFilter(BSON("info.uuid" << info->collectionUUID()));
+
+    auto response =
+        executeCommandAgainstDatabasePrimary(opCtx,
+                                             info->db(),
+                                             swDbInfo.getValue(),
+                                             listCollections.toBSON({}),
+                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                             Shard::RetryPolicy::kIdempotent);
+    if (!response.swResponse.isOK()) {
+        error->setStatus(response.swResponse.getStatus());
+        return;
+    }
+
+
+    if (auto status = getStatusFromCommandResult(response.swResponse.getValue().data);
+        !status.isOK()) {
+        error->setStatus(status);
+        return;
+    }
+
+    if (auto actualCollectionElem = dotted_path_support::extractElementAtPath(
+            response.swResponse.getValue().data, "cursor.firstBatch.0.name")) {
+        *actualCollection = actualCollectionElem.str();
+        setErrorStatus();
+    }
+
+    *hasContactedPrimaryShard = true;
 }
 
 }  // namespace
@@ -788,11 +872,30 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
     //
 
     if (!errOps.empty()) {
+        boost::optional<std::string> collectionUUIDMismatchActualCollection;
+
         for (std::vector<WriteOp*>::iterator it = errOps.begin(); it != errOps.end(); ++it) {
             WriteOp& writeOp = **it;
             WriteErrorDetail* error = new WriteErrorDetail();
             writeOp.getOpError().cloneTo(error);
             batchResp->addToErrDetails(error);
+
+            // For CollectionUUIDMismatch error, check if there is a response from a shard that
+            // aleady has the actualCollection information. If there is none, make an additional
+            // call to the primary shard to fetch this info in case the collection is unsharded or
+            // the targeted shard does not own any chunk of the collection with the requested uuid.
+            auto status = error->toStatus();
+            if (!collectionUUIDMismatchActualCollection &&
+                status.code() == ErrorCodes::CollectionUUIDMismatch) {
+                collectionUUIDMismatchActualCollection =
+                    status.extraInfo<CollectionUUIDMismatchInfo>()->actualCollection();
+            }
+        }
+
+        bool hasContactedPrimaryShard = false;
+        for (auto error : batchResp->getErrDetails()) {
+            populateCollectionUUIDMismatch(
+                _opCtx, error, &collectionUUIDMismatchActualCollection, &hasContactedPrimaryShard);
         }
     }
 

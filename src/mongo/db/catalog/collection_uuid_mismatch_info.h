@@ -51,6 +51,18 @@ public:
 
     void serialize(BSONObjBuilder* builder) const override;
 
+    const auto& db() const {
+        return _db;
+    }
+
+    const auto& collectionUUID() const {
+        return _collectionUUID;
+    }
+
+    const auto& expectedCollection() const {
+        return _expectedCollection;
+    }
+
     const auto& actualCollection() const {
         return _actualCollection;
     }
