@@ -48,11 +48,14 @@
 #include <boost/filesystem.hpp>
 
 #include "mongo/base/init.h"
+#include "mongo/base/parse_number.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_base.h"
+#include "mongo/db/server_options_helpers.h"
 #include "mongo/db/server_options_nongeneral_gen.h"
 #include "mongo/db/server_options_server_helpers.h"
+#include "mongo/idl/server_parameter.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/errno_util.h"
@@ -62,6 +65,7 @@
 #include "mongo/util/scopeguard.h"
 
 
+namespace mongo {
 namespace {
 
 using mongo::ErrorCodes;
@@ -857,4 +861,58 @@ TEST(SetupOptions, UnlinkedCwd) {
 
 #endif  // !defined(_WIN32)
 
-}  // unnamed namespace
+class SetParameterOptionTest : public unittest::Test {
+public:
+    class TestServerParameter : public ServerParameter {
+    public:
+        TestServerParameter(StringData name, ServerParameterType spt, int x)
+            : ServerParameter(name, spt), val{x} {}
+
+        void append(OperationContext*, BSONObjBuilder& bob, const std::string& name) final {
+            bob.append(name, val);
+        }
+
+        Status set(const BSONElement& bse) final {
+            auto swStr = coerceToString(bse, false);
+            return swStr.isOK() ? setFromString(swStr.getValue()) : swStr.getStatus();
+        }
+
+        Status setFromString(const std::string& str) final {
+            int value;
+            Status status = NumberParser{}(str, &value);
+            if (!status.isOK())
+                return status;
+            val = value;
+            return Status::OK();
+        }
+
+        int val;
+    };
+
+    static inline TestServerParameter p1{
+        "ServerOptionsTestServerParameter1", ServerParameterType::kStartupOnly, 123};
+    static inline TestServerParameter p2{
+        "ServerOptionsTestServerParameter2", ServerParameterType::kStartupOnly, 234};
+};
+
+TEST_F(SetParameterOptionTest, ApplySetParameters) {
+    p1.val = 123;
+    p2.val = 234;
+    auto swObj = server_options_detail::applySetParameterOptions(
+        {
+            {"ServerOptionsTestServerParameter1", "555"},
+            {"ServerOptionsTestServerParameter2", "666"},
+        },
+        *ServerParameterSet::getNodeParameterSet());
+    ASSERT_OK(swObj);
+    ASSERT_BSONOBJ_EQ(swObj.getValue(),
+                      BSON("ServerOptionsTestServerParameter1"
+                           << BSON("default" << 123 << "value" << 555)
+                           << "ServerOptionsTestServerParameter2"
+                           << BSON("default" << 234 << "value" << 666)));
+    ASSERT_EQ(p1.val, 555);
+    ASSERT_EQ(p2.val, 666);
+}
+
+}  // namespace
+}  // namespace mongo
