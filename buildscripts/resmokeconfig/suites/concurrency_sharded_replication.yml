@@ -104,7 +104,8 @@ selector:
 executor:
   archive:
     hooks:
-      - RunDBCheckInBackground
+      # TODO (SERVER-63855): remove 'RunDBCheckInBackground' or put it back.
+      # - RunDBCheckInBackground
       - CheckReplDBHashInBackground
       - CheckReplDBHash
       - ValidateCollections
@@ -116,7 +117,8 @@ executor:
           runningWithAutoSplit: false
           runningWithBalancer: false
   hooks:
-  - class: RunDBCheckInBackground
+  # TODO (SERVER-63855): remove 'RunDBCheckInBackground' or put it back.
+  # - class: RunDBCheckInBackground
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash
   - class: CheckOrphansDeleted
