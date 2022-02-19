@@ -40,7 +40,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/histogram.h"
+#include "mongo/util/integer_histogram.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -138,13 +138,13 @@ public:
     void appendExpectedHistogramResult(BSONObjBuilder* bob,
                                        std::string tag,
                                        const std::vector<int64_t>& latencies) {
-        Histogram<int64_t> hist = ReshardingMetrics::getLatencyHistogram();
+        IntegerHistogram<kLatencyHistogramBucketsCount> hist(tag, latencyHistogramBuckets);
         for (size_t i = 0; i < latencies.size(); i++) {
             hist.increment(latencies[i]);
         }
 
         BSONObjBuilder histogramBuilder;
-        appendHistogram(histogramBuilder, hist, tag);
+        hist.append(histogramBuilder, false);
         BSONObj histogram = histogramBuilder.obj();
         bob->appendElements(histogram);
     }
