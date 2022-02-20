@@ -501,6 +501,14 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
 
     repl::ReplSettings replSettings;
+    if (params.count("replication.serverless")) {
+        if (params.count("replication.replSet") || params.count("replication.replSetName")) {
+            return Status(ErrorCodes::BadValue,
+                          "serverless cannot be used with replSet or replSetName options");
+        }
+        // Starting a node in "serverless" mode implies it uses a replSet.
+        replSettings.setServerlessMode();
+    }
     if (params.count("replication.replSet")) {
         /* seed list of hosts for the repl set */
         replSettings.setReplSetString(params["replication.replSet"].as<std::string>().c_str());
@@ -526,7 +534,7 @@ Status storeMongodOptions(const moe::Environment& params) {
         storageGlobalParams.allowOplogTruncation = false;
     }
 
-    if (!replSettings.getReplSetString().empty() &&
+    if (replSettings.usingReplSets() &&
         (params.count("security.authorization") &&
          params["security.authorization"].as<std::string>() == "enabled") &&
         !serverGlobalParams.startupClusterAuthMode.x509Only() &&

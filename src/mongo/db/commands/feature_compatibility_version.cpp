@@ -468,12 +468,12 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
 void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContext* opCtx) {
     Lock::GlobalWrite lk(opCtx);
     const auto replProcess = repl::ReplicationProcess::get(opCtx);
-    const auto& replSettings = repl::ReplicationCoordinator::get(opCtx)->getSettings();
+    const bool usingReplication = repl::ReplicationCoordinator::get(opCtx)->isReplEnabled();
 
     // The node did not complete the last initial sync. If the initial sync flag is set and we are
     // part of a replica set, we expect the version to be initialized as part of initial sync after
     // startup.
-    bool needInitialSync = replSettings.usingReplSets() && replProcess &&
+    bool needInitialSync = usingReplication && replProcess &&
         replProcess->getConsistencyMarkers()->getInitialSyncFlag(opCtx);
     if (needInitialSync) {
         return;
@@ -499,7 +499,7 @@ void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContex
     // If we are part of a replica set and are started up with no data files, we do not set the
     // featureCompatibilityVersion until a primary is chosen. For this case, we expect the in-memory
     // featureCompatibilityVersion parameter to still be uninitialized until after startup.
-    if (isWriteableStorageEngine() && (!replSettings.usingReplSets() || nonLocalDatabases)) {
+    if (isWriteableStorageEngine() && (!usingReplication || nonLocalDatabases)) {
         invariant(serverGlobalParams.featureCompatibility.isVersionInitialized());
     }
 }

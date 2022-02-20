@@ -345,14 +345,20 @@ public:
             configObj = cmdObj["replSetInitiate"].Obj();
         }
 
-        std::string replSetString =
-            ReplicationCoordinator::get(opCtx)->getSettings().getReplSetString();
-        if (replSetString.empty()) {
+        const auto& settings = ReplicationCoordinator::get(opCtx)->getSettings();
+        if (!settings.usingReplSets()) {
             uasserted(ErrorCodes::NoReplicationEnabled,
-                      "This node was not started with the replSet option");
+                      "This node was not started with replication enabled.");
+        }
+
+        if (settings.isServerless() && configObj.isEmpty()) {
+            uasserted(ErrorCodes::InvalidReplicaSetConfig,
+                      "A config must be provided when started in serverless mode.");
         }
 
         if (configObj.isEmpty()) {
+            std::string replSetString = settings.getReplSetString();
+
             string noConfigMessage =
                 "no configuration specified. "
                 "Using a default configuration for the set";
@@ -746,8 +752,8 @@ public:
         Status status = Status(ErrorCodes::InternalError, "status not set in heartbeat code");
         /* we don't call ReplSetCommand::check() here because heartbeat
            checks many things that are pre-initialization. */
-        if (!ReplicationCoordinator::get(opCtx)->getSettings().usingReplSets()) {
-            status = Status(ErrorCodes::NoReplicationEnabled, "not running with --replSet");
+        if (!ReplicationCoordinator::get(opCtx)->isReplEnabled()) {
+            status = Status(ErrorCodes::NoReplicationEnabled, "not running using replication");
             uassertStatusOK(status);
         }
 

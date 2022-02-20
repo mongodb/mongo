@@ -46,7 +46,8 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             write_concern_majority_journal_default=None, auth_options=None,
             replset_config_options=None, voting_secondaries=True, all_nodes_electable=False,
             use_replica_set_connection_string=None, linear_chain=False, default_read_concern=None,
-            default_write_concern=None, shard_logging_prefix=None, replicaset_logging_prefix=None):
+            default_write_concern=None, shard_logging_prefix=None, replicaset_logging_prefix=None,
+            replset_name=None):
         """Initialize ReplicaSetFixture."""
 
         interface.ReplFixture.__init__(self, logger, job_num, fixturelib,
@@ -69,6 +70,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         self.shard_logging_prefix = shard_logging_prefix
         self.replicaset_logging_prefix = replicaset_logging_prefix
         self.num_nodes = num_nodes
+        self.replset_name = replset_name
         # Used by the enhanced multiversion system to signify multiversion mode.
         # None implies no multiversion run.
         self.fcv = None
@@ -103,7 +105,8 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             self._dbpath_prefix = os.path.join(self._dbpath_prefix, self.config.FIXTURE_SUBDIR)
 
         self.nodes = []
-        self.replset_name = self.mongod_options.setdefault("replSet", "rs")
+        if "serverless" not in self.mongod_options:
+            self.replset_name = self.mongod_options.setdefault("replSet", "rs")
         self.initial_sync_node = None
         self.initial_sync_node_idx = -1
 

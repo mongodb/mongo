@@ -56,7 +56,7 @@ class TenantMigrationFixture(interface.MultiClusterFixture):  # pylint: disable=
                 mongod_options = self.common_mongod_options.copy()
                 mongod_options.update(self.per_mongod_options[i])
                 mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, rs_name)
-                mongod_options["replSet"] = rs_name
+                mongod_options["serverless"] = True
 
                 self.replica_sets.append(
                     self.fixturelib.make_fixture(
@@ -67,7 +67,7 @@ class TenantMigrationFixture(interface.MultiClusterFixture):  # pylint: disable=
                         mixed_bin_versions=self.mixed_bin_versions,
                         replicaset_logging_prefix=rs_name,
                         use_replica_set_connection_string=self.use_replica_set_connection_string,
-                        all_nodes_electable=self.all_nodes_electable))
+                        all_nodes_electable=self.all_nodes_electable, replset_name=rs_name))
 
         # The ReplicaSetFixture for the replica set that starts out owning the data (i.e. the
         # replica set that driver should connect to when running commands).

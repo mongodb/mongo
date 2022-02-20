@@ -95,7 +95,8 @@ Milliseconds ReplicationCoordinatorImpl::_getRandomizedElectionOffset_inlock() {
 }
 
 void ReplicationCoordinatorImpl::_doMemberHeartbeat(executor::TaskExecutor::CallbackArgs cbData,
-                                                    const HostAndPort& target) {
+                                                    const HostAndPort& target,
+                                                    const std::string& replSetName) {
     stdx::lock_guard<Latch> lk(_mutex);
 
     _untrackHeartbeatHandle_inlock(cbData.myHandle);
@@ -107,7 +108,7 @@ void ReplicationCoordinatorImpl::_doMemberHeartbeat(executor::TaskExecutor::Call
     BSONObj heartbeatObj;
     Milliseconds timeout(0);
     const std::pair<ReplSetHeartbeatArgsV1, Milliseconds> hbRequest =
-        _topCoord->prepareHeartbeatRequestV1(now, _settings.ourSetName(), target);
+        _topCoord->prepareHeartbeatRequestV1(now, replSetName, target);
     heartbeatObj = hbRequest.first.toBSON();
     timeout = hbRequest.second;
 
@@ -115,7 +116,7 @@ void ReplicationCoordinatorImpl::_doMemberHeartbeat(executor::TaskExecutor::Call
         target, "admin", heartbeatObj, BSON(rpc::kReplSetMetadataFieldName << 1), nullptr, timeout);
     const executor::TaskExecutor::RemoteCommandCallbackFn callback =
         [=](const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
-            return _handleHeartbeatResponse(cbData);
+            return _handleHeartbeatResponse(cbData, replSetName);
         };
 
     LOGV2_FOR_HEARTBEATS(4615670,
@@ -130,7 +131,8 @@ void ReplicationCoordinatorImpl::_doMemberHeartbeat(executor::TaskExecutor::Call
 }
 
 void ReplicationCoordinatorImpl::_scheduleHeartbeatToTarget_inlock(const HostAndPort& target,
-                                                                   Date_t when) {
+                                                                   Date_t when,
+                                                                   std::string replSetName) {
     LOGV2_FOR_HEARTBEATS(4615618,
                          2,
                          "Scheduling heartbeat to {target} at {when}",
@@ -139,8 +141,9 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatToTarget_inlock(const HostAnd
                          "when"_attr = when);
     _trackHeartbeatHandle_inlock(
         _replExecutor->scheduleWorkAt(when,
-                                      [=](const executor::TaskExecutor::CallbackArgs& cbData) {
-                                          _doMemberHeartbeat(cbData, target);
+                                      [=, replSetName = std::move(replSetName)](
+                                          const executor::TaskExecutor::CallbackArgs& cbData) {
+                                          _doMemberHeartbeat(cbData, target, replSetName);
                                       }),
         HeartbeatState::kScheduled,
         target);
@@ -173,11 +176,11 @@ void ReplicationCoordinatorImpl::handleHeartbeatResponse_forTest(BSONObj respons
 
     hangAfterTrackingNewHandleInHandleHeartbeatResponseForTest.pauseWhileSet();
 
-    _handleHeartbeatResponse(cbData);
+    _handleHeartbeatResponse(cbData, _rsConfig.getReplSetName().toString());
 }
 
 void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
-    const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
+    const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData, const std::string& setName) {
     stdx::unique_lock<Latch> lk(_mutex);
 
     // remove handle from queued heartbeats
@@ -368,7 +371,8 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         }
     }
 
-    _scheduleHeartbeatToTarget_inlock(target, std::max(now, action.getNextHeartbeatStartDate()));
+    _scheduleHeartbeatToTarget_inlock(
+        target, std::max(now, action.getNextHeartbeatStartDate()), setName);
 
     _handleHeartbeatResponseAction_inlock(action, hbStatusResponse, std::move(lk));
 }
@@ -948,10 +952,11 @@ void ReplicationCoordinatorImpl::_cancelHeartbeats_inlock() {
 void ReplicationCoordinatorImpl::restartScheduledHeartbeats_forTest() {
     stdx::unique_lock<Latch> lk(_mutex);
     invariant(getTestCommandsEnabled());
-    _restartScheduledHeartbeats_inlock();
+    _restartScheduledHeartbeats_inlock(_rsConfig.getReplSetName().toString());
 };
 
-void ReplicationCoordinatorImpl::_restartScheduledHeartbeats_inlock() {
+void ReplicationCoordinatorImpl::_restartScheduledHeartbeats_inlock(
+    const std::string& replSetName) {
     LOGV2_FOR_HEARTBEATS(5031800, 2, "Restarting all scheduled heartbeats");
 
     const Date_t now = _replExecutor->now();
@@ -972,7 +977,7 @@ void ReplicationCoordinatorImpl::_restartScheduledHeartbeats_inlock() {
     }
 
     for (auto target : restartedTargets) {
-        _scheduleHeartbeatToTarget_inlock(target, now);
+        _scheduleHeartbeatToTarget_inlock(target, now, replSetName);
         _topCoord->restartHeartbeat(now, target);
     }
 }
@@ -986,7 +991,7 @@ void ReplicationCoordinatorImpl::_startHeartbeats_inlock() {
             continue;
         }
         auto target = _rsConfig.getMemberAt(i).getHostAndPort();
-        _scheduleHeartbeatToTarget_inlock(target, now);
+        _scheduleHeartbeatToTarget_inlock(target, now, _rsConfig.getReplSetName().toString());
         _topCoord->restartHeartbeat(now, target);
     }
 

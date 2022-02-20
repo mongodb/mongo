@@ -240,6 +240,43 @@ TEST_F(ReplCoordTest, NodeEntersStartupStateWhenStartingUpWithNoLocalConfig) {
     ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 }
 
+TEST_F(ReplCoordTest, NodeInitiateInServerlessMode) {
+    ReplSettings settings;
+    settings.setServerlessMode();
+
+    ReplCoordTest::init(settings);
+    start(HostAndPort("node1", 12345));
+    auto opCtx = makeOperationContext();
+    BSONObjBuilder result;
+    ASSERT_OK(
+        getReplCoord()->processReplSetInitiate(opCtx.get(),
+                                               BSON("_id"
+                                                    << "mySet"
+                                                    << "version" << 1 << "members"
+                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                             << "node1:12345"))),
+                                               &result));
+    ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, getReplCoord()->getReplicationMode());
+    auto config = getReplCoord()->getConfig();
+    ASSERT_EQUALS("mySet", config.getReplSetName());
+}
+
+TEST_F(ReplCoordTest, NodeInitiateDifferentSetNames) {
+    ReplCoordTest::init("cliSetName");
+    start(HostAndPort("node1", 12345));
+    auto opCtx = makeOperationContext();
+    BSONObjBuilder result;
+    ASSERT_EQUALS(
+        ErrorCodes::InvalidReplicaSetConfig,
+        getReplCoord()->processReplSetInitiate(opCtx.get(),
+                                               BSON("_id"
+                                                    << "mySet"
+                                                    << "version" << 1 << "members"
+                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                             << "node1:12345"))),
+                                               &result));
+}
+
 TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenInitiatedWithAnEmptyConfig) {
     init("mySet");
     start(HostAndPort("node1", 12345));

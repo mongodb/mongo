@@ -40,6 +40,7 @@ namespace repl {
 
 
 std::string ReplSettings::ourSetName() const {
+    invariant(!_isServerless);
     size_t sl = _replSetString.find('/');
     if (sl == std::string::npos)
         return _replSetString;
@@ -47,7 +48,7 @@ std::string ReplSettings::ourSetName() const {
 }
 
 bool ReplSettings::usingReplSets() const {
-    return !_replSetString.empty();
+    return _isServerless || !_replSetString.empty();
 }
 
 /**
@@ -59,7 +60,12 @@ long long ReplSettings::getOplogSizeBytes() const {
 }
 
 std::string ReplSettings::getReplSetString() const {
+    invariant(!_isServerless);
     return _replSetString;
+}
+
+bool ReplSettings::isServerless() const {
+    return _isServerless;
 }
 
 bool ReplSettings::shouldRecoverFromOplogAsStandalone() {
@@ -75,7 +81,13 @@ void ReplSettings::setOplogSizeBytes(long long oplogSizeBytes) {
 }
 
 void ReplSettings::setReplSetString(std::string replSetString) {
-    _replSetString = replSetString;
+    invariant(!_isServerless);
+    _replSetString = std::move(replSetString);
+}
+
+void ReplSettings::setServerlessMode() {
+    invariant(_replSetString.empty());
+    _isServerless = true;
 }
 
 }  // namespace repl

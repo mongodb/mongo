@@ -702,8 +702,7 @@ Status MultiIndexBlock::_insert(OperationContext* opCtx,
         // Only enforce the mixed-schema data constraint on the primary. Index builds may not fail
         // on the secondaries. The primary will replicate an abortIndexBuild oplog entry.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        const bool replSetAndNotPrimary = replCoord->getSettings().usingReplSets() &&
-            !replCoord->canAcceptWritesFor(opCtx, collection->ns());
+        const bool replSetAndNotPrimary = !replCoord->canAcceptWritesFor(opCtx, collection->ns());
 
         if (docHasMixedSchemaData && !replSetAndNotPrimary) {
             return timeseriesMixedSchemaDataFailure(collection.get());
@@ -917,8 +916,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
     }
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    const bool replSetAndNotPrimary = replCoord->getSettings().usingReplSets() &&
-        !replCoord->canAcceptWritesFor(opCtx, collection->ns());
+    const bool replSetAndNotPrimary = !replCoord->canAcceptWritesFor(opCtx, collection->ns());
 
     // During the collection scan phase, only the primary will enforce the mixed-schema data
     // constraint. Secondaries will only keep track of and take no action if mixed-schema data is

@@ -432,10 +432,9 @@ void setReplSetMemberInStandaloneMode(OperationContext* opCtx, StartupRecoveryMo
         return;
     }
 
-    const repl::ReplSettings& replSettings =
-        repl::ReplicationCoordinator::get(opCtx)->getSettings();
+    const bool usingReplication = repl::ReplicationCoordinator::get(opCtx)->isReplEnabled();
 
-    if (replSettings.usingReplSets()) {
+    if (usingReplication) {
         // Not in standalone mode.
         setReplSetMemberInStandaloneMode(opCtx->getServiceContext(), false);
         return;
@@ -571,13 +570,13 @@ void startupRecovery(OperationContext* opCtx,
     // index builds.
     reconcileCatalogAndRebuildUnfinishedIndexes(opCtx, storageEngine, lastShutdownState);
 
-    const auto& replSettings = repl::ReplicationCoordinator::get(opCtx)->getSettings();
+    const bool usingReplication = repl::ReplicationCoordinator::get(opCtx)->isReplEnabled();
 
     // On replica set members we only clear temp collections on DBs other than "local" during
     // promotion to primary. On secondaries, they are only cleared when the oplog tells them to. The
     // local DB is special because it is not replicated.  See SERVER-10927 for more details.
     const bool shouldClearNonLocalTmpCollections =
-        !(hasReplSetConfigDoc(opCtx) || replSettings.usingReplSets());
+        !(hasReplSetConfigDoc(opCtx) || usingReplication);
 
     openDatabases(opCtx, storageEngine, [&](auto db) {
         auto dbName = db->name().dbName();
@@ -586,7 +585,7 @@ void startupRecovery(OperationContext* opCtx,
         // if needed.
         uassertStatusOK(ensureCollectionProperties(opCtx, db, EnsureIndexPolicy::kBuildMissing));
 
-        if (replSettings.usingReplSets()) {
+        if (usingReplication) {
             // We only care about _id indexes and drop-pending collections if we are in a replset.
             db->checkForIdIndexesAndDropPendingCollections(opCtx);
             // Ensure oplog is capped (mongodb does not guarantee order of inserts on noncapped
@@ -617,8 +616,8 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
 
     // Create the FCV document for the first time, if necessary. Replica set nodes only initialize
     // the FCV when the replica set is first initiated or by data replication.
-    const auto& replSettings = repl::ReplicationCoordinator::get(opCtx)->getSettings();
-    if (isWriteableStorageEngine() && !replSettings.usingReplSets()) {
+    const bool usingReplication = repl::ReplicationCoordinator::get(opCtx)->isReplEnabled();
+    if (isWriteableStorageEngine() && !usingReplication) {
         FeatureCompatibilityVersion::setIfCleanStartup(opCtx, repl::StorageInterface::get(opCtx));
     }
 
@@ -644,8 +643,8 @@ void runStartupRecoveryInMode(OperationContext* opCtx,
 
     invariant(isWriteableStorageEngine() && !storageGlobalParams.readOnly);
     invariant(!storageGlobalParams.repair);
-    const auto& replSettings = repl::ReplicationCoordinator::get(opCtx)->getSettings();
-    invariant(replSettings.usingReplSets());
+    const bool usingReplication = repl::ReplicationCoordinator::get(opCtx)->isReplEnabled();
+    invariant(usingReplication);
     invariant(mode == StartupRecoveryMode::kReplicaSetMember ||
               mode == StartupRecoveryMode::kReplicaSetMemberInStandalone);
     startupRecovery(opCtx, storageEngine, lastShutdownState, mode);

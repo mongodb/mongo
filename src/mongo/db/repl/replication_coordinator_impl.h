@@ -1047,16 +1047,19 @@ private:
                                             bool isRollbackAllowed);
 
     /**
-     * Schedules a heartbeat to be sent to "target" at "when".
+     * Schedules a heartbeat using this node's "replSetName" to be sent to "target" at "when".
      */
-    void _scheduleHeartbeatToTarget_inlock(const HostAndPort& target, Date_t when);
+    void _scheduleHeartbeatToTarget_inlock(const HostAndPort& target,
+                                           Date_t when,
+                                           std::string replSetName);
 
     /**
-     * Processes each heartbeat response.
+     * Processes each heartbeat response using this node's "replSetName".
      *
      * Schedules additional heartbeats, triggers elections and step downs, etc.
      */
-    void _handleHeartbeatResponse(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData);
+    void _handleHeartbeatResponse(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData,
+                                  const std::string& replSetName);
 
     void _trackHeartbeatHandle_inlock(
         const StatusWith<executor::TaskExecutor::CallbackHandle>& handle,
@@ -1083,16 +1086,19 @@ private:
 
     /**
      * Cancels all heartbeats that have been scheduled but not yet sent out, then reschedules them
-     * at the current time immediately. Called while holding replCoord _mutex.
+     * at the current time immediately using this node's "replSetName". Called while holding
+     * replCoord _mutex.
      */
-    void _restartScheduledHeartbeats_inlock();
+    void _restartScheduledHeartbeats_inlock(const std::string& replSetName);
 
     /**
-     * Asynchronously sends a heartbeat to "target".
+     * Asynchronously sends a heartbeat to "target" using this node's "replSetName".
      *
      * Scheduled by _scheduleHeartbeatToTarget_inlock.
      */
-    void _doMemberHeartbeat(executor::TaskExecutor::CallbackArgs cbData, const HostAndPort& target);
+    void _doMemberHeartbeat(executor::TaskExecutor::CallbackArgs cbData,
+                            const HostAndPort& target,
+                            const std::string& replSetName);
 
 
     MemberState _getMemberState_inlock() const;

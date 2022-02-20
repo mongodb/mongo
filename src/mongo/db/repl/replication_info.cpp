@@ -108,7 +108,7 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
                                       boost::optional<std::int64_t> maxAwaitTimeMS) {
     TopologyVersion topologyVersion;
     ReplicationCoordinator* replCoord = ReplicationCoordinator::get(opCtx);
-    if (replCoord->getSettings().usingReplSets()) {
+    if (replCoord->isReplEnabled()) {
         const auto& horizonParams = SplitHorizon::getParameters(opCtx->getClient());
 
         boost::optional<Date_t> deadline;

@@ -148,8 +148,7 @@ bool shouldBuildIndexesOnEmptyCollectionSinglePhased(OperationContext* opCtx,
     // Secondaries should not bypass index build registration (and _runIndexBuild()) for two phase
     // index builds because they need to report index build progress to the primary per commit
     // quorum.
-    if (IndexBuildProtocol::kTwoPhase == protocol && replCoord->getSettings().usingReplSets() &&
-        !replCoord->canAcceptWritesFor(opCtx, nss)) {
+    if (IndexBuildProtocol::kTwoPhase == protocol && !replCoord->canAcceptWritesFor(opCtx, nss)) {
         return false;
     }
 
@@ -1831,8 +1830,7 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
     CollectionShardingState::get(opCtx, collection->ns())->checkShardVersionOrThrow(opCtx);
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    const bool replSetAndNotPrimary = replCoord->getSettings().usingReplSets() &&
-        !replCoord->canAcceptWritesFor(opCtx, collection->ns());
+    const bool replSetAndNotPrimary = !replCoord->canAcceptWritesFor(opCtx, collection->ns());
 
     // We will not have a start timestamp if we are newly a secondary (i.e. we started as
     // primary but there was a stepdown). We will be unable to timestamp the initial catalog write,
@@ -2110,8 +2108,7 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterFailure(
             // code.
             const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
             auto replCoord = repl::ReplicationCoordinator::get(abortCtx);
-            if (replCoord->getSettings().usingReplSets() &&
-                !replCoord->canAcceptWritesFor(abortCtx, dbAndUUID)) {
+            if (!replCoord->canAcceptWritesFor(abortCtx, dbAndUUID)) {
                 fassert(51101,
                         status.withContext(str::stream() << "Index build: " << replState->buildUUID
                                                          << "; Database: " << replState->dbName));
@@ -2812,7 +2809,7 @@ std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(
     // During secondary oplog application, the index specs have already been normalized in the
     // oplog entries read from the primary. We should not be modifying the specs any further.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->getSettings().usingReplSets() && !replCoord->canAcceptWritesFor(opCtx, nss)) {
+    if (!replCoord->canAcceptWritesFor(opCtx, nss)) {
         return indexSpecs;
     }
 

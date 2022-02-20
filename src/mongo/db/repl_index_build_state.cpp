@@ -462,7 +462,7 @@ void ReplIndexBuildState::clearLastOpTimeBeforeInterceptors() {
 
 bool ReplIndexBuildState::_shouldSkipIndexBuildStateTransitionCheck(OperationContext* opCtx) const {
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->getSettings().usingReplSets() && protocol == IndexBuildProtocol::kTwoPhase) {
+    if (replCoord->isReplEnabled() && protocol == IndexBuildProtocol::kTwoPhase) {
         return false;
     }
     return true;

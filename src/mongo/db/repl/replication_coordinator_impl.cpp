@@ -598,7 +598,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         }
     }
 
-    if (localConfig.getReplSetName() != _settings.ourSetName()) {
+    if (!_settings.isServerless() && localConfig.getReplSetName() != _settings.ourSetName()) {
         LOGV2_WARNING(21406,
                       "Local replica set configuration document reports set name of "
                       "{localConfigSetName}, but command line reports "
@@ -2212,7 +2212,7 @@ std::shared_ptr<HelloResponse> ReplicationCoordinatorImpl::_makeHelloResponse(
     // horizonString must be passed in if we are a valid member of the config.
     invariant(horizonString);
     auto response = std::make_shared<HelloResponse>();
-    invariant(getSettings().usingReplSets());
+    invariant(isReplEnabled());
     _topCoord->fillHelloForReplSet(response, *horizonString);
 
     OpTime lastOpTime = _getMyLastAppliedOpTime_inlock();
@@ -2930,6 +2930,11 @@ bool ReplicationCoordinatorImpl::canAcceptNonLocalWrites() const {
 
 bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
                                                     const NamespaceStringOrUUID& nsOrUUID) {
+    if (!isReplEnabled() || nsOrUUID.db() == kLocalDB) {
+        // Writes on stand-alone nodes or "local" database are always permitted.
+        return true;
+    }
+
     invariant(opCtx->lockState()->isRSTLLocked(), nsOrUUID.toString());
     return canAcceptWritesFor_UNSAFE(opCtx, nsOrUUID);
 }
@@ -3440,17 +3445,17 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
             return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());
         }
 
-        if (newConfig.getReplSetName() != _settings.ourSetName()) {
+        if (newConfig.getReplSetName() != oldConfig.getReplSetName()) {
             static constexpr char errmsg[] =
                 "Rejecting reconfig where new config set name differs from command line set name";
             LOGV2_ERROR(21419,
                         errmsg,
                         "newConfigSetName"_attr = newConfig.getReplSetName(),
-                        "commandLineSetName"_attr = _settings.ourSetName());
+                        "oldConfigSetName"_attr = oldConfig.getReplSetName());
             return Status(ErrorCodes::InvalidReplicaSetConfig,
                           str::stream()
                               << errmsg << ", new config set name: " << newConfig.getReplSetName()
-                              << ", command line set name: " << _settings.ourSetName());
+                              << ", old config set name: " << oldConfig.getReplSetName());
         }
 
         if (args.force) {
@@ -4106,7 +4111,9 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
                     "config"_attr = configObj);
         return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());
     }
-    if (newConfig.getReplSetName() != _settings.ourSetName()) {
+
+    // The setname is not provided as a command line argument in serverless mode.
+    if (!_settings.isServerless() && newConfig.getReplSetName() != _settings.ourSetName()) {
         static constexpr char errmsg[] =
             "Rejecting initiate with a set name that differs from command line set name";
         LOGV2_ERROR(21424,
@@ -5091,7 +5098,7 @@ HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const OpTime& lastOp
     // of other members's state, allowing us to make informed sync source decisions.
     if (newSyncSource.empty() && !oldSyncSource.empty() && _selfIndex >= 0 &&
         !_getMemberState_inlock().primary()) {
-        _restartScheduledHeartbeats_inlock();
+        _restartScheduledHeartbeats_inlock(_rsConfig.getReplSetName().toString());
     }
 
     return newSyncSource;
@@ -5615,9 +5622,23 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
     Status result(ErrorCodes::InternalError, "didn't set status in prepareHeartbeatResponse");
     stdx::lock_guard<Latch> lk(_mutex);
 
+    std::string replSetName = [&]() {
+        if (!_settings.isServerless()) {
+            return _settings.ourSetName();
+        } else {
+            if (_rsConfig.isInitialized()) {
+                return _rsConfig.getReplSetName().toString();
+            }
+
+            // In serverless mode before having an initialized config, simply use the replica set
+            // name provided in the hearbeat request.
+            return args.getSetName();
+        }
+    }();
+
     auto senderHost(args.getSenderHost());
     const Date_t now = _replExecutor->now();
-    result = _topCoord->prepareHeartbeatResponseV1(now, args, _settings.ourSetName(), response);
+    result = _topCoord->prepareHeartbeatResponseV1(now, args, replSetName, response);
 
     if ((result.isOK() || result == ErrorCodes::InvalidReplicaSetConfig) && _selfIndex < 0) {
         // If this node does not belong to the configuration it knows about, send heartbeats
@@ -5631,7 +5652,8 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
                   "Scheduling heartbeat to fetch a new config since we are not "
                   "a member of our current config",
                   "senderHost"_attr = senderHost);
-            _scheduleHeartbeatToTarget_inlock(senderHost, now);
+
+            _scheduleHeartbeatToTarget_inlock(senderHost, now, replSetName);
         }
     } else if (result.isOK() &&
                response->getConfigVersionAndTerm() < args.getConfigVersionAndTerm()) {
@@ -5663,7 +5685,7 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
 
             if (!inTestSkipFetchingConfig) {
                 LOGV2(21401, "Scheduling heartbeat to fetch a newer config", attr);
-                _scheduleHeartbeatToTarget_inlock(senderHost, now);
+                _scheduleHeartbeatToTarget_inlock(senderHost, now, replSetName);
             }
         }
     } else if (result.isOK() && args.getPrimaryId() >= 0 &&
@@ -5683,7 +5705,7 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
                   "myPrimaryId"_attr = myPrimaryId,
                   "senderAndPrimaryId"_attr = args.getPrimaryId(),
                   "senderTerm"_attr = args.getTerm());
-            _restartScheduledHeartbeats_inlock();
+            _restartScheduledHeartbeats_inlock(replSetName);
         }
     }
     return result;
