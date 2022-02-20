@@ -3858,7 +3858,7 @@ TEST(PhysRewriter, IndexPartitioning1) {
 
     ABT optimized = rootNode;
     ASSERT_TRUE(phaseManager.optimize(optimized));
-    ASSERT_BETWEEN(150, 300, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(150, 350, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
