@@ -35,7 +35,10 @@
 
 #include "s3_connection.h"
 #include "s3_log_system.h"
+
+#include <aws/auth/credentials.h>
 #include <aws/core/Aws.h>
+#include <aws/core/auth/AWSCredentialsProvider.h>
 #include <aws/core/utils/memory/stl/AWSString.h>
 #include <aws/core/utils/logging/AWSLogging.h>
 
@@ -418,7 +421,8 @@ S3FileSize(WT_FILE_HANDLE *fileHandle, WT_SESSION *session, wt_off_t *sizep)
 
 /*
  * S3CustomizeFileSystem --
- *     Return a customized file system to access the s3 storage source objects.
+ *     Return a customized file system to access the s3 storage source objects. The authToken
+ *     contains the AWS access key ID and the AWS secret key as comma-separated values.
  */
 static int
 S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, const char *bucketName,
@@ -432,14 +436,33 @@ S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, con
 
     s3 = (S3_STORAGE *)storageSource;
 
-    /* Mark parameters as unused for now, until implemented. */
-    UNUSED(authToken);
-
     /* We need to have a bucket to setup the file system. */
     if (bucketName == NULL || strlen(bucketName) == 0) {
         s3->log->LogVerboseErrorMessage("S3CustomizeFileSystem: bucket not specified.");
         return (EINVAL);
     }
+
+    /* Fail if there is no authentication provided. */
+    if (authToken == NULL || strlen(authToken) == 0) {
+        s3->log->LogVerboseErrorMessage("S3CustomizeFileSystem: authToken not specified.");
+        return (EINVAL);
+    }
+
+    /* Extract the AWS access key ID and the AWS secret key from authToken. */
+    int delimiter = std::string(authToken).find(',');
+    if (delimiter == std::string::npos) {
+        s3->log->LogVerboseErrorMessage("S3CustomizeFileSystem: authToken malformed.");
+        return (EINVAL);
+    }
+    const std::string accessKeyId = std::string(authToken).substr(0, delimiter);
+    const std::string secretKey = std::string(authToken).substr(delimiter + 1);
+    if (accessKeyId.empty() || secretKey.empty()) {
+        s3->log->LogVerboseErrorMessage("S3CustomizeFileSystem: authToken malformed.");
+        return (EINVAL);
+    }
+    Aws::Auth::AWSCredentials credentials;
+    credentials.SetAWSAccessKeyId(accessKeyId);
+    credentials.SetAWSSecretKey(secretKey);
 
     /*
      * Parse configuration string.
@@ -479,6 +502,7 @@ S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, con
         s3->log->LogVerboseErrorMessage("S3CustomizeFileSystem: AWS region not specified.");
         return (EINVAL);
     }
+
     /*
      * Get the directory to setup the cache, or use the default one. The default cache directory is
      * named "cache-<name>", where name is the last component of the bucket name's path. We'll
@@ -519,7 +543,7 @@ S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, con
     fs->cacheDir = cacheDir;
 
     /* New can fail; will deal with this later. */
-    fs->connection = new S3Connection(awsConfig, bucketName, objPrefix);
+    fs->connection = new S3Connection(credentials, awsConfig, bucketName, objPrefix);
     fs->fileSystem.fs_directory_list = S3ObjectList;
     fs->fileSystem.fs_directory_list_single = S3ObjectListSingle;
     fs->fileSystem.fs_directory_list_free = S3ObjectListFree;

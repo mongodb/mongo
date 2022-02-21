@@ -49,6 +49,13 @@ class test_s3_store01(wttest.WiredTigerTestCase):
     if bucket_name is None:
         bucket_name = "s3testext"
 
+    # Auth token contains the AWS access key ID and the AWS secret key as comma-separated values.
+    access_key = os.getenv('AWS_ACCESS_KEY_ID')
+    secret_key = os.getenv('AWS_SECRET_ACCESS_KEY')
+    auth_token = None
+    if access_key and secret_key:
+        auth_token = access_key + "," + secret_key
+
     # Load the s3 store extension, skip the test if missing.
     def conn_extensions(self, extlist):
         extlist.skip_if_missing = True
@@ -66,7 +73,7 @@ class test_s3_store01(wttest.WiredTigerTestCase):
     
         session = self.session
         s3_store = self.get_s3_storage_source()
-        fs = s3_store.ss_customize_file_system(session, self.bucket_name, "Secret", self.fs_config)
+        fs = s3_store.ss_customize_file_system(session, self.bucket_name, self.auth_token, self.fs_config)
        
         # Test flush functionality and flushing to cache and checking if file exists.
         f = open(filename, 'wb')
@@ -92,7 +99,7 @@ class test_s3_store01(wttest.WiredTigerTestCase):
         file_list = [object_name]
         self.assertEquals(fs.fs_directory_list(session, None, None), file_list)
 
-        fs2 = s3_store.ss_customize_file_system(session, self.bucket_name, "Secret", self.fs_config)
+        fs2 = s3_store.ss_customize_file_system(session, self.bucket_name, self.auth_token, self.fs_config)
         self.assertEquals(fs.fs_directory_list(session, None, None), file_list)
 
         s3_store.terminate(session)

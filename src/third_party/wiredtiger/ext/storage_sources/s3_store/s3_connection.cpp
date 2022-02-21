@@ -15,7 +15,19 @@
 #define S3_ALLOCATION_TAG ""
 /*
  * S3Connection --
- *     Constructor for AWS S3 bucket connection.
+ *     Constructor for AWS S3 bucket connection with provided credentials.
+ */
+S3Connection::S3Connection(const Aws::Auth::AWSCredentials &credentials,
+  const Aws::S3Crt::ClientConfiguration &config, const std::string &bucketName,
+  const std::string &objPrefix)
+    : _s3CrtClient(credentials, config), _bucketName(bucketName), _objectPrefix(objPrefix)
+{
+}
+
+/*
+ * S3Connection --
+ *     Constructor for AWS S3 bucket connection with credentials in local file.
+ *     https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
  */
 S3Connection::S3Connection(const Aws::S3Crt::ClientConfiguration &config,
   const std::string &bucketName, const std::string &objPrefix)
