@@ -90,14 +90,14 @@ bool checkIfSingleDoc(OperationContext* opCtx,
 
 /**
  * Checks the collection's metadata for a successful split on the specified chunkRange using the
- * specified splitKeys. Returns false if the metadata's chunks don't match the new chunk
+ * specified split points. Returns false if the metadata's chunks don't match the new chunk
  * boundaries exactly.
  */
 bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const OID& epoch,
                                           const ChunkRange& chunkRange,
-                                          const std::vector<BSONObj>& splitKeys) {
+                                          const std::vector<BSONObj>& splitPoints) {
     const auto metadataAfterSplit = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
         return CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
@@ -107,19 +107,21 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
             str::stream() << "Collection " << nss.ns() << " changed since split start",
             metadataAfterSplit.getCollVersion().epoch() == epoch);
 
-    auto newChunkBounds(splitKeys);
-    auto startKey = chunkRange.getMin();
-    newChunkBounds.push_back(chunkRange.getMax());
-
     ChunkType nextChunk;
-    for (const auto& endKey : newChunkBounds) {
+    for (auto it = splitPoints.begin(); it != splitPoints.end(); ++it) {
         // Check that all new chunks fit the new chunk boundaries
-        if (!metadataAfterSplit->getNextChunk(startKey, &nextChunk) ||
-            nextChunk.getMax().woCompare(endKey)) {
+        const auto& currentChunkMinKey =
+            it == splitPoints.begin() ? chunkRange.getMin() : *std::prev(it);
+        const auto& currentChunkMaxKey = *it;
+        if (!metadataAfterSplit->getNextChunk(currentChunkMinKey, &nextChunk) ||
+            nextChunk.getMax().woCompare(currentChunkMaxKey)) {
             return false;
         }
-
-        startKey = endKey;
+    }
+    // Special check for the last chunk produced.
+    if (!metadataAfterSplit->getNextChunk(splitPoints.back(), &nextChunk) ||
+        nextChunk.getMax().woCompare(chunkRange.getMax())) {
+        return false;
     }
 
     return true;
@@ -131,7 +133,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    const BSONObj& keyPatternObj,
                                                    const ChunkRange& chunkRange,
-                                                   const std::vector<BSONObj>& splitKeys,
+                                                   std::vector<BSONObj>&& splitPoints,
                                                    const std::string& shardName,
                                                    const OID& expectedCollectionEpoch) {
     auto scopedSplitOrMergeChunk(uassertStatusOK(
@@ -141,8 +143,8 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
     // data types.
     const auto hashedField = ShardKeyPattern::extractHashedField(keyPatternObj);
     if (hashedField) {
-        for (BSONObj splitKey : splitKeys) {
-            auto hashedSplitElement = splitKey[hashedField.fieldName()];
+        for (const auto& splitPoint : splitPoints) {
+            auto hashedSplitElement = splitPoint[hashedField.fieldName()];
             if (!ShardKeyPattern::isValidHashedValue(hashedSplitElement)) {
                 return {ErrorCodes::CannotSplit,
                         str::stream() << "splitChunk cannot split chunk " << chunkRange.toString()
@@ -154,8 +156,8 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
     }
 
     // Commit the split to the config server.
-    auto request =
-        SplitChunkRequest(nss, shardName, expectedCollectionEpoch, chunkRange, splitKeys);
+    auto request = SplitChunkRequest(
+        nss, shardName, expectedCollectionEpoch, chunkRange, std::move(splitPoints));
 
     auto configCmdObj =
         request.toConfigCommandBSON(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
@@ -204,7 +206,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
     //
     if (!commandStatus.isOK() || !writeConcernStatus.isOK()) {
         if (checkMetadataForSuccessfulSplitChunk(
-                opCtx, nss, expectedCollectionEpoch, chunkRange, splitKeys)) {
+                opCtx, nss, expectedCollectionEpoch, chunkRange, request.getSplitPoints())) {
             // Split was committed.
         } else if (!commandStatus.isOK()) {
             return commandStatus;
@@ -233,12 +235,12 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
     }
 
     auto backChunk = ChunkType();
-    backChunk.setMin(splitKeys.back());
+    backChunk.setMin(request.getSplitPoints().back());
     backChunk.setMax(chunkRange.getMax());
 
     auto frontChunk = ChunkType();
     frontChunk.setMin(chunkRange.getMin());
-    frontChunk.setMax(splitKeys.front());
+    frontChunk.setMax(request.getSplitPoints().front());
 
     KeyPattern shardKeyPattern(keyPatternObj);
     if (shardKeyPattern.globalMax().woCompare(backChunk.getMax()) == 0 &&
