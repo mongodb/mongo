@@ -788,12 +788,12 @@ struct __wt_session {
 	/*!
 	 * Reconfigure a session handle.
 	 *
+	 * Only configurations listed in the method arguments are modified, other configurations
+	 * remain in their current state. This method additionally resets the cursors associated
+	 * with the session. WT_SESSION::reconfigure will fail if a transaction is in progress in
+	 * the session.
+	 *
 	 * @snippet ex_all.c Reconfigure a session
-	 *
-	 * WT_SESSION::reconfigure will fail if a transaction is in progress
-	 * in the session.
-	 *
-	 * All cursors are reset.
 	 *
 	 * @param session the session handle
 	 * @configstart{WT_SESSION.reconfigure, see dist/api_data.py}
@@ -1522,11 +1522,10 @@ struct __wt_session {
 	/*!
 	 * Reset the session handle.
 	 *
-	 * This method resets all cursors associated with this session,
-	 * discards cached resources and resets session statistics.
-	 * The session can be re-used immediately after this call returns.
-	 * If a transaction is running on this session, then this call takes
-	 * no action and return an error.
+	 * This method resets the cursors associated with the session, clears session statistics and
+	 * discards cached resources. No session configurations are modified (or reset to their
+	 * default values). WT_SESSION::reset will fail if a transaction is in progress in the
+	 * session.
 	 *
 	 * @snippet ex_all.c Reset the session
 	 *
