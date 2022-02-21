@@ -746,7 +746,6 @@ __wt_txn_set_prepare_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t prepare_
 int
 __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t read_ts)
 {
-    WT_DECL_RET;
     WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_SHARED *txn_shared;
@@ -785,14 +784,7 @@ __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t read_ts)
      */
     __wt_readlock(session, &txn_global->rwlock);
 
-    if (F_ISSET(txn, WT_TXN_TS_READ_BEFORE_OLDEST)) {
-        /* Set a flag on the transaction to prevent re-acquiring the read lock. */
-        F_SET(txn, WT_TXN_TS_ALREADY_LOCKED);
-        ret = __wt_txn_get_pinned_timestamp(session, &ts_oldest, txn->flags);
-        F_CLR(txn, WT_TXN_TS_ALREADY_LOCKED);
-        WT_RET(ret);
-    } else
-        ts_oldest = txn_global->oldest_timestamp;
+    ts_oldest = txn_global->oldest_timestamp;
     did_roundup_to_oldest = false;
     if (read_ts < ts_oldest) {
         /*
@@ -816,9 +808,8 @@ __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t read_ts)
              * timestamp and simply expect the set to fail.
              */
             __wt_verbose_notice(session, WT_VERB_TIMESTAMP,
-              "read timestamp %s less than the %s timestamp %s",
+              "read timestamp %s less than the oldest timestamp %s",
               __wt_timestamp_to_string(read_ts, ts_string[0]),
-              F_ISSET(txn, WT_TXN_TS_READ_BEFORE_OLDEST) ? "pinned" : "oldest",
               __wt_timestamp_to_string(ts_oldest, ts_string[1]));
 #endif
             return (EINVAL);

@@ -422,8 +422,7 @@ file_config = format_meta + file_runtime_config + tiered_config + [
     Config('split_deepen_min_child', '0', r'''
         minimum entries in a page to consider deepening the tree. Pages
         will be considered for splitting and deepening the search tree
-        as soon as there are more than the configured number of children
-        ''',
+        as soon as there are more than the configured number of children''',
         type='int', undoc=True),
     Config('split_deepen_per_child', '0', r'''
         entries allocated per child when deepening the tree''',
@@ -1756,10 +1755,6 @@ methods = {
         priority of the transaction for resolving conflicts.
         Transactions with higher values are less likely to abort''',
         min='-100', max='100'),
-    Config('read_before_oldest', 'false', r'''
-        allows the caller to specify a read timestamp less than the oldest timestamp but newer
-        than or equal to the pinned timestamp. Cannot be set to true while also rounding up the read
-        timestamp.''', type='boolean', undoc=True),
     Config('read_timestamp', '', r'''
         read using the specified timestamp.  The supplied value must not be
         older than the current oldest timestamp.  See

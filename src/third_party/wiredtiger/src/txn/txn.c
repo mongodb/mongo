@@ -602,16 +602,6 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
     if (cval.val)
         F_SET(txn, WT_TXN_TS_ROUND_READ);
 
-    /* Check if the read timestamp is allowed to be before the oldest timestamp. */
-    WT_ERR(__wt_config_gets_def(session, cfg, "read_before_oldest", 0, &cval));
-    if (cval.val) {
-        if (F_ISSET(txn, WT_TXN_TS_ROUND_READ))
-            WT_ERR_MSG(session, EINVAL,
-              "cannot specify roundup_timestamps.read and "
-              "read_before_oldest on the same transaction");
-        F_SET(txn, WT_TXN_TS_READ_BEFORE_OLDEST);
-    }
-
     WT_ERR(__wt_config_gets_def(session, cfg, "read_timestamp", 0, &cval));
     if (cval.len != 0) {
         WT_ERR(__wt_txn_parse_timestamp(session, "read", &read_ts, &cval));
