@@ -42,8 +42,10 @@ S3Connection::ListObjects(const std::string &prefix, std::vector<std::string> &o
     if (!outcomes.IsSuccess())
         return (1);
     auto result = outcomes.GetResult();
+
+    /* Returning the object name with the prefix stripped. */
     for (const auto &object : result.GetContents())
-        objects.push_back(object.GetKey());
+        objects.push_back(object.GetKey().substr(_objectPrefix.length()));
 
     if (listSingle)
         return (0);
