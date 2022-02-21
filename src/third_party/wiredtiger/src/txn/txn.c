@@ -2422,8 +2422,10 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
     WT_SESSION_IMPL *s;
     char ts_string[WT_TS_INT_STRING_SIZE];
     const char *ckpt_cfg;
+    bool use_timestamp;
 
     conn = S2C(session);
+    use_timestamp = false;
 
     /*
      * Perform a system-wide checkpoint so that all tables are consistent with each other. All
@@ -2437,14 +2439,14 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
     if (cval.val != 0) {
         ckpt_cfg = "use_timestamp=true";
         if (conn->txn_global.has_stable_timestamp)
-            F_SET(conn, WT_CONN_CLOSING_TIMESTAMP);
+            use_timestamp = true;
     }
     if (!F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY | WT_CONN_PANIC)) {
         /*
          * Perform rollback to stable to ensure that the stable version is written to disk on a
          * clean shutdown.
          */
-        if (F_ISSET(conn, WT_CONN_CLOSING_TIMESTAMP)) {
+        if (use_timestamp) {
             __wt_verbose(session, WT_VERB_RTS,
               "performing shutdown rollback to stable with stable timestamp: %s",
               __wt_timestamp_to_string(conn->txn_global.stable_timestamp, ts_string));
