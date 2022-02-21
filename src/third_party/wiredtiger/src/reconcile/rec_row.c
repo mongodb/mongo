@@ -807,6 +807,15 @@ __wt_rec_row_leaf(
             case WT_UPDATE_STANDARD:
                 /* Take the value from the update. */
                 WT_ERR(__wt_rec_cell_build_val(session, r, upd->data, upd->size, twp, 0));
+                /*
+                 * When an out-of-order or mixed-mode tombstone is getting written to disk, remove
+                 * any historical versions that are greater in the history store for that key.
+                 */
+                if (upd_select.ooo_tombstone && r->hs_clear_on_tombstone) {
+                    WT_ERR(__wt_row_leaf_key(session, page, rip, tmpkey, true));
+                    WT_ERR(__wt_rec_hs_clear_on_tombstone(
+                      session, r, twp->durable_stop_ts, WT_RECNO_OOB, tmpkey, true));
+                }
                 dictionary = true;
                 break;
             case WT_UPDATE_TOMBSTONE:
@@ -831,12 +840,13 @@ __wt_rec_row_leaf(
                 }
 
                 /*
-                 * When removing a key due to a tombstone with a durable timestamp of "none", also
-                 * remove the history store contents associated with that key.
+                 * When an out-of-order or mixed-mode tombstone is getting written to disk, remove
+                 * any historical versions that are greater in the history store for this key.
                  */
-                if (twp->durable_stop_ts == WT_TS_NONE && r->hs_clear_on_tombstone) {
+                if (upd_select.ooo_tombstone && r->hs_clear_on_tombstone) {
                     WT_ERR(__wt_row_leaf_key(session, page, rip, tmpkey, true));
-                    WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, WT_RECNO_OOB, tmpkey));
+                    WT_ERR(__wt_rec_hs_clear_on_tombstone(
+                      session, r, twp->durable_stop_ts, WT_RECNO_OOB, tmpkey, false));
                 }
 
                 /*
