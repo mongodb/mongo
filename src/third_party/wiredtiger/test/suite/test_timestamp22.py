@@ -225,7 +225,7 @@ class test_timestamp22(wttest.WiredTigerTestCase):
         if do_prepare:
             if commit_ts < prepare_ts:
                 ok_commit = False
-            if prepare_ts < self.oldest_ts:
+            if prepare_ts <= self.stable_ts:
                 ok_prepare = False
 
         # If the final commit is too old, we'll fail.

@@ -115,9 +115,6 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
             self.assertEquals(cursor.next(), 0)
         session.commit_transaction()
 
-        # Set a stable timestamp so that first update value is durable.
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(250))
-
         # Update all values with value 222 i.e. second update value.
         self.assertEquals(cursor.reset(), 0)
         session.begin_transaction()
@@ -128,6 +125,10 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
             self.assertEquals(cursor.next(), 0)
 
         session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(200))
+
+        # Set a stable timestamp so that first update value is durable.
+        # (Must be done after preparing since preparing before stable is prohibited.)
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(250))
 
         # Commit timestamp is earlier to stable timestamp but durable timestamp
         # is later than stable timestamp. Hence second update value is not durable.

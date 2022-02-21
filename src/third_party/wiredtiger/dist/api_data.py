@@ -1765,13 +1765,18 @@ methods = {
         timestamp_roundup''',
         type='category', subconfig= [
         Config('prepared', 'false', r'''
-            applicable only for prepared transactions. Indicates if the prepare
-            timestamp and the commit timestamp of this transaction can be
-            rounded up. If the prepare timestamp is less than the stable
-            timestamp, the prepare timestamp will be rounded to the stable
-            timestamp. If the commit timestamp is less than the prepare
-            timestamp, the commit timestamp will be rounded up to the prepare
-            timestamp''', type='boolean'),
+            applicable only for prepared transactions, and intended only for special-purpose
+            use. (See @ref timestamp_roundup_prepare.) Allows the prepare timestamp and the
+            commit timestamp of this transaction to be rounded up to be no older than the
+            oldest timestamp, and allows violating the usual restriction that the prepare
+            timestamp must be newer than the stable timestamp. Specifically: at transaction
+            prepare, if the prepare
+            timestamp is less than or equal to the oldest timestamp, the prepare timestamp
+            will be rounded to the oldest timestamp. Subsequently, at commit time, if the
+            commit timestamp is less than the (now rounded) prepare timestamp, the commit
+            timestamp will be rounded up to it and thus to at least oldest.
+            Neither timestamp will be checked against the stable timestamp''',
+            type='boolean'),
         Config('read', 'false', r'''
             if the read timestamp is less than the oldest timestamp, the
             read timestamp will be rounded up to the oldest timestamp''',
@@ -1795,7 +1800,7 @@ methods = {
         set the durable timestamp for the current transaction. Required for the
         commit of a prepared transaction, and otherwise not permitted. The
         supplied value must not be older than the commit timestamp set for the
-        current transaction. The value must also not be older than the current
+        current transaction. The value must also be newer than the current
         oldest and stable timestamps. See @ref timestamp_prepare'''),
     Config('operation_timeout_ms', '0', r'''
         when non-zero, a requested limit on the time taken to complete operations in this
@@ -1816,7 +1821,7 @@ methods = {
     Config('prepare_timestamp', '', r'''
         set the prepare timestamp for the updates of the current transaction.
         The supplied value must not be older than any active read timestamps, and must
-        not be older than the current stable timestamp. See @ref timestamp_prepare'''),
+        be newer than the current stable timestamp. See @ref timestamp_prepare'''),
 ]),
 
 'WT_SESSION.timestamp_transaction' : Method([
@@ -1833,12 +1838,12 @@ methods = {
         commit of a prepared transaction, and otherwise not permitted. Can only
         be set once the current transaction has been prepared, and a commit
         timestamp has been set. The supplied value must not be older than the
-        commit timestamp. The value must also not be older than the current
+        commit timestamp. The value must also be newer than the current
         oldest and stable timestamps. See @ref timestamp_prepare'''),
     Config('prepare_timestamp', '', r'''
         set the prepare timestamp for the updates of the current transaction.
         The supplied value must not be older than any active read timestamps,
-        and must not be older than the current stable timestamp. Can be set only
+        and must be newer than the current stable timestamp. Can be set only
         once per transaction. Setting the prepare timestamp does not by itself
         prepare the transaction, but does oblige the application to eventually
         prepare the transaction before committing it. See @ref timestamp_prepare'''),

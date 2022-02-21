@@ -90,7 +90,7 @@ class test_prepare16(wttest.WiredTigerTestCase):
 
         cursor.reset()
         cursor.close()
-        self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(10))
+        self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(11))
 
         s = self.conn.open_session()
         s.begin_transaction('ignore_prepare = true')

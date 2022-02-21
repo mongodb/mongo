@@ -85,9 +85,11 @@ class test_rollback_to_stable11(test_rollback_to_stable_base):
         # Verify data is visible and correct.
         self.check(value_b, uri, nrows, None, 20)
 
-        # Pin stable to timestamp 30 if prepare otherwise 20.
+        # Pin stable to timestamp 28 if prepare otherwise 20.
+        # large_updates() prepares at 1 before the timestamp passed (so 29)
+        # and this is required to be strictly greater than (not >=) stable.
         if self.prepare:
-            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(30))
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(28))
         else:
             self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
 

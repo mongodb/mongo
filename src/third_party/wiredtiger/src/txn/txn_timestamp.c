@@ -695,7 +695,7 @@ __wt_txn_set_prepare_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t prepare_
 {
     WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
-    wt_timestamp_t oldest_ts;
+    wt_timestamp_t oldest_ts, stable_ts;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
 
     txn = session->txn;
@@ -713,25 +713,53 @@ __wt_txn_set_prepare_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t prepare_
     WT_RET(__txn_assert_after_reads(session, "prepare", prepare_ts));
 
     /*
-     * Check whether the prepare timestamp is less than the oldest timestamp.
+     * Check whether the prepare timestamp is less than the stable timestamp.
      */
-    oldest_ts = txn_global->oldest_timestamp;
-    if (prepare_ts < oldest_ts) {
+    stable_ts = txn_global->stable_timestamp;
+    if (prepare_ts <= stable_ts) {
         /*
-         * Check whether the prepare timestamp needs to be rounded up to the oldest timestamp.
+         * Check whether the application is using the "prepared" roundup mode. This rounds up to
+         * _oldest_, not stable, and permits preparing before stable, because it is meant to be used
+         * during application recovery to replay a transaction that was successfully prepared (and
+         * possibly committed) before a crash but had not yet become durable. In general it is
+         * important to replay such transactions at the same time they had before the crash; in a
+         * distributed setting they might have already committed in the network, in which case
+         * replaying them at a different time is very likely to be inconsistent. Meanwhile, once a
+         * transaction prepares we allow stable to move forward past it, so replaying may require
+         * preparing and even committing prior to stable.
+         *
+         * Such a replay is safe provided that it happens during application-level recovery before
+         * resuming ordinary operations: between the time the transaction prepares and the crash,
+         * operations intersecting with the prepared transaction fail with WT_PREPARE_CONFLICT, and
+         * after the crash, the replay recreates this state before any ordinary operations can
+         * intersect with it. Application recovery code is responsible for making sure that any
+         * other operations it does before the replay that might intersect with the prepared
+         * transaction are consistent with it.
+         *
+         * (There is a slight extra wrinkle at the moment, because it is possible for a transaction
+         * to prepare and commit and be interacted with before it becomes durable. Currently such
+         * transactions _must_ be replayed identically by the application to avoid inconsistency,
+         * or avoided. FIXME-WT-8747: remove this note when WT-8747 fixes this.)
+         *
+         * Under other circumstances, that is, not during application-level recovery when ordinary
+         * operations are excluded, use of "roundup=prepared" (for replaying transactions or
+         * otherwise) is not safe and can cause data inconsistency. There is currently no roundup
+         * mode for commit timestamps that is suitable for use during ordinary operation.
          */
         if (F_ISSET(txn, WT_TXN_TS_ROUND_PREPARED)) {
-            __wt_verbose(session, WT_VERB_TIMESTAMP,
-              "prepare timestamp %s rounded to oldest timestamp %s",
-              __wt_timestamp_to_string(prepare_ts, ts_string[0]),
-              __wt_timestamp_to_string(oldest_ts, ts_string[1]));
-
-            prepare_ts = oldest_ts;
+            oldest_ts = txn_global->oldest_timestamp;
+            if (prepare_ts < oldest_ts) {
+                __wt_verbose(session, WT_VERB_TIMESTAMP,
+                  "prepare timestamp %s rounded to oldest timestamp %s",
+                  __wt_timestamp_to_string(prepare_ts, ts_string[0]),
+                  __wt_timestamp_to_string(oldest_ts, ts_string[1]));
+                prepare_ts = oldest_ts;
+            }
         } else
             WT_RET_MSG(session, EINVAL,
-              "prepare timestamp %s is older than the oldest timestamp %s",
+              "prepare timestamp %s is not newer than the stable timestamp %s",
               __wt_timestamp_to_string(prepare_ts, ts_string[0]),
-              __wt_timestamp_to_string(oldest_ts, ts_string[1]));
+              __wt_timestamp_to_string(stable_ts, ts_string[1]));
     }
     txn->prepare_timestamp = prepare_ts;
     F_SET(txn, WT_TXN_HAS_TS_PREPARE);

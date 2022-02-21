@@ -1724,15 +1724,19 @@ struct __wt_session {
 	 * alters the visibility expected in a transaction.  See @ref timestamp_roundup., a set of
 	 * related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;prepared,
-	 * applicable only for prepared transactions.  Indicates if the prepare timestamp and the
-	 * commit timestamp of this transaction can be rounded up.  If the prepare timestamp is less
-	 * than the stable timestamp\, the prepare timestamp will be rounded to the stable
-	 * timestamp.  If the commit timestamp is less than the prepare timestamp\, the commit
-	 * timestamp will be rounded up to the prepare timestamp., a boolean flag; default \c
-	 * false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;read, if the read timestamp is less than the
-	 * oldest timestamp\, the read timestamp will be rounded up to the oldest timestamp., a
-	 * boolean flag; default \c false.}
+	 * applicable only for prepared transactions\, and intended only for special-purpose use.
+	 * (See @ref timestamp_roundup_prepare.) Allows the prepare timestamp and the commit
+	 * timestamp of this transaction to be rounded up to be no older than the oldest timestamp\,
+	 * and allows violating the usual restriction that the prepare timestamp must be newer than
+	 * the stable timestamp.  Specifically: at transaction prepare\, if the prepare timestamp is
+	 * less than or equal to the oldest timestamp\, the prepare timestamp will be rounded to the
+	 * oldest timestamp.  Subsequently\, at commit time\, if the commit timestamp is less than
+	 * the (now rounded) prepare timestamp\, the commit timestamp will be rounded up to it and
+	 * thus to at least oldest.  Neither timestamp will be checked against the stable
+	 * timestamp., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;read, if
+	 * the read timestamp is less than the oldest timestamp\, the read timestamp will be rounded
+	 * up to the oldest timestamp., a boolean flag; default \c false.}
 	 * @config{ ),,}
 	 * @config{sync, whether to sync log records when the transaction commits\, inherited from
 	 * ::wiredtiger_open \c transaction_sync., a boolean flag; default empty.}
@@ -1764,8 +1768,8 @@ struct __wt_session {
 	 * @config{durable_timestamp, set the durable timestamp for the current transaction.
 	 * Required for the commit of a prepared transaction\, and otherwise not permitted.  The
 	 * supplied value must not be older than the commit timestamp set for the current
-	 * transaction.  The value must also not be older than the current oldest and stable
-	 * timestamps.  See @ref timestamp_prepare., a string; default empty.}
+	 * transaction.  The value must also be newer than the current oldest and stable timestamps.
+	 * See @ref timestamp_prepare., a string; default empty.}
 	 * @config{operation_timeout_ms, when non-zero\, a requested limit on the time taken to
 	 * complete operations in this transaction.  Time is measured in real time milliseconds from
 	 * the start of each WiredTiger API call.  There is no guarantee any operation will not take
@@ -1801,8 +1805,8 @@ struct __wt_session {
 	 * @configstart{WT_SESSION.prepare_transaction, see dist/api_data.py}
 	 * @config{prepare_timestamp, set the prepare timestamp for the updates of the current
 	 * transaction.  The supplied value must not be older than any active read timestamps\, and
-	 * must not be older than the current stable timestamp.  See @ref timestamp_prepare., a
-	 * string; default empty.}
+	 * must be newer than the current stable timestamp.  See @ref timestamp_prepare., a string;
+	 * default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1883,14 +1887,14 @@ struct __wt_session {
 	 * Required for the commit of a prepared transaction\, and otherwise not permitted.  Can
 	 * only be set once the current transaction has been prepared\, and a commit timestamp has
 	 * been set.  The supplied value must not be older than the commit timestamp.  The value
-	 * must also not be older than the current oldest and stable timestamps.  See @ref
+	 * must also be newer than the current oldest and stable timestamps.  See @ref
 	 * timestamp_prepare., a string; default empty.}
 	 * @config{prepare_timestamp, set the prepare timestamp for the updates of the current
 	 * transaction.  The supplied value must not be older than any active read timestamps\, and
-	 * must not be older than the current stable timestamp.  Can be set only once per
-	 * transaction.  Setting the prepare timestamp does not by itself prepare the transaction\,
-	 * but does oblige the application to eventually prepare the transaction before committing
-	 * it.  See @ref timestamp_prepare., a string; default empty.}
+	 * must be newer than the current stable timestamp.  Can be set only once per transaction.
+	 * Setting the prepare timestamp does not by itself prepare the transaction\, but does
+	 * oblige the application to eventually prepare the transaction before committing it.  See
+	 * @ref timestamp_prepare., a string; default empty.}
 	 * @config{read_timestamp, read using the specified timestamp.  The supplied value must not
 	 * be older than the current oldest timestamp.  This can only be set once for a transaction.
 	 * See @ref timestamp_txn_api., a string; default empty.}
