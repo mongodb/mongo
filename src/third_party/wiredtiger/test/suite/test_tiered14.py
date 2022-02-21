@@ -41,7 +41,7 @@ class test_tiered14(wttest.WiredTigerTestCase):
     bucket_prefix = "pfx_"
     extension_name = "local_store"
 
-    # FIXME-WT-8781: enable the commented scenarios and run the
+    # FIXME-WT-7833: enable the commented scenarios and run the
     # test with the --long option.
 
     # The multiplier makes the size of keys and values progressively larger.
@@ -59,7 +59,7 @@ class test_tiered14(wttest.WiredTigerTestCase):
     ]
     dataset = [
         ('simple', dict(dataset='simple')),
-        ('complex', dict(dataset='complex', long_only=True)),
+        #('complex', dict(dataset='complex', long_only=True)),
     ]
     scenarios = wtscenario.make_scenarios(multiplier, keyfmt, dataset)
 
