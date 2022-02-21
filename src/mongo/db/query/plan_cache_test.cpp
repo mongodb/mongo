@@ -2080,4 +2080,18 @@ TEST(PlanCacheTest, PlanCacheSizeWithMultiplePlanCaches) {
     ASSERT_EQ(planCacheTotalSizeEstimateBytes.get(), originalSize);
 }
 
+TEST(PlanCacheTest, PlanCacheMaxSizeParameterCanBeZero) {
+    PlanCache planCache{0U};
+    unique_ptr<CanonicalQuery> query(canonicalize("{a: 1, c: 1}"));
+    auto qs = getQuerySolutionForCaching();
+    auto decision = createDecision(1U);
+    auto decisionPtr = decision.get();
+
+    ASSERT_OK(planCache.set(makeKey(*query),
+                            qs->cacheData->clone(),
+                            *decisionPtr,
+                            Date_t{},
+                            plan_cache_util::buildDebugInfo(*query, std::move(decision))));
+    ASSERT_EQ(0U, planCache.size());
+}
 }  // namespace

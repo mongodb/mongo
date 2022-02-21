@@ -282,8 +282,7 @@ public:
     explicit PlanCacheBase(size_t cacheSize, size_t numPartitions = 1)
         : _numPartitions(numPartitions) {
         invariant(numPartitions > 0);
-        invariant(cacheSize / numPartitions > 0);
-        auto lru = Lru(cacheSize / numPartitions);
+        Lru lru{cacheSize / numPartitions};
         _partitionedCache = std::make_unique<Partitioned<Lru, Partitioner>>(numPartitions, lru);
     }
 
