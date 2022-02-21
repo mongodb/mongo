@@ -104,7 +104,6 @@
     do {                                                                    \
         bool __autotxn = false, __update = false;                           \
         API_CALL(s, h, n, dh, config, cfg);                                 \
-        __wt_txn_timestamp_flags(s);                                        \
         __autotxn = !F_ISSET((s)->txn, WT_TXN_AUTOCOMMIT | WT_TXN_RUNNING); \
         if (__autotxn)                                                      \
             F_SET((s)->txn, WT_TXN_AUTOCOMMIT);                             \
@@ -117,7 +116,6 @@
     do {                                                                    \
         bool __autotxn = false, __update = false;                           \
         API_CALL_NOCONF(s, h, n, dh);                                       \
-        __wt_txn_timestamp_flags(s);                                        \
         __autotxn = !F_ISSET((s)->txn, WT_TXN_AUTOCOMMIT | WT_TXN_RUNNING); \
         if (__autotxn)                                                      \
             F_SET((s)->txn, WT_TXN_AUTOCOMMIT);                             \

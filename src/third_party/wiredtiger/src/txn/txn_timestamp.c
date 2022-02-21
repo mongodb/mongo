@@ -876,12 +876,14 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 {
     WT_CONFIG cparser;
     WT_CONFIG_ITEM ckey, cval;
+    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     wt_timestamp_t commit_ts, durable_ts, prepare_ts, read_ts;
     bool set_ts;
 
-    set_ts = false;
+    conn = S2C(session);
     commit_ts = durable_ts = prepare_ts = read_ts = WT_TS_NONE;
+    set_ts = false;
 
     WT_TRET(__wt_txn_context_check(session, true));
 
@@ -936,7 +938,9 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
     if (prepare_ts != WT_TS_NONE)
         WT_RET(__wt_txn_set_prepare_timestamp(session, prepare_ts));
 
-    if (set_ts)
+    /* Timestamps are only logged in debugging mode. */
+    if (set_ts && FLD_ISSET(conn->log_flags, WT_CONN_LOG_DEBUG_MODE) &&
+      FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) && !F_ISSET(conn, WT_CONN_RECOVERING))
         WT_RET(__wt_txn_ts_log(session));
 
     return (0);

@@ -230,9 +230,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page
     *updp = NULL;
     prev_upd_ts = WT_TS_NONE;
 
-#ifdef HAVE_DIAGNOSTIC
     prev_upd_ts = upd->prev_durable_ts;
-#endif
 
     /*
      * All structure setup must be flushed before the structure is entered into the list. We need a
@@ -248,9 +246,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page
             return (ret);
         }
     }
-#ifdef HAVE_DIAGNOSTIC
     upd->prev_durable_ts = prev_upd_ts;
-#endif
 
     /*
      * Increment in-memory footprint after swapping the update into place. Safe because the

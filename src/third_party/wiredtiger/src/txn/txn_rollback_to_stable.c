@@ -1883,8 +1883,8 @@ __wt_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[], bool no_ckp
      * concurrently. Copy parent session no logging option to the internal session to make sure that
      * rollback to stable doesn't generate log records.
      */
-    WT_RET(__wt_open_internal_session(S2C(session), "txn rollback_to_stable", true,
-      F_MASK(session, WT_SESSION_NO_LOGGING), 0, &session));
+    WT_RET(
+      __wt_open_internal_session(S2C(session), "txn rollback_to_stable", true, 0, 0, &session));
 
     WT_STAT_CONN_SET(session, txn_rollback_to_stable_running, 1);
     WT_WITH_CHECKPOINT_LOCK(

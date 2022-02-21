@@ -1126,22 +1126,25 @@ struct __wt_ikey {
 
 /*
  * WT_UPDATE --
- *	Entries on leaf pages can be updated, either modified or deleted.
- *	Updates to entries referenced from the WT_ROW and WT_COL arrays are
- *	stored in the page's WT_UPDATE array.  When the first element on a page
- *	is updated, the WT_UPDATE array is allocated, with one slot for every
- *	existing element in the page.  A slot points to a WT_UPDATE structure;
- *	if more than one update is done for an entry, WT_UPDATE structures are
- *	formed into a forward-linked list.
+ *
+ * Entries on leaf pages can be updated, either modified or deleted. Updates to entries in the
+ * WT_ROW and WT_COL arrays are stored in the page's WT_UPDATE array. When the first element on a
+ * page is updated, the WT_UPDATE array is allocated, with one slot for every existing element in
+ * the page. A slot points to a WT_UPDATE structure; if more than one update is done for an entry,
+ * WT_UPDATE structures are formed into a forward-linked list.
  */
 struct __wt_update {
     volatile uint64_t txnid; /* transaction ID */
 
     wt_timestamp_t durable_ts; /* timestamps */
     wt_timestamp_t start_ts;
-#ifdef HAVE_DIAGNOSTIC
+
+    /*
+     * The durable timestamp of the previous update in the update chain. This timestamp is used for
+     * diagnostic checks only, and could be removed to reduce the size of the structure should that
+     * be necessary.
+     */
     wt_timestamp_t prev_durable_ts;
-#endif
 
     WT_UPDATE *next; /* forward-linked list */
 
@@ -1186,11 +1189,7 @@ struct __wt_update {
  * WT_UPDATE_SIZE is the expected structure size excluding the payload data -- we verify the build
  * to ensure the compiler hasn't inserted padding.
  */
-#ifdef HAVE_DIAGNOSTIC
 #define WT_UPDATE_SIZE 47
-#else
-#define WT_UPDATE_SIZE 39
-#endif
 
 /*
  * The memory size of an update: include some padding because this is such a common case that
