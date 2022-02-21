@@ -1309,13 +1309,10 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::choosePlanForSubqueries
         auto orChild = planningResult.orExpression->getChild(i);
         auto branchResult = planningResult.branches[i].get();
 
-        if (branchResult->cachedSolution.get()) {
+        if (branchResult->cachedData.get()) {
             // We can get the index tags we need out of the cache.
-            Status tagStatus =
-                tagOrChildAccordingToCache(cacheData.get(),
-                                           branchResult->cachedSolution->cachedPlan.get(),
-                                           orChild,
-                                           planningResult.indexMap);
+            Status tagStatus = tagOrChildAccordingToCache(
+                cacheData.get(), branchResult->cachedData.get(), orChild, planningResult.indexMap);
             if (!tagStatus.isOK()) {
                 return tagStatus;
             }
@@ -1398,5 +1395,77 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::choosePlanForSubqueries
                 "compositeSolution"_attr = redact(compositeSolution->toString()));
 
     return std::move(compositeSolution);
+}
+
+StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
+    OperationContext* opCtx,
+    std::function<std::unique_ptr<SolutionCacheData>(
+        const CanonicalQuery& cq, const CollectionPtr& coll)> getSolutionCachedData,
+    const CollectionPtr& collection,
+    const CanonicalQuery& query,
+    const QueryPlannerParams& params) {
+    invariant(query.root()->matchType() == MatchExpression::OR);
+    invariant(query.root()->numChildren(), "Cannot plan subqueries for an $or with no children");
+
+    SubqueriesPlanningResult planningResult{query.root()->shallowClone()};
+    for (size_t i = 0; i < params.indices.size(); ++i) {
+        const IndexEntry& ie = params.indices[i];
+        const auto insertionRes = planningResult.indexMap.insert(std::make_pair(ie.identifier, i));
+        // Be sure the key was not already in the map.
+        invariant(insertionRes.second);
+        log_detail::logSubplannerIndexEntry(ie, i);
+    }
+
+    for (size_t i = 0; i < planningResult.orExpression->numChildren(); ++i) {
+        // We need a place to shove the results from planning this branch.
+        planningResult.branches.push_back(
+            std::make_unique<SubqueriesPlanningResult::BranchPlanningResult>());
+        auto branchResult = planningResult.branches.back().get();
+        auto orChild = planningResult.orExpression->getChild(i);
+
+        // Turn the i-th child into its own query.
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, query, orChild);
+        if (!statusWithCQ.isOK()) {
+            str::stream ss;
+            ss << "Can't canonicalize subchild " << orChild->debugString() << " "
+               << statusWithCQ.getStatus().reason();
+            return Status(ErrorCodes::BadValue, ss);
+        }
+
+        branchResult->canonicalQuery = std::move(statusWithCQ.getValue());
+
+        // Plan the i-th child. We might be able to find a plan for the i-th child in the plan
+        // cache. If there's no cached plan, then we generate and rank plans using the MPS.
+
+        // Populate branchResult->cachedData if an active cachedData entry exists.
+        if (getSolutionCachedData) {
+            branchResult->cachedData =
+                getSolutionCachedData(*branchResult->canonicalQuery, collection);
+        }
+
+        if (branchResult->cachedData) {
+            log_detail::logCachedPlanFound(planningResult.orExpression->numChildren(), i);
+        } else {
+            // No CachedSolution found. We'll have to plan from scratch.
+            log_detail::logCachedPlanNotFound(planningResult.orExpression->numChildren(), i);
+
+            // We don't set NO_TABLE_SCAN because peeking at the cache data will keep us from
+            // considering any plan that's a collscan.
+            invariant(branchResult->solutions.empty());
+            auto statusWithMultiPlanSolns =
+                QueryPlanner::plan(*branchResult->canonicalQuery, params);
+            if (!statusWithMultiPlanSolns.isOK()) {
+                str::stream ss;
+                ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString() << " "
+                   << statusWithMultiPlanSolns.getStatus().reason();
+                return Status(ErrorCodes::BadValue, ss);
+            }
+            branchResult->solutions = std::move(statusWithMultiPlanSolns.getValue());
+
+            log_detail::logNumberOfSolutions(branchResult->solutions.size());
+        }
+    }
+
+    return std::move(planningResult);
 }
 }  // namespace mongo

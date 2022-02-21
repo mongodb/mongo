@@ -171,19 +171,26 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     // Dismiss the requirement that no indices can be dropped when this method returns.
     ON_BLOCK_EXIT([this] { releaseAllIndicesRequirement(); });
 
-    std::function<PlanCacheKey(const CanonicalQuery& cq, const CollectionPtr& coll)>
-        createPlanCacheKey = [](const CanonicalQuery& cq, const CollectionPtr& coll) {
-            return plan_cache_key_factory::make<PlanCacheKey>(cq, coll);
-        };
+    std::function<std::unique_ptr<SolutionCacheData>(const CanonicalQuery& cq,
+                                                     const CollectionPtr& coll)>
+        getSolutionCachedData =
+            [](const CanonicalQuery& cq,
+               const CollectionPtr& coll) -> std::unique_ptr<SolutionCacheData> {
+        auto planCache = CollectionQueryInfo::get(coll).getPlanCache();
+        tassert(5969800, "Classic Plan Cache not found", planCache);
+        if (shouldCacheQuery(cq)) {
+            auto planCacheKey = plan_cache_key_factory::make<PlanCacheKey>(cq, coll);
+            if (auto cachedSol = planCache->getCacheEntryIfActive(planCacheKey)) {
+                return std::move(cachedSol->cachedPlan);
+            }
+        }
+
+        return nullptr;
+    };
 
     // Plan each branch of the $or.
-    auto subplanningStatus =
-        QueryPlanner::planSubqueries(expCtx()->opCtx,
-                                     CollectionQueryInfo::get(collection()).getPlanCache(),
-                                     createPlanCacheKey,
-                                     collection(),
-                                     *_query,
-                                     _plannerParams);
+    auto subplanningStatus = QueryPlanner::planSubqueries(
+        expCtx()->opCtx, getSolutionCachedData, collection(), *_query, _plannerParams);
     if (!subplanningStatus.isOK()) {
         return choosePlanWholeQuery(yieldPolicy);
     }
@@ -192,7 +199,7 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     auto subplanningResult = std::move(subplanningStatus.getValue());
     _branchPlannedFromCache.clear();
     for (auto&& branch : subplanningResult.branches) {
-        _branchPlannedFromCache.push_back(branch->cachedSolution != nullptr);
+        _branchPlannedFromCache.push_back(branch->cachedData != nullptr);
     }
 
     // Use the multi plan stage to select a winning plan for each branch, and then construct

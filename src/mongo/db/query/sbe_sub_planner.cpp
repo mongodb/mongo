@@ -39,22 +39,13 @@
 
 namespace mongo::sbe {
 CandidatePlans SubPlanner::plan(
-    std::vector<std::unique_ptr<QuerySolution>>,
+    std::vector<std::unique_ptr<QuerySolution>> solutions,
     std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>>) {
-    std::function<mongo::PlanCacheKey(const CanonicalQuery& cq, const CollectionPtr& coll)>
-        createPlanCacheKey = [](const CanonicalQuery& cq, const CollectionPtr& coll) {
-            return plan_cache_key_factory::make<mongo::PlanCacheKey>(cq, coll);
-        };
 
     const auto& mainColl = _collections.getMainCollection();
     // Plan each branch of the $or.
-    auto subplanningStatus =
-        QueryPlanner::planSubqueries(_opCtx,
-                                     CollectionQueryInfo::get(mainColl).getPlanCache(),
-                                     createPlanCacheKey,
-                                     mainColl,
-                                     _cq,
-                                     _queryParams);
+    auto subplanningStatus = QueryPlanner::planSubqueries(
+        _opCtx, {} /* getSolutionCachedData */, mainColl, _cq, _queryParams);
     if (!subplanningStatus.isOK()) {
         return planWholeQuery();
     }
@@ -122,6 +113,13 @@ CandidatePlans SubPlanner::plan(
     uassertStatusOK(status);
     auto [result, recordId, exitedEarly] = status.getValue();
     tassert(5323804, "sub-planner unexpectedly exited early during prepare phase", !exitedEarly);
+
+    // TODO SERVER-61507: do it unconditionally when $group pushdown is integrated with the SBE plan
+    // cache.
+    if (_cq.pipeline().empty()) {
+        plan_cache_util::updatePlanCache(_opCtx, mainColl, _cq, *compositeSolution, *root, data);
+    }
+
     return {makeVector(plan_ranker::CandidatePlan{
                 std::move(compositeSolution), std::move(root), std::move(data)}),
             0};
