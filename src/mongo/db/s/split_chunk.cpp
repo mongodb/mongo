@@ -109,9 +109,11 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
     ChunkType nextChunk;
     for (auto it = splitPoints.begin(); it != splitPoints.end(); ++it) {
         // Check that all new chunks fit the new chunk boundaries
-        const auto& currentChunkMinKey = it == splitPoints.begin() ? chunkRange.getMin() : *it;
+        const auto& currentChunkMinKey =
+            it == splitPoints.begin() ? chunkRange.getMin() : *std::prev(it);
+        const auto& currentChunkMaxKey = *it;
         if (!metadataAfterSplit->getNextChunk(currentChunkMinKey, &nextChunk) ||
-            nextChunk.getMax().woCompare(*it)) {
+            nextChunk.getMax().woCompare(currentChunkMaxKey)) {
             return false;
         }
     }
