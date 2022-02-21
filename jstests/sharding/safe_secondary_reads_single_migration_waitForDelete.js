@@ -488,8 +488,12 @@ for (let command of commands) {
             profileDB: recipientShardSecondary.getDB(db),
             filter: Object.extend({
                 "command.shardVersion": {"$exists": true},
-                "command.shardVersion.0": {$ne: ShardVersioningUtil.kIgnoredShardVersion[0]},
-                "command.shardVersion.1": {$ne: ShardVersioningUtil.kIgnoredShardVersion[1]},
+                "$or" : [
+                    {"command.shardVersion.0": {$ne: ShardVersioningUtil.kIgnoredShardVersion[0]}},
+                    {"command.shardVersion.1": {$ne: ShardVersioningUtil.kIgnoredShardVersion[1]}},
+                    {"command.shardVersion.v": {$ne: ShardVersioningUtil.kIgnoredShardVersion[0]}},
+                    {"command.shardVersion.e": {$ne: ShardVersioningUtil.kIgnoredShardVersion[1]}},
+                ],
                 "command.$readPreference": {"mode": "secondary"},
                 "command.readConcern": {"level": "local"},
                 "errCode": {"$ne": ErrorCodes.StaleConfig},

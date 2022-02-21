@@ -211,29 +211,23 @@ void ChunkVersion::serializeToPositionalWronlyEcondedOr60AsBSON(StringData field
     }
 }
 
+void ChunkVersion::serializeTo60BSON(StringData field,  BSONObjBuilder* builder) const {
+    ChunkVersion60Format chunkVersion(
+        _timestamp, _epoch, Timestamp(majorVersion(), minorVersion()));
+    builder->append(field, chunkVersion.toBSON());
+}
+
 void ChunkVersion::serializeToBSON(StringData field, BSONObjBuilder* builder) const {
-    BSONArrayBuilder arr(builder->subarrayStart(field));
-    arr.appendTimestamp(_combined);
-    arr.append(_epoch);
-    arr.append(_timestamp);
+    serializeTo60BSON(field, builder);
 }
 
 void ChunkVersion::serializeToPositionalFormatWronglyEncodedAsBSON(StringData field,
                                                                    BSONObjBuilder* builder) const {
-    BSONObjBuilder subObjBuilder(builder->subobjStart(field));
-    subObjBuilder.appendElements([&] {
-        BSONArrayBuilder arr;
-        arr.appendTimestamp(_combined);
-        arr.append(_epoch);
-        arr.append(_timestamp);
-        return arr.obj();
-    }());
+    serializeTo60BSON(field, builder);
 }
 
 void ChunkVersion::appendLegacyWithField(BSONObjBuilder* out, StringData field) const {
-    out->appendTimestamp(field, _combined);
-    out->append(field + "Epoch", _epoch);
-    out->append(field + "Timestamp", _timestamp);
+    serializeTo60BSON(field, out);
 }
 
 std::string ChunkVersion::toString() const {

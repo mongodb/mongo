@@ -59,13 +59,17 @@ let testSplit = () => {
     assert.eq(mongosCollectionVersion, getMongosCollVersion(ns));
 
     testColl.findOne({x: -1000});
-    assert.lt(mongosCollectionVersion, getMongosCollVersion(ns));
+    let mongosVersion = getMongosCollVersion(ns);
+    let mongosVersionInitial = mongosCollectionVersion;
+    mongosVersionInitial = mongosVersionInitial.hasOwnProperty('v') ? mongosVersionInitial.v : mongosVersionInitial;
+    mongosVersion = mongosVersion.hasOwnProperty('v') ? mongosVersion.v : mongosVersion;
+    assert.lt(tojson(mongosVersionInitial), tojson(mongosVersion));
 };
 
 // Verify that a merge doesn't update the mongos' catalog cache unless an affected chunk is
 // targeted.
 let testMerge = () => {
-    const mongosCollectionVersion = getMongosCollVersion(ns);
+    let mongosCollectionVersion = getMongosCollVersion(ns);
 
     assert.commandWorked(st.s.adminCommand({mergeChunks: ns, bounds: [{x: MinKey}, {x: -10}]}));
     testColl.findOne({x: 0});
@@ -73,7 +77,10 @@ let testMerge = () => {
     assert.eq(mongosCollectionVersion, getMongosCollVersion(ns));
 
     testColl.findOne({x: -1000});
-    assert.lt(mongosCollectionVersion, getMongosCollVersion(ns));
+    mongosCollectionVersion = mongosCollectionVersion.hasOwnProperty('v') ? mongosCollectionVersion.v : mongosCollectionVersion;
+    let mongosVersion = getMongosCollVersion(ns);
+    mongosVersion = mongosVersion.hasOwnProperty('v') ? mongosVersion.v : mongosVersion;
+    assert.lt(tojson(mongosCollectionVersion), tojson(mongosVersion));
 };
 
 // Verify that a chunk move doesn't update the mongos' catalog cache unless an affected chunk is
@@ -88,7 +95,10 @@ let testMoveChunk = () => {
     assert.eq(mongosCollectionVersion, getMongosCollVersion(ns));
 
     testColl.findOne({x: -1000});
-    assert.lt(mongosCollectionVersion, getMongosCollVersion(ns));
+    let mongosVersion = getMongosCollVersion(ns);
+    mongosVersion = mongosVersion.hasOwnProperty('v') ? mongosVersion.v : mongosVersion;
+    mongosCollectionVersion = mongosCollectionVersion.hasOwnProperty('v') ? mongosCollectionVersion.v : mongosCollectionVersion;
+    assert.lt(tojson(mongosCollectionVersion), tojson(mongosVersion));
 
     // Contact the recipient shard to trigger update.
     mongosCollectionVersion = getMongosCollVersion(ns);
@@ -99,7 +109,10 @@ let testMoveChunk = () => {
     assert.eq(mongosCollectionVersion, getMongosCollVersion(ns));
 
     testColl.findOne({x: -1000});
-    assert.lt(mongosCollectionVersion, getMongosCollVersion(ns));
+    mongosVersion = getMongosCollVersion(ns);
+    mongosVersion = mongosVersion.hasOwnProperty('v') ? mongosVersion.v : mongosVersion;
+    mongosCollectionVersion = mongosCollectionVersion.hasOwnProperty('v') ? mongosCollectionVersion.v : mongosCollectionVersion;
+    assert.lt(tojson(mongosCollectionVersion), tojson(mongosVersion));
 };
 
 setUp();

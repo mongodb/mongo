@@ -21,7 +21,9 @@ var ShardVersioningUtil = (function() {
      * is equal to the given collection version.
      */
     let assertCollectionVersionEquals = function(shard, ns, collectionVersion) {
-        assert.eq(getMetadataOnShard(shard, ns).collVersion, collectionVersion);
+        let collVersion = getMetadataOnShard(shard, ns).collVersion;
+        collVersion = collVersion.hasOwnProperty('v') ? collVersion.v : collVersion;
+        assert.eq(collVersion, collectionVersion);
     };
 
     /*
@@ -31,7 +33,7 @@ var ShardVersioningUtil = (function() {
     let assertCollectionVersionOlderThan = function(shard, ns, collectionVersion) {
         let shardCollectionVersion = getMetadataOnShard(shard, ns).collVersion;
         if (shardCollectionVersion != undefined) {
-            assert.lt(shardCollectionVersion.t, collectionVersion.t);
+            assert.lt(tojson(shardCollectionVersion.t), tojson(collectionVersion.t));
         }
     };
 
@@ -40,7 +42,9 @@ var ShardVersioningUtil = (function() {
      * given shard version.
      */
     let assertShardVersionEquals = function(shard, ns, shardVersion) {
-        assert.eq(getMetadataOnShard(shard, ns).shardVersion, shardVersion);
+        let collVersion = getMetadataOnShard(shard, ns).shardVersion;
+        collVersion = collVersion.hasOwnProperty('v') ? collVersion.v : collVersion;
+        assert.eq(collVersion, shardVersion);
     };
 
     /*

@@ -38,4 +38,5 @@ feature_flags:
     featureFlagNewPersistedChunkVersionFormat:
         description: Feature flag for enabling the new persisted chunk version format.
         cpp_varname: gFeatureFlagNewPersistedChunkVersionFormat
-        default: false
+        default: true
+        version: 6.0

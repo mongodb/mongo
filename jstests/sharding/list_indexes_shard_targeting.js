@@ -61,7 +61,10 @@ const latestCollectionVersion = ShardVersioningUtil.getMetadataOnShard(st.shard1
 const mongosCollectionVersion = st.s.adminCommand({getShardVersion: ns}).version;
 
 // Assert that the mongos and all non-donor shards have a stale collection version.
-assert.lt(mongosCollectionVersion, latestCollectionVersion);
+let mongosVersion = mongosCollectionVersion.hasOwnProperty('v') ? mongosCollectionVersion.v : mongosCollectionVersion;
+let latestVersion = latestCollectionVersion.hasOwnProperty('v') ? latestCollectionVersion.v : latestCollectionVersion;
+
+assert.lt(mongosVersion, latestVersion);
 ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard0, ns, latestCollectionVersion);
 ShardVersioningUtil.assertCollectionVersionEquals(st.shard1, ns, latestCollectionVersion);
 ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard2, ns, latestCollectionVersion);

@@ -63,7 +63,7 @@ types:
         bson_serialization_type: any
         description: An object representing a chunk version for a collection.
         cpp_type: ChunkVersion
-        serializer: ChunkVersion::serializeToBSON
+        serializer: ChunkVersion::serializeTo60BSON
         deserializer: ChunkVersion::fromBSONPositionalOrNewerFormat
 
     # DO NOT add any new usages of this format, use ChunkVersion above instead
@@ -75,5 +75,5 @@ types:
         bson_serialization_type: any
         description: An object representing a chunk version for a collection.
         cpp_type: ChunkVersion
-        serializer: ChunkVersion::serializeToPositionalFormatWronglyEncodedAsBSON
+        serializer: ChunkVersion::serializeTo60BSON
         deserializer: ChunkVersion::fromBSONPositionalOrNewerFormat

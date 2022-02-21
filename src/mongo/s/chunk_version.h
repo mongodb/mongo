@@ -208,6 +208,8 @@ public:
     void serializeToPositionalWronlyEcondedOr60AsBSON(StringData fieldName,
                                                       BSONObjBuilder* builder) const;
 
+    void serializeTo60BSON(StringData fieldName,  BSONObjBuilder* builder) const;
+
     /**
      * Serializes the version held by this object to 'out' in the form:
      *  { ..., <field>: [ <combined major/minor>, <OID epoch>, <Timestamp> ], ... }.
