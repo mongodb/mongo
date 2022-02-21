@@ -263,6 +263,9 @@ public:
               << " in collection " << nss.ns() << " on shard " << chunk->getShardId() << " at key "
               << redact(splitPoint);
 
+        std::vector<BSONObj> splitPoints;
+        splitPoints.push_back(std::move(splitPoint));
+
         uassertStatusOK(
             shardutil::splitChunkAtMultiplePoints(opCtx,
                                                   chunk->getShardId(),
@@ -270,7 +273,7 @@ public:
                                                   cm->getShardKeyPattern(),
                                                   cm->getVersion(),
                                                   ChunkRange(chunk->getMin(), chunk->getMax()),
-                                                  {splitPoint}));
+                                                  &splitPoints));
 
         // This invalidation is only necessary so that auto-split can begin to track statistics for
         // the chunks produced after the split instead of the single original chunk.

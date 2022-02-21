@@ -136,8 +136,13 @@ public:
         OID expectedCollectionEpoch;
         uassertStatusOK(bsonExtractOIDField(cmdObj, "epoch", &expectedCollectionEpoch));
 
-        auto topChunk = uassertStatusOK(splitChunk(
-            opCtx, nss, keyPatternObj, chunkRange, splitKeys, shardName, expectedCollectionEpoch));
+        auto topChunk = uassertStatusOK(splitChunk(opCtx,
+                                                   nss,
+                                                   keyPatternObj,
+                                                   chunkRange,
+                                                   std::move(splitKeys),
+                                                   shardName,
+                                                   expectedCollectionEpoch));
 
         // Otherwise, we want to check whether or not top-chunk optimization should be performed. If
         // yes, then we should have a ChunkRange that was returned. Regardless of whether it should

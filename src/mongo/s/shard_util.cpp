@@ -159,31 +159,33 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     const ShardKeyPattern& shardKeyPattern,
     ChunkVersion collectionVersion,
     const ChunkRange& chunkRange,
-    const std::vector<BSONObj>& splitPoints) {
-    invariant(!splitPoints.empty());
+    std::vector<BSONObj>* splitPoints) {
+    invariant(!splitPoints->empty());
 
-    const size_t kMaxSplitPoints = 8192;
-
-    if (splitPoints.size() > kMaxSplitPoints) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "Cannot split chunk in more than " << kMaxSplitPoints
-                              << " parts at a time."};
+    if (splitPoints->size() > kMaxSplitPoints) {
+        warning() << "Unable to apply all the" << splitPoints->size()
+                  << "split points received. Only the first " << shardutil::kMaxSplitPoints
+                  << "will be processed";
+        splitPoints->resize(kMaxSplitPoints);
     }
 
     // Sanity check that we are not attempting to split at the boundaries of the chunk. This check
     // is already performed at chunk split commit time, but we are performing it here for parity
     // with old auto-split code, which might rely on it.
-    if (SimpleBSONObjComparator::kInstance.evaluate(chunkRange.getMin() == splitPoints.front())) {
+    const auto& firstSplitPoint = splitPoints->front();
+
+    if (SimpleBSONObjComparator::kInstance.evaluate(chunkRange.getMin() == firstSplitPoint)) {
         const std::string msg(str::stream()
                               << "not splitting chunk " << chunkRange.toString() << ", split point "
-                              << splitPoints.front() << " is exactly on chunk bounds");
+                              << firstSplitPoint << " is exactly on chunk bounds");
         return {ErrorCodes::CannotSplit, msg};
     }
 
-    if (SimpleBSONObjComparator::kInstance.evaluate(chunkRange.getMax() == splitPoints.back())) {
+    const auto& lastSplitPoint = splitPoints->back();
+    if (SimpleBSONObjComparator::kInstance.evaluate(chunkRange.getMax() == lastSplitPoint)) {
         const std::string msg(str::stream()
                               << "not splitting chunk " << chunkRange.toString() << ", split point "
-                              << splitPoints.back() << " is exactly on chunk bounds");
+                              << lastSplitPoint << " is exactly on chunk bounds");
         return {ErrorCodes::CannotSplit, msg};
     }
 
@@ -195,7 +197,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     collectionVersion.appendWithField(
         &cmd, ChunkVersion::kShardVersionField);  // backwards compatibility with v3.4
     chunkRange.append(&cmd);
-    cmd.append("splitKeys", splitPoints);
+    cmd.append("splitKeys", *splitPoints);
 
     BSONObj cmdObj = cmd.obj();
 

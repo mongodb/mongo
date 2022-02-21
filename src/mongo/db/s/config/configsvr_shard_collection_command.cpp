@@ -498,7 +498,7 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
                     chunkManager->getShardKeyPattern(),
                     chunkManager->getVersion(),
                     ChunkRange(currentChunk->getMin(), currentChunk->getMax()),
-                    subSplits);
+                    &subSplits);
                 if (!splitStatus.isOK()) {
                     warning() << "couldn't split chunk " << redact(currentChunk->toString())
                               << " while sharding collection " << nss.ns()

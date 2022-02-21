@@ -59,7 +59,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    const BSONObj& keyPatternObj,
                                                    const ChunkRange& chunkRange,
-                                                   const std::vector<BSONObj>& splitKeys,
+                                                   std::vector<BSONObj>&& splitPoints,
                                                    const std::string& shardName,
                                                    const OID& expectedCollectionEpoch);
 

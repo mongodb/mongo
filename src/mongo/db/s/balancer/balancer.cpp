@@ -548,7 +548,7 @@ Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {
         return chunksToSplitStatus.getStatus();
     }
 
-    for (const auto& splitInfo : chunksToSplitStatus.getValue()) {
+    for (auto& splitInfo : chunksToSplitStatus.getValue()) {
         auto routingInfoStatus =
             Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
                 opCtx, splitInfo.nss);
@@ -565,7 +565,7 @@ Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {
                                                   cm->getShardKeyPattern(),
                                                   splitInfo.collectionVersion,
                                                   ChunkRange(splitInfo.minKey, splitInfo.maxKey),
-                                                  splitInfo.splitKeys);
+                                                  &splitInfo.splitKeys);
         if (!splitStatus.isOK()) {
             warning() << "Failed to split chunk " << redact(splitInfo.toString())
                       << causedBy(redact(splitStatus.getStatus()));
@@ -637,7 +637,7 @@ void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
     auto chunk = cm->findIntersectingChunkWithSimpleCollation(minKey);
 
     try {
-        const auto splitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(
+        auto splitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(
             opCtx,
             chunk.getShardId(),
             nss,
@@ -673,7 +673,7 @@ void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
                                                   cm->getShardKeyPattern(),
                                                   cm->getVersion(),
                                                   ChunkRange(chunk.getMin(), chunk.getMax()),
-                                                  splitPoints));
+                                                  &splitPoints));
     } catch (const DBException&) {
     }
 }
