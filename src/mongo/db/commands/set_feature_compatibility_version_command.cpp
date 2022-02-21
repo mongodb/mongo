@@ -340,8 +340,10 @@ public:
                          .isEnabledOnVersion(actualVersion) &&
                      !feature_flags::gFeatureFlagMigrationRecipientCriticalSection
                           .isEnabledOnVersion(requestedVersion)) ||
-                    feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabledOnVersion(
-                        actualVersion)) {
+                    (feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabledOnVersion(
+                         actualVersion) &&
+                     !feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabledOnVersion(
+                         requestedVersion))) {
                     drainNewMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionDowngrade");
 
                     // At this point, because we are holding the MigrationBlockingGuard, no new
@@ -437,8 +439,10 @@ public:
                      actualVersion) &&
                  feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
                      requestedVersion)) ||
-                feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabledOnVersion(
-                    actualVersion)) {
+                (!feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabledOnVersion(
+                     actualVersion) &&
+                 feature_flags::gFeatureFlagNewPersistedChunkVersionFormat.isEnabledOnVersion(
+                     requestedVersion))) {
                 drainOldMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionUpgrade");
 
                 // At this point, because we are holding the MigrationBlockingGuard, no new
