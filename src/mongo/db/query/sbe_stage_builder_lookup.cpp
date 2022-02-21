@@ -226,9 +226,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         case EqLookupNode::LookupStrategy::kHashJoin:
             uasserted(5842602, "$lookup planning logic picked hash join");
             break;
-        case EqLookupNode::LookupStrategy::kIndexedLoopJoin:
-            uasserted(5842603, "$lookup planning logic picked indexed loop join");
+        case EqLookupNode::LookupStrategy::kIndexedLoopJoin: {
+            const auto& index = *eqLookupNode->idxEntry;
+            uasserted(5842603,
+                      str::stream()
+                          << "$lookup planning logic picked indexed loop join with index: "
+                          << index.identifier.toString());
             break;
+        }
         case EqLookupNode::LookupStrategy::kNestedLoopJoin:
             // TODO SERVER-63533: replace the check for number of children with proper access to the
             // foreign collection. The check currently allows us to run unit tests.

@@ -12,20 +12,27 @@ const JoinAlgorithm = {
     NLJ: 5842604,
 };
 
-function runTest(coll, pipeline, expectedCode, aggOptions = {}) {
-    const cmd = () => coll.aggregate(pipeline, aggOptions).toArray();
-    if (expectedCode) {
-        assert.throwsWithCode(cmd, expectedCode);
-    } else {
-        assert.doesNotThrow(cmd);
-    }
-}
-
 // Standalone cases.
 const conn = MongoRunner.runMongod({setParameter: "internalEnableMultipleAutoGetCollections=true"});
 assert.neq(null, conn, "mongod was unable to start up");
 const name = "lookup_pushdown";
 let db = conn.getDB(name);
+
+function runTest(coll, pipeline, expectedCode, aggOptions = {}, errMsgRegex = null) {
+    const options = Object.assign({pipeline, cursor: {}}, aggOptions);
+    const response = coll.runCommand("aggregate", options);
+    if (expectedCode) {
+        const result = assert.commandFailedWithCode(response, expectedCode);
+        if (errMsgRegex) {
+            const errorMessage = result.errmsg;
+            assert(errMsgRegex.test(errorMessage),
+                   "Error message '" + errorMessage + "' did not match the RegEx '" + errMsgRegex +
+                       "'");
+        }
+    } else {
+        assert.commandWorked(response);
+    }
+}
 
 if (!checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
     jsTestLog("Skipping test because the sbe lookup pushdown feature flag is disabled");
@@ -159,7 +166,27 @@ runTest(coll,
 assert.commandWorked(foreignColl.createIndex({b: 1}));
 runTest(coll,
         [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        JoinAlgorithm.INLJ /* expectedCode */);
+        JoinAlgorithm.INLJ /* expectedCode */,
+        {} /* aggOptions */,
+        /\(b_1, \)$//* errMsgRegex */);
+
+// Build a hashed index on the foreign collection that matches the foreignField. Indexed nested loop
+// join strategy should be used.
+assert.commandWorked(foreignColl.dropIndexes());
+assert.commandWorked(foreignColl.createIndex({b: 'hashed'}));
+runTest(coll,
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        JoinAlgorithm.INLJ /* expectedCode */,
+        {} /* aggOptions */,
+        /\(b_hashed, \)$//* errMsgRegex */);
+
+// Build a wildcard index on the foreign collection that matches the foreignField. Nested loop join
+// strategy should be used.
+assert.commandWorked(foreignColl.dropIndexes());
+assert.commandWorked(foreignColl.createIndex({'$**': 1}));
+runTest(coll,
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        JoinAlgorithm.NLJ /* expectedCode */);
 
 // Build a compound index that is prefixed with the foreignField. We should use an indexed
 // nested loop join.
@@ -167,7 +194,61 @@ assert.commandWorked(foreignColl.dropIndexes());
 assert.commandWorked(foreignColl.createIndex({b: 1, c: 1, a: 1}));
 runTest(coll,
         [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        JoinAlgorithm.INLJ /* expectedCode */);
+        JoinAlgorithm.INLJ /* expectedCode */,
+        {} /* aggOptions */,
+        /\(b_1_c_1_a_1, \)$//* errMsgRegex */);
+
+// Build multiple compound indexes prefixed with the foreignField. We should utilize the index with
+// the least amount of components.
+assert.commandWorked(foreignColl.dropIndexes());
+assert.commandWorked(foreignColl.createIndex({b: 1, a: 1}));
+assert.commandWorked(foreignColl.createIndex({b: 1, c: 1, a: 1}));
+runTest(coll,
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        JoinAlgorithm.INLJ /* expectedCode */,
+        {} /* aggOptions */,
+        /\(b_1_a_1, \)$//* errMsgRegex */);
+
+// In the presence of hashed and BTree indexes with the same number of components, we should select
+// BTree one.
+assert.commandWorked(foreignColl.dropIndexes());
+assert.commandWorked(foreignColl.createIndex({b: 1}));
+assert.commandWorked(foreignColl.createIndex({b: 'hashed'}));
+runTest(coll,
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        JoinAlgorithm.INLJ /* expectedCode */,
+        {} /* aggOptions */,
+        /\(b_1, \)$//* errMsgRegex */);
+
+// While selecting a BTree index is more preferable, we should favor hashed index if it has smaller
+// number of components.
+assert.commandWorked(foreignColl.dropIndexes());
+assert.commandWorked(foreignColl.createIndex({b: 1, c: 1, d: 1}));
+assert.commandWorked(foreignColl.createIndex({b: 'hashed'}));
+runTest(coll,
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        JoinAlgorithm.INLJ /* expectedCode */,
+        {} /* aggOptions */,
+        /\(b_hashed, \)$//* errMsgRegex */);
+
+// If we have two indexes of the same type with the same number of components, index keypattern
+// should be used as a tie breaker.
+assert.commandWorked(foreignColl.dropIndexes());
+assert.commandWorked(foreignColl.createIndex({b: 1, c: 1}));
+assert.commandWorked(foreignColl.createIndex({b: 1, a: 1}));
+runTest(coll,
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        JoinAlgorithm.INLJ /* expectedCode */,
+        {} /* aggOptions */,
+        /\(b_1_a_1, \)$//* errMsgRegex */);
+
+// Build a 2d index on the foreign collection that matches the foreignField. In this case, we should
+// use regular nested loop join.
+assert.commandWorked(foreignColl.dropIndexes());
+assert.commandWorked(foreignColl.createIndex({b: '2d'}));
+runTest(coll,
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        JoinAlgorithm.NLJ /* expectedCode */);
 
 // Build a compound index containing the foreignField, but not as the first field. In this case,
 // we should use regular nested loop join.

@@ -40,6 +40,7 @@
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/logv2/log.h"
@@ -624,24 +625,43 @@ void QueryPlannerAnalysis::determineLookupStrategy(
                           << foreignCollName,
             foreignCollItr != collectionsInfo.end());
 
-    // Does an eligible index exist?
-    // TODO SERVER-62913: finalize the logic for indexes analysis.
-    const auto& foreignField = eqLookupNode->joinFieldForeign;
-    bool foundEligibleIndex = false;
-    for (const IndexEntry& idxEntry : foreignCollItr->second.indexes) {
-        tassert(5842601, "index key pattern should not be empty", !idxEntry.keyPattern.isEmpty());
-        if (idxEntry.keyPattern.firstElement().fieldName() == foreignField) {
-            foundEligibleIndex = true;
-            break;
+    // Check if an eligible index exists for indexed loop join strategy.
+    const auto foreignIndex = [&]() -> boost::optional<IndexEntry> {
+        // Sort indexes by (# of components, index type, index key pattern) tuple.
+        auto indexes = foreignCollItr->second.indexes;
+        std::sort(
+            indexes.begin(), indexes.end(), [](const IndexEntry& left, const IndexEntry& right) {
+                const auto nFieldsLeft = left.keyPattern.nFields();
+                const auto nFieldsRight = right.keyPattern.nFields();
+                if (nFieldsLeft != nFieldsRight) {
+                    return nFieldsLeft < nFieldsRight;
+                } else if (left.type != right.type) {
+                    // Here we rely on the fact that 'INDEX_BTREE < INDEX_HASHED'.
+                    return left.type < right.type;
+                }
+
+                // This is a completely arbitrary tie breaker to make the selection algorithm
+                // deterministic.
+                return left.keyPattern.woCompare(right.keyPattern) < 0;
+            });
+
+        for (const auto& index : indexes) {
+            if ((index.type == INDEX_BTREE || index.type == INDEX_HASHED) &&
+                index.keyPattern.firstElement().fieldName() == eqLookupNode->joinFieldForeign) {
+                return index;
+            }
         }
-    }
+
+        return boost::none;
+    }();
 
     // TODO SERVER-63449: make this setting configurable and tighten the HJ check to cover the
     // number of records and the storage size of the collection.
     static constexpr auto kMaxHashJoinCollectionSize = 100 * 1024 * 1024;
 
-    if (foundEligibleIndex) {
+    if (foreignIndex) {
         eqLookupNode->lookupStrategy = EqLookupNode::LookupStrategy::kIndexedLoopJoin;
+        eqLookupNode->idxEntry = foreignIndex;
     } else if (allowDiskUse &&
                foreignCollItr->second.approximateCollectionSizeBytes < kMaxHashJoinCollectionSize) {
         eqLookupNode->lookupStrategy = EqLookupNode::LookupStrategy::kHashJoin;
