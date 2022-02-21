@@ -49,6 +49,7 @@ def resmoke_commands(run_tests_fn_name: str, run_tests_vars: Dict[str, Any],
         FunctionCall(CONFIGURE_EVG_CREDENTIALS),
         FunctionCall(DO_MULTIVERSION_SETUP) if require_multiversion_setup else None,
         FunctionCall(run_tests_fn_name, run_tests_vars),
+        FunctionCall("validate resmoke tests runtime"),
     ]
 
     return [cmd for cmd in commands if cmd]

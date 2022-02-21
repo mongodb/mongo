@@ -105,7 +105,7 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
 
         unittest.TestResult.startTest(self, test)
 
-        test_info = _TestInfo(test.id(), test.test_name, test.dynamic)
+        test_info = TestInfo(test.id(), test.test_name, test.dynamic)
         if _config.SPAWN_USING == "jasper":
             # The group id represents the group of logs this test belongs to in
             # cedar buildlogger. It must be sent to evergreen/cedar in order to
@@ -322,14 +322,15 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
         Used when combining reports instances.
         """
 
-        report = cls(logging.loggers.EXECUTOR_LOGGER, _config.SuiteOptions.ALL_INHERITED.resolve())
+        report = cls(logging.loggers.ROOT_EXECUTOR_LOGGER,
+                     _config.SuiteOptions.ALL_INHERITED.resolve())
         for result in report_dict["results"]:
             # By convention, dynamic tests are named "<basename>:<hook name>".
             is_dynamic = ":" in result["test_file"] or ":" in result.get("display_test_name", "")
             test_file = result["test_file"]
             # Using test_file as the test id is ok here since the test id only needs to be unique
             # during suite execution.
-            test_info = _TestInfo(test_file, test_file, is_dynamic)
+            test_info = TestInfo(test_file, test_file, is_dynamic)
             test_info.display_test_name = result.get("display_test_name")
             test_info.group_id = result.get("group_id")
             test_info.url_endpoint = result.get("url")
@@ -377,11 +378,11 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
         raise ValueError("Details for %s not found in the report" % (test.basename()))
 
 
-class _TestInfo(object):  # pylint: disable=too-many-instance-attributes
+class TestInfo(object):  # pylint: disable=too-many-instance-attributes
     """Holder for the test status and timing information."""
 
     def __init__(self, test_id, test_file, dynamic):
-        """Initialize the _TestInfo instance."""
+        """Initialize the TestInfo instance."""
 
         self.test_id = test_id
         # If spawned using jasper, we need to set the display_test_name and the
@@ -405,7 +406,7 @@ class _TestInfo(object):  # pylint: disable=too-many-instance-attributes
 
 def test_order(test_name):
     """
-    A key function used for sorting _TestInfo objects by recommended order of investigation.
+    A key function used for sorting TestInfo objects by recommended order of investigation.
 
     Investigate setup/teardown errors, then hooks, then test files.
     """
