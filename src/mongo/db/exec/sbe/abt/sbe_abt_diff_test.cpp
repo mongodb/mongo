@@ -28,153 +28,15 @@
  */
 
 #include "mongo/db/concurrency/lock_state.h"
-#include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
-#include "mongo/db/pipeline/abt/abt_document_source_visitor.h"
-#include "mongo/db/pipeline/document_source_queue.h"
-#include "mongo/db/query/optimizer/explain.h"
-#include "mongo/db/query/optimizer/opt_phase_manager.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/unittest/temp_dir.h"
 
 namespace mongo::optimizer {
 namespace {
 
-ABT createValueArray(const std::vector<std::string>& jsonVector) {
-    const auto [tag, val] = sbe::value::makeNewArray();
-    auto outerArrayPtr = sbe::value::getArrayView(val);
-
-    for (const std::string& s : jsonVector) {
-        const auto [tag1, val1] = sbe::value::makeNewArray();
-        auto innerArrayPtr = sbe::value::getArrayView(val1);
-
-        const BSONObj& bsonObj = fromjson(s);
-        const auto [tag2, val2] =
-            sbe::value::copyValue(sbe::value::TypeTags::bsonObject,
-                                  sbe::value::bitcastFrom<const char*>(bsonObj.objdata()));
-        innerArrayPtr->push_back(tag2, val2);
-
-        outerArrayPtr->push_back(tag1, val1);
-    }
-
-    return make<Constant>(tag, val);
-}
-
-using ContextFn = std::function<ServiceContext::UniqueOperationContext()>;
-using ResultSet = std::vector<BSONObj>;
-
-ResultSet runSBEAST(const ContextFn& fn,
-                    const std::string& pipelineStr,
-                    const std::vector<std::string>& jsonVector) {
-    PrefixId prefixId;
-    Metadata metadata{{}};
-
-    auto pipeline = parsePipeline(pipelineStr, NamespaceString("test"));
-
-    ABT tree = createValueArray(jsonVector);
-
-    const ProjectionName scanProjName = prefixId.getNextId("scan");
-    tree = translatePipelineToABT(
-        metadata,
-        *pipeline.get(),
-        scanProjName,
-        make<ValueScanNode>(ProjectionNameVector{scanProjName}, std::move(tree)),
-        prefixId);
-
-    std::cerr << "********* Translated ABT *********\n";
-    std::cerr << ExplainGenerator::explainV2(tree);
-    std::cerr << "********* Translated ABT *********\n";
-
-    OptPhaseManager phaseManager(
-        OptPhaseManager::getAllRewritesSet(), prefixId, {{}}, DebugInfo::kDefaultForTests);
-    ASSERT_TRUE(phaseManager.optimize(tree));
-
-    std::cerr << "********* Optimized ABT *********\n";
-    std::cerr << ExplainGenerator::explainV2(tree);
-    std::cerr << "********* Optimized ABT *********\n";
-
-    SlotVarMap map;
-    sbe::value::SlotIdGenerator ids;
-
-    auto env = VariableEnvironment::build(tree);
-    SBENodeLowering g{env,
-                      map,
-                      ids,
-                      phaseManager.getMetadata(),
-                      phaseManager.getNodeToGroupPropsMap(),
-                      phaseManager.getRIDProjections()};
-    auto sbePlan = g.optimize(tree);
-    uassert(6624249, "Cannot optimize SBE plan", sbePlan != nullptr);
-
-    sbe::CompileCtx ctx(std::make_unique<sbe::RuntimeEnvironment>());
-    sbePlan->prepare(ctx);
-
-    std::vector<sbe::value::SlotAccessor*> accessors;
-    for (auto& [name, slot] : map) {
-        accessors.emplace_back(sbePlan->getAccessor(ctx, slot));
-    }
-    // For now assert we only have one final projection.
-    ASSERT_EQ(1, accessors.size());
-
-    sbePlan->attachToOperationContext(fn().get());
-    sbePlan->open(false);
-
-    ResultSet results;
-    while (sbePlan->getNext() != sbe::PlanState::IS_EOF) {
-        if (results.size() > 1000) {
-            uasserted(6624250, "Too many results!");
-        }
-
-        std::ostringstream os;
-        os << accessors.at(0)->getViewOfValue();
-        results.push_back(fromjson(os.str()));
-    };
-    sbePlan->close();
-
-    return results;
-}
-
-ResultSet runPipeline(const ContextFn& fn,
-                      const std::string& pipelineStr,
-                      const std::vector<std::string>& jsonVector) {
-    NamespaceString nss("test");
-    std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> pipeline =
-        parsePipeline(pipelineStr, nss);
-
-    const auto queueStage = DocumentSourceQueue::create(pipeline->getContext());
-    for (const std::string& s : jsonVector) {
-        BSONObj bsonObj = fromjson(s);
-        queueStage->emplace_back(Document{bsonObj});
-    }
-
-    pipeline->addInitialSource(queueStage);
-
-    boost::intrusive_ptr<ExpressionContext> expCtx;
-    expCtx.reset(new ExpressionContext(fn().get(), nullptr, nss));
-
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExec =
-        plan_executor_factory::make(expCtx, std::move(pipeline));
-
-    ResultSet results;
-    bool done = false;
-    while (!done) {
-        BSONObj outObj;
-        auto result = planExec->getNext(&outObj, nullptr);
-        switch (result) {
-            case PlanExecutor::ADVANCED:
-                results.push_back(outObj);
-                break;
-            case PlanExecutor::IS_EOF:
-                done = true;
-                break;
-        }
-    }
-
-    return results;
-}
-
-bool compareBSONObj(const BSONObj& actual, const BSONObj& expected, const bool preserveFieldOrder) {
+static bool compareBSONObj(const BSONObj& actual,
+                           const BSONObj& expected,
+                           const bool preserveFieldOrder) {
     BSONObj::ComparisonRulesSet rules = BSONObj::ComparisonRules::kConsiderFieldName;
     if (!preserveFieldOrder) {
         rules |= BSONObj::ComparisonRules::kIgnoreFieldOrder;
@@ -182,9 +44,9 @@ bool compareBSONObj(const BSONObj& actual, const BSONObj& expected, const bool p
     return actual.woCompare(expected, BSONObj(), rules) == 0;
 }
 
-bool compareResults(const ResultSet& expected,
-                    const ResultSet& actual,
-                    const bool preserveFieldOrder) {
+static bool compareResults(const std::vector<BSONObj>& expected,
+                           const std::vector<BSONObj>& actual,
+                           const bool preserveFieldOrder) {
     if (expected.size() != actual.size()) {
         std::cout << "Different result size: expected: " << expected.size()
                   << " vs actual: " << actual.size() << "\n";
@@ -209,28 +71,30 @@ bool compareResults(const ResultSet& expected,
     return true;
 }
 
-bool compareSBEABTAgainstExpected(const ContextFn& fn,
-                                  const std::string& pipelineStr,
-                                  const std::vector<std::string>& jsonVector,
-                                  const ResultSet& expected) {
-    const ResultSet& actual = runSBEAST(fn, pipelineStr, jsonVector);
+using TestContextFn = std::function<ServiceContext::UniqueOperationContext()>;
+
+static bool compareSBEABTAgainstExpected(const TestContextFn& fn,
+                                         const std::string& pipelineStr,
+                                         const std::vector<std::string>& jsonVector,
+                                         const std::vector<BSONObj>& expected) {
+    const auto& actual = runSBEAST(fn().get(), pipelineStr, jsonVector);
     return compareResults(expected, actual, true /*preserveFieldOrder*/);
 }
 
-bool comparePipelineAgainstExpected(const ContextFn& fn,
-                                    const std::string& pipelineStr,
-                                    const std::vector<std::string>& jsonVector,
-                                    const ResultSet& expected) {
-    const ResultSet& actual = runPipeline(fn, pipelineStr, jsonVector);
+static bool comparePipelineAgainstExpected(const TestContextFn& fn,
+                                           const std::string& pipelineStr,
+                                           const std::vector<std::string>& jsonVector,
+                                           const std::vector<BSONObj>& expected) {
+    const auto& actual = runPipeline(fn().get(), pipelineStr, jsonVector);
     return compareResults(expected, actual, true /*preserveFieldOrder*/);
 }
 
-bool compareSBEABTAgainstPipeline(const ContextFn& fn,
-                                  const std::string& pipelineStr,
-                                  const std::vector<std::string>& jsonVector,
-                                  const bool preserveFieldOrder = true) {
-    const ResultSet& pipelineResults = runPipeline(fn, pipelineStr, jsonVector);
-    const ResultSet& sbeResults = runSBEAST(fn, pipelineStr, jsonVector);
+static bool compareSBEABTAgainstPipeline(const TestContextFn& fn,
+                                         const std::string& pipelineStr,
+                                         const std::vector<std::string>& jsonVector,
+                                         const bool preserveFieldOrder = true) {
+    const auto& pipelineResults = runPipeline(fn().get(), pipelineStr, jsonVector);
+    const auto& sbeResults = runSBEAST(fn().get(), pipelineStr, jsonVector);
 
     std::cout << "Pipeline: " << pipelineStr << ", input size: " << jsonVector.size() << "\n";
     const bool result = compareResults(pipelineResults, sbeResults, preserveFieldOrder);
@@ -247,8 +111,8 @@ bool compareSBEABTAgainstPipeline(const ContextFn& fn,
     return result;
 }
 
-ResultSet toResultSet(const std::vector<std::string>& jsonVector) {
-    ResultSet results;
+static std::vector<BSONObj> toResultSet(const std::vector<std::string>& jsonVector) {
+    std::vector<BSONObj> results;
     for (const std::string& jsonStr : jsonVector) {
         results.emplace_back(fromjson(jsonStr));
     }

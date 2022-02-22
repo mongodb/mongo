@@ -41,8 +41,16 @@ namespace mongo::optimizer {
 class NodeSBE : public ServiceContextTest {};
 
 std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
-    const std::string& pipelineStr, NamespaceString nss);
+    const std::string& pipelineStr, NamespaceString nss, OperationContext* opCtx);
 
 using ABTSBE = sbe::EExpressionTestFixture;
 
+// Create a pipeline based on the given string, use a DocumentSourceQueue as input initialized with
+// the provided documents encoded as json strings, and return the results as BSON.
+std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
+                               const std::string& pipelineStr,
+                               const std::vector<std::string>& jsonVector);
+std::vector<BSONObj> runPipeline(OperationContext* opCtx,
+                                 const std::string& pipelineStr,
+                                 const std::vector<std::string>& jsonVector);
 }  // namespace mongo::optimizer

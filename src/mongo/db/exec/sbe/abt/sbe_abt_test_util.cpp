@@ -28,15 +28,23 @@
  */
 
 #include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
+
+#include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/pipeline/abt/abt_document_source_visitor.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/opt_phase_manager.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/unittest/temp_dir.h"
 
 namespace mongo::optimizer {
 
-static std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipelineInternal(
-    NamespaceString nss, const std::string& inputPipeline, OperationContextNoop& opCtx) {
-    const BSONObj inputBson = fromjson("{pipeline: " + inputPipeline + "}");
+std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
+    const std::string& pipelineStr, NamespaceString nss, OperationContext* opCtx) {
+    const BSONObj inputBson = fromjson("{pipeline: " + pipelineStr + "}");
 
     std::vector<BSONObj> rawPipeline;
     for (auto&& stageElem : inputBson["pipeline"].Array()) {
@@ -46,7 +54,7 @@ static std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipelineInt
 
     AggregateCommandRequest request(std::move(nss), rawPipeline);
     boost::intrusive_ptr<ExpressionContextForTest> ctx(
-        new ExpressionContextForTest(&opCtx, request));
+        new ExpressionContextForTest(opCtx, request));
 
     unittest::TempDir tempDir("ABTPipelineTest");
     ctx->tempDir = tempDir.path();
@@ -54,10 +62,137 @@ static std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipelineInt
     return Pipeline::parse(request.getPipeline(), ctx);
 }
 
-std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
-    const std::string& pipelineStr, NamespaceString nss) {
-    OperationContextNoop opCtx;
-    return parsePipelineInternal(std::move(nss), pipelineStr, opCtx);
+ABT createValueArray(const std::vector<std::string>& jsonVector) {
+    const auto [tag, val] = sbe::value::makeNewArray();
+    auto outerArrayPtr = sbe::value::getArrayView(val);
+
+    for (const std::string& s : jsonVector) {
+        const auto [tag1, val1] = sbe::value::makeNewArray();
+        auto innerArrayPtr = sbe::value::getArrayView(val1);
+
+        const BSONObj& bsonObj = fromjson(s);
+        const auto [tag2, val2] =
+            sbe::value::copyValue(sbe::value::TypeTags::bsonObject,
+                                  sbe::value::bitcastFrom<const char*>(bsonObj.objdata()));
+        innerArrayPtr->push_back(tag2, val2);
+
+        outerArrayPtr->push_back(tag1, val1);
+    }
+
+    return make<Constant>(tag, val);
+}
+
+std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
+                               const std::string& pipelineStr,
+                               const std::vector<std::string>& jsonVector) {
+    PrefixId prefixId;
+    Metadata metadata{{}};
+
+    auto pipeline = parsePipeline(pipelineStr, NamespaceString("test"), opCtx);
+
+    ABT tree = createValueArray(jsonVector);
+
+    const ProjectionName scanProjName = prefixId.getNextId("scan");
+    tree = translatePipelineToABT(
+        metadata,
+        *pipeline.get(),
+        scanProjName,
+        make<ValueScanNode>(ProjectionNameVector{scanProjName}, std::move(tree)),
+        prefixId);
+
+    std::cerr << "********* Translated ABT *********\n";
+    std::cerr << ExplainGenerator::explainV2(tree);
+    std::cerr << "********* Translated ABT *********\n";
+
+    OptPhaseManager phaseManager(
+        OptPhaseManager::getAllRewritesSet(), prefixId, {{}}, DebugInfo::kDefaultForTests);
+    ASSERT_TRUE(phaseManager.optimize(tree));
+
+    std::cerr << "********* Optimized ABT *********\n";
+    std::cerr << ExplainGenerator::explainV2(tree);
+    std::cerr << "********* Optimized ABT *********\n";
+
+    SlotVarMap map;
+    sbe::value::SlotIdGenerator ids;
+
+    auto env = VariableEnvironment::build(tree);
+    SBENodeLowering g{env,
+                      map,
+                      ids,
+                      phaseManager.getMetadata(),
+                      phaseManager.getNodeToGroupPropsMap(),
+                      phaseManager.getRIDProjections()};
+    auto sbePlan = g.optimize(tree);
+    uassert(6624249, "Cannot optimize SBE plan", sbePlan != nullptr);
+
+    sbe::CompileCtx ctx(std::make_unique<sbe::RuntimeEnvironment>());
+    sbePlan->prepare(ctx);
+
+    std::vector<sbe::value::SlotAccessor*> accessors;
+    for (auto& [name, slot] : map) {
+        accessors.emplace_back(sbePlan->getAccessor(ctx, slot));
+    }
+    // For now assert we only have one final projection.
+    ASSERT_EQ(1, accessors.size());
+
+    sbePlan->attachToOperationContext(opCtx);
+    sbePlan->open(false);
+
+    std::vector<BSONObj> results;
+    while (sbePlan->getNext() != sbe::PlanState::IS_EOF) {
+        if (results.size() > 1000) {
+            uasserted(6624250, "Too many results!");
+        }
+
+        std::ostringstream os;
+        os << accessors.at(0)->getViewOfValue();
+        results.push_back(fromjson(os.str()));
+    };
+    sbePlan->close();
+
+    return results;
+}
+
+std::vector<BSONObj> runPipeline(OperationContext* opCtx,
+                                 const std::string& pipelineStr,
+                                 const std::vector<std::string>& jsonVector) {
+    NamespaceString nss("test");
+    std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> pipeline =
+        parsePipeline(pipelineStr, nss, opCtx);
+
+    const auto queueStage = DocumentSourceQueue::create(pipeline->getContext());
+    for (const std::string& s : jsonVector) {
+        BSONObj bsonObj = fromjson(s);
+        queueStage->emplace_back(Document{bsonObj});
+    }
+
+    pipeline->addInitialSource(queueStage);
+
+    boost::intrusive_ptr<ExpressionContext> expCtx;
+    expCtx.reset(new ExpressionContext(opCtx, nullptr, nss));
+
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExec =
+        plan_executor_factory::make(expCtx, std::move(pipeline));
+
+    std::vector<BSONObj> results;
+    bool done = false;
+    while (!done) {
+        BSONObj outObj;
+        auto result = planExec->getNext(&outObj, nullptr);
+        switch (result) {
+            case PlanExecutor::ADVANCED:
+                results.push_back(outObj);
+                break;
+            case PlanExecutor::IS_EOF:
+                done = true;
+                break;
+
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+
+    return results;
 }
 
 }  // namespace mongo::optimizer

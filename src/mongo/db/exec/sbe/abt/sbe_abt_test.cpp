@@ -341,8 +341,9 @@ TEST_F(NodeSBE, Lower1) {
     PrefixId prefixId;
     Metadata metadata{{}};
 
+    OperationContextNoop noop;
     auto pipeline =
-        parsePipeline("[{$project:{'a.b.c.d':{$literal:'abc'}}}]", NamespaceString("test"));
+        parsePipeline("[{$project:{'a.b.c.d':{$literal:'abc'}}}]", NamespaceString("test"), &noop);
 
     const auto [tag, val] = sbe::value::makeNewArray();
     {
