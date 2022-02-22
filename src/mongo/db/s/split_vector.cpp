@@ -35,7 +35,6 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -45,6 +44,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -85,9 +85,11 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
 
         // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore,
         // any multi-key index prefixed by shard key cannot be multikey over the shard key fields.
-        auto catalog = collection->getIndexCatalog();
-        auto shardKeyIdx = catalog->findShardKeyPrefixedIndex(
-            opCtx, *collection, keyPattern, /*requireSingleKey=*/false);
+        auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
+                                                     *collection,
+                                                     collection->getIndexCatalog(),
+                                                     keyPattern,
+                                                     /*requireSingleKey=*/false);
         uassert(ErrorCodes::IndexNotFound,
                 str::stream() << "couldn't find index over splitting key "
                               << keyPattern.clientReadable().toString(),

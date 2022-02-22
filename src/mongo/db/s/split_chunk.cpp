@@ -35,7 +35,6 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
@@ -46,6 +45,7 @@
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -60,7 +60,7 @@ const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOn
 
 bool checkIfSingleDoc(OperationContext* opCtx,
                       const CollectionPtr& collection,
-                      const IndexCatalog::ShardKeyIndex& idx,
+                      const ShardKeyIndex& idx,
                       const ChunkType* chunk) {
     KeyPattern kp(idx.keyPattern());
     BSONObj newmin = Helpers::toKeyFormat(kp.extendRangeBound(chunk->getMin(), false));
@@ -231,9 +231,11 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
 
     // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore,
     // any multi-key index prefixed by shard key cannot be multikey over the shard key fields.
-    auto catalog = collection->getIndexCatalog();
-    auto shardKeyIdx = catalog->findShardKeyPrefixedIndex(
-        opCtx, *collection, keyPatternObj, /*requireSingleKey=*/false);
+    auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
+                                                 *collection,
+                                                 collection->getIndexCatalog(),
+                                                 keyPatternObj,
+                                                 /*requireSingleKey=*/false);
     if (!shardKeyIdx) {
         return boost::optional<ChunkRange>(boost::none);
     }

@@ -50,47 +50,61 @@ TimeseriesTest.run(() => {
         }
     };
 
-    const verifyAndDropIndex = function(isDowngradeCompatible) {
+    const verifyAndDropIndex = function(isDowngradeCompatible, indexName) {
+        let sawIndex = false;
+
         let userIndexes = coll.getIndexes();
         for (const index of userIndexes) {
-            checkIndexSpec(index, /*userIndex=*/true, isDowngradeCompatible);
+            if (index.name === indexName) {
+                sawIndex = true;
+                checkIndexSpec(index, /*userIndex=*/true, isDowngradeCompatible);
+            }
         }
 
         let bucketIndexes = bucketsColl.getIndexes();
         for (const index of bucketIndexes) {
-            checkIndexSpec(index, /*userIndex=*/false, isDowngradeCompatible);
+            if (index.name === indexName) {
+                sawIndex = true;
+                checkIndexSpec(index, /*userIndex=*/false, isDowngradeCompatible);
+            }
         }
 
-        assert.commandWorked(coll.dropIndexes("*"));
+        assert(sawIndex,
+               `Index with name: ${indexName} is missing: ${tojson({userIndexes, bucketIndexes})}`);
+
+        assert.commandWorked(coll.dropIndexes(indexName));
     };
 
-    assert.commandWorked(coll.createIndex({[timeFieldName]: 1}));
-    verifyAndDropIndex(/*isDowngradeCompatible=*/true);
+    assert.commandWorked(coll.createIndex({[timeFieldName]: 1}, {name: "timefield_downgradable"}));
+    verifyAndDropIndex(/*isDowngradeCompatible=*/true, "timefield_downgradable");
 
-    assert.commandWorked(coll.createIndex({[metaFieldName]: 1}));
-    verifyAndDropIndex(/*isDowngradeCompatible=*/true);
+    assert.commandWorked(coll.createIndex({[metaFieldName]: 1}, {name: "metafield_downgradable"}));
+    verifyAndDropIndex(/*isDowngradeCompatible=*/true, "metafield_downgradable");
 
-    assert.commandWorked(coll.createIndex({[timeFieldName]: 1, [metaFieldName]: 1}));
-    verifyAndDropIndex(/*isDowngradeCompatible=*/true);
+    assert.commandWorked(coll.createIndex({[timeFieldName]: 1, [metaFieldName]: 1},
+                                          {name: "time_meta_field_downgradable"}));
+    verifyAndDropIndex(/*isDowngradeCompatible=*/true, "time_meta_field_downgradable");
 
     if (TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
-        assert.commandWorked(coll.createIndex({x: 1}));
-        verifyAndDropIndex(/*isDowngradeCompatible=*/false);
-
-        assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {x: {$gt: 5}}}));
-        verifyAndDropIndex(/*isDowngradeCompatible=*/false);
+        assert.commandWorked(coll.createIndex({x: 1}, {name: "x_1"}));
+        verifyAndDropIndex(/*isDowngradeCompatible=*/false, "x_1");
 
         assert.commandWorked(
-            coll.createIndex({[timeFieldName]: 1}, {partialFilterExpression: {x: {$gt: 5}}}));
-        verifyAndDropIndex(/*isDowngradeCompatible=*/false);
+            coll.createIndex({x: 1}, {name: "x_partial", partialFilterExpression: {x: {$gt: 5}}}));
+        verifyAndDropIndex(/*isDowngradeCompatible=*/false, "x_partial");
+
+        assert.commandWorked(coll.createIndex(
+            {[timeFieldName]: 1}, {name: "time_partial", partialFilterExpression: {x: {$gt: 5}}}));
+        verifyAndDropIndex(/*isDowngradeCompatible=*/false, "time_partial");
+
+        assert.commandWorked(coll.createIndex(
+            {[metaFieldName]: 1}, {name: "meta_partial", partialFilterExpression: {x: {$gt: 5}}}));
+        verifyAndDropIndex(/*isDowngradeCompatible=*/false, "meta_partial");
 
         assert.commandWorked(
-            coll.createIndex({[metaFieldName]: 1}, {partialFilterExpression: {x: {$gt: 5}}}));
-        verifyAndDropIndex(/*isDowngradeCompatible=*/false);
-
-        assert.commandWorked(
-            coll.createIndex({[metaFieldName]: 1, x: 1}, {partialFilterExpression: {x: {$gt: 5}}}));
-        verifyAndDropIndex(/*isDowngradeCompatible=*/false);
+            coll.createIndex({[metaFieldName]: 1, x: 1},
+                             {name: "meta_x_partial", partialFilterExpression: {x: {$gt: 5}}}));
+        verifyAndDropIndex(/*isDowngradeCompatible=*/false, "meta_x_partial");
     }
 
     // Creating an index directly on the buckets collection is permitted. However, these types of

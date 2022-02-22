@@ -14,6 +14,7 @@
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/libs/fixture_helpers.js");
 
 if (!TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
     jsTestLog(
@@ -99,12 +100,11 @@ TimeseriesTest.run((insert) => {
     assert.eq({x: -1}, userIndexes[userIndexes.length - 1].key);
 
     bucketIndexes = bucketsColl.getIndexes();
-    assert.eq({"control.max.x": -1, "control.min.x": -1},
-              bucketIndexes[bucketIndexes.length - 1].key);
-    testHint(bucketIndexes[bucketIndexes.length - 1].name);
+    let bucketIndex = bucketIndexes[bucketIndexes.length - 1];
+    assert.eq({"control.max.x": -1, "control.min.x": -1}, bucketIndex.key);
+    testHint(bucketIndex.name);
 
-    // Drop index by name.
-    assert.commandWorked(coll.dropIndex(bucketIndexes[0].name));
+    assert.commandWorked(coll.dropIndex(bucketIndex.name));
     bucketIndexes = bucketsColl.getIndexes();
 
     // Test an index on dotted and sub document fields.
@@ -113,11 +113,11 @@ TimeseriesTest.run((insert) => {
     assert.eq({"x.y": 1}, userIndexes[userIndexes.length - 1].key);
 
     bucketIndexes = bucketsColl.getIndexes();
-    assert.eq({"control.min.x.y": 1, "control.max.x.y": 1},
-              bucketIndexes[bucketIndexes.length - 1].key);
-    testHint(bucketIndexes[bucketIndexes.length - 1].name);
+    bucketIndex = bucketIndexes[bucketIndexes.length - 1];
+    assert.eq({"control.min.x.y": 1, "control.max.x.y": 1}, bucketIndex.key);
+    testHint(bucketIndex.name);
 
-    assert.commandWorked(coll.dropIndex(bucketIndexes[0].name));
+    assert.commandWorked(coll.dropIndex(bucketIndex.name));
     bucketIndexes = bucketsColl.getIndexes();
 
     // Test bad input.
@@ -156,10 +156,17 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(
         bucketsColl.createIndex({"control.max.x.y": -1, "control.min.x.y": -1, "data.x": 1}));
 
-    userIndexes = coll.getIndexes();
-    assert.eq(0, userIndexes.length);
-
-    bucketIndexes = bucketsColl.getIndexes();
-    assert.eq(13, bucketIndexes.length);
+    if (FixtureHelpers.isSharded(bucketsColl)) {
+        // There are more indexes for sharded collections because it includes the shard key index.
+        userIndexes = coll.getIndexes();
+        assert.eq(1, userIndexes.length);
+        bucketIndexes = bucketsColl.getIndexes();
+        assert.eq(14, bucketIndexes.length);
+    } else {
+        userIndexes = coll.getIndexes();
+        assert.eq(0, userIndexes.length);
+        bucketIndexes = bucketsColl.getIndexes();
+        assert.eq(13, bucketIndexes.length);
+    }
 });
 }());

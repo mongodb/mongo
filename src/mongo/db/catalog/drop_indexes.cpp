@@ -49,6 +49,7 @@
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/visit_helper.h"
@@ -289,22 +290,63 @@ void dropReadyIndexes(OperationContext* opCtx,
     }
 
     IndexCatalog* indexCatalog = collection->getIndexCatalog();
-    if (indexNames.front() == "*") {
-        indexCatalog->dropAllIndexes(
-            opCtx, collection, false, [opCtx, collection](const IndexDescriptor* desc) {
-                opCtx->getServiceContext()->getOpObserver()->onDropIndex(opCtx,
-                                                                         collection->ns(),
-                                                                         collection->uuid(),
-                                                                         desc->indexName(),
-                                                                         desc->infoObj());
-            });
+    auto collDescription =
+        CollectionShardingState::get(opCtx, collection->ns())->getCollectionDescription(opCtx);
 
-        reply->setMsg("non-_id indexes dropped for collection"_sd);
+    if (indexNames.front() == "*") {
+        if (collDescription.isSharded()) {
+            indexCatalog->dropIndexes(
+                opCtx,
+                collection,
+                [&](const IndexDescriptor* desc) {
+                    if (desc->isIdIndex()) {
+                        return false;
+                    }
+
+                    if (isCompatibleWithShardKey(opCtx,
+                                                 CollectionPtr(collection),
+                                                 desc->getEntry(),
+                                                 collDescription.getKeyPattern(),
+                                                 false /* requiresSingleKey */)) {
+                        return false;
+                    }
+
+                    return true;
+                },
+                [opCtx, collection](const IndexDescriptor* desc) {
+                    opCtx->getServiceContext()->getOpObserver()->onDropIndex(opCtx,
+                                                                             collection->ns(),
+                                                                             collection->uuid(),
+                                                                             desc->indexName(),
+                                                                             desc->infoObj());
+                });
+
+            reply->setMsg("non-_id indexes and non-shard key indexes dropped for collection"_sd);
+        } else {
+            indexCatalog->dropAllIndexes(
+                opCtx, collection, false, [opCtx, collection](const IndexDescriptor* desc) {
+                    opCtx->getServiceContext()->getOpObserver()->onDropIndex(opCtx,
+                                                                             collection->ns(),
+                                                                             collection->uuid(),
+                                                                             desc->indexName(),
+                                                                             desc->infoObj());
+                });
+
+            reply->setMsg("non-_id indexes dropped for collection"_sd);
+        }
         return;
     }
 
     bool includeUnfinished = true;
     for (const auto& indexName : indexNames) {
+        if (collDescription.isSharded()) {
+            uassert(
+                649101,
+                "Cannot drop the only compatible index for this collection's shard key",
+                !isLastShardKeyIndex(
+                    opCtx, collection, indexCatalog, indexName, collDescription.getKeyPattern()));
+        }
+
         auto desc = indexCatalog->findIndexByName(opCtx, indexName, includeUnfinished);
         if (!desc) {
             uasserted(ErrorCodes::IndexNotFound,
@@ -466,6 +508,19 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
             auto indexCatalog = collection->getWritableCollection(opCtx)->getIndexCatalog();
             const bool includeUnfinished = false;
             for (const auto& indexName : indexNames) {
+                auto collDescription =
+                    CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
+
+                if (collDescription.isSharded()) {
+                    uassert(649100,
+                            "Cannot drop the only compatible index for this collection's shard key",
+                            !isLastShardKeyIndex(opCtx,
+                                                 collection->getCollection(),
+                                                 indexCatalog,
+                                                 indexName,
+                                                 collDescription.getKeyPattern()));
+                }
+
                 auto desc = indexCatalog->findIndexByName(opCtx, indexName, includeUnfinished);
                 if (!desc) {
                     // A similar index wasn't created while we yielded the locks during abort.

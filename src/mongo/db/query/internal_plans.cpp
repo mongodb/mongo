@@ -316,7 +316,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::shardKeyIndexScan(
     OperationContext* opCtx,
     const CollectionPtr* collection,
-    const IndexCatalog::ShardKeyIndex& shardKeyIdx,
+    const ShardKeyIndex& shardKeyIdx,
     const BSONObj& startKey,
     const BSONObj& endKey,
     BoundInclusion boundInclusion,
@@ -344,7 +344,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     OperationContext* opCtx,
     const CollectionPtr* coll,
     std::unique_ptr<DeleteStageParams> params,
-    const IndexCatalog::ShardKeyIndex& shardKeyIdx,
+    const ShardKeyIndex& shardKeyIdx,
     const BSONObj& startKey,
     const BSONObj& endKey,
     BoundInclusion boundInclusion,

@@ -190,31 +190,6 @@ public:
         std::unique_ptr<std::vector<IndexCatalogEntry*>> _ownedContainer;
     };
 
-    class ShardKeyIndex {
-    public:
-        /**
-         * Wraps information pertaining to the 'index' used as the shard key.
-         *
-         * A clustered index is not tied to an IndexDescriptor whereas all other types of indexes
-         * are. Either the 'index' is a clustered index and '_clusteredIndexKeyPattern' is
-         * non-empty, or '_indexDescriptor' is non-null and a standard index exists.
-         */
-        ShardKeyIndex(const IndexDescriptor* indexDescriptor);
-        ShardKeyIndex(const ClusteredIndexSpec& clusteredIndexSpec);
-
-        const BSONObj& keyPattern() const;
-        const IndexDescriptor* descriptor() const {
-            return _indexDescriptor;
-        }
-
-    private:
-        const IndexDescriptor* _indexDescriptor;
-
-        // Stores the keyPattern when the index is a clustered index and there is no
-        // IndexDescriptor. Empty otherwise.
-        BSONObj _clusteredIndexKeyPattern;
-    };
-
     IndexCatalog() = default;
     virtual ~IndexCatalog() = default;
 
@@ -281,26 +256,6 @@ public:
                                          const BSONObj& key,
                                          bool includeUnfinishedIndexes,
                                          std::vector<const IndexDescriptor*>* matches) const = 0;
-
-    /**
-     * Returns an index suitable for shard key range scans.
-     *
-     * This index:
-     * - must be prefixed by 'shardKey', and
-     * - must not be a partial index.
-     * - must have the simple collation.
-     *
-     * If the parameter 'requireSingleKey' is true, then this index additionally must not be
-     * multi-key.
-     *
-     * If no such index exists, returns NULL.
-     */
-    virtual const boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(
-        OperationContext* opCtx,
-        const CollectionPtr& collection,
-        const BSONObj& shardKey,
-        bool requireSingleKey) const = 0;
-
     virtual void findIndexByType(OperationContext* opCtx,
                                  const std::string& type,
                                  std::vector<const IndexDescriptor*>& matches,
@@ -419,6 +374,16 @@ public:
         const std::vector<BSONObj>& indexSpecsToBuild) const = 0;
 
     /**
+     * Drops indexes in the index catalog that returns true when it's descriptor returns true for
+     * 'matchFn'. If 'onDropFn' is provided, it will be called before each index is dropped to
+     * allow timestamping each individual drop.
+     */
+    virtual void dropIndexes(OperationContext* opCtx,
+                             Collection* collection,
+                             std::function<bool(const IndexDescriptor*)> matchFn,
+                             std::function<void(const IndexDescriptor*)> onDropFn) = 0;
+
+    /**
      * Drops all indexes in the index catalog, optionally dropping the id index depending on the
      * 'includingIdIndex' parameter value. If 'onDropFn' is provided, it will be called before each
      * index is dropped to allow timestamping each individual drop.
@@ -427,9 +392,6 @@ public:
                                 Collection* collection,
                                 bool includingIdIndex,
                                 std::function<void(const IndexDescriptor*)> onDropFn) = 0;
-    virtual void dropAllIndexes(OperationContext* opCtx,
-                                Collection* collection,
-                                bool includingIdIndex) = 0;
 
     /**
      * Drops the index given its descriptor.

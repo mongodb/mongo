@@ -171,10 +171,9 @@ runTest({
     shardKey: {[metaField]: 1},
     cmdObj: {
         dropIndexes: collName,
-        index: {[metaField]: 1},
+        index: "*",
     },
-    numProfilerEntries:
-        {sharded: 2, unsharded: 0 /* command fails when trying to drop a missing index */}
+    numProfilerEntries: {sharded: 2, unsharded: 1}
 });
 
 runTest({
@@ -229,10 +228,9 @@ runTest({
     shardKey: {[metaField]: 1},
     cmdObj: {
         dropIndexes: bucketsCollName,
-        index: {meta: 1},
+        index: "*",
     },
-    numProfilerEntries:
-        {sharded: 2, unsharded: 0 /* command fails when trying to drop a missing index */},
+    numProfilerEntries: {sharded: 2, unsharded: 1},
 });
 
 runTest({

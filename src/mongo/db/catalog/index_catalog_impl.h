@@ -122,26 +122,6 @@ public:
                                  const BSONObj& key,
                                  bool includeUnfinishedIndexes,
                                  std::vector<const IndexDescriptor*>* matches) const override;
-
-    /**
-     * Returns an index suitable for shard key range scans.
-     *
-     * This index:
-     * - must be prefixed by 'shardKey', and
-     * - must not be a partial index.
-     * - must have the simple collation.
-     *
-     * If the parameter 'requireSingleKey' is true, then this index additionally must not be
-     * multi-key.
-     *
-     * If no such index exists, returns NULL.
-     */
-    const boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(
-        OperationContext* opCtx,
-        const CollectionPtr& collection,
-        const BSONObj& shardKey,
-        bool requireSingleKey) const override;
-
     void findIndexByType(OperationContext* opCtx,
                          const std::string& type,
                          std::vector<const IndexDescriptor*>& matches,
@@ -207,19 +187,14 @@ public:
         const CollectionPtr& collection,
         const std::vector<BSONObj>& indexSpecsToBuild) const override;
 
-    /**
-     * Drops all indexes in the index catalog, optionally dropping the id index depending on the
-     * 'includingIdIndex' parameter value. If the 'droppedIndexes' parameter is not null,
-     * it is filled with the names and index info of the dropped indexes.
-     */
+    void dropIndexes(OperationContext* opCtx,
+                     Collection* collection,
+                     std::function<bool(const IndexDescriptor*)> matchFn,
+                     std::function<void(const IndexDescriptor*)> onDropFn) override;
     void dropAllIndexes(OperationContext* opCtx,
                         Collection* collection,
                         bool includingIdIndex,
                         std::function<void(const IndexDescriptor*)> onDropFn) override;
-    void dropAllIndexes(OperationContext* opCtx,
-                        Collection* collection,
-                        bool includingIdIndex) override;
-
 
     Status dropIndex(OperationContext* opCtx,
                      Collection* collection,
@@ -414,8 +389,7 @@ private:
     void _logInternalState(OperationContext* opCtx,
                            const CollectionPtr& collection,
                            long long numIndexesInCollectionCatalogEntry,
-                           const std::vector<std::string>& indexNamesToDrop,
-                           bool haveIdIndex);
+                           const std::vector<std::string>& indexNamesToDrop);
 
     IndexCatalogEntryContainer _readyIndexes;
     IndexCatalogEntryContainer _buildingIndexes;

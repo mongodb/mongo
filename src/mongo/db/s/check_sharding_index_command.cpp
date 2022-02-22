@@ -37,6 +37,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/s/shard_key_index_util.h"
 
 namespace mongo {
 namespace {
@@ -93,9 +94,11 @@ public:
             return false;
         }
 
-        auto catalog = collection->getIndexCatalog();
-        auto shardKeyIdx = catalog->findShardKeyPrefixedIndex(
-            opCtx, *collection, keyPattern, /*requireSingleKey=*/true);
+        auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
+                                                     *collection,
+                                                     collection->getIndexCatalog(),
+                                                     keyPattern,
+                                                     /*requireSingleKey=*/true);
         if (!shardKeyIdx) {
             errmsg = "couldn't find valid index for shard key";
             return false;

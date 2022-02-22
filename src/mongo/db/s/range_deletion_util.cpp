@@ -38,7 +38,6 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -56,6 +55,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/remove_saver.h"
@@ -133,9 +133,8 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
 
     // The IndexChunk has a keyPattern that may apply to more than one index - we need to
     // select the index and get the full index keyPattern here.
-    auto catalog = collection->getIndexCatalog();
-    auto shardKeyIdx = catalog->findShardKeyPrefixedIndex(
-        opCtx, collection, keyPattern, /*requireSingleKey=*/false);
+    auto shardKeyIdx = findShardKeyPrefixedIndex(
+        opCtx, collection, collection->getIndexCatalog(), keyPattern, /*requireSingleKey=*/false);
     if (!shardKeyIdx) {
         LOGV2_ERROR_OPTIONS(23765,
                             {logv2::UserAssertAfterLog(ErrorCodes::InternalError)},
@@ -644,9 +643,11 @@ void setOrphanCountersOnRangeDeletionTasks(OperationContext* opCtx) {
 
             KeyPattern keyPattern;
             uassertStatusOK(deletionTask.getRange().extractKeyPattern(&keyPattern));
-            auto catalog = collection->getIndexCatalog();
-            auto shardKeyIdx = catalog->findShardKeyPrefixedIndex(
-                opCtx, *collection, keyPattern.toBSON(), /*requireSingleKey=*/false);
+            auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
+                                                         *collection,
+                                                         collection->getIndexCatalog(),
+                                                         keyPattern.toBSON(),
+                                                         /*requireSingleKey=*/false);
 
             uassert(ErrorCodes::IndexNotFound,
                     str::stream() << "couldn't find index over shard key " << keyPattern.toBSON()

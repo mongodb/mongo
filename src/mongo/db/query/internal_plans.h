@@ -35,6 +35,7 @@
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/s/shard_key_index_util.h"
 
 namespace mongo {
 
@@ -135,7 +136,7 @@ public:
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> shardKeyIndexScan(
         OperationContext* opCtx,
         const CollectionPtr* collection,
-        const IndexCatalog::ShardKeyIndex& shardKeyIdx,
+        const ShardKeyIndex& shardKeyIdx,
         const BSONObj& startKey,
         const BSONObj& endKey,
         BoundInclusion boundInclusion,
@@ -153,7 +154,7 @@ public:
         OperationContext* opCtx,
         const CollectionPtr* collection,
         std::unique_ptr<DeleteStageParams> params,
-        const IndexCatalog::ShardKeyIndex& shardKeyIdx,
+        const ShardKeyIndex& shardKeyIdx,
         const BSONObj& startKey,
         const BSONObj& endKey,
         BoundInclusion boundInclusion,

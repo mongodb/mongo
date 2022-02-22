@@ -158,6 +158,8 @@ last-continuous:
       test_file: jstests/replsets/apply_ops_dropDatabase.js
     - ticket: SERVER-63732
       test_file: jstests/sharding/shard_collection_basic.js
+    - ticket: SERVER-6491
+      test_file: jstests/sharding/shard_key_index_must_exist.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -455,6 +457,8 @@ last-lts:
       test_file: jstests/replsets/apply_ops_dropDatabase.js
     - ticket: SERVER-63732
       test_file: jstests/sharding/shard_collection_basic.js
+    - ticket: SERVER-6491
+      test_file: jstests/sharding/shard_key_index_must_exist.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

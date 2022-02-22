@@ -25,13 +25,13 @@ assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 100}, to: st.shard1.shardName}));
 flushRoutersAndRefreshShardMetadata(st, {ns});
 
-assert.commandWorked(mongos0Coll.createIndex({x: 1}));
+assert.commandWorked(mongos0Coll.createIndex({y: 1}));
 
 // Move chunk without refreshing the recipient so that the recipient shard throws a
 // StaleShardVersion error upon receiving the drop index command.
 ShardVersioningUtil.moveChunkNotRefreshRecipient(st.s1, ns, st.shard1, st.shard0, {x: 100});
 
-assert.commandWorked(mongos0Coll.dropIndexes({x: 1}));
+assert.commandWorked(mongos0Coll.dropIndexes({y: 1}));
 
 st.stop();
 })();
