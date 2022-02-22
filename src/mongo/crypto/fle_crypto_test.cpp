@@ -34,11 +34,13 @@
 #include <algorithm>
 #include <iostream>
 #include <limits>
+#include <stack>
 #include <string>
 #include <tuple>
 #include <vector>
 
 #include "mongo/base/data_range.h"
+#include "mongo/base/data_type_validated.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -120,6 +122,22 @@ static UUID userKeyId = uassertStatusOK(UUID::parse(kUserKeyId.toString()));
 
 std::vector<char> testValue = {0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19};
 std::vector<char> testValue2 = {0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29};
+
+class TestKeyVault : public FLEKeyVault {
+public:
+    KeyMaterial getKey(UUID uuid) override;
+};
+
+KeyMaterial TestKeyVault::getKey(UUID uuid) {
+    if (uuid == indexKeyId) {
+        return indexKey.data;
+    } else if (uuid == userKeyId) {
+        return userKey.data;
+    } else {
+        FAIL("not implemented");
+        return KeyMaterial{};
+    }
+}
 
 TEST(FLETokens, TestVectors) {
 
@@ -466,5 +484,410 @@ TEST(FLE_ESC, EmuBinary2) {
     ASSERT_EQ(i, 5);
 }
 
+std::vector<char> generatePlaceholder(BSONElement value) {
+    FLE2EncryptionPlaceholder ep;
+
+    ep.setAlgorithm(mongo::Fle2AlgorithmInt::kEquality);
+    ep.setUserKeyId(userKeyId);
+    ep.setIndexKeyId(indexKeyId);
+    ep.setValue(value);
+    ep.setType(mongo::Fle2PlaceholderType::kInsert);
+    ep.setMaxContentionCounter(0);
+
+    BSONObj obj = ep.toBSON();
+
+    std::vector<char> v;
+    v.resize(obj.objsize() + 1);
+    v[0] = static_cast<uint8_t>(EncryptedBinDataType::kFLE2Placeholder);
+    std::copy(obj.objdata(), obj.objdata() + obj.objsize(), v.begin() + 1);
+    return v;
+}
+
+BSONObj encryptDocument(BSONObj obj, FLEKeyVault* keyVault) {
+    auto result = FLEClientCrypto::generateInsertOrUpdateFromPlaceholders(obj, keyVault);
+
+    // Start Server Side
+    auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
+
+    ASSERT_EQ(serverPayload.size(), 1);
+
+    // TODO set count based on EmuBinary
+    for (auto& payload : serverPayload) {
+        payload.count = 1;
+    }
+
+    // Finalize document for insert
+    auto finalDoc = EDCServerCollection::finalizeForInsert(result, serverPayload);
+    ASSERT_EQ(finalDoc["__safeContent__"].type(), Array);
+    return finalDoc;
+}
+
+void roundTripTest(BSONObj doc, BSONType type) {
+
+    auto element = doc.firstElement();
+    ASSERT_EQ(element.type(), type);
+
+
+    TestKeyVault keyVault;
+
+    auto inputDoc = BSON("plainText"
+                         << "sample"
+                         << "encrypted" << element);
+
+    auto buf = generatePlaceholder(element);
+    BSONObjBuilder builder;
+    builder.append("plainText", "sample");
+    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+
+    auto finalDoc = encryptDocument(builder.obj(), &keyVault);
+
+    ASSERT_EQ(finalDoc["plainText"].type(), String);
+    ASSERT_EQ(finalDoc["encrypted"].type(), BinData);
+    ASSERT_TRUE(finalDoc["encrypted"].isBinData(BinDataType::Encrypt));
+
+    // Decrypt document
+    auto decryptedDoc = FLEClientCrypto::decryptDocument(finalDoc, &keyVault);
+
+    // Remove this so the round-trip is clean
+    decryptedDoc = decryptedDoc.removeField("__safeContent__");
+
+    ASSERT_BSONOBJ_EQ(inputDoc, decryptedDoc);
+}
+
+TEST(FLE_EDC, Allowed_Types) {
+    roundTripTest(BSON("sample"
+                       << "value123"),
+                  String);
+    roundTripTest(BSON("sample" << BSONBinData(
+                           testValue.data(), testValue.size(), BinDataType::BinDataGeneral)),
+                  BinData);
+    roundTripTest(BSON("sample" << OID()), jstOID);
+
+
+    roundTripTest(BSON("sample" << false), Bool);
+    roundTripTest(BSON("sample" << true), Bool);
+    roundTripTest(BSON("sample" << Date_t()), Date);
+    roundTripTest(BSON("sample" << BSONRegEx("value1", "value2")), RegEx);
+    roundTripTest(BSON("sample" << 123456), NumberInt);
+    roundTripTest(BSON("sample" << Timestamp()), bsonTimestamp);
+    roundTripTest(BSON("sample" << 12345678901234567LL), NumberLong);
+    roundTripTest(BSON("sample" << BSONCode("value")), Code);
+}
+
+void illegalBSONType(BSONObj doc, BSONType type) {
+    auto element = doc.firstElement();
+    if (isValidBSONType(type)) {
+        ASSERT_EQ(element.type(), type);
+    }
+
+    TestKeyVault keyVault;
+
+    auto buf = generatePlaceholder(element);
+    BSONObjBuilder builder;
+    builder.append("plainText", "sample");
+    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+    BSONObj obj = builder.obj();
+
+    ASSERT_THROWS_CODE(FLEClientCrypto::generateInsertOrUpdateFromPlaceholders(obj, &keyVault),
+                       DBException,
+                       6338602);
+}
+
+TEST(FLE_EDC, Disallowed_Types) {
+    illegalBSONType(BSON("sample" << 123.456), NumberDouble);
+    illegalBSONType(BSON("sample" << Decimal128()), NumberDecimal);
+
+    illegalBSONType(BSON("sample" << MINKEY), MinKey);
+
+    illegalBSONType(BSON("sample" << BSON("nested"
+                                          << "value")),
+                    Object);
+    illegalBSONType(BSON("sample" << BSON_ARRAY(1 << 23)), Array);
+
+    illegalBSONType(BSON("sample" << BSONUndefined), Undefined);
+    illegalBSONType(BSON("sample" << BSONNULL), jstNULL);
+    illegalBSONType(BSON("sample" << BSONDBRef("value1", OID())), DBRef);
+    illegalBSONType(BSON("sample" << BSONSymbol("value")), Symbol);
+    illegalBSONType(BSON("sample" << BSONCodeWScope("value",
+                                                    BSON("code"
+                                                         << "something"))),
+                    CodeWScope);
+
+    illegalBSONType(BSON("sample" << MAXKEY), MaxKey);
+
+
+    uint8_t fakeBSONType = 42;
+    ASSERT_FALSE(isValidBSONType(fakeBSONType));
+    illegalBSONType(BSON("sample" << 123.456), static_cast<BSONType>(fakeBSONType));
+}
+
+
+template <typename T>
+T parseFromCDR(ConstDataRange cdr) {
+    ConstDataRangeCursor cdc(cdr);
+    auto swObj = cdc.readAndAdvanceNoThrow<Validated<BSONObj>>();
+
+    uassertStatusOK(swObj);
+
+    BSONObj obj = swObj.getValue();
+
+    IDLParserErrorContext ctx("root");
+    return T::parse(ctx, obj);
+}
+
+template <typename T>
+std::vector<uint8_t> toEncryptedVector(EncryptedBinDataType dt, T t) {
+    BSONObj obj = t.toBSON();
+
+    std::vector<uint8_t> buf(obj.objsize() + 1);
+    buf[0] = static_cast<uint8_t>(dt);
+
+    std::copy(obj.objdata(), obj.objdata() + obj.objsize(), buf.data() + 1);
+
+    return buf;
+}
+
+template <typename T>
+void toEncryptedBinData(StringData field, EncryptedBinDataType dt, T t, BSONObjBuilder* builder) {
+    auto buf = toEncryptedVector(dt, t);
+
+    builder->appendBinData(field, buf.size(), BinDataType::Encrypt, buf.data());
+}
+
+
+std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(ConstDataRange cdr) {
+    ConstDataRangeCursor cdrc(cdr);
+
+    uint8_t subTypeByte = cdrc.readAndAdvance<uint8_t>();
+
+    auto subType = EncryptedBinDataType_parse(IDLParserErrorContext("subtype"), subTypeByte);
+    return {subType, cdrc};
+}
+
+
+BSONObj transformBSON(
+    const BSONObj& object,
+    const std::function<void(ConstDataRange, BSONObjBuilder*, StringData)>& doTransform) {
+    struct IteratorState {
+        BSONObjIterator iter;
+        BSONObjBuilder builder;
+    };
+
+    std::stack<IteratorState> frameStack;
+
+    const ScopeGuard frameStackGuard([&] {
+        while (!frameStack.empty()) {
+            frameStack.pop();
+        }
+    });
+
+    frameStack.push({BSONObjIterator(object), BSONObjBuilder()});
+
+    while (frameStack.size() > 1 || frameStack.top().iter.more()) {
+        ASSERT(frameStack.size() < BSONDepth::kDefaultMaxAllowableDepth);
+        auto& [iterator, builder] = frameStack.top();
+        if (iterator.more()) {
+            BSONElement elem = iterator.next();
+            if (elem.type() == BSONType::Object) {
+                frameStack.push({BSONObjIterator(elem.Obj()),
+                                 BSONObjBuilder(builder.subobjStart(elem.fieldNameStringData()))});
+            } else if (elem.type() == BSONType::Array) {
+                frameStack.push(
+                    {BSONObjIterator(elem.Obj()),
+                     BSONObjBuilder(builder.subarrayStart(elem.fieldNameStringData()))});
+            } else if (elem.isBinData(BinDataType::Encrypt)) {
+                int len;
+                const char* data(elem.binData(len));
+                ConstDataRange cdr(data, len);
+                doTransform(cdr, &builder, elem.fieldNameStringData());
+            } else {
+                builder.append(elem);
+            }
+        } else {
+            frameStack.pop();
+        }
+    }
+    invariant(frameStack.size() == 1);
+    return frameStack.top().builder.obj();
+}
+
+void disallowedEqualityPayloadType(BSONType type) {
+    auto doc = BSON("sample" << 123456);
+    auto element = doc.firstElement();
+
+    TestKeyVault keyVault;
+
+
+    auto inputDoc = BSON("plainText"
+                         << "sample"
+                         << "encrypted" << element);
+
+    auto buf = generatePlaceholder(element);
+    BSONObjBuilder builder;
+    builder.append("plainText", "sample");
+    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+    BSONObj obj = builder.obj();
+
+    auto result = FLEClientCrypto::generateInsertOrUpdateFromPlaceholders(obj, &keyVault);
+
+    // Since FLEClientCrypto::generateInsertOrUpdateFromPlaceholders validates the type is correct,
+    // we send an allowed type and then change the type to something that is not allowed
+    result = transformBSON(
+        result,
+        [type](ConstDataRange cdr, BSONObjBuilder* builder, StringData fieldNameToSerialize) {
+            auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
+
+
+            auto iup = parseFromCDR<FLE2InsertUpdatePayload>(subCdr);
+
+            iup.setType(type);
+            toEncryptedBinData(
+                fieldNameToSerialize, EncryptedBinDataType::kFLE2InsertUpdatePayload, iup, builder);
+        });
+
+
+    // Start Server Side
+    ASSERT_THROWS_CODE(EDCServerCollection::getEncryptedFieldInfo(result), DBException, 6373504);
+}
+
+TEST(FLE_EDC, Disallowed_Types_FLE2InsertUpdatePayload) {
+    disallowedEqualityPayloadType(NumberDouble);
+    disallowedEqualityPayloadType(NumberDecimal);
+
+    disallowedEqualityPayloadType(MinKey);
+
+    disallowedEqualityPayloadType(Object);
+    disallowedEqualityPayloadType(Array);
+
+    disallowedEqualityPayloadType(Undefined);
+    disallowedEqualityPayloadType(jstNULL);
+    disallowedEqualityPayloadType(DBRef);
+    disallowedEqualityPayloadType(Symbol);
+    disallowedEqualityPayloadType(CodeWScope);
+
+    disallowedEqualityPayloadType(MaxKey);
+
+    uint8_t fakeBSONType = 42;
+    ASSERT_FALSE(isValidBSONType(fakeBSONType));
+    disallowedEqualityPayloadType(static_cast<BSONType>(fakeBSONType));
+}
+
+
+TEST(FLE_EDC, ServerSide_Payloads) {
+    auto doc = BSON("sample" << 123456);
+    auto element = doc.firstElement();
+
+    auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
+
+    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey);
+    auto serverEncryptToken =
+        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(indexKey);
+    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
+    auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
+    auto eccToken = FLECollectionTokenGenerator::generateECCToken(collectionToken);
+    auto ecocToken = FLECollectionTokenGenerator::generateECOCToken(collectionToken);
+
+    FLECounter counter = 0;
+
+
+    EDCDerivedFromDataToken edcDatakey =
+        FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, value);
+    ESCDerivedFromDataToken escDatakey =
+        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+    ECCDerivedFromDataToken eccDatakey =
+        FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(eccToken, value);
+
+
+    ESCDerivedFromDataTokenAndContentionFactorToken escDataCounterkey =
+        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
+            generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, counter);
+    ECCDerivedFromDataTokenAndContentionFactorToken eccDataCounterkey =
+        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
+            generateECCDerivedFromDataTokenAndContentionFactorToken(eccDatakey, counter);
+
+    FLE2InsertUpdatePayload iupayload;
+
+
+    iupayload.setEdcDerivedToken(edcDatakey.toCDR());
+    iupayload.setEscDerivedToken(escDatakey.toCDR());
+    iupayload.setEccDerivedToken(eccDatakey.toCDR());
+    iupayload.setServerEncryptionToken(serverEncryptToken.toCDR());
+
+    auto swEncryptedTokens =
+        EncryptedStateCollectionTokens(escDataCounterkey, eccDataCounterkey).serialize(ecocToken);
+    uassertStatusOK(swEncryptedTokens);
+    iupayload.setEncryptedTokens(swEncryptedTokens.getValue());
+
+    std::vector<uint8_t> cipherText = {0x1, 0x2, 0x3, 0x4, 0x5};
+    iupayload.setValue(cipherText);
+    iupayload.setType(element.type());
+
+    FLE2IndexedEqualityEncryptedValue serverPayload(iupayload, 123456);
+
+    auto swBuf = serverPayload.serialize(serverEncryptToken);
+    ASSERT_OK(swBuf.getStatus());
+
+    auto swServerPayload =
+        FLE2IndexedEqualityEncryptedValue::decryptAndParse(serverEncryptToken, swBuf.getValue());
+
+    ASSERT_OK(swServerPayload.getStatus());
+    auto sp = swServerPayload.getValue();
+    ASSERT_EQ(sp.edc, serverPayload.edc);
+    ASSERT_EQ(sp.esc, serverPayload.esc);
+    ASSERT_EQ(sp.ecc, serverPayload.ecc);
+    ASSERT_EQ(sp.count, serverPayload.count);
+    ASSERT(sp.clientEncryptedValue == serverPayload.clientEncryptedValue);
+    ASSERT(cipherText == serverPayload.clientEncryptedValue);
+}
+
+TEST(FLE_EDC, DuplicateSafeContent_CompatibleType) {
+
+    TestKeyVault keyVault;
+
+    auto doc = BSON("value"
+                    << "123456");
+    auto element = doc.firstElement();
+    auto inputDoc = BSON("__safeContent__" << BSON_ARRAY(1 << 2 << 4) << "encrypted" << element);
+
+    auto buf = generatePlaceholder(element);
+    BSONObjBuilder builder;
+    builder.append("__safeContent__", BSON_ARRAY(1 << 2 << 4));
+    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+
+    auto finalDoc = encryptDocument(builder.obj(), &keyVault);
+
+    ASSERT_EQ(finalDoc["__safeContent__"].type(), Array);
+    ASSERT_EQ(finalDoc["encrypted"].type(), BinData);
+    ASSERT_TRUE(finalDoc["encrypted"].isBinData(BinDataType::Encrypt));
+
+    // Decrypt document
+    auto decryptedDoc = FLEClientCrypto::decryptDocument(finalDoc, &keyVault);
+
+    std::cout << "Final Doc: " << decryptedDoc << std::endl;
+
+    auto elements = finalDoc["__safeContent__"].Array();
+    ASSERT_EQ(elements.size(), 4);
+    ASSERT_EQ(elements[0].safeNumberInt(), 1);
+    ASSERT_EQ(elements[1].safeNumberInt(), 2);
+    ASSERT_EQ(elements[2].safeNumberInt(), 4);
+    ASSERT(elements[3].type() == BinData);
+}
+
+
+TEST(FLE_EDC, DuplicateSafeContent_IncompatibleType) {
+
+    TestKeyVault keyVault;
+
+    auto doc = BSON("value"
+                    << "123456");
+    auto element = doc.firstElement();
+
+    auto buf = generatePlaceholder(element);
+    BSONObjBuilder builder;
+    builder.append("__safeContent__", 123456);
+    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
+
+    ASSERT_THROWS_CODE(encryptDocument(builder.obj(), &keyVault), DBException, 6373510);
+}
 
 }  // namespace mongo

@@ -201,7 +201,7 @@ boost::optional<BSONObj> rewriteDocument(const BSONObj& doc, OperationContext* o
     }
 
     if (mutableDoc) {
-        LOGV2_DEBUG(1, 5054900, "Rewrote state change error", "code"_attr = oldCode);
+        LOGV2_DEBUG(5054900, 1, "Rewrote state change error", "code"_attr = oldCode);
         return mutableDoc->getObject();
     }
     return {};

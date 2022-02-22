@@ -42,6 +42,8 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/crypto/encryption_fields_gen.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/util/uuid.h"
 
 
@@ -688,6 +690,18 @@ public:
                                         FLEUserKeyAndId userKey,
                                         FLECounter counter);
 
+
+    /**
+     * Explicit decrypt a single value into type and value
+     *
+     * Supports decrypting FLE2IndexedEqualityEncryptedValue
+     */
+    static std::pair<BSONType, std::vector<uint8_t>> decrypt(ConstDataRange cdr,
+                                                             FLEKeyVault* keyVault);
+
+    static std::pair<BSONType, std::vector<uint8_t>> decrypt(BSONElement element,
+                                                             FLEKeyVault* keyVault);
+
     /**
      * Generates a client-side payload that is sent to the server.
      *
@@ -706,6 +720,11 @@ public:
      */
     static BSONObj generateInsertOrUpdateFromPlaceholders(const BSONObj& obj,
                                                           FLEKeyVault* keyVault);
+
+    /**
+     * Decrypts a document. Only supports FLE2.
+     */
+    static BSONObj decryptDocument(BSONObj& doc, FLEKeyVault* keyVault);
 };
 
 /*
@@ -715,8 +734,8 @@ public:
  * ECCDerivedFromDataTokenAndContentionFactorToken)
  *
  * struct {
- *    uint8_t[64] esc;
- *    uint8_t[64] ecc;
+ *    uint8_t[32] esc;
+ *    uint8_t[32] ecc;
  * }
  */
 struct EncryptedStateCollectionTokens {
@@ -765,5 +784,99 @@ public:
     static ECOCCompactionDocument parseAndDecrypt(BSONObj& doc, ECOCToken token);
 };
 
+
+/**
+ * Class to read/write FLE2 Equality Indexed Encrypted Values
+ *
+ * Fields are encrypted with the following:
+ *
+ * struct {
+ *   uint8_t fle_blob_subtype = 7;
+ *   uint8_t key_uuid[16];
+ *   uint8  original_bson_type;
+ *   ciphertext[ciphertext_length];
+ * }
+ *
+ * Encrypt(ServerDataEncryptionLevel1Token, Struct(K_KeyId, v, count, d, s, c))
+ *
+ * struct {
+ *   uint8_t[length] cipherText; // UserKeyId + Encrypt(K_KeyId, value),
+ *   uint64_t counter;
+ *   uint8_t[32] edc;  // EDCDerivedFromDataTokenAndContentionFactorToken
+ *   uint8_t[32] esc;  // ESCDerivedFromDataTokenAndContentionFactorToken
+ *   uint8_t[32] ecc;  // ECCDerivedFromDataTokenAndContentionFactorToken
+ *}
+ */
+struct FLE2IndexedEqualityEncryptedValue {
+    FLE2IndexedEqualityEncryptedValue(FLE2InsertUpdatePayload payload, uint64_t counter);
+
+    FLE2IndexedEqualityEncryptedValue(EDCDerivedFromDataTokenAndContentionFactorToken edcParam,
+                                      ESCDerivedFromDataTokenAndContentionFactorToken escParam,
+                                      ECCDerivedFromDataTokenAndContentionFactorToken eccParam,
+                                      uint64_t countParam,
+                                      BSONType typeParam,
+                                      UUID indexKeyIdParam,
+                                      std::vector<uint8_t> serializedServerValueParam);
+
+    static StatusWith<FLE2IndexedEqualityEncryptedValue> decryptAndParse(
+        ServerDataEncryptionLevel1Token token, ConstDataRange serializedServerValue);
+
+    /**
+     * Read the key id from the payload.
+     */
+    static StatusWith<UUID> readKeyId(ConstDataRange serializedServerValue);
+
+    StatusWith<std::vector<uint8_t>> serialize(ServerDataEncryptionLevel1Token token);
+
+    EDCDerivedFromDataTokenAndContentionFactorToken edc;
+    ESCDerivedFromDataTokenAndContentionFactorToken esc;
+    ECCDerivedFromDataTokenAndContentionFactorToken ecc;
+    uint64_t count;
+    BSONType bsonType;
+    UUID indexKeyId;
+    std::vector<uint8_t> clientEncryptedValue;
+};
+
+
+struct EDCServerPayloadInfo {
+    FLE2InsertUpdatePayload payload;
+
+    std::string fieldPathName;
+    uint64_t count;
+};
+
+/**
+ * Manipulates the EDC collection.
+ *
+ * To finalize a document for insertion
+ *
+ * 1. Get all the encrypted fields that need counters via getEncryptedFieldInfo()
+ * 2. Choose counters
+ * 3. Finalize the insertion with finalizeForInsert().
+ */
+class EDCServerCollection {
+public:
+    /**
+     * Get information about all FLE2InsertUpdatePayload payloads
+     */
+    static std::vector<EDCServerPayloadInfo> getEncryptedFieldInfo(BSONObj& obj);
+
+    /**
+     * Generate a search tag
+     *
+     * HMAC(EDCTwiceDerivedToken, count)
+     */
+    static PrfBlock generateTag(EDCTwiceDerivedToken edcTwiceDerived, FLECounter count);
+    static PrfBlock generateTag(const EDCServerPayloadInfo& payload);
+
+    /**
+     * Consumes a payload from a MongoDB client for insert.
+     *
+     * Converts FLE2InsertUpdatePayload to a final insert payload and updates __safeContent__ with
+     * new tags.
+     */
+    static BSONObj finalizeForInsert(BSONObj& doc,
+                                     const std::vector<EDCServerPayloadInfo>& serverPayload);
+};
 
 }  // namespace mongo
