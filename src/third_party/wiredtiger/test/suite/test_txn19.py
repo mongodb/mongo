@@ -401,7 +401,6 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
     openable = [
         "removal:WiredTiger.basecfg",
         "removal:WiredTiger.turtle",
-        "removal:WiredTiger",
         "truncate:WiredTiger",
         "truncate:WiredTiger.basecfg",
         "truncate-middle:WiredTiger",
@@ -509,6 +508,9 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
                     self.reopen_conn(dir, self.conn_config)
                     self.captureout.checkAdditionalPattern(self,
                         'unexpected file WiredTiger.wt found, renamed to WiredTiger.wt.1')
+            elif self.filename == 'WiredTiger' and self.kind == 'truncate':
+                with self.expectedStdoutPattern("WiredTiger version file is empty"):
+                    self.reopen_conn(dir, self.conn_config)
             else:
                 self.reopen_conn(dir, self.conn_config)
             self.close_conn()

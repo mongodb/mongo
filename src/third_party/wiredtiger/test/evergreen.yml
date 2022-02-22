@@ -3827,6 +3827,9 @@ buildvariants:
 
 - name: ubuntu2004-perf-tests
   display_name: Ubuntu 20.04 Performance tests
+  # Perf tests are NOT expected to be triggered on Evergreen projects
+  # other than "WiredTiger (develop)".
+  activate: false
   run_on:
     - ubuntu2004-large
   expansions:
