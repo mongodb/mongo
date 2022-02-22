@@ -79,13 +79,12 @@ class test_backup14(backup_base):
     def add_data_validate_backups(self):
         self.pr('Adding initial data')
         self.initial_backup = True
-        self.add_data(self.uri, self.bigkey, self.bigval)
+        self.add_data(self.uri, self.bigkey, self.bigval, True)
 
         self.take_full_backup(self.home_incr)
         self.initial_backup = False
-        self.session.checkpoint()
 
-        self.add_data(self.uri, self.bigkey, self.bigval)
+        self.add_data(self.uri, self.bigkey, self.bigval, True)
 
         self.take_full_backup(self.home_full)
         self.take_incr_backup(self.home_incr)
@@ -98,6 +97,7 @@ class test_backup14(backup_base):
     #
     def remove_all_records_validate(self):
         self.remove_data()
+        self.session.checkpoint()
         self.take_full_backup(self.home_full)
         self.take_incr_backup(self.home_incr)
         self.compare_backups(self.uri, self.home_full, self.home_incr, str(self.bkup_id))
@@ -116,7 +116,7 @@ class test_backup14(backup_base):
         self.session.create(self.uri2, "key_format=S,value_format=S")
 
         self.new_table = True
-        self.add_data(self.uri2, self.bigkey, self.bigval)
+        self.add_data(self.uri2, self.bigkey, self.bigval, True)
         self.take_incr_backup(self.home_incr)
 
         table_list = 'tablelist.txt'
@@ -132,7 +132,7 @@ class test_backup14(backup_base):
     #
     def create_dropped_table_add_new_content(self):
         self.session.create(self.uri, "key_format=S,value_format=S")
-        self.add_data(self.uri, self.bigkey, self.bigval)
+        self.add_data(self.uri, self.bigkey, self.bigval, True)
         self.take_full_backup(self.home_full)
         self.take_incr_backup(self.home_incr)
         self.compare_backups(self.uri, self.home_full, self.home_incr, str(self.bkup_id))
@@ -147,7 +147,7 @@ class test_backup14(backup_base):
         # Insert bulk data into uri3 (table:logged_table).
         #
         self.session.create(self.uri_logged, "key_format=S,value_format=S")
-        self.add_data(self.uri_logged, self.bigkey, self.bigval)
+        self.add_data(self.uri_logged, self.bigkey, self.bigval, True)
 
         self.take_full_backup(self.home_full)
         self.take_incr_backup(self.home_incr)
@@ -157,7 +157,7 @@ class test_backup14(backup_base):
         # Insert bulk data into uri4 (table:not_logged_table).
         #
         self.session.create(self.uri_not_logged, "key_format=S,value_format=S,log=(enabled=false)")
-        self.add_data(self.uri_not_logged, self.bigkey, self.bigval)
+        self.add_data(self.uri_not_logged, self.bigkey, self.bigval, True)
 
         self.take_full_backup(self.home_full)
         self.take_incr_backup(self.home_incr)

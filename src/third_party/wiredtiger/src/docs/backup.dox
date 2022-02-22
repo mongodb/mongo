@@ -118,7 +118,8 @@ are no longer part of the backup when later incremental backups no longer
 return their name. This is especially important for WiredTiger log files
 that are no longer needed and must be removed before recovery is run.
 
-@copydoc doc_bulk_durability
+Block-based incremental backup can be performed after a bulk load, without
+an intervening full backup.
 
 The following is the procedure for incrementally backing up a database
 using block modifications:
