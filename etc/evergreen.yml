@@ -9528,7 +9528,7 @@ buildvariants:
 
 - &macos-debug-template
   name: macos-debug-suggested
-  display_name: "* Shared Library macOS DEBUG"
+  display_name: "* macOS DEBUG"
   cron: "0 */4 * * *" # Every 4 hours starting at midnight
   run_on:
   - macos-1100
@@ -9536,7 +9536,7 @@ buildvariants:
     test_flags: --excludeWithAnyTags=incompatible_with_macos
     resmoke_jobs_max: 6
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --link-model=dynamic
+    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_serial_TG
@@ -9576,7 +9576,6 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
-  - name: libdeps_graph_linting_TG
   - name: build_variant_gen
   - name: audit
   - name: auth_audit_gen
@@ -9621,7 +9620,7 @@ buildvariants:
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --link-model=dynamic --variables-files=etc/scons/xcode_macosx.vars
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 6
     num_scons_link_jobs_available: 0.99
   tasks:
@@ -9649,7 +9648,7 @@ buildvariants:
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --link-model=dynamic --variables-files=etc/scons/xcode_macosx.vars --cxx-std=20
+    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --cxx-std=20
     resmoke_jobs_max: 6
     num_scons_link_jobs_available: 0.99
   tasks:
@@ -9676,7 +9675,7 @@ buildvariants:
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: --ssl --js-engine=none -j$(sysctl -n hw.logicalcpu) --link-model=dynamic --libc++ --variables-files=etc/scons/xcode_macosx_arm.vars
+    compile_flags: --ssl --js-engine=none -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx_arm.vars
     resmoke_jobs_max: 6
     num_scons_link_jobs_available: 0.99
   tasks:
