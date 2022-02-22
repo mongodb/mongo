@@ -62,9 +62,8 @@ const awaitFirstSplitOperation = startParallelShell(
 awaitFirstSplitOperation();
 assertMigrationState(donorPrimary, firstOperationId, "aborted");
 
-jsTestLog(`Removing state document: ${tojson(firstOperationId)}`);
-// TODO(SERVER-62366): use `forgetShardSplit` instead of manually deleting the state document.
-assert.commandWorked(cleanupMigrationDocument(donorPrimary, firstOperationId));
+jsTestLog(`Running forgetShardSplit command: ${tojson(firstOperationId)}`);
+assert.commandWorked(adminDb.runCommand({forgetShardSplit: 1, migrationId: firstOperationId}));
 
 jsTestLog("Restarting replication on recipient nodes, and running new split operation");
 test.recipientNodes.forEach(node => restartServerReplication(node));
@@ -89,8 +88,8 @@ const awaitSecondSplitOperation = startParallelShell(
 awaitSecondSplitOperation();
 assertMigrationState(donorPrimary, secondOperationId, "committed");
 
-jsTestLog("Running forgetShardSplit command");
-assert.commandWorked(adminDb.runCommand({forgetShardSplit: 1, migrationId}));
+jsTestLog(`Running forgetShardSplit command: ${tojson(secondOperationId)}`);
+assert.commandWorked(adminDb.runCommand({forgetShardSplit: 1, migrationId: secondOperationId}));
 
 test.stop();
 })();

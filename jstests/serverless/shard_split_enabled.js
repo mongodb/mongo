@@ -11,18 +11,22 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/serverless/libs/basic_serverless_test.js");
 
 class ShardSplitEnabledTest extends BasicServerlessTest {
-    makeCommitShardSplitCmd() {
+    makeCommitShardSplitCmd(uuid) {
         return {
             commitShardSplit: 1,
             tenantIds: ["foo"],
-            migrationId: UUID(),
+            migrationId: uuid,
             recipientTagName: this.recipientTagName,
             recipientSetName: this.recipientSetName
         };
     }
 
-    makeAbortShardSplitCmd() {
-        return {abortShardSplit: 1, migrationId: UUID()};
+    makeAbortShardSplitCmd(uuid) {
+        return {abortShardSplit: 1, migrationId: uuid};
+    }
+
+    makeForgetShardSplitCmd(uuid) {
+        return {forgetShardSplit: 1, migrationId: uuid};
     }
 }
 
@@ -42,25 +46,38 @@ function makeShardSplitTest() {
         assert.eq(getFCVConstants().latest,
                   adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'}).version);
 
-        let res = adminDB.runCommand(test.makeCommitShardSplitCmd());
+        let commitUUID = UUID();
+        let res = adminDB.runCommand(test.makeCommitShardSplitCmd(commitUUID));
         assert.neq(res.code,
                    6057900,
                    `commitShardSplitCmd shouldn't reject when featureFlagShardSplit is enabled`);
-        res = adminDB.runCommand(test.makeAbortShardSplitCmd());
+
+        res = adminDB.runCommand(test.makeForgetShardSplitCmd(commitUUID));
+        assert.neq(res.code,
+                   6057900,
+                   `forgetShardSplit shouldn't reject when featureFlagShardSplit is enabled`);
+
+        let abortUUID = UUID();
+        res = adminDB.runCommand(test.makeAbortShardSplitCmd(abortUUID));
         assert.neq(res.code,
                    6057902,
                    `abortShardSplitCmd shouldn't reject when featureFlagShardSplit is enabled`);
+        res = adminDB.runCommand(test.makeForgetShardSplitCmd(abortUUID));
 
         assert.commandWorked(adminDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
 
         assert.commandFailedWithCode(
-            adminDB.runCommand(test.makeCommitShardSplitCmd()),
+            adminDB.runCommand(test.makeCommitShardSplitCmd(UUID())),
             6057900,
             `commitShardSplitCmd should reject when featureFlagShardSplit is disabled`);
         assert.commandFailedWithCode(
-            adminDB.runCommand(test.makeAbortShardSplitCmd()),
+            adminDB.runCommand(test.makeAbortShardSplitCmd(UUID())),
             6057902,
             `abortShardSplitCmd should reject when featureFlagShardSplit is disabled`);
+        assert.commandFailedWithCode(
+            adminDB.runCommand(test.makeForgetShardSplitCmd(UUID())),
+            6236600,
+            `forgetShardSplit should reject when featureFlagShardSplit is disabled`);
 
         // shut down replica sets
         test.stop();
