@@ -639,8 +639,11 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const HashJoinNode& n,
                                                       const ABT& leftChild,
                                                       const ABT& rightChild,
                                                       const ABT& refs) {
-    auto outerStage = generateInternal(leftChild);
-    auto innerStage = generateInternal(rightChild);
+    // Note the inner and outer sides here are reversed. The HashJoinNode assumes the build side is
+    // the inner side while sbe hash join stage assumes the build side is the outer side.
+
+    auto innerStage = generateInternal(leftChild);
+    auto outerStage = generateInternal(rightChild);
 
     uassert(6624228, "Only inner joins supported for now", n.getJoinType() == JoinType::Inner);
 
@@ -648,11 +651,11 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const HashJoinNode& n,
     const auto& rightProps = _nodeToGroupPropsMap.at(n.getRightChild().cast<Node>());
 
     // Add RID projection only from outer side.
-    auto outerKeys = convertProjectionsToSlots(n.getLeftKeys());
-    auto outerProjects = convertRequiredProjectionsToSlots(
-        leftProps, false /*removeRIDProjection*/, n.getLeftKeys());
-    auto innerKeys = convertProjectionsToSlots(n.getRightKeys());
+    auto innerKeys = convertProjectionsToSlots(n.getLeftKeys());
     auto innerProjects = convertRequiredProjectionsToSlots(
+        leftProps, false /*removeRIDProjection*/, n.getLeftKeys());
+    auto outerKeys = convertProjectionsToSlots(n.getRightKeys());
+    auto outerProjects = convertRequiredProjectionsToSlots(
         rightProps, true /*removeRIDProjection*/, n.getRightKeys());
 
     // TODO: use collator slot.

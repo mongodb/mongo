@@ -515,6 +515,7 @@ private:
 /**
  * Physical hash join node.
  * Join condition is a conjunction of pairwise equalities between corresponding left and right keys.
+ * It assumes the outer side is probe side and inner side is "build" side.
  *
  * TODO: support all join types (not just Inner).
  */
