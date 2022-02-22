@@ -117,8 +117,11 @@ jsTest.log("Split chunks while defragmenting");
     const chunks = findChunksUtil.findChunksByNs(st.config, nss).toArray();
     assert.eq(1, chunks.length);
     assert.commandWorked(st.s.adminCommand({split: nss, middle: {skey: 0}}));
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: nss, find: {skey: 0}, to: st.getOther(chunks[0]['shard']).name}));
+
+    const primaryShard = st.getPrimaryShard(coll.getDB().getName());
+    assert.eq(st.normalize(primaryShard.name), st.normalize(chunks[0]['shard']));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: nss, find: {skey: 0}, to: st.getOther(primaryShard).name}));
 
     // Pause defragmentation after initialization but before phase 1 runs
     setFailPointOnConfigNodes("afterBuildingNextDefragmentationPhase", {skip: 1});
