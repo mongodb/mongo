@@ -61,7 +61,8 @@ function setupCollection() {
                                                    targetChunkSizeMB / 2 /* maxChunkFillMB */,
                                                    0 /* numZones */,
                                                    32 * 1024 /* docSizeBytes */,
-                                                   1000 /* chunkSpacing */);
+                                                   1000 /* chunkSpacing */,
+                                                   false /* disableCollectionBalancing */);
     jsTest.log("Collection " + coll.getFullName() + ", number of chunks before defragmentation: " +
                findChunksUtil.countChunksForNs(st.s.getDB('config'), coll.getFullName()));
     return coll;

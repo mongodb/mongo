@@ -1,12 +1,23 @@
 var defragmentationUtil = (function() {
     load("jstests/sharding/libs/find_chunks_util.js");
 
-    let createFragmentedCollection = function(
-        mongos, ns, numChunks, maxChunkFillMB, numZones, docSizeBytes, chunkSpacing) {
+    let createFragmentedCollection = function(mongos,
+                                              ns,
+                                              numChunks,
+                                              maxChunkFillMB,
+                                              numZones,
+                                              docSizeBytes,
+                                              chunkSpacing,
+                                              disableCollectionBalancing) {
         jsTest.log("Creating fragmented collection " + ns + " with parameters: numChunks = " +
                    numChunks + ", numZones = " + numZones + ", docSizeBytes = " + docSizeBytes +
                    ", maxChunkFillMB = " + maxChunkFillMB + ", chunkSpacing = " + chunkSpacing);
         assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {key: 1}}));
+        // Turn off balancer for this collection
+        if (disableCollectionBalancing) {
+            assert.commandWorked(
+                mongos.getDB('config').collections.update({_id: ns}, {$set: {"noBalance": true}}));
+        }
 
         createAndDistributeChunks(mongos, ns, numChunks, chunkSpacing);
         createRandomZones(mongos, ns, numZones, chunkSpacing);
@@ -147,7 +158,7 @@ var defragmentationUtil = (function() {
         const tags = mongos.getDB('config')
                          .tags.find({ns: ns, min: {$lte: minKey}, max: {$gte: maxKey}})
                          .toArray();
-        assert.leq(tags.length, 1);
+        assert.lte(tags.length, 1);
         if (tags.length === 1) {
             return tags[0].tag;
         }
@@ -168,6 +179,7 @@ var defragmentationUtil = (function() {
     return {
         createFragmentedCollection,
         checkPostDefragmentationState,
+        getZoneForRange,
         waitForEndOfDefragmentation,
     };
 })();
