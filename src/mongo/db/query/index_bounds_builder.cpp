@@ -577,6 +577,18 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             return;
         }
 
+        if (MatchExpression::MATCH_IN == child->matchType()) {
+            auto ime = static_cast<const InMatchExpression*>(child);
+            if (QueryPlannerIXSelect::canUseIndexForNin(ime)) {
+                makeNullEqualityBounds(index, isHashed, oilOut, tightnessOut);
+                oilOut->intervals.push_back(IndexBoundsBuilder::kEmptyArrayPointInterval);
+                oilOut->complement();
+                unionize(oilOut);
+                *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+                return;
+            }
+        }
+
         _translatePredicate(child, elt, index, oilOut, tightnessOut);
         oilOut->complement();
 

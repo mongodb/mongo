@@ -84,8 +84,13 @@ Status filterMatches(const BSONObj& testFilter,
         return statusWithMatcher.getStatus().withContext(
             "match expression provided by the test did not parse successfully");
     }
-    const std::unique_ptr<MatchExpression> root = std::move(statusWithMatcher.getValue());
+    std::unique_ptr<MatchExpression> root = std::move(statusWithMatcher.getValue());
     MatchExpression::sortTree(root.get());
+    if (root->matchType() == mongo::MatchExpression::NOT) {
+        // Ideally we would optimize() everything, but some of the tests depend on structural
+        // equivalence of single-arg $or expressions.
+        root = MatchExpression::optimize(std::move(root));
+    }
     std::unique_ptr<MatchExpression> trueFilter(trueFilterNode->filter->shallowClone());
     MatchExpression::sortTree(trueFilter.get());
     if (trueFilter->equivalent(root.get())) {
