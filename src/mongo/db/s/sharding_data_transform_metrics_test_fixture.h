@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
+#include "mongo/db/s/sharding_data_transform_instance_metrics.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"
@@ -69,6 +70,10 @@ class ShardingDataTransformMetricsTestFixture : public unittest::Test {
 protected:
     constexpr static int64_t kYoungestTime = std::numeric_limits<int64_t>::max();
     constexpr static int64_t kOldestTime = 1;
+    using Role = ShardingDataTransformInstanceMetrics::Role;
+    const NamespaceString kTestNamespace = NamespaceString("test.source");
+    const BSONObj kTestCommand = BSON("command"
+                                      << "test");
 
     ShardingDataTransformMetricsTestFixture() : _cumulativeMetrics{"testMetrics"} {}
 

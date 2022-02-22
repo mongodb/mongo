@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/sharding_data_transform_metrics_observer_interface.h"
 
@@ -36,16 +37,64 @@ namespace mongo {
 
 class ShardingDataTransformInstanceMetrics {
 public:
+    enum Role { kCoordinator, kDonor, kRecipient };
     using ObserverPtr = std::unique_ptr<ShardingDataTransformMetricsObserverInterface>;
 
-    ShardingDataTransformInstanceMetrics(ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
-    ShardingDataTransformInstanceMetrics(ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
-                                         ObserverPtr observer);
-    ~ShardingDataTransformInstanceMetrics();
+    ShardingDataTransformInstanceMetrics(UUID instanceId,
+                                         BSONObj originalCommand,
+                                         NamespaceString sourceNs,
+                                         Role role,
+                                         ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
 
+    ShardingDataTransformInstanceMetrics(UUID instanceId,
+                                         NamespaceString sourceNs,
+                                         Role role,
+                                         BSONObj originalCommand,
+                                         ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+                                         ObserverPtr observer);
+    virtual ~ShardingDataTransformInstanceMetrics();
+
+    BSONObj reportForCurrentOp() const noexcept;
+    static StringData getRoleName(Role role);
     int64_t getRemainingTimeMillis() const;
     int64_t getStartTimestamp() const;
     const UUID& getUuid() const;
+
+protected:
+    virtual std::string createOperationDescription() const noexcept;
+    UUID _instanceId;
+    NamespaceString _sourceNs;
+    Role _role;
+    BSONObj _originalCommand;
+    static constexpr auto kType = "type";
+    static constexpr auto kDescription = "desc";
+    static constexpr auto kNamespace = "ns";
+    static constexpr auto kOp = "command";
+    static constexpr auto kOriginalCommand = "originalCommand";
+    static constexpr auto kOpTimeElapsed = "totalOperationTimeElapsedSecs";
+    static constexpr auto kCriticalSectionTimeElapsed = "totalCriticalSectionTimeElapsedSecs";
+    static constexpr auto kRemainingOpTimeEstimated = "remainingOperationTimeEstimatedSecs";
+    static constexpr auto kApplyTimeElapsed = "totalApplyTimeElapsedSecs";
+    static constexpr auto kCopyTimeElapsed = "totalCopyTimeElapsedSecs";
+    static constexpr auto kApproxDocumentsToCopy = "approxDocumentsToCopy";
+    static constexpr auto kApproxBytesToCopy = "approxBytesToCopy";
+    static constexpr auto kBytesCopied = "bytesCopied";
+    static constexpr auto kCountWritesToStashCollections = "countWritesToStashCollections";
+    static constexpr auto kInsertsApplied = "insertsApplied";
+    static constexpr auto kUpdatesApplied = "updatesApplied";
+    static constexpr auto kDeletesApplied = "deletesApplied";
+    static constexpr auto kOplogEntriesApplied = "oplogEntriesApplied";
+    static constexpr auto kOplogEntriesFetched = "oplogEntriesFetched";
+    static constexpr auto kDocumentsCopied = "documentsCopied";
+    static constexpr auto kCountWritesDuringCriticalSection = "countWritesDuringCriticalSection";
+    static constexpr auto kCountReadsDuringCriticalSection = "countReadsDuringCriticalSection";
+    static constexpr auto kCoordinatorState = "coordinatorState";
+    static constexpr auto kDonorState = "donorState";
+    static constexpr auto kRecipientState = "recipientState";
+    static constexpr auto kAllShardsLowestRemainingOperationTimeEstimatedSecs =
+        "allShardsLowestRemainingOperationTimeEstimatedSecs";
+    static constexpr auto kAllShardsHighestRemainingOperationTimeEstimatedSecs =
+        "allShardsHighestRemainingOperationTimeEstimatedSecs";
 
 private:
     ObserverPtr _observer;

@@ -32,18 +32,53 @@
 
 namespace {
 constexpr int64_t kPlaceholderTimestampForTesting = 0;
-}
+constexpr auto TEMP_VALUE = "placeholder";
+
+}  // namespace
 
 namespace mongo {
 
-ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
-    ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
-    : ShardingDataTransformInstanceMetrics{
-          cumulativeMetrics, std::make_unique<ShardingDataTransformMetricsObserver>(this)} {}
+namespace {
+const stdx::unordered_map<ShardingDataTransformInstanceMetrics::Role, StringData> roleToName = {
+    {ShardingDataTransformInstanceMetrics::kCoordinator, "Coordinator"_sd},
+    {ShardingDataTransformInstanceMetrics::kDonor, "Donor"_sd},
+    {ShardingDataTransformInstanceMetrics::kRecipient, "Recipient"_sd},
+};
+}
+
+StringData ShardingDataTransformInstanceMetrics::getRoleName(Role role) {
+    auto it = roleToName.find(role);
+    invariant(it != roleToName.end());
+    return it->second;
+}
 
 ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
-    ShardingDataTransformCumulativeMetrics* cumulativeMetrics, ObserverPtr observer)
-    : _observer{std::move(observer)},
+    UUID instanceId,
+    BSONObj originalCommand,
+    NamespaceString sourceNs,
+    Role role,
+
+    ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
+    : ShardingDataTransformInstanceMetrics{
+          std::move(instanceId),
+          std::move(sourceNs),
+          role,
+          std::move(originalCommand),
+          cumulativeMetrics,
+          std::make_unique<ShardingDataTransformMetricsObserver>(this)} {}
+
+ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
+    UUID instanceId,
+    NamespaceString sourceNs,
+    Role role,
+    BSONObj originalCommand,
+    ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+    ObserverPtr observer)
+    : _instanceId{std::move(instanceId)},
+      _sourceNs{std::move(sourceNs)},
+      _role{role},
+      _originalCommand{std::move(originalCommand)},
+      _observer{std::move(observer)},
       _cumulativeMetrics{cumulativeMetrics},
       _deregister{_cumulativeMetrics->registerInstanceMetrics(_observer.get())},
       _placeholderUuidForTesting(UUID::gen()) {}
@@ -64,6 +99,60 @@ int64_t ShardingDataTransformInstanceMetrics::getStartTimestamp() const {
 
 const UUID& ShardingDataTransformInstanceMetrics::getUuid() const {
     return _placeholderUuidForTesting;
+}
+
+std::string ShardingDataTransformInstanceMetrics::createOperationDescription() const noexcept {
+
+    return fmt::format(
+        "ShardingDataTransformMetrics{}Service {}", getRoleName(_role), _instanceId.toString());
+}
+
+BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcept {
+
+    BSONObjBuilder builder;
+    builder.append(kType, "op");
+    builder.append(kDescription, createOperationDescription());
+    builder.append(kOp, "command");
+    builder.append(kNamespace, _sourceNs.toString());
+    builder.append(kOriginalCommand, _originalCommand);
+    builder.append(kOpTimeElapsed, TEMP_VALUE);
+
+    switch (_role) {
+        case Role::kCoordinator:
+            builder.append(kAllShardsHighestRemainingOperationTimeEstimatedSecs, TEMP_VALUE);
+            builder.append(kAllShardsLowestRemainingOperationTimeEstimatedSecs, TEMP_VALUE);
+            builder.append(kCoordinatorState, TEMP_VALUE);
+            builder.append(kApplyTimeElapsed, TEMP_VALUE);
+            builder.append(kCopyTimeElapsed, TEMP_VALUE);
+            builder.append(kCriticalSectionTimeElapsed, TEMP_VALUE);
+            break;
+        case Role::kDonor:
+            builder.append(kDonorState, TEMP_VALUE);
+            builder.append(kCriticalSectionTimeElapsed, TEMP_VALUE);
+            builder.append(kCountWritesDuringCriticalSection, TEMP_VALUE);
+            builder.append(kCountReadsDuringCriticalSection, TEMP_VALUE);
+            break;
+        case Role::kRecipient:
+            builder.append(kRecipientState, TEMP_VALUE);
+            builder.append(kApplyTimeElapsed, TEMP_VALUE);
+            builder.append(kCopyTimeElapsed, TEMP_VALUE);
+            builder.append(kRemainingOpTimeEstimated, TEMP_VALUE);
+            builder.append(kApproxDocumentsToCopy, TEMP_VALUE);
+            builder.append(kApproxBytesToCopy, TEMP_VALUE);
+            builder.append(kBytesCopied, TEMP_VALUE);
+            builder.append(kCountWritesToStashCollections, TEMP_VALUE);
+            builder.append(kInsertsApplied, TEMP_VALUE);
+            builder.append(kUpdatesApplied, TEMP_VALUE);
+            builder.append(kDeletesApplied, TEMP_VALUE);
+            builder.append(kOplogEntriesApplied, TEMP_VALUE);
+            builder.append(kOplogEntriesFetched, TEMP_VALUE);
+            builder.append(kDocumentsCopied, TEMP_VALUE);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+
+    return builder.obj();
 }
 
 }  // namespace mongo
