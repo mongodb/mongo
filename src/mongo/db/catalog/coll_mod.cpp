@@ -310,7 +310,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             cmr.viewOn = e.str();
         } else if (fieldName == "recordPreImages" && !isView && !isTimeseries) {
             cmr.recordPreImages = e.trueValue();
-        } else if (fieldName == "expireAfterSeconds") {
+        } else if (fieldName == "expireAfterSeconds" && !isView) {
             if (coll->getRecordStore()->keyFormat() != KeyFormat::String) {
                 return Status(ErrorCodes::InvalidOptions,
                               "'expireAfterSeconds' option is only supported on collections "
