@@ -67,13 +67,22 @@ public:
     }
 
     void finishWaitingOneOpTime() {
-        stdx::unique_lock<Latch> lk(_mutex);
-        _isTestReady = true;
-        _isTestReadyCV.notify_one();
+        // There is a safe race condition in WaitForMajorityService where
+        // _periodicallyWaitForMajority can grab the mutex after the request has been marked as
+        // processed, but before it is removed from the queue. In this case, _isTestReady will
+        // flip without actually progressing through an OpTime, so we do the additional OpTime
+        // check.
+        auto opTimeBefore = _lastOpTimeWaited;
 
-        while (_isTestReady) {
-            _finishWaitingOneOpTimeCV.wait(lk);
-        }
+        do {
+            stdx::unique_lock<Latch> lk(_mutex);
+            _isTestReady = true;
+            _isTestReadyCV.notify_one();
+
+            while (_isTestReady) {
+                _finishWaitingOneOpTimeCV.wait(lk);
+            }
+        } while (_lastOpTimeWaited == opTimeBefore);
     }
 
     Status waitForWriteConcernStub(OperationContext* opCtx, const repl::OpTime& opTime) {
