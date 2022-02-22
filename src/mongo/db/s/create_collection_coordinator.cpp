@@ -39,6 +39,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
@@ -377,6 +378,46 @@ void broadcastDropCollection(OperationContext* opCtx,
         opCtx, nss, participants, executor, osi);
 }
 
+
+/**
+ * This function writes a no-op oplog entry on shardCollection event.
+ */
+void _writeOplogMessage(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const UUID& uuid,
+                        const BSONObj cmd) {
+
+
+    BSONObjBuilder cmdBuilder;
+    BSONObj shardCollCmd = BSON("shardCollection" << nss.ns());
+
+    cmdBuilder.appendElements(shardCollCmd);
+    cmdBuilder.appendElements(cmd);
+
+    BSONObj fullCmd = cmdBuilder.obj();
+
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+    oplogEntry.setNss(nss);
+    oplogEntry.setUuid(uuid);
+    oplogEntry.setObject(BSON("msg" << BSON("shardCollection" << nss.ns())));
+    oplogEntry.setObject2(fullCmd);
+    oplogEntry.setOpTime(repl::OpTime());
+    oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+
+    writeConflictRetry(
+        opCtx, "ShardCollectionWritesOplog", NamespaceString::kRsOplogNamespace.ns(), [&] {
+            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+            WriteUnitOfWork wunit(opCtx);
+            const auto& oplogOpTime = repl::logOp(opCtx, &oplogEntry);
+            uassert(8423339,
+                    str::stream() << "Failed to create new oplog entry for oplog with opTime: "
+                                  << oplogEntry.getOpTime().toString() << ": "
+                                  << redact(oplogEntry.toBSON()),
+                    !oplogOpTime.isNull());
+            wunit.commit();
+        });
+}
 }  // namespace
 
 CreateCollectionCoordinator::CreateCollectionCoordinator(ShardingDDLCoordinatorService* service,
@@ -566,7 +607,6 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
             auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
-
             _logEndCreateCollection(opCtx);
         })
         .onError([this, anchor = shared_from_this()](const Status& status) {
@@ -859,6 +899,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
     }
 
     _doc = _updateSession(opCtx, _doc);
+    _writeOplogMessage(opCtx, nss(), *_collectionUUID, _doc.getCreateCollectionRequest().toBSON());
     updateCatalogEntry(opCtx, nss(), coll, getCurrentSession(_doc));
 }
 
