@@ -407,7 +407,7 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }
-        } else if (fieldName == "expireAfterSeconds") {
+        } else if (fieldName == "expireAfterSeconds" && !isView) {
             cmr.numModifications++;
             if (coll->getRecordStore()->keyFormat() != KeyFormat::String) {
                 return Status(ErrorCodes::InvalidOptions,

@@ -166,6 +166,12 @@ assert.commandFailedWithCode(
     "BSON field 'collMod.pipeline' is the wrong type 'object', expected type 'array'");
 clear();
 
+// Check that collMod disallows the 'expireAfterSeconds' option over a view.
+makeView("a", "b");
+assert.commandFailedWithCode(viewsDb.runCommand({collMod: "a", expireAfterSeconds: 1}),
+                             ErrorCodes.InvalidOptions);
+clear();
+
 // Check that invalid pipelines are disallowed. The following $lookup is missing the 'as' field.
 makeView("a",
          "b",
