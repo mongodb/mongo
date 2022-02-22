@@ -42,6 +42,8 @@ class test_s3_store01(wttest.WiredTigerTestCase):
 
     fs_config = 'prefix=' + prefix
 
+    fs_config += ',region=ap-southeast-2'
+
     # Bucket name can be overridden by an environment variable.
     bucket_name = os.getenv('WT_S3_EXT_BUCKET')
     if bucket_name is None:
