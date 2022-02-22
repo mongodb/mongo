@@ -12,15 +12,16 @@
     'use strict';
     const defaultOptions = {noCleanData: true};
 
-    let mongodOptions5dot1 = Object.extend(
-        {binVersion: '5.2', setParameter: 'featureFlagClusteredIndexes=true'}, defaultOptions);
+    let mongodOptionsLastContinuous = Object.extend(
+        {binVersion: 'last-continuous', setParameter: 'featureFlagClusteredIndexes=true'},
+        defaultOptions);
     let mongodOptionsLatest = Object.extend({binVersion: 'latest'}, defaultOptions);
 
     load("jstests/noPassthrough/libs/index_build.js");
 
     const dbName = "test";
 
-    const rst = new ReplSetTest({nodes: 1, nodeOptions: mongodOptions5dot1});
+    const rst = new ReplSetTest({nodes: 1, nodeOptions: mongodOptionsLastContinuous});
     rst.startSet();
     rst.initiate();
 
