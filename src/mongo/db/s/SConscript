@@ -286,6 +286,8 @@ env.Library(
         'clone_collection_options_from_primary_shard_cmd.cpp',
         'collmod_coordinator.cpp',
         'collmod_coordinator_document.idl',
+        'config/set_cluster_parameter_coordinator.cpp',
+        'config/set_cluster_parameter_coordinator_document.idl',
         'config/set_user_write_block_mode_coordinator.cpp',
         'config/set_user_write_block_mode_coordinator_document.idl',
         'config/configsvr_abort_reshard_collection_command.cpp',
