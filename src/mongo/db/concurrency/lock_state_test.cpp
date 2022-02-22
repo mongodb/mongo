@@ -339,7 +339,7 @@ TEST_F(LockerImplTest, saveAndRestoreDBAndCollection) {
     // Lock some stuff.
     locker.lockGlobal(opCtx.get(), MODE_IX);
     locker.lock(resIdDatabase, MODE_IX);
-    locker.lock(resIdCollection, MODE_X);
+    locker.lock(resIdCollection, MODE_IX);
     locker.saveLockStateAndUnlock(&lockInfo);
 
     // Things shouldn't be locked anymore.
@@ -351,7 +351,7 @@ TEST_F(LockerImplTest, saveAndRestoreDBAndCollection) {
 
     // Make sure things were re-locked.
     ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdDatabase));
-    ASSERT_EQUALS(MODE_X, locker.getLockMode(resIdCollection));
+    ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdCollection));
 
     ASSERT(locker.unlockGlobal());
 }
@@ -370,7 +370,7 @@ TEST_F(LockerImplTest, releaseWriteUnitOfWork) {
     // Lock some stuff.
     locker.lockGlobal(opCtx.get(), MODE_IX);
     locker.lock(resIdDatabase, MODE_IX);
-    locker.lock(resIdCollection, MODE_X);
+    locker.lock(resIdCollection, MODE_IX);
     // Unlock them so that they will be pending to unlock.
     ASSERT_FALSE(locker.unlock(resIdCollection));
     ASSERT_FALSE(locker.unlock(resIdDatabase));
@@ -400,7 +400,7 @@ TEST_F(LockerImplTest, restoreWriteUnitOfWork) {
     // Lock some stuff.
     locker.lockGlobal(opCtx.get(), MODE_IX);
     locker.lock(resIdDatabase, MODE_IX);
-    locker.lock(resIdCollection, MODE_X);
+    locker.lock(resIdCollection, MODE_IX);
     // Unlock them so that they will be pending to unlock.
     ASSERT_FALSE(locker.unlock(resIdCollection));
     ASSERT_FALSE(locker.unlock(resIdDatabase));
@@ -418,7 +418,7 @@ TEST_F(LockerImplTest, restoreWriteUnitOfWork) {
 
     // Make sure things were re-locked.
     ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdDatabase));
-    ASSERT_EQUALS(MODE_X, locker.getLockMode(resIdCollection));
+    ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdCollection));
     ASSERT(locker.isLocked());
 
     locker.endWriteUnitOfWork();
@@ -624,15 +624,15 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithRecursiveLocks) {
     // Lock some stuff.
     locker.lockGlobal(opCtx.get(), MODE_IX);
     locker.lock(resIdDatabase, MODE_IX);
-    locker.lock(resIdCollection, MODE_X);
+    locker.lock(resIdCollection, MODE_IX);
     // Recursively lock them again with a weaker mode.
     locker.lockGlobal(opCtx.get(), MODE_IS);
     locker.lock(resIdDatabase, MODE_IS);
-    locker.lock(resIdCollection, MODE_S);
+    locker.lock(resIdCollection, MODE_IS);
 
     // Make sure locks are converted.
     ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdDatabase));
-    ASSERT_EQUALS(MODE_X, locker.getLockMode(resIdCollection));
+    ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdCollection));
     ASSERT_TRUE(locker.isWriteLocked());
     ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->recursiveCount, 2U);
     ASSERT_EQ(locker.getRequestsForTest().find(resIdDatabase).objAddr()->recursiveCount, 2U);
@@ -644,7 +644,7 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithRecursiveLocks) {
     ASSERT_FALSE(locker.unlockGlobal());
     // Make sure locks are still acquired in the correct mode.
     ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdDatabase));
-    ASSERT_EQUALS(MODE_X, locker.getLockMode(resIdCollection));
+    ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdCollection));
     ASSERT_TRUE(locker.isWriteLocked());
     // Make sure unlocking converted locks decrements the locks' recursiveCount instead of
     // incrementing unlockPending.
@@ -678,7 +678,7 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithRecursiveLocks) {
 
     // Make sure things were re-locked in the correct mode.
     ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdDatabase));
-    ASSERT_EQUALS(MODE_X, locker.getLockMode(resIdCollection));
+    ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdCollection));
     ASSERT_TRUE(locker.isWriteLocked());
     // Make sure locks were coalesced after restore and are pending to unlock as before.
     ASSERT_EQ(locker.getRequestsForTest().find(resourceIdGlobal).objAddr()->recursiveCount, 1U);

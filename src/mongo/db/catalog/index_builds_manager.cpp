@@ -109,6 +109,8 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
         builder->ignoreUniqueConstraint();
     }
 
+    builder->setIndexBuildMethod(options.method);
+
     std::vector<BSONObj> indexes;
     try {
         indexes = writeConflictRetry(opCtx, "IndexBuildsManager::setUpIndexBuild", nss.ns(), [&]() {

@@ -75,6 +75,13 @@ CollectionBulkLoaderImpl::~CollectionBulkLoaderImpl() {
 
 Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndexSpecs) {
     return _runTaskReleaseResourcesOnFailure([&secondaryIndexSpecs, this]() -> Status {
+        // This method is called during initial sync of a replica set member, so we can safely tell
+        // the index builders to build in the foreground instead of using the hybrid approach. The
+        // member won't be available to be queried by anyone until it's caught up with the primary.
+        // The only reason to do this is to force the index document insertion to not yield the
+        // locks as yielding a MODE_X/MODE_S lock isn't allowed.
+        _secondaryIndexesBlock->setIndexBuildMethod(IndexBuildMethod::kForeground);
+        _idIndexBlock->setIndexBuildMethod(IndexBuildMethod::kForeground);
         return writeConflictRetry(
             _opCtx.get(),
             "CollectionBulkLoader::init",
@@ -285,20 +292,6 @@ Status CollectionBulkLoaderImpl::commit() {
                             return Status::OK();
                         });
                 });
-            if (!status.isOK()) {
-                return status;
-            }
-
-            status = _idIndexBlock->drainBackgroundWrites(
-                _opCtx.get(),
-                RecoveryUnit::ReadSource::kNoTimestamp,
-                _nss.isSystemDotViews() ? IndexBuildInterceptor::DrainYieldPolicy::kNoYield
-                                        : IndexBuildInterceptor::DrainYieldPolicy::kYield);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            status = _idIndexBlock->checkConstraints(_opCtx.get(), _collection->getCollection());
             if (!status.isOK()) {
                 return status;
             }

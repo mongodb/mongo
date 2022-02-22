@@ -100,9 +100,11 @@ Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, 
 }
 
 Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj& spec) {
-    AutoGetDb autoDb(opCtx, nsToDatabaseSubstring(ns), MODE_X);
+    NamespaceString nss(ns);
+    AutoGetDb autoDb(opCtx, nsToDatabaseSubstring(ns), MODE_IX);
     Collection* coll;
     {
+        Lock::CollectionLock collLock(opCtx, nss, MODE_X);
         WriteUnitOfWork wunit(opCtx);
         coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
             opCtx, CollectionCatalog::LifetimeMode::kInplace, NamespaceString(ns));
@@ -116,42 +118,55 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     }
     MultiIndexBlock indexer;
     CollectionWriter collection(coll);
-    ScopeGuard abortOnExit(
-        [&] { indexer.abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn); });
-    Status status = indexer
-                        .init(opCtx,
-                              collection,
-                              spec,
-                              [opCtx](const std::vector<BSONObj>& specs) -> Status {
-                                  if (opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
-                                      return opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1));
-                                  }
-                                  return Status::OK();
-                              })
-                        .getStatus();
-    if (status == ErrorCodes::IndexAlreadyExists) {
-        return Status::OK();
+    ScopeGuard abortOnExit([&] {
+        Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+        indexer.abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
+    });
+    auto status = Status::OK();
+    {
+        Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+        status = indexer
+                     .init(opCtx,
+                           collection,
+                           spec,
+                           [opCtx](const std::vector<BSONObj>& specs) -> Status {
+                               if (opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
+                                   return opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1));
+                               }
+                               return Status::OK();
+                           })
+                     .getStatus();
+        if (status == ErrorCodes::IndexAlreadyExists) {
+            return Status::OK();
+        }
+        if (!status.isOK()) {
+            return status;
+        }
     }
-    if (!status.isOK()) {
-        return status;
+    {
+        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+        status = indexer.insertAllDocumentsInCollection(opCtx, coll);
+        if (!status.isOK()) {
+            return status;
+        }
     }
-    status = indexer.insertAllDocumentsInCollection(opCtx, coll);
-    if (!status.isOK()) {
-        return status;
+    {
+        Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+        status = indexer.retrySkippedRecords(opCtx, coll);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = indexer.checkConstraints(opCtx, coll);
+        if (!status.isOK()) {
+            return status;
+        }
+        WriteUnitOfWork wunit(opCtx);
+        ASSERT_OK(indexer.commit(
+            opCtx, coll, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
+        ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
+        wunit.commit();
     }
-    status = indexer.retrySkippedRecords(opCtx, coll);
-    if (!status.isOK()) {
-        return status;
-    }
-    status = indexer.checkConstraints(opCtx, coll);
-    if (!status.isOK()) {
-        return status;
-    }
-    WriteUnitOfWork wunit(opCtx);
-    ASSERT_OK(indexer.commit(
-        opCtx, coll, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
-    ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
-    wunit.commit();
     abortOnExit.dismiss();
     return Status::OK();
 }

@@ -1590,6 +1590,9 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
         auto onInitFn = MultiIndexBlock::makeTimestampedIndexOnInitFn(opCtx, collection.get());
         IndexBuildsManager::SetupOptions options;
         options.indexConstraints = indexConstraints;
+        // As the caller has a MODE_X lock on the collection, we can safely assume they want to
+        // build the index in the foreground instead of yielding during element insertion.
+        options.method = IndexBuildMethod::kForeground;
         uassertStatusOK(_indexBuildsManager.setUpIndexBuild(
             opCtx, collection, {spec}, buildUUID, onInitFn, options));
     } catch (DBException& ex) {
@@ -1617,17 +1620,6 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
         _indexBuildsManager.abortIndexBuild(opCtx, collection, buildUUID, onCleanUpFn);
     });
     uassertStatusOK(_indexBuildsManager.startBuildingIndex(opCtx, collection.get(), buildUUID));
-
-    // Retry indexing records that failed key generation, but only if we are primary. Secondaries
-    // rely on the primary's decision to commit as assurance that it has checked all key generation
-    // errors on its behalf.
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->canAcceptWritesFor(opCtx, nss)) {
-        uassertStatusOK(
-            _indexBuildsManager.retrySkippedRecords(opCtx, buildUUID, collection.get()));
-    }
-    uassertStatusOK(
-        _indexBuildsManager.checkIndexConstraintViolations(opCtx, collection.get(), buildUUID));
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     auto onCreateEachFn = [&](const BSONObj& spec) {

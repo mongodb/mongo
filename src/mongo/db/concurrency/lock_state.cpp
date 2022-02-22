@@ -746,7 +746,8 @@ boost::optional<Locker::LockerInfo> LockerImpl::getLockerInfo(
 bool LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
     // We shouldn't be saving and restoring lock state from inside a WriteUnitOfWork.
     invariant(!inAWriteUnitOfWork());
-
+    invariant(!(_modeForTicket == MODE_S || _modeForTicket == MODE_X),
+              "Yielding a strong global MODE_X/MODE_S lock is forbidden");
     // Clear out whatever is in stateOut.
     stateOut->locks.clear();
     stateOut->globalMode = MODE_NONE;
@@ -796,7 +797,10 @@ bool LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
         OneLock info;
         info.resourceId = resId;
         info.mode = it->mode;
-
+        invariant(
+            !(info.mode == MODE_S || info.mode == MODE_X),
+            str::stream() << "Yielding a strong MODE_X/MODE_S lock is forbidden. ResourceId was "
+                          << resId.toString());
         stateOut->locks.push_back(info);
 
         invariant(unlock(resId));

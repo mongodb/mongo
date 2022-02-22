@@ -72,6 +72,7 @@ public:
         SetupOptions();
         IndexConstraints indexConstraints = IndexConstraints::kEnforce;
         IndexBuildProtocol protocol = IndexBuildProtocol::kSinglePhase;
+        IndexBuildMethod method = IndexBuildMethod::kHybrid;
     };
 
     IndexBuildsManager() = default;
