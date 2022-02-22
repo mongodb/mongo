@@ -134,12 +134,14 @@ S3Connection::GetObject(const std::string &objectKey, const std::string &path) c
 
 /*
  * ObjectExists --
- *     Checks whether an object with the given key exists in the S3 bucket.
+ *     Checks whether an object with the given key exists in the S3 bucket and also retrieves
+ *     size of the object.
  */
 int
-S3Connection::ObjectExists(const std::string &objectKey, bool &exists) const
+S3Connection::ObjectExists(const std::string &objectKey, bool &exists, size_t &objectSize) const
 {
     exists = false;
+    objectSize = 0;
 
     Aws::S3Crt::Model::HeadObjectRequest request;
     request.SetBucket(_bucketName);
@@ -152,6 +154,7 @@ S3Connection::ObjectExists(const std::string &objectKey, bool &exists) const
      */
     if (outcome.IsSuccess()) {
         exists = true;
+        objectSize = outcome.GetResult().GetContentLength();
         return (0);
     } else if (outcome.GetError().GetResponseCode() == Aws::Http::HttpResponseCode::NOT_FOUND)
         return (0);
