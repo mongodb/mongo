@@ -460,8 +460,11 @@ public:
                     }
                 }
 
-                const auto availableDirections = indexSatisfiesCollation(
-                    indexDef.getCollationSpec(), candidateIndexEntry, requiredCollation);
+                const auto availableDirections =
+                    indexSatisfiesCollation(indexDef.getCollationSpec(),
+                                            candidateIndexEntry,
+                                            requiredCollation,
+                                            ridProjName);
                 if (!availableDirections._forward && !availableDirections._backward) {
                     // Failed to satisfy collation.
                     continue;
@@ -719,9 +722,9 @@ public:
 
         // Split collation between inner and outer side.
         const CollationSplitResult& collationLeftRightSplit =
-            splitCollationSpec(collationSpec, leftProjections, rightProjections);
+            splitCollationSpec(ridProjName, collationSpec, leftProjections, rightProjections);
         const CollationSplitResult& collationRightLeftSplit =
-            splitCollationSpec(collationSpec, rightProjections, leftProjections);
+            splitCollationSpec(ridProjName, collationSpec, rightProjections, leftProjections);
 
         // We are propagating the distribution requirements to both sides.
         PhysProps leftPhysProps = _physProps;
@@ -1092,7 +1095,8 @@ private:
     IndexAvailableDirections indexSatisfiesCollation(
         const IndexCollationSpec& indexCollationSpec,
         const CandidateIndexEntry& candidateIndexEntry,
-        const ProjectionCollationSpec& requiredCollationSpec) {
+        const ProjectionCollationSpec& requiredCollationSpec,
+        const ProjectionName& ridProjName) {
         if (requiredCollationSpec.empty()) {
             return {true, true};
         }
@@ -1102,48 +1106,62 @@ private:
         bool indexSuitable = true;
         const auto& fieldProjections = candidateIndexEntry._fieldProjectionMap._fieldProjections;
 
-        // Verify the index is compatible with our collation requirement, and can deliver the right
-        // order of paths.
-        for (size_t indexField = 0; indexField < indexCollationSpec.size(); indexField++) {
-            const bool needsCollation = candidateIndexEntry._fieldsToCollate.count(indexField) > 0;
+        const auto updateDirectionsFn = [&result](const CollationOp availableOp,
+                                                  const CollationOp reqOp) {
+            result._forward &= collationOpsCompatible(availableOp, reqOp);
+            result._backward &= collationOpsCompatible(reverseCollationOp(availableOp), reqOp);
+        };
 
-            auto it = fieldProjections.find(encodeIndexKeyName(indexField));
-            if (it == fieldProjections.cend()) {
-                // No bound projection for this index field.
-                if (needsCollation) {
-                    // We cannot satisfy the rest of the collation requirements.
+        // Verify the index is compatible with our collation requirement, and can deliver the right
+        // order of paths. Note: we are iterating to index one past the size. We assume there is an
+        // implicit rid index field which is collated in increasing order.
+        for (size_t indexField = 0; indexField < indexCollationSpec.size() + 1; indexField++) {
+            const auto& [reqProjName, reqOp] = requiredCollationSpec.at(collationSpecIndex);
+
+            if (indexField < indexCollationSpec.size()) {
+                const bool needsCollation =
+                    candidateIndexEntry._fieldsToCollate.count(indexField) > 0;
+
+                auto it = fieldProjections.find(encodeIndexKeyName(indexField));
+                if (it == fieldProjections.cend()) {
+                    // No bound projection for this index field.
+                    if (needsCollation) {
+                        // We cannot satisfy the rest of the collation requirements.
+                        indexSuitable = false;
+                        break;
+                    }
+                    continue;
+                }
+                const ProjectionName& projName = it->second;
+
+                if (!needsCollation) {
+                    // We do not need to collate this field because of equality.
+                    if (requiredCollationSpec.at(collationSpecIndex).first == projName) {
+                        // We can satisfy the next collation requirement independent of collation
+                        // op.
+                        if (++collationSpecIndex >= requiredCollationSpec.size()) {
+                            break;
+                        }
+                    }
+                    continue;
+                }
+
+                if (reqProjName != projName) {
                     indexSuitable = false;
                     break;
                 }
-                continue;
-            }
-            const ProjectionName& projName = it->second;
-
-            if (!needsCollation) {
-                // We do not need to collate this field because of equality.
-                if (requiredCollationSpec.at(collationSpecIndex).first == projName) {
-                    // We can satisfy the next collation requirement independent of collation op.
-                    if (++collationSpecIndex >= requiredCollationSpec.size()) {
-                        break;
-                    }
+                updateDirectionsFn(indexCollationSpec.at(indexField)._op, reqOp);
+            } else {
+                // If we fall through here, we are trying to satisfy a trailing collation
+                // requirement on rid.
+                if (reqProjName != ridProjName ||
+                    candidateIndexEntry._intervalPrefixSize != indexCollationSpec.size()) {
+                    indexSuitable = false;
+                    break;
                 }
-                continue;
+                updateDirectionsFn(CollationOp::Ascending, reqOp);
             }
 
-            // Check if we can satisfy the next collation requirement.
-            const auto& [reqProjName, reqOp] = requiredCollationSpec.at(collationSpecIndex);
-            if (reqProjName != projName) {
-                indexSuitable = false;
-                break;
-            }
-
-            const CollationOp indexOp = indexCollationSpec.at(indexField)._op;
-            if (result._forward && !collationOpsCompatible(indexOp, reqOp)) {
-                result._forward = false;
-            }
-            if (result._backward && !collationOpsCompatible(reverseCollationOp(indexOp), reqOp)) {
-                result._backward = false;
-            }
             if (!result._forward && !result._backward) {
                 indexSuitable = false;
                 break;
@@ -1311,8 +1329,18 @@ private:
                 PhysProps leftPhysPropsLocal = leftPhysProps;
                 PhysProps rightPhysPropsLocal = rightPhysProps;
 
-                setCollationForRIDIntersect(
-                    collationLeftRightSplit, leftPhysPropsLocal, rightPhysPropsLocal);
+                // Add collation requirement on rid to both sides if needed.
+                CollationSplitResult split = collationLeftRightSplit;
+                if (split._leftCollation.empty() ||
+                    split._leftCollation.back().first != ridProjectionName) {
+                    split._leftCollation.emplace_back(ridProjectionName, CollationOp::Ascending);
+                }
+                if (split._rightCollation.empty() ||
+                    split._rightCollation.back().first != ridProjectionName) {
+                    split._rightCollation.emplace_back(ridProjectionName, CollationOp::Ascending);
+                }
+                setCollationForRIDIntersect(split, leftPhysPropsLocal, rightPhysPropsLocal);
+
                 if (dedupRID) {
                     getProperty<IndexingRequirement>(leftPhysPropsLocal)
                         .setDedupRID(true /*dedupRID*/);

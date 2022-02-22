@@ -210,7 +210,8 @@ ResidualRequirement::ResidualRequirement(PartialSchemaKey key,
 bool CandidateIndexEntry::operator==(const CandidateIndexEntry& other) const {
     return _fieldProjectionMap == other._fieldProjectionMap && _intervals == other._intervals &&
         _residualRequirements == other._residualRequirements &&
-        _fieldsToCollate == other._fieldsToCollate;
+        _fieldsToCollate == other._fieldsToCollate &&
+        _intervalPrefixSize == other._intervalPrefixSize;
 }
 
 IndexSpecification::IndexSpecification(std::string scanDefName,

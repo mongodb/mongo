@@ -145,17 +145,24 @@ bool areMultiKeyIntervalsEqualities(const MultiKeyIntervalRequirement& intervals
     return true;
 }
 
-CollationSplitResult splitCollationSpec(const ProjectionCollationSpec& collationSpec,
+CollationSplitResult splitCollationSpec(const ProjectionName& ridProjName,
+                                        const ProjectionCollationSpec& collationSpec,
                                         const ProjectionNameSet& leftProjections,
                                         const ProjectionNameSet& rightProjections) {
     bool leftSide = true;
     ProjectionCollationSpec leftCollationSpec;
     ProjectionCollationSpec rightCollationSpec;
 
-    for (const auto& collationEntry : collationSpec) {
-        const ProjectionName& projectionName = collationEntry.first;
+    for (size_t index = 0; index < collationSpec.size(); index++) {
+        const auto& collationEntry = collationSpec[index];
 
-        if (leftProjections.count(projectionName) > 0) {
+        const ProjectionName& projectionName = collationEntry.first;
+        if (projectionName == ridProjName) {
+            uassert(6624147, "Collation on RID must be last", index + 1 == collationSpec.size());
+
+            // Propagate collation requirement on rid only to left side.
+            leftCollationSpec.emplace_back(collationEntry);
+        } else if (leftProjections.count(projectionName) > 0) {
             if (!leftSide) {
                 // Left and right projections must complement and form prefix and suffix.
                 return {};
@@ -872,6 +879,7 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
         ProjectionNameSet residualRequirementsTempProjections;
         ResidualKeyMap residualKeyMap;
         opt::unordered_set<size_t> fieldsToCollate;
+        size_t intervalPrefixSize = 0;
 
         PartialSchemaKeySet unsatisfiedKeys;
         for (const auto& [key, req] : reqMap) {
@@ -917,7 +925,7 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
                     } else {
                         if (indexDef.getPartialReqMap().empty()) {
                             hasEmptyInterval = true;
-                            return CandidateIndexMap();
+                            return {};
                         } else {
                             // This is a partial index, so skip the empty interval, but consider the
                             // remaining indexes.
@@ -927,7 +935,9 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
                     }
                 }
 
-                if (!combineSuccess) {
+                if (combineSuccess) {
+                    intervalPrefixSize++;
+                } else {
                     if (!combineMultiKeyIntervalsDNF(intervals,
                                                      IntervalReqExpr::makeSingularDNF())) {
                         uasserted(6624155, "Cannot combine with an open interval");
@@ -1027,7 +1037,8 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
                                            std::move(residualRequirements),
                                            std::move(residualRequirementsTempProjections),
                                            std::move(residualKeyMap),
-                                           std::move(fieldsToCollate)});
+                                           std::move(fieldsToCollate),
+                                           intervalPrefixSize});
     }
 
     return result;

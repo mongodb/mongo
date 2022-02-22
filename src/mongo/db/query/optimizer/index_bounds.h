@@ -169,6 +169,9 @@ struct CandidateIndexEntry {
     // requirements.
     // TODO: consider a bitset.
     opt::unordered_set<size_t> _fieldsToCollate;
+
+    // Length of prefix of fields with applied intervals.
+    size_t _intervalPrefixSize;
 };
 
 using CandidateIndexMap = opt::unordered_map<std::string /*index name*/, CandidateIndexEntry>;

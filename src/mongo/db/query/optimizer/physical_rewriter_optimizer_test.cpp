@@ -2624,6 +2624,97 @@ TEST(PhysRewriter, CompoundIndex3) {
         optimized);
 }
 
+TEST(PhysRewriter, CompoundIndex4Negative) {
+    using namespace properties;
+    PrefixId prefixId;
+
+    ABT scanNode = make<ScanNode>("root", "c1");
+
+    // Create the following expression: {$and: [{a: {$eq: 1}}, {b: {$eq: 2}}]}
+    ABT evalANode = make<EvaluationNode>(
+        "pa",
+        make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>("root")),
+        std::move(scanNode));
+
+    ABT filterANode = make<FilterNode>(
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1))),
+                         make<Variable>("pa")),
+        std::move(evalANode));
+
+    ABT evalBNode = make<EvaluationNode>(
+        "pb",
+        make<EvalPath>(make<PathGet>("b", make<PathIdentity>()), make<Variable>("root")),
+        std::move(filterANode));
+
+    ABT filterBNode = make<FilterNode>(
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2))),
+                         make<Variable>("pb")),
+        std::move(evalBNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterBNode));
+
+    // Create the following indexes: {a:1, c:1, {name: 'index1'}}, and {b:1, d:1, {name: 'index2'}}
+    OptPhaseManager phaseManager(
+        {OptPhaseManager::OptPhase::MemoSubstitutionPhase,
+         OptPhaseManager::OptPhase::MemoExplorationPhase,
+         OptPhaseManager::OptPhase::MemoImplementationPhase},
+        prefixId,
+        {{{"c1",
+           ScanDefinition{
+               {},
+               {{"index1",
+                 IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
+                                  {makeNonMultikeyIndexPath("c"), CollationOp::Descending}},
+                                 false /*isMultiKey*/}},
+                {"index2",
+                 IndexDefinition{{{makeNonMultikeyIndexPath("b"), CollationOp::Ascending},
+                                  {makeNonMultikeyIndexPath("d"), CollationOp::Ascending}},
+                                 false /*isMultiKey*/}}}}}}},
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = rootNode;
+    ASSERT_TRUE(phaseManager.optimize(optimized));
+    ASSERT_BETWEEN(20, 30, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    // Index intersection via merge join relies on the fact that the RIDs of equal keys are sorted.
+    // Demonstrate that we do not get a merge join when the lookup keys on both intersected indexes
+    // do not cover all field indexes. In this case there is no guarantee that the RIDs of all
+    // matching keys will be sorted, and therefore they cannot be merge-joined.
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   Filter []\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [evalTemp_2]\n"
+        "|   |   PathTraverse []\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [2]\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root, 'b': evalTemp_2}, c1]\n"
+        "|   |   BindBlock:\n"
+        "|   |       [evalTemp_2]\n"
+        "|   |           Source []\n"
+        "|   |       [root]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
+        "[1], Const [1]], (-inf, +inf)}]\n"
+        "    BindBlock:\n"
+        "        [rid_0]\n"
+        "            Source []\n",
+        optimized);
+}
+
 TEST(PhysRewriter, IndexBoundsIntersect) {
     using namespace properties;
     PrefixId prefixId;

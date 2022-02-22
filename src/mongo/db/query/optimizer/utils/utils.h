@@ -122,7 +122,8 @@ struct CollationSplitResult {
  * Split a collation requirement between an outer (left) and inner (right) side. The outer side must
  * be a prefix in the collation spec, and the right side a suffix.
  */
-CollationSplitResult splitCollationSpec(const ProjectionCollationSpec& collationSpec,
+CollationSplitResult splitCollationSpec(const ProjectionName& ridProjName,
+                                        const ProjectionCollationSpec& collationSpec,
                                         const ProjectionNameSet& leftProjections,
                                         const ProjectionNameSet& rightProjections);
 
