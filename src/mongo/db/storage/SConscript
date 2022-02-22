@@ -233,8 +233,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/unittest/unittest',
-        'index_entry_comparison',
         'key_string',
+    ],
+    LIBDEPS_PRIVATE=[
+        'index_entry_comparison',
     ],
 )
 

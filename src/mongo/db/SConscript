@@ -1540,10 +1540,12 @@ envWithAsio.Library(
         'service_liaison_mock.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/executor/async_timer_mock',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
         'kill_sessions',
         'service_liaison',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/executor/async_timer_mock',
     ],
 )
 
@@ -1989,7 +1991,7 @@ env.Library(
     source=[
         'write_block_bypass_propagation_egress_hook.cpp',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/rpc/metadata',
     ],
 )
