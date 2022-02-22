@@ -217,9 +217,8 @@ public:
 
         /**
          * Persists on disk the keys that have been inserted using this BulkBuilder.
-         * Appends necessary information to resume building to passed-in builder.
          */
-        virtual void persistDataForShutdown(BSONObjBuilder& builder) = 0;
+        virtual IndexStateInfo persistDataForShutdown() = 0;
     };
 
     /**

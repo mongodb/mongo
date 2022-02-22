@@ -604,7 +604,7 @@ public:
 
     bool isMultikey() const final;
 
-    void persistDataForShutdown(BSONObjBuilder& builder) final;
+    IndexStateInfo persistDataForShutdown() final;
 
 private:
     void _yield(OperationContext* opCtx,
@@ -745,20 +745,16 @@ bool SortedDataIndexAccessMethod::BulkBuilderImpl::isMultikey() const {
     return _isMultiKey;
 }
 
-void SortedDataIndexAccessMethod::BulkBuilderImpl::persistDataForShutdown(BSONObjBuilder& builder) {
+IndexStateInfo SortedDataIndexAccessMethod::BulkBuilderImpl::persistDataForShutdown() {
     _insertMultikeyMetadataKeysIntoSorter();
     auto state = _sorter->persistDataForShutdown();
 
-    builder.append("fileName", state.fileName);
-    builder.append("numKeys", _keysInserted);
+    IndexStateInfo stateInfo;
+    stateInfo.setFileName(StringData(state.fileName));
+    stateInfo.setNumKeys(_keysInserted);
+    stateInfo.setRanges(std::move(state.ranges));
 
-    BSONArrayBuilder ranges(builder.subarrayStart("ranges"));
-    for (const auto& rangeInfo : state.ranges) {
-        BSONObjBuilder range(ranges.subobjStart());
-        range.append("startOffset", rangeInfo.getStartOffset());
-        range.append("endOffset", rangeInfo.getEndOffset());
-        range.append("checksum", rangeInfo.getChecksum());
-    }
+    return stateInfo;
 }
 
 void SortedDataIndexAccessMethod::BulkBuilderImpl::_insertMultikeyMetadataKeysIntoSorter() {

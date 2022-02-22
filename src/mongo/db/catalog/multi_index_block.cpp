@@ -1064,59 +1064,63 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
 
 BSONObj MultiIndexBlock::_constructStateObject(OperationContext* opCtx,
                                                const CollectionPtr& collection) const {
-    BSONObjBuilder builder;
-    _buildUUID->appendToBuilder(&builder, "_id");
-    builder.append("phase", IndexBuildPhase_serializer(_phase));
+    ResumeIndexInfo resumeIndexInfo;
+    resumeIndexInfo.setBuildUUID(*_buildUUID);
+    resumeIndexInfo.setPhase(_phase);
 
     if (_collectionUUID) {
-        _collectionUUID->appendToBuilder(&builder, "collectionUUID");
+        resumeIndexInfo.setCollectionUUID(*_collectionUUID);
     }
 
     // We can be interrupted by shutdown before inserting the first document from the collection
     // scan, in which case there is no _lastRecordIdInserted.
     if (_phase == IndexBuildPhaseEnum::kCollectionScan && _lastRecordIdInserted) {
-        _lastRecordIdInserted->serializeToken("collectionScanPosition", &builder);
+        resumeIndexInfo.setCollectionScanPosition(_lastRecordIdInserted);
     }
 
-    BSONArrayBuilder indexesArray(builder.subarrayStart("indexes"));
+    std::vector<IndexStateInfo> indexInfos;
     for (const auto& index : _indexes) {
-        BSONObjBuilder indexInfo(indexesArray.subobjStart());
+        IndexStateInfo indexStateInfo;
 
         if (_phase != IndexBuildPhaseEnum::kDrainWrites) {
             // Persist the data to disk so that we see all of the data that has been inserted into
             // the Sorter.
-            index.bulk->persistDataForShutdown(indexInfo);
+            indexStateInfo = index.bulk->persistDataForShutdown();
         }
 
         auto indexBuildInterceptor =
             index.block->getEntry(opCtx, collection)->indexBuildInterceptor();
-        indexInfo.append("sideWritesTable", indexBuildInterceptor->getSideWritesTableIdent());
+        indexStateInfo.setSideWritesTable(indexBuildInterceptor->getSideWritesTableIdent());
 
         if (auto duplicateKeyTrackerTableIdent =
-                indexBuildInterceptor->getDuplicateKeyTrackerTableIdent())
-            indexInfo.append("duplicateKeyTrackerTable", *duplicateKeyTrackerTableIdent);
-
-        if (auto skippedRecordTrackerTableIdent =
-                indexBuildInterceptor->getSkippedRecordTracker()->getTableIdent())
-            indexInfo.append("skippedRecordTrackerTable", *skippedRecordTrackerTableIdent);
-
-        indexInfo.append("spec", index.block->getSpec());
-        indexInfo.append("isMultikey", index.bulk->isMultikey());
-
-        BSONArrayBuilder multikeyPaths(indexInfo.subarrayStart("multikeyPaths"));
-        for (const auto& multikeyPath : index.bulk->getMultikeyPaths()) {
-            BSONObjBuilder multikeyPathObj(multikeyPaths.subobjStart());
-            BSONArrayBuilder multikeyComponents(
-                multikeyPathObj.subarrayStart("multikeyComponents"));
-
-            for (const auto& multikeyComponent : multikeyPath) {
-                multikeyComponents.append(multikeyComponent);
-            }
+                indexBuildInterceptor->getDuplicateKeyTrackerTableIdent()) {
+            auto ident = StringData(*duplicateKeyTrackerTableIdent);
+            indexStateInfo.setDuplicateKeyTrackerTable(ident);
         }
-    }
-    indexesArray.done();
+        if (auto skippedRecordTrackerTableIdent =
+                indexBuildInterceptor->getSkippedRecordTracker()->getTableIdent()) {
+            auto ident = StringData(*skippedRecordTrackerTableIdent);
+            indexStateInfo.setSkippedRecordTrackerTable(ident);
+        }
+        indexStateInfo.setSpec(index.block->getSpec());
+        indexStateInfo.setIsMultikey(index.bulk->isMultikey());
 
-    return builder.obj();
+        std::vector<MultikeyPath> multikeyPaths;
+        for (const auto& multikeyPath : index.bulk->getMultikeyPaths()) {
+            MultikeyPath multikeyPathObj;
+            std::vector<int32_t> multikeyComponents;
+            for (const auto& multikeyComponent : multikeyPath) {
+                multikeyComponents.emplace_back(multikeyComponent);
+            }
+            multikeyPathObj.setMultikeyComponents(std::move(multikeyComponents));
+            multikeyPaths.emplace_back(std::move(multikeyPathObj));
+        }
+        indexStateInfo.setMultikeyPaths(std::move(multikeyPaths));
+        indexInfos.emplace_back(std::move(indexStateInfo));
+    }
+    resumeIndexInfo.setIndexes(std::move(indexInfos));
+
+    return resumeIndexInfo.toBSON();
 }
 
 Status MultiIndexBlock::_failPointHangDuringBuild(OperationContext* opCtx,
