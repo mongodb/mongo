@@ -373,6 +373,10 @@ create_object(TABLE *table, void *arg)
       p, ",internal_key_truncate=%s", TV(BTREE_INTERNAL_KEY_TRUNCATION) ? "true" : "false");
     CONFIG_APPEND(p, ",split_pct=%" PRIu32, TV(BTREE_SPLIT_PCT));
 
+    /* Timestamps */
+    if (g.transaction_timestamps_config)
+        CONFIG_APPEND(p, ",log=(enabled=false)");
+
     /* Assertions: assertions slow down the code for additional diagnostic checking.  */
     if (GV(ASSERT_READ_TIMESTAMP))
         CONFIG_APPEND(

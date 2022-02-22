@@ -78,6 +78,7 @@ class test_rollback_to_stable15(wttest.WiredTigerTestCase):
 
         # Create a table.
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        create_params += ',log=(enabled=false)' if self.in_memory else ''
         self.session.create(uri, create_params)
         cursor = self.session.open_cursor(uri)
 

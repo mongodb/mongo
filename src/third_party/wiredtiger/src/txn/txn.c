@@ -856,7 +856,7 @@ __txn_timestamp_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_UPDATE *
         return;
 
     /* Timestamps are ignored on logged files. */
-    if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && !F_ISSET(btree, WT_BTREE_NO_LOGGING))
+    if (F_ISSET(btree, WT_BTREE_LOGGED))
         return;
 
     /*
@@ -1802,8 +1802,11 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
          * Logged table updates should never be prepared. As these updates are immediately durable,
          * it is not possible to roll them back if the prepared transaction is rolled back.
          */
-        if (!F_ISSET(op->btree, WT_BTREE_NO_LOGGING))
-            WT_RET_MSG(session, EINVAL, "transaction prepare is not supported with logged tables");
+        if (F_ISSET(op->btree, WT_BTREE_LOGGED))
+            WT_RET_MSG(session, ENOTSUP,
+              "%s: transaction prepare is not supported on logged tables or tables without "
+              "timestamps",
+              op->btree->dhandle->name);
         switch (op->type) {
         case WT_TXN_OP_NONE:
             break;

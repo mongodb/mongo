@@ -118,8 +118,8 @@ class test_flcs03(wttest.WiredTigerTestCase):
     def test_flcs(self):
         uri = "table:test_flcs03"
         nrows = 10
-        ds = SimpleDataSet(
-            self, uri, 0, key_format='r', value_format='6t', config='leaf_page_max=4096')
+        ds = SimpleDataSet(self, uri,
+            0, key_format='r', value_format='6t', config='leaf_page_max=4096,log=(enabled=false)')
         ds.populate()
 
         # Pin oldest and stable to timestamp 1.

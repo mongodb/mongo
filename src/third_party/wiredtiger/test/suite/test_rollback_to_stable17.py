@@ -89,6 +89,7 @@ class test_rollback_to_stable17(wttest.WiredTigerTestCase):
 
         # Create a table.
         config = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        config += ',log=(enabled=false)' if self.in_memory else ''
         self.session.create(uri, config)
 
         # Pin oldest and stable to timestamp 1.

@@ -40,8 +40,6 @@ from wtscenario import make_scenarios
 # in-memory update records. (Testing on an in-memory database does not have that
 # effect.)
 class test_flcs01(wttest.WiredTigerTestCase):
-    conn_config = 'in_memory=false'
-
     prepare_values = [
         ('no_prepare', dict(do_prepare=False)),
         ('prepare', dict(do_prepare=True))

@@ -303,13 +303,12 @@ __wt_txn_op_set_timestamp(WT_SESSION_IMPL *session, WT_TXN_OP *op)
     txn = session->txn;
 
     /*
-     * Metadata updates, updates with no commit time, and logged objects don't have timestamps, and
-     * only the most recently committed data matches files on disk. The check for in-memory files
-     * comes first: in-memory files do have timestamps, but aren't logged.
+     * Updates without a commit time and logged objects don't have timestamps, and only the most
+     * recently committed data matches files on disk.
      */
-    if (WT_IS_METADATA(btree->dhandle) || !F_ISSET(txn, WT_TXN_HAS_TS_COMMIT))
+    if (!F_ISSET(txn, WT_TXN_HAS_TS_COMMIT))
         return;
-    if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && !F_ISSET(btree, WT_BTREE_NO_LOGGING))
+    if (F_ISSET(btree, WT_BTREE_LOGGED))
         return;
 
     if (F_ISSET(txn, WT_TXN_PREPARE)) {
@@ -435,20 +434,16 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
         return (txn_global->metadata_pinned);
 
     /*
-     * Take a local copy of these IDs in case they are updated while we are checking visibility.
-     */
-    oldest_id = txn_global->oldest_id;
-
-    /*
-     * The read of the transaction ID pinned by a checkpoint needs to be carefully ordered: if a
+     * Take a local copy of these IDs in case they are updated while we are checking visibility. The
+     * read of the transaction ID pinned by a checkpoint needs to be carefully ordered: if a
      * checkpoint is starting and we have to start checking the pinned ID, we take the minimum of it
      * with the oldest ID, which is what we want. The logged tables are excluded as part of RTS, so
      * there is no need of holding their oldest_id
      */
-    WT_READ_BARRIER();
+    WT_ORDERED_READ(oldest_id, txn_global->oldest_id);
 
     if (!F_ISSET(conn, WT_CONN_RECOVERING) || session->dhandle == NULL ||
-      !F_ISSET(S2BT(session), WT_BTREE_NO_LOGGING)) {
+      F_ISSET(S2BT(session), WT_BTREE_LOGGED)) {
         /*
          * Checkpoint transactions often fall behind ordinary application threads. If there is an
          * active checkpoint, keep changes until checkpoint is finished.
@@ -1278,10 +1273,10 @@ __wt_txn_search_check(WT_SESSION_IMPL *session)
     name = session->dhandle->name;
 
     /* Timestamps are ignored on logged files. */
-    if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && !F_ISSET(S2BT(session), WT_BTREE_NO_LOGGING))
+    if (F_ISSET(S2BT(session), WT_BTREE_LOGGED))
         return;
 
-    /* Skip during recovery. */
+    /* Skip checks during recovery. */
     if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
         return;
 

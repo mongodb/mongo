@@ -69,7 +69,9 @@ class test_rollback_to_stable27(test_rollback_to_stable_base):
 
         # Create a table.
         uri = "table:rollback_to_stable27"
-        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format="S")
+        ds_config = ',log=(enabled=false)' if self.in_memory else ''
+        ds = SimpleDataSet(self, uri, 0,
+            key_format=self.key_format, value_format="S", config=ds_config)
         ds.populate()
 
         value_a = "aaaaa" * 10

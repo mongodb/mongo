@@ -68,7 +68,9 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
 
         # Create a table.
         uri = "table:rollback_to_stable04"
-        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
+        ds_config = ',log=(enabled=false)' if self.in_memory else ''
+        ds = SimpleDataSet(self, uri, 0,
+            key_format=self.key_format, value_format=self.value_format, config=ds_config)
         ds.populate()
 
         if self.value_format == '8t':

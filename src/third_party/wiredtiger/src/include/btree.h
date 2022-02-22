@@ -256,8 +256,8 @@ struct __wt_btree {
 #define WT_BTREE_CLOSED 0x0004000u         /* Handle closed */
 #define WT_BTREE_IGNORE_CACHE 0x0008000u   /* Cache-resident object */
 #define WT_BTREE_IN_MEMORY 0x0010000u      /* Cache-resident object */
-#define WT_BTREE_NO_CHECKPOINT 0x0020000u  /* Disable checkpoints */
-#define WT_BTREE_NO_LOGGING 0x0040000u     /* Disable logging */
+#define WT_BTREE_LOGGED 0x0020000u         /* Commit-level durability without timestamps */
+#define WT_BTREE_NO_CHECKPOINT 0x0040000u  /* Disable checkpoints */
 #define WT_BTREE_OBSOLETE_PAGES 0x0080000u /* Handle has obsolete pages */
 #define WT_BTREE_READONLY 0x0100000u       /* Handle is readonly */
 #define WT_BTREE_SALVAGE 0x0200000u        /* Handle is for salvage */

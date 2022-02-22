@@ -35,14 +35,12 @@ import wiredtiger
 # update results in an empty update chain then a tombstone is appended to the chain
 class test_prepare19(wttest.WiredTigerTestCase):
 
-
     def conn_config(self):
         return 'in_memory=true'
-    
 
     def test_server_example(self):
         uri = 'table:test_prepare19'
-        config = 'key_format=i,value_format=S'
+        config = 'key_format=i,value_format=S,log=(enabled=false)'
 
         self.session.create(uri, config)
 
@@ -56,7 +54,8 @@ class test_prepare19(wttest.WiredTigerTestCase):
         # Make a prepared update on key 1, force eviction, and rollback.
         self.prepare_evict_rollback(uri, config, 1101)
 
-        # If no tombstone is written the update will be aborted in the update chain but not in the btree.
+        # If no tombstone is written the update will be aborted in the update chain but not in the
+        # btree.
         # The transaction will see an active transaction on key 1 and raise a write conflict.
         # Expect no error is raised.
         self.session.begin_transaction()

@@ -515,5 +515,74 @@ class test_timestamp26_log_ts(wttest.WiredTigerTestCase):
         c[ds.key(2)] = ds.value(2)
         self.session.commit_transaction()
 
+
+# Test that timestamps are ignored in in-memory configurations and that object configurations always
+# override.
+class test_timestamp26_in_memory_ts(wttest.WiredTigerTestCase):
+    types = [
+        ('fix', dict(key_format='r', value_format='8t')),
+        ('row', dict(key_format='S', value_format='S')),
+        ('var', dict(key_format='r', value_format='S')),
+    ]
+
+    # The two connection configurations that default to ignoring timestamps.
+    conn = [
+        ('true', dict(conn_config='in_memory=true')),
+        ('false', dict(conn_config='log=(enabled=true)')),
+    ]
+
+    # Objects can explicitly enable or ignore timestamps or default to the environment's behavior.
+    object = [
+        ('true', dict(obj_ignore=True, obj_config='log=(enabled=true)')),
+        ('false', dict(obj_ignore=False, obj_config='log=(enabled=false)')),
+        ('default', dict(obj_ignore=True, obj_config='')),
+    ]
+
+    always = [
+        ('always', dict(always=True)),
+        ('never', dict(always=False)),
+    ]
+    scenarios = make_scenarios(types, conn, object, always)
+
+    # Test that timestamps are ignored in in-memory configurations and that object configurations
+    # always override.
+    def test_in_memory_ts(self):
+        if wiredtiger.diagnostic_build():
+            self.skipTest('requires a non-diagnostic build')
+
+        # Create an object that's never written, it's just used to generate valid k/v pairs.
+        ds = SimpleDataSet(
+            self, 'file:notused', 10, key_format=self.key_format, value_format=self.value_format)
+
+        # Open the object, configuring write_timestamp usage.
+        uri = 'table:ts'
+        config = ',' + self.obj_config
+        config += ',write_timestamp_usage='
+        config += 'always' if self.always else 'never'
+        config += ',assert=(write_timestamp=on)'
+        self.session.breakpoint()
+        self.session.create(uri,
+            'key_format={},value_format={}'.format(self.key_format, self.value_format) + config)
+
+        c = self.session.open_cursor(uri)
+
+        # Commit with a timestamp.
+        self.session.begin_transaction()
+        c[ds.key(1)] = ds.value(1)
+        if self.always == True or self.obj_ignore == True:
+            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
+        else:
+            with self.expectedStderrPattern('unexpected timestamp usage'):
+                self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
+
+        # Commit without a timestamp.
+        self.session.begin_transaction()
+        c[ds.key(2)] = ds.value(2)
+        if self.always == False or self.obj_ignore == True:
+            self.session.commit_transaction()
+        else:
+            with self.expectedStderrPattern('unexpected timestamp usage'):
+                self.session.commit_transaction()
+
 if __name__ == '__main__':
     wttest.run()

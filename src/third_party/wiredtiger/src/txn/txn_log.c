@@ -267,7 +267,7 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
      * If this operation is diagnostic only, set the ignore bit on the fileid so that recovery can
      * skip it.
      */
-    if (F_ISSET(S2BT(session), WT_BTREE_NO_LOGGING) &&
+    if (!F_ISSET(S2BT(session), WT_BTREE_LOGGED) &&
       FLD_ISSET(conn->log_flags, WT_CONN_LOG_DEBUG_MODE))
         FLD_SET(fileid, WT_LOGOP_IGNORE);
 

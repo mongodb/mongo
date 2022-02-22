@@ -40,13 +40,18 @@ __wt_log_op(WT_SESSION_IMPL *session)
      * Objects with checkpoint durability don't need logging unless we're in debug mode. That rules
      * out almost all log records, check it first.
      */
-    if (F_ISSET(S2BT(session), WT_BTREE_NO_LOGGING) &&
+    if (!F_ISSET(S2BT(session), WT_BTREE_LOGGED) &&
       !FLD_ISSET(conn->log_flags, WT_CONN_LOG_DEBUG_MODE))
         return (false);
 
-    /* Logging must be enabled, and outside of recovery. */
+    /*
+     * Correct the above check for logging being configured. Files are configured for logging to
+     * turn off timestamps, so stop here if there aren't actually any log files.
+     */
     if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
         return (false);
+
+    /* No logging during recovery. */
     if (F_ISSET(conn, WT_CONN_RECOVERING))
         return (false);
 

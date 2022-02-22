@@ -32,9 +32,8 @@ from wtdataset import simple_key
 from wtscenario import make_scenarios
 
 # test_prepare14.py
-# Test that the transaction visibility of an on-disk update
-# that has both the start and the stop time points from the
-# same uncommitted prepared transaction.
+# Test that the transaction visibility of an on-disk update that has both the start and the stop
+# time points from the same uncommitted prepared transaction.
 class test_prepare14(wttest.WiredTigerTestCase):
 
     in_memory_values = [
@@ -59,10 +58,12 @@ class test_prepare14(wttest.WiredTigerTestCase):
         return config
 
     def test_prepare14(self):
-        # Create a table without logging.
+        # Create a table that supports timestamps.
         uri = "table:prepare14"
         create_config = 'allocation_size=512,key_format={},value_format={}'.format(
             self.key_format, self.value_format)
+        if self.in_memory:
+            create_config += ',log=(enabled=false)'
         self.session.create(uri, create_config)
 
         if self.value_format == '8t':
@@ -85,7 +86,8 @@ class test_prepare14(wttest.WiredTigerTestCase):
         cursor.close()
         s.prepare_transaction('prepare_timestamp=' + self.timestamp_str(20))
 
-        # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
+        # Configure debug behavior on a cursor to evict the page positioned on when the reset API
+        # is used.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
 
         # Search for the key so we position our cursor on the page that we want to evict.
