@@ -215,7 +215,7 @@ __tiered_create_local(WT_SESSION_IMPL *session, WT_TIERED *tiered)
     F_SET(this_tier, WT_TIERS_OP_READ | WT_TIERS_OP_WRITE);
 
     WT_WITH_DHANDLE(
-      session, &tiered->iface, ret = __wt_btree_switch_object(session, tiered->current_id, 0));
+      session, &tiered->iface, ret = __wt_btree_switch_object(session, tiered->current_id));
     WT_ERR(ret);
 
 err:
@@ -647,7 +647,7 @@ __tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
         WT_ERR(__wt_tiered_switch(session, config));
     }
     WT_ERR(__wt_btree_open(session, tiered_cfg));
-    WT_ERR(__wt_btree_switch_object(session, tiered->current_id, 0));
+    WT_ERR(__wt_btree_switch_object(session, tiered->current_id));
 
 #if 1
     if (0) {

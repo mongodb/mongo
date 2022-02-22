@@ -560,7 +560,7 @@ __bm_stat(WT_BM *bm, WT_SESSION_IMPL *session, WT_DSRC_STATS *stats)
  *     Switch the tiered object.
  */
 static int
-__bm_switch_object(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t objectid, uint32_t flags)
+__bm_switch_object(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t objectid)
 {
     WT_BLOCK *block;
 
@@ -570,15 +570,6 @@ __bm_switch_object(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t objectid, uint3
     WT_RET(__bm_close_block(session, block));
     bm->block = NULL;
 
-    /*
-     * FIXME-WT-7596 the flags argument will be used in the future to perform various tasks,
-     * to efficiently mark objects in transition (that is during a switch):
-     *  - mark this file as the writeable file (what currently happens)
-     *  - disallow writes to this object (reads still allowed, we're about to switch)
-     *  - close this object (about to move it, don't allow reopens yet)
-     *  - allow opens on this object again
-     */
-    WT_UNUSED(flags);
     WT_RET(__wt_blkcache_get_handle(session, NULL, objectid, &block));
 
     /*
@@ -603,10 +594,9 @@ __bm_switch_object(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t objectid, uint3
  *     Switch the tiered object; readonly version.
  */
 static int
-__bm_switch_object_readonly(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t objectid, uint32_t flags)
+__bm_switch_object_readonly(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t objectid)
 {
     WT_UNUSED(objectid);
-    WT_UNUSED(flags);
 
     return (__bm_readonly(bm, session));
 }

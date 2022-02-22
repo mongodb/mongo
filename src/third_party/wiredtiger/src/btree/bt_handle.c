@@ -998,7 +998,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
  *     Switch to a writeable object for a tiered btree.
  */
 int
-__wt_btree_switch_object(WT_SESSION_IMPL *session, uint32_t objectid, uint32_t flags)
+__wt_btree_switch_object(WT_SESSION_IMPL *session, uint32_t objectid)
 {
     WT_BM *bm;
 
@@ -1008,5 +1008,5 @@ __wt_btree_switch_object(WT_SESSION_IMPL *session, uint32_t objectid, uint32_t f
      * number.
      */
     bm = S2BT(session)->bm;
-    return (bm == NULL ? 0 : bm->switch_object(bm, session, objectid, flags));
+    return (bm == NULL ? 0 : bm->switch_object(bm, session, objectid));
 }
