@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/transport/service_entry_point_impl.h"
 
 #include <fmt/format.h>
@@ -40,6 +38,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/hello_metrics.h"
+#include "mongo/transport/service_entry_point_impl_gen.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_gen.h"
 #include "mongo/transport/service_state_machine.h"
@@ -214,6 +213,8 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
             _currentConnections.store(connectionCount);
         }
 
+        _sessionsCV.notify_one();
+
         if (!quiet) {
             LOGV2(22944,
                   "Connection ended",
@@ -222,8 +223,6 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
                   "connectionId"_attr = session->id(),
                   "connectionCount"_attr = connectionCount);
         }
-
-        _sessionsCV.notify_one();
     });
 
     auto seCtx = transport::ServiceExecutorContext{};
@@ -245,13 +244,24 @@ void ServiceEntryPointImpl::endAllSessions(transport::Session::TagMask tags) {
 
 bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
 #if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
+    static constexpr bool kSanitizerBuild = true;
+#else
+    static constexpr bool kSanitizerBuild = false;
+#endif
+
     // When running under address sanitizer, we get false positive leaks due to disorder around
     // the lifecycle of a connection and request. When we are running under ASAN, we try a lot
     // harder to dry up the server from active connections before going on to really shut down.
-    return shutdownAndWait(timeout);
-#else
+    // In non-sanitizer builds, a feature flag can enable a true shutdown anyway. We use the
+    // flag to identify these shutdown problems in testing.
+    if (kSanitizerBuild || transport::gJoinIngressSessionsOnShutdown) {
+        const auto result = shutdownAndWait(timeout);
+        if (transport::gJoinIngressSessionsOnShutdown)
+            invariant(result, "Shutdown did not complete within {}ms"_format(timeout.count()));
+        return result;
+    }
+
     return true;
-#endif
 }
 
 bool ServiceEntryPointImpl::shutdownAndWait(Milliseconds timeout) {
@@ -265,6 +275,9 @@ bool ServiceEntryPointImpl::shutdownAndWait(Milliseconds timeout) {
     // drained all active operations within the deadline, just keep going with shutdown: the OS will
     // do it for us when the process terminates.
     _terminateAll(lk);
+
+    LOGV2(6367401, "Shutting down service entry point and waiting for sessions to join");
+
     auto result = _waitForNoSessions(lk, deadline);
     lk.unlock();
 

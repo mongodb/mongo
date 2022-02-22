@@ -115,6 +115,7 @@ env.Library(
     target='service_entry_point',
     source=[
         'service_entry_point_impl.cpp',
+        'service_entry_point_impl.idl',
         'service_state_machine.cpp',
     ],
     LIBDEPS=[
