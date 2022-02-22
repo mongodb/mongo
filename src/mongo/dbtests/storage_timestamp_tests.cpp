@@ -248,7 +248,7 @@ public:
                     ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
                 }
                 collRaii.getWritableCollection()->getIndexCatalog()->dropAllIndexes(
-                    _opCtx, collRaii.getWritableCollection(), false);
+                    _opCtx, collRaii.getWritableCollection(), false, {});
                 wunit.commit();
                 return;
             }

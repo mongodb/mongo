@@ -1592,7 +1592,7 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
     }
 
     // 2) drop indexes
-    _indexCatalog->dropAllIndexes(opCtx, this, true);
+    _indexCatalog->dropAllIndexes(opCtx, this, true, {});
 
     // 3) truncate record store
     auto status = _shared->_recordStore->truncate(opCtx);

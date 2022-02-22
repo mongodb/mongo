@@ -37,7 +37,6 @@
 #include <boost/optional.hpp>
 #include <utility>
 
-#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -55,6 +54,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/service_context.h"
@@ -127,8 +127,8 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
 
     // The IndexChunk has a keyPattern that may apply to more than one index - we need to
     // select the index and get the full index keyPattern here.
-    auto catalog = collection->getIndexCatalog();
-    const IndexDescriptor* idx = catalog->findShardKeyPrefixedIndex(opCtx, keyPattern, false);
+    auto idx = findShardKeyPrefixedIndex(
+        opCtx, collection, collection->getIndexCatalog(), keyPattern, /*requireSingleKey=*/false);
     if (!idx) {
         LOGV2_ERROR(23765,
                     "Unable to find shard key index",

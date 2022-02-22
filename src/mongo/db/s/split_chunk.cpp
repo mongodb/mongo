@@ -35,7 +35,6 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
@@ -46,6 +45,7 @@
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -226,9 +226,12 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
 
     // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore,
     // any multi-key index prefixed by shard key cannot be multikey over the shard key fields.
-    const IndexDescriptor* idx =
-        collection->getIndexCatalog()->findShardKeyPrefixedIndex(opCtx, keyPatternObj, false);
-    if (!idx) {
+    auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
+                                                 *collection,
+                                                 collection->getIndexCatalog(),
+                                                 keyPatternObj,
+                                                 /*requireSingleKey=*/false);
+    if (!shardKeyIdx) {
         return boost::optional<ChunkRange>(boost::none);
     }
 
@@ -242,10 +245,10 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
 
     KeyPattern shardKeyPattern(keyPatternObj);
     if (shardKeyPattern.globalMax().woCompare(backChunk.getMax()) == 0 &&
-        checkIfSingleDoc(opCtx, collection.getCollection(), idx, &backChunk)) {
+        checkIfSingleDoc(opCtx, collection.getCollection(), shardKeyIdx, &backChunk)) {
         return boost::optional<ChunkRange>(ChunkRange(backChunk.getMin(), backChunk.getMax()));
     } else if (shardKeyPattern.globalMin().woCompare(frontChunk.getMin()) == 0 &&
-               checkIfSingleDoc(opCtx, collection.getCollection(), idx, &frontChunk)) {
+               checkIfSingleDoc(opCtx, collection.getCollection(), shardKeyIdx, &frontChunk)) {
         return boost::optional<ChunkRange>(ChunkRange(frontChunk.getMin(), frontChunk.getMax()));
     }
     return boost::optional<ChunkRange>(boost::none);

@@ -16,6 +16,7 @@ env.Library(
         'collection_sharding_state.cpp',
         'database_sharding_state.cpp',
         'operation_sharding_state.cpp',
+        'shard_key_index_util.cpp',
         'sharding_migration_critical_section.cpp',
         'sharding_state.cpp',
         'sharding_write_router.cpp',
@@ -25,6 +26,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/index_catalog',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/range_arithmetic',
         '$BUILD_DIR/mongo/s/grid',
@@ -513,6 +515,7 @@ env.CppUnitTest(
         'session_catalog_migration_destination_test.cpp',
         'session_catalog_migration_source_test.cpp',
         'shard_local_test.cpp',
+        'shard_key_index_util_test.cpp',
         'shard_metadata_util_test.cpp',
         'shard_server_catalog_cache_loader_test.cpp',
         'sharding_initialization_mongod_test.cpp',
@@ -533,6 +536,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
         '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/keys_collection_client_direct',
         '$BUILD_DIR/mongo/db/logical_session_cache_impl',

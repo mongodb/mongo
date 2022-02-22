@@ -250,23 +250,6 @@ public:
         const InclusionPolicy inclusionPolicy,
         std::vector<const IndexDescriptor*>* const matches) const = 0;
 
-    /**
-     * Returns an index suitable for shard key range scans.
-     *
-     * This index:
-     * - must be prefixed by 'shardKey', and
-     * - must not be a partial index.
-     * - must have the simple collation.
-     *
-     * If the parameter 'requireSingleKey' is true, then this index additionally must not be
-     * multi-key.
-     *
-     * If no such index exists, returns NULL.
-     */
-    virtual const IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* const opCtx,
-                                                             const BSONObj& shardKey,
-                                                             const bool requireSingleKey) const = 0;
-
     virtual void findIndexByType(
         OperationContext* const opCtx,
         const std::string& type,
@@ -385,6 +368,16 @@ public:
         const std::vector<BSONObj>& indexSpecsToBuild) const = 0;
 
     /**
+     * Drops indexes in the index catalog that returns true when it's descriptor returns true for
+     * 'matchFn'. If 'onDropFn' is provided, it will be called before each index is dropped to
+     * allow timestamping each individual drop.
+     */
+    virtual void dropIndexes(OperationContext* opCtx,
+                             Collection* collection,
+                             std::function<bool(const IndexDescriptor*)> matchFn,
+                             std::function<void(const IndexDescriptor*)> onDropFn) = 0;
+
+    /**
      * Drops all indexes in the index catalog, optionally dropping the id index depending on the
      * 'includingIdIndex' parameter value. If 'onDropFn' is provided, it will be called before each
      * index is dropped to allow timestamping each individual drop.
@@ -393,9 +386,6 @@ public:
                                 Collection* collection,
                                 bool includingIdIndex,
                                 std::function<void(const IndexDescriptor*)> onDropFn) = 0;
-    virtual void dropAllIndexes(OperationContext* opCtx,
-                                Collection* collection,
-                                bool includingIdIndex) = 0;
 
     /**
      * Drops the index given its descriptor.

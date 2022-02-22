@@ -64,7 +64,6 @@
 #include "mongo/db/drop_gen.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
@@ -87,6 +86,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/timeseries/catalog_helper.h"
@@ -422,10 +422,11 @@ public:
                 keyPattern = Helpers::inferKeyPattern(min);
             }
 
-            const IndexDescriptor* idx =
-                collection->getIndexCatalog()->findShardKeyPrefixedIndex(opCtx,
-                                                                         keyPattern,
-                                                                         true);  // requireSingleKey
+            auto idx = findShardKeyPrefixedIndex(opCtx,
+                                                 collection,
+                                                 collection->getIndexCatalog(),
+                                                 keyPattern,
+                                                 /*requireSingleKey=*/true);
 
             if (idx == nullptr) {
                 errmsg = "couldn't find valid index containing key pattern";

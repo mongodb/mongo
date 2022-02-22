@@ -34,6 +34,7 @@
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/s/shard_key_index_util.h"
 
 namespace mongo {
 

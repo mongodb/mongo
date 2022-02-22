@@ -537,7 +537,7 @@ void DatabaseImpl::_dropCollectionIndexes(OperationContext* opCtx,
     invariant(_name == nss.db());
     LOGV2_DEBUG(
         20316, 1, "dropCollection: {namespace} - dropAllIndexes start", "namespace"_attr = nss);
-    collection->getIndexCatalog()->dropAllIndexes(opCtx, collection, true);
+    collection->getIndexCatalog()->dropAllIndexes(opCtx, collection, true, {});
 
     invariant(collection->getTotalIndexCount() == 0);
     LOGV2_DEBUG(

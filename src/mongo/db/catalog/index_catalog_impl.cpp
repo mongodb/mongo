@@ -292,8 +292,7 @@ Status IndexCatalogImpl::_isNonIDIndexAndNotAllowedToBuild(OperationContext* opC
 void IndexCatalogImpl::_logInternalState(OperationContext* opCtx,
                                          const CollectionPtr& collection,
                                          long long numIndexesInCollectionCatalogEntry,
-                                         const std::vector<std::string>& indexNamesToDrop,
-                                         bool haveIdIndex) {
+                                         const std::vector<std::string>& indexNamesToDrop) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
 
     LOGV2_ERROR(20365,
@@ -303,8 +302,7 @@ void IndexCatalogImpl::_logInternalState(OperationContext* opCtx,
                 "readyIndexes_size"_attr = _readyIndexes.size(),
                 "buildingIndexes_size"_attr = _buildingIndexes.size(),
                 "frozenIndexes_size"_attr = _frozenIndexes.size(),
-                "indexNamesToDrop_size"_attr = indexNamesToDrop.size(),
-                "haveIdIndex"_attr = haveIdIndex);
+                "indexNamesToDrop_size"_attr = indexNamesToDrop.size());
 
     // Report the ready indexes.
     for (const auto& entry : _readyIndexes) {
@@ -987,15 +985,15 @@ BSONObj IndexCatalogImpl::getDefaultIdIndexSpec(const CollectionPtr& collection)
     return b.obj();
 }
 
-void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
-                                      Collection* collection,
-                                      bool includingIdIndex,
-                                      std::function<void(const IndexDescriptor*)> onDropFn) {
+void IndexCatalogImpl::dropIndexes(OperationContext* opCtx,
+                                   Collection* collection,
+                                   std::function<bool(const IndexDescriptor*)> matchFn,
+                                   std::function<void(const IndexDescriptor*)> onDropFn) {
     uassert(ErrorCodes::BackgroundOperationInProgressForNamespace,
             str::stream() << "cannot perform operation: an index build is currently running",
             !haveAnyIndexesInProgress());
 
-    bool haveIdIndex = false;
+    bool didExclude = false;
 
     invariant(_buildingIndexes.size() == 0);
     vector<string> indexNamesToDrop;
@@ -1008,11 +1006,11 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
         while (ii->more()) {
             seen++;
             const IndexDescriptor* desc = ii->next()->descriptor();
-            if (desc->isIdIndex() && includingIdIndex == false) {
-                haveIdIndex = true;
-                continue;
+            if (matchFn(desc)) {
+                indexNamesToDrop.push_back(desc->indexName());
+            } else {
+                didExclude = true;
             }
-            indexNamesToDrop.push_back(desc->indexName());
         }
         invariant(seen == numIndexesTotal(opCtx));
     }
@@ -1041,18 +1039,10 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
 
     long long numIndexesInCollectionCatalogEntry = collection->getTotalIndexCount();
 
-    if (haveIdIndex) {
-        fassert(17324, numIndexesTotal(opCtx) == 1);
-        fassert(17325, numIndexesReady(opCtx) == 1);
-        fassert(17326, numIndexesInCollectionCatalogEntry == 1);
-        fassert(17336, _readyIndexes.size() == 1);
-    } else {
+    if (!didExclude) {
         if (numIndexesTotal(opCtx) || numIndexesInCollectionCatalogEntry || _readyIndexes.size()) {
-            _logInternalState(opCtx,
-                              collection,
-                              numIndexesInCollectionCatalogEntry,
-                              indexNamesToDrop,
-                              haveIdIndex);
+            _logInternalState(
+                opCtx, collection, numIndexesInCollectionCatalogEntry, indexNamesToDrop);
         }
         fassert(17327, numIndexesTotal(opCtx) == 0);
         fassert(17328, numIndexesInCollectionCatalogEntry == 0);
@@ -1062,8 +1052,18 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
 
 void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
                                       Collection* collection,
-                                      bool includingIdIndex) {
-    dropAllIndexes(opCtx, collection, includingIdIndex, {});
+                                      bool includingIdIndex,
+                                      std::function<void(const IndexDescriptor*)> onDropFn) {
+    dropIndexes(opCtx,
+                collection,
+                [includingIdIndex](const IndexDescriptor* indexDescriptor) {
+                    if (includingIdIndex) {
+                        return true;
+                    }
+
+                    return !indexDescriptor->isIdIndex();
+                },
+                onDropFn);
 }
 
 Status IndexCatalogImpl::dropIndex(OperationContext* opCtx,
@@ -1278,34 +1278,6 @@ void IndexCatalogImpl::findIndexesByKeyPattern(OperationContext* opCtx,
             matches->push_back(desc);
         }
     }
-}
-
-const IndexDescriptor* IndexCatalogImpl::findShardKeyPrefixedIndex(OperationContext* opCtx,
-                                                                   const BSONObj& shardKey,
-                                                                   bool requireSingleKey) const {
-    const IndexDescriptor* best = nullptr;
-
-    std::unique_ptr<IndexIterator> ii =
-        getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
-    while (ii->more()) {
-        const IndexCatalogEntry* entry = ii->next();
-        const IndexDescriptor* desc = entry->descriptor();
-        bool hasSimpleCollation = desc->collation().isEmpty();
-
-        if (desc->isPartial() || desc->isSparse())
-            continue;
-
-        if (!shardKey.isPrefixOf(desc->keyPattern(), SimpleBSONElementComparator::kInstance))
-            continue;
-
-        if (!entry->isMultikey() && hasSimpleCollation)
-            return desc;
-
-        if (!requireSingleKey && hasSimpleCollation)
-            best = desc;
-    }
-
-    return best;
 }
 
 void IndexCatalogImpl::findIndexByType(OperationContext* opCtx,
