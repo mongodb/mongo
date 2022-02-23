@@ -104,16 +104,6 @@ const dumpInfoFn = function() {
 };
 
 assert.gt(timestampCompare(info.latestOptime, initialInfo.latestOptime), 0, dumpInfoFn);
-assert.gt(wallTimeCompare(replStatusInfo.optimes.lastAppliedWallTime,
-                          initialReplStatusInfo.optimes.lastAppliedWallTime),
-          0,
-          dumpInfoFn);
-if (isPersistent) {
-    assert.gt(wallTimeCompare(replStatusInfo.optimes.lastDurableWallTime,
-                              initialReplStatusInfo.optimes.lastDurableWallTime),
-              0,
-              dumpInfoFn);
-}
 assert.eq(timestampCompare(info.earliestOptime, initialInfo.earliestOptime), 0, dumpInfoFn);
 
 // Insert some large documents to force the oplog to roll over
@@ -135,11 +125,6 @@ assert.soon(function() {
                "; looking for it to be different from " + tojson(initialInfo.earliestOptime));
     replStatusInfo = primary.getDB('admin').runCommand({replSetGetStatus: 1});
     return timestampCompare(info.latestOptime, initialInfo.latestOptime) > 0 &&
-        wallTimeCompare(replStatusInfo.optimes.lastAppliedWallTime,
-                        initialReplStatusInfo.optimes.lastAppliedWallTime) > 0 &&
-        (!isPersistent ||
-         wallTimeCompare(replStatusInfo.optimes.lastDurableWallTime,
-                         initialReplStatusInfo.optimes.lastDurableWallTime) > 0) &&
         timestampCompare(info.earliestOptime, initialInfo.earliestOptime) > 0;
 });
 
