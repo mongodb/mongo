@@ -1133,8 +1133,11 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
             invariant(opCtx->lockState()->isRSTLLocked());
 
             // Override the 'signalAction' as this is an initial syncing node.
+            // Don't override it if it's a rollback abort which would be explictly requested
+            // by the initial sync code.
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-            if (replCoord->getMemberState().startup2()) {
+            if (replCoord->getMemberState().startup2() &&
+                IndexBuildAction::kRollbackAbort != signalAction) {
                 LOGV2_DEBUG(4665902,
                             1,
                             "Overriding abort 'signalAction' for initial sync",
@@ -1277,7 +1280,10 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
         }
         case IndexBuildAction::kRollbackAbort: {
             invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
-            invariant(replCoord->getMemberState().rollback());
+            // File copy based initial sync does a rollback-like operation, so we allow STARTUP2
+            // to abort as well as rollback.
+            invariant(replCoord->getMemberState().rollback() ||
+                      replCoord->getMemberState().startup2());
             // Defer cleanup until builder thread is joined.
             break;
         }
