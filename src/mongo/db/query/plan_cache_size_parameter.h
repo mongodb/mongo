@@ -32,7 +32,6 @@
 #include <string>
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/service_context.h"
 
 namespace mongo::plan_cache_util {
 
@@ -56,31 +55,5 @@ struct PlanCacheSizeParameter {
     const double size;
     const PlanCacheSizeUnits units;
 };
-
-/**
- * Callback called on a change of planCacheSize parameter.
- */
-Status onPlanCacheSizeUpdate(const std::string& str);
-
-/**
- * Callback called on validation of planCacheSize parameter.
- */
-Status validatePlanCacheSize(const std::string& str);
-
-/**
- * Encapsulates a callback function used to update the PlanCache size when the planCacheSize
- * parameter is updated.
- */
-class PlanCacheSizeUpdater {
-public:
-    virtual ~PlanCacheSizeUpdater() = default;
-    virtual void update(ServiceContext* serviceCtx, PlanCacheSizeParameter parameter) = 0;
-};
-
-/**
- * Decorated accessor to the PlanCacheSizeUpdater stored in ServiceContext.
- */
-extern const Decorable<ServiceContext>::Decoration<std::unique_ptr<PlanCacheSizeUpdater>>
-    sbePlanCacheSizeUpdaterDecoration;
 
 }  // namespace mongo::plan_cache_util

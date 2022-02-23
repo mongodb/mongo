@@ -31,7 +31,6 @@
 
 #include <pcrecpp.h>
 
-#include "mongo/db/client.h"
 #include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo::plan_cache_util {
@@ -71,34 +70,5 @@ StatusWith<PlanCacheSizeParameter> PlanCacheSizeParameter::parse(const std::stri
 
     return PlanCacheSizeParameter{size, statusWithUnit.getValue()};
 }
-
-Status onPlanCacheSizeUpdate(const std::string& str) {
-    auto newSize = PlanCacheSizeParameter::parse(str);
-    if (!newSize.isOK()) {
-        return newSize.getStatus();
-    }
-
-    // The client is nullptr if the parameter is supplied from the command line. In this case, we
-    // ignore the update event, the parameter will be processed when initializing the service
-    // context.
-    if (auto client = Client::getCurrent()) {
-        auto serviceCtx = client->getServiceContext();
-        tassert(6007013, "ServiceContext must be non null", serviceCtx);
-
-        auto updater = sbePlanCacheSizeUpdaterDecoration(serviceCtx).get();
-        tassert(6007014, "Plan cache size updater must be non null", serviceCtx);
-        updater->update(serviceCtx, newSize.getValue());
-    }
-
-    return Status::OK();
-}
-
-Status validatePlanCacheSize(const std::string& str) {
-    return PlanCacheSizeParameter::parse(str).getStatus();
-}
-
-const Decorable<ServiceContext>::Decoration<std::unique_ptr<PlanCacheSizeUpdater>>
-    sbePlanCacheSizeUpdaterDecoration =
-        ServiceContext::declareDecoration<std::unique_ptr<PlanCacheSizeUpdater>>();
 
 }  // namespace mongo::plan_cache_util

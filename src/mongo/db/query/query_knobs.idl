@@ -30,6 +30,7 @@ global:
   cpp_namespace: "mongo"
   cpp_includes:
     - "mongo/db/query/plan_cache_size_parameter.h"
+    - "mongo/db/query/sbe_plan_cache_on_parameter_change.h"
     - "mongo/platform/atomic_proxy.h"
     - "mongo/platform/atomic_word.h"
 
@@ -62,6 +63,7 @@ server_parameters:
     default: 10000
     validator:
       gt: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryPlanEvaluationCollFraction:
     description: "For large collections, the ceiling for the number times we work() candidate plans
@@ -86,6 +88,7 @@ server_parameters:
     validator:
       gte: 0.0
       lte: 1.0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryPlanEvaluationMaxResults:
     description: "Stop working plans once a plan returns this many results."
@@ -95,20 +98,24 @@ server_parameters:
     default: 101
     validator:
       gte: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryForceIntersectionPlans:
-    description: "Do we give a big ranking bonus to intersection plans?"
+    description: "Gives a large ranking bonus to index intersection plans, forcing intersection
+    plans to be chosen when possible."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryForceIntersectionPlans"
     cpp_vartype: AtomicWord<bool>
     default: false
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryPlannerEnableIndexIntersection:
-    description: "Do we have ixisect on at all?"
+    description: "Controls whether the planner will generate and consider index intersection plans."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryPlannerEnableIndexIntersection"
     cpp_vartype: AtomicWord<bool>
     default: true
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryPlannerEnableHashIntersection:
     description: "Do we use hash-based intersection for rooted $and queries?"
@@ -116,13 +123,15 @@ server_parameters:
     cpp_varname: "internalQueryPlannerEnableHashIntersection"
     cpp_vartype: AtomicWord<bool>
     default: false
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   #
   # Plan cache
   #
 
   internalQueryCacheMaxEntriesPerCollection:
-    description: "The maximum number of entries allowed in a given collection's plan cache."
+    description: "The maximum number of entries allowed in a given collection's plan cache. Applies
+    only to the classic plan cache, not to the SBE plan cache."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryCacheMaxEntriesPerCollection"
     cpp_vartype: AtomicWord<int>
@@ -136,7 +145,8 @@ server_parameters:
     the estimate of the number of bytes used across all plan caches exceeds this threshold, then
     debug info is not stored alongside new cache entries, in order to limit plan cache memory
     consumption. If plan cache entries are freed and the estimate once again dips below this
-    threshold, then new cache entries will once again have debug info associated with them."
+    threshold, then new cache entries will once again have debug info associated with them. Applies
+    only to the classic plan cache, not to the SBE plan cache."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryCacheMaxSizeBytesBeforeStripDebugInfo"
     cpp_vartype: AtomicWord<long long>
@@ -146,22 +156,26 @@ server_parameters:
       gte: 0
 
   internalQueryCacheEvictionRatio:
-    description: "How many times more works must we perform in order to justify plan cache eviction and replanning?"
+    description: "How many times more works must we perform in order to justify plan cache eviction
+    and replanning?"
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryCacheEvictionRatio"
     cpp_vartype: AtomicDouble
     default: 10.0
     validator:
       gte: 0.0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryCacheWorksGrowthCoefficient:
-    description: "How quickly the the 'works' value in an inactive cache entry will grow. It grows exponentially. The value of this server parameter is the base."
+    description: "How quickly the the 'works' value in an inactive cache entry will grow. It grows
+    exponentially. The value of this server parameter is the base."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryCacheWorksGrowthCoefficient"
     cpp_vartype: AtomicDouble
     default: 2.0
     validator:
       gt: 1.0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryCacheDisableInactiveEntries:
     description: "Whether or not cache entries can be marked as 'inactive'."
@@ -169,6 +183,7 @@ server_parameters:
     cpp_varname: "internalQueryCacheDisableInactiveEntries"
     cpp_vartype: AtomicWord<bool>
     default: false
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   planCacheSize:
     description: "The maximum amount of memory that the system will allocate for the plan cache.
@@ -228,6 +243,7 @@ server_parameters:
     default: 64
     validator:
       gte: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryEnumerationPreferLockstepOrEnumeration:
     description: "If set to true, instructs the plan enumerator to enumerate contained $ors in a
@@ -247,6 +263,7 @@ server_parameters:
     cpp_varname: "internalQueryEnumerationPreferLockstepOrEnumeration"
     cpp_vartype: AtomicWord<bool>
     default: false
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryEnumerationMaxOrSolutions:
     description: "How many solutions will the enumerator consider at each OR?"
@@ -256,6 +273,7 @@ server_parameters:
     default: 10
     validator:
       gte: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryEnumerationMaxIntersectPerAnd:
     description: "How many intersections will the enumerator consider at each AND?"
@@ -265,6 +283,7 @@ server_parameters:
     default: 3
     validator:
       gte: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryPlanOrChildrenIndependently:
     description: "Do we want to plan each child of the OR independently?"
@@ -272,22 +291,27 @@ server_parameters:
     cpp_varname: "internalQueryPlanOrChildrenIndependently"
     cpp_vartype: AtomicWord<bool>
     default: true
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryMaxScansToExplode:
-    description: "How many index scans are we willing to produce in order to obtain a sort order during explodeForSort?"
+    description: "How many index scans are we willing to produce in order to obtain a sort order
+    during explodeForSort?"
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryMaxScansToExplode"
     cpp_vartype: AtomicWord<int>
     default: 200
     validator:
       gte: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryPlannerGenerateCoveredWholeIndexScans:
-    description: "Allow the planner to generate covered whole index scans, rather than falling back to a COLLSCAN."
+    description: "Allow the planner to generate covered whole index scans, rather than falling back
+    to a COLLSCAN."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryPlannerGenerateCoveredWholeIndexScans"
     cpp_vartype: AtomicWord<bool>
     default: false
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryIgnoreUnknownJSONSchemaKeywords:
     description: "Ignore unknown JSON Schema keywords."
@@ -310,6 +334,7 @@ server_parameters:
       expr: 100 * 1024 * 1024
     validator:
       gte: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryExecYieldIterations:
     description: "Yield after this many \"should yield?\" checks."
@@ -348,7 +373,8 @@ server_parameters:
       gt: 0
 
   internalLookupStageIntermediateDocumentMaxSizeBytes:
-    description: "Maximum size of the result set that we cache from the foreign collection during a $lookup."
+    description: "Maximum size of the result set that we cache from the foreign collection during a
+    $lookup."
     set_at: [ startup, runtime ]
     cpp_varname: "internalLookupStageIntermediateDocumentMaxSizeBytes"
     cpp_vartype: AtomicWord<long long>
@@ -358,7 +384,8 @@ server_parameters:
       gte: { expr: BSONObjMaxInternalSize}
 
   internalDocumentSourceGroupMaxMemoryBytes:
-    description: "Maximum size of the data that the $group aggregation stage will cache in-memory before spilling to disk."
+    description: "Maximum size of the data that the $group aggregation stage will cache in-memory
+    before spilling to disk."
     set_at: [ startup, runtime ]
     cpp_varname: "internalDocumentSourceGroupMaxMemoryBytes"
     cpp_vartype: AtomicWord<long long>
@@ -368,7 +395,8 @@ server_parameters:
       gt: 0
 
   internalDocumentSourceSetWindowFieldsMaxMemoryBytes:
-    description: "Maximum size of the data that the $setWindowFields aggregation stage will cache in-memory before throwing an error."
+    description: "Maximum size of the data that the $setWindowFields aggregation stage will cache
+    in-memory before throwing an error."
     set_at: [ startup, runtime ]
     cpp_varname: "internalDocumentSourceSetWindowFieldsMaxMemoryBytes"
     cpp_vartype: AtomicWord<long long>
@@ -389,7 +417,8 @@ server_parameters:
       gt: 0
 
   internalDocumentSourceCursorBatchSizeBytes:
-    description: "Maximum amount of data that DocumentSourceCursor will cache from the underlying PlanExecutor before pipeline processing."
+    description: "Maximum amount of data that DocumentSourceCursor will cache from the underlying
+    PlanExecutor before pipeline processing."
     set_at: [ startup, runtime ]
     cpp_varname: "internalDocumentSourceCursorBatchSizeBytes"
     cpp_vartype: AtomicWord<int>
@@ -399,7 +428,8 @@ server_parameters:
       gte: 0
 
   internalDocumentSourceLookupCacheSizeBytes:
-    description: "Maximum amount of non-correlated foreign-collection data that the $lookup stage will cache before abandoning the cache and executing the full pipeline on each iteration."
+    description: "Maximum amount of non-correlated foreign-collection data that the $lookup stage
+    will cache before abandoning the cache and executing the full pipeline on each iteration."
     set_at: [ startup, runtime ]
     cpp_varname: "internalDocumentSourceLookupCacheSizeBytes"
     cpp_vartype: AtomicWord<int>
@@ -409,7 +439,8 @@ server_parameters:
       gte: 0
 
   internalQueryProhibitBlockingMergeOnMongoS:
-    description: "If true, blocking stages such as $group or non-merging $sort will be prohibited from running on mongoS."
+    description: "If true, blocking stages such as $group or non-merging $sort will be prohibited
+    from running on mongoS."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryProhibitBlockingMergeOnMongoS"
     cpp_vartype: AtomicWord<bool>
@@ -428,7 +459,7 @@ server_parameters:
 
   internalQueryMaxPushBytes:
     description: "Limits the vector of values pushed into a single array while grouping with the
-        $push accumulator."
+    $push accumulator."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryMaxPushBytes"
     cpp_vartype: AtomicWord<int>
@@ -439,7 +470,7 @@ server_parameters:
 
   internalQueryMaxRangeBytes:
     description: "Limits the vector of values pushed into a single array while generating $range
-        result."
+    result."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryMaxRangeBytes"
     cpp_vartype: AtomicWord<int>
@@ -450,7 +481,7 @@ server_parameters:
 
   internalQueryMaxAddToSetBytes:
     description: "Limits the vector of values pushed into a single array while grouping with the
-        $addToSet accumulator."
+    $addToSet accumulator."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryMaxAddToSetBytes"
     cpp_vartype: AtomicWord<int>
@@ -460,7 +491,8 @@ server_parameters:
         gt: 0
 
   internalQueryJavaScriptHeapSizeLimitMB:
-    description: "Limits the JavaScript heap size used in aggregation. Will defer to the global 'jsHeapLimitMB' limit if the global limit is smaller."
+    description: "Limits the JavaScript heap size used in aggregation. Will defer to the global
+    'jsHeapLimitMB' limit if the global limit is smaller."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryJavaScriptHeapSizeLimitMB"
     cpp_vartype: AtomicWord<int>
@@ -468,7 +500,8 @@ server_parameters:
       expr: 100
 
   internalQueryJavaScriptFnTimeoutMillis:
-    description: "Limits the maximum allowed time a user-defined javascript function can run in a query."
+    description: "Limits the maximum allowed time a user-defined javascript function can run in a
+    query."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryJavaScriptFnTimeoutMillis"
     cpp_vartype: AtomicWord<int>
@@ -485,7 +518,8 @@ server_parameters:
     default: false
 
   internalQueryDefaultDOP:
-    description: "Default degree of parallelism. This an internal experimental parameter and should not be changed on live systems."
+    description: "Default degree of parallelism. This an internal experimental parameter and should
+    not be changed on live systems."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryDefaultDOP"
     cpp_vartype: AtomicWord<int>
@@ -493,6 +527,7 @@ server_parameters:
     test_only: true
     validator:
       gt: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryEnableLoggingV2OplogEntries:
     description: "If true, this node may log $v:2 delta-style oplog entries."
@@ -502,7 +537,8 @@ server_parameters:
     default: true
 
   internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals:
-    description: "Limits the number of statically known intervals that SBE can decompose index bounds into when possible."
+    description: "Limits the number of statically known intervals that SBE can decompose index
+    bounds into when possible."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals"
     cpp_vartype: AtomicWord<int>
@@ -510,6 +546,7 @@ server_parameters:
       expr: 1000
     validator:
         gt: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryEnableCSTParser:
     description: "If true, use the grammar-based parser and CST to parse queries."
@@ -545,7 +582,8 @@ server_parameters:
     description: "The memory check in HashAgg stage is done on every T'th processed record, where T
     is calculated adaptively based on the estimated memory used and its recent growth. This setting
     defines the percent of the remaining available memory to be used before the next check, given
-    the estimated growth speed per advance [see internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill]."
+    the estimated growth speed per advance [see
+    internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill]."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQuerySBEAggMemoryUseCheckMargin"
     cpp_vartype: AtomicDouble
@@ -558,7 +596,8 @@ server_parameters:
   internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtMost:
     description: "The memory check in HashAgg stage is done on every T'th processed record, where T
     is calculated adaptively based on the estimated memory used and its recent growth. This setting
-    defines the lower bound for T [see internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill]."
+    defines the lower bound for T [see
+    internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill]."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQuerySBEAggMemoryCheckPerAdvanceAtMost"
     cpp_vartype: AtomicWord<long long>
@@ -570,9 +609,10 @@ server_parameters:
   internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtLeast:
     description: "The memory check in HashAgg stage is done on every T'th processed record, where T
     is calculated adaptively based on the estimated memory used and its recent growth. This setting
-    defines the upper bound for T. If this setting is less than [see internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtMost],
-    the check will be done on every internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtLeast'th
-    processed record [see internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill]."
+    defines the upper bound for T. If this setting is less than [see
+    internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtMost], the check will be done on
+    every internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtLeast'th processed record
+    [see internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill]."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQuerySBEAggMemoryCheckPerAdvanceAtLeast"
     cpp_vartype: AtomicWord<long long>
@@ -582,8 +622,8 @@ server_parameters:
         gt: 0
 
   internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill:
-    description: "The max size in bytes that the hash table in a HashAgg stage can be
-    estimated to be before we spill to disk."
+    description: "The max size in bytes that the hash table in a HashAgg stage can be estimated to
+    be before we spill to disk."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill"
     cpp_vartype: AtomicWord<long long>
@@ -599,16 +639,19 @@ server_parameters:
     cpp_varname: "internalQueryForceClassicEngine"
     cpp_vartype: AtomicWord<bool>
     default: false
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryAppendIdToSetWindowFieldsSort:
-    description: "If true, appends _id to the sort stage generated by desugaring $setWindowFields to ensure deterministic sort order."
+    description: "If true, appends _id to the sort stage generated by desugaring $setWindowFields to
+    ensure deterministic sort order."
     set_at: [startup, runtime]
     cpp_varname: "internalQueryAppendIdToSetWindowFieldsSort"
     cpp_vartype: AtomicWord<bool>
     default: false
 
   internalQueryTopNAccumulatorBytes:
-    description: "Limits the vector of values pushed into a single array while grouping with the 'N' family of accumulators."
+    description: "Limits the vector of values pushed into a single array while grouping with the 'N'
+    family of accumulators."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryTopNAccumulatorBytes"
     cpp_vartype: AtomicWord<int>
@@ -618,8 +661,8 @@ server_parameters:
         gt: 0
 
   enableSearchMeta:
-    description: "Exists for backwards compatibility in startup parameters,
-      enabling this was required on 4.4 to access SEARCH_META variables. Does not do anything."
+    description: "Exists for backwards compatibility in startup parameters, enabling this was
+    required on 4.4 to access SEARCH_META variables. Does not do anything."
     set_at: [ startup, runtime ]
     cpp_varname: "enableSearchMeta"
     cpp_vartype: AtomicWord<bool>
@@ -659,64 +702,79 @@ server_parameters:
     default: false
 
   internalQueryEnableSamplingCardinalityEstimator:
-    description: "Set to use the sampling-based method for estimating cardinality."
+    description: "Set to use the sampling-based method for estimating cardinality in the Cascades
+    optimizer."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryEnableSamplingCardinalityEstimator"
     cpp_vartype: AtomicWord<bool>
     default: true
 
   internalQueryEnableCascadesOptimizer:
-    description: "Set to use the new optimizer path, must be used in conjunction with the feature flag."
+    description: "Set to use the new optimizer path, must be used in conjunction with the feature
+    flag."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryEnableCascadesOptimizer"
     cpp_vartype: AtomicWord<bool>
     default: false
 
   internalCascadesOptimizerDisableScan:
-    description: "Disable full collection scans."
+    description: "Disable full collection scans in the Cascades optimizer."
     set_at: [ startup, runtime ]
     cpp_varname: "internalCascadesOptimizerDisableScan"
     cpp_vartype: AtomicWord<bool>
     default: false
 
   internalCascadesOptimizerDisableIndexes:
-    description: "Disable index scan plans."
+    description: "Disable index scan plans in the Cascades optimizer."
     set_at: [ startup, runtime ]
     cpp_varname: "internalCascadesOptimizerDisableIndexes"
     cpp_vartype: AtomicWord<bool>
     default: false
 
   internalCascadesOptimizerDisableMergeJoinRIDIntersect:
-    description: "Disable index RID intersection via merge join."
+    description: "Disable index RID intersection via merge join in the Cascades optimizer."
     set_at: [ startup, runtime ]
     cpp_varname: "internalCascadesOptimizerDisableMergeJoinRIDIntersect"
     cpp_vartype: AtomicWord<bool>
     default: false
 
   internalCascadesOptimizerDisableHashJoinRIDIntersect:
-    description: "Disable index RID intersection via hash join."
+    description: "Disable index RID intersection via hash join in the Cascades optimizer."
     set_at: [ startup, runtime ]
     cpp_varname: "internalCascadesOptimizerDisableHashJoinRIDIntersect"
     cpp_vartype: AtomicWord<bool>
     default: false
 
   internalCascadesOptimizerDisableGroupByAndUnionRIDIntersect:
-    description: "Disable index RID intersection via group by and union."
+    description: "Disable index RID intersection via group by and union in the Cascades optimizer."
     set_at: [ startup, runtime ]
     cpp_varname: "internalCascadesOptimizerDisableGroupByAndUnionRIDIntersect"
     cpp_vartype: AtomicWord<bool>
     default: false
 
   internalCascadesOptimizerKeepRejectedPlans:
-    description: "Keep track of rejected plans in the memo."
+    description: "Keep track of rejected plans in the memo. Applies only to the Cascades optimizer."
     set_at: [ startup, runtime ]
     cpp_varname: "internalCascadesOptimizerKeepRejectedPlans"
     cpp_vartype: AtomicWord<bool>
     default: false
 
   internalCascadesOptimizerDisableBranchAndBound:
-    description: "Disable cascades branch-and-bound strategy, and fully evaluate all plans."
+    description: "Disable cascades branch-and-bound strategy, and fully evaluate all plans in the
+    Cascades optimizer."
     set_at: [ startup, runtime ]
     cpp_varname: "internalCascadesOptimizerDisableBranchAndBound"
     cpp_vartype: AtomicWord<bool>
     default: false
+
+# Note for adding additional query knobs:
+#
+# When adding a new query knob, you should consider whether or not you need to add an 'on_update'
+# hook to flush the SBE plan cache. If your knob affects the contents of SBE plans which may be
+# cached, then the SBE cache should be flushed when the value of the knob changes. This will ensure
+# that the application actually starts to get plans which reflect the new value of the knob, rather
+# than continuing to use stale cached plans.
+#
+# When adding a new query knob which flushes the SBE plan cache on update, you should test this
+# behavior by including the name of the new knob in the list at the top of the jstest
+# 'sbe_plan_cache_clear_on_param_change.js'.

@@ -99,22 +99,29 @@ size_t getPlanCacheSizeInBytes(const plan_cache_util::PlanCacheSizeParameter& pa
     return capPlanCacheSize(planCacheSize);
 }
 
-class PlanCacheSizeUpdaterImpl final : public plan_cache_util::PlanCacheSizeUpdater {
+class PlanCacheOnParamChangeUpdaterImpl final : public plan_cache_util::OnParamChangeUpdater {
 public:
-    void update(ServiceContext* serviceCtx,
-                plan_cache_util::PlanCacheSizeParameter parameter) final {
+    void updateCacheSize(ServiceContext* serviceCtx,
+                         plan_cache_util::PlanCacheSizeParameter parameter) final {
         if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
             auto size = getPlanCacheSizeInBytes(parameter);
             auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
             globalPlanCache->reset(size);
         }
     }
+
+    void clearCache(ServiceContext* serviceCtx) final {
+        if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+            auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
+            globalPlanCache->clear();
+        }
+    }
 };
 
 ServiceContext::ConstructorActionRegisterer planCacheRegisterer{
     "PlanCacheRegisterer", [](ServiceContext* serviceCtx) {
-        plan_cache_util::sbePlanCacheSizeUpdaterDecoration(serviceCtx) =
-            std::make_unique<PlanCacheSizeUpdaterImpl>();
+        plan_cache_util::sbePlanCacheOnParamChangeUpdater(serviceCtx) =
+            std::make_unique<PlanCacheOnParamChangeUpdaterImpl>();
 
         if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
             auto status = plan_cache_util::PlanCacheSizeParameter::parse(planCacheSize.get());

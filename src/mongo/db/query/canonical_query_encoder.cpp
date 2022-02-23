@@ -39,7 +39,6 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/projection.h"
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/base64.h"
 
@@ -604,25 +603,6 @@ void encodeFindCommandRequest(const FindCommandRequest& findCommand, BufBuilder*
     encodeBSONObj(findCommand.getMin());
     encodeBSONObj(findCommand.getMax());
 }
-
-void encodeQueryParameters(BufBuilder* bufBuilder) {
-    auto encodeBool = [bufBuilder](bool val) { bufBuilder->appendChar(val ? 't' : 'f'); };
-
-    encodeBool(internalQueryForceIntersectionPlans.load());
-    encodeBool(internalQueryPlannerEnableIndexIntersection.load());
-    encodeBool(internalQueryPlannerEnableHashIntersection.load());
-
-    bufBuilder->appendNum(internalQueryPlannerMaxIndexedSolutions.load());
-    encodeBool(internalQueryEnumerationPreferLockstepOrEnumeration.load());
-    bufBuilder->appendNum(internalQueryEnumerationMaxOrSolutions.load());
-    bufBuilder->appendNum(internalQueryEnumerationMaxIntersectPerAnd.load());
-    encodeBool(internalQueryPlanOrChildrenIndependently.load());
-    bufBuilder->appendNum(internalQueryMaxScansToExplode.load());
-    encodeBool(internalQueryPlannerGenerateCoveredWholeIndexScans.load());
-
-    bufBuilder->appendNum(internalQueryMaxBlockingSortMemoryUsageBytes.load());
-    bufBuilder->appendNum(internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals.load());
-}
 }  // namespace
 
 namespace canonical_query_encoder {
@@ -668,7 +648,6 @@ std::string encodeSBE(const CanonicalQuery& cq) {
     bufBuilder.appendStr(strBuilderEncoded, false /* includeEndingNull */);
 
     encodeFindCommandRequest(cq.getFindCommandRequest(), &bufBuilder);
-    encodeQueryParameters(&bufBuilder);
 
     return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
 }
