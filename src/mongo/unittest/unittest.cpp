@@ -613,6 +613,19 @@ std::vector<std::string> getAllSuiteNames() {
     return result;
 }
 
+UnitTest* UnitTest::getInstance() {
+    static auto p = new UnitTest;
+    return p;
+}
+
+const TestInfo* UnitTest::currentTestInfo() const {
+    return _currentTestInfo;
+}
+
+void UnitTest::setCurrentTestInfo(const TestInfo* testInfo) {
+    _currentTestInfo = testInfo;
+}
+
 template <ComparisonOp op>
 ComparisonAssertion<op> ComparisonAssertion<op>::make(const char* theFile,
                                                       unsigned theLine,

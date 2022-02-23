@@ -331,8 +331,9 @@
     class TEST_TYPE : public TEST_BASE {                                                       \
     private:                                                                                   \
         void _doTest() override;                                                               \
-        static inline const RegistrationAgent<TEST_TYPE> _agent{                               \
-            #FIXTURE_NAME, #TEST_NAME, __FILE__};                                              \
+        static inline const ::mongo::unittest::TestInfo _testInfo{                             \
+            #FIXTURE_NAME, #TEST_NAME, __FILE__, __LINE__};                                    \
+        static inline const RegistrationAgent<TEST_TYPE> _agent{&_testInfo};                   \
     };                                                                                         \
     void TEST_TYPE::_doTest()
 
@@ -492,6 +493,79 @@ struct OldStyleSuiteInitializer {
 
 
 /**
+ * Represents data about a single unit test.
+ */
+class TestInfo {
+public:
+    TestInfo(StringData suiteName, StringData testName, StringData file, unsigned int line)
+        : _suiteName(suiteName), _testName(testName), _file(file), _line(line) {}
+
+    StringData suiteName() const {
+        return _suiteName;
+    }
+    StringData testName() const {
+        return _testName;
+    }
+    StringData file() const {
+        return _file;
+    }
+    unsigned int line() const {
+        return _line;
+    }
+
+private:
+    StringData _suiteName;
+    StringData _testName;
+    StringData _file;
+    unsigned int _line;
+};
+
+
+/**
+ * UnitTest singleton class. Provides access to information about current execution state.
+ */
+class UnitTest {
+    UnitTest() = default;
+
+public:
+    static UnitTest* getInstance();
+
+    UnitTest(const UnitTest& other) = delete;
+    UnitTest& operator=(const UnitTest&) = delete;
+
+public:
+    /**
+     * Returns the currently running test, or `nullptr` if a test is not running.
+     */
+    const TestInfo* currentTestInfo() const;
+
+public:
+    /**
+     * Used to set/unset currently running test information.
+     */
+    class TestRunScope {
+    public:
+        explicit TestRunScope(const TestInfo* testInfo) {
+            UnitTest::getInstance()->setCurrentTestInfo(testInfo);
+        }
+
+        ~TestRunScope() {
+            UnitTest::getInstance()->setCurrentTestInfo(nullptr);
+        }
+    };
+
+private:
+    /**
+     * Sets the currently running tests. Internal: should only be used by unit test framework.
+     * testInfo - test info of the currently running test, or `nullptr` is a test is not running.
+     */
+    void setCurrentTestInfo(const TestInfo* testInfo);
+
+private:
+    const TestInfo* _currentTestInfo = nullptr;
+};
+
+/**
  * Base type for unit test fixtures.  Also, the default fixture type used
  * by the TEST() macro.
  */
@@ -522,32 +596,32 @@ protected:
     class RegistrationAgent {
     public:
         /**
-         * These StringData must point to data that outlives this RegistrationAgent.
-         * In the case of TEST/TEST_F, these are string literals.
+         * These TestInfo must point to data that outlives this RegistrationAgent.
+         * In the case of TEST/TEST_F, these are static variables.
          */
-        RegistrationAgent(StringData suiteName, StringData testName, StringData fileName)
-            : _suiteName{suiteName}, _testName{testName}, _fileName{fileName} {
-            Suite::getSuite(_suiteName).add(std::string{_testName}, std::string{_fileName}, [] {
-                T{}.run();
-            });
+        explicit RegistrationAgent(const TestInfo* testInfo) : _testInfo{testInfo} {
+            Suite::getSuite(_testInfo->suiteName())
+                .add(
+                    std::string{_testInfo->testName()}, std::string{_testInfo->file()}, [testInfo] {
+                        UnitTest::TestRunScope trs(testInfo);
+                        T{}.run();
+                    });
         }
 
         StringData getSuiteName() const {
-            return _suiteName;
+            return _testInfo->suiteName();
         }
 
         StringData getTestName() const {
-            return _testName;
+            return _testInfo->testName();
         }
 
         StringData getFileName() const {
-            return _fileName;
+            return _testInfo->file();
         }
 
     private:
-        StringData _suiteName;
-        StringData _testName;
-        StringData _fileName;
+        const TestInfo* _testInfo;
     };
 
     /**
