@@ -148,3 +148,7 @@ feature_flags:
         description: "When enabled, support selective backups and restores on collections"
         cpp_varname: feature_flags::gSelectiveBackup
         default: false
+    featureFlagBatchMultiDeletes:
+        description: "When enabled, support batching multi-document deletions"
+        cpp_varname: feature_flags::gBatchMultiDeletes
+        default: false
