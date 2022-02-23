@@ -36,6 +36,7 @@
 
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/string_data.h"
+#include "mongo/config.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -110,11 +111,13 @@ TEST(Construction, Constexpr) {
 
 class StringDataDeathTest : public unittest::Test {};
 
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
 DEATH_TEST(StringDataDeathTest,
            InvariantNullRequiresEmpty,
            "StringData(nullptr,len) requires len==0") {
-    StringData bad{nullptr, 1};
+    [[maybe_unused]] StringData bad{nullptr, 1};
 }
+#endif
 
 TEST(Comparison, BothEmpty) {
     StringData empty("");

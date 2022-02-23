@@ -41,6 +41,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/debug_util.h"
 #define MONGO_ALLOW_INCLUDE_INVARIANT_H
 #include "mongo/util/invariant.h"
 #undef MONGO_ALLOW_INCLUDE_INVARIANT_H
@@ -97,7 +98,7 @@ public:
      * characters in the half-open interval `[c, c + len)` must be valid.
      */
     constexpr StringData(const char* c, size_t len) : StringData(c, len, TrustedInitTag()) {
-        if (!MONGO_likely(_data || (_size == 0)))
+        if (MONGO_unlikely(kDebugBuild && !_data && (_size != 0)))
             invariant(0, "StringData(nullptr,len) requires len==0");
     }
 
