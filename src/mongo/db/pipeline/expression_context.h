@@ -110,6 +110,15 @@ public:
     };
 
     /**
+     * The structure ExpressionCounters encapsulates counters for match, aggregate, and other
+     * expression types as seen in end-user queries.
+     */
+    struct ExpressionCounters {
+        StringMap<uint64_t> aggExprCountersMap;
+        StringMap<uint64_t> matchExprCountersMap;
+    };
+
+    /**
      * Constructs an ExpressionContext to be used for Pipeline parsing and evaluation.
      * 'resolvedNamespaces' maps collection names (not full namespaces) to ResolvedNamespaces.
      */
@@ -316,10 +325,19 @@ public:
     void incrementMatchExprCounter(StringData name);
 
     /**
+     * Increment the counter for the aggregate expression with a given name.
+     */
+    void incrementAggExprCounter(StringData name);
+
+    /**
      * Merge expression counters from the current expression context into the global maps
      * and stop counting.
      */
     void stopExpressionCounters();
+
+    bool expressionCountersAreActive() {
+        return _expressionCounters.is_initialized();
+    }
 
     // The explain verbosity requested by the user, or boost::none if no explain was requested.
     boost::optional<ExplainOptions::Verbosity> explain;
@@ -389,6 +407,29 @@ public:
 
     // True if this ExpressionContext is used to parse a collection validator expression.
     bool isParsingCollectionValidator = false;
+
+    // Indicates where there is any chance this operation will be profiled. Must be set at
+    // construction.
+    const bool mayDbProfile = true;
+
+    // These fields can be used in a context when API version validations were not enforced during
+    // parse time (Example creating a view or validator), but needs to be enforce while querying
+    // later.
+    bool exprUnstableForApiV1 = false;
+    bool exprDeprectedForApiV1 = false;
+
+    // Tracks whether the collator to use for the aggregation matches the default collation of the
+    // collection or view. For collectionless aggregates this is set to 'kNoDefaultCollation'.
+    enum class CollationMatchesDefault { kNoDefault, kYes, kNo };
+    CollationMatchesDefault collationMatchesDefault = CollationMatchesDefault::kNoDefault;
+
+    // When non-empty, contains the unmodified user provided aggregation command.
+    BSONObj originalAggregateCommand;
+
+    // True if the expression context is the original one for a given pipeline.
+    // False if another context is created for the same pipeline. Used to disable duplicate
+    // expression counting.
+    bool enabledCounters = true;
 
 protected:
     static const int kInterruptCheckPeriod = 128;

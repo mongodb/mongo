@@ -79,6 +79,7 @@ Status ParsedDelete::parseRequest() {
         return Status::OK();
     }
 
+    _expCtx->startExpressionCounters();
     return parseQueryToCQ();
 }
 

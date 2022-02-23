@@ -46,6 +46,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/regex_util.h"
@@ -123,6 +124,8 @@ void Expression::registerExpression(
             str::stream() << "Duplicate expression (" << key << ") registered.",
             op == parserMap.end());
     parserMap[key] = {parser, requiredMinVersion};
+    // Add this expression to the global map of operator counters for expressions.
+    operatorCountersAggExpressions.addAggExpressionCounter(key);
 }
 
 intrusive_ptr<Expression> Expression::parseExpression(
@@ -155,6 +158,9 @@ intrusive_ptr<Expression> Expression::parseExpression(
                           << " for more information.",
             !expCtx->maxFeatureCompatibilityVersion || !entry.requiredMinVersion ||
                 (*entry.requiredMinVersion <= *expCtx->maxFeatureCompatibilityVersion));
+
+    // Increment the counter for this expression in the current context.
+    expCtx->incrementAggExprCounter(opName);
     return entry.parser(expCtx, obj.firstElement(), vps);
 }
 

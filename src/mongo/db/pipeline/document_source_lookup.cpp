@@ -674,8 +674,10 @@ void DocumentSourceLookUp::resolveLetVariables(const Document& localDoc, Variabl
 
 void DocumentSourceLookUp::initializeResolvedIntrospectionPipeline() {
     copyVariablesToExpCtx(_variables, _variablesParseState, _fromExpCtx.get());
+    _fromExpCtx->startExpressionCounters();
     _resolvedIntrospectionPipeline =
         Pipeline::parse(_resolvedPipeline, _fromExpCtx, lookupPipeValidator);
+    _fromExpCtx->stopExpressionCounters();
 }
 
 void DocumentSourceLookUp::serializeToArray(
