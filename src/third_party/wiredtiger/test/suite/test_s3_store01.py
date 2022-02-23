@@ -32,17 +32,18 @@ FileSystem = wiredtiger.FileSystem  # easy access to constants
 # test_s3_store01.py
 #   Test minimal S3 extension with basic interactions with AWS S3CrtClient.
 class test_s3_store01(wttest.WiredTigerTestCase):
+
+    # Save all references so that we can cleanup properly on failure.
+    storage_sources = []
+
     # Generates a unique prefix to be used with the object keys, eg:
     # "s3test_artefacts/python_2022-31-01-16-34-10_623843294/"
     prefix = 's3test_artefacts/python_'
     prefix += datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
     # Range upto int32_max, matches that of C++'s std::default_random_engine
-    prefix += '_' + str(random.randrange(1,2147483646))
-    prefix += "/"
+    prefix += '_' + str(random.randrange(1, 2147483646)) + '/'
 
-    fs_config = 'prefix=' + prefix
-
-    fs_config += ',region=ap-southeast-2'
+    fs_config = 'prefix=' + prefix + ',region=ap-southeast-2'
 
     # Bucket name can be overridden by an environment variable.
     bucket_name = os.getenv('WT_S3_EXT_BUCKET')
@@ -53,6 +54,7 @@ class test_s3_store01(wttest.WiredTigerTestCase):
     access_key = os.getenv('AWS_ACCESS_KEY_ID')
     secret_key = os.getenv('AWS_SECRET_ACCESS_KEY')
     auth_token = None
+
     if access_key and secret_key:
         auth_token = access_key + "," + secret_key
 
@@ -62,9 +64,18 @@ class test_s3_store01(wttest.WiredTigerTestCase):
         extlist.extension('storage_sources', 's3_store=(config=\"(verbose=-3)\")')
 
     def get_s3_storage_source(self):
-        return self.conn.get_storage_source('s3_store')
+        ss = self.conn.get_storage_source('s3_store')
+        self.storage_sources.append(ss)
+        return ss
+    
+    # Override wttest tearDown to ensure storage sources are properly terminated
+    # on both success and failure.
+    def tearDown(self):
+        for ss in self.storage_sources:
+            ss.terminate(self.session)
+        super(test_s3_store01, self).tearDown()
 
-    def test_local_basic(self):
+    def test_s3_storage_source(self):
         # Test some basic functionality of the storage source API, calling
         # each supported method in the API at least once.
         cache_prefix = "cache-"
@@ -73,8 +84,13 @@ class test_s3_store01(wttest.WiredTigerTestCase):
     
         session = self.session
         s3_store = self.get_s3_storage_source()
-        fs = s3_store.ss_customize_file_system(session, self.bucket_name, self.auth_token, self.fs_config)
-       
+        fs = s3_store.ss_customize_file_system(session, self.bucket_name,
+            self.auth_token, self.fs_config)
+
+        # Test that we handle references correctly.
+        s3_store_x = self.get_s3_storage_source()
+        s3_store_y = self.get_s3_storage_source()
+
         # Test flush functionality and flushing to cache and checking if file exists.
         f = open(filename, 'wb')
         outbytes = ('MORE THAN ENOUGH DATA\n'*100000).encode()
@@ -85,7 +101,8 @@ class test_s3_store01(wttest.WiredTigerTestCase):
         s3_store.ss_flush_finish(session, fs, filename, object_name)
         self.assertTrue(fs.fs_exist(session, filename))
 
-        fh = fs.fs_open_file(session, filename, FileSystem.open_file_type_data, FileSystem.open_readonly)
+        fh = fs.fs_open_file(session, filename, FileSystem.open_file_type_data,
+            FileSystem.open_readonly)
         inbytes = bytes(1000000)         # An empty buffer with a million zero bytes.
         fh.fh_read(session, 0, inbytes)  # Read into the buffer.
         self.assertEquals(outbytes[0:1000000], inbytes)
@@ -93,16 +110,18 @@ class test_s3_store01(wttest.WiredTigerTestCase):
         self.assertEquals(fh.fh_size(session), len(outbytes))
         fh.close(session)
 
-        # Checking that the file still exists in S3 after removing it from the cache.
+        # Check that the file still exists in S3 after removing it from the cache.
         os.remove(cache_prefix + self.bucket_name + '/' + filename)
         self.assertTrue(fs.fs_exist(session, filename))
         file_list = [object_name]
         self.assertEquals(fs.fs_directory_list(session, None, None), file_list)
 
-        fs2 = s3_store.ss_customize_file_system(session, self.bucket_name, self.auth_token, self.fs_config)
+        fs2 = s3_store.ss_customize_file_system(session, self.bucket_name,
+            self.auth_token, self.fs_config)
         self.assertEquals(fs.fs_directory_list(session, None, None), file_list)
 
-        s3_store.terminate(session)
+        # Take one more reference for the road.
+        s3_store_z = self.get_s3_storage_source()
 
 if __name__ == '__main__':
     wttest.run()
