@@ -1663,6 +1663,7 @@ functions:
       type: test
       params:
         binary: bash
+        redirect_standard_error_to_output: true
         args:
           - "./src/evergreen/selinux_run_test.sh"
         env:
