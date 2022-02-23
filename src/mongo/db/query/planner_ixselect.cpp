@@ -175,12 +175,15 @@ bool QueryPlannerIXSelect::notEqualsNullCanUseIndex(const IndexEntry& index,
     }
 }
 
-static double fieldWithDefault(const BSONObj& infoObj, const string& name, double def) {
-    BSONElement e = infoObj[name];
-    if (e.isNumber()) {
-        return e.numberDouble();
-    }
-    return def;
+bool QueryPlannerIXSelect::canUseIndexForNin(const InMatchExpression* ime) {
+    const std::vector<BSONElement>& inList = ime->getEqualities();
+    auto containsNull = [](const BSONElement& elt) { return elt.type() == jstNULL; };
+    auto containsEmptyArray = [](const BSONElement& elt) {
+        return elt.type() == Array && elt.embeddedObject().isEmpty();
+    };
+    return ime->getRegexes().empty() && inList.size() == 2 &&
+        std::any_of(inList.begin(), inList.end(), containsNull) &&
+        std::any_of(inList.begin(), inList.end(), containsEmptyArray);
 }
 
 /**
@@ -432,13 +435,6 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
                 return false;
             }
 
-            // Comparisons with arrays have strange enough semantics that inverting the bounds
-            // within a $not has many complex special cases. We avoid indexing these queries, even
-            // though it is sometimes possible to build useful bounds.
-            if (isComparisonWithArrayPred(child)) {
-                return false;
-            }
-
             // $gt and $lt to MinKey/MaxKey must build inexact bounds if the index is multikey and
             // therefore cannot be inverted safely in a $not.
             if (index.multikey && (child->isGTMinKey() || child->isLTMaxKey())) {
@@ -457,6 +453,12 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             // If it's a negated $in, it can't have any REGEX's inside.
             if (MatchExpression::MATCH_IN == childtype) {
                 InMatchExpression* ime = static_cast<InMatchExpression*>(node->getChild(0));
+
+                if (canUseIndexForNin(ime)) {
+                    // This is a case that we know is supported.
+                    return true;
+                }
+
                 if (!ime->getRegexes().empty()) {
                     return false;
                 }
@@ -466,6 +468,13 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
                 if (!canUseIndexForNeNull && ime->hasNull()) {
                     return false;
                 }
+            }
+
+            // Comparisons with arrays have strange enough semantics that inverting the bounds
+            // within a $not has many complex special cases. We avoid indexing these queries, even
+            // though it is sometimes possible to build useful bounds.
+            if (isComparisonWithArrayPred(child)) {
+                return false;
             }
         }
 

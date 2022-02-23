@@ -81,8 +81,13 @@ bool filterMatches(const BSONObj& testFilter,
     if (!statusWithMatcher.isOK()) {
         return false;
     }
-    const std::unique_ptr<MatchExpression> root = std::move(statusWithMatcher.getValue());
+    std::unique_ptr<MatchExpression> root = std::move(statusWithMatcher.getValue());
     MatchExpression::sortTree(root.get());
+    if (root->matchType() == mongo::MatchExpression::NOT) {
+        // Ideally we would optimize() everything, but some of the tests depend on structural
+        // equivalence of single-arg $or expressions.
+        root = MatchExpression::optimize(std::move(root));
+    }
     std::unique_ptr<MatchExpression> trueFilter(trueFilterNode->filter->shallowClone());
     MatchExpression::sortTree(trueFilter.get());
     return trueFilter->equivalent(root.get());

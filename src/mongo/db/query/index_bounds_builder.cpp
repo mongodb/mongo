@@ -122,6 +122,7 @@ bool stringMayHaveUnescapedPipe(StringData str) {
 
 const BSONObj kUndefinedElementObj = BSON("" << BSONUndefined);
 const BSONObj kNullElementObj = BSON("" << BSONNULL);
+const BSONObj kEmptyArrayElementObj = BSON("" << BSONArray());
 
 const Interval kHashedUndefinedInterval = IndexBoundsBuilder::makePointInterval(
     ExpressionMapping::hash(kUndefinedElementObj.firstElement()));
@@ -561,6 +562,21 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             oilOut->intervals.push_back(makeNullPointInterval(isHashed));
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
             return;
+        }
+
+        if (MatchExpression::MATCH_IN == child->matchType()) {
+            auto ime = static_cast<const InMatchExpression*>(child);
+            if (QueryPlannerIXSelect::canUseIndexForNin(ime)) {
+                makeNullEqualityBounds(index, isHashed, oilOut, tightnessOut);
+                oilOut->intervals.push_back(
+                    IndexBoundsBuilder::makePointInterval(kEmptyArrayElementObj));
+                oilOut->complement();
+                unionize(oilOut);
+                if (index.pathHasMultikeyComponent(elt.fieldNameStringData())) {
+                    *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+                }
+                return;
+            }
         }
 
         _translatePredicate(child, elt, index, oilOut, tightnessOut);
