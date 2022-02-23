@@ -51,6 +51,50 @@ namespace mongo {
 // Fail point to set current time for time-based expiration of pre-images.
 MONGO_FAIL_POINT_DEFINE(changeStreamPreImageRemoverCurrentTime);
 
+namespace preImageRemoverInternal {
+
+bool PreImageAttributes::isExpiredPreImage(const boost::optional<Date_t>& preImageExpirationTime,
+                                           const Timestamp& earliestOplogEntryTimestamp) {
+    // Pre-image oplog entry is no longer present in the oplog if its timestamp is smaller
+    // than the 'earliestOplogEntryTimestamp'.
+    const bool preImageOplogEntryIsDeleted = ts < earliestOplogEntryTimestamp;
+    const auto expirationTime = preImageExpirationTime.get_value_or(Date_t::min());
+
+    // Pre-image is expired if its corresponding oplog entry is deleted or its operation
+    // time is less than or equal to the expiration time.
+    return preImageOplogEntryIsDeleted || operationTime <= expirationTime;
+}
+
+// Get the 'expireAfterSeconds' from the 'ChangeStreamOptions' if present, boost::none otherwise.
+boost::optional<std::int64_t> getExpireAfterSecondsFromChangeStreamOptions(
+    ChangeStreamOptions& changeStreamOptions) {
+    if (auto preAndPostImages = changeStreamOptions.getPreAndPostImages(); preAndPostImages &&
+        preAndPostImages->getExpireAfterSeconds() &&
+        !stdx::holds_alternative<std::string>(*preAndPostImages->getExpireAfterSeconds())) {
+        return stdx::get<std::int64_t>(*preAndPostImages->getExpireAfterSeconds());
+    }
+
+    return boost::none;
+}
+
+// Returns pre-images expiry time in milliseconds since the epoch time if configured, boost::none
+// otherwise.
+boost::optional<Date_t> getPreImageExpirationTime(OperationContext* opCtx, Date_t currentTime) {
+    boost::optional<std::int64_t> expireAfterSeconds = boost::none;
+
+    // Get the expiration time directly from the change stream manager.
+    if (auto changeStreamOptions = ChangeStreamOptionsManager::get(opCtx).getOptions(opCtx)) {
+        expireAfterSeconds = getExpireAfterSecondsFromChangeStreamOptions(*changeStreamOptions);
+    }
+
+    // A pre-image is eligible for deletion if:
+    //   pre-image's op-time + expireAfterSeconds  < currentTime.
+    return expireAfterSeconds ? boost::optional<Date_t>(currentTime - Seconds(*expireAfterSeconds))
+                              : boost::none;
+}
+
+}  // namespace preImageRemoverInternal
+
 namespace {
 
 RecordId toRecordId(ChangeStreamPreImageId id) {
@@ -91,12 +135,6 @@ public:
     // pre-image documents of one collection eligible for deletion due to expiration. Lower and
     // upper bounds of a range are inclusive.
     class Iterator {
-        struct PreImageAttributes {
-            mongo::UUID collectionUUID;
-            Timestamp ts;
-            Date_t operationTime;
-        };
-
     public:
         using RecordIdRange = std::pair<RecordId, RecordId>;
 
@@ -143,7 +181,7 @@ public:
         void advance() {
             const auto getNextPreImageAttributes =
                 [&](std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>& planExecutor)
-                -> boost::optional<PreImageAttributes> {
+                -> boost::optional<preImageRemoverInternal::PreImageAttributes> {
                 BSONObj preImageObj;
                 if (planExecutor->getNext(&preImageObj, nullptr) == PlanExecutor::IS_EOF) {
                     return boost::none;
@@ -177,7 +215,8 @@ public:
 
                 // If the first pre-image in the current collection is not expired, fetch the first
                 // pre-image from the next collection.
-                if (!isExpiredPreImage(*preImageAttributes)) {
+                if (!preImageAttributes->isExpiredPreImage(_preImageExpirationTime,
+                                                           _earliestOplogEntryTimestamp)) {
                     continue;
                 }
 
@@ -199,7 +238,8 @@ public:
                     // Iterate over all the expired pre-images in the collection in order to find
                     // the max RecordId.
                     while ((preImageAttributes = getNextPreImageAttributes(planExecutor)) &&
-                           isExpiredPreImage(*preImageAttributes) &&
+                           preImageAttributes->isExpiredPreImage(_preImageExpirationTime,
+                                                                 _earliestOplogEntryTimestamp) &&
                            preImageAttributes->collectionUUID == currentCollectionUUID) {
                         lastExpiredPreimageTs = preImageAttributes->ts;
                     }
@@ -223,22 +263,6 @@ public:
                 return;
             }
         }
-
-        // Computes if the pre-image is considered expired based on the expiration parameter being
-        // set.
-        bool isExpiredPreImage(const PreImageAttributes& preImageAttributes) const {
-            // Pre-image oplog entry is no longer present in the oplog if its timestamp is smaller
-            // than the 'earliestOplogEntryTimestamp'.
-            const bool preImageOplogEntryIsDeleted =
-                preImageAttributes.ts < _earliestOplogEntryTimestamp;
-            const auto expirationTime = _preImageExpirationTime.get_value_or(Date_t::min());
-
-            // Pre-image is expired if its corresponding oplog entry is deleted or its operation
-            // time is less than or equal to the expiration time.
-            return preImageOplogEntryIsDeleted ||
-                preImageAttributes.operationTime <= expirationTime;
-        }
-
 
         // Set up the new collection scan to start from the 'minKey'.
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createCollectionScan(
@@ -292,34 +316,6 @@ private:
     const boost::optional<Date_t> _preImageExpirationTime;
 };
 
-// Get the 'expireAfterSeconds' from the 'ChangeStreamOptions' if present, boost::none otherwise.
-boost::optional<std::int64_t> getExpireAfterSecondsFromChangeStreamOptions(
-    ChangeStreamOptions& changeStreamOptions) {
-    if (auto preAndPostImages = changeStreamOptions.getPreAndPostImages(); preAndPostImages &&
-        preAndPostImages->getExpireAfterSeconds() &&
-        !stdx::holds_alternative<std::string>(*preAndPostImages->getExpireAfterSeconds())) {
-        return stdx::get<std::int64_t>(*preAndPostImages->getExpireAfterSeconds());
-    }
-
-    return boost::none;
-}
-
-// Returns pre-images expiry time in milliseconds since the epoch time if configured, boost::none
-// otherwise.
-boost::optional<Date_t> getPreImageExpirationTime(OperationContext* opCtx, Date_t currentTime) {
-    boost::optional<std::int64_t> expireAfterSeconds = boost::none;
-
-    // Get the expiration time directly from the change stream manager.
-    if (auto changeStreamOptions = ChangeStreamOptionsManager::get(opCtx).getOptions(opCtx)) {
-        expireAfterSeconds = getExpireAfterSecondsFromChangeStreamOptions(*changeStreamOptions);
-    }
-
-    // A pre-image is eligible for deletion if:
-    //   pre-image's op-time + expireAfterSeconds  < currentTime.
-    return expireAfterSeconds ? boost::optional<Date_t>(currentTime - Seconds(*expireAfterSeconds))
-                              : boost::none;
-}
-
 void deleteExpiredChangeStreamPreImages(Client* client, Date_t currentTimeForTimeBasedExpiration) {
     const auto startTime = Date_t::now();
     auto opCtx = client->makeOperationContext();
@@ -350,7 +346,8 @@ void deleteExpiredChangeStreamPreImages(Client* client, Date_t currentTimeForTim
         opCtx.get(),
         &preImagesColl,
         currentEarliestOplogEntryTs,
-        getPreImageExpirationTime(opCtx.get(), currentTimeForTimeBasedExpiration));
+        ::mongo::preImageRemoverInternal::getPreImageExpirationTime(
+            opCtx.get(), currentTimeForTimeBasedExpiration));
 
     for (const auto& collectionRange : expiredPreImages) {
         writeConflictRetry(opCtx.get(),
@@ -439,5 +436,4 @@ void PeriodicChangeStreamExpiredPreImagesRemover::_init(ServiceContext* serviceC
 
     _anchor = std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
 }
-
 }  // namespace mongo

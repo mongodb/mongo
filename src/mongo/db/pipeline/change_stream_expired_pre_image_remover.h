@@ -29,12 +29,35 @@
 
 #pragma once
 
+#include "mongo/db/commands/change_stream_options_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
+
+namespace preImageRemoverInternal {
+
+/**
+ * Specifies attributes that determines if the pre-image has been expired or not.
+ */
+struct PreImageAttributes {
+    mongo::UUID collectionUUID;
+    Timestamp ts;
+    Date_t operationTime;
+
+    /**
+     * Determines if the pre-image is considered expired based on the expiration parameter being
+     * set.
+     */
+    bool isExpiredPreImage(const boost::optional<Date_t>& preImageExpirationTime,
+                           const Timestamp& earliestOplogEntryTimestamp);
+};
+
+boost::optional<Date_t> getPreImageExpirationTime(OperationContext* opCtx, Date_t currentTime);
+
+}  // namespace preImageRemoverInternal
 
 class ServiceContext;
 
