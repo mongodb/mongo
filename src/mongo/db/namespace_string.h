@@ -102,6 +102,9 @@ public:
     // Namespace for storing the logical sessions information
     static const NamespaceString kLogicalSessionsNamespace;
 
+    // Namespace for storing databases information
+    static const NamespaceString kConfigDatabasesNamespace;
+
     // Namespace for storing the transaction information for each session
     static const NamespaceString kSessionTransactionsTableNamespace;
 

@@ -49,8 +49,10 @@ std::shared_ptr<RemoteCommandTargeterMock> MigrationTestFixture::shardTargeterMo
 
 void MigrationTestFixture::setUpDatabase(const std::string& dbName, const ShardId primaryShard) {
     DatabaseType db(dbName, primaryShard, true, DatabaseVersion(UUID::gen(), Timestamp()));
-    ASSERT_OK(catalogClient()->insertConfigDocument(
-        operationContext(), DatabaseType::ConfigNS, db.toBSON(), kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    NamespaceString::kConfigDatabasesNamespace,
+                                                    db.toBSON(),
+                                                    kMajorityWriteConcern));
 }
 
 void MigrationTestFixture::setUpCollection(

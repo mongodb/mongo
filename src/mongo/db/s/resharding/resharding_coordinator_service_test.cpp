@@ -384,7 +384,7 @@ public:
                            coordinatorDoc.getDonorShards().front().getId(),
                            true,
                            DatabaseVersion{UUID::gen(), Timestamp(1, 1)});
-        client.insert(DatabaseType::ConfigNS.ns(), dbDoc.toBSON());
+        client.insert(NamespaceString::kConfigDatabasesNamespace.ns(), dbDoc.toBSON());
 
         return coordinatorDoc;
     }

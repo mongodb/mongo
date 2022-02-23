@@ -35,7 +35,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_database.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/database_version.h"
@@ -205,7 +205,8 @@ TEST_F(CatalogCacheRefreshTest, DatabaseBSONCorrupted) {
         FAIL(str::stream() << "Returning corrupted database entry did not fail and returned "
                            << cm.toString());
     } catch (const DBException& ex) {
-        ASSERT_EQ(ErrorCodes::NoSuchKey, ex.code());
+        constexpr int kParseError = 40414;
+        ASSERT_EQ(ErrorCodes::Error(kParseError), ex.code());
     }
 }
 

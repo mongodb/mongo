@@ -336,9 +336,9 @@ Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx) {
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                             repl::ReadConcernLevel::kMajorityReadConcern,
-                                            DatabaseType::ConfigNS,
-                                            BSON(DatabaseType::name << _dbname),
-                                            BSON(DatabaseType::name << -1),
+                                            NamespaceString::kConfigDatabasesNamespace,
+                                            BSON(DatabaseType::kNameFieldName << _dbname),
+                                            BSON(DatabaseType::kNameFieldName << -1),
                                             1));
 
     const auto databasesVector = std::move(findResponse.docs);
@@ -347,7 +347,8 @@ Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx) {
                           << "', but found no databases",
             !databasesVector.empty());
 
-    const auto dbType = uassertStatusOK(DatabaseType::fromBSON(databasesVector.front()));
+    const auto dbType =
+        DatabaseType::parse(IDLParserErrorContext("DatabaseType"), databasesVector.front());
 
     if (dbType.getPrimary() == _toShard) {
         return Status::OK();
@@ -360,13 +361,14 @@ Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx) {
 
     newDbType.setVersion(currentDatabaseVersion.makeUpdated());
 
-    auto updateQueryBuilder = BSONObjBuilder(BSON(DatabaseType::name << _dbname));
-    updateQueryBuilder.append(DatabaseType::version.name(), currentDatabaseVersion.toBSON());
+    auto const updateQuery =
+        BSON(DatabaseType::kNameFieldName << _dbname << DatabaseType::kVersionFieldName
+                                          << currentDatabaseVersion.toBSON());
 
     auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
         opCtx,
-        DatabaseType::ConfigNS,
-        updateQueryBuilder.obj(),
+        NamespaceString::kConfigDatabasesNamespace,
+        updateQuery,
         newDbType.toBSON(),
         false,
         ShardingCatalogClient::kMajorityWriteConcern);

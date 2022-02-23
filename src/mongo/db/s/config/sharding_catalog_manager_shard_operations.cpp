@@ -68,7 +68,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/type_database.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -748,8 +748,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             {
                 const auto status = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
                     opCtx,
-                    DatabaseType::ConfigNS,
-                    BSON(DatabaseType::name(dbName)),
+                    NamespaceString::kConfigDatabasesNamespace,
+                    BSON(DatabaseType::kNameFieldName << dbName),
                     dbt.toBSON(),
                     true,
                     ShardingCatalogClient::kLocalWriteConcern);
@@ -910,8 +910,10 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     const auto chunkCount = uassertStatusOK(
         _runCountCommandOnConfig(opCtx, ChunkType::ConfigNS, BSON(ChunkType::shard(name))));
 
-    const auto databaseCount = uassertStatusOK(
-        _runCountCommandOnConfig(opCtx, DatabaseType::ConfigNS, BSON(DatabaseType::primary(name))));
+    const auto databaseCount =
+        uassertStatusOK(_runCountCommandOnConfig(opCtx,
+                                                 NamespaceString::kConfigDatabasesNamespace,
+                                                 BSON(DatabaseType::kPrimaryFieldName << name)));
 
     const auto jumboCount = uassertStatusOK(_runCountCommandOnConfig(
         opCtx, ChunkType::ConfigNS, BSON(ChunkType::shard(name) << ChunkType::jumbo(true))));

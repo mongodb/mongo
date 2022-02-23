@@ -47,7 +47,7 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_database.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_version.h"
@@ -176,8 +176,9 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
         ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  DatabaseType::ConfigNS);
-        ASSERT_BSONOBJ_EQ(query->getFilter(), BSON(DatabaseType::name(expectedDb.getName())));
+                  NamespaceString::kConfigDatabasesNamespace);
+        ASSERT_BSONOBJ_EQ(query->getFilter(),
+                          BSON(DatabaseType::kNameFieldName << expectedDb.getName()));
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
         ASSERT(!query->getLimit());
 
@@ -920,9 +921,9 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
         ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  DatabaseType::ConfigNS);
+                  NamespaceString::kConfigDatabasesNamespace);
         ASSERT_BSONOBJ_EQ(query->getFilter(),
-                          BSON(DatabaseType::primary(dbt1.getPrimary().toString())));
+                          BSON(DatabaseType::kPrimaryFieldName << dbt1.getPrimary()));
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
@@ -951,7 +952,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardInvalidDoc) {
             "db1", {"shard0000"}, false, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
         return vector<BSONObj>{
             dbt1.toBSON(),
-            BSON(DatabaseType::name() << 0)  // DatabaseType::name() should be a string
+            BSON(DatabaseType::kNameFieldName << 0)  // Database name should be a string
         };
     });
 
@@ -1057,13 +1058,13 @@ TEST_F(ShardingCatalogClientTest, UpdateDatabase) {
         "test", ShardId("shard0000"), true, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     auto future = launchAsync([this, dbt] {
-        auto status =
-            catalogClient()->updateConfigDocument(operationContext(),
-                                                  DatabaseType::ConfigNS,
-                                                  BSON(DatabaseType::name(dbt.getName())),
-                                                  dbt.toBSON(),
-                                                  true,
-                                                  ShardingCatalogClient::kMajorityWriteConcern);
+        auto status = catalogClient()->updateConfigDocument(
+            operationContext(),
+            NamespaceString::kConfigDatabasesNamespace,
+            BSON(DatabaseType::kNameFieldName << dbt.getName()),
+            dbt.toBSON(),
+            true,
+            ShardingCatalogClient::kMajorityWriteConcern);
         ASSERT_OK(status);
     });
 
@@ -1075,7 +1076,7 @@ TEST_F(ShardingCatalogClientTest, UpdateDatabase) {
 
         const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         const auto updateOp = UpdateOp::parse(opMsgRequest);
-        ASSERT_EQUALS(DatabaseType::ConfigNS, updateOp.getNamespace());
+        ASSERT_EQUALS(NamespaceString::kConfigDatabasesNamespace, updateOp.getNamespace());
 
         const auto& updates = updateOp.getUpdates();
         ASSERT_EQUALS(1U, updates.size());
@@ -1083,7 +1084,7 @@ TEST_F(ShardingCatalogClientTest, UpdateDatabase) {
         const auto& update = updates.front();
         ASSERT(update.getUpsert());
         ASSERT(!update.getMulti());
-        ASSERT_BSONOBJ_EQ(update.getQ(), BSON(DatabaseType::name(dbt.getName())));
+        ASSERT_BSONOBJ_EQ(update.getQ(), BSON(DatabaseType::kNameFieldName << dbt.getName()));
         ASSERT_BSONOBJ_EQ(update.getU().getUpdateReplacement(), dbt.toBSON());
 
         BatchedCommandResponse response;
@@ -1105,13 +1106,13 @@ TEST_F(ShardingCatalogClientTest, UpdateConfigDocumentNonRetryableError) {
         "test", ShardId("shard0001"), false, DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
 
     auto future = launchAsync([this, dbt] {
-        auto status =
-            catalogClient()->updateConfigDocument(operationContext(),
-                                                  DatabaseType::ConfigNS,
-                                                  BSON(DatabaseType::name(dbt.getName())),
-                                                  dbt.toBSON(),
-                                                  true,
-                                                  ShardingCatalogClient::kMajorityWriteConcern);
+        auto status = catalogClient()->updateConfigDocument(
+            operationContext(),
+            NamespaceString::kConfigDatabasesNamespace,
+            BSON(DatabaseType::kNameFieldName << dbt.getName()),
+            dbt.toBSON(),
+            true,
+            ShardingCatalogClient::kMajorityWriteConcern);
         ASSERT_EQ(ErrorCodes::Interrupted, status);
     });
 

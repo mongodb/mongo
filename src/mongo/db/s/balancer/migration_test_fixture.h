@@ -38,7 +38,6 @@
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/type_collection_common_types_gen.h"

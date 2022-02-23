@@ -33,7 +33,7 @@
 
 #include <boost/optional/optional_io.hpp>
 
-#include "mongo/s/catalog/type_database.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/sharding_router_test_fixture.h"

@@ -10,8 +10,7 @@ assert.commandWorked(st.s.getDB("config")
                          .getCollection("databases")
                          .insert({_id: dbName, partitioned: false, primary: st.shard0.shardName}));
 
-assert.commandFailedWithCode(st.s.adminCommand({movePrimary: dbName, to: st.shard1.shardName}),
-                             ErrorCodes.InternalError);
+assert.commandFailed(st.s.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
 
 st.stop();
 })();

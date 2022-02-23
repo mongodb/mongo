@@ -68,7 +68,6 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"

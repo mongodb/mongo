@@ -42,7 +42,7 @@
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_database.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"

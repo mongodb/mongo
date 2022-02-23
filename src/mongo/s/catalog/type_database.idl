@@ -1,4 +1,4 @@
-# Copyright (C) 2018-present MongoDB, Inc.
+# Copyright (C) 2022-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -26,29 +26,41 @@
 # it in the license file.
 #
 
-# Sharding IDL file
-
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/s/shard_id.h"
-        - "mongo/s/database_version.h"
+        - "mongo/s/catalog/types_validators.h" 
 
 imports:
     - "mongo/idl/basic_types.idl"
+    - "mongo/s/sharding_types.idl"
 
-types:
-    shard_id:
-        bson_serialization_type: string
-        description: "String identifier for a shard's name"
-        cpp_type: "ShardId"
-        deserializer: "mongo::BSONElement::str"
-        serializer: "mongo::ShardId::toString"
-
-    database_version:
-        bson_serialization_type: object
-        description: An object representing a version for a database.
-        cpp_type: DatabaseVersion
-        serializer: "mongo::DatabaseVersion::toBSON"
-        deserializer: "mongo::DatabaseVersion"
+structs:
+    DatabaseType:
+        description: "Represents the layout and contents of documents contained in the config 
+                      server's config.databases collection."
+        strict: false
+        fields:
+            _id:
+                description: "Database name."
+                cpp_name: name
+                type: string
+                validator:
+                    callback: "validateDatabaseName"
+                optional: false
+            primary:
+                description: "Primary shard for this database."
+                type: shard_id
+                validator:
+                    callback: "validateShardId"
+                optional: false
+            partitioned:
+                description: "Specify if it is allowed to create sharded collection on this database."
+                cpp_name: sharded
+                type: bool
+                optional: false
+            version:
+                description: "Version of the database."
+                type: database_version
+                optional: false
 

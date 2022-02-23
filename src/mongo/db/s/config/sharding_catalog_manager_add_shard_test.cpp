@@ -48,7 +48,7 @@
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_config_version.h"
-#include "mongo/s/catalog/type_database.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_identity_loader.h"
@@ -823,7 +823,7 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
 
     // Add a pre-existing database.
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
-                                                    DatabaseType::ConfigNS,
+                                                    NamespaceString::kConfigDatabasesNamespace,
                                                     existingDB.toBSON(),
                                                     ShardingCatalogClient::kMajorityWriteConcern));
     assertDatabaseExists(existingDB);

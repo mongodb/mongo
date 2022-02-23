@@ -35,7 +35,6 @@
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 

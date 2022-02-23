@@ -169,7 +169,7 @@ env.Library(
         'catalog/type_collection.cpp',
         'catalog/type_collection.idl',
         'catalog/type_config_version.cpp',
-        'catalog/type_database.cpp',
+        'catalog/type_database.idl',
         'catalog/type_mongos.cpp',
         'catalog/type_shard.cpp',
         'catalog/type_tags.cpp',

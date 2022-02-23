@@ -31,7 +31,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/catalog/type_database.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
@@ -41,21 +41,21 @@ using namespace mongo;
 using std::string;
 
 TEST(DatabaseType, Empty) {
-    StatusWith<DatabaseType> status = DatabaseType::fromBSON(BSONObj());
-    ASSERT_FALSE(status.isOK());
+    // Constructing from empty BSON must fails
+    ASSERT_THROWS(DatabaseType::parse(IDLParserErrorContext("DatabaseType"), BSONObj()),
+                  AssertionException);
 }
 
 TEST(DatabaseType, Basic) {
     UUID uuid = UUID::gen();
     Timestamp timestamp = Timestamp(1, 1);
-    StatusWith<DatabaseType> status = DatabaseType::fromBSON(
-        BSON(DatabaseType::name("mydb")
-             << DatabaseType::primary("shard") << DatabaseType::sharded(true)
-             << DatabaseType::version(
-                    BSON("uuid" << uuid << "lastMod" << 0 << "timestamp" << timestamp))));
-    ASSERT_TRUE(status.isOK());
+    const auto dbObj =
+        BSON(DatabaseType::kNameFieldName
+             << "mydb" << DatabaseType::kPrimaryFieldName << "shard"
+             << DatabaseType::kShardedFieldName << true << DatabaseType::kVersionFieldName
+             << BSON("uuid" << uuid << "lastMod" << 0 << "timestamp" << timestamp));
 
-    DatabaseType db = status.getValue();
+    const auto db = DatabaseType::parse(IDLParserErrorContext("DatabaseType"), dbObj);
     ASSERT_EQUALS(db.getName(), "mydb");
     ASSERT_EQUALS(db.getPrimary(), "shard");
     ASSERT_TRUE(db.getSharded());
@@ -64,13 +64,17 @@ TEST(DatabaseType, Basic) {
 }
 
 TEST(DatabaseType, BadType) {
-    StatusWith<DatabaseType> status = DatabaseType::fromBSON(BSON(DatabaseType::name() << 0));
-    ASSERT_FALSE(status.isOK());
+    // Cosntructing from an BSON object with a malformed database must fails
+    const auto dbObj = BSON(DatabaseType::kNameFieldName << 0);
+    ASSERT_THROWS(DatabaseType::parse(IDLParserErrorContext("DatabaseType"), dbObj),
+                  AssertionException);
 }
 
 TEST(DatabaseType, MissingRequired) {
-    StatusWith<DatabaseType> status = DatabaseType::fromBSON(BSON(DatabaseType::name("mydb")));
-    ASSERT_FALSE(status.isOK());
+    // Cosntructing from an BSON object without all the required fields must fails
+    const auto dbObj = BSON(DatabaseType::kNameFieldName << "mydb");
+    ASSERT_THROWS(DatabaseType::parse(IDLParserErrorContext("DatabaseType"), dbObj),
+                  AssertionException);
 }
 
 }  // unnamed namespace

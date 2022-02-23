@@ -36,7 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_database.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/util/concurrency/notification.h"

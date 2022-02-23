@@ -32,7 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/s/catalog/type_database.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/type_collection_common_types_gen.h"

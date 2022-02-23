@@ -43,7 +43,7 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog/type_database.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/grid.h"
@@ -112,21 +112,22 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
     // expensive createDatabase flow.
     while (true) {
         auto response = client.findAndModify([&] {
-            write_ops::FindAndModifyCommandRequest findAndModify(DatabaseType::ConfigNS);
+            write_ops::FindAndModifyCommandRequest findAndModify(
+                NamespaceString::kConfigDatabasesNamespace);
             findAndModify.setQuery([&] {
                 BSONObjBuilder queryFilterBuilder;
-                queryFilterBuilder.append(DatabaseType::name.name(), dbName);
+                queryFilterBuilder.append(DatabaseType::kNameFieldName, dbName);
                 if (optPrimaryShard) {
                     uassert(ErrorCodes::BadValue,
                             str::stream() << "invalid shard name: " << *optPrimaryShard,
                             optPrimaryShard->isValid());
-                    queryFilterBuilder.append(DatabaseType::primary.name(),
+                    queryFilterBuilder.append(DatabaseType::kPrimaryFieldName,
                                               optPrimaryShard->toString());
                 }
                 return queryFilterBuilder.obj();
             }());
             findAndModify.setUpdate(write_ops::UpdateModification::parseFromClassicUpdate(
-                BSON("$set" << BSON(DatabaseType::sharded(enableSharding)))));
+                BSON("$set" << BSON(DatabaseType::kShardedFieldName << enableSharding))));
             findAndModify.setUpsert(false);
             findAndModify.setNew(true);
             return findAndModify;
@@ -134,7 +135,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
 
         if (response.getLastErrorObject().getNumDocs()) {
             uassert(528120, "Missing value in the response", response.getValue());
-            return uassertStatusOK(DatabaseType::fromBSON(*response.getValue()));
+            return DatabaseType::parse(IDLParserErrorContext("DatabaseType"), *response.getValue());
         }
 
         if (dbLock) {
@@ -155,14 +156,14 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
     // Check if a database already exists with the same name (case sensitive), and if so, return the
     // existing entry.
     BSONObjBuilder queryBuilder;
-    queryBuilder.appendRegex(DatabaseType::name(),
+    queryBuilder.appendRegex(DatabaseType::kNameFieldName,
                              (std::string) "^" + pcrecpp::RE::QuoteMeta(dbName.toString()) + "$",
                              "i");
 
-    auto dbDoc = client.findOne(DatabaseType::ConfigNS, queryBuilder.obj());
+    auto dbDoc = client.findOne(NamespaceString::kConfigDatabasesNamespace, queryBuilder.obj());
     auto const [primaryShardPtr, database] = [&] {
         if (!dbDoc.isEmpty()) {
-            auto actualDb = uassertStatusOK(DatabaseType::fromBSON(dbDoc));
+            auto actualDb = DatabaseType::parse(IDLParserErrorContext("DatabaseType"), dbDoc);
 
             uassert(ErrorCodes::DatabaseDifferCase,
                     str::stream() << "can't have 2 databases that just differ on case "
@@ -211,7 +212,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
             // when it receives the _flushDatabaseCacheUpdates.
             uassertStatusOK(
                 catalogClient->insertConfigDocument(opCtx,
-                                                    DatabaseType::ConfigNS,
+                                                    NamespaceString::kConfigDatabasesNamespace,
                                                     db.toBSON(),
                                                     ShardingCatalogClient::kMajorityWriteConcern));
 

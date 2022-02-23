@@ -64,9 +64,11 @@ void removeDatabaseMetadataFromConfig(OperationContext* opCtx,
     // ensures idempotency.
     const Status status = catalogClient->removeConfigDocuments(
         opCtx,
-        DatabaseType::ConfigNS,
-        BSON(DatabaseType::name(dbName.toString()) << DatabaseType::version() + "." +
-                 DatabaseVersion::kUuidFieldName << dbVersion.getUuid()),
+        NamespaceString::kConfigDatabasesNamespace,
+        BSON(DatabaseType::kNameFieldName
+             << dbName.toString()
+             << DatabaseType::kVersionFieldName + "." + DatabaseVersion::kUuidFieldName
+             << dbVersion.getUuid()),
         ShardingCatalogClient::kMajorityWriteConcern);
     uassertStatusOKWithContext(status,
                                str::stream()
