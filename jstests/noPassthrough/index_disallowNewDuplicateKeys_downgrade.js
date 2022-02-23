@@ -2,7 +2,6 @@
  * Tests that the cluster cannot be downgraded when there are indexes with the
  * 'disallowNewDuplicateKeys' field present.
  *
- * TODO SERVER-63563: Update this test once kLastContinuous is 5.3.
  * TODO SERVER-63564: Remove this test once kLastLTS is 6.0.
  *
  * @tags: [requires_fcv_53]

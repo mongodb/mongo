@@ -730,7 +730,6 @@ private:
                     });
             }
 
-            // TODO SERVER-63563: Only check on last-lts when FCV 5.3 becomes last-continuous.
             // TODO SERVER-63564: Remove once FCV 6.0 becomes last-lts.
             for (const auto& tenantDbName : DatabaseHolder::get(opCtx)->getNames()) {
                 const auto& dbName = tenantDbName.dbName();
