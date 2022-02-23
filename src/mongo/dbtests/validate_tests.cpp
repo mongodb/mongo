@@ -56,6 +56,23 @@ namespace {
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 const bool kTurnOnExtraLoggingForTest = true;
 
+std::size_t omitTransientWarningsFromCount(const ValidateResults& results) {
+    return std::count_if(
+        results.warnings.begin(), results.warnings.end(), [](const std::string& elem) {
+            std::string endMsg =
+                "This is a transient issue as the collection was actively in use by other "
+                "operations.";
+            std::string beginMsg = "Could not complete validation of ";
+            if (elem.size() >= std::max(endMsg.size(), beginMsg.size())) {
+                bool startsWith = std::equal(beginMsg.begin(), beginMsg.end(), elem.begin());
+                bool endsWith = std::equal(endMsg.rbegin(), endMsg.rend(), elem.rbegin());
+                return !(startsWith && endsWith);
+            } else {
+                return true;
+            }
+        });
+}
+
 }  // namespace
 
 static const char* const _ns = "unittests.validate_tests";
@@ -1186,7 +1203,7 @@ public:
 
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(2), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(1), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
 
@@ -1304,7 +1321,7 @@ public:
 
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
 
@@ -1393,7 +1410,7 @@ public:
 
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(static_cast<size_t>(2), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(2), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
 
@@ -1505,7 +1522,7 @@ public:
 
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(static_cast<size_t>(2), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(2), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(3), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(3), results.missingIndexEntries.size());
 
@@ -1536,7 +1553,7 @@ public:
             ASSERT_EQ(true, results.valid);
             ASSERT_EQ(true, results.repaired);
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(2), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(3, results.numRemovedExtraIndexEntries);
@@ -1571,7 +1588,7 @@ public:
             ASSERT_EQ(true, results.valid);
             ASSERT_EQ(false, results.repaired);
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
@@ -1690,7 +1707,7 @@ public:
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(false, results.repaired);
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
             ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
@@ -1721,7 +1738,7 @@ public:
             ASSERT_EQ(true, results.valid);
             ASSERT_EQ(true, results.valid);
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
@@ -1753,7 +1770,7 @@ public:
             ASSERT_EQ(true, results.valid);
             ASSERT_EQ(false, results.repaired);
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
@@ -1843,7 +1860,7 @@ public:
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(false, results.repaired);
             ASSERT_EQ(static_cast<size_t>(2), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(2), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
@@ -1874,7 +1891,7 @@ public:
             ASSERT_EQ(true, results.valid);
             ASSERT_EQ(true, results.repaired);
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(2, results.numRemovedExtraIndexEntries);
@@ -1905,7 +1922,7 @@ public:
             ASSERT_EQ(true, results.valid);
             ASSERT_EQ(false, results.repaired);
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
@@ -2057,7 +2074,7 @@ public:
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(false, results.repaired);
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
 
@@ -2087,7 +2104,7 @@ public:
             ASSERT_EQ(true, results.valid);
             ASSERT_EQ(true, results.repaired);
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
@@ -2122,7 +2139,7 @@ public:
             ASSERT_EQ(true, results.valid);
             ASSERT_EQ(false, results.repaired);
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
@@ -2293,7 +2310,7 @@ public:
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(false, results.repaired);
             ASSERT_EQ(static_cast<size_t>(2), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(2), results.missingIndexEntries.size());
 
@@ -2323,7 +2340,7 @@ public:
             ASSERT_EQ(true, results.valid);
             ASSERT_EQ(true, results.repaired);
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
@@ -2359,7 +2376,7 @@ public:
             ASSERT_EQ(true, results.valid);
             ASSERT_EQ(false, results.repaired);
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
@@ -2619,7 +2636,7 @@ public:
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(false, results.repaired);
             ASSERT_EQ(static_cast<size_t>(2), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(2), results.missingIndexEntries.size());
 
@@ -2652,7 +2669,7 @@ public:
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(true, results.repaired);
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(2), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
@@ -2688,7 +2705,7 @@ public:
             ASSERT_EQ(true, results.valid);
             ASSERT_EQ(false, results.repaired);
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
@@ -2813,7 +2830,7 @@ public:
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(false, results.repaired);
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(2), results.missingIndexEntries.size());
             ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
@@ -2844,7 +2861,7 @@ public:
             ASSERT_EQ(true, results.valid);
             ASSERT_EQ(true, results.repaired);
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(2), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
@@ -2878,7 +2895,7 @@ public:
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
             ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
             ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
 
@@ -3210,7 +3227,7 @@ public:
 
         ASSERT_FALSE(results.valid) << "Validation worked when it should have failed.";
         ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
-        ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+        ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
         ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
         ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
 
@@ -3275,7 +3292,7 @@ public:
 
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(1), results.corruptRecords.size());
@@ -3344,7 +3361,7 @@ public:
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(false, results.repaired);
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(3), results.corruptRecords.size());
@@ -3375,7 +3392,7 @@ public:
             ASSERT_EQ(true, results.valid);
             ASSERT_EQ(true, results.repaired);
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.corruptRecords.size());
@@ -3410,7 +3427,7 @@ public:
             ASSERT_EQ(true, results.valid);
             ASSERT_EQ(false, results.repaired);
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.corruptRecords.size());
@@ -3441,7 +3458,7 @@ public:
             ASSERT_EQ(true, results.valid);
             ASSERT_EQ(false, results.repaired);
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.corruptRecords.size());
@@ -3609,7 +3626,7 @@ public:
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
 
             dumpOnErrorGuard.dismiss();
         }
@@ -3638,7 +3655,7 @@ public:
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
 
             dumpOnErrorGuard.dismiss();
         }
@@ -3668,7 +3685,7 @@ public:
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
 
             dumpOnErrorGuard.dismiss();
         }
@@ -3815,7 +3832,7 @@ public:
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
 
             dumpOnErrorGuard.dismiss();
         }
@@ -3844,7 +3861,7 @@ public:
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(2), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
 
             dumpOnErrorGuard.dismiss();
         }
@@ -3873,7 +3890,7 @@ public:
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
 
             dumpOnErrorGuard.dismiss();
         }
@@ -3979,7 +3996,7 @@ public:
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
 
             dumpOnErrorGuard.dismiss();
         }
@@ -4012,7 +4029,7 @@ public:
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
 
             dumpOnErrorGuard.dismiss();
         }
@@ -4073,7 +4090,7 @@ public:
 
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(1), results.corruptRecords.size());
@@ -4173,7 +4190,7 @@ public:
 
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(2), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(1), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
 
@@ -4270,7 +4287,7 @@ public:
 
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(2), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(1), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
 
@@ -4303,7 +4320,7 @@ public:
             ASSERT_EQ(true, results.valid);
             ASSERT_EQ(true, results.repaired);
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(2), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(1, results.numRemovedExtraIndexEntries);
@@ -4423,7 +4440,7 @@ public:
 
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(static_cast<size_t>(2), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(2), results.corruptRecords.size());
