@@ -118,8 +118,7 @@ public:
      * Main constructor that constructs an internal transaction with the default options.
      */
     TransactionWithRetries(OperationContext* opCtx, ExecutorPtr executor)
-        : _executor(executor),
-          _internalTxn(std::make_shared<details::Transaction>(opCtx, executor)) {}
+        : _internalTxn(std::make_shared<details::Transaction>(opCtx, executor)) {}
 
     /**
      * Alternate constructor that accepts a custom transaction client.
@@ -127,8 +126,7 @@ public:
     TransactionWithRetries(OperationContext* opCtx,
                            ExecutorPtr executor,
                            std::unique_ptr<TransactionClient> txnClient)
-        : _executor(executor),
-          _internalTxn(
+        : _internalTxn(
               std::make_shared<details::Transaction>(opCtx, executor, std::move(txnClient))) {}
 
     /**
@@ -160,7 +158,6 @@ private:
      */
     void _bestEffortAbort(OperationContext* opCtx);
 
-    ExecutorPtr _executor;
     std::shared_ptr<details::Transaction> _internalTxn;
 };
 

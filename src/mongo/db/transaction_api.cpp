@@ -114,10 +114,7 @@ StatusWith<CommitResult> TransactionWithRetries::runSyncNoThrow(OperationContext
     _internalTxn->setCallback(std::move(callback));
     while (true) {
         {
-
-            auto bodyStatus = ExecutorFuture<void>(_executor)
-                                  .then([this] { return _internalTxn->runCallback(); })
-                                  .getNoThrow(opCtx);
+            auto bodyStatus = _internalTxn->runCallback().getNoThrow(opCtx);
 
             if (!bodyStatus.isOK()) {
                 auto nextStep = _internalTxn->handleError(bodyStatus);
@@ -137,9 +134,7 @@ StatusWith<CommitResult> TransactionWithRetries::runSyncNoThrow(OperationContext
         }
 
         while (true) {
-            auto swResult = ExecutorFuture<void>(_executor)
-                                .then([this] { return _internalTxn->commit(); })
-                                .getNoThrow(opCtx);
+            auto swResult = _internalTxn->commit().getNoThrow(opCtx);
 
             if (swResult.isOK() && swResult.getValue().getEffectiveStatus().isOK()) {
                 // Commit succeeded so return to the caller.
@@ -169,7 +164,7 @@ StatusWith<CommitResult> TransactionWithRetries::runSyncNoThrow(OperationContext
 
 void TransactionWithRetries::_bestEffortAbort(OperationContext* opCtx) {
     try {
-        ExecutorFuture<void>(_executor).then([this] { return _internalTxn->abort(); }).get(opCtx);
+        _internalTxn->abort().get(opCtx);
     } catch (const DBException& e) {
         LOGV2(5875900,
               "Unable to abort internal transaction",
@@ -299,8 +294,11 @@ SemiFuture<BSONObj> Transaction::_commitOrAbort(StringData dbName, StringData cm
     cmdBuilder.append(WriteConcernOptions::kWriteConcernField, _writeConcern);
     auto cmdObj = cmdBuilder.obj();
 
-    // Safe to inline because the continuation only holds state.
-    return _txnClient->runCommand(dbName, cmdObj)
+    return ExecutorFuture<void>(_executor)
+        .then([this, dbNameCopy = dbName.toString(), cmdObj = std::move(cmdObj)] {
+            return _txnClient->runCommand(dbNameCopy, cmdObj);
+        })
+        // Safe to inline because the continuation only holds state.
         .unsafeToInlineFuture()
         .tapAll([anchor = shared_from_this()](auto&&) {})
         .semi();
@@ -308,8 +306,9 @@ SemiFuture<BSONObj> Transaction::_commitOrAbort(StringData dbName, StringData cm
 
 SemiFuture<void> Transaction::runCallback() {
     invariant(_callback);
-    // Safe to inline because the continuation only holds state.
-    return _callback(*_txnClient, _executor)
+    return ExecutorFuture<void>(_executor)
+        .then([this] { return _callback(*_txnClient, _executor); })
+        // Safe to inline because the continuation only holds state.
         .unsafeToInlineFuture()
         .tapAll([anchor = shared_from_this()](auto&&) {})
         .semi();
