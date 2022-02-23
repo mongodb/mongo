@@ -64,6 +64,14 @@ types:
         serializer: "::mongo::write_ops::opTimeSerializerWithTermCheck"
         deserializer: "::mongo::write_ops::opTimeParser"
 
+    write_error:
+        bson_serialization_type: object
+        description: "Structure used to report a single error entry resulting from a batch write
+                      command."
+        cpp_type: "mongo::write_ops::WriteError"
+        serializer: "mongo::write_ops::WriteError::serialize"
+        deserializer: "mongo::write_ops::WriteError::parse"
+
 structs:
 
     WriteCommandReplyBase:
@@ -88,7 +96,7 @@ structs:
                 unstable: false
             writeErrors:
                 description: "Contains all the errors encoutered."
-                type: array<object_owned>
+                type: array<write_error>
                 optional: true
                 unstable: false
             retriedStmtIds:
@@ -119,6 +127,8 @@ structs:
     UpdateCommandReply:
         description: "Contains information related to update command reply."
         strict: false
+        chained_structs:
+            WriteCommandReplyBase: writeCommandReplyBase
         fields:
             upserted:
                 description: "An array contains information about upserted documents."
@@ -130,9 +140,6 @@ structs:
                 type: int
                 default: 0
                 unstable: false
-
-        chained_structs:
-            WriteCommandReplyBase: writeCommandReplyBase
 
     DeleteCommandReply:
         description: "Contains information related to delete command reply."

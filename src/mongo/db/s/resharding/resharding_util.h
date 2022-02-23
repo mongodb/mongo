@@ -46,7 +46,6 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/shard_id.h"
-#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

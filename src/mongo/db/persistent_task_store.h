@@ -187,7 +187,7 @@ private:
                      WriteConcerns::kMajorityWriteConcernShardingTimeout) {
         DBDirectClient dbClient(opCtx);
 
-        auto commandResponse = dbClient.update([&] {
+        auto commandResponse = write_ops::checkWriteErrors(dbClient.update([&] {
             write_ops::UpdateCommandRequest updateOp(_storageNss);
             auto updateModification = write_ops::UpdateModification::parseFromClassicUpdate(update);
             write_ops::UpdateOpEntry updateEntry(filter, updateModification);
@@ -195,14 +195,7 @@ private:
             updateEntry.setUpsert(upsert);
             updateOp.setUpdates({updateEntry});
             return updateOp;
-        }());
-
-        auto writeErrors = commandResponse.getWriteErrors();
-        if (writeErrors) {
-            BSONObj firstWriteError = writeErrors->front();
-            uasserted(ErrorCodes::Error(firstWriteError.getIntField("code")),
-                      firstWriteError.getStringField("errmsg"));
-        }
+        }()));
 
         uassert(ErrorCodes::NoMatchingDocument,
                 "No matching document found for query {} on namespace {}"_format(

@@ -40,6 +40,7 @@
 
 namespace mongo {
 namespace write_ops {
+
 // Conservative per array element overhead. This value was calculated as 1 byte (element type) + 5
 // bytes (max string encoding of the array index encoded as string and the maximum key is 99999) + 1
 // byte (zero terminator) = 7 bytes
@@ -201,6 +202,46 @@ private:
     };
     stdx::variant<ReplacementUpdate, ModifierUpdate, PipelineUpdate, DeltaUpdate, TransformUpdate>
         _update;
+};
+
+/**
+ * Class to abstract the vagaries of how write errors are reported in write commands, which is not
+ * consistent between the different errors. Specifically, errors such as StaleShardVersion report
+ * their extraInfo in a field called errInfo, which is not consistent with how Status(es) are
+ * serialised and parsed.
+ *
+ * TODO (SERVER-63327): The purpose of this class is to unify that reporting in subsequent versions
+ * after which it can become a proper IDL type.
+ */
+class WriteError {
+public:
+    static constexpr auto kIndexFieldName = "index"_sd;
+    static constexpr auto kCodeFieldName = "code"_sd;
+    static constexpr auto kErrmsgFieldName = "errmsg"_sd;
+    static constexpr auto kErrInfoFieldName = "errInfo"_sd;
+
+    static WriteError parse(const BSONObj& obj);
+    BSONObj serialize() const;
+
+    WriteError(int32_t index, Status status);
+
+    int32_t getIndex() const {
+        return _index;
+    }
+    void setIndex(int32_t index) {
+        _index = index;
+    }
+
+    const Status& getStatus() const {
+        return _status;
+    }
+    void setStatus(const Status& status) {
+        _status = status;
+    }
+
+private:
+    int32_t _index;
+    Status _status;
 };
 
 }  // namespace write_ops

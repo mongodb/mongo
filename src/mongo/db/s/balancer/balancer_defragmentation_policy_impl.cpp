@@ -146,15 +146,6 @@ bool areMergeable(const ChunkType& firstChunk,
         SimpleBSONObjComparator::kInstance.evaluate(firstChunk.getMax() == secondChunk.getMin());
 }
 
-void checkForWriteErrors(const write_ops::UpdateCommandReply& response) {
-    const auto& writeErrors = response.getWriteErrors();
-    if (writeErrors) {
-        BSONObj firstWriteError = writeErrors->front();
-        uasserted(ErrorCodes::Error(firstWriteError.getIntField("code")),
-                  firstWriteError.getStringField("errmsg"));
-    }
-}
-
 class MergeAndMeasureChunksPhase : public DefragmentationPhase {
 public:
     static std::unique_ptr<MergeAndMeasureChunksPhase> build(OperationContext* opCtx,
@@ -1780,8 +1771,7 @@ void BalancerDefragmentationPolicyImpl::_persistPhaseUpdate(OperationContext* op
                                 << DefragmentationPhase_serializer(phase)))));
         return entry;
     }()});
-    auto response = dbClient.update(updateOp);
-    checkForWriteErrors(response);
+    auto response = write_ops::checkWriteErrors(dbClient.update(updateOp));
     uassert(ErrorCodes::NoMatchingDocument,
             "Collection {} not found while persisting phase change"_format(uuid.toString()),
             response.getN() > 0);
@@ -1794,29 +1784,29 @@ void BalancerDefragmentationPolicyImpl::_persistPhaseUpdate(OperationContext* op
 void BalancerDefragmentationPolicyImpl::_clearDefragmentationState(OperationContext* opCtx,
                                                                    const UUID& uuid) {
     DBDirectClient dbClient(opCtx);
+
     // Clear datasize estimates from chunks
-    write_ops::UpdateCommandRequest removeDataSize(ChunkType::ConfigNS);
-    removeDataSize.setUpdates({[&] {
-        write_ops::UpdateOpEntry entry;
-        entry.setQ(BSON(CollectionType::kUuidFieldName << uuid));
-        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-            BSON("$unset" << BSON(ChunkType::estimatedSizeBytes.name() << ""))));
-        entry.setMulti(true);
-        return entry;
-    }()});
-    checkForWriteErrors(dbClient.update(removeDataSize));
+    write_ops::checkWriteErrors(dbClient.update(write_ops::UpdateCommandRequest(
+        ChunkType::ConfigNS, {[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(BSON(CollectionType::kUuidFieldName << uuid));
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+                BSON("$unset" << BSON(ChunkType::estimatedSizeBytes.name() << ""))));
+            entry.setMulti(true);
+            return entry;
+        }()})));
+
     // Clear defragmentation phase and defragmenting flag from collection
-    write_ops::UpdateCommandRequest removeCollectionFlags(CollectionType::ConfigNS);
-    removeCollectionFlags.setUpdates({[&] {
-        write_ops::UpdateOpEntry entry;
-        entry.setQ(BSON(CollectionType::kUuidFieldName << uuid));
-        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-            BSON("$unset" << BSON(CollectionType::kDefragmentCollectionFieldName
-                                  << "" << CollectionType::kDefragmentationPhaseFieldName << ""))));
-        return entry;
-    }()});
-    auto response = dbClient.update(removeCollectionFlags);
-    checkForWriteErrors(response);
+    write_ops::checkWriteErrors(dbClient.update(write_ops::UpdateCommandRequest(
+        CollectionType::ConfigNS, {[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(BSON(CollectionType::kUuidFieldName << uuid));
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON(
+                "$unset" << BSON(CollectionType::kDefragmentCollectionFieldName
+                                 << "" << CollectionType::kDefragmentationPhaseFieldName << ""))));
+            return entry;
+        }()})));
+
     WriteConcernResult ignoreResult;
     const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     uassertStatusOK(waitForWriteConcern(

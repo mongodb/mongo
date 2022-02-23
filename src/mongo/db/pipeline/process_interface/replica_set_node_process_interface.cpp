@@ -42,6 +42,7 @@
 #include "mongo/db/operation_time_tracker.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/future.h"
 

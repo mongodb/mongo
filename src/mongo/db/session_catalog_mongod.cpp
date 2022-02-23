@@ -51,7 +51,6 @@
 #include "mongo/db/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/scopeguard.h"
 
@@ -151,61 +150,46 @@ int removeSessionsTransactionRecords(OperationContext* opCtx,
     //
     // We opt for this rather than performing the two sets of deletes in a single transaction simply
     // to reduce code complexity.
-    write_ops::DeleteCommandRequest imageDeleteOp(NamespaceString::kConfigImagesNamespace);
-    imageDeleteOp.setWriteCommandRequestBase([] {
-        write_ops::WriteCommandRequestBase base;
-        base.setOrdered(false);
-        return base;
-    }());
-    imageDeleteOp.setDeletes([&] {
-        std::vector<write_ops::DeleteOpEntry> entries;
-        for (const auto& lsid : expiredSessionIds) {
-            entries.emplace_back(BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON()),
-                                 false /* multi = false */);
-        }
-        return entries;
-    }());
-
-    BatchedCommandResponse response;
-    std::string errmsg;
-    BSONObj result;
-
     DBDirectClient client(opCtx);
-    client.runCommand(
-        NamespaceString::kConfigImagesNamespace.db().toString(), imageDeleteOp.toBSON({}), result);
-
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << "Failed to parse response " << result,
-            response.parseBSON(result, &errmsg));
-    uassertStatusOK(response.getTopLevelStatus());
+    write_ops::checkWriteErrors(client.remove([&] {
+        write_ops::DeleteCommandRequest imageDeleteOp(NamespaceString::kConfigImagesNamespace);
+        imageDeleteOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase base;
+            base.setOrdered(false);
+            return base;
+        }());
+        imageDeleteOp.setDeletes([&] {
+            std::vector<write_ops::DeleteOpEntry> entries;
+            for (const auto& lsid : expiredSessionIds) {
+                entries.emplace_back(BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON()),
+                                     false /* multi = false */);
+            }
+            return entries;
+        }());
+        return imageDeleteOp;
+    }()));
 
     // Remove the session ids from the on-disk catalog
-    write_ops::DeleteCommandRequest sessionDeleteOp(
-        NamespaceString::kSessionTransactionsTableNamespace);
-    sessionDeleteOp.setWriteCommandRequestBase([] {
-        write_ops::WriteCommandRequestBase base;
-        base.setOrdered(false);
-        return base;
-    }());
-    sessionDeleteOp.setDeletes([&] {
-        std::vector<write_ops::DeleteOpEntry> entries;
-        for (const auto& lsid : expiredSessionIds) {
-            entries.emplace_back(BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON()),
-                                 false /* multi = false */);
-        }
-        return entries;
-    }());
+    auto sessionDeleteReply = write_ops::checkWriteErrors(client.remove([&] {
+        write_ops::DeleteCommandRequest sessionDeleteOp(
+            NamespaceString::kSessionTransactionsTableNamespace);
+        sessionDeleteOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase base;
+            base.setOrdered(false);
+            return base;
+        }());
+        sessionDeleteOp.setDeletes([&] {
+            std::vector<write_ops::DeleteOpEntry> entries;
+            for (const auto& lsid : expiredSessionIds) {
+                entries.emplace_back(BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON()),
+                                     false /* multi = false */);
+            }
+            return entries;
+        }());
+        return sessionDeleteOp;
+    }()));
 
-
-    client.runCommand(NamespaceString::kSessionTransactionsTableNamespace.db().toString(),
-                      sessionDeleteOp.toBSON({}),
-                      result);
-
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << "Failed to parse response " << result,
-            response.parseBSON(result, &errmsg));
-    uassertStatusOK(response.getTopLevelStatus());
-    return response.getN();
+    return sessionDeleteReply.getN();
 }
 
 void createTransactionTable(OperationContext* opCtx) {

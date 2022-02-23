@@ -1944,11 +1944,11 @@ env.Library(
         'vector_clock_mutable',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
         '$BUILD_DIR/mongo/s/grid',
         'dbdirectclient',
         'repl/replica_set_aware_service',
         'rw_concern_d',
+        's/sharding_api_d',
         'server_options_core',
     ],
 )

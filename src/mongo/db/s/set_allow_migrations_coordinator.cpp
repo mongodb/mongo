@@ -35,8 +35,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
 

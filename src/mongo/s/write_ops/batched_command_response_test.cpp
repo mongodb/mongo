@@ -33,14 +33,13 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/ops/write_ops.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-
-using std::string;
-
 namespace {
 
 TEST(BatchedCommandResponse, Basic) {
@@ -66,7 +65,7 @@ TEST(BatchedCommandResponse, Basic) {
              << writeErrorsArray << BatchedCommandResponse::writeConcernError() << writeConcernError
              << "ok" << 1.0);
 
-    string errMsg;
+    std::string errMsg;
     BatchedCommandResponse response;
     bool ok = response.parseBSON(origResponseObj, &errMsg);
     ASSERT_TRUE(ok);
@@ -186,5 +185,33 @@ TEST(BatchedCommandResponse, NoDuplicateErrInfo) {
         verifySingleErrInfo(elem.embeddedObject());
     }
 }
+
+TEST(BatchedCommandResponse, CompatibilityFromWriteErrorToBatchCommandResponse) {
+    ChunkVersion versionReceived(1, 0, OID::gen(), Timestamp(2, 0));
+
+    write_ops::UpdateCommandReply reply;
+    reply.getWriteCommandReplyBase().setN(1);
+    reply.getWriteCommandReplyBase().setWriteErrors(std::vector<write_ops::WriteError>{
+        write_ops::WriteError(1,
+                              Status(StaleConfigInfo(NamespaceString("TestDB", "TestColl"),
+                                                     versionReceived,
+                                                     boost::none,
+                                                     ShardId("TestShard")),
+                                     "Test stale config")),
+    });
+
+    BatchedCommandResponse response;
+    ASSERT_TRUE(response.parseBSON(reply.toBSON(), nullptr));
+    ASSERT_EQ(1U, response.getErrDetails().size());
+    ASSERT_EQ(ErrorCodes::StaleShardVersion, response.getErrDetailsAt(0)->toStatus().code());
+    ASSERT_EQ("Test stale config", response.getErrDetailsAt(0)->toStatus().reason());
+    auto staleInfo =
+        StaleConfigInfo::parseFromCommandError(response.getErrDetailsAt(0)->getErrInfo());
+    ASSERT_EQ("TestDB.TestColl", staleInfo.getNss().ns());
+    ASSERT_EQ(versionReceived, staleInfo.getVersionReceived());
+    ASSERT(!staleInfo.getVersionWanted());
+    ASSERT_EQ(ShardId("TestShard"), staleInfo.getShardId());
+}
+
 }  // namespace
 }  // namespace mongo

@@ -77,7 +77,7 @@ TEST_F(DBDirectClientTest, InsertDuplicateDocumentDoesNotThrow) {
     ASSERT_EQ(insertReply.getN(), 1);
     auto writeErrors = insertReply.getWriteErrors().get();
     ASSERT_EQ(writeErrors.size(), 1);
-    ASSERT_EQ(writeErrors[0].getIntField("code"), ErrorCodes::DuplicateKey);
+    ASSERT_EQ(writeErrors[0].getStatus(), ErrorCodes::DuplicateKey);
 }
 
 TEST_F(DBDirectClientTest, UpdateSingleDocumentSuccessfully) {
@@ -113,7 +113,7 @@ TEST_F(DBDirectClientTest, UpdateDuplicateImmutableFieldDoesNotThrow) {
     ASSERT_EQ(updateReply.getNModified(), 0);
     auto writeErrors = updateReply.getWriteErrors().get();
     ASSERT_EQ(writeErrors.size(), 1);
-    ASSERT_EQ(writeErrors[0].getIntField("code"), ErrorCodes::ImmutableField);
+    ASSERT_EQ(writeErrors[0].getStatus(), ErrorCodes::ImmutableField);
 }
 
 TEST_F(DBDirectClientTest, DeleteSingleDocumentSuccessful) {
@@ -154,7 +154,7 @@ TEST_F(DBDirectClientTest, DeleteDocumentIncorrectHintDoesNotThrow) {
     ASSERT_EQ(deleteReply.getN(), 0);
     auto writeErrors = deleteReply.getWriteErrors().get();
     ASSERT_EQ(writeErrors.size(), 1);
-    ASSERT_EQ(writeErrors[0].getIntField("code"), ErrorCodes::BadValue);
+    ASSERT_EQ(writeErrors[0].getStatus(), ErrorCodes::BadValue);
 }
 
 TEST_F(DBDirectClientTest, ExhaustQuery) {

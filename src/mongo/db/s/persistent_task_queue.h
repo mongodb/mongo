@@ -134,16 +134,8 @@ TaskId PersistentTaskQueue<T>::push(OperationContext* opCtx, const T& t) {
         builder.append("_id", recordId);
         builder.append("task", t.toBSON());
 
-        write_ops::InsertCommandRequest insertOp(_storageNss);
-        insertOp.setDocuments({builder.obj()});
-        auto response = dbClient.insert(insertOp);
-
-        if (response.getWriteErrors()) {
-            BSONObj firstWriteError = response.getWriteErrors()->front();
-            uasserted(ErrorCodes::Error(firstWriteError.getIntField("code")),
-                      firstWriteError.getStringField("errmsg"));
-        }
-
+        auto response = write_ops::checkWriteErrors(
+            dbClient.insert(write_ops::InsertCommandRequest(_storageNss, {builder.obj()})));
         _count++;
     }
 
@@ -168,14 +160,7 @@ TaskId PersistentTaskQueue<T>::pop(OperationContext* opCtx) {
 
     write_ops::DeleteCommandRequest deleteOp(_storageNss);
     deleteOp.setDeletes({write_ops::DeleteOpEntry(builder.obj(), false)});
-    auto response = client.remove(deleteOp);
-    auto writeErrors = response.getWriteErrors();
-    if (writeErrors) {
-        BSONObj firstWriteError = writeErrors->front();
-        uasserted(ErrorCodes::Error(firstWriteError.getIntField("code")),
-                  firstWriteError.getStringField("errmsg"));
-    }
-
+    write_ops::checkWriteErrors(client.remove(deleteOp));
     _count--;
 
     TaskId id = _currentFront->id;

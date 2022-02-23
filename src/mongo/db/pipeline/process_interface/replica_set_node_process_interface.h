@@ -32,7 +32,6 @@
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
-#include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
 

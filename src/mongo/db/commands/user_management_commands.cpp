@@ -253,22 +253,9 @@ Status insertAuthzDocument(OperationContext* opCtx,
                            const BSONObj& document) {
     try {
         DBDirectClient client(opCtx);
-
-        BSONObj res;
-        client.runCommand(collectionName.db().toString(),
-                          [&] {
-                              write_ops::InsertCommandRequest insertOp(collectionName);
-                              insertOp.setDocuments({document});
-                              return insertOp.toBSON({});
-                          }(),
-                          res);
-
-        BatchedCommandResponse response;
-        std::string errmsg;
-        if (!response.parseBSON(res, &errmsg)) {
-            return Status(ErrorCodes::FailedToParse, errmsg);
-        }
-        return response.toStatus();
+        write_ops::checkWriteErrors(
+            client.insert(write_ops::InsertCommandRequest(collectionName, {document})));
+        return Status::OK();
     } catch (const DBException& e) {
         return e.toStatus();
     }
@@ -289,33 +276,22 @@ Status updateAuthzDocuments(OperationContext* opCtx,
                             std::int64_t* numMatched) {
     try {
         DBDirectClient client(opCtx);
+        auto result = client.update([&] {
+            write_ops::UpdateCommandRequest updateOp(collectionName);
+            updateOp.setUpdates({[&] {
+                write_ops::UpdateOpEntry entry;
+                entry.setQ(query);
+                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(updatePattern));
+                entry.setMulti(multi);
+                entry.setUpsert(upsert);
+                return entry;
+            }()});
+            return updateOp;
+        }());
 
-        BSONObj res;
-        client.runCommand(collectionName.db().toString(),
-                          [&] {
-                              write_ops::UpdateCommandRequest updateOp(collectionName);
-                              updateOp.setUpdates({[&] {
-                                  write_ops::UpdateOpEntry entry;
-                                  entry.setQ(query);
-                                  entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-                                      updatePattern));
-                                  entry.setMulti(multi);
-                                  entry.setUpsert(upsert);
-                                  return entry;
-                              }()});
-                              return updateOp.toBSON({});
-                          }(),
-                          res);
-
-        BatchedCommandResponse response;
-        std::string errmsg;
-        if (!response.parseBSON(res, &errmsg)) {
-            return Status(ErrorCodes::FailedToParse, errmsg);
-        }
-        if (response.getOk()) {
-            *numMatched = response.getN();
-        }
-        return response.toStatus();
+        *numMatched = result.getN();
+        write_ops::checkWriteErrors(result);
+        return Status::OK();
     } catch (const DBException& e) {
         return e.toStatus();
     }
@@ -363,30 +339,20 @@ Status removeAuthzDocuments(OperationContext* opCtx,
                             std::int64_t* numRemoved) {
     try {
         DBDirectClient client(opCtx);
+        auto result = client.remove([&] {
+            write_ops::DeleteCommandRequest deleteOp(collectionName);
+            deleteOp.setDeletes({[&] {
+                write_ops::DeleteOpEntry entry;
+                entry.setQ(query);
+                entry.setMulti(true);
+                return entry;
+            }()});
+            return deleteOp;
+        }());
 
-        BSONObj res;
-        client.runCommand(collectionName.db().toString(),
-                          [&] {
-                              write_ops::DeleteCommandRequest deleteOp(collectionName);
-                              deleteOp.setDeletes({[&] {
-                                  write_ops::DeleteOpEntry entry;
-                                  entry.setQ(query);
-                                  entry.setMulti(true);
-                                  return entry;
-                              }()});
-                              return deleteOp.toBSON({});
-                          }(),
-                          res);
-
-        BatchedCommandResponse response;
-        std::string errmsg;
-        if (!response.parseBSON(res, &errmsg)) {
-            return Status(ErrorCodes::FailedToParse, errmsg);
-        }
-        if (response.getOk()) {
-            *numRemoved = response.getN();
-        }
-        return response.toStatus();
+        *numRemoved = result.getN();
+        write_ops::checkWriteErrors(result);
+        return Status::OK();
     } catch (const DBException& e) {
         return e.toStatus();
     }

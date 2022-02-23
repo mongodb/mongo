@@ -33,12 +33,9 @@
 
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
-
-#include "mongo/logv2/log.h"
 
 namespace mongo {
 namespace {

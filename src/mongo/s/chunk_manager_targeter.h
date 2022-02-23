@@ -37,7 +37,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/ns_targeter.h"
-#include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
 

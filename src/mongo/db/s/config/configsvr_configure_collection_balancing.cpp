@@ -45,7 +45,6 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/configure_collection_balancing_gen.h"
-#include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
 namespace {

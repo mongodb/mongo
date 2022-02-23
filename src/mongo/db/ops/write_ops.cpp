@@ -35,7 +35,6 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
-#include "mongo/logv2/redaction.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -43,11 +42,16 @@
 
 namespace mongo {
 
+using write_ops::DeleteCommandReply;
 using write_ops::DeleteCommandRequest;
 using write_ops::DeleteOpEntry;
+using write_ops::FindAndModifyCommandReply;
+using write_ops::InsertCommandReply;
 using write_ops::InsertCommandRequest;
+using write_ops::UpdateCommandReply;
 using write_ops::UpdateCommandRequest;
 using write_ops::UpdateOpEntry;
+using write_ops::WriteCommandRequestBase;
 
 namespace {
 
@@ -64,13 +68,13 @@ void checkOpCountForCommand(const T& op, size_t numOps) {
             str::stream() << "Number of statement ids must match the number of batch entries. Got "
                           << stmtIds->size() << " statement ids but " << numOps
                           << " operations. Statement ids: " << BSON("stmtIds" << *stmtIds)
-                          << ". Write command: " << redact(op.toBSON({})),
+                          << ". Write command: " << op.toBSON({}),
             stmtIds->size() == numOps);
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "May not specify both stmtId and stmtIds in write command. Got "
                               << BSON("stmtId" << *op.getWriteCommandRequestBase().getStmtId()
                                                << "stmtIds" << *stmtIds)
-                              << ". Write command: " << redact(op.toBSON({})),
+                              << ". Write command: " << op.toBSON({}),
                 !op.getWriteCommandRequestBase().getStmtId());
     }
 }
@@ -139,94 +143,19 @@ bool isClassicalUpdateReplacement(const BSONObj& update) {
     return update.firstElementFieldName()[0] != '$';
 }
 
-}  // namespace write_ops
+void checkWriteErrors(const WriteCommandReplyBase& reply) {
+    if (!reply.getWriteErrors())
+        return;
 
-write_ops::InsertCommandRequest InsertOp::parse(const OpMsgRequest& request) {
-    auto insertOp = InsertCommandRequest::parse(IDLParserErrorContext("insert"), request);
+    const auto& writeErrors = *reply.getWriteErrors();
+    uassert(633310, "Write errors must not be empty", !writeErrors.empty());
 
-    validate(insertOp);
-    return insertOp;
+    const auto& firstError = writeErrors.front();
+    uassertStatusOK(firstError.getStatus());
 }
 
-write_ops::InsertCommandRequest InsertOp::parseLegacy(const Message& msgRaw) {
-    DbMessage msg(msgRaw);
-
-    InsertCommandRequest op(NamespaceString(msg.getns()));
-
-    {
-        write_ops::WriteCommandRequestBase writeCommandBase;
-        writeCommandBase.setBypassDocumentValidation(false);
-        writeCommandBase.setOrdered(!(msg.reservedField() & InsertOption_ContinueOnError));
-        op.setWriteCommandRequestBase(std::move(writeCommandBase));
-    }
-
-    uassert(ErrorCodes::InvalidLength, "Need at least one object to insert", msg.moreJSObjs());
-
-    op.setDocuments([&] {
-        std::vector<BSONObj> documents;
-        while (msg.moreJSObjs()) {
-            documents.push_back(msg.nextJsObj());
-        }
-
-        return documents;
-    }());
-
-    validate(op);
-    return op;
-}
-
-write_ops::InsertCommandReply InsertOp::parseResponse(const BSONObj& obj) {
-    uassertStatusOK(getStatusFromCommandResult(obj));
-    return write_ops::InsertCommandReply::parse(IDLParserErrorContext("insertReply"), obj);
-}
-
-void InsertOp::validate(const write_ops::InsertCommandRequest& insertOp) {
-    const auto& docs = insertOp.getDocuments();
-    checkOpCountForCommand(insertOp, docs.size());
-}
-
-write_ops::UpdateCommandRequest UpdateOp::parse(const OpMsgRequest& request) {
-    auto updateOp = UpdateCommandRequest::parse(IDLParserErrorContext("update"), request);
-
-    checkOpCountForCommand(updateOp, updateOp.getUpdates().size());
-    return updateOp;
-}
-
-write_ops::UpdateCommandReply UpdateOp::parseResponse(const BSONObj& obj) {
-    uassertStatusOK(getStatusFromCommandResult(obj));
-
-    return write_ops::UpdateCommandReply::parse(IDLParserErrorContext("updateReply"), obj);
-}
-
-void UpdateOp::validate(const UpdateCommandRequest& updateOp) {
-    checkOpCountForCommand(updateOp, updateOp.getUpdates().size());
-}
-
-write_ops::FindAndModifyCommandReply FindAndModifyOp::parseResponse(const BSONObj& obj) {
-    uassertStatusOK(getStatusFromCommandResult(obj));
-
-    return write_ops::FindAndModifyCommandReply::parse(IDLParserErrorContext("findAndModifyReply"),
-                                                       obj);
-}
-
-write_ops::DeleteCommandRequest DeleteOp::parse(const OpMsgRequest& request) {
-    auto deleteOp = DeleteCommandRequest::parse(IDLParserErrorContext("delete"), request);
-
-    checkOpCountForCommand(deleteOp, deleteOp.getDeletes().size());
-    return deleteOp;
-}
-
-write_ops::DeleteCommandReply DeleteOp::parseResponse(const BSONObj& obj) {
-    uassertStatusOK(getStatusFromCommandResult(obj));
-    return write_ops::DeleteCommandReply::parse(IDLParserErrorContext("deleteReply"), obj);
-}
-
-void DeleteOp::validate(const DeleteCommandRequest& deleteOp) {
-    checkOpCountForCommand(deleteOp, deleteOp.getDeletes().size());
-}
-
-write_ops::UpdateModification write_ops::UpdateModification::parseFromOplogEntry(
-    const BSONObj& oField, const DiffOptions& options) {
+UpdateModification UpdateModification::parseFromOplogEntry(const BSONObj& oField,
+                                                           const DiffOptions& options) {
     BSONElement vField = oField[kUpdateOplogEntryVersionFieldName];
     BSONElement idField = oField["_id"];
 
@@ -257,13 +186,13 @@ write_ops::UpdateModification write_ops::UpdateModification::parseFromOplogEntry
     }
 }
 
-write_ops::UpdateModification::UpdateModification(doc_diff::Diff diff, DiffOptions options)
+UpdateModification::UpdateModification(doc_diff::Diff diff, DiffOptions options)
     : _update(DeltaUpdate{std::move(diff), options}) {}
 
-write_ops::UpdateModification::UpdateModification(TransformFunc transform)
+UpdateModification::UpdateModification(TransformFunc transform)
     : _update(TransformUpdate{std::move(transform)}) {}
 
-write_ops::UpdateModification::UpdateModification(BSONElement update) {
+UpdateModification::UpdateModification(BSONElement update) {
     const auto type = update.type();
     if (type == BSONType::Object) {
         _update = UpdateModification(update.Obj(), ClassicTag{})._update;
@@ -279,9 +208,7 @@ write_ops::UpdateModification::UpdateModification(BSONElement update) {
 
 // If we know whether the update is a replacement, use that value. For example, when we're parsing
 // the oplog entry, we know if the update is a replacement by checking whether there's an _id field.
-write_ops::UpdateModification::UpdateModification(const BSONObj& update,
-                                                  ClassicTag,
-                                                  bool isReplacement) {
+UpdateModification::UpdateModification(const BSONObj& update, ClassicTag, bool isReplacement) {
     if (isReplacement) {
         _update = ReplacementUpdate{update};
     } else {
@@ -292,21 +219,21 @@ write_ops::UpdateModification::UpdateModification(const BSONObj& update,
 // If we don't know whether the update is a replacement, for example while we are parsing a user
 // request, we infer this by checking whether the first element is a $-field to distinguish modifier
 // style updates.
-write_ops::UpdateModification::UpdateModification(const BSONObj& update, ClassicTag)
+UpdateModification::UpdateModification(const BSONObj& update, ClassicTag)
     : UpdateModification(update, ClassicTag{}, isClassicalUpdateReplacement(update)) {}
 
-write_ops::UpdateModification::UpdateModification(std::vector<BSONObj> pipeline)
+UpdateModification::UpdateModification(std::vector<BSONObj> pipeline)
     : _update{PipelineUpdate{std::move(pipeline)}} {}
 
 /**
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
  * break because of it.
  */
-write_ops::UpdateModification write_ops::UpdateModification::parseFromBSON(BSONElement elem) {
+UpdateModification UpdateModification::parseFromBSON(BSONElement elem) {
     return UpdateModification(elem);
 }
 
-int write_ops::UpdateModification::objsize() const {
+int UpdateModification::objsize() const {
     return stdx::visit(
         visit_helper::Overloaded{
             [](const ReplacementUpdate& replacement) -> int { return replacement.bson.objsize(); },
@@ -324,8 +251,7 @@ int write_ops::UpdateModification::objsize() const {
         _update);
 }
 
-
-write_ops::UpdateModification::Type write_ops::UpdateModification::type() const {
+UpdateModification::Type UpdateModification::type() const {
     return stdx::visit(
         visit_helper::Overloaded{
             [](const ReplacementUpdate& replacement) { return Type::kReplacement; },
@@ -340,8 +266,7 @@ write_ops::UpdateModification::Type write_ops::UpdateModification::type() const 
  * IMPORTANT: The method should not be modified, as API version input/output guarantees could
  * break because of it.
  */
-void write_ops::UpdateModification::serializeToBSON(StringData fieldName,
-                                                    BSONObjBuilder* bob) const {
+void UpdateModification::serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const {
 
     stdx::visit(
         visit_helper::Overloaded{
@@ -361,6 +286,147 @@ void write_ops::UpdateModification::serializeToBSON(StringData fieldName,
             [fieldName, bob](const DeltaUpdate& delta) { *bob << fieldName << delta.diff; },
             [](const TransformUpdate& transform) {}},
         _update);
+}
+
+WriteError::WriteError(int32_t index, Status status) : _index(index), _status(std::move(status)) {}
+
+WriteError WriteError::parse(const BSONObj& obj) {
+    auto index = int32_t(obj[WriteError::kIndexFieldName].Int());
+    auto status = [&] {
+        auto code = ErrorCodes::Error(obj[WriteError::kCodeFieldName].Int());
+        auto errmsg = obj[WriteError::kErrmsgFieldName].valueStringDataSafe();
+
+        // At least up to FCV 5.x, the write commands operation used to convert StaleConfig errors
+        // into StaleShardVersion and store the extra info of StaleConfig in a sub-field called
+        // "errInfo".
+        //
+        // TODO (SERVER-63327): This special parsing should be removed in the stable version
+        // following the resolution of this ticket.
+        if (code == ErrorCodes::StaleShardVersion) {
+            return Status(ErrorCodes::StaleConfig,
+                          std::move(errmsg),
+                          obj[WriteError::kErrInfoFieldName].Obj());
+        }
+
+        // All remaining errors have the error stored at the same level as the code and errmsg (in
+        // the same way that Status is serialised as part of regular command response)
+        return Status(code, std::move(errmsg), obj);
+    }();
+
+    return WriteError(index, std::move(status));
+}
+
+BSONObj WriteError::serialize() const {
+    BSONObjBuilder errBuilder;
+    errBuilder.append(WriteError::kIndexFieldName, _index);
+
+    // At least up to FCV 5.x, the write commands operation used to convert StaleConfig errors into
+    // StaleShardVersion and store the extra info of StaleConfig in a sub-field called "errInfo".
+    // This logic preserves this for backwards compatibility.
+    //
+    // TODO (SERVER-63327): This special serialisation should be removed in the stable version
+    // following the resolution of this ticket.
+    if (_status == ErrorCodes::StaleConfig) {
+        errBuilder.append(WriteError::kCodeFieldName, int32_t(ErrorCodes::StaleShardVersion));
+        errBuilder.append(WriteError::kErrmsgFieldName, _status.reason());
+        auto extraInfo = _status.extraInfo();
+        invariant(extraInfo);
+        BSONObjBuilder extraInfoBuilder(errBuilder.subobjStart(WriteError::kErrInfoFieldName));
+        extraInfo->serialize(&extraInfoBuilder);
+    } else {
+        errBuilder.append(WriteError::kCodeFieldName, int32_t(_status.code()));
+        errBuilder.append(WriteError::kErrmsgFieldName, _status.reason());
+        if (auto extraInfo = _status.extraInfo()) {
+            extraInfo->serialize(&errBuilder);
+        }
+    }
+
+    return errBuilder.obj();
+}
+
+}  // namespace write_ops
+
+InsertCommandRequest InsertOp::parse(const OpMsgRequest& request) {
+    auto insertOp = InsertCommandRequest::parse(IDLParserErrorContext("insert"), request);
+
+    validate(insertOp);
+    return insertOp;
+}
+
+InsertCommandRequest InsertOp::parseLegacy(const Message& msgRaw) {
+    DbMessage msg(msgRaw);
+
+    InsertCommandRequest op(NamespaceString(msg.getns()));
+
+    {
+        WriteCommandRequestBase writeCommandBase;
+        writeCommandBase.setBypassDocumentValidation(false);
+        writeCommandBase.setOrdered(!(msg.reservedField() & InsertOption_ContinueOnError));
+        op.setWriteCommandRequestBase(std::move(writeCommandBase));
+    }
+
+    uassert(ErrorCodes::InvalidLength, "Need at least one object to insert", msg.moreJSObjs());
+
+    op.setDocuments([&] {
+        std::vector<BSONObj> documents;
+        while (msg.moreJSObjs()) {
+            documents.push_back(msg.nextJsObj());
+        }
+
+        return documents;
+    }());
+
+    validate(op);
+    return op;
+}
+
+InsertCommandReply InsertOp::parseResponse(const BSONObj& obj) {
+    uassertStatusOK(getStatusFromCommandResult(obj));
+    return InsertCommandReply::parse(IDLParserErrorContext("insertReply"), obj);
+}
+
+void InsertOp::validate(const InsertCommandRequest& insertOp) {
+    const auto& docs = insertOp.getDocuments();
+    checkOpCountForCommand(insertOp, docs.size());
+}
+
+UpdateCommandRequest UpdateOp::parse(const OpMsgRequest& request) {
+    auto updateOp = UpdateCommandRequest::parse(IDLParserErrorContext("update"), request);
+
+    checkOpCountForCommand(updateOp, updateOp.getUpdates().size());
+    return updateOp;
+}
+
+UpdateCommandReply UpdateOp::parseResponse(const BSONObj& obj) {
+    uassertStatusOK(getStatusFromCommandResult(obj));
+
+    return UpdateCommandReply::parse(IDLParserErrorContext("updateReply"), obj);
+}
+
+void UpdateOp::validate(const UpdateCommandRequest& updateOp) {
+    checkOpCountForCommand(updateOp, updateOp.getUpdates().size());
+}
+
+FindAndModifyCommandReply FindAndModifyOp::parseResponse(const BSONObj& obj) {
+    uassertStatusOK(getStatusFromCommandResult(obj));
+
+    return FindAndModifyCommandReply::parse(IDLParserErrorContext("findAndModifyReply"), obj);
+}
+
+DeleteCommandRequest DeleteOp::parse(const OpMsgRequest& request) {
+    auto deleteOp = DeleteCommandRequest::parse(IDLParserErrorContext("delete"), request);
+
+    checkOpCountForCommand(deleteOp, deleteOp.getDeletes().size());
+    return deleteOp;
+}
+
+DeleteCommandReply DeleteOp::parseResponse(const BSONObj& obj) {
+    uassertStatusOK(getStatusFromCommandResult(obj));
+    return DeleteCommandReply::parse(IDLParserErrorContext("deleteReply"), obj);
+}
+
+void DeleteOp::validate(const DeleteCommandRequest& deleteOp) {
+    checkOpCountForCommand(deleteOp, deleteOp.getDeletes().size());
 }
 
 }  // namespace mongo

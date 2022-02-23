@@ -417,7 +417,6 @@ void populateReply(OperationContext* opCtx,
                    write_ops_exec::WriteResult result,
                    CommandReplyType* cmdReply,
                    boost::optional<PopulateReplyHooks> hooks = boost::none) {
-
     invariant(cmdReply);
 
     if (shouldSkipOutput(opCtx))
@@ -463,7 +462,11 @@ void populateReply(OperationContext* opCtx,
     }
 
     if (!errors.empty()) {
-        replyBase.setWriteErrors(errors);
+        std::vector<write_ops::WriteError> writeErrors;
+        for (const auto& e : errors) {
+            writeErrors.emplace_back(write_ops::WriteError::parse(e));
+        }
+        replyBase.setWriteErrors(std::move(writeErrors));
     }
 
     // writeConcernError field is handled by command processor.
@@ -545,22 +548,20 @@ public:
 
         write_ops::InsertCommandReply typedRun(OperationContext* opCtx) final try {
             transactionChecks(opCtx, ns());
-            write_ops::InsertCommandReply insertReply;
 
             if (isTimeseries(opCtx, request())) {
                 // Re-throw parsing exceptions to be consistent with CmdInsert::Invocation's
                 // constructor.
                 try {
-                    _performTimeseriesWrites(opCtx, &insertReply);
+                    return _performTimeseriesWrites(opCtx);
                 } catch (DBException& ex) {
                     ex.addContext(str::stream() << "time-series insert failed: " << ns().ns());
                     throw;
                 }
-
-                return insertReply;
             }
             auto reply = write_ops_exec::performInserts(opCtx, request());
 
+            write_ops::InsertCommandReply insertReply;
             populateReply(opCtx,
                           !request().getWriteCommandRequestBase().getOrdered(),
                           request().getDocuments().size(),
@@ -1239,8 +1240,7 @@ public:
             } while (!docsToRetry.empty());
         }
 
-        void _performTimeseriesWrites(OperationContext* opCtx,
-                                      write_ops::InsertCommandReply* insertReply) const {
+        write_ops::InsertCommandReply _performTimeseriesWrites(OperationContext* opCtx) const {
             auto& curOp = *CurOp::get(opCtx);
             ON_BLOCK_EXIT([&] {
                 // This is the only part of finishCurOp we need to do for inserts because they reuse
@@ -1276,7 +1276,8 @@ public:
             boost::optional<OID> electionId;
             bool containsRetry = false;
 
-            auto& baseReply = insertReply->getWriteCommandReplyBase();
+            write_ops::InsertCommandReply insertReply;
+            auto& baseReply = insertReply.getWriteCommandReplyBase();
 
             if (request().getOrdered()) {
                 baseReply.setN(_performOrderedTimeseriesWrites(
@@ -1293,7 +1294,11 @@ public:
             }
 
             if (!errors.empty()) {
-                baseReply.setWriteErrors(errors);
+                std::vector<write_ops::WriteError> writeErrors;
+                for (const auto& e : errors) {
+                    writeErrors.emplace_back(write_ops::WriteError::parse(e));
+                }
+                baseReply.setWriteErrors(std::move(writeErrors));
             }
             if (opTime) {
                 baseReply.setOpTime(*opTime);
@@ -1306,6 +1311,7 @@ public:
             }
 
             curOp.debug().additiveMetrics.ninserted = baseReply.getN();
+            return insertReply;
         }
     };
 } cmdInsert;
