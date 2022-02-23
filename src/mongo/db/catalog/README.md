@@ -564,6 +564,21 @@ Also see [MongoDB Manual - Indexes](https://docs.mongodb.com/manual/indexes/).
 A unique index maintains a constraint such that duplicate values are not allowed on the indexed
 field(s).
 
+To convert a regular index to unique, one has to follow the two-step process:
+  * The index has to be first set to `prepareUnique` state using `collMod` command with the index
+  option `prepareUnique: true`. In this state, the index will start rejecting writes introducing
+  duplicate keys.
+  * The `collMod` command with the index option `unique: true` will then check for the uniqueness
+  constraint and finally update the index spec in the catalog under a collection `MODE_X` lock.
+
+If the index already has duplicate keys, the conversion in step two will fail and return all
+violating documents' ids grouped by the keys. Step two can be retried to finish the conversion after
+all violating documents are fixed. Otherwise, the conversion can be cancelled using `collMod`
+command with the index option `prepareUnique: false`.
+
+The `collMod` option `dryRun: true` can also be specified to check for duplicates in the index
+without attempting to actually convert it.
+
 ### Multikey Indexes
 
 An index is considered "multikey" if there are multiple keys that map to the same record. That is,
