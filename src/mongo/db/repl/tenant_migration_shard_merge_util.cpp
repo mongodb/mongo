@@ -255,7 +255,7 @@ void cloneFile(OperationContext* opCtx, const BSONObj& metadataDoc) {
                 "metadata"_attr = metadataDoc);
     auto backupId = UUID(uassertStatusOK(UUID::parse(metadataDoc[kBackupIdFieldName])));
     auto remoteDbpath = metadataDoc["remoteDbpath"].str();
-    size_t fileSize = metadataDoc["fileSize"].safeNumberLong();
+    size_t fileSize = std::max(0ll, metadataDoc["fileSize"].safeNumberLong());
     auto relativePath = _getPathRelativeTo(fileName, metadataDoc[kDonorDbPathFieldName].str());
     invariant(!relativePath.empty());
 
