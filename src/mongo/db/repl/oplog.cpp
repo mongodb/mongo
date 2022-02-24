@@ -931,8 +931,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
               return *nsByUUID;
           }());
 
-          BSONObjBuilder resultWeDontCareAbout;
-          return collMod(opCtx, nss, cmd, &resultWeDontCareAbout);
+          return processCollModCommandForApplyOps(opCtx, nss, cmd, mode);
       },
       {ErrorCodes::IndexNotFound, ErrorCodes::NamespaceNotFound}}},
     {"dbCheck", {dbCheckOplogCommand, {}}},

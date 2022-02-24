@@ -118,7 +118,8 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const CollectionPtr& coll,
                                                const BSONObj& cmdObj,
-                                               BSONObjBuilder* oplogEntryBuilder) {
+                                               BSONObjBuilder* oplogEntryBuilder,
+                                               boost::optional<repl::OplogApplication::Mode> mode) {
 
     bool isView = !coll;
     bool isTimeseries = coll && coll->getTimeseriesOptions() != boost::none;
@@ -217,13 +218,16 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
 
             if (!cmr.indexExpireAfterSeconds.eoo()) {
                 BSONElement oldExpireSecs = cmr.idx->infoObj().getField("expireAfterSeconds");
-                if (oldExpireSecs.eoo()) {
-                    return Status(ErrorCodes::InvalidOptions,
-                                  "no expireAfterSeconds field to update");
-                }
-                if (!oldExpireSecs.isNumber()) {
-                    return Status(ErrorCodes::InvalidOptions,
-                                  "existing expireAfterSeconds field is not a number");
+                // Allows secondaries to convert to ttl.
+                if (!mode || *mode == repl::OplogApplication::Mode::kApplyOpsCmd) {
+                    if (oldExpireSecs.eoo()) {
+                        return Status(ErrorCodes::InvalidOptions,
+                                      "no expireAfterSeconds field to update");
+                    }
+                    if (!oldExpireSecs.isNumber()) {
+                        return Status(ErrorCodes::InvalidOptions,
+                                      "existing expireAfterSeconds field is not a number");
+                    }
                 }
             }
 
@@ -437,7 +441,8 @@ void _setClusteredExpireAfterSeconds(OperationContext* opCtx,
 Status _collModInternal(OperationContext* opCtx,
                         const NamespaceString& nss,
                         const BSONObj& cmdObj,
-                        BSONObjBuilder* result) {
+                        BSONObjBuilder* result,
+                        boost::optional<repl::OplogApplication::Mode> mode) {
     StringData dbName = nss.db();
     AutoGetCollection coll(opCtx, nss, MODE_X, AutoGetCollectionViewMode::kViewsPermitted);
     Lock::CollectionLock systemViewsLock(
@@ -494,7 +499,7 @@ Status _collModInternal(OperationContext* opCtx,
 
     BSONObjBuilder oplogEntryBuilder;
     auto statusW =
-        parseCollModRequest(opCtx, nss, coll.getCollection(), cmdObj, &oplogEntryBuilder);
+        parseCollModRequest(opCtx, nss, coll.getCollection(), cmdObj, &oplogEntryBuilder, mode);
     if (!statusW.isOK()) {
         return statusW.getStatus();
     }
@@ -569,6 +574,13 @@ Status _collModInternal(OperationContext* opCtx,
             if (indexExpireAfterSeconds) {
                 newExpireSecs = indexExpireAfterSeconds;
                 oldExpireSecs = idx->infoObj().getField("expireAfterSeconds");
+                // If this collection was not previously TTL, inform the TTL monitor when we commit.
+                if (oldExpireSecs.eoo()) {
+                    auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
+                    opCtx->recoveryUnit()->onCommit([ttlCache, uuid = coll->uuid(), &idx](auto _) {
+                        ttlCache->registerTTLInfo(uuid, idx->indexName());
+                    });
+                }
                 if (SimpleBSONElementComparator::kInstance.evaluate(oldExpireSecs !=
                                                                     newExpireSecs)) {
                     // Change the value of "expireAfterSeconds" on disk.
@@ -592,8 +604,9 @@ Status _collModInternal(OperationContext* opCtx,
             indexCollModInfo =
                 IndexCollModInfo{!indexExpireAfterSeconds ? boost::optional<Seconds>()
                                                           : Seconds(newExpireSecs.safeNumberLong()),
-                                 !indexExpireAfterSeconds ? boost::optional<Seconds>()
-                                                          : Seconds(oldExpireSecs.safeNumberLong()),
+                                 !indexExpireAfterSeconds || oldExpireSecs.eoo()
+                                     ? boost::optional<Seconds>()
+                                     : Seconds(oldExpireSecs.safeNumberLong()),
                                  !indexHidden ? boost::optional<bool>() : newHidden.booleanSafe(),
                                  !indexHidden ? boost::optional<bool>() : oldHidden.booleanSafe(),
                                  idx->indexName()};
@@ -669,7 +682,15 @@ Status collMod(OperationContext* opCtx,
                const NamespaceString& nss,
                const BSONObj& cmdObj,
                BSONObjBuilder* result) {
-    return _collModInternal(opCtx, nss, cmdObj, result);
+    return _collModInternal(opCtx, nss, cmdObj, result, boost::none);
+}
+
+Status processCollModCommandForApplyOps(OperationContext* opCtx,
+                                        const NamespaceString& nss,
+                                        const BSONObj& cmdObj,
+                                        repl::OplogApplication::Mode mode) {
+    BSONObjBuilder resultWeDontCareAbout;
+    return _collModInternal(opCtx, nss, cmdObj, &resultWeDontCareAbout, mode);
 }
 
 }  // namespace mongo

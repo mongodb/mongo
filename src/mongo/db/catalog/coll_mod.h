@@ -30,6 +30,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/repl/oplog.h"
 
 namespace mongo {
 class BSONObj;
@@ -52,5 +53,14 @@ Status collMod(OperationContext* opCtx,
                const NamespaceString& ns,
                const BSONObj& cmdObj,
                BSONObjBuilder* result);
+
+/**
+ * Performs the collection modification described in "cmdObj" on the collection "ns". Only allows
+ * converting non-ttl collection to ttl in secondary oplog application.
+ */
+Status processCollModCommandForApplyOps(OperationContext* opCtx,
+                                        const NamespaceString& nss,
+                                        const BSONObj& cmdObj,
+                                        repl::OplogApplication::Mode mode);
 
 }  // namespace mongo
