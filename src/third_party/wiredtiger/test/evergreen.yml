@@ -2938,7 +2938,8 @@ tasks:
           perf-test-name: update-checkpoint-btree.wtperf
 
   - name: perf-test-update-checkpoint-lsm
-    tags: ["checkpoint-perf"]
+    # Disable/Un-tag the LSM perf test till the support for LSM is restored.
+    # tags: ["checkpoint-perf"]
     depends_on:
       - name: compile
     commands:
@@ -3185,7 +3186,8 @@ tasks:
           perf-test-name: evict-btree-1.wtperf
 
   - name: perf-test-evict-lsm 
-    tags: ["evict-perf"]
+    # Disable/Un-tag the LSM perf test till the support for LSM is restored.
+    # tags: ["evict-perf"]
     depends_on:
       - name: compile
     commands:
@@ -3200,7 +3202,8 @@ tasks:
           perf-test-name: evict-lsm.wtperf
       
   - name: perf-test-evict-lsm-1 
-    tags: ["evict-perf"]
+    # Disable/Un-tag the LSM perf test till the support for LSM is restored.
+    # tags: ["evict-perf"]
     depends_on:
       - name: compile
     commands:
@@ -3735,7 +3738,8 @@ buildvariants:
   tasks:
     - name: compile
     - name: ".btree-perf"
-    - name: ".lsm-perf"
+    # Disable LSM perf tests till the support for LSM is restored.
+    # - name: ".lsm-perf"
     - name: ".stress-perf"
     - name: ".checkpoint-perf"
     - name: ".evict-perf"
@@ -3746,9 +3750,10 @@ buildvariants:
     - name: Wiredtiger-perf-btree-jobs
       execution_tasks:
       - ".btree-perf"
-    - name: Wiredtiger-perf-lsm-jobs
-      execution_tasks:
-      - ".lsm-perf"
+    # Disable LSM perf tests till the support for LSM is restored.
+    # - name: Wiredtiger-perf-lsm-jobs
+    #   execution_tasks:
+    #   - ".lsm-perf"
     - name: Wiredtiger-perf-stress-jobs
       execution_tasks:
       - ".stress-perf"
