@@ -273,6 +273,7 @@ connection_stats = [
     CacheStat('cache_eviction_walk_passes', 'eviction passes of a file'),
     CacheStat('cache_eviction_walk_saved_pos', 'eviction walks started from saved location in tree'),
     CacheStat('cache_eviction_walks_abandoned', 'eviction walks abandoned'),
+    CacheStat('cache_eviction_walk_sleeps', 'eviction walk most recent sleeps for checkpoint handle gathering'),
     CacheStat('cache_eviction_walks_active', 'files with active eviction walks', 'no_clear,no_scale'),
     CacheStat('cache_eviction_walks_ended', 'eviction walks reached end of tree'),
     CacheStat('cache_eviction_walks_gave_up_no_targets', 'eviction walks gave up because they saw too many pages and found no candidates'),
