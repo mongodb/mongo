@@ -79,7 +79,7 @@ private:
         MONGO_UNREACHABLE;
     }
 
-    SharedSemiFuture<void> recover() override {
+    VectorClock::VectorTime recoverDirect(OperationContext* opCtx) override {
         // VectorClockTrivial does not support persistence
         MONGO_UNREACHABLE;
     }

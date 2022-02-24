@@ -92,7 +92,7 @@ public:
      * Ensures that the values of the vector clock are at least equal to those from the last
      * successfully persisted ones.
      */
-    virtual SharedSemiFuture<void> recover() = 0;
+    virtual VectorClock::VectorTime recoverDirect(OperationContext* opCtx) = 0;
 
 protected:
     VectorClockMutable();

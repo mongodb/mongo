@@ -96,6 +96,7 @@
 #include "mongo/db/system_index.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -892,6 +893,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
     } else if (ShardingState::get(opCtx)->enabled()) {
         Status status = ShardingStateRecovery::recover(opCtx);
+        VectorClockMutable::get(opCtx)->recoverDirect(opCtx);
 
         // If the node is shutting down or it lost quorum just as it was becoming primary, don't
         // run the sharding onStepUp machinery. The onStepDown counterpart to these methods is
