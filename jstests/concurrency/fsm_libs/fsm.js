@@ -115,7 +115,7 @@ var fsm = (function() {
                         data = TransactionsUtil.deepCopyObject({}, args.data);
                         data[kIsRunningInsideTransaction] = true;
                         fn.call(data, args.db, args.collName, connCache);
-                    });
+                    }, {retryOnKilledSession: args.data.retryOnKilledSession});
                     delete data[kIsRunningInsideTransaction];
                     args.data = data;
                 } catch (e) {

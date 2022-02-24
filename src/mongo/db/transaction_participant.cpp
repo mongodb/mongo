@@ -710,6 +710,16 @@ void TransactionParticipant::Participant::_beginOrContinueRetryableWrite(
         retryableWriteTxnParticipantCatalog.addParticipant(*this);
     } else {
         // Retrying a retryable write.
+
+        // If this retryable write's transaction id has been converted to a transaction, and that
+        // transaction is in prepare, wait for it to exit prepare before throwing
+        // IncompleteTransactionHistory so the error response's operationTime is inclusive of the
+        // transaction's 2PC decision, guaranteeing causally consistent sessions will always read
+        // the transaction's writes.
+        uassert(ErrorCodes::PreparedTransactionInProgress,
+                "Retryable write that has been converted to a transaction is in prepare",
+                !o().txnState.isInSet(TransactionState::kPrepared));
+
         uassert(ErrorCodes::IncompleteTransactionHistory,
                 "Cannot retry a retryable write that has been converted into a transaction",
                 o().txnState.isInRetryableWriteMode());

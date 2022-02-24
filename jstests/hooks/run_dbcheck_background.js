@@ -14,6 +14,10 @@ if (typeof db === 'undefined') {
 
 TestData = TestData || {};
 
+// Disable implicit sessions so FSM workloads that kill random sessions won't interrupt the
+// operations in this test that aren't resilient to interruptions.
+TestData.disableImplicitSessions = true;
+
 const conn = db.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(conn);
 

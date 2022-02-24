@@ -7,7 +7,6 @@
  * @tags: [
  *  requires_sharding,
  *  assumes_balancer_off,
- *  requires_non_retryable_writes,
  *  uses_transactions,
  * ]
  */
@@ -152,7 +151,8 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.runInTransactionOrRetryableWrite = function runInTransactionOrRetryableWrite(
         functionToRun, wrapInTransaction) {
         if (wrapInTransaction) {
-            withTxnAndAutoRetry(this.session, functionToRun);
+            withTxnAndAutoRetry(
+                this.session, functionToRun, {retryOnKilledSession: this.retryOnKilledSession});
         } else {
             functionToRun();
         }
@@ -191,8 +191,22 @@ var $config = extendWorkload($config, function($config, $super) {
         jsTestLog(logString);
     };
 
+    function assertDocWasUpdated(collection, idToUpdate, currentShardKey, newShardKey, newCounter) {
+        assertWhenOwnColl.isnull(collection.findOne({_id: idToUpdate, skey: currentShardKey}));
+        assertWhenOwnColl.eq(collection.findOne({_id: idToUpdate, skey: newShardKey}),
+                             {_id: idToUpdate, skey: newShardKey, counter: newCounter});
+    }
+
+    function wasDocUpdated(collection, idToUpdate, currentShardKey) {
+        const docWithOldShardKey = collection.findOne({_id: idToUpdate, skey: currentShardKey});
+        return !docWithOldShardKey;
+    }
+
     $config.data.findAndModifyShardKey = function findAndModifyShardKey(
         db, collName, {wrapInTransaction, moveAcrossChunks} = {}) {
+        // This function uses a different session than the transaction wrapping logic expects.
+        fsm.forceRunningOutsideTransaction(this);
+
         const collection = this.session.getDatabase(db.getName()).getCollection(collName);
         const shardKeyField = this.shardKeyField[collName];
 
@@ -222,6 +236,32 @@ var $config = extendWorkload($config, function($config, $super) {
 
                 this.expectedCounters[idToUpdate] = counterForId + 1;
             } catch (e) {
+                if (e.code === ErrorCodes.IncompleteTransactionHistory && !wrapInTransaction) {
+                    print("Handling IncompleteTransactionHistory error for findAndModify: " +
+                          tojsononeline(e));
+
+                    // With internal transactions enabled, IncompleteTransactionHistory means the
+                    // write succeeded, so we can treat this error as success.
+                    if (this.internalTransactionsEnabled) {
+                        print("Internal transactions are on so assuming the operation succeeded");
+                        assertDocWasUpdated(
+                            collection, idToUpdate, currentShardKey, newShardKey, counterForId + 1);
+                        this.expectedCounters[idToUpdate] = counterForId + 1;
+                        return;
+                    }
+
+                    // With the previous implementation, this could also mean the first attempt at
+                    // handling a WCOS error failed transiently, so we have to detect whether the
+                    // operation succeeded or failed before continuing.
+                    const docWasUpdated = wasDocUpdated(collection, idToUpdate, currentShardKey);
+                    print("Was the document updated? " + docWasUpdated);
+                    if (docWasUpdated) {
+                        // The operation succeeded, so update the in-memory counters.
+                        this.expectedCounters[idToUpdate] = counterForId + 1;
+                    }
+                    return;
+                }
+
                 const msg = e.errmsg ? e.errmsg : e.message;
                 if (this.isUpdateShardKeyErrorAcceptable(e.code, msg, e.errorLabels)) {
                     print("Ignoring acceptable updateShardKey error attempting to update the" +
@@ -229,10 +269,8 @@ var $config = extendWorkload($config, function($config, $super) {
                           ": " + e);
                     assertWhenOwnColl.neq(
                         collection.findOne({_id: idToUpdate, skey: currentShardKey}), null);
-                    assertWhenOwnColl.eq(
-                        collection.findOne(
-                            {_id: idToUpdate, skey: newShardKey, counter: counterForId}),
-                        null);
+                    assertWhenOwnColl.eq(collection.findOne({_id: idToUpdate, skey: newShardKey}),
+                                         null);
                     return;
                 }
                 throw e;
@@ -246,6 +284,9 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.data.updateShardKey = function updateShardKey(
         db, collName, {moveAcrossChunks, wrapInTransaction} = {}) {
+        // This function uses a different session than the transaction wrapping logic expects.
+        fsm.forceRunningOutsideTransaction(this);
+
         const collection = this.session.getDatabase(db.getName()).getCollection(collName);
         const shardKeyField = this.shardKeyField[collName];
 
@@ -273,18 +314,41 @@ var $config = extendWorkload($config, function($config, $super) {
                 const err = updateResult instanceof WriteResult ? updateResult.getWriteError()
                                                                 : updateResult;
 
+                if (err.code === ErrorCodes.IncompleteTransactionHistory && !wrapInTransaction) {
+                    print("Handling IncompleteTransactionHistory error for update, caught error: " +
+                          tojsononeline(e) + ", err: " + tojsononeline(err));
+
+                    // TODO SERVER-59186: Once updates that change the shard key use the transaction
+                    // API, expect this to mean the write succeeded when the API is enabled.
+
+                    // With the original implementation, this error could mean the write succeeded
+                    // or failed, so we have to detect the outcome before continuing.
+                    const docWasUpdated = wasDocUpdated(collection, idToUpdate, currentShardKey);
+                    print("Was the document updated? " + docWasUpdated);
+                    if (docWasUpdated) {
+                        // The operation succeeded, so update the in-memory counters.
+                        this.expectedCounters[idToUpdate] = counterForId + 1;
+                    }
+                    return;
+                }
+
                 if (this.isUpdateShardKeyErrorAcceptable(err.code, err.errmsg, err.errorLabels)) {
                     print("Ignoring acceptable updateShardKey error attempting to update the" +
                           "document with _id: " + idToUpdate + " and shardKey: " + currentShardKey +
                           ": " + tojson(updateResult));
                     assertWhenOwnColl.neq(
                         collection.findOne({_id: idToUpdate, skey: currentShardKey}), null);
-                    assertWhenOwnColl.eq(
-                        collection.findOne(
-                            {_id: idToUpdate, skey: newShardKey, counter: counterForId}),
-                        null);
+                    assertWhenOwnColl.eq(collection.findOne({_id: idToUpdate, skey: newShardKey}),
+                                         null);
                     return;
                 }
+
+                // Put the write result's code on the thrown exception, if there is one, so it's in
+                // the expected format for any higher level error handling logic.
+                if (!e.hasOwnProperty("code") && err.code) {
+                    e.code = err.code;
+                }
+
                 throw e;
             }
         };
@@ -350,7 +414,23 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.init = function init(db, collName, connCache) {
         $super.states.init.apply(this, arguments);
 
-        this.session = db.getMongo().startSession({causalConsistency: false, retryWrites: true});
+        // With the original update shard key implementation, retrying a retryable write that was
+        // converted into a distributed transaction will immediately fail with
+        // IncompleteTransactionHistory. In suites where that transaction may be interrupted during
+        // two phase commit and the test retries on this, the retry may return the error before the
+        // transaction has left prepare, so any subsequent non-causally consistent reads may read
+        // the preimage of the data in prepare. This test expects to read the documents written to
+        // by the update shard key transaction after this error, so use a causally consistent
+        // session to guarantee that in these suites.
+        //
+        // TODO SERVER-59186: With the new implementation, IncompleteTransactionHistory is only
+        // returned after the shard owning the preimage document leaves prepare, and since
+        // coordinateCommitReturnImmediatelyAfterPersistingDecision is false in these suites, any
+        // subsequent reads should always read the transaction's writes on all shards without causal
+        // consistency, so use a non causally consistent session with internal transactions.
+        const shouldUseCausalConsistency = this.runningWithStepdowns || this.retryOnKilledSession;
+        this.session = db.getMongo().startSession(
+            {causalConsistency: shouldUseCausalConsistency, retryWrites: true});
 
         // Assign a default counter value to each document owned by this thread.
         db[collName].find({tid: this.tid}).forEach(doc => {
@@ -390,6 +470,12 @@ var $config = extendWorkload($config, function($config, $super) {
                 db.adminCommand({split: ns, middle: {skey: medianIdForThread}}));
         }
         db.printShardingStatus();
+
+        this.internalTransactionsEnabled =
+            assert
+                .commandWorked(
+                    db.adminCommand({getParameter: 1, featureFlagInternalTransactions: 1}))
+                .featureFlagInternalTransactions.value;
     };
 
     /**
@@ -403,6 +489,18 @@ var $config = extendWorkload($config, function($config, $super) {
                 return 'unexpected counter value, doc: ' + tojson(doc);
             });
         });
+    };
+
+    const origMoveChunk = $config.states.moveChunk;
+    $config.states.moveChunk = function moveChunk(db, collName, connCache) {
+        if (this.internalTransactionsEnabled &&
+            (this.retryOnKilledSession || this.runningWithStepdowns)) {
+            // TODO SERVER-58758: Remove this when retryable transaction history is migrated.
+            print("Skipping moveChunk until transaction API use supports retries");
+            return;
+        }
+
+        origMoveChunk.apply(this, arguments);
     };
 
     $config.transitions = {

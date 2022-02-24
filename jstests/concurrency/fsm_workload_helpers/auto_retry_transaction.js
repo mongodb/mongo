@@ -1,5 +1,7 @@
 'use strict';
 
+load("jstests/libs/killed_session_util.js");
+
 var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
     /**
      * Calls 'func' with the print() function overridden to be a no-op.
@@ -20,8 +22,7 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
 
     // Returns if the code is one that could come from a session being killed.
     function isKilledSessionCode(code) {
-        return code === ErrorCodes.Interrupted || code === ErrorCodes.CursorKilled ||
-            code === ErrorCodes.CursorNotFound;
+        return KilledSessionUtil.isKilledSessionCode(code);
     }
 
     // Returns true if the transaction can be retried with a higher transaction number after the
@@ -49,10 +50,8 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
             return true;
         }
 
-        if (retryOnKilledSession &&
-            (isKilledSessionCode(e.code) ||
-             (Array.isArray(e.writeErrors) &&
-              e.writeErrors.every(writeError => isKilledSessionCode(writeError.code))))) {
+        if (retryOnKilledSession && KilledSessionUtil.hasKilledSessionError(e)) {
+            print("-=-=-=- Retrying transaction after killed session error: " + tojsononeline(e));
             return true;
         }
 
@@ -68,7 +67,10 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
             // If commit fails with a killed session code, the commit must be retried because it is
             // unknown if the interrupted commit succeeded. This is safe because commitTransaction
             // is a retryable write.
-            if (!commitRes.ok && retryOnKilledSession && isKilledSessionCode(commitRes.code)) {
+            const failedWithInterruption =
+                !commitRes.ok && KilledSessionUtil.isKilledSessionCode(commitRes.code);
+            const wcFailedWithInterruption = KilledSessionUtil.hasKilledSessionWCError(commitRes);
+            if (retryOnKilledSession && (failedWithInterruption || wcFailedWithInterruption)) {
                 print("-=-=-=- Retrying commit after killed session code, sessionId: " +
                       tojsononeline(session.getSessionId()) +
                       ", txnNumber: " + tojsononeline(session.getTxnNumber_forTesting()) +
