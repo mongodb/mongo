@@ -142,6 +142,9 @@ private:
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                          const CancellationToken& token) noexcept override final;
 
+    SemiFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                              const CancellationToken& token) noexcept;
+
     void interrupt(Status status) noexcept override final;
 
     template <typename Func>
