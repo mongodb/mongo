@@ -68,6 +68,9 @@ public:
     // Namespace for the sharding config database
     static constexpr StringData kConfigDb = "config"_sd;
 
+    // The $external database used by X.509, LDAP, etc...
+    static constexpr StringData kExternalDb = "$external"_sd;
+
     // Name for the system views collection
     static constexpr StringData kSystemDotViewsCollectionName = "system.views"_sd;
 
