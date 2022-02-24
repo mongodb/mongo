@@ -40,10 +40,13 @@
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/histogram.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+
+static const size_t kLatencyHistogramBucketsCount = 5;
+static const std::array<int64_t, kLatencyHistogramBucketsCount> latencyHistogramBuckets = {
+    0, 11, 101, 1001, 10001};
 
 /*
  * Maintains the metrics for resharding operations.
@@ -170,10 +173,6 @@ public:
 
     // Reports the estimated remaining time for the active resharding operation, or `boost::none`.
     boost::optional<Milliseconds> getOperationRemainingTime() const;
-
-    static Histogram<int64_t> getLatencyHistogram() {
-        return Histogram<int64_t>({10, 100, 1000, 10000});
-    }
 
 private:
     class OperationMetrics;

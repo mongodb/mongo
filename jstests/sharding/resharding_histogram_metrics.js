@@ -122,12 +122,12 @@ reshardingTest.withReshardingInBackground(
                 // We expect 1 batch insert per document on each shard, plus 1 empty batch
                 // to discover no documents are left.
                 const expectedBatchInserts = reshardingMetrics[kDocumentsCopied] + 1;
-                const receivedBatchInserts = collClonerFillBatchForInsertHist["totalCount"];
+                const receivedBatchInserts = collClonerFillBatchForInsertHist["ops"];
                 assert(expectedBatchInserts == receivedBatchInserts,
                        `expected ${expectedBatchInserts} batch inserts,
                        received ${receivedBatchInserts}`);
 
-                firstReshardBatchApplies += oplogApplierApplyBatchHist["totalCount"];
+                firstReshardBatchApplies += oplogApplierApplyBatchHist["ops"];
             });
 
             assert(firstReshardBatchApplies > 0,
@@ -174,8 +174,8 @@ recipientShardNames.forEach(function(shardName) {
     const collClonerFillBatchForInsertHist =
         reshardingMetrics[kCollClonerFillBatchForInsertLatencyMillis];
 
-    cumulativeBatchApplies += oplogApplierApplyBatchHist["totalCount"];
-    cumulativeBatchInserts += collClonerFillBatchForInsertHist["totalCount"];
+    cumulativeBatchApplies += oplogApplierApplyBatchHist["ops"];
+    cumulativeBatchInserts += collClonerFillBatchForInsertHist["ops"];
     totalDocumentsCopied += reshardingMetrics[kDocumentsCopied];
 });
 
