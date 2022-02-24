@@ -772,9 +772,21 @@ const std::map<StringData, BuiltinRoleDefinition> kBuiltinRoles({
     {BUILTIN_ROLE_INTERNAL, {true, addInternalRolePrivileges}},
 });
 
+// $external is a virtual database used for X509, LDAP,
+// and other authentication mechanisms and not used for storage.
+// Therefore, granting privileges on this database does not make sense.
+bool isValidDB(StringData dbname) {
+    return NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow) &&
+        (dbname != NamespaceString::kExternalDb);
+}
+
 }  // namespace
 
 stdx::unordered_set<RoleName> auth::getBuiltinRoleNamesForDB(StringData dbname) {
+    if (!isValidDB(dbname)) {
+        return {};
+    }
+
     const bool isAdmin = dbname == ADMIN_DBNAME;
 
     stdx::unordered_set<RoleName> roleNames;
@@ -790,8 +802,7 @@ bool auth::addPrivilegesForBuiltinRole(const RoleName& roleName, PrivilegeVector
     auto role = roleName.getRole();
     auto dbname = roleName.getDB();
 
-    if (!NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow) ||
-        dbname == "$external") {
+    if (!isValidDB(dbname)) {
         return false;
     }
 
@@ -818,8 +829,7 @@ void auth::generateUniversalPrivileges(PrivilegeVector* privileges) {
 
 bool auth::isBuiltinRole(const RoleName& role) {
     auto dbname = role.getDB();
-    if (!NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow) ||
-        dbname == "$external") {
+    if (!isValidDB(dbname)) {
         return false;
     }
 
