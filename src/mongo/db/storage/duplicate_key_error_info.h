@@ -32,6 +32,8 @@
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/record_id.h"
+#include "mongo/stdx/variant.h"
 
 namespace mongo {
 
@@ -41,16 +43,16 @@ namespace mongo {
  */
 class DuplicateKeyErrorInfo final : public ErrorExtraInfo {
 public:
+    using FoundValue = stdx::variant<stdx::monostate, RecordId, BSONObj>;
+
     static constexpr auto code = ErrorCodes::DuplicateKey;
 
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
     explicit DuplicateKeyErrorInfo(const BSONObj& keyPattern,
                                    const BSONObj& keyValue,
-                                   const BSONObj& collation)
-        : _keyPattern(keyPattern.getOwned()),
-          _keyValue(keyValue.getOwned()),
-          _collation(collation.getOwned()) {}
+                                   const BSONObj& collation,
+                                   FoundValue&& foundValue);
 
     void serialize(BSONObjBuilder* bob) const override;
 
@@ -75,6 +77,12 @@ private:
     // An empty object if the index which resulted in the duplicate key error has the simple
     // collation, otherwise gives the index's collation.
     BSONObj _collation;
+
+    // Optionally, the value found at the cursor which produced the DuplicateKey error, for
+    // diagnostic use. If the error came from an _id index, then the value will be the record id of
+    // the duplicate document. If the error came from a clustered collection, then the value will be
+    // the duplicate document itself.
+    FoundValue _foundValue;
 };
 
 }  // namespace mongo

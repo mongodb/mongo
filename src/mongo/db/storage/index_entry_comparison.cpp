@@ -34,7 +34,6 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/text.h"
@@ -188,7 +187,8 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
                               const NamespaceString& collectionNamespace,
                               const std::string& indexName,
                               const BSONObj& keyPattern,
-                              const BSONObj& indexCollation) {
+                              const BSONObj& indexCollation,
+                              DuplicateKeyErrorInfo::FoundValue&& foundValue) {
     const bool hasCollation = !indexCollation.isEmpty();
 
     StringBuilder sb;
@@ -250,8 +250,22 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
 
     sb << builderForErrmsg.obj();
 
-    return Status(DuplicateKeyErrorInfo(keyPattern, builderForErrorExtraInfo.obj(), indexCollation),
-                  sb.str());
+    stdx::visit(
+        visit_helper::Overloaded{
+            [](stdx::monostate) {},
+            [&sb](const RecordId& rid) { sb << " found value: " << rid; },
+            [&sb](const BSONObj& obj) {
+                if (obj.objsize() < BSONObjMaxUserSize / 2) {
+                    sb << " found value: " << obj;
+                }
+            },
+        },
+        foundValue);
+
+    return Status(
+        DuplicateKeyErrorInfo(
+            keyPattern, builderForErrorExtraInfo.obj(), indexCollation, std::move(foundValue)),
+        sb.str());
 }
 
 Status buildDupKeyErrorStatus(const KeyString::Value& keyString,

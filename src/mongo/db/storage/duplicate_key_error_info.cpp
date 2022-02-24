@@ -36,6 +36,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/text.h"
+#include "mongo/util/visit_helper.h"
 
 namespace mongo {
 namespace {
@@ -43,6 +44,19 @@ namespace {
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(DuplicateKeyErrorInfo);
 
 }  // namespace
+
+DuplicateKeyErrorInfo::DuplicateKeyErrorInfo(const BSONObj& keyPattern,
+                                             const BSONObj& keyValue,
+                                             const BSONObj& collation,
+                                             FoundValue&& foundValue)
+    : _keyPattern(keyPattern.getOwned()),
+      _keyValue(keyValue.getOwned()),
+      _collation(collation.getOwned()),
+      _foundValue(std::move(foundValue)) {
+    if (auto foundValueObj = stdx::get_if<BSONObj>(&_foundValue)) {
+        _foundValue = foundValueObj->getOwned();
+    }
+}
 
 void DuplicateKeyErrorInfo::serialize(BSONObjBuilder* bob) const {
     bob->append("keyPattern", _keyPattern);
@@ -79,6 +93,18 @@ void DuplicateKeyErrorInfo::serialize(BSONObjBuilder* bob) const {
     if (!_collation.isEmpty()) {
         bob->append("collation", _collation);
     }
+
+    stdx::visit(
+        visit_helper::Overloaded{
+            [](stdx::monostate) {},
+            [bob](const RecordId& rid) { rid.serializeToken("foundValue", bob); },
+            [bob](const BSONObj& obj) {
+                if (obj.objsize() < BSONObjMaxUserSize / 2) {
+                    bob->append("foundValue", obj);
+                }
+            },
+        },
+        _foundValue);
 }
 
 std::shared_ptr<const ErrorExtraInfo> DuplicateKeyErrorInfo::parse(const BSONObj& obj) {
@@ -111,7 +137,17 @@ std::shared_ptr<const ErrorExtraInfo> DuplicateKeyErrorInfo::parse(const BSONObj
         collation = collationElt.Obj();
     }
 
-    return std::make_shared<DuplicateKeyErrorInfo>(keyPattern, keyValue, collation);
+    FoundValue foundValue;
+    if (auto foundValueElt = obj["foundValue"]) {
+        if (foundValueElt.isABSONObj()) {
+            foundValue = foundValueElt.Obj();
+        } else {
+            foundValue = RecordId::deserializeToken(foundValueElt);
+        }
+    }
+
+    return std::make_shared<DuplicateKeyErrorInfo>(
+        keyPattern, keyValue, collation, std::move(foundValue));
 }
 
 }  // namespace mongo

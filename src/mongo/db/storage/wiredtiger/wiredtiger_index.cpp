@@ -1582,9 +1582,22 @@ StatusWith<bool> WiredTigerIdIndex::_insert(OperationContext* opCtx,
         });
     }
 
+    DuplicateKeyErrorInfo::FoundValue foundValueRecordId;
+    if (TestingProctor::instance().isEnabled()) {
+        WT_ITEM foundValue;
+        invariantWTOK(c->get_value(c, &foundValue), c->session);
+
+        BufReader reader(foundValue.data, foundValue.size);
+        foundValueRecordId = KeyString::decodeRecordIdLong(&reader);
+    }
+
     auto key = KeyString::toBson(keyString, _ordering);
-    return buildDupKeyErrorStatus(
-        key, _desc->getEntry()->getNSSFromCatalog(opCtx), _indexName, _keyPattern, _collation);
+    return buildDupKeyErrorStatus(key,
+                                  _desc->getEntry()->getNSSFromCatalog(opCtx),
+                                  _indexName,
+                                  _keyPattern,
+                                  _collation,
+                                  std::move(foundValueRecordId));
 }
 
 StatusWith<bool> WiredTigerIndexUnique::_insert(OperationContext* opCtx,

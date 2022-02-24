@@ -37,14 +37,30 @@
 
 namespace mongo {
 
-TEST(IndexEntryComparison, BuildDupKeyErrorStatusProducesExpectedErrorObject) {
+void buildDupKeyErrorStatusProducesExpectedErrorObject(
+    DuplicateKeyErrorInfo::FoundValue&& foundValue) {
     NamespaceString collNss("test.foo");
     std::string indexName("a_1_b_1");
     auto keyPattern = BSON("a" << 1 << "b" << 1);
     auto keyValue = BSON("" << 10 << ""
                             << "abc");
+    auto keyValueWithFieldName = BSON("a" << 10 << "b"
+                                          << "abc");
 
-    auto dupKeyStatus = buildDupKeyErrorStatus(keyValue, collNss, indexName, keyPattern, BSONObj{});
+    BSONObjBuilder expectedObjBuilder;
+    expectedObjBuilder.append("keyPattern", keyPattern);
+    expectedObjBuilder.append("keyValue", keyValueWithFieldName);
+    stdx::visit(
+        visit_helper::Overloaded{
+            [](stdx::monostate) {},
+            [&](const RecordId& rid) { rid.serializeToken("foundValue", &expectedObjBuilder); },
+            [&](const BSONObj& obj) { expectedObjBuilder.append("foundValue", obj); },
+        },
+        foundValue);
+    auto expectedObj = expectedObjBuilder.obj();
+
+    auto dupKeyStatus = buildDupKeyErrorStatus(
+        keyValue, collNss, indexName, keyPattern, BSONObj{}, std::move(foundValue));
     ASSERT_NOT_OK(dupKeyStatus);
     ASSERT_EQUALS(dupKeyStatus.code(), ErrorCodes::DuplicateKey);
 
@@ -52,15 +68,25 @@ TEST(IndexEntryComparison, BuildDupKeyErrorStatusProducesExpectedErrorObject) {
     ASSERT(extraInfo);
 
     ASSERT_BSONOBJ_EQ(extraInfo->getKeyPattern(), keyPattern);
-
-    auto keyValueWithFieldName = BSON("a" << 10 << "b"
-                                          << "abc");
     ASSERT_BSONOBJ_EQ(extraInfo->getDuplicatedKeyValue(), keyValueWithFieldName);
 
     BSONObjBuilder objBuilder;
     extraInfo->serialize(&objBuilder);
-    ASSERT_BSONOBJ_EQ(objBuilder.obj(),
-                      BSON("keyPattern" << keyPattern << "keyValue" << keyValueWithFieldName));
+    auto obj = objBuilder.obj();
+    ASSERT_BSONOBJ_EQ(obj, expectedObj);
+
+    // Ensure the object is the same after parsing and serializing again.
+    auto parsedExtraInfo =
+        std::dynamic_pointer_cast<const DuplicateKeyErrorInfo>(DuplicateKeyErrorInfo::parse(obj));
+    BSONObjBuilder afterParseObjBuilder;
+    parsedExtraInfo->serialize(&afterParseObjBuilder);
+    ASSERT_BSONOBJ_EQ(afterParseObjBuilder.obj(), expectedObj);
+}
+
+TEST(IndexEntryComparison, BuildDupKeyErrorStatusProducesExpectedErrorObject) {
+    buildDupKeyErrorStatusProducesExpectedErrorObject(stdx::monostate{});
+    buildDupKeyErrorStatusProducesExpectedErrorObject(RecordId{1});
+    buildDupKeyErrorStatusProducesExpectedErrorObject(BSON("c" << 1));
 }
 
 void duplicateKeyErrorSerializationAndParseReturnTheSameObject(

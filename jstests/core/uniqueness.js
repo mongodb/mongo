@@ -59,9 +59,7 @@ res = t.insert(key);
 assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
 assert.eq(res.nInserted, 0, tojson(res));
 const writeError = res.getWriteError();
-assert.eq(writeError.errmsg,
-          expectedMessage,
-          "The duplicate key error message must exactly match." + tojson(res));
+assert.includes(writeError.errmsg, expectedMessage, tojson(res));
 
 /* Check that if we update and remove _id, it gets added back by the DB */
 

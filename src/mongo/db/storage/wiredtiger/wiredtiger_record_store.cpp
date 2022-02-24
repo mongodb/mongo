@@ -1397,6 +1397,14 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
             invariant(!_overwrite);
             invariant(_keyFormat == KeyFormat::String);
 
+            DuplicateKeyErrorInfo::FoundValue foundValueObj;
+            if (TestingProctor::instance().isEnabled()) {
+                WT_ITEM foundValue;
+                invariantWTOK(c->get_value(c, &foundValue), c->session);
+
+                foundValueObj.emplace<BSONObj>(reinterpret_cast<const char*>(foundValue.data));
+            }
+
             // Generate a useful error message that is consistent with duplicate key error messages
             // on indexes.
             BSONObj obj = record_id_helpers::toBSONAs(record.id, "");
@@ -1404,7 +1412,8 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
                                           NamespaceString(ns()),
                                           "" /* indexName */,
                                           BSON("_id" << 1),
-                                          BSONObj() /* collation */);
+                                          BSONObj() /* collation */,
+                                          std::move(foundValueObj));
         }
 
         if (ret)

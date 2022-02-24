@@ -38,6 +38,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/key_string.h"
 
 namespace mongo {
@@ -283,7 +284,8 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
                               const NamespaceString& collectionNamespace,
                               const std::string& indexName,
                               const BSONObj& keyPattern,
-                              const BSONObj& indexCollation);
+                              const BSONObj& indexCollation,
+                              DuplicateKeyErrorInfo::FoundValue&& foundValue = stdx::monostate{});
 
 Status buildDupKeyErrorStatus(const KeyString::Value& keyString,
                               const NamespaceString& collectionNamespace,
