@@ -221,8 +221,6 @@ var $config = (function() {
             for (let j = 0; j < collCount; j++) {
                 const fullNs = dbName + "." + collPrefix + j;
                 defragmentationUtil.waitForEndOfDefragmentation(mongos, fullNs);
-                defragmentationUtil.checkPostDefragmentationState(
-                    mongos, fullNs, maxChunkSizeMB, "key");
             }
         }
     }
