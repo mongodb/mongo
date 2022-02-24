@@ -152,26 +152,25 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
 
     *newUnique = true;
     autoColl->getWritableCollection(opCtx)->updateUniqueSetting(opCtx, idx->indexName());
-    // Resets 'disallowNewDuplicateKeys' to false after converting to unique index;
-    autoColl->getWritableCollection(opCtx)->updateDisallowNewDuplicateKeysSetting(
+    // Resets 'prepareUnique' to false after converting to unique index;
+    autoColl->getWritableCollection(opCtx)->updatePrepareUniqueSetting(
         opCtx, idx->indexName(), false);
 }
 
 /**
- * Adjusts disallowNewDuplicateKeys setting on an index.
+ * Adjusts prepareUnique setting on an index.
  */
-void _processCollModIndexRequestDisallowNewDuplicateKeys(
-    OperationContext* opCtx,
-    AutoGetCollection* autoColl,
-    const IndexDescriptor* idx,
-    bool indexDisallowNewDuplicateKeys,
-    boost::optional<bool>* newDisallowNewDuplicateKeys,
-    boost::optional<bool>* oldDisallowNewDuplicateKeys) {
-    *newDisallowNewDuplicateKeys = indexDisallowNewDuplicateKeys;
-    *oldDisallowNewDuplicateKeys = idx->disallowNewDuplicateKeys();
-    if (*oldDisallowNewDuplicateKeys != *newDisallowNewDuplicateKeys) {
-        autoColl->getWritableCollection(opCtx)->updateDisallowNewDuplicateKeysSetting(
-            opCtx, idx->indexName(), indexDisallowNewDuplicateKeys);
+void _processCollModIndexRequestPrepareUnique(OperationContext* opCtx,
+                                              AutoGetCollection* autoColl,
+                                              const IndexDescriptor* idx,
+                                              bool indexPrepareUnique,
+                                              boost::optional<bool>* newPrepareUnique,
+                                              boost::optional<bool>* oldPrepareUnique) {
+    *newPrepareUnique = indexPrepareUnique;
+    *oldPrepareUnique = idx->prepareUnique();
+    if (*oldPrepareUnique != *newPrepareUnique) {
+        autoColl->getWritableCollection(opCtx)->updatePrepareUniqueSetting(
+            opCtx, idx->indexName(), indexPrepareUnique);
     }
 }
 
@@ -187,11 +186,10 @@ void processCollModIndexRequest(OperationContext* opCtx,
     auto indexExpireAfterSeconds = collModIndexRequest.indexExpireAfterSeconds;
     auto indexHidden = collModIndexRequest.indexHidden;
     auto indexUnique = collModIndexRequest.indexUnique;
-    auto indexDisallowNewDuplicateKeys = collModIndexRequest.indexDisallowNewDuplicateKeys;
+    auto indexPrepareUnique = collModIndexRequest.indexPrepareUnique;
 
     // Return early if there are no index modifications requested.
-    if (!indexExpireAfterSeconds && !indexHidden && !indexUnique &&
-        !indexDisallowNewDuplicateKeys) {
+    if (!indexExpireAfterSeconds && !indexHidden && !indexUnique && !indexPrepareUnique) {
         return;
     }
 
@@ -200,8 +198,8 @@ void processCollModIndexRequest(OperationContext* opCtx,
     boost::optional<bool> newHidden;
     boost::optional<bool> oldHidden;
     boost::optional<bool> newUnique;
-    boost::optional<bool> newDisallowNewDuplicateKeys;
-    boost::optional<bool> oldDisallowNewDuplicateKeys;
+    boost::optional<bool> newPrepareUnique;
+    boost::optional<bool> oldPrepareUnique;
 
     // TTL Index
     if (indexExpireAfterSeconds) {
@@ -222,13 +220,9 @@ void processCollModIndexRequest(OperationContext* opCtx,
         _processCollModIndexRequestUnique(opCtx, autoColl, idx, mode, &newUnique);
     }
 
-    if (indexDisallowNewDuplicateKeys) {
-        _processCollModIndexRequestDisallowNewDuplicateKeys(opCtx,
-                                                            autoColl,
-                                                            idx,
-                                                            *indexDisallowNewDuplicateKeys,
-                                                            &newDisallowNewDuplicateKeys,
-                                                            &oldDisallowNewDuplicateKeys);
+    if (indexPrepareUnique) {
+        _processCollModIndexRequestPrepareUnique(
+            opCtx, autoColl, idx, *indexPrepareUnique, &newPrepareUnique, &oldPrepareUnique);
     }
 
     *indexCollModInfo =
@@ -237,8 +231,8 @@ void processCollModIndexRequest(OperationContext* opCtx,
                          newHidden,
                          oldHidden,
                          newUnique,
-                         newDisallowNewDuplicateKeys,
-                         oldDisallowNewDuplicateKeys,
+                         newPrepareUnique,
+                         oldPrepareUnique,
                          idx->indexName()};
 
     // This matches the default for IndexCatalog::refreshEntry().
@@ -259,8 +253,8 @@ void processCollModIndexRequest(OperationContext* opCtx,
                                      oldHidden,
                                      newHidden,
                                      newUnique,
-                                     oldDisallowNewDuplicateKeys,
-                                     newDisallowNewDuplicateKeys,
+                                     oldPrepareUnique,
+                                     newPrepareUnique,
                                      result](boost::optional<Timestamp>) {
         // add the fields to BSONObjBuilder result
         if (oldExpireSecs) {
@@ -278,10 +272,10 @@ void processCollModIndexRequest(OperationContext* opCtx,
             invariant(*newUnique);
             result->appendBool("unique_new", true);
         }
-        if (newDisallowNewDuplicateKeys) {
-            invariant(oldDisallowNewDuplicateKeys);
-            result->append("disallowNewDuplicateKeys_old", *oldDisallowNewDuplicateKeys);
-            result->append("disallowNewDuplicateKeys_new", *newDisallowNewDuplicateKeys);
+        if (newPrepareUnique) {
+            invariant(oldPrepareUnique);
+            result->append("prepareUnique_old", *oldPrepareUnique);
+            result->append("prepareUnique_new", *newPrepareUnique);
         }
     });
 

@@ -443,9 +443,9 @@ public:
 
     void updateUniqueSetting(OperationContext* opCtx, StringData idxName) final;
 
-    void updateDisallowNewDuplicateKeysSetting(OperationContext* opCtx,
-                                               StringData idxName,
-                                               bool disallowNewDuplicateKeys) final;
+    void updatePrepareUniqueSetting(OperationContext* opCtx,
+                                    StringData idxName,
+                                    bool prepareUnique) final;
 
     std::vector<std::string> removeInvalidIndexOptions(OperationContext* opCtx) final;
 

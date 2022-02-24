@@ -156,7 +156,7 @@ structs:
                 type: safeBool
                 optional: true
                 unstable: false
-            disallowNewDuplicateKeys:
+            prepareUnique:
                 type: safeBool
                 optional: true
                 unstable: true

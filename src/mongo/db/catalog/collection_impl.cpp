@@ -1980,14 +1980,14 @@ void CollectionImpl::updateUniqueSetting(OperationContext* opCtx, StringData idx
     });
 }
 
-void CollectionImpl::updateDisallowNewDuplicateKeysSetting(OperationContext* opCtx,
-                                                           StringData idxName,
-                                                           bool disallowNewDuplicateKeys) {
+void CollectionImpl::updatePrepareUniqueSetting(OperationContext* opCtx,
+                                                StringData idxName,
+                                                bool prepareUnique) {
     int offset = _metadata->findIndexOffset(idxName);
     invariant(offset >= 0);
 
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
-        md.indexes[offset].updateDisallowNewDuplicateKeysSetting(disallowNewDuplicateKeys);
+        md.indexes[offset].updatePrepareUniqueSetting(prepareUnique);
     });
 }
 

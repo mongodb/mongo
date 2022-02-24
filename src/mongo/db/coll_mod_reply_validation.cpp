@@ -41,14 +41,13 @@ void validateReply(const CollModReply& reply) {
                 false);
     }
 
-    auto disallowNewDuplicateKeys_new = reply.getDisallowNewDuplicateKeys_new().is_initialized();
-    auto disallowNewDuplicateKeys_old = reply.getDisallowNewDuplicateKeys_old().is_initialized();
+    auto prepareUnique_new = reply.getPrepareUnique_new().is_initialized();
+    auto prepareUnique_old = reply.getPrepareUnique_old().is_initialized();
 
-    if ((!disallowNewDuplicateKeys_new && disallowNewDuplicateKeys_old) ||
-        (disallowNewDuplicateKeys_new && !disallowNewDuplicateKeys_old)) {
+    if ((!prepareUnique_new && prepareUnique_old) || (prepareUnique_new && !prepareUnique_old)) {
         uassert(ErrorCodes::CommandResultSchemaViolation,
                 str::stream() << "Invalid CollModReply: Reply should define either both fields "
-                              << "(disallowNewDuplicateKeys_new and disallowNewDuplicateKeys_old) "
+                              << "(prepareUnique_new and prepareUnique_old) "
                                  "or none of them.",
                 false);
     }

@@ -413,9 +413,9 @@ public:
         std::abort();
     }
 
-    void updateDisallowNewDuplicateKeysSetting(OperationContext* opCtx,
-                                               StringData idxName,
-                                               bool disallowNewDuplicateKeys) {
+    void updatePrepareUniqueSetting(OperationContext* opCtx,
+                                    StringData idxName,
+                                    bool prepareUnique) {
         std::abort();
     }
 

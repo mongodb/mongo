@@ -610,9 +610,9 @@ public:
     /*
      * Disallows or allows new duplicates in the given index.
      */
-    virtual void updateDisallowNewDuplicateKeysSetting(OperationContext* opCtx,
-                                                       StringData idxName,
-                                                       bool disallowNewDuplicateKeys) = 0;
+    virtual void updatePrepareUniqueSetting(OperationContext* opCtx,
+                                            StringData idxName,
+                                            bool prepareUnique) = 0;
 
     /**
      * Removes invalid index options on all indexes in this collection. Returns a list of index

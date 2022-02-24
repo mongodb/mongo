@@ -1,6 +1,6 @@
 /**
  * Tests that the cluster cannot be downgraded when there are indexes with the
- * 'disallowNewDuplicateKeys' field present.
+ * 'prepareUnique' field present.
  *
  * TODO SERVER-63564: Remove this test once kLastLTS is 6.0.
  *
@@ -23,19 +23,19 @@ if (!collModIndexUniqueEnabled) {
     return;
 }
 
-const collName = "index_disallowNewDuplicateKeys_downgrade";
+const collName = "index_prepareUnique_downgrade";
 const coll = db.getCollection(collName);
 assert.commandWorked(db.createCollection(coll.getName()));
 
 function checkIndexForDowngrade(withFCV, fixIndex, isCompatible) {
-    assert.commandWorked(coll.createIndex({a: 1}, {disallowNewDuplicateKeys: true}));
-    assert.commandWorked(coll.createIndex({b: 1}, {disallowNewDuplicateKeys: true}));
+    assert.commandWorked(coll.createIndex({a: 1}, {prepareUnique: true}));
+    assert.commandWorked(coll.createIndex({b: 1}, {prepareUnique: true}));
 
     if (fixIndex) {
         // Resolves the incompatibility before the downgrade.
         assert.commandWorked(coll.dropIndex({a: 1}));
-        assert.commandWorked(db.runCommand(
-            {collMod: collName, index: {keyPattern: {b: 1}, disallowNewDuplicateKeys: false}}));
+        assert.commandWorked(
+            db.runCommand({collMod: collName, index: {keyPattern: {b: 1}, prepareUnique: false}}));
     } else if (!isCompatible) {
         assert.commandFailedWithCode(db.adminCommand({setFeatureCompatibilityVersion: withFCV}),
                                      ErrorCodes.CannotDowngrade);
@@ -55,10 +55,10 @@ checkIndexForDowngrade(lastContinuousFCV, false, false);
 // Fails to downgrade to 5.0.
 checkIndexForDowngrade(lastLTSFCV, false, false);
 
-// Successfully downgrades to 5.2 after removing the 'disallowNewDuplicateKeys' field.
+// Successfully downgrades to 5.2 after removing the 'prepareUnique' field.
 checkIndexForDowngrade(lastContinuousFCV, true, true);
 
-// Successfully downgrades to 5.0 after removing the 'disallowNewDuplicateKeys' field.
+// Successfully downgrades to 5.0 after removing the 'prepareUnique' field.
 checkIndexForDowngrade(lastLTSFCV, true, true);
 
 MongoRunner.stopMongod(conn);

@@ -63,7 +63,7 @@ structs:
                 optional: true
                 type: safeBool
                 unstable: true
-            disallowNewDuplicateKeys:
+            prepareUnique:
                 optional: true
                 type: safeBool
                 unstable: true
@@ -92,11 +92,11 @@ structs:
                 optional: true
                 type: safeBool
                 unstable: true
-            disallowNewDuplicateKeys_old:
+            prepareUnique_old:
                 optional: true
                 type: safeBool
                 unstable: true
-            disallowNewDuplicateKeys_new:
+            prepareUnique_new:
                 optional: true
                 type: safeBool
                 unstable: true

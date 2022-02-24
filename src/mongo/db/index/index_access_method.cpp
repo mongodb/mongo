@@ -268,7 +268,7 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
         *numInserted = 0;
     }
     bool unique = _descriptor->unique();
-    bool disallowNewDuplicateKeys = _descriptor->disallowNewDuplicateKeys();
+    bool prepareUnique = _descriptor->prepareUnique();
     bool dupsAllowed;
     if (!_descriptor->isIdIndex() && !opCtx->isEnforcingConstraints() &&
         coll->isIndexReady(_descriptor->indexName())) {
@@ -280,7 +280,7 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
         // Additionally, unique indexes conflict checking can cause out-of-order updates in
         // wiredtiger. See SERVER-59831.
         dupsAllowed = true;
-    } else if (disallowNewDuplicateKeys) {
+    } else if (prepareUnique) {
         // This currently is only used by collMod command when converting a regular index to a
         // unique index. The regular index will start rejecting duplicates even before the
         // conversion finishes.
@@ -295,7 +295,7 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
         // When duplicates are encountered and allowed, retry with dupsAllowed. Call
         // onDuplicateKey() with the inserted duplicate key.
         if (ErrorCodes::DuplicateKey == result.getStatus().code() && options.dupsAllowed &&
-            !disallowNewDuplicateKeys) {
+            !prepareUnique) {
             invariant(unique);
 
             result = _newInterface->insert(opCtx, keyString, true /* dupsAllowed */);
@@ -542,7 +542,7 @@ Status SortedDataIndexAccessMethod::doUpdate(OperationContext* opCtx,
 
     // Add all new data keys into the index.
     for (const auto& keyString : ticket.added) {
-        bool dupsAllowed = !_descriptor->disallowNewDuplicateKeys() && ticket.dupsAllowed;
+        bool dupsAllowed = !_descriptor->prepareUnique() && ticket.dupsAllowed;
         auto result = _newInterface->insert(opCtx, keyString, dupsAllowed);
         if (!result.isOK())
             return result.getStatus();

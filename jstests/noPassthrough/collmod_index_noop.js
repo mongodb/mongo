@@ -1,5 +1,5 @@
 /**
- * Validate that the 'collMod' command with 'hidden,' 'unique,' or 'disallowNewDuplicateKeys' fields
+ * Validate that the 'collMod' command with 'hidden,' 'unique,' or 'prepareUnique' fields
  * will return expected result document for the command and generate expected oplog entries in which
  * the index modifications (hiding/unhiding/convert to unique/allowing duplicates/disallowing
  * duplicates) will be no-ops if no other index option (TTL, for example) is involved.
@@ -53,10 +53,8 @@ function validateResultForCollMod(result, expectedResult) {
     assert.eq(result.expireAfterSeconds_old, expectedResult.expireAfterSeconds_old, result);
     assert.eq(result.expireAfterSeconds_new, expectedResult.expireAfterSeconds_new, result);
     assert.eq(result.unique_new, expectedResult.unique_new, result);
-    assert.eq(
-        result.disallowNewDuplicateKeys_old, expectedResult.disallowNewDuplicateKeys_old, result);
-    assert.eq(
-        result.disallowNewDuplicateKeys_new, expectedResult.disallowNewDuplicateKeys_new, result);
+    assert.eq(result.prepareUnique_old, expectedResult.prepareUnique_old, result);
+    assert.eq(result.prepareUnique_new, expectedResult.prepareUnique_new, result);
 }
 
 primaryColl.drop();
@@ -69,7 +67,7 @@ assert.commandWorked(primaryColl.createIndex({f: 1}, {unique: true, expireAfterS
 assert.commandWorked(
     primaryColl.createIndex({g: 1}, {hidden: true, unique: true, expireAfterSeconds: 25}));
 if (collModIndexUniqueEnabled) {
-    assert.commandWorked(primaryColl.createIndex({h: 1}, {disallowNewDuplicateKeys: true}));
+    assert.commandWorked(primaryColl.createIndex({h: 1}, {prepareUnique: true}));
 }
 
 // Hiding a non-hidden index will generate the oplog entry with a 'hidden_old: false'.
@@ -118,7 +116,7 @@ assert.eq(idxSpec.expireAfterSeconds, 10);
 // oplog entry with only 'unique'. Ditto for the command result returned to the user.
 if (collModIndexUniqueEnabled) {
     assert.commandWorked(primaryDB.runCommand(
-        {collMod: collName, index: {keyPattern: {c: 1}, disallowNewDuplicateKeys: true}}));
+        {collMod: collName, index: {keyPattern: {c: 1}, prepareUnique: true}}));
     assert.commandFailedWithCode(primaryDB.runCommand({
         "collMod": primaryColl.getName(),
         "index": {"name": "c_1", "unique": false, "hidden": false},
@@ -143,7 +141,7 @@ if (collModIndexUniqueEnabled) {
     // Validate that if the 'unique' option is specified but is a no-op, the operation as a whole
     // will be a no-op.
     assert.commandWorked(primaryDB.runCommand(
-        {collMod: collName, index: {keyPattern: {d: 1}, disallowNewDuplicateKeys: true}}));
+        {collMod: collName, index: {keyPattern: {d: 1}, prepareUnique: true}}));
     result = assert.commandWorked(primaryDB.runCommand({
         "collMod": primaryColl.getName(),
         "index": {"name": "d_1", "unique": true},
@@ -151,7 +149,7 @@ if (collModIndexUniqueEnabled) {
     validateResultForCollMod(result, {});
     validateCollModOplogEntryCount({
         "o.index.name": "d_1",
-        "o.index.disallowNewDuplicateKeys": {$exists: false},
+        "o.index.prepareUnique": {$exists: false},
     },
                                    0);
 
@@ -164,7 +162,7 @@ if (collModIndexUniqueEnabled) {
     // Validate that if both the 'hidden' and 'unique' options are specified but the
     // 'hidden' and 'unique' options are no-ops, the operation as a whole will be a no-op.
     assert.commandWorked(primaryDB.runCommand(
-        {collMod: collName, index: {keyPattern: {e: 1}, disallowNewDuplicateKeys: true}}));
+        {collMod: collName, index: {keyPattern: {e: 1}, prepareUnique: true}}));
     result = assert.commandWorked(primaryDB.runCommand({
         "collMod": primaryColl.getName(),
         "index": {"name": "e_1", "hidden": true, "unique": true},
@@ -172,7 +170,7 @@ if (collModIndexUniqueEnabled) {
     validateResultForCollMod(result, {});
     validateCollModOplogEntryCount({
         "o.index.name": "e_1",
-        "o.index.disallowNewDuplicateKeys": {$exists: false},
+        "o.index.prepareUnique": {$exists: false},
     },
                                    0);
 
@@ -187,7 +185,7 @@ if (collModIndexUniqueEnabled) {
     // generate an oplog entry with only 'expireAfterSeconds'. Ditto for the command result returned
     // to the user.
     assert.commandWorked(primaryDB.runCommand(
-        {collMod: collName, index: {keyPattern: {f: 1}, disallowNewDuplicateKeys: true}}));
+        {collMod: collName, index: {keyPattern: {f: 1}, prepareUnique: true}}));
     result = assert.commandWorked(primaryDB.runCommand({
         "collMod": primaryColl.getName(),
         "index": {"name": "f_1", "expireAfterSeconds": 20, "unique": true},
@@ -212,7 +210,7 @@ if (collModIndexUniqueEnabled) {
     // instead, it will generate an oplog entry with only 'expireAfterSeconds'. Ditto for the
     // command result returned to the user.
     assert.commandWorked(primaryDB.runCommand(
-        {collMod: collName, index: {keyPattern: {g: 1}, disallowNewDuplicateKeys: true}}));
+        {collMod: collName, index: {keyPattern: {g: 1}, prepareUnique: true}}));
     result = assert.commandWorked(primaryDB.runCommand({
         "collMod": primaryColl.getName(),
         "index": {"name": "g_1", "expireAfterSeconds": 30, "hidden": true, "unique": true},
@@ -233,11 +231,11 @@ if (collModIndexUniqueEnabled) {
     assert.eq(idxSpec.expireAfterSeconds, 30);
     assert(idxSpec.unique, tojson(idxSpec));
 
-    // Validate that if the 'disallowNewDuplicateKeys' option is specified but is a no-op, the
+    // Validate that if the 'prepareUnique' option is specified but is a no-op, the
     // operation as a whole will be a no-op.
     result = assert.commandWorked(primaryDB.runCommand({
         "collMod": primaryColl.getName(),
-        "index": {"name": "h_1", "disallowNewDuplicateKeys": true},
+        "index": {"name": "h_1", "prepareUnique": true},
     }));
     validateResultForCollMod(result, {});
     validateCollModOplogEntryCount({
@@ -249,7 +247,7 @@ if (collModIndexUniqueEnabled) {
     idxSpec = GetIndexHelpers.findByName(primaryColl.getIndexes(), "h_1");
     assert.eq(idxSpec.hidden, undefined);
     assert.eq(idxSpec.expireAfterSeconds, undefined);
-    assert(idxSpec.disallowNewDuplicateKeys, tojson(idxSpec));
+    assert(idxSpec.prepareUnique, tojson(idxSpec));
 }
 
 rst.stopSet();

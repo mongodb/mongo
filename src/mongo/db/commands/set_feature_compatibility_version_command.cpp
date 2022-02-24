@@ -745,7 +745,7 @@ private:
                                 ErrorCodes::CannotDowngrade,
                                 fmt::format(
                                     "Cannot downgrade the cluster when there are indexes that have "
-                                    "the 'disallowNewDuplicateKeys' field. Use listIndexes to find "
+                                    "the 'prepareUnique' field. Use listIndexes to find "
                                     "them and drop "
                                     "the indexes or use collMod to manually set it to false to "
                                     "remove the field "
@@ -753,7 +753,7 @@ private:
                                     "'{}' on collection: '{}'",
                                     indexEntry->descriptor()->indexName(),
                                     collection->ns().toString()),
-                                !indexEntry->descriptor()->disallowNewDuplicateKeys());
+                                !indexEntry->descriptor()->prepareUnique());
                         }
                         return true;
                     });

@@ -42,14 +42,14 @@ function countUnique(key) {
 // Creates a regular index and use collMod to convert it to a unique index.
 assert.commandWorked(coll.createIndex({a: 1}));
 
-// Tries to convert to unique without setting `disallowNewDuplicateKeys`.
+// Tries to convert to unique without setting `prepareUnique`.
 assert.commandFailedWithCode(
     db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}),
     ErrorCodes.InvalidOptions);
 
-// First sets 'disallowNewDuplicateKeys' before converting the index to unique.
-assert.commandWorked(db.runCommand(
-    {collMod: collName, index: {keyPattern: {a: 1}, disallowNewDuplicateKeys: true}}));
+// First sets 'prepareUnique' before converting the index to unique.
+assert.commandWorked(
+    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
 
 // Tries to modify with a string 'unique' value.
 assert.commandFailedWithCode(
@@ -71,12 +71,12 @@ assert.commandFailedWithCode(db.runCommand({
                              ErrorCodes.NamespaceNotFound);
 
 // Conversion should fail when there are existing duplicates.
-assert.commandWorked(db.runCommand(
-    {collMod: collName, index: {keyPattern: {a: 1}, disallowNewDuplicateKeys: false}}));
+assert.commandWorked(
+    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: false}}));
 assert.commandWorked(coll.insert({_id: 1, a: 100}));
 assert.commandWorked(coll.insert({_id: 2, a: 100}));
-assert.commandWorked(db.runCommand(
-    {collMod: collName, index: {keyPattern: {a: 1}, disallowNewDuplicateKeys: true}}));
+assert.commandWorked(
+    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
 const cannotConvertIndexToUniqueError = assert.commandFailedWithCode(
     db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}),
     ErrorCodes.CannotConvertIndexToUnique);
@@ -124,11 +124,11 @@ assert.commandWorked(
 assert.eq(countUnique({a: 1}), 0, 'index should not be unique: ' + tojson(coll.getIndexes()));
 
 // Conversion should report errors if there are duplicates.
-assert.commandWorked(db.runCommand(
-    {collMod: collName, index: {keyPattern: {a: 1}, disallowNewDuplicateKeys: false}}));
+assert.commandWorked(
+    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: false}}));
 assert.commandWorked(coll.insert({_id: 3, a: 100}));
-assert.commandWorked(db.runCommand(
-    {collMod: collName, index: {keyPattern: {a: 1}, disallowNewDuplicateKeys: true}}));
+assert.commandWorked(
+    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
 assert.commandFailedWithCode(
     db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}, dryRun: true}),
     ErrorCodes.CannotConvertIndexToUnique);

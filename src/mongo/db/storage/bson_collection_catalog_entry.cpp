@@ -146,20 +146,19 @@ void BSONCollectionCatalogEntry::IndexMetaData::updateUniqueSetting() {
     spec = b.obj();
 }
 
-void BSONCollectionCatalogEntry::IndexMetaData::updateDisallowNewDuplicateKeysSetting(
-    bool disallowNewDuplicateKeys) {
-    // If disallowNewDuplicateKeys == false, we remove this field from catalog rather than add a
+void BSONCollectionCatalogEntry::IndexMetaData::updatePrepareUniqueSetting(bool prepareUnique) {
+    // If prepareUnique == false, we remove this field from catalog rather than add a
     // field with false.
     BSONObjBuilder b;
     for (BSONObjIterator bi(spec); bi.more();) {
         BSONElement e = bi.next();
-        if (e.fieldNameStringData() != "disallowNewDuplicateKeys") {
+        if (e.fieldNameStringData() != "prepareUnique") {
             b.append(e);
         }
     }
 
-    if (disallowNewDuplicateKeys) {
-        b.append("disallowNewDuplicateKeys", disallowNewDuplicateKeys);
+    if (prepareUnique) {
+        b.append("prepareUnique", prepareUnique);
     }
     spec = b.obj();
 }

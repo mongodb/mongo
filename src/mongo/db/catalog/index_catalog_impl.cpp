@@ -1782,8 +1782,8 @@ StatusWith<BSONObj> IndexCatalogImpl::_fixIndexSpec(OperationContext* opCtx,
     if (o["hidden"].trueValue())
         b.appendBool("hidden", true);  // normalize to bool true in case was int 1 or something...
 
-    if (o["disallowNewDuplicateKeys"].trueValue())
-        b.appendBool("disallowNewDuplicateKeys",
+    if (o["prepareUnique"].trueValue())
+        b.appendBool("prepareUnique",
                      true);  // normalize to bool true in case was int 1 or something...
 
     BSONObj key = fixIndexKey(o["key"].Obj());
@@ -1815,7 +1815,7 @@ StatusWith<BSONObj> IndexCatalogImpl::_fixIndexSpec(OperationContext* opCtx,
                 // dropDups is silently ignored and removed from the spec as of SERVER-14710.
                 // ns is removed from the spec as of 4.4.
             } else if (s == "v" || s == "unique" || s == "key" || s == "name" || s == "hidden" ||
-                       s == "disallowNewDuplicateKeys") {
+                       s == "prepareUnique") {
                 // covered above
             } else {
                 b.append(e);

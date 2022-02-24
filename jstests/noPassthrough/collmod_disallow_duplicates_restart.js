@@ -34,12 +34,12 @@ const collName = 'collmod_disallow_duplicates_step_up';
 let db_primary = primary.getDB('test');
 let coll_primary = db_primary.getCollection(collName);
 
-// Sets 'disallowNewDuplicateKeys' and checks that the index rejects duplicates.
+// Sets 'prepareUnique' and checks that the index rejects duplicates.
 coll_primary.drop();
 assert.commandWorked(coll_primary.createIndex({a: 1}));
 assert.commandWorked(coll_primary.insert({_id: 0, a: 1}));
-assert.commandWorked(db_primary.runCommand(
-    {collMod: collName, index: {keyPattern: {a: 1}, disallowNewDuplicateKeys: true}}));
+assert.commandWorked(
+    db_primary.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
 assert.commandFailedWithCode(coll_primary.insert({_id: 1, a: 1}), ErrorCodes.DuplicateKey);
 
 // Restarts the primary and checks the index spec is persisted.

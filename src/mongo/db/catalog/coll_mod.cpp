@@ -164,19 +164,18 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
             if (!cmdIndex.getExpireAfterSeconds() && !cmdIndex.getHidden() &&
-                !cmdIndex.getUnique() && !cmdIndex.getDisallowNewDuplicateKeys()) {
-                return Status(
-                    ErrorCodes::InvalidOptions,
-                    "no expireAfterSeconds, hidden, unique, or disallowNewDuplicateKeys field");
+                !cmdIndex.getUnique() && !cmdIndex.getPrepareUnique()) {
+                return Status(ErrorCodes::InvalidOptions,
+                              "no expireAfterSeconds, hidden, unique, or prepareUnique field");
             }
 
             auto cmrIndex = &cmr.indexRequest;
             auto indexObj = e.Obj();
 
-            if (cmdIndex.getUnique() || cmdIndex.getDisallowNewDuplicateKeys()) {
+            if (cmdIndex.getUnique() || cmdIndex.getPrepareUnique()) {
                 uassert(ErrorCodes::InvalidOptions,
                         "collMod does not support converting an index to 'unique' or to "
-                        "'disallowNewDuplicateKeys' mode",
+                        "'prepareUnique' mode",
                         feature_flags::gCollModIndexUnique.isEnabled(
                             serverGlobalParams.featureCompatibility));
             }
@@ -276,10 +275,10 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
 
             if (cmdIndex.getUnique()) {
                 // Disallow one-step unique convertion. The user has to set
-                // 'disallowNewDuplicateKeys' to true first.
-                if (!cmrIndex->idx->disallowNewDuplicateKeys()) {
+                // 'prepareUnique' to true first.
+                if (!cmrIndex->idx->prepareUnique()) {
                     return Status(ErrorCodes::InvalidOptions,
-                                  "Cannot make index unique with 'disallowNewDuplicateKeys=false'. "
+                                  "Cannot make index unique with 'prepareUnique=false'. "
                                   "Run collMod to set it first.");
                 }
 
@@ -319,16 +318,14 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                 }
             }
 
-            if (cmdIndex.getDisallowNewDuplicateKeys()) {
+            if (cmdIndex.getPrepareUnique()) {
                 cmr.numModifications++;
                 // Attempting to modify with the same value should be treated as a no-op.
-                if (cmrIndex->idx->disallowNewDuplicateKeys() ==
-                    *cmdIndex.getDisallowNewDuplicateKeys()) {
-                    indexObjForOplog = indexObjForOplog.removeField(
-                        CollModIndex::kDisallowNewDuplicateKeysFieldName);
+                if (cmrIndex->idx->prepareUnique() == *cmdIndex.getPrepareUnique()) {
+                    indexObjForOplog =
+                        indexObjForOplog.removeField(CollModIndex::kPrepareUniqueFieldName);
                 } else {
-                    cmrIndex->indexDisallowNewDuplicateKeys =
-                        cmdIndex.getDisallowNewDuplicateKeys();
+                    cmrIndex->indexPrepareUnique = cmdIndex.getPrepareUnique();
                 }
             }
 
@@ -473,10 +470,10 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
         oplogEntryBuilder->append(e);
     }
 
-    // Currently disallows the use of 'indexDisallowNewDuplicateKeys' with other collMod options.
-    if (cmr.indexRequest.indexDisallowNewDuplicateKeys && cmr.numModifications > 1) {
+    // Currently disallows the use of 'indexPrepareUnique' with other collMod options.
+    if (cmr.indexRequest.indexPrepareUnique && cmr.numModifications > 1) {
         return {ErrorCodes::InvalidOptions,
-                "disallowNewDuplicateKeys cannot be combined with any other modification."};
+                "prepareUnique cannot be combined with any other modification."};
     }
 
     return {std::move(cmr)};

@@ -53,9 +53,9 @@ coll.drop();
 
 // Checks that the violations match what we expect.
 function assertFailedWithViolations(keyPattern, violations) {
-    // First sets 'disallowNewDuplicateKeys' before converting the index to unique.
-    assert.commandWorked(db.runCommand(
-        {collMod: collName, index: {keyPattern: keyPattern, disallowNewDuplicateKeys: true}}));
+    // First sets 'prepareUnique' before converting the index to unique.
+    assert.commandWorked(
+        db.runCommand({collMod: collName, index: {keyPattern: keyPattern, prepareUnique: true}}));
     const result =
         db.runCommand({collMod: collName, index: {keyPattern: keyPattern, unique: true}});
     assert.commandFailedWithCode(result, ErrorCodes.CannotConvertIndexToUnique);
@@ -63,9 +63,9 @@ function assertFailedWithViolations(keyPattern, violations) {
         bsonWoCompare(sortViolationsArray(result.violations), sortViolationsArray(violations)),
         0,
         tojson(result));
-    // Resets 'disallowNewDuplicateKeys'.
-    assert.commandWorked(db.runCommand(
-        {collMod: collName, index: {keyPattern: keyPattern, disallowNewDuplicateKeys: false}}));
+    // Resets 'prepareUnique'.
+    assert.commandWorked(
+        db.runCommand({collMod: collName, index: {keyPattern: keyPattern, prepareUnique: false}}));
 }
 
 assert.commandWorked(db.createCollection(collName));

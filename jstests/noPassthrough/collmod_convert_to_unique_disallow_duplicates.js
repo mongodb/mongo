@@ -73,8 +73,8 @@ const testCollModConvertUniqueWithSideWrites = function(initialDocs,
     assert.commandWorked(coll.insert(initialDocs));
 
     // Disallows new duplicate keys on the index.
-    assert.commandWorked(testDB.runCommand(
-        {collMod: collName, index: {keyPattern: {a: 1}, disallowNewDuplicateKeys: true}}));
+    assert.commandWorked(
+        testDB.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
 
     let awaitCollMod = () => {};
     const failPoint = configureFailPoint(
@@ -161,7 +161,7 @@ const testCollModConvertUniqueWithSideWrites = function(initialDocs,
 
         // Resets to allow duplicates on the regular index.
         assert.commandWorked(testDB.runCommand(
-            {collMod: collName, index: {keyPattern: {a: 1}, disallowNewDuplicateKeys: false}}));
+            {collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: false}}));
 
         // Checks that uniqueness constraint is not enforced.
         assert.commandWorked(coll.insert(duplicateDoc));

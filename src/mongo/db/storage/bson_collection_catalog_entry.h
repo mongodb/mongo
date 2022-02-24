@@ -100,7 +100,7 @@ public:
 
         void updateUniqueSetting();
 
-        void updateDisallowNewDuplicateKeysSetting(bool disallowNewDuplicateKeys);
+        void updatePrepareUniqueSetting(bool prepareUnique);
 
         StringData nameStringData() const {
             return spec["name"].valueStringDataSafe();

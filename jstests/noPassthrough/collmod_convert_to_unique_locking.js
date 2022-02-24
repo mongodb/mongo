@@ -43,8 +43,8 @@ assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.insert({a: 1}));
 
 // Disallows new duplicate keys on the index.
-assert.commandWorked(testDB.runCommand(
-    {collMod: collName, index: {keyPattern: {a: 1}, disallowNewDuplicateKeys: true}}));
+assert.commandWorked(
+    testDB.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
 
 let awaitCollMod = () => {};
 const failPoint = configureFailPoint(

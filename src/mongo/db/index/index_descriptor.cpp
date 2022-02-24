@@ -107,7 +107,7 @@ constexpr StringData IndexDescriptor::kTextVersionFieldName;
 constexpr StringData IndexDescriptor::kUniqueFieldName;
 constexpr StringData IndexDescriptor::kHiddenFieldName;
 constexpr StringData IndexDescriptor::kWeightsFieldName;
-constexpr StringData IndexDescriptor::kDisallowNewDuplicateKeysFieldName;
+constexpr StringData IndexDescriptor::kPrepareUniqueFieldName;
 
 IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj infoObj)
     : _accessMethodName(accessMethodName),
@@ -136,13 +136,12 @@ IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj in
         _collation = collationElement.Obj().getOwned();
     }
 
-    if (BSONElement disallowNewDuplicateKeysElement =
-            _infoObj[kDisallowNewDuplicateKeysFieldName]) {
+    if (BSONElement prepareUniqueElement = _infoObj[kPrepareUniqueFieldName]) {
         uassert(
             ErrorCodes::InvalidOptions,
-            "Index does not support the 'disallowNewDuplicateKeys' field",
+            "Index does not support the 'prepareUnique' field",
             feature_flags::gCollModIndexUnique.isEnabled(serverGlobalParams.featureCompatibility));
-        _disallowNewDuplicateKeys = disallowNewDuplicateKeysElement.trueValue();
+        _prepareUnique = prepareUniqueElement.trueValue();
     }
 }
 

@@ -37,7 +37,7 @@ namespace mongo::coll_mod_reply_validation {
  * are not sufficient in this case.
  * It is used to check that reply includes:
  *  - (hidden_new and hidden_old) together or none of them.
- *  - (disallowNewDuplicateKeys_new and disallowNewDuplicateKeys_old) together or none of them."
+ *  - (prepareUnique_new and prepareUnique_old) together or none of them."
  */
 void validateReply(const CollModReply& reply);
 }  // namespace mongo::coll_mod_reply_validation
