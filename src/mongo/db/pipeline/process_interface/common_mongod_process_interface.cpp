@@ -33,6 +33,9 @@
 
 #include "mongo/db/pipeline/process_interface/common_mongod_process_interface.h"
 
+#include <algorithm>
+#include <vector>
+
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
@@ -66,6 +69,7 @@
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/logv2/log.h"
@@ -154,6 +158,44 @@ void assertIgnorePrepareConflictsBehavior(const boost::intrusive_ptr<ExpressionC
             expCtx->opCtx->recoveryUnit()->getPrepareConflictBehavior() !=
                 PrepareConflictBehavior::kIgnoreConflicts);
 }
+
+/**
+ * Returns all documents from _mdb_catalog along with a sorted list of all
+ * <db>.system.views namespaces found.
+ */
+void listDurableCatalog(OperationContext* opCtx,
+                        std::deque<BSONObj>* docs,
+                        std::vector<NamespaceStringOrUUID>* systemViewsNamespaces) {
+    auto durableCatalog = DurableCatalog::get(opCtx);
+    auto rs = durableCatalog->getRecordStore();
+    if (!rs) {
+        return;
+    }
+
+    auto cursor = rs->getCursor(opCtx);
+    while (auto record = cursor->next()) {
+        BSONObj obj = record->data.releaseToBson();
+
+        // For backwards compatibility where older version have a written feature document.
+        // See SERVER-57125.
+        if (DurableCatalog::isFeatureDocument(obj)) {
+            continue;
+        }
+
+        NamespaceString ns(obj.getStringField("ns"));
+        if (ns.isSystemDotViews()) {
+            systemViewsNamespaces->push_back(ns);
+        }
+
+        BSONObjBuilder builder;
+        builder.append("db", ns.db());
+        builder.append("name", ns.coll());
+        builder.append("type", "collection");
+        builder.appendElements(obj);
+        docs->push_back(builder.obj());
+    }
+}
+
 }  // namespace
 
 std::unique_ptr<TransactionHistoryIteratorBase>
@@ -219,6 +261,86 @@ std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationConte
         indexStats.push_back(doc.freeze());
     }
     return indexStats;
+}
+
+std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* opCtx) const {
+    while (true) {
+        std::deque<BSONObj> docs;
+        std::vector<NamespaceStringOrUUID> systemViewsNamespaces;
+        {
+            Lock::GlobalLock globalLock(opCtx, MODE_IS);
+            listDurableCatalog(opCtx, &docs, &systemViewsNamespaces);
+        }
+
+        if (systemViewsNamespaces.empty()) {
+            return docs;
+        }
+
+        // Clear 'docs' because we will read _mdb_catalog again using a consistent snapshot for all
+        // the system.views collections.
+        docs.clear();
+
+        // We want to read all the system.views as well as _mdb_catalog (again) using a consistent
+        // snapshot.
+        // TODO(SERVER-63754): Replace with a less verbose constructor overload when available.
+        AutoGetCollectionForReadCommandMaybeLockFree collLock(
+            opCtx,
+            systemViewsNamespaces.front(),
+            AutoGetCollectionViewMode::kViewsForbidden,
+            Date_t::max(),
+            AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+            {++systemViewsNamespaces.cbegin(), systemViewsNamespaces.cend()});
+
+        // If the primary collection is not available, it means the information from parsing
+        // _mdb_catalog is no longer valid. Therefore, we restart this process from the top.
+        if (!collLock.getCollection()) {
+            continue;
+        }
+
+        // Read _mdb_catalog again using the same snapshot set up by our collection(s) lock helper.
+        // If _mdb_catalog contains a different set of system.views namespaces from the first time
+        // we read it, we should discard this set of results and retry from the top (with the
+        // global read lock) of this loop.
+        std::vector<NamespaceStringOrUUID> systemViewsNamespacesFromSecondCatalogRead;
+        listDurableCatalog(opCtx, &docs, &systemViewsNamespacesFromSecondCatalogRead);
+        if (!std::equal(
+                systemViewsNamespaces.cbegin(),
+                systemViewsNamespaces.cend(),
+                systemViewsNamespacesFromSecondCatalogRead.cbegin(),
+                [](const auto& lhs, const auto& rhs) { return *lhs.nss() == *rhs.nss(); })) {
+            continue;
+        }
+
+        for (const auto& svns : systemViewsNamespaces) {
+            auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
+                opCtx, *svns.nss());
+            if (!collection) {
+                continue;
+            }
+
+            auto cursor = collection->getCursor(opCtx);
+            while (auto record = cursor->next()) {
+                BSONObj obj = record->data.releaseToBson();
+
+                NamespaceString ns(obj.getStringField("_id"));
+                NamespaceString viewOnNs(ns.db(), obj.getStringField("viewOn"));
+
+                BSONObjBuilder builder;
+                builder.append("db", ns.db());
+                builder.append("name", ns.coll());
+                if (viewOnNs.isTimeseriesBucketsCollection()) {
+                    builder.append("type", "timeseries");
+                } else {
+                    builder.append("type", "view");
+                }
+                builder.appendAs(obj["_id"], "ns");
+                builder.appendElements(obj);
+                docs.push_back(builder.obj());
+            }
+        }
+
+        return docs;
+    }
 }
 
 void CommonMongodProcessInterface::appendLatencyStats(OperationContext* opCtx,

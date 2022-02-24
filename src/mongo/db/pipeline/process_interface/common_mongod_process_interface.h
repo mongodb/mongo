@@ -57,6 +57,8 @@ public:
                                         StringData host,
                                         bool addShardName) final;
 
+    std::deque<BSONObj> listCatalog(OperationContext* opCtx) const final;
+
     void appendLatencyStats(OperationContext* opCtx,
                             const NamespaceString& nss,
                             bool includeHistograms,

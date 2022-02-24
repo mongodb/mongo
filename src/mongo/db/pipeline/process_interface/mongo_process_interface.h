@@ -31,6 +31,7 @@
 
 #include <boost/intrusive_ptr.hpp>
 #include <boost/optional.hpp>
+#include <deque>
 #include <list>
 #include <memory>
 #include <string>
@@ -188,6 +189,11 @@ public:
     virtual std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
                                              const NamespaceString& ns,
                                              bool includeBuildUUIDs) = 0;
+
+    /**
+     * Returns all documents in `_mdb_catalog`.
+     */
+    virtual std::deque<BSONObj> listCatalog(OperationContext* opCtx) const = 0;
 
     /**
      * Appends operation latency statistics for collection "nss" to "builder"

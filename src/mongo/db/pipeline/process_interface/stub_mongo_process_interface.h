@@ -90,6 +90,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    std::deque<BSONObj> listCatalog(OperationContext* opCtx) const override {
+        MONGO_UNREACHABLE;
+    }
+
     void appendLatencyStats(OperationContext* opCtx,
                             const NamespaceString& nss,
                             bool includeHistograms,
