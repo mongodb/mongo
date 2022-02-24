@@ -130,12 +130,6 @@ public:
         return (_type != ServerParameterType::kClusterWide);
     }
 
-    LogicalTime getClusterParameterTime() const {
-        return _clusterParameterTime;
-    }
-
-    void setClusterParameterTime(const LogicalTime& clusterParameterTime);
-
     virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) = 0;
 
     virtual void appendSupportingRoundtrip(OperationContext* opCtx,
@@ -148,11 +142,53 @@ public:
         return Status::OK();
     }
 
+    Status validate(const BSONObj& newValueObj) const {
+        return validate(BSON("" << newValueObj).firstElement());
+    }
+
     // This base implementation calls `setFromString(coerceToString(newValueElement))`.
     // Derived classes may customize the behavior by specifying `override_set` in IDL.
     virtual Status set(const BSONElement& newValueElement);
 
+    /**
+     * This method will reset the server parameter's value back to its default. This is currently
+     * only used by cluster server parameters, but can work with node-only
+     * IDLServerParameterWithStorage.
+     * - IDLServerParameterWithStorage automatically initializes a copy of the storage variable's
+     * initial value when it is constructed, which is treated as the default value. When the storage
+     * variable is not declared by the IDL generator, it will use the setDefault() method to
+     * adjust both the current value and the default value.
+     * - Specialized server parameters can opt into providing resettability by implementing this
+     * method. If it is called without being implemented, it will return an error via the inherited
+     * method below.
+     */
+    virtual Status reset() {
+        return Status{ErrorCodes::OperationFailed,
+                      str::stream()
+                          << "Parameter reset not implemented for server parameter: " << name()};
+    }
+
+    /**
+     * Overload of set() that accepts BSONObjs instead of BSONElements. This is currently only used
+     * for cluster server parameters but can be used for node-only server parameters.
+     */
+    Status set(const BSONObj& newValueObj) {
+        return set(BSON("" << newValueObj).firstElement());
+    }
+
     virtual Status setFromString(const std::string& str) = 0;
+
+    /**
+     * Simply returns the uninitialized/default-constructed LogicalTime by default.
+     * IDLServerParameterWithStorage overrides this to atomically return the clusterParameterTime
+     * stored in the base ClusterServerParameter class that all non-specialized cluster server
+     * parameter storage types must be chained from. Specialized server parameters are expected to
+     * implement a mechanism for atomically setting the clusterParameterTime in the set() method and
+     * retrieving it via this method.
+     */
+    virtual const LogicalTime getClusterParameterTime() const {
+        return LogicalTime();
+    }
 
     bool isTestOnly() const {
         return _testOnly;
@@ -176,7 +212,6 @@ protected:
 
 private:
     std::string _name;
-    LogicalTime _clusterParameterTime;
     ServerParameterType _type;
     bool _testOnly = false;
     bool _redact = false;
@@ -255,6 +290,7 @@ public:
     IDLServerParameterDeprecatedAlias(StringData name, ServerParameter* sp);
 
     void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) final;
+    Status reset() final;
     Status set(const BSONElement& newValueElement) final;
     Status setFromString(const std::string& str) final;
 

@@ -38,6 +38,8 @@ namespace mongo {
 AtomicWord<int> test::gStdIntPreallocated;
 AtomicWord<int> test::gStdIntPreallocatedUpdateCount;
 
+test::ChangeStreamOptionsClusterParam clusterParamStorage;
+
 namespace {
 
 using SPT = ServerParameterType;
@@ -58,7 +60,7 @@ template <typename T, ServerParameterType spt>
 void doStorageTest(StringData name,
                    const std::vector<std::string>& valid,
                    const std::vector<std::string>& invalid) {
-    T val;
+    T val = T();
     IDLServerParameterWithStorage<spt, T> param(name, val);
     using element_type = typename decltype(param)::element_type;
 
@@ -192,6 +194,10 @@ TEST(IDLServerParameterWithStorage, stdIntDeclared) {
     ASSERT_NOT_OK(stdIntDeclared->setFromString("1000"));
     ASSERT_NOT_OK(stdIntDeclared->setFromString("-1"));
     ASSERT_NOT_OK(stdIntDeclared->setFromString("alpha"));
+
+    // Reset to default.
+    ASSERT_OK(stdIntDeclared->reset());
+    ASSERT_EQ(test::gStdIntDeclared.load(), 42);
 }
 
 TEST(IDLServerParameterWithStorage, stdIntPreallocated) {
@@ -209,6 +215,11 @@ TEST(IDLServerParameterWithStorage, stdIntPreallocated) {
     ASSERT_NOT_OK(stdIntPreallocated->setFromString("-1"));
     ASSERT_NOT_OK(stdIntPreallocated->setFromString("alpha"));
     ASSERT_EQ(test::gStdIntPreallocatedUpdateCount.load(), 2);
+
+    // Reset to default.
+    ASSERT_OK(stdIntPreallocated->reset());
+    ASSERT_EQ(test::gStdIntPreallocated.load(), 11);
+    ASSERT_EQ(test::gStdIntPreallocatedUpdateCount.load(), 3);
 }
 
 TEST(IDLServerParameterWithStorage, startupString) {
@@ -217,6 +228,10 @@ TEST(IDLServerParameterWithStorage, startupString) {
     ASSERT_EQ(sp->allowedToChangeAtRuntime(), false);
     ASSERT_OK(sp->setFromString("New Value"));
     ASSERT_EQ(test::gStartupString, "New Value");
+
+    // Reset to default.
+    ASSERT_OK(sp->reset());
+    ASSERT_EQ(test::gStartupString, "");
 }
 
 TEST(IDLServerParameterWithStorage, runtimeBoostDouble) {
@@ -225,6 +240,10 @@ TEST(IDLServerParameterWithStorage, runtimeBoostDouble) {
     ASSERT_EQ(sp->allowedToChangeAtRuntime(), true);
     ASSERT_OK(sp->setFromString("1.0"));
     ASSERT_EQ(test::gRuntimeBoostDouble.get(), 1.0);
+
+    // Reset to default.
+    ASSERT_OK(sp->reset());
+    ASSERT_EQ(test::gRuntimeBoostDouble.get(), 0.0);
 }
 
 TEST(IDLServerParameterWithStorage, startupStringRedacted) {
@@ -237,6 +256,10 @@ TEST(IDLServerParameterWithStorage, startupStringRedacted) {
     auto obj = b.obj();
     ASSERT_EQ(obj.nFields(), 1);
     ASSERT_EQ(obj[sp->name()].String(), "###");
+
+    // Reset to default.
+    ASSERT_OK(sp->reset());
+    ASSERT_EQ(test::gStartupStringRedacted, "");
 }
 
 TEST(IDLServerParameterWithStorage, startupIntWithExpressions) {
@@ -293,6 +316,118 @@ TEST(IDLServerParameterWithStorage, RAIIServerParameterController) {
         ASSERT_EQ(test::gStartupString, badStartupString);
     }
     ASSERT_EQ(test::gStartupString, coolStartupString);
+}
+
+/**
+ * IDLServerParameterWithStorage<SPT::kClusterWide> unit test.
+ */
+TEST(IDLServerParameterWithStorage, CSPStorageTest) {
+    // Construct a new IDLClusterServerParameter with the already-defined storage.
+    // TO-DO: Instantiate this in the IDL file as part of testing SERVER-62253.
+    auto* clusterParam = makeIDLServerParameterWithStorage<ServerParameterType::kClusterWide>(
+        "changeStreamOptions", clusterParamStorage);
+
+    // Check that current value is the default value.
+    test::ChangeStreamOptionsClusterParam retrievedParam = clusterParam->getValue();
+    ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 30);
+    ASSERT_EQ(retrievedParam.getTestStringField(), "");
+    ASSERT_EQ(clusterParam->getClusterParameterTime(), LogicalTime());
+
+    // Assert that onUpdate functions are fired after set and reset.
+    size_t count = 0;
+    clusterParam->setOnUpdate([&count](const test::ChangeStreamOptionsClusterParam& newVal) {
+        ++count;
+        return Status::OK();
+    });
+
+    // Set to new value and check that the updated value is seen on get.
+    test::ChangeStreamOptionsClusterParam updatedParam;
+    test::PreAndPostImagesStruct updatedPrePostImgs;
+    ClusterServerParameter baseCSP;
+
+    updatedPrePostImgs.setExpireAfterSeconds(40);
+    LogicalTime updateTime = LogicalTime(Timestamp(Date_t::now()));
+    baseCSP.setClusterParameterTime(updateTime);
+    baseCSP.set_id("changeStreamOptions"_sd);
+
+    updatedParam.setClusterServerParameter(baseCSP);
+    updatedParam.setPreAndPostImages(updatedPrePostImgs);
+    updatedParam.setTestStringField("testString");
+    ASSERT_OK(clusterParam->ServerParameter::set(updatedParam.toBSON()));
+
+    retrievedParam = clusterParam->getValue();
+    ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 40);
+    ASSERT_EQ(retrievedParam.getTestStringField(), "testString");
+    ASSERT_EQ(retrievedParam.getClusterParameterTime(), updateTime);
+    ASSERT_EQ(clusterParam->getClusterParameterTime(), updateTime);
+    ASSERT_EQ(count, 1);
+
+    // Append to BSONObj and verify that expected fields are present.
+    BSONObjBuilder b;
+    clusterParam->append(nullptr, b, clusterParam->name());
+    auto obj = b.obj();
+    ASSERT_EQ(obj.nFields(), 4);
+    ASSERT_EQ(obj["_id"_sd].String(), "changeStreamOptions");
+    ASSERT_EQ(obj["preAndPostImages"_sd].Obj()["expireAfterSeconds"].Long(), 40);
+    ASSERT_EQ(obj["testStringField"_sd].String(), "testString");
+    ASSERT_EQ(obj["clusterParameterTime"_sd].timestamp(), updateTime.asTimestamp());
+
+    // setFromString should fail for cluster server parameters.
+    ASSERT_NOT_OK(clusterParam->setFromString(""));
+
+    // Reset the parameter and check that it now has its default value.
+    ASSERT_OK(clusterParam->reset());
+    retrievedParam = clusterParam->getValue();
+    ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 30);
+    ASSERT_EQ(retrievedParam.getTestStringField(), "");
+    ASSERT_EQ(retrievedParam.getClusterParameterTime(), LogicalTime());
+    ASSERT_EQ(clusterParam->getClusterParameterTime(), LogicalTime());
+    ASSERT_EQ(count, 2);
+
+    // Update the default value. The parameter should automatically reset to the new default value.
+    test::ChangeStreamOptionsClusterParam newDefaultParam;
+    test::PreAndPostImagesStruct newDefaultPrePostImgs;
+
+    newDefaultPrePostImgs.setExpireAfterSeconds(35);
+    newDefaultParam.setPreAndPostImages(newDefaultPrePostImgs);
+    newDefaultParam.setTestStringField("default");
+    ASSERT_OK(clusterParam->setDefault(newDefaultParam));
+    retrievedParam = clusterParam->getValue();
+    ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 35);
+    ASSERT_EQ(retrievedParam.getTestStringField(), "default");
+    ASSERT_EQ(retrievedParam.getClusterParameterTime(), LogicalTime());
+    ASSERT_EQ(clusterParam->getClusterParameterTime(), LogicalTime());
+    ASSERT_EQ(count, 3);
+
+    // Updating the default value a second time should have no effect.
+    newDefaultPrePostImgs.setExpireAfterSeconds(45);
+    newDefaultParam.setPreAndPostImages(newDefaultPrePostImgs);
+    newDefaultParam.setTestStringField("newDefault");
+    ASSERT_OK(clusterParam->setDefault(newDefaultParam));
+    retrievedParam = clusterParam->getValue();
+    ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 35);
+    ASSERT_EQ(retrievedParam.getTestStringField(), "default");
+    ASSERT_EQ(count, 3);
+
+    // Assert that validation works as expected both when called separately and implicitly during
+    // set.
+    clusterParam->addValidator([&](const test::ChangeStreamOptionsClusterParam& newVal) {
+        if (newVal.getPreAndPostImages().getExpireAfterSeconds() < 0) {
+            return Status(ErrorCodes::BadValue, "Should be positive value only");
+        }
+        return Status::OK();
+    });
+    updatedPrePostImgs.setExpireAfterSeconds(-1);
+    updatedParam.setPreAndPostImages(updatedPrePostImgs);
+    updatedParam.setTestStringField("newTestString");
+    updateTime = LogicalTime(Timestamp(Date_t::now()));
+    ASSERT_NOT_OK(clusterParam->ServerParameter::validate(updatedParam.toBSON()));
+    ASSERT_NOT_OK(clusterParam->ServerParameter::set(updatedParam.toBSON()));
+    retrievedParam = clusterParam->getValue();
+    ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 35);
+    ASSERT_EQ(retrievedParam.getTestStringField(), "default");
+    ASSERT_EQ(clusterParam->getClusterParameterTime(), LogicalTime());
+    ASSERT_EQ(count, 3);
 }
 
 }  // namespace

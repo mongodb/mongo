@@ -2341,9 +2341,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line('ret->setRedact();')
 
         if param.default and not (param.cpp_vartype and param.cpp_varname):
-            # Only need to call setValue() if we haven't in-place initialized the declared var.
+            # Only need to call setDefault() if we haven't in-place initialized the declared var.
             self._writer.write_line(
-                'uassertStatusOK(ret->setValue(%s));' % (_get_expression(param.default)))
+                'uassertStatusOK(ret->setDefault(%s));' % (_get_expression(param.default)))
 
         self._writer.write_line('return ret;')
 

@@ -90,9 +90,7 @@ void updateParameter(BSONObj doc, StringData mode) {
         return;
     }
 
-    // TODO: SERVER-63630 Create a better interface for updating CSPs
-    uassertStatusOK(sp->set(BSON("" << doc).firstElement()));
-    sp->setClusterParameterTime(LogicalTime(cptElem.timestamp()));
+    uassertStatusOK(sp->set(doc));
 }
 
 void clearParameter(ServerParameter* sp) {
@@ -101,11 +99,7 @@ void clearParameter(ServerParameter* sp) {
         return;
     }
 
-    // TODO: SERVER-63630 Create a better interface for resetting CSPs
-    BSONObjBuilder bob;
-    bob.appendNull(""_sd);
-    uassertStatusOK(sp->set(bob.obj().firstElement()));
-    sp->setClusterParameterTime({});
+    uassertStatusOK(sp->reset());
 }
 
 void clearParameter(StringData id) {
