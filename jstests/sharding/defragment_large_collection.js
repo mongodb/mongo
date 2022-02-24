@@ -54,7 +54,7 @@ for (let i = 0; i < numCollections; ++i) {
                                                    numZones,
                                                    docSizeBytes,
                                                    chunkSpacing,
-                                                   false);
+                                                   true);
 
     collections.push(coll);
 }
