@@ -1,7 +1,7 @@
 /*
- * Tests that a client can retry a transaction that failed with a transient transaction error by
- * attaching a higher txnRetryCounter, and that the txnRetryCounter is persisted correctly on all
- * nodes.
+ * Tests that a transaction that failed with a transient transaction error
+ * can be retried on a replica set and that its txnRetryCounter is persisted correctly
+ * on all nodes.
  *
  * @tags: [requires_fcv_51, featureFlagInternalTransactions]
  */
@@ -231,22 +231,6 @@ function testNoPersistenceOfDefaultTxnRetryCounter(
         assert.eq(null, oplogEntry.txnRetryCounter, tojson(oplogEntry));
     });
 }
-
-(() => {
-    jsTest.log("Test transactions in a sharded cluster");
-    const sessionUUID = UUID();
-    const lsid0 = {id: sessionUUID};
-    testCommitAfterRetry(mongosTestDB, lsid0, NumberLong(0));
-    testAbortAfterRetry(mongosTestDB, lsid0, NumberLong(1));
-
-    const lsid1 = {id: sessionUUID, txnNumber: NumberLong(2), txnUUID: UUID()};
-    testCommitAfterRetry(mongosTestDB, lsid1, NumberLong(0));
-    testAbortAfterRetry(mongosTestDB, lsid1, NumberLong(1));
-
-    const lsid2 = {id: sessionUUID, txnUUID: UUID()};
-    testCommitAfterRetry(mongosTestDB, lsid2, NumberLong(0));
-    testAbortAfterRetry(mongosTestDB, lsid2, NumberLong(1));
-})();
 
 (() => {
     jsTest.log("Test transactions in a replica set");

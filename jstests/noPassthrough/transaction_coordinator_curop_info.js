@@ -12,18 +12,13 @@
 load('jstests/libs/fail_point_util.js');
 load('jstests/sharding/libs/sharded_transactions_helpers.js');  // for waitForFailpoint
 
-function commitTxn(
-    st, lsid, txnNumber, txnRetryCounter, areInternalTransactionsEnabled, expectedError = null) {
-    const txnRetryCounterField = areInternalTransactionsEnabled
-        ? ("txnRetryCounter: NumberInt(" + txnRetryCounter + "),")
-        : "";
-
+function commitTxn(st, lsid, txnNumber, expectedError = null) {
     let cmd = "db.adminCommand({" +
         "commitTransaction: 1," +
         "lsid: " + tojson(lsid) + "," +
         "txnNumber: NumberLong(" + txnNumber + ")," +
         "stmtId: NumberInt(0)," +
-        "autocommit: false," + txnRetryCounterField + "})";
+        "autocommit: false})";
 
     if (expectedError) {
         cmd = "assert.commandFailedWithCode(" + cmd + "," + String(expectedError) + ");";
@@ -85,7 +80,7 @@ function enableFailPoints(shard, failPointNames) {
     return failPoints;
 }
 
-function startTransaction(session, collectionName, insertValue, areInternalTransactionsEnabled) {
+function startTransaction(session, collectionName, insertValue) {
     const dbName = session.getDatabase('test');
     jsTest.log(`Starting a new transaction on ${dbName}.${collectionName}`);
     var insertCmdObj = {
@@ -96,10 +91,6 @@ function startTransaction(session, collectionName, insertValue, areInternalTrans
         startTransaction: true,
         autocommit: false,
     };
-
-    if (areInternalTransactionsEnabled) {
-        Object.assign(insertCmdObj, {txnRetryCounter: NumberInt(1)});
-    }
 
     assert.commandWorked(dbName.runCommand(insertCmdObj));
 }
@@ -140,12 +131,11 @@ let failPoints = enableFailPoints(coordinator, failPointNames);
 jsTest.log("Testing that coordinator threads show up in currentOp for a commit decision");
 {
     let session = adminDB.getMongo().startSession();
-    startTransaction(session, collectionName, 1, areInternalTransactionsEnabled);
+    startTransaction(session, collectionName, 1);
     let txnNumber = NumberLong(1);
-    let txnRetryCounter = NumberInt(1);
+    let txnRetryCounter = NumberInt(0);
     let lsid = session.getSessionId();
-    let commitJoin =
-        commitTxn(st, lsid, txnNumber, txnRetryCounter, areInternalTransactionsEnabled);
+    let commitJoin = commitTxn(st, lsid, txnNumber);
 
     var coordinateCommitFilter = {
         active: true,
@@ -155,10 +145,6 @@ jsTest.log("Testing that coordinator threads show up in currentOp for a commit d
         'command.coordinator': true,
         'command.autocommit': false
     };
-
-    if (areInternalTransactionsEnabled) {
-        Object.assign(coordinateCommitFilter, {'command.txnRetryCounter': txnRetryCounter});
-    }
 
     let createCoordinateCommitTxnOp = curOpAfterFailpoint(
         failPoints["hangAfterStartingCoordinateCommit"], coordinateCommitFilter);
@@ -200,10 +186,10 @@ jsTest.log("Testing that coordinator threads show up in currentOp for a commit d
 jsTest.log("Testing that coordinator threads show up in currentOp for an abort decision.");
 {
     let session = adminDB.getMongo().startSession();
-    startTransaction(session, collectionName, 2, areInternalTransactionsEnabled);
+    startTransaction(session, collectionName, 2);
     let txnNumber = NumberLong(1);
     let lsid = session.getSessionId();
-    let txnRetryCounter = NumberInt(1);
+    let txnRetryCounter = NumberInt(0);
     // Manually abort the transaction on one of the participants, so that the participant fails to
     // prepare and failpoint is triggered on the coordinator.
     var abortTransactionCmd = {
@@ -214,18 +200,9 @@ jsTest.log("Testing that coordinator threads show up in currentOp for an abort d
         autocommit: false,
     };
 
-    if (areInternalTransactionsEnabled) {
-        Object.assign(abortTransactionCmd, {txnRetryCounter: txnRetryCounter});
-    }
-
     assert.commandWorked(participant.adminCommand(abortTransactionCmd));
 
-    let commitJoin = commitTxn(st,
-                               lsid,
-                               txnNumber,
-                               txnRetryCounter,
-                               areInternalTransactionsEnabled,
-                               ErrorCodes.NoSuchTransaction);
+    let commitJoin = commitTxn(st, lsid, txnNumber, ErrorCodes.NoSuchTransaction);
 
     const sendAbortFilter = makeWorkerFilterWithAction(
         session, "sendingAbort", txnNumber, txnRetryCounter, areInternalTransactionsEnabled);

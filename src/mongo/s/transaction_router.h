@@ -368,7 +368,7 @@ public:
          * the previous transaction state.
          */
         void beginOrContinueTxn(OperationContext* opCtx,
-                                TxnNumberAndRetryCounter txnNumberAndRetryCounter,
+                                TxnNumber txnNumber,
                                 TransactionActions action);
 
         /**
@@ -559,17 +559,17 @@ public:
         /**
          * Continues or restarts the currently active transaction.
          */
-        void _beginOrContinueActiveTxnNumber(OperationContext* opCtx,
-                                             TxnNumberAndRetryCounter txnNumberAndRetryCounter,
-                                             TransactionActions action);
+        void _continueTxn(OperationContext* opCtx,
+                          TxnNumberAndRetryCounter txnNumberAndRetryCounter,
+                          TransactionActions action);
 
         /**
          * Starts a new transaction or continues a transaction started by a different router to
          * recover the commit decision.
          */
-        void _beginNewTxnNumber(OperationContext* opCtx,
-                                TxnNumberAndRetryCounter txnNumberAndRetryCounter,
-                                TransactionActions action);
+        void _beginTxn(OperationContext* opCtx,
+                       TxnNumberAndRetryCounter txnNumberAndRetryCounter,
+                       TransactionActions action);
 
         /**
          * Internal method for committing a transaction. Should only throw on failure to send
