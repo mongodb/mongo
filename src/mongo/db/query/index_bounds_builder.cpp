@@ -120,6 +120,7 @@ bool stringMayHaveUnescapedPipe(StringData str) {
 
 const BSONObj kUndefinedElementObj = BSON("" << BSONUndefined);
 const BSONObj kNullElementObj = BSON("" << BSONNULL);
+const BSONObj kEmptyArrayElementObj = BSON("" << BSONArray());
 
 const Interval kHashedUndefinedInterval = IndexBoundsBuilder::makePointInterval(
     ExpressionMapping::hash(kUndefinedElementObj.firstElement()));
@@ -517,6 +518,33 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
 
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
             return;
+        }
+
+        if (MatchExpression::MATCH_IN == child->matchType()) {
+            auto ime = static_cast<const InMatchExpression*>(child);
+            if (QueryPlannerIXSelect::canUseIndexForNin(ime)) {
+                // Permit documents with an undefined value to be
+                // returned from $nin index scan. the empty array is
+                // represented as undefined in the index but the empty
+                // array values are filtered out. This is required to
+                // match the collection scan (no index) behavior. This
+                // was later changed by SERVER-21929.
+                BSONObjBuilder bob;
+                bob.appendMinKey("");
+                bob.appendUndefined("");
+                oilOut->intervals.push_back(makeRangeInterval(
+                    bob.asTempObj().getOwned(), BoundInclusion::kIncludeBothStartAndEndKeys));
+                bob.resetToEmpty();
+                bob.appendNull("");
+                bob.appendMaxKey("");
+                oilOut->intervals.push_back(
+                    makeRangeInterval(bob.done().getOwned(), BoundInclusion::kIncludeEndKeyOnly));
+                unionize(oilOut);
+                if (index.pathHasMultikeyComponent(elt.fieldNameStringData())) {
+                    *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+                }
+                return;
+            }
         }
 
         _translatePredicate(child, elt, index, oilOut, tightnessOut);

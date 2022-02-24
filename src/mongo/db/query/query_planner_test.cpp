@@ -2765,6 +2765,55 @@ TEST_F(QueryPlannerTest, NegationInElemMatchDoesNotUseSparseIndex) {
     assertHasOnlyCollscan();
 }
 
+TEST_F(QueryPlannerTest, NinListWithOnlyNullAndEmptyArrayShouldUseMultikeyIndex) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    // Use a multikey index.
+    addIndex(fromjson("{a: 1}"), true);
+    runQuery(fromjson("{a: { $nin: [[], null] }}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$not: {$in: [null, []]}}}, node: {ixscan: "
+        "{pattern: {a: 1}, bounds: "
+        "{a: ["
+        "['MinKey', undefined, true, true],"
+        "[null, 'MaxKey', false, true]"
+        "]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, NinListWithOnlyNullAndEmptyArrayShouldUseIndex) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    // Use an index which is not multikey.
+    addIndex(fromjson("{a: 1}"));
+    runQuery(fromjson("{a: { $nin: [[], null] }}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: "
+        "{pattern: {a: 1}, bounds: "
+        "{a: ["
+        "['MinKey', undefined, true, true],"
+        "[null, 'MaxKey', false, true]"
+        "]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, NinListWithNullShouldNotUseIndex) {
+    addIndex(fromjson("{a: 1}"), true);
+    runQuery(fromjson("{a: { $nin: [null] }}"));
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerTest, NinListWithRegexCannotUseIndex) {
+    addIndex(fromjson("{a: 1}"), true);
+    // This matches the [[], null] pattern but also has a regex.
+    runQuery(fromjson("{a: { $nin: [[], null, /abc/] }}"));
+    assertHasOnlyCollscan();
+}
+
+TEST_F(QueryPlannerTest, NinListWithNonEmptyArrayShouldNotUseIndex) {
+    addIndex(fromjson("{a: 1}"), true);
+    runQuery(fromjson("{a: { $nin: [[], [1]] }}"));
+    assertHasOnlyCollscan();
+}
+
 TEST_F(QueryPlannerTest, SparseIndexCannotSupportEqualsNull) {
     addIndex(BSON("i" << 1),
              false,  // multikey

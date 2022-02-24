@@ -145,7 +145,7 @@ protected:
     void scheduleNetworkResponses(std::vector<CursorResponse> responses) {
         std::vector<BSONObj> objs;
         for (const auto& cursorResponse : responses) {
-            // For tests of the AsyncResultsMerger, all CursorRepsonses scheduled by the tests are
+            // For tests of the AsyncResultsMerger, all CursorResponses scheduled by the tests are
             // subsequent responses, since the AsyncResultsMerger will only ever run getMores.
             objs.push_back(cursorResponse.toBSON(CursorResponse::ResponseType::SubsequentResponse));
         }

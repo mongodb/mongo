@@ -48,6 +48,16 @@ public:
      * Describes various degrees of precision with which predicates can be evaluated based
      * on the index bounds.
      *
+     * Exact vs. inexact is about whether or not you will need to apply a predicate after scanning,
+     * and fetch vs. not fetch is whether you need data which is not in the index to answer the
+     * query. Often if you have inexact bounds it causes you to need more than the index data, but
+     * not always. For example, to correctly match null predicates like {a: {$eq: null}} you may
+     * need to fetch the data to distinguish between a null and missing 'a' value (the index stores
+     * both with a literal null), so would need INEXACT_FETCH bounds. And as an INEXACT_COVERED
+     * example you could think of something like $mod where you can apply the predicate to the data
+     * directly in the index, but $mod won't generate tight bounds so you still need to apply the
+     * predicate.
+     *
      * The integer values of the enum are significant, and are assigned in order of
      * increasing tightness. These values are used when we need to do comparison between two
      * BoundsTightness values. Such comparisons can answer questions such as "Does predicate

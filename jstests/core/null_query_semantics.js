@@ -314,6 +314,45 @@ function testNotEqualsNullSemantics() {
                projectResults);
     }());
 
+    // Test the semantics of the query {a: {$nin: [null, []]}}.
+    (function testNotInNullAndEmptyArrayQuery() {
+        const query = {a: {$nin: [null, []]}};
+        const noProjectResults = coll.find(query).toArray();
+        const expected = [
+            // Documents excluded by the query predicate are commented
+            // out below.
+            {_id: "a_empty_subobject", a: {}},
+            //{_id: "a_null", a: null},
+            {_id: "a_number", a: 4},
+            {_id: "a_subobject_b_not_null", a: {b: "hi"}},
+            {_id: "a_subobject_b_null", a: {b: null}},
+            {_id: "a_subobject_b_undefined", a: {b: undefined}},
+            // Semantic difference during backport: this document doesn't match "null" in this
+            // version (c.f. SERVER-21929).
+            {_id: "a_undefined", a: undefined},
+            //{_id: "no_a"},
+
+            //{_id: "a_double_array", a: [[]]},
+            //{_id: "a_empty_array", a: []},
+            {_id: "a_object_array_all_b_nulls", a: [{b: null}, {b: undefined}, {b: null}, {}]},
+            {_id: "a_object_array_no_b_nulls", a: [{b: 1}, {b: 3}, {b: "string"}]},
+            {_id: "a_object_array_some_b_nulls", a: [{b: null}, {b: 3}, {b: null}]},
+            {_id: "a_object_array_some_b_undefined", a: [{b: undefined}, {b: 3}]},
+            {_id: "a_object_array_some_b_missing", a: [{b: 3}, {}]},
+            //{_id: "a_value_array_all_nulls", a: [null, null]},
+            {_id: "a_value_array_no_nulls", a: [1, "string", 4]},
+            //{_id: "a_value_array_with_null", a: [1, "string", null, 4]},
+            // Semantic difference during backport: this document doesn't match "null" in this
+            // version (c.f. SERVER-21929).
+            {_id: "a_value_array_with_undefined", a: [1, "string", undefined, 4]},
+        ];
+
+        assert(resultsEq(noProjectResults, expected), noProjectResults);
+
+        const projectResults = coll.find(query, projectToOnlyA).toArray();
+        assert(resultsEq(projectResults, extractAValues(expected)), projectResults);
+    }());
+
     (function testNotInNullAndRegexQuery() {
         const query = {a: {$nin: [null, /^str.*/]}};
         const noProjectResults = coll.find(query).toArray();
