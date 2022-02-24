@@ -59,10 +59,16 @@ constexpr int kBackupCursorKeepAliveIntervalMillis = mongo::kCursorTimeoutMillis
 
 namespace mongo::repl::shard_merge_utils {
 namespace {
+MONGO_FAIL_POINT_DEFINE(skipDeleteTempDBPath);
 using namespace fmt::literals;
 
 void moveFile(const std::string& src, const std::string& dst) {
     LOGV2_DEBUG(6114304, 1, "Moving file", "src"_attr = src, "dst"_attr = dst);
+
+    tassert(6114401,
+            "Destination file '{}' already exists"_format(dst),
+            !boost::filesystem::exists(dst));
+
     // Boost filesystem functions clear "ec" on success.
     boost::system::error_code ec;
     boost::filesystem::rename(src, dst, ec);
@@ -121,6 +127,109 @@ Status connect(const HostAndPort& source, DBClientConnection* client) {
         return status;
     return replAuthenticate(client).withContext(str::stream()
                                                 << "Failed to authenticate to " << source);
+}
+
+void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
+                                      const std::vector<CollectionImportMetadata>& metadatas,
+                                      const std::string& importPath) {
+    for (auto&& collectionMetadata : metadatas) {
+        /*
+         * Move one collection file and one or more index files from temp dir to dbpath.
+         */
+
+        auto collFileSourcePath =
+            constructSourcePath(importPath, collectionMetadata.importArgs.ident);
+        auto collFileDestPath = constructDestinationPath(collectionMetadata.importArgs.ident);
+
+        moveFile(collFileSourcePath, collFileDestPath);
+
+        ScopeGuard revertCollFileMove([&] { moveFile(collFileDestPath, collFileSourcePath); });
+
+        auto indexPaths = std::vector<std::tuple<std::string, std::string>>();
+        ScopeGuard revertIndexFileMove([&] {
+            for (const auto& pathTuple : indexPaths) {
+                moveFile(std::get<1>(pathTuple), std::get<0>(pathTuple));
+            }
+        });
+        for (auto&& indexImportArgs : collectionMetadata.indexes) {
+            auto indexFileSourcePath = constructSourcePath(importPath, indexImportArgs.ident);
+            auto indexFileDestPath = constructDestinationPath(indexImportArgs.ident);
+            moveFile(indexFileSourcePath, indexFileDestPath);
+            indexPaths.push_back(std::tuple(indexFileSourcePath, indexFileDestPath));
+        }
+
+        /*
+         * Import the collection and index(es).
+         */
+        BSONObjBuilder storageMetadata;
+        buildStorageMetadata(collectionMetadata.importArgs, storageMetadata);
+        for (const auto& indexImportArgs : collectionMetadata.indexes) {
+            buildStorageMetadata(indexImportArgs, storageMetadata);
+        }
+
+        const auto nss = collectionMetadata.ns;
+        writeConflictRetry(opCtx, "importCollection", nss.ns(), [&] {
+            LOGV2_DEBUG(6114303, 1, "Importing donor collection", "ns"_attr = nss);
+            AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
+            Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+            auto catalog = CollectionCatalog::get(opCtx);
+            // TODO SERVER-63789 Uncomment WriteUnitOfWork declaration below when we
+            // make file import async.
+            // WriteUnitOfWork wunit(opCtx);
+            AutoStatsTracker statsTracker(opCtx,
+                                          nss,
+                                          Top::LockType::NotLocked,
+                                          AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                          catalog->getDatabaseProfileLevel(nss.db()));
+
+            // If the collection creation rolls back, ensure that the Top entry created for the
+            // collection is deleted.
+            opCtx->recoveryUnit()->onRollback([nss, serviceContext = opCtx->getServiceContext()]() {
+                Top::get(serviceContext).collectionDropped(nss);
+            });
+
+            // Create Collection object
+            TenantNamespace tenantNs(getActiveTenant(opCtx), nss);
+            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+            auto durableCatalog = storageEngine->getCatalog();
+            ImportOptions importOptions(ImportOptions::ImportCollectionUUIDOption::kKeepOld);
+            importOptions.importTimestampRule = ImportOptions::ImportTimestampRule::kStable;
+
+            // TODO SERVER-62659 Ensure the correct tenantId is used when importing the collection.
+            auto importResult = uassertStatusOK(
+                DurableCatalog::get(opCtx)->importCollection(opCtx,
+                                                             tenantNs,
+                                                             collectionMetadata.catalogObject,
+                                                             storageMetadata.done(),
+                                                             importOptions));
+            const auto md = durableCatalog->getMetaData(opCtx, importResult.catalogId);
+            for (const auto& index : md->indexes) {
+                uassert(6114301, "Cannot import non-ready indexes", index.ready);
+            }
+
+            std::shared_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
+                opCtx, tenantNs, importResult.catalogId, md, std::move(importResult.rs));
+            ownedCollection->init(opCtx);
+            ownedCollection->setCommitted(false);
+
+            // Update the number of records and data size on commit.
+            opCtx->recoveryUnit()->registerChange(
+                makeCountsChange(ownedCollection->getRecordStore(), collectionMetadata));
+
+            UncommittedCollections::addToTxn(opCtx, std::move(ownedCollection));
+            // TODO SERVER-63789 Uncomment wunit.commit() call below when we
+            // make file copy/import async.
+            // wunit.commit();
+            LOGV2(6114300,
+                  "Imported donor collection",
+                  "ns"_attr = nss,
+                  "numRecordsApprox"_attr = collectionMetadata.numRecords,
+                  "dataSizeApprox"_attr = collectionMetadata.dataSize);
+        });
+
+        revertCollFileMove.dismiss();
+        revertIndexFileMove.dismiss();
+    }
 }
 }  // namespace
 
@@ -192,88 +301,6 @@ void cloneFile(OperationContext* opCtx, const BSONObj& metadataDoc) {
     uassertStatusOK(cloneStatus);
 }
 
-void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
-                                      const std::vector<CollectionImportMetadata>& metadatas,
-                                      const std::string& importPath) {
-    for (auto&& collectionMetadata : metadatas) {
-        /*
-         * Move one collection file and one or more index files from temp dir to dbpath.
-         */
-        moveFile(constructSourcePath(importPath, collectionMetadata.importArgs.ident),
-                 constructDestinationPath(collectionMetadata.importArgs.ident));
-
-        for (auto&& indexImportArgs : collectionMetadata.indexes) {
-            moveFile(constructSourcePath(importPath, indexImportArgs.ident),
-                     constructDestinationPath(indexImportArgs.ident));
-        }
-
-        /*
-         * Import the collection and index(es).
-         */
-        BSONObjBuilder storageMetadata;
-        buildStorageMetadata(collectionMetadata.importArgs, storageMetadata);
-        for (const auto& indexImportArgs : collectionMetadata.indexes) {
-            buildStorageMetadata(indexImportArgs, storageMetadata);
-        }
-
-        const auto nss = collectionMetadata.ns;
-        writeConflictRetry(opCtx, "importCollection", nss.ns(), [&] {
-            LOGV2_DEBUG(6114303, 1, "Importing donor collection", "ns"_attr = nss);
-            AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
-            Lock::CollectionLock collLock(opCtx, nss, MODE_X);
-            auto catalog = CollectionCatalog::get(opCtx);
-            WriteUnitOfWork wunit(opCtx);
-            AutoStatsTracker statsTracker(opCtx,
-                                          nss,
-                                          Top::LockType::NotLocked,
-                                          AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                                          catalog->getDatabaseProfileLevel(nss.db()));
-
-            // If the collection creation rolls back, ensure that the Top entry created for the
-            // collection is deleted.
-            opCtx->recoveryUnit()->onRollback([nss, serviceContext = opCtx->getServiceContext()]() {
-                Top::get(serviceContext).collectionDropped(nss);
-            });
-
-            // Create Collection object
-            TenantNamespace tenantNs(getActiveTenant(opCtx), nss);
-            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-            auto durableCatalog = storageEngine->getCatalog();
-            ImportOptions importOptions(ImportOptions::ImportCollectionUUIDOption::kKeepOld);
-            importOptions.importTimestampRule = ImportOptions::ImportTimestampRule::kStable;
-
-            // TODO SERVER-62659 Ensure the correct tenantId is used when importing the collection.
-            auto importResult = uassertStatusOK(
-                DurableCatalog::get(opCtx)->importCollection(opCtx,
-                                                             tenantNs,
-                                                             collectionMetadata.catalogObject,
-                                                             storageMetadata.done(),
-                                                             importOptions));
-            const auto md = durableCatalog->getMetaData(opCtx, importResult.catalogId);
-            for (const auto& index : md->indexes) {
-                uassert(6114301, "Cannot import non-ready indexes", index.ready);
-            }
-
-            std::shared_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
-                opCtx, tenantNs, importResult.catalogId, md, std::move(importResult.rs));
-            ownedCollection->init(opCtx);
-            ownedCollection->setCommitted(false);
-
-            // Update the number of records and data size on commit.
-            opCtx->recoveryUnit()->registerChange(
-                makeCountsChange(ownedCollection->getRecordStore(), collectionMetadata));
-
-            UncommittedCollections::addToTxn(opCtx, std::move(ownedCollection));
-            wunit.commit();
-            LOGV2(6114300,
-                  "Imported donor collection",
-                  "ns"_attr = nss,
-                  "numRecordsApprox"_attr = collectionMetadata.numRecords,
-                  "dataSizeApprox"_attr = collectionMetadata.dataSize);
-        });
-    }
-}
-
 SemiFuture<void> keepBackupCursorAlive(CancellationSource cancellationSource,
                                        std::shared_ptr<executor::TaskExecutor> executor,
                                        HostAndPort hostAndPort,
@@ -295,5 +322,41 @@ SemiFuture<void> keepBackupCursorAlive(CancellationSource cancellationSource,
         .on(executor, cancellationSource.token())
         .onCompletion([](auto&&) {})
         .semi();
+}
+
+void importCopiedFiles(OperationContext* opCtx, UUID migrationId) {
+    auto tempWTDirectory = fileClonerTempDir(migrationId);
+    uassert(6113315,
+            str::stream() << "Missing file cloner's temporary dbpath directory: "
+                          << tempWTDirectory.string(),
+            boost::filesystem::exists(tempWTDirectory));
+
+    // TODO SERVER-63204: Evaluate correct place to remove the temporary
+    // WT dbpath.
+    ON_BLOCK_EXIT([&tempWTDirectory, &migrationId] {
+        // TODO SERVER-63789: Delete skipDeleteTempDBPath failpoint
+        if (MONGO_unlikely(skipDeleteTempDBPath.shouldFail())) {
+            LOGV2(6114402,
+                  "skipDeleteTempDBPath failpoint enabled, skipping temp directory cleanup.");
+            return;
+        }
+        LOGV2_DEBUG(6113324,
+                    1,
+                    "Done importing files, removing the temporary WT dbpath",
+                    "migrationId"_attr = migrationId,
+                    "tempDbPath"_attr = tempWTDirectory.string());
+        boost::system::error_code ec;
+        boost::filesystem::remove_all(tempWTDirectory, ec);
+    });
+
+    auto metadatas = wiredTigerRollbackToStableAndGetMetadata(opCtx, tempWTDirectory.string());
+
+    // TODO SERVER-63122: Remove the try-catch block once logical cloning is removed for
+    // shard merge protocol.
+    try {
+        wiredTigerImportFromBackupCursor(opCtx, metadatas, tempWTDirectory.string());
+    } catch (const ExceptionFor<ErrorCodes::NamespaceExists>& ex) {
+        LOGV2_WARNING(6113314, "Temporarily ignoring the error", "error"_attr = ex.toStatus());
+    }
 }
 }  // namespace mongo::repl::shard_merge_utils

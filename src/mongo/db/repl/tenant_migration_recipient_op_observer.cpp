@@ -192,8 +192,6 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
                     createAccessBlockerIfNeeded(opCtx, recipientStateDoc);
                     break;
                 case TenantMigrationRecipientStateEnum::kLearnedFilenames:
-                    repl::TenantFileImporterService::get(opCtx->getServiceContext())
-                        ->learnedAllFilenames(recipientStateDoc.getId());
                     break;
                 case TenantMigrationRecipientStateEnum::kCopiedFiles:
                     break;
@@ -206,6 +204,23 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
                     break;
             }
         });
+
+        // Perform TenantFileImporterService::learnedAllFilenames work outside of the above onCommit
+        // hook because of work done in a WriteUnitOfWork.
+        // TODO SERVER-63789: Revisit this when we make file import async and move
+        // within onCommit hook.
+        auto state = recipientStateDoc.getState();
+        auto protocol = recipientStateDoc.getProtocol().value_or(kDefaultMigrationProtocol);
+        if (state == TenantMigrationRecipientStateEnum::kLearnedFilenames) {
+            tassert(6114400,
+                    "Bad state '{}' for protocol '{}'"_format(
+                        TenantMigrationRecipientState_serializer(state),
+                        MigrationProtocol_serializer(protocol)),
+                    protocol == MigrationProtocolEnum::kShardMerge);
+
+            repl::TenantFileImporterService::get(opCtx->getServiceContext())
+                ->learnedAllFilenames(recipientStateDoc.getId());
+        }
     }
 }
 

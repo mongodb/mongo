@@ -466,11 +466,6 @@ public:
         SemiFuture<void> _onCloneSuccess();
 
         /*
-         * For protocol "shard merge", import donor data files.
-         */
-        SemiFuture<void> _importCopiedFiles();
-
-        /*
          * Returns a future that will be fulfilled when the tenant migration reaches consistent
          * state.
          */
@@ -595,8 +590,6 @@ public:
         // Promise that is resolved Signaled when the instance has started tenant database cloner
         // and tenant oplog fetcher.
         SharedPromise<void> _dataSyncStartedPromise;  // (W)
-        // Future that is resolved when all recipient nodes have copied all donor files.
-        SharedSemiFuture<void> _copiedFilesFuture;  // (W)
         // Future that is resolved when all recipient nodes have imported all donor files.
         SharedSemiFuture<void> _importedFilesFuture;  // (W)
         // Promise that is resolved Signaled when the tenant data sync has reached consistent point.

@@ -52,7 +52,7 @@ public:
     // have completed the step, or there was an error.
     SharedSemiFuture<void> beginAwaitingVotesForStep(UUID migrationId,
                                                      MigrationProgressStepEnum step);
-    // TODO (SERVER-61144): use cancelStep, which is currently unused.
+    // TODO (SERVER-63390): use cancelStep, which is currently unused.
     void cancelStep(UUID migrationId, MigrationProgressStepEnum step);
     void receivedVoteForStep(UUID migrationId,
                              MigrationProgressStepEnum step,

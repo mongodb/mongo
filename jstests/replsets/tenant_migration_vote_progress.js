@@ -75,15 +75,15 @@ fpAfterCollectionClonerDone.wait();
 fpAfterCollectionClonerDone.off();
 
 if (TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
-    jsTestLog("Test that voteCommitMigrationProgress succeeds with step 'copied files'");
-    voteShouldSucceed(migrationId, ["copied files"]);
+    jsTestLog("Test that voteCommitMigrationProgress succeeds with step 'imported files'");
+    voteShouldSucceed(migrationId, ["imported files"]);
 } else {
     jsTestLog("Test that voteCommitMigrationProgress fails with shard merge disabled");
-    voteShouldFail(migrationId, ["copied files"]);
+    voteShouldFail(migrationId, ["imported files"]);
 }
 
 jsTestLog("Test that voteCommitMigrationProgress fails with wrong 'step'");
-voteShouldFail(migrationId, ["imported files"]);
+voteShouldFail(migrationId, ["copied files"]);
 
 fpAfterDataConsistentMigrationRecipientInstance.wait();
 fpAfterDataConsistentMigrationRecipientInstance.off();

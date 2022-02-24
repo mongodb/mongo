@@ -20,9 +20,6 @@
 (function() {
 "use strict";
 
-// TODO (SERVER-61144): Recipient secondaries don't import donor files yet, so dbhash will mismatch.
-TestData.skipCheckDBHashes = true;
-
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/libs/fail_point_util.js");
@@ -35,6 +32,13 @@ const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 if (!TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
     tenantMigrationTest.stop();
     jsTestLog("Skipping Shard Merge-specific test");
+    return;
+}
+
+if (TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
+    // TODO SERVER-63789: Re-enable this test for Shard Merge
+    tenantMigrationTest.stop();
+    jsTestLog("Temporarily skipping Shard Merge test, dependent on SERVER-63789.");
     return;
 }
 
@@ -68,6 +72,7 @@ configureFailPoint(
     recipientPrimary, "WTWriteConflictExceptionForImportCollection", {} /* data */, {times: 1});
 configureFailPoint(
     recipientPrimary, "WTWriteConflictExceptionForImportIndex", {} /* data */, {times: 1});
+configureFailPoint(recipientPrimary, "skipDeleteTempDBPath");
 
 jsTestLog("Run migration");
 // The old multitenant migrations won't copy myDatabase since it doesn't start with testTenantId,
@@ -79,18 +84,18 @@ const migrationOpts = {
 };
 TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
 
-// TODO SERVER-61144: Check on all recipient nodes that the collection documents got imported
-// successfully.
-for (let collectionName of ["myCollection", "myCappedCollection"]) {
-    jsTestLog(`Checking ${collectionName}`);
-    // Use "countDocuments" to check actual docs, "count" to check sizeStorer data.
-    assert.eq(donorPrimary.getDB("myDatabase")[collectionName].countDocuments({}),
-              recipientPrimary.getDB("myDatabase")[collectionName].countDocuments({}),
-              "countDocuments");
-    assert.eq(donorPrimary.getDB("myDatabase")[collectionName].count(),
-              recipientPrimary.getDB("myDatabase")[collectionName].count(),
-              "count");
-}
+tenantMigrationTest.getRecipientRst().nodes.forEach(node => {
+    for (let collectionName of ["myCollection", "myCappedCollection"]) {
+        jsTestLog(`Checking ${collectionName}`);
+        // Use "countDocuments" to check actual docs, "count" to check sizeStorer data.
+        assert.eq(donorPrimary.getDB("myDatabase")[collectionName].countDocuments({}),
+                  recipientPrimary.getDB("myDatabase")[collectionName].countDocuments({}),
+                  "countDocuments");
+        assert.eq(donorPrimary.getDB("myDatabase")[collectionName].count(),
+                  recipientPrimary.getDB("myDatabase")[collectionName].count(),
+                  "count");
+    }
+});
 
 tenantMigrationTest.stop();
 })();

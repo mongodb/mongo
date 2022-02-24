@@ -155,11 +155,7 @@ checkStandardFieldsOK(res);
 currOp = res.inprog[0];
 assert.gt(new Date(), currOp.receiveStart, tojson(res));
 
-if (shardMergeIsEnabled) {
-    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kCopiedFiles, res);
-} else {
-    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kStarted, res);
-}
+assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kStarted, res);
 
 assert.eq(currOp.migrationCompleted, false, res);
 assert.eq(currOp.dataSyncCompleted, false, res);

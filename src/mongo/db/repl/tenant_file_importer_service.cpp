@@ -75,13 +75,18 @@ void TenantFileImporterService::onStartup(OperationContext*) {
 void TenantFileImporterService::learnedFilename(const UUID& migrationId,
                                                 const BSONObj& metadataDoc) {
     auto opCtx = cc().getOperationContext();
-    stdx::lock_guard lk(_mutex);
-    if (migrationId != _migrationId) {
-        _reset(lk);
-        _migrationId = migrationId;
-        _scopedExecutor = std::make_shared<executor::ScopedTaskExecutor>(
-            _executor,
-            Status{ErrorCodes::CallbackCanceled, "TenantFileImporterService executor cancelled"});
+    {
+        stdx::lock_guard lk(_mutex);
+        if (migrationId != _migrationId) {
+            _reset(lk);
+            _migrationId = migrationId;
+            _scopedExecutor = std::make_shared<executor::ScopedTaskExecutor>(
+                _executor,
+                Status{ErrorCodes::CallbackCanceled,
+                       "TenantFileImporterService executor cancelled"});
+        }
+
+        _state.setState(ImporterState::State::kCopyingFiles);
     }
 
     try {
@@ -112,15 +117,27 @@ void TenantFileImporterService::learnedAllFilenames(const UUID& migrationId) {
                       "Called learnedAllFilenames with migrationId {}, but {} is active"_format(
                           migrationId.toString(), _migrationId->toString()));
         }
-        if (_toldPrimaryAllFilesAreCopied) {
+
+        if (!_state.is(ImporterState::State::kCopyingFiles)) {
             return;
         }
 
-        _toldPrimaryAllFilesAreCopied = true;
+        _state.setState(ImporterState::State::kCopiedFiles);
     }
 
-    // TODO (SERVER-62734): Keep count of files remaining to copy, wait before voting.
-    _voteCommitMigrationProgress(MigrationProgressStepEnum::kCopiedFiles);
+    auto opCtx = cc().getOperationContext();
+    // TODO SERVER-63789: Revisit use of AllowLockAcquisitionOnTimestampedUnitOfWork and
+    // remove if possible.
+    // No other threads will try to acquire conflicting locks: we are acquiring
+    // database/collection locks for new tenants.
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
+    shard_merge_utils::importCopiedFiles(opCtx, migrationId);
+
+    // TODO (SERVER-62734): Keep count of files remaining to import, wait before voting.
+    _voteCommitMigrationProgress(MigrationProgressStepEnum::kImportedFiles);
+
+    stdx::lock_guard lk(_mutex);
+    _state.setState(ImporterState::State::kImportedFiles);
 }
 
 void TenantFileImporterService::reset() {
@@ -177,6 +194,6 @@ void TenantFileImporterService::_voteCommitMigrationProgress(MigrationProgressSt
 void TenantFileImporterService::_reset(WithLock lk) {
     _scopedExecutor.reset();  // Shuts down and joins the executor.
     _migrationId.reset();
-    _toldPrimaryAllFilesAreCopied = false;
+    _state.setState(ImporterState::State::kUninitialized);
 }
 }  // namespace mongo::repl

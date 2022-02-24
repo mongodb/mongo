@@ -34,11 +34,20 @@ const kMigrationFpNames = [
  * donor using the 'interruptFunc', and verifies the command response using the
  * 'verifyCmdResponseFunc'.
  */
-function testDonorStartMigrationInterrupt(interruptFunc, verifyCmdResponseFunc) {
+function testDonorStartMigrationInterrupt(
+    interruptFunc, verifyCmdResponseFunc, {skipForShardMerge = false} = {}) {
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
+
+    if (skipForShardMerge && TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+        // TODO SERVER-63390: Remove this conditional and ensure test(s) run
+        // successfully for shard merge.
+        jsTestLog("Skipping Shard Merge-incompatible test");
+        tenantMigrationTest.stop();
+        return;
+    }
 
     const migrationId = UUID();
     const migrationOpts = {
@@ -109,11 +118,20 @@ function testDonorForgetMigrationInterrupt(interruptFunc, verifyCmdResponseFunc)
  * donorAbortMigration, and interrupts the donor using the 'interruptFunc', and verifies the command
  * response using the 'verifyCmdResponseFunc'.
  */
-function testDonorAbortMigrationInterrupt(interruptFunc, verifyCmdResponseFunc, fpName) {
+function testDonorAbortMigrationInterrupt(
+    interruptFunc, verifyCmdResponseFunc, fpName, {skipForShardMerge = false} = {}) {
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
+
+    if (skipForShardMerge && TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+        // TODO SERVER-63390: Remove this conditional and ensure test(s) run
+        // successfully for shard merge.
+        jsTestLog("Skipping Shard Merge-incompatible test");
+        tenantMigrationTest.stop();
+        return;
+    }
 
     const migrationId = UUID();
     const migrationOpts = {
@@ -186,7 +204,7 @@ function assertCmdSucceededOrInterruptedDueToShutDown(cmdThread) {
     jsTest.log("Test that the donorStartMigration command is interrupted successfully on shutdown");
     testDonorStartMigrationInterrupt((donorRst) => {
         donorRst.stopSet();
-    }, assertCmdSucceededOrInterruptedDueToShutDown);
+    }, assertCmdSucceededOrInterruptedDueToShutDown, {skipForShardMerge: true});
 })();
 
 (() => {
@@ -231,7 +249,7 @@ function assertCmdSucceededOrInterruptedDueToShutDown(cmdThread) {
 
         testDonorAbortMigrationInterrupt((donorRst) => {
             donorRst.stopSet();
-        }, assertCmdSucceededOrInterruptedDueToShutDown, fpName);
+        }, assertCmdSucceededOrInterruptedDueToShutDown, fpName, {skipForShardMerge: true});
     });
 })();
 })();

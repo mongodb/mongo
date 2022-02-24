@@ -39,7 +39,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_import.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/util/cancellation.h"
 
@@ -107,12 +106,7 @@ struct MetadataInfo {
  */
 void cloneFile(OperationContext* opCtx, const BSONObj& metadataDoc);
 
-/**
- * After calling wiredTigerRollbackToStableAndGetMetadata, use this function to import files.
- */
-void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
-                                      const std::vector<CollectionImportMetadata>& metadatas,
-                                      const std::string& importPath);
+void importCopiedFiles(OperationContext* opCtx, UUID uuid);
 
 SemiFuture<void> keepBackupCursorAlive(CancellationSource cancellationSource,
                                        std::shared_ptr<executor::TaskExecutor> executor,

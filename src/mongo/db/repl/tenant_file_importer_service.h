@@ -89,6 +89,60 @@ private:
     std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;
     boost::optional<UUID> _migrationId;
     Mutex _mutex = MONGO_MAKE_LATCH("TenantFileImporterService::_mutex");
-    bool _toldPrimaryAllFilesAreCopied;
+
+    class ImporterState {
+    public:
+        enum class State { kUninitialized, kCopyingFiles, kCopiedFiles, kImportedFiles };
+
+        void setState(State nextState) {
+            tassert(6114403,
+                    str::stream() << "current state: " << toString(_state)
+                                  << ", new state: " << toString(nextState),
+                    isValidTransition(nextState));
+            _state = nextState;
+        }
+
+        bool is(State state) {
+            return _state == state;
+        }
+
+    private:
+        StringData toString(State value) {
+            switch (value) {
+                case State::kUninitialized:
+                    return "uninitialized";
+                case State::kCopyingFiles:
+                    return "copying files";
+                case State::kCopiedFiles:
+                    return "copied files";
+                case State::kImportedFiles:
+                    return "imported files";
+            }
+            MONGO_UNREACHABLE;
+            return StringData();
+        }
+
+        bool isValidTransition(State newState) {
+            if (_state == newState) {
+                return true;
+            }
+
+            switch (_state) {
+                case State::kUninitialized:
+                    return newState == State::kCopyingFiles;
+                case State::kCopyingFiles:
+                    return newState == State::kCopiedFiles || newState == State::kUninitialized;
+                case State::kCopiedFiles:
+                    return newState == State::kImportedFiles || newState == State::kUninitialized;
+                case State::kImportedFiles:
+                    return newState == State::kUninitialized;
+            }
+            MONGO_UNREACHABLE;
+        }
+
+        State _state = State::kUninitialized;
+    };
+
+    ImporterState _state;
 };
 }  // namespace mongo::repl
