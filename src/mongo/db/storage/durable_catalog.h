@@ -53,6 +53,8 @@ protected:
     DurableCatalog() = default;
 
 public:
+    static constexpr auto kIsFeatureDocumentFieldName = "isFeatureDoc"_sd;
+
     /**
      * `Entry` ties together the common identifiers of a single `_mdb_catalog` document.
      */
@@ -69,6 +71,17 @@ public:
 
     static DurableCatalog* get(OperationContext* opCtx) {
         return opCtx->getServiceContext()->getStorageEngine()->getCatalog();
+    }
+
+    /**
+     *  Allows featureDocuments to be checked with older versions.
+     */
+    static bool isFeatureDocument(const BSONObj& obj) {
+        BSONElement firstElem = obj.firstElement();
+        if (firstElem.fieldNameStringData() == kIsFeatureDocumentFieldName) {
+            return firstElem.booleanSafe();
+        }
+        return false;
     }
 
     virtual void init(OperationContext* opCtx) = 0;
@@ -223,7 +236,6 @@ public:
                                  RecordId catalogId,
                                  StringData indexName,
                                  MultikeyPaths* multikeyPaths) const = 0;
-
 
     virtual void setRand_forTest(const std::string& rand) = 0;
 

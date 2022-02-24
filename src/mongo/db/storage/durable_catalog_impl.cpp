@@ -59,7 +59,6 @@ namespace {
 // It is never used with KVEngines that support doc-level locking so this should never conflict
 // with anything else.
 
-const char kIsFeatureDocumentFieldName[] = "isFeatureDoc";
 const char kNamespaceFieldName[] = "ns";
 const char kNonRepairableFeaturesFieldName[] = "nonRepairable";
 const char kRepairableFeaturesFieldName[] = "repairable";
@@ -197,14 +196,6 @@ public:
     DurableCatalogImpl* const _catalog;
     const RecordId _catalogId;
 };
-
-bool DurableCatalogImpl::isFeatureDocument(BSONObj obj) {
-    BSONElement firstElem = obj.firstElement();
-    if (firstElem.fieldNameStringData() == kIsFeatureDocumentFieldName) {
-        return firstElem.booleanSafe();
-    }
-    return false;
-}
 
 DurableCatalogImpl::DurableCatalogImpl(RecordStore* rs,
                                        bool directoryPerDb,

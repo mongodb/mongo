@@ -187,9 +187,6 @@ private:
      */
     bool _hasEntryCollidingWithRand(WithLock) const;
 
-    // Allows featureDocuments to be checked with older versions
-    static bool isFeatureDocument(BSONObj obj);
-
     RecordStore* _rs;  // not owned
     const bool _directoryPerDb;
     const bool _directoryForIndexes;
