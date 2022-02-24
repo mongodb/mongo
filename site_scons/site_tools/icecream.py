@@ -135,7 +135,7 @@ def generate(env):
         env.get('ICECREAM_TARGET_DIR', '#./.icecream')
     )
     verbose = env.get('ICECREAM_VERBOSE', False)
-    env['ICECREAM_DEBUG'] = env.get('ICECREAM_DEBUG', False)
+    env['ICECC_DEBUG'] = env.get('ICECC_DEBUG', False)
 
     # We have a lot of things to build and run that the final user
     # environment doesn't need to see or know about. Make a custom env
@@ -511,7 +511,7 @@ def generate(env):
             env[command] = " ".join(["$( $ICERUN_GENERATOR $)", env[command]])
 
     # Uncomment these to debug your icecc integration
-    if env['ICECREAM_DEBUG']:
+    if env['ICECC_DEBUG']:
         env['ENV']['ICECC_DEBUG'] = 'debug'
         env['ENV']['ICECC_LOGFILE'] = 'icecc.log'
 
