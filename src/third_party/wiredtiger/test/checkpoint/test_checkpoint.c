@@ -263,16 +263,15 @@ wt_connect(const char *config_open)
     };
     int ret;
     char config[512];
-    char timing_stress_cofing[512];
+    char timing_stress_config[512];
     bool timing_stress;
 
     timing_stress = false;
-
     if (g.sweep_stress || g.failpoint_hs_delete_key_from_ts || g.failpoint_hs_insert_1 ||
       g.failpoint_hs_insert_2 || g.hs_checkpoint_timing_stress || g.reserved_txnid_timing_stress ||
       g.checkpoint_slow_timing_stress) {
         timing_stress = true;
-        testutil_check(__wt_snprintf(timing_stress_cofing, sizeof(timing_stress_cofing),
+        testutil_check(__wt_snprintf(timing_stress_config, sizeof(timing_stress_config),
           ",timing_stress_for_test=[%s%s%s%s%s]", g.sweep_stress ? "aggressive_sweep" : "",
           g.failpoint_hs_delete_key_from_ts ? "failpoint_history_store_delete_key_from_ts" : "",
           g.hs_checkpoint_timing_stress ? "history_store_checkpoint_delay" : "",
@@ -288,14 +287,14 @@ wt_connect(const char *config_open)
           "create,cache_cursors=false,statistics=(fast),statistics_log=(json,wait=1),error_prefix="
           "\"%s\",file_manager=(close_handle_minimum=1,close_idle_time=1,close_scan_interval=1),"
           "log=(enabled),cache_size=1GB%s%s%s%s",
-          progname, timing_stress_cofing, g.debug_mode ? DEBUG_MODE_CFG : "",
+          progname, timing_stress_config, g.debug_mode ? DEBUG_MODE_CFG : "",
           config_open == NULL ? "" : ",", config_open == NULL ? "" : config_open));
     else {
         testutil_check(__wt_snprintf(config, sizeof(config),
           "create,cache_cursors=false,statistics=(fast),statistics_log=(json,wait=1),log=(enabled),"
-          "error_prefix=\"%s\"%s%s%s%s",
+          "error_prefix=\"%s\",cache_size=1G%s%s%s%s",
           progname, g.debug_mode ? DEBUG_MODE_CFG : "", config_open == NULL ? "" : ",",
-          config_open == NULL ? "" : config_open, timing_stress ? timing_stress_cofing : ""));
+          config_open == NULL ? "" : config_open, timing_stress ? timing_stress_config : ""));
     }
     printf("WT open config: %s\n", config);
     if ((ret = wiredtiger_open(g.home, &event_handler, config, &g.conn)) != 0)

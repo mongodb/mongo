@@ -255,8 +255,7 @@ __tree_walk_internal(WT_SESSION_IMPL *session, WT_REF **refp, uint64_t *walkcntp
     restart_sleep = restart_yield = 0;
     empty_internal = false;
 
-    /* Ensure we have a snapshot to check visibility or we only check global visibility.
-     */
+    /* Ensure we have a snapshot to check visibility or we only check global visibility. */
     WT_ASSERT(session, LF_ISSET(WT_READ_VISIBLE_ALL) || F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT));
 
     /* All current tree walks skip deleted pages. */
