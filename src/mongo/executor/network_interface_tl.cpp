@@ -29,9 +29,9 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kASIO
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/executor/network_interface_tl.h"
+
+#include <fmt/format.h>
 
 #include "mongo/config.h"
 #include "mongo/db/auth/security_token.h"
@@ -39,6 +39,7 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_tl.h"
 #include "mongo/executor/hedging_metrics.h"
+#include "mongo/executor/network_interface_tl_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/transport/transport_layer_manager.h"
@@ -46,9 +47,10 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/testing_proctor.h"
 
-
 namespace mongo {
 namespace executor {
+
+using namespace fmt::literals;
 
 namespace {
 static inline const std::string kMaxTimeMSOpOnlyField = "maxTimeMSOpOnly";
@@ -73,6 +75,33 @@ Status appendMetadata(RemoteCommandRequestOnAny* request,
 
     return Status::OK();
 }
+
+/**
+ * Invokes `f()`, and returns true if it succeeds.
+ * Otherwise, we log the exception with a `hint` string and handle the error.
+ * The exception handling has two possibilities, controlled by the server parameter
+ * `suppressNetworkInterfaceTransportLayerExceptions`.
+ * The old behavior is to simply rethrow the exception, which will crash the process.
+ * The new behavior is to invoke `eh(err)` and return false. This gives the caller a way
+ * to provide a route to propagate the exception as a Status (perhaps filling a promise
+ * with it) and carry on.
+ */
+template <typename F, typename EH>
+bool catchingInvoke(F&& f, EH&& eh, StringData hint) {
+    try {
+        std::forward<F>(f)();
+        return true;
+    } catch (...) {
+        Status err = exceptionToStatus();
+        LOGV2(5802401, "Callback failed", "msg"_attr = hint, "error"_attr = err);
+        if (gSuppressNetworkInterfaceTransportLayerExceptions.isEnabledAndIgnoreFCV())
+            std::forward<EH>(eh)(err);  // new server parameter protected behavior
+        else
+            throw;  // old behavior
+        return false;
+    }
+}
+
 }  // namespace
 
 /**
@@ -530,7 +559,9 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         .thenRunOn(makeGuaranteedExecutor(baton, _reactor))
         .getAsync([cmdState = cmdState,
                    onFinish = std::move(onFinish)](StatusWith<RemoteCommandOnAnyResponse> swr) {
-            invariant(swr.isOK());
+            invariant(swr.isOK(),
+                      "Remote command response failed with an error: {}"_format(
+                          swr.getStatus().toString()));
             auto rs = std::move(swr.getValue());
             // The TransportLayer has, for historical reasons returned
             // SocketException for network errors, but sharding assumes
@@ -546,7 +577,9 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
                         "isOK"_attr = rs.isOK(),
                         "response"_attr =
                             redact(rs.isOK() ? rs.data.toString() : rs.status.toString()));
-            onFinish(std::move(rs));
+            catchingInvoke([&] { onFinish(std::move(rs)); },
+                           [&](Status& err) { cmdState->fulfillFinalPromise(err); },
+                           "The finish callback failed. Aborting exhaust command");
         });
 
     if (MONGO_unlikely(networkInterfaceDiscardCommandsBeforeAcquireConn.shouldFail())) {
@@ -596,7 +629,10 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::CommandState::sendRequest(
                    ->runCommandRequest(*requestState->request, baton);
            })
         .then([this, requestState](RemoteCommandResponse response) {
-            doMetadataHook(RemoteCommandOnAnyResponse(requestState->host, response));
+            catchingInvoke(
+                [&] { doMetadataHook(RemoteCommandOnAnyResponse(requestState->host, response)); },
+                [&](Status& err) { promise.setError(err); },
+                "Metadata hook readReplyMetadata");
             return response;
         });
 }
@@ -979,7 +1015,10 @@ void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
     }
 
     auto onAnyResponse = RemoteCommandOnAnyResponse(requestState->host, response);
-    doMetadataHook(onAnyResponse);
+    if (!catchingInvoke([&] { doMetadataHook(onAnyResponse); },
+                        [&](Status& err) { finalResponsePromise.setError(err); },
+                        "Exhaust command metadata hook readReplyMetadata"))
+        return;
 
     // If the command failed, we will call 'onReply' as a part of the future chain paired with
     // the promise. This is to be sure that all error paths will run 'onReply' only once upon
@@ -992,14 +1031,20 @@ void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
         return;
     }
 
-    onReplyFn(onAnyResponse);
+    if (!catchingInvoke([&] { onReplyFn(onAnyResponse); },
+                        [&](Status& err) { finalResponsePromise.setError(err); },
+                        "Exhaust command onReplyFn"))
+        return;
 
-    // Reset the stopwatch to measure the correct duration for the folowing reply
+    // Reset the stopwatch to measure the correct duration for the following reply
     stopwatch.restart();
     if (deadline != kNoExpirationDate) {
         deadline = stopwatch.start() + requestOnAny.timeout;
     }
-    setTimer();
+    if (!catchingInvoke([&] { setTimer(); },
+                        [&](Status& err) { finalResponsePromise.setError(err); },
+                        "Exhaust command setTimer"))
+        return;
 
     requestState->getClient(requestState->conn)
         ->awaitExhaustCommand(baton)

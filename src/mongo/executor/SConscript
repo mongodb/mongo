@@ -156,6 +156,7 @@ env.Library(
     source=[
         'connection_pool_tl.cpp',
         'network_interface_tl.cpp',
+        'network_interface_tl.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/async_client',
