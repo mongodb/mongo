@@ -667,6 +667,17 @@ void persistRangeDeletionTaskLocally(OperationContext* opCtx,
     }
 }
 
+void persistUpdatedNumOrphans(OperationContext* opCtx,
+                              const BSONObj& rangeDeletionQuery,
+                              const int& changeInOrphans) {
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    store.update(
+        opCtx,
+        rangeDeletionQuery,
+        BSON("$inc" << BSON(RangeDeletionTask::kNumOrphanDocsFieldName << changeInOrphans)),
+        WriteConcernOptions());
+}
+
 void persistCommitDecision(OperationContext* opCtx,
                            const MigrationCoordinatorDocument& migrationDoc) {
     invariant(migrationDoc.getDecision() &&

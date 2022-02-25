@@ -144,6 +144,14 @@ void persistRangeDeletionTaskLocally(OperationContext* opCtx,
                                      const WriteConcernOptions& writeConcern);
 
 /**
+ * Updates the range deletion task document to increase or decrease numOrphanedDocs and waits for
+ * write concern.
+ */
+void persistUpdatedNumOrphans(OperationContext* opCtx,
+                              const BSONObj& rangeDeletionQuery,
+                              const int& changeInOrphans);
+
+/**
  * Updates the migration coordinator document to set the decision field to "committed" and waits for
  * majority writeConcern.
  */

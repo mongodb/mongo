@@ -339,6 +339,24 @@ TEST_F(MigrationUtilsTest, TestInvalidUUID) {
     ASSERT_FALSE(migrationutil::checkForConflictingDeletions(opCtx, range, wrongUuid));
 }
 
+TEST_F(MigrationUtilsTest, TestUpdateNumberOfOrphans) {
+    auto opCtx = operationContext();
+    const auto uuid = UUID::gen();
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    auto rangeDeletionDoc = createDeletionTask(opCtx, kTestNss, uuid, 0, 10);
+    store.add(opCtx, rangeDeletionDoc);
+
+    auto rangeDeletionQuery = BSON("_id" << rangeDeletionDoc.getId());
+
+    migrationutil::persistUpdatedNumOrphans(opCtx, rangeDeletionQuery, 5);
+    rangeDeletionDoc.setNumOrphanDocs(5);
+    ASSERT_EQ(store.count(opCtx, rangeDeletionDoc.toBSON().removeField("timestamp")), 1);
+
+    migrationutil::persistUpdatedNumOrphans(opCtx, rangeDeletionQuery, -5);
+    rangeDeletionDoc.setNumOrphanDocs(0);
+    ASSERT_EQ(store.count(opCtx, rangeDeletionDoc.toBSON().removeField("timestamp")), 1);
+}
+
 /**
  * Fixture that uses a mocked CatalogCacheLoader and CatalogClient to allow metadata refreshes
  * without using the mock network.

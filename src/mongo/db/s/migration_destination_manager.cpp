@@ -1316,6 +1316,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                                                        << " failed.");
                     }
 
+                    migrationutil::persistUpdatedNumOrphans(
+                        opCtx, BSON("_id" << _migrationId.get()), batchNumCloned);
+
                     {
                         stdx::lock_guard<Latch> statsLock(_mutex);
                         _numCloned += batchNumCloned;
@@ -1635,6 +1638,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
 
 bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const BSONObj& xfer) {
     bool didAnything = false;
+    int changeInOrphans = 0;
 
     // Deleted documents
     if (xfer["deleted"].isABSONObj()) {
@@ -1678,6 +1682,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
                               true /* fromMigrate */);
             });
 
+            changeInOrphans--;
             didAnything = true;
         }
     }
@@ -1726,13 +1731,20 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
 
             // We are in write lock here, so sure we aren't killing
             writeConflictRetry(opCtx, "transferModsUpdates", _nss.ns(), [&] {
-                Helpers::upsert(opCtx, _nss.ns(), updatedDoc, true);
+                auto res = Helpers::upsert(opCtx, _nss.ns(), updatedDoc, true);
+                if (!res.upsertedId.isEmpty()) {
+                    changeInOrphans++;
+                }
             });
 
             didAnything = true;
         }
     }
 
+    if (changeInOrphans != 0) {
+        migrationutil::persistUpdatedNumOrphans(
+            opCtx, BSON("_id" << _migrationId.get()), changeInOrphans);
+    }
     return didAnything;
 }
 
