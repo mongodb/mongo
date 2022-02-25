@@ -1,7 +1,7 @@
 /**
  * Tests that replacement style update with $v field in the document is correctly applied.
  * @tags: [
- *  requires_fcv_60,
+ *  requires_fcv_50,
  * ]
  */
 
