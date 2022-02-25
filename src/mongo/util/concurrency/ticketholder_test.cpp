@@ -39,37 +39,37 @@ namespace {
 using namespace mongo;
 
 TEST(TicketholderTest, BasicTimeout) {
-    TicketHolder holder(1);
-    ASSERT_EQ(holder.used(), 0);
-    ASSERT_EQ(holder.available(), 1);
-    ASSERT_EQ(holder.outof(), 1);
+    std::unique_ptr<TicketHolder> holder = std::make_unique<SemaphoreTicketHolder>(1);
+    ASSERT_EQ(holder->used(), 0);
+    ASSERT_EQ(holder->available(), 1);
+    ASSERT_EQ(holder->outof(), 1);
 
     {
-        ScopedTicket ticket(&holder);
-        ASSERT_EQ(holder.used(), 1);
-        ASSERT_EQ(holder.available(), 0);
-        ASSERT_EQ(holder.outof(), 1);
+        ScopedTicket ticket(holder.get());
+        ASSERT_EQ(holder->used(), 1);
+        ASSERT_EQ(holder->available(), 0);
+        ASSERT_EQ(holder->outof(), 1);
 
-        ASSERT_FALSE(holder.tryAcquire());
-        ASSERT_FALSE(holder.waitForTicketUntil(Date_t::now()));
-        ASSERT_FALSE(holder.waitForTicketUntil(Date_t::now() + Milliseconds(1)));
-        ASSERT_FALSE(holder.waitForTicketUntil(Date_t::now() + Milliseconds(42)));
+        ASSERT_FALSE(holder->tryAcquire());
+        ASSERT_FALSE(holder->waitForTicketUntil(Date_t::now()));
+        ASSERT_FALSE(holder->waitForTicketUntil(Date_t::now() + Milliseconds(1)));
+        ASSERT_FALSE(holder->waitForTicketUntil(Date_t::now() + Milliseconds(42)));
     }
 
-    ASSERT_EQ(holder.used(), 0);
-    ASSERT_EQ(holder.available(), 1);
-    ASSERT_EQ(holder.outof(), 1);
+    ASSERT_EQ(holder->used(), 0);
+    ASSERT_EQ(holder->available(), 1);
+    ASSERT_EQ(holder->outof(), 1);
 
-    ASSERT(holder.waitForTicketUntil(Date_t::now()));
-    holder.release();
+    ASSERT(holder->waitForTicketUntil(Date_t::now()));
+    holder->release();
 
-    ASSERT_EQ(holder.used(), 0);
+    ASSERT_EQ(holder->used(), 0);
 
-    ASSERT(holder.waitForTicketUntil(Date_t::now() + Milliseconds(20)));
-    ASSERT_EQ(holder.used(), 1);
+    ASSERT(holder->waitForTicketUntil(Date_t::now() + Milliseconds(20)));
+    ASSERT_EQ(holder->used(), 1);
 
-    ASSERT_FALSE(holder.waitForTicketUntil(Date_t::now() + Milliseconds(2)));
-    holder.release();
-    ASSERT_EQ(holder.used(), 0);
+    ASSERT_FALSE(holder->waitForTicketUntil(Date_t::now() + Milliseconds(2)));
+    holder->release();
+    ASSERT_EQ(holder->used(), 0);
 }
 }  // namespace

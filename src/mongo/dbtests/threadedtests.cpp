@@ -231,7 +231,8 @@ class TicketHolderWaits : public ThreadedTest<10> {
     static const int rooms = 3;
 
 public:
-    TicketHolderWaits() : _hotel(rooms), _tickets(_hotel._nRooms) {}
+    TicketHolderWaits()
+        : _hotel(rooms), _tickets(std::make_unique<SemaphoreTicketHolder>(_hotel._nRooms)) {}
 
 private:
     class Hotel {
@@ -259,15 +260,15 @@ private:
     };
 
     Hotel _hotel;
-    TicketHolder _tickets;
+    std::unique_ptr<TicketHolder> _tickets;
 
     virtual void subthread(int x) {
         string threadName = (str::stream() << "ticketHolder" << x);
         Client::initThread(threadName.c_str());
 
         for (int i = 0; i < checkIns; i++) {
-            _tickets.waitForTicket();
-            TicketHolderReleaser whenDone(&_tickets);
+            _tickets->waitForTicket();
+            TicketHolderReleaser whenDone(_tickets.get());
 
             _hotel.checkIn();
 

@@ -282,8 +282,8 @@ std::string toString(const StorageEngine::OldestActiveTransactionTimestampResult
 }
 
 namespace {
-TicketHolder openWriteTransaction(128);
-TicketHolder openReadTransaction(128);
+SemaphoreTicketHolder openWriteTransaction(128);
+SemaphoreTicketHolder openReadTransaction(128);
 }  // namespace
 
 OpenWriteTransactionParam::OpenWriteTransactionParam(StringData name, ServerParameterType spt)

@@ -40,6 +40,8 @@
 
 namespace mongo {
 
+TicketHolder::~TicketHolder() = default;
+
 #if defined(__linux__)
 namespace {
 
@@ -71,15 +73,15 @@ void tsFromDate(const Date_t& deadline, struct timespec& ts) {
 }
 }  // namespace
 
-TicketHolder::TicketHolder(int num) : _outof(num) {
+SemaphoreTicketHolder::SemaphoreTicketHolder(int num) : _outof(num) {
     check(sem_init(&_sem, 0, num));
 }
 
-TicketHolder::~TicketHolder() {
+SemaphoreTicketHolder::~SemaphoreTicketHolder() {
     check(sem_destroy(&_sem));
 }
 
-bool TicketHolder::tryAcquire() {
+bool SemaphoreTicketHolder::tryAcquire() {
     while (0 != sem_trywait(&_sem)) {
         if (errno == EAGAIN)
             return false;
@@ -89,11 +91,11 @@ bool TicketHolder::tryAcquire() {
     return true;
 }
 
-void TicketHolder::waitForTicket(OperationContext* opCtx) {
+void SemaphoreTicketHolder::waitForTicket(OperationContext* opCtx) {
     waitForTicketUntil(opCtx, Date_t::max());
 }
 
-bool TicketHolder::waitForTicketUntil(OperationContext* opCtx, Date_t until) {
+bool SemaphoreTicketHolder::waitForTicketUntil(OperationContext* opCtx, Date_t until) {
     // Attempt to get a ticket without waiting in order to avoid expensive time calculations.
     if (sem_trywait(&_sem) == 0) {
         return true;
@@ -129,11 +131,11 @@ bool TicketHolder::waitForTicketUntil(OperationContext* opCtx, Date_t until) {
     return true;
 }
 
-void TicketHolder::release() {
+void SemaphoreTicketHolder::release() {
     check(sem_post(&_sem));
 }
 
-Status TicketHolder::resize(int newSize) {
+Status SemaphoreTicketHolder::resize(int newSize) {
     stdx::lock_guard<Latch> lk(_resizeMutex);
 
     if (newSize < 5)
@@ -151,7 +153,7 @@ Status TicketHolder::resize(int newSize) {
     }
 
     while (_outof.load() > newSize) {
-        waitForTicket();
+        this->TicketHolder::waitForTicket();
         _outof.subtractAndFetch(1);
     }
 
@@ -159,32 +161,32 @@ Status TicketHolder::resize(int newSize) {
     return Status::OK();
 }
 
-int TicketHolder::available() const {
+int SemaphoreTicketHolder::available() const {
     int val = 0;
     check(sem_getvalue(&_sem, &val));
     return val;
 }
 
-int TicketHolder::used() const {
+int SemaphoreTicketHolder::used() const {
     return outof() - available();
 }
 
-int TicketHolder::outof() const {
+int SemaphoreTicketHolder::outof() const {
     return _outof.load();
 }
 
 #else
 
-TicketHolder::TicketHolder(int num) : _outof(num), _num(num) {}
+SemaphoreTicketHolder::SemaphoreTicketHolder(int num) : _outof(num), _num(num) {}
 
-TicketHolder::~TicketHolder() = default;
+SemaphoreTicketHolder::~SemaphoreTicketHolder() = default;
 
-bool TicketHolder::tryAcquire() {
+bool SemaphoreTicketHolder::tryAcquire() {
     stdx::lock_guard<Latch> lk(_mutex);
     return _tryAcquire();
 }
 
-void TicketHolder::waitForTicket(OperationContext* opCtx) {
+void SemaphoreTicketHolder::waitForTicket(OperationContext* opCtx) {
     stdx::unique_lock<Latch> lk(_mutex);
 
     if (opCtx) {
@@ -194,7 +196,7 @@ void TicketHolder::waitForTicket(OperationContext* opCtx) {
     }
 }
 
-bool TicketHolder::waitForTicketUntil(OperationContext* opCtx, Date_t until) {
+bool SemaphoreTicketHolder::waitForTicketUntil(OperationContext* opCtx, Date_t until) {
     stdx::unique_lock<Latch> lk(_mutex);
 
     if (opCtx) {
@@ -206,7 +208,7 @@ bool TicketHolder::waitForTicketUntil(OperationContext* opCtx, Date_t until) {
     }
 }
 
-void TicketHolder::release() {
+void SemaphoreTicketHolder::release() {
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _num++;
@@ -214,7 +216,7 @@ void TicketHolder::release() {
     _newTicket.notify_one();
 }
 
-Status TicketHolder::resize(int newSize) {
+Status SemaphoreTicketHolder::resize(int newSize) {
     stdx::lock_guard<Latch> lk(_mutex);
 
     int used = _outof.load() - _num;
@@ -236,19 +238,19 @@ Status TicketHolder::resize(int newSize) {
     return Status::OK();
 }
 
-int TicketHolder::available() const {
+int SemaphoreTicketHolder::available() const {
     return _num;
 }
 
-int TicketHolder::used() const {
+int SemaphoreTicketHolder::used() const {
     return outof() - _num;
 }
 
-int TicketHolder::outof() const {
+int SemaphoreTicketHolder::outof() const {
     return _outof.load();
 }
 
-bool TicketHolder::_tryAcquire() {
+bool SemaphoreTicketHolder::_tryAcquire() {
     if (_num <= 0) {
         if (_num < 0) {
             std::cerr << "DISASTER! in TicketHolder" << std::endl;
@@ -259,4 +261,5 @@ bool TicketHolder::_tryAcquire() {
     return true;
 }
 #endif
+
 }  // namespace mongo

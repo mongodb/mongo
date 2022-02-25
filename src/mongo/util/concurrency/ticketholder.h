@@ -42,24 +42,24 @@
 namespace mongo {
 
 class TicketHolder {
-    TicketHolder(const TicketHolder&) = delete;
-    TicketHolder& operator=(const TicketHolder&) = delete;
-
 public:
-    explicit TicketHolder(int num);
-    ~TicketHolder();
+    virtual ~TicketHolder() = 0;
 
-    bool tryAcquire();
+    /**
+     * Attempts to acquire a ticket without blocking.
+     * Returns a boolean indicating whether the operation was successful or not.
+     */
+    virtual bool tryAcquire() = 0;
 
     /**
      * Attempts to acquire a ticket. Blocks until a ticket is acquired or the OperationContext
      * 'opCtx' is killed, throwing an AssertionException.
      * If 'opCtx' is not provided or equal to nullptr, the wait is not interruptible.
      */
-    void waitForTicket(OperationContext* opCtx);
+    virtual void waitForTicket(OperationContext* opCtx) = 0;
     void waitForTicket() {
-        waitForTicket(nullptr);
-    }
+        this->waitForTicket(nullptr);
+    };
 
     /**
      * Attempts to acquire a ticket within a deadline, 'until'. Returns 'true' if a ticket is
@@ -68,19 +68,42 @@ public:
      * proceed.
      * If 'opCtx' is not provided or equal to nullptr, the wait is not interruptible.
      */
-    bool waitForTicketUntil(OperationContext* opCtx, Date_t until);
+    virtual bool waitForTicketUntil(OperationContext* opCtx, Date_t until) = 0;
     bool waitForTicketUntil(Date_t until) {
-        return waitForTicketUntil(nullptr, until);
-    }
-    void release();
+        return this->waitForTicketUntil(nullptr, until);
+    };
 
-    Status resize(int newSize);
+    virtual void release() = 0;
 
-    int available() const;
+    virtual Status resize(int newSize) = 0;
 
-    int used() const;
+    virtual int available() const = 0;
 
-    int outof() const;
+    virtual int used() const = 0;
+
+    virtual int outof() const = 0;
+};
+
+class SemaphoreTicketHolder final : public TicketHolder {
+public:
+    explicit SemaphoreTicketHolder(int num);
+    ~SemaphoreTicketHolder() override final;
+
+    bool tryAcquire() override final;
+
+    void waitForTicket(OperationContext* opCtx) override final;
+
+    bool waitForTicketUntil(OperationContext* opCtx, Date_t until) override final;
+
+    void release() override final;
+
+    Status resize(int newSize) override final;
+
+    int available() const override final;
+
+    int used() const override final;
+
+    int outof() const override final;
 
 private:
 #if defined(__linux__)
