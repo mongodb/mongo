@@ -9634,7 +9634,8 @@ buildvariants:
   - name: .jscore .common !.decimal !.sharding
   - name: .logical_session_cache .one_sec
   - name: mqlrun
-  - name: replica_sets_auth_gen
+  # TODO(SERVER-64009): Re-enable replica_sets_auth_gen.
+  # - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough_gen
   - name: sasl
   - name: .csfle
