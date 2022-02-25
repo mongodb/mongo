@@ -23,7 +23,7 @@
     "canvas": "^2.5.0",
     "date-fns": "^2.16.1",
     "dayjs": "^1.9.7",
-    "http-server": "^0.12.3",
+    "http-server": "^0.13.0",
     "luxon": "^1.25.0",
     "moment": "^2.29.1",
     "p-limit": "^3.0.2",
