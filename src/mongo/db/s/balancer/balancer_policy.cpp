@@ -713,7 +713,6 @@ MigrateInfo::MigrateInfo(const ShardId& a_to,
                          const MoveChunkRequest::ForceJumbo a_forceJumbo,
                          MigrationReason a_reason)
     : nss(a_nss), uuid(a_chunk.getCollectionUUID()) {
-    invariant(a_chunk.validate());
     invariant(a_to.isValid());
 
     to = a_to;
