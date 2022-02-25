@@ -609,7 +609,11 @@ void ShardingCatalogManager::configureCollectionBalancing(
         return;
     }
 
-    const auto cm = Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfo(opCtx, nss);
+    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
+    // migrations
+    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
+    const auto cm = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss));
     const auto uuid = cm.getUUID();
 
     std::set<ShardId> shardsIds;
@@ -638,7 +642,6 @@ void ShardingCatalogManager::configureCollectionBalancing(
 
             bumpCollectionMinorVersionInTxn(opCtx, nss, txnNumber);
         });
-
 
     const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     sharding_util::tellShardsToRefreshCollection(
