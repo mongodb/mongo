@@ -312,16 +312,22 @@ TEST_F(DropDatabaseTest, DropDatabaseResetsDropPendingStateOnException) {
 
     _createCollection(_opCtx.get(), _nss);
 
-    AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
-    auto db = autoDb.getDb();
-    ASSERT_TRUE(db);
+    {
+        AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
+        auto db = autoDb.getDb();
+        ASSERT_TRUE(db);
+    }
 
     ASSERT_THROWS_CODE_AND_WHAT(dropDatabaseForApplyOps(_opCtx.get(), _nss.db().toString()),
                                 AssertionException,
                                 ErrorCodes::OperationFailed,
                                 "onDropCollection() failed");
 
-    ASSERT_FALSE(db->isDropPending(_opCtx.get()));
+    {
+        AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
+        auto db = autoDb.getDb();
+        ASSERT_FALSE(db->isDropPending(_opCtx.get()));
+    }
 }
 
 void _testDropDatabaseResetsDropPendingStateIfAwaitReplicationFails(OperationContext* opCtx,

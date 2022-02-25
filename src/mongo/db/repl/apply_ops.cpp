@@ -187,7 +187,7 @@ Status _applyOps(OperationContext* opCtx,
                     opCtx,
                     "applyOps",
                     nss.ns(),
-                    [opCtx, nss, opObj, opType, alwaysUpsert, oplogApplicationMode] {
+                    [opCtx, nss, opObj, opType, alwaysUpsert, oplogApplicationMode, &info] {
                         BSONObjBuilder builder;
                         builder.appendElements(opObj);
                         if (!builder.hasField(OplogEntry::kTimestampFieldName)) {
@@ -200,7 +200,18 @@ Status _applyOps(OperationContext* opCtx,
                             builder.append(OplogEntry::kWallClockTimeFieldName, Date_t());
                         }
                         auto entry = uassertStatusOK(OplogEntry::parse(builder.done()));
+
                         if (*opType == 'c') {
+                            if (entry.getCommandType() == OplogEntry::CommandType::kDropDatabase) {
+                                invariant(info.getOperations().size() == 1,
+                                          "dropDatabase in applyOps must be the only entry");
+                                // This method is explicitly called without locks in spite of the
+                                // _inlock suffix. dropDatabase cannot hold any locks for execution
+                                // of the operation due to potential replication waits.
+                                uassertStatusOK(
+                                    applyCommand_inlock(opCtx, entry, oplogApplicationMode));
+                                return Status::OK();
+                            }
                             invariant(opCtx->lockState()->isW());
                             uassertStatusOK(
                                 applyCommand_inlock(opCtx, entry, oplogApplicationMode));
@@ -357,7 +368,7 @@ Status applyOps(OperationContext* opCtx,
     uassert(31056, "applyOps command can't have 'partialTxn' field.", !info.getPartialTxn());
     uassert(31240, "applyOps command can't have 'count' field.", !info.getCount());
 
-    // There's only one case where we are allowed to take the database lock instead of the global
+    // There's one case where we are allowed to take the database lock instead of the global
     // lock - no preconditions; only CRUD ops; and non-atomic mode.
     if (!info.getPreCondition() && info.areOpsCrudOnly() && !info.getAllowAtomic()) {
         dbWriteLock.emplace(opCtx, dbName, MODE_IX);
@@ -388,6 +399,23 @@ Status applyOps(OperationContext* opCtx,
                 "cmd"_attr = redact(applyOpCmd));
 
     if (!info.isAtomic()) {
+        auto hasDropDatabase = std::any_of(
+            info.getOperations().begin(), info.getOperations().end(), [](const BSONObj& op) {
+                return op.getStringField("op") == "c" &&
+                    parseCommandType(op.getObjectField("o")) ==
+                    OplogEntry::CommandType::kDropDatabase;
+            });
+        if (hasDropDatabase) {
+            // Normally the contract for applyOps is to hold a global exclusive lock during
+            // application of ops. However, dropDatabase must specially not hold locks because it
+            // may need to await replication internally during application. Additionally, since
+            // dropDatabase is abnormal in locking behavior, applyOps is only allowed to apply a
+            // dropDatabase op singly, not in combination with additional ops.
+            uassert(6275900,
+                    "dropDatabase in an applyOps must be the only entry",
+                    info.getOperations().size() == 1);
+            globalWriteLock.reset();
+        }
         return _applyOps(opCtx, info, oplogApplicationMode, result, &numApplied, nullptr);
     }
 
