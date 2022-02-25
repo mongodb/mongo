@@ -29,7 +29,7 @@ if (TestData && TestData.inEvergreen) {
     assert.soon(() => {
         // Ensure the hang-analyzer has killed the process.
         return !checkProgram(child.pid).alive;
-    });
+    }, undefined, undefined, undefined, {runHangAnalyzer: false});
 
     const lines = rawMongoProgramOutput().split('\n');
     if (_isAddressSanitizerActive()) {
