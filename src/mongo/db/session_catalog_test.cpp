@@ -64,6 +64,31 @@ protected:
         return SessionCatalog::get(getServiceContext());
     }
 
+    void assertCanCheckoutSession(const LogicalSessionId& lsid) {
+        auto opCtx = makeOperationContext();
+        opCtx->setLogicalSessionId(lsid);
+        OperationContextSession ocs(opCtx.get());
+    }
+
+    void assertSessionCheckoutTimesOut(const LogicalSessionId& lsid) {
+        auto opCtx = makeOperationContext();
+        opCtx->setLogicalSessionId(lsid);
+        opCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
+        ASSERT_THROWS_CODE(
+            OperationContextSession(opCtx.get()), AssertionException, ErrorCodes::MaxTimeMSExpired);
+    }
+
+    void assertConcurrentCheckoutTimesOut(const LogicalSessionId& lsid) {
+        auto future = stdx::async(stdx::launch::async, [this, lsid] {
+            ThreadClient tc(getServiceContext());
+            auto sideOpCtx = Client::getCurrent()->makeOperationContext();
+            sideOpCtx->setLogicalSessionId(lsid);
+            sideOpCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
+            OperationContextSession ocs(sideOpCtx.get());
+        });
+        ASSERT_THROWS_CODE(future.get(), AssertionException, ErrorCodes::MaxTimeMSExpired);
+    }
+
     RAIIServerParameterControllerForTest _controller{"featureFlagInternalTransactions", true};
 };
 
@@ -473,14 +498,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsNotCheckedOut) {
 
         // Make sure that regular session check-out will fail because the session is marked as
         // killed
-        {
-            auto opCtx = makeOperationContext();
-            opCtx->setLogicalSessionId(lsid);
-            opCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
-            ASSERT_THROWS_CODE(OperationContextSession(opCtx.get()),
-                               AssertionException,
-                               ErrorCodes::MaxTimeMSExpired);
-        }
+        assertSessionCheckoutTimesOut(lsid);
 
         // Schedule a separate "regular operation" thread, which will block on checking-out the
         // session, which we will use to confirm that session kill completion actually unblocks
@@ -534,29 +552,14 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsCheckedOut) {
 
             // Make sure that the checkOutForKill call will wait for the owning operation context to
             // check the session back in
-            auto future = stdx::async(stdx::launch::async, [this, lsid] {
-                ThreadClient tc(getServiceContext());
-                auto sideOpCtx = Client::getCurrent()->makeOperationContext();
-                sideOpCtx->setLogicalSessionId(lsid);
-                sideOpCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
-                OperationContextSession ocs(sideOpCtx.get());
-            });
-
-            ASSERT_THROWS_CODE(future.get(), AssertionException, ErrorCodes::MaxTimeMSExpired);
+            assertConcurrentCheckoutTimesOut(lsid);
 
             return killToken;
         }();
 
         // Make sure that regular session check-out will fail because the session is marked as
         // killed
-        {
-            auto opCtx = makeOperationContext();
-            opCtx->setLogicalSessionId(lsid);
-            opCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
-            ASSERT_THROWS_CODE(OperationContextSession(opCtx.get()),
-                               AssertionException,
-                               ErrorCodes::MaxTimeMSExpired);
-        }
+        assertSessionCheckoutTimesOut(lsid);
 
         // Schedule a separate "regular operation" thread, which will block on checking-out the
         // session, which we will use to confirm that session kill completion actually unblocks
@@ -610,29 +613,14 @@ TEST_F(SessionCatalogTest, KillParentSessionWhenChildSessionIsCheckedOut) {
 
             // Make sure that the checkOutForKill call will wait for the owning operation context to
             // check the session back in
-            auto future = stdx::async(stdx::launch::async, [this, childLsid] {
-                ThreadClient tc(getServiceContext());
-                auto sideOpCtx = Client::getCurrent()->makeOperationContext();
-                sideOpCtx->setLogicalSessionId(childLsid);
-                sideOpCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
-                OperationContextSession ocs(sideOpCtx.get());
-            });
-
-            ASSERT_THROWS_CODE(future.get(), AssertionException, ErrorCodes::MaxTimeMSExpired);
+            assertConcurrentCheckoutTimesOut(childLsid);
 
             return killToken;
         }();
 
         // Make sure that regular session check-out will fail because the session is marked as
         // killed
-        {
-            auto opCtx = makeOperationContext();
-            opCtx->setLogicalSessionId(childLsid);
-            opCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
-            ASSERT_THROWS_CODE(OperationContextSession(opCtx.get()),
-                               AssertionException,
-                               ErrorCodes::MaxTimeMSExpired);
-        }
+        assertSessionCheckoutTimesOut(childLsid);
 
         // Schedule a separate "regular operation" thread, which will block on checking-out the
         // session, which we will use to confirm that session kill completion actually unblocks
@@ -684,29 +672,14 @@ TEST_F(SessionCatalogTest, KillParentSessionWhenChildSessionIsNotCheckedOut) {
 
             // Make sure that the checkOutForKill call will wait for the owning operation context to
             // check the session back in
-            auto future = stdx::async(stdx::launch::async, [this, childLsid] {
-                ThreadClient tc(getServiceContext());
-                auto sideOpCtx = Client::getCurrent()->makeOperationContext();
-                sideOpCtx->setLogicalSessionId(childLsid);
-                sideOpCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
-                OperationContextSession ocs(sideOpCtx.get());
-            });
-
-            ASSERT_THROWS_CODE(future.get(), AssertionException, ErrorCodes::MaxTimeMSExpired);
+            assertConcurrentCheckoutTimesOut(childLsid);
 
             return killToken;
         }();
 
         // Make sure that regular session check-out will fail because the session is marked as
         // killed
-        {
-            auto opCtx = makeOperationContext();
-            opCtx->setLogicalSessionId(childLsid);
-            opCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
-            ASSERT_THROWS_CODE(OperationContextSession(opCtx.get()),
-                               AssertionException,
-                               ErrorCodes::MaxTimeMSExpired);
-        }
+        assertSessionCheckoutTimesOut(childLsid);
 
         // Schedule a separate "regular operation" thread, which will block on checking-out the
         // session, which we will use to confirm that session kill completion actually unblocks
@@ -760,47 +733,39 @@ TEST_F(SessionCatalogTest, KillSessionWhenChildSessionIsCheckedOut) {
 
             // Make sure that the checkOutForKill call will wait for the owning operation context to
             // check the session back in
-            auto future = stdx::async(stdx::launch::async, [this, childLsid] {
-                ThreadClient tc(getServiceContext());
-                auto sideOpCtx = Client::getCurrent()->makeOperationContext();
-                sideOpCtx->setLogicalSessionId(childLsid);
-                sideOpCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
-                OperationContextSession ocs(sideOpCtx.get());
-            });
-
-            ASSERT_THROWS_CODE(future.get(), AssertionException, ErrorCodes::MaxTimeMSExpired);
+            assertConcurrentCheckoutTimesOut(parentLsid);
+            assertConcurrentCheckoutTimesOut(childLsid);
 
             return killToken;
         }();
 
         // Make sure that regular session check-out will fail because the session is marked as
         // killed
-        {
-            auto opCtx = makeOperationContext();
-            opCtx->setLogicalSessionId(childLsid);
-            opCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
-            ASSERT_THROWS_CODE(OperationContextSession(opCtx.get()),
-                               AssertionException,
-                               ErrorCodes::MaxTimeMSExpired);
-        }
+        assertSessionCheckoutTimesOut(childLsid);
 
-        // Check that checking out the parent session still succeeds.
-        {
-            auto opCtx = makeOperationContext();
-            opCtx->setLogicalSessionId(parentLsid);
-            OperationContextSession ocs(opCtx.get());
-        }
+        // Check that checking out the parent session will fail because it was marked as killed.
+        assertSessionCheckoutTimesOut(parentLsid);
 
         // Schedule a separate "regular operation" thread, which will block on checking-out the
         // session, which we will use to confirm that session kill completion actually unblocks
         // check-out
-        auto future = stdx::async(stdx::launch::async, [this, childLsid] {
+        auto childFuture = stdx::async(stdx::launch::async, [this, childLsid] {
             ThreadClient tc(getServiceContext());
             auto sideOpCtx = Client::getCurrent()->makeOperationContext();
             sideOpCtx->setLogicalSessionId(childLsid);
             OperationContextSession ocs(sideOpCtx.get());
         });
-        ASSERT(stdx::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
+        ASSERT(stdx::future_status::ready !=
+               childFuture.wait_for(Milliseconds(10).toSystemDuration()));
+
+        auto parentFuture = stdx::async(stdx::launch::async, [this, parentLsid] {
+            ThreadClient tc(getServiceContext());
+            auto sideOpCtx = Client::getCurrent()->makeOperationContext();
+            sideOpCtx->setLogicalSessionId(parentLsid);
+            OperationContextSession ocs(sideOpCtx.get());
+        });
+        ASSERT(stdx::future_status::ready !=
+               parentFuture.wait_for(Milliseconds(10).toSystemDuration()));
 
         // Make sure that "for kill" session check-out succeeds
         {
@@ -811,15 +776,12 @@ TEST_F(SessionCatalogTest, KillSessionWhenChildSessionIsCheckedOut) {
         }
 
         // Make sure that session check-out after kill succeeds again
-        {
-            auto opCtx = makeOperationContext();
-            opCtx->setLogicalSessionId(childLsid);
-            OperationContextSession ocs(opCtx.get());
-        }
+        assertCanCheckoutSession(childLsid);
+        assertCanCheckoutSession(parentLsid);
 
-        // Make sure the "regular operation" eventually is able to proceed and use the just killed
-        // session
-        future.get();
+        // Make sure the "regular operations" eventually proceed and use the just killed session
+        childFuture.get();
+        parentFuture.get();
     };
 
     auto parentLsid = makeLogicalSessionIdForTest();
@@ -841,47 +803,39 @@ TEST_F(SessionCatalogTest, KillSessionWhenChildSessionIsNotCheckedOut) {
 
             // Make sure that the checkOutForKill call will wait for the owning operation context to
             // check the session back in
-            auto future = stdx::async(stdx::launch::async, [this, childLsid] {
-                ThreadClient tc(getServiceContext());
-                auto sideOpCtx = Client::getCurrent()->makeOperationContext();
-                sideOpCtx->setLogicalSessionId(childLsid);
-                sideOpCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
-                OperationContextSession ocs(sideOpCtx.get());
-            });
-
-            ASSERT_THROWS_CODE(future.get(), AssertionException, ErrorCodes::MaxTimeMSExpired);
+            assertConcurrentCheckoutTimesOut(parentLsid);
+            assertConcurrentCheckoutTimesOut(childLsid);
 
             return killToken;
         }();
 
         // Make sure that regular session check-out will fail because the session is marked as
         // killed
-        {
-            auto opCtx = makeOperationContext();
-            opCtx->setLogicalSessionId(childLsid);
-            opCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
-            ASSERT_THROWS_CODE(OperationContextSession(opCtx.get()),
-                               AssertionException,
-                               ErrorCodes::MaxTimeMSExpired);
-        }
+        assertSessionCheckoutTimesOut(childLsid);
 
-        // Check that checking out the parent session still succeeds.
-        {
-            auto opCtx = makeOperationContext();
-            opCtx->setLogicalSessionId(parentLsid);
-            OperationContextSession ocs(opCtx.get());
-        }
+        // Check that checking out the parent session will fail because it was marked as killed.
+        assertSessionCheckoutTimesOut(parentLsid);
 
         // Schedule a separate "regular operation" thread, which will block on checking-out the
         // session, which we will use to confirm that session kill completion actually unblocks
         // check-out
-        auto future = stdx::async(stdx::launch::async, [this, childLsid] {
+        auto childFuture = stdx::async(stdx::launch::async, [this, childLsid] {
             ThreadClient tc(getServiceContext());
             auto sideOpCtx = Client::getCurrent()->makeOperationContext();
             sideOpCtx->setLogicalSessionId(childLsid);
             OperationContextSession ocs(sideOpCtx.get());
         });
-        ASSERT(stdx::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
+        ASSERT(stdx::future_status::ready !=
+               childFuture.wait_for(Milliseconds(10).toSystemDuration()));
+
+        auto parentFuture = stdx::async(stdx::launch::async, [this, parentLsid] {
+            ThreadClient tc(getServiceContext());
+            auto sideOpCtx = Client::getCurrent()->makeOperationContext();
+            sideOpCtx->setLogicalSessionId(parentLsid);
+            OperationContextSession ocs(sideOpCtx.get());
+        });
+        ASSERT(stdx::future_status::ready !=
+               parentFuture.wait_for(Milliseconds(10).toSystemDuration()));
 
         // Make sure that "for kill" session check-out succeeds
         {
@@ -892,21 +846,210 @@ TEST_F(SessionCatalogTest, KillSessionWhenChildSessionIsNotCheckedOut) {
         }
 
         // Make sure that session check-out after kill succeeds again
-        {
-            auto opCtx = makeOperationContext();
-            opCtx->setLogicalSessionId(childLsid);
-            OperationContextSession ocs(opCtx.get());
-        }
+        assertCanCheckoutSession(childLsid);
+        assertCanCheckoutSession(parentLsid);
 
-        // Make sure the "regular operation" eventually is able to proceed and use the just killed
-        // session
-        future.get();
+        // Make sure the "regular operations" eventually proceed and use the just killed session
+        childFuture.get();
+        parentFuture.get();
     };
 
     auto parentLsid = makeLogicalSessionIdForTest();
     runTest(parentLsid, makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid));
     runTest(parentLsid, makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
 }
+
+TEST_F(SessionCatalogTest, KillingChildSessionInterruptsParentSession) {
+    auto runTest = [&](const LogicalSessionId& parentLsid, const LogicalSessionId& childLsid) {
+        auto killToken = [this, &parentLsid, &childLsid] {
+            assertCanCheckoutSession(childLsid);
+
+            auto opCtx = makeOperationContext();
+            opCtx->setLogicalSessionId(parentLsid);
+            OperationContextSession operationContextSession(opCtx.get());
+
+            auto killToken = catalog()->killSession(childLsid);
+
+            // Make sure the owning operation context is interrupted
+            ASSERT_THROWS_CODE(
+                opCtx->checkForInterrupt(), AssertionException, ErrorCodes::Interrupted);
+
+            // Make sure that the checkOutForKill call will wait for the owning operation context to
+            // check the session back in
+            assertConcurrentCheckoutTimesOut(parentLsid);
+            assertConcurrentCheckoutTimesOut(childLsid);
+
+            return killToken;
+        }();
+
+        // Use up the killToken.
+        auto opCtx = makeOperationContext();
+        auto scopedSession = catalog()->checkOutSessionForKill(opCtx.get(), std::move(killToken));
+        ASSERT_EQ(opCtx.get(), scopedSession.currentOperation_forTest());
+    };
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid));
+    runTest(parentLsid, makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
+}
+
+TEST_F(SessionCatalogTest, KillParentThenChildSession) {
+    auto runTest = [&](const LogicalSessionId& parentLsid, const LogicalSessionId& childLsid) {
+        // Create a child session, which will also make the parent session.
+        assertCanCheckoutSession(childLsid);
+
+        // Kill the parent.
+        auto parentKillToken = catalog()->killSession(parentLsid);
+
+        // Verify we can't check out either child or parent now.
+        assertSessionCheckoutTimesOut(childLsid);
+        assertSessionCheckoutTimesOut(parentLsid);
+
+        // We can still kill the child.
+        auto childKillToken = catalog()->killSession(childLsid);
+
+        // Verify we can't check back out either session until all kill tokens have been used.
+        assertSessionCheckoutTimesOut(childLsid);
+        assertSessionCheckoutTimesOut(parentLsid);
+
+        {
+            auto opCtx = makeOperationContext();
+            auto scopedSession =
+                catalog()->checkOutSessionForKill(opCtx.get(), std::move(parentKillToken));
+            ASSERT_EQ(opCtx.get(), scopedSession.currentOperation_forTest());
+        }
+        assertSessionCheckoutTimesOut(childLsid);
+        assertSessionCheckoutTimesOut(parentLsid);
+
+        {
+            auto opCtx = makeOperationContext();
+            auto scopedSession =
+                catalog()->checkOutSessionForKill(opCtx.get(), std::move(childKillToken));
+            ASSERT_EQ(opCtx.get(), scopedSession.currentOperation_forTest());
+        }
+        assertCanCheckoutSession(childLsid);
+        assertCanCheckoutSession(parentLsid);
+    };
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid));
+    runTest(parentLsid, makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
+}
+
+TEST_F(SessionCatalogTest, KillChildThenParentSession) {
+    auto runTest = [&](const LogicalSessionId& parentLsid, const LogicalSessionId& childLsid) {
+        // Create a child session, which will also make the parent session.
+        assertCanCheckoutSession(childLsid);
+
+        // Kill the child.
+        auto childKillToken = catalog()->killSession(childLsid);
+
+        // Verify we can't check out either child or parent now.
+        assertSessionCheckoutTimesOut(childLsid);
+        assertSessionCheckoutTimesOut(parentLsid);
+
+        // We can still kill the parent.
+        auto parentKillToken = catalog()->killSession(parentLsid);
+
+        // Verify we can't check back out either session until all kill tokens have been used.
+        assertSessionCheckoutTimesOut(childLsid);
+        assertSessionCheckoutTimesOut(parentLsid);
+
+        {
+            auto opCtx = makeOperationContext();
+            auto scopedSession =
+                catalog()->checkOutSessionForKill(opCtx.get(), std::move(childKillToken));
+            ASSERT_EQ(opCtx.get(), scopedSession.currentOperation_forTest());
+        }
+        assertSessionCheckoutTimesOut(childLsid);
+        assertSessionCheckoutTimesOut(parentLsid);
+
+        {
+            auto opCtx = makeOperationContext();
+            auto scopedSession =
+                catalog()->checkOutSessionForKill(opCtx.get(), std::move(parentKillToken));
+            ASSERT_EQ(opCtx.get(), scopedSession.currentOperation_forTest());
+        }
+        assertCanCheckoutSession(childLsid);
+        assertCanCheckoutSession(parentLsid);
+    };
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid));
+    runTest(parentLsid, makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
+}
+
+TEST_F(SessionCatalogTest, KillChildAndParentMultipleTimes) {
+    auto runTest = [&](const LogicalSessionId& parentLsid, const LogicalSessionId& childLsid) {
+        // Create a child session, which will also make the parent session.
+        assertCanCheckoutSession(childLsid);
+
+        // Kill the parent and child in interleaved orders to verify the kill order doesn't matter.
+        auto firstParentKillToken = catalog()->killSession(parentLsid);
+
+        auto firstChildKillToken = catalog()->killSession(childLsid);
+        auto secondChildKillToken = catalog()->killSession(childLsid);
+
+        auto secondParentKillToken = catalog()->killSession(parentLsid);
+
+        auto thirdChildKillToken = catalog()->killSession(childLsid);
+
+        // Verify we can't check back out either session until all kill tokens have been used. Use
+        // an arbitrary order to verify the return order doesn't matter.
+        assertSessionCheckoutTimesOut(childLsid);
+        assertSessionCheckoutTimesOut(parentLsid);
+
+        {
+            auto opCtx = makeOperationContext();
+            auto scopedSession =
+                catalog()->checkOutSessionForKill(opCtx.get(), std::move(firstChildKillToken));
+            ASSERT_EQ(opCtx.get(), scopedSession.currentOperation_forTest());
+        }
+        assertSessionCheckoutTimesOut(childLsid);
+        assertSessionCheckoutTimesOut(parentLsid);
+
+        {
+            auto opCtx = makeOperationContext();
+            auto scopedSession =
+                catalog()->checkOutSessionForKill(opCtx.get(), std::move(secondParentKillToken));
+            ASSERT_EQ(opCtx.get(), scopedSession.currentOperation_forTest());
+        }
+        assertSessionCheckoutTimesOut(childLsid);
+        assertSessionCheckoutTimesOut(parentLsid);
+
+        {
+            auto opCtx = makeOperationContext();
+            auto scopedSession =
+                catalog()->checkOutSessionForKill(opCtx.get(), std::move(thirdChildKillToken));
+            ASSERT_EQ(opCtx.get(), scopedSession.currentOperation_forTest());
+        }
+        assertSessionCheckoutTimesOut(childLsid);
+        assertSessionCheckoutTimesOut(parentLsid);
+
+        {
+            auto opCtx = makeOperationContext();
+            auto scopedSession =
+                catalog()->checkOutSessionForKill(opCtx.get(), std::move(firstParentKillToken));
+            ASSERT_EQ(opCtx.get(), scopedSession.currentOperation_forTest());
+        }
+        assertSessionCheckoutTimesOut(childLsid);
+        assertSessionCheckoutTimesOut(parentLsid);
+
+        {
+            auto opCtx = makeOperationContext();
+            auto scopedSession =
+                catalog()->checkOutSessionForKill(opCtx.get(), std::move(secondChildKillToken));
+            ASSERT_EQ(opCtx.get(), scopedSession.currentOperation_forTest());
+        }
+        assertCanCheckoutSession(childLsid);
+        assertCanCheckoutSession(parentLsid);
+    };
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    runTest(parentLsid, makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid));
+    runTest(parentLsid, makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
+}
+
 
 TEST_F(SessionCatalogTest, MarkSessionAsKilledCanBeCalledMoreThanOnce) {
     auto runTest = [&](const LogicalSessionId& lsid) {
@@ -922,14 +1065,7 @@ TEST_F(SessionCatalogTest, MarkSessionAsKilledCanBeCalledMoreThanOnce) {
 
         // Make sure that regular session check-out will fail because there are two killers on the
         // session
-        {
-            auto opCtx = makeOperationContext();
-            opCtx->setLogicalSessionId(lsid);
-            opCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
-            ASSERT_THROWS_CODE(OperationContextSession(opCtx.get()),
-                               AssertionException,
-                               ErrorCodes::MaxTimeMSExpired);
-        }
+        assertSessionCheckoutTimesOut(lsid);
 
         boost::optional<SessionCatalog::KillToken> killTokenWhileSessionIsCheckedOutForKill;
 
@@ -946,14 +1082,7 @@ TEST_F(SessionCatalogTest, MarkSessionAsKilledCanBeCalledMoreThanOnce) {
 
         // Regular session check-out should still fail because there are now still two killers on
         // the session
-        {
-            auto opCtx = makeOperationContext();
-            opCtx->setLogicalSessionId(lsid);
-            opCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
-            ASSERT_THROWS_CODE(OperationContextSession(opCtx.get()),
-                               AssertionException,
-                               ErrorCodes::MaxTimeMSExpired);
-        }
+        assertSessionCheckoutTimesOut(lsid);
         {
             auto opCtx = makeOperationContext();
             auto scopedSession =
@@ -974,9 +1103,14 @@ TEST_F(SessionCatalogTest, MarkSessionAsKilledCanBeCalledMoreThanOnce) {
 }
 
 TEST_F(SessionCatalogTest, MarkSessionsAsKilledWhenSessionDoesNotExist) {
-    const auto nonExistentLsid = makeLogicalSessionIdForTest();
-    ASSERT_THROWS_CODE(
-        catalog()->killSession(nonExistentLsid), AssertionException, ErrorCodes::NoSuchSession);
+    auto runTest = [&](const LogicalSessionId& nonExistentLsid) {
+        ASSERT_THROWS_CODE(
+            catalog()->killSession(nonExistentLsid), AssertionException, ErrorCodes::NoSuchSession);
+    };
+
+    runTest(makeLogicalSessionIdForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
+    runTest(makeLogicalSessionIdWithTxnUUIDForTest());
 }
 
 TEST_F(SessionCatalogTestWithDefaultOpCtx, SessionDiscarOperationContextAfterCheckIn) {

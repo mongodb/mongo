@@ -69,8 +69,11 @@ private:
     // The id of the session with which this object is associated
     const LogicalSessionId _sessionId;
 
-    // A pointer to the parent Session for this Session if there is one. Always set to nullptr when
-    // this Session is not checked out.
+    // A pointer to the parent Session for this Session if there is one. Set at construction for
+    // child sessions. Children and parents are reaped atomically, so this pointer should always be
+    // valid if it is not null.
+    //
+    // TODO SERVER-62479: Verify the implementation of this ticket matches the assumption above.
     Session* _parentSession{nullptr};
 
     // These fields are only safe to read or write while holding the SessionCatalog::_mutex. In

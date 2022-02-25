@@ -83,17 +83,20 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSessionWithPare
 
     if (killToken) {
         invariant(killToken->lsidToKill == lsid);
+        invariant(killToken->parentLsidToKill);
+        invariant(*killToken->parentLsidToKill == *getParentSessionId(lsid));
     } else {
         invariant(opCtx->getLogicalSessionId() == lsid);
     }
 
     stdx::unique_lock<Latch> ul(_mutex);
 
-    auto parentSri = _getOrCreateSessionRuntimeInfo(ul, *getParentSessionId(lsid));
-    auto childSri = _getOrCreateSessionRuntimeInfo(ul, lsid);
+    auto parentSri = _getOrCreateSessionRuntimeInfo(ul, *getParentSessionId(lsid), nullptr);
+    auto childSri = _getOrCreateSessionRuntimeInfo(ul, lsid, parentSri);
 
     if (killToken) {
         invariant(ObservableSession(ul, childSri->session)._killed());
+        invariant(ObservableSession(ul, parentSri->session)._killed());
     }
 
     // Wait until the session is no longer checked out and until the previously scheduled kill has
@@ -129,7 +132,6 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSessionWithPare
 
     childSri->session._checkoutOpCtx = opCtx;
     childSri->session._lastCheckout = Date_t::now();
-    childSri->session._parentSession = &parentSri->session;
 
     return ScopedCheckedOutSession(
         *this, std::move(childSri), std::move(parentSri), std::move(killToken));
@@ -139,13 +141,14 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSessionWithoutP
     OperationContext* opCtx, const LogicalSessionId& lsid, boost::optional<KillToken> killToken) {
     if (killToken) {
         invariant(killToken->lsidToKill == lsid);
+        invariant(!killToken->parentLsidToKill);
     } else {
         invariant(opCtx->getLogicalSessionId() == lsid);
     }
 
     stdx::unique_lock<Latch> ul(_mutex);
 
-    auto sri = _getOrCreateSessionRuntimeInfo(ul, lsid);
+    auto sri = _getOrCreateSessionRuntimeInfo(ul, lsid, nullptr);
     if (killToken) {
         invariant(ObservableSession(ul, sri->session)._killed());
     }
@@ -260,7 +263,13 @@ size_t SessionCatalog::size() const {
 
 void SessionCatalog::createSessionIfDoesNotExist(const LogicalSessionId& lsid) {
     stdx::lock_guard<Latch> lg(_mutex);
-    _getOrCreateSessionRuntimeInfo(lg, lsid);
+    auto parentSri = [&]() -> SessionRuntimeInfo* {
+        if (auto parentLsid = getParentSessionId(lsid)) {
+            return _getOrCreateSessionRuntimeInfo(lg, *parentLsid, nullptr);
+        }
+        return nullptr;
+    }();
+    _getOrCreateSessionRuntimeInfo(lg, lsid, parentSri);
 }
 
 SessionCatalog::SessionRuntimeInfo* SessionCatalog::_getSessionRuntimeInfo(
@@ -273,12 +282,12 @@ SessionCatalog::SessionRuntimeInfo* SessionCatalog::_getSessionRuntimeInfo(
 }
 
 SessionCatalog::SessionRuntimeInfo* SessionCatalog::_getOrCreateSessionRuntimeInfo(
-    WithLock lk, const LogicalSessionId& lsid) {
+    WithLock lk, const LogicalSessionId& lsid, SessionRuntimeInfo* parentSri) {
     if (auto sri = _getSessionRuntimeInfo(lk, lsid)) {
         return sri;
     }
 
-    auto it = _sessions.emplace(lsid, std::make_unique<SessionRuntimeInfo>(lsid)).first;
+    auto it = _sessions.emplace(lsid, std::make_unique<SessionRuntimeInfo>(lsid, parentSri)).first;
     return it->second.get();
 }
 
@@ -293,6 +302,12 @@ void SessionCatalog::_releaseSession(SessionRuntimeInfo* sri,
     invariant(sri->session._checkoutOpCtx);
     if (killToken) {
         invariant(killToken->lsidToKill == sri->session.getSessionId());
+
+        if (parentSri) {
+            invariant(killToken->parentLsidToKill == parentSri->session.getSessionId());
+        } else {
+            invariant(!killToken->parentLsidToKill);
+        }
     }
 
     auto parentLsid = getParentSessionId(sri->session.getSessionId());
@@ -305,12 +320,17 @@ void SessionCatalog::_releaseSession(SessionRuntimeInfo* sri,
         invariant(!parentLsid);
     }
     sri->session._checkoutOpCtx = nullptr;
-    sri->session._parentSession = nullptr;
     sri->availableCondVar.notify_all();
 
     if (killToken) {
         invariant(sri->session._killsRequested > 0);
         --sri->session._killsRequested;
+
+        if (parentSri) {
+            invariant(killToken->parentLsidToKill);
+            invariant(parentSri->session._killsRequested > 0);
+            --parentSri->session._killsRequested;
+        }
     }
 }
 
@@ -326,19 +346,42 @@ SessionCatalog::KillToken ObservableSession::kill(ErrorCodes::Error reason) cons
     // can release the session
     if (firstKiller && hasCurrentOperation()) {
         if (_session->_checkoutOpCtx) {
-            invariant(_clientLock);
+            invariant(_clientLock.owns_lock());
+            invariant(!_session->_childSessionCheckoutOpCtx);
             const auto serviceContext = _session->_checkoutOpCtx->getServiceContext();
             serviceContext->killOperation(_clientLock, _session->_checkoutOpCtx, reason);
-        }
-        if (_session->_childSessionCheckoutOpCtx) {
-            stdx::unique_lock<Client> clientLock{
+        } else if (_session->_childSessionCheckoutOpCtx) {
+            // Both parent and child sessions can't be checked out at the same time, so _clientLock
+            // should be empty, and we'll never take the child operation context's client lock while
+            // already holding the parent's.
+            invariant(!_clientLock.owns_lock());
+            stdx::unique_lock<Client> childOpClientLock{
                 *_session->_childSessionCheckoutOpCtx->getClient()};
             const auto serviceContext = _session->_childSessionCheckoutOpCtx->getServiceContext();
-            serviceContext->killOperation(clientLock, _session->_childSessionCheckoutOpCtx, reason);
+            serviceContext->killOperation(
+                childOpClientLock, _session->_childSessionCheckoutOpCtx, reason);
         }
     }
 
-    return SessionCatalog::KillToken(getSessionId());
+    auto parentSession = _session->_parentSession;
+    if (parentSession) {
+        const bool firstParentKiller = (0 == parentSession->_killsRequested);
+        ++parentSession->_killsRequested;
+
+        if (firstParentKiller && parentSession->_checkoutOpCtx) {
+            // Both parent and child sessions can't be checked out at the same time, so _clientLock
+            // should be empty, and we'll never take the parent operation context's client lock
+            // while already holding the child's.
+            invariant(!_clientLock.owns_lock());
+            stdx::unique_lock<Client> clientLock{*parentSession->_checkoutOpCtx->getClient()};
+            const auto serviceContext = parentSession->_checkoutOpCtx->getServiceContext();
+            serviceContext->killOperation(clientLock, parentSession->_checkoutOpCtx, reason);
+        }
+    }
+
+    return SessionCatalog::KillToken(
+        getSessionId(),
+        parentSession ? boost::make_optional(parentSession->getSessionId()) : boost::none);
 }
 
 void ObservableSession::markForReap() {

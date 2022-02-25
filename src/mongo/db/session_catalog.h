@@ -63,11 +63,13 @@ public:
     class SessionToKill;
 
     struct KillToken {
-        KillToken(LogicalSessionId lsid) : lsidToKill(std::move(lsid)) {}
+        KillToken(LogicalSessionId lsid, boost::optional<LogicalSessionId> parentLsid)
+            : lsidToKill(std::move(lsid)), parentLsidToKill(std::move(parentLsid)) {}
         KillToken(KillToken&&) = default;
         KillToken& operator=(KillToken&&) = default;
 
         LogicalSessionId lsidToKill;
+        boost::optional<LogicalSessionId> parentLsidToKill;
     };
 
     SessionCatalog() = default;
@@ -123,7 +125,14 @@ public:
 
 private:
     struct SessionRuntimeInfo {
-        SessionRuntimeInfo(LogicalSessionId lsid) : session(std::move(lsid)) {}
+        SessionRuntimeInfo(LogicalSessionId lsid, SessionRuntimeInfo* parentSri)
+            : session(std::move(lsid)) {
+            // If we're a child we must have been given a parent session, if not, we must not have.
+            invariant(bool(getParentSessionId(lsid)) == bool(parentSri));
+            if (parentSri) {
+                session._parentSession = &parentSri->session;
+            }
+        }
         ~SessionRuntimeInfo();
 
         // Must only be accessed when the state is kInUse and only by the operation context, which
@@ -166,8 +175,13 @@ private:
     /**
      * Creates or returns the session runtime info for 'lsid' from the '_sessions' map. The
      * returned pointer is guaranteed to be linked on the map for as long as the mutex is held.
+     *
+     * If we're creating a child session, a pointer to the session runtime info of its parent must
+     * be provided.
      */
-    SessionRuntimeInfo* _getOrCreateSessionRuntimeInfo(WithLock lk, const LogicalSessionId& lsid);
+    SessionRuntimeInfo* _getOrCreateSessionRuntimeInfo(WithLock lk,
+                                                       const LogicalSessionId& lsid,
+                                                       SessionRuntimeInfo* parentSri);
 
     /**
      * Makes a session, previously checked out through 'checkoutSession', available again.
