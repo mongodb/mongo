@@ -376,9 +376,11 @@ std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
             auto [tag, val] = makeValue(cq.getExpCtx()->variables.getValue(id));
             env->registerSlot(name, tag, val, true, slotIdGenerator);
         } else if (id == Variables::kSearchMetaId) {
-            // SEARCH_META never has a value at this point but can be set later and therefore must
-            // have a slot. The find layer is not responsible for setting this value.
-            auto [tag, val] = makeValue(cq.getExpCtx()->variables.getValue(id));
+            // Normally, $search is responsible for setting a value for SEARCH_META, in which case
+            // we will bind the value to a slot above. However, in the event of a query that does
+            // not use $search, but references SEARCH_META, we need to bind a value of 'missing' to
+            // a slot so that the plan can run correctly.
+            auto [tag, val] = makeValue(Value());
             env->registerSlot(name, tag, val, true, slotIdGenerator);
         }
     }
