@@ -1,10 +1,11 @@
-// Test to verify that latency metrics are collected in both currentOp and cumulativeOp
-// during resharding.
-//
-// @tags: [
-//   uses_atclustertime,
-// ]
-//
+/**
+ * Test to verify that latency metrics are collected in both currentOp and cumulativeOp during
+ * resharding.
+ * @tags: [
+ *  requires_fcv_53,
+ *  uses_atclustertime,
+ * ]
+ */
 
 (function() {
 'use strict';
@@ -122,12 +123,12 @@ reshardingTest.withReshardingInBackground(
                 // We expect 1 batch insert per document on each shard, plus 1 empty batch
                 // to discover no documents are left.
                 const expectedBatchInserts = reshardingMetrics[kDocumentsCopied] + 1;
-                const receivedBatchInserts = collClonerFillBatchForInsertHist["ops"];
+                const receivedBatchInserts = collClonerFillBatchForInsertHist["totalCount"];
                 assert(expectedBatchInserts == receivedBatchInserts,
                        `expected ${expectedBatchInserts} batch inserts,
                        received ${receivedBatchInserts}`);
 
-                firstReshardBatchApplies += oplogApplierApplyBatchHist["ops"];
+                firstReshardBatchApplies += oplogApplierApplyBatchHist["totalCount"];
             });
 
             assert(firstReshardBatchApplies > 0,
@@ -174,8 +175,8 @@ recipientShardNames.forEach(function(shardName) {
     const collClonerFillBatchForInsertHist =
         reshardingMetrics[kCollClonerFillBatchForInsertLatencyMillis];
 
-    cumulativeBatchApplies += oplogApplierApplyBatchHist["ops"];
-    cumulativeBatchInserts += collClonerFillBatchForInsertHist["ops"];
+    cumulativeBatchApplies += oplogApplierApplyBatchHist["totalCount"];
+    cumulativeBatchInserts += collClonerFillBatchForInsertHist["totalCount"];
     totalDocumentsCopied += reshardingMetrics[kDocumentsCopied];
 });
 

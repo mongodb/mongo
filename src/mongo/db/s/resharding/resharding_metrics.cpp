@@ -37,7 +37,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/aligned.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/integer_histogram.h"
+#include "mongo/util/histogram.h"
 
 namespace mongo {
 
@@ -94,13 +94,6 @@ Milliseconds remainingTime(Milliseconds elapsedTime, double elapsedWork, double 
     elapsedWork = std::min(elapsedWork, totalWork);
     double remainingMsec = 1.0 * elapsedTime.count() * (totalWork / elapsedWork - 1);
     return Milliseconds(Milliseconds::rep(remainingMsec));
-}
-
-void appendHistogram(BSONObjBuilder* bob,
-                     const IntegerHistogram<kLatencyHistogramBucketsCount>& hist) {
-    BSONObjBuilder histogramBuilder;
-    hist.append(histogramBuilder, false);
-    bob->appendElements(histogramBuilder.obj());
 }
 
 static StringData serializeState(boost::optional<RecipientStateEnum> e) {
@@ -230,12 +223,8 @@ public:
 
     int64_t chunkImbalanceCount = 0;
 
-    IntegerHistogram<kLatencyHistogramBucketsCount> oplogApplierApplyBatchLatencyMillis =
-        IntegerHistogram<kLatencyHistogramBucketsCount>(kOplogApplierApplyBatchLatencyMillis,
-                                                        latencyHistogramBuckets);
-    IntegerHistogram<kLatencyHistogramBucketsCount> collClonerFillBatchForInsertLatencyMillis =
-        IntegerHistogram<kLatencyHistogramBucketsCount>(kCollClonerFillBatchForInsertLatencyMillis,
-                                                        latencyHistogramBuckets);
+    Histogram<int64_t> oplogApplierApplyBatchLatencyMillis = getLatencyHistogram();
+    Histogram<int64_t> collClonerFillBatchForInsertLatencyMillis = getLatencyHistogram();
 
     // The ops done by resharding to keep up with the client writes.
     ReshardingOpCounters opCounters;
@@ -319,8 +308,11 @@ void ReshardingMetrics::OperationMetrics::appendCurrentOpMetrics(BSONObjBuilder*
                         serializeState(recipientState.get_value_or(RecipientStateEnum::kUnused)));
             bob->append(kOpStatus, ReshardingOperationStatus_serializer(opStatus));
 
-            appendHistogram(bob, oplogApplierApplyBatchLatencyMillis);
-            appendHistogram(bob, collClonerFillBatchForInsertLatencyMillis);
+            appendHistogram(
+                *bob, oplogApplierApplyBatchLatencyMillis, kOplogApplierApplyBatchLatencyMillis);
+            appendHistogram(*bob,
+                            collClonerFillBatchForInsertLatencyMillis,
+                            kCollClonerFillBatchForInsertLatencyMillis);
             break;
         case Role::kCoordinator:
             bob->append(kCoordinatorState, serializeState(coordinatorState));
@@ -790,8 +782,11 @@ void ReshardingMetrics::serializeCumulativeOpMetrics(BSONObjBuilder* bob) const 
     bob->append(kMaxRemainingOperationTime,
                 getRemainingOperationTime(ops.maxRemainingOperationTime));
 
-    appendHistogram(bob, ops.oplogApplierApplyBatchLatencyMillis);
-    appendHistogram(bob, ops.collClonerFillBatchForInsertLatencyMillis);
+    appendHistogram(
+        *bob, ops.oplogApplierApplyBatchLatencyMillis, kOplogApplierApplyBatchLatencyMillis);
+    appendHistogram(*bob,
+                    ops.collClonerFillBatchForInsertLatencyMillis,
+                    kCollClonerFillBatchForInsertLatencyMillis);
 }
 
 Date_t ReshardingMetrics::_now() const {
