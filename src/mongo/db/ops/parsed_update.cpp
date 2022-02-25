@@ -42,19 +42,14 @@ namespace mongo {
 
 ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
                            const UpdateRequest* request,
-                           const ExtensionsCallback& extensionsCallback,
-                           bool forgoOpCounterIncrements)
+                           const ExtensionsCallback& extensionsCallback)
     : _opCtx(opCtx),
       _request(request),
       _expCtx(make_intrusive<ExpressionContext>(
           opCtx, nullptr, _request->getNamespaceString(), _request->getRuntimeConstants())),
       _driver(_expCtx),
       _canonicalQuery(),
-      _extensionsCallback(extensionsCallback) {
-    if (forgoOpCounterIncrements) {
-        _expCtx->enabledCounters = false;
-    }
-}
+      _extensionsCallback(extensionsCallback) {}
 
 Status ParsedUpdate::parseRequest() {
     // It is invalid to request that the UpdateStage return the prior or newly-updated version
@@ -156,7 +151,6 @@ Status ParsedUpdate::parseQueryToCQ() {
         qr->setRuntimeConstants(*runtimeConstants);
     }
 
-    _expCtx->startExpressionCounters();
     auto statusWithCQ = CanonicalQuery::canonicalize(
         _opCtx, std::move(qr), _expCtx, _extensionsCallback, allowedMatcherFeatures);
     if (statusWithCQ.isOK()) {

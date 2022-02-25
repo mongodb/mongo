@@ -645,10 +645,9 @@ WriteResult performInserts(OperationContext* opCtx,
 static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                                                const NamespaceString& ns,
                                                StmtId stmtId,
-                                               const UpdateRequest& updateRequest,
-                                               bool forgoOpCounterIncrements) {
+                                               const UpdateRequest& updateRequest) {
     const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest.getNamespaceString());
-    ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback, forgoOpCounterIncrements);
+    ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback);
     uassertStatusOK(parsedUpdate.parseRequest());
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -745,8 +744,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* 
                                                               const NamespaceString& ns,
                                                               StmtId stmtId,
                                                               const write_ops::UpdateOpEntry& op,
-                                                              RuntimeConstants runtimeConstants,
-                                                              bool forgoOpCounterIncrements) {
+                                                              RuntimeConstants runtimeConstants) {
     globalOpCounters.gotUpdate();
     ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(opCtx->getWriteConcern());
     auto& curOp = *CurOp::get(opCtx);
@@ -784,7 +782,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* 
         ++numAttempts;
 
         try {
-            return performSingleUpdateOp(opCtx, ns, stmtId, request, forgoOpCounterIncrements);
+            return performSingleUpdateOp(opCtx, ns, stmtId, request);
         } catch (ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
             const ExtensionsCallbackReal extensionsCallback(opCtx, &request.getNamespaceString());
             ParsedUpdate parsedUpdate(opCtx, &request, extensionsCallback);
@@ -835,9 +833,6 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
     const auto& runtimeConstants =
         wholeOp.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx));
 
-    // Increment operator counters only during the fisrt single update operation in a batch of
-    // updates.
-    bool forgoOpCounterIncrements = false;
     for (auto&& singleOp : wholeOp.getUpdates()) {
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
         if (opCtx->getTxnNumber()) {
@@ -863,14 +858,8 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
         ON_BLOCK_EXIT([&] { finishCurOp(opCtx, &curOp); });
         try {
             lastOpFixer.startingOp();
-            out.results.emplace_back(
-                performSingleUpdateOpWithDupKeyRetry(opCtx,
-                                                     wholeOp.getNamespace(),
-                                                     stmtId,
-                                                     singleOp,
-                                                     runtimeConstants,
-                                                     forgoOpCounterIncrements));
-            forgoOpCounterIncrements = true;
+            out.results.emplace_back(performSingleUpdateOpWithDupKeyRetry(
+                opCtx, wholeOp.getNamespace(), stmtId, singleOp, runtimeConstants));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
             const bool canContinue =

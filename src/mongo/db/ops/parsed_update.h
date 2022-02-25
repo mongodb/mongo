@@ -76,8 +76,7 @@ public:
      */
     ParsedUpdate(OperationContext* opCtx,
                  const UpdateRequest* request,
-                 const ExtensionsCallback& extensionsCallback,
-                 bool forgoOpCounterIncrements = false);
+                 const ExtensionsCallback& extensionsCallback);
 
     /**
      * Parses the update request to a canonical query and an update driver. On success, the

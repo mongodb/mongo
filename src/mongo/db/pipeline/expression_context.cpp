@@ -215,28 +215,21 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
 }
 
 void ExpressionContext::startExpressionCounters() {
-    if (enabledCounters && !_expressionCounters) {
+    if (!_expressionCounters) {
         _expressionCounters = boost::make_optional<ExpressionCounters>({});
     }
 }
 
 void ExpressionContext::incrementMatchExprCounter(StringData name) {
-    if (enabledCounters && _expressionCounters) {
+    if (_expressionCounters) {
         ++_expressionCounters.get().matchExprCountersMap[name];
     }
 }
 
-void ExpressionContext::incrementAggExprCounter(StringData name) {
-    if (enabledCounters && _expressionCounters) {
-        ++_expressionCounters.get().aggExprCountersMap[name];
-    }
-}
-
 void ExpressionContext::stopExpressionCounters() {
-    if (enabledCounters && _expressionCounters) {
+    if (_expressionCounters) {
         operatorCountersMatchExpressions.mergeCounters(
             _expressionCounters.get().matchExprCountersMap);
-        operatorCountersAggExpressions.mergeCounters(_expressionCounters.get().aggExprCountersMap);
     }
     _expressionCounters = boost::none;
 }
