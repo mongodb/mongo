@@ -6,9 +6,9 @@ cd src
 set -o errexit
 
 cat << EOF > notary_env.sh
-export NOTARY_TOKEN=${signing_auth_token_50}
+export NOTARY_TOKEN=${signing_auth_token_60}
 export BARQUE_USERNAME=${barque_user}
 export BARQUE_API_KEY=${barque_api_key}
 EOF
 
-echo "${signing_auth_token_50}" > signing_auth_token
+echo "${signing_auth_token_60}" > signing_auth_token
