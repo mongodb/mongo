@@ -30,10 +30,7 @@
 #pragma once
 
 #include <memory>
-#include <utility>
-#include <vector>
 
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/time_support.h"
 
@@ -55,11 +52,9 @@ public:
         _tracksSystemClock = false;
     }
 
-    static ClockSourceMock* get() noexcept;
-
     Milliseconds getPrecision() override;
     Date_t now() override;
-    Status setAlarm(Date_t when, unique_function<void()> action) override;
+    void setAlarm(Date_t when, unique_function<void()> action) override;
 
     /**
      * Advances the current time by the given value.
@@ -103,12 +98,12 @@ public:
         return _source->now();
     }
 
-    Status setAlarm(Date_t when, unique_function<void()> action) override {
-        return _source->setAlarm(when, std::move(action));
+    void setAlarm(Date_t when, unique_function<void()> action) override {
+        _source->setAlarm(when, std::move(action));
     }
 
 private:
-    std::shared_ptr<ClockSource> _source;
+    const std::shared_ptr<ClockSource> _source;
 };
 
 }  // namespace mongo

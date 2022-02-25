@@ -65,7 +65,7 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
     auto alarmInfo = std::make_shared<AlarmInfo>();
     alarmInfo->cv = &cv;
 
-    invariant(setAlarm(deadline, [alarmInfo] {
+    setAlarm(deadline, [alarmInfo] {
         // Set an alarm to hit our virtualized deadline
         stdx::lock_guard infoLk(alarmInfo->mutex);
         auto cv = std::exchange(alarmInfo->cv, nullptr);
@@ -75,7 +75,7 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
 
         alarmInfo->result = stdx::cv_status::timeout;
         cv->notify_all();
-    }));
+    });
 
     if (stdx::lock_guard infoLk(alarmInfo->mutex); !alarmInfo->cv) {
         // If setAlarm() ran inline, then we've timed out

@@ -59,7 +59,6 @@ public:
     ~BackgroundThreadClockSource() override;
     Milliseconds getPrecision() override;
     Date_t now() override;
-    Status setAlarm(Date_t when, unique_function<void()> action) override;
 
     size_t timesPausedForTest();
 

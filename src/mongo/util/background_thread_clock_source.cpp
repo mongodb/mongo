@@ -64,10 +64,6 @@ Milliseconds BackgroundThreadClockSource::getPrecision() {
     return _granularity;
 }
 
-Status BackgroundThreadClockSource::setAlarm(Date_t when, unique_function<void()> action) {
-    MONGO_UNREACHABLE;
-}
-
 Date_t BackgroundThreadClockSource::now() {
     // Since this is called very frequently by many threads, the common case should not write to
     // shared memory.

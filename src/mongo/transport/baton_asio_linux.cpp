@@ -321,7 +321,7 @@ std::list<Promise<void>> TransportLayerASIO::BatonASIO::_poll(stdx::unique_lock<
     if (deadline && !clkSource->tracksSystemClock()) {
         // The clock source and `::poll` may track time differently, so use the clock source to
         // enforce the timeout.
-        invariant(clkSource->setAlarm(*deadline, [self = shared_from_this()] { self->notify(); }));
+        clkSource->setAlarm(*deadline, [self = shared_from_this()] { self->notify(); });
         deadline.reset();
     }
 
