@@ -89,12 +89,28 @@ env.Library(
 )
 
 env.Library(
+    target="fle_key_vault_shell",
+    source=[
+        "fle_key_vault_shell.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/clientdriver_minimal',
+        'fle_crypto',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/shell/kms',
+    ]
+)
+
+env.Library(
     target="fle_crypto",
     source=[
         "encryption_fields_util.cpp",
         "fle_crypto.cpp",
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base/secure_allocator',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],

@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "mongo/base/data_range.h"
+#include "mongo/base/secure_allocator.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -44,6 +45,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/util/uuid.h"
 
 
@@ -52,7 +54,7 @@ namespace mongo {
 constexpr auto kSafeContent = "__safeContent__";
 
 using PrfBlock = std::array<std::uint8_t, 32>;
-using KeyMaterial = std::array<std::uint8_t, 32>;
+using KeyMaterial = SecureVector<std::uint8_t>;
 
 // u = [1, max parallel clients)
 using FLEContentionFactor = std::uint64_t;
@@ -77,10 +79,15 @@ template <FLEKeyType KeyT>
 struct FLEKey {
     FLEKey() = default;
 
-    FLEKey(KeyMaterial dataIn) : data(std::move(dataIn)) {}
+    FLEKey(KeyMaterial dataIn) : data(std::move(dataIn)) {
+        uassert(6364500,
+                str::stream() << "Length of KeyMaterial is expected to be 32 bytes, found "
+                              << data->size(),
+                data->size() == crypto::sym256KeySize);
+    }
 
     ConstDataRange toCDR() const {
-        return ConstDataRange(data.data(), data.data() + data.size());
+        return ConstDataRange(data->data(), data->data() + data->size());
     }
 
     // Actual type of the key
@@ -660,20 +667,20 @@ class FLEKeyVault {
 public:
     virtual ~FLEKeyVault();
 
-    FLEUserKeyAndId getUserKeyById(UUID uuid) {
+    FLEUserKeyAndId getUserKeyById(const UUID& uuid) {
         return getKeyById<FLEKeyType::User>(uuid);
     }
 
-    FLEIndexKeyAndId getIndexKeyById(UUID uuid) {
+    FLEIndexKeyAndId getIndexKeyById(const UUID& uuid) {
         return getKeyById<FLEKeyType::Index>(uuid);
     }
 
 protected:
-    virtual KeyMaterial getKey(UUID uuid) = 0;
+    virtual KeyMaterial getKey(const UUID& uuid) = 0;
 
 private:
     template <FLEKeyType KeyT>
-    FLEKeyAndId<KeyT> getKeyById(UUID uuid) {
+    FLEKeyAndId<KeyT> getKeyById(const UUID& uuid) {
         auto keyMaterial = getKey(uuid);
         return FLEKeyAndId<KeyT>(keyMaterial, uuid);
     }

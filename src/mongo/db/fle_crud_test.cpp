@@ -162,13 +162,18 @@ BSONObj FLEQueryTestImpl::updateWithPreimage(const NamespaceString& nss,
 }
 
 
-FLEIndexKey indexKey(KeyMaterial{0x6e, 0xda, 0x88, 0xc8, 0x49, 0x6e, 0xc9, 0x90, 0xf5, 0xd5, 0x51,
-                                 0x8d, 0xd2, 0xad, 0x6f, 0x3d, 0x9c, 0x33, 0xb6, 0x05, 0x59, 0x04,
-                                 0xb1, 0x20, 0xf1, 0x2d, 0xe8, 0x29, 0x11, 0xfb, 0xd9, 0x33});
+std::array<uint8_t, 32> indexVec = {
+    0x6e, 0xda, 0x88, 0xc8, 0x49, 0x6e, 0xc9, 0x90, 0xf5, 0xd5, 0x51, 0x8d, 0xd2, 0xad, 0x6f, 0x3d,
+    0x9c, 0x33, 0xb6, 0x05, 0x59, 0x04, 0xb1, 0x20, 0xf1, 0x2d, 0xe8, 0x29, 0x11, 0xfb, 0xd9, 0x33};
 
-FLEUserKey userKey(KeyMaterial{0x1b, 0xd4, 0x32, 0xd4, 0xce, 0x54, 0x7d, 0xd7, 0xeb, 0xfb, 0x30,
-                               0x9a, 0xea, 0xd6, 0xc6, 0x95, 0xfe, 0x53, 0xff, 0xe9, 0xc4, 0xb1,
-                               0xc4, 0xf0, 0x6f, 0x36, 0x3c, 0xf0, 0x7b, 0x00, 0x28, 0xaf});
+std::array<uint8_t, 32> userVec = {0x1b, 0xd4, 0x32, 0xd4, 0xce, 0x54, 0x7d, 0xd7, 0xeb, 0xfb, 0x30,
+                                   0x9a, 0xea, 0xd6, 0xc6, 0x95, 0xfe, 0x53, 0xff, 0xe9, 0xc4, 0xb1,
+                                   0xc4, 0xf0, 0x6f, 0x36, 0x3c, 0xf0, 0x7b, 0x00, 0x28, 0xaf};
+
+FLEIndexKey indexKey(KeyMaterial(indexVec.begin(), indexVec.end()));
+
+FLEUserKey userKey(KeyMaterial(userVec.begin(), userVec.end()));
+
 
 constexpr auto kIndexKeyId = "12345678-1234-9876-1234-123456789012"_sd;
 constexpr auto kUserKeyId = "ABCDEFAB-1234-9876-1234-123456789012"_sd;
@@ -182,7 +187,7 @@ class TestKeyVault : public FLEKeyVault {
 public:
     TestKeyVault() : _random(123456) {}
 
-    KeyMaterial getKey(UUID uuid) override;
+    KeyMaterial getKey(const UUID& uuid) override;
 
     uint64_t getCount() const {
         return _dynamicKeys.size();
@@ -193,7 +198,7 @@ private:
     stdx::unordered_map<UUID, KeyMaterial, UUID::Hash> _dynamicKeys;
 };
 
-KeyMaterial TestKeyVault::getKey(UUID uuid) {
+KeyMaterial TestKeyVault::getKey(const UUID& uuid) {
     if (uuid == indexKeyId) {
         return indexKey.data;
     } else if (uuid == userKeyId) {
@@ -203,8 +208,9 @@ KeyMaterial TestKeyVault::getKey(UUID uuid) {
             return _dynamicKeys[uuid];
         }
 
-        KeyMaterial material;
-        _random.fill(&material, sizeof(material));
+        std::vector<uint8_t> materialVector(32);
+        _random.fill(&materialVector[0], materialVector.size());
+        KeyMaterial material(materialVector.begin(), materialVector.end());
         _dynamicKeys.insert({uuid, material});
         return material;
     }

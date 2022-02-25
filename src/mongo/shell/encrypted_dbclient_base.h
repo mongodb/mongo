@@ -151,8 +151,18 @@ public:
 #endif
 
 protected:
-    std::pair<rpc::UniqueReply, DBClientBase*> processResponse(rpc::UniqueReply result,
-                                                               StringData databaseName);
+    BSONObj _decryptResponsePayload(BSONObj& reply, StringData databaseName, bool isFLE2);
+
+    std::pair<rpc::UniqueReply, DBClientBase*> processResponseFLE1(rpc::UniqueReply result,
+                                                                   StringData databaseName);
+
+    std::pair<rpc::UniqueReply, DBClientBase*> processResponseFLE2(rpc::UniqueReply result,
+                                                                   StringData databaseName);
+
+    std::pair<rpc::UniqueReply, DBClientBase*> prepareReply(rpc::UniqueReply result,
+                                                            StringData databaseName,
+                                                            BSONObj decryptedDoc);
+
 
     BSONObj encryptDecryptCommand(const BSONObj& object, bool encrypt, StringData databaseName);
 

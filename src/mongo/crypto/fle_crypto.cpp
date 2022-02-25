@@ -63,7 +63,6 @@
 #include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/crypto/symmetric_key.h"
 #include "mongo/idl/basic_types.h"
 #include "mongo/idl/idl_parser.h"
@@ -142,7 +141,6 @@ constexpr auto kDebugValueEnd = "_debug_value_end";
 using UUIDBuf = std::array<uint8_t, UUID::kNumBytes>;
 
 static_assert(sizeof(PrfBlock) == SHA256Block::kHashLength);
-static_assert(sizeof(KeyMaterial) == crypto::sym256KeySize);
 
 PrfBlock blockToArray(SHA256Block& block) {
     PrfBlock data;
@@ -1025,6 +1023,12 @@ void decryptField(FLEKeyVault* keyVault,
 
     auto pair = FLEClientCrypto::decrypt(cdr, keyVault);
 
+    if (pair.first == EOO) {
+        builder->appendBinData(
+            fieldPath.toString(), cdr.length(), BinDataType::Encrypt, cdr.data<char>());
+        return;
+    }
+
     BSONObj obj = toBSON(pair.first, pair.second);
 
     builder->appendAs(obj.firstElement(), fieldPath);
@@ -1088,12 +1092,12 @@ stdx::unordered_map<std::string, EncryptedField> toFieldMap(const EncryptedField
 
 CollectionsLevel1Token FLELevel1TokenGenerator::generateCollectionsLevel1Token(
     FLEIndexKey indexKey) {
-    return prf(indexKey.data, kLevel1Collection);
+    return prf(indexKey.toCDR(), kLevel1Collection);
 }
 
 ServerDataEncryptionLevel1Token FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(
     FLEIndexKey indexKey) {
-    return prf(indexKey.data, kLevelServerDataEncryption);
+    return prf(indexKey.toCDR(), kLevelServerDataEncryption);
 }
 
 
@@ -1254,6 +1258,9 @@ std::pair<BSONType, std::vector<uint8_t>> FLEClientCrypto::decrypt(ConstDataRang
 
         return {ieev.bsonType, userData};
 
+    } else if (pair.first == EncryptedBinDataType::kRandom ||
+               pair.first == EncryptedBinDataType::kDeterministic) {
+        return {EOO, std::vector<uint8_t>()};
     } else {
         uasserted(6373507, "Not supported");
     }

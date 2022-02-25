@@ -40,8 +40,10 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/config.h"
 #include "mongo/crypto/aead_encryption.h"
+#include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/crypto/fle_key_vault_shell.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -61,6 +63,7 @@
 #include "mongo/shell/kms.h"
 #include "mongo/shell/kms_gen.h"
 #include "mongo/shell/shell_options.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -197,11 +200,23 @@ void EncryptedDBClientBase::decryptPayload(ConstDataRange data,
     }
 }
 
-std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::processResponse(
+std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::processResponseFLE1(
     rpc::UniqueReply result, const StringData databaseName) {
     auto rawReply = result->getCommandReply();
-    BSONObj decryptedDoc = encryptDecryptCommand(rawReply, false, databaseName);
+    return prepareReply(
+        std::move(result), databaseName, encryptDecryptCommand(rawReply, false, databaseName));
+}
 
+std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::processResponseFLE2(
+    rpc::UniqueReply result, const StringData databaseName) {
+    auto rawReply = result->getCommandReply();
+    FLEKeyVaultShellImpl vault(_encryptionOptions, getCollectionNS(), _conn.get());
+    return prepareReply(
+        std::move(result), databaseName, FLEClientCrypto::decryptDocument(rawReply, &vault));
+}
+
+std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::prepareReply(
+    rpc::UniqueReply result, const StringData databaseName, BSONObj decryptedDoc) {
     rpc::OpMsgReplyBuilder replyBuilder;
     replyBuilder.setCommandReply(StatusWith<BSONObj>(decryptedDoc));
     auto msg = replyBuilder.done();
@@ -223,7 +238,8 @@ std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::runCommandWith
     }
 
     auto result = _conn->runCommandWithTarget(std::move(request)).first;
-    return processResponse(std::move(result), databaseName);
+    return processResponseFLE1(processResponseFLE2(std::move(result), databaseName).first,
+                               databaseName);
 }
 
 /**
