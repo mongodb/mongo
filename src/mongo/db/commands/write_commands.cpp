@@ -319,78 +319,45 @@ boost::optional<std::pair<Status, bool>> checkFailUnorderedTimeseriesInsertFailP
     return boost::none;
 }
 
-boost::optional<BSONObj> generateError(OperationContext* opCtx,
-                                       const Status& status,
-                                       int index,
-                                       size_t numErrors) {
+boost::optional<write_ops::WriteError> generateError(OperationContext* opCtx,
+                                                     const Status& status,
+                                                     int index,
+                                                     size_t numErrors) {
     if (status.isOK()) {
         return boost::none;
     }
 
-    auto errorMessage = [numErrors, errorSize = size_t(0)](StringData rawMessage) mutable {
-        // Start truncating error messages once both of these limits are exceeded.
-        constexpr size_t kErrorSizeTruncationMin = 1024 * 1024;
-        constexpr size_t kErrorCountTruncationMin = 2;
-        if (errorSize >= kErrorSizeTruncationMin && numErrors >= kErrorCountTruncationMin) {
-            return ""_sd;
-        }
+    boost::optional<Status> overwrittenStatus;
 
-        errorSize += rawMessage.size();
-        return rawMessage;
-    };
-
-    BSONSizeTracker errorsSizeTracker;
-    BSONObjBuilder error(errorsSizeTracker);
-    error.append("index", index);
-    if (auto staleInfo = status.extraInfo<StaleConfigInfo>()) {
-        error.append("code", int(ErrorCodes::StaleShardVersion));  // Different from exception!
-        {
-            BSONObjBuilder errInfo(error.subobjStart("errInfo"));
-            staleInfo->serialize(&errInfo);
-        }
-    } else if (auto docValidationError =
-                   status.extraInfo<doc_validation_error::DocumentValidationFailureInfo>()) {
-        error.append("code", static_cast<int>(ErrorCodes::DocumentValidationFailure));
-        error.append("errInfo", docValidationError->getDetails());
-    } else if (status.code() == ErrorCodes::TenantMigrationConflict) {
+    if (status == ErrorCodes::TenantMigrationConflict) {
         hangWriteBeforeWaitingForMigrationDecision.pauseWhileSet(opCtx);
 
-        auto migrationStatus =
-            tenant_migration_access_blocker::handleTenantMigrationConflict(opCtx, status);
+        overwrittenStatus.emplace(
+            tenant_migration_access_blocker::handleTenantMigrationConflict(opCtx, status));
 
         // Interruption errors encountered during batch execution fail the entire batch, so throw on
         // such errors here for consistency.
-        if (ErrorCodes::isInterruption(migrationStatus)) {
-            uassertStatusOK(migrationStatus);
-        }
-
-        error.append("code", migrationStatus.code());
-
-        // We want to append an empty errmsg for the errors after the first one, so let the
-        // code below that appends errmsg do that.
-        if (status.reason() != "") {
-            error.append("errmsg", errorMessage(migrationStatus.reason()));
-        }
-    } else {
-        error.append("code", int(status.code()));
-        if (auto const extraInfo = status.extraInfo()) {
-            extraInfo->serialize(&error);
+        if (ErrorCodes::isInterruption(*overwrittenStatus)) {
+            uassertStatusOK(*overwrittenStatus);
         }
     }
 
-    // Skip appending errmsg if it has already been appended like in the case of
-    // TenantMigrationConflict.
-    if (!error.hasField("errmsg")) {
-        error.append("errmsg", errorMessage(status.reason()));
-    }
-    return error.obj();
+    constexpr size_t kErrorCountTruncationMin = 2;
+    if (numErrors >= kErrorCountTruncationMin)
+        overwrittenStatus =
+            overwrittenStatus ? overwrittenStatus->withReason("") : status.withReason("");
+
+    if (overwrittenStatus)
+        return write_ops::WriteError(index, std::move(*overwrittenStatus));
+    else
+        return write_ops::WriteError(index, status);
 }
 
 template <typename T>
-boost::optional<BSONObj> generateError(OperationContext* opCtx,
-                                       const StatusWith<T>& result,
-                                       int index,
-                                       size_t numErrors) {
+boost::optional<write_ops::WriteError> generateError(OperationContext* opCtx,
+                                                     const StatusWith<T>& result,
+                                                     int index,
+                                                     size_t numErrors) {
     return generateError(opCtx, result.getStatus(), index, numErrors);
 }
 
@@ -439,11 +406,10 @@ void populateReply(OperationContext* opCtx,
     }
 
     long long nVal = 0;
-    std::vector<BSONObj> errors;
-
+    std::vector<write_ops::WriteError> errors;
     for (size_t i = 0; i < result.results.size(); ++i) {
         if (auto error = generateError(opCtx, result.results[i], i, errors.size())) {
-            errors.push_back(*error);
+            errors.emplace_back(std::move(*error));
             continue;
         }
 
@@ -456,17 +422,13 @@ void populateReply(OperationContext* opCtx,
     }
 
     auto& replyBase = cmdReply->getWriteCommandReplyBase();
+
     replyBase.setN(nVal);
     if (!result.retriedStmtIds.empty()) {
-        replyBase.setRetriedStmtIds(result.retriedStmtIds);
+        replyBase.setRetriedStmtIds(std::move(result.retriedStmtIds));
     }
-
     if (!errors.empty()) {
-        std::vector<write_ops::WriteError> writeErrors;
-        for (const auto& e : errors) {
-            writeErrors.emplace_back(write_ops::WriteError::parse(e));
-        }
-        replyBase.setWriteErrors(std::move(writeErrors));
+        replyBase.setWriteErrors(std::move(errors));
     }
 
     // writeConcernError field is handled by command processor.
@@ -484,7 +446,6 @@ void populateReply(OperationContext* opCtx,
         }
     }
 
-    // Call the called-defined post processing handler.
     if (hooks && hooks->postProcessHandler)
         hooks->postProcessHandler();
 }
@@ -776,7 +737,7 @@ public:
                                      size_t start,
                                      size_t index,
                                      std::vector<StmtId>&& stmtIds,
-                                     std::vector<BSONObj>* errors,
+                                     std::vector<write_ops::WriteError>* errors,
                                      boost::optional<repl::OpTime>* opTime,
                                      boost::optional<OID>* electionId,
                                      std::vector<size_t>* docsToRetry) const {
@@ -801,7 +762,7 @@ public:
                     _performTimeseriesInsert(opCtx, batch, metadata, std::move(stmtIds));
                 if (auto error =
                         generateError(opCtx, output.result, start + index, errors->size())) {
-                    errors->push_back(*error);
+                    errors->emplace_back(std::move(*error));
                     bucketCatalog.abort(batch, output.result.getStatus());
                     batchGuard.dismiss();
                     return output.canContinue;
@@ -816,7 +777,7 @@ public:
                     _performTimeseriesUpdate(opCtx, batch, metadata, std::move(stmtIds));
                 if (auto error =
                         generateError(opCtx, output.result, start + index, errors->size())) {
-                    errors->push_back(*error);
+                    errors->emplace_back(std::move(*error));
                     bucketCatalog.abort(batch, output.result.getStatus());
                     batchGuard.dismiss();
                     return output.canContinue;
@@ -840,7 +801,7 @@ public:
                 auto output = _performTimeseriesBucketCompression(opCtx, *closedBucket);
                 if (auto error =
                         generateError(opCtx, output.result, start + index, errors->size())) {
-                    errors->push_back(*error);
+                    errors->emplace_back(std::move(*error));
                     return output.canContinue;
                 }
             }
@@ -850,7 +811,7 @@ public:
         bool _commitTimeseriesBucketsAtomically(OperationContext* opCtx,
                                                 TimeseriesBatches* batches,
                                                 TimeseriesStmtIds&& stmtIds,
-                                                std::vector<BSONObj>* errors,
+                                                std::vector<write_ops::WriteError>* errors,
                                                 boost::optional<repl::OpTime>* opTime,
                                                 boost::optional<OID>* electionId) const {
             auto& bucketCatalog = BucketCatalog::get(opCtx);
@@ -948,7 +909,7 @@ public:
                                  size_t start,
                                  size_t numDocs,
                                  const std::vector<size_t>& indices,
-                                 std::vector<BSONObj>* errors,
+                                 std::vector<write_ops::WriteError>* errors,
                                  bool* containsRetry) const {
             auto& bucketCatalog = BucketCatalog::get(opCtx);
 
@@ -992,7 +953,7 @@ public:
                     _canCombineTimeseriesInsertWithOtherClients(opCtx));
 
                 if (auto error = generateError(opCtx, result, start + index, errors->size())) {
-                    errors->push_back(*error);
+                    errors->emplace_back(std::move(*error));
                     return false;
                 } else {
                     const auto& batch = result.getValue().batch;
@@ -1016,7 +977,7 @@ public:
                         // Bucket compression only fail when we may not try to perform any other
                         // write operation. When handleError() inside write_ops_exec.cpp return
                         // false.
-                        errors->push_back(*error);
+                        errors->emplace_back(std::move(*error));
                         canContinue = false;
                         return false;
                     }
@@ -1042,28 +1003,16 @@ public:
                     canContinue};
         }
 
-        BSONObj _cloneErrorWithIndex(BSONObj error, size_t index) const {
-            BSONObjBuilder bob;
-            for (auto&& elem : error) {
-                if (elem.fieldNameStringData() == "index") {
-                    bob.append("index", static_cast<int>(index));
-                } else {
-                    bob.append(elem);
-                }
-            }
-            return bob.obj();
-        }
-
         void _getTimeseriesBatchResults(OperationContext* opCtx,
                                         const TimeseriesBatches& batches,
                                         size_t start,
                                         size_t indexOfLastProcessedBatch,
                                         bool canContinue,
-                                        std::vector<BSONObj>* errors,
+                                        std::vector<write_ops::WriteError>* errors,
                                         boost::optional<repl::OpTime>* opTime,
                                         boost::optional<OID>* electionId,
                                         std::vector<size_t>* docsToRetry = nullptr) const {
-            boost::optional<BSONObj> lastError;
+            boost::optional<write_ops::WriteError> lastError;
             if (!errors->empty()) {
                 lastError = errors->back();
             }
@@ -1084,7 +1033,7 @@ public:
                         6023100,
                         "there should be at least one error if the batch processing exited early",
                         lastError);
-                    errors->push_back(_cloneErrorWithIndex(*lastError, start + index));
+                    errors->emplace_back(start + index, lastError->getStatus());
                     continue;
                 }
 
@@ -1096,7 +1045,7 @@ public:
                 }
                 if (auto error = generateError(
                         opCtx, swCommitInfo.getStatus(), start + index, errors->size())) {
-                    errors->push_back(*error);
+                    errors->emplace_back(std::move(*error));
                     continue;
                 }
 
@@ -1113,14 +1062,14 @@ public:
             // error.
             if (!canContinue && docsToRetry) {
                 for (auto&& index : *docsToRetry) {
-                    errors->push_back(_cloneErrorWithIndex(*lastError, start + index));
+                    errors->emplace_back(start + index, lastError->getStatus());
                 }
                 docsToRetry->clear();
             }
         }
 
         bool _performOrderedTimeseriesWritesAtomically(OperationContext* opCtx,
-                                                       std::vector<BSONObj>* errors,
+                                                       std::vector<write_ops::WriteError>* errors,
                                                        boost::optional<repl::OpTime>* opTime,
                                                        boost::optional<OID>* electionId,
                                                        bool* containsRetry) const {
@@ -1149,7 +1098,7 @@ public:
          * Returns the number of documents that were inserted.
          */
         size_t _performOrderedTimeseriesWrites(OperationContext* opCtx,
-                                               std::vector<BSONObj>* errors,
+                                               std::vector<write_ops::WriteError>* errors,
                                                boost::optional<repl::OpTime>* opTime,
                                                boost::optional<OID>* electionId,
                                                bool* containsRetry) const {
@@ -1175,14 +1124,15 @@ public:
          * can be passed as the 'indices' parameter in a subsequent call to this function, in order
          * to to be retried.
          */
-        std::vector<size_t> _performUnorderedTimeseriesWrites(OperationContext* opCtx,
-                                                              size_t start,
-                                                              size_t numDocs,
-                                                              const std::vector<size_t>& indices,
-                                                              std::vector<BSONObj>* errors,
-                                                              boost::optional<repl::OpTime>* opTime,
-                                                              boost::optional<OID>* electionId,
-                                                              bool* containsRetry) const {
+        std::vector<size_t> _performUnorderedTimeseriesWrites(
+            OperationContext* opCtx,
+            size_t start,
+            size_t numDocs,
+            const std::vector<size_t>& indices,
+            std::vector<write_ops::WriteError>* errors,
+            boost::optional<repl::OpTime>* opTime,
+            boost::optional<OID>* electionId,
+            bool* containsRetry) const {
             auto [batches, bucketStmtIds, _, canContinue] =
                 _insertIntoBucketCatalog(opCtx, start, numDocs, indices, errors, containsRetry);
 
@@ -1226,13 +1176,14 @@ public:
             return docsToRetry;
         }
 
-        void _performUnorderedTimeseriesWritesWithRetries(OperationContext* opCtx,
-                                                          size_t start,
-                                                          size_t numDocs,
-                                                          std::vector<BSONObj>* errors,
-                                                          boost::optional<repl::OpTime>* opTime,
-                                                          boost::optional<OID>* electionId,
-                                                          bool* containsRetry) const {
+        void _performUnorderedTimeseriesWritesWithRetries(
+            OperationContext* opCtx,
+            size_t start,
+            size_t numDocs,
+            std::vector<write_ops::WriteError>* errors,
+            boost::optional<repl::OpTime>* opTime,
+            boost::optional<OID>* electionId,
+            bool* containsRetry) const {
             std::vector<size_t> docsToRetry;
             do {
                 docsToRetry = _performUnorderedTimeseriesWrites(
@@ -1271,7 +1222,7 @@ public:
                 curOp.debug().additiveMetrics.ninserted = 0;
             }
 
-            std::vector<BSONObj> errors;
+            std::vector<write_ops::WriteError> errors;
             boost::optional<repl::OpTime> opTime;
             boost::optional<OID> electionId;
             bool containsRetry = false;
@@ -1294,11 +1245,7 @@ public:
             }
 
             if (!errors.empty()) {
-                std::vector<write_ops::WriteError> writeErrors;
-                for (const auto& e : errors) {
-                    writeErrors.emplace_back(write_ops::WriteError::parse(e));
-                }
-                baseReply.setWriteErrors(std::move(writeErrors));
+                baseReply.setWriteErrors(std::move(errors));
             }
             if (opTime) {
                 baseReply.setOpTime(*opTime);
