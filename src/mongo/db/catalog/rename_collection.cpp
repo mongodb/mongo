@@ -705,8 +705,8 @@ Status renameBetweenDBs(OperationContext* opCtx,
                 }
 
                 OpDebug* const opDebug = nullptr;
-                auto status =
-                    autoTmpColl->insertDocuments(opCtx, stmts.begin(), stmts.end(), opDebug, true);
+                auto status = autoTmpColl->insertDocuments(
+                    opCtx, stmts.begin(), stmts.end(), opDebug, false /* fromMigrate */);
                 if (!status.isOK()) {
                     return status;
                 }
