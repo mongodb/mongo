@@ -1981,9 +1981,9 @@ public:
                 getNewCollectionIndexIdent(durableCatalog, origIdents);
         }
 
-        AutoGetCollection coll(_opCtx, nss, LockMode::MODE_X);
         {
             // Drop/rename `kvDropDatabase`. `system.profile` does not get dropped/renamed.
+            AutoGetCollection coll(_opCtx, nss, LockMode::MODE_X);
             WriteUnitOfWork wuow(_opCtx);
             Database* db = coll.getDb();
             ASSERT_OK(db->dropCollection(_opCtx, nss));

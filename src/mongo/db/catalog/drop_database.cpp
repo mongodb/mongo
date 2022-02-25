@@ -122,6 +122,11 @@ void _finishDropDatabase(OperationContext* opCtx,
 }
 
 Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool abortIndexBuilds) {
+    // As this code can potentially require replication we disallow holding locks entirely. Holding
+    // of any locks is disallowed while awaiting replication because this can potentially block for
+    // long time while doing network activity.
+    invariant(!opCtx->lockState()->isLocked());
+
     uassert(ErrorCodes::IllegalOperation,
             "Cannot drop a database in read-only mode",
             !storageGlobalParams.readOnly);
@@ -304,8 +309,7 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
         }
     });
 
-    // Holding of any locks is disallowed while awaiting replication because this can potentially
-    // block for long time while doing network activity.
+    // Verify again that we haven't obtained any other locks before replication.
     invariant(!opCtx->lockState()->isLocked());
 
     auto awaitOpTime = [&]() {
