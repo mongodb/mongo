@@ -7,11 +7,14 @@
 //
 //       These transitions are tested for $where and MapReduce.
 
-var conn = MongoRunner.runMongod();
-var test = conn.getDB("test");
+(function() {
+'use strict';
+
+const conn = MongoRunner.runMongod();
+const test = conn.getDB("test");
 
 // insert a single document and add two test users
-test.foo.insert({a: 1});
+assert.writeOK(test.foo.insert({a: 1}));
 assert.eq(1, test.foo.findOne().a);
 test.createUser({user: 'a', pwd: 'a', roles: jsTest.basicUserRoles});
 test.createUser({user: 'b', pwd: 'b', roles: jsTest.basicUserRoles});
@@ -32,49 +35,59 @@ function testWhere() {
     test.foo.findOne({$where: 'someGlobal = "noUsers";'});
 
     // test new user auth causes scope to be cleared
-    test.auth('a', 'a');
+    assert(test.auth('a', 'a'));
     assert.eq(
         1, test.foo.count({$where: 'return ' + missingOrEquals('a')}), "$where: Auth user 'a");
 
     // test auth as another user causes scope to be cleared
     test.foo.findOne({$where: 'someGlobal = "a";'});
+    test.logout();
+
     test.auth('b', 'b');
     assert(test.foo.count({$where: 'return ' + missingOrEquals('a&b')}), "$where: Auth user 'b'");
     // test user logout causes scope to be cleared
     test.foo.findOne({$where: 'someGlobal = "a&b";'});
     test.logout();
+
     assert(test.foo.count({$where: 'return ' + missingOrEquals('noUsers')}), "$where: log out");
 }
 testWhere();
 testWhere();
 
 function testMapReduce() {
-    var mapSet = function(string) {
+    function mapSet(string) {
         return Function('someGlobal = "' + string + '"');
-    };
-    var mapGet = function(string) {
+    }
+
+    function mapGet(string) {
         return Function('assert(' + missingOrEquals(string) + ')');
-    };
-    var reduce = function(k, v) {};
-    var setGlobalInMap = function(string) {
+    }
+
+    function reduce(k, v) {
+        // Do nothing
+    }
+
+    function setGlobalInMap(string) {
         test.foo.mapReduce(mapSet(string), reduce, {out: {inline: 1}});
-    };
-    var getGlobalFromMap = function(string) {
+    }
+
+    function getGlobalFromMap(string) {
         test.foo.mapReduce(mapGet(string), reduce, {out: {inline: 1}});
-    };
+    }
 
     // set the global variable 'someGlobal' before authenticating
     setGlobalInMap('noUsers');
 
     // test new user auth causes scope to be cleared
-    test.auth('a', 'a');
+    assert(test.auth('a', 'a'));
     assert.doesNotThrow(function() {
         getGlobalFromMap('a');
     }, [], "M/R: Auth user 'a'");
 
     // test auth as another user causes scope to be cleared
     setGlobalInMap('a');
-    test.auth('b', 'b');
+    test.logout();
+    assert(test.auth('b', 'b'));
     assert.doesNotThrow(function() {
         getGlobalFromMap('a&b');
     }, [], "M/R: Auth user 'b'");
@@ -90,3 +103,4 @@ testMapReduce();
 testMapReduce();
 
 MongoRunner.stopMongod(conn);
+})();
