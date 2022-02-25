@@ -377,6 +377,7 @@ public:
     bool fromMongos = false;
     bool needsMerge = false;
     bool inMongos = false;
+    bool forPerShardCursor = false;
     bool allowDiskUse = false;
     bool bypassDocumentValidation = false;
     bool inMultiDocumentTransaction = false;

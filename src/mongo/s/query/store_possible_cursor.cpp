@@ -77,7 +77,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         std::shared_ptr<executor::TaskExecutor> executor,
                                         ClusterCursorManager* cursorManager,
                                         PrivilegeVector privileges,
-                                        TailableModeEnum tailableMode) {
+                                        TailableModeEnum tailableMode,
+                                        boost::optional<BSONObj> routerSort) {
     if (!cmdResult["ok"].trueValue() || !cmdResult.hasField("cursor")) {
         return cmdResult;
     }
@@ -115,6 +116,9 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     params.lsid = opCtx->getLogicalSessionId();
     params.txnNumber = opCtx->getTxnNumber();
     params.originatingPrivileges = std::move(privileges);
+    if (routerSort) {
+        params.sortToApplyOnRouter = *routerSort;
+    }
 
     if (TransactionRouter::get(opCtx)) {
         params.isAutoCommit = false;

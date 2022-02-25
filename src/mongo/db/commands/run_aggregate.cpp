@@ -450,6 +450,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     expCtx->inMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
     expCtx->collationMatchesDefault = collationMatchesDefault;
+    expCtx->forPerShardCursor = request.getPassthroughToShard().has_value();
 
     return expCtx;
 }
