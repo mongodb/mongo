@@ -425,6 +425,9 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
                                     << " in database " << dbAndUUID.db() << " does not exist.");
         }
 
+        // The collection could have been renamed when we dropped locks.
+        collNs = (*collection)->ns();
+
         uassertStatusOK(checkReplState(opCtx, dbAndUUID, collection->getCollection()));
 
         // Check to see if a new index build was started that the caller requested to be
@@ -437,10 +440,10 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
         }
 
         if (!abortAgain) {
-            assertMovePrimaryInProgress(opCtx, nss);
-            CollectionShardingState::get(opCtx, nss)
+            assertMovePrimaryInProgress(opCtx, collNs);
+            CollectionShardingState::get(opCtx, collNs)
                 ->getCollectionDescription(opCtx)
-                .throwIfReshardingInProgress(nss);
+                .throwIfReshardingInProgress(collNs);
             break;
         }
     }
