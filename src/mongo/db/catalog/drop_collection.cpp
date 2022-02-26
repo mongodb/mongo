@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/drop_collection.h"
 
 #include "mongo/db/audit.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/uncommitted_collections.h"
@@ -46,7 +47,6 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
@@ -87,7 +87,8 @@ Status _dropView(OperationContext* opCtx,
         return ex.toStatus();
     }
 
-    auto view = ViewCatalog::get(opCtx)->lookupWithoutValidatingDurableViews(opCtx, collectionName);
+    auto view =
+        CollectionCatalog::get(opCtx)->lookupViewWithoutValidatingDurable(opCtx, collectionName);
     if (!view) {
         Status status = Status(ErrorCodes::NamespaceNotFound, "ns not found");
         audit::logDropView(opCtx->getClient(), collectionName, "", {}, status.code());
@@ -95,7 +96,7 @@ Status _dropView(OperationContext* opCtx,
     }
 
     // Validates the view or throws an "invalid view" error.
-    ViewCatalog::get(opCtx)->lookup(opCtx, collectionName);
+    CollectionCatalog::get(opCtx)->lookupView(opCtx, collectionName);
 
     // Operations all lock system.views in the end to prevent deadlock.
     Lock::CollectionLock systemViewsLock(opCtx, db->getSystemViewsName(), MODE_X);
@@ -384,8 +385,8 @@ Status _dropCollection(OperationContext* opCtx,
                     false /* appendNs */);
             };
 
-            auto view =
-                ViewCatalog::get(opCtx)->lookupWithoutValidatingDurableViews(opCtx, collectionName);
+            auto view = CollectionCatalog::get(opCtx)->lookupViewWithoutValidatingDurable(
+                opCtx, collectionName);
             if (!view) {
                 // Timeseries bucket collection may exist even without the view. If that is the case
                 // delete it.

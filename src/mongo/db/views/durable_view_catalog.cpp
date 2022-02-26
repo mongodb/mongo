@@ -35,7 +35,9 @@
 
 #include <string>
 
+#include "mongo/db/audit.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -45,7 +47,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/tenant_database_name.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
@@ -61,15 +62,10 @@ void DurableViewCatalog::onExternalChange(OperationContext* opCtx, const Namespa
         NamespaceString(name.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
     // On an external change, an invalid view definition can be detected when the view catalog
-    // is reloaded. This will prevent any further usage of the view catalog until the invalid
-    // view definitions are removed. We use kValidateDurableViews here to catch any invalid view
-    // definitions in the view catalog to make it unusable for subsequent callers.
-    if (ViewCatalog::shouldIgnoreExternalChange(opCtx, name)) {
-        return;
-    }
-
-    ViewCatalog::reload(opCtx, name.db(), ViewCatalogLookupBehavior::kValidateDurableViews)
-        .ignore();
+    // is reloaded. This will prevent any further usage of the views for this database until the
+    // invalid view definitions are removed.
+    auto catalog = CollectionCatalog::get(opCtx);
+    catalog->reloadViews(opCtx, name.db()).ignore();
 }
 
 void DurableViewCatalog::onSystemViewsCollectionDrop(OperationContext* opCtx,
@@ -79,14 +75,24 @@ void DurableViewCatalog::onSystemViewsCollectionDrop(OperationContext* opCtx,
         NamespaceString(name.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
     dassert(name.coll() == NamespaceString::kSystemDotViewsCollectionName);
 
-    const TenantDatabaseName tenantDbName(boost::none, name.db());
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto db = databaseHolder->getDb(opCtx, tenantDbName);
-    if (db) {
-        // If the 'system.views' collection is dropped, we need to clear the in-memory state of the
-        // view catalog.
-        ViewCatalog::clear(opCtx, name.db());
-    }
+    auto catalog = CollectionCatalog::get(opCtx);
+
+    // First, iterate through the views on this database and audit them before they are dropped.
+    catalog->iterateViews(opCtx,
+                          name.db(),
+                          [&](const ViewDefinition& view) -> bool {
+                              audit::logDropView(opCtx->getClient(),
+                                                 view.name(),
+                                                 view.viewOn().ns(),
+                                                 view.pipeline(),
+                                                 ErrorCodes::OK);
+                              return true;
+                          },
+                          ViewCatalogLookupBehavior::kAllowInvalidViews);
+
+    // If the 'system.views' collection is dropped, we need to clear the in-memory state of the
+    // view catalog.
+    catalog->clearViews(opCtx, name.db());
 }
 
 // DurableViewCatalogImpl
@@ -95,17 +101,13 @@ const std::string& DurableViewCatalogImpl::getName() const {
     return _db->name().dbName();
 }
 
-bool DurableViewCatalogImpl::belongsTo(const Database* db) const {
-    return _db == db;
-}
-
 void DurableViewCatalogImpl::iterate(OperationContext* opCtx, Callback callback) {
-    _iterate(opCtx, callback, ViewCatalogLookupBehavior::kValidateDurableViews);
+    _iterate(opCtx, callback, ViewCatalogLookupBehavior::kValidateViews);
 }
 
 void DurableViewCatalogImpl::iterateIgnoreInvalidEntries(OperationContext* opCtx,
                                                          Callback callback) {
-    _iterate(opCtx, callback, ViewCatalogLookupBehavior::kAllowInvalidDurableViews);
+    _iterate(opCtx, callback, ViewCatalogLookupBehavior::kAllowInvalidViews);
 }
 
 void DurableViewCatalogImpl::_iterate(OperationContext* opCtx,
@@ -126,7 +128,7 @@ void DurableViewCatalogImpl::_iterate(OperationContext* opCtx,
             viewDefinition = _validateViewDefinition(opCtx, record->data);
             uassertStatusOK(callback(viewDefinition));
         } catch (const ExceptionFor<ErrorCodes::InvalidViewDefinition>& ex) {
-            if (lookupBehavior == ViewCatalogLookupBehavior::kValidateDurableViews) {
+            if (lookupBehavior == ViewCatalogLookupBehavior::kValidateViews) {
                 throw ex;
             }
         }

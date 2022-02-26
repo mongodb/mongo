@@ -44,7 +44,6 @@
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_util.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -198,15 +197,10 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                     // Make sure the target namespace is not a view
                     {
-                        Lock::DBLock dbLock(opCtx, toNss.db(), MODE_IS);
-                        const TenantDatabaseName tenantDbName(boost::none, toNss.db());
-                        const auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, tenantDbName);
-                        if (db) {
-                            uassert(ErrorCodes::CommandNotSupportedOnView,
-                                    str::stream() << "Can't rename to target collection `" << toNss
-                                                  << "` because it is a view.",
-                                    !ViewCatalog::get(opCtx)->lookup(opCtx, toNss));
-                        }
+                        uassert(ErrorCodes::CommandNotSupportedOnView,
+                                str::stream() << "Can't rename to target collection `" << toNss
+                                              << "` because it is a view.",
+                                !CollectionCatalog::get(opCtx)->lookupView(opCtx, toNss));
                     }
 
                     const auto optTargetCollType = getShardedCollection(opCtx, toNss);

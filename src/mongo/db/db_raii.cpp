@@ -33,6 +33,7 @@
 
 #include "mongo/db/db_raii.h"
 
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
@@ -40,7 +41,6 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/storage/snapshot_helper.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -125,7 +125,7 @@ Status checkSecondaryCollection(OperationContext* opCtx,
  * Returns true if 'nss' is a view. False if the view doesn't exist.
  */
 bool isSecondaryNssAView(OperationContext* opCtx, const NamespaceString& nss) {
-    return ViewCatalog::get(opCtx)->lookup(opCtx, nss).get();
+    return CollectionCatalog::get(opCtx)->lookupView(opCtx, nss).get();
 }
 
 /**

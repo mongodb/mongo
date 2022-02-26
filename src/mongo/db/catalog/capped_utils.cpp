@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/capped_utils.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/drop_collection.h"
@@ -52,7 +53,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -75,7 +75,7 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
     CollectionWriter collection(opCtx, collectionName);
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "emptycapped not supported on view: " << collectionName.ns(),
-            collection || !ViewCatalog::get(opCtx)->lookup(opCtx, collectionName));
+            collection || !CollectionCatalog::get(opCtx)->lookupView(opCtx, collectionName));
     uassert(ErrorCodes::NamespaceNotFound, "no such collection", collection);
 
     if (collectionName.isSystem() && !collectionName.isSystemDotProfile()) {
@@ -127,7 +127,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
     if (!fromCollection) {
         uassert(ErrorCodes::CommandNotSupportedOnView,
                 str::stream() << "cloneCollectionAsCapped not supported for views: " << fromNss,
-                !ViewCatalog::get(opCtx)->lookup(opCtx, fromNss));
+                !CollectionCatalog::get(opCtx)->lookupView(opCtx, fromNss));
 
         uasserted(ErrorCodes::NamespaceNotFound,
                   str::stream() << "source collection " << fromNss << " does not exist");

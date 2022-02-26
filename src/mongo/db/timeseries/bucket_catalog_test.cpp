@@ -33,7 +33,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"

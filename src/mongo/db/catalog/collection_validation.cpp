@@ -48,7 +48,6 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"

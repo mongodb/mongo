@@ -81,7 +81,7 @@
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/view.h"
-#include "mongo/db/views/view_catalog.h"
+#include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/string_map.h"
@@ -291,13 +291,12 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
         return {StringMap<ExpressionContext::ResolvedNamespace>()};
     }
 
-    // Acquire a single const view of the database's ViewCatalog (if it exists) and use it for all
-    // view definition resolutions that follow. This prevents the view definitions cached in
-    // 'resolvedNamespaces' from changing relative to those in the acquired ViewCatalog. The
-    // resolution of the view definitions below might lead into an endless cycle if any are allowed
-    // to change.
-    const TenantDatabaseName tenantDbName(boost::none, request.getNamespace().db());
-    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, tenantDbName);
+    // Acquire a single const view of the CollectionCatalog and use it for all view and collection
+    // lookups and view definition resolutions that follow. This prevents the view definitions
+    // cached in 'resolvedNamespaces' from changing relative to those in the acquired ViewCatalog.
+    // The resolution of the view definitions below might lead into an endless cycle if any are
+    // allowed to change.
+    auto catalog = CollectionCatalog::get(opCtx);
 
     std::deque<NamespaceString> involvedNamespacesQueue(pipelineInvolvedNamespaces.begin(),
                                                         pipelineInvolvedNamespaces.end());
@@ -312,9 +311,8 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
         }
 
         // If 'ns' refers to a view namespace, then we resolve its definition.
-        auto resolveViewDefinition = [&](const NamespaceString& ns,
-                                         std::shared_ptr<const ViewCatalog> vcp) -> Status {
-            auto resolvedView = vcp->resolveView(opCtx, ns, boost::none);
+        auto resolveViewDefinition = [&](const NamespaceString& ns) -> Status {
+            auto resolvedView = view_catalog_helpers::resolveView(opCtx, catalog, ns, boost::none);
             if (!resolvedView.isOK()) {
                 return resolvedView.getStatus().withContext(
                     str::stream() << "Failed to resolve view '" << involvedNs.ns());
@@ -322,7 +320,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
 
             auto&& underlyingNs = resolvedView.getValue().getNamespace();
             // Attempt to acquire UUID of the underlying collection using lock free method.
-            auto uuid = CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, underlyingNs);
+            auto uuid = catalog->lookupUUIDByNSS(opCtx, underlyingNs);
             resolvedNamespaces[ns.coll()] = {
                 underlyingNs, resolvedView.getValue().getPipeline(), uuid};
 
@@ -348,14 +346,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
                 // require a lookup stage involving a view on the 'local' database.
                 // If the involved namespace is 'local.system.tenantMigration.oplogView', resolve
                 // its view definition.
-                const TenantDatabaseName involvedTenantDbName(boost::none, involvedNs.db());
-                auto involvedDbViewCatalog =
-                    DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, involvedTenantDbName);
-
-                // It is safe to assume that the ViewCatalog for the `local` database always
-                // exists because replica sets forbid dropping the oplog and the `local` database.
-                invariant(involvedDbViewCatalog);
-                auto status = resolveViewDefinition(involvedNs, involvedDbViewCatalog);
+                auto status = resolveViewDefinition(involvedNs);
                 if (!status.isOK()) {
                     return status;
                 }
@@ -367,8 +358,8 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
                 // that the inverse scenario (mistaking a view for a collection) is not an issue
                 // because $merge/$out cannot target a view.
                 auto nssToCheck = NamespaceString(request.getNamespace().db(), involvedNs.coll());
-                if (viewCatalog && viewCatalog->lookup(opCtx, nssToCheck)) {
-                    auto status = resolveViewDefinition(nssToCheck, viewCatalog);
+                if (catalog->lookupView(opCtx, nssToCheck)) {
+                    auto status = resolveViewDefinition(nssToCheck);
                     if (!status.isOK()) {
                         return status;
                     }
@@ -376,18 +367,14 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
                     resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
                 }
             }
-        } else if (!viewCatalog ||
-                   CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, involvedNs)) {
+        } else if (catalog->lookupCollectionByNamespace(opCtx, involvedNs)) {
             // Attempt to acquire UUID of the collection using lock free method.
-            auto uuid = CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, involvedNs);
-            // If the aggregation database exists and 'involvedNs' refers to a collection namespace,
-            // then we resolve it as an empty pipeline in order to read directly from the underlying
-            // collection. If the database doesn't exist, then we still resolve it as an empty
-            // pipeline because 'involvedNs' doesn't refer to a view namespace in our consistent
-            // snapshot of the view catalog.
+            auto uuid = catalog->lookupUUIDByNSS(opCtx, involvedNs);
+            // If 'involvedNs' refers to a collection namespace, then we resolve it as an empty
+            // pipeline in order to read directly from the underlying collection.
             resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}, uuid};
-        } else if (viewCatalog->lookup(opCtx, involvedNs)) {
-            auto status = resolveViewDefinition(involvedNs, viewCatalog);
+        } else if (catalog->lookupView(opCtx, involvedNs)) {
+            auto status = resolveViewDefinition(involvedNs);
             if (!status.isOK()) {
                 return status;
             }
@@ -409,18 +396,13 @@ Status collatorCompatibleWithPipeline(OperationContext* opCtx,
                                       StringData dbName,
                                       const CollatorInterface* collator,
                                       const LiteParsedPipeline& liteParsedPipeline) {
-    const TenantDatabaseName tenantDbName(boost::none, dbName);
-    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, tenantDbName);
-    if (!viewCatalog) {
-        return Status::OK();
-    }
     auto catalog = CollectionCatalog::get(opCtx);
     for (auto&& potentialViewNs : liteParsedPipeline.getInvolvedNamespaces()) {
         if (catalog->lookupCollectionByNamespace(opCtx, potentialViewNs)) {
             continue;
         }
 
-        auto view = viewCatalog->lookup(opCtx, potentialViewNs);
+        auto view = catalog->lookupView(opCtx, potentialViewNs);
         if (!view) {
             continue;
         }
@@ -686,6 +668,7 @@ Status runAggregate(OperationContext* opCtx,
     std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     boost::intrusive_ptr<ExpressionContext> expCtx;
     auto curOp = CurOp::get(opCtx);
+    auto catalog = CollectionCatalog::get(opCtx);
 
     {
         // If we are in a transaction, check whether the parsed pipeline supports being in
@@ -718,19 +701,15 @@ Status runAggregate(OperationContext* opCtx,
             // a stream on an entire db or across the cluster.
             const TenantDatabaseName origTenantDbName(boost::none, origNss.db());
             if (!origNss.isCollectionlessAggregateNS()) {
-                auto viewCatalog =
-                    DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, origTenantDbName);
-                if (viewCatalog) {
-                    auto view = viewCatalog->lookup(opCtx, origNss);
-                    uassert(ErrorCodes::CommandNotSupportedOnView,
-                            str::stream()
-                                << "Namespace " << origNss.ns() << " is a timeseries collection",
-                            !view || !view->timeseries());
-                    uassert(ErrorCodes::CommandNotSupportedOnView,
-                            str::stream()
-                                << "Namespace " << origNss.ns() << " is a view, not a collection",
-                            !view);
-                }
+                auto view = catalog->lookupView(opCtx, origNss);
+                uassert(ErrorCodes::CommandNotSupportedOnView,
+                        str::stream()
+                            << "Namespace " << origNss.ns() << " is a timeseries collection",
+                        !view || !view->timeseries());
+                uassert(ErrorCodes::CommandNotSupportedOnView,
+                        str::stream()
+                            << "Namespace " << origNss.ns() << " is a view, not a collection",
+                        !view);
             }
 
             // If the user specified an explicit collation, adopt it; otherwise, use the simple
@@ -816,16 +795,15 @@ Status runAggregate(OperationContext* opCtx,
             auto timeSeriesCollator =
                 ctx->getView()->timeseries() ? request.getCollation() : boost::none;
 
-            // Check that the database/view catalog still exist, in case this is a lock-free
+            // Check that the database still exists, in case this is a lock-free
             // operation. It's possible for a view to disappear after we release locks below, so
             // it's safe to quit early if the view disappears while running lock-free.
             const TenantDatabaseName tenantDbName(boost::none, nss.db());
-            auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, tenantDbName);
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "Namespace '" << nss << "' no longer exists",
-                    viewCatalog);
-            auto resolvedView =
-                uassertStatusOK(viewCatalog->resolveView(opCtx, nss, timeSeriesCollator));
+                    DatabaseHolder::get(opCtx)->dbExists(opCtx, tenantDbName));
+            auto resolvedView = uassertStatusOK(
+                view_catalog_helpers::resolveView(opCtx, catalog, nss, timeSeriesCollator));
 
             // With the view & collation resolved, we can relinquish locks.
             resetContext();

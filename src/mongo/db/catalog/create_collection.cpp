@@ -59,7 +59,6 @@
 #include "mongo/db/tenant_database_name.h"
 #include "mongo/db/tenant_namespace.h"
 #include "mongo/db/timeseries/timeseries_options.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"

@@ -46,11 +46,6 @@ public:
         return false;
     }
 
-    std::shared_ptr<const ViewCatalog> getViewCatalog(
-        OperationContext* const opCtx, const TenantDatabaseName& tenantDbName) const override {
-        return nullptr;
-    }
-
     Database* openDb(OperationContext* opCtx,
                      const TenantDatabaseName& tenantDbName,
                      bool* justCreated = nullptr) override {

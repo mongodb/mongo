@@ -34,13 +34,13 @@
 #include "mongo/db/catalog/validate_state.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/catalog/validate_adaptor.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
@@ -80,7 +80,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
         _collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, _nss);
 
     if (!_collection) {
-        if (ViewCatalog::get(opCtx)->lookup(opCtx, _nss)) {
+        if (CollectionCatalog::get(opCtx)->lookupView(opCtx, _nss)) {
             uasserted(ErrorCodes::CommandNotSupportedOnView, "Cannot validate a view");
         }
 

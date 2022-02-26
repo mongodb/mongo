@@ -53,6 +53,11 @@ const ServiceContext::Decoration<LatestCollectionCatalog> getCatalog =
 
 std::shared_ptr<CollectionCatalog> batchedCatalogWriteInstance;
 
+const OperationContext::Decoration<std::shared_ptr<const CollectionCatalog>> stashedCatalog =
+    OperationContext::declareDecoration<std::shared_ptr<const CollectionCatalog>>();
+
+}  // namespace
+
 /**
  * Decoration on RecoveryUnit to store cloned Collections until they are committed or rolled
  * back TODO SERVER-51236: This should be merged with UncommittedCollections
@@ -62,19 +67,25 @@ public:
     struct Entry {
         enum class Action {
             // Writable clone
-            kWritable,
+            kWritableCollection,
             // Marker to indicate that the namespace has been renamed
-            kRenamed,
+            kRenamedCollection,
             // Dropped collection instance
-            kDropped,
+            kDroppedCollection,
             // Recreated collection after drop
-            kRecreated
+            kRecreatedCollection,
+            // Replaced views for a particular database
+            kReplacedViewsForDatabase,
+            // Add a view resource
+            kAddViewResource,
+            // Remove a view resource
+            kRemoveViewResource,
         };
 
-        UUID uuid() const {
-            if (action == Action::kDropped || action == Entry::Action::kRecreated)
-                return *externalUUID;
-            return collection->uuid();
+        boost::optional<UUID> uuid() const {
+            if (action == Action::kWritableCollection || action == Action::kRenamedCollection)
+                return collection->uuid();
+            return externalUUID;
         }
 
         // Type of action this entry has stored. Members below may or may not be set depending on
@@ -82,7 +93,7 @@ public:
         Action action;
 
         // Storage for the actual collection.
-        // Set for actions kWritable, kRecreated. nullptr otherwise.
+        // Set for actions kWritableCollection, kRecreatedCollection. nullptr otherwise.
         std::shared_ptr<Collection> collection;
 
         // Store namespace separately to handle rename and drop without making writable first
@@ -90,24 +101,38 @@ public:
         NamespaceString nss;
 
         // External uuid when not accessible via collection
-        // Set for actions kDropped, kRecreated. boost::none otherwise.
+        // Set for actions kDroppedCollection, kRecreatedCollection. boost::none otherwise.
         boost::optional<UUID> externalUUID;
 
         // New namespace this collection has been renamed to
-        // Set for action kRenamed. Default constructed otherwise.
+        // Set for action kRenamedCollection. Default constructed otherwise.
         NamespaceString renameTo;
+
+        // New set of view information for a database.
+        // Set for action kReplacedViewsForDatabase, boost::none otherwise.
+        boost::optional<ViewsForDatabase> viewsForDb;
     };
+
+    /**
+     * Determine if an entry is associated with a collection action (as opposed to a view action).
+     */
+    static bool isCollectionEntry(const Entry& entry) {
+        return (entry.action == Entry::Action::kWritableCollection ||
+                entry.action == Entry::Action::kRenamedCollection ||
+                entry.action == Entry::Action::kDroppedCollection ||
+                entry.action == Entry::Action::kRecreatedCollection);
+    }
 
     /**
      * Lookup of Collection by UUID. The boolean indicates if this namespace is managed.
      * A managed Collection pointer may be returned as nullptr, which indicates a drop.
      * If the returned boolean is false then the Collection will always be nullptr.
      */
-    std::pair<bool, Collection*> lookup(UUID uuid) const {
+    std::pair<bool, Collection*> lookupCollection(UUID uuid) const {
         // Doing reverse search so we find most recent entry affecting this uuid
         auto it = std::find_if(_entries.rbegin(), _entries.rend(), [uuid](auto&& entry) {
             // Rename actions don't have UUID
-            if (entry.action == Entry::Action::kRenamed)
+            if (entry.action == Entry::Action::kRenamedCollection)
                 return false;
 
             return entry.uuid() == uuid;
@@ -122,40 +147,52 @@ public:
      * A managed Collection pointer may be returned as nullptr, which indicates drop or rename.
      * If the returned boolean is false then the Collection will always be nullptr.
      */
-    std::pair<bool, Collection*> lookup(const NamespaceString& nss) const {
+    std::pair<bool, Collection*> lookupCollection(const NamespaceString& nss) const {
         // Doing reverse search so we find most recent entry affecting this namespace
-        auto it = std::find_if(
-            _entries.rbegin(), _entries.rend(), [&nss](auto&& entry) { return entry.nss == nss; });
+        auto it = std::find_if(_entries.rbegin(), _entries.rend(), [&nss](auto&& entry) {
+            return entry.nss == nss && isCollectionEntry(entry);
+        });
         if (it == _entries.rend())
             return {false, nullptr};
         return {true, it->collection.get()};
     }
 
+    boost::optional<const ViewsForDatabase&> getViewsForDatabase(StringData dbName) const {
+        // Doing reverse search so we find most recent entry affecting this namespace
+        auto it = std::find_if(_entries.rbegin(), _entries.rend(), [&](auto&& entry) {
+            return entry.nss.db() == dbName && entry.viewsForDb;
+        });
+        if (it == _entries.rend())
+            return boost::none;
+        return {*it->viewsForDb};
+    }
+
     /**
      * Manage the lifetime of uncommitted writable collection
      */
-    void writable(std::shared_ptr<Collection> collection) {
+    void writableCollection(std::shared_ptr<Collection> collection) {
         const auto& ns = collection->ns();
-        _entries.push_back({Entry::Action::kWritable, std::move(collection), ns});
+        _entries.push_back({Entry::Action::kWritableCollection, std::move(collection), ns});
     }
 
     /**
      * Manage an uncommitted rename, pointer must have made writable first and should exist in entry
      * list
      */
-    void rename(const Collection* collection, const NamespaceString& from) {
+    void renameCollection(const Collection* collection, const NamespaceString& from) {
         auto it = std::find_if(_entries.rbegin(), _entries.rend(), [collection](auto&& entry) {
             return entry.collection.get() == collection;
         });
         invariant(it != _entries.rend());
         it->nss = collection->ns();
-        _entries.push_back({Entry::Action::kRenamed, nullptr, from, boost::none, it->nss});
+        _entries.push_back(
+            {Entry::Action::kRenamedCollection, nullptr, from, boost::none, it->nss});
     }
 
     /**
      * Manage an uncommitted collection drop
      */
-    void drop(const Collection* collection) {
+    void dropCollection(const Collection* collection) {
         auto it = std::find_if(
             _entries.rbegin(), _entries.rend(), [uuid = collection->uuid()](auto&& entry) {
                 return entry.uuid() == uuid;
@@ -163,13 +200,13 @@ public:
         if (it == _entries.rend()) {
             // Entry with this uuid was not found, add new
             _entries.push_back(
-                {Entry::Action::kDropped, nullptr, collection->ns(), collection->uuid()});
+                {Entry::Action::kDroppedCollection, nullptr, collection->ns(), collection->uuid()});
             return;
         }
 
         // If we have been recreated after drop we can simply just erase this entry so lookup will
         // then find previous drop
-        if (it->action == Entry::Action::kRecreated) {
+        if (it->action == Entry::Action::kRecreatedCollection) {
             _entries.erase(it.base());
             return;
         }
@@ -180,7 +217,7 @@ public:
 
         // Transform found entry into dropped.
         invariant(it->collection.get() == collection);
-        it->action = Entry::Action::kDropped;
+        it->action = Entry::Action::kDroppedCollection;
         it->externalUUID = it->collection->uuid();
         it->collection = nullptr;
     }
@@ -188,9 +225,47 @@ public:
     /**
      * Re-creates a collection that has previously been dropped
      */
-    void createAfterDrop(UUID uuid, std::shared_ptr<Collection> collection) {
+    void createCollectionAfterDrop(UUID uuid, std::shared_ptr<Collection> collection) {
         const auto& ns = collection->ns();
-        _entries.push_back({Entry::Action::kRecreated, std::move(collection), ns, uuid});
+        _entries.push_back({Entry::Action::kRecreatedCollection, std::move(collection), ns, uuid});
+    }
+
+    /**
+     * Replace the ViewsForDatabase instance assocated with database `dbName` with `vfdb`. This is
+     * the primary low-level write method to alter any information about the views associated with a
+     * given database.
+     */
+    void replaceViewsForDatabase(StringData dbName, ViewsForDatabase&& vfdb) {
+        _entries.push_back({Entry::Action::kReplacedViewsForDatabase,
+                            nullptr,
+                            NamespaceString{dbName},
+                            boost::none,
+                            {},
+                            std::move(vfdb)});
+    }
+
+    /**
+     * Adds a ResourceID associated with a view namespace, and registers a preCommitHook to do
+     * conflict-checking on the view namespace.
+     */
+    void addView(OperationContext* opCtx, const NamespaceString nss) {
+        opCtx->recoveryUnit()->registerPreCommitHook([nss](OperationContext* opCtx) {
+            CollectionCatalog::write(opCtx, [opCtx, nss](CollectionCatalog& catalog) {
+                catalog.registerUncommittedView(opCtx, nss);
+            });
+        });
+        opCtx->recoveryUnit()->onRollback([opCtx, nss]() {
+            CollectionCatalog::write(
+                opCtx, [&](CollectionCatalog& catalog) { catalog.deregisterUncommittedView(nss); });
+        });
+        _entries.push_back({Entry::Action::kAddViewResource, nullptr, nss});
+    }
+
+    /**
+     * Removes the ResourceID associated with a view namespace.
+     */
+    void removeView(const NamespaceString nss) {
+        _entries.push_back({Entry::Action::kRemoveViewResource, nullptr, nss});
     }
 
     /**
@@ -202,12 +277,37 @@ public:
         return ret;
     }
 
+    /**
+     * The catalog needs to ignore external view changes for its own modifications. This method
+     * should be used by DDL operations to prevent op observers from triggering additional catalog
+     * operations.
+     */
+    void setIgnoreExternalViewChanges(StringData dbName, bool value) {
+        if (value) {
+            _ignoreExternalViewChanges.emplace(dbName);
+        } else {
+            _ignoreExternalViewChanges.erase(dbName);
+        }
+    }
+
+    /**
+     * The catalog needs to ignore external view changes for its own modifications. This method can
+     * be used by methods called by op observers (e.g. 'CollectionCatalog::reload()') to distinguish
+     * between an external write to 'system.views' and one initiated through the proper view DDL
+     * operations.
+     */
+    bool shouldIgnoreExternalViewChanges(StringData dbName) const {
+        return _ignoreExternalViewChanges.contains(dbName);
+    }
+
     static UncommittedCatalogUpdates& get(OperationContext* opCtx);
 
 private:
     // Store entries in vector, we will do linear search to find what we're looking for but it will
     // be very few entries so it should be fine.
     std::vector<Entry> _entries;
+
+    StringSet _ignoreExternalViewChanges;
 };
 
 const RecoveryUnit::Decoration<UncommittedCatalogUpdates> getUncommittedCatalogUpdates =
@@ -217,10 +317,23 @@ UncommittedCatalogUpdates& UncommittedCatalogUpdates::get(OperationContext* opCt
     return getUncommittedCatalogUpdates(opCtx->recoveryUnit());
 }
 
-const OperationContext::Decoration<std::shared_ptr<const CollectionCatalog>> stashedCatalog =
-    OperationContext::declareDecoration<std::shared_ptr<const CollectionCatalog>>();
+class IgnoreExternalViewChangesForDatabase {
+public:
+    IgnoreExternalViewChangesForDatabase(OperationContext* opCtx, StringData dbName)
+        : _opCtx(opCtx), _dbName(dbName) {
+        auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(_opCtx);
+        uncommittedCatalogUpdates.setIgnoreExternalViewChanges(_dbName, true);
+    }
 
-}  // namespace
+    ~IgnoreExternalViewChangesForDatabase() {
+        auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(_opCtx);
+        uncommittedCatalogUpdates.setIgnoreExternalViewChanges(_dbName, false);
+    }
+
+private:
+    OperationContext* _opCtx;
+    std::string _dbName;
+};
 
 /**
  * Publishes all uncommitted Collection actions registered on UncommittedCatalogUpdates to the
@@ -256,7 +369,7 @@ public:
         auto entries = _uncommittedCatalogUpdates.releaseEntries();
         for (auto&& entry : entries) {
             switch (entry.action) {
-                case UncommittedCatalogUpdates::Entry::Action::kWritable:
+                case UncommittedCatalogUpdates::Entry::Action::kWritableCollection:
                     writeJobs.push_back(
                         [collection = std::move(entry.collection)](CollectionCatalog& catalog) {
                             catalog._collections[collection->ns()] = collection;
@@ -267,7 +380,7 @@ public:
                             catalog._orderedCollections[dbIdPair] = collection;
                         });
                     break;
-                case UncommittedCatalogUpdates::Entry::Action::kRenamed:
+                case UncommittedCatalogUpdates::Entry::Action::kRenamedCollection:
                     writeJobs.push_back(
                         [& from = entry.nss, &to = entry.renameTo](CollectionCatalog& catalog) {
                             catalog._collections.erase(from);
@@ -282,17 +395,37 @@ public:
                             catalog.addResource(newRid, toStr);
                         });
                     break;
-                case UncommittedCatalogUpdates::Entry::Action::kDropped:
+                case UncommittedCatalogUpdates::Entry::Action::kDroppedCollection:
                     writeJobs.push_back(
-                        [opCtx = _opCtx, uuid = entry.uuid()](CollectionCatalog& catalog) {
+                        [opCtx = _opCtx, uuid = *entry.uuid()](CollectionCatalog& catalog) {
                             catalog.deregisterCollection(opCtx, uuid);
                         });
                     break;
-                case UncommittedCatalogUpdates::Entry::Action::kRecreated:
+                case UncommittedCatalogUpdates::Entry::Action::kRecreatedCollection:
                     writeJobs.push_back([opCtx = _opCtx,
                                          collection = std::move(entry.collection),
                                          uuid = *entry.externalUUID](CollectionCatalog& catalog) {
                         catalog.registerCollection(opCtx, uuid, std::move(collection));
+                    });
+                    break;
+                case UncommittedCatalogUpdates::Entry::Action::kReplacedViewsForDatabase:
+                    writeJobs.push_back(
+                        [dbName = entry.nss.db(),
+                         &viewsForDb = entry.viewsForDb.get()](CollectionCatalog& catalog) {
+                            catalog._replaceViewsForDatabase(dbName, std::move(viewsForDb));
+                        });
+                    break;
+                case UncommittedCatalogUpdates::Entry::Action::kAddViewResource:
+                    writeJobs.push_back([& viewName = entry.nss](CollectionCatalog& catalog) {
+                        auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
+                        catalog.addResource(viewRid, viewName.ns());
+                        catalog.deregisterUncommittedView(viewName);
+                    });
+                    break;
+                case UncommittedCatalogUpdates::Entry::Action::kRemoveViewResource:
+                    writeJobs.push_back([& viewName = entry.nss](CollectionCatalog& catalog) {
+                        auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
+                        catalog.removeResource(viewRid, viewName.ns());
                     });
                     break;
             };
@@ -565,6 +698,162 @@ void CollectionCatalog::write(OperationContext* opCtx,
     write(opCtx->getServiceContext(), std::move(job));
 }
 
+Status CollectionCatalog::createView(
+    OperationContext* opCtx,
+    const NamespaceString& viewName,
+    const NamespaceString& viewOn,
+    const BSONArray& pipeline,
+    const BSONObj& collation,
+    const ViewsForDatabase::PipelineValidatorFn& pipelineValidator) const {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(
+        NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+
+    invariant(_viewsForDatabase.contains(viewName.db()));
+    const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.db());
+
+    if (viewName.db() != viewOn.db())
+        return Status(ErrorCodes::BadValue,
+                      "View must be created on a view or collection in the same database");
+
+    if (viewsForDb.lookup(viewName) || _collections.contains(viewName))
+        return Status(ErrorCodes::NamespaceExists, "Namespace already exists");
+
+    if (!NamespaceString::validCollectionName(viewOn.coll()))
+        return Status(ErrorCodes::InvalidNamespace,
+                      str::stream() << "invalid name for 'viewOn': " << viewOn.coll());
+
+    auto collator = ViewsForDatabase::parseCollator(opCtx, collation);
+    if (!collator.isOK())
+        return collator.getStatus();
+
+    Status result = Status::OK();
+    {
+        IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.db());
+
+        result = _createOrUpdateView(opCtx,
+                                     viewName,
+                                     viewOn,
+                                     pipeline,
+                                     pipelineValidator,
+                                     std::move(collator.getValue()),
+                                     ViewsForDatabase{viewsForDb});
+    }
+
+    return result;
+}
+
+Status CollectionCatalog::modifyView(
+    OperationContext* opCtx,
+    const NamespaceString& viewName,
+    const NamespaceString& viewOn,
+    const BSONArray& pipeline,
+    const ViewsForDatabase::PipelineValidatorFn& pipelineValidator) const {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_X));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(
+        NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+
+    invariant(_viewsForDatabase.contains(viewName.db()));
+    const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.db());
+
+    if (viewName.db() != viewOn.db())
+        return Status(ErrorCodes::BadValue,
+                      "View must be created on a view or collection in the same database");
+
+    auto viewPtr = viewsForDb.lookup(viewName);
+    if (!viewPtr)
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "cannot modify missing view " << viewName.ns());
+
+    if (!NamespaceString::validCollectionName(viewOn.coll()))
+        return Status(ErrorCodes::InvalidNamespace,
+                      str::stream() << "invalid name for 'viewOn': " << viewOn.coll());
+
+    Status result = Status::OK();
+    {
+        IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.db());
+
+        result = _createOrUpdateView(opCtx,
+                                     viewName,
+                                     viewOn,
+                                     pipeline,
+                                     pipelineValidator,
+                                     CollatorInterface::cloneCollator(viewPtr->defaultCollator()),
+                                     ViewsForDatabase{viewsForDb});
+    }
+
+    return result;
+}
+
+Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceString& viewName) const {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(
+        NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+
+    invariant(_viewsForDatabase.contains(viewName.db()));
+    const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.db());
+    viewsForDb.requireValidCatalog();
+
+    // Make sure the view exists before proceeding.
+    if (auto viewPtr = viewsForDb.lookup(viewName); !viewPtr) {
+        return {ErrorCodes::NamespaceNotFound,
+                str::stream() << "cannot drop missing view: " << viewName.ns()};
+    }
+
+    Status result = Status::OK();
+    {
+        IgnoreExternalViewChangesForDatabase ignore(opCtx, viewName.db());
+
+        ViewsForDatabase writable{viewsForDb};
+
+        writable.durable->remove(opCtx, viewName);
+        writable.viewGraph.remove(viewName);
+        writable.viewMap.erase(viewName.ns());
+        writable.stats = {};
+
+        // Reload the view catalog with the changes applied.
+        result = writable.reload(opCtx);
+        if (result.isOK()) {
+            auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
+            uncommittedCatalogUpdates.removeView(viewName);
+            uncommittedCatalogUpdates.replaceViewsForDatabase(viewName.db(), std::move(writable));
+
+            PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx,
+                                                                    uncommittedCatalogUpdates);
+        }
+    }
+
+    return result;
+}
+
+Status CollectionCatalog::reloadViews(OperationContext* opCtx, StringData dbName) const {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(
+        NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_IS));
+
+    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
+    if (uncommittedCatalogUpdates.shouldIgnoreExternalViewChanges(dbName)) {
+        return Status::OK();
+    }
+
+    LOGV2_DEBUG(22546, 1, "Reloading view catalog for database", "db"_attr = dbName);
+
+    // Create a copy of the ViewsForDatabase instance to modify it. Reset the views for this
+    // database, but preserve the DurableViewCatalog pointer.
+    auto it = _viewsForDatabase.find(dbName);
+    invariant(it != _viewsForDatabase.end());
+    ViewsForDatabase viewsForDb{it->second.durable};
+    viewsForDb.valid = false;
+    viewsForDb.viewGraphNeedsRefresh = true;
+    viewsForDb.viewMap.clear();
+    viewsForDb.stats = {};
+
+    auto status = viewsForDb.reload(opCtx);
+    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+        catalog._replaceViewsForDatabase(dbName, std::move(viewsForDb));
+    });
+
+    return status;
+}
 
 void CollectionCatalog::onCollectionRename(OperationContext* opCtx,
                                            Collection* coll,
@@ -572,14 +861,14 @@ void CollectionCatalog::onCollectionRename(OperationContext* opCtx,
     invariant(coll);
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    uncommittedCatalogUpdates.rename(coll, fromCollection);
+    uncommittedCatalogUpdates.renameCollection(coll, fromCollection);
 }
 
 void CollectionCatalog::dropCollection(OperationContext* opCtx, Collection* coll) const {
     invariant(coll);
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    uncommittedCatalogUpdates.drop(coll);
+    uncommittedCatalogUpdates.dropCollection(coll);
 
     // Requesting a writable collection normally ensures we have registered PublishCatalogUpdates
     // with the recovery unit. However, when the writable Collection was requested in Inplace mode
@@ -587,10 +876,22 @@ void CollectionCatalog::dropCollection(OperationContext* opCtx, Collection* coll
     PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
 }
 
+void CollectionCatalog::onOpenDatabase(OperationContext* opCtx,
+                                       StringData dbName,
+                                       ViewsForDatabase&& viewsForDb) {
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IS));
+    uassert(ErrorCodes::AlreadyInitialized,
+            str::stream() << "Database " << dbName << " is already initialized",
+            _viewsForDatabase.find(dbName) == _viewsForDatabase.end());
+
+    _viewsForDatabase[dbName] = std::move(viewsForDb);
+}
+
 void CollectionCatalog::onCloseDatabase(OperationContext* opCtx, TenantDatabaseName tenantDbName) {
     invariant(opCtx->lockState()->isDbLockedForMode(tenantDbName.dbName(), MODE_X));
     auto rid = ResourceId(RESOURCE_DATABASE, tenantDbName.dbName());
     removeResource(rid, tenantDbName.dbName());
+    _viewsForDatabase.erase(tenantDbName.dbName());
 }
 
 void CollectionCatalog::onCloseCatalog(OperationContext* opCtx) {
@@ -630,7 +931,7 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
     }
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookup(uuid);
+    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookupCollection(uuid);
     // If UUID is managed by uncommittedCatalogUpdates return the pointer which will be nullptr in
     // case of a drop. We don't need to check UncommittedCollections as we will never share UUID for
     // a new Collection.
@@ -654,7 +955,7 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
     invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_X));
     auto cloned = coll->clone();
     auto ptr = cloned.get();
-    uncommittedCatalogUpdates.writable(std::move(cloned));
+    uncommittedCatalogUpdates.writableCollection(std::move(cloned));
 
     PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
 
@@ -663,7 +964,7 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
 
 CollectionPtr CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx, UUID uuid) const {
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookup(uuid);
+    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookupCollection(uuid);
     // If UUID is managed by uncommittedCatalogUpdates return the pointer which will be nullptr in
     // case of a drop. We don't need to check UncommittedCollections as we will never share UUID for
     // a new Collection.
@@ -709,7 +1010,7 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
     }
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookup(nss);
+    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookupCollection(nss);
     // If uncommittedPtr is valid, found is always true. Return the pointer as the collection still
     // exists.
     if (uncommittedPtr) {
@@ -737,7 +1038,7 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
     auto cloned = coll->clone();
     auto ptr = cloned.get();
-    uncommittedCatalogUpdates.writable(std::move(cloned));
+    uncommittedCatalogUpdates.writableCollection(std::move(cloned));
 
     PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
 
@@ -747,7 +1048,7 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
 CollectionPtr CollectionCatalog::lookupCollectionByNamespace(OperationContext* opCtx,
                                                              const NamespaceString& nss) const {
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookup(nss);
+    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookupCollection(nss);
     // If uncommittedPtr is valid, found is always true. Return the pointer as the collection still
     // exists.
     if (uncommittedPtr) {
@@ -775,7 +1076,7 @@ CollectionPtr CollectionCatalog::lookupCollectionByNamespace(OperationContext* o
 boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationContext* opCtx,
                                                                     const UUID& uuid) const {
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookup(uuid);
+    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookupCollection(uuid);
     // If UUID is managed by uncommittedCatalogUpdates return its corresponding namespace if the
     // Collection exists, boost::none otherwise.
     if (found) {
@@ -810,7 +1111,7 @@ boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationCon
 boost::optional<UUID> CollectionCatalog::lookupUUIDByNSS(OperationContext* opCtx,
                                                          const NamespaceString& nss) const {
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookup(nss);
+    auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookupCollection(nss);
     if (uncommittedPtr) {
         return uncommittedPtr->uuid();
     }
@@ -829,6 +1130,58 @@ boost::optional<UUID> CollectionCatalog::lookupUUIDByNSS(OperationContext* opCtx
         return it->second->isCommitted() ? uuid : boost::none;
     }
     return boost::none;
+}
+
+void CollectionCatalog::iterateViews(OperationContext* opCtx,
+                                     StringData dbName,
+                                     ViewIteratorCallback callback,
+                                     ViewCatalogLookupBehavior lookupBehavior) const {
+    auto viewsForDb = _getViewsForDatabase(opCtx, dbName);
+    if (!viewsForDb) {
+        return;
+    }
+
+    if (lookupBehavior != ViewCatalogLookupBehavior::kAllowInvalidViews) {
+        viewsForDb->requireValidCatalog();
+    }
+
+    for (auto&& view : viewsForDb->viewMap) {
+        if (!callback(*view.second)) {
+            break;
+        }
+    }
+}
+
+std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupView(
+    OperationContext* opCtx, const NamespaceString& ns) const {
+    auto viewsForDb = _getViewsForDatabase(opCtx, ns.db());
+    if (!viewsForDb) {
+        return nullptr;
+    }
+
+    if (!viewsForDb->valid && opCtx->getClient()->isFromUserConnection()) {
+        // We want to avoid lookups on invalid collection names.
+        if (!NamespaceString::validCollectionName(ns.ns())) {
+            return nullptr;
+        }
+
+        // ApplyOps should work on a valid existing collection, despite the presence of bad views
+        // otherwise the server would crash. The view catalog will remain invalid until the bad view
+        // definitions are removed.
+        viewsForDb->requireValidCatalog();
+    }
+
+    return viewsForDb->lookup(ns);
+}
+
+std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupViewWithoutValidatingDurable(
+    OperationContext* opCtx, const NamespaceString& ns) const {
+    auto viewsForDb = _getViewsForDatabase(opCtx, ns.db());
+    if (!viewsForDb) {
+        return nullptr;
+    }
+
+    return viewsForDb->lookup(ns);
 }
 
 NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(
@@ -942,11 +1295,23 @@ CollectionCatalog::Stats CollectionCatalog::getStats() const {
     return _stats;
 }
 
-CollectionCatalog::ViewCatalogSet CollectionCatalog::getViewCatalogDbNames() const {
-    ViewCatalogSet results;
-    for (const auto& dbNameViewSetPair : _views) {
-        results.insert(dbNameViewSetPair.first);
+boost::optional<ViewsForDatabase::Stats> CollectionCatalog::getViewStatsForDatabase(
+    OperationContext* opCtx, StringData dbName) const {
+    auto viewsForDb = _getViewsForDatabase(opCtx, dbName);
+    if (!viewsForDb) {
+        return boost::none;
     }
+    return viewsForDb->stats;
+}
+
+CollectionCatalog::ViewCatalogSet CollectionCatalog::getViewCatalogDbNames(
+    OperationContext* opCtx) const {
+    ViewCatalogSet results;
+    for (const auto& dbNameViewSetPair : _viewsForDatabase) {
+        // TODO (SERVER-63206): Return stored TenantDatabaseName
+        results.insert(TenantDatabaseName{boost::none, dbNameViewSetPair.first});
+    }
+
     return results;
 }
 
@@ -955,26 +1320,13 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
                                            std::shared_ptr<Collection> coll) {
     auto tenantNs = coll->tenantNs();
     auto tenantDbName = tenantNs.createTenantDatabaseName();
-    if (auto it = _views.find(tenantDbName); it != _views.end()) {
-        uassert(ErrorCodes::NamespaceExists,
-                str::stream() << "View already exists. NS: " << tenantNs,
-                !it->second.contains(tenantNs.getNss()));
-    }
-    if (_collections.find(tenantNs.getNss()) != _collections.end()) {
-        auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-        auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookup(tenantNs.getNss());
+    if (NonExistenceType::kDropPending ==
+        _ensureNamespaceDoesNotExist(opCtx, tenantNs.getNss(), NamespaceType::kAll)) {
         // If we have an uncommitted drop of this collection we can defer the creation, the register
         // will happen in the same catalog write as the drop.
-        if (found && !uncommittedPtr) {
-            uncommittedCatalogUpdates.createAfterDrop(uuid, std::move(coll));
-            return;
-        }
-
-        LOGV2(20279,
-              "Conflicted creating a collection. ns: {coll_ns} ({coll_uuid}).",
-              "Conflicted creating a collection",
-              logAttrs(*coll));
-        throw WriteConflictException();
+        auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
+        uncommittedCatalogUpdates.createCollectionAfterDrop(uuid, std::move(coll));
+        return;
     }
 
     LOGV2_DEBUG(20280,
@@ -1057,6 +1409,62 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationCon
     return coll;
 }
 
+void CollectionCatalog::registerUncommittedView(OperationContext* opCtx,
+                                                const NamespaceString& nss) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(
+        NamespaceString(nss.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+
+    // Since writing to system.views requires an X lock, we only need to cross-check collection
+    // namespaces here.
+    if (NonExistenceType::kDropPending ==
+        _ensureNamespaceDoesNotExist(opCtx, nss, NamespaceType::kCollection)) {
+        throw WriteConflictException();
+    }
+
+    _uncommittedViews.emplace(nss);
+}
+
+void CollectionCatalog::deregisterUncommittedView(const NamespaceString& nss) {
+    _uncommittedViews.erase(nss);
+}
+
+CollectionCatalog::NonExistenceType CollectionCatalog::_ensureNamespaceDoesNotExist(
+    OperationContext* opCtx, const NamespaceString& nss, NamespaceType type) const {
+    if (_collections.find(nss) != _collections.end()) {
+        auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
+        auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookupCollection(nss);
+        if (found && !uncommittedPtr) {
+            return NonExistenceType::kDropPending;
+        }
+
+        LOGV2(5725001,
+              "Conflicted registering namespace, already have a collection with the same namespace",
+              "nss"_attr = nss);
+        throw WriteConflictException();
+    }
+
+    if (type == NamespaceType::kAll) {
+        if (_uncommittedViews.contains(nss)) {
+            LOGV2(5725002,
+                  "Conflicted registering namespace, already have a view with the same namespace",
+                  "nss"_attr = nss);
+            throw WriteConflictException();
+        }
+
+        if (auto viewsForDb = _getViewsForDatabase(opCtx, nss.db())) {
+            if (viewsForDb->lookup(nss) != nullptr) {
+                LOGV2(
+                    5725003,
+                    "Conflicted registering namespace, already have a view with the same namespace",
+                    "nss"_attr = nss);
+                throw WriteConflictException();
+            }
+        }
+    }
+
+    return NonExistenceType::kNormal;
+}
+
 void CollectionCatalog::deregisterAllCollectionsAndViews() {
     LOGV2(20282, "Deregistering all the collections");
     for (auto& entry : _catalog) {
@@ -1071,42 +1479,28 @@ void CollectionCatalog::deregisterAllCollectionsAndViews() {
     _collections.clear();
     _orderedCollections.clear();
     _catalog.clear();
-    _views.clear();
+    _viewsForDatabase.clear();
     _stats = {};
 
     _resourceInformation.clear();
 }
 
-void CollectionCatalog::registerView(const NamespaceString& ns) {
-    if (_collections.contains(ns)) {
-        LOGV2(5706100, "Conflicted creating a view", logAttrs(ns));
-        throw WriteConflictException();
-    }
+void CollectionCatalog::clearViews(OperationContext* opCtx, StringData dbName) const {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(
+        NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
-    const TenantDatabaseName tenantDbName(boost::none, ns.db());
-    _views[tenantDbName].insert(ns);
-}
-void CollectionCatalog::deregisterView(const NamespaceString& ns) {
-    const TenantDatabaseName tenantDbName(boost::none, ns.db());
-    auto it = _views.find(tenantDbName);
-    if (it == _views.end()) {
-        return;
-    }
+    auto it = _viewsForDatabase.find(dbName);
+    invariant(it != _viewsForDatabase.end());
+    ViewsForDatabase viewsForDb = it->second;
 
-    auto& viewsForDb = it->second;
-    viewsForDb.erase(ns);
-    if (viewsForDb.empty()) {
-        _views.erase(it);
-    }
-}
-
-void CollectionCatalog::replaceViewsForDatabase(const TenantDatabaseName& tenantDbName,
-                                                absl::flat_hash_set<NamespaceString> views) {
-    if (views.empty())
-        _views.erase(tenantDbName);
-    else {
-        _views[tenantDbName] = std::move(views);
-    }
+    viewsForDb.viewMap.clear();
+    viewsForDb.viewGraph.clear();
+    viewsForDb.valid = true;
+    viewsForDb.viewGraphNeedsRefresh = false;
+    viewsForDb.stats = {};
+    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+        catalog._replaceViewsForDatabase(dbName, std::move(viewsForDb));
+    });
 }
 
 CollectionCatalog::iterator CollectionCatalog::begin(OperationContext* opCtx,
@@ -1170,6 +1564,79 @@ void CollectionCatalog::addResource(const ResourceId& rid, const std::string& en
     }
 
     namespaces.insert(entry);
+}
+
+boost::optional<const ViewsForDatabase&> CollectionCatalog::_getViewsForDatabase(
+    OperationContext* opCtx, StringData dbName) const {
+    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
+    auto uncommittedViews = uncommittedCatalogUpdates.getViewsForDatabase(dbName);
+    if (uncommittedViews) {
+        return uncommittedViews;
+    }
+
+    auto it = _viewsForDatabase.find(dbName);
+    if (it == _viewsForDatabase.end()) {
+        return boost::none;
+    }
+    return it->second;
+}
+
+void CollectionCatalog::_replaceViewsForDatabase(StringData dbName, ViewsForDatabase&& views) {
+    _viewsForDatabase[dbName] = std::move(views);
+}
+
+Status CollectionCatalog::_createOrUpdateView(
+    OperationContext* opCtx,
+    const NamespaceString& viewName,
+    const NamespaceString& viewOn,
+    const BSONArray& pipeline,
+    const ViewsForDatabase::PipelineValidatorFn& pipelineValidator,
+    std::unique_ptr<CollatorInterface> collator,
+    ViewsForDatabase&& viewsForDb) const {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(
+        NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+
+    viewsForDb.requireValidCatalog();
+
+    // Build the BSON definition for this view to be saved in the durable view catalog. If the
+    // collation is empty, omit it from the definition altogether.
+    BSONObjBuilder viewDefBuilder;
+    viewDefBuilder.append("_id", viewName.ns());
+    viewDefBuilder.append("viewOn", viewOn.coll());
+    viewDefBuilder.append("pipeline", pipeline);
+    if (collator) {
+        viewDefBuilder.append("collation", collator->getSpec().toBSON());
+    }
+
+    BSONObj ownedPipeline = pipeline.getOwned();
+    auto view = std::make_shared<ViewDefinition>(
+        viewName.db(), viewName.coll(), viewOn.coll(), ownedPipeline, std::move(collator));
+
+    // Check that the resulting dependency graph is acyclic and within the maximum depth.
+    Status graphStatus = viewsForDb.upsertIntoGraph(opCtx, *(view.get()), pipelineValidator);
+    if (!graphStatus.isOK()) {
+        return graphStatus;
+    }
+
+    viewsForDb.durable->upsert(opCtx, viewName, viewDefBuilder.obj());
+
+    viewsForDb.viewMap.clear();
+    viewsForDb.valid = false;
+    viewsForDb.viewGraphNeedsRefresh = true;
+    viewsForDb.stats = {};
+
+    // Reload the view catalog with the changes applied.
+    auto res = viewsForDb.reload(opCtx);
+    if (res.isOK()) {
+        auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
+        uncommittedCatalogUpdates.addView(opCtx, viewName);
+        uncommittedCatalogUpdates.replaceViewsForDatabase(viewName.db(), std::move(viewsForDb));
+
+        PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
+    }
+
+    return res;
 }
 
 CollectionCatalogStasher::CollectionCatalogStasher(OperationContext* opCtx)

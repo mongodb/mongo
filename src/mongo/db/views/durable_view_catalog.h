@@ -44,11 +44,11 @@ class OperationContext;
 class RecordData;
 
 /**
- * ViewCatalogLookupBehavior specifies whether a lookup into the view catalog should attempt to
- * validate the durable entries that currently exist within the catalog. This validation should
+ * ViewCatalogLookupBehavior specifies whether a lookup into the view catalog should validate the
+ * entries or allow the operation to proceed with an invalid entry present. This validation should
  * rarely be skipped.
  */
-enum class ViewCatalogLookupBehavior { kValidateDurableViews, kAllowInvalidDurableViews };
+enum class ViewCatalogLookupBehavior { kValidateViews, kAllowInvalidViews };
 
 /**
  * Interface for system.views collection operations associated with view catalog management.
@@ -81,7 +81,6 @@ public:
                         const BSONObj& view) = 0;
     virtual void remove(OperationContext* opCtx, const NamespaceString& name) = 0;
     virtual const std::string& getName() const = 0;
-    virtual bool belongsTo(const Database* db) const = 0;
     virtual ~DurableViewCatalog() = default;
 };
 
@@ -100,7 +99,6 @@ public:
     void upsert(OperationContext* opCtx, const NamespaceString& name, const BSONObj& view);
     void remove(OperationContext* opCtx, const NamespaceString& name);
     const std::string& getName() const;
-    bool belongsTo(const Database* db) const;
 
 private:
     void _iterate(OperationContext* opCtx,

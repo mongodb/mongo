@@ -40,7 +40,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
@@ -59,7 +58,7 @@ CollectionPtr getCollectionForCompact(OperationContext* opCtx,
 
     if (!collection) {
         std::shared_ptr<const ViewDefinition> view =
-            ViewCatalog::get(opCtx)->lookup(opCtx, collectionNss);
+            collectionCatalog->lookupView(opCtx, collectionNss);
         uassert(ErrorCodes::CommandNotSupportedOnView, "can't compact a view", !view);
         uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");
     }

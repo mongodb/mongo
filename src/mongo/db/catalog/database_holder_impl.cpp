@@ -44,7 +44,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -75,21 +74,8 @@ bool DatabaseHolderImpl::dbExists(OperationContext* opCtx,
             NamespaceString::validDBName(tenantDbName.dbName(),
                                          NamespaceString::DollarInDbNameBehavior::Allow));
     stdx::lock_guard<SimpleMutex> lk(_m);
-    return _dbs.find(tenantDbName) != _dbs.end();
-}
-
-std::shared_ptr<const ViewCatalog> DatabaseHolderImpl::getViewCatalog(
-    OperationContext* opCtx, const TenantDatabaseName& tenantDbName) const {
-    stdx::lock_guard<SimpleMutex> lk(_m);
-    DBs::const_iterator it = _dbs.find(tenantDbName);
-    if (it != _dbs.end()) {
-        const Database* db = it->second;
-        if (db) {
-            return ViewCatalog::get(opCtx);
-        }
-    }
-
-    return nullptr;
+    auto it = _dbs.find(tenantDbName);
+    return it != _dbs.end() && it->second != nullptr;
 }
 
 std::set<TenantDatabaseName> DatabaseHolderImpl::_getNamesWithConflictingCasing_inlock(
@@ -139,18 +125,14 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
     if (auto db = _dbs[tenantDbName])
         return db;
 
-    std::unique_ptr<DatabaseImpl> newDb;
     // We've inserted a nullptr entry for dbname: make sure to remove it on unsuccessful exit.
-    ScopeGuard removeDbGuard([this, &lk, &newDb, opCtx, tenantDbName] {
+    ScopeGuard removeDbGuard([this, &lk, opCtx, tenantDbName] {
         if (!lk.owns_lock())
             lk.lock();
         auto it = _dbs.find(tenantDbName);
         // If someone else hasn't either already removed it or already set it successfully, remove.
         if (it != _dbs.end() && !it->second) {
             _dbs.erase(it);
-        }
-        if (newDb) {
-            ViewCatalog::unregisterDatabase(opCtx, newDb.get());
         }
 
         // In case anyone else is trying to open the same DB simultaneously and waiting on our
@@ -176,7 +158,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
             *justCreated = true;
     }
 
-    newDb = std::make_unique<DatabaseImpl>(tenantDbName);
+    std::unique_ptr<DatabaseImpl> newDb = std::make_unique<DatabaseImpl>(tenantDbName);
     Status status = newDb->init(opCtx);
     while (!status.isOK()) {
         // If we get here, then initializing the database failed because another concurrent writer
@@ -296,25 +278,13 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, const TenantDatabaseName
                                          NamespaceString::DollarInDbNameBehavior::Allow));
     invariant(opCtx->lockState()->isDbLockedForMode(tenantDbName.dbName(), MODE_X));
 
-    stdx::unique_lock<SimpleMutex> lk(_m);
+    stdx::lock_guard<SimpleMutex> lk(_m);
 
     DBs::const_iterator it = _dbs.find(tenantDbName);
     if (it == _dbs.end()) {
         return;
     }
-
-    // Unlock to unregister this database from the ViewCatalog, then reacquire the lock.
     auto db = it->second;
-    lk.unlock();
-    ViewCatalog::unregisterDatabase(opCtx, db);
-    lk.lock();
-
-    // It's possible another thread altered the record before we reacquired the lock, so make sure
-    // we still have the same database.
-    it = _dbs.find(tenantDbName);
-    if (it == _dbs.end() || db != it->second) {
-        return;
-    }
 
     LOGV2_DEBUG(20311, 2, "DatabaseHolder::close", "db"_attr = tenantDbName);
 

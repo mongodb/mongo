@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -41,8 +42,9 @@
 #include "mongo/db/commands/validate_db_metadata_gen.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/multitenancy.h"
-#include "mongo/db/views/view_catalog.h"
+#include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/logv2/log.h"
+
 namespace mongo {
 namespace {
 void overrideAPIParams(OperationContext* opCtx, const APIParamsForCmd& params) {
@@ -142,13 +144,10 @@ public:
 
                 // If there is no collection name present in the input, run validation against all
                 // the collections.
-                if (auto viewCatalog =
-                        DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, tenantDbName)) {
-                    viewCatalog->iterate(tenantDbName.dbName(),
-                                         [this, opCtx](const ViewDefinition& view) {
-                                             return _validateView(opCtx, view);
-                                         });
-                }
+                collectionCatalog->iterateViews(
+                    opCtx, tenantDbName.dbName(), [this, opCtx](const ViewDefinition& view) {
+                        return _validateView(opCtx, view);
+                    });
 
                 for (auto collIt = collectionCatalog->begin(opCtx, tenantDbName);
                      collIt != collectionCatalog->end(opCtx);
@@ -166,7 +165,7 @@ public:
          * Returns false, if the evaluation needs to be aborted.
          */
         bool _validateView(OperationContext* opCtx, const ViewDefinition& view) {
-            auto pipelineStatus = ViewCatalog::validatePipeline(opCtx, view);
+            auto pipelineStatus = view_catalog_helpers::validatePipeline(opCtx, view);
             if (!pipelineStatus.isOK()) {
                 ErrorReplyElement error(view.name().ns(),
                                         ErrorCodes::APIStrictError,

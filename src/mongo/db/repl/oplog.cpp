@@ -99,7 +99,6 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction_participant.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -1208,7 +1207,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
     const bool haveWrappingWriteUnitOfWork = opCtx->lockState()->inAWriteUnitOfWork();
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "applyOps not supported on view: " << requestNss.ns(),
-            collection || !ViewCatalog::get(opCtx)->lookup(opCtx, requestNss));
+            collection || !CollectionCatalog::get(opCtx)->lookupView(opCtx, requestNss));
 
     // Decide whether to timestamp the write with the 'ts' field found in the operation. In general,
     // we do this for secondary oplog application, but there are some exceptions.
@@ -1821,14 +1820,8 @@ Status applyCommand_inlock(OperationContext* opCtx,
         return {ErrorCodes::InvalidNamespace, "invalid ns: " + std::string(nss.ns())};
     }
     {
-        // Command application doesn't always acquire the global writer lock for transaction
-        // commands, so we acquire its own locks here.
-        Lock::DBLock lock(opCtx, nss.db(), MODE_IS);
-        const TenantDatabaseName tenantDbName(boost::none, nss.db());
-        auto databaseHolder = DatabaseHolder::get(opCtx);
-        auto db = databaseHolder->getDb(opCtx, tenantDbName);
-        if (db && !CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss) &&
-            ViewCatalog::get(opCtx)->lookup(opCtx, nss)) {
+        auto catalog = CollectionCatalog::get(opCtx);
+        if (!catalog->lookupCollectionByNamespace(opCtx, nss) && catalog->lookupView(opCtx, nss)) {
             return {ErrorCodes::CommandNotSupportedOnView,
                     str::stream() << "applyOps not supported on view:" << nss.ns()};
         }

@@ -4,7 +4,7 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_files:
-  # Having duplicate namespaces is not supported and will cause initial sync to fail.
+  # Duplicate namespace may cause cloner to try and clone view instead of collection
   - jstests/core/views/duplicate_ns.js
   # Change stream pre-images are not cloned during initial sync.
   - jstests/core/write_change_stream_pit_preimage.js

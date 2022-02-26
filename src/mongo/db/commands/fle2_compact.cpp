@@ -35,10 +35,10 @@
 
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -149,7 +149,7 @@ StatusWith<CompactStats> compactEncryptedCompactionCollection(
     // Check the data collection exists and is not a view
     auto edc = catalog->lookupCollectionByNamespace(opCtx, edcNss);
     if (!edc) {
-        if (ViewCatalog::get(opCtx)->lookup(opCtx, edcNss)) {
+        if (catalog->lookupView(opCtx, edcNss)) {
             return Status(ErrorCodes::CommandNotSupportedOnView,
                           "cannot compact structured encryption data on a view");
         }

@@ -38,7 +38,7 @@
 
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/coll_mod_index.h"
-#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -59,7 +59,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/ttl_collection_cache.h"
-#include "mongo/db/views/view_catalog.h"
+#include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
@@ -652,7 +652,7 @@ Status _collModInternal(OperationContext* opCtx,
     // May also modify a view instead of a collection.
     boost::optional<ViewDefinition> view;
     if (!coll) {
-        const auto sharedView = ViewCatalog::get(opCtx)->lookup(opCtx, nss);
+        const auto sharedView = CollectionCatalog::get(opCtx)->lookupView(opCtx, nss);
         if (sharedView) {
             // We copy the ViewDefinition as it is modified below to represent the requested state.
             view = {*sharedView};
@@ -720,8 +720,8 @@ Status _collModInternal(OperationContext* opCtx,
     return writeConflictRetry(opCtx, "collMod", nss.ns(), [&] {
         WriteUnitOfWork wunit(opCtx);
 
-        // Handle collMod on a view and return early. The View Catalog handles the creation of oplog
-        // entries for modifications on a view.
+        // Handle collMod on a view and return early. The CollectionCatalog handles the creation of
+        // oplog entries for modifications on a view.
         if (view) {
             if (cmd.getPipeline())
                 view->setPipeline(*cmd.getPipeline());
@@ -734,7 +734,11 @@ Status _collModInternal(OperationContext* opCtx,
                 pipeline.append(item);
             }
             auto errorStatus =
-                ViewCatalog::modifyView(opCtx, nss, view->viewOn(), BSONArray(pipeline.obj()));
+                CollectionCatalog::get(opCtx)->modifyView(opCtx,
+                                                          nss,
+                                                          view->viewOn(),
+                                                          BSONArray(pipeline.obj()),
+                                                          view_catalog_helpers::validatePipeline);
             if (!errorStatus.isOK()) {
                 return errorStatus;
             }

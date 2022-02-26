@@ -59,7 +59,6 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
@@ -111,7 +110,7 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
     auto catalog = CollectionCatalog::get(opCtx);
     const auto sourceColl = catalog->lookupCollectionByNamespace(opCtx, source);
     if (!sourceColl) {
-        if (ViewCatalog::get(opCtx)->lookup(opCtx, source))
+        if (CollectionCatalog::get(opCtx)->lookupView(opCtx, source))
             return Status(ErrorCodes::CommandNotSupportedOnView,
                           str::stream() << "cannot rename view: " << source);
         return Status(ErrorCodes::NamespaceNotFound,
@@ -123,7 +122,7 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
     const auto targetColl = catalog->lookupCollectionByNamespace(opCtx, target);
 
     if (!targetColl) {
-        if (ViewCatalog::get(opCtx)->lookup(opCtx, target))
+        if (CollectionCatalog::get(opCtx)->lookupView(opCtx, target))
             return Status(ErrorCodes::NamespaceExists,
                           str::stream() << "a view already exists with that name: " << target);
     } else {
@@ -511,7 +510,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
     auto catalog = CollectionCatalog::get(opCtx);
     const auto sourceColl = catalog->lookupCollectionByNamespace(opCtx, source);
     if (!sourceColl) {
-        if (ViewCatalog::get(opCtx)->lookup(opCtx, source))
+        if (CollectionCatalog::get(opCtx)->lookupView(opCtx, source))
             return Status(ErrorCodes::CommandNotSupportedOnView,
                           str::stream() << "cannot rename view: " << source);
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
@@ -541,7 +540,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
             return Status(ErrorCodes::NamespaceExists, "target namespace exists");
         }
 
-    } else if (ViewCatalog::get(opCtx)->lookup(opCtx, target)) {
+    } else if (CollectionCatalog::get(opCtx)->lookupView(opCtx, target)) {
         return Status(ErrorCodes::NamespaceExists,
                       str::stream() << "a view already exists with that name: " << target);
     }

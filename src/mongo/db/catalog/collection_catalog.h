@@ -34,9 +34,11 @@
 #include <set>
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/views_for_database.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_database_name.h"
+#include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/uuid.h"
 
@@ -44,12 +46,14 @@ namespace mongo {
 
 class CollectionCatalog;
 class Database;
+class UncommittedCatalogUpdates;
 
 class CollectionCatalog {
     friend class iterator;
 
 public:
     using CollectionInfoFn = std::function<bool(const CollectionPtr& collection)>;
+    using ViewIteratorCallback = std::function<bool(const ViewDefinition& view)>;
 
     /**
      * Defines lifetime and behavior of writable Collections.
@@ -148,6 +152,58 @@ public:
     static void write(OperationContext* opCtx, CatalogWriteFn job);
 
     /**
+     * Create a new view 'viewName' with contents defined by running the specified aggregation
+     * 'pipeline' with collation 'collation' on a collection or view 'viewOn'.
+     *
+     * Must be in WriteUnitOfWork. View creation rolls back if the unit of work aborts.
+     *
+     * Caller must ensure corresponding database exists.
+     */
+    Status createView(OperationContext* opCtx,
+                      const NamespaceString& viewName,
+                      const NamespaceString& viewOn,
+                      const BSONArray& pipeline,
+                      const BSONObj& collation,
+                      const ViewsForDatabase::PipelineValidatorFn& pipelineValidator) const;
+
+    /**
+     * Drop the view named 'viewName'.
+     *
+     * Must be in WriteUnitOfWork. The drop rolls back if the unit of work aborts.
+     *
+     * Caller must ensure corresponding database exists.
+     */
+    Status dropView(OperationContext* opCtx, const NamespaceString& viewName) const;
+
+    /**
+     * Modify the view named 'viewName' to have the new 'viewOn' and 'pipeline'.
+     *
+     * Must be in WriteUnitOfWork. The modification rolls back if the unit of work aborts.
+     *
+     * Caller must ensure corresponding database exists.
+     */
+    Status modifyView(OperationContext* opCtx,
+                      const NamespaceString& viewName,
+                      const NamespaceString& viewOn,
+                      const BSONArray& pipeline,
+                      const ViewsForDatabase::PipelineValidatorFn& pipelineValidator) const;
+
+    /**
+     * Reloads the in-memory state of the view catalog from the 'system.views' collection. The
+     * durable view definitions will be validated. Reading stops on the first invalid entry with
+     * errors logged and returned. Performs no cycle detection, etc.
+     *
+     * This is implicitly called by other methods when write operations are performed on the
+     * view catalog, on external changes to the 'system.views' collection and on the first
+     * opening of a database.
+     *
+     * Callers must re-fetch the catalog to observe changes.
+     *
+     * Requires an IS lock on the 'system.views' collection'.
+     */
+    Status reloadViews(OperationContext* opCtx, StringData dbName) const;
+
+    /**
      * This function is responsible for safely tracking a Collection rename within a
      * WriteUnitOfWork.
      *
@@ -166,6 +222,17 @@ public:
      */
     void dropCollection(OperationContext* opCtx, Collection* coll) const;
 
+    /**
+     * Initializes view records for database 'dbName'. Can throw a 'WriteConflictException' if this
+     * database has already been initialized.
+     */
+    void onOpenDatabase(OperationContext* opCtx, StringData dbName, ViewsForDatabase&& viewsForDb);
+
+    /**
+     * Removes the view records associated with 'tenantDbName', if any, from the in-memory
+     * representation of the catalog. Should be called when Database instance is closed. Requires X
+     * lock on database namespace.
+     */
     void onCloseDatabase(OperationContext* opCtx, TenantDatabaseName tenantDbName);
 
     /**
@@ -181,29 +248,27 @@ public:
     std::shared_ptr<Collection> deregisterCollection(OperationContext* opCtx, const UUID& uuid);
 
     /**
+     * Create a temporary record of an uncommitted view namespace to aid in detecting a simultaneous
+     * attempt to create a collection with the same namespace.
+     */
+    void registerUncommittedView(OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
+     * Remove the temporary record for an uncommitted view namespace, either on commit or rollback.
+     */
+    void deregisterUncommittedView(const NamespaceString& nss);
+
+    /**
      * Deregister all the collection objects and view namespaces.
      */
     void deregisterAllCollectionsAndViews();
 
     /**
-     * Register the namespace to be used as a view.
+     * Clears the in-memory state for the views associated with a particular database.
      *
-     * Throws WriteConflictException if namespace is used by a Collection
+     * Callers must re-fetch the catalog to observe changes.
      */
-    void registerView(const NamespaceString& ns);
-
-    /**
-     * Deregister the namespace from being used as a view.
-     */
-    void deregisterView(const NamespaceString& ns);
-
-    /**
-     * Sets all namespaces used by views for a database. Does not validate if they are used by
-     * Collections. When creating new view its namespace should be registered with registerView()
-     * above.
-     */
-    void replaceViewsForDatabase(const TenantDatabaseName& tenantDbName,
-                                 absl::flat_hash_set<NamespaceString> views);
+    void clearViews(OperationContext* opCtx, StringData dbName) const;
 
     /**
      * This function gets the Collection pointer that corresponds to the UUID.
@@ -271,6 +336,36 @@ public:
      */
     boost::optional<UUID> lookupUUIDByNSS(OperationContext* opCtx,
                                           const NamespaceString& nss) const;
+
+    /**
+     * Iterates through the views in the catalog associated with database `dbName`, applying
+     * 'callback' to each view.  If the 'callback' returns false, the iterator exits early.
+     *
+     * Caller must ensure corresponding database exists.
+     */
+    void iterateViews(
+        OperationContext* opCtx,
+        StringData dbName,
+        ViewIteratorCallback callback,
+        ViewCatalogLookupBehavior lookupBehavior = ViewCatalogLookupBehavior::kValidateViews) const;
+
+    /**
+     * Look up the 'nss' in the view catalog, returning a shared pointer to a View definition,
+     * or nullptr if it doesn't exist.
+     *
+     * Caller must ensure corresponding database exists.
+     */
+    std::shared_ptr<const ViewDefinition> lookupView(OperationContext* opCtx,
+                                                     const NamespaceString& nss) const;
+
+    /**
+     * Same functionality as above, except this function skips validating durable views in the
+     * view catalog.
+     *
+     * Caller must ensure corresponding database exists.
+     */
+    std::shared_ptr<const ViewDefinition> lookupViewWithoutValidatingDurable(
+        OperationContext* opCtx, const NamespaceString& nss) const;
 
     /**
      * Without acquiring any locks resolves the given NamespaceStringOrUUID to an actual namespace.
@@ -365,14 +460,20 @@ public:
     Stats getStats() const;
 
     /**
+     * Returns view statistics for the specified database.
+     */
+    boost::optional<ViewsForDatabase::Stats> getViewStatsForDatabase(OperationContext* opCtx,
+                                                                     StringData dbName) const;
+
+    /**
      * Returns a set of databases, by name, that have view catalogs.
      */
     using ViewCatalogSet = absl::flat_hash_set<TenantDatabaseName>;
-    ViewCatalogSet getViewCatalogDbNames() const;
+    ViewCatalogSet getViewCatalogDbNames(OperationContext* opCtx) const;
 
     /**
-     * Puts the catalog in closed state. In this state, the lookupNSSByUUID method will fall back
-     * to the pre-close state to resolve queries for currently unknown UUIDs. This allows processes,
+     * Puts the catalog in closed state. In this state, the lookupNSSByUUID method will fall back to
+     * the pre-close state to resolve queries for currently unknown UUIDs. This allows processes,
      * like authorization and replication, which need to do lookups outside of database locks, to
      * proceed.
      *
@@ -381,7 +482,7 @@ public:
     void onCloseCatalog(OperationContext* opCtx);
 
     /**
-     * Puts the catatlog back in open state, removing the pre-close state. See onCloseCatalog.
+     * Puts the catalog back in open state, removing the pre-close state. See onCloseCatalog.
      *
      * Must be called with the global lock acquired in exclusive mode.
      */
@@ -403,8 +504,8 @@ public:
 
     /**
      * Lookup the name of a resource by its ResourceId. If there are multiple namespaces mapped to
-     * the same ResourceId entry, we return the boost::none for those namespaces until there is
-     * only one namespace in the set. If the ResourceId is not found, boost::none is returned.
+     * the same ResourceId entry, we return the boost::none for those namespaces until there is only
+     * one namespace in the set. If the ResourceId is not found, boost::none is returned.
      */
     boost::optional<std::string> lookupResourceName(const ResourceId& rid) const;
 
@@ -425,6 +526,48 @@ private:
     std::shared_ptr<Collection> _lookupCollectionByUUID(UUID uuid) const;
 
     /**
+     * Retrieves the views for a given database, including any uncommitted changes for this
+     * operation.
+     */
+    boost::optional<const ViewsForDatabase&> _getViewsForDatabase(OperationContext* opCtx,
+                                                                  StringData dbName) const;
+
+    /**
+     * Sets all namespaces used by views for a database. Will uassert if there is a conflicting
+     * collection name in the catalog.
+     */
+    void _replaceViewsForDatabase(StringData dbName, ViewsForDatabase&& views);
+
+    /**
+     * Helper to take care of shared functionality for 'createView(...)' and 'modifyView(...)'.
+     */
+    Status _createOrUpdateView(OperationContext* opCtx,
+                               const NamespaceString& viewName,
+                               const NamespaceString& viewOn,
+                               const BSONArray& pipeline,
+                               const ViewsForDatabase::PipelineValidatorFn& pipelineValidator,
+                               std::unique_ptr<CollatorInterface> collator,
+                               ViewsForDatabase&& viewsForDb) const;
+
+    /**
+     * Throws 'WriteConflictException' if given namespace is already registered with the catalog, as
+     * either a view or collection. In the case of an collection drop (by the calling thread) that
+     * has not been committed yet, it will not throw, but it will return
+     * 'NonExistenceType::kDropPending' to distinguish from the case that the namespace is simply
+     * not registered with the catalog at all. The results will include namespaces which have been
+     * registered by preCommitHooks on other threads, but which have not truly been committed yet.
+     *
+     * If 'type' is set to 'NamespaceType::kCollection', we will only check for collisions with
+     * collections. If set to 'NamespaceType::kAll', we will check against both collections and
+     * views.
+     */
+    enum class NonExistenceType { kDropPending, kNormal };
+    enum class NamespaceType { kAll, kCollection };
+    NonExistenceType _ensureNamespaceDoesNotExist(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  NamespaceType type) const;
+
+    /**
      * When present, indicates that the catalog is in closed state, and contains a map from UUID
      * to pre-close NSS. See also onCloseCatalog.
      */
@@ -435,14 +578,16 @@ private:
         std::map<std::pair<TenantDatabaseName, UUID>, std::shared_ptr<Collection>>;
     using NamespaceCollectionMap =
         stdx::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
+    using UncommittedViewsSet = stdx::unordered_set<NamespaceString>;
     using DatabaseProfileSettingsMap = StringMap<ProfileSettings>;
 
     CollectionCatalogMap _catalog;
     OrderedCollectionMap _orderedCollections;  // Ordered by <tenantDbName, collUUID> pair
     NamespaceCollectionMap _collections;
+    UncommittedViewsSet _uncommittedViews;
 
-    // Map of database names to a set of their views. Only databases with views are present.
-    absl::flat_hash_map<TenantDatabaseName, absl::flat_hash_set<NamespaceString>> _views;
+    // Map of database names to their corresponding views and other associated state.
+    StringMap<ViewsForDatabase> _viewsForDatabase;
 
     // Incremented whenever the CollectionCatalog gets closed and reopened (onCloseCatalog and
     // onOpenCatalog).

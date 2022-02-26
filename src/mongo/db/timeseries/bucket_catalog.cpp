@@ -39,7 +39,6 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/timeseries/timeseries_options.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/fail_point.h"

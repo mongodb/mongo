@@ -46,9 +46,6 @@ public:
 
     bool dbExists(OperationContext* opCtx, const TenantDatabaseName& tenantDbName) const override;
 
-    std::shared_ptr<const ViewCatalog> getViewCatalog(
-        OperationContext* opCtx, const TenantDatabaseName& tenantDbName) const override;
-
     Database* openDb(OperationContext* opCtx,
                      const TenantDatabaseName& tenantDbName,
                      bool* justCreated = nullptr) override;

@@ -37,6 +37,7 @@
 #include <fmt/format.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/uncommitted_collections.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -49,7 +50,6 @@
 #include "mongo/db/repl/tenant_migration_shared_data.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_import.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/future_util.h"
 

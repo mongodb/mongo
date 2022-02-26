@@ -35,7 +35,6 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -82,26 +81,21 @@ public:
         stats.clustered = catalogStats.userClustered;
         stats.internalCollections = catalogStats.internal;
 
-        const auto viewCatalogDbNames = catalog->getViewCatalogDbNames();
-        if (const auto viewCatalog = ViewCatalog::get(opCtx)) {
-            for (const auto& tenantDbName : viewCatalogDbNames) {
-                try {
-                    const auto viewStats = viewCatalog->getStats(tenantDbName.dbName());
-                    if (!viewStats) {
-                        // The database may have been dropped between listing the database names and
-                        // looking up the view catalog.
-                        continue;
-                    }
+        const auto viewCatalogDbNames = catalog->getViewCatalogDbNames(opCtx);
+        for (const auto& tenantDbName : viewCatalogDbNames) {
+            try {
+                const auto viewStats =
+                    catalog->getViewStatsForDatabase(opCtx, tenantDbName.dbName());
+                invariant(viewStats);
 
-                    stats.timeseries += viewStats->userTimeseries;
-                    stats.views += viewStats->userViews;
-                    stats.internalViews += viewStats->internal;
-                } catch (ExceptionForCat<ErrorCategory::Interruption>&) {
-                    LOGV2_DEBUG(5578400,
-                                2,
-                                "Failed to collect view catalog statistics",
-                                "db"_attr = tenantDbName);
-                }
+                stats.timeseries += viewStats->userTimeseries;
+                stats.views += viewStats->userViews;
+                stats.internalViews += viewStats->internal;
+            } catch (ExceptionForCat<ErrorCategory::Interruption>&) {
+                LOGV2_DEBUG(5578400,
+                            2,
+                            "Failed to collect view catalog statistics",
+                            "db"_attr = tenantDbName);
             }
         }
 

@@ -41,7 +41,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/views/view_catalog.h"
 
 namespace mongo {
 

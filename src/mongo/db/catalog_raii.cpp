@@ -37,7 +37,6 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
@@ -296,17 +295,14 @@ AutoGetCollection::AutoGetCollection(
         return;
     }
 
-    if (_autoDb->getDb()) {
-        _view = ViewCatalog::get(opCtx)->lookup(opCtx, _resolvedNss);
-        uassert(ErrorCodes::CommandNotSupportedOnView,
-                str::stream() << "Namespace " << _resolvedNss.ns() << " is a timeseries collection",
-                !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted ||
-                    !_view->timeseries());
-        uassert(ErrorCodes::CommandNotSupportedOnView,
-                str::stream() << "Namespace " << _resolvedNss.ns()
-                              << " is a view, not a collection",
-                !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted);
-    }
+    _view = catalog->lookupView(opCtx, _resolvedNss);
+    uassert(ErrorCodes::CommandNotSupportedOnView,
+            str::stream() << "Namespace " << _resolvedNss.ns() << " is a timeseries collection",
+            !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted ||
+                !_view->timeseries());
+    uassert(ErrorCodes::CommandNotSupportedOnView,
+            str::stream() << "Namespace " << _resolvedNss.ns() << " is a view, not a collection",
+            !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted);
 }
 
 Collection* AutoGetCollection::getWritableCollection(OperationContext* opCtx,
@@ -392,14 +388,7 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
         return;
     }
 
-    // Returns nullptr for 'viewCatalog' if db does not exist.
-    const TenantDatabaseName tenantDbName(boost::none, _resolvedNss.db());
-    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, tenantDbName);
-    if (!viewCatalog) {
-        return;
-    }
-
-    _view = viewCatalog->lookup(opCtx, _resolvedNss);
+    _view = catalog->lookupView(opCtx, _resolvedNss);
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "Namespace " << _resolvedNss.ns() << " is a timeseries collection",
             !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted ||

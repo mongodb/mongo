@@ -41,6 +41,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -65,7 +66,6 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -332,7 +332,7 @@ public:
                 // Acquire only the global lock and set up a consistent in-memory catalog and
                 // storage snapshot.
                 AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, dbName);
-                auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, tenantDbName);
+                auto catalog = CollectionCatalog::get(opCtx);
 
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(&hangBeforeListCollections,
                                                                  opCtx,
@@ -343,8 +343,8 @@ public:
                 auto ws = std::make_unique<WorkingSet>();
                 auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
 
-                // If the ViewCatalog pointer is valid, then the database exists.
-                if (viewCatalog) {
+                if (DatabaseHolder::get(opCtx)->dbExists(opCtx,
+                                                         TenantDatabaseName(boost::none, dbName))) {
                     if (auto collNames = _getExactNameMatches(matcher.get())) {
                         for (auto&& collName : *collNames) {
                             auto nss = NamespaceString(dbName, collName);
@@ -372,8 +372,7 @@ public:
                                         opCtx, collection, includePendingDrops, nameOnly);
                                 }
 
-                                auto view =
-                                    viewCatalog->lookupWithoutValidatingDurableViews(opCtx, nss);
+                                auto view = catalog->lookupViewWithoutValidatingDurable(opCtx, nss);
                                 if (view && view->timeseries()) {
                                     if (auto bucketsCollection = CollectionCatalog::get(opCtx)
                                                                      ->lookupCollectionByNamespace(
@@ -399,7 +398,7 @@ public:
                         auto perCollectionWork = [&](const CollectionPtr& collection) {
                             if (collection && collection->getTimeseriesOptions() &&
                                 !collection->ns().isDropPendingNamespace() &&
-                                viewCatalog->lookupWithoutValidatingDurableViews(
+                                catalog->lookupViewWithoutValidatingDurable(
                                     opCtx, collection->ns().getTimeseriesViewNamespace()) &&
                                 (!authorizedCollections ||
                                  as->isAuthorizedForAnyActionOnResource(
@@ -454,7 +453,7 @@ public:
                             ListCollectionsFilter::makeTypeCollectionFilter());
 
                     if (!skipViews) {
-                        viewCatalog->iterate(dbName, [&](const ViewDefinition& view) {
+                        catalog->iterateViews(opCtx, dbName, [&](const ViewDefinition& view) {
                             if (authorizedCollections &&
                                 !as->isAuthorizedForAnyActionOnResource(
                                     ResourcePattern::forExactNamespace(view.name()))) {

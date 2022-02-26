@@ -76,7 +76,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_util.h"
 #include "mongo/db/system_index.h"
-#include "mongo/db/views/view_catalog.h"
+#include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
@@ -167,12 +167,6 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
         uasserted(10028, status.toString());
     }
 
-    auto durableViewCatalog = std::make_unique<DurableViewCatalogImpl>(this);
-    status = ViewCatalog::registerDatabase(opCtx, _name.dbName(), std::move(durableViewCatalog));
-    if (!status.isOK()) {
-        return status;
-    }
-
     auto catalog = CollectionCatalog::get(opCtx);
     for (const auto& uuid : catalog->getAllCollectionUUIDsFromDb(_name)) {
         CollectionWriter collection(
@@ -189,28 +183,43 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
 
     // When in repair mode, record stores are not loaded. Thus the ViewsCatalog cannot be reloaded.
     if (!storageGlobalParams.repair) {
-        // At construction time of the viewCatalog, the CollectionCatalog map wasn't initialized
-        // yet, so no system.views collection would be found. Now that we're sufficiently
-        // initialized, reload the viewCatalog to populate its in-memory state. If there are
-        // problems with the catalog contents as might be caused by incorrect mongod versions or
-        // similar, they are found right away.
+        // At construction time of this DatabaseImpl, the CollectionCatalog map wasn't populated
+        // with collections for this database yet, so no system.views collection would be found to
+        // populate the views. Now that we've loaded the collections, reload the view definitions
+        // from system.views to populate the views portion of the CollectionCatalog. If there are
+        // problems with the durable catalog contents, as might be caused by incorrect mongod
+        // versions or similar, they are found right away.
         //
-        // We take an IS lock here because the ViewCatalog::reload API requires it for other uses.
-        // Realistically no one else can be accessing the collection, and there's no chance of this
-        // blocking.
-        Lock::CollectionLock systemViewsLock(
-            opCtx,
-            NamespaceString(_name.dbName(), NamespaceString::kSystemDotViewsCollectionName),
-            MODE_IS);
-        Status reloadStatus = ViewCatalog::reload(
-            opCtx, _name.dbName(), ViewCatalogLookupBehavior::kValidateDurableViews);
-        if (!reloadStatus.isOK()) {
-            LOGV2_WARNING_OPTIONS(20326,
-                                  {logv2::LogTag::kStartupWarnings},
-                                  "Unable to parse views; remove any invalid views "
-                                  "from the collection to restore server functionality",
-                                  "error"_attr = redact(reloadStatus),
-                                  "namespace"_attr = _viewsName);
+        // Even though no one can be writing to system.views at this point, we must take an IS lock
+        // because the ViewsForDatabase::reload API requires it for other uses.
+        try {
+            Lock::CollectionLock systemViewsLock(
+                opCtx,
+                NamespaceString(_name.dbName(), NamespaceString::kSystemDotViewsCollectionName),
+                MODE_IS);
+            ViewsForDatabase viewsForDb{std::make_unique<DurableViewCatalogImpl>(this)};
+            Status reloadStatus = viewsForDb.reload(opCtx);
+            if (!reloadStatus.isOK()) {
+                LOGV2_WARNING_OPTIONS(20326,
+                                      {logv2::LogTag::kStartupWarnings},
+                                      "Unable to parse views; remove any invalid views "
+                                      "from the collection to restore server functionality",
+                                      "error"_attr = redact(reloadStatus),
+                                      "namespace"_attr = _viewsName);
+            }
+
+            CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+                catalog.onOpenDatabase(opCtx, _name.dbName(), std::move(viewsForDb));
+            });
+        } catch (DBException& ex) {
+            // Another operation may have tried to simultaneously open the database and register it
+            // with the CollectionCatalog. If that's the case, error out here and handle the
+            // conflict one level up.
+            if (ex.code() == ErrorCodes::AlreadyInitialized) {
+                return ex.toStatus();
+            }
+
+            throw;
         }
     }
 
@@ -218,10 +227,12 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
     if (storageGlobalParams.restore) {
         invariant(opCtx->lockState()->isW());
 
+        // Refresh our copy of the catalog, since we may have modified it above.
+        catalog = CollectionCatalog::get(opCtx);
         try {
-            auto viewCatalog = ViewCatalog::get(opCtx);
-            viewCatalog->iterate(_name.dbName(), [&](const ViewDefinition& view) {
-                auto swResolvedView = viewCatalog->resolveView(opCtx, view.name(), boost::none);
+            catalog->iterateViews(opCtx, _name.dbName(), [&](const ViewDefinition& view) {
+                auto swResolvedView =
+                    view_catalog_helpers::resolveView(opCtx, catalog, view.name(), boost::none);
                 if (!swResolvedView.isOK()) {
                     LOGV2_WARNING(6260802,
                                   "Could not resolve view during restore",
@@ -246,7 +257,7 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
                       "resolvedNs"_attr = resolvedNs);
 
                 WriteUnitOfWork wuow(opCtx);
-                Status status = viewCatalog->dropView(opCtx, view.name());
+                Status status = catalog->dropView(opCtx, view.name());
                 if (!status.isOK()) {
                     LOGV2_WARNING(6260804,
                                   "Failed to remove view on unrestored collection",
@@ -353,10 +364,11 @@ void DatabaseImpl::getStats(OperationContext* opCtx,
         });
 
 
-    ViewCatalog::get(opCtx)->iterate(name().dbName(), [&](const ViewDefinition& view) {
-        nViews += 1;
-        return true;
-    });
+    CollectionCatalog::get(opCtx)->iterateViews(
+        opCtx, name().dbName(), [&](const ViewDefinition& view) {
+            nViews += 1;
+            return true;
+        });
 
     output->appendNumber("collections", nCollections);
     output->appendNumber("views", nViews);
@@ -406,7 +418,7 @@ Status DatabaseImpl::dropView(OperationContext* opCtx, NamespaceString viewName)
     dassert(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_viewsName), MODE_X));
 
-    Status status = ViewCatalog::dropView(opCtx, viewName);
+    Status status = CollectionCatalog::get(opCtx)->dropView(opCtx, viewName);
     Top::get(opCtx->getServiceContext()).collectionDropped(viewName);
     return status;
 }
@@ -417,7 +429,9 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
     // Cannot drop uncommitted collections.
     invariant(!UncommittedCollections::getForTxn(opCtx, nss));
 
-    if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
+    auto catalog = CollectionCatalog::get(opCtx);
+
+    if (!catalog->lookupCollectionByNamespace(opCtx, nss)) {
         // Collection doesn't exist so don't bother validating if it can be dropped.
         return Status::OK();
     }
@@ -426,13 +440,12 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
 
     if (nss.isSystem()) {
         if (nss.isSystemDotProfile()) {
-            if (CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(_name.dbName()) != 0)
+            if (catalog->getDatabaseProfileLevel(_name.dbName()) != 0)
                 return Status(ErrorCodes::IllegalOperation,
                               "turn off profiling before dropping system.profile collection");
         } else if (nss.isSystemDotViews()) {
             if (!MONGO_unlikely(allowSystemViewsDrop.shouldFail())) {
-                const auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, _name);
-                const auto viewStats = viewCatalog->getStats(_name.dbName());
+                const auto viewStats = catalog->getViewStatsForDatabase(opCtx, _name.dbName());
                 uassert(ErrorCodes::CommandFailed,
                         str::stream() << "cannot drop collection " << nss
                                       << " when time-series collections are present.",
@@ -758,7 +771,12 @@ Status DatabaseImpl::createView(OperationContext* opCtx,
         status = {ErrorCodes::InvalidNamespace,
                   str::stream() << "invalid namespace name for a view: " + viewName.toString()};
     } else {
-        status = ViewCatalog::createView(opCtx, viewName, viewOnNss, pipeline, options.collation);
+        status = CollectionCatalog::get(opCtx)->createView(opCtx,
+                                                           viewName,
+                                                           viewOnNss,
+                                                           pipeline,
+                                                           options.collation,
+                                                           view_catalog_helpers::validatePipeline);
     }
 
     audit::logCreateView(

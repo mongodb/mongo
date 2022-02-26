@@ -53,7 +53,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/db/views/view.h"
-#include "mongo/db/views/view_catalog.h"
+#include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/db/views/view_graph.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
@@ -105,8 +105,8 @@ public:
         CatalogTestFixture::tearDown();
     }
 
-    auto getViewCatalog() {
-        return ViewCatalog::get(operationContext());
+    auto getCatalog() {
+        return CollectionCatalog::get(operationContext());
     }
 
     Status createView(OperationContext* opCtx,
@@ -122,7 +122,8 @@ public:
             MODE_X);
 
         WriteUnitOfWork wuow(opCtx);
-        Status s = ViewCatalog::createView(opCtx, viewName, viewOn, pipeline, collation);
+        Status s = getCatalog()->createView(
+            opCtx, viewName, viewOn, pipeline, collation, view_catalog_helpers::validatePipeline);
         wuow.commit();
 
         return s;
@@ -140,7 +141,8 @@ public:
             MODE_X);
 
         WriteUnitOfWork wuow(opCtx);
-        Status s = ViewCatalog::modifyView(opCtx, viewName, viewOn, pipeline);
+        Status s = getCatalog()->modifyView(
+            opCtx, viewName, viewOn, pipeline, view_catalog_helpers::validatePipeline);
         wuow.commit();
 
         return s;
@@ -155,7 +157,7 @@ public:
             MODE_X);
 
         WriteUnitOfWork wuow(opCtx);
-        Status s = ViewCatalog::dropView(opCtx, viewName);
+        Status s = getCatalog()->dropView(opCtx, viewName);
         wuow.commit();
 
         return s;
@@ -168,7 +170,7 @@ public:
     std::shared_ptr<const ViewDefinition> lookup(OperationContext* opCtx,
                                                  const NamespaceString& ns) {
         Lock::DBLock dbLock(operationContext(), NamespaceString(ns).db(), MODE_IS);
-        return getViewCatalog()->lookup(operationContext(), ns);
+        return getCatalog()->lookupView(operationContext(), ns);
     }
 
 private:
@@ -516,8 +518,7 @@ TEST_F(ViewCatalogFixture, LookupRIDExistingView) {
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
 
     auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
-    auto collectionCatalog = CollectionCatalog::get(operationContext());
-    ASSERT(collectionCatalog->lookupResourceName(resourceID).get() == "db.view");
+    ASSERT(getCatalog()->lookupResourceName(resourceID).get() == "db.view");
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDExistingViewRollback) {
@@ -532,12 +533,15 @@ TEST_F(ViewCatalogFixture, LookupRIDExistingViewRollback) {
             MODE_X);
 
         WriteUnitOfWork wunit(operationContext());
-        ASSERT_OK(ViewCatalog::createView(
-            operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
+        ASSERT_OK(getCatalog()->createView(operationContext(),
+                                           viewName,
+                                           viewOn,
+                                           emptyPipeline,
+                                           emptyCollation,
+                                           view_catalog_helpers::validatePipeline));
     }
     auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
-    auto collectionCatalog = CollectionCatalog::get(operationContext());
-    ASSERT(!collectionCatalog->lookupResourceName(resourceID));
+    ASSERT(!getCatalog()->lookupResourceName(resourceID));
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDAfterDrop) {
@@ -548,8 +552,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterDrop) {
     ASSERT_OK(dropView(operationContext(), viewName));
 
     auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
-    auto collectionCatalog = CollectionCatalog::get(operationContext());
-    ASSERT(!collectionCatalog->lookupResourceName(resourceID));
+    ASSERT(!getCatalog()->lookupResourceName(resourceID));
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDAfterDropRollback) {
@@ -560,9 +563,8 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterDropRollback) {
     {
         WriteUnitOfWork wunit(operationContext());
         ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
-        ASSERT(CollectionCatalog::get(operationContext())->lookupResourceName(resourceID).get() ==
-               viewName.ns());
         wunit.commit();
+        ASSERT(getCatalog()->lookupResourceName(resourceID).get() == viewName.ns());
     }
 
     {
@@ -574,11 +576,11 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterDropRollback) {
             MODE_X);
 
         WriteUnitOfWork wunit(operationContext());
-        ASSERT_OK(ViewCatalog::dropView(operationContext(), viewName));
+        ASSERT_OK(getCatalog()->dropView(operationContext(), viewName));
+        // Do not commit, rollback.
     }
-
-    ASSERT(CollectionCatalog::get(operationContext())->lookupResourceName(resourceID).get() ==
-           viewName.ns());
+    // Make sure drop was rolled back and view is still in catalog.
+    ASSERT(getCatalog()->lookupResourceName(resourceID).get() == viewName.ns());
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDAfterModify) {
@@ -588,8 +590,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterModify) {
     auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     ASSERT_OK(modifyView(operationContext(), viewName, viewOn, emptyPipeline));
-    ASSERT(CollectionCatalog::get(operationContext())->lookupResourceName(resourceID).get() ==
-           viewName.ns());
+    ASSERT(getCatalog()->lookupResourceName(resourceID).get() == viewName.ns());
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDAfterModifyRollback) {
@@ -600,10 +601,10 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterModifyRollback) {
     {
         WriteUnitOfWork wunit(operationContext());
         ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
-        ASSERT(CollectionCatalog::get(operationContext())->lookupResourceName(resourceID).get() ==
-               viewName.ns());
         wunit.commit();
+        ASSERT(getCatalog()->lookupResourceName(resourceID).get() == viewName.ns());
     }
+
     {
         Lock::DBLock dbLock(operationContext(), viewName.db(), MODE_IX);
         Lock::CollectionLock collLock(operationContext(), viewName, MODE_X);
@@ -613,12 +614,16 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterModifyRollback) {
             MODE_X);
 
         WriteUnitOfWork wunit(operationContext());
-        ASSERT_OK(ViewCatalog::modifyView(operationContext(), viewName, viewOn, emptyPipeline));
-        ASSERT(CollectionCatalog::get(operationContext())->lookupResourceName(resourceID).get() ==
-               viewName.ns());
+        ASSERT_OK(getCatalog()->modifyView(operationContext(),
+                                           viewName,
+                                           viewOn,
+                                           emptyPipeline,
+                                           view_catalog_helpers::validatePipeline));
+        ASSERT(getCatalog()->lookupResourceName(resourceID).get() == viewName.ns());
+        // Do not commit, rollback.
     }
-    ASSERT(CollectionCatalog::get(operationContext())->lookupResourceName(resourceID).get() ==
-           viewName.ns());
+    // Make sure view resource is still available after rollback.
+    ASSERT(getCatalog()->lookupResourceName(resourceID).get() == viewName.ns());
 }
 
 TEST_F(ViewCatalogFixture, CreateViewThenDropAndLookup) {
@@ -644,7 +649,7 @@ TEST_F(ViewCatalogFixture, Iterate) {
     std::set<std::string> viewNames = {"db.view1", "db.view2", "db.view3"};
 
     Lock::DBLock dbLock(operationContext(), "db", MODE_IX);
-    getViewCatalog()->iterate("db", [&viewNames](const ViewDefinition& view) {
+    getCatalog()->iterateViews(operationContext(), "db", [&viewNames](const ViewDefinition& view) {
         std::string name = view.name().toString();
         ASSERT(viewNames.end() != viewNames.find(name));
         viewNames.erase(name);
@@ -672,7 +677,8 @@ TEST_F(ViewCatalogFixture, ResolveViewCorrectPipeline) {
     ASSERT_OK(createView(operationContext(), view3, view2, pipeline3.arr(), emptyCollation));
 
     Lock::DBLock dbLock(operationContext(), "db", MODE_IX);
-    auto resolvedView = getViewCatalog()->resolveView(operationContext(), view3, boost::none);
+    auto resolvedView =
+        view_catalog_helpers::resolveView(operationContext(), getCatalog(), view3, boost::none);
     ASSERT(resolvedView.isOK());
 
     std::vector<BSONObj> expected = {BSON("$match" << BSON("foo" << 1)),
@@ -692,8 +698,8 @@ TEST_F(ViewCatalogFixture, ResolveViewOnCollectionNamespace) {
     const NamespaceString collectionNamespace("db.coll");
 
     Lock::DBLock dbLock(operationContext(), "db", MODE_IS);
-    auto resolvedView = uassertStatusOK(
-        getViewCatalog()->resolveView(operationContext(), collectionNamespace, boost::none));
+    auto resolvedView = uassertStatusOK(view_catalog_helpers::resolveView(
+        operationContext(), getCatalog(), collectionNamespace, boost::none));
 
     ASSERT_EQ(resolvedView.getNamespace(), collectionNamespace);
     ASSERT_EQ(resolvedView.getPipeline().size(), 0U);
@@ -716,7 +722,8 @@ TEST_F(ViewCatalogFixture, ResolveViewCorrectlyExtractsDefaultCollation) {
     ASSERT_OK(createView(operationContext(), view2, view1, pipeline2.arr(), collation));
 
     Lock::DBLock dbLock(operationContext(), "db", MODE_IS);
-    auto resolvedView = getViewCatalog()->resolveView(operationContext(), view2, boost::none);
+    auto resolvedView =
+        view_catalog_helpers::resolveView(operationContext(), getCatalog(), view2, boost::none);
     ASSERT(resolvedView.isOK());
 
     ASSERT_EQ(resolvedView.getValue().getNamespace(), viewOn);

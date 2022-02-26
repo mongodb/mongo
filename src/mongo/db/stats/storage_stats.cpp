@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/db_raii.h"
@@ -39,7 +40,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_stats.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 
 #include "mongo/db/stats/storage_stats.h"

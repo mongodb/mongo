@@ -35,6 +35,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -44,7 +45,6 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -150,7 +150,7 @@ public:
             // for this check, only to validate if a view already exists for this namespace.
             if (autoDb->getDb() &&
                 !CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss) &&
-                ViewCatalog::get(opCtx)->lookupWithoutValidatingDurableViews(opCtx, nss)) {
+                CollectionCatalog::get(opCtx)->lookupViewWithoutValidatingDurable(opCtx, nss)) {
                 return true;
             }
 

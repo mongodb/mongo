@@ -39,6 +39,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
@@ -66,7 +67,6 @@
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -379,12 +379,9 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
     bool createCollImplicitly) {
     WriteUnitOfWork wunit(opCtx);
 
-    const TenantDatabaseName tenantDbName(boost::none, ns.db());
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto db = databaseHolder->getDb(opCtx, tenantDbName);
     uassert(ErrorCodes::CommandNotSupportedOnView,
             "Cannot create indexes on a view",
-            !db || !ViewCatalog::get(opCtx)->lookup(opCtx, ns));
+            !CollectionCatalog::get(opCtx)->lookupView(opCtx, ns));
 
     if (createCollImplicitly) {
         for (const auto& spec : specs) {

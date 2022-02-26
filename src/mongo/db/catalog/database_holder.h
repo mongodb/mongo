@@ -75,19 +75,6 @@ public:
                           const TenantDatabaseName& tenantDbName) const = 0;
 
     /**
-     * Fetches the ViewCatalog decorating the Database matching 'tenantDbName', or returns nullptr
-     * if the database does not exist. The returned ViewCatalog is safe to access without a lock
-     * because it is held as a shared_ptr.
-     *
-     * The ViewCatalog must be fetched through this interface if the caller holds no database lock
-     * to ensure the Database object is safe to access. This class' internal mutex provides
-     * concurrency protection around looking up and accessing the Database object matching
-     * 'tenantDbName'.
-     */
-    virtual std::shared_ptr<const ViewCatalog> getViewCatalog(
-        OperationContext* opCtx, const TenantDatabaseName& tenantDbName) const = 0;
-
-    /**
      * Retrieves a database reference if it is already opened, or opens it if it hasn't been
      * opened/created yet. Must be called with the database locked in X-mode.
      *

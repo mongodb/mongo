@@ -36,6 +36,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -54,7 +55,6 @@
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
@@ -161,7 +161,7 @@ public:
 
         AutoGetCollection autoColl(opCtx, toReIndexNss, MODE_X);
         if (!autoColl) {
-            if (ViewCatalog::get(opCtx)->lookup(opCtx, toReIndexNss))
+            if (CollectionCatalog::get(opCtx)->lookupView(opCtx, toReIndexNss))
                 uasserted(ErrorCodes::CommandNotSupportedOnView, "can't re-index a view");
             else
                 uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");
