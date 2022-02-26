@@ -39,7 +39,6 @@
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/s/write_ops/write_op.h"
 #include "mongo/stdx/unordered_map.h"
 

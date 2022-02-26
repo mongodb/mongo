@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"

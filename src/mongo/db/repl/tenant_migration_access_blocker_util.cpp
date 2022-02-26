@@ -389,7 +389,7 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
 }
 
 template <typename MigrationConflictInfoType>
-Status _handleTenantMigrationConflict(OperationContext* opCtx, Status status) {
+Status _handleTenantMigrationConflict(OperationContext* opCtx, const Status& status) {
     auto migrationConflictInfo = status.extraInfo<MigrationConflictInfoType>();
     invariant(migrationConflictInfo);
     auto mtab = migrationConflictInfo->getTenantMigrationAccessBlocker();
@@ -400,7 +400,7 @@ Status _handleTenantMigrationConflict(OperationContext* opCtx, Status status) {
 }
 
 Status handleTenantMigrationConflict(OperationContext* opCtx, Status status) {
-    if (status.code() == ErrorCodes::NonRetryableTenantMigrationConflict) {
+    if (status == ErrorCodes::NonRetryableTenantMigrationConflict) {
         auto migrationStatus =
             _handleTenantMigrationConflict<NonRetryableTenantMigrationConflictInfo>(opCtx, status);
 
