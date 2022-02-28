@@ -81,8 +81,10 @@ protected:
                         boost::none);
 
         if (!OperationShardingState::isOperationVersioned(opCtx)) {
-            OperationShardingState::setShardRole(
-                opCtx, kTestNss, cm.getVersion(ShardId("0")), boost::none);
+            OperationShardingState::setShardRole(opCtx,
+                                                 kTestNss,
+                                                 cm.getVersion(ShardId("0")) /* shardVersion */,
+                                                 boost::none /* databaseVersion */);
         }
 
         return CollectionMetadata(std::move(cm), ShardId("0"));

@@ -476,7 +476,8 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletesInTran
 
     auto env = setupReshardingEnv(opCtx, true);
 
-    OperationShardingState::setShardRole(opCtx, kNss, env.version, env.dbVersion);
+    OperationShardingState::setShardRole(
+        opCtx, kNss, env.version /* shardVersion */, env.dbVersion /* databaseVersion */);
     runInTransaction(opCtx, [&]() { deleteDoc(opCtx, kNss, BSON("_id" << 0), env); });
 
     // Look for destined recipient in latest oplog entry. Since this write was done in a

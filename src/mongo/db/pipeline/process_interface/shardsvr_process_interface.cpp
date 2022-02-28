@@ -397,7 +397,7 @@ bool ShardServerProcessInterface::setExpectedDbVersion(OperationContext* opCtx,
                 "Expected db version must match known db version",
                 knownDBVersion == dbVersion);
     } else {
-        OperationShardingState::setShardRole(opCtx, nss, boost::none, dbVersion);
+        OperationShardingState::setShardRole(opCtx, nss, boost::none /* shardVersion */, dbVersion);
     }
 
     return false;
@@ -411,7 +411,8 @@ void ShardServerProcessInterface::setExpectedShardVersion(
     if (oss.hasShardVersion(nss)) {
         invariant(oss.getShardVersion(nss) == chunkVersion);
     } else {
-        OperationShardingState::setShardRole(opCtx, nss, chunkVersion, boost::none);
+        OperationShardingState::setShardRole(
+            opCtx, nss, chunkVersion, boost::none /* databaseVersion */);
     }
 }
 

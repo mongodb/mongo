@@ -81,7 +81,10 @@ void runWithTransaction(OperationContext* opCtx,
     // the temporary resharding collection. We attach shard version IGNORED to the write operations
     // and leave it to ReshardingOplogBatchApplier::applyBatch() to retry on a StaleConfig exception
     // to allow the collection metadata information to be recovered.
-    ScopedSetShardRole scopedSetShardRole(asr.opCtx(), nss, ChunkVersion::IGNORED(), boost::none);
+    ScopedSetShardRole scopedSetShardRole(asr.opCtx(),
+                                          nss,
+                                          ChunkVersion::IGNORED() /* shardVersion */,
+                                          boost::none /* databaseVersion */);
 
     MongoDOperationContextSession ocs(asr.opCtx());
     auto txnParticipant = TransactionParticipant::get(asr.opCtx());

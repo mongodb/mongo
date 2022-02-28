@@ -125,8 +125,10 @@ protected:
         _manager = std::make_shared<MetadataManager>(
             getServiceContext(), kNss, executor(), CollectionMetadata(cm, ShardId("0")));
 
-        OperationShardingState::setShardRole(
-            operationContext(), kNss, cm.getVersion(ShardId("0")), boost::none);
+        OperationShardingState::setShardRole(operationContext(),
+                                             kNss,
+                                             cm.getVersion(ShardId("0")) /* shardVersion */,
+                                             boost::none /* databaseVersion */);
     }
 
     std::shared_ptr<MetadataManager> _manager;

@@ -44,11 +44,12 @@ const NamespaceString kTestNss("TestDB", "TestColl");
 
 void setCollectionFilteringMetadata(OperationContext* opCtx, CollectionMetadata metadata) {
     AutoGetCollection autoColl(opCtx, kTestNss, MODE_X);
-    const auto version = metadata.getShardVersion();
+    const auto shardVersion = metadata.getShardVersion();
     CollectionShardingRuntime::get(opCtx, kTestNss)
         ->setFilteringMetadata(opCtx, std::move(metadata));
 
-    OperationShardingState::setShardRole(opCtx, kTestNss, version, boost::none);
+    OperationShardingState::setShardRole(
+        opCtx, kTestNss, shardVersion, boost::none /* databaseVersion */);
 }
 
 class DocumentKeyStateTest : public ShardServerTestFixture {

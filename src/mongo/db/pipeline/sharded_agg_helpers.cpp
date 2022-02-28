@@ -1353,6 +1353,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
     return shardVersionRetry(
         expCtx->opCtx, catalogCache, expCtx->ns, "targeting pipeline to attach cursors"_sd, [&]() {
             auto pipelineToTarget = pipeline->clone();
+
             if (shardTargetingPolicy == ShardTargetingPolicy::kNotAllowed ||
                 shouldAlwaysAttachLocalCursorForNamespace(expCtx->ns)) {
                 return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
