@@ -3,7 +3,8 @@ test_kind: js_test
 selector:
   roots:
   - src/mongo/db/modules/*/jstests/fle/*.js
-
+  exclude_with_any_tags:
+  - unsupported_fle_1
 executor:
   config:
     shell_options:
