@@ -238,6 +238,11 @@ repl::OplogEntry getInnerNestedOplogEntry(const repl::OplogEntry& entry) {
 
 }  // namespace
 
+static constexpr StringData kWouldChangeOwningShardRetryContext =
+    "Operation was converted into a distributed transaction because the modified document would "
+    "move shards and succeeded but transaction history was not generated so the original reply "
+    "cannot be recreated."_sd;
+
 SingleWriteResult parseOplogEntryForUpdate(const repl::OplogEntry& entry) {
     SingleWriteResult res;
     // Upserts are stored as inserts.
@@ -252,6 +257,10 @@ SingleWriteResult parseOplogEntryForUpdate(const repl::OplogEntry& entry) {
         res.setN(1);
         res.setNModified(1);
     } else if (entry.getOpType() == repl::OpTypeEnum::kNoop) {
+        if (entry.getObject().woCompare(kWouldChangeOwningShardSentinel) == 0) {
+            uasserted(ErrorCodes::IncompleteTransactionHistory,
+                      kWouldChangeOwningShardRetryContext);
+        }
         return parseOplogEntryForUpdate(getInnerNestedOplogEntry(entry));
     } else {
         uasserted(40638,
@@ -265,12 +274,6 @@ SingleWriteResult parseOplogEntryForUpdate(const repl::OplogEntry& entry) {
     return res;
 }
 
-static constexpr StringData kFindAndModifyRetryContext =
-    "findAndModify operation was converted into a distributed transaction "
-    "because the modified document would move shards and succeeded but "
-    "transaction history was not generated so the original reply "
-    "cannot be recreated."_sd;
-
 write_ops::FindAndModifyCommandReply parseOplogEntryForFindAndModify(
     OperationContext* opCtx,
     const write_ops::FindAndModifyCommandRequest& request,
@@ -279,7 +282,8 @@ write_ops::FindAndModifyCommandReply parseOplogEntryForFindAndModify(
     // Migrated op and WouldChangeOwningShard sentinel case.
     if (oplogEntry.getOpType() == repl::OpTypeEnum::kNoop) {
         if (oplogEntry.getObject().woCompare(kWouldChangeOwningShardSentinel) == 0) {
-            uasserted(ErrorCodes::IncompleteTransactionHistory, kFindAndModifyRetryContext);
+            uasserted(ErrorCodes::IncompleteTransactionHistory,
+                      kWouldChangeOwningShardRetryContext);
         }
 
         return parseOplogEntryForFindAndModify(

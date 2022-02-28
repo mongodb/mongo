@@ -848,6 +848,7 @@ env.Library(
         'logical_session_id_helpers',
         'repl/repl_coordinator_interface',
         'service_context',
+        'session_catalog',
         'shared_request_handling',
     ],
 )

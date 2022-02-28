@@ -63,6 +63,64 @@ const BSONObj kRetryableWriteConcernError =
 const BSONObj kResWithRetryableWriteConcernError =
     BSON("ok" << 1 << "writeConcernError" << kRetryableWriteConcernError);
 
+class MockResourceYielder : public ResourceYielder {
+public:
+    void yield(OperationContext*) {
+        _timesYielded++;
+
+        if (_skipNTimes > 0) {
+            _skipNTimes--;
+            return;
+        }
+
+        auto error = _yieldError.load();
+        if (error != ErrorCodes::OK) {
+            uasserted(error, "Simulated yield error");
+        }
+    }
+
+    void unyield(OperationContext*) {
+        _timesUnyielded++;
+
+        if (_skipNTimes > 0) {
+            _skipNTimes--;
+            return;
+        }
+
+        auto error = _unyieldError.load();
+        if (error != ErrorCodes::OK) {
+            uasserted(error, "Simulated unyield error");
+        }
+    }
+
+    void skipNTimes(int skip) {
+        _skipNTimes = skip;
+    }
+
+    void throwInYield(ErrorCodes::Error error = ErrorCodes::Interrupted) {
+        _yieldError.store(error);
+    }
+
+    void throwInUnyield(ErrorCodes::Error error = ErrorCodes::Interrupted) {
+        _unyieldError.store(error);
+    }
+
+    auto timesYielded() {
+        return _timesYielded;
+    }
+
+    auto timesUnyielded() {
+        return _timesUnyielded;
+    }
+
+private:
+    int _skipNTimes{0};
+    int _timesYielded{0};
+    int _timesUnyielded{0};
+    AtomicWord<ErrorCodes::Error> _yieldError{ErrorCodes::OK};
+    AtomicWord<ErrorCodes::Error> _unyieldError{ErrorCodes::OK};
+};
+
 namespace txn_api::details {
 
 class MockTransactionClient : public TransactionClient {
@@ -160,8 +218,11 @@ protected:
 
         auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>();
         _mockClient = mockClient.get();
-        _txnWithRetries = std::make_unique<txn_api::TransactionWithRetries>(
-            opCtx(), InlineQueuedCountingExecutor::make(), std::move(mockClient));
+        _txnWithRetries =
+            std::make_unique<txn_api::TransactionWithRetries>(opCtx(),
+                                                              InlineQueuedCountingExecutor::make(),
+                                                              std::move(mockClient),
+                                                              nullptr /* resourceYielder */);
     }
 
     OperationContext* opCtx() {
@@ -172,15 +233,25 @@ protected:
         return _mockClient;
     }
 
+    MockResourceYielder* resourceYielder() {
+        return _resourceYielder;
+    }
+
     txn_api::TransactionWithRetries& txnWithRetries() {
         return *_txnWithRetries;
     }
 
-    void resetTxnWithRetries() {
+    void resetTxnWithRetries(std::unique_ptr<MockResourceYielder> resourceYielder = nullptr) {
         auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>();
         _mockClient = mockClient.get();
-        _txnWithRetries = std::make_unique<txn_api::TransactionWithRetries>(
-            opCtx(), InlineQueuedCountingExecutor::make(), std::move(mockClient));
+        if (resourceYielder) {
+            _resourceYielder = resourceYielder.get();
+        }
+        _txnWithRetries =
+            std::make_unique<txn_api::TransactionWithRetries>(opCtx(),
+                                                              InlineQueuedCountingExecutor::make(),
+                                                              std::move(mockClient),
+                                                              std::move(resourceYielder));
     }
 
     void expectSentAbort(TxnNumber txnNumber, BSONObj writeConcern) {
@@ -195,7 +266,8 @@ protected:
 
 private:
     ServiceContext::UniqueOperationContext _opCtx;
-    txn_api::details::MockTransactionClient* _mockClient;
+    txn_api::details::MockTransactionClient* _mockClient{nullptr};
+    MockResourceYielder* _resourceYielder{nullptr};
     std::unique_ptr<txn_api::TransactionWithRetries> _txnWithRetries;
 };
 
@@ -763,6 +835,154 @@ TEST_F(TxnAPITest, RunSyncThrowsOnCommitWCError) {
                            }),
                        DBException,
                        ErrorCodes::WriteConcernFailed);
+}
+
+TEST_F(TxnAPITest, HandlesExceptionWhileYieldingDuringBody) {
+    resetTxnWithRetries(std::make_unique<MockResourceYielder>());
+    resourceYielder()->throwInYield();
+
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT_EQ(swResult.getStatus(), ErrorCodes::Interrupted);
+    // 2 yields in body and abort but no unyields because both yields throw.
+    ASSERT_EQ(resourceYielder()->timesYielded(), 2);
+    ASSERT_EQ(resourceYielder()->timesUnyielded(), 0);
+}
+
+TEST_F(TxnAPITest, HandlesExceptionWhileUnyieldingDuringBody) {
+    resetTxnWithRetries(std::make_unique<MockResourceYielder>());
+    resourceYielder()->throwInUnyield();
+
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT_EQ(swResult.getStatus(), ErrorCodes::Interrupted);
+    // 2 yields in body and abort and both corresponding unyields.
+    ASSERT_EQ(resourceYielder()->timesYielded(), 2);
+    ASSERT_EQ(resourceYielder()->timesUnyielded(), 2);
+}
+
+TEST_F(TxnAPITest, HandlesExceptionWhileYieldingDuringCommit) {
+    resetTxnWithRetries(std::make_unique<MockResourceYielder>());
+
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+
+            resourceYielder()->throwInYield();
+
+            // The commit response.
+            mockClient()->setNextCommandResponse(kOKCommandResponse);
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT_EQ(swResult.getStatus(), ErrorCodes::Interrupted);
+    // 3 yields in body, commit, and best effort abort. Only unyield in body because the other
+    // yields throw.
+    ASSERT_EQ(resourceYielder()->timesYielded(), 3);
+    ASSERT_EQ(resourceYielder()->timesUnyielded(), 1);
+}
+
+TEST_F(TxnAPITest, HandlesExceptionWhileUnyieldingDuringCommit) {
+    resetTxnWithRetries(std::make_unique<MockResourceYielder>());
+
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+
+            resourceYielder()->skipNTimes(1);  // Skip the unyield when the body is finished.
+            resourceYielder()->throwInUnyield();
+
+            // The commit response.
+            mockClient()->setNextCommandResponse(kOKCommandResponse);
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT_EQ(swResult.getStatus(), ErrorCodes::Interrupted);
+    // 3 yields in body, commit, and best effort abort and all of their corresponding unyields.
+    ASSERT_EQ(resourceYielder()->timesYielded(), 3);
+    ASSERT_EQ(resourceYielder()->timesUnyielded(), 3);
+}
+
+TEST_F(TxnAPITest, HandlesExceptionWhileYieldingDuringAbort) {
+    resetTxnWithRetries(std::make_unique<MockResourceYielder>());
+
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+
+            resourceYielder()->throwInYield(ErrorCodes::Interrupted);
+
+            // No abort response necessary because the yielder throws before sending the command.
+            uasserted(ErrorCodes::InternalError, "Simulated body error");
+            return SemiFuture<void>::makeReady();
+        });
+
+    // The transaction should fail with the original error instead of the ResourceYielder error.
+    ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
+    // 2 yields in body and best effort abort. Only unyield in body because the other yield throws.
+    ASSERT_EQ(resourceYielder()->timesYielded(), 2);
+    ASSERT_EQ(resourceYielder()->timesUnyielded(), 1);
+}
+
+TEST_F(TxnAPITest, HandlesExceptionWhileUnyieldingDuringAbort) {
+    resetTxnWithRetries(std::make_unique<MockResourceYielder>());
+
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+
+            resourceYielder()->skipNTimes(1);  // Skip the unyield when the body is finished.
+            resourceYielder()->throwInUnyield(ErrorCodes::Interrupted);
+
+            // Best effort abort response.
+            mockClient()->setSecondCommandResponse(kOKCommandResponse);
+            uasserted(ErrorCodes::InternalError, "Simulated body error");
+            return SemiFuture<void>::makeReady();
+        });
+
+    // The transaction should fail with the original error instead of the ResourceYielder error.
+    ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
+    // 2 yields in body and best effort abort and both of their corresponding unyields.
+    ASSERT_EQ(resourceYielder()->timesYielded(), 2);
+    ASSERT_EQ(resourceYielder()->timesUnyielded(), 2);
 }
 
 }  // namespace

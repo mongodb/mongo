@@ -191,12 +191,20 @@ Future<void> invokeInTransactionRouter(std::shared_ptr<RequestExecutionContext> 
                 ErrorCodes::isNeedRetargettingError(code) ||
                 code == ErrorCodes::ShardInvalidatedForTargeting ||
                 code == ErrorCodes::StaleDbVersion ||
-                code == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
+                code == ErrorCodes::ShardCannotRefreshDueToLocksHeld ||
+                code == ErrorCodes::WouldChangeOwningShard) {
                 // Don't abort on possibly retryable errors.
                 return;
             }
 
             auto opCtx = rec->getOpCtx();
+
+            auto txnRouter = TransactionRouter::get(opCtx);
+            if (!txnRouter) {
+                // The command had yielded its session while the error was thrown.
+                return;
+            }
+
             TransactionRouter::get(opCtx).implicitlyAbortTransaction(opCtx, status);
         });
 }
@@ -434,6 +442,8 @@ private:
 
     // Logs and updates statistics if an error occurs.
     void _tapOnError(const Status& status);
+
+    void _tapOnSuccess();
 
     ParseAndRunCommand* const _parc;
 
@@ -910,8 +920,16 @@ void ParseAndRunCommand::RunAndRetry::_checkRetryForTransaction(Status& status) 
     // be retried on.
     auto opCtx = _parc->_rec->getOpCtx();
     auto txnRouter = TransactionRouter::get(opCtx);
-    if (!txnRouter)
+    if (!txnRouter) {
+        if (opCtx->inMultiDocumentTransaction()) {
+            // This command must have failed while its session was yielded. We cannot retry in this
+            // case, whatever the session was yielded to is responsible for that, so rethrow the
+            // error.
+            iassert(status);
+        }
+
         return;
+    }
 
     ScopeGuard abortGuard([&] { txnRouter.implicitlyAbortTransaction(opCtx, status); });
 
@@ -1067,6 +1085,15 @@ void ParseAndRunCommand::RunInvocation::_tapOnError(const Status& status) {
     _parc->_errorBuilder->appendElements(errorLabels);
 }
 
+void ParseAndRunCommand::RunInvocation::_tapOnSuccess() {
+    auto opCtx = _parc->_rec->getOpCtx();
+    if (_parc->_osi && _parc->_osi->getAutocommit() == boost::optional<bool>(false)) {
+        tassert(5918604,
+                "A successful transaction command must always check out its session after yielding",
+                TransactionRouter::get(opCtx));
+    }
+}
+
 Future<void> ParseAndRunCommand::RunAndRetry::run() {
     return makeReadyFutureWith([&] {
                // Try kMaxNumStaleVersionRetries times. On the last try, exceptions are rethrown.
@@ -1107,6 +1134,7 @@ Future<void> ParseAndRunCommand::RunInvocation::run() {
                return future_util::makeState<RunAndRetry>(_parc).thenWithState(
                    [](auto* runner) { return runner->run(); });
            })
+        .tap([this]() { _tapOnSuccess(); })
         .tapError([this](Status status) { _tapOnError(status); });
 }
 

@@ -991,6 +991,9 @@ void CheckoutSessionAndInvokeCommand::_tapError(Status status) {
     } else if (status.code() == ErrorCodes::WouldChangeOwningShard) {
         _txnParticipant->handleWouldChangeOwningShardError(opCtx);
         _stashTransaction();
+
+        auto txnResponseMetadata = _txnParticipant->getResponseMetadata();
+        txnResponseMetadata.serialize(_ecd->getExtraFieldsBuilder());
     }
 }
 

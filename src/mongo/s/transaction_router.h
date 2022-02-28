@@ -377,6 +377,11 @@ public:
         void stash(OperationContext* opCtx);
 
         /**
+         * Validates transaction state is still compatible after a yield.
+         */
+        void unstash(OperationContext* opCtx);
+
+        /**
          * Attaches the required transaction related fields for a request to be sent to the given
          * shard.
          *

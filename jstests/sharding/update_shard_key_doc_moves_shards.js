@@ -19,6 +19,7 @@ const st = new ShardingTest({
     rsOptions:
         {setParameter: {maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS}}
 });
+const internalTransactionsEnabled = areInternalTransactionsEnabled(st.s);
 const kDbName = 'db';
 const mongos = st.s0;
 const shard0 = st.shard0.shardName;
@@ -29,14 +30,16 @@ enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 st.ensurePrimaryShard(kDbName, shard0);
 
-function changeShardKeyWhenFailpointsSet(session, sessionDB, runInTxn, isFindAndModify) {
-    let docsToInsert = [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
-    shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
+function changeShardKeyWhenFailpointsSet(
+    session, sessionDB, runInTxn, isFindAndModify, internalTransactionsEnabled) {
+    const docsToInsert = [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
+    const splitDoc = {x: 100};
+    shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, splitDoc, {"x": 300});
 
-    // Assert that the document is not updated when the delete fails
+    // Assert that the document is updated when the delete fails.
     assert.commandWorked(st.rs1.getPrimary().getDB(kDbName).adminCommand({
         configureFailPoint: "failCommand",
-        mode: "alwaysOn",
+        mode: {times: 2},
         data: {
             errorCode: ErrorCodes.WriteConflict,
             failCommands: ["delete"],
@@ -44,25 +47,56 @@ function changeShardKeyWhenFailpointsSet(session, sessionDB, runInTxn, isFindAnd
         }
     }));
     if (isFindAndModify) {
-        runFindAndModifyCmdFail(
-            st, kDbName, session, sessionDB, runInTxn, {"x": 300}, {"$set": {"x": 30}}, false);
+        if (!runInTxn && internalTransactionsEnabled) {
+            // Internal transactions will retry internally with the transaction API.
+            runFindAndModifyCmdSuccess(st,
+                                       kDbName,
+                                       session,
+                                       sessionDB,
+                                       runInTxn,
+                                       [{x: 300}],
+                                       [{$set: {x: 30}}],
+                                       false /* upsert */,
+                                       false /* returnNew */,
+                                       splitDoc);
+        } else {
+            runFindAndModifyCmdFail(
+                st, kDbName, session, sessionDB, runInTxn, {x: 300}, {$set: {x: 30}}, false);
+        }
     } else {
-        runUpdateCmdFail(st,
-                         kDbName,
-                         session,
-                         sessionDB,
-                         runInTxn,
-                         {"x": 300},
-                         {"$set": {"x": 30}},
-                         false,
-                         ErrorCodes.WriteConflict);
+        if (!runInTxn && internalTransactionsEnabled) {
+            // Internal transactions will retry internally with the transaction API.
+            runUpdateCmdSuccess(st,
+                                kDbName,
+                                session,
+                                sessionDB,
+                                runInTxn,
+                                [{x: 300}],
+                                [{$set: {x: 30}}],
+                                false /* upsert */,
+                                splitDoc);
+        } else {
+            runUpdateCmdFail(st,
+                             kDbName,
+                             session,
+                             sessionDB,
+                             runInTxn,
+                             {x: 300},
+                             {$set: {x: 30}},
+                             false,
+                             ErrorCodes.WriteConflict);
+        }
     }
     assert.commandWorked(st.rs1.getPrimary().getDB(kDbName).adminCommand({
         configureFailPoint: "failCommand",
         mode: "off",
     }));
 
-    // Assert that the document is not updated when the insert fails
+    // Reset the collection's documents.
+    assert.commandWorked(st.s.getDB(kDbName).foo.remove({}));
+    assert.commandWorked(st.s.getDB(kDbName).foo.insert(docsToInsert));
+
+    // Assert that the document is not updated when the insert fails for a non transient reason.
     assert.commandWorked(st.rs0.getPrimary().getDB(kDbName).adminCommand({
         configureFailPoint: "failCommand",
         mode: "alwaysOn",
@@ -90,6 +124,10 @@ function changeShardKeyWhenFailpointsSet(session, sessionDB, runInTxn, isFindAnd
         configureFailPoint: "failCommand",
         mode: "off",
     }));
+
+    // Reset the collection's documents.
+    assert.commandWorked(st.s.getDB(kDbName).foo.remove({}));
+    assert.commandWorked(st.s.getDB(kDbName).foo.insert(docsToInsert));
 
     // Assert that the shard key update is not committed when there are no write errors and the
     // transaction is explicity aborted.
@@ -201,9 +239,10 @@ changeShardKeyOptions.forEach(function(updateConfig) {
         if (!isFindAndModify) {
             assertCannotUpdateWithMultiTrue(
                 st, kDbName, ns, session, sessionDB, runInTxn, {"x": 300}, {"$set": {"x": 30}});
-
-            changeShardKeyWhenFailpointsSet(session, sessionDB, runInTxn, isFindAndModify);
         }
+
+        changeShardKeyWhenFailpointsSet(
+            session, sessionDB, runInTxn, isFindAndModify, internalTransactionsEnabled);
     }
 });
 

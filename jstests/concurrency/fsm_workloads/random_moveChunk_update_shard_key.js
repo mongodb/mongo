@@ -318,8 +318,15 @@ var $config = extendWorkload($config, function($config, $super) {
                     print("Handling IncompleteTransactionHistory error for update, caught error: " +
                           tojsononeline(e) + ", err: " + tojsononeline(err));
 
-                    // TODO SERVER-59186: Once updates that change the shard key use the transaction
-                    // API, expect this to mean the write succeeded when the API is enabled.
+                    // With internal transactions enabled, IncompleteTransactionHistory means the
+                    // write succeeded, so we can treat this error as success.
+                    if (this.internalTransactionsEnabled) {
+                        print("Internal transactions are on so assuming the operation succeeded");
+                        assertDocWasUpdated(
+                            collection, idToUpdate, currentShardKey, newShardKey, counterForId + 1);
+                        this.expectedCounters[idToUpdate] = counterForId + 1;
+                        return;
+                    }
 
                     // With the original implementation, this error could mean the write succeeded
                     // or failed, so we have to detect the outcome before continuing.
@@ -423,12 +430,14 @@ var $config = extendWorkload($config, function($config, $super) {
         // by the update shard key transaction after this error, so use a causally consistent
         // session to guarantee that in these suites.
         //
-        // TODO SERVER-59186: With the new implementation, IncompleteTransactionHistory is only
-        // returned after the shard owning the preimage document leaves prepare, and since
+        // With the new implementation, IncompleteTransactionHistory is only returned after the
+        // shard owning the preimage document leaves prepare, and since
         // coordinateCommitReturnImmediatelyAfterPersistingDecision is false in these suites, any
         // subsequent reads should always read the transaction's writes on all shards without causal
         // consistency, so use a non causally consistent session with internal transactions.
-        const shouldUseCausalConsistency = this.runningWithStepdowns || this.retryOnKilledSession;
+        const shouldUseCausalConsistency =
+            (this.runningWithStepdowns || this.retryOnKilledSession) &&
+            !this.internalTransactionsEnabled;
         this.session = db.getMongo().startSession(
             {causalConsistency: shouldUseCausalConsistency, retryWrites: true});
 

@@ -38,6 +38,7 @@
 #include "mongo/db/commands/update_metrics.h"
 #include "mongo/db/commands/write_commands_common.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/stats/counters.h"
@@ -56,6 +57,7 @@
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -148,6 +150,134 @@ boost::optional<WouldChangeOwningShardInfo> getWouldChangeOwningShardErrorInfo(
     return boost::none;
 }
 
+void handleWouldChangeOwningShardErrorRetryableWrite(OperationContext* opCtx,
+                                                     BatchedCommandRequest* request,
+                                                     BatchedCommandResponse* response) {
+    // Strip write concern because this command will be sent as part of a
+    // transaction and the write concern has already been loaded onto the opCtx and
+    // will be picked up by the transaction API.
+    request->unsetWriteConcern();
+
+    // Strip runtime constants because they will be added again when the API sends this command
+    // through the service entry point.
+    request->unsetLegacyRuntimeConstants();
+
+    // Unset error details because they will be repopulated below.
+    response->unsetErrDetails();
+
+    auto txn =
+        txn_api::TransactionWithRetries(opCtx,
+                                        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+                                        TransactionRouterResourceYielder::make());
+
+    // Shared state for the transaction API use below.
+    struct SharedBlock {
+        SharedBlock(NamespaceString nss_) : nss(nss_) {}
+
+        NamespaceString nss;
+        BSONObj response;
+    };
+    auto sharedBlock = std::make_shared<SharedBlock>(request->getNS());
+
+    auto swCommitResult = txn.runSyncNoThrow(
+        opCtx,
+        [cmdObj = request->toBSON(), sharedBlock](const txn_api::TransactionClient& txnClient,
+                                                  ExecutorPtr txnExec) {
+            return txnClient.runCommand(sharedBlock->nss.db(), cmdObj)
+                .thenRunOn(txnExec)
+                .then([sharedBlock](auto res) {
+                    uassertStatusOK(getStatusFromWriteCommandReply(res));
+
+                    sharedBlock->response = CommandHelpers::filterCommandReplyForPassthrough(
+                        res.removeField("recoveryToken"));
+                })
+                .semi();
+        });
+
+    auto bodyStatus = swCommitResult.getStatus();
+    if (!bodyStatus.isOK()) {
+        if (bodyStatus != ErrorCodes::DuplicateKey ||
+            (bodyStatus == ErrorCodes::DuplicateKey &&
+             !bodyStatus.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id"))) {
+            bodyStatus.addContext(documentShardKeyUpdateUtil::kNonDuplicateKeyErrorContext);
+        };
+
+        auto error = std::make_unique<WriteErrorDetail>();
+        error->setIndex(0);
+        error->setStatus(bodyStatus);
+        response->addToErrDetails(error.release());
+        return;
+    }
+
+    uassertStatusOK(swCommitResult.getValue().cmdStatus);
+
+    // Note this will clear existing response as part of parsing.
+    std::string errMsg = "Failed to parse response from WouldChangeOwningShard error handling";
+    response->parseBSON(sharedBlock->response, &errMsg);
+
+    // Make a unique pointer with a copy of the error detail because
+    // BatchedCommandResponse::setWriteConcernError() expects a pointer to a heap allocated
+    // WriteConcernErrorDetail that it can take unique ownership of.
+    auto writeConcernDetail =
+        std::make_unique<WriteConcernErrorDetail>(swCommitResult.getValue().wcError);
+    if (!writeConcernDetail->toStatus().isOK()) {
+        response->setWriteConcernError(writeConcernDetail.release());
+    }
+}
+
+struct UpdateShardKeyResult {
+    bool updatedShardKey{false};
+    boost::optional<BSONObj> upsertedId;
+};
+
+UpdateShardKeyResult handleWouldChangeOwningShardErrorTransaction(
+    OperationContext* opCtx,
+    BatchedCommandRequest* request,
+    BatchedCommandResponse* response,
+    const WouldChangeOwningShardInfo& changeInfo) {
+    // Shared state for the transaction API use below.
+    struct SharedBlock {
+        SharedBlock(WouldChangeOwningShardInfo changeInfo_, NamespaceString nss_)
+            : changeInfo(changeInfo_), nss(nss_) {}
+
+        WouldChangeOwningShardInfo changeInfo;
+        NamespaceString nss;
+        bool updatedShardKey{false};
+    };
+    auto sharedBlock = std::make_shared<SharedBlock>(changeInfo, request->getNS());
+
+    auto txn =
+        txn_api::TransactionWithRetries(opCtx,
+                                        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+                                        TransactionRouterResourceYielder::make());
+
+    try {
+        txn.runSync(opCtx,
+                    [sharedBlock](const txn_api::TransactionClient& txnClient,
+                                  ExecutorPtr txnExec) -> SemiFuture<void> {
+                        return documentShardKeyUpdateUtil::updateShardKeyForDocument(
+                                   txnClient, txnExec, sharedBlock->nss, sharedBlock->changeInfo)
+                            .thenRunOn(txnExec)
+                            .then([sharedBlock](bool updatedShardKey) {
+                                sharedBlock->updatedShardKey = updatedShardKey;
+                            })
+                            .semi();
+                    });
+    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
+        Status status = ex->getKeyPattern().hasField("_id")
+            ? ex.toStatus().withContext(documentShardKeyUpdateUtil::kDuplicateKeyErrorContext)
+            : ex.toStatus();
+        uassertStatusOK(status);
+    }
+
+    // If the operation was an upsert, record the _id of the new document.
+    boost::optional<BSONObj> upsertedId;
+    if (sharedBlock->updatedShardKey && sharedBlock->changeInfo.getShouldUpsert()) {
+        upsertedId = sharedBlock->changeInfo.getPostImage()["_id"].wrap();
+    }
+    return UpdateShardKeyResult{sharedBlock->updatedShardKey, std::move(upsertedId)};
+}
+
 /**
  * Changes the shard key for the document if the response object contains a WouldChangeOwningShard
  * error. If the original command was sent as a retryable write, starts a transaction on the same
@@ -169,91 +299,112 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
 
     bool updatedShardKey = false;
     boost::optional<BSONObj> upsertedId;
-    if (isRetryableWrite) {
-        if (MONGO_unlikely(hangAfterThrowWouldChangeOwningShardRetryableWrite.shouldFail())) {
-            LOGV2(22759, "Hit hangAfterThrowWouldChangeOwningShardRetryableWrite failpoint");
-            hangAfterThrowWouldChangeOwningShardRetryableWrite.pauseWhileSet(opCtx);
-        }
-        RouterOperationContextSession routerSession(opCtx);
-        try {
-            // Start transaction and re-run the original update command
-            auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-            readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-
-            // Ensure the retried operation does not include WC inside the transaction.  The
-            // transaction commit will still use the WC, because it uses the WC from the opCtx
-            // (which has been set previously in Strategy).
-            request->unsetWriteConcern();
-
-            documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
-            // Clear the error details from the response object before sending the write again
-            response->unsetErrDetails();
-            cluster::write(opCtx, *request, &stats, response);
-            wouldChangeOwningShardErrorInfo =
-                getWouldChangeOwningShardErrorInfo(opCtx, *request, response, !isRetryableWrite);
-            if (!wouldChangeOwningShardErrorInfo)
-                uassertStatusOK(response->toStatus());
-
-            // If we do not get WouldChangeOwningShard when re-running the update, the document has
-            // been modified or deleted concurrently and we do not need to delete it and insert a
-            // new one.
-            updatedShardKey = wouldChangeOwningShardErrorInfo &&
-                documentShardKeyUpdateUtil::updateShardKeyForDocument(
-                                  opCtx, request->getNS(), wouldChangeOwningShardErrorInfo.get());
-
-            // If the operation was an upsert, record the _id of the new document.
-            if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
-                upsertedId = wouldChangeOwningShardErrorInfo->getPostImage()["_id"].wrap();
+    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        if (isRetryableWrite) {
+            if (MONGO_unlikely(hangAfterThrowWouldChangeOwningShardRetryableWrite.shouldFail())) {
+                LOGV2(5918603, "Hit hangAfterThrowWouldChangeOwningShardRetryableWrite failpoint");
+                hangAfterThrowWouldChangeOwningShardRetryableWrite.pauseWhileSet(opCtx);
             }
 
-            // Commit the transaction
-            auto commitResponse =
-                documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(opCtx);
-
-            uassertStatusOK(getStatusFromCommandResult(commitResponse));
-
-            auto writeConcernDetail = getWriteConcernErrorDetailFromBSONObj(commitResponse);
-            if (writeConcernDetail && !writeConcernDetail->toStatus().isOK())
-                response->setWriteConcernError(writeConcernDetail.release());
-        } catch (DBException& e) {
-            if (e.code() == ErrorCodes::DuplicateKey &&
-                e.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id")) {
-                e.addContext(documentShardKeyUpdateUtil::kDuplicateKeyErrorContext);
-            } else {
-                e.addContext(documentShardKeyUpdateUtil::kNonDuplicateKeyErrorContext);
-            }
-
-            if (!response->isErrDetailsSet() || !response->getErrDetails().back()) {
-                auto error = std::make_unique<WriteErrorDetail>();
-                error->setIndex(0);
-                response->addToErrDetails(error.release());
-            }
-
-            // Set the error status to the status of the failed command and abort the transaction.
-            auto status = e.toStatus();
-            response->getErrDetails().back()->setStatus(status);
-
-            auto txnRouterForAbort = TransactionRouter::get(opCtx);
-            if (txnRouterForAbort)
-                txnRouterForAbort.implicitlyAbortTransaction(opCtx, status);
-
-            return false;
+            handleWouldChangeOwningShardErrorRetryableWrite(opCtx, request, response);
+        } else {
+            auto updateResult = handleWouldChangeOwningShardErrorTransaction(
+                opCtx, request, response, *wouldChangeOwningShardErrorInfo);
+            updatedShardKey = updateResult.updatedShardKey;
+            upsertedId = std::move(updateResult.upsertedId);
         }
     } else {
-        try {
-            // Delete the original document and insert the new one
-            updatedShardKey = documentShardKeyUpdateUtil::updateShardKeyForDocument(
-                opCtx, request->getNS(), wouldChangeOwningShardErrorInfo.get());
-
-            // If the operation was an upsert, record the _id of the new document.
-            if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
-                upsertedId = wouldChangeOwningShardErrorInfo->getPostImage()["_id"].wrap();
+        // TODO SERVER-62375: Delete this branch.
+        if (isRetryableWrite) {
+            if (MONGO_unlikely(hangAfterThrowWouldChangeOwningShardRetryableWrite.shouldFail())) {
+                LOGV2(22759, "Hit hangAfterThrowWouldChangeOwningShardRetryableWrite failpoint");
+                hangAfterThrowWouldChangeOwningShardRetryableWrite.pauseWhileSet(opCtx);
             }
-        } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
-            Status status = ex->getKeyPattern().hasField("_id")
-                ? ex.toStatus().withContext(documentShardKeyUpdateUtil::kDuplicateKeyErrorContext)
-                : ex.toStatus();
-            uassertStatusOK(status);
+            RouterOperationContextSession routerSession(opCtx);
+            try {
+                // Start transaction and re-run the original update command
+                auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+                readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
+                // Ensure the retried operation does not include WC inside the transaction.  The
+                // transaction commit will still use the WC, because it uses the WC from the opCtx
+                // (which has been set previously in Strategy).
+                request->unsetWriteConcern();
+
+                documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
+                // Clear the error details from the response object before sending the write again
+                response->unsetErrDetails();
+                cluster::write(opCtx, *request, &stats, response);
+                wouldChangeOwningShardErrorInfo = getWouldChangeOwningShardErrorInfo(
+                    opCtx, *request, response, !isRetryableWrite);
+                if (!wouldChangeOwningShardErrorInfo)
+                    uassertStatusOK(response->toStatus());
+
+                // If we do not get WouldChangeOwningShard when re-running the update, the document
+                // has been modified or deleted concurrently and we do not need to delete it and
+                // insert a new one.
+                updatedShardKey =
+                    wouldChangeOwningShardErrorInfo &&
+                    documentShardKeyUpdateUtil::updateShardKeyForDocumentLegacy(
+                        opCtx, request->getNS(), wouldChangeOwningShardErrorInfo.get());
+
+                // If the operation was an upsert, record the _id of the new document.
+                if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
+                    upsertedId = wouldChangeOwningShardErrorInfo->getPostImage()["_id"].wrap();
+                }
+
+                // Commit the transaction
+                auto commitResponse =
+                    documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(opCtx);
+
+                uassertStatusOK(getStatusFromCommandResult(commitResponse));
+
+                auto writeConcernDetail = getWriteConcernErrorDetailFromBSONObj(commitResponse);
+                if (writeConcernDetail && !writeConcernDetail->toStatus().isOK())
+                    response->setWriteConcernError(writeConcernDetail.release());
+            } catch (DBException& e) {
+                if (e.code() == ErrorCodes::DuplicateKey &&
+                    e.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id")) {
+                    e.addContext(documentShardKeyUpdateUtil::kDuplicateKeyErrorContext);
+                } else {
+                    e.addContext(documentShardKeyUpdateUtil::kNonDuplicateKeyErrorContext);
+                }
+
+                if (!response->isErrDetailsSet() || !response->getErrDetails().back()) {
+                    auto error = std::make_unique<WriteErrorDetail>();
+                    error->setIndex(0);
+                    response->addToErrDetails(error.release());
+                }
+
+                // Set the error status to the status of the failed command and abort the
+                // transaction.
+                auto status = e.toStatus();
+                response->getErrDetails().back()->setStatus(status);
+
+                auto txnRouterForAbort = TransactionRouter::get(opCtx);
+                if (txnRouterForAbort)
+                    txnRouterForAbort.implicitlyAbortTransaction(opCtx, status);
+
+                return false;
+            }
+        } else {
+            try {
+                // Delete the original document and insert the new one
+                updatedShardKey = documentShardKeyUpdateUtil::updateShardKeyForDocumentLegacy(
+                    opCtx, request->getNS(), wouldChangeOwningShardErrorInfo.get());
+
+                // If the operation was an upsert, record the _id of the new document.
+                if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
+                    upsertedId = wouldChangeOwningShardErrorInfo->getPostImage()["_id"].wrap();
+                }
+            } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
+                Status status = ex->getKeyPattern().hasField("_id")
+                    ? ex.toStatus().withContext(
+                          documentShardKeyUpdateUtil::kDuplicateKeyErrorContext)
+                    : ex.toStatus();
+                uassertStatusOK(status);
+            }
         }
     }
 

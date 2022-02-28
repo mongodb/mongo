@@ -130,6 +130,13 @@ void BatchedCommandRequest::setLegacyRuntimeConstants(LegacyRuntimeConstants run
                                     }});
 }
 
+void BatchedCommandRequest::unsetLegacyRuntimeConstants() {
+    _visit(visit_helper::Overloaded{
+        [](write_ops::InsertCommandRequest&) {},
+        [&](write_ops::UpdateCommandRequest& op) { op.setLegacyRuntimeConstants(boost::none); },
+        [&](write_ops::DeleteCommandRequest& op) { op.setLegacyRuntimeConstants(boost::none); }});
+}
+
 const boost::optional<LegacyRuntimeConstants>& BatchedCommandRequest::getLegacyRuntimeConstants()
     const {
     struct Visitor {

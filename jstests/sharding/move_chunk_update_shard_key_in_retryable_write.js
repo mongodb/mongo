@@ -148,6 +148,13 @@ test("Updating shard key in retryable write receives error on retry", () => {
     // delete.
 });
 
+if (areInternalTransactionsEnabled(st.s)) {
+    // TODO SERVER-58758: Enable chunk migration tests once session history is copied by migrations.
+    st.stop();
+    MongoRunner.stopMongod(staticMongod);
+    return;
+}
+
 test(
     "Updating shard key in retryable write receives error on retry when the original chunk has been migrated to a new shard",
     () => {

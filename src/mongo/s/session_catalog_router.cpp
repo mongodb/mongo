@@ -72,7 +72,24 @@ RouterOperationContextSession::RouterOperationContextSession(OperationContext* o
     : _opCtx(opCtx), _operationContextSession(opCtx) {}
 
 RouterOperationContextSession::~RouterOperationContextSession() {
-    TransactionRouter::get(_opCtx).stash(_opCtx);
+    if (auto txnRouter = TransactionRouter::get(_opCtx)) {
+        // Only stash if the session wasn't yielded.
+        txnRouter.stash(_opCtx);
+    }
 };
+
+void RouterOperationContextSession::checkIn(OperationContext* opCtx) {
+    invariant(OperationContextSession::get(opCtx));
+
+    TransactionRouter::get(opCtx).stash(opCtx);
+    OperationContextSession::checkIn(opCtx);
+}
+
+void RouterOperationContextSession::checkOut(OperationContext* opCtx) {
+    invariant(!OperationContextSession::get(opCtx));
+
+    OperationContextSession::checkOut(opCtx);
+    TransactionRouter::get(opCtx).unstash(opCtx);
+}
 
 }  // namespace mongo

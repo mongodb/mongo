@@ -251,3 +251,11 @@ function makePrepareTransactionCmdObj(lsid, txnNumber) {
         writeConcern: {w: "majority"},
     };
 }
+
+function areInternalTransactionsEnabled(conn) {
+    return jsTestOptions().mongosBinVersion !== "last-lts" &&
+        jsTestOptions().mongosBinVersion !== "last-continuous" &&
+        assert
+            .commandWorked(conn.adminCommand({getParameter: 1, featureFlagInternalTransactions: 1}))
+            .featureFlagInternalTransactions.value;
+}

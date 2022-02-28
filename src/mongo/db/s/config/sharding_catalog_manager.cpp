@@ -675,8 +675,10 @@ void ShardingCatalogManager::withTransactionAPI(OperationContext* opCtx,
             feature_flags::gFeatureFlagInternalTransactions.isEnabled(
                 serverGlobalParams.featureCompatibility));
 
-    auto txn = txn_api::TransactionWithRetries(
-        opCtx, Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
+    auto txn =
+        txn_api::TransactionWithRetries(opCtx,
+                                        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+                                        nullptr /* resourceYielder */);
     txn.runSync(opCtx,
                 [innerCallback = std::move(callback),
                  namespaceForInitialFind](const txn_api::TransactionClient& txnClient,

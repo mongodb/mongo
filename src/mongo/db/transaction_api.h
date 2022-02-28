@@ -33,9 +33,11 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/resource_yielder.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
 
 namespace mongo::txn_api {
@@ -117,17 +119,22 @@ public:
     /**
      * Main constructor that constructs an internal transaction with the default options.
      */
-    TransactionWithRetries(OperationContext* opCtx, ExecutorPtr executor)
-        : _internalTxn(std::make_shared<details::Transaction>(opCtx, executor)) {}
+    TransactionWithRetries(OperationContext* opCtx,
+                           ExecutorPtr executor,
+                           std::unique_ptr<ResourceYielder> resourceYielder)
+        : _internalTxn(std::make_shared<details::Transaction>(opCtx, executor)),
+          _resourceYielder(std::move(resourceYielder)) {}
 
     /**
      * Alternate constructor that accepts a custom transaction client.
      */
     TransactionWithRetries(OperationContext* opCtx,
                            ExecutorPtr executor,
-                           std::unique_ptr<TransactionClient> txnClient)
+                           std::unique_ptr<TransactionClient> txnClient,
+                           std::unique_ptr<ResourceYielder> resourceYielder)
         : _internalTxn(
-              std::make_shared<details::Transaction>(opCtx, executor, std::move(txnClient))) {}
+              std::make_shared<details::Transaction>(opCtx, executor, std::move(txnClient))),
+          _resourceYielder(std::move(resourceYielder)) {}
 
     /**
      * Runs the given transaction callback synchronously.
@@ -158,7 +165,21 @@ private:
      */
     void _bestEffortAbort(OperationContext* opCtx);
 
+    /**
+     * Runs the body, commit, and abort logic in the owned internal transaction. Yields the
+     * ResourceYielder before constructing and waiting on the future and then unyields before
+     * returning the ready future's result. The only case where the resource won't be unyielded is
+     * if the given operation context is interrupted or reaches its deadline.
+     *
+     * Notably, the futures are constructed after yielding so a future made with an inline executor
+     * will still run after the yield.
+     */
+    Status _runBodyWithYields(OperationContext* opCtx) noexcept;
+    StatusWith<CommitResult> _runCommitWithYields(OperationContext* opCtx) noexcept;
+    Status _runAbortWithYields(OperationContext* opCtx) noexcept;
+
     std::shared_ptr<details::Transaction> _internalTxn;
+    std::unique_ptr<ResourceYielder> _resourceYielder;
 };
 
 /**
@@ -217,6 +238,7 @@ public:
 
     enum class ErrorHandlingStep {
         kDoNotRetry,
+        kAbortAndDoNotRetry,
         kRetryTransaction,
         kRetryCommit,
     };
@@ -237,9 +259,7 @@ public:
      * given OperationContext and constructs a default TransactionClient.
      */
     Transaction(OperationContext* opCtx, ExecutorPtr executor)
-        : _initialOpCtx(opCtx),
-          _executor(executor),
-          _txnClient(std::make_unique<SEPTransactionClient>(opCtx, executor)) {
+        : _executor(executor), _txnClient(std::make_unique<SEPTransactionClient>(opCtx, executor)) {
         _primeTransaction(opCtx);
         _txnClient->injectHooks(_makeTxnMetadataHooks());
     }
@@ -250,7 +270,7 @@ public:
     Transaction(OperationContext* opCtx,
                 ExecutorPtr executor,
                 std::unique_ptr<TransactionClient> txnClient)
-        : _initialOpCtx(opCtx), _executor(executor), _txnClient(std::move(txnClient)) {
+        : _executor(executor), _txnClient(std::move(txnClient)) {
         _primeTransaction(opCtx);
         _txnClient->injectHooks(_makeTxnMetadataHooks());
     }
@@ -315,32 +335,48 @@ public:
      */
     void primeForCommitRetry();
 
+    /**
+     * Returns the latest operationTime returned by a command in this transaction.
+     */
+    LogicalTime getOperationTime() const;
+
 private:
     std::unique_ptr<TxnMetadataHooks> _makeTxnMetadataHooks() {
         return std::make_unique<TxnMetadataHooks>(*this);
     }
 
-    void _setSessionInfo(LogicalSessionId lsid, TxnNumber txnNumber);
+    BSONObj _reportStateForLog(WithLock) const;
+
+    void _setSessionInfo(WithLock,
+                         LogicalSessionId lsid,
+                         TxnNumber txnNumber,
+                         boost::optional<bool> startTransaction);
 
     SemiFuture<BSONObj> _commitOrAbort(StringData dbName, StringData cmdName);
 
     /**
-     * Extracts session options from Operation Context and infers the internal transaction’s
+     * Extracts transaction options from Operation Context and infers the internal transaction’s
      * execution context, e.g. client has no session, client is running a retryable write.
      */
     void _primeTransaction(OperationContext* opCtx);
 
-    OperationContext* const _initialOpCtx;
-    ExecutorPtr _executor;
+    const ExecutorPtr _executor;
     std::unique_ptr<TransactionClient> _txnClient;
     Callback _callback;
 
-    bool _latestResponseHasTransientTransactionErrorLabel{false};
-
-    OperationSessionInfo _sessionInfo;
     BSONObj _writeConcern;
     BSONObj _readConcern;
     ExecutionContext _execContext;
+
+    // Protects the members below that are accessed by the TxnMetadataHooks, which are called by the
+    // user's callback and may run on a separate thread than the one that is driving the
+    // Transaction.
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("Transaction::_mutex");
+
+    LogicalTime _lastOperationTime;
+    bool _latestResponseHasTransientTransactionErrorLabel{false};
+
+    OperationSessionInfo _sessionInfo;
     TransactionState _state{TransactionState::kInit};
 };
 

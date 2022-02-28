@@ -342,6 +342,11 @@ void updateSessionRecord(OperationContext* opCtx,
                                                              std::move(opTime),
                                                              oplogEntry.getWallClockTime());
 
+                           if (isInternalSessionForRetryableWrite(*oplogEntry.getSessionId())) {
+                               sessionTxnRecord.setParentSessionId(
+                                   *getParentSessionId(*oplogEntry.getSessionId()));
+                           }
+
                            txnParticipant.onRetryableWriteCloningCompleted(
                                opCtx, stmtIds, sessionTxnRecord);
 

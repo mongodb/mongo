@@ -138,6 +138,8 @@ public:
 
     void setLegacyRuntimeConstants(LegacyRuntimeConstants runtimeConstants);
 
+    void unsetLegacyRuntimeConstants();
+
     bool hasLegacyRuntimeConstants() const;
 
     const boost::optional<LegacyRuntimeConstants>& getLegacyRuntimeConstants() const;

@@ -52,6 +52,7 @@ env.Library(
         'router_transactions_stats.idl',
         'session_catalog_router.cpp',
         'stale_shard_version_helpers.cpp',
+        'transaction_router_resource_yielder.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands/txn_cmd_request',

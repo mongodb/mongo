@@ -162,7 +162,7 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
                 }
 
                 if (shouldRetryEntireTxnOnError(e, hasCommitTxnError, retryOnKilledSession)) {
-                    print("Retrying transaction due to transient error.");
+                    print("Retrying transaction due to transient error: " + tojson(e));
                     hasTransientError = true;
                     continue;
                 }

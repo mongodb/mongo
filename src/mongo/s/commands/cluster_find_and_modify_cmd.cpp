@@ -61,6 +61,7 @@
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/timer.h"
 
@@ -134,41 +135,140 @@ void handleWouldChangeOwningShardErrorRetryableWrite(
     const NamespaceString& nss,
     const write_ops::FindAndModifyCommandRequest& request,
     BSONObjBuilder* result) {
-    auto txn = txn_api::TransactionWithRetries(
-        opCtx, Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
+    auto txn =
+        txn_api::TransactionWithRetries(opCtx,
+                                        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+                                        TransactionRouterResourceYielder::make());
 
-    auto swResult = txn.runSyncNoThrow(
+    // Shared state for the transaction API use below.
+    struct SharedBlock {
+        SharedBlock(NamespaceString nss_) : nss(nss_) {}
+
+        NamespaceString nss;
+        BSONObj response;
+    };
+    auto sharedBlock = std::make_shared<SharedBlock>(nss);
+
+    auto swCommitResult = txn.runSyncNoThrow(
         opCtx,
-        [cmdObj = request.toBSON({}), nss, result](const txn_api::TransactionClient& txnClient,
+        [cmdObj = request.toBSON({}), sharedBlock](const txn_api::TransactionClient& txnClient,
                                                    ExecutorPtr txnExec) {
-            auto res = txnClient.runCommand(nss.db(), cmdObj).get();
-            uassertStatusOK(getStatusFromCommandResult(res));
+            return txnClient.runCommand(sharedBlock->nss.db(), cmdObj)
+                .thenRunOn(txnExec)
+                .then([sharedBlock](auto res) {
+                    uassertStatusOK(getStatusFromCommandResult(res));
 
-            result->appendElementsUnique(
-                CommandHelpers::filterCommandReplyForPassthrough(res.removeField("recoveryToken")));
-
-            return SemiFuture<void>::makeReady();
+                    sharedBlock->response = CommandHelpers::filterCommandReplyForPassthrough(
+                        res.removeField("recoveryToken"));
+                })
+                .semi();
         });
 
-    auto cmdStatus = swResult.getStatus();
-    if (cmdStatus != ErrorCodes::DuplicateKey ||
-        (cmdStatus == ErrorCodes::DuplicateKey &&
-         !cmdStatus.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id"))) {
-        cmdStatus.addContext(documentShardKeyUpdateUtil::kNonDuplicateKeyErrorContext);
-    };
-    uassertStatusOK(cmdStatus);
+    result->appendElementsUnique(
+        CommandHelpers::filterCommandReplyForPassthrough(sharedBlock->response));
 
-    const auto& wcError = swResult.getValue().wcError;
+    auto bodyStatus = swCommitResult.getStatus();
+    if (bodyStatus != ErrorCodes::DuplicateKey ||
+        (bodyStatus == ErrorCodes::DuplicateKey &&
+         !bodyStatus.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id"))) {
+        bodyStatus.addContext(documentShardKeyUpdateUtil::kNonDuplicateKeyErrorContext);
+    };
+    uassertStatusOK(bodyStatus);
+
+    uassertStatusOK(swCommitResult.getValue().cmdStatus);
+    const auto& wcError = swCommitResult.getValue().wcError;
     if (!wcError.toStatus().isOK()) {
         appendWriteConcernErrorDetailToCmdResponse(shardId, wcError, *result);
     }
 }
 
-void updateShardKeyValueOnWouldChangeOwningShardError(OperationContext* opCtx,
-                                                      const NamespaceString nss,
-                                                      Status responseStatus,
-                                                      const BSONObj& cmdObj,
-                                                      BSONObjBuilder* result) {
+void updateReplyOnWouldChangeOwningShardSuccess(bool matchedDocOrUpserted,
+                                                const WouldChangeOwningShardInfo& changeInfo,
+                                                bool shouldReturnPostImage,
+                                                BSONObjBuilder* result) {
+    auto upserted = matchedDocOrUpserted && changeInfo.getShouldUpsert();
+    auto updatedExistingDocument = matchedDocOrUpserted && !upserted;
+
+    BSONObjBuilder lastErrorObjBuilder(result->subobjStart("lastErrorObject"));
+    lastErrorObjBuilder.appendNumber("n", matchedDocOrUpserted ? 1 : 0);
+    lastErrorObjBuilder.appendBool("updatedExisting", updatedExistingDocument);
+    if (upserted) {
+        lastErrorObjBuilder.appendAs(changeInfo.getPostImage()["_id"], "upserted");
+    }
+    lastErrorObjBuilder.doneFast();
+
+    if (updatedExistingDocument) {
+        result->append(
+            "value", shouldReturnPostImage ? changeInfo.getPostImage() : changeInfo.getPreImage());
+    } else if (upserted && shouldReturnPostImage) {
+        result->append("value", changeInfo.getPostImage());
+    } else {
+        result->appendNull("value");
+    }
+    result->append("ok", 1.0);
+}
+
+void handleWouldChangeOwningShardErrorTransaction(
+    OperationContext* opCtx,
+    const NamespaceString nss,
+    Status responseStatus,
+    const write_ops::FindAndModifyCommandRequest& request,
+    BSONObjBuilder* result) {
+
+    BSONObjBuilder extraInfoBuilder;
+    responseStatus.extraInfo()->serialize(&extraInfoBuilder);
+    auto extraInfo = extraInfoBuilder.obj();
+
+    // Shared state for the transaction API use below.
+    struct SharedBlock {
+        SharedBlock(WouldChangeOwningShardInfo changeInfo_, NamespaceString nss_)
+            : changeInfo(changeInfo_), nss(nss_) {}
+
+        WouldChangeOwningShardInfo changeInfo;
+        NamespaceString nss;
+        bool matchedDocOrUpserted{false};
+    };
+    auto sharedBlock = std::make_shared<SharedBlock>(
+        WouldChangeOwningShardInfo::parseFromCommandError(extraInfo), nss);
+
+    try {
+        auto txn =
+            txn_api::TransactionWithRetries(opCtx,
+                                            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+                                            TransactionRouterResourceYielder::make());
+
+        txn.runSync(opCtx,
+                    [sharedBlock](const txn_api::TransactionClient& txnClient,
+                                  ExecutorPtr txnExec) -> SemiFuture<void> {
+                        return documentShardKeyUpdateUtil::updateShardKeyForDocument(
+                                   txnClient, txnExec, sharedBlock->nss, sharedBlock->changeInfo)
+                            .thenRunOn(txnExec)
+                            .then([sharedBlock](bool matchedDocOrUpserted) {
+                                sharedBlock->matchedDocOrUpserted = matchedDocOrUpserted;
+                            })
+                            .semi();
+                    });
+
+        auto shouldReturnPostImage = request.getNew() && *request.getNew();
+        updateReplyOnWouldChangeOwningShardSuccess(sharedBlock->matchedDocOrUpserted,
+                                                   sharedBlock->changeInfo,
+                                                   shouldReturnPostImage,
+                                                   result);
+    } catch (DBException& e) {
+        if (e.code() == ErrorCodes::DuplicateKey &&
+            e.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id")) {
+            e.addContext(documentShardKeyUpdateUtil::kDuplicateKeyErrorContext);
+        }
+        e.addContext("findAndModify");
+        throw;
+    }
+}
+
+void handleWouldChangeOwningShardErrorTransactionLegacy(OperationContext* opCtx,
+                                                        const NamespaceString nss,
+                                                        Status responseStatus,
+                                                        const BSONObj& cmdObj,
+                                                        BSONObjBuilder* result) {
     BSONObjBuilder extraInfoBuilder;
     responseStatus.extraInfo()->serialize(&extraInfoBuilder);
     auto extraInfo = extraInfoBuilder.obj();
@@ -176,31 +276,12 @@ void updateShardKeyValueOnWouldChangeOwningShardError(OperationContext* opCtx,
         WouldChangeOwningShardInfo::parseFromCommandError(extraInfo);
 
     try {
-        auto matchedDocOrUpserted = documentShardKeyUpdateUtil::updateShardKeyForDocument(
+        auto matchedDocOrUpserted = documentShardKeyUpdateUtil::updateShardKeyForDocumentLegacy(
             opCtx, nss, wouldChangeOwningShardExtraInfo);
-        auto upserted = matchedDocOrUpserted && wouldChangeOwningShardExtraInfo.getShouldUpsert();
-        auto updatedExistingDocument = matchedDocOrUpserted && !upserted;
-
-        BSONObjBuilder lastErrorObjBuilder(result->subobjStart("lastErrorObject"));
-        lastErrorObjBuilder.appendNumber("n", matchedDocOrUpserted ? 1 : 0);
-        lastErrorObjBuilder.appendBool("updatedExisting", updatedExistingDocument);
-        if (upserted) {
-            lastErrorObjBuilder.appendAs(wouldChangeOwningShardExtraInfo.getPostImage()["_id"],
-                                         "upserted");
-        }
-        lastErrorObjBuilder.doneFast();
 
         auto shouldReturnPostImage = cmdObj.getBoolField("new");
-        if (updatedExistingDocument) {
-            result->append("value",
-                           shouldReturnPostImage ? wouldChangeOwningShardExtraInfo.getPostImage()
-                                                 : wouldChangeOwningShardExtraInfo.getPreImage());
-        } else if (upserted && shouldReturnPostImage) {
-            result->append("value", wouldChangeOwningShardExtraInfo.getPostImage());
-        } else {
-            result->appendNull("value");
-        }
-        result->append("ok", 1.0);
+        updateReplyOnWouldChangeOwningShardSuccess(
+            matchedDocOrUpserted, wouldChangeOwningShardExtraInfo, shouldReturnPostImage, result);
     } catch (DBException& e) {
         if (e.code() == ErrorCodes::DuplicateKey &&
             e.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id")) {
@@ -443,28 +524,34 @@ private:
         }
 
         if (responseStatus.code() == ErrorCodes::WouldChangeOwningShard) {
-            if (isRetryableWrite) {
-                if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
-                    auto parsedRequest = write_ops::FindAndModifyCommandRequest::parse(
-                        IDLParserErrorContext("ClusterFindAndModify"), cmdObj);
-                    // Strip write concern because this command will be sent as part of a
-                    // transaction and the write concern has already been loaded onto the opCtx and
-                    // will be picked up by the transaction API.
-                    //
-                    // Strip runtime constants because they will be added again when this command is
-                    // recursively sent through the service entry point.
-                    parsedRequest.setWriteConcern(boost::none);
-                    parsedRequest.setLegacyRuntimeConstants(boost::none);
+            if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                auto parsedRequest = write_ops::FindAndModifyCommandRequest::parse(
+                    IDLParserErrorContext("ClusterFindAndModify"), cmdObj);
+                // Strip write concern because this command will be sent as part of a
+                // transaction and the write concern has already been loaded onto the opCtx and
+                // will be picked up by the transaction API.
+                parsedRequest.setWriteConcern(boost::none);
+
+                // Strip runtime constants because they will be added again when this command is
+                // recursively sent through the service entry point.
+                parsedRequest.setLegacyRuntimeConstants(boost::none);
+                if (isRetryableWrite) {
                     handleWouldChangeOwningShardErrorRetryableWrite(
                         opCtx, shardId, nss, parsedRequest, result);
                 } else {
-                    _handleWouldChangeOwningShardErrorRetryableWriteLegacy(
-                        opCtx, shardId, shardVersion, dbVersion, nss, cmdObj, result);
+                    handleWouldChangeOwningShardErrorTransaction(
+                        opCtx, nss, responseStatus, parsedRequest, result);
                 }
             } else {
-                updateShardKeyValueOnWouldChangeOwningShardError(
-                    opCtx, nss, responseStatus, cmdObj, result);
+                // TODO SERVER-62375: Remove this branch.
+                if (isRetryableWrite) {
+                    _handleWouldChangeOwningShardErrorRetryableWriteLegacy(
+                        opCtx, shardId, shardVersion, dbVersion, nss, cmdObj, result);
+                } else {
+                    handleWouldChangeOwningShardErrorTransactionLegacy(
+                        opCtx, nss, responseStatus, cmdObj, result);
+                }
             }
 
             return;
@@ -497,7 +584,7 @@ private:
             // Re-run the findAndModify command that will change the shard key value in a
             // transaction. We call _runCommand recursively, and this second time through
             // since it will be run as a transaction it will take the other code path to
-            // updateShardKeyValueOnWouldChangeOwningShardError.  We ensure the retried
+            // handleWouldChangeOwningShardErrorTransactionLegacy.  We ensure the retried
             // operation does not include WC inside the transaction by stripping it from the
             // cmdObj.  The transaction commit will still use the WC, because it uses the WC
             // from the opCtx (which has been set previously in Strategy).

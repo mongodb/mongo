@@ -471,6 +471,8 @@ error_codes:
 
     - {code: 365, name: TemporarilyUnavailable}
 
+    - {code: 366, name: WouldChangeOwningShardDeletedNoDocument}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

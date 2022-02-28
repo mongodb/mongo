@@ -498,7 +498,9 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
     }
 
     auto commandStatus = getStatusFromCommandResult(responseObj);
-    if (!commandStatus.isOK()) {
+    // WouldChangeOwningShard errors don't abort their transaction and the responses containing them
+    // include transaction metadata, so we treat them as successful responses.
+    if (!commandStatus.isOK() && commandStatus != ErrorCodes::WouldChangeOwningShard) {
         return;
     }
 
@@ -1046,6 +1048,19 @@ void TransactionRouter::Router::stash(OperationContext* opCtx) {
     o(lk).metricsTracker->trySetInactive(tickSource, tickSource->getTicks());
 }
 
+void TransactionRouter::Router::unstash(OperationContext* opCtx) {
+    if (!isInitialized()) {
+        return;
+    }
+
+    // TODO SERVER-64052: Validate that the transaction number hasn't changed and metrics are
+    // updated appropriately.
+
+    auto tickSource = opCtx->getServiceContext()->getTickSource();
+    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    o(lk).metricsTracker->trySetActive(tickSource, tickSource->getTicks());
+}
+
 BSONObj TransactionRouter::Router::_handOffCommitToCoordinator(OperationContext* opCtx) {
     invariant(o().coordinatorId);
     auto coordinatorIter = o().participants.find(*o().coordinatorId);
@@ -1247,7 +1262,7 @@ BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
                 3,
                 "{sessionId}:{txnNumber} Aborting transaction on {numParticipantShards} shard(s)",
                 "Aborting transaction on all participant shards",
-                "sessionId"_attr = _sessionId().getId(),
+                "sessionId"_attr = _sessionId(),
                 "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
                 "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
                 "numParticipantShards"_attr = o().participants.size());
@@ -1295,7 +1310,7 @@ void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opC
             "may have been handed off to the coordinator",
             "Not sending implicit abortTransaction to participant shards after error because "
             "coordinating the commit decision may have been handed off to the coordinator shard",
-            "sessionId"_attr = _sessionId().getId(),
+            "sessionId"_attr = _sessionId(),
             "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
             "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
             "error"_attr = redact(status));
@@ -1324,7 +1339,7 @@ void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opC
                 "{sessionId}:{txnNumber} Implicitly aborting transaction on {numParticipantShards} "
                 "shard(s) due to error: {error}",
                 "Implicitly aborting transaction on all participant shards",
-                "sessionId"_attr = _sessionId().getId(),
+                "sessionId"_attr = _sessionId(),
                 "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
                 "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
                 "numParticipantShards"_attr = o().participants.size(),
@@ -1342,7 +1357,7 @@ void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opC
                     3,
                     "{sessionId}:{txnNumber} Implicitly aborting transaction failed {error}",
                     "Implicitly aborting transaction failed",
-                    "sessionId"_attr = _sessionId().getId(),
+                    "sessionId"_attr = _sessionId(),
                     "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
                     "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
                     "error"_attr = ex);
