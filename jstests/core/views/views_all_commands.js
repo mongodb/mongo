@@ -114,6 +114,7 @@ let viewsCommandTests = {
     _configsvrRemoveTags: {skip: isAnInternalCommand},
     _configsvrRepairShardedCollectionChunksHistory: {skip: isAnInternalCommand},
     _configsvrReshardCollection: {skip: isAnInternalCommand},
+    _configsvrRunRestore: {skip: isAnInternalCommand},
     _configsvrSetAllowMigrations: {skip: isAnInternalCommand},
     _configsvrSetClusterParameter: {skip: isAnInternalCommand},
     _configsvrSetUserWriteBlockMode: {skip: isAnInternalCommand},

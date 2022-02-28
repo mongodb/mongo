@@ -70,6 +70,9 @@ const NamespaceString NamespaceString::kSessionTransactionsTableNamespace(
 const NamespaceString NamespaceString::kTransactionCoordinatorsNamespace(
     NamespaceString::kConfigDb, "transaction_coordinators");
 
+const NamespaceString NamespaceString::kConfigsvrRestoreNamespace(NamespaceString::kLocalDb,
+                                                                  "system.collections_to_restore");
+
 const NamespaceString NamespaceString::kMigrationCoordinatorsNamespace(NamespaceString::kConfigDb,
                                                                        "migrationCoordinators");
 
@@ -185,6 +188,8 @@ bool NamespaceString::isLegalClientSystemNS(
         if (coll() == kSystemReplSetNamespace.coll())
             return true;
         if (coll() == "system.healthlog")
+            return true;
+        if (coll() == kConfigsvrRestoreNamespace.coll())
             return true;
     }
 

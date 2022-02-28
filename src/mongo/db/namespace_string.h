@@ -210,6 +210,9 @@ public:
     // Namespace for storing user write blocking critical section documents
     static const NamespaceString kUserWritesCriticalSectionsNamespace;
 
+    // Namespace used during the recovery procedure for the config server.
+    static const NamespaceString kConfigsvrRestoreNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

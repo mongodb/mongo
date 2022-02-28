@@ -51,6 +51,7 @@ const allCommands = {
     _configsvrRepairShardedCollectionChunksHistory: {skip: isPrimaryOnly},
     _configsvrRenameCollectionMetadata: {skip: isPrimaryOnly},
     _configsvrReshardCollection: {skip: isPrimaryOnly},
+    _configsvrRunRestore: {skip: isPrimaryOnly},
     _configsvrSetAllowMigrations: {skip: isPrimaryOnly},
     _configsvrSetClusterParameter: {skip: isPrimaryOnly},
     _configsvrSetUserWriteBlockMode: {skip: isPrimaryOnly},

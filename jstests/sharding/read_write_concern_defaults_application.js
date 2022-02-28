@@ -117,6 +117,7 @@ let testCases = {
     _configsvrRenameCollectionMetadata: {skip: "internal command"},
     _configsvrRepairShardedCollectionChunksHistory: {skip: "internal command"},
     _configsvrReshardCollection: {skip: "internal command"},
+    _configsvrRunRestore: {skip: "internal command"},
     _configsvrSetAllowMigrations: {skip: "internal command"},
     _configsvrSetClusterParameter: {skip: "internal command"},
     _configsvrSetUserWriteBlockMode: {skip: "internal command"},
