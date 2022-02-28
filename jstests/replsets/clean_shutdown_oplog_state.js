@@ -61,6 +61,12 @@ waitForReplStart();
 sleep(100);  // wait a bit to increase the chances of killing mid-batch.
 rst.stop(1);
 
+// Create a copy of the secondary nodes dbpath for diagnostic purposes.
+const backupPath = secondary.dbpath + "_backup";
+resetDbpath(backupPath);
+jsTestLog("Copying dbpath from " + secondary.dbpath + " to " + backupPath);
+copyDbpath(secondary.dbpath, backupPath);
+
 // Restart the secondary as a standalone node.
 var options = secondary.savedOptions;
 options.noCleanData = true;
