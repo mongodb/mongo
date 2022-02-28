@@ -158,7 +158,7 @@ void BucketCatalogTest::_commit(const std::shared_ptr<BucketCatalog::WriteBatch>
                                 uint16_t numPreviouslyCommittedMeasurements,
                                 size_t expectedBatchSize) {
     ASSERT(batch->claimCommitRights());
-    _bucketCatalog->prepareCommit(batch);
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch));
     ASSERT_EQ(batch->measurements().size(), expectedBatchSize);
     ASSERT_EQ(batch->numPreviouslyCommittedMeasurements(), numPreviouslyCommittedMeasurements);
 
@@ -261,7 +261,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
     // The batch hasn't actually been committed yet.
     ASSERT(!batch1->finished());
 
-    _bucketCatalog->prepareCommit(batch1);
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch1));
 
     // Still not finished.
     ASSERT(!batch1->finished());
@@ -290,7 +290,7 @@ TEST_F(BucketCatalogTest, GetMetadataReturnsEmptyDocOnMissingBucket) {
                      .batch;
     ASSERT(batch->claimCommitRights());
     auto bucket = batch->bucket();
-    _bucketCatalog->abort(batch);
+    _bucketCatalog->abort(batch, {ErrorCodes::TimeseriesBucketCleared, ""});
     ASSERT_BSONOBJ_EQ(BSONObj(), _bucketCatalog->getMetadata(bucket));
 }
 
@@ -502,7 +502,7 @@ TEST_F(BucketCatalogTest, InsertBetweenPrepareAndFinish) {
                       .getValue()
                       .batch;
     ASSERT(batch1->claimCommitRights());
-    _bucketCatalog->prepareCommit(batch1);
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch1));
     ASSERT_EQ(batch1->measurements().size(), 1);
     ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements(), 0);
 
@@ -533,7 +533,7 @@ DEATH_TEST_F(BucketCatalogTest, CannotCommitWithoutRights, "invariant") {
                                          BSON(_timeField << Date_t::now()),
                                          BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
     auto& batch = result.getValue().batch;
-    _bucketCatalog->prepareCommit(batch);
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch));
 
     // BucketCatalog::prepareCommit uses dassert, so it will only invariant in debug mode. Ensure we
     // die here in non-debug mode as well.
@@ -640,7 +640,7 @@ TEST_F(BucketCatalogTest, AbortBatchOnBucketWithPreparedCommit) {
                       .getValue()
                       .batch;
     ASSERT(batch1->claimCommitRights());
-    _bucketCatalog->prepareCommit(batch1);
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch1));
     ASSERT_EQ(batch1->measurements().size(), 1);
     ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements(), 0);
 
@@ -657,7 +657,7 @@ TEST_F(BucketCatalogTest, AbortBatchOnBucketWithPreparedCommit) {
     ASSERT_NE(batch1, batch2);
 
     ASSERT(batch2->claimCommitRights());
-    _bucketCatalog->abort(batch2);
+    _bucketCatalog->abort(batch2, {ErrorCodes::TimeseriesBucketCleared, ""});
     ASSERT(batch2->finished());
     ASSERT_EQ(batch2->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
 
@@ -680,8 +680,7 @@ TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
 
     _bucketCatalog->clear(_ns1);
 
-    bool prepared = _bucketCatalog->prepareCommit(batch);
-    ASSERT(!prepared);
+    ASSERT_NOT_OK(_bucketCatalog->prepareCommit(batch));
     ASSERT(batch->finished());
     ASSERT_EQ(batch->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
 
@@ -695,7 +694,7 @@ TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
                 .getValue()
                 .batch;
     ASSERT(batch->claimCommitRights());
-    _bucketCatalog->prepareCommit(batch);
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch));
     ASSERT_EQ(batch->measurements().size(), 1);
     ASSERT_EQ(batch->numPreviouslyCommittedMeasurements(), 0);
 
@@ -723,13 +722,13 @@ TEST_F(BucketCatalogTest, ClearBucketWithPreparedBatchThrowsConflict) {
                      .getValue()
                      .batch;
     ASSERT(batch->claimCommitRights());
-    _bucketCatalog->prepareCommit(batch);
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch));
     ASSERT_EQ(batch->measurements().size(), 1);
     ASSERT_EQ(batch->numPreviouslyCommittedMeasurements(), 0);
 
     ASSERT_THROWS(_bucketCatalog->clear(batch->bucket().id), WriteConflictException);
 
-    _bucketCatalog->abort(batch);
+    _bucketCatalog->abort(batch, {ErrorCodes::TimeseriesBucketCleared, ""});
     ASSERT(batch->finished());
     ASSERT_EQ(batch->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
 }
@@ -745,7 +744,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
                       .getValue()
                       .batch;
     ASSERT(batch1->claimCommitRights());
-    _bucketCatalog->prepareCommit(batch1);
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch1));
     ASSERT_EQ(batch1->measurements().size(), 1);
     ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements(), 0);
 
@@ -767,7 +766,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
 
     // Now try to prepare the second batch. Ensure it aborts the batch.
     ASSERT(batch2->claimCommitRights());
-    ASSERT(!_bucketCatalog->prepareCommit(batch2));
+    ASSERT_NOT_OK(_bucketCatalog->prepareCommit(batch2));
     ASSERT(batch2->finished());
     ASSERT_EQ(batch2->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
 
@@ -790,7 +789,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
     ASSERT_NE(batch1->bucket().id, batch3->bucket().id);
     // Clean up this batch
     ASSERT(batch3->claimCommitRights());
-    _bucketCatalog->abort(batch3);
+    _bucketCatalog->abort(batch3, {ErrorCodes::TimeseriesBucketCleared, ""});
 
     // Make sure we can finish the cleanly prepared batch.
     _bucketCatalog->finish(batch1, {});
@@ -810,12 +809,11 @@ TEST_F(BucketCatalogTest, PrepareCommitOnAlreadyAbortedBatch) {
                      .batch;
     ASSERT(batch->claimCommitRights());
 
-    _bucketCatalog->abort(batch);
+    _bucketCatalog->abort(batch, {ErrorCodes::TimeseriesBucketCleared, ""});
     ASSERT(batch->finished());
     ASSERT_EQ(batch->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
 
-    bool prepared = _bucketCatalog->prepareCommit(batch);
-    ASSERT(!prepared);
+    ASSERT_NOT_OK(_bucketCatalog->prepareCommit(batch));
     ASSERT(batch->finished());
     ASSERT_EQ(batch->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
 }
@@ -896,8 +894,8 @@ TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
     ASSERT(batch2->claimCommitRights());
 
     // Batch 2 will not be able to commit until batch 1 has finished.
-    _bucketCatalog->prepareCommit(batch1);
-    auto task = Task{[&]() { _bucketCatalog->prepareCommit(batch2); }};
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch1));
+    auto task = Task{[&]() { ASSERT_OK(_bucketCatalog->prepareCommit(batch2)); }};
     // Add a little extra wait to make sure prepareCommit actually gets to the blocking point.
     stdx::this_thread::sleep_for(stdx::chrono::milliseconds(10));
     ASSERT(task.future().valid());
@@ -932,7 +930,7 @@ TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
 
     // Batch 2 is the first batch to commit the time field.
     ASSERT(batch2->claimCommitRights());
-    _bucketCatalog->prepareCommit(batch2);
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch2));
     ASSERT_EQ(batch2->newFieldNamesToBeInserted().size(), 1);
     ASSERT_EQ(batch2->newFieldNamesToBeInserted().begin()->first, _timeField);
     _bucketCatalog->finish(batch2, {});
@@ -940,7 +938,7 @@ TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
     // Batch 1 was the first batch to insert the time field, but by commit time it was already
     // committed by batch 2.
     ASSERT(batch1->claimCommitRights());
-    _bucketCatalog->prepareCommit(batch1);
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch1));
     ASSERT(batch1->newFieldNamesToBeInserted().empty());
     _bucketCatalog->finish(batch1, {});
 }

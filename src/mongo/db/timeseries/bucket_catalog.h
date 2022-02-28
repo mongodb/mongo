@@ -160,10 +160,8 @@ public:
 
         /**
          * Abandons the write batch and notifies any waiters that the bucket has been cleared.
-         * Parameter 'bucket' provides a pointer to the bucket if still available, nullptr
-         * otherwise.
          */
-        void _abort(const boost::optional<Status>& status, const Bucket* bucket);
+        void _abort(const Status& status);
 
         const BucketHandle _bucket;
         OperationId _opId;
@@ -220,10 +218,10 @@ public:
 
     /**
      * Prepares a batch for commit, transitioning it to an inactive state. Caller must already have
-     * commit rights on batch. Returns true if the batch was successfully prepared, or false if the
-     * batch was aborted.
+     * commit rights on batch. Returns OK if the batch was successfully prepared, or a status
+     * indicating why the batch was previously aborted by another operation.
      */
-    bool prepareCommit(std::shared_ptr<WriteBatch> batch);
+    Status prepareCommit(std::shared_ptr<WriteBatch> batch);
 
     /**
      * Records the result of a batch commit. Caller must already have commit rights on batch, and
@@ -234,11 +232,10 @@ public:
     boost::optional<ClosedBucket> finish(std::shared_ptr<WriteBatch> batch, const CommitInfo& info);
 
     /**
-     * Aborts the given write batch and any other outstanding batches on the same bucket. Uses the
-     * provided status when clearing the bucket, or TimeseriesBucketCleared if not provided.
+     * Aborts the given write batch and any other outstanding batches on the same bucket, using the
+     * provided status.
      */
-    void abort(std::shared_ptr<WriteBatch> batch,
-               const boost::optional<Status>& status = boost::none);
+    void abort(std::shared_ptr<WriteBatch> batch, const Status& status);
 
     /**
      * Marks any bucket with the specified OID as cleared and prevents any future inserts from
@@ -415,7 +412,7 @@ private:
     void _abort(Stripe* stripe,
                 WithLock stripeLock,
                 std::shared_ptr<WriteBatch> batch,
-                const boost::optional<Status>& status = boost::none);
+                const Status& status);
 
     /**
      * Aborts any unprepared batches for the given bucket, then removes the bucket if there is no
@@ -426,7 +423,7 @@ private:
                 WithLock stripeLock,
                 Bucket* bucket,
                 std::shared_ptr<WriteBatch> batch,
-                const boost::optional<Status>& status);
+                const Status& status);
 
     /**
      * Adds the bucket to a list of idle buckets to be expired at a later date.

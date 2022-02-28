@@ -192,6 +192,17 @@ std::pair<OID, Date_t> generateBucketId(const Date_t& time, const TimeseriesOpti
 
     return {bucketId, roundedTime};
 }
+
+Status getTimeseriesBucketClearedError(const OID& bucketId,
+                                       const boost::optional<NamespaceString>& ns = boost::none) {
+    std::string nsIdentification;
+    if (ns) {
+        nsIdentification.assign(str::stream() << " for namespace " << *ns);
+    }
+    return {ErrorCodes::TimeseriesBucketCleared,
+            str::stream() << "Time-series bucket " << bucketId << nsIdentification
+                          << " was cleared"};
+}
 }  // namespace
 
 struct BucketCatalog::ExecutionStats {
@@ -524,19 +535,12 @@ void BucketCatalog::WriteBatch::_finish(const CommitInfo& info) {
     _promise.emplaceValue(info);
 }
 
-void BucketCatalog::WriteBatch::_abort(const boost::optional<Status>& status,
-                                       const Bucket* bucket) {
+void BucketCatalog::WriteBatch::_abort(const Status& status) {
     if (finished()) {
         return;
     }
 
-    std::string nsIdentification;
-    if (bucket) {
-        nsIdentification.append(str::stream() << " for namespace " << bucket->_ns);
-    }
-    _promise.setError(status.value_or(Status{ErrorCodes::TimeseriesBucketCleared,
-                                             str::stream() << "Time-series bucket " << _bucket.id
-                                                           << nsIdentification << " was cleared"}));
+    _promise.setError(status);
 }
 
 BucketCatalog& BucketCatalog::get(ServiceContext* svcCtx) {
@@ -675,10 +679,12 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::insert(
     return InsertResult{batch, closedBuckets};
 }
 
-bool BucketCatalog::prepareCommit(std::shared_ptr<WriteBatch> batch) {
+Status BucketCatalog::prepareCommit(std::shared_ptr<WriteBatch> batch) {
+    auto getBatchStatus = [&] { return batch->_promise.getFuture().getNoThrow().getStatus(); };
+
     if (batch->finished()) {
         // In this case, someone else aborted the batch behind our back. Oops.
-        return false;
+        return getBatchStatus();
     }
 
     auto& stripe = _stripes[batch->bucket().stripe];
@@ -690,17 +696,17 @@ bool BucketCatalog::prepareCommit(std::shared_ptr<WriteBatch> batch) {
 
     if (batch->finished()) {
         // Someone may have aborted it while we were waiting.
-        return false;
+        return getBatchStatus();
     } else if (!bucket) {
-        _abort(&stripe, stripeLock, batch, boost::none);
-        return false;
+        _abort(&stripe, stripeLock, batch, getTimeseriesBucketClearedError(batch->bucket().id));
+        return getBatchStatus();
     }
 
     auto prevMemoryUsage = bucket->_memoryUsage;
     batch->_prepareCommit(bucket);
     _memoryUsage.fetchAndAdd(bucket->_memoryUsage - prevMemoryUsage);
 
-    return true;
+    return Status::OK();
 }
 
 boost::optional<BucketCatalog::ClosedBucket> BucketCatalog::finish(
@@ -741,7 +747,11 @@ boost::optional<BucketCatalog::ClosedBucket> BucketCatalog::finish(
         if (it != stripe.allBuckets.end()) {
             bucket = it->second.get();
             bucket->_preparedBatch.reset();
-            _abort(&stripe, stripeLock, bucket, nullptr, boost::none);
+            _abort(&stripe,
+                   stripeLock,
+                   bucket,
+                   nullptr,
+                   getTimeseriesBucketClearedError(bucket->id(), bucket->_ns));
         }
     } else if (bucket->allCommitted()) {
         if (bucket->_full) {
@@ -772,8 +782,7 @@ boost::optional<BucketCatalog::ClosedBucket> BucketCatalog::finish(
     return closedBucket;
 }
 
-void BucketCatalog::abort(std::shared_ptr<WriteBatch> batch,
-                          const boost::optional<Status>& status) {
+void BucketCatalog::abort(std::shared_ptr<WriteBatch> batch, const Status& status) {
     invariant(batch);
     invariant(batch->_commitRights.load());
 
@@ -807,7 +816,11 @@ void BucketCatalog::clear(const std::function<bool(const NamespaceString&)>& sho
                     stdx::lock_guard catalogLock{_mutex};
                     _executionStats.erase(bucket->_ns);
                 }
-                _abort(&stripe, stripeLock, bucket.get(), nullptr, boost::none);
+                _abort(&stripe,
+                       stripeLock,
+                       bucket.get(),
+                       nullptr,
+                       getTimeseriesBucketClearedError(bucket->id(), bucket->_ns));
             }
 
             it = nextIt;
@@ -948,7 +961,12 @@ BucketCatalog::Bucket* BucketCatalog::_useOrCreateBucket(Stripe* stripe,
         return bucket;
     }
 
-    _abort(stripe, stripeLock, bucket, nullptr, boost::none);
+    _abort(stripe,
+           stripeLock,
+           bucket,
+           nullptr,
+           getTimeseriesBucketClearedError(bucket->id(), bucket->_ns));
+
     return _allocateBucket(stripe, stripeLock, info);
 }
 
@@ -1000,12 +1018,12 @@ bool BucketCatalog::_removeBucket(Stripe* stripe, WithLock stripeLock, Bucket* b
 void BucketCatalog::_abort(Stripe* stripe,
                            WithLock stripeLock,
                            std::shared_ptr<WriteBatch> batch,
-                           const boost::optional<Status>& status) {
+                           const Status& status) {
     // Before we access the bucket, make sure it's still there.
     Bucket* bucket = _useBucket(stripe, stripeLock, batch->bucket().id, ReturnClearedBuckets::kYes);
     if (!bucket) {
         // Special case, bucket has already been cleared, and we need only abort this batch.
-        batch->_abort(status, nullptr);
+        batch->_abort(status);
         return;
     }
 
@@ -1017,11 +1035,11 @@ void BucketCatalog::_abort(Stripe* stripe,
                            WithLock stripeLock,
                            Bucket* bucket,
                            std::shared_ptr<WriteBatch> batch,
-                           const boost::optional<Status>& status) {
+                           const Status& status) {
     // Abort any unprepared batches. This should be safe since we have a lock on the stripe,
     // preventing anyone else from using these.
     for (const auto& [_, current] : bucket->_batches) {
-        current->_abort(status, bucket);
+        current->_abort(status);
     }
     bucket->_batches.clear();
 
@@ -1032,7 +1050,7 @@ void BucketCatalog::_abort(Stripe* stripe,
     if (auto& prepared = bucket->_preparedBatch) {
         if (prepared == batch) {
             // We own the prepared batch, so we can go ahead and abort it and remove the bucket.
-            prepared->_abort(status, bucket);
+            prepared->_abort(status);
             prepared.reset();
         } else {
             doRemove = false;

@@ -740,18 +740,16 @@ public:
                                      std::vector<write_ops::WriteError>* errors,
                                      boost::optional<repl::OpTime>* opTime,
                                      boost::optional<OID>* electionId,
-                                     std::vector<size_t>* docsToRetry) const {
+                                     std::vector<size_t>* docsToRetry) const try {
             auto& bucketCatalog = BucketCatalog::get(opCtx);
 
             auto metadata = bucketCatalog.getMetadata(batch->bucket());
-            bool prepared = bucketCatalog.prepareCommit(batch);
-            if (!prepared) {
+            auto status = bucketCatalog.prepareCommit(batch);
+            if (!status.isOK()) {
                 invariant(batch->finished());
                 docsToRetry->push_back(index);
                 return true;
             }
-            // Now that the batch is prepared, make sure we clean up if we throw.
-            ScopeGuard batchGuard([&] { bucketCatalog.abort(batch); });
 
             hangTimeseriesInsertBeforeWrite.pauseWhileSet();
 
@@ -764,7 +762,6 @@ public:
                         generateError(opCtx, output.result, start + index, errors->size())) {
                     errors->emplace_back(std::move(*error));
                     bucketCatalog.abort(batch, output.result.getStatus());
-                    batchGuard.dismiss();
                     return output.canContinue;
                 }
 
@@ -779,7 +776,6 @@ public:
                         generateError(opCtx, output.result, start + index, errors->size())) {
                     errors->emplace_back(std::move(*error));
                     bucketCatalog.abort(batch, output.result.getStatus());
-                    batchGuard.dismiss();
                     return output.canContinue;
                 }
 
@@ -794,8 +790,6 @@ public:
             auto closedBucket =
                 bucketCatalog.finish(batch, BucketCatalog::CommitInfo{*opTime, *electionId});
 
-            batchGuard.dismiss();
-
             if (closedBucket) {
                 // If this write closed a bucket, compress the bucket
                 auto output = _performTimeseriesBucketCompression(opCtx, *closedBucket);
@@ -806,6 +800,9 @@ public:
                 }
             }
             return true;
+        } catch (const DBException& ex) {
+            BucketCatalog::get(opCtx).abort(batch, ex.toStatus());
+            throw;
         }
 
         bool _commitTimeseriesBucketsAtomically(OperationContext* opCtx,
@@ -834,7 +831,7 @@ public:
                 return left.get()->bucket().id < right.get()->bucket().id;
             });
 
-            boost::optional<Status> abortStatus;
+            Status abortStatus = Status::OK();
             ScopeGuard batchGuard{[&] {
                 for (auto batch : batchesToCommit) {
                     if (batch.get()) {
@@ -843,58 +840,63 @@ public:
                 }
             }};
 
-            std::vector<write_ops::InsertCommandRequest> insertOps;
-            std::vector<write_ops::UpdateCommandRequest> updateOps;
+            try {
+                std::vector<write_ops::InsertCommandRequest> insertOps;
+                std::vector<write_ops::UpdateCommandRequest> updateOps;
 
-            for (auto batch : batchesToCommit) {
-                auto metadata = bucketCatalog.getMetadata(batch.get()->bucket());
-                if (!bucketCatalog.prepareCommit(batch)) {
-                    return false;
-                }
-
-                if (batch.get()->numPreviouslyCommittedMeasurements() == 0) {
-                    insertOps.push_back(_makeTimeseriesInsertOp(
-                        batch, metadata, std::move(stmtIds[batch.get()->bucket().id])));
-                } else {
-                    updateOps.push_back(_makeTimeseriesUpdateOp(
-                        opCtx, batch, metadata, std::move(stmtIds[batch.get()->bucket().id])));
-                }
-            }
-
-            hangTimeseriesInsertBeforeWrite.pauseWhileSet();
-
-            auto result =
-                write_ops_exec::performAtomicTimeseriesWrites(opCtx, insertOps, updateOps);
-            if (!result.isOK()) {
-                abortStatus = result;
-                return false;
-            }
-
-            getOpTimeAndElectionId(opCtx, opTime, electionId);
-
-            bool compressClosedBuckets = true;
-            for (auto batch : batchesToCommit) {
-                auto closedBucket =
-                    bucketCatalog.finish(batch, BucketCatalog::CommitInfo{*opTime, *electionId});
-                batch.get().reset();
-
-                if (!closedBucket || !compressClosedBuckets) {
-                    continue;
-                }
-
-                // If this write closed a bucket, compress the bucket
-                auto ret = _performTimeseriesBucketCompression(opCtx, *closedBucket);
-                if (!ret.result.isOK()) {
-                    // Don't try to compress any other buckets if we fail. We're not allowed to do
-                    // more write operations.
-                    compressClosedBuckets = false;
-                }
-                if (!ret.canContinue) {
-                    if (!ret.result.isOK()) {
-                        abortStatus = ret.result.getStatus();
+                for (auto batch : batchesToCommit) {
+                    auto metadata = bucketCatalog.getMetadata(batch.get()->bucket());
+                    auto prepareCommitStatus = bucketCatalog.prepareCommit(batch);
+                    if (!prepareCommitStatus.isOK()) {
+                        abortStatus = prepareCommitStatus;
+                        return false;
                     }
+
+                    if (batch.get()->numPreviouslyCommittedMeasurements() == 0) {
+                        insertOps.push_back(_makeTimeseriesInsertOp(
+                            batch, metadata, std::move(stmtIds[batch.get()->bucket().id])));
+                    } else {
+                        updateOps.push_back(_makeTimeseriesUpdateOp(
+                            opCtx, batch, metadata, std::move(stmtIds[batch.get()->bucket().id])));
+                    }
+                }
+
+                hangTimeseriesInsertBeforeWrite.pauseWhileSet();
+
+                auto result =
+                    write_ops_exec::performAtomicTimeseriesWrites(opCtx, insertOps, updateOps);
+                if (!result.isOK()) {
+                    abortStatus = result;
                     return false;
                 }
+
+                getOpTimeAndElectionId(opCtx, opTime, electionId);
+
+                bool compressClosedBuckets = true;
+                for (auto batch : batchesToCommit) {
+                    auto closedBucket = bucketCatalog.finish(
+                        batch, BucketCatalog::CommitInfo{*opTime, *electionId});
+                    batch.get().reset();
+
+                    if (!closedBucket || !compressClosedBuckets) {
+                        continue;
+                    }
+
+                    // If this write closed a bucket, compress the bucket
+                    auto ret = _performTimeseriesBucketCompression(opCtx, *closedBucket);
+                    if (!ret.result.isOK()) {
+                        // Don't try to compress any other buckets if we fail. We're not allowed to
+                        // do more write operations.
+                        compressClosedBuckets = false;
+                    }
+                    if (!ret.canContinue) {
+                        abortStatus = ret.result.getStatus();
+                        return false;
+                    }
+                }
+            } catch (const DBException& ex) {
+                abortStatus = ex.toStatus();
+                throw;
             }
 
             batchGuard.dismiss();
@@ -1026,13 +1028,7 @@ public:
                 // If there are any unprocessed batches, we mark them as error with the last known
                 // error.
                 if (itr > indexOfLastProcessedBatch && batch->claimCommitRights()) {
-                    auto& bucketCatalog = BucketCatalog::get(opCtx);
-                    bucketCatalog.abort(batch);
-
-                    tassert(
-                        6023100,
-                        "there should be at least one error if the batch processing exited early",
-                        lastError);
+                    BucketCatalog::get(opCtx).abort(batch, lastError->getStatus());
                     errors->emplace_back(start + index, lastError->getStatus());
                     continue;
                 }
