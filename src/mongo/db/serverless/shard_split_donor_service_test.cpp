@@ -411,50 +411,6 @@ TEST_F(ShardSplitDonorServiceTest, StepUpWithkCommitted) {
     ASSERT_TRUE(serviceInstance->isGarbageCollectable());
 }
 
-TEST_F(ShardSplitDonorServiceTest, TimeoutAbortsAwaitReplication) {
-    auto opCtx = makeOperationContext();
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
-    test::shard_split::reconfigToAddRecipientNodes(
-        getServiceContext(), _recipientTagName, _replSet.getHosts());
-
-    RAIIServerParameterControllerForTest controller{"shardSplitTimeoutMS", 200};
-
-    AtomicWord<bool> sleptForWaitingForBlockTimestamp{false};
-    std::shared_ptr<ShardSplitDonorService::DonorStateMachine> serviceInstance;
-    {
-        FailPointEnableBlock fp("pauseShardSplitAfterBlocking");
-        serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
-            opCtx.get(), _service, defaultStateDocument().toBSON());
-        ASSERT(serviceInstance.get());
-
-        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
-
-        auto replCoord = dynamic_cast<repl::ReplicationCoordinatorMock*>(
-            repl::ReplicationCoordinator::get(cc().getServiceContext()));
-        replCoord->setAwaitReplicationReturnValueFunction(
-            [&sleptForWaitingForBlockTimestamp](OperationContext* opCtx, const repl::OpTime&) {
-                bool alreadySlept = false;
-                if (sleptForWaitingForBlockTimestamp.compareAndSwap(&alreadySlept, true)) {
-                    opCtx->sleepFor(Hours{1});
-                }
-
-                return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(),
-                                                                       Milliseconds(0));
-            });
-    }
-
-    uassertStatusOK(serviceInstance->decisionFuture().getNoThrow());
-    auto result = serviceInstance->decisionFuture().get(opCtx.get());
-    ASSERT(result.abortReason);
-    ASSERT_EQ(result.abortReason->code(), ErrorCodes::ExceededTimeLimit);
-
-    fastForwardCommittedSnapshotOpTime(serviceInstance, getServiceContext(), opCtx.get(), _uuid);
-    serviceInstance->tryForget();
-
-    ASSERT_OK(serviceInstance->completionFuture().getNoThrow());
-    ASSERT_TRUE(serviceInstance->isGarbageCollectable());
-}
-
 class SplitReplicaSetObserverTest : public ServiceContextTest {
 public:
     void setUp() override {
