@@ -480,11 +480,15 @@ var $config = extendWorkload($config, function($config, $super) {
         }
         db.printShardingStatus();
 
-        this.internalTransactionsEnabled =
-            assert
-                .commandWorked(
-                    db.adminCommand({getParameter: 1, featureFlagInternalTransactions: 1}))
-                .featureFlagInternalTransactions.value;
+        const parameterRes = db.adminCommand({getParameter: 1, featureFlagInternalTransactions: 1});
+        if (!parameterRes.ok) {
+            assert.eq(parameterRes.errmsg, "no option found to get", parameterRes);
+            this.internalTransactionsEnabled = false;
+        } else {
+            assert.commandWorked(parameterRes);
+            this.internalTransactionsEnabled = parameterRes.featureFlagInternalTransactions.value;
+        }
+        print("Internal transactions enabled: " + this.internalTransactionsEnabled);
     };
 
     /**
