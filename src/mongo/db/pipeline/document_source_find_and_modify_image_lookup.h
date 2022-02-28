@@ -34,10 +34,12 @@
 namespace mongo {
 
 /**
- * This stage will take a list of oplog entries as input and forge a no-op pre- or post-image to be
- * returned before each 'findAndModify' oplog entry that has the 'needsRetryImage' field. This stage
- * also downconverts 'findAndModify' entries by stripping the 'needsRetryImage' field and appending
- * the appropriate 'preImageOpTime' or 'postImageOpTime' field.
+ * This stage will take a list of oplog entry documents as input and forge a no-op pre- or
+ * post-image to be returned before the document for each 'findAndModify' oplog entry that has the
+ * the 'needsRetryImage' field or each 'applyOps' oplog entry with a 'findAndModify' operation entry
+ * that has the 'needsRetryImage' field. This stage also downconverts 'findAndModify' or 'applyOps'
+ * oplog entry documents by stripping the 'needsRetryImage' field and appending the appropriate
+ * 'preImageOpTime' or 'postImageOpTime' field.
  */
 class DocumentSourceFindAndModifyImageLookup : public DocumentSource {
 public:
@@ -72,11 +74,11 @@ private:
     DocumentSourceFindAndModifyImageLookup(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     // Forges the no-op pre- or post-image document to be returned. Also downconverts the original
-    // 'findAndModify' oplog entry and stashes it.
+    // 'findAndModify' or 'applyOps' oplog entry document and stashes it.
     boost::optional<Document> _forgeNoopImageDoc(Document inputDoc, OperationContext* opCtx);
 
-    // Represents the stashed 'findAndModify' document. This indicates that the previous document
-    // emitted was a forged pre- or post-image.
+    // Represents the stashed 'findAndModify' or 'applyOps' oplog entry document. This indicates
+    // that the previous document emitted was a forged pre- or post-image.
     boost::optional<Document> _stashedFindAndModifyDoc;
 };
 

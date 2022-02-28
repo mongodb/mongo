@@ -1915,15 +1915,21 @@ protected:
         update->updateArgs->storeDocOption = testCase.imageType;
     }
 
-    void checkPreImageInOplogIfNeeded(const UpdateTestCase& testCase,
-                                      const OplogUpdateEntryArgs& update,
-                                      const std::vector<BSONObj>& oplogs,
-                                      const OplogEntry& updateOplogEntry) {
+    void checkPreImageInOplogIfNeeded(
+        const UpdateTestCase& testCase,
+        const OplogUpdateEntryArgs& update,
+        const std::vector<BSONObj>& oplogs,
+        const OplogEntry& updateOplogEntry,
+        const boost::optional<OplogEntry>& applyOpsOplogEntry = boost::none) {
         const bool checkPreImageInOplog = testCase.alwaysRecordPreImages ||
             (testCase.imageType == StoreDocOption::PreImage &&
              testCase.retryableOptions == kRecordInOplog);
         if (checkPreImageInOplog) {
             ASSERT(updateOplogEntry.getPreImageOpTime());
+            if (applyOpsOplogEntry) {
+                ASSERT_FALSE(applyOpsOplogEntry->getPreImageOpTime());
+            }
+
             const Timestamp preImageOpTime = updateOplogEntry.getPreImageOpTime()->getTimestamp();
             ASSERT_FALSE(preImageOpTime.isNull());
             OplogEntry preImage = *findByTimestamp(oplogs, preImageOpTime);
@@ -1933,14 +1939,20 @@ protected:
         }
     }
 
-    void checkPostImageInOplogIfNeeded(const UpdateTestCase& testCase,
-                                       const OplogUpdateEntryArgs& update,
-                                       const std::vector<BSONObj>& oplogs,
-                                       const OplogEntry& updateOplogEntry) {
+    void checkPostImageInOplogIfNeeded(
+        const UpdateTestCase& testCase,
+        const OplogUpdateEntryArgs& update,
+        const std::vector<BSONObj>& oplogs,
+        const OplogEntry& updateOplogEntry,
+        const boost::optional<OplogEntry>& applyOpsOplogEntry = boost::none) {
         const bool checkPostImageInOplog = testCase.imageType == StoreDocOption::PostImage &&
             testCase.retryableOptions == kRecordInOplog;
         if (checkPostImageInOplog) {
             ASSERT(updateOplogEntry.getPostImageOpTime());
+            if (applyOpsOplogEntry) {
+                ASSERT_FALSE(applyOpsOplogEntry->getPostImageOpTime());
+            }
+
             const Timestamp postImageOpTime = updateOplogEntry.getPostImageOpTime()->getTimestamp();
             ASSERT_FALSE(postImageOpTime.isNull());
             OplogEntry postImage = *findByTimestamp(oplogs, postImageOpTime);
@@ -1950,11 +1962,13 @@ protected:
         }
     }
 
-    void checkSideCollectionIfNeeded(OperationContext* opCtx,
-                                     const UpdateTestCase& testCase,
-                                     const OplogUpdateEntryArgs& update,
-                                     const std::vector<BSONObj>& oplogs,
-                                     const OplogEntry& updateOplogEntry) {
+    void checkSideCollectionIfNeeded(
+        OperationContext* opCtx,
+        const UpdateTestCase& testCase,
+        const OplogUpdateEntryArgs& update,
+        const std::vector<BSONObj>& oplogs,
+        const OplogEntry& updateOplogEntry,
+        const boost::optional<OplogEntry>& applyOpsOplogEntry = boost::none) {
         bool checkSideCollection =
             testCase.isFindAndModify() && testCase.retryableOptions == kRecordInSideCollection;
         if (checkSideCollection && testCase.alwaysRecordPreImages &&
@@ -1972,6 +1986,9 @@ protected:
                 : update.updateArgs->updatedDoc;
             ASSERT_BSONOBJ_EQ(expectedImage, imageEntry.getImage());
             ASSERT(imageEntry.getImageKind() == updateOplogEntry.getNeedsRetryImage());
+            if (applyOpsOplogEntry) {
+                ASSERT_FALSE(applyOpsOplogEntry->getNeedsRetryImage());
+            }
             if (testCase.imageType == StoreDocOption::PreImage) {
                 ASSERT(imageEntry.getImageKind() == repl::RetryImageEnum::kPreImage);
             } else {
@@ -2133,9 +2150,12 @@ TEST_F(OnUpdateOutputsTest, TestFundamentalTransactionOnUpdateOutputs) {
         // Entries are returned in ascending timestamp order.
         auto applyOpsOplogEntry = assertGet(OplogEntry::parse(oplogs.back()));
         auto updateOplogEntry = getInnerEntryFromApplyOpsOplogEntry(applyOpsOplogEntry);
-        checkPreImageInOplogIfNeeded(testCase, updateEntryArgs, oplogs, updateOplogEntry);
-        checkPostImageInOplogIfNeeded(testCase, updateEntryArgs, oplogs, updateOplogEntry);
-        checkSideCollectionIfNeeded(opCtx, testCase, updateEntryArgs, oplogs, updateOplogEntry);
+        checkPreImageInOplogIfNeeded(
+            testCase, updateEntryArgs, oplogs, updateOplogEntry, applyOpsOplogEntry);
+        checkPostImageInOplogIfNeeded(
+            testCase, updateEntryArgs, oplogs, updateOplogEntry, applyOpsOplogEntry);
+        checkSideCollectionIfNeeded(
+            opCtx, testCase, updateEntryArgs, oplogs, updateOplogEntry, applyOpsOplogEntry);
     }
 }
 
@@ -2299,14 +2319,20 @@ protected:
         }
     }
 
-    void checkPreImageInOplogIfNeeded(const DeleteTestCase& testCase,
-                                      const OplogDeleteEntryArgs& deleteArgs,
-                                      const std::vector<BSONObj>& oplogs,
-                                      const OplogEntry& deleteOplogEntry) {
+    void checkPreImageInOplogIfNeeded(
+        const DeleteTestCase& testCase,
+        const OplogDeleteEntryArgs& deleteArgs,
+        const std::vector<BSONObj>& oplogs,
+        const OplogEntry& deleteOplogEntry,
+        const boost::optional<OplogEntry> applyOpsOplogEntry = boost::none) {
         const bool checkPreImageInOplog = deleteArgs.preImageRecordingEnabledForCollection ||
             deleteArgs.retryableFindAndModifyLocation == kRecordInOplog;
         if (checkPreImageInOplog) {
             ASSERT(deleteOplogEntry.getPreImageOpTime());
+            if (applyOpsOplogEntry) {
+                ASSERT_FALSE(applyOpsOplogEntry->getPreImageOpTime());
+            }
+
             const Timestamp preImageOpTime = deleteOplogEntry.getPreImageOpTime()->getTimestamp();
             ASSERT_FALSE(preImageOpTime.isNull());
             OplogEntry preImage = *findByTimestamp(oplogs, preImageOpTime);
@@ -2316,11 +2342,13 @@ protected:
         }
     }
 
-    void checkSideCollectionIfNeeded(OperationContext* opCtx,
-                                     const DeleteTestCase& testCase,
-                                     const OplogDeleteEntryArgs& deleteArgs,
-                                     const std::vector<BSONObj>& oplogs,
-                                     const OplogEntry& deleteOplogEntry) {
+    void checkSideCollectionIfNeeded(
+        OperationContext* opCtx,
+        const DeleteTestCase& testCase,
+        const OplogDeleteEntryArgs& deleteArgs,
+        const std::vector<BSONObj>& oplogs,
+        const OplogEntry& deleteOplogEntry,
+        const boost::optional<OplogEntry> applyOpsOplogEntry = boost::none) {
         bool didWriteInSideCollection =
             deleteArgs.retryableFindAndModifyLocation == kRecordInSideCollection &&
             !deleteArgs.preImageRecordingEnabledForCollection;
@@ -2328,6 +2356,9 @@ protected:
             repl::ImageEntry imageEntry =
                 getImageEntryFromSideCollection(opCtx, *deleteOplogEntry.getSessionId());
             ASSERT(imageEntry.getImageKind() == deleteOplogEntry.getNeedsRetryImage());
+            if (applyOpsOplogEntry) {
+                ASSERT_FALSE(applyOpsOplogEntry->getNeedsRetryImage());
+            }
             ASSERT(imageEntry.getImageKind() == repl::RetryImageEnum::kPreImage);
             ASSERT_BSONOBJ_EQ(_deletedDoc, imageEntry.getImage());
 
@@ -2477,8 +2508,10 @@ TEST_F(OnDeleteOutputsTest, TestTransactionFundamentalOnDeleteOutputs) {
         // Entries are returned in ascending timestamp order.
         auto applyOpsOplogEntry = assertGet(OplogEntry::parse(oplogs.back()));
         auto deleteOplogEntry = getInnerEntryFromApplyOpsOplogEntry(applyOpsOplogEntry);
-        checkPreImageInOplogIfNeeded(testCase, deleteEntryArgs, oplogs, deleteOplogEntry);
-        checkSideCollectionIfNeeded(opCtx, testCase, deleteEntryArgs, oplogs, deleteOplogEntry);
+        checkPreImageInOplogIfNeeded(
+            testCase, deleteEntryArgs, oplogs, deleteOplogEntry, applyOpsOplogEntry);
+        checkSideCollectionIfNeeded(
+            opCtx, testCase, deleteEntryArgs, oplogs, deleteOplogEntry, applyOpsOplogEntry);
     }
 }
 

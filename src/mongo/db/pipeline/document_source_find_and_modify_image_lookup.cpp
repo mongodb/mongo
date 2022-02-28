@@ -33,27 +33,85 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
+#include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
 namespace {
-// Downconverts a 'findAndModify' entry by stripping the 'needsRetryImage' field and appending
-// the appropriate 'preImageOpTime' or 'postImageOpTime' field.
-Document downConvertFindAndModifyEntry(Document inputDoc,
-                                       repl::OpTime imageOpTime,
-                                       repl::RetryImageEnum imageType) {
-    MutableDocument doc{inputDoc};
-    const auto imageOpTimeFieldName = imageType == repl::RetryImageEnum::kPreImage
-        ? repl::OplogEntry::kPreImageOpTimeFieldName
-        : repl::OplogEntry::kPostImageOpTimeFieldName;
-    doc.setField(
-        imageOpTimeFieldName,
-        Value{Document{{repl::OpTime::kTimestampFieldName.toString(), imageOpTime.getTimestamp()},
-                       {repl::OpTime::kTermFieldName.toString(), imageOpTime.getTerm()}}});
-    doc.remove(repl::OplogEntryBase::kNeedsRetryImageFieldName);
-    return doc.freeze();
+
+/**
+ * Fetches the pre- or post-image entry for the given oplog entry from the findAndModify image
+ * collection, and returns a forged noop oplog entry containing the image. Returns none if no
+ * matching image entry is not found.
+ */
+boost::optional<repl::OplogEntry> forgeNoopImageOplogEntry(
+    OperationContext* opCtx,
+    const boost::intrusive_ptr<ExpressionContext> pExpCtx,
+    const repl::OplogEntry oplogEntry) {
+    const auto sessionId = *oplogEntry.getSessionId();
+
+    auto localImageCollInfo = pExpCtx->mongoProcessInterface->getCollectionOptions(
+        pExpCtx->opCtx, NamespaceString::kConfigImagesNamespace);
+
+    // Extract the UUID from the collection information. We should always have a valid uuid here.
+    auto imageCollUUID = invariantStatusOK(UUID::parse(localImageCollInfo["uuid"]));
+    const auto& readConcernBson = repl::ReadConcernArgs::get(opCtx).toBSON();
+    auto imageDoc = pExpCtx->mongoProcessInterface->lookupSingleDocument(
+        pExpCtx,
+        NamespaceString::kConfigImagesNamespace,
+        imageCollUUID,
+        Document{BSON("_id" << sessionId.toBSON())},
+        std::move(readConcernBson));
+
+    if (!imageDoc) {
+        // If no image document with the corresponding 'sessionId' is found, we skip forging the
+        // no-op and rely on the retryable write mechanism to catch that no pre- or post- image
+        // exists.
+        LOGV2_DEBUG(580602,
+                    2,
+                    "Not forging no-op image oplog entry because no image document found with "
+                    "sessionId",
+                    "sessionId"_attr = sessionId);
+    }
+
+    auto image = repl::ImageEntry::parse(IDLParserErrorContext("image entry"), imageDoc->toBson());
+
+    if (image.getTxnNumber() != oplogEntry.getTxnNumber()) {
+        // In our snapshot, fetch the current transaction number for a session. If that
+        // transaction number doesn't match what's found on the image lookup, it implies that
+        // the image is not the correct version for this oplog entry. We will not forge a noop
+        // from it.
+        LOGV2_DEBUG(
+            580603,
+            2,
+            "Not forging no-op image oplog entry because image document has a different txnNum",
+            "sessionId"_attr = oplogEntry.getSessionId(),
+            "expectedTxnNum"_attr = oplogEntry.getTxnNumber(),
+            "actualTxnNum"_attr = image.getTxnNumber());
+        return boost::none;
+    }
+
+    // Forge a no-op image entry to be returned.
+    repl::MutableOplogEntry forgedNoop;
+    forgedNoop.setSessionId(sessionId);
+    forgedNoop.setTxnNumber(*oplogEntry.getTxnNumber());
+    forgedNoop.setObject(image.getImage());
+    forgedNoop.setOpType(repl::OpTypeEnum::kNoop);
+    forgedNoop.setWallClockTime(oplogEntry.getWallClockTime());
+    forgedNoop.setNss(oplogEntry.getNss());
+    forgedNoop.setUuid(*oplogEntry.getUuid());
+    // TODO (SERVER-63976): TenantMigrationOplogApplier expects pre/post image noop oplog entries
+    // to have a statement id.
+    forgedNoop.setStatementIds({0});
+
+    // Set the opTime to be the findAndModify timestamp - 1. We guarantee that there will be no
+    // collisions because we always reserve an extra oplog slot when writing the retryable
+    // findAndModify entry on the primary.
+    forgedNoop.setOpTime(repl::OpTime(oplogEntry.getTimestamp() - 1, *oplogEntry.getTerm()));
+    return repl::OplogEntry{forgedNoop.toBSON()};
 }
+
 }  // namespace
 
 using OplogEntry = repl::OplogEntryBase;
@@ -142,81 +200,80 @@ DocumentSource::GetNextResult DocumentSourceFindAndModifyImageLookup::doGetNext(
 
 boost::optional<Document> DocumentSourceFindAndModifyImageLookup::_forgeNoopImageDoc(
     Document inputDoc, OperationContext* opCtx) {
-    const auto needsRetryImageVal =
-        inputDoc.getField(repl::OplogEntryBase::kNeedsRetryImageFieldName);
-    if (needsRetryImageVal.missing()) {
+    const auto inputOplogEntry = uassertStatusOK(repl::OplogEntry::parse(inputDoc.toBson()));
+    const auto sessionId = inputOplogEntry.getSessionId();
+    const auto txnNumber = inputOplogEntry.getTxnNumber();
+
+    if (!sessionId || !txnNumber) {
+        // This oplog entry cannot have a retry image.
         return boost::none;
     }
 
-    const auto inputDocBson = inputDoc.toBson();
-    const auto sessionIdBson = inputDocBson.getObjectField(OplogEntry::kSessionIdFieldName);
-    auto localImageCollInfo = pExpCtx->mongoProcessInterface->getCollectionOptions(
-        pExpCtx->opCtx, NamespaceString::kConfigImagesNamespace);
+    if (inputOplogEntry.isCrudOpType() && inputOplogEntry.getNeedsRetryImage()) {
+        // This is a CRUD oplog entry for a retryable write and it has a retry image.
+        if (const auto forgedNoopOplogEntry =
+                forgeNoopImageOplogEntry(opCtx, pExpCtx, inputOplogEntry)) {
+            const auto imageType = inputOplogEntry.getNeedsRetryImage();
+            const auto imageOpTime = forgedNoopOplogEntry->getOpTime();
 
-    // Extract the UUID from the collection information. We should always have a valid uuid
-    // here.
-    auto imageCollUUID = invariantStatusOK(UUID::parse(localImageCollInfo["uuid"]));
-    const auto& readConcernBson = repl::ReadConcernArgs::get(opCtx).toBSON();
-    auto imageDoc = pExpCtx->mongoProcessInterface->lookupSingleDocument(
-        pExpCtx,
-        NamespaceString::kConfigImagesNamespace,
-        imageCollUUID,
-        Document{BSON("_id" << sessionIdBson)},
-        std::move(readConcernBson));
+            // Downcovert the document for this CRUD oplog entry, and then stash it.
+            MutableDocument downConvertedDoc{inputDoc};
+            downConvertedDoc.remove(repl::OplogEntryBase::kNeedsRetryImageFieldName);
+            downConvertedDoc.setField(
+                imageType == repl::RetryImageEnum::kPreImage
+                    ? repl::OplogEntry::kPreImageOpTimeFieldName
+                    : repl::OplogEntry::kPostImageOpTimeFieldName,
+                Value{Document{
+                    {repl::OpTime::kTimestampFieldName.toString(), imageOpTime.getTimestamp()},
+                    {repl::OpTime::kTermFieldName.toString(), imageOpTime.getTerm()}}});
+            _stashedFindAndModifyDoc = downConvertedDoc.freeze();
 
-    if (!imageDoc) {
-        // If no image document with the corresponding 'sessionId' is found, we skip forging the
-        // no-op and rely on the retryable write mechanism to catch that no pre- or post- image
-        // exists.
-        LOGV2_DEBUG(
-            580602,
-            2,
-            "Not forging no-op image oplog entry because no image document found with sessionId",
-            "sessionId"_attr = sessionIdBson);
+            return Document{forgedNoopOplogEntry->getEntry().toBSON()};
+        }
         return boost::none;
+    } else if (inputOplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps &&
+               isInternalSessionForRetryableWrite(*sessionId)) {
+        // This is an applyOps oplog entry for a retryable internal transaction. Unpack its
+        // operations to see if it has a retry image.
+        const auto applyOpsCmdObj = inputOplogEntry.getOperationToApply();
+        const auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(applyOpsCmdObj);
+        auto operationDocs = applyOpsInfo.getOperations();
+
+        for (size_t i = 0; i < operationDocs.size(); i++) {
+            auto op = repl::DurableReplOperation::parse(
+                {"DocumentSourceFindAndModifyImageLookup::_forgeNoopImageDoc"}, operationDocs[i]);
+
+            if (const auto imageType = op.getNeedsRetryImage()) {
+                // This operation has a retry image.
+                if (const auto forgedNoopOplogEntry =
+                        forgeNoopImageOplogEntry(opCtx, pExpCtx, inputOplogEntry)) {
+                    const auto imageOpTime = forgedNoopOplogEntry->getOpTime();
+
+                    // Downcovert the document for this applyOps oplog entry by downcoverting this
+                    // operation, and then stash it.
+                    op.setNeedsRetryImage(boost::none);
+                    if (imageType == repl::RetryImageEnum::kPreImage) {
+                        op.setPreImageOpTime(imageOpTime);
+                    } else if (imageType == repl::RetryImageEnum::kPostImage) {
+                        op.setPostImageOpTime(imageOpTime);
+                    } else {
+                        MONGO_UNREACHABLE;
+                    }
+                    operationDocs[i] = op.toBSON();
+                    const auto downCovertedApplyOpsCmdObj = applyOpsCmdObj.addFields(
+                        BSON(repl::ApplyOpsCommandInfo::kOperationsFieldName << operationDocs));
+                    MutableDocument downConvertedDoc(inputDoc);
+                    downConvertedDoc.setField(repl::OplogEntry::kObjectFieldName,
+                                              Value{downCovertedApplyOpsCmdObj});
+                    _stashedFindAndModifyDoc = Document(downConvertedDoc.freeze());
+
+                    return Document{forgedNoopOplogEntry->getEntry().toBSON()};
+                }
+                return boost::none;
+            }
+        }
     }
 
-    auto image = repl::ImageEntry::parse(IDLParserErrorContext("image entry"), imageDoc->toBson());
-    const auto inputOplog = uassertStatusOK(repl::OplogEntry::parse(inputDocBson));
-    if (image.getTxnNumber() != inputOplog.getTxnNumber()) {
-        // In our snapshot, fetch the current transaction number for a session. If that
-        // transaction number doesn't match what's found on the image lookup, it implies that
-        // the image is not the correct version for this oplog entry. We will not forge a noop
-        // from it.
-        LOGV2_DEBUG(
-            580603,
-            2,
-            "Not forging no-op image oplog entry because image document has a different txnNum",
-            "sessionId"_attr = sessionIdBson,
-            "expectedTxnNum"_attr = inputOplog.getTxnNumber(),
-            "actualTxnNum"_attr = image.getTxnNumber());
-        return boost::none;
-    }
-
-    // Stash the 'findAndModify' document to return after downconverting it.
-    repl::OpTime imageOpTime(inputOplog.getTimestamp() - 1, *inputOplog.getTerm());
-    const auto docToStash =
-        downConvertFindAndModifyEntry(inputDoc,
-                                      imageOpTime,
-                                      repl::RetryImage_parse(IDLParserErrorContext("retry image"),
-                                                             needsRetryImageVal.getStringData()));
-    _stashedFindAndModifyDoc = docToStash;
-
-    // Forge a no-op image document to be returned.
-    repl::MutableOplogEntry forgedNoop;
-    forgedNoop.setSessionId(image.get_id());
-    forgedNoop.setTxnNumber(image.getTxnNumber());
-    forgedNoop.setObject(image.getImage());
-    forgedNoop.setOpType(repl::OpTypeEnum::kNoop);
-    forgedNoop.setWallClockTime(inputOplog.getWallClockTime());
-    forgedNoop.setNss(inputOplog.getNss());
-    forgedNoop.setUuid(*inputOplog.getUuid());
-
-    // Set the opTime to be the findAndModify timestamp - 1. We guarantee that there will be no
-    // collisions because we always reserve an extra oplog slot when writing the retryable
-    // findAndModify entry on the primary.
-    forgedNoop.setOpTime(repl::OpTime(imageOpTime.getTimestamp(), *inputOplog.getTerm()));
-    forgedNoop.setStatementIds({0});
-    return Document{forgedNoop.toBSON()};
+    return boost::none;
 }
 }  // namespace mongo
