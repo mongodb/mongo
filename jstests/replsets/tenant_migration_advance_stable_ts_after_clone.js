@@ -68,7 +68,7 @@ assert.soon(function() {
             }))
             .operationTime;
 
-    return bsonWoCompare(donorAdvancedStableTs, recipientHoldStableTs) >= 0;
+    return bsonWoCompare(donorAdvancedStableTs, recipientHoldStableTs) > 0;
 });
 assert.commandWorked(donorPrimary.adminCommand({fsync: 1}));
 
