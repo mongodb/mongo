@@ -52,14 +52,7 @@ function getIndexSpecByName(coll, indexName) {
     return indexes[0];
 }
 
-jsTestLog('Fail if db is not sharded.');
-assert.commandFailed(mongos.adminCommand({shardCollection: kDbName + '.foo', key: {_id: 1}}));
-
 assert.commandWorked(mongos.getDB(kDbName).foo.insert({a: 1, b: 1}));
-
-jsTestLog('Fail if db is not sharding enabled.');
-assert.commandFailed(mongos.adminCommand({shardCollection: kDbName + '.foo', key: {_id: 1}}));
-
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 
 jsTestLog('Verify wrong arguments errors.');

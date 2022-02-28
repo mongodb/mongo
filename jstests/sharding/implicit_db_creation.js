@@ -26,10 +26,7 @@ assert.commandWorked(testDB.bar.insert({y: 1}));
 assert.eq(testDBDoc, configDB.databases.findOne());
 
 st.s.adminCommand({enableSharding: 'foo'});
-const fooDBDoc = configDB.databases.findOne({_id: 'foo'});
-
-assert.neq(null, fooDBDoc);
-assert(fooDBDoc.partitioned);
+assert.neq(null, configDB.databases.findOne({_id: 'foo'}));
 
 const newShard = new ReplSetTest({nodes: 1});
 newShard.startSet({shardsvr: ""});

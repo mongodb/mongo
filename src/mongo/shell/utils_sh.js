@@ -750,63 +750,59 @@ function printShardingStatus(configDB, verbose) {
 
         output(2, tojsononeline(db, "", true));
 
-        if (db.partitioned) {
-            configDB.collections.find({_id: new RegExp("^" + RegExp.escape(db._id) + "\\.")})
-                .sort({_id: 1})
-                .forEach(function(coll) {
-                    // Checking for '!dropped' to ensure mongo shell compatibility with earlier
-                    // versions of the server
-                    if (!coll.dropped) {
-                        output(3, coll._id);
-                        output(4, "shard key: " + tojson(coll.key));
+        configDB.collections.find({_id: new RegExp("^" + RegExp.escape(db._id) + "\\.")})
+            .sort({_id: 1})
+            .forEach(function(coll) {
+                // Checking for '!dropped' to ensure mongo shell compatibility with earlier
+                // versions of the server
+                if (!coll.dropped) {
+                    output(3, coll._id);
+                    output(4, "shard key: " + tojson(coll.key));
+                    output(
+                        4,
+                        "unique: " + truthy(coll.unique) + nonBooleanNote("unique", coll.unique));
+                    output(4,
+                           "balancing: " + !truthy(coll.noBalance) +
+                               nonBooleanNote("noBalance", coll.noBalance));
+                    output(4, "chunks:");
+
+                    const chunksMatchPredicate =
+                        coll.hasOwnProperty("timestamp") ? {uuid: coll.uuid} : {ns: coll._id};
+
+                    res = configDB.chunks
+                              .aggregate({$match: chunksMatchPredicate},
+                                         {$group: {_id: "$shard", cnt: {$sum: 1}}},
+                                         {$project: {_id: 0, shard: "$_id", nChunks: "$cnt"}},
+                                         {$sort: {shard: 1}})
+                              .toArray();
+
+                    var totalChunks = 0;
+                    res.forEach(function(z) {
+                        totalChunks += z.nChunks;
+                        output(5, z.shard + "\t" + z.nChunks);
+                    });
+
+                    if (totalChunks < 20 || verbose) {
+                        configDB.chunks.find(chunksMatchPredicate)
+                            .sort({min: 1})
+                            .forEach(function(chunk) {
+                                output(4,
+                                       tojson(chunk.min) + " -->> " + tojson(chunk.max) +
+                                           " on : " + chunk.shard + " " + tojson(chunk.lastmod) +
+                                           " " + (chunk.jumbo ? "jumbo " : ""));
+                            });
+                    } else {
                         output(4,
-                               "unique: " + truthy(coll.unique) +
-                                   nonBooleanNote("unique", coll.unique));
-                        output(4,
-                               "balancing: " + !truthy(coll.noBalance) +
-                                   nonBooleanNote("noBalance", coll.noBalance));
-                        output(4, "chunks:");
-
-                        const chunksMatchPredicate =
-                            coll.hasOwnProperty("timestamp") ? {uuid: coll.uuid} : {ns: coll._id};
-
-                        res = configDB.chunks
-                                  .aggregate({$match: chunksMatchPredicate},
-                                             {$group: {_id: "$shard", cnt: {$sum: 1}}},
-                                             {$project: {_id: 0, shard: "$_id", nChunks: "$cnt"}},
-                                             {$sort: {shard: 1}})
-                                  .toArray();
-
-                        var totalChunks = 0;
-                        res.forEach(function(z) {
-                            totalChunks += z.nChunks;
-                            output(5, z.shard + "\t" + z.nChunks);
-                        });
-
-                        if (totalChunks < 20 || verbose) {
-                            configDB.chunks.find(chunksMatchPredicate)
-                                .sort({min: 1})
-                                .forEach(function(chunk) {
-                                    output(4,
-                                           tojson(chunk.min) + " -->> " + tojson(chunk.max) +
-                                               " on : " + chunk.shard + " " +
-                                               tojson(chunk.lastmod) + " " +
-                                               (chunk.jumbo ? "jumbo " : ""));
-                                });
-                        } else {
-                            output(
-                                4,
-                                "too many chunks to print, use verbose if you want to force print");
-                        }
-
-                        configDB.tags.find({ns: coll._id}).sort({min: 1}).forEach(function(tag) {
-                            output(4,
-                                   " tag: " + tag.tag + "  " + tojson(tag.min) + " -->> " +
-                                       tojson(tag.max));
-                        });
+                               "too many chunks to print, use verbose if you want to force print");
                     }
-                });
-        }
+
+                    configDB.tags.find({ns: coll._id}).sort({min: 1}).forEach(function(tag) {
+                        output(4,
+                               " tag: " + tag.tag + "  " + tojson(tag.min) + " -->> " +
+                                   tojson(tag.max));
+                    });
+                }
+            });
     });
 
     print(raw);
@@ -841,27 +837,21 @@ function printShardingSizes(configDB) {
     configDB.databases.find().sort({name: 1}).forEach(function(db) {
         output(2, tojson(db, "", true));
 
-        if (db.partitioned) {
-            configDB.collections.find({_id: new RegExp("^" + RegExp.escape(db._id) + "\.")})
-                .sort({_id: 1})
-                .forEach(function(coll) {
-                    output(3, coll._id + " chunks:");
-                    configDB.chunks.find({"ns": coll._id}).sort({min: 1}).forEach(function(chunk) {
-                        var out = saveDB.adminCommand({
-                            dataSize: coll._id,
-                            keyPattern: coll.key,
-                            min: chunk.min,
-                            max: chunk.max
-                        });
-                        delete out.millis;
-                        delete out.ok;
+        configDB.collections.find({_id: new RegExp("^" + RegExp.escape(db._id) + "\.")})
+            .sort({_id: 1})
+            .forEach(function(coll) {
+                output(3, coll._id + " chunks:");
+                configDB.chunks.find({"ns": coll._id}).sort({min: 1}).forEach(function(chunk) {
+                    var out = saveDB.adminCommand(
+                        {dataSize: coll._id, keyPattern: coll.key, min: chunk.min, max: chunk.max});
+                    delete out.millis;
+                    delete out.ok;
 
-                        output(4,
-                               tojson(chunk.min) + " -->> " + tojson(chunk.max) +
-                                   " on : " + chunk.shard + " " + tojson(out));
-                    });
+                    output(4,
+                           tojson(chunk.min) + " -->> " + tojson(chunk.max) +
+                               " on : " + chunk.shard + " " + tojson(out));
                 });
-        }
+            });
     });
 
     print(raw);

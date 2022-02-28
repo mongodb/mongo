@@ -56,7 +56,6 @@ selector:
   - jstests/sharding/range_deleter_interacts_correctly_with_refine_shard_key.js
   - jstests/sharding/remove1.js
   - jstests/sharding/rename_across_mongos.js
-  - jstests/sharding/shard1.js
   - jstests/sharding/shard2.js
   - jstests/sharding/shard3.js
   - jstests/sharding/shard_collection_basic.js

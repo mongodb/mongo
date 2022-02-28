@@ -40,3 +40,9 @@ feature_flags:
       description: Feature flag for enabling the new metrics for global indexes and resharding.
       cpp_varname: feature_flags::gFeatureFlagShardingDataTransformMetrics
       default: false
+  # TODO SERVER-63983: remove the following flag once 6.0 becomes lastLTS
+  featureFlagEnableShardingOptional:
+    description: "Feature flag for making enableSharding optional"
+    cpp_varname: feature_flags::gEnableShardingOptional
+    default: true
+    version: 6.0

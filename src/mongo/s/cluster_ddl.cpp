@@ -119,8 +119,7 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
 
 void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& request) {
     const auto& nss = request.getNamespace();
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-    const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.db()));
+    const auto dbInfo = createDatabase(opCtx, nss.db());
 
     auto cmdResponse = executeCommandAgainstDatabasePrimaryOrFirstShard(
         opCtx,
@@ -136,6 +135,7 @@ void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& r
     auto createCollResp = CreateCollectionResponse::parse(IDLParserErrorContext("createCollection"),
                                                           remoteResponse.data);
 
+    auto catalogCache = Grid::get(opCtx)->catalogCache();
     catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
         nss, createCollResp.getCollectionVersion(), dbInfo.primaryId());
 }

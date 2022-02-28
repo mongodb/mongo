@@ -37,7 +37,7 @@ namespace cluster {
 
 /**
  * Creates (or ensures that it is created) a database `dbName`, with `suggestedPrimaryId` as the
- * primary node and the `shardingEnabled` field set to true.
+ * primary node.
  */
 CachedDatabaseInfo createDatabase(OperationContext* opCtx,
                                   StringData dbName,

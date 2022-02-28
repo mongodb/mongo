@@ -5,7 +5,12 @@
 (function() {
 'use strict';
 
+load("jstests/libs/feature_flag_util.js");  // for FeatureFlagUtil.isEnabled
+
 var st = new ShardingTest({shards: 2});
+
+const isEnableShardingOptional =
+    FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'), "EnableShardingOptional");
 
 jsTest.log('enableSharding can run only against the admin database');
 {
@@ -23,7 +28,7 @@ jsTest.log('Cannot shard system databases except for the config db');
 jsTest.log('Cannot shard db with the name that just differ on case');
 {
     assert.commandWorked(st.s0.adminCommand({enableSharding: 'db'}));
-    assert.eq(st.s0.getDB('config').databases.findOne({_id: 'db'}).partitioned, true);
+    assert.eq(1, st.config.databases.countDocuments({_id: 'db'}));
     assert.commandFailedWithCode(st.s0.adminCommand({enableSharding: 'DB'}),
                                  ErrorCodes.DatabaseDifferCase);
 }
@@ -37,19 +42,24 @@ jsTest.log('Cannot shard invalid db name');
 jsTest.log('Attempting to shard already sharded database returns success');
 {
     assert.commandWorked(st.s0.adminCommand({enableSharding: 'db'}));
-    assert.eq(st.s0.getDB('config').databases.findOne({_id: 'db'}).partitioned, true);
+    assert.eq(1, st.config.databases.countDocuments({_id: 'db'}));
 }
 
-jsTest.log('Verify config.databases metadata');
+jsTest.log('Implicit db creation when writing to an unsharded collection');
 {
     assert.commandWorked(st.s0.getDB('unsharded').foo.insert({aKey: "aValue"}));
-    assert.eq(st.s0.getDB('config').databases.findOne({_id: 'unsharded'}).partitioned, false);
-    assert.commandWorked(st.s0.adminCommand({enableSharding: 'unsharded'}));
-    assert.eq(st.s0.getDB('config').databases.findOne({_id: 'unsharded'}).partitioned, true);
+    assert.eq(1, st.config.databases.countDocuments({_id: 'unsharded'}));
 }
 
 jsTest.log('Sharding a collection before enableSharding is called fails');
-{ assert.commandFailed(st.s0.adminCommand({shardCollection: 'TestDB.TestColl', key: {_id: 1}})); }
+{
+    const res = st.s.adminCommand({shardCollection: 'testdb.testcoll', key: {_id: 1}});
+    if (isEnableShardingOptional) {
+        assert.commandWorked(res);
+    } else {
+        assert.commandFailed(res);
+    }
+}
 
 jsTest.log('Cannot enable sharding on a database using a wrong shard name');
 {

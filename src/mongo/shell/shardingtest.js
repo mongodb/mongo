@@ -158,35 +158,6 @@ var ShardingTest = function(params) {
     }
 
     /**
-     * Checks whether the specified collection is sharded by consulting the config metadata.
-     */
-    function _isSharded(collName) {
-        var collName = "" + collName;
-        var dbName;
-
-        if (typeof collName.getCollectionNames == 'function') {
-            dbName = "" + collName;
-            collName = undefined;
-        }
-
-        if (dbName) {
-            var x = self.config.databases.findOne({_id: dbname});
-            if (x)
-                return x.partitioned;
-            else
-                return false;
-        }
-
-        if (collName) {
-            var x = self.config.collections.findOne({_id: collName});
-            if (x)
-                return true;
-            else
-                return false;
-        }
-    }
-
-    /**
      * Extends the ShardingTest class with the methods exposed by the sh utility class.
      */
     function _extendWithShMethods() {
@@ -709,9 +680,7 @@ var ShardingTest = function(params) {
             c = "" + collName;
         }
 
-        if (!_isSharded(dbName)) {
-            assert.commandWorked(this.s.adminCommand({enableSharding: dbName}));
-        }
+        assert.commandWorked(this.s.adminCommand({enableSharding: dbName}));
 
         var result = assert.commandWorked(this.s.adminCommand({shardcollection: c, key: key}));
 

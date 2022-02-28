@@ -167,13 +167,8 @@ var $config = (function() {
         var ns = db[collName].getFullName();
         var configDB = db.getSiblingDB('config');
 
-        // Sharding must be enabled on db.
-        var res = configDB.databases.findOne({_id: dbName});
-        var msg = 'db ' + dbName + ' must be sharded.';
-        assertAlways(res.partitioned, msg);
-
         // Sharding must be enabled on db[collName].
-        msg = 'collection ' + collName + ' must be sharded.';
+        var msg = 'collection ' + collName + ' must be sharded.';
         assertAlways.gte(findChunksUtil.findChunksByNs(configDB, ns).itcount(), 1, msg);
 
         for (var tid = 0; tid < this.threadCount; ++tid) {
