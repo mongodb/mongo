@@ -61,6 +61,7 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/search_helper.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/cursor_response.h"
@@ -563,6 +564,9 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyEx
     } else {
         // Mark that this query uses DocumentSource.
         curOp->debug().documentSourceUsed = true;
+
+        getSearchHelpers(expCtx->opCtx->getServiceContext())
+            ->injectSearchShardFiltererIfNeeded(pipeline.get());
 
         // Complete creation of the initial $cursor stage, if needed.
         PipelineD::attachInnerQueryExecutorToPipeline(collections,

@@ -229,6 +229,13 @@ public:
         return _variablesParseState;
     }
 
+    const Pipeline::SourceContainer* getSubPipeline() const final {
+        tassert(6080015,
+                "$lookup expected to have a resolved pipeline, but didn't",
+                _resolvedIntrospectionPipeline);
+        return &_resolvedIntrospectionPipeline->getSources();
+    }
+
     std::unique_ptr<Pipeline, PipelineDeleter> getSubPipeline_forTest(const Document& inputDoc) {
         return buildPipeline(inputDoc);
     }

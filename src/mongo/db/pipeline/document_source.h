@@ -649,6 +649,14 @@ public:
         return false;
     }
 
+    /**
+     * For stages that have sub-pipelines returns the source container holding the stages of that
+     * pipeline. Otherwise returns a nullptr.
+     */
+    virtual const Pipeline::SourceContainer* getSubPipeline() const {
+        return nullptr;
+    }
+
 protected:
     DocumentSource(StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 

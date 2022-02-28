@@ -2396,7 +2396,7 @@ void ExpressionFieldPath::_doAddDependencies(DepsTracker* deps) const {
         } else {
             deps->fields.insert(_fieldPath.tail().fullPath());
         }
-    } else if (Variables::isUserDefinedVariable(_variable)) {
+    } else {
         deps->vars.insert(_variable);
     }
 }

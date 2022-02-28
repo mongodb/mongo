@@ -381,11 +381,26 @@ Value DocumentSourceUnionWith::serialize(boost::optional<ExplainOptions::Verbosi
     }
 }
 
+// Extracting dependencies for the outer collection. Although, this method walks the inner pipeline,
+// the field dependencies are not collected - only variable dependencies are.
 DepsTracker::State DocumentSourceUnionWith::getDependencies(DepsTracker* deps) const {
-    // Since the $unionWith stage is a simple passthrough, we *could* report SEE_NEXT here in an
-    // attempt to get a covered plan for the base collection. The ideal solution would involve
-    // pushing down any dependencies to the inner pipeline as well.
-    return DepsTracker::State::NOT_SUPPORTED;
+    if (!_pipeline) {
+        return DepsTracker::State::SEE_NEXT;
+    }
+
+    // We only need to know what variable dependencies exist in the subpipeline. So without
+    // knowledge of what metadata is in fact unavailable, we "lie" and say that all metadata
+    // is available to avoid tripping any assertions.
+    DepsTracker subDeps(DepsTracker::kNoMetadata);
+    // Get the subpipeline dependencies.
+    for (auto&& source : _pipeline->getSources()) {
+        source->getDependencies(&subDeps);
+    }
+    // Add sub-pipeline variable dependencies. Do not add field dependencies, since these refer
+    // to the fields from the foreign collection rather than the local collection.
+    deps->vars.insert(subDeps.vars.begin(), subDeps.vars.end());
+
+    return DepsTracker::State::SEE_NEXT;
 }
 
 void DocumentSourceUnionWith::detachFromOperationContext() {

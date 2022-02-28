@@ -364,13 +364,13 @@ TEST_F(DocumentSourceUnionWithTest, DependencyAnalysisReportsFullDoc) {
     const auto unionWith = make_intrusive<DocumentSourceUnionWith>(
         expCtx, Pipeline::create(std::list<boost::intrusive_ptr<DocumentSource>>{}, expCtx));
 
-    // With the $unionWith *before* the $replaceRoot, the dependency analysis will report that all
-    // fields are needed.
+    // With the $unionWith *before* the $replaceRoot, the dependency analysis will report that some
+    // fields are needed
     auto pipeline = Pipeline::create({unionWith, replaceRoot}, expCtx);
 
     auto deps = pipeline->getDependencies(DepsTracker::kNoMetadata);
-    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSONObj());
-    ASSERT_TRUE(deps.needWholeDocument);
+    ASSERT_BSONOBJ_EQ(deps.toProjectionWithoutMetadata(), BSON("b" << 1 << "_id" << 0));
+    ASSERT_TRUE(!deps.needWholeDocument);
 }
 
 TEST_F(DocumentSourceUnionWithTest, DependencyAnalysisReportsReferencedFieldsBeforeUnion) {

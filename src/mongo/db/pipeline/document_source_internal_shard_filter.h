@@ -74,6 +74,17 @@ public:
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) override;
 
+    DepsTracker::State getDependencies(DepsTracker* deps) const {
+        // This stage doesn't use any variables.
+        if (_shardFilterer->isCollectionSharded()) {
+            const BSONObj& keyPattern = _shardFilterer->getKeyPattern().toBSON();
+            for (BSONElement elem : keyPattern) {
+                deps->fields.insert(elem.fieldName());
+            }
+        }
+        return DepsTracker::State::SEE_NEXT;
+    }
+
 private:
     GetNextResult doGetNext() override;
 

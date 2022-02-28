@@ -140,6 +140,13 @@ public:
 
     boost::intrusive_ptr<DocumentSource> clone() const final;
 
+    const Pipeline::SourceContainer* getSubPipeline() const final {
+        if (_pipeline) {
+            return &_pipeline->getSources();
+        }
+        return nullptr;
+    }
+
 protected:
     GetNextResult doGetNext() final;
 
