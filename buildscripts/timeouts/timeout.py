@@ -1,11 +1,10 @@
 """Timeout information for generating tasks."""
 import math
 from datetime import timedelta
-from inspect import getframeinfo, currentframe
+from inspect import currentframe, getframeinfo
 from typing import NamedTuple, Optional
 
 import structlog
-
 from buildscripts.patch_builds.task_generation import TimeoutInfo
 
 LOGGER = structlog.getLogger(__name__)

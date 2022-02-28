@@ -1,6 +1,7 @@
 """Functions for working with resmoke task names."""
 
 import math
+import re
 
 GEN_SUFFIX = "_gen"
 
@@ -35,4 +36,26 @@ def remove_gen_suffix(task_name: str) -> str:
     """
     if task_name.endswith(GEN_SUFFIX):
         return task_name[:-4]
+    return task_name
+
+
+def determine_task_base_name(task_name: str, build_variant: str) -> str:
+    """
+    Determine the base name of a task.
+
+    For generated tasks the base name will have the build variant and sub-task index
+    stripped off. For other tasks, it is the unmodified task_name.
+
+    :param task_name: Name of task to get base name of.
+    :param build_variant: Build variant that may be included in task name.
+    :return: Base name of given task.
+    """
+    match = re.match(f"(.*)_([0-9]+|misc)_{build_variant}", task_name)
+    if match:
+        return match.group(1)
+
+    match = re.match(r"(.*)_([0-9]+|misc)", task_name)
+    if match:
+        return match.group(1)
+
     return task_name

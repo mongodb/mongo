@@ -1,0 +1,93 @@
+# This file defines timeouts in evergreen that will override the default timeouts.
+#
+# Each key under `overrides` provides the build variant where the override will occur. The
+# override should include the `task` that should have its timeout overridden and either the
+# `exec_timeout` to override or the `idle_timeout` to override.
+#
+# The timeouts should be specified in minutes.
+
+# Note: In order to make it easier to find existing entries, please try to keep the build variants
+# in alphabetical order.
+
+overrides:
+  enterprise-macos:
+  - task: replica_sets_jscore_passthrough
+    exec_timeout: 150  # 2.5 hours
+
+  enterprise-rhel-80-64-bit-coverage:
+  - task: replica_sets_jscore_passthrough
+    exec_timeout: 150  # 2.5 hours.
+
+  enterprise-ubuntu2004-debug-tsan:
+  - task: run_unittests
+    exec_timeout: 24
+
+  enterprise-windows:
+  - task: replica_sets_jscore_passthrough
+    exec_timeout: 180  # 3 hours.
+
+  enterprise-windows-all-feature-flags-suggested:
+  - task: replica_sets_jscore_passthrough
+    exec_timeout: 180  # 3 hours.
+  - task: replica_sets_update_v1_oplog_jscore_passthrough
+    exec_timeout: 150  # 2.5 hours.
+
+  enterprise-windows-inmem:
+  - task: replica_sets_jscore_passthrough
+    exec_timeout: 180  # 3 hours.
+
+  enterprise-windows-required:
+  - task: replica_sets_jscore_passthrough
+    exec_timeout: 180  # 3 hours.
+  - task: replica_sets_update_v1_oplog_jscore_passthrough
+    exec_timeout: 150  # 2.5 hours.
+
+  linux-64-debug:
+  - task: auth
+    exec_timeout: 60  # 1 hour.
+
+  linux-64-debug-repeated-execution:
+  - task: run_unittests
+    exec_timeout: 120  # 2 hours.
+
+  macos:
+  - task: replica_sets_jscore_passthrough
+    exec_timeout: 150  # 2.5 hours
+
+  ubuntu1804-asan:
+  - task: run_unittests
+    exec_timeout: 24
+
+  ubuntu1804-debug-asan:
+  - task: run_unittests
+    exec_timeout: 24
+
+  ubuntu1804-debug-aubsan-lite:
+  - task: run_unittests
+    exec_timeout: 24
+
+  ubuntu1804-debug-ubsan:
+  - task: run_unittests
+    exec_timeout: 24
+
+  ubuntu1804-debug-suggested:
+  - task: replica_sets_jscore_passthrough
+    exec_timeout: 180  # 3 hours.
+
+  ubuntu1804-ubsan:
+  - task: run_unittests
+    exec_timeout: 24
+
+  windows:
+  - task: replica_sets
+    exec_timeout: 180  # 3 hours.
+  - task: replica_sets_jscore_passthrough
+    exec_timeout: 150  # 2.5 hours.
+
+  windows-debug-suggested:
+  - task: replica_sets_initsync_jscore_passthrough
+    exec_timeout: 150  # 2.5 hours.
+  - task: replica_sets_jscore_passthrough
+    exec_timeout: 180  # 3 hours.
+  - task: replica_sets_update_v1_oplog_jscore_passthrough
+    exec_timeout: 150  # 2.5 hours.

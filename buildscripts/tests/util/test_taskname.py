@@ -4,7 +4,7 @@ import unittest
 
 import buildscripts.util.taskname as under_test
 
-# pylint: disable=missing-docstring,protected-access
+# pylint: disable=missing-docstring,protected-access,invalid-name
 
 
 class TestNameTask(unittest.TestCase):
@@ -24,3 +24,29 @@ class TestRemoveGenSuffix(unittest.TestCase):
         input_task_name = "sharded_multi_stmt_txn_jscore_passthroug"
         self.assertEqual("sharded_multi_stmt_txn_jscore_passthroug",
                          under_test.remove_gen_suffix(input_task_name))
+
+
+class TestDetermineTaskBaseName(unittest.TestCase):
+    def test_task_name_with_build_variant_should_strip_bv_and_sub_task_index(self):
+        bv = "enterprise-rhel-80-64-bit-dynamic-required"
+        task_name = f"auth_23_{bv}"
+
+        base_task_name = under_test.determine_task_base_name(task_name, bv)
+
+        self.assertEqual("auth", base_task_name)
+
+    def test_task_name_without_build_variant_should_strip_sub_task_index(self):
+        bv = "enterprise-rhel-80-64-bit-dynamic-required"
+        task_name = "auth_314"
+
+        base_task_name = under_test.determine_task_base_name(task_name, bv)
+
+        self.assertEqual("auth", base_task_name)
+
+    def test_task_name_without_build_variant_or_subtask_index_should_self(self):
+        bv = "enterprise-rhel-80-64-bit-dynamic-required"
+        task_name = "auth"
+
+        base_task_name = under_test.determine_task_base_name(task_name, bv)
+
+        self.assertEqual("auth", base_task_name)
