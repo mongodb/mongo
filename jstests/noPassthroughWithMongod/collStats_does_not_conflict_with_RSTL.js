@@ -27,18 +27,21 @@ let rstlXLockSleepJoin = startParallelShell(() => {
                                  ErrorCodes.Interrupted);
 }, testDB.getMongo().port);
 
-jsTestLog("Waiting for the sleep command to start & take locks on the server");
-const sleepID = waitForCommand(
+jsTestLog("Waiting for the sleep command to start and fetch the opID");
+const sleepCmdOpID = waitForCommand(
     "sleepCmd",
     op => (op["ns"] == "admin.$cmd" && op["command"]["$comment"] == "RSTL lock sleep"),
     testDB.getSiblingDB("admin"));
+
+jsTestLog("Wait for the sleep command to log that the RSTL MODE_X lock was acquired");
+checkLog.containsJson(testDB, 6001600);
 
 try {
     jsTestLog("Running collStats concurrently with the RSTL X lock");
     assert.commandWorked(testDB.runCommand({collStats: collName, maxTimeMS: 20 * 1000}));
 } finally {
     jsTestLog("Ensure the sleep cmd releases the lock so that the server can shutdown");
-    assert.commandWorked(testDB.getSiblingDB("admin").killOp(sleepID));  // kill the sleep cmd
+    assert.commandWorked(testDB.getSiblingDB("admin").killOp(sleepCmdOpID));  // kill the sleep cmd
     rstlXLockSleepJoin();  // wait for the thread running the sleep cmd to finish
 }
 })();

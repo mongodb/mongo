@@ -229,11 +229,18 @@ public:
         result.append("latestOptime", replCoord->getMyLastAppliedOpTime().getTimestamp());
 
         auto earliestOplogTimestampFetch = [&] {
-            AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
-            if (!oplogRead.getCollection()) {
+            auto oplog = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
+                opCtx, NamespaceString::kRsOplogNamespace);
+            if (!oplog) {
                 return StatusWith<Timestamp>(ErrorCodes::NamespaceNotFound, "oplog doesn't exist");
             }
-            return oplogRead.getCollection()->getRecordStore()->getEarliestOplogTimestamp(opCtx);
+
+            Lock::GlobalLock globalLock(opCtx,
+                                        MODE_IS,
+                                        Date_t::max(),
+                                        Lock::InterruptBehavior::kThrow,
+                                        true /* skipRSTLLock */);
+            return oplog->getRecordStore()->getEarliestOplogTimestamp(opCtx);
         }();
 
         if (earliestOplogTimestampFetch.getStatus() == ErrorCodes::OplogOperationUnsupported) {
