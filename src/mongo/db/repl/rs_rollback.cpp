@@ -1032,8 +1032,9 @@ void dropCollection(OperationContext* opCtx,
 
         // Performs a collection scan and writes all documents in the collection to disk
         // in order to keep an archive of items that were rolled back.
+        // As we're holding a strong MODE_X lock we disallow yielding the lock.
         auto exec = InternalPlanner::collectionScan(
-            opCtx, &collection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+            opCtx, &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
         PlanExecutor::ExecState execState;
         try {
             BSONObj curObj;
