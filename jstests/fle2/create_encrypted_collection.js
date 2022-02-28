@@ -40,6 +40,12 @@ assert.commandFailedWithCode(
     6346401,
     "Create with encryptedFields and timeseries passed");
 
+assert.commandFailedWithCode(
+    dbTest.createCollection("basic",
+                            {capped: true, size: 100000, encryptedFields: sampleEncryptedFields}),
+    6367301,
+    "Create with encryptedFields and capped passed");
+
 assert.commandWorked(dbTest.createCollection("basic", {encryptedFields: sampleEncryptedFields}));
 
 const result = dbTest.getCollectionInfos({name: "basic"});

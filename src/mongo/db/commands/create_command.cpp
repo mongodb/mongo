@@ -176,6 +176,10 @@ public:
             }
 
             if (cmd.getEncryptedFields()) {
+                uassert(6367301,
+                        "Encrypted fields cannot be used with capped collections",
+                        !cmd.getCapped());
+
                 uassert(6346401,
                         "Encrypted fields cannot be used with views or timeseries collections",
                         !(cmd.getViewOn() || cmd.getTimeseries()));
