@@ -37,6 +37,8 @@ echo "Running CSFLE exported symbols test"
 expect='A MONGO_CSFLE_1.0
 T mongo_csfle_v1_analyze_query
 T mongo_csfle_v1_bson_free
+T mongo_csfle_v1_get_version
+T mongo_csfle_v1_get_version_str
 T mongo_csfle_v1_lib_create
 T mongo_csfle_v1_lib_destroy
 T mongo_csfle_v1_query_analyzer_create
