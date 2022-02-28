@@ -380,8 +380,7 @@ std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
             // we will bind the value to a slot above. However, in the event of a query that does
             // not use $search, but references SEARCH_META, we need to bind a value of 'missing' to
             // a slot so that the plan can run correctly.
-            auto [tag, val] = makeValue(Value());
-            env->registerSlot(name, tag, val, true, slotIdGenerator);
+            env->registerSlot(name, sbe::value::TypeTags::Nothing, 0, false, slotIdGenerator);
         }
     }
 
