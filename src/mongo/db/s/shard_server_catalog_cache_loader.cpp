@@ -159,11 +159,12 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
  */
 Status persistDbVersion(OperationContext* opCtx, const DatabaseType& dbt) {
     // Update the databases collection entry for 'dbName' in case there are any new updates.
-    Status status = updateShardDatabasesEntry(opCtx,
-                                              BSON(ShardDatabaseType::name() << dbt.getName()),
-                                              dbt.toBSON(),
-                                              BSONObj(),
-                                              true /*upsert*/);
+    Status status =
+        updateShardDatabasesEntry(opCtx,
+                                  BSON(ShardDatabaseType::kNameFieldName << dbt.getName()),
+                                  dbt.toBSON(),
+                                  BSONObj(),
+                                  true /*upsert*/);
     if (!status.isOK()) {
         return status;
     }
@@ -271,17 +272,6 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
                                       shardCollectionEntry.getAllowAutoSplit(),
                                       shardCollectionEntry.getAllowMigrations(),
                                       std::move(changedChunks)};
-}
-
-DatabaseType getPersistedDbMetadata(OperationContext* opCtx, StringData dbName) {
-    ShardDatabaseType shardDatabaseEntry = uassertStatusOK(readShardDatabasesEntry(opCtx, dbName));
-
-    DatabaseType dbt(shardDatabaseEntry.getDbName(),
-                     shardDatabaseEntry.getPrimary(),
-                     shardDatabaseEntry.getPartitioned(),
-                     shardDatabaseEntry.getDbVersion());
-
-    return dbt;
 }
 
 /**
@@ -784,7 +774,7 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
 StatusWith<DatabaseType> ShardServerCatalogCacheLoader::_runSecondaryGetDatabase(
     OperationContext* opCtx, StringData dbName) {
     forcePrimaryDatabaseRefreshAndWaitForReplication(opCtx, dbName);
-    return getPersistedDbMetadata(opCtx, dbName);
+    return readShardDatabasesEntry(opCtx, dbName);
 }
 
 StatusWith<DatabaseType> ShardServerCatalogCacheLoader::_schedulePrimaryGetDatabase(

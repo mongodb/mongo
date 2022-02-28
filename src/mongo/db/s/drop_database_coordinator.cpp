@@ -194,9 +194,9 @@ void DropDatabaseCoordinator::_clearDatabaseInfoOnPrimary(OperationContext* opCt
 void DropDatabaseCoordinator::_clearDatabaseInfoOnSecondaries(OperationContext* opCtx) {
     Status signalStatus = shardmetadatautil::updateShardDatabasesEntry(
         opCtx,
-        BSON(ShardDatabaseType::name() << _dbName),
+        BSON(ShardDatabaseType::kNameFieldName << _dbName),
         BSONObj(),
-        BSON(ShardDatabaseType::enterCriticalSectionCounter() << 1),
+        BSON(ShardDatabaseType::kEnterCriticalSectionCounterFieldName << 1),
         false /*upsert*/);
     uassert(ErrorCodes::OperationFailed,
             str::stream() << "Failed to persist critical section signal for "

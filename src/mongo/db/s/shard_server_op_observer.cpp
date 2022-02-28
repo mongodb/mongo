@@ -375,12 +375,12 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
 
         // Extract which database was updated
         std::string db;
-        fassert(
-            40478,
-            bsonExtractStringField(args.updateArgs->criteria, ShardDatabaseType::name.name(), &db));
+        fassert(40478,
+                bsonExtractStringField(
+                    args.updateArgs->criteria, ShardDatabaseType::kNameFieldName, &db));
 
         auto enterCriticalSectionCounterFieldNewVal = update_oplog_entry::extractNewValueForField(
-            updateDoc, ShardDatabaseType::enterCriticalSectionCounter.name());
+            updateDoc, ShardDatabaseType::kEnterCriticalSectionCounterFieldName);
 
         if (enterCriticalSectionCounterFieldNewVal.ok()) {
             // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can
@@ -480,9 +480,9 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
 
         // Extract which database entry is being deleted from the _id field.
         std::string deletedDatabase;
-        fassert(
-            50772,
-            bsonExtractStringField(documentId, ShardDatabaseType::name.name(), &deletedDatabase));
+        fassert(50772,
+                bsonExtractStringField(
+                    documentId, ShardDatabaseType::kNameFieldName, &deletedDatabase));
 
         // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
         AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());

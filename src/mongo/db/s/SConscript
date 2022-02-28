@@ -122,7 +122,6 @@ env.Library(
         'start_chunk_clone_request.cpp',
         'type_shard_collection.cpp',
         'type_shard_collection.idl',
-        'type_shard_database.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',

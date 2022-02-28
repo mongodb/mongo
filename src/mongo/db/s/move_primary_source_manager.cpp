@@ -190,12 +190,12 @@ Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
     // time inclusive of the move primary config commit update from accessing secondary data.
     // Note: this write must occur after the critSec flag is set, to ensure the secondary refresh
     // will stall behind the flag.
-    Status signalStatus =
-        updateShardDatabasesEntry(opCtx,
-                                  BSON(ShardDatabaseType::name() << getNss().toString()),
-                                  BSONObj(),
-                                  BSON(ShardDatabaseType::enterCriticalSectionCounter() << 1),
-                                  false /*upsert*/);
+    Status signalStatus = updateShardDatabasesEntry(
+        opCtx,
+        BSON(ShardDatabaseType::kNameFieldName << getNss().toString()),
+        BSONObj(),
+        BSON(ShardDatabaseType::kEnterCriticalSectionCounterFieldName << 1),
+        false /*upsert*/);
     if (!signalStatus.isOK()) {
         return {
             ErrorCodes::OperationFailed,

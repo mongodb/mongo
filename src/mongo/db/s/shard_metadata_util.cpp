@@ -176,7 +176,7 @@ StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx, S
     try {
         DBDirectClient client(opCtx);
         FindCommandRequest findRequest{NamespaceString::kShardConfigDatabasesNamespace};
-        findRequest.setFilter(BSON(ShardDatabaseType::name() << dbName.toString()));
+        findRequest.setFilter(BSON(ShardDatabaseType::kNameFieldName << dbName.toString()));
         findRequest.setLimit(1);
         std::unique_ptr<DBClientCursor> cursor = client.find(std::move(findRequest));
         if (!cursor) {
@@ -193,15 +193,11 @@ StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx, S
         }
 
         BSONObj document = cursor->nextSafe();
-        auto statusWithDatabaseEntry = ShardDatabaseType::fromBSON(document);
-        if (!statusWithDatabaseEntry.isOK()) {
-            return statusWithDatabaseEntry.getStatus();
-        }
-
-        return statusWithDatabaseEntry.getValue();
+        return ShardDatabaseType::parse(IDLParserErrorContext("ShardDatabaseType"), document);
     } catch (const DBException& ex) {
-        return ex.toStatus(str::stream() << "Failed to read the '" << dbName.toString()
-                                         << "' entry locally from config.databases");
+        return ex.toStatus(str::stream()
+                           << "Failed to read the '" << dbName.toString() << "' entry locally from "
+                           << NamespaceString::kShardConfigDatabasesNamespace);
     }
 }
 
@@ -456,7 +452,7 @@ Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName) {
                 NamespaceString::kShardConfigDatabasesNamespace);
             deleteOp.setDeletes({[&] {
                 write_ops::DeleteOpEntry entry;
-                entry.setQ(BSON(ShardDatabaseType::name << dbName.toString()));
+                entry.setQ(BSON(ShardDatabaseType::kNameFieldName << dbName.toString()));
                 entry.setMulti(false);
                 return entry;
             }()});
