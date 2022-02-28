@@ -1036,7 +1036,7 @@ Status OplogFetcher::_checkRemoteOplogStart(const OplogFetcher::Documents& docum
 }
 
 Status OplogFetcher::_checkTooStaleToSyncFromSource(const OpTime lastFetched,
-                                                    const OpTime firstOpTimeInDocument) {
+                                                    const OpTime firstOpTimeInBatch) {
     // Check to see if the sync source's first oplog entry is later than 'lastFetched'. If it is, we
     // are too stale to sync from this node. If it isn't, we should go into rollback instead.
     BSONObj remoteFirstOplogEntry;
@@ -1082,8 +1082,8 @@ Status OplogFetcher::_checkTooStaleToSyncFromSource(const OpTime lastFetched,
     // If we are not too stale to sync from the source, we should go into rollback.
     std::string message =
         "the sync source's oplog and our oplog have diverged, going into rollback. our last optime "
-        "fetched: {}. source's GTE: {}"_format(lastFetched.toString(),
-                                               firstOpTimeInDocument.toString());
+        "fetched: {}. optime of first document in batch: {}. sync source's first optime: {}"_format(
+            lastFetched.toString(), firstOpTimeInBatch.toString(), remoteFirstOpTime.toString());
     return Status(ErrorCodes::OplogStartMissing, message);
 }
 
