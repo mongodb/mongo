@@ -20,7 +20,7 @@ import urllib3.util.retry as urllib3_retry
 from buildscripts.resmokelib.logging import flush
 from buildscripts.resmokelib import utils
 
-_TIMEOUT_SECS = 65
+_TIMEOUT_SECS = 55
 
 
 class BufferedHandler(logging.Handler):

@@ -7,8 +7,7 @@ from __future__ import annotations
 
 import datetime
 import distutils.spawn  # pylint: disable=no-name-in-module
-import re
-from typing import Set, List
+from typing import Set, List, Optional
 
 import yaml
 
@@ -363,6 +362,22 @@ class Variant(object):
         if san_options:
             return ASAN_SIGNATURE in san_options
         return False
+
+    @property
+    def idle_timeout_factor(self) -> Optional[float]:
+        """Get the value of idle_timeout_factor expansion or None if not found."""
+        factor = self.expansion("idle_timeout_factor")
+        if factor:
+            return float(factor)
+        return None
+
+    @property
+    def exec_timeout_factor(self) -> Optional[float]:
+        """Get the value of exec_timeout_factor expansion or None if not found."""
+        factor = self.expansion("exec_timeout_factor")
+        if factor:
+            return float(factor)
+        return None
 
 
 class VariantTask(Task):

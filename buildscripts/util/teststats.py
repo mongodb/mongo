@@ -116,7 +116,10 @@ class HistoricTestInfo(NamedTuple):
         """Get the average runtime of all the hooks associated with this test."""
         if not predicate:
             predicate = lambda _: True
-        return sum([hook.avg_duration for hook in self.hooks if predicate(hook)])
+        return sum([
+            hook.avg_duration * (hook.num_pass // (self.num_pass or hook.num_pass))
+            for hook in self.hooks if predicate(hook)
+        ])
 
     def total_test_runtime(self) -> float:
         """Get the average runtime of this test and it's non-task level hooks."""

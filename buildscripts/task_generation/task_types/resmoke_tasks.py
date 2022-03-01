@@ -5,6 +5,7 @@ import inject
 import structlog
 from shrub.v2 import Task, TaskDependency, FunctionCall
 
+from buildscripts.ciconfig.evergreen import EvergreenProjectConfig
 from buildscripts.resmokelib.multiversionconstants import REQUIRES_FCV_TAG
 from buildscripts.task_generation.constants import ARCHIVE_DIST_TEST_DEBUG_TASK, EXCLUDES_TAGS_FILE_PATH, \
     BACKPORT_REQUIRED_TAG, CONFIGURE_EVG_CREDENTIALS, RUN_GENERATED_TESTS
@@ -59,13 +60,16 @@ class ResmokeGenTaskService:
     """A service to generated split resmoke suites."""
 
     @inject.autoparams()
-    def __init__(self, gen_task_options: GenTaskOptions) -> None:
+    def __init__(self, gen_task_options: GenTaskOptions,
+                 evg_project_config: EvergreenProjectConfig) -> None:
         """
         Initialize the service.
 
         :param gen_task_options: Global options for how tasks should be generated.
+        :param evg_project_config: Configuration for Evergreen Project.
         """
         self.gen_task_options = gen_task_options
+        self.evg_project_config = evg_project_config
         self.multiversion_decorator = MultiversionGenTaskDecorator()  # pylint: disable=no-value-for-parameter
 
     def generate_tasks(self, generated_suite: GeneratedSuite,
@@ -138,8 +142,10 @@ class ResmokeGenTaskService:
                                                   task_name=suite.task_name, params=params)
 
         if timeout_est.is_specified():
+            build_variant = self.evg_project_config.get_variant(suite.build_variant)
             timeout_info = timeout_est.generate_timeout_cmd(
                 self.gen_task_options.is_patch, params.repeat_suites,
+                build_variant.idle_timeout_factor, build_variant.exec_timeout_factor,
                 self.gen_task_options.use_default_timeouts)
         else:
             timeout_info = self.gen_task_options.build_defualt_timeout()

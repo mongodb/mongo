@@ -10,26 +10,29 @@ from buildscripts.patch_builds.task_generation import TimeoutInfo
 
 LOGGER = structlog.getLogger(__name__)
 
-AVG_SETUP_TIME = int(timedelta(minutes=5).total_seconds())
+AVG_TASK_SETUP_TIME = int(timedelta(minutes=2).total_seconds())
 MIN_TIMEOUT_SECONDS = int(timedelta(minutes=5).total_seconds())
 MAX_EXPECTED_TIMEOUT = int(timedelta(hours=48).total_seconds())
+DEFAULT_SCALING_FACTOR = 3.0
 
 
-def calculate_timeout(avg_runtime: float, scaling_factor: int) -> int:
+def calculate_timeout(avg_runtime: float, scaling_factor: Optional[float] = None) -> int:
     """
     Determine how long a runtime to set based on average runtime and a scaling factor.
 
     :param avg_runtime: Average runtime of previous runs.
-    :param scaling_factor: scaling factor for timeout.
+    :param scaling_factor: Scaling factor for timeout.
     :return: timeout to use (in seconds).
     """
+
+    scaling_factor = DEFAULT_SCALING_FACTOR if not scaling_factor else scaling_factor
 
     def round_to_minute(runtime):
         """Round the given seconds up to the nearest minute."""
         distance_to_min = 60 - (runtime % 60)
         return int(math.ceil(runtime + distance_to_min))
 
-    return max(MIN_TIMEOUT_SECONDS, round_to_minute(avg_runtime)) * scaling_factor + AVG_SETUP_TIME
+    return max(MIN_TIMEOUT_SECONDS, round_to_minute(avg_runtime * scaling_factor))
 
 
 class TimeoutEstimate(NamedTuple):
@@ -47,43 +50,53 @@ class TimeoutEstimate(NamedTuple):
         """Determine if any specific timeout value has been specified."""
         return self.max_test_runtime is not None or self.expected_task_runtime is not None
 
-    def calculate_test_timeout(self, repeat_factor: int) -> Optional[int]:
+    def calculate_test_timeout(self, repeat_factor: int,
+                               scaling_factor: Optional[float] = None) -> Optional[int]:
         """
         Calculate the timeout to use for tests.
 
         :param repeat_factor: How many times the suite will be repeated.
+        :param scaling_factor: Scaling factor for timeout.
         :return: Timeout value to use for tests.
         """
         if self.max_test_runtime is None:
             return None
 
-        timeout = calculate_timeout(self.max_test_runtime, 3) * repeat_factor
+        timeout = calculate_timeout(self.max_test_runtime, scaling_factor) * repeat_factor
         LOGGER.debug("Setting timeout", timeout=timeout, max_runtime=self.max_test_runtime,
-                     factor=repeat_factor)
+                     repeat_factor=repeat_factor, scaling_factor=(scaling_factor
+                                                                  or DEFAULT_SCALING_FACTOR))
         return timeout
 
-    def calculate_task_timeout(self, repeat_factor: int) -> Optional[int]:
+    def calculate_task_timeout(self, repeat_factor: int,
+                               scaling_factor: Optional[float] = None) -> Optional[int]:
         """
         Calculate the timeout to use for tasks.
 
         :param repeat_factor: How many times the suite will be repeated.
+        :param scaling_factor: Scaling factor for timeout.
         :return: Timeout value to use for tasks.
         """
         if self.expected_task_runtime is None:
             return None
 
-        exec_timeout = calculate_timeout(self.expected_task_runtime, 3) * repeat_factor
+        exec_timeout = calculate_timeout(self.expected_task_runtime,
+                                         scaling_factor) * repeat_factor + AVG_TASK_SETUP_TIME
         LOGGER.debug("Setting exec_timeout", exec_timeout=exec_timeout,
-                     suite_runtime=self.expected_task_runtime, factor=repeat_factor)
+                     suite_runtime=self.expected_task_runtime, repeat_factor=repeat_factor,
+                     scaling_factor=(scaling_factor or DEFAULT_SCALING_FACTOR))
         return exec_timeout
 
-    def generate_timeout_cmd(self, is_patch: bool, repeat_factor: int,
-                             use_default: bool = False) -> TimeoutInfo:
+    def generate_timeout_cmd(
+            self, is_patch: bool, repeat_factor: int, test_timeout_factor: Optional[float] = None,
+            task_timeout_factor: Optional[float] = None, use_default: bool = False) -> TimeoutInfo:
         """
         Create the timeout info to use to create a timeout shrub command.
 
         :param is_patch: Whether the command is being created in a patch build.
         :param repeat_factor: How many times the suite will be repeated.
+        :param test_timeout_factor: Scaling factor for test timeout.
+        :param task_timeout_factor: Scaling factor for task timeout.
         :param use_default: Should the default timeout be used.
         :return: Timeout info for the task.
         """
@@ -91,8 +104,8 @@ class TimeoutEstimate(NamedTuple):
         if not self.is_specified or use_default:
             return TimeoutInfo.default_timeout()
 
-        test_timeout = self.calculate_test_timeout(repeat_factor)
-        task_timeout = self.calculate_task_timeout(repeat_factor)
+        test_timeout = self.calculate_test_timeout(repeat_factor, test_timeout_factor)
+        task_timeout = self.calculate_task_timeout(repeat_factor, task_timeout_factor)
 
         if is_patch and (test_timeout > MAX_EXPECTED_TIMEOUT
                          or task_timeout > MAX_EXPECTED_TIMEOUT):

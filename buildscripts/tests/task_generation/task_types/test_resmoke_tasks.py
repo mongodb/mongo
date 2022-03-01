@@ -2,8 +2,10 @@
 import unittest
 
 import inject
+from mock import MagicMock
 
 import buildscripts.task_generation.task_types.resmoke_tasks as under_test
+from buildscripts.ciconfig.evergreen import EvergreenProjectConfig, Variant
 from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
 from buildscripts.task_generation.suite_split import GeneratedSuite, SubSuite
 from buildscripts.task_generation.task_types.gentask_options import GenTaskOptions
@@ -63,6 +65,19 @@ def build_mock_suite(n_sub_suites, include_runtimes=True):
     )
 
 
+def build_mock_evg_project_config():
+    tasks = [{"name": "task name"}]
+    buildvariants = [{
+        "name": "build variant",
+        "tasks": tasks,
+    }]
+    project_conf = {
+        "buildvariants": buildvariants,
+        "tasks": tasks,
+    }
+    return EvergreenProjectConfig(project_conf)
+
+
 class TestGenerateTask(unittest.TestCase):
     def setUp(self) -> None:
         def dependencies(binder: inject.Binder) -> None:
@@ -74,8 +89,10 @@ class TestGenerateTask(unittest.TestCase):
         mock_gen_options = build_mock_gen_options()
         params = build_mock_gen_params(resmoke_args="resmoke_args --repeatSuites=5")
         suites = build_mock_suite(1, include_runtimes=False)
+        mock_evg_project_config = build_mock_evg_project_config()
 
-        resmoke_service = under_test.ResmokeGenTaskService(mock_gen_options)
+        resmoke_service = under_test.ResmokeGenTaskService(mock_gen_options,
+                                                           mock_evg_project_config)
         tasks = resmoke_service.generate_tasks(suites, params)
 
         for task in tasks:
@@ -94,8 +111,10 @@ class TestGenerateTask(unittest.TestCase):
         mock_gen_options = build_mock_gen_options()
         params = build_mock_gen_params(resmoke_args="resmoke_args --repeat=5")
         suites = build_mock_suite(1, include_runtimes=False)
+        mock_evg_project_config = build_mock_evg_project_config()
 
-        resmoke_service = under_test.ResmokeGenTaskService(mock_gen_options)
+        resmoke_service = under_test.ResmokeGenTaskService(mock_gen_options,
+                                                           mock_evg_project_config)
         tasks = resmoke_service.generate_tasks(suites, params)
 
         for task in tasks:
@@ -115,8 +134,10 @@ class TestGenerateTask(unittest.TestCase):
         mock_gen_options = build_mock_gen_options()
         params = build_mock_gen_params(repeat_suites=5)
         suites = build_mock_suite(n_sub_suites)
+        mock_evg_project_config = build_mock_evg_project_config()
 
-        resmoke_service = under_test.ResmokeGenTaskService(mock_gen_options)
+        resmoke_service = under_test.ResmokeGenTaskService(mock_gen_options,
+                                                           mock_evg_project_config)
         tasks = resmoke_service.generate_tasks(suites, params)
 
         self.assertEqual(n_sub_suites + 1, len(tasks))
@@ -133,8 +154,10 @@ class TestGenerateTask(unittest.TestCase):
         mock_gen_options = build_mock_gen_options()
         params = build_mock_gen_params()
         suites = build_mock_suite(1, include_runtimes=False)
+        mock_evg_project_config = build_mock_evg_project_config()
 
-        resmoke_service = under_test.ResmokeGenTaskService(mock_gen_options)
+        resmoke_service = under_test.ResmokeGenTaskService(mock_gen_options,
+                                                           mock_evg_project_config)
         tasks = resmoke_service.generate_tasks(suites, params)
 
         self.assertEqual(2, len(tasks))
@@ -147,8 +170,10 @@ class TestGenerateTask(unittest.TestCase):
         mock_gen_options = build_mock_gen_options(use_default_timeouts=True)
         params = build_mock_gen_params()
         suites = build_mock_suite(1)
+        mock_evg_project_config = build_mock_evg_project_config()
 
-        resmoke_service = under_test.ResmokeGenTaskService(mock_gen_options)
+        resmoke_service = under_test.ResmokeGenTaskService(mock_gen_options,
+                                                           mock_evg_project_config)
         tasks = resmoke_service.generate_tasks(suites, params)
 
         self.assertEqual(2, len(tasks))
@@ -161,8 +186,10 @@ class TestGenerateTask(unittest.TestCase):
         mock_gen_options = build_mock_gen_options(timeout_secs=300, exec_timeout_secs=150)
         params = build_mock_gen_params()
         suites = build_mock_suite(1, include_runtimes=False)
+        mock_evg_project_config = build_mock_evg_project_config()
 
-        resmoke_service = under_test.ResmokeGenTaskService(mock_gen_options)
+        resmoke_service = under_test.ResmokeGenTaskService(mock_gen_options,
+                                                           mock_evg_project_config)
         tasks = resmoke_service.generate_tasks(suites, params)
 
         self.assertEqual(2, len(tasks))

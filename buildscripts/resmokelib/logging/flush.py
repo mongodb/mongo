@@ -33,9 +33,9 @@ def stop_thread():
             raise ValueError("FlushThread hasn't been started")
 
     _FLUSH_THREAD.signal_shutdown()
-    # Wait for 5min instead of _FLUSH_THREAD.await_shutdown() because we can
+    # Wait for 1min instead of _FLUSH_THREAD.await_shutdown() because we can
     # sometimes wait indefinitely for a response, causing a task timeout.
-    _FLUSH_THREAD.join(5 * 60)
+    _FLUSH_THREAD.join(60)
 
     success = not _FLUSH_THREAD.is_alive()
     return success
