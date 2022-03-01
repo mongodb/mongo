@@ -7,6 +7,7 @@ mock <= 4.0.3
 shrub.py == 1.1.4
 ocspresponder == 0.5.0
 flask == 1.1.1
+itsdangerous == 2.0.0
 ocspbuilder == 0.10.2
 grpcio == 1.37.0; platform_machine == "x86_64" or platform_machine == "aarch64" or platform_machine == "arm64" or sys_platform == "win32"
 grpcio-tools == 1.37.0; platform_machine == "x86_64" or platform_machine == "aarch64" or platform_machine == "arm64" or sys_platform == "win32"
