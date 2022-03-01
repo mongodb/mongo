@@ -71,7 +71,8 @@ env.Library(
         "aead_encryption.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/matcher/expressions',
+        'fle_fields',
+        'sha_block_${MONGO_CRYPTO}',
         'symmetric_crypto',
     ],
 )
@@ -91,16 +92,27 @@ env.Library(
     target="fle_crypto",
     source=[
         "fle_crypto.cpp",
-        "fle_field_schema.idl",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
         'aead_encryption',
+        'fle_fields',
         'sha_block_${MONGO_CRYPTO}',
     ],
+)
+
+env.Library(
+    target="fle_fields",
+    source=[
+        "fle_field_schema.idl",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ]
 )
 
 env.CppUnitTest(

@@ -68,6 +68,11 @@ public:
         return _sub.get();
     }
 
+    void resetChild(size_t i, MatchExpression* other) final override {
+        tassert(6329410, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
+        _sub.reset(other);
+    }
+
     MatchCategory getCategory() const final {
         return MatchCategory::kOther;
     }

@@ -101,6 +101,12 @@ public:
         return _expression->getFilter();
     }
 
+    void resetChild(size_t i, MatchExpression* other) {
+        tassert(6329407, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
+        _expression->resetFilter(other);
+    };
+
+
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
     }

@@ -9,6 +9,7 @@ env.SConscript(
         "ce",
         "collation",
         "datetime",
+        "fle",
         'optimizer',
     ],
     exports=[
@@ -23,10 +24,12 @@ env.Library(
         "canonical_query_encoder.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/crypto/encrypted_field_config",
         "$BUILD_DIR/mongo/db/cst/cst",
         "$BUILD_DIR/mongo/db/matcher/expressions",
         "collation/collator_factory_interface",
         "collation/collator_interface",
+        "fle/server_rewrite",
         "projection_ast",
         "sort_pattern",
     ],
@@ -231,6 +234,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/crypto/fle_fields",
         "$BUILD_DIR/mongo/db/api_parameters",
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         "$BUILD_DIR/mongo/db/catalog/collection_catalog",

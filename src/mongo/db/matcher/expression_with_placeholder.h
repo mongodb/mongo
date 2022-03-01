@@ -88,6 +88,10 @@ public:
         return _filter.get();
     }
 
+    void resetFilter(MatchExpression* other) {
+        _filter.reset(other);
+    }
+
     std::unique_ptr<ExpressionWithPlaceholder> shallowClone() const {
         return std::make_unique<ExpressionWithPlaceholder>(_placeholder, _filter->shallowClone());
     }

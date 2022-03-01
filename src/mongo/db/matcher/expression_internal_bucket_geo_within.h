@@ -110,6 +110,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void resetChild(size_t, MatchExpression*) {
+        MONGO_UNREACHABLE;
+    };
+
     const std::string getField() const {
         return _field;
     }

@@ -64,6 +64,11 @@ public:
         return _expressions[i].get();
     }
 
+    void resetChild(size_t i, MatchExpression* other) override {
+        tassert(6329404, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
+        _expressions[i].reset(other);
+    }
+
     /*
      * Replaces the ith child with nullptr, and releases ownership of the child.
      */
@@ -272,6 +277,7 @@ public:
         return _exp.get();
     }
 
+
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
         return nullptr;
     }
@@ -280,7 +286,8 @@ public:
         return _exp.release();
     }
 
-    void resetChild(MatchExpression* newChild) {
+    void resetChild(size_t i, MatchExpression* newChild) {
+        tassert(6329405, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
         _exp.reset(newChild);
     }
 

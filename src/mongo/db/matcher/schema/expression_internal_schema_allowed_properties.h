@@ -158,6 +158,16 @@ public:
         return _patternProperties[i - 1].second->getFilter();
     }
 
+    virtual void resetChild(size_t i, MatchExpression* other) {
+        tassert(6329408, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
+
+        if (i == 0) {
+            _otherwise->resetFilter(other);
+        } else {
+            _patternProperties[i - 1].second->resetFilter(other);
+        }
+    }
+
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
     }

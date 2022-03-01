@@ -51,8 +51,85 @@ enums:
           kFLE2UnindexedEncryptedValue : 6 # see FLE2IndexedEqualityEncryptedValue
           kFLE2EqualityIndexedValue : 7
 
+    FleAlgorithmInt:
+        description: "The algorithm used to encrypt fields for field level encryption represented
+            as an unsigned integer."
+        type: int
+        values:
+            kDeterministic: 1
+            kRandom: 2
+
+    Fle2AlgorithmInt:
+        description: "The algorithm used to encrypt fields for field level encryption represented
+            as an unsigned integer."
+        type: int
+        values:
+            kUnindexed: 1
+            kEquality: 2
+
+    Fle2PlaceholderType:
+        description: "The type of payload to generate from a placeholder"
+        type: int
+        values:
+            kInsert: 1
+            kFind: 2
 
 structs:
+    EncryptionPlaceholder:
+        description: "Implements Encryption BinData (subtype 6) sub-subtype 0, the intent-to-encrypt
+            mapping. Contains a value to encrypt and a description of how it should be encrypted."
+        strict: true
+        fields:
+          a:
+            description: "The encryption algorithm to be used."
+            type: FleAlgorithmInt
+            cpp_name: algorithm
+          ki:
+            description: "Used to query the key vault by _id. If omitted, ka must be specified."
+            type: uuid
+            cpp_name: keyId
+            optional: true
+          ka:
+            description: "Used to query the key vault by keyAltName. If omitted,
+                ki must be specified."
+            type: string
+            cpp_name: keyAltName
+            optional: true
+          v:
+            description: "value to encrypt"
+            type: IDLAnyType
+            cpp_name: value
+
+    FLE2EncryptionPlaceholder:
+        description: "Implements Encryption BinData (subtype 6) sub-subtype 0, the intent-to-encrypt
+            mapping. Contains a value to encrypt and a description of how it should be encrypted."
+        strict: true
+        fields:
+          t:
+            description: "The type number, determines what payload to replace the placeholder with"
+            type: Fle2PlaceholderType
+            cpp_name: type
+          a:
+            description: "The encryption algorithm to be used."
+            type: Fle2AlgorithmInt
+            cpp_name: algorithm
+          ki:
+            description: "IndexKeyId, Used to query the key vault by _id."
+            type: uuid
+            cpp_name: indexKeyId
+          ku:
+            description: "UserKeyId, Used to query the key vault by _id.,
+              Typically same as IndexKeyId unless explicit encryption is used."
+            type: uuid
+            cpp_name: userKeyId
+          v:
+            description: "value to encrypt"
+            type: IDLAnyType
+            cpp_name: value
+          cm:
+            description: "FLE2 max contention counter"
+            type: long
+            cpp_name: maxContentionCounter
 
     FLE2InsertUpdatePayload:
         description: "Payload of an indexed field to insert or update"

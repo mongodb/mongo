@@ -94,6 +94,11 @@ public:
         return _expressions[i].get();
     }
 
+    void resetChild(size_t i, MatchExpression* other) override {
+        tassert(6329406, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
+        _expressions[i].reset(other);
+    }
+
     /**
      * The name of this MatchExpression.
      */

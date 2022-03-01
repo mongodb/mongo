@@ -38,6 +38,7 @@
 #include "mongo/config.h"
 #include "mongo/crypto/aead_encryption.h"
 #include "mongo/crypto/fle_data_frames.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"

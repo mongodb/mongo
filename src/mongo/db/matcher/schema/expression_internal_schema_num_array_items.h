@@ -33,6 +33,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/matcher/expression_array.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -60,6 +61,10 @@ public:
     }
 
     MatchExpression* getChild(size_t i) const final {
+        MONGO_UNREACHABLE;
+    }
+
+    void resetChild(size_t i, MatchExpression* other) override {
         MONGO_UNREACHABLE;
     }
 

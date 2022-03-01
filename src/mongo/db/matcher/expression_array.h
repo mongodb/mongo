@@ -104,6 +104,11 @@ public:
         return _sub.get();
     }
 
+    virtual void resetChild(size_t i, MatchExpression* other) {
+        tassert(6329401, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
+        _sub.reset(other);
+    }
+
     std::unique_ptr<MatchExpression> releaseChild() {
         return std::move(_sub);
     }
@@ -166,6 +171,11 @@ public:
         return _subs[i].get();
     }
 
+    virtual void resetChild(size_t i, MatchExpression* other) override {
+        tassert(6329402, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
+        _subs[i].reset(other);
+    }
+
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
     }
@@ -206,6 +216,10 @@ public:
 
     MatchExpression* getChild(size_t i) const override {
         return nullptr;
+    }
+
+    void resetChild(size_t i, MatchExpression* other) override {
+        tassert(6329403, "SizeMatchExpression does not have any children.", i < numChildren());
     }
 
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {

@@ -49,6 +49,8 @@
 
 namespace mongo {
 
+constexpr auto kSafeContent = "__safeContent__";
+
 using PrfBlock = std::array<std::uint8_t, 32>;
 using KeyMaterial = std::array<std::uint8_t, 32>;
 

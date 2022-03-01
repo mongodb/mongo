@@ -63,7 +63,6 @@
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/crypto/symmetric_key.h"
-#include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/idl/basic_types.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/object_check.h"
@@ -108,7 +107,6 @@ constexpr uint64_t kESCompactionRecordCountPlaceholder = 0;
 constexpr auto kId = "_id";
 constexpr auto kValue = "value";
 constexpr auto kFieldName = "fieldName";
-constexpr auto kSafeContent = "__safeContent__";
 
 using UUIDBuf = std::array<uint8_t, UUID::kNumBytes>;
 

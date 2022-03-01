@@ -27,16 +27,95 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/fle/server_rewrite.h"
-#include <memory>
 
+#include "mongo/db/query/fle/server_rewrite.h"
 namespace mongo::fle {
 
-/**
- * Placeholder function to make sure the compilation unit works.
- * TODO SERVER-63294: Turn this into an actual function.
- */
-std::unique_ptr<MatchExpression> rewriteMatchExpression(std::unique_ptr<MatchExpression> me) {
-    return me;
+std::unique_ptr<MatchExpression> FLEFindRewriter::rewriteMatchExpression(
+    std::unique_ptr<MatchExpression> expr) {
+    if (auto result = _rewrite(expr.get())) {
+        return result;
+    } else {
+        return expr;
+    }
 }
+
+// Rewrite the passed-in match expression in-place.
+std::unique_ptr<MatchExpression> FLEFindRewriter::_rewrite(MatchExpression* expr) {
+    switch (expr->matchType()) {
+        case MatchExpression::EQ:
+            return rewriteEq(std::move(static_cast<const EqualityMatchExpression*>(expr)));
+        case MatchExpression::MATCH_IN:
+            return rewriteIn(std::move(static_cast<const InMatchExpression*>(expr)));
+        case MatchExpression::AND:
+        case MatchExpression::OR:
+        case MatchExpression::NOT:
+        case MatchExpression::NOR:
+            for (size_t i = 0; i < expr->numChildren(); i++) {
+                auto child = expr->getChild(i);
+                if (auto newChild = _rewrite(child)) {
+                    expr->resetChild(i, newChild.release());
+                }
+            }
+            return nullptr;
+        default:
+            return nullptr;
+    }
+}
+
+BSONObj FLEFindRewriter::rewritePayloadAsTags(BSONElement fleFindPayload) {
+    return BSONObj();
+}
+
+std::unique_ptr<InMatchExpression> FLEFindRewriter::rewriteEq(const EqualityMatchExpression* expr) {
+    auto ffp = expr->getData();
+    if (!isFleFindPayload(ffp)) {
+        return nullptr;
+    }
+
+    auto obj = rewritePayloadAsTags(ffp);
+
+    auto tags = std::vector<BSONElement>();
+    obj.elems(tags);
+
+    auto inExpr = std::make_unique<InMatchExpression>(kSafeContent);
+    inExpr->setBackingBSON(std::move(obj));
+    auto status = inExpr->setEqualities(std::move(tags));
+    uassertStatusOK(status);
+    return inExpr;
+}
+
+std::unique_ptr<InMatchExpression> FLEFindRewriter::rewriteIn(const InMatchExpression* expr) {
+    auto backingBSONBuilder = BSONArrayBuilder();
+    size_t numFFPs = 0;
+    for (auto& eq : expr->getEqualities()) {
+        if (isFleFindPayload(eq)) {
+            auto obj = rewritePayloadAsTags(eq);
+            ++numFFPs;
+            for (auto&& elt : obj) {
+                backingBSONBuilder.append(elt);
+            }
+        }  // TODO: SERVER-63295 check for encrypted fields nested in objects.
+    }
+    if (numFFPs == 0) {
+        return nullptr;
+    }
+    // All elements in an encrypted $in expression should be FFPs.
+    uassert(
+        6329400,
+        "If any elements in a $in expression are encrypted, then all elements should be encrypted.",
+        numFFPs == expr->getEqualities().size());
+
+    auto backingBSON = backingBSONBuilder.arr();
+    auto allTags = std::vector<BSONElement>();
+    backingBSON.elems(allTags);
+
+    auto inExpr = std::make_unique<InMatchExpression>(kSafeContent);
+    inExpr->setBackingBSON(std::move(backingBSON));
+    auto status = inExpr->setEqualities(std::move(allTags));
+    uassertStatusOK(status);
+
+    return inExpr;
+}
+
 }  // namespace mongo::fle

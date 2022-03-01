@@ -33,6 +33,7 @@
 
 #include "mongo/db/query/canonical_query.h"
 
+#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/cst/cst_parser.h"
@@ -42,10 +43,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/fle/server_rewrite.h"
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/query_planner_common.h"
-
 namespace mongo {
 namespace {
 
@@ -132,6 +133,9 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     newExpCtx->stopExpressionCounters();
 
     std::unique_ptr<MatchExpression> me = std::move(statusWithMatcher.getValue());
+
+    // TODO: SERVER-64055 if encryptionInformation is present, rewrite MatchExpression FLE find
+    // payloads.
 
     Status initStatus =
         cq->init(opCtx,

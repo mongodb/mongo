@@ -33,6 +33,7 @@
 
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -80,6 +81,10 @@ public:
     }
 
     MatchExpression* getChild(size_t i) const final {
+        MONGO_UNREACHABLE;
+    }
+
+    void resetChild(size_t i, MatchExpression*) final override {
         MONGO_UNREACHABLE;
     }
 

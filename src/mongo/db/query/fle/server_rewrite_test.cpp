@@ -27,23 +27,265 @@
  *    it in the license file.
  */
 
+
 #include <memory>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/fle/server_rewrite.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "server_rewrite.h"
+
 
 namespace mongo {
 namespace {
 
-// Placeholder test for placeholder function to make sure compilation unit works.
-// TODO SERVER-63294: replace this unit test with tests that check the actual behavior.
-TEST(FLE2ServerRewrites, ServerRewriteIdentity) {
-    auto me = std::make_unique<EqualityMatchExpression>("_id"_sd, Value(1));
-    auto expected = EqualityMatchExpression("_id"_sd, Value(1));
-    auto result = fle::rewriteMatchExpression(std::move(me));
-    ASSERT_EQUALS(expected.path(), result->path());
+class MockFindRewriter : public fle::FLEFindRewriter {
+public:
+    MockFindRewriter() : fle::FLEFindRewriter(), _tags() {}
+
+    bool isFleFindPayload(const BSONElement& fleFindPayload) override {
+        return _encryptedFields.find(fleFindPayload.fieldNameStringData()) !=
+            _encryptedFields.end();
+    }
+
+    void setEncryptedTags(std::pair<StringData, int> fieldvalue, BSONObj tags) {
+        _encryptedFields.insert(fieldvalue.first);
+        _tags[fieldvalue] = tags;
+    }
+
+private:
+    BSONObj rewritePayloadAsTags(BSONElement fleFindPayload) override {
+        ASSERT(fleFindPayload.isNumber());  // Only accept numbers as mock FFPs.
+        ASSERT(_tags.find({fleFindPayload.fieldNameStringData(), fleFindPayload.Int()}) !=
+               _tags.end());
+        return _tags[{fleFindPayload.fieldNameStringData(), fleFindPayload.Int()}].copy();
+    };
+
+    std::map<std::pair<StringData, int>, BSONObj> _tags;
+    std::set<StringData> _encryptedFields;
+};
+class FLEServerRewriteTest : public unittest::Test {
+public:
+    FLEServerRewriteTest() {}
+
+    void setUp() override {}
+
+    void tearDown() override {}
+
+    std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& query) {
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
+        ASSERT_OK(result.getStatus());
+        std::unique_ptr<MatchExpression> expr;
+        result.getValue().swap(expr);
+        return expr;
+    }
+
+protected:
+    MockFindRewriter _mock;
+};
+
+TEST_F(FLEServerRewriteTest, NoFFP_Equality) {
+    auto match = fromjson("{ssn: '5'}");
+    auto expected = fromjson("{ssn: {$eq: '5'}}");
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, NoFFP_In) {
+    auto match = fromjson("{ssn: {$in: ['5', '6', '7']}}");
+    auto expected = fromjson("{ssn: {$in: ['5', '6', '7']}}");
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, TopLevel_Equality) {
+    auto match = fromjson("{ssn: 5}");
+    auto tags = BSON_ARRAY(1 << 2 << 3);
+
+    _mock.setEncryptedTags({"ssn", 5}, tags);
+    auto expected = BSON(kSafeContent << BSON("$in" << tags));
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, TopLevel_In) {
+    auto match = fromjson("{ssn: {$in: [2, 4, 6]}}");
+
+    // The key/value pairs that the mock functions use to determine the fake FFPs are inside an
+    // array, and so the keys are the index values and the values are the actual array elements.
+    _mock.setEncryptedTags({"0", 2}, BSON_ARRAY(1 << 2));
+    _mock.setEncryptedTags({"1", 4}, BSON_ARRAY(5 << 3));
+    _mock.setEncryptedTags({"2", 6}, BSON_ARRAY(99 << 100));
+
+    // Order doesn't matter in a disjunction.
+    auto expected = BSON(kSafeContent << BSON("$in" << BSON_ARRAY(1 << 2 << 3 << 5 << 99 << 100)));
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, TopLevel_Conjunction_BothEncrypted) {
+    auto match = fromjson("{$and: [{ssn: 5}, {age: 36}]}");
+    auto ssnTags = BSON_ARRAY(1 << 2 << 3);
+    auto ageTags = BSON_ARRAY(22 << 44 << 66);
+
+    _mock.setEncryptedTags({"ssn", 5}, ssnTags);
+    _mock.setEncryptedTags({"age", 36}, ageTags);
+    auto expected = BSON("$and" << BSON_ARRAY(BSON(kSafeContent << BSON("$in" << ssnTags))
+                                              << BSON(kSafeContent << BSON("$in" << ageTags))));
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, TopLevel_Conjunction_PartlyEncrypted) {
+    auto match = fromjson("{$and: [{ssn: 5}, {notSsn: 6}]}");
+    auto tags = BSON_ARRAY(1 << 2 << 3);
+
+    _mock.setEncryptedTags({"ssn", 5}, tags);
+    auto expected = BSON("$and" << BSON_ARRAY(BSON(kSafeContent << BSON("$in" << tags))
+                                              << BSON("notSsn" << BSON("$eq" << 6))));
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, TopLevel_CompoundEquality_PartlyEncrypted) {
+    auto match = fromjson("{ssn: 5, notSsn: 6}");
+    auto tags = BSON_ARRAY(1 << 2 << 3);
+
+    _mock.setEncryptedTags({"ssn", 5}, tags);
+    auto expected = BSON("$and" << BSON_ARRAY(BSON(kSafeContent << BSON("$in" << tags))
+                                              << BSON("notSsn" << BSON("$eq" << 6))));
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, TopLevel_Encrypted_Nested_Unencrypted) {
+    auto match = fromjson("{ssn: 5, user: {region: 'US'}}");
+    auto tags = BSON_ARRAY(1 << 2 << 3);
+
+    _mock.setEncryptedTags({"ssn", 5}, tags);
+    auto expected = BSON("$and" << BSON_ARRAY(BSON(kSafeContent << BSON("$in" << tags))
+                                              << BSON("user" << BSON("$eq" << BSON("region"
+                                                                                   << "US")))));
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, TopLevel_Not_Equality) {
+    auto match = fromjson("{ssn: {$not: {$eq: 5}}}");
+    auto tags = BSON_ARRAY(1 << 2 << 3);
+
+    _mock.setEncryptedTags({"ssn", 5}, tags);
+    auto expected = BSON(kSafeContent << BSON("$not" << BSON("$in" << tags)));
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, TopLevel_Neq) {
+    auto match = fromjson("{ssn: {$ne: 5}}");
+    auto tags = BSON_ARRAY(1 << 2 << 3);
+
+    _mock.setEncryptedTags({"ssn", 5}, tags);
+    auto expected = BSON(kSafeContent << BSON("$not" << BSON("$in" << tags)));
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+
+TEST_F(FLEServerRewriteTest, TopLevel_And_In) {
+    auto match = fromjson("{$and: [{ssn: {$in: [2, 4, 6]}}, {region: 'US'}]}");
+
+    _mock.setEncryptedTags({"0", 2}, BSON_ARRAY(1 << 2));
+    _mock.setEncryptedTags({"1", 4}, BSON_ARRAY(5 << 3));
+    _mock.setEncryptedTags({"2", 6}, BSON_ARRAY(99 << 100));
+
+    auto expected =
+        BSON("$and" << BSON_ARRAY(
+                 BSON(kSafeContent << BSON("$in" << BSON_ARRAY(1 << 2 << 3 << 5 << 99 << 100)))
+                 << BSON("region" << BSON("$eq"
+                                          << "US"))));
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, TopLevel_Nor_Equality) {
+    auto match = fromjson("{$nor: [{ssn: 5}]}");
+    auto tags = BSON_ARRAY(1 << 2 << 3);
+
+    _mock.setEncryptedTags({"ssn", 5}, tags);
+    auto expected = BSON("$nor" << BSON_ARRAY(BSON(kSafeContent << BSON("$in" << tags))));
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, TopLevel_Nor_Equality_WithUnencrypted) {
+    auto match = fromjson("{$nor: [{ssn: 5}, {region: 'US'}]}");
+    auto tags = BSON_ARRAY(1 << 2 << 3);
+
+    _mock.setEncryptedTags({"ssn", 5}, tags);
+    auto expected = BSON("$nor" << BSON_ARRAY(BSON(kSafeContent << BSON("$in" << tags))
+                                              << BSON("region" << BSON("$eq"
+                                                                       << "US"))));
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, TopLevel_Or_Equality_WithUnencrypted) {
+    auto match = fromjson("{$or: [{ssn: 5}, {region: 'US'}]}");
+    auto tags = BSON_ARRAY(1 << 2 << 3);
+
+    _mock.setEncryptedTags({"ssn", 5}, tags);
+    auto expected = BSON("$or" << BSON_ARRAY(BSON(kSafeContent << BSON("$in" << tags))
+                                             << BSON("region" << BSON("$eq"
+                                                                      << "US"))));
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, TopLevel_Not_In) {
+    auto match = fromjson("{ssn: {$not: {$in: [2, 4, 6]}}}");
+
+    _mock.setEncryptedTags({"0", 2}, BSON_ARRAY(1 << 2));
+    _mock.setEncryptedTags({"1", 4}, BSON_ARRAY(5 << 3));
+    _mock.setEncryptedTags({"2", 6}, BSON_ARRAY(99 << 100));
+
+    auto expected = BSON(
+        kSafeContent << BSON("$not" << BSON("$in" << BSON_ARRAY(1 << 2 << 3 << 5 << 99 << 100))));
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, TopLevel_Nin) {
+    auto match = fromjson("{ssn: {$nin: [2, 4, 6]}}");
+
+    _mock.setEncryptedTags({"0", 2}, BSON_ARRAY(1 << 2));
+    _mock.setEncryptedTags({"1", 4}, BSON_ARRAY(5 << 3));
+    _mock.setEncryptedTags({"2", 6}, BSON_ARRAY(99 << 100));
+
+    // Order doesn't matter in a disjunction.
+    auto expected = BSON(
+        kSafeContent << BSON("$not" << BSON("$in" << BSON_ARRAY(1 << 2 << 3 << 5 << 99 << 100))));
+
+    auto actual = _mock.rewriteMatchExpression(parseMatchExpression(match))->serialize();
+    ASSERT_BSONOBJ_EQ(actual, expected);
 }
 }  // namespace
 }  // namespace mongo

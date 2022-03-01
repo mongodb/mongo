@@ -41,6 +41,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
 
 namespace pcrecpp {
 class RE;
@@ -103,6 +104,11 @@ public:
     }
 
     MatchExpression* getChild(size_t i) const override {
+        MONGO_UNREACHABLE;
+    }
+
+
+    void resetChild(size_t, MatchExpression*) override {
         MONGO_UNREACHABLE;
     }
 

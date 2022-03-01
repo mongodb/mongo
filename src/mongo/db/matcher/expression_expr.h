@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_walker.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -89,6 +90,10 @@ public:
     MatchExpression* getChild(size_t i) const final {
         MONGO_UNREACHABLE;
     }
+
+    void resetChild(size_t, MatchExpression*) {
+        MONGO_UNREACHABLE;
+    };
 
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
         return nullptr;

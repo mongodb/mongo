@@ -82,6 +82,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void resetChild(size_t, MatchExpression*) override {
+        MONGO_UNREACHABLE;
+    }
+
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
         return nullptr;
     }

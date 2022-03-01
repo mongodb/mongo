@@ -90,6 +90,11 @@ public:
         return _expression->getFilter();
     }
 
+    void resetChild(size_t i, MatchExpression* other) final override {
+        tassert(6329409, "Out-of-bounds access to child of MatchExpression.", i < numChildren());
+        _expression->resetFilter(other);
+    }
+
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
     }
