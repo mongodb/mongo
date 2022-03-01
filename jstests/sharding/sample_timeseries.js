@@ -156,7 +156,8 @@ function containsDocs(actualDocs, expectedDocs) {
 const randomCursor = "COLLSCAN";
 const topK = "UNPACK_BUCKET";
 const arhash = "QUEUED_DATA";
-function assertPlanForSampleOnShard({root, planName}) {
+
+function checkShardPlanHasStage({root, planName}) {
     // The plan should only contain a TRIAL stage if we had to evaluate whether an ARHASH or Top-K
     // plan was best.
     const hasTrialStage = planHasStage(testDB, root, "TRIAL");
@@ -166,23 +167,27 @@ function assertPlanForSampleOnShard({root, planName}) {
         assert(hasTrialStage, root);
     }
 
-    // Ensure the plan contains the stage we expect to see for that plan.
-    assert(planHasStage(testDB, root, planName), root);
     if (planName !== arhash) {
         // The plan should always filter out orphans, but we only see this stage in the top-K case.
         assert(planHasStage(testDB, root, "SHARDING_FILTER"), root);
     }
+
+    return planHasStage(testDB, root, planName);
 }
 
-function assertPlanForSample({explainRes, planForShards}) {
-    const shardsExplain = explainRes.shards;
+function assertPlanForSample({explainResults, expectedPlan}) {
     for (const shardName of [primary.shardName, otherShard.shardName]) {
-        const root = shardsExplain[shardName].stages[0].$cursor;
-        assertPlanForSampleOnShard({root, planName: planForShards[shardName]});
+        let shardHasPlan = false;
+        for (const explainRes of explainResults) {
+            const shardsExplain = explainRes.shards;
+            const root = shardsExplain[shardName].stages[0].$cursor;
+            shardHasPlan = shardHasPlan || checkShardPlanHasStage({root, planName: expectedPlan});
+        }
+        assert(shardHasPlan, {shardName: shardName, explain: explainResults});
     }
 }
 
-function testPipeline({pipeline, expectedDocs, expectedCount, shardsTargetedCount, planForShards}) {
+function testPipeline({pipeline, expectedDocs, expectedCount, shardsTargetedCount, expectedPlan}) {
     // Restart profiling.
     for (const db of [primaryDB, otherShardDB]) {
         db.setProfilingLevel(0);
@@ -194,9 +199,15 @@ function testPipeline({pipeline, expectedDocs, expectedCount, shardsTargetedCoun
     const result = testColl.aggregate(pipeline).toArray();
 
     // Verify plan used.
-    if (planForShards) {
-        const explainRes = testColl.explain().aggregate(pipeline);
-        assertPlanForSample({explainRes, planForShards});
+    if (expectedPlan) {
+        // The ARHash plan is probabilistic. We may not always pick the plan. So we run the explain
+        // command three times to increase the chance of the plan getting picked.
+        const numInteration = (expectedPlan == arhash) ? 3 : 1;
+        const explainResults = [];
+        for (let i = 0; i < numInteration; ++i) {
+            explainResults.push(testColl.explain().aggregate(pipeline));
+        }
+        assertPlanForSample({explainResults, expectedPlan});
     }
 
     if (expectedCount) {
@@ -245,15 +256,15 @@ const projection = {
  *  4. Sample the given 'proportion' of non-Dublin (Galway, Cork) documents, which can be found on
  * both shards, and ensure we target both shards.
  */
-function runTest({proportion, planForShards, generateAdditionalData}) {
+function runTest({proportion, expectedPlan, generateAdditionalData}) {
     const expectedDocs = setUpTestColl(generateAdditionalData);
 
     let expectedCount = Math.floor(proportion * Object.keys(expectedDocs).length);
     jsTestLog("Running test with proportion: " + proportion + ", expected count: " + expectedCount +
-              ", expected plan: " + tojson(planForShards));
+              ", expected plan: " + tojson(expectedPlan));
 
     let pipeline = [{$sample: {size: expectedCount}}, projection];
-    testPipeline({pipeline, expectedDocs, expectedCount, shardsTargetedCount: 2, planForShards});
+    testPipeline({pipeline, expectedDocs, expectedCount, shardsTargetedCount: 2, expectedPlan});
 
     expectedCount = 1;
     pipeline = [{$sample: {size: expectedCount}}, projection];
@@ -379,14 +390,14 @@ runTest({
     generateAdditionalData: () => {
         return insertAdditionalData(false);
     },
-    planForShards: {[primary.shardName]: arhash, [otherShard.shardName]: arhash},
+    expectedPlan: arhash
 });
 runTest({
     proportion: 0.005,
     generateAdditionalData: () => {
         return insertAdditionalData(true);
     },
-    planForShards: {[primary.shardName]: topK, [otherShard.shardName]: topK},
+    expectedPlan: topK
 });
 
 // Top-K plan without the trail stage.
@@ -395,7 +406,7 @@ runTest({
     generateAdditionalData: () => {
         return insertAdditionalData(false);
     },
-    planForShards: {[primary.shardName]: randomCursor, [otherShard.shardName]: randomCursor},
+    expectedPlan: randomCursor,
 });
 
 // Verify that for a sample size > 1000, we pick the Top-K sort plan without any trial.
@@ -407,10 +418,7 @@ testPipeline({
     expectedCount: 1001,
     expectedDocs: expectedDocs,
     shardsTargetedCount: 2,
-    planForShards: {
-        [primary.shardName]: randomCursor,
-        [otherShard.shardName]: randomCursor,
-    }
+    expectedPlan: randomCursor
 });
 
 st.stop();
