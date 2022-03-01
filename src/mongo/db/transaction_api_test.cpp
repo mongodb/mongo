@@ -30,15 +30,18 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/error_labels.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/transaction_api.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/is_mongos.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/executor_test_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -177,6 +180,47 @@ private:
 
 namespace {
 
+LogicalSessionId getLsid(BSONObj obj) {
+    auto osi = OperationSessionInfo::parse("assertSessionIdMetadata"_sd, obj);
+    ASSERT(osi.getSessionId());
+    return *osi.getSessionId();
+}
+
+// TODO SERVER-64017: Make these consistent with the unified terms for internal sessions.
+enum class LsidAssertion {
+    kStandalone,
+    kNonRetryableChild,
+    kRetryableChild,
+};
+void assertSessionIdMetadata(BSONObj obj,
+                             LsidAssertion lsidAssert,
+                             boost::optional<LogicalSessionId> parentLsid = boost::none,
+                             boost::optional<TxnNumber> parentTxnNumber = boost::none) {
+    auto lsid = getLsid(obj);
+
+    switch (lsidAssert) {
+        case LsidAssertion::kStandalone:
+            ASSERT(!getParentSessionId(lsid));
+            break;
+        case LsidAssertion::kNonRetryableChild:
+            invariant(parentLsid);
+
+            ASSERT(getParentSessionId(lsid));
+            ASSERT_EQ(*getParentSessionId(lsid), *parentLsid);
+            ASSERT(isInternalSessionForNonRetryableWrite(lsid));
+            break;
+        case LsidAssertion::kRetryableChild:
+            invariant(parentTxnNumber);
+
+            ASSERT(getParentSessionId(lsid));
+            ASSERT_EQ(*getParentSessionId(lsid), *parentLsid);
+            ASSERT(isInternalSessionForRetryableWrite(lsid));
+            ASSERT(lsid.getTxnNumber());
+            ASSERT_EQ(*lsid.getTxnNumber(), *parentTxnNumber);
+            break;
+    }
+}
+
 void assertTxnMetadata(BSONObj obj,
                        TxnNumber txnNumber,
                        boost::optional<bool> startTransaction,
@@ -284,6 +328,7 @@ TEST_F(TxnAPITest, OwnSession_AttachesTxnMetadata) {
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(
                 mockClient()->getLastSentRequest(), 0 /* txnNumber */, true /* startTransaction */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
 
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             insertRes = txnClient
@@ -296,6 +341,7 @@ TEST_F(TxnAPITest, OwnSession_AttachesTxnMetadata) {
             assertTxnMetadata(mockClient()->getLastSentRequest(),
                               0 /* txnNumber */,
                               boost::none /* startTransaction */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
 
             // The commit response.
             mockClient()->setNextCommandResponse(kOKCommandResponse);
@@ -310,6 +356,7 @@ TEST_F(TxnAPITest, OwnSession_AttachesTxnMetadata) {
                       boost::none /* startTransaction */,
                       boost::none /* readConcern */,
                       WriteConcernOptions().toBSON() /* writeConcern */);
+    assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
@@ -343,6 +390,8 @@ TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnCommit) {
                 assertTxnMetadata(mockClient()->getLastSentRequest(),
                                   attempt /* txnNumber */,
                                   true /* startTransaction */);
+                assertSessionIdMetadata(mockClient()->getLastSentRequest(),
+                                        LsidAssertion::kStandalone);
 
                 mockClient()->setNextCommandResponse(kOKInsertResponse);
                 insertRes = txnClient
@@ -355,6 +404,8 @@ TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnCommit) {
                 assertTxnMetadata(mockClient()->getLastSentRequest(),
                                   attempt /* txnNumber */,
                                   boost::none /* startTransaction */);
+                assertSessionIdMetadata(mockClient()->getLastSentRequest(),
+                                        LsidAssertion::kStandalone);
 
                 // Throw a transient error to verify the retries behavior.
                 uassert(ErrorCodes::HostUnreachable, "Mock network error", attempt != 0);
@@ -372,6 +423,7 @@ TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnCommit) {
                           boost::none /* startTransaction */,
                           boost::none /* readConcern */,
                           writeConcern.toBSON());
+        assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
         ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
     }
 }
@@ -439,6 +491,8 @@ TEST_F(TxnAPITest, OwnSession_AttachesReadConcernOnStartTransaction) {
                                   attempt /* txnNumber */,
                                   true /* startTransaction */,
                                   readConcern.toBSONInner());
+                assertSessionIdMetadata(mockClient()->getLastSentRequest(),
+                                        LsidAssertion::kStandalone);
 
                 // Subsequent requests shouldn't have a read concern.
                 mockClient()->setNextCommandResponse(kOKInsertResponse);
@@ -452,6 +506,8 @@ TEST_F(TxnAPITest, OwnSession_AttachesReadConcernOnStartTransaction) {
                 assertTxnMetadata(mockClient()->getLastSentRequest(),
                                   attempt /* txnNumber */,
                                   boost::none /* startTransaction */);
+                assertSessionIdMetadata(mockClient()->getLastSentRequest(),
+                                        LsidAssertion::kStandalone);
 
                 // Throw a transient error to verify the retry will still use the read concern.
                 uassert(ErrorCodes::HostUnreachable, "Mock network error", attempt != 0);
@@ -469,6 +525,7 @@ TEST_F(TxnAPITest, OwnSession_AttachesReadConcernOnStartTransaction) {
                           boost::none /* startTransaction */,
                           boost::none /* readConcern */,
                           WriteConcernOptions().toBSON() /* writeConcern */);
+        assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
         ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
     }
 }
@@ -543,6 +600,7 @@ TEST_F(TxnAPITest, OwnSession_RetriesOnTransientError) {
             assertTxnMetadata(mockClient()->getLastSentRequest(),
                               attempt /* txnNumber */,
                               true /* startTransaction */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
 
             return SemiFuture<void>::makeReady();
         });
@@ -555,6 +613,7 @@ TEST_F(TxnAPITest, OwnSession_RetriesOnTransientError) {
                       boost::none /* startTransaction */,
                       boost::none /* readConcern */,
                       WriteConcernOptions().toBSON() /* writeConcern */);
+    assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
@@ -581,6 +640,7 @@ TEST_F(TxnAPITest, OwnSession_RetriesOnTransientClientError) {
             assertTxnMetadata(mockClient()->getLastSentRequest(),
                               attempt /* txnNumber */,
                               true /* startTransaction */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
 
             // The commit or implicit abort response.
             mockClient()->setNextCommandResponse(kOKCommandResponse);
@@ -597,6 +657,7 @@ TEST_F(TxnAPITest, OwnSession_RetriesOnTransientClientError) {
                       boost::none /* startTransaction */,
                       boost::none /* readConcern */,
                       WriteConcernOptions().toBSON() /* writeConcern */);
+    assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
@@ -615,6 +676,7 @@ TEST_F(TxnAPITest, OwnSession_CommitError) {
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(
                 mockClient()->getLastSentRequest(), 0 /* txnNumber */, true /* startTransaction */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
 
             // The commit response.
             mockClient()->setNextCommandResponse(
@@ -655,6 +717,7 @@ TEST_F(TxnAPITest, OwnSession_TransientCommitError) {
             assertTxnMetadata(mockClient()->getLastSentRequest(),
                               attempt /* txnNumber */,
                               true /* startTransaction */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
 
             // Set commit and best effort abort response, if necessary.
             if (attempt == 0) {
@@ -674,6 +737,7 @@ TEST_F(TxnAPITest, OwnSession_TransientCommitError) {
                       boost::none /* startTransaction */,
                       boost::none /* readConcern */,
                       WriteConcernOptions().toBSON() /* writeConcern */);
+    assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
@@ -692,6 +756,7 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitError) {
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(
                 mockClient()->getLastSentRequest(), 0 /* txnNumber */, true /* startTransaction */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
 
             // The commit response.
             mockClient()->setNextCommandResponse(
@@ -708,6 +773,7 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitError) {
                       boost::none /* startTransaction */,
                       boost::none /* readConcern */,
                       WriteConcernOptions().toBSON() /* writeConcern */);
+    assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
@@ -724,6 +790,7 @@ TEST_F(TxnAPITest, OwnSession_NonRetryableCommitWCError) {
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(
                 mockClient()->getLastSentRequest(), 0 /* txnNumber */, true /* startTransaction */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
 
             // The commit response.
             mockClient()->setNextCommandResponse(kResWithWriteConcernError);
@@ -754,6 +821,7 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitWCError) {
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(
                 mockClient()->getLastSentRequest(), 0 /* txnNumber */, true /* startTransaction */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
 
             // The commit responses.
             mockClient()->setNextCommandResponse(kResWithRetryableWriteConcernError);
@@ -769,6 +837,7 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitWCError) {
                       boost::none /* startTransaction */,
                       boost::none /* readConcern */,
                       WriteConcernOptions().toBSON() /* writeConcern */);
+    assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
@@ -983,6 +1052,115 @@ TEST_F(TxnAPITest, HandlesExceptionWhileUnyieldingDuringAbort) {
     // 2 yields in body and best effort abort and both of their corresponding unyields.
     ASSERT_EQ(resourceYielder()->timesYielded(), 2);
     ASSERT_EQ(resourceYielder()->timesUnyielded(), 2);
+}
+
+TEST_F(TxnAPITest, ClientSession_UsesNonRetryableInternalSession) {
+    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    resetTxnWithRetries();
+
+    int attempt = -1;
+    boost::optional<LogicalSessionId> firstAttemptLsid;
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            attempt += 1;
+
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+            ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+            assertTxnMetadata(mockClient()->getLastSentRequest(),
+                              attempt /* txnNumber */,
+                              true /* startTransaction */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(),
+                                    LsidAssertion::kNonRetryableChild,
+                                    opCtx()->getLogicalSessionId());
+
+            if (attempt == 0) {
+                firstAttemptLsid = getLsid(mockClient()->getLastSentRequest());
+                // Trigger transient error retry to verify the same session is used by the retry.
+                mockClient()->setNextCommandResponse(kNoSuchTransactionResponse);
+            } else {
+                ASSERT_EQ(*firstAttemptLsid, getLsid(mockClient()->getLastSentRequest()));
+                mockClient()->setNextCommandResponse(kOKCommandResponse);  // Commit response.
+            }
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT(swResult.getStatus().isOK());
+    ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+
+    auto lastRequest = mockClient()->getLastSentRequest();
+    assertTxnMetadata(lastRequest,
+                      attempt /* txnNumber */,
+                      boost::none /* startTransaction */,
+                      boost::none /* readConcern */,
+                      WriteConcernOptions().toBSON() /* writeConcern */);
+    assertSessionIdMetadata(mockClient()->getLastSentRequest(),
+                            LsidAssertion::kNonRetryableChild,
+                            opCtx()->getLogicalSessionId());
+    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
+}
+
+TEST_F(TxnAPITest, ClientRetryableWrite_UsesRetryableInternalSession) {
+    // This case is only currently supported on mongos.
+    // TODO SERVER-63747: Remove this once this restriction is lifted.
+    bool savedMongos = isMongos();
+    ON_BLOCK_EXIT([&] { setMongos(savedMongos); });
+    setMongos(true);
+
+    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    opCtx()->setTxnNumber(5);
+    resetTxnWithRetries();
+
+    int attempt = -1;
+    boost::optional<LogicalSessionId> firstAttemptLsid;
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            attempt += 1;
+
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+            ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+            assertTxnMetadata(mockClient()->getLastSentRequest(),
+                              attempt /* txnNumber */,
+                              true /* startTransaction */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(),
+                                    LsidAssertion::kRetryableChild,
+                                    opCtx()->getLogicalSessionId(),
+                                    opCtx()->getTxnNumber());
+
+            if (attempt == 0) {
+                firstAttemptLsid = getLsid(mockClient()->getLastSentRequest());
+                // Trigger transient error retry to verify the same session is used by the retry.
+                mockClient()->setNextCommandResponse(kNoSuchTransactionResponse);
+            } else {
+                ASSERT_EQ(*firstAttemptLsid, getLsid(mockClient()->getLastSentRequest()));
+                mockClient()->setNextCommandResponse(kOKCommandResponse);  // Commit response.
+            }
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT(swResult.getStatus().isOK());
+    ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+
+    auto lastRequest = mockClient()->getLastSentRequest();
+    assertTxnMetadata(lastRequest,
+                      attempt /* txnNumber */,
+                      boost::none /* startTransaction */,
+                      boost::none /* readConcern */,
+                      WriteConcernOptions().toBSON() /* writeConcern */);
+    assertSessionIdMetadata(mockClient()->getLastSentRequest(),
+                            LsidAssertion::kRetryableChild,
+                            opCtx()->getLogicalSessionId(),
+                            opCtx()->getTxnNumber());
+    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
 }  // namespace

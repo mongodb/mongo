@@ -542,9 +542,6 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
                         0 /* txnNumber */,
                         {true} /* startTransaction */);
         _execContext = ExecutionContext::kClientSession;
-
-        // TODO SERVER-63746: Handle client session case.
-        MONGO_UNREACHABLE;
     } else if (!clientInMultiDocumentTransaction) {
         _setSessionInfo(lg,
                         makeLogicalSessionIdWithTxnNumberAndUUID(*clientSession, *clientTxnNumber),
