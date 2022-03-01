@@ -1,0 +1,27 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+da{
+    collations{
+        search{
+            Sequence{
+                "[import und-u-co-search]"
+                "[import da-u-co-standard]"
+                "[caseFirst off]"
+            }
+            Version{"39"}
+        }
+        standard{
+            Sequence{
+                "[caseFirst upper]"
+                "&D<<đ<<<Đ<<ð<<<Ð"
+                "&th<<<þ"
+                "&TH<<<Þ"
+                "&Y<<ü<<<Ü<<ű<<<Ű"
+                "&[before 1]ǀ<æ<<<Æ<<ä<<<Ä<ø<<<Ø<<ö<<<Ö<<ő<<<Ő<å<<<Å<<<aa<<<Aa<<<AA"
+                "&oe<<œ<<<Œ"
+            }
+            Version{"39"}
+        }
+    }
+}

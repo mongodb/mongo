@@ -1,0 +1,257 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Grek_Latn.txt
+# Generated from CLDR
+#
+
+# Rules are predicated on running NFD first, and NFC afterwards
+# :: [\u0000-\u007F \u0370-Ͽ [:Greek:] [:nonspacing mark:]] ;
+# MINIMAL FILTER GENERATED FOR: Greek-Latin
+:: [;µ·ÄËÏÖÜäëïöüÿ-āĒ-ēĪ-īŌ-ōŪ-ūŸǕ-ǜǞ-ǣǬ-ǭȪ-ȭȰ-ȳ\u0304\u0308\u0313-\u0314\u0342-\u0345ͺ;Ά-ΊΌΎ-ΡΣ-ώϐ-ϗϛϝϟϡϣϥϧϩϫϭϯ-ϵϷ-\u07FBЁЇёїӒ-ӓӚ-ӟӢ-ӧӪ-ӱӴ-ӵӸ-ӹḔ-ḗḠ-ḡḦ-ḧḮ-ḯḸ-ḹṎ-ṓṜ-ṝṺ-ṻẄ-ẅẌ-ẍẗἀ-ἕἘ-Ἕἠ-ὅὈ-Ὅὐ-ὗὙὛὝὟ-ώᾀ-ᾴᾶ-ᾼι῁-ῄῆ-ῌ῏-ΐῖ-Ί῟-Ῥῲ-ῴῶ-ῼΩϹ] ;
+:: NFD (NFC) ;
+# TEST CASES
+# Ὀλίγοι ἔμφονες πολλῶν ἀφρόνων φοβερώτεροι — Πλάτωνος
+# ᾂ ᾒ ᾢ ᾃ ᾓ ᾣ
+# ᾳ ῃ ῳ ὃ ὄ
+# ὠς ὡς ὢς ὣς
+# Ὠς Ὡς Ὢς Ὣς
+# ὨΣ ὩΣ ὪΣ ὫΣ
+# Ạ, ạ, Ẹ, ẹ, Ọ, ọ
+# Useful variables
+$lower = [[:latin:][:greek:] & [:Ll:]];
+$glower = [[:greek:] & [:Ll:]];
+$upper = [[:latin:][:greek:] & [:Lu:]] ;
+$accent = [:M:] ;
+# NOTE: restrict to just the Greek & Latin accents that we care about
+# TODO: broaden out once interation is fixed
+$accentMinus = [ [\u0300-\u0345] & [:M:] - [\u0338]] ;
+$macron = \u0304 ;
+$ddot = \u0308 ;
+$ddotmac = [$ddot$macron];
+$lcgvowel = [αεηιουω] ;
+$ucgvowel = [ΑΕΗΙΟΥΩ] ;
+$gvowel = [$lcgvowel $ucgvowel] ;
+$lcgvowelC = [$lcgvowel $accent] ;
+$evowel = [aeiouyAEIOUY];
+$evowel2 = [iuyIUY];
+$vowel = [ $evowel $gvowel] ;
+$gammaLike = [ΓΚΞΧγκξχϰ] ;
+$egammaLike = [GKXCgkxc] ;
+$smooth = \u0313 ;
+$rough = \u0314 ;
+$iotasub = \u0345 ;
+$evowel_i = [$evowel-[iI]] ;
+$evowel2_i = [uyUY];
+$underbar = \u0331;
+$afterLetter = [:L:] [[:M:]\']* ;
+$beforeLetter = [[:M:]\']* [:L:] ;
+$beforeLower = $accent * $lower ;
+$notLetter = [^[:L:][:M:]] ;
+$under = \u0331;
+# Fix punctuation
+# preserve original
+\: ↔ \: $under ;
+\? ↔ \? $under ;
+\; ↔ \? ;
+· ↔ \: ;
+# CIRCUMFLEX: convert greek circumflex to normal one. Could use tilde or inverted breve
+\u0342 ↔ \u0302 ;
+# IOTA: convert iota subscript to iota
+# first make previous alpha long!
+$accent_minus = [[$accent]-[$iotasub$macron]];
+Α } $accent_minus * $iotasub → | Α $macron ;
+α } $accent_minus * $iotasub → | α $macron ;
+# now convert to uppercase if after uppercase, ow to lowercase
+$upper $accent * { $iotasub → I ;
+$iotasub → i ;
+| $1 $iotasub ← ($evowel $macron $accentMinus *) i ;
+| $1 $iotasub ← ($evowel $macron $accentMinus *) I ;
+# BREATHING
+# Convert rough breathing to h, and move before letters.
+# Make A ` x = → H a x
+Α ($macron?) $rough } $beforeLower → H | α $1;
+Ε $rough } $beforeLower → H | ε;
+Η $rough } $beforeLower → H | η ;
+Ι ($ddot?) $rough } $beforeLower → H | ι  $1;
+Ο $rough } $beforeLower → H | ο ;
+Υ $rough } $beforeLower → H | υ ;
+Ω ($ddot?) $rough } $beforeLower → H | ω $1;
+# Make A x ` = → H a x
+Α ($glower $macron?) $rough → H | α $1 ;
+Ε ($glower) $rough → H | ε $1 ;
+Η ($glower) $rough → H | η $1 ;
+Ι ($glower $ddot?) $rough → H | ι $1 ;
+Ο ($glower) $rough → H | ο $1 ;
+Υ ($glower) $rough → H | υ $1 ;
+Ω ($glower  $ddot?) $rough → H | ω $1 ;
+#Otherwise, make x ` into h x and X ` into H X
+($lcgvowel + $ddotmac? ) $rough → h | $1 ;
+($gvowel + $ddotmac? ) $rough → H | $1 ;
+# Go backwards with H
+| $1 $rough ← h ($evowel $macron $ddot? $evowel2_i $macron?) ;
+| $1 $rough ← h ($evowel $ddot? $evowel2 $macron?) ;
+| $1 $rough ← h ($evowel $macron? $ddot?) ;
+| $1 $rough ← H ([AEIOUY] $macron $ddot? $evowel2_i $macron?) ;
+| $1 $rough ← H ([AEIOUY] $ddot? $evowel2 $macron?) ;
+| $1 $rough ← H ([AEIOUY] $macron? $ddot?) ;
+# titlecase, have to fix individually
+# in the future, we should add &uppercase() to make this easier
+| A $1 $rough ← H a ($macron  $ddot? $evowel2_i $macron?) ;
+| E $1 $rough ← H e ($macron  $ddot? $evowel2_i $macron?) ;
+| I $1 $rough ← H i ($macron  $ddot? $evowel2_i $macron?) ;
+| O $1 $rough ← H o ($macron  $ddot? $evowel2_i $macron?) ;
+| U $1 $rough ← H u ($macron $ddot? $evowel2_i $macron?) ;
+| Y $1 $rough ← H y ($macron $ddot? $evowel2_i $macron?) ;
+| A $1 $rough ← H a ($ddot? $evowel2 $macron?) ;
+| E $1 $rough ← H e ($ddot? $evowel2 $macron?) ;
+| I $1 $rough ← H i ($ddot? $evowel2 $macron?) ;
+| O $1 $rough ← H o ($ddot? $evowel2 $macron?) ;
+| U $1 $rough ← H u ($ddot? $evowel2 $macron?) ;
+| Y $1 $rough ← H y ($ddot? $evowel2 $macron?) ;
+| A $1 $rough ← H a ($macron? $ddot? ) ;
+| E $1 $rough ← H e ($macron? $ddot? ) ;
+| I $1 $rough ← H i ($macron? $ddot? ) ;
+| O $1 $rough ← H o ($macron? $ddot? ) ;
+| U $1 $rough ← H u ($macron? $ddot? ) ;
+| Y $1 $rough ← H y ($macron? $ddot? ) ;
+# Now do smooth
+#delete smooth breathing for Latin
+$smooth → ;
+# insert in Greek
+# the assumption is that all Marks are on letters.
+| $1 $smooth ← $notLetter { ([rR]) } [^hH$smooth$rough] ;
+| $1 $smooth ← $notLetter { ($evowel $macron? $evowel2 $macron?) } [^$smooth$rough] ;
+| $1 $smooth ← $notLetter { ($evowel $macron?) } [^$evowel2$smooth$rough] ;
+# TODO: preserve smooth/rough breathing if not
+# on initial vowel sequence
+# need to have these up here so the rules don't mask
+# remove now superfluous macron when returning
+Α ← A $macron ;
+α ← a $macron ;
+η ↔ e $macron ;
+Η ↔ E $macron ;
+φ ↔ ph ;
+Ψ } $beforeLower ↔ Ps ;
+Ψ ↔ PS ;
+Φ } $beforeLower ↔ Ph ;
+Φ ↔ PH ;
+ψ ↔ ps ;
+ω ↔ o $macron ;
+Ω ↔  O $macron;
+# NORMAL
+α ↔ a ;
+Α ↔ A ;
+β ↔ b ;
+Β ↔ B ;
+γ } $gammaLike ↔ n } $egammaLike ;
+γ ↔ g ;
+Γ } $gammaLike ↔ N } $egammaLike ;
+Γ ↔ G ;
+δ ↔ d ;
+Δ ↔ D ;
+ε ↔ e ;
+Ε ↔ E ;
+ζ ↔ z ;
+Ζ ↔ Z ;
+θ ↔ th ;
+Θ } $beforeLower ↔ Th ;
+Θ ↔ TH ;
+ι ↔ i ;
+Ι ↔ I ;
+κ ↔ k ;
+Κ ↔ K ;
+λ ↔ l ;
+Λ ↔ L ;
+μ ↔ m ;
+Μ ↔ M ;
+ν } $gammaLike → n\' ;
+ν ↔ n ;
+Ν } $gammaLike ↔ N\' ;
+Ν ↔ N ;
+ξ ↔ x ;
+Ξ ↔ X ;
+ο ↔ o ;
+Ο ↔ O ;
+π ↔ p ;
+Π ↔ P ;
+ρ $rough ↔ rh;
+Ρ $rough } $beforeLower ↔ Rh ;
+Ρ $rough ↔ RH ;
+ρ ↔ r ;
+Ρ ↔ R ;
+# insert separator before things that turn into s
+[Pp] { } [ςσΣϷϸϺϻ] → \' ;
+# special S variants
+Ϸ ↔ S\u030C ; # Ϸ GREEK CAPITAL LETTER SHO Uppercase_Letter Grek - L
+ϸ ↔ s\u030C ; #ϸ GREEK SMALL LETTER SHO Lowercase_Letter Grek - L
+Ϻ ↔ S\u0302 ; # Ϻ GREEK CAPITAL LETTER SAN Uppercase_Letter Grek - L
+ϻ ↔ s\u0302 ; # ϻ GREEK SMALL LETTER SAN Lowercase_Letter Grek - L
+# underbar means exception
+# before a letter, initial
+ς } $beforeLetter ↔ s $underbar } $beforeLetter;
+σ } $beforeLetter ↔ s } $beforeLetter;
+# otherwise, after a letter = final
+$afterLetter { σ ↔ $afterLetter { s $underbar;
+$afterLetter { ς ↔ $afterLetter { s ;
+# otherwise (isolated) = initial
+ς ↔ s $underbar;
+σ ↔ s ;
+# [Pp] { Σ ↔ \'S ;
+Σ ↔ S ;
+τ ↔ t ;
+Τ ↔ T ;
+$vowel {υ } ↔ u ;
+υ ↔ y ;
+$vowel { Υ ↔ U ;
+Υ ↔ Y ;
+χ ↔ ch ;
+Χ } $beforeLower ↔ Ch ;
+Χ ↔ CH ;
+# Completeness for ASCII
+$ignore = [[:Mark:]''] * ;
+| k  ← c ;
+| ph ← f ;
+| i  ← j ;
+| k ← q ;
+| b ← v } $vowel ;
+| b ← w } $vowel;
+| u ← v ;
+| u ← w;
+| K ← C ;
+| Ph ← F ;
+| I ← J ;
+| K ← Q ;
+| B ← V  } $vowel ;
+| B ← W  } $vowel ;
+| U ← V ;
+| U ← W ;
+$rough } $ignore [:UppercaseLetter:] → H ;
+$ignore [:UppercaseLetter:] { $rough → H ;
+$rough ← H ;
+$rough ↔ h ;
+# Completeness for Greek
+ϐ → | β ;
+ϑ → | θ ;
+ϒ → | Υ ;
+ϕ → | φ ;
+ϖ → | π ;
+ϰ → | κ ;
+ϱ → | ρ ;
+ϲ → | σ ;
+Ϲ → | Σ; #U+03F9 GREEK CAPITAL LUNATE SIGMA SYMBOL
+ϳ → j ;
+ϴ → | Θ ;
+ϵ → | ε ;
+µ → | μ ;
+ͺ → i;
+# delete any trailing ' marks used for roundtripping
+← [Ππ] { \' } [Ss] ;
+← [Νν] { \' } $egammaLike ;
+::NFC (NFD) ;
+# ([\u0000-\u007F [:Latin:] [:Greek:] [:nonspacing mark:]]) ;
+# ([\u0000-\u007F · [:Latin:] [:nonspacing mark:]]) ;
+# MINIMAL FILTER GENERATED FOR: Latin-Greek BACKWARD
+:: ( [':?A-Za-zÀ-ÅÇ-ÏÑ-ÖÙ-Ýà-åç-ïñ-öù-ýÿ-ďĒ-ĥĨ-İĴ-ķĹ-ľŃ-ňŌ-őŔ-ťŨ-žƠ-ơƯ-ưǍ-ǜǞ-ǣǦ-ǰǴ-ǵǸ-țȞ-ȟȦ-ȳ\u0300-\u0337\u0339-\u0345΅-ΆΈ-ΊΌΎ-ΐΪ-ΰϊ-ώϓ-ϔЀ-ЁЃЇЌ-ЎЙйѐ-ёѓїќ-ўѶ-ѷӁ-ӂӐ-ӓӖ-ӗӚ-ӟӢ-ӧӪ-ӵӸ-ӹḀ-ẙẛẠ-ỹἀ-ἕἘ-Ἕἠ-ὅὈ-Ὅὐ-ὗὙὛὝὟ-ώᾀ-ᾴᾶ-ᾼ῁-ῄῆ-ΐῖ-Ί῝-΅ῲ-ῴῶ-ῼK-Å] ) ;
+

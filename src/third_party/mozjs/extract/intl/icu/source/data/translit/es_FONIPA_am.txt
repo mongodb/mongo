@@ -1,0 +1,237 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: es_FONIPA_am.txt
+# Generated from CLDR
+#
+
+# Phonemic transcription of Spanish into Amharic.
+# First pass: Collapse phonetic distinctions not preserved in Amharic.
+β → b;
+ð → d;
+ɣ → g;
+ʎ → ʝ;
+#
+#
+ŋ → n;
+θ → s;
+ɾ → r;
+#
+#
+i\u032F → i;
+u\u032F → u;
+#
+#
+j → i;
+[^gk] { w → u;
+#
+#
+# Main pass: Phoneme to Katakana conversion.
+::Null;
+#
+#
+'.' → ;
+#
+#
+# Degemination.
+bb → | b;
+dd → | d;
+ff → | f;
+gg → | g;
+ʝʝ → | ʝ;
+kk → | k;
+ll → | l;
+mm → | m;
+nn → | n;
+ɲɲ → | ɲ;
+pp → | p;
+rr → | r;
+ss → | s;
+ʃʃ → | ʃ;
+tt → | t;
+ʧʧ → | ʧ;
+xx → | x;
+ʒʒ → | ʒ;
+#
+#
+a → አ ;
+#
+#
+ba → ባ ;
+be → ቤ ;
+bi → ቢ ;
+bo → ቦ ;
+bu → ቡ ;
+b → ብ ;
+#
+#
+da → ዳ ;
+de → ዴ ;
+di → ዲ ;
+do → ዶ ;
+du → ዱ ;
+d → ድ ;
+#
+#
+e → ኤ ;
+#
+#
+fa → ፋ ;
+fe → ፌ ;
+fi → ፊ ;
+fo → ፎ ;
+fu → ፉ ;
+f → ፍ ;
+#
+#
+ga → ጋ ;
+ge → ጌ ;
+gi → ጊ ;
+go → ጎ ;
+gu → ጉ ;
+gwa → ጓ ;
+gwe → ጔ ;
+gwi → ጒ ;
+gwo → ጉዎ ;
+g → ግ ;
+#
+#
+i → ኢ ;
+#
+#
+ʝa → ያ ;
+ʝe → ዬ ;
+ʝi → ዪ ;
+ʝo → ዮ ;
+ʝu → ዩ ;
+ʝ → ይ ;
+#
+#
+ka → ካ ;
+ke → ኬ ;
+ki → ኪ ;
+ko → ኮ ;
+ku → ኩ ;
+kwa → ኳ ;
+kwe → ኴ ;
+kwi → ኲ ;
+kwo → ኩዎ ;
+k → ክ ;
+#
+#
+la → ላ ;
+le → ሌ ;
+li → ሊ ;
+lo → ሎ ;
+lu → ሉ ;
+l → ል ;
+#
+#
+ma → ማ ;
+me → ሜ ;
+mi → ሚ ;
+mo → ሞ ;
+mu → ሙ ;
+m → ም ;
+#
+#
+na → ና ;
+ne → ኔ ;
+ni → ኒ ;
+no → ኖ ;
+nu → ኑ ;
+n → ን ;
+#
+#
+ɲa → ኛ ;
+ɲe → ኜ ;
+ɲi → ኚ ;
+ɲo → ኞ ;
+ɲu → ኙ ;
+ɲ → ኝ ;
+#
+#
+o → ኦ ;
+#
+#
+pa → ፓ ;
+pe → ፔ ;
+pi → ፒ ;
+po → ፖ ;
+pu → ፑ ;
+p → ፕ ;
+#
+#
+ra → ራ ;
+re → ሬ ;
+ri → ሪ ;
+ro → ሮ ;
+ru → ሩ ;
+r → ር ;
+#
+#
+sa → ሳ ;
+se → ሴ ;
+si → ሲ ;
+so → ሶ ;
+su → ሱ ;
+s → ስ ;
+#
+#
+# Not used in Iberian Spanish, but occurs e.g. in Galician.
+ʃa → ሻ ;
+ʃe → ሼ ;
+ʃi → ሺ ;
+ʃo → ሾ ;
+ʃu → ሹ ;
+ʃ → ሽ ;
+#
+#
+ta → ታ ;
+te → ቴ ;
+ti → ቲ ;
+to → ቶ ;
+tu → ቱ ;
+t → ት ;
+#
+#
+ʧa → ቻ ;
+ʧe → ቼ ;
+ʧi → ቺ ;
+ʧo → ቾ ;
+ʧu → ቹ ;
+ʧ → ች ;
+#
+#
+u → ኡ ;
+#
+#
+# Not strictly used in Spanish, but needed for Amharic.
+va → ቫ ;
+ve → ቬ ;
+vi → ቪ ;
+vo → ቮ ;
+vu → ቩ ;
+v → ቭ ;
+#
+#
+xa → ኻ ;
+xe → ኼ ;
+xi → ኺ ;
+xo → ኾ ;
+xu → ኹ ;
+x → ኽ ;
+#
+#
+# Not used in Iberian Spanish, but occurs in e.g. Catalan.
+ʒa → ዣ ;
+ʒe → ዤ ;
+ʒi → ዢ ;
+ʒo → ዦ ;
+ʒu → ዡ ;
+ʒ → ዥ ;
+#
+#
+::NFC;
+

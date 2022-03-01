@@ -45,10 +45,23 @@ sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__), '../../
 import buildscripts.idl.lib as lib
 
 
+def is_third_party_idl(idl_path: str) -> bool:
+    """Check if an IDL file is under a third party directory."""
+    third_party_idl_subpaths = [os.path.join("third_party", "mozjs"), "win32com"]
+
+    for file_name in third_party_idl_subpaths:
+        if file_name in idl_path:
+            return True
+
+    return False
+
+
 def gen_all_feature_flags(idl_dir: str, import_dirs: List[str]):
     """Generate a list of all feature flags."""
     all_flags = []
     for idl_path in sorted(lib.list_idls(idl_dir)):
+        if is_third_party_idl(idl_path):
+            continue
         for feature_flag in lib.parse_idl(idl_path, import_dirs).spec.feature_flags:
             if feature_flag.default.literal != "true":
                 all_flags.append(feature_flag.name)

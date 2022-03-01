@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -8,37 +8,25 @@
 #define jit_JitFrames_inl_h
 
 #include "jit/JitFrames.h"
-
-#include "jit/LIR.h"
+#include "vm/JSContext.h"
 
 #include "jit/JSJitFrameIter-inl.h"
 
 namespace js {
 namespace jit {
 
-inline void
-SafepointIndex::resolve()
-{
-    MOZ_ASSERT(!resolved);
-    safepointOffset_ = safepoint_->offset();
-#ifdef DEBUG
-    resolved = true;
-#endif
-}
-
-inline BaselineFrame*
-GetTopBaselineFrame(JSContext* cx)
-{
-    JSJitFrameIter frame(cx->activation()->asJit());
-    MOZ_ASSERT(frame.type() == JitFrame_Exit);
+inline BaselineFrame* GetTopBaselineFrame(JSContext* cx) {
+  JSJitFrameIter frame(cx->activation()->asJit());
+  MOZ_ASSERT(frame.type() == FrameType::Exit);
+  ++frame;
+  if (frame.isBaselineStub()) {
     ++frame;
-    if (frame.isBaselineStub())
-        ++frame;
-    MOZ_ASSERT(frame.isBaselineJS());
-    return frame.baselineFrame();
+  }
+  MOZ_ASSERT(frame.isBaselineJS());
+  return frame.baselineFrame();
 }
 
-} // namespace jit
-} // namespace js
+}  // namespace jit
+}  // namespace js
 
 #endif /* jit_JitFrames_inl_h */

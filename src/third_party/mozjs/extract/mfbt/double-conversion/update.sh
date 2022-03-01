@@ -11,9 +11,10 @@ set -e
 LOCAL_PATCHES=""
 
 LOCAL_PATCHES="$LOCAL_PATCHES add-mfbt-api-markers.patch"
-LOCAL_PATCHES="$LOCAL_PATCHES use-StandardInteger.patch"
 LOCAL_PATCHES="$LOCAL_PATCHES use-mozilla-assertions.patch"
-LOCAL_PATCHES="$LOCAL_PATCHES ToPrecision-exponential.patch"
+LOCAL_PATCHES="$LOCAL_PATCHES debug-only-functions.patch"
+LOCAL_PATCHES="$LOCAL_PATCHES to-fixed-dbl-max.patch"
+LOCAL_PATCHES="$LOCAL_PATCHES to-fixed-digits-after-point.patch"
 
 TMPDIR=`mktemp --directory`
 LOCAL_CLONE="$TMPDIR/new-double-conversion"
@@ -70,7 +71,7 @@ done
 hg addremove "$DEST"
 
 # Note the revision used in this update.
-git -C "$LOCAL_CLONE" show > ./GIT-INFO
+git -C "$LOCAL_CLONE" show -s > ./GIT-INFO
 
 # Delete the tmpdir.
 rm -rf "$TMPDIR"

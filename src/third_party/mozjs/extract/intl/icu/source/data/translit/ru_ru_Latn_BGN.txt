@@ -1,0 +1,242 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: ru_ru_Latn_BGN.txt
+# Generated from CLDR
+#
+
+# BGN/PCGN 1947 System
+#
+# The BGN/PCGN system for Russian was adopted by the BGN in 1944 and
+# by the PCGN in 1947 for use in romanizing names written in the
+# Russian Cyrillic alphabet.
+#
+# The Russian Alphabet as defined by the BGN (Page 93):
+#     АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ
+#     абвгдеёжзийклмнопрстуфхцчшщъыьэюя
+#
+# Originally prepared by Michael Everson everson@evertype.com
+# Fixed by Frank Yung-Fong Tang ftang@google.com
+#
+# Test Data from http://en.wikipedia.org/wiki/BGN/PCGN_romanization_of_Russian
+########################################################################
+# MINIMAL FILTER: Russian-Latin
+::[АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя];
+::NFC;
+########################################################################
+# Define All Transformation Variables
+########################################################################
+$prime = ʹ ;
+$doublePrime = ʺ ;
+$wordBoundary = [^[:L:][:M:][:N:]] ;
+$upperVowels = [АЕЁЭИОУЫЮЯ] ;
+$lowerVowels = [аеёэиоуыюя] ;
+$vowels = [$upperVowels $lowerVowels] ;
+$upperConsonants = [[:Uppercase:]-$vowels] ;
+$lowerConsonants = [[:Lowercase:]-$vowels] ;
+$consonants = [$upperConsonants $lowerConsonants] ;
+$upper = [:Uppercase:];
+$lower = [:Lowercase:];
+########################################################################
+# Rules moved to front to avoid masking
+########################################################################
+$lowerVowels { ы → ·y ;
+$upperVowels { [Ыы] } $lower → ·y ;
+$upperVowels { [Ыы] } → ·Y ;
+[$consonants - [Йй]]{Э → ·E ;
+[$consonants - [Йй]]{э → ·e ;
+[$upperVowels [ЙЪЬ]] { Е } $upper → YE ; # CYRILLIC CAPITAL LETTER IE
+[$upperVowels [ЙЪЬ]] { Е → Ye ; # CYRILLIC CAPITAL LETTER IE
+[$upperVowels $lowerVowels [ЙйЪъЬь]] { е → ye ; # CYRILLIC SMALL LETTER IE
+[$upperVowels [ЙЪЬ]] { Ё } $upper → YË ; # CYRILLIC CAPITAL LETTER IO
+[$upperVowels [ЙЪЬ]] { Ё → Yë ; # CYRILLIC CAPITAL LETTER IO
+[$upperVowels $lowerVowels [ЙйЪъЬь]] { ё → yë ; # CYRILLIC SMALL LETTER IO
+# Since in the above rule we look at the Cyrillic context before the E/Ё/ё,
+# we have to transform these in a separate pass before we change the vowels.
+# The ::Null forces a separate pass.
+::Null;
+########################################################################
+# Start of Alphabetic Transformations
+########################################################################
+А → A ; # CYRILLIC CAPITAL LETTER A
+а → a ; # CYRILLIC SMALL LETTER A
+Б → B ; # CYRILLIC CAPITAL LETTER BE
+б → b ; # CYRILLIC SMALL LETTER BE
+В → V ; # CYRILLIC CAPITAL LETTER VE
+в → v ; # CYRILLIC SMALL LETTER VE
+Г → G ; # CYRILLIC CAPITAL LETTER GHE
+г → g ; # CYRILLIC SMALL LETTER GHE
+Д → D ; # CYRILLIC CAPITAL LETTER DE
+д → d ; # CYRILLIC SMALL LETTER DE
+########################################################################
+# BGN Page 94 Rule 1:
+# # The character e should be romanized ye
+# initially, after the vowel # characters a, e, ё, и, о, у, ы, э, ю,
+# and я, and after й, ъ, and ь.
+# In all other instances, it should
+# be romanized e.
+########################################################################
+# BUG(ftang)- the following two lines said BEFORE the vowels, instead of AFTER
+# Е}[$upperVowels [ЙЪЬ]] → YE ; # CYRILLIC CAPITAL LETTER IE
+# Е}[$lowerVowels [йъь]] → Ye ; # CYRILLIC CAPITAL LETTER IE
+$wordBoundary{Е} $upper → YE ; # CYRILLIC CAPITAL LETTER IE
+$wordBoundary{Е → Ye ; # CYRILLIC CAPITAL LETTER IE
+Е → E ; # CYRILLIC CAPITAL LETTER IE
+#
+# BUG(ftang)- the following line said BEFORE the vowels, instead of AFTER
+# е}[$upperVowels $lowerVowels [ЙйЪъЬь]] → ye ; # CYRILLIC SMALL LETTER IE
+$wordBoundary{е → ye ; # CYRILLIC SMALL LETTER IE
+е → e ; # CYRILLIC SMALL LETTER IE
+########################################################################
+# End of Rule 1
+########################################################################
+########################################################################
+# BGN Page 94 Rule 2:
+#
+# The character ё is not considered a separate character of the
+# Russian alphabet and the dieresis is generally not shown. When the
+# dieresis is shown, the character should be romanized yë initially,
+# after the vowel characters a, e, ё, и, о, у, ы, э, ю, and я, and
+# after й, ъ, and ь, In all other instances, it should be romanized
+# ё. When the dieresis is not shown, the character may still be
+# romanized in the preceding manner or, alternatively, in accordance
+# with note 1.
+########################################################################
+# BUG(ftang)- the following two lines said BEFORE the vowels, instead of AFTER
+# Ё}[$upperVowels [ЙЪЬ]] → YË ; # CYRILLIC CAPITAL LETTER IO
+# Ё}[$lowerVowels [йъь]] → Yë ; # CYRILLIC CAPITAL LETTER IO
+$wordBoundary {Ё} [·]? $upper → YË ; # CYRILLIC CAPITAL LETTER IO
+$wordBoundary {Ё} [·]? $lower → Yë ; # CYRILLIC CAPITAL LETTER IO
+Ё → Ë ; # CYRILLIC CAPITAL LETTER IO
+# BUG(ftang)- the following line said BEFORE the vowels, instead of AFTER
+# ё}[$upperVowels $lowerVowels [ЙйЪъЬь]] → yë ; # CYRILLIC SMALL LETTER IO
+$wordBoundary{ё → yë ; # CYRILLIC SMALL LETTER IO
+ё → ë ; # CYRILLIC SMALL LETTER IO
+########################################################################
+# End of Rule 2
+########################################################################
+Ж} $lower → Zh ; # CYRILLIC CAPITAL LETTER ZHE
+Ж → ZH ; # CYRILLIC CAPITAL LETTER ZHE
+ж → zh ; # CYRILLIC SMALL LETTER ZHE
+########################################################################
+# BGN Page 94 Rule 3.4
+# э after any consonant character except
+# й becomes ·е
+########################################################################
+З → Z ; # CYRILLIC CAPITAL LETTER ZE
+з → z ; # CYRILLIC SMALL LETTER ZE
+# BUG(ftang) The following two lines said those consonant becomes ·е
+# [$consonants - [Йй]]}Э → ·Е ;
+# [$consonants - [Йй]]}э → ·е ;
+########################################################################
+# End of Rule 3.4
+########################################################################
+И → I ; # CYRILLIC CAPITAL LETTER I
+и → i ; # CYRILLIC SMALL LETTER I
+########################################################################
+# BGN Page 94 Rule 3:
+#
+# Unusual Russian character sequences occurring primarily in
+# non-Russian-language names may be romanized as shown below in order
+# to provide differentiation from regularly-occurring digraphs and
+# character sequences.
+#
+# BGN Page 94 Rule 3.1
+# й before а, у, ы, or э becomes у·
+########################################################################
+Й}[АаУуЫыЭэ] → Y· ; # CYRILLIC CAPITAL LETTER I
+й}[АаУуЫыЭэ] → y· ; # CYRILLIC SMALL LETTER I
+Й → Y ; # CYRILLIC CAPITAL LETTER I
+й → y ; # CYRILLIC SMALL LETTER I
+########################################################################
+# End Rule 3.1
+########################################################################
+К → K ; # CYRILLIC CAPITAL LETTER KA
+к → k ; # CYRILLIC SMALL LETTER KA
+Л → L ; # CYRILLIC CAPITAL LETTER EL
+л → l ; # CYRILLIC SMALL LETTER EL
+М → M ; # CYRILLIC CAPITAL LETTER EM
+м → m ; # CYRILLIC SMALL LETTER EM
+Н → N ; # CYRILLIC CAPITAL LETTER EN
+н → n ; # CYRILLIC SMALL LETTER EN
+О → O ; # CYRILLIC CAPITAL LETTER O
+о → o ; # CYRILLIC SMALL LETTER O
+П → P ; # CYRILLIC CAPITAL LETTER PE
+п → p ; # CYRILLIC SMALL LETTER PE
+Р → R ; # CYRILLIC CAPITAL LETTER ER
+р → r ; # CYRILLIC SMALL LETTER ER
+С → S ; # CYRILLIC CAPITAL LETTER ES
+с → s ; # CYRILLIC SMALL LETTER ES
+########################################################################
+# BGN Page 94 Rule 3.5
+# тс becomes t·s
+########################################################################
+ТС → T·S ; # CYRILLIC CAPITAL LETTER TE
+Тс → T·s ; # CYRILLIC CAPITAL LETTER TE
+тс → t·s ; # CYRILLIC SMALL LETTER TE
+Т → T ; # CYRILLIC CAPITAL LETTER TE
+т → t ; # CYRILLIC SMALL LETTER TE
+########################################################################
+# End Rule 3.5
+########################################################################
+У → U ; # CYRILLIC CAPITAL LETTER U
+у → u ; # CYRILLIC SMALL LETTER U
+Ф → F ; # CYRILLIC CAPITAL LETTER EF
+ф → f ; # CYRILLIC SMALL LETTER EF
+Х} $lower → Kh ; # CYRILLIC CAPITAL LETTER HA
+Х → KH ; # CYRILLIC CAPITAL LETTER HA
+х → kh ; # CYRILLIC SMALL LETTER HA
+Ц} $lower → Ts ; # CYRILLIC CAPITAL LETTER TSE
+Ц → TS ; # CYRILLIC CAPITAL LETTER TSE
+ц → ts ; # CYRILLIC SMALL LETTER TSE
+Ч} $lower → Ch ; # CYRILLIC CAPITAL LETTER CHE
+Ч → CH ; # CYRILLIC CAPITAL LETTER CHE
+ч → ch ; # CYRILLIC SMALL LETTER CHE
+########################################################################
+# BGN Page 94 Rule 3.6
+# шч becomes sh·ch
+########################################################################
+ШЧ → SH·CH ; # CYRILLIC CAPITAL LETTER SHA
+Шч → Sh·ch ; # CYRILLIC CAPITAL LETTER SHA
+шч → sh·ch ; # CYRILLIC SMALL LETTER SHA
+Ш} $lower → Sh ; # CYRILLIC CAPITAL LETTER SHA
+Ш → SH ; # CYRILLIC CAPITAL LETTER SHA
+ш → sh ; # CYRILLIC SMALL LETTER SHA
+Щ} $lower → Shch ; # CYRILLIC CAPITAL LETTER SHCHA
+Щ → SHCH ; # CYRILLIC CAPITAL LETTER SHCHA
+щ → shch ; # CYRILLIC SMALL LETTER SHCHA
+########################################################################
+# End Rule 3.6
+########################################################################
+Ъ → $doublePrime ; # CYRILLIC CAPITAL LETTER HARD SIGN
+ъ → $doublePrime ; # CYRILLIC SMALL LETTER HARD SIGN
+########################################################################
+# BGN Page 94 Rule 3.2
+# ы before а, у, ы, or э becomes у·
+#
+# BGN Page 94 Rule 3.3
+# ы after any vowel character becomes ·у
+########################################################################
+#
+# BUG(ftang) the following line said the vowels will change
+# $vowels}Ы → ·Y ; # CYRILLIC CAPITAL LETTER I
+# $vowels}ы → ·y ; # CYRILLIC CAPITAL LETTER I
+Ы}[АаУуЫыЭэ] → Y· ; # CYRILLIC CAPITAL LETTER YERU
+ы}[ауыэ] → y· ; # CYRILLIC SMALL LETTER YERU
+Ы → Y ; # CYRILLIC CAPITAL LETTER YERU
+ы → y ; # CYRILLIC SMALL LETTER YERU
+########################################################################
+# End Rule 3.2 and 3.3
+########################################################################
+Ь → $prime ; # CYRILLIC CAPITAL LETTER SOFT SIGN
+ь → $prime ; # CYRILLIC SMALL LETTER SOFT SIGN
+Э → E ; # CYRILLIC CAPITAL LETTER E
+э → e ; # CYRILLIC SMALL LETTER E
+Ю} $lower → Yu ; # CYRILLIC CAPITAL LETTER YU
+Ю → YU ; # CYRILLIC CAPITAL LETTER YU
+ю → yu ; # CYRILLIC SMALL LETTER YU
+Я} $lower → Ya ; # CYRILLIC CAPITAL LETTER YA
+Я → YA ; # CYRILLIC CAPITAL LETTER YA
+я → ya ; # CYRILLIC SMALL LETTER YA
+

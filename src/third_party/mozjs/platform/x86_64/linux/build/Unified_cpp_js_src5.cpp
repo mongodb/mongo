@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "ds/MemoryProtectionExceptionHandler.cpp"
+#include "builtin/streams/ReadableStreamDefaultController.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "ds/MemoryProtectionExceptionHandler.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/ReadableStreamDefaultController.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "ds/MemoryProtectionExceptionHandler.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/ReadableStreamDefaultController.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "frontend/BytecodeCompiler.cpp"
+#include "builtin/streams/ReadableStreamDefaultControllerOperations.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "frontend/BytecodeCompiler.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/ReadableStreamDefaultControllerOperations.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "frontend/BytecodeCompiler.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/ReadableStreamDefaultControllerOperations.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "frontend/BytecodeEmitter.cpp"
+#include "builtin/streams/ReadableStreamDefaultReader.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "frontend/BytecodeEmitter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/ReadableStreamDefaultReader.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "frontend/BytecodeEmitter.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/ReadableStreamDefaultReader.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "frontend/FoldConstants.cpp"
+#include "builtin/streams/ReadableStreamInternals.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "frontend/FoldConstants.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/ReadableStreamInternals.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "frontend/FoldConstants.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/ReadableStreamInternals.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "frontend/NameFunctions.cpp"
+#include "builtin/streams/ReadableStreamOperations.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "frontend/NameFunctions.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/ReadableStreamOperations.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "frontend/NameFunctions.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/ReadableStreamOperations.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "frontend/ParseNode.cpp"
+#include "builtin/streams/ReadableStreamReader.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "frontend/ParseNode.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/ReadableStreamReader.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "frontend/ParseNode.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/ReadableStreamReader.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

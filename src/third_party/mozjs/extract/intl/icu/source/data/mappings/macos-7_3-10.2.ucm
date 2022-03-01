@@ -1,0 +1,325 @@
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# ***************************************************************************
+# *
+# *   Copyright (C) 2001-2003, International Business Machines
+# *   Corporation and others.  All Rights Reserved.
+# *
+# ***************************************************************************
+#
+# File created on Feb 21 13:52 PST 2003
+#
+# File created by genmucm tool.
+# from macos 10.2 using TECCreateConverter
+#
+# Table Version : 1.0
+# The 1st column is the Unicode scalar value.
+# The 2nd column is the codepage byte sequence.
+# The 3rd column is the fallback indicator.
+# The fallback indicator can have one of the following values:
+#   |0 for exact 1-1 roundtrip mapping
+#   |1 for the best fallback codepage byte sequence.
+#   |2 for the substitution character
+#   |3 for the best reverse fallback Unicode scaler value
+#
+# Encoding description: 
+# Encoding name: X-MAC-CYRILLIC
+#
+<code_set_name>               "macos-7_3-10.2"
+<mb_cur_max>                  1
+<mb_cur_min>                  1
+<uconv_class>                 "SBCS"
+<subchar>                     \x3F
+<icu:charsetFamily>           "ASCII"
+# Suggested ICU specific alias information
+#<icu:alias>                  "macos-7_3_VPUA"
+
+#
+CHARMAP
+#
+#UNICODE 7_3
+#_______ _________
+<U0000> \x00 |0
+<U0001> \x01 |0
+<U0002> \x02 |0
+<U0003> \x03 |0
+<U0004> \x04 |0
+<U0005> \x05 |0
+<U0006> \x06 |0
+<U0007> \x07 |0
+<U0008> \x08 |0
+<U0009> \x09 |0
+<U000A> \x0A |0
+<U000B> \x0B |0
+<U000C> \x0C |0
+<U000D> \x0D |0
+<U000E> \x0E |0
+<U000F> \x0F |0
+<U0010> \x10 |0
+<U0011> \x11 |0
+<U0012> \x12 |0
+<U0013> \x13 |0
+<U0014> \x14 |0
+<U0015> \x15 |0
+<U0016> \x16 |0
+<U0017> \x17 |0
+<U0018> \x18 |0
+<U0019> \x19 |0
+<U001A> \x1A |0
+<U001B> \x1B |0
+<U001C> \x1C |0
+<U001D> \x1D |0
+<U001E> \x1E |0
+<U001F> \x1F |0
+<U0020> \x20 |0
+<U0021> \x21 |0
+<U0022> \x22 |0
+<U0023> \x23 |0
+<U0024> \x24 |0
+<U0025> \x25 |0
+<U0026> \x26 |0
+<U0027> \x27 |0
+<U0028> \x28 |0
+<U0029> \x29 |0
+<U002A> \x2A |0
+<U002B> \x2B |0
+<U002C> \x2C |0
+<U002D> \x2D |0
+<U002E> \x2E |0
+<U002F> \x2F |0
+<U0030> \x30 |0
+<U0031> \x31 |0
+<U0032> \x32 |0
+<U0033> \x33 |0
+<U0034> \x34 |0
+<U0035> \x35 |0
+<U0036> \x36 |0
+<U0037> \x37 |0
+<U0038> \x38 |0
+<U0039> \x39 |0
+<U003A> \x3A |0
+<U003B> \x3B |0
+<U003C> \x3C |0
+<U003D> \x3D |0
+<U003E> \x3E |0
+<U003F> \x3F |0
+<U0040> \x40 |0
+<U0041> \x41 |0
+<U0042> \x42 |0
+<U0043> \x43 |0
+<U0044> \x44 |0
+<U0045> \x45 |0
+<U0046> \x46 |0
+<U0047> \x47 |0
+<U0048> \x48 |0
+<U0049> \x49 |0
+<U004A> \x4A |0
+<U004B> \x4B |0
+<U004C> \x4C |0
+<U004D> \x4D |0
+<U004E> \x4E |0
+<U004F> \x4F |0
+<U0050> \x50 |0
+<U0051> \x51 |0
+<U0052> \x52 |0
+<U0053> \x53 |0
+<U0054> \x54 |0
+<U0055> \x55 |0
+<U0056> \x56 |0
+<U0057> \x57 |0
+<U0058> \x58 |0
+<U0059> \x59 |0
+<U005A> \x5A |0
+<U005B> \x5B |0
+<U005C> \x5C |0
+<U005D> \x5D |0
+<U005E> \x5E |0
+<U005F> \x5F |0
+<U0060> \x60 |0
+<U0061> \x61 |0
+<U0062> \x62 |0
+<U0063> \x63 |0
+<U0064> \x64 |0
+<U0065> \x65 |0
+<U0066> \x66 |0
+<U0067> \x67 |0
+<U0068> \x68 |0
+<U0069> \x69 |0
+<U006A> \x6A |0
+<U006B> \x6B |0
+<U006C> \x6C |0
+<U006D> \x6D |0
+<U006E> \x6E |0
+<U006F> \x6F |0
+<U0070> \x70 |0
+<U0071> \x71 |0
+<U0072> \x72 |0
+<U0073> \x73 |0
+<U0074> \x74 |0
+<U0075> \x75 |0
+<U0076> \x76 |0
+<U0077> \x77 |0
+<U0078> \x78 |0
+<U0079> \x79 |0
+<U007A> \x7A |0
+<U007B> \x7B |0
+<U007C> \x7C |0
+<U007D> \x7D |0
+<U007E> \x7E |0
+<U007F> \x7F |0
+<U00A0> \xCA |0
+<U00A3> \xA3 |0
+<U00A7> \xA4 |0
+<U00A9> \xA9 |0
+<U00AB> \xC7 |0
+<U00AC> \xC2 |0
+<U00AE> \xA8 |0
+<U00B0> \xA1 |0
+<U00B1> \xB1 |0
+<U00B5> \xB5 |0
+<U00B6> \xA6 |0
+<U00BB> \xC8 |0
+<U00F7> \xD6 |0
+<U0192> \xC4 |0
+<U02BB> \xD4 |1
+<U02BC> \xD5 |1
+<U02CB> \x60 |1
+<U0300> \x60 |1
+<U0338> \x2F |1
+<U0401> \xDD |0
+<U0402> \xAB |0
+<U0403> \xAE |0
+<U0404> \xB8 |0
+<U0405> \xC1 |0
+<U0406> \xA7 |0
+<U0407> \xBA |0
+<U0408> \xB7 |0
+<U0409> \xBC |0
+<U040A> \xBE |0
+<U040B> \xCB |0
+<U040C> \xCD |0
+<U040E> \xD8 |0
+<U040F> \xDA |0
+<U0410> \x80 |0
+<U0411> \x81 |0
+<U0412> \x82 |0
+<U0413> \x83 |0
+<U0414> \x84 |0
+<U0415> \x85 |0
+<U0416> \x86 |0
+<U0417> \x87 |0
+<U0418> \x88 |0
+<U0419> \x89 |0
+<U041A> \x8A |0
+<U041B> \x8B |0
+<U041C> \x8C |0
+<U041D> \x8D |0
+<U041E> \x8E |0
+<U041F> \x8F |0
+<U0420> \x90 |0
+<U0421> \x91 |0
+<U0422> \x92 |0
+<U0423> \x93 |0
+<U0424> \x94 |0
+<U0425> \x95 |0
+<U0426> \x96 |0
+<U0427> \x97 |0
+<U0428> \x98 |0
+<U0429> \x99 |0
+<U042A> \x9A |0
+<U042B> \x9B |0
+<U042C> \x9C |0
+<U042D> \x9D |0
+<U042E> \x9E |0
+<U042F> \x9F |0
+<U0430> \xE0 |0
+<U0431> \xE1 |0
+<U0432> \xE2 |0
+<U0433> \xE3 |0
+<U0434> \xE4 |0
+<U0435> \xE5 |0
+<U0436> \xE6 |0
+<U0437> \xE7 |0
+<U0438> \xE8 |0
+<U0439> \xE9 |0
+<U043A> \xEA |0
+<U043B> \xEB |0
+<U043C> \xEC |0
+<U043D> \xED |0
+<U043E> \xEE |0
+<U043F> \xEF |0
+<U0440> \xF0 |0
+<U0441> \xF1 |0
+<U0442> \xF2 |0
+<U0443> \xF3 |0
+<U0444> \xF4 |0
+<U0445> \xF5 |0
+<U0446> \xF6 |0
+<U0447> \xF7 |0
+<U0448> \xF8 |0
+<U0449> \xF9 |0
+<U044A> \xFA |0
+<U044B> \xFB |0
+<U044C> \xFC |0
+<U044D> \xFD |0
+<U044E> \xFE |0
+<U044F> \xDF |0
+<U0451> \xDE |0
+<U0452> \xAC |0
+<U0453> \xAF |0
+<U0454> \xB9 |0
+<U0455> \xCF |0
+<U0456> \xB4 |0
+<U0457> \xBB |0
+<U0458> \xC0 |0
+<U0459> \xBD |0
+<U045A> \xBF |0
+<U045B> \xCC |0
+<U045C> \xCE |0
+<U045E> \xD9 |0
+<U045F> \xDB |0
+<U0490> \xA2 |0
+<U0491> \xB6 |0
+<U2000> \x20 |1
+<U2001> \x20 |1
+<U2002> \x20 |1
+<U2003> \x20 |1
+<U2004> \x20 |1
+<U2005> \x20 |1
+<U2006> \x20 |1
+<U2007> \x20 |1
+<U2008> \x20 |1
+<U2009> \x20 |1
+<U2010> \x2D |1
+<U2011> \x2D |1
+<U2012> \xD0 |1
+<U2013> \xD0 |0
+<U2014> \xD1 |0
+<U2015> \xD1 |1
+<U2018> \xD4 |0
+<U2019> \xD5 |0
+<U201C> \xD2 |0
+<U201D> \xD3 |0
+<U201E> \xD7 |0
+<U2020> \xA0 |0
+<U2022> \xA5 |0
+<U2026> \xC9 |0
+<U2028> \x0D |1
+<U2029> \x0D |1
+<U20AC> \xFF |0
+<U2116> \xDC |0
+<U2122> \xAA |0
+<U2206> \xC6 |0
+<U2215> \x2F |1
+<U2217> \x2A |1
+<U221A> \xC3 |0
+<U221E> \xB0 |0
+<U2236> \x3A |1
+<U223C> \x7E |1
+<U2248> \xC5 |0
+<U2260> \xAD |0
+<U2264> \xB2 |0
+<U2265> \xB3 |0
+#
+END CHARMAP
+#

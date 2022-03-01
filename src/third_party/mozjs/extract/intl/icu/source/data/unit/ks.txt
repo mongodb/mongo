@@ -1,0 +1,37 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ks{
+    units{
+        duration{
+            day{
+                one{"{0} دۄہ"}
+                other{"{0} دۄہ"}
+            }
+            hour{
+                one{"{0} گَنٹہٕ"}
+                other{"{0} گٲنٹہٕ"}
+            }
+            minute{
+                one{"{0} مِنَٹ"}
+                other{"{0} مِنَٹ"}
+            }
+            month{
+                one{"{0} ریتھ"}
+                other{"{0} ریتھ"}
+            }
+            second{
+                one{"{0} سیکَنڈ"}
+                other{"{0} سیکَنڈ"}
+            }
+            week{
+                one{"{0} ہَفتہٕ"}
+                other{"{0} ہَفتہٕ"}
+            }
+            year{
+                one{"{0} ؤری"}
+                other{"{0} ؤری"}
+            }
+        }
+    }
+}

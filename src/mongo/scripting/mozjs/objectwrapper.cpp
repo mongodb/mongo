@@ -31,7 +31,10 @@
 
 #include "mongo/scripting/mozjs/objectwrapper.h"
 
+#include <js/Array.h>
 #include <js/Conversions.h>
+#include <js/ValueArray.h>
+
 #include <jsapi.h>
 
 #include "mongo/base/error_codes.h"
@@ -58,9 +61,9 @@ void ObjectWrapper::Key::get(JSContext* cx, JS::HandleObject o, JS::MutableHandl
                 return;
             break;
         case Type::Id: {
-            JS::RootedId id(cx, _id);
+            JS::RootedId rid(cx, _id);
 
-            if (JS_GetPropertyById(cx, o, id, value))
+            if (JS_GetPropertyById(cx, o, rid, value))
                 return;
             break;
         }
@@ -137,6 +140,17 @@ void ObjectWrapper::Key::define(JSContext* cx,
     throwCurrentJSException(cx, ErrorCodes::InternalError, "Failed to define value on a JSObject");
 }
 
+/*
+ * Wrapper functions to create wrappers with no corresponding JSJitInfo from API
+ * function arguments.
+ */
+static JSNativeWrapper NativeOpWrapper(JSNative native) {
+    JSNativeWrapper ret;
+    ret.op = native;
+    ret.info = nullptr;
+    return ret;
+}
+
 void ObjectWrapper::Key::define(
     JSContext* cx, JS::HandleObject o, unsigned attrs, JSNative getter, JSNative setter) {
     switch (_type) {
@@ -144,14 +158,18 @@ void ObjectWrapper::Key::define(
             if (JS_DefineProperty(cx, o, _field, getter, setter, attrs))
                 return;
             break;
-        case Type::Index:
-            if (JS_DefineElement(cx, o, _idx, getter, setter, attrs))
+        case Type::Index: {
+            JS::RootedId rid1(cx);
+            if (!JS_IndexToId(cx, _idx, &rid1)) {
+                break;
+            }
+            if (JS_DefinePropertyById(cx, o, rid1, getter, setter, attrs))
                 return;
             break;
+        }
         case Type::Id: {
-            JS::RootedId id(cx, _id);
-
-            if (JS_DefinePropertyById(cx, o, id, getter, setter, attrs))
+            JS::RootedId rid2(cx, _id);
+            if (JS_DefinePropertyById(cx, o, rid2, getter, setter, attrs))
                 return;
             break;
         }
@@ -318,12 +336,12 @@ StringData ObjectWrapper::Key::toStringData(JSContext* cx, JSStringWrapper* jsst
         rid.set(id);
     }
 
-    if (JSID_IS_INT(rid)) {
+    if (rid.isInt()) {
         *jsstr = JSStringWrapper(JSID_TO_INT(rid));
         return jsstr->toStringData();
     }
 
-    if (JSID_IS_STRING(rid)) {
+    if (rid.isString()) {
         *jsstr = JSStringWrapper(cx, JSID_TO_STRING(rid));
         return jsstr->toStringData();
     }
@@ -506,7 +524,7 @@ void ObjectWrapper::callMethod(const char* field,
 }
 
 void ObjectWrapper::callMethod(const char* field, JS::MutableHandleValue out) {
-    JS::AutoValueVector args(_context);
+    JS::RootedValueVector args(_context);
 
     callMethod(field, args, out);
 }
@@ -521,7 +539,7 @@ void ObjectWrapper::callMethod(JS::HandleValue fun,
 }
 
 void ObjectWrapper::callMethod(JS::HandleValue fun, JS::MutableHandleValue out) {
-    JS::AutoValueVector args(_context);
+    JS::RootedValueVector args(_context);
 
     callMethod(fun, args, out);
 }
@@ -629,7 +647,7 @@ ObjectWrapper::WriteFieldRecursionFrame::WriteFieldRecursionFrame(JSContext* cx,
     : thisv(cx, obj), ids(cx, JS::IdVector(cx)) {
     bool isArray = false;
     if (parent) {
-        if (!JS_IsArrayObject(cx, thisv, &isArray)) {
+        if (!JS::IsArrayObject(cx, thisv, &isArray)) {
             throwCurrentJSException(
                 cx, ErrorCodes::JSInterpreterFailure, "Failure to check object is an array");
         }
@@ -639,7 +657,7 @@ ObjectWrapper::WriteFieldRecursionFrame::WriteFieldRecursionFrame(JSContext* cx,
 
     if (isArray) {
         uint32_t length;
-        if (!JS_GetArrayLength(cx, thisv, &length)) {
+        if (!JS::GetArrayLength(cx, thisv, &length)) {
             throwCurrentJSException(
                 cx, ErrorCodes::JSInterpreterFailure, "Failure to get array length");
         }
@@ -683,7 +701,7 @@ void ObjectWrapper::_writeField(BSONObjBuilder* b,
 }
 
 std::string ObjectWrapper::getClassName() {
-    auto jsclass = JS_GetClass(_object);
+    auto jsclass = JS::GetClass(_object);
 
     if (jsclass)
         return jsclass->name;

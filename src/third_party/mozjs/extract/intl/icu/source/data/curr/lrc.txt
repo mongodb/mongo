@@ -1,0 +1,83 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+lrc{
+    Currencies{
+        BRL{
+            "R$",
+            "رئال بئرئزیل",
+        }
+        CNY{
+            "CN¥",
+            "یوان چین",
+        }
+        EUR{
+            "€",
+            "یورو",
+        }
+        GBP{
+            "£",
+            "پوند بئریتانیا",
+        }
+        INR{
+            "₹",
+            "روٙپیه هئن",
+        }
+        IQD{
+            "د.ع.‏",
+            "IQD",
+        }
+        JPY{
+            "JP¥",
+            "یئن جاپوٙن",
+        }
+        RUB{
+            "RUB",
+            "روٙبل روٙسیه",
+        }
+        USD{
+            "US$",
+            "USD",
+        }
+        XXX{
+            "¤",
+            "پیل نادیار",
+        }
+    }
+    Currencies%narrow{
+        BRL{"R$"}
+        CNY{"¥"}
+        EUR{"€"}
+        GBP{"£"}
+        INR{"₹"}
+        JPY{"¥"}
+        RUB{"₽"}
+        USD{"$"}
+    }
+    CurrencyPlurals{
+        BRL{
+            other{"رئال بئرئزیل"}
+        }
+        CNY{
+            other{"یوان چین"}
+        }
+        EUR{
+            other{"یورو"}
+        }
+        GBP{
+            other{"پوند بئریتانیا"}
+        }
+        INR{
+            other{"روٙپیه هئن"}
+        }
+        JPY{
+            other{"یئن جاپوٙن"}
+        }
+        RUB{
+            other{"روٙبل روٙسیه"}
+        }
+        XXX{
+            other{"پیل نادیار"}
+        }
+    }
+}

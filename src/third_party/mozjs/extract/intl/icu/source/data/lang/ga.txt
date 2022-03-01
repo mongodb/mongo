@@ -1,0 +1,766 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ga{
+    Keys{
+        calendar{"Féilire"}
+        cf{"Formáid Airgeadra"}
+        collation{"Ord Sórtála"}
+        currency{"Airgeadra"}
+        hc{"Timthriall Uaire (12 vs 24)"}
+        lb{"Stíl Briseadh Líne"}
+        ms{"Córas Tomhais"}
+        numbers{"Uimhreacha"}
+    }
+    Languages{
+        aa{"Afáiris"}
+        ab{"Abcáisis"}
+        ady{"Adaigéis"}
+        ae{"Aivéistis"}
+        af{"Afracáinis"}
+        ain{"Aidhniúis"}
+        ak{"Acáinis"}
+        akk{"Acáidis"}
+        am{"Amáiris"}
+        an{"Aragóinis"}
+        ang{"Sean-Bhéarla"}
+        ar{"Araibis"}
+        ar_001{"Araibis Chaighdeánach"}
+        arc{"Aramais"}
+        arn{"Mapúitsis"}
+        as{"Asaimis"}
+        ast{"Astúiris"}
+        av{"Aváiris"}
+        ay{"Aidhmiris"}
+        az{"Asarbaiseáinis"}
+        ba{"Baiscíris"}
+        ban{"Bailís"}
+        bar{"Baváiris"}
+        bas{"Basáis"}
+        be{"Bealarúisis"}
+        bem{"Beimbis"}
+        bez{"Béinis"}
+        bg{"Bulgáiris"}
+        bi{"Bioslaimis"}
+        bm{"Bambairis"}
+        bn{"Beangáilis"}
+        bo{"Tibéidis"}
+        br{"Briotáinis"}
+        brx{"Bódóis"}
+        bs{"Boisnis"}
+        bua{"Buiriáitis"}
+        bug{"Buiginis"}
+        ca{"Catalóinis"}
+        ccp{"Chakma"}
+        ce{"Seisnis"}
+        ceb{"Seabúáinis"}
+        cgg{"Cígis"}
+        ch{"Seamóiris"}
+        chm{"Mairis"}
+        chr{"Seiricis"}
+        ckb{"Coirdis Lárnach"}
+        co{"Corsaicis"}
+        cop{"Coptais"}
+        cr{"Craís"}
+        crs{"Criól Fraincise Seselwa"}
+        cs{"Seicis"}
+        csb{"Caisiúibis"}
+        cu{"Slavais na hEaglaise"}
+        cv{"Suvaisis"}
+        cy{"Breatnais"}
+        da{"Danmhairgis"}
+        dav{"Taita"}
+        de{"Gearmáinis"}
+        de_AT{"Gearmáinis Ostarach"}
+        de_CH{"Ard-Ghearmáinis Eilvéiseach"}
+        dje{"Zarmais"}
+        dsb{"Sorbais Íochtarach"}
+        dua{"Duailis"}
+        dum{"Meán-Ollainnis"}
+        dv{"Divéihis"}
+        dyo{"Ióla-Fainís"}
+        dz{"Seoinicis"}
+        ebu{"Eambúis"}
+        ee{"Éabhais"}
+        egy{"Sean-Éigiptis"}
+        el{"Gréigis"}
+        en{"Béarla"}
+        en_AU{"Béarla Astrálach"}
+        en_CA{"Béarla Ceanadach"}
+        en_GB{"Béarla Briotanach"}
+        en_US{"Béarla Meiriceánach"}
+        enm{"Meán-Bhéarla"}
+        eo{"Esperanto"}
+        es{"Spáinnis"}
+        es_419{"Spáinnis Mheiriceá Laidinigh"}
+        es_ES{"Spáinnis Eorpach"}
+        es_MX{"Spáinnis Mheicsiceach"}
+        et{"Eastóinis"}
+        eu{"Bascais"}
+        ewo{"Éabhandóis"}
+        fa{"Peirsis"}
+        fa_AF{"Dairis"}
+        ff{"Fuláinis"}
+        fi{"Fionlainnis"}
+        fil{"Filipínis"}
+        fj{"Fidsis"}
+        fo{"Faróis"}
+        fon{"fon"}
+        fr{"Fraincis"}
+        fr_CA{"Fraincis Cheanadach"}
+        fr_CH{"Fraincis Eilvéiseach"}
+        frm{"Meán-Fhraincis"}
+        fro{"Sean-Fhraincis"}
+        frr{"Freaslainnis an Tuaiscirt"}
+        fur{"Friúilis"}
+        fy{"Freaslainnis Iartharach"}
+        ga{"Gaeilge"}
+        gan{"Sínis Gan"}
+        gd{"Gaeilge na hAlban"}
+        gez{"Aetóipis"}
+        gil{"Cireabaitis"}
+        gl{"Gailísis"}
+        gmh{"Meán-Ard-Ghearmáinis"}
+        gn{"Guaráinis"}
+        goh{"Sean-Ard-Ghearmáinis"}
+        grc{"Sean-Ghréigis"}
+        gsw{"Gearmáinis Eilvéiseach"}
+        gu{"Gúisearáitis"}
+        guc{"Uaúis"}
+        guz{"Gúisis"}
+        gv{"Manainnis"}
+        ha{"Hásais"}
+        hak{"Haicéis"}
+        haw{"Haváis"}
+        he{"Eabhrais"}
+        hi{"Hiondúis"}
+        hif{"Hiondúis Fhidsí"}
+        hil{"Hilgeanóinis"}
+        hit{"Hitis"}
+        hmn{"Mongais"}
+        ho{"Motúis Hírí"}
+        hr{"Cróitis"}
+        hsb{"Sorbais Uachtarach"}
+        hsn{"Sínis Xiang"}
+        ht{"Criól Háítíoch"}
+        hu{"Ungáiris"}
+        hup{"Húipis"}
+        hy{"Airméinis"}
+        hz{"Heiréiris"}
+        ia{"Interlingua"}
+        ibb{"Ibibis"}
+        id{"Indinéisis"}
+        ie{"Interlingue"}
+        ig{"Íogbóis"}
+        ii{"Ís Shichuan"}
+        ik{"Iniúipiaicis"}
+        inh{"Iongúis"}
+        io{"Ido"}
+        is{"Íoslainnis"}
+        it{"Iodáilis"}
+        iu{"Ionúitis"}
+        ja{"Seapáinis"}
+        jbo{"Lojban"}
+        jgo{"Ngomba"}
+        jmc{"Machame"}
+        jut{"Iútlainnis"}
+        jv{"Iáivis"}
+        ka{"Seoirsis"}
+        kaa{"Cara-Chalpáis"}
+        kab{"Caibílis"}
+        kam{"Cambais"}
+        kde{"Makonde"}
+        kea{"Criól Cabo Verde"}
+        kg{"Congóis"}
+        khq{"Songais Iartharach"}
+        ki{"Ciocúis"}
+        kj{"Cuainiáimis"}
+        kk{"Casaicis"}
+        kkj{"Cacóis"}
+        kl{"Kalaallisut"}
+        kln{"Kalenjin"}
+        km{"Ciméiris"}
+        kn{"Cannadais"}
+        ko{"Cóiréis"}
+        kok{"Concáinis"}
+        kr{"Canúiris"}
+        krl{"Cairéilis"}
+        kru{"Curúicis"}
+        ks{"Caismíris"}
+        ksb{"Shambala"}
+        ksf{"Baifiais"}
+        ksh{"Coilsis"}
+        ku{"Coirdis"}
+        kv{"Coimis"}
+        kw{"Coirnis"}
+        ky{"Cirgisis"}
+        la{"Laidin"}
+        lad{"Laidínis"}
+        lag{"Láingis"}
+        lah{"Puinseáibis Iartharach"}
+        lb{"Lucsambuirgis"}
+        lg{"Lugandais"}
+        li{"Liombuirgis"}
+        lij{"Liogúiris"}
+        liv{"Liovóinis"}
+        lkt{"Lacótais"}
+        lmo{"Lombairdis"}
+        ln{"Liongáilis"}
+        lo{"Laoisis"}
+        lrc{"Luri Thuaidh"}
+        lt{"Liotuáinis"}
+        lu{"Lúba-Cataingis"}
+        luo{"Lúóis"}
+        luy{"Luyia"}
+        lv{"Laitvis"}
+        mai{"Maitilis"}
+        mas{"Másais"}
+        men{"Meindis"}
+        mer{"Meru"}
+        mfe{"Morisyen"}
+        mg{"Malagáisis"}
+        mga{"Meán-Ghaeilge"}
+        mgh{"Makhuwa-Meetto"}
+        mgo{"Metaʼ"}
+        mh{"Mairsillis"}
+        mi{"Maorais"}
+        mk{"Macadóinis"}
+        ml{"Mailéalaimis"}
+        mn{"Mongóilis"}
+        mni{"Manapúiris"}
+        moh{"Móháicis"}
+        mr{"Maraitis"}
+        mrj{"Mairis Iartharach"}
+        ms{"Malaeis"}
+        mt{"Máltais"}
+        mua{"Mundang"}
+        mul{"Ilteangacha"}
+        mwl{"Mioraindéis"}
+        mwr{"Marmhairis"}
+        my{"Burmais"}
+        mzn{"Mázandaráinis"}
+        na{"Nárúis"}
+        nan{"Sínis Min Nan"}
+        nap{"Napóilis"}
+        naq{"Nama"}
+        nb{"Ioruais Bokmål"}
+        nd{"Ndeibéilis an Tuaiscirt"}
+        nds{"Gearmáinis Íochtarach"}
+        nds_NL{"Sacsainis Íochtarach"}
+        ne{"Neipeailis"}
+        ng{"Ndongais"}
+        niu{"Níobhais"}
+        nl{"Ollainnis"}
+        nl_BE{"Pléimeannais"}
+        nmg{"Cuaiseois"}
+        nn{"Nua-Ioruais"}
+        nnh{"Ngiemboon"}
+        no{"Ioruais"}
+        non{"Sean-Lochlainnis"}
+        nr{"Ndeibéilis an Deiscirt"}
+        nso{"Sútúis an Tuaiscirt"}
+        nus{"Nuairis"}
+        nv{"Navachóis"}
+        ny{"Siséivis"}
+        nyn{"Niancóilis"}
+        oc{"Ocsatáinis"}
+        oj{"Óisibis"}
+        om{"Oraimis"}
+        or{"Oirísis"}
+        os{"Oiséitis"}
+        pa{"Puinseáibis"}
+        pcm{"pidsean na Nigéire"}
+        peo{"Sean-Pheirsis"}
+        pi{"Páilis"}
+        pl{"Polainnis"}
+        prg{"Prúisis"}
+        ps{"Paistis"}
+        pt{"Portaingéilis"}
+        pt_BR{"Portaingéilis Bhrasaíleach"}
+        pt_PT{"Portaingéilis Ibéarach"}
+        qu{"Ceatsuais"}
+        quc{"Cuitséis"}
+        rm{"Rómainis"}
+        rn{"Rúindis"}
+        ro{"Rómáinis"}
+        ro_MD{"Moldáivis"}
+        rof{"Rombo"}
+        rom{"Romainis"}
+        ru{"Rúisis"}
+        rup{"Arómáinis"}
+        rw{"Ciniaruaindis"}
+        rwk{"Rwa"}
+        sa{"Sanscrait"}
+        sah{"Sachais"}
+        sam{"Aramais Shamárach"}
+        saq{"Samburu"}
+        sat{"Santáilis"}
+        sbp{"Sangu"}
+        sc{"Sairdínis"}
+        scn{"Sicilis"}
+        sco{"Albainis"}
+        sd{"Sindis"}
+        se{"Sáimis Thuaidh"}
+        seh{"Sena"}
+        ses{"Songais Oirthearach"}
+        sg{"Sangóis"}
+        sga{"Sean-Ghaeilge"}
+        sh{"Seirbea-Chróitis"}
+        shi{"Tachelhit"}
+        si{"Siolóinis"}
+        sk{"Slóvaicis"}
+        sl{"Slóivéinis"}
+        sm{"Samóis"}
+        sma{"Sáimis Theas"}
+        smj{"Sáimis Lule"}
+        smn{"Sáimis Inari"}
+        sms{"Sáimis Skolt"}
+        sn{"Seoinis"}
+        so{"Somáilis"}
+        sog{"Sogdánais"}
+        sq{"Albáinis"}
+        sr{"Seirbis"}
+        ss{"Suaisis"}
+        st{"Seasóitis"}
+        su{"Sundais"}
+        sux{"Suiméiris"}
+        sv{"Sualainnis"}
+        sw{"Svahaílis"}
+        sw_CD{"Svahaílis an Chongó"}
+        swb{"Comóiris"}
+        syr{"Siricis"}
+        szl{"Siléisis"}
+        ta{"Tamailis"}
+        te{"Teileagúis"}
+        teo{"Teso"}
+        tg{"Táidsícis"}
+        th{"Téalainnis"}
+        ti{"Tigrinis"}
+        tk{"Tuircméinis"}
+        tl{"Tagálaigis"}
+        tlh{"Klingon"}
+        tn{"Suáinis"}
+        to{"Tongais"}
+        tpi{"Tok Pisin"}
+        tr{"Tuircis"}
+        ts{"Songais"}
+        tt{"Tatairis"}
+        tw{"Tíbhis"}
+        twq{"Tasawaq"}
+        ty{"Taihítis"}
+        tzm{"Tamazight Atlais Láir"}
+        udm{"Udmairtis"}
+        ug{"Uigiúiris"}
+        uk{"Úcráinis"}
+        und{"Teanga Anaithnid"}
+        ur{"Urdúis"}
+        uz{"Úisbéiceastáinis"}
+        vai{"vai"}
+        ve{"Veindis"}
+        vec{"Veinéisis"}
+        vi{"Vítneaimis"}
+        vls{"Pléimeannais Iartharach"}
+        vo{"Volapük"}
+        vun{"Vunjo"}
+        wa{"Vallúnais"}
+        wae{"Walser"}
+        wo{"Volaifis"}
+        xal{"Cailmícis"}
+        xh{"Cóisis"}
+        xog{"Soga"}
+        yav{"Yangben"}
+        yi{"Giúdais"}
+        yo{"Iarúibis"}
+        yue{"Cantainis"}
+        za{"Siuáingis"}
+        zea{"Séalainnis"}
+        zgh{"Tamaisis Chaighdeánach Mharacó"}
+        zh{"Sínis"}
+        zh_Hans{"Sínis Shimplithe"}
+        zh_Hant{"Sínis Thraidisiúnta"}
+        zu{"Súlúis"}
+        zun{"Zúinis"}
+        zxx{"Gan ábhar teangeolaíoch"}
+    }
+    Languages%long{
+        zh_Hans{"Mandairínis Shimplithe"}
+    }
+    Languages%menu{
+        yue{"Sínis, Cantainis"}
+        zh{"Mandairínis"}
+    }
+    Languages%short{
+        az{"Asairis"}
+        en_GB{"Béarla na R.A."}
+        en_US{"Béarla S.A.M."}
+    }
+    Languages%variant{
+        ckb{"Coirdis, Sóráinis"}
+    }
+    Scripts{
+        Adlm{"Adlam"}
+        Aghb{"Albánach Cugasach"}
+        Ahom{"Ahom"}
+        Arab{"Arabach"}
+        Armi{"Aramach Impiriúil"}
+        Armn{"Airméanach"}
+        Avst{"Aivéisteach"}
+        Bali{"Bailíoch"}
+        Batk{"Batacach"}
+        Beng{"Beangálach"}
+        Bopo{"Bopomofo"}
+        Brai{"Braille"}
+        Bugi{"Buigineach"}
+        Buhd{"Buthaideach"}
+        Cans{"Siollach Bundúchasach Ceanadach Aontaithe"}
+        Cher{"Seiricíoch"}
+        Copt{"Coptach"}
+        Cprt{"Cipireach"}
+        Cyrl{"Coireallach"}
+        Deva{"Déiveanágrach"}
+        Dupl{"Gearrscríobh Duployan"}
+        Egyd{"Éigipteach coiteann"}
+        Egyh{"Éigipteach cliarúil"}
+        Egyp{"Iairiglifí Éigipteacha"}
+        Ethi{"Aetópach"}
+        Geor{"Seoirseach"}
+        Glag{"Glagalach"}
+        Goth{"Gotach"}
+        Grek{"Gréagach"}
+        Gujr{"Gúisearátach"}
+        Guru{"Gurmúcach"}
+        Hanb{"Han agus Bopomofo"}
+        Hang{"Hangalach"}
+        Hani{"Han"}
+        Hano{"Hananúis"}
+        Hans{"Simplithe"}
+        Hant{"Traidisiúnta"}
+        Hebr{"Eabhrach"}
+        Hira{"Hireagánach"}
+        Hluw{"Iairiglifí Anatólacha"}
+        Hrkt{"Siollabraí Seapánacha"}
+        Hung{"Sean-Ungárach"}
+        Ital{"Sean-Iodáilic"}
+        Jamo{"Seamó"}
+        Java{"Iávach"}
+        Jpan{"Seapánach"}
+        Kana{"Catacánach"}
+        Khmr{"Ciméarach"}
+        Knda{"Cannadach"}
+        Kore{"Cóiréach"}
+        Laoo{"Laosach"}
+        Latg{"Cló Gaelach"}
+        Latn{"Laidineach"}
+        Limb{"Liombúch"}
+        Lina{"Líneach A"}
+        Linb{"Líneach B"}
+        Lisu{"Fraser"}
+        Lyci{"Liciach"}
+        Lydi{"Lidiach"}
+        Mahj{"Mahasánach"}
+        Mani{"Mainicéasach"}
+        Maya{"Iairiglifí Máigheacha"}
+        Mend{"Meindeach"}
+        Mlym{"Mailéalamach"}
+        Mong{"Mongólach"}
+        Mult{"Multani"}
+        Mymr{"Maenmarach"}
+        Narb{"Sean-Arabach Thuaidh"}
+        Newa{"Newa"}
+        Nkoo{"N-cóis"}
+        Ogam{"Ogham"}
+        Orya{"Oiríseach"}
+        Osge{"Ósáis"}
+        Perm{"Sean-Pheirmeach"}
+        Phnx{"Féiníceach"}
+        Plrd{"Pollard Foghrach"}
+        Prti{"Pairtiach Inscríbhinniúil"}
+        Runr{"Rúnach"}
+        Samr{"Samárach"}
+        Sarb{"Sean-Arabach Theas"}
+        Sgnw{"Litritheoireacht Comharthaí"}
+        Shaw{"Shawach"}
+        Sinh{"Siolónach"}
+        Sund{"Sundainéis"}
+        Syrc{"Siriceach"}
+        Tale{"Deiheoingis"}
+        Talu{"Tai Lue Nua"}
+        Taml{"Tamalach"}
+        Telu{"Teileagúch"}
+        Tfng{"Tifinagh"}
+        Tglg{"Tagálagach"}
+        Thaa{"Tánach"}
+        Thai{"Téalannach"}
+        Tibt{"Tibéadach"}
+        Ugar{"Úgairíteach"}
+        Vaii{"Vadhais"}
+        Xpeo{"Sean-Pheirseach"}
+        Xsux{"Dingchruthach Suiméar-Acádach"}
+        Yiii{"Ís"}
+        Zinh{"Oidhreacht"}
+        Zmth{"Nodaireacht Mhatamaiticiúil"}
+        Zsye{"Emoji"}
+        Zsym{"Siombailí"}
+        Zxxx{"Gan Scríobh"}
+        Zyyy{"Coitianta"}
+        Zzzz{"Script Anaithnid"}
+    }
+    Scripts%stand-alone{
+        Hans{"Han Simplithe"}
+        Hant{"Han Traidisiúnta"}
+    }
+    Types{
+        calendar{
+            buddhist{"Féilire Búdaíoch"}
+            chinese{"Féilire Síneach"}
+            coptic{"Féilire Coptach"}
+            dangi{"Féilire Dangi"}
+            ethiopic{"Féilire Aetóipice"}
+            ethiopic-amete-alem{"Féilire Aetóipice Amete Alem"}
+            gregorian{"Féilire Ghréagóra"}
+            hebrew{"Féilire na nEabhrach"}
+            indian{"Féilire Náisiúnta na hIndia"}
+            islamic{"Féilire Ioslamach"}
+            islamic-civil{"Féilire Ioslamach (táblach, seanré shibhialta)"}
+            islamic-rgsa{"Féilire Ioslamach (an Araib Shádach, dearcadh)"}
+            islamic-tbla{"Féilire Ioslamach (táblach, seanré réalteolaíoch)"}
+            islamic-umalqura{"Féilire Ioslamach (Umm al-Qura)"}
+            iso8601{"Féilire ISO-8601"}
+            japanese{"Féilire Seapánach"}
+            persian{"Féilire Peirseach"}
+            roc{"Féilire Téavánach"}
+        }
+        cf{
+            account{"Formáid Airgeadra don Chuntasaíocht"}
+            standard{"Formáid Airgeadra Caighdeánach"}
+        }
+        collation{
+            big5han{"Ord sórtála Síneach traidisiúnta - Big5"}
+            compat{"Ord Sórtála Roimhe Seo, ar son na comhoiriúnachta"}
+            dictionary{"Ord Sórtála Foclóirí"}
+            ducet{"Ord Sórtála Réamhshocraithe Unicode"}
+            emoji{"Ord Sórtála Emoji"}
+            eor{"Rialacha Ordaithe Eorpacha"}
+            gb2312han{"Ord sórtála Síneach simplithe - GB 2312"}
+            phonebook{"Ord sórtála an eolaire teileafóin"}
+            pinyin{"Ord sórtála pinyin"}
+            reformed{"Ord Sórtála Athfhoirmithe"}
+            search{"Cuardach Ilfhóinteach"}
+            searchjl{"Cuardach de réir Consan Tosaigh Hangul"}
+            standard{"Ord Sórtála Caighdeánach"}
+            stroke{"Ord sórtála stríce"}
+            traditional{"Ord sórtála traidisiúnta"}
+            unihan{"Ord Sórtála Stríce Radacaí"}
+            zhuyin{"Ord Sórtála Zhuyin"}
+        }
+        hc{
+            h11{"Córas 12 Uair (0–11)"}
+            h12{"Córas 12 Uair (1–12)"}
+            h23{"Córas 24 Uair (0–23)"}
+            h24{"Córas 24 Uair (1–24)"}
+        }
+        lb{
+            loose{"Stíl Briseadh Líne Scaoilte"}
+            normal{"Stíl Gnáthbhriseadh Líne"}
+            strict{"Stíl Briseadh Líne Docht"}
+        }
+        ms{
+            metric{"Córas Méadrach"}
+            uksystem{"Córas Tomhais Reachtúil"}
+            ussystem{"Córas Tomhais SAM"}
+        }
+        numbers{
+            ahom{"Digití Ahom"}
+            arab{"Digití Ind-Arabacha"}
+            arabext{"Digití Ind-Arabacha Breisithe"}
+            armn{"Uimhreacha Airméanacha"}
+            armnlow{"Uimhreacha Cás Íochtair Airméanacha"}
+            bali{"Digití Bailíocha"}
+            beng{"Digití Beangálacha"}
+            brah{"Digití Brahmi"}
+            cakm{"Digití Chakma"}
+            cham{"Digití Cham"}
+            cyrl{"Uimhreacha Coireallacha"}
+            deva{"Digití Déiveanágracha"}
+            ethi{"Uimhreacha Aetóipice"}
+            fullwide{"Digití Lánleithid"}
+            geor{"Uimhreacha Seoirseacha"}
+            gonm{"Digití Masaram Gondi"}
+            grek{"Uimhreacha Gréagacha"}
+            greklow{"Uimhreacha Cás Íochtair Gréagacha"}
+            gujr{"Digití Gúisearátacha"}
+            guru{"Digití Gurmúcacha"}
+            hanidec{"Uimhreacha Deachúlacha Síneacha"}
+            hans{"Uimhreacha sa tSínis Shimplithe"}
+            hansfin{"Uimhreacha Airgeadúla sa tSínis Shimplithe"}
+            hant{"Uimhreacha sa tSínis Thraidisiúnta"}
+            hantfin{"Uimhreacha Airgeadúla sa tSínis Thraidisiúnta"}
+            hebr{"Uimhreacha Eabhracha"}
+            hmng{"Digití Pahawh Hmong"}
+            java{"Digití Iávacha"}
+            jpan{"Uimhreacha Seapánacha"}
+            jpanfin{"Uimhreacha Airgeadúla Seapánacha"}
+            kali{"Digití Kayah Li"}
+            khmr{"Digití Ciméaracha"}
+            knda{"Digití Cannadacha"}
+            lana{"Digití Tai Tham Hora"}
+            lanatham{"Digití Tai Tham Tham"}
+            laoo{"Digití Laosacha"}
+            latn{"Digití Iartharacha"}
+            lepc{"Digití Lepcha"}
+            limb{"Digití Limbu"}
+            mathbold{"Digití Troma Matamaiticiúla"}
+            mathdbl{"Digití Stríce Dúbailte Matamaiticiúla"}
+            mathmono{"Digití Aonspáis Matamaiticiúla"}
+            mathsanb{"Digití Troma Sans-Serif Matamaiticiúla"}
+            mathsans{"Digití Sans-Serif Matamaiticiúla"}
+            mlym{"Digití Mailéalamacha"}
+            modi{"Digití Modi"}
+            mong{"Digití Mongólacha"}
+            mroo{"Digití Mro"}
+            mtei{"Digití Meetei Mayek"}
+            mymr{"Digití Maenmaracha"}
+            mymrshan{"Digití Myanmar Shan"}
+            mymrtlng{"Digití Myanmar Tai Laing"}
+            nkoo{"Digití N’ko"}
+            olck{"Digití Ol Chiki"}
+            orya{"Digití Oiríseacha"}
+            osma{"Digití Osmanya"}
+            roman{"Uimhreacha Rómhánacha"}
+            romanlow{"Uimhreacha Cás Íochtair Rómhánacha"}
+            saur{"Digití Saurashtra"}
+            shrd{"Digití Sharada"}
+            sind{"Digití Khudawadi"}
+            sinh{"Digití Sinhala Lith"}
+            sora{"Digití Sora Sompeng"}
+            sund{"Digití Sundainéise"}
+            takr{"Digití Takri"}
+            talu{"Digití Tai Lue Nua"}
+            taml{"Uimhreacha Traidisiúnta Tamalacha"}
+            tamldec{"Digití Tamalacha"}
+            telu{"Digití Teileagúcha"}
+            thai{"Digití Téalannacha"}
+            tibt{"Digití Tibéadacha"}
+            tirh{"Digití Tirhuta"}
+            vaii{"Digití Vai"}
+            wara{"Digití Warang Citi"}
+        }
+    }
+    Variants{
+        1606NICT{"Fraincis Dhéanach Mheánach go 1606"}
+        1694ACAD{"Nua-Fhraincis Mhoch"}
+        1901{"Litriú Traidisiúnta na Gearmáinise"}
+        1959ACAD{"Acadúil"}
+        1994{"Ortagrafaíocht Resian Chaighdeánaithe"}
+        1996{"Ortagrafaíocht na Gearmáinise in 1996"}
+        ABL1943{"Foirmiú ortagrafaíochta in 1943"}
+        ALALC97{"Rómhánú ALA-LC, eagrán 1997"}
+        ALUKU{"Canúint Aluku"}
+        AO1990{"Comhaontú Ortagrafaíochta Theanga na Portaingéilise, 1990"}
+        AREVELA{"Airméinis an Oirthir"}
+        AREVMDA{"Airméinis an Iarthair"}
+        BAKU1926{"Abítir Laidine Tuircice Aontaithe"}
+        BALANKA{"Canúint Balanka de Anii"}
+        BARLA{"Grúpa canúna Barlavento de Kabuverdianu"}
+        BASICENG{"Bun-Bhéarla"}
+        BAUDDHA{"Bauddha"}
+        BISCAYAN{"BIOSCÁNACH"}
+        BISKE{"Canúint San Giorgo/Bila"}
+        BOHORIC{"Aibítir Bohorič"}
+        BOONT{"Boontling"}
+        COLB1945{"Coinbhinsiún Ortagrafaíochta na Portaingéilise na Brasaíle, 1945"}
+        CORNU{"Béarla an Choirn"}
+        DAJNKO{"Aibítir Dajnko"}
+        EKAVSK{"Seirbis le fuaimniú Ekavian"}
+        EMODENG{"Nua-Bhéarla Moch"}
+        FONIPA{"Fogharscríobh IPA"}
+        FONNAPA{"Fonnapa"}
+        FONUPA{"Fogharscríobh UPA"}
+        FONXSAMP{"Fonxsamp"}
+        HEPBURN{"Rómhánú Hepburn"}
+        HOGNORSK{"Hognorsk"}
+        HSISTEMO{"Hsistemo"}
+        IJEKAVSK{"Seirbis le fuaimniú Ijekavach"}
+        ITIHASA{"Itihasa"}
+        JAUER{"Jauer"}
+        JYUTPING{"Jyutping"}
+        KKCOR{"Gnáth-Litriú"}
+        KOCIEWIE{"Kociewie"}
+        KSCOR{"Litriú Caighdeánach"}
+        LAUKIKA{"Laukika"}
+        LIPAW{"Canúint Lipovaz de Resian"}
+        LUNA1918{"Luna1918"}
+        METELKO{"Aibítir Metelko"}
+        MONOTON{"Aontonach"}
+        NDYUKA{"Canúint Ndyuka"}
+        NEDIS{"Canúint Natisone"}
+        NEWFOUND{"Talamh an Éisc"}
+        NJIVA{"Canúint Gniva/Njiva"}
+        NULIK{"Volapük Nua-Aimseartha"}
+        OSOJS{"Canúint Oseacco/Osojane"}
+        OXENDICT{"Litriú OED"}
+        PAHAWH2{"Pahawh2"}
+        PAHAWH3{"Pahawh3"}
+        PAHAWH4{"Pahawh4"}
+        PAMAKA{"Canúint Pamaka"}
+        PETR1708{"Petr1708"}
+        PINYIN{"Rómhánú Pinyin"}
+        POLYTON{"Iltonach"}
+        POSIX{"Ríomhaire"}
+        PUTER{"Puter"}
+        REVISED{"Litriú Athbhreithnithe"}
+        RIGIK{"Volapük Clasaiceach"}
+        ROZAJ{"Reisiach"}
+        RUMGR{"Rumgr"}
+        SAAHO{"Saho"}
+        SCOTLAND{"Béarla Caighdeánach na hAlban"}
+        SCOUSE{"Béarla Learphoill"}
+        SIMPLE{"Simplí"}
+        SOLBA{"Canúint Stolvizza/Solbica"}
+        SOTAV{"Grúpa canúna Sotavento de Kabuverdianu"}
+        SPANGLIS{"Spainglis"}
+        SURMIRAN{"Surmiran"}
+        SURSILV{"Sursilvan"}
+        SUTSILV{"Sutsilv"}
+        TARASK{"Ortografaíocht Taraskievica"}
+        UCCOR{"Litriú Comhaontaithe"}
+        UCRCOR{"Litriú Comhaontaithe Athbhreithnithe"}
+        ULSTER{"Cúige Uladh"}
+        UNIFON{"Aibítir foghraíochta Unifon"}
+        VAIDIKA{"Véideach"}
+        VALENCIA{"Vaileinsis"}
+        VALLADER{"Vallader"}
+        WADEGILE{"Rómhánú Wade-Giles"}
+        XSISTEMO{"Xsistemo"}
+    }
+    characterLabelPattern{
+        all{"{0} — Uile"}
+        category-list{"{0}: {1}"}
+        compatibility{"{0} — Comhoiriúnacht"}
+        enclosed{"{0} — Iniata"}
+        extended{"{0} — Breisithe"}
+        historic{"{0} — Stairiúil"}
+        miscellaneous{"{0} — Ilghnéitheach"}
+        other{"{0} — Eile"}
+        scripts{"Scripteanna — {0}"}
+        strokes{
+            few{"{0} Stríoc"}
+            many{"{0} Stríoc"}
+            one{"{0} Stríoc"}
+            other{"{0} Stríoc"}
+            two{"{0} Stríoc"}
+        }
+        subscript{"foscript {0}"}
+        superscript{"forscript {0}"}
+    }
+    codePatterns{
+        language{"Teanga: {0}"}
+        script{"Script: {0}"}
+        territory{"Réigiún: {0}"}
+    }
+    localeDisplayPattern{
+        keyTypePattern{"{0}: {1}"}
+        pattern{"{0} ({1})"}
+        separator{"{0}, {1}"}
+    }
+}

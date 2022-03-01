@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "jit/MacroAssembler.cpp"
+#include "vm/JSAtom.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/MacroAssembler.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/JSAtom.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/MacroAssembler.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/JSAtom.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/MoveResolver.cpp"
+#include "vm/JSContext.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/MoveResolver.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/JSContext.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/MoveResolver.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/JSContext.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/OptimizationTracking.cpp"
+#include "vm/JSFunction.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/OptimizationTracking.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/JSFunction.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/OptimizationTracking.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/JSFunction.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/PerfSpewer.cpp"
+#include "vm/JSONParser.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/PerfSpewer.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/JSONParser.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/PerfSpewer.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/JSONParser.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/ProcessExecutableMemory.cpp"
+#include "vm/JSONPrinter.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/ProcessExecutableMemory.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/JSONPrinter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/ProcessExecutableMemory.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/JSONPrinter.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/RangeAnalysis.cpp"
+#include "vm/JSObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/RangeAnalysis.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/JSObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/RangeAnalysis.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/JSObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

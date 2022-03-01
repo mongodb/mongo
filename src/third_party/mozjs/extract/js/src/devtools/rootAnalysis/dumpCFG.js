@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 // const cfg = loadCFG(scriptArgs[0]);
 // dump_CFG(cfg);
 
@@ -59,9 +63,10 @@ function str_Type(type) {
     const {Kind, Type, Name, TypeFunctionArguments} = type;
     if (Kind == 'Pointer')
       return str_Type(Type) + "*";
-    else if (Kind == 'CSU') {
+    else if (Kind == 'CSU')
       return Name;
-    }
+    else if (Kind == 'Array')
+      return str_Type(Type) + "[]";
 
     return Kind;
   } catch(e) {
@@ -107,7 +112,7 @@ function str_value(val, env, options) {
     const {Exp, Field} = val;
     const name = Field.Name[0];
     if ("FieldInstanceFunction" in Field) {
-      return Field.FieldCSU.Type.Name + "::" + name;
+      return Field.FieldCSU.Type.Name + "." + name;
     }
     const container = str_value(Exp[0]);
     if (container.startsWith("*"))

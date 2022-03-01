@@ -28,18 +28,18 @@
  *    it in the license file.
  */
 
-#include "jsapi.h"
 #include "gc/FreeOp.h"
-#include "vm/Runtime.h"
+#include "jsapi.h"
 #include "vm/JSContext.h"
+#include "vm/Runtime.h"
 
 #include "mongo/scripting/mozjs/freeOpToJSContext.h"
 
 namespace mongo {
 namespace mozjs {
 
-JSContext* freeOpToJSContext(js::FreeOp* fop) {
-    return fop->runtime()->activeContextFromOwnThread();
+JSContext* freeOpToJSContext(JSFreeOp* fop) {
+    return fop->runtime()->mainContextFromOwnThread();
 }
 
 }  // namespace mozjs

@@ -1,0 +1,21 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ku{
+    collations{
+        standard{
+            Sequence{
+                "[reorder Latn Arab]"
+                "&c<ç<<<Ç"
+                "&e<ê<<<Ê"
+                "&i<î<<<Î"
+                "&s<ş<<<Ş"
+                "&u<û<<<Û"
+                "&ê<<é<<<É"
+                "&î<<í<<<Í"
+                "&û<<ú<<<Ú"
+            }
+            Version{"39"}
+        }
+    }
+}

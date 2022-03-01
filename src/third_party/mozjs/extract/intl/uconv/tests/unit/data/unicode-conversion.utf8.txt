@@ -1,0 +1,43 @@
+This is a Unicode converter test file containing Unicode data.  Its encoding is
+determined by the second-to-last dot-separated component of the filename.  For
+example, if this file is named foo.utf8.txt, its encoding is UTF-8; if this file
+is named foo.utf16le.txt, its encoding is UTF-16LE.  This file is marked as
+binary in Mozilla's version control system so that it's not accidentally
+"mangled".
+
+The contents of each file must differ ONLY by encoding, so if you edit this file
+you must edit all files with the name of this file (with the encoding-specific
+part changed).
+
+== BEGIN UNICODE TEST DATA ==
+
+== U+000000 -- U+00007F ==
+
+BELL:              ""
+DATA LINK ESCAPE:  ""
+DELETE:            ""
+
+== U+000080 -- U+0007FF ==
+
+CONTROL:                           ""
+NO-BREAK SPACE:                    " "
+POUND SIGN:                        "£"
+YEN SIGN:                          "¥"
+CURRENCY SIGN:                     "¢"
+LATIN SMALL LETTER SCHWA:          "ə"
+LATIN LETTER BILABIAL PERCUSSIVE:  "ʬ"
+
+== U+000800 -- U+00FFFF ==
+
+BUGINESE LETTER TA:         "ᨈ"
+BUGINESE LETTER DA:         "ᨉ"
+AIRPLANE:                   "✈"
+ZERO WIDTH NO-BREAK SPACE:  "﻿"
+
+
+== U+010000 -- U+10FFFF ==
+
+SHAVIAN LETTER IAN:                             "𐑾"
+MUSICAL SYMBOL ONE HUNDRED TWENTY-EIGHTH NOTE:  "𝅘𝅥𝅲"
+CJK UNIFIED IDEOGRAPH-20000:                    "𠀀"
+(private use U+10FEFF):                         "􏻿"

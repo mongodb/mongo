@@ -1,0 +1,236 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_MX{
+    %%Parent{"es_419"}
+    units{
+        concentr{
+            milligram-ofglucose-per-deciliter{
+                dnam{"miligramos por decilitro"}
+            }
+        }
+        coordinate{
+            east{"{0} este"}
+            north{"{0} norte"}
+            south{"{0} sur"}
+            west{"{0} oeste"}
+        }
+        electric{
+            ohm{
+                dnam{"ohmios"}
+                one{"{0} ohmio"}
+                other{"{0} ohmios"}
+            }
+        }
+        energy{
+            kilowatt-hour{
+                dnam{"kilowatts-hora"}
+                one{"kilowatt-hora"}
+                other{"{0} kilowatts-hora"}
+            }
+        }
+        length{
+            mile-scandinavian{
+                dnam{"millas escandinavas"}
+            }
+            nautical-mile{
+                dnam{"millas naúticas"}
+                one{"{0} milla naútica"}
+                other{"{0} millas naúticas"}
+            }
+            parsec{
+                dnam{"pársecs"}
+                one{"{0} pársec"}
+                other{"{0} pársecs"}
+            }
+        }
+        light{
+            lux{
+                dnam{"lux"}
+            }
+        }
+        power{
+            horsepower{
+                one{"{0} caballo de fuerza"}
+                other{"{0} caballos de fuerza"}
+            }
+        }
+        temperature{
+            kelvin{
+                dnam{"kelvines"}
+                one{"kelvin"}
+                other{"{0} kelvines"}
+            }
+        }
+        volume{
+            acre-foot{
+                one{"{0} acre-pie"}
+                other{"{0} acre-pies"}
+            }
+            fluid-ounce{
+                dnam{"onzas líquidas"}
+                one{"{0} onza líquida"}
+                other{"{0} onzas líquidas"}
+            }
+        }
+    }
+    unitsNarrow{
+        duration{
+            day{
+                dnam{"días"}
+                one{"{0}d"}
+                other{"{0}d"}
+            }
+            month{
+                dnam{"m"}
+                one{"{0}m"}
+                other{"{0}m"}
+            }
+            week{
+                dnam{"sem"}
+                one{"{0}sem"}
+                other{"{0}sem"}
+            }
+            year{
+                dnam{"a"}
+                one{"{0}a"}
+                other{"{0}a"}
+            }
+        }
+        temperature{
+            celsius{
+                one{"{0} °C"}
+                other{"{0} °C"}
+            }
+        }
+    }
+    unitsShort{
+        acceleration{
+            g-force{
+                dnam{"fuerza G"}
+            }
+        }
+        angle{
+            degree{
+                dnam{"º"}
+            }
+        }
+        concentr{
+            karat{
+                dnam{"kt"}
+                one{"{0} kt"}
+                other{"{0} kt"}
+            }
+            percent{
+                dnam{"%"}
+            }
+            permille{
+                dnam{"‰"}
+            }
+        }
+        consumption{
+            mile-per-gallon-imperial{
+                one{"{0} mi/gal imp."}
+                other{"{0} mi/gal imp."}
+            }
+        }
+        duration{
+            day{
+                dnam{"días"}
+                one{"{0} día"}
+                other{"{0} días"}
+                per{"{0}/d"}
+            }
+            month{
+                dnam{"meses"}
+                one{"{0} m"}
+                other{"{0} m"}
+            }
+            week{
+                dnam{"sem"}
+                one{"{0} sem"}
+                other{"{0} sem"}
+            }
+            year{
+                dnam{"a"}
+                one{"{0} a"}
+                other{"{0} a"}
+                per{"{0}/a"}
+            }
+        }
+        graphics{
+            dot{
+                dnam{"pto"}
+                one{"{0} pto"}
+                other{"{0} ptos"}
+            }
+        }
+        length{
+            astronomical-unit{
+                dnam{"au"}
+                one{"{0} au"}
+                other{"{0} au"}
+            }
+            light-year{
+                dnam{"a. l."}
+                one{"{0} a. l."}
+                other{"{0} a. l."}
+            }
+            mile{
+                dnam{"millas"}
+            }
+            nautical-mile{
+                dnam{"M"}
+                one{"{0} M"}
+                other{"{0} M"}
+            }
+            parsec{
+                dnam{"pc"}
+            }
+            point{
+                dnam{"pt"}
+                one{"{0} pt"}
+                other{"{0} pt"}
+            }
+            yard{
+                dnam{"yd"}
+            }
+        }
+        mass{
+            carat{
+                dnam{"c"}
+                one{"{0} c"}
+                other{"{0} c"}
+            }
+        }
+        power{
+            horsepower{
+                dnam{"CV"}
+                one{"{0} CV"}
+                other{"{0} CV"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                dnam{"km/hora"}
+            }
+        }
+        torque{
+            newton-meter{
+                dnam{"N⋅m"}
+                one{"{0} N⋅m"}
+                other{"{0} N⋅m"}
+            }
+        }
+        volume{
+            cup{
+                dnam{"tza."}
+                one{"{0} tza."}
+                other{"{0} tzas."}
+            }
+            pint{
+                dnam{"pt"}
+            }
+        }
+    }
+}

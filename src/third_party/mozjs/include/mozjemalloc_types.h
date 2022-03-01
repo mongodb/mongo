@@ -36,11 +36,13 @@
 #ifndef _JEMALLOC_TYPES_H_
 #define _JEMALLOC_TYPES_H_
 
+#include <stdint.h>
+
 // grab size_t
 #ifdef _MSC_VER
-#include <crtdefs.h>
+#  include <crtdefs.h>
 #else
-#include <stddef.h>
+#  include <stddef.h>
 #endif
 #include <stdbool.h>
 
@@ -49,77 +51,85 @@ extern "C" {
 #endif
 
 #ifndef MALLOC_USABLE_SIZE_CONST_PTR
-#define MALLOC_USABLE_SIZE_CONST_PTR const
+#  define MALLOC_USABLE_SIZE_CONST_PTR const
 #endif
 
 typedef MALLOC_USABLE_SIZE_CONST_PTR void* usable_ptr_t;
 
 typedef size_t arena_id_t;
 
-typedef struct arena_params_s
-{
+#define ARENA_FLAG_RANDOMIZE_SMALL_MASK 0x3
+#define ARENA_FLAG_RANDOMIZE_SMALL_DEFAULT 0
+#define ARENA_FLAG_RANDOMIZE_SMALL_ENABLED 1
+#define ARENA_FLAG_RANDOMIZE_SMALL_DISABLED 2
+
+typedef struct arena_params_s {
   size_t mMaxDirty;
+  uint32_t mFlags;
 
 #ifdef __cplusplus
-  arena_params_s()
-    : mMaxDirty(0)
-  {
-  }
+  arena_params_s() : mMaxDirty(0), mFlags(0) {}
 #endif
 } arena_params_t;
 
 // jemalloc_stats() is not a stable interface.  When using jemalloc_stats_t, be
 // sure that the compiled results of jemalloc.c are in sync with this header
 // file.
-typedef struct
-{
+typedef struct {
   // Run-time configuration settings.
-  bool opt_junk;    // Fill allocated memory with kAllocJunk?
-  bool opt_zero;    // Fill allocated memory with 0x0?
-  size_t narenas;   // Number of arenas.
-  size_t quantum;   // Allocation quantum.
-  size_t small_max; // Max quantum-spaced allocation size.
-  size_t large_max; // Max sub-chunksize allocation size.
-  size_t chunksize; // Size of each virtual memory mapping.
-  size_t page_size; // Size of pages.
-  size_t dirty_max; // Max dirty pages per arena.
+  bool opt_junk;       // Fill allocated memory with kAllocJunk?
+  bool opt_zero;       // Fill allocated memory with 0x0?
+  size_t narenas;      // Number of arenas.
+  size_t quantum;      // Allocation quantum.
+  size_t quantum_max;  // Max quantum-spaced allocation size.
+  // The next size class, sub-pagesize's max is always page_size/2.
+  size_t large_max;  // Max sub-chunksize allocation size.
+  size_t chunksize;  // Size of each virtual memory mapping.
+  size_t page_size;  // Size of pages.
+  size_t dirty_max;  // Max dirty pages per arena.
 
   // Current memory usage statistics.
-  size_t mapped;      // Bytes mapped (not necessarily committed).
-  size_t allocated;   // Bytes allocated (committed, in use by application).
-  size_t waste;       // Bytes committed, not in use by the
-                      // application, and not intentionally left
-                      // unused (i.e., not dirty).
-  size_t page_cache;  // Committed, unused pages kept around as a
-                      // cache.  (jemalloc calls these "dirty".)
-  size_t bookkeeping; // Committed bytes used internally by the
-                      // allocator.
-  size_t bin_unused;  // Bytes committed to a bin but currently unused.
+  size_t mapped;       // Bytes mapped (not necessarily committed).
+  size_t allocated;    // Bytes allocated (committed, in use by application).
+  size_t waste;        // Bytes committed, not in use by the
+                       // application, and not intentionally left
+                       // unused (i.e., not dirty).
+  size_t page_cache;   // Committed, unused pages kept around as a
+                       // cache.  (jemalloc calls these "dirty".)
+  size_t bookkeeping;  // Committed bytes used internally by the
+                       // allocator.
+  size_t bin_unused;   // Bytes committed to a bin but currently unused.
 } jemalloc_stats_t;
 
-enum PtrInfoTag
-{
+typedef struct {
+  size_t size;               // The size of objects in this bin, zero if this
+                             // bin stats array entry is unused (no more bins).
+  size_t num_non_full_runs;  // The number of non-full runs
+  size_t num_runs;           // The number of runs in this bin
+  size_t bytes_unused;       // The unallocated bytes across all these bins
+  size_t bytes_total;        // The total storage area for runs in this bin,
+  size_t bytes_per_run;      // The number of bytes per run, including headers.
+} jemalloc_bin_stats_t;
+
+#define JEMALLOC_MAX_STATS_BINS 40
+
+enum PtrInfoTag {
   // The pointer is not currently known to the allocator.
-  // 'addr' and 'size' are always 0.
+  // 'addr', 'size', and 'arenaId' are always 0.
   TagUnknown,
 
   // The pointer is within a live allocation.
-  // 'addr' and 'size' describe the allocation.
-  TagLiveSmall,
-  TagLiveLarge,
-  TagLiveHuge,
+  // 'addr', 'size', and 'arenaId' describe the allocation.
+  TagLiveAlloc,
 
   // The pointer is within a small freed allocation.
-  // 'addr' and 'size' describe the allocation.
-  TagFreedSmall,
+  // 'addr', 'size', and 'arenaId' describe the allocation.
+  TagFreedAlloc,
 
   // The pointer is within a freed page. Details about the original
   // allocation, including its size, are not available.
-  // 'addr' and 'size' describe the page.
-  TagFreedPageDirty,
-  TagFreedPageDecommitted,
-  TagFreedPageMadvised,
-  TagFreedPageZeroed,
+  // 'addr', 'size', and 'arenaId' describe the page.
+  TagFreedPage,
 };
 
 // The information in jemalloc_ptr_info_t could be represented in a variety of
@@ -127,38 +137,45 @@ enum PtrInfoTag
 // - The number of fields is minimized.
 // - The 'tag' field unambiguously defines the meaning of the subsequent fields.
 // Helper functions are used to group together related categories of tags.
-typedef struct
-{
+typedef struct jemalloc_ptr_info_s {
   enum PtrInfoTag tag;
-  void* addr;  // meaning depends on tag; see above
-  size_t size; // meaning depends on tag; see above
+  void* addr;   // meaning depends on tag; see above
+  size_t size;  // meaning depends on tag; see above
+
+#ifdef MOZ_DEBUG
+  arena_id_t arenaId;  // meaning depends on tag; see above
+#endif
+
+#ifdef __cplusplus
+  jemalloc_ptr_info_s() = default;
+  jemalloc_ptr_info_s(enum PtrInfoTag aTag, void* aAddr, size_t aSize,
+                      arena_id_t aArenaId)
+      : tag(aTag),
+        addr(aAddr),
+        size(aSize)
+#  ifdef MOZ_DEBUG
+        ,
+        arenaId(aArenaId)
+#  endif
+  {
+  }
+#endif
 } jemalloc_ptr_info_t;
 
-static inline bool
-jemalloc_ptr_is_live(jemalloc_ptr_info_t* info)
-{
-  return info->tag == TagLiveSmall || info->tag == TagLiveLarge ||
-         info->tag == TagLiveHuge;
+static inline bool jemalloc_ptr_is_live(jemalloc_ptr_info_t* info) {
+  return info->tag == TagLiveAlloc;
 }
 
-static inline bool
-jemalloc_ptr_is_freed(jemalloc_ptr_info_t* info)
-{
-  return info->tag == TagFreedSmall || info->tag == TagFreedPageDirty ||
-         info->tag == TagFreedPageDecommitted ||
-         info->tag == TagFreedPageMadvised || info->tag == TagFreedPageZeroed;
+static inline bool jemalloc_ptr_is_freed(jemalloc_ptr_info_t* info) {
+  return info->tag == TagFreedAlloc || info->tag == TagFreedPage;
 }
 
-static inline bool
-jemalloc_ptr_is_freed_page(jemalloc_ptr_info_t* info)
-{
-  return info->tag == TagFreedPageDirty ||
-         info->tag == TagFreedPageDecommitted ||
-         info->tag == TagFreedPageMadvised || info->tag == TagFreedPageZeroed;
+static inline bool jemalloc_ptr_is_freed_page(jemalloc_ptr_info_t* info) {
+  return info->tag == TagFreedPage;
 }
 
 #ifdef __cplusplus
-} // extern "C"
+}  // extern "C"
 #endif
 
-#endif // _JEMALLOC_TYPES_H_
+#endif  // _JEMALLOC_TYPES_H_

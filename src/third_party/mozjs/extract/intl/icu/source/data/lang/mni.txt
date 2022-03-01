@@ -1,0 +1,81 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+mni{
+    Languages{
+        de{"জর্মন"}
+        de_AT{"ওষ্ট্রিয়ান জর্মন"}
+        de_CH{"স্বিজ হায় জর্মন"}
+        en{"ইংলিস"}
+        en_AU{"ওষ্ট্রেলিয়ান ইংলিস"}
+        en_CA{"কানাদিয়ান ইংলিস"}
+        en_GB{"ব্রিটিশ ইংলিস"}
+        en_US{"অমেরিকান ইংলিস"}
+        es{"স্পেনিস"}
+        es_419{"লেটিন অমেরিকান স্পেনিস"}
+        es_ES{"য়ুরোপিয়ান স্পেনিস"}
+        es_MX{"মেক্সিকান স্পেনিস"}
+        fr{"ফ্রেঞ্চ"}
+        fr_CA{"কানাদিয়ান ফ্রেঞ্চ"}
+        fr_CH{"স্বিজ ফ্রেঞ্চ"}
+        it{"ইটালিয়ান"}
+        ja{"জাপানিজ"}
+        mni{"মৈতৈলোন্"}
+        pt{"পোর্টুগিজ"}
+        pt_BR{"ব্রাজিলিয়ান পোর্টুগিজ"}
+        pt_PT{"য়ুরোপিয়ান পোর্টুগিজ"}
+        ru{"রুসিয়ান"}
+        und{"মশকখংদবা লোল"}
+        zh{"চাইনিজ"}
+        zh_Hans{"সিমপ্লিফাইদ চাইনিজ"}
+        zh_Hant{"ত্রেদিস্নেল চাইনিজ"}
+    }
+    Languages%long{
+        zh_Hans{"সিমপ্লিফাইদ মন্দারিন চাইনিজ"}
+        zh_Hant{"ত্রেদিস্নেল মন্দারিন চাইনিজ"}
+    }
+    Languages%menu{
+        zh{"চাইনিজ মন্দারিন"}
+    }
+    Languages%short{
+        en_GB{"য়ু কে ইংলিস"}
+        en_US{"য়ু এস ইংলিস"}
+    }
+    Scripts{
+        Arab{"আরবিক"}
+        Beng{"বাংলা"}
+        Cyrl{"সিরিলিক"}
+        Hans{"লাইথোকহল্লবা"}
+        Hant{"ত্রেদিস্নেল"}
+        Latn{"লেটিন"}
+        Mtei{"মেইটেই মায়েক"}
+        Zxxx{"ইদবা"}
+        Zzzz{"মশকখংদবা স্ক্রিপ্ট"}
+    }
+    Scripts%stand-alone{
+        Hans{"লাইথোকহল্লবা চাইনিজ"}
+        Hant{"ত্রেদিস্নেল চাইনিজ"}
+    }
+    Types{
+        calendar{
+            gregorian{"গ্রিগোরিয়ান কেলেন্দর"}
+        }
+        collation{
+            standard{"ষ্টেন্দর্দ সোর্ট ওর্দর"}
+        }
+        numbers{
+            beng{"বাংলা দিজিট"}
+            latn{"ৱেস্তর্ন দিজিট"}
+        }
+    }
+    codePatterns{
+        language{"লোল: {0}"}
+        script{"স্ক্রিপ্ট: {0}"}
+        territory{"লমদম: {0}"}
+    }
+    localeDisplayPattern{
+        keyTypePattern{"{0}: {1}"}
+        pattern{"{0} ({1})"}
+        separator{"{0}, {1}"}
+    }
+}

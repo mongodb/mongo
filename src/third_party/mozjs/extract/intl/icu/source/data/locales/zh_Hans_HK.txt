@@ -1,0 +1,239 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+zh_Hans_HK{
+    calendar{
+        buddhist{
+            DateTimePatterns{
+                "zzzz ah:mm:ss",
+                "z ah:mm:ss",
+                "ah:mm:ss",
+                "ah:mm",
+                "Gy年M月d日EEEE",
+                "Gy年M月d日",
+                "Gy年M月d日",
+                "Gd/M/yy",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                M{"L"}
+                MEd{"M/dE"}
+            }
+        }
+        chinese{
+            DateTimePatterns{
+                "zzzz ah:mm:ss",
+                "z ah:mm:ss",
+                "ah:mm:ss",
+                "ah:mm",
+                {
+                    "U年MMMd日EEEE",
+                    "hanidec",
+                }
+                {
+                    "U年MMMd日",
+                    "hanidec",
+                }
+                {
+                    "U年MMMd日",
+                    "hanidec",
+                }
+                "r/M/d",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+        }
+        generic{
+            DateTimePatterns{
+                "zzzz ah:mm:ss",
+                "z ah:mm:ss",
+                "ah:mm:ss",
+                "ah:mm",
+                "Gy年M月d日EEEE",
+                "Gy年M月d日",
+                "Gy年M月d日",
+                "d/M/yyGGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                HHmm{"HH:mm"}
+                MEd{"E, d/M"}
+                MMM{"M月"}
+                MMMMdd{"M月d日"}
+                Md{"d/M"}
+                yyyyM{"M/yGGGGG"}
+                yyyyMEd{"E, d/M/yGGGGG"}
+                yyyyMd{"d/M/yGGGGG"}
+            }
+            intervalFormats{
+                Hmv{
+                    H{"vHH:mm–HH:mm"}
+                    m{"vHH:mm–HH:mm"}
+                }
+                Hv{
+                    H{"vHH–HH"}
+                }
+                fallback{"{0}–{1}"}
+                h{
+                    h{"ah至h时"}
+                }
+                yM{
+                    M{"y年M月至y年M月"}
+                }
+                yMEd{
+                    M{"d/M/yE至d/M/yE"}
+                    d{"d/M/yE至d/M/yE"}
+                    y{"d/M/yE至d/M/yE"}
+                }
+                yMMMEd{
+                    d{"y年M月d日E至M月d日E"}
+                }
+                yMd{
+                    M{"d/M/y至d/M/y"}
+                    d{"d/M/y至d/M/y"}
+                    y{"d/M/y至d/M/y"}
+                }
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "zzzz ah:mm:ss",
+                "z ah:mm:ss",
+                "ah:mm:ss",
+                "ah:mm",
+                "y年M月d日EEEE",
+                "y年M月d日",
+                "y年M月d日",
+                "d/M/yy",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                HHmm{"HH:mm"}
+                MEd{"E, d/M"}
+                MMMMdd{"M月d日"}
+                MMdd{"dd/MM"}
+                Md{"d/M"}
+                yM{"M/y"}
+                yMEd{"d/M/y（E）"}
+                yMM{"MM/y"}
+                yMd{"d/M/y"}
+            }
+            intervalFormats{
+                Hmv{
+                    H{"vHH:mm–HH:mm"}
+                    m{"vHH:mm–HH:mm"}
+                }
+                Hv{
+                    H{"vHH–HH"}
+                }
+                fallback{"{0}–{1}"}
+                h{
+                    h{"ah至h时"}
+                }
+                yM{
+                    M{"y年M月至y年M月"}
+                }
+                yMEd{
+                    M{"d/M/yE至d/M/yE"}
+                    d{"d/M/yE至d/M/yE"}
+                    y{"d/M/yE至d/M/yE"}
+                }
+                yMMMEd{
+                    d{"y年M月d日E至M月d日E"}
+                }
+                yMd{
+                    M{"d/M/y至d/M/y"}
+                    d{"d/M/y至d/M/y"}
+                    y{"d/M/y至d/M/y"}
+                }
+            }
+        }
+        islamic{
+            DateTimePatterns{
+                "zzzz ah:mm:ss",
+                "z ah:mm:ss",
+                "ah:mm:ss",
+                "ah:mm",
+                "Gy年M月d日EEEE",
+                "Gy年M月d日",
+                "Gy年M月d日",
+                "Gd/M/yy",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+        }
+        japanese{
+            DateTimePatterns{
+                "zzzz ah:mm:ss",
+                "z ah:mm:ss",
+                "ah:mm:ss",
+                "ah:mm",
+                "Gy年M月d日EEEE",
+                "Gy年M月d日",
+                "Gy年M月d日",
+                "Gd/M/yy",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                MEd{"M/dE"}
+                Md{"M/d"}
+            }
+        }
+        roc{
+            DateTimePatterns{
+                "zzzz ah:mm:ss",
+                "z ah:mm:ss",
+                "ah:mm:ss",
+                "ah:mm",
+                "Gy年M月d日EEEE",
+                "Gy年M月d日",
+                "Gy年M月d日",
+                "Gd/M/yy",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                M{"L"}
+                MMM{"M月"}
+                Md{"M-d"}
+            }
+        }
+    }
+    fields{
+        second{
+            relativeTime{
+                future{
+                    other{"{0}秒后"}
+                }
+                past{
+                    other{"{0}秒前"}
+                }
+            }
+        }
+    }
+}

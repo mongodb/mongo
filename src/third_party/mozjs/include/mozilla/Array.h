@@ -9,45 +9,46 @@
 #ifndef mozilla_Array_h
 #define mozilla_Array_h
 
+#include <stddef.h>
+
+#include <iterator>
+#include <ostream>
+#include <utility>
+
 #include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
-#include "mozilla/Move.h"
-#include "mozilla/ReverseIterator.h"
-
-#include <stddef.h>
 
 namespace mozilla {
 
-template<typename T, size_t Length>
-class Array
-{
-  T mArr[Length];
+template <typename T, size_t _Length>
+class Array {
+  T mArr[_Length];
 
-public:
-  Array() {}
+ public:
+  using ElementType = T;
+  static constexpr size_t Length = _Length;
+
+  Array() = default;
 
   template <typename... Args>
-  MOZ_IMPLICIT Array(Args&&... aArgs)
-    : mArr{mozilla::Forward<Args>(aArgs)...}
-  {
+  MOZ_IMPLICIT constexpr Array(Args&&... aArgs)
+      : mArr{std::forward<Args>(aArgs)...} {
     static_assert(sizeof...(aArgs) == Length,
-                  "The number of arguments should be equal to the template parameter Length");
+                  "The number of arguments should be equal to the template "
+                  "parameter Length");
   }
 
-  T& operator[](size_t aIndex)
-  {
+  T& operator[](size_t aIndex) {
     MOZ_ASSERT(aIndex < Length);
     return mArr[aIndex];
   }
 
-  const T& operator[](size_t aIndex) const
-  {
+  const T& operator[](size_t aIndex) const {
     MOZ_ASSERT(aIndex < Length);
     return mArr[aIndex];
   }
 
-  bool operator==(const Array<T, Length>& aOther) const
-  {
+  bool operator==(const Array<T, Length>& aOther) const {
     for (size_t i = 0; i < Length; i++) {
       if (mArr[i] != aOther[i]) {
         return false;
@@ -56,43 +57,49 @@ public:
     return true;
   }
 
-  typedef T*                        iterator;
-  typedef const T*                  const_iterator;
-  typedef ReverseIterator<T*>       reverse_iterator;
-  typedef ReverseIterator<const T*> const_reverse_iterator;
+  typedef T* iterator;
+  typedef const T* const_iterator;
+  typedef std::reverse_iterator<T*> reverse_iterator;
+  typedef std::reverse_iterator<const T*> const_reverse_iterator;
 
   // Methods for range-based for loops.
   iterator begin() { return mArr; }
-  const_iterator begin() const { return mArr; }
-  const_iterator cbegin() const { return begin(); }
+  constexpr const_iterator begin() const { return mArr; }
+  constexpr const_iterator cbegin() const { return begin(); }
   iterator end() { return mArr + Length; }
-  const_iterator end() const { return mArr + Length; }
-  const_iterator cend() const { return end(); }
+  constexpr const_iterator end() const { return mArr + Length; }
+  constexpr const_iterator cend() const { return end(); }
 
   // Methods for reverse iterating.
   reverse_iterator rbegin() { return reverse_iterator(end()); }
-  const_reverse_iterator rbegin() const { return const_reverse_iterator(end()); }
+  const_reverse_iterator rbegin() const {
+    return const_reverse_iterator(end());
+  }
   const_reverse_iterator crbegin() const { return rbegin(); }
   reverse_iterator rend() { return reverse_iterator(begin()); }
-  const_reverse_iterator rend() const { return const_reverse_iterator(begin()); }
+  const_reverse_iterator rend() const {
+    return const_reverse_iterator(begin());
+  }
   const_reverse_iterator crend() const { return rend(); }
 };
 
-template<typename T>
-class Array<T, 0>
-{
-public:
-  T& operator[](size_t aIndex)
-  {
-    MOZ_CRASH("indexing into zero-length array");
-  }
+template <typename T>
+class Array<T, 0> {
+ public:
+  T& operator[](size_t aIndex) { MOZ_CRASH("indexing into zero-length array"); }
 
-  const T& operator[](size_t aIndex) const
-  {
+  const T& operator[](size_t aIndex) const {
     MOZ_CRASH("indexing into zero-length array");
   }
 };
 
-}  /* namespace mozilla */
+// MOZ_DBG support
+
+template <typename T, size_t Length>
+std::ostream& operator<<(std::ostream& aOut, const Array<T, Length>& aArray) {
+  return aOut << Span(aArray);
+}
+
+} /* namespace mozilla */
 
 #endif /* mozilla_Array_h */

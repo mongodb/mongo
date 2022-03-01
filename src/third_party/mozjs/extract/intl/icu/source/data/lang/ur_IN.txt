@@ -1,0 +1,27 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ur_IN{
+    Languages{
+        ar_001{"جدید معیاری عربی"}
+        awa{"اودھی"}
+        ckb{"سورانی کردی"}
+        dje{"زرمہ"}
+        hr{"کروشین"}
+        jv{"جاوانیز"}
+        ka{"جارجيائى"}
+        kl{"کلالیسٹ"}
+        kn{"کنڑ"}
+        ku{"کرد"}
+        mag{"مگہی"}
+        zgh{"معیاری مراقشی تمازیقی"}
+        zh_Hans{"آسان چینی"}
+    }
+    Types{
+        numbers{
+            armnlow{"آرمینیائی لوئر کیس اعداد"}
+            greklow{"یونانی لوئر کیس اعداد"}
+            tibt{"تبتی ہندسے"}
+        }
+    }
+}

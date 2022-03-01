@@ -37,8 +37,6 @@ namespace mongo {
 namespace mozjs {
 
 InternedStringTable::InternedStringTable(JSContext* cx) {
-    JSAutoRequest ar(cx);
-
     int i = 0;
 
 #define MONGO_MOZJS_INTERNED_STRING(name, str)                                        \
@@ -47,7 +45,7 @@ InternedStringTable::InternedStringTable(JSContext* cx) {
         if (!s) {                                                                     \
             uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_InternString"); \
         }                                                                             \
-        _internedStrings[i++].init(cx, INTERNED_STRING_TO_JSID(cx, s));               \
+        _internedStrings[i++].init(cx, JS::PropertyKey::fromPinnedString(s));         \
     } while (0);
 #include "mongo/scripting/mozjs/internedstring.defs"
 #undef MONGO_MOZJS_INTERNED_STRING

@@ -1,0 +1,47 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+fr_HT{
+    units{
+        area{
+            hectare{
+                dnam{"carreau"}
+                one{"{0}carreau"}
+                other{"{0}carreaux"}
+            }
+        }
+        volume{
+            cubic-centimeter{
+                per{"{0} pour chaque centimetre cube"}
+            }
+            cubic-meter{
+                per{"{0} pour chaque metre cube"}
+            }
+        }
+    }
+    unitsNarrow{
+        mass{
+            gram{
+                dnam{"gr."}
+            }
+        }
+    }
+    unitsShort{
+        duration{
+            century{
+                dnam{"sec"}
+            }
+        }
+        mass{
+            carat{
+                dnam{"kr"}
+                one{"{0}kr"}
+                other{"{0}kr"}
+            }
+            gram{
+                one{"{0}gr"}
+                other{"{0}gr"}
+            }
+        }
+    }
+}

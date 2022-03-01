@@ -1,0 +1,20 @@
+// Copyright (C) 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+//*******************************************************************************
+//*
+//*   Copyright (C) 2005-2010, International Business Machines
+//*   Corporation and others.  All Rights Reserved.
+//*
+//*******************************************************************************
+
+sh{
+    a{
+	a1{"a01"}
+	a2{"a02"}
+        a3{"a03"}
+    }
+
+    tableT7996 {
+        a7996 {"string a7996 in table7996 for sh"}
+    }
+}

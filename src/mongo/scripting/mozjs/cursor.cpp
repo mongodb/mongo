@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <js/Object.h>
+
 #include "mongo/scripting/mozjs/cursor.h"
 
 #include "mongo/scripting/mozjs/bson.h"
@@ -58,7 +60,7 @@ const char* const CursorInfo::className = "Cursor";
 namespace {
 
 DBClientCursor* getCursor(JSObject* thisv) {
-    return static_cast<CursorInfo::CursorHolder*>(JS_GetPrivate(thisv))->cursor.get();
+    return static_cast<CursorInfo::CursorHolder*>(JS::GetPrivate(thisv))->cursor.get();
 }
 
 DBClientCursor* getCursor(JS::CallArgs& args) {
@@ -67,8 +69,8 @@ DBClientCursor* getCursor(JS::CallArgs& args) {
 
 }  // namespace
 
-void CursorInfo::finalize(js::FreeOp* fop, JSObject* obj) {
-    auto cursor = static_cast<CursorInfo::CursorHolder*>(JS_GetPrivate(obj));
+void CursorInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+    auto cursor = static_cast<CursorInfo::CursorHolder*>(JS::GetPrivate(obj));
 
     if (cursor) {
         getScope(fop)->trackedDelete(cursor);

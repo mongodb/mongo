@@ -1,0 +1,1735 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+to{
+    AuxExemplarCharacters{
+        "[à ă â å ä æ b c ç d è ĕ ê ë g ì ĭ î ï j ñ ò ŏ ô ö ø œ q r ù ŭ û ü w x y ÿ z"
+        "]"
+    }
+    Ellipsis{
+        final{"{0}…"}
+        initial{"…{0}"}
+        medial{"{0}…{1}"}
+        word-final{"{0} …"}
+        word-initial{"… {0}"}
+        word-medial{"{0} … {1}"}
+    }
+    ExemplarCharacters{"[a á ā e é ē f h i í ī k l m n {ng} o ó ō p s t u ú ū v ʻ]"}
+    ExemplarCharactersIndex{"[A E F H I K L M N {NG} O P S T U V ʻ]"}
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    ExemplarCharactersPunctuation{
+        "[\\- ‐ ‑ – — , ; \\: ! ? . … ' ‘ ’ \u0022 “ ” ( ) \\[ \\] § @ * / \\& # † ‡ "
+        "′ ″]"
+    }
+    MoreInformation{"?"}
+    NumberElements{
+        arab{
+            symbols{
+                minusSign{"‏-"}
+                plusSign{"‏+"}
+            }
+        }
+        latn{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}—{1}"}
+            }
+            patterns{
+                accountingFormat{"¤ #,##0.00"}
+                currencyFormat{"¤ #,##0.00"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"#,##0%"}
+                scientificFormat{"#E0"}
+            }
+            patternsLong{
+                decimalFormat{
+                    1000{
+                        other{"0 afe"}
+                    }
+                    10000{
+                        other{"0 mano"}
+                    }
+                    100000{
+                        other{"0 kilu"}
+                    }
+                    1000000{
+                        other{"0 miliona"}
+                    }
+                    10000000{
+                        other{"00 miliona"}
+                    }
+                    100000000{
+                        other{"000 miliona"}
+                    }
+                    1000000000{
+                        other{"0 piliona"}
+                    }
+                    10000000000{
+                        other{"00 piliona"}
+                    }
+                    100000000000{
+                        other{"000 piliona"}
+                    }
+                    1000000000000{
+                        other{"0 tiliona"}
+                    }
+                    10000000000000{
+                        other{"00 tiliona"}
+                    }
+                    100000000000000{
+                        other{"000 tiliona"}
+                    }
+                }
+            }
+            patternsShort{
+                currencyFormat{
+                    1000{
+                        other{"¤ 0a"}
+                    }
+                    10000{
+                        other{"¤ 0m"}
+                    }
+                    100000{
+                        other{"¤ 0k"}
+                    }
+                    1000000{
+                        other{"¤ 0M"}
+                    }
+                    10000000{
+                        other{"¤ 00M"}
+                    }
+                    100000000{
+                        other{"¤ 000M"}
+                    }
+                    1000000000{
+                        other{"¤ 0P"}
+                    }
+                    10000000000{
+                        other{"¤ 00P"}
+                    }
+                    100000000000{
+                        other{"¤ 000P"}
+                    }
+                    1000000000000{
+                        other{"¤ 0T"}
+                    }
+                    10000000000000{
+                        other{"¤ 00T"}
+                    }
+                    100000000000000{
+                        other{"¤ 000T"}
+                    }
+                }
+                decimalFormat{
+                    1000{
+                        other{"0a"}
+                    }
+                    10000{
+                        other{"0m"}
+                    }
+                    100000{
+                        other{"0k"}
+                    }
+                    1000000{
+                        other{"0M"}
+                    }
+                    10000000{
+                        other{"00M"}
+                    }
+                    100000000{
+                        other{"000M"}
+                    }
+                    1000000000{
+                        other{"0P"}
+                    }
+                    10000000000{
+                        other{"00P"}
+                    }
+                    100000000000{
+                        other{"000P"}
+                    }
+                    1000000000000{
+                        other{"0T"}
+                    }
+                    10000000000000{
+                        other{"00T"}
+                    }
+                    100000000000000{
+                        other{"000T"}
+                    }
+                }
+            }
+            symbols{
+                decimal{"."}
+                exponential{"E"}
+                group{","}
+                infinity{"∞"}
+                minusSign{"-"}
+                nan{"TF"}
+                perMille{"‰"}
+                percentSign{"%"}
+                plusSign{"+"}
+                superscriptingExponent{"×"}
+            }
+        }
+        minimalPairs{
+            ordinal{
+                other{"afe mataʻu he hala hono {0}"}
+            }
+            plural{
+                other{"Ngaahi ʻaho ʻe {0}"}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE d MMMM y G",
+                "d MMMM y G",
+                "d MMM y G",
+                "d/M/yy GGGGG",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                Bh{"h B"}
+                Bhm{"h:mm B"}
+                Bhms{"h:mm:ss B"}
+                E{"ccc"}
+                EBhm{"E h:mm B"}
+                EBhms{"E h:mm:ss B"}
+                EHm{"E HH:mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"E d"}
+                Ehm{"E h:mm a"}
+                Ehms{"E h:mm:ss a"}
+                Gy{"y G"}
+                GyMMM{"MMM y G"}
+                GyMMMEd{"E d MMM y G"}
+                GyMMMd{"d MMM y G"}
+                H{"HH"}
+                Hm{"H:mm"}
+                Hms{"H:mm:ss"}
+                M{"L"}
+                MEd{"E d/M"}
+                MMM{"LLL"}
+                MMMEd{"E d MMM"}
+                MMMMEd{"E d MMMM"}
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                Md{"d/M"}
+                d{"d"}
+                h{"h a"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                ms{"mm:ss"}
+                y{"y G"}
+                yM{"M-y"}
+                yMEd{"E d/M/y"}
+                yMM{"MM-y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E d MMM y"}
+                yMMMM{"MMMM y"}
+                yMMMd{"d MMM y"}
+                yMd{"d-M-y"}
+                yQQQ{"y QQQ"}
+                yQQQQ{"y QQQQ"}
+                yyyy{"y G"}
+                yyyyM{"y/MM GGGGG"}
+                yyyyMEd{"E dd-MM-y GGGGG"}
+                yyyyMMM{"MMM y G"}
+                yyyyMMMEd{"E d MMM y G"}
+                yyyyMMMM{"G y MMMM"}
+                yyyyMMMd{"d MMM y G"}
+                yyyyMd{"dd/MM/y GGGGG"}
+                yyyyQQQ{"y QQQ G"}
+                yyyyQQQQ{"y QQQQ G"}
+            }
+            intervalFormats{
+                Gy{
+                    G{"y G – y G"}
+                    y{"y – y G"}
+                }
+                GyM{
+                    G{"M/y GGGGG – M/y GGGGG"}
+                    M{"M/y – M/y GGGGG"}
+                    y{"M/y – M/y GGGGG"}
+                }
+                GyMEd{
+                    G{"E d/M/y GGGGG – E d/M/y GGGGG"}
+                    M{"E d/M/y – E d/M/y GGGGG"}
+                    d{"E d/M/y – E d/M/y GGGGG"}
+                    y{"E d/M/y – E d/M/y GGGGG"}
+                }
+                GyMMM{
+                    G{"MMM y G – MMM y G"}
+                    M{"MMM – MMM y G"}
+                    y{"MMM y – MMM y G"}
+                }
+                GyMMMEd{
+                    G{"E d MMM y G – E d MMM y G"}
+                    M{"E d MMM – E d MMM y G"}
+                    d{"E d MMM – E d MMM y G"}
+                    y{"E d MMM y – E d MMM y G"}
+                }
+                GyMMMd{
+                    G{"d MMM y G – d MMM y G"}
+                    M{"d MMM – d MMM y G"}
+                    d{"d – d MMM y G"}
+                    y{"d MMM y – d MMM y G"}
+                }
+                GyMd{
+                    G{"d/M/y GGGGG – d/M/y GGGGG"}
+                    M{"d/M/y – d/M/y GGGGG"}
+                    d{"d/M/y – d/M/y GGGGG"}
+                    y{"d/M/y – d/M/y GGGGG"}
+                }
+                M{
+                    M{"M – M"}
+                }
+                MEd{
+                    M{"E d/M – E d/M"}
+                    d{"E d/M – E d/M"}
+                }
+                MMM{
+                    M{"LLL – LLL"}
+                }
+                MMMEd{
+                    M{"E d MMM – E d MMM"}
+                    d{"E d MMM – E d MMM"}
+                }
+                MMMd{
+                    M{"d MMM – d MMM"}
+                    d{"d – d MMM"}
+                }
+                Md{
+                    M{"d/M – d/M"}
+                    d{"d/M – d/M"}
+                }
+                d{
+                    d{"d – d"}
+                }
+                fallback{"{0} – {1}"}
+                h{
+                    a{"h a – h a"}
+                    h{"h–h a"}
+                }
+                hm{
+                    a{"h:mm a – h:mm a"}
+                    h{"h:mm–h:mm a"}
+                    m{"h:mm–h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a – h:mm a v"}
+                    h{"h:mm–h:mm a v"}
+                    m{"h:mm–h:mm a v"}
+                }
+                hv{
+                    a{"h a – h a v"}
+                    h{"h–h a v"}
+                }
+                y{
+                    y{"y – y G"}
+                }
+                yM{
+                    M{"M/y – M/y GGGGG"}
+                    y{"M/y – M/y GGGGG"}
+                }
+                yMEd{
+                    M{"E d/M/y – E d/M/y GGGGG"}
+                    d{"E d/M/y – E d/M/y GGGGG"}
+                    y{"E d/M/y – E d/M/y GGGGG"}
+                }
+                yMMM{
+                    M{"MMM – MMM y G"}
+                    y{"MMM y – MMM y G"}
+                }
+                yMMMEd{
+                    M{"E d MMM – E d MMM y G"}
+                    d{"E d MMM – E d MMM y G"}
+                    y{"E d MMM y – E d MMM y G"}
+                }
+                yMMMM{
+                    M{"MMMM – MMMM y G"}
+                    y{"MMMM y – MMMM y G"}
+                }
+                yMMMd{
+                    M{"d MMM – d MMM y G"}
+                    d{"d – d MMM y G"}
+                    y{"d MMM y – d MMM y G"}
+                }
+                yMd{
+                    M{"d/M/y – d/M/y GGGGG"}
+                    d{"d/M/y – d/M/y GGGGG"}
+                    y{"d/M/y – d/M/y GGGGG"}
+                }
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "hengihengi",
+                "efiafi",
+            }
+            AmPmMarkersAbbr{
+                "AM",
+                "PM",
+            }
+            AmPmMarkersNarrow{
+                "AM",
+                "PM",
+            }
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE d MMMM y",
+                "d MMMM y",
+                "d MMM y",
+                "d/M/yy",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1} {0}",
+            }
+            appendItems{
+                Timezone{"{0} {1}"}
+            }
+            availableFormats{
+                Bh{"h B"}
+                Bhm{"h:mm B"}
+                Bhms{"h:mm:ss B"}
+                E{"ccc"}
+                EBhm{"E h:mm B"}
+                EBhms{"E h:mm:ss B"}
+                EHm{"E HH:mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"E d"}
+                Ehm{"E h:mm a"}
+                Ehms{"E h:mm:ss a"}
+                Gy{"y G"}
+                GyMMM{"MMM y G"}
+                GyMMMEd{"E d MMM y G"}
+                GyMMMd{"d MMM y G"}
+                H{"HH"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                Hmsv{"HH:mm:ss v"}
+                Hmv{"HH:mm v"}
+                M{"L"}
+                MEd{"E d/M"}
+                MMM{"LLL"}
+                MMMEd{"E d MMM"}
+                MMMMEd{"E d MMMM"}
+                MMMMW{
+                    other{"'uike' 'hono' W ʻ'o' MMMM"}
+                }
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                Md{"d/M"}
+                d{"d"}
+                h{"h a"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                hmsv{"h:mm:ss a v"}
+                hmv{"h:mm a v"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E d/M/y"}
+                yMM{"MM-y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E d MMM y"}
+                yMMMM{"MMMM y"}
+                yMMMd{"d MMM y"}
+                yMd{"d/M/y"}
+                yQQQ{"y QQQ"}
+                yQQQQ{"y QQQQ"}
+                yw{
+                    other{"'uike' 'hono' w ʻ'o' Y"}
+                }
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Sāp",
+                        "Mōn",
+                        "Tūs",
+                        "Pul",
+                        "Tuʻa",
+                        "Fal",
+                        "Tok",
+                    }
+                    narrow{
+                        "S",
+                        "M",
+                        "T",
+                        "P",
+                        "T",
+                        "F",
+                        "T",
+                    }
+                    short{
+                        "Sāp",
+                        "Mōn",
+                        "Tūs",
+                        "Pul",
+                        "Tuʻa",
+                        "Fal",
+                        "Tok",
+                    }
+                    wide{
+                        "Sāpate",
+                        "Mōnite",
+                        "Tūsite",
+                        "Pulelulu",
+                        "Tuʻapulelulu",
+                        "Falaite",
+                        "Tokonaki",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Sāp",
+                        "Mōn",
+                        "Tūs",
+                        "Pul",
+                        "Tuʻa",
+                        "Fal",
+                        "Tok",
+                    }
+                    narrow{
+                        "S",
+                        "M",
+                        "T",
+                        "P",
+                        "T",
+                        "F",
+                        "T",
+                    }
+                    short{
+                        "Sāp",
+                        "Mōn",
+                        "Tūs",
+                        "Pul",
+                        "Tuʻa",
+                        "Fal",
+                        "Tok",
+                    }
+                    wide{
+                        "Sāpate",
+                        "Mōnite",
+                        "Tūsite",
+                        "Pulelulu",
+                        "Tuʻapulelulu",
+                        "Falaite",
+                        "Tokonaki",
+                    }
+                }
+            }
+            dayPeriod{
+                stand-alone{
+                    abbreviated{
+                        am{"AM"}
+                        pm{"PM"}
+                    }
+                    narrow{
+                        am{"AM"}
+                        pm{"PM"}
+                    }
+                    wide{
+                        am{"HH"}
+                        pm{"EA"}
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "KM",
+                    "TS",
+                }
+                wide{
+                    "ki muʻa",
+                    "taʻu ʻo Sīsū",
+                }
+                wide%variant{
+                    "KM",
+                    "TS",
+                }
+            }
+            intervalFormats{
+                Gy{
+                    G{"y G – y G"}
+                    y{"y – y G"}
+                }
+                GyM{
+                    G{"M/y GGGGG – M/y GGGGG"}
+                    M{"M/y – M/y GGGGG"}
+                    y{"M/y – M/y GGGGG"}
+                }
+                GyMEd{
+                    G{"E d/M/y GGGGG – E d/M/y GGGGG"}
+                    M{"E d/M/y – E d/M/y GGGGG"}
+                    d{"E d/M/y – E d/M/y GGGGG"}
+                    y{"E d/M/y– E d/M/y GGGGG"}
+                }
+                GyMMM{
+                    G{"MMM y G – MMM y G"}
+                    M{"MMM – MMM y G"}
+                    y{"MMM y – MMM y G"}
+                }
+                GyMMMEd{
+                    G{"E d MMM y G – E d MMM y G"}
+                    M{"E d MMM – E d MMM y G"}
+                    d{"E d MMM – E d MMM y G"}
+                    y{"E d MMM y – E d MMM y G"}
+                }
+                GyMMMd{
+                    G{"d MMM y G – d MMM y G"}
+                    M{"d MMM – d MMM y G"}
+                    d{"d – d MMM y G"}
+                    y{"d MMM y – d MMM y G"}
+                }
+                GyMd{
+                    G{"d/M/y GGGGG – d/M/y GGGGG"}
+                    M{"d/M/y – d/M/y GGGGG"}
+                    d{"d/M/y – d/M/y GGGGG"}
+                    y{"d/M/y – d/M/y GGGGG"}
+                }
+                H{
+                    H{"HH – HH"}
+                }
+                Hm{
+                    H{"HH:mm – HH:mm"}
+                    m{"HH:mm – HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm–HH:mm v"}
+                    m{"HH:mm–HH:mm v"}
+                }
+                Hv{
+                    H{"HH – HH v"}
+                }
+                M{
+                    M{"M – M"}
+                }
+                MEd{
+                    M{"E d/M – E d/M"}
+                    d{"E d/M – E d/M"}
+                }
+                MMM{
+                    M{"LLL – LLL"}
+                }
+                MMMEd{
+                    M{"E d MMM – E d MMM"}
+                    d{"E d MMM – E d MMM"}
+                }
+                MMMd{
+                    M{"d MMM – d MMM"}
+                    d{"d – d MMM"}
+                }
+                Md{
+                    M{"d/M – d/M"}
+                    d{"d/M – d/M"}
+                }
+                d{
+                    d{"d – d"}
+                }
+                fallback{"{0} – {1}"}
+                h{
+                    a{"h a – h a"}
+                    h{"h – h a"}
+                }
+                hm{
+                    a{"h:mm a – h:mm a"}
+                    h{"h:mm – h:mm a"}
+                    m{"h:mm – h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a – h:mm a v"}
+                    h{"h:mm – h:mm a v"}
+                    m{"h:mm–h:mm a v"}
+                }
+                hv{
+                    a{"h a – h a v"}
+                    h{"h – h a v"}
+                }
+                y{
+                    y{"y – y"}
+                }
+                yM{
+                    M{"M/y – M/y"}
+                    y{"M/y – M/y"}
+                }
+                yMEd{
+                    M{"E d/M/y – E d/M/y"}
+                    d{"E d/M/y – E d/M/y"}
+                    y{"E d/M/y – E d/M/y"}
+                }
+                yMMM{
+                    M{"MMM – MMM y"}
+                    y{"MMM y – MMM y"}
+                }
+                yMMMEd{
+                    M{"E d MMM – E d MMM y"}
+                    d{"E d MMM – E d MMM y"}
+                    y{"E d MMM y – E d MMM y"}
+                }
+                yMMMM{
+                    M{"MMMM – MMMM y"}
+                    y{"MMMM y – MMMM y"}
+                }
+                yMMMd{
+                    M{"d MMM – d MMM y"}
+                    d{"d–d MMM y"}
+                    y{"d MMM y – d MMM y"}
+                }
+                yMd{
+                    M{"d/M/y – d/M/y"}
+                    d{"d/M/y – d/M/y"}
+                    y{"d/M/y – d/M/y"}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Sān",
+                        "Fēp",
+                        "Maʻa",
+                        "ʻEpe",
+                        "Mē",
+                        "Sun",
+                        "Siu",
+                        "ʻAok",
+                        "Sep",
+                        "ʻOka",
+                        "Nōv",
+                        "Tīs",
+                    }
+                    narrow{
+                        "S",
+                        "F",
+                        "M",
+                        "E",
+                        "M",
+                        "S",
+                        "S",
+                        "A",
+                        "S",
+                        "O",
+                        "N",
+                        "T",
+                    }
+                    wide{
+                        "Sānuali",
+                        "Fēpueli",
+                        "Maʻasi",
+                        "ʻEpeleli",
+                        "Mē",
+                        "Sune",
+                        "Siulai",
+                        "ʻAokosi",
+                        "Sepitema",
+                        "ʻOkatopa",
+                        "Nōvema",
+                        "Tīsema",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Sān",
+                        "Fēp",
+                        "Maʻa",
+                        "ʻEpe",
+                        "Mē",
+                        "Sun",
+                        "Siu",
+                        "ʻAok",
+                        "Sep",
+                        "ʻOka",
+                        "Nōv",
+                        "Tīs",
+                    }
+                    narrow{
+                        "S",
+                        "F",
+                        "M",
+                        "E",
+                        "M",
+                        "S",
+                        "S",
+                        "A",
+                        "S",
+                        "O",
+                        "N",
+                        "T",
+                    }
+                    wide{
+                        "Sānuali",
+                        "Fēpueli",
+                        "Maʻasi",
+                        "ʻEpeleli",
+                        "Mē",
+                        "Sune",
+                        "Siulai",
+                        "ʻAokosi",
+                        "Sepitema",
+                        "ʻOkatopa",
+                        "Nōvema",
+                        "Tīsema",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "K1",
+                        "K2",
+                        "K3",
+                        "K4",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "kuata ʻuluaki",
+                        "kuata ua",
+                        "kuata tolu",
+                        "kuata fā",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "K1",
+                        "K2",
+                        "K3",
+                        "K4",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "kuata 1",
+                        "kuata 2",
+                        "kuata 3",
+                        "kuata 4",
+                    }
+                }
+            }
+        }
+    }
+    characterLabel{
+        activities{"vaʻinga"}
+        african_scripts{"tohinima fakaʻafilika"}
+        american_scripts{"tohinima fakaʻamelika"}
+        animal{"manu"}
+        animals_nature{"manu & natula"}
+        arrows{"ngahau"}
+        body{"sino"}
+        box_drawing{"tā puha"}
+        braille{"mataʻitohi maʻae kakai kui"}
+        building{"fale"}
+        bullets_stars{"pulu & fetuʻu"}
+        consonantal_jamo{"samo fakakonisinanite"}
+        currency_symbols{"fakaʻilonga paʻanga"}
+        dash_connector{"kohi"}
+        digits{"mataʻifika"}
+        dingbats{"nikonikoʻi"}
+        divination_symbols{"fakaʻilonga tongafisi"}
+        downwards_arrows{"ngahau hifo"}
+        downwards_upwards_arrows{"ngahau hake-hifo"}
+        east_asian_scripts{"tohinima fakaʻēsia-hahake"}
+        emoji{"ngaahi ongo"}
+        european_scripts{"tohinima fakaʻeulope"}
+        female{"fakafefine"}
+        flag{"fuka"}
+        flags{"ngaahi fuka"}
+        food_drink{"inu & kai"}
+        format{"anga"}
+        format_whitespace{"anga & vā hinehina"}
+        full_width_form_variant{"fuo faikeheʻi fakalaulahiloa"}
+        geometric_shapes{"fuo fakasiomita"}
+        half_width_form_variant{"fuo faikeheʻi fakalaulahi"}
+        han_characters{"mataʻitohi hana"}
+        han_radicals{"ʻelitoʻi hana"}
+        hanja{"hanisa"}
+        hanzi_simplified{"hanisī fakafaingofua"}
+        hanzi_traditional{"hanisī tukufakaholo"}
+        heart{"mafu"}
+        historic_scripts{"tohinima fakatupuʻanga"}
+        ideographic_desc_characters{"fakaʻilonga fakakaukau"}
+        japanese_kana{"kana fakasiapani"}
+        kanbun{"kanipuni"}
+        kanji{"kanisī"}
+        keycap{"tatā foʻi kī"}
+        leftwards_arrows{"ngahau hema"}
+        leftwards_rightwards_arrows{"ngahau hema-mataʻu"}
+        letterlike_symbols{"fakaʻilonga vāofi mataʻitohi"}
+        limited_use{"ngāueʻaki fakangatangata"}
+        male{"fakatangata"}
+        math_symbols{"fakaʻilonga matematika"}
+        middle_eastern_scripts{"tohinima fakahahake-lotoloto"}
+        miscellaneous{"kehekehe"}
+        modern_scripts{"tohinima fakaonopooni"}
+        modifier{"fakaliliu"}
+        musical_symbols{"fakaʻilonga fasi"}
+        nature{"natula"}
+        nonspacing{"taʻevā"}
+        numbers{"fika"}
+        objects{"foʻi meʻa"}
+        other{"kehe"}
+        paired{"tauhoa"}
+        person{"kakai"}
+        phonetic_alphabet{"motuʻalea fakafonētiki"}
+        pictographs{"foʻi ʻata"}
+        place{"feituʻu"}
+        plant{"ʻakau"}
+        punctuation{"fakaʻilonga mālōlō"}
+        rightwards_arrows{"ngahau mataʻu"}
+        sign_standard_symbols{"fakaʻilonga sīpinga"}
+        small_form_variant{"fuo faikeheʻi iiki"}
+        smiley{"malimali"}
+        smileys_people{"malimali & kakai"}
+        south_asian_scripts{"tohinima fakaʻēsia-tonga"}
+        southeast_asian_scripts{"tohinima fakaʻēsia-tongahahake"}
+        spacing{"vā"}
+        sport{"vāʻinga"}
+        symbols{"fakaʻilonga"}
+        technical_symbols{"fakaʻilonga tekinikale"}
+        tone_marks{"fakaʻilonga fasiʻalea"}
+        travel{"folau"}
+        travel_places{"folau & feituʻu"}
+        upwards_arrows{"ngahau hake"}
+        variant_forms{"fuo faikeheʻi"}
+        vocalic_jamo{"samo fakavauele"}
+        weather{"ʻea"}
+        western_asian_scripts{"tohinima fakaʻēsia-hihifo"}
+        whitespace{"vā hinehina"}
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"ʻaho"}
+            relative{
+                "-1"{"ʻaneafi"}
+                "-2"{"ʻaneheafi"}
+                "0"{"ʻahó ni"}
+                "1"{"ʻapongipongi"}
+                "2"{"ʻahepongipongi"}
+            }
+            relativeTime{
+                future{
+                    other{"ʻi he ʻaho ʻe {0}"}
+                }
+                past{
+                    other{"ʻaho ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        day-narrow{
+            dn{"ʻaho"}
+            relative{
+                "-1"{"ʻaneafi"}
+                "-2"{"ʻaneheafi"}
+                "0"{"ʻahó ni"}
+                "1"{"ʻapongipongi"}
+                "2"{"ʻahepongipongi"}
+            }
+            relativeTime{
+                future{
+                    other{"ʻi he ʻaho ʻe {0}"}
+                }
+                past{
+                    other{"ʻaho ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        day-short{
+            dn{"ʻaho"}
+            relative{
+                "-1"{"ʻaneafi"}
+                "-2"{"ʻaneheafi"}
+                "0"{"ʻahó ni"}
+                "1"{"ʻapongipongi"}
+                "2"{"ʻahepongipongi"}
+            }
+            relativeTime{
+                future{
+                    other{"ʻi he ʻaho ʻe {0}"}
+                }
+                past{
+                    other{"ʻaho ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        dayOfYear{
+            dn{"ʻaho ʻo e taʻu"}
+        }
+        dayOfYear-narrow{
+            dn{"ʻaho ʻoe taʻu"}
+        }
+        dayOfYear-short{
+            dn{"ʻaho ʻoe taʻu"}
+        }
+        dayperiod{
+            dn{"AM/PM"}
+        }
+        era{
+            dn{"kuonga"}
+        }
+        era-narrow{
+            dn{"kuonga"}
+        }
+        era-short{
+            dn{"kuonga"}
+        }
+        fri{
+            relative{
+                "-1"{"Falaite kuoʻosi"}
+                "0"{"Falaité ni"}
+                "1"{"Falaite kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Ngaahi Falaite ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Ngaahi Falaite ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        fri-narrow{
+            relative{
+                "-1"{"Falaite kuoʻosi"}
+                "0"{"Falaité ni"}
+                "1"{"Falaite kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Falaite ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Falaite ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        fri-short{
+            relative{
+                "-1"{"Falaite kuoʻosi"}
+                "0"{"Falaité ni"}
+                "1"{"Falaite kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Falaite ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Falaite ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        hour{
+            dn{"houa"}
+            relative{
+                "0"{"ko e houa ʻeni"}
+            }
+            relativeTime{
+                future{
+                    other{"ʻi he houa ʻe {0}"}
+                }
+                past{
+                    other{"houa ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        hour-narrow{
+            dn{"houa"}
+            relativeTime{
+                future{
+                    other{"ʻi he houa ʻe {0}"}
+                }
+                past{
+                    other{"houa ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        hour-short{
+            dn{"houa"}
+            relativeTime{
+                future{
+                    other{"ʻi he houa ʻe {0}"}
+                }
+                past{
+                    other{"houa ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        minute{
+            dn{"miniti"}
+            relative{
+                "0"{"ko e miniti ʻeni"}
+            }
+            relativeTime{
+                future{
+                    other{"ʻi he miniti ʻe {0}"}
+                }
+                past{
+                    other{"miniti ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        minute-narrow{
+            dn{"miniti"}
+            relativeTime{
+                future{
+                    other{"ʻi he miniti ʻe {0}"}
+                }
+                past{
+                    other{"miniti ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        minute-short{
+            dn{"miniti"}
+            relativeTime{
+                future{
+                    other{"ʻi he miniti ʻe {0}"}
+                }
+                past{
+                    other{"miniti ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        mon{
+            relative{
+                "-1"{"Mōnite kuoʻosi"}
+                "0"{"Mōnité ni"}
+                "1"{"Mōnite kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Ngaahi Mōnite ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Ngaahi Mōnite ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        mon-narrow{
+            relative{
+                "-1"{"Mōnite kuoʻosi"}
+                "0"{"Mōnité ni"}
+                "1"{"Mōnite kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Mōnite ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Mōnite ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        mon-short{
+            relative{
+                "-1"{"Mōnite kuoʻosi"}
+                "0"{"Mōnité ni"}
+                "1"{"Mōnite kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Mōnite ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Mōnite ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        month{
+            dn{"māhina"}
+            relative{
+                "-1"{"māhina kuoʻosi"}
+                "0"{"māhiná ni"}
+                "1"{"māhina kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"ʻi he māhina ʻe {0}"}
+                }
+                past{
+                    other{"māhina ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        month-narrow{
+            dn{"māhina"}
+            relative{
+                "-1"{"māhina kuoʻosi"}
+                "0"{"māhiná ni"}
+                "1"{"māhina kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"ʻi he māhina ʻe {0}"}
+                }
+                past{
+                    other{"māhina ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        month-short{
+            dn{"māhina"}
+            relative{
+                "-1"{"māhina kuoʻosi"}
+                "0"{"māhiná ni"}
+                "1"{"māhina kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"ʻi he māhina ʻe {0}"}
+                }
+                past{
+                    other{"māhina ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        quarter{
+            dn{"kuata"}
+            relative{
+                "-1"{"kuata kuoʻosi"}
+                "0"{"kuata koʻeni"}
+                "1"{"kuata hoko"}
+            }
+            relativeTime{
+                future{
+                    other{"ʻi he kuata ʻe {0}"}
+                }
+                past{
+                    other{"kuata ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        quarter-narrow{
+            dn{"kuata"}
+            relative{
+                "-1"{"kuata kuoʻosi"}
+                "0"{"kuata koʻeni"}
+                "1"{"kuata hoko"}
+            }
+            relativeTime{
+                future{
+                    other{"ʻi he kuata ʻe {0}"}
+                }
+                past{
+                    other{"kuata ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        quarter-short{
+            dn{"kuata"}
+            relative{
+                "-1"{"kuata kuoʻosi"}
+                "0"{"kuata koʻeni"}
+                "1"{"kuata hoko"}
+            }
+            relativeTime{
+                future{
+                    other{"ʻi he kuata ʻe {0}"}
+                }
+                past{
+                    other{"kuata ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        sat{
+            relative{
+                "-1"{"Tokonaki kuoʻosi"}
+                "0"{"Tokonakí ni"}
+                "1"{"Tokonaki kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Ngaahi Tokonaki ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Ngaahi Tokonaki ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        sat-narrow{
+            relative{
+                "-1"{"Tokonaki kuoʻosi"}
+                "0"{"Tokonakí ni"}
+                "1"{"Tokonaki kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Tokonaki ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Tokonaki ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        sat-short{
+            relative{
+                "-1"{"Tokonaki kuoʻosi"}
+                "0"{"Tokonakí ni"}
+                "1"{"Tokonaki kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Tokonaki ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Tokonaki ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        second{
+            dn{"sekoni"}
+            relative{
+                "0"{"taimí ni"}
+            }
+            relativeTime{
+                future{
+                    other{"ʻi he sekoni ʻe {0}"}
+                }
+                past{
+                    other{"sekoni ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        second-narrow{
+            dn{"sekoni"}
+            relativeTime{
+                future{
+                    other{"ʻi he sekoni ʻe {0}"}
+                }
+                past{
+                    other{"sekoni ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        second-short{
+            dn{"sekoni"}
+            relativeTime{
+                future{
+                    other{"ʻi he sekoni ʻe {0}"}
+                }
+                past{
+                    other{"sekoni ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        sun{
+            relative{
+                "-1"{"Sāpate kuoʻosi"}
+                "0"{"Sāpaté ni"}
+                "1"{"Sāpate kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Ngaahi Sāpate ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Ngaahi Sāpate ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        sun-narrow{
+            relative{
+                "-1"{"Sāpate kuoʻosi"}
+                "0"{"Sāpaté ni"}
+                "1"{"Sāpate kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Sāpate ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Sāpate ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        sun-short{
+            relative{
+                "-1"{"Sāpate kuoʻosi"}
+                "0"{"Sāpaté ni"}
+                "1"{"Sāpate kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Sāpate ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Sāpate ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        thu{
+            relative{
+                "-1"{"Tuʻapulelulu kuoʻosi"}
+                "0"{"Tuʻapulelulú ni"}
+                "1"{"Tuʻapulelulu kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Ngaahi Tuʻapulelulu ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Ngaahi Tuʻapulelulu ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        thu-narrow{
+            relative{
+                "-1"{"Tuʻapulelulu kuoʻosi"}
+                "0"{"Tuʻapulelulú ni"}
+                "1"{"Tuʻapulelulu kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Tuʻapulelulu ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Tuʻapulelulu ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        thu-short{
+            relative{
+                "-1"{"Tuʻapulelulu kuoʻosi"}
+                "0"{"Tuʻapulelulú ni"}
+                "1"{"Tuʻapulelulu kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Tuʻapulelulu ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Tuʻapulelulu ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        tue{
+            relative{
+                "-1"{"Tūsite kuoʻosi"}
+                "0"{"Tūsité ni"}
+                "1"{"Tūsite kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Ngaahi Tūsite ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Ngaahi Tūsite ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        tue-narrow{
+            relative{
+                "-1"{"Tūsite kuoʻosi"}
+                "0"{"Tūsité ni"}
+                "1"{"Tūsite kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Tūsite ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Tūsite ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        tue-short{
+            relative{
+                "-1"{"Tūsite kuoʻosi"}
+                "0"{"Tūsité ni"}
+                "1"{"Tūsite kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Tūsite ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Tūsite ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        wed{
+            relative{
+                "-1"{"Pulelulu kuoʻosi"}
+                "0"{"Pulelulú ni"}
+                "1"{"Pulelulu kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Ngaahi Pulelulu ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Ngaahi Pulelulu ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        wed-narrow{
+            relative{
+                "-1"{"Pulelulu kuoʻosi"}
+                "0"{"Pulelulú ni"}
+                "1"{"Pulelulu kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Pulelulu ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Pulelulu ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        wed-short{
+            relative{
+                "-1"{"Pulelulu kuoʻosi"}
+                "0"{"Pulelulú ni"}
+                "1"{"Pulelulu kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"Pulelulu ʻe {0} ʻi he kahaʻu"}
+                }
+                past{
+                    other{"Pulelulu ʻe {0} ʻi he kuohili"}
+                }
+            }
+        }
+        week{
+            dn{"uike"}
+            relative{
+                "-1"{"uike kuoʻosi"}
+                "0"{"uiké ni"}
+                "1"{"uike kahaʻu"}
+            }
+            relativePeriod{"ʻi he uike ʻo e {0}"}
+            relativeTime{
+                future{
+                    other{"ʻi he uike ʻe {0}"}
+                }
+                past{
+                    other{"uike ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        week-narrow{
+            dn{"uike"}
+            relative{
+                "-1"{"uike kuoʻosi"}
+                "0"{"uiké ni"}
+                "1"{"uike kahaʻu"}
+            }
+            relativePeriod{"ʻi he uike ʻo e {0}"}
+            relativeTime{
+                future{
+                    other{"ʻi he uike ʻe {0}"}
+                }
+                past{
+                    other{"uike ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        week-short{
+            dn{"uike"}
+            relative{
+                "-1"{"uike kuoʻosi"}
+                "0"{"uiké ni"}
+                "1"{"uike kahaʻu"}
+            }
+            relativePeriod{"ʻi he uike ʻo e {0}"}
+            relativeTime{
+                future{
+                    other{"ʻi he uike ʻe {0}"}
+                }
+                past{
+                    other{"uike ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        weekOfMonth{
+            dn{"uike ʻo e māhina"}
+        }
+        weekOfMonth-narrow{
+            dn{"uk ʻoe mh"}
+        }
+        weekOfMonth-short{
+            dn{"uike ʻoe māhina"}
+        }
+        weekday{
+            dn{"ʻaho ʻo e uike"}
+        }
+        weekday-narrow{
+            dn{"ʻaho ʻoe uike"}
+        }
+        weekday-short{
+            dn{"ʻaho ʻoe uike"}
+        }
+        weekdayOfMonth{
+            dn{"ʻaho ʻo e mahina"}
+        }
+        weekdayOfMonth-narrow{
+            dn{"ʻaho ʻo e mahina"}
+        }
+        weekdayOfMonth-short{
+            dn{"ʻaho ʻo e mahina"}
+        }
+        year{
+            dn{"taʻu"}
+            relative{
+                "-1"{"taʻu kuoʻosi"}
+                "0"{"taʻú ni"}
+                "1"{"taʻu kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"ʻi he taʻu ʻe {0}"}
+                }
+                past{
+                    other{"taʻu ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        year-narrow{
+            dn{"taʻu"}
+            relative{
+                "-1"{"taʻu kuoʻosi"}
+                "0"{"taʻú ni"}
+                "1"{"taʻu kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"ʻi he taʻu ʻe {0}"}
+                }
+                past{
+                    other{"taʻu ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        year-short{
+            dn{"taʻu"}
+            relative{
+                "-1"{"taʻu kuoʻosi"}
+                "0"{"taʻú ni"}
+                "1"{"taʻu kahaʻu"}
+            }
+            relativeTime{
+                future{
+                    other{"ʻi he taʻu ʻe {0}"}
+                }
+                past{
+                    other{"taʻu ʻe {0} kuoʻosi"}
+                }
+            }
+        }
+        zone{
+            dn{"taimi fakavahe"}
+        }
+        zone-narrow{
+            dn{"taimi fakavahe"}
+        }
+        zone-short{
+            dn{"taimi fakavahe"}
+        }
+    }
+    listPattern{
+        or{
+            2{"{0} pē {1}"}
+            end{"{0}, pē {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        standard{
+            2{"{0} mo {1}"}
+            end{"{0} mo {1}"}
+            middle{"{0} mo {1}"}
+            start{"{0} mo {1}"}
+        }
+        standard-short{
+            2{"{0} mo {1}"}
+            end{"{0} mo {1}"}
+            middle{"{0} mo {1}"}
+            start{"{0} mo {1}"}
+        }
+        unit{
+            2{"{0} mo e {1}"}
+            end{"{0} mo e {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        unit-narrow{
+            2{"{0} mo e {1}"}
+            end{"{0} mo e {1}"}
+            middle{"{0} {1}"}
+            start{"{0} {1}"}
+        }
+        unit-short{
+            2{"{0} mo e {1}"}
+            end{"{0} mo e {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+    }
+    measurementSystemNames{
+        UK{"fakapilitānia"}
+        US{"fakaʻamelika"}
+        metric{"fakamita"}
+    }
+    parse{
+        date{
+            lenient{
+                "[\\--/]",
+                "[\\:∶]",
+            }
+        }
+        general{
+            lenient{
+                "[.․。︒﹒．｡]",
+                "['ʼ՚᾽᾿’＇]",
+                "[%٪﹪％]",
+                "[؉‰]",
+                "[\$﹩＄$]",
+                "[£₤]",
+                "[¥￥]",
+                "[₩￦]",
+                "[₨₹{Rp}{Rs}]",
+            }
+        }
+        number{
+            lenient{
+                "[\\-‒⁻₋−➖﹣－]",
+                "[,،٫、︐︑﹐﹑，､]",
+                "[+⁺₊➕﬩﹢＋]",
+            }
+            stricter{
+                "[,٫︐﹐，]",
+                "[.․﹒．｡]",
+            }
+        }
+    }
+}

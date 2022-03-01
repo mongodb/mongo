@@ -1,0 +1,33 @@
+# Handle "alias" entries in DateTimePatternGenerator::AppendItemNamesSink.
+#
+# ICU bug: https://unicode-org.atlassian.net/browse/ICU-20992
+
+diff --git a/intl/icu/source/i18n/dtptngen.cpp b/intl/icu/source/i18n/dtptngen.cpp
+--- a/intl/icu/source/i18n/dtptngen.cpp
++++ b/intl/icu/source/i18n/dtptngen.cpp
+@@ -956,16 +956,25 @@ struct DateTimePatternGenerator::AppendI
+     virtual void put(const char *key, ResourceValue &value, UBool /*noFallback*/,
+             UErrorCode &errorCode) {
+         ResourceTable itemsTable = value.getTable(errorCode);
+         if (U_FAILURE(errorCode)) { return; }
+         for (int32_t i = 0; itemsTable.getKeyAndValue(i, key, value); ++i) {
+             UDateTimePGDisplayWidth width;
+             UDateTimePatternField field = dtpg.getFieldAndWidthIndices(key, &width);
+             if (field == UDATPG_FIELD_COUNT) { continue; }
++
++            UResType type = value.getType();
++            U_ASSERT(type == URES_TABLE || type == URES_ALIAS);
++
++            // TODO: Implement support for alias types.
++            if (type == URES_ALIAS) {
++                continue;
++            }
++
+             ResourceTable detailsTable = value.getTable(errorCode);
+             if (U_FAILURE(errorCode)) { return; }
+             for (int32_t j = 0; detailsTable.getKeyAndValue(j, key, value); ++j) {
+                 if (uprv_strcmp(key, "dn") != 0) { continue; }
+                 const UnicodeString& valueStr = value.getUnicodeString(errorCode);
+                 if (dtpg.getFieldDisplayName(field,width).isEmpty() && !valueStr.isEmpty()) {
+                     dtpg.setFieldDisplayName(field,width,valueStr);
+                 }

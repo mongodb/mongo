@@ -1,0 +1,218 @@
+# Copyright (C) 2017 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+#
+# Name:             GSM 03.38 to Unicode
+# Unicode version:  3.0
+# Table version:    2.0
+# Date:             2009 Nov 10
+# Authors:          Ken Whistler
+#                   Kent Karlsson
+#                   Markus Kuhn
+#
+# Source:           http://www.unicode.org/Public/MAPPINGS/ETSI/GSM0338.TXT
+# See there for the license and for a description of the charset.
+# Formatted into ICU .ucm format by Markus Scherer on 2006-nov-02.
+# Updated to table version 2.0 by Fredrik Roubert on 2017-feb-08.
+# Commented-out mappings are turned into fallbacks (|1), all others are turned
+# into round-trips (|0).
+# Multi-byte mappings are preserved as multi-single-byte character mappings,
+# using ICU's m:n conversion capability.
+#
+# The substitution character is not documented in the Unicode file.
+# \x3F is chosen here because \x1A is a graphic character.
+#
+# Other deviations from the Unicode file:
+# a)
+# The GSM standard specifies that one or two ESC bytes (\x1B), if not followed
+# by a recognized final byte, be mapped to spaces (that is, reverse fallbacks
+# to U+0020).
+# The Unicode file round-trips a single \x1B to U+00A0 (NBSP) and has no mapping
+# for \x1B\x1B.
+# (Reverse fallbacks to U+00A0 would result in Unicode text that cannot be
+# converted back to GSM 03.38. A roundtrip for U+00A0 adds a character that is
+# not mappable in the standard.)
+#
+# See the ietf-charsets list email "Re: GSM 03.38 substitution character?"
+# at http://mail.apps.ietf.org/ietf/charsets/msg01696.html
+#
+# b)
+# The GSM standard maps U+00C7 capital C-cedilla to \x09 but the Unicode file
+# contains and documents a "fix" to map U+00E7 small c-cedilla instead, based on
+# an interpretation of the intent of the standard. Prevailing implementations
+# in mobile phones follow the standard.
+#
+# This file follows the GSM standard.
+#
+# See the GSM standard at
+# http://www.3gpp.org/ftp/Specs/archive/03_series/03.38/0338-720.zip
+#
+# For problems with the table format please submit a bug
+# at http://www.icu-project.org/ .
+# For issues with the mappings please contact Unicode
+# at http://www.unicode.org/reporting.html
+
+<code_set_name>     "gsm-03.38-2009"
+<char_name_mask>    "AXXXX"
+<mb_cur_max>        1
+<mb_cur_min>        1
+<uconv_class>       "SBCS"
+<icu:state>         0-7f
+<subchar>           \x3F
+<icu:charsetFamily> "ASCII"
+
+CHARMAP
+<U0000> \x00 |1
+<U000A> \x0A |0
+<U000C> \x1B\x0A |0
+<U000D> \x0D |0
+<U0020> \x20 |0
+<U0020> \x1B |3
+<U0020> \x1B\x1B |3
+<U0021> \x21 |0
+<U0022> \x22 |0
+<U0023> \x23 |0
+<U0024> \x02 |0
+<U0025> \x25 |0
+<U0026> \x26 |0
+<U0027> \x27 |0
+<U0028> \x28 |0
+<U0029> \x29 |0
+<U002A> \x2A |0
+<U002B> \x2B |0
+<U002C> \x2C |0
+<U002D> \x2D |0
+<U002E> \x2E |0
+<U002F> \x2F |0
+<U0030> \x30 |0
+<U0031> \x31 |0
+<U0032> \x32 |0
+<U0033> \x33 |0
+<U0034> \x34 |0
+<U0035> \x35 |0
+<U0036> \x36 |0
+<U0037> \x37 |0
+<U0038> \x38 |0
+<U0039> \x39 |0
+<U003A> \x3A |0
+<U003B> \x3B |0
+<U003C> \x3C |0
+<U003D> \x3D |0
+<U003E> \x3E |0
+<U003F> \x3F |0
+<U0040> \x00 |0
+<U0041> \x41 |0
+<U0042> \x42 |0
+<U0043> \x43 |0
+<U0044> \x44 |0
+<U0045> \x45 |0
+<U0046> \x46 |0
+<U0047> \x47 |0
+<U0048> \x48 |0
+<U0049> \x49 |0
+<U004A> \x4A |0
+<U004B> \x4B |0
+<U004C> \x4C |0
+<U004D> \x4D |0
+<U004E> \x4E |0
+<U004F> \x4F |0
+<U0050> \x50 |0
+<U0051> \x51 |0
+<U0052> \x52 |0
+<U0053> \x53 |0
+<U0054> \x54 |0
+<U0055> \x55 |0
+<U0056> \x56 |0
+<U0057> \x57 |0
+<U0058> \x58 |0
+<U0059> \x59 |0
+<U005A> \x5A |0
+<U005B> \x1B\x3C |0
+<U005C> \x1B\x2F |0
+<U005D> \x1B\x3E |0
+<U005E> \x1B\x14 |0
+<U005F> \x11 |0
+<U0061> \x61 |0
+<U0062> \x62 |0
+<U0063> \x63 |0
+<U0064> \x64 |0
+<U0065> \x65 |0
+<U0066> \x66 |0
+<U0067> \x67 |0
+<U0068> \x68 |0
+<U0069> \x69 |0
+<U006A> \x6A |0
+<U006B> \x6B |0
+<U006C> \x6C |0
+<U006D> \x6D |0
+<U006E> \x6E |0
+<U006F> \x6F |0
+<U0070> \x70 |0
+<U0071> \x71 |0
+<U0072> \x72 |0
+<U0073> \x73 |0
+<U0074> \x74 |0
+<U0075> \x75 |0
+<U0076> \x76 |0
+<U0077> \x77 |0
+<U0078> \x78 |0
+<U0079> \x79 |0
+<U007A> \x7A |0
+<U007B> \x1B\x28 |0
+<U007C> \x1B\x40 |0
+<U007D> \x1B\x29 |0
+<U007E> \x1B\x3D |0
+<U00A1> \x40 |0
+<U00A3> \x01 |0
+<U00A4> \x24 |0
+<U00A5> \x03 |0
+<U00A7> \x5F |0
+<U00BF> \x60 |0
+<U00C4> \x5B |0
+<U00C5> \x0E |0
+<U00C6> \x1C |0
+<U00C7> \x09 |0
+<U00C9> \x1F |0
+<U00D1> \x5D |0
+<U00D6> \x5C |0
+<U00D8> \x0B |0
+<U00DC> \x5E |0
+<U00DF> \x1E |0
+<U00E0> \x7F |0
+<U00E4> \x7B |0
+<U00E5> \x0F |0
+<U00E6> \x1D |0
+<U00E8> \x04 |0
+<U00E9> \x05 |0
+<U00EC> \x07 |0
+<U00F1> \x7D |0
+<U00F2> \x08 |0
+<U00F6> \x7C |0
+<U00F8> \x0C |0
+<U00F9> \x06 |0
+<U00FC> \x7E |0
+<U0391> \x41 |1
+<U0392> \x42 |1
+<U0393> \x13 |0
+<U0394> \x10 |0
+<U0395> \x45 |1
+<U0396> \x5A |1
+<U0397> \x48 |1
+<U0398> \x19 |0
+<U0399> \x49 |1
+<U039A> \x4B |1
+<U039B> \x14 |0
+<U039C> \x4D |1
+<U039D> \x4E |1
+<U039E> \x1A |0
+<U039F> \x4F |1
+<U03A0> \x16 |0
+<U03A1> \x50 |1
+<U03A3> \x18 |0
+<U03A4> \x54 |1
+<U03A5> \x59 |1
+<U03A6> \x12 |0
+<U03A7> \x58 |1
+<U03A8> \x17 |0
+<U03A9> \x15 |0
+<U20AC> \x1B\x65 |0
+END CHARMAP

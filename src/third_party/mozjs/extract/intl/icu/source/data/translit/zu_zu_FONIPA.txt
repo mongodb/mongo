@@ -1,0 +1,79 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: zu_zu_FONIPA.txt
+# Generated from CLDR
+#
+
+# Pronunciation rules for isiZulu.
+#
+# Author: mjansche@google.com (Martin Jansche)
+#
+# These rules transcribe isiZulu into the phoneme inventory used within the
+# NCHLT Speech Corpus (https://sites.google.com/site/nchltspeechcorpus/home).
+#
+# The rules were tested using the NCHLT-inlang isiZulu pronunciation dictionary
+# (http://rma.nwu.ac.za/index.php/resource-catalogue/nchlt-inlang-dictionaries.html).
+# They correctly account for all 15,000 entries in the dictionary.
+#
+# The NCHLT 2013 phone set does not indicate tone in any way. Transcription of
+# tone is out of scope without a dictionary, since tone is generally not
+# indicated in the orthography. Nasal clicks are not treated as separated
+# phonemes in the NCHLT 2013 phone set and are transcribed as a sequence of
+# nasal plus click instead.
+#
+# One minor notational deviation from the NCHLT 2013 phone set is that we use a
+# tie bar within the complex (depressor) clicks, e.g. ɡ\u0361ǀ instead of ɡǀ, to
+# avoid ambiguity and make the phoneme inventory uniquely decodable.
+::Lower;
+tsh → t\u0361ʃʼ;
+bh → b;
+ch → ǀʰ;
+dl → ɮ;
+gc → ɡ\u0361ǀ;
+gq → ɡ\u0361ǃ;
+gx → ɡ\u0361ǁ;
+hh → ɦ;  # To investigate: /ɦ/ and /h/ may be switched in the NCHLT dictionary.
+hl → ɬ;
+kh → kʰ;
+kl → k\u0361ɬ;
+ny → ɲ;
+ph → pʰ;
+qh → ǃʰ;
+n { sh → t\u0361sʼ;
+sh → ʃ;
+th → tʰ;
+xh → ǁʰ;
+a → a;
+m { b → b;
+b → ɓ;
+c → ǀ;
+d → d;
+e → ɛ;
+f → f;
+g → ɡ;
+h → h;
+i → i;
+j → d\u0361ʒ;
+k → k;
+l → l;
+m → m;
+[$] { n } gc → n;
+n } [gk] → ŋ;
+n } j → ɲ;
+n → n;
+o → ɔ;
+p → pʼ;
+q → ǃ;
+n { s → t\u0361sʼ;
+s → s;
+t → tʼ;
+u → u;
+v → v;
+w → w;
+x → ǁ;
+y → j;
+n { z → d\u0361z;
+z → z;
+

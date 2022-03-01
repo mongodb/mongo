@@ -1,0 +1,95 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: cs_FONIPA_ko.txt
+# Generated from CLDR
+#
+
+# Transliteration of Phonemic Czech (cs_FONIPA) to Korean (ko).
+#
+# First pass: Phonemic Czech (cs_FONIPA) to Latinized Korean (ko_Latn).
+$vowel = [aeɛiɪoux];
+$start = [\u0020$];
+$end = [\u0020$];
+b } $end   → peu ;
+b } $vowel → b ;
+bj } $vowel → b ;  # objɛc → obeti
+b          → beu ;
+c } $end   → ti ;
+c          → t ;
+d\u0361z         → deuj ;
+d } $end   → teu ;
+d } $vowel → d ;
+d          → deu ;
+ɛ          → e ;
+f } $vowel → p ;
+f          → peu ;
+ɡ } $vowel → g ;
+ɡ          → geu ;
+ɦ } $vowel → h ;
+ɦ          → heu ;
+h } $vowel → h ;
+h          → heu ;
+i          → i ;
+ɪ          → i ;
+j } $end   → i ;  # pokoj → pokoi
+j          → y ;
+kvu        → keub ;  # kvuasɪ → keubasi
+ks } $end  → gseu ;  # ksɛroks → jelogseu
+$start { ks → j ;  # ksɛroks → jelogseu
+ks         → gs ;  # saksofoːn → sagsopon
+k } $vowel → k ;
+k          → keu ;
+$vowel { l } $vowel → ll ;
+lz         → lj ;
+m } $end   → m ;
+m } $vowel → m ;
+m } [l]    → m ;
+m          → meu ;
+ɲ          → n ;
+ŋ          → n ;
+p } $vowel → p ;
+p } t      → b ;  # koroptɛv
+p          → peu ;
+r\u031D } $end   → leusi ; # kour\u031D → kouleusi
+r\u031D } $vowel → leuj ;
+r\u031D } k      → leusyu ;  # ɦor\u031Dkiː → holeusyuki
+r\u031D          → leuju ;
+r } $vowel → l ;
+r          → leu ;
+s } $vowel → s ;
+s          → seu ;
+ʃ } $end   → si ;
+ʃ } $vowel → sy ;
+ʃ          → syu ;
+t\u0361s} $vowel → ch ;
+t\u0361s         → cheu ;
+t\u0361ʃ} $vowel → ch ;
+t\u0361ʃ         → chi ;
+t } $vowel → t ;
+t          → teu ;
+vj         → b ;    # ʒvjɛr\u031Dɪna → jubeleujina
+v } $end   → peu ;
+v } $vowel → b ;
+v          → beu ;
+x } $vowel → h ;
+x          → heu ;
+ɣ } $vowel → h ;
+ɣ          → heu ;
+z } $vowel → j ;    # zaːmɛk → jamekeu
+z } $end   → seu ;  # ɦmɪz → heumiseu
+z          → jeu ;  # pozdniː → pojeudeuni
+ʒ } $vowel → j ;    # ʒɪʒka → jisyuka (first ʒ)
+ʒ } v      → ju ;   # ʒvjɛr\u031Dɪna → jubeleujina
+ʒ } $end   → si ;   # broʒ → beulosi
+ʒ          → syu ;  # ʒɪʒka → jisyuka (second ʒ)
+ɟ } $vowel → dy ;
+ɟ          → ti ;
+ː          → ;
+\u0020     → ;  # space
+#
+#
+# Second pass.
+:: Latin-Hangul ();
+

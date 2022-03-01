@@ -49,7 +49,7 @@ void setEncryptedDBClientCallback(EncryptedDBClientCallback* callback);
  * info type with common code and differentiate with varying constructors.
  */
 struct MongoBase : public BaseInfo {
-    static void finalize(js::FreeOp* fop, JSObject* obj);
+    static void finalize(JSFreeOp* fop, JSObject* obj);
     static void trace(JSTracer* trc, JSObject* obj);
 
     struct Functions {
@@ -77,7 +77,7 @@ struct MongoBase : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(_startSession);
     };
 
-    static const JSFunctionSpec methods[27];
+    static const JSFunctionSpec methods[20];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_HAS_PRIVATE;

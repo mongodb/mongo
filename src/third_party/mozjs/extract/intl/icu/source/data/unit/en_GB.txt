@@ -1,0 +1,33 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+en_GB{
+    %%Parent{"en_001"}
+    durationUnits{
+        hm{"h:mm"}
+        hms{"h:mm:ss"}
+        ms{"m:ss"}
+    }
+    units{
+        volume{
+            fluid-ounce-imperial{
+                dnam{"fluid ounces"}
+                one{"{0} fluid ounce"}
+                other{"{0} fluid ounces"}
+            }
+        }
+    }
+    unitsShort{
+        volume{
+            fluid-ounce-imperial{
+                dnam{"fl oz"}
+                one{"{0} fl oz"}
+                other{"{0} fl oz"}
+            }
+            jigger{
+                one{"{0} jigger"}
+                other{"{0} jiggers"}
+            }
+        }
+    }
+}

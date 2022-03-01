@@ -10,7 +10,9 @@
 #define mozilla_DoublyLinkedList_h
 
 #include <algorithm>
+#include <iosfwd>
 #include <iterator>
+#include <type_traits>
 
 #include "mozilla/Assertions.h"
 
@@ -69,14 +71,14 @@ namespace mozilla {
  *  DoublyLinkedList.
  */
 template <typename T>
-class DoublyLinkedListElement
-{
-  template<typename U, typename E> friend class DoublyLinkedList;
+class DoublyLinkedListElement {
+  template <typename U, typename E>
+  friend class DoublyLinkedList;
   friend T;
   T* mNext;
   T* mPrev;
 
-public:
+ public:
   DoublyLinkedListElement() : mNext(nullptr), mPrev(nullptr) {}
 };
 
@@ -92,15 +94,11 @@ public:
  * DoublyLinkedList. See TestDoublyLinkedList.cpp for an example.
  */
 template <typename T>
-struct GetDoublyLinkedListElement
-{
-  static_assert(mozilla::IsBaseOf<DoublyLinkedListElement<T>, T>::value,
+struct GetDoublyLinkedListElement {
+  static_assert(std::is_base_of<DoublyLinkedListElement<T>, T>::value,
                 "You need your own specialization of GetDoublyLinkedListElement"
                 " or use a separate Trait.");
-  static DoublyLinkedListElement<T>& Get(T* aThis)
-  {
-    return *aThis;
-  }
+  static DoublyLinkedListElement<T>& Get(T* aThis) { return *aThis; }
 };
 
 /**
@@ -110,8 +108,7 @@ struct GetDoublyLinkedListElement
  * get a reference to a DoublyLinkedListElement that may reside anywhere.
  */
 template <typename T, typename ElementAccess = GetDoublyLinkedListElement<T>>
-class DoublyLinkedList final
-{
+class DoublyLinkedList final {
   T* mHead;
   T* mTail;
 
@@ -119,9 +116,7 @@ class DoublyLinkedList final
    * Checks that either the list is empty and both mHead and mTail are nullptr
    * or the list has entries and both mHead and mTail are non-null.
    */
-  bool isStateValid() const {
-    return (mHead != nullptr) == (mTail != nullptr);
-  }
+  bool isStateValid() const { return (mHead != nullptr) == (mTail != nullptr); }
 
   bool ElementNotInList(T* aElm) {
     if (!ElementAccess::Get(aElm).mNext && !ElementAccess::Get(aElm).mPrev) {
@@ -134,13 +129,13 @@ class DoublyLinkedList final
     return false;
   }
 
-public:
+ public:
   DoublyLinkedList() : mHead(nullptr), mTail(nullptr) {}
 
   class Iterator final {
     T* mCurrent;
 
-  public:
+   public:
     using iterator_category = std::forward_iterator_tag;
     using value_type = T;
     using difference_type = std::ptrdiff_t;
@@ -150,8 +145,8 @@ public:
     Iterator() : mCurrent(nullptr) {}
     explicit Iterator(T* aCurrent) : mCurrent(aCurrent) {}
 
-    T& operator *() const { return *mCurrent; }
-    T* operator ->() const { return mCurrent; }
+    T& operator*() const { return *mCurrent; }
+    T* operator->() const { return mCurrent; }
 
     Iterator& operator++() {
       mCurrent = ElementAccess::Get(mCurrent).mNext;
@@ -183,9 +178,7 @@ public:
       return mCurrent == aOther.mCurrent;
     }
 
-    explicit operator bool() const {
-      return mCurrent;
-    }
+    explicit operator bool() const { return mCurrent; }
   };
 
   Iterator begin() { return Iterator(mHead); }
@@ -328,8 +321,9 @@ public:
    */
   void remove(T* aElm) {
     MOZ_ASSERT(aElm);
-    MOZ_ASSERT(ElementAccess::Get(aElm).mNext || ElementAccess::Get(aElm).mPrev ||
-               (aElm == mHead && aElm == mTail),
+    MOZ_ASSERT(ElementAccess::Get(aElm).mNext ||
+                   ElementAccess::Get(aElm).mPrev ||
+                   (aElm == mHead && aElm == mTail),
                "Attempted to remove element not in this list");
 
     if (T* prev = ElementAccess::Get(aElm).mPrev) {
@@ -354,17 +348,13 @@ public:
    * Returns an iterator referencing the first found element whose value matches
    * the given element according to operator==.
    */
-  Iterator find(const T& aElm) {
-    return std::find(begin(), end(), aElm);
-  }
+  Iterator find(const T& aElm) { return std::find(begin(), end(), aElm); }
 
   /**
    * Returns whether the given element is in the list. Note that this uses
    * T::operator==, not pointer comparison.
    */
-  bool contains(const T& aElm) {
-    return find(aElm) != Iterator();
-  }
+  bool contains(const T& aElm) { return find(aElm) != Iterator(); }
 
   /**
    * Returns whether the given element might be in the list. Note that this
@@ -380,6 +370,6 @@ public:
   }
 };
 
-} // namespace mozilla
+}  // namespace mozilla
 
-#endif // mozilla_DoublyLinkedList_h
+#endif  // mozilla_DoublyLinkedList_h

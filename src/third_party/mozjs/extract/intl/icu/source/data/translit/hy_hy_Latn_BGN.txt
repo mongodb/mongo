@@ -1,0 +1,172 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: hy_hy_Latn_BGN.txt
+# Generated from CLDR
+#
+
+# BGN/PCGN 1981 System
+#
+# The BGN/PCGN system for Armenian was designed for use in romanizing
+# names written in the Armenian alphabet. The Roman letters and letter
+# combinations shown as equivalents to the Armenian characters reflect
+# the eastern variety of Armenian, i.e., the language spoken in
+# the Republic of Armenia.
+#
+# The Armenian Alphabet as defined by the BGN (Page 11):
+#
+#   ԱԲԳԴԵԶԷԸԹԺԻԼԽԾԿՀՁՂՃՄՅՆՇՈՉՊՋՌՍՎՐՑՓՔՕՖ
+#   աբգդեզէըթժիլխծկհձղճմյնշոչպջռսվտրցփքևօֆ
+#
+# Originally prepared by Michael Everson <everson@evertype.com>
+#
+# https://www.gov.uk/government/uploads/system/uploads/attachment_data/file/614615/ROMANIZATION_SYSTEM_FOR_ARMENIAN.PDF
+::[ԱԲԳԴԵԶԷԸԹԺԻԼԽԾԿՀՁՂՃՄՅՆՇՈՉՊՋՌՍՎՏՐՑՒՓՔՕՖաբգդեզէըթժիլխծկհձղճմյնշոչպջռսվտրցւփքօֆև։];
+::NFC;
+$upperConsonants = [ԲԳԴԶԹԺԼԽԾԿՀՁՂՃՄՅՆՇՉՊՋՌՍՎՐՑՓՔՖ] ;
+$lowerConsonants = [բգդզթժլխծկհձղճմյնշչպջռսվտրցփքֆ] ;
+$consonants = [$upperConsonants $lowerConsonants] ;
+$upperVowels = [ԱԵԷԸԻՈՕՒ] ;
+$lowerVowels = [աեէըիոևօւ] ;
+$vowels = [$upperVowels $lowerVowels] ;
+$lower = [$lowerConsonants $lowerVowels] ;
+$aspirate = ’ ;
+# Use this $wordBoundary until bug 2034 is fixed in ICU:
+# http://bugs.icu-project.org/cgi-bin/icu-bugs/transliterate?id=2034;expression=boundary;user=guest
+$wordBoundary =  [^[:L:][:M:][:N:]] ;
+# BGN/PCGN 1981, Note 5: “The characters ԵՎ , եւ and և should be romanized
+# yev initially and after the vowel characters ա, ե, է, ի, ո, ու, and օ.
+# In all other instances these characters should be romanized ev.”
+#
+# BGN/PCGN 1981, Note 3: “In Soviet-era sources this upper-case digraph
+# character is found as Ե ի.”
+$YEV = [{ԵՎ} {ԵՒ} {ԵԻ}];
+$Yev = [{Եվ} {Եւ} {Եի}];
+$yev = [{եվ} {եւ} և {եի}];
+$yev_vowels = [ա ե է ի ո {ու} օ Ա Ե Է Ի Ո {ՈՒ} {Ու} Օ];
+[$wordBoundary $yev_vowels] {$YEV} → YEV;
+[$wordBoundary $yev_vowels] {$Yev} → Yev;
+[$wordBoundary $yev_vowels] {$yev} → yev;
+$YEV → EV;
+$Yev → Ev;
+$yev → ev;
+::null;
+# BGN Page 12 Rule 1: The character ե should be romanized ye initially,
+# after the vowel characters ա, ե, է, ը, ի, ո, ւ, and օ.
+# In all other instances, it should be romanized e.
+$upperVowels {Ե → YE ; # ARMENIAN CAPITAL LETTER ECH
+$lowerVowels {Ե → Ye ; # ARMENIAN CAPITAL LETTER ECH
+$wordBoundary {Ե → Ye ; # ARMENIAN CAPITAL LETTER ECH
+Ե → E ; # ARMENIAN CAPITAL LETTER ECH
+$vowels {ե → ye ; # ARMENIAN SMALL LETTER ECH
+$wordBoundary {ե → ye ; # ARMENIAN SMALL LETTER ECH
+ե → e ; # ARMENIAN SMALL LETTER ECH
+::null;
+Ա → A ; # ARMENIAN CAPITAL LETTER AYB
+ա → a ; # ARMENIAN SMALL LETTER AYB
+Բ → B ; # ARMENIAN CAPITAL LETTER BEN
+բ → b ; # ARMENIAN SMALL LETTER BEN
+Գ → G ; # ARMENIAN CAPITAL LETTER GIM
+գ → g ; # ARMENIAN SMALL LETTER GIM
+Դ → D ; # ARMENIAN CAPITAL LETTER DA
+դ → d ; # ARMENIAN SMALL LETTER DA
+Զ → Z ; # ARMENIAN CAPITAL LETTER ZA
+զ → z ; # ARMENIAN SMALL LETTER ZA
+Է → E ; # ARMENIAN CAPITAL LETTER EH
+է → e ; # ARMENIAN SMALL LETTER EH
+Ը → Y ; # ARMENIAN CAPITAL LETTER ET
+ը → y ; # ARMENIAN SMALL LETTER ET
+Թ → T $aspirate ; # ARMENIAN CAPITAL LETTER TO
+թ → t $aspirate ; # ARMENIAN SMALL LETTER TO
+Ժ} $lower → Zh ; # ARMENIAN CAPITAL LETTER ZHE
+Ժ → ZH ; # ARMENIAN CAPITAL LETTER ZHE
+ժ → zh ; # ARMENIAN SMALL LETTER ZHE
+Ի → I ; # ARMENIAN CAPITAL LETTER INI
+ի → i ; # ARMENIAN SMALL LETTER INI
+Լ → L ; # ARMENIAN CAPITAL LETTER LIWN
+լ → l ; # ARMENIAN SMALL LETTER LIWN
+Խ} $lower → Kh ; # ARMENIAN CAPITAL LETTER XEH
+Խ → KH ; # ARMENIAN CAPITAL LETTER XEH
+խ → kh ; # ARMENIAN SMALL LETTER XEH
+Ծ} $lower → Ts ; # ARMENIAN CAPITAL LETTER CA
+Ծ → TS ; # ARMENIAN CAPITAL LETTER CA
+ծ → ts ; # ARMENIAN SMALL LETTER CA
+Կ → K ; # ARMENIAN CAPITAL LETTER KEN
+կ → k ; # ARMENIAN SMALL LETTER KEN
+Հ → H ; # ARMENIAN CAPITAL LETTER HO
+հ → h ; # ARMENIAN SMALL LETTER HO
+Ձ} $lower → Dz ; # ARMENIAN CAPITAL LETTER JA
+Ձ → DZ ; # ARMENIAN CAPITAL LETTER JA
+ձ → dz ; # ARMENIAN SMALL LETTER JA
+Ղ} $lower → Gh ; # ARMENIAN CAPITAL LETTER GHAD
+Ղ → GH ; # ARMENIAN CAPITAL LETTER GHAD
+ղ → gh ; # ARMENIAN SMALL LETTER GHAD
+Ճ} $lower → Ch ; # ARMENIAN CAPITAL LETTER CHEH
+Ճ → CH ; # ARMENIAN CAPITAL LETTER CHEH
+ճ → ch ; # ARMENIAN SMALL LETTER CHEH
+Մ → M ; # ARMENIAN CAPITAL LETTER MEN
+մ → m ; # ARMENIAN SMALL LETTER MEN
+Յ → Y ; # ARMENIAN CAPITAL LETTER YI
+յ → y ; # ARMENIAN SMALL LETTER YI
+Ն → N ; # ARMENIAN CAPITAL LETTER NOW
+ն → n ; # ARMENIAN SMALL LETTER NOW
+Շ} $lower → Sh ; # ARMENIAN CAPITAL LETTER SHA
+Շ → SH ; # ARMENIAN CAPITAL LETTER SHA
+շ → sh ; # ARMENIAN SMALL LETTER SHA
+# Transliteration Case 34:
+Ու} $lower → U ; # ARMENIAN CAPITAL LETTER VO + SMALL YIWN
+ՈՒ → U ; # ARMENIAN CAPITAL LETTER VO + CAPITAL YIWN
+ու → u ; # ARMENIAN SMALL LETTER VO + SMALL YIWN
+# BGN Page 12 Rule 2:
+#
+# The character ո should be romanized vo initially except in the
+# word ով, which should be romanized ov. In all other instances, it
+# should be romanized o.
+ՈՎ → OV ;
+Ով → Ov ;
+ով → ov ;
+$wordBoundary{Ո}$lower → Vo ; # ARMENIAN CAPITAL LETTER VO
+$wordBoundary{Ո → VO ; # ARMENIAN CAPITAL LETTER VO
+Ո →  O ; # ARMENIAN CAPITAL LETTER ECH
+$wordBoundary{ո → vo ; # ARMENIAN SMALL LETTER VO
+ո →  o ; # ARMENIAN SMALL LETTER VO
+Չ} $lower → Ch $aspirate ; # ARMENIAN CAPITAL LETTER CHA
+Չ → CH $aspirate ; # ARMENIAN CAPITAL LETTER CHA
+չ → ch $aspirate ; # ARMENIAN SMALL LETTER CHA
+Պ → P ; # ARMENIAN CAPITAL LETTER PEH
+պ → p ; # ARMENIAN SMALL LETTER PEH
+Ջ → J ; # ARMENIAN CAPITAL LETTER JHEH
+ջ → j ; # ARMENIAN SMALL LETTER JHEH
+Ռ} $lower → Rr ; # ARMENIAN CAPITAL LETTER RA
+Ռ → RR ; # ARMENIAN CAPITAL LETTER RA
+ռ → rr ; # ARMENIAN SMALL LETTER RA
+Ս → S ; # ARMENIAN CAPITAL LETTER SEH
+ս → s ; # ARMENIAN SMALL LETTER SEH
+Վ → V ; # ARMENIAN CAPITAL LETTER VEW
+վ → v ; # ARMENIAN SMALL LETTER VEW
+Տ → T ; # ARMENIAN CAPITAL LETTER TIWN
+տ → t ; # ARMENIAN SMALL LETTER TIWN
+Ր → R ; # ARMENIAN CAPITAL LETTER REH
+ր → r ; # ARMENIAN SMALL LETTER REH
+Ց} $lower → Ts $aspirate ; # ARMENIAN CAPITAL LETTER CHEH
+Ց → TS $aspirate ; # ARMENIAN CAPITAL LETTER CO
+ց → ts $aspirate ; # ARMENIAN SMALL LETTER CO
+########################################################################
+#
+# The BGN does not show YIWN on its own.
+#
+#Ւ → W ; # ARMENIAN CAPITAL LETTER YIWN
+#ւ → w ; # ARMENIAN SMALL LETTER YIWN
+#
+########################################################################
+Փ → P $aspirate ; # ARMENIAN CAPITAL LETTER PIWR
+փ → p $aspirate ; # ARMENIAN SMALL LETTER PIWR
+Ք → K $aspirate ; # ARMENIAN CAPITAL LETTER KEH
+ք → k $aspirate ; # ARMENIAN SMALL LETTER KEH
+Օ → O ; # ARMENIAN CAPITAL LETTER OH
+օ → o ; # ARMENIAN SMALL LETTER OH
+Ֆ → F ; # ARMENIAN CAPITAL LETTER FEH
+ֆ → f ; # ARMENIAN SMALL LETTER FEH
+։ → \. ; # ARMENIAN FULL STOP
+

@@ -1,0 +1,612 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ku{
+    AuxExemplarCharacters{"[á à ă â å ä ã ā æ è ĕ ë ē é ì ĭ ï ī í ñ ó ò ŏ ô ø ō œ ß ù ŭ ū ú ÿ]"}
+    Ellipsis{
+        final{"{0}…"}
+        initial{"…{0}"}
+        medial{"{0}…{1}"}
+        word-final{"{0} …"}
+        word-initial{"… {0}"}
+        word-medial{"{0} … {1}"}
+    }
+    ExemplarCharacters{"[a b c ç d e ê f g h i î j k l m n o p q r s ş t u û v w x y z]"}
+    ExemplarCharactersIndex{"[A B C Ç D E Ê F G H I Î J K L M N O P Q R S Ş T U Û V W X Y Z]"}
+    ExemplarCharactersPunctuation{
+        "[\\- ‐ ‑ – — , ; \\: ! ? . … ' ‘ ’ \u0022 “ ” ( ) \\[ \\] § @ * / \\& # † ‡ "
+        "′ ″]"
+    }
+    MoreInformation{"?"}
+    NumberElements{
+        latn{
+            miscPatterns{
+                atLeast{"⩾{0}"}
+                range{"{0}–{1}"}
+            }
+            patterns{
+                accountingFormat{"#,##0.00 ¤;(#,##0.00 ¤)"}
+                currencyFormat{"#,##0.00 ¤"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"%#,##0"}
+                scientificFormat{"#E0"}
+            }
+            symbols{
+                decimal{","}
+                exponential{"E"}
+                group{"."}
+                infinity{"∞"}
+                minusSign{"-"}
+                nan{"NaN"}
+                perMille{"‰"}
+                percentSign{"%"}
+                plusSign{"+"}
+                superscriptingExponent{"×"}
+            }
+        }
+        minimalPairs{
+            plural{
+                one{"rojek"}
+                other{"{0} roj"}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "G y MMMM d, EEEE",
+                "G y MMMM d",
+                "G y MMM d",
+                "GGGGG y-MM-dd",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                E{"ccc"}
+                d{"d"}
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "BN",
+                "PN",
+            }
+            AmPmMarkersAbbr{
+                "BN",
+                "PN",
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "yş",
+                        "dş",
+                        "sş",
+                        "çş",
+                        "pş",
+                        "în",
+                        "ş",
+                    }
+                    narrow{
+                        "Y",
+                        "D",
+                        "S",
+                        "Ç",
+                        "P",
+                        "Î",
+                        "Ş",
+                    }
+                    short{
+                        "yş",
+                        "dş",
+                        "sş",
+                        "çş",
+                        "pş",
+                        "în",
+                        "ş",
+                    }
+                    wide{
+                        "yekşem",
+                        "duşem",
+                        "sêşem",
+                        "çarşem",
+                        "pêncşem",
+                        "în",
+                        "şemî",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "yş",
+                        "dş",
+                        "sş",
+                        "çş",
+                        "pş",
+                        "în",
+                        "ş",
+                    }
+                    narrow{
+                        "Y",
+                        "D",
+                        "S",
+                        "Ç",
+                        "P",
+                        "Î",
+                        "Ş",
+                    }
+                    short{
+                        "yş",
+                        "dş",
+                        "sş",
+                        "çş",
+                        "pş",
+                        "în",
+                        "ş",
+                    }
+                    wide{
+                        "yekşem",
+                        "duşem",
+                        "sêşem",
+                        "çarşem",
+                        "pêncşem",
+                        "în",
+                        "şemî",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "BZ",
+                    "PZ",
+                }
+                wide{
+                    "berî zayînê",
+                    "piştî zayînê",
+                }
+                wide%variant{
+                    "berî zayînê",
+                    "piştî zayînê",
+                }
+            }
+            intervalFormats{
+                H{
+                    H{"HH–HH"}
+                }
+                Hm{
+                    H{"HH:mm–HH:mm"}
+                    m{"HH:mm–HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm–HH:mm v"}
+                    m{"HH:mm–HH:mm v"}
+                }
+                Hv{
+                    H{"HH–HH v"}
+                }
+                fallback{"{0} – {1}"}
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "rêb",
+                        "reş",
+                        "ada",
+                        "avr",
+                        "gul",
+                        "pûş",
+                        "tîr",
+                        "gel",
+                        "rez",
+                        "kew",
+                        "ser",
+                        "ber",
+                    }
+                    narrow{
+                        "R",
+                        "R",
+                        "A",
+                        "A",
+                        "G",
+                        "P",
+                        "T",
+                        "G",
+                        "R",
+                        "K",
+                        "S",
+                        "B",
+                    }
+                    wide{
+                        "rêbendanê",
+                        "reşemiyê",
+                        "adarê",
+                        "avrêlê",
+                        "gulanê",
+                        "pûşperê",
+                        "tîrmehê",
+                        "gelawêjê",
+                        "rezberê",
+                        "kewçêrê",
+                        "sermawezê",
+                        "berfanbarê",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "rêb",
+                        "reş",
+                        "ada",
+                        "avr",
+                        "gul",
+                        "pûş",
+                        "tîr",
+                        "gel",
+                        "rez",
+                        "kew",
+                        "ser",
+                        "ber",
+                    }
+                    narrow{
+                        "R",
+                        "R",
+                        "A",
+                        "A",
+                        "G",
+                        "P",
+                        "T",
+                        "G",
+                        "R",
+                        "K",
+                        "S",
+                        "B",
+                    }
+                    wide{
+                        "rêbendan",
+                        "reşemî",
+                        "adar",
+                        "avrêl",
+                        "gulan",
+                        "pûşper",
+                        "tîrmeh",
+                        "gelawêj",
+                        "rezber",
+                        "kewçêr",
+                        "sermawez",
+                        "berfanbar",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "Ç1",
+                        "Ç2",
+                        "Ç3",
+                        "Ç4",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "Çarêka 1em",
+                        "Çarêka 2em",
+                        "Çarêka 3em",
+                        "Çarêka 4em",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Ç1",
+                        "Ç2",
+                        "Ç3",
+                        "Ç4",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "Çarêka 1em",
+                        "Çarêka 2em",
+                        "Çarêka 3em",
+                        "Çarêka 4em",
+                    }
+                }
+            }
+        }
+    }
+    characterLabel{
+        animal{"heywan"}
+        animals_nature{"heywan an xweza"}
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"roj"}
+            relative{
+                "-1"{"duh"}
+                "0"{"îro"}
+                "1"{"sibe"}
+            }
+        }
+        day-narrow{
+            dn{"r."}
+        }
+        day-short{
+            dn{"r."}
+        }
+        dayOfYear{
+            dn{"roja salê"}
+        }
+        dayOfYear-narrow{
+            dn{"roja salê"}
+        }
+        dayOfYear-short{
+            dn{"roja salê"}
+        }
+        dayperiod{
+            dn{"BN/PN"}
+        }
+        dayperiod-narrow{
+            dn{"BN/PN"}
+        }
+        dayperiod-short{
+            dn{"BN/PN"}
+        }
+        era{
+            dn{"serdem"}
+        }
+        hour{
+            dn{"saet"}
+        }
+        hour-narrow{
+            dn{"st."}
+        }
+        hour-short{
+            dn{"st."}
+        }
+        minute{
+            dn{"deqîqe"}
+        }
+        minute-narrow{
+            dn{"d."}
+        }
+        minute-short{
+            dn{"d."}
+        }
+        month{
+            dn{"meh"}
+            relative{
+                "-1"{"meha borî"}
+                "0"{"vê mehê"}
+                "1"{"meha were"}
+            }
+        }
+        month-narrow{
+            dn{"m."}
+            relative{
+                "-1"{"meha br."}
+                "0"{"vê mehê"}
+                "1"{"meha bê"}
+            }
+        }
+        month-short{
+            dn{"m."}
+            relative{
+                "-1"{"meha br."}
+                "0"{"vê mehê"}
+                "1"{"meha bê"}
+            }
+        }
+        quarter{
+            dn{"çarêk"}
+        }
+        quarter-narrow{
+            dn{"çrk."}
+        }
+        quarter-short{
+            dn{"çrk."}
+        }
+        second{
+            dn{"saniye"}
+        }
+        second-narrow{
+            dn{"s."}
+        }
+        second-short{
+            dn{"s."}
+        }
+        week{
+            dn{"hefte"}
+            relative{
+                "-1"{"hefteya borî"}
+                "0"{"vê hefteyê"}
+                "1"{"hefteya were"}
+            }
+            relativePeriod{"hefteya {0}"}
+        }
+        week-narrow{
+            dn{"hf."}
+            relative{
+                "-1"{"hft. borî"}
+                "0"{"vê hft."}
+                "1"{"hft. bê"}
+            }
+            relativePeriod{"hft. {0}"}
+        }
+        week-short{
+            dn{"hf."}
+            relative{
+                "-1"{"hft. borî"}
+                "0"{"vê hft."}
+                "1"{"hft. bê"}
+            }
+            relativePeriod{"hft. {0}"}
+        }
+        weekOfMonth{
+            dn{"hefteya mehê"}
+        }
+        weekday{
+            dn{"roja hefteyê"}
+        }
+        weekday-narrow{
+            dn{"roja hefteyê"}
+        }
+        weekday-short{
+            dn{"roja hefteyê"}
+        }
+        weekdayOfMonth{
+            dn{"roja mehê"}
+        }
+        weekdayOfMonth-narrow{
+            dn{"roja mehê"}
+        }
+        weekdayOfMonth-short{
+            dn{"roja mehê"}
+        }
+        year{
+            dn{"sal"}
+            relative{
+                "-1"{"par"}
+                "0"{"îsal"}
+                "1"{"sala piştî"}
+            }
+            relativeTime{
+                future{
+                    one{"di salekê de"}
+                    other{"di {0} salan de"}
+                }
+                past{
+                    one{"berî {0} salê"}
+                    other{"berî {0} salan"}
+                }
+            }
+        }
+        year-narrow{
+            dn{"sl"}
+            relative{
+                "-1"{"par"}
+                "0"{"îsal"}
+                "1"{"sala bê"}
+            }
+            relativeTime{
+                future{
+                    one{"piştî salekê"}
+                    other{"piştî {0} salan"}
+                }
+                past{
+                    one{"berî salekê"}
+                    other{"berî {0} salan"}
+                }
+            }
+        }
+        year-short{
+            dn{"sal"}
+            relative{
+                "-1"{"par"}
+                "0"{"îsal"}
+                "1"{"sala bê"}
+            }
+            relativeTime{
+                future{
+                    one{"piştî salekê"}
+                    other{"piştî {0} salan"}
+                }
+                past{
+                    one{"berî salekê"}
+                    other{"berî {0} salan"}
+                }
+            }
+        }
+        zone{
+            dn{"qada demê"}
+        }
+        zone-narrow{
+            dn{"qad"}
+        }
+        zone-short{
+            dn{"qad"}
+        }
+    }
+    listPattern{
+        or{
+            2{"{0} an {1}"}
+            end{"{0} an {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        standard{
+            2{"{0} û {1}"}
+            end{"{0} û {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        standard-short{
+            2{"{0} û {1}"}
+            end{"{0} û {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        unit{
+            2{"{0} û {1}"}
+            end{"{0} û {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        unit-narrow{
+            2{"{0} {1}"}
+            end{"{0} {1}"}
+            middle{"{0} {1}"}
+            start{"{0} {1}"}
+        }
+        unit-short{
+            2{"{0} û {1}"}
+            end{"{0} û {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+    }
+    parse{
+        date{
+            lenient{
+                "[\\--/]",
+                "[\\:∶]",
+            }
+        }
+        general{
+            lenient{
+                "[.․。︒﹒．｡]",
+                "['ʼ՚᾽᾿’＇]",
+                "[%٪﹪％]",
+                "[؉‰]",
+                "[\$﹩＄$]",
+                "[£₤]",
+                "[¥￥]",
+                "[₩￦]",
+                "[₨₹{Rp}{Rs}]",
+            }
+        }
+        number{
+            lenient{
+                "[\\-‒⁻₋−➖﹣－]",
+                "[,،٫⹁、︐︑﹐﹑，､]",
+                "[+⁺₊➕﬩﹢＋]",
+            }
+        }
+    }
+}

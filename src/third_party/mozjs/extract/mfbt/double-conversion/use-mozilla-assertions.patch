@@ -1,4 +1,5 @@
 diff --git a/mfbt/double-conversion/double-conversion/utils.h b/mfbt/double-conversion/double-conversion/utils.h
+index c72c333f020a1..6022132e2b495 100644
 --- a/mfbt/double-conversion/double-conversion/utils.h
 +++ b/mfbt/double-conversion/double-conversion/utils.h
 @@ -26,38 +26,38 @@
@@ -12,14 +13,14 @@ diff --git a/mfbt/double-conversion/double-conversion/utils.h b/mfbt/double-conv
  
 -#include <cassert>
 +#include "mozilla/Assertions.h"
- #ifndef ASSERT
- #define ASSERT(condition)         \
+ #ifndef DOUBLE_CONVERSION_ASSERT
+ #define DOUBLE_CONVERSION_ASSERT(condition)         \
 -    assert(condition);
 +    MOZ_ASSERT(condition)
  #endif
- #ifndef UNIMPLEMENTED
--#define UNIMPLEMENTED() (abort())
-+#define UNIMPLEMENTED() MOZ_CRASH()
+ #ifndef DOUBLE_CONVERSION_UNIMPLEMENTED
+-#define DOUBLE_CONVERSION_UNIMPLEMENTED() (abort())
++#define DOUBLE_CONVERSION_UNIMPLEMENTED() MOZ_CRASH()
  #endif
  #ifndef DOUBLE_CONVERSION_NO_RETURN
  #ifdef _MSC_VER
@@ -28,20 +29,20 @@ diff --git a/mfbt/double-conversion/double-conversion/utils.h b/mfbt/double-conv
  #define DOUBLE_CONVERSION_NO_RETURN __attribute__((noreturn))
  #endif
  #endif
- #ifndef UNREACHABLE
+ #ifndef DOUBLE_CONVERSION_UNREACHABLE
  #ifdef _MSC_VER
  void DOUBLE_CONVERSION_NO_RETURN abort_noreturn();
 -inline void abort_noreturn() { abort(); }
 +inline void abort_noreturn() { MOZ_CRASH(); }
- #define UNREACHABLE()   (abort_noreturn())
+ #define DOUBLE_CONVERSION_UNREACHABLE()   (abort_noreturn())
  #else
--#define UNREACHABLE()   (abort())
-+#define UNREACHABLE()   MOZ_CRASH()
+-#define DOUBLE_CONVERSION_UNREACHABLE()   (abort())
++#define DOUBLE_CONVERSION_UNREACHABLE()   MOZ_CRASH()
  #endif
  #endif
  
- 
- // Double operations detection based on target architecture.
- // Linux uses a 80bit wide floating point stack on x86. This induces double
- // rounding, which in turn leads to wrong results.
- // An easy way to test if the floating-point operations are correct is to
+ // Not all compilers support __has_attribute and combining a check for both
+ // ifdef and __has_attribute on the same preprocessor line isn't portable.
+ #ifdef __has_attribute
+ #   define DOUBLE_CONVERSION_HAS_ATTRIBUTE(x) __has_attribute(x)
+ #else

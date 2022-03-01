@@ -1,0 +1,29 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+jgo{
+    units{
+        duration{
+            day{
+                one{"{0} lɛ́Ꞌ"}
+                other{"{0} lɛ́Ꞌ"}
+            }
+            hour{
+                one{"{0} háwa"}
+                other{"{0} háwa"}
+            }
+            minute{
+                one{"{0} minút"}
+                other{"{0} minút"}
+            }
+            month{
+                one{"pɛsaŋ {0}"}
+                other{"pɛsaŋ {0}"}
+            }
+            year{
+                one{"ŋguꞋ {0}"}
+                other{"ŋguꞋ {0}"}
+            }
+        }
+    }
+}

@@ -1,0 +1,23 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ee{
+    collations{
+        standard{
+            Sequence{
+                "&̌<<̂"
+                "&D<dz<<<Dz<<<DZ<ɖ<<<Ɖ"
+                "&E<ɛ<<<Ɛ"
+                "&F<ƒ<<<Ƒ"
+                "&G<gb<<<Gb<<<GB<ɣ<<<Ɣ"
+                "&H<x<<<X"
+                "&K<kp<<<Kp<<<KP"
+                "&N<ny<<<Ny<<<NY<ŋ<<<Ŋ"
+                "&O<ɔ<<<Ɔ"
+                "&T<ts<<<Ts<<<TS"
+                "&V<ʋ<<<Ʋ"
+            }
+            Version{"39"}
+        }
+    }
+}

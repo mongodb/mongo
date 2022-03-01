@@ -1,0 +1,955 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+lb{
+    zoneStrings{
+        "Africa:Accra"{
+            ec{"Accra"}
+        }
+        "Africa:Addis_Ababa"{
+            ec{"Addis Abeba"}
+        }
+        "Africa:Algiers"{
+            ec{"Alger"}
+        }
+        "Africa:Asmera"{
+            ec{"Asmara"}
+        }
+        "Africa:Cairo"{
+            ec{"Kairo"}
+        }
+        "Africa:Dar_es_Salaam"{
+            ec{"Dar es Salaam"}
+        }
+        "Africa:Djibouti"{
+            ec{"Dschibuti"}
+        }
+        "Africa:El_Aaiun"{
+            ec{"El Aaiún"}
+        }
+        "Africa:Khartoum"{
+            ec{"Khartum"}
+        }
+        "Africa:Mogadishu"{
+            ec{"Mogadischu"}
+        }
+        "Africa:Ouagadougou"{
+            ec{"Wagadugu"}
+        }
+        "Africa:Sao_Tome"{
+            ec{"São Tomé"}
+        }
+        "Africa:Tripoli"{
+            ec{"Tripoli"}
+        }
+        "America:Asuncion"{
+            ec{"Asunción"}
+        }
+        "America:Cayman"{
+            ec{"Kaimaninselen"}
+        }
+        "America:Coral_Harbour"{
+            ec{"Atikokan"}
+        }
+        "America:Curacao"{
+            ec{"Curaçao"}
+        }
+        "America:El_Salvador"{
+            ec{"Salvador"}
+        }
+        "America:Havana"{
+            ec{"Havanna"}
+        }
+        "America:Indiana:Knox"{
+            ec{"Knox, Indiana"}
+        }
+        "America:Indiana:Marengo"{
+            ec{"Marengo, Indiana"}
+        }
+        "America:Indiana:Petersburg"{
+            ec{"Petersburg, Indiana"}
+        }
+        "America:Indiana:Tell_City"{
+            ec{"Tell City, Indiana"}
+        }
+        "America:Indiana:Vevay"{
+            ec{"Vevay, Indiana"}
+        }
+        "America:Indiana:Vincennes"{
+            ec{"Vincennes, Indiana"}
+        }
+        "America:Indiana:Winamac"{
+            ec{"Winamac, Indiana"}
+        }
+        "America:Jamaica"{
+            ec{"Jamaika"}
+        }
+        "America:Kentucky:Monticello"{
+            ec{"Monticello, Kentucky"}
+        }
+        "America:Lower_Princes"{
+            ec{"Lower Prince’s Quarter"}
+        }
+        "America:Mexico_City"{
+            ec{"Mexiko-Stad"}
+        }
+        "America:North_Dakota:Beulah"{
+            ec{"Beulah, North Dakota"}
+        }
+        "America:North_Dakota:Center"{
+            ec{"Center, North Dakota"}
+        }
+        "America:North_Dakota:New_Salem"{
+            ec{"New Salem, North Dakota"}
+        }
+        "America:Port_of_Spain"{
+            ec{"Port-of-Spain"}
+        }
+        "America:St_Barthelemy"{
+            ec{"Saint-Barthélemy"}
+        }
+        "America:St_Johns"{
+            ec{"St. John’s"}
+        }
+        "America:St_Kitts"{
+            ec{"St. Kitts"}
+        }
+        "America:St_Lucia"{
+            ec{"St. Lucia"}
+        }
+        "America:St_Thomas"{
+            ec{"St. Thomas"}
+        }
+        "America:St_Vincent"{
+            ec{"St. Vincent"}
+        }
+        "Antarctica:DumontDUrville"{
+            ec{"Dumont d’Urville"}
+        }
+        "Antarctica:Vostok"{
+            ec{"Wostok"}
+        }
+        "Asia:Aqtobe"{
+            ec{"Aqtöbe"}
+        }
+        "Asia:Baghdad"{
+            ec{"Bagdad"}
+        }
+        "Asia:Bishkek"{
+            ec{"Bischkek"}
+        }
+        "Asia:Calcutta"{
+            ec{"Kalkutta"}
+        }
+        "Asia:Damascus"{
+            ec{"Damaskus"}
+        }
+        "Asia:Dushanbe"{
+            ec{"Duschanbe"}
+        }
+        "Asia:Hong_Kong"{
+            ec{"Hong Kong"}
+        }
+        "Asia:Jayapura"{
+            ec{"Port Numbay"}
+        }
+        "Asia:Kamchatka"{
+            ec{"Kamtschatka"}
+        }
+        "Asia:Katmandu"{
+            ec{"Kathmandu"}
+        }
+        "Asia:Krasnoyarsk"{
+            ec{"Krasnojarsk"}
+        }
+        "Asia:Macau"{
+            ec{"Macau"}
+        }
+        "Asia:Muscat"{
+            ec{"Muskat"}
+        }
+        "Asia:Nicosia"{
+            ec{"Nikosia"}
+        }
+        "Asia:Novosibirsk"{
+            ec{"Nowosibirsk"}
+        }
+        "Asia:Pyongyang"{
+            ec{"Pjöngjang"}
+        }
+        "Asia:Qatar"{
+            ec{"Katar"}
+        }
+        "Asia:Riyadh"{
+            ec{"Riad"}
+        }
+        "Asia:Saigon"{
+            ec{"Ho-Chi-Minh-Stad"}
+        }
+        "Asia:Sakhalin"{
+            ec{"Sachalin"}
+        }
+        "Asia:Singapore"{
+            ec{"Singapur"}
+        }
+        "Asia:Taipei"{
+            ec{"Taipeh"}
+        }
+        "Asia:Tashkent"{
+            ec{"Taschkent"}
+        }
+        "Asia:Tbilisi"{
+            ec{"Tiflis"}
+        }
+        "Asia:Tehran"{
+            ec{"Teheran"}
+        }
+        "Asia:Tokyo"{
+            ec{"Tokio"}
+        }
+        "Asia:Vladivostok"{
+            ec{"Wladiwostok"}
+        }
+        "Asia:Yakutsk"{
+            ec{"Jakutsk"}
+        }
+        "Asia:Yekaterinburg"{
+            ec{"Jekaterinbuerg"}
+        }
+        "Asia:Yerevan"{
+            ec{"Erivan"}
+        }
+        "Atlantic:Azores"{
+            ec{"Azoren"}
+        }
+        "Atlantic:Bermuda"{
+            ec{"Bermudas"}
+        }
+        "Atlantic:Canary"{
+            ec{"Kanaresch Inselen"}
+        }
+        "Atlantic:Cape_Verde"{
+            ec{"Kap Verde"}
+        }
+        "Atlantic:Faeroe"{
+            ec{"Färöer"}
+        }
+        "Atlantic:South_Georgia"{
+            ec{"Südgeorgien"}
+        }
+        "Atlantic:St_Helena"{
+            ec{"St. Helena"}
+        }
+        "Etc:Unknown"{
+            ec{"Onbekannt"}
+        }
+        "Europe:Athens"{
+            ec{"Athen"}
+        }
+        "Europe:Belgrade"{
+            ec{"Belgrad"}
+        }
+        "Europe:Brussels"{
+            ec{"Bréissel"}
+        }
+        "Europe:Bucharest"{
+            ec{"Bukarest"}
+        }
+        "Europe:Chisinau"{
+            ec{"Kischinau"}
+        }
+        "Europe:Copenhagen"{
+            ec{"Kopenhagen"}
+        }
+        "Europe:Dublin"{
+            ld{"Iresch Summerzäit"}
+        }
+        "Europe:Kiev"{
+            ec{"Kiew"}
+        }
+        "Europe:Lisbon"{
+            ec{"Lissabon"}
+        }
+        "Europe:London"{
+            ld{"Britesch Summerzäit"}
+        }
+        "Europe:Luxembourg"{
+            ec{"Lëtzebuerg"}
+        }
+        "Europe:Moscow"{
+            ec{"Moskau"}
+        }
+        "Europe:Prague"{
+            ec{"Prag"}
+        }
+        "Europe:Rome"{
+            ec{"Roum"}
+        }
+        "Europe:Tirane"{
+            ec{"Tirana"}
+        }
+        "Europe:Uzhgorod"{
+            ec{"Uschgorod"}
+        }
+        "Europe:Vatican"{
+            ec{"Vatikan"}
+        }
+        "Europe:Vienna"{
+            ec{"Wien"}
+        }
+        "Europe:Vilnius"{
+            ec{"Wilna"}
+        }
+        "Europe:Volgograd"{
+            ec{"Wolgograd"}
+        }
+        "Europe:Warsaw"{
+            ec{"Warschau"}
+        }
+        "Europe:Zaporozhye"{
+            ec{"Saporischschja"}
+        }
+        "Europe:Zurich"{
+            ec{"Zürech"}
+        }
+        "Indian:Christmas"{
+            ec{"Chrëschtdagsinsel"}
+        }
+        "Indian:Comoro"{
+            ec{"Komoren"}
+        }
+        "Indian:Maldives"{
+            ec{"Maldiven"}
+        }
+        "Indian:Reunion"{
+            ec{"Réunion"}
+        }
+        "Pacific:Easter"{
+            ec{"Ouschterinsel"}
+        }
+        "Pacific:Fiji"{
+            ec{"Fidschi"}
+        }
+        "Pacific:Ponape"{
+            ec{"Pohnpei"}
+        }
+        "Pacific:Truk"{
+            ec{"Chuuk"}
+        }
+        "meta:Acre"{
+            ld{"Acre-Summerzäit"}
+            lg{"Acre-Zäit"}
+            ls{"Acre-Normalzäit"}
+        }
+        "meta:Afghanistan"{
+            ls{"Afghanistan-Zäit"}
+        }
+        "meta:Africa_Central"{
+            ls{"Zentralafrikanesch Zäit"}
+        }
+        "meta:Africa_Eastern"{
+            ls{"Ostafrikanesch Zäit"}
+        }
+        "meta:Africa_Southern"{
+            ls{"Südafrikanesch Zäit"}
+        }
+        "meta:Africa_Western"{
+            ld{"Westafrikanesch Summerzäit"}
+            lg{"Westafrikanesch Zäit"}
+            ls{"Westafrikanesch Normalzäit"}
+        }
+        "meta:Alaska"{
+            ld{"Alaska-Summerzäit"}
+            lg{"Alaska-Zäit"}
+            ls{"Alaska-Normalzäit"}
+        }
+        "meta:Almaty"{
+            ld{"Almaty-Summerzäit"}
+            lg{"Almaty-Zäit"}
+            ls{"Almaty-Normalzäit"}
+        }
+        "meta:Amazon"{
+            ld{"Amazonas-Summerzäit"}
+            lg{"Amazonas-Zäit"}
+            ls{"Amazonas-Normalzäit"}
+        }
+        "meta:America_Central"{
+            ld{"Nordamerikanesch Inland-Summerzäit"}
+            lg{"Nordamerikanesch Inlandzäit"}
+            ls{"Nordamerikanesch Inland-Normalzäit"}
+        }
+        "meta:America_Eastern"{
+            ld{"Nordamerikanesch Ostküsten-Summerzäit"}
+            lg{"Nordamerikanesch Ostküstenzäit"}
+            ls{"Nordamerikanesch Ostküsten-Normalzäit"}
+        }
+        "meta:America_Mountain"{
+            ld{"Rocky-Mountain-Summerzäit"}
+            lg{"Rocky-Mountain-Zäit"}
+            ls{"Rocky-Mountain-Normalzäit"}
+        }
+        "meta:America_Pacific"{
+            ld{"Nordamerikanesch Westküsten-Summerzäit"}
+            lg{"Nordamerikanesch Westküstenzäit"}
+            ls{"Nordamerikanesch Westküsten-Normalzäit"}
+        }
+        "meta:Anadyr"{
+            ld{"Anadyr-Summerzäit"}
+            lg{"Anadyr-Zäit"}
+            ls{"Anadyr-Normalzäit"}
+        }
+        "meta:Arabian"{
+            ld{"Arabesch Summerzäit"}
+            lg{"Arabesch Zäit"}
+            ls{"Arabesch Normalzäit"}
+        }
+        "meta:Argentina"{
+            ld{"Argentinesch Summerzäit"}
+            lg{"Argentinesch Zäit"}
+            ls{"Argentinesch Normalzäit"}
+        }
+        "meta:Argentina_Western"{
+            ld{"Westargentinesch Summerzäit"}
+            lg{"Westargentinesch Zäit"}
+            ls{"Westargentinesch Normalzäit"}
+        }
+        "meta:Armenia"{
+            ld{"Armenesch Summerzäit"}
+            lg{"Armenesch Zäit"}
+            ls{"Armenesch Normalzäit"}
+        }
+        "meta:Atlantic"{
+            ld{"Atlantik-Summerzäit"}
+            lg{"Atlantik-Zäit"}
+            ls{"Atlantik-Normalzäit"}
+        }
+        "meta:Australia_Central"{
+            ld{"Zentralaustralesch Summerzäit"}
+            lg{"Zentralaustralesch Zäit"}
+            ls{"Zentralaustralesch Normalzäit"}
+        }
+        "meta:Australia_CentralWestern"{
+            ld{"Zentral-/Westaustralesch Summerzäit"}
+            lg{"Zentral-/Westaustralesch Zäit"}
+            ls{"Zentral-/Westaustralesch Normalzäit"}
+        }
+        "meta:Australia_Eastern"{
+            ld{"Ostaustralesch Summerzäit"}
+            lg{"Ostaustralesch Zäit"}
+            ls{"Ostaustralesch Normalzäit"}
+        }
+        "meta:Australia_Western"{
+            ld{"Westaustralesch Summerzäit"}
+            lg{"Westaustralesch Zäit"}
+            ls{"Westaustralesch Normalzäit"}
+        }
+        "meta:Azerbaijan"{
+            ld{"Aserbaidschanesch Summerzäit"}
+            lg{"Aserbaidschanesch Zäit"}
+            ls{"Aserbeidschanesch Normalzäit"}
+        }
+        "meta:Azores"{
+            ld{"Azoren-Summerzäit"}
+            lg{"Azoren-Zäit"}
+            ls{"Azoren-Normalzäit"}
+        }
+        "meta:Bangladesh"{
+            ld{"Bangladesch-Summerzäit"}
+            lg{"Bangladesch-Zäit"}
+            ls{"Bangladesch-Normalzäit"}
+        }
+        "meta:Bhutan"{
+            ls{"Bhutan-Zäit"}
+        }
+        "meta:Bolivia"{
+            ls{"Bolivianesch Zäit"}
+        }
+        "meta:Brasilia"{
+            ld{"Brasília-Summerzäit"}
+            lg{"Brasília-Zäit"}
+            ls{"Brasília-Normalzäit"}
+        }
+        "meta:Brunei"{
+            ls{"Brunei-Zäit"}
+        }
+        "meta:Cape_Verde"{
+            ld{"Kap-Verde-Summerzäit"}
+            lg{"Kap-Verde-Zäit"}
+            ls{"Kap-Verde-Normalzäit"}
+        }
+        "meta:Chamorro"{
+            ls{"Chamorro-Zäit"}
+        }
+        "meta:Chatham"{
+            ld{"Chatham-Summerzäit"}
+            lg{"Chatham-Zäit"}
+            ls{"Chatham-Normalzäit"}
+        }
+        "meta:Chile"{
+            ld{"Chilenesch Summerzäit"}
+            lg{"Chilenesch Zäit"}
+            ls{"Chilenesch Normalzäit"}
+        }
+        "meta:China"{
+            ld{"Chinesesch Summerzäit"}
+            lg{"Chinesesch Zäit"}
+            ls{"Chinesesch Normalzäit"}
+        }
+        "meta:Choibalsan"{
+            ld{"Choibalsan-Summerzäit"}
+            lg{"Choibalsan-Zäit"}
+            ls{"Choibalsan-Normalzäit"}
+        }
+        "meta:Christmas"{
+            ls{"Chrëschtdagsinsel-Zäit"}
+        }
+        "meta:Cocos"{
+            ls{"Kokosinselen-Zäit"}
+        }
+        "meta:Colombia"{
+            ld{"Kolumbianesch Summerzäit"}
+            lg{"Kolumbianesch Zäit"}
+            ls{"Kolumbianesch Normalzäit"}
+        }
+        "meta:Cook"{
+            ld{"Cookinselen-Summerzäit"}
+            lg{"Cookinselen-Zäit"}
+            ls{"Cookinselen-Normalzäit"}
+        }
+        "meta:Cuba"{
+            ld{"Kubanesch Summerzäit"}
+            lg{"Kubanesch Zäit"}
+            ls{"Kubanesch Normalzäit"}
+        }
+        "meta:Davis"{
+            ls{"Davis-Zäit"}
+        }
+        "meta:DumontDUrville"{
+            ls{"Dumont-d’Urville-Zäit"}
+        }
+        "meta:East_Timor"{
+            ls{"Osttimor-Zäit"}
+        }
+        "meta:Easter"{
+            ld{"Ouschterinsel-Summerzäit"}
+            lg{"Ouschterinsel-Zäit"}
+            ls{"Ouschterinsel-Normalzäit"}
+        }
+        "meta:Ecuador"{
+            ls{"Ecuadorianesch Zäit"}
+        }
+        "meta:Europe_Central"{
+            ld{"Mëtteleuropäesch Summerzäit"}
+            lg{"Mëtteleuropäesch Zäit"}
+            ls{"Mëtteleuropäesch Normalzäit"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"Osteuropäesch Summerzäit"}
+            lg{"Osteuropäesch Zäit"}
+            ls{"Osteuropäesch Normalzäit"}
+        }
+        "meta:Europe_Western"{
+            ld{"Westeuropäesch Summerzäit"}
+            lg{"Westeuropäesch Zäit"}
+            ls{"Westeuropäesch Normalzäit"}
+        }
+        "meta:Falkland"{
+            ld{"Falklandinselen-Summerzäit"}
+            lg{"Falklandinselen-Zäit"}
+            ls{"Falklandinselen-Normalzäit"}
+        }
+        "meta:Fiji"{
+            ld{"Fidschi-Summerzäit"}
+            lg{"Fidschi-Zäit"}
+            ls{"Fidschi-Normalzäit"}
+        }
+        "meta:French_Guiana"{
+            ls{"Franséisch-Guayane-Zäit"}
+        }
+        "meta:French_Southern"{
+            ls{"Franséisch Süd- an Antarktisgebidder-Zäit"}
+        }
+        "meta:GMT"{
+            ls{"Mëttler Greenwich-Zäit"}
+        }
+        "meta:Galapagos"{
+            ls{"Galapagos-Zäit"}
+        }
+        "meta:Gambier"{
+            ls{"Gambier-Zäit"}
+        }
+        "meta:Georgia"{
+            ld{"Georgesch Summerzäit"}
+            lg{"Georgesch Zäit"}
+            ls{"Georgesch Normalzäit"}
+        }
+        "meta:Gilbert_Islands"{
+            ls{"Gilbert-Inselen-Zäit"}
+        }
+        "meta:Greenland_Eastern"{
+            ld{"Ostgrönland-Summerzäit"}
+            lg{"Ostgrönland-Zäit"}
+            ls{"Ostgrönland-Normalzäit"}
+        }
+        "meta:Greenland_Western"{
+            ld{"Westgrönland-Summerzäit"}
+            lg{"Westgrönland-Zäit"}
+            ls{"Westgrönland-Normalzäit"}
+        }
+        "meta:Guam"{
+            ls{"Guam-Zäit"}
+        }
+        "meta:Gulf"{
+            ls{"Golf-Zäit"}
+        }
+        "meta:Guyana"{
+            ls{"Guyana-Zäit"}
+        }
+        "meta:Hawaii_Aleutian"{
+            ld{"Hawaii-Aleuten-Summerzäit"}
+            lg{"Hawaii-Aleuten-Zäit"}
+            ls{"Hawaii-Aleuten-Normalzäit"}
+        }
+        "meta:Hong_Kong"{
+            ld{"Hong-Kong-Summerzäit"}
+            lg{"Hong-Kong-Zäit"}
+            ls{"Hong-Kong-Normalzäit"}
+        }
+        "meta:Hovd"{
+            ld{"Hovd-Summerzäit"}
+            lg{"Hovd-Zäit"}
+            ls{"Hovd-Normalzäit"}
+        }
+        "meta:India"{
+            ls{"Indesch Zäit"}
+        }
+        "meta:Indian_Ocean"{
+            ls{"Indeschen Ozean-Zäit"}
+        }
+        "meta:Indochina"{
+            ls{"Indochina-Zäit"}
+        }
+        "meta:Indonesia_Central"{
+            ls{"Zentralindonesesch Zäit"}
+        }
+        "meta:Indonesia_Eastern"{
+            ls{"Ostindonesesch Zäit"}
+        }
+        "meta:Indonesia_Western"{
+            ls{"Westindonesesch Zäit"}
+        }
+        "meta:Iran"{
+            ld{"Iranesch Summerzäit"}
+            lg{"Iranesch Zäit"}
+            ls{"Iranesch Normalzäit"}
+        }
+        "meta:Irkutsk"{
+            ld{"Irkutsk-Summerzäit"}
+            lg{"Irkutsk-Zäit"}
+            ls{"Irkutsk-Normalzäit"}
+        }
+        "meta:Israel"{
+            ld{"Israelesch Summerzäit"}
+            lg{"Israelesch Zäit"}
+            ls{"Israelesch Normalzäit"}
+        }
+        "meta:Japan"{
+            ld{"Japanesch Summerzäit"}
+            lg{"Japanesch Zäit"}
+            ls{"Japanesch Normalzäit"}
+        }
+        "meta:Kamchatka"{
+            ld{"Kamtschatka-Summerzäit"}
+            lg{"Kamtschatka-Zäit"}
+            ls{"Kamtschatka-Normalzäit"}
+        }
+        "meta:Kazakhstan_Eastern"{
+            ls{"Ostkasachesch Zäit"}
+        }
+        "meta:Kazakhstan_Western"{
+            ls{"Westkasachesch Zäit"}
+        }
+        "meta:Korea"{
+            ld{"Koreanesch Summerzäit"}
+            lg{"Koreanesch Zäit"}
+            ls{"Koreanesch Normalzäit"}
+        }
+        "meta:Kosrae"{
+            ls{"Kosrae-Zäit"}
+        }
+        "meta:Krasnoyarsk"{
+            ld{"Krasnojarsk-Summerzäit"}
+            lg{"Krasnojarsk-Zäit"}
+            ls{"Krasnojarsk-Normalzäit"}
+        }
+        "meta:Kyrgystan"{
+            ls{"Kirgisistan-Zäit"}
+        }
+        "meta:Line_Islands"{
+            ls{"Linneninselen-Zäit"}
+        }
+        "meta:Lord_Howe"{
+            ld{"Lord-Howe-Summerzäit"}
+            lg{"Lord-Howe-Zäit"}
+            ls{"Lord-Howe-Normalzäit"}
+        }
+        "meta:Macquarie"{
+            ls{"Macquarieinsel-Zäit"}
+        }
+        "meta:Magadan"{
+            ld{"Magadan-Summerzäit"}
+            lg{"Magadan-Zäit"}
+            ls{"Magadan-Normalzäit"}
+        }
+        "meta:Malaysia"{
+            ls{"Malaysesch Zäit"}
+        }
+        "meta:Maldives"{
+            ls{"Maldiven-Zäit"}
+        }
+        "meta:Marquesas"{
+            ls{"Marquesas-Zäit"}
+        }
+        "meta:Marshall_Islands"{
+            ls{"Marshallinselen-Zäit"}
+        }
+        "meta:Mauritius"{
+            ld{"Mauritius-Summerzäit"}
+            lg{"Mauritius-Zäit"}
+            ls{"Mauritius-Normalzäit"}
+        }
+        "meta:Mawson"{
+            ls{"Mawson-Zäit"}
+        }
+        "meta:Mexico_Northwest"{
+            ld{"Nordwest-Mexiko-Summerzäit"}
+            lg{"Nordwest-Mexiko-Zäit"}
+            ls{"Nordwest-Mexiko-Normalzäit"}
+        }
+        "meta:Mexico_Pacific"{
+            ld{"Mexikanesch Pazifik-Summerzäit"}
+            lg{"Mexikanesch Pazifikzäit"}
+            ls{"Mexikanesch Pazifik-Normalzäit"}
+        }
+        "meta:Mongolia"{
+            ld{"Ulaanbaatar-Summerzäit"}
+            lg{"Ulaanbaatar-Zäit"}
+            ls{"Ulaanbaatar-Normalzäit"}
+        }
+        "meta:Moscow"{
+            ld{"Moskauer Summerzäit"}
+            lg{"Moskauer Zäit"}
+            ls{"Moskauer Normalzäit"}
+        }
+        "meta:Myanmar"{
+            ls{"Myanmar-Zäit"}
+        }
+        "meta:Nauru"{
+            ls{"Nauru-Zäit"}
+        }
+        "meta:Nepal"{
+            ls{"Nepalesesch Zäit"}
+        }
+        "meta:New_Caledonia"{
+            ld{"Neikaledonesch Summerzäit"}
+            lg{"Neikaledonesch Zäit"}
+            ls{"Neikaledonesch Normalzäit"}
+        }
+        "meta:New_Zealand"{
+            ld{"Neiséiland-Summerzäit"}
+            lg{"Neiséiland-Zäit"}
+            ls{"Neiséiland-Normalzäit"}
+        }
+        "meta:Newfoundland"{
+            ld{"Neifundland-Summerzäit"}
+            lg{"Neifundland-Zäit"}
+            ls{"Neifundland-Normalzäit"}
+        }
+        "meta:Niue"{
+            ls{"Niue-Zäit"}
+        }
+        "meta:Norfolk"{
+            ld{"Norfolkinselen-Summerzäit"}
+            lg{"Norfolkinselen-Zäit"}
+            ls{"Norfolkinselen-Normalzäit"}
+        }
+        "meta:Noronha"{
+            ld{"Fernando-de-Noronha-Summerzäit"}
+            lg{"Fernando-de-Noronha-Zäit"}
+            ls{"Fernando-de-Noronha-Normalzäit"}
+        }
+        "meta:Novosibirsk"{
+            ld{"Nowosibirsk-Summerzäit"}
+            lg{"Nowosibirsk-Zäit"}
+            ls{"Nowosibirsk-Normalzäit"}
+        }
+        "meta:Omsk"{
+            ld{"Omsk-Summerzäit"}
+            lg{"Omsk-Zäit"}
+            ls{"Omsk-Normalzäit"}
+        }
+        "meta:Pakistan"{
+            ld{"Pakistanesch Summerzäit"}
+            lg{"Pakistanesch Zäit"}
+            ls{"Pakistanesch Normalzäit"}
+        }
+        "meta:Palau"{
+            ls{"Palau-Zäit"}
+        }
+        "meta:Papua_New_Guinea"{
+            ls{"Papua-Neiguinea-Zäit"}
+        }
+        "meta:Paraguay"{
+            ld{"Paraguayanesch Summerzäit"}
+            lg{"Paraguayanesch Zäit"}
+            ls{"Paraguayanesch Normalzäit"}
+        }
+        "meta:Peru"{
+            ld{"Peruanesch Summerzäit"}
+            lg{"Peruanesch Zäit"}
+            ls{"Peruanesch Normalzäit"}
+        }
+        "meta:Philippines"{
+            ld{"Philippinnesch Summerzäit"}
+            lg{"Philippinnesch Zäit"}
+            ls{"Philippinnesch Normalzäit"}
+        }
+        "meta:Phoenix_Islands"{
+            ls{"Phoenixinselen-Zäit"}
+        }
+        "meta:Pierre_Miquelon"{
+            ld{"Saint-Pierre-a-Miquelon-Summerzäit"}
+            lg{"Saint-Pierre-a-Miquelon-Zäit"}
+            ls{"Saint-Pierre-a-Miquelon-Normalzäit"}
+        }
+        "meta:Pitcairn"{
+            ls{"Pitcairninselen-Zäit"}
+        }
+        "meta:Ponape"{
+            ls{"Ponape-Zäit"}
+        }
+        "meta:Reunion"{
+            ls{"Réunion-Zäit"}
+        }
+        "meta:Rothera"{
+            ls{"Rothera-Zäit"}
+        }
+        "meta:Sakhalin"{
+            ld{"Sakhalin-Summerzäit"}
+            lg{"Sakhalin-Zäit"}
+            ls{"Sakhalin-Normalzäit"}
+        }
+        "meta:Samara"{
+            ld{"Samara-Summerzäit"}
+            lg{"Samara-Zäit"}
+            ls{"Samara-Normalzäit"}
+        }
+        "meta:Samoa"{
+            ld{"Samoa-Summerzäit"}
+            lg{"Samoa-Zäit"}
+            ls{"Samoa-Normalzäit"}
+        }
+        "meta:Seychelles"{
+            ls{"Seychellen-Zäit"}
+        }
+        "meta:Singapore"{
+            ls{"Singapur-Standardzäit"}
+        }
+        "meta:Solomon"{
+            ls{"Salomoninselen-Zäit"}
+        }
+        "meta:South_Georgia"{
+            ls{"Südgeorgesch Zäit"}
+        }
+        "meta:Suriname"{
+            ls{"Suriname-Zäit"}
+        }
+        "meta:Syowa"{
+            ls{"Syowa-Zäit"}
+        }
+        "meta:Tahiti"{
+            ls{"Tahiti-Zäit"}
+        }
+        "meta:Taipei"{
+            ld{"Taipei-Summerzäit"}
+            lg{"Taipei-Zäit"}
+            ls{"Taipei-Normalzäit"}
+        }
+        "meta:Tajikistan"{
+            ls{"Tadschikistan-Zäit"}
+        }
+        "meta:Tokelau"{
+            ls{"Tokelau-Zäit"}
+        }
+        "meta:Tonga"{
+            ld{"Tonganesch Summerzäit"}
+            lg{"Tonganesch Zäit"}
+            ls{"Tonganesch Normalzäit"}
+        }
+        "meta:Truk"{
+            ls{"Chuuk-Zäit"}
+        }
+        "meta:Turkmenistan"{
+            ld{"Turkmenistan-Summerzäit"}
+            lg{"Turkmenistan-Zäit"}
+            ls{"Turkmenistan-Normalzäit"}
+        }
+        "meta:Tuvalu"{
+            ls{"Tuvalu-Zäit"}
+        }
+        "meta:Uruguay"{
+            ld{"Uruguayanesch Summerzäit"}
+            lg{"Uruguayanesch Zäit"}
+            ls{"Uruguyanesch Normalzäit"}
+        }
+        "meta:Uzbekistan"{
+            ld{"Usbekistan-Summerzäit"}
+            lg{"Usbekistan-Zäit"}
+            ls{"Usbekistan-Normalzäit"}
+        }
+        "meta:Vanuatu"{
+            ld{"Vanuatu-Summerzäit"}
+            lg{"Vanuatu-Zäit"}
+            ls{"Vanuatu-Normalzäit"}
+        }
+        "meta:Venezuela"{
+            ls{"Venezuela-Zäit"}
+        }
+        "meta:Vladivostok"{
+            ld{"Wladiwostok-Summerzäit"}
+            lg{"Wladiwostok-Zäit"}
+            ls{"Wladiwostok-Normalzäit"}
+        }
+        "meta:Volgograd"{
+            ld{"Wolgograd-Summerzäit"}
+            lg{"Wolgograd-Zäit"}
+            ls{"Wolgograd-Normalzäit"}
+        }
+        "meta:Vostok"{
+            ls{"Wostok-Zäit"}
+        }
+        "meta:Wake"{
+            ls{"Wake-Insel-Zäit"}
+        }
+        "meta:Wallis"{
+            ls{"Wallis-a-Futuna-Zäit"}
+        }
+        "meta:Yakutsk"{
+            ld{"Jakutsk-Summerzäit"}
+            lg{"Jakutsk-Zäit"}
+            ls{"Jakutsk-Normalzäit"}
+        }
+        "meta:Yekaterinburg"{
+            ld{"Jekaterinbuerg-Summerzäit"}
+            lg{"Jekaterinbuerg-Zäit"}
+            ls{"Jekaterinbuerg-Normalzäit"}
+        }
+        fallbackFormat{"{1} ({0})"}
+        gmtFormat{"GMT{0}"}
+        gmtZeroFormat{"GMT"}
+        hourFormat{"+HH:mm;-HH:mm"}
+        regionFormat{"{0} Zäit"}
+        regionFormatDaylight{"{0} Summerzäit"}
+        regionFormatStandard{"{0} Normalzäit"}
+    }
+}

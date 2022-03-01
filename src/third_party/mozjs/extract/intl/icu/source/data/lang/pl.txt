@@ -1,0 +1,1004 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+pl{
+    Keys{
+        calendar{"kalendarz"}
+        cf{"format waluty"}
+        colAlternate{"Sortowanie ignorujące symbole"}
+        colBackwards{"Odwrotne sortowanie ze znakami akcentowanymi"}
+        colCaseFirst{"Kolejność wielkie/małe litery"}
+        colCaseLevel{"Sortowanie uwzględniające wielkość liter"}
+        colNormalization{"sortowanie znormalizowane"}
+        colNumeric{"sortowanie numeryczne"}
+        colStrength{"siła sortowania"}
+        collation{"kolejność sortowania"}
+        currency{"waluta"}
+        hc{"cykl (12- lub 24-godzinny)"}
+        lb{"styl podziału wiersza"}
+        ms{"system miar"}
+        numbers{"cyfry"}
+        timezone{"strefa czasowa"}
+        va{"wariant regionalny"}
+        x{"do użytku prywatnego"}
+    }
+    Languages{
+        aa{"afar"}
+        ab{"abchaski"}
+        ace{"aceh"}
+        ach{"aczoli"}
+        ada{"adangme"}
+        ady{"adygejski"}
+        ae{"awestyjski"}
+        aeb{"tunezyjski arabski"}
+        af{"afrikaans"}
+        afh{"afrihili"}
+        agq{"aghem"}
+        ain{"ajnu"}
+        ak{"akan"}
+        akk{"akadyjski"}
+        akz{"alabama"}
+        ale{"aleucki"}
+        aln{"albański gegijski"}
+        alt{"południowoałtajski"}
+        am{"amharski"}
+        an{"aragoński"}
+        ang{"staroangielski"}
+        anp{"angika"}
+        ar{"arabski"}
+        ar_001{"współczesny arabski"}
+        arc{"aramejski"}
+        arn{"mapudungun"}
+        aro{"araona"}
+        arp{"arapaho"}
+        arq{"algierski arabski"}
+        ars{"arabski nadżdyjski"}
+        arw{"arawak"}
+        ary{"marokański arabski"}
+        arz{"egipski arabski"}
+        as{"asamski"}
+        asa{"asu"}
+        ase{"amerykański język migowy"}
+        ast{"asturyjski"}
+        av{"awarski"}
+        avk{"kotava"}
+        awa{"awadhi"}
+        ay{"ajmara"}
+        az{"azerbejdżański"}
+        ba{"baszkirski"}
+        bal{"beludżi"}
+        ban{"balijski"}
+        bar{"bawarski"}
+        bas{"basaa"}
+        bax{"bamum"}
+        bbc{"batak toba"}
+        bbj{"ghomala"}
+        be{"białoruski"}
+        bej{"bedża"}
+        bem{"bemba"}
+        bew{"betawi"}
+        bez{"bena"}
+        bfd{"bafut"}
+        bfq{"badaga"}
+        bg{"bułgarski"}
+        bgn{"beludżi północny"}
+        bho{"bhodżpuri"}
+        bi{"bislama"}
+        bik{"bikol"}
+        bin{"bini"}
+        bjn{"banjar"}
+        bkm{"kom"}
+        bla{"siksika"}
+        bm{"bambara"}
+        bn{"bengalski"}
+        bo{"tybetański"}
+        bpy{"bisznuprija-manipuri"}
+        bqi{"bachtiarski"}
+        br{"bretoński"}
+        bra{"bradź"}
+        brh{"brahui"}
+        brx{"bodo"}
+        bs{"bośniacki"}
+        bss{"akoose"}
+        bua{"buriacki"}
+        bug{"bugijski"}
+        bum{"bulu"}
+        byn{"blin"}
+        byv{"medumba"}
+        ca{"kataloński"}
+        cad{"kaddo"}
+        car{"karaibski"}
+        cay{"kajuga"}
+        cch{"atsam"}
+        ccp{"czakma"}
+        ce{"czeczeński"}
+        ceb{"cebuański"}
+        cgg{"chiga"}
+        ch{"czamorro"}
+        chb{"czibcza"}
+        chg{"czagatajski"}
+        chk{"chuuk"}
+        chm{"maryjski"}
+        chn{"żargon czinucki"}
+        cho{"czoktawski"}
+        chp{"czipewiański"}
+        chr{"czirokeski"}
+        chy{"czejeński"}
+        ckb{"sorani"}
+        co{"korsykański"}
+        cop{"koptyjski"}
+        cps{"capiznon"}
+        cr{"kri"}
+        crh{"krymskotatarski"}
+        crs{"kreolski seszelski"}
+        cs{"czeski"}
+        csb{"kaszubski"}
+        cu{"cerkiewnosłowiański"}
+        cv{"czuwaski"}
+        cy{"walijski"}
+        da{"duński"}
+        dak{"dakota"}
+        dar{"dargwijski"}
+        dav{"taita"}
+        de{"niemiecki"}
+        de_AT{"niemiecki austriacki"}
+        de_CH{"wysokoniemiecki szwajcarski"}
+        del{"delaware"}
+        den{"slave"}
+        dgr{"dogrib"}
+        din{"dinka"}
+        dje{"dżerma"}
+        doi{"dogri"}
+        dsb{"dolnołużycki"}
+        dtp{"dusun centralny"}
+        dua{"duala"}
+        dum{"średniowieczny niderlandzki"}
+        dv{"malediwski"}
+        dyo{"diola"}
+        dyu{"diula"}
+        dz{"dzongkha"}
+        dzg{"dazaga"}
+        ebu{"embu"}
+        ee{"ewe"}
+        efi{"efik"}
+        egl{"emilijski"}
+        egy{"staroegipski"}
+        eka{"ekajuk"}
+        el{"grecki"}
+        elx{"elamicki"}
+        en{"angielski"}
+        en_AU{"angielski australijski"}
+        en_CA{"angielski kanadyjski"}
+        en_GB{"angielski brytyjski"}
+        en_US{"angielski amerykański"}
+        enm{"średnioangielski"}
+        eo{"esperanto"}
+        es{"hiszpański"}
+        es_419{"amerykański hiszpański"}
+        es_ES{"europejski hiszpański"}
+        es_MX{"meksykański hiszpański"}
+        esu{"yupik środkowosyberyjski"}
+        et{"estoński"}
+        eu{"baskijski"}
+        ewo{"ewondo"}
+        ext{"estremadurski"}
+        fa{"perski"}
+        fa_AF{"dari"}
+        fan{"fang"}
+        fat{"fanti"}
+        ff{"fulani"}
+        fi{"fiński"}
+        fil{"filipiński"}
+        fit{"meänkieli"}
+        fj{"fidżijski"}
+        fo{"farerski"}
+        fon{"fon"}
+        fr{"francuski"}
+        fr_CA{"francuski kanadyjski"}
+        fr_CH{"francuski szwajcarski"}
+        frc{"cajuński"}
+        frm{"średniofrancuski"}
+        fro{"starofrancuski"}
+        frp{"franko-prowansalski"}
+        frr{"północnofryzyjski"}
+        frs{"wschodniofryzyjski"}
+        fur{"friulski"}
+        fy{"zachodniofryzyjski"}
+        ga{"irlandzki"}
+        gaa{"ga"}
+        gag{"gagauski"}
+        gan{"gan"}
+        gay{"gayo"}
+        gba{"gbaya"}
+        gbz{"zaratusztriański dari"}
+        gd{"szkocki gaelicki"}
+        gez{"gyyz"}
+        gil{"gilbertański"}
+        gl{"galicyjski"}
+        glk{"giliański"}
+        gmh{"średnio-wysoko-niemiecki"}
+        gn{"guarani"}
+        goh{"staro-wysoko-niemiecki"}
+        gom{"konkani (Goa)"}
+        gon{"gondi"}
+        gor{"gorontalo"}
+        got{"gocki"}
+        grb{"grebo"}
+        grc{"starogrecki"}
+        gsw{"szwajcarski niemiecki"}
+        gu{"gudżarati"}
+        guc{"wayúu"}
+        gur{"frafra"}
+        guz{"gusii"}
+        gv{"manx"}
+        gwi{"gwichʼin"}
+        ha{"hausa"}
+        hai{"haida"}
+        hak{"hakka"}
+        haw{"hawajski"}
+        he{"hebrajski"}
+        hi{"hindi"}
+        hif{"hindi fidżyjskie"}
+        hil{"hiligaynon"}
+        hit{"hetycki"}
+        hmn{"hmong"}
+        ho{"hiri motu"}
+        hr{"chorwacki"}
+        hsb{"górnołużycki"}
+        hsn{"xiang"}
+        ht{"kreolski haitański"}
+        hu{"węgierski"}
+        hup{"hupa"}
+        hy{"ormiański"}
+        hz{"herero"}
+        ia{"interlingua"}
+        iba{"iban"}
+        ibb{"ibibio"}
+        id{"indonezyjski"}
+        ie{"interlingue"}
+        ig{"igbo"}
+        ii{"syczuański"}
+        ik{"inupiak"}
+        ilo{"ilokano"}
+        inh{"inguski"}
+        io{"ido"}
+        is{"islandzki"}
+        it{"włoski"}
+        iu{"inuktitut"}
+        izh{"ingryjski"}
+        ja{"japoński"}
+        jam{"jamajski"}
+        jbo{"lojban"}
+        jgo{"ngombe"}
+        jmc{"machame"}
+        jpr{"judeo-perski"}
+        jrb{"judeoarabski"}
+        jut{"jutlandzki"}
+        jv{"jawajski"}
+        ka{"gruziński"}
+        kaa{"karakałpacki"}
+        kab{"kabylski"}
+        kac{"kaczin"}
+        kaj{"jju"}
+        kam{"kamba"}
+        kaw{"kawi"}
+        kbd{"kabardyjski"}
+        kbl{"kanembu"}
+        kcg{"tyap"}
+        kde{"makonde"}
+        kea{"kreolski Wysp Zielonego Przylądka"}
+        ken{"kenyang"}
+        kfo{"koro"}
+        kg{"kongo"}
+        kgp{"kaingang"}
+        kha{"khasi"}
+        kho{"chotański"}
+        khq{"koyra chiini"}
+        khw{"khowar"}
+        ki{"kikuju"}
+        kiu{"kirmandżki"}
+        kj{"kwanyama"}
+        kk{"kazachski"}
+        kkj{"kako"}
+        kl{"grenlandzki"}
+        kln{"kalenjin"}
+        km{"khmerski"}
+        kmb{"kimbundu"}
+        kn{"kannada"}
+        ko{"koreański"}
+        koi{"komi-permiacki"}
+        kok{"konkani"}
+        kos{"kosrae"}
+        kpe{"kpelle"}
+        kr{"kanuri"}
+        krc{"karaczajsko-bałkarski"}
+        kri{"krio"}
+        krj{"kinaraya"}
+        krl{"karelski"}
+        kru{"kurukh"}
+        ks{"kaszmirski"}
+        ksb{"sambala"}
+        ksf{"bafia"}
+        ksh{"gwara kolońska"}
+        ku{"kurdyjski"}
+        kum{"kumycki"}
+        kut{"kutenai"}
+        kv{"komi"}
+        kw{"kornijski"}
+        ky{"kirgiski"}
+        la{"łaciński"}
+        lad{"ladyński"}
+        lag{"langi"}
+        lah{"lahnda"}
+        lam{"lamba"}
+        lb{"luksemburski"}
+        lez{"lezgijski"}
+        lfn{"Lingua Franca Nova"}
+        lg{"ganda"}
+        li{"limburski"}
+        lij{"liguryjski"}
+        liv{"liwski"}
+        lkt{"lakota"}
+        lmo{"lombardzki"}
+        ln{"lingala"}
+        lo{"laotański"}
+        lol{"mongo"}
+        lou{"kreolski luizjański"}
+        loz{"lozi"}
+        lrc{"luryjski północny"}
+        lt{"litewski"}
+        ltg{"łatgalski"}
+        lu{"luba-katanga"}
+        lua{"luba-lulua"}
+        lui{"luiseno"}
+        lun{"lunda"}
+        luo{"luo"}
+        lus{"mizo"}
+        luy{"luhya"}
+        lv{"łotewski"}
+        lzh{"chiński klasyczny"}
+        lzz{"lazyjski"}
+        mad{"madurski"}
+        maf{"mafa"}
+        mag{"magahi"}
+        mai{"maithili"}
+        mak{"makasar"}
+        man{"mandingo"}
+        mas{"masajski"}
+        mde{"maba"}
+        mdf{"moksza"}
+        mdr{"mandar"}
+        men{"mende"}
+        mer{"meru"}
+        mfe{"kreolski Mauritiusa"}
+        mg{"malgaski"}
+        mga{"średnioirlandzki"}
+        mgh{"makua"}
+        mgo{"meta"}
+        mh{"marszalski"}
+        mi{"maoryjski"}
+        mic{"mikmak"}
+        min{"minangkabu"}
+        mk{"macedoński"}
+        ml{"malajalam"}
+        mn{"mongolski"}
+        mnc{"manchu"}
+        mni{"manipuri"}
+        moh{"mohawk"}
+        mos{"mossi"}
+        mr{"marathi"}
+        mrj{"zachodniomaryjski"}
+        ms{"malajski"}
+        mt{"maltański"}
+        mua{"mundang"}
+        mul{"wiele języków"}
+        mus{"krik"}
+        mwl{"mirandyjski"}
+        mwr{"marwari"}
+        mwv{"mentawai"}
+        my{"birmański"}
+        mye{"myene"}
+        myv{"erzja"}
+        mzn{"mazanderański"}
+        na{"nauruański"}
+        nan{"minnański"}
+        nap{"neapolitański"}
+        naq{"nama"}
+        nb{"norweski (bokmål)"}
+        nd{"ndebele północny"}
+        nds{"dolnoniemiecki"}
+        nds_NL{"dolnosaksoński"}
+        ne{"nepalski"}
+        new{"newarski"}
+        ng{"ndonga"}
+        nia{"nias"}
+        niu{"niue"}
+        njo{"ao"}
+        nl{"niderlandzki"}
+        nl_BE{"flamandzki"}
+        nmg{"ngumba"}
+        nn{"norweski (nynorsk)"}
+        nnh{"ngiemboon"}
+        no{"norweski"}
+        nog{"nogajski"}
+        non{"staronordyjski"}
+        nov{"novial"}
+        nqo{"n’ko"}
+        nr{"ndebele południowy"}
+        nso{"sotho północny"}
+        nus{"nuer"}
+        nv{"nawaho"}
+        nwc{"newarski klasyczny"}
+        ny{"njandża"}
+        nym{"niamwezi"}
+        nyn{"nyankole"}
+        nyo{"nyoro"}
+        nzi{"nzema"}
+        oc{"oksytański"}
+        oj{"odżibwa"}
+        om{"oromo"}
+        or{"orija"}
+        os{"osetyjski"}
+        osa{"osage"}
+        ota{"osmańsko-turecki"}
+        pa{"pendżabski"}
+        pag{"pangasinan"}
+        pal{"pahlavi"}
+        pam{"pampango"}
+        pap{"papiamento"}
+        pau{"palau"}
+        pcd{"pikardyjski"}
+        pcm{"pidżyn nigeryjski"}
+        pdc{"pensylwański"}
+        pdt{"plautdietsch"}
+        peo{"staroperski"}
+        pfl{"palatynacki"}
+        phn{"fenicki"}
+        pi{"palijski"}
+        pl{"polski"}
+        pms{"piemoncki"}
+        pnt{"pontyjski"}
+        pon{"ponpejski"}
+        prg{"pruski"}
+        pro{"staroprowansalski"}
+        ps{"paszto"}
+        pt{"portugalski"}
+        pt_BR{"brazylijski portugalski"}
+        pt_PT{"europejski portugalski"}
+        qu{"keczua"}
+        quc{"kicze"}
+        qug{"keczua górski (Chimborazo)"}
+        raj{"radźasthani"}
+        rap{"rapanui"}
+        rar{"rarotonga"}
+        rgn{"romagnol"}
+        rif{"tarifit"}
+        rm{"retoromański"}
+        rn{"rundi"}
+        ro{"rumuński"}
+        ro_MD{"mołdawski"}
+        rof{"rombo"}
+        rom{"cygański"}
+        rtm{"rotumański"}
+        ru{"rosyjski"}
+        rue{"rusiński"}
+        rug{"roviana"}
+        rup{"arumuński"}
+        rw{"kinya-ruanda"}
+        rwk{"rwa"}
+        sa{"sanskryt"}
+        sad{"sandawe"}
+        sah{"jakucki"}
+        sam{"samarytański aramejski"}
+        saq{"samburu"}
+        sas{"sasak"}
+        sat{"santali"}
+        saz{"saurasztryjski"}
+        sba{"ngambay"}
+        sbp{"sangu"}
+        sc{"sardyński"}
+        scn{"sycylijski"}
+        sco{"scots"}
+        sd{"sindhi"}
+        sdc{"sassarski"}
+        sdh{"południowokurdyjski"}
+        se{"północnolapoński"}
+        see{"seneka"}
+        seh{"sena"}
+        sei{"seri"}
+        sel{"selkupski"}
+        ses{"koyraboro senni"}
+        sg{"sango"}
+        sga{"staroirlandzki"}
+        sgs{"żmudzki"}
+        sh{"serbsko-chorwacki"}
+        shi{"tashelhiyt"}
+        shn{"szan"}
+        shu{"arabski (Czad)"}
+        si{"syngaleski"}
+        sid{"sidamo"}
+        sk{"słowacki"}
+        sl{"słoweński"}
+        sli{"dolnośląski"}
+        sly{"selayar"}
+        sm{"samoański"}
+        sma{"południowolapoński"}
+        smj{"lule"}
+        smn{"inari"}
+        sms{"skolt"}
+        sn{"shona"}
+        snk{"soninke"}
+        so{"somalijski"}
+        sog{"sogdyjski"}
+        sq{"albański"}
+        sr{"serbski"}
+        srn{"sranan tongo"}
+        srr{"serer"}
+        ss{"suazi"}
+        ssy{"saho"}
+        st{"sotho południowy"}
+        stq{"fryzyjski saterlandzki"}
+        su{"sundajski"}
+        suk{"sukuma"}
+        sus{"susu"}
+        sux{"sumeryjski"}
+        sv{"szwedzki"}
+        sw{"suahili"}
+        sw_CD{"kongijski suahili"}
+        swb{"komoryjski"}
+        syc{"syriacki"}
+        syr{"syryjski"}
+        szl{"śląski"}
+        ta{"tamilski"}
+        tcy{"tulu"}
+        te{"telugu"}
+        tem{"temne"}
+        teo{"ateso"}
+        ter{"tereno"}
+        tet{"tetum"}
+        tg{"tadżycki"}
+        th{"tajski"}
+        ti{"tigrinia"}
+        tig{"tigre"}
+        tiv{"tiw"}
+        tk{"turkmeński"}
+        tkl{"tokelau"}
+        tkr{"cachurski"}
+        tl{"tagalski"}
+        tlh{"klingoński"}
+        tli{"tlingit"}
+        tly{"tałyski"}
+        tmh{"tamaszek"}
+        tn{"setswana"}
+        to{"tonga"}
+        tog{"tonga (Niasa)"}
+        tpi{"tok pisin"}
+        tr{"turecki"}
+        tru{"turoyo"}
+        trv{"taroko"}
+        ts{"tsonga"}
+        tsd{"cakoński"}
+        tsi{"tsimshian"}
+        tt{"tatarski"}
+        ttt{"tacki"}
+        tum{"tumbuka"}
+        tvl{"tuvalu"}
+        tw{"twi"}
+        twq{"tasawaq"}
+        ty{"tahitański"}
+        tyv{"tuwiński"}
+        tzm{"tamazight (Atlas Środkowy)"}
+        udm{"udmurcki"}
+        ug{"ujgurski"}
+        uga{"ugarycki"}
+        uk{"ukraiński"}
+        umb{"umbundu"}
+        und{"nieznany język"}
+        ur{"urdu"}
+        uz{"uzbecki"}
+        vai{"wai"}
+        ve{"venda"}
+        vec{"wenecki"}
+        vep{"wepski"}
+        vi{"wietnamski"}
+        vls{"zachodnioflamandzki"}
+        vmf{"meński frankoński"}
+        vo{"wolapik"}
+        vot{"wotiacki"}
+        vro{"võro"}
+        vun{"vunjo"}
+        wa{"waloński"}
+        wae{"walser"}
+        wal{"wolayta"}
+        war{"waraj"}
+        was{"washo"}
+        wbp{"warlpiri"}
+        wo{"wolof"}
+        wuu{"wu"}
+        xal{"kałmucki"}
+        xh{"khosa"}
+        xmf{"megrelski"}
+        xog{"soga"}
+        yao{"yao"}
+        yap{"japski"}
+        yav{"yangben"}
+        ybb{"yemba"}
+        yi{"jidysz"}
+        yo{"joruba"}
+        yrl{"nheengatu"}
+        yue{"kantoński"}
+        za{"czuang"}
+        zap{"zapotecki"}
+        zbl{"bliss"}
+        zea{"zelandzki"}
+        zen{"zenaga"}
+        zgh{"standardowy marokański tamazight"}
+        zh{"chiński"}
+        zh_Hans{"chiński uproszczony"}
+        zh_Hant{"chiński tradycyjny"}
+        zu{"zulu"}
+        zun{"zuni"}
+        zxx{"brak treści o charakterze językowym"}
+        zza{"zazaki"}
+    }
+    Languages%long{
+        zh_Hans{"standardowy chiński uproszczony"}
+        zh_Hant{"standardowy chiński tradycyjny"}
+    }
+    Languages%menu{
+        ckb{"kurdyjski sorani"}
+        yue{"chiński kantoński"}
+        zh{"chiński mandaryński"}
+    }
+    Languages%short{
+        az{"azerski"}
+    }
+    Languages%variant{
+        ps{"pasztuński"}
+    }
+    Scripts{
+        Arab{"arabskie"}
+        Aran{"nastaliq"}
+        Armi{"armi"}
+        Armn{"ormiańskie"}
+        Avst{"awestyjskie"}
+        Bali{"balijskie"}
+        Bamu{"bamun"}
+        Batk{"batak"}
+        Beng{"bengalskie"}
+        Blis{"symbole Blissa"}
+        Bopo{"bopomofo"}
+        Brah{"brahmi"}
+        Brai{"Braille’a"}
+        Bugi{"bugińskie"}
+        Buhd{"buhid"}
+        Cakm{"chakma"}
+        Cans{"zunifikowane symbole kanadyjskich autochtonów"}
+        Cari{"karyjskie"}
+        Cham{"czamskie"}
+        Cher{"czirokeski"}
+        Cirt{"cirth"}
+        Copt{"koptyjskie"}
+        Cprt{"cypryjskie"}
+        Cyrl{"cyrylica"}
+        Cyrs{"cyrylica staro-cerkiewno-słowiańska"}
+        Deva{"dewanagari"}
+        Dsrt{"deseret"}
+        Egyd{"egipskie demotyczne"}
+        Egyh{"egipskie hieratyczne"}
+        Egyp{"hieroglify egipskie"}
+        Ethi{"etiopskie"}
+        Geok{"gruzińskie chucuri"}
+        Geor{"gruzińskie"}
+        Glag{"głagolica"}
+        Goth{"gotyckie"}
+        Grek{"greckie"}
+        Gujr{"gudżarati"}
+        Guru{"gurmukhi"}
+        Hanb{"chińskie z bopomofo"}
+        Hang{"hangul"}
+        Hani{"chińskie"}
+        Hano{"hanunoo"}
+        Hans{"uproszczone"}
+        Hant{"tradycyjne"}
+        Hebr{"hebrajskie"}
+        Hira{"hiragana"}
+        Hmng{"pahawh hmong"}
+        Hrkt{"sylabariusze japońskie"}
+        Hung{"starowęgierskie"}
+        Inds{"indus"}
+        Ital{"starowłoskie"}
+        Jamo{"jamo"}
+        Java{"jawajskie"}
+        Jpan{"japońskie"}
+        Kali{"kayah li"}
+        Kana{"katakana"}
+        Khar{"charosti"}
+        Khmr{"khmerskie"}
+        Knda{"kannada"}
+        Kore{"koreańskie"}
+        Kthi{"kaithi"}
+        Lana{"lanna"}
+        Laoo{"laotańskie"}
+        Latf{"łaciński - fraktura"}
+        Latg{"łaciński - odmiana gaelicka"}
+        Latn{"łacińskie"}
+        Lepc{"lepcha"}
+        Limb{"limbu"}
+        Lina{"linearne A"}
+        Linb{"linearne B"}
+        Lyci{"likijskie"}
+        Lydi{"lidyjskie"}
+        Mand{"mandejskie"}
+        Mani{"manichejskie"}
+        Maya{"hieroglify Majów"}
+        Mero{"meroickie"}
+        Mlym{"malajalam"}
+        Mong{"mongolskie"}
+        Moon{"Moon’a"}
+        Mtei{"meitei mayek"}
+        Mymr{"birmańskie"}
+        Nkoo{"n’ko"}
+        Ogam{"ogham"}
+        Olck{"ol chiki"}
+        Orkh{"orchońskie"}
+        Orya{"orija"}
+        Osma{"osmanya"}
+        Perm{"staropermskie"}
+        Phag{"phags-pa"}
+        Phli{"inskrypcyjne pahlawi"}
+        Phlp{"pahlawi psałterzowy"}
+        Phlv{"pahlawi książkowy"}
+        Phnx{"fenicki"}
+        Plrd{"fonetyczny Pollard’a"}
+        Prti{"partyjski inskrypcyjny"}
+        Qaag{"zawgyi"}
+        Rjng{"rejang"}
+        Roro{"rongorongo"}
+        Runr{"runiczne"}
+        Samr{"samarytański"}
+        Sara{"sarati"}
+        Saur{"saurashtra"}
+        Sgnw{"pismo znakowe"}
+        Shaw{"shawa"}
+        Sinh{"syngaleskie"}
+        Sund{"sundajskie"}
+        Sylo{"syloti nagri"}
+        Syrc{"syryjski"}
+        Syre{"syriacki estrangelo"}
+        Syrj{"syryjski (odmiana zachodnia)"}
+        Syrn{"syryjski (odmiana wschodnia)"}
+        Tagb{"tagbanwa"}
+        Tale{"tai le"}
+        Talu{"nowy tai lue"}
+        Taml{"tamilskie"}
+        Tavt{"tai viet"}
+        Telu{"telugu"}
+        Teng{"tengwar"}
+        Tfng{"tifinagh (berberski)"}
+        Tglg{"tagalog"}
+        Thaa{"taana"}
+        Thai{"tajskie"}
+        Tibt{"tybetańskie"}
+        Ugar{"ugaryckie"}
+        Vaii{"vai"}
+        Visp{"Visible Speech"}
+        Xpeo{"staroperskie"}
+        Xsux{"klinowe sumero-akadyjskie"}
+        Yiii{"yi"}
+        Zinh{"dziedziczone"}
+        Zmth{"notacja matematyczna"}
+        Zsye{"emoji"}
+        Zsym{"symbole"}
+        Zxxx{"język bez systemu pisma"}
+        Zyyy{"wspólne"}
+        Zzzz{"nieznane pismo"}
+    }
+    Scripts%stand-alone{
+        Hans{"chińskie uproszczone"}
+        Hant{"chińskie tradycyjne"}
+    }
+    Scripts%variant{
+        Arab{"perso-arabskie"}
+    }
+    Types{
+        calendar{
+            buddhist{"kalendarz buddyjski"}
+            chinese{"kalendarz chiński"}
+            coptic{"Kalendarz koptyjski"}
+            dangi{"kalendarz koreański"}
+            ethiopic{"kalendarz etiopski"}
+            ethiopic-amete-alem{"Kalendarz etiopski Amete Alem"}
+            gregorian{"kalendarz gregoriański"}
+            hebrew{"kalendarz hebrajski"}
+            indian{"narodowy kalendarz hinduski"}
+            islamic{"kalendarz muzułmański"}
+            islamic-civil{"kalendarz islamski (metoda obliczeniowa)"}
+            islamic-rgsa{"kalendarz islamski (Arabia Saudyjska, metoda wzrokowa)"}
+            islamic-tbla{"kalendarz islamski (metoda obliczeniowa, epoka astronomiczna)"}
+            islamic-umalqura{"kalendarz islamski (Umm al-Kura)"}
+            iso8601{"kalendarz ISO-8601"}
+            japanese{"kalendarz japoński"}
+            persian{"kalendarz perski"}
+            roc{"kalendarz Republiki Chińskiej"}
+        }
+        cf{
+            account{"księgowy format waluty"}
+            standard{"standardowy format waluty"}
+        }
+        colAlternate{
+            non-ignorable{"Sortowanie symboli"}
+            shifted{"Sortowanie ignorujące symbole"}
+        }
+        colBackwards{
+            no{"Zwykłe sortowanie znaków akcentowanych"}
+            yes{"Sortowanie znaków akcentowanych w odwróconej kolejności"}
+        }
+        colCaseFirst{
+            lower{"Sortowanie od małych liter"}
+            no{"Sortowanie z zachowaniem zwykłej kolejności wielkości liter"}
+            upper{"Sortowanie od wielkich liter"}
+        }
+        colCaseLevel{
+            no{"Sortowanie bez rozróżniania wielkości liter"}
+            yes{"Sortowanie z rozróżnianiem wielkości liter"}
+        }
+        colNormalization{
+            no{"Sortowanie bez normalizacji"}
+            yes{"Sortowanie z normalizacją unicode"}
+        }
+        colNumeric{
+            no{"Oddzielne sortowanie cyfr"}
+            yes{"Numeryczne sortowanie cyfr"}
+        }
+        colStrength{
+            identical{"Sortuj wszystko"}
+            primary{"Sortowanie tylko liter podstawowych"}
+            quaternary{"Sortowanie znaków akcentowanych/wielkości liter/szerokości/kana"}
+            secondary{"Sortowanie znaków akcentowanych"}
+            tertiary{"Sortowanie znaków akcentowanych/wielkości liter/szerokości"}
+        }
+        collation{
+            big5han{"chiński tradycyjny porządek sortowania - Big5"}
+            compat{"poprzedni porządek sortowania, dla zgodności"}
+            dictionary{"sortowanie słownikowe"}
+            ducet{"domyślna kolejność sortowania Unicode"}
+            eor{"europejskie reguły określania kolejności"}
+            gb2312han{"chiński uproszczony porządek sortowania - GB2312"}
+            phonebook{"porządek sortowania książki telefonicznej"}
+            phonetic{"sortowanie fonetyczne"}
+            pinyin{"porządek sortowania pinyin"}
+            reformed{"sortowanie zreformowane"}
+            search{"wyszukiwanie ogólnego zastosowania"}
+            searchjl{"Wyszukiwanie według początkowej spółgłoski hangul"}
+            standard{"standardowa kolejność sortowania"}
+            stroke{"porządek akcentów"}
+            traditional{"tradycyjny porządek sortowania"}
+            unihan{"sortowanie wg kluczy i ich liczby kresek"}
+        }
+        d0{
+            fwidth{"pełna szerokość"}
+            hwidth{"połowa szerokości"}
+            npinyin{"Liczbowe"}
+        }
+        hc{
+            h11{"system 12-godzinny (0–11)"}
+            h12{"system 12-godzinny (1–12)"}
+            h23{"system 24-godzinny (0–23)"}
+            h24{"system 24-godzinny (1–24)"}
+        }
+        lb{
+            loose{"luźny styl podziału wiersza"}
+            normal{"normalny styl podziału wiersza"}
+            strict{"ścisły styl podziału wiersza"}
+        }
+        m0{
+            bgn{"transliteracja BGN"}
+            ungegn{"transliteracja UNGEGN"}
+        }
+        ms{
+            metric{"system metryczny"}
+            uksystem{"imperialny system miar"}
+            ussystem{"amerykański system miar"}
+        }
+        numbers{
+            arab{"cyfry arabsko-indyjskie"}
+            arabext{"rozszerzone cyfry arabsko-indyjskie"}
+            armn{"cyfry ormiańskie"}
+            armnlow{"cyfry ormiańskie (małe litery)"}
+            beng{"cyfry bengalskie"}
+            deva{"cyfry dewanagari"}
+            ethi{"cyfry etiopskie"}
+            finance{"Liczebniki księgowe"}
+            fullwide{"cyfry o pełnej szerokości"}
+            geor{"cyfry gruzińskie"}
+            grek{"cyfry greckie"}
+            greklow{"cyfry greckie (małe litery)"}
+            gujr{"cyfry gudżarati"}
+            guru{"cyfry gurmukhi"}
+            hanidec{"chińskie cyfry dziesiętne"}
+            hans{"uproszczone cyfry chińskie"}
+            hansfin{"uproszczone chińskie cyfry księgowe"}
+            hant{"tradycyjne cyfry chińskie"}
+            hantfin{"tradycyjne chińskie cyfry księgowe"}
+            hebr{"cyfry hebrajskie"}
+            jpan{"cyfry japońskie"}
+            jpanfin{"japońskie cyfry księgowe"}
+            khmr{"cyfry khmerskie"}
+            knda{"cyfry kannada"}
+            laoo{"cyfry laotańskie"}
+            latn{"cyfry arabskie"}
+            mlym{"cyfry malajalam"}
+            mong{"Cyfry mongolskie"}
+            mymr{"cyfry birmańskie"}
+            native{"Cyfry macierzyste"}
+            orya{"cyfry orija"}
+            roman{"cyfry rzymskie"}
+            romanlow{"cyfry rzymskie (małe litery)"}
+            taml{"tradycyjne cyfry tamilskie"}
+            tamldec{"cyfry tamilskie"}
+            telu{"cyfry telugu"}
+            thai{"cyfry tajskie"}
+            tibt{"cyfry tybetańskie"}
+            traditional{"Liczebniki tradycyjne"}
+            vaii{"Cyfry vai"}
+        }
+    }
+    Variants{
+        1606NICT{"szesnastowieczny francuski"}
+        1694ACAD{"siedemnastowieczny francuski"}
+        1901{"tradycyjna ortografia niemiecka"}
+        1994{"standardowa ortografia regionu Resia"}
+        1996{"ortografia niemiecka z 1996 r."}
+        AREVELA{"ormiański wchodni"}
+        AREVMDA{"ormiański zachodni"}
+        BAKU1926{"turecki zunifikowany alfabet łaciński"}
+        BISKE{"dialekt San Giorgio/Bila"}
+        BOONT{"dialekt Boontling"}
+        FONIPA{"fonetyczny międzynarodowy"}
+        FONUPA{"fonetyczny"}
+        KKCOR{"ortografia wspólna"}
+        LIPAW{"dialekt Lipovaz w regionie Resia"}
+        MONOTON{"monotoniczny"}
+        NEDIS{"dialekt Natisone"}
+        NJIVA{"dialekt Gniva/Njiva"}
+        OSOJS{"dialekt Oseacco/Osojane"}
+        POLYTON{"politoniczny"}
+        POSIX{"komputerowy"}
+        REVISED{"ortografia zreformowana"}
+        ROZAJ{"dialekt regionu Resia"}
+        SAAHO{"dialekt Saho"}
+        SCOTLAND{"standardowy szkocki angielski"}
+        SCOUSE{"dialekt Scouse"}
+        SOLBA{"dialekt Stolvizza/Solbica"}
+        TARASK{"ortografia taraszkiewicka"}
+        UCCOR{"ortografia ujednolicona"}
+        UCRCOR{"zreformowana ortografia ujednolicona"}
+        VALENCIA{"walencki"}
+        WADEGILE{"latynizacja Wade’a i Gilesa"}
+    }
+    characterLabelPattern{
+        all{"{0} — wszystko"}
+        category-list{"{0}: {1}"}
+        compatibility{"{0} — zgodność"}
+        enclosed{"{0} — obwiedzione"}
+        extended{"{0} — rozszerzone"}
+        historic{"{0} — historyczne"}
+        miscellaneous{"{0} — różne"}
+        other{"{0} — inne"}
+        scripts{"systemy pisma — {0}"}
+        strokes{
+            few{"{0} kreski"}
+            many{"{0} kresek"}
+            one{"{0} kreska"}
+            other{"{0} kreski"}
+        }
+        subscript{"indeks dolny {0}"}
+        superscript{"indeks górny {0}"}
+    }
+    codePatterns{
+        language{"Język: {0}"}
+        script{"Pismo: {0}"}
+        territory{"Region: {0}"}
+    }
+}

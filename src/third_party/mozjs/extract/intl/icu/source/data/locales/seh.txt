@@ -1,0 +1,234 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+seh{
+    ExemplarCharacters{
+        "[a á à â ã b c ç d e é ê f g h i í j k l m n o ó ò ô õ p q r s t u ú v w x y"
+        " z]"
+    }
+    ExemplarCharactersIndex{"[A B C D E F G H I J K L M N O P Q R S T U V W X Y Z]"}
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"#,##0.00¤"}
+            }
+            symbols{
+                decimal{","}
+                group{"."}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d 'de' MMMM 'de' y G",
+                "d 'de' MMMM 'de' y G",
+                "d 'de' MMM 'de' y G",
+                "d/M/y GGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                HHmm{"HH:mm"}
+                HHmmss{"HH:mm:ss"}
+                Hm{"H:mm"}
+                M{"L"}
+                MEd{"E, dd/MM"}
+                MMM{"LLL"}
+                MMMEd{"E, d MMM"}
+                MMMMEd{"E, d MMMM"}
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                MMdd{"dd/MM"}
+                Md{"d/M"}
+                d{"d"}
+                mmss{"mm:ss"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"MM/y"}
+                yMEd{"E, dd/MM/y"}
+                yMM{"MM/y"}
+                yMMM{"MMM 'de' y"}
+                yMMMEd{"E, d 'de' MMM 'de' y"}
+                yMMMM{"MMMM 'de' y"}
+                yMMMd{"d 'de' MMM 'de' y"}
+                yQQQ{"y QQQ"}
+                yQQQQ{"y QQQQ"}
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d 'de' MMMM 'de' y",
+                "d 'de' MMMM 'de' y",
+                "d 'de' MMM 'de' y",
+                "d/M/y",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                HHmm{"HH:mm"}
+                HHmmss{"HH:mm:ss"}
+                Hm{"H:mm"}
+                M{"L"}
+                MEd{"E, dd/MM"}
+                MMM{"LLL"}
+                MMMEd{"E, d MMM"}
+                MMMMEd{"E, d MMMM"}
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                MMdd{"dd/MM"}
+                Md{"d/M"}
+                d{"d"}
+                mmss{"mm:ss"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"MM/y"}
+                yMEd{"E, dd/MM/y"}
+                yMM{"MM/y"}
+                yMMM{"MMM 'de' y"}
+                yMMMEd{"E, d 'de' MMM 'de' y"}
+                yMMMM{"MMMM 'de' y"}
+                yMMMd{"d 'de' MMM 'de' y"}
+                yQQQ{"y QQQ"}
+                yQQQQ{"y QQQQ"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Dim",
+                        "Pos",
+                        "Pir",
+                        "Tat",
+                        "Nai",
+                        "Sha",
+                        "Sab",
+                    }
+                    wide{
+                        "Dimingu",
+                        "Chiposi",
+                        "Chipiri",
+                        "Chitatu",
+                        "Chinai",
+                        "Chishanu",
+                        "Sabudu",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "D",
+                        "P",
+                        "C",
+                        "T",
+                        "N",
+                        "S",
+                        "S",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "AC",
+                    "AD",
+                }
+                wide{
+                    "Antes de Cristo",
+                    "Anno Domini",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Jan",
+                        "Fev",
+                        "Mar",
+                        "Abr",
+                        "Mai",
+                        "Jun",
+                        "Jul",
+                        "Aug",
+                        "Set",
+                        "Otu",
+                        "Nov",
+                        "Dec",
+                    }
+                    wide{
+                        "Janeiro",
+                        "Fevreiro",
+                        "Marco",
+                        "Abril",
+                        "Maio",
+                        "Junho",
+                        "Julho",
+                        "Augusto",
+                        "Setembro",
+                        "Otubro",
+                        "Novembro",
+                        "Decembro",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "J",
+                        "F",
+                        "M",
+                        "A",
+                        "M",
+                        "J",
+                        "J",
+                        "A",
+                        "S",
+                        "O",
+                        "N",
+                        "D",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"Ntsiku"}
+            relative{
+                "-1"{"Zuro"}
+                "0"{"Lero"}
+                "1"{"Manguana"}
+            }
+        }
+        hour{
+            dn{"Hora"}
+        }
+        minute{
+            dn{"Minuto"}
+        }
+        month{
+            dn{"Mwezi"}
+        }
+        second{
+            dn{"Segundo"}
+        }
+        year{
+            dn{"Chaka"}
+        }
+    }
+}

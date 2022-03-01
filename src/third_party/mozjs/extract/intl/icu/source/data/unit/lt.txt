@@ -1,0 +1,3124 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+lt{
+    durationUnits{
+        hm{"hh:mm"}
+        hms{"hh:mm:ss"}
+        ms{"mm:ss"}
+    }
+    units{
+        acceleration{
+            g-force{
+                dnam{"laisvojo kritimo pagreičiai"}
+                few{"{0} laisvojo kritimo pagreičiai"}
+                many{"{0} laisvojo kritimo pagreičio"}
+                one{"{0} laisvojo kritimo pagreitis"}
+                other{"{0} laisvojo kritimo pagreičių"}
+            }
+            meter-per-square-second{
+                dnam{"metrai per kvadratinę sekundę"}
+                few{"{0} m/s²"}
+                many{"{0} m/s²"}
+                one{"{0} metras per kvadratinę sekundę"}
+                other{"{0} metrų per kvadratinę sekundę"}
+            }
+        }
+        angle{
+            arc-minute{
+                dnam{"kampo minutės"}
+                few{"{0} kampo minutės"}
+                many{"{0} kampo minutės"}
+                one{"{0} kampo minutė"}
+                other{"{0} kampo minučių"}
+            }
+            arc-second{
+                dnam{"kampo sekundės"}
+                few{"{0} kampo sekundės"}
+                many{"{0} kampo sekundės"}
+                one{"{0} kampo sekundė"}
+                other{"{0} kampo sekundžių"}
+            }
+            degree{
+                dnam{"laipsniai"}
+                few{"{0} laipsniai"}
+                many{"{0} laipsnio"}
+                one{"{0} laipsnis"}
+                other{"{0} laipsnių"}
+            }
+            radian{
+                dnam{"radianai"}
+                few{"{0} radianai"}
+                many{"{0} radiano"}
+                one{"{0} radianas"}
+                other{"{0} radianų"}
+            }
+            revolution{
+                dnam{"pilnas apsisukimas"}
+                few{"{0} pilni apsisukimai"}
+                many{"{0} pilno apsisukimo"}
+                one{"{0} pilnas apsisukimas"}
+                other{"{0} pilnų apsisukimų"}
+            }
+        }
+        area{
+            acre{
+                dnam{"akrai"}
+                few{"{0} akrai"}
+                many{"{0} akro"}
+                one{"{0} akras"}
+                other{"{0} akrų"}
+            }
+            dunam{
+                dnam{"dunamai"}
+                few{"{0} dunamai"}
+                many{"{0} dunamo"}
+                one{"{0} dunamas"}
+                other{"{0} dunamų"}
+            }
+            hectare{
+                dnam{"hektarai"}
+                few{"{0} hektarai"}
+                many{"{0} hektaro"}
+                one{"{0} hektaras"}
+                other{"{0} hektarų"}
+            }
+            square-centimeter{
+                dnam{"kvadratiniai centimetrai"}
+                few{"{0} kvadratiniai centimetrai"}
+                many{"{0} kvadratinio centimetro"}
+                one{"{0} kvadratinis centimetras"}
+                other{"{0} kvadratinių centimetrų"}
+                per{"{0}/cm²"}
+            }
+            square-foot{
+                dnam{"kvadratinės pėdos"}
+                few{"{0} kvadratinės pėdos"}
+                many{"{0} kvadratinės pėdos"}
+                one{"{0} kvadratinė pėda"}
+                other{"{0} kvadratinių pėdų"}
+            }
+            square-inch{
+                dnam{"kvadratiniai coliai"}
+                few{"{0} kvadratiniai coliai"}
+                many{"{0} kvadratinio colio"}
+                one{"{0} kvadratinis colis"}
+                other{"{0} kvadratinių colių"}
+                per{"{0}/in²"}
+            }
+            square-kilometer{
+                dnam{"kvadratiniai kilometrai"}
+                few{"{0} kvadratiniai kilometrai"}
+                many{"{0} kvadratinio kilometro"}
+                one{"{0} kvadratinis kilometras"}
+                other{"{0} kvadratinių kilometrų"}
+                per{"{0} kv. km"}
+            }
+            square-meter{
+                dnam{"kvadratiniai metrai"}
+                few{"{0} kvadratiniai metrai"}
+                many{"{0} kvadratinio metro"}
+                one{"{0} kvadratinis metras"}
+                other{"{0} kvadratinių metrų"}
+                per{"{0}/m²"}
+            }
+            square-mile{
+                dnam{"kvadratinės mylios"}
+                few{"{0} kvadratinės mylios"}
+                many{"{0} kvadratinės mylios"}
+                one{"{0} kvadratinė mylia"}
+                other{"{0} kvadratinių mylių"}
+                per{"{0} kv. my"}
+            }
+            square-yard{
+                dnam{"kvadratiniai jardai"}
+                few{"{0} kvadratiniai jardai"}
+                many{"{0} kvadratinio jardo"}
+                one{"{0} kvadratinis jardas"}
+                other{"{0} yd²"}
+            }
+        }
+        compound{
+            1024p1{"kibi{0}"}
+            1024p2{"mebi{0}"}
+            1024p3{"gibi{0}"}
+            1024p4{"tebi{0}"}
+            1024p5{"pebi{0}"}
+            1024p6{"exbi{0}"}
+            1024p7{"zebi{0}"}
+            1024p8{"yobe{0}"}
+            10p-1{"deci{0}"}
+            10p-12{"piko{0}"}
+            10p-15{"femto{0}"}
+            10p-18{"ato{0}"}
+            10p-2{"centi{0}"}
+            10p-21{"zepto{0}"}
+            10p-24{"jokto{0}"}
+            10p-3{"mili{0}"}
+            10p-6{"mikro{0}"}
+            10p-9{"nano{0}"}
+            10p1{"deka{0}"}
+            10p12{"tera{0}"}
+            10p15{"peta{0}"}
+            10p18{"eksa{0}"}
+            10p2{"hekto{0}"}
+            10p21{"zeta{0}"}
+            10p24{"jota{0}"}
+            10p3{"kilo{0}"}
+            10p6{"mega{0}"}
+            10p9{"giga{0}"}
+            per{"{0}/{1}"}
+            power2{
+                few{
+                    _{
+                        _{"{0} kvadratu"}
+                    }
+                }
+                many{
+                    _{
+                        _{"{0} kvadratu"}
+                    }
+                }
+                one{
+                    _{
+                        _{"{0} kvadratu"}
+                    }
+                }
+                other{
+                    _{
+                        _{"{0} kvadratu"}
+                    }
+                }
+            }
+            power3{
+                few{
+                    _{
+                        _{"{0} kubu"}
+                    }
+                }
+                many{
+                    _{
+                        _{"{0} kubu"}
+                    }
+                }
+                one{
+                    _{
+                        _{"{0} kubu"}
+                    }
+                }
+                other{
+                    _{
+                        _{"{0} kubu"}
+                    }
+                }
+            }
+        }
+        concentr{
+            karat{
+                dnam{"karatai"}
+                few{"{0} karatai"}
+                many{"{0} karato"}
+                one{"{0} karatas"}
+                other{"{0} karatų"}
+            }
+            milligram-ofglucose-per-deciliter{
+                dnam{"miligramai decilitre"}
+                few{"{0} miligramai decilitre"}
+                many{"{0} miligramo decilitre"}
+                one{"{0} miligramas decilitre"}
+                other{"{0} miligramų decilitre"}
+            }
+            millimole-per-liter{
+                dnam{"milimoliai litre"}
+                few{"{0} milimoliai litre"}
+                many{"{0} milimoliai litre"}
+                one{"{0} milimolis litre"}
+                other{"{0} milimolių litre"}
+            }
+            mole{
+                dnam{"moliai"}
+                few{"{0} moliai"}
+                many{"{0} molio"}
+                one{"{0} molis"}
+                other{"{0} molių"}
+            }
+            percent{
+                dnam{"procentas"}
+                few{"{0} %"}
+                many{"{0} %"}
+                one{"{0} procentas"}
+                other{"{0} procentas"}
+            }
+            permille{
+                dnam{"promilė"}
+                few{"{0} ‰"}
+                many{"{0} ‰"}
+                one{"{0} promilė"}
+                other{"{0} promilė"}
+            }
+            permillion{
+                dnam{"milijoninės dalys"}
+                few{"{0} milijoninės dalys"}
+                many{"{0} milijoninės dalies"}
+                one{"{0} milijoninė dalis"}
+                other{"{0} milijoninių dalių"}
+            }
+        }
+        consumption{
+            liter-per-100-kilometer{
+                dnam{"litrai 100 kilometrų"}
+                few{"{0} litrai 100 kilometrų"}
+                many{"{0} litro 100 kilometrų"}
+                one{"{0} litras 100 kilometrų"}
+                other{"{0} litrų 100 kilometrų"}
+            }
+            liter-per-kilometer{
+                dnam{"litrai kilometrui"}
+                few{"{0} litrai kilometrui"}
+                many{"{0} litro kilometrui"}
+                one{"{0} litras kilometrui"}
+                other{"{0} litrų kilometrui"}
+            }
+            mile-per-gallon{
+                dnam{"mylios už galoną"}
+                few{"{0} mylios už galoną"}
+                many{"{0} mylios už galoną"}
+                one{"{0} mylia už galoną"}
+                other{"{0} mylių už galoną"}
+            }
+            mile-per-gallon-imperial{
+                dnam{"mylios už imperinį galoną"}
+                few{"{0} mylios už imperinį galoną"}
+                many{"{0} mylios už imperinį galoną"}
+                one{"{0} mylia už imperinį galoną"}
+                other{"{0} mylių už imperinį galoną"}
+            }
+        }
+        coordinate{
+            dnam{"pagrindinė kryptis"}
+            east{"{0} rytų"}
+            north{"{0} šiaurės"}
+            south{"{0} pietų"}
+            west{"{0} vakarų"}
+        }
+        digital{
+            bit{
+                dnam{"bitai"}
+                few{"{0} bitai"}
+                many{"{0} bito"}
+                one{"{0} bitas"}
+                other{"{0} bitų"}
+            }
+            byte{
+                dnam{"baitai"}
+                few{"{0} baitai"}
+                many{"{0} baito"}
+                one{"{0} baitas"}
+                other{"{0} baitų"}
+            }
+            gigabit{
+                dnam{"gigabitai"}
+                few{"{0} gigabitai"}
+                many{"{0} gigabito"}
+                one{"{0} gigabitas"}
+                other{"{0} gigabitų"}
+            }
+            gigabyte{
+                dnam{"gigabaitai"}
+                few{"{0} gigabaitai"}
+                many{"{0} gigabaito"}
+                one{"{0} gigabaitas"}
+                other{"{0} gigabaitų"}
+            }
+            kilobit{
+                dnam{"kilobitai"}
+                few{"{0} kilobitai"}
+                many{"{0} kilobito"}
+                one{"{0} kilobitas"}
+                other{"{0} kilobitų"}
+            }
+            kilobyte{
+                dnam{"kilobaitai"}
+                few{"{0} kilobaitai"}
+                many{"{0} kilobaito"}
+                one{"{0} kilobaitas"}
+                other{"{0} kilobaitų"}
+            }
+            megabit{
+                dnam{"megabitai"}
+                few{"{0} megabitai"}
+                many{"{0} megabito"}
+                one{"{0} megabitas"}
+                other{"{0} megabitų"}
+            }
+            megabyte{
+                dnam{"megabaitai"}
+                few{"{0} megabaitai"}
+                many{"{0} megabaito"}
+                one{"{0} megabaitas"}
+                other{"{0} megabaitų"}
+            }
+            petabyte{
+                dnam{"pentabaitai"}
+                few{"{0} PB"}
+                many{"{0} PB"}
+                one{"{0} pentabaitas"}
+                other{"{0} pentabaitų"}
+            }
+            terabit{
+                dnam{"terabitai"}
+                few{"{0} terabitai"}
+                many{"{0} terabito"}
+                one{"{0} terabitas"}
+                other{"{0} terabitų"}
+            }
+            terabyte{
+                dnam{"terabaitai"}
+                few{"{0} terabaitai"}
+                many{"{0} terabaito"}
+                one{"{0} terabaitas"}
+                other{"{0} terabaitų"}
+            }
+        }
+        duration{
+            century{
+                dnam{"amžiai"}
+                few{"{0} amžiai"}
+                many{"{0} amžiaus"}
+                one{"{0} amžius"}
+                other{"{0} amžių"}
+            }
+            day{
+                dnam{"dienos"}
+                few{"{0} dienos"}
+                many{"{0} dienos"}
+                one{"{0} diena"}
+                other{"{0} dienų"}
+                per{"{0} per dieną"}
+            }
+            decade{
+                dnam{"dekados"}
+                few{"{0} dekados"}
+                many{"{0} dekados"}
+                one{"{0} dekada"}
+                other{"{0} dekadų"}
+            }
+            hour{
+                dnam{"valandos"}
+                few{"{0} valandos"}
+                many{"{0} valandos"}
+                one{"{0} valanda"}
+                other{"{0} valandų"}
+                per{"{0}/h"}
+            }
+            microsecond{
+                dnam{"mikrosekundės"}
+                few{"{0} mikrosekundės"}
+                many{"{0} mikrosekundės"}
+                one{"{0} mikrosekundė"}
+                other{"{0} mikrosekundžių"}
+            }
+            millisecond{
+                dnam{"milisekundės"}
+                few{"{0} milisekundės"}
+                many{"{0} milisekundės"}
+                one{"{0} milisekundė"}
+                other{"{0} milisekundžių"}
+            }
+            minute{
+                dnam{"minutės"}
+                few{"{0} minutės"}
+                many{"{0} minutės"}
+                one{"{0} minutė"}
+                other{"{0} minučių"}
+                per{"{0} per minutę"}
+            }
+            month{
+                dnam{"mėnesiai"}
+                few{"{0} mėnesiai"}
+                many{"{0} mėnesio"}
+                one{"{0} mėnuo"}
+                other{"{0} mėnesių"}
+                per{"{0} per mėnesį"}
+            }
+            nanosecond{
+                dnam{"nanosekundės"}
+                few{"{0} nanosekundės"}
+                many{"{0} nanosekundės"}
+                one{"{0} nanosekundė"}
+                other{"{0} nanosekundžių"}
+            }
+            second{
+                dnam{"sekundės"}
+                few{"{0} sekundės"}
+                many{"{0} sekundės"}
+                one{"{0} sekundė"}
+                other{"{0} sekundžių"}
+                per{"{0}/s"}
+            }
+            week{
+                dnam{"savaitės"}
+                few{"{0} savaitės"}
+                many{"{0} savaitės"}
+                one{"{0} savaitė"}
+                other{"{0} savaičių"}
+                per{"{0} per savaitę"}
+            }
+            year{
+                dnam{"metai"}
+                few{"{0} metai"}
+                many{"{0} metų"}
+                one{"{0} metai"}
+                other{"{0} metų"}
+                per{"{0} per metus"}
+            }
+        }
+        electric{
+            ampere{
+                dnam{"amperai"}
+                few{"{0} amperai"}
+                many{"{0} ampero"}
+                one{"{0} amperas"}
+                other{"{0} amperų"}
+            }
+            milliampere{
+                dnam{"miliamperai"}
+                few{"{0} miliamperai"}
+                many{"{0} miliampero"}
+                one{"{0} miliamperas"}
+                other{"{0} miliamperų"}
+            }
+            ohm{
+                dnam{"omai"}
+                few{"{0} omai"}
+                many{"{0} omo"}
+                one{"{0} omas"}
+                other{"{0} omų"}
+            }
+            volt{
+                dnam{"voltai"}
+                few{"{0} voltai"}
+                many{"{0} volto"}
+                one{"{0} voltas"}
+                other{"{0} voltų"}
+            }
+        }
+        energy{
+            british-thermal-unit{
+                dnam{"britiškieji šilumos vienetai"}
+            }
+            calorie{
+                dnam{"kalorijos"}
+                few{"{0} kalorijos"}
+                many{"{0} kalorijos"}
+                one{"{0} kalorija"}
+                other{"{0} kalorijų"}
+            }
+            electronvolt{
+                dnam{"elektronvoltai"}
+                few{"{0} elektronvoltai"}
+                many{"{0} elektronvolto"}
+                one{"{0} elektronvoltas"}
+                other{"{0} elektronvoltų"}
+            }
+            foodcalorie{
+                dnam{"kalorijos"}
+                few{"{0} kalorijos"}
+                many{"{0} kalorijos"}
+                one{"{0} kalorija"}
+                other{"{0} kalorijų"}
+            }
+            joule{
+                dnam{"džauliai"}
+                few{"{0} džauliai"}
+                many{"{0} džaulio"}
+                one{"{0} džaulis"}
+                other{"{0} džaulių"}
+            }
+            kilocalorie{
+                dnam{"kilokalorijos"}
+                few{"{0} kilokalorijos"}
+                many{"{0} kilokalorijos"}
+                one{"{0} kilokalorija"}
+                other{"{0} kilokalorijų"}
+            }
+            kilojoule{
+                dnam{"kilodžauliai"}
+                few{"{0} kilodžauliai"}
+                many{"{0} kilodžaulio"}
+                one{"{0} kilodžaulis"}
+                other{"{0} kilodžaulių"}
+            }
+            kilowatt-hour{
+                dnam{"kilovatvalandės"}
+                few{"{0} kilovatvalandės"}
+                many{"{0} kilovatvalandės"}
+                one{"{0} kilovatvalandė"}
+                other{"{0} kilovatvalandžių"}
+            }
+            therm-us{
+                dnam{"JAV termos"}
+                few{"{0} JAV termos"}
+                many{"{0} JAV termos"}
+                one{"{0} JAV terma"}
+                other{"{0} JAV termų"}
+            }
+        }
+        force{
+            newton{
+                dnam{"niutonai"}
+                few{"{0} niutonai"}
+                many{"{0} niutono"}
+                one{"{0} niutonas"}
+                other{"{0} niutonų"}
+            }
+            pound-force{
+                dnam{"jėgos svarai"}
+                few{"{0} jėgos svarai"}
+                many{"{0} jėgos svaro"}
+                one{"{0} jėgos svaras"}
+                other{"{0} jėgos svarų"}
+            }
+        }
+        frequency{
+            gigahertz{
+                dnam{"gigahercai"}
+                few{"{0} gigahercai"}
+                many{"{0} gigaherco"}
+                one{"{0} gigahercas"}
+                other{"{0} gigahercų"}
+            }
+            hertz{
+                dnam{"hercai"}
+                few{"{0} hercai"}
+                many{"{0} herco"}
+                one{"{0} hercas"}
+                other{"{0} hercų"}
+            }
+            kilohertz{
+                dnam{"kilohercai"}
+                few{"{0} kilohercai"}
+                many{"{0} kiloherco"}
+                one{"{0} kilohercas"}
+                other{"{0} kilohercų"}
+            }
+            megahertz{
+                dnam{"megahercai"}
+                few{"{0} megahercai"}
+                many{"{0} megaherco"}
+                one{"{0} megahercas"}
+                other{"{0} megahercų"}
+            }
+        }
+        graphics{
+            dot{
+                dnam{"taškas"}
+                few{"{0} taškai"}
+                many{"{0} taško"}
+                one{"{0} taškas"}
+                other{"{0} taškų"}
+            }
+            dot-per-centimeter{
+                dnam{"taškai centimetre"}
+                few{"{0} taškai centimetre"}
+                many{"{0} taško centimetre"}
+                one{"{0} taškas centimetre"}
+                other{"{0} taškų centimetre"}
+            }
+            dot-per-inch{
+                dnam{"taškai colyje"}
+                few{"{0} taškai colyje"}
+                many{"{0} taško colyje"}
+                one{"{0} taškas colyje"}
+                other{"{0} taškų colyje"}
+            }
+            em{
+                dnam{"tipografinis emas"}
+            }
+            megapixel{
+                dnam{"megapikseliai"}
+                few{"{0} megapikseliai"}
+                many{"{0} megapikselio"}
+                one{"{0} megapikselis"}
+                other{"{0} megapikselių"}
+            }
+            pixel{
+                dnam{"pikseliai"}
+                few{"{0} pikseliai"}
+                many{"{0} pikselio"}
+                one{"{0} pikselis"}
+                other{"{0} pikselių"}
+            }
+            pixel-per-centimeter{
+                dnam{"pikseliai centimetre"}
+                few{"{0} pikseliai centimetre"}
+                many{"{0} pikselio centimetre"}
+                one{"{0} pikselis centimetre"}
+                other{"{0} pikselių centimetre"}
+            }
+            pixel-per-inch{
+                dnam{"pikseliai colyje"}
+                few{"{0} pikseliai colyje"}
+                many{"{0} pikselio colyje"}
+                one{"{0} pikselis colyje"}
+                other{"{0} pikselių colyje"}
+            }
+        }
+        length{
+            astronomical-unit{
+                dnam{"astronominiai vienetai"}
+                few{"{0} astronominiai vienetai"}
+                many{"{0} astronominio vieneto"}
+                one{"{0} astronominis vienetas"}
+                other{"{0} astronominių vienetų"}
+            }
+            centimeter{
+                dnam{"centimetrai"}
+                few{"{0} centimetrai"}
+                many{"{0} centimetro"}
+                one{"{0} centimetras"}
+                other{"{0} centimetrų"}
+                per{"{0}/cm"}
+            }
+            decimeter{
+                dnam{"decimetrai"}
+                few{"{0} decimetrai"}
+                many{"{0} decimetro"}
+                one{"{0} decimetras"}
+                other{"{0} decimetrų"}
+            }
+            earth-radius{
+                dnam{"žemės spindulys"}
+                few{"{0} R⊕"}
+                many{"{0} R⊕"}
+                one{"{0} žemės spindulys"}
+                other{"{0} žemės spindulių"}
+            }
+            fathom{
+                dnam{"fadomai"}
+                few{"{0} fadomai"}
+                many{"{0} fadomo"}
+                one{"{0} fadomas"}
+                other{"{0} fth"}
+            }
+            foot{
+                dnam{"pėdos"}
+                few{"{0} pėdos"}
+                many{"{0} pėdos"}
+                one{"{0} pėda"}
+                other{"{0} pėdų"}
+                per{"{0}/ft"}
+            }
+            furlong{
+                dnam{"furlongai"}
+                few{"{0} furlongai"}
+                many{"{0} furlongo"}
+                one{"{0} furlongas"}
+                other{"{0} furlongų"}
+            }
+            inch{
+                dnam{"coliai"}
+                few{"{0} coliai"}
+                many{"{0} colio"}
+                one{"{0} colis"}
+                other{"{0} colių"}
+                per{"{0}/in"}
+            }
+            kilometer{
+                dnam{"kilometrai"}
+                few{"{0} kilometrai"}
+                many{"{0} kilometro"}
+                one{"{0} kilometras"}
+                other{"{0} kilometrų"}
+                per{"{0}/km"}
+            }
+            light-year{
+                dnam{"šviesmečiai"}
+                few{"{0} šviesmečiai"}
+                many{"{0} šviesmečio"}
+                one{"{0} šviesmetis"}
+                other{"{0} šviesmečių"}
+            }
+            meter{
+                dnam{"metrai"}
+                few{"{0} metrai"}
+                many{"{0} metro"}
+                one{"{0} metras"}
+                other{"{0} metrų"}
+                per{"{0}/m"}
+            }
+            micrometer{
+                dnam{"mikrometrai"}
+                few{"{0} mikrometrai"}
+                many{"{0} mikrometro"}
+                one{"{0} mikrometras"}
+                other{"{0} mikrometrų"}
+            }
+            mile{
+                dnam{"mylios"}
+                few{"{0} mylios"}
+                many{"{0} mylios"}
+                one{"{0} mylia"}
+                other{"{0} mylių"}
+            }
+            mile-scandinavian{
+                dnam{"ilgoji mylia"}
+                few{"{0} ilgosios mylios"}
+                many{"{0} ilgosios mylios"}
+                one{"{0} ilgoji mylia"}
+                other{"{0} ilgųjų mylių"}
+            }
+            millimeter{
+                dnam{"milimetrai"}
+                few{"{0} milimetrai"}
+                many{"{0} milimetro"}
+                one{"{0} milimetras"}
+                other{"{0} milimetrų"}
+            }
+            nanometer{
+                dnam{"nanometrai"}
+                few{"{0} nanometrai"}
+                many{"{0} nanometro"}
+                one{"{0} nanometras"}
+                other{"{0} nanometrų"}
+            }
+            nautical-mile{
+                dnam{"jūrmylės"}
+                few{"{0} jūrmylės"}
+                many{"{0} jūrmylės"}
+                one{"{0} jūrmylė"}
+                other{"{0} jūrmylių"}
+            }
+            parsec{
+                dnam{"parsekas"}
+                few{"{0} parsekai"}
+                many{"{0} parseko"}
+                one{"{0} parsekas"}
+                other{"{0} parsekų"}
+            }
+            picometer{
+                dnam{"pikometrai"}
+                few{"{0} pikometrai"}
+                many{"{0} pikometro"}
+                one{"{0} pikometras"}
+                other{"{0} pikometrų"}
+            }
+            point{
+                dnam{"punktai"}
+                few{"{0} punktai"}
+                many{"{0} punktų"}
+                one{"{0} punktas"}
+                other{"{0} punkto"}
+            }
+            solar-radius{
+                dnam{"saulės spinduliuotė"}
+            }
+            yard{
+                dnam{"jardai"}
+                few{"{0} jardai"}
+                many{"{0} jardo"}
+                one{"{0} jardas"}
+                other{"{0} jardų"}
+            }
+        }
+        light{
+            candela{
+                dnam{"kandela"}
+                few{"{0} cd"}
+                many{"{0} cd"}
+                one{"{0} kandela"}
+                other{"{0} kandelų"}
+            }
+            lumen{
+                dnam{"liumenas"}
+                few{"{0} lm"}
+                many{"{0} lm"}
+                one{"{0} liumenas"}
+                other{"{0} liumenų"}
+            }
+            lux{
+                dnam{"liuksai"}
+                few{"{0} liuksai"}
+                many{"{0} liukso"}
+                one{"{0} liuksas"}
+                other{"{0} liuksų"}
+            }
+            solar-luminosity{
+                dnam{"saulės šviesis"}
+            }
+        }
+        mass{
+            carat{
+                dnam{"karatai"}
+                few{"{0} karatai"}
+                many{"{0} karato"}
+                one{"{0} karatas"}
+                other{"{0} karatų"}
+            }
+            dalton{
+                dnam{"daltonai"}
+                few{"{0} daltonai"}
+                many{"{0} daltono"}
+                one{"{0} daltonas"}
+                other{"{0} daltonų"}
+            }
+            earth-mass{
+                dnam{"žemės masė"}
+            }
+            grain{
+                dnam{"grūdas"}
+                few{"{0} grūdai"}
+                many{"{0} grūdo"}
+                one{"{0} grūdas"}
+                other{"{0} grūdų"}
+            }
+            gram{
+                dnam{"gramai"}
+                few{"{0} gramai"}
+                many{"{0} gramo"}
+                one{"{0} gramas"}
+                other{"{0} gramų"}
+                per{"{0}/g"}
+            }
+            kilogram{
+                dnam{"kilogramai"}
+                few{"{0} kilogramai"}
+                many{"{0} kilogramo"}
+                one{"{0} kilogramas"}
+                other{"{0} kilogramų"}
+                per{"{0}/kg"}
+            }
+            metric-ton{
+                dnam{"metrinės tonos"}
+                few{"{0} metrinės tonos"}
+                many{"{0} metrinės tonos"}
+                one{"{0} metrinė tona"}
+                other{"{0} metrinių tonų"}
+            }
+            microgram{
+                dnam{"mikrogramai"}
+                few{"{0} mikrogramai"}
+                many{"{0} mikrogramo"}
+                one{"{0} mikrogramas"}
+                other{"{0} mikrogramų"}
+            }
+            milligram{
+                dnam{"miligramai"}
+                few{"{0} miligramai"}
+                many{"{0} miligramo"}
+                one{"{0} miligramas"}
+                other{"{0} miligramų"}
+            }
+            ounce{
+                dnam{"uncijos"}
+                few{"{0} uncijos"}
+                many{"{0} uncijos"}
+                one{"{0} uncija"}
+                other{"{0} uncijų"}
+                per{"{0}/oz"}
+            }
+            ounce-troy{
+                dnam{"Trojos uncijos"}
+                few{"{0} Trojos uncijos"}
+                many{"{0} Trojos uncijos"}
+                one{"{0} Trojos uncija"}
+                other{"{0} Trojos uncijų"}
+            }
+            pound{
+                dnam{"svarai"}
+                few{"{0} svarai"}
+                many{"{0} svaro"}
+                one{"{0} svaras"}
+                other{"{0} svarų"}
+                per{"{0}/lb"}
+            }
+            solar-mass{
+                dnam{"saulės masė"}
+            }
+            stone{
+                dnam{"stonai"}
+                few{"{0} stonai"}
+                many{"{0} stono"}
+                one{"{0} stonas"}
+                other{"{0} stonų"}
+            }
+            ton{
+                dnam{"tonos"}
+                few{"{0} tonos"}
+                many{"{0} tonos"}
+                one{"{0} tona"}
+                other{"{0} tonų"}
+            }
+        }
+        power{
+            gigawatt{
+                dnam{"gigavatai"}
+                few{"{0} gigavatai"}
+                many{"{0} gigavato"}
+                one{"{0} gigavatas"}
+                other{"{0} gigavatų"}
+            }
+            horsepower{
+                dnam{"arklio galios"}
+                few{"{0} arklio galios"}
+                many{"{0} arklio galios"}
+                one{"{0} arklio galia"}
+                other{"{0} arklio galių"}
+            }
+            kilowatt{
+                dnam{"kilovatai"}
+                few{"{0} kilovatai"}
+                many{"{0} kilovato"}
+                one{"{0} kilovatas"}
+                other{"{0} kilovatų"}
+            }
+            megawatt{
+                dnam{"megavatai"}
+                few{"{0} megavatai"}
+                many{"{0} megavato"}
+                one{"{0} megavatas"}
+                other{"{0} megavatų"}
+            }
+            milliwatt{
+                dnam{"milivatai"}
+                few{"{0} milivatai"}
+                many{"{0} milivato"}
+                one{"{0} milivatas"}
+                other{"{0} milivatų"}
+            }
+            watt{
+                dnam{"vatai"}
+                few{"{0} vatai"}
+                many{"{0} vato"}
+                one{"{0} vatas"}
+                other{"{0} vatų"}
+            }
+        }
+        pressure{
+            atmosphere{
+                dnam{"atmosferos"}
+                few{"{0} atmosferos"}
+                many{"{0} atmosferos"}
+                one{"{0} atmosfera"}
+                other{"{0} atmosferų"}
+            }
+            bar{
+                dnam{"baras"}
+                few{"{0} barai"}
+                many{"{0} baro"}
+                one{"{0} baras"}
+                other{"{0} barų"}
+            }
+            hectopascal{
+                dnam{"hektopaskaliai"}
+                few{"{0} hektopaskaliai"}
+                many{"{0} hektopaskalio"}
+                one{"{0} hektopaskalis"}
+                other{"{0} hektopaskalių"}
+            }
+            inch-ofhg{
+                dnam{"gyvsidabrio stulpelio coliai"}
+                few{"{0} gyvsidabrio stulpelio coliai"}
+                many{"{0} gyvsidabrio stulpelio colio"}
+                one{"{0} gyvsidabrio stulpelio colis"}
+                other{"{0} gyvsidabrio stulpelio colių"}
+            }
+            kilopascal{
+                dnam{"kilopaskaliai"}
+                few{"{0} kilopaskaliai"}
+                many{"{0} kilopaskalio"}
+                one{"{0} kilopaskalis"}
+                other{"{0} kilopaskalių"}
+            }
+            megapascal{
+                dnam{"megapaskaliai"}
+                few{"{0} megapaskaliai"}
+                many{"{0} megapaskalio"}
+                one{"{0} megapaskalis"}
+                other{"{0} megapaskalių"}
+            }
+            millibar{
+                dnam{"milibarai"}
+                few{"{0} milibarai"}
+                many{"{0} milibaro"}
+                one{"{0} milibaras"}
+                other{"{0} milibarų"}
+            }
+            millimeter-ofhg{
+                dnam{"gysidabrio stulpelio milimetrai"}
+                few{"{0} gysidabrio stulpelio milimetrai"}
+                many{"{0} gysidabrio stulpelio milimetro"}
+                one{"{0} gysidabrio stulpelio milimetras"}
+                other{"{0} gysidabrio stulpelio milimetrų"}
+            }
+            pascal{
+                dnam{"paskaliai"}
+                few{"{0} paskaliai"}
+                many{"{0} paskalio"}
+                one{"{0} paskalis"}
+                other{"{0} paskalių"}
+            }
+            pound-force-per-square-inch{
+                dnam{"svarai kv. colyje"}
+                few{"{0} svarai kv. colyje"}
+                many{"{0} svaro kv. colyje"}
+                one{"{0} svaras kv. colyje"}
+                other{"{0} svarų kv. colyje"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                dnam{"kilometrai per valandą"}
+                few{"{0} kilometrai per valandą"}
+                many{"{0} kilometro per valandą"}
+                one{"{0} kilometras per valandą"}
+                other{"{0} kilometrų per valandą"}
+            }
+            knot{
+                dnam{"mazgas"}
+                few{"{0} mazgai"}
+                many{"{0} mazgo"}
+                one{"{0} mazgas"}
+                other{"{0} mazgų"}
+            }
+            meter-per-second{
+                dnam{"metrai per sekundę"}
+                few{"{0} metrai per sekundę"}
+                many{"{0} metro per sekundę"}
+                one{"{0} metras per sekundę"}
+                other{"{0} metrų per sekundę"}
+            }
+            mile-per-hour{
+                dnam{"mylios per valandą"}
+                few{"{0} mylios per valandą"}
+                many{"{0} mylios per valandą"}
+                one{"{0} mylia per valandą"}
+                other{"{0} mylių per valandą"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"Celsijaus laipsniai"}
+                few{"{0} Celsijaus laipsniai"}
+                many{"{0} Celsijaus laipsnio"}
+                one{"{0} Celsijaus laipsnis"}
+                other{"{0} Celsijaus laipsnių"}
+            }
+            fahrenheit{
+                dnam{"Farenheito laipsniai"}
+                few{"{0} Farenheito laipsniai"}
+                many{"{0} Farenheito laipsnio"}
+                one{"{0} Farenheito laipsnis"}
+                other{"{0} Farenheito laipsnių"}
+            }
+            generic{
+                dnam{"°"}
+                few{"{0}°"}
+                many{"{0}°"}
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+            kelvin{
+                dnam{"kelvinai"}
+                few{"{0} kelvinai"}
+                many{"{0} kelvino"}
+                one{"{0} kelvinas"}
+                other{"{0} kelvinų"}
+            }
+        }
+        torque{
+            newton-meter{
+                dnam{"niutonmetrai"}
+                few{"{0} niutonmetrai"}
+                many{"{0} niutonmetro"}
+                one{"{0} niutonmetras"}
+                other{"{0} niutonmetrų"}
+            }
+            pound-force-foot{
+                dnam{"svarų pėdos"}
+            }
+        }
+        volume{
+            acre-foot{
+                dnam{"pėdos akre"}
+                few{"{0} pėdos akre"}
+                many{"{0} pėdos akre"}
+                one{"{0} pėda akre"}
+                other{"{0} pėdų akre"}
+            }
+            barrel{
+                dnam{"bareliai"}
+                few{"{0} bareliai"}
+                many{"{0} barelio"}
+                one{"{0} barelis"}
+                other{"{0} barelių"}
+            }
+            bushel{
+                dnam{"bušeliai"}
+                few{"{0} bušeliai"}
+                many{"{0} bušelio"}
+                one{"{0} bušelis"}
+                other{"{0} bušelių"}
+            }
+            centiliter{
+                dnam{"centilitrai"}
+                few{"{0} centilitrai"}
+                many{"{0} centilitro"}
+                one{"{0} centilitras"}
+                other{"{0} centilitrų"}
+            }
+            cubic-centimeter{
+                dnam{"kubiniai centimetrai"}
+                few{"{0} kubiniai centimetrai"}
+                many{"{0} kubinio centimetro"}
+                one{"{0} kubinis centimetras"}
+                other{"{0} kubinių centimetrų"}
+                per{"{0}/cm³"}
+            }
+            cubic-foot{
+                dnam{"kubinės pėdos"}
+                few{"{0} kubinės pėdos"}
+                many{"{0} kubinės pėdos"}
+                one{"{0} kubinė pėda"}
+                other{"{0} kubinių pėdų"}
+            }
+            cubic-inch{
+                dnam{"kubiniai coliai"}
+                few{"{0} kubiniai coliai"}
+                many{"{0} kubinio colio"}
+                one{"{0} kubinis colis"}
+                other{"{0} kubinių colių"}
+            }
+            cubic-kilometer{
+                dnam{"kubiniai kilometrai"}
+                few{"{0} kubiniai kilimetrai"}
+                many{"{0} kubinio kilometro"}
+                one{"{0} kubinis kilometras"}
+                other{"{0} kubinių kilometrų"}
+            }
+            cubic-meter{
+                dnam{"kubiniai metrai"}
+                few{"{0} kubiniai metrai"}
+                many{"{0} kubinio metro"}
+                one{"{0} kubinis metras"}
+                other{"{0} kubinių metrų"}
+                per{"{0}/m³"}
+            }
+            cubic-mile{
+                dnam{"kubinės mylios"}
+                few{"{0} kubinės mylios"}
+                many{"{0} kubinės mylios"}
+                one{"{0} kubinė mylia"}
+                other{"{0} kubinių mylių"}
+            }
+            cubic-yard{
+                dnam{"kubiniai jardai"}
+                few{"{0} kubiniai jardai"}
+                many{"{0} kubinio jardo"}
+                one{"{0} kubinis jardas"}
+                other{"{0} kubinių jardų"}
+            }
+            cup{
+                dnam{"stiklinės"}
+                few{"{0} stiklinės"}
+                many{"{0} stiklinės"}
+                one{"{0} stiklinė"}
+                other{"{0} stiklinių"}
+            }
+            cup-metric{
+                dnam{"matavimo puodeliai"}
+                few{"{0} matavimo puodeliai"}
+                many{"{0} matavimo puodelio"}
+                one{"{0} matavimo puodelis"}
+                other{"{0} matavimo puodelių"}
+            }
+            deciliter{
+                dnam{"decilitrai"}
+                few{"{0} decilitrai"}
+                many{"{0} decilitro"}
+                one{"{0} decilitras"}
+                other{"{0} decilitrų"}
+            }
+            dessert-spoon{
+                dnam{"desertinis šaukštelis"}
+                few{"{0} desertiniai šaukšteliai"}
+                many{"{0} desertinio šaukštelio"}
+                one{"{0} desertinis šaukštelis"}
+                other{"{0} desertinių šaukštelių"}
+            }
+            dessert-spoon-imperial{
+                dnam{"imp. desertinis šaukštelis"}
+                few{"{0} imp. desertiniai šaukšteliai"}
+                many{"{0} imp. desertinio šaukštelio"}
+                one{"{0} imp. desertinis šaukštelis"}
+                other{"{0} imp. desertinių šaukštelių"}
+            }
+            dram{
+                dnam{"skysčio drachma"}
+                few{"{0} skysčio drachmos"}
+                many{"{0} skysčio drachmos"}
+                one{"{0} skysčio drachma"}
+                other{"{0} skysčio drachmų"}
+            }
+            drop{
+                dnam{"lašas"}
+                few{"{0} lašai"}
+                many{"{0} lašo"}
+                one{"{0} lašas"}
+                other{"{0} lašų"}
+            }
+            fluid-ounce{
+                dnam{"skysčio uncijos"}
+                few{"{0} skysčio uncijos"}
+                many{"{0} skysčio uncijos"}
+                one{"{0} skysčio uncija"}
+                other{"{0} skysčio uncijų"}
+            }
+            fluid-ounce-imperial{
+                dnam{"imperatoriškosios skysčio uncijos"}
+                few{"{0} imp. skysčio uncijos"}
+                many{"{0} imp. skysčio uncijos"}
+                one{"{0} imp. skysčio uncija"}
+                other{"{0} imp. skysčio uncijų"}
+            }
+            gallon{
+                dnam{"galonai"}
+                few{"{0} galonai"}
+                many{"{0} galono"}
+                one{"{0} galonas"}
+                other{"{0} galonų"}
+                per{"{0}/gal"}
+            }
+            gallon-imperial{
+                dnam{"imperinis galonas"}
+                few{"{0} imperiniai galonai"}
+                many{"{0} imperinio galono"}
+                one{"{0} imperinis galonas"}
+                other{"{0} imperinių galonų"}
+                per{"{0} imperiniame galone"}
+            }
+            hectoliter{
+                dnam{"hektolitrai"}
+                few{"{0} hektolitrai"}
+                many{"{0} hektolitro"}
+                one{"{0} hektolitras"}
+                other{"{0} hektolitrų"}
+            }
+            jigger{
+                dnam{"džigeris"}
+                few{"{0} džigeriai"}
+                many{"{0} džigerio"}
+                one{"{0} džigeris"}
+                other{"{0} džigerio"}
+            }
+            liter{
+                dnam{"litrai"}
+                few{"{0} litrai"}
+                many{"{0} litro"}
+                one{"{0} litras"}
+                other{"{0} litrų"}
+                per{"{0}/l"}
+            }
+            megaliter{
+                dnam{"megalitrai"}
+                few{"{0} megalitrai"}
+                many{"{0} megalitro"}
+                one{"{0} megalitras"}
+                other{"{0} megalitrų"}
+            }
+            milliliter{
+                dnam{"mililitrai"}
+                few{"{0} mililitrai"}
+                many{"{0} mililitro"}
+                one{"{0} mililitras"}
+                other{"{0} mililitrų"}
+            }
+            pinch{
+                dnam{"žiupsnelis"}
+                few{"{0} žiupsneliai"}
+                many{"{0} žiupsnelio"}
+                one{"{0} žiupsnelių"}
+                other{"{0} žiupsnelis"}
+            }
+            pint{
+                dnam{"pintos"}
+                few{"{0} pintos"}
+                many{"{0} pintos"}
+                one{"{0} pinta"}
+                other{"{0} pintų"}
+            }
+            pint-metric{
+                dnam{"metrinės pintos"}
+                few{"{0} metrinės pintos"}
+                many{"{0} metrinės pintos"}
+                one{"{0} metrinė pinta"}
+                other{"{0} metrinių pintų"}
+            }
+            quart{
+                dnam{"kvortos"}
+                few{"{0} kvortos"}
+                many{"{0} kvortos"}
+                one{"{0} kvorta"}
+                other{"{0} kvortų"}
+            }
+            quart-imperial{
+                dnam{"imp. kvorta"}
+                few{"{0} imp. kvortos"}
+                many{"{0} imp. kvortos"}
+                one{"{0} imp. kvorta"}
+                other{"{0} imp. kvortų"}
+            }
+            tablespoon{
+                dnam{"valgomieji šaukštai"}
+                few{"{0} valgomieji šaukštai"}
+                many{"{0} valgomojo šaukšto"}
+                one{"{0} valgomasis šaukštas"}
+                other{"{0} valgomųjų šaukštų"}
+            }
+            teaspoon{
+                dnam{"arbatiniai šaukšteliai"}
+                few{"{0} arbatiniai šaukšteliai"}
+                many{"{0} arbatinio šaukštelio"}
+                one{"{0} arbatinis šaukštelis"}
+                other{"{0} arbatinių šaukštelių"}
+            }
+        }
+    }
+    unitsNarrow{
+        acceleration{
+            g-force{
+                dnam{"G"}
+                few{"{0} G"}
+                many{"{0} G"}
+                one{"{0} G"}
+                other{"{0} G"}
+            }
+            meter-per-square-second{
+                dnam{"m/s²"}
+                few{"{0} m/s²"}
+                many{"{0} m/s²"}
+                one{"{0} m/s²"}
+                other{"{0} m/s²"}
+            }
+        }
+        angle{
+            arc-minute{
+                few{"{0}′"}
+                many{"{0}′"}
+                one{"{0}′"}
+                other{"{0}′"}
+            }
+            arc-second{
+                few{"{0}″"}
+                many{"{0}″"}
+                one{"{0}″"}
+                other{"{0}″"}
+            }
+            degree{
+                few{"{0}°"}
+                many{"{0}°"}
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+        }
+        area{
+            acre{
+                few{"{0} akr."}
+                many{"{0} akr."}
+                one{"{0} akr."}
+                other{"{0} akr."}
+            }
+            hectare{
+                few{"{0}ha"}
+                many{"{0}ha"}
+                one{"{0}ha"}
+                other{"{0}ha"}
+            }
+            square-foot{
+                few{"{0} ft²"}
+                many{"{0} ft²"}
+                one{"{0} ft²"}
+                other{"{0} ft²"}
+            }
+            square-kilometer{
+                few{"{0} km²"}
+                many{"{0} km²"}
+                one{"{0} km²"}
+                other{"{0} km²"}
+            }
+            square-meter{
+                few{"{0} m²"}
+                many{"{0} m²"}
+                one{"{0} m²"}
+                other{"{0} m²"}
+            }
+            square-mile{
+                few{"{0} mi²"}
+                many{"{0} mi²"}
+                one{"{0} mi²"}
+                other{"{0} mi²"}
+            }
+        }
+        compound{
+            1024p1{"Ki{0}"}
+            1024p2{"Mi{0}"}
+            1024p3{"Gi{0}"}
+            1024p4{"Ti{0}"}
+            1024p5{"Pi{0}"}
+            1024p6{"Ei{0}"}
+            1024p7{"Zi{0}"}
+            1024p8{"Yi{0}"}
+            per{"{0}/{1}"}
+        }
+        concentr{
+            percent{
+                dnam{"%"}
+                few{"{0} %"}
+                many{"{0} %"}
+                one{"{0} %"}
+                other{"{0} %"}
+            }
+        }
+        consumption{
+            liter-per-100-kilometer{
+                dnam{"l/100 km"}
+                few{"{0} l/100 km"}
+                many{"{0} l/100 km"}
+                one{"{0} l/100 km"}
+                other{"{0} l/100 km"}
+            }
+            mile-per-gallon{
+                few{"{0} mi/gal"}
+                many{"{0} mi/gal"}
+                one{"{0} mi/gal"}
+                other{"{0} mi/gal"}
+            }
+        }
+        coordinate{
+            dnam{"kryptis"}
+            east{"{0} R"}
+            north{"{0} Š"}
+            south{"{0} P"}
+            west{"{0} V"}
+        }
+        duration{
+            century{
+                dnam{"a."}
+                few{"{0} a."}
+                many{"{0} a."}
+                one{"{0} a."}
+                other{"{0} a."}
+            }
+            day{
+                dnam{"diena"}
+                few{"{0} d."}
+                many{"{0} d."}
+                one{"{0} d."}
+                other{"{0} d."}
+                per{"{0}/d."}
+            }
+            hour{
+                dnam{"valanda"}
+                few{"{0} h"}
+                many{"{0} h"}
+                one{"{0} h"}
+                other{"{0} h"}
+                per{"{0}/h"}
+            }
+            microsecond{
+                dnam{"μs"}
+                few{"{0} μs"}
+                many{"{0} μs"}
+                one{"{0} μs"}
+                other{"{0} μs"}
+            }
+            millisecond{
+                dnam{"milisek."}
+                few{"{0} ms"}
+                many{"{0} ms"}
+                one{"{0} ms"}
+                other{"{0} ms"}
+            }
+            minute{
+                dnam{"min."}
+                few{"{0} min."}
+                many{"{0} min."}
+                one{"{0} min."}
+                other{"{0} min."}
+                per{"{0}/min."}
+            }
+            month{
+                dnam{"mėnuo"}
+                few{"{0} mėn."}
+                many{"{0} mėn."}
+                one{"{0} mėn."}
+                other{"{0} mėn."}
+                per{"{0}/mėn."}
+            }
+            nanosecond{
+                dnam{"nanosek."}
+                few{"{0} ns"}
+                many{"{0} ns"}
+                one{"{0} ns"}
+                other{"{0} ns"}
+            }
+            second{
+                dnam{"sek."}
+                few{"{0} s"}
+                many{"{0} s"}
+                one{"{0} s"}
+                other{"{0} s"}
+                per{"{0}/s"}
+            }
+            week{
+                dnam{"sav."}
+                few{"{0} sav."}
+                many{"{0} sav."}
+                one{"{0} sav."}
+                other{"{0} sav."}
+                per{"{0}/sav."}
+            }
+            year{
+                dnam{"metai"}
+                few{"{0} m."}
+                many{"{0} m."}
+                one{"{0} m."}
+                other{"{0} m."}
+                per{"{0}/m."}
+            }
+        }
+        length{
+            centimeter{
+                dnam{"cm"}
+                few{"{0} cm"}
+                many{"{0} cm"}
+                one{"{0} cm"}
+                other{"{0} cm"}
+                per{"{0}/cm"}
+            }
+            decimeter{
+                dnam{"dm"}
+                few{"{0} dm"}
+                many{"{0} dm"}
+                one{"{0} dm"}
+                other{"{0} dm"}
+            }
+            fathom{
+                dnam{"fth"}
+                few{"{0} fth"}
+                many{"{0} fth"}
+                one{"{0} fth"}
+                other{"{0} fth"}
+            }
+            foot{
+                dnam{"pėda"}
+                few{"{0} ft"}
+                many{"{0} ft"}
+                one{"{0} ft"}
+                other{"{0} ft"}
+                per{"{0}/ft"}
+            }
+            furlong{
+                dnam{"fur"}
+                few{"{0} fur"}
+                many{"{0} fur"}
+                one{"{0} fur"}
+                other{"{0} fur"}
+            }
+            inch{
+                dnam{"coliai"}
+                few{"{0} in"}
+                many{"{0} in"}
+                one{"{0} in"}
+                other{"{0} in"}
+                per{"{0}/in"}
+            }
+            kilometer{
+                dnam{"km"}
+                few{"{0} km"}
+                many{"{0} km"}
+                one{"{0} km"}
+                other{"{0} km"}
+                per{"{0}/km"}
+            }
+            light-year{
+                few{"{0} šm."}
+                many{"{0} šm."}
+                one{"{0} šm."}
+                other{"{0} šm."}
+            }
+            meter{
+                dnam{"m"}
+                few{"{0} m"}
+                many{"{0} m"}
+                one{"{0} m"}
+                other{"{0} m"}
+                per{"{0}/m"}
+            }
+            mile{
+                dnam{"mi"}
+                few{"{0} mi"}
+                many{"{0} mi"}
+                one{"{0} mi"}
+                other{"{0} mi"}
+            }
+            mile-scandinavian{
+                dnam{"IM"}
+                few{"{0} IM"}
+                many{"{0} IM"}
+                one{"{0} IM"}
+                other{"{0} IM"}
+            }
+            millimeter{
+                dnam{"mm"}
+                few{"{0} mm"}
+                many{"{0} mm"}
+                one{"{0} mm"}
+                other{"{0} mm"}
+            }
+            picometer{
+                few{"{0} pm"}
+                many{"{0} pm"}
+                one{"{0} pm"}
+                other{"{0} pm"}
+            }
+            yard{
+                dnam{"yd"}
+                few{"{0} yd"}
+                many{"{0} yd"}
+                one{"{0} yd"}
+                other{"{0} yd"}
+            }
+        }
+        mass{
+            gram{
+                dnam{"g"}
+                few{"{0} g"}
+                many{"{0} g"}
+                one{"{0} g"}
+                other{"{0} g"}
+                per{"{0}/g"}
+            }
+            kilogram{
+                dnam{"kg"}
+                few{"{0} kg"}
+                many{"{0} kg"}
+                one{"{0} kg"}
+                other{"{0} kg"}
+                per{"{0}/kg"}
+            }
+            ounce{
+                dnam{"oz"}
+                few{"{0} oz"}
+                many{"{0} oz"}
+                one{"{0} oz"}
+                other{"{0} oz"}
+                per{"{0}/oz"}
+            }
+            pound{
+                dnam{"lb"}
+                few{"{0} lb"}
+                many{"{0} lb"}
+                one{"{0} lb"}
+                other{"{0} lb"}
+                per{"{0}/lb"}
+            }
+            stone{
+                dnam{"st"}
+                few{"{0} st"}
+                many{"{0} st"}
+                one{"{0} st"}
+                other{"{0} st"}
+            }
+        }
+        power{
+            horsepower{
+                few{"{0} AG"}
+                many{"{0} AG"}
+                one{"{0} AG"}
+                other{"{0} AG"}
+            }
+            kilowatt{
+                few{"{0} kW"}
+                many{"{0} kW"}
+                one{"{0} kW"}
+                other{"{0} kW"}
+            }
+            watt{
+                few{"{0} W"}
+                many{"{0} W"}
+                one{"{0} W"}
+                other{"{0} W"}
+            }
+        }
+        pressure{
+            hectopascal{
+                dnam{"hPa"}
+                few{"{0} hPa"}
+                many{"{0} hPa"}
+                one{"{0} hPa"}
+                other{"{0} hPa"}
+            }
+            inch-ofhg{
+                dnam{"inHg"}
+                few{"{0} inHg"}
+                many{"{0} inHg"}
+                one{"{0} inHg"}
+                other{"{0} inHg"}
+            }
+            millibar{
+                dnam{"mbar"}
+                few{"{0} mbar"}
+                many{"{0} mbar"}
+                one{"{0} mbar"}
+                other{"{0} mbar"}
+            }
+            millimeter-ofhg{
+                dnam{"mm Hg"}
+                few{"{0} mm Hg"}
+                many{"{0} mm Hg"}
+                one{"{0} mm Hg"}
+                other{"{0} mm Hg"}
+            }
+            pound-force-per-square-inch{
+                dnam{"lb in²"}
+                few{"{0} lb in²"}
+                many{"{0} lb in²"}
+                one{"{0} lb in²"}
+                other{"{0} lb in²"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                dnam{"km/h"}
+                few{"{0} km/h"}
+                many{"{0} km/h"}
+                one{"{0} km/h"}
+                other{"{0} km/h"}
+            }
+            knot{
+                dnam{"mazgas"}
+                few{"{0} KN"}
+                many{"{0} KN"}
+                one{"{0} KN"}
+                other{"{0} KN"}
+            }
+            meter-per-second{
+                dnam{"m/s"}
+                few{"{0} m/s"}
+                many{"{0} m/s"}
+                one{"{0} m/s"}
+                other{"{0} m/s"}
+            }
+            mile-per-hour{
+                dnam{"mi/h"}
+                few{"{0} mi/h"}
+                many{"{0} mi/h"}
+                one{"{0} mi/h"}
+                other{"{0} mi/h"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"°C"}
+                few{"{0}°"}
+                many{"{0}°"}
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+            fahrenheit{
+                dnam{"°F"}
+                few{"{0}°F"}
+                many{"{0}°F"}
+                one{"{0}°F"}
+                other{"{0}°F"}
+            }
+            generic{
+                dnam{"°"}
+                few{"{0}°"}
+                many{"{0}°"}
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+            kelvin{
+                dnam{"K"}
+                few{"{0} K"}
+                many{"{0} K"}
+                one{"{0} K"}
+                other{"{0} K"}
+            }
+        }
+        volume{
+            acre-foot{
+                dnam{"ft akre"}
+                few{"{0} ft akre"}
+                many{"{0} ft akre"}
+                one{"{0} ft akre"}
+                other{"{0} ft akre"}
+            }
+            bushel{
+                dnam{"bu"}
+                few{"{0} bu"}
+                many{"{0} bu"}
+                one{"{0} bu"}
+                other{"{0} bu"}
+            }
+            cubic-kilometer{
+                few{"{0} km³"}
+                many{"{0} km³"}
+                one{"{0} km³"}
+                other{"{0} km³"}
+            }
+            cubic-mile{
+                few{"{0} mi³"}
+                many{"{0} mi³"}
+                one{"{0} mi³"}
+                other{"{0} mi³"}
+            }
+            fluid-ounce{
+                few{"{0} fl oz"}
+                many{"{0} fl oz"}
+                one{"{0} fl oz"}
+                other{"{0} fl oz"}
+            }
+            liter{
+                dnam{"litrai"}
+                few{"{0} l"}
+                many{"{0} l"}
+                one{"{0} l"}
+                other{"{0} l"}
+            }
+            quart{
+                few{"{0} kvortos"}
+                many{"{0} kvortos"}
+                one{"{0} kvorta"}
+                other{"{0} kvortų"}
+            }
+        }
+    }
+    unitsShort{
+        acceleration{
+            g-force{
+                dnam{"G"}
+                few{"{0} G"}
+                many{"{0} G"}
+                one{"{0} G"}
+                other{"{0} G"}
+            }
+            meter-per-square-second{
+                dnam{"m/s²"}
+                few{"{0} m/s²"}
+                many{"{0} m/s²"}
+                one{"{0} m/s²"}
+                other{"{0} m/s²"}
+            }
+        }
+        angle{
+            arc-minute{
+                dnam{"kampo minutės"}
+                few{"{0}′"}
+                many{"{0}′"}
+                one{"{0}′"}
+                other{"{0}′"}
+            }
+            arc-second{
+                dnam{"kampo sekundės"}
+                few{"{0}″"}
+                many{"{0}″"}
+                one{"{0}″"}
+                other{"{0}″"}
+            }
+            degree{
+                dnam{"laipsniai"}
+                few{"{0}°"}
+                many{"{0}°"}
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+            radian{
+                dnam{"rad"}
+                few{"{0} rad"}
+                many{"{0} rad"}
+                one{"{0} rad"}
+                other{"{0} rad"}
+            }
+            revolution{
+                dnam{"apsisuk."}
+                few{"{0} apsisuk."}
+                many{"{0} apsisuk."}
+                one{"{0} apsisuk."}
+                other{"{0} apsisuk."}
+            }
+        }
+        area{
+            acre{
+                dnam{"akrai"}
+                few{"{0} a."}
+                many{"{0} a."}
+                one{"{0} a."}
+                other{"{0} a."}
+            }
+            dunam{
+                dnam{"dunamai"}
+                few{"{0} dunamai"}
+                many{"{0} dunamo"}
+                one{"{0} dunamas"}
+                other{"{0} dunamų"}
+            }
+            hectare{
+                dnam{"hektarai"}
+                few{"{0} ha"}
+                many{"{0} ha"}
+                one{"{0} ha"}
+                other{"{0} ha"}
+            }
+            square-centimeter{
+                dnam{"cm²"}
+                few{"{0} cm²"}
+                many{"{0} cm²"}
+                one{"{0} cm²"}
+                other{"{0} cm²"}
+                per{"{0}/cm²"}
+            }
+            square-foot{
+                dnam{"kv. pėda"}
+                few{"{0} kv. pėdos"}
+                many{"{0} kv. pėdos"}
+                one{"{0} kv. pėda"}
+                other{"{0} kv. pėdų"}
+            }
+            square-inch{
+                dnam{"in²"}
+                few{"{0} in²"}
+                many{"{0} in²"}
+                one{"{0} in²"}
+                other{"{0} in²"}
+                per{"{0}/in²"}
+            }
+            square-kilometer{
+                dnam{"kv. km"}
+                few{"{0} kv. km"}
+                many{"{0} kv. km"}
+                one{"{0} kv. km"}
+                other{"{0} kv. km"}
+                per{"{0}/km²"}
+            }
+            square-meter{
+                dnam{"kv. m"}
+                few{"{0} kv. m"}
+                many{"{0} kv. m"}
+                one{"{0} kv. m"}
+                other{"{0} kv. m"}
+                per{"{0}/m²"}
+            }
+            square-mile{
+                dnam{"kv. mylios"}
+                few{"{0} kv. my"}
+                many{"{0} kv. my"}
+                one{"{0} kv. my"}
+                other{"{0} kv. my"}
+                per{"{0}/my²"}
+            }
+            square-yard{
+                dnam{"yd²"}
+                few{"{0} yd²"}
+                many{"{0} yd²"}
+                one{"{0} yd²"}
+                other{"{0} yd²"}
+            }
+        }
+        compound{
+            1024p1{"Ki{0}"}
+            1024p2{"Mi{0}"}
+            1024p3{"Gi{0}"}
+            1024p4{"Ti{0}"}
+            1024p5{"Pi{0}"}
+            1024p6{"Ei{0}"}
+            1024p7{"Zi{0}"}
+            1024p8{"Yi{0}"}
+            per{"{0}/{1}"}
+        }
+        concentr{
+            karat{
+                dnam{"kt"}
+                few{"{0} kt"}
+                many{"{0} kt"}
+                one{"{0} kt"}
+                other{"{0} kt"}
+            }
+            milligram-ofglucose-per-deciliter{
+                dnam{"mg/dl"}
+                few{"{0} mg/dl"}
+                many{"{0} mg/dl"}
+                one{"{0} mg/dl"}
+                other{"{0} mg/dl"}
+            }
+            millimole-per-liter{
+                dnam{"mmol/l"}
+                few{"{0} mmol/l"}
+                many{"{0} mmol/l"}
+                one{"{0} mmol/l"}
+                other{"{0} mmol/l"}
+            }
+            percent{
+                dnam{"procentas"}
+                few{"{0} %"}
+                many{"{0} %"}
+                one{"{0} %"}
+                other{"{0} %"}
+            }
+            permille{
+                dnam{"promilė"}
+                few{"{0} ‰"}
+                many{"{0} ‰"}
+                one{"{0} ‰"}
+                other{"{0} ‰"}
+            }
+            permillion{
+                dnam{"ppm"}
+                few{"{0} ppm"}
+                many{"{0} ppm"}
+                one{"{0} ppm"}
+                other{"{0} ppm"}
+            }
+        }
+        consumption{
+            liter-per-100-kilometer{
+                dnam{"l/100 km"}
+                few{"{0} l/100 km"}
+                many{"{0} l/100 km"}
+                one{"{0} l/100 km"}
+                other{"{0} l/100 km"}
+            }
+            liter-per-kilometer{
+                dnam{"l/km"}
+                few{"{0} l/km"}
+                many{"{0} l/km"}
+                one{"{0} l/km"}
+                other{"{0} l/km"}
+            }
+            mile-per-gallon{
+                dnam{"my/gal"}
+                few{"{0} my/gal"}
+                many{"{0} my/gal"}
+                one{"{0} my/gal"}
+                other{"{0} my/gal"}
+            }
+            mile-per-gallon-imperial{
+                dnam{"my/imp. g"}
+                few{"{0} my/imp. g"}
+                many{"{0} my/imp. g"}
+                one{"{0} my/imp. g"}
+                other{"{0} my/imp. g"}
+            }
+        }
+        coordinate{
+            dnam{"kryptis"}
+            east{"{0} R"}
+            north{"{0} Š"}
+            south{"{0} P"}
+            west{"{0} V"}
+        }
+        digital{
+            bit{
+                dnam{"bitai"}
+                few{"{0} b"}
+                many{"{0} b"}
+                one{"{0} b"}
+                other{"{0} b"}
+            }
+            byte{
+                dnam{"B"}
+                few{"{0} B"}
+                many{"{0} B"}
+                one{"{0} B"}
+                other{"{0} B"}
+            }
+            gigabit{
+                dnam{"Gb"}
+                few{"{0} Gb"}
+                many{"{0} Gb"}
+                one{"{0} Gb"}
+                other{"{0} Gb"}
+            }
+            gigabyte{
+                dnam{"GB"}
+                few{"{0} GB"}
+                many{"{0} GB"}
+                one{"{0} GB"}
+                other{"{0} GB"}
+            }
+            kilobit{
+                dnam{"kb"}
+                few{"{0} kb"}
+                many{"{0} kb"}
+                one{"{0} kb"}
+                other{"{0} kb"}
+            }
+            kilobyte{
+                dnam{"kB"}
+                few{"{0} kB"}
+                many{"{0} kB"}
+                one{"{0} kB"}
+                other{"{0} kB"}
+            }
+            megabit{
+                dnam{"Mb"}
+                few{"{0} Mb"}
+                many{"{0} Mb"}
+                one{"{0} Mb"}
+                other{"{0} Mb"}
+            }
+            megabyte{
+                dnam{"MB"}
+                few{"{0} MB"}
+                many{"{0} MB"}
+                one{"{0} MB"}
+                other{"{0} MB"}
+            }
+            petabyte{
+                dnam{"Petabaitas"}
+                few{"{0} PB"}
+                many{"{0} PB"}
+                one{"{0} PB"}
+                other{"{0} PB"}
+            }
+            terabit{
+                dnam{"Tb"}
+                few{"{0} Tb"}
+                many{"{0} Tb"}
+                one{"{0} Tb"}
+                other{"{0} Tb"}
+            }
+            terabyte{
+                dnam{"TB"}
+                few{"{0} TB"}
+                many{"{0} TB"}
+                one{"{0} TB"}
+                other{"{0} TB"}
+            }
+        }
+        duration{
+            century{
+                dnam{"a."}
+                few{"{0} a."}
+                many{"{0} a."}
+                one{"{0} a."}
+                other{"{0} a."}
+            }
+            day{
+                dnam{"dienos"}
+                few{"{0} d."}
+                many{"{0} d."}
+                one{"{0} d."}
+                other{"{0} d."}
+                per{"{0}/d."}
+            }
+            decade{
+                dnam{"dekados"}
+                few{"{0} dek."}
+                many{"{0} dek."}
+                one{"{0} dek."}
+                other{"{0} dek."}
+            }
+            hour{
+                dnam{"valandos"}
+                few{"{0} val."}
+                many{"{0} val."}
+                one{"{0} val."}
+                other{"{0} val."}
+                per{"{0}/h"}
+            }
+            microsecond{
+                dnam{"μs"}
+                few{"{0} μs"}
+                many{"{0} μs"}
+                one{"{0} μs"}
+                other{"{0} μs"}
+            }
+            millisecond{
+                dnam{"milisek."}
+                few{"{0} ms"}
+                many{"{0} ms"}
+                one{"{0} ms"}
+                other{"{0} ms"}
+            }
+            minute{
+                dnam{"min."}
+                few{"{0} min."}
+                many{"{0} min."}
+                one{"{0} min."}
+                other{"{0} min."}
+                per{"{0}/min."}
+            }
+            month{
+                dnam{"mėnesiai"}
+                few{"{0} mėn."}
+                many{"{0} mėn."}
+                one{"{0} mėn."}
+                other{"{0} mėn."}
+                per{"{0}/mėn."}
+            }
+            nanosecond{
+                dnam{"nanosek."}
+                few{"{0} ns"}
+                many{"{0} ns"}
+                one{"{0} ns"}
+                other{"{0} ns"}
+            }
+            second{
+                dnam{"sek."}
+                few{"{0} sek."}
+                many{"{0} sek."}
+                one{"{0} sek."}
+                other{"{0} sek."}
+                per{"{0}/s"}
+            }
+            week{
+                dnam{"savaitės"}
+                few{"{0} sav."}
+                many{"{0} sav."}
+                one{"{0} sav."}
+                other{"{0} sav."}
+                per{"{0}/sav."}
+            }
+            year{
+                dnam{"metai"}
+                few{"{0} m."}
+                many{"{0} m."}
+                one{"{0} m."}
+                other{"{0} m."}
+                per{"{0}/m."}
+            }
+        }
+        electric{
+            ampere{
+                dnam{"A"}
+                few{"{0} A"}
+                many{"{0} A"}
+                one{"{0} A"}
+                other{"{0} A"}
+            }
+            milliampere{
+                dnam{"mA"}
+                few{"{0} mA"}
+                many{"{0} mA"}
+                one{"{0} mA"}
+                other{"{0} mA"}
+            }
+            ohm{
+                dnam{"Ω"}
+                few{"{0} Ω"}
+                many{"{0} Ω"}
+                one{"{0} Ω"}
+                other{"{0} Ω"}
+            }
+            volt{
+                dnam{"V"}
+                few{"{0} V"}
+                many{"{0} V"}
+                one{"{0} V"}
+                other{"{0} V"}
+            }
+        }
+        energy{
+            calorie{
+                dnam{"cal"}
+                few{"{0} cal"}
+                many{"{0} cal"}
+                one{"{0} cal"}
+                other{"{0} cal"}
+            }
+            foodcalorie{
+                dnam{"cal"}
+                few{"{0} cal"}
+                many{"{0} cal"}
+                one{"{0} cal"}
+                other{"{0} cal"}
+            }
+            joule{
+                dnam{"J"}
+                few{"{0} J"}
+                many{"{0} J"}
+                one{"{0} J"}
+                other{"{0} J"}
+            }
+            kilocalorie{
+                dnam{"kcal"}
+                few{"{0} kcal"}
+                many{"{0} kcal"}
+                one{"{0} kcal"}
+                other{"{0} kcal"}
+            }
+            kilojoule{
+                dnam{"kJ"}
+                few{"{0} kJ"}
+                many{"{0} kJ"}
+                one{"{0} kJ"}
+                other{"{0} kJ"}
+            }
+            kilowatt-hour{
+                dnam{"kWh"}
+                few{"{0} kWh"}
+                many{"{0} kWh"}
+                one{"{0} kWh"}
+                other{"{0} kWh"}
+            }
+            therm-us{
+                dnam{"JAV terma"}
+                few{"{0} JAV termos"}
+                many{"{0} JAV termos"}
+                one{"{0} JAV terma"}
+                other{"{0} JAV termų"}
+            }
+        }
+        frequency{
+            gigahertz{
+                dnam{"GHz"}
+                few{"{0} GHz"}
+                many{"{0} GHz"}
+                one{"{0} GHz"}
+                other{"{0} GHz"}
+            }
+            hertz{
+                dnam{"Hz"}
+                few{"{0} Hz"}
+                many{"{0} Hz"}
+                one{"{0} Hz"}
+                other{"{0} Hz"}
+            }
+            kilohertz{
+                dnam{"kHz"}
+                few{"{0} kHz"}
+                many{"{0} kHz"}
+                one{"{0} kHz"}
+                other{"{0} kHz"}
+            }
+            megahertz{
+                dnam{"MHz"}
+                few{"{0} MHz"}
+                many{"{0} MHz"}
+                one{"{0} MHz"}
+                other{"{0} MHz"}
+            }
+        }
+        graphics{
+            dot{
+                dnam{"tšk."}
+                few{"{0} tšk."}
+                many{"{0} tšk."}
+                one{"{0} tšk."}
+                other{"{0} tšk."}
+            }
+            dot-per-centimeter{
+                dnam{"taškai centimetre"}
+                few{"{0} tšk./cm"}
+                many{"{0} tšk./cm"}
+                one{"{0} tšk./cm"}
+                other{"{0} tšk./cm"}
+            }
+            dot-per-inch{
+                dnam{"taškai colyje"}
+                few{"{0} tšk./in"}
+                many{"{0} tšk./in"}
+                one{"{0} tšk./in"}
+                other{"{0} tšk./in"}
+            }
+            em{
+                dnam{"tipografinis emas"}
+            }
+            megapixel{
+                dnam{"megapikseliai"}
+            }
+            pixel{
+                dnam{"pikseliai"}
+                few{"{0} p"}
+                many{"{0} p"}
+                one{"{0} p"}
+                other{"{0} p"}
+            }
+            pixel-per-centimeter{
+                dnam{"pikseliai centimetre"}
+                few{"{0} p/cm"}
+                many{"{0} p/cm"}
+                one{"{0} p/cm"}
+                other{"{0} p/cm"}
+            }
+            pixel-per-inch{
+                dnam{"pikseliai colyje"}
+            }
+        }
+        length{
+            astronomical-unit{
+                dnam{"AV"}
+                few{"{0} AV"}
+                many{"{0} AV"}
+                one{"{0} AV"}
+                other{"{0} AV"}
+            }
+            centimeter{
+                dnam{"cm"}
+                few{"{0} cm"}
+                many{"{0} cm"}
+                one{"{0} cm"}
+                other{"{0} cm"}
+                per{"{0}/cm"}
+            }
+            decimeter{
+                dnam{"dm"}
+                few{"{0} dm"}
+                many{"{0} dm"}
+                one{"{0} dm"}
+                other{"{0} dm"}
+            }
+            earth-radius{
+                dnam{"R⊕"}
+                few{"{0} R⊕"}
+                many{"{0} R⊕"}
+                one{"{0} R⊕"}
+                other{"{0} R⊕"}
+            }
+            fathom{
+                dnam{"fth"}
+                few{"{0} fth"}
+                many{"{0} fth"}
+                one{"{0} fth"}
+                other{"{0} fth"}
+            }
+            foot{
+                dnam{"pėda"}
+                few{"{0} ft"}
+                many{"{0} ft"}
+                one{"{0} ft"}
+                other{"{0} ft"}
+                per{"{0}/ft"}
+            }
+            furlong{
+                dnam{"fur"}
+                few{"{0} fur"}
+                many{"{0} fur"}
+                one{"{0} fur"}
+                other{"{0} fur"}
+            }
+            inch{
+                dnam{"coliai"}
+                few{"{0} in"}
+                many{"{0} in"}
+                one{"{0} in"}
+                other{"{0} in"}
+                per{"{0}/in"}
+            }
+            kilometer{
+                dnam{"km"}
+                few{"{0} km"}
+                many{"{0} km"}
+                one{"{0} km"}
+                other{"{0} km"}
+                per{"{0}/km"}
+            }
+            light-year{
+                dnam{"šviesmečiai"}
+                few{"{0} šm."}
+                many{"{0} šm."}
+                one{"{0} šm."}
+                other{"{0} šm."}
+            }
+            meter{
+                dnam{"m"}
+                few{"{0} m"}
+                many{"{0} m"}
+                one{"{0} m"}
+                other{"{0} m"}
+                per{"{0}/m"}
+            }
+            micrometer{
+                dnam{"μm"}
+                few{"{0} μm"}
+                many{"{0} μm"}
+                one{"{0} μm"}
+                other{"{0} μm"}
+            }
+            mile{
+                dnam{"mi"}
+                few{"{0} mi"}
+                many{"{0} mi"}
+                one{"{0} mi"}
+                other{"{0} mi"}
+            }
+            mile-scandinavian{
+                dnam{"IM"}
+                few{"{0} IM"}
+                many{"{0} IM"}
+                one{"{0} IM"}
+                other{"{0} IM"}
+            }
+            millimeter{
+                dnam{"mm"}
+                few{"{0} mm"}
+                many{"{0} mm"}
+                one{"{0} mm"}
+                other{"{0} mm"}
+            }
+            nanometer{
+                dnam{"nm"}
+                few{"{0} nm"}
+                many{"{0} nm"}
+                one{"{0} nm"}
+                other{"{0} nm"}
+            }
+            nautical-mile{
+                dnam{"M"}
+                few{"{0} M"}
+                many{"{0} M"}
+                one{"{0} M"}
+                other{"{0} M"}
+            }
+            parsec{
+                dnam{"pc"}
+                few{"{0} pc"}
+                many{"{0} pc"}
+                one{"{0} pc"}
+                other{"{0} pc"}
+            }
+            picometer{
+                dnam{"pm"}
+                few{"{0} pm"}
+                many{"{0} pm"}
+                one{"{0} pm"}
+                other{"{0} pm"}
+            }
+            point{
+                dnam{"pt"}
+                few{"{0} pt"}
+                many{"{0} pt"}
+                one{"{0} pt"}
+                other{"{0} pt"}
+            }
+            yard{
+                dnam{"yd"}
+                few{"{0} yd"}
+                many{"{0} yd"}
+                one{"{0} yd"}
+                other{"{0} yd"}
+            }
+        }
+        light{
+            candela{
+                dnam{"cd"}
+                few{"{0} cd"}
+                many{"{0} cd"}
+                one{"{0} cd"}
+                other{"{0} cd"}
+            }
+            lumen{
+                dnam{"lm"}
+                few{"{0} lm"}
+                many{"{0} lm"}
+                one{"{0} lm"}
+                other{"{0} lm"}
+            }
+            lux{
+                dnam{"lx"}
+                few{"{0} lx"}
+                many{"{0} lx"}
+                one{"{0} lx"}
+                other{"{0} lx"}
+            }
+        }
+        mass{
+            carat{
+                dnam{"ct"}
+                few{"{0} ct"}
+                many{"{0} ct"}
+                one{"{0} ct"}
+                other{"{0} ct"}
+            }
+            grain{
+                dnam{"grūdas"}
+                few{"{0} grūdai"}
+                many{"{0} grūdo"}
+                one{"{0} grūdas"}
+                other{"{0} grūdų"}
+            }
+            gram{
+                dnam{"g"}
+                few{"{0} g"}
+                many{"{0} g"}
+                one{"{0} g"}
+                other{"{0} g"}
+                per{"{0}/g"}
+            }
+            kilogram{
+                dnam{"kg"}
+                few{"{0} kg"}
+                many{"{0} kg"}
+                one{"{0} kg"}
+                other{"{0} kg"}
+                per{"{0}/kg"}
+            }
+            metric-ton{
+                dnam{"mt"}
+                few{"{0} mt"}
+                many{"{0} mt"}
+                one{"{0} mt"}
+                other{"{0} mt"}
+            }
+            microgram{
+                dnam{"μg"}
+                few{"{0} μg"}
+                many{"{0} μg"}
+                one{"{0} μg"}
+                other{"{0} μg"}
+            }
+            milligram{
+                dnam{"mg"}
+                few{"{0} mg"}
+                many{"{0} mg"}
+                one{"{0} mg"}
+                other{"{0} mg"}
+            }
+            ounce{
+                dnam{"oz"}
+                few{"{0} oz"}
+                many{"{0} oz"}
+                one{"{0} oz"}
+                other{"{0} oz"}
+                per{"{0}/oz"}
+            }
+            ounce-troy{
+                dnam{"ozt"}
+                few{"{0} ozt"}
+                many{"{0} ozt"}
+                one{"{0} ozt"}
+                other{"{0} ozt"}
+            }
+            pound{
+                dnam{"lb"}
+                few{"{0} lb"}
+                many{"{0} lb"}
+                one{"{0} lb"}
+                other{"{0} lb"}
+                per{"{0}/lb"}
+            }
+            stone{
+                dnam{"st"}
+                few{"{0} st"}
+                many{"{0} st"}
+                one{"{0} st"}
+                other{"{0} st"}
+            }
+            ton{
+                dnam{"t"}
+                few{"{0} t"}
+                many{"{0} t"}
+                one{"{0} t"}
+                other{"{0} t"}
+            }
+        }
+        power{
+            gigawatt{
+                dnam{"GW"}
+                few{"{0} GW"}
+                many{"{0} GW"}
+                one{"{0} GW"}
+                other{"{0} GW"}
+            }
+            horsepower{
+                dnam{"AG"}
+                few{"{0} AG"}
+                many{"{0} AG"}
+                one{"{0} AG"}
+                other{"{0} AG"}
+            }
+            kilowatt{
+                dnam{"kW"}
+                few{"{0} kW"}
+                many{"{0} kW"}
+                one{"{0} kW"}
+                other{"{0} kW"}
+            }
+            megawatt{
+                dnam{"MW"}
+                few{"{0} MW"}
+                many{"{0} MW"}
+                one{"{0} MW"}
+                other{"{0} MW"}
+            }
+            milliwatt{
+                dnam{"mW"}
+                few{"{0} mW"}
+                many{"{0} mW"}
+                one{"{0} mW"}
+                other{"{0} mW"}
+            }
+            watt{
+                dnam{"W"}
+                few{"{0} W"}
+                many{"{0} W"}
+                one{"{0} W"}
+                other{"{0} W"}
+            }
+        }
+        pressure{
+            atmosphere{
+                dnam{"atm"}
+                few{"{0} atm"}
+                many{"{0} atm"}
+                one{"{0} atm"}
+                other{"{0} atm"}
+            }
+            bar{
+                dnam{"baras"}
+                few{"{0} ba"}
+                many{"{0} ba"}
+                one{"{0} ba"}
+                other{"{0} ba"}
+            }
+            hectopascal{
+                dnam{"hPa"}
+                few{"{0} hPa"}
+                many{"{0} hPa"}
+                one{"{0} hPa"}
+                other{"{0} hPa"}
+            }
+            inch-ofhg{
+                dnam{"inHg"}
+                few{"{0} inHg"}
+                many{"{0} inHg"}
+                one{"{0} inHg"}
+                other{"{0} inHg"}
+            }
+            millibar{
+                dnam{"mbar"}
+                few{"{0} mbar"}
+                many{"{0} mbar"}
+                one{"{0} mbar"}
+                other{"{0} mbar"}
+            }
+            millimeter-ofhg{
+                dnam{"mm Hg"}
+                few{"{0} mm Hg"}
+                many{"{0} mm Hg"}
+                one{"{0} mm Hg"}
+                other{"{0} mm Hg"}
+            }
+            pascal{
+                dnam{"paskaliai"}
+            }
+            pound-force-per-square-inch{
+                dnam{"lb in²"}
+                few{"{0} lb in²"}
+                many{"{0} lb in²"}
+                one{"{0} lb in²"}
+                other{"{0} lb in²"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                dnam{"km/val."}
+                few{"{0} km/val."}
+                many{"{0} km/val."}
+                one{"{0} km/val."}
+                other{"{0} km/val."}
+            }
+            knot{
+                dnam{"mazgas"}
+                few{"{0} KN"}
+                many{"{0} KN"}
+                one{"{0} KN"}
+                other{"{0} KN"}
+            }
+            meter-per-second{
+                dnam{"m/sek."}
+                few{"{0} m/sek."}
+                many{"{0} m/sek."}
+                one{"{0} m/sek."}
+                other{"{0} m/sek."}
+            }
+            mile-per-hour{
+                dnam{"mi/h"}
+                few{"{0} mi/h"}
+                many{"{0} mi/h"}
+                one{"{0} mi/h"}
+                other{"{0} mi/h"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"°C"}
+                few{"{0}°C"}
+                many{"{0}°C"}
+                one{"{0}°C"}
+                other{"{0}°C"}
+            }
+            fahrenheit{
+                dnam{"°F"}
+                few{"{0}°F"}
+                many{"{0}°F"}
+                one{"{0}°F"}
+                other{"{0}°F"}
+            }
+            generic{
+                dnam{"°"}
+                few{"{0}°"}
+                many{"{0}°"}
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+            kelvin{
+                dnam{"K"}
+                few{"{0} K"}
+                many{"{0} K"}
+                one{"{0} K"}
+                other{"{0} K"}
+            }
+        }
+        torque{
+            newton-meter{
+                dnam{"N-m"}
+                few{"{0} N-m"}
+                many{"{0} N-m"}
+                one{"{0} N-m"}
+                other{"{0} N-m"}
+            }
+        }
+        volume{
+            acre-foot{
+                dnam{"pėda akre"}
+                few{"{0} ft akre"}
+                many{"{0} ft akre"}
+                one{"{0} ft akre"}
+                other{"{0} ft akre"}
+            }
+            bushel{
+                dnam{"bu"}
+                few{"{0} bu"}
+                many{"{0} bu"}
+                one{"{0} bu"}
+                other{"{0} bu"}
+            }
+            centiliter{
+                dnam{"cl"}
+                few{"{0} cl"}
+                many{"{0} cl"}
+                one{"{0} cl"}
+                other{"{0} cl"}
+            }
+            cubic-centimeter{
+                dnam{"cm³"}
+                few{"{0} cm³"}
+                many{"{0} cm³"}
+                one{"{0} cm³"}
+                other{"{0} cm³"}
+                per{"{0}/cm³"}
+            }
+            cubic-foot{
+                dnam{"ft³"}
+                few{"{0} ft³"}
+                many{"{0} ft³"}
+                one{"{0} ft³"}
+                other{"{0} ft³"}
+            }
+            cubic-inch{
+                dnam{"in³"}
+                few{"{0} in³"}
+                many{"{0} in³"}
+                one{"{0} in³"}
+                other{"{0} in³"}
+            }
+            cubic-kilometer{
+                dnam{"km³"}
+                few{"{0} km³"}
+                many{"{0} km³"}
+                one{"{0} km³"}
+                other{"{0} km³"}
+            }
+            cubic-meter{
+                dnam{"m³"}
+                few{"{0} m³"}
+                many{"{0} m³"}
+                one{"{0} m³"}
+                other{"{0} m³"}
+                per{"{0}/m³"}
+            }
+            cubic-mile{
+                dnam{"mi³"}
+                few{"{0} mi³"}
+                many{"{0} mi³"}
+                one{"{0} mi³"}
+                other{"{0} mi³"}
+            }
+            cubic-yard{
+                dnam{"yd³"}
+                few{"{0} yd³"}
+                many{"{0} yd³"}
+                one{"{0} yd³"}
+                other{"{0} yd³"}
+            }
+            cup{
+                dnam{"stikl."}
+                few{"{0} stikl."}
+                many{"{0} stikl."}
+                one{"{0} stikl."}
+                other{"{0} stikl."}
+            }
+            cup-metric{
+                dnam{"mat. puodelis"}
+                few{"{0} mat. puodeliai"}
+                many{"{0} mat. puodelio"}
+                one{"{0} mat. puodelis"}
+                other{"{0} mat. puodelių"}
+            }
+            deciliter{
+                dnam{"dl"}
+                few{"{0} dl"}
+                many{"{0} dl"}
+                one{"{0} dl"}
+                other{"{0} dl"}
+            }
+            dessert-spoon{
+                dnam{"des. š."}
+                few{"{0} des. š."}
+                many{"{0} des. š."}
+                one{"{0} des. š."}
+                other{"{0} des. š."}
+            }
+            dessert-spoon-imperial{
+                dnam{"imp. des. š."}
+                few{"{0} imp. des. š."}
+                many{"{0} imp. des. š."}
+                one{"{0} imp. des. š."}
+                other{"{0} imp. des. š."}
+            }
+            dram{
+                dnam{"sk. drach."}
+                few{"{0} sk. drach."}
+                many{"{0} sk. drach."}
+                one{"{0} sk. drach."}
+                other{"{0} sk. drach."}
+            }
+            drop{
+                dnam{"laš."}
+                few{"{0} laš."}
+                many{"{0} laš."}
+                one{"{0} laš."}
+                other{"{0} laš."}
+            }
+            fluid-ounce{
+                dnam{"skysčio oz"}
+                few{"{0} skysčio oz"}
+                many{"{0} skysčio oz"}
+                one{"{0} skysčio oz"}
+                other{"{0} skysčio oz"}
+            }
+            fluid-ounce-imperial{
+                dnam{"imp. skysčio uncija"}
+                few{"{0} imp. fl oz"}
+                many{"{0} imp. fl oz"}
+                one{"{0} imp. fl oz"}
+                other{"{0} imp. fl oz"}
+            }
+            gallon{
+                dnam{"gal"}
+                few{"{0} gal"}
+                many{"{0} gal"}
+                one{"{0} gal"}
+                other{"{0} gal"}
+                per{"{0}/gal"}
+            }
+            gallon-imperial{
+                dnam{"imp. galonas"}
+                few{"{0} imp. galonai"}
+                many{"{0} imp. galono"}
+                one{"{0} imp. galonas"}
+                other{"{0} imp. galonų"}
+                per{"{0}/imp. galone"}
+            }
+            hectoliter{
+                dnam{"hl"}
+                few{"{0} hl"}
+                many{"{0} hl"}
+                one{"{0} hl"}
+                other{"{0} hl"}
+            }
+            jigger{
+                dnam{"džigeris"}
+                few{"{0} džigeriai"}
+                many{"{0} džigerio"}
+                one{"{0} džigeris"}
+                other{"{0} džigerio"}
+            }
+            liter{
+                dnam{"litrai"}
+                few{"{0} l"}
+                many{"{0} l"}
+                one{"{0} l"}
+                other{"{0} l"}
+                per{"{0}/l"}
+            }
+            megaliter{
+                dnam{"Ml"}
+                few{"{0} Ml"}
+                many{"{0} Ml"}
+                one{"{0} Ml"}
+                other{"{0} Ml"}
+            }
+            milliliter{
+                dnam{"ml"}
+                few{"{0} ml"}
+                many{"{0} ml"}
+                one{"{0} ml"}
+                other{"{0} ml"}
+            }
+            pinch{
+                dnam{"žiupsn."}
+                few{"{0} žiupsn."}
+                many{"{0} žiupsn."}
+                one{"{0} žiupsn."}
+                other{"{0} žiupsn."}
+            }
+            pint{
+                dnam{"pintos"}
+                few{"{0} pt"}
+                many{"{0} pt"}
+                one{"{0} pt"}
+                other{"{0} pt"}
+            }
+            pint-metric{
+                dnam{"mpt"}
+                few{"{0} mpt"}
+                many{"{0} mpt"}
+                one{"{0} mpt"}
+                other{"{0} mpt"}
+            }
+            quart{
+                dnam{"kvortos"}
+                few{"{0} kvortos"}
+                many{"{0} kvortos"}
+                one{"{0} kvorta"}
+                other{"{0} kvortų"}
+            }
+            quart-imperial{
+                dnam{"imp. kv."}
+                few{"{0} imp. kv."}
+                many{"{0} imp. kv."}
+                one{"{0} imp. kv."}
+                other{"{0} imp. kv."}
+            }
+            tablespoon{
+                dnam{"v. š."}
+                few{"{0} v. š."}
+                many{"{0} v. š."}
+                one{"{0} v. š."}
+                other{"{0} v. š."}
+            }
+            teaspoon{
+                dnam{"a. š."}
+                few{"{0} a. š."}
+                many{"{0} a. š."}
+                one{"{0} a. š."}
+                other{"{0} a. š."}
+            }
+        }
+    }
+}

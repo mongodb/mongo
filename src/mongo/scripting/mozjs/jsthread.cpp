@@ -34,6 +34,9 @@
 #include "mongo/scripting/mozjs/jsthread.h"
 
 #include <cstdio>
+#include <js/Array.h>
+#include <js/Object.h>
+#include <jsfriendapi.h>
 #include <memory>
 #include <vm/PosixNSPR.h>
 
@@ -87,11 +90,11 @@ public:
         uassert(ErrorCodes::JSInterpreterFailure, "need at least one argument", args.length() > 0);
         uassert(ErrorCodes::JSInterpreterFailure,
                 "first argument must be a function",
-                args.get(0).isObject() && JS_ObjectIsFunction(cx, args.get(0).toObjectOrNull()));
+                args.get(0).isObject() && js::IsFunctionObject(args.get(0).toObjectOrNull()));
 
-        JS::RootedObject robj(cx, JS_NewArrayObject(cx, args));
+        JS::RootedObject robj(cx, JS::NewArrayObject(cx, args));
         if (!robj) {
-            uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_NewArrayObject");
+            uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS::NewArrayObject");
         }
 
         _sharedData->_args = ObjectWrapper(cx, robj).toBSON();
@@ -222,13 +225,13 @@ JSThreadConfig* getConfig(JSContext* cx, JS::CallArgs args) {
     if (!getScope(cx)->getProto<JSThreadInfo>().instanceOf(value))
         uasserted(ErrorCodes::BadValue, "_JSThreadConfig is not a JSThread");
 
-    return static_cast<JSThreadConfig*>(JS_GetPrivate(value.toObjectOrNull()));
+    return static_cast<JSThreadConfig*>(JS::GetPrivate(value.toObjectOrNull()));
 }
 
 }  // namespace
 
-void JSThreadInfo::finalize(js::FreeOp* fop, JSObject* obj) {
-    auto config = static_cast<JSThreadConfig*>(JS_GetPrivate(obj));
+void JSThreadInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+    auto config = static_cast<JSThreadConfig*>(JS::GetPrivate(obj));
 
     if (!config)
         return;
@@ -242,7 +245,7 @@ void JSThreadInfo::Functions::init::call(JSContext* cx, JS::CallArgs args) {
     JS::RootedObject obj(cx);
     scope->getProto<JSThreadInfo>().newObject(&obj);
     JSThreadConfig* config = scope->trackedNew<JSThreadConfig>(cx, args);
-    JS_SetPrivate(obj, config);
+    JS::SetPrivate(obj, config);
 
     ObjectWrapper(cx, args.thisv()).setObject(InternedString::_JSThreadConfig, obj);
 

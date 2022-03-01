@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -9,108 +9,232 @@
 
 #include "vm/BytecodeUtil.h"
 
+#include "frontend/SourceNotes.h"  // SrcNote, SrcNoteType, SrcNoteIterator
 #include "vm/JSScript.h"
 
 namespace js {
 
-static inline unsigned
-GetDefCount(jsbytecode* pc)
-{
-    /*
-     * Add an extra pushed value for OR/AND opcodes, so that they are included
-     * in the pushed array of stack values for type inference.
-     */
-    switch (JSOp(*pc)) {
-      case JSOP_OR:
-      case JSOP_AND:
-        return 1;
-      case JSOP_PICK:
-      case JSOP_UNPICK:
-        /*
-         * Pick pops and pushes how deep it looks in the stack + 1
-         * items. i.e. if the stack were |a b[2] c[1] d[0]|, pick 2
-         * would pop b, c, and d to rearrange the stack to |a c[0]
-         * d[1] b[2]|.
-         */
-        return pc[1] + 1;
-      default:
-        return StackDefs(pc);
-    }
+static inline unsigned GetDefCount(jsbytecode* pc) {
+  /*
+   * Add an extra pushed value for Or/And opcodes, so that they are included
+   * in the pushed array of stack values for type inference.
+   */
+  switch (JSOp(*pc)) {
+    case JSOp::Or:
+    case JSOp::And:
+    case JSOp::Coalesce:
+      return 1;
+    case JSOp::Pick:
+    case JSOp::Unpick:
+      /*
+       * Pick pops and pushes how deep it looks in the stack + 1
+       * items. i.e. if the stack were |a b[2] c[1] d[0]|, pick 2
+       * would pop b, c, and d to rearrange the stack to |a c[0]
+       * d[1] b[2]|.
+       */
+      return pc[1] + 1;
+    default:
+      return StackDefs(pc);
+  }
 }
 
-static inline unsigned
-GetUseCount(jsbytecode* pc)
-{
-    if (JSOp(*pc) == JSOP_PICK || JSOp(*pc) == JSOP_UNPICK)
-        return pc[1] + 1;
+static inline unsigned GetUseCount(jsbytecode* pc) {
+  if (JSOp(*pc) == JSOp::Pick || JSOp(*pc) == JSOp::Unpick) {
+    return pc[1] + 1;
+  }
 
-    return StackUses(pc);
+  return StackUses(pc);
 }
 
-static inline JSOp
-ReverseCompareOp(JSOp op)
-{
-    switch (op) {
-      case JSOP_GT:
-        return JSOP_LT;
-      case JSOP_GE:
-        return JSOP_LE;
-      case JSOP_LT:
-        return JSOP_GT;
-      case JSOP_LE:
-        return JSOP_GE;
-      case JSOP_EQ:
-      case JSOP_NE:
-      case JSOP_STRICTEQ:
-      case JSOP_STRICTNE:
-        return op;
-      default:
-        MOZ_CRASH("unrecognized op");
-    }
+static inline JSOp ReverseCompareOp(JSOp op) {
+  switch (op) {
+    case JSOp::Gt:
+      return JSOp::Lt;
+    case JSOp::Ge:
+      return JSOp::Le;
+    case JSOp::Lt:
+      return JSOp::Gt;
+    case JSOp::Le:
+      return JSOp::Ge;
+    case JSOp::Eq:
+    case JSOp::Ne:
+    case JSOp::StrictEq:
+    case JSOp::StrictNe:
+      return op;
+    default:
+      MOZ_CRASH("unrecognized op");
+  }
 }
 
-static inline JSOp
-NegateCompareOp(JSOp op)
-{
-    switch (op) {
-      case JSOP_GT:
-        return JSOP_LE;
-      case JSOP_GE:
-        return JSOP_LT;
-      case JSOP_LT:
-        return JSOP_GE;
-      case JSOP_LE:
-        return JSOP_GT;
-      case JSOP_EQ:
-        return JSOP_NE;
-      case JSOP_NE:
-        return JSOP_EQ;
-      case JSOP_STRICTNE:
-        return JSOP_STRICTEQ;
-      case JSOP_STRICTEQ:
-        return JSOP_STRICTNE;
-      default:
-        MOZ_CRASH("unrecognized op");
-    }
+static inline JSOp NegateCompareOp(JSOp op) {
+  switch (op) {
+    case JSOp::Gt:
+      return JSOp::Le;
+    case JSOp::Ge:
+      return JSOp::Lt;
+    case JSOp::Lt:
+      return JSOp::Ge;
+    case JSOp::Le:
+      return JSOp::Gt;
+    case JSOp::Eq:
+      return JSOp::Ne;
+    case JSOp::Ne:
+      return JSOp::Eq;
+    case JSOp::StrictNe:
+      return JSOp::StrictEq;
+    case JSOp::StrictEq:
+      return JSOp::StrictNe;
+    default:
+      MOZ_CRASH("unrecognized op");
+  }
 }
 
 class BytecodeRange {
-  public:
-    BytecodeRange(JSContext* cx, JSScript* script)
-      : script(cx, script), pc(script->code()), end(pc + script->length())
-    {}
-    bool empty() const { return pc == end; }
-    jsbytecode* frontPC() const { return pc; }
-    JSOp frontOpcode() const { return JSOp(*pc); }
-    size_t frontOffset() const { return script->pcToOffset(pc); }
-    void popFront() { pc += GetBytecodeLength(pc); }
+ public:
+  BytecodeRange(JSContext* cx, JSScript* script)
+      : script(cx, script), pc(script->code()), end(pc + script->length()) {}
+  bool empty() const { return pc == end; }
+  jsbytecode* frontPC() const { return pc; }
+  JSOp frontOpcode() const { return JSOp(*pc); }
+  size_t frontOffset() const { return script->pcToOffset(pc); }
+  void popFront() { pc += GetBytecodeLength(pc); }
 
-  private:
-    RootedScript script;
-    jsbytecode* pc;
-    jsbytecode* end;
+ private:
+  RootedScript script;
+  jsbytecode* pc;
+  jsbytecode* end;
 };
 
-} // namespace js
+class BytecodeRangeWithPosition : private BytecodeRange {
+ public:
+  using BytecodeRange::empty;
+  using BytecodeRange::frontOffset;
+  using BytecodeRange::frontOpcode;
+  using BytecodeRange::frontPC;
+
+  BytecodeRangeWithPosition(JSContext* cx, JSScript* script)
+      : BytecodeRange(cx, script),
+        initialLine(script->lineno()),
+        lineno(script->lineno()),
+        column(script->column()),
+        sn(script->notes()),
+        snpc(script->code()),
+        isEntryPoint(false),
+        isBreakpoint(false),
+        seenStepSeparator(false),
+        wasArtifactEntryPoint(false) {
+    if (!sn->isTerminator()) {
+      snpc += sn->delta();
+    }
+    updatePosition();
+    while (frontPC() != script->main()) {
+      popFront();
+    }
+
+    if (frontOpcode() != JSOp::JumpTarget) {
+      isEntryPoint = true;
+    } else {
+      wasArtifactEntryPoint = true;
+    }
+  }
+
+  void popFront() {
+    BytecodeRange::popFront();
+    if (empty()) {
+      isEntryPoint = false;
+    } else {
+      updatePosition();
+    }
+
+    // The following conditions are handling artifacts introduced by the
+    // bytecode emitter, such that we do not add breakpoints on empty
+    // statements of the source code of the user.
+    if (wasArtifactEntryPoint) {
+      wasArtifactEntryPoint = false;
+      isEntryPoint = true;
+    }
+
+    if (isEntryPoint && frontOpcode() == JSOp::JumpTarget) {
+      wasArtifactEntryPoint = isEntryPoint;
+      isEntryPoint = false;
+    }
+  }
+
+  size_t frontLineNumber() const { return lineno; }
+  size_t frontColumnNumber() const { return column; }
+
+  // Entry points are restricted to bytecode offsets that have an
+  // explicit mention in the line table.  This restriction avoids a
+  // number of failing cases caused by some instructions not having
+  // sensible (to the user) line numbers, and it is one way to
+  // implement the idea that the bytecode emitter should tell the
+  // debugger exactly which offsets represent "interesting" (to the
+  // user) places to stop.
+  bool frontIsEntryPoint() const { return isEntryPoint; }
+
+  // Breakable points are explicitly marked by the emitter as locations where
+  // the debugger may want to allow users to pause.
+  bool frontIsBreakablePoint() const { return isBreakpoint; }
+
+  // Breakable step points are the first breakable point after a
+  // SrcNote::StepSep note has been encountered.
+  bool frontIsBreakableStepPoint() const {
+    return isBreakpoint && seenStepSeparator;
+  }
+
+ private:
+  void updatePosition() {
+    if (isBreakpoint) {
+      isBreakpoint = false;
+      seenStepSeparator = false;
+    }
+
+    // Determine the current line number by reading all source notes up to
+    // and including the current offset.
+    jsbytecode* lastLinePC = nullptr;
+    SrcNoteIterator iter(sn);
+    for (; !iter.atEnd() && snpc <= frontPC();
+         ++iter, snpc += (*iter)->delta()) {
+      auto sn = *iter;
+
+      SrcNoteType type = sn->type();
+      if (type == SrcNoteType::ColSpan) {
+        ptrdiff_t colspan = SrcNote::ColSpan::getSpan(sn);
+        MOZ_ASSERT(ptrdiff_t(column) + colspan >= 0);
+        column += colspan;
+        lastLinePC = snpc;
+      } else if (type == SrcNoteType::SetLine) {
+        lineno = SrcNote::SetLine::getLine(sn, initialLine);
+        column = 0;
+        lastLinePC = snpc;
+      } else if (type == SrcNoteType::NewLine) {
+        lineno++;
+        column = 0;
+        lastLinePC = snpc;
+      } else if (type == SrcNoteType::Breakpoint) {
+        isBreakpoint = true;
+        lastLinePC = snpc;
+      } else if (type == SrcNoteType::StepSep) {
+        seenStepSeparator = true;
+        lastLinePC = snpc;
+      }
+    }
+
+    sn = *iter;
+    isEntryPoint = lastLinePC == frontPC();
+  }
+
+  size_t initialLine;
+  size_t lineno;
+  size_t column;
+  const SrcNote* sn;
+  jsbytecode* snpc;
+  bool isEntryPoint;
+  bool isBreakpoint;
+  bool seenStepSeparator;
+  bool wasArtifactEntryPoint;
+};
+
+}  // namespace js
 
 #endif /* vm_BytecodeUtil_inl_h */

@@ -1,0 +1,47 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ig{
+    units{
+        duration{
+            century{
+                dnam{"Ọtụtụ nari afọ"}
+            }
+            day{
+                dnam{"Ọtụtụ Ubochi"}
+            }
+            decade{
+                dnam{"Ọtụtụ afọ iri"}
+            }
+            month{
+                dnam{"Ọtụtụ Ọnwa"}
+            }
+            week{
+                dnam{"Ọtụtụ Izu"}
+            }
+            year{
+                dnam{"Ọtụtụ Afọ"}
+            }
+        }
+        length{
+            earth-radius{
+                dnam{"radius uwa"}
+            }
+        }
+        volume{
+            dessert-spoon{
+                dnam{"ngaji mégharia onu"}
+            }
+            dram{
+                dnam{"mmiri dram"}
+            }
+        }
+    }
+    unitsShort{
+        volume{
+            drop{
+                dnam{"dobé"}
+            }
+        }
+    }
+}

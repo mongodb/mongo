@@ -1,0 +1,62 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+genderList:table(nofallback){
+    genderList{
+        af{"neutral"}
+        ar{"maleTaints"}
+        bg{"neutral"}
+        bn{"neutral"}
+        ca{"maleTaints"}
+        cs{"maleTaints"}
+        da{"neutral"}
+        de{"neutral"}
+        el{"mixedNeutral"}
+        en{"neutral"}
+        es{"maleTaints"}
+        et{"neutral"}
+        eu{"neutral"}
+        fa{"neutral"}
+        fi{"neutral"}
+        fil{"neutral"}
+        fr{"maleTaints"}
+        gu{"neutral"}
+        he{"maleTaints"}
+        hi{"maleTaints"}
+        hr{"maleTaints"}
+        hu{"neutral"}
+        id{"neutral"}
+        is{"mixedNeutral"}
+        it{"maleTaints"}
+        ja{"neutral"}
+        kn{"neutral"}
+        ko{"neutral"}
+        lij{"maleTaints"}
+        lt{"maleTaints"}
+        lv{"maleTaints"}
+        ml{"neutral"}
+        mr{"maleTaints"}
+        ms{"neutral"}
+        nl{"maleTaints"}
+        no{"neutral"}
+        pl{"maleTaints"}
+        pt{"maleTaints"}
+        ro{"maleTaints"}
+        ru{"maleTaints"}
+        sk{"maleTaints"}
+        sl{"maleTaints"}
+        sr{"maleTaints"}
+        sv{"neutral"}
+        sw{"neutral"}
+        ta{"neutral"}
+        te{"neutral"}
+        th{"neutral"}
+        tr{"neutral"}
+        uk{"maleTaints"}
+        ur{"maleTaints"}
+        vi{"neutral"}
+        zh{"maleTaints"}
+        zh_Hant{"maleTaints"}
+        zu{"neutral"}
+    }
+}

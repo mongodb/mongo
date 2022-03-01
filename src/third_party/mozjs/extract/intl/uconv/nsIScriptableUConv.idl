@@ -1,0 +1,79 @@
+/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "nsISupports.idl"
+
+interface nsIInputStream;
+
+%{C++
+// {0A698C44-3BFF-11d4-9649-00C0CA135B4E}
+#define NS_ISCRIPTABLEUNICODECONVERTER_CID { 0x0A698C44, 0x3BFF, 0x11d4, { 0x96, 0x49, 0x00, 0xC0, 0xCA, 0x13, 0x5B, 0x4E } }
+#define NS_ISCRIPTABLEUNICODECONVERTER_CONTRACTID "@mozilla.org/intl/scriptableunicodeconverter"
+%}
+
+/**
+ * In new code, please use the WebIDL TextDecoder and TextEncoder
+ * instead. They represent bytes as Uint8Array (or as view to such
+ * array), which is the current best practice for representing bytes
+ * in JavaScript.
+ *
+ * This interface converts between UTF-16 in JavaScript strings
+ * and bytes transported as the unsigned value of each byte
+ * transported in a code unit of the same numeric value in
+ * a JavaScript string.
+ *
+ * @created         8/Jun/2000
+ * @author          Makoto Kato [m_kato@ga2.so-net.ne.jp]
+ */
+[scriptable, uuid(f36ee324-5c1c-437f-ba10-2b4db7a18031)]
+interface nsIScriptableUnicodeConverter : nsISupports
+{
+  /**
+   * Converts the data from Unicode to one Charset.
+   * Returns the converted string. After converting, Finish should be called
+   * and its return value appended to this return value.
+   */
+  ACString ConvertFromUnicode(in AString aSrc);
+
+  /**
+   * Returns the terminator string.
+   * Should be called after ConvertFromUnicode() and appended to that
+   * function's return value.
+   */
+  ACString Finish();
+
+  /**
+   * Converts the data from one Charset to Unicode.
+   */
+  AString ConvertToUnicode(in ACString aSrc);
+
+  /**
+   * Convert a unicode string to an array of bytes. Finish does not need to be
+   * called.
+   */
+  void convertToByteArray(in AString aString,
+                          [optional] out unsigned long aLen,
+                          [array, size_is(aLen),retval] out octet aData);
+
+  /**
+   * Converts a unicode string to an input stream. The bytes in the stream are
+   * encoded according to the charset attribute.
+   * The returned stream will be nonblocking.
+   */
+  nsIInputStream convertToInputStream(in AString aString);
+
+  /**
+   * Current character set.
+   *
+   * @throw NS_ERROR_UCONV_NOCONV
+   *        The requested charset is not supported.
+   */
+  attribute ACString charset;
+
+  /**
+   * Meaningless
+   */
+  attribute boolean isInternal;
+};

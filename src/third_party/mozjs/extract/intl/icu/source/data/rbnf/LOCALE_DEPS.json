@@ -1,0 +1,34 @@
+// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+
+{
+    "cldrVersion": "39",
+    "aliases": {
+        "ars": "ar_SA",
+        "in": "id",
+        "iw": "he",
+        "sh": "sr_Latn",
+        "zh_HK": "zh_Hant_HK",
+        "zh_Hant_HK": "yue",
+        "zh_MO": "zh_Hant_MO",
+        "zh_TW": "zh_Hant_TW"
+    },
+    "parents": {
+        "en_IN": "en_001",
+        "es_DO": "es_419",
+        "es_GT": "es_419",
+        "es_HN": "es_419",
+        "es_MX": "es_419",
+        "es_NI": "es_419",
+        "es_PA": "es_419",
+        "es_PR": "es_419",
+        "es_SV": "es_419",
+        "es_US": "es_419",
+        "nb": "no",
+        "nn": "no",
+        "sr_Latn": "root",
+        "yue_Hans": "root",
+        "zh_Hant": "root"
+    }
+}

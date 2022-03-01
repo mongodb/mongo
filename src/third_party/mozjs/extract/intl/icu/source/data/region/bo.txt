@@ -1,0 +1,19 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+bo{
+    Countries{
+        001{"འཛམ་གླིང་།"}
+        CN{"རྒྱ་ནག"}
+        DE{"འཇར་མན་"}
+        GB{"དབྱིན་ཇི་"}
+        IN{"རྒྱ་གར་"}
+        IT{"ཨི་ཀྲར་ལི་"}
+        JP{"ཉི་ཧོང་"}
+        KR{"ལྷོ་ཀོ་རི་ཡ།"}
+        NP{"བལ་ཡུལ་"}
+        RU{"ཨུ་རུ་སུ་"}
+        US{"ཨ་མེ་རི་ཀ།"}
+        ZZ{"མིའི་ཤེས་རྟོགས་མ་བྱུང་བའི་ཁོར་ཡུག"}
+    }
+}

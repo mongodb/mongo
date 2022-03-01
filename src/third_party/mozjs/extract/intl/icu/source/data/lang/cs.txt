@@ -1,0 +1,1003 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+cs{
+    Keys{
+        calendar{"Kalendář"}
+        cf{"Měnový formát"}
+        colAlternate{"Ignorovat řazení symbolů"}
+        colBackwards{"Obrácené řazení akcentů"}
+        colCaseFirst{"Řazení velkých a malých písmen"}
+        colCaseLevel{"Rozlišování velkých a malých písmen při řazení"}
+        colNormalization{"Normalizované řazení"}
+        colNumeric{"Číselné řazení"}
+        colStrength{"Míra řazení"}
+        collation{"Řazení"}
+        currency{"Měna"}
+        hc{"Hodinový cyklus (12 vs. 24)"}
+        lb{"Styl zalamování řádků"}
+        ms{"Měrná soustava"}
+        numbers{"Čísla"}
+        timezone{"Časové pásmo"}
+        va{"Varianta národního prostředí"}
+        x{"Soukromé použití"}
+    }
+    Languages{
+        aa{"afarština"}
+        ab{"abcházština"}
+        ace{"acehština"}
+        ach{"akolština"}
+        ada{"adangme"}
+        ady{"adygejština"}
+        ae{"avestánština"}
+        aeb{"arabština (tuniská)"}
+        af{"afrikánština"}
+        afh{"afrihili"}
+        agq{"aghem"}
+        ain{"ainština"}
+        ak{"akanština"}
+        akk{"akkadština"}
+        akz{"alabamština"}
+        ale{"aleutština"}
+        aln{"albánština (Gheg)"}
+        alt{"altajština (jižní)"}
+        am{"amharština"}
+        an{"aragonština"}
+        ang{"staroangličtina"}
+        anp{"angika"}
+        ar{"arabština"}
+        ar_001{"arabština (moderní standardní)"}
+        arc{"aramejština"}
+        arn{"mapudungun"}
+        aro{"araonština"}
+        arp{"arapažština"}
+        arq{"arabština (alžírská)"}
+        ars{"arabština (Nadžd)"}
+        arw{"arawacké jazyky"}
+        ary{"arabština (marocká)"}
+        arz{"arabština (egyptská)"}
+        as{"ásámština"}
+        asa{"asu"}
+        ase{"znaková řeč (americká)"}
+        ast{"asturština"}
+        av{"avarština"}
+        avk{"kotava"}
+        awa{"awadhština"}
+        ay{"ajmarština"}
+        az{"ázerbájdžánština"}
+        ba{"baškirština"}
+        bal{"balúčština"}
+        ban{"balijština"}
+        bar{"bavorština"}
+        bas{"basa"}
+        bax{"bamun"}
+        bbc{"batak toba"}
+        bbj{"ghomala"}
+        be{"běloruština"}
+        bej{"bedža"}
+        bem{"bembština"}
+        bew{"batavština"}
+        bez{"bena"}
+        bfd{"bafut"}
+        bfq{"badagština"}
+        bg{"bulharština"}
+        bgn{"balúčština (západní)"}
+        bho{"bhódžpurština"}
+        bi{"bislamština"}
+        bik{"bikolština"}
+        bin{"bini"}
+        bjn{"bandžarština"}
+        bkm{"kom"}
+        bla{"siksika"}
+        bm{"bambarština"}
+        bn{"bengálština"}
+        bo{"tibetština"}
+        bpy{"bišnuprijskomanipurština"}
+        bqi{"bachtijárština"}
+        br{"bretonština"}
+        bra{"bradžština"}
+        brh{"brahujština"}
+        brx{"bodoština"}
+        bs{"bosenština"}
+        bss{"akoose"}
+        bua{"burjatština"}
+        bug{"bugiština"}
+        bum{"bulu"}
+        byn{"blinština"}
+        byv{"medumba"}
+        ca{"katalánština"}
+        cad{"caddo"}
+        car{"karibština"}
+        cay{"kajugština"}
+        cch{"atsam"}
+        ccp{"čakma"}
+        ce{"čečenština"}
+        ceb{"cebuánština"}
+        cgg{"kiga"}
+        ch{"čamoro"}
+        chb{"čibča"}
+        chg{"čagatajština"}
+        chk{"čukština"}
+        chm{"marijština"}
+        chn{"činuk pidžin"}
+        cho{"čoktština"}
+        chp{"čipevajština"}
+        chr{"čerokézština"}
+        chy{"čejenština"}
+        ckb{"kurdština (sorání)"}
+        co{"korsičtina"}
+        cop{"koptština"}
+        cps{"kapiznonština"}
+        cr{"kríjština"}
+        crh{"turečtina (krymská)"}
+        crs{"kreolština (seychelská)"}
+        cs{"čeština"}
+        csb{"kašubština"}
+        cu{"staroslověnština"}
+        cv{"čuvaština"}
+        cy{"velština"}
+        da{"dánština"}
+        dak{"dakotština"}
+        dar{"dargština"}
+        dav{"taita"}
+        de{"němčina"}
+        de_CH{"němčina standardní (Švýcarsko)"}
+        del{"delawarština"}
+        den{"slejvština (athabaský jazyk)"}
+        dgr{"dogrib"}
+        din{"dinkština"}
+        dje{"zarmština"}
+        doi{"dogarština"}
+        dsb{"dolnolužická srbština"}
+        dtp{"kadazandusunština"}
+        dua{"dualština"}
+        dum{"holandština (středověká)"}
+        dv{"maledivština"}
+        dyo{"jola-fonyi"}
+        dyu{"djula"}
+        dz{"dzongkä"}
+        dzg{"dazaga"}
+        ebu{"embu"}
+        ee{"eweština"}
+        efi{"efikština"}
+        egl{"emilijština"}
+        egy{"egyptština stará"}
+        eka{"ekajuk"}
+        el{"řečtina"}
+        elx{"elamitština"}
+        en{"angličtina"}
+        en_GB{"angličtina (Velká Británie)"}
+        en_US{"angličtina (USA)"}
+        enm{"angličtina (středověká)"}
+        eo{"esperanto"}
+        es{"španělština"}
+        es_ES{"španělština (Evropa)"}
+        esu{"jupikština (středoaljašská)"}
+        et{"estonština"}
+        eu{"baskičtina"}
+        ewo{"ewondo"}
+        ext{"extremadurština"}
+        fa{"perština"}
+        fa_AF{"darí"}
+        fan{"fang"}
+        fat{"fantština"}
+        ff{"fulbština"}
+        fi{"finština"}
+        fil{"filipínština"}
+        fit{"finština (tornedalská)"}
+        fj{"fidžijština"}
+        fo{"faerština"}
+        fon{"fonština"}
+        fr{"francouzština"}
+        frc{"francouzština (cajunská)"}
+        frm{"francouzština (středověká)"}
+        fro{"francouzština (stará)"}
+        frp{"franko-provensálština"}
+        frr{"fríština (severní)"}
+        frs{"fríština (východní)"}
+        fur{"furlanština"}
+        fy{"fríština (západní)"}
+        ga{"irština"}
+        gaa{"gaština"}
+        gag{"gagauzština"}
+        gan{"čínština (dialekty Gan)"}
+        gay{"gayo"}
+        gba{"gbaja"}
+        gbz{"daríjština (zoroastrijská)"}
+        gd{"skotská gaelština"}
+        gez{"geez"}
+        gil{"kiribatština"}
+        gl{"galicijština"}
+        glk{"gilačtina"}
+        gmh{"hornoněmčina (středověká)"}
+        gn{"guaranština"}
+        goh{"hornoněmčina (stará)"}
+        gom{"konkánština (Goa)"}
+        gon{"góndština"}
+        gor{"gorontalo"}
+        got{"gótština"}
+        grb{"grebo"}
+        grc{"starořečtina"}
+        gsw{"němčina (Švýcarsko)"}
+        gu{"gudžarátština"}
+        guc{"wayúuština"}
+        gur{"frafra"}
+        guz{"gusii"}
+        gv{"manština"}
+        gwi{"gwichʼin"}
+        ha{"hauština"}
+        hai{"haidština"}
+        hak{"čínština (dialekty Hakka)"}
+        haw{"havajština"}
+        he{"hebrejština"}
+        hi{"hindština"}
+        hif{"hindština (Fidži)"}
+        hil{"hiligajnonština"}
+        hit{"chetitština"}
+        hmn{"hmongština"}
+        ho{"hiri motu"}
+        hr{"chorvatština"}
+        hsb{"hornolužická srbština"}
+        hsn{"čínština (dialekty Xiang)"}
+        ht{"haitština"}
+        hu{"maďarština"}
+        hup{"hupa"}
+        hy{"arménština"}
+        hz{"hererština"}
+        ia{"interlingua"}
+        iba{"ibanština"}
+        ibb{"ibibio"}
+        id{"indonéština"}
+        ie{"interlingue"}
+        ig{"igboština"}
+        ii{"iština (sečuánská)"}
+        ik{"inupiakština"}
+        ilo{"ilokánština"}
+        inh{"inguština"}
+        io{"ido"}
+        is{"islandština"}
+        it{"italština"}
+        iu{"inuktitutština"}
+        izh{"ingrijština"}
+        ja{"japonština"}
+        jam{"jamajská kreolština"}
+        jbo{"lojban"}
+        jgo{"ngomba"}
+        jmc{"mašame"}
+        jpr{"judeoperština"}
+        jrb{"judeoarabština"}
+        jut{"jutština"}
+        jv{"javánština"}
+        ka{"gruzínština"}
+        kaa{"karakalpačtina"}
+        kab{"kabylština"}
+        kac{"kačijština"}
+        kaj{"jju"}
+        kam{"kambština"}
+        kaw{"kawi"}
+        kbd{"kabardinština"}
+        kbl{"kanembu"}
+        kcg{"tyap"}
+        kde{"makonde"}
+        kea{"kapverdština"}
+        ken{"kenyang"}
+        kfo{"koro"}
+        kg{"konžština"}
+        kgp{"kaingang"}
+        kha{"khásí"}
+        kho{"chotánština"}
+        khq{"koyra chiini"}
+        khw{"chovarština"}
+        ki{"kikujština"}
+        kiu{"zazakština"}
+        kj{"kuaňamština"}
+        kk{"kazaština"}
+        kkj{"kako"}
+        kl{"grónština"}
+        kln{"kalendžin"}
+        km{"khmérština"}
+        kmb{"kimbundština"}
+        kn{"kannadština"}
+        ko{"korejština"}
+        koi{"komi-permjačtina"}
+        kok{"konkánština"}
+        kos{"kosrajština"}
+        kpe{"kpelle"}
+        kr{"kanuri"}
+        krc{"karačajevo-balkarština"}
+        kri{"krio"}
+        krj{"kinaraj-a"}
+        krl{"karelština"}
+        kru{"kuruchština"}
+        ks{"kašmírština"}
+        ksb{"šambala"}
+        ksf{"bafia"}
+        ksh{"kolínština"}
+        ku{"kurdština"}
+        kum{"kumyčtina"}
+        kut{"kutenajština"}
+        kv{"komijština"}
+        kw{"kornština"}
+        ky{"kyrgyzština"}
+        la{"latina"}
+        lad{"ladinština"}
+        lag{"langi"}
+        lah{"lahndština"}
+        lam{"lambština"}
+        lb{"lucemburština"}
+        lez{"lezginština"}
+        lfn{"lingua franca nova"}
+        lg{"gandština"}
+        li{"limburština"}
+        lij{"ligurština"}
+        liv{"livonština"}
+        lkt{"lakotština"}
+        lmo{"lombardština"}
+        ln{"lingalština"}
+        lo{"laoština"}
+        lol{"mongština"}
+        lou{"kreolština (Louisiana)"}
+        loz{"lozština"}
+        lrc{"lúrština (severní)"}
+        lt{"litevština"}
+        ltg{"latgalština"}
+        lu{"lubu-katanžština"}
+        lua{"luba-luluaština"}
+        lui{"luiseňo"}
+        lun{"lundština"}
+        luo{"luoština"}
+        lus{"mizoština"}
+        luy{"luhja"}
+        lv{"lotyština"}
+        lzh{"čínština (klasická)"}
+        lzz{"lazština"}
+        mad{"madurština"}
+        maf{"mafa"}
+        mag{"magahijština"}
+        mai{"maithiliština"}
+        mak{"makasarština"}
+        man{"mandingština"}
+        mas{"masajština"}
+        mde{"maba"}
+        mdf{"mokšanština"}
+        mdr{"mandar"}
+        men{"mende"}
+        mer{"meru"}
+        mfe{"mauricijská kreolština"}
+        mg{"malgaština"}
+        mga{"irština (středověká)"}
+        mgh{"makhuwa-meetto"}
+        mgo{"meta’"}
+        mh{"maršálština"}
+        mi{"maorština"}
+        mic{"micmac"}
+        min{"minangkabau"}
+        mk{"makedonština"}
+        ml{"malajálamština"}
+        mn{"mongolština"}
+        mnc{"mandžuština"}
+        mni{"manipurština"}
+        moh{"mohawkština"}
+        mos{"mosi"}
+        mr{"maráthština"}
+        mrj{"marijština (západní)"}
+        ms{"malajština"}
+        mt{"maltština"}
+        mua{"mundang"}
+        mul{"více jazyků"}
+        mus{"kríkština"}
+        mwl{"mirandština"}
+        mwr{"márvárština"}
+        mwv{"mentavajština"}
+        my{"barmština"}
+        mye{"myene"}
+        myv{"erzjanština"}
+        mzn{"mázandaránština"}
+        na{"naurština"}
+        nan{"čínština (dialekty Minnan)"}
+        nap{"neapolština"}
+        naq{"namaština"}
+        nb{"norština (bokmål)"}
+        nd{"ndebele (Zimbabwe)"}
+        nds{"dolnoněmčina"}
+        nds_NL{"dolnosaština"}
+        ne{"nepálština"}
+        new{"névárština"}
+        ng{"ndondština"}
+        nia{"nias"}
+        niu{"niueština"}
+        njo{"ao (jazyky Nágálandu)"}
+        nl{"nizozemština"}
+        nl_BE{"vlámština"}
+        nmg{"kwasio"}
+        nn{"norština (nynorsk)"}
+        nnh{"ngiemboon"}
+        no{"norština"}
+        nog{"nogajština"}
+        non{"norština historická"}
+        nov{"novial"}
+        nqo{"n’ko"}
+        nr{"ndebele (Jižní Afrika)"}
+        nso{"sotština (severní)"}
+        nus{"nuerština"}
+        nv{"navažština"}
+        nwc{"newarština (klasická)"}
+        ny{"ňandžština"}
+        nym{"ňamwežština"}
+        nyn{"ňankolština"}
+        nyo{"ňorština"}
+        nzi{"nzima"}
+        oc{"okcitánština"}
+        oj{"odžibvejština"}
+        om{"oromština"}
+        or{"urijština"}
+        os{"osetština"}
+        osa{"osage"}
+        ota{"turečtina (osmanská)"}
+        pa{"paňdžábština"}
+        pag{"pangasinanština"}
+        pal{"pahlavština"}
+        pam{"papangau"}
+        pap{"papiamento"}
+        pau{"palauština"}
+        pcd{"picardština"}
+        pcm{"nigerijský pidžin"}
+        pdc{"němčina (pensylvánská)"}
+        pdt{"němčina (plautdietsch)"}
+        peo{"staroperština"}
+        pfl{"falčtina"}
+        phn{"féničtina"}
+        pi{"pálí"}
+        pl{"polština"}
+        pms{"piemonština"}
+        pnt{"pontština"}
+        pon{"pohnpeiština"}
+        prg{"pruština"}
+        pro{"provensálština"}
+        ps{"paštština"}
+        pt{"portugalština"}
+        pt_PT{"portugalština (Evropa)"}
+        qu{"kečuánština"}
+        quc{"kičé"}
+        qug{"kečuánština (chimborazo)"}
+        raj{"rádžastánština"}
+        rap{"rapanujština"}
+        rar{"rarotongánština"}
+        rgn{"romaňolština"}
+        rif{"rífština"}
+        rm{"rétorománština"}
+        rn{"kirundština"}
+        ro{"rumunština"}
+        ro_MD{"moldavština"}
+        rof{"rombo"}
+        rom{"romština"}
+        rtm{"rotumanština"}
+        ru{"ruština"}
+        rue{"rusínština"}
+        rug{"rovianština"}
+        rup{"arumunština"}
+        rw{"kiňarwandština"}
+        rwk{"rwa"}
+        sa{"sanskrt"}
+        sad{"sandawština"}
+        sah{"jakutština"}
+        sam{"samarština"}
+        saq{"samburu"}
+        sas{"sasakština"}
+        sat{"santálština"}
+        saz{"saurášterština"}
+        sba{"ngambay"}
+        sbp{"sangoština"}
+        sc{"sardština"}
+        scn{"sicilština"}
+        sco{"skotština"}
+        sd{"sindhština"}
+        sdc{"sassarština"}
+        sdh{"kurdština (jižní)"}
+        se{"sámština (severní)"}
+        see{"seneca"}
+        seh{"sena"}
+        sei{"seriština"}
+        sel{"selkupština"}
+        ses{"koyraboro senni"}
+        sg{"sangština"}
+        sga{"irština (stará)"}
+        sgs{"žemaitština"}
+        sh{"srbochorvatština"}
+        shi{"tašelhit"}
+        shn{"šanština"}
+        shu{"arabština (čadská)"}
+        si{"sinhálština"}
+        sid{"sidamo"}
+        sk{"slovenština"}
+        sl{"slovinština"}
+        sli{"němčina (slezská)"}
+        sly{"selajarština"}
+        sm{"samojština"}
+        sma{"sámština (jižní)"}
+        smj{"sámština (lulejská)"}
+        smn{"sámština (inarijská)"}
+        sms{"sámština (skoltská)"}
+        sn{"šonština"}
+        snk{"sonikština"}
+        so{"somálština"}
+        sog{"sogdština"}
+        sq{"albánština"}
+        sr{"srbština"}
+        srn{"sranan tongo"}
+        srr{"sererština"}
+        ss{"siswatština"}
+        ssy{"saho"}
+        st{"sotština (jižní)"}
+        stq{"fríština (saterlandská)"}
+        su{"sundština"}
+        suk{"sukuma"}
+        sus{"susu"}
+        sux{"sumerština"}
+        sv{"švédština"}
+        sw{"svahilština"}
+        sw_CD{"svahilština (Kongo)"}
+        swb{"komorština"}
+        syc{"syrština (klasická)"}
+        syr{"syrština"}
+        szl{"slezština"}
+        ta{"tamilština"}
+        tcy{"tuluština"}
+        te{"telugština"}
+        tem{"temne"}
+        teo{"teso"}
+        ter{"tereno"}
+        tet{"tetumština"}
+        tg{"tádžičtina"}
+        th{"thajština"}
+        ti{"tigrinijština"}
+        tig{"tigrejština"}
+        tiv{"tivština"}
+        tk{"turkmenština"}
+        tkl{"tokelauština"}
+        tkr{"cachurština"}
+        tl{"tagalog"}
+        tlh{"klingonština"}
+        tli{"tlingit"}
+        tly{"talyština"}
+        tmh{"tamašek"}
+        tn{"setswanština"}
+        to{"tongánština"}
+        tog{"tonžština (nyasa)"}
+        tpi{"tok pisin"}
+        tr{"turečtina"}
+        tru{"turojština"}
+        trv{"taroko"}
+        ts{"tsonga"}
+        tsd{"tsakonština"}
+        tsi{"tsimšijské jazyky"}
+        tt{"tatarština"}
+        ttt{"tatština"}
+        tum{"tumbukština"}
+        tvl{"tuvalština"}
+        tw{"twi"}
+        twq{"tasawaq"}
+        ty{"tahitština"}
+        tyv{"tuvinština"}
+        tzm{"tamazight (střední Maroko)"}
+        udm{"udmurtština"}
+        ug{"ujgurština"}
+        uga{"ugaritština"}
+        uk{"ukrajinština"}
+        umb{"umbundu"}
+        und{"neznámý jazyk"}
+        ur{"urdština"}
+        uz{"uzbečtina"}
+        vai{"vai"}
+        ve{"venda"}
+        vec{"benátština"}
+        vep{"vepština"}
+        vi{"vietnamština"}
+        vls{"vlámština (západní)"}
+        vmf{"němčina (mohansko-franské dialekty)"}
+        vo{"volapük"}
+        vot{"votština"}
+        vro{"võruština"}
+        vun{"vunjo"}
+        wa{"valonština"}
+        wae{"němčina (walser)"}
+        wal{"wolajtština"}
+        war{"warajština"}
+        was{"waština"}
+        wbp{"warlpiri"}
+        wo{"wolofština"}
+        wuu{"čínština (dialekty Wu)"}
+        xal{"kalmyčtina"}
+        xh{"xhoština"}
+        xmf{"mingrelština"}
+        xog{"sogština"}
+        yao{"jaoština"}
+        yap{"japština"}
+        yav{"jangbenština"}
+        ybb{"yemba"}
+        yi{"jidiš"}
+        yo{"jorubština"}
+        yrl{"nheengatu"}
+        yue{"kantonština"}
+        za{"čuangština"}
+        zap{"zapotéčtina"}
+        zbl{"bliss systém"}
+        zea{"zélandština"}
+        zen{"zenaga"}
+        zgh{"tamazight (standardní marocký)"}
+        zh{"čínština"}
+        zh_Hans{"čínština (zjednodušená)"}
+        zu{"zuluština"}
+        zun{"zunijština"}
+        zxx{"žádný jazykový obsah"}
+        zza{"zaza"}
+    }
+    Languages%long{
+        zh_Hans{"standardní čínština (zjednodušená)"}
+        zh_Hant{"standardní čínština (tradiční)"}
+    }
+    Languages%menu{
+        yue{"čínština (kantonština)"}
+        zh{"standardní čínština"}
+    }
+    Languages%short{
+        en_GB{"angličtina (VB)"}
+    }
+    Scripts{
+        Afak{"afaka"}
+        Aghb{"kavkazskoalbánské"}
+        Arab{"arabské"}
+        Aran{"nastaliq"}
+        Armi{"aramejské (imperiální)"}
+        Armn{"arménské"}
+        Avst{"avestánské"}
+        Bali{"balijské"}
+        Bamu{"bamumské"}
+        Bass{"bassa vah"}
+        Batk{"batacké"}
+        Beng{"bengálské"}
+        Blis{"Blissovo písmo"}
+        Bopo{"bopomofo"}
+        Brah{"bráhmí"}
+        Brai{"Braillovo písmo"}
+        Bugi{"buginské"}
+        Buhd{"buhidské"}
+        Cakm{"čakma"}
+        Cans{"slabičné písmo kanadských domorodců"}
+        Cari{"karijské"}
+        Cham{"čam"}
+        Cher{"čerokí"}
+        Cirt{"kirt"}
+        Copt{"koptské"}
+        Cprt{"kyperské"}
+        Cyrl{"cyrilice"}
+        Cyrs{"cyrilce - staroslověnská"}
+        Deva{"dévanágarí"}
+        Dsrt{"deseret"}
+        Dupl{"Duployého těsnopis"}
+        Egyd{"egyptské démotické"}
+        Egyh{"egyptské hieratické"}
+        Egyp{"egyptské hieroglyfy"}
+        Elba{"elbasanské"}
+        Ethi{"etiopské"}
+        Geok{"gruzínské chutsuri"}
+        Geor{"gruzínské"}
+        Glag{"hlaholice"}
+        Goth{"gotické"}
+        Gran{"grantha"}
+        Grek{"řecké"}
+        Gujr{"gudžarátí"}
+        Guru{"gurmukhi"}
+        Hanb{"hanb"}
+        Hang{"hangul"}
+        Hani{"han"}
+        Hano{"hanunóo"}
+        Hans{"zjednodušené"}
+        Hant{"tradiční"}
+        Hebr{"hebrejské"}
+        Hira{"hiragana"}
+        Hluw{"anatolské hieroglyfy"}
+        Hmng{"hmongské"}
+        Hrkt{"japonské slabičné"}
+        Hung{"staromaďarské"}
+        Inds{"harappské"}
+        Ital{"etruské"}
+        Jamo{"jamo"}
+        Java{"javánské"}
+        Jpan{"japonské"}
+        Jurc{"džürčenské"}
+        Kali{"kayah li"}
+        Kana{"katakana"}
+        Khar{"kháróšthí"}
+        Khmr{"khmerské"}
+        Khoj{"chodžiki"}
+        Knda{"kannadské"}
+        Kore{"korejské"}
+        Kpel{"kpelle"}
+        Kthi{"kaithi"}
+        Lana{"lanna"}
+        Laoo{"laoské"}
+        Latf{"latinka - lomená"}
+        Latg{"latinka - galská"}
+        Latn{"latinka"}
+        Lepc{"lepčské"}
+        Limb{"limbu"}
+        Lina{"lineární A"}
+        Linb{"lineární B"}
+        Lisu{"Fraserovo"}
+        Loma{"loma"}
+        Lyci{"lýkijské"}
+        Lydi{"lýdské"}
+        Mahj{"mahádžaní"}
+        Mand{"mandejské"}
+        Mani{"manichejské"}
+        Maya{"mayské hieroglyfy"}
+        Mend{"mendské"}
+        Merc{"meroitické psací"}
+        Mero{"meroitické"}
+        Mlym{"malajlámské"}
+        Modi{"modí"}
+        Mong{"mongolské"}
+        Moon{"Moonovo písmo"}
+        Mroo{"mro"}
+        Mtei{"mejtej majek (manipurské)"}
+        Mymr{"myanmarské"}
+        Narb{"staroseveroarabské"}
+        Nbat{"nabatejské"}
+        Nkgb{"naxi geba"}
+        Nkoo{"n’ko"}
+        Nshu{"nü-šu"}
+        Ogam{"ogamské"}
+        Olck{"santálské (ol chiki)"}
+        Orkh{"orchonské"}
+        Orya{"urijské"}
+        Osma{"osmanské"}
+        Palm{"palmýrské"}
+        Pauc{"pau cin hau"}
+        Perm{"staropermské"}
+        Phag{"phags-pa"}
+        Phli{"pahlavské klínové"}
+        Phlp{"pahlavské žalmové"}
+        Phlv{"pahlavské knižní"}
+        Phnx{"fénické"}
+        Plrd{"Pollardova fonetická abeceda"}
+        Prti{"parthské klínové"}
+        Qaag{"zawgyi"}
+        Rjng{"redžanské"}
+        Roro{"rongorongo"}
+        Runr{"runové"}
+        Samr{"samařské"}
+        Sara{"sarati"}
+        Sarb{"starojihoarabské"}
+        Saur{"saurášterské"}
+        Sgnw{"SignWriting"}
+        Shaw{"Shawova abeceda"}
+        Shrd{"šáradá"}
+        Sidd{"siddham"}
+        Sind{"chudábádí"}
+        Sinh{"sinhálské"}
+        Sora{"sora sompeng"}
+        Sund{"sundské"}
+        Sylo{"sylhetské"}
+        Syrc{"syrské"}
+        Syre{"syrské - estrangelo"}
+        Syrj{"syrské - západní"}
+        Syrn{"syrské - východní"}
+        Tagb{"tagbanwa"}
+        Takr{"takrí"}
+        Tale{"tai le"}
+        Talu{"tai lü nové"}
+        Taml{"tamilské"}
+        Tang{"tangut"}
+        Tavt{"tai viet"}
+        Telu{"telugské"}
+        Teng{"tengwar"}
+        Tfng{"berberské"}
+        Tglg{"tagalské"}
+        Thaa{"thaana"}
+        Thai{"thajské"}
+        Tibt{"tibetské"}
+        Tirh{"tirhuta"}
+        Ugar{"ugaritské klínové"}
+        Vaii{"vai"}
+        Visp{"viditelná řeč"}
+        Wara{"varang kšiti"}
+        Wole{"karolínské (woleai)"}
+        Xpeo{"staroperské klínové písmo"}
+        Xsux{"sumero-akkadské klínové písmo"}
+        Yiii{"yi"}
+        Zmth{"matematický zápis"}
+        Zsye{"emodži"}
+        Zsym{"symboly"}
+        Zxxx{"bez zápisu"}
+        Zyyy{"obecné"}
+        Zzzz{"neznámé písmo"}
+    }
+    Scripts%stand-alone{
+        Hans{"han (zjednodušené)"}
+        Hant{"han (tradiční)"}
+    }
+    Scripts%variant{
+        Arab{"persko-arabské"}
+    }
+    Types{
+        calendar{
+            buddhist{"Buddhistický kalendář"}
+            chinese{"Čínský kalendář"}
+            coptic{"Koptský kalendář"}
+            dangi{"Korejský kalendář Dangi"}
+            ethiopic{"Etiopský kalendář"}
+            ethiopic-amete-alem{"Etiopský kalendář (Amete-Alem)"}
+            gregorian{"Gregoriánský kalendář"}
+            hebrew{"Hebrejský kalendář"}
+            indian{"Indický národní kalendář"}
+            islamic{"Islámský kalendář"}
+            islamic-civil{"Muslimský občanský kalendář"}
+            islamic-umalqura{"Muslimský kalendář (Umm al-Qura)"}
+            iso8601{"Kalendář ISO-8601"}
+            japanese{"Japonský kalendář"}
+            persian{"Perský kalendář"}
+            roc{"Kalendář Čínské republiky"}
+        }
+        cf{
+            account{"Účetní měnový formát"}
+            standard{"Standardní měnový formát"}
+        }
+        colAlternate{
+            non-ignorable{"Řadit symboly"}
+            shifted{"Při řazení ignorovat symboly"}
+        }
+        colBackwards{
+            no{"Normální řazení akcentů"}
+            yes{"Řadit akcenty opačně"}
+        }
+        colCaseFirst{
+            lower{"Nejdříve řadit malá písmena"}
+            no{"Běžné řazení velkých a malých písmen"}
+            upper{"Nejdříve řadit velká písmena"}
+        }
+        colCaseLevel{
+            no{"Nerozlišovat při řazení velká a malá písmena"}
+            yes{"Rozlišovat při řazení velká a malá písmena"}
+        }
+        colNormalization{
+            no{"Řadit bez normalizace"}
+            yes{"Řadit podle normalizovaného kódování Unicode"}
+        }
+        colNumeric{
+            no{"Řadit číslice jednotlivě"}
+            yes{"Řadit číslice numericky"}
+        }
+        colStrength{
+            identical{"Řadit vše"}
+            primary{"Řadit pouze základní písmena"}
+            quaternary{"Řadit akcenty/velká a malá písmena/šířku/kana"}
+            secondary{"Řadit akcenty"}
+            tertiary{"Řadit akcenty/velká a malá písmena/šířku"}
+        }
+        collation{
+            big5han{"Řazení pro tradiční čínštinu – Big5"}
+            compat{"Předchozí řazení, kompatibilita"}
+            dictionary{"Slovníkové řazení"}
+            ducet{"Výchozí řazení Unicode"}
+            eor{"Evropské řazení"}
+            gb2312han{"Řazení pro zjednodušenou čínštinu – GB2312"}
+            phonebook{"Řazení telefonního seznamu"}
+            phonetic{"Fonetické řazení"}
+            pinyin{"Řazení podle pchin-jinu"}
+            reformed{"Reformované řazení"}
+            search{"Obecné hledání"}
+            searchjl{"Vyhledávat podle počáteční souhlásky písma hangul"}
+            standard{"Standardní řazení"}
+            stroke{"Řazení podle tahů"}
+            traditional{"Tradiční řazení"}
+            unihan{"Řazení podle radikálů"}
+            zhuyin{"Ču-jin"}
+        }
+        d0{
+            fwidth{"Plná šířka"}
+            hwidth{"Poloviční šířka"}
+            npinyin{"Numerický"}
+        }
+        hc{
+            h11{"12hodinový systém (0–11)"}
+            h12{"12hodinový systém (1–12)"}
+            h23{"24hodinový systém (0–23)"}
+            h24{"24hodinový systém (1–24)"}
+        }
+        lb{
+            loose{"Volný styl zalamování řádků"}
+            normal{"Běžný styl zalamování řádků"}
+            strict{"Striktní styl zalamování řádků"}
+        }
+        m0{
+            bgn{"Transliterace podle BGN"}
+            ungegn{"Transliterace podle UNGEGN"}
+        }
+        ms{
+            metric{"Metrická soustava"}
+            uksystem{"Britská měrná soustava"}
+            ussystem{"Americká měrná soustava"}
+        }
+        numbers{
+            arab{"Arabsko-indické číslice"}
+            arabext{"Rozšířené arabsko-indické číslice"}
+            armn{"Arménské číslice"}
+            armnlow{"Malé arménské číslice"}
+            bali{"Balijské číslice"}
+            beng{"Bengálské číslice"}
+            deva{"Číslice písma dévanágarí"}
+            ethi{"Etiopské číslice"}
+            finance{"Finanční zápis čísel"}
+            fullwide{"Číslice – plná šířka"}
+            geor{"Gruzínské číslice"}
+            grek{"Řecké číslice"}
+            greklow{"Malé řecké číslice"}
+            gujr{"Gudžarátské číslice"}
+            guru{"Číslice gurmukhí"}
+            hanidec{"Čínské desítkové číslice"}
+            hans{"Číslice zjednodušené čínštiny"}
+            hansfin{"Finanční číslice zjednodušené čínštiny"}
+            hant{"Číslice tradiční čínštiny"}
+            hantfin{"Finanční číslice tradiční čínštiny"}
+            hebr{"Hebrejské číslice"}
+            java{"Javánské číslice"}
+            jpan{"Japonské číslice"}
+            jpanfin{"Japonské finanční číslice"}
+            khmr{"Khmerské číslice"}
+            knda{"Kannadské číslice"}
+            laoo{"Laoské číslice"}
+            latn{"Západní číslice"}
+            mlym{"Malajálamské číslice"}
+            mong{"Mongolské číslice"}
+            mymr{"Myanmarské číslice"}
+            native{"Nativní číslice"}
+            orya{"Urijské číslice"}
+            osma{"Somálské číslice"}
+            roman{"Římské číslice"}
+            romanlow{"Malé římské číslice"}
+            saur{"Saurášterské číslice"}
+            sund{"Sundské číslice"}
+            taml{"Tamilské tradiční číslice"}
+            tamldec{"Tamilské číslice"}
+            telu{"Telugské číslice"}
+            thai{"Thajské číslice"}
+            tibt{"Tibetské číslice"}
+            traditional{"Tradiční číslovky"}
+            vaii{"Vaiské číslice"}
+        }
+    }
+    Variants{
+        SCOTLAND{"angličtina (Skotsko)"}
+        WADEGILE{"Wade-Giles"}
+    }
+    characterLabelPattern{
+        all{"{0} – vše"}
+        category-list{"{0}: {1}"}
+        compatibility{"{0} – kompatibilita"}
+        enclosed{"{0} – uzavřené"}
+        extended{"{0} – rozšířené"}
+        historic{"{0} – historické"}
+        miscellaneous{"{0} – různé"}
+        other{"{0} – jiné"}
+        scripts{"Písma – {0}"}
+        strokes{
+            few{"{0} tahy"}
+            many{"{0} tahu"}
+            one{"{0} tah"}
+            other{"{0} tahů"}
+        }
+        subscript{"{0} v dolním indexu"}
+        superscript{"{0} v horním indexu"}
+    }
+    codePatterns{
+        language{"Jazyk: {0}"}
+        script{"Písmo: {0}"}
+        territory{"Region: {0}"}
+    }
+    localeDisplayPattern{
+        keyTypePattern{"{0}: {1}"}
+        pattern{"{0} ({1})"}
+        separator{"{0}, {1}"}
+    }
+}

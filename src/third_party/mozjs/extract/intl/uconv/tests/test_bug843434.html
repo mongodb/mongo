@@ -1,0 +1,27 @@
+<!DOCTYPE HTML>
+<html>
+<!--
+https://bugzilla.mozilla.org/show_bug.cgi?id=843434
+-->
+<head>
+  <meta http-equiv="Content-type" content="text/html; charset=UTF-8">
+  <title>Test for Bug 843434</title>
+  <script src="/tests/SimpleTest/SimpleTest.js"></script>
+  <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
+  <!-- This next 'link' is part of the test, it may cause an assertion. -->
+  <link rel=stylesheet href="data:text/css;charset=ISO-2022-JP,%cc">
+</head>
+<body onload="test()">
+<pre id="test">
+<script class="testbody" type="text/javascript">
+function test()
+{
+  ok(true, "Test for no prior assertion.");
+  SimpleTest.finish();
+}
+SimpleTest.waitForExplicitFinish();
+</script>
+</pre>
+</body>
+</html>
+

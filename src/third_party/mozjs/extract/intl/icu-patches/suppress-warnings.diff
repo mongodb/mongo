@@ -1,0 +1,80 @@
+diff --git a/intl/icu/source/acinclude.m4 b/intl/icu/source/acinclude.m4
+--- a/intl/icu/source/acinclude.m4
++++ b/intl/icu/source/acinclude.m4
+@@ -469,30 +469,36 @@ AC_DEFUN([AC_CHECK_STRICT_COMPILE],
+             *)
+                 # Do not use -ansi. It limits us to C90, and it breaks some platforms.
+                 # We use -std=c11 to disable the gnu99 defaults and its associated warnings
+                 CFLAGS="$CFLAGS -std=c11"
+                 ;;
+             esac
+             
+             CFLAGS="$CFLAGS -Wall -pedantic -Wshadow -Wpointer-arith -Wmissing-prototypes -Wwrite-strings"
++
++            # Suppress clang C warnings:
++            CFLAGS="$CFLAGS -Wno-sign-compare -Wno-unused"
+         else
+             case "${host}" in
+             *-*-cygwin)
+                 if test "`$CC /help 2>&1 | head -c9`" = "Microsoft"
+                 then
+                     CFLAGS="$CFLAGS /W4"
+                 fi ;;
+             *-*-mingw*)
+                 CFLAGS="$CFLAGS -W4" ;;
+             esac
+         fi
+         if test "$GXX" = yes
+         then
+             CXXFLAGS="$CXXFLAGS -W -Wall -pedantic -Wpointer-arith -Wwrite-strings -Wno-long-long"
++
++            # Suppress clang C++ warnings:
++            CXXFLAGS="$CXXFLAGS -Wno-unused -Wno-unused-parameter"
+         else
+             case "${host}" in
+             *-*-cygwin)
+                 if test "`$CXX /help 2>&1 | head -c9`" = "Microsoft"
+                 then
+                     CXXFLAGS="$CXXFLAGS /W4"
+                 fi ;;
+             *-*-mingw*)
+diff --git a/intl/icu/source/configure b/intl/icu/source/configure
+--- a/intl/icu/source/configure
++++ b/intl/icu/source/configure
+@@ -4359,30 +4359,36 @@ fi
+             *)
+                 # Do not use -ansi. It limits us to C90, and it breaks some platforms.
+                 # We use -std=c11 to disable the gnu99 defaults and its associated warnings
+                 CFLAGS="$CFLAGS -std=c11"
+                 ;;
+             esac
+ 
+             CFLAGS="$CFLAGS -Wall -pedantic -Wshadow -Wpointer-arith -Wmissing-prototypes -Wwrite-strings"
++
++            # Suppress clang C warnings:
++            CFLAGS="$CFLAGS -Wno-sign-compare -Wno-unused"
+         else
+             case "${host}" in
+             *-*-cygwin)
+                 if test "`$CC /help 2>&1 | head -c9`" = "Microsoft"
+                 then
+                     CFLAGS="$CFLAGS /W4"
+                 fi ;;
+             *-*-mingw*)
+                 CFLAGS="$CFLAGS -W4" ;;
+             esac
+         fi
+         if test "$GXX" = yes
+         then
+             CXXFLAGS="$CXXFLAGS -W -Wall -pedantic -Wpointer-arith -Wwrite-strings -Wno-long-long"
++
++            # Suppress clang C++ warnings:
++            CXXFLAGS="$CXXFLAGS -Wno-unused -Wno-unused-parameter"
+         else
+             case "${host}" in
+             *-*-cygwin)
+                 if test "`$CXX /help 2>&1 | head -c9`" = "Microsoft"
+                 then
+                     CXXFLAGS="$CXXFLAGS /W4"
+                 fi ;;
+             *-*-mingw*)

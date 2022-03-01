@@ -7,46 +7,37 @@
 #ifndef threading_LockGuard_h
 #define threading_LockGuard_h
 
+#include "mozilla/Attributes.h"
+
 namespace js {
 
-template <typename Mutex> class MOZ_RAII UnlockGuard;
+template <typename Mutex>
+class MOZ_RAII UnlockGuard;
 
 template <typename Mutex>
-class MOZ_RAII LockGuard
-{
+class MOZ_RAII LockGuard {
   friend class UnlockGuard<Mutex>;
   friend class ConditionVariable;
   Mutex& lock;
 
-public:
-  explicit LockGuard(Mutex& aLock)
-    : lock(aLock)
-  {
-    lock.lock();
-  }
+ public:
+  explicit LockGuard(Mutex& aLock) : lock(aLock) { lock.lock(); }
 
-  ~LockGuard() {
-    lock.unlock();
-  }
+  ~LockGuard() { lock.unlock(); }
 };
 
 template <typename Mutex>
-class MOZ_RAII UnlockGuard
-{
+class MOZ_RAII UnlockGuard {
   Mutex& lock;
 
-public:
-  explicit UnlockGuard(LockGuard<Mutex>& aGuard)
-    : lock(aGuard.lock)
-  {
+ public:
+  explicit UnlockGuard(LockGuard<Mutex>& aGuard) : lock(aGuard.lock) {
     lock.unlock();
   }
 
-  ~UnlockGuard() {
-    lock.lock();
-  }
+  ~UnlockGuard() { lock.lock(); }
 };
 
-} // namespace js
+}  // namespace js
 
-#endif // threading_LockGuard_h
+#endif  // threading_LockGuard_h

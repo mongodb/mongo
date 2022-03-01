@@ -1,0 +1,12 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ko_KP{
+    zoneStrings{
+        "meta:Korea"{
+            ld{"조선 하계 표준시"}
+            lg{"조선 시간"}
+            ls{"조선 표준시"}
+        }
+    }
+}

@@ -1,10 +1,10 @@
 {
-    "configure-args": "--enable-warnings-as-errors",
+    "configure-args": "--enable-warnings-as-errors --enable-rust-simd",
     "debug": true,
+    "env": {
+        "JS_SMOOSH_DISABLE_OPCODE_CHECK": "1"
+    },
     "skip-tests": {
         "all": ["jstests", "jittest", "checks"]
-    },
-    "extra-tests": {
-        "all": ["check-style"]
     }
 }

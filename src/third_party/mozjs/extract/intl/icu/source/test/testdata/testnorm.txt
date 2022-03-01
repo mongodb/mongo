@@ -1,0 +1,83 @@
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+#   Copyright (C) 2010, International Business Machines
+#   Corporation and others.  All Rights Reserved.
+#
+#   file name:  testnorm.txt
+#   encoding:   US-ASCII
+#   tab size:   8 (not used)
+#   indentation:4
+#
+#   created on: 2010feb15
+#   created by: Markus W. Scherer
+#
+# Normalization test data, for improving code coverage.
+
+# Selection of Canonical_Combining_Class (ccc) values
+0300..0314:230
+0315:232
+0316..0319:220
+031A:232
+031B:216
+031C..0320:220
+0321..0322:202
+0323..0326:220
+0327..0328:202
+0329..0333:220
+0334..0338:1
+0339..033C:220
+033D..0344:230
+0345:240
+0346:230
+0347..0349:220
+034A..034C:230
+034D..034E:220
+0350..0352:230
+0353..0356:220
+0357:230
+0358:232
+0359..035A:220
+035B:230
+035C:233
+035D..035E:234
+035F:233
+0360..0361:234
+0362:233
+0363..036F:230
+# ICU 63 normalization with UCPTrie requires inert surrogate code points.
+# D802:2  # surrogates with non-zero combining classes
+# D803:3
+# D804:4
+110B9:9
+110BA:7
+
+# Some interesting mappings
+00C0=0041 0300
+00C1=0041 0301
+00C2=0041 0302
+00C3=0041 0303
+00C4=0041 0308
+00C5=0041 030A
+00C7=0043 0327
+# ICU 63 normalization with UCPTrie requires inert surrogate code points.
+# D800>D7FF  # surrogates with mappings, and mappings to empty strings
+# D801>
+# DFFE>
+# DFFF>FFFF
+E000>
+E001=61 338  # composition with trail<=33FF and composite>7FFF
+E002=E001 308  # recursive mapping needs reordering
+E003>62 307 327 337  # mapping needs reordering
+E011=E010 F0011  # composition of BMP+supplementary, and F0011 is maybe & combines-fwd
+E111>1101  # mapping ends in Jamo L
+E112>1102 62  # mapping starts with Jamo L
+FFF3>FFF4
+FFF4>FFF5
+FFF5>FFF7
+FFF7>10037
+10036>FFF6
+10077>10037
+1109A=11099 110BA
+1109C=1109B 110BA
+110AB=110A5 110BA
+F0010=F0011 E012  # composition of supplementary+BMP

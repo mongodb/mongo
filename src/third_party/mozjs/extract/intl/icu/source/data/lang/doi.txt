@@ -1,0 +1,81 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+doi{
+    Languages{
+        de{"जर्मन"}
+        de_AT{"आस्ट्रियाई जर्मन"}
+        de_CH{"स्विस हाई जर्मन"}
+        doi{"डोगरी"}
+        en{"अंगरेजी"}
+        en_AU{"आस्ट्रेलियाई अंगरेजी"}
+        en_CA{"कैनेडियन अंगरेजी"}
+        en_GB{"ब्रिटिश अंगरेजी"}
+        en_US{"अमरीकी अंगरेजी"}
+        es{"स्पैनिश"}
+        es_419{"लैटिन अमरीकी स्पैनिश"}
+        es_ES{"यूरोपी स्पैनिश"}
+        es_MX{"मैक्सिन स्पैनिश"}
+        fr{"फ्रेंच"}
+        fr_CA{"कैनेडियन फ्रेंच"}
+        fr_CH{"स्विस फ्रेंच"}
+        it{"इटालियन"}
+        ja{"जापानी"}
+        pt{"पुर्तगाली"}
+        pt_BR{"ब्राजीली पुर्तगाली"}
+        pt_PT{"यूरोपी पुर्तगाली"}
+        ru{"रूसी"}
+        und{"अनजांती भाशा"}
+        zh{"चीनी"}
+        zh_Hans{"सरलीकृत चीनी"}
+        zh_Hant{"रवायती चीनी"}
+    }
+    Languages%long{
+        zh_Hans{"सरलीकृत मंदारिन चीनी"}
+        zh_Hant{"रवायती मंदारिन चीनी"}
+    }
+    Languages%menu{
+        zh{"चीनी, मंदारिन"}
+    }
+    Languages%short{
+        en_GB{"यूके अंगरेजी"}
+        en_US{"यूएस अंगरेजी"}
+    }
+    Scripts{
+        Arab{"अरबी"}
+        Cyrl{"सिरिलिक"}
+        Deva{"देवनागरी"}
+        Hans{"सरलीकृत"}
+        Hant{"रवायती"}
+        Latn{"लैटिन"}
+        Zxxx{"अनलिखत"}
+        Zzzz{"अनजांती लिपि"}
+    }
+    Scripts%stand-alone{
+        Hans{"सरलीकृत हान"}
+        Hant{"रवायती हान"}
+    }
+    Types{
+        calendar{
+            gregorian{"ग्रेगोरी कैलेन्डर"}
+        }
+        collation{
+            standard{"मानक ताल तरतीब"}
+        }
+        numbers{
+            arab{"अरबी-इंडिक अंक"}
+            deva{"देवनागरी अंक"}
+            latn{"पच्छमी अंक"}
+        }
+    }
+    codePatterns{
+        language{"भाशा: {0}"}
+        script{"लिपि: {0}"}
+        territory{"खेत्तर: {0}"}
+    }
+    localeDisplayPattern{
+        keyTypePattern{"{0}: {1}"}
+        pattern{"{0} ({1})"}
+        separator{"{0}, {1}"}
+    }
+}

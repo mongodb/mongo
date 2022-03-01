@@ -1,0 +1,29 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ln{
+    collations{
+        phonetic{
+            Sequence{
+                "&E<ɛ<<<Ɛ"
+                "&O<<ɔ<<<Ɔ"
+                "&G<gb<<<gB<<<Gb<<<GB"
+                "&K<kp<<<kP<<<Kp<<<KP"
+                "&M<mb<<<mB<<<Mb<<<MB<mf<<<mF<<<Mf<<<MF<mp<<<mP<<<Mp<<<MP<mv<<<mV<<<Mv<<<MV"
+                "&N<nd<<<nD<<<Nd<<<ND<ng<<<nG<<<Ng<<<NG<ngb<<<ngB<<<nGb<<<nGB<<<Ngb<<<NgB<<<NGB<nk"
+                "<<<nK<<<Nk<<<NK<ns<<<nS<<<Ns<<<NS<nt<<<nT<<<Nt<<<NT<ny<<<nY<<<Ny<<<NY<nz<<<nZ<<<Nz"
+                "<<<NZ"
+                "&S<sh<<<sH<<<Sh<<<SH"
+                "&T<ts<<<tS<<<Ts<<<TS"
+            }
+            Version{"39"}
+        }
+        standard{
+            Sequence{
+                "&E<ɛ<<<Ɛ"
+                "&O<<ɔ<<<Ɔ"
+            }
+            Version{"39"}
+        }
+    }
+}

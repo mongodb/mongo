@@ -2,6 +2,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+# flake8: noqa: F821
+
 # Generate graph structures for GC statistics recording.
 #
 # Stats phases are nested and form a directed acyclic graph starting
@@ -49,152 +51,220 @@
 #            | E |   | E'|
 #            +---+   +---+
 
+# NOTE: If you add new phases here the current next phase kind number can be
+# found at the end of js/src/gc/StatsPhasesGenerated.inc
+
 import re
-import sys
 import collections
 
-class PhaseKind():
-    def __init__(self, name, descr, bucket, children = []):
+
+class PhaseKind:
+    def __init__(self, name, descr, bucket, children=[]):
         self.name = name
         self.descr = descr
+        # For telemetry
         self.bucket = bucket
         self.children = children
 
-# The root marking phase appears in several places in the graph.
-MarkRootsPhaseKind = PhaseKind("MARK_ROOTS", "Mark Roots", 48, [
-    PhaseKind("MARK_CCWS", "Mark Cross Compartment Wrappers", 50),
-    PhaseKind("MARK_STACK", "Mark C and JS stacks", 51),
-    PhaseKind("MARK_RUNTIME_DATA", "Mark Runtime-wide Data", 52),
-    PhaseKind("MARK_EMBEDDING", "Mark Embedding", 53),
-    PhaseKind("MARK_COMPARTMENTS", "Mark Compartments", 54)
-])
 
-JoinParallelTasksPhaseKind = PhaseKind("JOIN_PARALLEL_TASKS", "Join Parallel Tasks", 67)
+AllPhaseKinds = []
+PhaseKindsByName = dict()
 
-UnmarkGrayPhaseKind = PhaseKind("UNMARK_GRAY", "Unmark gray", 56)
+
+def addPhaseKind(name, descr, bucket, children=[]):
+    assert name not in PhaseKindsByName
+    phaseKind = PhaseKind(name, descr, bucket, children)
+    AllPhaseKinds.append(phaseKind)
+    PhaseKindsByName[name] = phaseKind
+    return phaseKind
+
+
+def getPhaseKind(name):
+    return PhaseKindsByName[name]
+
 
 PhaseKindGraphRoots = [
-    PhaseKind("MUTATOR", "Mutator Running", 0),
-    PhaseKind("GC_BEGIN", "Begin Callback", 1),
-    PhaseKind("EVICT_NURSERY_FOR_MAJOR_GC", "Evict Nursery For Major GC", 70, [
-        MarkRootsPhaseKind,
-    ]),
-    PhaseKind("WAIT_BACKGROUND_THREAD", "Wait Background Thread", 2),
-    PhaseKind("PREPARE", "Prepare For Collection", 69, [
-        PhaseKind("UNMARK", "Unmark", 7),
-        PhaseKind("BUFFER_GRAY_ROOTS", "Buffer Gray Roots", 49),
-        PhaseKind("MARK_DISCARD_CODE", "Mark Discard Code", 3),
-        PhaseKind("RELAZIFY_FUNCTIONS", "Relazify Functions", 4),
-        PhaseKind("PURGE", "Purge", 5),
-        PhaseKind("PURGE_SHAPE_TABLES", "Purge ShapeTables", 60),
-        JoinParallelTasksPhaseKind
-    ]),
-    PhaseKind("MARK", "Mark", 6, [
-        MarkRootsPhaseKind,
-        UnmarkGrayPhaseKind,
-        PhaseKind("MARK_DELAYED", "Mark Delayed", 8, [
-            UnmarkGrayPhaseKind,
-        ]),
-    ]),
-    PhaseKind("SWEEP", "Sweep", 9, [
-        PhaseKind("SWEEP_MARK", "Mark During Sweeping", 10, [
-            UnmarkGrayPhaseKind,
-            PhaseKind("SWEEP_MARK_INCOMING_BLACK", "Mark Incoming Black Pointers", 12, [
-                UnmarkGrayPhaseKind,
-            ]),
-            PhaseKind("SWEEP_MARK_WEAK", "Mark Weak", 13, [
-                UnmarkGrayPhaseKind,
-            ]),
-            PhaseKind("SWEEP_MARK_INCOMING_GRAY", "Mark Incoming Gray Pointers", 14),
-            PhaseKind("SWEEP_MARK_GRAY", "Mark Gray", 15),
-            PhaseKind("SWEEP_MARK_GRAY_WEAK", "Mark Gray and Weak", 16)
-        ]),
-        PhaseKind("FINALIZE_START", "Finalize Start Callbacks", 17, [
-            PhaseKind("WEAK_ZONES_CALLBACK", "Per-Slice Weak Callback", 57),
-            PhaseKind("WEAK_COMPARTMENT_CALLBACK", "Per-Compartment Weak Callback", 58)
-        ]),
-        PhaseKind("UPDATE_ATOMS_BITMAP", "Sweep Atoms Bitmap", 68),
-        PhaseKind("SWEEP_ATOMS_TABLE", "Sweep Atoms Table", 18),
-        PhaseKind("SWEEP_COMPARTMENTS", "Sweep Compartments", 20, [
-            PhaseKind("SWEEP_DISCARD_CODE", "Sweep Discard Code", 21),
-            PhaseKind("SWEEP_INNER_VIEWS", "Sweep Inner Views", 22),
-            PhaseKind("SWEEP_CC_WRAPPER", "Sweep Cross Compartment Wrappers", 23),
-            PhaseKind("SWEEP_BASE_SHAPE", "Sweep Base Shapes", 24),
-            PhaseKind("SWEEP_INITIAL_SHAPE", "Sweep Initial Shapes", 25),
-            PhaseKind("SWEEP_TYPE_OBJECT", "Sweep Type Objects", 26),
-            PhaseKind("SWEEP_BREAKPOINT", "Sweep Breakpoints", 27),
-            PhaseKind("SWEEP_REGEXP", "Sweep Regexps", 28),
-            PhaseKind("SWEEP_COMPRESSION", "Sweep Compression Tasks", 62),
-            PhaseKind("SWEEP_WEAKMAPS", "Sweep WeakMaps", 63),
-            PhaseKind("SWEEP_UNIQUEIDS", "Sweep Unique IDs", 64),
-            PhaseKind("SWEEP_JIT_DATA", "Sweep JIT Data", 65),
-            PhaseKind("SWEEP_WEAK_CACHES", "Sweep Weak Caches", 66),
-            PhaseKind("SWEEP_MISC", "Sweep Miscellaneous", 29),
-            PhaseKind("SWEEP_TYPES", "Sweep type information", 30, [
-                PhaseKind("SWEEP_TYPES_BEGIN", "Sweep type tables and compilations", 31),
-                PhaseKind("SWEEP_TYPES_END", "Free type arena", 32),
-            ]),
-            JoinParallelTasksPhaseKind
-        ]),
-        PhaseKind("SWEEP_OBJECT", "Sweep Object", 33),
-        PhaseKind("SWEEP_STRING", "Sweep String", 34),
-        PhaseKind("SWEEP_SCRIPT", "Sweep Script", 35),
-        PhaseKind("SWEEP_SCOPE", "Sweep Scope", 59),
-        PhaseKind("SWEEP_REGEXP_SHARED", "Sweep RegExpShared", 61),
-        PhaseKind("SWEEP_SHAPE", "Sweep Shape", 36),
-        PhaseKind("FINALIZE_END", "Finalize End Callback", 38),
-        PhaseKind("DESTROY", "Deallocate", 39),
-        JoinParallelTasksPhaseKind
-        ]),
-    PhaseKind("COMPACT", "Compact", 40, [
-        PhaseKind("COMPACT_MOVE", "Compact Move", 41),
-        PhaseKind("COMPACT_UPDATE", "Compact Update", 42, [
-            MarkRootsPhaseKind,
-            PhaseKind("COMPACT_UPDATE_CELLS", "Compact Update Cells", 43),
-            JoinParallelTasksPhaseKind
-        ]),
-    ]),
-    PhaseKind("GC_END", "End Callback", 44),
-    PhaseKind("MINOR_GC", "All Minor GCs", 45, [
-        MarkRootsPhaseKind,
-    ]),
-    PhaseKind("EVICT_NURSERY", "Minor GCs to Evict Nursery", 46, [
-        MarkRootsPhaseKind,
-    ]),
-    PhaseKind("TRACE_HEAP", "Trace Heap", 47, [
-        MarkRootsPhaseKind,
-    ]),
-    PhaseKind("BARRIER", "Barriers", 55, [
-        UnmarkGrayPhaseKind
-    ])
+    addPhaseKind("MUTATOR", "Mutator Running", 0),
+    addPhaseKind("GC_BEGIN", "Begin Callback", 1),
+    addPhaseKind(
+        "EVICT_NURSERY_FOR_MAJOR_GC",
+        "Evict Nursery For Major GC",
+        70,
+        [
+            addPhaseKind(
+                "MARK_ROOTS",
+                "Mark Roots",
+                48,
+                [
+                    addPhaseKind("MARK_CCWS", "Mark Cross Compartment Wrappers", 50),
+                    addPhaseKind("MARK_STACK", "Mark C and JS stacks", 51),
+                    addPhaseKind("MARK_RUNTIME_DATA", "Mark Runtime-wide Data", 52),
+                    addPhaseKind("MARK_EMBEDDING", "Mark Embedding", 53),
+                    addPhaseKind("MARK_COMPARTMENTS", "Mark Compartments", 54),
+                ],
+            )
+        ],
+    ),
+    addPhaseKind("WAIT_BACKGROUND_THREAD", "Wait Background Thread", 2),
+    addPhaseKind(
+        "PREPARE",
+        "Prepare For Collection",
+        69,
+        [
+            addPhaseKind("UNMARK", "Unmark", 7),
+            addPhaseKind("UNMARK_WEAKMAPS", "Unmark WeakMaps", 76),
+            addPhaseKind("BUFFER_GRAY_ROOTS", "Buffer Gray Roots", 49),
+            addPhaseKind("MARK_DISCARD_CODE", "Mark Discard Code", 3),
+            addPhaseKind("RELAZIFY_FUNCTIONS", "Relazify Functions", 4),
+            addPhaseKind("PURGE", "Purge", 5),
+            addPhaseKind("PURGE_PROP_MAP_TABLES", "Purge PropMapTables", 60),
+            addPhaseKind("PURGE_SOURCE_URLS", "Purge Source URLs", 73),
+            addPhaseKind("JOIN_PARALLEL_TASKS", "Join Parallel Tasks", 67),
+        ],
+    ),
+    addPhaseKind(
+        "MARK",
+        "Mark",
+        6,
+        [getPhaseKind("MARK_ROOTS"), addPhaseKind("MARK_DELAYED", "Mark Delayed", 8)],
+    ),
+    addPhaseKind(
+        "SWEEP",
+        "Sweep",
+        9,
+        [
+            addPhaseKind(
+                "SWEEP_MARK",
+                "Mark During Sweeping",
+                10,
+                [
+                    getPhaseKind("MARK_DELAYED"),
+                    addPhaseKind(
+                        "SWEEP_MARK_INCOMING_BLACK", "Mark Incoming Black Pointers", 12
+                    ),
+                    addPhaseKind(
+                        "SWEEP_MARK_WEAK",
+                        "Mark Weak",
+                        13,
+                        [
+                            getPhaseKind("MARK_DELAYED"),
+                            addPhaseKind(
+                                "SWEEP_MARK_GRAY_WEAK", "Mark Gray and Weak", 16
+                            ),
+                        ],
+                    ),
+                    addPhaseKind(
+                        "SWEEP_MARK_INCOMING_GRAY", "Mark Incoming Gray Pointers", 14
+                    ),
+                    addPhaseKind("SWEEP_MARK_GRAY", "Mark Gray", 15),
+                ],
+            ),
+            addPhaseKind(
+                "FINALIZE_START",
+                "Finalize Start Callbacks",
+                17,
+                [
+                    addPhaseKind("WEAK_ZONES_CALLBACK", "Per-Slice Weak Callback", 57),
+                    addPhaseKind(
+                        "WEAK_COMPARTMENT_CALLBACK", "Per-Compartment Weak Callback", 58
+                    ),
+                ],
+            ),
+            addPhaseKind("UPDATE_ATOMS_BITMAP", "Sweep Atoms Bitmap", 68),
+            addPhaseKind("SWEEP_ATOMS_TABLE", "Sweep Atoms Table", 18),
+            addPhaseKind(
+                "SWEEP_COMPARTMENTS",
+                "Sweep Compartments",
+                20,
+                [
+                    addPhaseKind("SWEEP_DISCARD_CODE", "Sweep Discard Code", 21),
+                    addPhaseKind("SWEEP_INNER_VIEWS", "Sweep Inner Views", 22),
+                    addPhaseKind(
+                        "SWEEP_CC_WRAPPER", "Sweep Cross Compartment Wrappers", 23
+                    ),
+                    addPhaseKind("SWEEP_BASE_SHAPE", "Sweep Base Shapes", 24),
+                    addPhaseKind("SWEEP_INITIAL_SHAPE", "Sweep Initial Shapes", 25),
+                    addPhaseKind("SWEEP_REGEXP", "Sweep Regexps", 28),
+                    addPhaseKind("SWEEP_COMPRESSION", "Sweep Compression Tasks", 62),
+                    addPhaseKind("SWEEP_WEAKMAPS", "Sweep WeakMaps", 63),
+                    addPhaseKind("SWEEP_UNIQUEIDS", "Sweep Unique IDs", 64),
+                    addPhaseKind(
+                        "SWEEP_FINALIZATION_REGISTRIES",
+                        "Sweep FinalizationRegistries",
+                        74,
+                    ),
+                    addPhaseKind("SWEEP_WEAKREFS", "Sweep WeakRefs", 75),
+                    addPhaseKind("SWEEP_JIT_DATA", "Sweep JIT Data", 65),
+                    addPhaseKind("SWEEP_WEAK_CACHES", "Sweep Weak Caches", 66),
+                    addPhaseKind("SWEEP_MISC", "Sweep Miscellaneous", 29),
+                    getPhaseKind("JOIN_PARALLEL_TASKS"),
+                ],
+            ),
+            addPhaseKind("SWEEP_OBJECT", "Sweep Object", 33),
+            addPhaseKind("SWEEP_STRING", "Sweep String", 34),
+            addPhaseKind("SWEEP_SCRIPT", "Sweep Script", 35),
+            addPhaseKind("SWEEP_SCOPE", "Sweep Scope", 59),
+            addPhaseKind("SWEEP_REGEXP_SHARED", "Sweep RegExpShared", 61),
+            addPhaseKind("SWEEP_SHAPE", "Sweep Shape", 36),
+            addPhaseKind("SWEEP_PROP_MAP", "Sweep PropMap", 77),
+            addPhaseKind("FINALIZE_END", "Finalize End Callback", 38),
+            addPhaseKind("DESTROY", "Deallocate", 39),
+            getPhaseKind("JOIN_PARALLEL_TASKS"),
+        ],
+    ),
+    addPhaseKind(
+        "COMPACT",
+        "Compact",
+        40,
+        [
+            addPhaseKind("COMPACT_MOVE", "Compact Move", 41),
+            addPhaseKind(
+                "COMPACT_UPDATE",
+                "Compact Update",
+                42,
+                [
+                    getPhaseKind("MARK_ROOTS"),
+                    addPhaseKind("COMPACT_UPDATE_CELLS", "Compact Update Cells", 43),
+                    getPhaseKind("JOIN_PARALLEL_TASKS"),
+                ],
+            ),
+        ],
+    ),
+    addPhaseKind("DECOMMIT", "Decommit", 72),
+    addPhaseKind("GC_END", "End Callback", 44),
+    addPhaseKind(
+        "MINOR_GC",
+        "All Minor GCs",
+        45,
+        [
+            getPhaseKind("MARK_ROOTS"),
+        ],
+    ),
+    addPhaseKind(
+        "EVICT_NURSERY",
+        "Minor GCs to Evict Nursery",
+        46,
+        [
+            getPhaseKind("MARK_ROOTS"),
+        ],
+    ),
+    addPhaseKind(
+        "TRACE_HEAP",
+        "Trace Heap",
+        47,
+        [
+            getPhaseKind("MARK_ROOTS"),
+        ],
+    ),
+    addPhaseKind(
+        "BARRIER", "Barriers", 55, [addPhaseKind("UNMARK_GRAY", "Unmark gray", 56)]
+    ),
 ]
 
-# Make a linear list of all unique phases by performing a depth first
-# search on the phase graph starting at the roots.  This will be used to
-# generate the PhaseKind enum.
-
-def findAllPhaseKinds():
-    phases = []
-    seen = set()
-
-    def dfs(phase):
-        if phase in seen:
-            return
-        phases.append(phase)
-        seen.add(phase)
-        for child in phase.children:
-            dfs(child)
-
-    for phase in PhaseKindGraphRoots:
-        dfs(phase)
-    return phases
-
-AllPhaseKinds = findAllPhaseKinds()
-
-# Expand the DAG into a tree, duplicating phases which have more than
-# one parent.
 
 class Phase:
+    # Expand the DAG into a tree, duplicating phases which have more than
+    # one parent.
     def __init__(self, phaseKind, parent):
         self.phaseKind = phaseKind
         self.parent = parent
@@ -203,9 +273,10 @@ class Phase:
         self.nextSibling = None
         self.nextInPhaseKind = None
 
-        self.path = re.sub(r'\W+', '_', phaseKind.name.lower())
+        self.path = re.sub(r"\W+", "_", phaseKind.name.lower())
         if parent is not None:
-            self.path = parent.path + '.' + self.path
+            self.path = parent.path + "." + self.path
+
 
 def expandPhases():
     phases = []
@@ -233,6 +304,7 @@ def expandPhases():
 
     return phases, phasesForKind
 
+
 AllPhases, PhasesForPhaseKind = expandPhases()
 
 # Name phases based on phase kind name and index if there are multiple phases
@@ -247,21 +319,26 @@ for phaseKind in AllPhaseKinds:
             phase.name = "%s_%d" % (phaseKind.name, index + 1)
 
 # Find the maximum phase nesting.
-
 MaxPhaseNesting = max(phase.depth for phase in AllPhases) + 1
 
+# And the maximum bucket number.
+MaxBucket = max(kind.bucket for kind in AllPhaseKinds)
+
 # Generate code.
+
 
 def writeList(out, items):
     if items:
         out.write(",\n".join("  " + item for item in items) + "\n")
 
+
 def writeEnumClass(out, name, type, items, extraItems):
-    items = [ "FIRST" ] + items + [ "LIMIT" ] + extraItems
+    items = ["FIRST"] + list(items) + ["LIMIT"] + list(extraItems)
     items[1] += " = " + items[0]
-    out.write("enum class %s : %s {\n" % (name, type));
+    out.write("enum class %s : %s {\n" % (name, type))
     writeList(out, items)
     out.write("};\n")
+
 
 def generateHeader(out):
     #
@@ -271,7 +348,7 @@ def generateHeader(out):
     extraPhaseKinds = [
         "NONE = LIMIT",
         "EXPLICIT_SUSPENSION = LIMIT",
-        "IMPLICIT_SUSPENSION"
+        "IMPLICIT_SUSPENSION",
     ]
     writeEnumClass(out, "PhaseKind", "uint8_t", phaseKindNames, extraPhaseKinds)
     out.write("\n")
@@ -280,11 +357,7 @@ def generateHeader(out):
     # Generate Phase enum.
     #
     phaseNames = map(lambda phase: phase.name, AllPhases)
-    extraPhases = [
-        "NONE = LIMIT",
-        "EXPLICIT_SUSPENSION = LIMIT",
-        "IMPLICIT_SUSPENSION"
-    ]
+    extraPhases = ["NONE = LIMIT", "EXPLICIT_SUSPENSION = LIMIT", "IMPLICIT_SUSPENSION"]
     writeEnumClass(out, "Phase", "uint8_t", phaseNames, extraPhases)
     out.write("\n")
 
@@ -293,15 +366,18 @@ def generateHeader(out):
     #
     out.write("static const size_t MAX_PHASE_NESTING = %d;\n" % MaxPhaseNesting)
 
+
 def generateCpp(out):
     #
     # Generate the PhaseKindInfo table.
     #
-    out.write("static const PhaseKindTable phaseKinds = {\n")
+    out.write("static constexpr PhaseKindTable phaseKinds = {\n")
     for phaseKind in AllPhaseKinds:
         phase = PhasesForPhaseKind[phaseKind][0]
-        out.write("    /* PhaseKind::%s */ PhaseKindInfo { Phase::%s, %d },\n" %
-                  (phaseKind.name, phase.name, phaseKind.bucket))
+        out.write(
+            '    /* PhaseKind::%s */ PhaseKindInfo { Phase::%s, %d, "%s" },\n'
+            % (phaseKind.name, phase.name, phaseKind.bucket, phaseKind.name)
+        )
     out.write("};\n")
     out.write("\n")
 
@@ -311,18 +387,27 @@ def generateCpp(out):
     def name(phase):
         return "Phase::" + phase.name if phase else "Phase::NONE"
 
-    out.write("static const PhaseTable phases = {\n")
+    out.write("static constexpr PhaseTable phases = {\n")
     for phase in AllPhases:
         firstChild = phase.children[0] if phase.children else None
         phaseKind = phase.phaseKind
-        out.write("    /* %s */ PhaseInfo { %s, %s, %s, %s, PhaseKind::%s, %d, \"%s\", \"%s\" },\n" %
-                  (name(phase),
-                   name(phase.parent),
-                   name(firstChild),
-                   name(phase.nextSibling),
-                   name(phase.nextInPhaseKind),
-                   phaseKind.name,
-                   phase.depth,
-                   phaseKind.descr,
-                   phase.path))
+        out.write(
+            '    /* %s */ PhaseInfo { %s, %s, %s, %s, PhaseKind::%s, %d, "%s", "%s" },\n'
+            % (  # NOQA: E501
+                name(phase),
+                name(phase.parent),
+                name(firstChild),
+                name(phase.nextSibling),
+                name(phase.nextInPhaseKind),
+                phaseKind.name,
+                phase.depth,
+                phaseKind.descr,
+                phase.path,
+            )
+        )
     out.write("};\n")
+
+    #
+    # Print in a comment the next available phase kind number.
+    #
+    out.write("// The next available phase kind number is: %d\n" % (MaxBucket + 1))

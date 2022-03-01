@@ -1,0 +1,106 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Bengali_InterIndic.txt
+# Generated from CLDR
+#
+
+# Bengali-InterIndic
+ো→\uE04B; # VOWEL SIGN O
+ৌ→\uE04C; # VOWEL SIGN AU
+\u0981→\uE001; # SIGN CANDRABINDU
+ং→\uE002; # SIGN ANUSVARA
+ঃ→\uE003; # SIGN VISARGA
+অ→\uE005; # LETTER A
+আ→\uE006; # LETTER AA
+ই→\uE007; # LETTER I
+ঈ→\uE008; # LETTER II
+উ→\uE009; # LETTER U
+ঊ→\uE00A; # LETTER UU
+ঋ→\uE00B; # LETTER VOCALIC R
+ঌ→\uE00C; # LETTER VOCALIC L
+এ→\uE00F; # LETTER E
+ঐ→\uE010; # LETTER AI
+ও→\uE013; # LETTER O
+ঔ→\uE014; # LETTER AU
+ক→\uE015; # LETTER KA
+খ→\uE016; # LETTER KHA
+গ→\uE017; # LETTER GA
+ঘ→\uE018; # LETTER GHA
+ঙ→\uE019; # LETTER NGA
+চ→\uE01A; # LETTER CA
+ছ→\uE01B; # LETTER CHA
+জ→\uE01C; # LETTER JA
+ঝ→\uE01D; # LETTER JHA
+ঞ→\uE01E; # LETTER NYA
+ট→\uE01F; # LETTER TTA
+ঠ→\uE020; # LETTER TTHA
+ড→\uE021; # LETTER DDA
+ঢ→\uE022; # LETTER DDHA
+ণ→\uE023; # LETTER NNA
+ত→\uE024; # LETTER TA
+থ→\uE025; # LETTER THA
+দ→\uE026; # LETTER DA
+ধ→\uE027; # LETTER DHA
+ন→\uE028; # LETTER NA
+প→\uE02A; # LETTER PA
+ফ→\uE02B; # LETTER PHA
+ব→\uE02C; # LETTER BA
+ভ→\uE02D; # LETTER BHA
+ম→\uE02E; # LETTER MA
+য→\uE02F; # LETTER YA
+র→\uE030; # LETTER RA
+ল→\uE032; # LETTER LA
+শ→\uE036; # LETTER SHA
+ষ→\uE037; # LETTER SSA
+স→\uE038; # LETTER SA
+হ→\uE039; # LETTER HA
+\u09BC→\uE03C; # SIGN NUKTA
+ঽ→\uE03D; # SIGN AVAGRAHA
+া→\uE03E; # VOWEL SIGN AA
+ি→\uE03F; # VOWEL SIGN I
+ী→\uE040; # VOWEL SIGN II
+\u09C1→\uE041; # VOWEL SIGN U
+\u09C2→\uE042; # VOWEL SIGN UU
+\u09C3→\uE043; # VOWEL SIGN VOCALIC R
+\u09C4→\uE044; # VOWEL SIGN VOCALIC RR
+ে→\uE047; # VOWEL SIGN E
+ৈ→\uE048; # VOWEL SIGN AI
+ো→\uE04B;
+ৌ→\uE04C;
+#
+\u09CD→\uE04D; # SIGN VIRAMA
+ৎ→\uE083; # Khanda-ta
+ৗ→\uE057; # AU LENGTH MARK
+#
+ৠ→\uE060; # LETTER VOCALIC RR
+ৡ→\uE061; # LETTER VOCALIC LL
+\u09E2→\uE062; # VOWEL SIGN VOCALIC L
+\u09E3→\uE063; # VOWEL SIGN VOCALIC LL
+০→\uE066; # DIGIT ZERO
+১→\uE067; # DIGIT ONE
+২→\uE068; # DIGIT TWO
+৩→\uE069; # DIGIT THREE
+৪→\uE06A; # DIGIT FOUR
+৫→\uE06B; # DIGIT FIVE
+৬→\uE06C; # DIGIT SIX
+৭→\uE06D; # DIGIT SEVEN
+৮→\uE06E; # DIGIT EIGHT
+৯→\uE06F; # DIGIT NINE
+ৰ→\uE071; # Bengali-InterIndic: LETTER RA WITH MIDDLE DIAGONAL
+ৱ→\uE072; # Bengali-InterIndic: LETTER RA WITH LOWER DIAGONAL
+৲→\uE073; # Bengali-InterIndic: RUPEE MARK
+৳→\uE074; # Bengali-InterIndic: RUPEE SIGN
+৴→\uE075; # Bengali-InterIndic: CURRENCY NUMERATOR ONE
+৵→\uE076; # Bengali-InterIndic: CURRENCY NUMERATOR TWO
+৶→\uE077; # Bengali-InterIndic: CURRENCY NUMERATOR THREE
+৷→\uE078; # Bengali-InterIndic: CURRENCY NUMERATOR FOUR
+৸→\uE079; # Bengali-InterIndic: CURRENCY NUMERATOR ONE LESS THAN THE DENOMINATOR
+৹→\uE07A; # Bengali-InterIndic: CURRENCY DENOMINATOR SIXTEEN
+৺→\uE07B; # ISSHAR
+।→\uE064;        # DANDA
+॥→\uE065;        # DOUBLE DANDA
+#    :: NFC (NFD) ;
+# eof
+

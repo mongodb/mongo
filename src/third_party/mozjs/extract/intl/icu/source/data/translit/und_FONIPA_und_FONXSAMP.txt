@@ -1,0 +1,235 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: und_FONIPA_und_FONXSAMP.txt
+# Generated from CLDR
+#
+
+# Conversion between IPA and X-SAMPA phonetic transcription.
+#
+# See http://www.phon.ucl.ac.uk/home/sampa/x-sampa.htm for a description of
+# X-SAMPA, an ASCII encoding of the International Phonetic Alphabet.
+#
+# The following obsolete or extended IPA symbols have no X-SAMPA equivalents
+# and remain unaffected by this transform:
+#
+#   ʞ  LATIN SMALL LETTER TURNED K
+#   ʩ  LATIN SMALL LETTER FENG DIGRAPH
+#   ʪ  LATIN SMALL LETTER LS DIGRAPH
+#   ʫ  LATIN SMALL LETTER LZ DIGRAPH
+#   ʬ  LATIN LETTER BILABIAL PERCUSSIVE
+#   ʭ  LATIN LETTER BIDENTAL PERCUSSIVE
+#
+# An IPA tie bar is transformed to an X-SAMPA underscore, per the official
+# X-SAMPA guidelines.  This can result in certain ambiguities: For example, the
+# labial-velar nasal (http://en.wikipedia.org/wiki/Labial-velar_nasal) can be
+# either written as [ŋ\u0361m] or [m\u0361ŋ] in IPA.  However, neither version can be
+# represented unambiguously in X-SAMPA: IPA [ŋ\u0361m] becomes X-SAMPA [N_m], which
+# is also used to represent a hypothetical laminal (_m) velar nasal, IPA [ŋ\u033B];
+# and IPA [m\u0361ŋ] becomes X-SAMPA [m_N], which can also represent a linguolabial
+# (_N) nasal, IPA [m\u033C], which is more appropriately written [n\u033C].  To avoid
+# unintended ambiguities, it may therefore be advisable to write affricates
+# without tie bars.
+#
+$t = '_';  # X-SAMPA representation of IPA tie bar.
+::NFD(NFC);
+# 5-character X-SAMPA representations
+ʯ ↔ 'z`_w=';      # LATIN SMALL LETTER TURNED H WITH FISHHOOK AND TAIL
+# Alternative 5-character X-SAMPA representations
+n\u031F\u030A ← 'n_+_0';
+n\u0320\u030A ← 'n_-_0';
+n\u032A\u030A ← 'n_d_0';
+n\u033A\u030A ← 'n_a_0';
+n\u033B\u030A ← 'n_m_0';
+n\u033C\u030A ← 'n_N_0';
+ɻ\u030A ← 'r\`_0';
+# 4-character X-SAMPA representations
+ǁ ↔ '|\|\';       # LATIN LETTER LATERAL CLICK
+ʄ ↔ 'J\_<';    # LATIN SMALL LETTER DOTLESS J WITH STROKE AND HOOK
+ʛ ↔ 'G\_<';    # LATIN LETTER SMALL CAPITAL G WITH HOOK
+ʮ ↔ 'z_w=';       # LATIN SMALL LETTER TURNED H WITH FISHHOOK
+\u1DC4 ↔ '_H_T';  # COMBINING MACRON-ACUTE
+\u1DC5 ↔ '_B_L';  # COMBINING GRAVE-MACRON
+\u1DC8 ↔ '_R_F';  # COMBINING GRAVE-ACUTE-GRAVE
+# Alternative 4-character X-SAMPA representations
+ɭ\u030A ← 'l`_0';
+ɰ\u030A ← 'M\_0';
+ɳ\u030A ← 'n`_0';
+ɽ\u030A ← 'r`_0';
+# 3-character X-SAMPA representations
+ɓ ↔ 'b_<';     # LATIN SMALL LETTER B WITH HOOK
+ɗ ↔ 'd_<';     # LATIN SMALL LETTER D WITH HOOK
+ɠ ↔ 'g_<';     # LATIN SMALL LETTER G WITH HOOK
+ɻ ↔ 'r\`';        # LATIN SMALL LETTER TURNED R WITH HOOK
+↗ ↔ '<R>';  # NORTH EAST ARROW
+↘ ↔ '<F>';  # SOUTH EAST ARROW
+# Alternative 3-character X-SAMPA representations
+j\u030A ← 'j_0';
+ŋ\u030A ← 'N_0';
+ɥ\u030A ← 'H_0';
+ɱ\u030A ← 'F_0';
+ɲ\u030A ← 'J_0';
+# 2-character X-SAMPA representations
+ħ ↔ 'X\';      # LATIN SMALL LETTER H WITH STROKE
+ǀ ↔ '|\';      # LATIN LETTER DENTAL CLICK
+ǂ ↔ '=\';      # LATIN LETTER ALVEOLAR CLICK
+ǃ ↔ '!\';      # LATIN LETTER RETROFLEX CLICK
+ɕ ↔ 's\';      # LATIN SMALL LETTER C WITH CURL
+ɖ ↔ 'd`';      # LATIN SMALL LETTER D WITH TAIL
+ɘ ↔ '@\';      # LATIN SMALL LETTER REVERSED E
+ɚ ↔ '@`';      # LATIN SMALL LETTER SCHWA WITH HOOK
+ɝ ↔ '3`';      # LATIN SMALL LETTER REVERSED OPEN E WITH HOOK
+ɞ ↔ '3\';      # LATIN SMALL LETTER CLOSED REVERSED OPEN E
+ɟ ↔ 'J\';      # LATIN SMALL LETTER DOTLESS J WITH STROKE
+ɢ ↔ 'G\';      # LATIN LETTER SMALL CAPITAL G
+ɦ ↔ 'h\';      # LATIN SMALL LETTER H WITH HOOK
+ɧ ↔ 'x\';      # LATIN SMALL LETTER HENG WITH HOOK
+ɭ ↔ 'l`';      # LATIN SMALL LETTER L WITH RETROFLEX HOOK
+ɮ ↔ 'K\';      # LATIN SMALL LETTER LEZH
+ɰ ↔ 'M\';      # LATIN SMALL LETTER TURNED M WITH LONG LEG
+ɳ ↔ 'n`';      # LATIN SMALL LETTER N WITH RETROFLEX HOOK
+ɴ ↔ 'N\';      # LATIN LETTER SMALL CAPITAL N
+ɸ ↔ 'p\';      # LATIN SMALL LETTER PHI
+ɹ ↔ 'r\';      # LATIN SMALL LETTER TURNED R
+ɺ ↔ 'l\';      # LATIN SMALL LETTER TURNED R WITH LONG LEG
+ɽ ↔ 'r`';      # LATIN SMALL LETTER R WITH TAIL
+ʀ ↔ 'R\';      # LATIN LETTER SMALL CAPITAL R
+ʂ ↔ 's`';      # LATIN SMALL LETTER S WITH HOOK
+ʈ ↔ 't`';      # LATIN SMALL LETTER T WITH RETROFLEX HOOK
+ʐ ↔ 'z`';      # LATIN SMALL LETTER Z WITH RETROFLEX HOOK
+ʑ ↔ 'z\';      # LATIN SMALL LETTER Z WITH CURL
+ʕ ↔ '?\';      # LATIN LETTER PHARYNGEAL VOICED FRICATIVE
+ʘ ↔ 'O\';      # LATIN LETTER BILABIAL CLICK
+ʙ ↔ 'B\';      # LATIN LETTER SMALL CAPITAL B
+ʜ ↔ 'H\';      # LATIN LETTER SMALL CAPITAL H
+ʝ ↔ 'j\';      # LATIN SMALL LETTER J WITH CROSSED-TAIL
+ʟ ↔ 'L\';      # LATIN LETTER SMALL CAPITAL L
+ʡ ↔ '>\';      # LATIN LETTER GLOTTAL STOP WITH STROKE
+ʢ ↔ '<\';      # LATIN LETTER REVERSED GLOTTAL STOP WITH STROKE
+ʰ ↔ '_h';      # MODIFIER LETTER SMALL H
+ʷ ↔ '_w';      # MODIFIER LETTER SMALL W
+ʼ ↔ '_>';      # MODIFIER LETTER APOSTROPHE
+ˆ ↔ '_\';      # MODIFIER LETTER CIRCUMFLEX ACCENT
+ˇ ↔ '_/';      # CARON
+ˑ ↔ ':\';      # MODIFIER LETTER HALF TRIANGULAR COLON
+ˠ ↔ '_G';      # MODIFIER LETTER SMALL GAMMA
+ˡ ↔ '_l';      # MODIFIER LETTER SMALL L
+ˤ ↔ '_?\';     # MODIFIER LETTER SMALL REVERSED GLOTTAL STOP
+\u0300 ↔ '_L';    # COMBINING GRAVE ACCENT
+\u0301 ↔ '_H';    # COMBINING ACUTE ACCENT
+\u0302 ↔ '_F';    # COMBINING CIRCUMFLEX ACCENT
+\u0304 ↔ '_M';    # COMBINING MACRON
+\u0306 ↔ '_X';    # COMBINING BREVE
+\u0308 ↔ '_"';    # COMBINING DIAERESIS
+\u030B ↔ '_T';    # COMBINING DOUBLE ACUTE ACCENT
+\u030C ↔ '_R';    # COMBINING CARON
+\u030F ↔ '_B';    # COMBINING DOUBLE GRAVE ACCENT
+\u0318 ↔ '_A';    # COMBINING LEFT TACK BELOW
+\u0319 ↔ '_q';    # COMBINING RIGHT TACK BELOW
+\u031A ↔ '_}';    # COMBINING LEFT ANGLE ABOVE
+\u031C ↔ '_c';    # COMBINING LEFT HALF RING BELOW
+\u031D ↔ '_r';    # COMBINING UP TACK BELOW
+\u031E ↔ '_o';    # COMBINING DOWN TACK BELOW
+\u031F ↔ '_+';    # COMBINING PLUS SIGN BELOW
+\u0320 ↔ '_-';    # COMBINING MINUS SIGN BELOW
+\u0324 ↔ '_t';    # COMBINING DIAERESIS BELOW
+\u0325 ↔ '_0';    # COMBINING RING BELOW
+\u032A ↔ '_d';    # COMBINING BRIDGE BELOW
+\u032C ↔ '_v';    # COMBINING CARON BELOW
+\u032F ↔ '_^';    # COMBINING INVERTED BREVE BELOW
+\u0330 ↔ '_k';    # COMBINING TILDE BELOW
+\u0334 ↔ '_e';    # COMBINING TILDE OVERLAY
+\u0339 ↔ '_O';    # COMBINING RIGHT HALF RING BELOW
+\u033A ↔ '_a';    # COMBINING INVERTED BRIDGE BELOW
+\u033B ↔ '_m';    # COMBINING SQUARE BELOW
+\u033C ↔ '_N';    # COMBINING SEAGULL BELOW
+\u033D ↔ '_x';    # COMBINING X ABOVE
+ᵻ ↔ 'I\';      # LATIN SMALL CAPITAL LETTER I WITH STROKE
+ᵿ ↔ 'U\';      # LATIN SMALL CAPITAL LETTER U WITH STROKE
+ⁿ ↔ '_n';      # MODIFIER LETTER LATIN SMALL LETTER N
+# Alternative 2-character X-SAMPA representations
+ʋ ← 'v\';         # LATIN SMALL LETTER V WITH HOOK
+ʲ ← '_j';         # MODIFIER LETTER SMALL J
+\u0303 ← '_~';    # COMBINING TILDE
+\u0329 ← '_=';    # COMBINING VERTICAL LINE BELOW
+# 1-character X-SAMPA representations
+c\u0327 ↔ C;      # LATIN SMALL LETTER C WITH CEDILLA (decomposed)
+æ ↔ '{';          # LATIN SMALL LETTER AE
+ð ↔ D;            # LATIN SMALL LETTER ETH
+ø ↔ 2;            # LATIN SMALL LETTER O WITH STROKE
+ŋ ↔ N;            # LATIN SMALL LETTER ENG
+œ ↔ 9;            # LATIN SMALL LIGATURE OE
+ɐ ↔ 6;            # LATIN SMALL LETTER TURNED A
+ɑ ↔ A;            # LATIN SMALL LETTER ALPHA
+ɒ ↔ Q;            # LATIN SMALL LETTER TURNED ALPHA
+ɔ ↔ O;            # LATIN SMALL LETTER OPEN O
+ə ↔ '@';          # LATIN SMALL LETTER SCHWA
+ɛ ↔ E;            # LATIN SMALL LETTER OPEN E
+ɜ ↔ 3;            # LATIN SMALL LETTER REVERSED OPEN E
+ɡ ↔ g;            # LATIN SMALL LETTER SCRIPT G
+ɣ ↔ G;            # LATIN SMALL LETTER GAMMA
+ɤ ↔ 7;            # LATIN SMALL LETTER RAMS HORN
+ɥ ↔ H;            # LATIN SMALL LETTER TURNED H
+ɨ ↔ 1;            # LATIN SMALL LETTER I WITH STROKE
+ɪ ↔ I;            # LATIN LETTER SMALL CAPITAL I
+ɫ ↔ 5;            # LATIN SMALL LETTER L WITH MIDDLE TILDE
+ɬ ↔ K;            # LATIN SMALL LETTER L WITH BELT
+ɯ ↔ M;            # LATIN SMALL LETTER TURNED M
+ɱ ↔ F;            # LATIN SMALL LETTER M WITH HOOK
+ɲ ↔ J;            # LATIN SMALL LETTER N WITH LEFT HOOK
+ɵ ↔ 8;            # LATIN SMALL LETTER BARRED O
+ɶ ↔ '&';          # LATIN LETTER SMALL CAPITAL OE
+ɾ ↔ 4;            # LATIN SMALL LETTER R WITH FISHHOOK
+ʁ ↔ R;            # LATIN LETTER SMALL CAPITAL INVERTED R
+ʃ ↔ S;            # LATIN SMALL LETTER ESH
+ʉ ↔ '}';          # LATIN SMALL LETTER U BAR
+ʊ ↔ U;            # LATIN SMALL LETTER UPSILON
+ʋ ↔ P;            # LATIN SMALL LETTER V WITH HOOK
+ʌ ↔ V;            # LATIN SMALL LETTER TURNED V
+ʍ ↔ W;            # LATIN SMALL LETTER TURNED W
+ʎ ↔ L;            # LATIN SMALL LETTER TURNED Y
+ʏ ↔ Y;            # LATIN LETTER SMALL CAPITAL Y
+ʒ ↔ Z;            # LATIN SMALL LETTER EZH
+ʔ ↔ '?';          # LATIN LETTER GLOTTAL STOP
+ʲ ↔ \';           # MODIFIER LETTER SMALL J
+ˈ ↔ '"';          # MODIFIER LETTER VERTICAL LINE
+ˌ ↔ '%';          # MODIFIER LETTER LOW VERTICAL LINE
+ː ↔ ':';          # MODIFIER LETTER TRIANGULAR COLON
+˞ ↔ '`';          # MODIFIER LETTER RHOTIC HOOK
+\u0303 ↔ '~';     # COMBINING TILDE
+\u0329 ↔ '=';     # COMBINING VERTICAL LINE BELOW
+\u0361 ↔ $t;      # COMBINING DOUBLE INVERTED BREVE
+β ↔ B;            # GREEK SMALL LETTER BETA
+θ ↔ T;            # GREEK SMALL LETTER THETA
+χ ↔ X;            # GREEK SMALL LETTER CHI
+↑ ↔ '^';          # UPWARDS ARROW
+↓ ↔ '!';          # DOWNWARDS ARROW
+# Compatibility rules for variant or obsolete IPA symbols
+g → g;            # LATIN SMALL LETTER G (redundant, for additional clarity)
+ȵ → J;            # LATIN SMALL LETTER N WITH CURL
+ɩ → I;            # LATIN SMALL LETTER IOTA
+ɷ → U;            # LATIN SMALL LETTER CLOSED OMEGA
+ɼ → 'r_r';        # LATIN SMALL LETTER R WITH LONG LEG
+ɿ → 'z=';         # LATIN SMALL LETTER REVERSED R WITH FISHHOOK
+ʅ → 'z`=';        # LATIN SMALL LETTER SQUAT REVERSED ESH
+ʆ → S\';          # LATIN SMALL LETTER ESH WITH CURL
+ʇ → '|\' ;        # LATIN SMALL LETTER TURNED T
+ʓ → Z\';          # LATIN SMALL LETTER EZH WITH CURL
+ʖ → '|\|\';       # LATIN LETTER INVERTED GLOTTAL STOP
+ʗ → '!\';         # LATIN LETTER STRETCHED C
+ʚ → '3\';         # LATIN SMALL LETTER CLOSED OPEN E
+ʠ → 'G\_<_0';  # LATIN SMALL LETTER Q WITH HOOK
+ʣ → d $t z;       # LATIN SMALL LETTER DZ DIGRAPH
+ʤ → d $t Z;       # LATIN SMALL LETTER DEZH DIGRAPH
+ʥ → d $t 'z\';    # LATIN SMALL LETTER DZ DIGRAPH WITH CURL
+ʦ → t $t s;       # LATIN SMALL LETTER TS DIGRAPH
+ʧ → t $t S;       # LATIN SMALL LETTER TESH DIGRAPH
+ʨ → t $t 's\';    # LATIN SMALL LETTER TC DIGRAPH WITH CURL
+˔ → '_r';         # MODIFIER LETTER UP TACK
+˕ → '_o';         # MODIFIER LETTER DOWN TACK
+\u030A → '_0';    # COMBINING RING ABOVE
+φ → 'p\';         # GREEK SMALL LETTER PHI
+ꞎ → 'K`';         # LATIN SMALL LETTER L WITH RETROFLEX HOOK AND BELT
+::NFC(NFD);
+

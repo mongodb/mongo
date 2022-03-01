@@ -1,0 +1,23 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sq{
+    collations{
+        standard{
+            Sequence{
+                "&[before 1]D<ç<<<Ç"
+                "&[before 1]E<dh<<<Dh<<<DH"
+                "&[before 1]F<ë<<<Ë"
+                "&[before 1]H<gj<<<Gj<<<GJ"
+                "&[before 1]M<ll<<<Ll<<<LL"
+                "&[before 1]O<nj<<<Nj<<<NJ"
+                "&[before 1]S<rr<<<Rr<<<RR"
+                "&[before 1]T<sh<<<Sh<<<SH"
+                "&[before 1]U<th<<<Th<<<TH"
+                "&[before 1]Y<xh<<<Xh<<<XH"
+                "&[before 1]Ʒ<zh<<<Zh<<<ZH"
+            }
+            Version{"39"}
+        }
+    }
+}

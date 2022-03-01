@@ -1,0 +1,47 @@
+Copyright (C) 2016 and later: Unicode, Inc. and others. License & terms of use: http://www.unicode.org/copyright.html
+Copyright (c) 2002-2011, International Business Machines Corporation and others. All Rights Reserved.
+
+The genren.pl script is used to generate source/common/unicode/urename.h header file, which is needed for renaming the ICU exported names. 
+
+This script is intended to be used on Linux, although it should work on any platform that has Perl and nm command. Makefile may need to be updated, it's not 100% portable. 
+
+It also does not currently work well in an out-of-source situation.
+
+The following instructions are for Linux version.
+- urename.h file should be generated after implementation is complete for a release.
+- the version number for a release should be set according to the list in source/common/unicode/uvernum.h
+- Note: If you are running the script in a clean checkout, you must run the runConfigureICU at least once before
+  running the make install-header command below.
+
+Before generating urename.h, the layout engine header files must be installed from the harfbuzz project.
+This is prerequisite for the icu layoutex (Paragraph Layout) project, which is subject to renaming.
+(Using the svn command is the simplest way of getting just the files from one subdirectory of the git project.)
+
+    cd icu4c/source
+    svn export https://github.com/behdad/icu-le-hb/trunk/src layout
+
+(As an alternative to the above handling of layout engine header files, you can do the following:
+1. In the Makefile in this directory, temporarily delete $(LEX) from the list of objects for LIBS
+   before running make install-header
+2. After running make install-header, restore the deleted $(LEX) in the Makefile
+3. Then when comparing the old urename.h to the newly generated one, copy all of the lines beginning
+   "#define pl_" from the old version to the new one.
+ - Peter E)
+
+- Regenerate urename.h
+
+    cd icu4c/source/tools/genren
+    make install-header
+
+- urename.h will be updated in icu/source/common/unicode/urename.h  **in your original source directory**
+- Warnings concerning bad namespace (not 'icu') on UCaseMap can be ignored.
+- The defines for "__bss_start", "_edata", and "_end" should be ignored/removed (See ICU-20176).
+- Eyeball the new file for errors
+
+    cd icu4c/source
+    git diff common/unicode/urename.h
+
+- Other make targets here
+
+    clean      - cleans out intermediate files
+    urename.h  -just builds ./urename.h 

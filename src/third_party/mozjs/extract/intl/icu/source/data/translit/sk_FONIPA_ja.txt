@@ -1,0 +1,259 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: sk_FONIPA_ja.txt
+# Generated from CLDR
+#
+
+# Phonemic transcription of Slovak into Katakana.
+$vowel = [aeiouw] ;       # Vowels and glides
+$not_vowel = [^$vowel] ;
+#
+#
+# First pass: Collapse phonetic distinctions that are not preserved in Katakana
+#
+t \' → | t ʃ ;
+t \u0361 → | t ;
+d \u0361 ʒ → | ʒ ;
+d \u0361 z → | z ;
+r\u0329 → | r ;
+u\u032F → | u ;
+ŋ → | n ;
+ɔ → | o ;
+ɛ → | a ;
+ɟ → | d ;
+ɡ → | g ;
+ɦ → | h ;
+ɪ → | i ;
+ɱ → | m ;
+ʎ → | l;
+::Null;
+([bcdfghklmnprstvzʃʒ]) ː → $1 $1;
+::Null;
+# Main pass: Phoneme to Katakana conversion.
+a → ア;
+ba → バ;
+be → ベ;
+bi → ビ;
+bo → ボ;
+bu → ブ;
+b → ブ;
+#
+#
+ca → チャ ; # not backed by data
+ce → チェ ;
+ci → チ ;
+cu → チュ ; # not backed by data
+co → チョ ; # not backed by data
+c → チ ;
+#
+#
+da → ダ ;
+de → デ ;
+di → ディ ;
+do → ド ;
+du → ドゥ ;
+d → ド ;
+#
+#
+e → エ ;
+#
+#
+fa → ファ ;
+fe → フェ ;
+fi → フィ ;
+fo → フォ ;
+fu → フ ;
+f → フ ;
+#
+#
+ga → ガ;
+ge → ゲ;
+gi → ギ;
+go → ゴ;
+gu → グ;
+g → グ;
+#
+#
+ha → ハ ;
+hwe → フェ ;
+he → ヘ ;
+hi → ヒ ; # not backed by data
+ho → ホ ;
+hu → フ ;
+h → フ ;
+#
+#
+^ { ia → ヤ ;
+i → イ ;
+#
+#
+ja → ヤ ;
+je → イェ ;
+ji → イ ; # not backed by data
+jo → ヨ ;
+ju → ユ ;
+#
+#
+ka → カ ;
+ke → ケ ;
+ki → キ ;
+ko → コ ;
+ku → ク ;
+k → ク ;
+#
+#
+l \' a → リヤ ;
+l \' e → レ ; # not backed by data
+l \' i → リ ; # not backed by data
+l \' o → リヨ ; # not backed by data
+l \' u → リユ ; # not backed by data
+l \' → リ ;
+#
+#
+la → ラ ;
+le → レ ;
+li → リ ;
+lo → ロ ;
+lu → ル ;
+l →  ル ;
+#
+#
+ma → マ ;
+me → メ ;
+mi → ミ ;
+mo → モ ;
+mu → ム ;
+m } [bp] → ン ;
+m → ム ;
+#
+#
+ɲa → ニャ ;
+ɲe → ネ ;
+ɲi → ニ ;
+ɲo → ニョ ; # not backed by data
+ɲu → ニュ ; # not backed by data
+ɲ → ニ ;
+#
+#
+na → ナ ;
+ne → ネ ;
+ni → ニ ;
+no → ノ ;
+nu → ヌ ;
+n → ン ;
+#
+#
+o → オ ;
+#
+#
+pa → パ ;
+pe → ペ ;
+pi → ピ ;
+po → ポ ;
+pu → プ ;
+p → プ ;
+#
+#
+ra → ラ ;
+re → レ ;
+ri → リ ;
+ro → ロ ;
+ru → ル ;
+r → ル;
+#
+#
+sa → サ ;
+se → セ ;
+si → シ ;
+so → ソ ;
+su → ス ;
+s → ス ;
+#
+#
+ʃa → シャ ;
+ʃe → シェ ;
+ʃio → ショ ;
+ʃi → シ ;
+ʃo → ショ ;
+ʃu → シュ ;
+ʃ → シュ ;
+#
+#
+ta → タ ;
+te → テ ;
+ti → ティ ;
+to → ト ;
+tu → トゥ ;
+#
+#
+tʃa → チャ ;
+tʃea → チャ ;
+tʃe → チェ ;
+tʃiu → チュ ;
+tʃi → チ ;
+tʃo → チョ ;
+tʃu → チュ ;
+tʃ → チュ ;
+#
+#
+tsa → チャ ;
+tse → ツェ ;
+tsi → ツィ;
+tso → ツォ ;
+tsu → ツ ;
+ts → ツ ;
+t → ト ;
+#
+#
+u → ウ ;
+#
+#
+va → バ ;
+ve → ベ ;
+vu → ブ ;
+vi → ビ ;
+vo → ボ ;
+v → ヴ ;
+#
+#
+wa → ワ ;
+we → エ ; # not backed by data
+wi → イ ; # not backed by data
+wo → オ ; # not backed by data
+wu → ウ ; # not backed by data
+w → ウ ;
+#
+#
+xa → ハ ;
+xe → ヘ ; # not backed by data
+xi → ヒ ; # not backed by data
+xo → ホ ;
+xu → フ ; # not backed by data
+x → フ ;
+#
+#
+za → ザ ;
+ze → ゼ ;
+zi → ジ ;
+zo → ゾ ;
+zu → ズ ;
+z → ズ ;
+#
+#
+ʒa → ジャ ;
+ʒea → ジャ ;
+ʒe → ジェ ;
+ʒiu → ジュ ;
+ʒi → ジ ;
+ʒo → ジョ ;
+ʒu → ジュ ;
+ʒ → ジュ ;
+#
+#
+ː → ー ;
+' ' → ・;
+#
+#
+

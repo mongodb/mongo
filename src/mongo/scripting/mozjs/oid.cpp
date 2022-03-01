@@ -31,6 +31,7 @@
 
 #include "mongo/scripting/mozjs/oid.h"
 
+#include <js/Object.h>
 #include <memory>
 
 #include "mongo/scripting/mozjs/implscope.h"
@@ -51,8 +52,8 @@ const JSFunctionSpec OIDInfo::methods[3] = {
 
 const char* const OIDInfo::className = "ObjectId";
 
-void OIDInfo::finalize(js::FreeOp* fop, JSObject* obj) {
-    auto oid = static_cast<OID*>(JS_GetPrivate(obj));
+void OIDInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+    auto oid = static_cast<OID*>(JS::GetPrivate(obj));
 
     if (oid) {
         getScope(fop)->trackedDelete(oid);
@@ -60,7 +61,7 @@ void OIDInfo::finalize(js::FreeOp* fop, JSObject* obj) {
 }
 
 void OIDInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
-    auto oid = static_cast<OID*>(JS_GetPrivate(args.thisv().toObjectOrNull()));
+    auto oid = static_cast<OID*>(JS::GetPrivate(args.thisv().toObjectOrNull()));
 
     std::string str = str::stream() << "ObjectId(\"" << oid->toString() << "\")";
 
@@ -68,13 +69,13 @@ void OIDInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
 }
 
 void OIDInfo::Functions::toJSON::call(JSContext* cx, JS::CallArgs args) {
-    auto oid = static_cast<OID*>(JS_GetPrivate(args.thisv().toObjectOrNull()));
+    auto oid = static_cast<OID*>(JS::GetPrivate(args.thisv().toObjectOrNull()));
 
     ValueReader(cx, args.rval()).fromBSON(BSON("$oid" << oid->toString()), nullptr, false);
 }
 
 void OIDInfo::Functions::getter::call(JSContext* cx, JS::CallArgs args) {
-    auto oid = static_cast<OID*>(JS_GetPrivate(args.thisv().toObjectOrNull()));
+    auto oid = static_cast<OID*>(JS::GetPrivate(args.thisv().toObjectOrNull()));
 
     ValueReader(cx, args.rval()).fromStringData(oid->toString());
 }
@@ -98,7 +99,7 @@ void OIDInfo::make(JSContext* cx, const OID& oid, JS::MutableHandleValue out) {
 
     JS::RootedObject thisv(cx);
     scope->getProto<OIDInfo>().newObject(&thisv);
-    JS_SetPrivate(thisv, scope->trackedNew<OID>(oid));
+    JS::SetPrivate(thisv, scope->trackedNew<OID>(oid));
 
     out.setObjectOrNull(thisv);
 }
@@ -109,7 +110,7 @@ OID OIDInfo::getOID(JSContext* cx, JS::HandleValue value) {
 }
 
 OID OIDInfo::getOID(JSContext* cx, JS::HandleObject object) {
-    auto oid = static_cast<OID*>(JS_GetPrivate(object));
+    auto oid = static_cast<OID*>(JS::GetPrivate(object));
 
     if (oid) {
         return *oid;

@@ -1,0 +1,20 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+dsb{
+    collations{
+        standard{
+            Sequence{
+                "&C<č<<<Č<ć<<<Ć"
+                "&E<ě<<<Ě"
+                "&H<ch<<<cH<<<Ch<<<CH"
+                "&[before 1] L<ł<<<Ł"
+                "&N<ń<<<Ń"
+                "&R<ŕ<<<Ŕ"
+                "&S<š<<<Š<ś<<<Ś"
+                "&Z<ž<<<Ž<ź<<<Ź"
+            }
+            Version{"39"}
+        }
+    }
+}

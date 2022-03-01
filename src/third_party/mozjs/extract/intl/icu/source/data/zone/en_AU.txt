@@ -1,0 +1,94 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+en_AU{
+    %%Parent{"en_001"}
+    zoneStrings{
+        "Pacific:Johnston"{
+            ec{"Johnston"}
+        }
+        "meta:Africa_Eastern"{
+            ls{"Eastern Africa Time"}
+        }
+        "meta:Arabian"{
+            ld{"Arabia Daylight Time"}
+            lg{"Arabia Time"}
+            ls{"Arabia Standard Time"}
+        }
+        "meta:Australia_Central"{
+            ld{"Australian Central Daylight Time"}
+            lg{"Australian Central Time"}
+            ls{"Australian Central Standard Time"}
+            sd{"ACDT"}
+            sg{"ACT"}
+            ss{"ACST"}
+        }
+        "meta:Australia_CentralWestern"{
+            sd{"ACWDT"}
+            sg{"ACWT"}
+            ss{"ACWST"}
+        }
+        "meta:Australia_Eastern"{
+            ld{"Australian Eastern Daylight Time"}
+            lg{"Australian Eastern Time"}
+            ls{"Australian Eastern Standard Time"}
+            sd{"AEDT"}
+            sg{"AET"}
+            ss{"AEST"}
+        }
+        "meta:Australia_Western"{
+            ld{"Australian Western Daylight Time"}
+            lg{"Australian Western Time"}
+            ls{"Australian Western Standard Time"}
+            sd{"AWDT"}
+            sg{"AWT"}
+            ss{"AWST"}
+        }
+        "meta:China"{
+            ld{"China Summer Time"}
+            lg{"China Time"}
+            ls{"China Standard Time"}
+        }
+        "meta:Cook"{
+            ld{"Cook Island Summer Time"}
+            lg{"Cook Island Time"}
+            ls{"Cook Island Standard Time"}
+        }
+        "meta:Japan"{
+            ld{"Japan Summer Time"}
+            lg{"Japan Time"}
+            ls{"Japan Standard Time"}
+        }
+        "meta:Korea"{
+            ld{"Korean Summer Time"}
+            lg{"Korea Time"}
+            ls{"Korean Standard Time"}
+        }
+        "meta:Lord_Howe"{
+            sd{"LHDT"}
+            sg{"LHT"}
+            ss{"LHST"}
+        }
+        "meta:Moscow"{
+            ld{"Moscow Daylight Time"}
+            lg{"Moscow Time"}
+            ls{"Moscow Standard Time"}
+        }
+        "meta:New_Zealand"{
+            sd{"NZDT"}
+            sg{"NZT"}
+            ss{"NZST"}
+        }
+        "meta:Samoa"{
+            ld{"Samoa Summer Time"}
+            lg{"Samoa Time"}
+            ls{"Samoa Standard Time"}
+        }
+        "meta:Taipei"{
+            ld{"Taipei Summer Time"}
+            lg{"Taipei Time"}
+            ls{"Taipei Standard Time"}
+        }
+        gmtZeroFormat{"GMT"}
+    }
+}

@@ -1,0 +1,135 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: InterIndic_Arabic.txt
+# Generated from CLDR
+#
+
+$nonword = [^\uE000-\uE0FF];
+$wordBoundary = [^[:L:][:M:][:N:]];
+\uE015\uE03F\uE02F\uE03E } $nonword→كيا; # किया
+\uE026\uE03F\uE02F\uE03E } $nonword→ديا; # दिया
+\uE015\uE03F } $nonword→كي; # कि at word end
+\uE039\uE048→هي; # ह\u0948
+\uE001 } $nonword→ن; # chandrabindu at end to noon
+\uE001→ن; # chandrabindu not at end to noon
+\uE002 } $nonword→ن; # anusvara to noon at end
+\uE002→ن; # anusvara to noon \u0902
+\uE003→ه ا; # viarga to ha + alif  ः
+\uE004→ا; # short a to alif ऄ
+\uE005→ا; # अ
+\uE006→ا \u0653; # alif with mad आ
+[[:L:][:M:]] {\uE007}→ي; # इ after another letter or mark
+\uE007→إ; # इ at beginning of word
+[[:L:][:M:]] {\uE008}→ي; # ई after another letter or mark
+\uE008→إ; # ई at beginning of word
+\uE009→و; # उ
+\uE00A→و; # ऊ
+\uE00B→ر; # ऋ
+\uE00C→ل; # ऌ
+\uE00D→ا ي; # ऍ
+\uE00E→ي; # ऎ
+$wordBoundary {\uE00F} → إي; # word-initial ए
+\uE00F  } $nonword→ي; # ए use ي when at end
+\uE00F→ي; # ए use ي when not at end
+\uE010  } $nonword→ا ي; # ऐ use ي when at end
+\uE010→ا ي; # ऐ use ي when not at end
+\uE011→ا و; # ऑ
+\uE012→ا و; # ऒ
+\uE013→ا و; # ओ
+\uE014→ا و; # औ
+\uE015→ك; # क
+\uE016→كه; # ख
+\uE017→ج; # ग
+\uE018→جه; # घ
+\uE019→نج; # ङ
+\uE01A→تش; # च
+\uE01B→تشه; # छ
+\uE01C→ج; # ज
+\uE01D→جه; # झ
+\uE01E→ن; # ञ
+\uE01F→ط; # ट
+\uE020→طه; # ठ
+\uE021→د; # ड
+\uE022→ده; # ढ
+\uE023→ن; # ण
+\uE024→ت; # त
+\uE025→ته; # थ
+\uE026→د; # द
+\uE027→ده; # ध
+\uE028→ن; # न
+\uE029→ن; # ऩ
+\uE02A→ب; # प
+\uE02B→به; # फ
+\uE02C→ب; # ब
+\uE02D→به; # भ
+\uE02E→م; # म
+\uE02F→ي; # य
+\uE030→ر; # र
+\uE031→ر; # ऱ
+\uE032→ل; # ल
+\uE033→ر; # ळ
+\uE034→ر; # ऴ
+\uE035→و; # व
+\uE036→ش; # श
+\uE037→ش; # ष
+\uE038→س; # स
+\uE039→ه; # ह
+\uE03C→; # \u093C
+\uE03D→; # ऽ
+\uE03E→ا; # ा
+\uE03F→ي; # ि
+\uE040→ي; # ी
+\uE041→و; # \u0941
+\uE042→و; # \u0942
+\uE043→ر; # \u0943
+\uE044→ر; # \u0944
+\uE045→ن; # \u0945
+\uE046→ي; # \u0946
+\uE047 } $nonword→ي; # \u0947 use ي when at end
+\uE047→ي; # \u0947 use ي when not at end
+\uE048 } $nonword→ا ي; # \u0948 use ي when at end
+\uE048→ا ي; # \u0948 use ي when not at end
+\uE049→و; # ॉ
+\uE04A→ا و; # ॊ
+\uE04B→و; # ो
+\uE04C→ا و; # ौ
+\uE04D→; # \u094D
+\uE050→ا و; # ॐ
+\uE051→; # \u0951
+\uE052→; # \u0952
+\uE053→; # \u0953
+\uE054→; # \u0954
+\uE058→ق; # क़
+\uE059→خ; # ख़
+\uE05A→غ; # ग़
+\uE05B→ز; # ज़
+\uE05C→ر; # ड़
+\uE05D→ره; # ढ़
+\uE05E→ف; # फ़
+\uE05F→ي; # य़
+\uE060→ر; # ॠ
+\uE061→ل; # ॡ
+\uE062→ل; # \u0962
+\uE063→ل; # \u0963
+\uE064→۔; # ।
+\uE065→۔; # ॥
+\uE066→\.; # ०
+\uE067→١; # १
+\uE068→٢; # २
+\uE069→٣; # ३
+\uE06A→٤; # ४
+\uE06B→٥; # ५
+\uE06C→٦; # ६
+\uE06D→٧; # ७
+\uE06E→٨; # ८
+\uE06F→٩; # ९
+\uE070→\.; # ॰
+\uE082→; # ॽ
+# Remove sequences of alif characters.
+# For example, transform पाओला → بااولا → باولا.
+::null;
+$alif = [أإآا] [:M:]*;
+($alif) $alif+ → $1;
+

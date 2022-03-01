@@ -1,0 +1,856 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ro{
+    Keys{
+        calendar{"tip calendar"}
+        cf{"Format monedă"}
+        colAlternate{"sortare cu ignorarea simbolurilor"}
+        colBackwards{"sortare inversă după accent"}
+        colCaseFirst{"sortare după majuscule/minuscule"}
+        colCaseLevel{"sortare care ține seama de majuscule/minuscule"}
+        colNormalization{"sortare normalizată"}
+        colNumeric{"sortare numerică"}
+        colStrength{"puterea sortării"}
+        collation{"ordine de sortare"}
+        currency{"monedă"}
+        hc{"ciclu orar (12 sau 24)"}
+        lb{"stil de întrerupere a liniei"}
+        ms{"sistem de unități de măsură"}
+        numbers{"numere"}
+        timezone{"fus orar"}
+        va{"variantă locală"}
+        x{"utilizare privată"}
+    }
+    Languages{
+        aa{"afar"}
+        ab{"abhază"}
+        ace{"aceh"}
+        ach{"acoli"}
+        ada{"adangme"}
+        ady{"adyghe"}
+        ae{"avestană"}
+        af{"afrikaans"}
+        afh{"afrihili"}
+        agq{"aghem"}
+        ain{"ainu"}
+        ak{"akan"}
+        akk{"akkadiană"}
+        ale{"aleută"}
+        alt{"altaică meridională"}
+        am{"amharică"}
+        an{"aragoneză"}
+        ang{"engleză veche"}
+        anp{"angika"}
+        ar{"arabă"}
+        ar_001{"arabă standard modernă"}
+        arc{"aramaică"}
+        arn{"mapuche"}
+        arp{"arapaho"}
+        ars{"arabă najdi"}
+        arw{"arawak"}
+        as{"asameză"}
+        asa{"asu"}
+        ast{"asturiană"}
+        av{"avară"}
+        awa{"awadhi"}
+        ay{"aymara"}
+        az{"azeră"}
+        ba{"bașkiră"}
+        bal{"baluchi"}
+        ban{"balineză"}
+        bas{"basaa"}
+        bax{"bamun"}
+        bbj{"ghomala"}
+        be{"belarusă"}
+        bej{"beja"}
+        bem{"bemba"}
+        bez{"bena"}
+        bfd{"bafut"}
+        bg{"bulgară"}
+        bgn{"baluchi occidentală"}
+        bho{"bhojpuri"}
+        bi{"bislama"}
+        bik{"bikol"}
+        bin{"bini"}
+        bkm{"kom"}
+        bla{"siksika"}
+        bm{"bambara"}
+        bn{"bengaleză"}
+        bo{"tibetană"}
+        br{"bretonă"}
+        bra{"braj"}
+        brx{"bodo"}
+        bs{"bosniacă"}
+        bss{"akoose"}
+        bua{"buriat"}
+        bug{"bugineză"}
+        bum{"bulu"}
+        byn{"blin"}
+        byv{"medumba"}
+        ca{"catalană"}
+        cad{"caddo"}
+        car{"carib"}
+        cay{"cayuga"}
+        cch{"atsam"}
+        ccp{"chakma"}
+        ce{"cecenă"}
+        ceb{"cebuană"}
+        cgg{"chiga"}
+        ch{"chamorro"}
+        chb{"chibcha"}
+        chg{"chagatai"}
+        chk{"chuukese"}
+        chm{"mari"}
+        chn{"jargon chinook"}
+        cho{"choctaw"}
+        chp{"chipewyan"}
+        chr{"cherokee"}
+        chy{"cheyenne"}
+        ckb{"kurdă centrală"}
+        co{"corsicană"}
+        cop{"coptă"}
+        cr{"cree"}
+        crh{"turcă crimeeană"}
+        crs{"creolă franceză seselwa"}
+        cs{"cehă"}
+        csb{"cașubiană"}
+        cu{"slavonă"}
+        cv{"ciuvașă"}
+        cy{"galeză"}
+        da{"daneză"}
+        dak{"dakota"}
+        dar{"dargwa"}
+        dav{"taita"}
+        de{"germană"}
+        de_CH{"germană standard (Elveția)"}
+        del{"delaware"}
+        den{"slave"}
+        dgr{"dogrib"}
+        din{"dinka"}
+        dje{"zarma"}
+        doi{"dogri"}
+        dsb{"sorabă de jos"}
+        dua{"duala"}
+        dum{"neerlandeză medie"}
+        dv{"divehi"}
+        dyo{"jola-fonyi"}
+        dyu{"dyula"}
+        dz{"dzongkha"}
+        dzg{"dazaga"}
+        ebu{"embu"}
+        ee{"ewe"}
+        efi{"efik"}
+        egy{"egipteană veche"}
+        eka{"ekajuk"}
+        el{"greacă"}
+        elx{"elamită"}
+        en{"engleză"}
+        enm{"engleză medie"}
+        eo{"esperanto"}
+        es{"spaniolă"}
+        es_ES{"spaniolă (Europa)"}
+        et{"estonă"}
+        eu{"bască"}
+        ewo{"ewondo"}
+        fa{"persană"}
+        fa_AF{"dari"}
+        fan{"fang"}
+        fat{"fanti"}
+        ff{"fulah"}
+        fi{"finlandeză"}
+        fil{"filipineză"}
+        fj{"fijiană"}
+        fo{"feroeză"}
+        fon{"fon"}
+        fr{"franceză"}
+        frc{"franceză cajun"}
+        frm{"franceză medie"}
+        fro{"franceză veche"}
+        frr{"frizonă nordică"}
+        frs{"frizonă orientală"}
+        fur{"friulană"}
+        fy{"frizonă occidentală"}
+        ga{"irlandeză"}
+        gaa{"ga"}
+        gag{"găgăuză"}
+        gan{"chineză gan"}
+        gay{"gayo"}
+        gba{"gbaya"}
+        gd{"gaelică scoțiană"}
+        gez{"geez"}
+        gil{"gilbertină"}
+        gl{"galiciană"}
+        gmh{"germană înaltă medie"}
+        gn{"guarani"}
+        goh{"germană înaltă veche"}
+        gon{"gondi"}
+        gor{"gorontalo"}
+        got{"gotică"}
+        grb{"grebo"}
+        grc{"greacă veche"}
+        gsw{"germană (Elveția)"}
+        gu{"gujarati"}
+        guz{"gusii"}
+        gv{"manx"}
+        gwi{"gwichʼin"}
+        ha{"hausa"}
+        hai{"haida"}
+        hak{"chineză hakka"}
+        haw{"hawaiiană"}
+        he{"ebraică"}
+        hi{"hindi"}
+        hil{"hiligaynon"}
+        hit{"hitită"}
+        hmn{"hmong"}
+        ho{"hiri motu"}
+        hr{"croată"}
+        hsb{"sorabă de sus"}
+        hsn{"chineză xiang"}
+        ht{"haitiană"}
+        hu{"maghiară"}
+        hup{"hupa"}
+        hy{"armeană"}
+        hz{"herero"}
+        ia{"interlingua"}
+        iba{"iban"}
+        ibb{"ibibio"}
+        id{"indoneziană"}
+        ie{"interlingue"}
+        ig{"igbo"}
+        ii{"yi din Sichuan"}
+        ik{"inupiak"}
+        ilo{"iloko"}
+        inh{"ingușă"}
+        io{"ido"}
+        is{"islandeză"}
+        it{"italiană"}
+        iu{"inuktitut"}
+        ja{"japoneză"}
+        jbo{"lojban"}
+        jgo{"ngomba"}
+        jmc{"machame"}
+        jpr{"iudeo-persană"}
+        jrb{"iudeo-arabă"}
+        jv{"javaneză"}
+        ka{"georgiană"}
+        kaa{"karakalpak"}
+        kab{"kabyle"}
+        kac{"kachin"}
+        kaj{"jju"}
+        kam{"kamba"}
+        kaw{"kawi"}
+        kbd{"kabardian"}
+        kbl{"kanembu"}
+        kcg{"tyap"}
+        kde{"makonde"}
+        kea{"kabuverdianu"}
+        kfo{"koro"}
+        kg{"congoleză"}
+        kha{"khasi"}
+        kho{"khotaneză"}
+        khq{"koyra chiini"}
+        ki{"kikuyu"}
+        kj{"kuanyama"}
+        kk{"kazahă"}
+        kkj{"kako"}
+        kl{"kalaallisut"}
+        kln{"kalenjin"}
+        km{"khmeră"}
+        kmb{"kimbundu"}
+        kn{"kannada"}
+        ko{"coreeană"}
+        koi{"komi-permiak"}
+        kok{"konkani"}
+        kos{"kosrae"}
+        kpe{"kpelle"}
+        kr{"kanuri"}
+        krc{"karaceai-balkar"}
+        krl{"kareliană"}
+        kru{"kurukh"}
+        ks{"cașmiră"}
+        ksb{"shambala"}
+        ksf{"bafia"}
+        ksh{"kölsch"}
+        ku{"kurdă"}
+        kum{"kumyk"}
+        kut{"kutenai"}
+        kv{"komi"}
+        kw{"cornică"}
+        ky{"kârgâză"}
+        la{"latină"}
+        lad{"ladino"}
+        lag{"langi"}
+        lah{"lahnda"}
+        lam{"lamba"}
+        lb{"luxemburgheză"}
+        lez{"lezghian"}
+        lg{"ganda"}
+        li{"limburgheză"}
+        lkt{"lakota"}
+        ln{"lingala"}
+        lo{"laoțiană"}
+        lol{"mongo"}
+        lou{"creolă (Louisiana)"}
+        loz{"lozi"}
+        lrc{"luri de nord"}
+        lt{"lituaniană"}
+        lu{"luba-katanga"}
+        lua{"luba-lulua"}
+        lui{"luiseno"}
+        lun{"lunda"}
+        luo{"luo"}
+        lus{"mizo"}
+        luy{"luyia"}
+        lv{"letonă"}
+        mad{"madureză"}
+        maf{"mafa"}
+        mag{"magahi"}
+        mai{"maithili"}
+        mak{"makasar"}
+        man{"mandingo"}
+        mas{"masai"}
+        mde{"maba"}
+        mdf{"moksha"}
+        mdr{"mandar"}
+        men{"mende"}
+        mer{"meru"}
+        mfe{"morisyen"}
+        mg{"malgașă"}
+        mga{"irlandeză medie"}
+        mgh{"makhuwa-meetto"}
+        mgo{"meta’"}
+        mh{"marshalleză"}
+        mi{"maori"}
+        mic{"micmac"}
+        min{"minangkabau"}
+        mk{"macedoneană"}
+        ml{"malayalam"}
+        mn{"mongolă"}
+        mnc{"manciuriană"}
+        mni{"manipuri"}
+        moh{"mohawk"}
+        mos{"mossi"}
+        mr{"marathi"}
+        ms{"malaeză"}
+        mt{"malteză"}
+        mua{"mundang"}
+        mul{"mai multe limbi"}
+        mus{"creek"}
+        mwl{"mirandeză"}
+        mwr{"marwari"}
+        my{"birmană"}
+        mye{"myene"}
+        myv{"erzya"}
+        mzn{"mazanderani"}
+        na{"nauru"}
+        nan{"chineză min nan"}
+        nap{"napolitană"}
+        naq{"nama"}
+        nb{"norvegiană bokmål"}
+        nd{"ndebele de nord"}
+        nds{"germana de jos"}
+        nds_NL{"saxona de jos"}
+        ne{"nepaleză"}
+        new{"newari"}
+        ng{"ndonga"}
+        nia{"nias"}
+        niu{"niueană"}
+        nl{"neerlandeză"}
+        nl_BE{"flamandă"}
+        nmg{"kwasio"}
+        nn{"norvegiană nynorsk"}
+        nnh{"ngiemboon"}
+        no{"norvegiană"}
+        nog{"nogai"}
+        non{"nordică veche"}
+        nqo{"n’ko"}
+        nr{"ndebele de sud"}
+        nso{"sotho de nord"}
+        nus{"nuer"}
+        nv{"navajo"}
+        nwc{"newari clasică"}
+        ny{"nyanja"}
+        nym{"nyamwezi"}
+        nyn{"nyankole"}
+        nyo{"nyoro"}
+        nzi{"nzima"}
+        oc{"occitană"}
+        oj{"ojibwa"}
+        om{"oromo"}
+        or{"odia"}
+        os{"osetă"}
+        osa{"osage"}
+        ota{"turcă otomană"}
+        pa{"punjabi"}
+        pag{"pangasinan"}
+        pal{"pahlavi"}
+        pam{"pampanga"}
+        pap{"papiamento"}
+        pau{"palauană"}
+        pcm{"pidgin nigerian"}
+        peo{"persană veche"}
+        phn{"feniciană"}
+        pi{"pali"}
+        pl{"poloneză"}
+        pon{"pohnpeiană"}
+        prg{"prusacă"}
+        pro{"provensală veche"}
+        ps{"paștună"}
+        pt{"portugheză"}
+        pt_PT{"portugheză (Europa)"}
+        qu{"quechua"}
+        quc{"quiché"}
+        raj{"rajasthani"}
+        rap{"rapanui"}
+        rar{"rarotongan"}
+        rm{"romanșă"}
+        rn{"kirundi"}
+        ro{"română"}
+        rof{"rombo"}
+        rom{"romani"}
+        ru{"rusă"}
+        rup{"aromână"}
+        rw{"kinyarwanda"}
+        rwk{"rwa"}
+        sa{"sanscrită"}
+        sad{"sandawe"}
+        sah{"sakha"}
+        sam{"aramaică samariteană"}
+        saq{"samburu"}
+        sas{"sasak"}
+        sat{"santali"}
+        sba{"ngambay"}
+        sbp{"sangu"}
+        sc{"sardiniană"}
+        scn{"siciliană"}
+        sco{"scots"}
+        sd{"sindhi"}
+        sdh{"kurdă de sud"}
+        se{"sami de nord"}
+        see{"seneca"}
+        seh{"sena"}
+        sel{"selkup"}
+        ses{"koyraboro Senni"}
+        sg{"sango"}
+        sga{"irlandeză veche"}
+        sh{"sârbo-croată"}
+        shi{"tachelhit"}
+        shn{"shan"}
+        shu{"arabă ciadiană"}
+        si{"singhaleză"}
+        sid{"sidamo"}
+        sk{"slovacă"}
+        sl{"slovenă"}
+        sm{"samoană"}
+        sma{"sami de sud"}
+        smj{"sami lule"}
+        smn{"sami inari"}
+        sms{"sami skolt"}
+        sn{"shona"}
+        snk{"soninke"}
+        so{"somaleză"}
+        sog{"sogdien"}
+        sq{"albaneză"}
+        sr{"sârbă"}
+        srn{"sranan tongo"}
+        srr{"serer"}
+        ss{"swati"}
+        ssy{"saho"}
+        st{"sesotho"}
+        su{"sundaneză"}
+        suk{"sukuma"}
+        sus{"susu"}
+        sux{"sumeriană"}
+        sv{"suedeză"}
+        sw{"swahili"}
+        sw_CD{"swahili (R.D. Congo)"}
+        swb{"comoreză"}
+        syc{"siriacă clasică"}
+        syr{"siriacă"}
+        ta{"tamilă"}
+        te{"telugu"}
+        tem{"timne"}
+        teo{"teso"}
+        ter{"tereno"}
+        tet{"tetum"}
+        tg{"tadjică"}
+        th{"thailandeză"}
+        ti{"tigrină"}
+        tig{"tigre"}
+        tiv{"tiv"}
+        tk{"turkmenă"}
+        tkl{"tokelau"}
+        tl{"tagalog"}
+        tlh{"klingoniană"}
+        tli{"tlingit"}
+        tmh{"tamashek"}
+        tn{"setswana"}
+        to{"tongană"}
+        tog{"nyasa tonga"}
+        tpi{"tok pisin"}
+        tr{"turcă"}
+        trv{"taroko"}
+        ts{"tsonga"}
+        tsi{"tsimshian"}
+        tt{"tătară"}
+        tum{"tumbuka"}
+        tvl{"tuvalu"}
+        tw{"twi"}
+        twq{"tasawaq"}
+        ty{"tahitiană"}
+        tyv{"tuvană"}
+        tzm{"tamazight din Atlasul Central"}
+        udm{"udmurt"}
+        ug{"uigură"}
+        uga{"ugaritică"}
+        uk{"ucraineană"}
+        umb{"umbundu"}
+        und{"limbă necunoscută"}
+        ur{"urdu"}
+        uz{"uzbecă"}
+        vai{"vai"}
+        ve{"venda"}
+        vi{"vietnameză"}
+        vo{"volapuk"}
+        vot{"votică"}
+        vun{"vunjo"}
+        wa{"valonă"}
+        wae{"walser"}
+        wal{"wolaita"}
+        war{"waray"}
+        was{"washo"}
+        wbp{"warlpiri"}
+        wo{"wolof"}
+        wuu{"chineză wu"}
+        xal{"calmucă"}
+        xh{"xhosa"}
+        xog{"soga"}
+        yao{"yao"}
+        yap{"yapeză"}
+        yav{"yangben"}
+        ybb{"yemba"}
+        yi{"idiș"}
+        yo{"yoruba"}
+        yue{"cantoneză"}
+        za{"zhuang"}
+        zap{"zapotecă"}
+        zbl{"simboluri Bilss"}
+        zen{"zenaga"}
+        zgh{"tamazight standard marocană"}
+        zh{"chineză"}
+        zh_Hans{"chineză simplificată"}
+        zh_Hant{"chineză tradițională"}
+        zu{"zulu"}
+        zun{"zuni"}
+        zxx{"fară conținut lingvistic"}
+        zza{"zaza"}
+    }
+    Languages%long{
+        zh_Hans{"chineză mandarină simplificată"}
+        zh_Hant{"chineză mandarină tradițională"}
+    }
+    Languages%menu{
+        yue{"chineză, cantoneză"}
+        zh{"chineză, mandarină"}
+    }
+    Languages%short{
+        en_US{"engleză (S.U.A)"}
+    }
+    Languages%variant{
+        ckb{"kurdă sorani"}
+        ps{"pushto"}
+    }
+    Scripts{
+        Arab{"arabă"}
+        Aran{"nastaaliq"}
+        Armn{"armeană"}
+        Bali{"balineză"}
+        Beng{"bengaleză"}
+        Bopo{"bopomofo"}
+        Brai{"braille"}
+        Cans{"silabică aborigenă canadiană unificată"}
+        Copt{"coptă"}
+        Cprt{"cipriotă"}
+        Cyrl{"chirilică"}
+        Cyrs{"chirilică slavonă bisericească veche"}
+        Deva{"devanagari"}
+        Dsrt{"mormonă"}
+        Egyd{"demotică egipteană"}
+        Egyh{"hieratică egipteană"}
+        Egyp{"hieroglife egiptene"}
+        Ethi{"etiopiană"}
+        Geok{"georgiană bisericească"}
+        Geor{"georgiană"}
+        Glag{"glagolitică"}
+        Goth{"gotică"}
+        Grek{"greacă"}
+        Gujr{"gujarati"}
+        Guru{"gurmukhi"}
+        Hanb{"hanb"}
+        Hang{"hangul"}
+        Hani{"han"}
+        Hans{"simplificată"}
+        Hant{"tradițională"}
+        Hebr{"ebraică"}
+        Hira{"hiragana"}
+        Hrkt{"silabică japoneză"}
+        Hung{"maghiară veche"}
+        Inds{"indus"}
+        Ital{"italică veche"}
+        Jamo{"jamo"}
+        Java{"javaneză"}
+        Jpan{"japoneză"}
+        Kana{"katakana"}
+        Khmr{"khmeră"}
+        Knda{"kannada"}
+        Kore{"coreeană"}
+        Laoo{"laoțiană"}
+        Latf{"latină Fraktur"}
+        Latg{"latină gaelică"}
+        Latn{"latină"}
+        Lina{"lineară A"}
+        Linb{"lineară B"}
+        Lydi{"lidiană"}
+        Maya{"hieroglife maya"}
+        Mlym{"malayalam"}
+        Mong{"mongolă"}
+        Mtei{"meitei mayek"}
+        Mymr{"birmană"}
+        Olck{"ol chiki"}
+        Orya{"oriya"}
+        Phnx{"feniciană"}
+        Qaag{"zawgyi"}
+        Runr{"runică"}
+        Sinh{"singaleză"}
+        Syrc{"siriacă"}
+        Syrj{"siriacă occidentală"}
+        Syrn{"siriacă orientală"}
+        Taml{"tamilă"}
+        Telu{"telugu"}
+        Tfng{"berberă"}
+        Thaa{"thaana"}
+        Thai{"thailandeză"}
+        Tibt{"tibetană"}
+        Xpeo{"persană veche"}
+        Xsux{"cuneiformă sumero-akkadiană"}
+        Zinh{"moștenită"}
+        Zmth{"notație matematică"}
+        Zsye{"emoji"}
+        Zsym{"simboluri"}
+        Zxxx{"nescrisă"}
+        Zyyy{"comună"}
+        Zzzz{"scriere necunoscută"}
+    }
+    Scripts%stand-alone{
+        Hans{"han simplificată"}
+        Hant{"han tradițională"}
+    }
+    Scripts%variant{
+        Arab{"persano-arabă"}
+    }
+    Types{
+        calendar{
+            buddhist{"calendar budist"}
+            chinese{"calendar chinezesc"}
+            coptic{"calendar copt"}
+            dangi{"calendar dangi"}
+            ethiopic{"calendar etiopian"}
+            ethiopic-amete-alem{"Calendarul etiopian amete alem"}
+            gregorian{"calendar gregorian"}
+            hebrew{"calendar ebraic"}
+            indian{"calendar național indian"}
+            islamic{"calendar islamic"}
+            islamic-civil{"calendar islamic civil"}
+            islamic-umalqura{"calendar islamic (Umm al-Qura)"}
+            iso8601{"calendar ISO-8601"}
+            japanese{"calendar japonez"}
+            persian{"calendar persan"}
+            roc{"calendarul Republicii Chineze"}
+        }
+        cf{
+            account{"Format monedă contabilitate"}
+            standard{"Format monedă standard"}
+        }
+        colAlternate{
+            non-ignorable{"Ordonați simbolurile"}
+            shifted{"Ordonați ignorând simbolurile"}
+        }
+        colBackwards{
+            no{"Ordonați accentele în mod normal"}
+            yes{"Ordonați după accente în ordine inversă"}
+        }
+        colCaseFirst{
+            lower{"Ordonați întâi minusculele"}
+            no{"Ordonați după dimensiunea normală a literei"}
+            upper{"Ordonați mai întâi majusculele"}
+        }
+        colCaseLevel{
+            no{"Ordonați neținând seama de diferența dintre majuscule/minuscule"}
+            yes{"Ordonați ținând seama de diferența dintre majuscule/minuscule"}
+        }
+        colNormalization{
+            no{"Ordonați fără normalizare"}
+            yes{"Ordonați caracterele unicode normalizat"}
+        }
+        colNumeric{
+            no{"Ordonați cifrele individual"}
+            yes{"Ordonați cifrele în ordine numerică"}
+        }
+        colStrength{
+            identical{"Ordonați-le pe toate"}
+            primary{"Ordonați numai literele de bază"}
+            quaternary{"Ordonați după accente/dimensiunea literei/lățime/kana"}
+            secondary{"Ordonați după accent"}
+            tertiary{"Ordonați după accente/dimensiunea literei/lățime"}
+        }
+        collation{
+            big5han{"sortare pentru chineza tradițională - Big5"}
+            compat{"ordine de sortare anterioară, pentru compatibilitate"}
+            dictionary{"Ordine de sortare a dicționarului"}
+            ducet{"ordine de sortare Unicode implicită"}
+            eor{"regulile europene de sortare"}
+            gb2312han{"sortare pentru chineza simplificată - GB2312"}
+            phonebook{"sortare după cartea de telefon"}
+            phonetic{"Tip de ordonare fonetică"}
+            pinyin{"sortare pinyin"}
+            reformed{"Ordine de sortare reformată"}
+            search{"căutare cu scop general"}
+            searchjl{"Căutați în funcție de consoana inițială hangul"}
+            standard{"ordine de sortare standard"}
+            stroke{"ordine de sortare după trasare"}
+            traditional{"sortare tradițională"}
+            unihan{"Ordine de sortare a liniilor ideogramelor"}
+        }
+        d0{
+            fwidth{"Cu lățime întreagă"}
+            hwidth{"Cu jumătate de lățime"}
+            npinyin{"Numeric"}
+        }
+        hc{
+            h11{"sistem cu 12 ore (0–11)"}
+            h12{"sistem cu 12 ore (1–12)"}
+            h23{"sistem cu 24 de ore (0–23)"}
+            h24{"sistem cu 24 de ore (1–24)"}
+        }
+        lb{
+            loose{"stil liber de întrerupere a liniei"}
+            normal{"stil normal de întrerupere a liniei"}
+            strict{"stil strict de întrerupere a liniei"}
+        }
+        m0{
+            bgn{"transliterare BGN SUA"}
+            ungegn{"transliterare GEGN ONU"}
+        }
+        ms{
+            metric{"sistemul metric"}
+            uksystem{"sistemul imperial de unități de măsură"}
+            ussystem{"sistemul american de unități de măsură"}
+        }
+        numbers{
+            arab{"cifre indo-arabe"}
+            arabext{"cifre indo-arabe extinse"}
+            armn{"numerale armenești"}
+            armnlow{"numerale armenești cu minuscule"}
+            beng{"cifre bengaleze"}
+            deva{"cifre devanagari"}
+            ethi{"numerale etiopiene"}
+            finance{"Sistemul numeric financiar"}
+            fullwide{"cifre cu lățimea întreagă"}
+            geor{"numerale georgiene"}
+            grek{"numerale grecești"}
+            greklow{"numerale grecești cu minuscule"}
+            gujr{"cifre gujarati"}
+            guru{"cifre gurmukhi"}
+            hanidec{"numerale zecimale chinezești"}
+            hans{"numerale chinezești simplificate"}
+            hansfin{"numerale financiare chinezești simplificate"}
+            hant{"numerale chinezești tradiționale"}
+            hantfin{"numerale financiare chinezești tradiționale"}
+            hebr{"numerale ebraice"}
+            jpan{"numerale japoneze"}
+            jpanfin{"numerale financiare japoneze"}
+            khmr{"cifre khmere"}
+            knda{"cifre kannada"}
+            laoo{"cifre laoțiene"}
+            latn{"cifre occidentale"}
+            mlym{"cifre malayalam"}
+            mong{"Cifre mongole"}
+            mymr{"cifre birmaneze"}
+            native{"Cifre native"}
+            orya{"cifre oriya"}
+            roman{"numerale romane"}
+            romanlow{"numerale romane cu minuscule"}
+            taml{"numerale tradiționale tamile"}
+            tamldec{"cifre tamile"}
+            telu{"cifre telugu"}
+            thai{"cifre thailandeze"}
+            tibt{"cifre tibetane"}
+            traditional{"Numere tradiționale"}
+            vaii{"Cifre Vai"}
+        }
+    }
+    Variants{
+        1606NICT{"franceză medievală târzie până la 1606"}
+        1694ACAD{"franceză modernă veche"}
+        1901{"ortografie germană tradițională"}
+        1959ACAD{"belarusă academică"}
+        1994{"ortografie resiană standardizată"}
+        1996{"ortografie germană de la 1996"}
+        AREVELA{"armeană orientală"}
+        AREVMDA{"armeană occidentală"}
+        BAKU1926{"alfabet latin altaic unificat"}
+        BISKE{"dialect San Giorgio/Bila"}
+        BOONT{"boontling"}
+        FONIPA{"alfabet fonetic internațional"}
+        FONUPA{"alfabet fonetic uralic"}
+        KKCOR{"ortografie comuna cornish"}
+        LIPAW{"dialect lipovaz din resiană"}
+        MONOTON{"monotonică"}
+        NEDIS{"dialect Natisone"}
+        NJIVA{"dialect Gniva/Njiva"}
+        OSOJS{"dialect Oseacco/Osojane"}
+        PINYIN{"pinyin"}
+        POLYTON{"politonică"}
+        POSIX{"informatică"}
+        REVISED{"ortografie revizuită"}
+        ROZAJ{"dialect resian"}
+        SAAHO{"dialect saho"}
+        SCOTLAND{"engleză standard scoțiană"}
+        SCOUSE{"dialect scouse"}
+        SOLBA{"dialect Stolvizza/Solbica"}
+        TARASK{"ortografie taraskievica"}
+        UCCOR{"ortografie unificată cornish"}
+        UCRCOR{"ortografie revizuită unificată cornish"}
+        VALENCIA{"valenciană"}
+        WADEGILE{"Wade-Giles"}
+    }
+    characterLabelPattern{
+        all{"{0} – toate"}
+        category-list{"{0}: {1}"}
+        compatibility{"{0} – compatibilitate"}
+        enclosed{"{0} – încadrate"}
+        extended{"{0} – set extins"}
+        historic{"{0} – istorice"}
+        miscellaneous{"{0} – diverse"}
+        other{"{0} – altele"}
+        scripts{"scrieri – {0}"}
+        strokes{
+            few{"{0} trasări"}
+            one{"{0} trasare"}
+            other{"{0} de trasări"}
+        }
+        subscript{"indice {0}"}
+        superscript{"exponent {0}"}
+    }
+    codePatterns{
+        language{"Limbă: {0}"}
+        script{"Scriere: {0}"}
+        territory{"Regiune: {0}"}
+    }
+    localeDisplayPattern{
+        keyTypePattern{"{0}: {1}"}
+        pattern{"{0} ({1})"}
+        separator{"{0}, {1}"}
+    }
+}

@@ -8,7 +8,7 @@ function ObjectGetOwnPropertyDescriptors(O) {
     var obj = ToObject(O);
 
     // Step 2.
-    var keys = OwnPropertyKeys(obj);
+    var keys = std_Reflect_ownKeys(obj);
 
     // Step 3.
     var descriptors = {};
@@ -22,7 +22,7 @@ function ObjectGetOwnPropertyDescriptors(O) {
 
         // Step 4.c.
         if (typeof desc !== "undefined")
-            _DefineDataProperty(descriptors, key, desc);
+            DefineDataProperty(descriptors, key, desc);
     }
 
     // Step 5.
@@ -61,6 +61,20 @@ function Object_hasOwnProperty(V) {
     return hasOwn(V, this);
 }
 
+// ES 2021 draft rev 0b988b7700de675331ac360d164c978d6ea452ec
+// B.2.2.1.1 get Object.prototype.__proto__
+function $ObjectProtoGetter() {
+    return std_Reflect_getPrototypeOf(ToObject(this));
+}
+SetCanonicalName($ObjectProtoGetter, "get __proto__");
+
+// ES 2021 draft rev 0b988b7700de675331ac360d164c978d6ea452ec
+// B.2.2.1.2 set Object.prototype.__proto__
+function $ObjectProtoSetter(proto) {
+    return callFunction(std_Object_setProto, this, proto);
+}
+SetCanonicalName($ObjectProtoSetter, "set __proto__");
+
 // ES7 draft (2016 March 8) B.2.2.3
 function ObjectDefineSetter(name, setter) {
     // Step 1.
@@ -74,8 +88,8 @@ function ObjectDefineSetter(name, setter) {
     var key = TO_PROPERTY_KEY(name);
 
     // Steps 3, 5.
-    _DefineProperty(object, key, ACCESSOR_DESCRIPTOR_KIND | ATTR_ENUMERABLE | ATTR_CONFIGURABLE,
-                    null, setter, true);
+    DefineProperty(object, key, ACCESSOR_DESCRIPTOR_KIND | ATTR_ENUMERABLE | ATTR_CONFIGURABLE,
+                   null, setter, true);
 
     // Step 6. (implicit)
 }
@@ -93,8 +107,8 @@ function ObjectDefineGetter(name, getter) {
     var key = TO_PROPERTY_KEY(name);
 
     // Steps 3, 5.
-    _DefineProperty(object, key, ACCESSOR_DESCRIPTOR_KIND | ATTR_ENUMERABLE | ATTR_CONFIGURABLE,
-                    getter, null, true);
+    DefineProperty(object, key, ACCESSOR_DESCRIPTOR_KIND | ATTR_ENUMERABLE | ATTR_CONFIGURABLE,
+                   getter, null, true);
 
     // Step 6. (implicit)
 }
@@ -196,7 +210,7 @@ function ObjectGetOwnPropertyDescriptor(obj, propertyKey) {
 function ObjectOrReflectDefineProperty(obj, propertyKey, attributes, strict) {
     // Step 1.
     if (!IsObject(obj))
-        ThrowTypeError(JSMSG_NOT_NONNULL_OBJECT, DecompileArg(0, obj));
+        ThrowTypeError(JSMSG_OBJECT_REQUIRED, DecompileArg(0, obj));
 
     // Step 2.
     propertyKey = TO_PROPERTY_KEY(propertyKey);
@@ -254,35 +268,67 @@ function ObjectOrReflectDefineProperty(obj, propertyKey, attributes, strict) {
             ThrowTypeError(JSMSG_INVALID_DESCRIPTOR);
 
         // Step 4 (accessor descriptor property).
-        return _DefineProperty(obj, propertyKey, attrs, getter, setter, strict);
+        return DefineProperty(obj, propertyKey, attrs, getter, setter, strict);
     }
 
     // Step 4 (data property descriptor with value).
     if (hasValue) {
-        // Use the inlinable _DefineDataProperty function when possible.
+        // Use the inlinable DefineDataProperty function when possible.
         if (strict) {
             if ((attrs & (ATTR_ENUMERABLE | ATTR_CONFIGURABLE | ATTR_WRITABLE)) ===
                 (ATTR_ENUMERABLE | ATTR_CONFIGURABLE | ATTR_WRITABLE))
             {
-                _DefineDataProperty(obj, propertyKey, value);
+                DefineDataProperty(obj, propertyKey, value);
                 return true;
             }
         }
 
         // The fifth argument is set to |null| to mark that |value| is present.
-        return _DefineProperty(obj, propertyKey, attrs, value, null, strict);
+        return DefineProperty(obj, propertyKey, attrs, value, null, strict);
     }
 
     // Step 4 (generic property descriptor or data property without value).
-    return _DefineProperty(obj, propertyKey, attrs, undefined, undefined, strict);
+    return DefineProperty(obj, propertyKey, attrs, undefined, undefined, strict);
 }
 
 // ES2017 draft rev 6859bb9ccaea9c6ede81d71e5320e3833b92cb3e
 // 19.1.2.4 Object.defineProperty ( O, P, Attributes )
 function ObjectDefineProperty(obj, propertyKey, attributes) {
     // Steps 1-4.
-    ObjectOrReflectDefineProperty(obj, propertyKey, attributes, true);
+    if (!ObjectOrReflectDefineProperty(obj, propertyKey, attributes, true)) {
+        // Not standardized yet: https://github.com/tc39/ecma262/pull/688
+        return null;
+    }
 
     // Step 5.
     return obj;
 }
+
+// Proposal https://tc39.github.io/proposal-object-from-entries/
+// 1. Object.fromEntries ( iterable )
+function ObjectFromEntries(iter) {
+    // We omit the usual step number comments here because they don't help.
+    // This implementation inlines AddEntriesFromIterator and
+    // CreateDataPropertyOnObject, so it looks more like the polyfill
+    // <https://github.com/tc39/proposal-object-from-entries/blob/master/polyfill.js>
+    // than the spec algorithm.
+    const obj = {};
+
+    for (const pair of allowContentIter(iter)) {
+        if (!IsObject(pair))
+            ThrowTypeError(JSMSG_INVALID_MAP_ITERABLE, "Object.fromEntries");
+        DefineDataProperty(obj, pair[0], pair[1]);
+    }
+
+    return obj;
+}
+
+// Proposal https://github.com/tc39/proposal-accessible-object-hasownproperty
+// 1. Object.hasOwn ( O, P )
+function ObjectHasOwn(O, P) {
+    // Step 1.
+    var obj = ToObject(O);
+    // Step 2-3.
+    return hasOwn(P, obj);
+}
+

@@ -2,50 +2,61 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// ES6 draft rev34 (2015/02/20) 21.2.5.3 get RegExp.prototype.flags
-function RegExpFlagsGetter() {
+// ECMAScript 2020 draft (2020/03/12) 21.2.5.4 get RegExp.prototype.flags
+// https://tc39.es/ecma262/#sec-get-regexp.prototype.flags
+// Uncloned functions with `$` prefix are allocated as extended function
+// to store the original name in `SetCanonicalName`.
+function $RegExpFlagsGetter() {
     // Steps 1-2.
     var R = this;
     if (!IsObject(R))
-        ThrowTypeError(JSMSG_NOT_NONNULL_OBJECT, R === null ? "null" : typeof R);
+        ThrowTypeError(JSMSG_OBJECT_REQUIRED, R === null ? "null" : typeof R);
 
     // Step 3.
     var result = "";
 
-    // Steps 4-6.
+    // Steps 4-5.
+    if (R.hasIndices)
+        result += "d";
+
+    // Steps 6-7.
     if (R.global)
         result += "g";
 
-    // Steps 7-9.
+    // Steps 8-9.
     if (R.ignoreCase)
         result += "i";
 
-    // Steps 10-12.
+    // Steps 10-11.
     if (R.multiline)
         result += "m";
 
-    // Steps 13-15.
+    // Steps 12-13.
+    if (R.dotAll)
+        result += "s";
+
+    // Steps 14-15.
     if (R.unicode)
          result += "u";
 
-    // Steps 16-18.
+    // Steps 16-17
     if (R.sticky)
         result += "y";
 
-    // Step 19.
+    // Step 18.
     return result;
 }
-_SetCanonicalName(RegExpFlagsGetter, "get flags");
+SetCanonicalName($RegExpFlagsGetter, "get flags");
 
 // ES 2017 draft 40edb3a95a475c1b251141ac681b8793129d9a6d 21.2.5.14.
-function RegExpToString()
+function $RegExpToString()
 {
     // Step 1.
     var R = this;
 
     // Step 2.
     if (!IsObject(R))
-        ThrowTypeError(JSMSG_NOT_NONNULL_OBJECT, R === null ? "null" : typeof R);
+        ThrowTypeError(JSMSG_OBJECT_REQUIRED, R === null ? "null" : typeof R);
 
     // Step 3.
     var pattern = ToString(R.source);
@@ -56,7 +67,7 @@ function RegExpToString()
     // Steps 5-6.
     return "/" + pattern + "/" + flags;
 }
-_SetCanonicalName(RegExpToString, "toString");
+SetCanonicalName($RegExpToString, "toString");
 
 // ES 2016 draft Mar 25, 2016 21.2.5.2.3.
 function AdvanceStringIndex(S, index) {
@@ -102,7 +113,7 @@ function RegExpMatch(string) {
 
     // Step 2.
     if (!IsObject(rx))
-        ThrowTypeError(JSMSG_NOT_NONNULL_OBJECT, rx === null ? "null" : typeof rx);
+        ThrowTypeError(JSMSG_OBJECT_REQUIRED, rx === null ? "null" : typeof rx);
 
     // Step 3.
     var S = ToString(string);
@@ -161,7 +172,7 @@ function RegExpMatchSlowPath(rx, S) {
         var matchStr = ToString(result[0]);
 
         // Step 6.e.iii.2.
-        _DefineDataProperty(A, n, matchStr);
+        DefineDataProperty(A, n, matchStr);
 
         // Step 6.e.iii.4.
         if (matchStr === "") {
@@ -205,7 +216,7 @@ function RegExpGlobalMatchOpt(rx, S, fullUnicode) {
         var matchStr = result[0];
 
         // Step 6.e.iii.2.
-        _DefineDataProperty(A, n, matchStr);
+        DefineDataProperty(A, n, matchStr);
 
         // Step 6.e.iii.4.
         if (matchStr === "") {
@@ -222,9 +233,11 @@ function RegExpGlobalMatchOpt(rx, S, fullUnicode) {
 // Checks if following properties and getters are not modified, and accessing
 // them not observed by content script:
 //   * flags
+//   * hasIndices
 //   * global
 //   * ignoreCase
 //   * multiline
+//   * dotAll
 //   * sticky
 //   * unicode
 //   * exec
@@ -248,7 +261,7 @@ function RegExpReplace(string, replaceValue) {
 
     // Step 2.
     if (!IsObject(rx))
-        ThrowTypeError(JSMSG_NOT_NONNULL_OBJECT, rx === null ? "null" : typeof rx);
+        ThrowTypeError(JSMSG_OBJECT_REQUIRED, rx === null ? "null" : typeof rx);
 
     // Step 3.
     var S = ToString(string);
@@ -349,7 +362,7 @@ function RegExpReplaceSlowPath(rx, S, lengthS, replaceValue,
             break;
 
         // Step 11.c.i.
-        _DefineDataProperty(results, nResults++, result);
+        DefineDataProperty(results, nResults++, result);
 
         // Step 11.c.ii.
         if (!global)
@@ -389,7 +402,7 @@ function RegExpReplaceSlowPath(rx, S, lengthS, replaceValue,
 
         var n, capN, replacement;
         if (functionalReplace || firstDollarIndex !== -1) {
-            // Steps 14.g-j.
+            // Steps 14.g-k.
             replacement = RegExpGetComplexReplacement(result, matched, S, position,
                                                       nCaptures, replaceValue,
                                                       functionalReplace, firstDollarIndex);
@@ -404,16 +417,22 @@ function RegExpReplaceSlowPath(rx, S, lengthS, replaceValue,
                 if (capN !== undefined)
                     ToString(capN);
             }
+            // Step 14.j, 14.l., GetSubstitution Step 11.
+            // We don't need namedCaptures, but ToObject is visible to script.
+            var namedCaptures = result.groups;
+            if (namedCaptures !== undefined)
+                ToObject(namedCaptures);
+
             replacement = replaceValue;
         }
 
-        // Step 14.l.
+        // Step 14.m.
         if (position >= nextSourcePosition) {
-            // Step 14.l.ii.
+            // Step 14.m.ii.
             accumulatedResult += Substring(S, nextSourcePosition,
                                            position - nextSourcePosition) + replacement;
 
-            // Step 14.l.iii.
+            // Step 14.m.iii.
             nextSourcePosition = position + matchLength;
         }
     }
@@ -426,8 +445,9 @@ function RegExpReplaceSlowPath(rx, S, lengthS, replaceValue,
     return accumulatedResult + Substring(S, nextSourcePosition, lengthS - nextSourcePosition);
 }
 
-// ES 2017 draft rev 03bfda119d060aca4099d2b77cf43f6d4f11cfa2 21.2.5.8
-// steps 14.g-k.
+// ES 2021 draft 21.2.5.10
+// https://tc39.es/ecma262/#sec-regexp.prototype-@@replace
+// steps 14.g-l.
 // Calculates functional/substitution replacement from match result.
 // Used in the following functions:
 //   * RegExpReplaceSlowPath
@@ -439,8 +459,8 @@ function RegExpGetComplexReplacement(result, matched, S, position,
     var captures = [];
     var capturesLength = 0;
 
-    // Step 14.j.i (reordered).
-    _DefineDataProperty(captures, capturesLength++, matched);
+    // Step 14.k.i (reordered).
+    DefineDataProperty(captures, capturesLength++, matched);
 
     // Step 14.g, 14.i, 14.i.iv.
     for (var n = 1; n <= nCaptures; n++) {
@@ -452,38 +472,50 @@ function RegExpGetComplexReplacement(result, matched, S, position,
             capN = ToString(capN);
 
         // Step 14.i.iii.
-        _DefineDataProperty(captures, capturesLength++, capN);
+        DefineDataProperty(captures, capturesLength++, capN);
     }
 
     // Step 14.j.
+    var namedCaptures = result.groups;
+
+    // Step 14.k.
     if (functionalReplace) {
         // For `nCaptures` <= 4 case, call `replaceValue` directly, otherwise
         // use `std_Function_apply` with all arguments stored in `captures`.
-        switch (nCaptures) {
-          case 0:
-            return ToString(replaceValue(SPREAD(captures, 1), position, S));
-          case 1:
-            return ToString(replaceValue(SPREAD(captures, 2), position, S));
-          case 2:
-            return ToString(replaceValue(SPREAD(captures, 3), position, S));
-          case 3:
-            return ToString(replaceValue(SPREAD(captures, 4), position, S));
-          case 4:
-            return ToString(replaceValue(SPREAD(captures, 5), position, S));
-          default:
-            // Steps 14.j.ii-v.
-            _DefineDataProperty(captures, capturesLength++, position);
-            _DefineDataProperty(captures, capturesLength++, S);
-            return ToString(callFunction(std_Function_apply, replaceValue, undefined, captures));
+        if (namedCaptures === undefined) {
+            switch (nCaptures) {
+              case 0:
+                return ToString(replaceValue(SPREAD(captures, 1), position, S));
+              case 1:
+                return ToString(replaceValue(SPREAD(captures, 2), position, S));
+              case 2:
+                return ToString(replaceValue(SPREAD(captures, 3), position, S));
+              case 3:
+                return ToString(replaceValue(SPREAD(captures, 4), position, S));
+              case 4:
+                return ToString(replaceValue(SPREAD(captures, 5), position, S));
+            }
         }
+        // Steps 14.k.ii-v.
+        DefineDataProperty(captures, capturesLength++, position);
+        DefineDataProperty(captures, capturesLength++, S);
+        if (namedCaptures !== undefined) {
+            DefineDataProperty(captures, capturesLength++, namedCaptures);
+        }
+        return ToString(callFunction(std_Function_apply, replaceValue, undefined, captures));
     }
 
-    // Steps 14.k.i.
-    return RegExpGetSubstitution(captures, S, position, replaceValue, firstDollarIndex);
+    // Step 14.l.
+    if (namedCaptures !== undefined) {
+        namedCaptures = ToObject(namedCaptures);
+    }
+    return RegExpGetSubstitution(captures, S, position, replaceValue, firstDollarIndex,
+                                 namedCaptures);
 }
 
-// ES 2017 draft rev 03bfda119d060aca4099d2b77cf43f6d4f11cfa2 21.2.5.8
-// steps 14.g-j.
+// ES 2021 draft 21.2.5.10
+// https://tc39.es/ecma262/#sec-regexp.prototype-@@replace
+// steps 14.g-k.
 // Calculates functional replacement from match result.
 // Used in the following functions:
 //   * RegExpGlobalReplaceOptFunc
@@ -495,32 +527,42 @@ function RegExpGetFunctionalReplacement(result, S, position, replaceValue) {
     assert(result.length >= 1, "RegExpMatcher doesn't return an empty array");
     var nCaptures = result.length - 1;
 
-    switch (nCaptures) {
-      case 0:
-        return ToString(replaceValue(SPREAD(result, 1), position, S));
-      case 1:
-        return ToString(replaceValue(SPREAD(result, 2), position, S));
-      case 2:
-        return ToString(replaceValue(SPREAD(result, 3), position, S));
-      case 3:
-        return ToString(replaceValue(SPREAD(result, 4), position, S));
-      case 4:
-        return ToString(replaceValue(SPREAD(result, 5), position, S));
+    // Step 14.j (reordered)
+    var namedCaptures = result.groups;
+
+    if (namedCaptures === undefined) {
+        switch (nCaptures) {
+          case 0:
+            return ToString(replaceValue(SPREAD(result, 1), position, S));
+          case 1:
+            return ToString(replaceValue(SPREAD(result, 2), position, S));
+          case 2:
+            return ToString(replaceValue(SPREAD(result, 3), position, S));
+          case 3:
+            return ToString(replaceValue(SPREAD(result, 4), position, S));
+          case 4:
+            return ToString(replaceValue(SPREAD(result, 5), position, S));
+        }
     }
 
-    // Steps 14.g-i, 14.j.i-ii.
+    // Steps 14.g-i, 14.k.i-ii.
     var captures = [];
     for (var n = 0; n <= nCaptures; n++) {
         assert(typeof result[n] === "string" || result[n] === undefined,
                "RegExpMatcher returns only strings and undefined");
-        _DefineDataProperty(captures, n, result[n]);
+        DefineDataProperty(captures, n, result[n]);
     }
 
-    // Step 14.j.iii.
-    _DefineDataProperty(captures, nCaptures + 1, position);
-    _DefineDataProperty(captures, nCaptures + 2, S);
+    // Step 14.k.iii.
+    DefineDataProperty(captures, nCaptures + 1, position);
+    DefineDataProperty(captures, nCaptures + 2, S);
 
-    // Steps 14.j.iv-v.
+    // Step 14.k.iv.
+    if (namedCaptures !== undefined) {
+        DefineDataProperty(captures, nCaptures + 3, namedCaptures);
+    }
+
+    // Steps 14.k.v-vi.
     return ToString(callFunction(std_Function_apply, replaceValue, undefined, captures));
 }
 
@@ -661,7 +703,7 @@ function RegExpSearch(string) {
 
     // Step 2.
     if (!IsObject(rx))
-        ThrowTypeError(JSMSG_NOT_NONNULL_OBJECT, rx === null ? "null" : typeof rx);
+        ThrowTypeError(JSMSG_OBJECT_REQUIRED, rx === null ? "null" : typeof rx);
 
     // Step 3.
     var S = ToString(string);
@@ -755,7 +797,7 @@ function RegExpSplit(string, limit) {
 
     // Step 2.
     if (!IsObject(rx))
-        ThrowTypeError(JSMSG_NOT_NONNULL_OBJECT, rx === null ? "null" : typeof rx);
+        ThrowTypeError(JSMSG_OBJECT_REQUIRED, rx === null ? "null" : typeof rx);
 
     // Step 3.
     var S = ToString(string);
@@ -778,7 +820,7 @@ function RegExpSplit(string, limit) {
         // If split operation is optimizable, perform non-sticky match.
         if (flags & REGEXP_STICKY_FLAG) {
             var source = UnsafeGetStringFromReservedSlot(rx, REGEXP_SOURCE_SLOT);
-            splitter = regexp_construct_raw_flags(source, flags & ~REGEXP_STICKY_FLAG);
+            splitter = RegExpConstructRaw(source, flags & ~REGEXP_STICKY_FLAG);
         } else {
             splitter = rx;
         }
@@ -837,7 +879,7 @@ function RegExpSplit(string, limit) {
             return A;
 
         // Step 17.d.
-        _DefineDataProperty(A, 0, S);
+        DefineDataProperty(A, 0, S);
 
         // Step 17.e.
         return A;
@@ -891,7 +933,7 @@ function RegExpSplit(string, limit) {
         }
 
         // Steps 19.d.iv.1-3.
-        _DefineDataProperty(A, lengthA, Substring(S, p, q - p));
+        DefineDataProperty(A, lengthA, Substring(S, p, q - p));
 
         // Step 19.d.iv.4.
         lengthA++;
@@ -912,7 +954,7 @@ function RegExpSplit(string, limit) {
         // Step 19.d.iv.10.
         while (i <= numberOfCaptures) {
             // Steps 19.d.iv.10.a-b.
-            _DefineDataProperty(A, lengthA, z[i]);
+            DefineDataProperty(A, lengthA, z[i]);
 
             // Step 19.d.iv.10.c.
             i++;
@@ -931,9 +973,9 @@ function RegExpSplit(string, limit) {
 
     // Steps 20-22.
     if (p >= size)
-        _DefineDataProperty(A, lengthA, "");
+        DefineDataProperty(A, lengthA, "");
     else
-        _DefineDataProperty(A, lengthA, Substring(S, p, size - p));
+        DefineDataProperty(A, lengthA, Substring(S, p, size - p));
 
     // Step 23.
     return A;
@@ -975,7 +1017,7 @@ function RegExpExec(R, S, forTest) {
     var result = callContentFunction(exec, R, S);
 
     // Step 5.c.
-    if (typeof result !== "object")
+    if (result !== null && !IsObject(result))
         ThrowTypeError(JSMSG_EXEC_NOT_OBJORNULL);
 
     // Step 5.d.
@@ -1060,7 +1102,7 @@ function RegExpTest(string) {
     // Steps 1-2.
     var R = this;
     if (!IsObject(R))
-        ThrowTypeError(JSMSG_NOT_NONNULL_OBJECT, R === null ? "null" : typeof R);
+        ThrowTypeError(JSMSG_OBJECT_REQUIRED, R === null ? "null" : typeof R);
 
     // Steps 3-4.
     var S = ToString(string);
@@ -1070,8 +1112,261 @@ function RegExpTest(string) {
 }
 
 // ES 2016 draft Mar 25, 2016 21.2.4.2.
-function RegExpSpecies() {
+function $RegExpSpecies() {
     // Step 1.
     return this;
 }
-_SetCanonicalName(RegExpSpecies, "get [Symbol.species]");
+SetCanonicalName($RegExpSpecies, "get [Symbol.species]");
+
+function IsRegExpMatchAllOptimizable(rx, C) {
+    if (!IsRegExpObject(rx))
+        return false;
+
+    var RegExpCtor = GetBuiltinConstructor("RegExp");
+    if (C !== RegExpCtor)
+        return false;
+
+    var RegExpProto = RegExpCtor.prototype;
+    return RegExpPrototypeOptimizable(RegExpProto) &&
+           RegExpInstanceOptimizable(rx, RegExpProto);
+}
+
+// String.prototype.matchAll proposal.
+//
+// RegExp.prototype [ @@matchAll ] ( string )
+function RegExpMatchAll(string) {
+    // Step 1.
+    var rx = this;
+
+    // Step 2.
+    if (!IsObject(rx))
+        ThrowTypeError(JSMSG_OBJECT_REQUIRED, rx === null ? "null" : typeof rx);
+
+    // Step 3.
+    var str = ToString(string);
+
+    // Step 4.
+    var C = SpeciesConstructor(rx, GetBuiltinConstructor("RegExp"));
+
+    var source, flags, matcher, lastIndex;
+    if (IsRegExpMatchAllOptimizable(rx, C)) {
+        // Step 5, 9-12.
+        source = UnsafeGetStringFromReservedSlot(rx, REGEXP_SOURCE_SLOT);
+        flags = UnsafeGetInt32FromReservedSlot(rx, REGEXP_FLAGS_SLOT);
+
+        // Step 6.
+        matcher = rx;
+
+        // Step 7.
+        lastIndex = ToLength(rx.lastIndex);
+
+        // Step 8 (not applicable for the optimized path).
+    } else {
+        // Step 5.
+        source = "";
+        flags = ToString(rx.flags);
+
+        // Step 6.
+        matcher = new C(rx, flags);
+
+        // Steps 7-8.
+        matcher.lastIndex = ToLength(rx.lastIndex);
+
+        // Steps 9-12.
+        flags = (callFunction(std_String_includes, flags, "g") ? REGEXP_GLOBAL_FLAG : 0) |
+                (callFunction(std_String_includes, flags, "u") ? REGEXP_UNICODE_FLAG : 0);
+
+        // Take the non-optimized path.
+        lastIndex = REGEXP_STRING_ITERATOR_LASTINDEX_SLOW;
+    }
+
+    // Step 13.
+    return CreateRegExpStringIterator(matcher, str, source, flags, lastIndex);
+}
+
+// String.prototype.matchAll proposal.
+//
+// CreateRegExpStringIterator ( R, S, global, fullUnicode )
+function CreateRegExpStringIterator(regexp, string, source, flags, lastIndex) {
+    // Step 1.
+    assert(typeof string === "string", "|string| is a string value");
+
+    // Steps 2-3.
+    assert(typeof flags === "number", "|flags| is a number value");
+
+    assert(typeof source === "string", "|source| is a string value");
+    assert(typeof lastIndex === "number", "|lastIndex| is a number value");
+
+    // Steps 4-9.
+    var iterator = NewRegExpStringIterator();
+    UnsafeSetReservedSlot(iterator, REGEXP_STRING_ITERATOR_REGEXP_SLOT, regexp);
+    UnsafeSetReservedSlot(iterator, REGEXP_STRING_ITERATOR_STRING_SLOT, string);
+    UnsafeSetReservedSlot(iterator, REGEXP_STRING_ITERATOR_SOURCE_SLOT, source);
+    UnsafeSetReservedSlot(iterator, REGEXP_STRING_ITERATOR_FLAGS_SLOT, flags | 0);
+    UnsafeSetReservedSlot(iterator, REGEXP_STRING_ITERATOR_LASTINDEX_SLOT, lastIndex);
+
+    // Step 10.
+    return iterator;
+}
+
+function IsRegExpStringIteratorNextOptimizable() {
+    var RegExpProto = GetBuiltinPrototype("RegExp");
+    // If RegExpPrototypeOptimizable succeeds, `RegExpProto.exec` is
+    // guaranteed to be a data property.
+    return RegExpPrototypeOptimizable(RegExpProto) &&
+           RegExpProto.exec === RegExp_prototype_Exec;
+}
+
+// String.prototype.matchAll proposal.
+//
+// %RegExpStringIteratorPrototype%.next ( )
+function RegExpStringIteratorNext() {
+    // Steps 1-3.
+    var obj;
+    if (!IsObject(this) || (obj = GuardToRegExpStringIterator(this)) === null) {
+        return callFunction(CallRegExpStringIteratorMethodIfWrapped, this,
+                            "RegExpStringIteratorNext");
+    }
+
+    var result = { value: undefined, done: false };
+
+    // Step 4.
+    var lastIndex = UnsafeGetReservedSlot(obj, REGEXP_STRING_ITERATOR_LASTINDEX_SLOT);
+    if (lastIndex === REGEXP_STRING_ITERATOR_LASTINDEX_DONE) {
+        result.done = true;
+        return result;
+    }
+
+    // Step 5.
+    var regexp = UnsafeGetObjectFromReservedSlot(obj, REGEXP_STRING_ITERATOR_REGEXP_SLOT);
+
+    // Step 6.
+    var string = UnsafeGetStringFromReservedSlot(obj, REGEXP_STRING_ITERATOR_STRING_SLOT);
+
+    // Steps 7-8.
+    var flags = UnsafeGetInt32FromReservedSlot(obj, REGEXP_STRING_ITERATOR_FLAGS_SLOT);
+    var global = !!(flags & REGEXP_GLOBAL_FLAG);
+    var fullUnicode = !!(flags & REGEXP_UNICODE_FLAG);
+
+    if (lastIndex >= 0) {
+        assert(IsRegExpObject(regexp), "|regexp| is a RegExp object");
+
+        var source = UnsafeGetStringFromReservedSlot(obj, REGEXP_STRING_ITERATOR_SOURCE_SLOT);
+        if (IsRegExpStringIteratorNextOptimizable() &&
+            UnsafeGetStringFromReservedSlot(regexp, REGEXP_SOURCE_SLOT) === source &&
+            UnsafeGetInt32FromReservedSlot(regexp, REGEXP_FLAGS_SLOT) === flags)
+        {
+            // Step 9 (Inlined RegExpBuiltinExec).
+            var globalOrSticky = !!(flags & (REGEXP_GLOBAL_FLAG | REGEXP_STICKY_FLAG));
+            if (!globalOrSticky)
+                lastIndex = 0;
+
+            var match = (lastIndex <= string.length)
+                        ? RegExpMatcher(regexp, string, lastIndex)
+                        : null;
+
+            // Step 10.
+            if (match === null) {
+                // Step 10.a.
+                UnsafeSetReservedSlot(obj, REGEXP_STRING_ITERATOR_LASTINDEX_SLOT,
+                                      REGEXP_STRING_ITERATOR_LASTINDEX_DONE);
+
+                // Step 10.b.
+                result.done = true;
+                return result;
+            }
+
+            // Step 11.a.
+            if (global) {
+                // Step 11.a.i.
+                var matchLength = match[0].length;
+                lastIndex = match.index + matchLength;
+
+                // Step 11.a.ii.
+                if (matchLength === 0) {
+                    // Steps 11.a.ii.1-3.
+                    lastIndex = fullUnicode ? AdvanceStringIndex(string, lastIndex) : lastIndex + 1;
+                }
+
+                UnsafeSetReservedSlot(obj, REGEXP_STRING_ITERATOR_LASTINDEX_SLOT, lastIndex);
+            } else {
+                // Step 11.b.i.
+                UnsafeSetReservedSlot(obj, REGEXP_STRING_ITERATOR_LASTINDEX_SLOT,
+                                      REGEXP_STRING_ITERATOR_LASTINDEX_DONE);
+            }
+
+            // Steps 11.a.iii and 11.b.ii.
+            result.value = match;
+            return result;
+        }
+
+        // Reify the RegExp object.
+        regexp = RegExpConstructRaw(source, flags);
+        regexp.lastIndex = lastIndex;
+        UnsafeSetReservedSlot(obj, REGEXP_STRING_ITERATOR_REGEXP_SLOT, regexp);
+
+        // Mark the iterator as no longer optimizable.
+        UnsafeSetReservedSlot(obj, REGEXP_STRING_ITERATOR_LASTINDEX_SLOT,
+                              REGEXP_STRING_ITERATOR_LASTINDEX_SLOW);
+    }
+
+    // Step 9.
+    var match = RegExpExec(regexp, string, false);
+
+    // Step 10.
+    if (match === null) {
+        // Step 10.a.
+        UnsafeSetReservedSlot(obj, REGEXP_STRING_ITERATOR_LASTINDEX_SLOT,
+                              REGEXP_STRING_ITERATOR_LASTINDEX_DONE);
+
+        // Step 10.b.
+        result.done = true;
+        return result;
+    }
+
+    // Step 11.a.
+    if (global) {
+        // Step 11.a.i.
+        var matchStr = ToString(match[0]);
+
+        // Step 11.a.ii.
+        if (matchStr.length === 0) {
+            // Step 11.a.ii.1.
+            var thisIndex = ToLength(regexp.lastIndex);
+
+            // Step 11.a.ii.2.
+            var nextIndex = fullUnicode ? AdvanceStringIndex(string, thisIndex) : thisIndex + 1;
+
+            // Step 11.a.ii.3.
+            regexp.lastIndex = nextIndex;
+        }
+    } else {
+        // Step 11.b.i.
+        UnsafeSetReservedSlot(obj, REGEXP_STRING_ITERATOR_LASTINDEX_SLOT,
+                              REGEXP_STRING_ITERATOR_LASTINDEX_DONE);
+    }
+
+    // Steps 11.a.iii and 11.b.ii.
+    result.value = match;
+    return result;
+}
+
+// ES2020 draft rev e97c95d064750fb949b6778584702dd658cf5624
+// 7.2.8 IsRegExp ( argument )
+function IsRegExp(argument) {
+    // Step 1.
+    if (!IsObject(argument)) {
+        return false;
+    }
+
+    // Step 2.
+    var matcher = argument[GetBuiltinSymbol("match")];
+
+    // Step 3.
+    if (matcher !== undefined) {
+        return !!matcher;
+    }
+
+    // Steps 4-5.
+    return IsPossiblyWrappedRegExpObject(argument);
+}

@@ -1,0 +1,389 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Latn_Kana.txt
+# Generated from CLDR
+#
+
+# note: a global filter is more efficient, but MUST include all source chars
+#:: [\u0000-\u007E 、。 \u3099-゜ ァ-ー ｡-ﾟ [:Latin:][:Katakana:] [:nonspacing mark:]] ;
+# MINIMAL FILTER GENERATED FOR: Latin-Katakana
+### WARNING -- must add width filter, both here and below!!! ###
+:: [[ᄀ-ᄒᄚᄡ\u1160-ᅵᆪᆬ-ᆭᆰ-ᆵ←-↓│■○\u3000-。「-」\u3099-\u309Aァ-ロワヲ-ヴヷヺ-ー！-～￠-￦][',.A-Za-z~À-ÖØ-öø-ďĒ-ĥĨ-İĴ-ķĹ-ľŃ-ňŌ-őŔ-ťŨ-žƠ-ơƯ-ưǍ-ǜǞ-ǣǦ-ǭǰǴ-ǵǸ-țȞ-ȟȦ-ȳ\u0304Ӣ-ӣӮ-ӯḀ-ẙẠ-ỹᾱᾹῑῙῡῩK-Å]] ;
+:: [:Latin:] fullwidth-halfwidth ();
+:: NFD (NFC);
+:: Lower ();    # whenever transliterating from cased to uncased script, include this
+# :: NFD () ;   # this would catch the odd cases where a lowercase is not in NFD, but none are important for Japanese
+# Uses modified Hepburn. Small changes to make  unambiguous.
+# | Kunrei-shiki: Hepburn/MHepburn
+# | ------------------------------
+# | si: shi
+# | si ~ya: sha
+# | si ~yu: shu
+# | si ~yo: sho
+# | zi: ji
+# | zi ~ya: ja
+# | zi ~yu: ju
+# | zi ~yo: jo
+# | ti: chi
+# | ti ~ya: cha
+# | ti ~yu: chu
+# | ti ~yu: cho
+# | tu: tsu
+# | di: ji/dji
+# | du: zu/dzu
+# | hu: fu
+# | For foreign words:
+# | -----------------
+# | se ~i si
+# | si ~e she
+# |
+# | ze ~i zi
+# | zi ~e je
+# |
+# | te ~i ti
+# | ti ~e che
+# | te ~u tu
+# |
+# | de ~i di
+# | de ~u du
+# | de ~i di
+# |
+# | he ~u: hu
+# | hu ~a fa
+# | hu ~i fi
+# | hu ~e he
+# | hu ~o ho
+# Most small forms are generated, but if necessary
+# explicit small forms are given with ~a, ~ya, etc.
+#------------------------------------------------------
+# Variables
+$vowel = [aeiou] ;
+$consonant = [bcdfghjklmnpqrstvwxyz] ;
+$macron = \u0304 ;
+# Variables used for doubled-consonants with tsu
+$kana = [ぁ-ゔ] ;
+$voice = [\u3099゛];
+$semivoice = [\u309A゜];
+$k_start = [カキクケコかきくけこ] ;
+$s_start = [サシスセソさしすせそ] ;
+$j_start = [シし] $voice ;
+$t_start = [タチツテトたちつてと] ;
+$n_start = [ナニヌネノンなにぬねの] ;
+$h_start = [ハヒヘホはひへほ] ;
+$f_start = [フふ] ;
+$m_start = [マミムメモまみむめも] ;
+$y_start = [ヤユヨやゆよ] ;
+$r_start = [ラリルレロらりるれろ] ;
+$w_start = [ワヰヱヲわゐゑを] ;
+$v_start = [ワヰヱヲ]\u3099 ;
+$voweled_basekana = [ァ-オカキクケコサシスセソタチッツテトナ-ノハヒフヘホマ-ヲヵヶ] ;
+# if ン is followed by $n_quoter, then it needs an
+# apostrophe after its romaji form to disambiguate it.
+# e.g., ン ア ! =  ナ, so represent as "n'a", not "na".
+$n_quoter  =  [ア イ ウ エ オ ナ ニ ヌ ネ ノ ヤ ユ ヨ ン] ;
+$small_y = [ャィュェョ] ;
+$iteration = ゝ ;
+#------------------------------------------------------
+# katakana rules
+# Punctuation
+'.' ↔ 。;
+',' ↔ 、;
+# ' ' } [a-z] → ; # delete spaces before latin
+# ' ' ← [^' '゠-ヿ] {} ['゠-ヿ] ; #insert spaces before hiragana
+# Iteration Mark
+# Copy previous letter § marks
+# TODO
+# | $1 $1 ← ($kana [[:M:]$voice$semivoice]?) $iteration
+# Specials for katakana -- not shared with hiragana
+va ↔ ワ\u3099 ;
+vi ↔ ヰ\u3099 ;
+ve ↔ ヱ\u3099 ;
+vo ↔ ヲ\u3099 ;
+'~ka' ↔ ヵ ;
+'~ke' ↔ ヶ ;
+# ~~~ begin shared rules ~~~
+#special
+ya ← '~'ャ;
+yi ← '~'ィ ;
+yu ← '~'ュ;
+ye ← '~'ェ;
+yo ← '~'ョ;
+#normal
+a ↔ ア ;
+b | '~' ← ヒ \u3099} $small_y ;
+by } $vowel → ヒ\u3099 | '~y' ;
+ba ↔ ハ\u3099 ;
+bi ↔ ヒ\u3099 ;
+bu ↔ フ\u3099 ;
+be ↔ ヘ\u3099 ;
+bo ↔ ホ\u3099 ;
+c } i → | s ;
+c } e → | s ;
+da ↔ タ\u3099 ;
+di ↔ テ\u3099ィ ;
+du ↔ テ\u3099ゥ ;
+de ↔ テ\u3099 ;
+do ↔ ト\u3099 ;
+dzu ↔ ツ\u3099 ;
+dja ← チ\u3099ャ ;
+dji'~i' ← チ\u3099ィ ; # liu
+dju ← チ\u3099ュ ;
+dje ← チ\u3099ェ ;
+djo ← チ\u3099ョ ;
+dji ↔ チ\u3099 ;
+dj  } $vowel → チ\u3099 | '~y' ;
+# TODO: QUESTION: use ĵĴżŻ instead of dj, dz
+cha ← チャ ;
+chi'~i' ← チィ ; # liu
+chu ← チュ ;
+che ← チェ ;
+cho ← チョ ;
+chi ↔ チ ;
+ch } $vowel → チ | '~y' ;
+e ↔ エ ;
+g | '~' ← キ\u3099} $small_y ;
+gy  } $vowel → キ\u3099 | '~y' ;
+ga ↔ カ\u3099 ;
+gi ↔ キ\u3099 ;
+gu ↔ ク\u3099 ;
+ge ↔ ケ\u3099 ;
+go ↔ コ\u3099 ;
+i ↔ イ ;
+# j  } $vowel → シ\u3099 | '~y' ;
+ja ↔ シ\u3099ャ ;
+ji'~i' ← シ\u3099ィ ; # liu
+ju ↔ シ\u3099ュ ;
+je ↔ シ\u3099ェ ;
+jo ↔ シ\u3099ョ ;
+ji ↔ シ\u3099 ;
+k | '~' ← キ} $small_y ;
+ky  } $vowel → キ | '~y' ;
+ka ↔ カ ;
+ki ↔ キ ;
+ku ↔ ク ;
+ke ↔ ケ ;
+ko ↔ コ ;
+m | '~' ← ミ} $small_y ;
+my  } $vowel → ミ | '~y' ;
+ma ↔ マ ;
+mi ↔ ミ ;
+mu ↔ ム ;
+me ↔ メ ;
+mo ↔ モ ;
+m } [pbfv] → ン ;
+n | '~' ← ニ } $small_y ;
+ny  } $vowel → ニ | '~y' ;
+na ↔ ナ ;
+ni ↔ ニ ;
+nu ↔ ヌ ;
+ne ↔ ネ ;
+no ↔ ノ ;
+o ↔ オ ;
+p | '~' ← ヒ\u309A } $small_y ;
+py  } $vowel → ヒ\u309A | '~y' ;
+pa ↔ ハ\u309A ;
+pi ↔ ヒ\u309A ;
+pu ↔ フ\u309A ;
+pe ↔ ヘ\u309A ;
+po ↔ ホ\u309A ;
+h | '~' ← ヒ } $small_y ;
+hy  } $vowel → ヒ | '~y' ;
+ha ↔ ハ ;
+hi ↔ ヒ ;
+hu ↔ ヘゥ ;
+he ↔ ヘ ;
+ho ↔ ホ ;
+# f | '~' ← フ } $small_y ;
+# f } $vowel → フ | '~' ;
+fa ↔ ファ ;
+fi ↔ フィ ;
+fe ↔ フェ ;
+fo ↔ フォ ;
+fu ↔ フ ;
+r | '~' ← リ } $small_y ;
+ry  } $vowel → リ | '~y' ;
+ra ↔ ラ ;
+ri ↔ リ ;
+ru ↔ ル ;
+re ↔ レ ;
+ro ↔ ロ ;
+za ↔ サ\u3099 ;
+zi ↔ セ\u3099ィ ;
+zu ↔ ス\u3099 ;
+ze ↔ セ\u3099 ;
+zo ↔ ソ\u3099 ;
+sa ↔ サ ;
+si ↔ セィ ;
+su ↔ ス ;
+se ↔ セ ;
+so ↔ ソ ;
+sha ← シャ ;
+shi'~i' ← シィ ; # liu
+shu ← シュ ;
+she ← シェ ;
+sho ← ショ ;
+shi ↔ シ ;
+sh } $vowel → シ | '~y' ;
+ta ↔ タ ;
+ti ↔ ティ ;
+tu ↔ テゥ ;
+te ↔ テ ;
+to ↔ ト ;
+tsu ↔ ツ ;
+# v  } $vowel → ウ\u3099 | '~' ;
+#'v~a' ← ウ\u3099ァ ; # liu
+#'v~i' ← ウ\u3099ィ ; # liu
+#'v~e' ← ウ\u3099ェ ; # liu
+#'v~o' ← ウ\u3099ォ ; # liu
+vu ↔ ウ\u3099 ;
+u ↔ ウ ;
+# w  } $vowel → ウ | '~' ;
+wa ↔ ワ ;
+wi ↔ ヰ ;
+wu → ウ ;
+we ↔ ヱ ;
+wo ↔ ヲ ;
+ya ↔ ヤ ;
+yi → イ ;
+yu ↔ ユ ;
+ye → エ ;
+yo ↔ ヨ ;
+# double consonants
+#specials
+s } sh → ッ ;
+t } ch → ッ ;
+#voiced
+j } j ↔ ッ } $j_start ;
+b } b ↔ ッ } [$h_start$f_start] $voice;
+d } d ↔ ッ } $t_start $voice;
+g } g ↔ ッ } $k_start $voice;
+p } p ↔ ッ } [$h_start$f_start] $semivoice;
+# v } v ↔ ッ } [ワヰウヱヲう]  $voice ;
+z } z ↔ ッ } $s_start $voice;
+v } v ↔ ッ } $v_start;
+# normal
+k } k ↔ ッ } $k_start ;
+m } m ↔ ッ } $m_start ;
+n } n ↔ ッ } $n_start ;
+h } h ↔ ッ } $h_start ;
+f } f ↔ ッ } $f_start ;
+r } r ↔ ッ } $r_start ;
+t } t ↔ ッ } $t_start ;
+s } s ↔ ッ } $s_start ;
+w } w  ↔ ッ } $w_start;
+y } y ↔ ッ } $y_start;
+# completeness
+x } x → ッ ;
+c } k → ッ ;
+c } c → ッ ;
+c } q → ッ ;
+l } l → ッ ;
+q } q → ッ ;
+# y } y → ッ ;
+# w } w → ッ ;
+# prolonged vowel mark. this indicates a doubling of
+# the preceding vowel sound
+#a ← a { ー ; # liu
+#e ← e { ー ; # liu
+#i ← i { ー ; # liu
+#o ← o { ー ; # liu
+#u ← u { ー ; # liu
+$macron ↔ ー ;
+# small forms
+'~a' ↔ ァ ;
+'~i' ↔ ィ ;
+'~u' ↔ ゥ ;
+'~e' ↔ ェ ;
+'~o' ↔ ォ ;
+'~tsu' ↔ ッ ;
+'~wa' ↔ ヮ ;
+'~ya' ↔ ャ ;
+'~yi' → ィ ;
+'~yu' ↔ ュ ;
+'~ye' → ェ ;
+'~yo' ↔ ョ ;
+# iteration marks
+# TODO: make more accurate
+j $1 ← sh (y* $vowel) {ヽ$voice ;
+dj $1 ← ch (y* $vowel) {ヽ$voice ;
+dz $1 ← ts (y* $vowel) {ヽ$voice ;
+g $1 ← k (y* $vowel) {ヽ$voice ;
+z $1 ← s (y* $vowel) {ヽ$voice ;
+d $1 ← t (y* $vowel) {ヽ$voice ;
+h $1 ← b (y* $vowel) {ヽ$voice ;
+v $1 ← w (y* $vowel) {ヽ$voice ;
+sh $1 ← sh (y* $vowel) {ヽ$voice ;
+j $1 ← j (y* $vowel) {ヽ$voice ;
+ch $1 ← ch (y* $vowel) {ヽ$voice ;
+dj $1 ← dj(y* $vowel) {ヽ$voice ;
+ts $1 ← ts (y* $vowel) {ヽ$voice ;
+dz $1 ← dz (y* $vowel) {ヽ$voice ;
+$1 ← ($consonant y* $vowel) {ヽ$voice? ;
+$1 ← (.) {ヽ $voice? ; # otherwise repeat last character
+← ヽ $voice? ; # delete if no characters found
+# h- rule: lengthens vowel if not followed by a vowel.
+# At the point this is applied, latin [cons]?vowel sequences
+# have been converted to katakana in NFD form.
+$voweled_basekana [\u3099 \u309A]? { h → ー ;
+# one-way latin- → kana rules. these do not occur in
+# well-formed romaji representing actual japanese text.
+# their purpose is to make all romaji map to kana of
+# some sort.
+# the following are not really necessary, but produce
+# slightly more natural results.
+cy → セィ ;
+dy → テ\u3099ィ ;
+hy → ヒ ;
+sy → セィ ;
+ty → ティ ;
+zy → セ\u3099ィ ;
+h → ヘ ;
+# isolated consonants listed here so as not to mask
+# longer rules above.
+ch → チ;
+sh → シ ;
+dz → ツ\u3099 ;
+dj → チ\u3099;
+b → フ\u3099 ;
+d → テ\u3099 ;
+g → ク\u3099 ;
+k → ク ;
+m → ム ;
+n'' ← ン } $n_quoter ;
+n ↔ ン ;
+p → フ\u309A ;
+r → ル ;
+s → ス ;
+t → テ ;
+y → イ ;
+z → ス\u3099 ;
+v → ウ\u3099 ;
+f → フ;
+j  → シ\u3099;
+w → ウ;
+ß → | ss ;
+æ → | e ;
+ð → | d ;
+ø → | u ;
+þ → | th ;
+# simple substitutions using backup
+c → | k ;
+l → | r ;
+q → | k ;
+x → | ks ;
+# ~~~ END shared rules ~~~
+#------------------------------------------------------
+# Final cleanup
+'~' → ; # delete stray tildes between letters
+[:Katakana:] { '' } [:Latin:] → ; # delete stray quotes between letters
+# [ʾ[:Nonspacing Mark:]-[\u3099-゜]] → ; # delete any non-spacing marks that we didn't use
+:: NFC (NFD) ;
+:: ([[:Katakana:][\u309B\u309C\u30A0\u30FC\uFF70\uFF9E\uFF9F]] halfwidth-fullwidth);
+# note: a global filter is more efficient, but MUST include all source chars!!
+#:: ([\u0000-\u007E 、。 \u3099-゜ ァ-ー ｡-ﾟ [:Latin:][:Katakana:] [:nonspacing mark:]]);
+# MINIMAL FILTER GENERATED FOR: Latin-Katakana BACKWARD
+:: ( [[\ -~¢-£¥-¦¬\u0304₩｡-ﾾￂ-ￇￊ-ￏￒ-ￗￚ-ￜ￨-￮][~、-。がぎぐげござじずぜぞだぢづでどば-ぱび-ぴぶ-ぷべ-ぺぼ-ぽゔ\u3099-゛ゞァ-ヺー-ヾ][\u309B\u309C\u30A0\u30FC\uFF70\uFF9E\uFF9F]] ) ;
+# eof
+

@@ -1,0 +1,19 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: el_Lower.txt
+# Generated from CLDR
+#
+
+# Special case for final form of sigma.
+::NFD();
+# C is preceded by a sequence consisting of a cased letter and then zero or more case-ignorable characters,
+# and C is not followed by a sequence consisting of zero or more case-ignorable characters and then a cased letter.
+# 03A3; 03C2; 03A3; 03A3; Final_Sigma; # GREEK CAPITAL LETTER SIGMA
+# With translit rules, easiest is to handle the negative condition first, mapping in that case to the regular sigma.
+Σ } [:case-ignorable:]* [:cased:] → σ;
+[:cased:] [:case-ignorable:]* { Σ → ς;
+::Any-Lower;
+::NFC();
+

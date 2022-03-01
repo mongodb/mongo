@@ -1,0 +1,44 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+eo{
+    RBNFRules{
+        SpelloutRules{
+            "%spellout-numbering-year:",
+            "x.x: =0.0=;",
+            "0: =%spellout-numbering=;",
+            "%spellout-numbering:",
+            "0: =%spellout-cardinal=;",
+            "%spellout-cardinal:",
+            "-x: minus >>;",
+            "x.x: << komo >>;",
+            "0: nulo;",
+            "1: unu;",
+            "2: du;",
+            "3: tri;",
+            "4: kvar;",
+            "5: kvin;",
+            "6: ses;",
+            "7: sep;",
+            "8: ok;",
+            "9: na\u016D;",
+            "10: dek[ >>];",
+            "20: <<dek[ >>];",
+            "100: cent[ >>];",
+            "200: <<cent[ >>];",
+            "1000: mil[ >>];",
+            "2000: << mil[ >>];",
+            "1000000: miliono[ >>];",
+            "2000000: << milionoj[ >>];",
+            "1000000000: miliardo[ >>];",
+            "2000000000: << miliardoj[ >>];",
+            "1000000000000: biliono[ >>];",
+            "2000000000000: << bilionoj[ >>];",
+            "1000000000000000: biliardo[ >>];",
+            "2000000000000000: << biliardoj[ >>];",
+            "1000000000000000000: =#,##0=;",
+            "%spellout-ordinal:",
+            "0: =%spellout-cardinal=a;",
+        }
+    }
+}

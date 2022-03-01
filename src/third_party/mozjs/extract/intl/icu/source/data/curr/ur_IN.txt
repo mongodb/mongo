@@ -1,0 +1,73 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ur_IN{
+    Currencies{
+        CRC{
+            "CRC",
+            "کوسٹا ریکا کولون",
+        }
+        CUC{
+            "CUC",
+            "قابل منتقلی کیوبائی پیسو",
+        }
+        CUP{
+            "CUP",
+            "کیوبائی پیسو",
+        }
+        CVE{
+            "CVE",
+            "کیپ ورڈی اسکیوڈو",
+        }
+        GBP{
+            "£",
+            "برطانوی پاونڈ سٹرلنگ",
+        }
+        GHS{
+            "GHS",
+            "گھانی سیڈی",
+        }
+        PKR{
+            "PKR",
+            "پاکستانی روپیہ",
+        }
+        WST{
+            "WST",
+            "ساموآئی ٹالا",
+        }
+    }
+    CurrencyPlurals{
+        CRC{
+            one{"کوسٹا ریکا کولون"}
+            other{"کوسٹا ریکا کولون"}
+        }
+        CUC{
+            one{"قابل منتقلی کیوبائی پیسو"}
+            other{"قابل منتقلی کیوبائی پیسو"}
+        }
+        CUP{
+            one{"کیوبائی پیسو"}
+            other{"کیوبائی پیسو"}
+        }
+        CVE{
+            one{"کیپ ورڈی اسکیوڈو"}
+            other{"کیپ ورڈی اسکیوڈو"}
+        }
+        GBP{
+            one{"برطانوی پاونڈ سٹرلنگ"}
+            other{"برطانوی پاونڈ سٹرلنگ"}
+        }
+        GHS{
+            one{"گھانی سیڈی"}
+            other{"گھانی سیڈی"}
+        }
+        PKR{
+            one{"پاکستانی روپیہ"}
+            other{"پاکستانی روپے"}
+        }
+        WST{
+            one{"ساموآئی ٹالا"}
+            other{"ساموآئی ٹالا"}
+        }
+    }
+}

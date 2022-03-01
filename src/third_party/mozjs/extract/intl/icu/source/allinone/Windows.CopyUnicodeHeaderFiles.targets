@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2016 and later: Unicode, Inc. and others. License & terms of use: http://www.unicode.org/copyright.html -->
+<!--
+  This file is used to copy all of the header files (*.h) from a project's "unicode" folder to a common output folder.
+-->
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <!-- This is the location of the common output folder. -->
+    <CopyDestionationPath>$(SolutionDir)\..\..\include\unicode</CopyDestionationPath>
+    <BuildDependsOn>
+      $(BuildDependsOn);
+      CopyUnicodeHeaderFiles;
+    </BuildDependsOn>
+  </PropertyGroup>
+  <Target Name="CopyUnicodeHeaderFiles">
+    <ItemGroup>
+      <!-- Generate a list of all files that end in .h from the 'unicode' folder, relative to the current project. -->
+      <OutputFiles Include=".\unicode\**\*.h" />
+    </ItemGroup>
+    <!-- This message will be logged in the project's build output. -->
+    <Message Text="Copying @(OutputFiles->Count()) header files to $(CopyDestionationPath). Files copied: @(OutputFiles)" Importance="high"/>
+    <!-- Perform the copy. -->
+    <Copy SourceFiles="@(OutputFiles)" 
+          DestinationFolder="$(CopyDestionationPath)\%(RecursiveDir)"
+          SkipUnchangedFiles="false"></Copy>
+  </Target>
+</Project>

@@ -1,0 +1,261 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+mfe{
+    ExemplarCharacters{"[a b c d e f g h i j k l m n o p r s t u v w x y z]"}
+    ExemplarCharactersIndex{"[A B C D E F G H I J K L M N O P R S T U V W X Y Z]"}
+    ExemplarCharactersNumbers{"[  \\- ‑ . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    NumberElements{
+        latn{
+            symbols{
+                group{" "}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE d MMMM y G",
+                "d MMMM y G",
+                "d MMM, y G",
+                "d/M/y GGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                M{"M"}
+                MMM{"MMM"}
+                MMMEd{"E d MMM"}
+                MMMMEd{"E d MMMM"}
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                MMd{"d/MM"}
+                MMdd{"dd/MM"}
+                Md{"d/M"}
+                ms{"m:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E d/M/y"}
+                yMM{"MM/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E d MMM y"}
+                yMMMM{"MMMM y"}
+                yMMMd{"d MMM y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE d MMMM y",
+                "d MMMM y",
+                "d MMM, y",
+                "d/M/y",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            appendItems{
+                Day{"{0} ({2}: {1})"}
+                Day-Of-Week{"{0} {1}"}
+                Era{"{1} {0}"}
+                Hour{"{0} ({2}: {1})"}
+                Minute{"{0} ({2}: {1})"}
+                Month{"{0} ({2}: {1})"}
+                Quarter{"{0} ({2}: {1})"}
+                Second{"{0} ({2}: {1})"}
+                Timezone{"{0} {1}"}
+                Week{"{0} ({2}: {1})"}
+                Year{"{1} {0}"}
+            }
+            availableFormats{
+                M{"M"}
+                MMM{"MMM"}
+                MMMEd{"E d MMM"}
+                MMMMEd{"E d MMMM"}
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                MMd{"d/MM"}
+                MMdd{"dd/MM"}
+                Md{"d/M"}
+                ms{"m:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E d/M/y"}
+                yMM{"MM/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E d MMM y"}
+                yMMMM{"MMMM y"}
+                yMMMd{"d MMM y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "dim",
+                        "lin",
+                        "mar",
+                        "mer",
+                        "ze",
+                        "van",
+                        "sam",
+                    }
+                    wide{
+                        "dimans",
+                        "lindi",
+                        "mardi",
+                        "merkredi",
+                        "zedi",
+                        "vandredi",
+                        "samdi",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "d",
+                        "l",
+                        "m",
+                        "m",
+                        "z",
+                        "v",
+                        "s",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "av. Z-K",
+                    "ap. Z-K",
+                }
+                wide{
+                    "avan Zezi-Krist",
+                    "apre Zezi-Krist",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "zan",
+                        "fev",
+                        "mar",
+                        "avr",
+                        "me",
+                        "zin",
+                        "zil",
+                        "out",
+                        "sep",
+                        "okt",
+                        "nov",
+                        "des",
+                    }
+                    wide{
+                        "zanvie",
+                        "fevriye",
+                        "mars",
+                        "avril",
+                        "me",
+                        "zin",
+                        "zilye",
+                        "out",
+                        "septam",
+                        "oktob",
+                        "novam",
+                        "desam",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "z",
+                        "f",
+                        "m",
+                        "a",
+                        "m",
+                        "z",
+                        "z",
+                        "o",
+                        "s",
+                        "o",
+                        "n",
+                        "d",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "T1",
+                        "T2",
+                        "T3",
+                        "T4",
+                    }
+                    wide{
+                        "1e trimes",
+                        "2em trimes",
+                        "3em trimes",
+                        "4em trimes",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"Zour"}
+            relative{
+                "-1"{"Yer"}
+                "0"{"Zordi"}
+                "1"{"Demin"}
+            }
+        }
+        dayperiod{
+            dn{"Peryod dan lazourne"}
+        }
+        era{
+            dn{"Lepok"}
+        }
+        hour{
+            dn{"Ler"}
+        }
+        minute{
+            dn{"Minit"}
+        }
+        month{
+            dn{"Mwa"}
+        }
+        second{
+            dn{"Segonn"}
+        }
+        week{
+            dn{"Semenn"}
+        }
+        weekday{
+            dn{"Zour lasemenn"}
+        }
+        year{
+            dn{"Lane"}
+        }
+        zone{
+            dn{"Peryod letan"}
+        }
+    }
+}

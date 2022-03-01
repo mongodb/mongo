@@ -1,0 +1,52 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+os{
+    zoneStrings{
+        "Asia:Tbilisi"{
+            ec{"Тбилис"}
+        }
+        "Etc:Unknown"{
+            ec{"Нӕзонгӕ"}
+        }
+        "Europe:Minsk"{
+            ec{"Минск"}
+        }
+        "Europe:Moscow"{
+            ec{"Мӕскуы"}
+        }
+        "meta:Europe_Central"{
+            ld{"Астӕуккаг Европӕйаг сӕрдыгон рӕстӕг"}
+            lg{"Астӕуккаг Европӕйаг рӕстӕг"}
+            ls{"Астӕуккаг Европӕйаг стандартон рӕстӕг"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"Скӕсӕн Европӕйаг сӕрдыгон рӕстӕг"}
+            lg{"Скӕсӕн Европӕйаг рӕстӕг"}
+            ls{"Скӕсӕн Европӕйаг стандартон рӕстӕг"}
+        }
+        "meta:Europe_Western"{
+            ld{"Ныгъуылӕн Европӕйаг сӕрдыгон рӕстӕг"}
+            lg{"Ныгъуылӕн Европӕйаг рӕстӕг"}
+            ls{"Ныгъуылӕн Европӕйаг стандартон рӕстӕг"}
+        }
+        "meta:GMT"{
+            ls{"Гринвичы рӕстӕмбис рӕстӕг"}
+        }
+        "meta:Georgia"{
+            ld{"Гуырдзыстоны сӕрдыгон рӕстӕг"}
+            lg{"Гуырдзыстоны рӕстӕг"}
+            ls{"Гуырдзыстоны стандартон рӕстӕг"}
+        }
+        "meta:Moscow"{
+            ld{"Мӕскуыйы сӕрдыгон рӕстӕг"}
+            lg{"Мӕскуыйы рӕстӕг"}
+            ls{"Мӕскуыйы стандартон рӕстӕг"}
+        }
+        fallbackFormat{"{1} ({0})"}
+        gmtFormat{"GMT{0}"}
+        gmtZeroFormat{"GMT"}
+        hourFormat{"+HH:mm;-HH:mm"}
+        regionFormat{"{0} рӕстӕг"}
+    }
+}

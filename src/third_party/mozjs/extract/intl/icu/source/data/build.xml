@@ -1,0 +1,79 @@
+<!DOCTYPE project [
+    <!ENTITY icu-config SYSTEM "./icu-config.xml">
+    <!ENTITY icu-locale-deprecates SYSTEM "./icu-locale-deprecates.xml">
+    <!ENTITY icu-coll-deprecates SYSTEM "./icu-coll-deprecates.xml">
+    <!ENTITY icu-rbnf-deprecates SYSTEM "./icu-rbnf-deprecates.xml">
+]>
+<!--
+/*
+* Copyright (C) 2016 and later: Unicode, Inc. and others.
+* License & terms of use: http://www.unicode.org/copyright.html
+*******************************************************************************
+* Copyright (C) 2005-2015, International Business Machines Corporation and    *
+* others. All Rights Reserved.                                                *
+*******************************************************************************
+*/
+-->
+<project name="icu-build" default="all" basedir=".">
+    <target name="init">
+        <tstamp/>
+
+        <!-- Load environment variables -->
+        <property environment="env"/>
+
+    	<!-- Ant won't set properties that have already been set, so environment variables that have been set before won't be clobbered. -->
+    	<property name="env.ICU4C_DIR" location="../.."/>
+
+    	<condition property="is.cldr.dir.set" >
+            <isset property="env.CLDR_DIR" />
+        </condition >
+        <fail unless="is.cldr.dir.set" message="Please set the CLDR_DIR environment variable to the top level CLDR source dir (containing 'common')."/>
+
+        <available property="cldrtools.dir" value="${env.CLDR_DIR}/cldr-tools" file="${env.CLDR_DIR}/cldr-tools" type="dir"/>
+        <available property="cldrtools.dir" value="${env.CLDR_DIR}/tools" file="${env.CLDR_DIR}/tools" type="dir"/>
+        <fail unless="cldrtools.dir" message="Please make sure that the CLDR tools directory is checked out into CLDR_DIR"/>
+
+        <available property="env.CLDR_CLASSES" value="${cldrtools.dir}/cldr-code/target/classes" file="${cldrtools.dir}/cldr-code/target/classes" type="dir"/>
+        <available property="cldrtools.jar" value="${cldrtools.dir}/cldr-code/target/cldr-code.jar" file="${cldrtools.dir}/cldr-code/target/cldr-code.jar" type="file"/>
+        <condition property="is.cldr.classes.set">
+            <or>
+                <isset property="env.CLDR_CLASSES" />
+                <isset property="cldrtools.jar" />
+            </or>
+        </condition>
+        <fail unless="is.cldr.classes.set" message="CLDR classes not found in ${cldrtools.dir}/cldr-code/target/classes. Please either set the CLDR_CLASSES environment variable or build cldr-code.jar."/>
+
+        <property name="env.CLDR_TMP_DIR" location="${env.CLDR_DIR}/../cldr-aux" /> <!-- Hack: see CLDRPaths -->
+        <property name="cldr.prod.dir" location="${env.CLDR_TMP_DIR}/production/" />
+        <echo message="java home: ${java.home}"/>
+        <echo message="java version: ${java.version}"/>
+        <echo message="ant java version: ${ant.java.version}"/>
+        <echo message="${ant.version}"/>
+        <echo message="cldr tools dir: ${cldrtools.dir}"/>
+        <echo message="cldr tools jar: ${cldrtools.jar}"/>
+        <echo message="cldr tools classes: ${env.CLDR_CLASSES}"/>
+        <echo message="CLDR_TMP_DIR: ${env.CLDR_TMP_DIR} "/>
+        <echo message="cldr.prod.dir (production data): ${cldr.prod.dir}"/>
+    </target>
+    <target name="setup" depends="init">
+        <mkdir dir="${env.CLDR_TMP_DIR}"/> <!-- make sure parent dir exists -->
+        <condition property="cldrprod.exists">
+            <available file="${cldr.prod.dir}" type="dir"/>
+        </condition>
+    </target>
+
+    <target name="cleanprod" depends="init, setup" if="cldrprod.exists">
+        <delete dir="${cldr.prod.dir}" />
+    </target>
+    <target name="proddata" depends="init,setup" unless="cldrprod.exists">
+        <echo message="Rebuilding ${cldr.prod.dir} - takes a while!"/>
+
+        <!-- setup prod data -->
+        <java fork="true" jar="${cldrtools.jar}">
+            <arg value="org.unicode.cldr.tool.GenerateProductionData" /> <!-- change to short alias 'proddata' or similar when annotated -->
+            <arg value="-v" />
+            <!-- TODO: for now, we just let the default source/target paths used.
+                 could set '-s' / '-d' for explicit source/dest -->
+        </java>
+    </target>
+</project>

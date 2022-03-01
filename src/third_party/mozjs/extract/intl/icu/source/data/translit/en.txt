@@ -1,0 +1,24 @@
+﻿// ***************************************************************************
+// Copyright (C) 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// *
+// *   Copyright (C) 2004-2006, International Business Machines
+// *   Corporation and others.  All Rights Reserved.
+// *
+// ***************************************************************************
+// 
+
+en{
+
+    // Format for the display name of a Transliterator.
+    // This is the English form of this resource.
+    TransliteratorNamePattern { "{0,choice,0#|1#{1}|2#{1} to {2}}" }
+
+    // Transliterator display names
+    // This is the English form of this resource.
+    // This list is currently incomplete, and care should be taken to translate these identifiers.
+    // TODO: Reorganize this data like Country, Currencies and Language tables.
+    "%Translit%Hex"         { "Hex Escape" }
+    "%Translit%UnicodeName" { "Unicode Name" }
+    "%Translit%UnicodeChar" { "Unicode Character" }
+}

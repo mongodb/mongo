@@ -1,0 +1,97 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Test Localization.prototype.formatMessages API</title>
+  <script src="chrome://mochikit/content/tests/SimpleTest/SimpleTest.js"></script>
+  <link rel="stylesheet" type="text/css" href="chrome://mochikit/content/tests/SimpleTest/test.css">
+  <script type="application/javascript">
+  "use strict";
+
+  async function* generateBundles(resourceIds) {
+    const bundle = new FluentBundle("en-US", {
+      useIsolating: false,
+    });
+    bundle.addResource(new FluentResource(`
+key1 = Value
+  .title = Title 1
+  .accesskey = K
+key2 =
+  .label = This is a label for { $user }
+    `));
+    yield bundle;
+  }
+
+  function getAttributeByName(attributes, name) {
+    return attributes.find(attr => attr.name === name);
+  }
+
+  (async () => {
+    SimpleTest.waitForExplicitFinish();
+
+    const loc = new Localization(
+      ['mock.ftl'],
+      false,
+      { generateBundles },
+    );
+
+    {
+      // Simple mix works.
+      let msgs = await loc.formatMessages([
+        {id: "key1"},
+        {id: "key2", args: { user: "Amy"}},
+      ]);
+      {
+        is(msgs[0].value, "Value");
+        let attr0 = getAttributeByName(msgs[0].attributes, "title");
+        is(attr0.name, "title");
+        is(attr0.value, "Title 1");
+        let attr1 = getAttributeByName(msgs[0].attributes, "accesskey");
+        is(attr1.name, "accesskey");
+        is(attr1.value, "K");
+      }
+
+      {
+        is(msgs[1].value, null);
+        let attr0 = getAttributeByName(msgs[1].attributes, "label");
+        is(attr0.name, "label");
+        is(attr0.value, "This is a label for Amy");
+      }
+    }
+
+    {
+      // Missing arguments cause exception in automation.
+      try {
+        let msgs = await loc.formatMessages([
+          {id: "key1"},
+          {id: "key2"},
+        ]);
+        ok(false, "Missing argument didn't cause an exception.");
+      } catch (e) {
+        is(e,
+          "[fluent][resolver] errors in en-US/key2: Resolver error: Unknown variable: $user.",
+          "Missing key causes an exception.");
+      }
+    }
+
+    {
+      // Missing keys cause exception in automation.
+      try {
+        let msgs = await loc.formatMessages([
+          { id: "key1" },
+          { id: "key4" },
+        ]);
+        ok(false, "Missing key didn't cause an exception.");
+      } catch (e) {
+        is(e,
+           "[fluent] Missing translations in en-US: key4.",
+           "Missing key causes an exception.");
+      }
+    }
+    SimpleTest.finish();
+  })();
+  </script>
+</head>
+<body>
+</body>
+</html>

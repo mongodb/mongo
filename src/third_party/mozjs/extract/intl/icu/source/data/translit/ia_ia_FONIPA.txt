@@ -1,0 +1,78 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: ia_ia_FONIPA.txt
+# Generated from CLDR
+#
+
+# Transformation from Interlingua (ia) to its IPA transcription (ia_FONIPA).
+# http://en.wikipedia.org/wiki/Interlingua#Interlingua_alphabet
+# http://www.omniglot.com/writing/interlingua.htm
+::NFC;
+::Lower;
+# Interlinua has five falling diphthongs.
+# http://en.wikipedia.org/wiki/Interlingua#Orthography_and_pronunciation
+ai → ai\u032F;
+au → au\u032F;
+ei → ei\u032F;  # rare
+eu → eu\u032F;
+oi → oi\u032F;  # rare
+# ‹g› is usually [ɡ], but it is [d\u0361ʒ] in -age, -agi-, and -egi-.
+# http://www.omniglot.com/writing/interlingua.htm
+$vowel = [aeiouy];
+$end_of_word = [$ ];
+{age} $end_of_word → ad\u0361ʒe;
+{agi} $vowel → ad\u0361ʒ;  # viagiar → viad\u0361ʒar
+agi → ad\u0361ʒi;
+{egi} $vowel → ed\u0361ʒ;  # legier → led\u0361ʒer
+egi → ed\u0361ʒi;
+gg → ɡ;
+g → ɡ;
+# Omniglot: “The sounds of g and k assimilate a preceding n as in English.”
+{n} [gkqx] → ŋ;
+nn → n;
+n → n;
+a → a;
+bb → b;
+b → b;
+cc → k;
+{c} [ei] → t\u0361s;
+ch → k;
+c → k;
+dd → d;
+d → d;
+e → e;
+ff → f;
+f → f;
+h → ;  # ‹h› is normally silent.
+i → i;
+j → ʒ;
+kk → k;
+k → k;
+ll → l;
+l → l;
+mm → m;
+m → m;
+o → o;
+ph → f;  # philosophos, physica
+pp → p;
+p → p;
+que → ke;
+qu → kw;
+q → k;
+rr → ɾ;
+r → ɾ;
+sh → ʃ;  # rare
+ss → s;
+s → s;
+[^s] {ti} [aeiouy] → t\u0361sj;
+tt → t;
+t → t;
+u → u;
+v → v;
+w → v;
+x → ks;
+y → i;
+z → z;
+

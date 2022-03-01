@@ -1,0 +1,88 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_AR{
+    %%Parent{"es_419"}
+    units{
+        duration{
+            year{
+                per{"{0}/año"}
+            }
+        }
+        electric{
+            ampere{
+                dnam{"amperios"}
+                one{"{0} amperio"}
+                other{"{0} amperios"}
+            }
+            milliampere{
+                dnam{"miliamperios"}
+                one{"{0} miliamperio"}
+                other{"{0} miliamperios"}
+            }
+            ohm{
+                one{"{0} ohmio"}
+                other{"{0} ohmios"}
+            }
+        }
+        energy{
+            joule{
+                dnam{"julios"}
+                one{"{0} julio"}
+                other{"{0} julios"}
+            }
+            kilojoule{
+                dnam{"kilojulios"}
+                one{"{0} kilojulio"}
+                other{"{0} kilojulios"}
+            }
+        }
+    }
+    unitsNarrow{
+        duration{
+            second{
+                dnam{"seg."}
+                one{"{0}seg."}
+                other{"{0}seg."}
+            }
+            year{
+                one{"{0}a."}
+                other{"{0}a."}
+            }
+        }
+    }
+    unitsShort{
+        duration{
+            century{
+                dnam{"s"}
+                one{"{0} s"}
+                other{"{0} s"}
+            }
+            hour{
+                dnam{"hs."}
+            }
+            second{
+                dnam{"seg."}
+                one{"{0} seg."}
+                other{"{0} seg."}
+                per{"{0}/seg."}
+            }
+            year{
+                dnam{"años"}
+                one{"{0} año"}
+                other{"{0} años"}
+                per{"{0}/a"}
+            }
+        }
+        electric{
+            volt{
+                dnam{"voltios"}
+            }
+        }
+        power{
+            watt{
+                dnam{"vatios"}
+            }
+        }
+    }
+}

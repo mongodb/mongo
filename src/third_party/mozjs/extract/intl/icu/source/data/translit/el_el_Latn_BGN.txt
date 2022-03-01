@@ -1,0 +1,426 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: el_el_Latn_BGN.txt
+# Generated from CLDR
+#
+
+#
+########################################################################
+# BGN/PCGN 1962 System
+#
+# This system is a simplified version of the system devised by the PCGN
+# in 1941 and later adopted by the BGN. In 1962 the two organizations
+# agreed to joint adoption of certain changes in the original system,
+# specifically the omission of special rules for the treatment of Greek
+# geographic names of Albanian, Bulgarian, Italian, Macedonian, and
+# Turkish origin. That revision eliminated the need to consider the
+# origin of names and removed ambiguity from the romanization of Greek
+# expressions of possible non-Greek origin. This system is based on
+# the pronunciation of modern Greek and is not intended for use in
+# the romanization of classical Greek.
+#
+# The Greek Alphabet as defined by the BGN (Pages 29-31):
+#
+#   ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ
+#   αβγδεζηθικλμνξοπρσςτυφχψω
+#
+# Originally prepared by Michael Everson <everson@evertype.com>
+########################################################################
+#
+# MINIMAL FILTER: Greek-Latin
+#
+:: [ΆΈΉΊΌΎΏΐΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩΪΫάέήίΰαβγδεζηθικλμνξοπρςστυφχψωϊϋόύώἀἁἂἃἄἅἆἇἈἉἊἋἌἍἎἏἐἑἒἓἔἕἘἙἚἛἜἝἠἡἢἣἤἥἦἧἨἩἪἫἬἭἮἯἰἱἲἳἴἵἶἷἸἹἺἻἼἽἾἿὀὁὂὃὄὅὈὉὊὋὌὍὐὑὒὓὔὕὖὗὙὛὝὟὠὡὢὣὤὥὦὧὨὩὫὬὭὮὯὰάὲέὴήὶίὸόὺύὼώᾀᾁᾂᾃᾄᾅᾆᾇᾈᾉᾊᾋᾌᾍᾎᾏᾐᾑᾒᾓᾔᾕᾖᾗᾘᾙᾚᾛᾜᾝᾞᾟᾠᾡᾢᾣᾤᾥᾦᾧᾨᾩᾪᾫᾬᾭᾮᾯᾲᾳᾴᾶᾷᾺΆᾼῂῃῄῆῇῈΈῊΉῌῖῚΊῤῥῦῪΎῲῳῴῶῷῸΌῺΏῼ῾] ;
+:: NFD (NFC) ;
+#
+#
+########################################################################
+#
+########################################################################
+#
+# Define All Transformation Variables
+#
+########################################################################
+#
+$upperConsonants = [ΒΓΔΖΘΚΛΜΝΞΠΡΣΤΦΧΨ] ;
+$lowerConsonants = [βγδζθκλμνξπρσςτφχψ] ;
+$consonants = [$upperConsonants $lowerConsonants] ;
+$upperVowels = [ΑΕΗΙΟΥΩ] ;
+$lowerVowels = [αεηιουω] ;
+$vowels = [$upperVowels $lowerVowels] ;
+$lower = [$lowerConsonants $lowerVowels] ;
+#
+#
+# Use this $wordBoundary until bug 2034 is fixed in ICU:
+# http://bugs.icu-project.org/cgi-bin/icu-bugs/transliterate?id=2034;expression=boundary;user=guest
+#
+$wordBoundary =  [^[:L:][:M:][:N:]] ;
+#
+#
+########################################################################
+#
+########################################################################
+#
+# Rules moved to front to avoid masking
+#
+########################################################################
+#
+########################################################################
+#
+# BGN Page 32 Rule 1:
+#
+# The apostrophe and reversed apostrophe, on or the other of which is
+# written in Greek in front of all initial uppercase vowel characters,
+# above all initial lowercase vowel characters, and above the second
+# character of all initial two-vowel character sequences, should not
+# be romanized, e.g., Ἀθῆναι → Athínai, Ἠράκλειον → Iráklion,
+# Οἰνόφυτα → Oinófita. These apostrophes must be distinguished from
+# accent marks hen they occur together, e.g. Ἄβατον → Ávaton,
+# Ἤλια → Ília, Οἴτη → Oíti. The reversed apostrophe is sometimes found
+# also with ρ and should, likewise, not be romanized: ῥέμα → réma.
+#
+# BGN Page 32 Rule 2a:
+#
+# Stress is shown in Greek by the use of the tilde or circumflex,
+# the acute accent, or the grave accent; all of those marks should
+# be represented in romanization by an acute accent, e.g.,
+# Ἀθῆναι → Athínai, Νδία → Día, Ζεμενὸν → Zemenón.
+#
+# BGN Page 32 Rule 4:
+#
+# The character ι (ióta) is sometimes found written under, or,
+# in uppercase, to the right of the vowel characters α, η, and ω.
+# This "subscript iota" should not be romanized, e.g.,
+# Μυρτῷον Πέλαγος or ΜΥΡΤῼΟΝ ΠΕΛΑΓΟΣ [but not ΜΥΡΤΩΙΟΝ ΠΕΛΑΓΟΣ]
+# → Mirtóön Pélagos.
+#
+########################################################################
+#
+[ἈἉᾼᾈᾉ] → Α ; # GREEK CAPITAL LETTER ALPHA
+[ἀἁᾳᾀᾁ] → α ; # GREEK SMALL LETTER ALPHA
+[ἊἋἌἍἎἏᾊᾋᾌᾍᾎᾏᾺΆ] → Ά ; # GREEK CAPITAL LETTER ALPHA WITH TONOS
+[ἂἃἄἅἆἇὰάᾂᾃᾄᾅᾆᾇᾲᾴᾶᾷ] → ά ; # GREEK SMALL LETTER ALPHA WITH TONOS
+[ἘἙ] → Ε ; # GREEK CAPITAL LETTER EPSILON
+[ἐἑὲέ] → ε ; # GREEK SMALL LETTER EPSILON
+[ἚἛἜἝῈΈ] → Έ ; # GREEK CAPITAL LETTER EPSILON WITH TONOS
+[ἒἓἔἕ] → έ ; # GREEK SMALL LETTER EPSILON WITH TONOS
+[ἨἩᾘᾙῌ] → Η ; # GREEK CAPITAL LETTER ETA
+[ἠἡᾐᾑῃ] → η ; # GREEK SMALL LETTER ETA
+[ἪἫἬἭἮἯᾚᾛᾜᾝᾞᾟῊΉ] → Ή ; # GREEK CAPITAL LETTER ETA WITH TONOS
+[ἢἣἤἥἦἧὴήᾒᾓᾔᾕᾖᾗῂῄῆῇ] → ή ; # GREEK SMALL LETTER ETA WITH TONOS
+[ἸἹ] → Ι ; # GREEK CAPITAL LETTER IOTA
+[ἰἱ] → ι ; # GREEK SMALL LETTER IOTA
+[ἺἻἼἽἾἿῚΊ] → Ί ; # GREEK CAPITAL LETTER IOTA WITH TONOS
+[ἲἳἴἵἶἷὶίῖ] → ί ; # GREEK SMALL LETTER IOTA WITH TONOS
+[ὈὉ] → Ο ; # GREEK CAPITAL LETTER OMICRON
+[ὀὁ] → ο ; # GREEK SMALL LETTER OMICRON
+[ὊὋὌὍῸΌ] → Ό ; # GREEK CAPITAL LETTER OMICRON WITH TONOS
+[ὂὃὄὅὸό] → ό ; # GREEK SMALL LETTER OMICRON WITH TONOS
+Ὑ → Υ ; # GREEK CAPITAL LETTER UPSILON
+[ὐὑ] → υ ; # GREEK SMALL LETTER UPSILON
+[ὛὝὟῪΎ] → Ύ ; # GREEK CAPITAL LETTER UPSILON WITH TONOS
+[ὒὓὔὕὖὗὺύῦ] → ύ ; # GREEK SMALL LETTER UPSILON WITH TONOS
+[ὨὩᾨᾩῼ] → Ω ; # GREEK CAPITAL LETTER OMEGA
+[ὠὡᾠᾡῳ] → ω ; # GREEK SMALL LETTER OMEGA
+[ὬὫὬὭὮὯᾪᾫᾬᾭᾮᾯῺΏ] → Ώ ; # GREEK CAPITAL LETTER OMEGA WITH TONOS
+[ὢὣὤὥὦὧὼώᾢᾣᾤᾥᾦᾧῲῴῶῷ] → ώ ; # GREEK SMALL LETTER OMEGA WITH TONOS
+Ῥ → Ρ ; # GREEK CAPITAL LETTER RHO
+[ῤῥ] → ρ ; # GREEK SMALL LETTER RHO
+#
+#
+########################################################################
+#
+# End of Rules 1, 2a, and 4
+#
+########################################################################
+#
+########################################################################
+#
+# BGN Page 32 Rules 2b and 2c:
+#
+# If the stressed vowel is written as a sequence of two vowel characters
+# in Greek, the # second vowel character should carry the accent;
+# similarly, in Romanization the acute accent should be placed over the
+# second vowel letter, e.g., Οἰνοῦσαι → Oinoúsai, Οἴτη → Oíti,
+# Θεσπιαὶ → Thespiaí.
+#
+# Where a syllable containing on the combinations αυ, ευ, or ηυ
+# carries the stress, this is marked in Greek on the character υ.
+# In romanization it should be shown on the preceding vowel
+# letter, e.g., Πειραιεύς → Piraiévs, Αὔρα → Ávra.
+#
+Αί → Aí ;
+αί → aí ;
+Οί → Oí ;
+οί → Oí ;
+Ού → Oú ;
+ού → oú ;
+Αύ → Άυ ;
+αύ → άυ ;
+Εύ → Έυ ;
+εύ → έυ ;
+Ηύ → Ήυ ;
+ηύ → ήυ ;
+#
+#
+########################################################################
+#
+# End of Rules 2b and 2c
+#
+########################################################################
+#
+########################################################################
+#
+# BGN Page 32 Rule 3:
+#
+# The dieresis should be shown in romanization where it occurs in Greek,
+# e.g., Μαρινέϊκα → Marinéïka, Ἀχαΐα → Akhaï\u0301a; and over the second vowel
+# etter in romanization of the following combinations fo Greek vowel
+# characters: αε, e.g., Ἀετὸς → Aëtos; αη, e.g., Ἀηδὼν → Aïdhon; οη,
+# e.g. Οἰνόη → Oinóï; ωο, e.g., Ἠρῶον → Iróön.
+#
+[ΪΫ] → Ï ;
+[ϊϋ] → ï ;
+[ΐΰ] → ï\u0301 ;
+Αε → Aë ;
+αε → aë ;
+Αη → Aï ;
+αη → aï ;
+Οη → Oï ;
+οη → oï ;
+Ωο → Oö ;
+ωο → oö ;
+Άε → Áë ;
+άε → áë ;
+Άη → Áï ;
+άη → áï ;
+Όη → Óï ;
+όη → óï ;
+Ώο → Óö ;
+ώο → óö ;
+#
+#
+########################################################################
+#
+# End of Rule 3
+#
+########################################################################
+#
+########################################################################
+#
+# Start of Alphabetic Transformations
+#
+########################################################################
+#
+ΑΙ → AI ; # GREEK CAPITAL LETTER ALPHA + CAPITAL IOTA
+Αι → Ai ; # GREEK CAPITAL LETTER ALPHA + SMALL IOTA
+αι → ai ; # GREEK SMALL LETTER ALPHA + SMALL IOTA
+ΑΥ → AV ; # GREEK CAPITAL LETTER ALPHA + CAPITAL UPSILON
+Αυ → Av ; # GREEK CAPITAL LETTER ALPHA + SMALL UPSILON
+αυ → av ; # GREEK SMALL LETTER ALPHA + SMALL UPSILON
+Α → A ; # GREEK CAPITAL LETTER ALPHA
+α → a ; # GREEK SMALL LETTER ALPHA
+Ά → Á ; # GREEK CAPITAL LETTER ALPHA WITH TONOS
+ά → á ; # GREEK SMALL LETTER ALPHA WITH TONOS
+Β → V ; # GREEK CAPITAL LETTER BETA
+β → v ; # GREEK SMALL LETTER BETA
+ΓΓ → NG ; # GREEK CAPITAL LETTER GAMMA + CAPITAL GAMMA
+Γγ → Ng ; # GREEK CAPITAL LETTER GAMMA + SMALL GAMMA
+γγ → ng ; # GREEK SMALL LETTER GAMMA + SMALL GAMMA
+$wordBoundary{ΓΚ → G ; # GREEK CAPITAL LETTER GAMMA + CAPITAL KAPPA
+$wordBoundary{Γκ → G ; # GREEK CAPITAL LETTER GAMMA + SMALL KAPPA
+$wordBoundary{γκ → g ; # GREEK SMALL LETTER GAMMA + SMALL KAPPA
+ΓΚ → NG ; # GREEK CAPITAL LETTER GAMMA + CAPITAL KAPPA
+Γκ → Ng ; # GREEK CAPITAL LETTER GAMMA + SMALL KAPPA
+γκ → ng ; # GREEK SMALL LETTER GAMMA + SMALL KAPPA
+#
+#
+########################################################################
+#
+# BGN Page 29 Rule 3a:
+#
+# The character γ should be romanized g before α, ο, ου, ω, and
+# consonants other than γ, ξ, and χ.
+#
+########################################################################
+#
+Γ}[ΑΟΩ [$upperConsonants - [ΓΞΧ]]] → G ; # GREEK CAPITAL LETTER GAMMA
+Γ}[αοω [$lowerConsonants - [γξχ]]] → G ; # GREEK CAPITAL LETTER GAMMA
+Γ}ΟΥ → G ; # GREEK CAPITAL LETTER GAMMA
+Γ}ου → G ; # GREEK CAPITAL LETTER GAMMA
+γ}[αοω [$lowerConsonants - [γξχ]]] → g ; # GREEK SMALL LETTER GAMMA
+γ}ου → g ; # GREEK SMALL LETTER GAMMA
+#
+#
+########################################################################
+#
+# End of Rule 3a
+#
+########################################################################
+#
+########################################################################
+#
+# BGN Page 29 Rule 3b:
+#
+# The character γ should be romanized y before αι, ε, ει, η, ι, οι, υ,
+# and υι.
+#
+########################################################################
+#
+Γ}[ΑΕΟΥ]Ι → Y ; # GREEK CAPITAL LETTER GAMMA
+Γ}[ΕΗΙΥ]  → Y ; # GREEK CAPITAL LETTER GAMMA
+Γ}[αεου]ι → Y ; # GREEK CAPITAL LETTER GAMMA
+Γ}[εηιυ]  → Y ; # GREEK CAPITAL LETTER GAMMA
+γ}[αεου]ι → y ; # GREEK SMALL LETTER GAMMA
+γ}[εηιυ]  → y ; # GREEK SMALL LETTER GAMMA
+#
+#
+########################################################################
+#
+# End of Rule 3b
+#
+########################################################################
+#
+########################################################################
+#
+# BGN Page 29 Rule 3c:
+#
+# The character γ should be romanized n before ξ and χ.
+#
+########################################################################
+#
+Γ}[ΞΧ] → N ; # GREEK CAPITAL LETTER GAMMA
+Γ}[ξχ] → N ; # GREEK CAPITAL LETTER GAMMA
+γ}[ξχ] → n ; # GREEK SMALL LETTER GAMMA
+#
+#
+########################################################################
+#
+# End of Rule 3c
+#
+########################################################################
+#
+Γ → G ; # GREEK CAPITAL LETTER GAMMA
+γ → g ; # GREEK SMALL LETTER GAMMA
+#
+#
+########################################################################
+#
+# BGN Page 29 Rule 4a:
+#
+#  The character δ should be romanized d when between ν and ρ.
+#
+########################################################################
+#
+Ν{Δ}Ρ → D ; # GREEK CAPITAL LETTER DELTA
+ν{δ}ρ → d ; # GREEK SMALL LETTER GAMMA
+#
+#
+########################################################################
+#
+# End of Rule 4a
+#
+########################################################################
+#
+Δ} $lower → Dh ; # GREEK CAPITAL LETTER PSI
+Δ → DH ; # GREEK CAPITAL LETTER DELTA
+δ → dh ; # GREEK SMALL LETTER DELTA
+ΕΙ → I ; # GREEK CAPITAL LETTER EPSILON + CAPITAL IOTA
+Ει → I ; # GREEK CAPITAL LETTER EPSILON + SMALL IOTA
+ει → i ; # GREEK SMALL LETTER EPSILON + SMALL IOTA
+ΕΪ → EÏ ; # GREEK CAPITAL LETTER EPSILON + CAPITAL IOTA DIAERESIS
+Εϊ → Eï ; # GREEK CAPITAL LETTER EPSILON + SMALL IOTA DIAERESIS
+εϊ → eï ; # GREEK SMALL LETTER EPSILON + SMALL IOTA DIAERESIS
+ΕΥ → EV ; # GREEK CAPITAL LETTER EPSILON + CAPITAL UPSILON
+Ευ → Ev ; # GREEK CAPITAL LETTER EPSILON + SMALL UPSILON
+ευ → ev ; # GREEK SMALL LETTER EPSILON + SMALL UPSILON
+Ε → E ; # GREEK CAPITAL LETTER EPSILON
+ε → e ; # GREEK SMALL LETTER EPSILON
+Έ → É ; # GREEK CAPITAL LETTER EPSILON WITH TONOS
+έ → é ; # GREEK SMALL LETTER EPSILON WITH TONOS
+Ζ → Z ; # GREEK CAPITAL LETTER ZETA
+ζ → z ; # GREEK SMALL LETTER ZETA
+ΗΥ → IV ; # GREEK CAPITAL LETTER ALPHA + CAPITAL UPSILON
+Ηυ → Iv ; # GREEK CAPITAL LETTER ALPHA + SMALL UPSILON
+ηυ → iv ; # GREEK SMALL LETTER ALPHA + SMALL UPSILON
+Η → I ; # GREEK CAPITAL LETTER ETA
+η → i ; # GREEK SMALL LETTER ETA
+Ή → Í ; # GREEK CAPITAL LETTER ETA WITH TONOS
+ή → í ; # GREEK SMALL LETTER ETA WITH TONOS
+Θ} $lower → Th ; # GREEK CAPITAL LETTER THETA
+Θ → TH ; # GREEK CAPITAL LETTER THETA
+θ → th ; # GREEK SMALL LETTER THETA
+Ι → I ; # GREEK CAPITAL LETTER IOTA
+ι → i ; # GREEK SMALL LETTER IOTA
+Ί → Í ; # GREEK CAPITAL LETTER IOTA WITH TONOS
+ί → í ; # GREEK SMALL LETTER IOTA WITH TONOS
+Κ → K ; # GREEK CAPITAL LETTER KAPPA
+κ → k ; # GREEK SMALL LETTER KAPPA
+Λ → L ; # GREEK CAPITAL LETTER LAMDA
+λ → l ; # GREEK SMALL LETTER LAMDA
+$wordBoundary{ΜΠ → B ; # GREEK CAPITAL LETTER MU + CAPITAL PI
+$wordBoundary{Μπ → B ; # GREEK CAPITAL LETTER MU + SMALL PI
+$wordBoundary{μπ → b ; # GREEK SMALL LETTER MU + SMALL PI
+ΜΠ → MB ; # GREEK CAPITAL LETTER MU + CAPITAL PI
+Μπ → Mb ; # GREEK CAPITAL LETTER MU + SMALL PI
+μπ → mb ; # GREEK SMALL LETTER MU + SMALL PI
+Μ → M ; # GREEK CAPITAL LETTER MU
+μ → m ; # GREEK SMALL LETTER MU
+$wordBoundary{ΝΤ → D ; # GREEK CAPITAL LETTER NU + CAPITAL TAU
+$wordBoundary{Ντ → D ; # GREEK CAPITAL LETTER NU + SMALL TAU
+$wordBoundary{ντ → d ; # GREEK SMALL LETTER NU + SMALL TAU
+ΝΤ → ND ; # GREEK CAPITAL LETTER NU + CAPITAL TAU
+Ντ → Nd ; # GREEK CAPITAL LETTER NU + SMALL TAU
+ντ → nd ; # GREEK SMALL LETTER NU + SMALL TAU
+Ν → N ; # GREEK CAPITAL LETTER NU
+ν → n ; # GREEK SMALL LETTER NU
+Ξ → X ; # GREEK CAPITAL LETTER KSI
+ξ → x ; # GREEK SMALL LETTER KSI
+ΟΙ → OI ; # GREEK CAPITAL LETTER OMICRON + CAPITAL IOTA
+Οι → Oi ; # GREEK CAPITAL LETTER OMICRON + SMALL IOTA
+οι → oi ; # GREEK SMALL LETTER OMICRON + SMALL IOTA
+ΟΥ → OU ; # GREEK CAPITAL LETTER OMICRON + CAPITAL UPSILON
+Ου → Ou ; # GREEK CAPITAL LETTER OMICRON + SMALL UPSILON
+ου → ou ; # GREEK SMALL LETTER OMICRON + SMALL UPSILON
+Ο → O ; # GREEK CAPITAL LETTER OMICRON
+ο → o ; # GREEK SMALL LETTER OMICRON
+Ό → Ó ; # GREEK CAPITAL LETTER OMICRON WITH TONOS
+ό → ó ; # GREEK SMALL LETTER OMICRON WITH TONOS
+Π → P ; # GREEK CAPITAL LETTER PI
+π → p ; # GREEK SMALL LETTER PI
+Ρ → R ; # GREEK CAPITAL LETTER RHO
+ρ → r ; # GREEK SMALL LETTER RHO
+Σ → S ; # GREEK CAPITAL LETTER SIGMA
+σ → s ; # GREEK SMALL LETTER SIGMA
+ς → s ; # GREEK SMALL LETTER FINAL SIGMA
+Τ → T ; # GREEK CAPITAL LETTER TAU
+τ → t ; # GREEK SMALL LETTER TAU
+#
+#
+########################################################################
+#
+# End Rule 3.5
+#
+########################################################################
+#
+Υ → I ; # GREEK CAPITAL LETTER UPSILON
+υ → i ; # GREEK SMALL LETTER UPSILON
+Ύ → Í ; # GREEK CAPITAL LETTER UPSILON WITH TONOS
+ύ → í ; # GREEK SMALL LETTER UPSILON WITH TONOS
+Φ → F ; # GREEK CAPITAL LETTER PHI
+φ → f ; # GREEK SMALL LETTER PHI
+Χ} $lower → Kh ; # GREEK CAPITAL LETTER CHI
+Χ → KH ; # GREEK CAPITAL LETTER CHI
+χ → kh ; # GREEK SMALL LETTER CHI
+Ψ} $lower → Ps ; # GREEK CAPITAL LETTER PSI
+Ψ → PS ; # GREEK CAPITAL LETTER PSI
+ψ → ps ; # GREEK SMALL LETTER PSI
+Ω → O ; # GREEK CAPITAL LETTER OMEGA
+ω → o ; # GREEK SMALL LETTER OMEGA
+Ώ → Ó ; # GREEK CAPITAL LETTER OMEGA WITH TONOS
+ώ → ó ; # GREEK SMALL LETTER OMEGA WITH TONOS
+#
+#
+########################################################################
+

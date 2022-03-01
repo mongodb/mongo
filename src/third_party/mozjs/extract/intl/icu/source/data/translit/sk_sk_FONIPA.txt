@@ -1,0 +1,108 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: sk_sk_FONIPA.txt
+# Generated from CLDR
+#
+
+# Slovak orthography to phonemic transcription.
+# http://en.wikipedia.org/wiki/Slovak_language
+# http://en.wikipedia.org/wiki/Slovak_alphabet
+#
+# Letters that trigger softening; also triggered at end of word.
+# Softening also occurs before "ch", but that starts in "c" so it
+# is included in the set below.
+$soften = [ptťkcčsš$] ;
+#
+#
+# Transform input to normalized form NFC, and to lowercase.
+:: NFC () ;
+:: Lower () ;
+#
+#
+# digraphs
+ch → x ;
+#
+#
+dž } $soften → t \u0361 ʃ ;  # affricate indicated by ligature tie
+dz } $soften → t \u0361 s ;
+dž → d \u0361 ʒ ;
+dz → d \u0361 z ;
+#
+#
+a → a ;
+á → aː ;
+ä → ɛ ;
+b } $soften → p ;
+b → b ;
+c → t \u0361 s;  # affricate indicated by ligature tie
+č → t \u0361 ʃ;  # affricate indicated by ligature tie
+d } [ie] → ɟ ;
+d } $soften → t ;
+d → d ;
+ď } $soften → c ;
+ď → ɟ ;
+e → e ;
+é → eː ;
+f → f ;
+g } $soften → k ;
+g → ɡ ;
+h } $soften → x ;
+h → ɦ ;
+i → ɪ ;
+í → iː ;
+j → j ;
+k → k ;
+ľ → ʎ ;
+l\' → ʎ ;
+l → l ;
+ĺ → l\u0329ː ;
+m } [fv] → ɱ ;
+m → m ;
+n } [kg] → ŋ ;
+n } [ie] → ɲ ;
+n → n ;
+ň → ɲ ;
+o → ɔ ;
+ó → ɔː ;
+ô → u\u032Fo ;
+p → p ;
+q → kv ;
+r → r ;
+ŕ → r\u0329ː ;
+s → s ;
+š → ʃ ;
+t } [ie] → c ;
+t\' → c ;
+ť → c ;
+t → t ;
+u → u ;
+ú → uː ;
+vz } $soften → fs ;
+v } $soften → f ;
+[ $] { v } ' ' $soften → f ;  # v as preposition
+v → v ;
+w → v ;
+x → ks ;
+y → ɪ ;
+ý → iː ;
+z } $soften → s ;
+z → z ;
+ž } $soften → ʃ ;
+ž → ʒ ;
+::null;
+bb → bː;
+cc → cː;
+dd → dː;
+ff → fː;
+nn → nː;
+pp → pː;
+rr → rː;
+ss → sː;
+tt → tː;
+vv → vː;
+zz → zː;
+ʃʃ → ʃː;
+ʒʒ → ʒː;
+

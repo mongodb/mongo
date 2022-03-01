@@ -37,6 +37,13 @@
 #include <memory>
 
 #include <js/CharacterEncoding.h>
+#include <js/CompilationAndEvaluation.h>
+#include <js/ContextOptions.h>
+#include <js/Initialization.h>
+#include <js/Object.h>
+#include <js/SourceText.h>
+#include <js/TypeDecls.h>
+#include <jsapi.h>
 #include <jscustomallocator.h>
 #include <jsfriendapi.h>
 
@@ -121,8 +128,7 @@ thread_local MozJSImplScope::ASANHandles* kCurrentASANHandles = nullptr;
 thread_local std::atomic<MozJSImplScope*> kCurrentScope = nullptr;  // NOLINT
 
 struct MozJSImplScope::MozJSEntry {
-    MozJSEntry(MozJSImplScope* scope)
-        : ar(scope->_context), ac(scope->_context, scope->_global), _scope(scope) {
+    MozJSEntry(MozJSImplScope* scope) : ac(scope->_context, scope->_global), _scope(scope) {
         ++_scope->_inOp;
     }
 
@@ -130,8 +136,7 @@ struct MozJSImplScope::MozJSEntry {
         --_scope->_inOp;
     }
 
-    JSAutoRequest ar;
-    JSAutoCompartment ac;
+    JSAutoRealm ac;
     MozJSImplScope* _scope;
 };
 
@@ -165,8 +170,8 @@ void MozJSImplScope::kill() {
     {
         stdx::lock_guard<Latch> lk(_mutex);
 
-        // If we are on the right thread, in the middle of an operation, and we have a registered
-        // opCtx, then we should check the opCtx for interrupts.
+        // If we are on the right thread, in the middle of an operation, and we have a
+        // registered opCtx, then we should check the opCtx for interrupts.
         if (_opCtxThreadId == stdx::this_thread::get_id() && _inOp > 0 && _opCtx) {
             _killStatus = _opCtx->checkForInterruptNoAssert();
         }
@@ -232,7 +237,10 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
     return scope->_status.isOK();
 }
 
-void MozJSImplScope::_gcCallback(JSContext* rt, JSGCStatus status, void* data) {
+void MozJSImplScope::_gcCallback(JSContext* rt,
+                                 JSGCStatus status,
+                                 JS::GCReason reason,
+                                 void* data) {
     if (!shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(1))) {
         // don't collect stats unless verbose
         return;
@@ -241,6 +249,7 @@ void MozJSImplScope::_gcCallback(JSContext* rt, JSGCStatus status, void* data) {
     LOGV2_INFO(22787,
                "MozJS GC heap stats",
                "phase"_attr = (status == JSGC_BEGIN ? "prologue" : "epilogue"),
+               "reason"_attr = reason,
                "total"_attr = mongo::sm::get_total_bytes(),
                "limit"_attr = mongo::sm::get_max_bytes());
 }
@@ -284,8 +293,8 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine,
     /**
      * The maximum amount of memory to be given out per thread to mozilla. We
      * manage this by trapping all calls to malloc, free, etc. and keeping track of
-     * counts in some thread locals. If 'jsHeapLimitMB' is specified then we use this instead of the
-     * engine limit, given it does not exceed the engine limit.
+     * counts in some thread locals. If 'jsHeapLimitMB' is specified then we use this instead of
+     * the engine limit, given it does not exceed the engine limit.
      */
     const auto engineJsHeapLimit = engine->getJSHeapLimitMB();
     const auto jsHeapLimit =
@@ -311,8 +320,7 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine,
         }
 
         _context = std::unique_ptr<JSContext, std::function<void(JSContext*)>>(
-            JS_NewContext(kMaxBytesBeforeGC, JS::DefaultNurseryBytes),
-            [](JSContext* ptr) { JS_DestroyContext(ptr); });
+            JS_NewContext(kMaxBytesBeforeGC), [](JSContext* ptr) { JS_DestroyContext(ptr); });
         uassert(ErrorCodes::JSInterpreterFailure, "Failed to initialize JSContext", _context);
 
         // We turn on a variety of optimizations if the jit is enabled
@@ -320,23 +328,20 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine,
             JS::ContextOptionsRef(_context.get())
                 .setAsmJS(true)
                 .setThrowOnAsmJSValidationFailure(true)
-                .setBaseline(true)
-                .setIon(true)
-                .setAsyncStack(false)
-                .setNativeRegExp(true);
+                .setWasmBaseline(true)
+                .setAsyncStack(false);
         } else {
             JS::ContextOptionsRef(_context.get())
                 .setAsmJS(false)
                 .setThrowOnAsmJSValidationFailure(false)
-                .setBaseline(false)
-                .setIon(false)
-                .setAsyncStack(false)
-                .setNativeRegExp(false);
+                .setWasmBaseline(false)
+                .setDisableIon()
+                .setAsyncStack(false);
         }
 
         uassert(ErrorCodes::JSInterpreterFailure,
                 "UseInternalJobQueues",
-                js::UseInternalJobQueues(_context.get(), true));
+                js::UseInternalJobQueues(_context.get()));
 
         uassert(ErrorCodes::JSInterpreterFailure,
                 "InitSelfHostedCode",
@@ -363,10 +368,10 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine,
             const auto available_stack_space = available.get();
 
 #if defined(__powerpc64__) && defined(MONGO_CONFIG_DEBUG_BUILD)
-            // From experimentation, we need a larger reservation of 96k since debug ppc64le code
-            // needs more stack space to process stack overflow. In debug builds, more variables are
-            // stored on the stack which increases the stack pressure. It does not affects non-debug
-            // builds.
+            // From experimentation, we need a larger reservation of 96k since debug ppc64le
+            // code needs more stack space to process stack overflow. In debug builds, more
+            // variables are stored on the stack which increases the stack pressure. It does not
+            // affects non-debug builds.
             const decltype(available_stack_space) reserve_stack_space = 96 * 1024;
 #elif defined(_WIN32)
             // Windows is greedy for stack space while processing exceptions.
@@ -437,11 +442,10 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
         JS_AddInterruptCallback(_context, _interruptCallback);
         JS_SetGCCallback(_context, _gcCallback, this);
         JS_SetContextPrivate(_context, this);
-        JSAutoRequest ar(_context);
 
-        JSAutoCompartment ac(_context, _global);
+        JSAutoRealm ac(_context, _global);
 
-        _checkErrorState(JS_InitStandardClasses(_context, _global));
+        _checkErrorState(JS::InitRealmStandardClasses(_context));
 
         installBSONTypes();
 
@@ -454,7 +458,8 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
         installGlobalUtils(*this);
         _mongoHelpersProto.install(_global);
 
-        // install process-specific utilities in the global scope (dependancy: types.js, assert.js)
+        // install process-specific utilities in the global scope (dependancy: types.js,
+        // assert.js)
         if (_engine->getScopeInitCallback())
             _engine->getScopeInitCallback()(*this);
     } catch (...) {
@@ -494,17 +499,17 @@ auto MozJSImplScope::_runSafely(ImplScopeFunction&& functionToRun) -> decltype(f
         MozJSEntry entry(this);
         return functionToRun();
     } catch (...) {
-        // There may have already been an error reported by SpiderMonkey. If not, then we use the
-        // active C++ exception as the cause of the error.
+        // There may have already been an error reported by SpiderMonkey. If not, then we use
+        // the active C++ exception as the cause of the error.
         if (_status.isOK()) {
             _status = exceptionToStatus();
         }
 
         if (auto extraInfo = _status.extraInfo<JSExceptionInfo>()) {
-            // We intentionally don't transmit an JSInterpreterFailureWithStack error over the wire
-            // because of the complexity it'd entail on the recipient to reach inside to the
-            // underlying error for how it should be handled. Instead, the error is unwrapped and
-            // the JavaScript stacktrace is included as part of the error message.
+            // We intentionally don't transmit an JSInterpreterFailureWithStack error over the
+            // wire because of the complexity it'd entail on the recipient to reach inside to
+            // the underlying error for how it should be handled. Instead, the error is
+            // unwrapped and the JavaScript stacktrace is included as part of the error message.
             str::stream reasonWithStack;
             reasonWithStack << extraInfo->originalError.reason() << " :\n" << extraInfo->stack;
             _status = extraInfo->originalError.withReason(reasonWithStack);
@@ -586,17 +591,19 @@ void MozJSImplScope::_MozJSCreateFunction(StringData raw, JS::MutableHandleValue
     JS::CompileOptions co(_context);
     setCompileOptions(&co);
 
-    _checkErrorState(JS::Evaluate(_context, co, code.c_str(), code.length(), fun));
-    uassert(10232,
-            "not a function",
-            fun.isObject() && JS_ObjectIsFunction(_context, fun.toObjectOrNull()));
+    JS::SourceText<mozilla::Utf8Unit> srcBuf;
+
+    _checkErrorState(
+        srcBuf.init(_context, code.c_str(), code.length(), JS::SourceOwnership::Borrowed) &&
+        JS::Evaluate(_context, co, srcBuf, fun));
+    uassert(10232, "not a function", fun.isObject() && js::IsFunctionObject(fun.toObjectOrNull()));
 }
 
 BSONObj MozJSImplScope::callThreadArgs(const BSONObj& args) {
     // The _runSafely() function is called for all codepaths of executing JavaScript other than
-    // callThreadArgs(). We intentionally don't unwrap the JSInterpreterFailureWithStack error to
-    // make it possible for the parent thread to chain its JavaScript stacktrace with the child
-    // thread's JavaScript stacktrace.
+    // callThreadArgs(). We intentionally don't unwrap the JSInterpreterFailureWithStack error
+    // to make it possible for the parent thread to chain its JavaScript stacktrace with the
+    // child thread's JavaScript stacktrace.
     MozJSEntry entry(this);
 
     JS::RootedValue function(_context);
@@ -610,7 +617,7 @@ BSONObj MozJSImplScope::callThreadArgs(const BSONObj& args) {
 
     int argc = args.nFields() - 1;
 
-    JS::AutoValueVector argv(_context);
+    JS::RootedValueVector argv(_context);
     BSONObjIterator it(args);
     it.next();
     JS::RootedValue value(_context);
@@ -683,7 +690,7 @@ int MozJSImplScope::invoke(ScriptingFunction func,
 
         const int nargs = argsObject ? argsObject->nFields() : 0;
 
-        JS::AutoValueVector args(_context);
+        JS::RootedValueVector args(_context);
 
         if (nargs) {
             BSONObjIterator it(*argsObject);
@@ -751,12 +758,21 @@ bool MozJSImplScope::exec(StringData code,
         JS::CompileOptions co(_context);
         setCompileOptions(&co);
         co.setFileAndLine(name.c_str(), 1);
-        JS::RootedScript script(_context);
 
-        bool success = JS::Compile(_context, co, code.rawData(), code.size(), &script);
+        JS::SourceText<mozilla::Utf8Unit> srcBuf;
+        JSScript* scriptPtr;
 
+        bool success =
+            srcBuf.init(_context, code.rawData(), code.size(), JS::SourceOwnership::Borrowed);
         if (_checkErrorState(success, reportError, assertOnError))
             return false;
+
+        scriptPtr = JS::Compile(_context, co, srcBuf);
+        success = scriptPtr != nullptr;
+        if (_checkErrorState(success, reportError, assertOnError))
+            return false;
+
+        JS::RootedScript script(_context, scriptPtr);
 
         if (timeoutMs) {
             _engine->getDeadlineMonitor().startDeadline(this, timeoutMs);
@@ -901,7 +917,7 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
             if (excn.isObject()) {
                 str::stream ss;
                 // exceptions originating from c++ don't get the "uncaught exception: " prefix
-                if (!JS_GetPrivate(excn.toObjectOrNull())) {
+                if (!JS::GetPrivate(excn.toObjectOrNull())) {
                     ss << "uncaught exception: ";
                 }
                 ss << ValueWriter(_context, excn).toString();
@@ -964,9 +980,7 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
 }
 
 
-void MozJSImplScope::setCompileOptions(JS::CompileOptions* co) {
-    co->setUTF8(true);
-}
+void MozJSImplScope::setCompileOptions(JS::CompileOptions* co) {}
 
 MozJSImplScope* MozJSImplScope::getThreadScope() {
     return kCurrentScope;
@@ -1013,7 +1027,7 @@ std::string MozJSImplScope::buildStackString() {
     }
 
     JS::RootedString out(_context);
-    if (JS::BuildStackString(_context, stack, &out)) {
+    if (JS::BuildStackString(_context, nullptr, stack, &out)) {
         return JSStringWrapper(_context, out.get()).toString();
     } else {
         return {};

@@ -1,0 +1,14 @@
+{
+    "configure-args": "--enable-application=js --target=wasm32-unknown-wasi --with-sysroot=${MOZ_FETCHES_DIR}/wasi-sysroot/share/wasi-sysroot/ --disable-stdcxx-compat --disable-gold --without-system-zlib --without-intl-api --disable-jit --disable-shared-js --disable-shared-memory --disable-tests --disable-cranelift --disable-clang-plugin",
+    "optimize": true,
+    "debug": false,
+    "nspr": false,
+    "compiler": "clang",
+    "env": {
+        "JITTEST_EXTRA_ARGS": "--jitflags=none"
+    },
+    "skip-tests": {
+        "all": ["jstests", "jittest", "jsapitests"]
+    },
+    "use_minidump": false
+}

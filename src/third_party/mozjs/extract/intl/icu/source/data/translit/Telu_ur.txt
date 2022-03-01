@@ -1,0 +1,14 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Telu_ur.txt
+# Generated from CLDR
+#
+
+::[ఁ-ఃఅ-ఌఎ-ఐఒ-నప-ళవ-హ\u0C3E-ౄ\u0C46-\u0C48\u0C4A-\u0C4D\u0C55-\u0C56ౠ-ౡ౦-౯];
+::NFD;
+::Telugu-InterIndic;
+::InterIndic-ur;
+::NFC;
+

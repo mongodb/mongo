@@ -1,0 +1,78 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sat{
+    Languages{
+        de{"ᱡᱟᱨᱢᱟᱱ"}
+        de_AT{"ᱚᱥᱴᱨᱤᱭᱟ ᱡᱟᱨᱢᱟᱱ"}
+        de_CH{"ᱥᱩᱣᱤᱥ ᱦᱟᱤ ᱡᱟᱨᱢᱟᱱ"}
+        en{"ᱟᱝᱜᱽᱨᱮᱡᱤ"}
+        en_AU{"ᱚᱥᱴᱨᱮᱞᱤᱭᱟᱱ ᱟᱝᱜᱽᱨᱮᱡᱤ"}
+        en_CA{"ᱠᱟᱱᱟᱰᱤᱭᱟᱱ ᱟᱝᱜᱽᱨᱮᱡᱤ"}
+        en_GB{"ᱵᱨᱤᱴᱤᱥ ᱟᱝᱜᱽᱨᱮᱡᱤ"}
+        en_US{"ᱟᱢᱮᱨᱤᱠᱟᱱ ᱟᱝᱜᱽᱨᱮᱡᱤ"}
+        es{"ᱮᱥᱯᱮᱱᱤᱥ"}
+        es_419{"ᱞᱮᱴᱤᱱ ᱟᱢᱮᱨᱤᱠᱟᱱ ᱮᱥᱯᱮᱱᱤᱥ"}
+        es_ES{"ᱨᱩᱥᱤᱭᱟᱱ ᱮᱥᱯᱮᱱᱤᱥ"}
+        es_MX{"ᱢᱮᱠᱥᱤᱠᱟᱱ ᱮᱥᱯᱮᱱᱤᱥ"}
+        fr{"ᱯᱷᱨᱮᱧᱪ"}
+        fr_CA{"ᱠᱟᱱᱟᱰᱤᱭᱟᱱ ᱯᱷᱨᱮᱧᱪ"}
+        fr_CH{"ᱥᱩᱣᱤᱥ ᱯᱷᱨᱮᱧᱪ"}
+        it{"ᱤᱴᱟᱞᱤᱟᱱ"}
+        ja{"ᱡᱟᱯᱟᱱᱤ"}
+        pt{"ᱯᱩᱨᱛᱜᱟᱞᱤ"}
+        pt_BR{"ᱵᱨᱟᱡᱤᱞᱤᱭᱟᱱ ᱯᱩᱨᱛᱜᱟᱞᱤ"}
+        pt_PT{"ᱭᱩᱨᱚᱯᱤᱭᱟᱱ ᱯᱩᱨᱛᱜᱟᱞᱤ"}
+        ru{"ᱨᱩᱥᱤᱭᱟᱱ"}
+        sat{"ᱥᱟᱱᱛᱟᱲᱤ"}
+        und{"ᱵᱟᱝ ᱩᱨᱩᱢ ᱯᱟᱹᱨᱥᱤ"}
+        zh{"ᱪᱟᱭᱱᱤᱡᱽ"}
+        zh_Hans{"ᱟᱞᱜᱟᱣᱟᱠᱟᱱ ᱪᱟᱭᱱᱤᱡᱽ"}
+        zh_Hant{"ᱴᱨᱮᱰᱤᱥᱱᱟᱞ ᱪᱟᱭᱱᱤᱡᱽ"}
+    }
+    Languages%long{
+        zh_Hans{"ᱟᱞᱜᱟᱣᱟᱠᱟᱱ ᱢᱟᱫᱟᱨᱤᱱ ᱪᱟᱭᱱᱤᱡᱽ"}
+        zh_Hant{"ᱴᱨᱮᱰᱤᱥᱱᱟᱞ ᱢᱟᱫᱟᱨᱤᱱ ᱪᱟᱭᱱᱤᱡᱽ"}
+    }
+    Languages%menu{
+        zh{"ᱪᱟᱭᱱᱤᱡᱽ, ᱢᱟᱱᱰᱟᱨᱤᱱ"}
+    }
+    Languages%short{
+        en_GB{"ᱭᱩᱠᱮ ᱟᱝᱜᱽᱨᱮᱡᱤ"}
+        en_US{"ᱭᱩᱮᱥ ᱟᱝᱜᱽᱨᱮᱡᱤ"}
+    }
+    Scripts{
+        Arab{"ᱟᱨᱵᱤᱠ"}
+        Cyrl{"ᱥᱤᱨᱤᱞᱤᱠ"}
+        Deva{"ᱫᱮᱣᱟᱱᱟᱜᱟᱨᱤ"}
+        Hans{"ᱥᱤᱢᱯᱞᱤᱯᱟᱭᱤᱰ"}
+        Hant{"ᱴᱨᱮᱰᱤᱥᱚᱱ"}
+        Latn{"ᱞᱮᱴᱤᱱ"}
+        Olck{"ᱚᱞ ᱪᱤᱠᱤ"}
+        Zxxx{"ᱵᱟᱝ ᱚᱞ ᱟᱠᱟᱱ"}
+        Zzzz{"ᱵᱟᱝ ᱩᱨᱩᱢ ᱪᱤᱠᱤ"}
+    }
+    Scripts%stand-alone{
+        Hans{"ᱥᱤᱢᱯᱞᱤᱯᱟᱭᱤᱰ ᱦᱟᱱ"}
+        Hant{"ᱴᱨᱮᱰᱤᱥᱚᱱ ᱦᱟᱱ"}
+    }
+    Types{
+        calendar{
+            gregorian{"ᱜᱨᱮᱜᱚᱨᱤᱭᱟᱱ ᱠᱟᱞᱮᱱᱰᱟᱨ"}
+        }
+        collation{
+            standard{"ᱮᱥᱴᱮᱱᱰᱟᱨᱰ ᱛᱷᱟᱨ ᱟᱸᱫᱮ"}
+        }
+        numbers{
+            latn{"ᱣᱮᱥᱴᱟᱨᱱ ᱮᱞ"}
+        }
+    }
+    codePatterns{
+        language{"ᱯᱟᱹᱨᱥᱤ: {0}"}
+        script{"ᱪᱤᱠᱤ/ᱦᱟᱨᱚᱯᱺ {0}"}
+        territory{"ᱴᱚᱴᱷᱟᱺ {0}"}
+    }
+    localeDisplayPattern{
+        keyTypePattern{"{0}: {1}"}
+    }
+}

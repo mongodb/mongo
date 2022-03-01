@@ -1,0 +1,73 @@
+License information for hyph_lt.dic:
+
+This file is based on the TeX hyphenation patterns distributed under the
+LaTeX Project Public License (LPPL) as part of the hyph-utf8 package.
+
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+At the time this file was first modified, a complete, unmodified copy of
+the LPPL Work was available from:
+http://tug.org/svn/texhyphen/trunk/hyph-utf8/tex/generic/hyph-utf8/patterns/?pathrev=580
+
+and the original Lithuanian TeX package (from which this was derived) was available from:
+http://www.vtex.lt/tex/distfiles/littex-20081028.tar.gz
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+Portions of this file were originally made available under the following license
+(copied verbatim from hyph-lt.lic.txt in the original work):
+
+Lithuanian hyphenation patterns
+
+(more info about the licence to be added later)
+
+% This file is part of hyph-utf8 package and resulted from
+% semi-manual conversions of hyphenation patterns into UTF-8
+% in October 2008 by Mojca & Arthur.
+%
+% Source available on:
+% - http://www.vtex.lt/tex/littex/index.html
+%
+% Authors:
+%
+% First version in LT encoding (modified T1):
+% - Vytas Statulevičius <vytas at vtex.lt>
+% - Yannis Haralambous
+%   (Vilnius, March 4, 1992)
+% Conversion into Latin 7 and aditional support files (babel, fonts):
+% - Sigitas Tolusis <sigitas at vtex.lt>
+%   (2002-11-20)
+% Adaptation for hyph-utf8:
+% - Mojca & Arthur (see below), October 2008
+%
+% The copyright statement of this file is:
+%
+%    Do with this file whatever needs to be done in future for the sake of
+%    "a better world" as long as you respect the copyright of original file.
+%
+% If you want to change this file, rather than uploading directly to CTAN,
+% we would be grateful if you could send it to us (http://tug.org/tex-hyphen)
+% or ask for credentials for SVN repository and commit it yourself;
+% we will then upload the whole "package" to CTAN.
+%
+% For more unformation see
+%
+%    http://tug.org/tex-hyphen
+%
+%------------------------------------------------------------------------------
+%
+% A note about lefthyphenmin/righthyphenmin (by Sigitas, February 2009):
+%
+% At the moment the lefthyphenmin & righthyphenmin are both set to 2.
+% The Lithuanian patterns were build earlier then the latest grammatical rules
+% took place in 1997. At that time it was forbidden to leave one character at boundary.
+% One may change it to one now, but from typographical point of view there is no need to do
+% any changes. Even more, changing lefthyphen and righthyphen to 1 requires
+% to review and maybe rebuild the patterns file.
+%
+%------------------------------------------------------------------------------

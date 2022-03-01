@@ -1,0 +1,97 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_US{
+    %%Parent{"es_419"}
+    Currencies{
+        BDT{
+            "BDT",
+            "taka bangladesí",
+        }
+        BTN{
+            "BTN",
+            "ngultrum butanés",
+        }
+        ETB{
+            "ETB",
+            "birr",
+        }
+        JPY{
+            "¥",
+            "yen",
+        }
+        LAK{
+            "LAK",
+            "kip laosiano",
+        }
+        THB{
+            "THB",
+            "bat",
+        }
+        USD{
+            "$",
+            "dólar estadounidense",
+        }
+        UZS{
+            "UZS",
+            "sum",
+        }
+        VND{
+            "VND",
+            "dong vietnamita",
+        }
+        XAF{
+            "XAF",
+            "franco CFA de África central",
+        }
+        ZMW{
+            "ZMW",
+            "kwacha zambiano",
+        }
+    }
+    Currencies%narrow{
+        FKP{"£"}
+        RON{"lei"}
+        SSP{"£"}
+        SYP{"£"}
+        VEF{"Bs"}
+    }
+    CurrencyPlurals{
+        BDT{
+            one{"taka bangladesí"}
+            other{"takas bangladesíes"}
+        }
+        BTN{
+            one{"ngultrum butanés"}
+            other{"gultrums bultaneses"}
+        }
+        ETB{
+            one{"birr"}
+            other{"birres"}
+        }
+        LAK{
+            one{"kip laosiano"}
+            other{"kips laosianos"}
+        }
+        THB{
+            one{"bat"}
+            other{"bats"}
+        }
+        UZS{
+            one{"sum"}
+            other{"sums"}
+        }
+        VND{
+            one{"dong vietnamita"}
+            other{"dongs vietnamitas"}
+        }
+        XAF{
+            one{"franco CFA de África central"}
+            other{"francos CFA de África central"}
+        }
+        ZMW{
+            one{"kwacha zambiano"}
+            other{"kwachas zambianos"}
+        }
+    }
+}

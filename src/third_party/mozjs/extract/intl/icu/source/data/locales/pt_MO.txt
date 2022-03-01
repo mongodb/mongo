@@ -1,0 +1,25 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+pt_MO{
+    %%Parent{"pt_PT"}
+    calendar{
+        gregorian{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, d 'de' MMMM 'de' y",
+                "d 'de' MMMM 'de' y",
+                "dd/MM/y",
+                "dd/MM/yy",
+                "{1}, {0}",
+                "{1} 'às' {0}",
+                "{1} 'às' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+        }
+    }
+}

@@ -44,7 +44,7 @@ Date.prototype.tojson = function() {
         this.getTime();
     } catch (e) {
         if (e instanceof TypeError &&
-            e.message.includes("getTime method called on incompatible Object")) {
+            e.message.includes("Date.prototype.getTime called on incompatible")) {
             return new Date(NaN).tojson();
         }
         throw e;

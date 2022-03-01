@@ -1,0 +1,14 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Taml_Arab.txt
+# Generated from CLDR
+#
+
+::[\u0BE6\u0B82-ஃஅ-ஊஎ-ஐஒ-கங-சஜஞ-டண-தந-பம-வஷ-ஹா-ூெ-ைொ-\u0BCDௗ௧-௲ஶ];
+::NFD;
+::Tamil-InterIndic;
+::InterIndic-Arabic;
+::NFC;
+

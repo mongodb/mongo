@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "jit/x64/Lowering-x64.cpp"
+#include "vm/SharedArrayObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/x64/Lowering-x64.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SharedArrayObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/x64/Lowering-x64.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SharedArrayObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/x64/MacroAssembler-x64.cpp"
+#include "vm/SharedImmutableStringsCache.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/x64/MacroAssembler-x64.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SharedImmutableStringsCache.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/x64/MacroAssembler-x64.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SharedImmutableStringsCache.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/x64/SharedIC-x64.cpp"
+#include "vm/SourceHook.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/x64/SharedIC-x64.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SourceHook.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/x64/SharedIC-x64.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SourceHook.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/x64/Trampoline-x64.cpp"
+#include "vm/Stack.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/x64/Trampoline-x64.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Stack.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/x64/Trampoline-x64.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Stack.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/x86-shared/Architecture-x86-shared.cpp"
+#include "vm/StencilObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/x86-shared/Architecture-x86-shared.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/StencilObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/x86-shared/Architecture-x86-shared.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/StencilObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/x86-shared/Assembler-x86-shared.cpp"
+#include "vm/StringType.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/x86-shared/Assembler-x86-shared.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/StringType.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/x86-shared/Assembler-x86-shared.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/StringType.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

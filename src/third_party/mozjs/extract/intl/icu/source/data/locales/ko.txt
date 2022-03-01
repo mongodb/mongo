@@ -1,0 +1,3043 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ko{
+    AuxExemplarCharacters{
+        "[ᄀ-ᄒ ᅡ-ᅵ ᆨ-ᇂ 丘 串 乃 久 乖 九 乞 乫 乾 亂 亘 交 京 仇 今 介 件 价 企 伋 伎 伽 佳 佶 侃 來 侊 供 係 俓 俱 個"
+        " 倞 倦 倨 假 偈 健 傀 傑 傾 僅 僑 價 儆 儉 儺 光 克 兢 內 公 共 其 具 兼 冀 冠 凱 刊 刮 券 刻 剋 剛 劇 劍 劒 功 加"
+        " 劤 劫 勁 勍 勘 勤 勸 勻 勾 匡 匣 區 南 卦 却 卵 卷 卿 厥 去 及 口 句 叩 叫 可 各 吉 君 告 呱 呵 咎 咬 哥 哭 啓 喀"
+        " 喇 喝 喫 喬 嗜 嘉 嘔 器 囊 困 固 圈 國 圭 圻 均 坎 坑 坤 坰 坵 垢 基 埼 堀 堅 堈 堪 堺 塊 塏 境 墾 壙 壞 夔 奇 奈"
+        " 奎 契 奸 妓 妗 姑 姜 姦 娘 娜 嫁 嬌 孔 季 孤 宏 官 客 宮 家 寄 寇 寡 寬 尻 局 居 屆 屈 岐 岡 岬 崎 崑 崗 嵌 嵐 嶇"
+        " 嶠 工 巧 巨 己 巾 干 幹 幾 庚 庫 康 廊 廐 廓 廣 建 弓 强 彊 徑 忌 急 怪 怯 恐 恝 恪 恭 悸 愆 感 愧 愷 愾 慊 慣 慤"
+        " 慨 慶 慷 憩 憬 憾 懃 懇 懦 懶 懼 戈 戒 戟 戡 扱 技 抉 拉 拏 拐 拒 拘 括 拮 拱 拳 拷 拿 捏 据 捲 捺 掘 掛 控 揀 揆"
+        " 揭 擊 擎 擒 據 擧 攪 攷 改 攻 故 敎 救 敢 敬 敲 斛 斤 旗 旣 昆 昑 景 晷 暇 暖 暠 暻 曠 曲 更 曷 朗 朞 期 机 杆 杞"
+        " 杰 枏 果 枯 架 枸 柑 柩 柬 柯 校 根 格 桀 桂 桔 桿 梏 梗 械 梱 棄 棋 棍 棘 棨 棺 楗 楠 極 槁 構 槐 槨 槪 槻 槿 樂"
+        " 橄 橋 橘 機 檄 檎 檢 櫃 欄 權 欺 款 歌 歐 歸 殼 毆 毬 氣 求 江 汨 汲 決 汽 沂 沽 洛 洸 浪 涇 淃 淇 減 渠 渴 湳 溝"
+        " 溪 滑 滾 漑 潔 潰 澗 激 濫 灌 灸 炅 炚 炬 烙 烱 煖 爛 牽 犬 狂 狗 狡 狼 獗 玖 玘 珂 珏 珖 珙 珞 珪 球 琦 琨 琪 琯"
+        " 琴 瑾 璂 璟 璣 璥 瓊 瓘 瓜 甄 甘 甲 男 畇 界 畸 畺 畿 疆 疥 疳 痂 痙 痼 癎 癩 癸 皆 皎 皐 盖 監 看 眷 睾 瞰 瞼 瞿"
+        " 矜 矩 矯 硅 硬 碁 碣 磎 磬 磯 磵 祁 祇 祈 祛 祺 禁 禽 科 稈 稼 稽 稿 穀 究 穹 空 窘 窟 窮 窺 竅 竟 竭 競 竿 筋 筐"
+        " 筠 箇 箕 箝 管 簡 粳 糠 系 糾 紀 納 紘 級 紺 絅 結 絞 給 絳 絹 絿 經 綱 綺 緊 繫 繭 繼 缺 罐 罫 羅 羈 羌 羔 群 羹"
+        " 翹 考 耆 耉 耕 耭 耿 肌 肝 股 肩 肯 肱 胛 胱 脚 脛 腔 腱 膈 膏 膠 臘 臼 舅 舊 舡 艮 艱 芎 芥 芩 芹 苛 苟 苦 苽 茄"
+        " 莖 菅 菊 菌 菓 菫 菰 落 葛 葵 蓋 蕎 蕨 薑 藁 藍 藿 蘭 蘿 虔 蚣 蛟 蝎 螺 蠟 蠱 街 衢 衲 衾 衿 袈 袞 袴 裙 裸 褐 襁"
+        " 襟 襤 見 規 覡 覲 覺 觀 角 計 記 訣 訶 詭 誇 誡 誥 課 諫 諾 謙 講 謳 謹 譏 警 譴 谷 谿 豈 貢 貫 貴 賈 購 赳 起 跏"
+        " 距 跨 踞 蹇 蹶 躬 軀 車 軌 軍 軻 較 輕 轎 轟 辜 近 迦 迲 适 逑 逕 逵 過 遣 遽 邏 那 邯 邱 郊 郎 郡 郭 酪 醵 金 鈐"
+        " 鈞 鉀 鉅 鉗 鉤 銶 鋸 鋼 錡 錤 錦 錮 鍋 鍵 鎌 鎧 鏡 鑑 鑒 鑛 開 間 閘 閣 閨 闕 關 降 階 隔 隙 雇 難 鞏 鞠 鞨 鞫 頃"
+        " 頸 顆 顧 飢 餃 館 饉 饋 饑 駒 駕 駱 騎 騏 騫 驅 驕 驚 驥 骨 高 鬼 魁 鮫 鯤 鯨 鱇 鳩 鵑 鵠 鷄 鷗 鸞 麒 麴 黔 鼓 龕"
+        " 龜]"
+    }
+    Ellipsis{
+        final{"{0}…"}
+        initial{"…{0}"}
+        medial{"{0}…{1}"}
+        word-final{"{0} …"}
+        word-initial{"… {0}"}
+        word-medial{"{0} … {1}"}
+    }
+    ExemplarCharacters{"[가-힣]"}
+    ExemplarCharactersIndex{"[ㄱ ㄴ ㄷ ㄹ ㅁ ㅂ ㅅ ㅇ ㅈ ㅊ ㅋ ㅌ ㅍ ㅎ]"}
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    ExemplarCharactersPunctuation{
+        "[‾ _ ＿ \\- － ‐ ‑ — ― 〜 ・ , ， 、 ; ； \\: ： ! ！ ¡ ? ？ ¿ . ． ‥ … 。 · ＇ ‘ ’ "
+        "\u0022 ＂ “ ” ( （ ) ） \\[ ［ \\] ］ \\{ ｛ \\} ｝ 〈 〉 《 》 「 」 『 』 【 】 〔 〕 § ¶ @ ＠"
+        " * ＊ / ／ \\\\ ＼ \\& ＆ # ＃ % ％ ‰ † ‡ ′ ″ 〃 ※]"
+    }
+    MoreInformation{"?"}
+    NumberElements{
+        arab{
+            symbols{
+                minusSign{"‏-"}
+                plusSign{"‏+"}
+            }
+        }
+        default{"latn"}
+        latn{
+            miscPatterns{
+                approximately{"~{0}"}
+                atLeast{"{0}+"}
+                atMost{"≤{0}"}
+                range{"{0}~{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"#,##0%"}
+                scientificFormat{"#E0"}
+            }
+            patternsLong{
+                decimalFormat{
+                    1000{
+                        other{"0천"}
+                    }
+                    10000{
+                        other{"0만"}
+                    }
+                    100000{
+                        other{"00만"}
+                    }
+                    1000000{
+                        other{"000만"}
+                    }
+                    10000000{
+                        other{"0000만"}
+                    }
+                    100000000{
+                        other{"0억"}
+                    }
+                    1000000000{
+                        other{"00억"}
+                    }
+                    10000000000{
+                        other{"000억"}
+                    }
+                    100000000000{
+                        other{"0000억"}
+                    }
+                    1000000000000{
+                        other{"0조"}
+                    }
+                    10000000000000{
+                        other{"00조"}
+                    }
+                    100000000000000{
+                        other{"000조"}
+                    }
+                }
+            }
+            patternsShort{
+                currencyFormat{
+                    1000{
+                        other{"¤0천"}
+                    }
+                    10000{
+                        other{"¤0만"}
+                    }
+                    100000{
+                        other{"¤00만"}
+                    }
+                    1000000{
+                        other{"¤000만"}
+                    }
+                    10000000{
+                        other{"¤0000만"}
+                    }
+                    100000000{
+                        other{"¤0억"}
+                    }
+                    1000000000{
+                        other{"¤00억"}
+                    }
+                    10000000000{
+                        other{"¤000억"}
+                    }
+                    100000000000{
+                        other{"¤0000억"}
+                    }
+                    1000000000000{
+                        other{"¤0조"}
+                    }
+                    10000000000000{
+                        other{"¤00조"}
+                    }
+                    100000000000000{
+                        other{"¤000조"}
+                    }
+                }
+                decimalFormat{
+                    1000{
+                        other{"0천"}
+                    }
+                    10000{
+                        other{"0만"}
+                    }
+                    100000{
+                        other{"00만"}
+                    }
+                    1000000{
+                        other{"000만"}
+                    }
+                    10000000{
+                        other{"0000만"}
+                    }
+                    100000000{
+                        other{"0억"}
+                    }
+                    1000000000{
+                        other{"00억"}
+                    }
+                    10000000000{
+                        other{"000억"}
+                    }
+                    100000000000{
+                        other{"0000억"}
+                    }
+                    1000000000000{
+                        other{"0조"}
+                    }
+                    10000000000000{
+                        other{"00조"}
+                    }
+                    100000000000000{
+                        other{"000조"}
+                    }
+                }
+            }
+            symbols{
+                decimal{"."}
+                exponential{"E"}
+                group{","}
+                infinity{"∞"}
+                list{";"}
+                minusSign{"-"}
+                nan{"NaN"}
+                perMille{"‰"}
+                percentSign{"%"}
+                plusSign{"+"}
+                superscriptingExponent{"×"}
+                timeSeparator{":"}
+            }
+        }
+        minimalPairs{
+            ordinal{
+                other{"{0}번째 길목에서 우회전하세요."}
+            }
+            plural{
+                other{"{0}일"}
+            }
+        }
+        minimumGroupingDigits{"1"}
+        native{"latn"}
+    }
+    calendar{
+        buddhist{
+            availableFormats{
+                GyMMM{"G y년 MMM"}
+                GyMMMEEEEd{"G y년 MMM d일 EEEE"}
+                GyMMMEd{"G y년 MMM d일 (E)"}
+                GyMMMd{"G y년 MMM d일"}
+                MMMEEEEd{"MMM d일 EEEE"}
+                MMMEd{"MMM d일 (E)"}
+                MMMMd{"MMMM d일"}
+                MMMd{"MMM d일"}
+                yyyyMMM{"G y년 MMM"}
+                yyyyMMMEEEEd{"G y년 MMM d일 EEEE"}
+                yyyyMMMEd{"G y년 MMM d일 (E)"}
+                yyyyMMMM{"G y년 MMMM"}
+                yyyyMMMd{"G y년 MMM d일"}
+            }
+            eras{
+                abbreviated{
+                    "불기",
+                }
+                wide{
+                    "불기",
+                }
+            }
+        }
+        chinese{
+            DateTimePatterns{
+                "a h시 m분 s초 zzzz",
+                "a h시 m분 s초 z",
+                "a h:mm:ss",
+                "a h:mm",
+                "U년 MMM d일 EEEE",
+                "U년 MMM d일",
+                "y. M. d.",
+                "y. M. d.",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Bh{"B h시"}
+                Bhm{"B h:mm"}
+                Bhms{"B h:mm:ss"}
+                E{"ccc"}
+                EBhm{"E B h:mm"}
+                EBhms{"E B h:mm:ss"}
+                EEEEd{"d일 EEEE"}
+                Ed{"d일 (E)"}
+                Gy{"r년(U년)"}
+                GyMMM{"r년(U년) MMM"}
+                GyMMMEEEEd{"r년(U년) MMM d일 EEEE"}
+                GyMMMEd{"r년(U년) MMM d일 (E)"}
+                GyMMMd{"r년 MMM d일"}
+                H{"H시"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"MMM"}
+                MEEEEd{"M. d. EEEE"}
+                MEd{"M. d. (E)"}
+                MMM{"LLL"}
+                MMMEEEEd{"MMM d일 EEEE"}
+                MMMEd{"MMM d일 (E)"}
+                MMMMd{"MMMM d일"}
+                MMMd{"MMM d일"}
+                Md{"M. d."}
+                UM{"U년 MMM"}
+                UMMM{"U년 MMM"}
+                UMMMd{"U년 MMM d일"}
+                UMd{"U년 M. d."}
+                d{"d일"}
+                h{"a h시"}
+                hm{"a h:mm"}
+                hms{"a h:mm:ss"}
+                ms{"mm:ss"}
+                y{"r년(U년)"}
+                yMd{"r. M. d."}
+                yyyy{"r년(U년)"}
+                yyyyM{"r. M."}
+                yyyyMEEEEd{"r. M. d. EEEE"}
+                yyyyMEd{"r. M. d. (E)"}
+                yyyyMMM{"r년(U년) MMM"}
+                yyyyMMMEEEEd{"r년(U년) MMM d일 EEEE"}
+                yyyyMMMEd{"r년(U년) MMM d일 (E)"}
+                yyyyMMMM{"r년(U년) MMMM"}
+                yyyyMMMd{"r년 MMM d일"}
+                yyyyMd{"r. M. d."}
+                yyyyQQQ{"r년(U년) QQQ"}
+                yyyyQQQQ{"r년(U년) QQQQ"}
+            }
+            cyclicNameSets{
+                dayParts{
+                    format{
+                        abbreviated{
+                            "자",
+                            "축",
+                            "인",
+                            "묘",
+                            "진",
+                            "사",
+                            "오",
+                            "미",
+                            "신",
+                            "유",
+                            "술",
+                            "해",
+                        }
+                        narrow{
+                            "자",
+                            "축",
+                            "인",
+                            "묘",
+                            "진",
+                            "사",
+                            "오",
+                            "미",
+                            "신",
+                            "유",
+                            "술",
+                            "해",
+                        }
+                        wide{
+                            "자",
+                            "축",
+                            "인",
+                            "묘",
+                            "진",
+                            "사",
+                            "오",
+                            "미",
+                            "신",
+                            "유",
+                            "술",
+                            "해",
+                        }
+                    }
+                }
+                solarTerms{
+                    format{
+                        abbreviated{
+                            "입춘",
+                            "우수",
+                            "경칩",
+                            "춘분",
+                            "청명",
+                            "곡우",
+                            "입하",
+                            "소만",
+                            "망종",
+                            "하지",
+                            "소서",
+                            "대서",
+                            "입추",
+                            "처서",
+                            "백로",
+                            "추분",
+                            "한로",
+                            "상강",
+                            "입동",
+                            "소설",
+                            "대설",
+                            "동지",
+                            "소한",
+                            "대한",
+                        }
+                    }
+                }
+                years{
+                    format{
+                        abbreviated{
+                            "갑자",
+                            "을축",
+                            "병인",
+                            "정묘",
+                            "무진",
+                            "기사",
+                            "경오",
+                            "신미",
+                            "임신",
+                            "계유",
+                            "갑술",
+                            "을해",
+                            "병자",
+                            "정축",
+                            "무인",
+                            "기묘",
+                            "경진",
+                            "신사",
+                            "임오",
+                            "계미",
+                            "갑신",
+                            "을유",
+                            "병술",
+                            "정해",
+                            "무자",
+                            "기축",
+                            "경인",
+                            "신묘",
+                            "임진",
+                            "계사",
+                            "갑오",
+                            "을미",
+                            "병신",
+                            "정유",
+                            "무술",
+                            "기해",
+                            "경자",
+                            "신축",
+                            "임인",
+                            "계묘",
+                            "갑진",
+                            "을사",
+                            "병오",
+                            "정미",
+                            "무신",
+                            "기유",
+                            "경술",
+                            "신해",
+                            "임자",
+                            "계축",
+                            "갑인",
+                            "을묘",
+                            "병진",
+                            "정사",
+                            "무오",
+                            "기미",
+                            "경신",
+                            "신유",
+                            "임술",
+                            "계해",
+                        }
+                    }
+                }
+                zodiacs{
+                    format{
+                        abbreviated{
+                            "쥐",
+                            "소",
+                            "호랑이",
+                            "토끼",
+                            "용",
+                            "뱀",
+                            "말",
+                            "양",
+                            "원숭이",
+                            "닭",
+                            "개",
+                            "돼지",
+                        }
+                    }
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "1월",
+                        "2월",
+                        "3월",
+                        "4월",
+                        "5월",
+                        "6월",
+                        "7월",
+                        "8월",
+                        "9월",
+                        "10월",
+                        "11월",
+                        "12월",
+                    }
+                    wide{
+                        "1월",
+                        "2월",
+                        "3월",
+                        "4월",
+                        "5월",
+                        "6월",
+                        "7월",
+                        "8월",
+                        "9월",
+                        "10월",
+                        "11월",
+                        "12월",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                }
+            }
+            monthPatterns{
+                format{
+                    wide{
+                        leap{"윤{0}"}
+                    }
+                }
+                numeric{
+                    all{
+                        leap{"윤{0}"}
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        leap{"윤{0}"}
+                    }
+                }
+            }
+        }
+        coptic{
+            monthNames{
+                format{
+                    abbreviated{
+                        "투트",
+                        "바바흐",
+                        "하투르",
+                        "키야흐크",
+                        "투바흐",
+                        "암쉬르",
+                        "바라마트",
+                        "바라문다흐",
+                        "바샨스",
+                        "바우나흐",
+                        "아비브",
+                        "미스라",
+                        "나시",
+                    }
+                    wide{
+                        "투트",
+                        "바바흐",
+                        "하투르",
+                        "키야흐크",
+                        "투바흐",
+                        "암쉬르",
+                        "바라마트",
+                        "바라문다흐",
+                        "바샨스",
+                        "바우나흐",
+                        "아비브",
+                        "미스라",
+                        "나시",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "투트",
+                        "바바흐",
+                        "하투르",
+                        "키야흐크",
+                        "투바흐",
+                        "암쉬르",
+                        "바라마트",
+                        "바라문다흐",
+                        "바샨스",
+                        "바우나흐",
+                        "아비브",
+                        "미스라",
+                        "나시",
+                    }
+                    wide{
+                        "투트",
+                        "바바흐",
+                        "하투르",
+                        "키야흐크",
+                        "투바흐",
+                        "암쉬르",
+                        "바라마트",
+                        "바라문다흐",
+                        "바샨스",
+                        "바우나흐",
+                        "아비브",
+                        "미스라",
+                        "나시",
+                    }
+                }
+            }
+        }
+        dangi{
+            DateTimePatterns{
+                "a h시 m분 s초 zzzz",
+                "a h시 m분 s초 z",
+                "a h:mm:ss",
+                "a h:mm",
+                "U년 MMM d일 EEEE",
+                "U년 MMM d일",
+                "y. M. d.",
+                "y. M. d.",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            cyclicNameSets{
+                dayParts{
+                    format{
+                        abbreviated{
+                            "자",
+                            "축",
+                            "인",
+                            "묘",
+                            "진",
+                            "사",
+                            "오",
+                            "미",
+                            "신",
+                            "유",
+                            "술",
+                            "해",
+                        }
+                        wide{
+                            "자",
+                            "축",
+                            "인",
+                            "묘",
+                            "진",
+                            "사",
+                            "오",
+                            "미",
+                            "신",
+                            "유",
+                            "술",
+                            "해",
+                        }
+                    }
+                }
+                solarTerms{
+                    format{
+                        abbreviated{
+                            "입춘",
+                            "우수",
+                            "경칩",
+                            "춘분",
+                            "청명",
+                            "곡우",
+                            "입하",
+                            "소만",
+                            "망종",
+                            "하지",
+                            "소서",
+                            "대서",
+                            "입추",
+                            "처서",
+                            "백로",
+                            "추분",
+                            "한로",
+                            "상강",
+                            "입동",
+                            "소설",
+                            "대설",
+                            "동지",
+                            "소한",
+                            "대한",
+                        }
+                    }
+                }
+                years{
+                    format{
+                        abbreviated{
+                            "갑자",
+                            "을축",
+                            "병인",
+                            "정묘",
+                            "무진",
+                            "기사",
+                            "경오",
+                            "신미",
+                            "임신",
+                            "계유",
+                            "갑술",
+                            "을해",
+                            "병자",
+                            "정축",
+                            "무인",
+                            "기묘",
+                            "경진",
+                            "신사",
+                            "임오",
+                            "계미",
+                            "갑신",
+                            "을유",
+                            "병술",
+                            "정해",
+                            "무자",
+                            "기축",
+                            "경인",
+                            "신묘",
+                            "임진",
+                            "계사",
+                            "갑오",
+                            "을미",
+                            "병신",
+                            "정유",
+                            "무술",
+                            "기해",
+                            "경자",
+                            "신축",
+                            "임인",
+                            "계묘",
+                            "갑진",
+                            "을사",
+                            "병오",
+                            "정미",
+                            "무신",
+                            "기유",
+                            "경술",
+                            "신해",
+                            "임자",
+                            "계축",
+                            "갑인",
+                            "을묘",
+                            "병진",
+                            "정사",
+                            "무오",
+                            "기미",
+                            "경신",
+                            "신유",
+                            "임술",
+                            "계해",
+                        }
+                    }
+                }
+                zodiacs{
+                    format{
+                        abbreviated{
+                            "자",
+                            "축",
+                            "인",
+                            "묘",
+                            "진",
+                            "사",
+                            "오",
+                            "미",
+                            "신",
+                            "유",
+                            "술",
+                            "해",
+                        }
+                        wide{
+                            "자",
+                            "축",
+                            "인",
+                            "묘",
+                            "진",
+                            "사",
+                            "오",
+                            "미",
+                            "신",
+                            "유",
+                            "술",
+                            "해",
+                        }
+                    }
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "1월",
+                        "2월",
+                        "3월",
+                        "4월",
+                        "5월",
+                        "6월",
+                        "7월",
+                        "8월",
+                        "9월",
+                        "10월",
+                        "11월",
+                        "12월",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "1월",
+                        "2월",
+                        "3월",
+                        "4월",
+                        "5월",
+                        "6월",
+                        "7월",
+                        "8월",
+                        "9월",
+                        "10월",
+                        "11월",
+                        "12월",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "1월",
+                        "2월",
+                        "3월",
+                        "4월",
+                        "5월",
+                        "6월",
+                        "7월",
+                        "8월",
+                        "9월",
+                        "10월",
+                        "11월",
+                        "12월",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "1월",
+                        "2월",
+                        "3월",
+                        "4월",
+                        "5월",
+                        "6월",
+                        "7월",
+                        "8월",
+                        "9월",
+                        "10월",
+                        "11월",
+                        "12월",
+                    }
+                }
+            }
+            monthPatterns{
+                format{
+                    wide{
+                        leap{"윤{0}"}
+                    }
+                }
+                numeric{
+                    all{
+                        leap{"윤{0}"}
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        leap{"윤{0}"}
+                    }
+                }
+            }
+        }
+        ethiopic{
+            monthNames{
+                format{
+                    abbreviated{
+                        "매스캐램",
+                        "테켐트",
+                        "헤다르",
+                        "타흐사스",
+                        "테르",
+                        "얘카티트",
+                        "매가비트",
+                        "미야지야",
+                        "겐보트",
+                        "새네",
+                        "함레",
+                        "내하세",
+                        "파구맨",
+                    }
+                    wide{
+                        "매스캐램",
+                        "테켐트",
+                        "헤다르",
+                        "타흐사스",
+                        "테르",
+                        "얘카티트",
+                        "매가비트",
+                        "미야지야",
+                        "겐보트",
+                        "새네",
+                        "함레",
+                        "내하세",
+                        "파구맨",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "매스캐램",
+                        "테켐트",
+                        "헤다르",
+                        "타흐사스",
+                        "테르",
+                        "얘카티트",
+                        "매가비트",
+                        "미야지야",
+                        "겐보트",
+                        "새네",
+                        "함레",
+                        "내하세",
+                        "파구맨",
+                    }
+                    wide{
+                        "매스캐램",
+                        "테켐트",
+                        "헤다르",
+                        "타흐사스",
+                        "테르",
+                        "얘카티트",
+                        "매가비트",
+                        "미야지야",
+                        "겐보트",
+                        "새네",
+                        "함레",
+                        "내하세",
+                        "파구맨",
+                    }
+                }
+            }
+        }
+        generic{
+            DateTimePatterns{
+                "a h시 m분 s초 zzzz",
+                "a h시 m분 s초 z",
+                "a h:mm:ss",
+                "a h:mm",
+                "G y년 M월 d일 EEEE",
+                "G y년 M월 d일",
+                "G y. M. d.",
+                "G y. M. d.",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Bh{"B h시"}
+                Bhm{"B h:mm"}
+                Bhms{"B h:mm:ss"}
+                E{"ccc"}
+                EBhm{"E B h:mm"}
+                EBhms{"E B h:mm:ss"}
+                EEEEd{"d일 EEEE"}
+                EHm{"E HH:mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"d일 (E)"}
+                Ehm{"E a h:mm"}
+                Ehms{"E a h:mm:ss"}
+                Gy{"G y년"}
+                GyMMM{"G y년 M월"}
+                GyMMMEEEEd{"G y년 M월 d일 EEEE"}
+                GyMMMEd{"G y년 M월 d일 (E)"}
+                GyMMMd{"G y년 M월 d일"}
+                H{"H시"}
+                HHmmss{"HH:mm:ss"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"M월"}
+                MEEEEd{"M. d. EEEE"}
+                MEd{"M. d. (E)"}
+                MMM{"LLL"}
+                MMMEEEEd{"M월 d일 EEEE"}
+                MMMEd{"M월 d일 (E)"}
+                MMMMd{"M월 d일"}
+                MMMd{"M월 d일"}
+                Md{"M. d."}
+                d{"d일"}
+                h{"a h시"}
+                hm{"a h:mm"}
+                hms{"a h:mm:ss"}
+                ms{"mm:ss"}
+                y{"G y년"}
+                yyyy{"G y년"}
+                yyyyM{"G y. M."}
+                yyyyMEEEEd{"G y. M. d. EEEE"}
+                yyyyMEd{"G y. M. d. (E)"}
+                yyyyMMM{"G y년 M월"}
+                yyyyMMMEEEEd{"G y년 M월 d일 EEEE"}
+                yyyyMMMEd{"G y년 M월 d일 (E)"}
+                yyyyMMMM{"G y년 M월"}
+                yyyyMMMd{"G y년 M월 d일"}
+                yyyyMd{"G y. M. d."}
+                yyyyQQQ{"G y년 QQQ"}
+                yyyyQQQQ{"G y년 QQQQ"}
+            }
+            intervalFormats{
+                Bh{
+                    B{"B h시 ~ B h시"}
+                    h{"B h시 ~ h시"}
+                }
+                Bhm{
+                    B{"B h:mm ~ B h:mm"}
+                    h{"B h:mm ~ h:mm"}
+                    m{"B h:mm ~ h:mm"}
+                }
+                Gy{
+                    G{"G y년 ~ G y년"}
+                    y{"G y년~y년"}
+                }
+                GyM{
+                    G{"GGGGG y년 M월 ~ GGGGG y년 M월"}
+                    M{"GGGGG y년 M월 ~ y년 M월"}
+                    y{"GGGGG y년 M월 ~ y년 M월"}
+                }
+                GyMEd{
+                    G{"GGGGG y년 M월 d일 E요일 ~ GGGGG y년 M월 d일 E요일"}
+                    M{"GGGGG y년 M월 d일 E요일 ~ y년 M월 d일 E요일"}
+                    d{"GGGGG y년 M월 d일 E요일 ~ y년 M월 d일 E요일"}
+                    y{"GGGGG y년 M월 d일 E요일 ~ y년 M월 d일 E요일"}
+                }
+                GyMMM{
+                    G{"G y년 M월 ~ G y년 M월"}
+                    M{"G y년 M월 ~ y년 M월"}
+                    y{"G y년 M월 ~ y년 M월"}
+                }
+                GyMMMEd{
+                    G{"G y년 M월 d일 E요일 ~ G y년 M월 d일 E요일"}
+                    M{"G y년 M월 d일 E요일 ~ M월 d일 E요일"}
+                    d{"G y년 M월 d일 e요일 – M월 d일 e요일"}
+                    y{"G y년 M월 d일 E요일 ~ y년 M월 d일 E요일"}
+                }
+                GyMMMd{
+                    G{"G y년 M월 d일 ~ y년 M월 d일"}
+                    M{"G y년 M월 d일 ~ M월 d일"}
+                    d{"G y년 M월 d일 ~ d일"}
+                    y{"G y년 M월 d일 ~ y년 M월 d일"}
+                }
+                GyMd{
+                    G{"GGGGG y년 M월 d일 ~ GGGGG y년 M월 d일"}
+                    M{"GGGGG y년 M월 d일 ~ y년 M월 d일"}
+                    d{"GGGGG y년 M월 d일 ~ y년 M월 d일"}
+                    y{"GGGGG y년 M월 d일 ~ y년 M월 d일"}
+                }
+                H{
+                    H{"HH ~ HH시"}
+                }
+                Hm{
+                    H{"HH:mm ~ HH:mm"}
+                    m{"HH:mm ~ HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm ~ HH:mm v"}
+                    m{"HH:mm ~ HH:mm v"}
+                }
+                Hv{
+                    H{"HH ~ HH시 v"}
+                }
+                M{
+                    M{"M월 ~ M월"}
+                }
+                MEd{
+                    M{"M. d (E) ~ M. d (E)"}
+                    d{"M. d (E) ~ M. d (E)"}
+                }
+                MMM{
+                    M{"M월 ~ M월"}
+                }
+                MMMEEEEd{
+                    M{"M월 d일 EEEE ~ M월 d일 EEEE"}
+                    d{"M월 d일 EEEE ~ d일 EEEE"}
+                }
+                MMMEd{
+                    M{"M월 d일 (E) ~ M월 d일 (E)"}
+                    d{"M월 d일 (E) ~ d일 (E)"}
+                }
+                MMMM{
+                    M{"LLLL ~ LLLL"}
+                }
+                MMMd{
+                    M{"M월 d일 ~ M월 d일"}
+                    d{"M월 d일 ~ d일"}
+                }
+                Md{
+                    M{"M. d ~ M. d"}
+                    d{"M. d ~ M. d"}
+                }
+                d{
+                    d{"d일 ~ d일"}
+                }
+                fallback{"{0} ~ {1}"}
+                h{
+                    a{"a h시 ~ a h시"}
+                    h{"a h시 ~ h시"}
+                }
+                hm{
+                    a{"a h:mm ~ a h:mm"}
+                    h{"a h:mm~h:mm"}
+                    m{"a h:mm~h:mm"}
+                }
+                hmv{
+                    a{"a h:mm ~ a h:mm v"}
+                    h{"a h:mm~h:mm v"}
+                    m{"a h:mm~h:mm v"}
+                }
+                hv{
+                    a{"a h시 ~ a h시(v)"}
+                    h{"a h시 ~ h시(v)"}
+                }
+                y{
+                    y{"G y년 ~ y년"}
+                }
+                yM{
+                    M{"G y. M ~ y. M"}
+                    y{"G y. M ~ y. M"}
+                }
+                yMEd{
+                    M{"G y. M. d. (E) ~ y. M. d. (E)"}
+                    d{"G y. M. d. (E) ~ y. M. d. (E)"}
+                    y{"G y. M. d. (E) ~ y. M. d. (E)"}
+                }
+                yMMM{
+                    M{"G y년 M월~M월"}
+                    y{"G y년 M월 ~ y년 M월"}
+                }
+                yMMMEEEEd{
+                    M{"G y년 M월 d일 EEEE ~ M월 d일 EEEE"}
+                    d{"G y년 M월 d일 EEEE ~ d일 EEEE"}
+                    y{"G y년 M월 d일 EEEE ~ y년 M월 d일 EEEE"}
+                }
+                yMMMEd{
+                    M{"G y년 M월 d일 (E) ~ M월 d일 (E)"}
+                    d{"G y년 M월 d일 (E) ~ d일 (E)"}
+                    y{"G y년 M월 d일 (E) ~ y년 M월 d일 (E)"}
+                }
+                yMMMM{
+                    M{"G y년 MM월 ~ MM월"}
+                    y{"G y년 MM월 ~ y년 MM월"}
+                }
+                yMMMd{
+                    M{"G y년 M월 d일 ~ M월 d일"}
+                    d{"G y년 M월 d일~d일"}
+                    y{"G y년 M월 d일 ~ y년 M월 d일"}
+                }
+                yMd{
+                    M{"G y. M. d. ~ y. M. d."}
+                    d{"G y. M. d. ~ y. M. d."}
+                    y{"G y. M. d. ~ y. M. d."}
+                }
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "오전",
+                "오후",
+            }
+            AmPmMarkersAbbr{
+                "AM",
+                "PM",
+            }
+            AmPmMarkersNarrow{
+                "AM",
+                "PM",
+            }
+            DateTimePatterns{
+                "a h시 m분 s초 zzzz",
+                "a h시 m분 s초 z",
+                "a h:mm:ss",
+                "a h:mm",
+                "y년 M월 d일 EEEE",
+                "y년 M월 d일",
+                "y. M. d.",
+                "yy. M. d.",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            appendItems{
+                Timezone{"{0} {1}"}
+            }
+            availableFormats{
+                Bh{"B h시"}
+                Bhm{"B h:mm"}
+                Bhms{"B h:mm:ss"}
+                E{"ccc"}
+                EBhm{"(E) B h:mm"}
+                EBhms{"(E) B h:mm:ss"}
+                EEEEd{"d일 EEEE"}
+                EHm{"(E) HH:mm"}
+                EHms{"(E) HH:mm:ss"}
+                Ed{"d일 (E)"}
+                Ehm{"(E) a h:mm"}
+                Ehms{"(E) a h:mm:ss"}
+                Gy{"G y년"}
+                GyMMM{"G y년 MMM"}
+                GyMMMEEEEd{"G y년 MMM d일 EEEE"}
+                GyMMMEd{"G y년 MMM d일 (E)"}
+                GyMMMd{"G y년 MMM d일"}
+                H{"H시"}
+                HHmmss{"HH:mm:ss"}
+                Hm{"HH:mm"}
+                Hms{"H시 m분 s초"}
+                Hmsv{"H시 m분 s초 v"}
+                Hmv{"HH:mm v"}
+                M{"M월"}
+                MEEEEd{"M. d. EEEE"}
+                MEd{"M. d. (E)"}
+                MMM{"LLL"}
+                MMMEEEEd{"MMM d일 EEEE"}
+                MMMEd{"MMM d일 (E)"}
+                MMMMW{
+                    other{"MMMM W번째 주"}
+                }
+                MMMMd{"MMMM d일"}
+                MMMd{"MMM d일"}
+                Md{"M. d."}
+                d{"d일"}
+                h{"a h시"}
+                hm{"a h:mm"}
+                hms{"a h:mm:ss"}
+                hmsv{"a h:mm:ss v"}
+                hmv{"a h:mm v"}
+                mmss{"mm:ss"}
+                ms{"mm:ss"}
+                y{"y년"}
+                yM{"y. M."}
+                yMEEEEd{"y. M. d. EEEE"}
+                yMEd{"y. M. d. (E)"}
+                yMM{"y. M."}
+                yMMM{"y년 MMM"}
+                yMMMEEEEd{"y년 MMM d일 EEEE"}
+                yMMMEd{"y년 MMM d일 (E)"}
+                yMMMM{"y년 MMMM"}
+                yMMMd{"y년 MMM d일"}
+                yMd{"y. M. d."}
+                yQQQ{"y년 QQQ"}
+                yQQQQ{"y년 QQQQ"}
+                yw{
+                    other{"Y년 w번째 주"}
+                }
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "일",
+                        "월",
+                        "화",
+                        "수",
+                        "목",
+                        "금",
+                        "토",
+                    }
+                    narrow{
+                        "일",
+                        "월",
+                        "화",
+                        "수",
+                        "목",
+                        "금",
+                        "토",
+                    }
+                    short{
+                        "일",
+                        "월",
+                        "화",
+                        "수",
+                        "목",
+                        "금",
+                        "토",
+                    }
+                    wide{
+                        "일요일",
+                        "월요일",
+                        "화요일",
+                        "수요일",
+                        "목요일",
+                        "금요일",
+                        "토요일",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "일",
+                        "월",
+                        "화",
+                        "수",
+                        "목",
+                        "금",
+                        "토",
+                    }
+                    narrow{
+                        "일",
+                        "월",
+                        "화",
+                        "수",
+                        "목",
+                        "금",
+                        "토",
+                    }
+                    short{
+                        "일",
+                        "월",
+                        "화",
+                        "수",
+                        "목",
+                        "금",
+                        "토",
+                    }
+                    wide{
+                        "일요일",
+                        "월요일",
+                        "화요일",
+                        "수요일",
+                        "목요일",
+                        "금요일",
+                        "토요일",
+                    }
+                }
+            }
+            dayPeriod{
+                format{
+                    abbreviated{
+                        afternoon1{"오후"}
+                        evening1{"저녁"}
+                        midnight{"자정"}
+                        morning1{"새벽"}
+                        morning2{"오전"}
+                        night1{"밤"}
+                        noon{"정오"}
+                    }
+                    narrow{
+                        afternoon1{"오후"}
+                        evening1{"저녁"}
+                        midnight{"자정"}
+                        morning1{"새벽"}
+                        morning2{"오전"}
+                        night1{"밤"}
+                        noon{"정오"}
+                    }
+                    wide{
+                        afternoon1{"오후"}
+                        evening1{"저녁"}
+                        midnight{"자정"}
+                        morning1{"새벽"}
+                        morning2{"오전"}
+                        night1{"밤"}
+                        noon{"정오"}
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        afternoon1{"오후"}
+                        am{"AM"}
+                        evening1{"저녁"}
+                        midnight{"자정"}
+                        morning1{"새벽"}
+                        morning2{"오전"}
+                        night1{"밤"}
+                        noon{"정오"}
+                        pm{"PM"}
+                    }
+                    narrow{
+                        afternoon1{"오후"}
+                        am{"AM"}
+                        evening1{"저녁"}
+                        midnight{"자정"}
+                        morning1{"새벽"}
+                        morning2{"오전"}
+                        night1{"밤"}
+                        noon{"정오"}
+                        pm{"PM"}
+                    }
+                    wide{
+                        afternoon1{"오후"}
+                        am{"오전"}
+                        evening1{"저녁"}
+                        midnight{"자정"}
+                        morning1{"새벽"}
+                        morning2{"오전"}
+                        night1{"밤"}
+                        noon{"정오"}
+                        pm{"오후"}
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "BC",
+                    "AD",
+                }
+                abbreviated%variant{
+                    "BCE",
+                    "CE",
+                }
+                wide{
+                    "기원전",
+                    "서기",
+                }
+                wide%variant{
+                    "BCE",
+                    "CE",
+                }
+            }
+            intervalFormats{
+                Bh{
+                    B{"B h시 ~ B h시"}
+                    h{"B h시~h시"}
+                }
+                Bhm{
+                    B{"B h:mm~B h:mm"}
+                    h{"B h:mm ~ h:mm"}
+                    m{"B h:mm ~ h:mm"}
+                }
+                Gy{
+                    G{"G y년 ~ G y년"}
+                    y{"G y년~y년"}
+                }
+                GyM{
+                    G{"GGGGG y년 M월 ~ GGGGG y년 M월"}
+                    M{"GGGGG y년 M월 ~ GGGGG y년 M월"}
+                    y{"GGGGG y년 M월 ~ y년 M월"}
+                }
+                GyMEd{
+                    G{"GGGGG y년 M월 d일 E요일 ~ GGGGG y년 M월 d일 E요일"}
+                    M{"GGGGG y년 M월 d일 E요일 ~ y년 M월 d일 E요일"}
+                    d{"GGGGG y년 M월 d일 E요일 ~ y년 M월 d일 E요일"}
+                    y{"GGGGG y년 M월 d일 E요일 ~ y년 M월 d일 E요일"}
+                }
+                GyMMM{
+                    G{"G y년 MMM ~ G y년 MMM"}
+                    M{"G y년 MMM ~ MMM"}
+                    y{"G y년 MMM ~ y년 MMM"}
+                }
+                GyMMMEd{
+                    G{"G y년 MMM d일 E요일 ~ G y년 MMM d일 E요일"}
+                    M{"G y년 MMM d일 E요일 ~ MMM d일 E요일"}
+                    d{"G y년 MMM d일 E요일 ~ MMM d일 E요일"}
+                    y{"G y년 MMM d일 E요일 ~ y년 MMM d일 E요일"}
+                }
+                GyMMMd{
+                    G{"G y년 MMM d일 ~ G y년 MMM d일"}
+                    M{"G y년 MMM d일 ~ MMM d일"}
+                    d{"G y년 MMM d일 ~ d일"}
+                    y{"G y년 MMM d일 ~ y년 MMM d일"}
+                }
+                GyMd{
+                    G{"GGGGG y년 M월 d일 ~ GGGGG y년 M월 d일"}
+                    M{"GGGGG y년 M월 d일 ~ y년 M월 d일"}
+                    d{"GGGGG y년 M월 d일 ~ y년 M월 d일"}
+                    y{"GGGGG y년 M월 d일 ~ y년 M월 d일"}
+                }
+                H{
+                    H{"H ~ H시"}
+                }
+                Hm{
+                    H{"HH:mm ~ HH:mm"}
+                    m{"HH:mm ~ HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm ~ HH:mm v"}
+                    m{"HH:mm ~ HH:mm v"}
+                }
+                Hv{
+                    H{"HH ~ HH시 v"}
+                }
+                M{
+                    M{"M월~M월"}
+                }
+                MEd{
+                    M{"M. d (E) ~ M. d (E)"}
+                    d{"M. d (E) ~ M. d (E)"}
+                }
+                MMM{
+                    M{"MMM~MMM"}
+                }
+                MMMEd{
+                    M{"M월 d일 (E) ~ M월 d일 (E)"}
+                    d{"M월 d일 (E) ~ d일 (E)"}
+                }
+                MMMM{
+                    M{"LLLL–LLLL"}
+                }
+                MMMd{
+                    M{"M월 d일 ~ M월 d일"}
+                    d{"MMM d일~d일"}
+                }
+                Md{
+                    M{"M. d ~ M. d"}
+                    d{"M. d ~ M. d"}
+                }
+                d{
+                    d{"d일~d일"}
+                }
+                fallback{"{0} ~ {1}"}
+                h{
+                    a{"a h시 ~ a h시"}
+                    h{"a h시 ~ h시"}
+                }
+                hm{
+                    a{"a h:mm ~ a h:mm"}
+                    h{"a h:mm~h:mm"}
+                    m{"a h:mm~h:mm"}
+                }
+                hmv{
+                    a{"a h:mm ~ a h:mm v"}
+                    h{"a h:mm~h:mm v"}
+                    m{"a h:mm~h:mm v"}
+                }
+                hv{
+                    a{"a h시 ~ a h시(v)"}
+                    h{"a h시 ~ h시(v)"}
+                }
+                y{
+                    y{"y년 ~ y년"}
+                }
+                yM{
+                    M{"y. M ~ y. M"}
+                    y{"y. M ~ y. M"}
+                }
+                yMEd{
+                    M{"y. M. d. (E) ~ y. M. d. (E)"}
+                    d{"y. M. d. (E) ~ y. M. d. (E)"}
+                    y{"y. M. d. (E) ~ y. M. d. (E)"}
+                }
+                yMMM{
+                    M{"y년 M월~M월"}
+                    y{"y년 M월 ~ y년 M월"}
+                }
+                yMMMEEEEd{
+                    M{"y년 M월 d일 EEEE ~ M월 d일 EEEE"}
+                    d{"y년 M월 d일 EEEE ~ d일 EEEE"}
+                    y{"y년 M월 d일 EEEE ~ y년 M월 d일 EEEE"}
+                }
+                yMMMEd{
+                    M{"y년 M월 d일 (E) ~ M월 d일 (E)"}
+                    d{"y년 M월 d일 (E) ~ d일 (E)"}
+                    y{"y년 M월 d일 (E) ~ y년 M월 d일 (E)"}
+                }
+                yMMMM{
+                    M{"y년 MMMM ~ MMMM"}
+                    y{"y년 MMMM ~ y년 MMMM"}
+                }
+                yMMMd{
+                    M{"y년 M월 d일 ~ M월 d일"}
+                    d{"y년 M월 d일~d일"}
+                    y{"y년 M월 d일 ~ y년 M월 d일"}
+                }
+                yMd{
+                    M{"y. M. d. ~ y. M. d."}
+                    d{"y. M. d. ~ y. M. d."}
+                    y{"y. M. d. ~ y. M. d."}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "1월",
+                        "2월",
+                        "3월",
+                        "4월",
+                        "5월",
+                        "6월",
+                        "7월",
+                        "8월",
+                        "9월",
+                        "10월",
+                        "11월",
+                        "12월",
+                    }
+                    narrow{
+                        "1월",
+                        "2월",
+                        "3월",
+                        "4월",
+                        "5월",
+                        "6월",
+                        "7월",
+                        "8월",
+                        "9월",
+                        "10월",
+                        "11월",
+                        "12월",
+                    }
+                    wide{
+                        "1월",
+                        "2월",
+                        "3월",
+                        "4월",
+                        "5월",
+                        "6월",
+                        "7월",
+                        "8월",
+                        "9월",
+                        "10월",
+                        "11월",
+                        "12월",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "1월",
+                        "2월",
+                        "3월",
+                        "4월",
+                        "5월",
+                        "6월",
+                        "7월",
+                        "8월",
+                        "9월",
+                        "10월",
+                        "11월",
+                        "12월",
+                    }
+                    narrow{
+                        "1월",
+                        "2월",
+                        "3월",
+                        "4월",
+                        "5월",
+                        "6월",
+                        "7월",
+                        "8월",
+                        "9월",
+                        "10월",
+                        "11월",
+                        "12월",
+                    }
+                    wide{
+                        "1월",
+                        "2월",
+                        "3월",
+                        "4월",
+                        "5월",
+                        "6월",
+                        "7월",
+                        "8월",
+                        "9월",
+                        "10월",
+                        "11월",
+                        "12월",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "1분기",
+                        "2분기",
+                        "3분기",
+                        "4분기",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "제 1/4분기",
+                        "제 2/4분기",
+                        "제 3/4분기",
+                        "제 4/4분기",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "1분기",
+                        "2분기",
+                        "3분기",
+                        "4분기",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "제 1/4분기",
+                        "제 2/4분기",
+                        "제 3/4분기",
+                        "제 4/4분기",
+                    }
+                }
+            }
+        }
+        hebrew{
+            eras{
+                abbreviated{
+                    "AM",
+                }
+                narrow{
+                    "AM",
+                }
+                wide{
+                    "유대력",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "디스리",
+                        "말케스",
+                        "기슬르",
+                        "데벳",
+                        "스밧",
+                        "아달 1",
+                        "아달",
+                        "닛산",
+                        "이야르",
+                        "시완",
+                        "담무르",
+                        "압",
+                        "엘룰",
+                        "아달 2",
+                    }
+                    wide{
+                        "디스리",
+                        "말케스",
+                        "기슬르",
+                        "데벳",
+                        "스밧",
+                        "아달 1",
+                        "아달",
+                        "닛산",
+                        "이야르",
+                        "시완",
+                        "담무르",
+                        "압",
+                        "엘룰",
+                        "아달 2",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "디스리월",
+                        "말케스월",
+                        "기슬르월",
+                        "데벳월",
+                        "스밧월",
+                        "아달월 1",
+                        "아달월",
+                        "닛산월",
+                        "이야르월",
+                        "시완월",
+                        "담무르월",
+                        "압월",
+                        "엘룰월",
+                        "아달월 2",
+                    }
+                    wide{
+                        "디스리월",
+                        "말케스월",
+                        "기슬르월",
+                        "데벳월",
+                        "스밧월",
+                        "아달월 1",
+                        "아달월",
+                        "닛산월",
+                        "이야르월",
+                        "시완월",
+                        "담무르월",
+                        "압월",
+                        "엘룰월",
+                        "아달월 2",
+                    }
+                }
+            }
+        }
+        islamic{
+            availableFormats{
+                MMMMd{"MMMM d일"}
+                yyyyMMMM{"G y년 MMMM"}
+            }
+            eras{
+                abbreviated{
+                    "AH",
+                }
+                narrow{
+                    "AH",
+                }
+                wide{
+                    "히즈라력",
+                }
+            }
+            monthNames{
+                format{
+                    wide{
+                        "무하람",
+                        "사파르",
+                        "라비 알 아왈",
+                        "라비 알 쎄니",
+                        "주마다 알 아왈",
+                        "주마다 알 쎄니",
+                        "라잡",
+                        "쉐아반",
+                        "라마단",
+                        "쉐왈",
+                        "듀 알 까다",
+                        "듀 알 히자",
+                    }
+                }
+                stand-alone{
+                    wide{
+                        "무하람",
+                        "사파르",
+                        "라비 알 아왈",
+                        "라비 알 쎄니",
+                        "주마다 알 아왈",
+                        "주마다 알 쎄니",
+                        "라잡",
+                        "쉐아반",
+                        "라마단",
+                        "쉐왈",
+                        "듀 알 까다",
+                        "듀 알 히자",
+                    }
+                }
+            }
+        }
+        japanese{
+            availableFormats{
+                GyMMM{"G y년 MMM"}
+                GyMMMEEEEd{"G y년 MMM d일 EEEE"}
+                GyMMMEd{"G y년 MMM d일 (E)"}
+                GyMMMd{"G y년 MMM d일"}
+                MMMEEEEd{"MMM d일 EEEE"}
+                MMMEd{"MMM d일 (E)"}
+                MMMMd{"MMMM d일"}
+                MMMd{"MMM d일"}
+                yyyyMMM{"G y년 MMM"}
+                yyyyMMMEEEEd{"G y년 MMM d일 EEEE"}
+                yyyyMMMEd{"G y년 MMM d일 (E)"}
+                yyyyMMMM{"G y년 MMMM"}
+                yyyyMMMd{"G y년 MMM d일"}
+            }
+            eras{
+                abbreviated{
+                    "다이카 (645 ~ 650)",
+                    "하쿠치 (650 ~ 671)",
+                    "하쿠호 (672 ~ 686)",
+                    "슈초 (686 ~ 701)",
+                    "다이호 (701 ~ 704)",
+                    "게이운 (704 ~ 708)",
+                    "와도 (708 ~ 715)",
+                    "레이키 (715 ~ 717)",
+                    "요로 (717 ~ 724)",
+                    "진키 (724 ~ 729)",
+                    "덴표 (729 ~ 749)",
+                    "덴표칸포 (749 ~ 749)",
+                    "덴표쇼호 (749 ~ 757)",
+                    "덴표호지 (757 ~ 765)",
+                    "덴표진고 (765 ~ 767)",
+                    "진고케이운 (767 ~ 770)",
+                    "호키 (770 ~ 780)",
+                    "덴오 (781 ~ 782)",
+                    "엔랴쿠 (782 ~ 806)",
+                    "다이도 (806 ~ 810)",
+                    "고닌 (810 ~ 824)",
+                    "덴초 (824 ~ 834)",
+                    "조와 (834 ~ 848)",
+                    "가쇼 (848 ~ 851)",
+                    "닌주 (851 ~ 854)",
+                    "사이코 (854 ~ 857)",
+                    "덴난 (857 ~ 859)",
+                    "조간 (859 ~ 877)",
+                    "간교 (877 ~ 885)",
+                    "닌나 (885 ~ 889)",
+                    "간표 (889 ~ 898)",
+                    "쇼타이 (898 ~ 901)",
+                    "엔기 (901 ~ 923)",
+                    "엔초 (923 ~ 931)",
+                    "조헤이 (931 ~ 938)",
+                    "덴교 (938 ~ 947)",
+                    "덴랴쿠 (947 ~ 957)",
+                    "덴토쿠 (957 ~ 961)",
+                    "오와 (961 ~ 964)",
+                    "고호 (964 ~ 968)",
+                    "안나 (968 ~ 970)",
+                    "덴로쿠 (970 ~ 973)",
+                    "덴엔 (973 ~ 976)",
+                    "조겐 (976 ~ 978)",
+                    "덴겐 (978 ~ 983)",
+                    "에이간 (983 ~ 985)",
+                    "간나 (985 ~ 987)",
+                    "에이엔 (987 ~ 989)",
+                    "에이소 (989 ~ 990)",
+                    "쇼랴쿠 (990 ~ 995)",
+                    "조토쿠 (995 ~ 999)",
+                    "조호 (999 ~ 1004)",
+                    "간코 (1004 ~ 1012)",
+                    "조와 (1012 ~ 1017)",
+                    "간닌 (1017 ~ 1021)",
+                    "지안 (1021 ~ 1024)",
+                    "만주 (1024 ~ 1028)",
+                    "조겐 (1028 ~ 1037)",
+                    "조랴쿠 (1037 ~ 1040)",
+                    "조큐 (1040 ~ 1044)",
+                    "간토쿠 (1044 ~ 1046)",
+                    "에이쇼 (1046 ~ 1053)",
+                    "덴기 (1053 ~ 1058)",
+                    "고헤이 (1058 ~ 1065)",
+                    "지랴쿠 (1065 ~ 1069)",
+                    "엔큐 (1069 ~ 1074)",
+                    "조호 (1074 ~ 1077)",
+                    "쇼랴쿠 (1077 ~ 1081)",
+                    "에이호 (1081 ~ 1084)",
+                    "오토쿠 (1084 ~ 1087)",
+                    "간지 (1087 ~ 1094)",
+                    "가호 (1094 ~ 1096)",
+                    "에이초 (1096 ~ 1097)",
+                    "조토쿠 (1097 ~ 1099)",
+                    "고와 (1099 ~ 1104)",
+                    "조지 (1104 ~ 1106)",
+                    "가쇼 (1106 ~ 1108)",
+                    "덴닌 (1108 ~ 1110)",
+                    "덴에이 (1110 ~ 1113)",
+                    "에이큐 (1113 ~ 1118)",
+                    "겐에이 (1118 ~ 1120)",
+                    "호안 (1120 ~ 1124)",
+                    "덴지 (1124 ~ 1126)",
+                    "다이지 (1126 ~ 1131)",
+                    "덴쇼 (1131 ~ 1132)",
+                    "조쇼 (1132 ~ 1135)",
+                    "호엔 (1135 ~ 1141)",
+                    "에이지 (1141 ~ 1142)",
+                    "고지 (1142 ~ 1144)",
+                    "덴요 (1144 ~ 1145)",
+                    "규안 (1145 ~ 1151)",
+                    "닌페이 (1151 ~ 1154)",
+                    "규주 (1154 ~ 1156)",
+                    "호겐 (1156 ~ 1159)",
+                    "헤이지 (1159 ~ 1160)",
+                    "에이랴쿠 (1160 ~ 1161)",
+                    "오호 (1161 ~ 1163)",
+                    "조칸 (1163 ~ 1165)",
+                    "에이만 (1165 ~ 1166)",
+                    "닌난 (1166 ~ 1169)",
+                    "가오 (1169 ~ 1171)",
+                    "조안 (1171 ~ 1175)",
+                    "안겐 (1175 ~ 1177)",
+                    "지쇼 (1177 ~ 1181)",
+                    "요와 (1181 ~ 1182)",
+                    "주에이 (1182 ~ 1184)",
+                    "겐랴쿠 (1184 ~ 1185)",
+                    "분지 (1185 ~ 1190)",
+                    "겐큐 (1190 ~ 1199)",
+                    "쇼지 (1199 ~ 1201)",
+                    "겐닌 (1201 ~ 1204)",
+                    "겐큐 (1204 ~ 1206)",
+                    "겐에이 (1206 ~ 1207)",
+                    "조겐 (1207 ~ 1211)",
+                    "겐랴쿠 (1211 ~ 1213)",
+                    "겐포 (1213 ~ 1219)",
+                    "조큐 (1219 ~ 1222)",
+                    "조오 (1222 ~ 1224)",
+                    "겐닌 (1224 ~ 1225)",
+                    "가로쿠 (1225 ~ 1227)",
+                    "안테이 (1227 ~ 1229)",
+                    "간키 (1229 ~ 1232)",
+                    "조에이 (1232 ~ 1233)",
+                    "덴푸쿠 (1233 ~ 1234)",
+                    "분랴쿠 (1234 ~ 1235)",
+                    "가테이 (1235 ~ 1238)",
+                    "랴쿠닌 (1238 ~ 1239)",
+                    "엔오 (1239 ~ 1240)",
+                    "닌지 (1240 ~ 1243)",
+                    "간겐 (1243 ~ 1247)",
+                    "호지 (1247 ~ 1249)",
+                    "겐초 (1249 ~ 1256)",
+                    "고겐 (1256 ~ 1257)",
+                    "쇼카 (1257 ~ 1259)",
+                    "쇼겐 (1259 ~ 1260)",
+                    "분오 (1260 ~ 1261)",
+                    "고초 (1261 ~ 1264)",
+                    "분에이 (1264 ~ 1275)",
+                    "겐지 (1275 ~ 1278)",
+                    "고안 (1278 ~ 1288)",
+                    "쇼오 (1288 ~ 1293)",
+                    "에이닌 (1293 ~ 1299)",
+                    "쇼안 (1299 ~ 1302)",
+                    "겐겐 (1302 ~ 1303)",
+                    "가겐 (1303 ~ 1306)",
+                    "도쿠지 (1306 ~ 1308)",
+                    "엔쿄 (1308 ~ 1311)",
+                    "오초 (1311 ~ 1312)",
+                    "쇼와 (1312 ~ 1317)",
+                    "분포 (1317 ~ 1319)",
+                    "겐오 (1319 ~ 1321)",
+                    "겐코 (1321 ~ 1324)",
+                    "쇼추 (1324 ~ 1326)",
+                    "가랴쿠 (1326 ~ 1329)",
+                    "겐토쿠 (1329 ~ 1331)",
+                    "겐코 (1331 ~ 1334)",
+                    "겐무 (1334 ~ 1336)",
+                    "엔겐 (1336 ~ 1340)",
+                    "고코쿠 (1340 ~ 1346)",
+                    "쇼헤이 (1346 ~ 1370)",
+                    "겐토쿠 (1370 ~ 1372)",
+                    "분추 (1372 ~ 1375)",
+                    "덴주 (1375 ~ 1379)",
+                    "고랴쿠 (1379 ~ 1381)",
+                    "고와 (1381 ~ 1384)",
+                    "겐추 (1384 ~ 1392)",
+                    "메이토쿠 (1384 ~ 1387)",
+                    "가쿄 (1387 ~ 1389)",
+                    "고오 (1389 ~ 1390)",
+                    "메이토쿠 (1390 ~ 1394)",
+                    "오에이 (1394 ~ 1428)",
+                    "쇼초 (1428 ~ 1429)",
+                    "에이쿄 (1429 ~ 1441)",
+                    "가키쓰 (1441 ~ 1444)",
+                    "분안 (1444 ~ 1449)",
+                    "호토쿠 (1449 ~ 1452)",
+                    "교토쿠 (1452 ~ 1455)",
+                    "고쇼 (1455 ~ 1457)",
+                    "조로쿠 (1457 ~ 1460)",
+                    "간쇼 (1460 ~ 1466)",
+                    "분쇼 (1466 ~ 1467)",
+                    "오닌 (1467 ~ 1469)",
+                    "분메이 (1469 ~ 1487)",
+                    "조쿄 (1487 ~ 1489)",
+                    "엔토쿠 (1489 ~ 1492)",
+                    "메이오 (1492 ~ 1501)",
+                    "분키 (1501 ~ 1504)",
+                    "에이쇼 (1504 ~ 1521)",
+                    "다이에이 (1521 ~ 1528)",
+                    "교로쿠 (1528 ~ 1532)",
+                    "덴분 (1532 ~ 1555)",
+                    "고지 (1555 ~ 1558)",
+                    "에이로쿠 (1558 ~ 1570)",
+                    "겐키 (1570 ~ 1573)",
+                    "덴쇼 (1573 ~ 1592)",
+                    "분로쿠 (1592 ~ 1596)",
+                    "게이초 (1596 ~ 1615)",
+                    "겐나 (1615 ~ 1624)",
+                    "간에이 (1624 ~ 1644)",
+                    "쇼호 (1644 ~ 1648)",
+                    "게이안 (1648 ~ 1652)",
+                    "조오 (1652 ~ 1655)",
+                    "메이레키 (1655 ~ 1658)",
+                    "만지 (1658 ~ 1661)",
+                    "간분 (1661 ~ 1673)",
+                    "엔포 (1673 ~ 1681)",
+                    "덴나 (1681 ~ 1684)",
+                    "조쿄 (1684 ~ 1688)",
+                    "겐로쿠 (1688 ~ 1704)",
+                    "호에이 (1704 ~ 1711)",
+                    "쇼토쿠 (1711 ~ 1716)",
+                    "교호 (1716 ~ 1736)",
+                    "겐분 (1736 ~ 1741)",
+                    "간포 (1741 ~ 1744)",
+                    "엔쿄 (1744 ~ 1748)",
+                    "간엔 (1748 ~ 1751)",
+                    "호레키 (1751 ~ 1764)",
+                    "메이와 (1764 ~ 1772)",
+                    "안에이 (1772 ~ 1781)",
+                    "덴메이 (1781 ~ 1789)",
+                    "간세이 (1789 ~ 1801)",
+                    "교와 (1801 ~ 1804)",
+                    "분카 (1804 ~ 1818)",
+                    "분세이 (1818 ~ 1830)",
+                    "덴포 (1830 ~ 1844)",
+                    "고카 (1844 ~ 1848)",
+                    "가에이 (1848 ~ 1854)",
+                    "안세이 (1854 ~ 1860)",
+                    "만엔 (1860 ~ 1861)",
+                    "분큐 (1861 ~ 1864)",
+                    "겐지 (1864 ~ 1865)",
+                    "게이오 (1865 ~ 1868)",
+                    "메이지",
+                    "다이쇼",
+                    "쇼와",
+                    "헤이세이",
+                    "레이와",
+                }
+            }
+        }
+        persian{
+            monthNames{
+                format{
+                    abbreviated{
+                        "화르바딘",
+                        "오르디베헤쉬트",
+                        "호르다드",
+                        "티르",
+                        "모르다드",
+                        "샤흐리바르",
+                        "메흐르",
+                        "아반",
+                        "아자르",
+                        "다이",
+                        "바흐만",
+                        "에스판드",
+                    }
+                    wide{
+                        "화르바딘",
+                        "오르디베헤쉬트",
+                        "호르다드",
+                        "티르",
+                        "모르다드",
+                        "샤흐리바르",
+                        "메흐르",
+                        "아반",
+                        "아자르",
+                        "다이",
+                        "바흐만",
+                        "에스판드",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "화르바딘",
+                        "오르디베헤쉬트",
+                        "호르다드",
+                        "티르",
+                        "모르다드",
+                        "샤흐리바르",
+                        "메흐르",
+                        "아반",
+                        "아자르",
+                        "다이",
+                        "바흐만",
+                        "에스판드",
+                    }
+                    wide{
+                        "화르바딘",
+                        "오르디베헤쉬트",
+                        "호르다드",
+                        "티르",
+                        "모르다드",
+                        "샤흐리바르",
+                        "메흐르",
+                        "아반",
+                        "아자르",
+                        "다이",
+                        "바흐만",
+                        "에스판드",
+                    }
+                }
+            }
+        }
+        roc{
+            availableFormats{
+                GyMMM{"G y년 MMM"}
+                GyMMMEEEEd{"G y년 MMM d일 EEEE"}
+                GyMMMEd{"G y년 MMM d일 (E)"}
+                GyMMMd{"G y년 MMM d일"}
+                MMMEEEEd{"MMM d일 EEEE"}
+                MMMEd{"MMM d일 (E)"}
+                MMMMd{"MMMM d일"}
+                MMMd{"MMM d일"}
+                yyyyMMM{"G y년 MMM"}
+                yyyyMMMEEEEd{"G y년 MMM d일 EEEE"}
+                yyyyMMMEd{"G y년 MMM d일 (E)"}
+                yyyyMMMM{"G y년 MMMM"}
+                yyyyMMMd{"G y년 MMM d일"}
+            }
+            eras{
+                abbreviated{
+                    "중화민국전",
+                    "중화민국",
+                }
+            }
+        }
+    }
+    characterLabel{
+        activities{"활동"}
+        african_scripts{"아프리카 문자"}
+        american_scripts{"아메리카 문자"}
+        animal{"동물"}
+        animals_nature{"동물 및 자연"}
+        arrows{"화살표"}
+        body{"신체"}
+        box_drawing{"상자 그림"}
+        braille{"점자"}
+        building{"건물"}
+        bullets_stars{"구분점/별"}
+        consonantal_jamo{"자음 자모"}
+        currency_symbols{"통화 기호"}
+        dash_connector{"대시/연결어"}
+        digits{"숫자"}
+        dingbats{"딩벳"}
+        divination_symbols{"점성 기호"}
+        downwards_arrows{"아래쪽 방향 화살표"}
+        downwards_upwards_arrows{"상하 양방향 화살표"}
+        east_asian_scripts{"동아시아 문자"}
+        emoji{"이모티콘"}
+        european_scripts{"유럽 문자"}
+        female{"여성"}
+        flag{"깃발"}
+        flags{"깃발"}
+        food_drink{"식음료"}
+        format{"포맷"}
+        format_whitespace{"포맷 및 공백"}
+        full_width_form_variant{"전각 형식 변형"}
+        geometric_shapes{"도형 모양"}
+        half_width_form_variant{"반각 형식 변형"}
+        han_characters{"한자"}
+        han_radicals{"한자 부수"}
+        hanja{"한자"}
+        hanzi_simplified{"한자(간체)"}
+        hanzi_traditional{"한자(번체)"}
+        heart{"하트"}
+        historic_scripts{"고전 문자"}
+        ideographic_desc_characters{"상형 설명 문자"}
+        japanese_kana{"일본어 가나"}
+        kanbun{"간분"}
+        kanji{"간지"}
+        keycap{"키 캡"}
+        leftwards_arrows{"왼쪽 방향 화살표"}
+        leftwards_rightwards_arrows{"양방향 화살표"}
+        letterlike_symbols{"문자형 기호"}
+        limited_use{"제한적 사용"}
+        male{"남성"}
+        math_symbols{"수학 기호"}
+        middle_eastern_scripts{"중동 문자"}
+        miscellaneous{"기타"}
+        modern_scripts{"근대 문자"}
+        modifier{"수식어"}
+        musical_symbols{"음악 기호"}
+        nature{"자연"}
+        nonspacing{"공백 없음"}
+        numbers{"숫자"}
+        objects{"사물"}
+        other{"기타"}
+        paired{"쌍 기호"}
+        person{"인물"}
+        phonetic_alphabet{"음성 기호 알파벳"}
+        pictographs{"그림 문자"}
+        place{"장소"}
+        plant{"식물"}
+        punctuation{"구두점"}
+        rightwards_arrows{"오른쪽 방향 화살표"}
+        sign_standard_symbols{"상징/표준 기호"}
+        small_form_variant{"작은 부호 변형"}
+        smiley{"스마일"}
+        smileys_people{"스마일리 및 사람"}
+        south_asian_scripts{"남아시아 문자"}
+        southeast_asian_scripts{"동남아시아 문자"}
+        spacing{"간격"}
+        sport{"스포츠"}
+        symbols{"기호"}
+        technical_symbols{"기술 기호"}
+        tone_marks{"성조 표시"}
+        travel{"여행"}
+        travel_places{"여행 및 장소"}
+        upwards_arrows{"위쪽 방향 화살표"}
+        variant_forms{"부호 변형"}
+        vocalic_jamo{"모음 자모"}
+        weather{"날씨"}
+        western_asian_scripts{"동서양 문자"}
+        whitespace{"공백"}
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"일"}
+            relative{
+                "-1"{"어제"}
+                "-2"{"그저께"}
+                "0"{"오늘"}
+                "1"{"내일"}
+                "2"{"모레"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}일 후"}
+                }
+                past{
+                    other{"{0}일 전"}
+                }
+            }
+        }
+        day-narrow{
+            dn{"일"}
+            relativeTime{
+                future{
+                    other{"{0}일 후"}
+                }
+                past{
+                    other{"{0}일 전"}
+                }
+            }
+        }
+        day-short{
+            dn{"일"}
+            relativeTime{
+                future{
+                    other{"{0}일 후"}
+                }
+                past{
+                    other{"{0}일 전"}
+                }
+            }
+        }
+        dayOfYear{
+            dn{"년의 일"}
+        }
+        dayOfYear-narrow{
+            dn{"년의 일"}
+        }
+        dayOfYear-short{
+            dn{"년의 일"}
+        }
+        dayperiod{
+            dn{"오전/오후"}
+        }
+        dayperiod-narrow{
+            dn{"오전/오후"}
+        }
+        dayperiod-short{
+            dn{"오전/오후"}
+        }
+        era{
+            dn{"연호"}
+        }
+        era-narrow{
+            dn{"연호"}
+        }
+        era-short{
+            dn{"연호"}
+        }
+        fri{
+            relative{
+                "-1"{"지난 금요일"}
+                "0"{"이번 금요일"}
+                "1"{"다음 금요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 금요일"}
+                }
+                past{
+                    other{"{0}주 전 금요일"}
+                }
+            }
+        }
+        fri-narrow{
+            relative{
+                "-1"{"지난 금요일"}
+                "0"{"이번 금요일"}
+                "1"{"다음 금요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 금요일"}
+                }
+                past{
+                    other{"{0}주 전 금요일"}
+                }
+            }
+        }
+        fri-short{
+            relative{
+                "-1"{"지난 금요일"}
+                "0"{"이번 금요일"}
+                "1"{"다음 금요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 금요일"}
+                }
+                past{
+                    other{"{0}주 전 금요일"}
+                }
+            }
+        }
+        hour{
+            dn{"시"}
+            relative{
+                "0"{"현재 시간"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}시간 후"}
+                }
+                past{
+                    other{"{0}시간 전"}
+                }
+            }
+        }
+        hour-narrow{
+            dn{"시"}
+            relativeTime{
+                future{
+                    other{"{0}시간 후"}
+                }
+                past{
+                    other{"{0}시간 전"}
+                }
+            }
+        }
+        hour-short{
+            dn{"시"}
+            relativeTime{
+                future{
+                    other{"{0}시간 후"}
+                }
+                past{
+                    other{"{0}시간 전"}
+                }
+            }
+        }
+        minute{
+            dn{"분"}
+            relative{
+                "0"{"현재 분"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}분 후"}
+                }
+                past{
+                    other{"{0}분 전"}
+                }
+            }
+        }
+        minute-narrow{
+            dn{"분"}
+            relativeTime{
+                future{
+                    other{"{0}분 후"}
+                }
+                past{
+                    other{"{0}분 전"}
+                }
+            }
+        }
+        minute-short{
+            dn{"분"}
+            relativeTime{
+                future{
+                    other{"{0}분 후"}
+                }
+                past{
+                    other{"{0}분 전"}
+                }
+            }
+        }
+        mon{
+            relative{
+                "-1"{"지난 월요일"}
+                "0"{"이번 월요일"}
+                "1"{"다음 월요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 월요일"}
+                }
+                past{
+                    other{"{0}주 전 월요일"}
+                }
+            }
+        }
+        mon-narrow{
+            relative{
+                "-1"{"지난 월요일"}
+                "0"{"이번 월요일"}
+                "1"{"다음 월요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 월요일"}
+                }
+                past{
+                    other{"{0}주 전 월요일"}
+                }
+            }
+        }
+        mon-short{
+            relative{
+                "-1"{"지난 월요일"}
+                "0"{"이번 월요일"}
+                "1"{"다음 월요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 월요일"}
+                }
+                past{
+                    other{"{0}주 전 월요일"}
+                }
+            }
+        }
+        month{
+            dn{"월"}
+            relative{
+                "-1"{"지난달"}
+                "0"{"이번 달"}
+                "1"{"다음 달"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}개월 후"}
+                }
+                past{
+                    other{"{0}개월 전"}
+                }
+            }
+        }
+        month-narrow{
+            dn{"월"}
+            relativeTime{
+                future{
+                    other{"{0}개월 후"}
+                }
+                past{
+                    other{"{0}개월 전"}
+                }
+            }
+        }
+        month-short{
+            dn{"월"}
+            relativeTime{
+                future{
+                    other{"{0}개월 후"}
+                }
+                past{
+                    other{"{0}개월 전"}
+                }
+            }
+        }
+        quarter{
+            dn{"분기"}
+            relative{
+                "-1"{"지난 분기"}
+                "0"{"이번 분기"}
+                "1"{"다음 분기"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}분기 후"}
+                }
+                past{
+                    other{"{0}분기 전"}
+                }
+            }
+        }
+        quarter-narrow{
+            dn{"분기"}
+            relativeTime{
+                future{
+                    other{"{0}분기 후"}
+                }
+                past{
+                    other{"{0}분기 전"}
+                }
+            }
+        }
+        quarter-short{
+            dn{"분기"}
+            relativeTime{
+                future{
+                    other{"{0}분기 후"}
+                }
+                past{
+                    other{"{0}분기 전"}
+                }
+            }
+        }
+        sat{
+            relative{
+                "-1"{"지난 토요일"}
+                "0"{"이번 토요일"}
+                "1"{"다음 토요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 토요일"}
+                }
+                past{
+                    other{"{0}주 전 토요일"}
+                }
+            }
+        }
+        sat-narrow{
+            relative{
+                "-1"{"지난 토요일"}
+                "0"{"이번 토요일"}
+                "1"{"다음 토요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 토요일"}
+                }
+                past{
+                    other{"{0}주 전 토요일"}
+                }
+            }
+        }
+        sat-short{
+            relative{
+                "-1"{"지난 토요일"}
+                "0"{"이번 토요일"}
+                "1"{"다음 토요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 토요일"}
+                }
+                past{
+                    other{"{0}주 전 토요일"}
+                }
+            }
+        }
+        second{
+            dn{"초"}
+            relative{
+                "0"{"지금"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}초 후"}
+                }
+                past{
+                    other{"{0}초 전"}
+                }
+            }
+        }
+        second-narrow{
+            dn{"초"}
+            relativeTime{
+                future{
+                    other{"{0}초 후"}
+                }
+                past{
+                    other{"{0}초 전"}
+                }
+            }
+        }
+        second-short{
+            dn{"초"}
+            relativeTime{
+                future{
+                    other{"{0}초 후"}
+                }
+                past{
+                    other{"{0}초 전"}
+                }
+            }
+        }
+        sun{
+            relative{
+                "-1"{"지난 일요일"}
+                "0"{"이번 일요일"}
+                "1"{"다음 일요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 일요일"}
+                }
+                past{
+                    other{"{0}주 전 일요일"}
+                }
+            }
+        }
+        sun-narrow{
+            relative{
+                "-1"{"지난 일요일"}
+                "0"{"이번 일요일"}
+                "1"{"다음 일요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 일요일"}
+                }
+                past{
+                    other{"{0}주 전 일요일"}
+                }
+            }
+        }
+        sun-short{
+            relative{
+                "-1"{"지난 일요일"}
+                "0"{"이번 일요일"}
+                "1"{"다음 일요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 일요일"}
+                }
+                past{
+                    other{"{0}주 전 일요일"}
+                }
+            }
+        }
+        thu{
+            relative{
+                "-1"{"지난 목요일"}
+                "0"{"이번 목요일"}
+                "1"{"다음 목요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 목요일"}
+                }
+                past{
+                    other{"{0}주 전 목요일"}
+                }
+            }
+        }
+        thu-narrow{
+            relative{
+                "-1"{"지난 목요일"}
+                "0"{"이번 목요일"}
+                "1"{"다음 목요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 목요일"}
+                }
+                past{
+                    other{"{0}주 전 목요일"}
+                }
+            }
+        }
+        thu-short{
+            relative{
+                "-1"{"지난 목요일"}
+                "0"{"이번 목요일"}
+                "1"{"다음 목요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 목요일"}
+                }
+                past{
+                    other{"{0}주 전 목요일"}
+                }
+            }
+        }
+        tue{
+            relative{
+                "-1"{"지난 화요일"}
+                "0"{"이번 화요일"}
+                "1"{"다음 화요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 화요일"}
+                }
+                past{
+                    other{"{0}주 전 화요일"}
+                }
+            }
+        }
+        tue-narrow{
+            relative{
+                "-1"{"지난 화요일"}
+                "0"{"이번 화요일"}
+                "1"{"다음 화요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 화요일"}
+                }
+                past{
+                    other{"{0}주 전 화요일"}
+                }
+            }
+        }
+        tue-short{
+            relative{
+                "-1"{"지난 화요일"}
+                "0"{"이번 화요일"}
+                "1"{"다음 화요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 화요일"}
+                }
+                past{
+                    other{"{0}주 전 화요일"}
+                }
+            }
+        }
+        wed{
+            relative{
+                "-1"{"지난 수요일"}
+                "0"{"이번 수요일"}
+                "1"{"다음 수요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 수요일"}
+                }
+                past{
+                    other{"{0}주 전 수요일"}
+                }
+            }
+        }
+        wed-narrow{
+            relative{
+                "-1"{"지난 수요일"}
+                "0"{"이번 수요일"}
+                "1"{"다음 수요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 수요일"}
+                }
+                past{
+                    other{"{0}주 전 수요일"}
+                }
+            }
+        }
+        wed-short{
+            relative{
+                "-1"{"지난 수요일"}
+                "0"{"이번 수요일"}
+                "1"{"다음 수요일"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}주 후 수요일"}
+                }
+                past{
+                    other{"{0}주 전 수요일"}
+                }
+            }
+        }
+        week{
+            dn{"주"}
+            relative{
+                "-1"{"지난주"}
+                "0"{"이번 주"}
+                "1"{"다음 주"}
+            }
+            relativePeriod{"{0}번째 주"}
+            relativeTime{
+                future{
+                    other{"{0}주 후"}
+                }
+                past{
+                    other{"{0}주 전"}
+                }
+            }
+        }
+        week-narrow{
+            dn{"주"}
+            relativePeriod{"{0}번째 주"}
+            relativeTime{
+                future{
+                    other{"{0}주 후"}
+                }
+                past{
+                    other{"{0}주 전"}
+                }
+            }
+        }
+        week-short{
+            dn{"주"}
+            relativePeriod{"{0}번째 주"}
+            relativeTime{
+                future{
+                    other{"{0}주 후"}
+                }
+                past{
+                    other{"{0}주 전"}
+                }
+            }
+        }
+        weekOfMonth{
+            dn{"월의 주"}
+        }
+        weekOfMonth-narrow{
+            dn{"월의 주"}
+        }
+        weekOfMonth-short{
+            dn{"월의 주"}
+        }
+        weekday{
+            dn{"요일"}
+        }
+        weekday-narrow{
+            dn{"요일"}
+        }
+        weekday-short{
+            dn{"요일"}
+        }
+        weekdayOfMonth{
+            dn{"월의 평일"}
+        }
+        weekdayOfMonth-narrow{
+            dn{"월의 평일"}
+        }
+        weekdayOfMonth-short{
+            dn{"월의 평일"}
+        }
+        year{
+            dn{"년"}
+            relative{
+                "-1"{"작년"}
+                "0"{"올해"}
+                "1"{"내년"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}년 후"}
+                }
+                past{
+                    other{"{0}년 전"}
+                }
+            }
+        }
+        year-narrow{
+            dn{"년"}
+            relativeTime{
+                future{
+                    other{"{0}년 후"}
+                }
+                past{
+                    other{"{0}년 전"}
+                }
+            }
+        }
+        year-short{
+            dn{"년"}
+            relativeTime{
+                future{
+                    other{"{0}년 후"}
+                }
+                past{
+                    other{"{0}년 전"}
+                }
+            }
+        }
+        zone{
+            dn{"시간대"}
+        }
+        zone-narrow{
+            dn{"시간대"}
+        }
+        zone-short{
+            dn{"시간대"}
+        }
+    }
+    listPattern{
+        or{
+            2{"{0} 또는 {1}"}
+            end{"{0} 또는 {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        standard{
+            2{"{0} 및 {1}"}
+            end{"{0} 및 {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        standard-short{
+            2{"{0} 및 {1}"}
+            end{"{0} 및 {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        unit{
+            2{"{0} {1}"}
+            end{"{0} {1}"}
+            middle{"{0} {1}"}
+            start{"{0} {1}"}
+        }
+        unit-narrow{
+            2{"{0} {1}"}
+            end{"{0} {1}"}
+            middle{"{0} {1}"}
+            start{"{0} {1}"}
+        }
+        unit-short{
+            2{"{0} {1}"}
+            end{"{0} {1}"}
+            middle{"{0} {1}"}
+            start{"{0} {1}"}
+        }
+    }
+    measurementSystemNames{
+        UK{"영국식"}
+        US{"미국식"}
+        metric{"미터법"}
+    }
+    parse{
+        date{
+            lenient{
+                "[\\--/]",
+                "[\\:∶]",
+            }
+        }
+        general{
+            lenient{
+                "[.․。︒﹒．｡]",
+                "['ʼ՚᾽᾿’＇]",
+                "[%٪﹪％]",
+                "[؉‰]",
+                "[\$﹩＄$]",
+                "[£₤]",
+                "[¥￥]",
+                "[₩￦]",
+                "[₨₹{Rp}{Rs}]",
+            }
+        }
+        number{
+            lenient{
+                "[\\-‒⁻₋−➖﹣－]",
+                "[,،٫、︐︑﹐﹑，､]",
+                "[+⁺₊➕﬩﹢＋]",
+            }
+            stricter{
+                "[,٫︐﹐，]",
+                "[.․﹒．｡]",
+            }
+        }
+    }
+}

@@ -1,0 +1,239 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sw_KE{
+    zoneStrings{
+        "America:Barbados"{
+            ec{"Babadosi"}
+        }
+        "America:Costa_Rica"{
+            ec{"Kostarika"}
+        }
+        "America:Dominica"{
+            ec{"Dominika"}
+        }
+        "America:El_Salvador"{
+            ec{"Elsalvado"}
+        }
+        "America:Guadeloupe"{
+            ec{"Guadalupe"}
+        }
+        "America:Jamaica"{
+            ec{"Jamaika"}
+        }
+        "America:Martinique"{
+            ec{"Matinikiu"}
+        }
+        "America:North_Dakota:Beulah"{
+            ec{"Beulah, Dakota Kaskazini"}
+        }
+        "America:North_Dakota:Center"{
+            ec{"Center, Dakota Kaskazini"}
+        }
+        "America:North_Dakota:New_Salem"{
+            ec{"New Salem, Dakota Kaskazini"}
+        }
+        "America:Port-au-Prince"{
+            ec{"Bandari ya au-Prince"}
+        }
+        "America:Port_of_Spain"{
+            ec{"Bandari ya Uhispania"}
+        }
+        "Antarctica:Macquarie"{
+            ec{"Makwuarie"}
+        }
+        "Asia:Colombo"{
+            ec{"Kolombo"}
+        }
+        "Asia:Macau"{
+            ec{"Makao"}
+        }
+        "Asia:Rangoon"{
+            ec{"Yangon"}
+        }
+        "Asia:Saigon"{
+            ec{"Jiji la Ho Chi Minh"}
+        }
+        "Asia:Singapore"{
+            ec{"Singapoo"}
+        }
+        "Atlantic:Bermuda"{
+            ec{"Bamuda"}
+        }
+        "Atlantic:Canary"{
+            ec{"Kanari"}
+        }
+        "Etc:UTC"{
+            ls{"Saa ya Ulimwenguni"}
+        }
+        "Indian:Christmas"{
+            ec{"Krismasi"}
+        }
+        "Indian:Maldives"{
+            ec{"Maldivi"}
+        }
+        "meta:Afghanistan"{
+            ls{"Saa za Afghanistani"}
+        }
+        "meta:Argentina"{
+            ld{"Saa za Majira Joto za Ajentina"}
+            lg{"Saa za Ajentina"}
+            ls{"Saa za Wastani za Ajentina"}
+        }
+        "meta:Argentina_Western"{
+            ld{"Saa za Majira ya Joto za Magharibi mwa Ajentina"}
+            lg{"Saa za Magharibi mwa Ajentina"}
+            ls{"Saa za Wastani za Magharibi mwa Ajentina"}
+        }
+        "meta:Australia_CentralWestern"{
+            ld{"Saa za Mchana za Magharibi mwa Australia ya Kati"}
+            lg{"Saa za Magharibi mwa Austrialia ya Kati"}
+            ls{"Saa za Wastani za Magharibi mwa Australia ya Kati"}
+        }
+        "meta:Azerbaijan"{
+            ld{"Saa za Majira ya Joto za Azabajani"}
+            lg{"Saa za Azabajani"}
+            ls{"Saa za Wastani za Azabajani"}
+        }
+        "meta:Bangladesh"{
+            ld{"Saa za Majira ya Joto za Bangladeshi"}
+            lg{"Saa za Bangladeshi"}
+            ls{"Saa za Wastani za Bangladeshi"}
+        }
+        "meta:Bhutan"{
+            ls{"Saa za Butani"}
+        }
+        "meta:Brasilia"{
+            ld{"Saa za Majira ya Joto za Brazili"}
+            lg{"Saa za Brazili"}
+            ls{"Saa za Wastani za Brazili"}
+        }
+        "meta:Cape_Verde"{
+            ld{"Saa za Majira ya Joto za Kepuvede"}
+            lg{"Saa za Kepuvede"}
+            ls{"Saa za Wastani za Kepuvede"}
+        }
+        "meta:Colombia"{
+            ld{"Saa za Majira ya Joto za Kolombia"}
+            lg{"Saa za Kolombia"}
+            ls{"Saa za Wastani za Kolombia"}
+        }
+        "meta:Cook"{
+            ld{"Saa za Majira Nusu ya Joto za Visiwa vya Cook"}
+            lg{"Saa za Visiwa vya Cook"}
+            ls{"Saa za Wastani za Visiwa vya Cook"}
+        }
+        "meta:Cuba"{
+            ld{"Saa za Mchana za Kuba"}
+            lg{"Saa za Kuba"}
+            ls{"Saa za Wastani za Kuba"}
+        }
+        "meta:Easter"{
+            ld{"Saa za Majira ya Joto za Kisiwa cha Easter"}
+            lg{"Saa za Kisiwa cha Easter"}
+            ls{"Saa za Wastani za Kisiwa cha Easter"}
+        }
+        "meta:French_Guiana"{
+            ls{"Saa za Guiana"}
+        }
+        "meta:Georgia"{
+            ld{"Saa za Majira ya Joto za Jiojia"}
+            lg{"Saa za Jiojia"}
+            ls{"Saa za Wastani za Jiojia"}
+        }
+        "meta:Gulf"{
+            ls{"Saa za Wastani za Ghuba"}
+        }
+        "meta:Iran"{
+            ld{"Saa za Mchana za Irani"}
+            lg{"Saa za Irani"}
+            ls{"Saa za Wastani za Irani"}
+        }
+        "meta:Japan"{
+            ld{"Saa za Mchana za Japani"}
+            lg{"Saa za Japani"}
+            ls{"Saa za Wastani za Japani"}
+        }
+        "meta:Kazakhstan_Eastern"{
+            ls{"Saa za Kazakistani Mashariki"}
+        }
+        "meta:Kazakhstan_Western"{
+            ls{"Saa za Kazakistani Magharibi"}
+        }
+        "meta:Macquarie"{
+            ls{"Saa za Makwuarie"}
+        }
+        "meta:Malaysia"{
+            ls{"Saa za Malesia"}
+        }
+        "meta:Maldives"{
+            ls{"Saa za Maldivi"}
+        }
+        "meta:Mexico_Northwest"{
+            ld{"Saa za Mchana za Kaskazini Magharibi mwa Meksiko"}
+            lg{"Saa za Kaskazini Magharibi mwa Meksiko"}
+            ls{"Saa za Wastani za Kaskazini Magharibi mwa Meksiko"}
+        }
+        "meta:Mongolia"{
+            ld{"Saa za Majira ya Joto za Ulaanbaatar"}
+            lg{"Saa za Ulaanbataar"}
+            ls{"Saa za Wastani za Ulaanbataar"}
+        }
+        "meta:Myanmar"{
+            ls{"Saa za Myama"}
+        }
+        "meta:Nepal"{
+            ls{"Saa za Nepali"}
+        }
+        "meta:New_Caledonia"{
+            ld{"Saa za Majira ya Joto za Kaledonia Mpya"}
+            lg{"Saa za Kaledonia Mpya"}
+            ls{"Saa za Wastani za Kaledonia Mpya"}
+        }
+        "meta:New_Zealand"{
+            ld{"Saa za Mchana za Nyuzilandi"}
+            lg{"Saa za Nyuzilandi"}
+            ls{"Saa za Wastani za Nyuzilandi"}
+        }
+        "meta:Pakistan"{
+            ld{"Saa za Majira ya Joto za Pakistani"}
+            lg{"Saa za Pakistani"}
+            ls{"Saa za Wastani za Pakistani"}
+        }
+        "meta:Papua_New_Guinea"{
+            ls{"Saa za Papua"}
+        }
+        "meta:Paraguay"{
+            ld{"Saa za Majira ya Joto za Paragwai"}
+            lg{"Saa za Paragwai"}
+            ls{"Saa za Wastani za Paragwai"}
+        }
+        "meta:Phoenix_Islands"{
+            ls{"Saa za Visiwa vya Finiksi"}
+        }
+        "meta:Singapore"{
+            ls{"Saa za Wastani za Singapoo"}
+        }
+        "meta:South_Georgia"{
+            ls{"Saa za Jojia Kusini"}
+        }
+        "meta:Tajikistan"{
+            ls{"Saaza Tajikistani"}
+        }
+        "meta:Turkmenistan"{
+            ld{"Saa za Majira ya Joto za Turkmenistani"}
+            lg{"Saa za Turkmenistani"}
+            ls{"Saa za Wastani za Turkmenistani"}
+        }
+        "meta:Uruguay"{
+            ld{"Saa za Majira ya Joto za Urugwai"}
+            lg{"Saa za Uruagwai"}
+            ls{"Saa za Wastani za Urugwai"}
+        }
+        "meta:Uzbekistan"{
+            ld{"Saa za Majira ya Joto za Uzbekistani"}
+            lg{"Saa za Uzbekistani"}
+            ls{"Saa za wastani za Uzbekistani"}
+        }
+    }
+}

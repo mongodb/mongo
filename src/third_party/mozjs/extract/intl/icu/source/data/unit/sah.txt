@@ -1,0 +1,536 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sah{
+    durationUnits{
+        hm{"h:mm"}
+        hms{"h:mm:ss"}
+        ms{"m:ss"}
+    }
+    units{
+        angle{
+            degree{
+                dnam{"кыраадыс"}
+                other{"{0} кыраадыс"}
+            }
+        }
+        area{
+            hectare{
+                dnam{"гектаар"}
+                other{"{0} гектаар"}
+            }
+        }
+        concentr{
+            karat{
+                dnam{"караат"}
+                other{"{0} караат"}
+            }
+        }
+        digital{
+            bit{
+                dnam{"биит"}
+                other{"{0} биит"}
+            }
+            byte{
+                dnam{"баайт"}
+                other{"{0} баайт"}
+            }
+            gigabit{
+                dnam{"гигабиит"}
+                other{"{0} гигабиит"}
+            }
+            gigabyte{
+                dnam{"ГБаайт"}
+                other{"{0} ГБаайт"}
+            }
+            kilobit{
+                dnam{"килобиит"}
+                other{"{0} килобиит"}
+            }
+            kilobyte{
+                dnam{"килобаайт"}
+                other{"{0} килобаайт"}
+            }
+            megabit{
+                dnam{"мегабиит"}
+                other{"{0} мегабиит"}
+            }
+            megabyte{
+                dnam{"мегабаайт"}
+                other{"{0} мегабаайт"}
+            }
+            terabit{
+                dnam{"Тбит"}
+                other{"{0} Тбит"}
+            }
+            terabyte{
+                dnam{"терабаайт"}
+                other{"{0} терабаайт"}
+            }
+        }
+        duration{
+            century{
+                dnam{"үйэлэр"}
+                other{"{0} үйэ"}
+            }
+            day{
+                dnam{"күн"}
+                other{"{0} күн"}
+            }
+            hour{
+                dnam{"чаас"}
+                other{"{0} чаас"}
+                per{"чааска {0}"}
+            }
+            microsecond{
+                dnam{"микросөкүүндэлэр"}
+                other{"{0} микросөкүүндэ"}
+            }
+            millisecond{
+                other{"{0} миллисөкүүндэ"}
+            }
+            minute{
+                dnam{"мүнүүтэ"}
+                other{"{0} мүнүүтэ"}
+                per{"мүнүүтэҕэ {0}"}
+            }
+            month{
+                dnam{"ый"}
+                other{"{0} ый"}
+                per{"ыйга {0}"}
+            }
+            nanosecond{
+                dnam{"наносөкүүндэлэр"}
+                other{"{0} наносөкүүндэ"}
+            }
+            second{
+                dnam{"сөкүүндэ"}
+                other{"{0} сөкүүндэ"}
+                per{"сөкүүндэҕэ {0}"}
+            }
+            week{
+                dnam{"нэдиэлэ"}
+                other{"{0} нэдиэлэ"}
+                per{"нэдиэлэҕэ {0}"}
+            }
+            year{
+                dnam{"сыл"}
+                other{"{0} сыл"}
+                per{"сылга {0}"}
+            }
+        }
+        electric{
+            ampere{
+                dnam{"ампер"}
+                other{"{0} ампер"}
+            }
+            milliampere{
+                dnam{"миллиампер"}
+                other{"{0} миллиампер"}
+            }
+            volt{
+                dnam{"вольт"}
+            }
+        }
+        energy{
+            calorie{
+                dnam{"калорий"}
+                other{"{0} калорий"}
+            }
+            foodcalorie{
+                dnam{"Калорий"}
+                other{"{0} Калорий"}
+            }
+            joule{
+                dnam{"джоуль"}
+                other{"{0} джоуль"}
+            }
+            kilojoule{
+                dnam{"килоджоуль"}
+                other{"{0} килоджоуль"}
+            }
+            kilowatt-hour{
+                dnam{"киловатт-чаас"}
+                other{"{0} киловатт-чаас"}
+            }
+        }
+        frequency{
+            hertz{
+                dnam{"герц"}
+                other{"{0} герц"}
+            }
+        }
+        length{
+            meter{
+                dnam{"миэтэрэ"}
+                other{"{0} миэтэрэ"}
+            }
+            mile{
+                dnam{"миилэ"}
+                other{"{0} миилэ"}
+            }
+        }
+        light{
+            lux{
+                dnam{"люкс"}
+                other{"{0} люкс"}
+            }
+        }
+        mass{
+            carat{
+                dnam{"караат"}
+                other{"{0} караат"}
+            }
+            gram{
+                dnam{"кыраам"}
+                other{"{0} кыраам"}
+            }
+            kilogram{
+                dnam{"киилэ"}
+                other{"{0} киилэ"}
+            }
+        }
+        power{
+            kilowatt{
+                dnam{"кВт"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"Сиэлсий кыраадыһа"}
+                other{"{0} Сиэлсий кыраадыһа"}
+            }
+            fahrenheit{
+                dnam{"Фаренгейт кыраадыһа"}
+                other{"{0} Фаренгейт кыраадыһа"}
+            }
+            generic{
+                dnam{"°"}
+                other{"{0}°"}
+            }
+            kelvin{
+                dnam{"кельвин кыраадыһа"}
+                other{"{0} кельвин"}
+            }
+        }
+        volume{
+            liter{
+                dnam{"лиитирэ"}
+                other{"{0} лиитирэ"}
+            }
+        }
+    }
+    unitsNarrow{
+        duration{
+            day{
+                other{"{0} к."}
+            }
+            hour{
+                other{"{0} ч"}
+            }
+            millisecond{
+                dnam{"мс"}
+                other{"{0} мс"}
+            }
+            minute{
+                other{"{0} мүн"}
+            }
+            month{
+                dnam{"ый"}
+                other{"{0} ый"}
+            }
+            second{
+                other{"{0} с"}
+            }
+            week{
+                other{"{0} н."}
+            }
+            year{
+                other{"{0} с."}
+            }
+        }
+        length{
+            centimeter{
+                dnam{"см"}
+            }
+            kilometer{
+                dnam{"км"}
+                other{"{0} км"}
+            }
+            meter{
+                dnam{"миэтэрэ"}
+            }
+            millimeter{
+                dnam{"мм"}
+            }
+        }
+        mass{
+            gram{
+                dnam{"кыраам"}
+                other{"{0} г"}
+            }
+            kilogram{
+                dnam{"кг"}
+                other{"{0} кг"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"°C"}
+                other{"{0}°C"}
+            }
+        }
+        volume{
+            liter{
+                dnam{"лиитирэ"}
+                other{"{0}л"}
+            }
+        }
+    }
+    unitsShort{
+        angle{
+            degree{
+                dnam{"кыраадыс"}
+                other{"{0}°"}
+            }
+        }
+        area{
+            hectare{
+                dnam{"гаа"}
+                other{"{0} гаа"}
+            }
+            square-centimeter{
+                dnam{"см²"}
+                other{"{0} см²"}
+                per{"{0}/см²"}
+            }
+        }
+        concentr{
+            karat{
+                dnam{"караат"}
+                other{"{0} кар."}
+            }
+        }
+        digital{
+            bit{
+                dnam{"бит"}
+                other{"{0} бит"}
+            }
+            byte{
+                dnam{"байт"}
+                other{"{0} байт"}
+            }
+            gigabit{
+                dnam{"Gb"}
+                other{"{0} Gb"}
+            }
+            kilobit{
+                dnam{"кб"}
+                other{"{0} кб"}
+            }
+            kilobyte{
+                dnam{"кБайт"}
+                other{"{0} кБ"}
+            }
+            megabit{
+                dnam{"Мбит"}
+                other{"{0} Мбит"}
+            }
+            megabyte{
+                dnam{"МБ"}
+                other{"{0} МБ"}
+            }
+            terabit{
+                dnam{"Tb"}
+                other{"{0} Tb"}
+            }
+            terabyte{
+                dnam{"ТБаайт"}
+                other{"{0} TB"}
+            }
+        }
+        duration{
+            century{
+                dnam{"ү."}
+                other{"{0} ү."}
+            }
+            day{
+                dnam{"күн"}
+                other{"{0} күн"}
+                per{"{0}/күн"}
+            }
+            hour{
+                dnam{"чаас"}
+                other{"{0} ч"}
+                per{"{0}/ч"}
+            }
+            microsecond{
+                dnam{"мкс"}
+                other{"{0} мкс"}
+            }
+            millisecond{
+                dnam{"мс"}
+                other{"{0} мс"}
+            }
+            minute{
+                dnam{"мүнүүтэ"}
+                other{"{0} мүн"}
+                per{"{0}/мүн"}
+            }
+            month{
+                dnam{"ый"}
+                other{"{0} ый"}
+                per{"{0}/ый"}
+            }
+            nanosecond{
+                dnam{"нс"}
+                other{"{0} нс"}
+            }
+            second{
+                dnam{"сөкүүндэ"}
+                other{"{0} сөк"}
+                per{"{0}/сөк"}
+            }
+            week{
+                dnam{"нэдиэлэ"}
+                other{"{0} нэд."}
+                per{"{0}/нэд"}
+            }
+            year{
+                dnam{"сыл"}
+                other{"{0} с."}
+                per{"{0}/с"}
+            }
+        }
+        electric{
+            ampere{
+                other{"{0} А"}
+            }
+            milliampere{
+                other{"{0} мА"}
+            }
+        }
+        energy{
+            calorie{
+                dnam{"кал"}
+                other{"{0} кал"}
+            }
+            foodcalorie{
+                dnam{"Кал"}
+                other{"{0} Кал"}
+            }
+            joule{
+                dnam{"дж"}
+                other{"{0} дж"}
+            }
+            kilocalorie{
+                dnam{"ккал"}
+                other{"{0} ккал"}
+            }
+            kilojoule{
+                dnam{"кдж"}
+                other{"{0} кдж"}
+            }
+            kilowatt-hour{
+                other{"{0} кВт/ч"}
+            }
+        }
+        frequency{
+            hertz{
+                dnam{"Гц"}
+                other{"{0} Гц"}
+            }
+        }
+        length{
+            centimeter{
+                dnam{"см"}
+                other{"{0} см"}
+            }
+            kilometer{
+                dnam{"км"}
+                other{"{0} км"}
+                per{"{0}/км"}
+            }
+            meter{
+                dnam{"миэтэрэ"}
+                other{"{0} м"}
+                per{"{0}/м"}
+            }
+            mile{
+                dnam{"миилэ"}
+            }
+            millimeter{
+                dnam{"мм"}
+                other{"{0} мм"}
+            }
+        }
+        light{
+            lux{
+                dnam{"люкс"}
+                other{"{0} лк"}
+            }
+        }
+        mass{
+            carat{
+                dnam{"караат"}
+            }
+            gram{
+                dnam{"кыраам"}
+                other{"{0} г"}
+                per{"{0}/г"}
+            }
+            kilogram{
+                dnam{"кг"}
+                other{"{0} кг"}
+                per{"{0}/кг"}
+            }
+            metric-ton{
+                dnam{"т"}
+                other{"{0} т"}
+            }
+            milligram{
+                dnam{"мг"}
+                other{"{0} мг"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"кыр. С"}
+                other{"{0}°C"}
+            }
+            fahrenheit{
+                dnam{"°F"}
+                other{"{0}°F"}
+            }
+            generic{
+                dnam{"°"}
+                other{"{0}°"}
+            }
+            kelvin{
+                dnam{"K"}
+                other{"{0} K"}
+            }
+        }
+        volume{
+            cubic-centimeter{
+                dnam{"см³"}
+                other{"{0} см³"}
+                per{"{0}/см³"}
+            }
+            cubic-kilometer{
+                dnam{"км³"}
+                other{"{0} км³"}
+            }
+            cubic-meter{
+                dnam{"м³"}
+                other{"{0} м³"}
+                per{"{0}/м³"}
+            }
+            liter{
+                dnam{"лиитирэ"}
+                other{"{0} л"}
+                per{"{0}/л"}
+            }
+        }
+    }
+}

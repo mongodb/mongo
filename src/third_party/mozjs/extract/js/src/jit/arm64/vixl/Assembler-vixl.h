@@ -27,6 +27,7 @@
 #ifndef VIXL_A64_ASSEMBLER_A64_H_
 #define VIXL_A64_ASSEMBLER_A64_H_
 
+#include "jit/arm64/vixl/Cpu-vixl.h"
 #include "jit/arm64/vixl/Globals-vixl.h"
 #include "jit/arm64/vixl/Instructions-vixl.h"
 #include "jit/arm64/vixl/MozBaseAssembler-vixl.h"
@@ -37,6 +38,12 @@
 #include "jit/shared/Assembler-shared.h"
 #include "jit/shared/Disassembler-shared.h"
 #include "jit/shared/IonAssemblerBufferWithConstantPools.h"
+
+#if defined(_M_ARM64)
+#ifdef mvn
+#undef mvn
+#endif
+#endif
 
 namespace vixl {
 
@@ -295,10 +302,10 @@ class VRegister : public CPURegister {
     // VIXL_ASSERT(IsPowerOf2(lanes_) && (lanes_ <= 16));
   }
   constexpr VRegister(js::jit::FloatRegister r)
-      : CPURegister(r.code_, r.size() * 8, kVRegister), lanes_(1) {
+      : CPURegister(r.encoding(), r.size() * 8, kVRegister), lanes_(1) {
   }
   constexpr VRegister(js::jit::FloatRegister r, unsigned size)
-      : CPURegister(r.code_, size, kVRegister), lanes_(1) {
+      : CPURegister(r.encoding(), size, kVRegister), lanes_(1) {
   }
   VRegister(unsigned code, VectorFormat format)
       : CPURegister(code, RegisterSizeInBitsFromFormat(format), kVRegister),
@@ -695,22 +702,6 @@ class Operand {
   // where <extend> is one of {UXTB, UXTH, UXTW, UXTX, SXTB, SXTH, SXTW, SXTX}.
   //       <shift_amount> is uint2_t.
   explicit Operand(Register reg, Extend extend, unsigned shift_amount = 0);
-
-  // FIXME: Temporary constructors for compilation.
-  // FIXME: These should be removed -- Operand should not leak into shared code.
-  // FIXME: Something like an LAllocationUnion for {gpreg, fpreg, Address} is wanted.
-  explicit Operand(js::jit::Register) {
-    MOZ_CRASH("Operand with Register");
-  }
-  explicit Operand(js::jit::FloatRegister) {
-    MOZ_CRASH("Operand with FloatRegister");
-  }
-  explicit Operand(js::jit::Register, int32_t) {
-    MOZ_CRASH("Operand with implicit Address");
-  }
-  explicit Operand(js::jit::RegisterOrSP, int32_t) {
-    MOZ_CRASH("Operand with implicit Address");
-  }
 
   bool IsImmediate() const;
   bool IsShiftedRegister() const;
@@ -2039,6 +2030,9 @@ class Assembler : public MozBaseAssembler {
 
   // FP convert to signed integer, nearest with ties to even.
   void fcvtns(const VRegister& rd, const VRegister& vn);
+
+  // FP JavaScript convert to signed integer, rounding toward zero [Armv8.3].
+  void fjcvtzs(const Register& rd, const VRegister& vn);
 
   // FP convert to unsigned integer, nearest with ties to even.
   void fcvtnu(const VRegister& rd, const VRegister& vn);
@@ -3638,8 +3632,8 @@ class Assembler : public MozBaseAssembler {
 
   // PC-relative address encoding.
   static Instr ImmPCRelAddress(int imm21) {
-    VIXL_ASSERT(is_int21(imm21));
-    Instr imm = static_cast<Instr>(truncate_to_int21(imm21));
+    VIXL_ASSERT(IsInt21(imm21));
+    Instr imm = static_cast<Instr>(TruncateToUint21(imm21));
     Instr immhi = (imm >> ImmPCRelLo_width) << ImmPCRelHi_offset;
     Instr immlo = imm << ImmPCRelLo_offset;
     return (immhi & ImmPCRelHi_mask) | (immlo & ImmPCRelLo_mask);
@@ -3647,27 +3641,27 @@ class Assembler : public MozBaseAssembler {
 
   // Branch encoding.
   static Instr ImmUncondBranch(int imm26) {
-    VIXL_ASSERT(is_int26(imm26));
-    return truncate_to_int26(imm26) << ImmUncondBranch_offset;
+    VIXL_ASSERT(IsInt26(imm26));
+    return TruncateToUint26(imm26) << ImmUncondBranch_offset;
   }
 
   static Instr ImmCondBranch(int imm19) {
-    VIXL_ASSERT(is_int19(imm19));
-    return truncate_to_int19(imm19) << ImmCondBranch_offset;
+    VIXL_ASSERT(IsInt19(imm19));
+    return TruncateToUint19(imm19) << ImmCondBranch_offset;
   }
 
   static Instr ImmCmpBranch(int imm19) {
-    VIXL_ASSERT(is_int19(imm19));
-    return truncate_to_int19(imm19) << ImmCmpBranch_offset;
+    VIXL_ASSERT(IsInt19(imm19));
+    return TruncateToUint19(imm19) << ImmCmpBranch_offset;
   }
 
   static Instr ImmTestBranch(int imm14) {
-    VIXL_ASSERT(is_int14(imm14));
-    return truncate_to_int14(imm14) << ImmTestBranch_offset;
+    VIXL_ASSERT(IsInt14(imm14));
+    return TruncateToUint14(imm14) << ImmTestBranch_offset;
   }
 
   static Instr ImmTestBranchBit(unsigned bit_pos) {
-    VIXL_ASSERT(is_uint6(bit_pos));
+    VIXL_ASSERT(IsUint6(bit_pos));
     // Subtract five from the shift offset, as we need bit 5 from bit_pos.
     unsigned b5 = bit_pos << (ImmTestBranchBit5_offset - 5);
     unsigned b40 = bit_pos << ImmTestBranchBit40_offset;
@@ -3683,7 +3677,7 @@ class Assembler : public MozBaseAssembler {
 
   static Instr ImmAddSub(int imm) {
     VIXL_ASSERT(IsImmAddSub(imm));
-    if (is_uint12(imm)) {  // No shift required.
+    if (IsUint12(imm)) {  // No shift required.
       imm <<= ImmAddSub_offset;
     } else {
       imm = ((imm >> 12) << ImmAddSub_offset) | (1 << ShiftAddSub_offset);
@@ -3692,39 +3686,39 @@ class Assembler : public MozBaseAssembler {
   }
 
   static Instr ImmS(unsigned imms, unsigned reg_size) {
-    VIXL_ASSERT(((reg_size == kXRegSize) && is_uint6(imms)) ||
-           ((reg_size == kWRegSize) && is_uint5(imms)));
+    VIXL_ASSERT(((reg_size == kXRegSize) && IsUint6(imms)) ||
+           ((reg_size == kWRegSize) && IsUint5(imms)));
     USE(reg_size);
     return imms << ImmS_offset;
   }
 
   static Instr ImmR(unsigned immr, unsigned reg_size) {
-    VIXL_ASSERT(((reg_size == kXRegSize) && is_uint6(immr)) ||
-           ((reg_size == kWRegSize) && is_uint5(immr)));
+    VIXL_ASSERT(((reg_size == kXRegSize) && IsUint6(immr)) ||
+           ((reg_size == kWRegSize) && IsUint5(immr)));
     USE(reg_size);
-    VIXL_ASSERT(is_uint6(immr));
+    VIXL_ASSERT(IsUint6(immr));
     return immr << ImmR_offset;
   }
 
   static Instr ImmSetBits(unsigned imms, unsigned reg_size) {
     VIXL_ASSERT((reg_size == kWRegSize) || (reg_size == kXRegSize));
-    VIXL_ASSERT(is_uint6(imms));
-    VIXL_ASSERT((reg_size == kXRegSize) || is_uint6(imms + 3));
+    VIXL_ASSERT(IsUint6(imms));
+    VIXL_ASSERT((reg_size == kXRegSize) || IsUint6(imms + 3));
     USE(reg_size);
     return imms << ImmSetBits_offset;
   }
 
   static Instr ImmRotate(unsigned immr, unsigned reg_size) {
     VIXL_ASSERT((reg_size == kWRegSize) || (reg_size == kXRegSize));
-    VIXL_ASSERT(((reg_size == kXRegSize) && is_uint6(immr)) ||
-           ((reg_size == kWRegSize) && is_uint5(immr)));
+    VIXL_ASSERT(((reg_size == kXRegSize) && IsUint6(immr)) ||
+           ((reg_size == kWRegSize) && IsUint5(immr)));
     USE(reg_size);
     return immr << ImmRotate_offset;
   }
 
   static Instr ImmLLiteral(int imm19) {
-    VIXL_ASSERT(is_int19(imm19));
-    return truncate_to_int19(imm19) << ImmLLiteral_offset;
+    VIXL_ASSERT(IsInt19(imm19));
+    return TruncateToUint19(imm19) << ImmLLiteral_offset;
   }
 
   static Instr BitN(unsigned bitn, unsigned reg_size) {
@@ -3740,7 +3734,7 @@ class Assembler : public MozBaseAssembler {
   }
 
   static Instr ImmDPShift(unsigned amount) {
-    VIXL_ASSERT(is_uint6(amount));
+    VIXL_ASSERT(IsUint6(amount));
     return amount << ImmDPShift_offset;
   }
 
@@ -3754,7 +3748,7 @@ class Assembler : public MozBaseAssembler {
   }
 
   static Instr ImmCondCmp(unsigned imm) {
-    VIXL_ASSERT(is_uint5(imm));
+    VIXL_ASSERT(IsUint5(imm));
     return imm << ImmCondCmp_offset;
   }
 
@@ -3764,90 +3758,90 @@ class Assembler : public MozBaseAssembler {
 
   // MemOperand offset encoding.
   static Instr ImmLSUnsigned(int imm12) {
-    VIXL_ASSERT(is_uint12(imm12));
+    VIXL_ASSERT(IsUint12(imm12));
     return imm12 << ImmLSUnsigned_offset;
   }
 
   static Instr ImmLS(int imm9) {
-    VIXL_ASSERT(is_int9(imm9));
-    return truncate_to_int9(imm9) << ImmLS_offset;
+    VIXL_ASSERT(IsInt9(imm9));
+    return TruncateToUint9(imm9) << ImmLS_offset;
   }
 
   static Instr ImmLSPair(int imm7, unsigned access_size) {
     VIXL_ASSERT(((imm7 >> access_size) << access_size) == imm7);
     int scaled_imm7 = imm7 >> access_size;
-    VIXL_ASSERT(is_int7(scaled_imm7));
-    return truncate_to_int7(scaled_imm7) << ImmLSPair_offset;
+    VIXL_ASSERT(IsInt7(scaled_imm7));
+    return TruncateToUint7(scaled_imm7) << ImmLSPair_offset;
   }
 
   static Instr ImmShiftLS(unsigned shift_amount) {
-    VIXL_ASSERT(is_uint1(shift_amount));
+    VIXL_ASSERT(IsUint1(shift_amount));
     return shift_amount << ImmShiftLS_offset;
   }
 
   static Instr ImmPrefetchOperation(int imm5) {
-    VIXL_ASSERT(is_uint5(imm5));
+    VIXL_ASSERT(IsUint5(imm5));
     return imm5 << ImmPrefetchOperation_offset;
   }
 
   static Instr ImmException(int imm16) {
-    VIXL_ASSERT(is_uint16(imm16));
+    VIXL_ASSERT(IsUint16(imm16));
     return imm16 << ImmException_offset;
   }
 
   static Instr ImmSystemRegister(int imm15) {
-    VIXL_ASSERT(is_uint15(imm15));
+    VIXL_ASSERT(IsUint15(imm15));
     return imm15 << ImmSystemRegister_offset;
   }
 
   static Instr ImmHint(int imm7) {
-    VIXL_ASSERT(is_uint7(imm7));
+    VIXL_ASSERT(IsUint7(imm7));
     return imm7 << ImmHint_offset;
   }
 
   static Instr CRm(int imm4) {
-    VIXL_ASSERT(is_uint4(imm4));
+    VIXL_ASSERT(IsUint4(imm4));
     return imm4 << CRm_offset;
   }
 
   static Instr CRn(int imm4) {
-    VIXL_ASSERT(is_uint4(imm4));
+    VIXL_ASSERT(IsUint4(imm4));
     return imm4 << CRn_offset;
   }
 
   static Instr SysOp(int imm14) {
-    VIXL_ASSERT(is_uint14(imm14));
+    VIXL_ASSERT(IsUint14(imm14));
     return imm14 << SysOp_offset;
   }
 
   static Instr ImmSysOp1(int imm3) {
-    VIXL_ASSERT(is_uint3(imm3));
+    VIXL_ASSERT(IsUint3(imm3));
     return imm3 << SysOp1_offset;
   }
 
   static Instr ImmSysOp2(int imm3) {
-    VIXL_ASSERT(is_uint3(imm3));
+    VIXL_ASSERT(IsUint3(imm3));
     return imm3 << SysOp2_offset;
   }
 
   static Instr ImmBarrierDomain(int imm2) {
-    VIXL_ASSERT(is_uint2(imm2));
+    VIXL_ASSERT(IsUint2(imm2));
     return imm2 << ImmBarrierDomain_offset;
   }
 
   static Instr ImmBarrierType(int imm2) {
-    VIXL_ASSERT(is_uint2(imm2));
+    VIXL_ASSERT(IsUint2(imm2));
     return imm2 << ImmBarrierType_offset;
   }
 
   // Move immediates encoding.
   static Instr ImmMoveWide(uint64_t imm) {
-    VIXL_ASSERT(is_uint16(imm));
+    VIXL_ASSERT(IsUint16(imm));
     return static_cast<Instr>(imm << ImmMoveWide_offset);
   }
 
   static Instr ShiftMoveWide(int64_t shift) {
-    VIXL_ASSERT(is_uint2(shift));
+    VIXL_ASSERT(IsUint2(shift));
     return static_cast<Instr>(shift << ShiftMoveWide_offset);
   }
 
@@ -3861,7 +3855,7 @@ class Assembler : public MozBaseAssembler {
   }
 
   static Instr FPScale(unsigned scale) {
-    VIXL_ASSERT(is_uint6(scale));
+    VIXL_ASSERT(IsUint6(scale));
     return scale << FPScale_offset;
   }
 
@@ -3959,17 +3953,17 @@ class Assembler : public MozBaseAssembler {
   static Instr ImmNEONHLM(int index, int num_bits) {
     int h, l, m;
     if (num_bits == 3) {
-      VIXL_ASSERT(is_uint3(index));
+      VIXL_ASSERT(IsUint3(index));
       h  = (index >> 2) & 1;
       l  = (index >> 1) & 1;
       m  = (index >> 0) & 1;
     } else if (num_bits == 2) {
-      VIXL_ASSERT(is_uint2(index));
+      VIXL_ASSERT(IsUint2(index));
       h  = (index >> 1) & 1;
       l  = (index >> 0) & 1;
       m  = 0;
     } else {
-      VIXL_ASSERT(is_uint1(index) && (num_bits == 1));
+      VIXL_ASSERT(IsUint1(index) && (num_bits == 1));
       h  = (index >> 0) & 1;
       l  = 0;
       m  = 0;
@@ -3978,26 +3972,26 @@ class Assembler : public MozBaseAssembler {
   }
 
   static Instr ImmNEONExt(int imm4) {
-    VIXL_ASSERT(is_uint4(imm4));
+    VIXL_ASSERT(IsUint4(imm4));
     return imm4 << ImmNEONExt_offset;
   }
 
   static Instr ImmNEON5(Instr format, int index) {
-    VIXL_ASSERT(is_uint4(index));
+    VIXL_ASSERT(IsUint4(index));
     int s = LaneSizeInBytesLog2FromFormat(static_cast<VectorFormat>(format));
     int imm5 = (index << (s + 1)) | (1 << s);
     return imm5 << ImmNEON5_offset;
   }
 
   static Instr ImmNEON4(Instr format, int index) {
-    VIXL_ASSERT(is_uint4(index));
+    VIXL_ASSERT(IsUint4(index));
     int s = LaneSizeInBytesLog2FromFormat(static_cast<VectorFormat>(format));
     int imm4 = index << s;
     return imm4 << ImmNEON4_offset;
   }
 
   static Instr ImmNEONabcdefgh(int imm8) {
-    VIXL_ASSERT(is_uint8(imm8));
+    VIXL_ASSERT(IsUint8(imm8));
     Instr instr;
     instr  = ((imm8 >> 5) & 7) << ImmNEONabc_offset;
     instr |= (imm8 & 0x1f) << ImmNEONdefgh_offset;
@@ -4005,12 +3999,12 @@ class Assembler : public MozBaseAssembler {
   }
 
   static Instr NEONCmode(int cmode) {
-    VIXL_ASSERT(is_uint4(cmode));
+    VIXL_ASSERT(IsUint4(cmode));
     return cmode << NEONCmode_offset;
   }
 
   static Instr NEONModImmOp(int op) {
-    VIXL_ASSERT(is_uint1(op));
+    VIXL_ASSERT(IsUint1(op));
     return op << NEONModImmOp_offset;
   }
 
@@ -4024,6 +4018,12 @@ class Assembler : public MozBaseAssembler {
 
   PositionIndependentCodeOption pic() const {
     return pic_;
+  }
+
+  CPUFeatures* GetCPUFeatures() { return &cpu_features_; }
+
+  void SetCPUFeatures(const CPUFeatures& cpu_features) {
+    cpu_features_ = cpu_features;
   }
 
   bool AllowPageOffsetDependentCode() const {
@@ -4067,11 +4067,9 @@ class Assembler : public MozBaseAssembler {
                 const MemOperand& addr,
                 LoadStoreScalingOption option = PreferScaledOffset);
 
-  // TODO(all): The third parameter should be passed by reference but gcc 4.8.2
-  // reports a bogus uninitialised warning then.
   BufferOffset Logical(const Register& rd,
                        const Register& rn,
-                       const Operand operand,
+                       const Operand& operand,
                        LogicalOp op);
   BufferOffset LogicalImmediate(const Register& rd,
                                 const Register& rn,
@@ -4130,6 +4128,25 @@ class Assembler : public MozBaseAssembler {
     const CPURegister& rt, const CPURegister& rt2);
   static LoadLiteralOp LoadLiteralOpFor(const CPURegister& rt);
 
+  // Convenience pass-through for CPU feature checks.
+  bool CPUHas(CPUFeatures::Feature feature0,
+              CPUFeatures::Feature feature1 = CPUFeatures::kNone,
+              CPUFeatures::Feature feature2 = CPUFeatures::kNone,
+              CPUFeatures::Feature feature3 = CPUFeatures::kNone) const {
+    return cpu_features_.Has(feature0, feature1, feature2, feature3);
+  }
+
+  // Determine whether the target CPU has the specified registers, based on the
+  // currently-enabled CPU features. Presence of a register does not imply
+  // support for arbitrary operations on it. For example, CPUs with FP have H
+  // registers, but most half-precision operations require the FPHalf feature.
+  //
+  // These are used to check CPU features in loads and stores that have the same
+  // entry point for both integer and FP registers.
+  bool CPUHas(const CPURegister& rt) const;
+  bool CPUHas(const CPURegister& rt, const CPURegister& rt2) const;
+
+  bool CPUHas(SystemRegister sysreg) const;
 
  private:
   static uint32_t FP32ToImm8(float imm);
@@ -4297,6 +4314,8 @@ class Assembler : public MozBaseAssembler {
  protected:
   // Buffer where the code is emitted.
   PositionIndependentCodeOption pic_;
+
+  CPUFeatures cpu_features_;
 
 #ifdef DEBUG
   bool finalized_;

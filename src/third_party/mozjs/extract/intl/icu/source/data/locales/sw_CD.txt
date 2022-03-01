@@ -1,0 +1,40 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sw_CD{
+    AuxExemplarCharacters{"[q x]"}
+    ExemplarCharacters{"[a b c d e f g h i j k l m n o p r s t u v w y z]"}
+    NumberElements{
+        latn{
+            symbols{
+                decimal{","}
+                group{"."}
+            }
+        }
+    }
+    calendar{
+        generic{
+            availableFormats{
+                MMMEd{"E d MMM"}
+                ms{"m:ss"}
+            }
+        }
+    }
+    fields{
+        dayperiod{
+            dn{"Muda wa siku"}
+        }
+        era{
+            dn{"Wakati"}
+        }
+        week{
+            dn{"Juma"}
+        }
+        weekday{
+            dn{"Siku ya juma"}
+        }
+        zone{
+            dn{"Majira ya saa"}
+        }
+    }
+}

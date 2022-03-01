@@ -1,0 +1,81 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Test Localization.prototype.formatValues API</title>
+  <script src="chrome://mochikit/content/tests/SimpleTest/SimpleTest.js"></script>
+  <link rel="stylesheet" type="text/css" href="chrome://mochikit/content/tests/SimpleTest/test.css">
+  <script type="application/javascript">
+  "use strict";
+  async function* generateBundles(resourceIds) {
+    const bundle = new FluentBundle("en-US",
+    {
+      useIsolating: false,
+    });
+    bundle.addResource(new FluentResource(`
+key1 = Value
+key2 = Value { $user }
+key3 = Value { $count }
+    `));
+    yield bundle;
+  }
+
+  (async () => {
+    SimpleTest.waitForExplicitFinish();
+
+    const loc = new Localization(
+      ['mock.ftl'],
+      false,
+      { generateBundles },
+    );
+
+    {
+      // Simple mix works.
+      let vals = await loc.formatValues([
+        {id: "key1"},
+        {id: "key2", args: { user: "Amy"}},
+        {id: "key3", args: { count: -32.12 }},
+      ]);
+      is(vals[0], "Value");
+      is(vals[1], "Value Amy");
+      is(vals[2], "Value -32.12");
+    }
+
+    {
+      // Missing arguments cause exception in automation.
+      try {
+        let vals = await loc.formatValues([
+          {id: "key1"},
+          {id: "key2"},
+          {id: "key3", args: { count: -32.12 }},
+        ]);
+        ok(false, "Missing argument didn't cause an exception.");
+      } catch (e) {
+        is(e,
+          "[fluent][resolver] errors in en-US/key2: Resolver error: Unknown variable: $user.",
+          "Missing key causes an exception.");
+      }
+    }
+
+    {
+      // Missing keys cause exception in automation.
+      try {
+        let vals = await loc.formatValues([
+          { id: "key1" },
+          { id: "key4", args: { count: -32.12 } },
+        ]);
+        ok(false, "Missing key didn't cause an exception.");
+      } catch (e) {
+        is(e,
+           "[fluent] Missing translations in en-US: key4.",
+           "Missing key causes an exception.");
+      }
+    }
+
+    SimpleTest.finish();
+  })();
+  </script>
+</head>
+<body>
+</body>
+</html>

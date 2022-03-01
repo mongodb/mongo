@@ -1,0 +1,142 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: InterIndic_Bengali.txt
+# Generated from CLDR
+#
+
+# InterIndic-Bengali
+#:: NFD (NFC) ;
+\uE001→\u0981;          # SIGN CANDRABINDU
+\uE002→ং;          # SIGN ANUSVARA
+\uE003→ঃ;          # SIGN VISARGA
+\uE004→অ;          # FALLBACK TO LETTER A
+\uE005→অ;          # LETTER A
+\uE006→আ;          # LETTER AA
+\uE007→ই;          # LETTER I
+\uE008→ঈ;          # LETTER II
+\uE009→উ;          # LETTER U
+\uE00A→ঊ;          # LETTER UU
+\uE00B→ঋ;          # LETTER VOCALIC R
+\uE00C→ঌ;          # LETTER VOCALIC L
+\uE00D→এ;          # FALLBACK
+\uE00E→এ;          # FALLBACK
+\uE00F→এ;          # LETTER E
+\uE010→ঐ;          # LETTER AI
+\uE011→ও;          # FALLBACK
+\uE012→ও;          # FALLBACK
+\uE013→ও;          # LETTER O
+\uE014→ঔ;          # LETTER AU
+\uE015→ক;          # LETTER KA
+\uE016→খ;          # LETTER KHA
+\uE017→গ;          # LETTER GA
+\uE018→ঘ;          # LETTER GHA
+\uE019→ঙ;          # LETTER NGA
+\uE01A→চ;          # LETTER CA
+\uE01B→ছ;          # LETTER CHA
+\uE01C→জ;          # LETTER JA
+\uE01D→ঝ;          # LETTER JHA
+\uE01E→ঞ;          # LETTER NYA
+\uE01F→ট;          # LETTER TTA
+\uE020→ঠ;          # LETTER TTHA
+\uE021→ড;          # LETTER DDA
+\uE022→ঢ;          # LETTER DDHA
+\uE023→ণ;          # LETTER NNA
+\uE024→ত;          # LETTER TA
+\uE025→থ;          # LETTER THA
+\uE026→দ;          # LETTER DA
+\uE027→ধ;          # LETTER DHA
+\uE028→ন;          # LETTER NA
+\uE029→ন\u09BC;    # REMAP (indicExceptions.txt): \u09A9→ন = LETTER NNNA→LETTER NA
+\uE02A→প;          # LETTER PA
+\uE02B→ফ;          # LETTER PHA
+\uE02C→ব;          # LETTER BA
+\uE02D→ভ;          # LETTER BHA
+\uE02E→ম;          # LETTER MA
+\uE02F→য;          # LETTER YA
+\uE030→র;          # LETTER RA
+\uE031→র\u09BC;    # FALLBACK to RA
+\uE032→ল;          # LETTER LA
+\uE033→ল;          # REMAP (indicExceptions.txt): \u09B3→ল = LETTER LLA→LETTER LA
+\uE034→ল;          # REMAP (indicExceptions.txt): \u09B4→ল = LETTER LLLA→LETTER LA
+\uE035→ব;          # REMAP (indicExceptions.txt): \u09B5→ব = LETTER VA→LETTER BA
+\uE036→শ;          # LETTER SHA
+\uE037→ষ;          # LETTER SSA
+\uE038→স;          # LETTER SA
+\uE039→হ;          # LETTER HA
+\uE03C→\u09BC;          # SIGN NUKTA
+\uE03D→ঽ;          # SIGN AVAGRAHA
+\uE03E→া;          # VOWEL SIGN AA
+\uE03F→ি;          # VOWEL SIGN I
+\uE040→ী;          # VOWEL SIGN II
+\uE041→\u09C1;          # VOWEL SIGN U
+\uE042→\u09C2;          # VOWEL SIGN UU
+\uE043→\u09C3;          # VOWEL SIGN VOCALIC R
+\uE044→\u09C4;          # VOWEL SIGN VOCALIC RR
+\uE045→ে;          # REMAP (indicExceptions.txt): \u09C5→ে = VOWEL SIGN CANDRA E→VOWEL SIGN E
+\uE046→ে;          # FALLBACK
+\uE047→ে;          # VOWEL SIGN E
+\uE048→ৈ;          # VOWEL SIGN AI
+\uE049→ো;    # REMAP (indicExceptions.txt): \u09C9→ো = VOWEL SIGN CANDRA O→VOWEL SIGN O
+\uE04A→ো;    # FALLBACK
+\uE04B→ো;    # VOWEL SIGN O
+\uE04C→ৌ;    # VOWEL SIGN AU
+\uE04D→\u09CD;          # SIGN VIRAMA
+\uE050→ওং;    #  InterIndic-Bengali: OM
+\uE051→;
+\uE052→;
+\uE053→;
+\uE054→;
+\uE055→;                # LENGTH MARK
+\uE056→ৈ;          # REMAP (indicExceptions.txt): \u09D6→ৈ = AI LENGTH MARK→VOWEL SIGN AI
+\uE057→ৗ;          # AU LENGTH MARK
+\uE058→ক\u09BC;    # FALLBACK
+\uE059→খ\u09BC;    # REMAP (indicExceptions.txt): \u09D9→খ = LETTER KHHA→LETTER KHA
+\uE05A→গ\u09BC;    # REMAP (indicExceptions.txt): \u09DA→গ = LETTER GHHA→LETTER GA
+\uE05B→জ\u09BC;    # REMAP (indicExceptions.txt): \u09DB→জ = LETTER ZA→LETTER JA
+\uE05C→ড\u09BC;    # FALLBACK
+\uE05D→ঢ\u09BC;    # LETTER RHA
+\uE05E→ফ\u09BC;    # REMAP (indicExceptions.txt): \u09DE→ফ = LETTER FA→LETTER PHA
+\uE05F→য\u09BC;    # LETTER YYA
+\uE060→ৠ;          # LETTER VOCALIC RR
+\uE061→ৡ;          # LETTER VOCALIC LL
+\uE062→\u09E2;          # VOWEL SIGN VOCALIC L
+\uE063→\u09E3;          # VOWEL SIGN VOCALIC LL
+\uE064→।;          # DANDA
+\uE065→॥;          # DOUBLE DANDA
+\uE066→০;          # DIGIT ZERO
+\uE067→১;          # DIGIT ONE
+\uE068→২;          # DIGIT TWO
+\uE069→৩;          # DIGIT THREE
+\uE06A→৪;          # DIGIT FOUR
+\uE06B→৫;          # DIGIT FIVE
+\uE06C→৬;          # DIGIT SIX
+\uE06D→৭;          # DIGIT SEVEN
+\uE06E→৮;          # DIGIT EIGHT
+\uE06F→৯;          # DIGIT NINE
+\uE070→;           # ABBREVIATION SIGN
+\uE071→ৰ;          # LETTER RA WITH MIDDLE DIAGONAL
+\uE072→ৱ;          # LETTER RA WITH LOWER DIAGONAL
+\uE073→৲;          # RUPEE MARK
+\uE074→৳;          # RUPEE SIGN
+\uE075→৴;          # CURRENCY NUMERATOR ONE
+\uE076→৵;          # CURRENCY NUMERATOR TWO
+\uE077→৶;          # CURRENCY NUMERATOR THREE
+\uE078→৷;          # CURRENCY NUMERATOR FOUR
+\uE079→৸;          # CURRENCY NUMERATOR ONE LESS THAN THE DENOMINATOR
+\uE07A→৹;          # CURRENCY DENOMINATOR SIXTEEN
+\uE07B→৺;          # ISSHAR
+\uE07C→;                # TIPPI
+\uE07D→;                # ADDAK
+\uE07E→;                # IRI
+\uE07F→;                # URA
+\uE080→;                # EK ONKAR
+\uE081→ব;    # FALLBACK FOR ORIYA LETTER WA
+\uE082→;                # Devanagari Glottal Stop
+\uE083→ৎ;          # Khanda-ta
+0 → ০;             # FALLBACK FOR TAMIL
+1 → ১;
+#    :: NFC (NFD) ;
+# eof
+

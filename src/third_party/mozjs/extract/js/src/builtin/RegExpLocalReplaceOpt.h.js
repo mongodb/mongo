@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 // Function template for the following functions:
 //   * RegExpLocalReplaceOpt
 //   * RegExpLocalReplaceOptFunc
@@ -91,7 +95,7 @@ function FUNC_NAME(rx, S, lengthS, replaceValue
     // Step 14.e-f.
     var position = result.index;
 
-    // Step 14.l.iii (reordered)
+    // Step 14.m.iii (reordered)
     // To set rx.lastIndex before RegExpGetFunctionalReplacement.
     var nextSourcePosition = position + matchLength;
 #else
@@ -109,16 +113,23 @@ function FUNC_NAME(rx, S, lengthS, replaceValue
        rx.lastIndex = nextSourcePosition;
 
     var replacement;
-    // Steps g-j.
+    // Steps g-l.
 #if defined(FUNCTIONAL)
     replacement = RegExpGetFunctionalReplacement(result, S, position, replaceValue);
 #elif defined(SUBSTITUTION)
-    replacement = RegExpGetSubstitution(result, S, position, replaceValue, firstDollarIndex);
+    // Step l.i
+    var namedCaptures = result.groups;
+    if (namedCaptures !== undefined) {
+        namedCaptures = ToObject(namedCaptures);
+    }
+    // Step l.ii
+    replacement = RegExpGetSubstitution(result, S, position, replaceValue, firstDollarIndex,
+                                        namedCaptures);
 #else
     replacement = replaceValue;
 #endif
 
-    // Step 14.l.ii.
+    // Step 14.m.ii.
     var accumulatedResult = Substring(S, 0, position) + replacement;
 
     // Step 15.

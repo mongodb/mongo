@@ -1,0 +1,45 @@
+License information for hyph_fi.dic:
+
+This file is based on the Finnish hyphenation patterns for OpenOffice.org,
+which in turn are based on patterns for TeX.
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+At the time this file was first modified, a complete, unmodified copy of
+the original work was available from:
+http://openoffice.org/bugzilla/attachment.cgi?id=42837
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+This work was donated into the Public Domain by its author:
+
+%
+% ----->  Finnish hyphenation patterns for MLPCTeX  <------
+%
+%  + January 1986: first release by Kauko Saarinen,
+%    Computing Centre, University of Jyvaskyla, Finland
+%
+%  + January 1988: completely rewritten by Kauko Saarinen.
+%    The new patterns make much less mistakes with foreign
+%    and compound words. The article "Automatic Hyphenation
+%    of Finnish" by Professor Fred Karlsson is also referred
+%
+%  + 8th March 1989 (vers. 2.2): some vowel triples added by
+%    Kauko Saarinen based on Fred Karlsson's ideas
+%
+%  + 9th January 1995: added \uccode and \lccode by Thomas Esser
+%
+%  + 24th May 2004: changelog reformatted for disambiguation and
+%    Thomas Esser's \[u/l]ccode changes complete rewritten to make
+%    certain Saarinen is the sole copyright owner of the file again,
+%    by Jarno Elonen (who donated all his modification works into
+%    the Public Domain.)
+%
+%  + 24th May 2004: rewrote donated into the Public Domain
+%    by Kauko Saarinen
+%
+% This file/works is donated completely into the Public Domain.
+% However, the author kindly asks that any modifications be
+% voluntarily reported by logging them above, if possible.
+%
+%

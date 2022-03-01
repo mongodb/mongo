@@ -1,0 +1,562 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- Copyright (C) 2016 and later: Unicode, Inc. and others. License & terms of use: http://www.unicode.org/copyright.html -->
+<!-- Copyright (c) 2005-2013 IBM Corporation and others. All rights reserved -->
+<!-- See individual test cases for their specific copyright. -->
+
+<charset-detection-tests>
+    <test-case id="IUC10-ar" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-6/ar windows-1256/ar">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    أوروبا, برمجيات الحاسوب + انترنيت :
+    تصبح عالميا مع يونيكود
+    IUC10
+    تسجّل الآن لحضور المؤتمر الدولي العاشر ليونيكود, الذي سيعقد في 10-12 آذار 1997 بمدينة ماينتس,
+    ألمانيا. وسيجمع المؤتمر بين خبراء من كافة قطاعات الصناعة على الشبكة العالمية انترنيت ويونيكود, حيث ستتم,
+    على الصعيدين الدولي والمحلي على حد سواء مناقشة سبل استخدام يونكود في النظم القائمة وفيما يخص التطبيقات
+    الحاسوبية, الخطوط, تصميم النصوص والحوسبة متعددة اللغات. 
+
+    Unicode
+    عندما يريد العالم أن يتكلّم, فهو يتحدّث بلغة يونيكود
+
+    </test-case>
+
+    <test-case id="IUC10-da-Q" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE windows-1252/da">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Europa, Software + Internet:
+    Bliv global med Unicode
+    IUC10
+    Indskriv dig nu til den tiende internationale Unicode-konference, der holdes den 10-12
+    marts 1997 i Mainz, Tyskland. Konferencen samler eksperter fra hele verden inden for det
+    globale Internet og Unicode, internationalisering og lokalisering, implementering af
+    Unicode i styresystemer og programmer, skrifttyper, tekst-layout og flersproget databehandling.
+
+    Unicode
+    Når verden vil tale, taler den “Unicode.”
+
+    </test-case>
+
+    <test-case id="IUC10-da" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-1/da">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Europa, Software + Internet:
+    Bliv global med Unicode
+    IUC10
+    Indskriv dig nu til den tiende internationale Unicode-konference, der holdes den 10-12
+    marts 1997 i Mainz, Tyskland. Konferencen samler eksperter fra hele verden inden for det
+    globale Internet og Unicode, internationalisering og lokalisering, implementering af
+    Unicode i styresystemer og programmer, skrifttyper, tekst-layout og flersproget databehandling.
+
+    Unicode
+    Når verden vil tale, taler den Unicode.
+
+    </test-case>
+
+    <test-case id="IUC10-de" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-1/de">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Europa, Software + das Internet:
+    International mit Unicode
+    IUC10
+    Melden Sie sich jetzt für die 10. Internationale Unicode Konferenz an, die in der Zeit vom 10.-12. März 1997 in
+    Mainz stattfinden wird. Die Konferenz ist ein Treffpunkt für Betriebsexperten aus den Bereichen globales
+    Internet und Unicode, Internationalisierung und Lokalisierung, die Implementierung von Unicode in
+    Betriebssystemen und Programmen, sowie für Schriftarten, Textlayout und mehrsprachige Computeranwendungen.
+
+    Unicode
+    Wenn die Welt miteinander spricht, spricht sie Unicode.
+
+    </test-case>
+
+    <!-- No UTF-8 in this test because there are no non-ASCII characters. -->
+    <test-case id="IUC10-en" encodings="UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-1/en">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Europe, Software + the Internet:
+    Going Global with Unicode
+    IUC10
+    Register now for the Tenth International Unicode Conference, to be held on March 10-12, 1997,
+    in Mainz, Germany. The Conference will bring together industry-wide experts on the global Internet and
+    Unicode, internationalization and localization, implementation of Unicode in operating systems and applications,
+    fonts, text layout, and multilingual computing.
+
+    Unicode
+    When the world wants to talk, it speaks Unicode.
+
+    </test-case>
+
+    <test-case id="IUC10-es" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-1/es">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Europa, Software + el Internet:
+    Mundializando con Unicode
+    IUC10
+    Inscríbase ahora para la Décima Conferencia Internacional Unicode, que tendrá lugar del 10 al 12 de marzo de
+    1997 en Maguncia, Alemania. La Conferencia reunirá expertos de los sectores de la mundialización del Internet y
+    Unicode, la internacionalización y localización, implementación de Unicode en sistemas operativos y aplicaciones,
+    tipos, composición de texto e informática multilingüe.
+
+    Unicode
+    Cuando el mundo quiere conversar, habla Unicode.
+
+    </test-case>
+
+    <test-case id="IUC10-fr" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-1/fr">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    L'Europe, le logiciel et l'Internet :
+    la mondialisation avec Unicode
+    IUC10
+    Inscrivez-vous dès maintenant à la dixième Conférence internationale sur Unicode, qui se tiendra du 10 au 12
+    mars 1997 à Mayence, en Allemagne. Cette conférence rassemblera des experts de tous les horizons industriels
+    sur les sujets suivants : l'Internet mondial et Unicode, l'internationalisation et l'adaptation locale,
+    l'implémentation d'Unicode dans les systèmes d'exploitation et les applications, les polices de caractères,
+    la disposition de texte, l'informatique plurilingue.
+
+    Unicode
+    Quand le monde veut communiquer, il parle en Unicode.
+
+    </test-case>
+
+    <test-case id="IUC10-he" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-8-I/he">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    אירופה, תוכנה והאינטרנט:
+    Unicode יוצא לשוק העולמי
+    IUC10
+    הירשמו כעת לכנס Unicode הבינלאומי העשירי, שייערך בין התאריכים 12-10 במרץ 1997, במיינץ שבגרמניה. בכנס
+    ישתתפו מומחים מכל ענפי התעשייה בנושא האינטרנט העולמי וה-Unicode, בהתאמה לשוק הבינלאומי והמקומי, ביישום
+    Unicode במערכות הפעלה וביישומים, בגופנים, בפריסת טקסט ובמחשוב רב-לשוני.
+
+    Unicode
+    כאשר העולם רוצה לדבר, הוא מדבר ב-Unicode
+
+    </test-case>
+
+    <test-case id="IUC10-he-Q" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE windows-1255/he">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    אירופה, תוכנה והאינטרנט:
+    Unicode יוצא לשוק העולמי
+    IUC10
+    הירשמו כעת לכנס Unicode הבינלאומי העשירי, שייערך בין התאריכים 12-10 במרץ 1997, במיינץ שבגרמניה. בכנס
+    ישתתפו מומחים מכל ענפי התעשייה בנושא האינטרנט העולמי וה-Unicode, בהתאמה לשוק הבינלאומי והמקומי, ביישום
+    Unicode במערכות הפעלה וביישומים, בגופנים, בפריסת טקסט ובמחשוב רב-לשוני.
+
+    Unicode
+    כאשר העולם רוצה לדבר, הוא מדבר -“Unicode.”
+
+    </test-case>
+
+    <test-case id="IUC10-hu" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-2/hu">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Európa, a Szoftver s az Internet -
+    Globálissá Változik a Unicode Által
+    IUC10
+    Iratkozzon már most a Tizedik Nemzetközi Unicode Konferenciára, amely Március 10-12 1997
+    lesz megtartva, Meinz-be, Németországba. Ebben a Konferencián az iparág szerte sok szakértő
+    fog részt venni: a globális Internet s Unicode nemzetközisítése s lokalizálása, a
+    Unicode beteljesítése a működő rendszerekben s alkalmazásokban, fontokba, szöveg
+    térbeosztásba s többnyelvű computerekben.
+
+    Unicode
+    Ha a világ beszélni akar, azt Unicode-ul mondja.
+
+    </test-case>
+
+    <test-case id="IUC10-hu-Q" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE windows-1250/hu">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Európa, a Szoftver s az Internet -
+    Globálissá Változik a Unicode Által
+    IUC10
+    Iratkozzon már most a Tizedik Nemzetközi Unicode Konferenciára, amely Március 10-12 1997
+    lesz megtartva, Meinz-be, Németországba. Ebben a Konferencián az iparág szerte sok szakértő
+    fog részt venni: a globális Internet s Unicode nemzetközisítése s lokalizálása, a
+    Unicode beteljesítése a működő rendszerekben s alkalmazásokban, fontokba, szöveg
+    térbeosztásba s többnyelvű computerekben.
+
+    Unicode
+    Ha a világ beszélni akar, azt “Unicode”-ul mondja.
+
+    </test-case>
+
+    <test-case id="IUC10-it" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-1/it">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Europa, software e Internet:
+    Globalizzazione con Unicode
+    IUC10
+    Iscrivetevi subito alla X Conferenza Internazionale su Unicode, che si terrà dal 10 al 12 marzo 1997 a
+    Mainz in Germania. Alla Conferenza parteciperanno esperti di tutti i settori per discutere di Internet globale e
+    Unicode, internazionalizzazione e localizzazione, implementazione di Unicode in sistemi operativi e applicazioni,
+    caratteri, composizione dei testi ed elaborazione multilingue.
+
+    Unicode
+    Quando il mondo vuole comunicare, parla Unicode.
+
+    </test-case>
+
+    <!-- No EUC-JP in this test because it detects as GB18030 -->
+    <test-case id="IUC10-jp" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE Shift_JIS/ja ISO-2022-JP">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    ヨーロッパ、ソフトウェア、そしてインターネット:
+    Unicode でグローバル化を狙って
+    IUC10
+    第 10 回の Unicode 会議は 1997 年 3 月 10-12日、ドイツのマインツで開かれます。参加希望の方は今すぐ登録してください。
+    この会議では、グローバルなインタネット、Unicode、ソフトウェアの国際化およびローカリゼーション、OS およびアプリケーションでの
+    Unicode のインプリメンテーション、フォント、テキスト表示、マルチ言語コンピューティングにおける業界の専門家が集まります。
+
+    Unicode
+    世界的に話すなら、Unicode です。
+
+    </test-case>
+
+    <test-case id="IUC10-ko" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE EUC-KR/ko ISO-2022-KR">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    유럽, 소프트웨어 그리고 인터넷:
+    유니코드와 함께 세계로
+    IUC10
+    제10회 유니코드 국제 회의가 1997년 3월 10일부터 12일까지 독일의 마인즈에서 열립니다. 지금 등록하십시오.
+    이 회의에서는 업계 전반의 전문가들이 함께 모여 다음과 같은 분야를 다룹니다. - 인터넷과 유니코드, 국제화와 지역화,
+    운영 체제와 응용 프로그램에서 유니코드의 구현, 글꼴, 문자 배열, 다국어 컴퓨팅.
+
+    Unicode
+    세계를 향한 대화, 유니코드로 하십시오
+
+    </test-case>
+
+    <!-- No UTF-8 in this test because there are no non-ASCII characters. -->
+    <test-case id="IUC10-nl" encodings="UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-1/nl">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Europa, Software + het Internet:
+    wereldwijd met Unicode
+    IUC10
+    Meld u nu aan voor de Tiende Internationale Unicode-conferentie, die van 10 tot 12 maart 1997 in
+    Mainz (Duitsland) wordt gehouden. De Conferentie is een ontmoetingsplaats voor experts uit de industrie op het
+    gebied van het wereldwijde Internet en Unicode, internationalisatie en localisatie, implementatie van Unicode in
+    besturingssystemen en applicaties, lettertypes, tekstopmaak en meertalig computergebruik.
+
+    Unicode
+    Als de wereld wil praten, spreekt hij Unicode.
+
+    </test-case>
+
+    <!-- No language for ISO-8859-1 in this test because no-NO is recogonized as Danish... -->
+    <test-case id="IUC10-no-NO" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-1/da">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Europa, Programvare og Internet:
+    Global fokus med Unicode
+    IUC10
+    Registrer deg som deltager på den tiende inernasjonale Unicode konferansen i Mainz, Tyskland, fra 10. til 12. mars,
+    1997. Konferansen vil samle eksperter på Internet, Unicode, internasjonalisering og integrasjon av Unicode i
+    operativsystemer og programmer, fonter, tekst layout og flerspråklig databehandling.
+
+    Unicode
+    Når verden vil snakke, snakker den Unicode
+
+    </test-case>
+
+    <test-case id="IUC10-no-NO-NY" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-1/no">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Europa, programvare og Internett:
+    Femn verda med Unicode
+    IUC10
+    Meld deg på den 10. internasjonale Unicode-konferansen. Han går føre seg i Mainz i Tyskland i dagane 10.--12. mars
+    1997, og samlar fagkunnige innan konferansetemaet frå heile databransjen. Tema: Det globale Internettet og
+    Unicode, internasjonalisering og nasjonal tilpassing, implementering av Unicode i operativsystem og brukarprogram,
+    skriftsnitt (fontar), tekstutlegg, og fleirspråkleg databehandling.
+
+    Unicode
+    Når verda ønskjer å snakke, talar ho Unicode
+
+    </test-case>
+
+    <test-case id="IUC10-pt-BR" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-1/pt">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Europa, Software e a Internet:
+    Globalização com o Unicode
+    IUC10
+    Inscreva-se agora para a Décima Conferência Internacional Sobre O Unicode, realizada entre os dias 10 e 12 de
+    março de 1997 em Mainz na Alemanha. A Conferência reunirá peritos de todas as áreas da indústria especializados
+    em assuntos relacionados com a Internet global e o Unicode, internacionalização e localização de software,
+    implementação do Unicode em sistemas operacionais e aplicativos, fontes, layout de texto e informática multilíngüe.
+
+    Unicode
+    Quando o mundo quer falar, fala Unicode.
+
+    </test-case>
+
+    <test-case id="IUC10-pt-PT" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-1/pt">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Europa, Software e a Internet:
+    Globalização com o Unicode
+    IUC10
+    Inscreva-se agora para a Décima Conferência Internacional Sobre O Unicode, a ser realizada entre os dias 10 e 12
+    de Março de 1997 em Mainz na Alemanha. A Conferência reunirá peritos de todas as áreas da indústria
+    especializados em assuntos relacionados com a Internet global e o Unicode, internacionalização e localização de
+    software, implementação do Unicode em sistemas operativos e aplicações, tipos de letra, esquematização de
+    texto e informática multilíngue.
+
+    Unicode
+    Quando o mundo quer falar, fala Unicode.
+
+    </test-case>
+
+    <test-case id="IUC10-ro" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-2/ro">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Europa, Software şi Internet:
+    Globalizarea cu Unicode
+    IUC10
+    Inscrieţi-vă acum la a Zecea Conferinţă Internaţională "Unicode" ce va avea loc in
+    perioada de 10-12 martie, 1997 în Mainz, Germania. Conferinţa va întruni experţi din
+    variate domenii: Internet global şi Unicode, internaţionalizare şi localizare,
+    implementarede Unicode în sisteme de operare şi aplicaţii, fonturi, aranjare de text în
+    pagină, computerizare multilinguală.
+
+    Unicode
+    Când lumea vrea să comunice, vorbeşte Unicode.
+
+    </test-case>
+
+    <test-case id="IUC10-ru" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-5/ru windows-1251/ru KOI8-R/ru">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Европа, Программное обеспечение + Интернет:
+    Unicode в глобальных масштабах
+    IUC10
+    Зарегистрируйтесь сейчас на Десятую Международную Конференцию по Unicode, которая состоится
+    10-12 марта 1997 года в Майнце в Германии. Конференция соберет широкий круг экспертов по и
+    вопросам глобального Интернета и Unicode, локализации и интернационализации, воплощению
+    применению Unicode в различных операционных системах и программных приложениях,
+    шрифтах, верстке и многоязычных компьютерных системах.
+
+    Unicode
+    Когда мир желает общаться, он общается на Unicode.
+
+    </test-case>
+
+    <test-case id="IUC10-sv" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-1/sv">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Europa, programvara och Internet:
+    globalisera med Unicode
+    IUC10
+    Anmäl Dig till den tionde internationella Unicode-konferensen, som hålls den 10-12 mars 1997 i Mainz,
+    Tyskland. Vid konferensen kommer experter inom följande områden att delta: det globala Internet och Unicode,
+    internationalisering och lokalisering, implementering av Unicode i operativsystem, tillämpningar, typsnitt,
+    textlayout och mångspråklig datoranvändning.
+
+    Unicode
+    När världen vill tala, så talar den Unicode.
+
+    </test-case>
+
+    <test-case id="IUC10-yi" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    אײראָפּע: פּראָגראַמװאַרג און די װעלטנעץ:
+    אוניקאָד איבער דער גאָרער װעלט
+    IUC10
+    פֿאַרשרײַבט זיך שױן אױף דער צענטער אינטערנאַציאָנאַלער אוניקאָד-קאָנפֿערענץ, װאָס װעט פֿאָרקומען דעם
+    10טן ביזן 12טן מאַרץ, 1997, אין מײַנץ, דײַטשלאַנד. די קאָנפֿערענץ װעט צוזאַמענברענגן מבֿינים פֿון װעלטנעץ,
+     אוניקאָד, אי אַלװעלטלעכן אי סבֿיבֿהדיקן פּראָגראַמװאַרג, אַרײַנשטעלן אוניקאָד אין אָפּעריר-סיסטעמען און
+    אָנװענדונגען, שריפֿטן, טעקסט-אױסשטעל, און מערשפּראַכיקע קאָמפּיוטערײַ.
+
+    Unicode
+    אַז די װעלט װיל רעדן, רעדט זי אוניקאָד
+
+    </test-case>
+
+    <test-case id="IUC10-zh-Hant" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE Big5/zh">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    歐洲，軟體及網際網路：
+    讓統一碼（Unicode）領你進入全世界
+    IUC10
+    你現在就應報名將在１９９７年３月１０至１２日於德國美姿城（Mainz）召開的第十屆國際統一碼研討會。
+    本次研討會將邀請多位業界專家研討關於全球網際網路及統一碼發展、國際化及本土化、
+    支援統一碼的作業系統及應用程式、字型、文字排版、電腦多國語文化等多項課題。
+
+    Unicode
+    當世界需要溝通時，請用統一碼（Unicode）
+
+    </test-case>
+
+    <!-- No ISO-2022-CN in this test because Java doesn't support it in both directions :-( -->
+    <test-case id="IUC10-zh-Hans" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-2022-CN GB18030/zh">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    欧洲，软件＋互联网
+    用统一码 (Unicode) 走遍世界
+    IUC10
+    将于1997年 3 月10日－12日在德国 Mainz 市举行的第十届统一码国际研讨会现在开始注册。
+    本次会议将汇集各方面的专家。涉及的领域包括：国际互联网和统一码，国际化和本地化，
+    统一码在操作系统和应用软件中的实现，字型，文本格式以及多文种计算等。
+
+    Unicode
+    当世界需要沟通时，请用Unicode！
+
+Conference Program
+    </test-case>
+
+    <test-case id="WIU-cz" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-2/cs">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Co je Unicode?
+
+    Unicode přiřazuje každému znaku jedinečné číslo,
+    nezávisle na platformě,
+    nezávisle na programu,
+    nezávisle na jazyce.
+
+    Počítače, ze své podstaty, pracují pouze s čísly. Písmena a další znaky ukládají tak, že každému z nich
+    přiřadí číslo. Před vznikem Unicode existovaly stovky rozdílných kódovacích systémů pro přiřazování těchto
+    čísel. Žádné z těchto kódování nemohlo obsahovat dostatek znaků: například Evropská unie sama potřebuje
+    několik různých kódování, aby pokryla všechny své jazyky. Dokonce i pro jeden jediný jazyk, jako je angličtina,
+    nevyhovovalo žádné kódování pro všechny písmena, interpunkci a běžně používané technické symboly.
+
+    Tyto kódovací systémy také byly v konfliktu jeden s druhým. To znamená, že dvě kódování mohou používat
+    stejné číslo pro dva různé znaky, nebo používat různá čísla pro stejný znak. Jakýkoli počítač (zvláště servery)
+    musí podporovat mnoho různých kódování; přesto, kdykoli jsou data předávána mezi různými kódováními nebo
+    platformami, hrozí, že tato data budou poškozena.
+
+    </test-case>
+
+    <test-case id="WIU-el" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-7/el">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Τι είναι το Unicode;
+
+    Η κωδικοσελίδα Unicode προτείνει έναν και μοναδικό αριθμό για κάθε χαρακτήρα,
+    ανεξάρτητα από το λειτουργικό σύστημα,
+    ανεξάρτητα από το λογισμικό,
+    ανεξάρτητα από την γλώσσα.
+
+    Οι ηλεκτρονικοί υπολογιστές, σε τελική ανάλυση, χειρίζονται απλώς αριθμούς. Αποθηκεύουν γράμματα και
+    άλλους χαρακτήρες αντιστοιχώντας στο καθένα τους από έναν αριθμό (ονομάζουμε μία τέτοια αντιστοιχία
+    κωδικοσελίδα). Πριν την εφεύρεση του Unicode, υπήρχαν εκατοντάδες διαφορετικές κωδικοσελίδες. Λόγω
+    περιορισμών μεγέθους όμως, σε καμία κωδικοσελίδα δεν χωρούσαν αρκετοί χαρακτήρες: λόγου χάριν,
+    η Ευρωπαϊκή Ένωση χρειαζόταν πλήθος διαφορετικών κωδικοσελίδων για να καλύψει όλες τις γλώσσες των
+    χωρών-μελών της. Ακόμα και για μία και μόνη γλώσσα, όπως π.χ. τα Αγγλικά, μία κωδικοσελίδα δεν
+    επαρκούσε για να καλύψει όλα τα γράμματα, σημεία στίξης και τεχνικά σύμβολα ευρείας χρήσης.
+
+    Εκτός αυτού, οι κωδικοσελίδες αυτές διαφωνούσαν μεταξύ τους. Έτσι, δύο κωδικοσελίδες μπορούσαν κάλλιστα να
+    χρησιμοποιούν τον ίδιο αριθμό για δύο διαφορετικούς χαρακτήρες, ή να χρησιμοποιούν διαφορετικούς αριθμούς για
+    τον ίδιο χαρακτήρα. Κάθε υπολογιστής (και ιδίως εάν ήταν διακομιστής) έπρεπε να υποστηρίζει πλήθος διαφορετικών
+    κωδικοσελίδων ταυτόχρονα κάθε φορά που δεδομένα μεταφέρονταν μεταξύ διαφορετικών κωδικοσελίδων ή
+    λειτουργικών συστημάτων, τα δεδομένα αυτά κινδύνευαν να αλλοιωθούν.
+
+    </test-case>
+
+    <test-case id="WIU-el-Q" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE windows-1253/el">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Τι είναι το “Unicode”;
+
+    Η κωδικοσελίδα Unicode προτείνει έναν και μοναδικό αριθμό για κάθε χαρακτήρα,
+    ανεξάρτητα από το λειτουργικό σύστημα,
+    ανεξάρτητα από το λογισμικό,
+    ανεξάρτητα από την γλώσσα.
+
+    Οι ηλεκτρονικοί υπολογιστές, σε τελική ανάλυση, χειρίζονται απλώς αριθμούς. Αποθηκεύουν γράμματα και
+    άλλους χαρακτήρες αντιστοιχώντας στο καθένα τους από έναν αριθμό (ονομάζουμε μία τέτοια αντιστοιχία
+    κωδικοσελίδα). Πριν την εφεύρεση του Unicode, υπήρχαν εκατοντάδες διαφορετικές κωδικοσελίδες. Λόγω
+    περιορισμών μεγέθους όμως, σε καμία κωδικοσελίδα δεν χωρούσαν αρκετοί χαρακτήρες: λόγου χάριν,
+    η Ευρωπαϊκή Ένωση χρειαζόταν πλήθος διαφορετικών κωδικοσελίδων για να καλύψει όλες τις γλώσσες των
+    χωρών-μελών της. Ακόμα και για μία και μόνη γλώσσα, όπως π.χ. τα Αγγλικά, μία κωδικοσελίδα δεν
+    επαρκούσε για να καλύψει όλα τα γράμματα, σημεία στίξης και τεχνικά σύμβολα ευρείας χρήσης.
+
+    Εκτός αυτού, οι κωδικοσελίδες αυτές διαφωνούσαν μεταξύ τους. Έτσι, δύο κωδικοσελίδες μπορούσαν κάλλιστα να
+    χρησιμοποιούν τον ίδιο αριθμό για δύο διαφορετικούς χαρακτήρες, ή να χρησιμοποιούν διαφορετικούς αριθμούς για
+    τον ίδιο χαρακτήρα. Κάθε υπολογιστής (και ιδίως εάν ήταν διακομιστής) έπρεπε να υποστηρίζει πλήθος διαφορετικών
+    κωδικοσελίδων ταυτόχρονα κάθε φορά που δεδομένα μεταφέρονταν μεταξύ διαφορετικών κωδικοσελίδων ή
+    λειτουργικών συστημάτων, τα δεδομένα αυτά κινδύνευαν να αλλοιωθούν.
+
+    </test-case>
+
+    <test-case id="WIU-pl" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-2/pl">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Czym jest Unikod ?
+
+    Unikod przypisuje unikalny numer każdemu znakowi, niezależny od używanej platformy, programu czy języka.
+
+    Zasadniczo, komputery rozumieją tylko liczby. Zapisują litery i inne znaki przypisując każdemu z nich liczbę.
+    Nim powstał Unikod, było wiele różnych systemów kodowania przypisujących te liczby. Brakowało jednego,
+    który mógłby pomieścić wystarczająco dużą liczbę znaków. Przykładowo, sama Unia Europejska potrzebowała
+    kilku różnych kodowań, by móc używać wszystkich używanych w niej języków. Nawet dla pojedynczego języka
+    takiego jak np. angielski brakowało jednego kodowania, które byłoby odpowiednie dla zaprezentowania
+    wszystkich liter, znaków przestankowych i popularnych symboli technicznych.
+
+    Innym problemem było, że kodowania te kolidowały ze sobą. Dwa, różne kodowania używały jednej liczby dla dwu
+    różnych znaków lub różnych liczb dla tego samego znaku. Wszystkie komputery (między innymi serwery) muszą
+    wspierać wszystkie te kodowania, gdyż dane przesyłane między różnymi systemami operacyjnymi zawsze
+    narażone są na uszkodzenie.
+
+    </test-case>
+
+    <test-case id="WIU-tr" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE ISO-8859-9/tr">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    Evrensel Kod Nedir?
+
+    Evrensel Kod her yazı karakteri için bir ve yalnız bir sayı şart koşar,
+    hangi altyapı,
+    hangi yazılım,
+    hangi dil olursa olsun.
+
+    İlke olarak, bilgisayarlar sadece sayılarla işlem yaparlar. Kelimelerin ve yazı karakterlerinin her biri için
+    birer sayı atarlar ve böyle saklarlar. Evrensel Kod keşfedilmeden önce, bu sayıları atamak için birçok şifreleme
+    yöntemi vardı. Ancak, tüm bu dilleri gösterebilecek, örneğin; Avrupa Topluluğu bünyesindeki tüm ülkelerin dillerini
+    kapsayacak bir tek şifreleme yöntemi yoktu. Bunun yanısıra, sadece İngilizcedeki harfleri, noktalama
+    işaretlerini ve teknik sembolleri kapsayan tek bir şifreleme yöntemi de bulunmamaktaydı.
+
+    Bu şifreleme yöntemleri kendi aralarında çelişmektedir. İki farklı şifreleme, aynı sayıyı iki farklı karaktere
+    vermiş olabilir ya da farklı sayılar aynı karekteri kodlayabilir. Bilgisayarlar, özellikle sunucular, birçok
+    şifrelemeyi desteklemek zorundadırlar; veriler, farklı şifreleme ve altyapılardan geçerken bozulma riski taşırlar.
+
+    </test-case>
+
+    <test-case id="WIU-tr-Q" encodings="UTF-8 UTF-16LE UTF-16BE UTF-32BE UTF-32LE windows-1254/tr">
+    <!-- Copyright © 1991-2005 Unicode, Inc. All rights reserved. -->
+
+    “Evrensel Kod” Nedir?
+
+    Evrensel Kod her yazı karakteri için bir ve yalnız bir sayı şart koşar,
+    hangi altyapı,
+    hangi yazılım,
+    hangi dil olursa olsun.
+
+    İlke olarak, bilgisayarlar sadece sayılarla işlem yaparlar. Kelimelerin ve yazı karakterlerinin her biri için
+    birer sayı atarlar ve böyle saklarlar. Evrensel Kod keşfedilmeden önce, bu sayıları atamak için birçok şifreleme
+    yöntemi vardı. Ancak, tüm bu dilleri gösterebilecek, örneğin; Avrupa Topluluğu bünyesindeki tüm ülkelerin dillerini
+    kapsayacak bir tek şifreleme yöntemi yoktu. Bunun yanısıra, sadece İngilizcedeki harfleri, noktalama
+    işaretlerini ve teknik sembolleri kapsayan tek bir şifreleme yöntemi de bulunmamaktaydı.
+
+    Bu şifreleme yöntemleri kendi aralarında çelişmektedir. İki farklı şifreleme, aynı sayıyı iki farklı karaktere
+    vermiş olabilir ya da farklı sayılar aynı karekteri kodlayabilir. Bilgisayarlar, özellikle sunucular, birçok
+    şifrelemeyi desteklemek zorundadırlar; veriler, farklı şifreleme ve altyapılardan geçerken bozulma riski taşırlar.
+
+    </test-case>
+
+
+    <test-case id="bug-10532-utf-16" encodings="UTF-8 UTF-16BE UTF-16LE UTF-32BE UTF-32LE">
+    foo 東京・銀座の歌舞伎座。４月に新調された４枚の緞帳のうち３枚は、京都の川島織物セルコンが織った朝日新聞デジタル会員（有料・無料）にご登録いただくと、様々な特典・サービスが受けられます。
+    </test-case>
+    
+    <test-case id="bug-10532-ASCII" encodings="UTF-8 UTF-16BE UTF-16LE UTF-32BE UTF-32LE">
+    <!--  Note that plain 7 bit ASCII is detected as UTF-8 -->
+    ,1,,,5
+    </test-case>
+</charset-detection-tests>

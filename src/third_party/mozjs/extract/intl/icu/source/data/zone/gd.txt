@@ -1,0 +1,1988 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+gd{
+    zoneStrings{
+        "Africa:Abidjan"{
+            ec{"Abidjan"}
+        }
+        "Africa:Accra"{
+            ec{"Accra"}
+        }
+        "Africa:Addis_Ababa"{
+            ec{"Addis Abäba"}
+        }
+        "Africa:Algiers"{
+            ec{"Algiers"}
+        }
+        "Africa:Asmera"{
+            ec{"Asmarà"}
+        }
+        "Africa:Bamako"{
+            ec{"Bamako"}
+        }
+        "Africa:Bangui"{
+            ec{"Bangui"}
+        }
+        "Africa:Banjul"{
+            ec{"Banjul"}
+        }
+        "Africa:Bissau"{
+            ec{"Bissau"}
+        }
+        "Africa:Blantyre"{
+            ec{"Blantyre"}
+        }
+        "Africa:Brazzaville"{
+            ec{"Brazzaville"}
+        }
+        "Africa:Bujumbura"{
+            ec{"Bujumbura"}
+        }
+        "Africa:Cairo"{
+            ec{"Cairo"}
+        }
+        "Africa:Casablanca"{
+            ec{"Casablanca"}
+        }
+        "Africa:Ceuta"{
+            ec{"Ceuta"}
+        }
+        "Africa:Conakry"{
+            ec{"Conakry"}
+        }
+        "Africa:Dakar"{
+            ec{"Dakar"}
+        }
+        "Africa:Dar_es_Salaam"{
+            ec{"Dàr as-Salàm"}
+        }
+        "Africa:Djibouti"{
+            ec{"Diobùtaidh"}
+        }
+        "Africa:Douala"{
+            ec{"Douala"}
+        }
+        "Africa:El_Aaiun"{
+            ec{"El Aaiún"}
+        }
+        "Africa:Freetown"{
+            ec{"Freetown"}
+        }
+        "Africa:Gaborone"{
+            ec{"Gaborone"}
+        }
+        "Africa:Harare"{
+            ec{"Harare"}
+        }
+        "Africa:Johannesburg"{
+            ec{"Hannsaborgh"}
+        }
+        "Africa:Juba"{
+            ec{"Juba"}
+        }
+        "Africa:Kampala"{
+            ec{"Kampala"}
+        }
+        "Africa:Khartoum"{
+            ec{"Khartoum"}
+        }
+        "Africa:Kigali"{
+            ec{"Kigali"}
+        }
+        "Africa:Kinshasa"{
+            ec{"Kinshasa"}
+        }
+        "Africa:Lagos"{
+            ec{"Lagos"}
+        }
+        "Africa:Libreville"{
+            ec{"Libreville"}
+        }
+        "Africa:Lome"{
+            ec{"Lomé"}
+        }
+        "Africa:Luanda"{
+            ec{"Luanda"}
+        }
+        "Africa:Lubumbashi"{
+            ec{"Lubumbashi"}
+        }
+        "Africa:Lusaka"{
+            ec{"Lusaka"}
+        }
+        "Africa:Malabo"{
+            ec{"Malabo"}
+        }
+        "Africa:Maputo"{
+            ec{"Maputo"}
+        }
+        "Africa:Maseru"{
+            ec{"Maseru"}
+        }
+        "Africa:Mbabane"{
+            ec{"Mbabane"}
+        }
+        "Africa:Mogadishu"{
+            ec{"Mogadishu"}
+        }
+        "Africa:Monrovia"{
+            ec{"Monrovia"}
+        }
+        "Africa:Nairobi"{
+            ec{"Nairobi"}
+        }
+        "Africa:Ndjamena"{
+            ec{"N’Djaména"}
+        }
+        "Africa:Niamey"{
+            ec{"Niamey"}
+        }
+        "Africa:Nouakchott"{
+            ec{"Nouakchott"}
+        }
+        "Africa:Ouagadougou"{
+            ec{"Ouagadougou"}
+        }
+        "Africa:Porto-Novo"{
+            ec{"Porto-Novo"}
+        }
+        "Africa:Sao_Tome"{
+            ec{"São Tomé"}
+        }
+        "Africa:Tripoli"{
+            ec{"Tripoli"}
+        }
+        "Africa:Tunis"{
+            ec{"Tunis"}
+        }
+        "Africa:Windhoek"{
+            ec{"Windhoek"}
+        }
+        "America:Adak"{
+            ec{"Adak"}
+        }
+        "America:Anchorage"{
+            ec{"Anchorage"}
+        }
+        "America:Anguilla"{
+            ec{"Anguillia"}
+        }
+        "America:Antigua"{
+            ec{"Aintìoga"}
+        }
+        "America:Araguaina"{
+            ec{"Araguaína"}
+        }
+        "America:Argentina:La_Rioja"{
+            ec{"La Rioja"}
+        }
+        "America:Argentina:Rio_Gallegos"{
+            ec{"Río Gallegos"}
+        }
+        "America:Argentina:Salta"{
+            ec{"Salta"}
+        }
+        "America:Argentina:San_Juan"{
+            ec{"San Juan"}
+        }
+        "America:Argentina:San_Luis"{
+            ec{"San Luis"}
+        }
+        "America:Argentina:Tucuman"{
+            ec{"Tucumán"}
+        }
+        "America:Argentina:Ushuaia"{
+            ec{"Ushuaia"}
+        }
+        "America:Aruba"{
+            ec{"Arùba"}
+        }
+        "America:Asuncion"{
+            ec{"Asunción"}
+        }
+        "America:Bahia"{
+            ec{"Bahia"}
+        }
+        "America:Bahia_Banderas"{
+            ec{"Bahía de Banderas"}
+        }
+        "America:Barbados"{
+            ec{"Barbados"}
+        }
+        "America:Belem"{
+            ec{"Belém"}
+        }
+        "America:Belize"{
+            ec{"A’ Bheilìs"}
+        }
+        "America:Blanc-Sablon"{
+            ec{"Blanc-Sablon"}
+        }
+        "America:Boa_Vista"{
+            ec{"Boa Vista"}
+        }
+        "America:Bogota"{
+            ec{"Bogotá"}
+        }
+        "America:Boise"{
+            ec{"Boise"}
+        }
+        "America:Buenos_Aires"{
+            ec{"Buenos Aires"}
+        }
+        "America:Cambridge_Bay"{
+            ec{"Cambridge Bay"}
+        }
+        "America:Campo_Grande"{
+            ec{"Campo Grande"}
+        }
+        "America:Cancun"{
+            ec{"Cancún"}
+        }
+        "America:Caracas"{
+            ec{"Caracas"}
+        }
+        "America:Catamarca"{
+            ec{"Catamarca"}
+        }
+        "America:Cayenne"{
+            ec{"Cayenne"}
+        }
+        "America:Cayman"{
+            ec{"Caimean"}
+        }
+        "America:Chicago"{
+            ec{"Chicago"}
+        }
+        "America:Chihuahua"{
+            ec{"Chihuahua"}
+        }
+        "America:Coral_Harbour"{
+            ec{"Atikokan"}
+        }
+        "America:Cordoba"{
+            ec{"Córdoba"}
+        }
+        "America:Costa_Rica"{
+            ec{"Costa Rìcea"}
+        }
+        "America:Creston"{
+            ec{"Creston"}
+        }
+        "America:Cuiaba"{
+            ec{"Cuiabá"}
+        }
+        "America:Curacao"{
+            ec{"Curaçao"}
+        }
+        "America:Danmarkshavn"{
+            ec{"Danmarkshavn"}
+        }
+        "America:Dawson"{
+            ec{"Dawson"}
+        }
+        "America:Dawson_Creek"{
+            ec{"Dawson Creek"}
+        }
+        "America:Denver"{
+            ec{"Denver"}
+        }
+        "America:Detroit"{
+            ec{"Detroit"}
+        }
+        "America:Dominica"{
+            ec{"Doiminicea"}
+        }
+        "America:Edmonton"{
+            ec{"Edmonton"}
+        }
+        "America:Eirunepe"{
+            ec{"Eirunepé"}
+        }
+        "America:El_Salvador"{
+            ec{"An Salbhador"}
+        }
+        "America:Fort_Nelson"{
+            ec{"Fort Nelson"}
+        }
+        "America:Fortaleza"{
+            ec{"Fortaleza"}
+        }
+        "America:Glace_Bay"{
+            ec{"Glasbaidh"}
+        }
+        "America:Godthab"{
+            ec{"Nuuk"}
+        }
+        "America:Goose_Bay"{
+            ec{"Goose Bay"}
+        }
+        "America:Grand_Turk"{
+            ec{"An Turc Mhòr"}
+        }
+        "America:Grenada"{
+            ec{"Greanàda"}
+        }
+        "America:Guadeloupe"{
+            ec{"Guadalup"}
+        }
+        "America:Guatemala"{
+            ec{"Guatamala"}
+        }
+        "America:Guayaquil"{
+            ec{"Guayaquil"}
+        }
+        "America:Guyana"{
+            ec{"Guidheàna"}
+        }
+        "America:Halifax"{
+            ec{"Halifax"}
+        }
+        "America:Havana"{
+            ec{"Havana"}
+        }
+        "America:Hermosillo"{
+            ec{"Hermosillo"}
+        }
+        "America:Indiana:Knox"{
+            ec{"Knox, Indiana"}
+        }
+        "America:Indiana:Marengo"{
+            ec{"Marengo, Indiana"}
+        }
+        "America:Indiana:Petersburg"{
+            ec{"Petersburg, Indiana"}
+        }
+        "America:Indiana:Tell_City"{
+            ec{"Tell City, Indiana"}
+        }
+        "America:Indiana:Vevay"{
+            ec{"Vevay, Indiana"}
+        }
+        "America:Indiana:Vincennes"{
+            ec{"Vincennes, Indiana"}
+        }
+        "America:Indiana:Winamac"{
+            ec{"Winamac, Indiana"}
+        }
+        "America:Indianapolis"{
+            ec{"Indianapolis"}
+        }
+        "America:Inuvik"{
+            ec{"Inuuvik"}
+        }
+        "America:Iqaluit"{
+            ec{"Iqaluit"}
+        }
+        "America:Jamaica"{
+            ec{"Diameuga"}
+        }
+        "America:Jujuy"{
+            ec{"Jujuy"}
+        }
+        "America:Juneau"{
+            ec{"Juneau"}
+        }
+        "America:Kentucky:Monticello"{
+            ec{"Monticello, Kentucky"}
+        }
+        "America:Kralendijk"{
+            ec{"Kralendijk"}
+        }
+        "America:La_Paz"{
+            ec{"La Paz"}
+        }
+        "America:Lima"{
+            ec{"Lima"}
+        }
+        "America:Los_Angeles"{
+            ec{"Los Angeles"}
+        }
+        "America:Louisville"{
+            ec{"Louisville"}
+        }
+        "America:Lower_Princes"{
+            ec{"Lower Prince’s Quarter"}
+        }
+        "America:Maceio"{
+            ec{"Maceió"}
+        }
+        "America:Managua"{
+            ec{"Managua"}
+        }
+        "America:Manaus"{
+            ec{"Manaus"}
+        }
+        "America:Marigot"{
+            ec{"Marigot"}
+        }
+        "America:Martinique"{
+            ec{"Mairtinic"}
+        }
+        "America:Matamoros"{
+            ec{"Matamoros"}
+        }
+        "America:Mazatlan"{
+            ec{"Mazatlán"}
+        }
+        "America:Mendoza"{
+            ec{"Mendoza"}
+        }
+        "America:Menominee"{
+            ec{"Menominee"}
+        }
+        "America:Merida"{
+            ec{"Mérida"}
+        }
+        "America:Metlakatla"{
+            ec{"Metlakatla"}
+        }
+        "America:Mexico_City"{
+            ec{"Cathair Mheagsago"}
+        }
+        "America:Miquelon"{
+            ec{"Miquelon"}
+        }
+        "America:Moncton"{
+            ec{"Moncton"}
+        }
+        "America:Monterrey"{
+            ec{"Monterrey"}
+        }
+        "America:Montevideo"{
+            ec{"Montevideo"}
+        }
+        "America:Montserrat"{
+            ec{"Montsarat"}
+        }
+        "America:Nassau"{
+            ec{"Nassau"}
+        }
+        "America:New_York"{
+            ec{"Nuadh Eabhrac"}
+        }
+        "America:Nipigon"{
+            ec{"Nipigon"}
+        }
+        "America:Nome"{
+            ec{"Nome"}
+        }
+        "America:Noronha"{
+            ec{"Noronha"}
+        }
+        "America:North_Dakota:Beulah"{
+            ec{"Beulah, North Dakota"}
+        }
+        "America:North_Dakota:Center"{
+            ec{"Center, North Dakota"}
+        }
+        "America:North_Dakota:New_Salem"{
+            ec{"New Salem, North Dakota"}
+        }
+        "America:Ojinaga"{
+            ec{"Ojinaga"}
+        }
+        "America:Panama"{
+            ec{"Panama"}
+        }
+        "America:Pangnirtung"{
+            ec{"Pangniqtuuq"}
+        }
+        "America:Paramaribo"{
+            ec{"Paramaribo"}
+        }
+        "America:Phoenix"{
+            ec{"Phoenix"}
+        }
+        "America:Port-au-Prince"{
+            ec{"Port-au-Prince"}
+        }
+        "America:Port_of_Spain"{
+            ec{"Port na Spàinne"}
+        }
+        "America:Porto_Velho"{
+            ec{"Porto Velho"}
+        }
+        "America:Puerto_Rico"{
+            ec{"Porto Rìceo"}
+        }
+        "America:Punta_Arenas"{
+            ec{"Punta Arenas"}
+        }
+        "America:Rainy_River"{
+            ec{"Rainy River"}
+        }
+        "America:Rankin_Inlet"{
+            ec{"Kangiqliniq"}
+        }
+        "America:Recife"{
+            ec{"Recife"}
+        }
+        "America:Regina"{
+            ec{"Regina"}
+        }
+        "America:Resolute"{
+            ec{"Qausuittuq"}
+        }
+        "America:Rio_Branco"{
+            ec{"Rio Branco"}
+        }
+        "America:Santa_Isabel"{
+            ec{"Santa Isabel"}
+        }
+        "America:Santarem"{
+            ec{"Santarém"}
+        }
+        "America:Santiago"{
+            ec{"Santiago"}
+        }
+        "America:Santo_Domingo"{
+            ec{"Santo Domingo"}
+        }
+        "America:Sao_Paulo"{
+            ec{"São Paulo"}
+        }
+        "America:Scoresbysund"{
+            ec{"Ittoqqortoormiit"}
+        }
+        "America:Sitka"{
+            ec{"Sitka"}
+        }
+        "America:St_Barthelemy"{
+            ec{"Saint Barthélemy"}
+        }
+        "America:St_Johns"{
+            ec{"St. John’s"}
+        }
+        "America:St_Kitts"{
+            ec{"Naomh Crìstean"}
+        }
+        "America:St_Lucia"{
+            ec{"Naomh Lùisea"}
+        }
+        "America:St_Thomas"{
+            ec{"St. Thomas"}
+        }
+        "America:St_Vincent"{
+            ec{"Naomh Bhionsant"}
+        }
+        "America:Swift_Current"{
+            ec{"Swift Current"}
+        }
+        "America:Tegucigalpa"{
+            ec{"Tegucigalpa"}
+        }
+        "America:Thule"{
+            ec{"Qaanaaq"}
+        }
+        "America:Thunder_Bay"{
+            ec{"Thunder Bay"}
+        }
+        "America:Tijuana"{
+            ec{"Tijuana"}
+        }
+        "America:Toronto"{
+            ec{"Toronto"}
+        }
+        "America:Tortola"{
+            ec{"Tortola"}
+        }
+        "America:Vancouver"{
+            ec{"Vancouver"}
+        }
+        "America:Whitehorse"{
+            ec{"Whitehorse"}
+        }
+        "America:Winnipeg"{
+            ec{"Winnipeg"}
+        }
+        "America:Yakutat"{
+            ec{"Yakutat"}
+        }
+        "America:Yellowknife"{
+            ec{"Yellowknife"}
+        }
+        "Antarctica:Casey"{
+            ec{"Casey"}
+        }
+        "Antarctica:Davis"{
+            ec{"Davis"}
+        }
+        "Antarctica:DumontDUrville"{
+            ec{"Dumont d’Urville"}
+        }
+        "Antarctica:Macquarie"{
+            ec{"Eilean MhicGuaire"}
+        }
+        "Antarctica:Mawson"{
+            ec{"Mawson"}
+        }
+        "Antarctica:McMurdo"{
+            ec{"McMurdo"}
+        }
+        "Antarctica:Palmer"{
+            ec{"Palmer"}
+        }
+        "Antarctica:Rothera"{
+            ec{"Rothera"}
+        }
+        "Antarctica:Syowa"{
+            ec{"Syowa"}
+        }
+        "Antarctica:Troll"{
+            ec{"Troll"}
+        }
+        "Antarctica:Vostok"{
+            ec{"Vostok"}
+        }
+        "Arctic:Longyearbyen"{
+            ec{"Longyearbyen"}
+        }
+        "Asia:Aden"{
+            ec{"Aden"}
+        }
+        "Asia:Almaty"{
+            ec{"Almaty"}
+        }
+        "Asia:Amman"{
+            ec{"Ammān"}
+        }
+        "Asia:Anadyr"{
+            ec{"Anadyr"}
+        }
+        "Asia:Aqtau"{
+            ec{"Aqtau"}
+        }
+        "Asia:Aqtobe"{
+            ec{"Aqtöbe"}
+        }
+        "Asia:Ashgabat"{
+            ec{"Aşgabat"}
+        }
+        "Asia:Atyrau"{
+            ec{"Atyrau"}
+        }
+        "Asia:Baghdad"{
+            ec{"Baghdād"}
+        }
+        "Asia:Bahrain"{
+            ec{"Bachrain"}
+        }
+        "Asia:Baku"{
+            ec{"Baku"}
+        }
+        "Asia:Bangkok"{
+            ec{"Bangkok"}
+        }
+        "Asia:Barnaul"{
+            ec{"Barnaul"}
+        }
+        "Asia:Beirut"{
+            ec{"Beirut"}
+        }
+        "Asia:Bishkek"{
+            ec{"Biškek"}
+        }
+        "Asia:Brunei"{
+            ec{"Brùnaigh"}
+        }
+        "Asia:Calcutta"{
+            ec{"Kolkata"}
+        }
+        "Asia:Chita"{
+            ec{"Chita"}
+        }
+        "Asia:Choibalsan"{
+            ec{"Choibalsan"}
+        }
+        "Asia:Colombo"{
+            ec{"Colombo"}
+        }
+        "Asia:Damascus"{
+            ec{"Damascus"}
+        }
+        "Asia:Dhaka"{
+            ec{"Dhaka"}
+        }
+        "Asia:Dili"{
+            ec{"Dili"}
+        }
+        "Asia:Dubai"{
+            ec{"Dubai"}
+        }
+        "Asia:Dushanbe"{
+            ec{"Dušanbe"}
+        }
+        "Asia:Famagusta"{
+            ec{"Famagusta"}
+        }
+        "Asia:Gaza"{
+            ec{"Gàsa"}
+        }
+        "Asia:Hebron"{
+            ec{"Hebron"}
+        }
+        "Asia:Hong_Kong"{
+            ec{"Hong Kong"}
+        }
+        "Asia:Hovd"{
+            ec{"Khovd"}
+        }
+        "Asia:Irkutsk"{
+            ec{"Irkutsk"}
+        }
+        "Asia:Jakarta"{
+            ec{"Jakarta"}
+        }
+        "Asia:Jayapura"{
+            ec{"Jayapura"}
+        }
+        "Asia:Jerusalem"{
+            ec{"Ierusalam"}
+        }
+        "Asia:Kabul"{
+            ec{"Kabul"}
+        }
+        "Asia:Kamchatka"{
+            ec{"Kamchatka"}
+        }
+        "Asia:Karachi"{
+            ec{"Karācī"}
+        }
+        "Asia:Katmandu"{
+            ec{"Kathmandu"}
+        }
+        "Asia:Khandyga"{
+            ec{"Khandyga"}
+        }
+        "Asia:Krasnoyarsk"{
+            ec{"Krasnoyarsk"}
+        }
+        "Asia:Kuala_Lumpur"{
+            ec{"Kuala Lumpur"}
+        }
+        "Asia:Kuching"{
+            ec{"Kuching"}
+        }
+        "Asia:Kuwait"{
+            ec{"Cuibhèit"}
+        }
+        "Asia:Macau"{
+            ec{"Macàthu"}
+        }
+        "Asia:Magadan"{
+            ec{"Magadan"}
+        }
+        "Asia:Makassar"{
+            ec{"Makassar"}
+        }
+        "Asia:Manila"{
+            ec{"Manila"}
+        }
+        "Asia:Muscat"{
+            ec{"Muscat"}
+        }
+        "Asia:Nicosia"{
+            ec{"Nicosia"}
+        }
+        "Asia:Novokuznetsk"{
+            ec{"Novokuznetsk"}
+        }
+        "Asia:Novosibirsk"{
+            ec{"Novosibirsk"}
+        }
+        "Asia:Omsk"{
+            ec{"Omsk"}
+        }
+        "Asia:Oral"{
+            ec{"Oral"}
+        }
+        "Asia:Phnom_Penh"{
+            ec{"Phnom Penh"}
+        }
+        "Asia:Pontianak"{
+            ec{"Pontianak"}
+        }
+        "Asia:Pyongyang"{
+            ec{"Pyeongyang"}
+        }
+        "Asia:Qatar"{
+            ec{"Catar"}
+        }
+        "Asia:Qostanay"{
+            ec{"Qostanaı"}
+        }
+        "Asia:Qyzylorda"{
+            ec{"Qızılorda"}
+        }
+        "Asia:Rangoon"{
+            ec{"Rangun"}
+        }
+        "Asia:Riyadh"{
+            ec{"Riyadh"}
+        }
+        "Asia:Saigon"{
+            ec{"Cathair Ho Chi Minh"}
+        }
+        "Asia:Sakhalin"{
+            ec{"Sakhalin"}
+        }
+        "Asia:Samarkand"{
+            ec{"Samarkand"}
+        }
+        "Asia:Seoul"{
+            ec{"Seoul"}
+        }
+        "Asia:Shanghai"{
+            ec{"Shanghai"}
+        }
+        "Asia:Singapore"{
+            ec{"Singeapòr"}
+        }
+        "Asia:Srednekolymsk"{
+            ec{"Srednekolymsk"}
+        }
+        "Asia:Taipei"{
+            ec{"Taipei"}
+        }
+        "Asia:Tashkent"{
+            ec{"Toškent"}
+        }
+        "Asia:Tbilisi"{
+            ec{"T’bilisi"}
+        }
+        "Asia:Tehran"{
+            ec{"Tehrān"}
+        }
+        "Asia:Thimphu"{
+            ec{"Thimphu"}
+        }
+        "Asia:Tokyo"{
+            ec{"Tōkyō"}
+        }
+        "Asia:Tomsk"{
+            ec{"Tomsk"}
+        }
+        "Asia:Ulaanbaatar"{
+            ec{"Ulaanbaatar"}
+        }
+        "Asia:Urumqi"{
+            ec{"Ürümqi"}
+        }
+        "Asia:Ust-Nera"{
+            ec{"Ust-Nera"}
+        }
+        "Asia:Vientiane"{
+            ec{"Viang Chan"}
+        }
+        "Asia:Vladivostok"{
+            ec{"Vladivostok"}
+        }
+        "Asia:Yakutsk"{
+            ec{"Yakutsk"}
+        }
+        "Asia:Yekaterinburg"{
+            ec{"Yekaterinburg"}
+        }
+        "Asia:Yerevan"{
+            ec{"Yerevan"}
+        }
+        "Atlantic:Azores"{
+            ec{"Ponta Delgada"}
+        }
+        "Atlantic:Bermuda"{
+            ec{"Bearmùda"}
+        }
+        "Atlantic:Canary"{
+            ec{"Na h-Eileanan Canàrach"}
+        }
+        "Atlantic:Cape_Verde"{
+            ec{"An Ceap Uaine"}
+        }
+        "Atlantic:Faeroe"{
+            ec{"Fàro"}
+        }
+        "Atlantic:Madeira"{
+            ec{"Madeira"}
+        }
+        "Atlantic:Reykjavik"{
+            ec{"Reykjavík"}
+        }
+        "Atlantic:South_Georgia"{
+            ec{"Seòrsea a Deas"}
+        }
+        "Atlantic:St_Helena"{
+            ec{"Eilean Naomh Eilidh"}
+        }
+        "Atlantic:Stanley"{
+            ec{"Stanley"}
+        }
+        "Australia:Adelaide"{
+            ec{"Adelaide"}
+        }
+        "Australia:Brisbane"{
+            ec{"Brisbane"}
+        }
+        "Australia:Broken_Hill"{
+            ec{"Broken Hill"}
+        }
+        "Australia:Currie"{
+            ec{"Currie"}
+        }
+        "Australia:Darwin"{
+            ec{"Darwin"}
+        }
+        "Australia:Eucla"{
+            ec{"Eucla"}
+        }
+        "Australia:Hobart"{
+            ec{"Hobart"}
+        }
+        "Australia:Lindeman"{
+            ec{"Lindeman"}
+        }
+        "Australia:Lord_Howe"{
+            ec{"Lord Howe"}
+        }
+        "Australia:Melbourne"{
+            ec{"Melbourne"}
+        }
+        "Australia:Perth"{
+            ec{"Perth"}
+        }
+        "Australia:Sydney"{
+            ec{"Sidni"}
+        }
+        "Etc:UTC"{
+            ls{"Àm Uile-choitcheann Co-òrdanaichte"}
+            ss{"UTC"}
+        }
+        "Etc:Unknown"{
+            ec{"Baile neo-aithnichte"}
+        }
+        "Europe:Amsterdam"{
+            ec{"Amsterdam"}
+        }
+        "Europe:Andorra"{
+            ec{"Andorra"}
+        }
+        "Europe:Astrakhan"{
+            ec{"Astrakhan"}
+        }
+        "Europe:Athens"{
+            ec{"An Àithne"}
+        }
+        "Europe:Belgrade"{
+            ec{"Belgrade"}
+        }
+        "Europe:Berlin"{
+            ec{"Berlin"}
+        }
+        "Europe:Bratislava"{
+            ec{"Bratislava"}
+        }
+        "Europe:Brussels"{
+            ec{"A’ Bhruiseal"}
+        }
+        "Europe:Bucharest"{
+            ec{"Bucharest"}
+        }
+        "Europe:Budapest"{
+            ec{"Budapest"}
+        }
+        "Europe:Busingen"{
+            ec{"Busingen"}
+        }
+        "Europe:Chisinau"{
+            ec{"Chișinău"}
+        }
+        "Europe:Copenhagen"{
+            ec{"Beirbh"}
+        }
+        "Europe:Dublin"{
+            ec{"Baile Àtha Cliath"}
+            ld{"Bun-àm na h-Èireann"}
+            sd{"TSÈ (Èirinn)"}
+        }
+        "Europe:Gibraltar"{
+            ec{"Diobraltar"}
+        }
+        "Europe:Guernsey"{
+            ec{"Geàrnsaidh"}
+        }
+        "Europe:Helsinki"{
+            ec{"Helsinki"}
+        }
+        "Europe:Isle_of_Man"{
+            ec{"Eilean Mhanainn"}
+        }
+        "Europe:Istanbul"{
+            ec{"Istanbul"}
+        }
+        "Europe:Jersey"{
+            ec{"Deàrsaidh"}
+        }
+        "Europe:Kaliningrad"{
+            ec{"Kaliningrad"}
+        }
+        "Europe:Kiev"{
+            ec{"Kiev"}
+        }
+        "Europe:Kirov"{
+            ec{"Kirov"}
+        }
+        "Europe:Lisbon"{
+            ec{"Lisbon"}
+        }
+        "Europe:Ljubljana"{
+            ec{"Ljubljana"}
+        }
+        "Europe:London"{
+            ec{"Dùn Èideann/Lunnainn"}
+            ld{"Tìde samhraidh Bhreatainn"}
+            sd{"TSB"}
+        }
+        "Europe:Luxembourg"{
+            ec{"Lugsamburg"}
+        }
+        "Europe:Madrid"{
+            ec{"Madrid"}
+        }
+        "Europe:Malta"{
+            ec{"Malta"}
+        }
+        "Europe:Mariehamn"{
+            ec{"Mariehamn"}
+        }
+        "Europe:Minsk"{
+            ec{"Minsk"}
+        }
+        "Europe:Monaco"{
+            ec{"Monaco"}
+        }
+        "Europe:Moscow"{
+            ec{"Mosgo"}
+        }
+        "Europe:Oslo"{
+            ec{"Oslo"}
+        }
+        "Europe:Paris"{
+            ec{"Paras"}
+        }
+        "Europe:Podgorica"{
+            ec{"Podgorica"}
+        }
+        "Europe:Prague"{
+            ec{"Pràg"}
+        }
+        "Europe:Riga"{
+            ec{"Rīga"}
+        }
+        "Europe:Rome"{
+            ec{"An Ròimh"}
+        }
+        "Europe:Samara"{
+            ec{"Samara"}
+        }
+        "Europe:San_Marino"{
+            ec{"San Marino"}
+        }
+        "Europe:Sarajevo"{
+            ec{"Sarajevo"}
+        }
+        "Europe:Saratov"{
+            ec{"Saratov"}
+        }
+        "Europe:Simferopol"{
+            ec{"Simferopol"}
+        }
+        "Europe:Skopje"{
+            ec{"Skopje"}
+        }
+        "Europe:Sofia"{
+            ec{"Sofiya"}
+        }
+        "Europe:Stockholm"{
+            ec{"Stockholm"}
+        }
+        "Europe:Tallinn"{
+            ec{"Tallinn"}
+        }
+        "Europe:Tirane"{
+            ec{"Tiranë"}
+        }
+        "Europe:Ulyanovsk"{
+            ec{"Ulyanovsk"}
+        }
+        "Europe:Uzhgorod"{
+            ec{"Uzhgorod"}
+        }
+        "Europe:Vaduz"{
+            ec{"Vaduz"}
+        }
+        "Europe:Vatican"{
+            ec{"A’ Bhatacan"}
+        }
+        "Europe:Vienna"{
+            ec{"Vienna"}
+        }
+        "Europe:Vilnius"{
+            ec{"Vilnius"}
+        }
+        "Europe:Volgograd"{
+            ec{"Volgograd"}
+        }
+        "Europe:Warsaw"{
+            ec{"Warsaw"}
+        }
+        "Europe:Zagreb"{
+            ec{"Zagreb"}
+        }
+        "Europe:Zaporozhye"{
+            ec{"Zaporozhye"}
+        }
+        "Europe:Zurich"{
+            ec{"Zürich"}
+        }
+        "Indian:Antananarivo"{
+            ec{"Antananarivo"}
+        }
+        "Indian:Chagos"{
+            ec{"Chagos"}
+        }
+        "Indian:Christmas"{
+            ec{"Nollaig"}
+        }
+        "Indian:Cocos"{
+            ec{"Cocos"}
+        }
+        "Indian:Comoro"{
+            ec{"Comoro"}
+        }
+        "Indian:Kerguelen"{
+            ec{"Kergelenn"}
+        }
+        "Indian:Mahe"{
+            ec{"Mahé"}
+        }
+        "Indian:Maldives"{
+            ec{"Na h-Eileanan Mhaladaibh"}
+        }
+        "Indian:Mauritius"{
+            ec{"Na h-Eileanan Mhoiriseas"}
+        }
+        "Indian:Mayotte"{
+            ec{"Mayotte"}
+        }
+        "Indian:Reunion"{
+            ec{"Réunion"}
+        }
+        "Pacific:Apia"{
+            ec{"Apia"}
+        }
+        "Pacific:Auckland"{
+            ec{"Auckland"}
+        }
+        "Pacific:Bougainville"{
+            ec{"Bougainville"}
+        }
+        "Pacific:Chatham"{
+            ec{"Chatham"}
+        }
+        "Pacific:Easter"{
+            ec{"Rapa Nui"}
+        }
+        "Pacific:Efate"{
+            ec{"Efate"}
+        }
+        "Pacific:Enderbury"{
+            ec{"Enderbury"}
+        }
+        "Pacific:Fakaofo"{
+            ec{"Fakaofo"}
+        }
+        "Pacific:Fiji"{
+            ec{"Fìdi"}
+        }
+        "Pacific:Funafuti"{
+            ec{"Funafuti"}
+        }
+        "Pacific:Galapagos"{
+            ec{"Galápagos"}
+        }
+        "Pacific:Gambier"{
+            ec{"Mangareva"}
+        }
+        "Pacific:Guadalcanal"{
+            ec{"Guadalcanal"}
+        }
+        "Pacific:Guam"{
+            ec{"Guam"}
+        }
+        "Pacific:Honolulu"{
+            ec{"Honolulu"}
+            sd{"HDT"}
+            sg{"HST"}
+            ss{"HST"}
+        }
+        "Pacific:Johnston"{
+            ec{"Johnston"}
+        }
+        "Pacific:Kiritimati"{
+            ec{"Kiritimati"}
+        }
+        "Pacific:Kosrae"{
+            ec{"Kosrae"}
+        }
+        "Pacific:Kwajalein"{
+            ec{"Kwajalein"}
+        }
+        "Pacific:Majuro"{
+            ec{"Majuro"}
+        }
+        "Pacific:Marquesas"{
+            ec{"Eileanan a’ Mharcais"}
+        }
+        "Pacific:Midway"{
+            ec{"Midway"}
+        }
+        "Pacific:Nauru"{
+            ec{"Nabhru"}
+        }
+        "Pacific:Niue"{
+            ec{"Niue"}
+        }
+        "Pacific:Norfolk"{
+            ec{"Norfolk"}
+        }
+        "Pacific:Noumea"{
+            ec{"Noumea"}
+        }
+        "Pacific:Pago_Pago"{
+            ec{"Pago Pago"}
+        }
+        "Pacific:Palau"{
+            ec{"Palabh"}
+        }
+        "Pacific:Pitcairn"{
+            ec{"Peit a’ Chàirn"}
+        }
+        "Pacific:Ponape"{
+            ec{"Pohnpei"}
+        }
+        "Pacific:Port_Moresby"{
+            ec{"Port Moresby"}
+        }
+        "Pacific:Rarotonga"{
+            ec{"Rarotonga"}
+        }
+        "Pacific:Saipan"{
+            ec{"Saipan"}
+        }
+        "Pacific:Tahiti"{
+            ec{"Tahiti"}
+        }
+        "Pacific:Tarawa"{
+            ec{"Tarawa"}
+        }
+        "Pacific:Tongatapu"{
+            ec{"Tongatapu"}
+        }
+        "Pacific:Truk"{
+            ec{"Chuuk"}
+        }
+        "Pacific:Wake"{
+            ec{"Wake"}
+        }
+        "Pacific:Wallis"{
+            ec{"Uallas"}
+        }
+        "meta:Acre"{
+            ld{"Tìde samhraidh Acre"}
+            lg{"Àm Acre"}
+            ls{"Bun-àm Acre"}
+        }
+        "meta:Afghanistan"{
+            ls{"Àm Afghanastàin"}
+        }
+        "meta:Africa_Central"{
+            ls{"Àm Meadhan Afraga"}
+        }
+        "meta:Africa_Eastern"{
+            ls{"Àm Afraga an Ear"}
+        }
+        "meta:Africa_Southern"{
+            ls{"Àm Afraga a Deas"}
+        }
+        "meta:Africa_Western"{
+            ld{"Tìde Samhraidh Afraga an Iar"}
+            lg{"Àm Afraga an Iar"}
+            ls{"Bun-àm Afraga an Iar"}
+        }
+        "meta:Alaska"{
+            ld{"Tìde samhraidh Alaska"}
+            lg{"Àm Alaska"}
+            ls{"Bun-àm Alaska"}
+            sd{"AKDT"}
+            sg{"AKT"}
+            ss{"AKST"}
+        }
+        "meta:Almaty"{
+            ld{"Tìde samhraidh Almaty"}
+            lg{"Àm Almaty"}
+            ls{"Bun-àm Almaty"}
+        }
+        "meta:Amazon"{
+            ld{"Tìde samhraidh Amasoin"}
+            lg{"Àm Amasoin"}
+            ls{"Bun-àm Amasoin"}
+        }
+        "meta:America_Central"{
+            ld{"Tìde samhraidh Meadhan Aimeireaga a Tuath"}
+            lg{"Àm Meadhan Aimeireaga a Tuath"}
+            ls{"Bun-àm Meadhan Aimeireaga a Tuath"}
+            sd{"CDT"}
+            sg{"CT"}
+            ss{"CST"}
+        }
+        "meta:America_Eastern"{
+            ld{"Tìde samhraidh Aimeireaga a Tuath an Ear"}
+            lg{"Àm Aimeireaga a Tuath an Ear"}
+            ls{"Bun-àm Aimeireaga a Tuath an Ear"}
+            sd{"EDT"}
+            sg{"ET"}
+            ss{"EST"}
+        }
+        "meta:America_Mountain"{
+            ld{"Tìde samhraidh Monadh Aimeireaga a Tuath"}
+            lg{"Àm Monadh Aimeireaga a Tuath"}
+            ls{"Bun-àm Monadh Aimeireaga a Tuath"}
+            sd{"MDT"}
+            sg{"MT"}
+            ss{"MST"}
+        }
+        "meta:America_Pacific"{
+            ld{"Tìde samhraidh a’ Chuain Sèimh"}
+            lg{"Àm a’ Chuain Sèimh"}
+            ls{"Bun-àm a’ Chuain Sèimh"}
+            sd{"PDT"}
+            sg{"PT"}
+            ss{"PST"}
+        }
+        "meta:Anadyr"{
+            ld{"Tìde samhraidh Anadyr"}
+            lg{"Àm Anadyr"}
+            ls{"Bun-àm Anadyr"}
+        }
+        "meta:Apia"{
+            ld{"Tìde samhraidh Apia"}
+            lg{"Àm Apia"}
+            ls{"Bun-àm Apia"}
+        }
+        "meta:Aqtau"{
+            ld{"Tìde samhraidh Aqtau"}
+            lg{"Àm Aqtau"}
+            ls{"Bun-àm Aqtau"}
+        }
+        "meta:Aqtobe"{
+            ld{"Tìde samhraidh Aqtobe"}
+            lg{"Àm Aqtobe"}
+            ls{"Bun-àm Aqtobe"}
+        }
+        "meta:Arabian"{
+            ld{"Tìde samhraidh Arabach"}
+            lg{"Àm Arabach"}
+            ls{"Bun-àm Arabach"}
+        }
+        "meta:Argentina"{
+            ld{"Tìde samhraidh na h-Argantaine"}
+            lg{"Àm na h-Argantaine"}
+            ls{"Bun-àm na h-Argantaine"}
+        }
+        "meta:Argentina_Western"{
+            ld{"Tìde samhraidh na h-Argantaine Siaraich"}
+            lg{"Àm na h-Argantaine Siaraich"}
+            ls{"Bun-àm na h-Argantaine Siaraich"}
+        }
+        "meta:Armenia"{
+            ld{"Tìde samhraidh Airmeinia"}
+            lg{"Àm Airmeinia"}
+            ls{"Bun-àm Airmeinia"}
+        }
+        "meta:Atlantic"{
+            ld{"Tìde samhraidh a’ Chuain Siar"}
+            lg{"Àm a’ Chuain Siar"}
+            ls{"Bun-àm a’ Chuain Siar"}
+            sd{"ADT"}
+            sg{"AT"}
+            ss{"AST"}
+        }
+        "meta:Australia_Central"{
+            ld{"Tìde samhraidh Meadhan Astràilia"}
+            lg{"Àm Meadhan Astràilia"}
+            ls{"Bun-àm Meadhan Astràilia"}
+        }
+        "meta:Australia_CentralWestern"{
+            ld{"Tìde samhraidh Meadhan Astràilia an Iar"}
+            lg{"Àm Meadhan Astràilia an Iar"}
+            ls{"Bun-àm Meadhan Astràilia an Iar"}
+        }
+        "meta:Australia_Eastern"{
+            ld{"Tìde samhraidh Astràilia an Ear"}
+            lg{"Àm Astràilia an Ear"}
+            ls{"Bun-àm Astràilia an Ear"}
+        }
+        "meta:Australia_Western"{
+            ld{"Tìde samhraidh Astràilia an Iar"}
+            lg{"Àm Astràilia an Iar"}
+            ls{"Bun-àm Astràilia an Iar"}
+        }
+        "meta:Azerbaijan"{
+            ld{"Tìde samhraidh Asarbaideàin"}
+            lg{"Àm Asarbaideàin"}
+            ls{"Bun-àm Asarbaideàin"}
+        }
+        "meta:Azores"{
+            ld{"Tìde samhraidh nan Eileanan Asorach"}
+            lg{"Àm nan Eileanan Asorach"}
+            ls{"Bun-àm nan Eileanan Asorach"}
+        }
+        "meta:Bangladesh"{
+            ld{"Tìde samhraidh Bangladais"}
+            lg{"Àm Bangladais"}
+            ls{"Bun-àm Bangladais"}
+        }
+        "meta:Bhutan"{
+            ls{"Àm Butàin"}
+        }
+        "meta:Bolivia"{
+            ls{"Àm Boilibhia"}
+        }
+        "meta:Brasilia"{
+            ld{"Tìde samhraidh Bhrasília"}
+            lg{"Àm Bhrasília"}
+            ls{"Bun-àm Bhrasília"}
+        }
+        "meta:Brunei"{
+            ls{"Àm Bhrùnaigh Dàr as-Salàm"}
+        }
+        "meta:Cape_Verde"{
+            ld{"Tìde samhraidh a’ Chip Uaine"}
+            lg{"Àm a’ Chip Uaine"}
+            ls{"Bun-àm a’ Chip Uaine"}
+        }
+        "meta:Casey"{
+            ls{"Àm Chasey"}
+        }
+        "meta:Chamorro"{
+            ls{"Àm Chamorro"}
+        }
+        "meta:Chatham"{
+            ld{"Tìde samhraidh Chatham"}
+            lg{"Àm Chatham"}
+            ls{"Bun-àm Chatham"}
+        }
+        "meta:Chile"{
+            ld{"Tìde samhraidh na Sile"}
+            lg{"Àm na Sile"}
+            ls{"Bun-àm na Sile"}
+        }
+        "meta:China"{
+            ld{"Tìde samhraidh na Sìne"}
+            lg{"Àm na Sìne"}
+            ls{"Bun-àm na Sìne"}
+        }
+        "meta:Choibalsan"{
+            ld{"Tìde samhraidh Choibalsan"}
+            lg{"Àm Choibalsan"}
+            ls{"Bun-àm Choibalsan"}
+        }
+        "meta:Christmas"{
+            ls{"Àm Eilean na Nollaig"}
+        }
+        "meta:Cocos"{
+            ls{"Àm Eileanan Chocos"}
+        }
+        "meta:Colombia"{
+            ld{"Tìde samhraidh Coloimbia"}
+            lg{"Àm Coloimbia"}
+            ls{"Bun-àm Coloimbia"}
+        }
+        "meta:Cook"{
+            ld{"Leth-thìde samhraidh Eileanan Cook"}
+            lg{"Àm Eileanan Cook"}
+            ls{"Bun-àm Eileanan Cook"}
+        }
+        "meta:Cuba"{
+            ld{"Tìde samhraidh Cùba"}
+            lg{"Àm Cùba"}
+            ls{"Bun-àm Cùba"}
+        }
+        "meta:Davis"{
+            ls{"Àm Dhavis"}
+        }
+        "meta:DumontDUrville"{
+            ls{"Àm Dumont-d’Urville"}
+        }
+        "meta:East_Timor"{
+            ls{"Àm Thìomor an Ear"}
+        }
+        "meta:Easter"{
+            ld{"Tìde samhraidh Eilean na Càisge"}
+            lg{"Àm Eilean na Càisge"}
+            ls{"Bun-àm Eilean na Càisge"}
+        }
+        "meta:Ecuador"{
+            ls{"Àm Eacuadoir"}
+        }
+        "meta:Europe_Central"{
+            ld{"Tìde samhraidh Meadhan na Roinn-Eòrpa"}
+            lg{"Àm Meadhan na Roinn-Eòrpa"}
+            ls{"Bun-àm Meadhan na Roinn-Eòrpa"}
+            sd{"CEST"}
+            sg{"CET"}
+            ss{"CET"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"Tìde samhraidh na Roinn-Eòrpa an Ear"}
+            lg{"Àm na Roinn-Eòrpa an Ear"}
+            ls{"Bun-àm na Roinn-Eòrpa an Ear"}
+            sd{"EEST"}
+            sg{"EET"}
+            ss{"EET"}
+        }
+        "meta:Europe_Further_Eastern"{
+            ls{"Àm na Roinn-Eòrpa nas fhaide ear"}
+        }
+        "meta:Europe_Western"{
+            ld{"Tìde samhraidh na Roinn-Eòrpa an Iar"}
+            lg{"Àm na Roinn-Eòrpa an Iar"}
+            ls{"Bun-àm na Roinn-Eòrpa an Iar"}
+            sd{"WEST"}
+            sg{"WET"}
+            ss{"WET"}
+        }
+        "meta:Falkland"{
+            ld{"Tìde samhraidh nan Eileanan Fàclannach"}
+            lg{"Àm nan Eileanan Fàclannach"}
+            ls{"Bun-àm nan Eileanan Fàclannach"}
+        }
+        "meta:Fiji"{
+            ld{"Tìde samhraidh Fìdi"}
+            lg{"Àm Fìdi"}
+            ls{"Bun-àm Fìdi"}
+        }
+        "meta:French_Guiana"{
+            ls{"Àm Guidheàna na Frainge"}
+        }
+        "meta:French_Southern"{
+            ls{"Àm Deasach agus Antartaigeach na Frainge"}
+        }
+        "meta:GMT"{
+            ls{"Greenwich Mean Time"}
+            ss{"GMT"}
+        }
+        "meta:Galapagos"{
+            ls{"Àm Ghalapagos"}
+        }
+        "meta:Gambier"{
+            ls{"Àm Ghambier"}
+        }
+        "meta:Georgia"{
+            ld{"Tìde samhraidh na Cairtbheile"}
+            lg{"Àm na Cairtbheile"}
+            ls{"Bun-àm na Cairtbheile"}
+        }
+        "meta:Gilbert_Islands"{
+            ls{"Àm Eileanan Ghileabairt"}
+        }
+        "meta:Greenland_Eastern"{
+            ld{"Tìde samhraidh na Graonlainn an Ear"}
+            lg{"Àm na Graonlainn an Ear"}
+            ls{"Bun-àm na Graonlainn an Ear"}
+        }
+        "meta:Greenland_Western"{
+            ld{"Tìde samhraidh na Graonlainn an Iar"}
+            lg{"Àm na Graonlainn an Iar"}
+            ls{"Bun-àm na Graonlainn an Iar"}
+        }
+        "meta:Guam"{
+            ls{"Àm Guam"}
+        }
+        "meta:Gulf"{
+            ls{"Àm a’ Chamais"}
+        }
+        "meta:Guyana"{
+            ls{"Àm Guidheàna"}
+        }
+        "meta:Hawaii_Aleutian"{
+            ld{"Tìde Samhraidh nan Eileanan Hawai’i ’s Aleutach"}
+            lg{"Àm nan Eileanan Hawai’i ’s Aleutach"}
+            ls{"Bun-àm nan Eileanan Hawai’i ’s Aleutach"}
+            sd{"HADT"}
+            sg{"HAT"}
+            ss{"HAST"}
+        }
+        "meta:Hong_Kong"{
+            ld{"Tìde samhraidh Hong Kong"}
+            lg{"Àm Hong Kong"}
+            ls{"Bun-àm Hong Kong"}
+        }
+        "meta:Hovd"{
+            ld{"Tìde samhraidh Hovd"}
+            lg{"Àm Hovd"}
+            ls{"Bun-àm Hovd"}
+        }
+        "meta:India"{
+            ls{"Àm nan Innseachan"}
+        }
+        "meta:Indian_Ocean"{
+            ls{"Àm Cuan nan Innseachan"}
+        }
+        "meta:Indochina"{
+            ls{"Àm Sìn-Innseanach"}
+        }
+        "meta:Indonesia_Central"{
+            ls{"Àm Meadhan nan Innd-Innse"}
+        }
+        "meta:Indonesia_Eastern"{
+            ls{"Àm nan Innd-Innse an Ear"}
+        }
+        "meta:Indonesia_Western"{
+            ls{"Àm nan Innd-Innse an Iar"}
+        }
+        "meta:Iran"{
+            ld{"Tìde samhraidh Ioràin"}
+            lg{"Àm Ioràin"}
+            ls{"Bun-àm Ioràin"}
+        }
+        "meta:Irkutsk"{
+            ld{"Tìde Samhraidh Irkutsk"}
+            lg{"Àm Irkutsk"}
+            ls{"Bun-àm Irkutsk"}
+        }
+        "meta:Israel"{
+            ld{"Tìde samhraidh Iosrael"}
+            lg{"Àm Iosrael"}
+            ls{"Bun-àm Iosrael"}
+        }
+        "meta:Japan"{
+            ld{"Tìde samhraidh na Seapaine"}
+            lg{"Àm na Seapaine"}
+            ls{"Bun-àm na Seapaine"}
+        }
+        "meta:Kamchatka"{
+            ld{"Tìde samhraidh Petropavlovsk-Kamchatsky"}
+            lg{"Àm Petropavlovsk-Kamchatsky"}
+            ls{"Bun-àm Petropavlovsk-Kamchatsky"}
+        }
+        "meta:Kazakhstan_Eastern"{
+            ls{"Àm Casachstàin an Ear"}
+        }
+        "meta:Kazakhstan_Western"{
+            ls{"Àm Casachstàin an Iar"}
+        }
+        "meta:Korea"{
+            ld{"Tìde samhraidh Choirèa"}
+            lg{"Àm Choirèa"}
+            ls{"Bun-àm Choirèa"}
+        }
+        "meta:Kosrae"{
+            ls{"Àm Kosrae"}
+        }
+        "meta:Krasnoyarsk"{
+            ld{"Tìde samhraidh Krasnoyarsk"}
+            lg{"Àm Krasnoyarsk"}
+            ls{"Bun-àm Krasnoyarsk"}
+        }
+        "meta:Kyrgystan"{
+            ls{"Àm Cìorgastain"}
+        }
+        "meta:Lanka"{
+            ls{"Àm Lanca"}
+        }
+        "meta:Line_Islands"{
+            ls{"Àm Eileanan Teraina"}
+        }
+        "meta:Lord_Howe"{
+            ld{"Tìde samhraidh Lord Howe"}
+            lg{"Àm Lord Howe"}
+            ls{"Bun-àm Lord Howe"}
+        }
+        "meta:Macau"{
+            ld{"Tìde samhraidh Macàthu"}
+            lg{"Àm Macàthu"}
+            ls{"Bun-àm Macàthu"}
+        }
+        "meta:Macquarie"{
+            ls{"Àm Eilein MhicGuaire"}
+        }
+        "meta:Magadan"{
+            ld{"Tìde Samhraidh Magadan"}
+            lg{"Àm Magadan"}
+            ls{"Bun-àm Magadan"}
+        }
+        "meta:Malaysia"{
+            ls{"Àm Mhalaidhsea"}
+        }
+        "meta:Maldives"{
+            ls{"Àm nan Eileanan Mhaladaibh"}
+        }
+        "meta:Marquesas"{
+            ls{"Àm Eileanan a’ Mharcais"}
+        }
+        "meta:Marshall_Islands"{
+            ls{"Àm Eileanan Mharshall"}
+        }
+        "meta:Mauritius"{
+            ld{"Tìde samhraidh nan Eileanan Mhoiriseas"}
+            lg{"Àm nan Eileanan Mhoiriseas"}
+            ls{"Bun-àm nan Eileanan Mhoiriseas"}
+        }
+        "meta:Mawson"{
+            ls{"Àm Mhawson"}
+        }
+        "meta:Mexico_Northwest"{
+            ld{"Tìde samhraidh Mheagsago an Iar-thuath"}
+            lg{"Àm Mheagsago an Iar-thuath"}
+            ls{"Bun-àm Mheagsago an Iar-thuath"}
+        }
+        "meta:Mexico_Pacific"{
+            ld{"Tìde samhraidh a’ Chuain Sèimh Mheagsago"}
+            lg{"Àm a’ Chuain Sèimh Mheagsago"}
+            ls{"Bun-àm a’ Chuain Sèimh Mheagsago"}
+        }
+        "meta:Mongolia"{
+            ld{"Tìde samhraidh Ulan Bator"}
+            lg{"Àm Ulan Bator"}
+            ls{"Bun-àm Ulan Bator"}
+        }
+        "meta:Moscow"{
+            ld{"Tìde samhraidh Mhosgo"}
+            lg{"Àm Mhosgo"}
+            ls{"Bun-àm Mhosgo"}
+        }
+        "meta:Myanmar"{
+            ls{"Àm Miànmar"}
+        }
+        "meta:Nauru"{
+            ls{"Àm Nabhru"}
+        }
+        "meta:Nepal"{
+            ls{"Àm Neapàl"}
+        }
+        "meta:New_Caledonia"{
+            ld{"Tìde samhraidh Chailleann Nuaidh"}
+            lg{"Àm Chailleann Nuaidh"}
+            ls{"Bun-àm Chailleann Nuaidh"}
+        }
+        "meta:New_Zealand"{
+            ld{"Tìde samhraidh Shealainn Nuaidh"}
+            lg{"Àm Shealainn Nuaidh"}
+            ls{"Bun-àm Shealainn Nuaidh"}
+        }
+        "meta:Newfoundland"{
+            ld{"Tìde samhraidh Talamh an Èisg"}
+            lg{"Àm Talamh an Èisg"}
+            ls{"Bun-àm Talamh an Èisg"}
+        }
+        "meta:Niue"{
+            ls{"Àm Niue"}
+        }
+        "meta:Norfolk"{
+            ld{"Tìde samhraidh Eilein Norfolk"}
+            lg{"Àm Eilein Norfolk"}
+            ls{"Bun-àm Eilein Norfolk"}
+        }
+        "meta:Noronha"{
+            ld{"Tìde Samhraidh Fernando de Noronha"}
+            lg{"Àm Fernando de Noronha"}
+            ls{"Bun-àm Fernando de Noronha"}
+        }
+        "meta:North_Mariana"{
+            ls{"Àm nan Eileanan Mairianach a Tuath"}
+        }
+        "meta:Novosibirsk"{
+            ld{"Tìde samhraidh Novosibirsk"}
+            lg{"Àm Novosibirsk"}
+            ls{"Bun-àm Novosibirsk"}
+        }
+        "meta:Omsk"{
+            ld{"Tìde samhraidh Omsk"}
+            lg{"Àm Omsk"}
+            ls{"Bun-àm Omsk"}
+        }
+        "meta:Pakistan"{
+            ld{"Tìde samhraidh Pagastàin"}
+            lg{"Àm Pagastàin"}
+            ls{"Bun-àm Pagastàin"}
+        }
+        "meta:Palau"{
+            ls{"Àm Palabh"}
+        }
+        "meta:Papua_New_Guinea"{
+            ls{"Àm Gini Nuaidh Paputhaiche"}
+        }
+        "meta:Paraguay"{
+            ld{"Tìde samhraidh Paraguaidh"}
+            lg{"Àm Paraguaidh"}
+            ls{"Bun-àm Paraguaidh"}
+        }
+        "meta:Peru"{
+            ld{"Tìde samhraidh Pearù"}
+            lg{"Àm Pearù"}
+            ls{"Bun-àm Pearù"}
+        }
+        "meta:Philippines"{
+            ld{"Tìde samhraidh nan Eilean Filipineach"}
+            lg{"Àm nan Eilean Filipineach"}
+            ls{"Bun-àm nan Eilean Filipineach"}
+        }
+        "meta:Phoenix_Islands"{
+            ls{"Àm Eileanan Phoenix"}
+        }
+        "meta:Pierre_Miquelon"{
+            ld{"Tìde Samhraidh Saint Pierre agus Miquelon"}
+            lg{"Àm Saint Pierre agus Miquelon"}
+            ls{"Bun-àm Saint Pierre agus Miquelon"}
+        }
+        "meta:Pitcairn"{
+            ls{"Àm Peit a’ Chàirn"}
+        }
+        "meta:Ponape"{
+            ls{"Àm Pohnpei"}
+        }
+        "meta:Pyongyang"{
+            ls{"Àm Pyeongyang"}
+        }
+        "meta:Qyzylorda"{
+            ld{"Tìde samhraidh Qızılorda"}
+            lg{"Àm Qızılorda"}
+            ls{"Bun-àm Qızılorda"}
+        }
+        "meta:Reunion"{
+            ls{"Àm Reunion"}
+        }
+        "meta:Rothera"{
+            ls{"Àm Rothera"}
+        }
+        "meta:Sakhalin"{
+            ld{"Tìde samhraidh Sakhalin"}
+            lg{"Àm Sakhalin"}
+            ls{"Bun-àm Sakhalin"}
+        }
+        "meta:Samara"{
+            ld{"Tìde samhraidh Samara"}
+            lg{"Àm Samara"}
+            ls{"Bun-àm Samara"}
+        }
+        "meta:Samoa"{
+            ld{"Tìde samhraidh Samotha"}
+            lg{"Àm Samotha"}
+            ls{"Bun-àm Samotha"}
+        }
+        "meta:Seychelles"{
+            ls{"Àm nan Eileanan Sheiseall"}
+        }
+        "meta:Singapore"{
+            ls{"Àm Singeapòr"}
+        }
+        "meta:Solomon"{
+            ls{"Àm Eileanan Sholaimh"}
+        }
+        "meta:South_Georgia"{
+            ls{"Àm Seòrsea a Deas"}
+        }
+        "meta:Suriname"{
+            ls{"Àm Suranaim"}
+        }
+        "meta:Syowa"{
+            ls{"Àm Shyowa"}
+        }
+        "meta:Tahiti"{
+            ls{"Àm Tahiti"}
+        }
+        "meta:Taipei"{
+            ld{"Tìde samhraidh Taipei"}
+            lg{"Àm Taipei"}
+            ls{"Bun-àm Taipei"}
+        }
+        "meta:Tajikistan"{
+            ls{"Àm Taidigeastàin"}
+        }
+        "meta:Tokelau"{
+            ls{"Àm Tokelau"}
+        }
+        "meta:Tonga"{
+            ld{"Tìde samhraidh Tonga"}
+            lg{"Àm Tonga"}
+            ls{"Bun-àm Tonga"}
+        }
+        "meta:Truk"{
+            ls{"Àm Chuuk"}
+        }
+        "meta:Turkmenistan"{
+            ld{"Tìde samhraidh Turcmanastàin"}
+            lg{"Àm Turcmanastàin"}
+            ls{"Bun-àm Turcmanastàin"}
+        }
+        "meta:Tuvalu"{
+            ls{"Àm Tubhalu"}
+        }
+        "meta:Uruguay"{
+            ld{"Tìde samhraidh Uruguaidh"}
+            lg{"Àm Uruguaidh"}
+            ls{"Bun-àm Uruguaidh"}
+        }
+        "meta:Uzbekistan"{
+            ld{"Tìde samhraidh Usbagastàn"}
+            lg{"Àm Usbagastàn"}
+            ls{"Bun-àm Usbagastàn"}
+        }
+        "meta:Vanuatu"{
+            ld{"Tìde samhraidh Vanuatu"}
+            lg{"Àm Vanuatu"}
+            ls{"Bun-àm Vanuatu"}
+        }
+        "meta:Venezuela"{
+            ls{"Àm na Bheiniseala"}
+        }
+        "meta:Vladivostok"{
+            ld{"Tìde Samhraidh Vladivostok"}
+            lg{"Àm Vladivostok"}
+            ls{"Bun-àm Vladivostok"}
+        }
+        "meta:Volgograd"{
+            ld{"Tìde samhraidh Volgograd"}
+            lg{"Àm Volgograd"}
+            ls{"Bun-àm Volgograd"}
+        }
+        "meta:Vostok"{
+            ls{"Àm Vostok"}
+        }
+        "meta:Wake"{
+            ls{"Àm Eilean Wake"}
+        }
+        "meta:Wallis"{
+            ls{"Àm Uallas agus Futuna"}
+        }
+        "meta:Yakutsk"{
+            ld{"Tìde samhraidh Yakutsk"}
+            lg{"Àm Yakutsk"}
+            ls{"Bun-àm Yakutsk"}
+        }
+        "meta:Yekaterinburg"{
+            ld{"Tìde samhraidh Yekaterinburg"}
+            lg{"Àm Yekaterinburg"}
+            ls{"Bun-àm Yekaterinburg"}
+        }
+        fallbackFormat{"{1} ({0})"}
+        gmtFormat{"GMT{0}"}
+        gmtZeroFormat{"GMT"}
+        hourFormat{"+HH:mm;-HH:mm"}
+        regionFormat{"{0}"}
+        regionFormatDaylight{"Tìde samhraidh: {0}"}
+        regionFormatStandard{"Bun-àm: {0}"}
+    }
+}

@@ -1,0 +1,17 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+wo{
+    collations{
+        standard{
+            Sequence{
+                "[normalization on]"
+                "&A<à<<<À"
+                "&E<é<<<É<ë<<<Ë"
+                "&N<ñ<<<Ñ<ŋ<<<Ŋ"
+                "&O<ó<<<Ó"
+            }
+            Version{"39"}
+        }
+    }
+}

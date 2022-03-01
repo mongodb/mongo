@@ -1,0 +1,1117 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+wo{
+    AuxExemplarCharacters{"[ã h v z]"}
+    ExemplarCharacters{"[a à b c d e é ë f g i j k l m n ñ ŋ o ó p q r s t u w x y]"}
+    ExemplarCharactersIndex{"[A B C D E F G H I J K L M N Ŋ O P Q R S T U V W X Y Z]"}
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    ExemplarCharactersPunctuation{"[\\- ‑ , ; \\: ! ? . ( ) \\[ \\] \\{ \\}]"}
+    NumberElements{
+        default{"latn"}
+        latn{
+            miscPatterns{
+                atLeast{"⩾{0}"}
+                range{"{0}–{1}"}
+            }
+            patterns{
+                accountingFormat{"¤ #,##0.00"}
+                currencyFormat{"¤ #,##0.00"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"#,##0%"}
+                scientificFormat{"#E0"}
+            }
+            symbols{
+                decimal{","}
+                exponential{"E"}
+                group{"."}
+                infinity{"∞"}
+                minusSign{"-"}
+                nan{"NaN"}
+                perMille{"‰"}
+                percentSign{"%"}
+                plusSign{"+"}
+                superscriptingExponent{"×"}
+            }
+        }
+        minimumGroupingDigits{"1"}
+        native{"latn"}
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d MMM, y G",
+                "d MMMM, y G",
+                "d MMM, y G",
+                "dd-MM-y GGGGG",
+                "{1} - {0}",
+                "{1} 'ci' {0}",
+                "{1} 'ci' {0}",
+                "{1} - {0}",
+                "{1} - {0}",
+            }
+            availableFormats{
+                E{"ccc"}
+                Ed{"E, d"}
+                Gy{"y G"}
+                GyMMM{"MMM, y G"}
+                GyMMMEd{"E, d MMM, y G"}
+                GyMMMd{"d MMM, y G"}
+                M{"L"}
+                MEd{"E, dd-MM"}
+                MMM{"LLL"}
+                MMMEd{"E, d MMM"}
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                Md{"dd-MM"}
+                d{"d"}
+                y{"y G"}
+                yyyy{"y G"}
+                yyyyM{"MM y GGGGG"}
+                yyyyMEd{"E, dd/MM/y GGGGG"}
+                yyyyMMM{"MMM y G"}
+                yyyyMMMEd{"E, d MMM y G"}
+                yyyyMMMM{"MMMM y G"}
+                yyyyMMMd{"d/MM/y G"}
+                yyyyMd{"d/M/y GGGGG"}
+                yyyyQQQ{"QQQ y G"}
+                yyyyQQQQ{"QQQQ y G"}
+            }
+            intervalFormats{
+                fallback{"{0} – {1}"}
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "Sub",
+                "Ngo",
+            }
+            AmPmMarkersAbbr{
+                "Sub",
+                "Ngo",
+            }
+            AmPmMarkersNarrow{
+                "Sub",
+                "Ngo",
+            }
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d MMM, y",
+                "d MMMM, y",
+                "d MMM, y",
+                "dd-MM-y",
+                "{1} - {0}",
+                "{1} 'ci' {0}",
+                "{1} 'ci' {0}",
+                "{1} - {0}",
+                "{1} - {0}",
+            }
+            appendItems{
+                Timezone{"{0} {1}"}
+            }
+            availableFormats{
+                E{"ccc"}
+                EHm{"E HH:mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"E, d"}
+                Ehm{"E h:mm a"}
+                Ehms{"E h:mm:ss a"}
+                Gy{"y G"}
+                GyMMM{"MMM, y G"}
+                GyMMMEd{"E, d MMM, y G"}
+                GyMMMd{"d MMM, y G"}
+                H{"HH"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                Hmsv{"HH:mm:ss v"}
+                Hmv{"HH:mm v"}
+                M{"L"}
+                MEd{"E, dd-MM"}
+                MMM{"LLL"}
+                MMMEd{"E, d MMM"}
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                Md{"dd-MM"}
+                d{"d"}
+                h{"h a"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                hmsv{"h:mm:ss a v"}
+                hmv{"h:mm a v"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"MM-y"}
+                yMEd{"E, dd-MM-y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, d MMM y"}
+                yMMMM{"MMMM y"}
+                yMMMd{"d MMM y"}
+                yMd{"dd-MM-y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Dib",
+                        "Alt",
+                        "Tal",
+                        "Àla",
+                        "Alx",
+                        "Àjj",
+                        "Ase",
+                    }
+                    narrow{
+                        "Dib",
+                        "Alt",
+                        "Tal",
+                        "Àla",
+                        "Alx",
+                        "Àjj",
+                        "Ase",
+                    }
+                    short{
+                        "Dib",
+                        "Alt",
+                        "Tal",
+                        "Àla",
+                        "Alx",
+                        "Àjj",
+                        "Ase",
+                    }
+                    wide{
+                        "Dibéer",
+                        "Altine",
+                        "Talaata",
+                        "Àlarba",
+                        "Alxamis",
+                        "Àjjuma",
+                        "Aseer",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Dib",
+                        "Alt",
+                        "Tal",
+                        "Àla",
+                        "Alx",
+                        "Àjj",
+                        "Ase",
+                    }
+                    narrow{
+                        "Dib",
+                        "Alt",
+                        "Tal",
+                        "Àla",
+                        "Alx",
+                        "Àjj",
+                        "Ase",
+                    }
+                    short{
+                        "Dib",
+                        "Alt",
+                        "Tal",
+                        "Àla",
+                        "Alx",
+                        "Àjj",
+                        "Ase",
+                    }
+                    wide{
+                        "Dibéer",
+                        "Altine",
+                        "Talaata",
+                        "Àlarba",
+                        "Alxamis",
+                        "Àjjuma",
+                        "Aseer",
+                    }
+                }
+            }
+            dayPeriod{
+                stand-alone{
+                    abbreviated{
+                        am{"Sub"}
+                        pm{"Ngo"}
+                    }
+                    narrow{
+                        am{"Sub"}
+                        pm{"Ngo"}
+                    }
+                    wide{
+                        am{"Sub"}
+                        pm{"Ngo"}
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "JC",
+                    "AD",
+                }
+                abbreviated%variant{
+                    "BCE",
+                    "CE",
+                }
+                wide{
+                    "av. JC",
+                    "AD",
+                }
+            }
+            intervalFormats{
+                fallback{"{0} – {1}"}
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Sam",
+                        "Few",
+                        "Mar",
+                        "Awr",
+                        "Mee",
+                        "Suw",
+                        "Sul",
+                        "Ut",
+                        "Sàt",
+                        "Okt",
+                        "Now",
+                        "Des",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "Samwiyee",
+                        "Fewriyee",
+                        "Mars",
+                        "Awril",
+                        "Mee",
+                        "Suwe",
+                        "Sulet",
+                        "Ut",
+                        "Sàttumbar",
+                        "Oktoobar",
+                        "Nowàmbar",
+                        "Desàmbar",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Sam",
+                        "Few",
+                        "Mar",
+                        "Awr",
+                        "Mee",
+                        "Suw",
+                        "Sul",
+                        "Ut",
+                        "Sàt",
+                        "Okt",
+                        "Now",
+                        "Des",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "Samwiyee",
+                        "Fewriyee",
+                        "Mars",
+                        "Awril",
+                        "Mee",
+                        "Suwe",
+                        "Sulet",
+                        "Ut",
+                        "Sàttumbar",
+                        "Oktoobar",
+                        "Nowàmbar",
+                        "Desàmbar",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "1er Tri",
+                        "2e Tri",
+                        "3e Tri",
+                        "4e Tri",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "1er Trimestar",
+                        "2e Trimestar",
+                        "3e Trimestar",
+                        "4e Trimestar",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "1er Tri",
+                        "2e Tri",
+                        "3e Tri",
+                        "4e Tri",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "1er Trimestar",
+                        "2e Trimestar",
+                        "3e Trimestar",
+                        "4e Trimestar",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"fan"}
+            relative{
+                "-1"{"démb"}
+                "0"{"tay"}
+                "1"{"suba"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} fan"}
+                }
+                past{
+                    other{"{0} fan ci ginaaw"}
+                }
+            }
+        }
+        day-narrow{
+            dn{"fan"}
+            relativeTime{
+                future{
+                    other{"fileek {0} fan"}
+                }
+                past{
+                    other{"{0} fan ci ginaaw"}
+                }
+            }
+        }
+        day-short{
+            dn{"fan"}
+            relativeTime{
+                future{
+                    other{"fileek {0} fan"}
+                }
+                past{
+                    other{"{0} fan ci ginaaw"}
+                }
+            }
+        }
+        dayOfYear{
+            dn{"bisu at mi"}
+        }
+        dayOfYear-narrow{
+            dn{"bisu at"}
+        }
+        dayOfYear-short{
+            dn{"bisu at"}
+        }
+        dayperiod{
+            dn{"Sub/Ngo"}
+        }
+        era{
+            dn{"jamono"}
+        }
+        fri{
+            relative{
+                "-1"{"àjjuma ji weesu"}
+                "0"{"tay ci àjjuma ji"}
+                "1"{"àjjuma jiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} àjjuma"}
+                }
+                past{
+                    other{"{0} àjjuma ci ginaaw"}
+                }
+            }
+        }
+        fri-narrow{
+            relative{
+                "-1"{"àj. ji weesu"}
+                "0"{"tay ci àj. ji"}
+                "1"{"àj. jiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} àj."}
+                }
+                past{
+                    other{"{0} àj. ci ginaaw"}
+                }
+            }
+        }
+        fri-short{
+            relative{
+                "-1"{"àjj. ji weesu"}
+                "0"{"tay ci àjj. ji"}
+                "1"{"àjj. jiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} àjj."}
+                }
+                past{
+                    other{"{0} àjj. ci ginaaw"}
+                }
+            }
+        }
+        hour{
+            dn{"waxt"}
+            relative{
+                "0"{"ci waxtu wii"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} waxtu"}
+                }
+                past{
+                    other{"{0} waxtu ci ginaaw"}
+                }
+            }
+        }
+        hour-narrow{
+            dn{"wxt."}
+            relativeTime{
+                future{
+                    other{"fileek {0} wax."}
+                }
+                past{
+                    other{"{0} wax. ci ginaaw"}
+                }
+            }
+        }
+        hour-short{
+            dn{"wxt."}
+            relativeTime{
+                future{
+                    other{"fileek {0} wax."}
+                }
+                past{
+                    other{"{0} wax. ci ginaaw"}
+                }
+            }
+        }
+        minute{
+            dn{"simili"}
+            relative{
+                "0"{"ci simili bii"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} simili"}
+                }
+                past{
+                    other{"{0} simili ci ginaaw"}
+                }
+            }
+        }
+        minute-narrow{
+            dn{"sim."}
+            relativeTime{
+                future{
+                    other{"fileek {0} sim."}
+                }
+                past{
+                    other{"{0} sim. ci ginaaw"}
+                }
+            }
+        }
+        minute-short{
+            dn{"sim."}
+            relativeTime{
+                future{
+                    other{"fileek {0} sim."}
+                }
+                past{
+                    other{"{0} sim. ci ginaaw"}
+                }
+            }
+        }
+        mon{
+            relative{
+                "-1"{"altine ji weesu"}
+                "0"{"tay ci altine ji"}
+                "1"{"altine jiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} altine"}
+                }
+                past{
+                    other{"{0} altine ci ginaaw"}
+                }
+            }
+        }
+        mon-narrow{
+            relative{
+                "-1"{"alt. ji weesu"}
+                "0"{"tay ci alt. ji"}
+                "1"{"alt. jiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} alt."}
+                }
+                past{
+                    other{"{0} alt. ci ginaaw"}
+                }
+            }
+        }
+        mon-short{
+            relative{
+                "-1"{"alti. ji weesu"}
+                "0"{"tay ci alti. ji"}
+                "1"{"alti. jiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} alti."}
+                }
+                past{
+                    other{"{0} alti. ci ginaaw"}
+                }
+            }
+        }
+        month{
+            dn{"weer"}
+            relative{
+                "-1"{"weer wi weesu"}
+                "0"{"weer wii"}
+                "1"{"weer wiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} weer"}
+                }
+                past{
+                    other{"{0} weer ci ginaaw"}
+                }
+            }
+        }
+        month-narrow{
+            dn{"we."}
+            relative{
+                "-1"{"we. wi wees"}
+                "0"{"we. wii"}
+                "1"{"we. wiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} we."}
+                }
+                past{
+                    other{"{0} we. ci ginaaw"}
+                }
+            }
+        }
+        month-short{
+            dn{"we."}
+            relative{
+                "-1"{"we. wi wees"}
+                "0"{"we. wii"}
+                "1"{"we. wiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} we."}
+                }
+                past{
+                    other{"{0} we. ci ginaaw"}
+                }
+            }
+        }
+        quarter{
+            dn{"ñeenti-weer"}
+            relative{
+                "-1"{"trimestre bi weesu"}
+                "0"{"trimestre bii"}
+                "1"{"trimestre biy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} trimestre"}
+                }
+                past{
+                    other{"{0} trimestre ci ginaaw"}
+                }
+            }
+        }
+        quarter-narrow{
+            dn{"ñw."}
+            relativeTime{
+                future{
+                    other{"fileek {0} trim."}
+                }
+                past{
+                    other{"{0} trim. ci ginaaw"}
+                }
+            }
+        }
+        quarter-short{
+            dn{"ñw."}
+            relativeTime{
+                future{
+                    other{"fileek {0} trim."}
+                }
+                past{
+                    other{"{0} trim. ci ginaaw"}
+                }
+            }
+        }
+        sat{
+            relative{
+                "-1"{"gàwwu ji weesu"}
+                "0"{"tay ci gàwwu ji"}
+                "1"{"gàwwu jiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} gàwwu"}
+                }
+                past{
+                    other{"{0} gàwwu ci ginaaw"}
+                }
+            }
+        }
+        sat-narrow{
+            relative{
+                "-1"{"gà. ji weesu"}
+                "0"{"tay ci gà. ji"}
+                "1"{"gà. jiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} gà."}
+                }
+                past{
+                    other{"{0} gà. ci ginaaw"}
+                }
+            }
+        }
+        sat-short{
+            relative{
+                "-1"{"gàw. ji weesu"}
+                "0"{"tay ci gàw. ji"}
+                "1"{"gàw. jiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} gàw."}
+                }
+                past{
+                    other{"{0} gàw. ci ginaaw"}
+                }
+            }
+        }
+        second{
+            dn{"saa"}
+            relative{
+                "0"{"leegi"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} saa"}
+                }
+                past{
+                    other{"{0} saa ci ginaaw"}
+                }
+            }
+        }
+        second-narrow{
+            dn{"saa."}
+            relativeTime{
+                future{
+                    other{"fileek {0} saa"}
+                }
+                past{
+                    other{"{0} saa ci ginaaw"}
+                }
+            }
+        }
+        second-short{
+            dn{"saa."}
+            relativeTime{
+                future{
+                    other{"fileek {0} saa"}
+                }
+                past{
+                    other{"{0} saa ci ginaaw"}
+                }
+            }
+        }
+        sun{
+            relative{
+                "-1"{"dibéer bi weesu"}
+                "0"{"tay ci dibéer bi"}
+                "1"{"dibéer biy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} dibéer"}
+                }
+                past{
+                    other{"{0} dibéer ci ginaaw"}
+                }
+            }
+        }
+        sun-narrow{
+            relative{
+                "-1"{"dib. bi weesu"}
+                "0"{"tay ci dib. bi"}
+                "1"{"dib. biy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} dib."}
+                }
+                past{
+                    other{"{0} dib. ci ginaaw"}
+                }
+            }
+        }
+        sun-short{
+            relative{
+                "-1"{"dib. bi weesu"}
+                "0"{"tay ci dib. bi"}
+                "1"{"dib. biy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} dib."}
+                }
+                past{
+                    other{"{0} dib. ci ginaaw"}
+                }
+            }
+        }
+        thu{
+            relative{
+                "-1"{"alxamis ji weesu"}
+                "0"{"tay ci alxamis ji"}
+                "1"{"alxamis jiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} alxamis"}
+                }
+                past{
+                    other{"{0} alxamis ci ginaaw"}
+                }
+            }
+        }
+        thu-narrow{
+            relative{
+                "-1"{"alx. ji weesu"}
+                "0"{"tay ci alx. ji"}
+                "1"{"alx. jiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} alx."}
+                }
+                past{
+                    other{"{0} alx. ci ginaaw"}
+                }
+            }
+        }
+        thu-short{
+            relative{
+                "-1"{"alxa. ji weesu"}
+                "0"{"tay ci alxa. ji"}
+                "1"{"alxa. jiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} alxa."}
+                }
+                past{
+                    other{"{0} alxa. ci ginaaw"}
+                }
+            }
+        }
+        tue{
+            relative{
+                "-1"{"talaata ji weesu"}
+                "0"{"tay ci talaata ji"}
+                "1"{"talaata jiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} talaata"}
+                }
+                past{
+                    other{"{0} talaata ci ginaaw"}
+                }
+            }
+        }
+        tue-narrow{
+            relative{
+                "-1"{"ta. ji weesu"}
+                "0"{"tay ci ta. ji"}
+                "1"{"ta. jiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} ta."}
+                }
+                past{
+                    other{"{0} ta. ci ginaaw"}
+                }
+            }
+        }
+        tue-short{
+            relative{
+                "-1"{"tal. ji weesu"}
+                "0"{"tay ci tal. ji"}
+                "1"{"tal. jiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} tal."}
+                }
+                past{
+                    other{"{0} tal. ci ginaaw"}
+                }
+            }
+        }
+        wed{
+            relative{
+                "-1"{"àllarba ji weesu"}
+                "0"{"tay ci àllarba ji"}
+                "1"{"àllarba jiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} àllarba"}
+                }
+                past{
+                    other{"{0} àllarba ci ginaaw"}
+                }
+            }
+        }
+        wed-narrow{
+            relative{
+                "-1"{"àla. ji weesu"}
+                "0"{"tay ci àla. ji"}
+                "1"{"àla. jiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} àla."}
+                }
+                past{
+                    other{"{0} àla. ci ginaaw"}
+                }
+            }
+        }
+        wed-short{
+            relative{
+                "-1"{"àlla. ji weesu"}
+                "0"{"tay ci àlla. ji"}
+                "1"{"àlla. jiy ñëw"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} àlla."}
+                }
+                past{
+                    other{"{0} àlla. ci ginaaw"}
+                }
+            }
+        }
+        week{
+            dn{"ayu-bis"}
+            relative{
+                "-1"{"ayu-bis bi weesu"}
+                "0"{"ayu-bis bii"}
+                "1"{"ayu-bis biy ñëw"}
+            }
+            relativePeriod{"ayu-bisu {0}"}
+            relativeTime{
+                future{
+                    other{"fileek {0} ayi-bis"}
+                }
+                past{
+                    other{"{0} ayi-bis ci ginaaw"}
+                }
+            }
+        }
+        week-narrow{
+            dn{"ayu-b."}
+            relative{
+                "-1"{"ayu-b bi wees"}
+                "0"{"ayu-b bii"}
+                "1"{"ayu-b. ñëw"}
+            }
+            relativePeriod{"ayu-b. {0}"}
+            relativeTime{
+                future{
+                    other{"fileek {0} ayi-b."}
+                }
+                past{
+                    other{"{0} ayi-b. ci ginaaw"}
+                }
+            }
+        }
+        week-short{
+            dn{"ayu-b."}
+            relative{
+                "-1"{"ayu-b bi wees"}
+                "0"{"ayu-b bii"}
+                "1"{"ayu-b. ñëw"}
+            }
+            relativePeriod{"ayu-b. {0}"}
+            relativeTime{
+                future{
+                    other{"fileek {0} ayi-b."}
+                }
+                past{
+                    other{"{0} ayi-b. ci ginaaw"}
+                }
+            }
+        }
+        weekOfMonth{
+            dn{"ayu-bisu weer"}
+        }
+        weekOfMonth-narrow{
+            dn{"ayu-b. we."}
+        }
+        weekOfMonth-short{
+            dn{"ayu-b. we."}
+        }
+        weekday{
+            dn{"bisu ayu-bis"}
+        }
+        weekdayOfMonth{
+            dn{"bisu ayu-bisu weer wi"}
+        }
+        weekdayOfMonth-narrow{
+            dn{"bisu ayu-b. weer"}
+        }
+        weekdayOfMonth-short{
+            dn{"bisu ayu-b. weer"}
+        }
+        year{
+            dn{"at"}
+            relative{
+                "-1"{"daaw"}
+                "0"{"ren"}
+                "1"{"dewen"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} at"}
+                }
+                past{
+                    other{"{0} at ci ginaaw"}
+                }
+            }
+        }
+        year-narrow{
+            dn{"at."}
+            relative{
+                "-1"{"daaw"}
+                "0"{"ren"}
+                "1"{"dewen"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} at"}
+                }
+                past{
+                    other{"{0} at ci ginaaw"}
+                }
+            }
+        }
+        year-short{
+            dn{"at."}
+            relative{
+                "-1"{"daaw"}
+                "0"{"ren"}
+                "1"{"dewen"}
+            }
+            relativeTime{
+                future{
+                    other{"fileek {0} at"}
+                }
+                past{
+                    other{"{0} at ci ginaaw"}
+                }
+            }
+        }
+        zone{
+            dn{"goxu waxtu"}
+        }
+        zone-narrow{
+            dn{"gox"}
+        }
+        zone-short{
+            dn{"goxu"}
+        }
+    }
+    listPattern{
+        standard{
+            2{"{0}, {1}"}
+            end{"{0}, {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+    }
+    measurementSystemNames{
+        UK{"UK"}
+        US{"US"}
+        metric{"Metrik"}
+    }
+}

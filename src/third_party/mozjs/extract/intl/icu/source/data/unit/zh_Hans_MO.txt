@@ -1,0 +1,28 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+zh_Hans_MO{
+    units{
+        compound{
+            per{"{0}/{1}"}
+        }
+        duration{
+            second{
+                other{"{0}秒"}
+            }
+        }
+        temperature{
+            kelvin{
+                dnam{"开氏度"}
+                other{"{0}开氏度"}
+            }
+        }
+    }
+    unitsShort{
+        temperature{
+            kelvin{
+                other{"{0}°K"}
+            }
+        }
+    }
+}

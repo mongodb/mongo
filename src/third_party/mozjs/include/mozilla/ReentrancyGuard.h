@@ -11,47 +11,40 @@
 
 #include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
-#include "mozilla/GuardObjects.h"
 
 namespace mozilla {
 
 /* Useful for implementing containers that assert non-reentrancy */
-class MOZ_RAII ReentrancyGuard
-{
-  MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
+class MOZ_RAII ReentrancyGuard {
 #ifdef DEBUG
   bool& mEntered;
 #endif
 
-public:
-  template<class T>
+ public:
+  template <class T>
 #ifdef DEBUG
-  explicit ReentrancyGuard(T& aObj
-                           MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
-    : mEntered(aObj.mEntered)
+  explicit ReentrancyGuard(T& aObj)
+      : mEntered(aObj.mEntered)
 #else
-  explicit ReentrancyGuard(T&
-                           MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
+  explicit ReentrancyGuard(T&)
 #endif
   {
-    MOZ_GUARD_OBJECT_NOTIFIER_INIT;
 #ifdef DEBUG
     MOZ_ASSERT(!mEntered);
     mEntered = true;
 #endif
   }
-  ~ReentrancyGuard()
-  {
+  ~ReentrancyGuard() {
 #ifdef DEBUG
     mEntered = false;
 #endif
   }
 
-private:
+ private:
   ReentrancyGuard(const ReentrancyGuard&) = delete;
   void operator=(const ReentrancyGuard&) = delete;
 };
 
-} // namespace mozilla
+}  // namespace mozilla
 
 #endif /* mozilla_ReentrancyGuard_h */

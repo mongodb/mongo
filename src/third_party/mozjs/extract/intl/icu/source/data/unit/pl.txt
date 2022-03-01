@@ -1,0 +1,5272 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+pl{
+    durationUnits{
+        hm{"h:mm"}
+        hms{"h:mm:ss"}
+        ms{"m:ss"}
+    }
+    units{
+        acceleration{
+            g-force{
+                dnam{"stała grawitacji"}
+                gender{"neuter"}
+            }
+            meter-per-square-second{
+                case{
+                    accusative{
+                        few{"{0} metry na sekundę do kwadratu"}
+                        many{"{0} metrów na sekundę do kwadratu"}
+                        one{"{0} metr na sekundę do kwadratu"}
+                        other{"{0} metra na sekundę do kwadratu"}
+                    }
+                    dative{
+                        few{"{0} metrom na sekundę do kwadratu"}
+                        many{"{0} metrom na sekundę do kwadratu"}
+                        one{"{0} metrowi na sekundę do kwadratu"}
+                        other{"{0} metra na sekundę do kwadratu"}
+                    }
+                    genitive{
+                        few{"{0} metrów na sekundę do kwadratu"}
+                        many{"{0} metrów na sekundę do kwadratu"}
+                        one{"{0} metra na sekundę do kwadratu"}
+                        other{"{0} metra na sekundę do kwadratu"}
+                    }
+                    instrumental{
+                        few{"{0} metrami na sekundę do kwadratu"}
+                        many{"{0} metrami na sekundę do kwadratu"}
+                        one{"{0} metrem na sekundę do kwadratu"}
+                        other{"{0} metra na sekundę do kwadratu"}
+                    }
+                    locative{
+                        few{"{0} metrach na sekundę do kwadratu"}
+                        many{"{0} metrach na sekundę do kwadratu"}
+                        one{"{0} metrze na sekundę do kwadratu"}
+                        other{"{0} metra na sekundę do kwadratu"}
+                    }
+                    vocative{
+                        few{"{0} metry na sekundę do kwadratu"}
+                        many{"{0} metrów na sekundę do kwadratu"}
+                        one{"{0} metrze na sekundę do kwadratu"}
+                        other{"{0} metra na sekundę do kwadratu"}
+                    }
+                }
+                dnam{"metry na sekundę do kwadratu"}
+                few{"{0} metry na sekundę do kwadratu"}
+                gender{"inanimate"}
+                many{"{0} metrów na sekundę do kwadratu"}
+                one{"{0} metr na sekundę do kwadratu"}
+                other{"{0} metra na sekundę do kwadratu"}
+            }
+        }
+        angle{
+            arc-minute{
+                dnam{"minuty kątowe"}
+                few{"{0} minuty kątowe"}
+                many{"{0} minut kątowych"}
+                one{"{0} minuta kątowa"}
+                other{"{0} minuty kątowej"}
+            }
+            arc-second{
+                dnam{"sekundy kątowe"}
+                few{"{0} sekundy kątowe"}
+                many{"{0} sekund kątowych"}
+                one{"{0} sekunda kątowa"}
+                other{"{0} sekundy kątowej"}
+            }
+            degree{
+                dnam{"stopnie"}
+                few{"{0} stopnie"}
+                many{"{0} stopni"}
+                one{"{0} stopień"}
+                other{"{0} stopnia"}
+            }
+            radian{
+                dnam{"radiany"}
+                few{"{0} radiany"}
+                many{"{0} radianów"}
+                one{"{0} radian"}
+                other{"{0} radiana"}
+            }
+            revolution{
+                dnam{"obrót"}
+                few{"{0} obroty"}
+                many{"{0} obrotów"}
+                one{"{0} obrót"}
+                other{"{0} obrotu"}
+            }
+        }
+        area{
+            acre{
+                case{
+                    accusative{
+                        few{"{0} akry"}
+                        many{"{0} akrów"}
+                        one{"{0} akr"}
+                        other{"{0} akra"}
+                    }
+                    dative{
+                        few{"{0} akrom"}
+                        many{"{0} akrom"}
+                        one{"{0} akrowi"}
+                        other{"{0} akra"}
+                    }
+                    genitive{
+                        few{"{0} akrów"}
+                        many{"{0} akrów"}
+                        one{"{0} akra"}
+                        other{"{0} akra"}
+                    }
+                    instrumental{
+                        few{"{0} akrami"}
+                        many{"{0} akrami"}
+                        one{"{0} akrem"}
+                        other{"{0} akra"}
+                    }
+                    locative{
+                        few{"{0} akrach"}
+                        many{"{0} akrach"}
+                        one{"{0} akrze"}
+                        other{"{0} akra"}
+                    }
+                    vocative{
+                        few{"{0} akry"}
+                        many{"{0} akrów"}
+                        one{"{0} akrze"}
+                        other{"{0} akra"}
+                    }
+                }
+                dnam{"akry"}
+                few{"{0} akry"}
+                gender{"inanimate"}
+                many{"{0} akrów"}
+                one{"{0} akr"}
+                other{"{0} akra"}
+            }
+            dunam{
+                dnam{"dunamy"}
+                few{"{0} dunamy"}
+                many{"{0} dunamów"}
+                one{"{0} dunam"}
+                other{"{0} dunama"}
+            }
+            hectare{
+                case{
+                    accusative{
+                        few{"{0} hektary"}
+                        many{"{0} hektarów"}
+                        one{"{0} hektar"}
+                        other{"{0} hektara"}
+                    }
+                    dative{
+                        few{"{0} hektarom"}
+                        many{"{0} hektarom"}
+                        one{"{0} hektarowi"}
+                        other{"{0} hektara"}
+                    }
+                    genitive{
+                        few{"{0} hektarów"}
+                        many{"{0} hektarów"}
+                        one{"{0} hektara"}
+                        other{"{0} hektara"}
+                    }
+                    instrumental{
+                        few{"{0} hektarami"}
+                        many{"{0} hektarami"}
+                        one{"{0} hektarem"}
+                        other{"{0} hektara"}
+                    }
+                    locative{
+                        few{"{0} hektarach"}
+                        many{"{0} hektarach"}
+                        one{"{0} hektarze"}
+                        other{"{0} hektara"}
+                    }
+                    vocative{
+                        few{"{0} hektary"}
+                        many{"{0} hektarów"}
+                        one{"{0} hektarze"}
+                        other{"{0} hektara"}
+                    }
+                }
+                dnam{"hektary"}
+                few{"{0} hektary"}
+                gender{"inanimate"}
+                many{"{0} hektarów"}
+                one{"{0} hektar"}
+                other{"{0} hektara"}
+            }
+            square-centimeter{
+                case{
+                    accusative{
+                        few{"{0} centymetry kwadratowe"}
+                        many{"{0} centymetrów kwadratowych"}
+                        one{"{0} centymetr kwadratowy"}
+                        other{"{0} centymetra kwadratowego"}
+                    }
+                    dative{
+                        few{"{0} centymetrom kwadratowym"}
+                        many{"{0} centymetrom kwadratowym"}
+                        one{"{0} centymetrowi kwadratowemu"}
+                        other{"{0} centymetra kwadratowego"}
+                    }
+                    genitive{
+                        few{"{0} centymetrów kwadratowych"}
+                        many{"{0} centymetrów kwadratowych"}
+                        one{"{0} centymetra kwadratowego"}
+                        other{"{0} centymetra kwadratowego"}
+                    }
+                    instrumental{
+                        few{"{0} centymetrami kwadratowymi"}
+                        many{"{0} centymetrami kwadratowymi"}
+                        one{"{0} centymetrem kwadratowym"}
+                        other{"{0} centymetra kwadratowego"}
+                    }
+                    locative{
+                        few{"{0} centymetrach kwadratowych"}
+                        many{"{0} centymetrach kwadratowych"}
+                        one{"{0} centymetrze kwadratowym"}
+                        other{"{0} centymetra kwadratowego"}
+                    }
+                    vocative{
+                        few{"{0} centymetry kwadratowe"}
+                        many{"{0} centymetrów kwadratowych"}
+                        one{"{0} centymetrze kwadratowy"}
+                        other{"{0} centymetra kwadratowego"}
+                    }
+                }
+                dnam{"centymetry kwadratowe"}
+                few{"{0} centymetry kwadratowe"}
+                gender{"inanimate"}
+                many{"{0} centymetrów kwadratowych"}
+                one{"{0} centymetr kwadratowy"}
+                other{"{0} centymetra kwadratowego"}
+                per{"{0} na centymetr kwadratowy"}
+            }
+            square-foot{
+                case{
+                    accusative{
+                        few{"{0} stopy kwadratowe"}
+                        many{"{0} stóp kwadratowych"}
+                        one{"{0} stopę kwadratową"}
+                        other{"{0} stopy kwadratowej"}
+                    }
+                    dative{
+                        few{"{0} stopom kwadratowym"}
+                        many{"{0} stopom kwadratowym"}
+                        one{"{0} stopie kwadratowej"}
+                        other{"{0} stopy kwadratowej"}
+                    }
+                    genitive{
+                        few{"{0} stóp kwadratowych"}
+                        many{"{0} stóp kwadratowych"}
+                        one{"{0} stopy kwadratowej"}
+                        other{"{0} stopy kwadratowej"}
+                    }
+                    instrumental{
+                        few{"{0} stopami kwadratowymi"}
+                        many{"{0} stopami kwadratowymi"}
+                        one{"{0} stopą kwadratową"}
+                        other{"{0} stopy kwadratowej"}
+                    }
+                    locative{
+                        few{"{0} stopach kwadratowych"}
+                        many{"{0} stopach kwadratowych"}
+                        one{"{0} stopie kwadratowej"}
+                        other{"{0} stopy kwadratowej"}
+                    }
+                    vocative{
+                        few{"{0} stopy kwadratowe"}
+                        many{"{0} stóp kwadratowych"}
+                        one{"{0} stopo kwadratowa"}
+                        other{"{0} stopy kwadratowej"}
+                    }
+                }
+                dnam{"stopy kwadratowe"}
+                few{"{0} stopy kwadratowe"}
+                gender{"feminine"}
+                many{"{0} stóp kwadratowych"}
+                one{"{0} stopa kwadratowa"}
+                other{"{0} stopy kwadratowej"}
+            }
+            square-inch{
+                dnam{"cale kwadratowe"}
+                few{"{0} cale kwadratowe"}
+                many{"{0} cali kwadratowych"}
+                one{"{0} cal kwadratowy"}
+                other{"{0} cala kwadratowego"}
+                per{"{0} na cal kwadratowy"}
+            }
+            square-kilometer{
+                case{
+                    accusative{
+                        few{"{0} kilometry kwadratowe"}
+                        many{"{0} kilometrów kwadratowych"}
+                        one{"{0} kilometr kwadratowy"}
+                        other{"{0} kilometra kwadratowego"}
+                    }
+                    dative{
+                        few{"{0} kilometrom kwadratowym"}
+                        many{"{0} kilometrom kwadratowym"}
+                        one{"{0} kilometrowi kwadratowemu"}
+                        other{"{0} kilometra kwadratowego"}
+                    }
+                    genitive{
+                        few{"{0} kilometrów kwadratowych"}
+                        many{"{0} kilometrów kwadratowych"}
+                        one{"{0} kilometra kwadratowego"}
+                        other{"{0} kilometra kwadratowego"}
+                    }
+                    instrumental{
+                        few{"{0} kilometrami kwadratowymi"}
+                        many{"{0} kilometrami kwadratowymi"}
+                        one{"{0} kilometrem kwadratowym"}
+                        other{"{0} kilometra kwadratowego"}
+                    }
+                    locative{
+                        few{"{0} kilometrach kwadratowych"}
+                        many{"{0} kilometrach kwadratowych"}
+                        one{"{0} kilometrze kwadratowym"}
+                        other{"{0} kilometra kwadratowego"}
+                    }
+                    vocative{
+                        few{"{0} kilometry kwadratowe"}
+                        many{"{0} kilometrów kwadratowych"}
+                        one{"{0} kilometrze kwadratowy"}
+                        other{"{0} kilometra kwadratowego"}
+                    }
+                }
+                dnam{"kilometry kwadratowe"}
+                few{"{0} kilometry kwadratowe"}
+                gender{"inanimate"}
+                many{"{0} kilometrów kwadratowych"}
+                one{"{0} kilometr kwadratowy"}
+                other{"{0} kilometra kwadratowego"}
+                per{"{0} na kilometr kwadratowy"}
+            }
+            square-meter{
+                dnam{"metry kwadratowe"}
+                few{"{0} metry kwadratowe"}
+                many{"{0} metrów kwadratowych"}
+                one{"{0} metr kwadratowy"}
+                other{"{0} metra kwadratowego"}
+                per{"{0} na metr kwadratowy"}
+            }
+            square-mile{
+                case{
+                    accusative{
+                        few{"{0} mile kwadratowe"}
+                        many{"{0} mil kwadratowych"}
+                        one{"{0} milę kwadratową"}
+                        other{"{0} mili kwadratowej"}
+                    }
+                    dative{
+                        few{"{0} milom kwadratowym"}
+                        many{"{0} milom kwadratowym"}
+                        one{"{0} mili kwadratowej"}
+                        other{"{0} mili kwadratowej"}
+                    }
+                    genitive{
+                        few{"{0} mil kwadratowych"}
+                        many{"{0} mil kwadratowych"}
+                        one{"{0} mili kwadratowej"}
+                        other{"{0} mili kwadratowej"}
+                    }
+                    instrumental{
+                        few{"{0} milami kwadratowymi"}
+                        many{"{0} milami kwadratowymi"}
+                        one{"{0} milą kwadratową"}
+                        other{"{0} mili kwadratowej"}
+                    }
+                    locative{
+                        few{"{0} milach kwadratowych"}
+                        many{"{0} milach kwadratowych"}
+                        one{"{0} mili kwadratowej"}
+                        other{"{0} mili kwadratowej"}
+                    }
+                    vocative{
+                        few{"{0} mile kwadratowe"}
+                        many{"{0} mil kwadratowych"}
+                        one{"{0} milo kwadratowa"}
+                        other{"{0} mili kwadratowej"}
+                    }
+                }
+                dnam{"mile kwadratowe"}
+                few{"{0} mile kwadratowe"}
+                gender{"feminine"}
+                many{"{0} mil kwadratowych"}
+                one{"{0} mila kwadratowa"}
+                other{"{0} mili kwadratowej"}
+                per{"{0} na milę kwadratową"}
+            }
+            square-yard{
+                dnam{"jardy kwadratowe"}
+                few{"{0} jardy kwadratowe"}
+                many{"{0} jardów kwadratowych"}
+                one{"{0} jard kwadratowy"}
+                other{"{0} jarda kwadratowego"}
+            }
+        }
+        compound{
+            1024p1{"kibi{0}"}
+            1024p2{"mebi{0}"}
+            1024p3{"gibi{0}"}
+            1024p4{"tebi{0}"}
+            1024p5{"pebi{0}"}
+            1024p6{"eksbi{0}"}
+            1024p7{"zebi{0}"}
+            1024p8{"jobi{0}"}
+            10p-1{"decy{0}"}
+            10p-12{"piko{0}"}
+            10p-15{"femto{0}"}
+            10p-18{"atto{0}"}
+            10p-2{"centy{0}"}
+            10p-21{"zepto{0}"}
+            10p-24{"jokto{0}"}
+            10p-3{"mili{0}"}
+            10p-6{"mikro{0}"}
+            10p-9{"nano{0}"}
+            10p1{"deka{0}"}
+            10p12{"tera{0}"}
+            10p15{"peta{0}"}
+            10p18{"eksa{0}"}
+            10p2{"hekto{0}"}
+            10p21{"zetta{0}"}
+            10p24{"jotta{0}"}
+            10p3{"kilo{0}"}
+            10p6{"mega{0}"}
+            10p9{"giga{0}"}
+            per{"{0} na {1}"}
+            power2{
+                few{
+                    _{
+                        _{"{0} kwadratowe"}
+                        accusative{"{0} kwadratowe"}
+                        dative{"{0} kwadratowym"}
+                        genitive{"{0} kwadratowych"}
+                        instrumental{"{0} kwadratowymi"}
+                        locative{"{0} kwadratowych"}
+                        vocative{"{0} kwadratowe"}
+                    }
+                    feminine{
+                        _{"{0} kwadratowe"}
+                        accusative{"{0} kwadratowe"}
+                        dative{"{0} kwadratowym"}
+                        genitive{"{0} kwadratowych"}
+                        instrumental{"{0} kwadratowymi"}
+                        locative{"{0} kwadratowych"}
+                        vocative{"{0} kwadratowe"}
+                    }
+                    inanimate{
+                        _{"{0} kwadratowe"}
+                        accusative{"{0} kwadratowe"}
+                        dative{"{0} kwadratowym"}
+                        genitive{"{0} kwadratowych"}
+                        instrumental{"{0} kwadratowymi"}
+                        locative{"{0} kwadratowych"}
+                        vocative{"{0} kwadratowe"}
+                    }
+                }
+                many{
+                    _{
+                        _{"{0} kwadratowych"}
+                        accusative{"{0} kwadratowych"}
+                        dative{"{0} kwadratowym"}
+                        genitive{"{0} kwadratowych"}
+                        instrumental{"{0} kwadratowymi"}
+                        locative{"{0} kwadratowych"}
+                        vocative{"{0} kwadratowych"}
+                    }
+                    feminine{
+                        _{"{0} kwadratowych"}
+                        accusative{"{0} kwadratowych"}
+                        dative{"{0} kwadratowym"}
+                        genitive{"{0} kwadratowych"}
+                        instrumental{"{0} kwadratowymi"}
+                        locative{"{0} kwadratowych"}
+                        vocative{"{0} kwadratowych"}
+                    }
+                    inanimate{
+                        _{"{0} kwadratowych"}
+                        accusative{"{0} kwadratowych"}
+                        dative{"{0} kwadratowym"}
+                        genitive{"{0} kwadratowych"}
+                        instrumental{"{0} kwadratowymi"}
+                        locative{"{0} kwadratowych"}
+                        vocative{"{0} kwadratowych"}
+                    }
+                }
+                one{
+                    _{
+                        _{"{0} kwadratowe"}
+                        accusative{"{0} kwadratowe"}
+                        dative{"{0} kwadratowemu"}
+                        genitive{"{0} kwadratowego"}
+                        instrumental{"{0} kwadratowym"}
+                        locative{"{0} kwadratowym"}
+                        vocative{"{0} kwadratowe"}
+                    }
+                    feminine{
+                        _{"{0} kwadratowa"}
+                        accusative{"{0} kwadratową"}
+                        dative{"{0} kwadratowej"}
+                        genitive{"{0} kwadratowej"}
+                        instrumental{"{0} kwadratową"}
+                        locative{"{0} kwadratowej"}
+                        vocative{"{0} kwadratowa"}
+                    }
+                    inanimate{
+                        _{"{0} kwadratowy"}
+                        accusative{"{0} kwadratowy"}
+                        dative{"{0} kwadratowemu"}
+                        genitive{"{0} kwadratowego"}
+                        instrumental{"{0} kwadratowym"}
+                        locative{"{0} kwadratowym"}
+                        vocative{"{0} kwadratowy"}
+                    }
+                }
+                other{
+                    _{
+                        _{"{0} kwadratowego"}
+                        accusative{"{0} kwadratowego"}
+                        dative{"{0} kwadratowego"}
+                        genitive{"{0} kwadratowego"}
+                        instrumental{"{0} kwadratowego"}
+                        locative{"{0} kwadratowego"}
+                        vocative{"{0} kwadratowego"}
+                    }
+                    feminine{
+                        _{"{0} kwadratowej"}
+                        accusative{"{0} kwadratowej"}
+                        dative{"{0} kwadratowej"}
+                        genitive{"{0} kwadratowej"}
+                        instrumental{"{0} kwadratowej"}
+                        locative{"{0} kwadratowej"}
+                        vocative{"{0} kwadratowej"}
+                    }
+                    inanimate{
+                        _{"{0} kwadratowego"}
+                        accusative{"{0} kwadratowego"}
+                        dative{"{0} kwadratowego"}
+                        genitive{"{0} kwadratowego"}
+                        instrumental{"{0} kwadratowego"}
+                        locative{"{0} kwadratowego"}
+                        vocative{"{0} kwadratowego"}
+                    }
+                }
+            }
+            power3{
+                few{
+                    _{
+                        _{"{0} sześcienne"}
+                        accusative{"{0} sześcienne"}
+                        dative{"{0} sześciennym"}
+                        genitive{"{0} sześciennych"}
+                        instrumental{"{0} sześciennymi"}
+                        locative{"{0} sześciennych"}
+                        vocative{"{0} sześcienne"}
+                    }
+                    feminine{
+                        _{"{0} sześcienne"}
+                        accusative{"{0} sześcienne"}
+                        dative{"{0} sześciennym"}
+                        genitive{"{0} sześciennych"}
+                        instrumental{"{0} sześciennymi"}
+                        locative{"{0} sześciennych"}
+                        vocative{"{0} sześcienne"}
+                    }
+                    inanimate{
+                        _{"{0} sześcienne"}
+                        accusative{"{0} sześcienne"}
+                        dative{"{0} sześciennym"}
+                        genitive{"{0} sześciennych"}
+                        instrumental{"{0} sześciennymi"}
+                        locative{"{0} sześciennych"}
+                        vocative{"{0} sześcienne"}
+                    }
+                }
+                many{
+                    _{
+                        _{"{0} sześciennych"}
+                        accusative{"{0} sześciennych"}
+                        dative{"{0} sześciennym"}
+                        genitive{"{0} sześciennych"}
+                        instrumental{"{0} sześciennymi"}
+                        locative{"{0} sześciennych"}
+                        vocative{"{0} sześciennych"}
+                    }
+                    feminine{
+                        _{"{0} sześciennych"}
+                        accusative{"{0} sześciennych"}
+                        dative{"{0} sześciennym"}
+                        genitive{"{0} sześciennych"}
+                        instrumental{"{0} sześciennymi"}
+                        locative{"{0} sześciennych"}
+                        vocative{"{0} sześciennych"}
+                    }
+                    inanimate{
+                        _{"{0} sześciennych"}
+                        accusative{"{0} sześciennych"}
+                        dative{"{0} sześciennym"}
+                        genitive{"{0} sześciennych"}
+                        instrumental{"{0} sześciennymi"}
+                        locative{"{0} sześciennych"}
+                        vocative{"{0} sześciennych"}
+                    }
+                }
+                one{
+                    _{
+                        _{"{0} sześcienne"}
+                        accusative{"{0} sześcienne"}
+                        dative{"{0} sześciennemu"}
+                        genitive{"{0} sześciennego"}
+                        instrumental{"{0} sześciennym"}
+                        locative{"{0} sześciennym"}
+                        vocative{"{0} sześcienne"}
+                    }
+                    feminine{
+                        _{"{0} sześcienna"}
+                        accusative{"{0} sześcienną"}
+                        dative{"{0} sześciennej"}
+                        genitive{"{0} sześciennej"}
+                        instrumental{"{0} sześcienną"}
+                        locative{"{0} sześciennej"}
+                        vocative{"{0} sześcienna"}
+                    }
+                    inanimate{
+                        _{"{0} sześcienny"}
+                        accusative{"{0} sześcienny"}
+                        dative{"{0} sześciennemu"}
+                        genitive{"{0} sześciennego"}
+                        instrumental{"{0} sześciennym"}
+                        locative{"{0} sześciennym"}
+                        vocative{"{0} sześcienny"}
+                    }
+                }
+                other{
+                    _{
+                        _{"{0} sześciennego"}
+                        accusative{"{0} sześciennego"}
+                        dative{"{0} sześciennego"}
+                        genitive{"{0} sześciennego"}
+                        instrumental{"{0} sześciennego"}
+                        locative{"{0} sześciennego"}
+                        vocative{"{0} sześciennego"}
+                    }
+                    feminine{
+                        _{"{0} sześciennej"}
+                        accusative{"{0} sześciennej"}
+                        dative{"{0} sześciennej"}
+                        genitive{"{0} sześciennej"}
+                        instrumental{"{0} sześciennej"}
+                        locative{"{0} sześciennej"}
+                        vocative{"{0} sześciennej"}
+                    }
+                    inanimate{
+                        _{"{0} sześciennego"}
+                        accusative{"{0} sześciennego"}
+                        dative{"{0} sześciennego"}
+                        genitive{"{0} sześciennego"}
+                        instrumental{"{0} sześciennego"}
+                        locative{"{0} sześciennego"}
+                        vocative{"{0} sześciennego"}
+                    }
+                }
+            }
+        }
+        concentr{
+            karat{
+                dnam{"karaty"}
+                few{"{0} karaty"}
+                many{"{0} karatów"}
+                one{"{0} karat"}
+                other{"{0} karata"}
+            }
+            milligram-ofglucose-per-deciliter{
+                dnam{"miligramy na decylitr"}
+                few{"{0} miligramy na decylitr"}
+                many{"{0} miligramów na decylitr"}
+                one{"{0} miligram na decylitr"}
+                other{"{0} miligrama na decylitr"}
+            }
+            millimole-per-liter{
+                dnam{"milimole na litr"}
+                few{"{0} milimole na litr"}
+                many{"{0} milimoli na litr"}
+                one{"{0} milimol na litr"}
+                other{"{0} milimola na litr"}
+            }
+            mole{
+                dnam{"mol"}
+                few{"{0} mole"}
+                many{"{0} moli"}
+                one{"{0} mol"}
+                other{"{0} mola"}
+            }
+            percent{
+                case{
+                    accusative{
+                        few{"{0} procent"}
+                        many{"{0} procent"}
+                        one{"{0} procent"}
+                        other{"{0} procent"}
+                    }
+                    dative{
+                        few{"{0} procentom"}
+                        many{"{0} procentom"}
+                        one{"{0} procentowi"}
+                        other{"{0} procent"}
+                    }
+                    genitive{
+                        few{"{0} procent"}
+                        many{"{0} procent"}
+                        one{"{0} procentu"}
+                        other{"{0} procent"}
+                    }
+                    instrumental{
+                        few{"{0} procentami"}
+                        many{"{0} procentami"}
+                        one{"{0} procentem"}
+                        other{"{0} procent"}
+                    }
+                    locative{
+                        few{"{0} procentach"}
+                        many{"{0} procentach"}
+                        one{"{0} procencie"}
+                        other{"{0} procent"}
+                    }
+                    vocative{
+                        few{"{0} procent"}
+                        many{"{0} procent"}
+                        one{"{0} procencie"}
+                        other{"{0} procent"}
+                    }
+                }
+                dnam{"procent"}
+                few{"{0} procent"}
+                gender{"inanimate"}
+                many{"{0} procent"}
+                one{"{0} procent"}
+                other{"{0} procent"}
+            }
+            permille{
+                dnam{"promil"}
+                few{"{0} promile"}
+                many{"{0} promili"}
+                one{"{0} promil"}
+                other{"{0} promila"}
+            }
+            permillion{
+                dnam{"części na milion"}
+                few{"{0} części na milion"}
+                many{"{0} części na milion"}
+                one{"{0} część na milion"}
+                other{"{0} części na milion"}
+            }
+            permyriad{
+                dnam{"punkt bazowy"}
+                few{"{0} punkty bazowe"}
+                many{"{0} punktów bazowych"}
+                one{"{0} punkt bazowy"}
+                other{"{0} punktu bazowego"}
+            }
+        }
+        consumption{
+            liter-per-100-kilometer{
+                case{
+                    accusative{
+                        few{"{0} litry na 100 kilometrów"}
+                        many{"{0} litrów na 100 kilometrów"}
+                        one{"{0} litr na 100 kilometrów"}
+                        other{"{0} litra na 100 kilometrów"}
+                    }
+                    dative{
+                        few{"{0} litrom na 100 kilometrów"}
+                        many{"{0} litrom na 100 kilometrów"}
+                        one{"{0} litrowi na 100 kilometrów"}
+                        other{"{0} litra na 100 kilometrów"}
+                    }
+                    genitive{
+                        few{"{0} litrów na 100 kilometrów"}
+                        many{"{0} litrów na 100 kilometrów"}
+                        one{"{0} litra na 100 kilometrów"}
+                        other{"{0} litra na 100 kilometrów"}
+                    }
+                    instrumental{
+                        few{"{0} litrami na 100 kilometrów"}
+                        many{"{0} litrami na 100 kilometrów"}
+                        one{"{0} litrem na 100 kilometrów"}
+                        other{"{0} litra na 100 kilometrów"}
+                    }
+                    locative{
+                        few{"{0} litrach na 100 kilometrów"}
+                        many{"{0} litrach na 100 kilometrów"}
+                        one{"{0} litrze na 100 kilometrów"}
+                        other{"{0} litra na 100 kilometrów"}
+                    }
+                    vocative{
+                        few{"{0} litry na 100 kilometrów"}
+                        many{"{0} litrów na 100 kilometrów"}
+                        one{"{0} litrze na 100 kilometrów"}
+                        other{"{0} litra na 100 kilometrów"}
+                    }
+                }
+                dnam{"litry na 100 kilometrów"}
+                few{"{0} litry na 100 kilometrów"}
+                gender{"inanimate"}
+                many{"{0} litrów na 100 kilometrów"}
+                one{"{0} litr na 100 kilometrów"}
+                other{"{0} litra na 100 kilometrów"}
+            }
+            liter-per-kilometer{
+                dnam{"litry na kilometr"}
+                few{"{0} litry na kilometr"}
+                many{"{0} litrów na kilometr"}
+                one{"{0} litr na kilometr"}
+                other{"{0} litra na kilometr"}
+            }
+            mile-per-gallon{
+                case{
+                    accusative{
+                        few{"{0} mile na galon"}
+                        many{"{0} mil na galon"}
+                        one{"{0} milę na galon"}
+                        other{"{0} mili na galon"}
+                    }
+                    dative{
+                        few{"{0} milom na galon"}
+                        many{"{0} milom na galon"}
+                        one{"{0} mili na galon"}
+                        other{"{0} mili na galon"}
+                    }
+                    genitive{
+                        few{"{0} mil na galon"}
+                        many{"{0} mil na galon"}
+                        one{"{0} mili na galon"}
+                        other{"{0} mili na galon"}
+                    }
+                    instrumental{
+                        few{"{0} milami na galon"}
+                        many{"{0} milami na galon"}
+                        one{"{0} milą na galon"}
+                        other{"{0} mili na galon"}
+                    }
+                    locative{
+                        few{"{0} milach na galon"}
+                        many{"{0} milach na galon"}
+                        one{"{0} mili na galon"}
+                        other{"{0} mili na galon"}
+                    }
+                    vocative{
+                        few{"{0} mile na galon"}
+                        many{"{0} mil na galon"}
+                        one{"{0} milo na galon"}
+                        other{"{0} mili na galon"}
+                    }
+                }
+                dnam{"mile na galon"}
+                few{"{0} mile na galon"}
+                gender{"feminine"}
+                many{"{0} mil na galon"}
+                one{"{0} mila na galon"}
+                other{"{0} mili na galon"}
+            }
+            mile-per-gallon-imperial{
+                case{
+                    accusative{
+                        few{"{0} mile na galon angielski"}
+                        many{"{0} mil na galon angielski"}
+                        one{"{0} milę na galon angielski"}
+                        other{"{0} mili na galon angielski"}
+                    }
+                    dative{
+                        few{"{0} milom na galon angielski"}
+                        many{"{0} milom na galon angielski"}
+                        one{"{0} mili na galon angielski"}
+                        other{"{0} mili na galon angielski"}
+                    }
+                    genitive{
+                        few{"{0} mil na galon angielski"}
+                        many{"{0} mil na galon angielski"}
+                        one{"{0} mili na galon angielski"}
+                        other{"{0} mili na galon angielski"}
+                    }
+                    instrumental{
+                        few{"{0} milami na galon angielski"}
+                        many{"{0} milami na galon angielski"}
+                        one{"{0} milą na galon angielski"}
+                        other{"{0} mili na galon angielski"}
+                    }
+                    locative{
+                        few{"{0} milach na galon angielski"}
+                        many{"{0} milach na galon angielski"}
+                        one{"{0} mili na galon angielski"}
+                        other{"{0} mili na galon angielski"}
+                    }
+                    vocative{
+                        few{"{0} mile na galon angielski"}
+                        many{"{0} mil na galon angielski"}
+                        one{"{0} milo na galon angielski"}
+                        other{"{0} mili na galon angielski"}
+                    }
+                }
+                dnam{"mile na galon angielski"}
+                few{"{0} mile na galon angielski"}
+                gender{"feminine"}
+                many{"{0} mil na galon angielski"}
+                one{"{0} mila na galon angielski"}
+                other{"{0} mili na galon angielski"}
+            }
+        }
+        coordinate{
+            dnam{"kierunek świata"}
+            east{"{0} długości geograficznej wschodniej"}
+            north{"{0} szerokości geograficznej północnej"}
+            south{"{0} szerokości geograficznej południowej"}
+            west{"{0} długości geograficznej zachodniej"}
+        }
+        digital{
+            bit{
+                dnam{"bity"}
+                few{"{0} bity"}
+                many{"{0} bitów"}
+                one{"{0} bit"}
+                other{"{0} bita"}
+            }
+            byte{
+                dnam{"bajty"}
+                few{"{0} bajty"}
+                many{"{0} bajtów"}
+                one{"{0} bajt"}
+                other{"{0} bajta"}
+            }
+            gigabit{
+                dnam{"gigabity"}
+                few{"{0} gigabity"}
+                many{"{0} gigabitów"}
+                one{"{0} gigabit"}
+                other{"{0} gigabita"}
+            }
+            gigabyte{
+                dnam{"gigabajty"}
+                few{"{0} gigabajty"}
+                many{"{0} gigabajtów"}
+                one{"{0} gigabajt"}
+                other{"{0} gigabajta"}
+            }
+            kilobit{
+                dnam{"kilobity"}
+                few{"{0} kilobity"}
+                many{"{0} kilobitów"}
+                one{"{0} kilobit"}
+                other{"{0} kilobita"}
+            }
+            kilobyte{
+                dnam{"kilobajty"}
+                few{"{0} kilobajty"}
+                many{"{0} kilobajtów"}
+                one{"{0} kilobajt"}
+                other{"{0} kilobajta"}
+            }
+            megabit{
+                dnam{"megabity"}
+                few{"{0} megabity"}
+                many{"{0} megabitów"}
+                one{"{0} megabit"}
+                other{"{0} megabita"}
+            }
+            megabyte{
+                dnam{"megabajty"}
+                few{"{0} megabajty"}
+                many{"{0} megabajtów"}
+                one{"{0} megabajt"}
+                other{"{0} megabajta"}
+            }
+            petabyte{
+                dnam{"petabajty"}
+                few{"{0} petabajty"}
+                many{"{0} petabajtów"}
+                one{"{0} petabajt"}
+                other{"{0} petabajta"}
+            }
+            terabit{
+                dnam{"terabity"}
+                few{"{0} terabity"}
+                many{"{0} terabitów"}
+                one{"{0} terabit"}
+                other{"{0} terabita"}
+            }
+            terabyte{
+                dnam{"terabajty"}
+                few{"{0} terabajty"}
+                many{"{0} terabajtów"}
+                one{"{0} terabajt"}
+                other{"{0} terabajta"}
+            }
+        }
+        duration{
+            century{
+                dnam{"wieki"}
+                few{"{0} wieki"}
+                many{"{0} wieków"}
+                one{"{0} wiek"}
+                other{"{0} wieku"}
+            }
+            day{
+                case{
+                    accusative{
+                        few{"{0} doby"}
+                        many{"{0} dób"}
+                        one{"{0} dobę"}
+                        other{"{0} doby"}
+                    }
+                    dative{
+                        few{"{0} dobom"}
+                        many{"{0} dobom"}
+                        one{"{0} dobie"}
+                        other{"{0} doby"}
+                    }
+                    genitive{
+                        few{"{0} dób"}
+                        many{"{0} dób"}
+                        one{"{0} doby"}
+                        other{"{0} doby"}
+                    }
+                    instrumental{
+                        few{"{0} dobami"}
+                        many{"{0} dobami"}
+                        one{"{0} dobą"}
+                        other{"{0} doby"}
+                    }
+                    locative{
+                        few{"{0} dobach"}
+                        many{"{0} dobach"}
+                        one{"{0} dobie"}
+                        other{"{0} doby"}
+                    }
+                    vocative{
+                        few{"{0} doby"}
+                        many{"{0} dób"}
+                        one{"{0} dobo"}
+                        other{"{0} doby"}
+                    }
+                }
+                dnam{"doby"}
+                few{"{0} doby"}
+                gender{"feminine"}
+                many{"{0} dób"}
+                one{"{0} doba"}
+                other{"{0} doby"}
+                per{"{0} na dobę"}
+            }
+            decade{
+                dnam{"dekady"}
+                few{"{0} dekady"}
+                many{"{0} dekad"}
+                one{"{0} dekada"}
+                other{"{0} dekady"}
+            }
+            hour{
+                case{
+                    accusative{
+                        few{"{0} godziny"}
+                        many{"{0} godzin"}
+                        one{"{0} godzinę"}
+                        other{"{0} godziny"}
+                    }
+                    dative{
+                        few{"{0} godzinom"}
+                        many{"{0} godzinom"}
+                        one{"{0} godzinie"}
+                        other{"{0} godziny"}
+                    }
+                    genitive{
+                        few{"{0} godzin"}
+                        many{"{0} godzin"}
+                        one{"{0} godziny"}
+                        other{"{0} godziny"}
+                    }
+                    instrumental{
+                        few{"{0} godzinami"}
+                        many{"{0} godzinami"}
+                        one{"{0} godziną"}
+                        other{"{0} godziny"}
+                    }
+                    locative{
+                        few{"{0} godzinach"}
+                        many{"{0} godzinach"}
+                        one{"{0} godzinie"}
+                        other{"{0} godziny"}
+                    }
+                    vocative{
+                        few{"{0} godziny"}
+                        many{"{0} godzin"}
+                        one{"{0} godzino"}
+                        other{"{0} godziny"}
+                    }
+                }
+                dnam{"godziny"}
+                few{"{0} godziny"}
+                gender{"feminine"}
+                many{"{0} godzin"}
+                one{"{0} godzina"}
+                other{"{0} godziny"}
+                per{"{0} na godzinę"}
+            }
+            microsecond{
+                dnam{"mikrosekundy"}
+                few{"{0} mikrosekundy"}
+                many{"{0} mikrosekund"}
+                one{"{0} mikrosekunda"}
+                other{"{0} mikrosekundy"}
+            }
+            millisecond{
+                dnam{"milisekundy"}
+                few{"{0} milisekundy"}
+                many{"{0} milisekund"}
+                one{"{0} milisekunda"}
+                other{"{0} milisekundy"}
+            }
+            minute{
+                case{
+                    accusative{
+                        few{"{0} minuty"}
+                        many{"{0} minut"}
+                        one{"{0} minutę"}
+                        other{"{0} minuty"}
+                    }
+                    dative{
+                        few{"{0} minutom"}
+                        many{"{0} minutom"}
+                        one{"{0} minucie"}
+                        other{"{0} minuty"}
+                    }
+                    genitive{
+                        few{"{0} minut"}
+                        many{"{0} minut"}
+                        one{"{0} minuty"}
+                        other{"{0} minuty"}
+                    }
+                    instrumental{
+                        few{"{0} minutami"}
+                        many{"{0} minutami"}
+                        one{"{0} minutą"}
+                        other{"{0} minuty"}
+                    }
+                    locative{
+                        few{"{0} minutach"}
+                        many{"{0} minutach"}
+                        one{"{0} minucie"}
+                        other{"{0} minuty"}
+                    }
+                    vocative{
+                        few{"{0} minuty"}
+                        many{"{0} minut"}
+                        one{"{0} minuto"}
+                        other{"{0} minuty"}
+                    }
+                }
+                dnam{"minuty"}
+                few{"{0} minuty"}
+                gender{"feminine"}
+                many{"{0} minut"}
+                one{"{0} minuta"}
+                other{"{0} minuty"}
+                per{"{0} na minutę"}
+            }
+            month{
+                case{
+                    accusative{
+                        few{"{0} miesiące"}
+                        many{"{0} miesięcy"}
+                        one{"{0} miesiąc"}
+                        other{"{0} miesiąca"}
+                    }
+                    dative{
+                        few{"{0} miesiącom"}
+                        many{"{0} miesiącom"}
+                        one{"{0} miesiącowi"}
+                        other{"{0} miesiąca"}
+                    }
+                    genitive{
+                        few{"{0} miesięcy"}
+                        many{"{0} miesięcy"}
+                        one{"{0} miesiąca"}
+                        other{"{0} miesiąca"}
+                    }
+                    instrumental{
+                        few{"{0} miesiącami"}
+                        many{"{0} miesiącami"}
+                        one{"{0} miesiącem"}
+                        other{"{0} miesiąca"}
+                    }
+                    locative{
+                        few{"{0} miesiącach"}
+                        many{"{0} miesiącach"}
+                        one{"{0} miesiącu"}
+                        other{"{0} miesiąca"}
+                    }
+                    vocative{
+                        few{"{0} miesiące"}
+                        many{"{0} miesięcy"}
+                        one{"{0} miesiącu"}
+                        other{"{0} miesiąca"}
+                    }
+                }
+                dnam{"miesiące"}
+                few{"{0} miesiące"}
+                gender{"inanimate"}
+                many{"{0} miesięcy"}
+                one{"{0} miesiąc"}
+                other{"{0} miesiąca"}
+                per{"{0} na miesiąc"}
+            }
+            nanosecond{
+                dnam{"nanosekundy"}
+                few{"{0} nanosekundy"}
+                many{"{0} nanosekund"}
+                one{"{0} nanosekunda"}
+                other{"{0} nanosekundy"}
+            }
+            second{
+                case{
+                    accusative{
+                        few{"{0} sekundy"}
+                        many{"{0} sekund"}
+                        one{"{0} sekundę"}
+                        other{"{0} sekundy"}
+                    }
+                    dative{
+                        few{"{0} sekundom"}
+                        many{"{0} sekundom"}
+                        one{"{0} sekundzie"}
+                        other{"{0} sekundy"}
+                    }
+                    genitive{
+                        few{"{0} sekund"}
+                        many{"{0} sekund"}
+                        one{"{0} sekundy"}
+                        other{"{0} sekundy"}
+                    }
+                    instrumental{
+                        few{"{0} sekundami"}
+                        many{"{0} sekundami"}
+                        one{"{0} sekundą"}
+                        other{"{0} sekundy"}
+                    }
+                    locative{
+                        few{"{0} sekundach"}
+                        many{"{0} sekundach"}
+                        one{"{0} sekundzie"}
+                        other{"{0} sekundy"}
+                    }
+                    vocative{
+                        few{"{0} sekundy"}
+                        many{"{0} sekund"}
+                        one{"{0} sekundo"}
+                        other{"{0} sekundy"}
+                    }
+                }
+                dnam{"sekundy"}
+                few{"{0} sekundy"}
+                gender{"feminine"}
+                many{"{0} sekund"}
+                one{"{0} sekunda"}
+                other{"{0} sekundy"}
+                per{"{0} na sekundę"}
+            }
+            week{
+                case{
+                    accusative{
+                        few{"{0} tygodnie"}
+                        many{"{0} tygodni"}
+                        one{"{0} tydzień"}
+                        other{"{0} tygodnia"}
+                    }
+                    dative{
+                        few{"{0} tygodniom"}
+                        many{"{0} tygodniom"}
+                        one{"{0} tygodniowi"}
+                        other{"{0} tygodnia"}
+                    }
+                    genitive{
+                        few{"{0} tygodni"}
+                        many{"{0} tygodni"}
+                        one{"{0} tygodnia"}
+                        other{"{0} tygodnia"}
+                    }
+                    instrumental{
+                        few{"{0} tygodniami"}
+                        many{"{0} tygodniami"}
+                        one{"{0} tygodniem"}
+                        other{"{0} tygodnia"}
+                    }
+                    locative{
+                        few{"{0} tygodniach"}
+                        many{"{0} tygodniach"}
+                        one{"{0} tygodniu"}
+                        other{"{0} tygodnia"}
+                    }
+                    vocative{
+                        few{"{0} tygodnie"}
+                        many{"{0} tygodni"}
+                        one{"{0} tygodniu"}
+                        other{"{0} tygodnia"}
+                    }
+                }
+                dnam{"tygodnie"}
+                few{"{0} tygodnie"}
+                gender{"inanimate"}
+                many{"{0} tygodni"}
+                one{"{0} tydzień"}
+                other{"{0} tygodnia"}
+                per{"{0} na tydzień"}
+            }
+            year{
+                case{
+                    accusative{
+                        few{"{0} lata"}
+                        many{"{0} lat"}
+                        one{"{0} rok"}
+                        other{"{0} roku"}
+                    }
+                    dative{
+                        few{"{0} latom"}
+                        many{"{0} latom"}
+                        one{"{0} rokowi"}
+                        other{"{0} roku"}
+                    }
+                    genitive{
+                        few{"{0} lat"}
+                        many{"{0} lat"}
+                        one{"{0} roku"}
+                        other{"{0} roku"}
+                    }
+                    instrumental{
+                        few{"{0} latami"}
+                        many{"{0} latami"}
+                        one{"{0} rokiem"}
+                        other{"{0} roku"}
+                    }
+                    locative{
+                        few{"{0} latach"}
+                        many{"{0} latach"}
+                        one{"{0} roku"}
+                        other{"{0} roku"}
+                    }
+                    vocative{
+                        few{"{0} lata"}
+                        many{"{0} lat"}
+                        one{"{0} roku"}
+                        other{"{0} roku"}
+                    }
+                }
+                dnam{"lata"}
+                few{"{0} lata"}
+                gender{"inanimate"}
+                many{"{0} lat"}
+                one{"{0} rok"}
+                other{"{0} roku"}
+                per{"{0} na rok"}
+            }
+        }
+        electric{
+            ampere{
+                dnam{"ampery"}
+                few{"{0} ampery"}
+                many{"{0} amperów"}
+                one{"{0} amper"}
+                other{"{0} ampera"}
+            }
+            milliampere{
+                dnam{"miliampery"}
+                few{"{0} miliampery"}
+                many{"{0} miliamperów"}
+                one{"{0} miliamper"}
+                other{"{0} miliampera"}
+            }
+            ohm{
+                dnam{"omy"}
+                few{"{0} omy"}
+                many{"{0} omów"}
+                one{"{0} om"}
+                other{"{0} oma"}
+            }
+            volt{
+                dnam{"wolty"}
+                few{"{0} wolty"}
+                many{"{0} woltów"}
+                one{"{0} wolt"}
+                other{"{0} wolta"}
+            }
+        }
+        energy{
+            british-thermal-unit{
+                dnam{"brytyjska jednostka ciepła"}
+                few{"{0} brytyjskie jednostki ciepła"}
+                many{"{0} brytyjskich jednostek ciepła"}
+                one{"{0} brytyjska jednostka ciepła"}
+                other{"{0} brytyjskiej jednostki ciepła"}
+            }
+            calorie{
+                dnam{"kalorie"}
+                few{"{0} kalorie"}
+                many{"{0} kalorii"}
+                one{"{0} kaloria"}
+                other{"{0} kalorii"}
+            }
+            electronvolt{
+                dnam{"elektronowolty"}
+                few{"{0} elektronowolty"}
+                many{"{0} elektronowoltów"}
+                one{"{0} elektronowolt"}
+                other{"{0} elektronowolta"}
+            }
+            foodcalorie{
+                case{
+                    accusative{
+                        few{"{0} kalorie"}
+                        many{"{0} kalorii"}
+                        one{"{0} kalorię"}
+                        other{"{0} kalorii"}
+                    }
+                    dative{
+                        few{"{0} kaloriom"}
+                        many{"{0} kaloriom"}
+                        one{"{0} kalorii"}
+                        other{"{0} kalorii"}
+                    }
+                    genitive{
+                        few{"{0} kalorii"}
+                        many{"{0} kalorii"}
+                        one{"{0} kalorii"}
+                        other{"{0} kalorii"}
+                    }
+                    instrumental{
+                        few{"{0} kaloriami"}
+                        many{"{0} kaloriami"}
+                        one{"{0} kalorią"}
+                        other{"{0} kalorii"}
+                    }
+                    locative{
+                        few{"{0} kaloriach"}
+                        many{"{0} kaloriach"}
+                        one{"{0} kalorii"}
+                        other{"{0} kalorii"}
+                    }
+                    vocative{
+                        few{"{0} kalorie"}
+                        many{"{0} kalorii"}
+                        one{"{0} kalorio"}
+                        other{"{0} kalorii"}
+                    }
+                }
+                dnam{"kalorie"}
+                few{"{0} kalorie"}
+                gender{"feminine"}
+                many{"{0} kalorii"}
+                one{"{0} kaloria"}
+                other{"{0} kalorii"}
+            }
+            joule{
+                dnam{"dżule"}
+                few{"{0} dżule"}
+                many{"{0} dżuli"}
+                one{"{0} dżul"}
+                other{"{0} dżula"}
+            }
+            kilocalorie{
+                case{
+                    accusative{
+                        few{"{0} kilokalorie"}
+                        many{"{0} kilokalorii"}
+                        one{"{0} kilokalorię"}
+                        other{"{0} kilokalorii"}
+                    }
+                    dative{
+                        few{"{0} kilokaloriom"}
+                        many{"{0} kilokaloriom"}
+                        one{"{0} kilokalorii"}
+                        other{"{0} kilokalorii"}
+                    }
+                    genitive{
+                        few{"{0} kilokalorii"}
+                        many{"{0} kilokalorii"}
+                        one{"{0} kilokalorii"}
+                        other{"{0} kilokalorii"}
+                    }
+                    instrumental{
+                        few{"{0} kilokaloriami"}
+                        many{"{0} kilokaloriami"}
+                        one{"{0} kilokalorią"}
+                        other{"{0} kilokalorii"}
+                    }
+                    locative{
+                        few{"{0} kilokaloriach"}
+                        many{"{0} kilokaloriach"}
+                        one{"{0} kilokalorii"}
+                        other{"{0} kilokalorii"}
+                    }
+                    vocative{
+                        few{"{0} kilokalorie"}
+                        many{"{0} kilokalorii"}
+                        one{"{0} kilokalorio"}
+                        other{"{0} kilokalorii"}
+                    }
+                }
+                dnam{"kilokalorie"}
+                few{"{0} kilokalorie"}
+                gender{"feminine"}
+                many{"{0} kilokalorii"}
+                one{"{0} kilokaloria"}
+                other{"{0} kilokalorii"}
+            }
+            kilojoule{
+                dnam{"kilodżule"}
+                few{"{0} kilodżule"}
+                many{"{0} kilodżuli"}
+                one{"{0} kilodżul"}
+                other{"{0} kilodżula"}
+            }
+            kilowatt-hour{
+                dnam{"kilowatogodziny"}
+                few{"{0} kilowatogodziny"}
+                many{"{0} kilowatogodzin"}
+                one{"{0} kilowatogodzina"}
+                other{"{0} kilowatogodziny"}
+            }
+            therm-us{
+                dnam{"thermy amerykańskie"}
+                few{"{0} thermy amerykańskie"}
+                many{"{0} thermów amerykańskich"}
+                one{"{0} therm amerykański"}
+                other{"{0} therma amerykańskiego"}
+            }
+        }
+        force{
+            newton{
+                dnam{"niutony"}
+                few{"{0} niutony"}
+                many{"{0} niutonów"}
+                one{"{0} niuton"}
+                other{"{0} niutona"}
+            }
+            pound-force{
+                dnam{"funt-siła"}
+                few{"{0} funty-siły"}
+                many{"{0} funtów-siły"}
+                one{"{0} funt-siła"}
+                other{"{0} funta-siły"}
+            }
+        }
+        frequency{
+            gigahertz{
+                dnam{"gigaherce"}
+                few{"{0} gigaherce"}
+                many{"{0} gigaherców"}
+                one{"{0} gigaherc"}
+                other{"{0} gigaherca"}
+            }
+            hertz{
+                dnam{"herce"}
+                few{"{0} herce"}
+                many{"{0} herców"}
+                one{"{0} herc"}
+                other{"{0} herca"}
+            }
+            kilohertz{
+                dnam{"kiloherce"}
+                few{"{0} kiloherce"}
+                many{"{0} kiloherców"}
+                one{"{0} kiloherc"}
+                other{"{0} kiloherca"}
+            }
+            megahertz{
+                dnam{"megaherce"}
+                few{"{0} megaherce"}
+                many{"{0} megaherców"}
+                one{"{0} megaherc"}
+                other{"{0} megaherca"}
+            }
+        }
+        graphics{
+            em{
+                dnam{"firety"}
+                few{"{0} firety"}
+                many{"{0} firetów"}
+                one{"{0} firet"}
+                other{"{0} firetu"}
+            }
+            megapixel{
+                dnam{"megapiksele"}
+                few{"{0} megapiksele"}
+                many{"{0} megapikseli"}
+                one{"{0} megapiksel"}
+                other{"{0} megapiksela"}
+            }
+            pixel{
+                dnam{"piksele"}
+                few{"{0} piksele"}
+                many{"{0} pikseli"}
+                one{"{0} piksel"}
+                other{"{0} piksela"}
+            }
+        }
+        length{
+            astronomical-unit{
+                dnam{"jednostki astronomiczne"}
+                few{"{0} jednostki astronomiczne"}
+                many{"{0} jednostek astronomicznych"}
+                one{"{0} jednostka astronomiczna"}
+                other{"{0} jednostki astronomicznej"}
+            }
+            centimeter{
+                case{
+                    accusative{
+                        few{"{0} centymetry"}
+                        many{"{0} centymetrów"}
+                        one{"{0} centymetr"}
+                        other{"{0} centymetra"}
+                    }
+                    dative{
+                        few{"{0} centymetrom"}
+                        many{"{0} centymetrom"}
+                        one{"{0} centymetrowi"}
+                        other{"{0} centymetra"}
+                    }
+                    genitive{
+                        few{"{0} centymetrów"}
+                        many{"{0} centymetrów"}
+                        one{"{0} centymetra"}
+                        other{"{0} centymetra"}
+                    }
+                    instrumental{
+                        few{"{0} centymetrami"}
+                        many{"{0} centymetrami"}
+                        one{"{0} centymetrem"}
+                        other{"{0} centymetra"}
+                    }
+                    locative{
+                        few{"{0} centymetrach"}
+                        many{"{0} centymetrach"}
+                        one{"{0} centymetrze"}
+                        other{"{0} centymetra"}
+                    }
+                    vocative{
+                        few{"{0} centymetry"}
+                        many{"{0} centymetrów"}
+                        one{"{0} centymetrze"}
+                        other{"{0} centymetra"}
+                    }
+                }
+                dnam{"centymetry"}
+                few{"{0} centymetry"}
+                gender{"inanimate"}
+                many{"{0} centymetrów"}
+                one{"{0} centymetr"}
+                other{"{0} centymetra"}
+                per{"{0} na centymetr"}
+            }
+            decimeter{
+                dnam{"decymetry"}
+                few{"{0} decymetry"}
+                many{"{0} decymetrów"}
+                one{"{0} decymetr"}
+                other{"{0} decymetra"}
+            }
+            earth-radius{
+                dnam{"promień Ziemi"}
+                few{"{0} promienie Ziemi"}
+                many{"{0} promieni Ziemi"}
+                one{"{0} promień Ziemi"}
+                other{"{0} promienia Ziemi"}
+            }
+            fathom{
+                dnam{"sążnie"}
+                few{"{0} sążnie"}
+                many{"{0} sążni"}
+                one{"{0} sążeń"}
+                other{"{0} sążnia"}
+            }
+            foot{
+                case{
+                    accusative{
+                        few{"{0} stopy"}
+                        many{"{0} stóp"}
+                        one{"{0} stopę"}
+                        other{"{0} stopy"}
+                    }
+                    dative{
+                        few{"{0} stopom"}
+                        many{"{0} stopom"}
+                        one{"{0} stopie"}
+                        other{"{0} stopy"}
+                    }
+                    genitive{
+                        few{"{0} stóp"}
+                        many{"{0} stóp"}
+                        one{"{0} stopy"}
+                        other{"{0} stopy"}
+                    }
+                    instrumental{
+                        few{"{0} stopami"}
+                        many{"{0} stopami"}
+                        one{"{0} stopą"}
+                        other{"{0} stopy"}
+                    }
+                    locative{
+                        few{"{0} stopach"}
+                        many{"{0} stopach"}
+                        one{"{0} stopie"}
+                        other{"{0} stopy"}
+                    }
+                    vocative{
+                        few{"{0} stopy"}
+                        many{"{0} stóp"}
+                        one{"{0} stopo"}
+                        other{"{0} stopy"}
+                    }
+                }
+                dnam{"stopy"}
+                few{"{0} stopy"}
+                gender{"feminine"}
+                many{"{0} stóp"}
+                one{"{0} stopa"}
+                other{"{0} stopy"}
+                per{"{0} na stopę"}
+            }
+            furlong{
+                dnam{"furlongi"}
+                few{"{0} furlongi"}
+                many{"{0} furlongów"}
+                one{"{0} furlong"}
+                other{"{0} furlonga"}
+            }
+            inch{
+                case{
+                    accusative{
+                        few{"{0} cale"}
+                        many{"{0} cali"}
+                        one{"{0} cal"}
+                        other{"{0} cala"}
+                    }
+                    dative{
+                        few{"{0} calom"}
+                        many{"{0} calom"}
+                        one{"{0} calowi"}
+                        other{"{0} cala"}
+                    }
+                    genitive{
+                        few{"{0} cali"}
+                        many{"{0} cali"}
+                        one{"{0} cala"}
+                        other{"{0} cala"}
+                    }
+                    instrumental{
+                        few{"{0} calami"}
+                        many{"{0} calami"}
+                        one{"{0} calem"}
+                        other{"{0} cala"}
+                    }
+                    locative{
+                        few{"{0} calach"}
+                        many{"{0} calach"}
+                        one{"{0} calu"}
+                        other{"{0} cala"}
+                    }
+                    vocative{
+                        few{"{0} cale"}
+                        many{"{0} cali"}
+                        one{"{0} calu"}
+                        other{"{0} cala"}
+                    }
+                }
+                dnam{"cale"}
+                few{"{0} cale"}
+                gender{"inanimate"}
+                many{"{0} cali"}
+                one{"{0} cal"}
+                other{"{0} cala"}
+                per{"{0} na cal"}
+            }
+            kilometer{
+                case{
+                    accusative{
+                        few{"{0} kilometry"}
+                        many{"{0} kilometrów"}
+                        one{"{0} kilometr"}
+                        other{"{0} kilometra"}
+                    }
+                    dative{
+                        few{"{0} kilometrom"}
+                        many{"{0} kilometrom"}
+                        one{"{0} kilometrowi"}
+                        other{"{0} kilometra"}
+                    }
+                    genitive{
+                        few{"{0} kilometrów"}
+                        many{"{0} kilometrów"}
+                        one{"{0} kilometra"}
+                        other{"{0} kilometra"}
+                    }
+                    instrumental{
+                        few{"{0} kilometrami"}
+                        many{"{0} kilometrami"}
+                        one{"{0} kilomentrem"}
+                        other{"{0} kilometra"}
+                    }
+                    locative{
+                        few{"{0} kilometrach"}
+                        many{"{0} kilometrach"}
+                        one{"{0} kilometrze"}
+                        other{"{0} kilometra"}
+                    }
+                    vocative{
+                        few{"{0} kilometry"}
+                        many{"{0} kilometrów"}
+                        one{"{0} kilometrze"}
+                        other{"{0} kilometra"}
+                    }
+                }
+                dnam{"kilometry"}
+                few{"{0} kilometry"}
+                gender{"inanimate"}
+                many{"{0} kilometrów"}
+                one{"{0} kilometr"}
+                other{"{0} kilometra"}
+                per{"{0} na kilometr"}
+            }
+            light-year{
+                dnam{"lata świetlne"}
+                few{"{0} lata świetlne"}
+                many{"{0} lat świetlnych"}
+                one{"{0} rok świetlny"}
+                other{"{0} roku świetlnego"}
+            }
+            meter{
+                case{
+                    accusative{
+                        few{"{0} metry"}
+                        many{"{0} metrów"}
+                        one{"{0} metr"}
+                        other{"{0} metra"}
+                    }
+                    dative{
+                        few{"{0} metrom"}
+                        many{"{0} metrom"}
+                        one{"{0} metrowi"}
+                        other{"{0} metra"}
+                    }
+                    genitive{
+                        few{"{0} metrów"}
+                        many{"{0} metrów"}
+                        one{"{0} metra"}
+                        other{"{0} metra"}
+                    }
+                    instrumental{
+                        few{"{0} metrami"}
+                        many{"{0} metrami"}
+                        one{"{0} metrem"}
+                        other{"{0} metra"}
+                    }
+                    locative{
+                        few{"{0} metrach"}
+                        many{"{0} metrach"}
+                        one{"{0} metrze"}
+                        other{"{0} metra"}
+                    }
+                    vocative{
+                        few{"{0} metry"}
+                        many{"{0} metrów"}
+                        one{"{0} metrze"}
+                        other{"{0} metra"}
+                    }
+                }
+                dnam{"metry"}
+                few{"{0} metry"}
+                gender{"inanimate"}
+                many{"{0} metrów"}
+                one{"{0} metr"}
+                other{"{0} metra"}
+                per{"{0} na metr"}
+            }
+            micrometer{
+                dnam{"mikrometry"}
+                few{"{0} mikrometry"}
+                many{"{0} mikrometrów"}
+                one{"{0} mikrometr"}
+                other{"{0} mikrometra"}
+            }
+            mile{
+                case{
+                    accusative{
+                        few{"{0} mile"}
+                        many{"{0} mil"}
+                        one{"{0} milę"}
+                        other{"{0} mili"}
+                    }
+                    dative{
+                        few{"{0} milom"}
+                        many{"{0} milom"}
+                        one{"{0} mili"}
+                        other{"{0} mili"}
+                    }
+                    genitive{
+                        few{"{0} mil"}
+                        many{"{0} mil"}
+                        one{"{0} mili"}
+                        other{"{0} mili"}
+                    }
+                    instrumental{
+                        few{"{0} milami"}
+                        many{"{0} milami"}
+                        one{"{0} milą"}
+                        other{"{0} mili"}
+                    }
+                    locative{
+                        few{"{0} milach"}
+                        many{"{0} milach"}
+                        one{"{0} mili"}
+                        other{"{0} mili"}
+                    }
+                    vocative{
+                        few{"{0} mile"}
+                        many{"{0} mil"}
+                        one{"{0} milo"}
+                        other{"{0} mili"}
+                    }
+                }
+                dnam{"mile"}
+                few{"{0} mile"}
+                gender{"feminine"}
+                many{"{0} mil"}
+                one{"{0} mila"}
+                other{"{0} mili"}
+            }
+            mile-scandinavian{
+                dnam{"mila skandynawska"}
+                few{"{0} mile skandynawskie"}
+                many{"{0} mil skandynawskich"}
+                one{"{0} mila skandynawska"}
+                other{"{0} mili skandynawskiej"}
+            }
+            millimeter{
+                case{
+                    accusative{
+                        few{"{0} milimetry"}
+                        many{"{0} milimetrów"}
+                        one{"{0} milimetr"}
+                        other{"{0} milimetra"}
+                    }
+                    dative{
+                        few{"{0} milimetrom"}
+                        many{"{0} milimetrom"}
+                        one{"{0} milimetrowi"}
+                        other{"{0} milimetra"}
+                    }
+                    genitive{
+                        few{"{0} milimetrów"}
+                        many{"{0} milimetrów"}
+                        one{"{0} milimetra"}
+                        other{"{0} milimetra"}
+                    }
+                    instrumental{
+                        few{"{0} milimetrami"}
+                        many{"{0} milimetrami"}
+                        one{"{0} milimentrem"}
+                        other{"{0} milimetra"}
+                    }
+                    locative{
+                        few{"{0} milimetrach"}
+                        many{"{0} milimetrach"}
+                        one{"{0} milimetrze"}
+                        other{"{0} milimetra"}
+                    }
+                    vocative{
+                        few{"{0} milimetry"}
+                        many{"{0} milimetrów"}
+                        one{"{0} milimetrrze"}
+                        other{"{0} milimetra"}
+                    }
+                }
+                dnam{"milimetry"}
+                few{"{0} milimetry"}
+                gender{"inanimate"}
+                many{"{0} milimetrów"}
+                one{"{0} milimetr"}
+                other{"{0} milimetra"}
+            }
+            nanometer{
+                dnam{"nanometry"}
+                few{"{0} nanometry"}
+                many{"{0} nanometrów"}
+                one{"{0} nanometr"}
+                other{"{0} nanometra"}
+            }
+            nautical-mile{
+                dnam{"mile morskie"}
+                few{"{0} mile morskie"}
+                many{"{0} mil morskich"}
+                one{"{0} mila morska"}
+                other{"{0} mili morskiej"}
+            }
+            parsec{
+                case{
+                    accusative{
+                        few{"{0} parseki"}
+                        many{"{0} parseków"}
+                        one{"{0} parsek"}
+                        other{"{0} parseka"}
+                    }
+                    dative{
+                        few{"{0} parsekom"}
+                        many{"{0} parsekom"}
+                        one{"{0} parsekowi"}
+                        other{"{0} parseka"}
+                    }
+                    genitive{
+                        few{"{0} parseków"}
+                        many{"{0} parseków"}
+                        one{"{0} parseka"}
+                        other{"{0} parseka"}
+                    }
+                    instrumental{
+                        few{"{0} parsekami"}
+                        many{"{0} parsekami"}
+                        one{"{0} parsekiem"}
+                        other{"{0} parseka"}
+                    }
+                    locative{
+                        few{"{0} parsekach"}
+                        many{"{0} parsekach"}
+                        one{"{0} parseku"}
+                        other{"{0} parseka"}
+                    }
+                    vocative{
+                        few{"{0} parseki"}
+                        many{"{0} parseków"}
+                        one{"{0} parseku"}
+                        other{"{0} parseka"}
+                    }
+                }
+                dnam{"parseki"}
+                few{"{0} parseki"}
+                gender{"inanimate"}
+                many{"{0} parseków"}
+                one{"{0} parsek"}
+                other{"{0} parseka"}
+            }
+            picometer{
+                case{
+                    accusative{
+                        few{"{0} pikometry"}
+                        many{"{0} pikometrów"}
+                        one{"{0} pikometr"}
+                        other{"{0} pikometra"}
+                    }
+                    dative{
+                        few{"{0} pikometrom"}
+                        many{"{0} pikometrom"}
+                        one{"{0} pikometrowi"}
+                        other{"{0} pikometra"}
+                    }
+                    genitive{
+                        few{"{0} pikometrów"}
+                        many{"{0} pikometrów"}
+                        one{"{0} pikometra"}
+                        other{"{0} pikometra"}
+                    }
+                    instrumental{
+                        few{"{0} pikometrami"}
+                        many{"{0} pikometrami"}
+                        one{"{0} pikometrem"}
+                        other{"{0} pikometra"}
+                    }
+                    locative{
+                        few{"{0} pikometrach"}
+                        many{"{0} pikometrach"}
+                        one{"{0} pikometrze"}
+                        other{"{0} pikometra"}
+                    }
+                    vocative{
+                        few{"{0} pikometry"}
+                        many{"{0} pikometrów"}
+                        one{"{0} pikometrze"}
+                        other{"{0} pikometra"}
+                    }
+                }
+                dnam{"pikometry"}
+                few{"{0} pikometry"}
+                gender{"inanimate"}
+                many{"{0} pikometrów"}
+                one{"{0} pikometr"}
+                other{"{0} pikometra"}
+            }
+            point{
+                dnam{"punkty"}
+                few{"{0} punkty"}
+                many{"{0} punktów"}
+                one{"{0} punkt"}
+                other{"{0} punktu"}
+            }
+            solar-radius{
+                case{
+                    accusative{
+                        few{"{0} promienie Słońca"}
+                        many{"{0} promieni Słońca"}
+                        one{"{0} promień Słońca"}
+                        other{"{0} promienia Słońca"}
+                    }
+                    dative{
+                        few{"{0} promieniom Słońca"}
+                        many{"{0} promieniom Słońca"}
+                        one{"{0} promieniowi Słońca"}
+                        other{"{0} promienia Słońca"}
+                    }
+                    genitive{
+                        few{"{0} promieni Słońca"}
+                        many{"{0} promieni Słońca"}
+                        one{"{0} promienia Słońca"}
+                        other{"{0} promienia Słońca"}
+                    }
+                    instrumental{
+                        few{"{0} promieniami Słońca"}
+                        many{"{0} promieniami Słońca"}
+                        one{"{0} promieniem Słońca"}
+                        other{"{0} promienia Słońca"}
+                    }
+                    locative{
+                        few{"{0} promieniach Słońca"}
+                        many{"{0} promieniach Słońca"}
+                        one{"{0} promieniu Słońca"}
+                        other{"{0} promienia Słońca"}
+                    }
+                    vocative{
+                        few{"{0} promienie Słońca"}
+                        many{"{0} promieni Słońca"}
+                        one{"{0} promieniu Słońca"}
+                        other{"{0} promienia Słońca"}
+                    }
+                }
+                dnam{"promienie Słońca"}
+                few{"{0} promienie Słońca"}
+                gender{"inanimate"}
+                many{"{0} promieni Słońca"}
+                one{"{0} promień Słońca"}
+                other{"{0} promienia Słońca"}
+            }
+            yard{
+                case{
+                    accusative{
+                        few{"{0} jardy"}
+                        many{"{0} jardów"}
+                        one{"{0} jard"}
+                        other{"{0} jarda"}
+                    }
+                    dative{
+                        few{"{0} jardom"}
+                        many{"{0} jardom"}
+                        one{"{0} jardowi"}
+                        other{"{0} jarda"}
+                    }
+                    genitive{
+                        few{"{0} jardów"}
+                        many{"{0} jardów"}
+                        one{"{0} jardu"}
+                        other{"{0} jarda"}
+                    }
+                    instrumental{
+                        few{"{0} jardami"}
+                        many{"{0} jardami"}
+                        one{"{0} jardem"}
+                        other{"{0} jarda"}
+                    }
+                    locative{
+                        few{"{0} jardach"}
+                        many{"{0} jardach"}
+                        one{"{0} jardzie"}
+                        other{"{0} jarda"}
+                    }
+                    vocative{
+                        few{"{0} jardy"}
+                        many{"{0} jardów"}
+                        one{"{0} jardzie"}
+                        other{"{0} jarda"}
+                    }
+                }
+                dnam{"jardy"}
+                few{"{0} jardy"}
+                gender{"inanimate"}
+                many{"{0} jardów"}
+                one{"{0} jard"}
+                other{"{0} jarda"}
+            }
+        }
+        light{
+            candela{
+                dnam{"kandela"}
+                few{"{0} kandele"}
+                many{"{0} kandeli"}
+                one{"{0} kandela"}
+                other{"{0} kandeli"}
+            }
+            lumen{
+                dnam{"lumen"}
+                few{"{0} lumeny"}
+                many{"{0} lumenów"}
+                one{"{0} lumen"}
+                other{"{0} lumena"}
+            }
+            lux{
+                dnam{"luksy"}
+                few{"{0} luksy"}
+                many{"{0} luksów"}
+                one{"{0} luks"}
+                other{"{0} luksu"}
+            }
+            solar-luminosity{
+                case{
+                    accusative{
+                        few{"{0} jasności Słońca"}
+                        many{"{0} jasności Słońca"}
+                        one{"{0} jasność Słońca"}
+                        other{"{0} jasności Słońca"}
+                    }
+                    dative{
+                        few{"{0} jasnościom Słońca"}
+                        many{"{0} jasnościom Słońca"}
+                        one{"{0} jasności Słońca"}
+                        other{"{0} jasności Słońca"}
+                    }
+                    genitive{
+                        few{"{0} jasności Słońca"}
+                        many{"{0} jasności Słońca"}
+                        one{"{0} jasności Słońca"}
+                        other{"{0} jasności Słońca"}
+                    }
+                    instrumental{
+                        few{"{0} jasnościami Słońca"}
+                        many{"{0} jasnościami Słońca"}
+                        one{"{0} jasnością Słońca"}
+                        other{"{0} jasności Słońca"}
+                    }
+                    locative{
+                        few{"{0} jasnościach Słońca"}
+                        many{"{0} jasnościach Słońca"}
+                        one{"{0} jasności Słońca"}
+                        other{"{0} jasności Słońca"}
+                    }
+                    vocative{
+                        few{"{0} jasności Słońca"}
+                        many{"{0} jasności Słońca"}
+                        one{"{0} jasności Słońca"}
+                        other{"{0} jasności Słońca"}
+                    }
+                }
+                dnam{"jasności Słońca"}
+                few{"{0} jasności Słońca"}
+                gender{"feminine"}
+                many{"{0} jasności Słońca"}
+                one{"{0} jasność Słońca"}
+                other{"{0} jasności Słońca"}
+            }
+        }
+        mass{
+            carat{
+                dnam{"karaty"}
+                few{"{0} karaty"}
+                many{"{0} karatów"}
+                one{"{0} karat"}
+                other{"{0} karata"}
+            }
+            dalton{
+                case{
+                    accusative{
+                        few{"{0} jednostki masy atomowej"}
+                        many{"{0} jednostek masy atomowej"}
+                        one{"{0} jednostkę masy atomowej"}
+                        other{"{0} jednostki masy atomowej"}
+                    }
+                    dative{
+                        few{"{0} jednostkom masy atomowej"}
+                        many{"{0} jednostkom masy atomowej"}
+                        one{"{0} jednostce masy atomowej"}
+                        other{"{0} jednostki masy atomowej"}
+                    }
+                    genitive{
+                        few{"{0} jednostek masy atomowej"}
+                        many{"{0} jednostek masy atomowej"}
+                        one{"{0} jednostki masy atomowej"}
+                        other{"{0} jednostki masy atomowej"}
+                    }
+                    instrumental{
+                        few{"{0} jednostkami masy atomowej"}
+                        many{"{0} jednostkami masy atomowej"}
+                        one{"{0} jednostką masy atomowej"}
+                        other{"{0} jednostki masy atomowej"}
+                    }
+                    locative{
+                        few{"{0} jednostkach masy atomowej"}
+                        many{"{0} jednostkach masy atomowej"}
+                        one{"{0} jednostce masy atomowej"}
+                        other{"{0} jednostki masy atomowej"}
+                    }
+                    vocative{
+                        few{"{0} jednostki masy atomowej"}
+                        many{"{0} jednostek masy atomowej"}
+                        one{"{0} jednostko masy atomowej"}
+                        other{"{0} jednostki masy atomowej"}
+                    }
+                }
+                dnam{"jednostki masy atomowej"}
+                few{"{0} jednostki masy atomowej"}
+                gender{"feminine"}
+                many{"{0} jednostek masy atomowej"}
+                one{"{0} jednostka masy atomowej"}
+                other{"{0} jednostki masy atomowej"}
+            }
+            earth-mass{
+                case{
+                    accusative{
+                        few{"{0} masy Ziemi"}
+                        many{"{0} mas Ziemi"}
+                        one{"{0} masę Ziemi"}
+                        other{"{0} masy Ziemi"}
+                    }
+                    dative{
+                        few{"{0} masom Ziemi"}
+                        many{"{0} masom Ziemi"}
+                        one{"{0} masie Ziemi"}
+                        other{"{0} masy Ziemi"}
+                    }
+                    genitive{
+                        few{"{0} mas Ziemi"}
+                        many{"{0} mas Ziemi"}
+                        one{"{0} masy Ziemi"}
+                        other{"{0} masy Ziemi"}
+                    }
+                    instrumental{
+                        few{"{0} masami Ziemi"}
+                        many{"{0} masami Ziemi"}
+                        one{"{0} masą Ziemi"}
+                        other{"{0} masy Ziemi"}
+                    }
+                    locative{
+                        few{"{0} masach Ziemi"}
+                        many{"{0} masach Ziemi"}
+                        one{"{0} masie Ziemi"}
+                        other{"{0} masy Ziemi"}
+                    }
+                    vocative{
+                        few{"{0} masy Ziemi"}
+                        many{"{0} mas Ziemi"}
+                        one{"{0} maso Ziemi"}
+                        other{"{0} masy Ziemi"}
+                    }
+                }
+                dnam{"masy Ziemi"}
+                few{"{0} masy Ziemi"}
+                gender{"feminine"}
+                many{"{0} mas Ziemi"}
+                one{"{0} masa Ziemi"}
+                other{"{0} masy Ziemi"}
+            }
+            grain{
+                case{
+                    accusative{
+                        few{"{0} grany"}
+                        many{"{0} granów"}
+                        one{"{0} gran"}
+                        other{"{0} grana"}
+                    }
+                    dative{
+                        few{"{0} granom"}
+                        many{"{0} granom"}
+                        one{"{0} granowi"}
+                        other{"{0} grana"}
+                    }
+                    genitive{
+                        few{"{0} granów"}
+                        many{"{0} granów"}
+                        one{"{0} grana"}
+                        other{"{0} grana"}
+                    }
+                    instrumental{
+                        few{"{0} granami"}
+                        many{"{0} granami"}
+                        one{"{0} granem"}
+                        other{"{0} grana"}
+                    }
+                    locative{
+                        few{"{0} granach"}
+                        many{"{0} granach"}
+                        one{"{0} granie"}
+                        other{"{0} grana"}
+                    }
+                    vocative{
+                        few{"{0} grany"}
+                        many{"{0} granów"}
+                        one{"{0} granie"}
+                        other{"{0} grana"}
+                    }
+                }
+                dnam{"grany"}
+                few{"{0} grany"}
+                gender{"inanimate"}
+                many{"{0} granów"}
+                one{"{0} gran"}
+                other{"{0} grana"}
+            }
+            gram{
+                case{
+                    accusative{
+                        few{"{0} gramy"}
+                        many{"{0} gramów"}
+                        one{"{0} gram"}
+                        other{"{0} grama"}
+                    }
+                    dative{
+                        few{"{0} gramom"}
+                        many{"{0} gramom"}
+                        one{"{0} gramowi"}
+                        other{"{0} grama"}
+                    }
+                    genitive{
+                        few{"{0} gramów"}
+                        many{"{0} gramów"}
+                        one{"{0} grama"}
+                        other{"{0} grama"}
+                    }
+                    instrumental{
+                        few{"{0} gramami"}
+                        many{"{0} gramami"}
+                        one{"{0} gramem"}
+                        other{"{0} grama"}
+                    }
+                    locative{
+                        few{"{0} gramach"}
+                        many{"{0} gramach"}
+                        one{"{0} gramie"}
+                        other{"{0} grama"}
+                    }
+                    vocative{
+                        few{"{0} gramy"}
+                        many{"{0} gramów"}
+                        one{"{0} gramie"}
+                        other{"{0} grama"}
+                    }
+                }
+                dnam{"gramy"}
+                few{"{0} gramy"}
+                gender{"inanimate"}
+                many{"{0} gramów"}
+                one{"{0} gram"}
+                other{"{0} grama"}
+                per{"{0} na gram"}
+            }
+            kilogram{
+                case{
+                    accusative{
+                        few{"{0} kilogramy"}
+                        many{"{0} kilogramów"}
+                        one{"{0} kilogram"}
+                        other{"{0} kilograma"}
+                    }
+                    dative{
+                        few{"{0} kilogramom"}
+                        many{"{0} kilogramom"}
+                        one{"{0} kilogramowi"}
+                        other{"{0} kilograma"}
+                    }
+                    genitive{
+                        few{"{0} kilogramów"}
+                        many{"{0} kilogramów"}
+                        one{"{0} kilograma"}
+                        other{"{0} kilograma"}
+                    }
+                    instrumental{
+                        few{"{0} kilogramami"}
+                        many{"{0} kilogramami"}
+                        one{"{0} kilogramem"}
+                        other{"{0} kilograma"}
+                    }
+                    locative{
+                        few{"{0} kilogramach"}
+                        many{"{0} kilogramach"}
+                        one{"{0} kilogramie"}
+                        other{"{0} kilograma"}
+                    }
+                    vocative{
+                        few{"{0} kilogramy"}
+                        many{"{0} kilogramów"}
+                        one{"{0} kilogramie"}
+                        other{"{0} kilograma"}
+                    }
+                }
+                dnam{"kilogramy"}
+                few{"{0} kilogramy"}
+                gender{"inanimate"}
+                many{"{0} kilogramów"}
+                one{"{0} kilogram"}
+                other{"{0} kilograma"}
+                per{"{0} na kilogram"}
+            }
+            metric-ton{
+                dnam{"tony"}
+                few{"{0} tony"}
+                many{"{0} ton"}
+                one{"{0} tona"}
+                other{"{0} tony"}
+            }
+            microgram{
+                dnam{"mikrogramy"}
+                few{"{0} mikrogramy"}
+                many{"{0} mikrogramów"}
+                one{"{0} mikrogram"}
+                other{"{0} mikrograma"}
+            }
+            milligram{
+                case{
+                    accusative{
+                        few{"{0} miligramy"}
+                        many{"{0} miligramów"}
+                        one{"{0} miligram"}
+                        other{"{0} miligrama"}
+                    }
+                    dative{
+                        few{"{0} miligramom"}
+                        many{"{0} miligramom"}
+                        one{"{0} miligramowi"}
+                        other{"{0} miligrama"}
+                    }
+                    genitive{
+                        few{"{0} miligramów"}
+                        many{"{0} miligramów"}
+                        one{"{0} miligrama"}
+                        other{"{0} miligrama"}
+                    }
+                    instrumental{
+                        few{"{0} miligramami"}
+                        many{"{0} miligramami"}
+                        one{"{0} miligramem"}
+                        other{"{0} miligrama"}
+                    }
+                    locative{
+                        few{"{0} miligramach"}
+                        many{"{0} miligramach"}
+                        one{"{0} miligramie"}
+                        other{"{0} miligrama"}
+                    }
+                    vocative{
+                        few{"{0} miligramy"}
+                        many{"{0} miligramów"}
+                        one{"{0} miligramie"}
+                        other{"{0} miligrama"}
+                    }
+                }
+                dnam{"miligramy"}
+                few{"{0} miligramy"}
+                gender{"inanimate"}
+                many{"{0} miligramów"}
+                one{"{0} miligram"}
+                other{"{0} miligrama"}
+            }
+            ounce{
+                case{
+                    accusative{
+                        few{"{0} uncje"}
+                        many{"{0} uncji"}
+                        one{"{0} uncję"}
+                        other{"{0} uncji"}
+                    }
+                    dative{
+                        few{"{0} uncjom"}
+                        many{"{0} uncjom"}
+                        one{"{0} uncji"}
+                        other{"{0} uncji"}
+                    }
+                    genitive{
+                        few{"{0} uncji"}
+                        many{"{0} uncji"}
+                        one{"{0} uncji"}
+                        other{"{0} uncji"}
+                    }
+                    instrumental{
+                        few{"{0} uncjami"}
+                        many{"{0} uncjami"}
+                        one{"{0} uncją"}
+                        other{"{0} uncji"}
+                    }
+                    locative{
+                        few{"{0} uncjach"}
+                        many{"{0} uncjach"}
+                        one{"{0} uncji"}
+                        other{"{0} uncji"}
+                    }
+                    vocative{
+                        few{"{0} uncje"}
+                        many{"{0} uncji"}
+                        one{"{0} uncjo"}
+                        other{"{0} uncji"}
+                    }
+                }
+                dnam{"uncje"}
+                few{"{0} uncje"}
+                gender{"feminine"}
+                many{"{0} uncji"}
+                one{"{0} uncja"}
+                other{"{0} uncji"}
+                per{"{0} na uncję"}
+            }
+            ounce-troy{
+                dnam{"uncja trojańska"}
+                few{"{0} uncje trojańskie"}
+                many{"{0} uncji trojańskich"}
+                one{"{0} uncja trojańska"}
+                other{"{0} uncji trojańskiej"}
+            }
+            pound{
+                case{
+                    accusative{
+                        few{"{0} funty"}
+                        many{"{0} funtów"}
+                        one{"{0} funt"}
+                        other{"{0} funta"}
+                    }
+                    dative{
+                        few{"{0} funtom"}
+                        many{"{0} funtom"}
+                        one{"{0} funtowi"}
+                        other{"{0} funta"}
+                    }
+                    genitive{
+                        few{"{0} funtów"}
+                        many{"{0} funtów"}
+                        one{"{0} funta"}
+                        other{"{0} funta"}
+                    }
+                    instrumental{
+                        few{"{0} funtami"}
+                        many{"{0} funtami"}
+                        one{"{0} funtem"}
+                        other{"{0} funta"}
+                    }
+                    locative{
+                        few{"{0} funtach"}
+                        many{"{0} funtach"}
+                        one{"{0} funcie"}
+                        other{"{0} funta"}
+                    }
+                    vocative{
+                        few{"{0} funty"}
+                        many{"{0} funtów"}
+                        one{"{0} funcie"}
+                        other{"{0} funta"}
+                    }
+                }
+                dnam{"funty"}
+                few{"{0} funty"}
+                gender{"inanimate"}
+                many{"{0} funtów"}
+                one{"{0} funt"}
+                other{"{0} funta"}
+                per{"{0} na funt"}
+            }
+            solar-mass{
+                case{
+                    accusative{
+                        few{"{0} masy Słońca"}
+                        many{"{0} mas Słońca"}
+                        one{"{0} masę Słońca"}
+                        other{"{0} masy Słońca"}
+                    }
+                    dative{
+                        few{"{0} masom Słońca"}
+                        many{"{0} masom Słońca"}
+                        one{"{0} masie Słońca"}
+                        other{"{0} masy Słońca"}
+                    }
+                    genitive{
+                        few{"{0} mas Słońca"}
+                        many{"{0} mas Słońca"}
+                        one{"{0} masy Słońca"}
+                        other{"{0} masy Słońca"}
+                    }
+                    instrumental{
+                        few{"{0} masami Słońca"}
+                        many{"{0} masami Słońca"}
+                        one{"{0} masą Słońca"}
+                        other{"{0} masy Słońca"}
+                    }
+                    locative{
+                        few{"{0} masach Słońca"}
+                        many{"{0} masach Słońca"}
+                        one{"{0} masie Słońca"}
+                        other{"{0} masy Słońca"}
+                    }
+                    vocative{
+                        few{"{0} masy Słońca"}
+                        many{"{0} mas Słońca"}
+                        one{"{0} maso Słońca"}
+                        other{"{0} masy Słońca"}
+                    }
+                }
+                dnam{"masy Słońca"}
+                few{"{0} masy Słońca"}
+                gender{"feminine"}
+                many{"{0} mas Słońca"}
+                one{"{0} masa Słońca"}
+                other{"{0} masy Słońca"}
+            }
+            stone{
+                dnam{"kamień"}
+                few{"{0} kamienie"}
+                many{"{0} kamieni"}
+                one{"{0} kamień"}
+                other{"{0} kamienia"}
+            }
+            ton{
+                dnam{"krótkie tony"}
+                few{"{0} krótkie tony"}
+                many{"{0} krótkich ton"}
+                one{"{0} krótka tona"}
+                other{"{0} krótkiej tony"}
+            }
+        }
+        power{
+            gigawatt{
+                dnam{"gigawaty"}
+                few{"{0} gigawaty"}
+                many{"{0} gigawatów"}
+                one{"{0} gigawat"}
+                other{"{0} gigawata"}
+            }
+            horsepower{
+                dnam{"konie mechaniczne"}
+                few{"{0} konie mechaniczne"}
+                many{"{0} koni mechanicznych"}
+                one{"{0} koń mechaniczny"}
+                other{"{0} konia mechanicznego"}
+            }
+            kilowatt{
+                dnam{"kilowaty"}
+                few{"{0} kilowaty"}
+                many{"{0} kilowatów"}
+                one{"{0} kilowat"}
+                other{"{0} kilowata"}
+            }
+            megawatt{
+                dnam{"megawaty"}
+                few{"{0} megawaty"}
+                many{"{0} megawatów"}
+                one{"{0} megawat"}
+                other{"{0} megawata"}
+            }
+            milliwatt{
+                dnam{"miliwaty"}
+                few{"{0} miliwaty"}
+                many{"{0} miliwatów"}
+                one{"{0} miliwat"}
+                other{"{0} miliwata"}
+            }
+            watt{
+                dnam{"waty"}
+                few{"{0} waty"}
+                many{"{0} watów"}
+                one{"{0} wat"}
+                other{"{0} wata"}
+            }
+        }
+        pressure{
+            atmosphere{
+                dnam{"atmosfery"}
+                few{"{0} atmosfery"}
+                many{"{0} atmosfer"}
+                one{"{0} atmosfera"}
+                other{"{0} atmosfery"}
+            }
+            bar{
+                dnam{"bary"}
+                few{"{0} bary"}
+                many{"{0} barów"}
+                one{"{0} bar"}
+                other{"{0} bara"}
+            }
+            hectopascal{
+                dnam{"hektopaskale"}
+                few{"{0} hektopaskale"}
+                many{"{0} hektopaskali"}
+                one{"{0} hektopaskal"}
+                other{"{0} hektopaskala"}
+            }
+            inch-ofhg{
+                dnam{"cale słupa rtęci"}
+                few{"{0} cale słupa rtęci"}
+                many{"{0} cali słupa rtęci"}
+                one{"{0} cal słupa rtęci"}
+                other{"{0} cala słupa rtęci"}
+            }
+            kilopascal{
+                case{
+                    accusative{
+                        few{"{0} kilopaskale"}
+                        many{"{0} kilopaskali"}
+                        one{"{0} kilopaskal"}
+                        other{"{0} kilopaskala"}
+                    }
+                    dative{
+                        few{"{0} kilopaskalom"}
+                        many{"{0} kilopaskalom"}
+                        one{"{0} kilopaskalowi"}
+                        other{"{0} kilopaskala"}
+                    }
+                    genitive{
+                        few{"{0} kilopaskali"}
+                        many{"{0} kilopaskali"}
+                        one{"{0} kilopaskala"}
+                        other{"{0} kilopaskala"}
+                    }
+                    instrumental{
+                        few{"{0} kilopaskalami"}
+                        many{"{0} kilopaskalami"}
+                        one{"{0} kilopaskalem"}
+                        other{"{0} kilopaskala"}
+                    }
+                    locative{
+                        few{"{0} kilopaskalach"}
+                        many{"{0} kilopaskalach"}
+                        one{"{0} kilopaskalu"}
+                        other{"{0} kilopaskala"}
+                    }
+                    vocative{
+                        few{"{0} kilopaskale"}
+                        many{"{0} kilopaskali"}
+                        one{"{0} kilopaskalu"}
+                        other{"{0} kilopaskala"}
+                    }
+                }
+                dnam{"kilopaskale"}
+                few{"{0} kilopaskale"}
+                gender{"inanimate"}
+                many{"{0} kilopaskali"}
+                one{"{0} kilopaskal"}
+                other{"{0} kilopaskala"}
+            }
+            megapascal{
+                dnam{"megapaskale"}
+                few{"{0} megapaskale"}
+                many{"{0} megapaskali"}
+                one{"{0} megapaskal"}
+                other{"{0} megapaskala"}
+            }
+            millibar{
+                dnam{"milibary"}
+                few{"{0} millibary"}
+                many{"{0} millibarów"}
+                one{"{0} millibar"}
+                other{"{0} millibara"}
+            }
+            millimeter-ofhg{
+                dnam{"milimetry słupa rtęci"}
+                few{"{0} milimetry słupa rtęci"}
+                many{"{0} milimetrów słupa rtęci"}
+                one{"{0} milimetr słupa rtęci"}
+                other{"{0} milimetra słupa rtęci"}
+            }
+            pascal{
+                dnam{"paskale"}
+                few{"{0} paskale"}
+                many{"{0} paskali"}
+                one{"{0} paskal"}
+                other{"{0} paskala"}
+            }
+            pound-force-per-square-inch{
+                dnam{"funty na cal kwadratowy"}
+                few{"{0} funty na cal kwadratowy"}
+                many{"{0} funtów na cal kwadratowy"}
+                one{"{0} funt na cal kwadratowy"}
+                other{"{0} funta na cal kwadratowy"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                case{
+                    accusative{
+                        few{"{0} kilometry na godzinę"}
+                        many{"{0} kilometrów na godzinę"}
+                        one{"{0} kilometr na godzinę"}
+                        other{"{0} kilometra na godzinę"}
+                    }
+                    dative{
+                        few{"{0} kilometrom na godzinę"}
+                        many{"{0} kilometrom na godzinę"}
+                        one{"{0} kilometrowi na godzinę"}
+                        other{"{0} kilometra na godzinę"}
+                    }
+                    genitive{
+                        few{"{0} kilometrów na godzinę"}
+                        many{"{0} kilometrów na godzinę"}
+                        one{"{0} kilometra na godzinę"}
+                        other{"{0} kilometra na godzinę"}
+                    }
+                    instrumental{
+                        few{"{0} kilometrami na godzinę"}
+                        many{"{0} kilometrami na godzinę"}
+                        one{"{0} kilometrem na godzinę"}
+                        other{"{0} kilometra na godzinę"}
+                    }
+                    locative{
+                        few{"{0} kilometrach na godzinę"}
+                        many{"{0} kilometrach na godzinę"}
+                        one{"{0} kilometrze na godzinę"}
+                        other{"{0} kilometra na godzinę"}
+                    }
+                    vocative{
+                        few{"{0} kilometry na godzinę"}
+                        many{"{0} kilometrów na godzinę"}
+                        one{"{0} kilometrze na godzinę"}
+                        other{"{0} kilometra na godzinę"}
+                    }
+                }
+                dnam{"kilometry na godzinę"}
+                few{"{0} kilometry na godzinę"}
+                gender{"inanimate"}
+                many{"{0} kilometrów na godzinę"}
+                one{"{0} kilometr na godzinę"}
+                other{"{0} kilometra na godzinę"}
+            }
+            knot{
+                dnam{"węzeł"}
+                few{"{0} węzły"}
+                many{"{0} węzłów"}
+                one{"{0} węzeł"}
+                other{"{0} węzła"}
+            }
+            meter-per-second{
+                case{
+                    accusative{
+                        few{"{0} metry na sekundę"}
+                        many{"{0} metrów na sekundę"}
+                        one{"{0} metr na sekundę"}
+                        other{"{0} metra na sekundę"}
+                    }
+                    dative{
+                        few{"{0} metrom na sekundę"}
+                        many{"{0} metrom na sekundę"}
+                        one{"{0} metrowi na sekundę"}
+                        other{"{0} metra na sekundę"}
+                    }
+                    genitive{
+                        few{"{0} metrów na sekundę"}
+                        many{"{0} metrów na sekundę"}
+                        one{"{0} metra na sekundę"}
+                        other{"{0} metra na sekundę"}
+                    }
+                    instrumental{
+                        few{"{0} metrami na sekundę"}
+                        many{"{0} metrami na sekundę"}
+                        one{"{0} metrem na sekundę"}
+                        other{"{0} metra na sekundę"}
+                    }
+                    locative{
+                        few{"{0} metrach na sekundę"}
+                        many{"{0} metrach na sekundę"}
+                        one{"{0} metrze na sekundę"}
+                        other{"{0} metra na sekundę"}
+                    }
+                    vocative{
+                        few{"{0} metry na sekundę"}
+                        many{"{0} metrów na sekundę"}
+                        one{"{0} metrze na sekundę"}
+                        other{"{0} metra na sekundę"}
+                    }
+                }
+                dnam{"metry na sekundę"}
+                few{"{0} metry na sekundę"}
+                gender{"inanimate"}
+                many{"{0} metrów na sekundę"}
+                one{"{0} metr na sekundę"}
+                other{"{0} metra na sekundę"}
+            }
+            mile-per-hour{
+                case{
+                    accusative{
+                        few{"{0} mile na godzinę"}
+                        many{"{0} mil na godzinę"}
+                        one{"{0} milę na godzinę"}
+                        other{"{0} mili na godzinę"}
+                    }
+                    dative{
+                        few{"{0} milom na godzinę"}
+                        many{"{0} milom na godzinę"}
+                        one{"{0} mili na godzinę"}
+                        other{"{0} mili na godzinę"}
+                    }
+                    genitive{
+                        few{"{0} mil na godzinę"}
+                        many{"{0} mil na godzinę"}
+                        one{"{0} mili na godzinę"}
+                        other{"{0} mili na godzinę"}
+                    }
+                    instrumental{
+                        few{"{0} milami na godzinę"}
+                        many{"{0} milami na godzinę"}
+                        one{"{0} milą na godzinę"}
+                        other{"{0} mili na godzinę"}
+                    }
+                    locative{
+                        few{"{0} milach na godzinę"}
+                        many{"{0} milach na godzinę"}
+                        one{"{0} mili na godzinę"}
+                        other{"{0} mili na godzinę"}
+                    }
+                    vocative{
+                        few{"{0} mile na godzinę"}
+                        many{"{0} mil na godzinę"}
+                        one{"{0} milo na godzinę"}
+                        other{"{0} mili na godzinę"}
+                    }
+                }
+                dnam{"mile na godzinę"}
+                few{"{0} mile na godzinę"}
+                gender{"feminine"}
+                many{"{0} mil na godzinę"}
+                one{"{0} mila na godzinę"}
+                other{"{0} mili na godzinę"}
+            }
+        }
+        temperature{
+            celsius{
+                case{
+                    accusative{
+                        few{"{0} stopnie Celsjusza"}
+                        many{"{0} stopni Celsjusza"}
+                        one{"{0} stopień Celsjusza"}
+                        other{"{0} stopnia Celsjusza"}
+                    }
+                    dative{
+                        few{"{0} stopniom Celsjusza"}
+                        many{"{0} stopniom Celsjusza"}
+                        one{"{0} stopniowi Celsjusza"}
+                        other{"{0} stopnia Celsjusza"}
+                    }
+                    genitive{
+                        few{"{0} stopni Celsjusza"}
+                        many{"{0} stopni Celsjusza"}
+                        one{"{0} stopnia Celsjusza"}
+                        other{"{0} stopnia Celsjusza"}
+                    }
+                    instrumental{
+                        few{"{0} stopniami Celsjusza"}
+                        many{"{0} stopniami Celsjusza"}
+                        one{"{0} stopniem Celsjusza"}
+                        other{"{0} stopnia Celsjusza"}
+                    }
+                    locative{
+                        few{"{0} stopniach Celsjusza"}
+                        many{"{0} stopniach Celsjusza"}
+                        one{"{0} stopniu Celsjusza"}
+                        other{"{0} stopnia Celsjusza"}
+                    }
+                    vocative{
+                        few{"{0} stopnie Celsjusza"}
+                        many{"{0} stopni Celsjusza"}
+                        one{"{0} stopniu Celsjusza"}
+                        other{"{0} stopnia Celsjusza"}
+                    }
+                }
+                dnam{"stopnie Celsjusza"}
+                few{"{0} stopnie Celsjusza"}
+                gender{"inanimate"}
+                many{"{0} stopni Celsjusza"}
+                one{"{0} stopień Celsjusza"}
+                other{"{0} stopnia Celsjusza"}
+            }
+            fahrenheit{
+                case{
+                    accusative{
+                        few{"{0} stopnie Fahrenheita"}
+                        many{"{0} stopni Fahrenheita"}
+                        one{"{0} stopień Fahrenheita"}
+                        other{"{0} stopnia Fahrenheita"}
+                    }
+                    dative{
+                        few{"{0} stopniom Fahrenheita"}
+                        many{"{0} stopniom Fahrenheita"}
+                        one{"{0} stopniowi Fahrenheita"}
+                        other{"{0} stopnia Fahrenheita"}
+                    }
+                    genitive{
+                        few{"{0} stopni Fahrenheita"}
+                        many{"{0} stopni Fahrenheita"}
+                        one{"{0} stopnia Fahrenheita"}
+                        other{"{0} stopnia Fahrenheita"}
+                    }
+                    instrumental{
+                        few{"{0} stopniami Fahrenheita"}
+                        many{"{0} stopniami Fahrenheita"}
+                        one{"{0} stopniem Fahrenheita"}
+                        other{"{0} stopnia Fahrenheita"}
+                    }
+                    locative{
+                        few{"{0} stopniach Fahrenheita"}
+                        many{"{0} stopniach Fahrenheita"}
+                        one{"{0} stopniu Fahrenheita"}
+                        other{"{0} stopnia Fahrenheita"}
+                    }
+                    vocative{
+                        few{"{0} stopnie Fahrenheita"}
+                        many{"{0} stopni Fahrenheita"}
+                        one{"{0} stopniu Fahrenheita"}
+                        other{"{0} stopnia Fahrenheita"}
+                    }
+                }
+                dnam{"stopnie Fahrenheita"}
+                few{"{0} stopnie Fahrenheita"}
+                gender{"inanimate"}
+                many{"{0} stopni Fahrenheita"}
+                one{"{0} stopień Fahrenheita"}
+                other{"{0} stopnia Fahrenheita"}
+            }
+            generic{
+                case{
+                    accusative{
+                        few{"{0} stopnie"}
+                        many{"{0} stopni"}
+                        one{"{0} stopień"}
+                        other{"{0} stopnia"}
+                    }
+                    dative{
+                        few{"{0} stopniom"}
+                        many{"{0} stopniom"}
+                        one{"{0} stopniowi"}
+                        other{"{0} stopnia"}
+                    }
+                    genitive{
+                        few{"{0} stopni"}
+                        many{"{0} stopni"}
+                        one{"{0} stopnia"}
+                        other{"{0} stopnia"}
+                    }
+                    instrumental{
+                        few{"{0} stopniami"}
+                        many{"{0} stopniami"}
+                        one{"{0} stopniem"}
+                        other{"{0} stopnia"}
+                    }
+                    locative{
+                        few{"{0} stopniach"}
+                        many{"{0} stopniach"}
+                        one{"{0} stopniu"}
+                        other{"{0} stopnia"}
+                    }
+                    vocative{
+                        few{"{0} stopnie"}
+                        many{"{0} stopni"}
+                        one{"{0} stopniu"}
+                        other{"{0} stopnia"}
+                    }
+                }
+                dnam{"stopnie"}
+                few{"{0} stopnie"}
+                gender{"inanimate"}
+                many{"{0} stopni"}
+                one{"{0} stopień"}
+                other{"{0} stopnia"}
+            }
+            kelvin{
+                case{
+                    accusative{
+                        few{"{0} kelwiny"}
+                        many{"{0} kelwinów"}
+                        one{"{0} kelwin"}
+                        other{"{0} kelwina"}
+                    }
+                    dative{
+                        few{"{0} kelwinom"}
+                        many{"{0} kelwinom"}
+                        one{"{0} kelwinowi"}
+                        other{"{0} kelwina"}
+                    }
+                    genitive{
+                        few{"{0} kelwinów"}
+                        many{"{0} kelwinów"}
+                        one{"{0} kelwina"}
+                        other{"{0} kelwina"}
+                    }
+                    instrumental{
+                        few{"{0} kelwinami"}
+                        many{"{0} kelwinami"}
+                        one{"{0} kelwinem"}
+                        other{"{0} kelwina"}
+                    }
+                    locative{
+                        few{"{0} kelwinach"}
+                        many{"{0} kelwinach"}
+                        one{"{0} kelwinie"}
+                        other{"{0} kelwina"}
+                    }
+                    vocative{
+                        few{"{0} kelwiny"}
+                        many{"{0} kelwinów"}
+                        one{"{0} kelwinie"}
+                        other{"{0} kelwina"}
+                    }
+                }
+                dnam{"kelwiny"}
+                few{"{0} kelwiny"}
+                gender{"inanimate"}
+                many{"{0} kelwinów"}
+                one{"{0} kelwin"}
+                other{"{0} kelwina"}
+            }
+        }
+        torque{
+            newton-meter{
+                dnam{"niutonometry"}
+                few{"{0} niutonometry"}
+                many{"{0} niutonometrów"}
+                one{"{0} niutonometr"}
+                other{"{0} niutonometra"}
+            }
+            pound-force-foot{
+                dnam{"stopofunty"}
+                few{"{0} stopofunty"}
+                many{"{0} stopofuntów"}
+                one{"{0} stopofunt"}
+                other{"{0} stopofunta"}
+            }
+        }
+        volume{
+            acre-foot{
+                dnam{"akrostopy"}
+                few{"{0} akrostopy"}
+                many{"{0} akrostóp"}
+                one{"{0} akrostopa"}
+                other{"{0} akrostopy"}
+            }
+            barrel{
+                dnam{"baryłki"}
+                few{"{0} baryłki"}
+                many{"{0} baryłek"}
+                one{"{0} baryłka"}
+                other{"{0} baryłki"}
+            }
+            bushel{
+                dnam{"buszle"}
+                few{"{0} buszle"}
+                many{"{0} buszli"}
+                one{"{0} buszel"}
+                other{"{0} buszla"}
+            }
+            centiliter{
+                case{
+                    accusative{
+                        few{"{0} centylitry"}
+                        many{"{0} centylitrów"}
+                        one{"{0} centylitr"}
+                        other{"{0} centylitra"}
+                    }
+                    dative{
+                        few{"{0} centylitrom"}
+                        many{"{0} centylitrom"}
+                        one{"{0} centylitrowi"}
+                        other{"{0} centylitra"}
+                    }
+                    genitive{
+                        few{"{0} centylitrów"}
+                        many{"{0} centylitrów"}
+                        one{"{0} centylitra"}
+                        other{"{0} centylitra"}
+                    }
+                    instrumental{
+                        few{"{0} centylitrami"}
+                        many{"{0} centylitrami"}
+                        one{"{0} centylitrem"}
+                        other{"{0} centylitra"}
+                    }
+                    locative{
+                        few{"{0} centylitrach"}
+                        many{"{0} centylitrach"}
+                        one{"{0} centylitrze"}
+                        other{"{0} centylitra"}
+                    }
+                    vocative{
+                        few{"{0} centylitry"}
+                        many{"{0} centylitrów"}
+                        one{"{0} centylitrze"}
+                        other{"{0} centylitra"}
+                    }
+                }
+                dnam{"centylitry"}
+                few{"{0} centylitry"}
+                gender{"inanimate"}
+                many{"{0} centylitrów"}
+                one{"{0} centylitr"}
+                other{"{0} centylitra"}
+            }
+            cubic-centimeter{
+                case{
+                    accusative{
+                        few{"{0} centymetry sześcienne"}
+                        many{"{0} centymetrów sześciennych"}
+                        one{"{0} centymetr sześcienny"}
+                        other{"{0} centymetra sześciennego"}
+                    }
+                    dative{
+                        few{"{0} centymetrom sześciennym"}
+                        many{"{0} centymetrom sześciennym"}
+                        one{"{0} centymetrowi sześciennemu"}
+                        other{"{0} centymetra sześciennego"}
+                    }
+                    genitive{
+                        few{"{0} centymetrów sześciennych"}
+                        many{"{0} centymetrów sześciennych"}
+                        one{"{0} centymetra sześciennego"}
+                        other{"{0} centymetra sześciennego"}
+                    }
+                    instrumental{
+                        few{"{0} centymetrami sześciennymi"}
+                        many{"{0} centymetrami sześciennymi"}
+                        one{"{0} centymetrem sześciennym"}
+                        other{"{0} centymetra sześciennego"}
+                    }
+                    locative{
+                        few{"{0} centymetrach sześciennych"}
+                        many{"{0} centymetrach sześciennych"}
+                        one{"{0} centymetrze sześciennym"}
+                        other{"{0} centymetra sześciennego"}
+                    }
+                    vocative{
+                        few{"{0} centymetry sześcienne"}
+                        many{"{0} centymetrów sześciennych"}
+                        one{"{0} centymetrze sześcienny"}
+                        other{"{0} centymetra sześciennego"}
+                    }
+                }
+                dnam{"centymetry sześcienne"}
+                few{"{0} centymetry sześcienne"}
+                gender{"inanimate"}
+                many{"{0} centymetrów sześciennych"}
+                one{"{0} centymetr sześcienny"}
+                other{"{0} centymetra sześciennego"}
+                per{"{0} na centymetr sześcienny"}
+            }
+            cubic-foot{
+                case{
+                    accusative{
+                        few{"{0} stopy sześcienne"}
+                        many{"{0} stóp sześciennych"}
+                        one{"{0} stopę sześcienną"}
+                        other{"{0} stopy sześciennej"}
+                    }
+                    dative{
+                        few{"{0} stopom sześciennym"}
+                        many{"{0} stopom sześciennym"}
+                        one{"{0} stopie sześciennej"}
+                        other{"{0} stopy sześciennej"}
+                    }
+                    genitive{
+                        few{"{0} stóp sześciennych"}
+                        many{"{0} stóp sześciennych"}
+                        one{"{0} stopy sześciennej"}
+                        other{"{0} stopy sześciennej"}
+                    }
+                    instrumental{
+                        few{"{0} stopami sześciennymi"}
+                        many{"{0} stopami sześciennymi"}
+                        one{"{0} stopą sześcienną"}
+                        other{"{0} stopy sześciennej"}
+                    }
+                    locative{
+                        few{"{0} stopach sześciennych"}
+                        many{"{0} stopach sześciennych"}
+                        one{"{0} stopie sześciennej"}
+                        other{"{0} stopy sześciennej"}
+                    }
+                    vocative{
+                        few{"{0} stopy sześcienne"}
+                        many{"{0} stóp sześciennych"}
+                        one{"{0} stopo sześcienna"}
+                        other{"{0} stopy sześciennej"}
+                    }
+                }
+                dnam{"stopy sześcienne"}
+                few{"{0} stopy sześcienne"}
+                gender{"feminine"}
+                many{"{0} stóp sześciennych"}
+                one{"{0} stopa sześcienna"}
+                other{"{0} stopy sześciennej"}
+            }
+            cubic-inch{
+                dnam{"cale sześcienne"}
+                few{"{0} cale sześcienne"}
+                many{"{0} cali sześciennych"}
+                one{"{0} cal sześcienny"}
+                other{"{0} cala sześciennego"}
+            }
+            cubic-kilometer{
+                dnam{"kilometry sześcienne"}
+                few{"{0} kilometry sześcienne"}
+                many{"{0} kilometrów sześciennych"}
+                one{"{0} kilometr sześcienny"}
+                other{"{0} kilometra sześciennego"}
+            }
+            cubic-meter{
+                dnam{"metry sześcienne"}
+                few{"{0} metry sześcienne"}
+                many{"{0} metrów sześciennych"}
+                one{"{0} metr sześcienny"}
+                other{"{0} metra sześciennego"}
+                per{"{0} na metr sześcienny"}
+            }
+            cubic-mile{
+                case{
+                    accusative{
+                        few{"{0} mile sześcienne"}
+                        many{"{0} mil sześciennych"}
+                        one{"{0} milę sześcienną"}
+                        other{"{0} mili sześciennej"}
+                    }
+                    dative{
+                        few{"{0} milom sześciennym"}
+                        many{"{0} milom sześciennym"}
+                        one{"{0} mili sześciennej"}
+                        other{"{0} mili sześciennej"}
+                    }
+                    genitive{
+                        few{"{0} mil sześciennych"}
+                        many{"{0} mil sześciennych"}
+                        one{"{0} mili sześciennej"}
+                        other{"{0} mili sześciennej"}
+                    }
+                    instrumental{
+                        few{"{0} milami sześciennymi"}
+                        many{"{0} milami sześciennymi"}
+                        one{"{0} milą sześcienną"}
+                        other{"{0} mili sześciennej"}
+                    }
+                    locative{
+                        few{"{0} milach sześciennych"}
+                        many{"{0} milach sześciennych"}
+                        one{"{0} mili sześciennej"}
+                        other{"{0} mili sześciennej"}
+                    }
+                    vocative{
+                        few{"{0} mile sześcienne"}
+                        many{"{0} mil sześciennych"}
+                        one{"{0} milo sześcienna"}
+                        other{"{0} mili sześciennej"}
+                    }
+                }
+                dnam{"mile sześcienne"}
+                few{"{0} mile sześcienne"}
+                gender{"feminine"}
+                many{"{0} mil sześciennych"}
+                one{"{0} mila sześcienna"}
+                other{"{0} mili sześciennej"}
+            }
+            cubic-yard{
+                dnam{"jardy sześcienne"}
+                few{"{0} jardy sześcienne"}
+                many{"{0} jardów sześciennych"}
+                one{"{0} jard sześcienny"}
+                other{"{0} jarda sześciennego"}
+            }
+            cup{
+                case{
+                    accusative{
+                        few{"{0} ćwierćkwarty amerykańskie"}
+                        many{"{0} ćwierćkwart amerykańskich"}
+                        one{"{0} ćwierćkwartę amerykańską"}
+                        other{"{0} ćwierćkwarty amerykańskiej"}
+                    }
+                    dative{
+                        few{"{0} ćwierćkwartom amerykańskim"}
+                        many{"{0} ćwierćkwartom amerykańskim"}
+                        one{"{0} ćwierćkwarcie amerykańskiej"}
+                        other{"{0} ćwierćkwarty amerykańskiej"}
+                    }
+                    genitive{
+                        few{"{0} ćwierćkwart amerykańskich"}
+                        many{"{0} ćwierćkwart amerykańskich"}
+                        one{"{0} ćwierćkwarty amerykańskiej"}
+                        other{"{0} ćwierćkwarty amerykańskiej"}
+                    }
+                    instrumental{
+                        few{"{0} ćwierćkwartami amerykańskimi"}
+                        many{"{0} ćwierćkwartami amerykańskimi"}
+                        one{"{0} ćwierćkwartą amerykańską"}
+                        other{"{0} ćwierćkwarty amerykańskiej"}
+                    }
+                    locative{
+                        few{"{0} ćwierćkwartach amerykańskich"}
+                        many{"{0} ćwierćkwartach amerykańskich"}
+                        one{"{0} ćwierćkwarcie amerykańskiej"}
+                        other{"{0} ćwierćkwarty amerykańskiej"}
+                    }
+                    vocative{
+                        few{"{0} ćwierćkwarty amerykańskie"}
+                        many{"{0} ćwierćkwart amerykańskich"}
+                        one{"{0} ćwierćkwarto amerykańska"}
+                        other{"{0} ćwierćkwarty am."}
+                    }
+                }
+                dnam{"ćwierćkwarty amerykańske"}
+                few{"{0} ćwierćkwarty amerykańskie"}
+                gender{"feminine"}
+                many{"{0} ćwierćkwart amerykańskich"}
+                one{"{0} ćwierćkwarta amerykańska"}
+                other{"{0} ćwierćkwarty amerykańskiej"}
+            }
+            cup-metric{
+                dnam{"ćwierćkwarty metryczne"}
+                few{"{0} ćwierćkwarty metryczne"}
+                many{"{0} ćwierćkwart metrycznych"}
+                one{"{0} ćwierćkwarta metryczna"}
+                other{"{0} ćwierćkwarty metrycznej"}
+            }
+            deciliter{
+                case{
+                    accusative{
+                        few{"{0} decylitry"}
+                        many{"{0} decylitrów"}
+                        one{"{0} decylitr"}
+                        other{"{0} decylitra"}
+                    }
+                    dative{
+                        few{"{0} decylitrom"}
+                        many{"{0} decylitrom"}
+                        one{"{0} decylitrowi"}
+                        other{"{0} decylitra"}
+                    }
+                    genitive{
+                        few{"{0} decylitrów"}
+                        many{"{0} decylitrów"}
+                        one{"{0} decylitra"}
+                        other{"{0} decylitra"}
+                    }
+                    instrumental{
+                        few{"{0} decylitrami"}
+                        many{"{0} decylitrami"}
+                        one{"{0} decylitrem"}
+                        other{"{0} decylitra"}
+                    }
+                    locative{
+                        few{"{0} decylitrach"}
+                        many{"{0} decylitrach"}
+                        one{"{0} decylitrze"}
+                        other{"{0} decylitra"}
+                    }
+                    vocative{
+                        few{"{0} decylitry"}
+                        many{"{0} decylitrów"}
+                        one{"{0} decylitrze"}
+                        other{"{0} decylitra"}
+                    }
+                }
+                dnam{"decylitry"}
+                few{"{0} decylitry"}
+                gender{"inanimate"}
+                many{"{0} decylitrów"}
+                one{"{0} decylitr"}
+                other{"{0} decylitra"}
+            }
+            dessert-spoon{
+                case{
+                    accusative{
+                        few{"{0} łyżki deserowe"}
+                        many{"{0} łyżek deserowych"}
+                        one{"{0} łyżkę deserową"}
+                        other{"{0} łyżki deserowej"}
+                    }
+                    dative{
+                        few{"{0} łyżkom deserowym"}
+                        many{"{0} łyżkom deserowym"}
+                        one{"{0} łyżce deserowej"}
+                        other{"{0} łyżki deserowej"}
+                    }
+                    genitive{
+                        few{"{0} łyżek deserowych"}
+                        many{"{0} łyżek deserowych"}
+                        one{"{0} łyżki deserowej"}
+                        other{"{0} łyżki deserowej"}
+                    }
+                    instrumental{
+                        few{"{0} łyżkami deserowymi"}
+                        many{"{0} łyżkami deserowymi"}
+                        one{"{0} łyżką deserową"}
+                        other{"{0} łyżki deserowej"}
+                    }
+                    locative{
+                        few{"{0} łyżkach deserowych"}
+                        many{"{0} łyżkach deserowych"}
+                        one{"{0} łyżce deserowej"}
+                        other{"{0} łyżki deserowej"}
+                    }
+                    vocative{
+                        few{"{0} łyżki deserowe"}
+                        many{"{0} łyżek deserowych"}
+                        one{"{0} łyżko deserowa"}
+                        other{"{0} łyżki deserowej"}
+                    }
+                }
+                dnam{"łyżki deserowe"}
+                few{"{0} łyżki deserowe"}
+                gender{"feminine"}
+                many{"{0} łyżek deserowych"}
+                one{"{0} łyżka deserowa"}
+                other{"{0} łyżki deserowej"}
+            }
+            dessert-spoon-imperial{
+                case{
+                    accusative{
+                        few{"{0} imperialne łyżeczki deserowe"}
+                        many{"{0} imperialnych łyżeczek deserowych"}
+                        one{"{0} imperialną łyżeczkę deserową"}
+                        other{"{0} imperialnej łyżeczki deserowej"}
+                    }
+                    dative{
+                        few{"{0} imperialnym łyżeczkom deserowym"}
+                        many{"{0} imperialnym łyżeczkom deserowym"}
+                        one{"{0} imperialnej łyżeczkce deserowej"}
+                        other{"{0} imperialnej łyżeczki deserowej"}
+                    }
+                    genitive{
+                        few{"{0} imperialnych łyżeczek deserowych"}
+                        many{"{0} imperialnych łyżeczek deserowych"}
+                        one{"{0} imperialnej łyżeczki deserowej"}
+                        other{"{0} imperialnej łyżeczki deserowej"}
+                    }
+                    instrumental{
+                        few{"{0} imperialnymi łyżeczkami deserowymi"}
+                        many{"{0} imperialnymi łyżeczkami deserowymi"}
+                        one{"{0} imperialną łyżeczką deserową"}
+                        other{"{0} imperialnej łyżeczki deserowej"}
+                    }
+                    locative{
+                        few{"{0} imperialnych łyżeczkach deserowych"}
+                        many{"{0} imperialnych łyżeczkach deserowych"}
+                        one{"{0} imperialnej łyżeczce deserowej"}
+                        other{"{0} imperialnej łyżeczki deserowej"}
+                    }
+                    vocative{
+                        few{"{0} imperialne łyżeczki deserowe"}
+                        many{"{0} imperialnych łyżeczek deserowych"}
+                        one{"{0} imperialna łyżeczko deserowa"}
+                        other{"{0} imperialnej łyżeczki deserowej"}
+                    }
+                }
+                dnam{"imperialna łyżeczka deserowa"}
+                few{"{0} imperialne łyżeczki deserowe"}
+                gender{"feminine"}
+                many{"{0} imperialnych łyżeczek deserowych"}
+                one{"{0} imperialna łyżeczka deserowa"}
+                other{"{0} imperialnej łyżeczki deserowej"}
+            }
+            dram{
+                case{
+                    accusative{
+                        few{"{0} drachmy płynu"}
+                        many{"{0} drachm płynu"}
+                        one{"{0} drachmę płynu"}
+                        other{"{0} drachmy płynu"}
+                    }
+                    dative{
+                        few{"{0} drachmom płynu"}
+                        many{"{0} drachmom płynu"}
+                        one{"{0} drachmie płynu"}
+                        other{"{0} drachmy płynu"}
+                    }
+                    genitive{
+                        few{"{0} drachm płynu"}
+                        many{"{0} drachm płynu"}
+                        one{"{0} drachmy płynu"}
+                        other{"{0} drachmy płynu"}
+                    }
+                    instrumental{
+                        few{"{0} drachmami płynu"}
+                        many{"{0} drachmami płynu"}
+                        one{"{0} drachmą płynu"}
+                        other{"{0} drachmy płynu"}
+                    }
+                    locative{
+                        few{"{0} drachmach płynu"}
+                        many{"{0} drachmach płynu"}
+                        one{"{0} drachmie płynu"}
+                        other{"{0} drachmy płynu"}
+                    }
+                    vocative{
+                        few{"{0} drachmy płynu"}
+                        many{"{0} drachm płynu"}
+                        one{"{0} drachmo płynu"}
+                        other{"{0} drachmy płynu"}
+                    }
+                }
+                dnam{"drachmy płynu"}
+                few{"{0} drachmy płynu"}
+                gender{"feminine"}
+                many{"{0} drachm płynu"}
+                one{"{0} drachma płynu"}
+                other{"{0} drachmy płynu"}
+            }
+            drop{
+                case{
+                    accusative{
+                        few{"{0} krople"}
+                        many{"{0} kropli"}
+                        one{"{0} kroplę"}
+                        other{"{0} kropli"}
+                    }
+                    dative{
+                        few{"{0} kroplom"}
+                        many{"{0} kroplom"}
+                        one{"{0} kropli"}
+                        other{"{0} kropli"}
+                    }
+                    genitive{
+                        few{"{0} kropel"}
+                        many{"{0} kropel"}
+                        one{"{0} kropli"}
+                        other{"{0} kropli"}
+                    }
+                    instrumental{
+                        few{"{0} kroplami"}
+                        many{"{0} kroplami"}
+                        one{"{0} kroplą"}
+                        other{"{0} kropli"}
+                    }
+                    locative{
+                        few{"{0} kroplach"}
+                        many{"{0} kroplach"}
+                        one{"{0} kropli"}
+                        other{"{0} kropli"}
+                    }
+                    vocative{
+                        few{"{0} krople"}
+                        many{"{0} kropli"}
+                        one{"{0} kroplo"}
+                        other{"{0} kropli"}
+                    }
+                }
+                dnam{"krople"}
+                few{"{0} krople"}
+                gender{"feminine"}
+                many{"{0} kropli"}
+                one{"{0} kropla"}
+                other{"{0} kropli"}
+            }
+            fluid-ounce{
+                case{
+                    accusative{
+                        few{"{0} uncje płynu amerykańskie"}
+                        many{"{0} uncji płynu amerykańskich"}
+                        one{"{0} uncję płynu amerykańską"}
+                        other{"{0} uncji płynu amerykańskiej"}
+                    }
+                    dative{
+                        few{"{0} uncjom płynu amerykańskim"}
+                        many{"{0} uncjom płynu amerykańskim"}
+                        one{"{0} uncji płynu amerykańskiej"}
+                        other{"{0} uncji płynu amerykańskiej"}
+                    }
+                    genitive{
+                        few{"{0} uncji płynu amerykańskich"}
+                        many{"{0} uncji płynu amerykańskich"}
+                        one{"{0} uncji płynu amerykańskiej"}
+                        other{"{0} uncji płynu amerykańskiej"}
+                    }
+                    instrumental{
+                        few{"{0} uncjami płynu amerykańskimi"}
+                        many{"{0} uncjami płynu amerykańskimi"}
+                        one{"{0} uncją płynu amerykańską"}
+                        other{"{0} uncji płynu amerykańskiej"}
+                    }
+                    locative{
+                        few{"{0} uncjach płynu amerykańskich"}
+                        many{"{0} uncjach płynu amerykańskich"}
+                        one{"{0} uncji płynu amerykańskiej"}
+                        other{"{0} uncji płynu amerykańskiej"}
+                    }
+                    vocative{
+                        few{"{0} uncje płynu amerykańskie"}
+                        many{"{0} uncji płynu amerykańskich"}
+                        one{"{0} uncjo płynu amerykańska"}
+                        other{"{0} uncji płynu amerykańskiej"}
+                    }
+                }
+                dnam{"uncje płynu amerykańskie"}
+                few{"{0} uncje płynu amerykańskie"}
+                gender{"feminine"}
+                many{"{0} uncji płynu amerykańskich"}
+                one{"{0} uncja płynu amerykańska"}
+                other{"{0} uncji płynu amerykańskiej"}
+            }
+            fluid-ounce-imperial{
+                case{
+                    accusative{
+                        few{"{0} uncje płynu angielskie"}
+                        many{"{0} uncji płynu angielskich"}
+                        one{"{0} uncję płynu angielską"}
+                        other{"{0} uncji płynu angielskiej"}
+                    }
+                    dative{
+                        few{"{0} uncjom płynu angielskim"}
+                        many{"{0} uncjom płynu angielskim"}
+                        one{"{0} uncji płynu angielskiej"}
+                        other{"{0} uncji płynu angielskiej"}
+                    }
+                    genitive{
+                        few{"{0} uncji płynu angielskich"}
+                        many{"{0} uncji płynu angielskich"}
+                        one{"{0} uncji płynu angielskiej"}
+                        other{"{0} uncji płynu angielskiej"}
+                    }
+                    instrumental{
+                        few{"{0} uncjami płynu angielskimi"}
+                        many{"{0} uncjami płynu angielskimi"}
+                        one{"{0} uncją płynu angielską"}
+                        other{"{0} uncji płynu angielskiej"}
+                    }
+                    locative{
+                        few{"{0} uncjach płynu angielskich"}
+                        many{"{0} uncjach płynu angielskich"}
+                        one{"{0} uncji płynu angielskiej"}
+                        other{"{0} uncji płynu angielskiej"}
+                    }
+                    vocative{
+                        few{"{0} uncje płynu angielskie"}
+                        many{"{0} uncji płynu angielskich"}
+                        one{"{0} uncjo płynu angielska"}
+                        other{"{0} uncji płynu angielskiej"}
+                    }
+                }
+                dnam{"uncje płynu angielskie"}
+                few{"{0} uncje płynu angielskie"}
+                gender{"feminine"}
+                many{"{0} uncji płynu angielskich"}
+                one{"{0} uncja płynu angielska"}
+                other{"{0} uncji płynu angielskiej"}
+            }
+            gallon{
+                case{
+                    accusative{
+                        few{"{0} galony amerykańskie"}
+                        many{"{0} galonów amerykańskich"}
+                        one{"{0} galon amerykański"}
+                        other{"{0} galona amerykańskiego"}
+                    }
+                    dative{
+                        few{"{0} galonom amerykańskim"}
+                        many{"{0} galonom amerykańskim"}
+                        one{"{0} galonowi amerykańskiemu"}
+                        other{"{0} galona amerykańskiego"}
+                    }
+                    genitive{
+                        few{"{0} galonów amerykańskich"}
+                        many{"{0} galonów amerykańskich"}
+                        one{"{0} galona amerykańskiego"}
+                        other{"{0} galona amerykańskiego"}
+                    }
+                    instrumental{
+                        few{"{0} galonami amerykańskimi"}
+                        many{"{0} galonami amerykańskimi"}
+                        one{"{0} galonem amerykańskim"}
+                        other{"{0} galona amerykańskiego"}
+                    }
+                    locative{
+                        few{"{0} galonach amerykańskich"}
+                        many{"{0} galonach amerykańskich"}
+                        one{"{0} galonie amerykańskim"}
+                        other{"{0} galona amerykańskiego"}
+                    }
+                    vocative{
+                        few{"{0} galony amerykańskie"}
+                        many{"{0} galonów amerykańskich"}
+                        one{"{0} galonie amerykański"}
+                        other{"{0} galona amerykańskiego"}
+                    }
+                }
+                dnam{"galony amerykańskie"}
+                few{"{0} galony amerykańskie"}
+                gender{"inanimate"}
+                many{"{0} galonów amerykańskich"}
+                one{"{0} galon amerykański"}
+                other{"{0} galona amerykańskiego"}
+                per{"{0} na galon amerykański"}
+            }
+            gallon-imperial{
+                case{
+                    accusative{
+                        few{"{0} galony angielskie"}
+                        many{"{0} galonów angielskich"}
+                        one{"{0} galon angielski"}
+                        other{"{0} galona angielskiego"}
+                    }
+                    dative{
+                        few{"{0} galonom angielskim"}
+                        many{"{0} galonom angielskim"}
+                        one{"{0} galonowi angielskiemu"}
+                        other{"{0} galona angielskiego"}
+                    }
+                    genitive{
+                        few{"{0} galonów angielskich"}
+                        many{"{0} galonów angielskich"}
+                        one{"{0} galonu angielskiego"}
+                        other{"{0} galona angielskiego"}
+                    }
+                    instrumental{
+                        few{"{0} galonami angielskimi"}
+                        many{"{0} galonami angielskimi"}
+                        one{"{0} galonem angielskim"}
+                        other{"{0} galona angielskiego"}
+                    }
+                    locative{
+                        few{"{0} galonach angielskich"}
+                        many{"{0} galonach angielskich"}
+                        one{"{0} galonie angielskim"}
+                        other{"{0} galona angielskiego"}
+                    }
+                    vocative{
+                        few{"{0} galony angielskie"}
+                        many{"{0} galonów angielskich"}
+                        one{"{0} galonie angielski"}
+                        other{"{0} galona angielskiego"}
+                    }
+                }
+                dnam{"galony angielskie"}
+                few{"{0} galony angielskie"}
+                gender{"inanimate"}
+                many{"{0} galonów angielskich"}
+                one{"{0} galon angielski"}
+                other{"{0} galona angielskiego"}
+                per{"{0} na galon angielski"}
+            }
+            hectoliter{
+                dnam{"hektolitry"}
+                few{"{0} hektolitry"}
+                many{"{0} hektolitrów"}
+                one{"{0} hektolitr"}
+                other{"{0} hektolitra"}
+            }
+            jigger{
+                case{
+                    accusative{
+                        few{"{0} jiggery"}
+                        many{"{0} jiggerów"}
+                        one{"{0} jigger"}
+                        other{"{0} jiggera"}
+                    }
+                    dative{
+                        few{"{0} jiggerom"}
+                        many{"{0} jiggerom"}
+                        one{"{0} jiggerowi"}
+                        other{"{0} jiggera"}
+                    }
+                    genitive{
+                        few{"{0} jiggerów"}
+                        many{"{0} jiggerów"}
+                        one{"{0} jiggera"}
+                        other{"{0} jiggera"}
+                    }
+                    instrumental{
+                        few{"{0} jiggerami"}
+                        many{"{0} jiggerami"}
+                        one{"{0} jiggerem"}
+                        other{"{0} jiggera"}
+                    }
+                    locative{
+                        few{"{0} jiggerach"}
+                        many{"{0} jiggerach"}
+                        one{"{0} jiggerze"}
+                        other{"{0} jiggera"}
+                    }
+                    vocative{
+                        few{"{0} jiggery"}
+                        many{"{0} jiggerów"}
+                        one{"{0} jiggerze"}
+                        other{"{0} jiggera"}
+                    }
+                }
+                dnam{"jiggery"}
+                few{"{0} jiggery"}
+                gender{"inanimate"}
+                many{"{0} jiggerów"}
+                one{"{0} jigger"}
+                other{"{0} jiggera"}
+            }
+            liter{
+                case{
+                    accusative{
+                        few{"{0} litry"}
+                        many{"{0} litrów"}
+                        one{"{0} litr"}
+                        other{"{0} litra"}
+                    }
+                    dative{
+                        few{"{0} litrom"}
+                        many{"{0} litrom"}
+                        one{"{0} litrowi"}
+                        other{"{0} litra"}
+                    }
+                    genitive{
+                        few{"{0} litrów"}
+                        many{"{0} litrów"}
+                        one{"{0} litra"}
+                        other{"{0} litra"}
+                    }
+                    instrumental{
+                        few{"{0} litrami"}
+                        many{"{0} litrami"}
+                        one{"{0} litrem"}
+                        other{"{0} litra"}
+                    }
+                    locative{
+                        few{"{0} litrach"}
+                        many{"{0} litrach"}
+                        one{"{0} litrze"}
+                        other{"{0} litra"}
+                    }
+                    vocative{
+                        few{"{0} litry"}
+                        many{"{0} litrów"}
+                        one{"{0} litrze"}
+                        other{"{0} litra"}
+                    }
+                }
+                dnam{"litry"}
+                few{"{0} litry"}
+                gender{"inanimate"}
+                many{"{0} litrów"}
+                one{"{0} litr"}
+                other{"{0} litra"}
+                per{"{0} na litr"}
+            }
+            megaliter{
+                dnam{"megalitry"}
+                few{"{0} megalitry"}
+                many{"{0} megalitrów"}
+                one{"{0} megalitr"}
+                other{"{0} megalitra"}
+            }
+            milliliter{
+                case{
+                    accusative{
+                        few{"{0} mililitry"}
+                        many{"{0} mililitrów"}
+                        one{"{0} mililitr"}
+                        other{"{0} mililitra"}
+                    }
+                    dative{
+                        few{"{0} mililitrom"}
+                        many{"{0} mililitrom"}
+                        one{"{0} mililitrowi"}
+                        other{"{0} mililitra"}
+                    }
+                    genitive{
+                        few{"{0} mililitrów"}
+                        many{"{0} mililitrów"}
+                        one{"{0} mililitra"}
+                        other{"{0} mililitra"}
+                    }
+                    instrumental{
+                        few{"{0} mililitrami"}
+                        many{"{0} mililitrami"}
+                        one{"{0} mililitrem"}
+                        other{"{0} mililitra"}
+                    }
+                    locative{
+                        few{"{0} mililitrach"}
+                        many{"{0} mililitrach"}
+                        one{"{0} mililitrze"}
+                        other{"{0} mililitra"}
+                    }
+                    vocative{
+                        few{"{0} mililitry"}
+                        many{"{0} mililitrów"}
+                        one{"{0} mililitrze"}
+                        other{"{0} mililitra"}
+                    }
+                }
+                dnam{"mililitry"}
+                few{"{0} mililitry"}
+                gender{"inanimate"}
+                many{"{0} mililitrów"}
+                one{"{0} mililitr"}
+                other{"{0} mililitra"}
+            }
+            pinch{
+                case{
+                    accusative{
+                        few{"{0} szczypty"}
+                        many{"{0} szczypt"}
+                        one{"{0} szczyptę"}
+                        other{"{0} szczypty"}
+                    }
+                    dative{
+                        few{"{0} szczyptom"}
+                        many{"{0} szczyptom"}
+                        one{"{0} szczypcie"}
+                        other{"{0} szczypty"}
+                    }
+                    genitive{
+                        few{"{0} szczypt"}
+                        many{"{0} szczypt"}
+                        one{"{0} szczypty"}
+                        other{"{0} szczypty"}
+                    }
+                    instrumental{
+                        few{"{0} szczyptami"}
+                        many{"{0} szczyptami"}
+                        one{"{0} szczyptą"}
+                        other{"{0} szczypty"}
+                    }
+                    locative{
+                        few{"{0} szczyptach"}
+                        many{"{0} szczyptach"}
+                        one{"{0} szczypcie"}
+                        other{"{0} szczypty"}
+                    }
+                    vocative{
+                        few{"{0} szczypty"}
+                        many{"{0} szczypt"}
+                        one{"{0} szczypto"}
+                        other{"{0} szczypty"}
+                    }
+                }
+                dnam{"szczypty"}
+                few{"{0} szczypty"}
+                gender{"feminine"}
+                many{"{0} szczypt"}
+                one{"{0} szczypta"}
+                other{"{0} szczypty"}
+            }
+            pint{
+                case{
+                    accusative{
+                        few{"{0} półkwarty amerykańskie"}
+                        many{"{0} półkwart amerykańskich"}
+                        one{"{0} półkwartę amerykańską"}
+                        other{"{0} półkwarty amerykańskiej"}
+                    }
+                    dative{
+                        few{"{0} półkwartom amerykańskim"}
+                        many{"{0} półkwartom amerykańskim"}
+                        one{"{0} półkwarcie amerykańskiej"}
+                        other{"{0} półkwarty amerykańskiej"}
+                    }
+                    genitive{
+                        few{"{0} półkwart amerykańskich"}
+                        many{"{0} półkwart amerykańskich"}
+                        one{"{0} półkwarty amerykańskiej"}
+                        other{"{0} półkwarty amerykańskiej"}
+                    }
+                    instrumental{
+                        few{"{0} półkwartami amerykańskimi"}
+                        many{"{0} półkwartami amerykańskimi"}
+                        one{"{0} półkwartą amerykańską"}
+                        other{"{0} półkwarty amerykańskiej"}
+                    }
+                    locative{
+                        few{"{0} półkwartach amerykańskich"}
+                        many{"{0} półkwartach amerykańskich"}
+                        one{"{0} półkwarcie amerykańskiej"}
+                        other{"{0} półkwarty amerykańskiej"}
+                    }
+                    vocative{
+                        few{"{0} półkwarty amerykańskie"}
+                        many{"{0} półkwart amerykańskich"}
+                        one{"{0} półkwarto amerykańska"}
+                        other{"{0} półkwarty amerykańskiej"}
+                    }
+                }
+                dnam{"półkwarty amerykańskie"}
+                few{"{0} półkwarty amerykańskie"}
+                gender{"feminine"}
+                many{"{0} półkwart amerykańskich"}
+                one{"{0} półkwarta amerykańska"}
+                other{"{0} półkwarty amerykańskiej"}
+            }
+            pint-metric{
+                dnam{"półkwarty metryczne"}
+                few{"{0} półkwarty metryczne"}
+                many{"{0} półkwart metrycznych"}
+                one{"{0} półkwarta metryczna"}
+                other{"{0} półkwarty metrycznej"}
+            }
+            quart{
+                case{
+                    accusative{
+                        few{"{0} kwarty amerykańskie"}
+                        many{"{0} kwart amerykańskich"}
+                        one{"{0} kwartę amerykańską"}
+                        other{"{0} kwarty amerykańskiej"}
+                    }
+                    dative{
+                        few{"{0} kwartom amerykańskim"}
+                        many{"{0} kwartom amerykańskim"}
+                        one{"{0} kwarcie amerykańskiej"}
+                        other{"{0} kwarty amerykańskiej"}
+                    }
+                    genitive{
+                        few{"{0} kwart amerykańskich"}
+                        many{"{0} kwart amerykańskich"}
+                        one{"{0} kwarty amerykańskiej"}
+                        other{"{0} kwarty amerykańskiej"}
+                    }
+                    instrumental{
+                        few{"{0} kwartami amerykańskimi"}
+                        many{"{0} kwartami amerykańskimi"}
+                        one{"{0} kwartą amerykańską"}
+                        other{"{0} kwarty amerykańskiej"}
+                    }
+                    locative{
+                        few{"{0} kwartach amerykańskich"}
+                        many{"{0} kwartach amerykańskich"}
+                        one{"{0} kwarcie amerykańskiej"}
+                        other{"{0} kwarty amerykańskiej"}
+                    }
+                    vocative{
+                        few{"{0} kwarty amerykańskie"}
+                        many{"{0} kwart amerykańskich"}
+                        one{"{0} kwarto amerykańska"}
+                        other{"{0} kwarty amerykańskiej"}
+                    }
+                }
+                dnam{"kwarty amerykańskie"}
+                few{"{0} kwarty amerykańskie"}
+                gender{"feminine"}
+                many{"{0} kwart amerykańskich"}
+                one{"{0} kwarta amerykańska"}
+                other{"{0} kwarty amerykańskiej"}
+            }
+            quart-imperial{
+                case{
+                    accusative{
+                        few{"{0} kwarty angielskie"}
+                        many{"{0} kwart angielskich"}
+                        one{"{0} kwartę angielską"}
+                        other{"{0} kwarty angielskiej"}
+                    }
+                    dative{
+                        few{"{0} kwartom angielskim"}
+                        many{"{0} kwartom angielskim"}
+                        one{"{0} kwarcie angielskiej"}
+                        other{"{0} kwarty angielskiej"}
+                    }
+                    genitive{
+                        few{"{0} kwart angielskich"}
+                        many{"{0} kwart angielskich"}
+                        one{"{0} kwarty angielskiej"}
+                        other{"{0} kwarty angielskiej"}
+                    }
+                    instrumental{
+                        few{"{0} kwartami angielskimi"}
+                        many{"{0} kwartami angielskimi"}
+                        one{"{0} kwartą angielską"}
+                        other{"{0} kwarty angielskiej"}
+                    }
+                    locative{
+                        few{"{0} kwartach angielskich"}
+                        many{"{0} kwartach angielskich"}
+                        one{"{0} kwarcie angielskiej"}
+                        other{"{0} kwarty angielskiej"}
+                    }
+                    vocative{
+                        few{"{0} kwarty angielskie"}
+                        many{"{0} kwart angielskich"}
+                        one{"{0} kwarto angielska"}
+                        other{"{0} kwarty angielskiej"}
+                    }
+                }
+                dnam{"kwarty angielskie"}
+                few{"{0} kwarty angielskie"}
+                gender{"feminine"}
+                many{"{0} kwart angielskich"}
+                one{"{0} kwarta angielska"}
+                other{"{0} kwarty angielskiej"}
+            }
+            tablespoon{
+                case{
+                    accusative{
+                        few{"{0} łyżki stołowe"}
+                        many{"{0} łyżek stołowych"}
+                        one{"{0} łyżkę stołową"}
+                        other{"{0} łyżki stołowej"}
+                    }
+                    dative{
+                        few{"{0} łyżkom stołowym"}
+                        many{"{0} łyżkom stołowym"}
+                        one{"{0} łyżce stołowej"}
+                        other{"{0} łyżki stołowej"}
+                    }
+                    genitive{
+                        few{"{0} łyżek stołowych"}
+                        many{"{0} łyżek stołowych"}
+                        one{"{0} łyżki stołowej"}
+                        other{"{0} łyżki stołowej"}
+                    }
+                    instrumental{
+                        few{"{0} łyżkami stołowymi"}
+                        many{"{0} łyżkami stołowymi"}
+                        one{"{0} łyżką stołową"}
+                        other{"{0} łyżki stołowej"}
+                    }
+                    locative{
+                        few{"{0} łyżkach stołowych"}
+                        many{"{0} łyżkach stołowych"}
+                        one{"{0} łyżce stołowej"}
+                        other{"{0} łyżki stołowej"}
+                    }
+                    vocative{
+                        few{"{0} łyżki stołowe"}
+                        many{"{0} łyżek stołowych"}
+                        one{"{0} łyżko stołowa"}
+                        other{"{0} łyżki stołowej"}
+                    }
+                }
+                dnam{"łyżki stołowe"}
+                few{"{0} łyżki stołowe"}
+                gender{"feminine"}
+                many{"{0} łyżek stołowych"}
+                one{"{0} łyżka stołowa"}
+                other{"{0} łyżki stołowej"}
+            }
+            teaspoon{
+                case{
+                    accusative{
+                        few{"{0} łyżeczki"}
+                        many{"{0} łyżeczek"}
+                        one{"{0} łyżeczkę"}
+                        other{"{0} łyżeczki"}
+                    }
+                    dative{
+                        few{"{0} łyżeczkom"}
+                        many{"{0} łyżeczkom"}
+                        one{"{0} łyżeczkce"}
+                        other{"{0} łyżeczki"}
+                    }
+                    genitive{
+                        few{"{0} lyżeczek"}
+                        many{"{0} łyżeczek"}
+                        one{"{0} łyżeczki"}
+                        other{"{0} łyżeczki"}
+                    }
+                    instrumental{
+                        few{"{0} łyżeczkami"}
+                        many{"{0} łyżeczkami"}
+                        one{"{0} łyżeczką"}
+                        other{"{0} łyżeczki"}
+                    }
+                    locative{
+                        few{"{0} łyżeczkach"}
+                        many{"{0} łyżeczkach"}
+                        one{"{0} łyżeczce"}
+                        other{"{0} łyżeczki"}
+                    }
+                    vocative{
+                        few{"{0} łyżeczki"}
+                        many{"{0} łyżeczek"}
+                        one{"{0} łyżeczko"}
+                        other{"{0} łyżeczki"}
+                    }
+                }
+                dnam{"łyżeczki"}
+                few{"{0} łyżeczki"}
+                gender{"feminine"}
+                many{"{0} łyżeczek"}
+                one{"{0} łyżeczka"}
+                other{"{0} łyżeczki"}
+            }
+        }
+    }
+    unitsNarrow{
+        acceleration{
+            g-force{
+                few{"{0} G"}
+                many{"{0} G"}
+                one{"{0} G"}
+                other{"{0} G"}
+            }
+        }
+        angle{
+            arc-minute{
+                few{"{0}′"}
+                many{"{0}′"}
+                one{"{0}′"}
+                other{"{0}′"}
+            }
+            arc-second{
+                few{"{0}″"}
+                many{"{0}″"}
+                one{"{0}″"}
+                other{"{0}″"}
+            }
+        }
+        compound{
+            1024p2{"Mi{0}"}
+            1024p3{"Gi{0}"}
+            1024p4{"Ti{0}"}
+            1024p5{"Pi{0}"}
+            1024p6{"Ei{0}"}
+            1024p7{"Zi{0}"}
+            1024p8{"Yi{0}"}
+        }
+        concentr{
+            percent{
+                dnam{"%"}
+            }
+        }
+        consumption{
+            liter-per-100-kilometer{
+                dnam{"l/100 km"}
+                few{"{0} l/100 km"}
+                many{"{0} l/100 km"}
+                one{"{0} l/100 km"}
+                other{"{0} l/100 km"}
+            }
+        }
+        coordinate{
+            dnam{"kierunek"}
+        }
+        duration{
+            day{
+                dnam{"doba"}
+                few{"{0} d."}
+                many{"{0} d."}
+                one{"{0} d."}
+                other{"{0} d."}
+                per{"{0}/d."}
+            }
+            hour{
+                dnam{"g."}
+                few{"{0} g."}
+                many{"{0} g."}
+                one{"{0} g."}
+                other{"{0} g."}
+            }
+            millisecond{
+                dnam{"ms"}
+            }
+            minute{
+                dnam{"min"}
+            }
+            month{
+                dnam{"m-c"}
+                few{"{0} m-ce"}
+                many{"{0} m-cy"}
+                one{"{0} m-c"}
+                other{"{0} m-ca"}
+            }
+            second{
+                dnam{"s"}
+                few{"{0} s"}
+                many{"{0} s"}
+                one{"{0} s"}
+                other{"{0} s"}
+            }
+            week{
+                dnam{"tydz."}
+                few{"{0} tyg."}
+                many{"{0} tyg."}
+                one{"{0} tydz."}
+                other{"{0} tyg."}
+            }
+            year{
+                dnam{"r."}
+                few{"{0} l."}
+                many{"{0} l."}
+                one{"{0} r."}
+                other{"{0} r."}
+            }
+        }
+        length{
+            centimeter{
+                dnam{"cm"}
+            }
+            foot{
+                dnam{"stopy"}
+            }
+            inch{
+                dnam{"cale"}
+                few{"{0}″"}
+                many{"{0}″"}
+                one{"{0}″"}
+                other{"{0}″"}
+                per{"{0}/cal"}
+            }
+            meter{
+                dnam{"m"}
+            }
+            mile{
+                dnam{"mile"}
+            }
+        }
+        mass{
+            pound{
+                dnam{"funty"}
+            }
+        }
+        power{
+            horsepower{
+                few{"{0} KM"}
+                many{"{0} KM"}
+                one{"{0} KM"}
+                other{"{0} KM"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"°C"}
+                few{"{0}°C"}
+                many{"{0}°C"}
+                one{"{0}°C"}
+                other{"{0}°C"}
+            }
+        }
+        volume{
+            liter{
+                dnam{"l"}
+            }
+        }
+    }
+    unitsShort{
+        acceleration{
+            g-force{
+                dnam{"G"}
+            }
+        }
+        angle{
+            arc-minute{
+                dnam{"minuty"}
+            }
+            arc-second{
+                dnam{"sekundy"}
+            }
+            degree{
+                dnam{"stopnie"}
+            }
+            revolution{
+                dnam{"obr."}
+                few{"{0} obr."}
+                many{"{0} obr."}
+                one{"{0} obr."}
+                other{"{0} obr."}
+            }
+        }
+        area{
+            acre{
+                dnam{"akry"}
+                few{"{0} akry"}
+                many{"{0} akrów"}
+                one{"{0} akr"}
+                other{"{0} akra"}
+            }
+            dunam{
+                dnam{"dunamy"}
+                few{"{0} dunamy"}
+                many{"{0} dunamów"}
+                one{"{0} dunam"}
+                other{"{0} dunama"}
+            }
+            hectare{
+                dnam{"ha"}
+            }
+            square-foot{
+                dnam{"stopy kw."}
+                few{"{0} stopy kw."}
+                many{"{0} stóp kw."}
+                one{"{0} stopa kw."}
+                other{"{0} stopy kw."}
+            }
+            square-inch{
+                dnam{"cale kw."}
+                few{"{0} cale kw."}
+                many{"{0} cali kw."}
+                one{"{0} cal kw."}
+                other{"{0} cala kw."}
+                per{"{0}/cal kw."}
+            }
+            square-mile{
+                dnam{"mile kw."}
+                few{"{0} mile kw."}
+                many{"{0} mil kw."}
+                one{"{0} mila kw."}
+                other{"{0} mili kw."}
+                per{"{0}/mila kw."}
+            }
+            square-yard{
+                dnam{"jardy kw."}
+                few{"{0} jardy kw."}
+                many{"{0} jardów kw."}
+                one{"{0} jard kw."}
+                other{"{0} jarda kw."}
+            }
+        }
+        compound{
+            1024p2{"Mi{0}"}
+            1024p3{"Gi{0}"}
+            1024p4{"Ti{0}"}
+            1024p5{"Pi{0}"}
+            1024p6{"Ei{0}"}
+            1024p7{"Zi{0}"}
+            1024p8{"Yi{0}"}
+        }
+        concentr{
+            karat{
+                dnam{"karaty"}
+            }
+            milligram-ofglucose-per-deciliter{
+                dnam{"mg/dl"}
+                few{"{0} mg/dl"}
+                many{"{0} mg/dl"}
+                one{"{0} mg/dl"}
+                other{"{0} mg/dl"}
+            }
+            millimole-per-liter{
+                dnam{"mmol/l"}
+                few{"{0} mmol/l"}
+                many{"{0} mmol/l"}
+                one{"{0} mmol/l"}
+                other{"{0} mmol/l"}
+            }
+            mole{
+                dnam{"mol"}
+                few{"{0} mole"}
+                many{"{0} moli"}
+                one{"{0} mol"}
+                other{"{0} mola"}
+            }
+            permyriad{
+                few{"{0}‱"}
+                many{"{0}‱"}
+                one{"{0}‱"}
+                other{"{0}‱"}
+            }
+        }
+        consumption{
+            liter-per-100-kilometer{
+                dnam{"l/100 km"}
+                few{"{0} l/100 km"}
+                many{"{0} l/100 km"}
+                one{"{0} l/100 km"}
+                other{"{0} l/100 km"}
+            }
+            liter-per-kilometer{
+                dnam{"l/km"}
+                few{"{0} l/km"}
+                many{"{0} l/km"}
+                one{"{0} l/km"}
+                other{"{0} l/km"}
+            }
+            mile-per-gallon{
+                dnam{"mpg"}
+                few{"{0} mpg"}
+                many{"{0} mpg"}
+                one{"{0} mpg"}
+                other{"{0} mpg"}
+            }
+            mile-per-gallon-imperial{
+                dnam{"mile/gal ang."}
+                few{"{0} mi/gal ang."}
+                many{"{0} mi/gal ang."}
+                one{"{0} mi/gal ang."}
+                other{"{0} mi/gal ang."}
+            }
+        }
+        coordinate{
+            dnam{"kierunek"}
+            east{"{0}°E"}
+            north{"{0}°N"}
+            south{"{0}°S"}
+            west{"{0}°W"}
+        }
+        digital{
+            bit{
+                dnam{"b"}
+                few{"{0} b"}
+                many{"{0} b"}
+                one{"{0} b"}
+                other{"{0} b"}
+            }
+            byte{
+                dnam{"B"}
+                few{"{0} B"}
+                many{"{0} B"}
+                one{"{0} B"}
+                other{"{0} B"}
+            }
+        }
+        duration{
+            century{
+                dnam{"w."}
+                few{"{0} w."}
+                many{"{0} w."}
+                one{"{0} w."}
+                other{"{0} w."}
+            }
+            day{
+                dnam{"doby"}
+                few{"{0} doby"}
+                many{"{0} dób"}
+                one{"{0} doba"}
+                other{"{0} doby"}
+                per{"{0}/dobę"}
+            }
+            decade{
+                dnam{"dek"}
+                few{"{0} dek"}
+                many{"{0} dek"}
+                one{"{0} dek"}
+                other{"{0} dek"}
+            }
+            hour{
+                dnam{"godz."}
+                few{"{0} godz."}
+                many{"{0} godz."}
+                one{"{0} godz."}
+                other{"{0} godz."}
+                per{"{0}/godz."}
+            }
+            month{
+                dnam{"miesiące"}
+                few{"{0} mies."}
+                many{"{0} mies."}
+                one{"{0} mies."}
+                other{"{0} mies."}
+                per{"{0}/mies."}
+            }
+            second{
+                dnam{"sek."}
+                few{"{0} sek."}
+                many{"{0} sek."}
+                one{"{0} sek."}
+                other{"{0} sek."}
+            }
+            week{
+                dnam{"tyg."}
+                few{"{0} tyg."}
+                many{"{0} tyg."}
+                one{"{0} tydz."}
+                other{"{0} tyg."}
+                per{"{0}/tydz."}
+            }
+            year{
+                dnam{"lata"}
+                few{"{0} lata"}
+                many{"{0} lat"}
+                one{"{0} rok"}
+                other{"{0} roku"}
+                per{"{0}/rok"}
+            }
+        }
+        electric{
+            ampere{
+                dnam{"A"}
+            }
+            ohm{
+                dnam{"Ω"}
+            }
+            volt{
+                dnam{"V"}
+            }
+        }
+        energy{
+            british-thermal-unit{
+                dnam{"BTU"}
+                few{"{0} Btu"}
+                many{"{0} Btu"}
+                one{"{0} Btu"}
+                other{"{0} Btu"}
+            }
+            electronvolt{
+                dnam{"elektronowolt"}
+                few{"{0} eV"}
+                many{"{0} eV"}
+                one{"{0} eV"}
+                other{"{0} eV"}
+            }
+            foodcalorie{
+                dnam{"kcal"}
+                few{"{0} kcal"}
+                many{"{0} kcal"}
+                one{"{0} kcal"}
+                other{"{0} kcal"}
+            }
+            joule{
+                dnam{"J"}
+            }
+            therm-us{
+                dnam{"thermy amer."}
+                few{"{0} thermy amer."}
+                many{"{0} thermów amer."}
+                one{"{0} therm amer."}
+                other{"{0} therma amer."}
+            }
+        }
+        force{
+            newton{
+                few{"{0} N"}
+                many{"{0} N"}
+                one{"{0} N"}
+                other{"{0} N"}
+            }
+            pound-force{
+                dnam{"funt-siła"}
+                few{"{0} lbf"}
+                many{"{0} lbf"}
+                one{"{0} lbf"}
+                other{"{0} lbf"}
+            }
+        }
+        graphics{
+            em{
+                dnam{"firet"}
+                few{"{0} firety"}
+                many{"{0} firetów"}
+                one{"{0} firet"}
+                other{"{0} firetu"}
+            }
+        }
+        length{
+            astronomical-unit{
+                dnam{"j.a."}
+                few{"{0} j.a."}
+                many{"{0} j.a."}
+                one{"{0} j.a."}
+                other{"{0} j.a."}
+            }
+            fathom{
+                few{"{0} fm"}
+                many{"{0} fm"}
+                one{"{0} fm"}
+                other{"{0} fm"}
+            }
+            foot{
+                dnam{"stopy"}
+                few{"{0} ft"}
+                many{"{0} ft"}
+                one{"{0} ft"}
+                other{"{0} ft"}
+            }
+            inch{
+                dnam{"cale"}
+                few{"{0} cale"}
+                many{"{0} cali"}
+                one{"{0} cal"}
+                other{"{0} cala"}
+                per{"{0}/cal"}
+            }
+            meter{
+                dnam{"m"}
+            }
+            mile{
+                dnam{"mile"}
+                few{"{0} mile"}
+                many{"{0} mil"}
+                one{"{0} mila"}
+                other{"{0} mili"}
+            }
+            nautical-mile{
+                dnam{"Mm"}
+                few{"{0} Mm"}
+                many{"{0} Mm"}
+                one{"{0} Mm"}
+                other{"{0} Mm"}
+            }
+            point{
+                dnam{"pkt."}
+                few{"{0} pkt."}
+                many{"{0} pkt."}
+                one{"{0} pkt."}
+                other{"{0} pkt."}
+            }
+            solar-radius{
+                few{"{0} R☉"}
+                many{"{0} R☉"}
+                one{"{0} R☉"}
+                other{"{0} R☉"}
+            }
+            yard{
+                few{"{0} yd"}
+                many{"{0} yd"}
+                one{"{0} yd"}
+                other{"{0} yd"}
+            }
+        }
+        light{
+            candela{
+                dnam{"cd"}
+                few{"{0} cd"}
+                many{"{0} cd"}
+                one{"{0} cd"}
+                other{"{0} cd"}
+            }
+            lumen{
+                dnam{"lm"}
+                few{"{0} lm"}
+                many{"{0} lm"}
+                one{"{0} lm"}
+                other{"{0} lm"}
+            }
+            solar-luminosity{
+                few{"{0} L☉"}
+                many{"{0} L☉"}
+                one{"{0} L☉"}
+                other{"{0} L☉"}
+            }
+        }
+        mass{
+            carat{
+                dnam{"karaty"}
+                few{"{0} kt"}
+                many{"{0} kt"}
+                one{"{0} kt"}
+                other{"{0} kt"}
+            }
+            dalton{
+                few{"{0} Da"}
+                many{"{0} Da"}
+                one{"{0} Da"}
+                other{"{0} Da"}
+            }
+            earth-mass{
+                few{"{0} M⊕"}
+                many{"{0} M⊕"}
+                one{"{0} M⊕"}
+                other{"{0} M⊕"}
+            }
+            grain{
+                dnam{"gr"}
+                few{"{0} gr"}
+                many{"{0} gr"}
+                one{"{0} gr"}
+                other{"{0} gr"}
+            }
+            gram{
+                dnam{"g"}
+            }
+            pound{
+                dnam{"funty"}
+                few{"{0} funty"}
+                many{"{0} funtów"}
+                one{"{0} funt"}
+                other{"{0} funta"}
+                per{"{0}/funt"}
+            }
+            solar-mass{
+                few{"{0} M☉"}
+                many{"{0} M☉"}
+                one{"{0} M☉"}
+                other{"{0} M☉"}
+            }
+            stone{
+                few{"{0} st"}
+                many{"{0} st"}
+                one{"{0} st"}
+                other{"{0} st"}
+            }
+            ton{
+                dnam{"krótkie tony"}
+                few{"{0} krótkie tony"}
+                many{"{0} krótkich ton"}
+                one{"{0} krótka tona"}
+                other{"{0} krótkiej tony"}
+            }
+        }
+        power{
+            horsepower{
+                dnam{"KM"}
+                few{"{0} KM"}
+                many{"{0} KM"}
+                one{"{0} KM"}
+                other{"{0} KM"}
+            }
+            watt{
+                dnam{"waty"}
+            }
+        }
+        pressure{
+            kilopascal{
+                dnam{"kPa"}
+                few{"{0} kPa"}
+                many{"{0} kPa"}
+                one{"{0} kPa"}
+                other{"{0} kPa"}
+            }
+            megapascal{
+                dnam{"MPa"}
+                few{"{0} MPa"}
+                many{"{0} MPa"}
+                one{"{0} MPa"}
+                other{"{0} MPa"}
+            }
+            millimeter-ofhg{
+                dnam{"mmHg"}
+                few{"{0} mmHg"}
+                many{"{0} mmHg"}
+                one{"{0} mmHg"}
+                other{"{0} mmHg"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                dnam{"km/godz."}
+                few{"{0} km/godz."}
+                many{"{0} km/godz."}
+                one{"{0} km/godz."}
+                other{"{0} km/godz."}
+            }
+            knot{
+                dnam{"w."}
+                few{"{0} w."}
+                many{"{0} w."}
+                one{"{0} w."}
+                other{"{0} w."}
+            }
+            mile-per-hour{
+                dnam{"mile/h"}
+                few{"{0} mile/h"}
+                many{"{0} mil/h"}
+                one{"{0} mila/h"}
+                other{"{0} mili/h"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"st. C"}
+                few{"{0} st. C"}
+                many{"{0} st. C"}
+                one{"{0} st. C"}
+                other{"{0} st. C"}
+            }
+        }
+        torque{
+            newton-meter{
+                dnam{"N⋅m"}
+                few{"{0} N⋅m"}
+                many{"{0} N⋅m"}
+                one{"{0} N⋅m"}
+                other{"{0} N⋅m"}
+            }
+            pound-force-foot{
+                dnam{"lbf⋅ft"}
+                few{"{0} lbf⋅ft"}
+                many{"{0} lbf⋅ft"}
+                one{"{0} lbf⋅ft"}
+                other{"{0} lbf⋅ft"}
+            }
+        }
+        volume{
+            acre-foot{
+                dnam{"akrostopy"}
+                few{"{0} akrostopy"}
+                many{"{0} akrostóp"}
+                one{"{0} akrostopa"}
+                other{"{0} akrostopy"}
+            }
+            barrel{
+                dnam{"baryłki"}
+                few{"{0} bbl"}
+                many{"{0} bbl"}
+                one{"{0} bbl"}
+                other{"{0} bbl"}
+            }
+            centiliter{
+                dnam{"cl"}
+                few{"{0} cl"}
+                many{"{0} cl"}
+                one{"{0} cl"}
+                other{"{0} cl"}
+            }
+            cubic-foot{
+                dnam{"stopy sześc."}
+                few{"{0} stopy sześc."}
+                many{"{0} stóp sześc."}
+                one{"{0} stopa sześc."}
+                other{"{0} stopy sześc."}
+            }
+            cubic-inch{
+                dnam{"cale sześc."}
+                few{"{0} cale sześc."}
+                many{"{0} cali sześc."}
+                one{"{0} cal sześc."}
+                other{"{0} cala sześc."}
+            }
+            cubic-mile{
+                dnam{"mile sześc."}
+                few{"{0} mile sześc."}
+                many{"{0} mil sześc."}
+                one{"{0} mila sześc."}
+                other{"{0} mili sześc."}
+            }
+            cubic-yard{
+                dnam{"jardy sześc."}
+                few{"{0} jardy sześc."}
+                many{"{0} jardów sześc."}
+                one{"{0} jard sześc."}
+                other{"{0} jarda sześc."}
+            }
+            cup{
+                dnam{"ćwierćkwarty am."}
+                few{"{0} ćwierćkwarty am."}
+                many{"{0} ćwierćkwart am."}
+                one{"{0} ćwierćkwarta am."}
+                other{"{0} ćwierćkwarty am."}
+            }
+            cup-metric{
+                dnam{"ćwierćkwarty metr."}
+                few{"{0} ćwierćkwarty metr."}
+                many{"{0} ćwierćkwart metr."}
+                one{"{0} ćwierćkwarta metr."}
+                other{"{0} ćwierćkwarty metr."}
+            }
+            deciliter{
+                dnam{"dl"}
+                few{"{0} dl"}
+                many{"{0} dl"}
+                one{"{0} dl"}
+                other{"{0} dl"}
+            }
+            dessert-spoon{
+                dnam{"ł. deser."}
+                few{"{0} ł. deser."}
+                many{"{0} ł. deser."}
+                one{"{0} ł. deser."}
+                other{"{0} ł. deser."}
+            }
+            dessert-spoon-imperial{
+                dnam{"ł. deser. ang."}
+                few{"{0} ł. deser. ang."}
+                many{"{0} ł. deser. ang."}
+                one{"{0} ł. deser. ang."}
+                other{"{0} ł. deser. ang."}
+            }
+            dram{
+                dnam{"drachmy"}
+                few{"{0} drachmy"}
+                many{"{0} drachm"}
+                one{"{0} drachma"}
+                other{"{0} drachmy"}
+            }
+            drop{
+                dnam{"krople"}
+                few{"{0} krople"}
+                many{"{0} kropli"}
+                one{"{0} kropla"}
+                other{"{0} kropli"}
+            }
+            fluid-ounce{
+                dnam{"fl oz am."}
+                few{"{0} fl oz am."}
+                many{"{0} fl oz am."}
+                one{"{0} fl oz am."}
+                other{"{0} fl oz am."}
+            }
+            fluid-ounce-imperial{
+                dnam{"fl oz ang."}
+                few{"{0} fl oz ang."}
+                many{"{0} fl oz ang."}
+                one{"{0} fl oz ang."}
+                other{"{0} fl oz ang."}
+            }
+            gallon{
+                dnam{"gal am."}
+                few{"{0} gal am."}
+                many{"{0} gal am."}
+                one{"{0} gal am."}
+                other{"{0} gal am."}
+                per{"{0}/gal am."}
+            }
+            gallon-imperial{
+                dnam{"gal ang."}
+                few{"{0} gal ang."}
+                many{"{0} gal ang."}
+                one{"{0} gal ang."}
+                other{"{0} gal ang."}
+                per{"{0}/gal ang."}
+            }
+            hectoliter{
+                dnam{"hl"}
+                few{"{0} hl"}
+                many{"{0} hl"}
+                one{"{0} hl"}
+                other{"{0} hl"}
+            }
+            jigger{
+                dnam{"jiggery"}
+                few{"{0} jiggery"}
+                many{"{0} jiggerów"}
+                one{"{0} jigger"}
+                other{"{0} jiggera"}
+            }
+            liter{
+                dnam{"litry"}
+            }
+            megaliter{
+                dnam{"Ml"}
+                few{"{0} Ml"}
+                many{"{0} Ml"}
+                one{"{0} Ml"}
+                other{"{0} Ml"}
+            }
+            milliliter{
+                dnam{"ml"}
+                few{"{0} ml"}
+                many{"{0} ml"}
+                one{"{0} ml"}
+                other{"{0} ml"}
+            }
+            pinch{
+                dnam{"szcz."}
+                few{"{0} szcz."}
+                many{"{0} szcz."}
+                one{"{0} szcz."}
+                other{"{0} szcz."}
+            }
+            pint{
+                dnam{"półkwarty am."}
+                few{"{0} półkwarty am."}
+                many{"{0} półkwart am."}
+                one{"{0} półkwarta am."}
+                other{"{0} półkwarty am."}
+            }
+            pint-metric{
+                dnam{"półkwarty metr."}
+                few{"{0} półkwarty metr."}
+                many{"{0} półkwart metr."}
+                one{"{0} półkwarta metr."}
+                other{"{0} półkwarty metr."}
+            }
+            quart{
+                dnam{"kwarty am."}
+                few{"{0} kwarty am."}
+                many{"{0} kwart am."}
+                one{"{0} kwarta am."}
+                other{"{0} kwarty am."}
+            }
+            quart-imperial{
+                dnam{"kwarty ang."}
+                few{"{0} kwarty ang."}
+                many{"{0} kwart ang."}
+                one{"{0} kwarta ang."}
+                other{"{0} kwarty ang."}
+            }
+            tablespoon{
+                dnam{"ł. stoł."}
+                few{"{0} ł. stoł."}
+                many{"{0} ł. stoł."}
+                one{"{0} ł. stoł."}
+                other{"{0} ł. stoł."}
+            }
+            teaspoon{
+                dnam{"łyżeczki"}
+                few{"{0} łyżeczki"}
+                many{"{0} łyżeczek"}
+                one{"{0} łyżeczka"}
+                other{"{0} łyżeczki"}
+            }
+        }
+    }
+}

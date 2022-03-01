@@ -31,6 +31,8 @@
 
 #include "mongo/scripting/mozjs/numberdecimal.h"
 
+#include <js/Object.h>
+
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
@@ -51,21 +53,21 @@ const JSFunctionSpec NumberDecimalInfo::methods[3] = {
 
 const char* const NumberDecimalInfo::className = "NumberDecimal";
 
-void NumberDecimalInfo::finalize(js::FreeOp* fop, JSObject* obj) {
-    auto x = static_cast<Decimal128*>(JS_GetPrivate(obj));
+void NumberDecimalInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+    auto x = static_cast<Decimal128*>(JS::GetPrivate(obj));
 
     if (x)
         getScope(fop)->trackedDelete(x);
 }
 
 Decimal128 NumberDecimalInfo::ToNumberDecimal(JSContext* cx, JS::HandleValue thisv) {
-    auto x = static_cast<Decimal128*>(JS_GetPrivate(thisv.toObjectOrNull()));
+    auto x = static_cast<Decimal128*>(JS::GetPrivate(thisv.toObjectOrNull()));
 
     return x ? *x : Decimal128(0);
 }
 
 Decimal128 NumberDecimalInfo::ToNumberDecimal(JSContext* cx, JS::HandleObject thisv) {
-    auto x = static_cast<Decimal128*>(JS_GetPrivate(thisv));
+    auto x = static_cast<Decimal128*>(JS::GetPrivate(thisv));
 
     return x ? *x : Decimal128(0);
 }
@@ -102,7 +104,7 @@ void NumberDecimalInfo::construct(JSContext* cx, JS::CallArgs args) {
         uasserted(ErrorCodes::BadValue, "NumberDecimal takes 0 or 1 arguments");
     }
 
-    JS_SetPrivate(thisv, scope->trackedNew<Decimal128>(x));
+    JS::SetPrivate(thisv, scope->trackedNew<Decimal128>(x));
 
     args.rval().setObjectOrNull(thisv);
 }
@@ -111,7 +113,7 @@ void NumberDecimalInfo::make(JSContext* cx, JS::MutableHandleValue thisv, Decima
     auto scope = getScope(cx);
 
     scope->getProto<NumberDecimalInfo>().newObject(thisv);
-    JS_SetPrivate(thisv.toObjectOrNull(), scope->trackedNew<Decimal128>(decimal));
+    JS::SetPrivate(thisv.toObjectOrNull(), scope->trackedNew<Decimal128>(decimal));
 }
 
 }  // namespace mozjs

@@ -1,0 +1,96 @@
+License information for hyph_is.dic:
+
+This file is based on the TeX hyphenation patterns distributed under the
+LaTeX Project Public License (LPPL) as part of the hyph-utf8 package.
+
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+Portions of this file were originally made available under the following license
+(copied verbatim from hyph-is.lic.txt in the original work):
+
+Icelandic hyphenation patterns
+
+(more info about the licence to be added later)
+
+% This file is part of hyph-utf8 package and resulted from
+% semi-manual conversions of hyphenation patterns into UTF-8 in June 2008.
+%
+% Source: icehyph.tex (2004-03-08)
+% Author: Jorgen Pind <jorgen at lexis.hi.is>
+%
+% The above mentioned file should become obsolete,
+% and the author of the original file should preferaby modify this file instead.
+%
+% Modificatios were needed in order to support native UTF-8 engines,
+% but functionality (hopefully) didn't change in any way, at least not intentionally.
+% This file is no longer stand-alone; at least for 8-bit engines
+% you probably want to use loadhyph-foo.tex (which will load this file) instead.
+%
+% Modifications were done by Jonathan Kew, Mojca Miklavec & Arthur Reutenauer
+% with help & support from:
+% - Karl Berry, who gave us free hands and all resources
+% - Taco Hoekwater, with useful macros
+% - Hans Hagen, who did the unicodifisation of patterns already long before
+%               and helped with testing, suggestions and bug reports
+% - Norbert Preining, who tested & integrated patterns into TeX Live
+%
+% However, the "copyright/copyleft" owner of patterns remains the original author.
+%
+% The copyright statement of this file is thus:
+%
+%    Do with this file whatever needs to be done in future for the sake of
+%    "a better world" as long as you respect the copyright of original file.
+%    If you're the original author of patterns or taking over a new revolution,
+%    plese remove all of the TUG comments & credits that we added here -
+%    you are the Queen / the King, we are only the servants.
+%
+% If you want to change this file, rather than uploading directly to CTAN,
+% we would be grateful if you could send it to us (http://tug.org/tex-hyphen)
+% or ask for credentials for SVN repository and commit it yourself;
+% we will then upload the whole "package" to CTAN.
+%
+% Before a new "pattern-revolution" starts,
+% please try to follow some guidelines if possible:
+%
+% - \lccode is *forbidden*, and I really mean it
+% - all the patterns should be in UTF-8
+% - the only "allowed" TeX commands in this file are: \patterns, \hyphenation,
+%   and if you really cannot do without, also \input and \message
+% - in particular, please no \catcode or \lccode changes,
+%   they belong to loadhyph-foo.tex,
+%   and no \lefthyphenmin and \righthyphenmin,
+%   they have no influence here and belong elsewhere
+% - \begingroup and/or \endinput is not needed
+% - feel free to do whatever you want inside comments
+%
+% We know that TeX is extremely powerful, but give a stupid parser
+% at least a chance to read your patterns.
+%
+% For more unformation see
+%
+%    http://tug.org/tex-hyphen
+%
+%------------------------------------------------------------------------------
+%
+% The Icelandic Plain TeX hyphenation tables
+% as of Nov 2 1988.
+% Jorgen Pind, Institute of Lexicography, Univ. of Iceland
+% jorgen@lexis.hi.is (Internet)
+%
+% Mar 2 2004: Uploaded a new version to CTAN, with a clarified license
+% statement, at the request of the author, Jorgen Pind.
+% Kristinn Gylfason (kristgy@ieee.org)
+
+% This file may be distributed and/or modified under the
+% conditions of the LaTeX Project Public License, either version 1.2
+% of this license or (at your option) any later version.
+% The latest version of this license is in
+%    http://www.latex-project.org/lppl.txt
+% and version 1.2 or later is part of all distributions of LaTeX
+% version 1999/12/01 or later.
+%

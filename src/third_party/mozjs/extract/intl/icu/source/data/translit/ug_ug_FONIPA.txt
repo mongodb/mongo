@@ -1,0 +1,76 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: ug_ug_FONIPA.txt
+# Generated from CLDR
+#
+
+# Uyghur to phonemic transcription
+# Alphabet http://learn101.org/uyghur_alphabet.php + youtube video https://youtu.be/dw1DVFgC8x0
+# Vowel-consonant harmony in Uyghur. Laura Becker http://home.uni-leipzig.de/lbecker/papers/VowelConsHarmonyUyghur.pdf
+# Shadike, Muhetaer & Wasili, Buheliqiguli. (2014). Acoustic Articulatory of Uyghur Phonetics. Applied Mechanics and Materials. 519→520. 762→766. 10.4028/www.scientific.net/AMM.519→520.762.
+# https://kuscholarworks.ku.edu/bitstream/handle/1808/5624/EngYakDwy2009_Uyg1full_10.pdf?seque
+#
+# Originally prepared by Alina Korshunova <alinakor2202@gmail.com>
+# as part of her internship at PanLex (panlex.org)
+ئ → ʔ;
+ا → a;
+ە → ‎ɛ;
+ب‎ → b;
+پ → p;
+ت → t;
+ج → d\u0361ʒ;
+چ → t\u0361ʃ;
+خ → x;
+د → d;
+ر → r;
+ز → z;
+ژ → ʒ;
+س → s;
+ش → ʃ;
+غ → ʁ;
+ف → f;
+ق → q;
+ك → k;
+گ → ɡ;
+ڭ → ŋ;
+ل → l;
+م → m;
+ن → n;
+ھ → h;
+و → o;
+ۇ → u;
+ۆ → ø;
+ۈ → y;
+ۋ → w;
+ې → e;
+ى → i;
+ي → j;
+# Handle geminated consonants
+::Null;
+bb → bː;
+pp → pː;
+tt } [^\u0361] → tː; # make sure not to consume tt\u0361ʃ
+d\u0361ʒd\u0361ʒ → d\u0361ʒː;
+t\u0361ʃt\u0361ʃ → t\u0361ʃː;
+xx → xː;
+dd } [^\u0361] → dː; # make sure not to consume dd\u0361ʒ
+rr → rː;
+zz → zː;
+ʒʒ → ʒː;
+ss → sː;
+ʃʃ → ʃː;
+ʁʁ → ʁː;
+ff → fː;
+qq → qː;
+kk → kː;
+ɡɡ → ɡː;
+ŋŋ → ŋː;
+ll → lː;
+mm → mː;
+nn → nː;
+hh → hː;
+ww → wː;
+jj → jː;
+

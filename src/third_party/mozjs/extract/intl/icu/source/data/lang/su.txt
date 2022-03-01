@@ -1,0 +1,76 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+su{
+    Languages{
+        de{"Jérman"}
+        de_AT{"Jérman Austria"}
+        de_CH{"Jérman Swiss Luhur"}
+        en{"Inggris"}
+        en_AU{"Inggris Australia"}
+        en_CA{"Inggris Kanada"}
+        en_US{"Inggris Amerika"}
+        es{"Spanyol"}
+        es_419{"Spanyol Amérika Latin"}
+        es_ES{"Spanyol Éropa"}
+        es_MX{"Spanyol Méksiko"}
+        fr{"Prancis"}
+        fr_CA{"Prancis Kanada"}
+        fr_CH{"Prancis Swiss"}
+        it{"Italia"}
+        ja{"Jepang"}
+        pt{"Portugis"}
+        pt_BR{"Portugis Brasil"}
+        pt_PT{"Portugis Éropa"}
+        ru{"Rusia"}
+        su{"Basa Sunda"}
+        und{"Basa teu dikenal"}
+        zh{"Tiongkok"}
+        zh_Hans{"Tiongkok Sederhana"}
+        zh_Hant{"Tiongkok Tradisional"}
+    }
+    Languages%long{
+        zh_Hans{"Tiongkok Mandarin Sederhana"}
+        zh_Hant{"Tiongkok Mandarin Tradisional"}
+    }
+    Languages%menu{
+        zh{"Tiongkok, Mandarin"}
+    }
+    Languages%short{
+        en_GB{"Inggris UK"}
+        en_US{"Inggris AS"}
+    }
+    Scripts{
+        Cyrl{"Sirilik"}
+        Hans{"Sederhana"}
+        Hant{"Tradisional"}
+        Latn{"Latin"}
+        Zxxx{"Non-tulisan"}
+        Zzzz{"Tulisan Teu Dikenal"}
+    }
+    Scripts%stand-alone{
+        Hans{"Han Sederhana"}
+        Hant{"Han Tradisional"}
+    }
+    Types{
+        calendar{
+            gregorian{"Kalénder Grégorian"}
+        }
+        collation{
+            standard{"Aturan Runtuyan Standar"}
+        }
+        numbers{
+            latn{"Digit Barat"}
+        }
+    }
+    codePatterns{
+        language{"Basa: {0}"}
+        script{"Skrip: {0}"}
+        territory{"Daérah: {0}"}
+    }
+    localeDisplayPattern{
+        keyTypePattern{"{0}: {1}"}
+        pattern{"{0} ({1})"}
+        separator{"{0}, {1}"}
+    }
+}

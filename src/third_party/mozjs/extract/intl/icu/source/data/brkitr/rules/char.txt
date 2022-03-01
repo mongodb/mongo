@@ -1,0 +1,81 @@
+#
+#   Copyright (C) 2016 and later: Unicode, Inc. and others.
+#   License & terms of use: http://www.unicode.org/copyright.html
+#   Copyright (C) 2002-2016, International Business Machines Corporation and others.
+#       All Rights Reserved.
+#
+#   file:  char.txt
+#
+#   ICU Character Break Rules
+#      These rules are based on the Extended Grapheme Cluster rules from
+#      Unicode UAX #29 Revision 34 for Unicode Version 12.0
+
+!!quoted_literals_only;
+
+#
+#  Character Class Definitions.
+#
+$CR          = [\p{Grapheme_Cluster_Break = CR}];
+$LF          = [\p{Grapheme_Cluster_Break = LF}];
+$Control     = [[\p{Grapheme_Cluster_Break = Control}]];
+$Extend      = [[\p{Grapheme_Cluster_Break = Extend}]];
+$ZWJ         = [\p{Grapheme_Cluster_Break = ZWJ}];
+$Regional_Indicator = [\p{Grapheme_Cluster_Break = Regional_Indicator}];
+$Prepend     = [\p{Grapheme_Cluster_Break = Prepend}];
+$SpacingMark = [\p{Grapheme_Cluster_Break = SpacingMark}];
+
+#
+#  From cldr/common/properties/segments/
+#       and issue CLDR-10994
+#
+$Virama      = [\p{Gujr}\p{sc=Telu}\p{sc=Mlym}\p{sc=Orya}\p{sc=Beng}\p{sc=Deva}&\p{Indic_Syllabic_Category=Virama}];
+$LinkingConsonant = [\p{Gujr}\p{sc=Telu}\p{sc=Mlym}\p{sc=Orya}\p{sc=Beng}\p{sc=Deva}&\p{Indic_Syllabic_Category=Consonant}];
+$ExtCccZwj   = [[\p{gcb=Extend}-\p{ccc=0}] \p{gcb=ZWJ}];
+
+# Korean Syllable Definitions
+#
+$L           = [\p{Grapheme_Cluster_Break = L}];
+$V           = [\p{Grapheme_Cluster_Break = V}];
+$T           = [\p{Grapheme_Cluster_Break = T}];
+
+$LV          = [\p{Grapheme_Cluster_Break = LV}];
+$LVT         = [\p{Grapheme_Cluster_Break = LVT}];
+
+# Emoji defintions
+
+$Extended_Pict = [:ExtPict:];
+
+## -------------------------------------------------
+!!chain;
+!!lookAheadHardBreak;
+
+$CR $LF;
+
+$L ($L | $V | $LV | $LVT);
+($LV | $V) ($V | $T);
+($LVT | $T) $T;
+
+# GB 9
+[^$Control $CR $LF] ($Extend | $ZWJ);
+
+# GB 9a
+[^$Control $CR $LF] $SpacingMark;
+
+# GB 9b
+$Prepend [^$Control $CR $LF];
+
+# GB 9.3, from CLDR-10994
+$LinkingConsonant $ExtCccZwj* $Virama $ExtCccZwj* $LinkingConsonant;
+
+# GB 11 Do not break within emoji modifier sequences or emoji zwj sequences.
+$Extended_Pict $Extend* $ZWJ $Extended_Pict;
+
+# GB 12-13. Keep pairs of regional indicators together
+#           Note that hard break '/' rule triggers only if there are three or more initial RIs,
+
+^$Prepend* $Regional_Indicator $Regional_Indicator / $Regional_Indicator;
+^$Prepend* $Regional_Indicator $Regional_Indicator;
+
+# GB 999 Match a single code point if no other rule applies.
+.;
+

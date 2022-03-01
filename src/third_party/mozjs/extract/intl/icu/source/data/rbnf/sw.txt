@@ -1,0 +1,52 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sw{
+    RBNFRules{
+        SpelloutRules{
+            "%spellout-numbering-year:",
+            "x.x: =0.0=;",
+            "0: =%spellout-numbering=;",
+            "%spellout-numbering:",
+            "0: =%spellout-cardinal=;",
+            "%spellout-cardinal:",
+            "NaN: si nambari;",
+            "Inf: usio;",
+            "-x: kasoro >>;",
+            "x.x: << nukta >>;",
+            "0: sifuri;",
+            "1: moja;",
+            "2: mbili;",
+            "3: tatu;",
+            "4: nne;",
+            "5: tano;",
+            "6: sita;",
+            "7: saba;",
+            "8: nane;",
+            "9: tisa;",
+            "10: kumi[ na >>];",
+            "20: ishirini[ na >>];",
+            "30: thelathini[ na >>];",
+            "40: arobaini[ na >>];",
+            "50: hamsini[ na >>];",
+            "60: sitini[ na >>];",
+            "70: sabini[ na >>];",
+            "80: themanini[ na >>];",
+            "90: tisini[ na >>];",
+            "100: mia <<[ na >>];",
+            "1000: elfu <<[, >>];",
+            "1000000: milioni <<[, >>];",
+            "1000000000: bilioni <<[, >>];",
+            "1000000000000: trilioni <<[, >>];",
+            "1000000000000000: kvadrilioni <<[, >>];",
+            "1000000000000000000: =#,##0.#=;",
+            "%spellout-ordinal:",
+            "-x: wa kasoro >%spellout-cardinal>;",
+            "x.x: =0.0=;",
+            "0: wa sifuri;",
+            "1: kwanza;",
+            "2: pili;",
+            "3: wa =%spellout-cardinal=;",
+        }
+    }
+}

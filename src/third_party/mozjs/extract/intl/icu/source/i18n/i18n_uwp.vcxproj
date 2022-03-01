@@ -1,0 +1,742 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|ARM">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|ARM64">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM">
+      <Configuration>Release</Configuration>
+      <Platform>ARM</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM64">
+      <Configuration>Release</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{6786C051-383B-47E0-9E82-B8B994E06A25}</ProjectGuid>
+    <Keyword>DynamicLibrary</Keyword>
+    <DefaultLanguage>en-US</DefaultLanguage>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseOfMfc>false</UseOfMfc>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <!-- The following import will include the UWP configuration options for VS projects. -->
+  <Import Project="..\allinone\Build.Windows.UWP.ProjectConfiguration.props" />
+  <!-- The following import will include the library configuration options for VS projects. -->
+  <Import Project="..\allinone\Build.Windows.Library.ProjectConfiguration.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
+    <OutDir>.\$(Platform)\$(Configuration)UWP\</OutDir>
+    <IntDir>.\$(Platform)\$(Configuration)UWP\</IntDir>
+    <!-- The ICU projects use "Win32" to mean "x86", so we need to special case it. -->
+    <OutDir Condition="'$(Platform)'=='Win32'">.\x86\$(Configuration)UWP\</OutDir>
+    <IntDir Condition="'$(Platform)'=='Win32'">.\x86\$(Configuration)UWP\</IntDir>
+    <!-- Disable Incremental Linking for Release builds as it prevents Link-time Code Generation -->
+    <LinkIncremental Condition="'$(Configuration)'=='Debug'">true</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)'=='Release'">false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <Midl>
+      <MkTypLibCompatible>true</MkTypLibCompatible>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+    </Midl>
+    <ClCompile>
+      <AdditionalIncludeDirectories>..\..\include;..\common;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- U_DISABLE_RENAMING -->
+      <!-- U_HIDE_DRAFT_API & U_HIDE_DEPRECATED_API -->
+      <PreprocessorDefinitions>U_ATTRIBUTE_DEPRECATED=;_CRT_SECURE_NO_DEPRECATE;U_I18N_IMPLEMENTATION;U_PLATFORM_USES_ONLY_WIN32_API=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <StringPooling>true</StringPooling>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <DisableLanguageExtensions>false</DisableLanguageExtensions>
+      <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
+      <WarningLevel>Level3</WarningLevel>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <CompileAs>Default</CompileAs>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <CompileAsWinRT>false</CompileAsWinRT>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <ResourceCompile>
+      <Culture>0x0409</Culture>
+      <AdditionalIncludeDirectories>../common;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Link>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
+      <RandomizedBaseAddress>true</RandomizedBaseAddress>
+      <DataExecutionPrevention>
+      </DataExecutionPrevention>
+      <TurnOffAssemblyGeneration>true</TurnOffAssemblyGeneration>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <Midl>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </Midl>
+    <ClCompile>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
+    <Link>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <Midl>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </Midl>
+    <ClCompile>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <Optimization>Disabled</Optimization>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Platform)'=='Win32'">
+    <Midl>
+      <TargetEnvironment>Win32</TargetEnvironment>
+    </Midl>
+    <ClCompile>
+      <PreprocessorDefinitions>WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Platform)'=='x64'">
+    <Midl>
+      <TargetEnvironment>X64</TargetEnvironment>
+    </Midl>
+    <ClCompile>
+      <PreprocessorDefinitions>WIN64;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <TargetMachine>MachineX64</TargetMachine>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Platform)'=='ARM'">
+    <Midl>
+      <TargetEnvironment>ARM</TargetEnvironment>
+    </Midl>
+    <ClCompile>
+      <PreprocessorDefinitions>ARM;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <TargetMachine>MachineARM</TargetMachine>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Platform)'=='ARM64'">
+    <Midl>
+      <TargetEnvironment>ARM64</TargetEnvironment>
+    </Midl>
+    <ClCompile>
+      <PreprocessorDefinitions>ARM64;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <TargetMachine>MachineARM64</TargetMachine>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Midl>
+      <TypeLibraryName>.\..\..\lib32uwp\icuin.tlb</TypeLibraryName>
+    </Midl>
+    <ClCompile>
+      <PrecompiledHeaderOutputFile>.\x86\ReleaseUWP/i18n.pch</PrecompiledHeaderOutputFile>
+      <AssemblerListingLocation>.\x86\ReleaseUWP/</AssemblerListingLocation>
+      <ObjectFileName>.\x86\ReleaseUWP/</ObjectFileName>
+      <ProgramDataBaseFileName>.\x86\ReleaseUWP/</ProgramDataBaseFileName>
+    </ClCompile>
+    <Link>
+      <OutputFile>..\..\bin32uwp\icuin69.dll</OutputFile>
+      <ProgramDatabaseFile>.\..\..\lib32uwp\icuin.pdb</ProgramDatabaseFile>
+      <ImportLibrary>..\..\lib32uwp\icuin.lib</ImportLibrary>
+      <AdditionalDependencies>..\..\lib32uwp\icuuc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Midl>
+      <TypeLibraryName>.\..\..\lib32uwp\icuind.tlb</TypeLibraryName>
+    </Midl>
+    <ClCompile>
+      <PrecompiledHeaderOutputFile>.\x86\DebugUWP/i18n.pch</PrecompiledHeaderOutputFile>
+      <AssemblerListingLocation>.\x86\DebugUWP/</AssemblerListingLocation>
+      <ObjectFileName>.\x86\DebugUWP/</ObjectFileName>
+      <ProgramDataBaseFileName>.\x86\DebugUWP/</ProgramDataBaseFileName>
+    </ClCompile>
+    <Link>
+      <OutputFile>..\..\bin32uwp\icuin69d.dll</OutputFile>
+      <ProgramDatabaseFile>.\..\..\lib32uwp\icuind.pdb</ProgramDatabaseFile>
+      <ImportLibrary>..\..\lib32uwp\icuind.lib</ImportLibrary>
+      <AdditionalDependencies>..\..\lib32uwp\icuucd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Midl>
+      <TypeLibraryName>.\..\..\lib64uwp\icuin.tlb</TypeLibraryName>
+    </Midl>
+    <ClCompile>
+      <PrecompiledHeaderOutputFile>.\x64\ReleaseUWP/i18n.pch</PrecompiledHeaderOutputFile>
+      <AssemblerListingLocation>.\x64\ReleaseUWP/</AssemblerListingLocation>
+      <ObjectFileName>.\x64\ReleaseUWP/</ObjectFileName>
+      <ProgramDataBaseFileName>.\x64\ReleaseUWP/</ProgramDataBaseFileName>
+    </ClCompile>
+    <Link>
+      <OutputFile>..\..\bin64uwp\icuin69.dll</OutputFile>
+      <ProgramDatabaseFile>.\..\..\lib64uwp\icuin.pdb</ProgramDatabaseFile>
+      <ImportLibrary>..\..\lib64uwp\icuin.lib</ImportLibrary>
+      <AdditionalDependencies>..\..\lib64uwp\icuuc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Midl>
+      <TypeLibraryName>.\..\..\lib64uwp\icuind.tlb</TypeLibraryName>
+    </Midl>
+    <ClCompile>
+      <PrecompiledHeaderOutputFile>.\x64\DebugUWP/i18n.pch</PrecompiledHeaderOutputFile>
+      <AssemblerListingLocation>.\x64\DebugUWP/</AssemblerListingLocation>
+      <ObjectFileName>.\x64\DebugUWP/</ObjectFileName>
+      <ProgramDataBaseFileName>.\x64\DebugUWP/</ProgramDataBaseFileName>
+    </ClCompile>
+    <Link>
+      <OutputFile>..\..\bin64uwp\icuin69d.dll</OutputFile>
+      <ProgramDatabaseFile>.\..\..\lib64uwp\icuind.pdb</ProgramDatabaseFile>
+      <ImportLibrary>..\..\lib64uwp\icuind.lib</ImportLibrary>
+      <AdditionalDependencies>..\..\lib64uwp\icuucd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
+    <Midl>
+      <TypeLibraryName>.\..\..\libARMuwp\icuin.tlb</TypeLibraryName>
+    </Midl>
+    <ClCompile>
+      <PrecompiledHeaderOutputFile>.\ARM\ReleaseUWP/i18n.pch</PrecompiledHeaderOutputFile>
+      <AssemblerListingLocation>.\ARM\ReleaseUWP/</AssemblerListingLocation>
+      <ObjectFileName>.\ARM\ReleaseUWP/</ObjectFileName>
+      <ProgramDataBaseFileName>.\ARM\ReleaseUWP/</ProgramDataBaseFileName>
+    </ClCompile>
+    <Link>
+      <OutputFile>..\..\binARMuwp\icuin69.dll</OutputFile>
+      <ProgramDatabaseFile>.\..\..\libARMuwp\icuin.pdb</ProgramDatabaseFile>
+      <ImportLibrary>..\..\libARMuwp\icuin.lib</ImportLibrary>
+      <AdditionalDependencies>..\..\libARMuwp\icuuc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
+    <Midl>
+      <TypeLibraryName>.\..\..\libARMuwp\icuind.tlb</TypeLibraryName>
+    </Midl>
+    <ClCompile>
+      <PrecompiledHeaderOutputFile>.\ARM\DebugUWP/i18n.pch</PrecompiledHeaderOutputFile>
+      <AssemblerListingLocation>.\ARM\DebugUWP/</AssemblerListingLocation>
+      <ObjectFileName>.\ARM\DebugUWP/</ObjectFileName>
+      <ProgramDataBaseFileName>.\ARM\DebugUWP/</ProgramDataBaseFileName>
+    </ClCompile>
+    <Link>
+      <OutputFile>..\..\binARMuwp\icuin69d.dll</OutputFile>
+      <ProgramDatabaseFile>.\..\..\libARMuwp\icuind.pdb</ProgramDatabaseFile>
+      <ImportLibrary>..\..\libARMuwp\icuind.lib</ImportLibrary>
+      <AdditionalDependencies>..\..\libARMuwp\icuucd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
+    <Midl>
+      <TypeLibraryName>.\..\..\libARM64uwp\icuin.tlb</TypeLibraryName>
+    </Midl>
+    <ClCompile>
+      <PrecompiledHeaderOutputFile>.\ARM64\ReleaseUWP/i18n.pch</PrecompiledHeaderOutputFile>
+      <AssemblerListingLocation>.\ARM64\ReleaseUWP/</AssemblerListingLocation>
+      <ObjectFileName>.\ARM64\ReleaseUWP/</ObjectFileName>
+      <ProgramDataBaseFileName>.\ARM64\ReleaseUWP/</ProgramDataBaseFileName>
+    </ClCompile>
+    <Link>
+      <OutputFile>..\..\binARM64uwp\icuin69.dll</OutputFile>
+      <ProgramDatabaseFile>.\..\..\libARM64uwp\icuin.pdb</ProgramDatabaseFile>
+      <ImportLibrary>..\..\libARM64uwp\icuin.lib</ImportLibrary>
+      <AdditionalDependencies>..\..\libARM64uwp\icuuc.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
+    <Midl>
+      <TypeLibraryName>.\..\..\libARM64uwp\icuind.tlb</TypeLibraryName>
+    </Midl>
+    <ClCompile>
+      <PrecompiledHeaderOutputFile>.\ARM64\DebugUWP/i18n.pch</PrecompiledHeaderOutputFile>
+      <AssemblerListingLocation>.\ARM64\DebugUWP/</AssemblerListingLocation>
+      <ObjectFileName>.\ARM64\DebugUWP/</ObjectFileName>
+      <ProgramDataBaseFileName>.\ARM64\DebugUWP/</ProgramDataBaseFileName>
+    </ClCompile>
+    <Link>
+      <OutputFile>..\..\binARM64uwp\icuin69d.dll</OutputFile>
+      <ProgramDatabaseFile>.\..\..\libARM64uwp\icuind.pdb</ProgramDatabaseFile>
+      <ImportLibrary>..\..\libARM64uwp\icuind.lib</ImportLibrary>
+      <AdditionalDependencies>..\..\libARM64uwp\icuucd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="erarules.cpp" />
+    <ClCompile Include="region.cpp" />
+    <ClCompile Include="uregion.cpp" />
+    <ClCompile Include="alphaindex.cpp" />
+    <ClCompile Include="bocsu.cpp" />
+    <ClCompile Include="coleitr.cpp" />
+    <ClCompile Include="coll.cpp" />
+    <ClCompile Include="collation.cpp" />
+    <ClCompile Include="collationbuilder.cpp" />
+    <ClCompile Include="collationcompare.cpp" />
+    <ClCompile Include="collationdata.cpp" />
+    <ClCompile Include="collationdatabuilder.cpp" />
+    <ClCompile Include="collationdatareader.cpp" />
+    <ClCompile Include="collationdatawriter.cpp" />
+    <ClCompile Include="collationfastlatin.cpp" />
+    <ClCompile Include="collationfastlatinbuilder.cpp" />
+    <ClCompile Include="collationfcd.cpp" />
+    <ClCompile Include="collationiterator.cpp" />
+    <ClCompile Include="collationkeys.cpp" />
+    <ClCompile Include="collationroot.cpp" />
+    <ClCompile Include="collationrootelements.cpp" />
+    <ClCompile Include="collationruleparser.cpp" />
+    <ClCompile Include="collationsets.cpp" />
+    <ClCompile Include="collationsettings.cpp" />
+    <ClCompile Include="collationtailoring.cpp" />
+    <ClCompile Include="collationweights.cpp" />
+    <ClCompile Include="rulebasedcollator.cpp" />
+    <ClCompile Include="search.cpp" />
+    <ClCompile Include="sortkey.cpp" />
+    <ClCompile Include="stsearch.cpp" />
+    <ClCompile Include="tzfmt.cpp" />
+    <ClCompile Include="tzgnames.cpp" />
+    <ClCompile Include="tznames.cpp" />
+    <ClCompile Include="tznames_impl.cpp" />
+    <ClCompile Include="ucol.cpp" />
+    <ClCompile Include="ucol_res.cpp" />
+    <ClCompile Include="ucol_sit.cpp" />
+    <ClCompile Include="ucoleitr.cpp" />
+    <ClCompile Include="uitercollationiterator.cpp" />
+    <ClCompile Include="usearch.cpp" />
+    <ClCompile Include="astro.cpp" />
+    <ClCompile Include="basictz.cpp" />
+    <ClCompile Include="buddhcal.cpp" />
+    <ClCompile Include="calendar.cpp" />
+    <ClCompile Include="cecal.cpp" />
+    <ClCompile Include="chnsecal.cpp" />
+    <ClCompile Include="choicfmt.cpp" />
+    <ClCompile Include="compactdecimalformat.cpp" />
+    <ClCompile Include="coptccal.cpp" />
+    <ClCompile Include="curramt.cpp" />
+    <ClCompile Include="currfmt.cpp" />
+    <ClCompile Include="currpinf.cpp" />
+    <ClCompile Include="currunit.cpp" />
+    <ClCompile Include="dangical.cpp" />
+    <ClCompile Include="datefmt.cpp" />
+    <ClCompile Include="dayperiodrules.cpp" />
+    <ClCompile Include="dcfmtsym.cpp" />
+    <ClCompile Include="decContext.cpp" />
+    <ClCompile Include="decimfmt.cpp" />
+    <ClCompile Include="decNumber.cpp" />
+    <ClCompile Include="double-conversion-bignum-dtoa.cpp" />
+    <ClCompile Include="double-conversion-bignum.cpp" />
+    <ClCompile Include="double-conversion-cached-powers.cpp" />
+    <ClCompile Include="double-conversion-double-to-string.cpp" />
+    <ClCompile Include="double-conversion-fast-dtoa.cpp" />
+    <ClCompile Include="double-conversion-string-to-double.cpp" />
+    <ClCompile Include="double-conversion-strtod.cpp" />
+    <ClCompile Include="dtfmtsym.cpp" />
+    <ClCompile Include="dtitvfmt.cpp" />
+    <ClCompile Include="dtitvinf.cpp" />
+    <ClCompile Include="dtptngen.cpp" />
+    <ClCompile Include="dtrule.cpp" />
+    <ClCompile Include="ethpccal.cpp" />
+    <ClCompile Include="fmtable.cpp" />
+    <ClCompile Include="fmtable_cnv.cpp" />
+    <ClCompile Include="format.cpp" />
+    <ClCompile Include="formattedval_iterimpl.cpp" />
+    <ClCompile Include="formattedval_sbimpl.cpp" />
+    <ClCompile Include="formattedvalue.cpp" />
+    <ClCompile Include="fphdlimp.cpp" />
+    <ClCompile Include="fpositer.cpp" />
+    <ClCompile Include="gender.cpp" />
+    <ClCompile Include="gregocal.cpp" />
+    <ClCompile Include="gregoimp.cpp" />
+    <ClCompile Include="hebrwcal.cpp" />
+    <ClCompile Include="indiancal.cpp" />
+    <ClCompile Include="islamcal.cpp" />
+    <ClCompile Include="japancal.cpp" />
+    <ClCompile Include="listformatter.cpp" />
+    <ClCompile Include="ulistformatter.cpp" />
+    <ClCompile Include="measfmt.cpp" />
+    <ClCompile Include="measunit.cpp" />
+    <ClCompile Include="measunit_extra.cpp" />
+    <ClCompile Include="measure.cpp" />
+    <ClCompile Include="msgfmt.cpp" />
+    <ClCompile Include="nfrs.cpp" />
+    <ClCompile Include="nfrule.cpp" />
+    <ClCompile Include="nfsubs.cpp" />
+    <ClCompile Include="number_affixutils.cpp" />
+    <ClCompile Include="number_asformat.cpp" />
+    <ClCompile Include="number_compact.cpp" />
+    <ClCompile Include="number_decimalquantity.cpp" />
+    <ClCompile Include="number_decimfmtprops.cpp" />
+    <ClCompile Include="number_fluent.cpp" />
+    <ClCompile Include="number_formatimpl.cpp" />
+    <ClCompile Include="number_grouping.cpp" />
+    <ClCompile Include="number_integerwidth.cpp" />
+    <ClCompile Include="number_longnames.cpp" />
+    <ClCompile Include="number_modifiers.cpp" />
+    <ClCompile Include="number_notation.cpp" />
+    <ClCompile Include="number_output.cpp" />
+    <ClCompile Include="number_padding.cpp" />
+    <ClCompile Include="number_patternmodifier.cpp" />
+    <ClCompile Include="number_patternstring.cpp" />
+    <ClCompile Include="number_rounding.cpp" />
+    <ClCompile Include="number_scientific.cpp" />
+    <ClCompile Include="formatted_string_builder.cpp" />
+    <ClCompile Include="number_usageprefs.cpp" />
+    <ClCompile Include="number_utils.cpp" />
+    <ClCompile Include="number_mapper.cpp" />
+    <ClCompile Include="number_multiplier.cpp" />
+    <ClCompile Include="number_currencysymbols.cpp" />
+    <ClCompile Include="number_skeletons.cpp" />
+    <ClCompile Include="number_symbolswrapper.cpp" />
+    <ClCompile Include="number_capi.cpp" />
+    <ClCompile Include="string_segment.cpp" />
+    <ClCompile Include="numparse_parsednumber.cpp" />
+    <ClCompile Include="numparse_impl.cpp" />
+    <ClCompile Include="numparse_symbols.cpp" />
+    <ClCompile Include="numparse_decimal.cpp" />
+    <ClCompile Include="numparse_scientific.cpp" />
+    <ClCompile Include="numparse_currency.cpp" />
+    <ClCompile Include="numparse_affixes.cpp" />
+    <ClCompile Include="numparse_compositions.cpp" />
+    <ClCompile Include="numparse_validators.cpp" />
+    <ClCompile Include="numrange_capi.cpp" />
+    <ClCompile Include="numrange_fluent.cpp" />
+    <ClCompile Include="numrange_impl.cpp" />
+    <ClCompile Include="numfmt.cpp" />
+    <ClCompile Include="numsys.cpp" />
+    <ClCompile Include="olsontz.cpp" />
+    <ClCompile Include="persncal.cpp" />
+    <ClCompile Include="pluralranges.cpp" />
+    <ClCompile Include="plurfmt.cpp" />
+    <ClCompile Include="plurrule.cpp" />
+    <ClCompile Include="quantityformatter.cpp" />
+    <ClCompile Include="rbnf.cpp" />
+    <ClCompile Include="rbtz.cpp" />
+    <ClCompile Include="reldatefmt.cpp" />
+    <ClCompile Include="reldtfmt.cpp" />
+    <ClCompile Include="scientificnumberformatter.cpp" />
+    <ClCompile Include="sharedbreakiterator.cpp" />
+    <ClCompile Include="selfmt.cpp" />
+    <ClCompile Include="simpletz.cpp" />
+    <ClCompile Include="scriptset.cpp" />
+    <ClCompile Include="smpdtfmt.cpp" />
+    <ClCompile Include="smpdtfst.cpp" />
+    <ClCompile Include="standardplural.cpp" />
+    <ClCompile Include="taiwncal.cpp" />
+    <ClCompile Include="timezone.cpp" />
+    <ClCompile Include="tmunit.cpp" />
+    <ClCompile Include="tmutamt.cpp" />
+    <ClCompile Include="tmutfmt.cpp" />
+    <ClCompile Include="tzrule.cpp" />
+    <ClCompile Include="tztrans.cpp" />
+    <ClCompile Include="ucal.cpp" />
+    <ClCompile Include="udat.cpp" />
+    <ClCompile Include="udateintervalformat.cpp" />
+    <ClCompile Include="udatpg.cpp" />
+    <ClCompile Include="ufieldpositer.cpp" />
+    <ClCompile Include="ulocdata.cpp" />
+    <ClCompile Include="umsg.cpp" />
+    <ClCompile Include="units_complexconverter.cpp" />
+    <ClCompile Include="units_converter.cpp" />
+    <ClCompile Include="units_data.cpp" />
+    <ClCompile Include="units_router.cpp" />
+    <ClCompile Include="unum.cpp" />
+    <ClCompile Include="unumsys.cpp" />
+    <ClCompile Include="upluralrules.cpp" />
+    <ClCompile Include="utf16collationiterator.cpp" />
+    <ClCompile Include="utf8collationiterator.cpp" />
+    <ClCompile Include="utmscale.cpp" />
+    <ClCompile Include="vtzone.cpp" />
+    <ClCompile Include="vzone.cpp" />
+    <ClCompile Include="windtfmt.cpp" />
+    <ClCompile Include="winnmfmt.cpp" />
+    <ClCompile Include="wintzimpl.cpp" />
+    <ClCompile Include="zonemeta.cpp" />
+    <ClCompile Include="zrule.cpp" />
+    <ClCompile Include="ztrans.cpp" />
+    <ClCompile Include="ucln_in.cpp" />
+    <ClCompile Include="regexcmp.cpp" />
+    <ClCompile Include="regeximp.cpp" />
+    <ClCompile Include="regexst.cpp" />
+    <ClCompile Include="regextxt.cpp" />
+    <ClCompile Include="rematch.cpp" />
+    <ClCompile Include="repattrn.cpp" />
+    <ClCompile Include="uregex.cpp" />
+    <ClCompile Include="uregexc.cpp" />
+    <ClCompile Include="anytrans.cpp" />
+    <ClCompile Include="brktrans.cpp" />
+    <ClCompile Include="casetrn.cpp" />
+    <ClCompile Include="cpdtrans.cpp" />
+    <ClCompile Include="esctrn.cpp" />
+    <ClCompile Include="funcrepl.cpp" />
+    <ClCompile Include="name2uni.cpp" />
+    <ClCompile Include="nortrans.cpp" />
+    <ClCompile Include="nultrans.cpp" />
+    <ClCompile Include="quant.cpp" />
+    <ClCompile Include="rbt.cpp" />
+    <ClCompile Include="rbt_data.cpp" />
+    <ClCompile Include="rbt_pars.cpp" />
+    <ClCompile Include="rbt_rule.cpp" />
+    <ClCompile Include="rbt_set.cpp" />
+    <ClCompile Include="remtrans.cpp" />
+    <ClCompile Include="strmatch.cpp" />
+    <ClCompile Include="strrepl.cpp" />
+    <ClCompile Include="titletrn.cpp" />
+    <ClCompile Include="tolowtrn.cpp" />
+    <ClCompile Include="toupptrn.cpp" />
+    <ClCompile Include="translit.cpp" />
+    <ClCompile Include="transreg.cpp" />
+    <ClCompile Include="tridpars.cpp" />
+    <ClCompile Include="unesctrn.cpp" />
+    <ClCompile Include="uni2name.cpp" />
+    <ClCompile Include="utrans.cpp" />
+    <ClCompile Include="csdetect.cpp" />
+    <ClCompile Include="csmatch.cpp" />
+    <ClCompile Include="csr2022.cpp" />
+    <ClCompile Include="csrecog.cpp" />
+    <ClCompile Include="csrmbcs.cpp" />
+    <ClCompile Include="csrsbcs.cpp" />
+    <ClCompile Include="csrucode.cpp" />
+    <ClCompile Include="csrutf8.cpp" />
+    <ClCompile Include="inputext.cpp" />
+    <ClCompile Include="ucsdet.cpp" />
+    <ClCompile Include="uspoof.cpp" />
+    <ClCompile Include="uspoof_build.cpp" />
+    <ClCompile Include="uspoof_conf.cpp" />
+    <ClCompile Include="uspoof_impl.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="bocsu.h" />
+    <ClInclude Include="collation.h" />
+    <ClInclude Include="collationbuilder.h" />
+    <ClInclude Include="collationcompare.h" />
+    <ClInclude Include="collationdata.h" />
+    <ClInclude Include="collationdatabuilder.h" />
+    <ClInclude Include="collationdatareader.h" />
+    <ClInclude Include="collationdatawriter.h" />
+    <ClInclude Include="collationfastlatin.h" />
+    <ClInclude Include="collationfastlatinbuilder.h" />
+    <ClInclude Include="collationfcd.h" />
+    <ClInclude Include="collationiterator.h" />
+    <ClInclude Include="collationkeys.h" />
+    <ClInclude Include="collationroot.h" />
+    <ClInclude Include="collationrootelements.h" />
+    <ClInclude Include="collationruleparser.h" />
+    <ClInclude Include="collationsets.h" />
+    <ClInclude Include="collationsettings.h" />
+    <ClInclude Include="collationtailoring.h" />
+    <ClInclude Include="collationweights.h" />
+    <ClInclude Include="dayperiodrules.h" />
+    <ClInclude Include="erarules.h" />
+    <ClInclude Include="numsys_impl.h" />
+    <ClInclude Include="region_impl.h" />
+    <ClInclude Include="selfmtimpl.h" />
+    <ClInclude Include="tzgnames.h" />
+    <ClInclude Include="tznames_impl.h" />
+    <ClInclude Include="ucol_imp.h" />
+    <ClInclude Include="uitercollationiterator.h" />
+    <ClInclude Include="usrchimp.h" />
+    <ClInclude Include="astro.h" />
+    <ClInclude Include="buddhcal.h" />
+    <ClInclude Include="cecal.h" />
+    <ClInclude Include="chnsecal.h" />
+    <ClInclude Include="coptccal.h" />
+    <ClInclude Include="currfmt.h" />
+    <ClInclude Include="dangical.h" />
+    <ClInclude Include="decContext.h" />
+    <ClInclude Include="decNumber.h" />
+    <ClInclude Include="decNumberLocal.h" />
+    <ClInclude Include="double-conversion-bignum-dtoa.h" />
+    <ClInclude Include="double-conversion-bignum.h" />
+    <ClInclude Include="double-conversion-cached-powers.h" />
+    <ClInclude Include="double-conversion-diy-fp.h" />
+    <ClInclude Include="double-conversion-double-to-string.h" />
+    <ClInclude Include="double-conversion-fast-dtoa.h" />
+    <ClInclude Include="double-conversion-ieee.h" />
+    <ClInclude Include="double-conversion-string-to-double.h" />
+    <ClInclude Include="double-conversion-strtod.h" />
+    <ClInclude Include="double-conversion-utils.h" />
+    <ClInclude Include="double-conversion.h" />
+    <ClInclude Include="dt_impl.h" />
+    <ClInclude Include="dtitv_impl.h" />
+    <ClInclude Include="dtptngen_impl.h" />
+    <ClInclude Include="ethpccal.h" />
+    <ClInclude Include="fphdlimp.h" />
+    <ClInclude Include="gregoimp.h" />
+    <ClInclude Include="hebrwcal.h" />
+    <ClInclude Include="indiancal.h" />
+    <ClInclude Include="islamcal.h" />
+    <ClInclude Include="japancal.h" />
+    <ClInclude Include="measunit_impl.h" />
+    <ClInclude Include="msgfmt_impl.h" />
+    <ClInclude Include="nfrlist.h" />
+    <ClInclude Include="nfrs.h" />
+    <ClInclude Include="nfrule.h" />
+    <ClInclude Include="nfsubs.h" />
+    <ClInclude Include="olsontz.h" />
+    <ClInclude Include="persncal.h" />
+    <ClInclude Include="pluralranges.h" />
+    <ClInclude Include="plurrule_impl.h" />
+    <ClInclude Include="quantityformatter.h" />
+    <ClInclude Include="sharedbreakiterator.h" />
+    <ClInclude Include="sharedcalendar.h" />
+    <ClInclude Include="shareddateformatsymbols.h" />
+    <ClInclude Include="sharednumberformat.h" />
+    <ClInclude Include="sharedpluralrules.h" />
+    <ClInclude Include="reldtfmt.h" />
+    <ClInclude Include="smpdtfst.h" />
+    <ClInclude Include="standardplural.h" />
+    <ClInclude Include="taiwncal.h" />
+    <ClInclude Include="umsg_imp.h" />
+    <ClInclude Include="utf16collationiterator.h" />
+    <ClInclude Include="utf8collationiterator.h" />
+    <ClInclude Include="vzone.h" />
+    <ClInclude Include="windtfmt.h" />
+    <ClInclude Include="winnmfmt.h" />
+    <ClInclude Include="wintzimpl.h" />
+    <ClInclude Include="zonemeta.h" />
+    <ClInclude Include="zrule.h" />
+    <ClInclude Include="ztrans.h" />
+    <ClInclude Include="ucln_in.h" />
+    <ClInclude Include="regexcmp.h" />
+    <ClInclude Include="regexcst.h" />
+    <ClInclude Include="regeximp.h" />
+    <ClInclude Include="regexst.h" />
+    <ClInclude Include="regextxt.h" />
+    <ClInclude Include="anytrans.h" />
+    <ClInclude Include="brktrans.h" />
+    <ClInclude Include="casetrn.h" />
+    <ClInclude Include="cpdtrans.h" />
+    <ClInclude Include="esctrn.h" />
+    <ClInclude Include="funcrepl.h" />
+    <ClInclude Include="name2uni.h" />
+    <ClInclude Include="nortrans.h" />
+    <ClInclude Include="nultrans.h" />
+    <ClInclude Include="quant.h" />
+    <ClInclude Include="rbt.h" />
+    <ClInclude Include="rbt_data.h" />
+    <ClInclude Include="rbt_pars.h" />
+    <ClInclude Include="rbt_rule.h" />
+    <ClInclude Include="rbt_set.h" />
+    <ClInclude Include="remtrans.h" />
+    <ClInclude Include="strmatch.h" />
+    <ClInclude Include="strrepl.h" />
+    <ClInclude Include="titletrn.h" />
+    <ClInclude Include="tolowtrn.h" />
+    <ClInclude Include="toupptrn.h" />
+    <ClInclude Include="transreg.h" />
+    <ClInclude Include="tridpars.h" />
+    <ClInclude Include="unesctrn.h" />
+    <ClInclude Include="uni2name.h" />
+    <ClInclude Include="csdetect.h" />
+    <ClInclude Include="csmatch.h" />
+    <ClInclude Include="csr2022.h" />
+    <ClInclude Include="csrecog.h" />
+    <ClInclude Include="csrmbcs.h" />
+    <ClInclude Include="csrsbcs.h" />
+    <ClInclude Include="csrucode.h" />
+    <ClInclude Include="csrutf8.h" />
+    <ClInclude Include="inputext.h" />
+    <ClInclude Include="scriptset.h" />
+    <ClInclude Include="uspoof_conf.h" />
+    <ClInclude Include="uspoof_impl.h" />
+    <ClInclude Include="number_affixutils.h" />
+    <ClInclude Include="number_asformat.h" />
+    <ClInclude Include="number_compact.h" />
+    <ClInclude Include="number_decimalquantity.h" />
+    <ClInclude Include="number_decimfmtprops.h" />
+    <ClInclude Include="number_decnum.h" />
+    <ClInclude Include="number_formatimpl.h" />
+    <ClInclude Include="number_longnames.h" />
+    <ClInclude Include="number_microprops.h" />
+    <ClInclude Include="number_modifiers.h" />
+    <ClInclude Include="number_patternmodifier.h" />
+    <ClInclude Include="number_patternstring.h" />
+    <ClInclude Include="number_roundingutils.h" />
+    <ClInclude Include="number_scientific.h" />
+    <ClInclude Include="formatted_string_builder.h" />
+    <ClInclude Include="number_types.h" />
+    <ClInclude Include="number_usageprefs.h" />
+    <ClInclude Include="number_utypes.h" />
+    <ClInclude Include="number_utils.h" />
+    <ClInclude Include="number_mapper.h" />
+    <ClInclude Include="number_multiplier.h" />
+    <ClInclude Include="number_currencysymbols.h" />
+    <ClInclude Include="number_skeletons.h" />
+    <ClInclude Include="number_symbolswrapper.h" />
+    <ClInclude Include="string_segment.h" />
+    <ClInclude Include="numparse_impl.h" />
+    <ClInclude Include="numparse_symbols.h" />
+    <ClInclude Include="numparse_decimal.h" />
+    <ClInclude Include="numparse_scientific.h" />
+    <ClInclude Include="numparse_currency.h" />
+    <ClInclude Include="numparse_affixes.h" />
+    <ClInclude Include="numparse_compositions.h" />
+    <ClInclude Include="numparse_validators.h" />
+    <ClInclude Include="numparse_types.h" />
+    <ClInclude Include="numparse_utils.h" />
+    <ClInclude Include="numrange_impl.h" />
+    <ClInclude Include="formattedval_impl.h" />
+    <ClInclude Include="units_complexconverter.h" />
+    <ClInclude Include="units_converter.h" />
+    <ClInclude Include="units_data.h" />
+    <ClInclude Include="units_router.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="i18n.rc" />
+  </ItemGroup>
+  <Target Name="Build" Condition="'$(SkipUWP)'=='true'">
+    <Message Text="Skipping building the UWP project: $(MSBuildThisFile)" Importance="high" />
+  </Target>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" Condition="'$(SkipUWP)'!='true'" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

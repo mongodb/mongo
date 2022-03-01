@@ -54,7 +54,7 @@ class FormatToken;
 
 class Debugger : public Simulator {
  public:
-  explicit Debugger(JSContext* cx, Decoder* decoder, FILE* stream = stdout);
+  explicit Debugger(Decoder* decoder, FILE* stream = stdout);
   ~Debugger();
 
   virtual void Run() override;

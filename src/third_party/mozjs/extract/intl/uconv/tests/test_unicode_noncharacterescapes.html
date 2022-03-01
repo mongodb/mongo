@@ -1,0 +1,303 @@
+<!DOCTYPE HTML>
+<html>
+<!--
+https://bugzilla.mozilla.org/show_bug.cgi?id=445886
+-->
+<head>
+  <meta http-equiv="Content-type" content="text/html; charset=UTF-8">
+  <title>Test for Unicode non-characters</title>
+  <script src="/tests/SimpleTest/SimpleTest.js"></script>
+  <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
+</head>
+<body onload="Inject()">
+<pre id="test">
+<script class="testbody" type="text/javascript">
+
+/* eslint-disable no-eval */
+
+/** Test that unicode non-characters are not discarded **/
+function test()
+{
+    is($("display").innerHTML,"All good.", "Noncharacters not stripped");
+    SimpleTest.finish();
+}
+
+// eslint-disable-next-line complexity
+function Inject()
+{
+    // script fragments containing Unicode non-characters
+    try {
+        // U+FDD0
+        eval("$(\"display\").inner\ufdd0HTML += \" U+FDD0 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDD1
+        eval("$(\"display\").inner\ufdd1HTML += \" U+FDD1 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDD2
+        eval("$(\"display\").inner\ufdd2HTML += \" U+FDD2 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDD3
+        eval("$(\"display\").inner\ufdd3HTML += \" U+FDD3 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDD4
+        eval("$(\"display\").inner\ufdd4HTML += \" U+FDD4 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDD5
+        eval("$(\"display\").inner\ufdd5HTML += \" U+FDD5 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDD6
+        eval("$(\"display\").inner\ufdd6HTML += \" U+FDD6 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDD7
+        eval("$(\"display\").inner\ufdd7HTML += \" U+FDD7 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDD8
+        eval("$(\"display\").inner\ufdd8HTML += \" U+FDD8 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDD9
+        eval("$(\"display\").inner\ufdd9HTML += \" U+FDD9 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDDA
+        eval("$(\"display\").inner\ufddaHTML += \" U+FDDA is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDDB
+        eval("$(\"display\").inner\ufddbHTML += \" U+FDDB is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDDC
+        eval("$(\"display\").inner\ufddcHTML += \" U+FDDC is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDDD
+        eval("$(\"display\").inner\ufdddHTML += \" U+FDDD is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDDE
+        eval("$(\"display\").inner\ufddeHTML += \" U+FDDE is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDDF
+        eval("$(\"display\").inner\ufddfHTML += \" U+FDDF is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDE0
+        eval("$(\"display\").inner\ufde0HTML += \" U+FDE0 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDE1
+        eval("$(\"display\").inner\ufde1HTML += \" U+FDE1 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDE2
+        eval("$(\"display\").inner\ufde2HTML += \" U+FDE2 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDE3
+        eval("$(\"display\").inner\ufde3HTML += \" U+FDE3 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDE4
+        eval("$(\"display\").inner\ufde4HTML += \" U+FDE4 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDE5
+        eval("$(\"display\").inner\ufde5HTML += \" U+FDE5 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDE6
+        eval("$(\"display\").inner\ufde6HTML += \" U+FDE6 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDE7
+        eval("$(\"display\").inner\ufde7HTML += \" U+FDE7 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDE8
+        eval("$(\"display\").inner\ufde8HTML += \" U+FDE8 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDE9
+        eval("$(\"display\").inner\ufde9HTML += \" U+FDE9 is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDEA
+        eval("$(\"display\").inner\ufdeaHTML += \" U+FDEA is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDEB
+        eval("$(\"display\").inner\ufdebHTML += \" U+FDEB is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDEC
+        eval("$(\"display\").inner\ufdecHTML += \" U+FDEC is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDED
+        eval("$(\"display\").inner\ufdedHTML += \" U+FDED is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDEE
+        eval("$(\"display\").inner\ufdeeHTML += \" U+FDEE is evil\"");
+    } catch(e) {}
+    try {
+        // U+FDEF
+        eval("$(\"display\").inner\ufdefHTML += \" U+FDEF is evil\"");
+    } catch(e) {}
+    try {
+        // U+FFFE
+        eval("$(\"display\").inner\ufffeHTML += \" U+FFFE is evil\"");
+    } catch(e) {}
+    try {
+        // U+FFFF
+        eval("$(\"display\").inner\uffffHTML += \" U+FFFF is evil\"");
+    } catch(e) {}
+    try {
+        // U+1FFFE
+        eval("$(\"display\").inner\ud83f\udffeHTML += \" U+1FFFE is evil\"");
+    } catch(e) {}
+    try {
+        // U+1FFFF
+        eval("$(\"display\").inner\ud83f\udfffHTML += \" U+1FFFF is evil\"");
+    } catch(e) {}
+    try {
+        // U+2FFFE
+        eval("$(\"display\").inner\ud87f\udffeHTML += \" U+2FFFE is evil\"");
+    } catch(e) {}
+    try {
+        // U+2FFFF
+        eval("$(\"display\").inner\ud87f\udfffHTML += \" U+2FFFF is evil\"");
+    } catch(e) {}
+    try {
+        // U+3FFFE
+        eval("$(\"display\").inner\ud8bf\udffeHTML += \" U+3FFFE is evil\"");
+    } catch(e) {}
+    try {
+        // U+3FFFF
+        eval("$(\"display\").inner\ud8bf\udfffHTML += \" U+3FFFF is evil\"");
+    } catch(e) {}
+    try {
+        // U+4FFFE
+        eval("$(\"display\").inner\ud8ff\udffeHTML += \" U+4FFFE is evil\"");
+    } catch(e) {}
+    try {
+        // U+4FFFF
+        eval("$(\"display\").inner\ud8ff\udfffHTML += \" U+4FFFF is evil\"");
+    } catch(e) {}
+    try {
+        // U+5FFFE
+        eval("$(\"display\").inner\ud93f\udffeHTML += \" U+5FFFE is evil\"");
+    } catch(e) {}
+    try {
+        // U+5FFFF
+        eval("$(\"display\").inner\ud93f\udfffHTML += \" U+5FFFF is evil\"");
+    } catch(e) {}
+    try {
+        // U+6FFFE
+        eval("$(\"display\").inner\ud97f\udffeHTML += \" U+6FFFE is evil\"");
+    } catch(e) {}
+    try {
+        // U+6FFFF
+        eval("$(\"display\").inner\ud97f\udfffHTML += \" U+6FFFF is evil\"");
+    } catch(e) {}
+    try {
+        // U+7FFFE
+        eval("$(\"display\").inner\ud9bf\udffeHTML += \" U+7FFFE is evil\"");
+    } catch(e) {}
+    try {
+        // U+7FFFF
+        eval("$(\"display\").inner\ud9bf\udfffHTML += \" U+7FFFF is evil\"");
+    } catch(e) {}
+    try {
+        // U+8FFFE
+        eval("$(\"display\").inner\ud9ff\udffeHTML += \" U+8FFFE is evil\"");
+    } catch(e) {}
+    try {
+        // U+8FFFF
+        eval("$(\"display\").inner\ud9ff\udfffHTML += \" U+8FFFF is evil\"");
+    } catch(e) {}
+    try {
+        // U+9FFFE
+        eval("$(\"display\").inner\uda3f\udffeHTML += \" U+9FFFE is evil\"");
+    } catch(e) {}
+    try {
+        // U+9FFFF
+        eval("$(\"display\").inner\uda3f\udfffHTML += \" U+9FFFF is evil\"");
+    } catch(e) {}
+    try {
+        // U+AFFFE
+        eval("$(\"display\").inner\uda7f\udffeHTML += \" U+AFFFE is evil\"");
+    } catch(e) {}
+    try {
+        // U+AFFFF
+        eval("$(\"display\").inner\uda7f\udfffHTML += \" U+AFFFF is evil\"");
+    } catch(e) {}
+    try {
+        // U+BFFFE
+        eval("$(\"display\").inner\udabf\udffeHTML += \" U+BFFFE is evil\"");
+    } catch(e) {}
+    try {
+        // U+BFFFF
+        eval("$(\"display\").inner\udabf\udfffHTML += \" U+BFFFF is evil\"");
+    } catch(e) {}
+    try {
+        // U+CFFFE
+        eval("$(\"display\").inner\udaff\udffeHTML += \" U+CFFFE is evil\"");
+    } catch(e) {}
+    try {
+        // U+CFFFF
+        eval("$(\"display\").inner\udaff\udfffHTML += \" U+CFFFF is evil\"");
+    } catch(e) {}
+    try {
+        // U+DFFFE
+        eval("$(\"display\").inner\udb3f\udffeHTML += \" U+DFFFE is evil\"");
+    } catch(e) {}
+    try {
+        // U+DFFFF
+        eval("$(\"display\").inner\udb3f\udfffHTML += \" U+DFFFF is evil\"");
+    } catch(e) {}
+    try {
+        // U+EFFFE
+        eval("$(\"display\").inner\udb7f\udffeHTML += \" U+EFFFE is evil\"");
+    } catch(e) {}
+    try {
+        // U+EFFFF
+        eval("$(\"display\").inner\udb7f\udfffHTML += \" U+EFFFF is evil\"");
+    } catch(e) {}
+    try {
+        // U+FFFFE
+        eval("$(\"display\").inner\udbbf\udffeHTML += \" U+FFFFE is evil\"");
+    } catch(e) {}
+    try {
+        // U+FFFFF
+        eval("$(\"display\").inner\udbbf\udfffHTML += \" U+FFFFF is evil\"");
+    } catch(e) {}
+    try {
+        // U+10FFFE
+        eval("$(\"display\").inner\udbff\udffeHTML += \" U+10FFFE is evil\"");
+    } catch(e) {}
+    try {
+        // U+10FFFF
+        eval("$(\"display\").inner\udbff\udfffHTML += \" U+10FFFF is evil\"");
+    } catch(e) {}
+    test();
+}
+
+  SimpleTest.waitForExplicitFinish();
+</script>
+</pre>
+<a target="_blank" href="https://bugzilla.mozilla.org/show_bug.cgi?id=445886">Mozilla Bug 445886</a>
+<p id="display">All good.</p>
+<div id="content" style="display: none"></div>
+</body>
+</html>

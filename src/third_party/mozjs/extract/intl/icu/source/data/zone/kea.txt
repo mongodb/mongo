@@ -1,0 +1,282 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+kea{
+    zoneStrings{
+        "America:Adak"{
+            ec{"Adaki"}
+        }
+        "America:Anchorage"{
+            ec{"Ankoraji"}
+        }
+        "America:Anguilla"{
+            ec{"Angila"}
+        }
+        "America:Bahia_Banderas"{
+            ec{"Baía di Banderas"}
+        }
+        "America:Barbados"{
+            ec{"Barbadus"}
+        }
+        "America:Belize"{
+            ec{"Belizi"}
+        }
+        "America:Blanc-Sablon"{
+            ec{"Blank-Sablon"}
+        }
+        "America:Boise"{
+            ec{"Boiz"}
+        }
+        "America:Cancun"{
+            ec{"Kankun"}
+        }
+        "America:Cayman"{
+            ec{"Kaiman"}
+        }
+        "America:Chicago"{
+            ec{"Xikagu"}
+        }
+        "America:Chihuahua"{
+            ec{"Xiuáua"}
+        }
+        "America:Costa_Rica"{
+            ec{"Kosta Rika"}
+        }
+        "America:Creston"{
+            ec{"Kréston"}
+        }
+        "America:Curacao"{
+            ec{"Kurasau"}
+        }
+        "America:Dominica"{
+            ec{"Dominika"}
+        }
+        "America:Grenada"{
+            ec{"Granada"}
+        }
+        "America:Guadeloupe"{
+            ec{"Guadalupi"}
+        }
+        "America:Guatemala"{
+            ec{"Guatimala"}
+        }
+        "America:Havana"{
+            ec{"Avana"}
+        }
+        "America:Indianapolis"{
+            ec{"Indianápolis"}
+        }
+        "America:Jamaica"{
+            ec{"Jamaika"}
+        }
+        "America:Managua"{
+            ec{"Manágua"}
+        }
+        "America:Martinique"{
+            ec{"Martinika"}
+        }
+        "America:Merida"{
+            ec{"Mérida"}
+        }
+        "America:Mexico_City"{
+            ec{"Sidadi di Méxiku"}
+        }
+        "America:Miquelon"{
+            ec{"Mikelon"}
+        }
+        "America:New_York"{
+            ec{"Nova Iorki"}
+        }
+        "America:North_Dakota:Beulah"{
+            ec{"Beulah, Dakota di Norti"}
+        }
+        "America:North_Dakota:Center"{
+            ec{"Center, Dakota di Norti"}
+        }
+        "America:North_Dakota:New_Salem"{
+            ec{"New Salem, Dakota di Norti"}
+        }
+        "America:Panama"{
+            ec{"Panamá"}
+        }
+        "America:Port_of_Spain"{
+            ec{"Portu di Spanha"}
+        }
+        "America:Puerto_Rico"{
+            ec{"Portu Riku"}
+        }
+        "America:Santo_Domingo"{
+            ec{"Santu Dumingu"}
+        }
+        "America:St_Barthelemy"{
+            ec{"San Bartolomeu"}
+        }
+        "America:St_Kitts"{
+            ec{"San Kristovan"}
+        }
+        "America:St_Lucia"{
+            ec{"Santa Lúsia"}
+        }
+        "America:St_Vincent"{
+            ec{"San Bisenti"}
+        }
+        "America:Toronto"{
+            ec{"Torontu"}
+        }
+        "America:Vancouver"{
+            ec{"Vankuver"}
+        }
+        "America:Winnipeg"{
+            ec{"Uínipeg"}
+        }
+        "Atlantic:Bermuda"{
+            ec{"Bermuda"}
+        }
+        "Etc:UTC"{
+            ls{"Ora Universal Kordenadu"}
+        }
+        "Etc:Unknown"{
+            ec{"Sidadi diskonxedu"}
+        }
+        "Europe:Dublin"{
+            ld{"Ora Padron di Irlanda"}
+        }
+        "Europe:London"{
+            ld{"Ora di Veron Britániku"}
+        }
+        "meta:Africa_Central"{
+            ls{"Ora di Áfrika Sentral"}
+        }
+        "meta:Africa_Eastern"{
+            ls{"Ora di Áfrika Oriental"}
+        }
+        "meta:Africa_Southern"{
+            ls{"Ora di Sul di Áfrika"}
+        }
+        "meta:Africa_Western"{
+            ld{"Ora di Veron di Áfrika Osidental"}
+            lg{"Ora di Áfrika Osidental"}
+            ls{"Ora Padron di Áfrika Osidental"}
+        }
+        "meta:Alaska"{
+            ld{"Ora di Veron di Alaska"}
+            lg{"Ora di Alaska"}
+            ls{"Ora Padron di Alaska"}
+        }
+        "meta:America_Central"{
+            ld{"Ora di Veron Sentral"}
+            lg{"Ora Sentral"}
+            ls{"Ora Padron Sentral"}
+        }
+        "meta:America_Eastern"{
+            ld{"Ora di Veron Oriental"}
+            lg{"Ora Oriental"}
+            ls{"Ora Padron Oriental"}
+        }
+        "meta:America_Mountain"{
+            ld{"Ora di Veron di Montanha"}
+            lg{"Ora di Montanha"}
+            ls{"Ora Padron di Montanha"}
+        }
+        "meta:America_Pacific"{
+            ld{"Ora di Veron di Pasífiku"}
+            lg{"Ora di Pasífiku"}
+            ls{"Ora Padron di Pasífiku"}
+        }
+        "meta:Atlantic"{
+            ld{"Ora di Veron di Atlántiku"}
+            lg{"Ora di Atlántiku"}
+            ls{"Ora Padron di Atlántiku"}
+        }
+        "meta:Australia_Central"{
+            ld{"Ora di Veron di Austrália Sentral"}
+            lg{"Ora di Austrália Sentral"}
+            ls{"Ora Padron di Austrália Sentral"}
+        }
+        "meta:Australia_CentralWestern"{
+            ld{"Ora di Veron di Austrália Sentru-Osidental"}
+            lg{"Ora di Austrália Sentru-Osidental"}
+            ls{"Ora Padron di Austrália Sentru-Osidental"}
+        }
+        "meta:Australia_Eastern"{
+            ld{"Ora di Veron di Austrália Oriental"}
+            lg{"Ora di Austrália Oriental"}
+            ls{"Ora Padron di Austrália Oriental"}
+        }
+        "meta:Australia_Western"{
+            ld{"Ora di Veron di Austrália Osidental"}
+            lg{"Ora di Austrália Osidental"}
+            ls{"Ora Padron di Austrália Osidental"}
+        }
+        "meta:Cape_Verde"{
+            ld{"Ora di Veron de Kabu Verdi"}
+            lg{"Ora di Kabu Verdi"}
+            ls{"Ora Padron di Kabu Verdi"}
+        }
+        "meta:Cuba"{
+            ld{"Ora di Veron di Kuba"}
+            lg{"Ora di Kuba"}
+            ls{"Ora Padron di Kuba"}
+        }
+        "meta:Europe_Central"{
+            ld{"Ora di Veron di Europa Sentral"}
+            lg{"Ora di Europa Sentral"}
+            ls{"Ora Padron di Europa Sentral"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"Ora di Veron di Europa Oriental"}
+            lg{"Ora di Europa Oriental"}
+            ls{"Ora Padron di Europa Oriental"}
+        }
+        "meta:Europe_Western"{
+            ld{"Ora di Veron di Europa Osidental"}
+            lg{"Ora di Europa Osidental"}
+            ls{"Ora Padron di Europa Osidental"}
+        }
+        "meta:GMT"{
+            ls{"Ora Médiu di Greenwich"}
+        }
+        "meta:Greenland_Eastern"{
+            ld{"Ora di Veron di Gronelándia Oriental"}
+            lg{"Ora di Gronelándia Oriental"}
+            ls{"Ora Padron di Gronelándia Oriental"}
+        }
+        "meta:Greenland_Western"{
+            ld{"Ora di Veron di Gronelándia Osidental"}
+            lg{"Ora di Gronelándia Osidental"}
+            ls{"Ora Padron di Gronelándia Osidental"}
+        }
+        "meta:Hawaii_Aleutian"{
+            ld{"Ora di Veron di Avaí i Aleutas"}
+            lg{"Ora di Avaí i Aleutas"}
+            ls{"Ora Padron di Avaí i Aleutas"}
+        }
+        "meta:Mexico_Northwest"{
+            ld{"Ora di Veron di Noroesti di Méxiku"}
+            lg{"Ora di Noroesti di Méxiku"}
+            ls{"Ora Padron di Noroesti di Méxiku"}
+        }
+        "meta:Mexico_Pacific"{
+            ld{"Ora di Veron di Pasífiku Mexikanu"}
+            lg{"Ora di Pasífiku Mexikanu"}
+            ls{"Ora Padron di Pasífiku Mexikanu"}
+        }
+        "meta:Newfoundland"{
+            ld{"Ora di Veron di Tera Nova"}
+            lg{"Ora di Tera Nova"}
+            ls{"Ora Padron di Tera Nova"}
+        }
+        "meta:Pierre_Miquelon"{
+            ld{"Ora di Veron di San Pedru i Mikelon"}
+            lg{"Ora di San Pedru i Mikelon"}
+            ls{"Ora Padron di San Pedru i Mikelon"}
+        }
+        fallbackFormat{"{1} ({0})"}
+        gmtFormat{"GMT{0}"}
+        gmtZeroFormat{"GMT"}
+        hourFormat{"+HH:mm;-HH:mm"}
+        regionFormat{"Ora di {0}"}
+        regionFormatDaylight{"Ora di Veron di {0}"}
+        regionFormatStandard{"Ora Padron di {0}"}
+    }
+}

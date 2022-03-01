@@ -31,6 +31,7 @@
 
 #include "mongo/scripting/mozjs/exception.h"
 
+#include <js/friend/ErrorMessages.h>
 #include <jsfriendapi.h>
 #include <limits>
 

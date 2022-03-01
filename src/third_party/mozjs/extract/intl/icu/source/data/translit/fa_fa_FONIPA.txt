@@ -1,0 +1,83 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: fa_fa_FONIPA.txt
+# Generated from CLDR
+#
+
+[\u200c \u200d] → ;  # Strip off ZWJ and ZWNJ.
+::NFD;
+# Rewrite similarly-looking Arabic letters to Persian.
+ي → ی;
+ى → ی;
+ك → ک;
+ە → ه;
+::NULL;
+$VOWEL = [ \u064E \u0650  \u064F  \u0653 ا و ی];
+$BOUNDARY = [^[:L:][:M:][:N:]];
+$IPA_CONSONANT = [ m n p b t d k ɡ ʔ f v s z ʃ ʒ ʁ ɢ h χ {t\u0361ʃ} {d\u0361ʒ} l ɾ ];
+# Vowels
+ی\u0651 → jj;
+($VOWEL)\u0651 → \u0651 | $1;
+\u064Eی\u0652 → æj;
+\u0650ی\u0652 → ej;
+\u064Eو\u0652 → ov;
+\u0650ی → iː;
+\u064Eه → æ;
+[^ːeoæ] {ه} $BOUNDARY → e;
+[e] {ه} $BOUNDARY → ;
+ا\u064E → æ;
+ا\u064B $BOUNDARY → æn;
+\u064E → æ;
+یه → je;
+{ه\u0654} $BOUNDARY → jæ;
+ی\u0670 → ɒː;
+{ی} $VOWEL → j;
+ی → iː;
+$BOUNDARY {ای} → iː;
+ا\u0653 → ɒː;
+آ → ɒː;
+ا\u0650 → e;
+ا\u064F → o;
+او → uː;
+ا → ɒː; # Probably [^$BOUNDARY]
+\u0650 → e;
+ه\u0650 → e;
+{و} $VOWEL → v;
+$IPA_CONSONANT {و} → uː;
+\u064F{و} $IPA_CONSONANT → uː;
+$BOUNDARY {و} $BOUNDARY → va;
+و → ;
+\u064F → o;
+# Consonants
+پ → p;
+ب → b;
+[ت ط] → t;
+د → d;
+ک → k;
+گ → ɡ;
+[ع ء] → ʔ;
+چ → t\u0361ʃ;
+ج → d\u0361ʒ;
+ف → f;
+[س ص ث] → s;
+[ز ذ ض ظ] → z;
+ش → ʃ;
+ژ → ʒ;
+خ → χ;
+غ → ʁ;
+ق → ɢ;
+ح → h;
+م → m;
+ن → n;
+ه → h;
+ل → l;
+ر → ɾ;
+\u0652 → ;
+::NULL;
+# TODO: How to handle these?
+([$IPA_CONSONANT|$VOWEL]){\u0651} → $1;
+[ \u0651 \u0654 \u064B \u0670 ] → ;
+::NFC;
+

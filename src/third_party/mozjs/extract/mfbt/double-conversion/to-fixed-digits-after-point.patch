@@ -1,0 +1,22 @@
+diff --git a/mfbt/double-conversion/double-conversion/double-to-string.h b/mfbt/double-conversion/double-conversion/double-to-string.h
+--- a/mfbt/double-conversion/double-conversion/double-to-string.h
++++ b/mfbt/double-conversion/double-conversion/double-to-string.h
+@@ -34,17 +34,17 @@
+ namespace double_conversion {
+ 
+ class DoubleToStringConverter {
+  public:
+   // When calling ToFixed with a double > 10^kMaxFixedDigitsBeforePoint
+   // or a requested_digits parameter > kMaxFixedDigitsAfterPoint then the
+   // function returns false.
+   static const int kMaxFixedDigitsBeforePoint = 308;
+-  static const int kMaxFixedDigitsAfterPoint = 60;
++  static const int kMaxFixedDigitsAfterPoint = 100;
+ 
+   // When calling ToExponential with a requested_digits
+   // parameter > kMaxExponentialDigits then the function returns false.
+   static const int kMaxExponentialDigits = 120;
+ 
+   // When calling ToPrecision with a requested_digits
+   // parameter < kMinPrecisionDigits or requested_digits > kMaxPrecisionDigits
+   // then the function returns false.

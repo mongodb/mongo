@@ -1,0 +1,22 @@
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+#******************************************************************************
+#
+#   Copyright (C) 2000-2006, International Business Machines
+#   Corporation and others.  All Rights Reserved.
+#
+#******************************************************************************
+# This Makefile is used to build the ICU's data.
+# It is included with the -O option to pkgdata.
+
+top_srcdir=@top_srcdir@
+srcdir=@srcdir@
+top_builddir=../..
+
+include $(top_builddir)/icudefs.mk
+
+##### Add the following to source/config/Makefile.in
+
+GENCCODE=$(BINDIR)/genccode
+ICUPKG=$(BINDIR)/icupkg
+

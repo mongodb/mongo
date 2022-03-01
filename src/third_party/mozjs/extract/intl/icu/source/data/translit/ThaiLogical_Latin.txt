@@ -1,0 +1,154 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: ThaiLogical_Latin.txt
+# Generated from CLDR
+#
+
+# Thai-Latin
+# This set of rules follows ISO 11940
+#     see http://homepage.mac.com/sirbinks/pdf/Thai.r2.pdf
+# except that that does not mention an implicit vowel, so we use o\u0323
+#
+# The transcription is fairly ugly, so we ought to also do the UNGEGN version
+#     see: http://www.eki.ee/wgrs/rom1_th.pdf
+# and probably make that the main variant.
+#
+# Note: this is an internal file. The NFD/NFC is handled externally, in the index
+# The insertion of spaces between words, the reversal of the vowels
+# and the conversion of space to semicolon are done *outside* of these rules.
+# So as far as these rules are concerned, the vowels are in logical order!
+# insert implicit vowel (and remove it going the other way)
+# COMMENTED out: the implicit vowel positions cannot be predicted algorithmically
+#$consonant = [ก-ฮ];
+#$vowel = [ะ-\u0E3Aเ-ไ\u0E47];
+#{ ( $consonant ) } [^$vowel \uE000] → | $1 \uE000 ;
+#\uE000 → o\u0323 ;
+# ← o\u0323 ;
+$notAbove = [^\p{ccc=0}\p{ccc=above}] ;
+$notBelow = [^\p{ccc=0}\p{ccc=below}] ;
+# Consonants
+# Warning: the 'h's need to be handled carefully!
+# What we really want to say is the following, but we can't
+# $notHAccent = !($notAbove*   \u0304 | $notBelow*   \u0323) ;
+# Since the only accents we care about that could cause problems are free-standing accents below, we use instead:
+$freeStandingBelow = [\u0325  ];
+$hAccent =  [   \u0304     \u0323];
+$notHAccent0 = [^$freeStandingBelow$hAccent];
+$notHAccent1 = $freeStandingBelow [^$hAccent];
+ห → h\u0304 ; # THAI CHARACTER HO HIP
+ห | $1 ← h ($notAbove*)    \u0304; # backward case, account for reordering
+ฮ ↔ h\u0323 ; # THAI CHARACTER HO NOKHUK
+ข ↔ k\u0304h ; # THAI CHARACTER KHO KHAI
+ฃ ↔ k\u0323\u0304h ; # THAI CHARACTER KHO KHUAT
+ฅ ↔ kʹh ; # THAI CHARACTER KHO KHON
+ฆ ↔ k\u0323h ; # THAI CHARACTER KHO RAKHANG
+ค ← kh } $notHAccent1 ; # THAI CHARACTER KHO KHWAI
+ค ↔ kh } $notHAccent0 ; # THAI CHARACTER KHO KHWAI
+ก ↔ k ; # THAI CHARACTER KO KAI
+ภ ↔ p\u0323h ; # THAI CHARACTER PHO SAMPHAO
+ผ ↔ p\u0304h ; # THAI CHARACTER PHO PHUNG
+พ ← ph } $notHAccent1 ; # THAI CHARACTER PHO PHAN
+พ ↔ ph } $notHAccent0 ; # THAI CHARACTER PHO PHAN
+ป ↔ p ; # THAI CHARACTER PO PLA
+ฉ ↔ c\u0304h ; # THAI CHARACTER CHO CHING
+ฌ ↔ c\u0323h ; # THAI CHARACTER CHO CHOE
+ช ← ch } $notHAccent1 ; # THAI CHARACTER CHO CHANG
+ช ↔ ch } $notHAccent0 ; # THAI CHARACTER CHO CHANG
+จ ↔ c ; # THAI CHARACTER CHO CHAN
+ฐ ↔ t\u0323\u0304h ; # THAI CHARACTER THO THAN
+ฑ ↔ t\u0331h ; # THAI CHARACTER THO NANGMONTHO
+ฒ ↔ tʹh ; # THAI CHARACTER THO PHUTHAO
+ถ ↔ t\u0304h ; # THAI CHARACTER THO THUNG
+ธ ↔ t\u0323h ; # THAI CHARACTER THO THONG
+ท ← th } $notHAccent1 ; # THAI CHARACTER THO THAHAN
+ท ↔ th } $notHAccent0 ; # THAI CHARACTER THO THAHAN
+#Note: TO PATAK deviates from ISO since t-dotunder + h would be ambigous. So it uses vertical tick.
+ฏ ↔ t\u0329 ; # THAI CHARACTER TO PATAK
+ต ↔ t ; # THAI CHARACTER TO TAO
+# since there is no singleton g (generated), don't worry about that.
+ง ↔ ng ; # THAI CHARACTER NGO NGU
+ณ ↔ n\u0323 ; # THAI CHARACTER NO NEN
+น ↔ n ; # THAI CHARACTER NO NU
+ญ ↔ y\u0323  ; # THAI CHARACTER YO YING
+ฎ ↔ d\u0323 ; # THAI CHARACTER DO CHADA
+ด ↔ d ; # THAI CHARACTER DO DEK
+บ ↔ b ; # THAI CHARACTER BO BAIMAI
+ฝ ↔ f\u0304 ; # THAI CHARACTER FO FA
+ฝ | $1 ← f ($notAbove*)    \u0304; # backward case, account for reordering
+ม ↔ m ; # THAI CHARACTER MO MA
+ย ↔ y ; # THAI CHARACTER YO YAK
+ร ↔ r ; # THAI CHARACTER RO RUA
+ฤ ↔ v ; # THAI CHARACTER RU
+ฦ ↔ ł ; # THAI CHARACTER LU
+ว ↔ w ; # THAI CHARACTER WO WAEN
+ศ ↔ s\u0323\u0304 ; # THAI CHARACTER SO SALA***
+ศ | $1 ← s    \u0323 ($notAbove*)    \u0304; # backward case, account for reordering
+ษ ↔ s\u0304ʹ ; # THAI CHARACTER SO RUSI
+ส → s\u0304 ; # THAI CHARACTER SO SUA***
+ส | $1 ← s ($notAbove*)    \u0304; # backward case, account for reordering
+ฬ ↔ l\u0323 ; # THAI CHARACTER LO CHULA
+ล ↔ l ; # THAI CHARACTER LO LING
+ฟ ↔ f ; # THAI CHARACTER FO FAN
+อ ↔ x ; # THAI CHARACTER O ANG
+ซ ↔ s ; # THAI CHARACTER SO SO
+# vowels
+\u0E31 ↔ a\u0323 ; # THAI CHARACTER MAI HAN-AKAT
+า → a\u0304 ; # THAI CHARACTER SARA AA
+า | $1 ← a ($notAbove*)    \u0304; # backward case, account for reordering
+# We deviate from ISO for SARA AM for disambiguation
+ำ → a  \u0309; # THAI CHARACTER SARA AM
+ำ | $1 ← a ($notAbove*)  \u0309 ; # backward case, account for reordering
+ะ ↔ a ; # THAI CHARACTER SARA A
+\u0E35 ↔ i\u0304 ; # THAI CHARACTER SARA II
+\u0E35 | $1 ← i ($notAbove*)    \u0304  ; # backward case, account for reordering
+\u0E37 ↔ u\u0323\u0304 ; # THAI CHARACTER SARA UEE
+\u0E37 | $1 ← u   \u0323 ($notAbove*)    \u0304  ; # backward case, account for reordering
+\u0E36 ↔ u\u0323 ; # THAI CHARACTER SARA UE
+\u0E39 ↔ u\u0304 ; # THAI CHARACTER SARA UU
+\u0E39 | $1 ← u  ($notAbove*)    \u0304  ; # backward case, account for reordering
+\u0E38 ↔ u ; # THAI CHARACTER SARA U
+ฯ ↔ ‡ ; # THAI CHARACTER PAIYANNOI
+# ฿ ↔ XXX ; # THAI CURRENCY SYMBOL BAHT
+เ ↔ e ; # THAI CHARACTER SARA E
+แ ↔ æ ; # THAI CHARACTER SARA AE
+โ ↔ o ; # THAI CHARACTER SARA O
+ใ ↔ ı ; # THAI CHARACTER SARA AI MAIMUAN
+ไ ↔ i\u0323 ; # THAI CHARACTER SARA AI MAIMALAI
+ๅ ↔ ɨ ; # THAI CHARACTER LAKKHANGYAO
+\u0E47 ↔ \u0306 ; # THAI CHARACTER MAITAIKHU
+\u0E48 ↔ \u0300 ; # THAI CHARACTER MAI EK
+\u0E49 ↔ \u0302 ; # THAI CHARACTER MAI THO
+\u0E4A ↔ \u0301 ; # THAI CHARACTER MAI TRI
+\u0E4B ↔ \u030C ; # THAI CHARACTER MAI CHATTAWA
+\u0E4C ↔ \u0312 ; # THAI CHARACTER THANTHAKHAT
+\u0E4E ↔ '~' ; # THAI CHARACTER YAMAKKAN
+# We deviate from ISO for disambiguation
+\u0E4D ↔  \u030A ; # THAI CHARACTER NIKHAHIT
+๏ ↔ '§' ; # THAI CHARACTER FONGMAN
+๐ ↔ 0 ; # THAI DIGIT ZERO
+๑ ↔ 1 ; # THAI DIGIT ONE
+๒ ↔ 2 ; # THAI DIGIT TWO
+๓ ↔ 3 ; # THAI DIGIT THREE
+๔ ↔ 4 ; # THAI DIGIT FOUR
+๕ ↔ 5 ; # THAI DIGIT FIVE
+๖ ↔ 6 ; # THAI DIGIT SIX
+๗ ↔ 7 ; # THAI DIGIT SEVEN
+๘ ↔ 8 ; # THAI DIGIT EIGHT
+๙ ↔ 9 ; # THAI DIGIT NINE
+๚ ↔ '||' ; # THAI CHARACTER ANGKHANKHU
+๛ ↔ » ; # THAI CHARACTER KHOMUT
+ๆ ↔ « ; # THAI CHARACTER MAIYAMOK
+# moved down to make shorter first
+#Note: PHINTHU deviates from ISO since underring causes canonical problems. So it uses spacing tick below.
+\u0E3A ↔ ˌ ; # THAI CHARACTER PHINTHU
+\u0E34 ↔ i ; # THAI CHARACTER SARA I
+# fallbacks
+| k ← g ;
+| k ← h ;
+| c ← j ;
+| k ← q ;
+| s ← z ;
+:: (lower);
+

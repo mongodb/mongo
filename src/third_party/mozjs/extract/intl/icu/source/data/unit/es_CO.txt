@@ -1,0 +1,76 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_CO{
+    %%Parent{"es_419"}
+    units{
+        duration{
+            month{
+                per{"{0}/mes"}
+            }
+            week{
+                per{"{0}/sem."}
+            }
+        }
+    }
+    unitsNarrow{
+        duration{
+            day{
+                dnam{"día"}
+                one{"{0} día"}
+                other{"{0} días"}
+            }
+            hour{
+                one{"{0} h"}
+                other{"{0} h"}
+            }
+            millisecond{
+                one{"{0} ms"}
+                other{"{0} ms"}
+            }
+            minute{
+                one{"{0} min"}
+                other{"{0} min"}
+            }
+            month{
+                dnam{"mes"}
+                one{"{0} mes"}
+                other{"{0} meses"}
+            }
+            second{
+                one{"{0} s"}
+                other{"{0} s"}
+            }
+            week{
+                one{"{0} sem."}
+                other{"{0} sems."}
+            }
+            year{
+                one{"{0} a."}
+                other{"{0} a."}
+            }
+        }
+    }
+    unitsShort{
+        duration{
+            day{
+                dnam{"días"}
+                one{"{0} día"}
+                other{"{0} días"}
+                per{"{0}/día"}
+            }
+            month{
+                dnam{"mes"}
+                one{"{0} mes"}
+                other{"{0} meses"}
+                per{"{0}/mes"}
+            }
+            year{
+                dnam{"a."}
+                one{"{0} a."}
+                other{"{0} a."}
+                per{"{0}/año"}
+            }
+        }
+    }
+}

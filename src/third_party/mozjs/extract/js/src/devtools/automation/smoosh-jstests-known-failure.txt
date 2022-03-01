@@ -1,0 +1,2 @@
+# https://github.com/mozilla-spidermonkey/jsparagus/issues/635
+test262/language/expressions/assignmenttargettype/parenthesized-primaryexpression-objectliteral.js

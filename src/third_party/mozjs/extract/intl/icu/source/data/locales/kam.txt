@@ -1,0 +1,258 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+kam{
+    ExemplarCharacters{"[a b c d e f g h i ĩ j k l m n o p q r s t u ũ v w y z]"}
+    ExemplarCharactersIndex{"[A B C D E F G H I J K L M N O P Q R S T U V W X Y Z]"}
+    NumberElements{
+        latn{
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d MMMM y G",
+                "d MMMM y G",
+                "d MMM y G",
+                "dd/MM/y GGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, M/d"}
+                MMM{"LLL"}
+                MMMEd{"E, MMM d"}
+                MMMMEd{"E, MMMM d"}
+                MMMMd{"MMMM d"}
+                MMMd{"MMM d"}
+                Md{"M/d"}
+                d{"d"}
+                hm{"h:mm a"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E, M/d/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, MMM d, y"}
+                yMMMM{"MMMM y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "Ĩyakwakya",
+                "Ĩyawĩoo",
+            }
+            AmPmMarkersAbbr{
+                "Ĩyakwakya",
+                "Ĩyawĩoo",
+            }
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d MMMM y",
+                "d MMMM y",
+                "d MMM y",
+                "dd/MM/y",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, M/d"}
+                MMM{"LLL"}
+                MMMEd{"E, MMM d"}
+                MMMMEd{"E, MMMM d"}
+                MMMMd{"MMMM d"}
+                MMMd{"MMM d"}
+                Md{"M/d"}
+                d{"d"}
+                hm{"h:mm a"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E, M/d/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, MMM d, y"}
+                yMMMM{"MMMM y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Wky",
+                        "Wkw",
+                        "Wkl",
+                        "Wtũ",
+                        "Wkn",
+                        "Wtn",
+                        "Wth",
+                    }
+                    wide{
+                        "Wa kyumwa",
+                        "Wa kwambĩlĩlya",
+                        "Wa kelĩ",
+                        "Wa katatũ",
+                        "Wa kana",
+                        "Wa katano",
+                        "Wa thanthatũ",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "Y",
+                        "W",
+                        "E",
+                        "A",
+                        "A",
+                        "A",
+                        "A",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "MY",
+                    "IY",
+                }
+                wide{
+                    "Mbee wa Yesũ",
+                    "Ĩtina wa Yesũ",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Mbe",
+                        "Kel",
+                        "Ktũ",
+                        "Kan",
+                        "Ktn",
+                        "Tha",
+                        "Moo",
+                        "Nya",
+                        "Knd",
+                        "Ĩku",
+                        "Ĩkm",
+                        "Ĩkl",
+                    }
+                    wide{
+                        "Mwai wa mbee",
+                        "Mwai wa kelĩ",
+                        "Mwai wa katatũ",
+                        "Mwai wa kana",
+                        "Mwai wa katano",
+                        "Mwai wa thanthatũ",
+                        "Mwai wa muonza",
+                        "Mwai wa nyaanya",
+                        "Mwai wa kenda",
+                        "Mwai wa ĩkumi",
+                        "Mwai wa ĩkumi na ĩmwe",
+                        "Mwai wa ĩkumi na ilĩ",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "M",
+                        "K",
+                        "K",
+                        "K",
+                        "K",
+                        "T",
+                        "M",
+                        "N",
+                        "K",
+                        "Ĩ",
+                        "Ĩ",
+                        "Ĩ",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "L1",
+                        "L2",
+                        "L3",
+                        "L4",
+                    }
+                    wide{
+                        "Lovo ya mbee",
+                        "Lovo ya kelĩ",
+                        "Lovo ya katatũ",
+                        "Lovo ya kana",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"Mũthenya"}
+            relative{
+                "-1"{"Ĩyoo"}
+                "0"{"Ũmũnthĩ"}
+                "1"{"Ũnĩ"}
+            }
+        }
+        dayperiod{
+            dn{"Ĩyakwakya/Ĩyawĩoo"}
+        }
+        era{
+            dn{"Ĩvinda"}
+        }
+        hour{
+            dn{"Saa"}
+        }
+        minute{
+            dn{"Ndatĩka"}
+        }
+        month{
+            dn{"Mwai"}
+        }
+        second{
+            dn{"sekondi"}
+        }
+        week{
+            dn{"Kyumwa"}
+        }
+        weekday{
+            dn{"Kyumwanĩ"}
+        }
+        year{
+            dn{"Mwaka"}
+        }
+        zone{
+            dn{"Kĩsio kya ĩsaa"}
+        }
+    }
+}

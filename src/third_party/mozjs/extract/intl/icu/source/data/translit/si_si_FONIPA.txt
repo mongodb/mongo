@@ -1,0 +1,164 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: si_si_FONIPA.txt
+# Generated from CLDR
+#
+
+# Sinhala pronunciation rules
+#
+# Output
+#     k ɡ ŋ ᵑɡ c ɟ ɲ ʈ ɖ ⁿɖ t d n ⁿd p b m ᵐb j r l w ʃ s h f
+#     ə əː a aː æ æː i iː u uː e eː o oː
+#
+# References
+# [1] Asanka Wasala, Ruvan Weerasinghe, and Kumudu Gamage:
+#     Sinhala Grapheme-to-Phoneme Conversion and Rules for Schwa Epenthesis.
+#     Proceedings of the COLING/ACL 2006 Main Conference Poster Sessions,
+#     pages 890–897. http://www.aclweb.org/anthology/P06-2114
+# Simplify ya + yansaya to plain ya after a consonant.
+[\u0D9A-\u0DC6] \u0DCA (\u200D)? { ය\u0DCA‍ය → ය;
+# Delete ZWNJ and ZWJ to simplify further processing.
+\u200C → ;
+\u200D → ;
+# Insert a schwa after every consonant that is not followed by a dependent vowel
+# or virama.
+::Null;
+([\u0D9A-\u0DC6]) } [^\u0DCA-\u0DDF \u0DF2\u0DF3] → $1 ə;
+# Pronunciation rules proper.
+::Null;
+# fප is an alternative spelling of ෆ.
+# This occurs e.g. in ඩේව\u0DD2ඩ\u0DCA කොපර\u0DCAfප\u0DD3ල\u0DCAඩ\u0DCA (David Copperfield)
+# [see http://bradshawofthefuture.blogspot.com/2013/02/f.html].
+[Ff]ප → f;
+# zස is seemingly the only way to unambiguously indicate a voiced /z/ sound.
+# This occurs in e.g. ඇල\u0DCAzසය\u0DD2ම' රෝගය (Alzheimer's disease)
+# [see https://si.wikipedia.org/wiki/ඇල\u0DCAzසය\u0DD2ම%27_රෝගය]
+# or in zස\u0DD3බ\u0DCA‍රා (zebra) [see https://si.wikipedia.org/wiki/‍zස\u0DD3බ\u0DCA‍රා].
+[Zz]ස → z;
+ං → ŋ;
+o → ŋ;  # common substitution for anusvaraya
+ඃ ([\u0D9A-\u0DC6]) → | $1 \u0DCA $1;  # TODO: check which consonants geminate
+ඃ → h;
+අ → a;
+ආ → aː;
+ඇ → æ;
+ඈ → æː;
+ඉ → i;
+ඊ → iː;
+උ → u;
+ඌ → uː;
+ඍ → ri;
+ඎ → ruː;
+ඏ → ilu;
+ඐ → iluː;
+එ → e;
+ඒ → eː;
+ඓ → aj;
+ඔ → o;
+ඕ → oː;
+ඖ → aw;  # TODO: check if this is correct
+ක → k;
+ඛ → k;
+ග → ɡ;
+ඝ → ɡ;
+ඞ → ŋ;
+ඟ → ᵑɡ;
+ච → c;
+ඡ → c;
+ජ → ɟ;
+ඣ → ɟ;
+ඤ → ɲ;
+ඥ → kɲ;  # TODO: double-check
+ඦ → ɟ;
+ට → ʈ;
+ඨ → ʈ;
+ඩ → ɖ;
+ඪ → ɖ;
+ණ → n;
+ඬ → ⁿɖ;
+ත → t;
+ථ → t;
+ද → d;
+ධ → d;
+න → n;
+ඳ → ⁿd;
+ප → p;
+ඵ → p;
+බ → b;
+භ → b;
+ම → m;
+ඹ → ᵐb;
+ය → j;
+ර → r;
+ල → l;
+ව → w;
+ශ → ʃ;
+ෂ → ʃ;
+ස → s;
+හ → h;
+ළ → l;
+ෆ → f;
+\u0DCA → ;  # delete virama
+ා → aː;
+ැ → æ;
+ෑ → æː;
+\u0DD2 → i;
+\u0DD3 → iː;
+\u0DD4 → u;
+\u0DD6 → uː;
+ෘ → ru;
+ෙ → e;
+ේ → eː;
+ෛ → aj;
+ො → o;
+ෝ → oː;
+ෞ → aw;  # TODO: check if this is correct
+ෟ → lu;
+ෲ → ruː;
+ෳ → luː;
+# Heuristics for turning /ə/ into /a/. Based on [1].
+$c=[k ɡ ŋ {ᵑɡ} c ɟ ɲ ʈ ɖ {ⁿɖ} t d n {ⁿd} p b m {ᵐb} j r l w ʃ s z h f];
+$s=[:^L:];
+# Rule #1
+::Null;
+$s sv    { ə      → ə;  # exception (a)
+$s k     { ə } r  → ə;  # exception (b)
+$s $c    { ə } $s → ə;  # exception (c)
+$s $c $c { ə      → a;
+$s $c    { ə      → a;
+# Rule #2
+::Null;
+$c r { ə } $c → a;  # clause (a) and (b)
+$c r { a } h  → a;  # clause (d), exception
+$c r { a } $c → ə;  # clause (c)
+# Rule #3
+# The paper is unclear about what this rule means. The interpretation here
+# assumes that "preceded" in the paper is a typo and should be read "followed".
+::Null;
+[a e æ o ə] h { ə → a;
+# Rules #4 through #7
+::Null;
+ə } $c $c     → a;  # Rule #4
+ə } [rbɖʈ] $s → ə;  # Rule #5 exception
+ə } $c     $s → a;  # Rule #5
+ə } ji     $s → a;  # Rule #6
+k { ə } [rl] u    → a;  # Rule #7
+# Rule #8
+# Note that the paper doesn't say explicitly that this rule should be
+# anchored at the beginning of a word, but the remarks before the rules
+# seem to imply this.
+::Null;
+$s k { a } l[aeo]ːj   → ə;  # Typo in paper: /j/ was /y/.
+$s k { a } le[mh][ui] → ə;
+$s k { alə } h[ui]    → əle;
+$s k { a } lə         → ə;
+# Diphthongs
+::Null;
+www+ → ww;  # යෞව\u0DCAවන
+[i {iː} e {eː} æ {æː} o {oː} a {aː}] { wu → w;
+əji → aj;
+iji → iː;  # perhaps: ij
+[u {uː} e {eː} æ {æː} o {oː} a {aː}] { ji → j;
+

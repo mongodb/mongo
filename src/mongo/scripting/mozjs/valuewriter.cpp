@@ -31,7 +31,11 @@
 
 #include "mongo/scripting/mozjs/valuewriter.h"
 
+#include <js/Array.h>
 #include <js/Conversions.h>
+#include <js/Date.h>
+#include <js/Object.h>
+#include <jsfriendapi.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/platform/decimal128.h"
@@ -63,7 +67,7 @@ int ValueWriter::type() {
 
     bool isArray;
 
-    if (!JS_IsArrayObject(_context, _value, &isArray)) {
+    if (!JS::IsArrayObject(_context, _value, &isArray)) {
         uasserted(ErrorCodes::BadValue, "unable to check if type is an array");
     }
     if (isArray)
@@ -83,13 +87,13 @@ int ValueWriter::type() {
         JS::RootedObject obj(_context, _value.toObjectOrNull());
         bool isDate;
 
-        if (!JS_ObjectIsDate(_context, obj, &isDate)) {
+        if (!JS::ObjectIsDate(_context, obj, &isDate)) {
             uasserted(ErrorCodes::BadValue, "unable to check if type is a date");
         }
         if (isDate)
             return Date;
 
-        if (JS_ObjectIsFunction(_context, obj))
+        if (js::IsFunctionObject(obj))
             return Code;
 
         return Object;
@@ -108,7 +112,7 @@ std::string ValueWriter::typeAsString() {
 
     bool isArray;
 
-    if (!JS_IsArrayObject(_context, _value, &isArray)) {
+    if (!JS::IsArrayObject(_context, _value, &isArray)) {
         uasserted(ErrorCodes::BadValue, "unable to check if type is an array");
     }
 
@@ -122,7 +126,7 @@ std::string ValueWriter::typeAsString() {
     if (_value.isObject()) {
         JS::RootedObject obj(_context, _value.toObjectOrNull());
 
-        if (!JS_IsArrayObject(_context, obj, &isArray)) {
+        if (!JS::IsArrayObject(_context, obj, &isArray)) {
             uasserted(ErrorCodes::BadValue, "unable to check if type is an array");
         }
         if (isArray)
@@ -130,13 +134,13 @@ std::string ValueWriter::typeAsString() {
 
         bool isDate;
 
-        if (!JS_ObjectIsDate(_context, obj, &isDate)) {
+        if (!JS::ObjectIsDate(_context, obj, &isDate)) {
             uasserted(ErrorCodes::BadValue, "unable to check if type is a date");
         }
         if (isDate)
             return "date";
 
-        if (JS_ObjectIsFunction(_context, obj))
+        if (js::IsFunctionObject(obj))
             return "function";
 
         return ObjectWrapper(_context, _value).getClassName();
@@ -292,7 +296,7 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
         JS::RootedObject obj(_context, _value.toObjectOrNull());
         ObjectWrapper o(_context, obj);
 
-        auto jsclass = JS_GetClass(obj);
+        auto jsclass = JS::GetClass(obj);
 
         if (jsclass) {
             if (scope->getProto<OIDInfo>().getJSClass() == jsclass) {
@@ -353,7 +357,7 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
             }
 
             if (scope->getProto<BinDataInfo>().getJSClass() == jsclass) {
-                auto str = static_cast<std::string*>(JS_GetPrivate(obj));
+                auto str = static_cast<std::string*>(JS::GetPrivate(obj));
 
                 uassert(ErrorCodes::BadValue, "Cannot call getter on BinData prototype", str);
 

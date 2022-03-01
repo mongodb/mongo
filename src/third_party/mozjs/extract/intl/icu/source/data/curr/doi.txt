@@ -1,0 +1,95 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+doi{
+    Currencies{
+        BRL{
+            "R$",
+            "ब्राजीली रियाल",
+        }
+        CNY{
+            "CN¥",
+            "चीनी युआन",
+        }
+        EUR{
+            "€",
+            "यूरो",
+        }
+        GBP{
+            "£",
+            "ब्रिटिश पाउंड",
+        }
+        INR{
+            "₹",
+            "भारती रपेऽ",
+        }
+        JPY{
+            "¥",
+            "जापानी येन",
+        }
+        RUB{
+            "RUB",
+            "रूसी रूबल",
+        }
+        USD{
+            "$",
+            "यूएस डालर",
+        }
+        XXX{
+            "¤",
+            "अनजांती करंसी",
+        }
+    }
+    Currencies%narrow{
+        BRL{"R$"}
+        CNY{"¥"}
+        EUR{"€"}
+        GBP{"£"}
+        INR{"₹"}
+        JPY{"¥"}
+        RUB{"₽"}
+        USD{"$"}
+    }
+    CurrencyPlurals{
+        BRL{
+            one{"ब्राजीली रियाल"}
+            other{"ब्राजीली रियाल"}
+        }
+        CNY{
+            one{"चीनी युआन"}
+            other{"चीनी युआन"}
+        }
+        EUR{
+            one{"यूरो"}
+            other{"यूरो"}
+        }
+        GBP{
+            one{"ब्रिटिश पाउंड"}
+            other{"ब्रिटिश पाउंड"}
+        }
+        INR{
+            one{"भारती रपेऽ"}
+            other{"भारती रपेऽ"}
+        }
+        JPY{
+            one{"जापानी येन"}
+            other{"जापानी येन"}
+        }
+        RUB{
+            one{"रूसी रूबल"}
+            other{"रूसी रूबल"}
+        }
+        USD{
+            one{"यूएस डालर"}
+            other{"यूएस डालर"}
+        }
+        XXX{
+            one{"(अनजांती करंसी)"}
+            other{"(अनजांती करंसी)"}
+        }
+    }
+    CurrencyUnitPatterns{
+        one{"{0} {1}"}
+        other{"{0} {1}"}
+    }
+}

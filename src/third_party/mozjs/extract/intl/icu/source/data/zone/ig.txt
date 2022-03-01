@@ -1,0 +1,620 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ig{
+    zoneStrings{
+        "America:Araguaina"{
+            ec{"Araguaina"}
+        }
+        "Etc:UTC"{
+            ls{"Nhazi Oge Ụwa Niile"}
+        }
+        "Etc:Unknown"{
+            ec{"Obodo Amaghị"}
+        }
+        "Europe:Dublin"{
+            ld{"Oge Okpomọkụ Ireland"}
+        }
+        "Europe:London"{
+            ld{"Oge Okpomọkụ Britain"}
+        }
+        "meta:Afghanistan"{
+            ls{"Oge Afghanistan"}
+        }
+        "meta:Africa_Central"{
+            ls{"Oge Etiti Afrịka"}
+        }
+        "meta:Africa_Eastern"{
+            ls{"Oge Mpaghara Ọwụwa Anyanwụ Afrịka"}
+        }
+        "meta:Africa_Southern"{
+            ls{"Oge Izugbe Mpaghara Mgbada Ugwu Afrịka"}
+        }
+        "meta:Africa_Western"{
+            ld{"Oge Okpomọkụ Mpaghara Ọdịda Anyanwụ Afrịka"}
+            lg{"Oge Mpaghara Ọdịda Anyanwụ Afrịka"}
+            ls{"Oge Izugbe Mpaghara Ọdịda Anyanwụ Afrịka"}
+        }
+        "meta:Alaska"{
+            ld{"Oge Ihe Alaska"}
+            lg{"Oge Alaska"}
+            ls{"Oge Izugbe Alaska"}
+        }
+        "meta:Amazon"{
+            ld{"Oge Okpomọkụ Amazon"}
+            lg{"Oge Amazon"}
+            ls{"Oge Izugbe Amazon"}
+        }
+        "meta:America_Central"{
+            ld{"Oge Ihe Mpaghara Etiti"}
+            lg{"Oge Mpaghara Etiti"}
+            ls{"Oge Izugbe Mpaghara Etiti"}
+        }
+        "meta:America_Eastern"{
+            ld{"Oge Ihe Mpaghara Ọwụwa Anyanwụ"}
+            lg{"Oge Mpaghara Ọwụwa Anyanwụ"}
+            ls{"Oge Izugbe Mpaghara Ọwụwa Anyanwụ"}
+        }
+        "meta:America_Mountain"{
+            ld{"Oge Ihe Mpaghara Ugwu"}
+            lg{"Oge Mpaghara Ugwu"}
+            ls{"Oge Izugbe Mpaghara Ugwu"}
+        }
+        "meta:America_Pacific"{
+            ld{"Oge Ihe Mpaghara Pacific"}
+            lg{"Oge Mpaghara Pacific"}
+            ls{"Oge Izugbe Mpaghara Pacific"}
+        }
+        "meta:Apia"{
+            ld{"Oge Ihe Apia"}
+            lg{"Oge Apia"}
+            ls{"Oge Izugbe Apia"}
+        }
+        "meta:Arabian"{
+            ld{"Oge Ihe Arab"}
+            lg{"Oge Arab"}
+            ls{"Oge Izugbe Arab"}
+        }
+        "meta:Argentina"{
+            ld{"Oge Okpomọkụ Argentina"}
+            lg{"Oge Argentina"}
+            ls{"Oge Izugbe Argentina"}
+        }
+        "meta:Argentina_Western"{
+            ld{"Oge Okpomọkụ Mpaghara Ọdịda Anyanwụ Argentina"}
+            lg{"Oge Mpaghara Ọdịda Anyanwụ Argentina"}
+            ls{"Oge Izugbe Mpaghara Ọdịda Anyanwụ Argentina"}
+        }
+        "meta:Armenia"{
+            ld{"Oge Okpomọkụ Armenia"}
+            lg{"Oge Armenia"}
+            ls{"Oge Izugbe Armenia"}
+        }
+        "meta:Atlantic"{
+            ld{"Oge Ihe Mpaghara Atlantic"}
+            lg{"Oge Mpaghara Atlantic"}
+            ls{"Oge Izugbe Mpaghara Atlantic"}
+        }
+        "meta:Australia_Central"{
+            ld{"Oge Ihe Etiti Australia"}
+            lg{"Oge Etiti Australia"}
+            ls{"Oge Izugbe Etiti Australia"}
+        }
+        "meta:Australia_CentralWestern"{
+            ld{"Oge Ihe Mpaghara Ọdịda Anyanwụ Etiti Australia"}
+            lg{"Oge Mpaghara Ọdịda Anyanwụ Etiti Australia"}
+            ls{"Oge Izugbe Mpaghara Ọdịda Anyanwụ Etiti Australia"}
+        }
+        "meta:Australia_Eastern"{
+            ld{"Oge Ihe Mpaghara Ọwụwa Anyanwụ Australia"}
+            lg{"Oge Mpaghara Ọwụwa Anyanwụ Australia"}
+            ls{"Oge Izugbe Mpaghara Ọwụwa Anyanwụ Australia"}
+        }
+        "meta:Australia_Western"{
+            ld{"Oge Ihe Mpaghara Ọdịda Anyanwụ Australia"}
+            lg{"Oge Mpaghara Ọdịda Anyanwụ Australia"}
+            ls{"Oge Izugbe Mpaghara Ọdịda Anyanwụ Australia"}
+        }
+        "meta:Azerbaijan"{
+            ld{"Oge Okpomọkụ Azerbaijan"}
+            lg{"Oge Azerbaijan"}
+            ls{"Oge Izugbe Azerbaijan"}
+        }
+        "meta:Azores"{
+            ld{"Oge Okpomọkụ Azores"}
+            lg{"Oge Azores"}
+            ls{"Oge Izugbe Azores"}
+        }
+        "meta:Bangladesh"{
+            ld{"Oge Okpomọkụ Bangladesh"}
+            lg{"Oge Bangladesh"}
+            ls{"Oge Izugbe Bangladesh"}
+        }
+        "meta:Bhutan"{
+            ls{"Oge Bhutan"}
+        }
+        "meta:Bolivia"{
+            ls{"Oge Bolivia"}
+        }
+        "meta:Brasilia"{
+            ld{"Oge Okpomọkụ Brasilia"}
+            lg{"Oge Brasilia"}
+            ls{"Oge Izugbe Brasilia"}
+        }
+        "meta:Brunei"{
+            ls{"Oge Brunei Darussalam"}
+        }
+        "meta:Cape_Verde"{
+            ld{"Oge Okpomọkụ Cape Verde"}
+            lg{"Oge Cape Verde"}
+            ls{"Oge Izugbe Cape Verde"}
+        }
+        "meta:Chamorro"{
+            ls{"Oge Izugbe Chamorro"}
+        }
+        "meta:Chatham"{
+            ld{"Oge Ihe Chatham"}
+            lg{"Oge Chatham"}
+            ls{"Oge Izugbe Chatham"}
+        }
+        "meta:Chile"{
+            ld{"Oge Okpomọkụ Chile"}
+            lg{"Oge Chile"}
+            ls{"Oge Izugbe Chile"}
+        }
+        "meta:China"{
+            ld{"Oge Ihe China"}
+            lg{"Oge China"}
+            ls{"Oge Izugbe China"}
+        }
+        "meta:Choibalsan"{
+            ld{"Oge Okpomọkụ Choibals"}
+            lg{"Oge Choibals"}
+            ls{"Oge Izugbe Choibals"}
+        }
+        "meta:Christmas"{
+            ls{"Oge Ekeresimesi Island"}
+        }
+        "meta:Cocos"{
+            ls{"Oge Cocos Islands"}
+        }
+        "meta:Colombia"{
+            ld{"Oge Okpomọkụ Columbia"}
+            lg{"Oge Columbia"}
+            ls{"Oge Izugbe Columbia"}
+        }
+        "meta:Cook"{
+            ld{"Oge Ọkara Okpomọkụ Cook Islands"}
+            lg{"Oge Cook Islands"}
+            ls{"Oge Izugbe Cook Islands"}
+        }
+        "meta:Cuba"{
+            ld{"Oge Ihe Mpaghara Cuba"}
+            lg{"Oge Cuba"}
+            ls{"Oge Izugbe Cuba"}
+        }
+        "meta:Davis"{
+            ls{"Oge Davis"}
+        }
+        "meta:DumontDUrville"{
+            ls{"Oge Dumont-d’Urville"}
+        }
+        "meta:East_Timor"{
+            ls{"Oge Mpaghara Ọwụwa Anyanwụ Timor"}
+        }
+        "meta:Easter"{
+            ld{"Oge Okpomọkụ Mpaghara Ọwụwa Anyanwụ Island"}
+            lg{"Oge Mpaghara Ọwụwa Anyanwụ Island"}
+            ls{"Oge Izugbe Mpaghara Ọwụwa Anyanwụ Island"}
+        }
+        "meta:Ecuador"{
+            ls{"Oge Ecuador"}
+        }
+        "meta:Europe_Central"{
+            ld{"Oge Okpomọkụ Mpaghara Etiti Europe"}
+            lg{"Oge Mpaghara Etiti Europe"}
+            ls{"Oge Izugbe Mpaghara Etiti Europe"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"Oge Okpomọkụ Mpaghara Ọwụwa Anyanwụ Europe"}
+            lg{"Oge Mpaghara Ọwụwa Anyanwụ Europe"}
+            ls{"Oge Izugbe Mpaghara Ọwụwa Anyanwụ Europe"}
+        }
+        "meta:Europe_Further_Eastern"{
+            ls{"Further-eastern European Time"}
+        }
+        "meta:Europe_Western"{
+            ld{"Oge Okpomọkụ Mpaghara Ọdịda Anyanwụ Europe"}
+            lg{"Oge Mpaghara Ọdịda Anyanwụ Europe"}
+            ls{"Oge Izugbe Mpaghara Ọdịda Anyanwụ Europe"}
+        }
+        "meta:Falkland"{
+            ld{"Oge Okpomọkụ Falkland Islands"}
+            lg{"Oge Falkland Islands"}
+            ls{"Oge Izugbe Falkland Islands"}
+        }
+        "meta:Fiji"{
+            ld{"Oge Okpomọkụ Fiji"}
+            lg{"Oge Fiji"}
+            ls{"Oge Izugbe Fiji"}
+        }
+        "meta:French_Guiana"{
+            ls{"Oge French Guiana"}
+        }
+        "meta:French_Southern"{
+            ls{"Oge French Southern & Antarctic"}
+        }
+        "meta:GMT"{
+            ls{"Oge Mpaghara Greemwich Mean"}
+        }
+        "meta:Galapagos"{
+            ls{"Oge Galapagos"}
+        }
+        "meta:Gambier"{
+            ls{"Oge Gambier"}
+        }
+        "meta:Georgia"{
+            ld{"Oge Okpomọkụ Georgia"}
+            lg{"Oge Georgia"}
+            ls{"Oge Izugbe Georgia"}
+        }
+        "meta:Gilbert_Islands"{
+            ls{"Oge Gilbert Islands"}
+        }
+        "meta:Greenland_Eastern"{
+            ld{"Oge Okpomọkụ Mpaghara Ọwụwa Anyanwụ Greenland"}
+            lg{"Oge Mpaghara Ọwụwa Anyanwụ Greenland"}
+            ls{"Oge Izugbe Mpaghara Ọwụwa Anyanwụ Greenland"}
+        }
+        "meta:Greenland_Western"{
+            ld{"Oge Okpomọkụ Mpaghara Ọdịda Anyanwụ Greenland"}
+            lg{"Oge Mpaghara Ọdịda Anyanwụ Greenland"}
+            ls{"Oge Izugbe Mpaghara Ọdịda Anyanwụ Greenland"}
+        }
+        "meta:Gulf"{
+            ls{"Oge Izugbe Gulf"}
+        }
+        "meta:Guyana"{
+            ls{"Oge Guyana"}
+        }
+        "meta:Hawaii_Aleutian"{
+            ld{"Oge Ihe Hawaii-Aleutian"}
+            lg{"Oge Hawaii-Aleutian"}
+            ls{"Oge Izugbe Hawaii-Aleutian"}
+        }
+        "meta:Hong_Kong"{
+            ld{"Oge Okpomọkụ Hong Kong"}
+            lg{"Oge Hong Kong"}
+            ls{"Oge Izugbe Hong Kong"}
+        }
+        "meta:Hovd"{
+            ld{"Oge Okpomọkụ Hovd"}
+            lg{"Oge Hovd"}
+            ls{"Oge Izugbe Hovd"}
+        }
+        "meta:India"{
+            ls{"Oge Izugbe India"}
+        }
+        "meta:Indian_Ocean"{
+            ls{"Oge Osimiri India"}
+        }
+        "meta:Indochina"{
+            ls{"Oge Indochina"}
+        }
+        "meta:Indonesia_Central"{
+            ls{"Oge Etiti Indonesia"}
+        }
+        "meta:Indonesia_Eastern"{
+            ls{"Oge Mpaghara Ọwụwa Anyanwụ Indonesia"}
+        }
+        "meta:Indonesia_Western"{
+            ls{"Oge Mpaghara Ọdịda Anyanwụ Indonesia"}
+        }
+        "meta:Iran"{
+            ld{"Oge Ihe Iran"}
+            lg{"Oge Iran"}
+            ls{"Oge Izugbe Iran"}
+        }
+        "meta:Irkutsk"{
+            ld{"Oge Okpomọkụ Irkutsk"}
+            lg{"Oge Irkutsk"}
+            ls{"Oge Izugbe Irkutsk"}
+        }
+        "meta:Israel"{
+            ld{"Oge Ihe Israel"}
+            lg{"Oge Israel"}
+            ls{"Oge Izugbe Israel"}
+        }
+        "meta:Japan"{
+            ld{"Oge Ihe Japan"}
+            lg{"Oge Japan"}
+            ls{"Oge Izugbe Japan"}
+        }
+        "meta:Kazakhstan_Eastern"{
+            ls{"Oge Mpaghara Ọwụwa Anyanwụ Kazakhstan"}
+        }
+        "meta:Kazakhstan_Western"{
+            ls{"Oge Mpaghara Ọdịda Anyanwụ Kazakhstan"}
+        }
+        "meta:Korea"{
+            ld{"Oge Ihe Korea"}
+            lg{"Oge Korea"}
+            ls{"Oge Izugbe Korea"}
+        }
+        "meta:Kosrae"{
+            ls{"Oge Kosrae"}
+        }
+        "meta:Krasnoyarsk"{
+            ld{"Oge Okpomọkụ Krasnoyarsk"}
+            lg{"Oge Krasnoyarsk"}
+            ls{"Oge Izugbe Krasnoyarsk"}
+        }
+        "meta:Kyrgystan"{
+            ls{"Oge Kyrgyzstan"}
+        }
+        "meta:Line_Islands"{
+            ls{"Oge Line Islands"}
+        }
+        "meta:Lord_Howe"{
+            ld{"Oge Ihe Lord Howe"}
+            lg{"Oge Lord Howe"}
+            ls{"Oge Izugbe Lord Howe"}
+        }
+        "meta:Macquarie"{
+            ls{"Oge Macquarie Island"}
+        }
+        "meta:Magadan"{
+            ld{"Oge Okpomọkụ Magadan"}
+            lg{"Oge Magadan"}
+            ls{"Oge Izugbe Magadan"}
+        }
+        "meta:Malaysia"{
+            ls{"Oge Malaysia"}
+        }
+        "meta:Maldives"{
+            ls{"Oge Maldives"}
+        }
+        "meta:Marquesas"{
+            ls{"Oge Marquesas"}
+        }
+        "meta:Marshall_Islands"{
+            ls{"Oge Marshall Islands"}
+        }
+        "meta:Mauritius"{
+            ld{"Oge Okpomọkụ Mauritius"}
+            lg{"Oge Mauritius"}
+            ls{"Oge Izugbe Mauritius"}
+        }
+        "meta:Mawson"{
+            ls{"Oge Mawson"}
+        }
+        "meta:Mexico_Northwest"{
+            ld{"Oge Ihe Northwest Mexico"}
+            lg{"Oge Northwest Mexico"}
+            ls{"Oge Izugbe Northwest Mexico"}
+        }
+        "meta:Mexico_Pacific"{
+            ld{"Oge Ihe Mexican Pacific"}
+            lg{"Oge Mexican Pacific"}
+            ls{"Oge Izugbe Mexican Pacific"}
+        }
+        "meta:Mongolia"{
+            ld{"Oge Okpomọkụ Ulaanbaatar"}
+            lg{"Oge Ulaanbaatar"}
+            ls{"Oge Izugbe Ulaanbaatar"}
+        }
+        "meta:Moscow"{
+            ld{"Oge Okpomọkụ Moscow"}
+            lg{"Oge Moscow"}
+            ls{"Oge Izugbe Moscow"}
+        }
+        "meta:Myanmar"{
+            ls{"Oge Myanmar"}
+        }
+        "meta:Nauru"{
+            ls{"Oge Nauru"}
+        }
+        "meta:Nepal"{
+            ls{"Oge Nepal"}
+        }
+        "meta:New_Caledonia"{
+            ld{"Oge Okpomọkụ New Caledonia"}
+            lg{"Oge New Caledonia"}
+            ls{"Oge Izugbe New Caledonia"}
+        }
+        "meta:New_Zealand"{
+            ld{"Oge Ihe New Zealand"}
+            lg{"Oge New Zealand"}
+            ls{"Oge Izugbe New Zealand"}
+        }
+        "meta:Newfoundland"{
+            ld{"Oge Ihe Newfoundland"}
+            lg{"Oge Newfoundland"}
+            ls{"Oge Izugbe Newfoundland"}
+        }
+        "meta:Niue"{
+            ls{"Oge Niue"}
+        }
+        "meta:Norfolk"{
+            ld{"Oge Okpomọkụ Norfolk Island"}
+            lg{"Oge Norfolk Island"}
+            ls{"Oge Izugbe Norfolk Island"}
+        }
+        "meta:Noronha"{
+            ld{"Oge Okpomọkụ Fernando de Noronha"}
+            lg{"Oge Fernando de Noronha"}
+            ls{"Oge Izugbe Fernando de Noronha"}
+        }
+        "meta:Novosibirsk"{
+            ld{"Oge Okpomọkụ Novosibirsk"}
+            lg{"Oge Novosibirsk"}
+            ls{"Oge Izugbe Novosibirsk"}
+        }
+        "meta:Omsk"{
+            ld{"Oge Okpomọkụ Omsk"}
+            lg{"Oge Omsk"}
+            ls{"Oge Izugbe Omsk"}
+        }
+        "meta:Pakistan"{
+            ld{"Oge Okpomọkụ Pakistan"}
+            lg{"Oge Pakistan"}
+            ls{"Oge Izugbe Pakistan"}
+        }
+        "meta:Palau"{
+            ls{"Oge Palau"}
+        }
+        "meta:Papua_New_Guinea"{
+            ls{"Oge Papua New Guinea"}
+        }
+        "meta:Paraguay"{
+            ld{"Oge Okpomọkụ Paraguay"}
+            lg{"Oge Paraguay"}
+            ls{"Oge Izugbe Paraguay"}
+        }
+        "meta:Peru"{
+            ld{"Oge Okpomọkụ Peru"}
+            lg{"Oge Peru"}
+            ls{"Oge Izugbe Peru"}
+        }
+        "meta:Philippines"{
+            ld{"Oge Okpomọkụ Philippine"}
+            lg{"Oge Philippine"}
+            ls{"Oge Izugbe Philippine"}
+        }
+        "meta:Phoenix_Islands"{
+            ls{"Oge Phoenix Islands"}
+        }
+        "meta:Pierre_Miquelon"{
+            ld{"Oge Ihe St. Pierre & Miquelon"}
+            lg{"Oge St. Pierre & Miquelon"}
+            ls{"Oge Izugbe St. Pierre & Miquelon"}
+        }
+        "meta:Pitcairn"{
+            ls{"Oge Pitcairn"}
+        }
+        "meta:Ponape"{
+            ls{"Oge Ponape"}
+        }
+        "meta:Pyongyang"{
+            ls{"Oge Pyongyang"}
+        }
+        "meta:Reunion"{
+            ls{"Oge Réunion"}
+        }
+        "meta:Rothera"{
+            ls{"Oge Rothera"}
+        }
+        "meta:Sakhalin"{
+            ld{"Oge Okpomọkụ Sakhalin"}
+            lg{"Oge Sakhalin"}
+            ls{"Oge Izugbe Sakhalin"}
+        }
+        "meta:Samoa"{
+            ld{"Oge Ihe Samoa"}
+            lg{"Oge Samoa"}
+            ls{"Oge Izugbe Samoa"}
+        }
+        "meta:Seychelles"{
+            ls{"Oge Seychelles"}
+        }
+        "meta:Singapore"{
+            ls{"Oge Izugbe Singapore"}
+        }
+        "meta:Solomon"{
+            ls{"Oge Solomon Islands"}
+        }
+        "meta:South_Georgia"{
+            ls{"Oge South Georgia"}
+        }
+        "meta:Suriname"{
+            ls{"Oge Suriname"}
+        }
+        "meta:Syowa"{
+            ls{"Oge Syowa"}
+        }
+        "meta:Tahiti"{
+            ls{"Oge Tahiti"}
+        }
+        "meta:Taipei"{
+            ld{"Oge Ihe Taipei"}
+            lg{"Oge Taipei"}
+            ls{"Oge Izugbe Taipei"}
+        }
+        "meta:Tajikistan"{
+            ls{"Oge Tajikistan"}
+        }
+        "meta:Tokelau"{
+            ls{"Oge Tokelau"}
+        }
+        "meta:Tonga"{
+            ld{"Oge Okpomọkụ Tonga"}
+            lg{"Oge Tonga"}
+            ls{"Oge Izugbe Tonga"}
+        }
+        "meta:Truk"{
+            ls{"Oge Chuuk"}
+        }
+        "meta:Turkmenistan"{
+            ld{"Oge Okpomọkụ Turkmenist"}
+            lg{"Oge Turkmenist"}
+            ls{"Oge Izugbe Turkmenist"}
+        }
+        "meta:Tuvalu"{
+            ls{"Oge Tuvalu"}
+        }
+        "meta:Uruguay"{
+            ld{"Oge Okpomọkụ Uruguay"}
+            lg{"Oge Uruguay"}
+            ls{"Oge Izugbe Uruguay"}
+        }
+        "meta:Uzbekistan"{
+            ld{"Oge Okpomọkụ Uzbekist"}
+            lg{"Oge Uzbekist"}
+            ls{"Oge Izugbe Uzbekist"}
+        }
+        "meta:Vanuatu"{
+            ld{"Oge Okpomọkụ Vanuatu"}
+            lg{"Oge Vanuatu"}
+            ls{"Oge Izugbe Vanuatu"}
+        }
+        "meta:Venezuela"{
+            ls{"Oge Venezuela"}
+        }
+        "meta:Vladivostok"{
+            ld{"Oge Okpomọkụ Vladivostok"}
+            lg{"Oge Vladivostok"}
+            ls{"Oge Izugbe Vladivostok"}
+        }
+        "meta:Volgograd"{
+            ld{"Oge Okpomọkụ Volgograd"}
+            lg{"Oge Volgograd"}
+            ls{"Oge Izugbe Volgograd"}
+        }
+        "meta:Vostok"{
+            ls{"Oge Vostok"}
+        }
+        "meta:Wake"{
+            ls{"Oge Wake Island"}
+        }
+        "meta:Wallis"{
+            ls{"Oge Wallis & Futuna"}
+        }
+        "meta:Yakutsk"{
+            ld{"Oge Okpomọkụ Yakutsk"}
+            lg{"Oge Yakutsk"}
+            ls{"Oge Izugbe Yakutsk"}
+        }
+        "meta:Yekaterinburg"{
+            ld{"Oge Okpomọkụ Yekaterinburg"}
+            lg{"Oge Yekaterinburg"}
+            ls{"Oge Izugbe Yekaterinburg"}
+        }
+        fallbackFormat{"{1} ({0})"}
+        gmtFormat{"GMT{0}"}
+        gmtZeroFormat{"GMT"}
+        hourFormat{"+HH:mm;-HH:mm"}
+        regionFormat{"Oge {0}"}
+        regionFormatDaylight{"Oge Ihe {0}"}
+        regionFormatStandard{"Oge Izugbe {0}"}
+    }
+}

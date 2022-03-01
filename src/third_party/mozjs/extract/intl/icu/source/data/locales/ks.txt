@@ -1,0 +1,292 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ks{
+    AuxExemplarCharacters{"[\u200E\u200F \u064E \u064F \u0650 \u0654 \u0655 \u065F \u0656 \u0657]"}
+    ExemplarCharacters{
+        "[ء آ أ ٲ ؤ ا ب پ ت ث ٹ ج چ ح خ د ذ ڈ ر ز ڑ ژ س ش ص ض ط ظ ع غ ف ق ک گ ل م ن ں"
+        " ھ ہ و ۄ ۆ ی ۍ ؠ ے]"
+    }
+    ExemplarCharactersNumbers{"[\u200E \\- ‑ , . % ‰ + 0۰ 1۱ 2۲ 3۳ 4۴ 5۵ 6۶ 7۷ 8۸ 9۹]"}
+    NumberElements{
+        arabext{
+            symbols{
+                timeSeparator{":"}
+            }
+        }
+        default{"arabext"}
+        latn{
+            patterns{
+                currencyFormat{"¤ #,##,##0.00"}
+                decimalFormat{"#,##,##0.###"}
+                percentFormat{"#,##,##0%"}
+                scientificFormat{"#E0"}
+            }
+            symbols{
+                decimal{"."}
+                exponential{"E"}
+                group{","}
+                infinity{"∞"}
+                list{";"}
+                minusSign{"‎-"}
+                nan{"NaN"}
+                perMille{"‰"}
+                percentSign{"%"}
+                plusSign{"‎+"}
+            }
+        }
+        native{"arabext"}
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, MMMM d, Gy",
+                "MMMM d, Gy",
+                "MMM d, Gy",
+                "M/d/Gy",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Gy{"Gy"}
+                GyMMM{"MMM Gy"}
+                GyMMMEd{"EEE, MMM d, Gy"}
+                GyMMMd{"MMM d, Gy"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, M/d"}
+                MMM{"LLL"}
+                MMMEd{"E, MMM d"}
+                MMMMEd{"E, MMMM d"}
+                MMMMd{"MMMM d"}
+                MMMd{"d-MMM"}
+                Md{"M/d"}
+                d{"d"}
+                hm{"h:mm a"}
+                ms{"mm:ss"}
+                y{"Gy"}
+                yyyy{"Gy"}
+                yyyyM{"M/Gy"}
+                yyyyMEd{"EEE, M/d/Gy"}
+                yyyyMMM{"MMM Gy"}
+                yyyyMMMEd{"EEE, MMM d, Gy"}
+                yyyyMMMM{"MMMM Gy"}
+                yyyyMMMd{"MMM d, Gy"}
+                yyyyQQQ{"QQQ Gy"}
+                yyyyQQQQ{"QQQQ Gy"}
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, MMMM d, y",
+                "MMMM d, y",
+                "MMM d, y",
+                "M/d/yy",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Gy{"Gy"}
+                GyMMM{"MMM Gy"}
+                GyMMMEd{"EEE, MMM d, Gy"}
+                GyMMMd{"MMM d, Gy"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, M/d"}
+                MMM{"LLL"}
+                MMMEd{"E, MMM d"}
+                MMMMEd{"E, MMMM d"}
+                MMMMd{"MMMM d"}
+                MMMd{"d-MMM"}
+                Md{"M/d"}
+                d{"d"}
+                hm{"h:mm a"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"EEE, M/d/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"EEE, MMM d, y"}
+                yMMMM{"MMMM y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "آتھوار",
+                        "ژٔندٕروار",
+                        "بۆموار",
+                        "بودوار",
+                        "برؠسوار",
+                        "جُمہ",
+                        "بٹوار",
+                    }
+                    wide{
+                        "اَتھوار",
+                        "ژٔندرٕروار",
+                        "بۆموار",
+                        "بودوار",
+                        "برؠسوار",
+                        "جُمہ",
+                        "بٹوار",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "ا",
+                        "ژ",
+                        "ب",
+                        "ب",
+                        "ب",
+                        "ج",
+                        "ب",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "بی سی",
+                    "اے ڈی",
+                }
+                wide{
+                    "قبٕل مسیٖح",
+                    "عیٖسوی سنہٕ",
+                }
+            }
+            monthNames{
+                format{
+                    wide{
+                        "جنؤری",
+                        "فرؤری",
+                        "مارٕچ",
+                        "اپریل",
+                        "میٔ",
+                        "جوٗن",
+                        "جوٗلایی",
+                        "اگست",
+                        "ستمبر",
+                        "اکتوٗبر",
+                        "نومبر",
+                        "دسمبر",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "ج",
+                        "ف",
+                        "م",
+                        "ا",
+                        "م",
+                        "ج",
+                        "ج",
+                        "ا",
+                        "س",
+                        "س",
+                        "ا",
+                        "ن",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "ژۄباگ",
+                        "دۆیِم ژۄباگ",
+                        "تریِم ژۄباگ",
+                        "ژوٗرِم ژۄباگ",
+                    }
+                    wide{
+                        "گۄڑنیُک ژۄباگ",
+                        "دۆیِم ژۄباگ",
+                        "تریِم ژۄباگ",
+                        "ژوٗرِم ژۄباگ",
+                    }
+                }
+            }
+        }
+        indian{
+            monthNames{
+                format{
+                    wide{
+                        "محرم",
+                        "صفر",
+                        "ربیٖع الاول",
+                        "ربیٖع الثانی",
+                        "جمادی الاول",
+                        "جمادی الثانی",
+                        "رجب",
+                        "شعبان",
+                        "رمضان",
+                        "شوال",
+                        "ذِی القد",
+                        "ذِی الحج",
+                    }
+                }
+            }
+        }
+    }
+    fields{
+        day{
+            dn{"دۄہ"}
+            relative{
+                "-1"{"راتھ"}
+                "0"{"اَز"}
+                "1"{"پگاہ"}
+            }
+        }
+        dayperiod{
+            dn{"صبح/رات"}
+        }
+        era{
+            dn{"دور"}
+        }
+        hour{
+            dn{"گٲنٹہٕ"}
+        }
+        minute{
+            dn{"مِنَٹ"}
+        }
+        month{
+            dn{"رؠتھ"}
+        }
+        second{
+            dn{"سؠکَنڑ"}
+        }
+        week{
+            dn{"ہفتہٕ"}
+        }
+        weekday{
+            dn{"ہفتُک دۄہ"}
+        }
+        year{
+            dn{"ؤری"}
+        }
+        zone{
+            dn{"زون"}
+        }
+    }
+    layout{
+        characters{"right-to-left"}
+    }
+    measurementSystemNames{
+        US{"یوٗ ایس"}
+        metric{"میٖٹرِک"}
+    }
+}

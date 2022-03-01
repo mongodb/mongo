@@ -18,59 +18,62 @@
 #include <unistd.h>
 #include <string.h>
 
-#if defined(__DragonFly__) || defined(__FreeBSD__) \
-    || defined(__NetBSD__) || defined(__OpenBSD__)
-#include <sys/param.h>
-#include <sys/sysctl.h>
+#if defined(__DragonFly__) || defined(__FreeBSD__) || defined(__NetBSD__) || \
+    defined(__OpenBSD__)
+#  include <sys/param.h>
+#  include <sys/sysctl.h>
 #endif
 
 #if defined(__DragonFly__) || defined(__FreeBSD__)
-#include <sys/user.h>
+#  include <sys/user.h>
 #endif
 
 #if defined(__NetBSD__)
-#undef KERN_PROC
-#define KERN_PROC KERN_PROC2
-#define KINFO_PROC struct kinfo_proc2
+#  undef KERN_PROC
+#  define KERN_PROC KERN_PROC2
+#  define KINFO_PROC struct kinfo_proc2
 #else
-#define KINFO_PROC struct kinfo_proc
+#  define KINFO_PROC struct kinfo_proc
 #endif
 
 #if defined(__DragonFly__)
-#define KP_START_SEC kp_start.tv_sec
-#define KP_START_USEC kp_start.tv_usec
+#  define KP_START_SEC kp_start.tv_sec
+#  define KP_START_USEC kp_start.tv_usec
 #elif defined(__FreeBSD__)
-#define KP_START_SEC ki_start.tv_sec
-#define KP_START_USEC ki_start.tv_usec
+#  define KP_START_SEC ki_start.tv_sec
+#  define KP_START_USEC ki_start.tv_usec
 #else
-#define KP_START_SEC p_ustart_sec
-#define KP_START_USEC p_ustart_usec
+#  define KP_START_SEC p_ustart_sec
+#  define KP_START_USEC p_ustart_usec
 #endif
 
 #include "mozilla/Sprintf.h"
 #include "mozilla/TimeStamp.h"
-#include <pthread.h>
+#include "mozilla/Uptime.h"
+
+#if !defined(__wasi__)
+#  include <pthread.h>
+#endif
 
 // Estimate of the smallest duration of time we can measure.
 static uint64_t sResolution;
 static uint64_t sResolutionSigDigs;
 
-static const uint16_t kNsPerUs   =       1000;
-static const uint64_t kNsPerMs   =    1000000;
-static const uint64_t kNsPerSec  = 1000000000;
-static const double kNsPerMsd    =    1000000.0;
-static const double kNsPerSecd   = 1000000000.0;
+#if !defined(__wasi__)
+static const uint16_t kNsPerUs = 1000;
+#endif
 
-static uint64_t
-TimespecToNs(const struct timespec& aTs)
-{
+static const uint64_t kNsPerMs = 1000000;
+static const uint64_t kNsPerSec = 1000000000;
+static const double kNsPerMsd = 1000000.0;
+static const double kNsPerSecd = 1000000000.0;
+
+static uint64_t TimespecToNs(const struct timespec& aTs) {
   uint64_t baseNs = uint64_t(aTs.tv_sec) * kNsPerSec;
   return baseNs + uint64_t(aTs.tv_nsec);
 }
 
-static uint64_t
-ClockTimeNs()
-{
+static uint64_t ClockTimeNs() {
   struct timespec ts;
   // this can't fail: we know &ts is valid, and TimeStamp::Startup()
   // checks that CLOCK_MONOTONIC is supported (and aborts if not)
@@ -85,9 +88,7 @@ ClockTimeNs()
   return TimespecToNs(ts);
 }
 
-static uint64_t
-ClockResolutionNs()
-{
+static uint64_t ClockResolutionNs() {
   // NB: why not rely on clock_getres()?  Two reasons: (i) it might
   // lie, and (ii) it might return an "ideal" resolution that while
   // theoretically true, could never be measured in practice.  Since
@@ -132,15 +133,11 @@ ClockResolutionNs()
 
 namespace mozilla {
 
-double
-BaseTimeDurationPlatformUtils::ToSeconds(int64_t aTicks)
-{
+double BaseTimeDurationPlatformUtils::ToSeconds(int64_t aTicks) {
   return double(aTicks) / kNsPerSecd;
 }
 
-double
-BaseTimeDurationPlatformUtils::ToSecondsSigDigits(int64_t aTicks)
-{
+double BaseTimeDurationPlatformUtils::ToSecondsSigDigits(int64_t aTicks) {
   // don't report a value < mResolution ...
   int64_t valueSigDigs = sResolution * (aTicks / sResolution);
   // and chop off insignificant digits
@@ -148,11 +145,10 @@ BaseTimeDurationPlatformUtils::ToSecondsSigDigits(int64_t aTicks)
   return double(valueSigDigs) / kNsPerSecd;
 }
 
-int64_t
-BaseTimeDurationPlatformUtils::TicksFromMilliseconds(double aMilliseconds)
-{
+int64_t BaseTimeDurationPlatformUtils::TicksFromMilliseconds(
+    double aMilliseconds) {
   double result = aMilliseconds * kNsPerMsd;
-  if (result > INT64_MAX) {
+  if (result > double(INT64_MAX)) {
     return INT64_MAX;
   }
   if (result < INT64_MIN) {
@@ -162,17 +158,13 @@ BaseTimeDurationPlatformUtils::TicksFromMilliseconds(double aMilliseconds)
   return result;
 }
 
-int64_t
-BaseTimeDurationPlatformUtils::ResolutionInTicks()
-{
+int64_t BaseTimeDurationPlatformUtils::ResolutionInTicks() {
   return static_cast<int64_t>(sResolution);
 }
 
 static bool gInitialized = false;
 
-void
-TimeStamp::Startup()
-{
+void TimeStamp::Startup() {
   if (gInitialized) {
     return;
   }
@@ -186,23 +178,22 @@ TimeStamp::Startup()
 
   // find the number of significant digits in sResolution, for the
   // sake of ToSecondsSigDigits()
-  for (sResolutionSigDigs = 1;
-       !(sResolutionSigDigs == sResolution ||
-         10 * sResolutionSigDigs > sResolution);
-       sResolutionSigDigs *= 10);
+  for (sResolutionSigDigs = 1; !(sResolutionSigDigs == sResolution ||
+                                 10 * sResolutionSigDigs > sResolution);
+       sResolutionSigDigs *= 10)
+    ;
 
   gInitialized = true;
 }
 
-void
-TimeStamp::Shutdown()
-{
+void TimeStamp::Shutdown() {}
+
+TimeStamp TimeStamp::Now(bool aHighResolution) {
+  return TimeStamp::NowFuzzy(TimeStampValue(false, ClockTimeNs()));
 }
 
-TimeStamp
-TimeStamp::Now(bool aHighResolution)
-{
-  return TimeStamp(ClockTimeNs());
+TimeStamp TimeStamp::NowUnfuzzed(bool aHighResolution) {
+  return TimeStamp(TimeStampValue(false, ClockTimeNs()));
 }
 
 #if defined(XP_LINUX) || defined(ANDROID)
@@ -211,9 +202,7 @@ TimeStamp::Now(bool aHighResolution)
 // starttime value of a specific process as found in its /proc/*/stat file.
 // Returns 0 if an error occurred.
 
-static uint64_t
-JiffiesSinceBoot(const char* aFile)
-{
+static uint64_t JiffiesSinceBoot(const char* aFile) {
   char stat[512];
 
   FILE* f = fopen(aFile, "r");
@@ -231,7 +220,7 @@ JiffiesSinceBoot(const char* aFile)
 
   stat[n] = 0;
 
-  long long unsigned startTime = 0; // instead of uint64_t to keep GCC quiet
+  long long unsigned startTime = 0;  // instead of uint64_t to keep GCC quiet
   char* s = strrchr(stat, ')');
 
   if (!s) {
@@ -256,9 +245,7 @@ JiffiesSinceBoot(const char* aFile)
 // process uptime. This value will be stored at the address pointed by aTime;
 // if an error occurred 0 will be stored instead.
 
-static void*
-ComputeProcessUptimeThread(void* aTime)
-{
+static void* ComputeProcessUptimeThread(void* aTime) {
   uint64_t* uptime = static_cast<uint64_t*>(aTime);
   long hz = sysconf(_SC_CLK_TCK);
 
@@ -269,7 +256,8 @@ ComputeProcessUptimeThread(void* aTime)
   }
 
   char threadStat[40];
-  SprintfLiteral(threadStat, "/proc/self/task/%d/stat", (pid_t)syscall(__NR_gettid));
+  SprintfLiteral(threadStat, "/proc/self/task/%d/stat",
+                 (pid_t)syscall(__NR_gettid));
 
   uint64_t threadJiffies = JiffiesSinceBoot(threadStat);
   uint64_t selfJiffies = JiffiesSinceBoot("/proc/self/stat");
@@ -285,13 +273,12 @@ ComputeProcessUptimeThread(void* aTime)
 // Computes and returns the process uptime in us on Linux & its derivatives.
 // Returns 0 if an error was encountered.
 
-uint64_t
-TimeStamp::ComputeProcessUptime()
-{
+uint64_t TimeStamp::ComputeProcessUptime() {
   uint64_t uptime = 0;
   pthread_t uptime_pthread;
 
-  if (pthread_create(&uptime_pthread, nullptr, ComputeProcessUptimeThread, &uptime)) {
+  if (pthread_create(&uptime_pthread, nullptr, ComputeProcessUptimeThread,
+                     &uptime)) {
     MOZ_CRASH("Failed to create process uptime thread.");
     return 0;
   }
@@ -301,15 +288,13 @@ TimeStamp::ComputeProcessUptime()
   return uptime / kNsPerUs;
 }
 
-#elif defined(__DragonFly__) || defined(__FreeBSD__) \
-      || defined(__NetBSD__) || defined(__OpenBSD__)
+#elif defined(__DragonFly__) || defined(__FreeBSD__) || defined(__NetBSD__) || \
+    defined(__OpenBSD__)
 
 // Computes and returns the process uptime in us on various BSD flavors.
 // Returns 0 if an error was encountered.
 
-uint64_t
-TimeStamp::ComputeProcessUptime()
-{
+uint64_t TimeStamp::ComputeProcessUptime() {
   struct timespec ts;
   int rv = clock_gettime(CLOCK_REALTIME, &ts);
 
@@ -322,10 +307,10 @@ TimeStamp::ComputeProcessUptime()
     KERN_PROC,
     KERN_PROC_PID,
     getpid(),
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#  if defined(__NetBSD__) || defined(__OpenBSD__)
     sizeof(KINFO_PROC),
     1,
-#endif
+#  endif
   };
   u_int mibLen = sizeof(mib) / sizeof(mib[0]);
 
@@ -338,7 +323,7 @@ TimeStamp::ComputeProcessUptime()
   }
 
   uint64_t startTime = ((uint64_t)proc.KP_START_SEC * kNsPerSec) +
-    (proc.KP_START_USEC * kNsPerUs);
+                       (proc.KP_START_USEC * kNsPerUs);
   uint64_t now = ((uint64_t)ts.tv_sec * kNsPerSec) + ts.tv_nsec;
 
   if (startTime > now) {
@@ -350,12 +335,8 @@ TimeStamp::ComputeProcessUptime()
 
 #else
 
-uint64_t
-TimeStamp::ComputeProcessUptime()
-{
-  return 0;
-}
+uint64_t TimeStamp::ComputeProcessUptime() { return 0; }
 
 #endif
 
-} // namespace mozilla
+}  // namespace mozilla

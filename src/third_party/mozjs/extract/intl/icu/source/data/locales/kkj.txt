@@ -1,0 +1,232 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+kkj{
+    AuxExemplarCharacters{"[q x z]"}
+    ExemplarCharacters{
+        "[a á à â {a\u0327} b ɓ c d ɗ {ɗy} e é è ê ɛ {ɛ\u0301} {ɛ\u0300} {ɛ\u0302} {ɛ"
+        "\u0327} f g {gb} {gw} h i í ì î {i\u0327} j k {kp} {kw} l m {mb} n {nd} ǌ {n"
+        "y} ŋ {ŋg} {ŋgb} {ŋgw} o ó ò ô ɔ {ɔ\u0301} {ɔ\u0300} {ɔ\u0302} {ɔ\u0327} p r "
+        "s t u ú ù û {u\u0327} v w y]"
+    }
+    ExemplarCharactersIndex{
+        "[A B Ɓ C D Ɗ {Ɗy} E Ɛ F G {Gb} {Gw} H I {I\u0327} J K {Kp} {Kw} L M {Mb} N {"
+        "Nd} ǋ {Ny} Ŋ {Ŋg} {Ŋgb} {Ŋgw} O Ɔ {Ɔ\u0327} P R S T U {U\u0327} V W Y]"
+    }
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    ExemplarCharactersPunctuation{"[, \\: ! ? . … ‘ ‹ › “ ” « » ( ) *]"}
+    NumberElements{
+        default{"latn"}
+        latn{
+            symbols{
+                decimal{","}
+                group{"."}
+            }
+        }
+        native{"latn"}
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE dd MMMM y G",
+                "d MMMM y G",
+                "d MMM y G",
+                "dd/MM y GGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Ed{"E d"}
+                Gy{"y G"}
+                GyMMM{"MMM y G"}
+                GyMMMEd{"E d MMM y G"}
+                GyMMMd{"d MMM y G"}
+                MEd{"E dd/MM"}
+                MMMEd{"E d MMM"}
+                MMMd{"d MMM"}
+                Md{"dd/MM"}
+                yyyyM{"MM y GGGGG"}
+                yyyyMEd{"E dd/MM y GGGGG"}
+                yyyyMMM{"MMM y G"}
+                yyyyMMMEd{"E d MMM y G"}
+                yyyyMMMd{"d MMM y G"}
+                yyyyMd{"dd/MM y GGGGG"}
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE dd MMMM y",
+                "d MMMM y",
+                "d MMM y",
+                "dd/MM y",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Ed{"E d"}
+                Gy{"y G"}
+                GyMMM{"MMM y G"}
+                GyMMMEd{"E d MMM y G"}
+                GyMMMd{"d MMM y G"}
+                MEd{"E dd/MM"}
+                MMMEd{"E d MMM"}
+                MMMd{"d MMM"}
+                Md{"dd/MM"}
+                yM{"MM y"}
+                yMEd{"E dd/MM y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E d MMM y"}
+                yMMMd{"d MMM y"}
+                yMd{"dd/MM y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "sɔndi",
+                        "lundi",
+                        "mardi",
+                        "mɛrkɛrɛdi",
+                        "yedi",
+                        "vaŋdɛrɛdi",
+                        "mɔnɔ sɔndi",
+                    }
+                    narrow{
+                        "so",
+                        "lu",
+                        "ma",
+                        "mɛ",
+                        "ye",
+                        "va",
+                        "ms",
+                    }
+                    short{
+                        "sɔndi",
+                        "lundi",
+                        "mardi",
+                        "mɛrkɛrɛdi",
+                        "yedi",
+                        "vaŋdɛrɛdi",
+                        "mɔnɔ sɔndi",
+                    }
+                    wide{
+                        "sɔndi",
+                        "lundi",
+                        "mardi",
+                        "mɛrkɛrɛdi",
+                        "yedi",
+                        "vaŋdɛrɛdi",
+                        "mɔnɔ sɔndi",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "sɔndi",
+                        "lundi",
+                        "mardi",
+                        "mɛrkɛrɛdi",
+                        "yedi",
+                        "vaŋdɛrɛdi",
+                        "mɔnɔ sɔndi",
+                    }
+                    narrow{
+                        "so",
+                        "lu",
+                        "ma",
+                        "mɛ",
+                        "ye",
+                        "va",
+                        "ms",
+                    }
+                    short{
+                        "so",
+                        "lu",
+                        "ma",
+                        "mɛ",
+                        "ye",
+                        "va",
+                        "ms",
+                    }
+                    wide{
+                        "sɔndi",
+                        "lundi",
+                        "mardi",
+                        "mɛrkɛrɛdi",
+                        "yedi",
+                        "vaŋdɛrɛdi",
+                        "mɔnɔ sɔndi",
+                    }
+                }
+            }
+            monthNames{
+                format{
+                    wide{
+                        "pamba",
+                        "wanja",
+                        "mbiyɔ mɛndoŋgɔ",
+                        "Nyɔlɔmbɔŋgɔ",
+                        "Mɔnɔ ŋgbanja",
+                        "Nyaŋgwɛ ŋgbanja",
+                        "kuŋgwɛ",
+                        "fɛ",
+                        "njapi",
+                        "nyukul",
+                        "M11",
+                        "ɓulɓusɛ",
+                    }
+                }
+                stand-alone{
+                    wide{
+                        "pamba",
+                        "wanja",
+                        "mbiyɔ mɛndoŋgɔ",
+                        "Nyɔlɔmbɔŋgɔ",
+                        "Mɔnɔ ŋgbanja",
+                        "Nyaŋgwɛ ŋgbanja",
+                        "kuŋgwɛ",
+                        "fɛ",
+                        "njapi",
+                        "nyukul",
+                        "M11",
+                        "ɓulɓusɛ",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"›"}
+        alternateQuotationStart{"‹"}
+        quotationEnd{"»"}
+        quotationStart{"«"}
+    }
+    fields{
+        day{
+            relative{
+                "-1"{"kwey"}
+                "0"{"muka"}
+                "1"{"nɛmɛnɔ"}
+            }
+        }
+    }
+    listPattern{
+        standard{
+            end{"{0}, {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+    }
+}

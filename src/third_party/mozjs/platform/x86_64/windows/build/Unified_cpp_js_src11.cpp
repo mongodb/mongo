@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "jit/Bailouts.cpp"
+#include "util/AllocPolicy.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/Bailouts.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "util/AllocPolicy.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/Bailouts.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "util/AllocPolicy.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/BaselineBailouts.cpp"
+#include "util/AllocationLogging.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/BaselineBailouts.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "util/AllocationLogging.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/BaselineBailouts.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "util/AllocationLogging.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/BaselineCacheIRCompiler.cpp"
+#include "util/CompleteFile.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/BaselineCacheIRCompiler.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "util/CompleteFile.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/BaselineCacheIRCompiler.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "util/CompleteFile.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/BaselineCompiler.cpp"
+#include "util/DumpFunctions.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/BaselineCompiler.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "util/DumpFunctions.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/BaselineCompiler.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "util/DumpFunctions.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/BaselineDebugModeOSR.cpp"
+#include "util/NativeStack.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/BaselineDebugModeOSR.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "util/NativeStack.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/BaselineDebugModeOSR.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "util/NativeStack.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/BaselineFrame.cpp"
+#include "util/Printf.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/BaselineFrame.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "util/Printf.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/BaselineFrame.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "util/Printf.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

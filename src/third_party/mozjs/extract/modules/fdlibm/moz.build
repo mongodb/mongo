@@ -21,15 +21,17 @@ if CONFIG['CC_TYPE'] == 'clang':
         '-Wno-dangling-else',
     ]
 
-if CONFIG['CC_TYPE'] in ('msvc', 'clang-cl'):
+if CONFIG['CC_TYPE'] == 'clang-cl':
     CXXFLAGS += [
-        '-wd4018', # signed/unsigned mismatch
+        '-Wno-sign-compare',
         '-wd4146', # unary minus operator applied to unsigned type
         '-wd4305', # truncation from 'double' to 'const float'
         '-wd4723', # potential divide by 0
         '-wd4756', # overflow in constant arithmetic
     ]
 
+# These sources can't be unified because there are too many conflicting global
+# variables (e.g. almost every source file defines a `one` and a `huge`).
 SOURCES += [
     'e_acos.cpp',
     'e_acosh.cpp',
@@ -44,14 +46,18 @@ SOURCES += [
     'e_log2.cpp',
     'e_pow.cpp',
     'e_sinh.cpp',
-    'e_sqrt.cpp',
+    'k_cos.cpp',
     'k_exp.cpp',
+    'k_rem_pio2.cpp',
+    'k_sin.cpp',
+    'k_tan.cpp',
     's_asinh.cpp',
     's_atan.cpp',
     's_cbrt.cpp',
     's_ceil.cpp',
     's_ceilf.cpp',
     's_copysign.cpp',
+    's_cos.cpp',
     's_expm1.cpp',
     's_fabs.cpp',
     's_floor.cpp',
@@ -61,6 +67,8 @@ SOURCES += [
     's_rint.cpp',
     's_rintf.cpp',
     's_scalbn.cpp',
+    's_sin.cpp',
+    's_tan.cpp',
     's_tanh.cpp',
     's_trunc.cpp',
     's_truncf.cpp',

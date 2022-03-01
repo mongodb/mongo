@@ -35,7 +35,7 @@
 namespace mongo {
 namespace mozjs {
 
-JSContext* freeOpToJSContext(js::FreeOp* fop);
+JSContext* freeOpToJSContext(JSFreeOp* fop);
 
 }  // namespace mozjs
 }  // namespace mongo

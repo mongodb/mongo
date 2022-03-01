@@ -38,17 +38,16 @@
  * methods or data used cross-file.
  */
 #if defined(WIN32)
-#  define MOZ_EXPORT   __declspec(dllexport)
+#  define MOZ_EXPORT __declspec(dllexport)
 #else /* Unix */
 #  ifdef HAVE_VISIBILITY_ATTRIBUTE
-#    define MOZ_EXPORT       __attribute__((visibility("default")))
+#    define MOZ_EXPORT __attribute__((visibility("default")))
 #  elif defined(__SUNPRO_C) || defined(__SUNPRO_CC)
-#    define MOZ_EXPORT      __global
+#    define MOZ_EXPORT __global
 #  else
 #    define MOZ_EXPORT /* nothing */
 #  endif
 #endif
-
 
 /*
  * Whereas implementers use MOZ_EXPORT to declare and define library symbols,
@@ -68,9 +67,9 @@
 #endif
 
 #if defined(_WIN32) && !defined(__MWERKS__)
-#  define MOZ_IMPORT_DATA  __declspec(dllimport)
+#  define MOZ_IMPORT_DATA __declspec(dllimport)
 #else
-#  define MOZ_IMPORT_DATA  MOZ_EXPORT
+#  define MOZ_IMPORT_DATA MOZ_EXPORT
 #endif
 
 /*
@@ -78,27 +77,29 @@
  * export mfbt declarations when building mfbt, and they expose import mfbt
  * declarations when using mfbt.
  */
-#if defined(IMPL_MFBT) || (defined(JS_STANDALONE) && !defined(MOZ_MEMORY) && (defined(EXPORT_JS_API) || defined(STATIC_EXPORTABLE_JS_API)))
-#  define MFBT_API     MOZ_EXPORT
-#  define MFBT_DATA    MOZ_EXPORT
+#if defined(IMPL_MFBT) ||                              \
+    (defined(JS_STANDALONE) && !defined(MOZ_MEMORY) && \
+     (defined(EXPORT_JS_API) || defined(STATIC_EXPORTABLE_JS_API)))
+#  define MFBT_API MOZ_EXPORT
+#  define MFBT_DATA MOZ_EXPORT
 #else
 #  if defined(JS_STANDALONE) && !defined(MOZ_MEMORY) && defined(STATIC_JS_API)
 #    define MFBT_API
 #    define MFBT_DATA
 #  else
-    /*
-     * On linux mozglue is linked in the program and we link libxul.so with
-     * -z,defs. Normally that causes the linker to reject undefined references in
-     * libxul.so, but as a loophole it allows undefined references to weak
-     * symbols. We add the weak attribute to the import version of the MFBT API
-     * macros to exploit this.
-     */
+/*
+ * On linux mozglue is linked in the program and we link libxul.so with
+ * -z,defs. Normally that causes the linker to reject undefined references in
+ * libxul.so, but as a loophole it allows undefined references to weak
+ * symbols. We add the weak attribute to the import version of the MFBT API
+ * macros to exploit this.
+ */
 #    if defined(MOZ_GLUE_IN_PROGRAM)
-#      define MFBT_API   __attribute__((weak)) MOZ_IMPORT_API
-#      define MFBT_DATA  __attribute__((weak)) MOZ_IMPORT_DATA
+#      define MFBT_API __attribute__((weak)) MOZ_IMPORT_API
+#      define MFBT_DATA __attribute__((weak)) MOZ_IMPORT_DATA
 #    else
-#      define MFBT_API   MOZ_IMPORT_API
-#      define MFBT_DATA  MOZ_IMPORT_DATA
+#      define MFBT_API MOZ_IMPORT_API
+#      define MFBT_DATA MOZ_IMPORT_DATA
 #    endif
 #  endif
 #endif
@@ -121,8 +122,8 @@
  * its greater clarity.
  */
 #ifdef __cplusplus
-#  define MOZ_BEGIN_EXTERN_C    extern "C" {
-#  define MOZ_END_EXTERN_C      }
+#  define MOZ_BEGIN_EXTERN_C extern "C" {
+#  define MOZ_END_EXTERN_C }
 #else
 #  define MOZ_BEGIN_EXTERN_C
 #  define MOZ_END_EXTERN_C
@@ -132,7 +133,7 @@
  * GCC's typeof is available when decltype is not.
  */
 #if defined(__GNUC__) && defined(__cplusplus) && \
-  !defined(__GXX_EXPERIMENTAL_CXX0X__) && __cplusplus < 201103L
+    !defined(__GXX_EXPERIMENTAL_CXX0X__) && __cplusplus < 201103L
 #  define decltype __typeof__
 #endif
 

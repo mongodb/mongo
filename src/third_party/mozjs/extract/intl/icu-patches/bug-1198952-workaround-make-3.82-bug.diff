@@ -1,0 +1,42 @@
+diff --git a/intl/icu/source/Makefile.in b/intl/icu/source/Makefile.in
+--- a/intl/icu/source/Makefile.in
++++ b/intl/icu/source/Makefile.in
+@@ -134,32 +134,36 @@ endif
+ 
+ LOCAL_SUBDIRS = $(SUBDIRS)
+ CLEAN_FIRST_SUBDIRS = $(TOOLS)
+ 
+ $(LIBDIR) $(BINDIR):
+ 	-$(MKINSTALLDIRS) $@
+ 
+ ## Recursive targets
++## Strictly speaking, the $(MAKEOVERRIDES) is not necessary when recursing, but
++## there is a bug in GNU make 3.82 that throws away the original overrides in
++## favor of RECURSIVE=YES when the submake in the subdirectory restarts itself
++## after dependency files have been created.
+ all-recursive install-recursive clean-recursive distclean-recursive dist-recursive check-recursive check-exhaustive-recursive: $(LIBDIR) $(BINDIR)
+ ifneq ($(NEED_ESCAPING),)
+ 	@echo "building tools/escapesrc (Needed for this platform with NEED_ESCAPING)"
+-	@(cd tools/escapesrc && $(MAKE) RECURSIVE=YES $$local_target) || exit
++	@(cd tools/escapesrc && $(MAKE) $(MAKEOVERRIDES) RECURSIVE=YES $$local_target) || exit
+ endif
+ 	@dot_seen=no; \
+ 	target=`echo $@ | sed s/-recursive//`; \
+ 	list='$(LOCAL_SUBDIRS)'; for subdir in $$list; do \
+ 	  echo "$(MAKE)[$(MAKELEVEL)]: Making \`$$target' in \`$$subdir'"; \
+ 	  if test "$$subdir" = "."; then \
+ 	    dot_seen=yes; \
+ 	    local_target="$$target-local"; \
+ 	  else \
+ 	    local_target="$$target"; \
+ 	  fi; \
+-	  (cd $$subdir && $(MAKE) RECURSIVE=YES $$local_target) || exit; \
++	  (cd $$subdir && $(MAKE) $(MAKEOVERRIDES) RECURSIVE=YES $$local_target) || exit; \
+ 	done; \
+ 	if test "$$dot_seen" = "no"; then \
+ 	  $(MAKE) "$$target-local" || exit; \
+ 	fi
+ 
+ clean-recursive-with-twist:
+ 	$(MAKE) clean-recursive LOCAL_SUBDIRS='$(CLEAN_FIRST_SUBDIRS) $(filter-out $(CLEAN_FIRST_SUBDIRS),$(LOCAL_SUBDIRS))'
+ 

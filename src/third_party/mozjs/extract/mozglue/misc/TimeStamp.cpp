@@ -8,17 +8,19 @@
  * Implementation of the OS-independent methods of the TimeStamp class
  */
 
+#include "mozilla/Atomics.h"
 #include "mozilla/TimeStamp.h"
+#include "mozilla/Uptime.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 namespace mozilla {
 
 /**
  * Wrapper class used to initialize static data used by the TimeStamp class
  */
-struct TimeStampInitialization
-{
+struct TimeStampInitialization {
   /**
    * First timestamp taken when the class static initializers are run. This
    * timestamp is used to sanitize timestamps coming from different sources.
@@ -32,23 +34,43 @@ struct TimeStampInitialization
    */
   TimeStamp mProcessCreation;
 
-  TimeStampInitialization()
-  {
+  TimeStampInitialization() {
     TimeStamp::Startup();
     mFirstTimeStamp = TimeStamp::Now();
+    // On Windows < 10, initializing the uptime requires `mFirstTimeStamp` to be
+    // valid.
+    mozilla::InitializeUptime();
   };
 
-  ~TimeStampInitialization()
-  {
-    TimeStamp::Shutdown();
-  };
+  ~TimeStampInitialization() { TimeStamp::Shutdown(); };
 };
 
+static bool sFuzzyfoxEnabled;
+
+/* static */
+bool TimeStamp::GetFuzzyfoxEnabled() { return sFuzzyfoxEnabled; }
+
+/* static */
+void TimeStamp::SetFuzzyfoxEnabled(bool aValue) { sFuzzyfoxEnabled = aValue; }
+
+// These variables store the frozen time (as a TimeStamp) for FuzzyFox that
+// will be reported if FuzzyFox is enabled.
+// We overload the top bit of sCanonicalNow and sCanonicalGTC to
+// indicate if a Timestamp is a fuzzed timestamp (bit set) or not
+// (bit unset).
+#ifdef XP_WIN
+static Atomic<uint64_t> sCanonicalGTC;
+static Atomic<uint64_t> sCanonicalQPC;
+static Atomic<bool> sCanonicalHasQPC;
+#else
+static Atomic<uint64_t> sCanonicalNowTimeStamp;
+#endif
+static Atomic<int64_t> sCanonicalNowTime;
+// This variable stores the frozen time (as ms since the epoch) for FuzzyFox
+// to report if FuzzyFox is enabled.
 static TimeStampInitialization sInitOnce;
 
-MFBT_API TimeStamp
-TimeStamp::ProcessCreation(bool* aIsInconsistent)
-{
+MFBT_API TimeStamp TimeStamp::ProcessCreation(bool* aIsInconsistent) {
   if (aIsInconsistent) {
     *aIsInconsistent = false;
   }
@@ -87,10 +109,46 @@ TimeStamp::ProcessCreation(bool* aIsInconsistent)
   return sInitOnce.mProcessCreation;
 }
 
-void
-TimeStamp::RecordProcessRestart()
-{
+void TimeStamp::RecordProcessRestart() {
   sInitOnce.mProcessCreation = TimeStamp();
 }
 
-} // namespace mozilla
+MFBT_API TimeStamp TimeStamp::NowFuzzy(TimeStampValue aValue) {
+#ifdef XP_WIN
+  TimeStampValue canonicalNow =
+      TimeStampValue(sCanonicalGTC, sCanonicalQPC, sCanonicalHasQPC, true);
+#else
+  TimeStampValue canonicalNow = TimeStampValue(sCanonicalNowTimeStamp);
+#endif
+
+  if (TimeStamp::GetFuzzyfoxEnabled()) {
+    if (MOZ_LIKELY(!canonicalNow.IsNull())) {
+      return TimeStamp(canonicalNow);
+    }
+  }
+  // When we disable Fuzzyfox, time may goes backwards, so we need to make sure
+  // we don't do that.
+  else if (MOZ_UNLIKELY(canonicalNow > aValue)) {
+    return TimeStamp(canonicalNow);
+  }
+
+  return TimeStamp(aValue);
+}
+
+MFBT_API void TimeStamp::UpdateFuzzyTimeStamp(TimeStamp aValue) {
+#ifdef XP_WIN
+  sCanonicalGTC = aValue.mValue.mGTC;
+  sCanonicalQPC = aValue.mValue.mQPC;
+  sCanonicalHasQPC = aValue.mValue.mHasQPC;
+#else
+  sCanonicalNowTimeStamp = aValue.mValue.mTimeStamp;
+#endif
+}
+
+MFBT_API int64_t TimeStamp::NowFuzzyTime() { return sCanonicalNowTime; }
+
+MFBT_API void TimeStamp::UpdateFuzzyTime(int64_t aValue) {
+  sCanonicalNowTime = aValue;
+}
+
+}  // namespace mozilla

@@ -1,0 +1,126 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: InterIndic_ur.txt
+# Generated from CLDR
+#
+
+$nonword = [^\uE000-\uE0FF];
+\uE015\uE03F\uE02F\uE03E } $nonword→کیا; # किया
+\uE026\uE03F\uE02F\uE03E } $nonword→دیا; # दिया
+\uE015\uE03F } $nonword→کہ; # कि at word end
+\uE039\uE048→ہے; # ह\u0948
+\uE001 } $nonword→ں; # chandrabindu at end to noon ghunna
+\uE001→ن; # chandrabindu not at end to noon
+\uE002 } $nonword→ں; # anusvara to noon ghunna at end
+\uE002→ن; # anusvara to noon \u0902
+\uE003→ه ا; # viarga to ha + alif  ः
+\uE004→ا; # short a to alif ऄ
+\uE005→ا; # अ
+\uE006→ا \u0653; # alif with mad आ
+\uE007→ا \u0650; # इ
+\uE008→ا \u0650; # ई
+\uE009→و; # उ
+\uE00A→و; # ऊ
+\uE00B→ر; # ऋ
+\uE00C→ل; # ऌ
+\uE00D→ا ے; # ऍ
+\uE00E→ی; # ऎ
+\uE00F  } $nonword→ے; # ए use ے when at end
+\uE00F→ی; # ए use ی when not at end
+\uE010  } $nonword→ا ے; # ऐ use ے when at end
+\uE010→ا ی; # ऐ use ی when not at end
+\uE011→ا و; # ऑ
+\uE012→ا و; # ऒ
+\uE013→ا و; # ओ
+\uE014→ا و; # औ
+\uE015→ک; # क
+\uE016→ک ھ; # ख
+\uE017→گ; # ग
+\uE018→گ ھ; # घ
+\uE019→ن گ; # ङ
+\uE01A→چ; # च
+\uE01B→چ ھ; # छ
+\uE01C→ج; # ज
+\uE01D→ج ھ; # झ
+\uE01E→ن; # ञ
+\uE01F→ٹ; # ट
+\uE020→ٹ ھ; # ठ
+\uE021→ڈ; # ड
+\uE022→ڈ ھ; # ढ
+\uE023→ن; # ण
+\uE024→ت; # त
+\uE025→ت ھ; # थ
+\uE026→د; # द
+\uE027→د ھ; # ध
+\uE028→ن; # न
+\uE029→ں; # ऩ
+\uE02A→پ; # प
+\uE02B→پ ھ; # फ
+\uE02C→ب; # ब
+\uE02D→ب ھ; # भ
+\uE02E→م; # म
+\uE02F→ی; # य
+\uE030→ر; # र
+\uE031→ر; # ऱ
+\uE032→ل; # ल
+\uE033→ڑ; # ळ
+\uE034→ڑ; # ऴ
+\uE035→و; # व
+\uE036→ش; # श
+\uE037→ش; # ष
+\uE038→س; # स
+\uE039→ه; # ह
+\uE03C→; # \u093C
+\uE03D→; # ऽ
+\uE03E→ا; # ा
+\uE03F→ی; # ि
+\uE040→ی; # ी
+\uE041→و; # \u0941
+\uE042→و; # \u0942
+\uE043→ر; # \u0943
+\uE044→ر; # \u0944
+\uE045→ن; # \u0945
+\uE046→ی; # \u0946
+\uE047 } $nonword→ے; # \u0947 use ے when at end
+\uE047→ی; # \u0947 use ی when not at end
+\uE048 } $nonword→ا ے; # \u0948 use ے when at end
+\uE048→ا ی; # \u0948 use ی when not at end
+\uE049→و; # ॉ
+\uE04A→ا و; # ॊ
+\uE04B→و; # ो
+\uE04C→ا و; # ौ
+\uE04D→; # \u094D
+\uE050→ا و; # ॐ
+\uE051→; # \u0951
+\uE052→; # \u0952
+\uE053→; # \u0953
+\uE054→; # \u0954
+\uE058→ق; # क़
+\uE059→خ; # ख़
+\uE05A→غ; # ग़
+\uE05B→ز; # ज़
+\uE05C→ڑ; # ड़
+\uE05D→ڑ ھ; # ढ़
+\uE05E→ف; # फ़
+\uE05F→ی; # य़
+\uE060→ر; # ॠ
+\uE061→ل; # ॡ
+\uE062→ل; # \u0962
+\uE063→ل; # \u0963
+\uE064→۔; # ।
+\uE065→۔; # ॥
+\uE066→۰; # ०
+\uE067→۱; # १
+\uE068→۲; # २
+\uE069→۳; # ३
+\uE06A→۴; # ४
+\uE06B→۵; # ५
+\uE06C→۶; # ६
+\uE06D→۷; # ७
+\uE06E→۸; # ८
+\uE06F→۹; # ९
+\uE070→ء; # ॰
+\uE082→; # ॽ
+

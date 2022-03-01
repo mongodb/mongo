@@ -1,0 +1,51 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+km{
+    RBNFRules{
+        OrdinalRules{
+            "%digits-ordinal:",
+            "-x: \u2212>>;",
+            "0: \u1791\u17B8=#,##0=;",
+        }
+        SpelloutRules{
+            "%%lenient-parse:",
+            "&[last primary ignorable ] << ' ' << '\u200B' << '\u00AD';",
+            "%spellout-numbering-year:",
+            "0: =%spellout-numbering=;",
+            "%spellout-numbering:",
+            "-x: \u178A\u1780\u200B>>;",
+            "x.x: <<\u200B\u1785\u17BB\u1785\u200B>>>;",
+            "0: \u179F\u17BC\u1793\u17D2\u1799;",
+            "1: \u1798\u17BD\u1799;",
+            "2: \u1796\u17B8\u179A;",
+            "3: \u1794\u17B8;",
+            "4: \u1794\u17BD\u1793;",
+            "5: \u1794\u17D2\u179A\u17B6\u17C6;",
+            "6: \u1794\u17D2\u179A\u17B6\u17C6\u1798\u17BD\u1799;",
+            "7: \u1794\u17D2\u179A\u17B6\u17C6\u1796\u17B8\u179A;",
+            "8: \u1794\u17D2\u179A\u17B6\u17C6\u1794\u17B8;",
+            "9: \u1794\u17D2\u179A\u17B6\u17C6\u1794\u17BD\u1793;",
+            "10: \u178A\u1794\u17CB[\u200B>>];",
+            "20: \u1798\u17D2\u1797\u17C3[\u200B>>];",
+            "30: \u179F\u17B6\u1798\u179F\u17B7\u1794[\u200B>>];",
+            "40: \u179F\u17C2\u179F\u17B7\u1794[\u200B>>];",
+            "50: \u17A0\u17B6\u179F\u17B7\u1794[\u200B>>];",
+            "60: \u17A0\u17BB\u1780\u179F\u17B7\u1794[\u200B>>];",
+            "70: \u1785\u17B7\u178F\u179F\u17B7\u1794[\u200B>>];",
+            "80: \u1794\u17C9\u17C2\u178F\u179F\u17B7\u1794[\u200B>>];",
+            "90: \u1780\u17C5\u179F\u17B7\u1794[\u200B>>];",
+            "100: <<\u200B\u179A\u1799[\u200B>>];",
+            "1000: <<\u200B\u1796\u17B6\u1793\u17CB[\u200B>>];",
+            "10000: <<\u200B\u1798\u17C9\u17BA\u1793[\u200B>>];",
+            "100000: <<\u200B\u179F\u17C2\u1793[\u200B>>];",
+            "1000000: <<\u200B\u179B\u17B6\u1793[\u200B>>];",
+            "10000000000: <<\u200B\u1796\u17B6\u1793\u17CB\u200B\u1780\u17C4\u178A\u17B7[\u200B>>];",
+            "1000000000000: =#,##0=;",
+            "%spellout-cardinal:",
+            "0: =%spellout-numbering=;",
+            "%spellout-ordinal:",
+            "0: \u1791\u17B8=%spellout-cardinal=;",
+        }
+    }
+}

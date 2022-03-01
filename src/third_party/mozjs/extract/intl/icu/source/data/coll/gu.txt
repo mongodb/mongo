@@ -1,0 +1,15 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+gu{
+    collations{
+        standard{
+            Sequence{
+                "[normalization on]"
+                "[reorder Gujr Deva Beng Guru Orya Taml Telu Knda Mlym Sinh]"
+                "&ૐ<ં<<ઁ<ઃ"
+            }
+            Version{"39"}
+        }
+    }
+}

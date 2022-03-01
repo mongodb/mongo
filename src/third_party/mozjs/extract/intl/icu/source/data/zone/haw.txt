@@ -1,0 +1,22 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+haw{
+    zoneStrings{
+        "Pacific:Honolulu"{
+            sd{"HDT"}
+            sg{"HST"}
+            ss{"HST"}
+        }
+        "meta:Alaska"{
+            sd{"AKDT"}
+            sg{"AKT"}
+            ss{"AKST"}
+        }
+        "meta:Hawaii_Aleutian"{
+            sd{"HADT"}
+            sg{"HAT"}
+            ss{"HAST"}
+        }
+    }
+}

@@ -1,388 +1,422 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "vm/Xdr.h"
 
-#include "mozilla/PodOperations.h"
+#include "mozilla/ArrayUtils.h"
+#include "mozilla/ScopeExit.h"
+#include "mozilla/Utf8.h"
 
+#include <algorithm>  // std::transform
 #include <string.h>
+#include <type_traits>  // std::is_same
+#include <utility>      // std::move
 
 #include "jsapi.h"
 
-#include "vm/Debugger.h"
-#include "vm/EnvironmentObject.h"
+#include "builtin/ModuleObject.h"
+#include "debugger/DebugAPI.h"
+#include "frontend/CompilationStencil.h"  // frontend::{CompilationStencil, ExtensibleCompilationStencil, CompilationStencilMerger, BorrowingCompilationStencil}
+#include "frontend/StencilXdr.h"          // frontend::StencilXDR
+#include "js/BuildId.h"                   // JS::BuildIdCharVector
 #include "vm/JSContext.h"
 #include "vm/JSScript.h"
+#include "vm/SharedStencil.h"  // js::SourceExtent
 #include "vm/TraceLogging.h"
 
 using namespace js;
-using mozilla::PodEqual;
 
-template<XDRMode mode>
-LifoAlloc&
-XDRState<mode>::lifoAlloc() const {
-    return buf.cx()->tempLifoAlloc();
-}
+using mozilla::ArrayEqual;
+using mozilla::Utf8Unit;
 
-template<XDRMode mode>
-void
-XDRState<mode>::postProcessContextErrors(JSContext* cx)
-{
-    // NOTE: This should only be called on transcode failure. Not all failure
-    // paths call XDRState::fail(...), so we should update resultCode_ if it
-    // doesn't hold a specific transcode error.
-
-    if (resultCode_ & JS::TranscodeResult_Failure)
-        MOZ_ASSERT_IF(!cx->helperThread(), !cx->isExceptionPending());
-    else
-        resultCode_ = JS::TranscodeResult_Throw;
-}
-
-template<XDRMode mode>
-bool
-XDRState<mode>::codeChars(const Latin1Char* chars, size_t nchars)
-{
-    static_assert(sizeof(Latin1Char) == sizeof(uint8_t), "Latin1Char must fit in 1 byte");
-
-    MOZ_ASSERT(mode == XDR_ENCODE);
-
-    if (nchars == 0)
-        return true;
-    uint8_t* ptr = buf.write(nchars);
-    if (!ptr)
-        return fail(JS::TranscodeResult_Throw);
-
-    mozilla::PodCopy(ptr, chars, nchars);
+#ifdef DEBUG
+bool XDRCoderBase::validateResultCode(JSContext* cx,
+                                      JS::TranscodeResult code) const {
+  // NOTE: This function is called to verify that we do not have a pending
+  // exception on the JSContext at the same time as a TranscodeResult failure.
+  if (cx->isHelperThreadContext()) {
     return true;
+  }
+  return cx->isExceptionPending() == bool(code == JS::TranscodeResult::Throw);
+}
+#endif
+
+template <XDRMode mode>
+XDRResult XDRState<mode>::codeChars(char* chars, size_t nchars) {
+  return codeBytes(chars, nchars);
 }
 
-template<XDRMode mode>
-bool
-XDRState<mode>::codeChars(char16_t* chars, size_t nchars)
-{
-    if (nchars == 0)
-        return true;
-    size_t nbytes = nchars * sizeof(char16_t);
-    if (mode == XDR_ENCODE) {
-        uint8_t* ptr = buf.write(nbytes);
-        if (!ptr)
-            return fail(JS::TranscodeResult_Throw);
-        mozilla::NativeEndian::copyAndSwapToLittleEndian(ptr, chars, nchars);
-    } else {
-        const uint8_t* ptr = buf.read(nbytes);
-        if (!ptr)
-            return fail(JS::TranscodeResult_Failure_BadDecode);
-        mozilla::NativeEndian::copyAndSwapFromLittleEndian(chars, ptr, nchars);
-    }
-    return true;
+template <XDRMode mode>
+XDRResult XDRState<mode>::codeChars(Latin1Char* chars, size_t nchars) {
+  static_assert(sizeof(Latin1Char) == 1,
+                "Latin1Char must be 1 byte for nchars below to be the "
+                "proper count of bytes");
+  static_assert(std::is_same_v<Latin1Char, unsigned char>,
+                "Latin1Char must be unsigned char to C++-safely reinterpret "
+                "the bytes generically copied below as Latin1Char");
+  return codeBytes(chars, nchars);
 }
 
-template<XDRMode mode>
-static bool
-VersionCheck(XDRState<mode>* xdr)
-{
-    JS::BuildIdCharVector buildId;
-    MOZ_ASSERT(xdr->cx()->buildIdOp());
-    if (!xdr->cx()->buildIdOp()(&buildId)) {
-        ReportOutOfMemory(xdr->cx());
-        return xdr->fail(JS::TranscodeResult_Throw);
-    }
-    MOZ_ASSERT(!buildId.empty());
+template <XDRMode mode>
+XDRResult XDRState<mode>::codeChars(Utf8Unit* units, size_t count) {
+  if (count == 0) {
+    return Ok();
+  }
 
-    uint32_t buildIdLength;
-    if (mode == XDR_ENCODE)
-        buildIdLength = buildId.length();
-
-    if (!xdr->codeUint32(&buildIdLength))
-        return false;
-
-    if (mode == XDR_DECODE && buildIdLength != buildId.length())
-        return xdr->fail(JS::TranscodeResult_Failure_BadBuildId);
-
-    if (mode == XDR_ENCODE) {
-        if (!xdr->codeBytes(buildId.begin(), buildIdLength))
-            return false;
-    } else {
-        JS::BuildIdCharVector decodedBuildId;
-
-        // buildIdLength is already checked against the length of current
-        // buildId.
-        if (!decodedBuildId.resize(buildIdLength)) {
-            ReportOutOfMemory(xdr->cx());
-            return xdr->fail(JS::TranscodeResult_Throw);
-        }
-
-        if (!xdr->codeBytes(decodedBuildId.begin(), buildIdLength))
-            return false;
-
-        // We do not provide binary compatibility with older scripts.
-        if (!PodEqual(decodedBuildId.begin(), buildId.begin(), buildIdLength))
-            return xdr->fail(JS::TranscodeResult_Failure_BadBuildId);
+  if (mode == XDR_ENCODE) {
+    uint8_t* ptr = buf->write(count);
+    if (!ptr) {
+      return fail(JS::TranscodeResult::Throw);
     }
 
-    return true;
+    std::transform(units, units + count, ptr,
+                   [](const Utf8Unit& unit) { return unit.toUint8(); });
+  } else {
+    const uint8_t* ptr = buf->read(count);
+    if (!ptr) {
+      return fail(JS::TranscodeResult::Failure_BadDecode);
+    }
+
+    std::transform(ptr, ptr + count, units,
+                   [](const uint8_t& value) { return Utf8Unit(value); });
+  }
+
+  return Ok();
 }
 
-template<XDRMode mode>
-bool
-XDRState<mode>::codeFunction(MutableHandleFunction funp, HandleScriptSource sourceObject)
-{
-    TraceLoggerThread* logger = TraceLoggerForCurrentThread(cx());
-    TraceLoggerTextId event =
-        mode == XDR_DECODE ? TraceLogger_DecodeFunction : TraceLogger_EncodeFunction;
-    AutoTraceLog tl(logger, event);
+template <XDRMode mode>
+XDRResult XDRState<mode>::codeChars(char16_t* chars, size_t nchars) {
+  if (nchars == 0) {
+    return Ok();
+  }
 
-    RootedScope scope(cx(), &cx()->global()->emptyGlobalScope());
-    if (mode == XDR_DECODE) {
-        MOZ_ASSERT(!sourceObject);
-        funp.set(nullptr);
-    } else if (getTreeKey(funp) != AutoXDRTree::noKey) {
-        MOZ_ASSERT(sourceObject);
-        scope = funp->nonLazyScript()->enclosingScope();
-    } else {
-        MOZ_ASSERT(!sourceObject);
-        MOZ_ASSERT(funp->nonLazyScript()->enclosingScope()->is<GlobalScope>());
+  size_t nbytes = nchars * sizeof(char16_t);
+  if (mode == XDR_ENCODE) {
+    uint8_t* ptr = buf->write(nbytes);
+    if (!ptr) {
+      return fail(JS::TranscodeResult::Throw);
     }
 
-    if (!VersionCheck(this)) {
-        postProcessContextErrors(cx());
-        return false;
+    // |mozilla::NativeEndian| correctly handles writing into unaligned |ptr|.
+    mozilla::NativeEndian::copyAndSwapToLittleEndian(ptr, chars, nchars);
+  } else {
+    const uint8_t* ptr = buf->read(nbytes);
+    if (!ptr) {
+      return fail(JS::TranscodeResult::Failure_BadDecode);
     }
 
-    if (!XDRInterpretedFunction(this, scope, sourceObject, funp)) {
-        postProcessContextErrors(cx());
-        funp.set(nullptr);
-        return false;
-    }
-
-    return true;
+    // |mozilla::NativeEndian| correctly handles reading from unaligned |ptr|.
+    mozilla::NativeEndian::copyAndSwapFromLittleEndian(chars, ptr, nchars);
+  }
+  return Ok();
 }
 
-template<XDRMode mode>
-bool
-XDRState<mode>::codeScript(MutableHandleScript scriptp)
-{
-    TraceLoggerThread* logger = TraceLoggerForCurrentThread(cx());
-    TraceLoggerTextId event =
-        mode == XDR_DECODE ? TraceLogger_DecodeScript : TraceLogger_EncodeScript;
-    AutoTraceLog tl(logger, event);
+template <XDRMode mode, typename CharT>
+static XDRResult XDRCodeCharsZ(XDRState<mode>* xdr,
+                               XDRTranscodeString<CharT>& buffer) {
+  MOZ_ASSERT_IF(mode == XDR_ENCODE, !buffer.empty());
+  MOZ_ASSERT_IF(mode == XDR_DECODE, buffer.empty());
 
-    AutoXDRTree scriptTree(this, getTopLevelTreeKey());
+  using OwnedString = js::UniquePtr<CharT[], JS::FreePolicy>;
+  OwnedString owned;
 
-    if (mode == XDR_DECODE)
-        scriptp.set(nullptr);
-    else
-        MOZ_ASSERT(!scriptp->enclosingScope());
+  static_assert(JSString::MAX_LENGTH <= INT32_MAX,
+                "String length must fit in int32_t");
 
-    if (!VersionCheck(this)) {
-        postProcessContextErrors(cx());
-        return false;
+  uint32_t length = 0;
+  CharT* chars = nullptr;
+
+  if (mode == XDR_ENCODE) {
+    chars = const_cast<CharT*>(buffer.template ref<const CharT*>());
+
+    // Set a reasonable limit on string length.
+    size_t lengthSizeT = std::char_traits<CharT>::length(chars);
+    if (lengthSizeT > JSString::MAX_LENGTH) {
+      ReportAllocationOverflow(xdr->cx());
+      return xdr->fail(JS::TranscodeResult::Throw);
     }
+    length = static_cast<uint32_t>(lengthSizeT);
+  }
+  MOZ_TRY(xdr->codeUint32(&length));
 
-    if (!XDRScript(this, nullptr, nullptr, nullptr, scriptp)) {
-        postProcessContextErrors(cx());
-        scriptp.set(nullptr);
-        return false;
+  if (mode == XDR_DECODE) {
+    owned = xdr->cx()->template make_pod_array<CharT>(length + 1);
+    if (!owned) {
+      return xdr->fail(JS::TranscodeResult::Throw);
     }
+    chars = owned.get();
+  }
 
-    return true;
+  MOZ_TRY(xdr->codeChars(chars, length));
+  if (mode == XDR_DECODE) {
+    // Null-terminate and transfer ownership to caller.
+    owned[length] = '\0';
+    buffer.template construct<OwnedString>(std::move(owned));
+  }
+
+  return Ok();
 }
 
-template<XDRMode mode>
-bool
-XDRState<mode>::codeConstValue(MutableHandleValue vp)
-{
-    return XDRScriptConst(this, vp);
+template <XDRMode mode>
+XDRResult XDRState<mode>::codeCharsZ(XDRTranscodeString<char>& buffer) {
+  return XDRCodeCharsZ(this, buffer);
+}
+
+template <XDRMode mode>
+XDRResult XDRState<mode>::codeCharsZ(XDRTranscodeString<char16_t>& buffer) {
+  return XDRCodeCharsZ(this, buffer);
+}
+
+enum class XDRFormatType : uint8_t {
+  UseOption,
+  JSScript,
+  Stencil,
+};
+
+static bool GetScriptTranscodingBuildId(XDRFormatType formatType,
+                                        JS::BuildIdCharVector* buildId) {
+  MOZ_ASSERT(buildId->empty());
+  MOZ_ASSERT(GetBuildId);
+
+  if (!GetBuildId(buildId)) {
+    return false;
+  }
+
+  // Note: the buildId returned here is also used for the bytecode cache MIME
+  // type so use plain ASCII characters.
+
+  if (!buildId->reserve(buildId->length() + 4)) {
+    return false;
+  }
+
+  buildId->infallibleAppend('-');
+
+  // XDR depends on pointer size and endianness.
+  static_assert(sizeof(uintptr_t) == 4 || sizeof(uintptr_t) == 8);
+  buildId->infallibleAppend(sizeof(uintptr_t) == 4 ? '4' : '8');
+  buildId->infallibleAppend(MOZ_LITTLE_ENDIAN() ? 'l' : 'b');
+
+  // '0': Stencil
+  // '1': JSScript.
+  char formatChar = '0';
+  switch (formatType) {
+    case XDRFormatType::UseOption:
+      // If off-thread parse global isn't used for single script decoding,
+      // we use stencil XDR instead of JSScript XDR.
+      formatChar = js::UseOffThreadParseGlobal() ? '1' : '0';
+      break;
+    case XDRFormatType::JSScript:
+      formatChar = '1';
+      break;
+    case XDRFormatType::Stencil:
+      formatChar = '0';
+      break;
+  }
+  buildId->infallibleAppend(formatChar);
+
+  return true;
+}
+
+JS_PUBLIC_API bool JS::GetScriptTranscodingBuildId(
+    JS::BuildIdCharVector* buildId) {
+  return GetScriptTranscodingBuildId(XDRFormatType::UseOption, buildId);
+}
+
+template <XDRMode mode>
+static XDRResult VersionCheck(XDRState<mode>* xdr, XDRFormatType formatType) {
+  JS::BuildIdCharVector buildId;
+  if (!GetScriptTranscodingBuildId(formatType, &buildId)) {
+    ReportOutOfMemory(xdr->cx());
+    return xdr->fail(JS::TranscodeResult::Throw);
+  }
+  MOZ_ASSERT(!buildId.empty());
+
+  uint32_t buildIdLength;
+  if (mode == XDR_ENCODE) {
+    buildIdLength = buildId.length();
+  }
+
+  MOZ_TRY(xdr->codeUint32(&buildIdLength));
+
+  if (mode == XDR_DECODE && buildIdLength != buildId.length()) {
+    return xdr->fail(JS::TranscodeResult::Failure_BadBuildId);
+  }
+
+  if (mode == XDR_ENCODE) {
+    MOZ_TRY(xdr->codeBytes(buildId.begin(), buildIdLength));
+  } else {
+    JS::BuildIdCharVector decodedBuildId;
+
+    // buildIdLength is already checked against the length of current
+    // buildId.
+    if (!decodedBuildId.resize(buildIdLength)) {
+      ReportOutOfMemory(xdr->cx());
+      return xdr->fail(JS::TranscodeResult::Throw);
+    }
+
+    MOZ_TRY(xdr->codeBytes(decodedBuildId.begin(), buildIdLength));
+
+    // We do not provide binary compatibility with older scripts.
+    if (!ArrayEqual(decodedBuildId.begin(), buildId.begin(), buildIdLength)) {
+      return xdr->fail(JS::TranscodeResult::Failure_BadBuildId);
+    }
+  }
+
+  return Ok();
+}
+
+template <XDRMode mode>
+XDRResult XDRState<mode>::codeModuleObject(MutableHandleModuleObject modp) {
+#ifdef DEBUG
+  auto sanityCheck = mozilla::MakeScopeExit(
+      [&] { MOZ_ASSERT(validateResultCode(cx(), resultCode())); });
+#endif
+  if (mode == XDR_DECODE) {
+    modp.set(nullptr);
+  } else {
+    MOZ_ASSERT(modp->status() < MODULE_STATUS_LINKING);
+  }
+
+  MOZ_TRY(XDRModuleObject(this, modp));
+  return Ok();
+}
+
+template <XDRMode mode>
+XDRResult XDRState<mode>::codeScript(MutableHandleScript scriptp) {
+  TraceLoggerThread* logger = TraceLoggerForCurrentThread(cx());
+  TraceLoggerTextId event =
+      mode == XDR_DECODE ? TraceLogger_DecodeScript : TraceLogger_EncodeScript;
+  AutoTraceLog tl(logger, event);
+
+#ifdef DEBUG
+  auto sanityCheck = mozilla::MakeScopeExit(
+      [&] { MOZ_ASSERT(validateResultCode(cx(), resultCode())); });
+#endif
+  auto guard = mozilla::MakeScopeExit([&] { scriptp.set(nullptr); });
+
+  if (mode == XDR_DECODE) {
+    scriptp.set(nullptr);
+  } else {
+    MOZ_ASSERT(!scriptp->enclosingScope());
+  }
+
+  MOZ_TRY(VersionCheck(this, XDRFormatType::JSScript));
+  MOZ_TRY(XDRScript(this, nullptr, nullptr, nullptr, scriptp));
+
+  guard.release();
+  return Ok();
+}
+
+template <XDRMode mode>
+static XDRResult XDRStencilHeader(
+    XDRState<mode>* xdr, const JS::ReadOnlyCompileOptions* maybeOptions,
+    RefPtr<ScriptSource>& source) {
+  // The XDR-Stencil header is inserted at beginning of buffer, but it is
+  // computed at the end the incremental-encoding process.
+
+  MOZ_TRY(VersionCheck(xdr, XDRFormatType::Stencil));
+  MOZ_TRY(ScriptSource::XDR(xdr, maybeOptions, source));
+
+  return Ok();
 }
 
 template class js::XDRState<XDR_ENCODE>;
 template class js::XDRState<XDR_DECODE>;
 
-AutoXDRTree::AutoXDRTree(XDRCoderBase* xdr, AutoXDRTree::Key key)
-  : key_(key),
-    parent_(this),
-    xdr_(xdr)
-{
-    if (key_ != AutoXDRTree::noKey)
-        xdr->createOrReplaceSubTree(this);
+XDRResult XDRStencilEncoder::codeStencil(
+    const JS::ReadOnlyCompileOptions* options,
+    const RefPtr<ScriptSource>& source,
+    const frontend::CompilationStencil& stencil) {
+#ifdef DEBUG
+  auto sanityCheck = mozilla::MakeScopeExit(
+      [&] { MOZ_ASSERT(validateResultCode(cx(), resultCode())); });
+#endif
+
+  MOZ_TRY(frontend::StencilXDR::checkCompilationStencil(this, stencil));
+
+  MOZ_TRY(XDRStencilHeader(this, options,
+                           const_cast<RefPtr<ScriptSource>&>(source)));
+  MOZ_TRY(frontend::StencilXDR::codeCompilationStencil(
+      this, const_cast<frontend::CompilationStencil&>(stencil)));
+
+  return Ok();
 }
 
-AutoXDRTree::~AutoXDRTree()
-{
-    if (key_ != AutoXDRTree::noKey)
-        xdr_->endSubTree();
+XDRResult XDRStencilEncoder::codeStencil(
+    const frontend::CompilationInput& input,
+    const frontend::CompilationStencil& stencil) {
+  return codeStencil(&input.options, stencil.source, stencil);
 }
 
-constexpr AutoXDRTree::Key AutoXDRTree::noKey;
-constexpr AutoXDRTree::Key AutoXDRTree::noSubTree;
-constexpr AutoXDRTree::Key AutoXDRTree::topLevel;
-
-AutoXDRTree::Key
-XDRIncrementalEncoder::getTopLevelTreeKey() const
-{
-    return AutoXDRTree::topLevel;
+XDRResult XDRStencilEncoder::codeStencil(
+    const RefPtr<ScriptSource>& source,
+    const frontend::CompilationStencil& stencil) {
+  return codeStencil(nullptr, source, stencil);
 }
 
-AutoXDRTree::Key
-XDRIncrementalEncoder::getTreeKey(JSFunction* fun) const
-{
-    if (fun->isInterpretedLazy()) {
-        static_assert(sizeof(fun->lazyScript()->begin()) == 4 ||
-                      sizeof(fun->lazyScript()->end()) == 4,
-                      "AutoXDRTree key requires LazyScripts positions to be uint32");
-        return uint64_t(fun->lazyScript()->begin()) << 32 | fun->lazyScript()->end();
-    }
-
-    if (fun->isInterpreted()) {
-        static_assert(sizeof(fun->nonLazyScript()->sourceStart()) == 4 ||
-                      sizeof(fun->nonLazyScript()->sourceEnd()) == 4,
-                      "AutoXDRTree key requires JSScripts positions to be uint32");
-        return uint64_t(fun->nonLazyScript()->sourceStart()) << 32 | fun->nonLazyScript()->sourceEnd();
-    }
-
-    return AutoXDRTree::noKey;
+XDRIncrementalStencilEncoder::~XDRIncrementalStencilEncoder() {
+  if (merger_) {
+    js_delete(merger_);
+  }
 }
 
-bool
-XDRIncrementalEncoder::init()
-{
-    if (!tree_.init())
-        return false;
-    return true;
+XDRResult XDRIncrementalStencilEncoder::setInitial(
+    JSContext* cx, const JS::ReadOnlyCompileOptions& options,
+    UniquePtr<frontend::ExtensibleCompilationStencil>&& initial) {
+  MOZ_TRY(frontend::StencilXDR::checkCompilationStencil(*initial));
+
+  merger_ = cx->new_<frontend::CompilationStencilMerger>();
+  if (!merger_) {
+    return mozilla::Err(JS::TranscodeResult::Throw);
+  }
+
+  if (!merger_->setInitial(
+          cx, std::forward<UniquePtr<frontend::ExtensibleCompilationStencil>>(
+                  initial))) {
+    return mozilla::Err(JS::TranscodeResult::Throw);
+  }
+
+  return Ok();
 }
 
-void
-XDRIncrementalEncoder::createOrReplaceSubTree(AutoXDRTree* child)
-{
-    AutoXDRTree* parent = scope_;
-    child->parent_ = parent;
-    scope_ = child;
-    if (oom_)
-        return;
+XDRResult XDRIncrementalStencilEncoder::addDelazification(
+    JSContext* cx, const frontend::CompilationStencil& delazification) {
+  if (!merger_->addDelazification(cx, delazification)) {
+    return mozilla::Err(JS::TranscodeResult::Throw);
+  }
 
-    size_t cursor = buf.cursor();
-
-    // End the parent slice here, set the key to the child.
-    if (parent) {
-        Slice& last = node_->back();
-        last.sliceLength = cursor - last.sliceBegin;
-        last.child = child->key_;
-        MOZ_ASSERT_IF(uint32_t(parent->key_) != 0,
-                      uint32_t(parent->key_ >> 32) <= uint32_t(child->key_ >> 32) &&
-                      uint32_t(child->key_) <= uint32_t(parent->key_));
-    }
-
-    // Create or replace the part with what is going to be encoded next.
-    SlicesTree::AddPtr p = tree_.lookupForAdd(child->key_);
-    SlicesNode tmp;
-    if (!p) {
-        // Create a new sub-tree node.
-        if (!tree_.add(p, child->key_, mozilla::Move(tmp))) {
-            oom_ = true;
-            return;
-        }
-    } else {
-        // Replace an exisiting sub-tree.
-        p->value() = mozilla::Move(tmp);
-    }
-    node_ = &p->value();
-
-    // Add content to the root of the new sub-tree,
-    // i-e an empty slice with no children.
-    if (!node_->append(Slice { cursor, 0, AutoXDRTree::noSubTree }))
-        MOZ_CRASH("SlicesNode have a reserved space of 1.");
+  return Ok();
 }
 
-void
-XDRIncrementalEncoder::endSubTree()
-{
-    AutoXDRTree* child = scope_;
-    AutoXDRTree* parent = child->parent_;
-    scope_ = parent;
-    if (oom_)
-        return;
+XDRResult XDRIncrementalStencilEncoder::linearize(JSContext* cx,
+                                                  JS::TranscodeBuffer& buffer,
+                                                  ScriptSource* ss) {
+  XDRStencilEncoder encoder(cx, buffer);
+  RefPtr<ScriptSource> source(ss);
+  {
+    frontend::BorrowingCompilationStencil borrowingStencil(
+        merger_->getResult());
+    MOZ_TRY(encoder.codeStencil(source, borrowingStencil));
+  }
 
-    size_t cursor = buf.cursor();
-
-    // End the child sub-tree.
-    Slice& last = node_->back();
-    last.sliceLength = cursor - last.sliceBegin;
-    MOZ_ASSERT(last.child == AutoXDRTree::noSubTree);
-
-    // Stop at the top-level.
-    if (!parent) {
-        node_ = nullptr;
-        return;
-    }
-
-    // Restore the parent node.
-    SlicesTree::Ptr p = tree_.lookup(parent->key_);
-    node_ = &p->value();
-
-    // Append the new slice in the parent node.
-    if (!node_->append(Slice { cursor, 0, AutoXDRTree::noSubTree })) {
-        oom_ = true;
-        return;
-    }
+  return Ok();
 }
 
-bool
-XDRIncrementalEncoder::linearize(JS::TranscodeBuffer& buffer)
-{
-    if (oom_) {
-        ReportOutOfMemory(cx());
-        return fail(JS::TranscodeResult_Throw);
-    }
+XDRResult XDRStencilDecoder::codeStencil(
+    frontend::CompilationInput& input, frontend::CompilationStencil& stencil) {
+#ifdef DEBUG
+  auto sanityCheck = mozilla::MakeScopeExit(
+      [&] { MOZ_ASSERT(validateResultCode(cx(), resultCode())); });
+#endif
 
-    // Do not linearize while we are currently adding bytes.
-    MOZ_ASSERT(scope_ == nullptr);
+  auto resetOptions = mozilla::MakeScopeExit([&] { options_ = nullptr; });
+  options_ = &input.options;
 
-    // Visit the tree parts in a depth first order, to linearize the bits.
-    Vector<SlicesNode::ConstRange> depthFirst(cx());
+  MOZ_TRY(XDRStencilHeader(this, options_, stencil.source));
+  MOZ_TRY(frontend::StencilXDR::codeCompilationStencil(this, stencil));
 
-    SlicesTree::Ptr p = tree_.lookup(AutoXDRTree::topLevel);
-    MOZ_ASSERT(p);
-
-    if (!depthFirst.append(((const SlicesNode&) p->value()).all())) {
-        ReportOutOfMemory(cx());
-        return fail(JS::TranscodeResult_Throw);
-    }
-
-    while (!depthFirst.empty()) {
-        SlicesNode::ConstRange& iter = depthFirst.back();
-        Slice slice = iter.popCopyFront();
-        // These fields have different meaning, but they should be correlated if
-        // the tree is well formatted.
-        MOZ_ASSERT_IF(slice.child == AutoXDRTree::noSubTree, iter.empty());
-        if (iter.empty())
-            depthFirst.popBack();
-
-        // Copy the bytes associated with the current slice to the transcode
-        // buffer which would be serialized.
-        MOZ_ASSERT(slice.sliceBegin <= slices_.length());
-        MOZ_ASSERT(slice.sliceBegin + slice.sliceLength <= slices_.length());
-        if (!buffer.append(slices_.begin() + slice.sliceBegin, slice.sliceLength)) {
-            ReportOutOfMemory(cx());
-            return fail(JS::TranscodeResult_Throw);
-        }
-
-        // If we are at the end, go to back to the parent script.
-        if (slice.child == AutoXDRTree::noSubTree)
-            continue;
-
-        // Visit the sub-parts before visiting the rest of the current slice.
-        SlicesTree::Ptr p = tree_.lookup(slice.child);
-        MOZ_ASSERT(p);
-        if (!depthFirst.append(((const SlicesNode&) p->value()).all())) {
-            ReportOutOfMemory(cx());
-            return fail(JS::TranscodeResult_Throw);
-        }
-    }
-
-    tree_.finish();
-    slices_.clearAndFree();
-    return true;
+  return Ok();
 }

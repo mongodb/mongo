@@ -1,0 +1,132 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+kl{
+    durationUnits{
+        hm{"h:mm"}
+        hms{"h:mm:ss"}
+        ms{"m:ss"}
+    }
+    units{
+        length{
+            fathom{
+                dnam{"fm"}
+                one{"{0} fth"}
+                other{"{0} fth"}
+            }
+            furlong{
+                dnam{"fur"}
+                one{"{0} fur"}
+                other{"{0} fur"}
+            }
+        }
+    }
+    unitsNarrow{
+        area{
+            acre{
+                one{"{0} ac"}
+                other{"{0} ac"}
+            }
+            square-foot{
+                one{"{0} ft²"}
+                other{"{0} ft²"}
+            }
+            square-mile{
+                one{"{0} mi²"}
+                other{"{0} mi²"}
+            }
+        }
+        length{
+            fathom{
+                dnam{"fm"}
+                one{"{0} fth"}
+                other{"{0} fth"}
+            }
+            furlong{
+                dnam{"fur"}
+                one{"{0} fur"}
+                other{"{0} fur"}
+            }
+            mile{
+                one{"{0} mi"}
+                other{"{0} mi"}
+            }
+            yard{
+                one{"{0} yd"}
+                other{"{0} yd"}
+            }
+        }
+        pressure{
+            inch-ofhg{
+                one{"{0} inHg"}
+                other{"{0} inHg"}
+            }
+        }
+        speed{
+            mile-per-hour{
+                one{"{0} mi/h"}
+                other{"{0} mi/h"}
+            }
+        }
+        volume{
+            cubic-mile{
+                one{"{0} mi³"}
+                other{"{0} mi³"}
+            }
+        }
+    }
+    unitsShort{
+        area{
+            acre{
+                one{"{0} ac"}
+                other{"{0} ac"}
+            }
+            square-foot{
+                one{"{0} ft²"}
+                other{"{0} ft²"}
+            }
+            square-mile{
+                one{"{0} mi²"}
+                other{"{0} mi²"}
+            }
+        }
+        length{
+            fathom{
+                dnam{"fm"}
+                one{"{0} fth"}
+                other{"{0} fth"}
+            }
+            furlong{
+                dnam{"fur"}
+                one{"{0} fur"}
+                other{"{0} fur"}
+            }
+            mile{
+                one{"{0} mi"}
+                other{"{0} mi"}
+            }
+            yard{
+                one{"{0} yd"}
+                other{"{0} yd"}
+            }
+        }
+        pressure{
+            inch-ofhg{
+                one{"{0} inHg"}
+                other{"{0} inHg"}
+            }
+        }
+        speed{
+            mile-per-hour{
+                one{"{0} mi/h"}
+                other{"{0} mi/h"}
+            }
+        }
+        volume{
+            cubic-mile{
+                one{"{0} mi³"}
+                other{"{0} mi³"}
+            }
+        }
+    }
+}

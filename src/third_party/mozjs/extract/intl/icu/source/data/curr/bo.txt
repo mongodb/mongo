@@ -1,0 +1,23 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+bo{
+    Currencies{
+        CNY{
+            "¥",
+            "ཡུ་ཨན་",
+        }
+        INR{
+            "₹",
+            "རྒྱ་གར་སྒོར་",
+        }
+        USD{
+            "US$",
+            "ཨ་རིའི་སྒོར་",
+        }
+        XXX{
+            "¤",
+            "མ་རྟོགས་པའི་ནུས་མེད་དངུལ་ལོར",
+        }
+    }
+}

@@ -1,0 +1,178 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: dv_dv_Latn_BGN.txt
+# Generated from CLDR
+#
+
+# BGN/PCGN 1988 Agreement, with modifications 2009
+#
+# This romanization system supersedes the one which was approved by
+# the BGN and the PCGN in 1972. This official system was submitted
+# to the PCGN by the Maldivian government in 1987 and approved by BGN
+# and PCGN in 1988. The system presented here reflects the 1988 Agreement
+# with minor modifications introduced by the government of the Maldives
+# in 2009.
+#
+# In our rules, we also convert Arabic punctuation characters to Latin.
+# These appears to be used in Maldivian text, for example in the Universal
+# Declaration of Human Rights.
+::[[:block=thaana:][،؛؟٪٫٬]\uFDF2] ;
+::NFD;
+$wordBoundary = [^[:L:][:M:][:N:]] ;
+$vowel = [\u07A6-\u07AF] ;
+$sukun = \u07B0 ;
+$sign = [$sukun $vowel] ;
+$rule4 = [އށ] $sukun ; # see note 4
+### Consonants
+# HAA
+$rule4 ހ → hh ;
+ހ → h ;
+# NOONU
+# See note 5: "romanized n’ when appearing without any vowel or auxiliary sign"
+$rule4 ނ } $sign → nn ;
+$rule4 ނ → nn\' ;
+ނ } $sign → n ;
+ނ → n\' ;
+# RAA
+$rule4 ރ → rr ;
+ރ → r ;
+# BAA
+$rule4 ބ → bb ;
+ބ → b ;
+# LHAVIYANI
+$rule4 ޅ → hlh ;
+ޅ → lh;
+# KAAFU
+$rule4 ކ → kk ;
+ކ → k ;
+# VAAVU
+$rule4 ވ → vv ;
+ވ → v ;
+# MEEMU
+$rule4 މ → mm ;
+މ → m ;
+# FAAFU
+$rule4 ފ → ff ;
+ފ → f;
+# DHAALU
+$rule4 ދ → hdh ;
+ދ → dh;
+# THAA
+# See note 6: "romanized iy when appearing in combination with a supercircle"
+$rule4 ތ $sukun → hiy ;
+$rule4 ތ → hth ;
+\u07A8 ތ $sukun → iy ;
+ތ $sukun → iy ;
+ތ → th ;
+# LAAMU
+$rule4 ލ → ll ;
+ލ → l ;
+# GAAFU
+$rule4 ގ → gg ;
+ގ → g ;
+# GNAVIYANI
+$rule4 ޏ → hgn ;
+ޏ → gn ;
+# SEENU
+$rule4 ސ → ss ;
+ސ → s ;
+# DAVIYANI
+$rule4 ޑ → dd ;
+ޑ → d ;
+# ZAVIYANI
+$rule4 ޒ → zz ;
+ޒ → z ;
+# TAVIYANI
+$rule4 ޓ → tt ;
+ޓ → t ;
+# YAA
+$rule4 ޔ → yy ;
+ޔ → y ;
+# PAVIYANI
+$rule4 ޕ → pp ;
+ޕ → p ;
+# JAVIYANI
+$rule4 ޖ → jj ;
+ޖ → j ;
+# CHAVIYANI
+$rule4 ޗ → hch ;
+ޗ → ch ;
+### Borrowed Consonants (See Rule 7)
+# SAADHU
+$rule4 ޞ → şş ;
+ޞ → ş ;
+# SHEENU
+$rule4 ޝ → hsh ;
+ޝ → sh ;
+# ZAA
+$rule4 ޜ → zz ;
+ޜ → z;
+# KHAA
+$rule4 ޚ → hkh ;
+ޚ → kh;
+# HHAA
+$rule4 ޙ → ḩḩ ;
+ޙ → ḩ ;
+# THAALU
+$rule4 ޛ → hdh ;
+ޛ → dh ;
+# TTAA
+$rule4 ޘ → hth ;
+ޘ → th ;
+# WAAVU
+$rule4 ޥ → ww ;
+ޥ → w ;
+# QAAFU
+$rule4 ޤ → qq ;
+ޤ → q ;
+# GHAINU
+$rule4 ޣ → hgh ;
+ޣ → gh ;
+# AINU
+$rule4 ޢ → \'\' ;
+ޢ → \' ;
+# ZO
+$rule4 ޡ → z\u0327z\u0327 ;
+ޡ → z\u0327 ;
+# TO
+$rule4 ޠ → ţţ ;
+ޠ → ţ ;
+# DAADHU
+$rule4 ޟ → ḑḑ ;
+ޟ → ḑ ;
+# NOTE: not in Maldivian BGN system, but for completeness of Thaana block
+# NAA
+$rule4 ޱ → n\u0332n\u0332 ;
+ޱ → n\u0332 ;
+# Rule 4 in word-final position
+$rule4 } $wordBoundary → h;
+# SHAVIYANI (placed last to avoid masking)
+$rule4 ށ → hsh;
+ށ → sh;
+# Otherwise, these signs are not romanized elsewhere
+$rule4 → ;
+\u07B0 → ;
+އ → ;
+# NOTE: not in Maldivian BGN system, but common in names (e.g. Abdullah)
+($vowel) \uFDF2 → | $1 llāh ;
+\uFDF2 → allāh;
+### Vowels
+\u07A6 → a; # ABAFILI
+\u07A7 → aa; # AABAAFILI
+\u07AC → e; # EBEFILI
+\u07AD → ey; # EYBEYFILI
+\u07A8 → i; # IBIFILI
+\u07A9 → ee; # EEBEEFILI
+\u07AE → o; # OBOFILI
+\u07AF → oa; # OABOAFILI
+\u07AA → u; # UBUFILI
+\u07AB → oo; # OOBOOFILI
+، → ',';  # U+060C ARABIC COMMA
+؛ → ';';  # U+061B ARABIC SEMICOLON
+؟ → '?';  # U+061F ARABIC QUESTION MARK
+٪ → '%';  # U+066A ARABIC PERCENT SIGN
+٫ → '.';  # U+066B ARABIC DECIMAL SEPARATOR
+٬ → ',';  # U+066C ARABIC THOUSANDS SEPARATOR
+

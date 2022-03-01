@@ -1,0 +1,20 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: az_Lower.txt
+# Generated from CLDR
+#
+
+# I and i-dotless; I-dot and i are case pairs in Turkish and Azeri
+# 0130; 0069; 0130; 0130; tr; # LATIN CAPITAL LETTER I WITH DOT ABOVE
+İ→i;
+# When lowercasing, remove dot_above in the sequence I + dot_above, which will turn into i.
+# This matches the behavior of the canonically equivalent I-dot_above
+# 0307; ; 0307; 0307; tr After_I; # COMBINING DOT ABOVE
+# When lowercasing, unless an I is before a dot_above, it turns into a dotless i.
+# 0049; 0131; 0049; 0049; tr Not_Before_Dot; # LATIN CAPITAL LETTER I
+I([^[:ccc=Not_Reordered:][:ccc=Above:]]*)\u0307 → i$1 ;
+I→ı ;
+::Any-Lower();
+

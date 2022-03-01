@@ -17,7 +17,7 @@ namespace mozilla {
 enum NotNullTag {
   KnownNotNull,
 };
-} // namespace mozilla
+}  // namespace mozilla
 
 /*
  * The logic here is a little subtle.  [expr.new] states that if the allocation
@@ -42,11 +42,9 @@ enum NotNullTag {
  * hypothetical static analyzers.  Doing so makes |MOZ_ASSERT(p)|'s internal
  * test vacuous, and some compilers warn about such vacuous tests.
  */
-inline void*
-operator new(size_t, mozilla::NotNullTag, void* p)
-{
+inline void* operator new(size_t, mozilla::NotNullTag, void* p) {
   MOZ_ASSERT(p);
   return p;
 }
 
-#endif // mozilla_OperatorNewExtensions_h
+#endif  // mozilla_OperatorNewExtensions_h

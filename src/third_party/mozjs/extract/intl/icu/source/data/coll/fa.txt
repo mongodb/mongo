@@ -1,0 +1,22 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+fa{
+    collations{
+        standard{
+            Sequence{
+                "[normalization on]"
+                "[reorder Arab]"
+                "&َ<<ِ<<ُ<<ً<<ٍ<<ٌ"
+                "&[before 1]ا<آ"
+                "&ا<<ٱ<ء"
+                "<<أ<<ٲ<<إ<<ٳ<<ؤ"
+                "<<یٔ<<<ىٔ<<<ئ"
+                "&ک<<*ڪګكڬڭڮ"
+                "&ۏ<ه<<ە<<ہ<<ة<<ۃ<<ۀ<<ھ"
+                "&ی<<*ىےيېۑۍێ"
+            }
+            Version{"39"}
+        }
+    }
+}

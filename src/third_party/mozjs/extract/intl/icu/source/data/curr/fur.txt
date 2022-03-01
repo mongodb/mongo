@@ -1,0 +1,381 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+fur{
+    Currencies{
+        AMD{
+            "AMD",
+            "Dram armen",
+        }
+        ARS{
+            "ARS",
+            "Peso argjentin",
+        }
+        ATS{
+            "ATS",
+            "Selin austriac",
+        }
+        AUD{
+            "A$",
+            "dolar australian",
+        }
+        BEF{
+            "BEF",
+            "Franc de Belgjiche",
+        }
+        BIF{
+            "BIF",
+            "Franc burundês",
+        }
+        BND{
+            "BND",
+            "Dolar dal Brunei",
+        }
+        BRL{
+            "R$",
+            "real brasilian",
+        }
+        BYN{
+            "BYN",
+            "Rubli bielorùs",
+        }
+        BYR{
+            "BYR",
+            "Rubli bielorùs (2000–2016)",
+        }
+        CAD{
+            "CA$",
+            "dolar canadês",
+        }
+        CHF{
+            "CHF",
+            "franc svuizar",
+        }
+        CNY{
+            "CN¥",
+            "yuan cinês",
+        }
+        CSD{
+            "CSD",
+            "Vieri dinar serp",
+        }
+        CUP{
+            "CUP",
+            "Peso cuban",
+        }
+        CZK{
+            "CZK",
+            "Corone de Republiche Ceche",
+        }
+        DEM{
+            "DEM",
+            "Marc todesc",
+        }
+        DKK{
+            "DKK",
+            "corone danese",
+        }
+        DZD{
+            "DZD",
+            "Dinar algerin",
+        }
+        EUR{
+            "€",
+            "euro",
+        }
+        FRF{
+            "FRF",
+            "Franc francês",
+        }
+        GBP{
+            "£",
+            "sterline britaniche",
+        }
+        HKD{
+            "HK$",
+            "dolar di Hong Kong",
+        }
+        HRD{
+            "HRD",
+            "Dinar cravuat",
+        }
+        HRK{
+            "HRK",
+            "Kuna cravuate",
+        }
+        IDR{
+            "IDR",
+            "rupiah indonesiane",
+        }
+        INR{
+            "₹",
+            "rupie indiane",
+        }
+        IRR{
+            "IRR",
+            "Rial iranian",
+        }
+        ITL{
+            "ITL",
+            "Lire taliane",
+        }
+        JPY{
+            "JP¥",
+            "yen gjaponês",
+        }
+        KRW{
+            "₩",
+            "won de Coree dal Sud",
+        }
+        LVL{
+            "LVL",
+            "Lats leton",
+        }
+        MXN{
+            "MX$",
+            "peso messican",
+        }
+        NAD{
+            "NAD",
+            "Dolar namibian",
+        }
+        NIO{
+            "NIO",
+            "Córdoba oro nicaraguan",
+        }
+        NOK{
+            "NOK",
+            "corone norvegjese",
+        }
+        NZD{
+            "NZ$",
+            "Dollar neozelandês",
+        }
+        PKR{
+            "PKR",
+            "Rupie pachistane",
+        }
+        PLN{
+            "PLN",
+            "zloty polac",
+        }
+        RSD{
+            "RSD",
+            "Dinar serp",
+        }
+        RUB{
+            "RUB",
+            "rubli rus",
+        }
+        SAR{
+            "SAR",
+            "riyal de Arabie Saudite",
+        }
+        SEK{
+            "SEK",
+            "corone svedese",
+        }
+        SIT{
+            "SIT",
+            "Talar sloven",
+        }
+        SKK{
+            "SKK",
+            "Corone slovache",
+        }
+        THB{
+            "THB",
+            "baht tailandês",
+        }
+        TRL{
+            "TRL",
+            "Viere Lire turche",
+        }
+        TRY{
+            "TRY",
+            "lire turche",
+        }
+        TWD{
+            "NT$",
+            "gnûf dolar taiwanês",
+        }
+        USD{
+            "US$",
+            "dolar american",
+        }
+        USN{
+            "USN",
+            "Dolar american (prossime zornade)",
+        }
+        USS{
+            "USS",
+            "Dolar american (stesse zornade)",
+        }
+        XAG{
+            "XAG",
+            "Arint",
+        }
+        XAU{
+            "XAU",
+            "Aur",
+        }
+        XBA{
+            "XBA",
+            "Unitât composite europeane",
+        }
+        XBB{
+            "XBB",
+            "Unitât monetarie europeane",
+        }
+        XBC{
+            "XBC",
+            "Unitât di acont europeane (XBC)",
+        }
+        XBD{
+            "XBD",
+            "Unitât di acont europeane (XBD)",
+        }
+        XDR{
+            "XDR",
+            "Dirits speciâi di incas",
+        }
+        XFO{
+            "XFO",
+            "Franc aur francês",
+        }
+        XFU{
+            "XFU",
+            "Franc UIC francês",
+        }
+        XPD{
+            "XPD",
+            "Paladi",
+        }
+        XPT{
+            "XPT",
+            "Platin",
+        }
+        XRE{
+            "XRE",
+            "fonts RINET",
+        }
+        XTS{
+            "XTS",
+            "codiç di verifiche de monede",
+        }
+        XXX{
+            "¤",
+            "Monede no valide o no cognossude",
+        }
+        ZAR{
+            "ZAR",
+            "rand sudafrican",
+        }
+    }
+    CurrencyPlurals{
+        AUD{
+            one{"dolar australian"}
+            other{"dolars australians"}
+        }
+        BRL{
+            one{"real brasilian"}
+            other{"real brasilians"}
+        }
+        CAD{
+            one{"dolar canadês"}
+            other{"dolars canadês"}
+        }
+        CHF{
+            one{"franc svuizar"}
+            other{"francs svuizars"}
+        }
+        CNY{
+            one{"yuan cinês"}
+            other{"yuan cinês"}
+        }
+        DKK{
+            one{"corone danese"}
+            other{"coronis danesis"}
+        }
+        EUR{
+            one{"euro"}
+            other{"euros"}
+        }
+        GBP{
+            one{"sterline britaniche"}
+            other{"sterlinis britanichis"}
+        }
+        HKD{
+            one{"dolar di Hong Kong"}
+            other{"dolars di Hong Kong"}
+        }
+        IDR{
+            one{"rupiah indonesiane"}
+            other{"rupiah indonesianis"}
+        }
+        INR{
+            one{"rupie indiane"}
+            other{"rupiis indianis"}
+        }
+        JPY{
+            one{"yen gjaponês"}
+            other{"yen gjaponês"}
+        }
+        KRW{
+            one{"won de Coree dal Sud"}
+            other{"won de Coree dal Sud"}
+        }
+        MXN{
+            one{"peso messican"}
+            other{"pesos messicans"}
+        }
+        NOK{
+            one{"corone norvegjese"}
+            other{"coronis norvegjesis"}
+        }
+        PLN{
+            one{"zloty polac"}
+            other{"zloty polacs"}
+        }
+        RUB{
+            one{"rubli rus"}
+            other{"rublis rus"}
+        }
+        SAR{
+            one{"riyal de Arabie Saudite"}
+            other{"riyals de Arabie Saudite"}
+        }
+        SEK{
+            one{"corone svedese"}
+            other{"coronis svedesis"}
+        }
+        THB{
+            one{"baht tailandês"}
+            other{"baht tailandês"}
+        }
+        TRY{
+            one{"lire turche"}
+            other{"liris turchis"}
+        }
+        TWD{
+            one{"gnûf dolar taiwanês"}
+            other{"gnûfs dolars taiwanês"}
+        }
+        USD{
+            one{"dolar american"}
+            other{"dolars americans"}
+        }
+        XXX{
+            one{"Monede no valide o no cognossude"}
+            other{"Monedis no validis o no cognossudis"}
+        }
+        ZAR{
+            one{"rand sudafrican"}
+            other{"rands sudafricans"}
+        }
+    }
+    CurrencyUnitPatterns{
+        one{"{0} {1}"}
+        other{"{0} {1}"}
+    }
+}

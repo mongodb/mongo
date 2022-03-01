@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -18,134 +18,88 @@
 class JSLinearString;
 class JSRope;
 class JSTracer;
+struct JSClass;
 
 namespace js {
 class BaseShape;
 class GCMarker;
-class LazyScript;
 class NativeObject;
-class ObjectGroup;
 class Shape;
 class WeakMapBase;
 
 namespace jit {
 class JitCode;
-} // namespace jit
-
-#ifdef DEBUG
-// Return true if this trace is happening on behalf of gray buffering during
-// the marking phase of incremental GC.
-bool
-IsBufferGrayRootsTracer(JSTracer* trc);
-
-bool
-IsUnmarkGrayTracer(JSTracer* trc);
-#endif
+}  // namespace jit
 
 namespace gc {
 
-class Arena;
 struct Cell;
 class TenuredCell;
 
-/*** Special Cases ***/
-
-void
-PushArena(GCMarker* gcmarker, Arena* arena);
-
 /*** Liveness ***/
 
-// Report whether a thing has been marked.  Things which are in zones that are
-// not currently being collected or are owned by another runtime are always
-// reported as being marked.
-template <typename T>
-bool
-IsMarkedUnbarriered(JSRuntime* rt, T* thingp);
-
-// Report whether a thing has been marked.  Things which are in zones that are
-// not currently being collected or are owned by another runtime are always
-// reported as being marked.
-template <typename T>
-bool
-IsMarked(JSRuntime* rt, WriteBarrieredBase<T>* thingp);
+// The IsMarkedInternal and IsAboutToBeFinalizedInternal function templates are
+// used to implement the IsMarked and IsAboutToBeFinalized set of functions.
+// These internal functions are instantiated for the base GC types and should
+// not be called directly.
+//
+// Note that there are two function templates declared for each, not one
+// template and a specialization. This is necessary so that pointer arguments
+// (e.g. JSObject**) and tagged value arguments (e.g. JS::Value*) are routed to
+// separate implementations.
 
 template <typename T>
-bool
-IsAboutToBeFinalizedUnbarriered(T* thingp);
+bool IsMarkedInternal(JSRuntime* rt, T** thing);
 
 template <typename T>
-bool
-IsAboutToBeFinalized(WriteBarrieredBase<T>* thingp);
-
+bool IsAboutToBeFinalizedInternal(T* thingp);
 template <typename T>
-bool
-IsAboutToBeFinalized(ReadBarrieredBase<T>* thingp);
+bool IsAboutToBeFinalizedInternal(T** thingp);
 
-bool
-IsAboutToBeFinalizedDuringSweep(TenuredCell& tenured);
-
-inline Cell*
-ToMarkable(const Value& v)
-{
-    if (v.isGCThing())
-        return (Cell*)v.toGCThing();
-    return nullptr;
+// Report whether a GC thing has been marked with any color. Things which are in
+// zones that are not currently being collected or are owned by another runtime
+// are always reported as being marked.
+template <typename T>
+inline bool IsMarkedUnbarriered(JSRuntime* rt, T* thingp) {
+  return IsMarkedInternal(rt, ConvertToBase(thingp));
 }
 
-inline Cell*
-ToMarkable(Cell* cell)
-{
-    return cell;
+// Report whether a GC thing has been marked with any color. Things which are in
+// zones that are not currently being collected or are owned by another runtime
+// are always reported as being marked.
+template <typename T>
+inline bool IsMarked(JSRuntime* rt, BarrieredBase<T>* thingp) {
+  return IsMarkedInternal(rt, ConvertToBase(thingp->unbarrieredAddress()));
 }
 
-// Wrap a GC thing pointer into a new Value or jsid. The type system enforces
-// that the thing pointer is a wrappable type.
-template <typename S, typename T>
-struct RewrapTaggedPointer{};
-#define DECLARE_REWRAP(S, T, method, prefix) \
-    template <> struct RewrapTaggedPointer<S, T> { \
-        static S wrap(T* thing) { return method ( prefix thing ); } \
-    }
-DECLARE_REWRAP(JS::Value, JSObject, JS::ObjectOrNullValue, );
-DECLARE_REWRAP(JS::Value, JSString, JS::StringValue, );
-DECLARE_REWRAP(JS::Value, JS::Symbol, JS::SymbolValue, );
-DECLARE_REWRAP(jsid, JSString, NON_INTEGER_ATOM_TO_JSID, (JSAtom*));
-DECLARE_REWRAP(jsid, JS::Symbol, SYMBOL_TO_JSID, );
-DECLARE_REWRAP(js::TaggedProto, JSObject, js::TaggedProto, );
-#undef DECLARE_REWRAP
+template <typename T>
+inline bool IsAboutToBeFinalizedUnbarriered(T* thingp) {
+  return IsAboutToBeFinalizedInternal(ConvertToBase(thingp));
+}
 
 template <typename T>
-struct IsPrivateGCThingInValue
-  : public mozilla::EnableIf<mozilla::IsBaseOf<Cell, T>::value &&
-                             !mozilla::IsBaseOf<JSObject, T>::value &&
-                             !mozilla::IsBaseOf<JSString, T>::value &&
-                             !mozilla::IsBaseOf<JS::Symbol, T>::value, T>
-{
-    static_assert(!mozilla::IsSame<Cell, T>::value && !mozilla::IsSame<TenuredCell, T>::value,
-                  "T must not be Cell or TenuredCell");
-};
+inline bool IsAboutToBeFinalized(const BarrieredBase<T>* thingp) {
+  return IsAboutToBeFinalizedInternal(
+      ConvertToBase(thingp->unbarrieredAddress()));
+}
 
-template <typename T>
-struct RewrapTaggedPointer<Value, T>
-{
-    static Value wrap(typename IsPrivateGCThingInValue<T>::Type* thing) {
-        return JS::PrivateGCThingValue(thing);
-    }
-};
+inline bool IsAboutToBeFinalizedDuringMinorSweep(Cell* cell);
+
+inline Cell* ToMarkable(const Value& v) {
+  if (v.isGCThing()) {
+    return (Cell*)v.toGCThing();
+  }
+  return nullptr;
+}
+
+inline Cell* ToMarkable(Cell* cell) { return cell; }
+
+bool UnmarkGrayGCThingUnchecked(JSRuntime* rt, JS::GCCellPtr thing);
 
 } /* namespace gc */
 
 // The return value indicates if anything was unmarked.
-bool
-UnmarkGrayShapeRecursively(Shape* shape);
-
-template<typename T>
-void
-CheckTracedThing(JSTracer* trc, T* thing);
-
-template<typename T>
-void
-CheckTracedThing(JSTracer* trc, T thing);
+bool UnmarkGrayShapeRecursively(Shape* shape);
 
 namespace gc {
 
@@ -165,7 +119,6 @@ namespace gc {
 
 template <typename T>
 inline bool IsForwarded(const T* t);
-inline bool IsForwarded(const JS::Value& value);
 
 template <typename T>
 inline T* Forwarded(const T* t);
@@ -175,11 +128,16 @@ inline Value Forwarded(const JS::Value& value);
 template <typename T>
 inline T MaybeForwarded(T t);
 
-inline void
-MakeAccessibleAfterMovingGC(void* anyp) {}
+// Helper functions for use in situations where the object's group might be
+// forwarded, for example while marking.
 
-inline void
-MakeAccessibleAfterMovingGC(JSObject* obj); // Defined in jsobjinlines.h.
+inline const JSClass* MaybeForwardedObjectClass(const JSObject* obj);
+
+template <typename T>
+inline bool MaybeForwardedObjectIs(JSObject* obj);
+
+template <typename T>
+inline T& MaybeForwardedObjectAs(JSObject* obj);
 
 #ifdef JSGC_HASH_TABLE_CHECKS
 
@@ -190,13 +148,25 @@ template <typename T>
 inline void CheckGCThingAfterMovingGC(T* t);
 
 template <typename T>
-inline void CheckGCThingAfterMovingGC(const ReadBarriered<T*>& t);
+inline void CheckGCThingAfterMovingGC(const WeakHeapPtr<T*>& t);
 
-inline void CheckValueAfterMovingGC(const JS::Value& value);
-
-#endif // JSGC_HASH_TABLE_CHECKS
+#endif  // JSGC_HASH_TABLE_CHECKS
 
 } /* namespace gc */
+
+// Debugging functions to check tracing invariants.
+#ifdef DEBUG
+template <typename T>
+void CheckTracedThing(JSTracer* trc, T* thing);
+template <typename T>
+void CheckTracedThing(JSTracer* trc, const T& thing);
+#else
+template <typename T>
+inline void CheckTracedThing(JSTracer* trc, T* thing) {}
+template <typename T>
+inline void CheckTracedThing(JSTracer* trc, const T& thing) {}
+#endif
+
 } /* namespace js */
 
 #endif /* gc_Marking_h */

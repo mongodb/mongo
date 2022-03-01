@@ -1,0 +1,66 @@
+## -*-makefile-*-
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+## MP-RAS specific setup
+## Copyright (c) 2003-2004, International Business Machines Corporation and
+## others. All Rights Reserved.
+##
+## Original contributer: Jason Gordon from NCR
+
+## Flags for position independent code
+SHAREDLIBCFLAGS = -K PIC
+SHAREDLIBCXXFLAGS = -K PIC
+SHAREDLIBCPPFLAGS = -DPIC
+
+## Commands to generate dependency files
+GEN_DEPS.c= $(CC) -Hnocopyr -I/usr/include -Hcpplvl=3 -Xa -Hmake $(DEFS) $(CPPFLAGS)
+GEN_DEPS.cc= $(CXX) -Hnocopyr -I/usr/include -Hcpplvl=3 -Xa -Hmake $(DEFS) $(CPPFLAGS)
+
+## Commands to link
+LINK.c=		$(CC) $(CXXFLAGS) $(LDFLAGS)
+LINK.cc=	$(CXX) $(CXXFLAGS) $(LDFLAGS)
+
+## Commands to make a shared library
+SHLIB.c=	$(CC) $(CFLAGS) $(LDFLAGS) -G
+SHLIB.cc=	$(CXX) $(CXXFLAGS) $(LDFLAGS) -G
+
+## Compiler switch to embed a runtime search path
+LD_RPATH=     -YP,
+LD_RPATH_PRE=	
+
+## Compiler switch to embed a library name
+LD_SONAME = -h $(notdir $(MIDDLE_SO_TARGET))
+
+## Shared object suffix
+SO=		so
+## Non-shared intermediate object suffix
+STATIC_O = o
+
+## Compilation rules
+%.$(STATIC_O): $(srcdir)/%.c
+	$(COMPILE.c) $(STATICCPPFLAGS) $(STATICCFLAGS) -o $@ $<
+%.o: $(srcdir)/%.c
+	$(COMPILE.c) $(DYNAMICCPPFLAGS) $(DYNAMICCFLAGS) -o $@ $<
+
+%.$(STATIC_O): $(srcdir)/%.cpp
+	$(COMPILE.cc) $(STATICCPPFLAGS) $(STATICCXXFLAGS) -o $@ $<
+%.o: $(srcdir)/%.cpp
+	$(COMPILE.cc) $(DYNAMICCPPFLAGS) $(DYNAMICCXXFLAGS) -o $@ $<
+
+
+## Dependency rules
+%.d : $(srcdir)/%.c
+	@echo "generating dependency information for $<"
+	@$(GEN_DEPS.c) $< > $@
+
+%.d : $(srcdir)/%.cpp
+	@echo "generating dependency information for $<"
+	@$(GEN_DEPS.cc) $< > $@
+
+## Versioned libraries rules
+
+%.$(SO).$(SO_TARGET_VERSION_MAJOR): %.$(SO).$(SO_TARGET_VERSION)
+	$(RM) $@ && ln -s ${<F} $@
+%.$(SO): %.$(SO).$(SO_TARGET_VERSION_MAJOR)
+	$(RM) $@ && ln -s ${*F}.$(SO).$(SO_TARGET_VERSION) $@
+

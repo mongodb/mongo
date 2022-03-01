@@ -9,7 +9,7 @@
 #ifndef mozilla_Opaque_h
 #define mozilla_Opaque_h
 
-#include "mozilla/TypeTraits.h"
+#include <type_traits>
 
 namespace mozilla {
 
@@ -18,27 +18,24 @@ namespace mozilla {
  * must be supported, and it's desirable to prevent accidental dependency on
  * exact values.
  */
-template<typename T>
-class Opaque final
-{
-  static_assert(mozilla::IsIntegral<T>::value,
+template <typename T>
+class Opaque final {
+  static_assert(std::is_integral_v<T>,
                 "mozilla::Opaque only supports integral types");
 
   T mValue;
 
-public:
-  Opaque() {}
+ public:
+  Opaque() = default;
   explicit Opaque(T aValue) : mValue(aValue) {}
 
   bool operator==(const Opaque& aOther) const {
     return mValue == aOther.mValue;
   }
 
-  bool operator!=(const Opaque& aOther) const {
-    return !(*this == aOther);
-  }
+  bool operator!=(const Opaque& aOther) const { return !(*this == aOther); }
 };
 
-} // namespace mozilla
+}  // namespace mozilla
 
 #endif /* mozilla_Opaque_h */

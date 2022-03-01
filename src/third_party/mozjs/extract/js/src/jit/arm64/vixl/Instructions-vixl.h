@@ -86,8 +86,10 @@ const uint64_t kByteMask = UINT64_C(0xff);
 const uint64_t kHalfWordMask = UINT64_C(0xffff);
 const uint64_t kWordMask = UINT64_C(0xffffffff);
 const uint64_t kXMaxUInt = UINT64_C(0xffffffffffffffff);
+const uint64_t kXMaxExactUInt = UINT64_C(0xfffffffffffff800);
 const uint64_t kWMaxUInt = UINT64_C(0xffffffff);
 const int64_t kXMaxInt = INT64_C(0x7fffffffffffffff);
+const int64_t kXMaxExactInt = UINT64_C(0x7ffffffffffffc00);
 const int64_t kXMinInt = INT64_C(0x8000000000000000);
 const int32_t kWMaxInt = INT32_C(0x7fffffff);
 const int32_t kWMinInt = INT32_C(0x80000000);
@@ -101,27 +103,6 @@ const unsigned kAddressTagWidth = 8;
 const uint64_t kAddressTagMask =
     ((UINT64_C(1) << kAddressTagWidth) - 1) << kAddressTagOffset;
 VIXL_STATIC_ASSERT(kAddressTagMask == UINT64_C(0xff00000000000000));
-
-// AArch64 floating-point specifics. These match IEEE-754.
-const unsigned kDoubleMantissaBits = 52;
-const unsigned kDoubleExponentBits = 11;
-const unsigned kFloatMantissaBits = 23;
-const unsigned kFloatExponentBits = 8;
-const unsigned kFloat16MantissaBits = 10;
-const unsigned kFloat16ExponentBits = 5;
-
-// Floating-point infinity values.
-extern const float16 kFP16PositiveInfinity;
-extern const float16 kFP16NegativeInfinity;
-extern const float kFP32PositiveInfinity;
-extern const float kFP32NegativeInfinity;
-extern const double kFP64PositiveInfinity;
-extern const double kFP64NegativeInfinity;
-
-// The default NaN values (for FPCR.DN=1).
-extern const float16 kFP16DefaultNaN;
-extern const float kFP32DefaultNaN;
-extern const double kFP64DefaultNaN;
 
 unsigned CalcLSDataSize(LoadStoreOp op);
 unsigned CalcLSPairDataSize(LoadStorePairOp op);
@@ -153,19 +134,6 @@ enum AddrMode {
   PostIndex
 };
 
-enum FPRounding {
-  // The first four values are encodable directly by FPCR<RMode>.
-  FPTieEven = 0x0,
-  FPPositiveInfinity = 0x1,
-  FPNegativeInfinity = 0x2,
-  FPZero = 0x3,
-
-  // The final rounding modes are only available when explicitly specified by
-  // the instruction (such as with fcvta). It cannot be set in FPCR.
-  FPTieAway,
-  FPRoundOdd
-};
-
 enum Reg31Mode {
   Reg31IsStackPointer,
   Reg31IsZeroRegister
@@ -188,12 +156,12 @@ class Instruction {
   }
 
   uint32_t Bits(int msb, int lsb) const {
-    return unsigned_bitextract_32(msb, lsb, InstructionBits());
+    return ExtractUnsignedBitfield32(msb, lsb, InstructionBits());
   }
 
   int32_t SignedBits(int msb, int lsb) const {
     int32_t bits = *(reinterpret_cast<const int32_t*>(this));
-    return signed_bitextract_32(msb, lsb, bits);
+    return ExtractSignedBitfield32(msb, lsb, bits);
   }
 
   Instr Mask(uint32_t mask) const {
@@ -216,7 +184,7 @@ class Instruction {
     int offset =
         static_cast<int>((ImmPCRelHi() << ImmPCRelLo_width) | ImmPCRelLo());
     int width = ImmPCRelLo_width + ImmPCRelHi_width;
-    return signed_bitextract_32(width - 1, 0, offset);
+    return ExtractSignedBitfield32(width - 1, 0, offset);
   }
 
   uint64_t ImmLogical() const;
@@ -315,7 +283,7 @@ class Instruction {
   bool IsMovz() const;
   bool IsMovk() const;
   bool IsBranchLinkImm() const;
-  bool IsTargetReachable(Instruction* target) const;
+  bool IsTargetReachable(const Instruction* target) const;
   ptrdiff_t ImmPCRawOffset() const;
   void SetImmPCRawOffset(ptrdiff_t offset);
   void SetBits32(int msb, int lsb, unsigned value);
@@ -462,12 +430,16 @@ class Instruction {
     return literal;
   }
 
+  void SetLiteral64(uint64_t literal) const {
+    memcpy(LiteralAddress<void*>(), &literal, sizeof(literal));
+  }
+
   float LiteralFP32() const {
-    return rawbits_to_float(Literal32());
+    return RawbitsToFloat(Literal32());
   }
 
   double LiteralFP64() const {
-    return rawbits_to_double(Literal64());
+    return RawbitsToDouble(Literal64());
   }
 
   const Instruction* NextInstruction() const {

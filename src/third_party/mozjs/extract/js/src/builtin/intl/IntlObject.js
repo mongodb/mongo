@@ -47,7 +47,7 @@ function Intl_getCalendarInfo(locales) {
     const localeData = DateTimeFormat.localeData;
 
     // 3. Let localeOpt be a new Record.
-    const localeOpt = new Record();
+    const localeOpt = new_Record();
 
     // 4. Set localeOpt.[[localeMatcher]] to "best fit".
     localeOpt.localeMatcher = "best fit";
@@ -55,7 +55,7 @@ function Intl_getCalendarInfo(locales) {
     // 5. Let r be ResolveLocale(%DateTimeFormat%.[[availableLocales]],
     //    requestedLocales, localeOpt,
     //    %DateTimeFormat%.[[relevantExtensionKeys]], localeData).
-    const r = ResolveLocale(callFunction(DateTimeFormat.availableLocales, DateTimeFormat),
+    const r = ResolveLocale("DateTimeFormat",
                             requestedLocales,
                             localeOpt,
                             DateTimeFormat.relevantExtensionKeys,
@@ -63,8 +63,8 @@ function Intl_getCalendarInfo(locales) {
 
     // 6. Let result be GetCalendarInfo(r.[[locale]]).
     const result = intl_GetCalendarInfo(r.locale);
-    _DefineDataProperty(result, "calendar", r.ca);
-    _DefineDataProperty(result, "locale", r.locale);
+    DefineDataProperty(result, "calendar", r.ca);
+    DefineDataProperty(result, "locale", r.locale);
 
     // 7. Return result.
     return result;
@@ -119,18 +119,18 @@ function Intl_getDisplayNames(locales, options) {
     const localeData = DateTimeFormat.localeData;
 
     // 5. Let localeOpt be a new Record.
-    const localeOpt = new Record();
+    const localeOpt = new_Record();
 
     // 6. Set localeOpt.[[localeMatcher]] to "best fit".
     localeOpt.localeMatcher = "best fit";
 
     // 7. Let r be ResolveLocale(%DateTimeFormat%.[[availableLocales]], requestedLocales, localeOpt,
     //    %DateTimeFormat%.[[relevantExtensionKeys]], localeData).
-    const r = ResolveLocale(callFunction(DateTimeFormat.availableLocales, DateTimeFormat),
-                          requestedLocales,
-                          localeOpt,
-                          DateTimeFormat.relevantExtensionKeys,
-                          localeData);
+    const r = ResolveLocale("DateTimeFormat",
+                            requestedLocales,
+                            localeOpt,
+                            DateTimeFormat.relevantExtensionKeys,
+                            localeData);
 
     // 8. Let style be ? GetOption(options, "style", "string", « "long", "short", "narrow" », "long").
     const style = GetOption(options, "style", "string", ["long", "short", "narrow"], "long");
@@ -162,7 +162,7 @@ function Intl_getDisplayNames(locales, options) {
     for (let i = 0; i < len; i++) {
         // a. Let processedKey be ? ToString(? Get(keys, i)).
         // b. Perform ? CreateDataPropertyOrThrow(processedKeys, i, processedKey).
-        _DefineDataProperty(processedKeys, i, ToString(keys[i]));
+        DefineDataProperty(processedKeys, i, ToString(keys[i]));
     }
 
     // 16. Let names be ? ComputeDisplayNames(r.[[locale]], style, processedKeys).
@@ -183,7 +183,7 @@ function Intl_getDisplayNames(locales, options) {
         // d. Assert: the length of name is greater than zero.
         assert(name.length > 0, "empty string value");
         // e. Perform ? DefinePropertyOrThrow(values, key, name).
-        _DefineDataProperty(values, key, name);
+        DefineDataProperty(values, key, name);
     }
 
     // 20. Let options be ObjectCreate(%ObjectPrototype%).
@@ -203,10 +203,10 @@ function Intl_getLocaleInfo(locales) {
   const DateTimeFormat = dateTimeFormatInternalProperties;
   const localeData = DateTimeFormat.localeData;
 
-  const localeOpt = new Record();
+  const localeOpt = new_Record();
   localeOpt.localeMatcher = "best fit";
 
-  const r = ResolveLocale(callFunction(DateTimeFormat.availableLocales, DateTimeFormat),
+  const r = ResolveLocale("DateTimeFormat",
                           requestedLocales,
                           localeOpt,
                           DateTimeFormat.relevantExtensionKeys,

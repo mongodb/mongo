@@ -1,0 +1,9103 @@
+# © 2019 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+
+compact-short percent unit-width-narrow
+  es-MX
+    0%
+    92 k%
+    -0.22%
+  zh-TW
+    0%
+    9.2萬%
+    -0.22%
+  bn-BD
+    ০%
+    ৯২ হা%
+    -০.২২%
+
+compact-short percent unit-width-full-name
+  es-MX
+    0 por ciento
+    92 k por ciento
+    -0.22 por ciento
+  zh-TW
+    0%
+    9.2萬%
+    -0.22%
+  bn-BD
+    ০শতাংশ
+    ৯২ হাশতাংশ
+    -০.২২শতাংশ
+
+compact-short currency/EUR unit-width-narrow
+  es-MX
+    €0
+    92 k€
+    -€0.22
+  zh-TW
+    €0
+    €9.2萬
+    -€0.22
+  bn-BD
+    ০€
+    ৯২ হা€
+    -০.২২€
+
+compact-short currency/EUR unit-width-full-name
+  es-MX
+    0 euros
+    92 k euros
+    -0.22 euros
+  zh-TW
+    0 歐元
+    9.2萬 歐元
+    -0.22 歐元
+  bn-BD
+    ০ ইউরো
+    ৯২ হা ইউরো
+    -০.২২ ইউরো
+
+compact-short measure-unit/length-furlong unit-width-narrow
+  es-MX
+    0 fur
+    92 k fur
+    -0.22 fur
+  zh-TW
+    0化朗
+    9.2萬化朗
+    -0.22化朗
+  bn-BD
+    ০ ফার্লং
+    ৯২ হা ফার্লং
+    -০.২২ ফার্লং
+
+compact-short measure-unit/length-furlong unit-width-full-name
+  es-MX
+    0 furlongs
+    92 k furlongs
+    -0.22 furlongs
+  zh-TW
+    0 化朗
+    9.2萬 化朗
+    -0.22 化朗
+  bn-BD
+    ০ ফার্লং
+    ৯২ হা ফার্লং
+    -০.২২ ফার্লং
+
+scientific/+ee/sign-always percent unit-width-narrow
+  es-MX
+    0E+00 %
+    9.182736E+04 %
+    -2.2222E-01 %
+  zh-TW
+    0E+00%
+    9.182736E+04%
+    -2.2222E-01%
+  bn-BD
+    ০E+০০%
+    ৯.১৮২৭৩৬E+০৪%
+    -২.২২২২E-০১%
+
+scientific/+ee/sign-always percent unit-width-full-name
+  es-MX
+    0E+00 por ciento
+    9.182736E+04 por ciento
+    -2.2222E-01 por ciento
+  zh-TW
+    0E+00%
+    9.182736E+04%
+    -2.2222E-01%
+  bn-BD
+    ০E+০০শতাংশ
+    ৯.১৮২৭৩৬E+০৪শতাংশ
+    -২.২২২২E-০১শতাংশ
+
+scientific/+ee/sign-always currency/EUR unit-width-narrow
+  es-MX
+    €0.00E+00
+    €9.18E+04
+    -€2.22E-01
+  zh-TW
+    €0.00E+00
+    €9.18E+04
+    -€2.22E-01
+  bn-BD
+    ০.০০E+০০€
+    ৯.১৮E+০৪€
+    -২.২২E-০১€
+
+scientific/+ee/sign-always currency/EUR unit-width-full-name
+  es-MX
+    0.00E+00 euros
+    9.18E+04 euros
+    -2.22E-01 euros
+  zh-TW
+    0.00E+00 歐元
+    9.18E+04 歐元
+    -2.22E-01 歐元
+  bn-BD
+    ০.০০E+০০ ইউরো
+    ৯.১৮E+০৪ ইউরো
+    -২.২২E-০১ ইউরো
+
+scientific/+ee/sign-always measure-unit/length-furlong unit-width-narrow
+  es-MX
+    0E+00 fur
+    9.182736E+04 fur
+    -2.2222E-01 fur
+  zh-TW
+    0E+00化朗
+    9.182736E+04化朗
+    -2.2222E-01化朗
+  bn-BD
+    ০E+০০ ফার্লং
+    ৯.১৮২৭৩৬E+০৪ ফার্লং
+    -২.২২২২E-০১ ফার্লং
+
+scientific/+ee/sign-always measure-unit/length-furlong unit-width-full-name
+  es-MX
+    0E+00 furlongs
+    9.182736E+04 furlongs
+    -2.2222E-01 furlongs
+  zh-TW
+    0E+00 化朗
+    9.182736E+04 化朗
+    -2.2222E-01 化朗
+  bn-BD
+    ০E+০০ ফার্লং
+    ৯.১৮২৭৩৬E+০৪ ফার্লং
+    -২.২২২২E-০১ ফার্লং
+
+compact-short percent precision-integer
+  es-MX
+    0 %
+    92 k %
+    -0 %
+  zh-TW
+    0%
+    9萬%
+    -0%
+  bn-BD
+    ০%
+    ৯২ হা%
+    -০%
+
+compact-short percent .000
+  es-MX
+    0.000 %
+    91.827 k %
+    -0.222 %
+  zh-TW
+    0.000%
+    9.183萬%
+    -0.222%
+  bn-BD
+    ০.০০০%
+    ৯১.৮২৭ হা%
+    -০.২২২%
+
+compact-short percent .##/@@@+
+  es-MX
+    0 %
+    91.83 k %
+    -0.222 %
+  zh-TW
+    0%
+    9.18萬%
+    -0.222%
+  bn-BD
+    ০%
+    ৯১.৮৩ হা%
+    -০.২২২%
+
+compact-short percent @@
+  es-MX
+    0.0 %
+    92 k %
+    -0.22 %
+  zh-TW
+    0.0%
+    9.2萬%
+    -0.22%
+  bn-BD
+    ০.০%
+    ৯২ হা%
+    -০.২২%
+
+compact-short currency/EUR precision-integer
+  es-MX
+    EUR 0
+    92 kEUR
+    -EUR 0
+  zh-TW
+    €0
+    €9萬
+    -€0
+  bn-BD
+    ০€
+    ৯২ হা€
+    -০€
+
+compact-short currency/EUR .000
+  es-MX
+    EUR 0.000
+    91.827 kEUR
+    -EUR 0.222
+  zh-TW
+    €0.000
+    €9.183萬
+    -€0.222
+  bn-BD
+    ০.০০০€
+    ৯১.৮২৭ হা€
+    -০.২২২€
+
+compact-short currency/EUR .##/@@@+
+  es-MX
+    EUR 0
+    91.83 kEUR
+    -EUR 0.222
+  zh-TW
+    €0
+    €9.18萬
+    -€0.222
+  bn-BD
+    ০€
+    ৯১.৮৩ হা€
+    -০.২২২€
+
+compact-short currency/EUR @@
+  es-MX
+    EUR 0.0
+    92 kEUR
+    -EUR 0.22
+  zh-TW
+    €0.0
+    €9.2萬
+    -€0.22
+  bn-BD
+    ০.০€
+    ৯২ হা€
+    -০.২২€
+
+compact-short measure-unit/length-furlong precision-integer
+  es-MX
+    0 fur
+    92 k fur
+    -0 fur
+  zh-TW
+    0 化朗
+    9萬 化朗
+    -0 化朗
+  bn-BD
+    ০ ফার্লং
+    ৯২ হা ফার্লং
+    -০ ফার্লং
+
+compact-short measure-unit/length-furlong .000
+  es-MX
+    0.000 fur
+    91.827 k fur
+    -0.222 fur
+  zh-TW
+    0.000 化朗
+    9.183萬 化朗
+    -0.222 化朗
+  bn-BD
+    ০.০০০ ফার্লং
+    ৯১.৮২৭ হা ফার্লং
+    -০.২২২ ফার্লং
+
+compact-short measure-unit/length-furlong .##/@@@+
+  es-MX
+    0 fur
+    91.83 k fur
+    -0.222 fur
+  zh-TW
+    0 化朗
+    9.18萬 化朗
+    -0.222 化朗
+  bn-BD
+    ০ ফার্লং
+    ৯১.৮৩ হা ফার্লং
+    -০.২২২ ফার্লং
+
+compact-short measure-unit/length-furlong @@
+  es-MX
+    0.0 fur
+    92 k fur
+    -0.22 fur
+  zh-TW
+    0.0 化朗
+    9.2萬 化朗
+    -0.22 化朗
+  bn-BD
+    ০.০ ফার্লং
+    ৯২ হা ফার্লং
+    -০.২২ ফার্লং
+
+scientific/+ee/sign-always percent precision-integer
+  es-MX
+    0E+00 %
+    9E+04 %
+    -2E-01 %
+  zh-TW
+    0E+00%
+    9E+04%
+    -2E-01%
+  bn-BD
+    ০E+০০%
+    ৯E+০৪%
+    -২E-০১%
+
+scientific/+ee/sign-always percent .000
+  es-MX
+    0.000E+00 %
+    9.183E+04 %
+    -2.222E-01 %
+  zh-TW
+    0.000E+00%
+    9.183E+04%
+    -2.222E-01%
+  bn-BD
+    ০.০০০E+০০%
+    ৯.১৮৩E+০৪%
+    -২.২২২E-০১%
+
+scientific/+ee/sign-always percent .##/@@@+
+  es-MX
+    0E+00 %
+    9.18E+04 %
+    -2.22E-01 %
+  zh-TW
+    0E+00%
+    9.18E+04%
+    -2.22E-01%
+  bn-BD
+    ০E+০০%
+    ৯.১৮E+০৪%
+    -২.২২E-০১%
+
+scientific/+ee/sign-always percent @@
+  es-MX
+    0.0E+00 %
+    9.2E+04 %
+    -2.2E-01 %
+  zh-TW
+    0.0E+00%
+    9.2E+04%
+    -2.2E-01%
+  bn-BD
+    ০.০E+০০%
+    ৯.২E+০৪%
+    -২.২E-০১%
+
+scientific/+ee/sign-always currency/EUR precision-integer
+  es-MX
+    EUR 0E+00
+    EUR 9E+04
+    -EUR 2E-01
+  zh-TW
+    €0E+00
+    €9E+04
+    -€2E-01
+  bn-BD
+    ০E+০০€
+    ৯E+০৪€
+    -২E-০১€
+
+scientific/+ee/sign-always currency/EUR .000
+  es-MX
+    EUR 0.000E+00
+    EUR 9.183E+04
+    -EUR 2.222E-01
+  zh-TW
+    €0.000E+00
+    €9.183E+04
+    -€2.222E-01
+  bn-BD
+    ০.০০০E+০০€
+    ৯.১৮৩E+০৪€
+    -২.২২২E-০১€
+
+scientific/+ee/sign-always currency/EUR .##/@@@+
+  es-MX
+    EUR 0E+00
+    EUR 9.18E+04
+    -EUR 2.22E-01
+  zh-TW
+    €0E+00
+    €9.18E+04
+    -€2.22E-01
+  bn-BD
+    ০E+০০€
+    ৯.১৮E+০৪€
+    -২.২২E-০১€
+
+scientific/+ee/sign-always currency/EUR @@
+  es-MX
+    EUR 0.0E+00
+    EUR 9.2E+04
+    -EUR 2.2E-01
+  zh-TW
+    €0.0E+00
+    €9.2E+04
+    -€2.2E-01
+  bn-BD
+    ০.০E+০০€
+    ৯.২E+০৪€
+    -২.২E-০১€
+
+scientific/+ee/sign-always measure-unit/length-furlong precision-integer
+  es-MX
+    0E+00 fur
+    9E+04 fur
+    -2E-01 fur
+  zh-TW
+    0E+00 化朗
+    9E+04 化朗
+    -2E-01 化朗
+  bn-BD
+    ০E+০০ ফার্লং
+    ৯E+০৪ ফার্লং
+    -২E-০১ ফার্লং
+
+scientific/+ee/sign-always measure-unit/length-furlong .000
+  es-MX
+    0.000E+00 fur
+    9.183E+04 fur
+    -2.222E-01 fur
+  zh-TW
+    0.000E+00 化朗
+    9.183E+04 化朗
+    -2.222E-01 化朗
+  bn-BD
+    ০.০০০E+০০ ফার্লং
+    ৯.১৮৩E+০৪ ফার্লং
+    -২.২২২E-০১ ফার্লং
+
+scientific/+ee/sign-always measure-unit/length-furlong .##/@@@+
+  es-MX
+    0E+00 fur
+    9.18E+04 fur
+    -2.22E-01 fur
+  zh-TW
+    0E+00 化朗
+    9.18E+04 化朗
+    -2.22E-01 化朗
+  bn-BD
+    ০E+০০ ফার্লং
+    ৯.১৮E+০৪ ফার্লং
+    -২.২২E-০১ ফার্লং
+
+scientific/+ee/sign-always measure-unit/length-furlong @@
+  es-MX
+    0.0E+00 fur
+    9.2E+04 fur
+    -2.2E-01 fur
+  zh-TW
+    0.0E+00 化朗
+    9.2E+04 化朗
+    -2.2E-01 化朗
+  bn-BD
+    ০.০E+০০ ফার্লং
+    ৯.২E+০৪ ফার্লং
+    -২.২E-০১ ফার্লং
+
+compact-short percent rounding-mode-floor
+  es-MX
+    0 %
+    91 k %
+    -0.23 %
+  zh-TW
+    0%
+    9.1萬%
+    -0.23%
+  bn-BD
+    ০%
+    ৯১ হা%
+    -০.২৩%
+
+compact-short currency/EUR rounding-mode-floor
+  es-MX
+    EUR 0
+    91 kEUR
+    -EUR 0.23
+  zh-TW
+    €0
+    €9.1萬
+    -€0.23
+  bn-BD
+    ০€
+    ৯১ হা€
+    -০.২৩€
+
+compact-short measure-unit/length-furlong rounding-mode-floor
+  es-MX
+    0 fur
+    91 k fur
+    -0.23 fur
+  zh-TW
+    0 化朗
+    9.1萬 化朗
+    -0.23 化朗
+  bn-BD
+    ০ ফার্লং
+    ৯১ হা ফার্লং
+    -০.২৩ ফার্লং
+
+scientific/+ee/sign-always percent rounding-mode-floor
+  es-MX
+    0E+00 %
+    9.182736E+04 %
+    -2.2222E-01 %
+  zh-TW
+    0E+00%
+    9.182736E+04%
+    -2.2222E-01%
+  bn-BD
+    ০E+০০%
+    ৯.১৮২৭৩৬E+০৪%
+    -২.২২২২E-০১%
+
+scientific/+ee/sign-always currency/EUR rounding-mode-floor
+  es-MX
+    EUR 0.00E+00
+    EUR 9.18E+04
+    -EUR 2.23E-01
+  zh-TW
+    €0.00E+00
+    €9.18E+04
+    -€2.23E-01
+  bn-BD
+    ০.০০E+০০€
+    ৯.১৮E+০৪€
+    -২.২৩E-০১€
+
+scientific/+ee/sign-always measure-unit/length-furlong rounding-mode-floor
+  es-MX
+    0E+00 fur
+    9.182736E+04 fur
+    -2.2222E-01 fur
+  zh-TW
+    0E+00 化朗
+    9.182736E+04 化朗
+    -2.2222E-01 化朗
+  bn-BD
+    ০E+০০ ফার্লং
+    ৯.১৮২৭৩৬E+০৪ ফার্লং
+    -২.২২২২E-০১ ফার্লং
+
+compact-short percent integer-width/##00
+  es-MX
+    00 %
+    92 k %
+    -00.22 %
+  zh-TW
+    00%
+    09.2萬%
+    -00.22%
+  bn-BD
+    ০০%
+    ৯২ হা%
+    -০০.২২%
+
+compact-short currency/EUR integer-width/##00
+  es-MX
+    EUR 00
+    92 kEUR
+    -EUR 00.22
+  zh-TW
+    €00
+    €09.2萬
+    -€00.22
+  bn-BD
+    ০০€
+    ৯২ হা€
+    -০০.২২€
+
+compact-short measure-unit/length-furlong integer-width/##00
+  es-MX
+    00 fur
+    92 k fur
+    -00.22 fur
+  zh-TW
+    00 化朗
+    09.2萬 化朗
+    -00.22 化朗
+  bn-BD
+    ০০ ফার্লং
+    ৯২ হা ফার্লং
+    -০০.২২ ফার্লং
+
+scientific/+ee/sign-always percent integer-width/##00
+  es-MX
+    00E+00 %
+    09.182736E+04 %
+    -02.2222E-01 %
+  zh-TW
+    00E+00%
+    09.182736E+04%
+    -02.2222E-01%
+  bn-BD
+    ০০E+০০%
+    ০৯.১৮২৭৩৬E+০৪%
+    -০২.২২২২E-০১%
+
+scientific/+ee/sign-always currency/EUR integer-width/##00
+  es-MX
+    EUR 00.00E+00
+    EUR 09.18E+04
+    -EUR 02.22E-01
+  zh-TW
+    €00.00E+00
+    €09.18E+04
+    -€02.22E-01
+  bn-BD
+    ০০.০০E+০০€
+    ০৯.১৮E+০৪€
+    -০২.২২E-০১€
+
+scientific/+ee/sign-always measure-unit/length-furlong integer-width/##00
+  es-MX
+    00E+00 fur
+    09.182736E+04 fur
+    -02.2222E-01 fur
+  zh-TW
+    00E+00 化朗
+    09.182736E+04 化朗
+    -02.2222E-01 化朗
+  bn-BD
+    ০০E+০০ ফার্লং
+    ০৯.১৮২৭৩৬E+০৪ ফার্লং
+    -০২.২২২২E-০১ ফার্লং
+
+compact-short percent scale/0.5
+  es-MX
+    0 %
+    46 k %
+    -0.11 %
+  zh-TW
+    0%
+    4.6萬%
+    -0.11%
+  bn-BD
+    ০%
+    ৪৬ হা%
+    -০.১১%
+
+compact-short currency/EUR scale/0.5
+  es-MX
+    EUR 0
+    46 kEUR
+    -EUR 0.11
+  zh-TW
+    €0
+    €4.6萬
+    -€0.11
+  bn-BD
+    ০€
+    ৪৬ হা€
+    -০.১১€
+
+compact-short measure-unit/length-furlong scale/0.5
+  es-MX
+    0 fur
+    46 k fur
+    -0.11 fur
+  zh-TW
+    0 化朗
+    4.6萬 化朗
+    -0.11 化朗
+  bn-BD
+    ০ ফার্লং
+    ৪৬ হা ফার্লং
+    -০.১১ ফার্লং
+
+scientific/+ee/sign-always percent scale/0.5
+  es-MX
+    0E+00 %
+    4.591368E+04 %
+    -1.1111E-01 %
+  zh-TW
+    0E+00%
+    4.591368E+04%
+    -1.1111E-01%
+  bn-BD
+    ০E+০০%
+    ৪.৫৯১৩৬৮E+০৪%
+    -১.১১১১E-০১%
+
+scientific/+ee/sign-always currency/EUR scale/0.5
+  es-MX
+    EUR 0.00E+00
+    EUR 4.59E+04
+    -EUR 1.11E-01
+  zh-TW
+    €0.00E+00
+    €4.59E+04
+    -€1.11E-01
+  bn-BD
+    ০.০০E+০০€
+    ৪.৫৯E+০৪€
+    -১.১১E-০১€
+
+scientific/+ee/sign-always measure-unit/length-furlong scale/0.5
+  es-MX
+    0E+00 fur
+    4.591368E+04 fur
+    -1.1111E-01 fur
+  zh-TW
+    0E+00 化朗
+    4.591368E+04 化朗
+    -1.1111E-01 化朗
+  bn-BD
+    ০E+০০ ফার্লং
+    ৪.৫৯১৩৬৮E+০৪ ফার্লং
+    -১.১১১১E-০১ ফার্লং
+
+compact-short percent group-on-aligned
+  es-MX
+    0 %
+    92 k %
+    -0.22 %
+  zh-TW
+    0%
+    9.2萬%
+    -0.22%
+  bn-BD
+    ০%
+    ৯২ হা%
+    -০.২২%
+
+compact-short currency/EUR group-on-aligned
+  es-MX
+    EUR 0
+    92 kEUR
+    -EUR 0.22
+  zh-TW
+    €0
+    €9.2萬
+    -€0.22
+  bn-BD
+    ০€
+    ৯২ হা€
+    -০.২২€
+
+compact-short measure-unit/length-furlong group-on-aligned
+  es-MX
+    0 fur
+    92 k fur
+    -0.22 fur
+  zh-TW
+    0 化朗
+    9.2萬 化朗
+    -0.22 化朗
+  bn-BD
+    ০ ফার্লং
+    ৯২ হা ফার্লং
+    -০.২২ ফার্লং
+
+scientific/+ee/sign-always percent group-on-aligned
+  es-MX
+    0E+00 %
+    9.182736E+04 %
+    -2.2222E-01 %
+  zh-TW
+    0E+00%
+    9.182736E+04%
+    -2.2222E-01%
+  bn-BD
+    ০E+০০%
+    ৯.১৮২৭৩৬E+০৪%
+    -২.২২২২E-০১%
+
+scientific/+ee/sign-always currency/EUR group-on-aligned
+  es-MX
+    EUR 0.00E+00
+    EUR 9.18E+04
+    -EUR 2.22E-01
+  zh-TW
+    €0.00E+00
+    €9.18E+04
+    -€2.22E-01
+  bn-BD
+    ০.০০E+০০€
+    ৯.১৮E+০৪€
+    -২.২২E-০১€
+
+scientific/+ee/sign-always measure-unit/length-furlong group-on-aligned
+  es-MX
+    0E+00 fur
+    9.182736E+04 fur
+    -2.2222E-01 fur
+  zh-TW
+    0E+00 化朗
+    9.182736E+04 化朗
+    -2.2222E-01 化朗
+  bn-BD
+    ০E+০০ ফার্লং
+    ৯.১৮২৭৩৬E+০৪ ফার্লং
+    -২.২২২২E-০১ ফার্লং
+
+compact-short percent latin
+  es-MX
+    0 %
+    92 k %
+    -0.22 %
+  zh-TW
+    0%
+    9.2萬%
+    -0.22%
+  bn-BD
+    0%
+    92 হা%
+    -0.22%
+
+compact-short currency/EUR latin
+  es-MX
+    EUR 0
+    92 kEUR
+    -EUR 0.22
+  zh-TW
+    €0
+    €9.2萬
+    -€0.22
+  bn-BD
+    0€
+    92 হা€
+    -0.22€
+
+compact-short measure-unit/length-furlong latin
+  es-MX
+    0 fur
+    92 k fur
+    -0.22 fur
+  zh-TW
+    0 化朗
+    9.2萬 化朗
+    -0.22 化朗
+  bn-BD
+    0 ফার্লং
+    92 হা ফার্লং
+    -0.22 ফার্লং
+
+scientific/+ee/sign-always percent latin
+  es-MX
+    0E+00 %
+    9.182736E+04 %
+    -2.2222E-01 %
+  zh-TW
+    0E+00%
+    9.182736E+04%
+    -2.2222E-01%
+  bn-BD
+    0E+00%
+    9.182736E+04%
+    -2.2222E-01%
+
+scientific/+ee/sign-always currency/EUR latin
+  es-MX
+    EUR 0.00E+00
+    EUR 9.18E+04
+    -EUR 2.22E-01
+  zh-TW
+    €0.00E+00
+    €9.18E+04
+    -€2.22E-01
+  bn-BD
+    0.00E+00€
+    9.18E+04€
+    -2.22E-01€
+
+scientific/+ee/sign-always measure-unit/length-furlong latin
+  es-MX
+    0E+00 fur
+    9.182736E+04 fur
+    -2.2222E-01 fur
+  zh-TW
+    0E+00 化朗
+    9.182736E+04 化朗
+    -2.2222E-01 化朗
+  bn-BD
+    0E+00 ফার্লং
+    9.182736E+04 ফার্লং
+    -2.2222E-01 ফার্লং
+
+compact-short percent sign-accounting-except-zero
+  es-MX
+    0 %
+    +92 k %
+    -0.22 %
+  zh-TW
+    0%
+    +9.2萬%
+    -0.22%
+  bn-BD
+    ০%
+    +৯২ হা%
+    -০.২২%
+
+compact-short currency/EUR sign-accounting-except-zero
+  es-MX
+    EUR 0
+    +92 kEUR
+    -EUR 0.22
+  zh-TW
+    €0
+    +€9.2萬
+    (€0.22)
+  bn-BD
+    ০€
+    +৯২ হা€
+    (০.২২€)
+
+compact-short measure-unit/length-furlong sign-accounting-except-zero
+  es-MX
+    0 fur
+    +92 k fur
+    -0.22 fur
+  zh-TW
+    0 化朗
+    +9.2萬 化朗
+    -0.22 化朗
+  bn-BD
+    ০ ফার্লং
+    +৯২ হা ফার্লং
+    -০.২২ ফার্লং
+
+scientific/+ee/sign-always percent sign-accounting-except-zero
+  es-MX
+    0E+00 %
+    +9.182736E+04 %
+    -2.2222E-01 %
+  zh-TW
+    0E+00%
+    +9.182736E+04%
+    -2.2222E-01%
+  bn-BD
+    ০E+০০%
+    +৯.১৮২৭৩৬E+০৪%
+    -২.২২২২E-০১%
+
+scientific/+ee/sign-always currency/EUR sign-accounting-except-zero
+  es-MX
+    EUR 0.00E+00
+    +EUR 9.18E+04
+    -EUR 2.22E-01
+  zh-TW
+    €0.00E+00
+    +€9.18E+04
+    (€2.22E-01)
+  bn-BD
+    ০.০০E+০০€
+    +৯.১৮E+০৪€
+    (২.২২E-০১€)
+
+scientific/+ee/sign-always measure-unit/length-furlong sign-accounting-except-zero
+  es-MX
+    0E+00 fur
+    +9.182736E+04 fur
+    -2.2222E-01 fur
+  zh-TW
+    0E+00 化朗
+    +9.182736E+04 化朗
+    -2.2222E-01 化朗
+  bn-BD
+    ০E+০০ ফার্লং
+    +৯.১৮২৭৩৬E+০৪ ফার্লং
+    -২.২২২২E-০১ ফার্লং
+
+compact-short percent decimal-always
+  es-MX
+    0. %
+    92. k %
+    -0.22 %
+  zh-TW
+    0.%
+    9.2萬%
+    -0.22%
+  bn-BD
+    ০.%
+    ৯২. হা%
+    -০.২২%
+
+compact-short currency/EUR decimal-always
+  es-MX
+    EUR 0.
+    92. kEUR
+    -EUR 0.22
+  zh-TW
+    €0.
+    €9.2萬
+    -€0.22
+  bn-BD
+    ০.€
+    ৯২. হা€
+    -০.২২€
+
+compact-short measure-unit/length-furlong decimal-always
+  es-MX
+    0. fur
+    92. k fur
+    -0.22 fur
+  zh-TW
+    0. 化朗
+    9.2萬 化朗
+    -0.22 化朗
+  bn-BD
+    ০. ফার্লং
+    ৯২. হা ফার্লং
+    -০.২২ ফার্লং
+
+scientific/+ee/sign-always percent decimal-always
+  es-MX
+    0.E+00 %
+    9.182736E+04 %
+    -2.2222E-01 %
+  zh-TW
+    0.E+00%
+    9.182736E+04%
+    -2.2222E-01%
+  bn-BD
+    ০.E+০০%
+    ৯.১৮২৭৩৬E+০৪%
+    -২.২২২২E-০১%
+
+scientific/+ee/sign-always currency/EUR decimal-always
+  es-MX
+    EUR 0.00E+00
+    EUR 9.18E+04
+    -EUR 2.22E-01
+  zh-TW
+    €0.00E+00
+    €9.18E+04
+    -€2.22E-01
+  bn-BD
+    ০.০০E+০০€
+    ৯.১৮E+০৪€
+    -২.২২E-০১€
+
+scientific/+ee/sign-always measure-unit/length-furlong decimal-always
+  es-MX
+    0.E+00 fur
+    9.182736E+04 fur
+    -2.2222E-01 fur
+  zh-TW
+    0.E+00 化朗
+    9.182736E+04 化朗
+    -2.2222E-01 化朗
+  bn-BD
+    ০.E+০০ ফার্লং
+    ৯.১৮২৭৩৬E+০৪ ফার্লং
+    -২.২২২২E-০১ ফার্লং
+
+compact-short unit-width-narrow precision-integer
+  es-MX
+    0
+    92 k
+    -0
+  zh-TW
+    0
+    9萬
+    -0
+  bn-BD
+    ০
+    ৯২ হা
+    -০
+
+compact-short unit-width-narrow .000
+  es-MX
+    0.000
+    91.827 k
+    -0.222
+  zh-TW
+    0.000
+    9.183萬
+    -0.222
+  bn-BD
+    ০.০০০
+    ৯১.৮২৭ হা
+    -০.২২২
+
+compact-short unit-width-narrow .##/@@@+
+  es-MX
+    0
+    91.83 k
+    -0.222
+  zh-TW
+    0
+    9.18萬
+    -0.222
+  bn-BD
+    ০
+    ৯১.৮৩ হা
+    -০.২২২
+
+compact-short unit-width-narrow @@
+  es-MX
+    0.0
+    92 k
+    -0.22
+  zh-TW
+    0.0
+    9.2萬
+    -0.22
+  bn-BD
+    ০.০
+    ৯২ হা
+    -০.২২
+
+compact-short unit-width-full-name precision-integer
+  es-MX
+    0
+    92 k
+    -0
+  zh-TW
+    0
+    9萬
+    -0
+  bn-BD
+    ০
+    ৯২ হা
+    -০
+
+compact-short unit-width-full-name .000
+  es-MX
+    0.000
+    91.827 k
+    -0.222
+  zh-TW
+    0.000
+    9.183萬
+    -0.222
+  bn-BD
+    ০.০০০
+    ৯১.৮২৭ হা
+    -০.২২২
+
+compact-short unit-width-full-name .##/@@@+
+  es-MX
+    0
+    91.83 k
+    -0.222
+  zh-TW
+    0
+    9.18萬
+    -0.222
+  bn-BD
+    ০
+    ৯১.৮৩ হা
+    -০.২২২
+
+compact-short unit-width-full-name @@
+  es-MX
+    0.0
+    92 k
+    -0.22
+  zh-TW
+    0.0
+    9.2萬
+    -0.22
+  bn-BD
+    ০.০
+    ৯২ হা
+    -০.২২
+
+scientific/+ee/sign-always unit-width-narrow precision-integer
+  es-MX
+    0E+00
+    9E+04
+    -2E-01
+  zh-TW
+    0E+00
+    9E+04
+    -2E-01
+  bn-BD
+    ০E+০০
+    ৯E+০৪
+    -২E-০১
+
+scientific/+ee/sign-always unit-width-narrow .000
+  es-MX
+    0.000E+00
+    9.183E+04
+    -2.222E-01
+  zh-TW
+    0.000E+00
+    9.183E+04
+    -2.222E-01
+  bn-BD
+    ০.০০০E+০০
+    ৯.১৮৩E+০৪
+    -২.২২২E-০১
+
+scientific/+ee/sign-always unit-width-narrow .##/@@@+
+  es-MX
+    0E+00
+    9.18E+04
+    -2.22E-01
+  zh-TW
+    0E+00
+    9.18E+04
+    -2.22E-01
+  bn-BD
+    ০E+০০
+    ৯.১৮E+০৪
+    -২.২২E-০১
+
+scientific/+ee/sign-always unit-width-narrow @@
+  es-MX
+    0.0E+00
+    9.2E+04
+    -2.2E-01
+  zh-TW
+    0.0E+00
+    9.2E+04
+    -2.2E-01
+  bn-BD
+    ০.০E+০০
+    ৯.২E+০৪
+    -২.২E-০১
+
+scientific/+ee/sign-always unit-width-full-name precision-integer
+  es-MX
+    0E+00
+    9E+04
+    -2E-01
+  zh-TW
+    0E+00
+    9E+04
+    -2E-01
+  bn-BD
+    ০E+০০
+    ৯E+০৪
+    -২E-০১
+
+scientific/+ee/sign-always unit-width-full-name .000
+  es-MX
+    0.000E+00
+    9.183E+04
+    -2.222E-01
+  zh-TW
+    0.000E+00
+    9.183E+04
+    -2.222E-01
+  bn-BD
+    ০.০০০E+০০
+    ৯.১৮৩E+০৪
+    -২.২২২E-০১
+
+scientific/+ee/sign-always unit-width-full-name .##/@@@+
+  es-MX
+    0E+00
+    9.18E+04
+    -2.22E-01
+  zh-TW
+    0E+00
+    9.18E+04
+    -2.22E-01
+  bn-BD
+    ০E+০০
+    ৯.১৮E+০৪
+    -২.২২E-০১
+
+scientific/+ee/sign-always unit-width-full-name @@
+  es-MX
+    0.0E+00
+    9.2E+04
+    -2.2E-01
+  zh-TW
+    0.0E+00
+    9.2E+04
+    -2.2E-01
+  bn-BD
+    ০.০E+০০
+    ৯.২E+০৪
+    -২.২E-০১
+
+compact-short unit-width-narrow rounding-mode-floor
+  es-MX
+    0
+    91 k
+    -0.23
+  zh-TW
+    0
+    9.1萬
+    -0.23
+  bn-BD
+    ০
+    ৯১ হা
+    -০.২৩
+
+compact-short unit-width-full-name rounding-mode-floor
+  es-MX
+    0
+    91 k
+    -0.23
+  zh-TW
+    0
+    9.1萬
+    -0.23
+  bn-BD
+    ০
+    ৯১ হা
+    -০.২৩
+
+scientific/+ee/sign-always unit-width-narrow rounding-mode-floor
+  es-MX
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+  bn-BD
+    ০E+০০
+    ৯.১৮২৭৩৬E+০৪
+    -২.২২২২E-০১
+
+scientific/+ee/sign-always unit-width-full-name rounding-mode-floor
+  es-MX
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+  bn-BD
+    ০E+০০
+    ৯.১৮২৭৩৬E+০৪
+    -২.২২২২E-০১
+
+compact-short unit-width-narrow integer-width/##00
+  es-MX
+    00
+    92 k
+    -00.22
+  zh-TW
+    00
+    09.2萬
+    -00.22
+  bn-BD
+    ০০
+    ৯২ হা
+    -০০.২২
+
+compact-short unit-width-full-name integer-width/##00
+  es-MX
+    00
+    92 k
+    -00.22
+  zh-TW
+    00
+    09.2萬
+    -00.22
+  bn-BD
+    ০০
+    ৯২ হা
+    -০০.২২
+
+scientific/+ee/sign-always unit-width-narrow integer-width/##00
+  es-MX
+    00E+00
+    09.182736E+04
+    -02.2222E-01
+  zh-TW
+    00E+00
+    09.182736E+04
+    -02.2222E-01
+  bn-BD
+    ০০E+০০
+    ০৯.১৮২৭৩৬E+০৪
+    -০২.২২২২E-০১
+
+scientific/+ee/sign-always unit-width-full-name integer-width/##00
+  es-MX
+    00E+00
+    09.182736E+04
+    -02.2222E-01
+  zh-TW
+    00E+00
+    09.182736E+04
+    -02.2222E-01
+  bn-BD
+    ০০E+০০
+    ০৯.১৮২৭৩৬E+০৪
+    -০২.২২২২E-০১
+
+compact-short unit-width-narrow scale/0.5
+  es-MX
+    0
+    46 k
+    -0.11
+  zh-TW
+    0
+    4.6萬
+    -0.11
+  bn-BD
+    ০
+    ৪৬ হা
+    -০.১১
+
+compact-short unit-width-full-name scale/0.5
+  es-MX
+    0
+    46 k
+    -0.11
+  zh-TW
+    0
+    4.6萬
+    -0.11
+  bn-BD
+    ০
+    ৪৬ হা
+    -০.১১
+
+scientific/+ee/sign-always unit-width-narrow scale/0.5
+  es-MX
+    0E+00
+    4.591368E+04
+    -1.1111E-01
+  zh-TW
+    0E+00
+    4.591368E+04
+    -1.1111E-01
+  bn-BD
+    ০E+০০
+    ৪.৫৯১৩৬৮E+০৪
+    -১.১১১১E-০১
+
+scientific/+ee/sign-always unit-width-full-name scale/0.5
+  es-MX
+    0E+00
+    4.591368E+04
+    -1.1111E-01
+  zh-TW
+    0E+00
+    4.591368E+04
+    -1.1111E-01
+  bn-BD
+    ০E+০০
+    ৪.৫৯১৩৬৮E+০৪
+    -১.১১১১E-০১
+
+compact-short unit-width-narrow group-on-aligned
+  es-MX
+    0
+    92 k
+    -0.22
+  zh-TW
+    0
+    9.2萬
+    -0.22
+  bn-BD
+    ০
+    ৯২ হা
+    -০.২২
+
+compact-short unit-width-full-name group-on-aligned
+  es-MX
+    0
+    92 k
+    -0.22
+  zh-TW
+    0
+    9.2萬
+    -0.22
+  bn-BD
+    ০
+    ৯২ হা
+    -০.২২
+
+scientific/+ee/sign-always unit-width-narrow group-on-aligned
+  es-MX
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+  bn-BD
+    ০E+০০
+    ৯.১৮২৭৩৬E+০৪
+    -২.২২২২E-০১
+
+scientific/+ee/sign-always unit-width-full-name group-on-aligned
+  es-MX
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+  bn-BD
+    ০E+০০
+    ৯.১৮২৭৩৬E+০৪
+    -২.২২২২E-০১
+
+compact-short unit-width-narrow latin
+  es-MX
+    0
+    92 k
+    -0.22
+  zh-TW
+    0
+    9.2萬
+    -0.22
+  bn-BD
+    0
+    92 হা
+    -0.22
+
+compact-short unit-width-full-name latin
+  es-MX
+    0
+    92 k
+    -0.22
+  zh-TW
+    0
+    9.2萬
+    -0.22
+  bn-BD
+    0
+    92 হা
+    -0.22
+
+scientific/+ee/sign-always unit-width-narrow latin
+  es-MX
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+  bn-BD
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+
+scientific/+ee/sign-always unit-width-full-name latin
+  es-MX
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+  bn-BD
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+
+compact-short unit-width-narrow sign-accounting-except-zero
+  es-MX
+    0
+    +92 k
+    -0.22
+  zh-TW
+    0
+    +9.2萬
+    -0.22
+  bn-BD
+    ০
+    +৯২ হা
+    -০.২২
+
+compact-short unit-width-full-name sign-accounting-except-zero
+  es-MX
+    0
+    +92 k
+    -0.22
+  zh-TW
+    0
+    +9.2萬
+    -0.22
+  bn-BD
+    ০
+    +৯২ হা
+    -০.২২
+
+scientific/+ee/sign-always unit-width-narrow sign-accounting-except-zero
+  es-MX
+    0E+00
+    +9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0E+00
+    +9.182736E+04
+    -2.2222E-01
+  bn-BD
+    ০E+০০
+    +৯.১৮২৭৩৬E+০৪
+    -২.২২২২E-০১
+
+scientific/+ee/sign-always unit-width-full-name sign-accounting-except-zero
+  es-MX
+    0E+00
+    +9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0E+00
+    +9.182736E+04
+    -2.2222E-01
+  bn-BD
+    ০E+০০
+    +৯.১৮২৭৩৬E+০৪
+    -২.২২২২E-০১
+
+compact-short unit-width-narrow decimal-always
+  es-MX
+    0.
+    92. k
+    -0.22
+  zh-TW
+    0.
+    9.2萬
+    -0.22
+  bn-BD
+    ০.
+    ৯২. হা
+    -০.২২
+
+compact-short unit-width-full-name decimal-always
+  es-MX
+    0.
+    92. k
+    -0.22
+  zh-TW
+    0.
+    9.2萬
+    -0.22
+  bn-BD
+    ০.
+    ৯২. হা
+    -০.২২
+
+scientific/+ee/sign-always unit-width-narrow decimal-always
+  es-MX
+    0.E+00
+    9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0.E+00
+    9.182736E+04
+    -2.2222E-01
+  bn-BD
+    ০.E+০০
+    ৯.১৮২৭৩৬E+০৪
+    -২.২২২২E-০১
+
+scientific/+ee/sign-always unit-width-full-name decimal-always
+  es-MX
+    0.E+00
+    9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0.E+00
+    9.182736E+04
+    -2.2222E-01
+  bn-BD
+    ০.E+০০
+    ৯.১৮২৭৩৬E+০৪
+    -২.২২২২E-০১
+
+compact-short precision-integer rounding-mode-floor
+  es-MX
+    0
+    91 k
+    -1
+  zh-TW
+    0
+    9萬
+    -1
+  bn-BD
+    ০
+    ৯১ হা
+    -১
+
+compact-short .000 rounding-mode-floor
+  es-MX
+    0.000
+    91.827 k
+    -0.223
+  zh-TW
+    0.000
+    9.182萬
+    -0.223
+  bn-BD
+    ০.০০০
+    ৯১.৮২৭ হা
+    -০.২২৩
+
+compact-short .##/@@@+ rounding-mode-floor
+  es-MX
+    0
+    91.82 k
+    -0.223
+  zh-TW
+    0
+    9.18萬
+    -0.223
+  bn-BD
+    ০
+    ৯১.৮২ হা
+    -০.২২৩
+
+compact-short @@ rounding-mode-floor
+  es-MX
+    0.0
+    91 k
+    -0.23
+  zh-TW
+    0.0
+    9.1萬
+    -0.23
+  bn-BD
+    ০.০
+    ৯১ হা
+    -০.২৩
+
+scientific/+ee/sign-always precision-integer rounding-mode-floor
+  es-MX
+    0E+00
+    9E+04
+    -3E-01
+  zh-TW
+    0E+00
+    9E+04
+    -3E-01
+  bn-BD
+    ০E+০০
+    ৯E+০৪
+    -৩E-০১
+
+scientific/+ee/sign-always .000 rounding-mode-floor
+  es-MX
+    0.000E+00
+    9.182E+04
+    -2.223E-01
+  zh-TW
+    0.000E+00
+    9.182E+04
+    -2.223E-01
+  bn-BD
+    ০.০০০E+০০
+    ৯.১৮২E+০৪
+    -২.২২৩E-০১
+
+scientific/+ee/sign-always .##/@@@+ rounding-mode-floor
+  es-MX
+    0E+00
+    9.18E+04
+    -2.23E-01
+  zh-TW
+    0E+00
+    9.18E+04
+    -2.23E-01
+  bn-BD
+    ০E+০০
+    ৯.১৮E+০৪
+    -২.২৩E-০১
+
+scientific/+ee/sign-always @@ rounding-mode-floor
+  es-MX
+    0.0E+00
+    9.1E+04
+    -2.3E-01
+  zh-TW
+    0.0E+00
+    9.1E+04
+    -2.3E-01
+  bn-BD
+    ০.০E+০০
+    ৯.১E+০৪
+    -২.৩E-০১
+
+compact-short precision-integer integer-width/##00
+  es-MX
+    00
+    92 k
+    -00
+  zh-TW
+    00
+    09萬
+    -00
+  bn-BD
+    ০০
+    ৯২ হা
+    -০০
+
+compact-short .000 integer-width/##00
+  es-MX
+    00.000
+    91.827 k
+    -00.222
+  zh-TW
+    00.000
+    09.183萬
+    -00.222
+  bn-BD
+    ০০.০০০
+    ৯১.৮২৭ হা
+    -০০.২২২
+
+compact-short .##/@@@+ integer-width/##00
+  es-MX
+    00
+    91.83 k
+    -00.222
+  zh-TW
+    00
+    09.18萬
+    -00.222
+  bn-BD
+    ০০
+    ৯১.৮৩ হা
+    -০০.২২২
+
+compact-short @@ integer-width/##00
+  es-MX
+    00.0
+    92 k
+    -00.22
+  zh-TW
+    00.0
+    09.2萬
+    -00.22
+  bn-BD
+    ০০.০
+    ৯২ হা
+    -০০.২২
+
+scientific/+ee/sign-always precision-integer integer-width/##00
+  es-MX
+    00E+00
+    09E+04
+    -02E-01
+  zh-TW
+    00E+00
+    09E+04
+    -02E-01
+  bn-BD
+    ০০E+০০
+    ০৯E+০৪
+    -০২E-০১
+
+scientific/+ee/sign-always .000 integer-width/##00
+  es-MX
+    00.000E+00
+    09.183E+04
+    -02.222E-01
+  zh-TW
+    00.000E+00
+    09.183E+04
+    -02.222E-01
+  bn-BD
+    ০০.০০০E+০০
+    ০৯.১৮৩E+০৪
+    -০২.২২২E-০১
+
+scientific/+ee/sign-always .##/@@@+ integer-width/##00
+  es-MX
+    00E+00
+    09.18E+04
+    -02.22E-01
+  zh-TW
+    00E+00
+    09.18E+04
+    -02.22E-01
+  bn-BD
+    ০০E+০০
+    ০৯.১৮E+০৪
+    -০২.২২E-০১
+
+scientific/+ee/sign-always @@ integer-width/##00
+  es-MX
+    00.0E+00
+    09.2E+04
+    -02.2E-01
+  zh-TW
+    00.0E+00
+    09.2E+04
+    -02.2E-01
+  bn-BD
+    ০০.০E+০০
+    ০৯.২E+০৪
+    -০২.২E-০১
+
+compact-short precision-integer scale/0.5
+  es-MX
+    0
+    46 k
+    -0
+  zh-TW
+    0
+    5萬
+    -0
+  bn-BD
+    ০
+    ৪৬ হা
+    -০
+
+compact-short .000 scale/0.5
+  es-MX
+    0.000
+    45.914 k
+    -0.111
+  zh-TW
+    0.000
+    4.591萬
+    -0.111
+  bn-BD
+    ০.০০০
+    ৪৫.৯১৪ হা
+    -০.১১১
+
+compact-short .##/@@@+ scale/0.5
+  es-MX
+    0
+    45.91 k
+    -0.111
+  zh-TW
+    0
+    4.59萬
+    -0.111
+  bn-BD
+    ০
+    ৪৫.৯১ হা
+    -০.১১১
+
+compact-short @@ scale/0.5
+  es-MX
+    0.0
+    46 k
+    -0.11
+  zh-TW
+    0.0
+    4.6萬
+    -0.11
+  bn-BD
+    ০.০
+    ৪৬ হা
+    -০.১১
+
+scientific/+ee/sign-always precision-integer scale/0.5
+  es-MX
+    0E+00
+    5E+04
+    -1E-01
+  zh-TW
+    0E+00
+    5E+04
+    -1E-01
+  bn-BD
+    ০E+০০
+    ৫E+০৪
+    -১E-০১
+
+scientific/+ee/sign-always .000 scale/0.5
+  es-MX
+    0.000E+00
+    4.591E+04
+    -1.111E-01
+  zh-TW
+    0.000E+00
+    4.591E+04
+    -1.111E-01
+  bn-BD
+    ০.০০০E+০০
+    ৪.৫৯১E+০৪
+    -১.১১১E-০১
+
+scientific/+ee/sign-always .##/@@@+ scale/0.5
+  es-MX
+    0E+00
+    4.59E+04
+    -1.11E-01
+  zh-TW
+    0E+00
+    4.59E+04
+    -1.11E-01
+  bn-BD
+    ০E+০০
+    ৪.৫৯E+০৪
+    -১.১১E-০১
+
+scientific/+ee/sign-always @@ scale/0.5
+  es-MX
+    0.0E+00
+    4.6E+04
+    -1.1E-01
+  zh-TW
+    0.0E+00
+    4.6E+04
+    -1.1E-01
+  bn-BD
+    ০.০E+০০
+    ৪.৬E+০৪
+    -১.১E-০১
+
+compact-short precision-integer group-on-aligned
+  es-MX
+    0
+    92 k
+    -0
+  zh-TW
+    0
+    9萬
+    -0
+  bn-BD
+    ০
+    ৯২ হা
+    -০
+
+compact-short .000 group-on-aligned
+  es-MX
+    0.000
+    91.827 k
+    -0.222
+  zh-TW
+    0.000
+    9.183萬
+    -0.222
+  bn-BD
+    ০.০০০
+    ৯১.৮২৭ হা
+    -০.২২২
+
+compact-short .##/@@@+ group-on-aligned
+  es-MX
+    0
+    91.83 k
+    -0.222
+  zh-TW
+    0
+    9.18萬
+    -0.222
+  bn-BD
+    ০
+    ৯১.৮৩ হা
+    -০.২২২
+
+compact-short @@ group-on-aligned
+  es-MX
+    0.0
+    92 k
+    -0.22
+  zh-TW
+    0.0
+    9.2萬
+    -0.22
+  bn-BD
+    ০.০
+    ৯২ হা
+    -০.২২
+
+scientific/+ee/sign-always precision-integer group-on-aligned
+  es-MX
+    0E+00
+    9E+04
+    -2E-01
+  zh-TW
+    0E+00
+    9E+04
+    -2E-01
+  bn-BD
+    ০E+০০
+    ৯E+০৪
+    -২E-০১
+
+scientific/+ee/sign-always .000 group-on-aligned
+  es-MX
+    0.000E+00
+    9.183E+04
+    -2.222E-01
+  zh-TW
+    0.000E+00
+    9.183E+04
+    -2.222E-01
+  bn-BD
+    ০.০০০E+০০
+    ৯.১৮৩E+০৪
+    -২.২২২E-০১
+
+scientific/+ee/sign-always .##/@@@+ group-on-aligned
+  es-MX
+    0E+00
+    9.18E+04
+    -2.22E-01
+  zh-TW
+    0E+00
+    9.18E+04
+    -2.22E-01
+  bn-BD
+    ০E+০০
+    ৯.১৮E+০৪
+    -২.২২E-০১
+
+scientific/+ee/sign-always @@ group-on-aligned
+  es-MX
+    0.0E+00
+    9.2E+04
+    -2.2E-01
+  zh-TW
+    0.0E+00
+    9.2E+04
+    -2.2E-01
+  bn-BD
+    ০.০E+০০
+    ৯.২E+০৪
+    -২.২E-০১
+
+compact-short precision-integer latin
+  es-MX
+    0
+    92 k
+    -0
+  zh-TW
+    0
+    9萬
+    -0
+  bn-BD
+    0
+    92 হা
+    -0
+
+compact-short .000 latin
+  es-MX
+    0.000
+    91.827 k
+    -0.222
+  zh-TW
+    0.000
+    9.183萬
+    -0.222
+  bn-BD
+    0.000
+    91.827 হা
+    -0.222
+
+compact-short .##/@@@+ latin
+  es-MX
+    0
+    91.83 k
+    -0.222
+  zh-TW
+    0
+    9.18萬
+    -0.222
+  bn-BD
+    0
+    91.83 হা
+    -0.222
+
+compact-short @@ latin
+  es-MX
+    0.0
+    92 k
+    -0.22
+  zh-TW
+    0.0
+    9.2萬
+    -0.22
+  bn-BD
+    0.0
+    92 হা
+    -0.22
+
+scientific/+ee/sign-always precision-integer latin
+  es-MX
+    0E+00
+    9E+04
+    -2E-01
+  zh-TW
+    0E+00
+    9E+04
+    -2E-01
+  bn-BD
+    0E+00
+    9E+04
+    -2E-01
+
+scientific/+ee/sign-always .000 latin
+  es-MX
+    0.000E+00
+    9.183E+04
+    -2.222E-01
+  zh-TW
+    0.000E+00
+    9.183E+04
+    -2.222E-01
+  bn-BD
+    0.000E+00
+    9.183E+04
+    -2.222E-01
+
+scientific/+ee/sign-always .##/@@@+ latin
+  es-MX
+    0E+00
+    9.18E+04
+    -2.22E-01
+  zh-TW
+    0E+00
+    9.18E+04
+    -2.22E-01
+  bn-BD
+    0E+00
+    9.18E+04
+    -2.22E-01
+
+scientific/+ee/sign-always @@ latin
+  es-MX
+    0.0E+00
+    9.2E+04
+    -2.2E-01
+  zh-TW
+    0.0E+00
+    9.2E+04
+    -2.2E-01
+  bn-BD
+    0.0E+00
+    9.2E+04
+    -2.2E-01
+
+compact-short precision-integer sign-accounting-except-zero
+  es-MX
+    0
+    +92 k
+    0
+  zh-TW
+    0
+    +9萬
+    0
+  bn-BD
+    ০
+    +৯২ হা
+    ০
+
+compact-short .000 sign-accounting-except-zero
+  es-MX
+    0.000
+    +91.827 k
+    -0.222
+  zh-TW
+    0.000
+    +9.183萬
+    -0.222
+  bn-BD
+    ০.০০০
+    +৯১.৮২৭ হা
+    -০.২২২
+
+compact-short .##/@@@+ sign-accounting-except-zero
+  es-MX
+    0
+    +91.83 k
+    -0.222
+  zh-TW
+    0
+    +9.18萬
+    -0.222
+  bn-BD
+    ০
+    +৯১.৮৩ হা
+    -০.২২২
+
+compact-short @@ sign-accounting-except-zero
+  es-MX
+    0.0
+    +92 k
+    -0.22
+  zh-TW
+    0.0
+    +9.2萬
+    -0.22
+  bn-BD
+    ০.০
+    +৯২ হা
+    -০.২২
+
+scientific/+ee/sign-always precision-integer sign-accounting-except-zero
+  es-MX
+    0E+00
+    +9E+04
+    -2E-01
+  zh-TW
+    0E+00
+    +9E+04
+    -2E-01
+  bn-BD
+    ০E+০০
+    +৯E+০৪
+    -২E-০১
+
+scientific/+ee/sign-always .000 sign-accounting-except-zero
+  es-MX
+    0.000E+00
+    +9.183E+04
+    -2.222E-01
+  zh-TW
+    0.000E+00
+    +9.183E+04
+    -2.222E-01
+  bn-BD
+    ০.০০০E+০০
+    +৯.১৮৩E+০৪
+    -২.২২২E-০১
+
+scientific/+ee/sign-always .##/@@@+ sign-accounting-except-zero
+  es-MX
+    0E+00
+    +9.18E+04
+    -2.22E-01
+  zh-TW
+    0E+00
+    +9.18E+04
+    -2.22E-01
+  bn-BD
+    ০E+০০
+    +৯.১৮E+০৪
+    -২.২২E-০১
+
+scientific/+ee/sign-always @@ sign-accounting-except-zero
+  es-MX
+    0.0E+00
+    +9.2E+04
+    -2.2E-01
+  zh-TW
+    0.0E+00
+    +9.2E+04
+    -2.2E-01
+  bn-BD
+    ০.০E+০০
+    +৯.২E+০৪
+    -২.২E-০১
+
+compact-short precision-integer decimal-always
+  es-MX
+    0.
+    92. k
+    -0.
+  zh-TW
+    0.
+    9.萬
+    -0.
+  bn-BD
+    ০.
+    ৯২. হা
+    -০.
+
+compact-short .000 decimal-always
+  es-MX
+    0.000
+    91.827 k
+    -0.222
+  zh-TW
+    0.000
+    9.183萬
+    -0.222
+  bn-BD
+    ০.০০০
+    ৯১.৮২৭ হা
+    -০.২২২
+
+compact-short .##/@@@+ decimal-always
+  es-MX
+    0.
+    91.83 k
+    -0.222
+  zh-TW
+    0.
+    9.18萬
+    -0.222
+  bn-BD
+    ০.
+    ৯১.৮৩ হা
+    -০.২২২
+
+compact-short @@ decimal-always
+  es-MX
+    0.0
+    92. k
+    -0.22
+  zh-TW
+    0.0
+    9.2萬
+    -0.22
+  bn-BD
+    ০.০
+    ৯২. হা
+    -০.২২
+
+scientific/+ee/sign-always precision-integer decimal-always
+  es-MX
+    0.E+00
+    9.E+04
+    -2.E-01
+  zh-TW
+    0.E+00
+    9.E+04
+    -2.E-01
+  bn-BD
+    ০.E+০০
+    ৯.E+০৪
+    -২.E-০১
+
+scientific/+ee/sign-always .000 decimal-always
+  es-MX
+    0.000E+00
+    9.183E+04
+    -2.222E-01
+  zh-TW
+    0.000E+00
+    9.183E+04
+    -2.222E-01
+  bn-BD
+    ০.০০০E+০০
+    ৯.১৮৩E+০৪
+    -২.২২২E-০১
+
+scientific/+ee/sign-always .##/@@@+ decimal-always
+  es-MX
+    0.E+00
+    9.18E+04
+    -2.22E-01
+  zh-TW
+    0.E+00
+    9.18E+04
+    -2.22E-01
+  bn-BD
+    ০.E+০০
+    ৯.১৮E+০৪
+    -২.২২E-০১
+
+scientific/+ee/sign-always @@ decimal-always
+  es-MX
+    0.0E+00
+    9.2E+04
+    -2.2E-01
+  zh-TW
+    0.0E+00
+    9.2E+04
+    -2.2E-01
+  bn-BD
+    ০.০E+০০
+    ৯.২E+০৪
+    -২.২E-০১
+
+compact-short rounding-mode-floor integer-width/##00
+  es-MX
+    00
+    91 k
+    -00.23
+  zh-TW
+    00
+    09.1萬
+    -00.23
+  bn-BD
+    ০০
+    ৯১ হা
+    -০০.২৩
+
+scientific/+ee/sign-always rounding-mode-floor integer-width/##00
+  es-MX
+    00E+00
+    09.182736E+04
+    -02.2222E-01
+  zh-TW
+    00E+00
+    09.182736E+04
+    -02.2222E-01
+  bn-BD
+    ০০E+০০
+    ০৯.১৮২৭৩৬E+০৪
+    -০২.২২২২E-০১
+
+compact-short rounding-mode-floor scale/0.5
+  es-MX
+    0
+    45 k
+    -0.12
+  zh-TW
+    0
+    4.5萬
+    -0.12
+  bn-BD
+    ০
+    ৪৫ হা
+    -০.১২
+
+scientific/+ee/sign-always rounding-mode-floor scale/0.5
+  es-MX
+    0E+00
+    4.591368E+04
+    -1.1111E-01
+  zh-TW
+    0E+00
+    4.591368E+04
+    -1.1111E-01
+  bn-BD
+    ০E+০০
+    ৪.৫৯১৩৬৮E+০৪
+    -১.১১১১E-০১
+
+compact-short rounding-mode-floor group-on-aligned
+  es-MX
+    0
+    91 k
+    -0.23
+  zh-TW
+    0
+    9.1萬
+    -0.23
+  bn-BD
+    ০
+    ৯১ হা
+    -০.২৩
+
+scientific/+ee/sign-always rounding-mode-floor group-on-aligned
+  es-MX
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+  bn-BD
+    ০E+০০
+    ৯.১৮২৭৩৬E+০৪
+    -২.২২২২E-০১
+
+compact-short rounding-mode-floor latin
+  es-MX
+    0
+    91 k
+    -0.23
+  zh-TW
+    0
+    9.1萬
+    -0.23
+  bn-BD
+    0
+    91 হা
+    -0.23
+
+scientific/+ee/sign-always rounding-mode-floor latin
+  es-MX
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+  bn-BD
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+
+compact-short rounding-mode-floor sign-accounting-except-zero
+  es-MX
+    0
+    +91 k
+    -0.23
+  zh-TW
+    0
+    +9.1萬
+    -0.23
+  bn-BD
+    ০
+    +৯১ হা
+    -০.২৩
+
+scientific/+ee/sign-always rounding-mode-floor sign-accounting-except-zero
+  es-MX
+    0E+00
+    +9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0E+00
+    +9.182736E+04
+    -2.2222E-01
+  bn-BD
+    ০E+০০
+    +৯.১৮২৭৩৬E+০৪
+    -২.২২২২E-০১
+
+compact-short rounding-mode-floor decimal-always
+  es-MX
+    0.
+    91. k
+    -0.23
+  zh-TW
+    0.
+    9.1萬
+    -0.23
+  bn-BD
+    ০.
+    ৯১. হা
+    -০.২৩
+
+scientific/+ee/sign-always rounding-mode-floor decimal-always
+  es-MX
+    0.E+00
+    9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0.E+00
+    9.182736E+04
+    -2.2222E-01
+  bn-BD
+    ০.E+০০
+    ৯.১৮২৭৩৬E+০৪
+    -২.২২২২E-০১
+
+compact-short integer-width/##00 scale/0.5
+  es-MX
+    00
+    46 k
+    -00.11
+  zh-TW
+    00
+    04.6萬
+    -00.11
+  bn-BD
+    ০০
+    ৪৬ হা
+    -০০.১১
+
+scientific/+ee/sign-always integer-width/##00 scale/0.5
+  es-MX
+    00E+00
+    04.591368E+04
+    -01.1111E-01
+  zh-TW
+    00E+00
+    04.591368E+04
+    -01.1111E-01
+  bn-BD
+    ০০E+০০
+    ০৪.৫৯১৩৬৮E+০৪
+    -০১.১১১১E-০১
+
+compact-short integer-width/##00 group-on-aligned
+  es-MX
+    00
+    92 k
+    -00.22
+  zh-TW
+    00
+    09.2萬
+    -00.22
+  bn-BD
+    ০০
+    ৯২ হা
+    -০০.২২
+
+scientific/+ee/sign-always integer-width/##00 group-on-aligned
+  es-MX
+    00E+00
+    09.182736E+04
+    -02.2222E-01
+  zh-TW
+    00E+00
+    09.182736E+04
+    -02.2222E-01
+  bn-BD
+    ০০E+০০
+    ০৯.১৮২৭৩৬E+০৪
+    -০২.২২২২E-০১
+
+compact-short integer-width/##00 latin
+  es-MX
+    00
+    92 k
+    -00.22
+  zh-TW
+    00
+    09.2萬
+    -00.22
+  bn-BD
+    00
+    92 হা
+    -00.22
+
+scientific/+ee/sign-always integer-width/##00 latin
+  es-MX
+    00E+00
+    09.182736E+04
+    -02.2222E-01
+  zh-TW
+    00E+00
+    09.182736E+04
+    -02.2222E-01
+  bn-BD
+    00E+00
+    09.182736E+04
+    -02.2222E-01
+
+compact-short integer-width/##00 sign-accounting-except-zero
+  es-MX
+    00
+    +92 k
+    -00.22
+  zh-TW
+    00
+    +09.2萬
+    -00.22
+  bn-BD
+    ০০
+    +৯২ হা
+    -০০.২২
+
+scientific/+ee/sign-always integer-width/##00 sign-accounting-except-zero
+  es-MX
+    00E+00
+    +09.182736E+04
+    -02.2222E-01
+  zh-TW
+    00E+00
+    +09.182736E+04
+    -02.2222E-01
+  bn-BD
+    ০০E+০০
+    +০৯.১৮২৭৩৬E+০৪
+    -০২.২২২২E-০১
+
+compact-short integer-width/##00 decimal-always
+  es-MX
+    00.
+    92. k
+    -00.22
+  zh-TW
+    00.
+    09.2萬
+    -00.22
+  bn-BD
+    ০০.
+    ৯২. হা
+    -০০.২২
+
+scientific/+ee/sign-always integer-width/##00 decimal-always
+  es-MX
+    00.E+00
+    09.182736E+04
+    -02.2222E-01
+  zh-TW
+    00.E+00
+    09.182736E+04
+    -02.2222E-01
+  bn-BD
+    ০০.E+০০
+    ০৯.১৮২৭৩৬E+০৪
+    -০২.২২২২E-০১
+
+compact-short scale/0.5 group-on-aligned
+  es-MX
+    0
+    46 k
+    -0.11
+  zh-TW
+    0
+    4.6萬
+    -0.11
+  bn-BD
+    ০
+    ৪৬ হা
+    -০.১১
+
+scientific/+ee/sign-always scale/0.5 group-on-aligned
+  es-MX
+    0E+00
+    4.591368E+04
+    -1.1111E-01
+  zh-TW
+    0E+00
+    4.591368E+04
+    -1.1111E-01
+  bn-BD
+    ০E+০০
+    ৪.৫৯১৩৬৮E+০৪
+    -১.১১১১E-০১
+
+compact-short scale/0.5 latin
+  es-MX
+    0
+    46 k
+    -0.11
+  zh-TW
+    0
+    4.6萬
+    -0.11
+  bn-BD
+    0
+    46 হা
+    -0.11
+
+scientific/+ee/sign-always scale/0.5 latin
+  es-MX
+    0E+00
+    4.591368E+04
+    -1.1111E-01
+  zh-TW
+    0E+00
+    4.591368E+04
+    -1.1111E-01
+  bn-BD
+    0E+00
+    4.591368E+04
+    -1.1111E-01
+
+compact-short scale/0.5 sign-accounting-except-zero
+  es-MX
+    0
+    +46 k
+    -0.11
+  zh-TW
+    0
+    +4.6萬
+    -0.11
+  bn-BD
+    ০
+    +৪৬ হা
+    -০.১১
+
+scientific/+ee/sign-always scale/0.5 sign-accounting-except-zero
+  es-MX
+    0E+00
+    +4.591368E+04
+    -1.1111E-01
+  zh-TW
+    0E+00
+    +4.591368E+04
+    -1.1111E-01
+  bn-BD
+    ০E+০০
+    +৪.৫৯১৩৬৮E+০৪
+    -১.১১১১E-০১
+
+compact-short scale/0.5 decimal-always
+  es-MX
+    0.
+    46. k
+    -0.11
+  zh-TW
+    0.
+    4.6萬
+    -0.11
+  bn-BD
+    ০.
+    ৪৬. হা
+    -০.১১
+
+scientific/+ee/sign-always scale/0.5 decimal-always
+  es-MX
+    0.E+00
+    4.591368E+04
+    -1.1111E-01
+  zh-TW
+    0.E+00
+    4.591368E+04
+    -1.1111E-01
+  bn-BD
+    ০.E+০০
+    ৪.৫৯১৩৬৮E+০৪
+    -১.১১১১E-০১
+
+compact-short group-on-aligned latin
+  es-MX
+    0
+    92 k
+    -0.22
+  zh-TW
+    0
+    9.2萬
+    -0.22
+  bn-BD
+    0
+    92 হা
+    -0.22
+
+scientific/+ee/sign-always group-on-aligned latin
+  es-MX
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+  bn-BD
+    0E+00
+    9.182736E+04
+    -2.2222E-01
+
+compact-short group-on-aligned sign-accounting-except-zero
+  es-MX
+    0
+    +92 k
+    -0.22
+  zh-TW
+    0
+    +9.2萬
+    -0.22
+  bn-BD
+    ০
+    +৯২ হা
+    -০.২২
+
+scientific/+ee/sign-always group-on-aligned sign-accounting-except-zero
+  es-MX
+    0E+00
+    +9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0E+00
+    +9.182736E+04
+    -2.2222E-01
+  bn-BD
+    ০E+০০
+    +৯.১৮২৭৩৬E+০৪
+    -২.২২২২E-০১
+
+compact-short group-on-aligned decimal-always
+  es-MX
+    0.
+    92. k
+    -0.22
+  zh-TW
+    0.
+    9.2萬
+    -0.22
+  bn-BD
+    ০.
+    ৯২. হা
+    -০.২২
+
+scientific/+ee/sign-always group-on-aligned decimal-always
+  es-MX
+    0.E+00
+    9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0.E+00
+    9.182736E+04
+    -2.2222E-01
+  bn-BD
+    ০.E+০০
+    ৯.১৮২৭৩৬E+০৪
+    -২.২২২২E-০১
+
+compact-short latin sign-accounting-except-zero
+  es-MX
+    0
+    +92 k
+    -0.22
+  zh-TW
+    0
+    +9.2萬
+    -0.22
+  bn-BD
+    0
+    +92 হা
+    -0.22
+
+scientific/+ee/sign-always latin sign-accounting-except-zero
+  es-MX
+    0E+00
+    +9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0E+00
+    +9.182736E+04
+    -2.2222E-01
+  bn-BD
+    0E+00
+    +9.182736E+04
+    -2.2222E-01
+
+compact-short latin decimal-always
+  es-MX
+    0.
+    92. k
+    -0.22
+  zh-TW
+    0.
+    9.2萬
+    -0.22
+  bn-BD
+    0.
+    92. হা
+    -0.22
+
+scientific/+ee/sign-always latin decimal-always
+  es-MX
+    0.E+00
+    9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0.E+00
+    9.182736E+04
+    -2.2222E-01
+  bn-BD
+    0.E+00
+    9.182736E+04
+    -2.2222E-01
+
+compact-short sign-accounting-except-zero decimal-always
+  es-MX
+    0.
+    +92. k
+    -0.22
+  zh-TW
+    0.
+    +9.2萬
+    -0.22
+  bn-BD
+    ০.
+    +৯২. হা
+    -০.২২
+
+scientific/+ee/sign-always sign-accounting-except-zero decimal-always
+  es-MX
+    0.E+00
+    +9.182736E+04
+    -2.2222E-01
+  zh-TW
+    0.E+00
+    +9.182736E+04
+    -2.2222E-01
+  bn-BD
+    ০.E+০০
+    +৯.১৮২৭৩৬E+০৪
+    -২.২২২২E-০১
+
+percent unit-width-narrow precision-integer
+  es-MX
+    0 %
+    91,827 %
+    -0 %
+  zh-TW
+    0%
+    91,827%
+    -0%
+  bn-BD
+    ০%
+    ৯১,৮২৭%
+    -০%
+
+percent unit-width-narrow .000
+  es-MX
+    0.000 %
+    91,827.364 %
+    -0.222 %
+  zh-TW
+    0.000%
+    91,827.364%
+    -0.222%
+  bn-BD
+    ০.০০০%
+    ৯১,৮২৭.৩৬৪%
+    -০.২২২%
+
+percent unit-width-narrow .##/@@@+
+  es-MX
+    0 %
+    91,827.36 %
+    -0.222 %
+  zh-TW
+    0%
+    91,827.36%
+    -0.222%
+  bn-BD
+    ০%
+    ৯১,৮২৭.৩৬%
+    -০.২২২%
+
+percent unit-width-narrow @@
+  es-MX
+    0.0 %
+    92,000 %
+    -0.22 %
+  zh-TW
+    0.0%
+    92,000%
+    -0.22%
+  bn-BD
+    ০.০%
+    ৯২,০০০%
+    -০.২২%
+
+percent unit-width-full-name precision-integer
+  es-MX
+    0 por ciento
+    91,827 por ciento
+    -0 por ciento
+  zh-TW
+    0%
+    91,827%
+    -0%
+  bn-BD
+    ০শতাংশ
+    ৯১,৮২৭শতাংশ
+    -০শতাংশ
+
+percent unit-width-full-name .000
+  es-MX
+    0.000 por ciento
+    91,827.364 por ciento
+    -0.222 por ciento
+  zh-TW
+    0.000%
+    91,827.364%
+    -0.222%
+  bn-BD
+    ০.০০০শতাংশ
+    ৯১,৮২৭.৩৬৪শতাংশ
+    -০.২২২শতাংশ
+
+percent unit-width-full-name .##/@@@+
+  es-MX
+    0 por ciento
+    91,827.36 por ciento
+    -0.222 por ciento
+  zh-TW
+    0%
+    91,827.36%
+    -0.222%
+  bn-BD
+    ০শতাংশ
+    ৯১,৮২৭.৩৬শতাংশ
+    -০.২২২শতাংশ
+
+percent unit-width-full-name @@
+  es-MX
+    0.0 por ciento
+    92,000 por ciento
+    -0.22 por ciento
+  zh-TW
+    0.0%
+    92,000%
+    -0.22%
+  bn-BD
+    ০.০শতাংশ
+    ৯২,০০০শতাংশ
+    -০.২২শতাংশ
+
+currency/EUR unit-width-narrow precision-integer
+  es-MX
+    €0
+    €91,827
+    -€0
+  zh-TW
+    €0
+    €91,827
+    -€0
+  bn-BD
+    ০€
+    ৯১,৮২৭€
+    -০€
+
+currency/EUR unit-width-narrow .000
+  es-MX
+    €0.000
+    €91,827.364
+    -€0.222
+  zh-TW
+    €0.000
+    €91,827.364
+    -€0.222
+  bn-BD
+    ০.০০০€
+    ৯১,৮২৭.৩৬৪€
+    -০.২২২€
+
+currency/EUR unit-width-narrow .##/@@@+
+  es-MX
+    €0
+    €91,827.36
+    -€0.222
+  zh-TW
+    €0
+    €91,827.36
+    -€0.222
+  bn-BD
+    ০€
+    ৯১,৮২৭.৩৬€
+    -০.২২২€
+
+currency/EUR unit-width-narrow @@
+  es-MX
+    €0.0
+    €92,000
+    -€0.22
+  zh-TW
+    €0.0
+    €92,000
+    -€0.22
+  bn-BD
+    ০.০€
+    ৯২,০০০€
+    -০.২২€
+
+currency/EUR unit-width-full-name precision-integer
+  es-MX
+    0 euros
+    91,827 euros
+    -0 euros
+  zh-TW
+    0 歐元
+    91,827 歐元
+    -0 歐元
+  bn-BD
+    ০ ইউরো
+    ৯১,৮২৭ ইউরো
+    -০ ইউরো
+
+currency/EUR unit-width-full-name .000
+  es-MX
+    0.000 euros
+    91,827.364 euros
+    -0.222 euros
+  zh-TW
+    0.000 歐元
+    91,827.364 歐元
+    -0.222 歐元
+  bn-BD
+    ০.০০০ ইউরো
+    ৯১,৮২৭.৩৬৪ ইউরো
+    -০.২২২ ইউরো
+
+currency/EUR unit-width-full-name .##/@@@+
+  es-MX
+    0 euros
+    91,827.36 euros
+    -0.222 euros
+  zh-TW
+    0 歐元
+    91,827.36 歐元
+    -0.222 歐元
+  bn-BD
+    ০ ইউরো
+    ৯১,৮২৭.৩৬ ইউরো
+    -০.২২২ ইউরো
+
+currency/EUR unit-width-full-name @@
+  es-MX
+    0.0 euros
+    92,000 euros
+    -0.22 euros
+  zh-TW
+    0.0 歐元
+    92,000 歐元
+    -0.22 歐元
+  bn-BD
+    ০.০ ইউরো
+    ৯২,০০০ ইউরো
+    -০.২২ ইউরো
+
+measure-unit/length-furlong unit-width-narrow precision-integer
+  es-MX
+    0 fur
+    91,827 fur
+    -0 fur
+  zh-TW
+    0化朗
+    91,827化朗
+    -0化朗
+  bn-BD
+    ০ ফার্লং
+    ৯১,৮২৭ ফার্লং
+    -০ ফার্লং
+
+measure-unit/length-furlong unit-width-narrow .000
+  es-MX
+    0.000 fur
+    91,827.364 fur
+    -0.222 fur
+  zh-TW
+    0.000化朗
+    91,827.364化朗
+    -0.222化朗
+  bn-BD
+    ০.০০০ ফার্লং
+    ৯১,৮২৭.৩৬৪ ফার্লং
+    -০.২২২ ফার্লং
+
+measure-unit/length-furlong unit-width-narrow .##/@@@+
+  es-MX
+    0 fur
+    91,827.36 fur
+    -0.222 fur
+  zh-TW
+    0化朗
+    91,827.36化朗
+    -0.222化朗
+  bn-BD
+    ০ ফার্লং
+    ৯১,৮২৭.৩৬ ফার্লং
+    -০.২২২ ফার্লং
+
+measure-unit/length-furlong unit-width-narrow @@
+  es-MX
+    0.0 fur
+    92,000 fur
+    -0.22 fur
+  zh-TW
+    0.0化朗
+    92,000化朗
+    -0.22化朗
+  bn-BD
+    ০.০ ফার্লং
+    ৯২,০০০ ফার্লং
+    -০.২২ ফার্লং
+
+measure-unit/length-furlong unit-width-full-name precision-integer
+  es-MX
+    0 furlongs
+    91,827 furlongs
+    -0 furlongs
+  zh-TW
+    0 化朗
+    91,827 化朗
+    -0 化朗
+  bn-BD
+    ০ ফার্লং
+    ৯১,৮২৭ ফার্লং
+    -০ ফার্লং
+
+measure-unit/length-furlong unit-width-full-name .000
+  es-MX
+    0.000 furlongs
+    91,827.364 furlongs
+    -0.222 furlongs
+  zh-TW
+    0.000 化朗
+    91,827.364 化朗
+    -0.222 化朗
+  bn-BD
+    ০.০০০ ফার্লং
+    ৯১,৮২৭.৩৬৪ ফার্লং
+    -০.২২২ ফার্লং
+
+measure-unit/length-furlong unit-width-full-name .##/@@@+
+  es-MX
+    0 furlongs
+    91,827.36 furlongs
+    -0.222 furlongs
+  zh-TW
+    0 化朗
+    91,827.36 化朗
+    -0.222 化朗
+  bn-BD
+    ০ ফার্লং
+    ৯১,৮২৭.৩৬ ফার্লং
+    -০.২২২ ফার্লং
+
+measure-unit/length-furlong unit-width-full-name @@
+  es-MX
+    0.0 furlongs
+    92,000 furlongs
+    -0.22 furlongs
+  zh-TW
+    0.0 化朗
+    92,000 化朗
+    -0.22 化朗
+  bn-BD
+    ০.০ ফার্লং
+    ৯২,০০০ ফার্লং
+    -০.২২ ফার্লং
+
+percent unit-width-narrow rounding-mode-floor
+  es-MX
+    0 %
+    91,827.3645 %
+    -0.22222 %
+  zh-TW
+    0%
+    91,827.3645%
+    -0.22222%
+  bn-BD
+    ০%
+    ৯১,৮২৭.৩৬৪৫%
+    -০.২২২২২%
+
+percent unit-width-full-name rounding-mode-floor
+  es-MX
+    0 por ciento
+    91,827.3645 por ciento
+    -0.22222 por ciento
+  zh-TW
+    0%
+    91,827.3645%
+    -0.22222%
+  bn-BD
+    ০শতাংশ
+    ৯১,৮২৭.৩৬৪৫শতাংশ
+    -০.২২২২২শতাংশ
+
+currency/EUR unit-width-narrow rounding-mode-floor
+  es-MX
+    €0.00
+    €91,827.36
+    -€0.23
+  zh-TW
+    €0.00
+    €91,827.36
+    -€0.23
+  bn-BD
+    ০.০০€
+    ৯১,৮২৭.৩৬€
+    -০.২৩€
+
+currency/EUR unit-width-full-name rounding-mode-floor
+  es-MX
+    0.00 euros
+    91,827.36 euros
+    -0.23 euros
+  zh-TW
+    0.00 歐元
+    91,827.36 歐元
+    -0.23 歐元
+  bn-BD
+    ০.০০ ইউরো
+    ৯১,৮২৭.৩৬ ইউরো
+    -০.২৩ ইউরো
+
+measure-unit/length-furlong unit-width-narrow rounding-mode-floor
+  es-MX
+    0 fur
+    91,827.3645 fur
+    -0.22222 fur
+  zh-TW
+    0化朗
+    91,827.3645化朗
+    -0.22222化朗
+  bn-BD
+    ০ ফার্লং
+    ৯১,৮২৭.৩৬৪৫ ফার্লং
+    -০.২২২২২ ফার্লং
+
+measure-unit/length-furlong unit-width-full-name rounding-mode-floor
+  es-MX
+    0 furlongs
+    91,827.3645 furlongs
+    -0.22222 furlongs
+  zh-TW
+    0 化朗
+    91,827.3645 化朗
+    -0.22222 化朗
+  bn-BD
+    ০ ফার্লং
+    ৯১,৮২৭.৩৬৪৫ ফার্লং
+    -০.২২২২২ ফার্লং
+
+percent unit-width-narrow integer-width/##00
+  es-MX
+    00 %
+    1,827.3645 %
+    -00.22222 %
+  zh-TW
+    00%
+    1,827.3645%
+    -00.22222%
+  bn-BD
+    ০০%
+    ১,৮২৭.৩৬৪৫%
+    -০০.২২২২২%
+
+percent unit-width-full-name integer-width/##00
+  es-MX
+    00 por ciento
+    1,827.3645 por ciento
+    -00.22222 por ciento
+  zh-TW
+    00%
+    1,827.3645%
+    -00.22222%
+  bn-BD
+    ০০শতাংশ
+    ১,৮২৭.৩৬৪৫শতাংশ
+    -০০.২২২২২শতাংশ
+
+currency/EUR unit-width-narrow integer-width/##00
+  es-MX
+    €00.00
+    €1,827.36
+    -€00.22
+  zh-TW
+    €00.00
+    €1,827.36
+    -€00.22
+  bn-BD
+    ০০.০০€
+    ১,৮২৭.৩৬€
+    -০০.২২€
+
+currency/EUR unit-width-full-name integer-width/##00
+  es-MX
+    00.00 euros
+    1,827.36 euros
+    -00.22 euros
+  zh-TW
+    00.00 歐元
+    1,827.36 歐元
+    -00.22 歐元
+  bn-BD
+    ০০.০০ ইউরো
+    ১,৮২৭.৩৬ ইউরো
+    -০০.২২ ইউরো
+
+measure-unit/length-furlong unit-width-narrow integer-width/##00
+  es-MX
+    00 fur
+    1,827.3645 fur
+    -00.22222 fur
+  zh-TW
+    00化朗
+    1,827.3645化朗
+    -00.22222化朗
+  bn-BD
+    ০০ ফার্লং
+    ১,৮২৭.৩৬৪৫ ফার্লং
+    -০০.২২২২২ ফার্লং
+
+measure-unit/length-furlong unit-width-full-name integer-width/##00
+  es-MX
+    00 furlongs
+    1,827.3645 furlongs
+    -00.22222 furlongs
+  zh-TW
+    00 化朗
+    1,827.3645 化朗
+    -00.22222 化朗
+  bn-BD
+    ০০ ফার্লং
+    ১,৮২৭.৩৬৪৫ ফার্লং
+    -০০.২২২২২ ফার্লং
+
+percent unit-width-narrow scale/0.5
+  es-MX
+    0 %
+    45,913.68225 %
+    -0.11111 %
+  zh-TW
+    0%
+    45,913.68225%
+    -0.11111%
+  bn-BD
+    ০%
+    ৪৫,৯১৩.৬৮২২৫%
+    -০.১১১১১%
+
+percent unit-width-full-name scale/0.5
+  es-MX
+    0 por ciento
+    45,913.68225 por ciento
+    -0.11111 por ciento
+  zh-TW
+    0%
+    45,913.68225%
+    -0.11111%
+  bn-BD
+    ০শতাংশ
+    ৪৫,৯১৩.৬৮২২৫শতাংশ
+    -০.১১১১১শতাংশ
+
+currency/EUR unit-width-narrow scale/0.5
+  es-MX
+    €0.00
+    €45,913.68
+    -€0.11
+  zh-TW
+    €0.00
+    €45,913.68
+    -€0.11
+  bn-BD
+    ০.০০€
+    ৪৫,৯১৩.৬৮€
+    -০.১১€
+
+currency/EUR unit-width-full-name scale/0.5
+  es-MX
+    0.00 euros
+    45,913.68 euros
+    -0.11 euros
+  zh-TW
+    0.00 歐元
+    45,913.68 歐元
+    -0.11 歐元
+  bn-BD
+    ০.০০ ইউরো
+    ৪৫,৯১৩.৬৮ ইউরো
+    -০.১১ ইউরো
+
+measure-unit/length-furlong unit-width-narrow scale/0.5
+  es-MX
+    0 fur
+    45,913.68225 fur
+    -0.11111 fur
+  zh-TW
+    0化朗
+    45,913.68225化朗
+    -0.11111化朗
+  bn-BD
+    ০ ফার্লং
+    ৪৫,৯১৩.৬৮২২৫ ফার্লং
+    -০.১১১১১ ফার্লং
+
+measure-unit/length-furlong unit-width-full-name scale/0.5
+  es-MX
+    0 furlongs
+    45,913.68225 furlongs
+    -0.11111 furlongs
+  zh-TW
+    0 化朗
+    45,913.68225 化朗
+    -0.11111 化朗
+  bn-BD
+    ০ ফার্লং
+    ৪৫,৯১৩.৬৮২২৫ ফার্লং
+    -০.১১১১১ ফার্লং
+
+percent unit-width-narrow group-on-aligned
+  es-MX
+    0 %
+    91,827.3645 %
+    -0.22222 %
+  zh-TW
+    0%
+    91,827.3645%
+    -0.22222%
+  bn-BD
+    ০%
+    ৯১,৮২৭.৩৬৪৫%
+    -০.২২২২২%
+
+percent unit-width-full-name group-on-aligned
+  es-MX
+    0 por ciento
+    91,827.3645 por ciento
+    -0.22222 por ciento
+  zh-TW
+    0%
+    91,827.3645%
+    -0.22222%
+  bn-BD
+    ০শতাংশ
+    ৯১,৮২৭.৩৬৪৫শতাংশ
+    -০.২২২২২শতাংশ
+
+currency/EUR unit-width-narrow group-on-aligned
+  es-MX
+    €0.00
+    €91,827.36
+    -€0.22
+  zh-TW
+    €0.00
+    €91,827.36
+    -€0.22
+  bn-BD
+    ০.০০€
+    ৯১,৮২৭.৩৬€
+    -০.২২€
+
+currency/EUR unit-width-full-name group-on-aligned
+  es-MX
+    0.00 euros
+    91,827.36 euros
+    -0.22 euros
+  zh-TW
+    0.00 歐元
+    91,827.36 歐元
+    -0.22 歐元
+  bn-BD
+    ০.০০ ইউরো
+    ৯১,৮২৭.৩৬ ইউরো
+    -০.২২ ইউরো
+
+measure-unit/length-furlong unit-width-narrow group-on-aligned
+  es-MX
+    0 fur
+    91,827.3645 fur
+    -0.22222 fur
+  zh-TW
+    0化朗
+    91,827.3645化朗
+    -0.22222化朗
+  bn-BD
+    ০ ফার্লং
+    ৯১,৮২৭.৩৬৪৫ ফার্লং
+    -০.২২২২২ ফার্লং
+
+measure-unit/length-furlong unit-width-full-name group-on-aligned
+  es-MX
+    0 furlongs
+    91,827.3645 furlongs
+    -0.22222 furlongs
+  zh-TW
+    0 化朗
+    91,827.3645 化朗
+    -0.22222 化朗
+  bn-BD
+    ০ ফার্লং
+    ৯১,৮২৭.৩৬৪৫ ফার্লং
+    -০.২২২২২ ফার্লং
+
+percent unit-width-narrow latin
+  es-MX
+    0 %
+    91,827.3645 %
+    -0.22222 %
+  zh-TW
+    0%
+    91,827.3645%
+    -0.22222%
+  bn-BD
+    0%
+    91,827.3645%
+    -0.22222%
+
+percent unit-width-full-name latin
+  es-MX
+    0 por ciento
+    91,827.3645 por ciento
+    -0.22222 por ciento
+  zh-TW
+    0%
+    91,827.3645%
+    -0.22222%
+  bn-BD
+    0শতাংশ
+    91,827.3645শতাংশ
+    -0.22222শতাংশ
+
+currency/EUR unit-width-narrow latin
+  es-MX
+    €0.00
+    €91,827.36
+    -€0.22
+  zh-TW
+    €0.00
+    €91,827.36
+    -€0.22
+  bn-BD
+    0.00€
+    91,827.36€
+    -0.22€
+
+currency/EUR unit-width-full-name latin
+  es-MX
+    0.00 euros
+    91,827.36 euros
+    -0.22 euros
+  zh-TW
+    0.00 歐元
+    91,827.36 歐元
+    -0.22 歐元
+  bn-BD
+    0.00 ইউরো
+    91,827.36 ইউরো
+    -0.22 ইউরো
+
+measure-unit/length-furlong unit-width-narrow latin
+  es-MX
+    0 fur
+    91,827.3645 fur
+    -0.22222 fur
+  zh-TW
+    0化朗
+    91,827.3645化朗
+    -0.22222化朗
+  bn-BD
+    0 ফার্লং
+    91,827.3645 ফার্লং
+    -0.22222 ফার্লং
+
+measure-unit/length-furlong unit-width-full-name latin
+  es-MX
+    0 furlongs
+    91,827.3645 furlongs
+    -0.22222 furlongs
+  zh-TW
+    0 化朗
+    91,827.3645 化朗
+    -0.22222 化朗
+  bn-BD
+    0 ফার্লং
+    91,827.3645 ফার্লং
+    -0.22222 ফার্লং
+
+percent unit-width-narrow sign-accounting-except-zero
+  es-MX
+    0 %
+    +91,827.3645 %
+    -0.22222 %
+  zh-TW
+    0%
+    +91,827.3645%
+    -0.22222%
+  bn-BD
+    ০%
+    +৯১,৮২৭.৩৬৪৫%
+    -০.২২২২২%
+
+percent unit-width-full-name sign-accounting-except-zero
+  es-MX
+    0 por ciento
+    +91,827.3645 por ciento
+    -0.22222 por ciento
+  zh-TW
+    0%
+    +91,827.3645%
+    -0.22222%
+  bn-BD
+    ০শতাংশ
+    +৯১,৮২৭.৩৬৪৫শতাংশ
+    -০.২২২২২শতাংশ
+
+currency/EUR unit-width-narrow sign-accounting-except-zero
+  es-MX
+    €0.00
+    +€91,827.36
+    -€0.22
+  zh-TW
+    €0.00
+    +€91,827.36
+    (€0.22)
+  bn-BD
+    ০.০০€
+    +৯১,৮২৭.৩৬€
+    (০.২২€)
+
+currency/EUR unit-width-full-name sign-accounting-except-zero
+  es-MX
+    0.00 euros
+    +91,827.36 euros
+    -0.22 euros
+  zh-TW
+    0.00 歐元
+    +91,827.36 歐元
+    -0.22 歐元
+  bn-BD
+    ০.০০ ইউরো
+    +৯১,৮২৭.৩৬ ইউরো
+    -০.২২ ইউরো
+
+measure-unit/length-furlong unit-width-narrow sign-accounting-except-zero
+  es-MX
+    0 fur
+    +91,827.3645 fur
+    -0.22222 fur
+  zh-TW
+    0化朗
+    +91,827.3645化朗
+    -0.22222化朗
+  bn-BD
+    ০ ফার্লং
+    +৯১,৮২৭.৩৬৪৫ ফার্লং
+    -০.২২২২২ ফার্লং
+
+measure-unit/length-furlong unit-width-full-name sign-accounting-except-zero
+  es-MX
+    0 furlongs
+    +91,827.3645 furlongs
+    -0.22222 furlongs
+  zh-TW
+    0 化朗
+    +91,827.3645 化朗
+    -0.22222 化朗
+  bn-BD
+    ০ ফার্লং
+    +৯১,৮২৭.৩৬৪৫ ফার্লং
+    -০.২২২২২ ফার্লং
+
+percent unit-width-narrow decimal-always
+  es-MX
+    0. %
+    91,827.3645 %
+    -0.22222 %
+  zh-TW
+    0.%
+    91,827.3645%
+    -0.22222%
+  bn-BD
+    ০.%
+    ৯১,৮২৭.৩৬৪৫%
+    -০.২২২২২%
+
+percent unit-width-full-name decimal-always
+  es-MX
+    0. por ciento
+    91,827.3645 por ciento
+    -0.22222 por ciento
+  zh-TW
+    0.%
+    91,827.3645%
+    -0.22222%
+  bn-BD
+    ০.শতাংশ
+    ৯১,৮২৭.৩৬৪৫শতাংশ
+    -০.২২২২২শতাংশ
+
+currency/EUR unit-width-narrow decimal-always
+  es-MX
+    €0.00
+    €91,827.36
+    -€0.22
+  zh-TW
+    €0.00
+    €91,827.36
+    -€0.22
+  bn-BD
+    ০.০০€
+    ৯১,৮২৭.৩৬€
+    -০.২২€
+
+currency/EUR unit-width-full-name decimal-always
+  es-MX
+    0.00 euros
+    91,827.36 euros
+    -0.22 euros
+  zh-TW
+    0.00 歐元
+    91,827.36 歐元
+    -0.22 歐元
+  bn-BD
+    ০.০০ ইউরো
+    ৯১,৮২৭.৩৬ ইউরো
+    -০.২২ ইউরো
+
+measure-unit/length-furlong unit-width-narrow decimal-always
+  es-MX
+    0. fur
+    91,827.3645 fur
+    -0.22222 fur
+  zh-TW
+    0.化朗
+    91,827.3645化朗
+    -0.22222化朗
+  bn-BD
+    ০. ফার্লং
+    ৯১,৮২৭.৩৬৪৫ ফার্লং
+    -০.২২২২২ ফার্লং
+
+measure-unit/length-furlong unit-width-full-name decimal-always
+  es-MX
+    0. furlongs
+    91,827.3645 furlongs
+    -0.22222 furlongs
+  zh-TW
+    0. 化朗
+    91,827.3645 化朗
+    -0.22222 化朗
+  bn-BD
+    ০. ফার্লং
+    ৯১,৮২৭.৩৬৪৫ ফার্লং
+    -০.২২২২২ ফার্লং
+
+percent precision-integer rounding-mode-floor
+  es-MX
+    0 %
+    91,827 %
+    -1 %
+  zh-TW
+    0%
+    91,827%
+    -1%
+  bn-BD
+    ০%
+    ৯১,৮২৭%
+    -১%
+
+percent .000 rounding-mode-floor
+  es-MX
+    0.000 %
+    91,827.364 %
+    -0.223 %
+  zh-TW
+    0.000%
+    91,827.364%
+    -0.223%
+  bn-BD
+    ০.০০০%
+    ৯১,৮২৭.৩৬৪%
+    -০.২২৩%
+
+percent .##/@@@+ rounding-mode-floor
+  es-MX
+    0 %
+    91,827.36 %
+    -0.223 %
+  zh-TW
+    0%
+    91,827.36%
+    -0.223%
+  bn-BD
+    ০%
+    ৯১,৮২৭.৩৬%
+    -০.২২৩%
+
+percent @@ rounding-mode-floor
+  es-MX
+    0.0 %
+    91,000 %
+    -0.23 %
+  zh-TW
+    0.0%
+    91,000%
+    -0.23%
+  bn-BD
+    ০.০%
+    ৯১,০০০%
+    -০.২৩%
+
+currency/EUR precision-integer rounding-mode-floor
+  es-MX
+    EUR 0
+    EUR 91,827
+    -EUR 1
+  zh-TW
+    €0
+    €91,827
+    -€1
+  bn-BD
+    ০€
+    ৯১,৮২৭€
+    -১€
+
+currency/EUR .000 rounding-mode-floor
+  es-MX
+    EUR 0.000
+    EUR 91,827.364
+    -EUR 0.223
+  zh-TW
+    €0.000
+    €91,827.364
+    -€0.223
+  bn-BD
+    ০.০০০€
+    ৯১,৮২৭.৩৬৪€
+    -০.২২৩€
+
+currency/EUR .##/@@@+ rounding-mode-floor
+  es-MX
+    EUR 0
+    EUR 91,827.36
+    -EUR 0.223
+  zh-TW
+    €0
+    €91,827.36
+    -€0.223
+  bn-BD
+    ০€
+    ৯১,৮২৭.৩৬€
+    -০.২২৩€
+
+currency/EUR @@ rounding-mode-floor
+  es-MX
+    EUR 0.0
+    EUR 91,000
+    -EUR 0.23
+  zh-TW
+    €0.0
+    €91,000
+    -€0.23
+  bn-BD
+    ০.০€
+    ৯১,০০০€
+    -০.২৩€
+
+measure-unit/length-furlong precision-integer rounding-mode-floor
+  es-MX
+    0 fur
+    91,827 fur
+    -1 fur
+  zh-TW
+    0 化朗
+    91,827 化朗
+    -1 化朗
+  bn-BD
+    ০ ফার্লং
+    ৯১,৮২৭ ফার্লং
+    -১ ফার্লং
+
+measure-unit/length-furlong .000 rounding-mode-floor
+  es-MX
+    0.000 fur
+    91,827.364 fur
+    -0.223 fur
+  zh-TW
+    0.000 化朗
+    91,827.364 化朗
+    -0.223 化朗
+  bn-BD
+    ০.০০০ ফার্লং
+    ৯১,৮২৭.৩৬৪ ফার্লং
+    -০.২২৩ ফার্লং
+
+measure-unit/length-furlong .##/@@@+ rounding-mode-floor
+  es-MX
+    0 fur
+    91,827.36 fur
+    -0.223 fur
+  zh-TW
+    0 化朗
+    91,827.36 化朗
+    -0.223 化朗
+  bn-BD
+    ০ ফার্লং
+    ৯১,৮২৭.৩৬ ফার্লং
+    -০.২২৩ ফার্লং
+
+measure-unit/length-furlong @@ rounding-mode-floor
+  es-MX
+    0.0 fur
+    91,000 fur
+    -0.23 fur
+  zh-TW
+    0.0 化朗
+    91,000 化朗
+    -0.23 化朗
+  bn-BD
+    ০.০ ফার্লং
+    ৯১,০০০ ফার্লং
+    -০.২৩ ফার্লং
+
+percent precision-integer integer-width/##00
+  es-MX
+    00 %
+    1,827 %
+    -00 %
+  zh-TW
+    00%
+    1,827%
+    -00%
+  bn-BD
+    ০০%
+    ১,৮২৭%
+    -০০%
+
+percent .000 integer-width/##00
+  es-MX
+    00.000 %
+    1,827.364 %
+    -00.222 %
+  zh-TW
+    00.000%
+    1,827.364%
+    -00.222%
+  bn-BD
+    ০০.০০০%
+    ১,৮২৭.৩৬৪%
+    -০০.২২২%
+
+percent .##/@@@+ integer-width/##00
+  es-MX
+    00 %
+    1,827.36 %
+    -00.222 %
+  zh-TW
+    00%
+    1,827.36%
+    -00.222%
+  bn-BD
+    ০০%
+    ১,৮২৭.৩৬%
+    -০০.২২২%
+
+percent @@ integer-width/##00
+  es-MX
+    00.0 %
+    2,000 %
+    -00.22 %
+  zh-TW
+    00.0%
+    2,000%
+    -00.22%
+  bn-BD
+    ০০.০%
+    ২,০০০%
+    -০০.২২%
+
+currency/EUR precision-integer integer-width/##00
+  es-MX
+    EUR 00
+    EUR 1,827
+    -EUR 00
+  zh-TW
+    €00
+    €1,827
+    -€00
+  bn-BD
+    ০০€
+    ১,৮২৭€
+    -০০€
+
+currency/EUR .000 integer-width/##00
+  es-MX
+    EUR 00.000
+    EUR 1,827.364
+    -EUR 00.222
+  zh-TW
+    €00.000
+    €1,827.364
+    -€00.222
+  bn-BD
+    ০০.০০০€
+    ১,৮২৭.৩৬৪€
+    -০০.২২২€
+
+currency/EUR .##/@@@+ integer-width/##00
+  es-MX
+    EUR 00
+    EUR 1,827.36
+    -EUR 00.222
+  zh-TW
+    €00
+    €1,827.36
+    -€00.222
+  bn-BD
+    ০০€
+    ১,৮২৭.৩৬€
+    -০০.২২২€
+
+currency/EUR @@ integer-width/##00
+  es-MX
+    EUR 00.0
+    EUR 2,000
+    -EUR 00.22
+  zh-TW
+    €00.0
+    €2,000
+    -€00.22
+  bn-BD
+    ০০.০€
+    ২,০০০€
+    -০০.২২€
+
+measure-unit/length-furlong precision-integer integer-width/##00
+  es-MX
+    00 fur
+    1,827 fur
+    -00 fur
+  zh-TW
+    00 化朗
+    1,827 化朗
+    -00 化朗
+  bn-BD
+    ০০ ফার্লং
+    ১,৮২৭ ফার্লং
+    -০০ ফার্লং
+
+measure-unit/length-furlong .000 integer-width/##00
+  es-MX
+    00.000 fur
+    1,827.364 fur
+    -00.222 fur
+  zh-TW
+    00.000 化朗
+    1,827.364 化朗
+    -00.222 化朗
+  bn-BD
+    ০০.০০০ ফার্লং
+    ১,৮২৭.৩৬৪ ফার্লং
+    -০০.২২২ ফার্লং
+
+measure-unit/length-furlong .##/@@@+ integer-width/##00
+  es-MX
+    00 fur
+    1,827.36 fur
+    -00.222 fur
+  zh-TW
+    00 化朗
+    1,827.36 化朗
+    -00.222 化朗
+  bn-BD
+    ০০ ফার্লং
+    ১,৮২৭.৩৬ ফার্লং
+    -০০.২২২ ফার্লং
+
+measure-unit/length-furlong @@ integer-width/##00
+  es-MX
+    00.0 fur
+    2,000 fur
+    -00.22 fur
+  zh-TW
+    00.0 化朗
+    2,000 化朗
+    -00.22 化朗
+  bn-BD
+    ০০.০ ফার্লং
+    ২,০০০ ফার্লং
+    -০০.২২ ফার্লং
+
+percent precision-integer scale/0.5
+  es-MX
+    0 %
+    45,914 %
+    -0 %
+  zh-TW
+    0%
+    45,914%
+    -0%
+  bn-BD
+    ০%
+    ৪৫,৯১৪%
+    -০%
+
+percent .000 scale/0.5
+  es-MX
+    0.000 %
+    45,913.682 %
+    -0.111 %
+  zh-TW
+    0.000%
+    45,913.682%
+    -0.111%
+  bn-BD
+    ০.০০০%
+    ৪৫,৯১৩.৬৮২%
+    -০.১১১%
+
+percent .##/@@@+ scale/0.5
+  es-MX
+    0 %
+    45,913.68 %
+    -0.111 %
+  zh-TW
+    0%
+    45,913.68%
+    -0.111%
+  bn-BD
+    ০%
+    ৪৫,৯১৩.৬৮%
+    -০.১১১%
+
+percent @@ scale/0.5
+  es-MX
+    0.0 %
+    46,000 %
+    -0.11 %
+  zh-TW
+    0.0%
+    46,000%
+    -0.11%
+  bn-BD
+    ০.০%
+    ৪৬,০০০%
+    -০.১১%
+
+currency/EUR precision-integer scale/0.5
+  es-MX
+    EUR 0
+    EUR 45,914
+    -EUR 0
+  zh-TW
+    €0
+    €45,914
+    -€0
+  bn-BD
+    ০€
+    ৪৫,৯১৪€
+    -০€
+
+currency/EUR .000 scale/0.5
+  es-MX
+    EUR 0.000
+    EUR 45,913.682
+    -EUR 0.111
+  zh-TW
+    €0.000
+    €45,913.682
+    -€0.111
+  bn-BD
+    ০.০০০€
+    ৪৫,৯১৩.৬৮২€
+    -০.১১১€
+
+currency/EUR .##/@@@+ scale/0.5
+  es-MX
+    EUR 0
+    EUR 45,913.68
+    -EUR 0.111
+  zh-TW
+    €0
+    €45,913.68
+    -€0.111
+  bn-BD
+    ০€
+    ৪৫,৯১৩.৬৮€
+    -০.১১১€
+
+currency/EUR @@ scale/0.5
+  es-MX
+    EUR 0.0
+    EUR 46,000
+    -EUR 0.11
+  zh-TW
+    €0.0
+    €46,000
+    -€0.11
+  bn-BD
+    ০.০€
+    ৪৬,০০০€
+    -০.১১€
+
+measure-unit/length-furlong precision-integer scale/0.5
+  es-MX
+    0 fur
+    45,914 fur
+    -0 fur
+  zh-TW
+    0 化朗
+    45,914 化朗
+    -0 化朗
+  bn-BD
+    ০ ফার্লং
+    ৪৫,৯১৪ ফার্লং
+    -০ ফার্লং
+
+measure-unit/length-furlong .000 scale/0.5
+  es-MX
+    0.000 fur
+    45,913.682 fur
+    -0.111 fur
+  zh-TW
+    0.000 化朗
+    45,913.682 化朗
+    -0.111 化朗
+  bn-BD
+    ০.০০০ ফার্লং
+    ৪৫,৯১৩.৬৮২ ফার্লং
+    -০.১১১ ফার্লং
+
+measure-unit/length-furlong .##/@@@+ scale/0.5
+  es-MX
+    0 fur
+    45,913.68 fur
+    -0.111 fur
+  zh-TW
+    0 化朗
+    45,913.68 化朗
+    -0.111 化朗
+  bn-BD
+    ০ ফার্লং
+    ৪৫,৯১৩.৬৮ ফার্লং
+    -০.১১১ ফার্লং
+
+measure-unit/length-furlong @@ scale/0.5
+  es-MX
+    0.0 fur
+    46,000 fur
+    -0.11 fur
+  zh-TW
+    0.0 化朗
+    46,000 化朗
+    -0.11 化朗
+  bn-BD
+    ০.০ ফার্লং
+    ৪৬,০০০ ফার্লং
+    -০.১১ ফার্লং
+
+percent precision-integer group-on-aligned
+  es-MX
+    0 %
+    91,827 %
+    -0 %
+  zh-TW
+    0%
+    91,827%
+    -0%
+  bn-BD
+    ০%
+    ৯১,৮২৭%
+    -০%
+
+percent .000 group-on-aligned
+  es-MX
+    0.000 %
+    91,827.364 %
+    -0.222 %
+  zh-TW
+    0.000%
+    91,827.364%
+    -0.222%
+  bn-BD
+    ০.০০০%
+    ৯১,৮২৭.৩৬৪%
+    -০.২২২%
+
+percent .##/@@@+ group-on-aligned
+  es-MX
+    0 %
+    91,827.36 %
+    -0.222 %
+  zh-TW
+    0%
+    91,827.36%
+    -0.222%
+  bn-BD
+    ০%
+    ৯১,৮২৭.৩৬%
+    -০.২২২%
+
+percent @@ group-on-aligned
+  es-MX
+    0.0 %
+    92,000 %
+    -0.22 %
+  zh-TW
+    0.0%
+    92,000%
+    -0.22%
+  bn-BD
+    ০.০%
+    ৯২,০০০%
+    -০.২২%
+
+currency/EUR precision-integer group-on-aligned
+  es-MX
+    EUR 0
+    EUR 91,827
+    -EUR 0
+  zh-TW
+    €0
+    €91,827
+    -€0
+  bn-BD
+    ০€
+    ৯১,৮২৭€
+    -০€
+
+currency/EUR .000 group-on-aligned
+  es-MX
+    EUR 0.000
+    EUR 91,827.364
+    -EUR 0.222
+  zh-TW
+    €0.000
+    €91,827.364
+    -€0.222
+  bn-BD
+    ০.০০০€
+    ৯১,৮২৭.৩৬৪€
+    -০.২২২€
+
+currency/EUR .##/@@@+ group-on-aligned
+  es-MX
+    EUR 0
+    EUR 91,827.36
+    -EUR 0.222
+  zh-TW
+    €0
+    €91,827.36
+    -€0.222
+  bn-BD
+    ০€
+    ৯১,৮২৭.৩৬€
+    -০.২২২€
+
+currency/EUR @@ group-on-aligned
+  es-MX
+    EUR 0.0
+    EUR 92,000
+    -EUR 0.22
+  zh-TW
+    €0.0
+    €92,000
+    -€0.22
+  bn-BD
+    ০.০€
+    ৯২,০০০€
+    -০.২২€
+
+measure-unit/length-furlong precision-integer group-on-aligned
+  es-MX
+    0 fur
+    91,827 fur
+    -0 fur
+  zh-TW
+    0 化朗
+    91,827 化朗
+    -0 化朗
+  bn-BD
+    ০ ফার্লং
+    ৯১,৮২৭ ফার্লং
+    -০ ফার্লং
+
+measure-unit/length-furlong .000 group-on-aligned
+  es-MX
+    0.000 fur
+    91,827.364 fur
+    -0.222 fur
+  zh-TW
+    0.000 化朗
+    91,827.364 化朗
+    -0.222 化朗
+  bn-BD
+    ০.০০০ ফার্লং
+    ৯১,৮২৭.৩৬৪ ফার্লং
+    -০.২২২ ফার্লং
+
+measure-unit/length-furlong .##/@@@+ group-on-aligned
+  es-MX
+    0 fur
+    91,827.36 fur
+    -0.222 fur
+  zh-TW
+    0 化朗
+    91,827.36 化朗
+    -0.222 化朗
+  bn-BD
+    ০ ফার্লং
+    ৯১,৮২৭.৩৬ ফার্লং
+    -০.২২২ ফার্লং
+
+measure-unit/length-furlong @@ group-on-aligned
+  es-MX
+    0.0 fur
+    92,000 fur
+    -0.22 fur
+  zh-TW
+    0.0 化朗
+    92,000 化朗
+    -0.22 化朗
+  bn-BD
+    ০.০ ফার্লং
+    ৯২,০০০ ফার্লং
+    -০.২২ ফার্লং
+
+percent precision-integer latin
+  es-MX
+    0 %
+    91,827 %
+    -0 %
+  zh-TW
+    0%
+    91,827%
+    -0%
+  bn-BD
+    0%
+    91,827%
+    -0%
+
+percent .000 latin
+  es-MX
+    0.000 %
+    91,827.364 %
+    -0.222 %
+  zh-TW
+    0.000%
+    91,827.364%
+    -0.222%
+  bn-BD
+    0.000%
+    91,827.364%
+    -0.222%
+
+percent .##/@@@+ latin
+  es-MX
+    0 %
+    91,827.36 %
+    -0.222 %
+  zh-TW
+    0%
+    91,827.36%
+    -0.222%
+  bn-BD
+    0%
+    91,827.36%
+    -0.222%
+
+percent @@ latin
+  es-MX
+    0.0 %
+    92,000 %
+    -0.22 %
+  zh-TW
+    0.0%
+    92,000%
+    -0.22%
+  bn-BD
+    0.0%
+    92,000%
+    -0.22%
+
+currency/EUR precision-integer latin
+  es-MX
+    EUR 0
+    EUR 91,827
+    -EUR 0
+  zh-TW
+    €0
+    €91,827
+    -€0
+  bn-BD
+    0€
+    91,827€
+    -0€
+
+currency/EUR .000 latin
+  es-MX
+    EUR 0.000
+    EUR 91,827.364
+    -EUR 0.222
+  zh-TW
+    €0.000
+    €91,827.364
+    -€0.222
+  bn-BD
+    0.000€
+    91,827.364€
+    -0.222€
+
+currency/EUR .##/@@@+ latin
+  es-MX
+    EUR 0
+    EUR 91,827.36
+    -EUR 0.222
+  zh-TW
+    €0
+    €91,827.36
+    -€0.222
+  bn-BD
+    0€
+    91,827.36€
+    -0.222€
+
+currency/EUR @@ latin
+  es-MX
+    EUR 0.0
+    EUR 92,000
+    -EUR 0.22
+  zh-TW
+    €0.0
+    €92,000
+    -€0.22
+  bn-BD
+    0.0€
+    92,000€
+    -0.22€
+
+measure-unit/length-furlong precision-integer latin
+  es-MX
+    0 fur
+    91,827 fur
+    -0 fur
+  zh-TW
+    0 化朗
+    91,827 化朗
+    -0 化朗
+  bn-BD
+    0 ফার্লং
+    91,827 ফার্লং
+    -0 ফার্লং
+
+measure-unit/length-furlong .000 latin
+  es-MX
+    0.000 fur
+    91,827.364 fur
+    -0.222 fur
+  zh-TW
+    0.000 化朗
+    91,827.364 化朗
+    -0.222 化朗
+  bn-BD
+    0.000 ফার্লং
+    91,827.364 ফার্লং
+    -0.222 ফার্লং
+
+measure-unit/length-furlong .##/@@@+ latin
+  es-MX
+    0 fur
+    91,827.36 fur
+    -0.222 fur
+  zh-TW
+    0 化朗
+    91,827.36 化朗
+    -0.222 化朗
+  bn-BD
+    0 ফার্লং
+    91,827.36 ফার্লং
+    -0.222 ফার্লং
+
+measure-unit/length-furlong @@ latin
+  es-MX
+    0.0 fur
+    92,000 fur
+    -0.22 fur
+  zh-TW
+    0.0 化朗
+    92,000 化朗
+    -0.22 化朗
+  bn-BD
+    0.0 ফার্লং
+    92,000 ফার্লং
+    -0.22 ফার্লং
+
+percent precision-integer sign-accounting-except-zero
+  es-MX
+    0 %
+    +91,827 %
+    0 %
+  zh-TW
+    0%
+    +91,827%
+    0%
+  bn-BD
+    ০%
+    +৯১,৮২৭%
+    ০%
+
+percent .000 sign-accounting-except-zero
+  es-MX
+    0.000 %
+    +91,827.364 %
+    -0.222 %
+  zh-TW
+    0.000%
+    +91,827.364%
+    -0.222%
+  bn-BD
+    ০.০০০%
+    +৯১,৮২৭.৩৬৪%
+    -০.২২২%
+
+percent .##/@@@+ sign-accounting-except-zero
+  es-MX
+    0 %
+    +91,827.36 %
+    -0.222 %
+  zh-TW
+    0%
+    +91,827.36%
+    -0.222%
+  bn-BD
+    ০%
+    +৯১,৮২৭.৩৬%
+    -০.২২২%
+
+percent @@ sign-accounting-except-zero
+  es-MX
+    0.0 %
+    +92,000 %
+    -0.22 %
+  zh-TW
+    0.0%
+    +92,000%
+    -0.22%
+  bn-BD
+    ০.০%
+    +৯২,০০০%
+    -০.২২%
+
+currency/EUR precision-integer sign-accounting-except-zero
+  es-MX
+    EUR 0
+    +EUR 91,827
+    EUR 0
+  zh-TW
+    €0
+    +€91,827
+    €0
+  bn-BD
+    ০€
+    +৯১,৮২৭€
+    ০€
+
+currency/EUR .000 sign-accounting-except-zero
+  es-MX
+    EUR 0.000
+    +EUR 91,827.364
+    -EUR 0.222
+  zh-TW
+    €0.000
+    +€91,827.364
+    (€0.222)
+  bn-BD
+    ০.০০০€
+    +৯১,৮২৭.৩৬৪€
+    (০.২২২€)
+
+currency/EUR .##/@@@+ sign-accounting-except-zero
+  es-MX
+    EUR 0
+    +EUR 91,827.36
+    -EUR 0.222
+  zh-TW
+    €0
+    +€91,827.36
+    (€0.222)
+  bn-BD
+    ০€
+    +৯১,৮২৭.৩৬€
+    (০.২২২€)
+
+currency/EUR @@ sign-accounting-except-zero
+  es-MX
+    EUR 0.0
+    +EUR 92,000
+    -EUR 0.22
+  zh-TW
+    €0.0
+    +€92,000
+    (€0.22)
+  bn-BD
+    ০.০€
+    +৯২,০০০€
+    (০.২২€)
+
+measure-unit/length-furlong precision-integer sign-accounting-except-zero
+  es-MX
+    0 fur
+    +91,827 fur
+    0 fur
+  zh-TW
+    0 化朗
+    +91,827 化朗
+    0 化朗
+  bn-BD
+    ০ ফার্লং
+    +৯১,৮২৭ ফার্লং
+    ০ ফার্লং
+
+measure-unit/length-furlong .000 sign-accounting-except-zero
+  es-MX
+    0.000 fur
+    +91,827.364 fur
+    -0.222 fur
+  zh-TW
+    0.000 化朗
+    +91,827.364 化朗
+    -0.222 化朗
+  bn-BD
+    ০.০০০ ফার্লং
+    +৯১,৮২৭.৩৬৪ ফার্লং
+    -০.২২২ ফার্লং
+
+measure-unit/length-furlong .##/@@@+ sign-accounting-except-zero
+  es-MX
+    0 fur
+    +91,827.36 fur
+    -0.222 fur
+  zh-TW
+    0 化朗
+    +91,827.36 化朗
+    -0.222 化朗
+  bn-BD
+    ০ ফার্লং
+    +৯১,৮২৭.৩৬ ফার্লং
+    -০.২২২ ফার্লং
+
+measure-unit/length-furlong @@ sign-accounting-except-zero
+  es-MX
+    0.0 fur
+    +92,000 fur
+    -0.22 fur
+  zh-TW
+    0.0 化朗
+    +92,000 化朗
+    -0.22 化朗
+  bn-BD
+    ০.০ ফার্লং
+    +৯২,০০০ ফার্লং
+    -০.২২ ফার্লং
+
+percent precision-integer decimal-always
+  es-MX
+    0. %
+    91,827. %
+    -0. %
+  zh-TW
+    0.%
+    91,827.%
+    -0.%
+  bn-BD
+    ০.%
+    ৯১,৮২৭.%
+    -০.%
+
+percent .000 decimal-always
+  es-MX
+    0.000 %
+    91,827.364 %
+    -0.222 %
+  zh-TW
+    0.000%
+    91,827.364%
+    -0.222%
+  bn-BD
+    ০.০০০%
+    ৯১,৮২৭.৩৬৪%
+    -০.২২২%
+
+percent .##/@@@+ decimal-always
+  es-MX
+    0. %
+    91,827.36 %
+    -0.222 %
+  zh-TW
+    0.%
+    91,827.36%
+    -0.222%
+  bn-BD
+    ০.%
+    ৯১,৮২৭.৩৬%
+    -০.২২২%
+
+percent @@ decimal-always
+  es-MX
+    0.0 %
+    92,000. %
+    -0.22 %
+  zh-TW
+    0.0%
+    92,000.%
+    -0.22%
+  bn-BD
+    ০.০%
+    ৯২,০০০.%
+    -০.২২%
+
+currency/EUR precision-integer decimal-always
+  es-MX
+    EUR 0.
+    EUR 91,827.
+    -EUR 0.
+  zh-TW
+    €0.
+    €91,827.
+    -€0.
+  bn-BD
+    ০.€
+    ৯১,৮২৭.€
+    -০.€
+
+currency/EUR .000 decimal-always
+  es-MX
+    EUR 0.000
+    EUR 91,827.364
+    -EUR 0.222
+  zh-TW
+    €0.000
+    €91,827.364
+    -€0.222
+  bn-BD
+    ০.০০০€
+    ৯১,৮২৭.৩৬৪€
+    -০.২২২€
+
+currency/EUR .##/@@@+ decimal-always
+  es-MX
+    EUR 0.
+    EUR 91,827.36
+    -EUR 0.222
+  zh-TW
+    €0.
+    €91,827.36
+    -€0.222
+  bn-BD
+    ০.€
+    ৯১,৮২৭.৩৬€
+    -০.২২২€
+
+currency/EUR @@ decimal-always
+  es-MX
+    EUR 0.0
+    EUR 92,000.
+    -EUR 0.22
+  zh-TW
+    €0.0
+    €92,000.
+    -€0.22
+  bn-BD
+    ০.০€
+    ৯২,০০০.€
+    -০.২২€
+
+measure-unit/length-furlong precision-integer decimal-always
+  es-MX
+    0. fur
+    91,827. fur
+    -0. fur
+  zh-TW
+    0. 化朗
+    91,827. 化朗
+    -0. 化朗
+  bn-BD
+    ০. ফার্লং
+    ৯১,৮২৭. ফার্লং
+    -০. ফার্লং
+
+measure-unit/length-furlong .000 decimal-always
+  es-MX
+    0.000 fur
+    91,827.364 fur
+    -0.222 fur
+  zh-TW
+    0.000 化朗
+    91,827.364 化朗
+    -0.222 化朗
+  bn-BD
+    ০.০০০ ফার্লং
+    ৯১,৮২৭.৩৬৪ ফার্লং
+    -০.২২২ ফার্লং
+
+measure-unit/length-furlong .##/@@@+ decimal-always
+  es-MX
+    0. fur
+    91,827.36 fur
+    -0.222 fur
+  zh-TW
+    0. 化朗
+    91,827.36 化朗
+    -0.222 化朗
+  bn-BD
+    ০. ফার্লং
+    ৯১,৮২৭.৩৬ ফার্লং
+    -০.২২২ ফার্লং
+
+measure-unit/length-furlong @@ decimal-always
+  es-MX
+    0.0 fur
+    92,000. fur
+    -0.22 fur
+  zh-TW
+    0.0 化朗
+    92,000. 化朗
+    -0.22 化朗
+  bn-BD
+    ০.০ ফার্লং
+    ৯২,০০০. ফার্লং
+    -০.২২ ফার্লং
+
+percent rounding-mode-floor integer-width/##00
+  es-MX
+    00 %
+    1,827.3645 %
+    -00.22222 %
+  zh-TW
+    00%
+    1,827.3645%
+    -00.22222%
+  bn-BD
+    ০০%
+    ১,৮২৭.৩৬৪৫%
+    -০০.২২২২২%
+
+currency/EUR rounding-mode-floor integer-width/##00
+  es-MX
+    EUR 00.00
+    EUR 1,827.36
+    -EUR 00.23
+  zh-TW
+    €00.00
+    €1,827.36
+    -€00.23
+  bn-BD
+    ০০.০০€
+    ১,৮২৭.৩৬€
+    -০০.২৩€
+
+measure-unit/length-furlong rounding-mode-floor integer-width/##00
+  es-MX
+    00 fur
+    1,827.3645 fur
+    -00.22222 fur
+  zh-TW
+    00 化朗
+    1,827.3645 化朗
+    -00.22222 化朗
+  bn-BD
+    ০০ ফার্লং
+    ১,৮২৭.৩৬৪৫ ফার্লং
+    -০০.২২২২২ ফার্লং
+
+percent rounding-mode-floor scale/0.5
+  es-MX
+    0 %
+    45,913.68225 %
+    -0.11111 %
+  zh-TW
+    0%
+    45,913.68225%
+    -0.11111%
+  bn-BD
+    ০%
+    ৪৫,৯১৩.৬৮২২৫%
+    -০.১১১১১%
+
+currency/EUR rounding-mode-floor scale/0.5
+  es-MX
+    EUR 0.00
+    EUR 45,913.68
+    -EUR 0.12
+  zh-TW
+    €0.00
+    €45,913.68
+    -€0.12
+  bn-BD
+    ০.০০€
+    ৪৫,৯১৩.৬৮€
+    -০.১২€
+
+measure-unit/length-furlong rounding-mode-floor scale/0.5
+  es-MX
+    0 fur
+    45,913.68225 fur
+    -0.11111 fur
+  zh-TW
+    0 化朗
+    45,913.68225 化朗
+    -0.11111 化朗
+  bn-BD
+    ০ ফার্লং
+    ৪৫,৯১৩.৬৮২২৫ ফার্লং
+    -০.১১১১১ ফার্লং
+
+percent rounding-mode-floor group-on-aligned
+  es-MX
+    0 %
+    91,827.3645 %
+    -0.22222 %
+  zh-TW
+    0%
+    91,827.3645%
+    -0.22222%
+  bn-BD
+    ০%
+    ৯১,৮২৭.৩৬৪৫%
+    -০.২২২২২%
+
+currency/EUR rounding-mode-floor group-on-aligned
+  es-MX
+    EUR 0.00
+    EUR 91,827.36
+    -EUR 0.23
+  zh-TW
+    €0.00
+    €91,827.36
+    -€0.23
+  bn-BD
+    ০.০০€
+    ৯১,৮২৭.৩৬€
+    -০.২৩€
+
+measure-unit/length-furlong rounding-mode-floor group-on-aligned
+  es-MX
+    0 fur
+    91,827.3645 fur
+    -0.22222 fur
+  zh-TW
+    0 化朗
+    91,827.3645 化朗
+    -0.22222 化朗
+  bn-BD
+    ০ ফার্লং
+    ৯১,৮২৭.৩৬৪৫ ফার্লং
+    -০.২২২২২ ফার্লং
+
+percent rounding-mode-floor latin
+  es-MX
+    0 %
+    91,827.3645 %
+    -0.22222 %
+  zh-TW
+    0%
+    91,827.3645%
+    -0.22222%
+  bn-BD
+    0%
+    91,827.3645%
+    -0.22222%
+
+currency/EUR rounding-mode-floor latin
+  es-MX
+    EUR 0.00
+    EUR 91,827.36
+    -EUR 0.23
+  zh-TW
+    €0.00
+    €91,827.36
+    -€0.23
+  bn-BD
+    0.00€
+    91,827.36€
+    -0.23€
+
+measure-unit/length-furlong rounding-mode-floor latin
+  es-MX
+    0 fur
+    91,827.3645 fur
+    -0.22222 fur
+  zh-TW
+    0 化朗
+    91,827.3645 化朗
+    -0.22222 化朗
+  bn-BD
+    0 ফার্লং
+    91,827.3645 ফার্লং
+    -0.22222 ফার্লং
+
+percent rounding-mode-floor sign-accounting-except-zero
+  es-MX
+    0 %
+    +91,827.3645 %
+    -0.22222 %
+  zh-TW
+    0%
+    +91,827.3645%
+    -0.22222%
+  bn-BD
+    ০%
+    +৯১,৮২৭.৩৬৪৫%
+    -০.২২২২২%
+
+currency/EUR rounding-mode-floor sign-accounting-except-zero
+  es-MX
+    EUR 0.00
+    +EUR 91,827.36
+    -EUR 0.23
+  zh-TW
+    €0.00
+    +€91,827.36
+    (€0.23)
+  bn-BD
+    ০.০০€
+    +৯১,৮২৭.৩৬€
+    (০.২৩€)
+
+measure-unit/length-furlong rounding-mode-floor sign-accounting-except-zero
+  es-MX
+    0 fur
+    +91,827.3645 fur
+    -0.22222 fur
+  zh-TW
+    0 化朗
+    +91,827.3645 化朗
+    -0.22222 化朗
+  bn-BD
+    ০ ফার্লং
+    +৯১,৮২৭.৩৬৪৫ ফার্লং
+    -০.২২২২২ ফার্লং
+
+percent rounding-mode-floor decimal-always
+  es-MX
+    0. %
+    91,827.3645 %
+    -0.22222 %
+  zh-TW
+    0.%
+    91,827.3645%
+    -0.22222%
+  bn-BD
+    ০.%
+    ৯১,৮২৭.৩৬৪৫%
+    -০.২২২২২%
+
+currency/EUR rounding-mode-floor decimal-always
+  es-MX
+    EUR 0.00
+    EUR 91,827.36
+    -EUR 0.23
+  zh-TW
+    €0.00
+    €91,827.36
+    -€0.23
+  bn-BD
+    ০.০০€
+    ৯১,৮২৭.৩৬€
+    -০.২৩€
+
+measure-unit/length-furlong rounding-mode-floor decimal-always
+  es-MX
+    0. fur
+    91,827.3645 fur
+    -0.22222 fur
+  zh-TW
+    0. 化朗
+    91,827.3645 化朗
+    -0.22222 化朗
+  bn-BD
+    ০. ফার্লং
+    ৯১,৮২৭.৩৬৪৫ ফার্লং
+    -০.২২২২২ ফার্লং
+
+percent integer-width/##00 scale/0.5
+  es-MX
+    00 %
+    5,913.68225 %
+    -00.11111 %
+  zh-TW
+    00%
+    5,913.68225%
+    -00.11111%
+  bn-BD
+    ০০%
+    ৫,৯১৩.৬৮২২৫%
+    -০০.১১১১১%
+
+currency/EUR integer-width/##00 scale/0.5
+  es-MX
+    EUR 00.00
+    EUR 5,913.68
+    -EUR 00.11
+  zh-TW
+    €00.00
+    €5,913.68
+    -€00.11
+  bn-BD
+    ০০.০০€
+    ৫,৯১৩.৬৮€
+    -০০.১১€
+
+measure-unit/length-furlong integer-width/##00 scale/0.5
+  es-MX
+    00 fur
+    5,913.68225 fur
+    -00.11111 fur
+  zh-TW
+    00 化朗
+    5,913.68225 化朗
+    -00.11111 化朗
+  bn-BD
+    ০০ ফার্লং
+    ৫,৯১৩.৬৮২২৫ ফার্লং
+    -০০.১১১১১ ফার্লং
+
+percent integer-width/##00 group-on-aligned
+  es-MX
+    00 %
+    1,827.3645 %
+    -00.22222 %
+  zh-TW
+    00%
+    1,827.3645%
+    -00.22222%
+  bn-BD
+    ০০%
+    ১,৮২৭.৩৬৪৫%
+    -০০.২২২২২%
+
+currency/EUR integer-width/##00 group-on-aligned
+  es-MX
+    EUR 00.00
+    EUR 1,827.36
+    -EUR 00.22
+  zh-TW
+    €00.00
+    €1,827.36
+    -€00.22
+  bn-BD
+    ০০.০০€
+    ১,৮২৭.৩৬€
+    -০০.২২€
+
+measure-unit/length-furlong integer-width/##00 group-on-aligned
+  es-MX
+    00 fur
+    1,827.3645 fur
+    -00.22222 fur
+  zh-TW
+    00 化朗
+    1,827.3645 化朗
+    -00.22222 化朗
+  bn-BD
+    ০০ ফার্লং
+    ১,৮২৭.৩৬৪৫ ফার্লং
+    -০০.২২২২২ ফার্লং
+
+percent integer-width/##00 latin
+  es-MX
+    00 %
+    1,827.3645 %
+    -00.22222 %
+  zh-TW
+    00%
+    1,827.3645%
+    -00.22222%
+  bn-BD
+    00%
+    1,827.3645%
+    -00.22222%
+
+currency/EUR integer-width/##00 latin
+  es-MX
+    EUR 00.00
+    EUR 1,827.36
+    -EUR 00.22
+  zh-TW
+    €00.00
+    €1,827.36
+    -€00.22
+  bn-BD
+    00.00€
+    1,827.36€
+    -00.22€
+
+measure-unit/length-furlong integer-width/##00 latin
+  es-MX
+    00 fur
+    1,827.3645 fur
+    -00.22222 fur
+  zh-TW
+    00 化朗
+    1,827.3645 化朗
+    -00.22222 化朗
+  bn-BD
+    00 ফার্লং
+    1,827.3645 ফার্লং
+    -00.22222 ফার্লং
+
+percent integer-width/##00 sign-accounting-except-zero
+  es-MX
+    00 %
+    +1,827.3645 %
+    -00.22222 %
+  zh-TW
+    00%
+    +1,827.3645%
+    -00.22222%
+  bn-BD
+    ০০%
+    +১,৮২৭.৩৬৪৫%
+    -০০.২২২২২%
+
+currency/EUR integer-width/##00 sign-accounting-except-zero
+  es-MX
+    EUR 00.00
+    +EUR 1,827.36
+    -EUR 00.22
+  zh-TW
+    €00.00
+    +€1,827.36
+    (€00.22)
+  bn-BD
+    ০০.০০€
+    +১,৮২৭.৩৬€
+    (০০.২২€)
+
+measure-unit/length-furlong integer-width/##00 sign-accounting-except-zero
+  es-MX
+    00 fur
+    +1,827.3645 fur
+    -00.22222 fur
+  zh-TW
+    00 化朗
+    +1,827.3645 化朗
+    -00.22222 化朗
+  bn-BD
+    ০০ ফার্লং
+    +১,৮২৭.৩৬৪৫ ফার্লং
+    -০০.২২২২২ ফার্লং
+
+percent integer-width/##00 decimal-always
+  es-MX
+    00. %
+    1,827.3645 %
+    -00.22222 %
+  zh-TW
+    00.%
+    1,827.3645%
+    -00.22222%
+  bn-BD
+    ০০.%
+    ১,৮২৭.৩৬৪৫%
+    -০০.২২২২২%
+
+currency/EUR integer-width/##00 decimal-always
+  es-MX
+    EUR 00.00
+    EUR 1,827.36
+    -EUR 00.22
+  zh-TW
+    €00.00
+    €1,827.36
+    -€00.22
+  bn-BD
+    ০০.০০€
+    ১,৮২৭.৩৬€
+    -০০.২২€
+
+measure-unit/length-furlong integer-width/##00 decimal-always
+  es-MX
+    00. fur
+    1,827.3645 fur
+    -00.22222 fur
+  zh-TW
+    00. 化朗
+    1,827.3645 化朗
+    -00.22222 化朗
+  bn-BD
+    ০০. ফার্লং
+    ১,৮২৭.৩৬৪৫ ফার্লং
+    -০০.২২২২২ ফার্লং
+
+percent scale/0.5 group-on-aligned
+  es-MX
+    0 %
+    45,913.68225 %
+    -0.11111 %
+  zh-TW
+    0%
+    45,913.68225%
+    -0.11111%
+  bn-BD
+    ০%
+    ৪৫,৯১৩.৬৮২২৫%
+    -০.১১১১১%
+
+currency/EUR scale/0.5 group-on-aligned
+  es-MX
+    EUR 0.00
+    EUR 45,913.68
+    -EUR 0.11
+  zh-TW
+    €0.00
+    €45,913.68
+    -€0.11
+  bn-BD
+    ০.০০€
+    ৪৫,৯১৩.৬৮€
+    -০.১১€
+
+measure-unit/length-furlong scale/0.5 group-on-aligned
+  es-MX
+    0 fur
+    45,913.68225 fur
+    -0.11111 fur
+  zh-TW
+    0 化朗
+    45,913.68225 化朗
+    -0.11111 化朗
+  bn-BD
+    ০ ফার্লং
+    ৪৫,৯১৩.৬৮২২৫ ফার্লং
+    -০.১১১১১ ফার্লং
+
+percent scale/0.5 latin
+  es-MX
+    0 %
+    45,913.68225 %
+    -0.11111 %
+  zh-TW
+    0%
+    45,913.68225%
+    -0.11111%
+  bn-BD
+    0%
+    45,913.68225%
+    -0.11111%
+
+currency/EUR scale/0.5 latin
+  es-MX
+    EUR 0.00
+    EUR 45,913.68
+    -EUR 0.11
+  zh-TW
+    €0.00
+    €45,913.68
+    -€0.11
+  bn-BD
+    0.00€
+    45,913.68€
+    -0.11€
+
+measure-unit/length-furlong scale/0.5 latin
+  es-MX
+    0 fur
+    45,913.68225 fur
+    -0.11111 fur
+  zh-TW
+    0 化朗
+    45,913.68225 化朗
+    -0.11111 化朗
+  bn-BD
+    0 ফার্লং
+    45,913.68225 ফার্লং
+    -0.11111 ফার্লং
+
+percent scale/0.5 sign-accounting-except-zero
+  es-MX
+    0 %
+    +45,913.68225 %
+    -0.11111 %
+  zh-TW
+    0%
+    +45,913.68225%
+    -0.11111%
+  bn-BD
+    ০%
+    +৪৫,৯১৩.৬৮২২৫%
+    -০.১১১১১%
+
+currency/EUR scale/0.5 sign-accounting-except-zero
+  es-MX
+    EUR 0.00
+    +EUR 45,913.68
+    -EUR 0.11
+  zh-TW
+    €0.00
+    +€45,913.68
+    (€0.11)
+  bn-BD
+    ০.০০€
+    +৪৫,৯১৩.৬৮€
+    (০.১১€)
+
+measure-unit/length-furlong scale/0.5 sign-accounting-except-zero
+  es-MX
+    0 fur
+    +45,913.68225 fur
+    -0.11111 fur
+  zh-TW
+    0 化朗
+    +45,913.68225 化朗
+    -0.11111 化朗
+  bn-BD
+    ০ ফার্লং
+    +৪৫,৯১৩.৬৮২২৫ ফার্লং
+    -০.১১১১১ ফার্লং
+
+percent scale/0.5 decimal-always
+  es-MX
+    0. %
+    45,913.68225 %
+    -0.11111 %
+  zh-TW
+    0.%
+    45,913.68225%
+    -0.11111%
+  bn-BD
+    ০.%
+    ৪৫,৯১৩.৬৮২২৫%
+    -০.১১১১১%
+
+currency/EUR scale/0.5 decimal-always
+  es-MX
+    EUR 0.00
+    EUR 45,913.68
+    -EUR 0.11
+  zh-TW
+    €0.00
+    €45,913.68
+    -€0.11
+  bn-BD
+    ০.০০€
+    ৪৫,৯১৩.৬৮€
+    -০.১১€
+
+measure-unit/length-furlong scale/0.5 decimal-always
+  es-MX
+    0. fur
+    45,913.68225 fur
+    -0.11111 fur
+  zh-TW
+    0. 化朗
+    45,913.68225 化朗
+    -0.11111 化朗
+  bn-BD
+    ০. ফার্লং
+    ৪৫,৯১৩.৬৮২২৫ ফার্লং
+    -০.১১১১১ ফার্লং
+
+percent group-on-aligned latin
+  es-MX
+    0 %
+    91,827.3645 %
+    -0.22222 %
+  zh-TW
+    0%
+    91,827.3645%
+    -0.22222%
+  bn-BD
+    0%
+    91,827.3645%
+    -0.22222%
+
+currency/EUR group-on-aligned latin
+  es-MX
+    EUR 0.00
+    EUR 91,827.36
+    -EUR 0.22
+  zh-TW
+    €0.00
+    €91,827.36
+    -€0.22
+  bn-BD
+    0.00€
+    91,827.36€
+    -0.22€
+
+measure-unit/length-furlong group-on-aligned latin
+  es-MX
+    0 fur
+    91,827.3645 fur
+    -0.22222 fur
+  zh-TW
+    0 化朗
+    91,827.3645 化朗
+    -0.22222 化朗
+  bn-BD
+    0 ফার্লং
+    91,827.3645 ফার্লং
+    -0.22222 ফার্লং
+
+percent group-on-aligned sign-accounting-except-zero
+  es-MX
+    0 %
+    +91,827.3645 %
+    -0.22222 %
+  zh-TW
+    0%
+    +91,827.3645%
+    -0.22222%
+  bn-BD
+    ০%
+    +৯১,৮২৭.৩৬৪৫%
+    -০.২২২২২%
+
+currency/EUR group-on-aligned sign-accounting-except-zero
+  es-MX
+    EUR 0.00
+    +EUR 91,827.36
+    -EUR 0.22
+  zh-TW
+    €0.00
+    +€91,827.36
+    (€0.22)
+  bn-BD
+    ০.০০€
+    +৯১,৮২৭.৩৬€
+    (০.২২€)
+
+measure-unit/length-furlong group-on-aligned sign-accounting-except-zero
+  es-MX
+    0 fur
+    +91,827.3645 fur
+    -0.22222 fur
+  zh-TW
+    0 化朗
+    +91,827.3645 化朗
+    -0.22222 化朗
+  bn-BD
+    ০ ফার্লং
+    +৯১,৮২৭.৩৬৪৫ ফার্লং
+    -০.২২২২২ ফার্লং
+
+percent group-on-aligned decimal-always
+  es-MX
+    0. %
+    91,827.3645 %
+    -0.22222 %
+  zh-TW
+    0.%
+    91,827.3645%
+    -0.22222%
+  bn-BD
+    ০.%
+    ৯১,৮২৭.৩৬৪৫%
+    -০.২২২২২%
+
+currency/EUR group-on-aligned decimal-always
+  es-MX
+    EUR 0.00
+    EUR 91,827.36
+    -EUR 0.22
+  zh-TW
+    €0.00
+    €91,827.36
+    -€0.22
+  bn-BD
+    ০.০০€
+    ৯১,৮২৭.৩৬€
+    -০.২২€
+
+measure-unit/length-furlong group-on-aligned decimal-always
+  es-MX
+    0. fur
+    91,827.3645 fur
+    -0.22222 fur
+  zh-TW
+    0. 化朗
+    91,827.3645 化朗
+    -0.22222 化朗
+  bn-BD
+    ০. ফার্লং
+    ৯১,৮২৭.৩৬৪৫ ফার্লং
+    -০.২২২২২ ফার্লং
+
+percent latin sign-accounting-except-zero
+  es-MX
+    0 %
+    +91,827.3645 %
+    -0.22222 %
+  zh-TW
+    0%
+    +91,827.3645%
+    -0.22222%
+  bn-BD
+    0%
+    +91,827.3645%
+    -0.22222%
+
+currency/EUR latin sign-accounting-except-zero
+  es-MX
+    EUR 0.00
+    +EUR 91,827.36
+    -EUR 0.22
+  zh-TW
+    €0.00
+    +€91,827.36
+    (€0.22)
+  bn-BD
+    0.00€
+    +91,827.36€
+    (0.22€)
+
+measure-unit/length-furlong latin sign-accounting-except-zero
+  es-MX
+    0 fur
+    +91,827.3645 fur
+    -0.22222 fur
+  zh-TW
+    0 化朗
+    +91,827.3645 化朗
+    -0.22222 化朗
+  bn-BD
+    0 ফার্লং
+    +91,827.3645 ফার্লং
+    -0.22222 ফার্লং
+
+percent latin decimal-always
+  es-MX
+    0. %
+    91,827.3645 %
+    -0.22222 %
+  zh-TW
+    0.%
+    91,827.3645%
+    -0.22222%
+  bn-BD
+    0.%
+    91,827.3645%
+    -0.22222%
+
+currency/EUR latin decimal-always
+  es-MX
+    EUR 0.00
+    EUR 91,827.36
+    -EUR 0.22
+  zh-TW
+    €0.00
+    €91,827.36
+    -€0.22
+  bn-BD
+    0.00€
+    91,827.36€
+    -0.22€
+
+measure-unit/length-furlong latin decimal-always
+  es-MX
+    0. fur
+    91,827.3645 fur
+    -0.22222 fur
+  zh-TW
+    0. 化朗
+    91,827.3645 化朗
+    -0.22222 化朗
+  bn-BD
+    0. ফার্লং
+    91,827.3645 ফার্লং
+    -0.22222 ফার্লং
+
+percent sign-accounting-except-zero decimal-always
+  es-MX
+    0. %
+    +91,827.3645 %
+    -0.22222 %
+  zh-TW
+    0.%
+    +91,827.3645%
+    -0.22222%
+  bn-BD
+    ০.%
+    +৯১,৮২৭.৩৬৪৫%
+    -০.২২২২২%
+
+currency/EUR sign-accounting-except-zero decimal-always
+  es-MX
+    EUR 0.00
+    +EUR 91,827.36
+    -EUR 0.22
+  zh-TW
+    €0.00
+    +€91,827.36
+    (€0.22)
+  bn-BD
+    ০.০০€
+    +৯১,৮২৭.৩৬€
+    (০.২২€)
+
+measure-unit/length-furlong sign-accounting-except-zero decimal-always
+  es-MX
+    0. fur
+    +91,827.3645 fur
+    -0.22222 fur
+  zh-TW
+    0. 化朗
+    +91,827.3645 化朗
+    -0.22222 化朗
+  bn-BD
+    ০. ফার্লং
+    +৯১,৮২৭.৩৬৪৫ ফার্লং
+    -০.২২২২২ ফার্লং
+
+unit-width-narrow precision-integer rounding-mode-floor
+  es-MX
+    0
+    91,827
+    -1
+  zh-TW
+    0
+    91,827
+    -1
+  bn-BD
+    ০
+    ৯১,৮২৭
+    -১
+
+unit-width-narrow .000 rounding-mode-floor
+  es-MX
+    0.000
+    91,827.364
+    -0.223
+  zh-TW
+    0.000
+    91,827.364
+    -0.223
+  bn-BD
+    ০.০০০
+    ৯১,৮২৭.৩৬৪
+    -০.২২৩
+
+unit-width-narrow .##/@@@+ rounding-mode-floor
+  es-MX
+    0
+    91,827.36
+    -0.223
+  zh-TW
+    0
+    91,827.36
+    -0.223
+  bn-BD
+    ০
+    ৯১,৮২৭.৩৬
+    -০.২২৩
+
+unit-width-narrow @@ rounding-mode-floor
+  es-MX
+    0.0
+    91,000
+    -0.23
+  zh-TW
+    0.0
+    91,000
+    -0.23
+  bn-BD
+    ০.০
+    ৯১,০০০
+    -০.২৩
+
+unit-width-full-name precision-integer rounding-mode-floor
+  es-MX
+    0
+    91,827
+    -1
+  zh-TW
+    0
+    91,827
+    -1
+  bn-BD
+    ০
+    ৯১,৮২৭
+    -১
+
+unit-width-full-name .000 rounding-mode-floor
+  es-MX
+    0.000
+    91,827.364
+    -0.223
+  zh-TW
+    0.000
+    91,827.364
+    -0.223
+  bn-BD
+    ০.০০০
+    ৯১,৮২৭.৩৬৪
+    -০.২২৩
+
+unit-width-full-name .##/@@@+ rounding-mode-floor
+  es-MX
+    0
+    91,827.36
+    -0.223
+  zh-TW
+    0
+    91,827.36
+    -0.223
+  bn-BD
+    ০
+    ৯১,৮২৭.৩৬
+    -০.২২৩
+
+unit-width-full-name @@ rounding-mode-floor
+  es-MX
+    0.0
+    91,000
+    -0.23
+  zh-TW
+    0.0
+    91,000
+    -0.23
+  bn-BD
+    ০.০
+    ৯১,০০০
+    -০.২৩
+
+unit-width-narrow precision-integer integer-width/##00
+  es-MX
+    00
+    1,827
+    -00
+  zh-TW
+    00
+    1,827
+    -00
+  bn-BD
+    ০০
+    ১,৮২৭
+    -০০
+
+unit-width-narrow .000 integer-width/##00
+  es-MX
+    00.000
+    1,827.364
+    -00.222
+  zh-TW
+    00.000
+    1,827.364
+    -00.222
+  bn-BD
+    ০০.০০০
+    ১,৮২৭.৩৬৪
+    -০০.২২২
+
+unit-width-narrow .##/@@@+ integer-width/##00
+  es-MX
+    00
+    1,827.36
+    -00.222
+  zh-TW
+    00
+    1,827.36
+    -00.222
+  bn-BD
+    ০০
+    ১,৮২৭.৩৬
+    -০০.২২২
+
+unit-width-narrow @@ integer-width/##00
+  es-MX
+    00.0
+    2,000
+    -00.22
+  zh-TW
+    00.0
+    2,000
+    -00.22
+  bn-BD
+    ০০.০
+    ২,০০০
+    -০০.২২
+
+unit-width-full-name precision-integer integer-width/##00
+  es-MX
+    00
+    1,827
+    -00
+  zh-TW
+    00
+    1,827
+    -00
+  bn-BD
+    ০০
+    ১,৮২৭
+    -০০
+
+unit-width-full-name .000 integer-width/##00
+  es-MX
+    00.000
+    1,827.364
+    -00.222
+  zh-TW
+    00.000
+    1,827.364
+    -00.222
+  bn-BD
+    ০০.০০০
+    ১,৮২৭.৩৬৪
+    -০০.২২২
+
+unit-width-full-name .##/@@@+ integer-width/##00
+  es-MX
+    00
+    1,827.36
+    -00.222
+  zh-TW
+    00
+    1,827.36
+    -00.222
+  bn-BD
+    ০০
+    ১,৮২৭.৩৬
+    -০০.২২২
+
+unit-width-full-name @@ integer-width/##00
+  es-MX
+    00.0
+    2,000
+    -00.22
+  zh-TW
+    00.0
+    2,000
+    -00.22
+  bn-BD
+    ০০.০
+    ২,০০০
+    -০০.২২
+
+unit-width-narrow precision-integer scale/0.5
+  es-MX
+    0
+    45,914
+    -0
+  zh-TW
+    0
+    45,914
+    -0
+  bn-BD
+    ০
+    ৪৫,৯১৪
+    -০
+
+unit-width-narrow .000 scale/0.5
+  es-MX
+    0.000
+    45,913.682
+    -0.111
+  zh-TW
+    0.000
+    45,913.682
+    -0.111
+  bn-BD
+    ০.০০০
+    ৪৫,৯১৩.৬৮২
+    -০.১১১
+
+unit-width-narrow .##/@@@+ scale/0.5
+  es-MX
+    0
+    45,913.68
+    -0.111
+  zh-TW
+    0
+    45,913.68
+    -0.111
+  bn-BD
+    ০
+    ৪৫,৯১৩.৬৮
+    -০.১১১
+
+unit-width-narrow @@ scale/0.5
+  es-MX
+    0.0
+    46,000
+    -0.11
+  zh-TW
+    0.0
+    46,000
+    -0.11
+  bn-BD
+    ০.০
+    ৪৬,০০০
+    -০.১১
+
+unit-width-full-name precision-integer scale/0.5
+  es-MX
+    0
+    45,914
+    -0
+  zh-TW
+    0
+    45,914
+    -0
+  bn-BD
+    ০
+    ৪৫,৯১৪
+    -০
+
+unit-width-full-name .000 scale/0.5
+  es-MX
+    0.000
+    45,913.682
+    -0.111
+  zh-TW
+    0.000
+    45,913.682
+    -0.111
+  bn-BD
+    ০.০০০
+    ৪৫,৯১৩.৬৮২
+    -০.১১১
+
+unit-width-full-name .##/@@@+ scale/0.5
+  es-MX
+    0
+    45,913.68
+    -0.111
+  zh-TW
+    0
+    45,913.68
+    -0.111
+  bn-BD
+    ০
+    ৪৫,৯১৩.৬৮
+    -০.১১১
+
+unit-width-full-name @@ scale/0.5
+  es-MX
+    0.0
+    46,000
+    -0.11
+  zh-TW
+    0.0
+    46,000
+    -0.11
+  bn-BD
+    ০.০
+    ৪৬,০০০
+    -০.১১
+
+unit-width-narrow precision-integer group-on-aligned
+  es-MX
+    0
+    91,827
+    -0
+  zh-TW
+    0
+    91,827
+    -0
+  bn-BD
+    ০
+    ৯১,৮২৭
+    -০
+
+unit-width-narrow .000 group-on-aligned
+  es-MX
+    0.000
+    91,827.364
+    -0.222
+  zh-TW
+    0.000
+    91,827.364
+    -0.222
+  bn-BD
+    ০.০০০
+    ৯১,৮২৭.৩৬৪
+    -০.২২২
+
+unit-width-narrow .##/@@@+ group-on-aligned
+  es-MX
+    0
+    91,827.36
+    -0.222
+  zh-TW
+    0
+    91,827.36
+    -0.222
+  bn-BD
+    ০
+    ৯১,৮২৭.৩৬
+    -০.২২২
+
+unit-width-narrow @@ group-on-aligned
+  es-MX
+    0.0
+    92,000
+    -0.22
+  zh-TW
+    0.0
+    92,000
+    -0.22
+  bn-BD
+    ০.০
+    ৯২,০০০
+    -০.২২
+
+unit-width-full-name precision-integer group-on-aligned
+  es-MX
+    0
+    91,827
+    -0
+  zh-TW
+    0
+    91,827
+    -0
+  bn-BD
+    ০
+    ৯১,৮২৭
+    -০
+
+unit-width-full-name .000 group-on-aligned
+  es-MX
+    0.000
+    91,827.364
+    -0.222
+  zh-TW
+    0.000
+    91,827.364
+    -0.222
+  bn-BD
+    ০.০০০
+    ৯১,৮২৭.৩৬৪
+    -০.২২২
+
+unit-width-full-name .##/@@@+ group-on-aligned
+  es-MX
+    0
+    91,827.36
+    -0.222
+  zh-TW
+    0
+    91,827.36
+    -0.222
+  bn-BD
+    ০
+    ৯১,৮২৭.৩৬
+    -০.২২২
+
+unit-width-full-name @@ group-on-aligned
+  es-MX
+    0.0
+    92,000
+    -0.22
+  zh-TW
+    0.0
+    92,000
+    -0.22
+  bn-BD
+    ০.০
+    ৯২,০০০
+    -০.২২
+
+unit-width-narrow precision-integer latin
+  es-MX
+    0
+    91,827
+    -0
+  zh-TW
+    0
+    91,827
+    -0
+  bn-BD
+    0
+    91,827
+    -0
+
+unit-width-narrow .000 latin
+  es-MX
+    0.000
+    91,827.364
+    -0.222
+  zh-TW
+    0.000
+    91,827.364
+    -0.222
+  bn-BD
+    0.000
+    91,827.364
+    -0.222
+
+unit-width-narrow .##/@@@+ latin
+  es-MX
+    0
+    91,827.36
+    -0.222
+  zh-TW
+    0
+    91,827.36
+    -0.222
+  bn-BD
+    0
+    91,827.36
+    -0.222
+
+unit-width-narrow @@ latin
+  es-MX
+    0.0
+    92,000
+    -0.22
+  zh-TW
+    0.0
+    92,000
+    -0.22
+  bn-BD
+    0.0
+    92,000
+    -0.22
+
+unit-width-full-name precision-integer latin
+  es-MX
+    0
+    91,827
+    -0
+  zh-TW
+    0
+    91,827
+    -0
+  bn-BD
+    0
+    91,827
+    -0
+
+unit-width-full-name .000 latin
+  es-MX
+    0.000
+    91,827.364
+    -0.222
+  zh-TW
+    0.000
+    91,827.364
+    -0.222
+  bn-BD
+    0.000
+    91,827.364
+    -0.222
+
+unit-width-full-name .##/@@@+ latin
+  es-MX
+    0
+    91,827.36
+    -0.222
+  zh-TW
+    0
+    91,827.36
+    -0.222
+  bn-BD
+    0
+    91,827.36
+    -0.222
+
+unit-width-full-name @@ latin
+  es-MX
+    0.0
+    92,000
+    -0.22
+  zh-TW
+    0.0
+    92,000
+    -0.22
+  bn-BD
+    0.0
+    92,000
+    -0.22
+
+unit-width-narrow precision-integer sign-accounting-except-zero
+  es-MX
+    0
+    +91,827
+    0
+  zh-TW
+    0
+    +91,827
+    0
+  bn-BD
+    ০
+    +৯১,৮২৭
+    ০
+
+unit-width-narrow .000 sign-accounting-except-zero
+  es-MX
+    0.000
+    +91,827.364
+    -0.222
+  zh-TW
+    0.000
+    +91,827.364
+    -0.222
+  bn-BD
+    ০.০০০
+    +৯১,৮২৭.৩৬৪
+    -০.২২২
+
+unit-width-narrow .##/@@@+ sign-accounting-except-zero
+  es-MX
+    0
+    +91,827.36
+    -0.222
+  zh-TW
+    0
+    +91,827.36
+    -0.222
+  bn-BD
+    ০
+    +৯১,৮২৭.৩৬
+    -০.২২২
+
+unit-width-narrow @@ sign-accounting-except-zero
+  es-MX
+    0.0
+    +92,000
+    -0.22
+  zh-TW
+    0.0
+    +92,000
+    -0.22
+  bn-BD
+    ০.০
+    +৯২,০০০
+    -০.২২
+
+unit-width-full-name precision-integer sign-accounting-except-zero
+  es-MX
+    0
+    +91,827
+    0
+  zh-TW
+    0
+    +91,827
+    0
+  bn-BD
+    ০
+    +৯১,৮২৭
+    ০
+
+unit-width-full-name .000 sign-accounting-except-zero
+  es-MX
+    0.000
+    +91,827.364
+    -0.222
+  zh-TW
+    0.000
+    +91,827.364
+    -0.222
+  bn-BD
+    ০.০০০
+    +৯১,৮২৭.৩৬৪
+    -০.২২২
+
+unit-width-full-name .##/@@@+ sign-accounting-except-zero
+  es-MX
+    0
+    +91,827.36
+    -0.222
+  zh-TW
+    0
+    +91,827.36
+    -0.222
+  bn-BD
+    ০
+    +৯১,৮২৭.৩৬
+    -০.২২২
+
+unit-width-full-name @@ sign-accounting-except-zero
+  es-MX
+    0.0
+    +92,000
+    -0.22
+  zh-TW
+    0.0
+    +92,000
+    -0.22
+  bn-BD
+    ০.০
+    +৯২,০০০
+    -০.২২
+
+unit-width-narrow precision-integer decimal-always
+  es-MX
+    0.
+    91,827.
+    -0.
+  zh-TW
+    0.
+    91,827.
+    -0.
+  bn-BD
+    ০.
+    ৯১,৮২৭.
+    -০.
+
+unit-width-narrow .000 decimal-always
+  es-MX
+    0.000
+    91,827.364
+    -0.222
+  zh-TW
+    0.000
+    91,827.364
+    -0.222
+  bn-BD
+    ০.০০০
+    ৯১,৮২৭.৩৬৪
+    -০.২২২
+
+unit-width-narrow .##/@@@+ decimal-always
+  es-MX
+    0.
+    91,827.36
+    -0.222
+  zh-TW
+    0.
+    91,827.36
+    -0.222
+  bn-BD
+    ০.
+    ৯১,৮২৭.৩৬
+    -০.২২২
+
+unit-width-narrow @@ decimal-always
+  es-MX
+    0.0
+    92,000.
+    -0.22
+  zh-TW
+    0.0
+    92,000.
+    -0.22
+  bn-BD
+    ০.০
+    ৯২,০০০.
+    -০.২২
+
+unit-width-full-name precision-integer decimal-always
+  es-MX
+    0.
+    91,827.
+    -0.
+  zh-TW
+    0.
+    91,827.
+    -0.
+  bn-BD
+    ০.
+    ৯১,৮২৭.
+    -০.
+
+unit-width-full-name .000 decimal-always
+  es-MX
+    0.000
+    91,827.364
+    -0.222
+  zh-TW
+    0.000
+    91,827.364
+    -0.222
+  bn-BD
+    ০.০০০
+    ৯১,৮২৭.৩৬৪
+    -০.২২২
+
+unit-width-full-name .##/@@@+ decimal-always
+  es-MX
+    0.
+    91,827.36
+    -0.222
+  zh-TW
+    0.
+    91,827.36
+    -0.222
+  bn-BD
+    ০.
+    ৯১,৮২৭.৩৬
+    -০.২২২
+
+unit-width-full-name @@ decimal-always
+  es-MX
+    0.0
+    92,000.
+    -0.22
+  zh-TW
+    0.0
+    92,000.
+    -0.22
+  bn-BD
+    ০.০
+    ৯২,০০০.
+    -০.২২
+
+unit-width-narrow rounding-mode-floor integer-width/##00
+  es-MX
+    00
+    1,827.3645
+    -00.22222
+  zh-TW
+    00
+    1,827.3645
+    -00.22222
+  bn-BD
+    ০০
+    ১,৮২৭.৩৬৪৫
+    -০০.২২২২২
+
+unit-width-full-name rounding-mode-floor integer-width/##00
+  es-MX
+    00
+    1,827.3645
+    -00.22222
+  zh-TW
+    00
+    1,827.3645
+    -00.22222
+  bn-BD
+    ০০
+    ১,৮২৭.৩৬৪৫
+    -০০.২২২২২
+
+unit-width-narrow rounding-mode-floor scale/0.5
+  es-MX
+    0
+    45,913.68225
+    -0.11111
+  zh-TW
+    0
+    45,913.68225
+    -0.11111
+  bn-BD
+    ০
+    ৪৫,৯১৩.৬৮২২৫
+    -০.১১১১১
+
+unit-width-full-name rounding-mode-floor scale/0.5
+  es-MX
+    0
+    45,913.68225
+    -0.11111
+  zh-TW
+    0
+    45,913.68225
+    -0.11111
+  bn-BD
+    ০
+    ৪৫,৯১৩.৬৮২২৫
+    -০.১১১১১
+
+unit-width-narrow rounding-mode-floor group-on-aligned
+  es-MX
+    0
+    91,827.3645
+    -0.22222
+  zh-TW
+    0
+    91,827.3645
+    -0.22222
+  bn-BD
+    ০
+    ৯১,৮২৭.৩৬৪৫
+    -০.২২২২২
+
+unit-width-full-name rounding-mode-floor group-on-aligned
+  es-MX
+    0
+    91,827.3645
+    -0.22222
+  zh-TW
+    0
+    91,827.3645
+    -0.22222
+  bn-BD
+    ০
+    ৯১,৮২৭.৩৬৪৫
+    -০.২২২২২
+
+unit-width-narrow rounding-mode-floor latin
+  es-MX
+    0
+    91,827.3645
+    -0.22222
+  zh-TW
+    0
+    91,827.3645
+    -0.22222
+  bn-BD
+    0
+    91,827.3645
+    -0.22222
+
+unit-width-full-name rounding-mode-floor latin
+  es-MX
+    0
+    91,827.3645
+    -0.22222
+  zh-TW
+    0
+    91,827.3645
+    -0.22222
+  bn-BD
+    0
+    91,827.3645
+    -0.22222
+
+unit-width-narrow rounding-mode-floor sign-accounting-except-zero
+  es-MX
+    0
+    +91,827.3645
+    -0.22222
+  zh-TW
+    0
+    +91,827.3645
+    -0.22222
+  bn-BD
+    ০
+    +৯১,৮২৭.৩৬৪৫
+    -০.২২২২২
+
+unit-width-full-name rounding-mode-floor sign-accounting-except-zero
+  es-MX
+    0
+    +91,827.3645
+    -0.22222
+  zh-TW
+    0
+    +91,827.3645
+    -0.22222
+  bn-BD
+    ০
+    +৯১,৮২৭.৩৬৪৫
+    -০.২২২২২
+
+unit-width-narrow rounding-mode-floor decimal-always
+  es-MX
+    0.
+    91,827.3645
+    -0.22222
+  zh-TW
+    0.
+    91,827.3645
+    -0.22222
+  bn-BD
+    ০.
+    ৯১,৮২৭.৩৬৪৫
+    -০.২২২২২
+
+unit-width-full-name rounding-mode-floor decimal-always
+  es-MX
+    0.
+    91,827.3645
+    -0.22222
+  zh-TW
+    0.
+    91,827.3645
+    -0.22222
+  bn-BD
+    ০.
+    ৯১,৮২৭.৩৬৪৫
+    -০.২২২২২
+
+unit-width-narrow integer-width/##00 scale/0.5
+  es-MX
+    00
+    5,913.68225
+    -00.11111
+  zh-TW
+    00
+    5,913.68225
+    -00.11111
+  bn-BD
+    ০০
+    ৫,৯১৩.৬৮২২৫
+    -০০.১১১১১
+
+unit-width-full-name integer-width/##00 scale/0.5
+  es-MX
+    00
+    5,913.68225
+    -00.11111
+  zh-TW
+    00
+    5,913.68225
+    -00.11111
+  bn-BD
+    ০০
+    ৫,৯১৩.৬৮২২৫
+    -০০.১১১১১
+
+unit-width-narrow integer-width/##00 group-on-aligned
+  es-MX
+    00
+    1,827.3645
+    -00.22222
+  zh-TW
+    00
+    1,827.3645
+    -00.22222
+  bn-BD
+    ০০
+    ১,৮২৭.৩৬৪৫
+    -০০.২২২২২
+
+unit-width-full-name integer-width/##00 group-on-aligned
+  es-MX
+    00
+    1,827.3645
+    -00.22222
+  zh-TW
+    00
+    1,827.3645
+    -00.22222
+  bn-BD
+    ০০
+    ১,৮২৭.৩৬৪৫
+    -০০.২২২২২
+
+unit-width-narrow integer-width/##00 latin
+  es-MX
+    00
+    1,827.3645
+    -00.22222
+  zh-TW
+    00
+    1,827.3645
+    -00.22222
+  bn-BD
+    00
+    1,827.3645
+    -00.22222
+
+unit-width-full-name integer-width/##00 latin
+  es-MX
+    00
+    1,827.3645
+    -00.22222
+  zh-TW
+    00
+    1,827.3645
+    -00.22222
+  bn-BD
+    00
+    1,827.3645
+    -00.22222
+
+unit-width-narrow integer-width/##00 sign-accounting-except-zero
+  es-MX
+    00
+    +1,827.3645
+    -00.22222
+  zh-TW
+    00
+    +1,827.3645
+    -00.22222
+  bn-BD
+    ০০
+    +১,৮২৭.৩৬৪৫
+    -০০.২২২২২
+
+unit-width-full-name integer-width/##00 sign-accounting-except-zero
+  es-MX
+    00
+    +1,827.3645
+    -00.22222
+  zh-TW
+    00
+    +1,827.3645
+    -00.22222
+  bn-BD
+    ০০
+    +১,৮২৭.৩৬৪৫
+    -০০.২২২২২
+
+unit-width-narrow integer-width/##00 decimal-always
+  es-MX
+    00.
+    1,827.3645
+    -00.22222
+  zh-TW
+    00.
+    1,827.3645
+    -00.22222
+  bn-BD
+    ০০.
+    ১,৮২৭.৩৬৪৫
+    -০০.২২২২২
+
+unit-width-full-name integer-width/##00 decimal-always
+  es-MX
+    00.
+    1,827.3645
+    -00.22222
+  zh-TW
+    00.
+    1,827.3645
+    -00.22222
+  bn-BD
+    ০০.
+    ১,৮২৭.৩৬৪৫
+    -০০.২২২২২
+
+unit-width-narrow scale/0.5 group-on-aligned
+  es-MX
+    0
+    45,913.68225
+    -0.11111
+  zh-TW
+    0
+    45,913.68225
+    -0.11111
+  bn-BD
+    ০
+    ৪৫,৯১৩.৬৮২২৫
+    -০.১১১১১
+
+unit-width-full-name scale/0.5 group-on-aligned
+  es-MX
+    0
+    45,913.68225
+    -0.11111
+  zh-TW
+    0
+    45,913.68225
+    -0.11111
+  bn-BD
+    ০
+    ৪৫,৯১৩.৬৮২২৫
+    -০.১১১১১
+
+unit-width-narrow scale/0.5 latin
+  es-MX
+    0
+    45,913.68225
+    -0.11111
+  zh-TW
+    0
+    45,913.68225
+    -0.11111
+  bn-BD
+    0
+    45,913.68225
+    -0.11111
+
+unit-width-full-name scale/0.5 latin
+  es-MX
+    0
+    45,913.68225
+    -0.11111
+  zh-TW
+    0
+    45,913.68225
+    -0.11111
+  bn-BD
+    0
+    45,913.68225
+    -0.11111
+
+unit-width-narrow scale/0.5 sign-accounting-except-zero
+  es-MX
+    0
+    +45,913.68225
+    -0.11111
+  zh-TW
+    0
+    +45,913.68225
+    -0.11111
+  bn-BD
+    ০
+    +৪৫,৯১৩.৬৮২২৫
+    -০.১১১১১
+
+unit-width-full-name scale/0.5 sign-accounting-except-zero
+  es-MX
+    0
+    +45,913.68225
+    -0.11111
+  zh-TW
+    0
+    +45,913.68225
+    -0.11111
+  bn-BD
+    ০
+    +৪৫,৯১৩.৬৮২২৫
+    -০.১১১১১
+
+unit-width-narrow scale/0.5 decimal-always
+  es-MX
+    0.
+    45,913.68225
+    -0.11111
+  zh-TW
+    0.
+    45,913.68225
+    -0.11111
+  bn-BD
+    ০.
+    ৪৫,৯১৩.৬৮২২৫
+    -০.১১১১১
+
+unit-width-full-name scale/0.5 decimal-always
+  es-MX
+    0.
+    45,913.68225
+    -0.11111
+  zh-TW
+    0.
+    45,913.68225
+    -0.11111
+  bn-BD
+    ০.
+    ৪৫,৯১৩.৬৮২২৫
+    -০.১১১১১
+
+unit-width-narrow group-on-aligned latin
+  es-MX
+    0
+    91,827.3645
+    -0.22222
+  zh-TW
+    0
+    91,827.3645
+    -0.22222
+  bn-BD
+    0
+    91,827.3645
+    -0.22222
+
+unit-width-full-name group-on-aligned latin
+  es-MX
+    0
+    91,827.3645
+    -0.22222
+  zh-TW
+    0
+    91,827.3645
+    -0.22222
+  bn-BD
+    0
+    91,827.3645
+    -0.22222
+
+unit-width-narrow group-on-aligned sign-accounting-except-zero
+  es-MX
+    0
+    +91,827.3645
+    -0.22222
+  zh-TW
+    0
+    +91,827.3645
+    -0.22222
+  bn-BD
+    ০
+    +৯১,৮২৭.৩৬৪৫
+    -০.২২২২২
+
+unit-width-full-name group-on-aligned sign-accounting-except-zero
+  es-MX
+    0
+    +91,827.3645
+    -0.22222
+  zh-TW
+    0
+    +91,827.3645
+    -0.22222
+  bn-BD
+    ০
+    +৯১,৮২৭.৩৬৪৫
+    -০.২২২২২
+
+unit-width-narrow group-on-aligned decimal-always
+  es-MX
+    0.
+    91,827.3645
+    -0.22222
+  zh-TW
+    0.
+    91,827.3645
+    -0.22222
+  bn-BD
+    ০.
+    ৯১,৮২৭.৩৬৪৫
+    -০.২২২২২
+
+unit-width-full-name group-on-aligned decimal-always
+  es-MX
+    0.
+    91,827.3645
+    -0.22222
+  zh-TW
+    0.
+    91,827.3645
+    -0.22222
+  bn-BD
+    ০.
+    ৯১,৮২৭.৩৬৪৫
+    -০.২২২২২
+
+unit-width-narrow latin sign-accounting-except-zero
+  es-MX
+    0
+    +91,827.3645
+    -0.22222
+  zh-TW
+    0
+    +91,827.3645
+    -0.22222
+  bn-BD
+    0
+    +91,827.3645
+    -0.22222
+
+unit-width-full-name latin sign-accounting-except-zero
+  es-MX
+    0
+    +91,827.3645
+    -0.22222
+  zh-TW
+    0
+    +91,827.3645
+    -0.22222
+  bn-BD
+    0
+    +91,827.3645
+    -0.22222
+
+unit-width-narrow latin decimal-always
+  es-MX
+    0.
+    91,827.3645
+    -0.22222
+  zh-TW
+    0.
+    91,827.3645
+    -0.22222
+  bn-BD
+    0.
+    91,827.3645
+    -0.22222
+
+unit-width-full-name latin decimal-always
+  es-MX
+    0.
+    91,827.3645
+    -0.22222
+  zh-TW
+    0.
+    91,827.3645
+    -0.22222
+  bn-BD
+    0.
+    91,827.3645
+    -0.22222
+
+unit-width-narrow sign-accounting-except-zero decimal-always
+  es-MX
+    0.
+    +91,827.3645
+    -0.22222
+  zh-TW
+    0.
+    +91,827.3645
+    -0.22222
+  bn-BD
+    ০.
+    +৯১,৮২৭.৩৬৪৫
+    -০.২২২২২
+
+unit-width-full-name sign-accounting-except-zero decimal-always
+  es-MX
+    0.
+    +91,827.3645
+    -0.22222
+  zh-TW
+    0.
+    +91,827.3645
+    -0.22222
+  bn-BD
+    ০.
+    +৯১,৮২৭.৩৬৪৫
+    -০.২২২২২
+
+precision-integer rounding-mode-floor integer-width/##00
+  es-MX
+    00
+    1,827
+    -01
+  zh-TW
+    00
+    1,827
+    -01
+  bn-BD
+    ০০
+    ১,৮২৭
+    -০১
+
+.000 rounding-mode-floor integer-width/##00
+  es-MX
+    00.000
+    1,827.364
+    -00.223
+  zh-TW
+    00.000
+    1,827.364
+    -00.223
+  bn-BD
+    ০০.০০০
+    ১,৮২৭.৩৬৪
+    -০০.২২৩
+
+.##/@@@+ rounding-mode-floor integer-width/##00
+  es-MX
+    00
+    1,827.36
+    -00.223
+  zh-TW
+    00
+    1,827.36
+    -00.223
+  bn-BD
+    ০০
+    ১,৮২৭.৩৬
+    -০০.২২৩
+
+@@ rounding-mode-floor integer-width/##00
+  es-MX
+    00.0
+    1,000
+    -00.23
+  zh-TW
+    00.0
+    1,000
+    -00.23
+  bn-BD
+    ০০.০
+    ১,০০০
+    -০০.২৩
+
+precision-integer rounding-mode-floor scale/0.5
+  es-MX
+    0
+    45,913
+    -1
+  zh-TW
+    0
+    45,913
+    -1
+  bn-BD
+    ০
+    ৪৫,৯১৩
+    -১
+
+.000 rounding-mode-floor scale/0.5
+  es-MX
+    0.000
+    45,913.682
+    -0.112
+  zh-TW
+    0.000
+    45,913.682
+    -0.112
+  bn-BD
+    ০.০০০
+    ৪৫,৯১৩.৬৮২
+    -০.১১২
+
+.##/@@@+ rounding-mode-floor scale/0.5
+  es-MX
+    0
+    45,913.68
+    -0.112
+  zh-TW
+    0
+    45,913.68
+    -0.112
+  bn-BD
+    ০
+    ৪৫,৯১৩.৬৮
+    -০.১১২
+
+@@ rounding-mode-floor scale/0.5
+  es-MX
+    0.0
+    45,000
+    -0.12
+  zh-TW
+    0.0
+    45,000
+    -0.12
+  bn-BD
+    ০.০
+    ৪৫,০০০
+    -০.১২
+
+precision-integer rounding-mode-floor group-on-aligned
+  es-MX
+    0
+    91,827
+    -1
+  zh-TW
+    0
+    91,827
+    -1
+  bn-BD
+    ০
+    ৯১,৮২৭
+    -১
+
+.000 rounding-mode-floor group-on-aligned
+  es-MX
+    0.000
+    91,827.364
+    -0.223
+  zh-TW
+    0.000
+    91,827.364
+    -0.223
+  bn-BD
+    ০.০০০
+    ৯১,৮২৭.৩৬৪
+    -০.২২৩
+
+.##/@@@+ rounding-mode-floor group-on-aligned
+  es-MX
+    0
+    91,827.36
+    -0.223
+  zh-TW
+    0
+    91,827.36
+    -0.223
+  bn-BD
+    ০
+    ৯১,৮২৭.৩৬
+    -০.২২৩
+
+@@ rounding-mode-floor group-on-aligned
+  es-MX
+    0.0
+    91,000
+    -0.23
+  zh-TW
+    0.0
+    91,000
+    -0.23
+  bn-BD
+    ০.০
+    ৯১,০০০
+    -০.২৩
+
+precision-integer rounding-mode-floor latin
+  es-MX
+    0
+    91,827
+    -1
+  zh-TW
+    0
+    91,827
+    -1
+  bn-BD
+    0
+    91,827
+    -1
+
+.000 rounding-mode-floor latin
+  es-MX
+    0.000
+    91,827.364
+    -0.223
+  zh-TW
+    0.000
+    91,827.364
+    -0.223
+  bn-BD
+    0.000
+    91,827.364
+    -0.223
+
+.##/@@@+ rounding-mode-floor latin
+  es-MX
+    0
+    91,827.36
+    -0.223
+  zh-TW
+    0
+    91,827.36
+    -0.223
+  bn-BD
+    0
+    91,827.36
+    -0.223
+
+@@ rounding-mode-floor latin
+  es-MX
+    0.0
+    91,000
+    -0.23
+  zh-TW
+    0.0
+    91,000
+    -0.23
+  bn-BD
+    0.0
+    91,000
+    -0.23
+
+precision-integer rounding-mode-floor sign-accounting-except-zero
+  es-MX
+    0
+    +91,827
+    -1
+  zh-TW
+    0
+    +91,827
+    -1
+  bn-BD
+    ০
+    +৯১,৮২৭
+    -১
+
+.000 rounding-mode-floor sign-accounting-except-zero
+  es-MX
+    0.000
+    +91,827.364
+    -0.223
+  zh-TW
+    0.000
+    +91,827.364
+    -0.223
+  bn-BD
+    ০.০০০
+    +৯১,৮২৭.৩৬৪
+    -০.২২৩
+
+.##/@@@+ rounding-mode-floor sign-accounting-except-zero
+  es-MX
+    0
+    +91,827.36
+    -0.223
+  zh-TW
+    0
+    +91,827.36
+    -0.223
+  bn-BD
+    ০
+    +৯১,৮২৭.৩৬
+    -০.২২৩
+
+@@ rounding-mode-floor sign-accounting-except-zero
+  es-MX
+    0.0
+    +91,000
+    -0.23
+  zh-TW
+    0.0
+    +91,000
+    -0.23
+  bn-BD
+    ০.০
+    +৯১,০০০
+    -০.২৩
+
+precision-integer rounding-mode-floor decimal-always
+  es-MX
+    0.
+    91,827.
+    -1.
+  zh-TW
+    0.
+    91,827.
+    -1.
+  bn-BD
+    ০.
+    ৯১,৮২৭.
+    -১.
+
+.000 rounding-mode-floor decimal-always
+  es-MX
+    0.000
+    91,827.364
+    -0.223
+  zh-TW
+    0.000
+    91,827.364
+    -0.223
+  bn-BD
+    ০.০০০
+    ৯১,৮২৭.৩৬৪
+    -০.২২৩
+
+.##/@@@+ rounding-mode-floor decimal-always
+  es-MX
+    0.
+    91,827.36
+    -0.223
+  zh-TW
+    0.
+    91,827.36
+    -0.223
+  bn-BD
+    ০.
+    ৯১,৮২৭.৩৬
+    -০.২২৩
+
+@@ rounding-mode-floor decimal-always
+  es-MX
+    0.0
+    91,000.
+    -0.23
+  zh-TW
+    0.0
+    91,000.
+    -0.23
+  bn-BD
+    ০.০
+    ৯১,০০০.
+    -০.২৩
+
+precision-integer integer-width/##00 scale/0.5
+  es-MX
+    00
+    5,914
+    -00
+  zh-TW
+    00
+    5,914
+    -00
+  bn-BD
+    ০০
+    ৫,৯১৪
+    -০০
+
+.000 integer-width/##00 scale/0.5
+  es-MX
+    00.000
+    5,913.682
+    -00.111
+  zh-TW
+    00.000
+    5,913.682
+    -00.111
+  bn-BD
+    ০০.০০০
+    ৫,৯১৩.৬৮২
+    -০০.১১১
+
+.##/@@@+ integer-width/##00 scale/0.5
+  es-MX
+    00
+    5,913.68
+    -00.111
+  zh-TW
+    00
+    5,913.68
+    -00.111
+  bn-BD
+    ০০
+    ৫,৯১৩.৬৮
+    -০০.১১১
+
+@@ integer-width/##00 scale/0.5
+  es-MX
+    00.0
+    6,000
+    -00.11
+  zh-TW
+    00.0
+    6,000
+    -00.11
+  bn-BD
+    ০০.০
+    ৬,০০০
+    -০০.১১
+
+precision-integer integer-width/##00 group-on-aligned
+  es-MX
+    00
+    1,827
+    -00
+  zh-TW
+    00
+    1,827
+    -00
+  bn-BD
+    ০০
+    ১,৮২৭
+    -০০
+
+.000 integer-width/##00 group-on-aligned
+  es-MX
+    00.000
+    1,827.364
+    -00.222
+  zh-TW
+    00.000
+    1,827.364
+    -00.222
+  bn-BD
+    ০০.০০০
+    ১,৮২৭.৩৬৪
+    -০০.২২২
+
+.##/@@@+ integer-width/##00 group-on-aligned
+  es-MX
+    00
+    1,827.36
+    -00.222
+  zh-TW
+    00
+    1,827.36
+    -00.222
+  bn-BD
+    ০০
+    ১,৮২৭.৩৬
+    -০০.২২২
+
+@@ integer-width/##00 group-on-aligned
+  es-MX
+    00.0
+    2,000
+    -00.22
+  zh-TW
+    00.0
+    2,000
+    -00.22
+  bn-BD
+    ০০.০
+    ২,০০০
+    -০০.২২
+
+precision-integer integer-width/##00 latin
+  es-MX
+    00
+    1,827
+    -00
+  zh-TW
+    00
+    1,827
+    -00
+  bn-BD
+    00
+    1,827
+    -00
+
+.000 integer-width/##00 latin
+  es-MX
+    00.000
+    1,827.364
+    -00.222
+  zh-TW
+    00.000
+    1,827.364
+    -00.222
+  bn-BD
+    00.000
+    1,827.364
+    -00.222
+
+.##/@@@+ integer-width/##00 latin
+  es-MX
+    00
+    1,827.36
+    -00.222
+  zh-TW
+    00
+    1,827.36
+    -00.222
+  bn-BD
+    00
+    1,827.36
+    -00.222
+
+@@ integer-width/##00 latin
+  es-MX
+    00.0
+    2,000
+    -00.22
+  zh-TW
+    00.0
+    2,000
+    -00.22
+  bn-BD
+    00.0
+    2,000
+    -00.22
+
+precision-integer integer-width/##00 sign-accounting-except-zero
+  es-MX
+    00
+    +1,827
+    00
+  zh-TW
+    00
+    +1,827
+    00
+  bn-BD
+    ০০
+    +১,৮২৭
+    ০০
+
+.000 integer-width/##00 sign-accounting-except-zero
+  es-MX
+    00.000
+    +1,827.364
+    -00.222
+  zh-TW
+    00.000
+    +1,827.364
+    -00.222
+  bn-BD
+    ০০.০০০
+    +১,৮২৭.৩৬৪
+    -০০.২২২
+
+.##/@@@+ integer-width/##00 sign-accounting-except-zero
+  es-MX
+    00
+    +1,827.36
+    -00.222
+  zh-TW
+    00
+    +1,827.36
+    -00.222
+  bn-BD
+    ০০
+    +১,৮২৭.৩৬
+    -০০.২২২
+
+@@ integer-width/##00 sign-accounting-except-zero
+  es-MX
+    00.0
+    +2,000
+    -00.22
+  zh-TW
+    00.0
+    +2,000
+    -00.22
+  bn-BD
+    ০০.০
+    +২,০০০
+    -০০.২২
+
+precision-integer integer-width/##00 decimal-always
+  es-MX
+    00.
+    1,827.
+    -00.
+  zh-TW
+    00.
+    1,827.
+    -00.
+  bn-BD
+    ০০.
+    ১,৮২৭.
+    -০০.
+
+.000 integer-width/##00 decimal-always
+  es-MX
+    00.000
+    1,827.364
+    -00.222
+  zh-TW
+    00.000
+    1,827.364
+    -00.222
+  bn-BD
+    ০০.০০০
+    ১,৮২৭.৩৬৪
+    -০০.২২২
+
+.##/@@@+ integer-width/##00 decimal-always
+  es-MX
+    00.
+    1,827.36
+    -00.222
+  zh-TW
+    00.
+    1,827.36
+    -00.222
+  bn-BD
+    ০০.
+    ১,৮২৭.৩৬
+    -০০.২২২
+
+@@ integer-width/##00 decimal-always
+  es-MX
+    00.0
+    2,000.
+    -00.22
+  zh-TW
+    00.0
+    2,000.
+    -00.22
+  bn-BD
+    ০০.০
+    ২,০০০.
+    -০০.২২
+
+precision-integer scale/0.5 group-on-aligned
+  es-MX
+    0
+    45,914
+    -0
+  zh-TW
+    0
+    45,914
+    -0
+  bn-BD
+    ০
+    ৪৫,৯১৪
+    -০
+
+.000 scale/0.5 group-on-aligned
+  es-MX
+    0.000
+    45,913.682
+    -0.111
+  zh-TW
+    0.000
+    45,913.682
+    -0.111
+  bn-BD
+    ০.০০০
+    ৪৫,৯১৩.৬৮২
+    -০.১১১
+
+.##/@@@+ scale/0.5 group-on-aligned
+  es-MX
+    0
+    45,913.68
+    -0.111
+  zh-TW
+    0
+    45,913.68
+    -0.111
+  bn-BD
+    ০
+    ৪৫,৯১৩.৬৮
+    -০.১১১
+
+@@ scale/0.5 group-on-aligned
+  es-MX
+    0.0
+    46,000
+    -0.11
+  zh-TW
+    0.0
+    46,000
+    -0.11
+  bn-BD
+    ০.০
+    ৪৬,০০০
+    -০.১১
+
+precision-integer scale/0.5 latin
+  es-MX
+    0
+    45,914
+    -0
+  zh-TW
+    0
+    45,914
+    -0
+  bn-BD
+    0
+    45,914
+    -0
+
+.000 scale/0.5 latin
+  es-MX
+    0.000
+    45,913.682
+    -0.111
+  zh-TW
+    0.000
+    45,913.682
+    -0.111
+  bn-BD
+    0.000
+    45,913.682
+    -0.111
+
+.##/@@@+ scale/0.5 latin
+  es-MX
+    0
+    45,913.68
+    -0.111
+  zh-TW
+    0
+    45,913.68
+    -0.111
+  bn-BD
+    0
+    45,913.68
+    -0.111
+
+@@ scale/0.5 latin
+  es-MX
+    0.0
+    46,000
+    -0.11
+  zh-TW
+    0.0
+    46,000
+    -0.11
+  bn-BD
+    0.0
+    46,000
+    -0.11
+
+precision-integer scale/0.5 sign-accounting-except-zero
+  es-MX
+    0
+    +45,914
+    0
+  zh-TW
+    0
+    +45,914
+    0
+  bn-BD
+    ০
+    +৪৫,৯১৪
+    ০
+
+.000 scale/0.5 sign-accounting-except-zero
+  es-MX
+    0.000
+    +45,913.682
+    -0.111
+  zh-TW
+    0.000
+    +45,913.682
+    -0.111
+  bn-BD
+    ০.০০০
+    +৪৫,৯১৩.৬৮২
+    -০.১১১
+
+.##/@@@+ scale/0.5 sign-accounting-except-zero
+  es-MX
+    0
+    +45,913.68
+    -0.111
+  zh-TW
+    0
+    +45,913.68
+    -0.111
+  bn-BD
+    ০
+    +৪৫,৯১৩.৬৮
+    -০.১১১
+
+@@ scale/0.5 sign-accounting-except-zero
+  es-MX
+    0.0
+    +46,000
+    -0.11
+  zh-TW
+    0.0
+    +46,000
+    -0.11
+  bn-BD
+    ০.০
+    +৪৬,০০০
+    -০.১১
+
+precision-integer scale/0.5 decimal-always
+  es-MX
+    0.
+    45,914.
+    -0.
+  zh-TW
+    0.
+    45,914.
+    -0.
+  bn-BD
+    ০.
+    ৪৫,৯১৪.
+    -০.
+
+.000 scale/0.5 decimal-always
+  es-MX
+    0.000
+    45,913.682
+    -0.111
+  zh-TW
+    0.000
+    45,913.682
+    -0.111
+  bn-BD
+    ০.০০০
+    ৪৫,৯১৩.৬৮২
+    -০.১১১
+
+.##/@@@+ scale/0.5 decimal-always
+  es-MX
+    0.
+    45,913.68
+    -0.111
+  zh-TW
+    0.
+    45,913.68
+    -0.111
+  bn-BD
+    ০.
+    ৪৫,৯১৩.৬৮
+    -০.১১১
+
+@@ scale/0.5 decimal-always
+  es-MX
+    0.0
+    46,000.
+    -0.11
+  zh-TW
+    0.0
+    46,000.
+    -0.11
+  bn-BD
+    ০.০
+    ৪৬,০০০.
+    -০.১১
+
+precision-integer group-on-aligned latin
+  es-MX
+    0
+    91,827
+    -0
+  zh-TW
+    0
+    91,827
+    -0
+  bn-BD
+    0
+    91,827
+    -0
+
+.000 group-on-aligned latin
+  es-MX
+    0.000
+    91,827.364
+    -0.222
+  zh-TW
+    0.000
+    91,827.364
+    -0.222
+  bn-BD
+    0.000
+    91,827.364
+    -0.222
+
+.##/@@@+ group-on-aligned latin
+  es-MX
+    0
+    91,827.36
+    -0.222
+  zh-TW
+    0
+    91,827.36
+    -0.222
+  bn-BD
+    0
+    91,827.36
+    -0.222
+
+@@ group-on-aligned latin
+  es-MX
+    0.0
+    92,000
+    -0.22
+  zh-TW
+    0.0
+    92,000
+    -0.22
+  bn-BD
+    0.0
+    92,000
+    -0.22
+
+precision-integer group-on-aligned sign-accounting-except-zero
+  es-MX
+    0
+    +91,827
+    0
+  zh-TW
+    0
+    +91,827
+    0
+  bn-BD
+    ০
+    +৯১,৮২৭
+    ০
+
+.000 group-on-aligned sign-accounting-except-zero
+  es-MX
+    0.000
+    +91,827.364
+    -0.222
+  zh-TW
+    0.000
+    +91,827.364
+    -0.222
+  bn-BD
+    ০.০০০
+    +৯১,৮২৭.৩৬৪
+    -০.২২২
+
+.##/@@@+ group-on-aligned sign-accounting-except-zero
+  es-MX
+    0
+    +91,827.36
+    -0.222
+  zh-TW
+    0
+    +91,827.36
+    -0.222
+  bn-BD
+    ০
+    +৯১,৮২৭.৩৬
+    -০.২২২
+
+@@ group-on-aligned sign-accounting-except-zero
+  es-MX
+    0.0
+    +92,000
+    -0.22
+  zh-TW
+    0.0
+    +92,000
+    -0.22
+  bn-BD
+    ০.০
+    +৯২,০০০
+    -০.২২
+
+precision-integer group-on-aligned decimal-always
+  es-MX
+    0.
+    91,827.
+    -0.
+  zh-TW
+    0.
+    91,827.
+    -0.
+  bn-BD
+    ০.
+    ৯১,৮২৭.
+    -০.
+
+.000 group-on-aligned decimal-always
+  es-MX
+    0.000
+    91,827.364
+    -0.222
+  zh-TW
+    0.000
+    91,827.364
+    -0.222
+  bn-BD
+    ০.০০০
+    ৯১,৮২৭.৩৬৪
+    -০.২২২
+
+.##/@@@+ group-on-aligned decimal-always
+  es-MX
+    0.
+    91,827.36
+    -0.222
+  zh-TW
+    0.
+    91,827.36
+    -0.222
+  bn-BD
+    ০.
+    ৯১,৮২৭.৩৬
+    -০.২২২
+
+@@ group-on-aligned decimal-always
+  es-MX
+    0.0
+    92,000.
+    -0.22
+  zh-TW
+    0.0
+    92,000.
+    -0.22
+  bn-BD
+    ০.০
+    ৯২,০০০.
+    -০.২২
+
+precision-integer latin sign-accounting-except-zero
+  es-MX
+    0
+    +91,827
+    0
+  zh-TW
+    0
+    +91,827
+    0
+  bn-BD
+    0
+    +91,827
+    0
+
+.000 latin sign-accounting-except-zero
+  es-MX
+    0.000
+    +91,827.364
+    -0.222
+  zh-TW
+    0.000
+    +91,827.364
+    -0.222
+  bn-BD
+    0.000
+    +91,827.364
+    -0.222
+
+.##/@@@+ latin sign-accounting-except-zero
+  es-MX
+    0
+    +91,827.36
+    -0.222
+  zh-TW
+    0
+    +91,827.36
+    -0.222
+  bn-BD
+    0
+    +91,827.36
+    -0.222
+
+@@ latin sign-accounting-except-zero
+  es-MX
+    0.0
+    +92,000
+    -0.22
+  zh-TW
+    0.0
+    +92,000
+    -0.22
+  bn-BD
+    0.0
+    +92,000
+    -0.22
+
+precision-integer latin decimal-always
+  es-MX
+    0.
+    91,827.
+    -0.
+  zh-TW
+    0.
+    91,827.
+    -0.
+  bn-BD
+    0.
+    91,827.
+    -0.
+
+.000 latin decimal-always
+  es-MX
+    0.000
+    91,827.364
+    -0.222
+  zh-TW
+    0.000
+    91,827.364
+    -0.222
+  bn-BD
+    0.000
+    91,827.364
+    -0.222
+
+.##/@@@+ latin decimal-always
+  es-MX
+    0.
+    91,827.36
+    -0.222
+  zh-TW
+    0.
+    91,827.36
+    -0.222
+  bn-BD
+    0.
+    91,827.36
+    -0.222
+
+@@ latin decimal-always
+  es-MX
+    0.0
+    92,000.
+    -0.22
+  zh-TW
+    0.0
+    92,000.
+    -0.22
+  bn-BD
+    0.0
+    92,000.
+    -0.22
+
+precision-integer sign-accounting-except-zero decimal-always
+  es-MX
+    0.
+    +91,827.
+    0.
+  zh-TW
+    0.
+    +91,827.
+    0.
+  bn-BD
+    ০.
+    +৯১,৮২৭.
+    ০.
+
+.000 sign-accounting-except-zero decimal-always
+  es-MX
+    0.000
+    +91,827.364
+    -0.222
+  zh-TW
+    0.000
+    +91,827.364
+    -0.222
+  bn-BD
+    ০.০০০
+    +৯১,৮২৭.৩৬৪
+    -০.২২২
+
+.##/@@@+ sign-accounting-except-zero decimal-always
+  es-MX
+    0.
+    +91,827.36
+    -0.222
+  zh-TW
+    0.
+    +91,827.36
+    -0.222
+  bn-BD
+    ০.
+    +৯১,৮২৭.৩৬
+    -০.২২২
+
+@@ sign-accounting-except-zero decimal-always
+  es-MX
+    0.0
+    +92,000.
+    -0.22
+  zh-TW
+    0.0
+    +92,000.
+    -0.22
+  bn-BD
+    ০.০
+    +৯২,০০০.
+    -০.২২
+
+rounding-mode-floor integer-width/##00 scale/0.5
+  es-MX
+    00
+    5,913.68225
+    -00.11111
+  zh-TW
+    00
+    5,913.68225
+    -00.11111
+  bn-BD
+    ০০
+    ৫,৯১৩.৬৮২২৫
+    -০০.১১১১১
+
+rounding-mode-floor integer-width/##00 group-on-aligned
+  es-MX
+    00
+    1,827.3645
+    -00.22222
+  zh-TW
+    00
+    1,827.3645
+    -00.22222
+  bn-BD
+    ০০
+    ১,৮২৭.৩৬৪৫
+    -০০.২২২২২
+
+rounding-mode-floor integer-width/##00 latin
+  es-MX
+    00
+    1,827.3645
+    -00.22222
+  zh-TW
+    00
+    1,827.3645
+    -00.22222
+  bn-BD
+    00
+    1,827.3645
+    -00.22222
+
+rounding-mode-floor integer-width/##00 sign-accounting-except-zero
+  es-MX
+    00
+    +1,827.3645
+    -00.22222
+  zh-TW
+    00
+    +1,827.3645
+    -00.22222
+  bn-BD
+    ০০
+    +১,৮২৭.৩৬৪৫
+    -০০.২২২২২
+
+rounding-mode-floor integer-width/##00 decimal-always
+  es-MX
+    00.
+    1,827.3645
+    -00.22222
+  zh-TW
+    00.
+    1,827.3645
+    -00.22222
+  bn-BD
+    ০০.
+    ১,৮২৭.৩৬৪৫
+    -০০.২২২২২
+
+rounding-mode-floor scale/0.5 group-on-aligned
+  es-MX
+    0
+    45,913.68225
+    -0.11111
+  zh-TW
+    0
+    45,913.68225
+    -0.11111
+  bn-BD
+    ০
+    ৪৫,৯১৩.৬৮২২৫
+    -০.১১১১১
+
+rounding-mode-floor scale/0.5 latin
+  es-MX
+    0
+    45,913.68225
+    -0.11111
+  zh-TW
+    0
+    45,913.68225
+    -0.11111
+  bn-BD
+    0
+    45,913.68225
+    -0.11111
+
+rounding-mode-floor scale/0.5 sign-accounting-except-zero
+  es-MX
+    0
+    +45,913.68225
+    -0.11111
+  zh-TW
+    0
+    +45,913.68225
+    -0.11111
+  bn-BD
+    ০
+    +৪৫,৯১৩.৬৮২২৫
+    -০.১১১১১
+
+rounding-mode-floor scale/0.5 decimal-always
+  es-MX
+    0.
+    45,913.68225
+    -0.11111
+  zh-TW
+    0.
+    45,913.68225
+    -0.11111
+  bn-BD
+    ০.
+    ৪৫,৯১৩.৬৮২২৫
+    -০.১১১১১
+
+rounding-mode-floor group-on-aligned latin
+  es-MX
+    0
+    91,827.3645
+    -0.22222
+  zh-TW
+    0
+    91,827.3645
+    -0.22222
+  bn-BD
+    0
+    91,827.3645
+    -0.22222
+
+rounding-mode-floor group-on-aligned sign-accounting-except-zero
+  es-MX
+    0
+    +91,827.3645
+    -0.22222
+  zh-TW
+    0
+    +91,827.3645
+    -0.22222
+  bn-BD
+    ০
+    +৯১,৮২৭.৩৬৪৫
+    -০.২২২২২
+
+rounding-mode-floor group-on-aligned decimal-always
+  es-MX
+    0.
+    91,827.3645
+    -0.22222
+  zh-TW
+    0.
+    91,827.3645
+    -0.22222
+  bn-BD
+    ০.
+    ৯১,৮২৭.৩৬৪৫
+    -০.২২২২২
+
+rounding-mode-floor latin sign-accounting-except-zero
+  es-MX
+    0
+    +91,827.3645
+    -0.22222
+  zh-TW
+    0
+    +91,827.3645
+    -0.22222
+  bn-BD
+    0
+    +91,827.3645
+    -0.22222
+
+rounding-mode-floor latin decimal-always
+  es-MX
+    0.
+    91,827.3645
+    -0.22222
+  zh-TW
+    0.
+    91,827.3645
+    -0.22222
+  bn-BD
+    0.
+    91,827.3645
+    -0.22222
+
+rounding-mode-floor sign-accounting-except-zero decimal-always
+  es-MX
+    0.
+    +91,827.3645
+    -0.22222
+  zh-TW
+    0.
+    +91,827.3645
+    -0.22222
+  bn-BD
+    ০.
+    +৯১,৮২৭.৩৬৪৫
+    -০.২২২২২
+
+integer-width/##00 scale/0.5 group-on-aligned
+  es-MX
+    00
+    5,913.68225
+    -00.11111
+  zh-TW
+    00
+    5,913.68225
+    -00.11111
+  bn-BD
+    ০০
+    ৫,৯১৩.৬৮২২৫
+    -০০.১১১১১
+
+integer-width/##00 scale/0.5 latin
+  es-MX
+    00
+    5,913.68225
+    -00.11111
+  zh-TW
+    00
+    5,913.68225
+    -00.11111
+  bn-BD
+    00
+    5,913.68225
+    -00.11111
+
+integer-width/##00 scale/0.5 sign-accounting-except-zero
+  es-MX
+    00
+    +5,913.68225
+    -00.11111
+  zh-TW
+    00
+    +5,913.68225
+    -00.11111
+  bn-BD
+    ০০
+    +৫,৯১৩.৬৮২২৫
+    -০০.১১১১১
+
+integer-width/##00 scale/0.5 decimal-always
+  es-MX
+    00.
+    5,913.68225
+    -00.11111
+  zh-TW
+    00.
+    5,913.68225
+    -00.11111
+  bn-BD
+    ০০.
+    ৫,৯১৩.৬৮২২৫
+    -০০.১১১১১
+
+integer-width/##00 group-on-aligned latin
+  es-MX
+    00
+    1,827.3645
+    -00.22222
+  zh-TW
+    00
+    1,827.3645
+    -00.22222
+  bn-BD
+    00
+    1,827.3645
+    -00.22222
+
+integer-width/##00 group-on-aligned sign-accounting-except-zero
+  es-MX
+    00
+    +1,827.3645
+    -00.22222
+  zh-TW
+    00
+    +1,827.3645
+    -00.22222
+  bn-BD
+    ০০
+    +১,৮২৭.৩৬৪৫
+    -০০.২২২২২
+
+integer-width/##00 group-on-aligned decimal-always
+  es-MX
+    00.
+    1,827.3645
+    -00.22222
+  zh-TW
+    00.
+    1,827.3645
+    -00.22222
+  bn-BD
+    ০০.
+    ১,৮২৭.৩৬৪৫
+    -০০.২২২২২
+
+integer-width/##00 latin sign-accounting-except-zero
+  es-MX
+    00
+    +1,827.3645
+    -00.22222
+  zh-TW
+    00
+    +1,827.3645
+    -00.22222
+  bn-BD
+    00
+    +1,827.3645
+    -00.22222
+
+integer-width/##00 latin decimal-always
+  es-MX
+    00.
+    1,827.3645
+    -00.22222
+  zh-TW
+    00.
+    1,827.3645
+    -00.22222
+  bn-BD
+    00.
+    1,827.3645
+    -00.22222
+
+integer-width/##00 sign-accounting-except-zero decimal-always
+  es-MX
+    00.
+    +1,827.3645
+    -00.22222
+  zh-TW
+    00.
+    +1,827.3645
+    -00.22222
+  bn-BD
+    ০০.
+    +১,৮২৭.৩৬৪৫
+    -০০.২২২২২
+
+scale/0.5 group-on-aligned latin
+  es-MX
+    0
+    45,913.68225
+    -0.11111
+  zh-TW
+    0
+    45,913.68225
+    -0.11111
+  bn-BD
+    0
+    45,913.68225
+    -0.11111
+
+scale/0.5 group-on-aligned sign-accounting-except-zero
+  es-MX
+    0
+    +45,913.68225
+    -0.11111
+  zh-TW
+    0
+    +45,913.68225
+    -0.11111
+  bn-BD
+    ০
+    +৪৫,৯১৩.৬৮২২৫
+    -০.১১১১১
+
+scale/0.5 group-on-aligned decimal-always
+  es-MX
+    0.
+    45,913.68225
+    -0.11111
+  zh-TW
+    0.
+    45,913.68225
+    -0.11111
+  bn-BD
+    ০.
+    ৪৫,৯১৩.৬৮২২৫
+    -০.১১১১১
+
+scale/0.5 latin sign-accounting-except-zero
+  es-MX
+    0
+    +45,913.68225
+    -0.11111
+  zh-TW
+    0
+    +45,913.68225
+    -0.11111
+  bn-BD
+    0
+    +45,913.68225
+    -0.11111
+
+scale/0.5 latin decimal-always
+  es-MX
+    0.
+    45,913.68225
+    -0.11111
+  zh-TW
+    0.
+    45,913.68225
+    -0.11111
+  bn-BD
+    0.
+    45,913.68225
+    -0.11111
+
+scale/0.5 sign-accounting-except-zero decimal-always
+  es-MX
+    0.
+    +45,913.68225
+    -0.11111
+  zh-TW
+    0.
+    +45,913.68225
+    -0.11111
+  bn-BD
+    ০.
+    +৪৫,৯১৩.৬৮২২৫
+    -০.১১১১১
+
+group-on-aligned latin sign-accounting-except-zero
+  es-MX
+    0
+    +91,827.3645
+    -0.22222
+  zh-TW
+    0
+    +91,827.3645
+    -0.22222
+  bn-BD
+    0
+    +91,827.3645
+    -0.22222
+
+group-on-aligned latin decimal-always
+  es-MX
+    0.
+    91,827.3645
+    -0.22222
+  zh-TW
+    0.
+    91,827.3645
+    -0.22222
+  bn-BD
+    0.
+    91,827.3645
+    -0.22222
+
+group-on-aligned sign-accounting-except-zero decimal-always
+  es-MX
+    0.
+    +91,827.3645
+    -0.22222
+  zh-TW
+    0.
+    +91,827.3645
+    -0.22222
+  bn-BD
+    ০.
+    +৯১,৮২৭.৩৬৪৫
+    -০.২২২২২
+
+latin sign-accounting-except-zero decimal-always
+  es-MX
+    0.
+    +91,827.3645
+    -0.22222
+  zh-TW
+    0.
+    +91,827.3645
+    -0.22222
+  bn-BD
+    0.
+    +91,827.3645
+    -0.22222
+

@@ -1,0 +1,63 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+se{
+    zoneStrings{
+        "America:Curacao"{
+            ec{"Curaçao"}
+        }
+        "America:Merida"{
+            ec{"Mérida"}
+        }
+        "America:Sao_Paulo"{
+            ec{"São Paulo"}
+        }
+        "America:St_Barthelemy"{
+            ec{"Saint Barthélemy"}
+        }
+        "Antarctica:DumontDUrville"{
+            ec{"Dumont d’Urville"}
+        }
+        "Etc:Unknown"{
+            ec{"dovdameahttun áigeavádat"}
+        }
+        "meta:Europe_Central"{
+            ld{"gaska-Eurohpá geassiáigi"}
+            lg{"gaska-Eurohpá áigi"}
+            ls{"gaska-Eurohpá dábálašáigi"}
+            sd{"CEST"}
+            sg{"CET"}
+            ss{"CET"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"nuorti-Eurohpá geassiáigi"}
+            lg{"nuorti-Eurohpá áigi"}
+            ls{"nuorti-Eurohpá dábálašáigi"}
+            sd{"EEST"}
+            sg{"EET"}
+            ss{"EET"}
+        }
+        "meta:Europe_Western"{
+            ld{"oarje-Eurohpá geassiáigi"}
+            lg{"oarje-Eurohpá áigi"}
+            ls{"oarje-Eurohpá dábálašáigi"}
+            sd{"WEST"}
+            sg{"WET"}
+            ss{"WET"}
+        }
+        "meta:GMT"{
+            ls{"Greenwich gaskka áigi"}
+            ss{"GMT"}
+        }
+        "meta:Moscow"{
+            ld{"Moskva-geassiáigi"}
+            lg{"Moskva-áigi"}
+            ls{"Moskva-dábálašáigi"}
+        }
+        fallbackFormat{"{0} ({1})"}
+        gmtFormat{"UTC{0}"}
+        gmtZeroFormat{"UTC"}
+        hourFormat{"+HH:mm;−HH:mm"}
+        regionFormat{"{0} áigi"}
+    }
+}

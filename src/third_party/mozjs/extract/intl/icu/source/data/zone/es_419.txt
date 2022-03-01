@@ -1,0 +1,124 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_419{
+    zoneStrings{
+        "America:Fort_Nelson"{
+            ec{"Fuerte Nelson"}
+        }
+        "America:Nassau"{
+            ec{"Nasáu"}
+        }
+        "America:Santiago"{
+            ec{"Santiago"}
+        }
+        "America:St_Thomas"{
+            ec{"Santo Tomás"}
+        }
+        "Atlantic:Canary"{
+            ec{"Islas Canarias"}
+        }
+        "Etc:UTC"{
+            ls{"hora universal coordinada"}
+        }
+        "Etc:Unknown"{
+            ec{"ciudad desconocida"}
+        }
+        "Europe:Busingen"{
+            ec{"Büsingen"}
+        }
+        "Europe:Dublin"{
+            ld{"hora estándar de Irlanda"}
+        }
+        "Europe:Guernsey"{
+            ec{"Guernsey"}
+        }
+        "Pacific:Wake"{
+            ec{"Isla Wake"}
+        }
+        "meta:America_Mountain"{
+            ld{"hora de verano de la montaña"}
+            lg{"hora de la montaña"}
+            ls{"hora estándar de la montaña"}
+        }
+        "meta:Cocos"{
+            ls{"hora de Islas Cocos"}
+        }
+        "meta:Cook"{
+            ld{"hora de verano media de las islas Cook"}
+            lg{"hora de las islas Cook"}
+            ls{"hora estándar de las islas Cook"}
+        }
+        "meta:Easter"{
+            ld{"hora de verano de la Isla de Pascua"}
+            lg{"hora de la Isla de Pascua"}
+            ls{"hora estándar de Isla de Pascua"}
+        }
+        "meta:Europe_Central"{
+            sd{"∅∅∅"}
+            sg{"∅∅∅"}
+            ss{"∅∅∅"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"hora de verano de Europa del Este"}
+            lg{"hora de Europa del Este"}
+            ls{"hora estándar de Europa del Este"}
+            sd{"∅∅∅"}
+            sg{"∅∅∅"}
+            ss{"∅∅∅"}
+        }
+        "meta:Europe_Further_Eastern"{
+            ls{"horario del lejano este de Europa"}
+        }
+        "meta:Europe_Western"{
+            ld{"hora de verano de Europa del Oeste"}
+            lg{"hora de Europa del Oeste"}
+            ls{"hora estándar de Europa del Oeste"}
+            sd{"∅∅∅"}
+            sg{"∅∅∅"}
+            ss{"∅∅∅"}
+        }
+        "meta:Falkland"{
+            ld{"hora de verano de las Islas Malvinas"}
+            lg{"hora de las Islas Malvinas"}
+            ls{"hora estándar de las Islas Malvinas"}
+        }
+        "meta:French_Southern"{
+            ls{"hora de las Tierras Australes y Antárticas Francesas"}
+        }
+        "meta:GMT"{
+            ss{"∅∅∅"}
+        }
+        "meta:Gilbert_Islands"{
+            ls{"hora de Islas Gilbert"}
+        }
+        "meta:India"{
+            ls{"hora de India"}
+        }
+        "meta:Macquarie"{
+            ls{"hora de la Isla Macquarie"}
+        }
+        "meta:Marshall_Islands"{
+            ls{"hora de Islas Marshall"}
+        }
+        "meta:Myanmar"{
+            ls{"hora de Myanmar (Birmania)"}
+        }
+        "meta:Norfolk"{
+            ld{"hora de verano de la Isla Norfolk"}
+            lg{"hora de la Isla Norfolk"}
+            ls{"hora estándar de la Isla Norfolk"}
+        }
+        "meta:Pyongyang"{
+            ls{"hora de Pionyang"}
+        }
+        "meta:Solomon"{
+            ls{"hora de Islas Salomón"}
+        }
+        "meta:Wake"{
+            ls{"hora de Isla Wake"}
+        }
+        regionFormatDaylight{"hora de verano de {0}"}
+        regionFormatStandard{"hora estándar de {0}"}
+    }
+}

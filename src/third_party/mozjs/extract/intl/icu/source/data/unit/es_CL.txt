@@ -1,0 +1,40 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_CL{
+    %%Parent{"es_419"}
+    durationUnits{
+        hms{"hh:mm:ss"}
+        ms{"mm:ss"}
+    }
+    units{
+        electric{
+            ampere{
+                dnam{"amperios"}
+                one{"{0} amperio"}
+                other{"{0} amperios"}
+            }
+            milliampere{
+                dnam{"miliamperios"}
+                one{"{0} miliamperio"}
+                other{"{0} miliamperios"}
+            }
+            ohm{
+                one{"{0} ohmio"}
+                other{"{0} ohmios"}
+            }
+        }
+    }
+    unitsShort{
+        electric{
+            volt{
+                dnam{"voltios"}
+            }
+        }
+        power{
+            watt{
+                dnam{"vatios"}
+            }
+        }
+    }
+}

@@ -1,0 +1,20 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ps_PK{
+    Languages{
+        ar_001{"نوے معياري عربي"}
+        dsb{"لوړے سربي"}
+        fo{"فاروئے"}
+        kha{"خاسے"}
+        nb{"ناروے بوکمال"}
+    }
+    Types{
+        collation{
+            standard{"معياري د لټے ترتيب"}
+        }
+        numbers{
+            arabext{"غځېدلے عربي ۔ اينډيک عدد"}
+        }
+    }
+}

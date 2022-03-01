@@ -1,0 +1,318 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_419{
+    units{
+        acceleration{
+            g-force{
+                dnam{"fuerza G"}
+                one{"{0} unidad de fuerza gravitacional"}
+                other{"{0} unidades de fuerza gravitacional"}
+            }
+        }
+        concentr{
+            milligram-ofglucose-per-deciliter{
+                dnam{"mg/dL"}
+            }
+        }
+        electric{
+            ampere{
+                dnam{"amperes"}
+                one{"{0} ampere"}
+                other{"{0} amperes"}
+            }
+            milliampere{
+                dnam{"miliamperes"}
+                one{"{0} miliampere"}
+                other{"{0} miliamperes"}
+            }
+            ohm{
+                dnam{"ohms"}
+                one{"{0} ohm"}
+                other{"{0} ohms"}
+            }
+        }
+        energy{
+            joule{
+                dnam{"joules"}
+                one{"{0} joule"}
+                other{"{0} joules"}
+            }
+            kilojoule{
+                dnam{"kilojoules"}
+                one{"{0} kilojule"}
+                other{"{0} kilojules"}
+            }
+        }
+        graphics{
+            em{
+                dnam{"em tipográfico"}
+            }
+        }
+        length{
+            mile-scandinavian{
+                dnam{"milla escandinava"}
+            }
+        }
+        mass{
+            metric-ton{
+                dnam{"toneladas métricas"}
+                one{"{0} tonelada métrica"}
+                other{"{0} toneladas métricas"}
+            }
+            ton{
+                dnam{"toneladas"}
+                one{"{0} tonelada"}
+                other{"{0} toneladas"}
+            }
+        }
+        power{
+            horsepower{
+                dnam{"caballos de fuerza"}
+                one{"caballo de fuerza"}
+                other{"{0} caballos de fuerza"}
+            }
+        }
+        temperature{
+            generic{
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+            kelvin{
+                dnam{"kelvins"}
+                one{"{0} kelvin"}
+                other{"{0} kelvins"}
+            }
+        }
+        volume{
+            acre-foot{
+                dnam{"acre-pies"}
+                one{"{0} acre pie"}
+                other{"{0} acres pies"}
+            }
+            fluid-ounce{
+                dnam{"onzas fluidas"}
+                one{"{0} onza fluida"}
+                other{"{0} onzas fluidas"}
+            }
+        }
+    }
+    unitsNarrow{
+        acceleration{
+            g-force{
+                dnam{"G"}
+            }
+            meter-per-square-second{
+                dnam{"m/s²"}
+                one{"{0}m/s²"}
+                other{"{0}m/s²"}
+            }
+        }
+        duration{
+            day{
+                dnam{"d."}
+                one{"{0}d."}
+                other{"{0}dd."}
+                per{"{0}/d."}
+            }
+            month{
+                one{"{0}m."}
+                other{"{0}mm."}
+                per{"{0}/m."}
+            }
+            week{
+                dnam{"sem."}
+                one{"{0}sem."}
+                other{"{0}sems."}
+                per{"{0}/sem."}
+            }
+            year{
+                dnam{"a."}
+                one{"{0}a."}
+                other{"{0}aa."}
+            }
+        }
+        length{
+            astronomical-unit{
+                dnam{"ua"}
+            }
+            light-year{
+                dnam{"aa. l."}
+                one{"{0}a. l."}
+                other{"{0}a.a. l."}
+            }
+            parsec{
+                dnam{"parsec"}
+            }
+        }
+        mass{
+            carat{
+                dnam{"ct"}
+                one{"{0}ct"}
+                other{"{0}ct"}
+            }
+            metric-ton{
+                dnam{"t"}
+                one{"{0}t"}
+                other{"{0}t"}
+            }
+            microgram{
+                dnam{"μg"}
+                one{"{0}μg"}
+                other{"{0}μg"}
+            }
+            milligram{
+                dnam{"mg"}
+                one{"{0}mg"}
+                other{"{0}mg"}
+            }
+            ounce-troy{
+                dnam{"ozt"}
+                one{"{0}ozt"}
+                other{"{0}ozt"}
+            }
+            ton{
+                dnam{"ton"}
+                one{"{0}ton"}
+                other{"{0}ton"}
+            }
+        }
+        speed{
+            knot{
+                dnam{"kn"}
+                one{"{0}kn"}
+                other{"{0}kn"}
+            }
+        }
+        volume{
+            cup{
+                one{"{0} tza."}
+            }
+        }
+    }
+    unitsShort{
+        acceleration{
+            g-force{
+                dnam{"G"}
+                one{"{0} G"}
+                other{"{0} G"}
+            }
+        }
+        angle{
+            degree{
+                dnam{"grados"}
+            }
+        }
+        consumption{
+            mile-per-gallon-imperial{
+                one{"{0} mpg imp."}
+                other{"{0} mpg imp."}
+            }
+        }
+        duration{
+            day{
+                dnam{"dd."}
+                one{"{0} d."}
+                other{"{0} dd."}
+                per{"{0}/d."}
+            }
+            month{
+                dnam{"mm."}
+                one{"{0} m."}
+                other{"{0} mm."}
+            }
+            week{
+                dnam{"sems."}
+                one{"{0} sem."}
+                other{"{0} sems."}
+            }
+            year{
+                dnam{"aa."}
+                one{"{0} a."}
+                other{"{0} aa."}
+                per{"{0}/a."}
+            }
+        }
+        graphics{
+            dot{
+                dnam{"p"}
+                one{"{0} p"}
+                other{"{0} p"}
+            }
+        }
+        length{
+            astronomical-unit{
+                dnam{"ua"}
+                one{"{0} ua"}
+                other{"{0} ua"}
+            }
+            light-year{
+                dnam{"aa. l."}
+                one{"{0} a. l."}
+                other{"{0} aa. l."}
+            }
+            nautical-mile{
+                dnam{"nmi"}
+                one{"{0} nmi"}
+                other{"{0} nmi"}
+            }
+            parsec{
+                dnam{"parsecs"}
+            }
+            point{
+                dnam{"pto."}
+            }
+            yard{
+                dnam{"yardas"}
+            }
+        }
+        mass{
+            metric-ton{
+                dnam{"t"}
+                one{"{0} t"}
+                other{"{0} t"}
+            }
+            ounce-troy{
+                dnam{"ozt"}
+                one{"{0} ozt"}
+                other{"{0} ozt"}
+            }
+            stone{
+                dnam{"stones"}
+            }
+            ton{
+                dnam{"ton"}
+                one{"{0} ton"}
+                other{"{0} ton"}
+            }
+        }
+        power{
+            horsepower{
+                dnam{"hp"}
+                one{"{0} hp"}
+                other{"{0} hp"}
+            }
+        }
+        volume{
+            cup{
+                one{"{0} tza."}
+                other{"{0} tza."}
+            }
+            pint{
+                dnam{"pintas"}
+                one{"{0} pt"}
+                other{"{0} pt"}
+            }
+            tablespoon{
+                dnam{"cdas."}
+                one{"{0} cda."}
+                other{"{0} cdas."}
+            }
+            teaspoon{
+                dnam{"cdtas."}
+                one{"{0} cdta."}
+                other{"{0} cdtas."}
+            }
+        }
+    }
+}

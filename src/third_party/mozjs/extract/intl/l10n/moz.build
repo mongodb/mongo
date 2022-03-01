@@ -1,0 +1,58 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+EXPORTS.mozilla.intl += [
+    "FluentBindings.h",
+    "FluentBundle.h",
+    "FluentResource.h",
+    "Localization.h",
+]
+
+UNIFIED_SOURCES += [
+    "FluentBundle.cpp",
+    "FluentResource.cpp",
+    "L10nRegistry.cpp",
+    "Localization.cpp",
+]
+
+EXTRA_JS_MODULES += [
+    "L10nRegistry.jsm",
+    "Localization.jsm",
+]
+
+TESTING_JS_MODULES += [
+    "FluentSyntax.jsm",
+]
+
+TEST_DIRS += [
+    "rust/gtest",
+]
+
+XPIDL_SOURCES += [
+    "mozILocalization.idl",
+]
+
+XPIDL_MODULE = "locale"
+
+LOCAL_INCLUDES += [
+    "/dom/base",
+]
+
+USE_LIBS += ["intlcomponents"]
+
+if CONFIG["COMPILE_ENVIRONMENT"]:
+    CbindgenHeader("fluent_ffi_generated.h", inputs=["/intl/l10n/rust/fluent-ffi"])
+
+    EXPORTS.mozilla.intl += [
+        "!fluent_ffi_generated.h",
+    ]
+
+XPCSHELL_TESTS_MANIFESTS += ["test/xpcshell.ini"]
+MOCHITEST_CHROME_MANIFESTS += ["test/mochitest/chrome.ini"]
+
+SPHINX_TREES["/l10n"] = "docs"
+
+FINAL_LIBRARY = "xul"

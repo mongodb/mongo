@@ -1,0 +1,32 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sw_CD{
+    Countries{
+        030{"Asia Mashariki"}
+        AF{"Afuganistani"}
+        AZ{"Azabajani"}
+        BJ{"Benini"}
+        CI{"Kodivaa"}
+        CX{"Kisiwa cha Christmas"}
+        HR{"Kroeshia"}
+        JO{"Yordani"}
+        LB{"Lebanoni"}
+        LI{"Lishenteni"}
+        LU{"Lasembagi"}
+        LV{"Lativia"}
+        MA{"Moroko"}
+        MM{"Myama"}
+        NE{"Nijeri"}
+        NG{"Nijeria"}
+        NO{"Norwe"}
+        NP{"Nepali"}
+        OM{"Omani"}
+        PR{"Puetoriko"}
+        QA{"Katari"}
+        SD{"Sudani"}
+        ST{"Sao Tome na Prinsipe"}
+        TD{"Chadi"}
+        TL{"Timori ya Mashariki"}
+    }
+}

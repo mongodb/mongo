@@ -1,0 +1,384 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ig{
+    Keys{
+        calendar{"Kalịnda"}
+        cf{"Ụsọrọ egọ"}
+        collation{"Ụsọrọ Nhazị"}
+        currency{"Egọ"}
+        hc{"Ọge ọkịrịkịrị"}
+        lb{"Akara akanka nkwụsị"}
+        ms{"Ụsọrọ Mmeshọ"}
+        numbers{"Nọmba"}
+    }
+    Languages{
+        af{"Afrikaans"}
+        agq{"Aghem"}
+        ak{"Akan"}
+        am{"Amariikị"}
+        ar{"Arabiikị"}
+        ar_001{"Ụdị Arabiikị nke oge a"}
+        asa{"Asụ"}
+        az{"Azerbajanị"}
+        be{"Belarusianụ"}
+        bez{"Bena"}
+        bg{"Bọlụgarịa"}
+        bm{"Bambara"}
+        bn{"Bengali"}
+        bo{"Tibetan"}
+        br{"Breton"}
+        brx{"Bọdọ"}
+        bs{"Bosnia"}
+        ca{"Catalan"}
+        ccp{"Chakma"}
+        ce{"Chechen"}
+        ceb{"Cebụanọ"}
+        chr{"Cheroke"}
+        co{"Kọsịan"}
+        cs{"Cheekị"}
+        cu{"Church slavic"}
+        cy{"Wesh"}
+        da{"Danịsh"}
+        dav{"Taịta"}
+        de{"Jamanị"}
+        de_AT{"Jaman ndị Austria"}
+        de_CH{"Jaman Izugbe ndị Switzerland"}
+        dje{"Zarma"}
+        dsb{"Lowa Sorbịan"}
+        dua{"Dụala"}
+        dyo{"Jọla-Fọnyị"}
+        dz{"Dọzngọka"}
+        ebu{"Ebụm"}
+        ee{"Ewe"}
+        el{"Giriikị"}
+        en{"Bekee"}
+        en_AU{"Bekee ndị Australia"}
+        en_CA{"Bekee ndị Canada"}
+        en_GB{"Bekee ndị United Kingdom"}
+        en_US{"Bekee ndị America"}
+        eo{"Ndị Esperantọ"}
+        es{"Spanishi"}
+        es_419{"Spanishi ndị Latin America"}
+        es_ES{"Spanishi ndị Europe"}
+        es_MX{"Spanishi ndị Mexico"}
+        et{"Ndị Estọnịa"}
+        eu{"Baskwe"}
+        ewo{"Ewọndọ"}
+        fa{"Peshianụ"}
+        ff{"Fula"}
+        fi{"Fịnịsh"}
+        fil{"Fịlịpịnọ"}
+        fo{"Farọse"}
+        fr{"Fụrenchị"}
+        fr_CA{"Fụrench ndị Canada"}
+        fr_CH{"Fụrench ndị Switzerland"}
+        fur{"Frụlịan"}
+        fy{"Westan Frịsịan"}
+        ga{"Ịrịsh"}
+        gd{"Sụkọtịs Gelị"}
+        gl{"Galịcịan"}
+        gsw{"German Swiss"}
+        gu{"Gụaratị"}
+        guz{"Gụshị"}
+        gv{"Mansị"}
+        ha{"Hausa"}
+        haw{"Hawaịlịan"}
+        he{"Hebrew"}
+        hi{"Hindị"}
+        hmn{"Hmong"}
+        hr{"Kọrọtịan"}
+        hsb{"Ụpa Sọrbịa"}
+        ht{"Haịtịan ndị Cerọle"}
+        hu{"Hụngarian"}
+        ia{"Intalịgụa"}
+        id{"Indonisia"}
+        ig{"Igbo"}
+        ii{"Sịchụayị"}
+        is{"Icịlandịk"}
+        it{"Italịanu"}
+        ja{"Japaniisi"}
+        jgo{"Ngọmba"}
+        jmc{"Machame"}
+        jv{"Java"}
+        ka{"Geọjịan"}
+        kab{"Kabyle"}
+        kam{"Kamba"}
+        kde{"Makọnde"}
+        kea{"Kabụverdịanụ"}
+        khq{"Kọyra Chịnị"}
+        ki{"Kịkụyụ"}
+        kk{"Kazak"}
+        kkj{"Kakọ"}
+        kl{"Kalaalịsụt"}
+        kln{"Kalenjịn"}
+        km{"Keme"}
+        kn{"Kanhada"}
+        ko{"Korịa"}
+        kok{"Kọnkanị"}
+        ks{"Kashmịrị"}
+        ksb{"Shabala"}
+        ksf{"Bafịa"}
+        ksh{"Colognịan"}
+        ku{"Ndị Kụrdịsh"}
+        kw{"Kọnịsh"}
+        ky{"Kyrayz"}
+        la{"Latịn"}
+        lag{"Langị"}
+        lb{"Lụxenbọụgịsh"}
+        lg{"Ganda"}
+        ln{"Lịngala"}
+        lo{"Laọ"}
+        lrc{"Nọrtụ Lụrị"}
+        lt{"Lituanian"}
+        lu{"Lịba-Katanga"}
+        luy{"Lụyịa"}
+        lv{"Latviani"}
+        mai{"Maịtịlị"}
+        mas{"Masaị"}
+        mer{"Merụ"}
+        mfe{"Mọrịsye"}
+        mg{"Malagasị"}
+        mgh{"Makụwa Metọ"}
+        mgo{"Meta"}
+        mi{"Maọrị"}
+        mk{"Masedọnịa"}
+        ml{"Malayalam"}
+        mn{"Mọngolịan"}
+        mni{"Manịpụrị"}
+        mr{"Maratị"}
+        ms{"Maleyi"}
+        mt{"Matịse"}
+        mua{"Mụdang"}
+        mul{"Ọtụtụ asụsụ"}
+        my{"Bụrmese"}
+        mzn{"Mazandaranị"}
+        naq{"Nama"}
+        nb{"Nọrweyịan Bọkmal"}
+        nd{"Nọrtụ Ndabede"}
+        nds{"Lowa German"}
+        ne{"Nepali"}
+        nl{"Dọchị"}
+        nmg{"Kwasịọ"}
+        nn{"Nọrweyịan Nynersk"}
+        nnh{"Nglembọn"}
+        nus{"Nụer"}
+        ny{"Nyanja"}
+        nyn{"Nyakọle"}
+        om{"Ọromo"}
+        or{"Ọdịa"}
+        os{"Osetik"}
+        pa{"Punjabi"}
+        pcm{"Pidgịn"}
+        pl{"Poliishi"}
+        prg{"Prụssịan"}
+        ps{"Pashọ"}
+        pt{"Pọrtụgụese"}
+        pt_BR{"Pọrtụgụese ndị Brazil"}
+        pt_PT{"Asụsụ Portuguese ndị Europe"}
+        qu{"Qụechụa"}
+        rm{"Rọmansị"}
+        rn{"Rụndị"}
+        ro{"Romania"}
+        rof{"Rọmbọ"}
+        ru{"Rọshian"}
+        rw{"Kinyarwanda"}
+        rwk{"Rwa"}
+        sa{"Sansịkịt"}
+        sah{"Saka"}
+        saq{"Sambụrụ"}
+        sat{"Santalị"}
+        sbp{"Sangụ"}
+        sd{"Sịndh"}
+        se{"Nọrtan Samị"}
+        seh{"Sena"}
+        ses{"Kọyraboro Senị"}
+        sg{"Sangọ"}
+        shi{"Tachịkịt"}
+        si{"Sinhala"}
+        sk{"Slova"}
+        sl{"Slovịan"}
+        sm{"Samọa"}
+        smn{"Inarị Samị"}
+        sn{"Shọna"}
+        so{"Somali"}
+        sr{"Sebịan"}
+        st{"Sọụth Soto"}
+        sv{"Sụwidiishi"}
+        ta{"Tamil"}
+        te{"Telụgụ"}
+        teo{"Tesọ"}
+        tg{"Tajịk"}
+        th{"Taị"}
+        ti{"Tịgrịnya"}
+        tk{"Turkịs"}
+        to{"Tọngan"}
+        tr{"Tọkiishi"}
+        tt{"Tata"}
+        twq{"Tasawa"}
+        ug{"Ụyghụr"}
+        uk{"Ukureenị"}
+        und{"Asụsụ amaghị"}
+        ur{"Urdụ"}
+        uz{"Ụzbek"}
+        vai{"Val"}
+        vi{"Vietnamisi"}
+        vo{"Volapụ"}
+        vun{"Vụnjọ"}
+        wae{"Wasa"}
+        wo{"Wolọf"}
+        xh{"Xhọsa"}
+        xog{"Sọga"}
+        yav{"Yangben"}
+        yi{"Yịdịsh"}
+        yo{"Yoruba"}
+        yue{"Katọnịse"}
+        zh{"Chainisi"}
+        zh_Hans{"Asụsụ Chinese dị mfe"}
+        zh_Hant{"Asụsụ Chinese Izugbe"}
+        zu{"Zulu"}
+        zxx{"Ndị ọzọ abụghị asụsụ"}
+    }
+    Languages%menu{
+        ckb{"Kurdish ọsote"}
+        yue{"Chinese,Cantonese"}
+    }
+    Languages%short{
+        az{"Azeri"}
+        en_GB{"Bekee ndị UK"}
+        en_US{"Bekee ndị US"}
+    }
+    Languages%variant{
+        ckb{"Kurdish ọzọ"}
+    }
+    Scripts{
+        Arab{"Mkpụrụ Okwu Arabic"}
+        Armn{"Mkpụrụ ọkwụ Armenịan"}
+        Beng{"Mkpụrụ ọkwụ Bangla"}
+        Bopo{"Mkpụrụ ọkwụ Bopomofo"}
+        Brai{"Braịlle"}
+        Cyrl{"Mkpụrụ Okwu Cyrillic"}
+        Deva{"Mkpụrụ ọkwụ Devangarị"}
+        Ethi{"Mkpụrụ ọkwụ Etọpịa"}
+        Geor{"Mkpụrụ ọkwụ Geọjịan"}
+        Grek{"Mkpụrụ ọkwụ grịk"}
+        Gujr{"Mkpụrụ ọkwụ Gụjaratị"}
+        Guru{"Mkpụrụ ọkwụ Gụrmụkị"}
+        Hanb{"Han na Bopomofo"}
+        Hang{"Mkpụrụ ọkwụ Hangụl"}
+        Hani{"Mkpụrụ ọkwụ Han"}
+        Hans{"Nke dị mfe"}
+        Hant{"Izugbe"}
+        Hebr{"Mkpụrụ ọkwụ Hebrew"}
+        Hira{"Mkpụrụ okwụ Hịragana"}
+        Hrkt{"mkpụrụ ọkwụ Japanịsị"}
+        Jamo{"Jamọ"}
+        Jpan{"Japanese"}
+        Kana{"Katakana"}
+        Khmr{"Khmer"}
+        Knda{"Kannaada"}
+        Kore{"Korea"}
+        Laoo{"Laọ"}
+        Latn{"Latin"}
+        Mlym{"Malayala"}
+        Mong{"Mọngọlịan"}
+        Mymr{"Myanmar"}
+        Orya{"Ọdịa"}
+        Sinh{"Sinhala"}
+        Taml{"Tamịl"}
+        Telu{"Telụgụ"}
+        Thaa{"Taa"}
+        Tibt{"Tịbeta"}
+        Zmth{"Mkpụrụ ọkwụ Mgbakọ"}
+        Zsye{"Emojị"}
+        Zsym{"Akara"}
+        Zxxx{"Edeghị ede"}
+        Zyyy{"kọmọn"}
+        Zzzz{"Mkpụrụ okwu amaghị"}
+    }
+    Scripts%stand-alone{
+        Hans{"Han di mfe"}
+        Hant{"Han Izugbe"}
+    }
+    Types{
+        calendar{
+            buddhist{"Kalịnda Bụddịst"}
+            chinese{"Kalịnda Chinese"}
+            dangi{"Kalịnda Dang"}
+            ethiopic{"Kalịnda Etopịa"}
+            gregorian{"Kalenda Gregory"}
+            hebrew{"Kalịnda Hebrew"}
+            islamic{"Kalịnda Islam"}
+            iso8601{"Kalenda ISO-8601"}
+            japanese{"Kalịnda Japanese"}
+            persian{"Kalịnda Persian"}
+            roc{"Kalịnda repụblic nke China"}
+        }
+        cf{
+            account{"Ụsọrọ akantụ egọ"}
+            standard{"Ụsọrọ egọ nzụgbe"}
+        }
+        collation{
+            search{"Ọchụchụ nịle"}
+            standard{"Usoro Nhazi"}
+        }
+        hc{
+            h11{"Ụsọrọ Ọge ọkịrịkịri 12"}
+            h12{"Ụsọrọ Oge okịrịkịri 12"}
+            h23{"Ụsọrọ Oge okịrịkịrị 24"}
+            h24{"Ụsọrọ Ọge okịrịkịrị 24"}
+        }
+        lb{
+            loose{"Akara akanka nkwụsị esịghị ịke"}
+            normal{"Akara akanka nkwụsị kwesịrị"}
+            strict{"Akara akanka nkwụsị sịrị ịke"}
+        }
+        ms{
+            metric{"Ụsọrọ Metịrịk"}
+            uksystem{"Ụsọrọ Mmeshọ ịmperịa"}
+            ussystem{"Ụsọrọ Mmeshọ US"}
+        }
+        numbers{
+            arab{"Ọnụ ọgụgụ Arab na Indị"}
+            arabext{"Ọnụ ọgụgụ Arab na Indị agbatịrị"}
+            armn{"Ọnụ ọgụgụ Armenịan"}
+            armnlow{"ọbere ọnụ ọgụgụ Armenịan"}
+            beng{"Ọnụ ọgụgụ Bang"}
+            deva{"Ọnụ ọgụgụ Devanagarị"}
+            ethi{"Ọnụ ọgụgụ Etọpịa"}
+            fullwide{"Ọnụ ọgụgụ ọbọsara"}
+            geor{"Ọnụ ọgụgụ Geọjịan"}
+            grek{"Ọnụ ọgụgụ Greek"}
+            greklow{"Ọbere ọnụ ọgụgụ Greek"}
+            gujr{"Ọnụ ọgụgụ Gụjaratị"}
+            guru{"Onụ ọgụgụ Gụmụkh"}
+            hanidec{"Ọnụ ọgụgụ ntụpọ Chịnese"}
+            hans{"Ọnụ ọgụgụ mfe Chịnese"}
+            hansfin{"Ọnụ ọgụgụ akantụ mfe nke Chinese"}
+            hant{"Ọnụ ọgụgụ ọdinala chinese"}
+            hantfin{"Ọnụ ọgụgụ akantụ ọdịnala Chinese"}
+            hebr{"Ọnụ ọgụgụ Hebrew"}
+            jpan{"Ọnụ ọgụgụ Japanese"}
+            jpanfin{"Ọnụ ọgụgụ akantụ Japanese"}
+            khmr{"Ọnụ ọgụgụ Khmer"}
+            knda{"Ọnụ ọgụgụ Kanada"}
+            laoo{"Ọnụ ọgụgụ Laọ"}
+            latn{"Ọnụ Ọgụgụ Mpaghara Ọdịda Anyanwụ"}
+            mlym{"Ọnụ ọgụgụ Malayala"}
+            mymr{"Ọnụ ọgụgụ Myamar"}
+            orya{"Ọnụ ọgụgụ Ọdịa"}
+            roman{"Ọnụ ọgụgụ Roman"}
+            romanlow{"Ọbere Ọnụ ọgụgụ Roman"}
+            taml{"Ọnụ ọgụgụ ọdịnala Tamịl"}
+            tamldec{"Ọnụ ọgụgụ Tamị"}
+            telu{"Ọnụ ọgụgụ Telụgụ"}
+            thai{"Ọnụ ọgụgụ Taị"}
+            tibt{"Ọnụ ọgụgụ Tịbeta"}
+        }
+    }
+    codePatterns{
+        language{"Asụsụ: {0}"}
+        script{"Mkpụrụ Okwu: {0}"}
+        territory{"Mpaghara: {0}"}
+    }
+}

@@ -1,0 +1,92 @@
+﻿# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+######################################################################
+# Copyright (c) 2004-2011 International Business Machines
+# Corporation and others.  All Rights Reserved.
+######################################################################
+# Author: Alan Liu
+# Created: March 15 2004
+# Since: ICU 3.0
+######################################################################
+
+ref= "#.#"
+
+rt:  "0.###"  1.0         "1"         
+
+# Basics
+fp:  "0.####" 0.10005     "0.1"        0.1
+fp:  -        0.10006     "0.1001"     0.1001
+pat: -        "0.####"
+fp:  "#.####" 0.10005     "0.1"        0.1
+pat: -        "0.####"
+
+rt:  "0"      1234        "1234"
+pat: -        "0"
+
+# Significant digits                                                  
+fp:  "@@@"    1.234567    "1.23"       1.23
+fp:  -        1234567     "1230000"    1230000
+fp:  -        0.012345    "0.0123"     0.0123
+pat: -        -                                    
+fp:  "#,@@@"  1234567     "1,230,000"  1230000
+pat: -        "#,@@@"
+rt:  "@@@@"   0.0012      "0.001200"  
+fp:  -        0.99999     "1.000"      1
+pat: -        -
+rt:  "@###"   0.00123     "0.00123"   
+rt:  -        123000      "123000"    
+fp:  -        123456      "123500"     123500
+fp:  -        12.3456     "12.35"      12.35
+fp:  -        0.0123456   "0.01235"    0.01235
+pat: -        -
+fp:  "@,###"  27182       "27,180"     27180
+rt:  -        123000      "123,000"   
+fp:  -        0.99999     "1"          1
+rt:  -        0.9999      "0.9999"    
+pat: -        -
+rt:  "@##E0"  20000       "2E4"
+rt:  -        27000       "2.7E4"     
+rt:  -        27100       "2.71E4"
+fp:  -        27182       "2.72E4"     27200
+pat: -        -
+rt:  "@@@E0"  20000       "2.00E4"
+rt:  -        27000       "2.70E4"    
+rt:  -        27100       "2.71E4"
+fp:  -        27182       "2.72E4"     27200
+pat: -        -
+fp:  "#,@@##" 314156      "31,4200"    314200
+rt:  -        3           "3.0"       
+rt:  -        5000        "5000"      
+rt:  -        0.005       "0.0050"    
+pat: -        -
+fp:  "@@@@@@" 123456.7    "123457"     123457
+pat: -        -
+
+pat: "##,@@##" "#,@@##"
+pat: "##@@##"  "@@##"
+
+pat: "@@.@@"  err  # decimal sep. disallowed in sig. digits
+pat: "@#@"    err  # only one cluster of sig. digits
+pat: "@@0"    err  # either @ or 0, not both
+
+# NumberRegression/Test4140009
+rt:  ""       123.456     "123.456"
+rt:  ""       -123.456    "-123.456"
+
+# Currency
+fpc: "en_US"        1234.56/USD  "$1,234.56"    1234.56/USD
+fpc: -              1234.56/JPY  "\u00A51,235"  1235/JPY
+# ISO codes that overlap display names (QQQ vs. Q)
+# recognize real ISO name in parsing, so, can not use fake name as QQQ
+#fpc: -              123/QQQ      "QQQ123.00"    123/QQQ   # QQQ is fake
+fpc: -              123/GTQ      "GTQ 123.00"      123/GTQ
+# ChoiceFormat-based display names
+fpc: -              1/INR        "\u20b91.00"      1/INR
+fpc: -              2/INR        "\u20b92.00"      2/INR
+# Display names with shared prefix (YDD vs. Y)
+fpc: -              100/YDD      "YDD 100.00"    100/YDD
+fpc: -              100/CNY      "CN\u00a5100.00"      100/CNY
+
+# Regression Tests bug#7914
+p: "#E00" "12E12" "12000000000000"
+p: "#####" "12E12" "12000000000000"

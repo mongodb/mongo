@@ -1,0 +1,36 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Latin_NumericPinyin.txt
+# Generated from CLDR
+#
+
+# According to the pinyin definitions I've been able to find:
+# 'a', 'e' are the preferred bases
+# otherwise 'o'
+# otherwise last vowel
+# The trailing form of syllables are the following:
+#         "a", "ai", "ao", "an", "ang",
+#         "o", "ou", "ong",
+#         "e", "ei", "er", "en", "eng",
+#         "i", "ia", "iao", "ie", "iu", "ian", "in", "iang", "ing", "iong",
+#         "u", "ua", "uo", "uai", "ui", "uan", "un", "uang", "ueng",
+#         "ü", "üe", "üan", "ün"
+# so the letters the tone will 'hop' are:
+::NFD (NFC);
+$tone = [\u0304\u0301\u030C\u0300\u0306] ;
+# Move the tone to the end of a syllable, and convert to number
+e {($tone) r} → r &Pinyin-NumericPinyin($1);
+($tone) ( [i o n u {o n} {n g}]) → $2 &Pinyin-NumericPinyin($1);
+($tone) → &Pinyin-NumericPinyin($1);
+# The following backs up until it finds the right vowel, then deposits the tone
+$vowel = [aAeEiIoOuU {u\u0308} {U\u0308} vV];
+$consonant = [[a-z A-Z] - [$vowel]];
+$digit = [1-5];
+$1 &NumericPinyin-Pinyin($3) $2 ← ([aAeE]) ($vowel* $consonant*) ($digit);
+$1 &NumericPinyin-Pinyin($3) $2 ← ([oO]) ([$vowel-[aeAE]]* $consonant*) ($digit);
+$1 &NumericPinyin-Pinyin($3) $2 ← ($vowel) ($consonant*) ($digit);
+&NumericPinyin-Pinyin($1) ← [:letter:] {($digit)};
+::NFC (NFD);
+

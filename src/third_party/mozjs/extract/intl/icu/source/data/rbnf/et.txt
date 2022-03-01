@@ -1,0 +1,44 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+et{
+    RBNFRules{
+        SpelloutRules{
+            "%spellout-numbering-year:",
+            "-x: miinus >>;",
+            "x.x: =0.0=;",
+            "0: =%spellout-numbering=;",
+            "1100/100: << sada[ >>];",
+            "10000: =%spellout-numbering=;",
+            "%spellout-numbering:",
+            "0: =%spellout-cardinal=;",
+            "%spellout-cardinal:",
+            "-x: miinus >>;",
+            "x.x: << koma >>;",
+            "0: null;",
+            "1: \u00FCks;",
+            "2: kaks;",
+            "3: kolm;",
+            "4: neli;",
+            "5: viis;",
+            "6: kuus;",
+            "7: seitse;",
+            "8: kaheksa;",
+            "9: \u00FCheksa;",
+            "10: k\u00FCmme;",
+            "11: >>teist;",
+            "20: <<k\u00FCmmend[ >>];",
+            "100: <<sada[ >>];",
+            "1000: << tuhat[ >>];",
+            "1000000: << miljon[ >>];",
+            "2000000: << miljonit[ >>];",
+            "1000000000: << miljard[ >>];",
+            "2000000000: << miljardit[ >>];",
+            "1000000000000: << biljon[ >>];",
+            "2000000000000: << biljonit[ >>];",
+            "1000000000000000: << biljard[ >>];",
+            "2000000000000000: << biljardit[ >>];",
+            "1000000000000000000: =#,##0=;",
+        }
+    }
+}

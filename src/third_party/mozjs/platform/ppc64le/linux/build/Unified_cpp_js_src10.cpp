@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "irregexp/RegExpParser.cpp"
+#include "proxy/Wrapper.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "irregexp/RegExpParser.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "proxy/Wrapper.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "irregexp/RegExpParser.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "proxy/Wrapper.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "irregexp/RegExpStack.cpp"
+#include "threading/Mutex.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "irregexp/RegExpStack.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "threading/Mutex.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "irregexp/RegExpStack.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "threading/Mutex.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/AliasAnalysis.cpp"
+#include "threading/ProtectedData.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/AliasAnalysis.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "threading/ProtectedData.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/AliasAnalysis.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "threading/ProtectedData.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/AliasAnalysisShared.cpp"
+#include "threading/Thread.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/AliasAnalysisShared.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "threading/Thread.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/AliasAnalysisShared.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "threading/Thread.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/AlignmentMaskAnalysis.cpp"
+#include "threading/posix/CpuCount.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/AlignmentMaskAnalysis.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "threading/posix/CpuCount.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/AlignmentMaskAnalysis.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "threading/posix/CpuCount.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/BacktrackingAllocator.cpp"
+#include "threading/posix/PosixThread.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/BacktrackingAllocator.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "threading/posix/PosixThread.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/BacktrackingAllocator.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "threading/posix/PosixThread.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

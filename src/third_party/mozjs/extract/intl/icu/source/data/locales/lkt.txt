@@ -1,0 +1,226 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+lkt{
+    AuxExemplarCharacters{"[c d f {ȟʼ} j q r {sʼ} {šʼ} v x]"}
+    ExemplarCharacters{
+        "[a á {aŋ} b č {čh} {čʼ} e é g ǧ h ȟ i í {iŋ} k {kh} {kȟ} {kʼ} l m n ŋ o ó p "
+        "{ph} {pȟ} {pʼ} s š t {th} {tȟ} {tʼ} u ú {uŋ} w y z ž ʼ]"
+    }
+    ExemplarCharactersIndex{"[A B Č E G Ǧ H Ȟ I K L M N Ŋ O P S Š T U W Y Z Ž]"}
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    ExemplarCharactersPunctuation{"[\\- ‐ ‑ – — , ; \\: ! ? . \u0022 “ ” ( ) \\[ \\] @ * / \\& #]"}
+    calendar{
+        gregorian{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, MMMM d, y",
+                "MMMM d, y",
+                "MMM d, y",
+                "M/d/yy",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            dayNames{
+                format{
+                    narrow{
+                        "A",
+                        "W",
+                        "N",
+                        "Y",
+                        "T",
+                        "Z",
+                        "O",
+                    }
+                    wide{
+                        "Aŋpétuwakȟaŋ",
+                        "Aŋpétuwaŋži",
+                        "Aŋpétunuŋpa",
+                        "Aŋpétuyamni",
+                        "Aŋpétutopa",
+                        "Aŋpétuzaptaŋ",
+                        "Owáŋgyužažapi",
+                    }
+                }
+            }
+            monthNames{
+                format{
+                    wide{
+                        "Wiótheȟika Wí",
+                        "Thiyóȟeyuŋka Wí",
+                        "Ištáwičhayazaŋ Wí",
+                        "Pȟežítȟo Wí",
+                        "Čhaŋwápetȟo Wí",
+                        "Wípazukȟa-wašté Wí",
+                        "Čhaŋpȟásapa Wí",
+                        "Wasútȟuŋ Wí",
+                        "Čhaŋwápeǧi Wí",
+                        "Čhaŋwápe-kasná Wí",
+                        "Waníyetu Wí",
+                        "Tȟahékapšuŋ Wí",
+                    }
+                }
+            }
+        }
+    }
+    fields{
+        day{
+            dn{"Aŋpétu"}
+            relative{
+                "-1"{"Ȟtálehaŋ"}
+                "0"{"Lé aŋpétu kiŋ"}
+                "1"{"Híŋhaŋni kiŋháŋ"}
+            }
+            relativeTime{
+                future{
+                    other{"Letáŋhaŋ {0}-čháŋ kiŋháŋ"}
+                }
+                past{
+                    other{"Hékta {0}-čháŋ k’uŋ héhaŋ"}
+                }
+            }
+        }
+        fri{
+            relative{
+                "-1"{"Aŋpétuzaŋptaŋ kʼuŋ héhaŋ"}
+                "0"{"Apétuzaptaŋ kiŋ lé"}
+                "1"{"Aŋpétuzaptaŋ kiŋháŋ"}
+            }
+        }
+        hour{
+            dn{"Owápȟe"}
+            relativeTime{
+                future{
+                    other{"Letáŋhaŋ owápȟe {0} kiŋháŋ"}
+                }
+                past{
+                    other{"Hékta owápȟe {0} kʼuŋ héhaŋ"}
+                }
+            }
+        }
+        minute{
+            dn{"Owápȟe oȟʼáŋkȟo"}
+            relativeTime{
+                future{
+                    other{"Letáŋhaŋ oȟ’áŋkȟo {0} kiŋháŋ"}
+                }
+                past{
+                    other{"Hékta oȟ’áŋkȟo {0} k’uŋ héhaŋ"}
+                }
+            }
+        }
+        mon{
+            relative{
+                "-1"{"Aŋpétutȟokahe kʼuŋ héhaŋ"}
+                "0"{"Aŋpétutȟokahe kiŋ lé"}
+                "1"{"Aŋpétutȟokahe kiŋháŋ"}
+            }
+        }
+        month{
+            dn{"Wí"}
+            relative{
+                "-1"{"Wí kʼuŋ héhaŋ"}
+                "0"{"Lé wí kiŋ"}
+                "1"{"Tȟokáta wí kiŋháŋ"}
+            }
+            relativeTime{
+                future{
+                    other{"Letáŋhaŋ wíyawapi {0} kiŋháŋ"}
+                }
+                past{
+                    other{"Hékta wíyawapi {0} kʼuŋ héhaŋ"}
+                }
+            }
+        }
+        sat{
+            relative{
+                "-1"{"Owáŋkayužažapi kʼuŋ héhaŋ"}
+                "0"{"Owáŋkayužažapi kiŋ lé"}
+                "1"{"Owáŋkayužažapi kiŋháŋ"}
+            }
+        }
+        second{
+            dn{"Okpí"}
+            relativeTime{
+                future{
+                    other{"Letáŋhaŋ okpí {0} kiŋháŋ"}
+                }
+                past{
+                    other{"Hékta okpí {0} k’uŋ héhaŋ"}
+                }
+            }
+        }
+        sun{
+            relative{
+                "-1"{"Aŋpétuwakȟáŋ kʼuŋ héhaŋ"}
+                "0"{"Aŋpétuwakȟáŋ kiŋ lé"}
+                "1"{"Aŋpétuwakȟáŋ kiŋháŋ"}
+            }
+        }
+        thu{
+            relative{
+                "-1"{"Aŋpétutopa kʼuŋ héhaŋ"}
+                "0"{"Aŋpétutopa kiŋ lé"}
+                "1"{"Aŋpétutopa kiŋháŋ"}
+            }
+        }
+        tue{
+            relative{
+                "-1"{"Aŋpétunuŋpa kʼuŋ héhaŋ"}
+                "0"{"Aŋpétunuŋpa kiŋ lé"}
+                "1"{"Aŋpétunuŋpa kiŋháŋ"}
+            }
+        }
+        wed{
+            relative{
+                "-1"{"Aŋpétuyamni kʼuŋ héhaŋ"}
+                "0"{"Aŋpétuyamni kiŋ lé"}
+                "1"{"Aŋpétuyamni kiŋháŋ"}
+            }
+        }
+        week{
+            dn{"Okó"}
+            relative{
+                "-1"{"Okó kʼuŋ héhaŋ"}
+                "0"{"Lé okó kiŋ"}
+                "1"{"Tȟokáta okó kiŋháŋ"}
+            }
+            relativeTime{
+                future{
+                    other{"Letáŋhaŋ okó {0} kiŋháŋ"}
+                }
+                past{
+                    other{"Hékta okó {0} kʼuŋ héhaŋ"}
+                }
+            }
+        }
+        weekday{
+            dn{"Okó-aŋpétu"}
+        }
+        year{
+            dn{"Ómakȟa"}
+            relative{
+                "-1"{"Ómakȟa kʼuŋ héhaŋ"}
+                "0"{"Lé ómakȟa kiŋ"}
+                "1"{"Tȟokáta ómakȟa kiŋháŋ"}
+            }
+            relativeTime{
+                future{
+                    other{"Letáŋhaŋ ómakȟa {0} kiŋháŋ"}
+                }
+                past{
+                    other{"Hékta ómakȟa {0} kʼuŋ héhaŋ"}
+                }
+            }
+        }
+    }
+    measurementSystemNames{
+        US{"US"}
+    }
+}

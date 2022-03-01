@@ -1,0 +1,186 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Hira_Kana.txt
+# Generated from CLDR
+#
+
+# note: a global filter is more efficient, but MUST include all source chars
+:: [[\u0000-\u007E 、。 \u3099-゜ ァ-ー ｡-ﾟー[:Hiragana:] [:Katakana:] [:nonspacing mark:]]-[\u309B \u309C]];
+:: NFKC (NFC);
+# Hiragana-Katakana
+# This is largely a one-to-one mapping, but it has a
+# few kinks:
+# 1. The Katakana va/vi/ve/vo (30F7-30FA) have no
+# Hiragana equivalents.  We use Hiragana wa/wi/we/wo
+# (308F-3092) with a voicing mark (3099), which is
+# semantically equivalent.  However, this is a non-
+# roundtripping transformation.
+# 2. The Katakana small ka/ke (30F5,30F6) have no
+# Hiragana equiavlents.  We convert them to normal
+# Hiragana ka/ke (304B,3051).  This is a one-way
+# information-losing transformation and precludes
+# round-tripping of 30F5 and 30F6.
+# 3. The combining marks 3099-309C are in the Hiragana
+# block, but they apply to Katakana as well, so we
+# leave them untouched.
+# 4. The Katakana prolonged sound mark 30FC doubles the
+# preceding vowel.  This is a one-way information-
+# losing transformation from Katakana to Hiragana.
+# 5. The Katakana middle dot separates words in foreign
+# expressions; we leave this unmodified.
+# The above points preclude successful round-trip
+# transformations of arbitrary input text.  However,
+# they provide naturalistic results that should conform
+# to user expectations.
+# Combining equivalents va/vi/ve/vo
+わ\u3099 ↔ ヷ;
+ゐ\u3099 ↔ ヸ;
+ゑ\u3099 ↔ ヹ;
+を\u3099 ↔ ヺ;
+# One-to-one mappings, main block
+# 3041:3094 ↔ 30A1:30F4
+# 309D,E ↔ 30FD,E
+ぁ ↔ ァ;
+あ ↔ ア;
+ぃ ↔ ィ;
+い ↔ イ;
+ぅ ↔ ゥ;
+う ↔ ウ;
+ぇ ↔ ェ;
+え ↔ エ;
+ぉ ↔ ォ;
+お ↔ オ;
+か ↔ カ;
+が ↔ ガ;
+き ↔ キ;
+ぎ ↔ ギ;
+く ↔ ク;
+ぐ ↔ グ;
+け ↔ ケ;
+げ ↔ ゲ;
+こ ↔ コ;
+ご ↔ ゴ;
+さ ↔ サ;
+ざ ↔ ザ;
+し ↔ シ;
+じ ↔ ジ;
+す ↔ ス;
+ず ↔ ズ;
+せ ↔ セ;
+ぜ ↔ ゼ;
+そ ↔ ソ;
+ぞ ↔ ゾ;
+た ↔ タ;
+だ ↔ ダ;
+ち ↔ チ;
+ぢ ↔ ヂ;
+っ ↔ ッ;
+つ ↔ ツ;
+づ ↔ ヅ;
+て ↔ テ;
+で ↔ デ;
+と ↔ ト;
+ど ↔ ド;
+な ↔ ナ;
+に ↔ ニ;
+ぬ ↔ ヌ;
+ね ↔ ネ;
+の ↔ ノ;
+は ↔ ハ;
+ば ↔ バ;
+ぱ ↔ パ;
+ひ ↔ ヒ;
+び ↔ ビ;
+ぴ ↔ ピ;
+ふ ↔ フ;
+ぶ ↔ ブ;
+ぷ ↔ プ;
+へ ↔ ヘ;
+べ ↔ ベ;
+ぺ ↔ ペ;
+ほ ↔ ホ;
+ぼ ↔ ボ;
+ぽ ↔ ポ;
+ま ↔ マ;
+み ↔ ミ;
+む ↔ ム;
+め ↔ メ;
+も ↔ モ;
+ゃ ↔ ャ;
+や ↔ ヤ;
+ゅ ↔ ュ;
+ゆ ↔ ユ;
+ょ ↔ ョ;
+よ ↔ ヨ;
+ら ↔ ラ;
+り ↔ リ;
+る ↔ ル;
+れ ↔ レ;
+ろ ↔ ロ;
+ゎ ↔ ヮ;
+わ ↔ ワ;
+ゐ ↔ ヰ;
+ゑ ↔ ヱ;
+を ↔ ヲ;
+ん ↔ ン;
+ゔ ↔ ヴ;
+ゝ ↔ ヽ;
+ゞ ↔ ヾ;
+# One-way Katakana-Hiragana xform of small K ka/ke to
+# normal H ka/ke.
+か ← ヵ;
+け ← ヶ;
+# Katakana followed by a prolonged sound mark 30FC has
+# its final vowel doubled.  This is a Katakana-Hiragana
+# one-way information-losing transformation.  We
+# include the small Katakana (e.g., small A 3041) and
+# do not distinguish them from their large
+# counterparts.  It doesn't make sense to double a
+# small counterpart vowel as a small Hiragana vowel, so
+# we don't do so.  In natural text this should never
+# occur anyway.  If a 30FC is seen without a preceding
+# vowel sound (e.g., after n 30F3) we do not change it.
+### $long = ー;
+# The following categories are Hiragana, not Katakana
+# as might be expected, since by the time we get to the
+# 30FC, the preceding character will have already been
+# transformed to Hiragana.
+# {The following mechanically generated from the
+# Unicode 3.0 data:}
+$xa = [ \
+ぁ あ か が さ ざ \
+た だ な は ば ぱ \
+ま ゃ や ら ゎ わ \
+];
+$xi = [ \
+ぃ い き ぎ し じ \
+ち ぢ に ひ び ぴ \
+み り ゐ \
+];
+$xu = [ \
+ぅ う く ぐ す ず \
+っ つ づ ぬ ふ ぶ \
+ぷ む ゅ ゆ る ゔ \
+];
+$xe = [ \
+ぇ え け げ せ ぜ \
+て で ね へ べ ぺ \
+め れ ゑ \
+];
+$xo = [ \
+ぉ お こ ご そ ぞ \
+と ど の ほ ぼ ぽ \
+も ょ よ ろ を \
+];
+あ ← $xa {ー};
+い ← $xi {ー};
+う ← $xu {ー};
+え ← $xe {ー};
+お ← $xo {ー};
+:: NFC (NFKC) ;
+# note: a global filter is more efficient, but MUST include all source chars!!
+:: ([[\u0000-\u007E 、。 \u3099-゜ ァ-ー ｡-ﾟー[:Hiragana:] [:Katakana:] [:nonspacing mark:]]-[\u309B \u309C]]);
+# eof
+

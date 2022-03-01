@@ -1,0 +1,99 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+gv{
+    ExemplarCharacters{"[a b c ç d e f g h i j k l m n o p q r s t u v w x y z]"}
+    ExemplarCharactersIndex{"[A B C D E F G H I J K L M N O P Q R S T U V W X Y Z]"}
+    ExemplarCharactersPunctuation{
+        "[\\- ‐ ‑ – — , ; \\: ! ? . … ' ‘ ’ \u0022 “ ” ( ) \\[ \\] § @ * / \\& # † ‡ "
+        "′ ″]"
+    }
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        minimalPairs{
+            plural{
+                few{"{0} thunnag/muc/ooyl"}
+                many{"{0} dy hunnagyn/dy vucyn/dy ooylyn"}
+                one{"{0} thunnag/vuc/ooyl"}
+                other{"{0} thunnagyn/mucyn/ooylyn"}
+                two{"{0} hunnag/vuc/ooyl"}
+            }
+        }
+    }
+    calendar{
+        gregorian{
+            AmPmMarkers{
+                "a.m.",
+                "p.m.",
+            }
+            AmPmMarkersAbbr{
+                "a.m.",
+                "p.m.",
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Jed",
+                        "Jel",
+                        "Jem",
+                        "Jerc",
+                        "Jerd",
+                        "Jeh",
+                        "Jes",
+                    }
+                    wide{
+                        "Jedoonee",
+                        "Jelhein",
+                        "Jemayrt",
+                        "Jercean",
+                        "Jerdein",
+                        "Jeheiney",
+                        "Jesarn",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "RC",
+                    "AD",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "J-guer",
+                        "T-arree",
+                        "Mayrnt",
+                        "Avrril",
+                        "Boaldyn",
+                        "M-souree",
+                        "J-souree",
+                        "Luanistyn",
+                        "M-fouyir",
+                        "J-fouyir",
+                        "M-Houney",
+                        "M-Nollick",
+                    }
+                    wide{
+                        "Jerrey-geuree",
+                        "Toshiaght-arree",
+                        "Mayrnt",
+                        "Averil",
+                        "Boaldyn",
+                        "Mean-souree",
+                        "Jerrey-souree",
+                        "Luanistyn",
+                        "Mean-fouyir",
+                        "Jerrey-fouyir",
+                        "Mee Houney",
+                        "Mee ny Nollick",
+                    }
+                }
+            }
+        }
+    }
+}

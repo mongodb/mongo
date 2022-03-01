@@ -1,0 +1,244 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sah{
+    zoneStrings{
+        "Asia:Almaty"{
+            ec{"Алматы"}
+        }
+        "Asia:Anadyr"{
+            ec{"Анаадыр"}
+        }
+        "Asia:Ashgabat"{
+            ec{"Асхабаат"}
+        }
+        "Asia:Baghdad"{
+            ec{"Багдаад"}
+        }
+        "Asia:Baku"{
+            ec{"Бакуу"}
+        }
+        "Asia:Barnaul"{
+            ec{"Барнаул"}
+        }
+        "Asia:Chita"{
+            ec{"Читаа"}
+        }
+        "Asia:Choibalsan"{
+            ec{"Чойбалсан"}
+        }
+        "Asia:Colombo"{
+            ec{"Коломбо"}
+        }
+        "Asia:Damascus"{
+            ec{"Дамаас"}
+        }
+        "Asia:Dubai"{
+            ec{"Дубаай"}
+        }
+        "Asia:Irkutsk"{
+            ec{"Иркутскай"}
+        }
+        "Asia:Kabul"{
+            ec{"Кабуул"}
+        }
+        "Asia:Kamchatka"{
+            ec{"Камчаатка"}
+        }
+        "Asia:Khandyga"{
+            ec{"Хаандыга"}
+        }
+        "Asia:Krasnoyarsk"{
+            ec{"Красноярскай"}
+        }
+        "Asia:Magadan"{
+            ec{"Магадаан"}
+        }
+        "Asia:Novosibirsk"{
+            ec{"Новосибирскай"}
+        }
+        "Asia:Omsk"{
+            ec{"Омскай"}
+        }
+        "Asia:Sakhalin"{
+            ec{"Сахалиин"}
+        }
+        "Asia:Samarkand"{
+            ec{"Самаркаан"}
+        }
+        "Asia:Srednekolymsk"{
+            ec{"Орто Халыма"}
+        }
+        "Asia:Ulaanbaatar"{
+            ec{"Улан Баатар"}
+        }
+        "Asia:Urumqi"{
+            ec{"Урумчу"}
+        }
+        "Asia:Ust-Nera"{
+            ec{"Уус Ньара"}
+        }
+        "Asia:Yakutsk"{
+            ec{"Дьокуускай"}
+        }
+        "Asia:Yekaterinburg"{
+            ec{"Екатеринбуур"}
+        }
+        "Etc:Unknown"{
+            ec{"Биллибэт"}
+        }
+        "Europe:Astrakhan"{
+            ec{"Аастрахан"}
+        }
+        "Europe:Istanbul"{
+            ec{"Стамбуул"}
+        }
+        "Europe:Kaliningrad"{
+            ec{"Калининград"}
+        }
+        "Europe:Moscow"{
+            ec{"Москуба"}
+        }
+        "Europe:Samara"{
+            ec{"Самаара"}
+        }
+        "Europe:Simferopol"{
+            ec{"Симферополь"}
+        }
+        "Europe:Ulyanovsk"{
+            ec{"Ульяновскай"}
+        }
+        "meta:Arabian"{
+            ld{"Арааб сайыҥҥы кэмэ"}
+            lg{"Арааб кэмэ"}
+            ls{"Арааб сүрүн кэмэ"}
+        }
+        "meta:Armenia"{
+            ld{"Эрмээн сайыҥҥы кэмэ"}
+            lg{"Эрмээн кэмэ"}
+            ls{"Эрмээн сүрүн кэмэ"}
+        }
+        "meta:Australia_Central"{
+            ld{"Киин Австралия сайыҥҥы кэмэ"}
+            lg{"Киин Австралия кэмэ"}
+            ls{"Киин Австралия сүрүн кэмэ"}
+        }
+        "meta:Australia_Eastern"{
+            ld{"Илин Австралия сайыҥҥы кэмэ"}
+            lg{"Илин Австралия кэмэ"}
+            ls{"Илин Австралия сүрүн кэмэ"}
+        }
+        "meta:Australia_Western"{
+            ld{"Арҕаа Австралия сайыҥҥы кэмэ"}
+            lg{"Арҕаа Австралия кэмэ"}
+            ls{"Арҕаа Австралия сүрүн кэмэ"}
+        }
+        "meta:China"{
+            ld{"Кытай сайыҥҥы кэмэ"}
+            lg{"Кытай кэмэ"}
+            ls{"Кытай сүрүн кэмэ"}
+        }
+        "meta:Choibalsan"{
+            ld{"Чойбалсан сайыҥҥы кэмэ"}
+            lg{"Чойбалсан кэмэ"}
+            ls{"Чойбалсан сүрүн кэмэ"}
+        }
+        "meta:Georgia"{
+            ld{"Курусуун сайыҥҥы кэмэ"}
+            lg{"Курусуун кэмэ"}
+            ls{"Курусуун сүрүн кэмэ"}
+        }
+        "meta:India"{
+            ls{"Ииндийэ сүрүн кэмэ"}
+        }
+        "meta:Iran"{
+            ld{"Ыраан сайыҥҥы кэмэ"}
+            lg{"Ираан кэмэ"}
+            ls{"Ираан сүрүн кэмэ"}
+        }
+        "meta:Japan"{
+            ld{"Дьоппуон сайыҥҥы кэмэ"}
+            lg{"Дьоппуон кэмэ"}
+            ls{"Дьоппуон сүрүн кэмэ"}
+        }
+        "meta:Kazakhstan_Eastern"{
+            ls{"Илин Казахстаан кэмэ"}
+        }
+        "meta:Kazakhstan_Western"{
+            ls{"Арҕаа Казахстаан кэмэ"}
+        }
+        "meta:Korea"{
+            ld{"Кэриэй сайыҥҥы кэмэ"}
+            lg{"Кэриэй кэмэ"}
+            ls{"Кэриэй сүрүн кэмэ"}
+        }
+        "meta:Krasnoyarsk"{
+            ld{"Красноярскай сайыҥҥы кэмэ"}
+            lg{"Красноярскай кэмэ"}
+            ls{"Красноярскай сүрүн кэмэ"}
+        }
+        "meta:Kyrgystan"{
+            ls{"Кыргыстаан кэмэ"}
+        }
+        "meta:Magadan"{
+            ld{"Магадаан сайыҥҥы кэмэ"}
+            lg{"Магадаан кэмэ"}
+            ls{"Магадаан сүрүн кэмэ"}
+        }
+        "meta:Mongolia"{
+            ld{"Улан Баатар сайыҥҥы кэмэ"}
+            lg{"Улан Баатар кэмэ"}
+            ls{"Улан Баатар сүрүн кэмэ"}
+        }
+        "meta:Moscow"{
+            ld{"Москуба сайыҥҥы кэмэ"}
+            lg{"Москуба кэмэ"}
+            ls{"Москуба сүрүн кэмэ"}
+        }
+        "meta:New_Zealand"{
+            ld{"Саҥа Сэйлэнд сайыҥҥы кэмэ"}
+            lg{"Саҥа Зеландия кэмэ"}
+            ls{"Саҥа Сэйлэнд сүрүн кэмэ"}
+        }
+        "meta:Novosibirsk"{
+            ld{"Новосибирскай сайыҥҥы кэмэ"}
+            lg{"Новосибирскай кэмэ"}
+            ls{"Новосибирскай сүрүн кэмэ"}
+        }
+        "meta:Omsk"{
+            ld{"Омскай сайыҥҥы кэмэ"}
+            lg{"Омскай кэмэ"}
+            ls{"Омскай сүрүн кэмэ"}
+        }
+        "meta:Pakistan"{
+            ld{"Пакистаан сайыҥҥы кэмэ"}
+            lg{"Пакистаан кэмэ"}
+            ls{"Пакистаан сүрүн кэмэ"}
+        }
+        "meta:Sakhalin"{
+            ld{"Сахалыын сайыҥҥы кэмэ"}
+            lg{"Сахалиин кэмэ"}
+            ls{"Сахалыын сүрүн кэмэ"}
+        }
+        "meta:Vladivostok"{
+            ld{"Быладьыбастыак сайыҥҥы кэмэ"}
+            lg{"Владивосток кэмэ"}
+            ls{"Быладьыбастыак сүрүн кэмэ"}
+        }
+        "meta:Volgograd"{
+            ld{"Волгоград сайыҥҥы кэмэ"}
+            lg{"Волгоград кэмэ"}
+            ls{"Волгоград сүрүн кэмэ"}
+        }
+        "meta:Yakutsk"{
+            ld{"Дьокуускай сайыҥҥы кэмэ"}
+            lg{"Дьокуускай кэмэ"}
+            ls{"Дьокуускай сүрүн кэмэ"}
+        }
+        "meta:Yekaterinburg"{
+            ld{"Екатеринбуур сайыҥҥы кэмэ"}
+            lg{"Екатеринбург кэмэ"}
+            ls{"Екатеринбуур сүрүн кэмэ"}
+        }
+    }
+}

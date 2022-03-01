@@ -1,0 +1,80 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sa{
+    Currencies{
+        BRL{
+            "R$",
+            "ब्राजीली रियाल",
+        }
+        CNY{
+            "CN¥",
+            "चीनी युआन",
+        }
+        EUR{
+            "€",
+            "फिरङ्गिन् मुद्रा",
+        }
+        GBP{
+            "£",
+            "आङ्ग्लदेशीयः पाउंड",
+        }
+        INR{
+            "₹",
+            "भारतीय रूप्यकम्",
+        }
+        JPY{
+            "JP¥",
+            "जापानी येन",
+        }
+        RUB{
+            "RUB",
+            "रष्यदेशीय रूबल",
+        }
+        USD{
+            "US$",
+            "यूएस डॉलर",
+        }
+        XXX{
+            "¤",
+            "अज्ञात मुद्रा",
+        }
+    }
+    Currencies%narrow{
+        BRL{"R$"}
+        CNY{"¥"}
+        GBP{"£"}
+        INR{"₹"}
+        JPY{"¥"}
+        USD{"$"}
+    }
+    CurrencyPlurals{
+        BRL{
+            other{"ब्राजीली रियाल"}
+        }
+        CNY{
+            other{"चीनी युआन"}
+        }
+        EUR{
+            other{"फिरङ्गिन् मुद्रा"}
+        }
+        GBP{
+            other{"आङ्ग्लदेशीयः पाउंड"}
+        }
+        INR{
+            other{"भारतीय रूप्यकम्"}
+        }
+        JPY{
+            other{"जापानी येन"}
+        }
+        RUB{
+            other{"रष्यदेशीय रूबल"}
+        }
+        USD{
+            other{"अमेरिकादेशः डॉलर"}
+        }
+        XXX{
+            other{"(अज्ञात मुद्रा)"}
+        }
+    }
+}

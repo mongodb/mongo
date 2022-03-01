@@ -1,0 +1,2585 @@
+﻿# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Copyright (c) 2012-2015 International Business Machines
+# Corporation and others. All Rights Reserved.
+#
+# This file should be in UTF-8 with a signature byte sequence ("BOM").
+#
+# collationtest.txt: Collation test data.
+#
+# created on: 2012apr13
+# created by: Markus W. Scherer
+
+# A line with "** test: description" is used for verbose and error output.
+
+# A collator can be set with "@ root" or "@ locale language-tag",
+# for example "@ locale de-u-co-phonebk".
+# An old-style locale ID can also be used, for example "@ locale de@collation=phonebook".
+
+# A collator can be built with "@ rules".
+# An "@ rules" line is followed by one or more lines with the tailoring rules.
+
+# A collator can be modified with "% attribute=value".
+
+# "* compare" tests the order (= or <) of the following strings.
+# The relation can be "=" or "<" (the level of the difference is not specified)
+# or "<1", "<2", "<c", "<3", "<4" (indicating the level of the difference).
+
+# Test sections ("* compare") are terminated by
+# definitions of new collators, changing attributes, or new test sections.
+
+** test: simple CEs & expansions
+# Many types of mappings are tested elsewhere, including via the UCA conformance tests.
+# Here we mostly cover a few unusual mappings.
+@ rules
+&\x01                           # most control codes are ignorable
+<<<\u0300                       # tertiary CE
+&9<\x00                         # NUL not ignorable
+&\uA00A\uA00B=\uA002            # two long-primary CEs
+&\uA00A\uA00B\u00050005=\uA003  # three CEs, require 64 bits
+
+* compare
+=  \x01
+=  \x02
+<3 \u0300
+<1 9
+<1 \x00
+=  \x01\x00\x02
+<1 a
+<3 a\u0300
+<2 a\u0308
+=  ä
+<1 b
+<1 か        # Hiragana Ka (U+304B)
+<2 か\u3099  # plus voiced sound mark
+=  が        # Hiragana Ga (U+304C)
+<1 \uA00A\uA00B
+=  \uA002
+<1 \uA00A\uA00B\u00050004
+<1 \uA00A\uA00B\u00050005
+=  \uA003
+<1 \uA00A\uA00B\u00050006
+
+** test: contractions
+# Create some interesting mappings, and map some normalization-inert characters
+# (which are not subject to canonical reordering)
+# to some of the same CEs to check the sequence of CEs.
+@ rules
+
+# Contractions starting with 'a' should not continue with any character < U+0300
+# so that we can test a shortcut for that.
+&a=ⓐ
+&b<bz=ⓑ
+&d<dz\u0301=ⓓ           # d+z+acute
+&z
+<a\u0301=Ⓐ              # a+acute sorts after z
+<a\u0301\u0301=Ⓑ        # a+acute+acute
+<a\u0301\u0301\u0358=Ⓒ  # a+acute+acute+dot above right
+<a\u030a=Ⓓ              # a+ring
+<a\u0323=Ⓔ              # a+dot below
+<a\u0323\u0358=Ⓕ        # a+dot below+dot above right
+<a\u0327\u0323\u030a=Ⓖ  # a+cedilla+dot below+ring
+<a\u0327\u0323bz=Ⓗ      # a+cedilla+dot below+b+z
+
+&\U0001D158=⁰           # musical notehead black (has a symbol primary)
+<\U0001D158\U0001D165=¼ # musical quarter note
+
+# deliberately missing prefix contractions:
+# dz
+# a\u0327
+# a\u0327\u0323
+# a\u0327\u0323b
+
+&\x01
+<<<\U0001D165=¹         # musical stem (ccc=216)
+<<<\U0001D16D=²         # musical augmentation dot (ccc=226)
+<<<\U0001D165\U0001D16D=³  # stem+dot (ccc=216 226)
+&\u0301=❶               # acute (ccc=230)
+&\u030a=❷               # ring (ccc=230)
+&\u0308=❸               # diaeresis (ccc=230)
+<<\u0308\u0301=❹        # diaeresis+acute (=dialytika tonos) (ccc=230 230)
+&\u0327=❺               # cedilla (ccc=202)
+&\u0323=❻               # dot below (ccc=220)
+&\u0331=❼               # macron below (ccc=220)
+<<\u0331\u0358=❽        # macron below+dot above right (ccc=220 232)
+&\u0334=❾               # tilde overlay (ccc=1)
+&\u0358=❿               # dot above right (ccc=232)
+
+&\u0f71=①               # tibetan vowel sign aa
+&\u0f72=②               # tibetan vowel sign i
+#  \u0f71\u0f72         # tibetan vowel sign aa + i = ii = U+0F73
+&\u0f73=③               # tibetan vowel sign ii (ccc=0 but lccc=129)
+
+** test: simple contractions
+
+# Some strings are chosen to cause incremental contiguous contraction matching to
+# go into partial matches for prefixes of contractions
+# (where the prefixes are deliberately not also contractions).
+# When there is no complete match, then the matching code must back out of those
+# so that discontiguous contractions work as specified.
+
+* compare
+# contraction starter with no following text, or mismatch, or blocked
+<1 a
+=  ⓐ
+<1 aa
+=  ⓐⓐ
+<1 ab
+=  ⓐb
+<1 az
+=  ⓐz
+
+* compare
+<1 a
+<2 a\u0308\u030a  # ring blocked by diaeresis
+=  ⓐ❸❷
+<2 a\u0327
+=  ⓐ❺
+
+* compare
+<2 \u0308
+=  ❸
+<2 \u0308\u030a\u0301  # acute blocked by ring
+=  ❸❷❶
+
+* compare
+<1 \U0001D158
+=  ⁰
+<1 \U0001D158\U0001D165
+=  ¼
+
+# no discontiguous contraction because of missing prefix contraction d+z,
+# and a starter ('z') after the 'd'
+* compare
+<1 dz\u0323\u0301
+=  dz❻❶
+
+# contiguous contractions
+* compare
+<1 abz
+=  ⓐⓑ
+<1 abzz
+=  ⓐⓑz
+
+* compare
+<1 a
+<1 z
+<1 a\u0301
+=  Ⓐ
+<1 a\u0301\u0301
+=  Ⓑ
+<1 a\u0301\u0301\u0358
+=  Ⓒ
+<1 a\u030a
+=  Ⓓ
+<1 a\u0323\u0358
+=  Ⓕ
+<1 a\u0327\u0323\u030a  # match despite missing prefix
+=  Ⓖ
+<1 a\u0327\u0323bz
+=  Ⓗ
+
+* compare
+<2 \u0308\u0308\u0301  # acute blocked from first diaeresis, contracts with second
+=  ❸❹
+
+* compare
+<1 \U0001D158\U0001D165
+=  ¼
+
+* compare
+<3 \U0001D165\U0001D16D
+=  ³
+
+** test: discontiguous contractions
+* compare
+<1 a\u0327\u030a                # a+ring skips cedilla
+=  Ⓓ❺
+<2 a\u0327\u0327\u030a          # a+ring skips 2 cedillas
+=  Ⓓ❺❺
+<2 a\u0327\u0327\u0327\u030a    # a+ring skips 3 cedillas
+=  Ⓓ❺❺❺
+<2 a\u0334\u0327\u0327\u030a    # a+ring skips tilde overlay & 2 cedillas
+=  Ⓓ❾❺❺
+<1 a\u0327\u0323                # a+dot below skips cedilla
+=  Ⓔ❺
+<1 a\u0323\u0301\u0358          # a+dot below+dot ab.r.: 2-char match, then skips acute
+=  Ⓕ❶
+<2 a\u0334\u0323\u0358          # a+dot below skips tilde overlay
+=  Ⓕ❾
+
+* compare
+<2 \u0331\u0331\u0358           # macron below+dot ab.r. skips the second macron below
+=  ❽❼
+
+* compare
+<1 a\u0327\u0331\u0323\u030a    # a+ring skips cedilla, macron below, dot below (dot blocked by macron)
+=  Ⓓ❺❼❻
+<1 a\u0327\u0323\U0001D16D\u030a  # a+dot below skips cedilla
+=  Ⓔ❺²❷
+<2 a\u0327\u0327\u0323\u030a    # a+dot below skips 2 cedillas
+=  Ⓔ❺❺❷
+<2 a\u0327\u0323\u0323\u030a    # a+dot below skips cedilla
+=  Ⓔ❺❻❷
+<2 a\u0334\u0327\u0323\u030a    # a+dot below skips tilde overlay & cedilla
+=  Ⓔ❾❺❷
+
+* compare
+<1 \U0001D158\u0327\U0001D165   # quarter note skips cedilla
+=  ¼❺
+<1 a\U0001D165\u0323            # a+dot below skips stem
+=  Ⓔ¹
+
+# partial contiguous match, backs up, matches discontiguous contraction
+<1 a\u0327\u0323b
+=  Ⓔ❺b
+<1 a\u0327\u0323ba
+=  Ⓔ❺bⓐ
+
+# a+acute+acute+dot above right skips cedilla, continues matching 2 same-ccc combining marks
+* compare
+<1 a\u0327\u0301\u0301\u0358
+=  Ⓒ❺
+
+# FCD but not NFD
+* compare
+<1 a\u0f73\u0301                # a+acute skips tibetan ii
+=  Ⓐ③
+
+# FCD but the 0f71 inside the 0f73 must be skipped
+# to match the discontiguous contraction of the first 0f71 with the trailing 0f72 inside the 0f73
+* compare
+<1 \u0f71\u0f73                 # == \u0f73\u0f71 == \u0f71\u0f71\u0f72
+=  ③①
+
+** test: discontiguous contractions with nested contractions
+* compare
+<1 a\u0323\u0308\u0301\u0358
+=  Ⓕ❹
+<2 a\u0323\u0308\u0301\u0308\u0301\u0358
+=  Ⓕ❹❹
+
+** test: discontiguous contractions with interleaved contractions
+* compare
+# a+ring & cedilla & macron below+dot above right
+<1 a\u0327\u0331\u030a\u0358
+=  Ⓓ❺❽
+
+# a+ring & 1x..3x macron below+dot above right
+<2 a\u0331\u030a\u0358
+=  Ⓓ❽
+<2 a\u0331\u0331\u030a\u0358\u0358
+=  Ⓓ❽❽
+# also skips acute
+<2 a\u0331\u0331\u0331\u030a\u0301\u0358\u0358\u0358
+=  Ⓓ❽❽❽❶
+
+# a+dot below & stem+augmentation dot, followed by contiguous d+z+acute
+<1 a\U0001D165\u0323\U0001D16Ddz\u0301
+=  Ⓔ³ⓓ
+
+** test: some simple string comparisons
+@ root
+* compare
+# first string compares against ""
+= \u0000
+< a
+<1 b
+<3 B
+= \u0000B\u0000
+
+** test: compare with strength=primary
+% strength=primary
+* compare
+<1 a
+<1 b
+= B
+
+** test: compare with strength=secondary
+% strength=secondary
+* compare
+<1 a
+<1 b
+= B
+
+** test: compare with strength=tertiary
+% strength=tertiary
+* compare
+<1 a
+<1 b
+<3 B
+
+** test: compare with strength=quaternary
+% strength=quaternary
+* compare
+<1 a
+<1 b
+<3 B
+
+** test: compare with strength=identical
+% strength=identical
+* compare
+<1 a
+<1 b
+<3 B
+
+** test: côté with forwards secondary
+@ root
+* compare
+<1 cote
+<2 coté
+<2 côte
+<2 côté
+
+** test: côté with forwards secondary vs. U+FFFE merge separator
+# Merged sort keys: On each level, any difference in the first segment
+# must trump any further difference.
+* compare
+<1 cote\uFFFEcôté
+<2 coté\uFFFEcôte
+<2 côte\uFFFEcoté
+<2 côté\uFFFEcote
+
+** test: côté with backwards secondary
+% backwards=on
+* compare
+<1 cote
+<2 côte
+<2 coté
+<2 côté
+
+** test: côté with backwards secondary vs. U+FFFE merge separator
+# Merged sort keys: On each level, any difference in the first segment
+# must trump any further difference.
+* compare
+<1 cote\uFFFEcôté
+<2 côte\uFFFEcoté
+<2 coté\uFFFEcôte
+<2 côté\uFFFEcote
+
+** test: U+FFFE on identical level
+@ root
+% strength=identical
+* compare
+# All of these control codes are completely-ignorable, so that
+# their low code points are compared with the merge separator.
+# The merge separator must compare less than any other character.
+<1 \uFFFE\u0001\u0002\u0003
+<i \u0001\uFFFE\u0002\u0003
+<i \u0001\u0002\uFFFE\u0003
+<i \u0001\u0002\u0003\uFFFE
+
+* compare
+# The merge separator must even compare less than U+0000.
+<1 \uFFFE\u0000\u0000
+<i \u0000\uFFFE\u0000
+<i \u0000\u0000\uFFFE
+
+** test: Hani < surrogates < U+FFFD
+# Note: compareUTF8() treats unpaired surrogates like U+FFFD,
+# so with that the strings with surrogates will compare equal to each other
+# and equal to the string with U+FFFD.
+@ root
+% strength=identical
+* compare
+<1 abz
+<1 a\u4e00z
+<1 a\U00020000z
+<1 a\ud800z
+<1 a\udbffz
+<1 a\udc00z
+<1 a\udfffz
+<1 a\ufffdz
+
+** test: script reordering
+@ root
+% reorder Hani Zzzz digit
+* compare
+<1 ?
+<1 +
+<1 丂
+<1 a
+<1 α
+<1 5
+
+% reorder default
+* compare
+<1 ?
+<1 +
+<1 5
+<1 a
+<1 α
+<1 丂
+
+** test: empty rules
+@ rules
+* compare
+<1 a
+<2 ä
+<3 Ä
+<1 b
+
+** test: very simple rules
+@ rules
+&a=e<<<<q<<<<r<x<<<X<<y<<<Y;z,Z
+% strength=quaternary
+* compare
+<1 a
+=  e
+<4 q
+<4 r
+<1 x
+<3 X
+<2 y
+<3 Y
+<2 z
+<3 Z
+
+** test: tailoring twice before a root position: primary
+@ rules
+&[before 1]b<p
+&[before 1]b<q
+* compare
+<1 a
+<1 p
+<1 q
+<1 b
+
+** test: tailoring twice before a root position: secondary
+@ rules
+&[before 2]ſ<<p
+&[before 2]ſ<<q
+* compare
+<1 s
+<2 p
+<2 q
+<2 ſ
+
+# secondary-before common weight
+@ rules
+&[before 2]b<<p
+&[before 2]b<<q
+* compare
+<1 a
+<1 p
+<2 q
+<2 b
+
+** test: tailoring twice before a root position: tertiary
+@ rules
+&[before 3]B<<<p
+&[before 3]B<<<q
+* compare
+<1 b
+<3 p
+<3 q
+<3 B
+
+# tertiary-before common weight
+@ rules
+&[before 3]b<<<p
+&[before 3]b<<<q
+* compare
+<1 a
+<1 p
+<3 q
+<3 b
+
+@ rules
+&[before 2]b<<s
+&[before 3]s<<<p
+&[before 3]s<<<q
+* compare
+<1 a
+<1 p
+<3 q
+<3 s
+<2 b
+
+** test: tailor after completely ignorable
+@ rules
+&\x00<<<x<<y
+* compare
+= \x00
+= \x1F
+<3 x
+<2 y
+
+** test: secondary tailoring gaps, ICU ticket 9362
+@ rules
+&[before 2]s<<'_'
+&s<<r  # secondary between s and ſ (long s)
+&ſ<<*a-q  # more than 15 between ſ and secondary CE boundary
+&[before 2][first primary ignorable]<<u<<v  # between secondary CE boundary & lowest secondary CE
+&[last primary ignorable]<<y<<z
+
+* compare
+<2 u
+<2 v
+<2 \u0332  # lowest secondary CE
+<2 \u0308
+<2 y
+<2 z
+<1 s_
+<2 ss
+<2 sr
+<2 sſ
+<2 sa
+<2 sb
+<2 sp
+<2 sq
+<2 sus
+<2 svs
+<2 rs
+
+** test: tertiary tailoring gaps, ICU ticket 9362
+@ rules
+&[before 3]t<<<'_'
+&t<<<r  # tertiary between t and fullwidth t
+&ᵀ<<<*a-q  # more than 15 between ᵀ (modifier letter T) and tertiary CE boundary
+&[before 3][first secondary ignorable]<<<u<<<v  # between tertiary CE boundary & lowest tertiary CE
+&[last secondary ignorable]<<<y<<<z
+
+* compare
+<3 u
+<3 v
+# Note: The root collator currently does not map any characters to tertiary CEs.
+<3 y
+<3 z
+<1 t_
+<3 tt
+<3 tr
+<3 tｔ
+<3 tᵀ
+<3 ta
+<3 tb
+<3 tp
+<3 tq
+<3 tut
+<3 tvt
+<3 rt
+
+** test: secondary & tertiary around root character
+@ rules
+&[before 2]m<<r
+&m<<s
+&[before 3]m<<<u
+&m<<<v
+* compare
+<1 l
+<1 r
+<2 u
+<3 m
+<3 v
+<2 s
+<1 n
+
+** test: secondary & tertiary around tailored item
+@ rules
+&m<x
+&[before 2]x<<r
+&x<<s
+&[before 3]x<<<u
+&x<<<v
+* compare
+<1 m
+<1 r
+<2 u
+<3 x
+<3 v
+<2 s
+<1 n
+
+** test: more nesting of secondary & tertiary before
+@ rules
+&[before 3]m<<<u
+&[before 2]m<<r
+&[before 3]r<<<q
+&m<<<w
+&m<<t
+&[before 3]w<<<v
+&w<<<x
+&w<<s
+* compare
+<1 l
+<1 q
+<3 r
+<2 u
+<3 m
+<3 v
+<3 w
+<3 x
+<2 s
+<2 t
+<1 n
+
+** test: case bits
+@ rules
+&w<x  # tailored CE getting case bits
+  =uv=uV=Uv=UV  # 2 chars -> 1 CE
+&ae=ch=cH=Ch=CH  # 2 chars -> 2 CEs
+&rst=yz=yZ=Yz=YZ  # 2 chars -> 3 CEs
+% caseFirst=lower
+* compare
+<1 ae
+=  ch
+<3 cH
+<3 Ch
+<3 CH
+<1 rst
+=  yz
+<3 yZ
+<3 Yz
+<3 YZ
+<1 w
+<1 x
+=  uv
+<3 uV
+=  Uv  # mixed case on single CE cannot distinguish variations
+<3 UV
+
+** test: tertiary CEs, tertiary, caseLevel=off, caseFirst=lower
+@ rules
+&\u0001<<<t<<<T  # tertiary CEs
+% caseFirst=lower
+* compare
+<1 aa
+<3 aat
+<3 aaT
+<3 aA
+<3 aAt
+<3 ata
+<3 aTa
+
+** test: tertiary CEs, tertiary, caseLevel=off, caseFirst=upper
+% caseFirst=upper
+* compare
+<1 aA
+<3 aAt
+<3 aa
+<3 aat
+<3 aaT
+<3 ata
+<3 aTa
+
+** test: reset on expansion, ICU tickets 9415 & 9593
+@ rules
+&æ<x    # tailor the last primary CE so that x sorts between ae and af
+&æb=bæ  # copy all reset CEs to make bæ sort the same
+&각<h    # copy/tailor 3 CEs to make h sort before the next Hangul syllable 갂
+&⒀<<y   # copy/tailor 4 CEs to make y sort with only a secondary difference
+&l·=z   # handle the pre-context for · when fetching reset CEs
+   <<u  # copy/tailor 2 CEs
+
+* compare
+<1 ae
+<2 æ
+<1 x
+<1 af
+
+* compare
+<1 aeb
+<2 æb
+=  bæ
+
+* compare
+<1 각
+<1 h
+<1 갂
+<1 갃
+
+* compare
+<1 ·    # by itself: primary CE
+<1 l
+<2 l·   # l+middle dot has only a secondary difference from l
+=  z
+<2 u
+
+* compare
+<1 (13)
+<3 ⒀  # DUCET sets special tertiary weights in all CEs
+<2 y
+<1 (13[
+
+% alternate=shifted
+* compare
+<1 (13)
+=  13
+<3 ⒀
+=  y  # alternate=shifted removes the tailoring difference on the last CE
+<1 14
+
+** test: contraction inside extension, ICU ticket 9378
+@ rules
+&а<<х/й     # all letters are Cyrillic
+* compare
+<1 ай
+<2 х
+
+** test: no duplicate tailored CEs for different reset positions with same CEs, ICU ticket 10104
+@ rules
+&t<x &ᵀ<y           # same primary weights
+&q<u &[before 1]ꝗ<v # q and ꝗ are primary adjacent
+* compare
+<1 q
+<1 u
+<1 v
+<1 ꝗ
+<1 t
+<3 ᵀ
+<1 y
+<1 x
+
+# Principle: Each rule builds on the state of preceding rules and ignores following rules.
+
+** test: later rule does not affect earlier reset position, ICU ticket 10105
+@ rules
+&a < u < v < w  &ov < x  &b < v
+* compare
+<1 oa
+<1 ou
+<1 x    # CE(o) followed by CE between u and w
+<1 ow
+<1 ob
+<1 ov
+
+** test: later rule does not affect earlier extension (1), ICU ticket 10105
+@ rules
+&a=x/b &v=b
+% strength=secondary
+* compare
+<1 B
+<1 c
+<1 v
+=  b
+* compare
+<1 AB
+=  x
+<1 ac
+<1 av
+=  ab
+
+** test: later rule does not affect earlier extension (2), ICU ticket 10105
+@ rules
+&a <<< c / e &g <<< e / l
+% strength=secondary
+* compare
+<1 AE
+=  c
+<2 æ
+<1 agl
+=  ae
+
+** test: later rule does not affect earlier extension (3), ICU ticket 10105
+@ rules
+&a = b / c  &d = c / e
+% strength=secondary
+* compare
+<1 AC  # C is still only tertiary different from the original c
+=  b
+<1 ade
+=  ac
+
+** test: extension contains tailored character, ICU ticket 10105
+@ rules
+&a=e &b=u/e
+* compare
+<1 a
+=  e
+<1 ba
+=  be
+=  u
+
+** test: add simple mappings for characters with root context
+@ rules
+&z=·    # middle dot has a prefix mapping in the CLDR root
+&n=и    # и (U+0438) has contractions in the root
+* compare
+<1 l
+<2 l·   # root mapping for l|· still works
+<1 z
+=  ·
+* compare
+<1 n
+=  и
+<1 И
+<1 и\u0306  # root mapping for й=и\u0306 still works
+=  й
+<3 Й
+
+** test: add context mappings around characters with root context
+@ rules
+&z=·h   # middle dot has a prefix mapping in the CLDR root
+&n=ә|и  # и (U+0438) has contractions in the root
+* compare
+<1 l
+<2 l·   # root mapping for l|· still works
+<1 z
+=  ·h
+* compare
+<1 и
+<3 И
+<1 и\u0306  # root mapping for й=и\u0306 still works
+=  й
+* compare
+<1 әn
+=  әи
+<1 әo
+
+** test: many secondary CEs at the top of their range
+@ rules
+&[last primary ignorable]<<*\u2801-\u28ff
+* compare
+<2 \u0308
+<2 \u2801
+<2 \u2802
+<2 \u2803
+<2 \u2804
+<2 \u28fd
+<2 \u28fe
+<2 \u28ff
+<1 \x20
+
+** test: many tertiary CEs at the top of their range
+@ rules
+&[last secondary ignorable]<<<*a-z
+* compare
+<3 a
+<3 b
+<3 c
+<3 d
+# e..w
+<3 x
+<3 y
+<3 z
+<2 \u0308
+
+** test: tailor contraction together with nearly equivalent prefix, ICU ticket 10101
+@ rules
+&a=p|x &b=px &c=op
+* compare
+<1 b
+=  px
+<3 B
+<1 c
+=  op
+<3 C
+* compare
+<1 ca
+=  opx  # first contraction op, then prefix p|x
+<3 cA
+<3 Ca
+
+** test: reset position with prefix (pre-context), ICU ticket 10102
+@ rules
+&a=p|x &px=y
+* compare
+<1 pa
+=  px
+=  y
+<3 pA
+<1 q
+<1 x
+
+** test: prefix+contraction together (1), ICU ticket 10071
+@ rules
+&x=a|bc
+* compare
+<1 ab
+<1 Abc
+<1 abd
+<1 ac
+<1 aw
+<1 ax
+=  abc
+<3 aX
+<3 Ax
+<1 b
+<1 bb
+<1 bc
+<3 bC
+<3 Bc
+<1 bd
+
+** test: prefix+contraction together (2), ICU ticket 10071
+@ rules
+&w=bc &x=a|b
+* compare
+<1 w
+=  bc
+<3 W
+* compare
+<1 aw
+<1 ax
+=  ab
+<3 aX
+<1 axb
+<1 axc
+=  abc  # prefix match a|b takes precedence over contraction match bc
+<3 abC
+<1 abd
+<1 ay
+
+** test: prefix+contraction together (3), ICU ticket 10071
+@ rules
+&x=a|b &w=bc    # reverse order of rules as previous test, order should not matter here
+* compare       # same "compare" sequences as previous test
+<1 w
+=  bc
+<3 W
+* compare
+<1 aw
+<1 ax
+=  ab
+<3 aX
+<1 axb
+<1 axc
+=  abc  # prefix match a|b takes precedence over contraction match bc
+<3 abC
+<1 abd
+<1 ay
+
+** test: no mapping p|c, falls back to contraction ch, CLDR ticket 5962
+@ rules
+&d=ch &v=p|ci
+* compare
+<1 pc
+<3 pC
+<1 pcH
+<1 pcI
+<1 pd
+=  pch  # no-prefix contraction ch matches
+<3 pD
+<1 pv
+=  pci  # prefix+contraction p|ci matches
+<3 pV
+
+** test: tailor in & around compact ranges of root primaries
+# The Ogham characters U+1681..U+169A are in simple ascending order of primary CEs
+# which should be reliably encoded as one range in the root elements data.
+@ rules
+&[before 1]ᚁ<a
+&ᚁ<b
+&[before 1]ᚂ<c
+&ᚂ<d
+&[before 1]ᚚ<y
+&ᚚ<z
+&[before 2]ᚁ<<r
+&ᚁ<<s
+&[before 3]ᚚ<<<t
+&ᚚ<<<u
+* compare
+<1 ᣵ    # U+18F5 last Canadian Aboriginal
+<1 a
+<1 r
+<2 ᚁ
+<2 s
+<1 b
+<1 c
+<1 ᚂ
+<1 d
+<1 ᚃ
+<1 ᚙ
+<1 y
+<1 t
+<3 ᚚ
+<3 u
+<1 z
+<1 ᚠ    # U+16A0 first Runic
+
+** test: suppressContractions
+@ rules
+&z<ch<әж [suppressContractions [·cә]]
+* compare
+<1 ch
+<3 cH   # ch was suppressed
+<1 l
+<1 l·   # primary difference, not secondary, because l|· was suppressed
+<1 ә
+<2 ә\u0308  # secondary difference, not primary, because contractions for ә were suppressed
+<1 әж
+<3 әЖ
+
+** test: Hangul & Jamo
+@ rules
+&L=\u1100  # first Jamo L
+&V=\u1161  # first Jamo V
+&T=\u11A8  # first Jamo T
+&\uAC01<<*\u4E00-\u4EFF  # first Hangul LVT syllable & lots of secondary diffs
+* compare
+<1 Lv
+<3 LV
+=  \u1100\u1161
+=  \uAC00
+<1 LVt
+<3 LVT
+=  \u1100\u1161\u11A8
+=  \uAC00\u11A8
+=  \uAC01
+<2 LVT\u0308
+<2 \u4E00
+<2 \u4E01
+<2 \u4E80
+<2 \u4EFF
+<2 LV\u0308T
+<1 \uAC02
+
+** test: adjust special reset positions according to previous rules, CLDR ticket 6070
+@ rules
+&[last variable]<x
+[maxVariable space]  # has effect only after building, no effect on following rules
+&[last variable]<y
+&[before 1][first regular]<z
+* compare
+<1 ?  # some punctuation
+<1 x
+<1 y
+<1 z
+<1 $  # some symbol
+
+@ rules
+&[last primary ignorable]<<x<<<y
+&[last primary ignorable]<<z
+* compare
+<2 \u0358
+<2 x
+<3 y
+<2 z
+<1 \x20
+
+@ rules
+&[last secondary ignorable]<<<x
+&[last secondary ignorable]<<<y
+* compare
+<3 x
+<3 y
+<2 \u0358
+
+@ rules
+&[before 2][first variable]<<z
+&[before 2][first variable]<<y
+&[before 3][first variable]<<<x
+&[before 3][first variable]<<<w
+&[before 1][first variable]<v
+&[before 2][first variable]<<u
+&[before 3][first variable]<<<t
+&[before 2]\uFDD1\xA0<<s  # FractionalUCA.txt: FDD1 00A0, SPACE first primary
+* compare
+<2 \u0358
+<1 s
+<2 \uFDD1\xA0
+<1 t
+<3 u
+<2 v
+<1 w
+<3 x
+<3 y
+<2 z
+<2 \t
+
+@ rules
+&[before 2][first regular]<<z
+&[before 3][first regular]<<<y
+&[before 1][first regular]<x
+&[before 3][first regular]<<<w
+&[before 2]\uFDD1\u263A<<v  # FractionalUCA.txt: FDD1 263A, SYMBOL first primary
+&[before 3][first regular]<<<u
+&[before 1][first regular]<p  # primary before the boundary: becomes variable
+&[before 3][first regular]<<<t  # not affected by p
+&[last variable]<q              # after p!
+* compare
+<1 ?
+<1 p
+<1 q
+<1 t
+<3 u
+<3 v
+<1 w
+<3 x
+<1 y
+<3 z
+<1 $
+
+# check that p & q are indeed variable
+% alternate=shifted
+* compare
+=  ?
+=  p
+=  q
+<1 t
+<3 u
+<3 v
+<1 w
+<3 x
+<1 y
+<3 z
+<1 $
+
+@ rules
+&[before 2][first trailing]<<z
+&[before 1][first trailing]<y
+&[before 3][first trailing]<<<x
+* compare
+<1 \u4E00  # first Han, first implicit
+<1 \uFDD1\uFDD0  # FractionalUCA.txt: unassigned first primary
+# Note: The root collator currently does not map any characters to the trailing first boundary primary.
+<1 x
+<3 y
+<1 z
+<2 \uFFFD  # The root collator currently maps U+FFFD to the first real trailing primary.
+
+@ rules
+&[before 2][first primary ignorable]<<z
+&[before 2][first primary ignorable]<<y
+&[before 3][first primary ignorable]<<<x
+&[before 3][first primary ignorable]<<<w
+* compare
+=  \x01
+<2 w
+<3 x
+<3 y
+<2 z
+<2 \u0301
+
+@ rules
+&[before 3][first secondary ignorable]<<<y
+&[before 3][first secondary ignorable]<<<x
+* compare
+=  \x01
+<3 x
+<3 y
+<2 \u0301
+
+** test: canonical closure
+@ rules
+&X=A &U=Â
+* compare
+<1 U
+=  Â
+=  A\u0302
+<2 Ú  # U with acute
+=  U\u0301
+=  Ấ  # A with circumflex & acute
+=  Â\u0301
+=  A\u0302\u0301
+<1 X
+=  A
+<2 X\u030A  # with ring above
+=  Å
+=  A\u030A
+=  \u212B  # Angstrom sign
+
+@ rules
+&x=\u5140\u55C0
+* compare
+<1 x
+=  \u5140\u55C0
+=  \u5140\uFA0D
+=  \uFA0C\u55C0
+=  \uFA0C\uFA0D  # CJK compatibility characters
+<3 X
+
+# canonical closure on prefix rules, ICU ticket 9444
+@ rules
+&x=ä|ŝ
+* compare
+<1 äs  # not tailored
+<1 äx
+=  äŝ
+=  a\u0308s\u0302
+=  a\u0308ŝ
+=  äs\u0302
+<3 äX
+
+** test: conjoining Jamo map to expansions
+@ rules
+&gg=\u1101  # Jamo Lead consonant GG
+&nj=\u11AC  # Jamo Trail consonant NJ
+* compare
+<1 gg\u1161nj
+=  \u1101\u1161\u11AC
+=  \uAE4C\u11AC
+=  \uAE51
+<3 gg\u1161nJ
+<1 \u1100\u1100
+
+** test: canonical tail closure, ICU ticket 5913
+@ rules
+&a<â
+* compare
+<1 a
+<1 â              # tailored
+=  a\u0302
+<2 a\u0323\u0302  # discontiguous contraction
+=  ạ\u0302        # equivalent
+=  ậ              # equivalent
+<1 b
+
+@ rules
+&a<ạ
+* compare
+<1 a
+<1 ạ              # tailored
+=  a\u0323
+<2 a\u0323\u0302  # contiguous contraction plus extra diacritic
+=  ạ\u0302        # equivalent
+=  ậ              # equivalent
+<1 b
+
+# Tail closure should work even if there is a prefix and/or contraction.
+@ rules
+&a<\u5140|câ
+# In order to find discontiguous contractions for \u5140|câ
+# there must exist a mapping for \u5140|ca, regardless of what it maps to.
+# (This follows from the UCA spec.)
+&x=\u5140|ca
+* compare
+<1 \u5140a
+=  \uFA0Ca
+<1 \u5140câ              # tailored
+=  \uFA0Ccâ
+=  \u5140ca\u0302
+=  \uFA0Cca\u0302
+<2 \u5140ca\u0323\u0302  # discontiguous contraction
+=  \uFA0Cca\u0323\u0302
+=  \u5140cạ\u0302
+=  \uFA0Ccạ\u0302
+=  \u5140cậ
+=  \uFA0Ccậ
+<1 \u5140b
+=  \uFA0Cb
+<1 \u5140x
+=  \u5140ca
+
+# Double-check that without the extra mapping there will be no discontiguous match.
+@ rules
+&a<\u5140|câ
+* compare
+<1 \u5140a
+=  \uFA0Ca
+<1 \u5140câ              # tailored
+=  \uFA0Ccâ
+=  \u5140ca\u0302
+=  \uFA0Cca\u0302
+<1 \u5140b
+=  \uFA0Cb
+<1 \u5140ca\u0323\u0302  # no discontiguous contraction
+=  \uFA0Cca\u0323\u0302
+=  \u5140cạ\u0302
+=  \uFA0Ccạ\u0302
+=  \u5140cậ
+=  \uFA0Ccậ
+
+@ rules
+&a<cạ
+* compare
+<1 a
+<1 cạ              # tailored
+=  ca\u0323
+<2 ca\u0323\u0302  # contiguous contraction plus extra diacritic
+=  cạ\u0302        # equivalent
+=  cậ              # equivalent
+<1 b
+
+# ᾢ = U+1FA2 GREEK SMALL LETTER OMEGA WITH PSILI AND VARIA AND YPOGEGRAMMENI
+#   = 03C9 0313 0300 0345
+# ccc = 0, 230, 230, 240
+@ rules
+&δ=αῳ
+# In order to find discontiguous contractions for αῳ
+# there must exist a mapping for αω, regardless of what it maps to.
+# (This follows from the UCA spec.)
+&ε=αω
+* compare
+<1 δ
+=  αῳ
+=  αω\u0345
+<2 αω\u0313\u0300\u0345  # discontiguous contraction
+=  αὠ\u0300\u0345
+=  αὢ\u0345
+=  αᾢ
+<2 αω\u0300\u0313\u0345
+=  αὼ\u0313\u0345
+=  αῲ\u0313  # not FCD
+<1 ε
+=  αω
+
+# Double-check that without the extra mapping there will be no discontiguous match.
+@ rules
+&δ=αῳ
+* compare
+<1 αω\u0313\u0300\u0345  # no discontiguous contraction
+=  αὠ\u0300\u0345
+=  αὢ\u0345
+=  αᾢ
+<2 αω\u0300\u0313\u0345
+=  αὼ\u0313\u0345
+=  αῲ\u0313  # not FCD
+<1 δ
+=  αῳ
+=  αω\u0345
+
+# Add U+0315 COMBINING COMMA ABOVE RIGHT which has ccc=232.
+# Tests code paths where the tailored string has a combining mark
+# that does not occur in any composite's decomposition.
+@ rules
+&δ=αὼ\u0315
+* compare
+<1 αω\u0313\u0300\u0315  # Not tailored: The grave accent blocks the comma above.
+=  αὠ\u0300\u0315
+=  αὢ\u0315
+<1 δ
+=  αὼ\u0315
+=  αω\u0300\u0315
+<2 αω\u0300\u0315\u0345
+=  αὼ\u0315\u0345
+=  αῲ\u0315  # not FCD
+
+** test: danish a+a vs. a-umlaut, ICU ticket 9319
+@ rules
+&z<aa
+* compare
+<1 z
+<1 aa
+<2 aa\u0308
+=  aä
+
+** test: Jamo L with and in prefix
+# Useful for the Korean "searchjl" tailoring (instead of contractions of pairs of Jamo L).
+@ rules
+# Jamo Lead consonant G after G or GG
+&[last primary ignorable]<<\u1100|\u1100=\u1101|\u1100
+# Jamo Lead consonant GG sorts like G+G
+&\u1100\u1100=\u1101
+# Note: Making G|GG and GG|GG sort the same as G|G+G
+# would require the ability to reset on G|G+G,
+# or we could make G-after-G equal to some secondary-CE character,
+# and reset on a pair of those.
+# (It does not matter much if there are at most two G in a row in real text.)
+* compare
+<1 \u1100
+<2 \u1100\u1100  # only one primary from a sequence of G lead consonants
+=  \u1101
+<2 \u1100\u1100\u1100
+=  \u1101\u1100
+# but not = \u1100\u1101, see above
+<1 \u1100\u1161
+=  \uAC00
+<2 \u1100\u1100\u1161
+=  \u1100\uAC00  # prefix match from the L of the LV syllable
+=  \u1101\u1161
+=  \uAE4C
+
+** test: proposed Korean "searchjl" tailoring with prefixes, CLDR ticket 6546
+@ rules
+# Low secondary CEs for Jamo V & T.
+# Note: T should sort before V for proper syllable order.
+&\u0332  # COMBINING LOW LINE (first primary ignorable)
+<<\u1161<<\u1162
+
+# Korean Jamo lead consonant search rules, part 2:
+# Make modern compound L jamo primary equivalent to non-compound forms.
+
+# Secondary CEs for Jamo L-after-L, greater than Jamo V & T.
+&\u0313  # COMBINING COMMA ABOVE (second primary ignorable)
+=\u1100|\u1100
+=\u1103|\u1103
+=\u1107|\u1107
+=\u1109|\u1109
+=\u110C|\u110C
+
+# Compound L Jamo map to equivalent expansions of primary+secondary CE.
+&\u1100\u0313=\u1101<<<\u3132  # HANGUL CHOSEONG SSANGKIYEOK, HANGUL LETTER SSANGKIYEOK
+&\u1103\u0313=\u1104<<<\u3138  # HANGUL CHOSEONG SSANGTIKEUT, HANGUL LETTER SSANGTIKEUT
+&\u1107\u0313=\u1108<<<\u3143  # HANGUL CHOSEONG SSANGPIEUP, HANGUL LETTER SSANGPIEUP
+&\u1109\u0313=\u110A<<<\u3146  # HANGUL CHOSEONG SSANGSIOS, HANGUL LETTER SSANGSIOS
+&\u110C\u0313=\u110D<<<\u3149  # HANGUL CHOSEONG SSANGCIEUC, HANGUL LETTER SSANGCIEUC
+
+* compare
+<1 \u1100\u1161
+=  \uAC00
+<2 \u1100\u1162
+=  \uAC1C
+<2 \u1100\u1100\u1161
+=  \u1100\uAC00
+=  \u1101\u1161
+=  \uAE4C
+<3 \u3132\u1161
+
+** test: Hangul syllables in prefix & in the interior of a contraction
+@ rules
+&x=\u1100\u1161|a\u1102\u1162z
+* compare
+<1 \u1100\u1161x
+=  \u1100\u1161a\u1102\u1162z
+=  \u1100\u1161a\uB0B4z
+=  \uAC00a\u1102\u1162z
+=  \uAC00a\uB0B4z
+
+** test: digits are unsafe-backwards when numeric=on
+@ root
+% numeric=on
+* compare
+# If digits are not unsafe, then numeric collation sees "1"=="01" and "b">"a".
+# We need to back up before the identical prefix "1" and compare the full numbers.
+<1 11b
+<1 101a
+
+** test: simple locale data test
+@ locale de
+* compare
+<1 a
+<2 ä
+<1 ae
+<2 æ
+
+@ locale de-u-co-phonebk
+* compare
+<1 a
+<1 ae
+<2 ä
+<2 æ
+
+# The following test cases were moved here from ICU 52's DataDrivenCollationTest.txt.
+
+** test: DataDrivenCollationTest/TestMorePinyin
+# Testing the primary strength.
+@ locale zh
+% strength=primary
+* compare
+< lā
+= lĀ
+= Lā
+= LĀ
+< lān
+= lĀn
+< lē
+= lĒ
+= Lē
+= LĒ
+< lēn
+= lĒn
+
+** test: DataDrivenCollationTest/TestLithuanian
+# Lithuanian sort order.
+@ locale lt
+* compare
+< cz
+< č
+< d
+< iz
+< j
+< sz
+< š
+< t
+< zz
+< ž
+
+** test: DataDrivenCollationTest/TestLatvian
+# Latvian sort order.
+@ locale lv
+* compare
+< cz
+< č
+< d
+< gz
+< ģ
+< h
+< iz
+< j
+< kz
+< ķ
+< l
+< lz
+< ļ
+< m
+< nz
+< ņ
+< o
+< rz
+< ŗ
+< s
+< sz
+< š
+< t
+< zz
+< ž
+
+** test: DataDrivenCollationTest/TestEstonian
+# Estonian sort order.
+@ locale et
+* compare
+< sy
+< š
+< šy
+< z
+< zy
+< ž
+< v
+< va
+< w
+< õ
+< õy
+< ä
+< äy
+< ö
+< öy
+< ü
+< üy
+< x
+
+** test: DataDrivenCollationTest/TestAlbanian
+# Albanian sort order.
+@ locale sq
+* compare
+< cz
+< ç
+< d
+< dz
+< dh
+< e
+< ez
+< ë
+< f
+< gz
+< gj
+< h
+< lz
+< ll
+< m
+< nz
+< nj
+< o
+< rz
+< rr
+< s
+< sz
+< sh
+< t
+< tz
+< th
+< u
+< xz
+< xh
+< y
+< zz
+< zh
+
+** test: DataDrivenCollationTest/TestSimplifiedChineseOrder
+# Sorted file has different order.
+@ root
+# normalization=on turned on & off automatically.
+* compare
+< \u5F20
+< \u5F20\u4E00\u8E3F
+
+** test: DataDrivenCollationTest/TestTibetanNormalizedIterativeCrash
+# This pretty much crashes.
+@ root
+* compare
+< \u0f71\u0f72\u0f80\u0f71\u0f72
+< \u0f80
+
+** test: DataDrivenCollationTest/TestThaiPartialSortKeyProblems
+# These are examples of strings that caused trouble in partial sort key testing.
+@ locale th-TH
+* compare
+< \u0E01\u0E01\u0E38\u0E18\u0E20\u0E31\u0E13\u0E11\u0E4C
+< \u0E01\u0E01\u0E38\u0E2A\u0E31\u0E19\u0E42\u0E18
+* compare
+< \u0E01\u0E07\u0E01\u0E32\u0E23
+< \u0E01\u0E07\u0E42\u0E01\u0E49
+* compare
+< \u0E01\u0E23\u0E19\u0E17\u0E32
+< \u0E01\u0E23\u0E19\u0E19\u0E40\u0E0A\u0E49\u0E32
+* compare
+< \u0E01\u0E23\u0E30\u0E40\u0E08\u0E35\u0E22\u0E27
+< \u0E01\u0E23\u0E30\u0E40\u0E08\u0E35\u0E4A\u0E22\u0E27
+* compare
+< \u0E01\u0E23\u0E23\u0E40\u0E0A\u0E2D
+< \u0E01\u0E23\u0E23\u0E40\u0E0A\u0E49\u0E32
+
+** test: DataDrivenCollationTest/TestJavaStyleRule
+# java.text allows rules to start as '<<<x<<<y...'
+# we emulate this by assuming a &[first tertiary ignorable] in this case.
+@ rules
+&\u0001=equal<<<z<<x<<<w &[first tertiary ignorable]=a &[first primary ignorable]=b
+* compare
+= a
+= equal
+< z
+< x
+= b  # x had become the new first primary ignorable
+< w
+
+** test: DataDrivenCollationTest/TestShiftedIgnorable
+# The UCA states that primary ignorables should be completely
+# ignorable when following a shifted code point.
+@ root
+% alternate=shifted
+% strength=quaternary
+* compare
+< a\u0020b
+= a\u0020\u0300b
+= a\u0020\u0301b
+< a_b
+= a_\u0300b
+= a_\u0301b
+< A\u0020b
+= A\u0020\u0300b
+= A\u0020\u0301b
+< A_b
+= A_\u0300b
+= A_\u0301b
+< a\u0301b
+< A\u0301b
+< a\u0300b
+< A\u0300b
+
+** test: DataDrivenCollationTest/TestNShiftedIgnorable
+# The UCA states that primary ignorables should be completely
+# ignorable when following a shifted code point.
+@ root
+% alternate=non-ignorable
+% strength=tertiary
+* compare
+< a\u0020b
+< A\u0020b
+< a\u0020\u0301b
+< A\u0020\u0301b
+< a\u0020\u0300b
+< A\u0020\u0300b
+< a_b
+< A_b
+< a_\u0301b
+< A_\u0301b
+< a_\u0300b
+< A_\u0300b
+< a\u0301b
+< A\u0301b
+< a\u0300b
+< A\u0300b
+
+** test: DataDrivenCollationTest/TestSafeSurrogates
+# It turned out that surrogates were not skipped properly
+# when iterating backwards if they were in the middle of a
+# contraction. This test assures that this is fixed.
+@ rules
+&a < x\ud800\udc00b
+* compare
+< a
+< x\ud800\udc00b
+
+** test: DataDrivenCollationTest/da_TestPrimary
+# This test goes through primary strength cases
+@ locale da
+% strength=primary
+* compare
+< Lvi
+< Lwi
+* compare
+< L\u00e4vi
+< L\u00f6wi
+* compare
+< L\u00fcbeck
+= Lybeck
+
+** test: DataDrivenCollationTest/da_TestTertiary
+# This test goes through tertiary strength cases
+@ locale da
+% strength=tertiary
+* compare
+< Luc
+< luck
+* compare
+< luck
+< L\u00fcbeck
+* compare
+< lybeck
+< L\u00fcbeck
+* compare
+< L\u00e4vi
+< L\u00f6we
+* compare
+< L\u00f6ww
+< mast
+
+* compare
+< A/S
+< ANDRE
+< ANDR\u00c9
+< ANDREAS
+< AS
+< CA
+< \u00c7A
+< CB
+< \u00c7C
+< D.S.B.
+< DA
+< \u00d0A
+< DB
+< \u00d0C
+< DSB
+< DSC
+< EKSTRA_ARBEJDE
+< EKSTRABUD0
+< H\u00d8ST
+< HAAG
+< H\u00c5NDBOG
+< HAANDV\u00c6RKSBANKEN
+< Karl
+< karl
+< NIELS\u0020J\u00d8RGEN
+< NIELS-J\u00d8RGEN
+< NIELSEN
+< R\u00c9E,\u0020A
+< REE,\u0020B
+< R\u00c9E,\u0020L
+< REE,\u0020V
+< SCHYTT,\u0020B
+< SCHYTT,\u0020H
+< SCH\u00dcTT,\u0020H
+< SCHYTT,\u0020L
+< SCH\u00dcTT,\u0020M
+< SS
+< \u00df
+< SSA
+< STORE\u0020VILDMOSE
+< STOREK\u00c6R0
+< STORM\u0020PETERSEN
+< STORMLY
+< THORVALD
+< THORVARDUR
+< \u00feORVAR\u00d0UR
+< THYGESEN
+< VESTERG\u00c5RD,\u0020A
+< VESTERGAARD,\u0020A
+< VESTERG\u00c5RD,\u0020B
+< \u00c6BLE
+< \u00c4BLE
+< \u00d8BERG
+< \u00d6BERG
+
+* compare
+< andere
+< chaque
+< chemin
+< cote
+< cot\u00e9
+< c\u00f4te
+< c\u00f4t\u00e9
+< \u010du\u010d\u0113t
+< Czech
+< hi\u0161a
+< irdisch
+< lie
+< lire
+< llama
+< l\u00f5ug
+< l\u00f2za
+< lu\u010d
+< luck
+< L\u00fcbeck
+< lye
+< l\u00e4vi
+< L\u00f6wen
+< m\u00e0\u0161ta
+< m\u00eer
+< myndig
+< M\u00e4nner
+< m\u00f6chten
+< pi\u00f1a
+< pint
+< pylon
+< \u0161\u00e0ran
+< savoir
+< \u0160erb\u016bra
+< Sietla
+< \u015blub
+< subtle
+< symbol
+< s\u00e4mtlich
+< verkehrt
+< vox
+< v\u00e4ga
+< waffle
+< wood
+< yen
+< yuan
+< yucca
+< \u017eal
+< \u017eena
+< \u017den\u0113va
+< zoo0
+< Zviedrija
+< Z\u00fcrich
+< zysk0
+< \u00e4ndere
+
+** test: DataDrivenCollationTest/hi_TestNewRules
+# This test goes through new rules and tests against old rules
+@ locale hi
+* compare
+< कॐ
+< कं
+< कँ
+< कः
+
+** test: DataDrivenCollationTest/ro_TestNewRules
+# This test goes through new rules and tests against old rules
+@ locale ro
+* compare
+< xAx
+< xă
+< xĂ
+< Xă
+< XĂ
+< xăx
+< xĂx
+< xâ
+< xÂ
+< Xâ
+< XÂ
+< xâx
+< xÂx
+< xb
+< xIx
+< xî
+< xÎ
+< Xî
+< XÎ
+< xîx
+< xÎx
+< xj
+< xSx
+< xș
+= xş
+< xȘ
+= xŞ
+< Xș
+= Xş
+< XȘ
+= XŞ
+< xșx
+= xşx
+< xȘx
+= xŞx
+< xT
+< xTx
+< xț
+= xţ
+< xȚ
+= xŢ
+< Xț
+= Xţ
+< XȚ
+= XŢ
+< xțx
+= xţx
+< xȚx
+= xŢx
+< xU
+
+** test: DataDrivenCollationTest/testOffsets
+# This tests cases where forwards and backwards iteration get different offsets
+@ locale en
+% strength=tertiary
+* compare
+< a\uD800\uDC00\uDC00
+< b\uD800\uDC00\uDC00
+* compare
+< \u0301A\u0301\u0301
+< \u0301B\u0301\u0301
+* compare
+< abcd\r\u0301
+< abce\r\u0301
+# TODO: test offsets in new CollationTest
+
+# End of test cases moved here from ICU 52's DataDrivenCollationTest.txt.
+
+** test: was ICU 52 cmsccoll/TestRedundantRules
+@ rules
+& a < b < c < d& [before 1] c < m
+* compare
+<1 a
+<1 b
+<1 m
+<1 c
+<1 d
+
+@ rules
+& a < b <<< c << d <<< e& [before 3] e <<< x
+* compare
+<1 a
+<1 b
+<3 c
+<2 d
+<3 x
+<3 e
+
+@ rules
+& a < b <<< c << d <<< e <<< f < g& [before 1] g < x
+* compare
+<1 a
+<1 b
+<3 c
+<2 d
+<3 e
+<3 f
+<1 x
+<1 g
+
+@ rules
+& a <<< b << c < d& a < m
+* compare
+<1 a
+<3 b
+<2 c
+<1 m
+<1 d
+
+@ rules
+&a<b<<b\u0301 &z<b
+* compare
+<1 a
+<1 b\u0301
+<1 z
+<1 b
+
+@ rules
+&z<m<<<q<<<m
+* compare
+<1 z
+<1 q
+<3 m
+
+@ rules
+&z<<<m<q<<<m
+* compare
+<1 z
+<1 q
+<3 m
+
+@ rules
+& a < b < c < d& r < c
+* compare
+<1 a
+<1 b
+<1 d
+<1 r
+<1 c
+
+@ rules
+& a < b < c < d& c < m
+* compare
+<1 a
+<1 b
+<1 c
+<1 m
+<1 d
+
+@ rules
+& a < b < c < d& a < m
+* compare
+<1 a
+<1 m
+<1 b
+<1 c
+<1 d
+
+** test: was ICU 52 cmsccoll/TestExpansionSyntax
+# The following two rules should sort the particular list of strings the same.
+@ rules
+&AE <<< a << b <<< c &d <<< f
+* compare
+<1 AE
+<3 a
+<2 b
+<3 c
+<1 d
+<3 f
+
+@ rules
+&A <<< a / E << b / E <<< c /E  &d <<< f
+* compare
+<1 AE
+<3 a
+<2 b
+<3 c
+<1 d
+<3 f
+
+# The following two rules should sort the particular list of strings the same.
+@ rules
+&AE <<< a <<< b << c << d < e < f <<< g
+* compare
+<1 AE
+<3 a
+<3 b
+<2 c
+<2 d
+<1 e
+<1 f
+<3 g
+
+@ rules
+&A <<< a / E <<< b / E << c / E << d / E < e < f <<< g
+* compare
+<1 AE
+<3 a
+<3 b
+<2 c
+<2 d
+<1 e
+<1 f
+<3 g
+
+# The following two rules should sort the particular list of strings the same.
+@ rules
+&AE <<< B <<< C / D <<< F
+* compare
+<1 AE
+<3 B
+<3 F
+<1 AED
+<3 C
+
+@ rules
+&A <<< B / E <<< C / ED <<< F / E
+* compare
+<1 AE
+<3 B
+<3 F
+<1 AED
+<3 C
+
+** test: never reorder trailing primaries
+@ root
+% reorder Zzzz Grek
+* compare
+<1 L
+<1 字
+<1 Ω
+<1 \uFFFD
+<1 \uFFFF
+
+** test: fall back to mappings with shorter prefixes, not immediately to ones with no prefixes
+@ rules
+&u=ab|cd
+&v=b|ce
+* compare
+<1 abc
+<1 abcc
+<1 abcf
+<1 abcd
+=  abu
+<1 abce
+=  abv
+
+# With the following rules, there is only one prefix per composite ĉ or ç,
+# but both prefixes apply to just c in NFD form.
+# We would get different results for composed vs. NFD input
+# if we fell back directly from longest-prefix mappings to no-prefix mappings.
+@ rules
+&x=op|ĉ
+&y=p|ç
+* compare
+<1 opc
+<2 opć
+<1 opcz
+<1 opd
+<1 opĉ
+=  opc\u0302
+=  opx
+<1 opç
+=  opc\u0327
+=  opy
+
+# The mapping is used which has the longest matching prefix for which
+# there is also a suffix match, with the longest suffix match among several for that prefix.
+@ rules
+&❶=d
+&❷=de
+&❸=def
+&①=c|d
+&②=c|de
+&③=c|def
+&④=bc|d
+&⑤=bc|de
+&⑥=bc|def
+&⑦=abc|d
+&⑧=abc|de
+&⑨=abc|def
+* compare
+<1 9aadzz
+=  9aa❶zz
+<1 9aadez
+=  9aa❷z
+<1 9aadef
+=  9aa❸
+<1 9acdzz
+=  9ac①zz
+<1 9acdez
+=  9ac②z
+<1 9acdef
+=  9ac③
+<1 9bcdzz
+=  9bc④zz
+<1 9bcdez
+=  9bc⑤z
+<1 9bcdef
+=  9bc⑥
+<1 abcdzz
+=  abc⑦zz
+<1 abcdez
+=  abc⑧z
+<1 abcdef
+=  abc⑨
+
+** test: prefix + discontiguous contraction with missing prefix contraction
+# Unfortunate terminology: The first "prefix" here is the pre-context,
+# the second "prefix" refers to the contraction/relation string that is
+# one shorter than the one being tested.
+@ rules
+&x=p|e
+&y=p|ê
+&z=op|ê
+# No mapping for op|e:
+# Discontiguous contraction matching should not match op|ê in opệ
+# because it would have to skip the dot below and extend a match on op|e by the circumflex,
+# but there is no match on op|e.
+* compare
+<1 oPe
+<1 ope
+=  opx
+<1 opệ
+=  opy\u0323  # y not z
+<1 opê
+=  opz
+
+# We cannot test for fallback by whether the contraction default CE32
+# is for another contraction. With the following rules, there is no mapping for op|e,
+# and the fallback to prefix p has no contractions.
+@ rules
+&x=p|e
+&z=op|ê
+* compare
+<1 oPe
+<1 ope
+=  opx
+<2 opệ
+=  opx\u0323\u0302  # x not z
+<1 opê
+=  opz
+
+# One more variation: Fallback to the simple code point, no shorter non-empty prefix.
+@ rules
+&x=e
+&z=op|ê
+* compare
+<1 ope
+=  opx
+<3 oPe
+=  oPx
+<2 opệ
+=  opx\u0323\u0302  # x not z
+<1 opê
+=  opz
+
+** test: maxVariable via rules
+@ rules
+[maxVariable space][alternate shifted]
+* compare
+=  \u0020
+=  \u000A
+<1 .
+<1 °  # degree sign
+<1 $
+<1 0
+
+** test: maxVariable via setting
+@ root
+% maxVariable=currency
+% alternate=shifted
+* compare
+=  \u0020
+=  \u000A
+=  .
+=  °  # degree sign
+=  $
+<1 0
+
+** test: ICU4J CollationMiscTest/TestContractionClosure (ää)
+# This tests canonical closure, but it also tests that CollationFastLatin
+# bails out properly for contractions with combining marks.
+# For that we need pairs of strings that remain in the Latin fastpath
+# long enough, hence the extra "= b" lines.
+@ rules
+&b=\u00e4\u00e4
+* compare
+<1 b
+=  \u00e4\u00e4
+=  b
+=  a\u0308a\u0308
+=  b
+=  \u00e4a\u0308
+=  b
+=  a\u0308\u00e4
+
+** test: ICU4J CollationMiscTest/TestContractionClosure (Å)
+@ rules
+&b=\u00C5
+* compare
+<1 b
+=  \u00C5
+=  b
+=  A\u030A
+=  b
+=  \u212B
+
+** test: reset-before on already-tailored characters, ICU ticket 10108
+@ rules
+&a<w<<x &[before 2]x<<y
+* compare
+<1 a
+<1 w
+<2 y
+<2 x
+
+@ rules
+&a<<w<<<x &[before 2]x<<y
+* compare
+<1 a
+<2 y
+<2 w
+<3 x
+
+@ rules
+&a<w<x &[before 2]x<<y
+* compare
+<1 a
+<1 w
+<1 y
+<2 x
+
+@ rules
+&a<w<<<x &[before 2]x<<y
+* compare
+<1 a
+<1 y
+<2 w
+<3 x
+
+** test: numeric collation with other settings, ICU ticket 9092
+@ root
+% strength=identical
+% caseFirst=upper
+% numeric=on
+* compare
+<1 100\u0020a
+<1 101
+
+** test: collation type fallback from unsupported type, ICU ticket 10149
+@ locale fr-CA-u-co-phonebk
+# Expect the same result as with fr-CA, using backwards-secondary order.
+# That is, we should fall back from the unsupported collation type
+# to the locale's default collation type.
+* compare
+<1 cote
+<2 côte
+<2 coté
+<2 côté
+
+** test: @ is equivalent to [backwards 2], ICU ticket 9956
+@ rules
+&b<a @ &v<<w
+* compare
+<1 b
+<1 a
+<1 cote
+<2 côte
+<2 coté
+<2 côté
+<1 v
+<2 w
+<1 x
+
+** test: shifted+reordering, ICU ticket 9507
+@ root
+% reorder Grek punct space
+% alternate=shifted
+% strength=quaternary
+# Which primaries are "variable" should be determined without script reordering,
+# and then primaries should be reordered whether they are shifted to quaternary or not.
+* compare
+<4 (  # punctuation
+<4 )
+<4 \u0020  # space
+<1 `  # symbol
+<1 ^
+<1 $  # currency symbol
+<1 €
+<1 0  # numbers
+<1 ε  # Greek
+<1 e  # Latin
+<1 e(e
+<4 e)e
+<4 e\u0020e
+<4 ee
+<3 e(E
+<4 e)E
+<4 e\u0020E
+<4 eE
+
+** test: "uppercase first" could sort a string before its prefix, ICU ticket 9351
+@ rules
+&\u0001<<<b<<<B
+% caseFirst=upper
+* compare
+<1 aaa
+<3 aaaB
+
+** test: secondary+case ignores secondary ignorables, ICU ticket 9355
+@ rules
+&\u0001<<<b<<<B
+% strength=secondary
+% caseLevel=on
+* compare
+<1 a
+=  ab
+=  aB
+
+** test: custom collation rules involving tail of a contraction in Malayalam, ICU ticket 6328
+@ rules
+&[before 2] ൌ << ൗ  # U+0D57 << U+0D4C == 0D46+0D57
+* compare
+<1 ൗx
+<2 ൌx
+<1 ൗy
+<2 ൌy
+
+** test: quoted apostrophe in compact syntax, ICU ticket 8204
+@ rules
+&q<<*a''c
+* compare
+<1 d
+<1 p
+<1 q
+<2 a
+<2 \u0027
+<2 c
+<1 r
+
+# ICU ticket #8260 "Support all collation-related keywords in Collator.getInstance()"
+** test: locale -u- with collation keywords, ICU ticket 8260
+@ locale de-u-kv-sPace-ka-shifTed-kn-kk-falsE-kf-Upper-kc-tRue-ks-leVel4
+* compare
+<4 \u0020  # space is shifted, strength=quaternary
+<1 !  # punctuation is regular
+<1 2
+<1 12  # numeric sorting
+<1 B
+<c b  # uppercase first on case level
+<1 x\u0301\u0308
+<2 x\u0308\u0301  # normalization off
+
+** test: locale @ with collation keywords, ICU ticket 8260
+@ locale fr@colbAckwards=yes;ColStrength=Quaternary;kv=currencY;colalternate=shifted
+* compare
+<4 $  # currency symbols are shifted, strength=quaternary
+<1 àla
+<2 alà  # backwards secondary level
+
+** test: locale -u- with script reordering, ICU ticket 8260
+@ locale el-u-kr-kana-SYMBOL-Grek-hani-cyrl-latn-digit-armn-deva-ethi-thai
+* compare
+<1 \u0020
+<1 あ
+<1 ☂
+<1 Ω
+<1 丂
+<1 ж
+<1 L
+<1 4
+<1 Ձ
+<1 अ
+<1 ሄ
+<1 ฉ
+
+** test: locale @collation=type should be case-insensitive
+@ locale de@coLLation=PhoneBook
+* compare
+<1 ae
+<2 ä
+<3 Ä
+
+** test: import root search rules plus German phonebook rules, ICU ticket 8962
+@ locale de-u-co-search
+* compare
+<1 =
+<1 ≠
+<1 a
+<1 ae
+<2 ä
+
+# Once more, but with runtime builder.
+@ rules
+[import und-u-co-search][import de-u-co-phonebk]
+* compare
+<1 =
+<1 ≠
+<1 a
+<1 ae
+<2 ä
+
+# Once again, with import from "root" not "und" (as in a proper language tag).
+@ rules
+[import root-u-co-search][import de-u-co-phonebk]
+* compare
+<1 =
+<1 ≠
+<1 a
+<1 ae
+<2 ä
+
+** test: import rules from a language with non-Latin native script, and reset the reordering, ICU ticket 10998
+# Greek should sort Greek first.
+@ rules
+[import el]
+* compare
+<1 4
+<1 Ω
+<1 L
+
+# Import Greek, and then reset the reordering.
+@ rules
+[import el][reorder Zzzz]
+* compare
+<1 4
+<1 L
+<1 Ω
+
+# "others" is a synonym for Zzzz.
+@ rules
+[import el][reorder others]
+* compare
+<1 4
+<1 L
+<1 Ω
+
+** test: regression test for CollationFastLatinBuilder, ICU ticket 11388
+@ rules
+&x<<aa<<<Aa<<<AA
+% strength=secondary
+* compare
+<1 AA
+<2 Aẩ
+<2 aą
+* compare
+<1 AA
+<2 aą
+
+** test: tailor tertiary-after a common tertiary where there is a lower one
+# Assume that Hiragana small A has a below-common tertiary, and Hiragana A has a common one.
+# See ICU ticket 11448 & CLDR ticket 7222.
+@ rules
+&あ<<<x<<<y<<<z
+* compare
+<1 ぁ
+<3 あ
+<3 x
+<3 y
+<3 z
+<3 ァ
+<1 い
+
+** test: tailor tertiary-after a below-common tertiary
+@ rules
+&ぁ<<<x<<<y<<<z
+* compare
+<1 ぁ
+<3 x
+<3 y
+<3 z
+<3 あ
+<3 ァ
+<1 い
+
+** test: tailor tertiary-before a common tertiary where there is a lower one
+@ rules
+&[before 3]あ<<<x<<<y<<<z
+* compare
+<1 ぁ
+<3 x
+<3 y
+<3 z
+<3 あ
+<3 ァ
+<1 い
+
+** test: tailor tertiary-before a below-common tertiary
+@ rules
+&[before 3]ぁ<<<x<<<y<<<z
+* compare
+<1 x
+<3 y
+<3 z
+<3 ぁ
+<3 あ
+<3 ァ
+<1 い
+
+** test: reorder single scripts not groups, ICU ticket 11449
+@ root
+% reorder Goth Latn
+* compare
+<1 4
+<1 𐌰  # Gothic
+<1 L
+<1 Ω
+# Before ICU 55, the following reordered together with Gothic.
+<1 𐌈  # Old Italic
+<1 𐑐  # Shavian
+
+# Check for presence of certain chars 乛冂刂卜又小彑艹日月爫牛辶 in
+# zh pinyin and stroke, ICU-13790
+# (bracket pinyin test with 卬..作, stroke test with 一..乾)
+
+** test: DataDrivenCollationTest/VerifyCertainCharsInPinyin
+@ locale zh-u-co-pinyin
+* compare
+< 卬
+< 卜
+< 艹
+< 辶
+< 刂
+< 彑
+< 冂
+< 牛
+< 日
+< 小
+< 乛
+< 又
+< 月
+< 爫
+< 作
+
+** test: DataDrivenCollationTest/VerifyCertainCharsInStroke
+@ locale zh-u-co-stroke
+* compare
+< 一
+< 乛
+< 冂
+< 刂
+< 卜
+< 又
+< 小
+< 彑
+< 艹
+< 日
+< 月
+< 爫
+< 牛
+< 辶
+< 乾
+

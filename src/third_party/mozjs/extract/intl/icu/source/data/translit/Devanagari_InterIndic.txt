@@ -1,0 +1,119 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Devanagari_InterIndic.txt
+# Generated from CLDR
+#
+
+# Devanagari-InterIndic
+# :: NFD;
+#Rules for Decomposed characters
+\u0901→\uE001;  # SIGN CANDRABINDU
+\u0902→\uE002;  # SIGN ANUSVARA
+ः→\uE003;  # SIGN VISARGA
+ऄ→\uE004;  # SIGN SHORT A
+अ→\uE005;  # LETTER A
+आ→\uE006;  # LETTER AA
+इ→\uE007;  # LETTER I
+ई→\uE008;  # LETTER II
+उ→\uE009;  # LETTER U
+ऊ→\uE00A;  # LETTER UU
+ऋ→\uE00B;  # LETTER VOCALIC R
+ऌ→\uE00C;  # LETTER VOCALIC L
+ऍ→\uE00D;  # LETTER CANDRA E (For representing English sounds)
+ऎ→\uE00E; # UNMAPPED LETTER SHORT E(For Southern Scripts)
+ए→\uE00F;  # LETTER E
+ऐ→\uE010;  # LETTER AI
+ऑ→\uE011;  # LETTER CANDRA O (For representing English sounds)
+ऒ→\uE012; # UNMAPPED LETTER SHORT O (For Southern Scripts)
+ओ→\uE013;  # LETTER O
+औ→\uE014;  # LETTER AU
+क→\uE015;  # LETTER KA
+ख→\uE016;  # LETTER KHA
+ग→\uE017;  # LETTER GA
+घ→\uE018;  # LETTER GHA
+ङ→\uE019;  # LETTER NGA
+च→\uE01A;  # LETTER CA
+छ→\uE01B;  # LETTER CHA
+ज→\uE01C;  # LETTER JA
+झ→\uE01D;  # LETTER JHA
+ञ→\uE01E;  # LETTER NYA
+ट→\uE01F;  # LETTER TTA
+ठ→\uE020;  # LETTER TTHA
+ड→\uE021;  # LETTER DDA
+ढ→\uE022;  # LETTER DDHA
+ण→\uE023;  # LETTER NNA
+त→\uE024;  # LETTER TA
+थ→\uE025;  # LETTER THA
+द→\uE026;  # LETTER DA
+ध→\uE027;  # LETTER DHA
+न→\uE028;  # LETTER NA
+ऩ→\uE029;
+प→\uE02A;  # LETTER PA
+फ→\uE02B;  # LETTER PHA
+ब→\uE02C;  # LETTER BA
+भ→\uE02D;  # LETTER BHA
+म→\uE02E;  # LETTER MA
+य→\uE02F;  # LETTER YA
+र→\uE030;  # LETTER RA
+ऱ→\uE031;
+ल→\uE032;  # LETTER LA
+ळ→\uE033;  # LETTER LLA
+ऴ→\uE034;
+व→\uE035;  # LETTER VA
+श→\uE036;  # LETTER SHA
+ष→\uE037;  # LETTER SSA
+स→\uE038;  # LETTER SA
+ह→\uE039;  # LETTER HA
+\u093C→\uE03C;  # SIGN NUKTA
+ऽ→\uE03D;  # SIGN AVAGRAHA
+ा→\uE03E;  # VOWEL SIGN AA
+ि→\uE03F;  # VOWEL SIGN I
+ी→\uE040;  # VOWEL SIGN II
+\u0941→\uE041;  # VOWEL SIGN U
+\u0942→\uE042;  # VOWEL SIGN UU
+\u0943→\uE043;  # VOWEL SIGN VOCALIC R
+\u0944→\uE044;  # VOWEL SIGN VOCALIC RR
+\u0945→\uE045;  # VOWEL SIGN CANDRA E
+\u0946→\uE046; # UNMAPPED VOWEL SIGN SHORT E
+\u0947→\uE047;  # VOWEL SIGN E
+\u0948→\uE048;  # VOWEL SIGN AI
+ॉ→\uE049;  # VOWEL SIGN CANDRA O
+ॊ→\uE04A; # UNMAPPED VOWEL SIGN SHORT O
+ो→\uE04B;  # VOWEL SIGN O
+ौ→\uE04C;  # VOWEL SIGN AU
+\u094D→\uE04D;  # SIGN VIRAMA
+ॐ→\uE050;  # OM
+\u0951→\uE051;       # UNMAPPED STRESS SIGN UDATTA
+\u0952→\uE052;       # UNMAPPED STRESS SIGN ANUDATTA
+\u0953→\uE053;       # UNMAPPED GRAVE ACCENT
+\u0954→\uE054;       # UNMAPPED ACUTE ACCENT
+क़→\uE058;
+ख़→\uE059;
+ग़→\uE05A;
+ज़→\uE05B;
+ड़→\uE05C;
+ढ़→\uE05D;
+फ़→\uE05E;
+य़→\uE05F;
+ॠ→\uE060;  # LETTER VOCALIC RR
+ॡ→\uE061;  # LETTER VOCALIC LL
+\u0962→\uE062;  # VOWEL SIGN VOCALIC L
+\u0963→\uE063;  # VOWEL SIGN VOCALIC LL
+।→\uE064;  # DANDA
+॥→\uE065;  # DOUBLE DANDA
+०→\uE066;  # DIGIT ZERO
+१→\uE067;  # DIGIT ONE
+२→\uE068;  # DIGIT TWO
+३→\uE069;  # DIGIT THREE
+४→\uE06A;  # DIGIT FOUR
+५→\uE06B;  # DIGIT FIVE
+६→\uE06C;  # DIGIT SIX
+७→\uE06D;  # DIGIT SEVEN
+८→\uE06E;  # DIGIT EIGHT
+९→\uE06F;  # DIGIT NINE
+॰→\uE070;  # Devanagari-InterIndic: ABBREVIATION SIGN
+ॽ→\uE082;  # Devanagari Glottal Stop
+#    :: NFC (NFD) ;
+

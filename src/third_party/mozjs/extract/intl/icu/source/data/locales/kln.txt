@@ -1,0 +1,259 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+kln{
+    AuxExemplarCharacters{"[f q v x z]"}
+    ExemplarCharacters{"[a b c d e g h i j k l m n o p r s t u w y]"}
+    ExemplarCharactersIndex{"[A B C D E G H I J K L M N O P R S T U W Y]"}
+    NumberElements{
+        latn{
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d MMMM y G",
+                "d MMMM y G",
+                "d MMM y G",
+                "dd/MM/y GGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, M/d"}
+                MMM{"LLL"}
+                MMMEd{"E, MMM d"}
+                MMMMEd{"E, MMMM d"}
+                MMMMd{"MMMM d"}
+                MMMd{"MMM d"}
+                Md{"M/d"}
+                d{"d"}
+                hm{"h:mm a"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E, M/d/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, MMM d, y"}
+                yMMMM{"MMMM y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "karoon",
+                "kooskoliny",
+            }
+            AmPmMarkersAbbr{
+                "krn",
+                "koosk",
+            }
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d MMMM y",
+                "d MMMM y",
+                "d MMM y",
+                "dd/MM/y",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, M/d"}
+                MMM{"LLL"}
+                MMMEd{"E, MMM d"}
+                MMMMEd{"E, MMMM d"}
+                MMMMd{"MMMM d"}
+                MMMd{"MMM d"}
+                Md{"M/d"}
+                d{"d"}
+                hm{"h:mm a"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E, M/d/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, MMM d, y"}
+                yMMMM{"MMMM y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Kts",
+                        "Kot",
+                        "Koo",
+                        "Kos",
+                        "Koa",
+                        "Kom",
+                        "Kol",
+                    }
+                    wide{
+                        "Kotisap",
+                        "Kotaai",
+                        "Koaeng’",
+                        "Kosomok",
+                        "Koang’wan",
+                        "Komuut",
+                        "Kolo",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "T",
+                        "T",
+                        "O",
+                        "S",
+                        "A",
+                        "M",
+                        "L",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "AM",
+                    "KO",
+                }
+                wide{
+                    "Amait kesich Jesu",
+                    "Kokakesich Jesu",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Mul",
+                        "Ngat",
+                        "Taa",
+                        "Iwo",
+                        "Mam",
+                        "Paa",
+                        "Nge",
+                        "Roo",
+                        "Bur",
+                        "Epe",
+                        "Kpt",
+                        "Kpa",
+                    }
+                    wide{
+                        "Mulgul",
+                        "Ng’atyaato",
+                        "Kiptaamo",
+                        "Iwootkuut",
+                        "Mamuut",
+                        "Paagi",
+                        "Ng’eiyeet",
+                        "Rooptui",
+                        "Bureet",
+                        "Epeeso",
+                        "Kipsuunde ne taai",
+                        "Kipsuunde nebo aeng’",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "M",
+                        "N",
+                        "T",
+                        "I",
+                        "M",
+                        "P",
+                        "N",
+                        "R",
+                        "B",
+                        "E",
+                        "K",
+                        "K",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "R1",
+                        "R2",
+                        "R3",
+                        "R4",
+                    }
+                    wide{
+                        "Robo netai",
+                        "Robo nebo aeng’",
+                        "Robo nebo somok",
+                        "Robo nebo ang’wan",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"Betut"}
+            relative{
+                "-1"{"Amut"}
+                "0"{"Raini"}
+                "1"{"Mutai"}
+            }
+        }
+        dayperiod{
+            dn{"BE/KE"}
+        }
+        era{
+            dn{"Ibinta"}
+        }
+        hour{
+            dn{"Sait"}
+        }
+        minute{
+            dn{"Minitit"}
+        }
+        month{
+            dn{"Arawet"}
+        }
+        second{
+            dn{"Sekondit"}
+        }
+        week{
+            dn{"Wikit"}
+        }
+        weekday{
+            dn{"Betutab wikit"}
+        }
+        year{
+            dn{"Kenyit"}
+        }
+        zone{
+            dn{"Saitab sonit"}
+        }
+    }
+}

@@ -1,0 +1,22 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: de_ASCII.txt
+# Generated from CLDR
+#
+
+$AE = [Ä {A \u0308}];
+$OE = [Ö {O \u0308}];
+$UE = [Ü {U \u0308}];
+[ä {a \u0308}] → ae;
+[ö {o \u0308}] → oe;
+[ü {u \u0308}] → ue;
+{$AE} [:Lowercase:] → Ae;
+{$OE} [:Lowercase:] → Oe;
+{$UE} [:Lowercase:] → Ue;
+$AE → AE;
+$OE → OE;
+$UE → UE;
+::Any-ASCII;
+

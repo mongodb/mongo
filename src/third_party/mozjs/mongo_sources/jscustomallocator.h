@@ -36,37 +36,76 @@
 
 namespace mongo {
 namespace sm {
-JS_PUBLIC_API(size_t) get_total_bytes();
-JS_PUBLIC_API(void) reset(size_t max_bytes);
-JS_PUBLIC_API(size_t) get_max_bytes();
+JS_PUBLIC_API size_t get_total_bytes();
+JS_PUBLIC_API void reset(size_t max_bytes);
+JS_PUBLIC_API size_t get_max_bytes();
 }  // namespace sm
 }  // namespace mongo
 
-#ifdef DEBUG
-extern JS_PUBLIC_DATA(uint32_t) OOM_maxAllocations;
-extern JS_PUBLIC_DATA(uint32_t) OOM_counter;
-#endif
+typedef size_t arena_id_t;
 
-JS_PUBLIC_API(void*) js_malloc(size_t bytes);
-JS_PUBLIC_API(void*) js_calloc(size_t bytes);
-JS_PUBLIC_API(void*) js_calloc(size_t nmemb, size_t size);
-JS_PUBLIC_API(void) js_free(void* p);
-JS_PUBLIC_API(void*) js_realloc(void* p, size_t bytes);
+JS_PUBLIC_API void* js_malloc(size_t bytes);
+JS_PUBLIC_API void* js_calloc(size_t bytes);
+JS_PUBLIC_API void* js_calloc(size_t nmemb, size_t size);
+JS_PUBLIC_API void js_free(void* p);
+JS_PUBLIC_API void* js_realloc(void* p, size_t bytes);
+JS_PUBLIC_API void* js_arena_malloc(arena_id_t arena, size_t bytes);
+JS_PUBLIC_API void* js_arena_calloc(arena_id_t arena, size_t bytes);
+JS_PUBLIC_API void* js_arena_calloc(arena_id_t arena, size_t nmemb, size_t size);
+JS_PUBLIC_API void* js_arena_realloc(arena_id_t arena, void* p, size_t bytes);
 
-// js_strdup was only partially removed from the custom allocator api.
-// The custom allocator still needs to declare it, but can't define it because
-// a it's defined elsewhere
-JS_PUBLIC_API(char*) js_strdup(const char* s);
 
-#define JS_OOM_POSSIBLY_FAIL() do {} while(0)                                                     
-#define JS_OOM_POSSIBLY_FAIL_BOOL() do {} while(0)                                                
-#define JS_STACK_OOM_POSSIBLY_FAIL() do {} while(0)                                               
-#define JS_STACK_OOM_POSSIBLY_FAIL_REPORT() do {} while(0)                                        
-#define JS_INTERRUPT_POSSIBLY_FAIL() do {} while(0)                                               
+// Malloc allocation.
 
 namespace js {
 
+extern JS_PUBLIC_DATA arena_id_t MallocArena;
+extern JS_PUBLIC_DATA arena_id_t ArrayBufferContentsArena;
+extern JS_PUBLIC_DATA arena_id_t StringBufferArena;
+
 extern void InitMallocAllocator();
 extern void ShutDownMallocAllocator();
+
+// This is a no-op if built without MOZ_MEMORY and MOZ_DEBUG.
+extern void AssertJSStringBufferInCorrectArena(const void* ptr);
+
+} /* namespace js */
+
+namespace js {
+
+/* Disable OOM testing in sections which are not OOM safe. */
+struct MOZ_RAII JS_PUBLIC_DATA AutoEnterOOMUnsafeRegion {
+    MOZ_NORETURN MOZ_COLD void crash(const char* reason);
+    MOZ_NORETURN MOZ_COLD void crash(size_t size, const char* reason);
+
+    using AnnotateOOMAllocationSizeCallback = void (*)(size_t);
+    static mozilla::Atomic<AnnotateOOMAllocationSizeCallback, mozilla::Relaxed>
+        annotateOOMSizeCallback;
+    static void setAnnotateOOMAllocationSizeCallback(AnnotateOOMAllocationSizeCallback callback) {
+        annotateOOMSizeCallback = callback;
+    }
+
+#if defined(DEBUG) || defined(JS_OOM_BREAKPOINT)
+    AutoEnterOOMUnsafeRegion() : oomEnabled_(oom::simulator.isThreadSimulatingAny()) {
+        if (oomEnabled_) {
+            MOZ_ALWAYS_TRUE(owner_.compareExchange(nullptr, this));
+            oom::simulator.setInUnsafeRegion(true);
+        }
+    }
+
+    ~AutoEnterOOMUnsafeRegion() {
+        if (oomEnabled_) {
+            oom::simulator.setInUnsafeRegion(false);
+            MOZ_ALWAYS_TRUE(owner_.compareExchange(this, nullptr));
+        }
+    }
+
+private:
+    // Used to catch concurrent use from other threads.
+    static mozilla::Atomic<AutoEnterOOMUnsafeRegion*> owner_;
+
+    bool oomEnabled_;
+#endif
+};
 
 } /* namespace js */

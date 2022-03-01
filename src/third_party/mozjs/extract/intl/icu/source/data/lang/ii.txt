@@ -1,0 +1,42 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ii{
+    Languages{
+        de{"ꄓꇩꉙ"}
+        en{"ꑱꇩꉙ"}
+        es{"ꑭꀠꑸꉙ"}
+        fr{"ꃔꇩꉙ"}
+        ii{"ꆈꌠꉙ"}
+        it{"ꑴꄊꆺꉙ"}
+        ja{"ꏝꀪꉙ"}
+        pt{"ꁍꄨꑸꉙ"}
+        pt_BR{"ꀠꑟꁍꄨꑸꉙ"}
+        ru{"ꊉꇩꉙ"}
+        und{"ꅉꀋꌠꅇꂷ"}
+        zh{"ꍏꇩꉙ"}
+        zh_Hans{"ꈝꐯꍏꇩꉙ"}
+        zh_Hant{"ꀎꋏꍏꇩꉙ"}
+    }
+    Scripts{
+        Arab{"ꀊꇁꀨꁱꂷ"}
+        Cyrl{"ꀊꆨꌦꇁꃚꁱꂷ"}
+        Hans{"ꈝꐯꉌꈲꁱꂷ"}
+        Hant{"ꀎꋏꉌꈲꁱꂷ"}
+        Latn{"ꇁꄀꁱꂷ"}
+        Yiii{"ꆈꌠꁱꂷ"}
+        Zxxx{"ꁱꀋꉆꌠ"}
+        Zzzz{"ꅉꀋꐚꌠꁱꂷ"}
+    }
+    Types{
+        calendar{
+            gregorian{"ꄉꉻꃅꑍ"}
+            islamic{"ꑳꌦꇂꑍꉖ"}
+        }
+    }
+    codePatterns{
+        language{"ꅇꉙ: {0}"}
+        script{"ꇇꁱ: {0}"}
+        territory{"ꃅꄷ: {0}"}
+    }
+}

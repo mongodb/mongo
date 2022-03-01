@@ -1,0 +1,84 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_UY{
+    %%Parent{"es_419"}
+    NumberElements{
+        latn{
+            patterns{
+                accountingFormat{"¤ #,##0.00;(¤ #,##0.00)"}
+                currencyFormat{"¤ #,##0.00"}
+            }
+            symbols{
+                decimal{","}
+                group{"."}
+            }
+        }
+    }
+    calendar{
+        gregorian{
+            monthNames{
+                format{
+                    abbreviated{
+                        "ene.",
+                        "feb.",
+                        "mar.",
+                        "abr.",
+                        "may.",
+                        "jun.",
+                        "jul.",
+                        "ago.",
+                        "set.",
+                        "oct.",
+                        "nov.",
+                        "dic.",
+                    }
+                    wide{
+                        "enero",
+                        "febrero",
+                        "marzo",
+                        "abril",
+                        "mayo",
+                        "junio",
+                        "julio",
+                        "agosto",
+                        "setiembre",
+                        "octubre",
+                        "noviembre",
+                        "diciembre",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Ene.",
+                        "Feb.",
+                        "Mar.",
+                        "Abr.",
+                        "May.",
+                        "Jun.",
+                        "Jul.",
+                        "Ago.",
+                        "Set.",
+                        "Oct.",
+                        "Nov.",
+                        "Dic.",
+                    }
+                    wide{
+                        "Enero",
+                        "Febrero",
+                        "Marzo",
+                        "Abril",
+                        "Mayo",
+                        "Junio",
+                        "Julio",
+                        "Agosto",
+                        "Setiembre",
+                        "Octubre",
+                        "Noviembre",
+                        "Diciembre",
+                    }
+                }
+            }
+        }
+    }
+}

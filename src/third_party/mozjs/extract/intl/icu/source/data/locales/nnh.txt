@@ -1,0 +1,253 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+nnh{
+    AuxExemplarCharacters{"[q r x]"}
+    ExemplarCharacters{
+        "[a á à â ǎ b c d e é è ê ě ɛ {ɛ\u0301} {ɛ\u0300} {ɛ\u0302} {ɛ\u030C} f g h i"
+        " í ì j k l m ḿ n ń ŋ o ó ò ô ǒ ɔ {ɔ\u0301} {ɔ\u0300} {ɔ\u0302} {ɔ\u030C} p {"
+        "pf} s {sh} t {ts} u ú ù û ǔ ʉ {ʉ\u0301} {ʉ\u0300} {ʉ\u0302} {ʉ\u030C} v w ẅ "
+        "y ÿ z ʼ]"
+    }
+    ExemplarCharactersIndex{
+        "[A B C D E Ɛ F G H I J K L M N Ŋ O Ɔ P {Pf} R S {Sh} T {Ts} U Ʉ V W Ẅ Y Ÿ Z "
+        "ʼ]"
+    }
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    ExemplarCharactersPunctuation{"[, ; \\: ! ? . ' ‘ ’ « »]"}
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"¤ #,##0.00"}
+                decimalFormat{"#,##0.###"}
+            }
+            symbols{
+                decimal{","}
+                group{"."}
+                list{";"}
+                percentSign{"%"}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE , 'lyɛ'̌ʼ d 'na' MMMM, y G",
+                "'lyɛ'̌ʼ d 'na' MMMM, y G",
+                "d MMM, y G",
+                "dd/MM/yy GGGGG",
+                "{1} {0}",
+                "{1},{0}",
+                "{1}, {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                yMEd{"E , 'lyɛ'̌ʼ d 'na' M, y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E , 'lyɛ'̌ʼ d 'na' MMM, y"}
+                yMMMd{"'lyɛ'̌ʼ d 'na' MMMM, y"}
+                yMd{"d/M/y"}
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "mbaʼámbaʼ",
+                "ncwònzém",
+            }
+            AmPmMarkersAbbr{
+                "mbaʼámbaʼ",
+                "ncwònzém",
+            }
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE , 'lyɛ'̌ʼ d 'na' MMMM, y",
+                "'lyɛ'̌ʼ d 'na' MMMM, y",
+                "d MMM, y",
+                "dd/MM/yy",
+                "{1} {0}",
+                "{1},{0}",
+                "{1}, {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                yMEd{"E , 'lyɛ'̌ʼ d 'na' M, y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E , 'lyɛ'̌ʼ d 'na' MMM, y"}
+                yMMMd{"'lyɛ'̌ʼ d 'na' MMMM, y"}
+                yMd{"d/M/y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "lyɛʼɛ́ sẅíŋtè",
+                        "mvfò lyɛ̌ʼ",
+                        "mbɔ́ɔntè mvfò lyɛ̌ʼ",
+                        "tsètsɛ̀ɛ lyɛ̌ʼ",
+                        "mbɔ́ɔntè tsetsɛ̀ɛ lyɛ̌ʼ",
+                        "mvfò màga lyɛ̌ʼ",
+                        "màga lyɛ̌ʼ",
+                    }
+                    short{
+                        "lyɛʼɛ́ sẅíŋtè",
+                        "mvfò lyɛ̌ʼ",
+                        "mbɔ́ɔntè mvfò lyɛ̌ʼ",
+                        "tsètsɛ̀ɛ lyɛ̌ʼ",
+                        "mbɔ́ɔntè tsetsɛ̀ɛ lyɛ̌ʼ",
+                        "mvfò màga lyɛ̌ʼ",
+                        "màga lyɛ̌ʼ",
+                    }
+                    wide{
+                        "lyɛʼɛ́ sẅíŋtè",
+                        "mvfò lyɛ̌ʼ",
+                        "mbɔ́ɔntè mvfò lyɛ̌ʼ",
+                        "tsètsɛ̀ɛ lyɛ̌ʼ",
+                        "mbɔ́ɔntè tsetsɛ̀ɛ lyɛ̌ʼ",
+                        "mvfò màga lyɛ̌ʼ",
+                        "màga lyɛ̌ʼ",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "lyɛʼɛ́ sẅíŋtè",
+                        "mvfò lyɛ̌ʼ",
+                        "mbɔ́ɔntè mvfò lyɛ̌ʼ",
+                        "tsètsɛ̀ɛ lyɛ̌ʼ",
+                        "mbɔ́ɔntè tsetsɛ̀ɛ lyɛ̌ʼ",
+                        "mvfò màga lyɛ̌ʼ",
+                        "màga lyɛ̌ʼ",
+                    }
+                    short{
+                        "lyɛʼɛ́ sẅíŋtè",
+                        "mvfò lyɛ̌ʼ",
+                        "mbɔ́ɔntè mvfò lyɛ̌ʼ",
+                        "tsètsɛ̀ɛ lyɛ̌ʼ",
+                        "mbɔ́ɔntè tsetsɛ̀ɛ lyɛ̌ʼ",
+                        "mvfò màga lyɛ̌ʼ",
+                        "màga lyɛ̌ʼ",
+                    }
+                    wide{
+                        "lyɛʼɛ́ sẅíŋtè",
+                        "mvfò lyɛ̌ʼ",
+                        "mbɔ́ɔntè mvfò lyɛ̌ʼ",
+                        "tsètsɛ̀ɛ lyɛ̌ʼ",
+                        "mbɔ́ɔntè tsetsɛ̀ɛ lyɛ̌ʼ",
+                        "mvfò màga lyɛ̌ʼ",
+                        "màga lyɛ̌ʼ",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "m.z.Y.",
+                    "m.g.n.Y.",
+                }
+                wide{
+                    "mé zyé Yěsô",
+                    "mé gÿo ńzyé Yěsô",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "saŋ tsetsɛ̀ɛ lùm",
+                        "saŋ kàg ngwóŋ",
+                        "saŋ lepyè shúm",
+                        "saŋ cÿó",
+                        "saŋ tsɛ̀ɛ cÿó",
+                        "saŋ njÿoláʼ",
+                        "saŋ tyɛ̀b tyɛ̀b mbʉ̀ŋ",
+                        "saŋ mbʉ̀ŋ",
+                        "saŋ ngwɔ̀ʼ mbÿɛ",
+                        "saŋ tàŋa tsetsáʼ",
+                        "saŋ mejwoŋó",
+                        "saŋ lùm",
+                    }
+                    wide{
+                        "saŋ tsetsɛ̀ɛ lùm",
+                        "saŋ kàg ngwóŋ",
+                        "saŋ lepyè shúm",
+                        "saŋ cÿó",
+                        "saŋ tsɛ̀ɛ cÿó",
+                        "saŋ njÿoláʼ",
+                        "saŋ tyɛ̀b tyɛ̀b mbʉ̀ŋ",
+                        "saŋ mbʉ̀ŋ",
+                        "saŋ ngwɔ̀ʼ mbÿɛ",
+                        "saŋ tàŋa tsetsáʼ",
+                        "saŋ mejwoŋó",
+                        "saŋ lùm",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "saŋ tsetsɛ̀ɛ lùm",
+                        "saŋ kàg ngwóŋ",
+                        "saŋ lepyè shúm",
+                        "saŋ cÿó",
+                        "saŋ tsɛ̀ɛ cÿó",
+                        "saŋ njÿoláʼ",
+                        "saŋ tyɛ̀b tyɛ̀b mbʉ̀ŋ",
+                        "saŋ mbʉ̀ŋ",
+                        "saŋ ngwɔ̀ʼ mbÿɛ",
+                        "saŋ tàŋa tsetsáʼ",
+                        "saŋ mejwoŋó",
+                        "saŋ lùm",
+                    }
+                    wide{
+                        "saŋ tsetsɛ̀ɛ lùm",
+                        "saŋ kàg ngwóŋ",
+                        "saŋ lepyè shúm",
+                        "saŋ cÿó",
+                        "saŋ tsɛ̀ɛ cÿó",
+                        "saŋ njÿoláʼ",
+                        "saŋ tyɛ̀b tyɛ̀b mbʉ̀ŋ",
+                        "saŋ mbʉ̀ŋ",
+                        "saŋ ngwɔ̀ʼ mbÿɛ",
+                        "saŋ tàŋa tsetsáʼ",
+                        "saŋ mejwoŋó",
+                        "saŋ lùm",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"”"}
+        alternateQuotationStart{"“"}
+        quotationEnd{"»"}
+        quotationStart{"«"}
+    }
+    fields{
+        day{
+            dn{"lyɛ̌ʼ"}
+            relative{
+                "-1"{"jǔɔ gẅie à ka tɔ̌g"}
+                "0"{"lyɛ̌ʼɔɔn"}
+                "1"{"jǔɔ gẅie à ne ntóo"}
+            }
+        }
+        era{
+            dn{"tsɔ́ fʉ̀ʼ"}
+        }
+        hour{
+            dn{"fʉ̀ʼ nèm"}
+        }
+        weekday{
+            dn{"ngàba láʼ"}
+        }
+        year{
+            dn{"ngùʼ"}
+        }
+    }
+    measurementSystemNames{
+        metric{"fʉ̀ʼʉ mmó"}
+    }
+}

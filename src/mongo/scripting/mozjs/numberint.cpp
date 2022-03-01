@@ -31,6 +31,8 @@
 
 #include "mongo/scripting/mozjs/numberint.h"
 
+#include <js/Object.h>
+
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
@@ -51,21 +53,21 @@ const JSFunctionSpec NumberIntInfo::methods[5] = {
 
 const char* const NumberIntInfo::className = "NumberInt";
 
-void NumberIntInfo::finalize(js::FreeOp* fop, JSObject* obj) {
-    auto x = static_cast<int*>(JS_GetPrivate(obj));
+void NumberIntInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+    auto x = static_cast<int*>(JS::GetPrivate(obj));
 
     if (x)
         getScope(fop)->trackedDelete(x);
 }
 
 int NumberIntInfo::ToNumberInt(JSContext* cx, JS::HandleValue thisv) {
-    auto x = static_cast<int*>(JS_GetPrivate(thisv.toObjectOrNull()));
+    auto x = static_cast<int*>(JS::GetPrivate(thisv.toObjectOrNull()));
 
     return x ? *x : 0;
 }
 
 int NumberIntInfo::ToNumberInt(JSContext* cx, JS::HandleObject thisv) {
-    auto x = static_cast<int*>(JS_GetPrivate(thisv));
+    auto x = static_cast<int*>(JS::GetPrivate(thisv));
 
     return x ? *x : 0;
 }
@@ -112,7 +114,7 @@ void NumberIntInfo::construct(JSContext* cx, JS::CallArgs args) {
         uasserted(ErrorCodes::BadValue, "NumberInt takes 0 or 1 arguments");
     }
 
-    JS_SetPrivate(thisv, scope->trackedNew<int>(x));
+    JS::SetPrivate(thisv, scope->trackedNew<int>(x));
 
     args.rval().setObjectOrNull(thisv);
 }

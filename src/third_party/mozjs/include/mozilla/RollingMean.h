@@ -10,10 +10,10 @@
 #define mozilla_RollingMean_h_
 
 #include "mozilla/Assertions.h"
-#include "mozilla/TypeTraits.h"
 #include "mozilla/Vector.h"
 
 #include <stddef.h>
+#include <type_traits>
 
 namespace mozilla {
 
@@ -26,44 +26,30 @@ namespace mozilla {
  *
  * WARNING: Float types are not supported due to rounding errors.
  */
-template<typename T, typename S>
-class RollingMean
-{
-private:
+template <typename T, typename S>
+class RollingMean {
+ private:
   size_t mInsertIndex;
   size_t mMaxValues;
   Vector<T> mValues;
   S mTotal;
 
-public:
-  static_assert(!IsFloatingPoint<T>::value,
+ public:
+  static_assert(!std::is_floating_point_v<T>,
                 "floating-point types are unsupported due to rounding "
                 "errors");
 
   explicit RollingMean(size_t aMaxValues)
-    : mInsertIndex(0),
-      mMaxValues(aMaxValues),
-      mTotal(0)
-  {
+      : mInsertIndex(0), mMaxValues(aMaxValues), mTotal(0) {
     MOZ_ASSERT(aMaxValues > 0);
   }
 
-  RollingMean& operator=(RollingMean&& aOther)
-  {
-    MOZ_ASSERT(this != &aOther, "self-assignment is forbidden");
-    this->~RollingMean();
-    new(this) RollingMean(aOther.mMaxValues);
-    mInsertIndex = aOther.mInsertIndex;
-    mTotal = aOther.mTotal;
-    mValues.swap(aOther.mValues);
-    return *this;
-  }
+  RollingMean& operator=(RollingMean&& aOther) = default;
 
   /**
    * Insert a value into the rolling mean.
    */
-  bool insert(T aValue)
-  {
+  bool insert(T aValue) {
     MOZ_ASSERT(mValues.length() <= mMaxValues);
 
     if (mValues.length() == mMaxValues) {
@@ -83,33 +69,25 @@ public:
   /**
    * Calculate the rolling mean.
    */
-  T mean()
-  {
+  T mean() const {
     MOZ_ASSERT(!empty());
     return T(mTotal / int64_t(mValues.length()));
   }
 
-  bool empty()
-  {
-    return mValues.empty();
-  }
+  bool empty() const { return mValues.empty(); }
 
   /**
    * Remove all values from the rolling mean.
    */
-  void clear()
-  {
+  void clear() {
     mValues.clear();
     mInsertIndex = 0;
     mTotal = T(0);
   }
 
-  size_t maxValues()
-  {
-    return mMaxValues;
-  }
+  size_t maxValues() const { return mMaxValues; }
 };
 
-} // namespace mozilla
+}  // namespace mozilla
 
-#endif // mozilla_RollingMean_h_
+#endif  // mozilla_RollingMean_h_

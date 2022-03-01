@@ -1,0 +1,96 @@
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+######################################################################
+# Copyright (C) 2007-2014, International Business Machines
+# Corporation and others.  All Rights Reserved.
+######################################################################
+# This is an ICU-specific file with the same format as regular
+# tzdata time zone files, for consistent parsing by the tools that
+# turn "Olson" tzdata into ICU's zoneinfo.txt.
+# The purpose of this file is to give ICU a superset of the time zones
+# that are in CLDR and also include legacy ICU time zones originally
+# in tz.alias for rataining backward compatibility.
+
+# Add Etc/Unknown, defined by CLDR. Give it Etc/GMT behavior.
+
+# Zone	NAME		GMTOFF	RULES	FORMAT
+Zone	Etc/Unknown	0	-	Unknown
+
+# SystemV time zones.
+# IANA tzdb file 'systemv' file has these SystemV/* zones commented out up to 2020a.
+# 'systemv' file was removed in 2020b. We keep them in this supplemental zone data
+# file for compatibility purpose.
+
+# Rule	NAME	FROM	TO	TYPE	IN	ON	AT	SAVE	LETTER/S
+Rule	SystemV	min	1973	-	Apr	lastSun	2:00	1:00	D
+Rule	SystemV	min	1973	-	Oct	lastSun	2:00	0	S
+Rule	SystemV	1974	only	-	Jan	6	2:00	1:00	D
+Rule	SystemV	1974	only	-	Nov	lastSun	2:00	0	S
+Rule	SystemV	1975	only	-	Feb	23	2:00	1:00	D
+Rule	SystemV	1975	only	-	Oct	lastSun	2:00	0	S
+Rule	SystemV	1976	max	-	Apr	lastSun	2:00	1:00	D
+Rule	SystemV	1976	max	-	Oct	lastSun	2:00	0	S
+
+# Zone	NAME		GMTOFF	RULES/SAVE	FORMAT	[UNTIL]
+Zone	SystemV/AST4ADT	-4:00	SystemV		A%sT
+Zone	SystemV/EST5EDT	-5:00	SystemV		E%sT
+Zone	SystemV/CST6CDT	-6:00	SystemV		C%sT
+Zone	SystemV/MST7MDT	-7:00	SystemV		M%sT
+Zone	SystemV/PST8PDT	-8:00	SystemV		P%sT
+Zone	SystemV/YST9YDT	-9:00	SystemV		Y%sT
+Zone	SystemV/AST4	-4:00	-		AST
+Zone	SystemV/EST5	-5:00	-		EST
+Zone	SystemV/CST6	-6:00	-		CST
+Zone	SystemV/MST7	-7:00	-		MST
+Zone	SystemV/PST8	-8:00	-		PST
+Zone	SystemV/YST9	-9:00	-		YST
+Zone	SystemV/HST10	-10:00	-		HST
+
+# pacificnew
+# IANA tzdb file 'pacificnew' used to contain a Link for US/Pacific-New.
+# 'pacificnew' file was removed in 2020b. We keep the Link here for compatibility.
+Link America/Los_Angeles US/Pacific-New
+
+
+# The list below is for supporting legacy ICU zone aliases.
+# These definitions were originally defined in tz.alias.
+
+#### Aliases that conflict with Olson compatibility Zone definition
+
+Link Australia/Darwin ACT
+Link Australia/Sydney AET
+Link America/Argentina/Buenos_Aires AGT
+Link Africa/Cairo ART
+Link America/Anchorage AST
+Link America/Sao_Paulo BET
+Link Asia/Dhaka BST
+Link Africa/Maputo CAT
+Link America/St_Johns CNT
+Link America/Chicago CST
+Link Asia/Shanghai CTT
+Link Africa/Addis_Ababa EAT
+Link Europe/Paris ECT
+#Link Europe/Istanbul EET # EET is a standard UNIX zone
+####Link EST America/New_York EST # Defined as -05:00
+####Link Pacific/Honolulu HST # Defined as -10:00
+Link America/Indiana/Indianapolis IET
+Link Asia/Kolkata IST
+Link Asia/Tokyo JST
+#Link Asia/Tehran MET # MET is a standard UNIX zone
+Link Pacific/Apia MIT
+####Link America/Denver MST # Defined as -07:00
+Link Asia/Yerevan NET
+Link Pacific/Auckland NST
+Link Asia/Karachi PLT
+Link America/Phoenix PNT
+Link America/Puerto_Rico PRT
+Link America/Los_Angeles PST
+Link Pacific/Guadalcanal SST
+#Link Etc/UTC UTC # Olson LINK
+Link Asia/Ho_Chi_Minh VST
+
+#
+# Aliases already dropped from the TZ database.
+# ICU may also remove these aliases.
+#
+Link America/Regina Canada/East-Saskatchewan # removed from backward in 2017c

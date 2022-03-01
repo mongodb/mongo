@@ -1,0 +1,595 @@
+﻿// Copyright (C) 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Copyright (c) 2007-2015 International Business Machines
+// Corporation and others. All Rights Reserved.
+format:table(nofallback) {
+    Info {
+        Description { "These are the data driven format tests" }
+        LongDescription {   "Data for data driven format tests." }
+    }
+    TestData {
+        TestDateFormatBasic {
+            Info {
+                Description { "Test data for format and parse :" }
+            }
+            Settings {
+                // options: 'format', or 'parse'.  One can be omitted if this is a 1 way test.
+                {
+                    Type { "date_format" }
+                },
+                {
+                    Type { "date_parse" }
+                },
+            }
+            Headers { "locale", "zone", "spec", "date", "str"}
+            // locale: locale including calendar type
+            // zone:   time zone name, or "" to not explicitly set zone
+            // spec:   either 'PATTERN=y mm h' etc, or 'DATE=SHORT,TIME=LONG'
+            // date:   either 'MILLIS=####' where #### is millis,
+            //        or a calendar spec ERA=0,YEAR=1, etc.. applied to the calendar type specified by the locale
+            //        or RELATIVE_MILLIS=### where ### is a signed value which is added to the current millis
+            //        or RELATIVE_ADD:DATE=1  which means that the field "DATE" will be added by +1 relative to current time,
+            //           and any other fields present will be set explicitly.
+            // str:   the expected unicode string
+            Cases { 
+               {
+                    "en_US@calendar=gregorian",
+                    "",
+                    "DATE=SHORT,TIME=SHORT",
+                    "ERA=1,YEAR=2007,MONTH=AUGUST,DATE=8,HOUR_OF_DAY=18,MINUTE=54,SECOND=0",
+                    "8/8/07, 6:54 PM"
+               },
+               {
+                    "zh_TW@calendar=roc",
+                    "",
+                    "DATE=LONG",
+                    "ERA=1,YEAR=98,MONTH=0,DATE=24",
+                    "民國98年1月24日",
+               },
+               {
+                    //民國前2年1月24日 -> 1910-1-24 
+                    "zh_TW@calendar=roc",
+                    "",
+                    "DATE=LONG",
+                    "ERA=0,YEAR=2,MONTH=0,DATE=24",
+                    "民國前2年1月24日",
+               },
+            }
+        }
+        TestFormatRelative {
+            Info {
+                Description { "relative format :" }
+            }
+            Settings {
+                {
+                    Type { "date_format" }
+                },
+            }
+            Headers { "locale", "zone", "spec", "date", "str"}
+            Cases { 
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "DATE=RELATIVE_SHORT",
+                    "RELATIVE_ADD:DATE=1", // one day from now
+                    "tomorrow"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "DATE=RELATIVE_SHORT",
+                    "RELATIVE_MILLIS=0", // today
+                    "today"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "DATE=RELATIVE_SHORT",
+                    "RELATIVE_ADD:DATE=-1", // one day before now
+                    "yesterday"
+               },
+               // date only, out of relative range
+               {
+                    "en_US@calendar=gregorian",         
+                    "GMT",
+                    "DATE=RELATIVE_FULL",
+                    "ERA=1,YEAR=2012,MONTH=OCTOBER,DATE=8,HOUR_OF_DAY=23,MINUTE=59,SECOND=0",
+                    "Monday, October 8, 2012"
+               },
+               // time only
+               {
+                    "en_US@calendar=gregorian",         
+                    "GMT",
+                    "TIME=LONG",
+                    "ERA=1,YEAR=2012,MONTH=OCTOBER,DATE=8,HOUR_OF_DAY=23,MINUTE=59,SECOND=0",
+                    "11:59:00 PM GMT"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "GMT",
+                    "TIME=LONG",
+                    "RELATIVE_ADD:DATE=-1,HOUR_OF_DAY=17,MINUTE=0,SECOND=0", // one day before now at specified time
+                    "5:00:00 PM GMT"
+               },
+               // normal formats, combined using 'at'
+               {
+                    "en_US@calendar=gregorian",         
+                    "GMT",
+                    "DATE=RELATIVE_FULL,TIME=LONG",
+                    "ERA=1,YEAR=2012,MONTH=OCTOBER,DATE=8,HOUR_OF_DAY=23,MINUTE=59,SECOND=0",
+                    "Monday, October 8, 2012 at 11:59:00 PM GMT"
+               },
+               // normal formats, combined using ", "
+               {
+                    "en_US@calendar=gregorian",         
+                    "GMT",
+                    "DATE=RELATIVE_MEDIUM,TIME=SHORT",
+                    "ERA=1,YEAR=2012,MONTH=OCTOBER,DATE=8,HOUR_OF_DAY=23,MINUTE=59,SECOND=0",
+                    "Oct 8, 2012, 11:59 PM"
+               },
+               // formats with relative day, combined using 'at'
+               {
+                    "en_US@calendar=gregorian",         
+                    "GMT",
+                    "DATE=RELATIVE_FULL,TIME=LONG",
+                    "RELATIVE_ADD:DATE=-1,HOUR_OF_DAY=17,MINUTE=0,SECOND=0", // one day before now at specified time
+                    "yesterday at 5:00:00 PM GMT"
+               },
+               // formats with relative day, combined using ", "
+               {
+                    "en_US@calendar=gregorian",         
+                    "GMT",
+                    "DATE=RELATIVE_MEDIUM,TIME=SHORT",
+                    "RELATIVE_ADD:DATE=-1,HOUR_OF_DAY=17,MINUTE=0,SECOND=0", // one day before now at specified time
+                    "yesterday, 5:00 PM"
+               },
+               // normal formats that have quoted literals, combined
+               {
+                    "pt@calendar=gregorian",         
+                    "GMT",
+                    "DATE=RELATIVE_FULL,TIME=LONG",
+                    "ERA=1,YEAR=2012,MONTH=OCTOBER,DATE=8,HOUR_OF_DAY=23,MINUTE=59,SECOND=0",
+                    "segunda-feira, 8 de outubro de 2012 23:59:00 GMT"
+               },
+               // vi combined formats have time first
+               {
+                    "vi@calendar=gregorian",         
+                    "GMT",
+                    "DATE=RELATIVE_LONG,TIME=MEDIUM",
+                    "ERA=1,YEAR=2012,MONTH=OCTOBER,DATE=8,HOUR_OF_DAY=23,MINUTE=59,SECOND=0",
+                    "23:59:00 8 tháng 10, 2012"
+               },
+               {
+                    "vi@calendar=gregorian",         
+                    "GMT",
+                    "DATE=RELATIVE_LONG,TIME=MEDIUM",
+                    "RELATIVE_ADD:DATE=-1,HOUR_OF_DAY=17,MINUTE=0,SECOND=0", // one day before now at specified time
+                    "17:00:00 Hôm qua"
+               },
+               // el combines formats using hyphen
+               {
+                    "el@calendar=gregorian",         
+                    "GMT",
+                    "DATE=RELATIVE_LONG,TIME=MEDIUM",
+                    "ERA=1,YEAR=2012,MONTH=OCTOBER,DATE=8,HOUR_OF_DAY=23,MINUTE=59,SECOND=0",
+                    "8 Οκτωβρίου 2012 - 11:59:00 μ.μ."
+               },
+               {
+                    "el@calendar=gregorian",         
+                    "GMT",
+                    "DATE=RELATIVE_LONG,TIME=MEDIUM",
+                    "RELATIVE_ADD:DATE=-1,HOUR_OF_DAY=17,MINUTE=0,SECOND=0", // one day before now at specified time
+                    "χθες - 5:00:00 μ.μ."
+               },
+              // other tests
+               {
+                    "mt_MT@calendar=gregorian",         
+                    "",
+                    "DATE=RELATIVE_SHORT",
+                    "RELATIVE_ADD:DATE=1", // one day from now
+                    "għada"
+               },
+               {
+                    "mt_MT@calendar=gregorian",         
+                    "",
+                    "DATE=RELATIVE_SHORT",
+                    "RELATIVE_MILLIS=0", // today
+                    "illum"
+               },
+               {
+                    "mt_MT@calendar=gregorian",         
+                    "",
+                    "DATE=RELATIVE_SHORT",
+                    "RELATIVE_ADD:DATE=-1", // one day before now
+                    "lbieraħ"
+               },
+               {
+                    "ru",
+                    "",
+                    "DATE=RELATIVE_SHORT",
+                    "RELATIVE_ADD:DATE=-2", // 2 days ago
+                    "позавчера"
+               },
+            }
+        }
+        TestYearLengths {
+            Info {
+                Description { "Test data for multiple year lengths, y yy yyy yyyy yyyyy:" }
+            }
+            Settings {
+                // options: 'format', or 'parse'.  One can be omitted if this is a 1 way test.
+                {
+                    Type { "date_format" }
+                },
+// These are not round trippable, so do not parse.
+//                {
+//                    Type { "date_parse" }
+//                },
+            }
+            Headers { "locale", "zone", "spec", "date", "str"}
+            // locale: locale including calendar type
+            // zone:   time zone name, or "" to not explicitly set zone
+            // spec:   either 'PATTERN=y mm h' etc, or 'DATE=SHORT,TIME=LONG'
+            // date:   either 'MILLIS=####' where #### is millis,
+            //        or a calendar spec ERA=0,YEAR=1, etc.. applied to the calendar type specified by the locale
+            //        or RELATIVE_MILLIS=### where ### is a signed value which is added to the current millis
+            //        or RELATIVE_ADD:DATE=1  which means that the field "DATE" will be added by +1 relative to current time,
+            //           and any other fields present will be set explicitly.
+            // str:   the expected unicode string
+           
+// from CLDR UTS 35: 
+//Year  	y  	yy  	yyy  	yyyy  	yyyyy
+            
+            Cases { 
+//AD 1 	    1 	01 	001 	0001 	00001
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G y",
+                    "YEAR=1",
+                    "AD 1"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yy",
+                    "YEAR=1",
+                    "AD 01"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yyy",
+                    "YEAR=1",
+                    "AD 001"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yyyy",
+                    "YEAR=1",
+                    "AD 0001"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yyyyy",
+                    "YEAR=1",
+                    "AD 00001"
+               },
+//AD 12 	12 	12 	012 	0012 	00012
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G y",
+                    "YEAR=12",
+                    "AD 12"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yy",
+                    "YEAR=12",
+                    "AD 12"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yyy",
+                    "YEAR=12",
+                    "AD 012"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yyyy",
+                    "YEAR=12",
+                    "AD 0012"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yyyyy",
+                    "YEAR=12",
+                    "AD 00012"
+               },
+//AD 123 	123 	23 	123 	0123 	00123
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G y",
+                    "YEAR=123",
+                    "AD 123"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yy",
+                    "YEAR=123",
+                    "AD 23"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yyy",
+                    "YEAR=123",
+                    "AD 123"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yyyy",
+                    "YEAR=123",
+                    "AD 0123"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yyyyy",
+                    "YEAR=123",
+                    "AD 00123"
+               },
+//AD 1234 	1234 	34 	1234 	1234 	01234
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G y",
+                    "YEAR=1234",
+                    "AD 1234"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yy",
+                    "YEAR=1234",
+                    "AD 34"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yyy",
+                    "YEAR=1234",
+                    "AD 1234"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yyyy",
+                    "YEAR=1234",
+                    "AD 1234"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yyyyy",
+                    "YEAR=1234",
+                    "AD 01234"
+               },
+//AD 12345 	12345 	45 	12345 	12345 	12345
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G y",
+                    "YEAR=12345",
+                    "AD 12345"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yy",
+                    "YEAR=12345",
+                    "AD 45"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yyy",
+                    "YEAR=12345",
+                    "AD 12345"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yyyy",
+                    "YEAR=12345",
+                    "AD 12345"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yyyyy",
+                    "YEAR=12345",
+                    "AD 12345"
+               },
+            }
+        }
+        TestConsistentPivot {
+            Info {
+                Description { "Test consistent pivot (parse/format) for multiple year lengths, y yy yyy yyyy yyyyy:" }
+            }
+            Settings {
+                // options: 'format', or 'parse'.  One can be omitted if this is a 1 way test.
+                {
+                    Type { "date_format" }
+                },
+                {
+                    Type { "date_parse" }
+                },
+            }
+            Headers { "locale", "zone", "spec", "date", "str"}
+            // locale: locale including calendar type
+            // zone:   time zone name, or "" to not explicitly set zone
+            // spec:   either 'PATTERN=y mm h' etc, or 'DATE=SHORT,TIME=LONG'
+            // date:   either 'MILLIS=####' where #### is millis,
+            //        or a calendar spec ERA=0,YEAR=1, etc.. applied to the calendar type specified by the locale
+            //        or RELATIVE_MILLIS=### where ### is a signed value which is added to the current millis
+            //        or RELATIVE_ADD:DATE=1  which means that the field "DATE" will be added by +1 relative to current time,
+            //           and any other fields present will be set explicitly.
+            // str:   the expected unicode string
+           
+// from CLDR UTS 35: 
+//Year  	y  	yy  	yyy  	yyyy  	yyyyy
+            
+            Cases { 
+//AD 1 	    1 	01 	001 	0001 	00001
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G y",
+                    "YEAR=2008",
+                    "AD 2008"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yy",
+                    "YEAR=2008",
+                    "AD 08"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yyy",
+                    "YEAR=2008",
+                    "AD 2008"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yyyy",
+                    "YEAR=2008",
+                    "AD 2008"
+               },
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=G yyyyy",
+                    "YEAR=2008",
+                    "AD 02008"
+               },
+
+				// Japanese
+//               {
+//                    "en_US@calendar=japanese",         
+//                    "",
+//                    "PATTERN=G y",
+//                    "YEAR=8",
+//                    "Heisei 8"
+//               },
+//               {
+//                    "en_US@calendar=japanese",         
+//                    "",
+//                    "PATTERN=G yy",
+//                    "YEAR=8",
+//                    "Heisei 08"
+//               },
+//               {
+//                    "en_US@calendar=japanese",         
+//                    "",
+//                    "PATTERN=G yyy",
+//                    "YEAR=8",
+//                    "Heisei 008"
+//               },
+//               {
+//                    "en_US@calendar=japanese",         
+//                    "",
+//                    "PATTERN=G yyyy",
+//                    "YEAR=8",
+//                    "Heisei 0008"
+//               },
+//               {
+//                    "en_US@calendar=japanese",         
+//                    "",
+//                    "PATTERN=G yyyyy",
+//                    "YEAR=8",
+//                    "Heisei 00008"
+//               },
+
+            }
+        }
+        TestHebrew{
+            Info {
+                Description { "Test Hebrew calendar:" }
+            }
+            Settings {
+                // options: 'format', or 'parse'.  One can be omitted if this is a 1 way test.
+                {
+                    Type { "date_format" }
+                },
+            }
+            Headers { "locale", "zone", "spec", "date", "str"}
+            // locale: locale including calendar type
+            // zone:   time zone name, or "" to not explicitly set zone
+            // spec:   either 'PATTERN=y mm h' etc, or 'DATE=SHORT,TIME=LONG'
+            // date:   either 'MILLIS=####' where #### is millis,
+            //        or a calendar spec ERA=0,YEAR=1, etc.. applied to the calendar type specified by the locale
+            //        or RELATIVE_MILLIS=### where ### is a signed value which is added to the current millis
+            //        or RELATIVE_ADD:DATE=1  which means that the field "DATE" will be added by +1 relative to current time,
+            //           and any other fields present will be set explicitly.
+            // str:   the expected unicode string
+            
+            Cases { 
+               {
+                    "en_US@calendar=hebrew",         
+                    "",
+                    "DATE=FULL,TIME=FULL",
+                    "MILLIS=3076424179200000",
+                    "Friday, 3 Heshvan 103217 at 12:00:00 AM GMT-08:00"
+               },
+            }    
+        }
+        TestMoreDateParse {
+            Info {
+                Description { "Additional date parse tests (may not
+               round/trip to format.)" }
+            }
+            Settings {
+                // options: 'format', or 'parse'.  One can be omitted if this is a 1 way test.
+                {
+                    Type { "date_parse" }
+                },
+            }
+            Headers { "locale", "zone", "spec", "date", "str"}
+            // locale: locale including calendar type
+            // zone:   time zone name, or "" to not explicitly set zone
+            // spec:   either 'PATTERN=y mm h' etc, or 'DATE=SHORT,TIME=LONG'
+            // date:   either 'MILLIS=####' where #### is millis,
+            //        or a calendar spec ERA=0,YEAR=1, etc.. applied to the calendar type specified by the locale
+            //        or RELATIVE_MILLIS=### where ### is a signed value which is added to the current millis
+            //        or RELATIVE_ADD:DATE=1  which means that the field "DATE" will be added by +1 relative to current time,
+            //           and any other fields present will be set explicitly.
+            // str:   the expected unicode string
+            
+            Cases { 
+               {
+                    "en_US@calendar=gregorian",         
+                    "",
+                    "PATTERN=YYYYHHmmssEEEww",
+                    "YEAR=1999,HOUR_OF_DAY=4,MINUTE=5,SECOND=6,DAY_OF_WEEK=2,WEEK_OF_YEAR=4",
+               // won't roundtrip.
+                    "1998040506MON56"
+               }
+            }    
+        }
+    }        
+}

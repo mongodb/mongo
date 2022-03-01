@@ -1,0 +1,155 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{D9DF7F2F-93B7-4810-B5CD-96F4F33C079B}</ProjectGuid>
+    <Keyword>MakeFileProj</Keyword>
+    <ConfigurationType>Makefile</ConfigurationType>
+    <UseOfMfc>false</UseOfMfc>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <!-- The following import will include the 'default' configuration options for VS projects. -->
+  <Import Project="..\allinone\Build.Windows.ProjectConfiguration.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
+    <OutDir>.\data\tmp\$(Platform)\</OutDir>
+    <IntDir>.\data\build\</IntDir>
+    <MakeCFG>$(Platform)\$(Configuration)</MakeCFG>
+    <DebugBuild Condition="'$(Configuration)'=='Debug'">true</DebugBuild>
+    <!-- The ICU projects use "Win32" to mean "x86", so we need to special case it. -->
+    <OutDir Condition="'$(Platform)'=='Win32'">.\data\tmp\x86\</OutDir>
+    <MakeCFG Condition="'$(Platform)'=='Win32'">x86\$(Configuration)</MakeCFG>
+    <!-- NMake -->
+    <NMakeBuildCommandLine>NMAKE /f makedata.mak ICUMAKE="$(ProjectDir)\" CFG=$(MakeCFG) DEBUG=$(DebugBuild)</NMakeBuildCommandLine>
+    <NMakeReBuildCommandLine>NMAKE /f makedata.mak ICUMAKE="$(ProjectDir)\" CFG=$(MakeCFG) clean all</NMakeReBuildCommandLine>
+    <NMakeCleanCommandLine>NMAKE /f makedata.mak ICUMAKE="$(ProjectDir)\" CFG=$(MakeCFG) clean</NMakeCleanCommandLine>
+    <NMakeOutput/>
+    <NMakePreprocessorDefinitions>$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
+    <NMakeIncludeSearchPath>$(NMakeIncludeSearchPath)</NMakeIncludeSearchPath>
+    <NMakeForcedIncludes>$(NMakeForcedIncludes)</NMakeForcedIncludes>
+    <NMakeAssemblySearchPath>$(NMakeAssemblySearchPath)</NMakeAssemblySearchPath>
+    <NMakeForcedUsingAssemblies>$(NMakeForcedUsingAssemblies)</NMakeForcedUsingAssemblies>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <BuildLog>
+      <Path>.\data\log\$(Platform)\$(Configuration)BuildLog.html</Path>
+    </BuildLog>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <None Include="brkitr\brkfiles.mk" />
+    <None Include="coll\colfiles.mk" />
+    <None Include="makedata.mak" />
+    <None Include="misc\miscfiles.mk" />
+    <None Include="rbnf\rbnffiles.mk" />
+    <None Include="locales\resfiles.mk" />
+    <None Include="..\test\testdata\testdata.mak" />
+    <None Include="translit\trnsfiles.mk" />
+    <None Include="mappings\ucmcore.mk" />
+    <None Include="mappings\ucmebcdic.mk" />
+    <None Include="mappings\ucmfiles.mk" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\common\common.vcxproj">
+      <Project>{73c0a65b-d1f2-4de1-b3a6-15dad2c23f3d}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\extra\uconv\uconv.vcxproj">
+      <Project>{dba4088d-f6f9-4f8f-8820-082a4765c16c}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\i18n\i18n.vcxproj">
+      <Project>{0178b127-6269-407d-b112-93877bb62776}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\io\io.vcxproj">
+      <Project>{c2b04507-2521-4801-bf0d-5fd79d6d518c}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\stubdata\stubdata.vcxproj">
+      <Project>{203ec78a-0531-43f0-a636-285439bde025}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\test\cintltst\cintltst.vcxproj">
+      <Project>{3d1246ae-1b32-479b-beca-aefa97be2321}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\test\intltest\intltest.vcxproj">
+      <Project>{73632960-b3a6-464d-83a3-4b43365f19b8}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\test\iotest\iotest.vcxproj">
+      <Project>{e4993e82-d68a-46ca-bae0-9d35e172e46f}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\tools\ctestfw\ctestfw.vcxproj">
+      <Project>{eca6b435-b4fa-4f9f-bf95-f451d078fc47}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\tools\genbrk\genbrk.vcxproj">
+      <Project>{c2be5000-7501-4e87-9724-b8d82494fae6}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\tools\genccode\genccode.vcxproj">
+      <Project>{fdd3c4f2-9805-44eb-9a77-bc1c1c95b547}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\tools\gencfu\gencfu.vcxproj">
+      <Project>{691ee0c0-dc57-4a48-8aee-8ed75eb3a057}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\tools\gencmn\gencmn.vcxproj">
+      <Project>{a8d36f8d-09e6-4174-91c3-7beaa9c3f04f}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\tools\gencnval\gencnval.vcxproj">
+      <Project>{8b41752b-5a52-41e4-b7e0-07921c0cc6bf}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\tools\gendict\gendict.vcxproj">
+      <Project>{9d4211f7-2c77-439c-82f0-30a4e43ba569}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\tools\gennorm2\gennorm2.vcxproj">
+      <Project>{c7891a65-80ab-4245-912e-5f1e17b0e6c4}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\tools\genrb\derb.vcxproj">
+      <Project>{d3065adb-8820-4cc7-9b6c-9510833961a3}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\tools\genrb\genrb.vcxproj">
+      <Project>{97521d06-ec47-45d4-8bd0-9e16b3f93b2a}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\tools\gensprep\gensprep.vcxproj">
+      <Project>{631c23ce-6c1d-4875-88f0-85e0a42b36ea}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\tools\gentest\gentest.vcxproj">
+      <Project>{77c78066-746f-4ea6-b3fe-b8c8a4a97891}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\tools\icupkg\icupkg.vcxproj">
+      <Project>{62d4b15d-7a90-4ecb-ba19-5e021d6a21bc}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\tools\makeconv\makeconv.vcxproj">
+      <Project>{f5ad9738-1a3d-4906-b9c4-a7d9ce33dc2c}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\tools\pkgdata\pkgdata.vcxproj">
+      <Project>{4c8454fe-81d3-4ca3-9927-29ba96f03dac}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\tools\toolutil\toolutil.vcxproj">
+      <Project>{6b231032-3cb5-4eed-9210-810d666a23a0}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

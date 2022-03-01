@@ -1,0 +1,103 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: rm_SURSILV_rm_FONIPA_SURSILV.txt
+# Generated from CLDR
+#
+
+# Transforms Rumantsch Sursilvan (rm-sursilv) to IPA (rm-fonipa-sursilv).
+#
+# References
+# ----------
+# [1] https://als.wikipedia.org/wiki/Surselvisch#Orthographi
+#     with links to sound recordings on Wikimedia Commons
+#
+# Output
+# ------
+# m n ɲ
+# p b t d c ɟ k ɡ
+# f v s z ʃ ʒ h
+# t\u0361ʃ t\u0361s
+# r l j ʎ
+# w
+# i u e ʊ ɛ ɔ a
+# ɪa\u032F ɪa\u032Fʊ\u032F ɪʊ\u032F ɪɛ\u032F u ʊa\u032F ʊa\u032Fʊ\u032F ʊɛ\u032F ʊɛ\u032Fɪ\u032F ʊɔ\u032F
+# ɛɪ\u032F ɛʊ\u032F aɪ\u032F aʊ\u032F
+::Lower;
+ai → aɪ\u032F ;
+au → aʊ\u032F ;
+a → a ;
+b → b ;
+{c} [ei] → t\u0361s ;
+c → k ;
+d → d ;
+ei → ɛɪ\u032F ;  # can also be /aɪ\u032F/ or /ɔɪ\u032F/ in some regions
+eu → ɛʊ\u032F ;
+e → e ;  # can also be /ɛ/; needs a dictionary
+é → e ;
+è → ɛ ;
+f → f ;
+ge → ɟ ;
+gh → ɡ ;
+gi → ɟ ;
+{gl} [aeou] → ɡl ;
+{gl} → ʎ ;
+gn → ɲ ;
+g → ɡ ;
+h → ;
+iau → ɪa\u032Fʊ\u032F ;
+ia → ɪa\u032F ;
+ie → ɪɛ\u032F ;
+iu → ɪʊ\u032F ;
+i → i ;
+j → j ;
+k → k ;
+l → l ;
+m → m ;
+n → n ;
+o → ɔ ;
+p → p ;
+q → k ;
+r → r ;
+{sch} [aeiou] → ʒ ;  # can also be /ʃ/; needs a dictionary
+{sch} → ʃ ;  # can also be /ʒ/; needs a dictionary
+{s} [cptnm] → ʃ ;
+{s} [gbdv] → ʒ ;
+s → s ;  # can also be /z/; needs a dictionary
+tg → c ;
+tsch → t\u0361ʃ ;
+t → t ;
+uau → ʊa\u032Fʊ\u032F ;
+ua → ʊa\u032F ;
+uei → ʊɛ\u032Fɪ\u032F ;
+ue → ʊɛ\u032F ;
+uo → ʊɔ\u032F ;
+u → u ;
+v → v ;
+w → v ;
+x → ks ;
+y → i ;
+z → t\u0361s ;
+::NULL;
+mm+ → mː;
+nn+ → nː;
+ɲɲ+ → ɲː;
+pp+ → pː;
+bb+ → bː;
+tt+ → tː;
+dd+ → dː;
+cc+ → cː ;
+ɟɟ+ → ɟː ;
+kk+ → kː ;
+ɡɡ+ → ɡː ;
+ff+ → fː ;
+vv+ → vː ;
+ss+ → sː ;
+zz+ → zː ;
+ʃʃ+ → ʃː ;
+ʒʒ+ → ʒː ;
+rr+ → rː ;
+ll+ → lː ;
+jj+ → jː ;
+

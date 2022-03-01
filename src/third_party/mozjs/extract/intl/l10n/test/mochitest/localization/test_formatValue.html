@@ -1,0 +1,76 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Test Localization.prototype.formatValue API</title>
+  <script src="chrome://mochikit/content/tests/SimpleTest/SimpleTest.js"></script>
+  <link rel="stylesheet" type="text/css" href="chrome://mochikit/content/tests/SimpleTest/test.css">
+  <script type="application/javascript">
+  "use strict";
+  async function* generateBundles(resourceIds) {
+    const bundle = new FluentBundle("en-US", {
+      useIsolating: false,
+    });
+    bundle.addResource(new FluentResource(`
+key1 = Value
+key2 = Value { $user }
+key3 = Value { $count }
+    `));
+    yield bundle;
+  }
+
+  (async () => {
+    SimpleTest.waitForExplicitFinish();
+
+    const loc = new Localization(
+      ['mock.ftl'],
+      false,
+      { generateBundles },
+    );
+
+    {
+      // Simple value works.
+      let val = await loc.formatValue("key1");
+      is(val, "Value");
+    }
+
+    {
+      // Value with a string argument works.
+      let val = await loc.formatValue("key2", { user: "John" });
+      is(val, "Value John");
+    }
+
+    {
+      // Value with a number argument works.
+      let val = await loc.formatValue("key3", { count: -3.21 });
+      is(val, "Value -3.21");
+    }
+
+    {
+      // Verify that in automation, a missing
+      // argument causes an exception.
+      try {
+        let val = await loc.formatValue("key3");
+        ok(false, "Missing argument didn't cause an exception.");
+      } catch (e) {
+        is(e,
+          "[fluent][resolver] errors in en-US/key3: Resolver error: Unknown variable: $count.",
+          "Missing key causes an exception.");
+      }
+    }
+
+    {
+      // Incorrect argument type works.
+      // Due to how WebIDL handles union types, it'll convert
+      // the argument to a string `[object Object]`.
+      let val = await loc.formatValue("key2", { user: { name: true } });
+      is(val, "Value [object Object]");
+    }
+
+    SimpleTest.finish();
+  })();
+  </script>
+</head>
+<body>
+</body>
+</html>

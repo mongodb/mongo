@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+ Copyright (C) 2016 and later: Unicode, Inc. and others.
+ License & terms of use: http://www.unicode.org/copyright.html
+ Copyright (c) 2014-2015 International Business Machines Corporation and others. All rights reserved.
+
+ See http://bugs.icu-project.org/trac/ticket/10750#comment:5 - this file is needed to emit break iterator rules properly.
+-->
+<!DOCTYPE ldml SYSTEM "../../dtd/cldr-35.1/common/dtd/ldml.dtd"
+[
+   <!ENTITY % icu SYSTEM "../../dtd/cldr-35.1/common/dtd/ldmlICU.dtd">
+   %icu;
+]
+>
+<ldml>
+    <identity>
+        <version number="$Revision$"/>
+        <language type="pt"/>
+    </identity>
+</ldml>
+

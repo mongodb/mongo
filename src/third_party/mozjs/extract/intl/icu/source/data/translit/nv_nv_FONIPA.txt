@@ -1,0 +1,81 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: nv_nv_FONIPA.txt
+# Generated from CLDR
+#
+
+::Lower;
+::NFC;
+# References
+# [1] https://en.wikipedia.org/wiki/Navajo_language#Orthography
+# [2] https://en.wikipedia.org/wiki/Navajo_phonology
+$apostrophe = [’ ʼ \'];
+ą\u0301ą\u0301 → ɑ\u0303\u0301ː;
+áá → ɑ\u0301ː;
+ąą → ɑ\u0303ː;
+aa → ɑː;
+ą\u0301 → ɑ\u0303\u0301;
+á → ɑ\u0301;
+ą → ɑ\u0303;
+a → ɑ;
+ę\u0301ę\u0301 → ẽ\u0301ː;
+éé → éː;
+ęę → ẽː;
+ee → eː;
+ę\u0301 → ẽ\u0301;
+é → é;
+ę → ẽ;
+e → e;
+į\u0301į\u0301 → ɪ\u0303\u0301ː;
+íí → ɪ\u0301ː;
+įį → ɪ\u0303ː;
+ii → ɪː;
+į\u0301 → ɪ\u0303\u0301;
+í → ɪ\u0301;
+į → ɪ\u0303;
+i → ɪ;
+ǫ\u0301ǫ\u0301 → ṍː;
+óó → óː;
+ǫǫ → õː;
+oo → oː;
+ǫ\u0301 → ṍ;
+ó → ó;
+ǫ → õ;
+o → o;
+$apostrophe → ʔ;
+b → p;
+ch $apostrophe → t\u0361ʃʼ;
+ch → t\u0361ʃʰ;
+dl → tˡ;
+dz → t\u0361s;
+d → t;
+gh → ɣ;
+g → k;
+hw → xʷ;
+h → h;
+j → t\u0361ʃ;
+k $apostrophe → kʼ;
+kw → k\u0361xʷ;
+k → k\u0361x;
+l → l;
+ł → ɬ;
+m → m;
+n → n;
+sh → ʃ;
+s → s;
+tł $apostrophe → t\u0361ɬʼ;
+tł → t\u0361ɬʰ;
+ts $apostrophe → t\u0361sʼ;
+ts → t\u0361sʰ;
+t $apostrophe → tʼ;
+t → t\u0361x;
+w → w;
+x → x;
+y → j;
+zh → ʒ;
+z → z;
+::NULL;
+{ɣ} [{ṍ} {ó} {õ} {o}] → ɣʷ;
+

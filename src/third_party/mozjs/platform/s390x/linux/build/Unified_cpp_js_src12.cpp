@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "jit/BaselineFrameInfo.cpp"
+#include "util/StringBuffer.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/BaselineFrameInfo.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "util/StringBuffer.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/BaselineFrameInfo.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "util/StringBuffer.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/BaselineIC.cpp"
+#include "util/StructuredSpewer.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/BaselineIC.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "util/StructuredSpewer.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/BaselineIC.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "util/StructuredSpewer.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/BaselineInspector.cpp"
+#include "util/Text.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/BaselineInspector.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "util/Text.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/BaselineInspector.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "util/Text.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/BaselineJIT.cpp"
+#include "util/Unicode.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/BaselineJIT.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "util/Unicode.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/BaselineJIT.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "util/Unicode.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/BitSet.cpp"
+#include "vm/Activation.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/BitSet.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Activation.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/BitSet.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Activation.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/BytecodeAnalysis.cpp"
+#include "vm/ArgumentsObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/BytecodeAnalysis.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ArgumentsObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/BytecodeAnalysis.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ArgumentsObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

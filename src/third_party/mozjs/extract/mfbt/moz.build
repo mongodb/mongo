@@ -7,159 +7,198 @@
 with Files("**"):
     BUG_COMPONENT = ("Core", "MFBT")
 
-TEST_DIRS += ['tests']
+Library("mfbt")
 
-Library('mfbt')
+EXPORTS += [
+    "../third_party/rust/encoding_c_mem/include/encoding_rs_mem.h",
+]
 
 EXPORTS.mozilla = [
-    'Alignment.h',
-    'AllocPolicy.h',
-    'AlreadyAddRefed.h',
-    'Array.h',
-    'ArrayUtils.h',
-    'Assertions.h',
-    'Atomics.h',
-    'Attributes.h',
-    'BinarySearch.h',
-    'BloomFilter.h',
-    'BufferList.h',
-    'Casting.h',
-    'ChaosMode.h',
-    'Char16.h',
-    'CheckedInt.h',
-    'Compiler.h',
-    'Compression.h',
-    'DebugOnly.h',
-    'decimal/Decimal.h',
-    'DefineEnum.h',
-    'DoublyLinkedList.h',
-    'EndianUtils.h',
-    'EnumeratedArray.h',
-    'EnumeratedRange.h',
-    'EnumSet.h',
-    'EnumTypeTraits.h',
-    'FastBernoulliTrial.h',
-    'FloatingPoint.h',
-    'FStream.h',
-    'GuardObjects.h',
-    'HashFunctions.h',
-    'IndexSequence.h',
-    'IntegerPrintfMacros.h',
-    'IntegerRange.h',
-    'IntegerTypeTraits.h',
-    'JSONWriter.h',
-    'Likely.h',
-    'LinkedList.h',
-    'MacroArgs.h',
-    'MacroForEach.h',
-    'MathAlgorithms.h',
-    'Maybe.h',
-    'MaybeOneOf.h',
-    'MemoryChecking.h',
-    'MemoryReporting.h',
-    'Move.h',
-    'NotNull.h',
-    'NullPtr.h',
-    'Opaque.h',
-    'OperatorNewExtensions.h',
-    'Pair.h',
-    'Path.h',
-    'PodOperations.h',
-    'Poison.h',
-    'Range.h',
-    'RangedArray.h',
-    'RangedPtr.h',
-    'ReentrancyGuard.h',
-    'RefCounted.h',
-    'RefCountType.h',
-    'RefPtr.h',
-    'Result.h',
-    'ResultExtensions.h',
-    'ReverseIterator.h',
-    'RollingMean.h',
-    'Saturate.h',
-    'Scoped.h',
-    'ScopeExit.h',
-    'SegmentedVector.h',
-    'SHA1.h',
-    'SmallPointerArray.h',
-    'Span.h',
-    'SplayTree.h',
-    'Sprintf.h',
-    'StaticAnalysisFunctions.h',
-    'TaggedAnonymousMemory.h',
-    'TemplateLib.h',
-    'TextUtils.h',
-    'ThreadLocal.h',
-    'ThreadSafeWeakPtr.h',
-    'ToString.h',
-    'Tuple.h',
-    'TypedEnumBits.h',
-    'Types.h',
-    'TypeTraits.h',
-    'UniquePtr.h',
-    'UniquePtrExtensions.h',
-    'Unused.h',
-    'Variant.h',
-    'Vector.h',
-    'WeakPtr.h',
-    'WrappingOperations.h',
-    'XorShift128PlusRNG.h',
+    "Algorithm.h",
+    "Alignment.h",
+    "AllocPolicy.h",
+    "AlreadyAddRefed.h",
+    "Array.h",
+    "ArrayUtils.h",
+    "Assertions.h",
+    "AtomicBitfields.h",
+    "Atomics.h",
+    "Attributes.h",
+    "BinarySearch.h",
+    "BitSet.h",
+    "BloomFilter.h",
+    "Buffer.h",
+    "BufferList.h",
+    "Casting.h",
+    "ChaosMode.h",
+    "Char16.h",
+    "CheckedInt.h",
+    "CompactPair.h",
+    "Compiler.h",
+    "Compression.h",
+    "DbgMacro.h",
+    "DebugOnly.h",
+    "DefineEnum.h",
+    "DoublyLinkedList.h",
+    "EndianUtils.h",
+    "EnumeratedArray.h",
+    "EnumeratedRange.h",
+    "EnumSet.h",
+    "EnumTypeTraits.h",
+    "fallible.h",
+    "FastBernoulliTrial.h",
+    "FloatingPoint.h",
+    "FStream.h",
+    "FunctionRef.h",
+    "FunctionTypeTraits.h",
+    "HashFunctions.h",
+    "HashTable.h",
+    "HelperMacros.h",
+    "InitializedOnce.h",
+    "IntegerRange.h",
+    "IntegerTypeTraits.h",
+    "JSONWriter.h",
+    "JsRust.h",
+    "Latin1.h",
+    "Likely.h",
+    "LinkedList.h",
+    "MacroArgs.h",
+    "MacroForEach.h",
+    "MathAlgorithms.h",
+    "Maybe.h",
+    "MaybeOneOf.h",
+    "MaybeStorageBase.h",
+    "MemoryChecking.h",
+    "MemoryReporting.h",
+    "NonDereferenceable.h",
+    "NotNull.h",
+    "Opaque.h",
+    "OperatorNewExtensions.h",
+    "PairHash.h",
+    "Path.h",
+    "PodOperations.h",
+    "Poison.h",
+    "RandomNum.h",
+    "Range.h",
+    "RangedArray.h",
+    "RangedPtr.h",
+    "ReentrancyGuard.h",
+    "RefCounted.h",
+    "RefCountType.h",
+    "RefPtr.h",
+    "Result.h",
+    "ResultExtensions.h",
+    "ResultVariant.h",
+    "ReverseIterator.h",
+    "RollingMean.h",
+    "Saturate.h",
+    "Scoped.h",
+    "ScopeExit.h",
+    "SegmentedVector.h",
+    "SHA1.h",
+    "SharedLibrary.h",
+    "SmallPointerArray.h",
+    "Span.h",
+    "SplayTree.h",
+    "SPSCQueue.h",
+    "StaticAnalysisFunctions.h",
+    "TaggedAnonymousMemory.h",
+    "Tainting.h",
+    "TemplateLib.h",
+    "TextUtils.h",
+    "ThreadLocal.h",
+    "ThreadSafeWeakPtr.h",
+    "ToString.h",
+    "Tuple.h",
+    "TypedEnumBits.h",
+    "Types.h",
+    "TypeTraits.h",
+    "UniquePtr.h",
+    "UniquePtrExtensions.h",
+    "Unused.h",
+    "Utf8.h",
+    "Variant.h",
+    "Vector.h",
+    "WeakPtr.h",
+    "WrappingOperations.h",
+    "XorShift128PlusRNG.h",
 ]
 
 EXPORTS["double-conversion"] = [
-    'double-conversion/double-conversion/double-conversion.h',
-    'double-conversion/double-conversion/utils.h',
+    "double-conversion/double-conversion/double-conversion.h",
+    "double-conversion/double-conversion/double-to-string.h",
+    "double-conversion/double-conversion/string-to-double.h",
+    "double-conversion/double-conversion/utils.h",
 ]
 
 LOCAL_INCLUDES += [
-    '/mfbt/double-conversion',
+    "/mfbt/double-conversion",
 ]
 
-if CONFIG['OS_ARCH'] == 'WINNT':
+USE_LIBS += [
+    "icu",
+]
+
+if CONFIG["OS_ARCH"] == "WINNT":
     EXPORTS.mozilla += [
-        'WindowsVersion.h',
+        "WindowsVersion.h",
     ]
-elif CONFIG['OS_ARCH'] == 'Linux':
+
+if CONFIG["OS_ARCH"] == "WASI":
     EXPORTS.mozilla += [
-        'LinuxSignal.h',
+        "WasiAtomic.h",
+    ]
+
+if CONFIG["MOZ_TSAN"]:
+    EXPORTS.mozilla += [
+        "TsanOptions.h",
     ]
 
 UNIFIED_SOURCES += [
-    'Assertions.cpp',
-    'ChaosMode.cpp',
-    'double-conversion/double-conversion/bignum-dtoa.cc',
-    'double-conversion/double-conversion/bignum.cc',
-    'double-conversion/double-conversion/cached-powers.cc',
-    'double-conversion/double-conversion/diy-fp.cc',
-    'double-conversion/double-conversion/double-conversion.cc',
-    'double-conversion/double-conversion/fast-dtoa.cc',
-    'double-conversion/double-conversion/fixed-dtoa.cc',
-    'double-conversion/double-conversion/strtod.cc',
-    'FloatingPoint.cpp',
-    'HashFunctions.cpp',
-    'JSONWriter.cpp',
-    'Poison.cpp',
-    'SHA1.cpp',
-    'TaggedAnonymousMemory.cpp',
-    'Unused.cpp',
+    "Assertions.cpp",
+    "ChaosMode.cpp",
+    "Compression.cpp",
+    "double-conversion/double-conversion/bignum-dtoa.cc",
+    "double-conversion/double-conversion/bignum.cc",
+    "double-conversion/double-conversion/cached-powers.cc",
+    "double-conversion/double-conversion/double-to-string.cc",
+    "double-conversion/double-conversion/fast-dtoa.cc",
+    "double-conversion/double-conversion/fixed-dtoa.cc",
+    "double-conversion/double-conversion/string-to-double.cc",
+    "double-conversion/double-conversion/strtod.cc",
+    "FloatingPoint.cpp",
+    "HashFunctions.cpp",
+    "JSONWriter.cpp",
+    "Poison.cpp",
+    "RandomNum.cpp",
+    "SHA1.cpp",
+    "TaggedAnonymousMemory.cpp",
+    "UniquePtrExtensions.cpp",
+    "Unused.cpp",
+    "Utf8.cpp",
 ]
 
-DEFINES['IMPL_MFBT'] = True
+if CONFIG["MOZ_BUILD_APP"] not in (
+    "memory",
+    "tools/update-programs",
+):
+    # Building MFBT tests adds a large overhead when building.
+    TEST_DIRS += ["tests"]
+
+DEFINES["IMPL_MFBT"] = True
 
 SOURCES += [
-    'Compression.cpp',
-    'decimal/Decimal.cpp',
-    'lz4.c',
+    "lz4/lz4.c",
+    "lz4/lz4frame.c",
+    "lz4/lz4hc.c",
+    "lz4/xxhash.c",
 ]
+
+SOURCES["lz4/xxhash.c"].flags += ["-Wno-unused-function"]
 
 DisableStlWrapping()
 
-if CONFIG['CC_TYPE'] == 'clang':
-    # Suppress warnings from third-party V8 Decimal code.
-    SOURCES['decimal/Decimal.cpp'].flags += ['-Wno-implicit-fallthrough']
+if CONFIG["MOZ_NEEDS_LIBATOMIC"]:
+    OS_LIBS += ["atomic"]
 
-if CONFIG['MOZ_NEEDS_LIBATOMIC']:
-    OS_LIBS += ['atomic']
-
-DEFINES['LZ4LIB_VISIBILITY'] = ''
+DEFINES["LZ4LIB_VISIBILITY"] = ""

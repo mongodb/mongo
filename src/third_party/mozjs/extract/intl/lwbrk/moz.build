@@ -1,0 +1,44 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+TEST_DIRS += ["gtest"]
+
+EXPORTS.mozilla.intl += [
+    "LineBreaker.h",
+    "WordBreaker.h",
+]
+
+UNIFIED_SOURCES += [
+    "LineBreaker.cpp",
+    "WordBreaker.cpp",
+]
+
+if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":
+    SOURCES += [
+        "nsPangoBreaker.cpp",
+    ]
+    CXXFLAGS += CONFIG["MOZ_PANGO_CFLAGS"]
+elif CONFIG["MOZ_WIDGET_TOOLKIT"] == "windows":
+    SOURCES += [
+        "nsUniscribeBreaker.cpp",
+    ]
+    if CONFIG["NIGHTLY_BUILD"]:
+        SOURCES += [
+            "rulebrk.c",
+        ]
+elif CONFIG["MOZ_WIDGET_TOOLKIT"] == "cocoa":
+    UNIFIED_SOURCES += [
+        "nsCarbonBreaker.cpp",
+    ]
+else:
+    SOURCES += [
+        "nsRuleBreaker.cpp",
+    ]
+    SOURCES += [
+        "rulebrk.c",
+    ]
+
+FINAL_LIBRARY = "xul"

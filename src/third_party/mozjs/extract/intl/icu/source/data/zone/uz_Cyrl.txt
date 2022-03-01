@@ -1,0 +1,684 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+uz_Cyrl{
+    %%Parent{"root"}
+    zoneStrings{
+        "Africa:Asmera"{
+            ec{"Asmara"}
+        }
+        "America:Coral_Harbour"{
+            ec{"Atikokan"}
+        }
+        "America:Godthab"{
+            ec{"Nuuk"}
+        }
+        "America:Indiana:Knox"{
+            ec{"Knox, Indiana"}
+        }
+        "America:Indiana:Marengo"{
+            ec{"Marengo, Indiana"}
+        }
+        "America:Indiana:Petersburg"{
+            ec{"Petersburg, Indiana"}
+        }
+        "America:Indiana:Tell_City"{
+            ec{"Tell City, Indiana"}
+        }
+        "America:Indiana:Vevay"{
+            ec{"Vevay, Indiana"}
+        }
+        "America:Indiana:Vincennes"{
+            ec{"Vincennes, Indiana"}
+        }
+        "America:Indiana:Winamac"{
+            ec{"Winamac, Indiana"}
+        }
+        "America:Kentucky:Monticello"{
+            ec{"Monticello, Kentucky"}
+        }
+        "America:Lower_Princes"{
+            ec{"Lower Princeʼs Quarter"}
+        }
+        "America:North_Dakota:Beulah"{
+            ec{"Beulah, North Dakota"}
+        }
+        "America:North_Dakota:Center"{
+            ec{"Center, North Dakota"}
+        }
+        "America:North_Dakota:New_Salem"{
+            ec{"New Salem, North Dakota"}
+        }
+        "America:Scoresbysund"{
+            ec{"Ittoqqortoormiit"}
+        }
+        "America:St_Barthelemy"{
+            ec{"St. Barthelemy"}
+        }
+        "America:St_Johns"{
+            ec{"St. John’s"}
+        }
+        "America:St_Kitts"{
+            ec{"St. Kitts"}
+        }
+        "America:St_Lucia"{
+            ec{"St. Lucia"}
+        }
+        "America:St_Thomas"{
+            ec{"St. Thomas"}
+        }
+        "America:St_Vincent"{
+            ec{"St. Vincent"}
+        }
+        "Antarctica:DumontDUrville"{
+            ec{"Dumont d’Urville"}
+        }
+        "Asia:Calcutta"{
+            ec{"Kolkata"}
+        }
+        "Asia:Katmandu"{
+            ec{"Kathmandu"}
+        }
+        "Asia:Saigon"{
+            ec{"Ho Chi Minh"}
+        }
+        "Atlantic:Faeroe"{
+            ec{"Faroe"}
+        }
+        "Atlantic:St_Helena"{
+            ec{"St. Helena"}
+        }
+        "Etc:Unknown"{
+            ec{"Номаълум"}
+        }
+        "Europe:Dublin"{
+            ld{"Ирландия ёзги вақти"}
+        }
+        "Europe:London"{
+            ld{"Британия ёзги вақти"}
+        }
+        "Pacific:Ponape"{
+            ec{"Pohnpei"}
+        }
+        "Pacific:Truk"{
+            ec{"Chuuk"}
+        }
+        "meta:Afghanistan"{
+            ls{"Афғонистон вақти"}
+        }
+        "meta:Africa_Central"{
+            ls{"Марказий Африка вақти"}
+        }
+        "meta:Africa_Eastern"{
+            ls{"Шарқий Африка вақти"}
+        }
+        "meta:Africa_Southern"{
+            ls{"Жанубий Африка вақти"}
+        }
+        "meta:Africa_Western"{
+            ld{"Ғарбий Африка ёзги вақти"}
+            lg{"Ғарбий Африка вақти"}
+            ls{"Ғарбий Африка стандарт вақти"}
+        }
+        "meta:Alaska"{
+            ld{"Аляска кундузги вақти"}
+            lg{"Аляска вақти"}
+            ls{"Аляска стандарт вақти"}
+        }
+        "meta:Amazon"{
+            ld{"Амазонка ёзги вақти"}
+            lg{"Амазонка вақти"}
+            ls{"Амазонка стандарт вақти"}
+        }
+        "meta:America_Central"{
+            ld{"Шимолий Америка марказий кундузги вақти"}
+            lg{"Шимолий Америка"}
+            ls{"Шимолий Америка марказий стандарт вақти"}
+        }
+        "meta:America_Eastern"{
+            ld{"Шимолий Америка шарқий кундузги вақти"}
+            lg{"Шимолий Америка шарқий вақти"}
+            ls{"Шимолий Америка шарқий стандарт вақти"}
+        }
+        "meta:America_Mountain"{
+            ld{"Шимолий Америка тоғ кундузги вақти"}
+            lg{"Шимолий Америка тоғ вақти"}
+            ls{"Шимолий Америка тоғ стандарт вақти"}
+        }
+        "meta:America_Pacific"{
+            ld{"Шимолий Америка тинч океани кундузги вақти"}
+            lg{"Шимолий Америка тинч океани вақти"}
+            ls{"Шимолий Америка тинч океани стандарт вақти"}
+        }
+        "meta:Arabian"{
+            ld{"Арабистон кундузги вақти"}
+            lg{"Арабистон вақти"}
+            ls{"Арабистон стандарт вақти"}
+        }
+        "meta:Argentina"{
+            ld{"Аргентина ёзги вақти"}
+            lg{"Аргентина вақти"}
+            ls{"Аргентина стандарт вақти"}
+        }
+        "meta:Argentina_Western"{
+            ld{"Ғарбий Аргентина ёзги вақти"}
+            lg{"Ғарбий Аргентина вақти"}
+            ls{"Ғарбий Аргентина стандарт вақти"}
+        }
+        "meta:Armenia"{
+            ld{"Арманистон ёзги вақти"}
+            lg{"Арамнистон вақти"}
+            ls{"Арманистон стандарт вақти"}
+        }
+        "meta:Atlantic"{
+            ld{"Атлантика кундузги вақти"}
+            lg{"Атлантика вақти"}
+            ls{"Атлантика стандарт вақти"}
+        }
+        "meta:Australia_Central"{
+            ld{"Марказий Австралия кундузги вақти"}
+            lg{"Марказий Австралия вақти"}
+            ls{"Марказий Австралия стандарт вақти"}
+        }
+        "meta:Australia_CentralWestern"{
+            ld{"Марказий Австралия Ғарбий кундузги вақти"}
+            lg{"Марказий Австралия Ғарбий вақти"}
+            ls{"Марказий Австралия Ғарбий стандарт вақти"}
+        }
+        "meta:Australia_Eastern"{
+            ld{"Шарқий Австралия кундузги вақти"}
+            lg{"Шарқий Австралия вақти"}
+            ls{"Шарқий Австралия стандарт вақти"}
+        }
+        "meta:Australia_Western"{
+            ld{"Ғарбий Австралия кундузги вақти"}
+            lg{"Ғарбий Австралия вақти"}
+            ls{"Ғарбий Австралия стандарт вақти"}
+        }
+        "meta:Azerbaijan"{
+            ld{"Озарбайжон ёзги вақти"}
+            lg{"Озарбайжон вақти"}
+            ls{"Озарбайжон стандарт вақти"}
+        }
+        "meta:Azores"{
+            ld{"Азор ёзги вақти"}
+            lg{"Азор вақти"}
+            ls{"Азор стандарт вақти"}
+        }
+        "meta:Bangladesh"{
+            ld{"Бангладеш ёзги вақти"}
+            lg{"Бангладеш вақти"}
+            ls{"Бангладеш стандарт вақти"}
+        }
+        "meta:Bhutan"{
+            ls{"Бутан вақти"}
+        }
+        "meta:Bolivia"{
+            ls{"Боливия вақти"}
+        }
+        "meta:Brasilia"{
+            ld{"Бразилия ёзги вақти"}
+            lg{"Бразилия вақти"}
+            ls{"Бразилия стандарт вақти"}
+        }
+        "meta:Brunei"{
+            ls{"Бруней Даруссалом вақти"}
+        }
+        "meta:Cape_Verde"{
+            ld{"Кабо-Верде ёзги вақти"}
+            lg{"Кабо-Верде вақти"}
+            ls{"Кабо-Верде стандарт вақти"}
+        }
+        "meta:Chamorro"{
+            ls{"Каморро вақти"}
+        }
+        "meta:Chatham"{
+            ld{"Чатхам кундузги вақти"}
+            lg{"Чатхам вақти"}
+            ls{"Чатхам стандарт вақти"}
+        }
+        "meta:Chile"{
+            ld{"Чили ёзги вақти"}
+            lg{"Чили вақти"}
+            ls{"Чили стандарт вақти"}
+        }
+        "meta:China"{
+            ld{"Хитой кундузги вақти"}
+            lg{"Хитой вақти"}
+            ls{"Хитой стандарт вақти"}
+        }
+        "meta:Choibalsan"{
+            ld{"Чойбалсан ёзги вақти"}
+            lg{"Чойбалсан вақти"}
+            ls{"Чойбалсан стандарт вақти"}
+        }
+        "meta:Christmas"{
+            ls{"Рождество ороли вақти"}
+        }
+        "meta:Cocos"{
+            ls{"Кокос ороллари вақти"}
+        }
+        "meta:Colombia"{
+            ld{"Колумбия ёзги вақти"}
+            lg{"Колумбия вақти"}
+            ls{"Колумбия стандарт вақти"}
+        }
+        "meta:Cook"{
+            ld{"Кук ороллари ярим ёзги вақти"}
+            lg{"Кук ороллари вақти"}
+            ls{"Кук ороллари стандарт вақти"}
+        }
+        "meta:Cuba"{
+            ld{"Куба кундузги вақти"}
+            lg{"Куба вақти"}
+            ls{"Куба стандарт вақти"}
+        }
+        "meta:Davis"{
+            ls{"Дэвис вақти"}
+        }
+        "meta:DumontDUrville"{
+            ls{"Думонт-д-Урвил вақти"}
+        }
+        "meta:East_Timor"{
+            ls{"Шарқий Тимор вақти"}
+        }
+        "meta:Easter"{
+            ld{"Пасхи ороли ёзги вақти"}
+            lg{"Пасхи Ороли вақти"}
+            ls{"Пасхи ороли стандарт вақти"}
+        }
+        "meta:Ecuador"{
+            ls{"Эквадор вақти"}
+        }
+        "meta:Europe_Central"{
+            ld{"Марказий Европа ёзги вақти"}
+            lg{"Марказий Европа вақти"}
+            ls{"Марказий Европа стандарт вақти"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"Шарқий Европа ёзги вақти"}
+            lg{"Шарқий Европа вақти"}
+            ls{"Шарқий Европа стандарт вақти"}
+        }
+        "meta:Europe_Western"{
+            ld{"Ғарбий Европа ёзги вақти"}
+            lg{"Ғарбий Европа вақти"}
+            ls{"Ғарбий Европа стандарт вақти"}
+        }
+        "meta:Falkland"{
+            ld{"Фолькленд ороллари ёзги вақти"}
+            lg{"Фолькленд ороллари вақти"}
+            ls{"Фолькленд ороллари стандарт вақти"}
+        }
+        "meta:Fiji"{
+            ld{"Фижи ёзги вақти"}
+            lg{"Фижи вақти"}
+            ls{"Фижи стандарт вақти"}
+        }
+        "meta:French_Guiana"{
+            ls{"Француз Гвианаси вақти"}
+        }
+        "meta:French_Southern"{
+            ls{"Француз жанубий ва Антарктика вақти"}
+        }
+        "meta:GMT"{
+            ls{"Гринвич вақти"}
+        }
+        "meta:Galapagos"{
+            ls{"Галапагос вақти"}
+        }
+        "meta:Gambier"{
+            ls{"Гамбиер вақти"}
+        }
+        "meta:Georgia"{
+            ld{"Грузия ёзги вақти"}
+            lg{"Грузия вақти"}
+            ls{"Грузия стандарт вақти"}
+        }
+        "meta:Gilbert_Islands"{
+            ls{"Гилберт ороллари вақти"}
+        }
+        "meta:Greenland_Eastern"{
+            ld{"Шарқий Гренландия ёзги вақти"}
+            lg{"Шарқий Гренландия вақти"}
+            ls{"Шарқий Гренландия стандарт вақти"}
+        }
+        "meta:Greenland_Western"{
+            ld{"Ғарбий Гренландия ёзги вақти"}
+            lg{"Ғарбий Гренландия вақти"}
+            ls{"Ғарбий Гренландия стандарт вақти"}
+        }
+        "meta:Gulf"{
+            ls{"Кўрфаз вақти"}
+        }
+        "meta:Guyana"{
+            ls{"Гайана вақти"}
+        }
+        "meta:Hawaii_Aleutian"{
+            ld{"Гавайи-алеут кундузги вақти"}
+            lg{"Гавайи-алеут вақти"}
+            ls{"Гавайи-алеут стандарт вақти"}
+        }
+        "meta:Hong_Kong"{
+            ld{"Гонконг ёзги вақти"}
+            lg{"Гонконг вақти"}
+            ls{"Гонконг стандарт вақти"}
+        }
+        "meta:Hovd"{
+            ld{"Ховд ёзги вақти"}
+            lg{"Ховд вақти"}
+            ls{"Ховд стандарт вақти"}
+        }
+        "meta:India"{
+            ls{"Ҳиндистон вақти"}
+        }
+        "meta:Indian_Ocean"{
+            ls{"Ҳинд океани вақти"}
+        }
+        "meta:Indochina"{
+            ls{"Ҳинд-Хитой вақти"}
+        }
+        "meta:Indonesia_Central"{
+            ls{"Марказий Индонезия вақти"}
+        }
+        "meta:Indonesia_Eastern"{
+            ls{"Шарқий Индонезия вақти"}
+        }
+        "meta:Indonesia_Western"{
+            ls{"Ғарбий Индонезия вақти"}
+        }
+        "meta:Iran"{
+            ld{"Эрон кундузги вақти"}
+            lg{"Эрон вақти"}
+            ls{"Эрон стандарт вақти"}
+        }
+        "meta:Irkutsk"{
+            ld{"Иркутск ёзги вақти"}
+            lg{"Иркутск вақти"}
+            ls{"Иркутск стандарт вақти"}
+        }
+        "meta:Israel"{
+            ld{"Исроил кундузги вақти"}
+            lg{"Исроил вақти"}
+            ls{"Исроил стандарт вақти"}
+        }
+        "meta:Japan"{
+            ld{"Япония кундузги вақти"}
+            lg{"Япония вақти"}
+            ls{"Япония стандарт вақти"}
+        }
+        "meta:Kazakhstan_Eastern"{
+            ls{"Шарқий Қозоғистон вақти"}
+        }
+        "meta:Kazakhstan_Western"{
+            ls{"Ғарбий Қозоғистон вақти"}
+        }
+        "meta:Korea"{
+            ld{"Корея кундузги вақти"}
+            lg{"Корея вақти"}
+            ls{"Корея стандарт вақти"}
+        }
+        "meta:Kosrae"{
+            ls{"Косрае вақти"}
+        }
+        "meta:Krasnoyarsk"{
+            ld{"Красноярск ёзги вақти"}
+            lg{"Красноярск вақти"}
+            ls{"Красноярск стандарт вақти"}
+        }
+        "meta:Kyrgystan"{
+            ls{"Қирғизистон вақти"}
+        }
+        "meta:Line_Islands"{
+            ls{"Лайн ороллари вақти"}
+        }
+        "meta:Lord_Howe"{
+            ld{"Лорд Хове кундузги вақти"}
+            lg{"Лорд Хове вақти"}
+            ls{"Лорд Хове стандарт вақти"}
+        }
+        "meta:Macquarie"{
+            ls{"Маквари ороли вақти"}
+        }
+        "meta:Magadan"{
+            ld{"Магадан ёзги вақти"}
+            lg{"Магадан вақти"}
+            ls{"Магадан стандарт вақти"}
+        }
+        "meta:Malaysia"{
+            ls{"Малайзия вақти"}
+        }
+        "meta:Maldives"{
+            ls{"Мальдив ороллар"}
+        }
+        "meta:Marquesas"{
+            ls{"Маркезас вақти"}
+        }
+        "meta:Marshall_Islands"{
+            ls{"Маршалл ороллари вақти"}
+        }
+        "meta:Mauritius"{
+            ld{"Маврикий ёзги вақти"}
+            lg{"Маврикий вақти"}
+            ls{"Маврикий стандарт вақти"}
+        }
+        "meta:Mawson"{
+            ls{"Моувсон вақти"}
+        }
+        "meta:Mongolia"{
+            ld{"Улан-Батор ёзги вақти"}
+            lg{"Улан-Батор вақти"}
+            ls{"Улан-Батор стандарт вақти"}
+        }
+        "meta:Moscow"{
+            ld{"Москва ёзги вақти"}
+            lg{"Москва вақти"}
+            ls{"Москва стандарт вақти"}
+        }
+        "meta:Myanmar"{
+            ls{"Мьянма вақти"}
+        }
+        "meta:Nauru"{
+            ls{"Науру вақти"}
+        }
+        "meta:Nepal"{
+            ls{"Непал вақти"}
+        }
+        "meta:New_Caledonia"{
+            ld{"Янги Каледония ёзги вақти"}
+            lg{"Янги Каледония вақти"}
+            ls{"Янги Каледония стандарт вақти"}
+        }
+        "meta:New_Zealand"{
+            ld{"Янги Зеландия кундузги вақти"}
+            lg{"Янги Зеландия вақти"}
+            ls{"Янги Зеландия стандарт вақти"}
+        }
+        "meta:Newfoundland"{
+            ld{"Ньюфаундленд кундузги вақти"}
+            lg{"Ньюфаундленд вақти"}
+            ls{"Ньюфаундленд стандарт вақти"}
+        }
+        "meta:Niue"{
+            ls{"Ниуе вақти"}
+        }
+        "meta:Norfolk"{
+            ld{"Норфолк ороли ёзги вақти"}
+            lg{"Норфолк ороли вақти"}
+            ls{"Норфолк ороли стандарт вақти"}
+        }
+        "meta:Noronha"{
+            ld{"Фернандо де Норонья ёзги вақти"}
+            lg{"Фернандо де Норонья вақти"}
+            ls{"Фернандо де Норонья стандарт вақти"}
+        }
+        "meta:Novosibirsk"{
+            ld{"Новосибирск ёзги вақти"}
+            lg{"Новосибирск вақти"}
+            ls{"Новосибирск стандарт вақти"}
+        }
+        "meta:Omsk"{
+            ld{"Омск ёзги вақти"}
+            lg{"Омск вақти"}
+            ls{"Омск стандарт вақти"}
+        }
+        "meta:Pakistan"{
+            ld{"Покистон ёзги вақти"}
+            lg{"Покистон вақти"}
+            ls{"Покистон стандарт вақти"}
+        }
+        "meta:Palau"{
+            ls{"Палау вақти"}
+        }
+        "meta:Papua_New_Guinea"{
+            ls{"Папуа-Янги Гвинея вақти"}
+        }
+        "meta:Paraguay"{
+            ld{"Парагвай ёзги вақти"}
+            lg{"Парагвай вақти"}
+            ls{"Парагвай стандарт вақти"}
+        }
+        "meta:Peru"{
+            ld{"Перу ёзги вақти"}
+            lg{"Перу вақти"}
+            ls{"Перу стандарт вақти"}
+        }
+        "meta:Philippines"{
+            ld{"Филиппин ёзги вақти"}
+            lg{"Филиппин вақти"}
+            ls{"Филиппин стандарт вақти"}
+        }
+        "meta:Phoenix_Islands"{
+            ls{"Феникс ороллари вақти"}
+        }
+        "meta:Pierre_Miquelon"{
+            ld{"Сент-Пьер ва Микелон кундузги вақти"}
+            lg{"Сент-Пьер ва Микелон вақти"}
+            ls{"Сент-Пьер ва Микелон стандарт вақти"}
+        }
+        "meta:Pitcairn"{
+            ls{"Питкерн вақти"}
+        }
+        "meta:Ponape"{
+            ls{"Понапе вақти"}
+        }
+        "meta:Reunion"{
+            ls{"Реюньон вақти"}
+        }
+        "meta:Rothera"{
+            ls{"Ротера вақти"}
+        }
+        "meta:Sakhalin"{
+            ld{"Сахалин ёзги вақти"}
+            lg{"Сахалин вақти"}
+            ls{"Сахалин стандарт вақти"}
+        }
+        "meta:Samoa"{
+            ld{"Самоа кундузги вақти"}
+            lg{"Самоа вақти"}
+            ls{"Самоа стандарт вақти"}
+        }
+        "meta:Seychelles"{
+            ls{"Сейшел ороллари вақти"}
+        }
+        "meta:Singapore"{
+            ls{"Сингапур вақти"}
+        }
+        "meta:Solomon"{
+            ls{"Соломон ороллари вақти"}
+        }
+        "meta:South_Georgia"{
+            ls{"Жанубий Джорджия вақти"}
+        }
+        "meta:Suriname"{
+            ls{"Суринам вақти"}
+        }
+        "meta:Syowa"{
+            ls{"Сьова вақти"}
+        }
+        "meta:Tahiti"{
+            ls{"Таити вақти"}
+        }
+        "meta:Taipei"{
+            ld{"Тайпей кундузги вақти"}
+            lg{"Тайпей вақти"}
+            ls{"Тайпей стандарт вақти"}
+        }
+        "meta:Tajikistan"{
+            ls{"Тожикистон вақти"}
+        }
+        "meta:Tokelau"{
+            ls{"Токелау вақти"}
+        }
+        "meta:Tonga"{
+            ld{"Тонга ёзги вақти"}
+            lg{"Тонга вақти"}
+            ls{"Тонга стандарт вақти"}
+        }
+        "meta:Truk"{
+            ls{"Чуук вақти"}
+        }
+        "meta:Turkmenistan"{
+            ld{"Туркманистон ёзги вақти"}
+            lg{"Туркманистон вақти"}
+            ls{"Туркманистон стандарт вақти"}
+        }
+        "meta:Tuvalu"{
+            ls{"Тувалу вақти"}
+        }
+        "meta:Uruguay"{
+            ld{"Уругвай ёзги вақти"}
+            lg{"Уругвай вақти"}
+            ls{"Уругвай стандарт вақти"}
+        }
+        "meta:Uzbekistan"{
+            ld{"Ўзбекистон ёзги вақти"}
+            lg{"Ўзбекистон вақти"}
+            ls{"Ўзбекистон стандарт вақти"}
+        }
+        "meta:Vanuatu"{
+            ld{"Вануату ёзги вақти"}
+            lg{"Вануату вақти"}
+            ls{"Вануату стандарт вақти"}
+        }
+        "meta:Venezuela"{
+            ls{"Венесуэла вақти"}
+        }
+        "meta:Vladivostok"{
+            ld{"Владивосток ёзги вақти"}
+            lg{"Владивосток вақти"}
+            ls{"Владивосток стандарт вақти"}
+        }
+        "meta:Volgograd"{
+            ld{"Волгоград ёзги вақти"}
+            lg{"Волгоград вақти"}
+            ls{"Волгоград стандарт вақти"}
+        }
+        "meta:Vostok"{
+            ls{"Восток вақти"}
+        }
+        "meta:Wake"{
+            ls{"Уэйк ороли вақти"}
+        }
+        "meta:Wallis"{
+            ls{"Уэллис ва Футуна вақти"}
+        }
+        "meta:Yakutsk"{
+            ld{"Якутск ёзги вақти"}
+            lg{"Якутск вақти"}
+            ls{"Якутск стандарт вақти"}
+        }
+        "meta:Yekaterinburg"{
+            ld{"Екатеринбург ёзги вақти"}
+            lg{"Екатеринбург вақти"}
+            ls{"Екатеринбург стандарт вақти"}
+        }
+        fallbackFormat{"{1} ({0})"}
+        gmtFormat{"GMT{0}"}
+        gmtZeroFormat{"GMT"}
+        hourFormat{"+HH:mm;-HH:mm"}
+        regionFormat{"{0} вақти"}
+        regionFormatDaylight{"{0} кундузги вақти"}
+        regionFormatStandard{"{0} стандарт вақти"}
+    }
+}

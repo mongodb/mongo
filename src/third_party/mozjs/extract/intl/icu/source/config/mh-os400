@@ -1,0 +1,141 @@
+## -*-makefile-*-
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+## OS400-specific setup (for cross build)
+## Copyright (c) 1999-2013, International Business Machines Corporation and
+## others. All Rights Reserved.
+
+# This otherwise breaks on OS400 - can't find "shell"
+CURR_FULL_DIR=.
+CURR_SRCCODE_FULL_DIR=.
+
+GEN_DEPS.c=	$(CC1) -E -M $(DEFS) $(CPPFLAGS)
+GEN_DEPS.cc=	$(CXX1) -E -M $(DEFS) $(CPPFLAGS)
+
+THREADSCPPFLAGS = -D_MULTI_THREADED
+
+# put this in the environment to get threading
+THREADSENVFLAGS = QIBM_MULTI_THREADED=Y ;
+
+## Commands to compile
+# -qTERASPACE: large pointers
+# -qPFROPT=*STRDONLY: Strings are read-only
+COMPILE.c=	$(CC) $(DEFS) $(CPPFLAGS) $(CFLAGS) -c -qTERASPACE=*YES -qSTGMDL=*INHERIT -qPFROPT=*STRDONLY
+COMPILE.cc=	$(CXX) $(DEFS) $(CPPFLAGS) $(CXXFLAGS) -c -qTERASPACE=*YES -qSTGMDL=*INHERIT -qPFROPT=*STRDONLY -qRTTIALL
+
+## ICULD program - run bldiculd.sh in icu/as_is/os400/ to build it
+ICULD=/qsys.lib/$(OUTPUTDIR).lib/iculd.pgm
+
+## Commands to link
+## We need to use the C++ linker, even when linking C programs, since
+##  our libraries contain C++ code (C++ static init not called)
+LINK.c=		$(ICULD)  $(CXXFLAGS) $(LDFLAGS) -qOPTION='*DUPPROC *DUPVAR'
+LINK.cc=	$(ICULD) $(CXXFLAGS) $(LDFLAGS) -qOPTION='*DUPPROC *DUPVAR'
+
+## Commands to make a shared library
+# -qALWLIBUPD: It allows the compiled service program to have dependencies on
+#	service programs in a different library than that specified originally
+#	by CRTSRVPGM after having used the UPDSRVPGM command.
+#	Similar to -fPIC and -install_name on other compilers, but different.
+SHLIB.c=   ld -v -qOPTION='*DUPPROC *DUPVAR' -qALWLIBUPD=*YES
+SHLIB.cc=	 ld -v -qOPTION='*DUPPROC *DUPVAR' -qALWLIBUPD=*YES
+AR = qar
+ARFLAGS = -cuv
+
+## Compiler switch to embed a runtime search path
+LD_RPATH=	-I
+LD_RPATH_PRE=	-I
+
+## Make target to rebind the common library
+## to the actual data versus the stub data
+POST_DATA_BUILD = os400-data-rebind
+
+# The stubdata directory is the same directory as the normal data library.
+STUBDATA_LIBDIR = $(LIBDIR)/
+
+## Versioned target for a shared library.
+FINAL_SO_TARGET = $(SO_TARGET)
+MIDDLE_SO_TARGET = 
+
+# this one is for icudefs.mk's use
+ifeq ($(ENABLE_SHARED),YES)
+SO_TARGET_VERSION_SUFFIX = $(SO_TARGET_VERSION_MAJOR)
+endif
+
+# this one is for the individual make files and linking
+ICULIBSUFFIX = $(SO_TARGET_VERSION_SUFFIX)
+
+##  object suffix
+TO=		o
+
+## Shared object suffix
+SO=	so
+## Non-shared intermediate object suffix
+STATIC_O = o
+
+## Platform command to remove or move executable target
+RMV = del
+## Platform commands to remove or move executable and library targets
+INSTALL-S =  cp -fph
+INSTALL-L = $(INSTALL-S)
+
+# Stub name overrides for iSeries
+DATA_STUBNAME = dt
+I18N_STUBNAME = in
+CTESTFW_STUBNAME = tf
+
+## Link commands to link to ICU service programs
+LIBICUDT = $(LIBDIR)/$(LIBICU)$(DATA_STUBNAME)$(ICULIBSUFFIX).$(SO)
+LIBICUUC = $(LIBDIR)/$(LIBICU)$(COMMON_STUBNAME)$(ICULIBSUFFIX).$(SO)
+LIBICUI18N = $(LIBDIR)/$(LIBICU)$(I18N_STUBNAME)$(ICULIBSUFFIX).$(SO)
+LIBICULE = $(LIBDIR)/$(LIBICU)$(LAYOUT_STUBNAME)$(ICULIBSUFFIX).$(SO)
+LIBICULX = $(LIBDIR)/$(LIBICU)$(LAYOUTEX_STUBNAME)$(ICULIBSUFFIX).$(SO)
+LIBCTESTFW = $(top_builddir)/tools/ctestfw/$(LIBICU)$(CTESTFW_STUBNAME)$(ICULIBSUFFIX).$(SO)
+LIBICUTOOLUTIL = $(LIBDIR)/$(LIBICU)$(TOOLUTIL_STUBNAME)$(ICULIBSUFFIX).$(SO)
+LIBICUIO= $(LIBDIR)/$(LIBICU)$(IO_STUBNAME)$(ICULIBSUFFIX).$(SO)
+
+## Special OS400 rules
+
+## Build archive from shared object
+%.a : %.o
+	$(AR) $(ARFLAGS) $@ $<
+
+## Build import list from export list
+%.e : %.exp
+	@echo "Building an import list for $<"
+	@$(SHELL) -ec "echo '#! $*.a($*.so)' | cat - $< > $@"
+
+## Compilation rules
+%.$(STATIC_O): $(srcdir)/%.c
+	$(COMPILE.c) $(STATICCPPFLAGS) $(STATICCFLAGS) -o $@ $<
+%.o: $(srcdir)/%.c
+	$(COMPILE.c) $(DYNAMICCPPFLAGS) $(DYNAMICCFLAGS) -o $@ $<
+
+%.$(STATIC_O): $(srcdir)/%.cpp
+	$(COMPILE.cc) $(STATICCPPFLAGS) $(STATICCXXFLAGS) -o $@ $<
+%.o: $(srcdir)/%.cpp
+	$(COMPILE.cc) $(DYNAMICCPPFLAGS) $(DYNAMICCXXFLAGS) -o $@ $<
+
+%.qwobj : $(srcdir)/%.c
+	$(COMPILE.c) -o $@ $<
+
+%.qwobj : $(srcdir)/%.cpp
+	$(COMPILE.cc) -o $@ $<
+
+## Dependency rules
+%.d : %.u
+#	@$(SHELL) -ec 'cat $<  \
+#		| sed '\''s/\($*\)\.o[ :]*/\1.o $@ : /g'\'' > $@; \
+#		[ -s $@ ] || rm -f $@ ; rm -f $<'
+
+%.u : $(srcdir)/%.c
+	@echo "generating dependency information for $<"
+#	@$(SHELL) -ec 'touch            $*.u  > /dev/null 2>&1'
+#	@$(SHELL) -ec '$(GEN_DEPS.c) -f $*.u $< > /dev/null 2>&1'
+
+%.u : $(srcdir)/%.cpp
+	@echo "generating dependency information for $<"
+#	@$(SHELL) -ec 'touch              $*.u  > /dev/null 2>&1'
+#	@$(SHELL) -ec '$(GEN_DEPS.cc)  -f $*.u $< > /dev/null 2>&1'
+
+## End OS400-specific setup

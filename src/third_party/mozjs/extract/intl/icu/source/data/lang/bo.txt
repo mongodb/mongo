@@ -1,0 +1,25 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+bo{
+    Languages{
+        bo{"བོད་སྐད་"}
+        dz{"རྫོང་ཁ"}
+        en{"དབྱིན་ཇིའི་སྐད།"}
+        en_CA{"དབྱིན་ཇིའི་སྐད། (ཁེ་ན་ཌ་)"}
+        en_GB{"དབྱིན་ཇིའི་སྐད། (དབྱིན་ལན་)"}
+        en_US{"དབྱིན་ཇིའི་སྐད། (ཨ་རི་)"}
+        hi{"ཧིན་དི"}
+        ja{"ཉི་ཧོང་སྐད་"}
+        ne{"ནེ་པ་ལི"}
+        ru{"ཨུ་རུ་སུ་སྐད་"}
+        zh{"རྒྱ་སྐད་"}
+        zza{"ཟ་ཟའ་སྐད།"}
+    }
+    Scripts{
+        Hans{"རྒྱ་ཡིག་གསར་པ།"}
+        Hant{"རྒྱ་ཡིག་རྙིང་པ།"}
+        Tibt{"བོད་ཡིག་"}
+        Zxxx{"སྙན་བརྒྱུད། ཡིག་རིགས་སུ་མ་བཀོད་པའི་ཟིན་ཐོ།"}
+    }
+}

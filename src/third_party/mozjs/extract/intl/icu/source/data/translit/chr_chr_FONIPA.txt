@@ -1,0 +1,118 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: chr_chr_FONIPA.txt
+# Generated from CLDR
+#
+
+# References
+# ----------
+# [1] http://www.omniglot.com/writing/cherokee.htm
+# [2] https://en.wikipedia.org/wiki/Cherokee_language#Phonology
+# [3] Edward Finegan. Language: Its structure and use. ISBN 978-1-4130-3055-6.
+#     Figure 12-4: The Cherokee Writing System, page 401.
+::[[:sc=Cher:][:P:][:M:]];
+::upper;
+[:P:]+ → ' ';
+Ꭰ → a;
+Ꭱ → e;
+Ꭲ → i;
+Ꭳ → o;
+Ꭴ → u;
+Ꭵ → ə\u0303;
+Ꭶ → ɡa;
+Ꭷ → ka;
+Ꭸ → ɡe;
+Ꭹ → ɡi;
+Ꭺ → ɡo;
+Ꭻ → ɡu;
+Ꭼ → ɡə\u0303;
+Ꭽ → ha;
+Ꭾ → he;
+Ꭿ → hi;
+Ꮀ → ho;
+Ꮁ → hu;
+Ꮂ → hə\u0303;
+Ꮃ → la;
+Ꮄ → le;
+Ꮅ → li;
+Ꮆ → lo;
+Ꮇ → lu;
+Ꮈ → lə\u0303;
+Ꮉ → ma;
+Ꮊ → me;
+Ꮋ → mi;
+Ꮌ → mo;
+Ꮍ → mu;
+Ᏽ → mə\u0303;
+Ꮎ → na;
+Ꮏ → hna;
+Ꮐ → nah;
+Ꮑ → ne;
+Ꮒ → ni;
+Ꮓ → no;
+Ꮔ → nu;
+Ꮕ → nə\u0303;
+Ꮖ → kʷa;
+Ꮗ → kʷe;
+Ꮘ → kʷi;
+Ꮙ → kʷo;
+Ꮚ → kʷu;
+Ꮛ → kʷə\u0303;
+Ꮝ → s;
+Ꮜ → sa;
+Ꮞ → se;
+Ꮟ → si;
+Ꮠ → so;
+Ꮡ → su;
+Ꮢ → sə\u0303;
+Ꮣ → da;
+Ꮤ → ta;
+Ꮥ → de;
+Ꮦ → te;
+Ꮧ → di;
+Ꮨ → ti;
+Ꮩ → do;
+Ꮪ → du;
+Ꮫ → də\u0303;
+Ꮬ → d\u0361la;
+Ꮭ → t\u0361ɬa;
+Ꮮ → t\u0361ɬe;
+Ꮯ → t\u0361ɬi;
+Ꮰ → t\u0361ɬo;
+Ꮱ → t\u0361ɬu;
+Ꮲ → t\u0361ɬə\u0303;
+Ꮳ → t\u0361sa;
+Ꮴ → t\u0361se;
+Ꮵ → t\u0361si;
+Ꮶ → t\u0361so;
+Ꮷ → t\u0361su;
+Ꮸ → t\u0361sə\u0303;
+Ꮹ → wa;
+Ꮺ → we;
+Ꮻ → wi;
+Ꮼ → wo;
+Ꮽ → wu;
+Ꮾ → wə\u0303;
+Ꮿ → ja;
+Ᏸ → je;
+Ᏹ → ji;
+Ᏺ → jo;
+Ᏻ → ju;
+Ᏼ → jə\u0303;
+\u030B → ˥;
+\u0301 → ˦;
+\u0304 → ˧;
+\u0300 → ˧˩;
+[ \u030C \u0306 ] → ˨˦;
+\u0302 → ˥˧;
+[:M:] → ;
+::null;
+a a+ → aː;
+e e+ → eː;
+i i+ → iː;
+o o+ → oː;
+u u+ → uː;
+ə\u0303 {ə\u0303}+ → ə\u0303;
+

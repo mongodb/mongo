@@ -1,0 +1,13 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: es_FONIPA_es_419_FONIPA.txt
+# Generated from CLDR
+#
+
+# Conflate sounds of Castilian Spanish to produce Latin American Spanish.
+# This operates on a phonemic IPA transcription of Spanish (es_FONIPA).
+ʎ → ʝ;
+[sθ]+ → s;
+

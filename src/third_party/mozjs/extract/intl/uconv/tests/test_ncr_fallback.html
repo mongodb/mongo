@@ -1,0 +1,74 @@
+<!DOCTYPE HTML>
+<html>
+<!--
+https://bugzilla.mozilla.org/show_bug.cgi?id=1202366
+-->
+<head>
+  <meta http-equiv="Content-type" content="text/html; charset=UTF-8">
+  <title>Test for unpaired surrogates</title>
+  <script src="/tests/SimpleTest/SimpleTest.js"></script>
+  <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
+</head>
+<body onload="step()">
+<pre id="test">
+<script class="testbody" type="text/javascript">
+/* NOTE:
+ * When we make our data: URL origin work as in Blink, this test will fail.
+ * Don't let this test block alignment of data: URL origin with Blink.
+ */
+SimpleTest.waitForExplicitFinish();
+
+var expectations = [
+  "%26%2365533%3B",
+  "a%26%2365533%3B",
+  "%26%2365533%3Ba",
+  "a%26%2365533%3Ba",
+  "%26%2365533%3B",
+  "a%26%2365533%3B",
+  "%26%2365533%3Ba",
+  "a%26%2365533%3Ba",
+  "%26%23128169%3B",
+  "%26%23128169%3B",
+  "%1B%24B%22%29%1B%28B",
+  "%1B%24B%22%29%1B%28B%26%23128169%3B",
+];
+
+var i = 0;
+
+function step() {
+  var f = document.getElementsByTagName("iframe")[i];
+  f.onload = function() {
+    var href = SpecialPowers.wrap(f).contentWindow.location.href;
+    var index = href.indexOf("?foo=");
+    var actual = href.substring(index + 5);
+    var expected = expectations[i];
+    is(actual, expected, "Should have gotten the expected encode.");
+    i++
+    if (i == document.getElementsByTagName("iframe").length) {
+      SimpleTest.finish();
+    } else {
+      step();
+    }    
+  }
+  SpecialPowers.wrap(f).contentDocument.forms[0].submit();
+}
+</script>
+</pre>
+<a target="_blank" href="https://bugzilla.mozilla.org/show_bug.cgi?id=1202366">Mozilla Bug 1202366</a>
+<p id="display"></p>
+<div id="content" style="display: none">
+<iframe src="data:text/html;charset=big5,<script>document.write('<form><input name=foo value=\uD83D></form>');</script>"></iframe>
+<iframe src="data:text/html;charset=big5,<script>document.write('<form><input name=foo value=a\uD83D></form>');</script>"></iframe>
+<iframe src="data:text/html;charset=big5,<script>document.write('<form><input name=foo value=\uD83Da></form>');</script>"></iframe>
+<iframe src="data:text/html;charset=big5,<script>document.write('<form><input name=foo value=a\uD83Da></form>');</script>"></iframe>
+<iframe src="data:text/html;charset=big5,<script>document.write('<form><input name=foo value=\uDCA9></form>');</script>"></iframe>
+<iframe src="data:text/html;charset=big5,<script>document.write('<form><input name=foo value=a\uDCA9></form>');</script>"></iframe>
+<iframe src="data:text/html;charset=big5,<script>document.write('<form><input name=foo value=\uDCA9a></form>');</script>"></iframe>
+<iframe src="data:text/html;charset=big5,<script>document.write('<form><input name=foo value=a\uDCA9a></form>');</script>"></iframe>
+<iframe src="data:text/html;charset=big5,<script>document.write('<form><input name=foo value=\uD83D\uDCA9></form>');</script>"></iframe>
+<iframe src="data:text/html;charset=iso-2022-jp,<script>document.write('<form><input name=foo value=\uD83D\uDCA9></form>');</script>"></iframe>
+<iframe src="data:text/html;charset=iso-2022-jp,<script>document.write('<form><input name=foo value=\u3012></form>');</script>"></iframe>
+<iframe src="data:text/html;charset=iso-2022-jp,<script>document.write('<form><input name=foo value=\u3012\uD83D\uDCA9></form>');</script>"></iframe>
+</div>
+</body>
+</html>

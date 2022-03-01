@@ -1,0 +1,211 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ur_IN{
+    zoneStrings{
+        "Africa:Accra"{
+            ec{"اکرا"}
+        }
+        "America:Cambridge_Bay"{
+            ec{"کیمبرج بے"}
+        }
+        "America:Glace_Bay"{
+            ec{"گلیس بے"}
+        }
+        "America:Goose_Bay"{
+            ec{"گوس بے"}
+        }
+        "America:Grand_Turk"{
+            ec{"گرینڈ ترک"}
+        }
+        "America:Scoresbysund"{
+            ec{"اتتوققورتورمیت"}
+        }
+        "America:Thule"{
+            ec{"تھولے"}
+        }
+        "Europe:Budapest"{
+            ec{"بوڈاپیسٹ"}
+        }
+        "meta:Afghanistan"{
+            ls{"افغانستان ٹائم"}
+        }
+        "meta:Amazon"{
+            ld{"ایمیزون سمر ٹائم"}
+            lg{"ایمیزون ٹائم"}
+            ls{"ایمیزون سٹینڈرڈ ٹائم"}
+        }
+        "meta:Arabian"{
+            ld{"عرب ڈے لائٹ ٹائم"}
+            lg{"عرب ٹائم"}
+            ls{"عرب سٹینڈرڈ ٹائم"}
+        }
+        "meta:Argentina_Western"{
+            ld{"مغربی ارجنٹینا سمر ٹائم"}
+            lg{"مغربی ارجنٹینا ٹائم"}
+            ls{"مغربی ارجنٹینا سٹینڈرڈ ٹائم"}
+        }
+        "meta:Armenia"{
+            ld{"آرمینیا سمر ٹائم"}
+            lg{"آرمینیا ٹائم"}
+            ls{"آرمینیا سٹینڈرڈ ٹائم"}
+        }
+        "meta:Azerbaijan"{
+            ld{"آذربائیجان سمر ٹائم"}
+            lg{"آذربائیجان ٹائم"}
+            ls{"آذربائیجان سٹینڈرڈ ٹائم"}
+        }
+        "meta:Bangladesh"{
+            ld{"بنگلہ دیش سمر ٹائم"}
+            lg{"بنگلہ دیش ٹائم"}
+            ls{"بنگلہ دیش سٹینڈرڈ ٹائم"}
+        }
+        "meta:Bhutan"{
+            ls{"بھوٹان ٹائم"}
+        }
+        "meta:Bolivia"{
+            ls{"بولیویا ٹائم"}
+        }
+        "meta:Brasilia"{
+            ld{"برازیلیا سمر ٹائم"}
+            lg{"برازیلیا ٹائم"}
+            ls{"برازیلیا سٹینڈرڈ ٹائم"}
+        }
+        "meta:Chile"{
+            ld{"چلی سمر ٹائم"}
+            lg{"چلی ٹائم"}
+            ls{"چلی سٹینڈرڈ ٹائم"}
+        }
+        "meta:Colombia"{
+            ld{"کولمبیا سمر ٹائم"}
+            lg{"کولمبیا ٹائم"}
+            ls{"کولمبیا سٹینڈرڈ ٹائم"}
+        }
+        "meta:Easter"{
+            ld{"ایسٹر آئلینڈ سمر ٹائم"}
+            lg{"ایسٹر آئلینڈ ٹائم"}
+            ls{"ایسٹر آئلینڈ سٹینڈرڈ ٹائم"}
+        }
+        "meta:Ecuador"{
+            ls{"ایکواڈور ٹائم"}
+        }
+        "meta:Europe_Central"{
+            ld{"وسطی یورپ کا موسم گرما کا وقت"}
+            lg{"وسطی یورپ کا وقت"}
+            ls{"وسطی یورپ کا معیاری وقت"}
+        }
+        "meta:Falkland"{
+            ld{"فاک لینڈ آئلینڈز سمر ٹائم"}
+            lg{"فاک لینڈ آئلینڈز ٹائم"}
+            ls{"فاک لینڈ آئلینڈز سٹینڈرڈ ٹائم"}
+        }
+        "meta:French_Guiana"{
+            ls{"فرینچ گیانا ٹائم"}
+        }
+        "meta:GMT"{
+            ls{"گرین وچ مین ٹائم"}
+        }
+        "meta:Galapagos"{
+            ls{"گالاپاگوز ٹائم"}
+        }
+        "meta:Georgia"{
+            ld{"جارجیا سمر ٹائم"}
+            lg{"جارجیا ٹائم"}
+            ls{"جارجیا سٹینڈرڈ ٹائم"}
+        }
+        "meta:Gulf"{
+            ls{"خلیج سٹینڈرڈ ٹائم"}
+        }
+        "meta:Guyana"{
+            ls{"گیانا ٹائم"}
+        }
+        "meta:India"{
+            ls{"انڈیا سٹینڈرڈ ٹائم"}
+        }
+        "meta:Iran"{
+            ld{"ایران ڈے لائٹ ٹائم"}
+            lg{"ایران ٹائم"}
+            ls{"ایران سٹینڈرڈ ٹائم"}
+        }
+        "meta:Israel"{
+            ld{"اسرائیل ڈے لائٹ ٹائم"}
+            lg{"اسرائیل ٹائم"}
+            ls{"اسرائیل سٹینڈرڈ ٹائم"}
+        }
+        "meta:Kazakhstan_Eastern"{
+            ls{"مشرقی قزاخستان ٹائم"}
+        }
+        "meta:Kazakhstan_Western"{
+            ls{"مغربی قزاخستان ٹائم"}
+        }
+        "meta:Kyrgystan"{
+            ls{"کرغستان ٹائم"}
+        }
+        "meta:Macquarie"{
+            ls{"مکوآری آئلینڈ ٹائم"}
+        }
+        "meta:Maldives"{
+            ls{"مالدیپ ٹائم"}
+        }
+        "meta:Nepal"{
+            ls{"نیپال ٹائم"}
+        }
+        "meta:New_Zealand"{
+            ld{"نیوزی لینڈ ڈے لائٹ ٹائم"}
+            lg{"نیوزی لینڈ ٹائم"}
+            ls{"نیوزی لینڈ سٹینڈرڈ ٹائم"}
+        }
+        "meta:Noronha"{
+            ld{"فرنانڈو ڈی نورونہا سمر ٹائم"}
+            lg{"فرنانڈو ڈی نورنہا ٹائم"}
+            ls{"فرنانڈو ڈی نورنہا سٹینڈرڈ ٹائم"}
+        }
+        "meta:Pakistan"{
+            ld{"پاکستان سمر ٹائم"}
+            lg{"پاکستان ٹائم"}
+            ls{"پاکستان سٹینڈرڈ ٹائم"}
+        }
+        "meta:Paraguay"{
+            ld{"پیراگوئے سمر ٹائم"}
+            lg{"پیراگوئے ٹائم"}
+            ls{"پیراگوئے سٹینڈرڈ ٹائم"}
+        }
+        "meta:Peru"{
+            ld{"پیرو سمر ٹائم"}
+            lg{"پیرو ٹائم"}
+            ls{"پیرو سٹینڈرڈ ٹائم"}
+        }
+        "meta:Rothera"{
+            ls{"روتھیرا ٹائم"}
+        }
+        "meta:Suriname"{
+            ls{"سورینام ٹائم"}
+        }
+        "meta:Tajikistan"{
+            ls{"تاجکستان ٹائم"}
+        }
+        "meta:Turkmenistan"{
+            ld{"ترکمانستان سمر ٹائم"}
+            lg{"ترکمانستان ٹائم"}
+            ls{"ترکمانستان سٹینڈرڈ ٹائم"}
+        }
+        "meta:Uruguay"{
+            ld{"یوروگوئے سمر ٹائم"}
+            lg{"یوروگوئے ٹائم"}
+            ls{"یوروگوئے سٹینڈرڈ ٹائم"}
+        }
+        "meta:Uzbekistan"{
+            ld{"ازبکستان سمر ٹائم"}
+            lg{"ازبکستان ٹائم"}
+            ls{"ازبکستان سٹینڈرڈ ٹائم"}
+        }
+        "meta:Venezuela"{
+            ls{"وینزوئیلا ٹائم"}
+        }
+        "meta:Vostok"{
+            ls{"ووسٹاک ٹائم"}
+        }
+        gmtFormat{"GMT{0}"}
+        regionFormatDaylight{"{0} دن کا وقت"}
+    }
+}

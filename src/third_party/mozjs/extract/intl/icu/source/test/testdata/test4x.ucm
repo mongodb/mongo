@@ -1,0 +1,22 @@
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# *******************************************************************************
+# * Copyright (C) 2003, International Business Machines
+# * Corporation and others.  All Rights Reserved.
+# *******************************************************************************
+#
+# test4x.ucm
+#
+# Test file for MBCS conversion extension with four-byte codepage data.
+
+<code_set_name>     "test4x"
+<mb_cur_max>        4
+<mb_cur_min>        1
+<uconv_class>       "MBCS"
+
+# test loading an extension table from the testdata package
+<icu:base>          "test4"
+
+CHARMAP
+<U0009>     \x09 |0
+END CHARMAP

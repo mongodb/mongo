@@ -1,0 +1,308 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: pl_FONIPA_ja.txt
+# Generated from CLDR
+#
+
+# Transforms a Phonemic IPA transcription of Polish (pl_FONIPA) to Katakana.
+#
+$word_boundary = [-\ $] ;
+$vowel = [aeiouw] ;       # Vowels and glides
+$not_vowel = [^$vowel] ;
+#
+#
+# First pass: Collapse phonetic distinctions not preserved in Katakana.
+ç → | h;
+ɡ → | g;
+ʎ → | l;
+ŋ → | n;
+d \u0361 ʑ → | ʑ;
+d \u0361 ʐ → | ʐ;
+d \u0361 z → | z;
+#
+#
+ɛ\u0303 → | en;
+ɛ → | e;
+[ɨʲ] → | i;
+ɔ\u0303 → | on;
+ɔ → | o;
+#
+#
+:: Null ();
+#
+#
+# Main pass: Phoneme to Katakana conversion.
+'.' → ;
+a → ア;
+#
+#
+ba → バ;
+bb → ッ | b;
+be → ベ;
+b[ij]a → ビャ;
+b[ij]o → ビョ;
+b[ij] → ビ;
+bo → ボ;
+bu → ブ;
+b } $word_boundary → プ;
+b → ブ;
+#
+#
+ca → チャ ;
+ce → チェ ;
+ci → チ ;
+cu → チュ ;
+co → チョ ;
+c → チ ;
+#
+#
+^ d \u0361 ɕ → dɕ;
+d \u0361 ɕ → ッ | dɕ;
+#
+#
+da → ダ;
+dd → ッ | d;
+de → デ;
+di → ディ;
+do → ド;
+du → ドゥ;
+dɕ → チ;
+d } $word_boundary → ト;
+d → ド;
+#
+#
+e → エ;
+#
+#
+fa → ファ;
+fe → フェ;
+ff → ッ | f;
+fi → フィ;
+fo → フォ;
+fu → フ;
+f → フ;
+#
+#
+ha → ハ;
+hi → ヒ;
+hu → フ;
+he → ヘ;
+ho → ホ;
+h } $word_boundary → ;
+h → フ;
+#
+#
+ga → ガ;
+ge → グエ;
+gi → ギ;
+gg → ッ | g;
+go → ゴ;
+gu → グ;
+g } $word_boundary → ク;
+g → グ;
+#
+#
+i → イ ;
+#
+#
+ja → ヤ;
+ji → イ;
+jo → ヨ;
+je → イェ;
+ju → ユ;
+j → イ;
+#
+#
+ka → カ;
+ke → ケ;
+ki → キ;
+kk → ッ | k;
+ko → コ;
+ku → ク;
+k → ク;
+#
+#
+la → ラ ;
+le → レ ;
+li → リ ;
+lho → ロ ;
+lo → ロ ;
+lu → ル ;
+l → ル ;
+#
+#
+ma → マ ;
+me → メ ;
+mi → ミ ;
+mo → モ ;
+mu → ム ;
+m } [bp] → ン ;
+m → ム ;
+#
+#
+na → ナ ;
+ne → ネ ;
+ni → ニ ;
+no → ノ ;
+nu → ヌ ;
+n → ン ;
+#
+#
+ɲa → ニャ ;
+ɲe → ニエ ;
+ɲi → ニ ;
+ɲo → ニョ ;
+ɲu → ニュ ;
+ɲ → ン ;
+#
+#
+o → オ ;
+#
+#
+pa → パ ;
+pe → ペ ;
+pio → ピョ ;
+pi → ピ ;
+po → ポ ;
+pp → ッ | p;
+pu → プ ;
+p → プ ;
+#
+#
+ra → ラ ;
+re → レ ;
+ri → リ ;
+ro → ロ ;
+ru → ル ;
+r → ル;
+#
+#
+sa → サ ;
+se → セ ;
+si → シ ;
+so → ソ ;
+su → ス ;
+s → ス ;
+#
+#
+ɕa → シャ; # not backed by data
+ɕe → シェ;
+ɕu → シュ; # not backed by data
+ɕo → ショ; # not backed by data
+ɕvi → シフィ;
+ɕi → シ;
+ɕ → シ;
+#
+#
+ʂa → シャ;
+ʂe → シェ;
+ʂu → シュ;
+ʂo → ショ; # not backed by data
+ʂi → シ;
+ʂ → シュ;
+#
+#
+#tʂa → ツァ;
+#tʂi → トシ;
+#tʂu → チュ;
+#tʂe → トシェ;
+#tʂ } $word_boundary → チ;
+#tʂ → チュ;
+#
+tɕa → チャ;
+tɕe → チェ;
+tɕi → チ;
+tɕu → チュ;
+tɕo → チョ;
+tɕ → チ;
+#
+#
+ta → タ;
+te → テ ;
+ti → ティ ;
+to → ト ;
+tu → トゥ ;
+#
+#
+tsa → ツァ ;
+tse → ツェ ;
+ts[ij] → ツィ ;
+tso → ツォ ;
+tsu → ツ ;
+ts → ツ ;
+#
+#
+^tt → ト | t;
+tt → ッ | t;
+#
+#
+t \u0361 ʂa → ツァ;
+t \u0361 ʂi → チ;
+t \u0361 ʂu → チュ;
+t \u0361 ʂe → チェ;
+t \u0361 ʂo → チョ;
+t \u0361 ʂ } $word_boundary → チ;
+t \u0361 ʂ → チュ;
+t \u0361 → | t;
+t → ト ;
+#
+#
+u → ウ ;
+#
+#
+va → バ;
+ve → ベ;
+vi → ビ;
+vo → ボ;
+vu → ブ;
+v } $word_boundary → フ;
+v → ブ;
+#
+#
+wa → ワ;
+wu → ウ;
+wi → ウィ;
+we → ウェ;
+wo → ウォ;
+w → ウ;
+#
+#
+xa → ハ ;
+xe → ヘ ;
+xi → ヒ ;
+xo → ホ ;
+xu → フ ;
+x → フ ;
+#
+#
+ʐa → ジャ;
+ʐe → ジェ;
+ʐi → ジ;
+ʐo → ジョ;
+ʐu → ジュ;
+ʐ } $word_boundary → ジュ;
+ʐ → ジ;
+#
+#
+ʑa → ジャ;
+ʑi → ジ;
+ʑo → ジオ;
+ʑe → ジェ;
+ʑu → ジュ;
+ʑ → ジ;
+#
+#
+za → ザ;
+ze → ジェ;
+zi → ジ;
+zo → ゾ;
+zu → ズ;
+z } $word_boundary → ス;
+z → ズ;
+#
+#
+#' ' → ・;
+#
+

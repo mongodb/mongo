@@ -1,0 +1,135 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sr_Latn_ME{
+    calendar{
+        generic{
+            intervalFormats{
+                MMMEd{
+                    M{"E, d. MMM – E, d. MMM"}
+                    d{"E, d. MMM – E, d. MMM"}
+                }
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "prije podne",
+                "po podne",
+            }
+            AmPmMarkersAbbr{
+                "prije podne",
+                "po podne",
+            }
+            availableFormats{
+                MMMMW{
+                    few{"W. 'sjedmica' 'u' MMMM"}
+                    one{"W. 'sjedmica' 'u' MMMM"}
+                    other{"W. 'sjedmica' 'u' MMMM"}
+                }
+                yw{
+                    few{"w. 'sjedmica' 'u' Y."}
+                    one{"w. 'sjedmica' 'u' Y."}
+                    other{"w. 'sjedmica' 'u' Y."}
+                }
+            }
+            dayNames{
+                format{
+                    wide{
+                        "nedjelja",
+                        "ponedeljak",
+                        "utorak",
+                        "srijeda",
+                        "četvrtak",
+                        "petak",
+                        "subota",
+                    }
+                }
+                stand-alone{
+                    wide{
+                        "nedjelja",
+                        "ponedeljak",
+                        "utorak",
+                        "srijeda",
+                        "četvrtak",
+                        "petak",
+                        "subota",
+                    }
+                }
+            }
+            dayPeriod{
+                format{
+                    abbreviated{
+                        afternoon1{"po pod."}
+                        evening1{"veče"}
+                        midnight{"ponoć"}
+                        morning1{"jutro"}
+                        night1{"noću"}
+                        noon{"podne"}
+                    }
+                    narrow{
+                        afternoon1{"po pod."}
+                        evening1{"veče"}
+                        midnight{"ponoć"}
+                        morning1{"jutro"}
+                        night1{"noć"}
+                        noon{"podne"}
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        am{"prije podne"}
+                        pm{"po podne"}
+                    }
+                    narrow{
+                        am{"a"}
+                        pm{"p"}
+                    }
+                    wide{
+                        am{"prije podne"}
+                        pm{"po podne"}
+                    }
+                }
+            }
+            eras{
+                wide{
+                    "prije nove ere",
+                    "nove ere",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "jan",
+                        "feb",
+                        "mart",
+                        "apr",
+                        "maj",
+                        "jun",
+                        "jul",
+                        "avg",
+                        "sept",
+                        "okt",
+                        "nov",
+                        "dec",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "jan",
+                        "feb",
+                        "mart",
+                        "apr",
+                        "maj",
+                        "jun",
+                        "jul",
+                        "avg",
+                        "sept",
+                        "okt",
+                        "nov",
+                        "dec",
+                    }
+                }
+            }
+        }
+    }
+}

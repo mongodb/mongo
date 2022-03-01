@@ -1,0 +1,118 @@
+// Copyright (C) 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+//*******************************************************************************
+//*
+//*   Copyright (C) 1998-2016, International Business Machines
+//*   Corporation and others.  All Rights Reserved.
+//*
+//*******************************************************************************
+
+
+// This is a test default locale file
+
+root
+{
+    Version { 44.0 }
+    ExpectCLDRVersionAtLeast { 39.0 } // 'base' cldr version. Allow up to version =.=.* of this
+    CurrentCLDRVersion { 39.0 } // Current CLDR version as of the test update. Warn if not an exact match.
+
+    ShortLanguage { xxx }
+
+    string_only_in_Root { ROOT }
+
+    array_only_in_Root { ROOT0, ROOT1, ROOT2, ROOT3 }
+
+    array_2d_only_in_Root
+    {
+        { ROOT00, ROOT01 }
+        { ROOT10, ROOT11 }
+    }
+
+    tagged_array_only_in_Root
+    {
+        tag2 { ROOT2 } 
+        tag1 { ROOT1 } 
+        tag3 { ROOT3 } 
+        tag6 { ROOT6 } 
+        tag12 { ROOT12 } 
+        tag7 { ROOT7 } 
+        tag14 { ROOT14 } 
+        tag9 { ROOT9 } 
+    }
+
+    string_in_Root_te_te_IN { ROOT }
+
+    array_in_Root_te_te_IN { ROOT0, ROOT1, ROOT2, ROOT3, ROOT4 }
+
+    array_2d_in_Root_te_te_IN
+    {
+        { ROOT00, ROOT01, ROOT02 }
+        { ROOT10, ROOT11, ROOT12 }
+        { ROOT20, ROOT21, ROOT22 }
+        { ROOT30, ROOT31, ROOT32 }
+    }
+
+    tagged_array_in_Root_te_te_IN
+    {
+        tag4 { ROOT4 } 
+        tag9 { ROOT9 } 
+        tag12 { ROOT12 } 
+    tag1 { ROOT1 }
+    }
+
+    string_in_Root_te { ROOT }
+
+    array_in_Root_te { ROOT0, ROOT1, ROOT2, ROOT3, ROOT4 }
+
+    array_2d_in_Root_te
+    {
+        { ROOT00, ROOT01, ROOT02 }
+        { ROOT10, ROOT11, ROOT12 }
+        { ROOT20, ROOT21, ROOT22 }
+        { ROOT30, ROOT31, ROOT32 }
+    }
+
+    tagged_array_in_Root_te
+    {
+        tag12 { ROOT12 } 
+        tag1 { ROOT1 } 
+        tag7 { ROOT7 } 
+        tag3 { ROOT3 } 
+    }
+
+    string_in_Root_te_IN { ROOT }
+
+    array_in_Root_te_IN { ROOT0, ROOT1, ROOT2 }
+
+    array_2d_in_Root_te_IN
+    {
+        { ROOT00, ROOT01, ROOT02, ROOT03 }
+        { ROOT10, ROOT11, ROOT12, ROOT13 }
+        { ROOT20, ROOT21, ROOT22, ROOT23 }
+    }
+
+    tagged_array_in_Root_te_IN
+    {
+        tag13 { ROOT13 } 
+        tag8 { ROOT8 } 
+    }
+    rootAliasClient:alias {"/LOCALE/rootAliasDestination"}
+    rootAliasDestination {"wrong"}
+    nestedRootAliasClient:alias {"/LOCALE/rootAliasTable/destination"}
+    rootAliasTable {
+        destination { "correct" }
+    }
+    a {
+        a1{"ar1"}
+        a2{"ar2"}
+        a3{"ar3"}
+        a4{"ar4"}
+    }    
+
+    tableT7996 {
+        b7996:alias {"/LOCALE/tableT7996/c7996"}
+        c7996 {"string c7996 in tableT7996 for root"}
+    }
+}
+
+//eof

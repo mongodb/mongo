@@ -1,0 +1,134 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ps_PK{
+    units{
+        acceleration{
+            g-force{
+                dnam{"د جاذبے قوه"}
+                one{"{0} د جاذبے قوه"}
+                other{"{0} د جاذبے قوه"}
+            }
+        }
+        angle{
+            arc-second{
+                dnam{"آرک ثانيے"}
+                one{"{0} آرک ثانيه"}
+                other{"{0} آرک ثانيے"}
+            }
+            degree{
+                dnam{"درجے"}
+                one{"{0} درجے"}
+                other{"{0} درجے"}
+            }
+        }
+        area{
+            hectare{
+                dnam{"هيکترے"}
+                one{"{0} هيکتر"}
+                other{"{0} هيکترے"}
+            }
+        }
+        duration{
+            day{
+                dnam{"ورځے"}
+                one{"{0} ورځ"}
+                other{"{0} ورځے"}
+                per{"{0} په هره ورځ کے"}
+            }
+            month{
+                dnam{"مياشتے"}
+                one{"{0} مياشت"}
+                other{"{0} مياشتے"}
+            }
+            week{
+                per{"{0} په هره اونۍ کے"}
+            }
+        }
+        length{
+            astronomical-unit{
+                dnam{"فلکي احدے"}
+                one{"{0} فلکي احد"}
+                other{"{0} فلکي احدے"}
+            }
+            inch{
+                dnam{"انچے"}
+                one{"{0} انچ"}
+                other{"{0} انچے"}
+            }
+        }
+        pressure{
+            inch-ofhg{
+                dnam{"د پارے انچے"}
+                one{"{0} د پارے انچ"}
+                other{"{0} د پارے انچے"}
+            }
+            millimeter-ofhg{
+                dnam{"د پارے ملي مترز"}
+                one{"{0} د پارے ملي متر"}
+                other{"{0} د پارے ملي مترز"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"درجے سيلسيس"}
+                one{"{0} درجے سيلسيس"}
+                other{"{0} درجے سيلسيس"}
+            }
+            fahrenheit{
+                dnam{"درجے فارنهايټ"}
+                one{"{0} درجے فارنهايټ"}
+                other{"{0} درجے فارنهايټ"}
+            }
+        }
+        volume{
+            cup{
+                dnam{"پيالے"}
+                one{"{0} پياله"}
+                other{"{0} پيالے"}
+            }
+            teaspoon{
+                dnam{"د ميز کاچوغے"}
+                one{"{0} د ميز کاچوغه"}
+                other{"{0} د ميز کاچوغے"}
+            }
+        }
+    }
+    unitsShort{
+        acceleration{
+            g-force{
+                dnam{"د جاذبے قوه"}
+            }
+        }
+        angle{
+            degree{
+                dnam{"درجے"}
+            }
+        }
+        area{
+            hectare{
+                dnam{"هيکترے"}
+            }
+        }
+        duration{
+            day{
+                dnam{"ورځے"}
+                one{"{0} ورځ"}
+                other{"{0} ورځے"}
+            }
+            month{
+                dnam{"مياشتے"}
+            }
+        }
+        length{
+            inch{
+                dnam{"انچے"}
+            }
+        }
+        volume{
+            cup{
+                dnam{"پيالے"}
+            }
+        }
+    }
+}

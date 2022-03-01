@@ -1,0 +1,200 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_CL{
+    %%Parent{"es_419"}
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"¤#,##0.00;¤-#,##0.00"}
+            }
+            symbols{
+                decimal{","}
+                group{"."}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d 'de' MMMM 'de' y G",
+                "d 'de' MMMM 'de' y G",
+                "dd-MM-y G",
+                "dd-MM-y GGGGG",
+                "{1} {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                MEd{"E, dd-MM"}
+                Md{"dd-MM"}
+                yyyyM{"MM-y G"}
+                yyyyMEd{"E dd-MM-y G"}
+                yyyyMd{"dd-MM-y G"}
+            }
+            intervalFormats{
+                MEd{
+                    M{"E dd-MM – E dd-MM"}
+                    d{"E dd-MM – E dd-MM"}
+                }
+                MMMEd{
+                    M{"E d 'de' MMM 'al' E d 'de' MMM"}
+                    d{"E d 'al' E d 'de' MMM"}
+                }
+                MMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM"}
+                }
+                Md{
+                    M{"dd-MM – dd-MM"}
+                    d{"dd-MM – dd-MM"}
+                }
+                fallback{"{0} a el {1}"}
+                yM{
+                    M{"MM-y – MM-y G"}
+                    y{"MM-y – MM-y G"}
+                }
+                yMEd{
+                    M{"E dd-MM-y – E dd-MM-y G"}
+                    d{"E dd-MM-y – E dd-MM-y G"}
+                    y{"E dd-MM-y – E dd-MM-y G"}
+                }
+                yMMM{
+                    y{"MMM 'de' y 'a' MMM 'de' y G"}
+                }
+                yMMMEd{
+                    M{"E d 'de' MMM 'al' E d 'de' MMM 'de' y G"}
+                    d{"E d 'al' E d 'de' MMM 'de' y G"}
+                    y{"E d 'de' MMM 'de' y 'al' E d 'de' MMM 'de' y G"}
+                }
+                yMMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM 'de' y G"}
+                    y{"d 'de' MMM 'de' y 'al' d 'de' MMM 'de' y G"}
+                }
+                yMd{
+                    M{"dd-MM-y – dd-MM-y G"}
+                    d{"dd-MM-y – dd-MM-y G"}
+                    y{"dd-MM-y – dd-MM-y G"}
+                }
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d 'de' MMMM 'de' y",
+                "d 'de' MMMM 'de' y",
+                "dd-MM-y",
+                "dd-MM-yy",
+                "{1} {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                GyMMMd{"d MMM y G"}
+                MEd{"E, dd-MM"}
+                Md{"dd-MM"}
+                yM{"MM-y"}
+                yMEd{"E dd-MM-y"}
+                yMd{"dd-MM-y"}
+            }
+            dayNames{
+                format{
+                    short{
+                        "do",
+                        "lu",
+                        "ma",
+                        "mi",
+                        "ju",
+                        "vi",
+                        "sá",
+                    }
+                }
+            }
+            intervalFormats{
+                MEd{
+                    M{"E dd-MM – E dd-MM"}
+                    d{"E dd-MM – E dd-MM"}
+                }
+                MMMEd{
+                    M{"E d 'de' MMM 'al' E d 'de' MMM"}
+                    d{"E d 'al' E d 'de' MMM"}
+                }
+                MMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM"}
+                }
+                Md{
+                    M{"dd-MM – dd-MM"}
+                    d{"dd-MM – dd-MM"}
+                }
+                fallback{"{0} a el {1}"}
+                hm{
+                    h{"h:mm–h:mm a"}
+                    m{"h:mm–h:mm a"}
+                }
+                yM{
+                    M{"MM-y – MM-y"}
+                    y{"MM-y – MM-y"}
+                }
+                yMEd{
+                    M{"E dd-MM-y – E dd-MM-y"}
+                    d{"E dd-MM-y – E dd-MM-y"}
+                }
+                yMMM{
+                    y{"MMM 'de' y 'a' MMM 'de' y"}
+                }
+                yMMMEd{
+                    M{"E d 'de' MMM 'al' E d 'de' MMM 'de' y"}
+                    d{"E d 'al' E d 'de' MMM 'de' y"}
+                    y{"E d 'de' MMM 'de' y 'al' E d 'de' MMM 'de' y"}
+                }
+                yMMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM 'de' y"}
+                    y{"d 'de' MMM 'de' y 'al' d 'de' MMM 'de' y"}
+                }
+                yMd{
+                    M{"dd-MM-y – dd-MM-y"}
+                    d{"dd-MM-y – dd-MM-y"}
+                    y{"dd-MM-y – dd-MM-y"}
+                }
+            }
+            monthNames{
+                stand-alone{
+                    abbreviated{
+                        "ene.",
+                        "feb.",
+                        "mar.",
+                        "abr.",
+                        "may.",
+                        "jun.",
+                        "jul.",
+                        "ago.",
+                        "sept.",
+                        "oct.",
+                        "nov.",
+                        "dic.",
+                    }
+                }
+            }
+            quarters{
+                stand-alone{
+                    wide{
+                        "1.° trimestre",
+                        "2.° trimestre",
+                        "3.° trimestre",
+                        "4.º trimestre",
+                    }
+                }
+            }
+        }
+    }
+}

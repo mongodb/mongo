@@ -1,0 +1,86 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: la_la_FONIPA.txt
+# Generated from CLDR
+#
+
+# Transformation from Latin (la) to its IPA transcription (la_FONIPA).
+# http://en.wikipedia.org/wiki/Latin_spelling_and_pronunciation
+# http://en.wikipedia.org/wiki/Wikipedia:IPA_for_Latin
+#
+# These rules follow the Wikipedia description of the presumed pronunciation
+# of Classical Latin. This is different from Medieval Latin, and it is also
+# different from the ecclesiastical pronunciation used by the Roman Catholic
+# church.
+::Lower;
+::NFC;
+$vowel = [aáàăāeéèĕēiíìĭīoóòŏōuúùŭūæœ];
+$end_of_word = [$ ];
+ae → aj;
+av → aw;
+æ → aj; # 19th century English orthography
+ā → aː;
+[aáàă] → a;
+b → b;
+ch → kʰ; # Greek loanwoards
+c → k;
+d → d;
+ev → ew;
+ē → eː;
+[eéèĕ] → ɛ;
+f → f;
+{g} n → ŋ; # eg. agnus
+g → ɡ;
+h → h;
+ī → iː;
+{[iíìĭ]} $vowel → j; # eg. cuius
+[iíìĭ] → ɪ;
+k → k;
+l → l;
+m → m;
+{n} [bpfm] → m; # eg. infirmus
+{n} [gckq] → ŋ; # eg. quinque
+n → n;
+œ → oj; # 19th century English orthography
+oe → oj;
+ō → oː;
+[oóòŏ] → ɔ;
+ph → pʰ; # Greek loanwords
+p → p;
+qu → kʷ;
+qv → kʷ;
+rh → rʰ; # Greek loanwords
+r → r;
+s → s;
+th → tʰ; # Greek loanwords
+t → t;
+ū → uː;
+[uúùŭ] → ʊ;
+{v} $vowel → w;
+v → u;
+xs → ks; # Old Latin spelling
+x → ks;
+y → y; # Greek loanwords
+z → d\u0361z; # eg. zerum
+::Null;
+# Gemination of double consonants.
+# http://en.wikipedia.org/wiki/Latin_spelling_and_pronunciation#Double_consonants
+bb → bː;
+dd → dː;
+ɡɡ → ɡː;
+hh → hː;
+kk → kː;
+ll → lː;
+mm → mː;
+nn → nː;
+pp → pː;
+rr → rː;
+ss → sː;
+tt → tː;
+# Velarization of [l].
+# http://en.wikipedia.org/wiki/Latin_spelling_and_pronunciation#cite_note-20
+{l} [^aeɛiouː] → ɫ;
+::NFC;
+

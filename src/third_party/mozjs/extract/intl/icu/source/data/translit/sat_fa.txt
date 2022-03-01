@@ -1,0 +1,13 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: sat_fa.txt
+# Generated from CLDR
+#
+
+# TODO: Add other scripts (eg. sat-Beng) once we can transcribe them to IPA.
+# Do this in a separate rule for "sat-sat_FONIPA", so it can be reused.
+::sat_Olck-sat_FONIPA;
+::und_FONIPA-fa;
+

@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -7,70 +7,108 @@
 #ifndef jit_Bailouts_h
 #define jit_Bailouts_h
 
+#include "mozilla/Assertions.h"  // MOZ_ASSERT
+
+#include <stddef.h>  // size_t
+#include <stdint.h>  // uint8_t, uint32_t
+
 #include "jstypes.h"
 
-#include "jit/JitFrames.h"
-#include "jit/JSJitFrameIter.h"
-#include "vm/Stack.h"
+#include "jit/IonTypes.h"  // js::jit::Bailout{Id,Kind}, js::jit::SnapshotOffset
+#include "jit/Registers.h"  // js::jit::MachineState
+#include "js/TypeDecls.h"   // jsbytecode
 
 namespace js {
+
+class AbstractFramePtr;
+
 namespace jit {
 
-// A "bailout" is a condition in which we need to recover an interpreter frame
-// from an IonFrame. Bailouts can happen for the following reasons:
-//   (1) A deoptimization guard, for example, an add overflows or a type check
-//       fails.
-//   (2) A check or assumption held by the JIT is invalidated by the VM, and
-//       JIT code must be thrown away. This includes the GC possibly deciding
-//       to evict live JIT code, or a Type Inference reflow.
+// [SMDOC] IonMonkey Bailouts
 //
-// Note that bailouts as described here do not include normal Ion frame
-// inspection, for example, if an exception must be built or the GC needs to
-// scan an Ion frame for gcthings.
+// A "bailout" is the process of recovering a baseline interpreter frame from an
+// IonFrame.  Bailouts are implemented in js::jit::BailoutIonToBaseline, which
+// has the following callers:
 //
-// The second type of bailout needs a different name - "deoptimization" or
-// "deep bailout". Here we are concerned with eager (or maybe "shallow")
-// bailouts, that happen from JIT code. These happen from guards, like:
+// *   js::jit::Bailout - This is used when a guard fails in the Ion code
+//     itself; for example, an LGuardShape fails or an LAddI overflows. See
+//     callers of CodeGenerator::bailoutFrom() for more examples.
 //
-//  cmp [obj + shape], 0x50M37TH1NG
-//  jmp _bailout
+// * js::jit::ExceptionHandlerBailout - Ion doesn't implement `catch` or
+//     `finally`. If an exception is thrown and would be caught by an Ion frame,
+//     we bail out instead.
 //
-// The bailout target needs to somehow translate the Ion frame (whose state
-// will differ at each program point) to an interpreter frame. This state is
-// captured into the IonScript's snapshot buffer, and for each bailout we know
-// which snapshot corresponds to its state.
+// *   js::jit::InvalidationBailout - We returned to Ion code that was
+//     invalidated while it was on the stack. See "OSI" below. Ion code can be
+//     invalidated for several reasons: when GC evicts Ion code to save memory,
+//     for example, or when assumptions baked into the jitted code are
+//     invalidated by the VM.
 //
-// Roughly, the following needs to happen at the bailout target.
-//   (1) Move snapshot ID into a known stack location (registers cannot be
-//       mutated).
-//   (2) Spill all registers to the stack.
-//   (3) Call a Bailout() routine, whose argument is the stack pointer.
-//   (4) Bailout() will find the IonScript on the stack, use the snapshot ID
-//       to find the structure of the frame, and then use the stack and spilled
-//       registers to perform frame conversion.
-//   (5) Bailout() returns, and the JIT must immediately return to the
-//       interpreter (all frames are converted at once).
+// (Some stack inspection can be done without bailing out, including GC stack
+// marking, Error object construction, and Gecko profiler sampling.)
 //
-// (2) and (3) are implemented by a trampoline held in the compartment.
-// Naively, we could implement (1) like:
+// Consider the first case. When an Ion guard fails, we can't continue in
+// Ion. There's no IC fallback case coming to save us; we've got a broken
+// assumption baked into the code we're running. So we jump to an out-of-line
+// code path that's responsible for abandoning Ion execution and resuming in
+// the baseline interpreter: the bailout path.
 //
-//   _bailout_ID_1:
-//     push 1
-//     jmp _global_bailout_handler
-//   _bailout_ID_2:
-//     push 2
-//     jmp _global_bailout_handler
+// We were in the midst of optimized Ion code, so bits of program state may be
+// in registers or spilled to the native stack; values may be unboxed; some
+// objects may have been optimized away; thanks to inlining, whole call frames
+// may be missing. The bailout path must put all these pieces back together
+// into the structure the baseline interpreter expects.
+//
+// The data structure that makes this possible is called a *snapshot*.
+// Snapshots are created during Ion codegen and associated with the IonScript;
+// they tell how to recover each value in a BaselineFrame from the current
+// machine state at a given point in the Ion JIT code. This is potentially
+// different at every place in an Ion script where we might bail out. (See
+// Snapshots.h.)
+//
+// The bailout path performs roughly the following steps:
+//
+// 1.  Push a snapshot index and the frame size to the native stack.
+// 2.  Spill all registers.
+// 3.  Call js::jit::Bailout to reconstruct the baseline frame(s).
+// 4.  memmove() those to the right place on the native stack.
+// 5.  Jump into the baseline interpreter.
+//
+// When C++ code invalidates Ion code, we do on-stack invalidation, or OSI, to
+// arrange for every affected Ion frame on the stack to bail out as soon as
+// control returns to it. OSI patches every instruction in the JIT code that's
+// at a return address currently on the stack. See InvalidateActivation.
+//
+//
+// ## Bailout path implementation details
+//
+// Ion code has a lot of guards, so each bailout path must be small. Steps 2
+// and 3 above are therefore implemented by a shared per-Runtime trampoline,
+// rt->jitRuntime()->getGenericBailoutHandler().
+//
+// Naively, we could implement step 1 like:
+//
+//     _bailout_ID_1:
+//       push 1
+//       jmp _deopt
+//     _bailout_ID_2:
+//       push 2
+//       jmp _deopt
+//     ...
+//     _deopt:
+//       push imm(FrameSize)
+//       call _global_bailout_handler
 //
 // This takes about 10 extra bytes per guard. On some platforms, we can reduce
 // this overhead to 4 bytes by creating a global jump table, shared again in
 // the compartment:
 //
-//     call _global_bailout_handler
-//     call _global_bailout_handler
-//     call _global_bailout_handler
-//     call _global_bailout_handler
-//      ...
-//    _global_bailout_handler:
+//       call _global_bailout_handler
+//       call _global_bailout_handler
+//       call _global_bailout_handler
+//       call _global_bailout_handler
+//       ...
+//     _global_bailout_handler:
 //
 // In the bailout handler, we can recompute which entry in the table was
 // selected by subtracting the return addressed pushed by the call, from the
@@ -94,131 +132,100 @@ static const BailoutId INVALID_BAILOUT_ID = BailoutId(-1);
 // Keep this arbitrarily small for now, for testing.
 static const uint32_t BAILOUT_TABLE_SIZE = 16;
 
-// Bailout return codes.
-// N.B. the relative order of these values is hard-coded into ::GenerateBailoutThunk.
-static const uint32_t BAILOUT_RETURN_OK = 0;
-static const uint32_t BAILOUT_RETURN_FATAL_ERROR = 1;
-static const uint32_t BAILOUT_RETURN_OVERRECURSED = 2;
-
-// This address is a magic number made to cause crashes while indicating that we
-// are making an attempt to mark the stack during a bailout.
-static const uint32_t FAKE_EXITFP_FOR_BAILOUT_ADDR = 0xba2;
-static uint8_t* const FAKE_EXITFP_FOR_BAILOUT =
-    reinterpret_cast<uint8_t*>(FAKE_EXITFP_FOR_BAILOUT_ADDR);
-
-static_assert(!(FAKE_EXITFP_FOR_BAILOUT_ADDR & JitActivation::ExitFpWasmBit),
-              "FAKE_EXITFP_FOR_BAILOUT could be mistaken as a low-bit tagged wasm exit fp");
-
 // BailoutStack is an architecture specific pointer to the stack, given by the
 // bailout handler.
 class BailoutStack;
 class InvalidationBailoutStack;
+
+class IonScript;
+class InlineFrameIterator;
+class JitActivation;
+class JitActivationIterator;
+class JSJitFrameIter;
+struct ResumeFromException;
 
 // Must be implemented by each architecture.
 
 // This structure is constructed before recovering the baseline frames for a
 // bailout. It records all information extracted from the stack, and which are
 // needed for the JSJitFrameIter.
-class BailoutFrameInfo
-{
-    MachineState machine_;
-    uint8_t* framePointer_;
-    size_t topFrameSize_;
-    IonScript* topIonScript_;
-    uint32_t snapshotOffset_;
-    JitActivation* activation_;
+class BailoutFrameInfo {
+  MachineState machine_;
+  uint8_t* framePointer_;
+  size_t topFrameSize_;
+  IonScript* topIonScript_;
+  uint32_t snapshotOffset_;
+  JitActivation* activation_;
 
-    void attachOnJitActivation(const JitActivationIterator& activations);
+  void attachOnJitActivation(const JitActivationIterator& activations);
 
-  public:
-    BailoutFrameInfo(const JitActivationIterator& activations, BailoutStack* sp);
-    BailoutFrameInfo(const JitActivationIterator& activations, InvalidationBailoutStack* sp);
-    BailoutFrameInfo(const JitActivationIterator& activations, const JSJitFrameIter& frame);
-    ~BailoutFrameInfo();
+ public:
+  BailoutFrameInfo(const JitActivationIterator& activations, BailoutStack* sp);
+  BailoutFrameInfo(const JitActivationIterator& activations,
+                   InvalidationBailoutStack* sp);
+  BailoutFrameInfo(const JitActivationIterator& activations,
+                   const JSJitFrameIter& frame);
+  ~BailoutFrameInfo();
 
-    uint8_t* fp() const {
-        return framePointer_;
-    }
-    SnapshotOffset snapshotOffset() const {
-        return snapshotOffset_;
-    }
-    const MachineState* machineState() const {
-        return &machine_;
-    }
-    size_t topFrameSize() const {
-        return topFrameSize_;
-    }
-    IonScript* ionScript() const {
-        return topIonScript_;
-    }
-    JitActivation* activation() const {
-        return activation_;
-    }
+  uint8_t* fp() const { return framePointer_; }
+  SnapshotOffset snapshotOffset() const { return snapshotOffset_; }
+  const MachineState* machineState() const { return &machine_; }
+  size_t topFrameSize() const { return topFrameSize_; }
+  IonScript* ionScript() const { return topIonScript_; }
+  JitActivation* activation() const { return activation_; }
 };
 
-MOZ_MUST_USE bool EnsureHasEnvironmentObjects(JSContext* cx, AbstractFramePtr fp);
+[[nodiscard]] bool EnsureHasEnvironmentObjects(JSContext* cx,
+                                               AbstractFramePtr fp);
 
 struct BaselineBailoutInfo;
 
-// Called from a bailout thunk. Returns a BAILOUT_* error code.
-uint32_t Bailout(BailoutStack* sp, BaselineBailoutInfo** info);
+// Called from a bailout thunk.
+[[nodiscard]] bool Bailout(BailoutStack* sp, BaselineBailoutInfo** info);
 
-// Called from the invalidation thunk. Returns a BAILOUT_* error code.
-uint32_t InvalidationBailout(InvalidationBailoutStack* sp, size_t* frameSizeOut,
-                             BaselineBailoutInfo** info);
+// Called from the invalidation thunk.
+[[nodiscard]] bool InvalidationBailout(InvalidationBailoutStack* sp,
+                                       size_t* frameSizeOut,
+                                       BaselineBailoutInfo** info);
 
-class ExceptionBailoutInfo
-{
-    size_t frameNo_;
-    jsbytecode* resumePC_;
-    size_t numExprSlots_;
+class ExceptionBailoutInfo {
+  size_t frameNo_;
+  jsbytecode* resumePC_;
+  size_t numExprSlots_;
 
-  public:
-    ExceptionBailoutInfo(size_t frameNo, jsbytecode* resumePC, size_t numExprSlots)
-      : frameNo_(frameNo),
-        resumePC_(resumePC),
-        numExprSlots_(numExprSlots)
-    { }
+ public:
+  ExceptionBailoutInfo(size_t frameNo, jsbytecode* resumePC,
+                       size_t numExprSlots)
+      : frameNo_(frameNo), resumePC_(resumePC), numExprSlots_(numExprSlots) {}
 
-    ExceptionBailoutInfo()
-      : frameNo_(0),
-        resumePC_(nullptr),
-        numExprSlots_(0)
-    { }
+  ExceptionBailoutInfo() : frameNo_(0), resumePC_(nullptr), numExprSlots_(0) {}
 
-    bool catchingException() const {
-        return !!resumePC_;
-    }
-    bool propagatingIonExceptionForDebugMode() const {
-        return !resumePC_;
-    }
+  bool catchingException() const { return !!resumePC_; }
+  bool propagatingIonExceptionForDebugMode() const { return !resumePC_; }
 
-    size_t frameNo() const {
-        MOZ_ASSERT(catchingException());
-        return frameNo_;
-    }
-    jsbytecode* resumePC() const {
-        MOZ_ASSERT(catchingException());
-        return resumePC_;
-    }
-    size_t numExprSlots() const {
-        MOZ_ASSERT(catchingException());
-        return numExprSlots_;
-    }
+  size_t frameNo() const {
+    MOZ_ASSERT(catchingException());
+    return frameNo_;
+  }
+  jsbytecode* resumePC() const {
+    MOZ_ASSERT(catchingException());
+    return resumePC_;
+  }
+  size_t numExprSlots() const {
+    MOZ_ASSERT(catchingException());
+    return numExprSlots_;
+  }
 };
 
 // Called from the exception handler to enter a catch or finally block.
-// Returns a BAILOUT_* error code.
-uint32_t ExceptionHandlerBailout(JSContext* cx, const InlineFrameIterator& frame,
-                                 ResumeFromException* rfe,
-                                 const ExceptionBailoutInfo& excInfo,
-                                 bool* overrecursed);
+[[nodiscard]] bool ExceptionHandlerBailout(JSContext* cx,
+                                           const InlineFrameIterator& frame,
+                                           ResumeFromException* rfe,
+                                           const ExceptionBailoutInfo& excInfo);
 
-uint32_t FinishBailoutToBaseline(BaselineBailoutInfo* bailoutInfo);
+[[nodiscard]] bool FinishBailoutToBaseline(BaselineBailoutInfo* bailoutInfoArg);
 
-void CheckFrequentBailouts(JSContext* cx, JSScript* script, BailoutKind bailoutKind);
-
-} // namespace jit
-} // namespace js
+}  // namespace jit
+}  // namespace js
 
 #endif /* jit_Bailouts_h */

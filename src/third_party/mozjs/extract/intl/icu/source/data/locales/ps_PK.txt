@@ -1,0 +1,128 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ps_PK{
+    AuxExemplarCharacters{"[\u200C \u200D \u200E\u200F]"}
+    ExemplarCharacters{
+        "[\u064E \u0650 \u064F \u064B \u064D \u064C \u0651 \u0652 \u0654 \u0670 آ ا أ"
+        " ء ب پ ت ټ ث ج ځ چ څ ح خ د ډ ذ ر ړ ز ژ ږ س ش ښ ص ض ط ظ ع غ ف ق ک ګ گ ل م ن ڼ"
+        " ه ة و ؤ ی ے ي ې ۍ ئ]"
+    }
+    calendar{
+        gregorian{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE د y د MMMM d",
+                "د y د MMMM d",
+                "y MMM d",
+                "y/M/d",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+        }
+        islamic{
+            monthNames{
+                format{
+                    wide{
+                        "محرم",
+                        "د صفرے د",
+                        "ربيع",
+                        "ربيع II",
+                        "جماعه",
+                        "جموما II",
+                        "رجب",
+                        "شعبان",
+                        "رمضان",
+                        "شوال",
+                        "ذي القعده",
+                        "ذي الحج",
+                    }
+                }
+                stand-alone{
+                    wide{
+                        "محرم",
+                        "د صفرے د",
+                        "ربيع",
+                        "ربيع II",
+                        "جماعه",
+                        "جموما II",
+                        "رجب",
+                        "شعبان",
+                        "رمضان",
+                        "شوال",
+                        "دالقاعده",
+                        "ذي الحج",
+                    }
+                }
+            }
+        }
+    }
+    characterLabel{
+        east_asian_scripts{"د ختيځے اسيا سکرېپټ"}
+        nonspacing{"بے واټنه کول"}
+        numbers{"شمېرے"}
+        smiley{"مسکېدلے"}
+    }
+    fields{
+        weekOfMonth{
+            dn{"د مياشتے اونۍ"}
+        }
+        weekOfMonth-narrow{
+            dn{"د مياشتے اونۍ"}
+        }
+        weekOfMonth-short{
+            dn{"د مياشتے اونۍ"}
+        }
+        weekdayOfMonth{
+            dn{"د مياشتے اونۍ ورځ"}
+        }
+        weekdayOfMonth-narrow{
+            dn{"د مياشتے اونۍ ورځ"}
+        }
+        weekdayOfMonth-short{
+            dn{"د مياشتے اونۍ ورځ"}
+        }
+        year{
+            relativeTime{
+                future{
+                    one{"په {0} کال کے"}
+                    other{"په {0} کالونو کے"}
+                }
+                past{
+                    one{"{0} کال مخکے"}
+                    other{"{0} کاله مخکے"}
+                }
+            }
+        }
+        year-narrow{
+            relativeTime{
+                future{
+                    one{"په {0} کال کے"}
+                    other{"په {0} کالونو کے"}
+                }
+                past{
+                    one{"{0} کال مخکے"}
+                    other{"{0} کاله مخکے"}
+                }
+            }
+        }
+        year-short{
+            relativeTime{
+                future{
+                    one{"په {0} کال کے"}
+                    other{"په {0} کالونو کے"}
+                }
+                past{
+                    one{"{0} کال مخکے"}
+                    other{"{0} کاله مخکے"}
+                }
+            }
+        }
+    }
+}

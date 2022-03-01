@@ -1,0 +1,15 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_SV{
+    %%Parent{"es_419"}
+    Languages{
+        ace{"acehnés"}
+        arp{"arapaho"}
+        bho{"bhojpuri"}
+        grc{"griego antiguo"}
+        nso{"sotho septentrional"}
+        ss{"siswati"}
+        wo{"wolof"}
+    }
+}

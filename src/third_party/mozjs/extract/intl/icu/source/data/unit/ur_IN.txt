@@ -1,0 +1,14 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ur_IN{
+    units{
+        length{
+            astronomical-unit{
+                dnam{"فلکیاتی اکائیاں"}
+                one{"{0} فلکیاتی اکائی"}
+                other{"{0} فلکیاتی اکائیاں"}
+            }
+        }
+    }
+}

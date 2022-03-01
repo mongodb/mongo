@@ -1,0 +1,59 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Syrc_Latn.txt
+# Generated from CLDR
+#
+
+# Consonants
+ܫ ↔ sh;
+ܞ → yh;
+ܖ ↔ dr;
+ܐ ↔ ʾ;
+\u0711  → ʾ;
+ܒ ↔ b;
+ܓ ↔ g;
+ܔ → g;
+ܕ ↔ d;
+ܗ ↔ h;
+ܘ ↔ w;
+ܙ ↔ z;
+ܚ ↔ ḥ;
+ܛ ↔ t\u0323;
+ܜ → t\u0323;
+ܝ ↔ y;
+ܟ ↔ k;
+ܠ ↔ l;
+ܡ ↔ m;
+ܢ ↔ n;
+ܣ ↔ s;
+ܤ → s;
+ܥ → ʿ;
+ܦ ↔ p;
+ܧ → p;
+ܨ ↔ ṣ;
+ܩ ↔ q;
+ܪ ↔ r;
+ܬ ↔ t;
+# Vowels
+\u0730 → a;
+\u0731 → a;
+\u0732 ↔ a;
+\u0733 → o;
+\u0734 → o;
+\u0735 → a;
+\u0736 → e;
+\u0737 → e;
+\u0738 ↔ e;
+\u0739 ↔ ē;
+\u073A → i;
+\u073B → i;
+\u0742 ↔ i;
+\u073D → u;
+\u073E → u;
+\u073C ↔ u;
+\u073F ↔ o;
+# Punctuation
+܍ → \*;
+

@@ -1,0 +1,41 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ro_MD{
+    unitsNarrow{
+        duration{
+            day{
+                few{"{0} zile"}
+                one{"{0} zi"}
+                other{"{0} zile"}
+            }
+            millisecond{
+                dnam{"msec"}
+            }
+            minute{
+                dnam{"min"}
+                few{"{0} min."}
+                one{"{0} min."}
+                other{"{0} min."}
+            }
+            month{
+                dnam{"lună"}
+                few{"{0} luni"}
+                one{"{0} lună"}
+                other{"{0} luni"}
+            }
+            year{
+                few{"{0} ani"}
+                one{"{0} an"}
+                other{"{0} ani"}
+            }
+        }
+    }
+    unitsShort{
+        duration{
+            millisecond{
+                dnam{"milisec."}
+            }
+        }
+    }
+}

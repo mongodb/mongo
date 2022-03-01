@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  *
  * Copyright 2015 Mozilla Foundation
  *
@@ -19,24 +19,23 @@
 #ifndef wasm_ion_compile_h
 #define wasm_ion_compile_h
 
-#include "mozilla/Attributes.h"
-
 #include "wasm/WasmGenerator.h"
 
 namespace js {
 namespace wasm {
 
 // Return whether IonCompileFunction() can generate code on the current device.
-bool
-IonCanCompile();
+// Usually you do *not* want this, you want IonAvailable().
+[[nodiscard]] bool IonPlatformSupport();
 
 // Generates very fast code at the expense of compilation time.
-MOZ_MUST_USE bool
-IonCompileFunctions(const ModuleEnvironment& env, LifoAlloc& lifo,
-                    const FuncCompileInputVector& inputs, CompiledCode* code,
-                    UniqueChars* error);
+[[nodiscard]] bool IonCompileFunctions(const ModuleEnvironment& moduleEnv,
+                                       const CompilerEnvironment& compilerEnv,
+                                       LifoAlloc& lifo,
+                                       const FuncCompileInputVector& inputs,
+                                       CompiledCode* code, UniqueChars* error);
 
-} // namespace wasm
-} // namespace js
+}  // namespace wasm
+}  // namespace js
 
-#endif // wasm_ion_compile_h
+#endif  // wasm_ion_compile_h

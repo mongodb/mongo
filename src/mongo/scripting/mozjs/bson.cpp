@@ -32,6 +32,7 @@
 
 #include <boost/optional.hpp>
 #include <fmt/format.h>
+#include <js/Object.h>
 #include <set>
 
 #include "mongo/scripting/mozjs/idwrapper.h"
@@ -114,7 +115,7 @@ struct BSONHolder {
 };
 
 BSONHolder* getValidHolder(JSContext* cx, JSObject* obj) {
-    auto holder = static_cast<BSONHolder*>(JS_GetPrivate(obj));
+    auto holder = static_cast<BSONHolder*>(JS::GetPrivate(obj));
 
     if (holder)
         holder->uassertValid(cx);
@@ -129,11 +130,11 @@ void BSONInfo::make(
     auto scope = getScope(cx);
 
     scope->getProto<BSONInfo>().newObject(obj);
-    JS_SetPrivate(obj, scope->trackedNew<BSONHolder>(bson, parent, scope, ro));
+    JS::SetPrivate(obj, scope->trackedNew<BSONHolder>(bson, parent, scope, ro));
 }
 
-void BSONInfo::finalize(js::FreeOp* fop, JSObject* obj) {
-    auto holder = static_cast<BSONHolder*>(JS_GetPrivate(obj));
+void BSONInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+    auto holder = static_cast<BSONHolder*>(JS::GetPrivate(obj));
 
     if (!holder)
         return;
@@ -143,7 +144,7 @@ void BSONInfo::finalize(js::FreeOp* fop, JSObject* obj) {
 
 void BSONInfo::enumerate(JSContext* cx,
                          JS::HandleObject obj,
-                         JS::AutoIdVector& properties,
+                         JS::MutableHandleIdVector properties,
                          bool enumerableOnly) {
     auto holder = getValidHolder(cx, obj);
 

@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "jit/Linker.cpp"
+#include "vm/GlobalObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/Linker.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/GlobalObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/Linker.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/GlobalObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/LoopUnroller.cpp"
+#include "vm/HelperThreads.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/LoopUnroller.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/HelperThreads.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/LoopUnroller.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/HelperThreads.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/Lowering.cpp"
+#include "vm/Id.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/Lowering.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Id.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/Lowering.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Id.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/MCallOptimize.cpp"
+#include "vm/Initialization.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/MCallOptimize.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Initialization.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/MCallOptimize.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Initialization.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/MIR.cpp"
+#include "vm/InternalThreadPool.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/MIR.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/InternalThreadPool.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/MIR.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/InternalThreadPool.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/MIRGraph.cpp"
+#include "vm/Iteration.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/MIRGraph.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Iteration.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/MIRGraph.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Iteration.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

@@ -1,0 +1,701 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: am_am_FONIPA.txt
+# Generated from CLDR
+#
+
+# Transforms Amharic (am) to Amharic in phonemic IPA transcription (am_FONIPA).
+#
+# Long vowels, long/geminated consonants:
+#     In the direction from am_FONIPA to am, we emit Ethiopic gemination
+#     and vowel length markers (U+135D, U+135E, U+135F) although
+#     they are rarely written in Amharic text. Exceptions include
+#     school books and textbooks for non-native speakers.
+#     Clients who do not want these markers can easily strip them off
+#     in a post-processing step.
+#
+# Labialization:
+#     Amharic speakers will usually say ሟ as [mʷa] instead of [mwa];
+#     labializing [m] instead of saying [m] followed by a separate [w].
+#     Most Amharic consonants can get labialized. To keep the phonemic
+#     transcription simple, we emit /m/ + /w/; otherwise, our phoneme
+#     set would almost double, and it would include very unusual phonemes
+#     such as /ɲʷ/ or /t\u0361ʃʼʷ/.
+#
+# References:
+#     [1] The Ge’ez Frontier Foundation: “Principles and Specification
+#     for Mnemonic Ethiopic Keyboards.” Version of January 17, 2009;
+#     retrieved on November 4, 2014.
+#     http://keyboards.ethiopic.org/specification/GFF-MnemonicEthiopicKeyboardSpecification.pdf
+#     Other than most online sources, this report uses correct IPA notation
+#     with the exception of /j/, which it consistently (but wrongly)
+#     writes as */y/.
+$IPA_VOWEL = [aeəiɨou];
+$IPA_CONSONANT = [mnɲɴ p{pʼ}bt{tʼ}dk{kʼ}ɡʔʕ fvs{sʼ}zʃʒxh lr {t\u0361ʃ}{t\u0361ʃʼ}{d\u0361ʒ}];
+# Some consonants have a special syllable when labialized, such as ፗ ↔ /pʷa/.
+# Amharic restricts this mostly to /a/ syllables. While the Ethiopic script
+# does offer labialized syllables for other vowels, these are typically
+# not written in Amharic.
+$LABIALIZABLE_BEFORE_A = [p{pʼ}t{tʼ} {t\u0361ʃ}{t\u0361ʃʼ}{d\u0361ʒ}{d\u0361ʒʼ} s{sʼ}zʃʒ fv r];
+← [ ʼ  \u0361  \u035C  \u032F];
+::(null);
+# Appendix B of [1] transcribes ሀ as /hə/. However, according to
+# an Amharic-speaking person, there is no /hə/ sequence
+# in Amharic; instead, it gets pronounced as /ha/.
+ሀ → ha;
+ሀ ← hə;
+ሁ ↔ hu;
+ሂ ↔ hi;
+ሃ ↔ ha;
+ሄ ↔ he;
+ህ ↔ hɨ;
+ሆ ↔ ho;
+ሇ → ho;  # Dizi, Me’en, Mursi, Suri /hɔ/ ([1], Appendix E); not used in Amharic.
+ህ ← h;
+ለ ↔ lə;
+ሉ ↔ lu;
+ሊ ↔ li;
+ላ ↔ la;
+ሌ ↔ le;
+ል ↔ lɨ;
+ሎ ↔ lo;
+ⶀ → lo;  # Dizi, Me’en, Mursi, Suri /lɔ/ ([1], Appendix E); not used in Amharic.
+ሏ ↔ lwa;
+ል ← l;
+# Appendix B of [1] transcribes ሐ as Voiceless pharyngeal fricative
+# /ħə/.  However, according to an Amharic-speaking person, Amharic
+# makes no difference in pronunciation between ሐ...ሓ and ሀ...ሃ; both
+# are pronounced as Voiceless glottal fricative /h/.  Also, according
+# to the speaker there is no /hə/ sequence in Amharic; instead, it
+# gets pronounced as /ha/.
+ሐ → ha;
+ሑ → hu;
+ሒ → hi;
+ሓ → ha;
+ሔ → he;
+ሕ → hɨ;
+ሖ → ho;
+ሗ → hwa;
+መ ↔ mə;
+ሙ ↔ mu;
+ሚ ↔ mi;
+ማ ↔ ma;
+ሜ ↔ me;
+ም ↔ mɨ;
+ሞ ↔ mo;
+ⶁ → mo;  # Dizi, Me’en, Mursi, Suri /mɔ/ ([1], Appendix E); not used in Amharic.
+ᎀ → mwə;  # Sebatbeit /mwə/ ([1], Appendix H); not used in Amharic.
+ᎃ → mwu;  # Sebatbeit /mwu/ ([1], Appendix H); not used in Amharic.
+ᎁ → mwi;  # Sebatbeit /mwi/ ([1], Appendix H); not used in Amharic.
+ሟ ↔ mwa;
+ᎂ → mwe;  # Sebatbeit /mwe/ ([1], Appendix H); not used in Amharic.
+ፙ → mja;  # Unclear which language; Appendix L of [1] transcribes ፙ as /mʲa/.
+ም ← m;
+ሠ → sə;
+ሡ → su;
+ሢ → si;
+ሣ → sa;
+ሤ → se;
+ሥ → sɨ;
+ሦ → so;
+ሧ → swa;
+ረ ↔ rə;
+ሩ ↔ ru;
+ሪ ↔ ri;
+ራ ↔ ra;
+ሬ ↔ re;
+ር ↔ rɨ;
+ሮ ↔ ro;
+ⶂ → ro;  # Dizi, Me’en, Mursi, Suri /rɔ/ ([1], Appendix E); not used in Amharic.
+ሯ ↔ rwa;
+ፘ → rja;  # Unclear which language; Appendix L of [1] transcribes ፘ as /rʲa/.
+ር ← r;
+# Amharic speakers pronounce ⶠ like ሸ. Source: [1], Appendix B.
+ⶠ → ʃə;
+ⶡ → ʃu;
+ⶢ → ʃi;
+ⶣ → ʃa;
+ⶤ → ʃe;
+ⶥ → ʃɨ;
+ⶦ → ʃo;
+ሸ ↔ ʃə;
+ሹ ↔ ʃu;
+ሺ ↔ ʃi;
+ሻ ↔ ʃa;
+ሼ ↔ ʃe;
+ሽ ↔ ʃɨ;
+ሾ ↔ ʃo;
+ⶄ → ʃo;  # Dizi, Me’en, Mursi, Suri /ʃɔ/ ([1], Appendix E); not used in Amharic.
+ሿ ↔ ʃwa;
+ሽ ← ʃ;
+ቀ ↔ kʼə;
+ቁ ↔ kʼu;
+ቂ ↔ kʼi;
+ቃ ↔ kʼa;
+ቄ ↔ kʼe;
+ቅ ↔ kʼɨ;
+ቆ ↔ kʼo;
+ቇ → kʼo;  # Dizi, Me’en, Mursi, Suri /kʼɔ/ ([1], Appendix E); not used in Amharic.
+ቈ ↔ kʼwə;
+ቍ ↔ kʼwu;
+ቊ ↔ kʼwi;
+ቋ ↔ kʼwa;
+ቌ ↔ kʼwe;
+ቅ ← kʼ;
+# In Awngi, Blin, Qimant, and Xamtanga, ቐ is spoken as voiced uvular fricative [ʁ].
+# Source: [1], Appendix C. However, */ʁ/ is not an Amharic phoneme.
+# When reading foreign words with ቐ, Amharic speakers pronounce
+# ቐ like ቀ, i.e. as velar ejective /kʼ/.
+ቐ → kʼə;
+ቑ → kʼu;
+ቒ → kʼi;
+ቓ → kʼa;
+ቔ → kʼe;
+ቕ → kʼɨ;
+ቖ → kʼo;
+ቘ → kʼwə;
+ቝ → kʼwu;
+ቚ → kʼwi;
+ቛ → kʼwa;
+ቜ → kʼwe;
+# In Sebatbeit, ⷀ is spoken as palatalized velar ejective /kʼʲ/ ([1], Appendix H).
+# In Amharic, the syllable is not used, but it might appear in names.
+ⷀ → kʼjə;
+ⷁ → kʼju;
+ⷂ → kʼji;
+ⷃ → kʼja;
+ⷄ → kʼje;
+ⷅ → kʼjɨ;
+ⷆ → kʼjo;
+በ ↔ bə;
+ቡ ↔ bu;
+ቢ ↔ bi;
+ባ ↔ ba;
+ቤ ↔ be;
+ብ ↔ bɨ;
+ቦ ↔ bo;
+ⶅ → bo;  # Dizi, Me’en, Mursi, Suri /bɔ/ ([1], Appendix E); not used in Amharic.
+ᎄ → bwə;  # Sebatbeit /bʷə/ ([1], Appendix H); not used in Amharic.
+ᎇ → bwu;  # Sebatbeit /bʷu/ ([1], Appendix H); not used in Amharic.
+ᎅ → bwi;  # Sebatbeit /bʷi/ ([1], Appendix H); not used in Amharic.
+ቧ → bwa;  # Sebatbeit /bʷa/ ([1], Appendix H); not used in Amharic.
+ᎆ → bwe;  # Sebatbeit /bʷe/ ([1], Appendix H); not used in Amharic.
+ብ ← b;
+ቨ ↔ və;
+ቩ ↔ vu;
+ቪ ↔ vi;
+ቫ ↔ va;
+ቬ ↔ ve;
+ቭ ↔ vɨ;
+ቮ ↔ vo;
+ቯ ↔ vwa;
+ቭ ← v;
+# Unclear which Ethiopic language uses ⶨ. It only appears in the
+# “Language Neutral” list of Appendix L in [1], which transcribes it as t\u0361ʃ.
+# For Amharic, we pronounce ⶨ therefore like ቸ.
+ⶨ → t\u0361ʃə;
+ⶩ → t\u0361ʃu;
+ⶪ → t\u0361ʃi;
+ⶫ → t\u0361ʃa;
+ⶬ → t\u0361ʃe;
+ⶭ → t\u0361ʃɨ;
+ⶮ → t\u0361ʃo;
+# In Amharic, ኀ is pronounced like ሀ.
+# Source: [1], section on “Phonological Redundancy” for Amharic, page 5.
+# Appendix B of [1] transcribes ሀ as /hə/. However, according to
+# an Amharic-speaking person, there is no /hə/ sequence in Amharic.
+# Instead, ሀ (and hence also ኀ) gets pronounced as /ha/.
+ኀ → ha;
+ኁ → hu;
+ኂ → hi;
+ኃ → ha;
+ኄ → he;
+ኅ → hɨ;
+ኆ → ho;
+ኇ → ho;  # Dizi, Me’en, Mursi, Suri /ŋɔ/ ([1], Appendix E); not used in Amharic.
+ኈ → hwə;
+ኍ → hwu;
+ኊ → hwi;
+ኋ → hwa;
+ኌ → hwe;
+ነ ↔ nə;
+ኑ ↔ nu;
+ኒ ↔ ni;
+ና ↔ na;
+ኔ ↔ ne;
+ን ↔ nɨ;
+ኖ ↔ no;
+ⶈ → no;  # Dizi, Me’en, Mursi, Suri /nɔ/ ([1], Appendix E); not used in Amharic.
+ኗ ↔ nwa;
+ን ← n;
+ኘ ↔ ɲə;
+ኙ ↔ ɲu;
+ኚ ↔ ɲi;
+ኛ ↔ ɲa;
+ኜ ↔ ɲe;
+ኝ ↔ ɲɨ;
+ኞ ↔ ɲo;
+ⶉ → ɲo;  # Dizi, Me’en, Mursi, Suri /ɲɔ/ ([1], Appendix E); not used in Amharic.
+ኟ ↔ ɲwa;
+ኝ ← ɲ;
+# Amharic speakers pronounce ኸ as [h] because Amharic has no [x] sound.
+# However, in transliterations of foreign (eg. Spanish) words with [x],
+# several Amharic speakers have confirmed that they prefer ኻ over ሃ.
+ዀ → hwə;
+ዂ → hwi;
+ዃ → hwa;
+ዄ → hwe;
+ዅ → hwɨ;
+ኸ → hə;
+ኹ → hu;
+ኺ → hi;
+ኻ → ha;
+ኼ → he;
+ኽ → hɨ;
+ኾ → ho;
+ዀ ← xwə;
+ዂ ← xwi;
+ዃ ← xwa;
+ዄ ← xwe;
+ዅ ← xwɨ;
+ዅ ← xw;
+ኸ ← xə;
+ኹ ← xu;
+ኺ ← xi;
+ኻ ← xa;
+ኼ ← xe;
+ኽ ← xɨ;
+ኾ ← xo;
+ኽ ← x;
+አ ↔ ʔə;
+ኡ ↔ ʔu;
+ኢ ↔ ʔi;
+ኣ ↔ ʔa;
+ኤ ↔ ʔe;
+እ ↔ ʔɨ;
+ኦ ↔ ʔo;
+ⶊ → ʔo;  # Dizi, Me’en, Mursi, Suri /ɲɔ/ ([1], Appendix E); not used in Amharic.
+እ ← ʔ;
+ከ ↔ kə;
+ኩ ↔ ku;
+ኪ ↔ ki;
+ካ ↔ ka;
+ኬ ↔ ke;
+ክ ↔ kɨ;
+ኮ ↔ ko;
+ኰ ↔ kwə;
+ኵ ↔ kwu;
+ኲ ↔ kwi;
+ኳ ↔ kwa;
+ኴ ↔ kwe;
+ክ ← k;
+# In Sebatbeit, ⷈ is spoken as palatalized velar plosive /kʲ/ ([1], Appendix H).
+# Amharic speakers pronounce it as /k/ without palatalization.
+ⷈ → kə;
+ⷉ → ku;
+ⷊ → ki;
+ⷋ → ka;
+ⷌ → ke;
+ⷍ → kɨ;
+ⷎ → ko;
+# In Sebatbeit, ⷐ is spoken as palatalized voiceless velar fricative/xʲə/
+# according to [1], Appendix H. When the syllable appears in names,
+# Amharic speakers pronounce it as /kə/ without palatalization.
+ⷐ → kə;
+ⷑ → ku;
+ⷒ → ki;
+ⷓ → ka;
+ⷔ → ke;
+ⷕ → kɨ;
+ⷖ → ko;
+ወ ↔ wə;
+ዉ ↔ wu;
+ዊ ↔ wi;
+ዋ ↔ wa;
+ዌ ↔ we;
+ው ↔ wɨ;
+ዎ ↔ wo;
+ዏ → wo;  # Dizi, Me’en, Mursi, Suri /wɔ/ ([1], Appendix E); not used in Amharic.
+ው ← w;
+ዐ ↔ ʕə;
+ዑ ↔ ʕu;
+ዒ ↔ ʕi;
+ዓ ↔ ʕa;
+ዔ ↔ ʕe;
+ዕ ↔ ʕɨ;
+ዖ ↔ ʕo;
+ዒ ← ʕ;
+ዘ ↔ zə;
+ዙ ↔ zu;
+ዚ ↔ zi;
+ዛ ↔ za;
+ዜ ↔ ze;
+ዝ ↔ zɨ;
+ዞ ↔ zo;
+ⶋ → zo;  # Dizi, Me’en, Mursi, Suri /zɔ/ ([1], Appendix E); not used in Amharic.
+ዟ ↔ zwa;
+ዝ ← z;
+ዠ ↔ ʒə;
+ዡ ↔ ʒu;
+ዢ ↔ ʒi;
+ዣ ↔ ʒa;
+ዤ ↔ ʒe;
+ዥ ↔ ʒɨ;
+ዦ ↔ ʒo;
+ዧ ↔ ʒwa;
+ዢ ← ʒ;
+# Unclear which Ethiopic language uses ⶰ. It only appears in the
+# “Language Neutral” list of Appendix L in [1], which transcribes it as ʒ.
+# For Amharic, we pronounce ⶰ therefore like ዠ.
+ⶰ → ʒə;
+ⶱ → ʒu;
+ⶲ → ʒi;
+ⶳ → ʒa;
+ⶴ → ʒe;
+ⶵ → ʒɨ;
+ⶶ → ʒo;
+የ ↔ jə;
+ዩ ↔ ju;
+ዪ ↔ ji;
+ያ ↔ ja;
+ዬ ↔ je;
+ይ ↔ jɨ;
+ዮ ↔ jo;
+ዯ → jo;  # Dizi, Me’en, Mursi, Suri /zɔ/ ([1], Appendix E); not used in Amharic.
+ይ ← j;
+ጀ ↔ d\u0361ʒə;
+ጁ ↔ d\u0361ʒu;
+ጂ ↔ d\u0361ʒi;
+ጃ ↔ d\u0361ʒa;
+ጄ ↔ d\u0361ʒe;
+ጅ ↔ d\u0361ʒɨ;
+ጆ ↔ d\u0361ʒo;
+ጇ ↔ d\u0361ʒwa;
+ጅ ← d\u0361ʒ;
+ደ ↔ də;
+ዱ ↔ du;
+ዲ ↔ di;
+ዳ ↔ da;
+ዴ ↔ de;
+ድ ↔ dɨ;
+ዶ ↔ do;
+ⶌ → do;  # Dizi, Me’en, Mursi, Suri /zɔ/ ([1], Appendix E); not used in Amharic.
+ዷ ↔ dwa;
+ድ ← d;
+ገ ↔ ɡə;
+ጉ ↔ ɡu;
+ጊ ↔ ɡi;
+ጋ ↔ ɡa;
+ጌ ↔ ɡe;
+ግ ↔ ɡɨ;
+ጎ ↔ ɡo;
+ጐ ↔ ɡwə;
+ጕ ↔ ɡwu;
+ጒ ↔ ɡwi;
+ጓ ↔ ɡwa;
+ጔ ↔ ɡwe;
+ግ ← ɡ;
+# In Awngi, Blin, Qimant, and Xamtanga, ጘ is spoken as voiced velar nasal [ŋ].
+# Source: [1], Appendix C. While /ŋ/ is not an Amharic phoneme, Amharic speakers
+# still can pronounce it according to our source. However, when transliterating
+# foreign words with [ŋ], Amharic uses the sequence ንግ /nɡ/. For example,
+# the Amharic transliteration of Washington /waʃiŋtən/ is ዋሺንግተን.
+ጘ → ŋə;
+ጙ → ŋu;
+ጚ → ŋi;
+ጛ → ŋa;
+ጜ → ŋe;
+ጝ → ŋɨ;
+ጞ → ŋo;
+ⶓ → ŋwə;
+ⶖ → ŋwu;
+ⶔ → ŋwi;
+ጟ → ŋwa;
+ⶕ → ŋwe;
+# Since there is no uvular nasal [ɴ] in Amharic, we use the velar nasal [ŋ].
+ጘ ← ɴə;
+ጙ ← ɴu;
+ጚ ← ɴi;
+ጛ ← ɴa;
+ጜ ← ɴe;
+ጝ ← ɴɨ;
+ጞ ← ɴo;
+ጝ ← ɴ;
+# In Sebatbeit, ⷘ is spoken as palatalized voiced velar stop /ɡj/ ([1], Appendix H).
+# Amharic speakers pronounce it as voiced velar stop /ɡ/ without palatalization.
+ⷘ → ɡə;
+ⷙ → ɡu;
+ⷚ → ɡi;
+ⷛ → ɡa;
+ⷜ → ɡe;
+ⷝ → ɡɨ;
+ⷞ → ɡo;
+ጠ ↔ tʼə;
+ጡ ↔ tʼu;
+ጢ ↔ tʼi;
+ጣ ↔ tʼa;
+ጤ ↔ tʼe;
+ጥ ↔ tʼɨ;
+ጦ ↔ tʼo;
+ጧ ↔ tʼwa;
+ጢ ← tʼ;
+ጨ ↔ t\u0361ʃʼə;
+ጩ ↔ t\u0361ʃʼu;
+ጪ ↔ t\u0361ʃʼi;
+ጫ ↔ t\u0361ʃʼa;
+ጬ ↔ t\u0361ʃʼe;
+ጭ ↔ t\u0361ʃʼɨ;
+ጮ ↔ t\u0361ʃʼo;
+ⶐ → t\u0361ʃʼo;  # Dizi, Me’en, Mursi, Suri /t\u0361ʃʼɔ/ ([1], Appendix E); not used in Amharic.
+ጯ ↔ t\u0361ʃʼwa;
+ጪ ← t\u0361ʃʼ;
+# According to Appendix B of [1], the following are used in the Bench language
+# (aka Benchnon, Gimira). In Bench, ⶻ is pronounced as /ʈ\u0361ʂʼ/ Retroflex
+# ejective affricate; with a phonemic distrinction to the non-retroflex version.
+# Amharic does not have retroflex phonemes, so we go with /t\u0361ʃʼ/.
+ⶸ → t\u0361ʃʼə;
+ⶹ → t\u0361ʃʼu;
+ⶺ → t\u0361ʃʼi;
+ⶻ → t\u0361ʃʼa;
+ⶼ → t\u0361ʃʼe;
+ⶽ → t\u0361ʃʼɨ;
+ⶾ → t\u0361ʃʼo;
+ቸ ↔ t\u0361ʃə;
+ቹ ↔ t\u0361ʃu;
+ቺ ↔ t\u0361ʃi;
+ቻ ↔ t\u0361ʃa;
+ቼ ↔ t\u0361ʃe;
+ች ↔ t\u0361ʃɨ;
+ቾ ↔ t\u0361ʃo;
+ቿ ↔ t\u0361ʃwa;
+ች ← t\u0361ʃ;
+ተ ↔ tə;
+ቱ ↔ tu;
+ቲ ↔ ti;
+ታ ↔ ta;
+ቴ ↔ te;
+ት ↔ tɨ;
+ቶ ↔ to;
+ⶆ → to;  # Dizi, Me’en, Mursi, Suri /tɔ/ ([1], Appendix E); not used in Amharic.
+ቷ ↔ twa;
+ት ← t;
+ጰ ↔ pʼə;
+ጱ ↔ pʼu;
+ጲ ↔ pʼi;
+ጳ ↔ pʼa;
+ጴ ↔ pʼe;
+ጵ ↔ pʼɨ;
+ጶ ↔ pʼo;
+ⶑ → pʼo;  # Dizi, Me’en, Mursi, Suri /pʼɔ/ ([1], Appendix E); not used in Amharic.
+ጷ ↔ pʼwa;
+ጵ ← pʼ;
+ጸ ↔ sʼə;
+ጹ ↔ sʼu;
+ጺ ↔ sʼi;
+ጻ ↔ sʼa;
+ጼ ↔ sʼe;
+ጽ ↔ sʼɨ;
+ጾ ↔ sʼo;
+ጿ ↔ sʼwa;
+ጽ ← sʼ;
+# In Amharic, ፀ is pronounced like ጸ.
+# Source: [1], section on “Phonological Redundancy” for Amharic, page 5.
+ፀ → sʼə;
+ፁ → sʼu;
+ፂ → sʼi;
+ፃ → sʼa;
+ፄ → sʼe;
+ፅ → sʼɨ;
+ፆ → sʼo;
+ፇ → sʼo;  # Dizi, Me’en, Mursi, Suri /sʼɔ/ ([1], Appendix E); not used in Amharic.
+# Amharic speakers pronounce ሰ like ሠ. Source: [1], Appendix B.
+ሰ ↔ sə;
+ሱ ↔ su;
+ሲ ↔ si;
+ሳ ↔ sa;
+ሴ ↔ se;
+ስ ↔ sɨ;
+ሶ ↔ so;
+ⶃ → so;  # Dizi, Me’en, Mursi, Suri /sɔ/ ([1], Appendix E); not used in Amharic.
+ሷ ↔ swa;
+ስ ← s;
+ፈ ↔ fə;
+ፉ ↔ fu;
+ፊ ↔ fi;
+ፋ ↔ fa;
+ፌ ↔ fe;
+ፍ ↔ fɨ;
+ፎ ↔ fo;
+ᎈ → fwə;  # Sebatbeit /fwə/ ([1], Appendix H); not used in Amharic.
+ᎉ → fwu;  # Sebatbeit /fwu/ ([1], Appendix H); not used in Amharic.
+ᎋ → fwi;  # Sebatbeit /fwi/ ([1], Appendix H); not used in Amharic.
+ፏ ↔ fwa;
+ᎊ → fwe;  # Sebatbeit /fwe/ ([1], Appendix H); not used in Amharic.
+ፚ → fja;  # Unclear which language; Appendix L of [1] transcribes ፚ as /fja/.
+ፍ ← f;
+ፐ ↔ pə;
+ፑ ↔ pu;
+ፒ ↔ pi;
+ፓ ↔ pa;
+ፔ ↔ pe;
+ፕ ↔ pɨ;
+ፖ ↔ po;
+ⶒ → po;  # Dizi, Me’en, Mursi, Suri /pɔ/ ([1], Appendix E); not used in Amharic.
+ᎌ → pwə;  # Sebatbeit /pwə/ ([1], Appendix H); not used in Amharic.
+ᎍ → pwu;  # Sebatbeit /pwu/ ([1], Appendix H); not used in Amharic.
+ᎏ → pwi;  # Sebatbeit /pwi/ ([1], Appendix H); not used in Amharic.
+ፗ ↔ pwa;
+ᎎ → pwe;  # Sebatbeit /pwe/ ([1], Appendix H); not used in Amharic.
+ፕ ← p;
+ኧ ↔ ə;
+ኡ ← u;  # ኡላዓን ባዓታር ← Ulaan Baatar /ulaʕan baʕatar/
+አ ← a;  # አምስተርዳም ← Amsterdam /amstərdam/
+ኤ ← e;
+እ ← ɨ;
+ኦ ← o;  # ፖርት ኦፍ ስፔን ← Port of Spain /port of speːn/
+ኢ ← i;  # ኢስላማባድ ← Islamabad /islamabad/
+# Applications will typically split words before calling our rules.
+# To be resilient, we replace punctuation by whitespace in IPA.
+፠ → ' ';  # U+1360 ETHIOPIC SECTION MARK
+፡ → ' ';  # U+1361 ETHIOPIC WORDSPACE
+። → ' ';  # U+1362 ETHIOPIC FULL STOP
+፣ → ' ';  # U+1363 ETHIOPIC COMMA
+፤ → ' ';  # U+1364 ETHIOPIC SEMICOLON
+፥ → ' ';  # U+1365 ETHIOPIC COLON
+፦ → ' ';  # U+1366 ETHIOPIC PREFACE COLON
+፧ → ' ';  # U+1367 ETHIOPIC QUESTION MARK
+፨ → ' ';  # U+1368 ETHIOPIC PARAGRAPH SEPARATOR
+# Likewise, Ethiopic numberals cannot be pronounced by these rules,
+# so we replace them by whitespace in the output IPA notation.
+# Applications will typically pre-process text before calling
+# the am → am_FONIPA transform.
+፩ → ' ';  # U+1369 ETHIOPIC DIGIT ONE
+፪ → ' ';  # U+136A ETHIOPIC DIGIT TWO
+፫ → ' ';  # U+136B ETHIOPIC DIGIT THREE
+፬ → ' ';  # U+136C ETHIOPIC DIGIT FOUR
+፭ → ' ';  # U+136D ETHIOPIC DIGIT FIVE
+፮ → ' ';  # U+136E ETHIOPIC DIGIT SIX
+፯ → ' ';  # U+136F ETHIOPIC DIGIT SEVEN
+፰ → ' ';  # U+1370 ETHIOPIC DIGIT EIGHT
+፱ → ' ';  # U+1371 ETHIOPIC DIGIT NINE
+፲ → ' ';  # U+1372 ETHIOPIC NUMBER TEN
+፳ → ' ';  # U+1373 ETHIOPIC NUMBER TWENTY
+፴ → ' ';  # U+1374 ETHIOPIC NUMBER THIRTY
+፵ → ' ';  # U+1375 ETHIOPIC NUMBER FORTY
+፶ → ' ';  # U+1376 ETHIOPIC NUMBER FIFTY
+፷ → ' ';  # U+1377 ETHIOPIC NUMBER SIXTY
+፸ → ' ';  # U+1378 ETHIOPIC NUMBER SEVENTY
+፹ → ' ';  # U+1379 ETHIOPIC NUMBER EIGHTY
+፺ → ' ';  # U+137A ETHIOPIC NUMBER NINETY
+፻ → ' ';  # U+137B ETHIOPIC NUMBER HUNDRED
+፼ → ' ';  # U+137C ETHIOPIC NUMBER TEN THOUSAND
+# Transform IPA length markers to one of these:
+# U+135D ETHIOPIC COMBINING GEMINATION AND VOWEL LENGTH MARK
+# U+135E ETHIOPIC COMBINING VOWEL LENGTH MARK
+# U+135F ETHIOPIC COMBINING GEMINATION MARK
+::null();
+← ː ;  # Strip off any remaining IPA length markers.
+::(null);
+($IPA_CONSONANT) ([jw]? $IPA_VOWEL) \u135D → $1 ː $2 ː;
+($IPA_CONSONANT) ([jw]? $IPA_VOWEL) \u135E → $1 $2 ː;
+($IPA_CONSONANT) ([jw]? $IPA_VOWEL?) \u135F → $1 ː $2;
+[\u135D \u135E \u135F] → ;  # Strip off any remaining length markers.
+$1 wa \u135D ← ($LABIALIZABLE_BEFORE_A) ː waː;  # ቷ\u135D ← [tːʷaː]
+$1 wa \u135E ← ($LABIALIZABLE_BEFORE_A)   waː;  # ቷ\u135E ← [tʷaː]
+$1 wa \u135F ← ($LABIALIZABLE_BEFORE_A) ː wa;   # አቷ\u135F ← [tːʷa]
+$1 \u135F $2 \u135E ← ([b $LABIALIZABLE_BEFORE_A]) ː ([jw] $IPA_VOWEL) ː;
+$1 \u135F $2 ← {([b $LABIALIZABLE_BEFORE_A]) ː ([jw] $IPA_VOWEL?)};
+$1 \u135E ← ($IPA_VOWEL ː);
+$1 \u135D ← (jː $IPA_VOWEL ː);
+$1 \u135E ← ([jw] $IPA_VOWEL ː);
+$1 \u135F ← (jː $IPA_VOWEL?);
+$1 \u135D ← ($IPA_CONSONANT ː [w]? $IPA_VOWEL ː);
+$1 \u135E ← ($IPA_CONSONANT [w]? $IPA_VOWEL ː);
+$1 \u135F ← ($IPA_CONSONANT ː [w]? $IPA_VOWEL?);
+# Insert syllable markers in a separate pass.
+::null;
+{($IPA_VOWEL ː?)} [[:L:]] → $1 \.;
+::(null);
+← [ˈˌ\. \u0303\u032F];
+aj ← ai;     # Nairobi /nairobi/ ናይሮቢ, Cairo /kairo/ ካይሮ
+aw ← au;     # Bissau /bisːau/ ቢሳው
+eji ← ei;    # Beijing /beid\u0361ʒiŋ/ ቤዪጂንግ
+ewo ← eo;    # Montevideo /montevideo/ ሞንቴቪዴዎ
+ija ← ia;    # Monrovia /monrovia/ ሞንሮቪያ
+ijə ← iə;    # Reunion /rijunijən/ ሪዩኒየን
+iw ← iu;     # Vilnius /vilnius/ ቪልኒውስ, New Delhi /niu deːli/ ኒው ዴሊ
+jo ← io;     # Tokyo /tokio/ ቶክዮ
+nɡ ← ŋɡ;     # Kongo /koŋɡo/ ኮንጎ, Hungary /həŋɡari/ ሀንጋሪ
+nɡ ← ŋ;      # Bangkok /baŋkok/ ባንግኮክ, Beijing /beid\u0361ʒiŋ/ ቤዪጂንግ
+uwa ← ua;    # Kuala Lumpur /kuala lumpur/ ኩዋላ ሉምፑር, Ruanda /ruanda/ ሩዋንዳ
+bwe ← bue;   # Buenos Aires /buenos aires/ ብዌኖስ አይሬስ
+sʼ ← t\u0361s;     # Podgorica /podɡorit\u0361sa/ ፖድጎሪጻ, Vaduz /fadut\u0361s/ ፋዱጽ
+uwi ← ui;    # Port Luis /port luis/ ፖርት ሉዊስ
+uwe ← ue;    # Lithuania /lituenia/ ሊቱዌኒያ, Venezuela /venɨzuela/ ቬንዙዌላ
+::(null);
+ʔə ← \. ə;
+ʔu ← \. u;
+ʔi ← \. i;
+ʔa ← \. a;
+ʔe ← \. e;
+ʔɨ ← \. ɨ;
+ʔo ← \. o;
+$1 w ← {($IPA_VOWEL ː?) \u032F} $IPA_VOWEL;  # /ewowa/ ← /e\u032Fo\u032Fa/
+::(null);
+n ← [n {n\u033C} {n\u033C\u030A} {m\u033A} {n\u030A} {n\u0325} ⁿ ᵑ];
+m ← [ɱ {m\u0325} {m\u032A} ᵐ];
+ɲ ← [{ɳ\u030A} {ɳ\u0325} ɳ {ɲ\u030A} {ɲ\u0325} ɲ];
+ŋ ← [{ŋ\u030A} {ŋ\u0325} ŋ];
+ɴ ← [{ɴ\u030A} {ɴ\u0325} ɴ];
+p ← [{t\u033C} {p\u033A}];
+pʼ ← [ʘ ɋ];
+b ← [{d\u033C} {b\u033A} {ɾ\u033C} ɓ];
+t ← [{t\u032A} ʈ];
+tʼ ← [ǁ ʖ];
+d ← [ɖ ɗ ᶑ];
+k ← q;
+kʼ ←  [ǃ ʗ];
+ɡ ← [g ɢ ɣ ɠ ʛ];
+nɡ ← ᵑɡ;
+ʔ ← ʡ;
+s ← [θ {θ\u0331} {θ\u031E} {θ\u033C} {ɸ\u033A}];
+z ← [ð {ð\u0320} {ð\u033C} {β\u033A}];
+sʼ ← [{t\u0361s} {t\u035Cs} ʦ];
+t\u0361ʃ ← [{t\u035Cʃ} ʧ {t\u0361ɕ} {t\u035Cɕ} ʨ {ʈ\u0361ʂ} c];
+t\u0361ʃʼ ← [ǀ ʇ ǂ ʄ];
+d\u0361ʒ ← [ʤ ʣ {d\u0361z} {d\u035Cz} {d\u0361ɕ} ʥ {d\u0361ʑ} {d\u035Cʑ} {ɖ\u0361ʐ} {d\u0361ʐ} ɟ];
+pf ← [{p\u032A} {p\u0346} ȹ {p\u0361f} {p\u032Af} {p\u032A\u035Cf}];
+bv ← [{b\u032A} {b\u0346} ȸ {b\u0361v} {b\u032A\u0361v}];
+ʃ ← [ʂ ɕ];
+ʒ ← [ʐ ʑ];
+r ← [ɾ ɽ ʁ];
+rːʒ ← r\u031Dː;
+rʒ ← r\u031D;
+v ← β;
+x ← [ç x χ];
+ʕ ← ʕ\u031D;
+h ← ɦ;
+j ← [ʝ ʲ];
+lj ← ʎ [iɨ]? [jʝʲ]?;
+t\u0361ʃl ← [{t\u0361ɬ} {tɬ}];
+ʃl ← ɬ;
+w ← {u\u032F} $IPA_VOWEL;
+w ← ʷ;
+ʼː ← ːʼ;  # /pʼː/ ← /pːʼ/; /sʼː/ ← /sːʼ/; etc.
+::(null);
+i ← y;
+ɨ ← [ɪ ʉ];
+u ← [ʊ ɯ];
+ə ← [ɛ æ ɘ];
+o ← [ɔ ø];
+a ← ɑ;
+ʼ ← ʰ;
+← [ʱ];
+$1ːʲ ← ([pbtd])ʲː;  # [bːʲeː] ← [bʲːeː]
+$1ːʷ ← ([pbtd])ʷː;  # [bːʷeː] ← [bʷːeː]
+::(NFC);
+← [ \u0303  \u0330  \u030B  \u0301  \u0304  \u0300  \u030F  \u030C  \u0302 ˥ ˦ ˧ ˨ ˩ ꜜ ꜛ ↗ ↘ ];
+::(NFD);
+

@@ -1,0 +1,317 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_US{
+    %%Parent{"es_419"}
+    units{
+        compound{
+            power3{
+                one{
+                    _{
+                        _{"{0} cúbico"}
+                    }
+                }
+                other{
+                    _{
+                        _{"cúbico{0}"}
+                    }
+                }
+            }
+        }
+        concentr{
+            milligram-ofglucose-per-deciliter{
+                dnam{"miligramos por decilitro"}
+            }
+        }
+        coordinate{
+            east{"{0} este"}
+            north{"{0} norte"}
+            south{"{0} sur"}
+            west{"{0} oeste"}
+        }
+        electric{
+            ampere{
+                dnam{"amperios"}
+                one{"{0} amperio"}
+                other{"{0} amperios"}
+            }
+            milliampere{
+                dnam{"miliamperio"}
+                one{"{0} miliamperio"}
+                other{"{0} miliamperios"}
+            }
+            ohm{
+                dnam{"ohmios"}
+                one{"{0} ohmio"}
+                other{"{0} ohmios"}
+            }
+        }
+        energy{
+            foodcalorie{
+                dnam{"Calorías"}
+                one{"{0} Caloría"}
+                other{"{0} Calorías"}
+            }
+            joule{
+                dnam{"julios"}
+                one{"{0} julio"}
+                other{"{0} julios"}
+            }
+            kilojoule{
+                dnam{"kilojulios"}
+                one{"{0} kilojulio"}
+                other{"{0} kilojulio"}
+            }
+            kilowatt-hour{
+                dnam{"kilovatios por hora"}
+                one{"{0} kilovatio por hora"}
+                other{"{0} kilovatios por hora"}
+            }
+        }
+        graphics{
+            em{
+                dnam{"espacio eme"}
+            }
+            megapixel{
+                dnam{"megapixeles"}
+                one{"{0} megapixel"}
+                other{"{0} megapixeles"}
+            }
+            pixel{
+                dnam{"pixeles"}
+                one{"{0} pixel"}
+                other{"{0} pixeles"}
+            }
+            pixel-per-centimeter{
+                dnam{"pixeles por centímetro"}
+                one{"{0} pixel por centímetro"}
+                other{"{0} pixeles por centímetro"}
+            }
+            pixel-per-inch{
+                dnam{"pixeles por pulgada"}
+                one{"{0} pixel por pulgada"}
+                other{"{0} pixeles por pulgada"}
+            }
+        }
+        length{
+            furlong{
+                dnam{"furlones"}
+                one{"{0} furlong"}
+                other{"{0} frulones"}
+            }
+            nautical-mile{
+                dnam{"millas naúticas"}
+                one{"{0} milla naútica"}
+                other{"{0} millas naúticas"}
+            }
+        }
+        power{
+            horsepower{
+                one{"{0} caballo de fuerza"}
+                other{"{0} caballos de fuerza"}
+            }
+        }
+        temperature{
+            generic{
+                one{"{0} grado"}
+                other{"{0} grados"}
+            }
+            kelvin{
+                dnam{"kelvin"}
+                one{"kelvin"}
+                other{"{0} kelvin"}
+            }
+        }
+        torque{
+            pound-force-foot{
+                dnam{"libra fuerza-pies"}
+                one{"{0} libra fuerza-pie"}
+                other{"{0} libra fuerza-pies"}
+            }
+        }
+        volume{
+            acre-foot{
+                dnam{"acres-pies"}
+                one{"{0} acre-pie"}
+                other{"{0} acres pies"}
+            }
+            dram{
+                dnam{"dracma fluida"}
+                one{"{0} dracma fluida"}
+                other{"{0} dreacmas fluidas"}
+            }
+            fluid-ounce-imperial{
+                dnam{"onzas fluidas imperiales"}
+                one{"onza fluida imperial"}
+                other{"{0} onzas fluidas imperiales"}
+            }
+            jigger{
+                dnam{"jigger"}
+                one{"{0} jigger"}
+                other{"{0} jiggers"}
+            }
+        }
+    }
+    unitsNarrow{
+        duration{
+            day{
+                dnam{"día"}
+                one{"{0}d"}
+                other{"{0}d"}
+            }
+            month{
+                dnam{"m"}
+                one{"{0}m"}
+                other{"{0}m"}
+            }
+            year{
+                dnam{"a"}
+                one{"{0}a"}
+                other{"{0}a"}
+            }
+        }
+        temperature{
+            fahrenheit{
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+        }
+    }
+    unitsShort{
+        concentr{
+            percent{
+                dnam{"%"}
+            }
+            permille{
+                dnam{"‰"}
+            }
+        }
+        digital{
+            bit{
+                dnam{"bit"}
+            }
+            byte{
+                dnam{"byte"}
+            }
+        }
+        duration{
+            day{
+                dnam{"días"}
+                one{"{0} día"}
+                other{"{0} días"}
+                per{"{0}/d"}
+            }
+            minute{
+                dnam{"mins"}
+            }
+            month{
+                one{"{0} m"}
+                other{"{0} mm."}
+            }
+            year{
+                one{"{0} a"}
+                other{"{0} aa."}
+                per{"{0}/a"}
+            }
+        }
+        energy{
+            foodcalorie{
+                dnam{"Cal"}
+                one{"{0} Cal"}
+                other{"{0} Cal"}
+            }
+            therm-us{
+                dnam{"th US"}
+                one{"{0} th US"}
+                other{"{0} th US"}
+            }
+        }
+        graphics{
+            dot{
+                dnam{"pts"}
+                one{"{0} pts"}
+                other{"{0} p"}
+            }
+        }
+        length{
+            fathom{
+                dnam{"brz."}
+                one{"{0} brz."}
+                other{"{0} brz."}
+            }
+            furlong{
+                dnam{"furlones"}
+                one{"{0} fur."}
+                other{"{0} fur."}
+            }
+            light-year{
+                one{"{0} a. l."}
+                other{"{0} a. l."}
+            }
+            nautical-mile{
+                dnam{"mn"}
+                one{"{0} mn"}
+                other{"{0} mn"}
+            }
+            yard{
+                dnam{"yd"}
+            }
+        }
+        speed{
+            knot{
+                dnam{"nudo"}
+                one{"{0} nudo"}
+                other{"{0} nudos"}
+            }
+        }
+        torque{
+            pound-force-foot{
+                dnam{"lbf⋅ft"}
+                one{"{0} lbf⋅ft"}
+                other{"{0} lbf⋅ft"}
+            }
+        }
+        volume{
+            bushel{
+                dnam{"bsh"}
+                one{"{0} bsh"}
+                other{"{0} bsh"}
+            }
+            cup{
+                dnam{"tza."}
+                one{"{0} tza."}
+                other{"{0} tzas."}
+            }
+            cup-metric{
+                dnam{"Tm"}
+                one{"{0} Tm"}
+                other{"{0} Tm"}
+            }
+            dessert-spoon{
+                dnam{"cdapostre"}
+                one{"{0} cdapostre"}
+                other{"{0} cdapostre"}
+            }
+            dessert-spoon-imperial{
+                dnam{"cdapostre imp."}
+                one{"{0} cdapostre imp."}
+                other{"{0} cdaspostre imp."}
+            }
+            dram{
+                dnam{"fl dracma"}
+                one{"{0} fl dracma"}
+                other{"{0} fl dracmas"}
+            }
+            jigger{
+                dnam{"jigger"}
+                one{"{0} jigger"}
+                other{"{0} jiggers"}
+            }
+            pint-metric{
+                dnam{"ptm"}
+                one{"{0} ptm"}
+                other{"{0} ptm"}
+            }
+        }
+    }
+}

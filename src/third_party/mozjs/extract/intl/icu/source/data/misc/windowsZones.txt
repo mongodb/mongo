@@ -1,0 +1,819 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+windowsZones:table(nofallback){
+    mapTimezones{
+        "AUS Central Standard Time"{
+            001{"Australia/Darwin"}
+            AU{"Australia/Darwin"}
+        }
+        "AUS Eastern Standard Time"{
+            001{"Australia/Sydney"}
+            AU{"Australia/Sydney Australia/Melbourne"}
+        }
+        "Afghanistan Standard Time"{
+            001{"Asia/Kabul"}
+            AF{"Asia/Kabul"}
+        }
+        "Alaskan Standard Time"{
+            001{"America/Anchorage"}
+            US{
+                "America/Anchorage America/Juneau America/Metlakatla America/Nome Ame"
+                "rica/Sitka America/Yakutat"
+            }
+        }
+        "Aleutian Standard Time"{
+            001{"America/Adak"}
+            US{"America/Adak"}
+        }
+        "Altai Standard Time"{
+            001{"Asia/Barnaul"}
+            RU{"Asia/Barnaul"}
+        }
+        "Arab Standard Time"{
+            001{"Asia/Riyadh"}
+            BH{"Asia/Bahrain"}
+            KW{"Asia/Kuwait"}
+            QA{"Asia/Qatar"}
+            SA{"Asia/Riyadh"}
+            YE{"Asia/Aden"}
+        }
+        "Arabian Standard Time"{
+            001{"Asia/Dubai"}
+            AE{"Asia/Dubai"}
+            OM{"Asia/Muscat"}
+            ZZ{"Etc/GMT-4"}
+        }
+        "Arabic Standard Time"{
+            001{"Asia/Baghdad"}
+            IQ{"Asia/Baghdad"}
+        }
+        "Argentina Standard Time"{
+            001{"America/Buenos_Aires"}
+            AR{
+                "America/Buenos_Aires America/Argentina/La_Rioja America/Argentina/Ri"
+                "o_Gallegos America/Argentina/Salta America/Argentina/San_Juan Americ"
+                "a/Argentina/San_Luis America/Argentina/Tucuman America/Argentina/Ush"
+                "uaia America/Catamarca America/Cordoba America/Jujuy America/Mendoza"
+            }
+        }
+        "Astrakhan Standard Time"{
+            001{"Europe/Astrakhan"}
+            RU{"Europe/Astrakhan Europe/Ulyanovsk"}
+        }
+        "Atlantic Standard Time"{
+            001{"America/Halifax"}
+            BM{"Atlantic/Bermuda"}
+            CA{"America/Halifax America/Glace_Bay America/Goose_Bay America/Moncton"}
+            GL{"America/Thule"}
+        }
+        "Aus Central W. Standard Time"{
+            001{"Australia/Eucla"}
+            AU{"Australia/Eucla"}
+        }
+        "Azerbaijan Standard Time"{
+            001{"Asia/Baku"}
+            AZ{"Asia/Baku"}
+        }
+        "Azores Standard Time"{
+            001{"Atlantic/Azores"}
+            GL{"America/Scoresbysund"}
+            PT{"Atlantic/Azores"}
+        }
+        "Bahia Standard Time"{
+            001{"America/Bahia"}
+            BR{"America/Bahia"}
+        }
+        "Bangladesh Standard Time"{
+            001{"Asia/Dhaka"}
+            BD{"Asia/Dhaka"}
+            BT{"Asia/Thimphu"}
+        }
+        "Belarus Standard Time"{
+            001{"Europe/Minsk"}
+            BY{"Europe/Minsk"}
+        }
+        "Bougainville Standard Time"{
+            001{"Pacific/Bougainville"}
+            PG{"Pacific/Bougainville"}
+        }
+        "Canada Central Standard Time"{
+            001{"America/Regina"}
+            CA{"America/Regina America/Swift_Current"}
+        }
+        "Cape Verde Standard Time"{
+            001{"Atlantic/Cape_Verde"}
+            CV{"Atlantic/Cape_Verde"}
+            ZZ{"Etc/GMT+1"}
+        }
+        "Caucasus Standard Time"{
+            001{"Asia/Yerevan"}
+            AM{"Asia/Yerevan"}
+        }
+        "Cen. Australia Standard Time"{
+            001{"Australia/Adelaide"}
+            AU{"Australia/Adelaide Australia/Broken_Hill"}
+        }
+        "Central America Standard Time"{
+            001{"America/Guatemala"}
+            BZ{"America/Belize"}
+            CR{"America/Costa_Rica"}
+            EC{"Pacific/Galapagos"}
+            GT{"America/Guatemala"}
+            HN{"America/Tegucigalpa"}
+            NI{"America/Managua"}
+            SV{"America/El_Salvador"}
+            ZZ{"Etc/GMT+6"}
+        }
+        "Central Asia Standard Time"{
+            001{"Asia/Almaty"}
+            AQ{"Antarctica/Vostok"}
+            CN{"Asia/Urumqi"}
+            IO{"Indian/Chagos"}
+            KG{"Asia/Bishkek"}
+            KZ{"Asia/Almaty Asia/Qostanay"}
+            ZZ{"Etc/GMT-6"}
+        }
+        "Central Brazilian Standard Time"{
+            001{"America/Cuiaba"}
+            BR{"America/Cuiaba America/Campo_Grande"}
+        }
+        "Central Europe Standard Time"{
+            001{"Europe/Budapest"}
+            AL{"Europe/Tirane"}
+            CZ{"Europe/Prague"}
+            HU{"Europe/Budapest"}
+            ME{"Europe/Podgorica"}
+            RS{"Europe/Belgrade"}
+            SI{"Europe/Ljubljana"}
+            SK{"Europe/Bratislava"}
+        }
+        "Central European Standard Time"{
+            001{"Europe/Warsaw"}
+            BA{"Europe/Sarajevo"}
+            HR{"Europe/Zagreb"}
+            MK{"Europe/Skopje"}
+            PL{"Europe/Warsaw"}
+        }
+        "Central Pacific Standard Time"{
+            001{"Pacific/Guadalcanal"}
+            AQ{"Antarctica/Casey"}
+            FM{"Pacific/Ponape Pacific/Kosrae"}
+            NC{"Pacific/Noumea"}
+            SB{"Pacific/Guadalcanal"}
+            VU{"Pacific/Efate"}
+            ZZ{"Etc/GMT-11"}
+        }
+        "Central Standard Time (Mexico)"{
+            001{"America/Mexico_City"}
+            MX{
+                "America/Mexico_City America/Bahia_Banderas America/Merida America/Mo"
+                "nterrey"
+            }
+        }
+        "Central Standard Time"{
+            001{"America/Chicago"}
+            CA{
+                "America/Winnipeg America/Rainy_River America/Rankin_Inlet America/Re"
+                "solute"
+            }
+            MX{"America/Matamoros"}
+            US{
+                "America/Chicago America/Indiana/Knox America/Indiana/Tell_City Ameri"
+                "ca/Menominee America/North_Dakota/Beulah America/North_Dakota/Center"
+                " America/North_Dakota/New_Salem"
+            }
+            ZZ{"CST6CDT"}
+        }
+        "Chatham Islands Standard Time"{
+            001{"Pacific/Chatham"}
+            NZ{"Pacific/Chatham"}
+        }
+        "China Standard Time"{
+            001{"Asia/Shanghai"}
+            CN{"Asia/Shanghai"}
+            HK{"Asia/Hong_Kong"}
+            MO{"Asia/Macau"}
+        }
+        "Cuba Standard Time"{
+            001{"America/Havana"}
+            CU{"America/Havana"}
+        }
+        "Dateline Standard Time"{
+            001{"Etc/GMT+12"}
+            ZZ{"Etc/GMT+12"}
+        }
+        "E. Africa Standard Time"{
+            001{"Africa/Nairobi"}
+            AQ{"Antarctica/Syowa"}
+            DJ{"Africa/Djibouti"}
+            ER{"Africa/Asmera"}
+            ET{"Africa/Addis_Ababa"}
+            KE{"Africa/Nairobi"}
+            KM{"Indian/Comoro"}
+            MG{"Indian/Antananarivo"}
+            SO{"Africa/Mogadishu"}
+            TZ{"Africa/Dar_es_Salaam"}
+            UG{"Africa/Kampala"}
+            YT{"Indian/Mayotte"}
+            ZZ{"Etc/GMT-3"}
+        }
+        "E. Australia Standard Time"{
+            001{"Australia/Brisbane"}
+            AU{"Australia/Brisbane Australia/Lindeman"}
+        }
+        "E. Europe Standard Time"{
+            001{"Europe/Chisinau"}
+            MD{"Europe/Chisinau"}
+        }
+        "E. South America Standard Time"{
+            001{"America/Sao_Paulo"}
+            BR{"America/Sao_Paulo"}
+        }
+        "Easter Island Standard Time"{
+            001{"Pacific/Easter"}
+            CL{"Pacific/Easter"}
+        }
+        "Eastern Standard Time (Mexico)"{
+            001{"America/Cancun"}
+            MX{"America/Cancun"}
+        }
+        "Eastern Standard Time"{
+            001{"America/New_York"}
+            BS{"America/Nassau"}
+            CA{
+                "America/Toronto America/Iqaluit America/Montreal America/Nipigon Ame"
+                "rica/Pangnirtung America/Thunder_Bay"
+            }
+            US{
+                "America/New_York America/Detroit America/Indiana/Petersburg America/"
+                "Indiana/Vincennes America/Indiana/Winamac America/Kentucky/Monticell"
+                "o America/Louisville"
+            }
+            ZZ{"EST5EDT"}
+        }
+        "Egypt Standard Time"{
+            001{"Africa/Cairo"}
+            EG{"Africa/Cairo"}
+        }
+        "Ekaterinburg Standard Time"{
+            001{"Asia/Yekaterinburg"}
+            RU{"Asia/Yekaterinburg"}
+        }
+        "FLE Standard Time"{
+            001{"Europe/Kiev"}
+            AX{"Europe/Mariehamn"}
+            BG{"Europe/Sofia"}
+            EE{"Europe/Tallinn"}
+            FI{"Europe/Helsinki"}
+            LT{"Europe/Vilnius"}
+            LV{"Europe/Riga"}
+            UA{"Europe/Kiev Europe/Uzhgorod Europe/Zaporozhye"}
+        }
+        "Fiji Standard Time"{
+            001{"Pacific/Fiji"}
+            FJ{"Pacific/Fiji"}
+        }
+        "GMT Standard Time"{
+            001{"Europe/London"}
+            ES{"Atlantic/Canary"}
+            FO{"Atlantic/Faeroe"}
+            GB{"Europe/London"}
+            GG{"Europe/Guernsey"}
+            IE{"Europe/Dublin"}
+            IM{"Europe/Isle_of_Man"}
+            JE{"Europe/Jersey"}
+            PT{"Europe/Lisbon Atlantic/Madeira"}
+        }
+        "GTB Standard Time"{
+            001{"Europe/Bucharest"}
+            CY{"Asia/Nicosia Asia/Famagusta"}
+            GR{"Europe/Athens"}
+            RO{"Europe/Bucharest"}
+        }
+        "Georgian Standard Time"{
+            001{"Asia/Tbilisi"}
+            GE{"Asia/Tbilisi"}
+        }
+        "Greenland Standard Time"{
+            001{"America/Godthab"}
+            GL{"America/Godthab"}
+        }
+        "Greenwich Standard Time"{
+            001{"Atlantic/Reykjavik"}
+            BF{"Africa/Ouagadougou"}
+            CI{"Africa/Abidjan"}
+            GH{"Africa/Accra"}
+            GL{"America/Danmarkshavn"}
+            GM{"Africa/Banjul"}
+            GN{"Africa/Conakry"}
+            GW{"Africa/Bissau"}
+            IS{"Atlantic/Reykjavik"}
+            LR{"Africa/Monrovia"}
+            ML{"Africa/Bamako"}
+            MR{"Africa/Nouakchott"}
+            SH{"Atlantic/St_Helena"}
+            SL{"Africa/Freetown"}
+            SN{"Africa/Dakar"}
+            TG{"Africa/Lome"}
+        }
+        "Haiti Standard Time"{
+            001{"America/Port-au-Prince"}
+            HT{"America/Port-au-Prince"}
+        }
+        "Hawaiian Standard Time"{
+            001{"Pacific/Honolulu"}
+            CK{"Pacific/Rarotonga"}
+            PF{"Pacific/Tahiti"}
+            UM{"Pacific/Johnston"}
+            US{"Pacific/Honolulu"}
+            ZZ{"Etc/GMT+10"}
+        }
+        "India Standard Time"{
+            001{"Asia/Calcutta"}
+            IN{"Asia/Calcutta"}
+        }
+        "Iran Standard Time"{
+            001{"Asia/Tehran"}
+            IR{"Asia/Tehran"}
+        }
+        "Israel Standard Time"{
+            001{"Asia/Jerusalem"}
+            IL{"Asia/Jerusalem"}
+        }
+        "Jordan Standard Time"{
+            001{"Asia/Amman"}
+            JO{"Asia/Amman"}
+        }
+        "Kaliningrad Standard Time"{
+            001{"Europe/Kaliningrad"}
+            RU{"Europe/Kaliningrad"}
+        }
+        "Korea Standard Time"{
+            001{"Asia/Seoul"}
+            KR{"Asia/Seoul"}
+        }
+        "Libya Standard Time"{
+            001{"Africa/Tripoli"}
+            LY{"Africa/Tripoli"}
+        }
+        "Line Islands Standard Time"{
+            001{"Pacific/Kiritimati"}
+            KI{"Pacific/Kiritimati"}
+            ZZ{"Etc/GMT-14"}
+        }
+        "Lord Howe Standard Time"{
+            001{"Australia/Lord_Howe"}
+            AU{"Australia/Lord_Howe"}
+        }
+        "Magadan Standard Time"{
+            001{"Asia/Magadan"}
+            RU{"Asia/Magadan"}
+        }
+        "Magallanes Standard Time"{
+            001{"America/Punta_Arenas"}
+            CL{"America/Punta_Arenas"}
+        }
+        "Marquesas Standard Time"{
+            001{"Pacific/Marquesas"}
+            PF{"Pacific/Marquesas"}
+        }
+        "Mauritius Standard Time"{
+            001{"Indian/Mauritius"}
+            MU{"Indian/Mauritius"}
+            RE{"Indian/Reunion"}
+            SC{"Indian/Mahe"}
+        }
+        "Middle East Standard Time"{
+            001{"Asia/Beirut"}
+            LB{"Asia/Beirut"}
+        }
+        "Montevideo Standard Time"{
+            001{"America/Montevideo"}
+            UY{"America/Montevideo"}
+        }
+        "Morocco Standard Time"{
+            001{"Africa/Casablanca"}
+            EH{"Africa/El_Aaiun"}
+            MA{"Africa/Casablanca"}
+        }
+        "Mountain Standard Time (Mexico)"{
+            001{"America/Chihuahua"}
+            MX{"America/Chihuahua America/Mazatlan"}
+        }
+        "Mountain Standard Time"{
+            001{"America/Denver"}
+            CA{
+                "America/Edmonton America/Cambridge_Bay America/Inuvik America/Yellow"
+                "knife"
+            }
+            MX{"America/Ojinaga"}
+            US{"America/Denver America/Boise"}
+            ZZ{"MST7MDT"}
+        }
+        "Myanmar Standard Time"{
+            001{"Asia/Rangoon"}
+            CC{"Indian/Cocos"}
+            MM{"Asia/Rangoon"}
+        }
+        "N. Central Asia Standard Time"{
+            001{"Asia/Novosibirsk"}
+            RU{"Asia/Novosibirsk"}
+        }
+        "Namibia Standard Time"{
+            001{"Africa/Windhoek"}
+            NA{"Africa/Windhoek"}
+        }
+        "Nepal Standard Time"{
+            001{"Asia/Katmandu"}
+            NP{"Asia/Katmandu"}
+        }
+        "New Zealand Standard Time"{
+            001{"Pacific/Auckland"}
+            AQ{"Antarctica/McMurdo"}
+            NZ{"Pacific/Auckland"}
+        }
+        "Newfoundland Standard Time"{
+            001{"America/St_Johns"}
+            CA{"America/St_Johns"}
+        }
+        "Norfolk Standard Time"{
+            001{"Pacific/Norfolk"}
+            NF{"Pacific/Norfolk"}
+        }
+        "North Asia East Standard Time"{
+            001{"Asia/Irkutsk"}
+            RU{"Asia/Irkutsk"}
+        }
+        "North Asia Standard Time"{
+            001{"Asia/Krasnoyarsk"}
+            RU{"Asia/Krasnoyarsk Asia/Novokuznetsk"}
+        }
+        "North Korea Standard Time"{
+            001{"Asia/Pyongyang"}
+            KP{"Asia/Pyongyang"}
+        }
+        "Omsk Standard Time"{
+            001{"Asia/Omsk"}
+            RU{"Asia/Omsk"}
+        }
+        "Pacific SA Standard Time"{
+            001{"America/Santiago"}
+            CL{"America/Santiago"}
+        }
+        "Pacific Standard Time (Mexico)"{
+            001{"America/Tijuana"}
+            MX{"America/Tijuana America/Santa_Isabel"}
+        }
+        "Pacific Standard Time"{
+            001{"America/Los_Angeles"}
+            CA{"America/Vancouver"}
+            US{"America/Los_Angeles"}
+            ZZ{"PST8PDT"}
+        }
+        "Pakistan Standard Time"{
+            001{"Asia/Karachi"}
+            PK{"Asia/Karachi"}
+        }
+        "Paraguay Standard Time"{
+            001{"America/Asuncion"}
+            PY{"America/Asuncion"}
+        }
+        "Qyzylorda Standard Time"{
+            001{"Asia/Qyzylorda"}
+            KZ{"Asia/Qyzylorda"}
+        }
+        "Romance Standard Time"{
+            001{"Europe/Paris"}
+            BE{"Europe/Brussels"}
+            DK{"Europe/Copenhagen"}
+            ES{"Europe/Madrid Africa/Ceuta"}
+            FR{"Europe/Paris"}
+        }
+        "Russia Time Zone 10"{
+            001{"Asia/Srednekolymsk"}
+            RU{"Asia/Srednekolymsk"}
+        }
+        "Russia Time Zone 11"{
+            001{"Asia/Kamchatka"}
+            RU{"Asia/Kamchatka Asia/Anadyr"}
+        }
+        "Russia Time Zone 3"{
+            001{"Europe/Samara"}
+            RU{"Europe/Samara"}
+        }
+        "Russian Standard Time"{
+            001{"Europe/Moscow"}
+            RU{"Europe/Moscow Europe/Kirov"}
+            UA{"Europe/Simferopol"}
+        }
+        "SA Eastern Standard Time"{
+            001{"America/Cayenne"}
+            AQ{"Antarctica/Rothera Antarctica/Palmer"}
+            BR{
+                "America/Fortaleza America/Belem America/Maceio America/Recife Americ"
+                "a/Santarem"
+            }
+            FK{"Atlantic/Stanley"}
+            GF{"America/Cayenne"}
+            SR{"America/Paramaribo"}
+            ZZ{"Etc/GMT+3"}
+        }
+        "SA Pacific Standard Time"{
+            001{"America/Bogota"}
+            BR{"America/Rio_Branco America/Eirunepe"}
+            CA{"America/Coral_Harbour"}
+            CO{"America/Bogota"}
+            EC{"America/Guayaquil"}
+            JM{"America/Jamaica"}
+            KY{"America/Cayman"}
+            PA{"America/Panama"}
+            PE{"America/Lima"}
+            ZZ{"Etc/GMT+5"}
+        }
+        "SA Western Standard Time"{
+            001{"America/La_Paz"}
+            AG{"America/Antigua"}
+            AI{"America/Anguilla"}
+            AW{"America/Aruba"}
+            BB{"America/Barbados"}
+            BL{"America/St_Barthelemy"}
+            BO{"America/La_Paz"}
+            BQ{"America/Kralendijk"}
+            BR{"America/Manaus America/Boa_Vista America/Porto_Velho"}
+            CA{"America/Blanc-Sablon"}
+            CW{"America/Curacao"}
+            DM{"America/Dominica"}
+            DO{"America/Santo_Domingo"}
+            GD{"America/Grenada"}
+            GP{"America/Guadeloupe"}
+            GY{"America/Guyana"}
+            KN{"America/St_Kitts"}
+            LC{"America/St_Lucia"}
+            MF{"America/Marigot"}
+            MQ{"America/Martinique"}
+            MS{"America/Montserrat"}
+            PR{"America/Puerto_Rico"}
+            SX{"America/Lower_Princes"}
+            TT{"America/Port_of_Spain"}
+            VC{"America/St_Vincent"}
+            VG{"America/Tortola"}
+            VI{"America/St_Thomas"}
+            ZZ{"Etc/GMT+4"}
+        }
+        "SE Asia Standard Time"{
+            001{"Asia/Bangkok"}
+            AQ{"Antarctica/Davis"}
+            CX{"Indian/Christmas"}
+            ID{"Asia/Jakarta Asia/Pontianak"}
+            KH{"Asia/Phnom_Penh"}
+            LA{"Asia/Vientiane"}
+            TH{"Asia/Bangkok"}
+            VN{"Asia/Saigon"}
+            ZZ{"Etc/GMT-7"}
+        }
+        "Saint Pierre Standard Time"{
+            001{"America/Miquelon"}
+            PM{"America/Miquelon"}
+        }
+        "Sakhalin Standard Time"{
+            001{"Asia/Sakhalin"}
+            RU{"Asia/Sakhalin"}
+        }
+        "Samoa Standard Time"{
+            001{"Pacific/Apia"}
+            WS{"Pacific/Apia"}
+        }
+        "Sao Tome Standard Time"{
+            001{"Africa/Sao_Tome"}
+            ST{"Africa/Sao_Tome"}
+        }
+        "Saratov Standard Time"{
+            001{"Europe/Saratov"}
+            RU{"Europe/Saratov"}
+        }
+        "Singapore Standard Time"{
+            001{"Asia/Singapore"}
+            BN{"Asia/Brunei"}
+            ID{"Asia/Makassar"}
+            MY{"Asia/Kuala_Lumpur Asia/Kuching"}
+            PH{"Asia/Manila"}
+            SG{"Asia/Singapore"}
+            ZZ{"Etc/GMT-8"}
+        }
+        "South Africa Standard Time"{
+            001{"Africa/Johannesburg"}
+            BI{"Africa/Bujumbura"}
+            BW{"Africa/Gaborone"}
+            CD{"Africa/Lubumbashi"}
+            LS{"Africa/Maseru"}
+            MW{"Africa/Blantyre"}
+            MZ{"Africa/Maputo"}
+            RW{"Africa/Kigali"}
+            SS{"Africa/Juba"}
+            SZ{"Africa/Mbabane"}
+            ZA{"Africa/Johannesburg"}
+            ZM{"Africa/Lusaka"}
+            ZW{"Africa/Harare"}
+            ZZ{"Etc/GMT-2"}
+        }
+        "Sri Lanka Standard Time"{
+            001{"Asia/Colombo"}
+            LK{"Asia/Colombo"}
+        }
+        "Sudan Standard Time"{
+            001{"Africa/Khartoum"}
+            SD{"Africa/Khartoum"}
+        }
+        "Syria Standard Time"{
+            001{"Asia/Damascus"}
+            SY{"Asia/Damascus"}
+        }
+        "Taipei Standard Time"{
+            001{"Asia/Taipei"}
+            TW{"Asia/Taipei"}
+        }
+        "Tasmania Standard Time"{
+            001{"Australia/Hobart"}
+            AU{"Australia/Hobart Australia/Currie Antarctica/Macquarie"}
+        }
+        "Tocantins Standard Time"{
+            001{"America/Araguaina"}
+            BR{"America/Araguaina"}
+        }
+        "Tokyo Standard Time"{
+            001{"Asia/Tokyo"}
+            ID{"Asia/Jayapura"}
+            JP{"Asia/Tokyo"}
+            PW{"Pacific/Palau"}
+            TL{"Asia/Dili"}
+            ZZ{"Etc/GMT-9"}
+        }
+        "Tomsk Standard Time"{
+            001{"Asia/Tomsk"}
+            RU{"Asia/Tomsk"}
+        }
+        "Tonga Standard Time"{
+            001{"Pacific/Tongatapu"}
+            TO{"Pacific/Tongatapu"}
+        }
+        "Transbaikal Standard Time"{
+            001{"Asia/Chita"}
+            RU{"Asia/Chita"}
+        }
+        "Turkey Standard Time"{
+            001{"Europe/Istanbul"}
+            TR{"Europe/Istanbul"}
+        }
+        "Turks And Caicos Standard Time"{
+            001{"America/Grand_Turk"}
+            TC{"America/Grand_Turk"}
+        }
+        "US Eastern Standard Time"{
+            001{"America/Indianapolis"}
+            US{"America/Indianapolis America/Indiana/Marengo America/Indiana/Vevay"}
+        }
+        "US Mountain Standard Time"{
+            001{"America/Phoenix"}
+            CA{"America/Creston America/Dawson_Creek America/Fort_Nelson"}
+            MX{"America/Hermosillo"}
+            US{"America/Phoenix"}
+            ZZ{"Etc/GMT+7"}
+        }
+        "UTC"{
+            001{"Etc/UTC"}
+            ZZ{"Etc/UTC Etc/GMT"}
+        }
+        "UTC+12"{
+            001{"Etc/GMT-12"}
+            KI{"Pacific/Tarawa"}
+            MH{"Pacific/Majuro Pacific/Kwajalein"}
+            NR{"Pacific/Nauru"}
+            TV{"Pacific/Funafuti"}
+            UM{"Pacific/Wake"}
+            WF{"Pacific/Wallis"}
+            ZZ{"Etc/GMT-12"}
+        }
+        "UTC+13"{
+            001{"Etc/GMT-13"}
+            KI{"Pacific/Enderbury"}
+            TK{"Pacific/Fakaofo"}
+            ZZ{"Etc/GMT-13"}
+        }
+        "UTC-02"{
+            001{"Etc/GMT+2"}
+            BR{"America/Noronha"}
+            GS{"Atlantic/South_Georgia"}
+            ZZ{"Etc/GMT+2"}
+        }
+        "UTC-08"{
+            001{"Etc/GMT+8"}
+            PN{"Pacific/Pitcairn"}
+            ZZ{"Etc/GMT+8"}
+        }
+        "UTC-09"{
+            001{"Etc/GMT+9"}
+            PF{"Pacific/Gambier"}
+            ZZ{"Etc/GMT+9"}
+        }
+        "UTC-11"{
+            001{"Etc/GMT+11"}
+            AS{"Pacific/Pago_Pago"}
+            NU{"Pacific/Niue"}
+            UM{"Pacific/Midway"}
+            ZZ{"Etc/GMT+11"}
+        }
+        "Ulaanbaatar Standard Time"{
+            001{"Asia/Ulaanbaatar"}
+            MN{"Asia/Ulaanbaatar Asia/Choibalsan"}
+        }
+        "Venezuela Standard Time"{
+            001{"America/Caracas"}
+            VE{"America/Caracas"}
+        }
+        "Vladivostok Standard Time"{
+            001{"Asia/Vladivostok"}
+            RU{"Asia/Vladivostok Asia/Ust-Nera"}
+        }
+        "Volgograd Standard Time"{
+            001{"Europe/Volgograd"}
+            RU{"Europe/Volgograd"}
+        }
+        "W. Australia Standard Time"{
+            001{"Australia/Perth"}
+            AU{"Australia/Perth"}
+        }
+        "W. Central Africa Standard Time"{
+            001{"Africa/Lagos"}
+            AO{"Africa/Luanda"}
+            BJ{"Africa/Porto-Novo"}
+            CD{"Africa/Kinshasa"}
+            CF{"Africa/Bangui"}
+            CG{"Africa/Brazzaville"}
+            CM{"Africa/Douala"}
+            DZ{"Africa/Algiers"}
+            GA{"Africa/Libreville"}
+            GQ{"Africa/Malabo"}
+            NE{"Africa/Niamey"}
+            NG{"Africa/Lagos"}
+            TD{"Africa/Ndjamena"}
+            TN{"Africa/Tunis"}
+            ZZ{"Etc/GMT-1"}
+        }
+        "W. Europe Standard Time"{
+            001{"Europe/Berlin"}
+            AD{"Europe/Andorra"}
+            AT{"Europe/Vienna"}
+            CH{"Europe/Zurich"}
+            DE{"Europe/Berlin Europe/Busingen"}
+            GI{"Europe/Gibraltar"}
+            IT{"Europe/Rome"}
+            LI{"Europe/Vaduz"}
+            LU{"Europe/Luxembourg"}
+            MC{"Europe/Monaco"}
+            MT{"Europe/Malta"}
+            NL{"Europe/Amsterdam"}
+            NO{"Europe/Oslo"}
+            SE{"Europe/Stockholm"}
+            SJ{"Arctic/Longyearbyen"}
+            SM{"Europe/San_Marino"}
+            VA{"Europe/Vatican"}
+        }
+        "W. Mongolia Standard Time"{
+            001{"Asia/Hovd"}
+            MN{"Asia/Hovd"}
+        }
+        "West Asia Standard Time"{
+            001{"Asia/Tashkent"}
+            AQ{"Antarctica/Mawson"}
+            KZ{"Asia/Oral Asia/Aqtau Asia/Aqtobe Asia/Atyrau"}
+            MV{"Indian/Maldives"}
+            TF{"Indian/Kerguelen"}
+            TJ{"Asia/Dushanbe"}
+            TM{"Asia/Ashgabat"}
+            UZ{"Asia/Tashkent Asia/Samarkand"}
+            ZZ{"Etc/GMT-5"}
+        }
+        "West Bank Standard Time"{
+            001{"Asia/Hebron"}
+            PS{"Asia/Hebron Asia/Gaza"}
+        }
+        "West Pacific Standard Time"{
+            001{"Pacific/Port_Moresby"}
+            AQ{"Antarctica/DumontDUrville"}
+            FM{"Pacific/Truk"}
+            GU{"Pacific/Guam"}
+            MP{"Pacific/Saipan"}
+            PG{"Pacific/Port_Moresby"}
+            ZZ{"Etc/GMT-10"}
+        }
+        "Yakutsk Standard Time"{
+            001{"Asia/Yakutsk"}
+            RU{"Asia/Yakutsk Asia/Khandyga"}
+        }
+        "Yukon Standard Time"{
+            001{"America/Whitehorse"}
+            CA{"America/Whitehorse America/Dawson"}
+        }
+    }
+}

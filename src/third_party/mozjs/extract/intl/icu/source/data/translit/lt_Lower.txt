@@ -1,0 +1,27 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: lt_Lower.txt
+# Generated from CLDR
+#
+
+# Introduce an explicit dot above when lowercasing capital Is and Js
+# whenever there are more accents above.
+# (of the accents used in Lithuanian: grave, acute, tilde above, and ogonek)
+# 0049; 0069 0307; 0049; 0049; lt More_Above; # LATIN CAPITAL LETTER I
+# 004A; 006A 0307; 004A; 004A; lt More_Above; # LATIN CAPITAL LETTER J
+# 012E; 012F 0307; 012E; 012E; lt More_Above; # LATIN CAPITAL LETTER I WITH OGONEK
+# 00CC; 0069 0307 0300; 00CC; 00CC; lt; # LATIN CAPITAL LETTER I WITH GRAVE
+# 00CD; 0069 0307 0301; 00CD; 00CD; lt; # LATIN CAPITAL LETTER I WITH ACUTE
+# 0128; 0069 0307 0303; 0128; 0128; lt; # LATIN CAPITAL LETTER I WITH TILDE
+::NFD();
+I } [^[:ccc=Not_Reordered:][:ccc=Above:]]* [:ccc=Above:] → i \u0307;
+J } [^[:ccc=Not_Reordered:][:ccc=Above:]]* [:ccc=Above:] → j \u0307;
+I \u0328 } [^[:ccc=Not_Reordered:][:ccc=Above:]]* [:ccc=Above:] → i \u0328 \u0307;
+I \u0300 → i \u0307 \u0300;
+I \u0301 → i \u0307 \u0301;
+I \u0303 → i \u0307 \u0303;
+::Any-Lower();
+::NFC();
+

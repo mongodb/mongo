@@ -1,0 +1,157 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+pa_Arab{
+    %%Parent{"root"}
+    AuxExemplarCharacters{"[\u200E\u200F أ ٻ ة ٺ ټ ٽ]"}
+    ExemplarCharacters{
+        "[\u064F ء آ ؤ ئ ا ب پ ت ث ٹ ج چ ح خ د ذ ڈ ر ز ڑ ژ س ش ص ض ط ظ ع غ ف ق ک گ ل "
+        "م ن ں ه ھ ہ و ی ے]"
+    }
+    ExemplarCharactersNumbers{"[\u200E \\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    NumberElements{
+        arabext{
+            symbols{
+                timeSeparator{":"}
+            }
+        }
+        default{"arabext"}
+        latn{
+            symbols{
+                minusSign{"‎-"}
+                plusSign{"‎+"}
+            }
+        }
+        native{"arabext"}
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, dd MMMM y G",
+                "d MMMM y G",
+                "d MMM y G",
+                "dd/MM/y GGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                HHmmss{"HH:mm:ss"}
+                Md{"d/M"}
+                ms{"mm:ss"}
+                yMMM{"MMM y"}
+                yQQQ{"QQQ y"}
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, dd MMMM y",
+                "d MMMM y",
+                "d MMM y",
+                "dd/MM/y",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                HHmmss{"HH:mm:ss"}
+                Md{"d/M"}
+                mmss{"mm:ss"}
+                yMMM{"MMM y"}
+                yQQQ{"QQQ y"}
+            }
+            dayNames{
+                format{
+                    wide{
+                        "اتوار",
+                        "پیر",
+                        "منگل",
+                        "بُدھ",
+                        "جمعرات",
+                        "جمعہ",
+                        "ہفتہ",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "ايساپورو",
+                    "سں",
+                }
+                wide{
+                    "ايساپورو",
+                    "سں",
+                }
+            }
+            monthNames{
+                format{
+                    wide{
+                        "جنوری",
+                        "فروری",
+                        "مارچ",
+                        "اپریل",
+                        "مئ",
+                        "جون",
+                        "جولائی",
+                        "اگست",
+                        "ستمبر",
+                        "اکتوبر",
+                        "نومبر",
+                        "دسمبر",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    wide{
+                        "چوتھاي پہلاں",
+                        "چوتھاي دوجا",
+                        "چوتھاي تيجا",
+                        "چوتھاي چوتھا",
+                    }
+                }
+            }
+        }
+    }
+    fields{
+        day{
+            dn{"دئن"}
+        }
+        hour{
+            dn{"گھنٹا"}
+        }
+        minute{
+            dn{"منٹ"}
+        }
+        month{
+            dn{"مہينا"}
+        }
+        week{
+            dn{"ہفتہ"}
+        }
+        weekday{
+            dn{"ہفتے دا دن"}
+        }
+        year{
+            dn{"ورھا"}
+        }
+        zone{
+            dn{"ٹپہ"}
+        }
+    }
+    layout{
+        characters{"right-to-left"}
+    }
+}

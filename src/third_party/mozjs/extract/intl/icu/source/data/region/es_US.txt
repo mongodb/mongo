@@ -1,0 +1,30 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_US{
+    %%Parent{"es_419"}
+    Countries{
+        011{"África occidental"}
+        014{"África oriental"}
+        015{"África septentrional"}
+        018{"África meridional"}
+        030{"Asia oriental"}
+        034{"Asia meridional"}
+        035{"Sudeste asiático"}
+        039{"Europa meridional"}
+        145{"Asia occidental"}
+        151{"Europa oriental"}
+        154{"Europa septentrional"}
+        155{"Europa occidental"}
+        AC{"Isla de la Ascensión"}
+        BA{"Bosnia y Herzegovina"}
+        CI{"Côte d’Ivoire"}
+        GG{"Guernsey"}
+        QO{"Territorios alejados de Oceanía"}
+        TA{"Tristán de Acuña"}
+        UM{"Islas menores alejadas de EE. UU."}
+    }
+    Countries%short{
+        GB{"RU"}
+    }
+}

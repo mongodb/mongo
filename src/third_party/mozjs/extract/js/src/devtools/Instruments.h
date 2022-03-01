@@ -7,7 +7,7 @@
 
 #ifdef __APPLE__
 
-#include <unistd.h>
+#  include <unistd.h>
 
 namespace Instruments {
 
@@ -16,7 +16,7 @@ void Pause();
 bool Resume();
 void Stop(const char* profileName);
 
-}
+}  // namespace Instruments
 
 #endif /* __APPLE__ */
 

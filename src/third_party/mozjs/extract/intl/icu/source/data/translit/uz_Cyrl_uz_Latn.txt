@@ -1,0 +1,110 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: uz_Cyrl_uz_Latn.txt
+# Generated from CLDR
+#
+
+# Rules are predicated on running NFD first, and NFC afterwards
+:: NFD (NFC) ;
+$letters = [[:sc=Latn:][:sc=Cyrl:] & [:L:]] ;
+$latinVowel = [AEIOUaeiouĬĭʼËë{oʻ}{Oʻ}] ;
+$lower = [$letters & [:Ll:]] ;
+у \u0306 ↔ oʻ ;
+У \u0306 ↔ Oʻ ;
+ғ ↔ gʻ ;
+Ғ ↔ Gʻ ;
+# For many cases, use a following character to determine the difference between XY and Xy
+ш ↔ sh ;
+{ Ш } $lower ↔ Sh ;
+Ш ↔ SH ;
+ч ↔ ch ;
+{ Ч } $lower ↔ Ch ;
+Ч ↔ CH ;
+# нг ↔ ng ; as separate letters works
+# Нг ↔ Ng ; as separate letters works
+# If we have a lowercase letter on either side, use the lowercase hard sign
+ъ ↔ { ʼ } $lower ;
+ъ ← $lower { ʼ } ;
+Ъ ↔ ʼ ;
+е\u0308 ↔ yo ;
+Е\u0308 } $lower ↔ Yo ;
+Е\u0308 ↔ YO ;
+# е → 'ye' at the beginning of a syllable, after a vowel, ъ or ь, otherwise 'e'
+[:^L:] { е ↔ ye ;
+[:^L:] { Е } $lower ↔ Ye ;
+[:^L:] {Е ↔ YE ;
+$latinVowel { е → ye ;
+$latinVowel { Е } $lower → Ye ;
+$latinVowel { Е → YE ;
+# handle these specially, since ьЬ otherwise disappear.
+ье → ye ;
+{ ьЕ } $lower → Ye ;
+ьЕ → YE ;
+Ье → ye ;
+{ ЬЕ } $lower → Ye ;
+ЬЕ → YE ;
+е → e ;
+Е → E ;
+ю ↔ yu ;
+{ Ю } $lower ↔ Yu ;
+Ю ↔ YU ;
+я ↔ ya ;
+{ Я } $lower ↔ Ya ;
+Я ↔ YA ;
+ц ↔ ts ;
+{ Ц } $lower ↔ Ts ;
+Ц ↔ TS ;
+а ↔ a ;
+А ↔ A ;
+б ↔ b ;
+Б ↔ B ;
+д ↔ d ;
+Д ↔ D ;
+э ↔ e ;
+Э ↔ E ;
+ф ↔ f ;
+Ф ↔ F ;
+г ↔ g ;
+Г ↔ G ;
+ҳ ↔ h ;
+Ҳ ↔ H ;
+и\u0306 ↔ y ;
+И\u0306 ↔ Y ;
+и ↔ i ;
+И ↔ I ;
+ж ↔ j ;
+Ж ↔ J ;
+к ↔ k ;
+К ↔ K ;
+л ↔ l ;
+Л ↔ L ;
+м ↔ m ;
+М ↔ M ;
+н ↔ n ;
+Н ↔ N ;
+о ↔ o ;
+О ↔ O ;
+п ↔ p ;
+П ↔ P ;
+қ ↔ q ;
+Қ ↔ Q ;
+р ↔ r ;
+Р ↔ R ;
+с ↔ s ;
+С ↔ S ;
+т ↔ t ;
+Т ↔ T ;
+у ↔ u ;
+У ↔ U ;
+в ↔ v ;
+В ↔ V ;
+х ↔ x ;
+Х ↔ X ;
+з ↔ z ;
+З ↔ Z ;
+ь → ;
+Ь → ;
+::NFC (NFD) ;
+

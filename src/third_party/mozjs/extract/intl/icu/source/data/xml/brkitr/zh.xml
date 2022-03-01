@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+ Copyright (C) 2016 and later: Unicode, Inc. and others.
+ License & terms of use: http://www.unicode.org/copyright.html
+ Copyright (c) 2006-2015 International Business Machines Corporation and others. All rights reserved.
+-->
+<!DOCTYPE ldml SYSTEM "../../dtd/cldr-35.1/common/dtd/ldml.dtd"
+[
+   <!ENTITY % icu SYSTEM "../../dtd/cldr-35.1/common/dtd/ldmlICU.dtd">
+   %icu;
+]
+>
+<ldml>
+    <identity>
+        <version number="$ $"/>
+        <generation date="$ $"/>
+        <language type="zh"/> 
+    </identity>
+    <special xmlns:icu="http://www.icu-project.org/">
+        <icu:breakIteratorData>
+            <icu:boundaries>
+                <icu:line icu:dependency="line_cj.brk"/>
+                <icu:line alt="loose"  icu:dependency="line_loose_cj.brk"/>
+                <icu:line alt="normal" icu:dependency="line_normal_cj.brk"/>
+                <icu:line alt="strict" icu:dependency="line_cj.brk"/>
+            </icu:boundaries>
+        </icu:breakIteratorData>
+    </special>
+</ldml>
+

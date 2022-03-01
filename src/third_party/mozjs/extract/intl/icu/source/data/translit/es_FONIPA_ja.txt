@@ -1,0 +1,162 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: es_FONIPA_ja.txt
+# Generated from CLDR
+#
+
+# Phonemic transcription of Spanish into Katakana.
+$word_boundary = [-\ $] ;
+$vowel = [aeijouw] ;       # Vowels and glides
+$not_vowel = [^$vowel] ;
+#
+#
+# First pass: Collapse phonetic distinctions not preserved in Katakana.
+β → | b;
+ð → | d;
+ɣ → | g;
+ŋ → | n;
+θ → | s;
+ɾ → | r;
+[ij{i\u032F}]+ → i;
+[uw{u\u032F}]+ → u;
+#
+#
+nn → n ;
+#
+#
+::Null;
+#
+#
+# Main pass: Phoneme to Katakana conversion.
+'.' → ;
+a → ア;
+ba → バ;
+bb → ッ | b;
+be → ベ;
+bi → ビ;
+bo → ボ;
+bu → ブ;
+b → ブ ;
+da → ダ;
+dd → ッ | d;
+de → デ;
+di → ディ;
+do → ド;
+du → ドゥ;
+#
+#
+# 'd' at the end of a word is usually ignored.
+d } $word_boundary → ー;
+d → ド;
+e → エ;
+fa → ファ;
+fe → フェ;
+ff → ッ | f;
+fi → フィ;
+fo → フォ;
+fu → フ;
+f → フ;
+ga → ガ;
+ge → グエ;
+gi → グイ;
+gg → ッ | g;
+go → ゴ;
+gu → グ;
+g → グ;
+i → イ ;
+ʝa → ヤ ;
+ʝe → イェ ;
+ʝi → イ ;
+ʝu → ユ ;
+ʝo → ヨ ;
+ʝ → イ ;
+ka → カ;
+ke → ケ;
+ki → キ;
+kk → ッ | k;
+ko → コ;
+ku → ク;
+k → ク;
+la → ラ ;
+le → レ ;
+li → リ ;
+lo → ロ ;
+lu → ル ;
+l → ル ;
+ʎa → リャ ;
+ʎe → レ ;
+ʎi → リ ;
+ʎo → リョ ;
+ʎu → リュ ;
+ʎ → ル ;
+ma → マ ;
+me → メ ;
+mi → ミ ;
+mo → モ ;
+mu → ム ;
+m } $word_boundary → ム ;
+m } $not_vowel → ン ;
+m → ム ;
+na → ナ ;
+ne → ネ ;
+ni → ニ ;
+no → ノ ;
+nu → ヌ ;
+n → ン ;
+ɲa → ニャ ;
+ɲe → ニェ ;
+ɲi → ニ ;
+ɲo → ニョ ;
+ɲu → ニュ ;
+o → オ ;
+pa → パ ;
+pe → ペ ;
+pi → ピ ;
+po → ポ ;
+pp → ッ | p;
+pu → プ ;
+p → プ ;
+ra → ラ ;
+re → レ ;
+ri → リ ;
+ro → ロ ;
+ru → ル ;
+r → ル;
+sa → サ ;
+se → セ ;
+si → シ ;
+so → ソ ;
+su → ス ;
+s → ス ;
+ta → タ ;
+te → テ ;
+ti → ティ ;
+to → ト ;
+tsa → ツァ ;
+tse → ツェ ;
+tsi → ツィ ;
+tso → ツォ ;
+tsu → ツ ;
+ts → ツ ;
+tt → ッ | t;
+tu → トゥ ;
+t → ト ;
+ʧa → チャ ;
+ʧe → チェ ;
+ʧi → チ ;
+ʧo → チョ ;
+ʧu → チュ ;
+ʧ → チュ ;
+u → ウ ;
+xa → ハ ;
+xe → ヘ ;
+xi → ヒ ;
+xo → ホ ;
+xu → フ ;
+x → フ ;
+#
+#
+::NFC;
+

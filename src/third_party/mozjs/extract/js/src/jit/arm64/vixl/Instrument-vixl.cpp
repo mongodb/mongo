@@ -26,8 +26,6 @@
 
 #include "jit/arm64/vixl/Instrument-vixl.h"
 
-#include "mozilla/Unused.h"
-
 namespace vixl {
 
 Counter::Counter(const char* name, CounterType type)
@@ -141,7 +139,7 @@ Instrument::Instrument(const char* datafile, uint64_t sample_period)
   // Construct Counter objects from counter description array.
   for (int i = 0; i < num_counters; i++) {
     if (Counter* counter = js_new<Counter>(kCounterList[i].name, kCounterList[i].type))
-      mozilla::Unused << counters_.append(counter);
+      (void)counters_.append(counter);
   }
 
   DumpCounterNames();

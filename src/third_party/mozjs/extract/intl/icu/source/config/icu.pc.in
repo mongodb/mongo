@@ -1,0 +1,36 @@
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Copyright (C) 2010-2013, International Business Machines Corporation. All Rights Reserved.
+
+# CFLAGS contains only anything end users should set
+CFLAGS = @UCONFIG_CFLAGS@
+# CXXFLAGS contains only anything end users should set
+CXXFLAGS = @UCONFIG_CXXFLAGS@
+# DEFS only contains those UCONFIG_CPPFLAGS which are not auto-set by platform.h
+DEFS = @UCONFIG_CPPFLAGS@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+#bindir = @bindir@
+libdir = @libdir@
+includedir = @includedir@
+baselibs = @LIBS@
+#datarootdir = @datarootdir@
+#datadir = @datadir@
+#sbindir = @sbindir@
+#mandir = @mandir@
+#sysconfdir = @sysconfdir@
+UNICODE_VERSION=@UNICODE_VERSION@
+ICUPREFIX=icu
+ICULIBSUFFIX=@ICULIBSUFFIX@
+LIBICU=lib${ICUPREFIX}
+#SHAREDLIBCFLAGS=-fPIC
+pkglibdir=${libdir}/@PACKAGE@${ICULIBSUFFIX}/@VERSION@
+#pkgdatadir=${datadir}/@PACKAGE@${ICULIBSUFFIX}/@VERSION@
+ICUDATA_NAME = icudt@LIB_VERSION_MAJOR@@ICUDATA_CHAR@
+#ICUPKGDATA_DIR=@libdir@
+#ICUDATA_DIR=${pkgdatadir}
+ICUDESC=International Components for Unicode
+
+Version: @VERSION@
+Cflags: -I${includedir}
+# end of icu.pc.in

@@ -1,0 +1,85 @@
+## -*-makefile-*-
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+## Linux-specific setup
+## Copyright (c) 1999-2009, International Business Machines Corporation and
+## others. All Rights Reserved.
+
+## Commands to generate dependency files
+GEN_DEPS.c=	$(CC) -E -MM $(DEFS) $(CPPFLAGS)
+GEN_DEPS.cc=	$(CXX) -E -MM $(DEFS) $(CPPFLAGS)
+
+## Flags for position independent code
+SHAREDLIBCFLAGS = -fPIC
+SHAREDLIBCXXFLAGS = -fPIC
+SHAREDLIBCPPFLAGS = -DPIC
+
+## Additional flags when building libraries and with threads
+THREADSCPPFLAGS = -D_REENTRANT
+LIBCPPFLAGS =
+
+# The tests need complete IEEE floating point support
+CFLAGS += -mieee
+CXXFLAGS += -mieee
+
+## Compiler switch to embed a runtime search path
+LD_RPATH=	
+LD_RPATH_PRE=	-Wl,-rpath,
+
+## Compiler switch to embed a library name
+LD_SONAME = -Wl,-soname -Wl,$(notdir $(MIDDLE_SO_TARGET))
+
+
+## Shared library options
+LD_SOOPTIONS= -Wl,-Bsymbolic
+
+## Shared object suffix
+SO = so
+## Non-shared intermediate object suffix
+STATIC_O = ao
+
+## Compilation rules
+%.$(STATIC_O): $(srcdir)/%.c
+	$(COMPILE.c) $(STATICCPPFLAGS) $(STATICCFLAGS) -o $@ $<
+%.o: $(srcdir)/%.c
+	$(COMPILE.c) $(DYNAMICCPPFLAGS) $(DYNAMICCFLAGS) -o $@ $<
+
+%.$(STATIC_O): $(srcdir)/%.cpp
+	$(COMPILE.cc) $(STATICCPPFLAGS) $(STATICCXXFLAGS) -o $@ $<
+%.o: $(srcdir)/%.cpp
+	$(COMPILE.cc) $(DYNAMICCPPFLAGS) $(DYNAMICCXXFLAGS) -o $@ $<
+
+
+## Dependency rules
+%.d: $(srcdir)/%.c
+	@echo "generating dependency information for $<"
+	@$(SHELL) -ec '$(GEN_DEPS.c) $< \
+		| sed '\''s%\($*\)\.o[ :]*%\1.o $@ : %g'\'' > $@; \
+		[ -s $@ ] || rm -f $@'
+
+%.d: $(srcdir)/%.cpp
+	@echo "generating dependency information for $<"
+	@$(SHELL) -ec '$(GEN_DEPS.cc) $< \
+		| sed '\''s%\($*\)\.o[ :]*%\1.o $@ : %g'\'' > $@; \
+		[ -s $@ ] || rm -f $@'
+
+## Versioned libraries rules
+
+%.$(SO).$(SO_TARGET_VERSION_MAJOR): %.$(SO).$(SO_TARGET_VERSION)
+	$(RM) $@ && ln -s ${<F} $@
+%.$(SO): %.$(SO).$(SO_TARGET_VERSION_MAJOR)
+	$(RM) $@ && ln -s ${*F}.$(SO).$(SO_TARGET_VERSION) $@
+
+# The type of assembly to write for generating an object file
+GENCCODE_ASSEMBLY=-a gcc
+
+##  Bind internal references
+
+# LDflags that pkgdata will use
+BIR_LDFLAGS= -Wl,-Bsymbolic
+
+# Dependencies [i.e. map files] for the final library
+BIR_DEPS=
+
+## End Linux-specific setup
+

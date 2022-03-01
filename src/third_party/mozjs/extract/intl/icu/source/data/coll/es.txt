@@ -1,0 +1,26 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es{
+    collations{
+        search{
+            Sequence{
+                "[import und-u-co-search]"
+                "&N<ñ<<<Ñ"
+            }
+            Version{"39"}
+        }
+        standard{
+            Sequence{"&N<ñ<<<Ñ"}
+            Version{"39"}
+        }
+        traditional{
+            Sequence{
+                "&N<ñ<<<Ñ"
+                "&C<ch<<<Ch<<<CH"
+                "&l<ll<<<Ll<<<LL"
+            }
+            Version{"39"}
+        }
+    }
+}

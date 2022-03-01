@@ -1,0 +1,15 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Latn_Telu.txt
+# Generated from CLDR
+#
+
+::['.0-9A-Za-z~À-ÅÇ-ÏÑ-ÖÙ-Ýà-åç-ïñ-öù-ýÿ-ďĒ-ĥĨ-İĴ-ķĹ-ľŃ-ňŌ-őŔ-ťŨ-žƠ-ơƯ-ưǍ-ǜǞ-ǣǦ-ǭǰǴ-ǵǸ-țȞ-ȟȦ-ȳʔ\u0301\u0303-\u0304\u0306-\u0307\u0310\u0314-\u0315\u0323\u0325\u0331\u0341\u0344΅-ΆΈ-ΊΌΎ-ΐά-ΰό-ώϓЃЌЎЙйѓќўӁ-ӂӐ-ӑӖ-ӗӢ-ӣӮ-ӯḀ-ẙẠ-ỹἁἃ-ἅἇἉἋ-ἍἏἑἓ-ἕἙἛ-Ἕἡἣ-ἥἧἩἫ-ἭἯἱἳ-ἵἷἹἻ-ἽἿὁὃ-ὅὉὋ-Ὅὑὓ-ὕὗὙὛὝὟὡὣ-ὥὧὩὫ-ὭὯάέήίόύώᾁᾃ-ᾅᾇᾉᾋ-ᾍᾏᾑᾓ-ᾕᾗᾙᾛ-ᾝᾟᾡᾣ-ᾥᾧᾩᾫ-ᾭᾯ-ᾱᾴᾸ-ᾹΆῄΈΉ῎ῐ-ῑΐῘ-ῙΊ῞ῠ-ῡΰῥῨ-ῩΎ-Ῥ΅ῴΌΏK-Å\uE04D\uE064];
+::NFD;
+::Lower;
+::Latin-InterIndic;
+::InterIndic-Telugu;
+::NFC;
+

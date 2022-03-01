@@ -1,0 +1,43 @@
+License information for hyph_gl.dic:
+
+This file is based on the TeX hyphenation patterns distributed under the
+LaTeX Project Public License (LPPL) as part of the hyph-utf8 package.
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+At the time this file was first modified, a complete, unmodified copy of
+the LPPL Work was available from:
+http://tug.org/svn/texhyphen/trunk/hyph-utf8/tex/generic/hyph-utf8/patterns/?pathrev=580
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+Portions of this file were originally made available under the following license
+(copied verbatim from hyph-gl.lic.txt in the original work):
+
+Galician hyphenation patterns
+
+(more info about the licence to be added later)
+
+% This is the file hyph-gl.tex, version 2.4
+% Hyphenation patterns for Galician, written in the utf8 encoding.
+%
+% Generated with the mkpattern utility (v. 1.2), on 2010/04/23
+% The original source file were glpatter-utf8.tex
+% This is a generated file
+%
+% (c) Javier A. Múgica; 2006, 2007, 2008, 2010
+% License: LPPL version 1.3
+%
+% LPPL maintenance status: maintained
+% Current Maintainer: Javier A. Múgica
+%
+% For bug reports and comments:
+%
+% Javier Múgica, javier at digi21.eu
+%
+% Note that there is no 'j' nor 'y' in Galician
+

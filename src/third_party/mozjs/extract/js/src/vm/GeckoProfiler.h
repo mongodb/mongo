@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -7,15 +7,21 @@
 #ifndef vm_GeckoProfiler_h
 #define vm_GeckoProfiler_h
 
+#include "mozilla/Assertions.h"
+#include "mozilla/Attributes.h"
 #include "mozilla/DebugOnly.h"
-#include "mozilla/GuardObjects.h"
 
 #include <stddef.h>
+#include <stdint.h>
 
-#include "js/ProfilingStack.h"
-#include "threading/ExclusiveData.h"
-#include "vm/JSScript.h"
-#include "vm/MutexIDs.h"
+#include "jspubtd.h"
+
+#include "js/AllocPolicy.h"
+#include "js/HashTable.h"
+#include "js/ProfilingCategory.h"
+#include "js/TypeDecls.h"
+#include "js/Utility.h"
+#include "threading/ProtectedData.h"
 
 /*
  * Gecko Profiler integration with the JS Engine
@@ -32,7 +38,7 @@
  * is pushed onto a stack that the profiler owns and maintains. This
  * information is then popped at the end of the JS function. The profiler
  * informs the JS engine of this stack at runtime, and it can by turned on/off
- * dynamically. Each stack entry has type ProfileEntry.
+ * dynamically. Each stack frame has type ProfilingStackFrame.
  *
  * Throughout execution, the size of the stack recorded in memory may exceed the
  * maximum. The JS engine will not write any information past the maximum limit,
@@ -46,7 +52,7 @@
  * available. The other bit of information is the relevant C++ (native) stack
  * pointer. This stack pointer is what enables the interleaving of the C++ and
  * the JS stack. Finally, throughout execution of the function, some extra
- * information may be updated on the ProfileEntry structure.
+ * information may be updated on the ProfilingStackFrame structure.
  *
  * = Profile Strings
  *
@@ -82,7 +88,7 @@
  *
  * One goal of sampling is to get both a backtrace of the JS stack, but also
  * know where within each function on the stack execution currently is. For
- * this, each ProfileEntry has a 'pc' field to tell where its execution
+ * this, each ProfilingStackFrame has a 'pc' field to tell where its execution
  * currently is. This field is updated whenever a call is made to another JS
  * function, and for the JIT it is also updated whenever the JIT is left.
  *
@@ -93,7 +99,7 @@
  *
  * As an invariant, if the pc is nullptr, then the JIT is currently executing
  * generated code. Otherwise execution is in another JS function or in C++. With
- * this in place, only the top entry of the stack can ever have nullptr as its
+ * this in place, only the top frame of the stack can ever have nullptr as its
  * pc. Additionally with this invariant, it is possible to maintain mappings of
  * JIT code to pc which can be accessed safely because they will only be
  * accessed from a signal handler when the JIT code is executing.
@@ -101,157 +107,109 @@
 
 namespace js {
 
-// The `ProfileStringMap` weakly holds its `JSScript*` keys and owns its string
-// values. Entries are removed when the `JSScript` is finalized; see
+class BaseScript;
+class GeckoProfilerThread;
+
+// The `ProfileStringMap` weakly holds its `BaseScript*` keys and owns its
+// string values. Entries are removed when the `BaseScript` is finalized; see
 // `GeckoProfiler::onScriptFinalized`.
-using ProfileStringMap = HashMap<JSScript*,
-                                 UniqueChars,
-                                 DefaultHasher<JSScript*>,
-                                 SystemAllocPolicy>;
+using ProfileStringMap = HashMap<BaseScript*, JS::UniqueChars,
+                                 DefaultHasher<BaseScript*>, SystemAllocPolicy>;
 
-class GeckoProfilerRuntime
-{
-    JSRuntime*           rt;
-    ExclusiveData<ProfileStringMap> strings;
-    bool                 slowAssertions;
-    uint32_t             enabled_;
-    void                (*eventMarker_)(const char*);
+class GeckoProfilerRuntime {
+  JSRuntime* rt;
+  MainThreadData<ProfileStringMap> strings_;
+  bool slowAssertions;
+  uint32_t enabled_;
+  void (*eventMarker_)(const char*, const char*);
 
-    UniqueChars allocProfileString(JSScript* script, JSFunction* function);
+ public:
+  explicit GeckoProfilerRuntime(JSRuntime* rt);
 
-  public:
-    explicit GeckoProfilerRuntime(JSRuntime* rt);
+  /* management of whether instrumentation is on or off */
+  bool enabled() { return enabled_; }
+  void enable(bool enabled);
+  void enableSlowAssertions(bool enabled) { slowAssertions = enabled; }
+  bool slowAssertionsEnabled() { return slowAssertions; }
 
-    bool init();
+  void setEventMarker(void (*fn)(const char*, const char*));
 
-    /* management of whether instrumentation is on or off */
-    bool enabled() { return enabled_; }
-    void enable(bool enabled);
-    void enableSlowAssertions(bool enabled) { slowAssertions = enabled; }
-    bool slowAssertionsEnabled() { return slowAssertions; }
+  static JS::UniqueChars allocProfileString(JSContext* cx, BaseScript* script);
+  const char* profileString(JSContext* cx, BaseScript* script);
 
-    void setEventMarker(void (*fn)(const char*));
-    const char* profileString(JSScript* script, JSFunction* maybeFun);
-    void onScriptFinalized(JSScript* script);
+  void onScriptFinalized(BaseScript* script);
 
-    void markEvent(const char* event);
+  void markEvent(const char* event, const char* details);
 
-    /* meant to be used for testing, not recommended to call in normal code */
-    size_t stringsCount();
-    void stringsReset();
+  ProfileStringMap& strings() { return strings_.ref(); }
 
-    uint32_t* addressOfEnabled() {
-        return &enabled_;
-    }
+  /* meant to be used for testing, not recommended to call in normal code */
+  size_t stringsCount();
+  void stringsReset();
 
-    void fixupStringsMapAfterMovingGC();
+  uint32_t* addressOfEnabled() { return &enabled_; }
+
+  void fixupStringsMapAfterMovingGC();
 #ifdef JSGC_HASH_TABLE_CHECKS
-    void checkStringsMapAfterMovingGC();
+  void checkStringsMapAfterMovingGC();
 #endif
 };
 
-inline size_t
-GeckoProfilerRuntime::stringsCount()
-{
-    return strings.lock()->count();
-}
+inline size_t GeckoProfilerRuntime::stringsCount() { return strings().count(); }
 
-inline void
-GeckoProfilerRuntime::stringsReset()
-{
-    strings.lock()->clear();
-}
+inline void GeckoProfilerRuntime::stringsReset() { strings().clear(); }
 
 /*
  * This class is used in RunScript() to push the marker onto the sampling stack
  * that we're about to enter JS function calls. This is the only time in which a
  * valid stack pointer is pushed to the sampling stack.
  */
-class MOZ_RAII GeckoProfilerEntryMarker
-{
-  public:
-    explicit MOZ_ALWAYS_INLINE
-    GeckoProfilerEntryMarker(JSContext* cx,
-                             JSScript* script
-                             MOZ_GUARD_OBJECT_NOTIFIER_PARAM);
-    MOZ_ALWAYS_INLINE ~GeckoProfilerEntryMarker();
+class MOZ_RAII GeckoProfilerEntryMarker {
+ public:
+  explicit MOZ_ALWAYS_INLINE GeckoProfilerEntryMarker(JSContext* cx,
+                                                      JSScript* script);
+  MOZ_ALWAYS_INLINE ~GeckoProfilerEntryMarker();
 
-  private:
-    GeckoProfilerThread* profiler_;
+ private:
+  GeckoProfilerThread* profiler_;
 #ifdef DEBUG
-    uint32_t spBefore_;
+  uint32_t spBefore_;
 #endif
-    MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
 };
 
 /*
- * RAII class to automatically add Gecko Profiler pseudo frame entries.
+ * RAII class to automatically add Gecko Profiler profiling stack frames.
  *
  * NB: The `label` string must be statically allocated.
  */
-class MOZ_NONHEAP_CLASS AutoGeckoProfilerEntry
-{
-  public:
-    explicit MOZ_ALWAYS_INLINE
-    AutoGeckoProfilerEntry(JSContext* cx, const char* label,
-                           ProfileEntry::Category category = ProfileEntry::Category::JS
-                           MOZ_GUARD_OBJECT_NOTIFIER_PARAM);
-    MOZ_ALWAYS_INLINE ~AutoGeckoProfilerEntry();
+class MOZ_NONHEAP_CLASS AutoGeckoProfilerEntry {
+ public:
+  explicit MOZ_ALWAYS_INLINE AutoGeckoProfilerEntry(
+      JSContext* cx, const char* label,
+      JS::ProfilingCategoryPair categoryPair = JS::ProfilingCategoryPair::JS,
+      uint32_t flags = 0);
+  MOZ_ALWAYS_INLINE ~AutoGeckoProfilerEntry();
 
-  private:
-    GeckoProfilerThread* profiler_;
+ private:
+  GeckoProfilerThread* profiler_;
 #ifdef DEBUG
-    uint32_t spBefore_;
+  uint32_t spBefore_;
 #endif
-    MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
 };
 
 /*
  * This class is used in the interpreter to bound regions where the baseline JIT
- * being entered via OSR.  It marks the current top pseudostack entry as
+ * being entered via OSR.  It marks the current top profiling stack frame as
  * OSR-ed
  */
-class MOZ_RAII GeckoProfilerBaselineOSRMarker
-{
-  public:
-    explicit GeckoProfilerBaselineOSRMarker(JSContext* cx, bool hasProfilerFrame
-                                            MOZ_GUARD_OBJECT_NOTIFIER_PARAM);
-    ~GeckoProfilerBaselineOSRMarker();
+class MOZ_RAII GeckoProfilerBaselineOSRMarker {
+ public:
+  explicit GeckoProfilerBaselineOSRMarker(JSContext* cx, bool hasProfilerFrame);
+  ~GeckoProfilerBaselineOSRMarker();
 
-  private:
-    GeckoProfilerThread* profiler;
-    mozilla::DebugOnly<uint32_t> spBefore_;
-    MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
-};
-
-/*
- * This class manages the instrumentation portion of the profiling for JIT
- * code.
- *
- * The instrumentation tracks entry into functions, leaving those functions via
- * a function call, reentering the functions from a function call, and exiting
- * the functions from returning. This class also handles inline frames and
- * manages the instrumentation which needs to be attached to them as well.
- *
- * The basic methods which emit instrumentation are at the end of this class,
- * and the management functions are all described in the middle.
- */
-template<class Assembler, class Register>
-class GeckoProfilerInstrumentation
-{
-    GeckoProfilerRuntime* profiler_; // Instrumentation location management
-
-  public:
-    /*
-     * Creates instrumentation which writes information out the the specified
-     * profiler's stack and constituent fields.
-     */
-    explicit GeckoProfilerInstrumentation(GeckoProfilerRuntime* profiler) : profiler_(profiler) {}
-
-    /* Small proxies around GeckoProfiler */
-    bool enabled() { return profiler_ && profiler_->enabled(); }
-    GeckoProfilerRuntime* profiler() { MOZ_ASSERT(enabled()); return profiler_; }
-    void disable() { profiler_ = nullptr; }
+ private:
+  GeckoProfilerThread* profiler;
+  mozilla::DebugOnly<uint32_t> spBefore_;
 };
 
 } /* namespace js */

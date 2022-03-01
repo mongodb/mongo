@@ -1,0 +1,183 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: mk_mk_Latn_BGN.txt
+# Generated from CLDR
+#
+
+#
+########################################################################
+# BGN/PCGN 1981 System
+#
+# Macedonian was official established as a literary language in
+# Yugoslavia during World War II and is now the official language
+# of Macedonia. Its alphabet is identical to Serbian, except
+# that the letters Ђђ and Ћћ are replaced by Ѓѓ and Ќќ, and
+# the letter Ѕѕ and the apostrophe are added.
+#
+# The Macedonian Alphabet as defined by the BGN (Page 69):
+#
+#   АБВГДЃЕЖЗЅИЈКЛЉМНЊОПРСТЌУФХЦЧЏШ
+#   абвгдѓежзѕијклљмнњопрстќуфхцчџш’
+#
+# Originally prepared by Michael Everson <everson@evertype.com>
+########################################################################
+#
+# MINIMAL FILTER: Macedonian-Latin
+#
+:: [АБВГДЃЕЖЗЅИЈКЛЉМНЊОПРСТЌУФХЦЧЏШабвгдѓежзѕијклљмнњопрстќуфхцчџш’] ;
+:: NFD (NFC) ;
+#
+#
+########################################################################
+#
+########################################################################
+#
+# Define All Transformation Variables
+#
+########################################################################
+#
+$prime  = ’ ;
+$upperConsonants = [БВГДЃЖЗЅЈКЛЉМНЊПРСТЌФХЦЧЏШ] ;
+$lowerConsonants = [бвгдѓжзѕјклљмнњпрстќфхцчџш’] ;
+$consonants = [$upperConsonants $lowerConsonants] ;
+$upperVowels = [АЕИОУ] ;
+$lowerVowels = [аеиоу] ;
+$vowels = [$upperVowels $lowerVowels] ;
+$lower = [$lowerConsonants $lowerVowels] ;
+#
+#
+# Use this $wordBoundary until bug 2034 is fixed in ICU:
+# http://bugs.icu-project.org/cgi-bin/icu-bugs/transliterate?id=2034;expression=boundary;user=guest
+#
+$wordBoundary =  [^[:L:][:M:][:N:]] ;
+#
+#
+########################################################################
+#
+########################################################################
+#
+# Start of Alphabetic Transformations
+#
+########################################################################
+#
+А → A ; # CYRILLIC CAPITAL LETTER A
+а → a ; # CYRILLIC SMALL LETTER A
+Б → B ; # CYRILLIC CAPITAL LETTER BE
+б → b ; # CYRILLIC SMALL LETTER BE
+В → V ; # CYRILLIC CAPITAL LETTER VE
+в → v ; # CYRILLIC SMALL LETTER VE
+Г → G ; # CYRILLIC CAPITAL LETTER GHE
+г → g ; # CYRILLIC SMALL LETTER GHE
+Д → D ; # CYRILLIC CAPITAL LETTER DE
+д → d ; # CYRILLIC SMALL LETTER DE
+#
+#
+########################################################################
+#
+# BGN Page 70 Rule 1:
+#
+# The character ѓ should be romanized g when it occurs before е
+# and и. In all other instances, it should be romanized đ (Đ).
+#
+########################################################################
+#
+Ѓ}[ЕеИи] → G ; # CYRILLIC CAPITAL LETTER GJE
+ѓ}[ЕеИи] → g ; # CYRILLIC SMALL LETTER GJE
+Ѓ → Đ ; # CYRILLIC CAPITAL LETTER GJE
+ѓ → đ ; # CYRILLIC SMALL LETTER GJE
+#
+#
+########################################################################
+#
+# End Rule 1
+#
+########################################################################
+#
+Е → E ; # CYRILLIC CAPITAL LETTER DE
+е → e ; # CYRILLIC SMALL LETTER DE
+Ж → Ž ; # CYRILLIC CAPITAL LETTER ZHE
+ж → ž ; # CYRILLIC SMALL LETTER ZHE
+З → Z ; # CYRILLIC CAPITAL LETTER ZE
+з → z ; # CYRILLIC SMALL LETTER ZE
+Ѕ} $lower → Dz ; # CYRILLIC CAPITAL LETTER DZE
+Ѕ → DZ ; # CYRILLIC CAPITAL LETTER DZE
+ѕ → dz ; # CYRILLIC SMALL LETTER DZE
+И → I ; # CYRILLIC CAPITAL LETTER I
+и → i ; # CYRILLIC SMALL LETTER I
+Ј → J ; # CYRILLIC CAPITAL LETTER JE
+ј → j ; # CYRILLIC SMALL LETTER JE
+К → K ; # CYRILLIC CAPITAL LETTER KA
+к → k ; # CYRILLIC SMALL LETTER KA
+Л → L ; # CYRILLIC CAPITAL LETTER EL
+л → l ; # CYRILLIC SMALL LETTER EL
+Љ} $lower → Lj ; # CYRILLIC CAPITAL LETTER LJE
+Љ → LJ ; # CYRILLIC CAPITAL LETTER LJE
+љ → lj ; # CYRILLIC SMALL LETTER LJE
+М → M ; # CYRILLIC CAPITAL LETTER EM
+м → m ; # CYRILLIC SMALL LETTER EM
+Н → N ; # CYRILLIC CAPITAL LETTER EN
+н → n ; # CYRILLIC SMALL LETTER EN
+Њ} $lower → Nj ; # CYRILLIC CAPITAL LETTER NJE
+Њ → NJ ; # CYRILLIC CAPITAL LETTER NJE
+њ → nj ; # CYRILLIC SMALL LETTER NJE
+О → O ; # CYRILLIC CAPITAL LETTER O
+о → o ; # CYRILLIC SMALL LETTER O
+П → P ; # CYRILLIC CAPITAL LETTER PE
+п → p ; # CYRILLIC SMALL LETTER PE
+Р → R ; # CYRILLIC CAPITAL LETTER ER
+р → r ; # CYRILLIC SMALL LETTER ER
+С → S ; # CYRILLIC CAPITAL LETTER ES
+с → s ; # CYRILLIC SMALL LETTER ES
+Т → T ; # CYRILLIC CAPITAL LETTER TE
+т → t ; # CYRILLIC SMALL LETTER TE
+#
+#
+########################################################################
+#
+# BGN Page 70 Rule 2:
+#
+# The character ќ should be romanized k when it occurs before е
+# and и. In all other instances, it should be romanized c\u0301.
+#
+########################################################################
+#
+Ќ}[ЕеИи] → K ; # CYRILLIC CAPITAL LETTER KJE
+ќ}[ЕеИи] → k ; # CYRILLIC SMALL LETTER KJE
+Ќ → C\u0301 ; # CYRILLIC CAPITAL LETTER KJE
+ќ → c\u0301 ; # CYRILLIC SMALL LETTER KJE
+#
+#
+########################################################################
+#
+# End Rule 2
+#
+########################################################################
+#
+У → U ; # CYRILLIC CAPITAL LETTER U
+у → u ; # CYRILLIC SMALL LETTER U
+Ф → F ; # CYRILLIC CAPITAL LETTER EF
+ф → f ; # CYRILLIC SMALL LETTER EF
+Х → H ; # CYRILLIC CAPITAL LETTER HA
+х → h ; # CYRILLIC SMALL LETTER HA
+Ц → C ; # CYRILLIC CAPITAL LETTER TSE
+ц → c ; # CYRILLIC SMALL LETTER TSE
+Ч → Č ; # CYRILLIC CAPITAL LETTER CHE
+ч → č ; # CYRILLIC SMALL LETTER CHE
+Џ} $lower → Dž ; # CYRILLIC CAPITAL LETTER SHA
+Џ → DŽ ; # CYRILLIC CAPITAL LETTER SHA
+џ → dž ; # CYRILLIC SMALL LETTER SHA
+Ш → Š ; # CYRILLIC CAPITAL LETTER SHA
+ш → š ; # CYRILLIC SMALL LETTER SHA
+#
+#
+########################################################################
+#
+# BGN Page 69 Rule 32, maps the symbol onto itself and
+# is ignored here for computational efficiency.
+#
+# $prime → $prime ; # RIGHT SINGLE QUOTATION MARK
+#
+########################################################################
+

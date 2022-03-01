@@ -1,0 +1,61 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sat{
+    zoneStrings{
+        "Etc:UTC"{
+            ls{"ᱠᱚᱨᱰᱤᱱᱮᱴᱮᱰ ᱭᱩᱱᱤᱣᱟᱨᱥᱟᱞ ᱚᱠᱛᱚ"}
+        }
+        "Etc:Unknown"{
+            ec{"ᱵᱟᱝ ᱪᱤᱱᱦᱟᱹᱣ ᱵᱟᱡᱟᱨ"}
+        }
+        "meta:America_Central"{
+            ld{"ᱛᱟᱱᱟᱞᱟ ᱥᱤᱧᱟᱜ ᱚᱠᱛᱚ"}
+            lg{"ᱛᱟᱱᱟᱞᱟ ᱚᱠᱛᱚ"}
+            ls{"ᱛᱟᱱᱟᱞᱟ ᱮᱥᱴᱮᱱᱰᱟᱨᱰ ᱚᱠᱛᱚ"}
+        }
+        "meta:America_Eastern"{
+            ld{"ᱤᱥᱴᱟᱨᱱ ᱥᱤᱧᱟᱜ ᱵᱚᱠᱛᱚ"}
+            lg{"ᱤᱥᱴᱟᱨᱱ ᱚᱠᱛᱚ"}
+            ls{"ᱤᱥᱴᱟᱨᱱ ᱮᱥᱴᱮᱱᱰᱟᱨᱰ ᱚᱠᱛᱚ"}
+        }
+        "meta:America_Mountain"{
+            ld{"ᱢᱟᱩᱱᱴᱮᱱ ᱥᱤᱧᱟᱜ ᱚᱠᱛᱚ"}
+            lg{"ᱢᱟᱩᱱᱴᱮᱱ ᱚᱠᱛᱚ"}
+            ls{"ᱢᱟᱩᱱᱴᱮᱱ ᱮᱥᱴᱮᱱᱰᱟᱨᱰ ᱚᱠᱛᱚ"}
+        }
+        "meta:America_Pacific"{
+            ld{"ᱯᱮᱥᱤᱯᱷᱤᱠ ᱥᱤᱧᱟᱜ ᱚᱠᱛᱚ"}
+            lg{"ᱯᱮᱥᱤᱯᱷᱤᱠ ᱚᱠᱛᱚ"}
+            ls{"ᱯᱮᱥᱤᱯᱷᱤᱠ ᱮᱥᱴᱮᱱᱰᱟᱨᱰ ᱚᱠᱛᱚ"}
+        }
+        "meta:Atlantic"{
+            ld{"ᱮᱴᱞᱟᱱᱴᱤᱠ ᱥᱤᱧᱟᱜ ᱚᱠᱛᱚ"}
+            lg{"ᱮᱴᱞᱟᱱᱴᱤᱠ ᱚᱠᱛᱚ"}
+            ls{"ᱮᱴᱞᱟᱱᱴᱤᱠ ᱮᱥᱴᱮᱱᱰᱟᱨᱰ ᱚᱠᱛᱚ"}
+        }
+        "meta:Europe_Central"{
+            ld{"ᱥᱮᱱᱴᱨᱟᱞ ᱩᱨᱚᱯᱤᱭᱟᱱ ᱥᱟᱢᱟᱨ ᱚᱠᱛᱚ"}
+            lg{"ᱥᱮᱱᱴᱨᱟᱞ ᱩᱨᱚᱯᱤᱭᱟᱱ ᱚᱠᱛᱚ"}
+            ls{"ᱥᱮᱱᱴᱨᱟᱞ ᱩᱨᱚᱯᱤᱭᱟᱱ ᱮᱥᱴᱮᱱᱰᱟᱨᱰ ᱚᱠᱛᱚ"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"ᱤᱥᱴᱟᱨᱱ ᱩᱨᱚᱯᱤᱭᱟᱱ ᱥᱟᱢᱟᱨ ᱚᱠᱛᱚ"}
+            lg{"ᱤᱥᱴᱟᱨᱱ ᱩᱨᱚᱯᱤᱭᱟᱱ ᱚᱠᱛᱚ"}
+            ls{"ᱤᱥᱴᱟᱨᱱ ᱩᱨᱚᱯᱤᱭᱟᱱ ᱮᱥᱴᱮᱱᱰᱟᱨᱰ ᱚᱠᱛᱚ"}
+        }
+        "meta:Europe_Western"{
+            ld{"ᱣᱮᱥᱴᱟᱨᱱ ᱩᱨᱚᱯᱤᱭᱟᱱ ᱥᱟᱢᱟᱨ ᱚᱠᱛᱚ"}
+            lg{"ᱣᱮᱥᱴᱟᱨᱱ ᱩᱨᱚᱯᱤᱭᱟᱱ ᱚᱠᱛᱚ"}
+            ls{"ᱣᱮᱥᱴᱟᱨᱱ ᱩᱨᱚᱯᱤᱭᱟᱱ ᱮᱥᱴᱮᱱᱰᱟᱨᱰ ᱚᱠᱛᱚ"}
+        }
+        "meta:GMT"{
+            ls{"ᱜᱨᱤᱱᱣᱤᱪ ᱢᱤᱱ ᱚᱠᱛᱚ"}
+        }
+        gmtFormat{"ᱡᱤᱮᱢᱴᱤ{0}"}
+        gmtZeroFormat{"ᱡᱤᱮᱢᱴᱤ"}
+        regionFormat{"{0} ᱚᱠᱛᱚ"}
+        regionFormatDaylight{"{0} ᱫᱤᱱᱵᱮᱲᱟ ᱚᱠᱛᱚ"}
+        regionFormatStandard{"{0} ᱮᱴᱮᱱᱰᱟᱨᱰ ᱚᱠᱛᱚ"}
+    }
+}

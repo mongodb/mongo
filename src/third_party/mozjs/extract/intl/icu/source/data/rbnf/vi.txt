@@ -1,0 +1,63 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+vi{
+    RBNFRules{
+        OrdinalRules{
+            "%digits-ordinal:",
+            "-x: \u2212>>;",
+            "0: th\u1EE9 =#,##0=;",
+        }
+        SpelloutRules{
+            "%spellout-numbering-year:",
+            "x.x: =0.0=;",
+            "0: =%spellout-numbering=;",
+            "%spellout-numbering:",
+            "0: =%spellout-cardinal=;",
+            "%%teen:",
+            "0: =%spellout-cardinal=;",
+            "5: l\u0103m;",
+            "6: =%spellout-cardinal=;",
+            "%%x-ty:",
+            "0: =%spellout-cardinal=;",
+            "1: m\u1ED1t;",
+            "2: =%%teen=;",
+            "4: t\u01B0;",
+            "5: =%%teen=;",
+            "%%after-hundred:",
+            "0: l\u1EBB =%spellout-cardinal=;",
+            "10: =%spellout-cardinal=;",
+            "%%after-thousand-or-more:",
+            "0: kh\u00F4ng tr\u0103m =%%after-hundred=;",
+            "100: =%spellout-cardinal=;",
+            "%spellout-cardinal:",
+            "-x: \u00E2m >>;",
+            "x.x: << ph\u1EA9y >>;",
+            "0: kh\u00F4ng;",
+            "1: m\u1ED9t;",
+            "2: hai;",
+            "3: ba;",
+            "4: b\u1ED1n;",
+            "5: n\u0103m;",
+            "6: s\u00E1u;",
+            "7: b\u1EA3y;",
+            "8: t\u00E1m;",
+            "9: ch\u00EDn;",
+            "10: m\u01B0\u1EDDi[ >%%teen>];",
+            "20: << m\u01B0\u01A1i[ >%%x-ty>];",
+            "100: << tr\u0103m[ >%%after-hundred>];",
+            "1000: << ngh\u00ECn[ >%%after-thousand-or-more>];",
+            "1000000: << tri\u1EC7u[ >%%after-hundred>];",
+            "1000000000: << t\u1EF7[ >%%after-hundred>];",
+            "1000000000000000000: =#,##0=;",
+            "%spellout-ordinal:",
+            "x.x: =#,##0.#=;",
+            "0: th\u1EE9 =%spellout-cardinal=;",
+            "1: th\u1EE9 nh\u1EA5t;",
+            "2: th\u1EE9 nh\u00EC;",
+            "3: th\u1EE9 =%spellout-cardinal=;",
+            "4: th\u1EE9 t\u01B0;",
+            "5: th\u1EE9 =%spellout-cardinal=;",
+        }
+    }
+}

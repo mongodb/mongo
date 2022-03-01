@@ -1,0 +1,43 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: yo_yo_BJ.txt
+# Generated from CLDR
+#
+
+#
+########################################################################
+#
+# Latin Characters that must be changed:
+#
+#   ẸỌṢ
+#   ẹọṣ
+#
+# Originally prepared by Jonathan Lai ( jali01@ca.ibm.com )
+########################################################################
+#
+# MINIMAL FILTER: yo-yo-BJ
+#
+:: [ẸỌṢẹọṣ] ;
+:: NFC ;
+#
+#
+########################################################################
+#
+########################################################################
+#
+# Start of Alphabetic Transformations
+#
+########################################################################
+#
+Ẹ→Ɛ;# LATIN CAPITAL LETTER E WITH DOT BELOW
+ẹ→ɛ;# LATIN SMALL LETTER E WITH DOT BELOW
+Ọ→Ɔ ;# LATIN CAPITAL LETTER O WITH DOT BELOW
+ọ→ɔ;# LATIN SMALL LETTER O WITH DOT BELOW
+Ṣ→Sh;# LATIN CAPITAL LETTER S WITH DOT BELOW
+ṣ→sh;# LATIN SMALL LETTER S WITH DOT BELOW
+#
+#
+########################################################################
+

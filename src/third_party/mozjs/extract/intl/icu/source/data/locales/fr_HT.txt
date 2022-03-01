@@ -1,0 +1,93 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+fr_HT{
+    calendar{
+        gregorian{
+            dayPeriod{
+                format{
+                    wide{
+                        afternoon1{"de l’après-midi"}
+                        evening1{"du soir"}
+                        midnight{"minuit"}
+                        morning1{"du matin"}
+                        night1{"de la nuit"}
+                        noon{"midi"}
+                    }
+                }
+            }
+        }
+    }
+    fields{
+        day-narrow{
+            dn{"jr."}
+        }
+        day-short{
+            dn{"jr."}
+        }
+        fri-narrow{
+            relative{
+                "-1"{"ven dernier"}
+                "0"{"ce ven"}
+                "1"{"ven prochain"}
+            }
+        }
+        hour-narrow{
+            dn{"hr"}
+        }
+        hour-short{
+            dn{"hr"}
+        }
+        minute-narrow{
+            dn{"min."}
+        }
+        minute-short{
+            dn{"min."}
+        }
+        mon-narrow{
+            relative{
+                "-1"{"lun dernier"}
+                "0"{"ce lun"}
+                "1"{"lun prochain"}
+            }
+        }
+        sat-narrow{
+            relative{
+                "-1"{"sam dernier"}
+                "0"{"ce sam"}
+                "1"{"sam prochain"}
+            }
+        }
+        second-narrow{
+            dn{"sec."}
+        }
+        sun-narrow{
+            relative{
+                "-1"{"dim dernier"}
+                "0"{"ce dim"}
+                "1"{"dim prochain"}
+            }
+        }
+        thu-narrow{
+            relative{
+                "-1"{"jeu dernier"}
+                "0"{"ce jeu"}
+                "1"{"jeu prochain"}
+            }
+        }
+        tue-narrow{
+            relative{
+                "-1"{"mar dernier"}
+                "0"{"ce mar"}
+                "1"{"mar prochain"}
+            }
+        }
+        wed-narrow{
+            relative{
+                "-1"{"mer dernier"}
+                "0"{"ce mer"}
+                "1"{"mer prochain"}
+            }
+        }
+    }
+}

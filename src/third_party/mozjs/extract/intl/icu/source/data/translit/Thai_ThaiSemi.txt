@@ -1,0 +1,13 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Thai_ThaiSemi.txt
+# Generated from CLDR
+#
+
+# The rules that convert space into semicolon are in this file;
+# since they have to come BEFORE the break iterator.
+$thai = [[:thai:] ก-\u0E3Aเ-๛] ;
+$thai { ' ' } $thai → '; ' ;
+

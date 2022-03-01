@@ -43,12 +43,11 @@ namespace vixl {
 // immediate field is used to identify the type of debug pseudo instruction.
 
 enum DebugHltOpcodes {
-  kUnreachableOpcode = 0xdeb0,
   kPrintfOpcode,
   kTraceOpcode,
   kLogOpcode,
   // Aliases.
-  kDebugHltFirstOpcode = kUnreachableOpcode,
+  kDebugHltFirstOpcode = kPrintfOpcode,
   kDebugHltLastOpcode = kLogOpcode
 };
 

@@ -24,6 +24,10 @@ double	asin(double);
 double	atan(double);
 double	atan2(double, double);
 
+double	cos(double);
+double	sin(double);
+double	tan(double);
+
 double	cosh(double);
 double	sinh(double);
 double	tanh(double);
@@ -33,7 +37,6 @@ double	log(double);
 double	log10(double);
 
 double	pow(double, double);
-double	sqrt(double);
 double	fabs(double);
 
 double	floor(double);

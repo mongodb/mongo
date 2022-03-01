@@ -1,0 +1,27 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+jgo{
+    Currencies{
+        CAD{
+            "CA$",
+            "Ndɔ́la-Kanandâ",
+        }
+        EUR{
+            "€",
+            "Ʉ́lɔ",
+        }
+        USD{
+            "US$",
+            "Ndɔ́la-Amɛlîk",
+        }
+        XAF{
+            "FCFA",
+            "Fɛlâŋ",
+        }
+        XXX{
+            "¤",
+            "ntɛ-ŋkáp yi pɛ́ ká kɛ́ jínɛ",
+        }
+    }
+}

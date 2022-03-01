@@ -1,0 +1,82 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+mi{
+    Currencies{
+        BRL{
+            "R$",
+            "Real Parahi",
+        }
+        CNY{
+            "CN¥",
+            "Yuan Haina",
+        }
+        EUR{
+            "€",
+            "Euro",
+        }
+        GBP{
+            "£",
+            "Pāuna Piritene",
+        }
+        INR{
+            "₹",
+            "Rupī Iniana",
+        }
+        JPY{
+            "¥",
+            "Yen Hapanihi",
+        }
+        NZD{
+            "$",
+            "Tāra o Aotearoa",
+        }
+        RUB{
+            "RUB",
+            "Rūpera Ruhiana",
+        }
+        USD{
+            "US$",
+            "Tāra US",
+        }
+        XXX{
+            "¤",
+            "Moni Tē Mōhiotia",
+        }
+    }
+    CurrencyPlurals{
+        BRL{
+            other{"real Parahi"}
+        }
+        CNY{
+            other{"yuan Haina"}
+        }
+        EUR{
+            other{"euro"}
+        }
+        GBP{
+            other{"pāuna Piritene"}
+        }
+        INR{
+            other{"rupī Iniana"}
+        }
+        JPY{
+            other{"yen Hapanihi"}
+        }
+        NZD{
+            other{"tāra o Aotearoa"}
+        }
+        RUB{
+            other{"rūpera Ruhiana"}
+        }
+        USD{
+            other{"tāra US"}
+        }
+        XXX{
+            other{"(moni tē mōhiotia)"}
+        }
+    }
+    CurrencyUnitPatterns{
+        other{"{0} {1}"}
+    }
+}

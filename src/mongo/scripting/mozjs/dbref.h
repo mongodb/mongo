@@ -56,9 +56,9 @@ struct DBRefInfo : public BaseInfo {
                             JS::ObjectOpResult& result);
     static void enumerate(JSContext* cx,
                           JS::HandleObject obj,
-                          JS::AutoIdVector& properties,
+                          JS::MutableHandleIdVector properties,
                           bool enumerableOnly);
-    static void finalize(js::FreeOp* fop, JSObject* obj);
+    static void finalize(JSFreeOp* fop, JSObject* obj);
     static void resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* resolvedp);
     static void setProperty(JSContext* cx,
                             JS::HandleObject obj,

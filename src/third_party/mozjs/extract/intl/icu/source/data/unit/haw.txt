@@ -1,0 +1,49 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+haw{
+    units{
+        duration{
+            day{
+                one{"{0} lā"}
+                other{"{0} lā"}
+            }
+            hour{
+                one{"{0} hola"}
+                other{"{0} hola"}
+            }
+            minute{
+                one{"{0} minuke"}
+                other{"{0} minuke"}
+            }
+            month{
+                one{"{0} mahina"}
+                other{"{0} mahina"}
+            }
+            second{
+                one{"{0} kekona"}
+                other{"{0} kekona"}
+            }
+            week{
+                one{"{0} pule"}
+                other{"{0} pule"}
+            }
+            year{
+                one{"{0} makahiki"}
+                other{"{0} makahiki"}
+            }
+        }
+    }
+    unitsNarrow{
+        temperature{
+            celsius{
+                one{"{0}°C"}
+                other{"{0}°C"}
+            }
+            fahrenheit{
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+        }
+    }
+}

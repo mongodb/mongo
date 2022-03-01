@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  *
  * Copyright 2016 Mozilla Foundation
  *
@@ -24,53 +24,74 @@
 namespace js {
 namespace wasm {
 
-// Return whether BaselineCompileFunction can generate code on the current device.
-// Note: asm.js is also currently not supported due to Atomics and SIMD.
-bool
-BaselineCanCompile();
+// Return whether BaselineCompileFunction can generate code on the current
+// device.  Usually you do *not* want to call this, you want
+// BaselineAvailable().
+[[nodiscard]] bool BaselinePlatformSupport();
 
 // Generate adequate code quickly.
-MOZ_MUST_USE bool
-BaselineCompileFunctions(const ModuleEnvironment& env, LifoAlloc& lifo,
-                         const FuncCompileInputVector& inputs, CompiledCode* code,
-                         UniqueChars* error);
+[[nodiscard]] bool BaselineCompileFunctions(
+    const ModuleEnvironment& moduleEnv, const CompilerEnvironment& compilerEnv,
+    LifoAlloc& lifo, const FuncCompileInputVector& inputs, CompiledCode* code,
+    UniqueChars* error);
 
-class BaseLocalIter
-{
-  private:
-    using ConstValTypeRange = mozilla::Range<const ValType>;
+class BaseLocalIter {
+ private:
+  using ConstValTypeRange = mozilla::Range<const ValType>;
 
-    const ValTypeVector&               locals_;
-    size_t                             argsLength_;
-    ConstValTypeRange                  argsRange_; // range struct cache for ABIArgIter
-    jit::ABIArgIter<ConstValTypeRange> argsIter_;
-    size_t                             index_;
-    int32_t                            localSize_;
-    int32_t                            reservedSize_;
-    int32_t                            frameOffset_;
-    jit::MIRType                       mirType_;
-    bool                               done_;
+  const ValTypeVector& locals_;
+  const ArgTypeVector& args_;
+  jit::WasmABIArgIter<ArgTypeVector> argsIter_;
+  size_t index_;
+  int32_t frameSize_;
+  int32_t nextFrameSize_;
+  int32_t frameOffset_;
+  int32_t stackResultPointerOffset_;
+  jit::MIRType mirType_;
+  bool done_;
 
-    void settle();
-    int32_t pushLocal(size_t nbytes);
+  void settle();
+  int32_t pushLocal(size_t nbytes);
 
-  public:
-    BaseLocalIter(const ValTypeVector& locals, size_t argsLength, bool debugEnabled);
-    void operator++(int);
-    bool done() const { return done_; }
+ public:
+  BaseLocalIter(const ValTypeVector& locals, const ArgTypeVector& args,
+                bool debugEnabled);
+  void operator++(int);
+  bool done() const { return done_; }
 
-    jit::MIRType mirType() const { MOZ_ASSERT(!done_); return mirType_; }
-    int32_t frameOffset() const { MOZ_ASSERT(!done_); return frameOffset_; }
-    size_t index() const { MOZ_ASSERT(!done_); return index_; }
-    int32_t currentLocalSize() const { return localSize_; }
-    int32_t reservedSize() const { return reservedSize_; }
+  jit::MIRType mirType() const {
+    MOZ_ASSERT(!done_);
+    return mirType_;
+  }
+  int32_t frameOffset() const {
+    MOZ_ASSERT(!done_);
+    MOZ_ASSERT(frameOffset_ != INT32_MAX);
+    return frameOffset_;
+  }
+  size_t index() const {
+    MOZ_ASSERT(!done_);
+    return index_;
+  }
+  // The size in bytes taken up by the previous `index_` locals, also including
+  // fixed allocations like the DebugFrame and "hidden" locals like a spilled
+  // stack results pointer.
+  int32_t frameSize() const { return frameSize_; }
+
+  int32_t stackResultPointerOffset() const {
+    MOZ_ASSERT(args_.hasSyntheticStackResultPointerArg());
+    MOZ_ASSERT(stackResultPointerOffset_ != INT32_MAX);
+    return stackResultPointerOffset_;
+  }
 
 #ifdef DEBUG
-    bool isArg() const { MOZ_ASSERT(!done_); return !argsIter_.done(); }
+  bool isArg() const {
+    MOZ_ASSERT(!done_);
+    return !argsIter_.done();
+  }
 #endif
 };
 
-} // namespace wasm
-} // namespace js
+}  // namespace wasm
+}  // namespace js
 
-#endif // asmjs_wasm_baseline_compile_h
+#endif  // asmjs_wasm_baseline_compile_h

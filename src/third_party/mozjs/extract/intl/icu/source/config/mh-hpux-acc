@@ -1,0 +1,138 @@
+## -*-makefile-*-
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+## HP/UX-specific setup using aCC
+## Copyright (c) 1999-2012, International Business Machines Corporation and
+## others. All Rights Reserved.
+
+## Commands to generate dependency files
+GEN_DEPS.c=	:
+GEN_DEPS.cc= 	:
+
+## Flags for position independent code
+SHAREDLIBCFLAGS = +Z
+SHAREDLIBCXXFLAGS = +Z
+
+## Additional flags when building libraries with threads
+## We use this instead of -mt, which isn't available in all versions of aCC
+## Our tools won't compile with -D_POSIX_C_SOURCE=199506L
+THREADSCPPFLAGS = -D_REENTRANT -D_THREAD_SAFE
+
+# Use Extended ANSI mode, which is useful for 64-bit numbers
+# +W ignores some warnings
+#    740 Unsafe cast between pointers/references to incomplete classes...
+#    749 This operation is non-portable and potentially unsafe.
+#        (Ironically the solution to fix this warning is non-portable)
+#    823 Redundant preprocessing concatenation operation results in two valid
+#        preprocessing tokens. This comes from INT64_C in <inttypes.h>
+#   4232 conversion to a more strictly aligned type may cause misaligned access.
+CFLAGS += -Ae +Olit=all
+CXXFLAGS += -AA -Wc,-ansi_for_scope,on +W740 +W749 +W823 +W4232
+
+ifeq ($(UCLN_NO_AUTO_CLEANUP),0)
+# set up init point.
+UCLN_FINI =  ucln_fini$(TARGET_STUBNAME)_$(SO_TARGET_VERSION_MAJOR)$(ICULIBSUFFIXCNAME)
+CPPFLAGS_FINI = -DUCLN_FINI=$(UCLN_FINI)
+LDFLAGS_FINI = -Wl,+fini,$(UCLN_FINI)
+
+CPPFLAGSICUUC += $(CPPFLAGS_FINI)
+LDFLAGSICUUC += $(LDFLAGS_FINI)
+CPPFLAGSICUIO += $(CPPFLAGS_FINI)
+LDFLAGSICUIO += $(LDFLAGS_FINI)
+CPPFLAGSICUI18N += $(CPPFLAGS_FINI)
+LDFLAGSICUI18N += $(LDFLAGS_FINI)
+CPPFLAGSCTESTFW += $(CPPFLAGS_FINI)
+LDFLAGSCTESTFW += $(LDFLAGS_FINI)
+
+# ICUUC, ICUIO, ICUI18N, CTESTFW
+endif
+
+# -Bhidden_def Hides all symbols defined in the module.
+#LIBCFLAGS = -Bhidden_def
+#LIBCXXFLAGS = -Bhidden_def
+
+## Commands to compile
+COMPILE.c=	$(CC) $(DEFS) $(CPPFLAGS) $(CFLAGS) -c
+COMPILE.cc=	$(CXX) $(DEFS) $(CPPFLAGS) $(CXXFLAGS) -c
+
+## Common 'default' path to ensure the sanity of users.  Search the current
+## directory, at least.
+LD_DEFAULTPATH= -Wl,+b,'$$'ORIGIN/
+
+# Use SHLIB_PATH and LD_LIBRARY_PATH to locate shared libraries
+LDFLAGS += -Wl,+s $(LD_DEFAULTPATH)
+
+## Commands to link
+## For aCC, use the C++ linker so that __shlinit gets defined
+LINK.c=		$(CXX) $(CXXFLAGS) $(LDFLAGS)
+LINK.cc=	$(CXX) $(CXXFLAGS) $(LDFLAGS)
+
+## Shared library options
+## HPUX PA-risc does not recognize -Bprotected_def aC++ option.
+## Use linker option -Wl,-B,symbolic instead.
+ifeq ($(shell uname -m),ia64)
+LD_SOOPTIONS= -Bprotected_def
+else
+LD_SOOPTIONS= -Wl,-B,symbolic
+endif
+
+## Commands to make a shared library
+#SHLIB.c=	$(LD) $(LDFLAGS) -b
+SHLIB.c=	$(CXX) $(CXXFLAGS) $(LDFLAGS) -b $(LD_SOOPTIONS)
+SHLIB.cc=	$(CXX) $(CXXFLAGS) $(LDFLAGS) -b $(LD_SOOPTIONS)
+
+## Compiler switch to embed a runtime search path
+LD_RPATH=	-Wl,+b,
+LD_RPATH_PRE= 	
+
+## Environment variable to set a runtime search path
+LDLIBRARYPATH_ENVVAR = SHLIB_PATH
+
+## Compiler switch to embed a library name
+LD_SONAME = -Wl,+h,$(notdir $(MIDDLE_SO_TARGET))
+
+## The type of assembly needed when pkgdata is used for generating shared libraries.
+# Commented out for now because the hp1 test machine runs out of memory.
+#GENCCODE_ASSEMBLY=-a aCC-parisc
+
+## Shared object suffix
+SO=		sl
+## Non-shared intermediate object suffix
+STATIC_O = o
+
+## Compilation rules
+%.$(STATIC_O): $(srcdir)/%.c
+	$(COMPILE.c) $(STATICCPPFLAGS) $(STATICCFLAGS) -o $@ $<
+%.o: $(srcdir)/%.c
+	$(COMPILE.c) $(DYNAMICCPPFLAGS) $(DYNAMICCFLAGS) -o $@ $<
+
+%.$(STATIC_O): $(srcdir)/%.cpp
+	$(COMPILE.cc) $(STATICCPPFLAGS) $(STATICCXXFLAGS) -o $@ $<
+%.o: $(srcdir)/%.cpp
+	$(COMPILE.cc) $(DYNAMICCPPFLAGS) $(DYNAMICCXXFLAGS) -o $@ $<
+
+
+## Dependency rules
+%.d : $(srcdir)/%.c
+	@echo "generating dependency information for $<"
+	@$(GEN_DEPS.c) $< > $@
+
+%.d : $(srcdir)/%.cpp
+	@echo "generating dependency information for $<"
+	@$(GEN_DEPS.cc) $< > $@
+
+## Versioned libraries rules
+
+%.$(SO).$(SO_TARGET_VERSION_MAJOR): %.$(SO).$(SO_TARGET_VERSION)
+	$(RM) $@ && ln -s ${<F} $@
+%.$(SO): %.$(SO).$(SO_TARGET_VERSION_MAJOR)
+	$(RM) $@ && ln -s ${*F}.$(SO).$(SO_TARGET_VERSION) $@
+
+## Install libraries as executable
+INSTALL-L=$(INSTALL_PROGRAM)
+
+## Remove shared library 's'
+STATIC_PREFIX_WHEN_USED = 
+STATIC_PREFIX = 
+
+## End HP/UX-specific setup

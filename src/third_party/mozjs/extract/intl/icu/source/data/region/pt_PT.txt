@@ -1,0 +1,86 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+pt_PT{
+    Countries{
+        009{"Oceânia"}
+        015{"Norte de África"}
+        018{"África Austral"}
+        029{"Caraíbas"}
+        034{"Ásia do Sul"}
+        039{"Europa do Sul"}
+        154{"Europa do Norte"}
+        202{"África subsariana"}
+        AM{"Arménia"}
+        AX{"Alanda"}
+        BD{"Bangladeche"}
+        BH{"Barém"}
+        BJ{"Benim"}
+        BS{"Baamas"}
+        CC{"Ilhas dos Cocos (Keeling)"}
+        CD{"Congo-Kinshasa"}
+        CG{"Congo-Brazzaville"}
+        CI{"Côte d’Ivoire (Costa do Marfim)"}
+        CW{"Curaçau"}
+        CX{"Ilha do Natal"}
+        CZ{"Chéquia"}
+        DJ{"Jibuti"}
+        DM{"Domínica"}
+        EA{"Ceuta e Melilha"}
+        EE{"Estónia"}
+        EH{"Sara Ocidental"}
+        EZ{"Zona Euro"}
+        FK{"Ilhas Falkland"}
+        GG{"Guernesey"}
+        GL{"Gronelândia"}
+        GU{"Guame"}
+        IR{"Irão"}
+        KE{"Quénia"}
+        KI{"Quiribáti"}
+        KN{"São Cristóvão e Neves"}
+        KW{"Koweit"}
+        KY{"Ilhas Caimão"}
+        LI{"Listenstaine"}
+        LK{"Sri Lanca"}
+        LV{"Letónia"}
+        MC{"Mónaco"}
+        MG{"Madagáscar"}
+        MK{"Macedónia do Norte"}
+        MS{"Monserrate"}
+        MU{"Maurícia"}
+        MW{"Maláui"}
+        NC{"Nova Caledónia"}
+        NU{"Niuê"}
+        PL{"Polónia"}
+        PS{"Territórios palestinianos"}
+        QO{"Oceânia Insular"}
+        RO{"Roménia"}
+        SI{"Eslovénia"}
+        SM{"São Marinho"}
+        SV{"Salvador"}
+        SX{"São Martinho (Sint Maarten)"}
+        TF{"Territórios Austrais Franceses"}
+        TJ{"Tajiquistão"}
+        TK{"Toquelau"}
+        TM{"Turquemenistão"}
+        TT{"Trindade e Tobago"}
+        UM{"Ilhas Menores Afastadas dos EUA"}
+        UZ{"Usbequistão"}
+        VI{"Ilhas Virgens dos EUA"}
+        VN{"Vietname"}
+        XA{"pseudoacentos"}
+        XB{"pseudobidirecional"}
+        YE{"Iémen"}
+        YT{"Maiote"}
+        ZW{"Zimbabué"}
+    }
+    Countries%short{
+        GB{"GB"}
+    }
+    Countries%variant{
+        CG{"República do Congo"}
+        CI{"Costa do Marfim"}
+        CZ{"República Checa"}
+        FK{"Ilhas Falkland (Malvinas)"}
+    }
+}

@@ -1,11 +1,23 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 loadRelativeToScript('utility.js');
 loadRelativeToScript('annotations.js');
 loadRelativeToScript('CFG.js');
 
-var subclasses = new Map(); // Map from csu => set of immediate subclasses
-var superclasses = new Map(); // Map from csu => set of immediate superclasses
-var classFunctions = new Map(); // Map from "csu:name" => set of full method name
+// Map from csu => set of immediate subclasses
+var subclasses = new Map();
 
+// Map from csu => set of immediate superclasses
+var superclasses = new Map();
+
+// Map from "csu.name:nargs" => set of full method name
+var virtualDefinitions = new Map();
+
+// Every virtual method declaration, anywhere.
+//
+//   field : CFG of the field
 var virtualResolutionsSeen = new Set();
 
 // map is a map from names to sets of entries.
@@ -18,10 +30,12 @@ function addToNamedSet(map, name, entry)
 
 function fieldKey(csuName, field)
 {
-    // Note: not dealing with overloading correctly.
+    // This makes a minimal attempt at dealing with overloading: it will not
+    // conflate two virtual methods with differing numbers of arguments. So
+    // far, that is all that has been needed.
     var nargs = 0;
     if (field.Type.Kind == "Function" && "TypeFunctionArguments" in field.Type)
-	nargs = field.Type.TypeFunctionArguments.length;
+        nargs = field.Type.TypeFunctionArguments.Type.length;
     return csuName + ":" + field.Name[0] + ":" + nargs;
 }
 
@@ -38,10 +52,11 @@ function processCSU(csuName, csu)
             addToNamedSet(subclasses, superclass, subclass);
             addToNamedSet(superclasses, subclass, superclass);
         }
+
         if ("Variable" in field) {
             // Note: not dealing with overloading correctly.
             const name = field.Variable.Name[0];
-            addToNamedSet(classFunctions, fieldKey(csuName, field.Field[0]), name);
+            addToNamedSet(virtualDefinitions, fieldKey(csuName, field.Field[0]), name);
         }
     }
 }
@@ -52,8 +67,8 @@ function nearestAncestorMethods(csu, field)
 {
     const key = fieldKey(csu, field);
 
-    if (classFunctions.has(key))
-        return new Set(classFunctions.get(key));
+    if (virtualDefinitions.has(key))
+        return new Set(virtualDefinitions.get(key));
 
     const functions = new Set();
     if (superclasses.has(csu)) {
@@ -64,10 +79,11 @@ function nearestAncestorMethods(csu, field)
     return functions;
 }
 
-// Return [ instantations, suppressed ], where instantiations is a Set of all
+// Return [ instantiations, limits ], where instantiations is a Set of all
 // possible implementations of 'field' given static type 'initialCSU', plus
-// null if arbitrary other implementations are possible, and suppressed is true
-// if we the method is assumed to be non-GC'ing by annotation.
+// null if arbitrary other implementations are possible, and limits gives
+// information about what things are not possible within it (currently, that it
+// cannot GC).
 function findVirtualFunctions(initialCSU, field)
 {
     const fieldName = field.Name[0];
@@ -87,7 +103,7 @@ function findVirtualFunctions(initialCSU, field)
     while (worklist.length) {
         const csu = worklist.pop();
         if (isSuppressedVirtualMethod(csu, fieldName))
-            return [ new Set(), true ];
+            return [ new Set(), LIMIT_CANNOT_GC ];
         if (isOverridableField(initialCSU, csu, fieldName)) {
             // We will still resolve the virtual function call, because it's
             // nice to have as complete a callgraph as possible for other uses.
@@ -113,14 +129,14 @@ function findVirtualFunctions(initialCSU, field)
         const csu = worklist.pop();
         const key = fieldKey(csu, field);
 
-        if (classFunctions.has(key))
-            functions.update(classFunctions.get(key));
+        if (virtualDefinitions.has(key))
+            functions.update(virtualDefinitions.get(key));
 
         if (subclasses.has(csu))
             worklist.push(...subclasses.get(csu));
     }
 
-    return [ functions, false ];
+    return [ functions, LIMIT_NONE ];
 }
 
 // Return a list of all callees that the given edge might be a call to. Each
@@ -141,7 +157,7 @@ function getCallees(edge)
 
     if (callee.Kind == "Int")
         return []; // Intentional crash
-  
+
     assert(callee.Kind == "Drf");
     const called = callee.Exp[0];
     if (called.Kind == "Var") {
@@ -159,15 +175,11 @@ function getCallees(edge)
     const fieldName = field.Name[0];
     const csuName = field.FieldCSU.Type.Name;
     let functions;
+    let limits = LIMIT_NONE;
     if ("FieldInstanceFunction" in field) {
-        let suppressed;
-        [ functions, suppressed ] = findVirtualFunctions(csuName, field, suppressed);
-        if (suppressed) {
-            // Field call known to not GC; mark it as suppressed so direct
-            // invocations will be ignored
-            callees.push({'kind': "field", 'csu': csuName, 'field': fieldName,
-                          'suppressed': true, 'isVirtual': true});
-        }
+        [ functions, limits ] = findVirtualFunctions(csuName, field);
+        callees.push({'kind': "field", 'csu': csuName, 'field': fieldName,
+                      'limits': limits, 'isVirtual': true});
     } else {
         functions = new Set([null]); // field call
     }
@@ -186,11 +198,11 @@ function getCallees(edge)
             // in extensions. Use the isVirtual property so that callers can
             // tell which case holds.
             callees.push({'kind': "field", 'csu': csuName, 'field': fieldName,
+                          'limits': limits,
 			  'isVirtual': "FieldInstanceFunction" in field});
             fullyResolved = false;
         } else {
-            callees.push({'kind': "direct", 'name': name});
-            targets.push({'kind': "direct", 'name': name});
+            targets.push({'kind': "direct", name, limits });
         }
     }
     if (fullyResolved)
@@ -225,10 +237,10 @@ function loadTypesWithCache(type_xdb_filename, cache_filename) {
         const cacheData = deserialize(cb);
         subclasses = cacheData.subclasses;
         superclasses = cacheData.superclasses;
-        classFunctions = cacheData.classFunctions;
+        virtualDefinitions = cacheData.virtualDefinitions;
     } catch (e) {
         loadTypes(type_xdb_filename);
-        const cb = serialize({subclasses, superclasses, classFunctions});
+        const cb = serialize({subclasses, superclasses, virtualDefinitions});
         os.file.writeTypedArrayToFile(cache_filename,
                                       new Uint8Array(cb.arraybuffer));
     }

@@ -31,6 +31,9 @@
 
 #include "mongo/scripting/mozjs/status.h"
 
+#include <js/Object.h>
+#include <js/ValueArray.h>
+
 #include "mongo/scripting/jsexception.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
@@ -45,11 +48,11 @@ const char* const MongoStatusInfo::className = "MongoStatus";
 const char* const MongoStatusInfo::inheritFrom = "Error";
 
 Status MongoStatusInfo::toStatus(JSContext* cx, JS::HandleObject object) {
-    return *static_cast<Status*>(JS_GetPrivate(object));
+    return *static_cast<Status*>(JS::GetPrivate(object));
 }
 
 Status MongoStatusInfo::toStatus(JSContext* cx, JS::HandleValue value) {
-    return *static_cast<Status*>(JS_GetPrivate(value.toObjectOrNull()));
+    return *static_cast<Status*>(JS::GetPrivate(value.toObjectOrNull()));
 }
 
 void MongoStatusInfo::fromStatus(JSContext* cx, Status status, JS::MutableHandleValue value) {
@@ -59,7 +62,7 @@ void MongoStatusInfo::fromStatus(JSContext* cx, Status status, JS::MutableHandle
     JS::RootedValue undef(cx);
     undef.setUndefined();
 
-    JS::AutoValueArray<1> args(cx);
+    JS::RootedValueArray<1> args(cx);
     ValueReader(cx, args[0]).fromStringData(status.reason());
     JS::RootedObject error(cx);
     scope->getProto<ErrorInfo>().newInstance(args, &error);
@@ -86,13 +89,13 @@ void MongoStatusInfo::fromStatus(JSContext* cx, Status status, JS::MutableHandle
         smUtils::wrapConstrainedMethod<Functions::stack, false, MongoStatusInfo>,
         nullptr);
 
-    JS_SetPrivate(thisv, scope->trackedNew<Status>(std::move(status)));
+    JS::SetPrivate(thisv, scope->trackedNew<Status>(std::move(status)));
 
     value.setObjectOrNull(thisv);
 }
 
-void MongoStatusInfo::finalize(js::FreeOp* fop, JSObject* obj) {
-    auto status = static_cast<Status*>(JS_GetPrivate(obj));
+void MongoStatusInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+    auto status = static_cast<Status*>(JS::GetPrivate(obj));
 
     if (status)
         getScope(fop)->trackedDelete(status);
@@ -145,7 +148,7 @@ void MongoStatusInfo::Functions::stack::call(JSContext* cx, JS::CallArgs args) {
 void MongoStatusInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto) {
     auto scope = getScope(cx);
 
-    JS_SetPrivate(
+    JS::SetPrivate(
         proto,
         scope->trackedNew<Status>(Status(ErrorCodes::UnknownError, "Mongo Status Prototype")));
 }

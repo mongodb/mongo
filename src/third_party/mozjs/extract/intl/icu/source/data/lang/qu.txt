@@ -1,0 +1,406 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+qu{
+    Keys{
+        calendar{"Intiwatana"}
+        cf{"Imayna Qullqi kaynin"}
+        collation{"Ñiqinchana"}
+        currency{"qullqi"}
+        hc{"Ciclo de Horas (12 vs 24)"}
+        lb{"Siqi paway kaynin"}
+        ms{"Tupuy Kamay"}
+        numbers{"Yupaykuna"}
+    }
+    Languages{
+        af{"Afrikaans Simi"}
+        agq{"Aghem Simi"}
+        ak{"Akan Simi"}
+        am{"Amarico Simi"}
+        ar{"Arabe Simi"}
+        arn{"Mapuche Simi"}
+        as{"Asames Simi"}
+        asa{"Asu Simi"}
+        ast{"Asturiano Simi"}
+        ay{"Aymara Simi"}
+        az{"Azerbaiyano Simi"}
+        ba{"Baskir Simi"}
+        bas{"Basaa Simi"}
+        be{"Bielorruso Simi"}
+        bem{"Bemba Simi"}
+        bez{"Bena Simi"}
+        bg{"Bulgaro Simi"}
+        bm{"Bambara Simi"}
+        bn{"Bangla Simi"}
+        bo{"Tibetano Simi"}
+        br{"Breton Simi"}
+        brx{"Bodo Simi"}
+        bs{"Bosnio Simi"}
+        ca{"Catalan Simi"}
+        ccp{"Chakma Simi"}
+        ce{"Checheno Simi"}
+        ceb{"Cebuano Simi"}
+        cgg{"Kiga Simi"}
+        chr{"Cheroqui Simi"}
+        ckb{"Chawpi Kurdo Simi"}
+        co{"Corso Simi"}
+        cs{"Checo Simi"}
+        cu{"Eslavo Eclesiástico Simi"}
+        cy{"Gales Simi"}
+        da{"Danes Simi"}
+        dav{"Taita Simi"}
+        de{"Aleman Simi"}
+        dje{"Zarma Simi"}
+        dsb{"Bajo Sorbio Simi"}
+        dua{"Duala Simi"}
+        dv{"Divehi Simi"}
+        dyo{"Jola-Fonyi Simi"}
+        dz{"Butanés Simi"}
+        ebu{"Embu Simi"}
+        ee{"Ewé Simi"}
+        el{"Griego Simi"}
+        en{"Ingles Simi"}
+        eo{"Esperanto Simi"}
+        es{"Español Simi"}
+        es_419{"Español Simi (Latino América)"}
+        et{"Estonio Simi"}
+        eu{"Euskera Simi"}
+        ewo{"Ewondo Simi"}
+        fa{"Persa Simi"}
+        fa_AF{"Dari Simi"}
+        ff{"Fulah Simi"}
+        fi{"Fines Simi"}
+        fil{"Filipino Simi"}
+        fo{"Feroes Simi"}
+        fr{"Frances Simi"}
+        fur{"Friulano Simi"}
+        fy{"Frison Simi"}
+        ga{"Irlandes Simi"}
+        gd{"Gaelico Escoces Simi"}
+        gl{"Gallego Simi"}
+        gsw{"Alsaciano Simi"}
+        gu{"Gujarati Simi"}
+        guz{"Guzí Simi"}
+        gv{"Manés Simi"}
+        ha{"Hausa Simi"}
+        haw{"Hawaiano Simi"}
+        he{"Hebreo Simi"}
+        hi{"Hindi Simi"}
+        hmn{"Hmong Daw Simi"}
+        hr{"Croata Simi"}
+        hsb{"Alto Sorbio Simi"}
+        ht{"Haitiano Criollo Simi"}
+        hu{"Hungaro Simi"}
+        hy{"Armenio Simi"}
+        ia{"Interlingua Simi"}
+        id{"Indonesio Simi"}
+        ig{"Igbo Simi"}
+        ii{"Yi Simi"}
+        is{"Islandes Simi"}
+        it{"Italiano Simi"}
+        iu{"Inuktitut Simi"}
+        ja{"Japones Simi"}
+        jgo{"Ngomba Simi"}
+        jmc{"Machame Simi"}
+        jv{"Javanés Simi"}
+        ka{"Georgiano Simi"}
+        kab{"Cabilio Simi"}
+        kam{"Kamba Simi"}
+        kde{"Makonde Simi"}
+        kea{"Caboverdiano Simi"}
+        khq{"Koyra Chiini Simi"}
+        ki{"Kikuyu Simi"}
+        kk{"Kazajo Simi"}
+        kkj{"Kako Simi"}
+        kl{"Groenlandes Simi"}
+        kln{"Kalenjin Simi"}
+        km{"Khmer Simi"}
+        kn{"Kannada Simi"}
+        ko{"Coreano Simi"}
+        kok{"Konkani Simi"}
+        ks{"Cachemir Simi"}
+        ksb{"Shambala Simi"}
+        ksf{"Bafia Simi"}
+        ksh{"Kölsch Simi"}
+        ku{"Kurdo Simi"}
+        kw{"Córnico Simi"}
+        ky{"Kirghiz Simi"}
+        la{"Latín Simi"}
+        lag{"Langi Simi"}
+        lb{"Luxemburgues Simi"}
+        lg{"Luganda Simi"}
+        lkt{"Lakota Simi"}
+        ln{"Lingala Simi"}
+        lo{"Lao Simi"}
+        lrc{"Luri septentrional Simi"}
+        lt{"Lituano Simi"}
+        lu{"Luba-Katanga Simi"}
+        luo{"Luo Simi"}
+        luy{"Luyia Simi"}
+        lv{"Leton Simi"}
+        mai{"Maithili Simi"}
+        mas{"Masai Simi"}
+        mer{"Meru Simi"}
+        mfe{"Mauriciano Simi"}
+        mg{"Malgache Simi"}
+        mgh{"Makhuwa-Meetto Simi"}
+        mgo{"Metaʼ Simi"}
+        mi{"Maori Simi"}
+        mk{"Macedonio Simi"}
+        ml{"Malayalam Simi"}
+        mn{"Mongol Simi"}
+        mni{"Manipuri Simi"}
+        moh{"Mohawk Simi"}
+        mr{"Marathi Simi"}
+        ms{"Malayo Simi"}
+        mt{"Maltes Simi"}
+        mua{"Mundang Simi"}
+        mul{"Idiomas M´últiples Simi"}
+        my{"Birmano Simi"}
+        mzn{"Mazandaraní Simi"}
+        naq{"Nama Simi"}
+        nb{"Noruego Bokmål Simi"}
+        nd{"Ndebele septentrional Simi"}
+        nds{"Bajo Alemán Simi"}
+        ne{"Nepali Simi"}
+        nl{"Neerlandes Simi"}
+        nl_BE{"Flamenco Simi"}
+        nmg{"Kwasio Ngumba Simi"}
+        nn{"Noruego Nynorsk Simi"}
+        nnh{"Ngiemboon Simi"}
+        no{"Noruego Simi"}
+        nso{"Sesotho Sa Leboa Simi"}
+        nus{"Nuer Simi"}
+        ny{"Nyanja Simi"}
+        nyn{"Nyankole Simi"}
+        oc{"Occitano Simi"}
+        om{"Oromo Simi"}
+        or{"Odia Simi"}
+        os{"Osetio Simi"}
+        pa{"Punyabi Simi"}
+        pap{"Papiamento Simi"}
+        pcm{"Pidgin Nigeriano Simi"}
+        pl{"Polaco Simi"}
+        prg{"Prusiano Simi"}
+        ps{"Pashto Simi"}
+        pt{"Portugues Simi"}
+        qu{"Runasimi"}
+        quc{"Kʼicheʼ Simi"}
+        rm{"Romanche Simi"}
+        rn{"Rundi Simi"}
+        ro{"Rumano Simi"}
+        rof{"Rombo Simi"}
+        ru{"Ruso Simi"}
+        rw{"Kinyarwanda Simi"}
+        rwk{"Rwa Simi"}
+        sa{"Sanscrito Simi"}
+        sah{"Sakha Simi"}
+        saq{"Samburu Simi"}
+        sat{"Santali Simi"}
+        sbp{"Sangu Simi"}
+        sd{"Sindhi Simi"}
+        se{"Chincha Sami Simi"}
+        seh{"Sena Simi"}
+        ses{"Koyraboro Senni Simi"}
+        sg{"Sango Simi"}
+        shi{"Tashelhit Simi"}
+        si{"Cingales Simi"}
+        sk{"Eslovaco Simi"}
+        sl{"Esloveno Simi"}
+        sm{"Samoano Simi"}
+        sma{"Qulla Sami Simi"}
+        smj{"Sami Lule Simi"}
+        smn{"Sami Inari Simi"}
+        sms{"Sami Skolt Simi"}
+        sn{"Shona Simi"}
+        so{"Somali Simi"}
+        sq{"Albanes Simi"}
+        sr{"Serbio Simi"}
+        st{"Soto Meridional Simi"}
+        su{"Sundanés Simi"}
+        sv{"Sueco Simi"}
+        sw{"Suajili Simi"}
+        sw_CD{"Suajili Simi (Congo (RDC))"}
+        syr{"Siriaco Simi"}
+        ta{"Tamil Simi"}
+        te{"Telugu Simi"}
+        teo{"Teso Simi"}
+        tg{"Tayiko Simi"}
+        th{"Tailandes Simi"}
+        ti{"Tigriña Simi"}
+        tk{"Turcomano Simi"}
+        tn{"Setsuana Simi"}
+        to{"Tongano Simi"}
+        tr{"Turco Simi"}
+        tt{"Tartaro Simi"}
+        twq{"Tasawaq Simi"}
+        tzm{"Tamazight Simi"}
+        ug{"Uigur Simi"}
+        uk{"Ucraniano Simi"}
+        und{"Mana Riqsisqa Simi"}
+        ur{"Urdu Simi"}
+        uz{"Uzbeko Simi"}
+        vai{"Vai Simi"}
+        vi{"Vietnamita Simi"}
+        vo{"Volapük Simi"}
+        vun{"Vunjo Simi"}
+        wae{"Walser Simi"}
+        wo{"Wolof Simi"}
+        xh{"Isixhosa Simi"}
+        xog{"Soga Simi"}
+        yav{"Yangben Simi"}
+        yi{"Yiddish Simi"}
+        yo{"Yoruba Simi"}
+        yue{"Cantonés Simi"}
+        zgh{"Bereber Marroquí Estándar Simi"}
+        zh{"Chino Simi"}
+        zh_Hans{"Chino Simplificado Simi"}
+        zh_Hant{"Chino Tradicional Simi"}
+        zu{"Isizulu Simi"}
+        zxx{"Manaraq simi yachana"}
+    }
+    Languages%long{
+        zh_Hans{"Chino Mandarín Simplificado Simi"}
+        zh_Hant{"Chino Mandarín Tradicional Simi"}
+    }
+    Languages%menu{
+        ckb{"Kurdo Simi, Chawpi"}
+        yue{"Chino Cantonés Simi"}
+        zh{"Chino Mandarín Simi"}
+    }
+    Languages%short{
+        az{"Azerí Simi"}
+        en_GB{"Ingles Simi (GB)"}
+        en_US{"Ingles Simi (US)"}
+    }
+    Languages%variant{
+        ckb{"Kurdo Simi, Sorani"}
+    }
+    Scripts{
+        Arab{"Arabe Simi"}
+        Armn{"Armenio Simi"}
+        Beng{"Bangla Simi"}
+        Bopo{"Bopomofo Simi"}
+        Brai{"Braile"}
+        Cyrl{"Cirilico"}
+        Deva{"Devanagari"}
+        Ethi{"Etiope"}
+        Geor{"Georgiano"}
+        Grek{"Griego Simi"}
+        Gujr{"Gujarati Simi"}
+        Guru{"Gurmukhi Simi"}
+        Hanb{"Han with Bopomofo"}
+        Hang{"Hangul"}
+        Hani{"Han"}
+        Hans{"Simplificado"}
+        Hant{"Tradicional"}
+        Hebr{"Hebreo Simi"}
+        Hira{"Hiragana"}
+        Hrkt{"Japones silabico sananpakuna"}
+        Jamo{"Jamo"}
+        Jpan{"Japones Simi"}
+        Kana{"Katakana"}
+        Khmr{"Khmer"}
+        Knda{"Kannada Simi"}
+        Kore{"Coreano Simi"}
+        Laoo{"Lao Simi"}
+        Latn{"Latin Simi"}
+        Mlym{"Malayalam Simi"}
+        Mong{"Mongol Simi"}
+        Mymr{"Myanmar"}
+        Orya{"Odia Simi"}
+        Sinh{"Cingales Simi"}
+        Taml{"Tamil Simi"}
+        Telu{"Tegulu Simi"}
+        Thaa{"Thaana Simi"}
+        Thai{"Tailandes Simi"}
+        Tibt{"Tibetano Simi"}
+        Zmth{"Matimatica Willay"}
+        Zsye{"Emoji"}
+        Zsym{"Unanchakuna"}
+        Zxxx{"Mana qillqasqa"}
+        Zyyy{"Common Simi"}
+        Zzzz{"Mana yachasqa Qillqa"}
+    }
+    Scripts%stand-alone{
+        Hans{"Simplificado Han"}
+        Hant{"Tradicional Han"}
+    }
+    Types{
+        calendar{
+            buddhist{"Budista Intiwatana"}
+            chinese{"Chino Intiwatana"}
+            dangi{"Dangi Intiwatana"}
+            ethiopic{"Etiope Intiwatana"}
+            gregorian{"Gregoriano Intiwatana"}
+            hebrew{"Hebreo Intiwatana"}
+            islamic{"Islamico Intiwatana"}
+            iso8601{"ISO-8601 Intiwatana"}
+            japanese{"Japones Intiwatana"}
+            persian{"Persa Intiwatana"}
+            roc{"Minguo Intiwatana"}
+        }
+        cf{
+            account{"Yupana Qullqi imayna kaynin"}
+            standard{"Estandar nisqa qullqi imayna kaynin"}
+        }
+        collation{
+            ducet{"Ñawpaqchasqa Unicode Nisqa Ñiqinchana"}
+            search{"Llapanpaq maskana"}
+            standard{"Estandar nisqa Ñiqinchana"}
+        }
+        hc{
+            h11{"12 hora kaynin (0–11)"}
+            h12{"12 hora kaynin (1–12)"}
+            h23{"24 hora kaynin (0–23)"}
+            h24{"24 hora kaynin (1–24)"}
+        }
+        lb{
+            loose{"Siqi paway chinkachiy kaynin"}
+            normal{"Siqi paway Normal kaynin"}
+            strict{"Siqi paway Chiqa kaynin"}
+        }
+        ms{
+            metric{"Metrico Kamay"}
+            uksystem{"Metrico Ingles Kamay"}
+            ussystem{"Metrico Americano Kamay"}
+        }
+        numbers{
+            arab{"Arabe Sananpakuna"}
+            arabext{"Arabe Mirachisqa Sananpakuna"}
+            armn{"Armenio Sananpakuna"}
+            armnlow{"Armenio Uchuy Sananpakuna"}
+            beng{"Bangla Sananpakuna"}
+            deva{"Devanagari Sananpakuna"}
+            ethi{"Etiope Sananpakuna"}
+            fullwide{"Llapan kinray Sananpakuna"}
+            geor{"Gregoriano Yupaykuna"}
+            grek{"Griego Yupaykuna"}
+            greklow{"Griego Uchuy Yupaykuna"}
+            gujr{"Gujarati Sananpakuna"}
+            guru{"Gurmukhi Sananpakuna"}
+            hanidec{"Chunkachasqa Chino Yupaykuna"}
+            hans{"Uchuyachusqa Chino Yupaypakuna"}
+            hansfin{"Uchuyachisqa Qullqi Chino Yupaypakuna"}
+            hant{"Kikin Chino Yupaypakuna"}
+            hantfin{"Kikin Qullqi Chino Yupaypakuna"}
+            hebr{"Hebreo Yupaykuna"}
+            jpan{"Japones Yupaykuna"}
+            jpanfin{"Japones Qullqi Yupaykuna"}
+            khmr{"Khmer Sananpakuna"}
+            knda{"Kannada Sananpakuna"}
+            laoo{"Lao Sananpakuna"}
+            latn{"Occidental Sananpakuna"}
+            mlym{"Malayalam Sananpakuna"}
+            mymr{"Myanmar Sananpakuna"}
+            orya{"Odia Sananpakuna"}
+            roman{"Romano Sananpakuna"}
+            romanlow{"Roman Uchuy Yupaykuna"}
+            taml{"Kikin Tamil Yupaykuna"}
+            tamldec{"Tamil Sananpakuna"}
+            telu{"Telegu Sananpakuna"}
+            thai{"Thai Sananpakuna"}
+            tibt{"Tibetano Sananpakuna"}
+        }
+    }
+}

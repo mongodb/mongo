@@ -1,0 +1,30 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+zh_Hans_HK{
+    Currencies{
+        CNY{
+            "CN¥",
+            "人民币",
+        }
+        KYD{
+            "KYD",
+            "开曼群岛元",
+        }
+        XAG{
+            "XAG",
+            "白银",
+        }
+    }
+    CurrencyPlurals{
+        KYD{
+            other{"开曼群岛元"}
+        }
+        NIO{
+            other{"尼加拉瓜科多巴"}
+        }
+    }
+    CurrencyUnitPatterns{
+        other{"{0} {1}"}
+    }
+}

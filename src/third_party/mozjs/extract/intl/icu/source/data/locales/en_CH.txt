@@ -1,0 +1,18 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+en_CH{
+    %%Parent{"en_150"}
+    NumberElements{
+        latn{
+            patterns{
+                accountingFormat{"¤ #,##0.00;¤-#,##0.00"}
+                currencyFormat{"¤ #,##0.00;¤-#,##0.00"}
+            }
+            symbols{
+                group{"’"}
+                superscriptingExponent{"·"}
+            }
+        }
+    }
+}

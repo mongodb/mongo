@@ -1,0 +1,235 @@
+## Cygwin with Microsoft Visual C++ compiler specific setup
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+## Copyright (c) 2001-2013, International Business Machines Corporation and
+## others. All Rights Reserved.
+
+# We install sbin tools into the same bin directory because
+# pkgdata needs some of the tools in sbin, and we can't always depend on
+# icu-config working on Windows.
+sbindir=$(bindir)
+
+## Commands to generate dependency files
+GEN_DEPS.c=	:
+GEN_DEPS.cc=	:
+#GEN_DEPS.c=	$(COMPILE.c) -E
+#GEN_DEPS.cc=	$(COMPILE.cc) -E
+
+## Flags to create/use a static library
+ifneq ($(ENABLE_SHARED),YES)
+## Make sure that the static libraries can be built and used
+CPPFLAGS += -DU_STATIC_IMPLEMENTATION#M#
+else
+## Make sure that the static libraries can be built
+STATICCPPFLAGS = -DU_STATIC_IMPLEMENTATION
+endif
+
+## ICU requires a minimum target of Windows 7, and WINVER is not set to this by default.
+## https://msdn.microsoft.com/en-us/library/aa383745.aspx
+CPPFLAGS += -DWINVER=0x0601 -D_WIN32_WINNT=0x0601
+
+## Flags for position independent code
+SHAREDLIBCFLAGS = 
+SHAREDLIBCXXFLAGS = 
+SHAREDLIBCPPFLAGS =
+
+## Additional flags when building libraries and with threads
+LIBCPPFLAGS = 
+
+ifeq ($(ENABLE_RELEASE),1)
+# Make sure that assertions are disabled
+CPPFLAGS+=-DU_RELEASE=1#M#
+endif
+
+ifeq ($(ENABLE_DEBUG),1)
+# Pass debugging flag through
+CPPFLAGS+=-D_DEBUG=1#M#
+ICULIBSUFFIX:=$(ICULIBSUFFIX)d#M#
+endif
+
+# /GF pools strings and places them into read-only memory
+# /EHsc enables exception handling
+# /Zc:wchar_t makes wchar_t a native type. Required for C++ ABI compatibility.
+# -D_CRT_SECURE_NO_DEPRECATE is needed to quiet warnings about using standard C functions.
+# -utf-8 set source file encoding to utf-8.
+CFLAGS+=-GF -nologo -utf-8
+CXXFLAGS+=-GF -nologo -EHsc -Zc:wchar_t -utf-8
+CPPFLAGS+=-D_CRT_SECURE_NO_DEPRECATE
+DEFS+=-DWIN32 -DCYGWINMSVC
+LDFLAGS+=-nologo
+
+# Commands to compile
+COMPILE.c=	$(CC) $(CPPFLAGS) $(DEFS) $(CFLAGS) -c
+COMPILE.cc=	$(CXX) $(CPPFLAGS) $(DEFS) $(CXXFLAGS) -c
+
+# Commands to link
+LINK.c=		LINK.EXE -subsystem:console $(LDFLAGS)
+LINK.cc=	LINK.EXE -subsystem:console $(LDFLAGS)
+
+## Commands to make a shared library
+SHLIB.c=	LINK.EXE -DLL $(LDFLAGS)
+SHLIB.cc=	LINK.EXE -DLL $(LDFLAGS)
+
+## Compiler switch to embed a runtime search path
+LD_RPATH=	
+LD_RPATH_PRE=
+
+## Compiler switch to embed a library name
+LD_SONAME = -IMPLIB:$(SO_TARGET:.dll=.lib)
+
+## Shared object suffix
+SO = dll
+## Non-shared intermediate object suffix
+STATIC_O = ao
+# OUTOPT is for creating a specific output name
+OUTOPT = -out:
+
+# Static library prefix and file extension
+LIBSICU = $(STATIC_PREFIX)$(ICUPREFIX)
+A = lib
+
+# Cygwin's ar can't handle Win64 right now. So we use Microsoft's tool instead.
+AR = LIB.EXE#M#
+ARFLAGS := -nologo $(ARFLAGS:r=)#M#
+RANLIB = ls -s#M#
+AR_OUTOPT = -OUT:#M#
+
+## An import library is needed for z/OS, MSVC and Cygwin
+IMPORT_LIB_EXT = .lib
+
+LIBPREFIX=
+DEFAULT_LIBS = advapi32.lib
+
+# Change the stubnames so that poorly working FAT disks and installation programs can work.
+# This is also for backwards compatibility.
+DATA_STUBNAME = dt
+I18N_STUBNAME = in
+LIBICU = $(STATIC_PREFIX_WHEN_USED)$(ICUPREFIX)
+
+## Link commands to link to ICU libs
+ifeq ($(wildcard $(LIBDIR)/$(LIBICU)$(DATA_STUBNAME)$(ICULIBSUFFIX).lib),)
+LIBICUDT=	$(top_builddir)/stubdata/$(LIBICU)$(DATA_STUBNAME)$(ICULIBSUFFIX).lib
+else
+LIBICUDT=	$(LIBDIR)/$(LIBICU)$(DATA_STUBNAME)$(ICULIBSUFFIX).lib
+endif
+LIBICUUC=	$(LIBDIR)/$(LIBICU)$(COMMON_STUBNAME)$(ICULIBSUFFIX).lib $(LIBICUDT)
+LIBICUI18N=	$(LIBDIR)/$(LIBICU)$(I18N_STUBNAME)$(ICULIBSUFFIX).lib
+LIBICULE=	$(LIBDIR)/$(LIBICU)$(LAYOUT_STUBNAME)$(ICULIBSUFFIX).lib
+LIBICULX=	$(LIBDIR)/$(LIBICU)$(LAYOUTEX_STUBNAME)$(ICULIBSUFFIX).lib
+LIBICUIO=	$(LIBDIR)/$(LIBICU)$(IO_STUBNAME)$(ICULIBSUFFIX).lib
+LIBCTESTFW=	$(top_builddir)/tools/ctestfw/$(LIBICU)$(CTESTFW_STUBNAME)$(ICULIBSUFFIX).lib
+LIBICUTOOLUTIL=	$(LIBDIR)/$(LIBICU)$(TOOLUTIL_STUBNAME)$(ICULIBSUFFIX).lib
+
+## These are the library specific LDFLAGS
+LDFLAGSICUDT+=	-NOENTRY# The NOENTRY option is required for creating a resource-only DLL.
+LDFLAGSICUUC=# Unused for now.
+LDFLAGSICUI18N=# Unused for now.
+LDFLAGSICUIO=# Unused for now.
+LDFLAGSICULX=# Unused for now.
+LDFLAGSCTESTFW=# Unused for now.
+LDFLAGSICUTOOLUTIL=# Unused for now.
+
+# The #M# is used to delete lines for icu-config
+# Current full path directory.
+CURR_FULL_DIR?=$(subst \,/,$(shell cygpath -da .))#M# -m isn't used because it doesn't work on Win98
+# Current full path directory for use in source code in a -D compiler option.
+CURR_SRCCODE_FULL_DIR=$(subst \,\\,$(shell cygpath -da .))#M#
+
+ifeq ($(srcdir),.)
+SOURCE_FILE=$<
+else
+SOURCE_FILE=$(shell cygpath -dma $<)#M#
+endif
+
+## Compilation rules
+%.$(STATIC_O): $(srcdir)/%.c
+	$(COMPILE.c) $(STATICCPPFLAGS) $(STATICCFLAGS) -Fo$@ $(SOURCE_FILE)
+%.o: $(srcdir)/%.c
+	$(COMPILE.c) $(DYNAMICCPPFLAGS) $(DYNAMICCFLAGS) -Fo$@ $(SOURCE_FILE)
+
+%.$(STATIC_O): $(srcdir)/%.cpp
+	$(COMPILE.cc) $(STATICCPPFLAGS) $(STATICCXXFLAGS) -Fo$@ $(SOURCE_FILE)
+%.o: $(srcdir)/%.cpp
+	$(COMPILE.cc) $(DYNAMICCPPFLAGS) $(DYNAMICCXXFLAGS) -Fo$@ $(SOURCE_FILE)
+
+
+## Dependency rules
+## This is a start to how depdendencies could work
+# The commented out rules may not properly delete the file when ^C is pressed
+#   or the compiler fails.
+# make currently doesn't like rules with C:\\PROGRA~1\\.. in the depedency.
+#   So system headers are ignored by ignoring \\
+%.d : $(srcdir)/%.c
+	@echo "generating dependency information for $<"
+	@$(GEN_DEPS.c) $< > $@
+#	@echo -n "generating dependency information for "
+#	@echo -n "$@ $(basename $<).o : " > $@
+#	@$(SHELL) -ec '$(GEN_DEPS.c) $< \
+#		| grep "#line 1 " | grep -v \\\\ | cut -d " " -f 3 \
+#		| /usr/bin/sort -u | sed s/\"$$/\\\\/ | sed s/^\"/\	/ >> $@ \
+#		|| (rm -f $@ && echo $@ && false)'
+
+%.d : $(srcdir)/%.cpp
+	@echo "generating dependency information for $<"
+	@$(GEN_DEPS.cc) $< > $@
+#	@echo -n "generating dependency information for "
+#	@echo -n "$@ $(basename $<).o : " > $@
+#	@$(SHELL) -ec '$(GEN_DEPS.cc) $< \
+#		| grep "#line 1 " | grep -v \\\\ | cut -d " " -f 3 \
+#		| /usr/bin/sort -u | sed s/\"$$/\\\\/ | sed s/^\"/\	/ >> $@ \
+#		|| (rm -f $@ && echo $@ && false)'
+
+## Compile a Windows resource file
+%.res : $(srcdir)/%.rc
+	rc.exe -fo$@ $(CPPFLAGS) $(SOURCE_FILE)
+
+## Versioned target for a shared library.
+FINAL_SO_TARGET= $(basename $(SO_TARGET))$(SO_TARGET_VERSION_MAJOR).$(SO)
+MIDDLE_SO_TARGET=$(FINAL_SO_TARGET)
+
+## Starting in MSVC 2005, manifest files are required. This reduces the obnoxiousness of this feature.
+	POST_SO_BUILD_STEP = @([ -e $<.manifest ] && \
+	( echo Embedding manifest into $< && mt.exe -nologo -manifest $<.manifest -outputresource:"$<;2" && rm -rf $<.manifest )) \
+	|| true
+	POST_BUILD_STEP = @([ -e $@.manifest ] && \
+	( echo Embedding manifest into $@ && mt.exe -nologo -manifest $@.manifest -outputresource:"$@;1" && rm -rf $@.manifest )) \
+	|| true
+
+## Special pkgdata information that is needed
+PKGDATA_VERSIONING = -r $(SO_TARGET_VERSION_MAJOR)
+ICUPKGDATA_INSTALL_DIR = $(shell mkdir -p  $(DESTDIR)$(ICUPKGDATA_DIR) ;  cygpath -dma $(DESTDIR)$(ICUPKGDATA_DIR))#M#
+ICUPKGDATA_INSTALL_LIBDIR = $(shell mkdir -p  $(DESTDIR)$(libdir) ; cygpath -dma $(DESTDIR)$(libdir))#M#
+
+## Versioned import library names. The library names are versioned,
+## but the import libraries do not need versioning.
+IMPORT_LIB = $(basename $(SO_TARGET))$(IMPORT_LIB_EXT)#M#
+MIDDLE_IMPORT_LIB = $(IMPORT_LIB)#M#
+FINAL_IMPORT_LIB = $(MIDDLE_IMPORT_LIB)#M#
+
+# The following is for Makefile.inc's use.
+ICULIBSUFFIX_VERSION = $(LIB_VERSION_MAJOR)
+
+## Versioned libraries rules
+#%$(SO_TARGET_VERSION_MAJOR).$(SO): %$(SO_TARGET_VERSION).$(SO)
+#	$(RM) $@ && cp ${<F} $@
+
+# The following rule is sometimes a no op.
+# We only want to do a post-build step when a manifest file doesn't exist.
+%.$(SO): %$(SO_TARGET_VERSION_MAJOR).$(SO)
+	@echo -n
+	$(POST_SO_BUILD_STEP)
+
+## Install libraries as executable
+INSTALL-L=$(INSTALL_PROGRAM)
+
+# Environment variable to set a runtime search path
+LDLIBRARYPATH_ENVVAR = PATH
+
+# These are needed to allow the pkgdata nmake files to work
+PKGDATA_INVOKE_OPTS = MAKEFLAGS=
+
+# Include the version information in the shared library
+ENABLE_SO_VERSION_DATA=1
+
+## End Cygwin-specific setup
+

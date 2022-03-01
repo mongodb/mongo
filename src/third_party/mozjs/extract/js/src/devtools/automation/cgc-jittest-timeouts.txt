@@ -1,4 +1,3 @@
-SIMD/nursery-overflow.js
 asm.js/testBug1117235.js
 asm.js/testParallelCompile.js
 auto-regress/bug653395.js
@@ -7,6 +6,7 @@ auto-regress/bug675251.js
 auto-regress/bug729797.js
 baseline/bug847446.js
 baseline/bug852175.js
+basic/bug1610192.js
 basic/bug632964-regexp.js
 basic/bug656261.js
 basic/bug677957-2.js

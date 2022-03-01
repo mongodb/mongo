@@ -1,0 +1,85 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+wae{
+    Currencies{
+        BRL{
+            "R$",
+            "Brasilianiši Real",
+        }
+        CNY{
+            "CN¥",
+            "Chinesiši Yuan",
+        }
+        EUR{
+            "€",
+            "Euro",
+        }
+        GBP{
+            "£",
+            "Pfund",
+        }
+        INR{
+            "₹",
+            "Indiši Rupie",
+        }
+        JPY{
+            "¥",
+            "Yen",
+        }
+        RUB{
+            "RUB",
+            "Rubel",
+        }
+        USD{
+            "$",
+            "Dollar",
+        }
+        XXX{
+            "¤",
+            "Unbekannti Wãrig",
+        }
+    }
+    CurrencyPlurals{
+        BRL{
+            one{"Brasilianišä Real"}
+            other{"Brasilianiši Real"}
+        }
+        CNY{
+            one{"Chinesišä Yuan"}
+            other{"Chinesiši Yuan"}
+        }
+        EUR{
+            one{"Euro"}
+            other{"Euro"}
+        }
+        GBP{
+            one{"Pfund"}
+            other{"Pfund"}
+        }
+        INR{
+            one{"Indišä Rupie"}
+            other{"Indiši Rupie"}
+        }
+        JPY{
+            one{"Yen"}
+            other{"Yen"}
+        }
+        RUB{
+            one{"Rubel"}
+            other{"Rubel"}
+        }
+        USD{
+            one{"Dollar"}
+            other{"Dollar"}
+        }
+        XXX{
+            one{"Unbekannti Wãrig"}
+            other{"Unbekannti Wãrig"}
+        }
+    }
+    CurrencyUnitPatterns{
+        one{"{0} {1}"}
+        other{"{0} {1}"}
+    }
+}

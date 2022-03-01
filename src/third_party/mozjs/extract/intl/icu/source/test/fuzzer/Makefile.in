@@ -1,0 +1,101 @@
+# © 2019 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+#******************************************************************************
+## Makefile.in for ICU - test/fuzzer
+
+## Source directory information
+srcdir = @srcdir@
+top_srcdir = @top_srcdir@
+
+top_builddir = ../..
+
+## All the flags and other definitions are included here.
+include $(top_builddir)/icudefs.mk
+
+## Build directory information
+subdir = test/fuzzer
+
+## Extra files to remove for 'make clean'
+CLEANFILES = *~ $(DEPS) $(TESTXML)
+
+## Target information
+TARGET = all_fuzzers
+
+BUILDDIR := $(CURR_SRCCODE_FULL_DIR)/../../
+# Simplify the path for Unix
+BUILDDIR := $(BUILDDIR:test/fuzzer/../../=)
+# Simplify the path for Windows
+BUILDDIR := $(BUILDDIR:test\\fuzzer/../../=)
+# Simplify the path for Windows 98
+BUILDDIR := $(BUILDDIR:TEST\\FUZZER/../../=)
+
+CPPFLAGS += -I$(srcdir) -I$(top_srcdir)/common -I$(top_srcdir)/i18n -I$(top_srcdir)/tools/ctestfw -I$(top_srcdir)/io
+DEFS += -D'U_TOPSRCDIR="$(top_srcdir)/"' -D'U_TOPBUILDDIR="$(BUILDDIR)"'
+LIBS = $(LIBCTESTFW) $(LIBICUTOOLUTIL) $(LIBICUIO) $(LIBICUI18N) $(LIBICUUC) $(DEFAULT_LIBS) $(LIB_M)
+
+FUZZER_TARGETS = break_iterator_fuzzer collator_compare_fuzzer collator_rulebased_fuzzer converter_fuzzer locale_fuzzer number_format_fuzzer ucasemap_fuzzer uloc_canonicalize_fuzzer uloc_for_language_tag_fuzzer uloc_get_name_fuzzer uloc_is_right_to_left_fuzzer uloc_open_keywords_fuzzer unicode_string_codepage_create_fuzzer uregex_open_fuzzer
+
+OBJECTS = $(FUZZER_TARGETS:%=%.o)
+OBJECTS += fuzzer_driver.o locale_util.o
+
+DEPS = $(OBJECTS:.o=.d)
+
+-include Makefile.local
+
+## List of phony targets
+.PHONY : all all-local install install-local clean clean-local	\
+distclean distclean-local dist dist-local check check-local xcheck	\
+check-exhaustive check-exhaustive-local all_fuzzers
+
+## Clear suffix list
+.SUFFIXES :
+
+## List of standard targets
+all: all-local
+install: install-local
+clean: clean-local
+distclean : distclean-local
+dist: dist-local
+check: all check-local
+xcheck: all xcheck-local
+
+all-local: $(TARGET)
+
+install-local:
+
+dist-local:
+
+clean-local:
+	test -z "$(CLEANFILES)" || $(RMV) $(CLEANFILES)
+	$(RMV) $(OBJECTS) $(TARGET) $(FUZZER_TARGETS)
+
+distclean-local: clean-local
+	$(RMV) Makefile
+
+check-local: all-local
+	# Create a dummy test case file with content "abc123"
+	echo "abc123" > dummytestcase
+	$(foreach trgt,$(FUZZER_TARGETS), echo $(trgt); $(INVOKE) ./$(trgt) dummytestcase -q \
+            $(TEST_OUTPUT_OPTS) || exit \
+            $(IOTEST_OPTS);)
+
+xcheck-local: check-local
+
+Makefile: $(srcdir)/Makefile.in  $(top_builddir)/config.status
+	cd $(top_builddir) \
+	 && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+
+all_fuzzers: $(FUZZER_TARGETS)
+
+%_fuzzer: %_fuzzer.o fuzzer_driver.o locale_util.o
+	$(LINK.cc) $(OUTOPT)$@ $^ $(LIBS)
+
+ifeq (,$(MAKECMDGOALS))
+-include $(DEPS)
+else
+ifneq ($(patsubst %clean,,$(MAKECMDGOALS)),)
+ifneq ($(patsubst %install,,$(MAKECMDGOALS)),)
+-include $(DEPS)
+endif
+endif
+endif

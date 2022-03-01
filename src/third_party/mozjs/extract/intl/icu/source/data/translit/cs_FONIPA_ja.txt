@@ -1,0 +1,235 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: cs_FONIPA_ja.txt
+# Generated from CLDR
+#
+
+# Transforms a Phonemic IPA transcription of Czech (cs_FONIPA) to Katakana.
+$word_boundary = [-\ $] ;
+$vowel = [aeiouw] ;       # Vowels and glides
+$not_vowel = [^$vowel] ;
+#
+#
+# First pass: Collapse phonetic distinctions not preserved in Katakana.
+d\u0361ʒ → | ʒ ;
+d\u0361z → | z ;
+ɛ → | e;
+ll → | l;
+ɣ → | x;
+ɦ → | h;
+ŋ → | n;
+ɾ → | r;
+t \u0361 ʃ → | ʧ;
+t \u0361 → t;
+[i{i\u032F}ɪ]+ → i;
+[uw{u\u032F}]+ → u;
+#
+#
+nn → n ;
+#
+#
+::Null;
+#
+#
+# Main pass: Phoneme to Katakana conversion.
+'.' → ;
+a → ア;
+ba → バ;
+bb → ッ | b;
+be → ベ;
+bi → ビ;
+bje → ビェ ;
+bo → ボ;
+bu → ブ;
+b } $word_boundary → プ;
+b → ブ;
+ca → チャ ;
+ce → チェ ;
+ci → チ ;
+cu → チュ ;
+co → チョ ;
+c → チ ;
+da → ダ;
+dd → ッ | d;
+de → デ;
+di → ディ;
+do → ド;
+du → ドゥ;
+d } $word_boundary → ト;
+d → ド;
+e → エ;
+fa → ファ;
+fe → フェ;
+ff → ッ | f;
+fi → フィ;
+fo → フォ;
+fu → フ;
+f → フ;
+ha → ハ;
+hi → ヒ;
+hu → フ;
+he → ヘ;
+ho → ホ;
+h } $word_boundary → ;
+h → フ;
+ga → ガ; # not backed by data
+ge → グエ; # not backed by data
+gi → グイ; # not backed by data
+gg → ッ | g; # not backed by data
+go → ゴ; # not backed by data
+gu → グ; # not backed by data
+g } $word_boundary → ク; # not backed by data
+g → グ; # not backed by data
+i → イ ;
+ɟa → ジャ;
+ɟi → ジ; # not backed by data
+ɟo → ジョ; # not backed by data
+ɟe → ジェ;
+ɟu → ジュ; # not backed by data
+#
+#
+ja → ヤ;
+ji → イ;
+jo → ヨ;
+je → イェ;
+ju → ユ; # not backed by data
+j → イ;
+#
+#
+ka → カ;
+ke → ケ;
+ki → キ;
+kk → ッ | k;
+ko → コ;
+ku → ク;
+k → ク;
+la → ラ ;
+le → レ ;
+li → リ ;
+lho → ロ ;
+lo → ロ ;
+lu → ル ;
+l → ル ;
+ma → マ ;
+me → メ ;
+#
+#mɲe → ミェ;
+mi → ミ ;
+mo → モ ;
+mu → ム ;
+m } [bp] → ン ;
+m → ム ;
+na → ナ ;
+ne → ネ ;
+ni → ニ ;
+no → ノ ;
+nu → ヌ ;
+n → ン ;
+ɲa → ニャ ;
+ɲe → ニェ ;
+ɲi → ニ ;
+ɲo → ニョ ;
+ɲu → ニュ ;
+ɲ → ニ ;
+o → オ ;
+pa → パ ;
+pe → ペ ;
+pi → ピ ;
+po → ポ ;
+pp → ッ | p;
+pu → プ ;
+p → プ ;
+#
+#
+r\u031Da → ジャ;
+r\u031De → ジェ;
+r\u031Di → ジ;
+r\u031Do → ジョ; # not backed by data
+r\u031Du → ジュ; # not backed by data
+r\u031D → ルシ;
+#
+#
+ra → ラ ;
+re → レ ;
+ri → リ ;
+ro → ロ ;
+ru → ル ;
+r → ル;
+sa → サ ;
+se → セ ;
+si → シ ;
+so → ソ ;
+su → ス ;
+s → ス ;
+ʃa → シャ;
+ʃo → ショ;
+ʃi → シ;
+ʃu → シュ;
+ʃe → シェ;
+ʃ → シュ;
+ta → タ;
+te → テ ;
+ti → ティ ;
+to → ト ;
+tu → トゥ ;
+tsa → ツァ ;
+tse → ツェ ;
+tsi → ツィ ;
+tso → ツォ ;
+tsu → ツ ;
+ts → ツ ;
+tt → ッ | t;
+t → ト ;
+#
+#
+ʧa → チャ ;
+ʧe → チェ ;
+ʧi → チ ;
+ʧo → チョ ;
+ʧu → チュ ;
+ʧ } k → チ ;
+ʧ → チュ ;
+u → ウ ;
+#
+#
+va → ヴァ;
+ve → ヴェ;
+vi → ヴィ;
+vo → ヴォ;
+vu → ヴ;
+vje → ヴィエ ;
+v } $word_boundary → フ;
+v → ヴ;
+#
+#
+xa → ハ ;
+xe → ヘ ;
+xi → ヒ ;
+xo → ホ ;
+xu → フ ;
+x → フ ;
+#
+#
+za → ザ;
+ze → ゼ;
+zi → ジ;
+zo → ゾ;
+zu → ズ;
+z } $word_boundary → ス;
+z → ズ;
+ʒa → ジャ;
+ʒe → ジェ; # not backed by data
+ʒi → ジ; # not backed by data
+ʒo → ジョ; # not backed by data
+ʒu → ジュ; # not backed by data
+ʒ } k → シュ;
+ʒ → ジュ;
+#
+#
+ː → ー; # Long vowel
+' ' → ・;
+#
+#
+

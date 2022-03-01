@@ -201,8 +201,10 @@ void CountDownLatchInfo::postInstall(JSContext* cx,
 
     JS::RootedValue val(cx);
     for (auto iter = methods; iter->name; ++iter) {
-        protoWrapper.getValue(iter->name, &val);
-        objWrapper.setValue(iter->name, val);
+        invariant(!iter->name.isSymbol());
+        ObjectWrapper::Key key(iter->name.string());
+        protoWrapper.getValue(key, &val);
+        objWrapper.setValue(key, val);
     }
 
     val.setObjectOrNull(obj);

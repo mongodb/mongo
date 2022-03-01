@@ -1,0 +1,111 @@
+/* -*- Mode: IDL; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "nsISupports.idl"
+#include "nsISimpleEnumerator.idl"
+
+%{C++
+#include "mozilla/MemoryReporting.h"
+
+namespace mozilla {
+namespace dom {
+class ContentParent;
+}
+namespace ipc {
+class FileDescriptor;
+}
+}
+
+// Define Contractid and CID
+// {D85A17C1-AA7C-11d2-9B8C-00805F8A16D9}
+#define NS_STRINGBUNDLESERVICE_CID \
+{ 0xd85a17c1, 0xaa7c, 0x11d2, \
+  { 0x9b, 0x8c, 0x0, 0x80, 0x5f, 0x8a, 0x16, 0xd9 } }
+
+#define NS_STRINGBUNDLE_CONTRACTID "@mozilla.org/intl/stringbundle;1"
+
+%}
+
+[scriptable, uuid(D85A17C2-AA7C-11d2-9B8C-00805F8A16D9)]
+interface nsIStringBundle : nsISupports
+{
+  AString GetStringFromID(in long aID);
+
+  // This method is mostly used from JS, where AUTF8String is appropriate.
+  [binaryname(GetStringFromAUTF8Name)]
+  AString GetStringFromName(in AUTF8String aName);
+
+  // This method is mostly used from C++, where |string| is appropriate because
+  // the names are most often 8-bit string literals (normally ASCII, though
+  // u8"foo" literals will also work).
+  [noscript, binaryname(GetStringFromName)]
+  AString GetStringFromNameCpp(in string aName);
+
+  // this is kind of like ssprintf - except that you can
+  // only pass it unicode strings, using the %S formatting character.
+  // the id or name should refer to a string in the bundle that
+  // uses %S.. do NOT try to use any other types.
+  // this uses nsTextFormatter::ssprintf to do the dirty work.
+  AString formatStringFromID(in long aID, in Array<AString> params);
+
+  // This method is mostly used from JS, where AUTF8String is appropriate.
+  [binaryname(FormatStringFromAUTF8Name)]
+  AString formatStringFromName(in AUTF8String aName, in Array<AString> params);
+
+  // This method is mostly used from C++, where |string| is appropriate because
+  // the names are most often 8-bit string literals (normally ASCII, though
+  // u8"foo" literals will also work).
+  [noscript, binaryname(FormatStringFromName)]
+  AString formatStringFromNameCpp(in string aName, in Array<AString> params);
+
+  /*
+  Implements nsISimpleEnumerator, replaces nsIEnumerator
+  */
+  nsISimpleEnumerator getSimpleEnumeration();
+  // Preloads string bundle data asynchronously
+  void asyncPreload();
+
+%{C++
+  virtual size_t SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const = 0;
+  virtual size_t SizeOfIncludingThisIfUnshared(mozilla::MallocSizeOf aMallocSizeOf) const = 0;
+%}
+};
+
+[scriptable, uuid(D85A17C0-AA7C-11d2-9B8C-00805F8A16D9)]
+interface nsIStringBundleService : nsISupports
+{
+  nsIStringBundle createBundle(in string aURLSpec);
+
+  /**
+   * Formats a message string from a status code and status arguments.
+   * @param aStatus - The status code. This is mapped into a string ID and
+   *            and used in the string lookup process (see nsIErrorService).
+   * @param aStatusArg - The status message argument(s). Multiple arguments
+   *            can be separated by newline ('\n') characters.
+   * @return the formatted message
+   */
+  AString formatStatusMessage(in nsresult aStatus, in wstring aStatusArg);
+
+  /**
+   * flushes the string bundle cache - useful when the locale changes or
+   * when we need to get some extra memory back
+   *
+   * at some point, we might want to make this flush all the bundles,
+   * because any bundles that are floating around when the locale changes
+   * will suddenly contain bad data
+   *
+   */
+  void flushBundles();
+
+  %{C++
+    virtual size_t SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const = 0;
+
+  virtual void SendContentBundles(mozilla::dom::ContentParent* aContentParent) const = 0;
+
+  virtual void RegisterContentBundle(const nsCString& aBundleURL,
+                                     const mozilla::ipc::FileDescriptor& aMapFile,
+                                     size_t aMapSize) = 0;
+  %}
+};

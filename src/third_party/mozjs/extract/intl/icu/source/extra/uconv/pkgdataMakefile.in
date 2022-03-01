@@ -1,0 +1,42 @@
+## pkgdataMakefile.in for ICU data
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+## Copyright (c) 2008-2012, International Business Machines Corporation and
+## others. All Rights Reserved.
+
+## Source directory information
+srcdir = @srcdir@
+top_srcdir = @top_srcdir@
+
+# So that you have $(top_builddir)/config.status
+top_builddir = ../..
+
+## All the flags and other definitions are included here.
+include $(top_builddir)/icudefs.mk
+
+OUTPUTFILE=pkgdata.inc
+MIDDLE_SO_TARGET=
+PKGDATA_TRAILING_SPACE=" "
+
+all : clean 
+	@echo GENCCODE_ASSEMBLY_TYPE=$(GENCCODE_ASSEMBLY) >> $(OUTPUTFILE)
+	@echo SO=$(SO) >> $(OUTPUTFILE)
+	@echo SOBJ=$(SOBJ) >> $(OUTPUTFILE)
+	@echo A=$(A) >> $(OUTPUTFILE)
+	@echo LIBPREFIX=$(LIBPREFIX)$(STATIC_PREFIX_WHEN_USED) >> $(OUTPUTFILE)
+	@echo LIB_EXT_ORDER=$(FINAL_SO_TARGET) >> $(OUTPUTFILE)
+	@echo COMPILE="$(COMPILE.c)" >> $(OUTPUTFILE)
+	@echo LIBFLAGS="-I$(top_srcdir)/common -I$(top_builddir)/common $(SHAREDLIBCPPFLAGS) $(SHAREDLIBCFLAGS)" >> $(OUTPUTFILE)
+	@echo GENLIB="$(SHLIB.c)" >> $(OUTPUTFILE)
+	@echo LDICUDTFLAGS=$(LDFLAGSICUDT) >> $(OUTPUTFILE)
+	@echo LD_SONAME=$(LD_SONAME) >> $(OUTPUTFILE)
+	@echo RPATH_FLAGS=$(RPATH_FLAGS) >> $(OUTPUTFILE)
+	@echo BIR_LDFLAGS=$(BIR_LDFLAGS) >> $(OUTPUTFILE)
+	@echo AR=$(AR) >> $(OUTPUTFILE)
+	@echo ARFLAGS=$(ARFLAGS) >> $(OUTPUTFILE)
+	@echo RANLIB=$(RANLIB) >> $(OUTPUTFILE)
+	@echo INSTALL_CMD=$(INSTALL) >> $(OUTPUTFILE)
+
+clean : 
+	$(RMV) $(OUTPUTFILE)
+

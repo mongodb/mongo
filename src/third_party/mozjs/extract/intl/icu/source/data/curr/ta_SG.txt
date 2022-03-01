@@ -1,0 +1,19 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ta_SG{
+    Currencies{
+        MYR{
+            "RM",
+            "மலேஷியன் ரிங்கிட்",
+        }
+        SGD{
+            "$",
+            "சிங்கப்பூர் டாலர்",
+        }
+        USD{
+            "US$",
+            "அமெரிக்க டாலர்",
+        }
+    }
+}

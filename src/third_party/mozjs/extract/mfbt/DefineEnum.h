@@ -90,8 +90,8 @@
 /*
  * A helper macro for asserting that an enumerator does not have an initializer.
  *
- * The static_assert and the comparison to 0 are just scaffolding; the
- * important part is forming the expression |aEnumName::aEnumeratorDecl|.
+ * The static_assert and the comparison are just scaffolding; the important
+ * part is forming the expression |aEnumName::aEnumeratorDecl|.
  *
  * If |aEnumeratorDecl| is just the enumerator name without an identifier,
  * this expression compiles fine. However, if |aEnumeratorDecl| includes an
@@ -99,48 +99,58 @@
  * compile in expression context, since |eEnumerator| is not an lvalue.
  *
  * (The static_assert itself should always pass in the absence of the above
- * error, since you can't get a negative enumerator value without having
- * an initializer somewhere. It just provides a place to put the expression
- * we want to form.)
+ * error, since turning on a bit can only increase an integer value. It just
+ * provides a place to put the expression we want to form.)
  */
+
 #define MOZ_ASSERT_ENUMERATOR_HAS_NO_INITIALIZER(aEnumName, aEnumeratorDecl) \
-  static_assert((aEnumName::aEnumeratorDecl) >= aEnumName(0), \
-                "MOZ_DEFINE_ENUM does not allow enumerators to have initializers");
+  static_assert(                                                             \
+      int(aEnumName::aEnumeratorDecl) <=                                     \
+          (int(aEnumName::aEnumeratorDecl) | 1),                             \
+      "MOZ_DEFINE_ENUM does not allow enumerators to have initializers");
 
-#define MOZ_DEFINE_ENUM_IMPL(aEnumName, aClassSpec, aBaseSpec, aEnumerators)  \
-  enum aClassSpec aEnumName aBaseSpec { MOZ_UNWRAP_ARGS aEnumerators };  \
-  constexpr size_t k##aEnumName##Count = MOZ_ARG_COUNT aEnumerators;  \
-  constexpr aEnumName k##Highest##aEnumName = aEnumName(k##aEnumName##Count - 1);  \
-  MOZ_FOR_EACH(MOZ_ASSERT_ENUMERATOR_HAS_NO_INITIALIZER, (aEnumName,), aEnumerators)
+#define MOZ_DEFINE_ENUM_IMPL(aEnumName, aClassSpec, aBaseSpec, aEnumerators) \
+  enum aClassSpec aEnumName aBaseSpec{MOZ_UNWRAP_ARGS aEnumerators};         \
+  constexpr size_t k##aEnumName##Count = MOZ_ARG_COUNT aEnumerators;         \
+  constexpr aEnumName kHighest##aEnumName =                                  \
+      aEnumName(k##aEnumName##Count - 1);                                    \
+  MOZ_FOR_EACH(MOZ_ASSERT_ENUMERATOR_HAS_NO_INITIALIZER, (aEnumName, ),      \
+               aEnumerators)
 
-#define MOZ_DEFINE_ENUM(aEnumName, aEnumerators)  \
+#define MOZ_DEFINE_ENUM(aEnumName, aEnumerators) \
   MOZ_DEFINE_ENUM_IMPL(aEnumName, , , aEnumerators)
 
 #define MOZ_DEFINE_ENUM_WITH_BASE(aEnumName, aBaseName, aEnumerators) \
   MOZ_DEFINE_ENUM_IMPL(aEnumName, , : aBaseName, aEnumerators)
 
-#define MOZ_DEFINE_ENUM_CLASS(aEnumName, aEnumerators)  \
+#define MOZ_DEFINE_ENUM_CLASS(aEnumName, aEnumerators) \
   MOZ_DEFINE_ENUM_IMPL(aEnumName, class, , aEnumerators)
 
 #define MOZ_DEFINE_ENUM_CLASS_WITH_BASE(aEnumName, aBaseName, aEnumerators) \
   MOZ_DEFINE_ENUM_IMPL(aEnumName, class, : aBaseName, aEnumerators)
 
-#define MOZ_DEFINE_ENUM_AT_CLASS_SCOPE_IMPL(aEnumName, aClassSpec, aBaseSpec, aEnumerators) \
-  enum aClassSpec aEnumName aBaseSpec { MOZ_UNWRAP_ARGS aEnumerators };  \
-  constexpr static size_t s##aEnumName##Count = MOZ_ARG_COUNT aEnumerators; \
-  constexpr static aEnumName s##Highest##aEnumName = aEnumName(s##aEnumName##Count - 1); \
-  MOZ_FOR_EACH(MOZ_ASSERT_ENUMERATOR_HAS_NO_INITIALIZER, (aEnumName,), aEnumerators)
+#define MOZ_DEFINE_ENUM_AT_CLASS_SCOPE_IMPL(aEnumName, aClassSpec, aBaseSpec, \
+                                            aEnumerators)                     \
+  enum aClassSpec aEnumName aBaseSpec{MOZ_UNWRAP_ARGS aEnumerators};          \
+  constexpr static size_t s##aEnumName##Count = MOZ_ARG_COUNT aEnumerators;   \
+  constexpr static aEnumName sHighest##aEnumName =                            \
+      aEnumName(s##aEnumName##Count - 1);                                     \
+  MOZ_FOR_EACH(MOZ_ASSERT_ENUMERATOR_HAS_NO_INITIALIZER, (aEnumName, ),       \
+               aEnumerators)
 
 #define MOZ_DEFINE_ENUM_AT_CLASS_SCOPE(aEnumName, aEnumerators) \
   MOZ_DEFINE_ENUM_AT_CLASS_SCOPE_IMPL(aEnumName, , , aEnumerators)
 
-#define MOZ_DEFINE_ENUM_WITH_BASE_AT_CLASS_SCOPE(aEnumName, aBaseName, aEnumerators)  \
+#define MOZ_DEFINE_ENUM_WITH_BASE_AT_CLASS_SCOPE(aEnumName, aBaseName, \
+                                                 aEnumerators)         \
   MOZ_DEFINE_ENUM_AT_CLASS_SCOPE_IMPL(aEnumName, , : aBaseName, aEnumerators)
 
 #define MOZ_DEFINE_ENUM_CLASS_AT_CLASS_SCOPE(aEnumName, aEnumerators) \
   MOZ_DEFINE_ENUM_AT_CLASS_SCOPE_IMPL(aEnumName, class, , aEnumerators)
 
-#define MOZ_DEFINE_ENUM_CLASS_WITH_BASE_AT_CLASS_SCOPE(aEnumName, aBaseName, aEnumerators)  \
-  MOZ_DEFINE_ENUM_AT_CLASS_SCOPE_IMPL(aEnumName, class, : aBaseName, aEnumerators)
+#define MOZ_DEFINE_ENUM_CLASS_WITH_BASE_AT_CLASS_SCOPE(aEnumName, aBaseName, \
+                                                       aEnumerators)         \
+  MOZ_DEFINE_ENUM_AT_CLASS_SCOPE_IMPL(aEnumName, class,                      \
+                                      : aBaseName, aEnumerators)
 
-#endif // mozilla_DefineEnum_h
+#endif  // mozilla_DefineEnum_h

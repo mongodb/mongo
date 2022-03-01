@@ -1,0 +1,22 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+en_ER{
+    %%Parent{"en_001"}
+    zoneStrings{
+        "meta:Africa_Central"{
+            ss{"CAT"}
+        }
+        "meta:Africa_Eastern"{
+            ss{"EAT"}
+        }
+        "meta:Africa_Southern"{
+            ss{"SAST"}
+        }
+        "meta:Africa_Western"{
+            sd{"WAST"}
+            sg{"WAT"}
+            ss{"WAT"}
+        }
+    }
+}

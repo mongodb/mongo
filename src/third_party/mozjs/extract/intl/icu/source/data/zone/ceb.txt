@@ -1,0 +1,620 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ceb{
+    zoneStrings{
+        "Asia:Saigon"{
+            ec{"Siyudad sa Ho Chi Minh"}
+        }
+        "Etc:UTC"{
+            ls{"Gikoordinar nga Kinatibuk-ang Oras"}
+        }
+        "Etc:Unknown"{
+            ec{"Wala Mailhing Lungsod"}
+        }
+        "Europe:Dublin"{
+            ld{"Tamdanang Oras sa Irish"}
+        }
+        "Europe:London"{
+            ld{"Oras sa Tag-init sa British"}
+        }
+        "meta:Afghanistan"{
+            ls{"Oras sa Afghanistan"}
+        }
+        "meta:Africa_Central"{
+            ls{"Oras sa Central Africa"}
+        }
+        "meta:Africa_Eastern"{
+            ls{"Oras sa East Africa"}
+        }
+        "meta:Africa_Southern"{
+            ls{"Tamdanang Oras sa South Africa"}
+        }
+        "meta:Africa_Western"{
+            ld{"Oras sa Tag-init sa West Africa"}
+            lg{"Oras sa West Africa"}
+            ls{"Tamdanang Oras sa West Africa"}
+        }
+        "meta:Alaska"{
+            ld{"Oras sa Tag-init sa Alaska"}
+            lg{"Oras sa Alaska"}
+            ls{"Tamdanang Oras sa Alaska"}
+        }
+        "meta:Amazon"{
+            ld{"Oras sa Tag-init sa Amazon"}
+            lg{"Oras sa Amazon"}
+            ls{"Tamdanang Oras sa Amazon"}
+        }
+        "meta:America_Central"{
+            ld{"Sentrong Oras sa Tag-init"}
+            lg{"Sentrong Oras"}
+            ls{"Sentong Tamdanan nga Oras"}
+        }
+        "meta:America_Eastern"{
+            ld{"Oras sa Tag-init sa Sidlakan"}
+            lg{"Oras sa Sidlakan"}
+            ls{"Tamdanan nga Oras sa Sidlakan"}
+        }
+        "meta:America_Mountain"{
+            ld{"Oras sa Tag-init sa Kabukiran"}
+            lg{"Oras sa Kabukiran"}
+            ls{"Tamdanang Oras sa Kabukiran"}
+        }
+        "meta:America_Pacific"{
+            ld{"Oras sa Tag-init sa Pasipiko"}
+            lg{"Oras sa Pasipiko"}
+            ls{"Tamdanang Oras sa Pasipiko"}
+        }
+        "meta:Apia"{
+            ld{"Oras sa Tag-init sa Apia"}
+            lg{"Oras sa Apia"}
+            ls{"Tamdanang Oras sa Apia"}
+        }
+        "meta:Arabian"{
+            ld{"Oras sa Tag-init sa Arabia"}
+            lg{"Oras sa Arabia"}
+            ls{"Tamdanang Oras sa Arabia"}
+        }
+        "meta:Argentina"{
+            ld{"Oras sa Tag-init sa Argentina"}
+            lg{"Oras sa Argentina"}
+            ls{"Tamdanang Oras sa Argentina"}
+        }
+        "meta:Argentina_Western"{
+            ld{"Oras sa Tag-init sa Western Argentina"}
+            lg{"Oras sa Western Argentina"}
+            ls{"Tamdanang Oras sa Western Argentina"}
+        }
+        "meta:Armenia"{
+            ld{"Oras sa Tag-init sa Armenia"}
+            lg{"Oras sa Armenia"}
+            ls{"Tamdanang Oras sa Armenia"}
+        }
+        "meta:Atlantic"{
+            ld{"Oras sa Tag-init sa Atlantiko"}
+            lg{"Oras sa Atlantiko"}
+            ls{"Tamdanang Oras sa Atlantiko"}
+        }
+        "meta:Australia_Central"{
+            ld{"Oras sa Tag-init sa Central Australia"}
+            lg{"Oras sa Central Australia"}
+            ls{"Tamdanang Oras sa Central Australia"}
+        }
+        "meta:Australia_CentralWestern"{
+            ld{"Oras sa Tag-init sa Central Western Australia"}
+            lg{"Oras sa Central Western Australia"}
+            ls{"Tamdanang Oras sa Central Western Australia"}
+        }
+        "meta:Australia_Eastern"{
+            ld{"Oras sa Tag-init sa Eastern Australia"}
+            lg{"Oras sa Eastern Australia"}
+            ls{"Tamdanang Oras sa Eastern Australia"}
+        }
+        "meta:Australia_Western"{
+            ld{"Oras sa Tag-init sa Western Australia"}
+            lg{"Oras sa Western Australia"}
+            ls{"Tamdanang Oras sa Western Australia"}
+        }
+        "meta:Azerbaijan"{
+            ld{"Oras sa Tag-init sa Azerbaijan"}
+            lg{"Oras sa Azerbaijan"}
+            ls{"Tamdanang Oras sa Azerbaijan"}
+        }
+        "meta:Azores"{
+            ld{"Oras sa Tag-init sa Azores"}
+            lg{"Oras sa Azores"}
+            ls{"Tamdanang Oras sa Azores"}
+        }
+        "meta:Bangladesh"{
+            ld{"Oras sa Tag-init sa Bangladesh"}
+            lg{"Oras sa Bangladesh"}
+            ls{"Tamdanang Oras sa Bangladesh"}
+        }
+        "meta:Bhutan"{
+            ls{"Oras sa Bhutan"}
+        }
+        "meta:Bolivia"{
+            ls{"Oras sa Bolivia"}
+        }
+        "meta:Brasilia"{
+            ld{"Oras sa Tag-init sa Brasilia"}
+            lg{"Oras sa Brasilia"}
+            ls{"Tamdanang Oras sa Brasilia"}
+        }
+        "meta:Brunei"{
+            ls{"Oras sa Brunei Darussalam"}
+        }
+        "meta:Cape_Verde"{
+            ld{"Oras sa Tag-init sa Cape Verde"}
+            lg{"Oras sa Cape Verde"}
+            ls{"Tamdanang Oras sa Cape Verde"}
+        }
+        "meta:Chamorro"{
+            ls{"Tamdanang Oras sa Chamorro"}
+        }
+        "meta:Chatham"{
+            ld{"Oras sa Tag-init sa Chatham"}
+            lg{"Oras sa Chatham"}
+            ls{"Tamdanang Oras sa Chatham"}
+        }
+        "meta:Chile"{
+            ld{"Oras sa Tag-init sa Chile"}
+            lg{"Oras sa Chile"}
+            ls{"Tamdanang Oras sa Chile"}
+        }
+        "meta:China"{
+            ld{"Oras sa Tag-init sa Tsina"}
+            lg{"Oras sa Tsina"}
+            ls{"Tamdanang Oras sa Tsina"}
+        }
+        "meta:Choibalsan"{
+            ld{"Oras sa Tag-init sa Choibalsan"}
+            lg{"Oras sa Choibalsan"}
+            ls{"Tamdanang Oras sa Choibalsan"}
+        }
+        "meta:Christmas"{
+            ls{"Oras sa Christmas Island"}
+        }
+        "meta:Cocos"{
+            ls{"Oras sa Cocos Islands"}
+        }
+        "meta:Colombia"{
+            ld{"Oras sa Tag-init sa Colombia"}
+            lg{"Oras sa Colombia"}
+            ls{"Tamdanang Oras sa Colombia"}
+        }
+        "meta:Cook"{
+            ld{"Katungang Oras sa Tag-init sa Cook Islands"}
+            lg{"Oras sa Cook Islands"}
+            ls{"Tamdanang Oras sa Cook Islands"}
+        }
+        "meta:Cuba"{
+            ld{"Oras sa Tag-init sa Cuba"}
+            lg{"Oras sa Cuba"}
+            ls{"Tamdanang Oras sa Cuba"}
+        }
+        "meta:Davis"{
+            ls{"Oras sa Davis"}
+        }
+        "meta:DumontDUrville"{
+            ls{"Oras sa Dumont-d’Urville"}
+        }
+        "meta:East_Timor"{
+            ls{"Oras sa East Timor"}
+        }
+        "meta:Easter"{
+            ld{"Oras sa Tag-init sa Easter Island"}
+            lg{"Oras sa Easter Island"}
+            ls{"Tamdanang Oras sa Easter Island"}
+        }
+        "meta:Ecuador"{
+            ls{"Oras sa Ecuador"}
+        }
+        "meta:Europe_Central"{
+            ld{"Oras sa Tag-init sa Central Europe"}
+            lg{"Oras sa Central Europe"}
+            ls{"Tamdanang Oras sa Central Europe"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"Oras sa Tag-init sa Eastern Europe"}
+            lg{"Oras sa Eastern Europe"}
+            ls{"Tamdanang Oras sa Eastern Europe"}
+        }
+        "meta:Europe_Further_Eastern"{
+            ls{"Oras sa Further-eastern Europe"}
+        }
+        "meta:Europe_Western"{
+            ld{"Oras sa Tag-init sa Western Europe"}
+            lg{"Oras sa Western Europe"}
+            ls{"Tamdanang Oras sa Western Europe"}
+        }
+        "meta:Falkland"{
+            ld{"Oras sa Tag-init sa Falkland Islands"}
+            lg{"Oras sa Falkland Islands"}
+            ls{"Tamdanang Oras sa Falkland Islands"}
+        }
+        "meta:Fiji"{
+            ld{"Oras sa Tag-init sa Fiji"}
+            lg{"Oras sa Fiji"}
+            ls{"Tamdanang Oras sa Fiji"}
+        }
+        "meta:French_Guiana"{
+            ls{"Oras sa French Guiana"}
+        }
+        "meta:French_Southern"{
+            ls{"Oras sa French Southern ug Antarctic"}
+        }
+        "meta:GMT"{
+            ls{"Oras sa Greenwich Mean"}
+        }
+        "meta:Galapagos"{
+            ls{"Oras sa Galapagos"}
+        }
+        "meta:Gambier"{
+            ls{"Oras sa Gambier"}
+        }
+        "meta:Georgia"{
+            ld{"Oras sa Tag-init sa Georgia"}
+            lg{"Oras sa Georgia"}
+            ls{"Tamdanang Oras sa Georgia"}
+        }
+        "meta:Gilbert_Islands"{
+            ls{"Oras sa Gilbert Islands"}
+        }
+        "meta:Greenland_Eastern"{
+            ld{"Oras sa Tag-init sa East Greenland"}
+            lg{"Oras sa East Greenland"}
+            ls{"Tamdanang Oras sa East Greenland"}
+        }
+        "meta:Greenland_Western"{
+            ld{"Oras sa Tag-init sa West Greenland"}
+            lg{"Oras sa West Greenland"}
+            ls{"Tamdanang Oras sa West Greenland"}
+        }
+        "meta:Gulf"{
+            ls{"Tamdanang Oras sa Gulf"}
+        }
+        "meta:Guyana"{
+            ls{"Oras sa Guyana"}
+        }
+        "meta:Hawaii_Aleutian"{
+            ld{"Oras sa Tag-init sa Hawaii-Aleutian"}
+            lg{"Oras sa Hawaii-Aleutian"}
+            ls{"Tamdanang Oras sa Hawaii-Aleutian"}
+        }
+        "meta:Hong_Kong"{
+            ld{"Oras sa Tag-init sa Hong Kong"}
+            lg{"Oras sa Hong Kong"}
+            ls{"Tamdanang Oras sa Hong Kong"}
+        }
+        "meta:Hovd"{
+            ld{"Oras sa Tag-init sa Hovd"}
+            lg{"Oras sa Hovd"}
+            ls{"Tamdanang Oras sa Hovd"}
+        }
+        "meta:India"{
+            ls{"Tamdanang Oras sa India"}
+        }
+        "meta:Indian_Ocean"{
+            ls{"Oras sa Indian Ocean"}
+        }
+        "meta:Indochina"{
+            ls{"Oras sa Indochina"}
+        }
+        "meta:Indonesia_Central"{
+            ls{"Oras sa Central Indonesia"}
+        }
+        "meta:Indonesia_Eastern"{
+            ls{"Oras sa Eastern Indonesia"}
+        }
+        "meta:Indonesia_Western"{
+            ls{"Oras sa Western Indonesia"}
+        }
+        "meta:Iran"{
+            ld{"Oras sa Tag-init sa Iran"}
+            lg{"Oras sa Iran"}
+            ls{"Tamdanang Oras sa Iran"}
+        }
+        "meta:Irkutsk"{
+            ld{"Oras sa Tag-init sa Irkutsk"}
+            lg{"Oras sa Irkutsk"}
+            ls{"Tamdanang Oras sa Irkutsk"}
+        }
+        "meta:Israel"{
+            ld{"Oras sa Tag-init sa Israel"}
+            lg{"Oras sa Israel"}
+            ls{"Tamdanang Oras sa Israel"}
+        }
+        "meta:Japan"{
+            ld{"Oras sa Adlawan sa Japan"}
+            lg{"Oras sa Japan"}
+            ls{"Tamdanang Oras sa Japan"}
+        }
+        "meta:Kazakhstan_Eastern"{
+            ls{"Oras sa East Kazakhstan"}
+        }
+        "meta:Kazakhstan_Western"{
+            ls{"Oras sa West Kazakhstan"}
+        }
+        "meta:Korea"{
+            ld{"Oras sa Tag-init sa Korea"}
+            lg{"Oras sa Korea"}
+            ls{"Tamdanang Oras sa Korea"}
+        }
+        "meta:Kosrae"{
+            ls{"Oras sa Kosrae"}
+        }
+        "meta:Krasnoyarsk"{
+            ld{"Oras sa Tag-init sa Krasnoyarsk"}
+            lg{"Oras sa Krasnoyarsk"}
+            ls{"Tamdanang Oras sa Krasnoyarsk"}
+        }
+        "meta:Kyrgystan"{
+            ls{"Oras sa Kyrgyzstan"}
+        }
+        "meta:Line_Islands"{
+            ls{"Oras sa Line Islands"}
+        }
+        "meta:Lord_Howe"{
+            ld{"Oras sa Tag-init sa Lord Howe"}
+            lg{"Oras sa Lord Howe"}
+            ls{"Tamdanang Oras sa Lord Howe"}
+        }
+        "meta:Macquarie"{
+            ls{"Oras sa Macquarie Island"}
+        }
+        "meta:Magadan"{
+            ld{"Oras sa Tag-init sa Magadan"}
+            lg{"Oras sa Magadan"}
+            ls{"Tamdanang Oras sa Magadan"}
+        }
+        "meta:Malaysia"{
+            ls{"Oras sa Malaysia"}
+        }
+        "meta:Maldives"{
+            ls{"Oras sa Maldives"}
+        }
+        "meta:Marquesas"{
+            ls{"Oras sa Marquesas"}
+        }
+        "meta:Marshall_Islands"{
+            ls{"Oras sa Marshall Islands"}
+        }
+        "meta:Mauritius"{
+            ld{"Oras sa Tag-init sa Mauritius"}
+            lg{"Oras sa Mauritius"}
+            ls{"Tamdanang Oras sa Mauritius"}
+        }
+        "meta:Mawson"{
+            ls{"Oras sa Mawson"}
+        }
+        "meta:Mexico_Northwest"{
+            ld{"Oras sa Tag-init sa Northwest Mexico"}
+            lg{"Oras sa Northwest Mexico"}
+            ls{"Tamdanang Oras sa Northwest Mexico"}
+        }
+        "meta:Mexico_Pacific"{
+            ld{"Oras sa Tag-init sa Mexican Pacific"}
+            lg{"Oras sa Mexican Pacific"}
+            ls{"Tamdanang Oras sa Mexican Pacific"}
+        }
+        "meta:Mongolia"{
+            ld{"Oras sa Tag-init sa Ulaanbaatar"}
+            lg{"Oras sa Ulaanbaatar"}
+            ls{"Tamdanang Oras sa Ulaanbaatar"}
+        }
+        "meta:Moscow"{
+            ld{"Oras sa Tag-init sa Moscow"}
+            lg{"Oras sa Moscow"}
+            ls{"Tamdanang Oras sa Moscow"}
+        }
+        "meta:Myanmar"{
+            ls{"Oras sa Myanmar"}
+        }
+        "meta:Nauru"{
+            ls{"Oras sa Nauru"}
+        }
+        "meta:Nepal"{
+            ls{"Oras sa Nepal"}
+        }
+        "meta:New_Caledonia"{
+            ld{"Oras sa Tag-init sa New Caledonia"}
+            lg{"Oras sa New Caledonia"}
+            ls{"Tamdanang Oras sa New Caledonia"}
+        }
+        "meta:New_Zealand"{
+            ld{"Oras sa Tag-init sa New Zealand"}
+            lg{"Oras sa New Zealand"}
+            ls{"Tamdanang Oras sa New Zealand"}
+        }
+        "meta:Newfoundland"{
+            ld{"Oras sa Tag-init sa Newfoundland"}
+            lg{"Oras sa Newfoundland"}
+            ls{"Tamdanang Oras sa Newfoundland"}
+        }
+        "meta:Niue"{
+            ls{"Oras sa Niue"}
+        }
+        "meta:Norfolk"{
+            ld{"Oras sa Tag-init sa Norfolk Island"}
+            lg{"Oras sa Norfolk Island"}
+            ls{"Tamdanang Oras sa Norfolk Island"}
+        }
+        "meta:Noronha"{
+            ld{"Oras sa Tag-init sa Fernando de Noronha"}
+            lg{"Oras sa Fernando de Noronha"}
+            ls{"Tamdanang Oras sa Fernando de Noronha"}
+        }
+        "meta:Novosibirsk"{
+            ld{"Oras sa Tag-init sa Novosibirsk"}
+            lg{"Oras sa Novosibirsk"}
+            ls{"Tamdanang Oras sa Novosibirsk"}
+        }
+        "meta:Omsk"{
+            ld{"Oras sa Tag-init sa Omsk"}
+            lg{"Oras sa Omsk"}
+            ls{"Tamdanang Oras sa Omsk"}
+        }
+        "meta:Pakistan"{
+            ld{"Oras sa Tag-init sa Pakistan"}
+            lg{"Oras sa Pakistan"}
+            ls{"Tamdanang Oras sa Pakistan"}
+        }
+        "meta:Palau"{
+            ls{"Oras sa Palau"}
+        }
+        "meta:Papua_New_Guinea"{
+            ls{"Oras sa Papua New Guinea"}
+        }
+        "meta:Paraguay"{
+            ld{"Oras sa Tag-init sa Paraguay"}
+            lg{"Oras sa Paraguay"}
+            ls{"Tamdanang Oras sa Paraguay"}
+        }
+        "meta:Peru"{
+            ld{"Oras sa Tag-init sa Peru"}
+            lg{"Oras sa Peru"}
+            ls{"Tamdanang Oras sa Peru"}
+        }
+        "meta:Philippines"{
+            ld{"Oras sa Tag-init sa Pilipinas"}
+            lg{"Oras sa Pilipinas"}
+            ls{"Tamdanang Oras sa Pilipinas"}
+        }
+        "meta:Phoenix_Islands"{
+            ls{"Oras sa Phoenix Islands"}
+        }
+        "meta:Pierre_Miquelon"{
+            ld{"Oras sa Tag-init sa St.Pierre & Miquelon"}
+            lg{"Oras sa St. Pierre & Miquelon"}
+            ls{"Tamdanang Oras sa St. Pierre & Miquelon"}
+        }
+        "meta:Pitcairn"{
+            ls{"Oras sa Pitcairn"}
+        }
+        "meta:Ponape"{
+            ls{"Oras sa Ponape"}
+        }
+        "meta:Pyongyang"{
+            ls{"Oras sa Pyongyang"}
+        }
+        "meta:Reunion"{
+            ls{"Oras sa Reunion"}
+        }
+        "meta:Rothera"{
+            ls{"Oras sa Rothera"}
+        }
+        "meta:Sakhalin"{
+            ld{"Oras sa Tag-init sa Sakhalin"}
+            lg{"Oras sa Sakhalin"}
+            ls{"Tamdanang Oras sa Sakhalin"}
+        }
+        "meta:Samoa"{
+            ld{"Oras sa Tag-init sa Samoa"}
+            lg{"Oras sa Samoa"}
+            ls{"Tamdanang Oras sa Samoa"}
+        }
+        "meta:Seychelles"{
+            ls{"Oras sa Seychelles"}
+        }
+        "meta:Singapore"{
+            ls{"Tamdanang Oras sa Singapore"}
+        }
+        "meta:Solomon"{
+            ls{"Oras sa Solomon Islands"}
+        }
+        "meta:South_Georgia"{
+            ls{"Oras sa South Georgia"}
+        }
+        "meta:Suriname"{
+            ls{"Oras sa Suriname"}
+        }
+        "meta:Syowa"{
+            ls{"Oras sa Syowa"}
+        }
+        "meta:Tahiti"{
+            ls{"Oras sa Tahiti"}
+        }
+        "meta:Taipei"{
+            ld{"Oras sa Tag-init sa Taipei"}
+            lg{"Oras sa Taipei"}
+            ls{"Tamdanang Oras sa Taipei"}
+        }
+        "meta:Tajikistan"{
+            ls{"Oras sa Tajikistan"}
+        }
+        "meta:Tokelau"{
+            ls{"Oras sa Tokelau"}
+        }
+        "meta:Tonga"{
+            ld{"Oras sa Tag-init sa Tonga"}
+            lg{"Oras sa Tonga"}
+            ls{"Tamdanang Oras sa Tonga"}
+        }
+        "meta:Truk"{
+            ls{"Oras sa Chuuk"}
+        }
+        "meta:Turkmenistan"{
+            ld{"Oras sa Tag-init sa Turkmenistan"}
+            lg{"Oras sa Turkmenistan"}
+            ls{"Tamdanang Oras sa Turkmenistan"}
+        }
+        "meta:Tuvalu"{
+            ls{"Oras sa Tuvalu"}
+        }
+        "meta:Uruguay"{
+            ld{"Oras sa Tag-init sa Uruguay"}
+            lg{"Oras sa Uruguay"}
+            ls{"Tamdanang Oras sa Uruguay"}
+        }
+        "meta:Uzbekistan"{
+            ld{"Oras sa Tag-init sa Uzbekistan"}
+            lg{"Oras sa Uzbekistan"}
+            ls{"Tamdanang Oras sa Uzbekistan"}
+        }
+        "meta:Vanuatu"{
+            ld{"Oras sa Tag-init sa Vanuatu"}
+            lg{"Oras sa Vanuatu"}
+            ls{"Tamdanang Oras sa Vanuatu"}
+        }
+        "meta:Venezuela"{
+            ls{"Oras sa Venezuela"}
+        }
+        "meta:Vladivostok"{
+            ld{"Oras sa Tag-init sa Vladivostok"}
+            lg{"Oras sa Vladivostok"}
+            ls{"Tamdanang Oras sa Vladivostok"}
+        }
+        "meta:Volgograd"{
+            ld{"Oras sa Tag-init sa Volgograd"}
+            lg{"Oras sa Volgograd"}
+            ls{"Tamdanang Oras sa Volgograd"}
+        }
+        "meta:Vostok"{
+            ls{"Oras sa Vostok"}
+        }
+        "meta:Wake"{
+            ls{"Oras sa Wake Island"}
+        }
+        "meta:Wallis"{
+            ls{"Oras sa Wallis & Futuna"}
+        }
+        "meta:Yakutsk"{
+            ld{"Oras sa Tag-init sa Yakutsk"}
+            lg{"Oras sa Yakutsk"}
+            ls{"Tamdanang Oras sa Yakutsk"}
+        }
+        "meta:Yekaterinburg"{
+            ld{"Oras sa Tag-init sa Yekaterinburg"}
+            lg{"Oras sa Yekaterinburg"}
+            ls{"Tamdanang Oras sa Yekaterinburg"}
+        }
+        fallbackFormat{"{1} {0}"}
+        gmtFormat{"GMT {0}"}
+        gmtZeroFormat{"GMT"}
+        hourFormat{"+HH:mm;-HH:mm"}
+        regionFormat{"{0} Oras"}
+        regionFormatDaylight{"{0} Oras sa Tag-init"}
+        regionFormatStandard{"{0} Tamdanang Oras"}
+    }
+}

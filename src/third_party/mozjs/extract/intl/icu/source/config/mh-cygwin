@@ -1,0 +1,147 @@
+## -*-makefile-*-
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+## Cygwin-specific setup
+## Copyright (c) 2001-2010, International Business Machines Corporation and
+## others. All Rights Reserved.
+
+## Commands to generate dependency files
+GEN_DEPS.c=	$(CC) -E -MM $(DEFS) $(CPPFLAGS)
+GEN_DEPS.cc=	$(CXX) -E -MM $(DEFS) $(CPPFLAGS) $(CXXFLAGS)
+
+## Flags to create/use a static library
+ifneq ($(ENABLE_SHARED),YES)
+## Make sure that the static libraries can be built and used
+CPPFLAGS += -DU_STATIC_IMPLEMENTATION
+else
+## Make sure that the static libraries can be built
+STATICCPPFLAGS = -DU_STATIC_IMPLEMENTATION
+endif
+
+## ICU requires a minimum target of Windows 7, and WINVER is not set to this by default.
+## https://msdn.microsoft.com/en-us/library/aa383745.aspx
+CPPFLAGS += -DWINVER=0x0601 -D_WIN32_WINNT=0x0601
+
+## Flags for position independent code
+SHAREDLIBCFLAGS = 
+SHAREDLIBCXXFLAGS = 
+SHAREDLIBCPPFLAGS = -DPIC
+
+## Additional flags when building libraries and with threads
+THREADSCPPFLAGS = -D_REENTRANT
+LIBCPPFLAGS =
+
+# Commands to link. Link with C++ in case static libraries are used.
+LINK.c=       $(CXX) $(CXXFLAGS) $(LDFLAGS)
+#LINK.cc=      $(CXX) $(CXXFLAGS) $(LDFLAGS)
+
+## Shared library options
+LD_SOOPTIONS= -Wl,-Bsymbolic
+
+## Commands to make a shared library
+# $(subst) won't work in shell script.  #M# at the end omits these
+# lines from the shell script (Make only)
+SHLIB.c=	$(CC) $(CFLAGS) $(LDFLAGS) -shared $(LD_SOOPTIONS) -Wl,--enable-auto-import -Wl,--out-implib=$(subst cyg,lib,$@).$(A)#M#
+SHLIB.cc=	$(CXX) $(CXXFLAGS) $(LDFLAGS) -shared $(LD_SOOPTIONS) -Wl,--enable-auto-import -Wl,--out-implib=$(subst cyg,lib,$@).$(A)#M#
+# the #SH# lines don't go through further postprocessing. 
+# so, they must be valid shell script starting from column 4
+#SH#SHLIB_c="$(CC) $(CFLAGS) $(LDFLAGS) -shared "
+#SH#SHLIB_cc="$(CXX) $(CXXFLAGS) $(LDFLAGS) -shared "
+
+
+## Compiler switch to embed a runtime search path
+LD_RPATH=	
+LD_RPATH_PRE=	-Wl,-rpath,
+
+## Compiler switch to embed a library name
+LD_SONAME =
+
+## Shared object suffix
+SO = dll
+## Non-shared intermediate object suffix
+STATIC_O = ao
+LIBICU = cyg$(ICUPREFIX)
+## To have an import library is better on Cygwin
+IMPORT_LIB_EXT = .dll.a
+
+## Compilation rules
+%.$(STATIC_O): $(srcdir)/%.c
+	$(COMPILE.c) $(STATICCPPFLAGS) $(STATICCFLAGS) -o $@ $<
+%.o: $(srcdir)/%.c
+	$(COMPILE.c) $(DYNAMICCPPFLAGS) $(DYNAMICCFLAGS) -o $@ $<
+
+%.$(STATIC_O): $(srcdir)/%.cpp
+	$(COMPILE.cc) $(STATICCPPFLAGS) $(STATICCXXFLAGS) -o $@ $<
+%.o: $(srcdir)/%.cpp
+	$(COMPILE.cc) $(DYNAMICCPPFLAGS) $(DYNAMICCXXFLAGS) -o $@ $<
+
+
+## Dependency rules
+%.d: $(srcdir)/%.c
+	@echo "generating dependency information for $<"
+	@echo -n "$@ " > $@
+	@$(GEN_DEPS.c) $< >> $@ || (rm -f $@ && FALSE)
+
+%.d: $(srcdir)/%.cpp
+	@echo "generating dependency information for $<"
+	@echo -n "$@ " > $@
+	@$(GEN_DEPS.cc) $< >> $@ || (rm -f $@ && FALSE)
+
+## Versioned target for a shared library.
+## Since symbolic links don't work the same way on Windows,
+## we only use the version major number.
+#FINAL_SO_TARGET=$(basename $(SO_TARGET))$(SO_TARGET_VERSION).$(SO)
+FINAL_SO_TARGET=$(basename $(SO_TARGET))$(SO_TARGET_VERSION_MAJOR).$(SO)
+MIDDLE_SO_TARGET=$(FINAL_SO_TARGET)
+
+IMPORT_LIB = $(subst cyg,lib,$(FINAL_SO_TARGET)).$(A)#M#
+MIDDLE_IMPORT_LIB = $(subst cyg,lib,$(basename $(SO_TARGET)))$(SO_TARGET_VERSION_MAJOR).$(SO).$(A)#M#
+FINAL_IMPORT_LIB = $(IMPORT_LIB)#M#
+
+# The following is for Makefile.inc's use.
+ICULIBSUFFIX_VERSION = $(LIB_VERSION_MAJOR)
+
+## Versioned libraries rules
+#%$(SO_TARGET_VERSION_MAJOR).$(SO): %$(SO_TARGET_VERSION).$(SO)
+#	$(RM) $@ && cp ${<F} $@
+%.$(SO): %$(SO_TARGET_VERSION_MAJOR).$(SO)
+	ln -fs $(subst cyg,lib,${<F}).$(A) $(subst cyg,lib,$@).$(A)
+
+## Install libraries as executable
+INSTALL-L=$(INSTALL_PROGRAM)
+
+##  Bind internal references
+
+# LDflags that pkgdata will use
+BIR_LDFLAGS= -Wl,-Bsymbolic
+
+# Dependencies [i.e. map files] for the final library
+BIR_DEPS=
+
+# Environment variable to set a runtime search path
+LDLIBRARYPATH_ENVVAR = PATH
+
+# The type of assembly to write for generating an object file
+GENCCODE_ASSEMBLY=-a gcc-cygwin
+
+# put this here again so it gets cyguc...
+
+#SH#ICULIBS_COMMON_LIB_NAME="${LIBICU}uc${ICULIBSUFFIX}${ICULIBSUFFIX_VERSION}.${SO}"
+
+# for icu-config
+
+#SH### copied from Makefile.inc
+#SH#ICULIBS_COMMON="-l${LIBICU}uc${ICULIBSUFFIX}${ICULIBSUFFIX_VERSION}"
+#SH#ICULIBS_DATA="-l${LIBICU}${DATA_STUBNAME}${ICULIBSUFFIX}${ICULIBSUFFIX_VERSION}"
+#SH#ICULIBS_I18N="-l${LIBICU}${I18N_STUBNAME}${ICULIBSUFFIX}${ICULIBSUFFIX_VERSION}"
+#SH#ICULIBS_TOOLUTIL="-l${LIBICU}tu${ICULIBSUFFIX}${ICULIBSUFFIX_VERSION}"
+#SH#ICULIBS_CTESTFW="-l${LIBICU}ctestfw${ICULIBSUFFIX}${ICULIBSUFFIX_VERSION}"
+#SH#ICULIBS_ICUIO="-l${LIBICU}io${ICULIBSUFFIX}${ICULIBSUFFIX_VERSION}"
+#SH#ICULIBS_OBSOLETE="-l${LIBICU}obsolete${ICULIBSUFFIX}${ICULIBSUFFIX_VERSION}"
+#SH#ICULIBS_LAYOUT="-l${LIBICU}le${ICULIBSUFFIX}${ICULIBSUFFIX_VERSION}"
+#SH#ICULIBS_LAYOUTEX="-l${LIBICU}lx${ICULIBSUFFIX}${ICULIBSUFFIX_VERSION}"
+#SH#ICULIBS_BASE="${LIBS} -L${libdir}"
+#SH#ICULIBS="${ICULIBS_BASE} ${ICULIBS_I18N} ${ICULIBS_COMMON} ${ICULIBS_DATA}" 
+
+## End Cygwin-specific setup
+

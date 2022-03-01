@@ -1,0 +1,20 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+cy{
+    collations{
+        standard{
+            Sequence{
+                "&C<ch<<<Ch<<<CH"
+                "&D<dd<<<Dd<<<DD"
+                "&F<ff<<<Ff<<<FF"
+                "&G<ng<<<Ng<<<NG"
+                "&L<ll<<<Ll<<<LL"
+                "&P<ph<<<Ph<<<PH"
+                "&R<rh<<<Rh<<<RH"
+                "&T<th<<<Th<<<TH"
+            }
+            Version{"39"}
+        }
+    }
+}

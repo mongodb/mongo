@@ -30,34 +30,6 @@
 
 namespace vixl {
 
-
-// Floating-point infinity values.
-const float16 kFP16PositiveInfinity = 0x7c00;
-const float16 kFP16NegativeInfinity = 0xfc00;
-const float kFP32PositiveInfinity = rawbits_to_float(0x7f800000);
-const float kFP32NegativeInfinity = rawbits_to_float(0xff800000);
-const double kFP64PositiveInfinity =
-    rawbits_to_double(UINT64_C(0x7ff0000000000000));
-const double kFP64NegativeInfinity =
-    rawbits_to_double(UINT64_C(0xfff0000000000000));
-
-
-// The default NaN values (for FPCR.DN=1).
-const double kFP64DefaultNaN = rawbits_to_double(UINT64_C(0x7ff8000000000000));
-const float kFP32DefaultNaN = rawbits_to_float(0x7fc00000);
-const float16 kFP16DefaultNaN = 0x7e00;
-
-
-static uint64_t RotateRight(uint64_t value,
-                            unsigned int rotate,
-                            unsigned int width) {
-  VIXL_ASSERT(width <= 64);
-  rotate &= 63;
-  return ((value & ((UINT64_C(1) << rotate) - 1)) <<
-          (width - rotate)) | (value >> rotate);
-}
-
-
 static uint64_t RepeatBitsAcrossReg(unsigned reg_size,
                                     uint64_t value,
                                     unsigned width) {
@@ -196,7 +168,7 @@ float Instruction::Imm8ToFP32(uint32_t imm8) {
   uint32_t bit5_to_0 = bits & 0x3f;
   uint32_t result = (bit7 << 31) | ((32 - bit6) << 25) | (bit5_to_0 << 19);
 
-  return rawbits_to_float(result);
+  return RawbitsToFloat(result);
 }
 
 
@@ -216,7 +188,7 @@ double Instruction::Imm8ToFP64(uint32_t imm8) {
   uint64_t bit5_to_0 = bits & 0x3f;
   uint64_t result = (bit7 << 63) | ((256 - bit6) << 54) | (bit5_to_0 << 48);
 
-  return rawbits_to_double(result);
+  return RawbitsToDouble(result);
 }
 
 
@@ -289,7 +261,7 @@ int32_t Instruction::ImmBranchForwardRange(ImmBranchType branch_type) {
 
 bool Instruction::IsValidImmPCOffset(ImmBranchType branch_type,
                                      int64_t offset) {
-  return is_intn(ImmBranchRangeBitwidth(branch_type), offset);
+  return IsIntN(ImmBranchRangeBitwidth(branch_type), offset);
 }
 
 ImmBranchRangeType Instruction::ImmBranchTypeToRange(ImmBranchType branch_type)
@@ -329,11 +301,11 @@ int32_t Instruction::ImmBranchMinBackwardOffset(ImmBranchRangeType range_type)
 {
   switch(range_type) {
     case TestBranchRangeType:
-      return -int32_t(1 << ImmTestBranch_width) / 2 * kInstructionSize;
+      return -int32_t(1 << ImmTestBranch_width) / int32_t(2 * kInstructionSize);
     case CondBranchRangeType:
-      return -int32_t(1 << ImmCondBranch_width) / 2 * kInstructionSize;
+      return -int32_t(1 << ImmCondBranch_width) / int32_t(2 * kInstructionSize);
     case UncondBranchRangeType:
-      return -int32_t(1 << ImmUncondBranch_width) / 2 * kInstructionSize;
+      return -int32_t(1 << ImmUncondBranch_width) / int32_t(2 * kInstructionSize);
     default:
       VIXL_UNREACHABLE();
       return 0;

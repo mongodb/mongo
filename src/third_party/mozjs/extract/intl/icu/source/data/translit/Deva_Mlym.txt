@@ -1,0 +1,14 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Deva_Mlym.txt
+# Generated from CLDR
+#
+
+::[\u0901-ःऄअ-ह\u093C-\u094Dॐ-\u0954क़-९ॽ];
+::NFD;
+::Devanagari-InterIndic;
+::InterIndic-Malayalam;
+::NFC;
+

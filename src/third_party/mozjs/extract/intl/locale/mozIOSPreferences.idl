@@ -1,0 +1,95 @@
+/* -*- Mode: IDL; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "nsISupports.idl"
+
+%{C++
+// Define Contractid and CID
+#define MOZ_OSPREFERENCES_CID \
+  { 0x65944815, 0xe9ae, 0x48bd, { 0xa2, 0xbf, 0xf1, 0x10, 0x87, 0x20, 0x95, 0x0c } }
+
+#define MOZ_OSPREFERENCES_CONTRACTID "@mozilla.org/intl/ospreferences;1"
+%}
+
+[scriptable, uuid(65944815-e9ae-48bd-a2bf-f1108720950c)]
+interface mozIOSPreferences : nsISupports
+{
+  const long dateTimeFormatStyleNone     = 0;
+  const long dateTimeFormatStyleShort    = 1;
+  const long dateTimeFormatStyleMedium   = 2;
+  const long dateTimeFormatStyleLong     = 3;
+  const long dateTimeFormatStyleFull     = 4;
+
+  /**
+   * Returns a list of locales used by the host environment for UI
+   * localization.
+   *
+   * The result is a sorted list and we expect that the OS attempts to
+   * use the top locale from the list for which it has data.
+   *
+   * Each element of the list is a valid locale ID that can be passed to ICU
+   * and ECMA402 Intl APIs,
+   * At the same time each element is a valid BCP47 language tag that can be
+   * used for language negotiation.
+   *
+   * Example: ["en-US", "de", "pl", "sr-Cyrl", "zh-Hans-HK"]
+   */
+  readonly attribute Array<ACString> systemLocales;
+
+  /**
+   * Returns a list of locales used by host environment for regional
+   * preferences internationalization.
+   *
+   * The result is a sorted list and we expect that the OS attempts to
+   * use the top locale from the list for which it has data.
+   *
+   * Each element of the list is a valid locale ID that can be passed to ICU
+   * and ECMA402 Intl APIs,
+   *
+   * Example: ["en-US", "de", "pl", "sr-Cyrl", "zh-Hans-HK"]
+   */
+  readonly attribute Array<ACString> regionalPrefsLocales;
+
+  /**
+   * Returns the best locale that the host environment is localized to.
+   *
+   * The result is a valid locale ID and it should be
+   * used for all APIs that do not handle language negotiation.
+   *
+   * In any scenario involving language negotiation, systemLocales should
+   * be preferred over the single value.
+   *
+   * Example: "zh-Hans-HK"
+   */
+  readonly attribute ACString systemLocale;
+
+  /**
+   * Returns the best possible date/time pattern for the host environment
+   * taking into account date/time regional settings user defined in the OS
+   * preferences.
+   *
+   * Notice, that depending on the OS it may take into account those settings
+   * for all locales, or only if the locale matches the OS locale.
+   *
+   * It takes two integer arguments that must be valid `dateTimeFormatStyle*`
+   * values (see constants defined above), and a string representing a
+   * BCP47 locale.
+   *
+   * It returns a string with a LDML date/time pattern.
+   *
+   * If no pattern can be retrieved from the host environment, it will
+   * lookup the best available pattern from ICU.
+   *
+   * Notice, this is a pretty unique method in this API in that it does
+   * more than look up into host environment.
+   * The reason for that is that constructing the right date/time pattern
+   * requires a lot of OS-specific logic and it ends up being easier to just
+   * handle all scenarios, including with cases where we fail to retrieve
+   * anything from the OS, here.
+   */
+  AUTF8String getDateTimePattern(in long timeFormatStyle,
+                                 in long dateFormatStyle,
+                                 [optional] in ACString locale);
+};

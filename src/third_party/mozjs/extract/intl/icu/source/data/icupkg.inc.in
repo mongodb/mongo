@@ -1,0 +1,59 @@
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+#******************************************************************************
+#
+#   Copyright (C) 2000-2008, International Business Machines
+#   Corporation and others.  All Rights Reserved.
+#
+#******************************************************************************
+# This Makefile is used to build the ICU's data.
+# It is included with the -O option to pkgdata.
+
+top_srcdir=@top_srcdir@
+srcdir=@srcdir@
+top_builddir=..
+
+include $(top_builddir)/icudefs.mk
+
+CPPFLAGS+= -I$(top_builddir)/common -I$(top_srcdir)/common
+LDFLAGS=@LDFLAGS@ $(PKGDATA_LDFLAGS)
+exec_prefix=@exec_prefix@
+prefix=@prefix@
+bindir=@bindir@
+sbindir=@sbindir@
+libexecdir=@libexecdir@
+datarootdir=@datarootdir@
+datadir=@datadir@
+sysconfdir=@sysconfdir@
+sharedstatedir=@sharedstatedir@
+localstatedir=@localstatedir@
+libdir=@libdir@
+includedir=@includedir@
+oldincludedir=@oldincludedir@
+infodir=@infodir@
+mandir=@mandir@
+
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
+
+INSTALL_PROGRAM=@INSTALL_PROGRAM@
+INSTALL_SCRIPT=@INSTALL_SCRIPT@
+INSTALL_DATA=@INSTALL_DATA@
+MKINSTALLDIRS = $(SHELL) $(top_srcdir)/mkinstalldirs
+host=@host@
+host_alias=@host_alias@
+host_cpu=@host_cpu@
+host_vendor=@host_vendor@
+host_os=@host_os@
+CPP=@CPP@
+U_HAVE_INTTYPES_H=@U_HAVE_INTTYPES_H@
+U_IS_BIG_ENDIAN=@U_IS_BIG_ENDIAN@
+
+##### Add the following to source/config/Makefile.in
+
+GENCCODE=$(BINDIR)/genccode
+GENCMN=$(BINDIR)/gencmn
+ICUPKG=$(BINDIR)/icupkg
+
+

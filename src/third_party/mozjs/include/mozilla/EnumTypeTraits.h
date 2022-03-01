@@ -8,40 +8,38 @@
 #ifndef mozilla_EnumTypeTraits_h
 #define mozilla_EnumTypeTraits_h
 
+#include <stddef.h>
 #include <type_traits>
 
 namespace mozilla {
 
 namespace detail {
 
-template<size_t EnumSize, bool EnumSigned, size_t StorageSize, bool StorageSigned>
+template <size_t EnumSize, bool EnumSigned, size_t StorageSize,
+          bool StorageSigned>
 struct EnumFitsWithinHelper;
 
 // Signed enum, signed storage.
-template<size_t EnumSize, size_t StorageSize>
+template <size_t EnumSize, size_t StorageSize>
 struct EnumFitsWithinHelper<EnumSize, true, StorageSize, true>
-  : public std::integral_constant<bool, (EnumSize <= StorageSize)>
-{};
+    : public std::integral_constant<bool, (EnumSize <= StorageSize)> {};
 
 // Signed enum, unsigned storage.
-template<size_t EnumSize, size_t StorageSize>
+template <size_t EnumSize, size_t StorageSize>
 struct EnumFitsWithinHelper<EnumSize, true, StorageSize, false>
-  : public std::integral_constant<bool, false>
-{};
+    : public std::integral_constant<bool, false> {};
 
 // Unsigned enum, signed storage.
-template<size_t EnumSize, size_t StorageSize>
+template <size_t EnumSize, size_t StorageSize>
 struct EnumFitsWithinHelper<EnumSize, false, StorageSize, true>
-  : public std::integral_constant<bool, (EnumSize * 2 <= StorageSize)>
-{};
+    : public std::integral_constant<bool, (EnumSize * 2 <= StorageSize)> {};
 
 // Unsigned enum, unsigned storage.
-template<size_t EnumSize, size_t StorageSize>
+template <size_t EnumSize, size_t StorageSize>
 struct EnumFitsWithinHelper<EnumSize, false, StorageSize, false>
-  : public std::integral_constant<bool, (EnumSize <= StorageSize)>
-{};
+    : public std::integral_constant<bool, (EnumSize <= StorageSize)> {};
 
-} // namespace detail
+}  // namespace detail
 
 /*
  * Type trait that determines whether the enum type T can fit within the
@@ -52,17 +50,15 @@ struct EnumFitsWithinHelper<EnumSize, false, StorageSize, false>
  * So for an enum with only small non-negative values, the underlying type may
  * be either int or unsigned int, depending on the whims of the implementation.
  */
-template<typename T, typename Storage>
+template <typename T, typename Storage>
 struct EnumTypeFitsWithin
-  : public detail::EnumFitsWithinHelper<
-      sizeof(T),
-      std::is_signed<typename std::underlying_type<T>::type>::value,
-      sizeof(Storage),
-      std::is_signed<Storage>::value
-    >
-{
+    : public detail::EnumFitsWithinHelper<
+          sizeof(T),
+          std::is_signed<typename std::underlying_type<T>::type>::value,
+          sizeof(Storage), std::is_signed<Storage>::value> {
   static_assert(std::is_enum<T>::value, "must provide an enum type");
-  static_assert(std::is_integral<Storage>::value, "must provide an integral type");
+  static_assert(std::is_integral<Storage>::value,
+                "must provide an integral type");
 };
 
 /*
@@ -88,6 +84,30 @@ struct EnumTypeFitsWithin
 template <typename T>
 struct MaxEnumValue;  // no need to define the primary template
 
-} // namespace mozilla
+/**
+ * Get the underlying value of an enum, but typesafe.
+ *
+ * example:
+ *
+ *   enum class Pet : int16_t {
+ *     Cat,
+ *     Dog,
+ *     Fish
+ *   };
+ *   enum class Plant {
+ *     Flower,
+ *     Tree,
+ *     Vine
+ *   };
+ *   UnderlyingValue(Pet::Fish) -> int16_t(2)
+ *   UnderlyingValue(Plant::Tree) -> int(1)
+ */
+template <typename T>
+inline constexpr auto UnderlyingValue(const T v) {
+  static_assert(std::is_enum_v<T>);
+  return static_cast<typename std::underlying_type<T>::type>(v);
+}
+
+}  // namespace mozilla
 
 #endif /* mozilla_EnumTypeTraits_h */

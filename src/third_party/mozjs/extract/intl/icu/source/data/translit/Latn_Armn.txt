@@ -1,0 +1,91 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Latn_Armn.txt
+# Generated from CLDR
+#
+
+::NFD(NFC);
+ev ↔ և ;
+tʻ ↔ թ ;
+čʻ ↔ չ ;
+cʻ ↔ ց ;
+pʻ ↔ փ ;
+kʻ ↔ ք ;
+u ↔ ու ;
+a ↔ ա ;
+b ↔ բ ;
+g ↔ գ ;
+d ↔ դ ;
+e ↔ ե ;
+z ↔ զ ;
+ē ↔ է ;
+ə ↔ ը ;
+ž ↔ ժ ;
+i ↔ ի ;
+l ↔ լ ;
+x ↔ խ ;
+c ↔ ծ ;
+k ↔ կ ;
+h ↔ հ ;
+j ↔ ձ ;
+ġ ↔ ղ ;
+č ↔ ճ ;
+m ↔ մ ;
+y ↔ յ ;
+n ↔ ն ;
+š ↔ շ ;
+o ↔ ո ;
+p ↔ պ ;
+ǰ ↔ ջ ;
+ṙ ↔ ռ ;
+s ↔ ս ;
+v ↔ վ ;
+t ↔ տ ;
+r ↔ ր ;
+w ↔ ւ ;
+ō ↔ օ ;
+f ↔ ֆ ;
+U ↔ ՈՒ ;
+EV ↔ ԵՒ ;
+J\u030C ↔ Ջ ;
+Pʻ ↔ Փ ;
+Kʻ ↔ Ք ;
+Tʻ ↔ Թ ;
+Čʻ ↔ Չ ;
+Cʻ ↔ Ց ;
+A ↔ Ա ;
+B ↔ Բ ;
+G ↔ Գ ;
+D ↔ Դ ;
+E ↔ Ե ;
+Z ↔ Զ ;
+Ē ↔ Է ;
+Ə ↔ Ը ;
+Ž ↔ Ժ ;
+I ↔ Ի ;
+L ↔ Լ ;
+X ↔ Խ ;
+C ↔ Ծ ;
+K ↔ Կ ;
+H ↔ Հ ;
+J ↔ Ձ ;
+Ġ ↔ Ղ ;
+Č ↔ Ճ ;
+M ↔ Մ ;
+Y ↔ Յ ;
+N ↔ Ն ;
+Š ↔ Շ ;
+O ↔ Ո ;
+P ↔ Պ ;
+Ṙ ↔ Ռ ;
+S ↔ Ս ;
+V ↔ Վ ;
+T ↔ Տ ;
+R ↔ Ր ;
+W ↔ Ւ ;
+Ō ↔ Օ ;
+F ↔ Ֆ ;
+::NFC(NFD);
+

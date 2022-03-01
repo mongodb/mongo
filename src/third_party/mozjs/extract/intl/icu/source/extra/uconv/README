@@ -1,0 +1,17 @@
+Copyright (C) 2016 and later: Unicode, Inc. and others.
+License & terms of use: http://www.unicode.org/copyright.html
+Copyright (c) 2002, International Business Machines Corporation and others. All Rights Reserved.
+
+The uconv command is an iconv(1)-like conversion / transcoding
+program. Please check its manual page, or run uconv -h, for help.
+
+Help, as well as error messages, are displayed through the use of a
+resource bundle. Please contact Steven Loomis <srl@jtcsv.com> if you
+want to offer a translation of these messages for a particular locale.
+
+uconv was originally written and contributed to icuapps by Jonas Utterström
+<jonas.utterstrom@vittran.norrnod.se>, and offered simple conversion and
+a way to know which encodings were available. It has since then be
+moved to the main ICU distribution and converted to the C conversion
+API, and is maintained by Yves Arrouye <yves@realnames.com> who seems
+to always be looking for one more feature or option to add to the tool.

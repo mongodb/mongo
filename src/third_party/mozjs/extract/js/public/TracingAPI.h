@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -7,346 +7,423 @@
 #ifndef js_TracingAPI_h
 #define js_TracingAPI_h
 
-#include "js/AllocPolicy.h"
-#include "js/HashTable.h"
+#include "js/GCTypeMacros.h"
 #include "js/HeapAPI.h"
 #include "js/TraceKind.h"
 
-class JS_PUBLIC_API(JSTracer);
+class JS_PUBLIC_API JSTracer;
 
 namespace JS {
-class JS_PUBLIC_API(CallbackTracer);
-template <typename T> class Heap;
-template <typename T> class TenuredHeap;
+class JS_PUBLIC_API CallbackTracer;
+template <typename T>
+class Heap;
+template <typename T>
+class TenuredHeap;
 
 /** Returns a static string equivalent of |kind|. */
-JS_FRIEND_API(const char*)
-GCTraceKindToAscii(JS::TraceKind kind);
+JS_PUBLIC_API const char* GCTraceKindToAscii(JS::TraceKind kind);
 
-} // namespace JS
+/** Returns the base size in bytes of the GC thing of kind |kind|. */
+JS_PUBLIC_API size_t GCTraceKindSize(JS::TraceKind kind);
 
-enum WeakMapTraceKind {
-    /**
-     * Do not trace into weak map keys or values during traversal. Users must
-     * handle weak maps manually.
-     */
-    DoNotTraceWeakMaps,
+// Kinds of JSTracer.
+enum class TracerKind {
+  // Marking path: a tracer used only for marking liveness of cells, not
+  // for moving them.
+  Marking,
 
-    /**
-     * Do true ephemeron marking with a weak key lookup marking phase. This is
-     * the default for GCMarker.
-     */
-    ExpandWeakMaps,
+  // Generic tracers: Internal tracers that have a different virtual method
+  // called for each edge kind.
+  //
+  // Order is important. All generic kinds must follow this one.
+  Generic,
 
-    /**
-     * Trace through to all values, irrespective of whether the keys are live
-     * or not. Used for non-marking tracers.
-     */
-    TraceWeakMapValues,
+  // Specific kinds of generic tracer.
+  Tenuring,
+  Moving,
+  GrayBuffering,
+  ClearEdges,
+  Sweeping,
+  Barrier,
 
-    /**
-     * Trace through to all keys and values, irrespective of whether the keys
-     * are live or not. Used for non-marking tracers.
-     */
-    TraceWeakMapKeysValues
+  // Callback tracers: General-purpose tracers that have a single virtual
+  // method called on every edge.
+  //
+  // Order is important. All callback kinds must follow this one.
+  Callback,
+
+  // Specific kinds of callback tracer.
+  UnmarkGray,
+  VerifyTraceProtoAndIface,
 };
 
-class JS_PUBLIC_API(JSTracer)
-{
-  public:
-    // Return the runtime set on the tracer.
-    JSRuntime* runtime() const { return runtime_; }
+enum class WeakMapTraceAction {
+  /**
+   * Do not trace into weak map keys or values during traversal. Users must
+   * handle weak maps manually.
+   */
+  Skip,
 
-    // Return the weak map tracing behavior currently set on this tracer.
-    WeakMapTraceKind weakMapAction() const { return weakMapAction_; }
+  /**
+   * Do true ephemeron marking with a weak key lookup marking phase. This is
+   * the default for GCMarker.
+   */
+  Expand,
 
-    enum class TracerKindTag {
-        // Marking path: a tracer used only for marking liveness of cells, not
-        // for moving them. The kind will transition to WeakMarking after
-        // everything reachable by regular edges has been marked.
-        Marking,
+  /**
+   * Trace through to all values, irrespective of whether the keys are live
+   * or not. Used for non-marking tracers.
+   */
+  TraceValues,
 
-        // Same as Marking, except we have now moved on to the "weak marking
-        // phase", in which every marked obj/script is immediately looked up to
-        // see if it is a weak map key (and therefore might require marking its
-        // weak map value).
-        WeakMarking,
-
-        // A tracer that traverses the graph for the purposes of moving objects
-        // from the nursery to the tenured area.
-        Tenuring,
-
-        // General-purpose traversal that invokes a callback on each cell.
-        // Traversing children is the responsibility of the callback.
-        Callback
-    };
-    bool isMarkingTracer() const { return tag_ == TracerKindTag::Marking || tag_ == TracerKindTag::WeakMarking; }
-    bool isWeakMarkingTracer() const { return tag_ == TracerKindTag::WeakMarking; }
-    bool isTenuringTracer() const { return tag_ == TracerKindTag::Tenuring; }
-    bool isCallbackTracer() const { return tag_ == TracerKindTag::Callback; }
-    inline JS::CallbackTracer* asCallbackTracer();
-    bool traceWeakEdges() const { return traceWeakEdges_; }
-#ifdef DEBUG
-    bool checkEdges() { return checkEdges_; }
-#endif
-
-    // Get the current GC number. Only call this method if |isMarkingTracer()|
-    // is true.
-    uint32_t gcNumberForMarking() const;
-
-  protected:
-    JSTracer(JSRuntime* rt, TracerKindTag tag,
-             WeakMapTraceKind weakTraceKind = TraceWeakMapValues)
-      : runtime_(rt)
-      , weakMapAction_(weakTraceKind)
-#ifdef DEBUG
-      , checkEdges_(true)
-#endif
-      , tag_(tag)
-      , traceWeakEdges_(true)
-    {}
-
-#ifdef DEBUG
-    // Set whether to check edges are valid in debug builds.
-    void setCheckEdges(bool check) {
-        checkEdges_ = check;
-    }
-#endif
-
-  private:
-    JSRuntime* runtime_;
-    WeakMapTraceKind weakMapAction_;
-#ifdef DEBUG
-    bool checkEdges_;
-#endif
-
-  protected:
-    TracerKindTag tag_;
-    bool traceWeakEdges_;
+  /**
+   * Trace through to all keys and values, irrespective of whether the keys
+   * are live or not. Used for non-marking tracers.
+   */
+  TraceKeysAndValues
 };
 
-namespace JS {
+// Whether a tracer should trace weak edges. GCMarker sets this to Skip.
+enum class WeakEdgeTraceAction { Skip, Trace };
+
+// Whether a tracer can skip tracing JS::Ids. This is needed by the cycle
+// collector to skip some Ids for performance reasons. Not all Ids are skipped.
+enum class IdTraceAction { CanSkip, Trace };
+
+struct TraceOptions {
+  JS::WeakMapTraceAction weakMapAction = WeakMapTraceAction::TraceValues;
+  JS::WeakEdgeTraceAction weakEdgeAction = WeakEdgeTraceAction::Trace;
+  JS::IdTraceAction idAction = IdTraceAction::Trace;
+
+  TraceOptions() = default;
+  TraceOptions(JS::WeakMapTraceAction weakMapActionArg,
+               JS::WeakEdgeTraceAction weakEdgeActionArg,
+               JS::IdTraceAction idActionArg = IdTraceAction::Trace)
+      : weakMapAction(weakMapActionArg),
+        weakEdgeAction(weakEdgeActionArg),
+        idAction(idActionArg) {}
+  MOZ_IMPLICIT TraceOptions(JS::WeakMapTraceAction weakMapActionArg)
+      : weakMapAction(weakMapActionArg) {}
+  MOZ_IMPLICIT TraceOptions(JS::WeakEdgeTraceAction weakEdgeActionArg)
+      : weakEdgeAction(weakEdgeActionArg) {}
+  MOZ_IMPLICIT TraceOptions(JS::IdTraceAction idActionArg)
+      : idAction(idActionArg) {}
+};
 
 class AutoTracingName;
 class AutoTracingIndex;
-class AutoTracingCallback;
 
-class JS_PUBLIC_API(CallbackTracer) : public JSTracer
-{
-  public:
-    CallbackTracer(JSRuntime* rt, WeakMapTraceKind weakTraceKind = TraceWeakMapValues)
-      : JSTracer(rt, JSTracer::TracerKindTag::Callback, weakTraceKind),
-        contextName_(nullptr), contextIndex_(InvalidIndex), contextFunctor_(nullptr)
-    {}
-    CallbackTracer(JSContext* cx, WeakMapTraceKind weakTraceKind = TraceWeakMapValues);
+// Optional context information that can be used to construct human readable
+// descriptions of what is being traced.
+class TracingContext {
+ public:
+  // Access to the tracing context: When tracing with a JS::CallbackTracer, we
+  // invoke the callback with the edge location and the type of target. This is
+  // useful for operating on the edge in the abstract or on the target thing,
+  // satisfying most common use cases.  However, some tracers need additional
+  // detail about the specific edge that is being traced in order to be
+  // useful. Unfortunately, the raw pointer to the edge that we provide is not
+  // enough information to infer much of anything useful about that edge.
+  //
+  // In order to better support use cases that care in particular about edges --
+  // as opposed to the target thing -- tracing implementations are responsible
+  // for providing extra context information about each edge they trace, as it
+  // is traced. This contains, at a minimum, an edge name and, when tracing an
+  // array, the index. Further specialization can be achieved (with some
+  // complexity), by associating a functor with the tracer so that, when
+  // requested, the user can generate totally custom edge descriptions.
 
-    // Override these methods to receive notification when an edge is visited
-    // with the type contained in the callback. The default implementation
-    // dispatches to the fully-generic onChild implementation, so for cases that
-    // do not care about boxing overhead and do not need the actual edges,
-    // just override the generic onChild.
-    virtual void onObjectEdge(JSObject** objp) { onChild(JS::GCCellPtr(*objp)); }
-    virtual void onStringEdge(JSString** strp) { onChild(JS::GCCellPtr(*strp)); }
-    virtual void onSymbolEdge(JS::Symbol** symp) { onChild(JS::GCCellPtr(*symp)); }
-    virtual void onScriptEdge(JSScript** scriptp) { onChild(JS::GCCellPtr(*scriptp)); }
-    virtual void onShapeEdge(js::Shape** shapep) {
-        onChild(JS::GCCellPtr(*shapep, JS::TraceKind::Shape));
-    }
-    virtual void onObjectGroupEdge(js::ObjectGroup** groupp) {
-        onChild(JS::GCCellPtr(*groupp, JS::TraceKind::ObjectGroup));
-    }
-    virtual void onBaseShapeEdge(js::BaseShape** basep) {
-        onChild(JS::GCCellPtr(*basep, JS::TraceKind::BaseShape));
-    }
-    virtual void onJitCodeEdge(js::jit::JitCode** codep) {
-        onChild(JS::GCCellPtr(*codep, JS::TraceKind::JitCode));
-    }
-    virtual void onLazyScriptEdge(js::LazyScript** lazyp) {
-        onChild(JS::GCCellPtr(*lazyp, JS::TraceKind::LazyScript));
-    }
-    virtual void onScopeEdge(js::Scope** scopep) {
-        onChild(JS::GCCellPtr(*scopep, JS::TraceKind::Scope));
-    }
-    virtual void onRegExpSharedEdge(js::RegExpShared** sharedp) {
-        onChild(JS::GCCellPtr(*sharedp, JS::TraceKind::RegExpShared));
-    }
+  // Returns the current edge's name. It is only valid to call this when
+  // inside the trace callback, however, the edge name will always be set.
+  const char* name() const {
+    MOZ_ASSERT(name_);
+    return name_;
+  }
 
-    // Override this method to receive notification when a node in the GC
-    // heap graph is visited.
-    virtual void onChild(const JS::GCCellPtr& thing) = 0;
+  // Returns the current edge's index, if marked as part of an array of edges.
+  // This must be called only inside the trace callback. When not tracing an
+  // array, the value will be InvalidIndex.
+  constexpr static size_t InvalidIndex = size_t(-1);
+  size_t index() const { return index_; }
 
-    // Access to the tracing context:
-    // When tracing with a JS::CallbackTracer, we invoke the callback with the
-    // edge location and the type of target. This is useful for operating on
-    // the edge in the abstract or on the target thing, satisfying most common
-    // use cases.  However, some tracers need additional detail about the
-    // specific edge that is being traced in order to be useful. Unfortunately,
-    // the raw pointer to the edge that we provide is not enough information to
-    // infer much of anything useful about that edge.
-    //
-    // In order to better support use cases that care in particular about edges
-    // -- as opposed to the target thing -- tracing implementations are
-    // responsible for providing extra context information about each edge they
-    // trace, as it is traced. This contains, at a minimum, an edge name and,
-    // when tracing an array, the index. Further specialization can be achived
-    // (with some complexity), by associating a functor with the tracer so
-    // that, when requested, the user can generate totally custom edge
-    // descriptions.
+  // Build a description of this edge in the heap graph. This call may invoke
+  // the context functor, if set, which may inspect arbitrary areas of the
+  // heap. On the other hand, the description provided by this method may be
+  // substantially more accurate and useful than those provided by only the
+  // name and index.
+  void getEdgeName(char* buffer, size_t bufferSize);
 
-    // Returns the current edge's name. It is only valid to call this when
-    // inside the trace callback, however, the edge name will always be set.
-    const char* contextName() const { MOZ_ASSERT(contextName_); return contextName_; }
+  // The trace implementation may associate a callback with one or more edges
+  // using AutoTracingDetails. This functor is called by getEdgeName and
+  // is responsible for providing a textual representation of the edge currently
+  // being traced. The callback has access to the full heap, including the
+  // currently set tracing context.
+  class Functor {
+   public:
+    virtual void operator()(TracingContext* tcx, char* buf, size_t bufsize) = 0;
+  };
 
-    // Returns the current edge's index, if marked as part of an array of edges.
-    // This must be called only inside the trace callback. When not tracing an
-    // array, the value will be InvalidIndex.
-    const static size_t InvalidIndex = size_t(-1);
-    size_t contextIndex() const { return contextIndex_; }
+ private:
+  friend class AutoTracingName;
+  const char* name_ = nullptr;
 
-    // Build a description of this edge in the heap graph. This call may invoke
-    // the context functor, if set, which may inspect arbitrary areas of the
-    // heap. On the other hand, the description provided by this method may be
-    // substantially more accurate and useful than those provided by only the
-    // contextName and contextIndex.
-    void getTracingEdgeName(char* buffer, size_t bufferSize);
+  friend class AutoTracingIndex;
+  size_t index_ = InvalidIndex;
 
-    // The trace implementation may associate a callback with one or more edges
-    // using AutoTracingDetails. This functor is called by getTracingEdgeName
-    // and is responsible for providing a textual representation of the
-    // currently being traced edge. The callback has access to the full heap,
-    // including the currently set tracing context.
-    class ContextFunctor {
-      public:
-        virtual void operator()(CallbackTracer* trc, char* buf, size_t bufsize) = 0;
-    };
+  friend class AutoTracingDetails;
+  Functor* functor_ = nullptr;
+};
 
-#ifdef DEBUG
-    enum class TracerKind {
-        DoNotCare,
-        Moving,
-        GrayBuffering,
-        VerifyTraceProtoAndIface,
-        ClearEdges,
-        UnmarkGray
-    };
-    virtual TracerKind getTracerKind() const { return TracerKind::DoNotCare; }
-#endif
+}  // namespace JS
 
-    // In C++, overriding a method hides all methods in the base class with
-    // that name, not just methods with that signature. Thus, the typed edge
-    // methods have to have distinct names to allow us to override them
-    // individually, which is freqently useful if, for example, we only want to
-    // process only one type of edge.
-    void dispatchToOnEdge(JSObject** objp) { onObjectEdge(objp); }
-    void dispatchToOnEdge(JSString** strp) { onStringEdge(strp); }
-    void dispatchToOnEdge(JS::Symbol** symp) { onSymbolEdge(symp); }
-    void dispatchToOnEdge(JSScript** scriptp) { onScriptEdge(scriptp); }
-    void dispatchToOnEdge(js::Shape** shapep) { onShapeEdge(shapep); }
-    void dispatchToOnEdge(js::ObjectGroup** groupp) { onObjectGroupEdge(groupp); }
-    void dispatchToOnEdge(js::BaseShape** basep) { onBaseShapeEdge(basep); }
-    void dispatchToOnEdge(js::jit::JitCode** codep) { onJitCodeEdge(codep); }
-    void dispatchToOnEdge(js::LazyScript** lazyp) { onLazyScriptEdge(lazyp); }
-    void dispatchToOnEdge(js::Scope** scopep) { onScopeEdge(scopep); }
-    void dispatchToOnEdge(js::RegExpShared** sharedp) { onRegExpSharedEdge(sharedp); }
+namespace js {
+class GenericTracer;
+}  // namespace js
 
-  protected:
-    void setTraceWeakEdges(bool value) {
-        traceWeakEdges_ = value;
-    }
+class JS_PUBLIC_API JSTracer {
+ public:
+  // Return the runtime set on the tracer.
+  JSRuntime* runtime() const { return runtime_; }
 
-  private:
-    friend class AutoTracingName;
-    const char* contextName_;
+  JS::TracerKind kind() const { return kind_; }
+  bool isMarkingTracer() const { return kind_ == JS::TracerKind::Marking; }
+  bool isTenuringTracer() const { return kind_ == JS::TracerKind::Tenuring; }
+  bool isGenericTracer() const { return kind_ >= JS::TracerKind::Generic; }
+  bool isCallbackTracer() const { return kind_ >= JS::TracerKind::Callback; }
 
-    friend class AutoTracingIndex;
-    size_t contextIndex_;
+  inline js::GenericTracer* asGenericTracer();
+  inline JS::CallbackTracer* asCallbackTracer();
 
-    friend class AutoTracingDetails;
-    ContextFunctor* contextFunctor_;
+  JS::WeakMapTraceAction weakMapAction() const {
+    return options_.weakMapAction;
+  }
+  bool traceWeakEdges() const {
+    return options_.weakEdgeAction == JS::WeakEdgeTraceAction::Trace;
+  }
+  bool canSkipJsids() const {
+    return options_.idAction == JS::IdTraceAction::CanSkip;
+  }
+
+  JS::TracingContext& context() { return context_; }
+
+  // Get the current GC number. Only call this method if |isMarkingTracer()|
+  // is true.
+  uint32_t gcNumberForMarking() const;
+
+ protected:
+  JSTracer(JSRuntime* rt, JS::TracerKind kind,
+           JS::TraceOptions options = JS::TraceOptions())
+      : runtime_(rt), kind_(kind), options_(options) {}
+
+ private:
+  JSRuntime* const runtime_;
+  const JS::TracerKind kind_;
+  const JS::TraceOptions options_;
+  JS::TracingContext context_;
+};
+
+namespace js {
+
+class GenericTracer : public JSTracer {
+ public:
+  GenericTracer(JSRuntime* rt, JS::TracerKind kind = JS::TracerKind::Generic,
+                JS::TraceOptions options = JS::TraceOptions())
+      : JSTracer(rt, kind, options) {
+    MOZ_ASSERT(isGenericTracer());
+  }
+
+  // These methods are called when the tracer encounters an edge. Clients should
+  // override them to receive notifications when an edge of each type is
+  // visited.
+  //
+  // The caller updates the edge with the return value (if different).
+  //
+  // In C++, overriding a method hides all methods in the base class with that
+  // name, not just methods with that signature. Thus, the typed edge methods
+  // have to have distinct names to allow us to override them individually,
+  // which is freqently useful if, for example, we only want to process one type
+  // of edge.
+  virtual JSObject* onObjectEdge(JSObject* obj) = 0;
+  virtual JSString* onStringEdge(JSString* str) = 0;
+  virtual JS::Symbol* onSymbolEdge(JS::Symbol* sym) = 0;
+  virtual JS::BigInt* onBigIntEdge(JS::BigInt* bi) = 0;
+  virtual js::BaseScript* onScriptEdge(js::BaseScript* script) = 0;
+  virtual js::Shape* onShapeEdge(js::Shape* shape) = 0;
+  virtual js::RegExpShared* onRegExpSharedEdge(js::RegExpShared* shared) = 0;
+  virtual js::GetterSetter* onGetterSetterEdge(js::GetterSetter* gs) = 0;
+  virtual js::PropMap* onPropMapEdge(js::PropMap* map) = 0;
+  virtual js::BaseShape* onBaseShapeEdge(js::BaseShape* base) = 0;
+  virtual js::jit::JitCode* onJitCodeEdge(js::jit::JitCode* code) = 0;
+  virtual js::Scope* onScopeEdge(js::Scope* scope) = 0;
+};
+
+}  // namespace js
+
+namespace JS {
+
+class JS_PUBLIC_API CallbackTracer : public js::GenericTracer {
+ public:
+  CallbackTracer(JSRuntime* rt, JS::TracerKind kind = JS::TracerKind::Callback,
+                 JS::TraceOptions options = JS::TraceOptions())
+      : GenericTracer(rt, kind, options) {
+    MOZ_ASSERT(isCallbackTracer());
+  }
+  CallbackTracer(JSContext* cx, JS::TracerKind kind = JS::TracerKind::Callback,
+                 JS::TraceOptions options = JS::TraceOptions());
+
+  // Override this method to receive notification when a node in the GC
+  // heap graph is visited.
+  virtual void onChild(const JS::GCCellPtr& thing) = 0;
+
+ private:
+  // This class implements the GenericTracer interface to dispatches to onChild.
+  virtual JSObject* onObjectEdge(JSObject* obj) {
+    onChild(JS::GCCellPtr(obj));
+    return obj;
+  }
+  virtual JSString* onStringEdge(JSString* str) {
+    onChild(JS::GCCellPtr(str));
+    return str;
+  }
+  virtual JS::Symbol* onSymbolEdge(JS::Symbol* sym) {
+    onChild(JS::GCCellPtr(sym));
+    return sym;
+  }
+  virtual JS::BigInt* onBigIntEdge(JS::BigInt* bi) {
+    onChild(JS::GCCellPtr(bi));
+    return bi;
+  }
+  virtual js::BaseScript* onScriptEdge(js::BaseScript* script) {
+    onChild(JS::GCCellPtr(script));
+    return script;
+  }
+  virtual js::Shape* onShapeEdge(js::Shape* shape) {
+    onChild(JS::GCCellPtr(shape, JS::TraceKind::Shape));
+    return shape;
+  }
+  virtual js::BaseShape* onBaseShapeEdge(js::BaseShape* base) {
+    onChild(JS::GCCellPtr(base, JS::TraceKind::BaseShape));
+    return base;
+  }
+  virtual js::GetterSetter* onGetterSetterEdge(js::GetterSetter* gs) {
+    onChild(JS::GCCellPtr(gs, JS::TraceKind::GetterSetter));
+    return gs;
+  }
+  virtual js::PropMap* onPropMapEdge(js::PropMap* map) {
+    onChild(JS::GCCellPtr(map, JS::TraceKind::PropMap));
+    return map;
+  }
+  virtual js::jit::JitCode* onJitCodeEdge(js::jit::JitCode* code) {
+    onChild(JS::GCCellPtr(code, JS::TraceKind::JitCode));
+    return code;
+  }
+  virtual js::Scope* onScopeEdge(js::Scope* scope) {
+    onChild(JS::GCCellPtr(scope, JS::TraceKind::Scope));
+    return scope;
+  }
+  virtual js::RegExpShared* onRegExpSharedEdge(js::RegExpShared* shared) {
+    onChild(JS::GCCellPtr(shared, JS::TraceKind::RegExpShared));
+    return shared;
+  }
 };
 
 // Set the name portion of the tracer's context for the current edge.
-class MOZ_RAII AutoTracingName
-{
-    CallbackTracer* trc_;
-    const char* prior_;
+class MOZ_RAII AutoTracingName {
+  JSTracer* trc_;
 
-  public:
-    AutoTracingName(CallbackTracer* trc, const char* name) : trc_(trc), prior_(trc->contextName_) {
-        MOZ_ASSERT(name);
-        trc->contextName_ = name;
-    }
-    ~AutoTracingName() {
-        MOZ_ASSERT(trc_->contextName_);
-        trc_->contextName_ = prior_;
-    }
+ public:
+  AutoTracingName(JSTracer* trc, const char* name) : trc_(trc) {
+    MOZ_ASSERT(name);
+    MOZ_ASSERT(!trc_->context().name_);
+    trc_->context().name_ = name;
+  }
+  ~AutoTracingName() {
+    MOZ_ASSERT(trc_->context().name_);
+    trc_->context().name_ = nullptr;
+  }
 };
 
 // Set the index portion of the tracer's context for the current range.
-class MOZ_RAII AutoTracingIndex
-{
-    CallbackTracer* trc_;
+class MOZ_RAII AutoTracingIndex {
+  JSTracer* trc_;
 
-  public:
-    explicit AutoTracingIndex(JSTracer* trc, size_t initial = 0) : trc_(nullptr) {
-        if (trc->isCallbackTracer()) {
-            trc_ = trc->asCallbackTracer();
-            MOZ_ASSERT(trc_->contextIndex_ == CallbackTracer::InvalidIndex);
-            trc_->contextIndex_ = initial;
-        }
-    }
-    ~AutoTracingIndex() {
-        if (trc_) {
-            MOZ_ASSERT(trc_->contextIndex_ != CallbackTracer::InvalidIndex);
-            trc_->contextIndex_ = CallbackTracer::InvalidIndex;
-        }
-    }
+ public:
+  explicit AutoTracingIndex(JSTracer* trc, size_t initial = 0) : trc_(trc) {
+    MOZ_ASSERT(trc_->context().index_ == TracingContext::InvalidIndex);
+    trc_->context().index_ = initial;
+  }
+  ~AutoTracingIndex() {
+    MOZ_ASSERT(trc_->context().index_ != TracingContext::InvalidIndex);
+    trc_->context().index_ = TracingContext::InvalidIndex;
+  }
 
-    void operator++() {
-        if (trc_) {
-            MOZ_ASSERT(trc_->contextIndex_ != CallbackTracer::InvalidIndex);
-            ++trc_->contextIndex_;
-        }
-    }
+  void operator++() {
+    MOZ_ASSERT(trc_->context().index_ != TracingContext::InvalidIndex);
+    ++trc_->context().index_;
+  }
 };
 
 // Set a context callback for the trace callback to use, if it needs a detailed
 // edge description.
-class MOZ_RAII AutoTracingDetails
-{
-    CallbackTracer* trc_;
+class MOZ_RAII AutoTracingDetails {
+  JSTracer* trc_;
 
-  public:
-    AutoTracingDetails(JSTracer* trc, CallbackTracer::ContextFunctor& func) : trc_(nullptr) {
-        if (trc->isCallbackTracer()) {
-            trc_ = trc->asCallbackTracer();
-            MOZ_ASSERT(trc_->contextFunctor_ == nullptr);
-            trc_->contextFunctor_ = &func;
-        }
-    }
-    ~AutoTracingDetails() {
-        if (trc_) {
-            MOZ_ASSERT(trc_->contextFunctor_);
-            trc_->contextFunctor_ = nullptr;
-        }
-    }
+ public:
+  AutoTracingDetails(JSTracer* trc, TracingContext::Functor& func) : trc_(trc) {
+    MOZ_ASSERT(trc_->context().functor_ == nullptr);
+    trc_->context().functor_ = &func;
+  }
+  ~AutoTracingDetails() {
+    MOZ_ASSERT(trc_->context().functor_);
+    trc_->context().functor_ = nullptr;
+  }
 };
 
-} // namespace JS
+// Save and clear tracing context when performing nested tracing.
+class MOZ_RAII AutoClearTracingContext {
+  JSTracer* trc_;
+  TracingContext prev_;
 
-JS::CallbackTracer*
-JSTracer::asCallbackTracer()
-{
-    MOZ_ASSERT(isCallbackTracer());
-    return static_cast<JS::CallbackTracer*>(this);
+ public:
+  explicit AutoClearTracingContext(JSTracer* trc)
+      : trc_(trc), prev_(trc->context()) {
+    trc_->context() = TracingContext();
+  }
+
+  ~AutoClearTracingContext() { trc_->context() = prev_; }
+};
+
+}  // namespace JS
+
+js::GenericTracer* JSTracer::asGenericTracer() {
+  MOZ_ASSERT(isGenericTracer());
+  return static_cast<js::GenericTracer*>(this);
+}
+
+JS::CallbackTracer* JSTracer::asCallbackTracer() {
+  MOZ_ASSERT(isCallbackTracer());
+  return static_cast<JS::CallbackTracer*>(this);
 }
 
 namespace js {
+
+class AbstractGeneratorObject;
+class SavedFrame;
+
 namespace gc {
-template <typename T>
-JS_PUBLIC_API(void) TraceExternalEdge(JSTracer* trc, T* thingp, const char* name);
-} // namespace gc
-} // namespace js
+
+#define JS_DECLARE_TRACE_EXTERNAL_EDGE(type)                               \
+  extern JS_PUBLIC_API void TraceExternalEdge(JSTracer* trc, type* thingp, \
+                                              const char* name);
+
+// Declare edge-tracing function overloads for public GC pointer types.
+JS_FOR_EACH_PUBLIC_GC_POINTER_TYPE(JS_DECLARE_TRACE_EXTERNAL_EDGE)
+JS_FOR_EACH_PUBLIC_TAGGED_GC_POINTER_TYPE(JS_DECLARE_TRACE_EXTERNAL_EDGE)
+
+#undef JS_DECLARE_TRACE_EXTERNAL_EDGE
+
+}  // namespace gc
+}  // namespace js
 
 namespace JS {
 
@@ -366,81 +443,98 @@ namespace JS {
 // nullptr.
 
 template <typename T>
-inline void
-TraceEdge(JSTracer* trc, JS::Heap<T>* thingp, const char* name)
-{
-    MOZ_ASSERT(thingp);
-    if (*thingp)
-        js::gc::TraceExternalEdge(trc, thingp->unsafeGet(), name);
+inline void TraceEdge(JSTracer* trc, JS::Heap<T>* thingp, const char* name) {
+  MOZ_ASSERT(thingp);
+  if (*thingp) {
+    js::gc::TraceExternalEdge(trc, thingp->unsafeGet(), name);
+  }
 }
 
 template <typename T>
-inline void
-TraceEdge(JSTracer* trc, JS::TenuredHeap<T>* thingp, const char* name)
-{
-    MOZ_ASSERT(thingp);
-    if (T ptr = thingp->unbarrieredGetPtr()) {
-        js::gc::TraceExternalEdge(trc, &ptr, name);
-        thingp->setPtr(ptr);
-    }
+inline void TraceEdge(JSTracer* trc, JS::TenuredHeap<T>* thingp,
+                      const char* name) {
+  MOZ_ASSERT(thingp);
+  if (T ptr = thingp->unbarrieredGetPtr()) {
+    js::gc::TraceExternalEdge(trc, &ptr, name);
+    thingp->setPtr(ptr);
+  }
 }
 
 // Edges that are always traced as part of root marking do not require
-// incremental barriers. This function allows for marking non-barriered
-// pointers, but asserts that this happens during root marking.
+// incremental barriers. |JS::UnsafeTraceRoot| overloads allow for marking
+// non-barriered pointers but assert that this happens during root marking.
 //
 // Note that while |edgep| must never be null, it is fine for |*edgep| to be
 // nullptr.
-template <typename T>
-extern JS_PUBLIC_API(void)
-UnsafeTraceRoot(JSTracer* trc, T* edgep, const char* name);
+#define JS_DECLARE_UNSAFE_TRACE_ROOT(type)                              \
+  extern JS_PUBLIC_API void UnsafeTraceRoot(JSTracer* trc, type* edgep, \
+                                            const char* name);
 
-extern JS_PUBLIC_API(void)
-TraceChildren(JSTracer* trc, GCCellPtr thing);
+// Declare edge-tracing function overloads for public GC pointer types.
+JS_FOR_EACH_PUBLIC_GC_POINTER_TYPE(JS_DECLARE_UNSAFE_TRACE_ROOT)
+JS_FOR_EACH_PUBLIC_TAGGED_GC_POINTER_TYPE(JS_DECLARE_UNSAFE_TRACE_ROOT)
 
-using ZoneSet = js::HashSet<Zone*, js::DefaultHasher<Zone*>, js::SystemAllocPolicy>;
-using CompartmentSet = js::HashSet<JSCompartment*, js::DefaultHasher<JSCompartment*>,
-                                   js::SystemAllocPolicy>;
+// We also require overloads for these purely-internal types.  These overloads
+// ought not be in public headers, and they should use a different name in order
+// to not be *actual* overloads, but for the moment we still declare them here.
+JS_DECLARE_UNSAFE_TRACE_ROOT(js::AbstractGeneratorObject*)
+JS_DECLARE_UNSAFE_TRACE_ROOT(js::SavedFrame*)
 
-/**
- * Trace every value within |compartments| that is wrapped by a
- * cross-compartment wrapper from a compartment that is not an element of
- * |compartments|.
- */
-extern JS_PUBLIC_API(void)
-TraceIncomingCCWs(JSTracer* trc, const JS::CompartmentSet& compartments);
+#undef JS_DECLARE_UNSAFE_TRACE_ROOT
 
-} // namespace JS
+extern JS_PUBLIC_API void TraceChildren(JSTracer* trc, GCCellPtr thing);
 
-extern JS_PUBLIC_API(void)
-JS_GetTraceThingInfo(char* buf, size_t bufsize, JSTracer* trc,
-                     void* thing, JS::TraceKind kind, bool includeDetails);
+}  // namespace JS
 
 namespace js {
+
+inline bool IsTracerKind(JSTracer* trc, JS::TracerKind kind) {
+  return trc->kind() == kind;
+}
 
 // Trace an edge that is not a GC root and is not wrapped in a barriered
 // wrapper for some reason.
 //
 // This method does not check if |*edgep| is non-null before tracing through
 // it, so callers must check any nullable pointer before calling this method.
+extern JS_PUBLIC_API void UnsafeTraceManuallyBarrieredEdge(JSTracer* trc,
+                                                           JSObject** edgep,
+                                                           const char* name);
+
+// Not part of the public API, but declared here so we can use it in
+// GCPolicyAPI.h
 template <typename T>
-extern JS_PUBLIC_API(void)
-UnsafeTraceManuallyBarrieredEdge(JSTracer* trc, T* edgep, const char* name);
+inline bool TraceManuallyBarrieredWeakEdge(JSTracer* trc, T* thingp,
+                                           const char* name);
+
+template <typename T>
+class BarrieredBase;
+
+template <typename T>
+inline bool TraceWeakEdge(JSTracer* trc, BarrieredBase<T>* thingp,
+                          const char* name);
 
 namespace gc {
 
 // Return true if the given edge is not live and is about to be swept.
 template <typename T>
-extern JS_PUBLIC_API(bool)
-EdgeNeedsSweep(JS::Heap<T>* edgep);
+extern JS_PUBLIC_API bool EdgeNeedsSweep(JS::Heap<T>* edgep);
 
 // Not part of the public API, but declared here so we can use it in GCPolicy
 // which is.
 template <typename T>
-bool
-IsAboutToBeFinalizedUnbarriered(T* thingp);
+bool IsAboutToBeFinalizedUnbarriered(T* thingp);
 
-} // namespace gc
-} // namespace js
+}  // namespace gc
+
+#ifdef DEBUG
+/*
+ * Return whether the runtime is currently being destroyed, for use in
+ * assertions.
+ */
+extern JS_PUBLIC_API bool RuntimeIsBeingDestroyed();
+#endif
+
+}  // namespace js
 
 #endif /* js_TracingAPI_h */

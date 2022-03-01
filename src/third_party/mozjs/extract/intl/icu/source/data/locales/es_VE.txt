@@ -1,0 +1,173 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_VE{
+    %%Parent{"es_419"}
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"¤#,##0.00;¤-#,##0.00"}
+            }
+            symbols{
+                decimal{","}
+                group{"."}
+            }
+        }
+    }
+    calendar{
+        gregorian{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, d 'de' MMMM 'de' y",
+                "d 'de' MMMM 'de' y",
+                "d MMM y",
+                "d/M/yy",
+                "{1} {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                yMMMd{"d MMM y"}
+            }
+            dayNames{
+                format{
+                    short{
+                        "Do",
+                        "Lu",
+                        "Ma",
+                        "Mi",
+                        "Ju",
+                        "Vi",
+                        "Sa",
+                    }
+                }
+                stand-alone{
+                    short{
+                        "Do",
+                        "Lu",
+                        "Ma",
+                        "Mi",
+                        "Ju",
+                        "Vi",
+                        "Sa",
+                    }
+                }
+            }
+            dayPeriod{
+                stand-alone{
+                    narrow{
+                        noon{"m."}
+                    }
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "ene.",
+                        "feb.",
+                        "mar.",
+                        "abr.",
+                        "may.",
+                        "jun.",
+                        "jul.",
+                        "ago.",
+                        "sept.",
+                        "oct.",
+                        "nov.",
+                        "dic.",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ene.",
+                        "feb.",
+                        "mar.",
+                        "abr.",
+                        "may.",
+                        "jun.",
+                        "jul.",
+                        "ago.",
+                        "sept.",
+                        "oct.",
+                        "nov.",
+                        "dic.",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    wide{
+                        "1er trimestre",
+                        "2do trimestre",
+                        "3er trimestre",
+                        "4to trimestre",
+                    }
+                }
+                stand-alone{
+                    wide{
+                        "1er trimestre",
+                        "2do trimestre",
+                        "3er trimestre",
+                        "4to trimestre",
+                    }
+                }
+            }
+        }
+    }
+    fields{
+        fri-narrow{
+            relative{
+                "-1"{"el Vi pasado"}
+                "0"{"este Vi"}
+                "1"{"el próximo Vi"}
+            }
+        }
+        mon-narrow{
+            relative{
+                "-1"{"el Lu pasado"}
+                "0"{"este Lu"}
+                "1"{"el próximo Lu"}
+            }
+        }
+        sat-narrow{
+            relative{
+                "-1"{"el Sa pasado"}
+                "0"{"este Sa"}
+                "1"{"el próximo Sa"}
+            }
+        }
+        sun-narrow{
+            relative{
+                "-1"{"el Do pasado"}
+                "0"{"este Do"}
+                "1"{"el próximo Do"}
+            }
+        }
+        thu-narrow{
+            relative{
+                "-1"{"el Ju pasado"}
+                "0"{"este Ju"}
+                "1"{"el próximo Ju"}
+            }
+        }
+        tue-narrow{
+            relative{
+                "-1"{"el Ma pasado"}
+                "0"{"este Ma"}
+                "1"{"el próximo Ma"}
+            }
+        }
+        wed-narrow{
+            relative{
+                "-1"{"el Mi pasado"}
+                "0"{"este Mi"}
+                "1"{"el próximo Mi"}
+            }
+        }
+    }
+}

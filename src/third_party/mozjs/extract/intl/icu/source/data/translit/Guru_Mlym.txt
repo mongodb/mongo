@@ -1,0 +1,14 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Guru_Mlym.txt
+# Generated from CLDR
+#
+
+::[।-॥\u0A01\u0A02ਅ-ਊਏ-ਐਓ-ਨਪ-ਰਲ-ਲ਼ਵ-ਸ਼ਸ-ਹ\u0A3Cਾ-\u0A42\u0A47-\u0A48\u0A4B-\u0A4Dਖ਼-ੜਫ਼੦-ੴ];
+::NFD;
+::Gurmukhi-InterIndic;
+::InterIndic-Malayalam;
+::NFC;
+

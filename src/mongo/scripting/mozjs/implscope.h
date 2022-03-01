@@ -396,7 +396,7 @@ private:
     friend struct MozJSEntry;
 
     static bool _interruptCallback(JSContext* cx);
-    static void _gcCallback(JSContext* rt, JSGCStatus status, void* data);
+    static void _gcCallback(JSContext* rt, JSGCStatus status, JS::GCReason reason, void* data);
     bool _checkErrorState(bool success, bool reportError = true, bool assertOnError = true);
 
     void installDBAccess();
@@ -466,7 +466,7 @@ inline MozJSImplScope* getScope(JSContext* cx) {
     return static_cast<MozJSImplScope*>(JS_GetContextPrivate(cx));
 }
 
-inline MozJSImplScope* getScope(js::FreeOp* fop) {
+inline MozJSImplScope* getScope(JSFreeOp* fop) {
     return getScope(freeOpToJSContext(fop));
 }
 

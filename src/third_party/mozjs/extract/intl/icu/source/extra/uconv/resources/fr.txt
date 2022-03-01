@@ -1,0 +1,106 @@
+﻿// -*- Coding: utf-8; -*-  [all uconv resource files]
+// Copyright (C) 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+//
+// Copyright (c) 2000-2004 IBM, Inc. and Others.
+//
+// Root translation file for uconv messages.
+// So you want to translate this file??? Great!
+// 1. copy it to a new name [ex: se.txt]
+//
+// 2. You might wish to comment out ALL lines, and then uncomment them
+//    as you add translations. That way, you don't inadvertently mark
+//    an untranslated English (or whatever) string as already
+//    translated. The base translation might change!
+// 
+// 3. These files are in UTF-8 format (even though root uses only
+//    ASCII)
+//
+// 4. Make note of the location of {0}, {1}, etc.. they are taken from
+//    arguments to u_wmsg() in order..
+//
+// 5. Add se.txt to RESSRC= in resfiles.mk and to the project file on 
+//    the Windows side.
+//
+// 6. Send it in to srl@jtcsv.com or ask on the ICU mailing list! thanks!
+
+fr
+{
+  // uconv errors
+
+    lcUsageWord { "usage" } 
+    ucUsageWord { "Usage" } 
+    usage {
+        "{0}: {1} "
+        "[ -h, -?, --help ] [ -V, --version ] [ -s, --silent ] [ -v, --verbose ] "
+        "[ -l, --list | --list-code code | --default-code | -L, --list-transliterators ] "
+        "[ --canon ] [ -x translitération ] "
+        "[ --to-callback callback | -c ] [ --from-callback callback | -i ] [ --callback callback ] "
+        "[ --fallback | --no-fallback ] "
+        "[ -b, --block-size taille ] "
+        "[ -f, --from-code code ] [ -t, --to-code code ] "
+        "[ --add-signature ] [ --remove-signature ] "
+        "[ -o, --output fichier ] "
+        "[ fichier ... ]\n"
+    }
+
+    // TODO there is some English in here
+    help { "Options :  -h, --help                   affiche ce message\n"
+           "           -V, --version                affiche la version du programme\n"
+"           -s, --silent                 supprime les messages\n"
+"           -v, --verbose                affiche les progrès\n"
+"           -l, --list                   liste tous les encodages disponibles\n"
+"           --list-code code             liste juste l''encodage donné\n"
+"           --default-code               liste juste l''encodage par défaut\n"
+"           -L, --list-transliterators   liste tous les translitérateurs\n"
+"           --canon                      affiche la liste dans le format de cnvrtrs.txt(5)\n"
+"           -x translitération           passe le texte à travers translitération\n"
+"           --to-callback callback       utilise callback sur l''encodage cible\n"
+"           -c                           omet les caractères invalides de la sortie\n"
+"           --from-callback callback     utilise callback sur l''encodage source\n"
+"           -i                           omet les séquences invalides de l''entrée\n"
+"           --callback callback          utilise callback sur les deux encodages\n"
+"           -b, --block-size taille      lit des blocks de taille octets (défaut : 4096)\n"
+"           --fallback                   utilise les correspondances de secours\n"
+"           --no-fallback                n''utilise pas les correspondances de secours\n"
+"           -f, --from-code code         fixe l''encodage d''origine\n"
+"           -t, --to-code code           fixe l''encodage de destination\n"
+"          --add-signature               add a U+FEFF Unicode signature character (BOM)\n"
+"          --remove-signature            remove a U+FEFF Unicode signature character (BOM)\n"
+"           -o, --output fichier         écrit la sortie dans fichier\n"
+"\n"
+"Callbacks :" } 
+
+    cantGetNames { "Ne peux obtenir la liste des encodages.\n" } // 0: err
+    cantGetTag { "Ne peux obtenir le nom de l'étiquette standard : {0}.\n" } // 0: err
+
+    noSuchCodeset { "Ne peux trouver l''encodage : {0}.\n" } // 0: name of the encoding
+    noFromCodeset { "L''encodage d''origine n''a pas été fixé (utilisez -f).\n" } 
+    noToCodeset { "L''encodage de destination n''a pas été fixé (utilisez -t).\n" } 
+
+    badBlockSize { "Taille de bloc incorrecte : {0}.\n" } // 0: size of the block
+
+    cantSetInBinMode { "Ne peux mettre l''entrée standard en mode binaire.\n" } 
+    cantSetOutBinMode { "Ne peux mettre la sortie standard en mode binaire.\n" } 
+
+    cantOpenFromCodeset { "Ne peux ouvrir de convertisseur pour l''encodage d''origine {0} : {1}.\n" } // 0:set, 1: err
+    cantOpenToCodeset { "Ne peux ouvrir de convertisseur pour l''encodage de destination {0} : {1}.\n" } // 0:set, 1: err
+
+    cantCreateTranslit { "Ne peux créer la translitération \"{0}\": {1}.\n" } // 0:set, 1: err
+    cantCreateTranslitParseErr { "Ne peux créer la translitération \"{0}\": {1}, ligne {2}, position {3}.\n" } // 0: set, 1: err, 2: line, 3: offset
+
+    cantSetCallback { "Ne peux fixer le callack de transcodage : {0}.\n" } // 0: err
+
+    unknownCallback { "Callback inconnu : {0}.\n" } // 0: callback name
+
+    cantOpenInputF { "Ne peux ouvrir le fichier d''entrée {0} : {1}.\n" } // 0: file, 1: strerror [OS error string] 
+    cantCreateOutputF { "Ne peux créer le fichier de sortie {0} : {1}.\n" } // 0: file, 1: strerror [OS error string]
+
+    cantWrite { "Le texte converti ne peut pas être écrit : {0}.\n" } // 0: OS error string
+    cantRead { "Erreur de lecture du fichier d''entrée : {0}.\n" } // 0: OS error string
+
+    // TODO retranslate the problemCvt... messages because their format changed
+    //problemCvtToU { "La conversion d''Unicode vers l''encodage de destination a échoué à la position {0} : {1}.\n" } // 0: position, 1: err
+    //problemCvtFromU { "La conversion de l''encodage original vers Unicode a échoué à la position {0} : {1}.\n" } // 0: position, 1: err
+    //problemCvtFromUOut { "La conversion de l''encodage original vers Unicode a échoué à la position {0} de la sortie : {1}.\n" } // 0: position, 1: err
+}

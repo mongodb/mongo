@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -15,31 +15,47 @@
 #include "js/Class.h"
 #include "vm/NativeObject.h"
 
+namespace mozilla::intl {
+class NumberFormat;
+}
+
 namespace js {
 
-class FreeOp;
+class NumberFormatObject : public NativeObject {
+ public:
+  static const JSClass class_;
+  static const JSClass& protoClass_;
 
-class NumberFormatObject : public NativeObject
-{
-  public:
-    static const Class class_;
+  static constexpr uint32_t INTERNALS_SLOT = 0;
+  static constexpr uint32_t UNUMBER_FORMATTER_SLOT = 1;
+  static constexpr uint32_t SLOT_COUNT = 2;
 
-    static constexpr uint32_t INTERNALS_SLOT = 0;
-    static constexpr uint32_t UNUMBER_FORMAT_SLOT = 1;
-    static constexpr uint32_t SLOT_COUNT = 2;
+  static_assert(INTERNALS_SLOT == INTL_INTERNALS_OBJECT_SLOT,
+                "INTERNALS_SLOT must match self-hosting define for internals "
+                "object slot");
 
-    static_assert(INTERNALS_SLOT == INTL_INTERNALS_OBJECT_SLOT,
-                  "INTERNALS_SLOT must match self-hosting define for internals object slot");
+  // Estimated memory use for UNumberFormatter and UFormattedNumber
+  // (see IcuMemoryUsage).
+  static constexpr size_t EstimatedMemoryUse = 750;
 
-  private:
-    static const ClassOps classOps_;
+  mozilla::intl::NumberFormat* getNumberFormatter() const {
+    const auto& slot = getFixedSlot(UNUMBER_FORMATTER_SLOT);
+    if (slot.isUndefined()) {
+      return nullptr;
+    }
+    return static_cast<mozilla::intl::NumberFormat*>(slot.toPrivate());
+  }
 
-    static void finalize(FreeOp* fop, JSObject* obj);
+  void setNumberFormatter(mozilla::intl::NumberFormat* formatter) {
+    setFixedSlot(UNUMBER_FORMATTER_SLOT, PrivateValue(formatter));
+  }
+
+ private:
+  static const JSClassOps classOps_;
+  static const ClassSpec classSpec_;
+
+  static void finalize(JSFreeOp* fop, JSObject* obj);
 };
-
-extern JSObject*
-CreateNumberFormatPrototype(JSContext* cx, HandleObject Intl, Handle<GlobalObject*> global,
-                            MutableHandleObject constructor);
 
 /**
  * Returns a new instance of the standard built-in NumberFormat constructor.
@@ -48,19 +64,8 @@ CreateNumberFormatPrototype(JSContext* cx, HandleObject Intl, Handle<GlobalObjec
  *
  * Usage: numberFormat = intl_NumberFormat(locales, options)
  */
-extern MOZ_MUST_USE bool
-intl_NumberFormat(JSContext* cx, unsigned argc, Value* vp);
-
-/**
- * Returns an object indicating the supported locales for number formatting
- * by having a true-valued property for each such locale with the
- * canonicalized language tag as the property name. The object has no
- * prototype.
- *
- * Usage: availableLocales = intl_NumberFormat_availableLocales()
- */
-extern MOZ_MUST_USE bool
-intl_NumberFormat_availableLocales(JSContext* cx, unsigned argc, Value* vp);
+[[nodiscard]] extern bool intl_NumberFormat(JSContext* cx, unsigned argc,
+                                            Value* vp);
 
 /**
  * Returns the numbering system type identifier per Unicode
@@ -69,8 +74,8 @@ intl_NumberFormat_availableLocales(JSContext* cx, unsigned argc, Value* vp);
  *
  * Usage: defaultNumberingSystem = intl_numberingSystem(locale)
  */
-extern MOZ_MUST_USE bool
-intl_numberingSystem(JSContext* cx, unsigned argc, Value* vp);
+[[nodiscard]] extern bool intl_numberingSystem(JSContext* cx, unsigned argc,
+                                               Value* vp);
 
 /**
  * Returns a string representing the number x according to the effective
@@ -80,9 +85,20 @@ intl_numberingSystem(JSContext* cx, unsigned argc, Value* vp);
  *
  * Usage: formatted = intl_FormatNumber(numberFormat, x, formatToParts)
  */
-extern MOZ_MUST_USE bool
-intl_FormatNumber(JSContext* cx, unsigned argc, Value* vp);
+[[nodiscard]] extern bool intl_FormatNumber(JSContext* cx, unsigned argc,
+                                            Value* vp);
 
-} // namespace js
+#if DEBUG || MOZ_SYSTEM_ICU
+/**
+ * Returns an object with all available measurement units.
+ *
+ * Usage: units = intl_availableMeasurementUnits()
+ */
+[[nodiscard]] extern bool intl_availableMeasurementUnits(JSContext* cx,
+                                                         unsigned argc,
+                                                         Value* vp);
+#endif
+
+}  // namespace js
 
 #endif /* builtin_intl_NumberFormat_h */

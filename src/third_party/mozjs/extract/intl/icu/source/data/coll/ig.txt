@@ -1,0 +1,21 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ig{
+    collations{
+        standard{
+            Sequence{
+                "[normalization on]"
+                "&B<ch<<<Ch<<<CH"
+                "&G<gb<<<Gb<<<GB<gh<<<Gh<<<GH<gw<<<Gw<<<GW"
+                "&I<ị<<<Ị"
+                "&K<kp<<<Kp<<<KP<kw<<<Kw<<<KW"
+                "&N<ṅ<<<Ṅ<nw<<<Nw<<<NW<ny<<<Ny<<<NY"
+                "&O<ọ<<<Ọ"
+                "&S<sh<<<Sh<<<SH"
+                "&U<ụ<<<Ụ"
+            }
+            Version{"39"}
+        }
+    }
+}

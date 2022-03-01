@@ -1,0 +1,3181 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+br{
+    Currencies{
+        ADP{
+            "ADP",
+            "peseta Andorra",
+        }
+        AED{
+            "AED",
+            "dirham EAU",
+        }
+        AFA{
+            "AFA",
+            "afghani Afghanistan (1927–2002)",
+        }
+        AFN{
+            "AFN",
+            "afghani Afghanistan",
+        }
+        ALK{
+            "ALK",
+            "lek Albania (1946–1965)",
+        }
+        ALL{
+            "ALL",
+            "lek Albania",
+        }
+        AMD{
+            "AMD",
+            "dram Armenia",
+        }
+        ANG{
+            "ANG",
+            "florin Antilhez nederlandat",
+        }
+        AOA{
+            "AOA",
+            "kwanza Angola",
+        }
+        AOK{
+            "AOK",
+            "kwanza Angola (1977–1991)",
+        }
+        AON{
+            "AON",
+            "kwanza nevez Angola (1990–2000)",
+        }
+        AOR{
+            "AOR",
+            "AOR",
+        }
+        ARA{
+            "ARA",
+            "ARA",
+        }
+        ARL{
+            "ARL",
+            "ARL",
+        }
+        ARM{
+            "ARM",
+            "peso Arcʼhantina (1881–1970)",
+        }
+        ARP{
+            "ARP",
+            "peso Arcʼhantina (1983–1985)",
+        }
+        ARS{
+            "ARS",
+            "peso Arcʼhantina",
+        }
+        ATS{
+            "ATS",
+            "schilling Aostria",
+        }
+        AUD{
+            "$A",
+            "dollar Aostralia",
+        }
+        AWG{
+            "AWG",
+            "florin Aruba",
+        }
+        AZM{
+            "AZM",
+            "manat Azerbaidjan (1993–2006)",
+        }
+        AZN{
+            "AZN",
+            "manat Azerbaidjan",
+        }
+        BAD{
+            "BAD",
+            "dinar Bosnia ha Herzegovina (1992–1994)",
+        }
+        BAM{
+            "BAM",
+            "mark kemmadus Bosnia ha Herzegovina",
+        }
+        BAN{
+            "BAN",
+            "dinar nevez Bosnia ha Herzegovina (1994–1997)",
+        }
+        BBD{
+            "BBD",
+            "dollar Barbados",
+        }
+        BDT{
+            "BDT",
+            "taka Bangladesh",
+        }
+        BEC{
+            "BEC",
+            "lur Belgia (kemmadus)",
+        }
+        BEF{
+            "BEF",
+            "lur Belgia",
+        }
+        BGL{
+            "BGL",
+            "BGL",
+        }
+        BGM{
+            "BGM",
+            "lev sokialour Bulgaria",
+        }
+        BGN{
+            "BGN",
+            "lev Bulgaria",
+        }
+        BGO{
+            "BGO",
+            "lev Bulgaria (1879–1952)",
+        }
+        BHD{
+            "BHD",
+            "dinar Bahrein",
+        }
+        BIF{
+            "BIF",
+            "lur Burundi",
+        }
+        BMD{
+            "BMD",
+            "dollar Bermuda",
+        }
+        BND{
+            "BND",
+            "dollar Brunei",
+        }
+        BOB{
+            "BOB",
+            "boliviano Bolivia",
+        }
+        BOL{
+            "BOL",
+            "boliviano Bolivia (1863–1963)",
+        }
+        BOP{
+            "BOP",
+            "peso Bolivia",
+        }
+        BOV{
+            "BOV",
+            "BOV",
+        }
+        BRB{
+            "BRB",
+            "BRB",
+        }
+        BRC{
+            "BRC",
+            "BRC",
+        }
+        BRE{
+            "BRE",
+            "BRE",
+        }
+        BRL{
+            "BRL",
+            "real Brazil",
+        }
+        BRN{
+            "BRN",
+            "BRN",
+        }
+        BRR{
+            "BRR",
+            "BRR",
+        }
+        BRZ{
+            "BRZ",
+            "BRZ",
+        }
+        BSD{
+            "BSD",
+            "dollar Bahamas",
+        }
+        BTN{
+            "BTN",
+            "ngultrum Bhoutan",
+        }
+        BUK{
+            "BUK",
+            "kyat Birmania",
+        }
+        BWP{
+            "BWP",
+            "pula Botswana",
+        }
+        BYB{
+            "BYB",
+            "roubl nevez Belarus (1994–1999)",
+        }
+        BYN{
+            "BYN",
+            "roubl Belarus",
+        }
+        BYR{
+            "BYR",
+            "roubl Belarus (2000–2016)",
+        }
+        BZD{
+            "BZD",
+            "dollar Belize",
+        }
+        CAD{
+            "$CA",
+            "dollar Kanada",
+        }
+        CDF{
+            "CDF",
+            "lur Kongo",
+        }
+        CHE{
+            "CHE",
+            "euro WIR",
+        }
+        CHF{
+            "CHF",
+            "lur Suis",
+        }
+        CHW{
+            "CHW",
+            "lur WIR",
+        }
+        CLE{
+            "CLE",
+            "escudo Chile",
+        }
+        CLF{
+            "CLF",
+            "unanenn jediñ Chile",
+        }
+        CLP{
+            "CLP",
+            "peso Chile",
+        }
+        CNH{
+            "CNH",
+            "yuan Sina (diavaez)",
+        }
+        CNX{
+            "CNX",
+            "dollar Bank poblel Sina",
+        }
+        CNY{
+            "CNY",
+            "yuan Sina",
+        }
+        COP{
+            "COP",
+            "peso Kolombia",
+        }
+        COU{
+            "COU",
+            "COU",
+        }
+        CRC{
+            "CRC",
+            "colón Costa Rica",
+        }
+        CSD{
+            "CSD",
+            "dinar Serbia (2002–2006)",
+        }
+        CSK{
+            "CSK",
+            "CSK",
+        }
+        CUC{
+            "CUC",
+            "peso kemmadus Kuba",
+        }
+        CUP{
+            "CUP",
+            "peso Kuba",
+        }
+        CVE{
+            "CVE",
+            "escudo Kab Glas",
+        }
+        CYP{
+            "CYP",
+            "lur Kiprenez",
+        }
+        CZK{
+            "CZK",
+            "kurunenn Tchek",
+        }
+        DDM{
+            "DDM",
+            "mark Alamagn ar Reter",
+        }
+        DEM{
+            "DEM",
+            "mark Alamagn",
+        }
+        DJF{
+            "DJF",
+            "lur Djibouti",
+        }
+        DKK{
+            "DKK",
+            "kurunenn Danmark",
+        }
+        DOP{
+            "DOP",
+            "peso Dominikan",
+        }
+        DZD{
+            "DZD",
+            "dinar Aljeria",
+        }
+        ECS{
+            "ECS",
+            "ECS",
+        }
+        ECV{
+            "ECV",
+            "ECV",
+        }
+        EEK{
+            "EEK",
+            "kurunenn Estonia",
+        }
+        EGP{
+            "EGP",
+            "lur Egipt",
+        }
+        ERN{
+            "ERN",
+            "nakfa Eritrea",
+        }
+        ESA{
+            "ESA",
+            "ESA",
+        }
+        ESB{
+            "ESB",
+            "peseta gemmadus Spagn",
+        }
+        ESP{
+            "ESP",
+            "peseta Spagn",
+        }
+        ETB{
+            "ETB",
+            "birr Etiopia",
+        }
+        EUR{
+            "€",
+            "euro",
+        }
+        FIM{
+            "FIM",
+            "mark Finland",
+        }
+        FJD{
+            "FJD",
+            "dollar Fidji",
+        }
+        FKP{
+            "FKP",
+            "lur Inizi Falkland",
+        }
+        FRF{
+            "FRF",
+            "lur gall",
+        }
+        GBP{
+            "£ RU",
+            "lur Breizh-Veur",
+        }
+        GEK{
+            "GEK",
+            "GEK",
+        }
+        GEL{
+            "GEL",
+            "lari Jorjia",
+        }
+        GHC{
+            "GHC",
+            "GHC",
+        }
+        GHS{
+            "GHS",
+            "cedi Ghana",
+        }
+        GIP{
+            "GIP",
+            "lur Jibraltar",
+        }
+        GMD{
+            "GMD",
+            "dalasi Gambia",
+        }
+        GNF{
+            "GNF",
+            "lur Ginea",
+        }
+        GNS{
+            "GNS",
+            "syli Ginea",
+        }
+        GQE{
+            "GQE",
+            "ekwele Ginea ar Cʼheheder",
+        }
+        GRD{
+            "GRD",
+            "drakm Gres",
+        }
+        GTQ{
+            "GTQ",
+            "quetzal Guatemala",
+        }
+        GWE{
+            "GWE",
+            "GWE",
+        }
+        GWP{
+            "GWP",
+            "peso Ginea-Bissau",
+        }
+        GYD{
+            "GYD",
+            "dollar Guyana",
+        }
+        HKD{
+            "$ HK",
+            "dollar Hong Kong",
+        }
+        HNL{
+            "HNL",
+            "lempira Honduras",
+        }
+        HRD{
+            "HRD",
+            "dinar Kroatia",
+        }
+        HRK{
+            "HRK",
+            "kuna Kroatia",
+        }
+        HTG{
+            "HTG",
+            "gourde Haiti",
+        }
+        HUF{
+            "HUF",
+            "forint Hungaria",
+        }
+        IDR{
+            "IDR",
+            "roupi Indonezia",
+        }
+        IEP{
+            "IEP",
+            "lur Iwerzhon",
+        }
+        ILP{
+            "ILP",
+            "lur Israel",
+        }
+        ILR{
+            "ILR",
+            "shekel Israel (1980–1985)",
+        }
+        ILS{
+            "ILS",
+            "shekel nevez Israel",
+        }
+        INR{
+            "₹",
+            "roupi India",
+        }
+        IQD{
+            "IQD",
+            "dinar Iraq",
+        }
+        IRR{
+            "IRR",
+            "rial Iran",
+        }
+        ISJ{
+            "ISJ",
+            "kurunenn Island (1918–1981)",
+        }
+        ISK{
+            "ISK",
+            "kurunenn Island",
+        }
+        ITL{
+            "ITL",
+            "lur Italia",
+        }
+        JMD{
+            "JMD",
+            "dollar Jamaika",
+        }
+        JOD{
+            "JOD",
+            "dinar Jordania",
+        }
+        JPY{
+            "JPY",
+            "yen Japan",
+        }
+        KES{
+            "KES",
+            "shilling Kenya",
+        }
+        KGS{
+            "KGS",
+            "som Kyrgyzstan",
+        }
+        KHR{
+            "KHR",
+            "riel Kambodja",
+        }
+        KMF{
+            "KMF",
+            "lur Komorez",
+        }
+        KPW{
+            "KPW",
+            "won Korea an Norzh",
+        }
+        KRH{
+            "KRH",
+            "hwan Korea ar Su (1953–1962)",
+        }
+        KRO{
+            "KRO",
+            "won Korea ar Su (1945–1953)",
+        }
+        KRW{
+            "KRW",
+            "won Korea ar Su",
+        }
+        KWD{
+            "KWD",
+            "dinar Koweit",
+        }
+        KYD{
+            "KYD",
+            "dollar Inizi Cayman",
+        }
+        KZT{
+            "KZT",
+            "tenge Kazakstan",
+        }
+        LAK{
+            "LAK",
+            "kip Laos",
+        }
+        LBP{
+            "LBP",
+            "lur Liban",
+        }
+        LKR{
+            "LKR",
+            "roupi Sri Lanka",
+        }
+        LRD{
+            "LRD",
+            "dollar Liberia",
+        }
+        LSL{
+            "LSL",
+            "loti Lesotho",
+        }
+        LTL{
+            "LTL",
+            "litas Lituania",
+        }
+        LTT{
+            "LTT",
+            "talonas Lituania",
+        }
+        LUC{
+            "LUC",
+            "lur kemmadus Luksembourg",
+        }
+        LUF{
+            "LUF",
+            "lur Luksembourg",
+        }
+        LUL{
+            "LUL",
+            "LUL",
+        }
+        LVL{
+            "LVL",
+            "lats Latvia",
+        }
+        LVR{
+            "LVR",
+            "roubl Latvia",
+        }
+        LYD{
+            "LYD",
+            "dinar Libia",
+        }
+        MAD{
+            "MAD",
+            "dirham Maroko",
+        }
+        MAF{
+            "MAF",
+            "lur Maroko",
+        }
+        MCF{
+            "MCF",
+            "lur Monaco",
+        }
+        MDC{
+            "MDC",
+            "MDC",
+        }
+        MDL{
+            "MDL",
+            "leu Moldova",
+        }
+        MGA{
+            "MGA",
+            "ariary Madagaskar",
+        }
+        MGF{
+            "MGF",
+            "lur Madagaskar",
+        }
+        MKD{
+            "MKD",
+            "denar Makedonia",
+        }
+        MKN{
+            "MKN",
+            "denar Makedonia (1992–1993)",
+        }
+        MLF{
+            "MLF",
+            "lur Mali",
+        }
+        MMK{
+            "MMK",
+            "kyat Myanmar",
+        }
+        MNT{
+            "MNT",
+            "tugrik Mongolia",
+        }
+        MOP{
+            "MOP",
+            "pataca Macau",
+        }
+        MRO{
+            "MRO",
+            "ouguiya Maouritania (1973–2017)",
+        }
+        MRU{
+            "MRU",
+            "ouguiya Maouritania",
+        }
+        MTL{
+            "MTL",
+            "lira Malta",
+        }
+        MTP{
+            "MTP",
+            "lur Malta",
+        }
+        MUR{
+            "MUR",
+            "roupi Moris",
+        }
+        MVP{
+            "MVP",
+            "roupi Maldivez",
+        }
+        MVR{
+            "MVR",
+            "rufiyaa Maldivez",
+        }
+        MWK{
+            "MWK",
+            "kwacha Malawi",
+        }
+        MXN{
+            "MX$",
+            "peso Mecʼhiko",
+        }
+        MXP{
+            "MXP",
+            "peso arcʼhant Mecʼhiko (1861–1992)",
+        }
+        MXV{
+            "MXV",
+            "MXV",
+        }
+        MYR{
+            "MYR",
+            "ringgit Malaysia",
+        }
+        MZE{
+            "MZE",
+            "escudo Mozambik",
+        }
+        MZM{
+            "MZM",
+            "metical Mozambik (1980–2006)",
+        }
+        MZN{
+            "MZN",
+            "metical Mozambik",
+        }
+        NAD{
+            "NAD",
+            "dollar Namibia",
+        }
+        NGN{
+            "NGN",
+            "naira Nigeria",
+        }
+        NIC{
+            "NIC",
+            "cordoba Nicaragua (1988–1991)",
+        }
+        NIO{
+            "NIO",
+            "cordoba Nicaragua",
+        }
+        NLG{
+            "NLG",
+            "florin an Izelvroioù",
+        }
+        NOK{
+            "NOK",
+            "kurunenn Norvegia",
+        }
+        NPR{
+            "NPR",
+            "roupi Nepal",
+        }
+        NZD{
+            "$ ZN",
+            "dollar Zeland-Nevez",
+        }
+        OMR{
+            "OMR",
+            "rial Oman",
+        }
+        PAB{
+            "PAB",
+            "balboa Panamá",
+        }
+        PEI{
+            "PEI",
+            "PEI",
+        }
+        PEN{
+            "PEN",
+            "sol Perou",
+        }
+        PES{
+            "PES",
+            "sol Perou (1863–1965)",
+        }
+        PGK{
+            "PGK",
+            "kina Papoua Ginea-Nevez",
+        }
+        PHP{
+            "PHP",
+            "peso Filipinez",
+        }
+        PKR{
+            "PKR",
+            "roupi Pakistan",
+        }
+        PLN{
+            "PLN",
+            "zloty Polonia",
+        }
+        PLZ{
+            "PLZ",
+            "zloty Polonia (1950–1995)",
+        }
+        PTE{
+            "PTE",
+            "escudo Portugal",
+        }
+        PYG{
+            "PYG",
+            "guarani Paraguay",
+        }
+        QAR{
+            "QAR",
+            "rial Qatar",
+        }
+        RHD{
+            "RHD",
+            "dollar Rodezia",
+        }
+        ROL{
+            "ROL",
+            "leu Roumania (1952–2006)",
+        }
+        RON{
+            "RON",
+            "leu Roumania",
+        }
+        RSD{
+            "RSD",
+            "dinar Serbia",
+        }
+        RUB{
+            "RUB",
+            "roubl Rusia",
+        }
+        RUR{
+            "RUR",
+            "roubl Rusia (1991–1998)",
+        }
+        RWF{
+            "RWF",
+            "lur Rwanda",
+        }
+        SAR{
+            "SAR",
+            "riyal Arabia Saoudat",
+        }
+        SBD{
+            "SBD",
+            "dollar Inizi Salomon",
+        }
+        SCR{
+            "SCR",
+            "roupi Sechelez",
+        }
+        SDD{
+            "SDD",
+            "dinar Soudan (1992–2007)",
+        }
+        SDG{
+            "SDG",
+            "lur Soudan",
+        }
+        SDP{
+            "SDP",
+            "lur Soudan (1957–1998)",
+        }
+        SEK{
+            "SEK",
+            "kurunenn Sveden",
+        }
+        SGD{
+            "SGD",
+            "dollar Singapour",
+        }
+        SHP{
+            "SHP",
+            "lur Saint-Helena",
+        }
+        SIT{
+            "SIT",
+            "tolar Slovenia",
+        }
+        SKK{
+            "SKK",
+            "kurunenn Slovakia",
+        }
+        SLL{
+            "SLL",
+            "leone Sierra Leone",
+        }
+        SOS{
+            "SOS",
+            "shilling Somalia",
+        }
+        SRD{
+            "SRD",
+            "dollar Surinam",
+        }
+        SRG{
+            "SRG",
+            "florin Surinam",
+        }
+        SSP{
+            "SSP",
+            "lur Susoudan",
+        }
+        STD{
+            "STD",
+            "dobra São Tomé ha Príncipe (1977–2017)",
+        }
+        STN{
+            "STN",
+            "dobra São Tomé ha Príncipe",
+        }
+        SUR{
+            "SUR",
+            "roubl soviedel",
+        }
+        SVC{
+            "SVC",
+            "colón Salvador",
+        }
+        SYP{
+            "SYP",
+            "lur Siria",
+        }
+        SZL{
+            "SZL",
+            "lilangeni Swaziland",
+        }
+        THB{
+            "THB",
+            "baht Thailand",
+        }
+        TJR{
+            "TJR",
+            "roubl Tadjikistan",
+        }
+        TJS{
+            "TJS",
+            "somoni Tadjikistan",
+        }
+        TMM{
+            "TMM",
+            "manat Turkmenistan (1993–2009)",
+        }
+        TMT{
+            "TMT",
+            "manat Turkmenistan",
+        }
+        TND{
+            "TND",
+            "dinar Tunizia",
+        }
+        TOP{
+            "TOP",
+            "paʻanga Tonga",
+        }
+        TPE{
+            "TPE",
+            "escudo Timor",
+        }
+        TRL{
+            "TRL",
+            "lur Turkia (1922–2005)",
+        }
+        TRY{
+            "TRY",
+            "lur Turkia",
+        }
+        TTD{
+            "TTD",
+            "dollar Trinidad ha Tobago",
+        }
+        TWD{
+            "TWD",
+            "dollar nevez Taiwan",
+        }
+        TZS{
+            "TZS",
+            "shilling Tanzania",
+        }
+        UAH{
+            "UAH",
+            "hryvnia Ukraina",
+        }
+        UAK{
+            "UAK",
+            "UAK",
+        }
+        UGS{
+            "UGS",
+            "shilling Ouganda (1966–1987)",
+        }
+        UGX{
+            "UGX",
+            "shilling Ouganda",
+        }
+        USD{
+            "$ SU",
+            "dollar SU",
+        }
+        USN{
+            "USN",
+            "USN",
+        }
+        USS{
+            "USS",
+            "USS",
+        }
+        UYI{
+            "UYI",
+            "UYI",
+        }
+        UYP{
+            "UYP",
+            "peso Uruguay (1975–1993)",
+        }
+        UYU{
+            "UYU",
+            "peso Uruguay",
+        }
+        UZS{
+            "UZS",
+            "som Ouzbekistan",
+        }
+        VEB{
+            "VEB",
+            "bolivar Venezuela (1871–2008)",
+        }
+        VEF{
+            "VEF",
+            "bolivar Venezuela (2008–2018)",
+        }
+        VES{
+            "VES",
+            "bolivar Venezuela",
+        }
+        VND{
+            "VND",
+            "dong Viêt Nam",
+        }
+        VNN{
+            "VNN",
+            "dong Viêt Nam (1978–1985)",
+        }
+        VUV{
+            "VUV",
+            "vatu Vanuatu",
+        }
+        WST{
+            "WST",
+            "tala Samoa",
+        }
+        XAF{
+            "FCFA",
+            "lur CFA Kreizafrika",
+        }
+        XAG{
+            "XAG",
+            "arcʼhant",
+        }
+        XAU{
+            "XAU",
+            "aour",
+        }
+        XBA{
+            "XBA",
+            "unanenn genaoz europat",
+        }
+        XBB{
+            "XBB",
+            "unanenn voneiz europat",
+        }
+        XBC{
+            "XBC",
+            "unanenn jediñ europat (XBC)",
+        }
+        XBD{
+            "XBD",
+            "unanenn jediñ europat (XBD)",
+        }
+        XCD{
+            "XCD",
+            "dollar Karib ar reter",
+        }
+        XDR{
+            "XDR",
+            "gwirioù tennañ arbennik",
+        }
+        XEU{
+            "XEU",
+            "unanenn jediñ europat",
+        }
+        XFO{
+            "XFO",
+            "lur aour Frañs",
+        }
+        XFU{
+            "XFU",
+            "lur Unaniezh etrebroadel an hentoù-houarn",
+        }
+        XOF{
+            "F CFA",
+            "lur CFA Afrika ar Cʼhornôg",
+        }
+        XPD{
+            "XPD",
+            "palladiom",
+        }
+        XPF{
+            "CFPF",
+            "lur CFP",
+        }
+        XPT{
+            "XPT",
+            "platin",
+        }
+        XRE{
+            "XRE",
+            "XRE",
+        }
+        XSU{
+            "XSU",
+            "XSU",
+        }
+        XTS{
+            "XTS",
+            "kod moneiz amprouiñ",
+        }
+        XUA{
+            "XUA",
+            "unanenn jediñ BAD",
+        }
+        XXX{
+            "XXX",
+            "moneiz dianav",
+        }
+        YDD{
+            "YDD",
+            "dinar Yemen",
+        }
+        YER{
+            "YER",
+            "rial Yemen",
+        }
+        YUD{
+            "YUD",
+            "YUD",
+        }
+        YUM{
+            "YUM",
+            "dinar nevez Yougoslavia (1994–2002)",
+        }
+        YUN{
+            "YUN",
+            "dinar kemmadus Yougoslavia (1990–1992)",
+        }
+        YUR{
+            "YUR",
+            "dinar adreizhet Yougoslavia (1992–1993)",
+        }
+        ZAL{
+            "ZAL",
+            "ZAL",
+        }
+        ZAR{
+            "ZAR",
+            "rand Suafrika",
+        }
+        ZMK{
+            "ZMK",
+            "kwacha Zambia (1968–2012)",
+        }
+        ZMW{
+            "ZMW",
+            "kwacha Zambia",
+        }
+        ZRN{
+            "ZRN",
+            "ZRN",
+        }
+        ZRZ{
+            "ZRZ",
+            "ZRZ",
+        }
+        ZWD{
+            "ZWD",
+            "dollar Zimbabwe (1980–2008)",
+        }
+        ZWL{
+            "ZWL",
+            "dollar Zimbabwe (2009)",
+        }
+        ZWR{
+            "ZWR",
+            "dollar Zimbabwe (2008)",
+        }
+    }
+    Currencies%narrow{
+        AOA{"Kz"}
+        AUD{"$"}
+        BAM{"KM"}
+        BBD{"$"}
+        BDT{"৳"}
+        BMD{"$"}
+        BND{"$"}
+        BOB{"Bs"}
+        BSD{"$"}
+        BWP{"P"}
+        BYN{"р."}
+        BZD{"$"}
+        CAD{"$"}
+        CNY{"¥"}
+        CRC{"₡"}
+        CZK{"Kč"}
+        DKK{"kr"}
+        EGP{"£ E"}
+        ESP{"₧"}
+        EUR{"€"}
+        FJD{"$"}
+        FKP{"£"}
+        GBP{"£"}
+        GIP{"£"}
+        GNF{"FG"}
+        GTQ{"Q"}
+        GYD{"$"}
+        HKD{"$"}
+        HNL{"L"}
+        HRK{"kn"}
+        HUF{"Ft"}
+        IDR{"Rp"}
+        ILS{"₪"}
+        INR{"₹"}
+        ISK{"kr"}
+        JMD{"$"}
+        JPY{"¥"}
+        KHR{"៛"}
+        KPW{"₩"}
+        KRW{"₩"}
+        KYD{"$"}
+        KZT{"₸"}
+        LAK{"₭"}
+        LBP{"£L"}
+        LKR{"Rs"}
+        LRD{"$"}
+        LTL{"Lt"}
+        LVL{"Ls"}
+        MGA{"Ar"}
+        MMK{"K"}
+        MNT{"₮"}
+        MUR{"Rs"}
+        MYR{"RM"}
+        NAD{"$"}
+        NGN{"₦"}
+        NOK{"kr"}
+        NPR{"Rs"}
+        NZD{"$"}
+        PHP{"₱"}
+        PKR{"Rs"}
+        PLN{"zł"}
+        PYG{"₲"}
+        RUB{"₽"}
+        RUR{"р."}
+        SBD{"$"}
+        SEK{"kr"}
+        SGD{"$"}
+        SHP{"£"}
+        SRD{"$"}
+        SSP{"£"}
+        STN{"Db"}
+        SYP{"£"}
+        THB{"฿"}
+        TOP{"$ T"}
+        TRY{"₺"}
+        TTD{"$"}
+        TWD{"$"}
+        UAH{"₴"}
+        USD{"$"}
+        VEF{"Bs"}
+        VND{"₫"}
+        XCD{"$"}
+        ZAR{"R"}
+    }
+    CurrencyPlurals{
+        ADP{
+            few{"feseta Andorra"}
+            many{"a besetaoù Andorra"}
+            one{"beseta Andorra"}
+            other{"peseta Andorra"}
+            two{"beseta Andorra"}
+        }
+        AED{
+            few{"dirham EAU"}
+            many{"a zirhamoù EAU"}
+            one{"dirham EAU"}
+            other{"dirham EAU"}
+            two{"zirham EAU"}
+        }
+        AFA{
+            few{"afghani Afghanistan (1927–2002)"}
+            many{"a afghanioù Afghanistan (1927–2002)"}
+            one{"afghani Afghanistan (1927–2002)"}
+            other{"afghani Afghanistan (1927–2002)"}
+            two{"afghani Afghanistan (1927–2002)"}
+        }
+        AFN{
+            few{"afghani Afghanistan"}
+            many{"a afghanioù Afghanistan"}
+            one{"afghani Afghanistan"}
+            other{"afghani Afghanistan"}
+            two{"afghani Afghanistan"}
+        }
+        ALK{
+            few{"lek Albania (1946–1965)"}
+            many{"a lekoù Albania (1946–1965)"}
+            one{"lek Albania (1946–1965)"}
+            other{"lek Albania (1946–1965)"}
+            two{"lek Albania (1946–1965)"}
+        }
+        ALL{
+            few{"lek Albania"}
+            many{"a lekoù Albania"}
+            one{"lek Albania"}
+            other{"lek Albania"}
+            two{"lek Albania"}
+        }
+        AMD{
+            few{"dram Armenia"}
+            many{"a zramoù Armenia"}
+            one{"dram Armenia"}
+            other{"dram Armenia"}
+            two{"zram Armenia"}
+        }
+        ANG{
+            few{"florin Antilhez nederlandat"}
+            many{"a florinoù Antilhez"}
+            one{"florin Antilhez nederlandat"}
+            other{"florin Antilhez nederlandat"}
+            two{"florin Antilhez nederlandat"}
+        }
+        AOA{
+            few{"cʼhwanza Angola"}
+            many{"a gwanzaoù Angola"}
+            one{"cʼhwanza Angola"}
+            other{"kwanza Angola"}
+            two{"gwanza Angola"}
+        }
+        AOK{
+            few{"cʼhwanza Angola (1977–1991)"}
+            many{"a gwanzaoù Angola (1977–1991)"}
+            one{"cʼhwanza Angola (1977–1991)"}
+            other{"kwanza Angola (1977–1991)"}
+            two{"gwanza Angola (1977–1991)"}
+        }
+        AON{
+            few{"cʼhwanza nevez Angola (1990–2000)"}
+            many{"a gwanzaoù nevez Angola (1990–2000)"}
+            one{"cʼhwanza nevez Angola (1990–2000)"}
+            other{"kwanza nevez Angola (1990–2000)"}
+            two{"gwanza nevez Angola (1990–2000)"}
+        }
+        ARM{
+            few{"feso Arcʼhantina (1881–1970)"}
+            many{"a besoioù Arcʼhantina (1881–1970)"}
+            one{"peso Arcʼhantina (1881–1970)"}
+            other{"peso Arcʼhantina (1881–1970)"}
+            two{"beso Arcʼhantina (1881–1970)"}
+        }
+        ARP{
+            few{"feso Arcʼhantina (1983–1985)"}
+            many{"a besoioù Arcʼhantina (1983–1985)"}
+            one{"peso Arcʼhantina (1983–1985)"}
+            other{"peso Arcʼhantina (1983–1985)"}
+            two{"beso Arcʼhantina (1983–1985)"}
+        }
+        ARS{
+            few{"feso Arcʼhantina"}
+            many{"a pesoioù Arcʼhantina"}
+            one{"peso Arcʼhantina"}
+            other{"peso Arcʼhantina"}
+            two{"beso Arcʼhantina"}
+        }
+        ATS{
+            few{"schilling Aostria"}
+            many{"a schillingoù Aostria"}
+            one{"schilling Aostria"}
+            other{"schilling Aostria"}
+            two{"schilling Aostria"}
+        }
+        AUD{
+            few{"dollar Aostralia"}
+            many{"a zollaroù Aostralia"}
+            one{"dollar Aostralia"}
+            other{"dollar Aostralia"}
+            two{"zollar Aostralia"}
+        }
+        AWG{
+            few{"florin Aruba"}
+            many{"a florinoù Aruba"}
+            one{"florin Aruba"}
+            other{"florin Aruba"}
+            two{"florin Aruba"}
+        }
+        AZM{
+            few{"manat Azerbaidjan (1993–2006)"}
+            many{"a vanatoù Azerbaidjan (1993–2006)"}
+            one{"manat Azerbaidjan (1993–2006)"}
+            other{"manat Azerbaidjan (1993–2006)"}
+            two{"vanat Azerbaidjan (1993–2006)"}
+        }
+        AZN{
+            few{"manat Azerbaidjan"}
+            many{"a vanatoù Azerbaidjan"}
+            one{"manat Azerbaidjan"}
+            other{"manat Azerbaidjan"}
+            two{"vanat Azerbaidjan"}
+        }
+        BAD{
+            few{"dinar Bosnia ha Herzegovina (1992–1994)"}
+            many{"a zinaroù Bosnia ha Herzegovina (1992–1994)"}
+            one{"dinar Bosnia ha Herzegovina (1992–1994)"}
+            other{"dinar Bosnia ha Herzegovina (1992–1994)"}
+            two{"zinar Bosnia ha Herzegovina (1992–1994)"}
+        }
+        BAM{
+            few{"mark kemmadus Bosnia ha Herzegovina"}
+            many{"a varkoù kemmadus Bosnia ha Herzegovina"}
+            one{"mark kemmadus Bosnia ha Herzegovina"}
+            other{"mark kemmadus Bosnia ha Herzegovina"}
+            two{"vark kemmadus Bosnia ha Herzegovina"}
+        }
+        BAN{
+            few{"dinar nevez Bosnia ha Herzegovina (1994–1997)"}
+            many{"a zinaroù nevez Bosnia ha Herzegovina (1994–1997)"}
+            one{"dinar nevez Bosnia ha Herzegovina (1994–1997)"}
+            other{"dinar nevez Bosnia ha Herzegovina (1994–1997)"}
+            two{"zinar nevez Bosnia ha Herzegovina (1994–1997)"}
+        }
+        BBD{
+            few{"dollar Barbados"}
+            many{"a zollaroù Barbados"}
+            one{"dollar Barbados"}
+            other{"dollar Barbados"}
+            two{"zollar Barbados"}
+        }
+        BDT{
+            few{"zaka Bangladesh"}
+            many{"a dakaoù Bangladesh"}
+            one{"taka Bangladesh"}
+            other{"taka Bangladesh"}
+            two{"daka Bangladesh"}
+        }
+        BEC{
+            few{"lur Belgia (kemmadus)"}
+            many{"a lurioù Belgia (kemmadus)"}
+            one{"lur Belgia (kemmadus)"}
+            other{"lur Belgia (kemmadus)"}
+            two{"lur Belgia (kemmadus)"}
+        }
+        BEF{
+            few{"lur Belgia"}
+            many{"a lurioù Belgia"}
+            one{"lur Belgia"}
+            other{"lur Belgia"}
+            two{"lur Belgia"}
+        }
+        BGM{
+            few{"lev sokialour Bulgaria"}
+            many{"a levoù sokialour Bulgaria"}
+            one{"lev sokialour Bulgaria"}
+            other{"lev sokialour Bulgaria"}
+            two{"lev sokialour Bulgaria"}
+        }
+        BGN{
+            few{"lev Bulgaria"}
+            many{"a levoù Bulgaria"}
+            one{"lev Bulgaria"}
+            other{"lev Bulgaria"}
+            two{"lev Bulgaria"}
+        }
+        BGO{
+            few{"lev Bulgaria (1879–1952)"}
+            many{"a levoù Bulgaria (1879–1952)"}
+            one{"lev Bulgaria (1879–1952)"}
+            other{"lev Bulgaria (1879–1952)"}
+            two{"lev Bulgaria (1879–1952)"}
+        }
+        BHD{
+            few{"dinar Bahrein"}
+            many{"a zinaroù Bahrein"}
+            one{"dinar Bahrein"}
+            other{"dinar Bahrein"}
+            two{"zinar Bahrein"}
+        }
+        BIF{
+            few{"lur Burundi"}
+            many{"a lurioù Burundi"}
+            one{"lur Burundi"}
+            other{"lur Burundi"}
+            two{"lur Burundi"}
+        }
+        BMD{
+            few{"dollar Bermuda"}
+            many{"a zollaroù Bermuda"}
+            one{"dollar Bermuda"}
+            other{"dollar Bermuda"}
+            two{"zollar Bermuda"}
+        }
+        BND{
+            few{"dollar Brunei"}
+            many{"a zollaroù Brunei"}
+            one{"dollar Brunei"}
+            other{"dollar Brunei"}
+            two{"zollar Brunei"}
+        }
+        BOB{
+            few{"boliviano Bolivia"}
+            many{"a volivianoioù Bolivia"}
+            one{"boliviano Bolivia"}
+            other{"boliviano Bolivia"}
+            two{"voliviano Bolivia"}
+        }
+        BOL{
+            few{"boliviano Bolivia (1863–1963)"}
+            many{"a volivianoioù Bolivia (1863–1963)"}
+            one{"boliviano Bolivia (1863–1963)"}
+            other{"boliviano Bolivia (1863–1963)"}
+            two{"voliviano Bolivia (1863–1963)"}
+        }
+        BOP{
+            few{"feso Bolivia"}
+            many{"a besoioù Bolivia"}
+            one{"peso Bolivia"}
+            other{"peso Bolivia"}
+            two{"beso Bolivia"}
+        }
+        BRL{
+            few{"real Brazil"}
+            many{"a realioù Brazil"}
+            one{"real Brazil"}
+            other{"real Brazil"}
+            two{"real Brazil"}
+        }
+        BSD{
+            few{"dollar Bahamas"}
+            many{"a zollaroù Bahamas"}
+            one{"dollar Bahamas"}
+            other{"dollar Bahamas"}
+            two{"zollar Bahamas"}
+        }
+        BTN{
+            few{"ngultrum Bhoutan"}
+            many{"a ngultrumoù Bhoutan"}
+            one{"ngultrum Bhoutan"}
+            other{"ngultrum Bhoutan"}
+            two{"ngultrum Bhoutan"}
+        }
+        BUK{
+            few{"cʼhyat Birmania"}
+            many{"a gyatoù Birmania"}
+            one{"cʼhyat Birmania"}
+            other{"kyat Birmania"}
+            two{"gyat Birmania"}
+        }
+        BWP{
+            few{"fula Botswana"}
+            many{"a bulaoù Botswana"}
+            one{"pula Botswana"}
+            other{"pula Botswana"}
+            two{"bula Botswana"}
+        }
+        BYB{
+            few{"roubl nevez Belarus (1994–1999)"}
+            many{"a roubloù nevez Belarus (1994–1999)"}
+            one{"roubl nevez Belarus (1994–1999)"}
+            other{"roubl nevez Belarus (1994–1999)"}
+            two{"roubl nevez Belarus (1994–1999)"}
+        }
+        BYN{
+            few{"roubl Belarus"}
+            many{"a roubloù Belarus"}
+            one{"roubl Belarus"}
+            other{"roubl Belarus"}
+            two{"roubl Belarus"}
+        }
+        BYR{
+            few{"roubl Belarus (2000–2016)"}
+            many{"a roubloù Belarus (2000–2016)"}
+            one{"roubl Belarus (2000–2016)"}
+            other{"roubl Belarus (2000–2016)"}
+            two{"roubl Belarus (2000–2016)"}
+        }
+        BZD{
+            few{"dollar Belize"}
+            many{"a zollaroù Belize"}
+            one{"dollar Belize"}
+            other{"dollar Belize"}
+            two{"zollar Belize"}
+        }
+        CAD{
+            few{"dollar Kanada"}
+            many{"a zollaroù Kanada"}
+            one{"dollar Kanada"}
+            other{"dollar Kanada"}
+            two{"zollar Kanada"}
+        }
+        CDF{
+            few{"lur Kongo"}
+            many{"a lurioù Kongo"}
+            one{"lur Kongo"}
+            other{"lur Kongo"}
+            two{"lur Kongo"}
+        }
+        CHE{
+            few{"euro WIR"}
+            many{"a euroioù WIR"}
+            one{"euro WIR"}
+            other{"euro WIR"}
+            two{"euro WIR"}
+        }
+        CHF{
+            few{"lur Suis"}
+            many{"a lurioù Suis"}
+            one{"lur Suis"}
+            other{"lur Suis"}
+            two{"lur Suis"}
+        }
+        CHW{
+            few{"lur WIR"}
+            many{"a lurioù WIR"}
+            one{"lur WIR"}
+            other{"lur WIR"}
+            two{"lur WIR"}
+        }
+        CLE{
+            few{"escudo Chile"}
+            many{"a escudoioù Chile"}
+            one{"escudo Chile"}
+            other{"escudo Chile"}
+            two{"escudo Chile"}
+        }
+        CLF{
+            few{"unanenn jediñ Chile"}
+            many{"a unanennoù jediñ Chile"}
+            one{"unanenn jediñ Chile"}
+            other{"unanenn jediñ Chile"}
+            two{"unanenn jediñ Chile"}
+        }
+        CLP{
+            few{"feso Chile"}
+            many{"a besoioù Chile"}
+            one{"peso Chile"}
+            other{"peso Chile"}
+            two{"beso Chile"}
+        }
+        CNH{
+            few{"yuan Sina (diavaez)"}
+            many{"a yuanoù Sina (diavaez)"}
+            one{"yuan Sina (diavaez)"}
+            other{"yuan Sina (diavaez)"}
+            two{"yuan Sina (diavaez)"}
+        }
+        CNX{
+            few{"dollar Bank poblel Sina"}
+            many{"a zollaroù Bank poblel Sina"}
+            one{"dollar Bank poblel Sina"}
+            other{"dollar Bank poblel Sina"}
+            two{"zollar Bank poblel Sina"}
+        }
+        CNY{
+            few{"yuan Sina"}
+            many{"a yuanoù Sina"}
+            one{"yuan Sina"}
+            other{"yuan Sina"}
+            two{"yuan Sina"}
+        }
+        COP{
+            few{"feso Kolombia"}
+            many{"a besoioù Kolombia"}
+            one{"peso Kolombia"}
+            other{"peso Kolombia"}
+            two{"beso Kolombia"}
+        }
+        CRC{
+            few{"cʼholón Costa Rica"}
+            many{"a golónoù Costa Rica"}
+            one{"cʼholón Costa Rica"}
+            other{"colón Costa Rica"}
+            two{"golón Costa Rica"}
+        }
+        CSD{
+            few{"dinar Serbia (2002–2006)"}
+            many{"a zinaroù Serbia (2002–2006)"}
+            one{"dinar Serbia (2002–2006)"}
+            other{"dinar Serbia (2002–2006)"}
+            two{"zinar Serbia (2002–2006)"}
+        }
+        CUC{
+            few{"feso kemmadus Kuba"}
+            many{"a besoioù kemmadus Kuba"}
+            one{"peso kemmadus Kuba"}
+            other{"peso kemmadus Kuba"}
+            two{"beso gemmadus Kuba"}
+        }
+        CUP{
+            few{"feso Kuba"}
+            many{"a besoioù Kuba"}
+            one{"peso Kuba"}
+            other{"peso Kuba"}
+            two{"beso Kuba"}
+        }
+        CVE{
+            few{"escudo Kab Glas"}
+            many{"a escudoioù Kab Glas"}
+            one{"escudo Kab Glas"}
+            other{"escudo Kab Glas"}
+            two{"escudo Kab Glas"}
+        }
+        CYP{
+            few{"lur Kiprenez"}
+            many{"a lurioù Kiprenez"}
+            one{"lur Kiprenez"}
+            other{"lur Kiprenez"}
+            two{"lur Kiprenez"}
+        }
+        CZK{
+            few{"cʼhurunenn Tchek"}
+            many{"a gurunennoù Tchek"}
+            one{"gurunenn Tchek"}
+            other{"kurunenn Tchek"}
+            two{"gurunenn Tchek"}
+        }
+        DDM{
+            few{"mark Alamagn ar Reter"}
+            many{"a varkoù Alamagn ar Reter"}
+            one{"mark Alamagn ar Reter"}
+            other{"mark Alamagn ar Reter"}
+            two{"mark Alamagn ar Reter"}
+        }
+        DEM{
+            few{"mark Alamagn"}
+            many{"a varkoù Alamagn"}
+            one{"mark Alamagn"}
+            other{"mark Alamagn"}
+            two{"vark Alamagn"}
+        }
+        DJF{
+            few{"lur Djibouti"}
+            many{"a lurioù Djibouti"}
+            one{"lur Djibouti"}
+            other{"lur Djibouti"}
+            two{"lur Djibouti"}
+        }
+        DKK{
+            few{"cʼhurunenn Danmark"}
+            many{"a gurunennoù Danmark"}
+            one{"gurunenn Danmark"}
+            other{"kurunenn Danmark"}
+            two{"gurunenn Danmark"}
+        }
+        DOP{
+            few{"feso Dominikan"}
+            many{"a besoioù Dominikan"}
+            one{"peso Dominikan"}
+            other{"peso Dominikan"}
+            two{"beso Dominikan"}
+        }
+        DZD{
+            few{"dinar Aljeria"}
+            many{"a zinaroù Aljeria"}
+            one{"dinar Aljeria"}
+            other{"dinar Aljeria"}
+            two{"zinar Aljeria"}
+        }
+        EEK{
+            few{"cʼhurunenn Estonia"}
+            many{"a gurunennoù Estonia"}
+            one{"gurunenn Estonia"}
+            other{"kurunenn Estonia"}
+            two{"gurunenn Estonia"}
+        }
+        EGP{
+            few{"lur Egipt"}
+            many{"a lurioù Egipt"}
+            one{"lur Egipt"}
+            other{"lur Egipt"}
+            two{"lur Egipt"}
+        }
+        ERN{
+            few{"nakfa Eritrea"}
+            many{"a nakfaoù Eritrea"}
+            one{"nakfa Eritrea"}
+            other{"nakfa Eritrea"}
+            two{"nakfa Eritrea"}
+        }
+        ESB{
+            few{"feseta gemmadus Spagn"}
+            many{"a besetaoù kemmadus Spagn"}
+            one{"beseta gemmadus Spagn"}
+            other{"peseta gemmadus Spagn"}
+            two{"beseta gemmadus Spagn"}
+        }
+        ESP{
+            few{"feseta Spagn"}
+            many{"a besetaoù Spagn"}
+            one{"beseta Spagn"}
+            other{"peseta Spagn"}
+            two{"beseta Spagn"}
+        }
+        ETB{
+            few{"birr Etiopia"}
+            many{"a virroù Etiopia"}
+            one{"birr Etiopia"}
+            other{"birr Etiopia"}
+            two{"virr Etiopia"}
+        }
+        EUR{
+            few{"euro"}
+            many{"a euroioù"}
+            one{"euro"}
+            other{"euro"}
+            two{"euro"}
+        }
+        FIM{
+            few{"mark Finland"}
+            many{"a varkoù Finland"}
+            one{"mark Finland"}
+            other{"mark Finland"}
+            two{"vark Finland"}
+        }
+        FJD{
+            few{"dollar Fidji"}
+            many{"a zollaroù Fidji"}
+            one{"dollar Fidji"}
+            other{"dollar Fidji"}
+            two{"zollar Fidji"}
+        }
+        FKP{
+            few{"lur Inizi Falkland"}
+            many{"a lurioù Inizi Falkland"}
+            one{"lur Inizi Falkland"}
+            other{"lur Inizi Falkland"}
+            two{"lur Inizi Falkland"}
+        }
+        FRF{
+            few{"lur gall"}
+            many{"a lurioù gall"}
+            one{"lur gall"}
+            other{"lur gall"}
+            two{"lur gall"}
+        }
+        GBP{
+            few{"lur Breizh-Veur"}
+            many{"a lurioù Breizh-Veur"}
+            one{"lur Breizh-Veur"}
+            other{"lur Breizh-Veur"}
+            two{"lur Breizh-Veur"}
+        }
+        GEL{
+            few{"lari Jorjia"}
+            many{"a larioù Jorjia"}
+            one{"lari Jorjia"}
+            other{"lari Jorjia"}
+            two{"lari Jorjia"}
+        }
+        GHS{
+            few{"cedi Ghana"}
+            many{"cedi Ghana"}
+            one{"cedi Ghana"}
+            other{"cedi Ghana"}
+            two{"cedi Ghana"}
+        }
+        GIP{
+            few{"lur Jibraltar"}
+            many{"a lurioù Jibraltar"}
+            one{"lur Jibraltar"}
+            other{"lur Jibraltar"}
+            two{"lur Jibraltar"}
+        }
+        GMD{
+            few{"dalasi Gambia"}
+            many{"a zalasioù Gambia"}
+            one{"dalasi Gambia"}
+            other{"dalasi Gambia"}
+            two{"zalasi Gambia"}
+        }
+        GNF{
+            few{"lur Ginea"}
+            many{"a lurioù Ginea"}
+            one{"lur Ginea"}
+            other{"lur Ginea"}
+            two{"lur Ginea"}
+        }
+        GNS{
+            few{"syli Ginea"}
+            many{"a sylioù Ginea"}
+            one{"syli Ginea"}
+            other{"syli Ginea"}
+            two{"syli Ginea"}
+        }
+        GQE{
+            few{"ekwele Ginea ar Cʼheheder"}
+            many{"a ekweleoù Ginea ar Cʼheheder"}
+            one{"ekwele Ginea ar Cʼheheder"}
+            other{"ekwele Ginea ar Cʼheheder"}
+            two{"ekwele Ginea ar Cʼheheder"}
+        }
+        GRD{
+            few{"drakm Gres"}
+            many{"a zrakmoù Gres"}
+            one{"drakm Gres"}
+            other{"drakm Gres"}
+            two{"zrakm Gres"}
+        }
+        GTQ{
+            few{"cʼhuetzal Guatemala"}
+            many{"a guetzaloù Guatemala"}
+            one{"cʼhuetzal Guatemala"}
+            other{"quetzal Guatemala"}
+            two{"guetzal Guatemala"}
+        }
+        GWP{
+            few{"feso Ginea-Bissau"}
+            many{"a besoioù Ginea-Bissau"}
+            one{"peso Ginea-Bissau"}
+            other{"peso Ginea-Bissau"}
+            two{"beso Ginea-Bissau"}
+        }
+        GYD{
+            few{"dollar Guyana"}
+            many{"a zollaroù Guyana"}
+            one{"dollar Guyana"}
+            other{"dollar Guyana"}
+            two{"zollar Guyana"}
+        }
+        HKD{
+            few{"dollar Hong Kong"}
+            many{"a zollaroù Hong Kong"}
+            one{"dollar Hong Kong"}
+            other{"dollar Hong Kong"}
+            two{"zollar Hong Kong"}
+        }
+        HNL{
+            few{"lempira Honduras"}
+            many{"a lempiraoù Honduras"}
+            one{"lempira Honduras"}
+            other{"lempira Honduras"}
+            two{"lempira Honduras"}
+        }
+        HRD{
+            few{"dinar Kroatia"}
+            many{"a zinaroù Kroatia"}
+            one{"dinar Kroatia"}
+            other{"dinar Kroatia"}
+            two{"zinar Kroatia"}
+        }
+        HRK{
+            few{"cʼhuna Kroatia"}
+            many{"a gunaoù Kroatia"}
+            one{"cʼhuna Kroatia"}
+            other{"kuna Kroatia"}
+            two{"guna Kroatia"}
+        }
+        HTG{
+            few{"gourde Haiti"}
+            many{"a cʼhourdeoù Haiti"}
+            one{"gourde Haiti"}
+            other{"gourde Haiti"}
+            two{"cʼhourde Haiti"}
+        }
+        HUF{
+            few{"forint Hungaria"}
+            many{"a forintoù Hungaria"}
+            one{"forint Hungaria"}
+            other{"forint Hungaria"}
+            two{"forint Hungaria"}
+        }
+        IDR{
+            few{"roupi Indonezia"}
+            many{"a roupioù Indonezia"}
+            one{"roupi Indonezia"}
+            other{"roupi Indonezia"}
+            two{"roupi Indonezia"}
+        }
+        IEP{
+            few{"lur Iwerzhon"}
+            many{"a lurioù Iwerzhon"}
+            one{"lur Iwerzhon"}
+            other{"lur Iwerzhon"}
+            two{"lur Iwerzhon"}
+        }
+        ILP{
+            few{"lur Israel"}
+            many{"a lurioù Israel"}
+            one{"lur Israel"}
+            other{"lur Israel"}
+            two{"lur Israel"}
+        }
+        ILR{
+            few{"shekel Israel (1980–1985)"}
+            many{"shekel Israel (1980–1985)"}
+            one{"shekel Israel (1980–1985)"}
+            other{"shekel Israel (1980–1985)"}
+            two{"shekel Israel (1980–1985)"}
+        }
+        ILS{
+            few{"shekel nevez Israel"}
+            many{"shekel nevez Israel"}
+            one{"shekel nevez Israel"}
+            other{"shekel nevez Israel"}
+            two{"shekel nevez Israel"}
+        }
+        INR{
+            few{"roupi India"}
+            many{"a roupioù India"}
+            one{"roupi India"}
+            other{"roupi India"}
+            two{"roupi India"}
+        }
+        IQD{
+            few{"dinar Iraq"}
+            many{"a zinaroù Iraq"}
+            one{"dinar Iraq"}
+            other{"dinar Iraq"}
+            two{"zinar Iraq"}
+        }
+        IRR{
+            few{"rial Iran"}
+            many{"a rialoù Iran"}
+            one{"rial Iran"}
+            other{"rial Iran"}
+            two{"rial Iran"}
+        }
+        ISJ{
+            few{"cʼhurunenn Island (1918–1981)"}
+            many{"a gurunennoù Island (1918–1981)"}
+            one{"gurunenn Island (1918–1981)"}
+            other{"kurunenn Island (1918–1981)"}
+            two{"gurunenn Island (1918–1981)"}
+        }
+        ISK{
+            few{"cʼhurunenn Island"}
+            many{"a gurunennoù Island"}
+            one{"gurunenn Island"}
+            other{"kurunenn Island"}
+            two{"gurunenn Island"}
+        }
+        ITL{
+            few{"lur Italia"}
+            many{"a lurioù Italia"}
+            one{"lur Italia"}
+            other{"lur Italia"}
+            two{"lur Italia"}
+        }
+        JMD{
+            few{"dollar Jamaika"}
+            many{"a zollaroù Jamaika"}
+            one{"dollar Jamaika"}
+            other{"dollar Jamaika"}
+            two{"zollar Jamaika"}
+        }
+        JOD{
+            few{"dinar Jordania"}
+            many{"a zinaroù Jordania"}
+            one{"dinar Jordania"}
+            other{"dinar Jordania"}
+            two{"zinar Jordania"}
+        }
+        JPY{
+            few{"yen Japan"}
+            many{"a yenoù Japan"}
+            one{"yen Japan"}
+            other{"yen Japan"}
+            two{"yen Japan"}
+        }
+        KES{
+            few{"shilling Kenya"}
+            many{"a shillingoù Kenya"}
+            one{"shilling Kenya"}
+            other{"shilling Kenya"}
+            two{"shilling Kenya"}
+        }
+        KGS{
+            few{"som Kyrgyzstan"}
+            many{"a somoù Kyrgyzstan"}
+            one{"som Kyrgyzstan"}
+            other{"som Kyrgyzstan"}
+            two{"som Kyrgyzstan"}
+        }
+        KHR{
+            few{"riel Kambodja"}
+            many{"a rieloù Kambodja"}
+            one{"riel Kambodja"}
+            other{"riel Kambodja"}
+            two{"riel Kambodja"}
+        }
+        KMF{
+            few{"lur Komorez"}
+            many{"a lurioù Komorez"}
+            one{"lur Komorez"}
+            other{"lur Komorez"}
+            two{"lur Komorez"}
+        }
+        KPW{
+            few{"won Korea an Norzh"}
+            many{"a wonoù Korea an Norzh"}
+            one{"won Korea an Norzh"}
+            other{"won Korea an Norzh"}
+            two{"won Korea an Norzh"}
+        }
+        KRH{
+            few{"hwan Korea ar Su (1953–1962)"}
+            many{"a hwanoù Korea ar Su (1953–1962)"}
+            one{"hwan Korea ar Su (1953–1962)"}
+            other{"hwan Korea ar Su (1953–1962)"}
+            two{"hwan Korea ar Su (1953–1962)"}
+        }
+        KRO{
+            few{"won Korea ar Su (1945–1953)"}
+            many{"a wonoù Korea ar Su (1945–1953)"}
+            one{"won Korea ar Su (1945–1953)"}
+            other{"won Korea ar Su (1945–1953)"}
+            two{"won Korea ar Su (1945–1953)"}
+        }
+        KRW{
+            few{"won Korea ar Su"}
+            many{"a wonoù Korea ar Su"}
+            one{"won Korea ar Su"}
+            other{"won Korea ar Su"}
+            two{"won Korea ar Su"}
+        }
+        KWD{
+            few{"dinar Koweit"}
+            many{"a zinaroù Koweit"}
+            one{"dinar Koweit"}
+            other{"dinar Koweit"}
+            two{"zinar Koweit"}
+        }
+        KYD{
+            few{"dollar Inizi Cayman"}
+            many{"a zollaroù Inizi Cayman"}
+            one{"dollar Inizi Cayman"}
+            other{"dollar Inizi Cayman"}
+            two{"zollar Inizi Cayman"}
+        }
+        KZT{
+            few{"zenge Kazakstan"}
+            many{"a dengeoù Kazakstan"}
+            one{"tenge Kazakstan"}
+            other{"tenge Kazakstan"}
+            two{"denge Kazakstan"}
+        }
+        LAK{
+            few{"cʼhip Laos"}
+            many{"a gipoù Laos"}
+            one{"cʼhip Laos"}
+            other{"kip Laos"}
+            two{"gip Laos"}
+        }
+        LBP{
+            few{"lur Liban"}
+            many{"a lurioù Liban"}
+            one{"lur Liban"}
+            other{"lur Liban"}
+            two{"lur Liban"}
+        }
+        LKR{
+            few{"roupi Sri Lanka"}
+            many{"a roupioù Sri Lanka"}
+            one{"roupi Sri Lanka"}
+            other{"roupi Sri Lanka"}
+            two{"roupi Sri Lanka"}
+        }
+        LRD{
+            few{"dollar Liberia"}
+            many{"a zollaroù Liberia"}
+            one{"dollar Liberia"}
+            other{"dollar Liberia"}
+            two{"zollar Liberia"}
+        }
+        LSL{
+            few{"loti Lesotho"}
+            many{"a lotioù Lesotho"}
+            one{"loti Lesotho"}
+            other{"loti Lesotho"}
+            two{"loti Lesotho"}
+        }
+        LTL{
+            few{"litas Lituania"}
+            many{"a litasoù Lituania"}
+            one{"litas Lituania"}
+            other{"litas Lituania"}
+            two{"litas Lituania"}
+        }
+        LTT{
+            few{"zalonas Lituania"}
+            many{"a dalonasoù Lituania"}
+            one{"talonas Lituania"}
+            other{"talonas Lituania"}
+            two{"dalonas Lituania"}
+        }
+        LUC{
+            few{"lur kemmadus Luksembourg"}
+            many{"a lurioù kemmadus Luksembourg"}
+            one{"lur kemmadus Luksembourg"}
+            other{"lur kemmadus Luksembourg"}
+            two{"lur kemmadus Luksembourg"}
+        }
+        LUF{
+            few{"lur Luksembourg"}
+            many{"a lurioù Luksembourg"}
+            one{"lur Luksembourg"}
+            other{"lur Luksembourg"}
+            two{"lur Luksembourg"}
+        }
+        LVL{
+            few{"lats Latvia"}
+            many{"a latsoù Latvia"}
+            one{"lats Latvia"}
+            other{"lats Latvia"}
+            two{"lats Latvia"}
+        }
+        LVR{
+            few{"roubl Latvia"}
+            many{"a roubloù Latvia"}
+            one{"roubl Latvia"}
+            other{"roubl Latvia"}
+            two{"roubl Latvia"}
+        }
+        LYD{
+            few{"dinar Libia"}
+            many{"a zinaroù Libia"}
+            one{"dinar Libia"}
+            other{"dinar Libia"}
+            two{"zinar Libia"}
+        }
+        MAD{
+            few{"dirham Maroko"}
+            many{"a zirhamoù Maroko"}
+            one{"dirham Maroko"}
+            other{"dirham Maroko"}
+            two{"zirham Maroko"}
+        }
+        MAF{
+            few{"lur Maroko"}
+            many{"a lurioù Maroko"}
+            one{"lur Maroko"}
+            other{"lur Maroko"}
+            two{"lur Maroko"}
+        }
+        MCF{
+            few{"lur Monaco"}
+            many{"a lurioù Monaco"}
+            one{"lur Monaco"}
+            other{"lur Monaco"}
+            two{"lur Monaco"}
+        }
+        MDL{
+            few{"leu Moldova"}
+            many{"leu Moldova"}
+            one{"leu Moldova"}
+            other{"leu Moldova"}
+            two{"leu Moldova"}
+        }
+        MGA{
+            few{"ariary Madagaskar"}
+            many{"a ariaryoù Madagaska"}
+            one{"ariary Madagaskar"}
+            other{"ariary Madagaskar"}
+            two{"ariary Madagaskar"}
+        }
+        MGF{
+            few{"lur Madagaskar"}
+            many{"a lurioù Madagaskar"}
+            one{"lur Madagaskar"}
+            other{"lur Madagaskar"}
+            two{"lur Madagaskar"}
+        }
+        MKD{
+            few{"denar Makedonia"}
+            many{"a zenaroù Makedonia"}
+            one{"denar Makedonia"}
+            other{"denar Makedonia"}
+            two{"zenar Makedonia"}
+        }
+        MKN{
+            few{"denar Makedonia (1992–1993)"}
+            many{"a zenaroù Makedonia (1992–1993)"}
+            one{"denar Makedonia (1992–1993)"}
+            other{"denar Makedonia (1992–1993)"}
+            two{"zenar Makedonia (1992–1993)"}
+        }
+        MLF{
+            few{"lur Mali"}
+            many{"a lurioù Mali"}
+            one{"lur Mali"}
+            other{"lur Mali"}
+            two{"lur Mali"}
+        }
+        MMK{
+            few{"cʼhyat Myanmar"}
+            many{"a gyatoù Myanmar"}
+            one{"cʼhyat Myanmar"}
+            other{"kyat Myanmar"}
+            two{"gyat Myanmar"}
+        }
+        MNT{
+            few{"zugrik Mongolia"}
+            many{"a dugrikoù Mongolia"}
+            one{"tugrik Mongolia"}
+            other{"tugrik Mongolia"}
+            two{"dugrik Mongolia"}
+        }
+        MOP{
+            few{"fataca Macau"}
+            many{"a batacaoù Macau"}
+            one{"pataca Macau"}
+            other{"pataca Macau"}
+            two{"bataca Macau"}
+        }
+        MRO{
+            few{"ouguiya Maouritania (1973–2017)"}
+            many{"a ouguiyaoù Maouritania (1973–2017)"}
+            one{"ouguiya Maouritania (1973–2017)"}
+            other{"ouguiya Maouritania (1973–2017)"}
+            two{"ouguiya Maouritania (1973–2017)"}
+        }
+        MRU{
+            few{"ouguiya Maouritania"}
+            many{"a ouguiyaoù Maouritania"}
+            one{"ouguiya Maouritania"}
+            other{"ouguiya Maouritania"}
+            two{"ouguiya Maouritania"}
+        }
+        MTL{
+            few{"lira Malta"}
+            many{"a liraoù Malta"}
+            one{"lira Malta"}
+            other{"lira Malta"}
+            two{"lira Malta"}
+        }
+        MTP{
+            few{"lur Malta"}
+            many{"a lurioù Malta"}
+            one{"lur Malta"}
+            other{"lur Malta"}
+            two{"lur Malta"}
+        }
+        MUR{
+            few{"roupi Moris"}
+            many{"a roupioù Moris"}
+            one{"roupi Moris"}
+            other{"roupi Moris"}
+            two{"roupi Moris"}
+        }
+        MVP{
+            few{"roupi Maldivez"}
+            many{"a roupioù Maldivez"}
+            one{"roupi Maldivez"}
+            other{"roupi Maldivez"}
+            two{"roupi Maldivez"}
+        }
+        MVR{
+            few{"rufiyaa Maldivez"}
+            many{"a rufiyaaoù Maldivez"}
+            one{"rufiyaa Maldivez"}
+            other{"rufiyaa Maldivez"}
+            two{"rufiyaa Maldivez"}
+        }
+        MWK{
+            few{"kwacha Malawi"}
+            many{"a gwachaoù Malawi"}
+            one{"cʼhwacha Malawi"}
+            other{"kwacha Malawi"}
+            two{"gwacha Malawi"}
+        }
+        MXN{
+            few{"feso Mecʼhiko"}
+            many{"a besoioù Mecʼhiko"}
+            one{"peso Mecʼhiko"}
+            other{"peso Mecʼhiko"}
+            two{"beso Mecʼhiko"}
+        }
+        MXP{
+            few{"feso arcʼhant Mecʼhiko (1861–1992)"}
+            many{"a besoioù arcʼhant Mecʼhiko (1861–1992)"}
+            one{"peso arcʼhant Mecʼhiko (1861–1992)"}
+            other{"peso arcʼhant Mecʼhiko (1861–1992)"}
+            two{"beso arcʼhant Mecʼhiko (1861–1992)"}
+        }
+        MYR{
+            few{"ringgit Malaysia"}
+            many{"a ringgitoù Malaysia"}
+            one{"ringgit Malaysia"}
+            other{"ringgit Malaysia"}
+            two{"ringgit Malaysia"}
+        }
+        MZE{
+            few{"escudo Mozambik"}
+            many{"a escudoioù Mozambik"}
+            one{"escudo Mozambik"}
+            other{"escudo Mozambik"}
+            two{"escudo Mozambik"}
+        }
+        MZM{
+            few{"metical Mozambik (1980–2006)"}
+            many{"a veticaloù Mozambik (1980–2006)"}
+            one{"metical Mozambik (1980–2006)"}
+            other{"metical Mozambik (1980–2006)"}
+            two{"vetical Mozambik (1980–2006)"}
+        }
+        MZN{
+            few{"metical Mozambik"}
+            many{"a veticaloù Mozambik"}
+            one{"metical Mozambik"}
+            other{"metical Mozambik"}
+            two{"vetical Mozambik"}
+        }
+        NAD{
+            few{"dollar Namibia"}
+            many{"a zollaroù Namibia"}
+            one{"dollar Namibia"}
+            other{"dollar Namibia"}
+            two{"zollar Namibia"}
+        }
+        NGN{
+            few{"naira Nigeria"}
+            many{"a nairaoù Nigeria"}
+            one{"naira Nigeria"}
+            other{"naira Nigeria"}
+            two{"naira Nigeria"}
+        }
+        NIC{
+            few{"cʼhordoba Nicaragua (1988–1991)"}
+            many{"a gordobaoù Nicaragua (1988–1991)"}
+            one{"cʼhordoba Nicaragua (1988–1991)"}
+            other{"cordoba Nicaragua (1988–1991)"}
+            two{"gordoba Nicaragua (1988–1991)"}
+        }
+        NIO{
+            few{"cʼhordoba Nicaragua"}
+            many{"a gordobaoù Nicaragua"}
+            one{"cʼhordoba Nicaragua"}
+            other{"cordoba Nicaragua"}
+            two{"gordoba Nicaragua"}
+        }
+        NLG{
+            few{"florin an Izelvroioù"}
+            many{"a florinoù an Izelvroioù"}
+            one{"florin an Izelvroioù"}
+            other{"florin an Izelvroioù"}
+            two{"florin an Izelvroioù"}
+        }
+        NOK{
+            few{"cʼhurunenn Norvegia"}
+            many{"a gurunennoù Norvegia"}
+            one{"gurunenn Norvegia"}
+            other{"kurunenn Norvegia"}
+            two{"gurunenn Norvegia"}
+        }
+        NPR{
+            few{"roupi Nepal"}
+            many{"a roupioù Nepal"}
+            one{"roupi Nepal"}
+            other{"roupi Nepal"}
+            two{"roupi Nepal"}
+        }
+        NZD{
+            few{"dollar Zeland-Nevez"}
+            many{"a zollaroù Zeland-Nevez"}
+            one{"dollar Zeland-Nevez"}
+            other{"dollar Zeland-Nevez"}
+            two{"zollar Zeland-Nevez"}
+        }
+        OMR{
+            few{"rial Oman"}
+            many{"a rialoù Oman"}
+            one{"rial Oman"}
+            other{"rial Oman"}
+            two{"rial Oman"}
+        }
+        PAB{
+            few{"balboa Panamá"}
+            many{"a valboaoù Panamá"}
+            one{"balboa Panamá"}
+            other{"balboa Panamá"}
+            two{"valboa Panamá"}
+        }
+        PEN{
+            few{"sol Perou"}
+            many{"sol Perou"}
+            one{"sol Perou"}
+            other{"sol Perou"}
+            two{"sol Perou"}
+        }
+        PES{
+            few{"sol Perou (1863–1965)"}
+            many{"a solioù Perou (1863–1965)"}
+            one{"sol Perou (1863–1965)"}
+            other{"sol Perou (1863–1965)"}
+            two{"sol Perou (1863–1965)"}
+        }
+        PGK{
+            few{"cʼhina Papoua Ginea-Nevez"}
+            many{"a ginaoù Papoua Ginea-Nevez"}
+            one{"cʼhina Papoua Ginea-Nevez"}
+            other{"kina Papoua Ginea-Nevez"}
+            two{"gina Papoua Ginea-Nevez"}
+        }
+        PHP{
+            few{"feso Filipinez"}
+            many{"a besoioù Filipinez"}
+            one{"peso Filipinez"}
+            other{"peso Filipinez"}
+            two{"beso Filipinez"}
+        }
+        PKR{
+            few{"roupi Pakistan"}
+            many{"a roupioù Pakistan"}
+            one{"roupi Pakistan"}
+            other{"roupi Pakistan"}
+            two{"roupi Pakistan"}
+        }
+        PLN{
+            few{"zloty Polonia"}
+            many{"a zlotyoù Polonia"}
+            one{"zloty Polonia"}
+            other{"zloty Polonia"}
+            two{"zloty Polonia"}
+        }
+        PLZ{
+            few{"zloty Polonia (1950–1995)"}
+            many{"a zlotyoù Polonia (1950–1995)"}
+            one{"zloty Polonia (1950–1995)"}
+            other{"zloty Polonia (1950–1995)"}
+            two{"zloty Polonia (1950–1995)"}
+        }
+        PTE{
+            few{"escudo Portugal"}
+            many{"a escudoioù Portugal"}
+            one{"escudo Portugal"}
+            other{"escudo Portugal"}
+            two{"escudo Portugal"}
+        }
+        PYG{
+            few{"guarani Paraguay"}
+            many{"a uaranioù Paraguay"}
+            one{"guarani Paraguay"}
+            other{"guarani Paraguay"}
+            two{"uarani Paraguay"}
+        }
+        QAR{
+            few{"rial Qatar"}
+            many{"a rialoù Qatar"}
+            one{"rial Qatar"}
+            other{"rial Qatar"}
+            two{"rial Qatar"}
+        }
+        RHD{
+            few{"dollar Rodezia"}
+            many{"a zollaroù Rodezia"}
+            one{"dollar Rodezia"}
+            other{"dollar Rodezia"}
+            two{"zollar Rodezia"}
+        }
+        ROL{
+            few{"leu Roumania (1952–2006)"}
+            many{"leu Roumania (1952–2006)"}
+            one{"leu Roumania (1952–2006)"}
+            other{"leu Roumania (1952–2006)"}
+            two{"leu Roumania (1952–2006)"}
+        }
+        RON{
+            few{"leu Roumania"}
+            many{"leu Roumania"}
+            one{"leu Roumania"}
+            other{"leu Roumania"}
+            two{"leu Roumania"}
+        }
+        RSD{
+            few{"dinar Serbia"}
+            many{"a zinaroù Serbia"}
+            one{"dinar Serbia"}
+            other{"dinar Serbia"}
+            two{"zinar Serbia"}
+        }
+        RUB{
+            few{"roubl Rusia"}
+            many{"a roubloù Rusia"}
+            one{"roubl Rusia"}
+            other{"roubl Rusia"}
+            two{"roubl Rusia"}
+        }
+        RUR{
+            few{"roubl Rusia (1991–1998)"}
+            many{"a roubloù Rusia (1991–1998)"}
+            one{"roubl Rusia (1991–1998)"}
+            other{"roubl Rusia (1991–1998)"}
+            two{"roubl Rusia (1991–1998)"}
+        }
+        RWF{
+            few{"lur Rwanda"}
+            many{"a lurioù Rwanda"}
+            one{"lur Rwanda"}
+            other{"lur Rwanda"}
+            two{"lur Rwanda"}
+        }
+        SAR{
+            few{"riyal Arabia Saoudat"}
+            many{"a riyaloù Arabia Saoudat"}
+            one{"riyal Arabia Saoudat"}
+            other{"riyal Arabia Saoudat"}
+            two{"riyal Arabia Saoudat"}
+        }
+        SBD{
+            few{"dollar Inizi Salomon"}
+            many{"a zollaroù Inizi Salomon"}
+            one{"dollar Inizi Salomon"}
+            other{"dollar Inizi Salomon"}
+            two{"zollar Inizi Salomon"}
+        }
+        SCR{
+            few{"roupi Sechelez"}
+            many{"a roupioù Sechelez"}
+            one{"roupi Sechelez"}
+            other{"roupi Sechelez"}
+            two{"roupi Sechelez"}
+        }
+        SDD{
+            few{"dinar Soudan (1992–2007)"}
+            many{"a zinaroù Soudan (1992–2007)"}
+            one{"dinar Soudan (1992–2007)"}
+            other{"dinar Soudan (1992–2007)"}
+            two{"zinar Soudan (1992–2007)"}
+        }
+        SDG{
+            few{"lur Soudan"}
+            many{"a lurioù Soudan"}
+            one{"lur Soudan"}
+            other{"lur Soudan"}
+            two{"lur Soudan"}
+        }
+        SDP{
+            few{"lur Soudan (1957–1998)"}
+            many{"a lurioù Soudan (1957–1998)"}
+            one{"lur Soudan (1957–1998)"}
+            other{"lur Soudan (1957–1998)"}
+            two{"lur Soudan (1957–1998)"}
+        }
+        SEK{
+            few{"cʼhurunenn Sveden"}
+            many{"a gurunennoù Sveden"}
+            one{"gurunenn Sveden"}
+            other{"kurunenn Sveden"}
+            two{"gurunenn Sveden"}
+        }
+        SGD{
+            few{"dollar Singapour"}
+            many{"a zollaroù Singapour"}
+            one{"dollar Singapour"}
+            other{"dollar Singapour"}
+            two{"zollar Singapour"}
+        }
+        SHP{
+            few{"lur Saint-Helena"}
+            many{"a lurioù Saint-Helena"}
+            one{"lur Saint-Helena"}
+            other{"lur Saint-Helena"}
+            two{"lur Saint-Helena"}
+        }
+        SIT{
+            few{"zolar Slovenia"}
+            many{"a dolaroù Slovenia"}
+            one{"tolar Slovenia"}
+            other{"tolar Slovenia"}
+            two{"dolar Slovenia"}
+        }
+        SKK{
+            few{"cʼhurunenn Slovakia"}
+            many{"a gurunennoù Slovakia"}
+            one{"gurunenn Slovakia"}
+            other{"kurunenn Slovakia"}
+            two{"gurunenn Slovakia"}
+        }
+        SLL{
+            few{"leone Sierra Leone"}
+            many{"a leoneoù Sierra Leone"}
+            one{"leone Sierra Leone"}
+            other{"leone Sierra Leone"}
+            two{"leone Sierra Leone"}
+        }
+        SOS{
+            few{"shilling Somalia"}
+            many{"a shillingoù Somalia"}
+            one{"shilling Somalia"}
+            other{"shilling Somalia"}
+            two{"shilling Somalia"}
+        }
+        SRD{
+            few{"dollar Surinam"}
+            many{"a zollaroù Surinam"}
+            one{"dollar Surinam"}
+            other{"dollar Surinam"}
+            two{"zollar Surinam"}
+        }
+        SRG{
+            few{"florin Surinam"}
+            many{"a florinoù Surinam"}
+            one{"florin Surinam"}
+            other{"florin Surinam"}
+            two{"florin Surinam"}
+        }
+        SSP{
+            few{"lur Susoudan"}
+            many{"a lurioù Susoudan"}
+            one{"lur Susoudan"}
+            other{"lur Susoudan"}
+            two{"lur Susoudan"}
+        }
+        STD{
+            few{"dobra São Tomé ha Príncipe (1977–2017)"}
+            many{"a zobraoù São Tomé ha Príncipe (1977–2017)"}
+            one{"dobra São Tomé ha Príncipe (1977–2017)"}
+            other{"dobra São Tomé ha Príncipe (1977–2017)"}
+            two{"zobra São Tomé ha Príncipe (1977–2017)"}
+        }
+        STN{
+            few{"dobra São Tomé ha Príncipe"}
+            many{"a zobraoù São Tomé ha Príncipe"}
+            one{"dobra São Tomé ha Príncipe"}
+            other{"dobra São Tomé ha Príncipe"}
+            two{"zobra São Tomé ha Príncipe"}
+        }
+        SUR{
+            few{"roubl soviedel"}
+            many{"a roubloù soviedel"}
+            one{"roubl soviedel"}
+            other{"roubl soviedel"}
+            two{"roubl soviedel"}
+        }
+        SVC{
+            few{"cʼholón Salvador"}
+            many{"a golónoù Salvador"}
+            one{"cʼholón Salvador"}
+            other{"colón Salvador"}
+            two{"golón Salvador"}
+        }
+        SYP{
+            few{"lur Siria"}
+            many{"a lurioù Siria"}
+            one{"lur Siria"}
+            other{"lur Siria"}
+            two{"lur Siria"}
+        }
+        SZL{
+            few{"lilangeni Swaziland"}
+            many{"a lilangenioù Swaziland"}
+            one{"lilangeni Swaziland"}
+            other{"lilangeni Swaziland"}
+            two{"lilangeni Swaziland"}
+        }
+        THB{
+            few{"baht Thailand"}
+            many{"a vahtoù Thailand"}
+            one{"baht Thailand"}
+            other{"baht Thailand"}
+            two{"vaht Thailand"}
+        }
+        TJR{
+            few{"roubl Tadjikistan"}
+            many{"a roubloù Tadjikistan"}
+            one{"roubl Tadjikistan"}
+            other{"roubl Tadjikistan"}
+            two{"roubl Tadjikistan"}
+        }
+        TJS{
+            few{"somoni Tadjikistan"}
+            many{"a somonioù Tadjikistan"}
+            one{"somoni Tadjikistan"}
+            other{"somoni Tadjikistan"}
+            two{"somoni Tadjikistan"}
+        }
+        TMM{
+            few{"manat Turkmenistan (1993–2009)"}
+            many{"a vanatoù Turkmenistan (1993–2009)"}
+            one{"manat Turkmenistan (1993–2009)"}
+            other{"manat Turkmenistan (1993–2009)"}
+            two{"vanat Turkmenistan (1993–2009)"}
+        }
+        TMT{
+            few{"manat Turkmenistan"}
+            many{"a vanatoù Turkmenistan"}
+            one{"manat Turkmenistan"}
+            other{"manat Turkmenistan"}
+            two{"vanat Turkmenistan"}
+        }
+        TND{
+            few{"dinar Tunizia"}
+            many{"a zinaroù Tunizia"}
+            one{"dinar Tunizia"}
+            other{"dinar Tunizia"}
+            two{"zinar Tunizia"}
+        }
+        TOP{
+            few{"faʻanga Tonga"}
+            many{"a baʻangaoù Tonga"}
+            one{"paʻanga Tonga"}
+            other{"paʻanga Tonga"}
+            two{"baʻanga Tonga"}
+        }
+        TPE{
+            few{"escudo Timor"}
+            many{"a escudoioù Timor"}
+            one{"escudo Timor"}
+            other{"escudo Timor"}
+            two{"escudo Timor"}
+        }
+        TRL{
+            few{"lur Turkia (1922–2005)"}
+            many{"a lurioù Turkia (1922–2005)"}
+            one{"lur Turkia (1922–2005)"}
+            other{"lur Turkia (1922–2005)"}
+            two{"lur Turkia (1922–2005)"}
+        }
+        TRY{
+            few{"lur Turkia"}
+            many{"a lurioù Turkia"}
+            one{"lur Turkia"}
+            other{"lur Turkia"}
+            two{"lur Turkia"}
+        }
+        TTD{
+            few{"dollar Trinidad ha Tobago"}
+            many{"a zollaroù Trinidad ha Tobago"}
+            one{"dollar Trinidad ha Tobago"}
+            other{"dollar Trinidad ha Tobago"}
+            two{"zollar Trinidad ha Tobago"}
+        }
+        TWD{
+            few{"dollar nevez Taiwan"}
+            many{"a zollaroù nevez Taiwan"}
+            one{"dollar nevez Taiwan"}
+            other{"dollar nevez Taiwan"}
+            two{"zollar nevez Taiwan"}
+        }
+        TZS{
+            few{"shilling Tanzania"}
+            many{"a shillingoù Tanzania"}
+            one{"shilling Tanzania"}
+            other{"shilling Tanzania"}
+            two{"shilling Tanzania"}
+        }
+        UAH{
+            few{"hryvnia Ukraina"}
+            many{"a hryvniaoù Ukraina"}
+            one{"hryvnia Ukraina"}
+            other{"hryvnia Ukraina"}
+            two{"hryvnia Ukraina"}
+        }
+        UGS{
+            few{"shilling Ouganda (1966–1987)"}
+            many{"a shillingoù Ouganda (1966–1987)"}
+            one{"shilling Ouganda (1966–1987)"}
+            other{"shilling Ouganda (1966–1987)"}
+            two{"shilling Ouganda (1966–1987)"}
+        }
+        UGX{
+            few{"shilling Ouganda"}
+            many{"a shillingoù Ouganda"}
+            one{"shilling Ouganda"}
+            other{"shilling Ouganda"}
+            two{"shilling Ouganda"}
+        }
+        USD{
+            few{"dollar SU"}
+            many{"a zollaroù SU"}
+            one{"dollar SU"}
+            other{"dollar SU"}
+            two{"zollar SU"}
+        }
+        UYP{
+            few{"feso Uruguay (1975–1993)"}
+            many{"a besoioù Uruguay (1975–1993)"}
+            one{"peso Uruguay (1975–1993)"}
+            other{"peso Uruguay (1975–1993)"}
+            two{"beso Uruguay (1975–1993)"}
+        }
+        UYU{
+            few{"feso Uruguay"}
+            many{"a besoioù Uruguay"}
+            one{"peso Uruguay"}
+            other{"peso Uruguay"}
+            two{"beso Uruguay"}
+        }
+        UZS{
+            few{"som Ouzbekistan"}
+            many{"a somoù Ouzbekistan"}
+            one{"som Ouzbekistan"}
+            other{"som Ouzbekistan"}
+            two{"som Ouzbekistan"}
+        }
+        VEB{
+            few{"bolivar Venezuela (1871–2008)"}
+            many{"a volivaroù Venezuela (1871–2008)"}
+            one{"bolivar Venezuela (1871–2008)"}
+            other{"bolivar Venezuela (1871–2008)"}
+            two{"volivar Venezuela (1871–2008)"}
+        }
+        VEF{
+            few{"bolivar Venezuela (2008–2018)"}
+            many{"a volivaroù Venezuela (2008–2018)"}
+            one{"bolivar Venezuela (2008–2018)"}
+            other{"bolivar Venezuela (2008–2018)"}
+            two{"volivar Venezuela (2008–2018)"}
+        }
+        VES{
+            few{"bolivar Venezuela"}
+            many{"a volivaroù Venezuela"}
+            one{"bolivar Venezuela"}
+            other{"bolivar Venezuela"}
+            two{"volivar Venezuela"}
+        }
+        VND{
+            few{"dong Viêt Nam"}
+            many{"a zongoù Viêt Nam"}
+            one{"dong Viêt Nam"}
+            other{"dong Viêt Nam"}
+            two{"zong Viêt Nam"}
+        }
+        VNN{
+            few{"dong Viêt Nam (1978–1985)"}
+            many{"a zongoù Viêt Nam (1978–1985)"}
+            one{"dong Viêt Nam (1978–1985)"}
+            other{"dong Viêt Nam (1978–1985)"}
+            two{"zong Viêt Nam (1978–1985)"}
+        }
+        VUV{
+            few{"vatu Vanuatu"}
+            many{"a vatuoù Vanuatu"}
+            one{"vatu Vanuatu"}
+            other{"vatu Vanuatu"}
+            two{"vatu Vanuatu"}
+        }
+        WST{
+            few{"zala Samoa"}
+            many{"a dalaoù Samoa"}
+            one{"tala Samoa"}
+            other{"tala Samoa"}
+            two{"dala Samoa"}
+        }
+        XAF{
+            few{"lur CFA Kreizafrika"}
+            many{"lur CFA Kreizafrika"}
+            one{"lur CFA Kreizafrika"}
+            other{"lur CFA Kreizafrika"}
+            two{"lur CFA Kreizafrika"}
+        }
+        XAG{
+            few{"oñs troy arcʼhant"}
+            many{"oñs troy arcʼhant"}
+            one{"oñs troy arcʼhant"}
+            other{"oñs troy arcʼhant"}
+            two{"oñs troy arcʼhant"}
+        }
+        XAU{
+            few{"oñs troy aour"}
+            many{"oñs troy aour"}
+            one{"oñs troy aour"}
+            other{"oñs troy aour"}
+            two{"oñs troy aour"}
+        }
+        XBA{
+            few{"unanenn genaoz europat"}
+            many{"a unanennoù kenaoz europat"}
+            one{"unanenn genaoz europat"}
+            other{"unanenn genaoz europat"}
+            two{"unanenn genaoz europat"}
+        }
+        XBB{
+            few{"unanenn voneiz europat"}
+            many{"a unanennoù moneiz europat"}
+            one{"unanenn voneiz europat"}
+            other{"unanenn voneiz europat"}
+            two{"unanenn voneiz europat"}
+        }
+        XBC{
+            few{"unanenn jediñ europat (XBC)"}
+            many{"a unanennoù jediñ europat (XBC)"}
+            one{"unanenn jediñ europat (XBC)"}
+            other{"unanenn jediñ europat (XBC)"}
+            two{"unanenn jediñ europat (XBC)"}
+        }
+        XBD{
+            few{"unanenn jediñ europat (XBD)"}
+            many{"a unanennoù jediñ europat (XBD)"}
+            one{"unanenn jediñ europat (XBD)"}
+            other{"unanenn jediñ europat (XBD)"}
+            two{"unanenn jediñ europat (XBD)"}
+        }
+        XCD{
+            few{"dollar Karib ar reter"}
+            many{"a zollaroù Karib ar reter"}
+            one{"dollar Karib ar reter"}
+            other{"dollar Karib ar reter"}
+            two{"zollar Karib ar reter"}
+        }
+        XDR{
+            few{"gwirioù tennañ arbennik"}
+            many{"gwirioù tennañ arbennik"}
+            one{"gwirioù tennañ arbennik"}
+            other{"gwirioù tennañ arbennik"}
+            two{"gwirioù tennañ arbennik"}
+        }
+        XEU{
+            few{"unanenn jediñ europat"}
+            many{"a unanennoù jediñ europat"}
+            one{"unanenn jediñ europat"}
+            other{"unanenn jediñ europat"}
+            two{"unanenn jediñ europat"}
+        }
+        XFO{
+            few{"lur aour Frañs"}
+            many{"a lurioù aour Frañs"}
+            one{"lur aour Frañs"}
+            other{"lur aour Frañs"}
+            two{"lur aour Frañs"}
+        }
+        XFU{
+            few{"lur Unaniezh etrebroadel an hentoù-houarn"}
+            many{"a lurioù Unaniezh etrebroadel an hentoù-houarn"}
+            one{"lur Unaniezh etrebroadel an hentoù-houarn"}
+            other{"lur Unaniezh etrebroadel an hentoù-houarn"}
+            two{"lur Unaniezh etrebroadel an hentoù-houarn"}
+        }
+        XOF{
+            few{"lur CFA BCEAO"}
+            many{"a lurioù CFA BCEAO"}
+            one{"lur CFA Afrika ar Cʼhornôg"}
+            other{"lur CFA Afrika ar Cʼhornôg"}
+            two{"lur CFA BCEAO"}
+        }
+        XPD{
+            few{"oñs troy palladiom"}
+            many{"oñs troy palladiom"}
+            one{"oñs troy palladiom"}
+            other{"oñs troy palladiom"}
+            two{"oñs troy palladiom"}
+        }
+        XPF{
+            few{"lur CFP"}
+            many{"a lurioù CFP"}
+            one{"lur CFP"}
+            other{"lur CFP"}
+            two{"lur CFP"}
+        }
+        XPT{
+            few{"oñs troy platin"}
+            many{"oñs troy platin"}
+            one{"oñs troy platin"}
+            other{"oñs troy platin"}
+            two{"oñs troy platin"}
+        }
+        XTS{
+            few{"unanenn voneiz amprouiñ"}
+            many{"a unanennoù voneiz amprouiñ"}
+            one{"unanenn voneiz amprouiñ"}
+            other{"unanenn voneiz amprouiñ"}
+            two{"unanenn voneiz amprouiñ"}
+        }
+        XUA{
+            few{"unanenn jediñ BAD"}
+            many{"a unanennoù jediñ BAD"}
+            one{"unanenn jediñ BAD"}
+            other{"unanenn jediñ BAD"}
+            two{"unanenn jediñ BAD"}
+        }
+        XXX{
+            few{"(moneiz dianav)"}
+            many{"(moneiz dianav)"}
+            one{"(moneiz dianav)"}
+            other{"(moneiz dianav)"}
+            two{"(moneiz dianav)"}
+        }
+        YDD{
+            few{"dinar Yemen"}
+            many{"a zinaroù Yemen"}
+            one{"dinar Yemen"}
+            other{"dinar Yemen"}
+            two{"zinar Yemen"}
+        }
+        YER{
+            few{"rial Yemen"}
+            many{"a rialoù Yemen"}
+            one{"rial Yemen"}
+            other{"rial Yemen"}
+            two{"rial Yemen"}
+        }
+        YUM{
+            few{"dinar nevez Yougoslavia (1994–2002)"}
+            many{"a zinaroù nevez Yougoslavia (1994–2002)"}
+            one{"dinar nevez Yougoslavia (1994–2002)"}
+            other{"dinar nevez Yougoslavia (1994–2002)"}
+            two{"zinar nevez Yougoslavia (1994–2002)"}
+        }
+        YUN{
+            few{"dinar kemmadus Yougoslavia (1990–1992)"}
+            many{"a zinaroù kemmadus Yougoslavia (1990–1992)"}
+            one{"dinar kemmadus Yougoslavia (1990–1992)"}
+            other{"dinar kemmadus Yougoslavia (1990–1992)"}
+            two{"zinar kemmadus Yougoslavia (1990–1992)"}
+        }
+        YUR{
+            few{"dinar adreizhet Yougoslavia (1992–1993)"}
+            many{"a zinaroù adreizhet Yougoslavia (1992–1993)"}
+            one{"dinar adreizhet Yougoslavia (1992–1993)"}
+            other{"dinar adreizhet Yougoslavia (1992–1993)"}
+            two{"zinar adreizhet Yougoslavia (1992–1993)"}
+        }
+        ZAR{
+            few{"rand Suafrika"}
+            many{"a randoù Suafrika"}
+            one{"rand Suafrika"}
+            other{"rand Suafrika"}
+            two{"rand Suafrika"}
+        }
+        ZMK{
+            few{"kwacha Zambia (1968–2012)"}
+            many{"a gwachaoù Zambia (1968–2012)"}
+            one{"cʼhwacha Zambia (1968–2012)"}
+            other{"kwacha Zambia (1968–2012)"}
+            two{"gwacha Zambia (1968–2012)"}
+        }
+        ZMW{
+            few{"kwacha Zambia"}
+            many{"a gwachaoù Zambia"}
+            one{"cʼhwacha Zambia"}
+            other{"kwacha Zambia"}
+            two{"gwacha Zambia"}
+        }
+        ZWD{
+            few{"dollar Zimbabwe (1980–2008)"}
+            many{"a zollaroù Zimbabwe (1980–2008)"}
+            one{"dollar Zimbabwe (1980–2008)"}
+            other{"dollar Zimbabwe (1980–2008)"}
+            two{"zollar Zimbabwe (1980–2008)"}
+        }
+        ZWL{
+            few{"dollar Zimbabwe (2009)"}
+            many{"a zollaroù Zimbabwe (2009)"}
+            one{"dollar Zimbabwe (2009)"}
+            other{"dollar Zimbabwe (2009)"}
+            two{"zollar Zimbabwe (2009)"}
+        }
+        ZWR{
+            few{"dollar Zimbabwe (2008)"}
+            many{"a zollaroù Zimbabwe (2008)"}
+            one{"dollar Zimbabwe (2008)"}
+            other{"dollar Zimbabwe (2008)"}
+            two{"zollar Zimbabwe (2008)"}
+        }
+    }
+    CurrencyUnitPatterns{
+        few{"{0} {1}"}
+        many{"{0} {1}"}
+        one{"{0} {1}"}
+        other{"{0} {1}"}
+        two{"{0} {1}"}
+    }
+}

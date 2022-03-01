@@ -1,0 +1,186 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Grek_Latn_UNGEGN.txt
+# Generated from CLDR
+#
+
+# For modern Greek, based on UNGEGN rules.
+# Rules are predicated on running NFD first, and NFC afterwards
+# MINIMAL FILTER GENERATED FOR: Greek-Latin/UNGEGN
+# WARNING: need to add accents to both filters ###
+# :: [\u0301\u0304\u0306\u0308;µ·ÀÂÈÊÌÎÒÔÙÛàâèêìîòôùûĈ-ĉĜ-ĝĤ-ĥĴ-ĵŜ-ŝŴ-ŷǛ-ǜǸ-ǹ\u0300\u0302\u0313-\u0314\u0340\u0342-\u0343\u0345ͺ;Ά-ΊΌΎ-ΡΣ-ώϐ-ϖϰ-ϵЀЍѐѝḔ-ḕṐ-ṑẀ-ẁẐ-ẑẤ-ậẰ-ằẾ-ệỐ-ộỜ-ờỪ-ừỲ-ỳἀ-ἕἘ-Ἕἠ-ὅὈ-Ὅὐ-ὗὙὛὝὟ-ώᾀ-ᾴᾶ-ᾼι῁-ῄῆ-῍῏-ΐῖ-Ί῝῟-῭ῲ-ῴῶ-ῼΩϷ-\u07FBϹ] ;
+:: [[[:Greek:][:Mn:][:Me:]] [\:-;?·;·]] ;
+::NFD (NFC) ;
+# Useful variables
+$lower = [[:latin:][:greek:] & [:Ll:]] ;
+$upper = [[:latin:][:greek:] & [:Lu:]] ;
+$accent = [[:Mn:][:Me:]] ;
+$macron = \u0304 ;
+$ddot = \u0308 ;
+$lcgvowel = [αεηιουω] ;
+$ucgvowel = [ΑΕΗΙΟΥΩ] ;
+$gvowel = [$lcgvowel $ucgvowel] ;
+$lcgvowelC = [$lcgvowel $accent] ;
+$evowel = [aeiouyAEIOUY];
+$vowel = [ $evowel $gvowel] ;
+$beforeLower = $accent * $lower ;
+$gammaLike = [ΓΚΞΧγκξχϰ] ;
+$egammaLike = [GKXCgkxc] ;
+$smooth = \u0313 ;
+$rough = \u0314 ;
+$iotasub = \u0345 ;
+$softener = [βΒγΓδΔζΖλΛμΜνΝρΡ$gvowel] ;
+$under = \u0331;
+$caron = \u030C;
+$afterLetter = [:L:] [\'$accent]* ;
+$beforeLetter = [\'$accent]* [:L:] ;
+# Fix punctuation
+# preserve orginal
+\: ↔ \: $under ;
+\? ↔ \? $under ;
+\; ↔ \? ;
+· ↔ \: ;
+# Fix any ancient characters that creep in
+\u0342 → \u0301 ;
+\u0302 → \u0301 ;
+\u0300 → \u0301 ;
+$smooth → ;
+$rough → ;
+$iotasub → ;
+ͺ → ;
+# need to have these up here so the rules don't mask
+η ↔ i $under ;
+Η ↔ I $under ;
+Ψ } $beforeLower ↔ Ps ;
+Ψ ↔ PS ;
+ψ ↔ ps ;
+ω ↔ o $under ;
+Ω ↔  O $under;
+# at begining or end of word, convert mp to b
+[^[:L:]$accent] { μπ → b ;
+μπ } [^[:L:]$accent] → b ;
+[^[:L:]$accent] { [Μμ][Ππ] → B ;
+[Μμ][Ππ] } [^[:L:]$accent] → B ;
+μπ ← b ;
+Μπ ← B } $beforeLower ;
+ΜΠ ← B ;
+# handle diphthongs ending with upsilon
+ου ↔ ou ;
+ΟΥ ↔ OU ;
+Ου ↔ Ou ;
+οΥ ↔ oU ;
+$fmaker = [aeiAEI] $under ? ;
+$shiftForwardVowels = [[:Mn:]-[\u0308]]; # note: a diaeresis keeps the items separate
+$fmaker { υ ( $shiftForwardVowels )* } $softener → $1 v $under ;
+υ $1 ← ( $shiftForwardVowels )* v $under ;
+$fmaker { υ ( $shiftForwardVowels )* } → $1 f $under;
+υ $1 ← ( $shiftForwardVowels )* f $under ;
+$fmaker { Υ } $softener ↔ V $under ;
+$fmaker { Υ ↔ U $under ;
+υ ↔ y ;
+Υ ↔ Y ;
+# NORMAL
+α ↔ a ;
+Α ↔ A ;
+β ↔ v ;
+Β ↔ V ;
+γ } $gammaLike ↔ n } $egammaLike ;
+γ ↔ g ;
+Γ } $gammaLike ↔ N } $egammaLike ;
+Γ ↔ G ;
+δ ↔ d ;
+Δ ↔ D ;
+ε ↔ e ;
+Ε ↔ E ;
+ζ ↔ z ;
+Ζ ↔ Z ;
+θ ↔ th ;
+Θ } $beforeLower ↔ Th ;
+Θ ↔ TH ;
+ι ↔ i ;
+Ι ↔ I ;
+κ ↔ k ;
+Κ ↔ K ;
+λ ↔ l ;
+Λ ↔ L ;
+μ ↔ m ;
+Μ ↔ M ;
+ν } $gammaLike → n\' ;
+ν ↔ n ;
+Ν } $gammaLike ↔ N\' ;
+Ν ↔ N ;
+ξ ↔ x ;
+Ξ ↔ X ;
+ο ↔ o ;
+Ο ↔ O ;
+π ↔ p ;
+Π ↔ P ;
+ρ ↔ r ;
+Ρ ↔ R ;
+# insert separator before things that turn into s
+[Pp] { } [ςσΣϷϸϺϻ] → \' ;
+# special S variants
+Ϸ ↔ S\u030C ; # Ϸ GREEK CAPITAL LETTER SHO Uppercase_Letter Grek - L
+ϸ ↔ s\u030C ; #ϸ GREEK SMALL LETTER SHO Lowercase_Letter Grek - L
+Ϻ ↔ S\u0302 ; # Ϻ GREEK CAPITAL LETTER SAN Uppercase_Letter Grek - L
+ϻ ↔ s\u0302 ; # ϻ GREEK SMALL LETTER SAN Lowercase_Letter Grek - L
+# Caron means exception
+# before a letter, initial
+ς } $beforeLetter ↔ s $under } $beforeLetter;
+σ } $beforeLetter ↔ s } $beforeLetter;
+# otherwise, after a letter = final
+$afterLetter { σ ↔ $afterLetter { s $under;
+$afterLetter { ς ↔ $afterLetter { s ;
+# otherwise (isolated) = initial
+ς ↔ s $under;
+σ ↔ s ;
+# [Pp] { Σ ↔ \'S ;
+Σ ↔ S ;
+τ ↔ t ;
+Τ ↔ T ;
+φ ↔ f ;
+Φ ↔ F ;
+χ ↔ ch ;
+Χ } $beforeLower ↔ Ch ;
+Χ ↔ CH ;
+# Completeness for ASCII
+# $ignore = [[:Mark:]''] * ;
+| ch ← h ;
+| k  ← c ;
+| i  ← j ;
+| k ← q ;
+| b ← u } $vowel ;
+| b ← w } $vowel ;
+| y ← u ;
+| y ← w ;
+| Ch ← H ;
+| K ← C ;
+| I ← J ;
+| K ← Q ;
+| B ← W } $vowel ;
+| B ← U } $vowel ;
+| Y ← W ;
+| Y ← U ;
+# Completeness for Greek
+ϐ → | β ;
+ϑ → | θ ;
+ϒ → | Υ ;
+ϕ → | φ ;
+ϖ → | π ;
+ϰ → | κ ;
+ϱ → | ρ ;
+ϲ → | σ ;
+Ϲ → | Σ; #U+03F9 GREEK CAPITAL LUNATE SIGMA SYMBOL
+ϳ → j ;
+ϴ → | Θ ;
+ϵ → | ε ;
+µ → | μ ;
+# delete any trailing ' marks used for roundtripping
+← [Ππ] { \' } [Ss] ;
+← [Νν] { \' } $egammaLike ;
+::NFC (NFD) ;
+# MINIMAL FILTER GENERATED FOR: Latin-Greek/UNGEGN BACKWARD
+:: ([[[:Latin:][:Mn:][:Me:]] ['\:?]]) ;
+

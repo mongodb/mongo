@@ -1,0 +1,16 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+uz{
+    collations{
+        standard{
+            Sequence{
+                "&[before 1]ʒ<oʻ=o‘=o''<<<Oʻ=O‘=O''"
+                "<gʻ=g‘=g''<<<Gʻ=G‘=G''"
+                "<sh<<<Sh<<<SH"
+                "<ch<<<Ch<<<CH"
+            }
+            Version{"39"}
+        }
+    }
+}

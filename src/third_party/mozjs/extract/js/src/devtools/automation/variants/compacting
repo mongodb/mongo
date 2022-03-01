@@ -1,5 +1,5 @@
 {
-    "configure-args": "--enable-ctypes",
+    "configure-args": "--enable-ctypes --enable-rust-simd",
     "optimize": true,
     "debug": true,
     "env": {

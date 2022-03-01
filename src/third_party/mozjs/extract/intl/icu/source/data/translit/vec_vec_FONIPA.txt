@@ -1,0 +1,92 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: vec_vec_FONIPA.txt
+# Generated from CLDR
+#
+
+# References
+# ----------
+# [1] Personal communication with Academia de ła Bona Creansa, Venice
+# [2] https://en.wikipedia.org/wiki/Venetian_language#Phonology
+# [3] https://en.wikipedia.org/wiki/Help:IPA/Venetian (mixed with Ladin)
+#
+# Output phonemes
+# ---------------
+#   m n ɲ ŋ
+#   p b t d k ɡ
+#   f v ɾ s z
+#   l ʎ j w
+#   t\u0361ʃ d\u0361ʒ d\u0361z
+#   i u e e\u032F o ɛ ɔ a
+$boundary = [^[:L:][:M:][:N:]];
+$e = [e é è];
+$i = [i í ì];
+$ei = [$e $i];
+$vowel = [a á à $ei o ó ò u ú ù];
+$onset = [
+j w m n ɲ ŋ p b t d k ɡ f v ɾ s z h l ʎ {e\u032F}
+{t\u0361ʃ} {d\u0361ʒ} {d\u0361z} {mj} {mw} {nj} {nw}
+{ps} {pɾ} {pɾw} {pl} {pj} {pw} {bɾ} {bɾw} {bw} {bj} {bl}
+{ts} {tɾ} {tɾw} {tl} {tj} {tw} {dɾ} {dɾw} {dw} {dj} {dl}
+{kɾ} {kw} {kɾw} {kl} {kj} {kw} {ɡɾ} {ɡɾw} {ɡw} {ɡj} {ɡl}
+{fɾ} {fj} {fl} {fw} {fɾw} {vɾ} {vj} {vw} {ɾw} {ɾj}
+{zm} {zn} {zɲ} {zj} {zl} {zb} {zbɾ} {zbj} {zbw} {zd} {zdɾ} {zdj} {zdw}
+{zɡ} {zɡɾ} {zɡj} {zɡw} {zv} {zvɾ} {zɾ} {zvj} {zd\u0361ʒ} {zw}
+{sp} {spɾ} {spw} {st} {stɾ} {stw} {sk} {skɾ} {skw}
+{sf} {sfɾ} {sɾ} {st\u0361ʃ} {sj} {sw} {lj} {lw}
+];
+::Lower;
+::NFC;
+([abefjklmoptvw]) → $1;
+[á à] → ˈa;
+{c [$ei \' ’]} $vowel → t\u0361ʃ;
+cé [\' ’]? → t\u0361ʃˈe;
+cè [\' ’]? → t\u0361ʃˈɛ;
+c e [\' ’]? → t\u0361ʃe;
+c [íì] [\' ’]? → t\u0361ʃˈi;
+c i [\' ’]? → t\u0361ʃi;
+[c {ch} k q {qu}] → k;
+é → ˈe;
+è → ˈɛ;
+{g l $ei} $vowel → ʎ;
+g l → ʎ;
+ġ → d\u0361ʒ;
+gé [\' ’]? → d\u0361ʒˈe;
+gè [\' ’]? → d\u0361ʒˈɛ;
+g [íì] [\' ’]? → d\u0361ʒˈi;
+{g [$ei \' ’]} $vowel → d\u0361ʒ;
+{g} $ei → d\u0361ʒ;
+gn → ɲ;
+[g {gh}] → ɡ;
+[í ì] → ˈi;
+{i} $vowel → j;
+ł → ɰ;
+ṅ → ŋ;
+ñ → ɲ;
+nj → ɲ;
+ó → ˈo;
+ò → ˈɔ;
+r → ɾ;
+[ṡ x z] → z;
+{s}[bdg] → z;
+s → s;
+{u} $vowel → w;
+[ú ù] → ˈu;
+u → u;
+y → j;
+[ż đ {dh}] → d\u0361z;
+d → d;
+[[:P:][:Z:]]+ → ' ';
+::NULL;
+{n} [p b t d k ɡ f v ɾ s z $boundary] → ŋ;
+{ɰ} ˈ? [ei] → ;
+eɰ → e;
+iɰ → i;
+ɰ → e\u032F;
+::NULL;
+# Move stress marker before syllable onset: [zɡɾaŋfiɲˈae] → [zɡɾaŋfiˈɲae]
+($onset) ˈ → ˈ $1;
+::NULL;
+

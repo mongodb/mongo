@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2018 and later: Unicode, Inc. and others. License & terms of use: http://www.unicode.org/copyright.html -->
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- This file is used to set compiler Warning configurations that are common to *all* ICU library code (common, i18n, and io). -->
+  <!-- Note: These options are for *all* configurations for *all* library projects.  -->
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <!--
+        We treat the following Warnings as Errors in the ICU library code, in order to catch/prevent
+        issues like ICU-20209, ICU-20157, ICU-13816 and others.
+
+          C4251 Need to DLL-Export template instantiations.
+          C4661 No suitable definition provided for explicit template instantiation request.
+          C4715 Not all control paths return a value.
+          C4706 Assignment within conditional expression.
+          C4005 Macro redifintion.
+          C4068 Unknown pragma.
+          C4267 Conversion from size_t to type, possible loss of data.
+          C4910 __declspec(dllexport) and extern are incompatible on an explicit instantiation.
+          C4003 Not enough parameters for macro.
+      -->
+      <TreatSpecificWarningsAsErrors>4251;4661;4715;4706;4005;4068;4267;4910;4003;%(TreatSpecificWarningsAsErrors)</TreatSpecificWarningsAsErrors>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>

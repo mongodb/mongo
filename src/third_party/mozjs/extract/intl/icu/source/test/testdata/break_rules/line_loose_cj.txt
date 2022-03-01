@@ -1,0 +1,247 @@
+﻿#
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Copyright (c) 2016, International Business Machines Corporation and others. All Rights Reserved.
+#
+#  file:  line_loose_cj.txt
+#
+# Reference Line Break rules for intltest rbbi/RBBIMonkeyTest.
+# Rules derived from Unicode Standard Annex #14 Revision 44 for Unicode 13.0
+#
+# Note: Rule syntax and the monkey test itself are still a work in progress.
+#       They are expected to change with review and the addition of support for rule tailoring.
+#
+#         Line Breaking Rules
+#         Implement default line breaking as defined by
+#         Unicode Standard Annex #14
+#         http://www.unicode.org/reports/tr14/, tailored as noted below.
+#
+#         This tailors the line break behavior to correspond to CSS
+#         line-break=loose (BCP47 -u-lb-loose) as defined for Chinese & Japanese.
+#         It sets characters of class CJ to behave like ID.
+#         In addition, it allows breaks:
+#         * before hyphens 2010 & 2013 (both BA) and 301C, 30A0 (both NS)
+#         * before iteration marks 3005, 303B, 309D, 309E, 30FD, 30FE (all NS)
+#         * between characters of LineBreak class IN such as 2026
+#         * before some centered punct 203C, 2047, 2048, 2049, 30FB, FF1A, FF1B,
+#           FF65 (all NS) and FF01, FF1F (both EX).
+#         * before suffix characters with LineBreak class PO and EastAsianWidth A,F,W;
+#           this includes: 00B0 2030 2032 2033 2035 2103 2109 FE6A FF05 FFE0
+#         * after prefix characters with LineBreak class PR and EastAsianWidth A,F,W;
+#           this includes: 00A4 00B1 20AC 2116 FE69 FF04 FFE1 FFE5 FFE6
+#         It allows breaking before 201C and after 201D, for zh_Hans, zh_Hant, and ja.
+
+
+type = line;
+locale = ja@lb=loose;
+
+
+AI = [:LineBreak =  Ambiguous:];
+AL = [:LineBreak =  Alphabetic:];
+BAX = [\u2010 \u2013];
+BA = [[:LineBreak =  Break_After:] - BAX];
+HH = [\u2010];      # \u2010 is HYPHEN, default line break is BA.
+BB = [:LineBreak =  Break_Before:];
+BK = [:LineBreak =  Mandatory_Break:];
+B2 = [:LineBreak =  Break_Both:];
+CB = [:LineBreak =  Contingent_Break:];
+CJ = [:LineBreak =  Conditional_Japanese_Starter:];
+CL = [[:LineBreak =  Close_Punctuation:] \u201d];
+CMS = [:LineBreak =  Combining_Mark:];
+CP = [:LineBreak =  Close_Parenthesis:];
+CR = [:LineBreak =  Carriage_Return:];
+EB = [:LineBreak =  EB:];
+EM = [:LineBreak =  EM:];
+EXX = [\uFF01 \uFF1F];
+EX = [[:LineBreak =  Exclamation:] - EXX];
+GL = [:LineBreak =  Glue:];
+HL = [:LineBreak =  Hebrew_Letter:];
+HY = [:LineBreak =  Hyphen:];
+H2 = [:LineBreak =  H2:];
+H3 = [:LineBreak =  H3:];
+ID = [[:LineBreak =  Ideographic:] CJ];  # CSS Loose tailoring: CJ resolves to ID
+IN = [:LineBreak =  Inseperable:];
+IS = [:LineBreak =  Infix_Numeric:];
+JL = [:LineBreak =  JL:];
+JV = [:LineBreak =  JV:];
+JT = [:LineBreak =  JT:];
+LF = [:LineBreak =  Line_Feed:];
+NL = [:LineBreak =  Next_Line:];
+NSX = [\u301C \u30A0 \u3005 \u303B \u309D \u309E \u30FD \u30FE \u203C \u2047 \u2048 \u2049 \u30FB \uFF1A \uFF1B \uFF65];
+NS = [[:LineBreak =  Nonstarter:] - NSX];
+NU = [:LineBreak =  Numeric:];
+OP = [[:LineBreak =  Open_Punctuation:] \u201c];
+POX = [\u00B0 \u2030 \u2032 \u2033 \u2035 \u2103 \u2109 \uFE6A \uFF05 \uFFE0];
+PO = [[:LineBreak =  Postfix_Numeric:] - POX];
+PRX = [\u00A4 \u00B1 \u20AC \u2116 \uFE69 \uFF04 \uFFE1 \uFFE5 \uFFE6];
+PR = [[:LineBreak =  Prefix_Numeric:] - PRX];
+QU = [[:LineBreak =  Quotation:] - [\u201c\u201d]];
+RI = [:LineBreak =  Regional_Indicator:];
+SA = [:LineBreak =  Complex_Context:];
+SG = [:LineBreak =  Surrogate:];
+SP = [:LineBreak =  Space:];
+SY = [:LineBreak =  Break_Symbols:];
+WJ = [:LineBreak =  Word_Joiner:];
+XX = [:LineBreak =  Unknown:];
+ZW = [:LineBreak =  ZWSpace:];
+ZWJ = [:LineBreak =  ZWJ:];
+
+# OP30 and CP30 are variants of OP and CP that appear in rule LB30 from UAX 14.
+# Limitations of this monkey test rule parser require that these definitions be pulled out
+# rather than appearing in-line in LB 30.
+
+OP30 = [OP - [\p{ea=F}\p{ea=W}\p{ea=H}]];
+CP30 = [CP - [\p{ea=F}\p{ea=W}\p{ea=H}]];
+
+# LB1 - Resolve AI, CB, CJ, SA, SG, and XX into other line breaking classes
+AL = [AL AI SG XX ];
+dictionary = SA;
+
+# By LB9, a ZWJ also behaves as a CM. Including it in the definition of CM avoids having to explicitly
+#         list it in the numerous rules that use CM.
+CM = [CMS ZWJ];
+
+LB4:        BK ÷;
+LB5:        CR LF;
+LB5.1:      CR ÷;
+LB5.2:      LF ÷;
+LB5.3:      NL ÷;
+
+LB6:        . (BK | CR | LF | NL);
+LB6.1:      [^BK CR LF NL SP ZW] CM* (BK | CR | LF | NL);
+
+# LB8   break after ZW SP*.
+# Precedes LB7 because both rules will match the sequences like ZW SP,
+# and LB8 must take precedence.
+
+LB8:        ZW SP* ÷ [^ZW SP BK CR LF NL];
+
+# Numbers. Equivalent to Tailoring example 8 from UAX 14.
+# Moved up, before LB14, because it can match longer sequences which must take precedence.
+#          Loose_cj tailoring: do not include $PRX at the beginning or $POX at the end.
+LB25:        ((PR | PO | POX)CM*)? ((OP | HY)CM*)? (IS CM*)? NU (CM*(NU | SY | IS))* (CM*(CL | CP))? (CM*(PR | PRX | PO))?;
+
+# Rules LB14 - LB17.
+# Moved up, before LB7, because they can match a longer sequence that would also match LB7.
+# For example, the sequence "OP CM SP AL" matches LB14
+# while the prefix of it, "OP CM SP" matches LB7.1
+LB14:        OP CM* SP* .;
+
+# LB 14a Break before an IS that begins a number and follows a space.
+LB14a:       SP ÷ IS CM* NU;
+
+# LB14b       × IS
+LB14b.1:     [^SP] CM* IS;
+LB14b.2:     SP IS;
+
+LB15:        QU CM* SP* OP;
+LB16:        (CL | CP)CM* SP* NS;
+LB17:        B2 CM* SP* B2;
+
+
+# LB7 Do not break before spaces or zero width space.
+
+LB7.1:      [^ZW SP] CM* [SP ZW];
+LB7.2:      [ZW SP] [SP ZW];
+
+# LB8a
+#      ZWJ x
+#      Don't match a CM on the right - let other rules pick up CM sequences, where
+#      the ZWJ behaves as just another generic CM.
+LB8a:       ZWJ [^CM];
+
+
+# LB9:  X CM -> X
+# LB10: Unattached CM -> AL
+
+#LB11:       × WJ;
+#            WJ ×
+
+LB11.1:      [^SP] CM* WJ;
+LB11.2:      SP WJ;
+LB11.3:      WJ CM* [^CM];
+
+LB12:        GL CM* [^CM];
+
+LB12a:       [^SP BA BAX HY] CM* GL;
+
+# LB 13 Do not break before ‘]’ or ‘!’ or ‘/’, even after spaces.
+LB13.1: [^SP] CM* [CL CP EX SY];
+LB13.2: SP [CL CP EX SY];
+
+
+# LB 14-17 are moved above LB 7.
+
+LB18:        SP ÷;
+
+LB19:        . CM* QU;
+LB19.1:      QU CM* [^CM];
+
+# LB 20   Break before and after CB.
+#         Interaction with LB8a:  ZWJ x . is tricky because CM includes ZWJ.
+#                                 ZWJ acts like a CM to the left, combining with CB.
+#                                 ZWJ acts independently to the right, no break after by LB8a.
+LB20.1:      . CM* ZWJ CB;
+LB20.2:      . CM* ÷ CB;
+
+LB20.3:      CB CM* ZWJ [^CM];
+LB20.4:      CB CM* ÷;
+
+# LB 20.09    Don't break between Hyphens and Letters when there is a break preceding the hyphen.
+LB20.09:     ^(HY | HH) CM* AL;
+
+# Note: Rule 21a must come before 21 to prevent 21.1 from matching HL BA, then
+#       not picking up the continuing match after the BA from 21a.
+# LB 21a Don't break after Hebrew + Hyphen
+#   HL (HY | BA) x
+
+LB21a:       HL CM* (HY | BA | BAX) CM* [^CM CB]?;
+
+LB21.1:      . CM* [BA HY NS];
+LB21.2:      BB CM* [^CM CB];
+
+LB21b:       SY CM* HL;
+
+
+LB22:        [^IN] CM* IN;   # For CSS Loose, allow breaks between adjacent ellipses characters.
+
+LB23.1:      (AL | HL | CM) CM* NU;
+LB23.2:      NU CM* (AL | HL);
+
+LB23a.1:     PR CM* (ID | EB | EM);
+LB23a.2:     (ID | EB | EM) CM* PO;
+
+LB24.2:      (PR | PO | POX) CM* (AL | HL);
+LB24.3:      (AL | HL | CM) CM* (PR | PO | POX);
+
+
+LB26.1:      JL CM* (JL | JV | H2 | H3);
+LB26.2:      (JV | H2) CM* (JV | JT);
+LB26.3:      (JT | H3) CM* JT;
+
+LB27.1:      (JL | JV | JT | H2 | H3) CM* IN;
+LB27.2:      (JL | JV | JT | H2 | H3) CM* PO;
+LB27.3:      PR CM* (JL | JV | JT | H2 | H3);
+
+# LB28 Do not break between Alphabetics.
+#      Unattached (leading) CM treated as AL.
+LB28:        (AL | HL | CM)CM* (AL | HL);
+
+LB29:        IS CM* (AL | HL);
+
+# LB30  is adjusted for unattached leading CM being treated as AL.
+LB30.1:      (AL | CM | HL | NU) CM* OP30;
+LB30.2:      CP30 CM* (AL | HL | NU);
+
+# LB30a  keep pairs of RI together.
+LB30a.1:     RI CM* RI         ÷ [^BK CR LF NL SP ZW WJ CL CP EX IS SY GL QU BA HY NS IN CM];
+LB30a.2:     RI CM* RI CM* CMS ÷ [^BK CR LF NL SP ZW WJ CL CP EX IS SY GL QU BA HY NS IN CM];
+LB30a.3:     RI CM* RI CM* [BK CR LF NL SP ZW WJ GL CL CP EX IS SY QU BA HY NS IN ZWJ]?;
+
+# LB30b Do not break between Emoji Base and Emoji Modifier
+LB30b:       EB CM* EM;
+
+# LB31 Break Everywhere Else.
+#      Include combining marks
+LB31.1:        . CM* ZWJ [^CM];
+LB31.2:        . CM* ÷;

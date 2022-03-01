@@ -1,0 +1,1303 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+se_FI{
+    NumberElements{
+        latn{
+            patternsLong{
+                decimalFormat{
+                    1000{
+                        other{"0 duháhat"}
+                        two{"0 dt"}
+                    }
+                    10000{
+                        one{"00 duháhat"}
+                        two{"00 dt"}
+                    }
+                    100000{
+                        one{"000 duháhat"}
+                        two{"000 dt"}
+                    }
+                    1000000{
+                        two{"0 mn"}
+                    }
+                    10000000{
+                        one{"00 miljonat"}
+                        two{"00 mn"}
+                    }
+                    100000000{
+                        one{"000 miljonat"}
+                        two{"000 mn"}
+                    }
+                    1000000000{
+                        one{"0 miljárda"}
+                        other{"0 miljárdat"}
+                        two{"0 miljárdat"}
+                    }
+                    10000000000{
+                        one{"00 miljárdat"}
+                        other{"00 miljárdat"}
+                        two{"00 md"}
+                    }
+                    100000000000{
+                        one{"000 miljárdat"}
+                        other{"000 miljárdat"}
+                        two{"000 md"}
+                    }
+                    1000000000000{
+                        one{"0 biljovdna"}
+                        other{"0 biljovdnat"}
+                        two{"0 bn"}
+                    }
+                    10000000000000{
+                        one{"00 biljovdnat"}
+                        other{"00 biljovdnat"}
+                        two{"00 bn"}
+                    }
+                    100000000000000{
+                        one{"000 biljovdnat"}
+                        other{"000 biljovdnat"}
+                        two{"000 bn"}
+                    }
+                }
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE d MMMM y G",
+                "d MMMM y G",
+                "d MMM y G",
+                "d.M.y GGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Ed{"E d"}
+                Gy{"y G"}
+                GyMMM{"MMM y G"}
+                GyMMMEd{"E d MMM y G"}
+                GyMMMd{"d MMM y G"}
+                MEd{"E d.M"}
+                MMMEd{"E d MMM"}
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                Md{"d/M"}
+                y{"y G"}
+                yyyy{"y G"}
+                yyyyM{"MM.y. GGGG"}
+                yyyyMEd{"E dd.MM.y GGGG"}
+                yyyyMMM{"MMM y G"}
+                yyyyMMMEd{"E d MMM y G"}
+                yyyyMMMM{"MMMM y G"}
+                yyyyMMMd{"d MMM y G"}
+                yyyyMd{"dd.MM.y GGGG"}
+                yyyyQQQ{"QQQ y G"}
+                yyyyQQQQ{"QQQQ y G"}
+            }
+            intervalFormats{
+                M{
+                    M{"M – M"}
+                }
+                MEd{
+                    M{"E d.M – E d.M"}
+                    d{"E d.M – E d.M"}
+                }
+                MMM{
+                    M{"MMM – MMM"}
+                }
+                MMMEd{
+                    M{"E d MMM – E d MMM"}
+                    d{"E d MMM – E d MMM"}
+                }
+                MMMd{
+                    M{"d MMM – d MMM"}
+                    d{"d–d MMM"}
+                }
+                Md{
+                    M{"d.M – d.M"}
+                    d{"d.M –d.M"}
+                }
+                y{
+                    y{"y–y G"}
+                }
+                yM{
+                    M{"M.y – M.y GGGG"}
+                    y{"M.y – M.y GGGG"}
+                }
+                yMEd{
+                    M{"E d.M.y – E.d.M.y GGGG"}
+                    d{"E d.M.y – E d.M.y GGGG"}
+                    y{"E d.M.y – E d.M.y GGGG"}
+                }
+                yMMMEd{
+                    M{"E d MMM y – E d MMM y G"}
+                    d{"E d MMM y – E d MMM y G"}
+                    y{"E d MMM y – E d MMM y G"}
+                }
+                yMMMM{
+                    M{"MMMM – MMMM y G"}
+                    y{"MMMM y – MMMM y G"}
+                }
+                yMMMd{
+                    M{"d.MMM – d.MMM y G"}
+                    d{"d–d.MMM y G"}
+                    y{"d MMM y – d MMM y G"}
+                }
+                yMd{
+                    M{"d.M.y – d.M.y GGGG"}
+                    d{"d.M.y – d.M.y GGGG"}
+                    y{"d.M.y – d.M.y GGGG"}
+                }
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "ib",
+                "eb",
+            }
+            AmPmMarkersAbbr{
+                "ib",
+                "eb",
+            }
+            AmPmMarkersNarrow{
+                "i",
+                "e",
+            }
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE d MMMM y",
+                "d MMMM y",
+                "d MMM y",
+                "dd.MM.y",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Ed{"d E"}
+                Gy{"y G"}
+                GyMMM{"MMM y G"}
+                GyMMMEd{"E d MMM y G"}
+                GyMMMd{"d MMM y G"}
+                MEd{"E d.M"}
+                MMMEd{"E d MMM"}
+                MMMMW{
+                    one{"MMMM:'a' 'vahkku' W"}
+                    other{"MMMM:'a' 'vahkku' W"}
+                    two{"MMMM:'a' 'vahkku' W"}
+                }
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                Md{"d/M"}
+                yM{"MM.y"}
+                yMEd{"E dd.MM.y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E d MMM y"}
+                yMMMM{"MMMM y"}
+                yMMMd{"d MMM y"}
+                yMd{"dd.MM.y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "so",
+                        "má",
+                        "di",
+                        "ga",
+                        "du",
+                        "be",
+                        "lá",
+                    }
+                    narrow{
+                        "S",
+                        "M",
+                        "D",
+                        "G",
+                        "D",
+                        "B",
+                        "L",
+                    }
+                    short{
+                        "so",
+                        "má",
+                        "di",
+                        "ga",
+                        "du",
+                        "be",
+                        "lá",
+                    }
+                    wide{
+                        "sotnabeaivi",
+                        "mánnodat",
+                        "disdat",
+                        "gaskavahkku",
+                        "duorastat",
+                        "bearjadat",
+                        "lávvordat",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "so",
+                        "má",
+                        "di",
+                        "ga",
+                        "du",
+                        "be",
+                        "lá",
+                    }
+                    narrow{
+                        "S",
+                        "M",
+                        "D",
+                        "G",
+                        "D",
+                        "B",
+                        "L",
+                    }
+                    short{
+                        "so",
+                        "má",
+                        "di",
+                        "ga",
+                        "du",
+                        "be",
+                        "lá",
+                    }
+                    wide{
+                        "sotnabeaivi",
+                        "mánnodat",
+                        "disdat",
+                        "gaskavahkku",
+                        "duorastat",
+                        "bearjadat",
+                        "lávvordat",
+                    }
+                }
+            }
+            dayPeriod{
+                stand-alone{
+                    abbreviated{
+                        am{"ib"}
+                        pm{"eb"}
+                    }
+                    narrow{
+                        am{"ib"}
+                        pm{"eb"}
+                    }
+                    wide{
+                        am{"ib"}
+                        pm{"eb"}
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "oKr.",
+                    "mKr.",
+                }
+                abbreviated%variant{
+                    "oáá.",
+                    "áá.",
+                }
+                wide{
+                    "ovdal Kristusa",
+                    "maŋŋel Kristusa",
+                }
+                wide%variant{
+                    "ovdal áigelogu",
+                    "áigelohku",
+                }
+            }
+            intervalFormats{
+                M{
+                    M{"M–M"}
+                }
+                MEd{
+                    M{"E d.M.–E d.M."}
+                    d{"E d.M.–E.d.M"}
+                }
+                MMM{
+                    M{"MMM–MMM"}
+                }
+                MMMEd{
+                    M{"E d.MMM–E d.MMM"}
+                    d{"E d.MMM–E d.MMM"}
+                }
+                MMMd{
+                    M{"d MMM–d MMM"}
+                    d{"d–d MMM"}
+                }
+                Md{
+                    M{"d.M.–d.M."}
+                    d{"d.M.–d.M."}
+                }
+                yM{
+                    M{"M.y–M.y"}
+                    y{"M.y – M.y"}
+                }
+                yMEd{
+                    M{"E d.M.y – E d.M.y"}
+                    d{"E d.M.y – E d.M.y"}
+                    y{"E d.M.y – E d.M.y"}
+                }
+                yMMM{
+                    M{"MMM – MMM y"}
+                    y{"MMM y – MMM y"}
+                }
+                yMMMEd{
+                    M{"E d MMM – E d MMM y"}
+                    d{"E d MMM – E d MMM y"}
+                    y{"E d MMM y – E d MMM y"}
+                }
+                yMMMM{
+                    M{"MMMM – MMMM y"}
+                    y{"MMMM y – MMMM y"}
+                }
+                yMMMd{
+                    M{"d MMM – d MMM y"}
+                    d{"d–d MMM y"}
+                    y{"d MMM y – d MMM y"}
+                }
+                yMd{
+                    M{"d.M.y – d.M.y"}
+                    d{"d.M.y – d.M.y"}
+                    y{"d.M.y – d.M.y"}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "ođđj",
+                        "guov",
+                        "njuk",
+                        "cuoŋ",
+                        "mies",
+                        "geas",
+                        "suoi",
+                        "borg",
+                        "čakč",
+                        "golg",
+                        "skáb",
+                        "juov",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ođđj",
+                        "guov",
+                        "njuk",
+                        "cuoŋ",
+                        "mies",
+                        "geas",
+                        "suoi",
+                        "borg",
+                        "čakč",
+                        "golg",
+                        "skáb",
+                        "juov",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "1Q",
+                        "2Q",
+                        "3Q",
+                        "4Q",
+                    }
+                    wide{
+                        "1. njealjádas",
+                        "2. njealjádas",
+                        "3. njealjádas",
+                        "4. njealjádas",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Q1",
+                        "2Q",
+                        "3Q",
+                        "4Q",
+                    }
+                    wide{
+                        "1. njealjádas",
+                        "2. njealjádas",
+                        "3. njealjádas",
+                        "4. njealjádas",
+                    }
+                }
+            }
+        }
+    }
+    fields{
+        day{
+            relative{
+                "-2"{"ovddet beaivvi"}
+                "2"{"don beaivve"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} beaivve siste"}
+                    other{"{0} beaivve siste"}
+                    two{"{0} beaivve siste"}
+                }
+                past{
+                    one{"ikte"}
+                    other{"{0} beaivve dás ovdal"}
+                    two{"ovddet beaivve"}
+                }
+            }
+        }
+        day-narrow{
+            dn{"b."}
+            relativeTime{
+                future{
+                    one{"{0} beaivve siste"}
+                    other{"{0} beaivve siste"}
+                    two{"{0} beaivve siste"}
+                }
+                past{
+                    one{"ikte"}
+                    other{"{0} beaivve dás ovdal"}
+                    two{"ovddet beaivve"}
+                }
+            }
+        }
+        day-short{
+            dn{"b."}
+            relativeTime{
+                future{
+                    one{"{0} beaivve siste"}
+                    other{"{0} beaivve siste"}
+                    two{"{0} beaivve siste"}
+                }
+                past{
+                    one{"ikte"}
+                    other{"{0} beaivve dás ovdal"}
+                    two{"ovddet beaivve"}
+                }
+            }
+        }
+        dayOfYear{
+            dn{"jagi beaivi"}
+        }
+        dayOfYear-narrow{
+            dn{"j. beaivi"}
+        }
+        dayOfYear-short{
+            dn{"j. beaivi"}
+        }
+        dayperiod{
+            dn{"ib/eb"}
+        }
+        dayperiod-short{
+            dn{"ib/eb"}
+        }
+        era{
+            dn{"áigodat"}
+        }
+        era-narrow{
+            dn{"áig."}
+        }
+        era-short{
+            dn{"áig."}
+        }
+        fri{
+            relative{
+                "-1"{"mannan bearjadaga"}
+                "0"{"dán bearjadaga"}
+                "1"{"boahtte bearjadaga"}
+            }
+            relativeTime{
+                future{
+                    one{"boahtte bearjadaga"}
+                    other{"boahtte {0} bearjadaga"}
+                    two{"boahtte {0} bearjadaga"}
+                }
+                past{
+                    one{"mannan bearjadaga"}
+                    other{"-{0} bearjadaga dás ovdal"}
+                    two{"ovddet bearjadaga"}
+                }
+            }
+        }
+        fri-narrow{
+            relative{
+                "-1"{"mannan be"}
+                "0"{"dán be"}
+                "1"{"boahtte be"}
+            }
+            relativeTime{
+                future{
+                    one{"boahtte {0} be"}
+                    other{"boahtte {0} be"}
+                    two{"boahtte {0} bearjadaga"}
+                }
+                past{
+                    one{"{0} mannan be"}
+                    other{"-{0} be dás ovdal"}
+                    two{"ovddet bearjadaga"}
+                }
+            }
+        }
+        fri-short{
+            relative{
+                "-1"{"mannan be"}
+                "0"{"dán be"}
+                "1"{"boahtte be"}
+            }
+            relativeTime{
+                future{
+                    one{"boahtte be"}
+                    other{"boahtte {0} be"}
+                    two{"boahtte {0} bearjadaga"}
+                }
+                past{
+                    one{"mannan be"}
+                    other{"-{0} be dás ovdal"}
+                    two{"ovddet bearjadaga"}
+                }
+            }
+        }
+        hour{
+            relative{
+                "0"{"dán diimmu"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} diimmu siste"}
+                    other{"{0} diimmu siste"}
+                    two{"{0} diimmu siste"}
+                }
+                past{
+                    one{"{0} diibmu áigi"}
+                    other{"{0} diimmu áigi"}
+                    two{"{0} diimmu áigi"}
+                }
+            }
+        }
+        hour-narrow{
+            dn{"dmu"}
+            relativeTime{
+                future{
+                    one{"{0} dmu siste"}
+                    other{"{0} dmu siste"}
+                    two{"{0} diimmu siste"}
+                }
+                past{
+                    one{"{0} dmu áigi"}
+                    other{"{0} dmu áigi"}
+                    two{"{0} diimmu áigi"}
+                }
+            }
+        }
+        hour-short{
+            dn{"dmu"}
+            relativeTime{
+                future{
+                    one{"{0} dmu siste"}
+                    other{"{0} dmu siste"}
+                    two{"{0} diimmu siste"}
+                }
+                past{
+                    one{"{0} dmu áigi"}
+                    other{"{0} dmu áigi"}
+                    two{"{0} diimmu áigi"}
+                }
+            }
+        }
+        minute{
+            relative{
+                "0"{"dán minuhta"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} minuhta siste"}
+                    other{"{0} minuhta siste"}
+                    two{"{0} minuhta siste"}
+                }
+                past{
+                    one{"{0} minuhtta áigi"}
+                    other{"{0} minuhta áigi"}
+                    two{"{0} minuhta áigi"}
+                }
+            }
+        }
+        minute-narrow{
+            dn{"min."}
+            relativeTime{
+                future{
+                    one{"{0} min. siste"}
+                    other{"{0} min. siste"}
+                    two{"{0} minuhta siste"}
+                }
+                past{
+                    one{"{0} min. áigi"}
+                    other{"{0} min. áigi"}
+                    two{"{0} minuhta áigi"}
+                }
+            }
+        }
+        minute-short{
+            dn{"min."}
+            relativeTime{
+                future{
+                    one{"{0} min. siste"}
+                    other{"{0} min. siste"}
+                    two{"{0} minuhta siste"}
+                }
+                past{
+                    one{"{0} min. áigi"}
+                    other{"{0} min. áigi"}
+                    two{"{0} minuhta áigi"}
+                }
+            }
+        }
+        mon{
+            relative{
+                "-1"{"mannan mánnodaga"}
+                "0"{"dán mánnodaga"}
+                "1"{"boahtte mánnodaga"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} boahtte mánnodaga"}
+                    other{"boahtte {0} mánnodaga"}
+                    two{"boahtte {0} mánnodaga"}
+                }
+                past{
+                    one{"mannan mánnodaga"}
+                    other{"{0} mánnodaga dás ovdal"}
+                    two{"ovddet mánnodaga"}
+                }
+            }
+        }
+        mon-narrow{
+            relative{
+                "-1"{"mannan má"}
+                "0"{"dán má"}
+                "1"{"boahtte má"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} boahtte má"}
+                    other{"{0} boahtte má"}
+                    two{"{0} boahtte mánnodaga"}
+                }
+                past{
+                    one{"{0} mannan má"}
+                    other{"{0} má dás ovdal"}
+                    two{"ovddet má"}
+                }
+            }
+        }
+        mon-short{
+            relative{
+                "-1"{"mannan má"}
+                "0"{"dán má"}
+                "1"{"boahtte má"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} boahtte má"}
+                    other{"{0} boahtte má"}
+                    two{"{0} boahtte mánnodaga"}
+                }
+                past{
+                    one{"mannan má"}
+                    other{"{0} má dás ovdal"}
+                    two{"ovddet má"}
+                }
+            }
+        }
+        month{
+            relative{
+                "-1"{"mannan mánu"}
+                "0"{"dán mánu"}
+                "1"{"boahtte mánu"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} mánu siste"}
+                    other{"{0} mánu siste"}
+                    two{"{0} mánu siste"}
+                }
+                past{
+                    one{"{0} mánnu dás ovdal"}
+                    other{"{0} mánu dás ovdal"}
+                    two{"{0} mánu dás ovdal"}
+                }
+            }
+        }
+        month-narrow{
+            dn{"m."}
+            relativeTime{
+                future{
+                    one{"{0} mánu geahčen"}
+                    other{"{0} mánu geahčen"}
+                    two{"{0} mánu geahčen"}
+                }
+                past{
+                    one{"{0} mánnu dás ovdal"}
+                    other{"{0} mánu dás ovdal"}
+                    two{"{0} mánu dás ovdal"}
+                }
+            }
+        }
+        month-short{
+            dn{"m."}
+            relativeTime{
+                future{
+                    one{"{0} mánu siste"}
+                    other{"{0} mánu siste"}
+                    two{"{0} mánu siste"}
+                }
+                past{
+                    one{"{0} mánnu dás ovdal"}
+                    other{"{0} mánu dás ovdal"}
+                    two{"{0} mánu dás ovdal"}
+                }
+            }
+        }
+        quarter{
+            dn{"njealjádasjahki"}
+            relative{
+                "-1"{"mannan njealjádasjagi"}
+                "0"{"dán njealjádasjagi"}
+                "1"{"boahtte njealjádasjagi"}
+            }
+            relativeTime{
+                future{
+                    one{"čuovvovaš {0} njealjádasjagi"}
+                    other{"čuovvovaš {0} njealjádasjagi"}
+                    two{"čuovvovaš {0} njealjádasjagi"}
+                }
+                past{
+                    one{"-{0} njealjádasjagi dás ovdal"}
+                    other{"-{0} njealjádasjagi dás ovdal"}
+                    two{"-{0} njealjádasjagi dás ovdal"}
+                }
+            }
+        }
+        quarter-narrow{
+            dn{"jahkenjealjádas"}
+            relativeTime{
+                future{
+                    one{"boahtte {0} njealj.j."}
+                    other{"boahtte {0} njealj.j."}
+                    two{"boahtte {0} njealjádasjagi"}
+                }
+                past{
+                    one{"{0} njealj.j. dás ovdal"}
+                    other{"{0} njealj.j. dás ovdal"}
+                    two{"-{0} njealjádasjagi dás ovdal"}
+                }
+            }
+        }
+        quarter-short{
+            dn{"njealj.j."}
+            relativeTime{
+                future{
+                    one{"boahtte {0} njealj.j."}
+                    other{"boahtte {0} njealj.j."}
+                    two{"boahtte {0} njealjádasjagi"}
+                }
+                past{
+                    one{"{0} njealj.j. dás ovdal"}
+                    other{"{0} njealj.j. dás ovdal"}
+                    two{"{0} njealjádasjagi dás ovdal"}
+                }
+            }
+        }
+        sat{
+            relative{
+                "-1"{"mannan lávvordaga"}
+                "0"{"dán lávvordaga"}
+                "1"{"boahtte lávvordaga"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} boahtte lávvordaga"}
+                    other{"boahtte {0} lávvordaga"}
+                    two{"boahtte {0} lávvordaga"}
+                }
+                past{
+                    one{"mannan lávvordaga"}
+                    other{"-{0} lávvordaga dás ovdal"}
+                    two{"ovddet lávvordaga"}
+                }
+            }
+        }
+        sat-narrow{
+            relative{
+                "-1"{"mannan lá"}
+                "0"{"dán lá"}
+                "1"{"boahtte lá"}
+            }
+            relativeTime{
+                future{
+                    one{"+{0} boahtte lá"}
+                    other{"boahtte {0} lá"}
+                    two{"boahtte {0} lá"}
+                }
+                past{
+                    one{"{0} mannan lá"}
+                    other{"-{0} lá dás ovdal"}
+                    two{"ovddet lá"}
+                }
+            }
+        }
+        sat-short{
+            relative{
+                "-1"{"mannan lá"}
+                "0"{"dán lá"}
+                "1"{"boahtte lá"}
+            }
+            relativeTime{
+                future{
+                    one{"+{0} boahtte lá"}
+                    other{"boahtte {0} lá"}
+                    two{"boahtte {0} lá"}
+                }
+                past{
+                    one{"mannan lá"}
+                    other{"-{0} lá dás ovdal"}
+                    two{"ovddet lá"}
+                }
+            }
+        }
+        second{
+            relative{
+                "0"{"dál"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} sekundda siste"}
+                    other{"{0} sekundda siste"}
+                    two{"{0} sekundda siste"}
+                }
+                past{
+                    one{"{0} sekunda áigi"}
+                    other{"{0} sekundda áigi"}
+                    two{"{0} sekundda áigi"}
+                }
+            }
+        }
+        second-narrow{
+            dn{"sek."}
+            relativeTime{
+                future{
+                    one{"{0} sek. siste"}
+                    other{"{0} sek. siste"}
+                    two{"{0} sekundda siste"}
+                }
+                past{
+                    one{"{0} sek. áigi"}
+                    other{"{0} sek. áigi"}
+                    two{"{0} sekundda áigi"}
+                }
+            }
+        }
+        second-short{
+            dn{"sek."}
+            relativeTime{
+                future{
+                    one{"{0} sek. siste"}
+                    other{"{0} sek. siste"}
+                    two{"{0} sekundda siste"}
+                }
+                past{
+                    one{"{0} sek. áigi"}
+                    other{"{0} sek. áigi"}
+                    two{"{0} sekundda áigi"}
+                }
+            }
+        }
+        sun{
+            relative{
+                "-1"{"mannan sotnabeaivve"}
+                "0"{"dán sotnabeaivve"}
+                "1"{"boahtte sotnabeaivve"}
+            }
+            relativeTime{
+                future{
+                    one{"boahtte sotnabeaivve"}
+                    other{"boahtte {0} sotnabeaivve"}
+                    two{"boahtte {0} sotnabeaivve"}
+                }
+                past{
+                    one{"mannan sotnabeaivve"}
+                    other{"{0} sotnabeaivve dás ovdal"}
+                    two{"ovddet sotnabeaivve"}
+                }
+            }
+        }
+        sun-narrow{
+            relative{
+                "-1"{"mannan so"}
+                "0"{"dán so"}
+                "1"{"boahtte so"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} boahtte so"}
+                    other{"{0} boahtte so"}
+                    two{"boahtte {0} sotnabeaivve"}
+                }
+                past{
+                    one{"{0} mannan so"}
+                    other{"{0} so dás ovdal"}
+                    two{"ovddet sotnabeaivve"}
+                }
+            }
+        }
+        sun-short{
+            relative{
+                "-1"{"mannan so"}
+                "0"{"dán so"}
+                "1"{"boahtte so"}
+            }
+            relativeTime{
+                future{
+                    one{"boahtte so"}
+                    other{"{0} boahtte so"}
+                    two{"maŋit sotnabeaivve"}
+                }
+                past{
+                    one{"mannan so"}
+                    other{"{0} so dás ovdal"}
+                    two{"ovddet sotnabeaivve"}
+                }
+            }
+        }
+        thu{
+            relative{
+                "-1"{"mannan duorastaga"}
+                "0"{"dán duorastaga"}
+                "1"{"boahtte duorastaga"}
+            }
+            relativeTime{
+                future{
+                    one{"boahtte duorastaga"}
+                    other{"+{0} boahtte duorastaga"}
+                    two{"+{0} boahtte duorastaga"}
+                }
+                past{
+                    one{"mannan duorastaga"}
+                    other{"{0} duorastaga dás ovdal"}
+                    two{"ovddet duorastaga"}
+                }
+            }
+        }
+        thu-narrow{
+            relative{
+                "-1"{"mannan du"}
+                "0"{"dán du"}
+                "1"{"boahtte du"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} boahtte du"}
+                    other{"+{0} boahtte du"}
+                    two{"+{0} boahtte duorastaga"}
+                }
+                past{
+                    one{"{0} mannan du"}
+                    other{"{0} du dás ovdal"}
+                    two{"ovddet duorastaga"}
+                }
+            }
+        }
+        thu-short{
+            relative{
+                "-1"{"mannan du"}
+                "0"{"dán du"}
+                "1"{"boahtte du"}
+            }
+            relativeTime{
+                future{
+                    one{"boahtte du"}
+                    other{"+{0} boahtte du"}
+                    two{"+{0} boahtte duorastaga"}
+                }
+                past{
+                    one{"mannan du"}
+                    other{"{0} du dás ovdal"}
+                    two{"ovddet duorastaga"}
+                }
+            }
+        }
+        tue{
+            relative{
+                "-1"{"mannan disdaga"}
+                "0"{"dán disdaga"}
+                "1"{"boahtte disdaga"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} boahtte disdaga"}
+                    other{"{0} boahtte disdaga"}
+                    two{"{0} boahtte disdaga"}
+                }
+                past{
+                    one{"mannan disdaga"}
+                    other{"{0} disdaga dás ovdal"}
+                    two{"ovddet disdaga"}
+                }
+            }
+        }
+        tue-narrow{
+            relative{
+                "-1"{"mannan di"}
+                "0"{"dán di"}
+                "1"{"boahtte di"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} boahtte di"}
+                    other{"{0} boahtte di"}
+                    two{"{0} boahtte disdaga"}
+                }
+                past{
+                    one{"{0} mannan di"}
+                    other{"{0} di dás ovdal"}
+                    two{"ovddet disdaga"}
+                }
+            }
+        }
+        tue-short{
+            relative{
+                "-1"{"mannan di"}
+                "0"{"dán di"}
+                "1"{"boahtte di"}
+            }
+            relativeTime{
+                future{
+                    one{"boahtte di"}
+                    other{"{0} boahtte di"}
+                    two{"{0} boahtte disdaga"}
+                }
+                past{
+                    one{"mannan di"}
+                    other{"{0} di dás ovdal"}
+                    two{"ovddet disdaga"}
+                }
+            }
+        }
+        wed{
+            relative{
+                "-1"{"mannan gaskavahku"}
+                "0"{"dán gaskavahku"}
+                "1"{"boahtte gaskavahku"}
+            }
+            relativeTime{
+                future{
+                    one{"boahtte gaskavahku"}
+                    other{"{0} boahtte gaskavahku"}
+                    two{"{0} boahtte gaskavahku"}
+                }
+                past{
+                    one{"mannan gaskavahku"}
+                    other{"{0} gaskavahku dás ovdal"}
+                    two{"ovddet gaskavahku"}
+                }
+            }
+        }
+        wed-narrow{
+            relative{
+                "-1"{"mannan ga"}
+                "0"{"dán ga"}
+                "1"{"boahtte ga"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} boahtte ga"}
+                    other{"{0} boahtte ga"}
+                    two{"{0} boahtte gaskavahku"}
+                }
+                past{
+                    one{"{0} mannan ga"}
+                    other{"{0} ga dás ovdal"}
+                    two{"ovddet gaskavahku"}
+                }
+            }
+        }
+        wed-short{
+            relative{
+                "-1"{"mannan ga"}
+                "0"{"dán ga"}
+                "1"{"boahtte ga"}
+            }
+            relativeTime{
+                future{
+                    one{"boahtte ga"}
+                    other{"{0} boahtte ga"}
+                    two{"{0} boahtte gaskavahku"}
+                }
+                past{
+                    one{"mannan ga"}
+                    other{"{0} ga dás ovdal"}
+                    two{"ovddet gaskavahku"}
+                }
+            }
+        }
+        week{
+            dn{"vahkku"}
+            relative{
+                "-1"{"mannan vahku"}
+                "0"{"dán vahku"}
+                "1"{"boahtte vahku"}
+            }
+            relativePeriod{"{0} vahkku"}
+            relativeTime{
+                future{
+                    one{"{0} vahku geahčen"}
+                    other{"{0} vahku geahčen"}
+                    two{"{0} vahku geahčen"}
+                }
+                past{
+                    one{"{0} vahkku dás ovdal"}
+                    other{"{0} vahku dás ovdal"}
+                    two{"{0} vahku dás ovdal"}
+                }
+            }
+        }
+        week-narrow{
+            dn{"v(k)"}
+            relativePeriod{"{0} vahkku"}
+            relativeTime{
+                future{
+                    one{"{0} v(k) geahčen"}
+                    other{"{0} v(k) geahčen"}
+                    two{"{0} v(k) geahčen"}
+                }
+                past{
+                    one{"{0} vahkku dás ovdal"}
+                    other{"{0} v(k) dás ovdal"}
+                    two{"{0} vahku dás ovdal"}
+                }
+            }
+        }
+        week-short{
+            dn{"v(k)"}
+            relativePeriod{"{0} vahkku"}
+            relativeTime{
+                future{
+                    one{"{0} v(k) siste"}
+                    other{"{0} v(k) siste"}
+                    two{"{0} vahku siste"}
+                }
+                past{
+                    one{"{0} v(k) dás ovdal"}
+                    other{"{0} v(k) dás ovdal"}
+                    two{"{0} vahku dás ovdal"}
+                }
+            }
+        }
+        weekOfMonth{
+            dn{"mánu vahkku"}
+        }
+        weekOfMonth-narrow{
+            dn{"m. v(k)"}
+        }
+        weekOfMonth-short{
+            dn{"m. v(k)"}
+        }
+        weekday{
+            dn{"vahkkobeaivi"}
+        }
+        weekday-narrow{
+            dn{"v(k) beaivi"}
+        }
+        weekday-short{
+            dn{"v(k) beaivi"}
+        }
+        weekdayOfMonth{
+            dn{"mánu vahkkobeaivi"}
+        }
+        weekdayOfMonth-narrow{
+            dn{"m. v(k)b."}
+        }
+        weekdayOfMonth-short{
+            dn{"m. v(k)b."}
+        }
+        year{
+            dn{"jahki"}
+            relative{
+                "-1"{"diibmá"}
+                "0"{"dán jagi"}
+                "1"{"boahtte jagi"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} jagi siste"}
+                    other{"{0} jagi siste"}
+                    two{"{0} jagi siste"}
+                }
+                past{
+                    one{"diibmá"}
+                    other{"{0} jagi dás ovdal"}
+                    two{"ovddet jagi"}
+                }
+            }
+        }
+        year-narrow{
+            dn{"j."}
+            relativeTime{
+                future{
+                    one{"{0} jagi siste"}
+                    other{"{0} jagi siste"}
+                    two{"{0} jagi siste"}
+                }
+                past{
+                    one{"{0} j. dás ovdal"}
+                    other{"{0} j. dás ovdal"}
+                    two{"{0} jagi dás ovdal"}
+                }
+            }
+        }
+        year-short{
+            dn{"j."}
+            relative{
+                "0"{"dán jagi"}
+                "1"{"boahtte jagi"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} j. siste"}
+                    other{"{0} j. siste"}
+                    two{"{0} jagi siste"}
+                }
+                past{
+                    one{"diibmá"}
+                    other{"{0} j. dás ovdal"}
+                    two{"ovddet jagi"}
+                }
+            }
+        }
+        zone-narrow{
+            dn{"á.av."}
+        }
+        zone-short{
+            dn{"á.av."}
+        }
+    }
+}

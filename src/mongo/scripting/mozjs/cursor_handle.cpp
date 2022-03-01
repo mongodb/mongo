@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <js/Object.h>
+
 #include "mongo/client/dbclient_base.h"
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/mozjs/cursor_handle.h"
@@ -52,7 +54,7 @@ namespace {
 
 long long* getCursorId(JSObject* thisv) {
     CursorHandleInfo::CursorTracker* tracker =
-        static_cast<CursorHandleInfo::CursorTracker*>(JS_GetPrivate(thisv));
+        static_cast<CursorHandleInfo::CursorTracker*>(JS::GetPrivate(thisv));
     if (tracker) {
         return &tracker->cursorId;
     }
@@ -66,8 +68,8 @@ long long* getCursorId(JS::CallArgs& args) {
 
 }  // namespace
 
-void CursorHandleInfo::finalize(js::FreeOp* fop, JSObject* obj) {
-    auto cursorTracker = static_cast<CursorHandleInfo::CursorTracker*>(JS_GetPrivate(obj));
+void CursorHandleInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+    auto cursorTracker = static_cast<CursorHandleInfo::CursorTracker*>(JS::GetPrivate(obj));
     if (cursorTracker) {
         const long long cursorId = cursorTracker->cursorId;
         if (!skipShellCursorFinalize && cursorId) {

@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "jit/JitFrames.cpp"
+#include "vm/ForOfIterator.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/JitFrames.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ForOfIterator.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/JitFrames.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ForOfIterator.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/JitOptions.cpp"
+#include "vm/FrameIter.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/JitOptions.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/FrameIter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/JitOptions.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/FrameIter.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/JitSpewer.cpp"
+#include "vm/FunctionFlags.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/JitSpewer.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/FunctionFlags.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/JitSpewer.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/FunctionFlags.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/JitcodeMap.cpp"
+#include "vm/GeckoProfiler.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/JitcodeMap.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/GeckoProfiler.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/JitcodeMap.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/GeckoProfiler.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/LICM.cpp"
+#include "vm/GeneratorObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/LICM.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/GeneratorObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/LICM.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/GeneratorObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/LIR.cpp"
+#include "vm/GetterSetter.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/LIR.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/GetterSetter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/LIR.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/GetterSetter.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

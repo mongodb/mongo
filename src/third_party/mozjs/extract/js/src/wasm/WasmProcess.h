@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  *
  * Copyright 2017 Mozilla Foundation
  *
@@ -30,13 +30,16 @@ class CodeSegment;
 
 // These methods return the wasm::CodeSegment (resp. wasm::Code) containing
 // the given pc, if any exist in the process. These methods do not take a lock,
-// and thus are safe to use in a profiling or async interrupt context.
+// and thus are safe to use in a profiling context.
 
-const CodeSegment*
-LookupCodeSegment(const void* pc, const CodeRange** codeRange = nullptr);
+const CodeSegment* LookupCodeSegment(const void* pc,
+                                     const CodeRange** codeRange = nullptr);
 
-const Code*
-LookupCode(const void* pc, const CodeRange** codeRange = nullptr);
+const Code* LookupCode(const void* pc, const CodeRange** codeRange = nullptr);
+
+// Return whether the given PC is in any type of wasm code (module or builtin).
+
+bool InCompiledCode(void* pc);
 
 // A bool member that can be used as a very fast lookup to know if there is any
 // code segment at all.
@@ -46,16 +49,24 @@ extern mozilla::Atomic<bool> CodeExists;
 // These methods allow to (un)register CodeSegments so they can be looked up
 // via pc in the methods described above.
 
-bool
-RegisterCodeSegment(const CodeSegment* cs);
+bool RegisterCodeSegment(const CodeSegment* cs);
 
-void
-UnregisterCodeSegment(const CodeSegment* cs);
+void UnregisterCodeSegment(const CodeSegment* cs);
 
-void
-ShutDownProcessStaticData();
+// Whether this process is configured to use huge memory or not.
 
-} // namespace wasm
-} // namespace js
+bool IsHugeMemoryEnabled();
 
-#endif // wasm_process_h
+[[nodiscard]] bool DisableHugeMemory();
+
+// Called once before/after the last VM execution which could execute or compile
+// wasm.
+
+bool Init();
+
+void ShutDown();
+
+}  // namespace wasm
+}  // namespace js
+
+#endif  // wasm_process_h

@@ -1,0 +1,146 @@
+##
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+##  Copyright (c) 1999-2011, International Business Machines Corporation and
+##  others. All Rights Reserved.
+##
+##
+##  THE PURPOSE OF THIS TEST
+##
+##     This tests all public header files  - as installed.  icu-config needs to be on the PATH
+##  
+##     To run it simply type 'make check' after ICU is installed. You SHOULD see:
+##
+##  unicode/uchar.h -	0
+##  unicode/uchriter.h -	0
+##  unicode/ucnv.h -	0
+##
+##    .. etc.  Anything other than zero is an error. (except for the deprecation tests, where '1' is the correct value)
+##
+##  If the header test is run for a particular UCONFIG_NO_XXX=1 variation (see uconfig.h)
+##  then invoke the test with 'make UCONFIG_NO="-DUCONFIG_NO_XXX=1 check'.
+##  For standard header test run the UCONFIG_NO variable will evaluate to empty string.
+##
+##  If a header fails the C compile test it is likely because the header is a
+##  C++ header and it isn't properly guarded by the U_SHOW_CPLUSPLUS_API macro.
+##
+##  If a header fails the cppguardtest test it is likely because the header doesn't
+##  include the utypes.h header first *before* using the macro U_SHOW_CPLUSPLUS_API.
+##
+##  If a header fails because it is deprecated, add it to the 'dfiles.txt'
+##
+##
+
+## Source directory information
+srcdir = @srcdir@
+top_srcdir = @top_srcdir@
+
+top_builddir = ../..
+subdir = test/hdrtst
+
+include $(shell icu-config --incfile)
+
+all: 
+	@echo Please read this Makefile for more information.
+	@echo run \'$(MAKE) check\' to run the test "(use -k if you don't want to stop on errs)"
+
+check: dtest ctest cpptest drafttest deprtest internaltest obsoletetest cppguardtest
+
+headertest:
+	@FAIL=0;stub=ht_stub_$(NAME.headers).$(SUFFIX.headers); for file in "$(prefix)/include/unicode"/*.h ; do \
+		incfile=`basename $$file` ; \
+		echo "$(NAME.headers) unicode/$$incfile" ; \
+		echo "#include <unicode/$$incfile>" > $$stub ; \
+		echo 'void junk(){}' >> $$stub ; \
+		$(COMPILE.headers) $(cppflags) $(FLAGS.headers) $(UCONFIG_NO) $$stub || FAIL=1 ; \
+		rm -f $$stub; \
+	done ; \
+	exit $$FAIL
+
+ctest:
+	$(MAKE) headertest \
+		NAME.headers=$@ \
+		COMPILE.headers="$(COMPILE.c)" \
+		SUFFIX.headers=c \
+		FLAGS.headers=
+
+cpptest:
+	$(MAKE) headertest \
+		NAME.headers=$@ \
+		COMPILE.headers="$(COMPILE.cc)" \
+		SUFFIX.headers=cpp \
+		FLAGS.headers=
+
+drafttest:
+	$(MAKE) headertest \
+		NAME.headers=$@ \
+		COMPILE.headers="$(COMPILE.cc)" \
+		SUFFIX.headers=cpp \
+		FLAGS.headers="-DU_HIDE_DRAFT_API"
+
+deprtest:
+	$(MAKE) headertest \
+		NAME.headers=$@ \
+		COMPILE.headers="$(COMPILE.cc)" \
+		SUFFIX.headers=cpp \
+		FLAGS.headers="-DU_HIDE_DEPRECATED_API"
+
+internaltest:
+	$(MAKE) headertest \
+		NAME.headers=$@ \
+		COMPILE.headers="$(COMPILE.cc)" \
+		SUFFIX.headers=cpp \
+		FLAGS.headers="-DU_HIDE_INTERNAL_API"
+
+obsoletetest:
+	$(MAKE) headertest \
+		NAME.headers=$@ \
+		COMPILE.headers="$(COMPILE.cc)" \
+		SUFFIX.headers=cpp \
+		FLAGS.headers="-DU_HIDE_OBSOLETE_API"
+
+dtest:
+	@FAIL=0;NONE="(No deprecated headers)";stub=ht_stub_dtest.cpp;for incfile in `cat $(srcdir)/dfiles.txt | grep -v '^#' | sort` ; do \
+		NONE= ; \
+		echo "$@ unicode/$$incfile" ; \
+		echo "#include <unicode/$$incfile>" > $$stub ; \
+		echo 'void junk(){}' >> $$stub ; \
+		$(COMPILE.cc) $(cppflags) $$stub 2>&1 | tee $$stub.out || FAIL=1 ; \
+		if ! cat $$stub.out | sed -e 's/^.*#error[^"]*"//' | grep -v ht_ | grep -v "$$incfile header is obsolete"; then \
+			echo "** FAIL Header unicode/$$incfile is not obsoleted properly" ; \
+			FAIL=1 ; \
+		fi ; \
+		rm -f $$stub*; \
+	done ; \
+	echo "$@: $$NONE - exit status $$FAIL" ; \
+	exit $$FAIL
+
+cppguardtest:
+	@FAIL=0;stub=ht_stub_cppguardtest.cpp; for file in "$(prefix)/include/unicode"/*.h ; do \
+		incfile=`basename $$file` ; \
+		if grep -q "U_SHOW_CPLUSPLUS_API" $$file ; then \
+			echo "$@ unicode/$$incfile" ; \
+			echo "#include <unicode/$$incfile>" > $$stub ; \
+			echo 'void junk(){}' >> $$stub ; \
+			echo '#if !defined(U_SHOW_CPLUSPLUS_API)' >> $$stub ; \
+			echo "#error The header '$$incfile' refers to the macro U_SHOW_CPLUSPLUS_API (defined in utypes.h) but either does not include utypes.h or does so incorrectly." >> $$stub ; \
+			echo '#endif' >> $$stub ; \
+			$(COMPILE.cc) $(cppflags) $(UCONFIG_NO) $$stub || FAIL=1 ; \
+			rm -f $$stub; \
+		else \
+			echo "$@ skipping unicode/$$incfile" ; \
+		fi ; \
+	done ; \
+	exit $$FAIL
+
+clean:
+	-@rm -f ht_*
+
+distclean: clean
+	-@rm -f Makefile
+
+Makefile: $(srcdir)/Makefile.in  $(top_builddir)/config.status
+	cd $(top_builddir) \
+	&& CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+
+.PHONY:	doclean check all headertest cpptest dtest cppguardtest ctest clean distclean

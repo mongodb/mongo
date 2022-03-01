@@ -1,0 +1,81 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: cs_cs_FONIPA.txt
+# Generated from CLDR
+#
+
+# Tranformation from Czech to Czech in IPA transcription (cs_FONIPA).
+# The transcription is not fully phonemic since we mark allophonic variations
+# of /m/, /n/, /x/ and /ɦ/.
+#
+# http://en.wikipedia.org/wiki/Czech_alphabet
+# http://en.wikipedia.org/wiki/Czech_language#Phonology
+# http://en.wikipedia.org/wiki/Czech_orthography
+#
+# Transform input to normalized form NFC, and to lowercase.
+::NFC;
+::Lower;
+#
+#
+#
+#
+# Digraphs.
+#
+ch } [ bdďjlmnňrřvwzž ] → ɣ ;
+ch → x ;
+dě → ɟɛ ;
+mě → mɲɛ ;
+tě → cɛ ;
+ně → ɲɛ ;
+dž → d \u0361 ʒ;  # affricate indicated by ligature tie
+dz → d \u0361 z;  # affricate indicated by ligature tie
+#
+#
+#
+a → a ;
+á → aː ;
+b → b ;
+c → t \u0361 s;  # affricate indicated by ligature tie
+č → t \u0361 ʃ;  # affricate indicated by ligature tie
+d → d ;
+ď → ɟ ;
+e → ɛ ;
+é → ɛː ;
+ě → jɛ ;
+f → f ;
+g → ɡ ;
+h } [cčfkpqsštťx] → h ;
+h → ɦ ;
+i → ɪ ;
+í → iː ;
+j → j ;
+k → k ;
+l → l ;
+m } [fvw] → ɱ ;
+m → m ;
+n } [gkqx] → ŋ ;
+n → n ;
+ň → ɲ ;
+o → o ;
+ó → oː ;
+p → p ;
+q → kv ;
+r → r ;
+ř → r\u031D ;
+s → s ;
+š → ʃ ;
+t → t ;
+ť → c ;
+u → u ;
+ú → uː ;
+ů → uː ;
+v → v ;
+w → v ;
+x → ks ;
+y → ɪ ;
+ý → iː ;
+z → z ;
+ž → ʒ ;
+

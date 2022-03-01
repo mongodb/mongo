@@ -1,0 +1,200 @@
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+#******************************************************************************
+#
+#   Copyright (C) 1998-2015, International Business Machines
+#   Corporation and others.  All Rights Reserved.
+#
+#******************************************************************************
+## Top-level Makefile.in for ICU
+## Stephen F. Booth
+
+## Source directory information
+srcdir = @srcdir@
+top_srcdir = @top_srcdir@
+
+top_builddir = ../..
+
+include $(top_builddir)/icudefs.mk
+
+## Build directory information
+subdir = test/testdata
+
+## Files to remove for 'make clean'
+CLEANFILES = *~ 
+
+SUBDIRS = 
+
+-include Makefile.local
+
+## List of phony targets
+.PHONY : all all-local all-recursive install install-local	\
+install-recursive clean clean-local clean-recursive distclean	\
+distclean-local distclean-recursive doc dist dist-local dist-recursive	\
+check check-local check-recursive build-dir testdata.jar xcheck check-exhaustive
+
+xcheck: all-local
+
+.NOTPARALLEL: build-dir
+
+## Clear suffix list
+.SUFFIXES :
+
+## List of standard targets
+all: all-local
+install: install-local
+clean: clean-local
+distclean : distclean-local
+dist: dist-local
+check: all check-local
+
+check-exhaustive: check
+
+all-local: build-dir build-testdata testdata packagetest
+
+install-local: 
+
+dist-local:
+
+clean-local:
+	test -z "$(CLEANFILES)" || $(RMV) $(CLEANFILES)
+	$(RMV) $(TESTOUTDIR)
+
+distclean-local: clean-local
+	$(RMV) Makefile pkgdata.inc
+
+check-local:
+
+Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
+	cd $(top_builddir) \
+	&& CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+
+pkgdata.inc: pkgdataMakefile
+	$(MAKE) -f pkgdataMakefile
+
+pkgdataMakefile:
+	cd $(top_builddir) \
+	&& CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+
+#########################################################################
+############################## Test ## stuff ############################
+
+# relative lib links from pkgdata are the same as for tmp
+GENRBOPTS=-k
+# use the cross root, in case we are cross compiling. Otherwise it is equal to top_builddir
+TOOLDIR=$(cross_buildroot)/tools
+SRCDATADIR=$(top_srcdir)/data
+UNICODEDATADIR=$(SRCDATADIR)/unidata
+OUTDIR=$(top_builddir)/data/out
+OUTTMPDIR=$(top_builddir)/data/out/tmp
+BUILDDIR=$(OUTDIR)/build/$(ICUDATA_PLATFORM_NAME)
+TESTSRCDATADIR=$(top_srcdir)/test/testdata
+TESTOUTDIR=$(top_builddir)/test/testdata/out
+BUILD_DIRS = $(TESTOUTDIR) $(TESTBUILDDIR) $(TESTOUTDIR)/$(TESTDT)
+GENTEST=$(TOOLDIR)/gentest/gentest$(TOOLEXEEXT)
+
+ifeq ($(PKGDATA_MODE),common)
+ICU_DATA_OPT = -i $(OUTDIR)
+else
+ifeq ($(PKGDATA_MODE),dll)
+ifneq ($(ENABLE_SHARED),YES)
+ICU_DATA_OPT = -i $(BUILDDIR)
+else
+ICU_DATA_OPT =
+endif
+else
+ICU_DATA_OPT = -i $(BUILDDIR)
+endif
+endif
+
+CURDIR:=$(CURR_FULL_DIR)
+# current directory should not be blank
+ifeq ($(CURDIR),)
+CURDIR=.
+endif
+
+PKGDATA = $(TOOLBINDIR)/pkgdata -q -c -s $(CURDIR)/out/build/$(ICUDATA_PLATFORM_NAME)
+PKGDATA_INVOKE:=$(INVOKE) $(PKGDATA_INVOKE_OPTS)
+
+# Contains all 'intermediate' files (and temp files) except for 'unpackaged data' below
+TESTBUILDDIR=$(TESTOUTDIR)/build
+
+# unpackaged files  - live in 'out' so that the path can find them as part of the pkg
+UNPACKAGEDTESTDATA=$(TESTOUTDIR)/$(TESTDT)/nam.typ
+
+# pkg name for testdata
+TESTDATA=testdata
+# prefix for files that are testdata
+TESTDT=$(TESTDATA)
+
+# Variable names for rules.mk
+OUT_DIR=$(TESTBUILDDIR)
+TMP_DIR=$(TESTOUTDIR)/$(TESTDT)
+
+## Include the Python-generated rules
+
+include $(top_builddir)/$(subdir)/rules.mk
+
+
+build-testdata: build-dir $(TESTDATA_ALL_OUTPUT_FILES)
+
+testdata: build-testdata
+
+
+packagetest: build-dir testdata pkgdata.inc $(TMP_DIR)/testdata.lst 
+	$(PKGDATA_INVOKE) $(PKGDATA) -T $(TESTBUILDDIR) -d $(TESTOUTDIR) -s $(TESTBUILDDIR) -p $(TESTDATA) -m common $(TMP_DIR)/testdata.lst
+
+build-dir: $(BUILD_DIRS)
+$(BUILD_DIRS):
+	-$(MKINSTALLDIRS) $(BUILD_DIRS)
+
+# Build the ICU4J testdata.jar.
+# Command line:
+#   (Run this from the output testdata folder which may not be .../source/test/testdata in an out-of-source build.)
+#   ~/svn.icu/trunk/source/test/testdata> make JAR=jar ICU4J_ROOT=~/svn.icu4j/trunk testdata.jar
+# You can omit the ICU4J_ROOT for just building the .jar files without copying them.
+# You can omit the JAR if it's just jar.
+JAR=jar
+
+# Build testdata.jar:
+# - swap the test data
+# - extract all data items
+# - package them into the .jar file
+$(OUTDIR)/icu4j/testdata.jar: build-dir testdata $(TESTOUTDIR)/testdata.dat
+	mkdir -p $(OUTDIR)/icu4j/com/ibm/icu/dev/data/testdata
+	$(INVOKE) $(TOOLBINDIR)/icupkg $(TESTOUTDIR)/testdata.dat -r test.icu -x '*' -tb -d $(OUTDIR)/icu4j/com/ibm/icu/dev/data/testdata
+	$(JAR) cf $(OUTDIR)/icu4j/testdata.jar -C $(OUTDIR)/icu4j com/ibm/icu/dev/data/testdata
+
+
+DEBUGUTILITIESDATA_DIR=main/tests/core/src/com/ibm/icu/dev/test/util
+DEBUGUTILITIESDATA_SRC=DebugUtilitiesData.java
+
+ICU4J_DATA=$(OUTDIR)/icu4j/src/$(DEBUGUTILITIESDATA_SRC) $(OUTDIR)/icu4j/testdata.jar
+
+$(OUTDIR)/icu4j/src/$(DEBUGUTILITIESDATA_SRC): $(GENTEST)
+	mkdir -p $(OUTDIR)/icu4j/src
+	$(INVOKE) $(GENTEST) -j -d $(OUTDIR)/icu4j/src
+
+ifdef ICU4J_ROOT
+
+icu4j-data-install: $(ICU4J_ROOT)/main/shared/data/testdata.jar $(ICU4J_ROOT)/$(DEBUGUTILITIESDATA_DIR)/$(DEBUGUTILITIESDATA_SRC)
+	@echo ICU4J test data installed in $(ICU4J_ROOT)
+
+$(ICU4J_ROOT)/main/shared/data/testdata.jar: $(OUTDIR)/icu4j/testdata.jar
+	mkdir -p $(ICU4J_ROOT)/main/shared/data
+	cp $(OUTDIR)/icu4j/testdata.jar $(ICU4J_ROOT)/main/shared/data
+
+$(ICU4J_ROOT)/$(DEBUGUTILITIESDATA_DIR)/$(DEBUGUTILITIESDATA_SRC): $(OUTDIR)/icu4j/src/$(DEBUGUTILITIESDATA_SRC)
+	mkdir -p $(ICU4J_ROOT)/$(DEBUGUTILITIESDATA_DIR)
+	cp $^ $@
+
+else
+
+icu4j-data-install: $(ICU4J_DATA)
+	@echo ICU4J data was built into $(OUTDIR)/icu4j
+	@echo '** Error:' ICU4J_ROOT was not set, could not install
+	exit 1
+
+endif
+
+icu4j-data: $(ICU4J_DATA)

@@ -26,7 +26,7 @@
 use strict;
 use warnings;
 use IO::Handle;
-use File::Basename qw(dirname);
+use File::Basename qw(basename dirname);
 use Getopt::Long;
 use Cwd;
 
@@ -249,13 +249,17 @@ sub run_build
 	# Tell the wrapper where to find the config
 	$ENV{"XGILL_CONFIG"} = Cwd::abs_path($config_file);
 
-        # update the PATH so that the build will see the wrappers.
+        # If overriding $CC, use GCCDIR to tell the wrapper scripts where the
+        # real compiler is. If $CC is not set, then the wrapper script will
+        # search $PATH anyway.
         if (exists $ENV{CC}) {
-            $ENV{PATH} = dirname($ENV{CC}) . ":$ENV{PATH}";
-            delete $ENV{CC};
-            delete $ENV{CXX};
+            $ENV{GCCDIR} = dirname($ENV{CC});
         }
-        $ENV{"PATH"} = "$wrap_dir:" . $ENV{"PATH"};
+
+        # Force the wrapper scripts to be run in place of the compiler during
+        # whatever build process we use.
+        $ENV{CC} = "$wrap_dir/" . basename($ENV{CC} // "gcc");
+        $ENV{CXX} = "$wrap_dir/" . basename($ENV{CXX} // "g++");
 
         # do the build, cleaning if necessary.
         chdir $build_dir;

@@ -1,4 +1,31 @@
 #define MOZ_UNIFIED_BUILD
+#include "builtin/Promise.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "builtin/Promise.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "builtin/Promise.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "builtin/Reflect.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "builtin/Reflect.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "builtin/Reflect.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "builtin/ReflectParse.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "builtin/ReflectParse.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "builtin/ReflectParse.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "builtin/Stream.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "builtin/Stream.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -24,32 +51,5 @@
 #endif
 #ifdef INITGUID
 #error "builtin/Symbol.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "builtin/TestingFunctions.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "builtin/TestingFunctions.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "builtin/TestingFunctions.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "builtin/TypedObject.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "builtin/TypedObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "builtin/TypedObject.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "builtin/WeakMapObject.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "builtin/WeakMapObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "builtin/WeakMapObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

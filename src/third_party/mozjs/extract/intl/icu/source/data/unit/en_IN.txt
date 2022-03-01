@@ -1,0 +1,43 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+en_IN{
+    %%Parent{"en_001"}
+    units{
+        temperature{
+            generic{
+                dnam{"°"}
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+        }
+    }
+    unitsNarrow{
+        speed{
+            kilometer-per-hour{
+                one{"{0}kph"}
+                other{"{0}kph"}
+            }
+        }
+    }
+    unitsShort{
+        speed{
+            kilometer-per-hour{
+                one{"{0} kph"}
+                other{"{0} kph"}
+            }
+        }
+        temperature{
+            generic{
+                dnam{"°"}
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+        }
+        volume{
+            cubic-centimeter{
+                per{"{0}/cm³"}
+            }
+        }
+    }
+}

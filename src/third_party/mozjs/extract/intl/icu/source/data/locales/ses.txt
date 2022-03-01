@@ -1,0 +1,270 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ses{
+    AuxExemplarCharacters{"[v]"}
+    ExemplarCharacters{"[a ã b c d e ẽ f g h i j k l m n ɲ ŋ o õ p q r s š t u w x y z ž]"}
+    ExemplarCharactersIndex{"[A Ã B C D E Ẽ F G H I J K L M N Ɲ Ŋ O Õ P Q R S Š T U W X Y Z Ž]"}
+    ExemplarCharactersNumbers{"[  \\- ‑ . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"#,##0.00¤"}
+            }
+            symbols{
+                group{" "}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE d MMMM y G",
+                "d MMMM y G",
+                "d MMM, y G",
+                "d/M/y GGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                M{"M"}
+                MMM{"MMM"}
+                MMMEd{"E d MMM"}
+                MMMMEd{"E d MMMM"}
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                MMd{"d/MM"}
+                MMdd{"dd/MM"}
+                Md{"d/M"}
+                ms{"m:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E d/M/y"}
+                yMM{"MM/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E d MMM y"}
+                yMMMM{"MMMM y"}
+                yMMMd{"d MMM y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "Adduha",
+                "Aluula",
+            }
+            AmPmMarkersAbbr{
+                "Adduha",
+                "Aluula",
+            }
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE d MMMM y",
+                "d MMMM y",
+                "d MMM, y",
+                "d/M/y",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            appendItems{
+                Day{"{0} ({2}: {1})"}
+                Day-Of-Week{"{0} {1}"}
+                Era{"{1} {0}"}
+                Hour{"{0} ({2}: {1})"}
+                Minute{"{0} ({2}: {1})"}
+                Month{"{0} ({2}: {1})"}
+                Quarter{"{0} ({2}: {1})"}
+                Second{"{0} ({2}: {1})"}
+                Timezone{"{0} {1}"}
+                Week{"{0} ({2}: {1})"}
+                Year{"{1} {0}"}
+            }
+            availableFormats{
+                M{"M"}
+                MMM{"MMM"}
+                MMMEd{"E d MMM"}
+                MMMMEd{"E d MMMM"}
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                MMd{"d/MM"}
+                MMdd{"dd/MM"}
+                Md{"d/M"}
+                ms{"m:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E d/M/y"}
+                yMM{"MM/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E d MMM y"}
+                yMMMM{"MMMM y"}
+                yMMMd{"d MMM y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Alh",
+                        "Ati",
+                        "Ata",
+                        "Ala",
+                        "Alm",
+                        "Alz",
+                        "Asi",
+                    }
+                    wide{
+                        "Alhadi",
+                        "Atinni",
+                        "Atalaata",
+                        "Alarba",
+                        "Alhamiisa",
+                        "Alzuma",
+                        "Asibti",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "H",
+                        "T",
+                        "T",
+                        "L",
+                        "L",
+                        "L",
+                        "S",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "IJ",
+                    "IZ",
+                }
+                wide{
+                    "Isaa jine",
+                    "Isaa zamanoo",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Žan",
+                        "Fee",
+                        "Mar",
+                        "Awi",
+                        "Me",
+                        "Žuw",
+                        "Žuy",
+                        "Ut",
+                        "Sek",
+                        "Okt",
+                        "Noo",
+                        "Dee",
+                    }
+                    wide{
+                        "Žanwiye",
+                        "Feewiriye",
+                        "Marsi",
+                        "Awiril",
+                        "Me",
+                        "Žuweŋ",
+                        "Žuyye",
+                        "Ut",
+                        "Sektanbur",
+                        "Oktoobur",
+                        "Noowanbur",
+                        "Deesanbur",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "Ž",
+                        "F",
+                        "M",
+                        "A",
+                        "M",
+                        "Ž",
+                        "Ž",
+                        "U",
+                        "S",
+                        "O",
+                        "N",
+                        "D",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "A1",
+                        "A2",
+                        "A3",
+                        "A4",
+                    }
+                    wide{
+                        "Arrubu 1",
+                        "Arrubu 2",
+                        "Arrubu 3",
+                        "Arrubu 4",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"Zaari"}
+            relative{
+                "-1"{"Bi"}
+                "0"{"Hõo"}
+                "1"{"Suba"}
+            }
+        }
+        dayperiod{
+            dn{"Adduha wala Aluula"}
+        }
+        era{
+            dn{"Zaman"}
+        }
+        hour{
+            dn{"Guuru"}
+        }
+        minute{
+            dn{"Miniti"}
+        }
+        month{
+            dn{"Handu"}
+        }
+        second{
+            dn{"Miti"}
+        }
+        week{
+            dn{"Hebu"}
+        }
+        year{
+            dn{"Jiiri"}
+        }
+        zone{
+            dn{"Leerazuu"}
+        }
+    }
+}

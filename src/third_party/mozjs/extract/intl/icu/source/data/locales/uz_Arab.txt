@@ -1,0 +1,95 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+uz_Arab{
+    %%Parent{"root"}
+    AuxExemplarCharacters{"[\u200C\u200D\u200E\u200F ټ ځ څ ډ ړ ږ ښ ګ ڼ ي ۍ ې]"}
+    ExemplarCharacters{
+        "[\u064B \u064C \u064D \u064E \u064F \u0650 \u0651 \u0652 \u0654 \u0670 ء آ أ"
+        " ؤ ئ ا ب پ ة ت ث ج چ ح خ د ذ ر ز ژ س ش ص ض ط ظ ع غ ف ق ک گ ل م ن ه و ۇ ۉ ی]"
+    }
+    ExemplarCharactersNumbers{"[\u200E \\- ‑ , ٫ ٬ . % ٪ ‰ ؉ + − 0۰ 1۱ 2۲ 3۳ 4۴ 5۵ 6۶ 7۷ 8۸ 9۹]"}
+    NumberElements{
+        arabext{
+            symbols{
+                decimal{"٫"}
+                exponential{"×۱۰^"}
+                group{"٬"}
+                percentSign{"٪"}
+                timeSeparator{":"}
+            }
+        }
+        default{"arabext"}
+        latn{
+            symbols{
+                decimal{","}
+                group{"."}
+                minusSign{"‎−"}
+                plusSign{"‎+"}
+            }
+        }
+        native{"arabext"}
+    }
+    calendar{
+        default{"persian"}
+        gregorian{
+            dayNames{
+                format{
+                    abbreviated{
+                        "ی.",
+                        "د.",
+                        "س.",
+                        "چ.",
+                        "پ.",
+                        "ج.",
+                        "ش.",
+                    }
+                    wide{
+                        "یکشنبه",
+                        "دوشنبه",
+                        "سه‌شنبه",
+                        "چهارشنبه",
+                        "پنجشنبه",
+                        "جمعه",
+                        "شنبه",
+                    }
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "جنو",
+                        "فبر",
+                        "مار",
+                        "اپر",
+                        "می",
+                        "جون",
+                        "جول",
+                        "اگس",
+                        "سپت",
+                        "اکت",
+                        "نوم",
+                        "دسم",
+                    }
+                    wide{
+                        "جنوری",
+                        "فبروری",
+                        "مارچ",
+                        "اپریل",
+                        "می",
+                        "جون",
+                        "جولای",
+                        "اگست",
+                        "سپتمبر",
+                        "اکتوبر",
+                        "نومبر",
+                        "دسمبر",
+                    }
+                }
+            }
+        }
+    }
+    layout{
+        characters{"right-to-left"}
+    }
+}

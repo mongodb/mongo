@@ -1,0 +1,44 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+smn{
+    Currencies{
+        DKK{
+            "DKK",
+            "Tanska ruvnâ",
+        }
+        EEK{
+            "EEK",
+            "Eesti ruvnâ",
+        }
+        EUR{
+            "€",
+            "euro",
+        }
+        FIM{
+            "FIM",
+            "Suomâ märkki",
+        }
+        ISK{
+            "ISK",
+            "Island ruvnâ",
+        }
+        LVR{
+            "LVR",
+            "Latvia ruble",
+        }
+        NOK{
+            "NOK",
+            "Taažâ ruvnâ",
+        }
+        SEK{
+            "SEK",
+            "Ruotâ ruvnâ",
+        }
+    }
+    CurrencyUnitPatterns{
+        one{"{0} {1}"}
+        other{"{0} {1}"}
+        two{"{0} {1}"}
+    }
+}

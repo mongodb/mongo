@@ -1,0 +1,54 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ms{
+    RBNFRules{
+        OrdinalRules{
+            "%digits-ordinal:",
+            "-x: \u2212ke->#,##0>;",
+            "0: ke-=#,##0=;",
+            "1: No. 1;",
+            "2: ke-=#,##0=;",
+        }
+        SpelloutRules{
+            "%spellout-numbering-year:",
+            "x.x: =0.0=;",
+            "0: =%spellout-numbering=;",
+            "%spellout-numbering:",
+            "0: =%spellout-cardinal=;",
+            "%spellout-cardinal:",
+            "-x: negatif >>;",
+            "x.x: << perpuluhan >>;",
+            "0: kosong;",
+            "1: satu;",
+            "2: dua;",
+            "3: tiga;",
+            "4: empat;",
+            "5: lima;",
+            "6: enam;",
+            "7: tujuh;",
+            "8: lapan;",
+            "9: sembilan;",
+            "10: sepuluh;",
+            "11: sebelas;",
+            "12: >> belas;",
+            "20: << puluh[ >>];",
+            "100: seratus[ >>];",
+            "200: << ratus[ >>];",
+            "1000: seribu[ >>];",
+            "2000: << ribu[ >>];",
+            "1000000: sejuta[ >>];",
+            "2000000: << juta[ >>];",
+            "1000000000: << bilion[ >>];",
+            "1000000000000: << trilion[ >>];",
+            "1000000000000000: << kuadrilion[ >>];",
+            "1000000000000000000: =#,##0=;",
+            "%spellout-ordinal:",
+            "-x: negatif >>;",
+            "x.x: =#,##0.#=;",
+            "0: kekosong;",
+            "1: pertama;",
+            "2: ke=%spellout-cardinal=;",
+        }
+    }
+}

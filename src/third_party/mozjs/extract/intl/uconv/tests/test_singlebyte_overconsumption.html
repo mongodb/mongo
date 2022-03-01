@@ -1,0 +1,33 @@
+<!DOCTYPE HTML>
+<html>
+<!--
+https://bugzilla.mozilla.org/show_bug.cgi?id=564679
+-->
+<head>
+  <meta http-equiv="Content-type" content="text/html; charset=windows-1253">
+  <title>Test for undefined codepoints</title>
+  <script src="/tests/SimpleTest/SimpleTest.js"></script>
+  <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
+</head>
+<body onload="test()">
+<pre id="test">
+<script class="testbody" type="text/javascript">
+
+/** test that single byte decoding resynchronizes after undefined codepoints */
+function test()
+{
+    is($("display").innerHTML, "All good.", "No overconsumption");
+    SimpleTest.finish();
+}
+
+  SimpleTest.waitForExplicitFinish();
+</script>
+</pre>
+<a target="_blank" href="https://bugzilla.mozilla.org/show_bug.cgi?id=564679">Mozilla Bug 564679</a>
+<p id="display">Evil.</p>
+<div id="content" style="display: none"></div>
+ Ò<script type="text/javascript">
+ $("display").innerHTML = "All good.";
+  </script> ->
+</body>
+</html>

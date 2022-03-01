@@ -25,19 +25,14 @@ extern MFBT_DATA uintptr_t gMozillaPoisonValue;
 /**
  * @return the poison value.
  */
-inline uintptr_t mozPoisonValue()
-{
-  return gMozillaPoisonValue;
-}
+inline uintptr_t mozPoisonValue() { return gMozillaPoisonValue; }
 
 /**
  * Overwrite the memory block of aSize bytes at aPtr with the poison value.
- * aPtr MUST be aligned at a sizeof(uintptr_t) boundary.
- * Only an even number of sizeof(uintptr_t) bytes are overwritten, the last
- * few bytes (if any) is not overwritten.
+ * Only a multiple of sizeof(uintptr_t) bytes are overwritten, the last
+ * few bytes (if any) are not overwritten.
  */
-inline void mozWritePoison(void* aPtr, size_t aSize)
-{
+inline void mozWritePoison(void* aPtr, size_t aSize) {
   const uintptr_t POISON = mozPoisonValue();
   char* p = (char*)aPtr;
   char* limit = p + (aSize & ~(sizeof(uintptr_t) - 1));
@@ -46,12 +41,6 @@ inline void mozWritePoison(void* aPtr, size_t aSize)
     memcpy(p, &POISON, sizeof(POISON));
   }
 }
-
-/**
- * Initialize the poison value.
- * This should only be called once.
- */
-extern MFBT_API void mozPoisonValueInit();
 
 /* Values annotated by CrashReporter */
 extern MFBT_DATA uintptr_t gMozillaPoisonBase;
@@ -62,6 +51,30 @@ MOZ_END_EXTERN_C
 #if defined(__cplusplus)
 
 namespace mozilla {
+
+/**
+ * A version of CorruptionCanary that is suitable as a member of objects that
+ * are statically allocated.
+ */
+class CorruptionCanaryForStatics {
+ public:
+  constexpr CorruptionCanaryForStatics() : mValue(kCanarySet) {}
+
+  // This is required to avoid static constructor bloat.
+  ~CorruptionCanaryForStatics() = default;
+
+  void Check() const {
+    if (mValue != kCanarySet) {
+      MOZ_CRASH("Canary check failed, check lifetime");
+    }
+  }
+
+ protected:
+  uintptr_t mValue;
+
+ private:
+  static const uintptr_t kCanarySet = 0x0f0b0f0b;
+};
 
 /**
  * This class is designed to cause crashes when various kinds of memory
@@ -79,29 +92,17 @@ namespace mozilla {
  * consolidated at the point of a Check(), rather than scattered about at
  * various uses of the corrupted memory.
  */
-class CorruptionCanary {
-public:
-  CorruptionCanary() {
-    mValue = kCanarySet;
-  }
+class CorruptionCanary : public CorruptionCanaryForStatics {
+ public:
+  constexpr CorruptionCanary() = default;
 
   ~CorruptionCanary() {
     Check();
     mValue = mozPoisonValue();
   }
-
-  void Check() const {
-    if (mValue != kCanarySet) {
-      MOZ_CRASH("Canary check failed, check lifetime");
-    }
-  }
-
-private:
-  static const uintptr_t kCanarySet = 0x0f0b0f0b;
-  uintptr_t mValue;
 };
 
-} // mozilla
+}  // namespace mozilla
 
 #endif
 

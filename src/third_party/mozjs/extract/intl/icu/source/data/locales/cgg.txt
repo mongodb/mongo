@@ -1,0 +1,250 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+cgg{
+    ExemplarCharacters{"[a b c d e f g h i j k l m n o p q r s t u v w x y z]"}
+    ExemplarCharactersIndex{"[A B C D E F G H I J K L M N O P Q R S T U V W X Y Z]"}
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d MMMM y G",
+                "d MMMM y G",
+                "d MMM y G",
+                "dd/MM/y GGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, M/d"}
+                MMM{"LLL"}
+                MMMEd{"E, MMM d"}
+                MMMMEd{"E, MMMM d"}
+                MMMMd{"MMMM d"}
+                MMMd{"MMM d"}
+                Md{"M/d"}
+                d{"d"}
+                hm{"h:mm a"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E, M/d/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, MMM d, y"}
+                yMMMM{"MMMM y"}
+                yMMMd{"d MMM y"}
+                yMd{"d/M/y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d MMMM y",
+                "d MMMM y",
+                "d MMM y",
+                "dd/MM/y",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, M/d"}
+                MMM{"LLL"}
+                MMMEd{"E, MMM d"}
+                MMMMEd{"E, MMMM d"}
+                MMMMd{"MMMM d"}
+                MMMd{"MMM d"}
+                Md{"M/d"}
+                d{"d"}
+                hm{"h:mm a"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E, M/d/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, MMM d, y"}
+                yMMMM{"MMMM y"}
+                yMMMd{"d MMM y"}
+                yMd{"d/M/y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "SAN",
+                        "ORK",
+                        "OKB",
+                        "OKS",
+                        "OKN",
+                        "OKT",
+                        "OMK",
+                    }
+                    wide{
+                        "Sande",
+                        "Orwokubanza",
+                        "Orwakabiri",
+                        "Orwakashatu",
+                        "Orwakana",
+                        "Orwakataano",
+                        "Orwamukaaga",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "S",
+                        "K",
+                        "R",
+                        "S",
+                        "N",
+                        "T",
+                        "M",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "BC",
+                    "AD",
+                }
+                wide{
+                    "Kurisito Atakaijire",
+                    "Kurisito Yaijire",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "KBZ",
+                        "KBR",
+                        "KST",
+                        "KKN",
+                        "KTN",
+                        "KMK",
+                        "KMS",
+                        "KMN",
+                        "KMW",
+                        "KKM",
+                        "KNK",
+                        "KNB",
+                    }
+                    wide{
+                        "Okwokubanza",
+                        "Okwakabiri",
+                        "Okwakashatu",
+                        "Okwakana",
+                        "Okwakataana",
+                        "Okwamukaaga",
+                        "Okwamushanju",
+                        "Okwamunaana",
+                        "Okwamwenda",
+                        "Okwaikumi",
+                        "Okwaikumi na kumwe",
+                        "Okwaikumi na ibiri",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "J",
+                        "F",
+                        "M",
+                        "A",
+                        "M",
+                        "J",
+                        "J",
+                        "A",
+                        "S",
+                        "O",
+                        "N",
+                        "D",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "K1",
+                        "K2",
+                        "K3",
+                        "K4",
+                    }
+                    wide{
+                        "KWOTA 1",
+                        "KWOTA 2",
+                        "KWOTA 3",
+                        "KWOTA 4",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"Eizooba"}
+            relative{
+                "-1"{"Nyomwabazyo"}
+                "0"{"Erizooba"}
+                "1"{"Nyenkyakare"}
+            }
+        }
+        dayperiod{
+            dn{"Nyomushana/nyekiro"}
+        }
+        era{
+            dn{"Obunaku"}
+        }
+        hour{
+            dn{"Shaaha"}
+        }
+        minute{
+            dn{"Edakiika"}
+        }
+        month{
+            dn{"Omwezi"}
+        }
+        second{
+            dn{"Obucweka/Esekendi"}
+        }
+        week{
+            dn{"Esande"}
+        }
+        weekday{
+            dn{"Eizooba ry’okukora"}
+        }
+        year{
+            dn{"Omwaka"}
+        }
+    }
+}

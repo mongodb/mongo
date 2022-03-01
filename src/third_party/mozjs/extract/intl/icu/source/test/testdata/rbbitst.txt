@@ -1,0 +1,2018 @@
+﻿# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Copyright (c) 2001-2016 International Business Machines
+# Corporation and others. All Rights Reserved.
+#
+# RBBI Test Data
+#
+#   File:  rbbitst.txt
+#
+#     The format of this file looks vaguely like some kind of xml-ish markup,
+#     but it is NOT.  The syntax is this..
+#
+#   <word>    any following data is for word break testing
+#   <sent>    any following data is for sentence break testing
+#   <line>    any following data is for line break testing
+#   <char>    any following data is for char break testing
+#   <title>   any following data is for title break testing
+#   <rules> rules ... </rules>  following data is tested against these rules.
+#                               Applies until a following occurence of <word>, <sent>, etc. or another <rules>
+#   <locale locale_name>  Switch to the named locale at the next occurence of <word>, <sent>, etc.
+#   <data> ... </data>   test data.  May span multiple lines.
+#      <>        Break position, status == 0
+#      •         Break position, status == 0   (Bullet, \u2022)
+#      <nnn>     Break position, status == nnn
+#      \         Escape.  Normal ICU unescape applied.
+#      \ at end of line  ->  Line Continuation.  Remove both the backslash and the new line
+#
+# In ICU4C, this test data is run by intltest, rbbi/RBBITest/TestExtended.
+# In ICU4J, this test data is run by com.ibm.icu.dev.test.rbbi.RBBITestExtended
+#
+# There are two copies of this file in the source repository,
+#   [ICU4C]   source/test/testdata/rbbitst.txt
+#   [ICU4J]   main/tests/core/src/com/ibm/icu/dev/test/rbbi/rbbitst.txt
+#
+# ICU4C's copy is the primary one.  If any changes are made to ICU4J's copy, make sure they
+#  are merged back into ICU4C's copy of the file, lest they get overwritten later.
+# TODO:  figure out how to have a single copy of the file for use by both C and Java.
+
+
+#   Temp debugging tests
+#
+<word>
+<data>•
+•</data>
+
+## FILTERED BREAK TESTS
+
+# (William Bradford, public domain. http://catalog.hathitrust.org/Record/008651224 ) - edited.
+<locale en>
+<sent>
+<data>\
+•In the meantime Mr. •Weston arrived with his small ship, which he had now recovered. •Capt. •Gorges, who informed the Sgt. here that one purpose of his going east was to meet with Mr. •Weston, took this opportunity to call him to account for some abuses he had to lay to his charge.•</data>
+
+<locale en@ss=standard>
+<sent>
+<data>\
+•In the meantime Mr. Weston arrived with his small ship, which he had now recovered. •Capt. Gorges, who informed the Sgt. here that one purpose of his going east was to meet with Mr. Weston, took this opportunity to call him to account for some abuses he had to lay to his charge.•</data>
+
+# This hits the case where "D." would match the end of "Ph.D.".
+<locale en@ss=standard>
+<sent>
+<data>\
+•Doctor with a D. •As in, Ph.D., you know.•</data>
+
+# ICU-21459 logic error.
+<locale en@ss=standard>
+<sent>
+<data>•on. •But after a day in the arena sun, the metal feels hot enough to blister my hands.•</data>
+
+# same as root (unless some exceptions are added!)
+<locale tfg@ss=standard>
+<sent>
+<data>\
+•In the meantime Mr. •Weston arrived with his small ship, which he had now recovered. •Capt. •Gorges, who informed the Sgt. here that one purpose of his going east was to meet with Mr. •Weston, took this opportunity to call him to account for some abuses he had to lay to his charge.•</data>
+
+# same as root (unless some exceptions are added!)
+<locale ja@ss=standard>
+<sent>
+<data>\
+•In the meantime Mr. •Weston arrived with his small ship, which he had now recovered. •Capt. •Gorges, who informed the Sgt. here that one purpose of his going east was to meet with Mr. •Weston, took this opportunity to call him to account for some abuses he had to lay to his charge.•</data>
+
+## END FILTERED BREAK TESTS
+
+
+########################################################################################
+#
+#
+#       G r a p h e m e    C l u s t e r     T e s t s
+#
+#
+##########################################################################################
+<char>
+
+<data>•a•b•c• •,•\u0666•</data>                 # Quick Test
+<data>•\r•\r•\r\n•\r\n•\n•\r•</data>            # don't break CR/LF
+
+# Always break after controls.  Combining chars don't combine with them.
+<data>•\u0003•\N{COMBINING GRAVE ACCENT}•\r•\N{COMBINING GRAVE ACCENT}•</data>
+<data>•\u0085•\N{COMBINING MACRON}•A\N{COMBINING MACRON}•</data>
+
+# Surrogates
+<data>•\U00011000•\U00010020•\U00010000\N{COMBINING MACRON}•</data>
+<data>•\ud800\udc00•\udbff\udfff•a•</data>
+
+# Extend (Combining chars) combine.
+<data>•A\N{COMBINING GRAVE ACCENT}•B•</data>
+<data>•\N{GREEK SMALL LETTER MU}\N{COMBINING LOW LINE}\N{COMBINING HORN}•</data>
+<data>•a\u0301•b\u0302•c\u0303•d\u0304•e\u0305•f\u0306•g\u0307•h\u0308•i\u0309•</data>
+
+<data>•a\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304\u0301\u0302\u0303\u0304•</data>
+
+# Don't break Hangul Syllables
+#   L : \u1100
+#   V : \u1161
+#   T : \u11A8
+#  LV : \uAC00
+# LVT : \uAC01
+
+<data>•\u1100\u1161\u11a8•\u1100\u1161\u11a8•</data>  #LVT
+<data>•\u1100\u1161•\u1100\u1161•</data>
+<data>•\u1100\u1161\u11a8•\u1161•\u1100•\u11a8•\u1161\u1161\u1161\u11a8•</data>
+<data>•\u1100\u1100\uac01•\u1100\uac01•\u1100\uac01\u0301•\uac01•</data>
+<data>•\u1100\u0301•\u1161\u11a8\u0301•\u11a8•</data>
+
+
+
+# Hindi combining chars.  (An old test)
+#   TODO:  Update these tests for Unicode 5.1 Extended Grapheme clusters
+#<data>•भ••ा•\u0930•\u0924• •\u0938\u0941\u0902•\u0926•\u0930•
+#•\u0939•\u094c•\u0964•</data>
+#<data>•\u0916\u0947•\u0938\u0941\u0902•\u0926•\u0930•\u0939•\u094c•\u0964•</data>
+
+
+#  Bug 1587.  Tamil.  \u0baa\u0bc1 is an Extended Grpaheme Cluster
+<data>•\u0baa\u0bc1•\u0baa\u0bc1•</data>
+
+#   Regression test for bug 1889
+<data>•\u0f40\u0f7d•\u0000•\u0f7e•</data>
+
+
+#     0xffff is a legal character, and should not stop the break iterator early.
+#     (Requires special casing in implementation, which is why it gets a test.)
+<data>•\uffff•\uffff• •a•</data>
+
+#  Treat Japanese Half Width voicing marks as combining
+<data>•A\uff9e•B\uff9f\uff9e\uff9f•C•</data>
+
+# Test data originally from Java BreakIteratorTest.TestCharcterBreak()
+<data>•S\u0300•i\u0317•m•p•l•e\u0301• •s•a\u0302•m•p•l•e\u0303•.•w•a\u0302•w•a•f•q•\n•\r•\r\n•\n•</data>
+
+########################################################################################
+#
+#
+#       E x t e n d e d    G r a p h e m e    C l u s t e r     T e s t s
+#
+#
+##########################################################################################
+#<xgc>
+
+# Plain Vanilla grapheme clusters
+#<data>•a•b•c•</data>
+#<data>•a\u0301\u0302• •b\u0303\u0304•</data>
+
+# Assorted Hindi combining marks
+#<data>•\u0904\u0903• •\u0937\u093E• •\u0904\u093F• •\u0937\u0940• •\u0937\u0949• •\u0937\u094A• •\u0937\u094B• •\u0937\u094C•</data>
+
+# Thai Clusters
+# $Prepend $Extend* $PrependBase $Extend*;
+#
+#<data>•\u0e40\u0e01•\u0e44\u0301\u0e23\u0302\u0303•\u0e40•\u0e40\u0e02•\u0e02• •</data>
+
+#
+#  ICU-13637 and CLDR-10994 - Indic Grapheme Cluster Boundary changes to support aksaras
+#      New rule: LinkingConsonant ExtCccZwj* Virama ExtCccZwj* × LinkingConsonant
+#      Sample Chars: LinkingConsonant: \u0915
+#                    Virama:           \u094d    [also Extend]
+#                    ExtCccZWJ:        \u0308
+#                    Extend but not ExtCCCZWJ   \u093A
+<char>
+<data>•\u0915\u094d\u0915•</data>
+<data>•\u0915\u0308\u0308\u094d\u0308\u0308\u0915•</data>
+<data>•\u0915\u0308\u0308\u094d\u0308\u0308•\u0041•</data>
+<data>•\u0915\u0308\u0308\u094d\u093A\u093A•\u0915•</data>
+
+#
+# From cldr/common/testData/segmentation/graphemeCluster/TestSegmenter-Bengali.txt
+#
+
+# ব্যক্তিত্বের ;
+<data>•ব্য•ক্তি•ত্বে•র•</data>
+# আত্মবিশ্বাস ;
+<data>•আ•ত্ম•বি•শ্বা•স•</data>
+# ব্যাক্টেরিয়া ;
+<data>•ব্যা•ক্টে•রি•য়া•</data>
+# সমস্যার  ;
+<data>•স•ম•স্যা•র•</data>
+# মিশ্রণ ;
+<data>•মি•শ্র•ণ•</data>
+# দুর্গন্ধ ;
+<data>•দু•র্গ•ন্ধ•</data>
+# পরীক্ষার ;
+<data>•প•রী•ক্ষা•র•</data>
+# কোলেস্টেরল ;
+<data>•কো•লে•স্টে•র•ল•</data>
+# ব্যায়ামকে ;
+<data>•ব্যা•য়া•ম•কে•</data>
+# সপ্তাহে ;
+<data>•স•প্তা•হে•</data>
+# পরীক্ষার ;
+<data>•প•রী•ক্ষা•র•</data>
+# চর্বিজাতীয় ;
+<data>•চ•র্বি•জা•তী•য়•</data>
+# নিয়ণ্ত্রণ ;
+<data>•নি•য়•ণ্ত্র•ণ•</data>
+# অবশ্যই ;
+<data>•অ•ব•শ্য•ই•</data>
+# নয়াদিল্লির ;
+<data>•ন•য়া•দি•ল্লি•র•</data>
+# সমীক্ষাটা ;
+<data>•স•মী•ক্ষা•টা•</data>
+# #ভূমিকম্পের ;
+# <data>•ভূ•মি•ক•ম্পের•</data>   # line 17 in TestSegmenter-Bengali.txt
+# কেন্দ্রীয় ;
+<data>•কে•ন্দ্রী•য়•</data>
+# উস্কানিই ;
+<data>•উ•স্কা•নি•ই•</data>
+# সমীক্ষকরা ;
+<data>•স•মী•ক্ষ•ক•রা•</data>
+# মুহূর্তে ;
+<data>•মু•হূ•র্তে•</data>
+# সম্পর্কে ;
+<data>•স•ম্প•র্কে•</data>
+# পৌষসংক্রান্তির ;
+<data>•পৌ•ষ•সং•ক্রা•ন্তি•র•</data>
+# মুখ্যমন্ত্রী ;
+<data>•মু•খ্য•ম•ন্ত্রী•</data>
+
+#
+# from cldr/common/testData/segmentation/graphemeCluster/TestSegmenter-Devanagari.txt
+#
+
+# संदिग्ध ;
+<data>•सं•दि•ग्ध•</data>
+# सुरक्षा ;
+<data>•सु•र•क्षा•</data>
+# टक्कर ;
+<data>•ट•क्क•र•</data>
+# सत्र  ;
+<data>•स•त्र•</data>
+# दक्षिण ;
+<data>•द•क्षि•ण•</data>
+# मिश्रणाने ;
+<data>•मि•श्र•णा•ने•</data>
+# दुर्घटनाग्रस्त ;
+<data>•दु•र्घ•ट•ना•ग्र•स्त•</data>
+# मुहूर्त ;
+<data>•मु•हू•र्त•</data>
+# शर्करायुक्त ;
+<data>•श•र्क•रा•यु•क्त•</data>
+# अंतरराष्ट्रीय ;
+<data>•अं•त•र•रा•ष्ट्री•य•</data>
+# राष्ट्रपति ;
+<data>•रा•ष्ट्र•प•ति•</data>
+# फ्रांस ;
+<data>•फ्रां•स•</data>
+# ट्रैक्टर ;
+<data>•ट्रै•क्ट•र•</data>
+# सिट्रोनेलाचे ;
+<data>•सि•ट्रो•ने•ला•चे•</data>
+# टुक्रालाई ;
+<data>•टु•क्रा•ला•ई•</data>
+# इकट्ठा ;
+<data>•इ•क•ट्ठा•</data>
+# शास्त्र ;
+<data>•शा•स्त्र•</data>
+# स्त्री ;
+<data>•स्त्री•</data>
+# लक्ष्य ;
+<data>•ल•क्ष्य•</data>
+# तीक्ष्ण ;
+<data>•ती•क्ष्ण•</data>
+# Words ;
+<data>•W•o•r•d•s•</data>
+# त्रिवेदी ;
+<data>•त्रि•वे•दी•</data>
+# कृत्रिम ;
+<data>•कृ•त्रि•म•</data>
+# मात्रामा ;
+<data>•मा•त्रा•मा•</data>
+# सिद्धार्थनगर ;
+<data>•सि•द्धा•र्थ•न•ग•र•</data>
+# श्रद्धालुओं ;
+<data>•श्र•द्धा•लु•ओं•</data>
+# वृद्धिसँग ;
+<data>•वृ•द्धि•सँ•ग•</data>
+# अंतःज्ञानी  ;
+<data>•अं•तः•ज्ञा•नी• •</data>
+# गन्नदी॑धिम ;
+<data>•ग•न्न•दी॑•धि•म•</data>
+# प्प्रप॑द्ये॒ ;
+<data>•प्प्र•प॑•द्ये॒•</data>
+# मनस्तापः ;
+<data>•म•न•स्ता•पः•</data>
+# हविष्करोमि ;
+<data>•ह•वि•ष्क•रो•मि•</data>
+# अहर्पतिः ;
+<data>•अ•ह•र्प•तिः•</data>
+# गच्छति ;
+<data>•ग•च्छ•ति•</data>
+# अयम् ;
+<data>•अ•य•म्•</data>
+# शिवश्चोदति ;
+<data>•शि•व•श्चो•द•ति•</data>
+# मनष्टालयति ;
+<data>•म•न•ष्टा•ल•य•ति•</data>
+# अश्वष्ठक्कस्य ;
+<data>•अ•श्व•ष्ठ•क्क•स्य•</data>
+# दुष्पुत्रः ;
+<data>•दु•ष्पु•त्रः•</data>
+# द्विःपक्वम् ;
+<data>•द्विः•प•क्व•म्•</data>
+# द्विष्कामः ;
+<data>•द्वि•ष्का•मः•</data>
+# भर्तुर्भोगः ;
+<data>•भ•र्तु•र्भो•गः•</data>
+# शॆत्युल  ;
+<data>•शॆ•त्यु•ल• •</data>
+# महारॆन्य ;
+<data>•म•हा•रॆ•न्य•</data>
+# सॆक्युल ;
+<data>•सॆ•क्यु•ल•</data>
+# ल्यॊदुर ;
+<data>•ल्यॊ•दु•र•</data>
+# फयॊक ;
+<data>•फ•यॊ•क•</data>
+# मॊहन्युव ;
+<data>•मॊ•ह•न्यु•व•</data>
+# अन्यर ;
+<data>•अ•न्य•र•</data>
+# ख्वजि ;
+<data>•ख्व•जि•</data>
+# खॅरिन्य ;
+<data>•खॅ•रि•न्य•</data>
+# उच्छ्वास ;
+<data>•उ•च्छ्वा•स•</data>
+# व्यक्तिमत्व ;
+<data>•व्य•क्ति•म•त्व•</data>
+# दातांच्यामध्ये ;
+<data>•दा•तां•च्या•म•ध्ये•</data>
+# दुर्गंधी ;
+<data>•दु•र्गं•धी•</data>
+# दुर्गंधीपासूनसुद्धा ;
+<data>•दु•र्गं•धी•पा•सू•न•सु•द्धा•</data>
+# नित्यकर्मामध्ये ;
+<data>•नि•त्य•क•र्मा•म•ध्ये•</data>
+# आजारांपासूनसुद्धा ;
+<data>•आ•जा•रां•पा•सू•न•सु•द्धा•</data>
+# भाज्यांमध्ये ;
+<data>•भा•ज्यां•म•ध्ये•</data>
+# उच्छ्वासाच्या ;
+<data>•उ•च्छ्वा•सा•च्या•</data>
+# सुकिल्लीं ;
+<data>•सु•कि•ल्लीं•</data>
+# स्लिपां ;
+<data>•स्लि•पां•</data>
+# मिसळिल्ल्यान ;
+<data>•मि•स•ळि•ल्ल्या•न•</data>
+# रोंप्यांची ;
+<data>•रों•प्यां•ची•</data>
+# वर्सांतल्यान ;
+<data>•व•र्सां•त•ल्या•न•</data>
+# रोंप्याच्या ;
+<data>•रों•प्या•च्या•</data>
+# नाशिल्ल्यान ;
+<data>•ना•शि•ल्ल्या•न•</data>
+# जिल्ल्याच्या ;
+<data>•जि•ल्ल्या•च्या•</data>
+# कुरुक्षेत्रांतल्या ;
+<data>•कु•रु•क्षे•त्रां•त•ल्या•</data>
+# भाज्ज्यांची ;
+<data>•भा•ज्ज्यां•ची•</data>
+# सिट्रोनेलाका ;
+<data>•सि•ट्रो•ने•ला•का•</data>
+# गरिनुपर्छ ;
+<data>•ग•रि•नु•प•र्छ•</data>
+# सामान्यतः ;
+<data>•सा•मा•न्य•तः•</data>
+# वृद्धिसँग ;
+<data>•वृ•द्धि•सँ•ग•</data>
+# रिपोर्टनि ;
+<data>•रि•पो•र्ट•नि•</data>
+# टोस्टर्ज़ ;
+<data>•टो•स्ट•र्ज़•</data>
+# वक्तव्य ;
+<data>•व•क्त•व्य•</data>
+# प्रक्रिया ;
+<data>•प्र•क्रि•या•</data>
+# निर्दिष्ट ;
+<data>•नि•र्दि•ष्ट•</data>
+# अस्वीकृत ;
+<data>•अ•स्वी•कृ•त•</data>
+# प्रयोक्ता ;
+<data>•प्र•यो•क्ता•</data>
+# प्रकार्यक ;
+<data>•प्र•का•र्य•क•</data>
+# ट्रेक्टरु ;
+<data>•ट्रे•क्ट•रु•</data>
+# स्थानधारक ;
+<data>•स्था•न•धा•र•क•</data>
+# प्रकार्यक ;
+<data>•प्र•का•र्य•क•</data>
+# अनुच्छेदसँ ;
+<data>•अ•नु•च्छे•द•सँ•</data>
+# गर्मीपदु ;
+<data>•ग•र्मी•प•दु•</data>
+# शास्त्रु ;
+<data>•शा•स्त्रु•</data>
+# इन्द्री ;
+<data>•इ•न्द्री•</data>
+# श्रधालू ;
+<data>•श्र•धा•लू•</data>
+# आस्तिकु ;
+<data>•आ•स्ति•कु•</data>
+# सकार्थो ;
+<data>•स•का•र्थो•</data>
+# सन्ॿंधु ;
+<data>•स•न्ॿं•धु•</data>
+# मनुक्खो ;
+<data>•म•नु•क्खो•</data>
+# हानिफ्राय ;
+<data>•हा•नि•फ्रा•य•</data>
+# दैथाइहरग्रा ;
+<data>•दै•था•इ•ह•र•ग्रा•</data>
+# बोसोरब्रै ;
+<data>•बो•सो•र•ब्रै•</data>
+# रांखान्थियारि ;
+<data>•रां•खा•न्थि•या•रि•</data>
+# खान्थियाव ;
+<data>•खा•न्थि•या•व•</data>
+# स्लिप्स ;
+<data>•स्लि•प्स•</data>
+
+#
+# cldr/common/testData/segmentation/graphemeCluster/TestSegmenter-Gujarati.txt
+#
+
+# અંગ્રેજી ;
+<data>•અં•ગ્રે•જી•</data>
+# શબ્દકોશ ;
+<data>•શ•બ્દ•કો•શ•</data>
+# બાપ્તિસ્મા ;
+<data>•બા•પ્તિ•સ્મા•</data>
+# મિસ્ત્રી  ;
+<data>•મિ•સ્ત્રી•</data>
+# સિક્કા ;
+<data>•સિ•ક્કા•</data>
+#6 ; એકત્રીસમું ; એ÷કત્રી÷સ÷મું
+
+# સ્વસ્થાને ;
+<data>•સ્વ•સ્થા•ને•</data>
+# પ્રશ્નાર્થ ;
+<data>•પ્ર•શ્ના•ર્થ•</data>
+# વર્તમાનકૃદંત ;
+<data>•વ•ર્ત•મા•ન•કૃ•દં•ત•</data>
+# વાક્યની ;
+<data>•વા•ક્ય•ની•</data>
+# સાર્વજનિક ;
+<data>•સા•ર્વ•જ•નિ•ક•</data>
+# સમાપ્તિ ;
+<data>•સ•મા•પ્તિ•</data>
+# પધાર્યા ;
+<data>•પ•ધા•ર્યા•</data>
+# વ્યક્તિત્વને ;
+<data>•વ્ય•ક્તિ•ત્વ•ને•</data>
+# આત્મવિશ્વાસ ;
+<data>•આ•ત્મ•વિ•શ્વા•સ•</data>
+# વ્યાયામથી ;
+<data>•વ્યા•યા•મ•થી•</data>
+# યુક્ત ;
+<data>•યુ•ક્ત•</data>
+# #18 ; પુરુષોત્તમ ;
+<data>•પ•રુ•ષો•ત્ત•મ•</data>
+# કેન્દ્રીય ;
+<data>•કે•ન્દ્રી•ય•</data>
+# ક્ષત્રિય ;
+<data>•ક્ષ•ત્રિ•ય•</data>
+# ફોર્મ્યુલા ;
+<data>•ફો•ર્મ્યુ•લા•</data>
+# કેન્દ્રમાં ;
+<data>•કે•ન્દ્ર•માં•</data>
+# સ્પ્રિંગ ;
+<data>•સ્પ્રિં•ગ•</data>
+# પ્રારંભ ;
+<data>•પ્રા•રં•ભ•</data>
+# વિદ્યાર્થીઓ  ;
+<data>•વિ•દ્યા•ર્થી•ઓ•</data>
+# સ્વાર્થની  ;
+<data>•સ્વા•ર્થ•ની•</data>
+# લોન્ગયરબ્યેન  ;
+<data>•લો•ન્ગ•ય•ર•બ્યે•ન•</data>
+# સ્થાનિક  ;
+<data>•સ્થા•નિ•ક•</data>
+# બિલ્ડિંગની  ;
+<data>•બિ•લ્ડિં•ગ•ની•</data>
+# ઉત્પાદક  ;
+<data>•ઉ•ત્પા•દ•ક•</data>
+# ઝૂકાવ્યું  ;
+<data>•ઝૂ•કા•વ્યું•</data>
+# પ્રપૌત્ર  ;
+<data>•પ્ર•પૌ•ત્ર•</data>
+
+
+#
+# cldr/common/testData/segmentation/graphemeCluster/TestSegmenter-Malayalam.txt
+#
+
+# സ്ഥാനമൊഴിയുക ;
+<data>•സ്ഥാ•ന•മൊ•ഴി•യു•ക•</data>
+# വ്യക്തി ;
+<data>•വ്യ•ക്തി•</data>
+# കൗമാരക്കാരി ;
+<data>•കൗ•മാ•ര•ക്കാ•രി•</data>
+# കല്യാണം  ;
+<data>•ക•ല്യാ•ണം•</data>
+# റദ്ദാക്കിയ ;
+<data>•റ•ദ്ദാ•ക്കി•യ•</data>
+# വ്യാപിക്കുക ;
+<data>•വ്യാ•പി•ക്കു•ക•</data>
+# സ്തുതി ;
+<data>•സ്തു•തി•</data>
+# ഭക്ഷ്യസുരക്ഷ ;
+<data>•ഭ•ക്ഷ്യ•സു•ര•ക്ഷ•</data>
+# പൂഴ്ത്തിവെക്കുക ;
+<data>•പൂ•ഴ്ത്തി•വെ•ക്കു•ക•</data>
+# നിശ്ചയിച്ച ;
+<data>•നി•ശ്ച•യി•ച്ച•</data>
+# പ്രശ്നം ;
+<data>•പ്ര•ശ്നം•</data>
+# സംസ്ഥാനം ;
+<data>•സം•സ്ഥാ•നം•</data>
+# പ്രോത്സാഹം ;
+<data>•പ്രോ•ത്സാ•ഹം•</data>
+# ഉദ്യോഗസ്ഥ ;
+<data>•ഉ•ദ്യോ•ഗ•സ്ഥ•</data>
+# സ്ഥാപനം ;
+<data>•സ്ഥാ•പ•നം•</data>
+# അത്ഭുതം ;
+<data>•അ•ത്ഭു•തം•</data>
+# പ്രഖ്യാപനം ;
+<data>•പ്ര•ഖ്യാ•പ•നം•</data>
+
+#
+# cldr/common/testData/segmentation/graphemeCluster/TestSegmenter-Odia.txt
+#
+
+# ଅସ୍ବରାନ୍ତ ;
+<data>•ଅ•ସ୍ବ•ରା•ନ୍ତ•</data>
+# ଅକର୍ମଣ୍ୟତା ;
+<data>•ଅ•କ•ର୍ମ•ଣ୍ୟ•ତା•</data>
+# ଅକର୍ମା ;
+<data>•ଅ•କ•ର୍ମା•</data>
+# ଆକର୍ଣ୍ଣ  ;
+<data>•ଆ•କ•ର୍ଣ୍ଣ•</data>
+# ଆକସ୍ମିକୀ ;
+<data>•ଆ•କ•ସ୍ମି•କୀ•</data>
+# ଇଞ୍ଚମନୌତୀ ;
+<data>•ଇ•ଞ୍ଚ•ମ•ନୌ•ତୀ•</data>
+# ଅଗତ୍ୟା ;
+<data>•ଅ•ଗ•ତ୍ୟା•</data>
+# ଇନ୍ଦ୍ରଧ୍ବଜ ;
+<data>•ଇ•ନ୍ଦ୍ର•ଧ୍ବ•ଜ•</data>
+# ଊରୁତ୍ରାଣ ;
+<data>•ଊ•ରୁ•ତ୍ରା•ଣ•</data>
+# ଐଶ୍ବର୍ଯ୍ୟ ;
+<data>•ଐ•ଶ୍ବ•ର୍ଯ୍ୟ•</data>
+# ଅଗତ୍ୟା ;
+<data>•ଅ•ଗ•ତ୍ୟା•</data>
+# ଔପନ୍ୟାସିକ ;
+<data>•ଔ•ପ•ନ୍ୟା•ସି•କ•</data>
+# ଔଷ୍ଠ୍ୟ ;
+<data>•ଔ•ଷ୍ଠ୍ୟ•</data>
+# ଯଜୁର୍ବେଦୀ ;
+<data>•ଯ•ଜୁ•ର୍ବେ•ଦୀ•</data>
+# ପକ୍ଷ୍ମ ;
+<data>•ପ•କ୍ଷ୍ମ•</data>
+# ପଞ୍ଚଭୌତିକ ;
+<data>•ପ•ଞ୍ଚ•ଭୌ•ତି•କ•</data>
+# ତନ୍ତ୍ରିକାତନ୍ତ୍ର ;
+<data>•ତ•ନ୍ତ୍ରି•କା•ତ•ନ୍ତ୍ର•</data>
+# ସ୍ନାୟୁତନ୍ତ୍ର ;
+<data>•ସ୍ନା•ୟୁ•ତ•ନ୍ତ୍ର•</data>
+# ତପ୍ତକୁଣ୍ଡ ;
+<data>•ତ•ପ୍ତ•କୁ•ଣ୍ଡ•</data>
+# ଚଣ୍ଡୋଦରୀ ;
+<data>•ଚ•ଣ୍ଡୋ•ଦ•ରୀ•</data>
+# ଝଙ୍କାର ;
+<data>•ଝ•ଙ୍କା•ର•</data>
+# କଙ୍କପୃଷ୍ଠୀ ;
+<data>•କ•ଙ୍କ•ପୃ•ଷ୍ଠୀ•</data>
+# ଖଣ୍ଡନୀୟ ;
+<data>•ଖ•ଣ୍ଡ•ନୀ•ୟ•</data>
+# ଖମ୍ଭାବତୀ ;
+<data>•ଖ•ମ୍ଭା•ବ•ତୀ•</data>
+# ଘାଣେନ୍ଦ୍ରିୟ  ;
+<data>•ଘା•ଣେ•ନ୍ଦ୍ରି•ୟ•</data>
+# ଘୁଞ୍ଚାଇବା  ;
+<data>•ଘୁ•ଞ୍ଚା•ଇ•ବା•</data>
+
+#
+# cldr/common/testData/segmentation/graphemeCluster/TestSegmenter-Telugu.txt
+#
+
+# ﻿అదృశ్యం ;
+<data>•అ•దృ•శ్యం•</data>
+# ఉద్యోగాలు ;
+<data>•ఉ•ద్యో•గా•లు•</data>
+# ఉన్నాయన్న ;
+<data>•ఉ•న్నా•య•న్న•</data>
+# కార్యదర్శి  ;
+<data>•కా•ర్య•ద•ర్శి•</data>
+# సామర్థ్యం ;
+<data>•సా•మ•ర్థ్యం•</data>
+# అభిప్రాయం ;
+<data>•అ•భి•ప్రా•యం•</data>
+# రాష్ట్రస్థాయి ;
+<data>•రా•ష్ట్ర•స్థా•యి•</data>
+# నిర్లక్ష్యం ;
+<data>•ని•ర్ల•క్ష్యం•</data>
+# వ్యాజ్యాలన్నీ ;
+<data>•వ్యా•జ్యా•ల•న్నీ•</data>
+# న్యాయవ్యవస్థ ;
+<data>•న్యా•య•వ్య•వ•స్థ•</data>
+# వ్యాఖ్యలు ;
+<data>•వ్యా•ఖ్య•లు•</data>
+# నేతృత్వం ;
+<data>•నే•తృ•త్వం•</data>
+# ఉద్రిక్తత ;
+<data>•ఉ•ద్రి•క్త•త•</data>
+# వ్యాఖ్యలు ;
+<data>•వ్యా•ఖ్య•లు•</data>
+# అత్యున్నత ;
+<data>•అ•త్యు•న్న•త•</data>
+# మనస్పర్ధలు ;
+<data>•మ•న•స్ప•ర్ధ•లు•</data>
+# కార్యక్రమం ;
+<data>•కా•ర్య•క్ర•మం•</data>
+# గుప్పిస్తున్నారు ;
+<data>•గు•ప్పి•స్తు•న్నా•రు•</data>
+# నటిస్తున్నారు ;
+<data>•న•టి•స్తు•న్నా•రు•</data>
+# ద్వితీయార్ధం ;
+<data>•ద్వి•తీ•యా•ర్ధం•</data>
+# జీర్ణవ్యవస్థ ;
+<data>•జీ•ర్ణ•వ్య•వ•స్థ•</data>
+# ఉత్సాహం ;
+<data>•ఉ•త్సా•హం•</data>
+# హృద్రోగాలు ;
+<data>•హృ•ద్రో•గా•లు•</data>
+# పాల్గొనాల్సింది ;
+<data>•పా•ల్గొ•నా•ల్సిం•ది•</data>
+# మార్గదర్శకాలు  ;
+<data>•మా•ర్గ•ద•ర్శ•కా•లు•</data>
+
+
+########################################################################################
+#
+#
+#       W o r d    B o u n d a r y      T e s t s
+#
+#
+##########################################################################################
+
+<word>
+#
+# Quick sanity test
+#
+<data>•hello<200> •there<200> •goodbye<200></data>
+<data>•hello<200> •12345<100> •,•</data>
+
+
+#
+# Test data originally in RBBIAPITest::TestFirstNextFollowing() and TestLastPreviousPreceding()
+#
+
+<word>
+<data>•This<200> •is<200> •a<200> •word<200> •break<200>.•  •Isn't<200> •it<200>?• •2.25<100></data>
+
+
+
+#
+# Data originally from TestDefaultRuleBasedWordIteration()
+#
+<data>•Write<200> •wordrules<200>.• •123.456<100> •alpha\u00adbeta\u00adgamma<200> •\u092f\u0939<200> •</data>
+<data>• •\u0939\u093f\u0928\u094d\u200d\u0926\u0940<200> •\u0939\u0948<200> •\u0905\u093e\u092a<200> •\u0938\u093f\u0916\u094b\u0917\u0947<200>?•</data>
+
+#Hindi Numbers
+<data>• •\u0968\u0966.\u0969\u096f<100> •\u0967\u0966\u0966.\u0966\u0966<100> •\N{RUPEE SIGN}•\u0967,\u0967\u0966\u0966.\u0966\u0966<100>  •\u0905\u092e\u091c<200>\n•</data>
+
+<data>•\u0938\u094d\u200d\u0935\u0924\u0902deadTA\u0930<200>\r•It's<200> •$•30.10<100> •12,34<100>¢•£•¤•¥•alpha\u05f3beta\u05f4gamma<200> •</data>
+
+<data>•Badges<200>?• •BADGES<200>!•?•!• •We<200> •don't<200> •need<200> •no<200> •STINKING<200> •BADGES<200>!•!•1000,233,456.000<100> •1,23.322<100>%•123.1222<100>$•123,000.20<100> •179.01<100>%•X<200> •Now<200>\r•is<200>\n•the<200>\r\n•time<200> •</data>
+
+#Hangul
+<data>•\uc5f0\ud569<200> •\uc7a5\ub85c\uad50\ud68c<200> •\u1109\u1161\u11bc\u1112\u1161\u11bc<200> •\u1112\u1161\u11ab\u110b\u1175\u11ab<200> •Hello<200>,• •how<200> •are<200> •you<200> •</data>
+
+<data>•Hello<200>,• •how<200> •are<200> •you<200> •\uc5f0\ud569<200> •\uc7a5\ub85c\uad50\ud68c<200> •\u1109\u1161\u11bc\u1112\u1161\u11bc<200> •\u1112\u1161\u11ab\u110b\u1175\u11ab<200> •</data>
+
+# Words containing non-BMP letters
+<data>•abc\U00010300<200> •abc\N{DESERET SMALL LETTER ENG}<200> •abc\N{MATHEMATICAL BOLD SMALL Z}<200> •abc\N{MATHEMATICAL SANS-SERIF BOLD ITALIC PI SYMBOL}<200> •</data>
+
+# Unassigned code points
+<data>•abc<200>\U0001D800•def<200>\U0001D3FF• •</data>
+
+# Hiragana & Katakana stay together, but separates from each other and Latin.
+# *** what to do about theoretical combos of chars? i.e. hiragana + accent
+#<data>•abc<200>\N{HIRAGANA LETTER SMALL A}<400>\N{HIRAGANA LETTER VU}\N{COMBINING ACUTE ACCENT}<400>\N{HIRAGANA ITERATION MARK}<400>\N{KATAKANA LETTER SMALL A}\N{KATAKANA ITERATION MARK}\N{HALFWIDTH KATAKANA LETTER WO}\N{HALFWIDTH KATAKANA LETTER N}<400>def<200>#•</data>
+
+# test normalization/dictionary handling of halfwidth katakana: same dictionary phrase in fullwidth and halfwidth
+<data>•芽キャベツ<400>芽キャﾍﾞツ<400></data>
+
+# more Japanese tests
+# TODO: some script=common characters in the Hiragana and the Katakana block may not be treated correctly
+# (was formerly true for U+30FC); need to check and fix if so.
+#<data>•どー<400>せ<400>日本語<400>を<400>勉強<400>する<400>理由<400>について<400>　•て<400>こと<400>は<400>我<400>でも<400>知<400>ら<400>も<400>い<400>こと<400>なん<400>だ<400>。•</data>
+<data>•日本語<400>を<400>勉強<400>する<400>理由<400>について<400>　•て<400>こと<400>は<400>我<400>でも<400>知<400>ら<400>も<400>い<400>こと<400>なん<400>だ<400>。•</data>
+
+# Testing of word boundary for dictionary word containing both kanji and kana
+<data>•中だるみ<400>蔵王の森<400>ウ離島<400></data>
+
+# Testing of Chinese segmentation (taken from a Chinese news article)
+<data>•400<100>余<400>名<400>中央<400>委员<400>和<400>中央<400>候补<400>委员<400>都<400>领<400>到了<400>“•推荐<400>票<400>”•，•有<400>资格<400>在<400>200<100>多<400>名<400>符合<400>条件<400>的<400>63<100>岁<400>以下<400>中共<400>正<400>部<400>级<400>干部<400>中<400>，•选出<400>他们<400>属意<400>的<400>中央<400>政治局<400>委员<400>以<400>向<400>政治局<400>常委<400>会<400>举荐<400>。•</data>
+
+# Words with interior formatting characters
+<data>•def\N{COMBINING ACUTE ACCENT}\N{SYRIAC ABBREVIATION MARK}ghi<200> •</data>
+
+# to test for bug #4097779
+<data>•aa\N{COMBINING GRAVE ACCENT}a<200> •</data>
+
+# fullwidth numeric, midletter characters etc should be treated like their halfwidth counterparts
+<data>•ＩＳＮ'Ｔ<200> •１９<100>日<400></data>
+
+#      to test for bug #4098467
+#      What follows is a string of Korean characters (I found it in the Yellow Pages
+#      ad for the Korean Presbyterian Church of San Francisco, and I hope I transcribed
+#      it correctly), first as precomposed syllables, and then as conjoining jamo.
+#      Both sequences should be semantically identical and break the same way.
+#      precomposed syllables...
+<data>•\uc0c1\ud56d<200> •\ud55c\uc778<200> •\uc5f0\ud569<200> •\uc7a5\ub85c\uad50\ud68c<200> •\u1109\u1161\u11bc\u1112\u1161\u11bc<200> •\u1112\u1161\u11ab\u110b\u1175\u11ab<200> •\u110b\u1167\u11ab\u1112\u1161\u11b8<200> •\u110c\u1161\u11bc\u1105\u1169\u1100\u116d\u1112\u116c<200> •</data>
+
+# more Korean tests (Jamo not tested here, not counted as dictionary characters)
+# Disable them now because we don't include a Korean dictionary.
+#<data>•\ud55c\uad6d<200>\ub300\ud559\uad50<200>\uc790\uc5f0<200>\uacfc\ud559<200>\ub300\ud559<200>\ubb3c\ub9ac\ud559\uacfc<200></data>
+#<data>•\ud604\uc7ac<200>\ub294<200> •\uac80\ucc30<200>\uc774<200> •\ubd84\uc2dd<200>\ud68c\uacc4<200>\ubb38\uc81c<200>\ub97c<200> •\uc870\uc0ac<200>\ud560<200> •\uac00\ub2a5\uc131<200>\uc740<200> •\uc5c6\ub2e4<200>\u002e•</data>
+
+<data>•abc<200>\u4e01<400>\u4e02<400>\u3005<400>\u4e03\u4e03<400>abc<200> •</data>
+
+<data>•\u06c9<200>\uc799\ufffa•</data>
+
+
+#
+#      Try some words from other scripts.
+#
+
+#       Try some words from other scripts.
+#          Greek, Cyrillic, Hebrew, Arabic, Arabic, Georgian, Latin
+#
+<data>•ΑΒΓ<200> •БВГ<200> •אבג֓<200> •ابت<200> •١٢٣<100> •\u10A0\u10A1\u10A2<200> •ABC<200> •</data>
+
+<data>•\u0301•A<200></data>
+
+
+#
+#  Hindi word break tests, imported from the old RBBI tests.
+#    An historical note:  a much earlier version of ICU break iterators had a number
+#    of special case rules for Hindi, which were tested by an earlier version of
+#    this test data.  The current RBBI rules do not special case Hindi in
+#    any way, making this test data much less signfificant.
+#
+<data>•\u0917\u092a\u00ad\u0936\u092a<200>!•\u092f\u0939<200> •\u0939\u093f\u0928\u094d\u200d\u0926\u0940<200> •\u0939\u0948<200> •\u0905\u093e\u092a<200> •\u0938\u093f\u0916\u094b\u0917\u0947<200>?•\n•:•\u092a\u094d\u0930\u093e\u092f\u0903<200>
+•\u0935\u0930\u094d\u0937\u093e<200>\r\n•\u092a\u094d\u0930\u0915\u093e\u0936<200>,•\u0924\u0941\u092e\u093e\u0930\u094b<200> •\u092e\u093f\u0924\u094d\u0930<200> •\u0915\u093e<200> •\u092a\u0924\u094d\u0930<200> •\u092a\u095d\u094b<200> •\u0938\u094d\u0924\u094d\u0930\u093f<200>.• •\u0968\u0966.\u0969\u096f<100> •\u0967\u0966\u0966.\u0966\u0966<100>\u20a8•\u0967,\u0967\u0966\u0966.\u0966\u0966<100> •\u0905\u092e\u091c<200>\n•\u0938\u094d\u200d\u0935\u0924\u0902\u0924\u094d\u0930<200>\r•</data>
+
+#
+#  Failures from monkey tests
+#
+<data>•\u8527<400>\u02ba<200>\u0027\u0d42•\u00b7•\u09ea<100></data>
+
+#
+# Jitterbug 5276 - treat Japanese half width voicing marks as Grapheme Extend
+#
+<data>•A\uff9e\uff9fBC<200> •1\uff9e\uff9f23<100></data>
+
+# User guide example:
+<data>•Parlez<200>-•vous<200> •français<200> •?•</data>
+
+# Test for #11673
+<word>
+<data>•ジョージア<400> •</data>
+
+# Test for #11723
+<word>
+<data>•アレルギー性<400>結膜炎<400></data>
+<data>•アテ<400>ローム<400>性<400>動脈硬化<400></data>
+
+# Ticket #11996
+<locale en>
+<word>
+<data>•栃木<400>県<400>足利<400>市<400>で<400>の<400>撮影<400>が<400>公開<400></data>
+<data>•栃木<400>県<400>足利<400>市<400>で<400>の<400>撮影<400>が<400>公開<400>さ<400>れ<400>た<400></data>
+
+# Ticket #11999
+#   Unhandled Break Engine was consuming all characters, not just unhandled.
+#   \U00011700 is AHOM LETTER KA. There is no dictionary for AHOM, triggering the unhandled engine,
+#       which then incorrectly also consumed the following Japanese text. (ICU4J only)
+<word>
+<locale en>
+<data>•ロ<400>から<400>売却<400>完了<400>時<400>の<400>時価<400>が<400>提示<400>さ<400>れ<400>て<400>いる<400></data>
+<data>•\U00011700<200>ロ<400>から<400>売却<400>完了<400>時<400>の<400>時価<400>が<400>提示<400>さ<400>れ<400>て<400>いる<400></data>
+
+#
+# Ticket #13549
+#   CjiBreakEngine::divideUpDictionaryRange: assertion failure.
+#
+<locale en>
+<word>
+<data>•\U00020029<400>\u3300<400>\U0002C400<400></data>
+<data>•\uFAD7<400>\u331B<400>\u87DF<400>\u006D<200>\uFFFD•</data>
+
+#
+# What Is Unicode in Japanese
+# From http://unicode.org/standard/translations/japanese.html
+
+<locale en>
+<word>
+<data><0>ユニ<400>コード<400>と<400>は<400>何<400>か<400>？<0></data>
+<data><0>ユニ<400>コード<400>は<400>、<0>すべて<400>の<400>文字<400>に<400>固有<400>の<400>番号<400>を<400>付与<400>し<400>ます<400></data>
+<data><0>プラットフォーム<400>に<400>は<400>依存<400>しま<400>せん<400></data>
+<data><0>プログラム<400>に<400>も<400>依存<400>しま<400>せん<400></data>
+<data><0>言語<400>に<400>も<400>依存<400>しま<400>せん<400></data>
+
+<data><0>コンピューター<400>は<400>、<0>本質<400>的<400>に<400>は<400>数字<400>しか<400>扱う<400>こと<400>が<400>でき<400>ま<400>せん<400>。<0>\
+コンピューター<400>は<400>、<0>文字<400>や<400>記号<400>など<400>の<400>それぞれに<400>番号<400>を<400>割り振る<400>こと<400>によって<400>扱える<400>\
+よう<400>にし<400>ます<400>。<0>ユニ<400>コード<400>が<400>出来る<400>まで<400>は<400>、<0>これらの<400>番号<400>を<400>割り振る<400>仕組み<400>が<400>\
+何<400>百<400>種類<400>も<400>存在<400>しま<400>した<400>。<0>どの<400>一つ<400>を<400>とっても<400>、<0>十分<400>な<400>文字<400>を<400>含<400>\
+んで<400>は<400>いま<400>せん<400>で<400>した<400>。<0>例えば<400>、<0>欧州<400>連合<400>一つ<400>を<400>見<400>て<400>も<400>、<0>その<400>\
+すべて<400>の<400>言語<400>を<400>カバー<400>する<400>ため<400>に<400>は<400>、<0>いくつか<400>の<400>異なる<400>符号<400>化<400>の<400>仕組み<400>\
+が<400>必要<400>で<400>した<400>。<0>英語<400>の<400>よう<400>な<400>一つ<400>の<400>言語<400>に<400>限<400>って<400>も<400>、<0>一つ<400>だけ<400>\
+の<400>符号<400>化<400>の<400>仕組み<400>では<400>、<0>一般<400>的<400>に<400>使<400>われる<400>すべて<400>の<400>文字<400>、<0>句読点<400>、<0>\
+技術<400>的<400>な<400>記号<400>など<400>を<400>扱う<400>に<400>は<400>不十分<400>で<400>した<400>。<0></data>
+
+<data><0>これらの<400>符号<400>化<400>の<400>仕組み<400>は<400>、<0>相互<400>に<400>矛盾<400>する<400>もの<400>でも<400>ありま<400>した<400>。<0>\
+二つ<400>の<400>異なる<400>符号<400>化<400>の<400>仕組み<400>が<400>、<0>二つ<400>の<400>異なる<400>文字<400>に<400>同一<400>の<400>番号<400>\
+を<400>付ける<400>こと<400>も<400>できる<400>し<400>、<0>同じ<400>文字<400>に<400>異なる<400>番号<400>を<400>付ける<400>こと<400>も<400>できる<400>\
+の<400>です<400>。<0>どの<400>よう<400>な<400>コンピューター<400>も<400>（<0>特に<400>サーバー<400>は<400>）<0>多く<400>の<400>異<400>な<400>っ<400>\
+た<400>符号<400>化<400>の<400>仕組み<400>を<400>サポート<400>する<400>必要<400>が<400>あり<400>ます<400>。<0>たとえ<400>データ<400>が<400>異なる<400>\
+符号<400>化<400>の<400>仕組み<400>や<400>プラットフォーム<400>を<400>通過<400>し<400>て<400>も<400>、<0>いつ<400>どこ<400>で<400>データ<400>が<400>\
+乱れる<400>か<400>分<400>から<400>ない<400>危険<400>を<400>冒す<400>こと<400>の<400>なる<400>の<400>です<400>。<0></data>
+
+<data><0>ユニ<400>コード<400>は<400>すべて<400>を<400>変<400>え<400>ます<400></data>
+
+<data><0>ユニ<400>コード<400>は<400>、<0>プラットフォーム<400>に<400>係<400>わら<400>ず<400>、<0>プログラム<400>に<400>係<400>わら<400>ず<400>、<0>\
+言語<400>に<400>係<400>わら<400>ず<400>、<0>すべて<400>の<400>文字<400>に<400>独立<400>した<400>番号<400>を<400>与<400>え<400>ます<400>。<0>\
+ユニ<400>コード<400>標準<400>は<400>、<0>アップル<400>、<0>ヒュー<400>レット<400>パッ<400>カード<400>、<0>IBM<200>、<0>ジャスト<400>システム<400>\
+、<0>マイクロ<400>ソフト<400>、<0>オラクル<400>、<0>SAＰ<200>、<0>サン<400>、<0>サイ<400>ベース<400>など<400>の<400>産業<400>界<400>の<400>\
+主導<400>的<400>企業<400>と<400>他の<400>多く<400>の<400>企業<400>に<400>採用<400>さ<400>れ<400>てい<400>ます<400>。<0>ユニ<400>コード<400>\
+は<400>、<0>XML<200>、<0>Java<200>、<0>ECMAScript<200>(<0>JavaScript<200>)<0>、<0>LDAP<200>、<0>CORBA<200> <0>3.0<100>など<400>\
+の<400>最先端<400>の<400>標準<400>の<400>前提<400>と<400>な<400>って<400>おり<400>、<0>ユニ<400>コード<400>を<400>実装<400>す<400>れ<400>ば<400>\
+、<0>ISO<200>/<0>IEC<200></data>
+<data><0> <0>10646<100>に<400>適合<400>する<400>ことに<400>なり<400>ます<400>。<0>ユニ<400>コード<400>は<400>、<0>多く<400>の<400>\
+オペレーティングシステム<400>と<400>すべて<400>の<400>最新<400>の<400>ブラウザー<400>と<400>他の<400>多く<400>の<400>製品<400>で<400>サポート<400>\
+さ<400>れ<400>てい<400>ます<400>。<0>ユニ<400>コード<400>標準<400>の<400>出現<400>と<400>ユニ<400>コード<400>を<400>サポート<400>する<400>\
+ツール<400>類<400>は<400>、<0>昨今<400>顕著<400>に<400>な<400>って<400>いる<400>ソフトウエア<400>技術<400>の<400>グローバル<400>化<400>の<400>\
+流れ<400>に対して<400>、<0>特に<400>役<400>に<400>立<400>って<400>い<400>ます<400>。<0></data>
+
+<data><0>ユニ<400>コード<400>を<400>ク<400>ライアン<400>ト<400>サーバー<400>型<400>の<400>アプリケーション<400>や<400>、<0>多層<400>構造<400>\
+を<400>持つ<400>アプリケーション<400>、<0>ウェブサイト<400>など<400>に<400>に<400>組み込む<400>こと<400>で<400>、<0>従来<400>の<400>文字<400>\
+コードセット<400>を<400>用いる<400>より<400>も<400>明らか<400>な<400>コスト<400>削減<400>が<400>可能<400>です<400>。<0>ユニ<400>コード<400>は<400>\
+、<0>単一<400>の<400>ソフトウエア<400>製品<400>、<0>単一<400>の<400>ウェブサイト<400>に<400>、<0>何ら<400>手<400>を<400>加える<400>こと<400>なく<400>\
+、<0>複数<400>の<400>プラットフォーム<400>、<0>複数<400>の<400>言語<400>、<0>複数<400>の<400>国<400>を<400>カバー<400>する<400>こと<400>が<400>\
+出来る<400>の<400>です<400>。<0>ユニ<400>コード<400>は<400>、<0>データ<400>が<400>多く<400>の<400>異なる<400>システム<400>の<400>間<400>を<400>、<0>\
+何<400>の<400>乱れ<400>も<400>なし<400>に<400>転送<400>する<400>こと<400>を<400>可能<400>と<400>する<400>の<400>です<400>。<0></data>
+
+<data><0>ユニ<400>コード<400>コンソーシアム<400>について<400></data>
+
+<data><0>ユニ<400>コード<400>コンソーシアム<400>は<400>、<0>最新<400>の<400>ソフトウエア<400>製品<400>と<400>標準<400>において<400>テキスト<400>\
+を<400>表現<400>する<400>こと<400>を<400>意味<400>する<400>“<0>ユニ<400>コード<400>標準<400>”<0>の<400>構築<400>、<0>発展<400>、<0>普及<400>、<0>\
+利用<400>促進<400>を<400>目的<400>として<400>設立<400>さ<400>れ<400>た<400>非<400>営利<400>組織<400>です<400>。<0>同<400>コンソーシアム<400>\
+の<400>会員<400>は<400>、<0>コンピューター<400>と<400>情報処理<400>に<400>係わる<400>広汎<400>な<400>企業<400>や<400>組織<400>から<400>構成<400>\
+さ<400>れ<400>てい<400>ます<400>。<0>同<400>コンソーシアム<400>は<400>、<0>財政<400>的<400>に<400>は<400>、<0>純粋<400>に<400>会費<400>のみ<400>\
+によって<400>運営<400>さ<400>れ<400>てい<400>ます<400>。<0>ユニ<400>コード<400>標準<400>を<400>支持<400>し<400>、<0>その<400>拡張<400>と<400>\
+実装<400>を<400>支援<400>する<400>世界中<400>の<400>組織<400>や<400>個人<400>は<400>、<0>だれ<400>も<400>が<400>ユニ<400>コード<400>\
+コンソーシアム<400>の<400>会員<400>なる<400>こと<400>が<400>でき<400>ます<400>。<0></data>
+
+<data><0>より<400>詳しい<400>こと<400>を<400>お<400>知<400>り<400>に<400>なり<400>たい<400>方<400>は<400>、<0>Glossary<200>,<0> <0>\
+Technical<200> <0>Introduction<200> <0>および<400> <0>Useful<200> <0>Resources<200>を<400>ご<400>参照<400>くだ<400>さい<400>。<0></data>
+
+#
+# Bug ICU-13334  Report of different boundaries between Windows and Linux.
+#
+<data><0>丙酮<400></data>
+
+########################################################################################
+#
+#
+#       S e n t e n c e     B o u n d a r y      T e s t s
+#
+#
+##########################################################################################
+
+
+#
+# Test data originally from RBBI RBBITest::TestDefaultRuleBasedSentenceIteration()
+#
+<sent>
+
+
+<sent>
+<data>•This\n<100></data>
+<data>•Hello! •how are you? •I'am fine. •Thankyou. •How are you \
+doing? •This\n<100> costs $20,00,000. •</data>
+
+
+# Sentence ending in a quote.
+<data>•"Sentence ending with a quote." •Bye.•</data>
+
+# Sentence, and test data, ending without a period or other terminator.
+<data>•Here is a random sentence, no ending period<100></data>
+
+
+<data>•  (This is it).  •Testing the sentence iterator. •\
+"This isn't it." •Hi! \
+•This is a simple sample sentence. •(This is it.) •This is a simple sample sentence. •\
+"This isn't it." •\
+Hi! •This is a simple sample sentence. •It does not have to make any sense as you can see. •Nel mezzo del cammin di nostra vita, mi ritrovai in una selva oscura. •Che la dritta via aveo smarrita. •He said, that I said, that you said!! •Don't rock the boat.\u2029•Because I am the daddy, that is why.
+•Not on my time (el timo.)! •</data>
+
+<data>•Hello.  •So what!!\u2029•"But now," he said, \
+"I know!" •\
+Harris thumbed down several, including "Away We Go" (which became the huge success Oklahoma!). •One species, B. anthracis, is highly virulent.
+•Wolf said about Sounder:\
+"Beautifully thought-out and directed." •\
+Have you ever said, "This is where\tI shall live"? •He answered, \
+"You may not!" •Another popular saying is: "How do you do?". \n•\
+Yet another popular saying is: \
+'I'm fine thanks.' •\
+What is the proper use of the abbreviation pp.? •Yes, I am definatelly 12" tall!!\
+•Now\r<100>is\n<100>the\r\n<100>time\n<100>\r<100>for\r<100>\r<100></data>
+
+<data>•No breaks when . is surrounded by UPPER.Case letters.  •</data>
+<data>•No breaks when . is followed by Numeric .4 a.4 C.4 3.1 .•</data>
+<data>•No breaks when . is followed by a lower, with possible intervening punct .,a .$a .)a. •</data>
+
+#
+#  Sentence Breaks: no break at the boundary between CJK and other letters. TestBug4111338
+#
+<data>•\u5487\u67ff\ue591\u5017\u61b3\u60a1\u9510\u8165:"JAVA\u821c\u8165\u7fc8\u51ce\u306d,\u2494\u56d8\u4ec0\u60b1\u8560\u51ba\u611d\u57b6\u2510\u5d46".\u2029\
+•\u5487\u67ff\ue591\u5017\u61b3\u60a1\u9510\u8165\u9de8\u97e4JAVA\u821c\u8165\u7fc8\u51ce\u306d\ue30b\u2494\u56d8\u4ec0\u60b1\u8560\u51ba\u611d\u57b6\u2510\u5d46\u97e5\u7751\u3002\
+•\u5487\u67ff\ue591\u5017\u61b3\u60a1\u9510\u8165\u9de8\u97e4\u6470\u8790JAVA\u821c\u8165\u7fc8\u51ce\u306d\ue30b\u2494\u56d8\u4ec0\u60b1\u8560\u51ba\u611d\u57b6\u2510\u5d46\u97e5\u7751\u2048\
+•He said, "I can go there."\u2029•Bye, now.•</data>
+
+#
+#      Treat fullwidth variants of .!? the same as their
+#      normal counterparts
+#
+<data>•I know I'm right\uff0e •Right\uff1f •Right\uff01 •</data>
+
+
+#
+#       Don't break sentences at boundary between CJK and digits
+#
+<data>•\u5487\u67ff\ue591\u5017\u61b3\u60a1\u9510\u8165\u9de8\u97e48888\u821c\u8165\u7fc8\u51ce\u306d\ue30b\u2494\u56d8\u4ec0\u60b1\u8560\u51ba\u611d\u57b6\u2510\u5d46\u97e5\u7751\u3002•Bye, now<100></data>
+
+#
+#      Breaks around '(' following a sentence TERM.  (Rule 9)
+#
+<data>•How do you do?(•Fine). •</data>
+<data>•How do you do? •(Fine). •</data>
+<data>•How do you do?(•fine). •</data>
+<data>•How do you do? •(fine). •</data>
+
+#
+<data>•Hello.123<100></data>    # Rule 6
+<data>•Hello?•123<100></data>
+
+<data>•HELLO.Bye<100></data>    # Rule 7
+<data>•HELLO?•Bye<100></data>
+
+<data>•Hello.goodbye<100></data>  #Rule 8
+<data>•Hello. •Goodbye<100></data>
+<data>•Hello. goodbye<100></data>
+
+
+
+#
+#        test for bug #4158381: No breaks when there are no terminators around
+#
+<data>•\<P>Provides a set of &quot;lightweight&quot; (all-java\<FONT SIZE="-2">\<SUP>TM\</SUP>\</FONT> language) components that, to the maximum degree possible, work the same on all platforms.  •</data>
+<data>•Another test.\u2029•</data>
+
+#        test for bug #4143071: Make sure sentences that end with digits
+#        work right
+#
+<data>•Today is the 27th of May, 1998.  •</data>
+<data>•Tomorrow with be 28 May 1998.  •</data>
+<data>•The day after will be the 30th.\u2029•</data>
+
+#        test for bug #4152416: Make sure sentences ending with a capital
+#        letter are treated correctly
+#
+<data>•The type of all primitive \<code>boolean\</code> values accessed in the target VM.  •\
+Calls to xxx will return an implementor of this interface.  \u2029•</data>
+
+#        test for bug #4152117: Make sure sentence breaking is handling
+#        punctuation correctly [COULD NOT REPRODUCE THIS BUG, BUT TEST IS
+#        HERE TO MAKE SURE IT DOESN'T CROP UP]
+#
+<data>•Constructs a randomly generated BigInteger, uniformly distributed over the range \<tt>0\</tt> to\
+ \<tt>(2\<sup>numBits\</sup> - 1\)\</tt>, inclusive.  \
+ •The uniformity of the distribution assumes that a fair source of random bits is provided in \<tt>rnd\</tt>.  \
+ •Note that this constructor always constructs a non-negative biginteger.  \n•Ahh abc.•</data>
+
+#        sentence breaks for hindi which used Devanagari script
+#        make sure there is sentence break after ?,danda(hindi phrase separator),
+#        fullstop followed by space.  (VERY old test)
+#
+<data>•\u0928\u092e\u0938\u094d\u200d\u0924\u0947 \u0930\u092e\u0947\u0936\u0905\u093e\u092a\u0915\u0948\u0938\u0947 \u0939\u0948?\
+•\u092e\u0948 \u0905\u091a\u094d\u200d \u091b\u093e \u0939\u0942\u0901\u0964 •\u0905\u093e\u092a\r\n<100>\
+\u0915\u0948\u0938\u0947 \u0939\u0948?•\u0935\u0939 \u0915\u094d\u200d\u092f\u093e\n\
+<100>\u0939\u0948?•\u092f\u0939 \u0905\u093e\u092e \u0939\u0948. •\u092f\u0939 means "this". \
+•"\u092a\u095d\u093e\u0908" meaning "education" or "studies". \
+•\u0905\u093e\u091c(\u0938\u094d\u200d\u0935\u0924\u0902\u0924\u094d\u0930 \u0926\u093f\u0935\u093e\u0938) \u0939\u0948\u0964 •Let's end here. •</data>
+
+#         Regression test for bug #1984, Sentence break in Arabic text.
+
+<data>\
+•\u0623\u0633\u0627\u0633\u064b\u0627\u060c\u0020\u062a\u062a\u0639\u0627"\u0645\u0644\u0020\u0627\u0644\u062d\u0648\u0627\u0633\u064a\u0628\u0020"\u0641\u0642\u0637\u0020\u0645\u0639\u0020\u0627\u0644\u0623\u0631\u0642\u0627\u0645\u060c\u0648\u062a\u0642\u0648\u0645\u0020\u0628\u062a\u062e\u0632\u064a\u0646\u0020\u0627\u0644\u0623\u062d\u0631\u0641\u0020\u0648\u0627\u0644\u0645\u062d\u0627\u0631\u0641\u0020\u0627\u0644\u0623\u062e\u0631\u0649\u0020\u0628\u0639\u062f\u0020\u0623\u0646\u062a\u064f\u0639\u0637\u064a\u0020\u0631\u0642\u0645\u0627\u0020\u0645\u0639\u064a\u0646\u0627\u0020\u0644\u0643\u0644\u0020\u0648\u0627\u062d\u062f\u0020\u0645\u0646\u0647\u0627\u002e\u0020•\u0648\u0642\u0628\u0644\u0020\u0627\u062e\u062a\u0631\u0627\u0639\u0022\u064a\u0648\u0646\u0650\u0643\u0648\u062f\u0022\u060c\u0020\u0643\u0627\u0646\u0020\u0647\u0646\u0627\u0643\u0020\u0645\u0626\u0627\u062a\u0020\u0627\u0644\u0623\u0646\u0638\u0645\u0629\u0020\u0644\u0644\u062a\u0634\u0641\u064a\u0631\u0648\u062a\u062e\u0635\u064a\u0635\u0020\u0647\u0630\u0647\u0020\u0627\u0644\u0623\u0631\u0642\u0627\u0645\u0020\u0644\u0644\u0645\u062d\u0627\u0631\u0641\u060c\u0020\u0648\u0644\u0645\u0020\u064a\u0648\u062c\u062f\u0020\u0646\u0638\u0627\u0645\u062a\u0634\u0641\u064a\u0020\u0639\u0644\u0649\u0020\u062c\u0645\u064a\u0639\u0020\u0627\u0644\u0645\u062d\u0627\u0631\u0641\u0020\u0627\u0644\u0636\u0631\u0648\u0631\u064a\u0629.  •</data>
+
+#         Try a few more of the less common sentence endings.
+<data>•Hello, world\u3002 •Hello, world\u1803 •Hello, world\u2048 •Hello, world\u203c •Let's end here. •</data>
+
+
+
+
+################################################################
+#
+#
+#        L I N E     B R E A K
+#
+#
+################################################################
+
+<line>
+#
+# Test Character for each of the line break classes.
+#
+# 00A1;AI # INVERTED EXCLAMATION MARK  ¡
+# 0041;AL # LATIN CAPITAL LETTER A
+# 0009;BA # <control>
+# 00B4;BB # ACUTE ACCENT
+# 000C;BK # <control>
+# 2014;B2 # EM DASH
+# FFFC;CB # OBJECT REPLACEMENT CHARACTER
+# 0029;CL # RIGHT PARENTHESIS
+# 0301;CM # COMBINING ACUTE ACCENT
+# 0021;EX # EXCLAMATION MARK
+# 00A0;GL # NO-BREAK SPACE
+# 002D;HY # HYPHEN-MINUS
+# 4E00;ID # <CJK Ideograph, First>
+# 2024;IN # ONE DOT LEADER
+# 002C;IS # COMMA
+# 000A;LF # <control>
+# 0E5A;NS # THAI CHARACTER ANGKHANKHU
+# 0032;NU # DIGIT TWO
+# 0028;OP # LEFT PARENTHESIS
+# 0025;PO # PERCENT SIGN
+# 0024;PR # DOLLAR SIGN
+# 0022;QU # QUOTATION MARK
+# 0E01;SA # THAI CHARACTER KO KAI
+# DB7F;SG # Surrogate
+# 0020;SP # SPACE
+# 002F;SY # SOLIDUS /
+# F8FF;XX # Private Use
+# 200B;ZW # ZERO WIDTH SPACE
+
+
+# 2b  Always break at end of text
+
+<data>•  •\u00A1•</data>
+<data>•  •\u0041•</data>
+<data>•  •\u0009•</data>
+<data>•  •\u00B4•</data>
+<data>•    \u000C<100></data>    # LB3C  × BK
+<data>•  •\u2014•</data>
+<data>•  •\uFFFC•</data>
+<data>•   \u0029•</data>    # LB 8   × CL
+# <data>• • \u0301•</data>    # LB 7a   Treat SP CM* as if it were ID  #TODO:  SP CM
+<data>•   \u0021•</data>    # LB 8   × EX
+#<data>•   \u00A0•</data>    # LB 11b   × GL   TODO:  fix.
+<data>•  •\u002D•</data>
+<data>•  •\u4E00•</data>
+<data>•  •\u2024•</data>
+<data>•   \u002C•</data>    # LB 8   × IS
+<data>•   \u000A<100></data>    # LB3C   × ( BK | CR | LF | NL )
+<data>•  •\u0E5A•</data>
+<data>•  •\u0032•</data>
+<data>•  •\u0028•</data>
+<data>•  •\u0025•</data>
+<data>•  •\u0024•</data>
+<data>•  •\u0022•</data>
+<data>•  •\u0E01•</data>
+<data>•  •\uDB7F•</data>
+<data>•   \u0020•</data>     # LB4 - don't break before space.
+<data>•   \u002F•</data>     # LB 8  × SY
+<data>•  •\uF8FF•</data>
+<data>•   \u200B•</data>     # LB4 - don't break before ZA
+
+
+# 3a  Always break after hard line breaks.
+# 3c  Never break before hard line breaks.
+
+<data>•  •\u00A1\u2028<100>\u00A1•</data>
+<data>•  •\u0041\u2028<100>\u0041•</data>
+<data>•  •\u0009\u2028<100>\u0009•</data>
+<data>•  •\u00B4\u2028<100>\u00B4•</data>
+<data>•   \u000C<100>\u2028<100>\u000C<100></data>
+<data>•  •\u2014\u2028<100>\u2014•</data>
+<data>•  •\uFFFC\u2028<100>\uFFFC•</data>
+<data>•   \u0029\u2028<100>\u0029•</data>
+<data>•  •\u0301\u2028<100>\u0301•</data>
+<data>•   \u0021\u2028<100>\u0021•</data>
+<data>•  •\u00A0\u2028<100>\u00A0•</data>
+<data>•  •\u002D\u2028<100>\u002D•</data>
+<data>•  •\u4E00\u2028<100>\u4E00•</data>
+<data>•  •\u2024\u2028<100>\u2024•</data>
+<data>•   \u002C\u2028<100>\u002C•</data>
+<data>•   \u000A<100>\u2028<100>\u000A<100></data>
+<data>•  •\u0E5A\u2028<100>\u0E5A•</data>
+<data>•  •\u0032\u2028<100>\u0032•</data>
+<data>•  •\u0028\u2028<100>\u0028•</data>
+<data>•  •\u0025\u2028<100>\u0025•</data>
+<data>•  •\u0024\u2028<100>\u0024•</data>
+<data>•  •\u0022\u2028<100>\u0022•</data>
+<data>•  •\u0E01\u2028<100>\u0E01•</data>
+<data>•  •\uDB7F\u2028<100>\uDB7F•</data>
+<data>•   \u0020\u2028<100>\u0020•</data>
+<data>•   \u002F\u2028<100>\u002F•</data>
+<data>•  •\uF8FF\u2028<100>\uF8FF•</data>
+<data>•   \u200B\u2028<100>\u200B•</data>
+
+# Regional Indicator sequences. They group in pairs.
+#    Sequences are long enough that the non-exaustive monkey test won't reliably pick up problems.
+
+<data>•\U0001F1E6\U0001F1E6•\U0001F1E6\U0001F1E6•\U0001F1E6\U0001F1E6•\U0001F1E6\U0001F1E6•</data>
+<data>•\U0001F1E6\U0001F1E6•\U0001F1E6\U0001F1E6•\U0001F1E6\U0001F1E6•\U0001F1E6\U0001F1E6•\U0001F1E6•</data>
+
+<data>•\U0001F1E6\U0001F1E6•\U0001F1E6\U0001F1E6\u00a0\U0001F1E6\U0001F1E6•\U0001F1E6\U0001F1E6•</data>
+<data>•\U0001F1E6\U0001F1E6•\U0001F1E6\U0001F1E6\u00a0\U0001F1E6\U0001F1E6•\U0001F1E6\U0001F1E6•\U0001F1E6•</data>
+<data>•\U0001F1E6\U0001F1E6•\U0001F1E6\u00a0\U0001F1E6\U0001F1E6•\U0001F1E6\U0001F1E6•</data>
+<data>•\U0001F1E6\U0001F1E6•\U0001F1E6\u00a0\U0001F1E6\U0001F1E6•\U0001F1E6\U0001F1E6•\U0001F1E6•</data>
+
+
+# User Guide example
+
+<data>•Parlez-•vous •français ?•</data>
+
+#
+#  Old Line Break Test data.  Orginally located in RBBITest::TestDefaultRuleBasedLineIteration()
+#
+
+<line>
+
+<data>•Multi-•Level •example •of •a •semi-•idiotic •non-•sensical •(non-•important) •sentence.
+<100>Hi  •Hello •How\n<100>are\r<100>you\u2028<100>fine.\t•good.  •Now\r<100>is\n<100>the\r\n<100>time\n<100>\r<100>for\r<100>\r<100>all•</data>
+
+<line>
+<data>•Hello! •how\r\n<100> •(are)\r<100> •you? •I'am •fine- •Thankyou. •foo\u00a0bar
+<100>How, •are, •you? •This, •costs •$20,00,000.•</data>
+
+#     test for bug #4068133
+#
+<data>•\u96f6•\u4e00\u3002•\u4e8c\u3001•\u4e09\u3002\u3001•\u56db\u3001\u3002\u3001•\u4e94,•\u516d.•\u4e03.\u3001,\u3002•\u516b•</data>
+
+#     to test for bug #4086052
+<data>•foo\u00a0bar•</data>
+
+#     to test for bug #4097920
+<data>•dog,cat,mouse •(one)•(two)\n<100></data>
+
+#     to test for bug #4035266
+<data>•The •balance •is •$-23,456.78, •not •-•$32,456.78!\n<100></data>
+
+
+#      to test for bug #4098467
+#      What follows is a string of Korean characters (I found it in the Yellow Pages
+#      ad for the Korean Presbyterian Church of San Francisco, and I hope I transcribed
+#      it correctly), first as precomposed syllables, and then as conjoining jamo.
+#      Both sequences should be semantically identical and break the same way.
+#      precomposed syllables...  (I == Rich Gillam?)
+#
+<data>•\uc0c1•\ud56d •\ud55c•\uc778 •\uc5f0•\ud569 •\uc7a5•\ub85c•\uad50•\ud68c•</data>
+
+#      Bug 4450804 estLineBreakContractions
+#
+<line>
+<data>•These •are •'foobles'. •Don't •you •like •them?•</data>
+
+
+#      conjoining jamo...
+<data>•\u1109\u1161\u11bc•\u1112\u1161\u11bc •\u1112\u1161\u11ab•\u110b\u1175\u11ab •\u110b\u1167\u11ab•\u1112\u1161\u11b8 •\u110c\u1161\u11bc•\u1105\u1169•\u1100\u116d•\u1112\u116c•</data>
+
+#      to test for bug #4117554: Fullwidth .!? should be treated as postJwrd
+<data>•\u4e01\uff0e•\u4e02\uff01•\u4e03\uff1f•</data>
+
+#      Surrogate line break tests.
+#
+<data>•\u4e01•\ud840\udc01•\u4e02•abc •\ue000 •\udb80\udc01•</data>  #This line and the following are equivalent.
+<data>•\u4e01•\U00020001•\u4e02•abc •\ue000 •\U000f0001•</data>
+
+#      Regression for bug 836
+#        Note:  Unicode 5.1 changed this behavior
+#               Unicode 5.2 changed it again, there is no break following the '('
+<data>•AAA(AAA •</data>
+
+#       Try some words from other scripts.
+#          Greek, Cyrillic, Hebrew, Arabic, Arabic, Georgian, Latin
+#
+<data>•ΑΒΓ •БВГ •אבג֓ •ابت •١٢٣ •\u10A0\u10A1\u10A2 •ABC •</data>
+
+#
+#       ticket #4853:  unpaired surrogates should behave like AL
+#
+<data>•abc\ud801xyz•</data>
+
+#   a character sequence such as "X11" or "30F3" or "native2ascii" should
+#   be kept together as a single word.
+<data>•X11 •30F3 •native2ascii•</data>
+
+#
+#     Regression tests for failures that originally came from the monkey test.
+#     Monkey test failure lines can, with slight reformatting, be copied into this section
+#     as test cases.  The error display from here is more informative.
+#
+<data>•\ufffc•\u30e3\u000c<100>\u1b39•\u300a\u002f\u203a\u200b•\ufffc•\uaf64•\udcfb•</data>
+<data>•\u114d\u31f3•\ube44\u002d•\u0362\u24e2\u276e\u2014\u205f\ufe16•\uc877•\u0fd0\u000a<100>\u20a3•</data>
+<data>•\u080a\u215b\U0001d7d3\u002c\u2025\U000e012e•\u02df\u118d\u0029\ua8d6\u0085<100>\u6cc4\u2024\u202f\ufffc•</data>
+
+# Test for #10176 (in root)
+<line>
+<data>•abc/•s •def•</data>
+<data>•abc/\u05D9 •def•</data>
+<data>•\u05E7\u05D7/\u05D9 •\u05DE\u05E2\u05D9\u05DC•</data>
+<data>•\u05D3\u05E8\u05D5\u05E9\u05D9\u05DD •\u05E9\u05D7\u05E7\u05E0\u05D9\u05DD/\u05D9\u05D5\u05EA•</data>
+
+# Ticket #11556 don't break "R$" or "JP¥"
+<locale en>
+<line>
+<data>•R$ •JP¥ •a9 •3a •H% •CA$ •Travi$ •Scott •Ke$ha •Curren$y •A$AP •Rocky•</data>
+
+# Test Bug 4146175 Lines
+# the fullwidth comma should stick to the preceding Japanese character
+<line>
+<data>•\u7d42\uff0c•\u308f•</data>
+
+# Empty String
+<line>
+<data>•</data>
+
+# Bug #13664 Mixed Thai & English text had different boundaries between forward & reverse.
+#
+<line>
+<data>•Northern •Thailand •is •a •mountainous •area. •Parallel •mountain •ranges •extend •from •the •\
+Daen •Lao •Range •(ทิว•เขา•แดน•ลาว), •in •the •southern •region •of •the •Shan •Hills, •in •a •\
+north/•south •direction, •the •Dawna •Range •(ทิว•เขา•ดอย•มอน•กุ•จู) •forming •the •western •border •of •Thailand •\
+between •Mae •Hong •Son •and •the •Salween •River, •the •Thanon •Thong •Chai •Range •(เทือก•เขา•ถนน•ธงชัย), •\
+the •Khun •Tan •Range •(ดอย•ขุน•ตาน), •the •Phi •Pan •Nam •Range •(ทิว•เขา•ผี•ปัน•น้ำ), •as •well •as •the •western •\
+part •of •the •Luang •Prabang •Range •(ทิว•เขา•หลวง•พระ•บาง).•</data>
+
+# Breaking around numbers that begin with a decimal point.
+# Bug ICU-12017
+
+<line>
+<data>•start •.789 •end•</data>
+<data>•start .abc •end•</data>
+<data>•start •( .789 •end)•</data>
+<data>•start •.\u0301789 •end•</data>     # \u0301 is a CM (COMBINING ACUTE ACCENT)
+<data>•start •.\u200D789 •end•</data>     # \u200D is ZWJ
+<data>•start •.\u200D\u0301789 •end•</data>
+<data>•start •.\u0301\u200D789 •end•</data>
+<data>•start .\u0301\u200D•</data>
+<data>•start .\u0301\u200D •</data>
+<data>•start ; •end •</data>
+
+########################################################################################
+#
+#
+#       T i t l e   B o u n d a r y      T e s t s
+#
+#
+##########################################################################################
+<title>
+<data>•Here •is •a •short •sample •sentence.  •And •another.•</data>
+<data>•HERE •IS •A •SHORT •SAMPLE •SENTENCE.  •AND •ANOTHER.•</data>
+<data>•  •Start •and •end •with •spaces   •</data>
+<data>•Include 123 456 ^&  •some 54332 •numbers 4445•abc123•abc •ending 1223 •</data>
+
+<data>•Combining\u0301 \u0301•ma\u0306rks  •bye  •</data>
+<data>•123  •Start •with •a •number.•</data>
+
+<data>•'•start •with •a •case-•ignorable •cha'r'a'cter•</data>
+<data>•'  '' •start •with •case-•ignorable & •case-•insensitive •cha'r'a'cter•</data>
+<data>•  ''•aaa' •bbb '•ccc' '•ddd''' '''•eee   '''•fff'''   •ggg  ''•</data>
+# Note: apostrophe is case-ignorable. space is not cased.
+
+##########################################################################################
+#
+#   Thai Tests
+#
+##########################################################################################
+<locale th>
+<word>
+#
+# Test data originally from the test code source file
+#      // @suwit -- Thai sample data from GVT Guideline
+#
+<data>•\u0E2B\u0E19\u0E36\u0E48\u0E07<200>\u0E04\u0E33<200>\u0E44\u0E17\u0E22<200>\
+\u0E2A\u0E32\u0E21\u0E32\u0E23\u0E16<200>\u0E1B\u0E23\u0E30\u0E01\u0E2D\u0E1A<200>\
+\u0E14\u0E49\u0E27\u0E22<200>\u0e2b\u0e25\u0e32\u0e22<200>\
+\u0e1e\u0e22\u0e32\u0e07\u0e04\u0e4c<200></data>
+
+# Test data originally from http://bugs.icu-project.org/trac/search?q=r30327
+<data>•กู<200> •กิน<200>กุ้ง<200> •ปิ้่<200>งอ<200>ยู่<200>ใน<200>ถ้ำ<200></data>
+
+<data>•\u0E01\u0E39<200>\u0020•\u0E01\u0E34\u0E19<200>\u0E01\u0E38\u0E49\u0E07<200>\
+\u0020•\u0E1B\u0E34\u0E49\u0E48<200>\u0E07\u0E2D<200>\u0E22\u0E39\u0E48<200>\
+\u0E43\u0E19<200>\u0E16\u0E49\u0E33<200></data>
+
+<line>
+<data>•0E01\u0E39\u0020•\u0E01\u0E34\u0E19•\u0E01\u0E38\u0E49\u0E07\
+\u0020•\u0E1B\u0E34\u0E49\u0E48•\u0E07\u0E2D•\u0E22\u0E39\u0E48•\
+\u0E43\u0E19•\u0E16\u0E49\u0E33•</data>
+
+# Data originally from intltest RBBITest::TestThaiLineBreak()
+#
+#  \u0e2f-- the Thai paiyannoi character-- isn't a letter.  It's a symbol that
+#  represents elided letters at the end of a long word.  It should be bound to
+#  the end of the word and not treated as an independent punctuation mark.
+#
+#  the one time where the paiyannoi occurs somewhere other than at the end
+#  of a word is in the Thai abbrevation for "etc.", which both begins and
+#  ends with a paiyannoi
+#
+<line>
+<data>•\u0e2a\u0e16\u0e32\u0e19\u0e35\u0e2f•\
+\u0e08\u0e30•\
+\u0e23\u0e30\u0e14\u0e21•\
+\u0e40\u0e08\u0e49\u0e32•\
+\u0e2b\u0e19\u0e49\u0e32\u0e17\u0e35\u0e48•\
+\u0e2d\u0e2d\u0e01•\
+\u0e21\u0e32•\
+\u0e40\u0e23\u0e48\u0e07•\
+\u0e23\u0e30\u0e1a\u0e32\u0e22•\
+\u0e2d\u0e22\u0e48\u0e32\u0e07•\
+\u0e40\u0e15\u0e47\u0e21•\
+\u0e2f\u0e25\u0e2f•\
+\u0e17\u0e35\u0e48•\
+\u0e19\u0e31\u0e49\u0e19•</data>
+
+# Data originally from RBBITest::TestMixedThaiLineBreak()
+#   @suwit -- Test Arabic numerals, Thai numerals, Punctuation and English characters start
+#
+<line>
+<data>•\u0E1B\u0E35•\
+\u0E1E\u0E38\u0E17\u0E18\u0E28\u0E31\u0E01\u0E23\u0E32\u0E0A •\
+2545 •\
+\u0E40\u0E1B\u0E47\u0E19•\
+\u0E1B\u0E35•\
+\u0E09\u0E25\u0E2D\u0E07•\
+\u0E04\u0E23\u0E1A•\
+\u0E23\u0E2D\u0E1A •\
+\"\u0E52\u0E52\u0E50 •\
+\u0E1b\u0E35\" •\
+\u0E02\u0E2d\u0E07•\
+\u0E01\u0E23\u0E38\u0E07•\
+\u0E23\u0E31\u0E15\u0E19\u0E42\u0E01\u0E2A\u0E34\u0E19\u0E17\u0E23\u0E4C •\
+(\u0E01\u0E23\u0E38\u0E07\u0E40\u0E17\u0E1e\u0E2F•\
+\u0E2B\u0E23\u0E37\u0E2D •\
+Bangkok)•</data>
+
+# Data originally from RBBITest::TestMaiyamok()
+#   The Thai maiyamok character is a shorthand symbol that means "repeat the previous
+#   word".  Instead of appearing as a word unto itself, however, it's kept together
+#   with the word before it.
+#
+<line>
+<data>•\u0e44\u0e1b\u0e46•\
+\u0e21\u0e32\u0e46•\
+\u0e23\u0e30\u0e2b\u0e27\u0e48\u0e32\u0e07•\
+\u0e01\u0e23\u0e38\u0e07•\
+\u0e40\u0e17\u0e1e•\
+\u0e41\u0e25\u0e30•\
+\u0e40\u0e03\u0e35•\
+\u0e22\u0e07•\
+\u0e43\u0e2b\u0e21\u0e48•</data>
+
+# Test for #10296
+<line>
+<data>•ใช•มั้ย•</data>
+<data>•มั๊ยล่ะ•ที่รัก•</data>
+
+# Test for #10593
+<line>
+<data>•เล่น•ผ่าน•ทาง•บลูทูธ•บน•อุปกรณ์•</data>
+
+# Test for city names #10691
+<line>
+<data>•ไป•ที่•ซานฟรานซิสโก•</data>
+
+# Test for #10630, #10631
+<line>
+<data>•แท็ก•แอปพลิเคชัน•เป็น•พิเศษ•</data>
+
+# Test for #11019
+<line>
+<data>•เบ•เบราว์เซอร์•โพ•โพสต์•โพสท์•</data>
+
+# Test for #11688
+<line>
+<data>•อัปเดต•อีเวนต์•</data>
+
+##########################################################################################
+#
+#   Lao Tests
+#
+##########################################################################################
+<locale en>
+# Basic check for #7647
+<line>
+<data>•ສະບາຍດີ•</data>
+<data>•ດີ•ຂອບໃຈ•</data>
+<data>•ເຈົ້າ•ເວົ້າ•ພາສາ•ອັງກິດ•ໄດ້•ບໍ່•</data>
+<data>•ກະລຸນາ•ເວົ້າ•ຊ້າ•ໆ•</data>
+
+##########################################################################################
+#
+#   Burmese/Myanmar Tests
+#
+##########################################################################################
+<locale en>
+# Basic sanity check for #10326 (some text from http://www.unicode.org/udhr/d/udhr_mya.txt)
+<line>
+<data>•လူ•တိုင်း•သည် •တူညီ •လွတ်လပ်•သော •ဂုဏ်•သိ•က္•ခါ•ဖြ•င့် •လည်းကောင်း၊ •</data>
+<data>•တူညီ•လွတ်လပ်•သော •အ•ခွ•င့်•အရေး•များ•ဖြ•င့် •လည်းကောင်း၊ •မွေး•ဖွား•လာ•သူများ •ဖြစ်သည်။•</data>
+<data>•ထို•သူ•တို့၌ •ပိုင်းခြား •ဝေဖန်•တတ်•သော •ဉာဏ်•နှ•င့် •ကျ•င့်•ဝတ် •သိတတ်•သော •စိတ်•တို့•ရှိ•ကြ၍ •</data>
+<data>•ထို•သူ•တို့သည် •အချင်းချင်း •မေတ္တာ•ထား၍ •ဆက်ဆံ•ကျ•င့်•သုံး•</data>
+
+##########################################################################################
+#
+#   Khmer Tests
+#
+##########################################################################################
+
+# Test data originally from http://bugs.icu-project.org/trac/search?q=r30327
+#  from the file testdata/wordsegments.txt
+<locale en>
+<word>
+
+<data>•តើ<200>លោក<200>មក<200>ពី<200>ប្រទេស<200>ណា<200></data>
+<data>•សណ្ដូក<200>ក<200>បណ្ដែត<200>ខ្លួន<200></data>
+<data>•ពណ៌ស<200>ម្ដេច<200>ថា<200>ខ្មៅ<200></data>
+#ប្រយោគ|ពី|របៀប|រួបរួម|និង|ភាព|ផ្សេងគ្នា|ដែល|អាច|ចូល<200></data>
+<data>•ប្រយោគ<200>ពី<200>របៀប<200>ដែល<200>និង<200>ភាព<200>ផ្សេងគ្នា<200>ដែល<200>អាច<200>ចូល<200></data>
+#ប្រយោគ|ពី|របៀប|ជា|មួយ|និង|ភាព|ផ្សេងគ្នា|ដែល|អាច|ចូល<200></data>
+<data>•សូម<200>ចំណាយពេល<200>បន្តិច<200>ដើម្បី<200>អធិស្ឋាន<200>អរព្រះគុណ<200>ដល់<200>ព្រះអង្គ<200></data>
+<data>•ការ<200>ថោកទាប<200>បរិប្បូណ៌<200>ដោយ<200></data>
+<data>•ប្រើប្រាស់<200>ស្អាត<200>ទាំង<200>ចិត្ត<200>សិស្ស<200>នោះ<200></data>
+<data>•បើ<200>អ្នក<200>ប្រព្រឺត្ត<200>អំពើអាក្រក់<200>មុខ<200>ជា<200>មាន<200></data>
+<data>•ប្រដាប់<200>ប្រដា<200>រ<200>រៀនសូត្រ<200>បន្ទប់<200>រៀន<200></data>
+<data>•ដើរតួ<200>មនុស្សគ<200>ឥត<200>បញ្ចេញ<200>យោបល់<200>សោះ<200>ឡើយ<200></data>
+<data>•មិន<200>អាច<200>ឲ្យ<200>យើង<200>ធ្វើ<200>កសិកម្ម<200>បាន<200>ឡើយ<200></data>
+<data>•បន្ត<200>សេចក្ត<200>ទៅទៀត<200></data>
+<data>•ក្រុម<200>ប៉ូលិស<200>បណ្តាក់<200>គ្នា<200></data>
+<data>•គ្មាន<200>សុខ<200>សំរាន្ត<200>ដង<200>ណា<200></data>
+<data>•បាន<200>សុខភាព<200>បរិប្បូណ៌<200></data>
+<data>•ជា<200>មេចោរ<200>ខ្ញុំ<200>នឹង<200>ស្លាប់<200>ទៅវិញ<200>ជា<200>មេចោរ<200></data>
+<data>•ឯ<200>ការ<200>វាយ<200>ផ្ចាល<200>ដែល<200>នាំ<200></data>
+<data>•គេ<200>ដឹក<200>ទៅ<200>សំឡាប់<200></data>
+#អ្នក|ដែល|ជា|មន្ត្រី|ធំ|លើ|គាត់|ទេ<200></data>
+<data>•យក<200>ទៅ<200>សម្លាប់ចោល<200>ស្ងាត់<200></data>
+<data>•ត្រូវ<200>បាន<200>គេ<200>សម្លាប់<200></data>
+<data>•នៅក្នុង<200>ស្រុក<200>ខ្ល<200>ងហ្ស៊ុន<200></data>
+
+
+#
+#  Jitterbug 3671 Test Case
+#
+<data>•สวัสดี<200>ครับ<200>สบาย<200>ดี<200>ไหม<200> •ครับ<200></data>
+
+#
+#  Trac ticket 5595 Test Case
+<data>•บท<200>ที่๑พายุ<200>ไซโคลน<200>โด<200>โรธี<200>อาศัย<200>อยู่<200>ท่ามกลาง<200>\
+ทุ่งใหญ่<200>ใน<200>แคนซัส<200>กับ<200>ลุง<200>เฮ<200>นรี<200>ชาวไร่<200>และ<200>ป้า<200>เอ็ม<200>\
+ภรรยา<200>ชาวไร่<200>บ้าน<200>ของ<200>พวก<200>เขา<200>หลัง<200>เล็ก<200>เพราะ<200>ไม้<200>\
+สร้าง<200>บ้าน<200>ต้อง<200>ขน<200>มา<200>ด้วย<200>เกวียน<200>เป็น<200>ระยะ<200>ทาง<200>หลาย<200>\
+ไมล์<200></data>
+
+####################################################################################
+#
+#  Tailored (locale specific) breaking.
+#
+####################################################################################
+
+# Japanese line break tailoring test
+
+<locale ja>
+<line>
+<data>•\u3041•\u3043•\u3045•\u31f1•</data>
+<locale en>
+<line>
+<data>•\u3041\u3043\u3045\u31f1•</data>
+
+# The following data was originally in RBBITest::TestJapaneseWordBreak()
+<locale ja>
+<word>
+<data>•\u4ECA\u65E5<400>\u306F<400>\u3044\u3044<400>\u5929\u6C17<400>\u3067\u3059<400>\u306D<400>\u3002•\u000D\u000A•</data>
+
+# UBreakIteratorType UBRK_WORD, Locale "ja"
+# Don't break in runs of hiragana or runs of ideograph, where the latter includes \u3005 \u3007 \u303B (cldrbug #2009).
+# \u79C1\u9054\u306B\u4E00\u3007\u3007\u3007\u306E\u30B3\u30F3\u30D4\u30E5\u30FC\u30BF\u304C\u3042\u308B\u3002\u5948\u3005\u306F\u30EF\u30FC\u30C9\u3067\u3042\u308B\u3002
+# modified to work with dbbi code - should verify
+
+<locale ja>
+<word>
+<data>•私<400>達<400>に<400>一<400>〇<400>〇〇<400>の<400>コンピュータ<400>が<400>ある<400>。<0>奈々<400>は<400>ワード<400>で<400>ある<400>。•</data>
+
+# Test for #10176 (in ja)
+<line>
+<data>•abc/•s •def•</data>
+<data>•abc/\u05D9 •def•</data>
+<data>•\u05E7\u05D7/\u05D9 •\u05DE\u05E2\u05D9\u05DC•</data>
+<data>•\u05D3\u05E8\u05D5\u05E9\u05D9\u05DD •\u05E9\u05D7\u05E7\u05E0\u05D9\u05DD/\u05D9\u05D5\u05EA•</data>
+
+
+<locale root>
+<word>
+<data>•私<400>達<400>に<400>一<400>〇<400>〇〇<400>の<400>コンピュータ<400>が<400>ある<400>。<0>奈々<400>は<400>ワード<400>で<400>ある<400>。•</data>
+# The following test is for #10300
+<data>•例えば<400>オーストラリア<400>。•</data>
+# The following test is for #10571
+<data>•一部<400>の<400>地域<400>では<400>、<0>ブラジル<400>、<0>インドネシア<400>、<0>オーストリア<400>、<0>ニュージーランド<400>で<400>ある<400>。•</data>
+
+# UBreakIteratorType UBRK_SENTENCE, Locale "el"
+# Add break after Greek question mark (cldrbug #2069).
+# "\u0391\u03B2, \u03B3\u03B4; \u0395 \u03B6\u03B7\u037E \u0398 \u03B9\u03BA. "
+# "\u039B\u03BC \u03BD\u03BE! \u039F\u03C0, \u03A1\u03C2? \u03A3"
+# which is "Αβ, γδ; Ε ζη; Θ ικ. Λμ νξ! Οπ, Ρς? Σ"
+
+<locale root>
+<sent>
+<data>•Αβ, γδ; Ε ζη; Θ ικ. •Λμ νξ! •Οπ, Ρς? •Σ<100></data>
+
+<locale el>
+<sent>
+<data>•Αβ, γδ; •Ε ζη; •Θ ικ. •Λμ νξ! •Οπ, Ρς? •Σ<100></data>
+
+#  UBreakIteratorType UBRK_WORD, Locale "en_US_POSIX"
+#  Words don't include colon or period (cldrbug #1969).
+
+<locale en_US>
+<word>
+<data>•Can't<200> •have<200> •breaks<200> •in<200> •xx:yy<200> •or<200> •struct.field<200> \
+•for<200> •CS<200>-•types<200>.•</data>
+<data>•\uFF92\uFF76\uFF9E<400> •</data>
+
+<locale en_US_POSIX>
+<word>
+<data>•Can't<200> •have<200> •breaks<200> •in<200> •xx<200>:•yy<200> •or<200> •struct<200>.•field<200> \
+•for<200> •CS<200>-•types<200>.•</data>
+<data>•\u06c9<200>\uc799\ufffa•</data>
+<data>•\uFF92\uFF76\uFF9E<400> •</data>
+
+
+# UBreakIteratorType UBRK_CHARACTER, Locale "th"
+# Clusters should not include spacing Thai/Lao vowels (prefix or postfix), except for [SARA] AM (cldrbug #2161).
+# Update:  As of Unicode 6.1 root has same behavior as th for this.
+#
+# "\u0E01\u0E23\u0E30\u0E17\u0E48\u0E2D\u0E21\u0E23\u0E08\u0E19\u0E32 "
+# "(\u0E2A\u0E38\u0E0A\u0E32\u0E15\u0E34-\u0E08\u0E38\u0E11\u0E32\u0E21\u0E32\u0E28) "
+# "\u0E40\u0E14\u0E47\u0E01\u0E21\u0E35\u0E1B\u0E31\u0E0D\u0E2B\u0E32 "
+# which is "กระท่อมรจนา (สุชาติ-จุฑามาศ) เด็กมีปัญหา "
+
+<locale th>
+<char>
+<data>•\u0E01•\u0E23•\u0E30•\u0E17\u0E48•\u0E2D•\u0E21•\u0E23•\u0E08•\u0E19•\u0E32• •\
+(•\u0E2A\u0E38•\u0E0A•\u0E32•\u0E15\u0E34•-•\u0E08\u0E38•\u0E11•\u0E32•\u0E21•\u0E32•\u0E28•)• •\
+\u0E40•\u0E14\u0E47•\u0E01•\u0E21\u0E35•\u0E1B\u0E31•\u0E0D•\u0E2B•\u0E32• •</data>
+
+# Finnish line breaking
+#
+# These rules deal with hyphens when there is a space on the leading side.
+# When followed by a letter, there should be a break opportunity between
+# the space and the hyphen, and not after the hyphen.
+# See CLDR ticket 3029.
+# See ICU ticket 8151
+# As of ICU 63, the Finnish tailoring behavior is moved to root.
+
+<locale root>
+<line>
+<data>•abc •- •def    •abc •-def    •abc- •def   •abc-•def•</data>   # With ASCII hyphen
+<data>•abc •‐ •def    •abc •‐def    •abc‐ •def   •abc‐•def•</data>   # With Unicode u2010 hyphen
+
+<locale fi>
+<line>
+<data>•abc •- •def    •abc •-def    •abc- •def   •abc-•def•</data>   # With ASCII hyphen
+<data>•abc •‐ •def    •abc •‐def    •abc‐ •def   •abc‐•def•</data>   # With Unicode u2010 hyphen
+
+# Test for #10176 (in fi)
+<line>
+<data>•abc/•s •def•</data>
+<data>•abc/\u05D9 •def•</data>
+<data>•\u05E7\u05D7/\u05D9 •\u05DE\u05E2\u05D9\u05DC•</data>
+<data>•\u05D3\u05E8\u05D5\u05E9\u05D9\u05DD •\u05E9\u05D7\u05E7\u05E0\u05D9\u05DD/\u05D9\u05D5\u05EA•</data>
+
+####################################################################################
+#
+#  Test CSS line break variants: strict, normal, loose
+#
+####################################################################################
+
+<locale ja@lb=strict>
+<line>
+#     •no brk before 3063              •no brk before 301C•no brk btw 2026   •no brk before FF01•
+<data>•\u3084\u3063•\u3071•\u308A\u0020•\u0031\u301C\u0020•\u2026\u2026\u0020•\u30A2\uFF01\u0020•</data>
+
+<locale ja@lb=normal>
+<line>
+#     •brk OK before 3063               •brk OK before 301C •no brk btw 2026   •no brk before FF01•
+<data>•\u3084•\u3063•\u3071•\u308A\u0020•\u0031•\u301C\u0020•\u2026\u2026\u0020•\u30A2\uFF01\u0020•</data>
+
+<locale ja@lb=loose>
+<line>
+#     •brk OK before 3063               •brk OK before 301C •brk OK btw 2026    •brk OK before FF01•
+<data>•\u3084•\u3063•\u3071•\u308A\u0020•\u0031•\u301C\u0020•\u2026•\u2026\u0020•u30A2•\uFF01\u0020•</data>
+
+<locale en@lb=strict>
+<line>
+#     •no brk before 3063              •no brk before 301C•no brk btw 2026   •no brk before FF01•
+<data>•\u3084\u3063•\u3071•\u308A\u0020•\u0031\u301C\u0020•\u2026\u2026\u0020•\u30A2\uFF01\u0020•</data>
+
+<locale en@lb=normal>
+<line>
+#     •brk OK before 3063               •no brk before 301C •no brk btw 2026  •no brk before FF01•
+<data>•\u3084•\u3063•\u3071•\u308A\u0020•\u0031\u301C\u0020•\u2026\u2026\u0020•\u30A2\uFF01\u0020•</data>
+
+<locale en@lb=loose>
+<line>
+#     •brk OK before 3063               •no brk before 301C •brk OK btw 2026   •no brk before FF01•
+<data>•\u3084•\u3063•\u3071•\u308A\u0020•\u0031\u301C\u0020•\u2026•\u2026\u0020•u30A2\uFF01\u0020•</data>
+
+####################################################################################
+#
+#  Test breaks for emoji clusters (same for all locales, mostly the same for all break types)
+#
+####################################################################################
+
+<locale root>
+
+<char>
+# woman zwj woman zwj girl zwj girl, woman/fitz-1-2 zwj woman/fitz-4 zwj boy/fitz-6
+<data>•\U0001F469\u200D\U0001F469\u200D\U0001F467\u200D\U0001F467•\U0001F469\U0001F3FB\u200D\U0001F469\U0001F3FD\u200D\U0001F466\U0001F3FF•</data>
+# woman zwj baby/fitz-3, older_woman/fitz-5, runner/fitz-4, raised_fist/fitz-3, fuel_pump, fitz-3
+#TODO: <data>•\U0001F469\u200D\U0001F476\U0001F3FC•\U0001F475\U0001F3FE•\U0001F3C3\U0001F3FD•\u270A\U0001F3FC•\u26FD•\U0001F3FC•</data>
+# man zwj hvy_blk_heart zwj man, woman, man zwj hvy_blk_heart/evar zwj man, woman
+<data>•\U0001F468\u200D\u2764\u200D\U0001F468•\U0001F469•\U0001F468\u200D\u2764\uFE0F\u200D\U0001F468•\U0001F469•</data>
+# woman zwj hvy_blk_heart/evar zwj kiss_mark zwj woman, sleuth/fitz-4, horse_racing/fitz-5
+<data>•\U0001F469\u200D\u2764\uFE0F\u200D\U0001F48B\u200D\U0001F469•\U0001F575\U0001F3FD•\U0001F3C7\U0001F3FE•</data>
+# victory_hand/evar, victory_hand/evar/fitz-1-2, victory_hand/fitz-1-2, rowboat/fitz-4, vulcan_salute/fitz-5, space,
+<data>•\u270C\uFE0F•\u270C\uFE0F\U0001F3FB•\u270C\U0001F3FB•\U0001F6A3\U0001F3FD•\U0001F596\U0001F3FE•\u0020•</data>
+# writing_hand fitz-1-2, splayed_hand/fitz-3, middle_finger/fitz-4, sign_of_horns/fitz-5, eye zwj left_speech_bubble, space
+<data>•\u270D\U0001F3FB•\U0001F590\U0001F3FC•\U0001F595\U0001F3FD•\U0001F918\U0001F3FE•\U0001F441\u200D\U0001F5E8•\u0020•</data>
+# family (man, boy, boy), family (woman, girl), space
+<data>•\U0001F468\u200D\U0001F466\u200D\U0001F466•\U0001F469\u200D\U0001F467•\u0020•</data>
+# rainbow flag using evar, rainbow flag no evar, space
+<data>•\U0001F3F3\uFE0F\u200D\U0001F308•\U0001F3F3\u200D\U0001F308•\u0020•</data>
+# woman with ball using evar, woman with ball no evar, woman with ball fitz 4 using evar, woman with ball fitz 4 no evar, space
+<data>•\u26F9\uFE0F\u200D\u2640\uFE0F•\u26F9\u200D\u2640•\u26F9\U0001F3FD\u200D\u2640\uFE0F•\u26F9\U0001F3FD\u200D\u2640•\u0020•</data>
+# woman runner using evar, woman runner no evar, woman runner fitz 4 using evar, woman runner fitz 4 no evar, space
+<data>•\U0001F3C3\u200D\u2640\uFE0F•\U0001F3C3\u200D\u2640•\U0001F3C3\U0001F3FD\u200D\u2640\uFE0F•\U0001F3C3\U0001F3FD\u200D\u2640•\u0020•</data>
+# 9.0 + professions
+# black heart, fitz 4, squid, fitz4, man dancing /fitz4, mother xmas /fitz4
+#TODO: <data>•\U0001F5A4•\U0001F3FD•\U0001F991•\U0001F3FD•\U0001F57A\U0001F3FD•\U0001F936\U0001F3FD•\u0020•</data>
+# facepalm, facepalm / fitz4, facepalm + woman +var, facepalm + woman -var, facepalm/fitz4 + woman +var, facepalm/fitz4 + woman -var
+<data>•\U0001F926•\U0001F926\U0001F3FD•\U0001F926\u200D\u2640\uFE0F•\U0001F926\u200D\u2640•\U0001F926\U0001F3FD\u200D\u2640\uFE0F•\U0001F926\U0001F3FD\u200D\u2640•\u0020•</data>
+# handball, handball / fitz4, handball + man +var, handball + man -var, handball/fitz4 + man +var, handball/fitz4 + man -var
+<data>•\U0001F93E•\U0001F93E\U0001F3FD•\U0001F93E\u200D\u2642\uFE0F•\U0001F93E\u200D\u2642•\U0001F93E\U0001F3FD\u200D\u2642\uFE0F•\U0001F93E\U0001F3FD\u200D\u2642•\u0020•</data>
+# man health worker +var, man health worker -var, man health worker / fitz4 +var, man health worker / fitz4 -var
+<data>•\U0001F468\u200D\u2695\uFE0F•\U0001F468\u200D\u2695•\U0001F468\U0001F3FD\u200D\u2695\uFE0F•\U0001F468\U0001F3FD\u200D\u2695•\u0020•</data>
+# woman astronaut, woman astronaut / fitz4
+<data>•\U0001F469\u200D\U0001F680•\U0001F469\U0001F3FD\u200D\U0001F680•\u0020•</data>
+# modifier bases added in emoji 4.0
+# SNOWBOARDER/fitz-3, HORSE RACING/fitz-4, GOLFER/fitz-5, MAN IN BUSINESS SUIT LEVITATING/fitz-6, SLEEPING ACCOMMODATION/fitz-12, space
+<data>•\U0001F3C2\U0001F3FC•\U0001F3C7\U0001F3FD•\U0001F3CC\U0001F3FE•\U0001F574\U0001F3FF•\U0001F6CC\U0001F3FB•\u0020•</data>
+# test kiss: man, man with variation selector
+<data>•\U0001F468\u200D\u2764\uFE0F\u200D\U0001F48B\u200D\U0001F468•\u0020•</data>
+
+# flags1    AE AF AL AM AO AR AT
+<data>•\U0001F1E6\U0001F1EA•\U0001F1E6\U0001F1EB•\U0001F1E6\U0001F1F1•\U0001F1E6\U0001F1F2•\U0001F1E6\U0001F1F4•\U0001F1E6\U0001F1F7•\U0001F1E6\U0001F1F9•</data>
+# flags2    AU AZ BA BD BE BF BG
+<data>•\U0001F1E6\U0001F1FA•\U0001F1E6\U0001F1FF•\U0001F1E7\U0001F1E6•\U0001F1E7\U0001F1E9•\U0001F1E7\U0001F1EA•\U0001F1E7\U0001F1EB•\U0001F1E7\U0001F1EC•</data>
+# flags3    BH BJ BN BO BR BS BT
+<data>•\U0001F1E7\U0001F1ED•\U0001F1E7\U0001F1EF•\U0001F1E7\U0001F1F3•\U0001F1E7\U0001F1F4•\U0001F1E7\U0001F1F7•\U0001F1E7\U0001F1F8•\U0001F1E7\U0001F1F9•</data>
+# flags4    BW BY BZ CA CD CF CG
+<data>•\U0001F1E7\U0001F1FC•\U0001F1E7\U0001F1FE•\U0001F1E7\U0001F1FF•\U0001F1E8\U0001F1E6•\U0001F1E8\U0001F1E9•\U0001F1E8\U0001F1EB•\U0001F1E8\U0001F1EC•</data>
+# flags5    CH CI CL CM CN CO CR
+<data>•\U0001F1E8\U0001F1ED•\U0001F1E8\U0001F1EE•\U0001F1E8\U0001F1F1•\U0001F1E8\U0001F1F2•\U0001F1E8\U0001F1F3•\U0001F1E8\U0001F1F4•\U0001F1E8\U0001F1F7•</data>
+# flags6    CU CV CY CZ DE DJ DK
+<data>•\U0001F1E8\U0001F1FA•\U0001F1E8\U0001F1FB•\U0001F1E8\U0001F1FE•\U0001F1E8\U0001F1FF•\U0001F1E9\U0001F1EA•\U0001F1E9\U0001F1EF•\U0001F1E9\U0001F1F0•</data>
+# flags7    DM DO DZ EC EE EG ER
+<data>•\U0001F1E9\U0001F1F2•\U0001F1E9\U0001F1F4•\U0001F1E9\U0001F1FF•\U0001F1EA\U0001F1E8•\U0001F1EA\U0001F1EA•\U0001F1EA\U0001F1EC•\U0001F1EA\U0001F1F7•</data>
+# flags8    ES ET FI FJ FR GA GB
+<data>•\U0001F1EA\U0001F1F8•\U0001F1EA\U0001F1F9•\U0001F1EB\U0001F1EE•\U0001F1EB\U0001F1EF•\U0001F1EB\U0001F1F7•\U0001F1EC\U0001F1E6•\U0001F1EC\U0001F1E7•</data>
+# flags9    GE GH GM GN GR GT GW
+<data>•\U0001F1EC\U0001F1EA•\U0001F1EC\U0001F1ED•\U0001F1EC\U0001F1F2•\U0001F1EC\U0001F1F3•\U0001F1EC\U0001F1F7•\U0001F1EC\U0001F1F9•\U0001F1EC\U0001F1FC•</data>
+# flags10   GY HK HN HR HT HU ID
+<data>•\U0001F1EC\U0001F1FE•\U0001F1ED\U0001F1F0•\U0001F1ED\U0001F1F3•\U0001F1ED\U0001F1F7•\U0001F1ED\U0001F1F9•\U0001F1ED\U0001F1FA•\U0001F1EE\U0001F1E9•</data>
+# flags11   IE IL IN IQ IR IS IT
+<data>•\U0001F1EE\U0001F1EA•\U0001F1EE\U0001F1F1•\U0001F1EE\U0001F1F3•\U0001F1EE\U0001F1F6•\U0001F1EE\U0001F1F7•\U0001F1EE\U0001F1F8•\U0001F1EE\U0001F1F9•</data>
+# flags12   JM JO JP KE KG KH KR
+<data>•\U0001F1EF\U0001F1F2•\U0001F1EF\U0001F1F4•\U0001F1EF\U0001F1F5•\U0001F1F0\U0001F1EA•\U0001F1F0\U0001F1EC•\U0001F1F0\U0001F1ED•\U0001F1F0\U0001F1F7•</data>
+# flags13   MX MY NL NO PL PT
+<data>•\U0001F1F2\U0001F1FD•\U0001F1F2\U0001F1FE•\U0001F1F3\U0001F1F1•\U0001F1F3\U0001F1F4•\U0001F1F5\U0001F1F1•\U0001F1F5\U0001F1F9•</data>
+# flags14   RO RU SA SE SK TH TR
+<data>•\U0001F1F7\U0001F1F4•\U0001F1F7\U0001F1FA•\U0001F1F8\U0001F1E6•\U0001F1F8\U0001F1EA•\U0001F1F8\U0001F1F0•\U0001F1F9\U0001F1ED•\U0001F1F9\U0001F1F7•</data>
+# flags15   UA US VN XK ZW
+<data>•\U0001F1FA\U0001F1E6•\U0001F1FA\U0001F1F8•\U0001F1FB\U0001F1F3•\U0001F1FD\U0001F1F0•\U0001F1FF\U0001F1FC•</data>
+# flagsX1   ES ES ES SE SE SE
+<data>•\U0001F1EA\U0001F1F8•\U0001F1EA\U0001F1F8•\U0001F1EA\U0001F1F8•\U0001F1F8\U0001F1EA•\U0001F1F8\U0001F1EA•\U0001F1F8\U0001F1EA•</data>
+# flagsX2   GB GB GB BG BG BG
+<data>•\U0001F1EC\U0001F1E7•\U0001F1EC\U0001F1E7•\U0001F1EC\U0001F1E7•\U0001F1E7\U0001F1EC•\U0001F1E7\U0001F1EC•\U0001F1E7\U0001F1EC•</data>
+# flagsXtnd AE AF AL AM AO AR
+<data>•\U0001F1E6\U0001F1EA\u200C•\U0001F1E6\U0001F1EB\u200C•\U0001F1E6\U0001F1F1\u200C•\U0001F1E6\U0001F1F2\u0300•\U0001F1E6\U0001F1F4\u20DE•\U0001F1E6\U0001F1F7\u200C•</data>
+
+<word>
+# woman zwj woman zwj girl zwj girl, woman/fitz-1-2 zwj woman/fitz-4 zwj boy/fitz-6
+<data>•\U0001F469\u200D\U0001F469\u200D\U0001F467\u200D\U0001F467•\U0001F469\U0001F3FB\u200D\U0001F469\U0001F3FD\u200D\U0001F466\U0001F3FF•</data>
+# woman zwj baby/fitz-3, older_woman/fitz-5, runner/fitz-4, raised_fist/fitz-3, fuel_pump, fitz-3
+#TODO: <data>•\U0001F469\u200D\U0001F476\U0001F3FC•\U0001F475\U0001F3FE•\U0001F3C3\U0001F3FD•\u270A\U0001F3FC•\u26FD•\U0001F3FC•</data>
+# man zwj hvy_blk_heart zwj man, woman, man zwj hvy_blk_heart/evar zwj man, woman
+<data>•\U0001F468\u200D\u2764\u200D\U0001F468•\U0001F469•\U0001F468\u200D\u2764\uFE0F\u200D\U0001F468•\U0001F469•</data>
+# woman zwj hvy_blk_heart/evar zwj kiss_mark zwj woman, sleuth/fitz-4, horse_racing/fitz-5
+<data>•\U0001F469\u200D\u2764\uFE0F\u200D\U0001F48B\u200D\U0001F469•\U0001F575\U0001F3FD•\U0001F3C7\U0001F3FE•</data>
+# victory_hand/evar, victory_hand/evar/fitz-1-2, victory_hand/fitz-1-2, rowboat/fitz-4, vulcan_salute/fitz-5, space,
+<data>•\u270C\uFE0F•\u270C\uFE0F\U0001F3FB•\u270C\U0001F3FB•\U0001F6A3\U0001F3FD•\U0001F596\U0001F3FE•\u0020•</data>
+# writing_hand fitz-1-2, splayed_hand/fitz-3, middle_finger/fitz-4, sign_of_horns/fitz-5, eye zwj left_speech_bubble, space
+<data>•\u270D\U0001F3FB•\U0001F590\U0001F3FC•\U0001F595\U0001F3FD•\U0001F918\U0001F3FE•\U0001F441\u200D\U0001F5E8•\u0020•</data>
+# family (man, boy, boy), family (woman, girl), space
+<data>•\U0001F468\u200D\U0001F466\u200D\U0001F466•\U0001F469\u200D\U0001F467•\u0020•</data>
+# rainbow flag using evar, rainbow flag no evar, space
+<data>•\U0001F3F3\uFE0F\u200D\U0001F308•\U0001F3F3\u200D\U0001F308•\u0020•</data>
+# woman with ball using evar, woman with ball no evar, woman with ball fitz 4 using evar, woman with ball fitz 4 no evar, space
+<data>•\u26F9\uFE0F\u200D\u2640\uFE0F•\u26F9\u200D\u2640•\u26F9\U0001F3FD\u200D\u2640\uFE0F•\u26F9\U0001F3FD\u200D\u2640•\u0020•</data>
+# woman runner using evar, woman runner no evar, woman runner fitz 4 using evar, woman runner fitz 4 no evar, space
+<data>•\U0001F3C3\u200D\u2640\uFE0F•\U0001F3C3\u200D\u2640•\U0001F3C3\U0001F3FD\u200D\u2640\uFE0F•\U0001F3C3\U0001F3FD\u200D\u2640•\u0020•</data>
+# 9.0 + professions
+# black heart, fitz 4, squid, fitz4, man dancing /fitz4, mother xmas /fitz4
+#TODO: <data>•\U0001F5A4•\U0001F3FD•\U0001F991•\U0001F3FD•\U0001F57A\U0001F3FD•\U0001F936\U0001F3FD•\u0020•</data>
+# facepalm, facepalm / fitz4, facepalm + woman +evar, facepalm + woman -evar, facepalm/fitz4 + woman +evar, facepalm/fitz4 + woman -evar
+<data>•\U0001F926•\U0001F926\U0001F3FD•\U0001F926\u200D\u2640\uFE0F•\U0001F926\u200D\u2640•\U0001F926\U0001F3FD\u200D\u2640\uFE0F•\U0001F926\U0001F3FD\u200D\u2640•\u0020•</data>
+# handball, handball / fitz4, handball + man +evar, handball + man -evar, handball/fitz4 + man +evar, handball/fitz4 + man -evar
+<data>•\U0001F93E•\U0001F93E\U0001F3FD•\U0001F93E\u200D\u2642\uFE0F•\U0001F93E\u200D\u2642•\U0001F93E\U0001F3FD\u200D\u2642\uFE0F•\U0001F93E\U0001F3FD\u200D\u2642•\u0020•</data>
+# man health worker +evar, man health worker -evar, man health worker / fitz4 +evar, man health worker / fitz4 -evar
+<data>•\U0001F468\u200D\u2695\uFE0F•\U0001F468\u200D\u2695•\U0001F468\U0001F3FD\u200D\u2695\uFE0F•\U0001F468\U0001F3FD\u200D\u2695•\u0020•</data>
+# woman astronaut, woman astronaut / fitz4
+<data>•\U0001F469\u200D\U0001F680•\U0001F469\U0001F3FD\u200D\U0001F680•\u0020•</data>
+# modifier bases added in emoji 4.0
+# SNOWBOARDER/fitz-3, HORSE RACING/fitz-4, GOLFER/fitz-5, MAN IN BUSINESS SUIT LEVITATING/fitz-6, SLEEPING ACCOMMODATION/fitz-12, space
+<data>•\U0001F3C2\U0001F3FC•\U0001F3C7\U0001F3FD•\U0001F3CC\U0001F3FE•\U0001F574\U0001F3FF•\U0001F6CC\U0001F3FB•\u0020•</data>
+
+# flags1    AE AF AL AM AO AR AT
+<data>•\U0001F1E6\U0001F1EA•\U0001F1E6\U0001F1EB•\U0001F1E6\U0001F1F1•\U0001F1E6\U0001F1F2•\U0001F1E6\U0001F1F4•\U0001F1E6\U0001F1F7•\U0001F1E6\U0001F1F9•</data>
+# flags2    AU AZ BA BD BE BF BG
+<data>•\U0001F1E6\U0001F1FA•\U0001F1E6\U0001F1FF•\U0001F1E7\U0001F1E6•\U0001F1E7\U0001F1E9•\U0001F1E7\U0001F1EA•\U0001F1E7\U0001F1EB•\U0001F1E7\U0001F1EC•</data>
+# flags3    BH BJ BN BO BR BS BT
+<data>•\U0001F1E7\U0001F1ED•\U0001F1E7\U0001F1EF•\U0001F1E7\U0001F1F3•\U0001F1E7\U0001F1F4•\U0001F1E7\U0001F1F7•\U0001F1E7\U0001F1F8•\U0001F1E7\U0001F1F9•</data>
+# flags4    BW BY BZ CA CD CF CG
+<data>•\U0001F1E7\U0001F1FC•\U0001F1E7\U0001F1FE•\U0001F1E7\U0001F1FF•\U0001F1E8\U0001F1E6•\U0001F1E8\U0001F1E9•\U0001F1E8\U0001F1EB•\U0001F1E8\U0001F1EC•</data>
+# flags5    CH CI CL CM CN CO CR
+<data>•\U0001F1E8\U0001F1ED•\U0001F1E8\U0001F1EE•\U0001F1E8\U0001F1F1•\U0001F1E8\U0001F1F2•\U0001F1E8\U0001F1F3•\U0001F1E8\U0001F1F4•\U0001F1E8\U0001F1F7•</data>
+# flags6    CU CV CY CZ DE DJ DK
+<data>•\U0001F1E8\U0001F1FA•\U0001F1E8\U0001F1FB•\U0001F1E8\U0001F1FE•\U0001F1E8\U0001F1FF•\U0001F1E9\U0001F1EA•\U0001F1E9\U0001F1EF•\U0001F1E9\U0001F1F0•</data>
+# flags7    DM DO DZ EC EE EG ER
+<data>•\U0001F1E9\U0001F1F2•\U0001F1E9\U0001F1F4•\U0001F1E9\U0001F1FF•\U0001F1EA\U0001F1E8•\U0001F1EA\U0001F1EA•\U0001F1EA\U0001F1EC•\U0001F1EA\U0001F1F7•</data>
+# flags8    ES ET FI FJ FR GA GB
+<data>•\U0001F1EA\U0001F1F8•\U0001F1EA\U0001F1F9•\U0001F1EB\U0001F1EE•\U0001F1EB\U0001F1EF•\U0001F1EB\U0001F1F7•\U0001F1EC\U0001F1E6•\U0001F1EC\U0001F1E7•</data>
+# flags9    GE GH GM GN GR GT GW
+<data>•\U0001F1EC\U0001F1EA•\U0001F1EC\U0001F1ED•\U0001F1EC\U0001F1F2•\U0001F1EC\U0001F1F3•\U0001F1EC\U0001F1F7•\U0001F1EC\U0001F1F9•\U0001F1EC\U0001F1FC•</data>
+# flags10   GY HK HN HR HT HU ID
+<data>•\U0001F1EC\U0001F1FE•\U0001F1ED\U0001F1F0•\U0001F1ED\U0001F1F3•\U0001F1ED\U0001F1F7•\U0001F1ED\U0001F1F9•\U0001F1ED\U0001F1FA•\U0001F1EE\U0001F1E9•</data>
+# flags11   IE IL IN IQ IR IS IT
+<data>•\U0001F1EE\U0001F1EA•\U0001F1EE\U0001F1F1•\U0001F1EE\U0001F1F3•\U0001F1EE\U0001F1F6•\U0001F1EE\U0001F1F7•\U0001F1EE\U0001F1F8•\U0001F1EE\U0001F1F9•</data>
+# flags12   JM JO JP KE KG KH KR
+<data>•\U0001F1EF\U0001F1F2•\U0001F1EF\U0001F1F4•\U0001F1EF\U0001F1F5•\U0001F1F0\U0001F1EA•\U0001F1F0\U0001F1EC•\U0001F1F0\U0001F1ED•\U0001F1F0\U0001F1F7•</data>
+# flags13   MX MY NL NO PL PT
+<data>•\U0001F1F2\U0001F1FD•\U0001F1F2\U0001F1FE•\U0001F1F3\U0001F1F1•\U0001F1F3\U0001F1F4•\U0001F1F5\U0001F1F1•\U0001F1F5\U0001F1F9•</data>
+# flags14   RO RU SA SE SK TH TR
+<data>•\U0001F1F7\U0001F1F4•\U0001F1F7\U0001F1FA•\U0001F1F8\U0001F1E6•\U0001F1F8\U0001F1EA•\U0001F1F8\U0001F1F0•\U0001F1F9\U0001F1ED•\U0001F1F9\U0001F1F7•</data>
+# flags15   UA US VN XK ZW
+<data>•\U0001F1FA\U0001F1E6•\U0001F1FA\U0001F1F8•\U0001F1FB\U0001F1F3•\U0001F1FD\U0001F1F0•\U0001F1FF\U0001F1FC•</data>
+# flagsX1   ES ES ES SE SE SE
+<data>•\U0001F1EA\U0001F1F8•\U0001F1EA\U0001F1F8•\U0001F1EA\U0001F1F8•\U0001F1F8\U0001F1EA•\U0001F1F8\U0001F1EA•\U0001F1F8\U0001F1EA•</data>
+# flagsX2   GB GB GB BG BG BG
+<data>•\U0001F1EC\U0001F1E7•\U0001F1EC\U0001F1E7•\U0001F1EC\U0001F1E7•\U0001F1E7\U0001F1EC•\U0001F1E7\U0001F1EC•\U0001F1E7\U0001F1EC•</data>
+# flagsXtnd AE AF AL AM AO AR
+<data>•\U0001F1E6\U0001F1EA\u200C•\U0001F1E6\U0001F1EB\u200C•\U0001F1E6\U0001F1F1\u200C•\U0001F1E6\U0001F1F2\u0300•\U0001F1E6\U0001F1F4\u20DE•\U0001F1E6\U0001F1F7\u200C•</data>
+
+<line>
+# woman zwj woman zwj girl zwj girl
+<data>•\U0001F469\u200D\U0001F469\u200D\U0001F467\u200D\U0001F467•</data>
+# woman zwj baby/fitz-3, older_woman/fitz-5, runner/fitz-4, raised_fist/fitz-3, fuel_pump, fitz-3
+<data>•\U0001F469\u200D\U0001F476\U0001F3FC•\U0001F475\U0001F3FE•\U0001F3C3\U0001F3FD•\u270A\U0001F3FC•\u26FD•\U0001F3FC•</data>
+# man zwj hvy_blk_heart zwj man, woman, man zwj hvy_blk_heart/evar zwj man, woman
+<data>•\U0001F468\u200D\u2764\u200D\U0001F468•\U0001F469•\U0001F468\u200D\u2764\uFE0F\u200D\U0001F468•\U0001F469•</data>
+# woman zwj hvy_blk_heart/evar zwj kiss_mark zwj woman, sleuth/fitz-4, horse_racing/fitz-5
+<data>•\U0001F469\u200D\u2764\uFE0F\u200D\U0001F48B\u200D\U0001F469•\U0001F575\U0001F3FD•\U0001F3C7\U0001F3FE•</data>
+# victory_hand/evar, victory_hand/evar/fitz-1-2, victory_hand/fitz-1-2, rowboat/fitz-4, vulcan_salute/fitz-5 space,
+<data>•\u270C\uFE0F•\u270C\uFE0F\U0001F3FB•\u270C\U0001F3FB•\U0001F6A3\U0001F3FD•\U0001F596\U0001F3FE\u0020•</data>
+# writing_hand fitz-1-2, splayed_hand/fitz-3, middle_finger/fitz-4, sign_of_horns/fitz-5, eye zwj left_speech_bubble, space
+<data>•\u270D\U0001F3FB•\U0001F590\U0001F3FC•\U0001F595\U0001F3FD•\U0001F918\U0001F3FE•\U0001F441\u200D\U0001F5E8\u0020•</data>
+# family (man, boy, boy), family (woman, girl), space
+<data>•\U0001F468\u200D\U0001F466\u200D\U0001F466•\U0001F469\u200D\U0001F467\u0020•</data>
+# rainbow flag using evar, rainbow flag no evar, space
+<data>•\U0001F3F3\uFE0F\u200D\U0001F308•\U0001F3F3\u200D\U0001F308\u0020•</data>
+# woman with ball using evar, woman with ball no evar, woman with ball fitz 4 using evar, woman with ball fitz 4 no evar, space
+<data>•\u26F9\uFE0F\u200D\u2640\uFE0F•\u26F9\u200D\u2640•\u26F9\U0001F3FD\u200D\u2640\uFE0F•\u26F9\U0001F3FD\u200D\u2640\u0020•</data>
+# woman runner using evar, woman runner no evar, woman runner fitz 4 using evar, woman runner fitz 4 no evar, space
+<data>•\U0001F3C3\u200D\u2640\uFE0F•\U0001F3C3\u200D\u2640•\U0001F3C3\U0001F3FD\u200D\u2640\uFE0F•\U0001F3C3\U0001F3FD\u200D\u2640\u0020•</data>
+# 9.0 + professions
+# black heart, fitz 4, squid, fitz4, man dancing /fitz4, mother xmas /fitz4
+<data>•\U0001F5A4•\U0001F3FD•\U0001F991•\U0001F3FD•\U0001F57A\U0001F3FD•\U0001F936\U0001F3FD\u0020•</data>
+# facepalm, facepalm / fitz4, facepalm + woman +evar, facepalm + woman -evar, facepalm/fitz4 + woman +evar, facepalm/fitz4 + woman -evar
+<data>•\U0001F926•\U0001F926\U0001F3FD•\U0001F926\u200D\u2640\uFE0F•\U0001F926\u200D\u2640•\U0001F926\U0001F3FD\u200D\u2640\uFE0F•\U0001F926\U0001F3FD\u200D\u2640\u0020•</data>
+# handball, handball / fitz4, handball + man +evar, handball + man -evar, handball/fitz4 + man +evar, handball/fitz4 + man -evar
+<data>•\U0001F93E•\U0001F93E\U0001F3FD•\U0001F93E\u200D\u2642\uFE0F•\U0001F93E\u200D\u2642•\U0001F93E\U0001F3FD\u200D\u2642\uFE0F•\U0001F93E\U0001F3FD\u200D\u2642\u0020•</data>
+# man health worker +evar, man health worker -evar, man health worker / fitz4 +evar, man health worker / fitz4 -evar
+<data>•\U0001F468\u200D\u2695\uFE0F•\U0001F468\u200D\u2695•\U0001F468\U0001F3FD\u200D\u2695\uFE0F•\U0001F468\U0001F3FD\u200D\u2695\u0020•</data>
+# woman astronaut, woman astronaut / fitz4
+<data>•\U0001F469\u200D\U0001F680•\U0001F469\U0001F3FD\u200D\U0001F680\u0020•</data>
+# modifier bases added in emoji 4.0
+# SNOWBOARDER/fitz-3, HORSE RACING/fitz-4, GOLFER/fitz-5, MAN IN BUSINESS SUIT LEVITATING/fitz-6, SLEEPING ACCOMMODATION/fitz-12 space
+<data>•\U0001F3C2\U0001F3FC•\U0001F3C7\U0001F3FD•\U0001F3CC\U0001F3FE•\U0001F574\U0001F3FF•\U0001F6CC\U0001F3FB\u0020•</data>
+
+<locale ja@lb=loose>
+<line>
+# woman zwj woman zwj girl zwj girl
+<data>•\U0001F469\u200D\U0001F469\u200D\U0001F467\u200D\U0001F467•</data>
+# woman zwj baby/fitz-3, older_woman/fitz-5, runner/fitz-4, raised_fist/fitz-3, fuel_pump, fitz-3
+<data>•\U0001F469\u200D\U0001F476\U0001F3FC•\U0001F475\U0001F3FE•\U0001F3C3\U0001F3FD•\u270A\U0001F3FC•\u26FD•\U0001F3FC•</data>
+# man zwj hvy_blk_heart zwj man, woman, man zwj hvy_blk_heart/evar zwj man, woman
+<data>•\U0001F468\u200D\u2764\u200D\U0001F468•\U0001F469•\U0001F468\u200D\u2764\uFE0F\u200D\U0001F468•\U0001F469•</data>
+# woman zwj hvy_blk_heart/evar zwj kiss_mark zwj woman, sleuth/fitz-4, horseRacing/fitz-5
+<data>•\U0001F469\u200D\u2764\uFE0F\u200D\U0001F48B\u200D\U0001F469•\U0001F575\U0001F3FD•\U0001F3C7\U0001F3FE•</data>
+# victory_hand/evar, victory_hand/evar/fitz-1-2, victory_hand/fitz-1-2, rowboat/fitz-4, vulcan_salute/fitz-5 space,
+<data>•\u270C\uFE0F•\u270C\uFE0F\U0001F3FB•\u270C\U0001F3FB•\U0001F6A3\U0001F3FD•\U0001F596\U0001F3FE\u0020•</data>
+# writing_hand fitz-1-2, splayed_hand/fitz-3, middle_finger/fitz-4, sign_of_horns/fitz-5, eye zwj left_speech_bubble, space
+<data>•\u270D\U0001F3FB•\U0001F590\U0001F3FC•\U0001F595\U0001F3FD•\U0001F918\U0001F3FE•\U0001F441\u200D\U0001F5E8\u0020•</data>
+# 9.0 + professions
+# black heart, fitz 4, squid, fitz4, man dancing /fitz4, mother xmas /fitz4
+<data>•\U0001F5A4•\U0001F3FD•\U0001F991•\U0001F3FD•\U0001F57A\U0001F3FD•\U0001F936\U0001F3FD\u0020•</data>
+# facepalm, facepalm / fitz4, facepalm + woman +evar, facepalm + woman -evar, facepalm/fitz4 + woman +evar, facepalm/fitz4 + woman -evar
+<data>•\U0001F926•\U0001F926\U0001F3FD•\U0001F926\u200D\u2640\uFE0F•\U0001F926\u200D\u2640•\U0001F926\U0001F3FD\u200D\u2640\uFE0F•\U0001F926\U0001F3FD\u200D\u2640\u0020•</data>
+# handball, handball / fitz4, handball + man +evar, handball + man -evar, handball/fitz4 + man +evar, handball/fitz4 + man -evar
+<data>•\U0001F93E•\U0001F93E\U0001F3FD•\U0001F93E\u200D\u2642\uFE0F•\U0001F93E\u200D\u2642•\U0001F93E\U0001F3FD\u200D\u2642\uFE0F•\U0001F93E\U0001F3FD\u200D\u2642\u0020•</data>
+# man health worker +evar, man health worker -evar, man health worker / fitz4 +evar, man health worker / fitz4 -evar
+<data>•\U0001F468\u200D\u2695\uFE0F•\U0001F468\u200D\u2695•\U0001F468\U0001F3FD\u200D\u2695\uFE0F•\U0001F468\U0001F3FD\u200D\u2695\u0020•</data>
+# woman astronaut, woman astronaut / fitz4
+<data>•\U0001F469\u200D\U0001F680•\U0001F469\U0001F3FD\u200D\U0001F680\u0020•</data>
+
+
+####################################################################################
+#
+#  Test rule status values
+#
+####################################################################################
+<rules> $Letters = [:L:];
+    $Numbers = [:N:];
+    $Letters+{1};
+    $Numbers+{2};
+    Help\ me\!{4};
+    [^$Letters $Numbers];
+    !.*;
+</rules>
+<data>•abc<1>123<2>.•.•abc<1> •Help<1> •me<1> •Help me!<4></data>
+
+# Test option to prohibit unquoted literals.
+
+<rules>
+!!forward;
+    Hello\ World;
+!!safe_reverse;
+    .*;
+</rules>
+<data>•Hello World•</data>
+
+<badrules>
+!!quoted_literals_only;
+!!forward;
+    Hello\ World;
+!!safe_reverse;
+    .*;
+</badrules>
+
+<rules>
+!!quoted_literals_only;
+!!forward;
+    'Hello World';
+!!safe_reverse;
+    .*;
+</rules>
+<data>•Hello World•</data>
+
+
+# Test for circular buffer overflow during reverse iteration with inefficient reverse rules,
+# Too many boundaries between safe back up position and current position.
+
+<rules>
+!!forward;
+.;
+!!safe_reverse;
+.*;
+</rules>
+<data>•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•a•</data>
+
+#
+#  Dictionary regression check
+#    Intended to find unexpected behavior changes when changing dictionary implementation code,
+#    but may also be fragile, failing with intended improvements to dictionary breaking.
+#
+<locale en>
+<word>
+<data>•Unicode<200> •คือ<200>อะไร<200>?•
+•Unicode<200> •กำหนด<200>หมายเลข<200>เฉพาะ<200>สำหรับ<200>ทุก<200>อักขระ<200>
+•โดย<200>ไม่<200>สนใจ<200>ว่า<200>เป็น<200>แพ<200>ล็ต<200>ฟอร์ม<200>ใด<200>
+•ไม่<200>ขึ้น<200>กับ<200>ว่า<200>จะ<200>เป็น<200>โปรแกรม<200>ใด<200>
+•และ<200>ไม่<200>ว่า<200>จะ<200>เป็น<200>ภาษา<200>ใด<200>
+•
+•โดย<200>พื้น<200>ฐาน<200>แล้ว<200>,• •คอมพิวเตอร์<200>จะ<200>เกี่ยวข้อง<200>กับ<200>เรื่อง<200>ของ<200>ตัวเลข<200>.• •คอมพิวเตอร์<200>จัด<200>เก็บ<200>ตัว<200>อักษร<200>และ<200>อักข<200>ระ<200>อื่นๆ<200> •โดย<200>การ<200>กำหนด<200>หมายเลข<200>ให้<200>สำหรับ<200>แต่ละ<200>ตัว<200>.• •ก่อน<200>หน้า<200>ที่๊<200> •Unicode<200> •จะ<200>ถูก<200>สร้าง<200>ขึ้น<200>,• •ได้<200>มี<200>ระบบ<200> •encoding<200> •อยู่<200>หลาย<200>ร้อย<200>ระบบ<200>สำหรับ<200>การ<200>กำหนด<200>หมายเลข<200>เหล่า<200>นี้<200>.• •ไม่มี<200> •encoding<200> •ใด<200>ที่<200>มี<200>จำนวน<200>ตัว<200>อักขระ<200>มาก<200>เพียง<200>พอ<200>:• •ยก<200>ตัวอย่าง<200>เช่น<200>,• •เฉพาะ<200>ใน<200>กลุ่ม<200>สหภาพ<200>ยุโรป<200>เพียง<200>แห่ง<200>เดียว<200> •ก็<200>ต้องการ<200>หลาย<200> •encoding<200> •ใน<200>การ<200>ครอบคลุม<200>ทุก<200>ภาษา<200>ใน<200>กลุ่ม<200>.• •หรือ<200>แม้แต่<200>ใน<200>ภาษา<200>เดี่ยว<200> •เช่น<200> •ภาษา<200>อังกฤษ<200> •ก็<200>ไม่มี<200> •encoding<200> •ใด<200>ที่<200>เพียง<200>พอ<200>สำหรับ<200>ทุก<200>ตัว<200>อักษร<200>,• •เครื่องหมาย<200>วรรค<200>ตอน<200> •และ<200>สัญลักษณ์<200>ทาง<200>เทคนิค<200>ที่<200>ใช้<200>กัน<200>อยู่<200>ทั่วไป<200>.•
+•
+•ระบบ<200> •encoding<200> •เหล่า<200>นี้<200>ยัง<200>ขัด<200>แย้ง<200>ซึ่ง<200>กัน<200>และ<200>กัน<200>.• •นั่น<200>ก็<200>คือ<200>,• •ใน<200>สอง<200> •encoding<200> •สามารถ<200>ใช้<200>หมายเลข<200>เดียวกัน<200>สำหรับ<200>ตัว<200>อักขระ<200>สอง<200>ตัว<200>ที่<200>แตก<200>ต่าง<200>กัน<200>,•หรือ<200>ใช้<200>หมายเลข<200>ต่าง<200>กัน<200>สำหรับ<200>อักขระ<200>ตัว<200>เดียวกัน<200>.• •ใน<200>ระบบ<200>คอมพิวเตอร์<200> •(•โดย<200>เฉพาะ<200>เซิร์ฟเวอร์<200>)• •ต้อง<200>มี<200>การ<200>สนับสนุน<200>หลาย<200> •encoding<200>;• •และ<200>เมื่อ<200>ข้อมูล<200>ที่<200>ผ่าน<200>ไป<200>มาระ<200>หว่าง<200>การ<200>เข้า<200>รหัส<200>หรือ<200>แพ<200>ล็ต<200>ฟอร์ม<200>ที่<200>ต่าง<200>กัน<200>,• •ข้อมูล<200>นั้น<200>จะ<200>เสี่ยง<200>ต่อ<200>การ<200>ผิด<200>พลาด<200>เสีย<200>หาย<200>.•
+•
+•Unicode<200> •จะ<200>เปลี่ยนแปลง<200>สิ่ง<200>เหล่า<200>นั้น<200>ทั้งหมด<200>!•
+•
+•Unicode<200> •กำหนด<200>หมายเลข<200>เฉพาะ<200>สำหรับ<200>แต่ละ<200>อักขระ<200>,• •โดย<200>ไม่<200>สนใจ<200>ว่า<200>เป็น<200>แพ<200>ล็ต<200>ฟอร์ม<200>ใด<200>,• •ไม่<200>ขึ้น<200>กับ<200>ว่า<200>จะ<200>เป็น<200>โปรแกรม<200>ใด<200>และ<200>ไม่<200>ว่า<200>จะ<200>เป็น<200>ภาษา<200>ใด<200>.• •มาตรฐาน<200> •Unicode<200> •ได้<200>ถูก<200>นำ<200>ไป<200>ใช้<200>โดย<200>ผู้นำ<200>ใน<200>อุตสาหกรรม<200> •เช่น<200> •Apple<200>,• •HP<200>,• •IBM<200>,• •JustSystem<200>,• •Microsoft<200>,• •Oracle<200>,• •SAP<200>,• •Sun<200>,• •Sybase<200>,• •Unisys<200> •และ<200>อื่นๆ<200> •อีก<200>มาก<200>.• •Unicode<200> •เป็น<200>สิ่ง<200>ที่<200>จำเป็น<200>สำหรับ<200>มาตร<200>ฐาน<200>ใหม่ๆ<200> •เช่น<200> •XML<200>,• •Java<200>,• •ECMAScript<200> •(•JavaScript<200>)•,• •LDAP<200>,• •CORBA<200> •3.0<100>,• •WML<200> •ฯลฯ<200>.•,• •และ<200>เป็น<200>แนวทาง<200>อย่าง<200>เป็น<200>ทางการ<200>ใน<200>การ<200>ทำ<200> •ISO<200>/•IEC<200> •10646<100>.• •Unicode<200> •ได้<200>รับ<200>การ<200>สนับสนุน<200>ใน<200>ระบบ<200>ปฏิบัติ<200>การ<200>จำนวน<200>มาก<200>,• •บราวเซอร์<200>ใหม่ๆ<200> •ทก<200>ตัว<200>,• •และ<200>ผลิต<200>ภัณฑ์<200>อื่นๆ<200> •อีก<200>มาก<200>.• •การ<200>เกิด<200>ขึ้น<200>ของ<200> •Unicode<200> •Standard<200> •และ<200>ทูล<200>ส์<200>ต่างๆ<200> •ที่<200>มี<200>ใน<200>การ<200>สนับสนุน<200> •Unicode<200>,• •เป็น<200>หนึ่ง<200>ใน<200>แนว<200>โน้ม<200>ทาง<200>เทคโนโลยี<200>ซอฟต์แวร์<200>ระดับ<200>โลก<200>ที่<200>มี<200>ความ<200>สำคัญ<200>ที่สุด<200>.•
+•
+•การ<200>รวม<200> •Unicode<200> •เข้าไป<200>ใน<200>ระบบ<200>ไคลเอ็นต์<200>-•เซิร์ฟเวอร์<200> •หรือ<200>แอ็พ<200>พลิ<200>เค<200>ชัน<200>แบบ<200> •multi<200>-•tiered<200> •และ<200>เว็บไซต์<200> •จะ<200>ทำให้<200>เกิด<200>การ<200>ประหยัด<200>ค่า<200>ใช้<200>จ่าย<200>มากกว่า<200>การ<200>ใช้<200>ชุด<200>อักขระ<200>แบบ<200>เดิม<200>.• •Unicode<200> •ทำให้<200>ผลิตภัณฑ์<200>ซอฟต์แวร์<200>หนึ่ง<200>เดียว<200> •หรือ<200>เว็บไซต์<200>แห่ง<200>เดียว<200> •รองรับ<200>ได้<200>หลาย<200>แพ<200>ล็ต<200>ฟอร์ม<200>,• •หลาย<200>ภาษา<200>และ<200>หลาย<200>ประเทศ<200>โดย<200>ไม่<200>ต้อง<200>ทำการ<200>รื้อ<200>ปรับ<200>ระบบ<200>.• •Unicode<200> •ยัง<200>ทำให้<200>ข้อมูล<200>สามารถ<200>เคลื่อน<200>ย้าย<200>ไป<200>มา<200>ใน<200>หลายๆ<200> •ระบบ<200>โดย<200>ไม่<200>เกิด<200>ความ<200>ผิด<200>พลาด<200>เสีย<200>หาย<200>.•
+•
+•เกี่ยว<200>กับ<200> •Unicode<200> •Consortium<200>
+•
+•Unicode<200> •Consortium<200> •เป็น<200>องค์กร<200>ไม่<200>แสวงหา<200>กำไร<200>ที่<200>ก่อ<200>ตั้ง<200>ขึ้น<200>เพื่อ<200>พัฒนา<200>,• •ขยาย<200>และ<200>ส่ง<200>เสริม<200>การ<200>ใช้<200> •Unicode<200> •Standard<200>,• •ซึ่ง<200>กำหนด<200>รูป<200>แบบ<200>การ<200>แทน<200>ค่า<200>ของ<200>ข้อความ<200>ใน<200>ผลิตภัณฑ์<200>ซอฟต์แวร์<200>และ<200>มาตร<200>ฐาน<200>ใหม่ๆ<200>.• •สมาชิก<200>ของ<200>สมาคม<200>เป็น<200>ตัวแทน<200>จาก<200>บริษัท<200>และ<200>องค์กร<200>ใน<200>อุตสาหกรรม<200>คอมพิวเตอร์<200>และ<200>การ<200>ประมวล<200>ผล<200>สารสนเทศ<200>.• •สมาคม<200>ได้<200>รับ<200>การ<200>สนับสนุน<200>ทางการ<200>เงิน<200>ผ่าน<200>ทาง<200>ค่า<200>ธรรมเนียม<200>ของ<200>การ<200>เป็น<200>สมาชิก<200>เท่านั้น<200>.• •สมาชิก<200>ภาพ<200>ของ<200> •Unicode<200> •Consortium<200> •เปิด<200>กว้าง<200>สำหรับ<200>องค์กร<200>หรือ<200>บุคคล<200>ใดๆ<200> •ใน<200>โลก<200>ที่<200>ต้องการ<200>สนับสนุน<200> •Unicode<200> •Standard<200> •และ<200>ช่วย<200>เหลือ<200>การ<200>ขยาย<200>ตัว<200>และ<200>การนำ<200> •Unicode<200> •ไป<200>ใช้<200>งาน<200>.•
+•
+•สำหรับ<200>ข้อมูล<200>เพิ่ม<200>เติม<200>,• •ให้<200>ดู<200>ที่<200> •Glossary<200>,• •Sample<200> •Unicode<200>-•Enabled<200> •Products<200>,• •Technical<200> •Introduction<200> •และ<200> •Useful<200> •Resources<200>.•</data>
+
+<word>
+# Burmese
+<data>•အ<200>လော<200>င္<200>မ<200>င္<200>တရား<200>
+•     •မဟာ<200>ဓမ္မရာဇာ<200>မိ<200>ပတိ<200>လ<200>က္<200>ထ<200>က္<200>တ္<200>ဝ<200>င္<200> •အ<200>င္<200>ဝ<200>နေ<200>ပ္<200>ရ<200>ည္<200>တော္<200>က္<200>ရီး<200>သ<200>ည္<200> •မ<200>င္<200>ရိ<200>မ္<200>မ<200>သ<200>က္<200>ဖ္<200>ရ<200>စ္<200>နေ<200>သ<200>ည္<200>။• •မဏိ<200>ပူ<200>ရ<200> •က<200>သ<200>ည္<200>မ္<200>ယား<200>က<200> •အ<200>င္<200>ဝ<200>နေ<200>ပ္<200>ရ<200>ည္<200>တော္<200>၏• •မ္<200>ရော<200>က္<200>ဘ<200>က္<200>တ<200>လ္<200>ဝ္<200>ဟား<200>ကုိ<200> •တုိ<200>က္<200>ခုိ<200>က္<200>ဖ္<200>ယ<200>က္<200>ဆီး<200>သ<200>ည္<200>။• •အော<200>က္<200>မ္<200>ရ<200>န္<200>မာ<200>နုိ<200>င္<200>ငံ<200> •ဟံ<200>သာ<200>ဝ<200>တီ<200>သား<200>တုိ့<200>က<200>လ<200>ည္<200> •ပု<200>န္<200>က<200>န္<200>သ<200>ည္<200>။• •မတ္တ<200>ရာ<200>အု<200>တ္<200>ဖုိ<200>ရ္<200>ဟိ<200> •က္<200>ဝေ့<200>ရ္<200>ဟ<200>မ္<200>မ္<200>ယား<200>က<200>လ<200>ည္<200> •ထ<200>က္<200>ရ္<200>ဝ<200>သ<200>ည္<200>။•
+•
+•    •ထုိ<200>အ<200>ခ္<200>ယိ<200>န္<200>တ္<200>ဝ<200>င္<200> •မု<200>ဆုိး<200>ဖုိ<200>ရ္<200>ဝာ<200>သူ<200>က္<200>ရီး<200> •အော<200>င္<200>ဇေ<200>ယ္<200>ယ<200>သ<200>ည္<200> •မိမိ<200>၏•ရ္<200>ဝာ<200>ကုိ<200> •လုံ<200>ခ္<200>ရုံ<200>အော<200>င္<200>ထ<200>န္<200>လုံး<200>တ<200>ပ္<200>မ္<200>ယား<200>ကာ<200>ရ<200>သ<200>ည္<200>။• •အနီး<200>အ<200>ပား<200> •က္<200>ယေး<200>ရ္<200>ဝာ<200> •လေး<200>ဆ<200>ယ့္<200>ခ္<200>ရော<200>က္<200>ရ္<200>ဝာ<200>ကုိ<200> •သိ<200>မ္း<200>သ္<200>ဝ<200>င္<200>ထား<200>သ<200>ည္<200>။• •မ<200>က္<200>ရာ<200>မီ<200>ပ<200>င္<200> •အ<200>င္<200>ဝ<200>နေ<200>ပ္<200>ရ<200>ည္<200>တော္<200>က္<200>ရီး<200>သ<200>ည္<200> •ဟံ<200>သာ<200>ဝ<200>တီ<200>တ<200>ပ္<200>မ္<200>ယား<200> •လ<200>က္<200>တ္<200>ဝ<200>င္<200>သ<200>က္<200>ဆ<200>င္<200>ရ<200>တော့<200>သ<200>ည္<200>။•
+•
+•    •အ<200>င္<200>ဝ<200>ကုိ<200> •သိ<200>မ္<200>ပုိ<200>က္<200>ပ္<200>ရီး<200>သော<200> •ဟံ<200>သာ<200>ဝ<200>တီ<200>တ<200>ပ္<200>မ္<200>ယား<200>သ<200>ည္<200> •မ္<200>ရော<200>က္<200>ဘ<200>က္<200>တ<200>လ္<200>ဝ္<200>ဟား<200>က္<200>ယေး<200>ရ္<200>ဝာ<200>မ္<200>ယား<200>ကုိ<200> •သစ္စာ<200>ခံ<200>ခုိ<200>င္<200>ရ<200>န္<200> •လာ<200>က္<200>ရ<200>ရာ<200> •မု<200>ဆုိး<200>ဖုိ<200>ရ္<200>ဝာ<200>သုိ့<200> •ရော<200>က္<200>ရ္<200>ဟိ<200>လာ<200>သ<200>ည္<200>။• •တ<200>ခ္<200>ယိ<200>န္<200>တ<200>ည္<200>မ္<200>ဟာ<200>ပ<200>င္<200> •က္<200>ဝေ့<200>ရ္<200>ဟ<200>မ္<200>မ္<200>ယား<200>က<200>လ<200>ည္<200> •သစ္စာ<200>ခံ<200>ခုိ<200>င္<200>ရ<200>န္<200> •ရော<200>က္<200>ရ္<200>ဟိ<200>လာ<200>သ<200>ည္<200>။• •ဦး<200>အော<200>င္<200>ဇေ<200>ယ္<200>ယ<200>သ<200>ည္<200> •အ<200>ဖ္<200>ဝဲ့<200>န္<200>ဟ<200>စ္<200>ဖ္<200>ဝဲ့<200>ကုိ<200> •ခ္<200>ရေ<200>ငံ<200>စ္<200>ဝာ<200> •ဆ<200>က္<200>ဆံ<200>သ<200>ည္<200>။• •မ<200>ည္<200>သူ့<200>သ<200>စ္<200>စာ<200>ကုိ<200>မ္<200>ယ္<200>ဟ<200> •ခံ<200>ယူ<200>ခ္<200>ရ<200>င္<200>မ<200>ပ္<200>ရု<200>ပေ<200>။• •ဟံ<200>သာ<200>ဝ<200>တီ<200>တ<200>ပ္<200>ဖ္<200>ဝဲ့<200>ကုိ<200> •အ<200>ပ္<200>ရ<200>န္<200>ခ<200>ရီး<200>တ္<200>ဝ<200>င္<200> •လ<200>မ္<200>မ္<200>ဟ<200>ဖ္<200>ရ<200>တ္<200>၍• •တုိ<200>က္<200>ခုိ<200>က္<200>သ<200>ည္<200>။• •ဟံ<200>သာ<200>ဝ<200>တီ<200>တ<200>ပ္<200>ဖ္<200>ဝဲ့<200>မ္<200>ယား<200> •အထိ<200>အ<200>ခုိ<200>က္<200>အ<200>က္<200>ယ<200>အ<200>ဆုံး<200>မ္<200>ယား<200>စ္<200>ဝာ<200>ဖ္<200>ရ<200>င္<200> •ပ္<200>ရ<200>န္<200>ရ<200>သ<200>ည္<200>။•
+•
+•    •ဟံ<200>သာ<200>ဝ<200>တီ<200>တ<200>ပ္<200>မ္<200>ယား<200>သ<200>ည္<200> •မု<200>ဆုိး<200>ဖုိ<200>ရ္<200>ဝာ<200>ကုိ<200> •လာ<200>ရော<200>က္<200>တုိ<200>က္<200>ခုိ<200>က္<200>က္<200>ရ<200>ပ္<200>ရ<200>န္<200>သ<200>ည္<200>။• •ဦး<200>အော<200>င္<200>ဇေ<200>ယ္<200>ယ<200>သ<200>ည္<200> •သ္<200>ဝေး<200>သော<200>က္<200>ရဲ<200>ဘော္<200> •ခ္<200>ရော<200>က္<200>က္<200>ယိ<200>ပ္<200>ရ္<200>ဟ<200>စ္<200>ယော<200>က္<200>န္<200>ဟ<200>င္<200>အတူ<200> •ဦးစီး<200>ကာ<200>အော<200>င္<200>မ္<200>ရ<200>င္<200>စ္<200>ဝာ<200>ခု<200>ခံ<200>တ္<200>ဝ<200>န္<200>လ္<200>ဟ<200>န္<200>နုိ<200>င္<200>ခဲ့<200>သ<200>ည္<200>။• •ထုိ့<200>နော<200>က္<200> •ဦး<200>အော<200>င္<200>ဇေ<200>ယ္<200>ယ<200>သ<200>ည္<200> •မ္<200>ရော<200>က္<200>ဘ<200>က္<200>တ<200>လ္<200>ဝ္<200>ဟား<200>ရ္<200>ဟိ<200> •ရ္<200>ဟ<200>မ္<200>မ္<200>ယား<200>န္<200>ဟ<200>င္<200> •မ္<200>ရ<200>န္<200>မာ<200>မ္<200>ယား<200>ကုိ<200>လ<200>ည္<200> •ဆ<200>က္<200>သ္<200>ဝ<200>ယ္<200>စ<200>ည္<200>ရုံး<200>နုိ<200>င္<200>ခဲ့<200>သ<200>ည္<200>။• •ဤ<200>သုိ့<200>ဖ္<200>ရ<200>င္<200> •ဦး<200>အော<200>င္<200>ဇေ<200>ယ္<200>ယ<200>၏• •အ<200>ရ္<200>ဟိ<200>န္<200>အ<200>ဝာ<200> •မ္<200>ရ<200>င္<200>မား<200>လာ<200>လေ<200>သ<200>ည္<200>။•
+•
+•    •ဦး<200>အော<200>င္<200>ဇေ<200>ယ္<200>ယ<200>သ<200>ည္<200> •အ<200>လော<200>င္<200>မ<200>င္<200>တ<200>ရား<200>ဘ္<200>ဝဲ့<200>ကုိ<200> •ခံယူ<200>ကာ<200> •ကု<200>န္<200>ဘော<200>င္<200>မ<200>င္<200>ဆ<200>က္<200>ကုိ<200>စ<200>တ<200>င္<200>တ<200>ည္<200>ထော<200>င္<200>သ<200>ည္<200>။• •မု<200>ဆုိး<200>ဖုိ<200>ရ္<200>ဝာ<200>ကုိ<200> •ရ္<200>ဝ္<200>ဟ<200>ဝေ<200>ဘုိ<200>ဟု<200> •သ<200>မု<200>တ္<200>ကာ<200> •မ္<200>ရုိ့<200>န<200>န္<200>တ<200>ည္<200>သ<200>ည္<200>။• •န<200>န္<200>တ<200>ည္<200>သ<200>က္<200>က<200>ရာ<200>ဇ္<200>ဖ္<200>ရ<200>စ္<200>သော<200> •၁၁၁၅<100> •ခု<200>ကုိ<200> •ဥ<200>ဩ<200>အော္<200>မ္<200>ရ<200>ည္<200> •ကု<200>န္<200>ဘော<200>င္<200>တ<200>ည္<200>ဟု<200> •အ<200>မ္<200>ဟ<200>တ္<200>အ<200>သား<200>ပ္<200>ရု<200>က္<200>ရ<200>သ<200>ည္<200>။•
+•
+•    •အ<200>လော<200>င္<200>မ<200>င္<200>တရား<200>သ<200>ည္<200> •ဧရာ<200>ဝ<200>တီ<200>န္<200>ဟ<200>င္<200>ခ္<200>ယ<200>င္<200>တ္<200>ဝ<200>င္<200> •မ္<200>ရ<200>စ္<200>န္<200>ဟ<200>စ္<200>သ္<200>ဝ<200>ယ္<200>အ<200>က္<200>ရား<200> •ဒေ<200>သ<200>မ္<200>ယား<200>ကုိ<200>အ<200>ခုိ<200>င္<200>အ<200>မာ<200> •စု<200>စ<200>ည္<200>ပ္<200>ရီး<200>နော<200>က္<200> •အ<200>င္<200>ဝ<200>ကုိ<200> •တုိ<200>က္<200>ခုိ<200>က္<200>အော<200>င္<200>မ္<200>ရ<200>င္<200>သ<200>ည္<200>။• •ထုိ<200>နော<200>က္<200>တ္<200>ဝ<200>င္<200>ပ္<200>ရ<200>ည္<200>၊• •လ္<200>ဝ<200>န္<200>ဆေး<200>၊• •ဒ<200>ဂုံ<200>မ္<200>ရုိ့<200>မ္<200>ယား<200>ကုိ<200> •သိ<200>မ္<200>ပုိ<200>က္<200>သ<200>ည္<200>။• •လ္<200>ဝ<200>န္<200>ဆေး<200> •ကုိ<200>မ္<200>ရ<200>န္<200>အော<200>င္<200>ဟူ<200>၍• •သ<200>မု<200>တ္<200>သ<200>ည္<200>။• •ဒ<200>ဂုံ<200>ကုိ<200>ရ<200>န္<200>ကု<200>န္<200>ဟူ<200>၍• •သ<200>မု<200>တ္<200>ထ<200>သ<200>ည္<200>။•</data>
+
+<word>
+# japanese
+<data>•ユニ<400>コード<400>と<400>は<400>何<400>か<400>？•
+•ユニ<400>コード<400>は<400>、•すべて<400>の<400>文字<400>に<400>固有<400>の<400>番号<400>を<400>付与<400>し<400>ます<400>
+•プラットフォーム<400>に<400>は<400>依存<400>しま<400>せん<400>
+•プログラム<400>に<400>も<400>依存<400>しま<400>せん<400>
+•言語<400>に<400>も<400>依存<400>しま<400>せん<400>
+•
+•コンピューター<400>は<400>、•本質<400>的<400>に<400>は<400>数字<400>しか<400>扱う<400>こと<400>が<400>でき<400>ま<400>せん<400>。•コンピューター<400>は<400>、•文字<400>や<400>記号<400>など<400>の<400>それぞれに<400>番号<400>を<400>割り振る<400>こと<400>によって<400>扱える<400>よう<400>にし<400>ます<400>。•ユニ<400>コード<400>が<400>出来る<400>まで<400>は<400>、•これらの<400>番号<400>を<400>割り振る<400>仕組み<400>が<400>何<400>百<400>種類<400>も<400>存在<400>しま<400>した<400>。•どの<400>一つ<400>を<400>とっても<400>、•十分<400>な<400>文字<400>を<400>含<400>んで<400>は<400>いま<400>せん<400>で<400>した<400>。•例えば<400>、•欧州<400>連合<400>一つ<400>を<400>見<400>て<400>も<400>、•その<400>すべて<400>の<400>言語<400>を<400>カバー<400>する<400>ため<400>に<400>は<400>、•いくつか<400>の<400>異なる<400>符号<400>化<400>の<400>仕組み<400>が<400>必要<400>で<400>した<400>。•英語<400>の<400>よう<400>な<400>一つ<400>の<400>言語<400>に<400>限<400>って<400>も<400>、•一つ<400>だけ<400>の<400>符号<400>化<400>の<400>仕組み<400>では<400>、•一般<400>的<400>に<400>使<400>われる<400>すべて<400>の<400>文字<400>、•句読点<400>、•技術<400>的<400>な<400>記号<400>など<400>を<400>扱う<400>に<400>は<400>不十分<400>で<400>した<400>。•
+•
+•これらの<400>符号<400>化<400>の<400>仕組み<400>は<400>、•相互<400>に<400>矛盾<400>する<400>もの<400>でも<400>ありま<400>した<400>。•二つ<400>の<400>異なる<400>符号<400>化<400>の<400>仕組み<400>が<400>、•二つ<400>の<400>異なる<400>文字<400>に<400>同一<400>の<400>番号<400>を<400>付ける<400>こと<400>も<400>できる<400>し<400>、•同じ<400>文字<400>に<400>異なる<400>番号<400>を<400>付ける<400>こと<400>も<400>できる<400>の<400>です<400>。•どの<400>よう<400>な<400>コンピューター<400>も<400>（•特に<400>サーバー<400>は<400>）•多く<400>の<400>異<400>な<400>っ<400>た<400>符号<400>化<400>の<400>仕組み<400>を<400>サポート<400>する<400>必要<400>が<400>あり<400>ます<400>。•たとえ<400>データ<400>が<400>異なる<400>符号<400>化<400>の<400>仕組み<400>や<400>プラットフォーム<400>を<400>通過<400>し<400>て<400>も<400>、•いつ<400>どこ<400>で<400>データ<400>が<400>乱れる<400>か<400>分<400>から<400>ない<400>危険<400>を<400>冒す<400>こと<400>の<400>なる<400>の<400>です<400>。•
+•
+•ユニ<400>コード<400>は<400>すべて<400>を<400>変<400>え<400>ます<400>
+•
+•ユニ<400>コード<400>は<400>、•プラットフォーム<400>に<400>係<400>わら<400>ず<400>、•プログラム<400>に<400>係<400>わら<400>ず<400>、•言語<400>に<400>係<400>わら<400>ず<400>、•すべて<400>の<400>文字<400>に<400>独立<400>した<400>番号<400>を<400>与<400>え<400>ます<400>。•ユニ<400>コード<400>標準<400>は<400>、•アップル<400>、•ヒュー<400>レット<400>パッ<400>カード<400>、•IBM<200>、•ジャスト<400>システム<400>、•マイクロ<400>ソフト<400>、•オラクル<400>、•SAＰ<200>、•サン<400>、•サイ<400>ベース<400>など<400>の<400>産業<400>界<400>の<400>主導<400>的<400>企業<400>と<400>他の<400>多く<400>の<400>企業<400>に<400>採用<400>さ<400>れ<400>てい<400>ます<400>。•ユニ<400>コード<400>は<400>、•XML<200>、•Java<200>、•ECMAScript<200>(•JavaScript<200>)•、•LDAP<200>、•CORBA<200> •3.0<100>など<400>の<400>最先端<400>の<400>標準<400>の<400>前提<400>と<400>な<400>って<400>おり<400>、•ユニ<400>コード<400>を<400>実装<400>す<400>れ<400>ば<400>、•ISO<200>/•IEC<200> •10646<100>に<400>適合<400>する<400>ことに<400>なり<400>ます<400>。•ユニ<400>コード<400>は<400>、•多く<400>の<400>オペレーティングシステム<400>と<400>すべて<400>の<400>最新<400>の<400>ブラウザー<400>と<400>他の<400>多く<400>の<400>製品<400>で<400>サポート<400>さ<400>れ<400>てい<400>ます<400>。•ユニ<400>コード<400>標準<400>の<400>出現<400>と<400>ユニ<400>コード<400>を<400>サポート<400>する<400>ツール<400>類<400>は<400>、•昨今<400>顕著<400>に<400>な<400>って<400>いる<400>ソフトウエア<400>技術<400>の<400>グローバル<400>化<400>の<400>流れ<400>に対して<400>、•特に<400>役<400>に<400>立<400>って<400>い<400>ます<400>。•
+•
+•ユニ<400>コード<400>を<400>ク<400>ライアン<400>ト<400>サーバー<400>型<400>の<400>アプリケーション<400>や<400>、•多層<400>構造<400>を<400>持つ<400>アプリケーション<400>、•ウェブサイト<400>など<400>に<400>組み込む<400>こと<400>で<400>、•従来<400>の<400>文字<400>コードセット<400>を<400>用いる<400>より<400>も<400>明らか<400>な<400>コスト<400>削減<400>が<400>可能<400>です<400>。•ユニ<400>コード<400>は<400>、•単一<400>の<400>ソフトウエア<400>製品<400>、•単一<400>の<400>ウェブサイト<400>に<400>、•何ら<400>手<400>を<400>加える<400>こと<400>なく<400>、•複数<400>の<400>プラットフォーム<400>、•複数<400>の<400>言語<400>、•複数<400>の<400>国<400>を<400>カバー<400>する<400>こと<400>が<400>出来る<400>の<400>です<400>。•ユニ<400>コード<400>は<400>、•データ<400>が<400>多く<400>の<400>異なる<400>システム<400>の<400>間<400>を<400>、•何<400>の<400>乱れ<400>も<400>なし<400>に<400>転送<400>する<400>こと<400>を<400>可能<400>と<400>する<400>の<400>です<400>。•
+•
+•ユニ<400>コード<400>コンソーシアム<400>について<400>
+•
+•ユニ<400>コード<400>コンソーシアム<400>は<400>、•最新<400>の<400>ソフトウエア<400>製品<400>と<400>標準<400>において<400>テキスト<400>を<400>表現<400>する<400>こと<400>を<400>意味<400>する<400>“•ユニ<400>コード<400>標準<400>”•の<400>構築<400>、•発展<400>、•普及<400>、•利用<400>促進<400>を<400>目的<400>として<400>設立<400>さ<400>れ<400>た<400>非<400>営利<400>組織<400>です<400>。•同<400>コンソーシアム<400>の<400>会員<400>は<400>、•コンピューター<400>と<400>情報処理<400>に<400>係わる<400>広汎<400>な<400>企業<400>や<400>組織<400>から<400>構成<400>さ<400>れ<400>てい<400>ます<400>。•同<400>コンソーシアム<400>は<400>、•財政<400>的<400>に<400>は<400>、•純粋<400>に<400>会費<400>のみ<400>によって<400>運営<400>さ<400>れ<400>てい<400>ます<400>。•ユニ<400>コード<400>標準<400>を<400>支持<400>し<400>、•その<400>拡張<400>と<400>実装<400>を<400>支援<400>する<400>世界中<400>の<400>組織<400>や<400>個人<400>は<400>、•だれ<400>も<400>が<400>ユニ<400>コード<400>コンソーシアム<400>の<400>会員<400>なる<400>こと<400>が<400>でき<400>ます<400>。•
+•
+•より<400>詳しい<400>こと<400>を<400>お<400>知<400>り<400>に<400>なり<400>たい<400>方<400>は<400>、•Glossary<200>,• •Technical<200> •Introduction<200> •および<400> •Useful<200> •Resources<200>を<400>ご<400>参照<400>くだ<400>さい<400>。•
+•</data>
+
+
+#
+# Bug 20303 Multiple Look-ahead rules with similar contexts.
+#           Check that samples of such rules are being handled correctly.
+#
+
+<rules>
+!!forward;
+!!quoted_literals_only;
+!!chain;
+[a] [b] / [c] [d];
+[a] [b] / [c] [d] {100};
+[a] [b] / [e] [f] {200};
+[a] [b] / [e] [g] {300};
+[a] [b] [c] [h] {400};
+[x] [a] [b] / [c] [d] {500};
+[y] [a] [b] [c] [d] {600};
+</rules>
+<data>•ab<100>c•d•ab<200>e•f•ab<300>e•g•abch<400>xab<500>c•d•yabcd<600></data>

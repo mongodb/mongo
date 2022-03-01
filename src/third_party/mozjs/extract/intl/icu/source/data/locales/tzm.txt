@@ -1,0 +1,263 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+tzm{
+    AuxExemplarCharacters{"[o p v]"}
+    ExemplarCharacters{"[a b c d ḍ e ɛ f g {gʷ} ɣ h ḥ i j k {kʷ} l m n q r ṛ s ṣ t ṭ u w x y z]"}
+    ExemplarCharactersIndex{"[A B C D Ḍ E Ɛ F G Ɣ H Ḥ I J K L M N Q R Ṛ S Ṣ T Ṭ U W X Y Z]"}
+    ExemplarCharactersNumbers{"[  \\- ‑ , % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"#,##0.00 ¤"}
+            }
+            symbols{
+                decimal{","}
+                group{" "}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d MMMM y G",
+                "d MMMM y G",
+                "d MMM y G",
+                "dd/MM/y GGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, M/d"}
+                MMM{"LLL"}
+                MMMEd{"E, MMM d"}
+                MMMMEd{"E, MMMM d"}
+                MMMMd{"MMMM d"}
+                MMMd{"MMM d"}
+                Md{"M/d"}
+                d{"d"}
+                hm{"h:mm a"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E, M/d/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, MMM d, y"}
+                yMMMM{"MMMM y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "Zdat azal",
+                "Ḍeffir aza",
+            }
+            AmPmMarkersAbbr{
+                "Zdat azal",
+                "Ḍeffir aza",
+            }
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d MMMM y",
+                "d MMMM y",
+                "d MMM y",
+                "dd/MM/y",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, M/d"}
+                MMM{"LLL"}
+                MMMEd{"E, MMM d"}
+                MMMMEd{"E, MMMM d"}
+                MMMMd{"MMMM d"}
+                MMMd{"MMM d"}
+                Md{"M/d"}
+                d{"d"}
+                hm{"h:mm a"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E, M/d/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, MMM d, y"}
+                yMMMM{"MMMM y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Asa",
+                        "Ayn",
+                        "Asn",
+                        "Akr",
+                        "Akw",
+                        "Asm",
+                        "Asḍ",
+                    }
+                    wide{
+                        "Asamas",
+                        "Aynas",
+                        "Asinas",
+                        "Akras",
+                        "Akwas",
+                        "Asimwas",
+                        "Asiḍyas",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "A",
+                        "A",
+                        "A",
+                        "A",
+                        "A",
+                        "A",
+                        "A",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "ZƐ",
+                    "ḌƐ",
+                }
+                wide{
+                    "Zdat Ɛisa (TAƔ)",
+                    "Ḍeffir Ɛisa (TAƔ)",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Yen",
+                        "Yeb",
+                        "Mar",
+                        "Ibr",
+                        "May",
+                        "Yun",
+                        "Yul",
+                        "Ɣuc",
+                        "Cut",
+                        "Kṭu",
+                        "Nwa",
+                        "Duj",
+                    }
+                    wide{
+                        "Yennayer",
+                        "Yebrayer",
+                        "Mars",
+                        "Ibrir",
+                        "Mayyu",
+                        "Yunyu",
+                        "Yulyuz",
+                        "Ɣuct",
+                        "Cutanbir",
+                        "Kṭuber",
+                        "Nwanbir",
+                        "Dujanbir",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "Y",
+                        "Y",
+                        "M",
+                        "I",
+                        "M",
+                        "Y",
+                        "Y",
+                        "Ɣ",
+                        "C",
+                        "K",
+                        "N",
+                        "D",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "IA1",
+                        "IA2",
+                        "IA3",
+                        "IA4",
+                    }
+                    wide{
+                        "Imir adamsan 1",
+                        "Imir adamsan 2",
+                        "Imir adamsan 3",
+                        "Imir adamsan 4",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"Ass"}
+            relative{
+                "-1"{"Assenaṭ"}
+                "0"{"Assa"}
+                "1"{"Asekka"}
+            }
+        }
+        dayperiod{
+            dn{"Zdat azal/Deffir azal"}
+        }
+        era{
+            dn{"Tallit"}
+        }
+        hour{
+            dn{"Tasragt"}
+        }
+        minute{
+            dn{"Tusdat"}
+        }
+        month{
+            dn{"Ayur"}
+        }
+        second{
+            dn{"Tusnat"}
+        }
+        week{
+            dn{"Imalass"}
+        }
+        weekday{
+            dn{"Ass n Imalass"}
+        }
+        year{
+            dn{"Asseggas"}
+        }
+        zone{
+            dn{"Aseglem asergan"}
+        }
+    }
+}

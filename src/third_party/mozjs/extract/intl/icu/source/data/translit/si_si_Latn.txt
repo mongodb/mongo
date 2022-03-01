@@ -1,0 +1,101 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: si_si_Latn.txt
+# Generated from CLDR
+#
+
+# Based on http://en.wiktionary.org/wiki/Wiktionary:Sinhalese_transliteration
+::[[:Sinh:][\u200C\u200D]];
+::NFKC;
+# Delete ZWNJ and ZWJ to simplify further processing.
+\u200C → ;
+\u200D → ;
+# Insert "a" after every consonant that is not followed by a dependent vowel
+# or virama.
+::Null;
+([\u0D9A-\u0DC6]) } [^\u0DCA-\u0DDF] → $1 a;
+::Null;
+ක → k;
+ට → ṭ;
+ත → t;
+ප → p;
+ග → g;
+ඩ → ḍ;
+ද → d;
+බ → b;
+[Zz]ස → z;
+ස → s;
+ච → c;
+ම → m;
+ල → l;
+ව → v;
+ණ → ṇ;
+හ → h;
+ජ → j;
+න → n;
+ර → r;
+ය → y;
+ළ → ḷ;
+අ → a;
+එ → e;
+ඉ → i;
+ඔ → o;
+උ → u;
+ඇ → æ;
+ෙ → e;
+\u0DD2 → i;
+ො → o;
+\u0DD4 → u;
+ැ → æ;
+ආ → ā;
+ඒ → ē;
+ඊ → ī;
+ඕ → ō;
+ඌ → ū;
+ඈ → ǣ;
+ා → ā;
+ේ → ē;
+\u0DD3 → ī;
+ෝ → ō;
+\u0DD6 → ū;
+ෑ → ǣ;
+ඟ → n\u0306g;
+ඬ → n\u0306ḍ;
+ඳ → n\u0306d;
+ඹ → m\u0306b;
+ඛ → kh;
+ඨ → ṭh;
+ථ → th;
+ඵ → ph;
+ඝ → gh;
+ඪ → ḍh;
+ධ → dh;
+භ → bh;
+ශ → ś;
+ඡ → ch;
+ඤ → ñ;
+ඞ → ṅ;
+ඦ → n\u0306j;
+ෂ → ṣ;
+ඣ → jh;
+ඥ → gn;
+ෆ → f;
+[Ff]ප → f;
+ඓ → ai;
+ඍ → ṛ;
+ඏ → ḷ;
+ෛ → ai;
+ෘ → ṛ;
+ෟ → ḷ;
+ඖ → au;
+ඎ → ṝ;
+ඐ → ḹ;
+ෞ → au;
+ෲ → ṝ;
+ෳ → ḹ;
+ඃ  → ḥ;
+ං → ṁ;
+\u0DCA → ;
+

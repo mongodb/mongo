@@ -1,0 +1,170 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_PY{
+    %%Parent{"es_419"}
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"¤ #,##0.00;¤ -#,##0.00"}
+            }
+            symbols{
+                decimal{","}
+                group{"."}
+            }
+        }
+    }
+    calendar{
+        gregorian{
+            dayNames{
+                format{
+                    short{
+                        "do",
+                        "lu",
+                        "ma",
+                        "mi",
+                        "ju",
+                        "vi",
+                        "sa",
+                    }
+                }
+                stand-alone{
+                    short{
+                        "Do",
+                        "Lu",
+                        "Ma",
+                        "Mi",
+                        "Ju",
+                        "Vi",
+                        "Sa",
+                    }
+                }
+            }
+            dayPeriod{
+                stand-alone{
+                    narrow{
+                        noon{"m."}
+                    }
+                }
+            }
+            intervalFormats{
+                Md{
+                    M{"d/M 'al' d/M"}
+                    d{"d/M 'al' d/M"}
+                }
+                h{
+                    a{"h a 'a' h a"}
+                    h{"h 'a' h a"}
+                }
+                hm{
+                    a{"h:mm a 'a' h:mm a"}
+                    h{"h:mm 'a' h:mm a"}
+                    m{"h:mm 'a' h:mm a"}
+                }
+                yMMM{
+                    M{"MMM 'a' MMM y"}
+                    y{"MMM 'de' y 'a' MMM 'de' y"}
+                }
+                yMMMM{
+                    M{"MMMM 'a' MMMM 'de' y"}
+                    y{"MMMM 'de' y 'a' MMMM 'de' y"}
+                }
+                yMMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM 'de' y"}
+                }
+                yMd{
+                    M{"d/M/y 'al' d/M/y"}
+                    d{"d/M/y 'al' d/M/y"}
+                    y{"d/M/y 'al' d/M/y"}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "ene.",
+                        "feb.",
+                        "mar.",
+                        "abr.",
+                        "may.",
+                        "jun.",
+                        "jul.",
+                        "ago.",
+                        "sept.",
+                        "oct.",
+                        "nov.",
+                        "dic.",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ene.",
+                        "feb.",
+                        "mar.",
+                        "abr.",
+                        "may.",
+                        "jun.",
+                        "jul.",
+                        "ago.",
+                        "sept.",
+                        "oct.",
+                        "nov.",
+                        "dic.",
+                    }
+                }
+            }
+        }
+    }
+    fields{
+        mon-narrow{
+            relative{
+                "-1"{"el lun. pasado"}
+                "0"{"este lun."}
+                "1"{"el próximo lun."}
+            }
+        }
+        second-narrow{
+            relativeTime{
+                future{
+                    one{"dentro de {0} seg."}
+                    other{"dentro de {0} seg."}
+                }
+                past{
+                    one{"hace {0} seg."}
+                    other{"hace {0} seg."}
+                }
+            }
+        }
+        second-short{
+            dn{"seg."}
+            relativeTime{
+                future{
+                    one{"dentro de {0} seg."}
+                    other{"dentro de {0} seg."}
+                }
+                past{
+                    one{"hace {0} seg."}
+                    other{"hace {0} seg."}
+                }
+            }
+        }
+        sun-narrow{
+            relative{
+                "-1"{"el dom. pasado"}
+                "0"{"este dom."}
+                "1"{"el próximo dom."}
+            }
+        }
+        tue-narrow{
+            relative{
+                "-1"{"el mar. pasado"}
+                "0"{"este mar."}
+                "1"{"el próximo mar."}
+            }
+        }
+    }
+    listPattern{
+        unit-short{
+            end{"{0} y {1}"}
+        }
+    }
+}

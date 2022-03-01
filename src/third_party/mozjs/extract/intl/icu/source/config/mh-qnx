@@ -1,0 +1,94 @@
+## -*-makefile-*-
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+## QNX-specific setup
+## Copyright (c) 1999-2006, International Business Machines Corporation and
+## others. All Rights Reserved.
+##
+## Provided By: Chris McKillop <cdm@qnx.com>
+
+
+#
+# Create shared libs that "work" properly.
+#
+
+## Commands to generate dependency files
+GEN_DEPS.c=  $(CC) -E -Wp,-MM $(DEFS) $(CPPFLAGS)
+GEN_DEPS.cc= $(CXX) -E -Wp,-MM $(DEFS) $(CPPFLAGS)
+
+## Flags for position independent code
+SHAREDLIBCFLAGS = -shared
+SHAREDLIBCXXFLAGS = -shared
+# SHAREDLIBCPPFLAGS = -shared
+
+#
+# Always generatate PIC code.
+#
+#CPPFLAGS+=-shared
+
+## Additional flags when building libraries and with threads
+LIBCPPFLAGS = 
+THREADSCPPFLAGS = 
+
+## Compiler switch to embed a runtime search path
+LD_RPATH=	
+LD_RPATH_PRE = -Wl,-rpath,
+
+## Compiler switch to embed a library name
+LD_SONAME = -Wl,-soname -Wl,$(notdir $(MIDDLE_SO_TARGET))
+
+## Shared object suffix
+SO = so
+## Non-shared intermediate object suffix
+STATIC_O = ao
+
+## Compilation rules
+%.$(STATIC_O): $(srcdir)/%.c
+	$(COMPILE.c) $(STATICCPPFLAGS) $(STATICCFLAGS) -o $@ $<
+%.o: $(srcdir)/%.c
+	$(COMPILE.c) $(DYNAMICCPPFLAGS) $(DYNAMICCFLAGS) -o $@ $<
+
+%.$(STATIC_O): $(srcdir)/%.cpp
+	$(COMPILE.cc) $(STATICCPPFLAGS) $(STATICCXXFLAGS) -o $@ $<
+%.o: $(srcdir)/%.cpp
+	$(COMPILE.cc) $(DYNAMICCPPFLAGS) $(DYNAMICCXXFLAGS) -o $@ $<
+
+
+## Dependency rules
+%.d: $(srcdir)/%.c
+	@echo "generating dependency information for $<"
+	@$(SHELL) -ec '$(GEN_DEPS.c) $< \
+		| sed '\''s%\($*\)\.o[ :]*%\1.o $@ : %g'\'' > $@; \
+		[ -s $@ ] || rm -f $@'
+
+%.d: $(srcdir)/%.cpp
+	@echo "generating dependency information for $<"
+	@$(SHELL) -ec '$(GEN_DEPS.cc) $< \
+		| sed '\''s%\($*\)\.o[ :]*%\1.o $@ : %g'\'' > $@; \
+		[ -s $@ ] || rm -f $@'
+
+## Versioned libraries rules
+##
+## QNX wants the SONAME in the shared lib to match the final "real" filename.
+## (to ease in packaging with QNX's native package format)
+##
+MIDDLE_SO_TARGET = $(SO_TARGET).$(SO_TARGET_VERSION_MAJOR)
+FINAL_SO_TARGET = $(MIDDLE_SO_TARGET)
+
+%.$(SO): %.$(SO).$(SO_TARGET_VERSION_MAJOR)
+	$(RM) $@ && ln -s ${*F}.$(SO).$(SO_TARGET_VERSION_MAJOR) $@
+#%.$(SO).$(SO_TARGET_VERSION_MAJOR): %.$(SO).$(SO_TARGET_VERSION)
+#	$(RM) $@ && ln -s ${<F} $@
+#%.$(SO): %.$(SO).$(SO_TARGET_VERSION_MAJOR)
+#	$(RM) $@ && ln -s ${*F}.$(SO).$(SO_TARGET_VERSION) $@
+
+##  Bind internal references
+
+# LDflags that pkgdata will use
+BIR_LDFLAGS= -Wl,-Bsymbolic
+
+# Dependencies [i.e. map files] for the final library
+BIR_DEPS=
+
+## End QNX-specific setup
+

@@ -1,0 +1,352 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: ko_ko_Latn_BGN.txt
+# Generated from CLDR
+#
+
+#
+########################################################################
+# BGN/PCGN Agreement
+#
+# This system wad devised by G. M. McCune and E. O. Reischauer, and
+# was originally published in the Transactions of the Korea Branch of
+# the Royal Asiatic Society, Volume XXIX, 1939. It has been used by
+# the BGN since 1943, and was later adopted for use by the PCGN. A
+# main characteristic of this system is the attempt to represent
+# approximate Korean pronunciation, while systematically converting
+# the Hangul characters to corresponding Roman-script letters. Since
+# Korean pronunciation is often inconsistently represented in Hangul,
+# the McCune-Reischauer conversion tables are rather elaborate, and
+# reverse conversion (from Roman script back to Hangul) is not possible.
+#
+# Originally prepared by Michael Everson <everson@evertype.com>
+########################################################################
+#
+# MINIMAL FILTER: Korean-Latin
+#
+:: [ᄀᄁᄂᄃᄄᄅᄆᄇᄈᄉᄊᄋᄌᄍᄎᄏᄐᄑᄒᄭᄯᄲᄶᅡᅢᅣᅤᅥᅦᅧᅨᅩᅪᅫᅬᅭᅮᅯᅰᅱᅲᅳᅴᅵᆨᆫᆮᆯᆰᆱᆲᆷᆸᆺᆼᆽᆾᆿᇀᇁ] ;
+:: NFD (NFC) ;
+#
+#
+########################################################################
+#
+########################################################################
+#
+# Define All Transformation Variables
+#
+########################################################################
+#
+$aspirate = ’;
+$apostrophe = ’;
+$vowels = [ᅡᅢᅣᅤᅥᅦᅧᅨᅩᅪᅫᅬᅭᅮᅯᅰᅱᅲᅳᅴᅵ] ;
+#
+#
+# Use this $wordBoundary until bug 2034 is fixed in ICU:
+# http://bugs.icu-project.org/cgi-bin/icu-bugs/transliterate?id=2034;expression=boundary;user=guest
+#
+$wordBoundary =  [^[:L:][:M:][:N:]] ;
+#
+#
+########################################################################
+#
+########################################################################
+#
+# Rules moved to front to avoid masking
+#
+########################################################################
+#
+########################################################################
+#
+# BGN Page 60 Rule 1:
+#
+# Romanization of Hangul consonants and consonant clusters within words.
+#
+########################################################################
+#
+ᆨᄀ → kk ; # HANGUL JONGSEONG KIYEOK + CHOSEONG KIYEOK
+ᆨᄂ → ngn ; # HANGUL JONGSEONG KIYEOK + CHOSEONG NIEUN
+ᆨᄃ → kt ; # HANGUL JONGSEONG KIYEOK + CHOSEONG TIKEUT
+ᆨᄅ → ngn ; # HANGUL JONGSEONG KIYEOK + CHOSEONG RIEUL
+ᆨᄆ → ngm ; # HANGUL JONGSEONG KIYEOK + CHOSEONG MIEUM
+ᆨᄇ → kp ; # HANGUL JONGSEONG KIYEOK + CHOSEONG PIEUP
+ᆨᄉ → ks ; # HANGUL JONGSEONG KIYEOK + CHOSEONG SIOS
+ᆨᄋ → g ; # HANGUL JONGSEONG KIYEOK + CHOSEONG IEUNG
+ᆨᄌ → kch ; # HANGUL JONGSEONG KIYEOK + CHOSEONG CIEUC
+ᆨᄎ → kch $aspirate ; # HANGUL JONGSEONG KIYEOK + CHOSEONG CHIEUCH
+ᆨᄏ → kk $aspirate ; # HANGUL JONGSEONG KIYEOK + CHOSEONG KHIEUKH
+ᆨᄐ → kt $aspirate ; # HANGUL JONGSEONG KIYEOK + CHOSEONG THIEUTH
+ᆨᄑ → kp $aspirate ; # HANGUL JONGSEONG KIYEOK + CHOSEONG PHIEUPH
+ᆨᄒ → kh ; # HANGUL JONGSEONG KIYEOK + CHOSEONG HIEUH
+ᆨᄁ → kk ; # HANGUL JONGSEONG KIYEOK + CHOSEONG SSANGKIYEOK
+ᆨᄄ → ktt ; # HANGUL JONGSEONG KIYEOK + CHOSEONG SSANGTIKEUT
+ᆨᄈ → kpp ; # HANGUL JONGSEONG KIYEOK + CHOSEONG SSANGPIEUP
+ᆨᄊ → kss ; # HANGUL JONGSEONG KIYEOK + CHOSEONG SSANGSIOS
+ᆨᄍ → ktch ; # HANGUL JONGSEONG KIYEOK + CHOSEONG SSANGCIEUC
+ᆫᄀ → n $apostrophe g ; # HANGUL JONGSEONG NIEUN + CHOSEONG KIEUK
+ᆫᄂ → nn ; # HANGUL JONGSEONG NIEUN + CHOSEONG NIEUN
+ᆫᄃ → nd ; # HANGUL JONGSEONG NIEUN + CHOSEONG TIKEUT
+ᆫᄅ → ll ; # HANGUL JONGSEONG NIEUN + CHOSEONG RIEUL
+ᆫᄆ → nm ; # HANGUL JONGSEONG NIEUN + CHOSEONG MIEUM
+ᆫᄇ → nb ; # HANGUL JONGSEONG NIEUN + CHOSEONG PIEUP
+ᆫᄉ → ns ; # HANGUL JONGSEONG NIEUN + CHOSEONG SIOS
+ᆫᄋ → n ; # HANGUL JONGSEONG NIEUN + CHOSEONG IEUNG
+ᆫᄌ → nj ; # HANGUL JONGSEONG NIEUN + CHOSEONG CIEUC
+ᆫᄎ → nch $aspirate ; # HANGUL JONGSEONG NIEUN + CHOSEONG CHIEUCH
+ᆫᄏ → nk $aspirate ; # HANGUL JONGSEONG NIEUN + CHOSEONG KHIEUKH
+ᆫᄐ → nt $aspirate ; # HANGUL JONGSEONG NIEUN + CHOSEONG THIEUTH
+ᆫᄑ → np $aspirate ; # HANGUL JONGSEONG NIEUN + CHOSEONG PHIEUPH
+ᆫᄒ → nh ; # HANGUL JONGSEONG NIEUN + CHOSEONG HIEUH
+ᆫᄁ → nkk ; # HANGUL JONGSEONG NIEUN + CHOSEONG SSANGKIYEOK
+ᆫᄄ → ntt ; # HANGUL JONGSEONG NIEUN + CHOSEONG SSANGTIKEUT
+ᆫᄈ → npp ; # HANGUL JONGSEONG NIEUN + CHOSEONG SSANGPIEUP
+ᆫᄊ → nss ; # HANGUL JONGSEONG NIEUN + CHOSEONG SSANGSIOS
+ᆫᄍ → ntch ; # HANGUL JONGSEONG NIEUN + CHOSEONG SSANGCIEUC
+ᆯᄀ → lg ; # HANGUL JONGSEONG RIEUL + CHOSEONG KIYEOK
+ᆯᄂ → ll ; # HANGUL JONGSEONG RIEUL + CHOSEONG NIEUN
+ᆯᄃ → lt ; # HANGUL JONGSEONG RIEUL + CHOSEONG TIKEUT
+ᆯᄅ → ll ; # HANGUL JONGSEONG RIEUL + CHOSEONG RIEUL
+ᆯᄆ → lm ; # HANGUL JONGSEONG RIEUL + CHOSEONG MIEUM
+ᆯᄇ → lb ; # HANGUL JONGSEONG RIEUL + CHOSEONG PIEUP
+ᆯᄉ → ls ; # HANGUL JONGSEONG RIEUL + CHOSEONG SIOS
+ᆯᄋ → r ; # HANGUL JONGSEONG RIEUL + CHOSEONG IEUNG
+ᆯᄌ → lch ; # HANGUL JONGSEONG RIEUL + CHOSEONG CIEUC
+ᆯᄎ → lch $aspirate ; # HANGUL JONGSEONG RIEUL + CHOSEONG CHIEUCH
+ᆯᄏ → lk $aspirate ; # HANGUL JONGSEONG RIEUL + CHOSEONG KHIEUKH
+ᆯᄐ → lt $aspirate ; # HANGUL JONGSEONG RIEUL + CHOSEONG THIEUTH
+ᆯᄑ → lp $aspirate ; # HANGUL JONGSEONG RIEUL + CHOSEONG PHIEUPH
+ᆯᄒ → rh ; # HANGUL JONGSEONG RIEUL + CHOSEONG HIEUH
+ᆯᄁ → lkk ; # HANGUL JONGSEONG RIEUL + CHOSEONG SSANGKIYEOK
+ᆯᄄ → ltt ; # HANGUL JONGSEONG RIEUL + CHOSEONG SSANGTIKEUT
+ᆯᄈ → lpp ; # HANGUL JONGSEONG RIEUL + CHOSEONG SSANGPIEUP
+ᆯᄊ → lss ; # HANGUL JONGSEONG RIEUL + CHOSEONG SSANGSIOS
+ᆯᄍ → ltch ; # HANGUL JONGSEONG RIEUL + CHOSEONG SSANGCIEUC
+ᆷᄀ → mg ; # HANGUL JONGSEONG MIEUM + CHOSEONG KIYEOK
+ᆷᄂ → mn ; # HANGUL JONGSEONG MIEUM + CHOSEONG NIEUN
+ᆷᄃ → md ; # HANGUL JONGSEONG MIEUM + CHOSEONG TIKEUT
+ᆷᄅ → mn ; # HANGUL JONGSEONG MIEUM + CHOSEONG RIEUL
+ᆷᄆ → mm ; # HANGUL JONGSEONG MIEUM + CHOSEONG MIEUM
+ᆷᄇ → mb ; # HANGUL JONGSEONG MIEUM + CHOSEONG PIEUP
+ᆷᄉ → ms ; # HANGUL JONGSEONG MIEUM + CHOSEONG SIOS
+ᆷᄋ → m ; # HANGUL JONGSEONG MIEUM + CHOSEONG IEUNG
+ᆷᄌ → mj ; # HANGUL JONGSEONG MIEUM + CHOSEONG CIEUC
+ᆷᄎ → mch $aspirate ; # HANGUL JONGSEONG MIEUM + CHOSEONG CHIEUCH
+ᆷᄏ → mk $aspirate ; # HANGUL JONGSEONG MIEUM + CHOSEONG KHIEUKH
+ᆷᄐ → mt $aspirate ; # HANGUL JONGSEONG MIEUM + CHOSEONG THIEUTH
+ᆷᄑ → mp $aspirate ; # HANGUL JONGSEONG MIEUM + CHOSEONG PHIEUPH
+ᆷᄒ → mh ; # HANGUL JONGSEONG MIEUM + CHOSEONG HIEUH
+ᆷᄁ → mkk ; # HANGUL JONGSEONG MIEUM + CHOSEONG SSANGKIYEOK
+ᆷᄄ → mtt ; # HANGUL JONGSEONG MIEUM + CHOSEONG SSANGTIKEUT
+ᆷᄈ → mpp ; # HANGUL JONGSEONG MIEUM + CHOSEONG SSANGPIEUP
+ᆷᄊ → mss ; # HANGUL JONGSEONG MIEUM + CHOSEONG SSANGSIOS
+ᆷᄍ → mtch ; # HANGUL JONGSEONG MIEUM + CHOSEONG SSANGCIEUC
+ᆸᄀ → pk ; # HANGUL JONGSEONG PIEUP + CHOSEONG KIYEOK
+ᆸᄂ → mn ; # HANGUL JONGSEONG PIEUP + CHOSEONG NIEUN
+ᆸᄃ → pt ; # HANGUL JONGSEONG PIEUP + CHOSEONG TIKEUT
+ᆸᄅ → mn ; # HANGUL JONGSEONG PIEUP + CHOSEONG RIEUL
+ᆸᄆ → mm ; # HANGUL JONGSEONG PIEUP + CHOSEONG MIEUM
+ᆸᄇ → pp ; # HANGUL JONGSEONG PIEUP + CHOSEONG PIEUP
+ᆸᄉ → ps ; # HANGUL JONGSEONG PIEUP + CHOSEONG SIOS
+ᆸᄋ → p ; # HANGUL JONGSEONG PIEUP + CHOSEONG IEUNG
+ᆸᄌ → pch ; # HANGUL JONGSEONG PIEUP + CHOSEONG CIEUC
+ᆸᄎ → pch $aspirate ; # HANGUL JONGSEONG PIEUP + CHOSEONG CHIEUCH
+ᆸᄏ → pk $aspirate ; # HANGUL JONGSEONG PIEUP + CHOSEONG KHIEUKH
+ᆸᄐ → pt $aspirate ; # HANGUL JONGSEONG PIEUP + CHOSEONG THIEUTH
+ᆸᄑ → pp $aspirate ; # HANGUL JONGSEONG PIEUP + CHOSEONG PHIEUPH
+ᆸᄒ → ph ; # HANGUL JONGSEONG PIEUP + CHOSEONG HIEUH
+ᆸᄁ → pkk ; # HANGUL JONGSEONG PIEUP + CHOSEONG SSANGKIYEOK
+ᆸᄄ → ptt ; # HANGUL JONGSEONG PIEUP + CHOSEONG SSANGTIKEUT
+ᆸᄈ → pp ; # HANGUL JONGSEONG PIEUP + CHOSEONG SSANGPIEUP
+ᆸᄊ → pss ; # HANGUL JONGSEONG PIEUP + CHOSEONG SSANGSIOS
+ᆸᄍ → ptch ; # HANGUL JONGSEONG PIEUP + CHOSEONG SSANGCIEUC
+ᆺᄀ → kk ; # HANGUL JONGSEONG SIOS + CHOSEONG KIYEOK
+ᆺᄂ → nn ; # HANGUL JONGSEONG SIOS + CHOSEONG NIEUN
+ᆺᄃ → tt ; # HANGUL JONGSEONG SIOS + CHOSEONG TIKEUT
+ᆺᄅ → nn ; # HANGUL JONGSEONG SIOS + CHOSEONG RIEUL
+ᆺᄆ → nm ; # HANGUL JONGSEONG SIOS + CHOSEONG MIEUM
+ᆺᄇ → pp ; # HANGUL JONGSEONG SIOS + CHOSEONG PIEUP
+ᆺᄉ → ss ; # HANGUL JONGSEONG SIOS + CHOSEONG SIOS
+ᆺᄋ → d ; # HANGUL JONGSEONG SIOS + CHOSEONG IEUNG
+ᆺᄌ → tch ; # HANGUL JONGSEONG SIOS + CHOSEONG CIEUC
+ᆺᄎ → tch $aspirate ; # HANGUL JONGSEONG SIOS + CHOSEONG CHIEUCH
+ᆺᄏ → tk $aspirate ; # HANGUL JONGSEONG SIOS + CHOSEONG KHIEUKH
+ᆺᄐ → tt $aspirate ; # HANGUL JONGSEONG SIOS + CHOSEONG THIEUTH
+ᆺᄑ → tp $aspirate ; # HANGUL JONGSEONG SIOS + CHOSEONG PHIEUPH
+ᆺᄒ → th ; # HANGUL JONGSEONG SIOS + CHOSEONG HIEUH
+ᆺᄁ → tkk ; # HANGUL JONGSEONG SIOS + CHOSEONG SSANGKIYEOK
+ᆺᄄ → tt ; # HANGUL JONGSEONG SIOS + CHOSEONG SSANGTIKEUT
+ᆺᄈ → tpp ; # HANGUL JONGSEONG SIOS + CHOSEONG SSANGPIEUP
+ᆺᄊ → tss ; # HANGUL JONGSEONG SIOS + CHOSEONG SSANGSIOS
+ᆺᄍ → tch ; # HANGUL JONGSEONG SIOS + CHOSEONG SSANGCIEUC
+ᆼᄀ → ngg ; # HANGUL JONGSEONG IEUNG + CHOSEONG KIYEOK
+ᆼᄂ → ngn ; # HANGUL JONGSEONG IEUNG + CHOSEONG NIEUN
+ᆼᄃ → ngd ; # HANGUL JONGSEONG IEUNG + CHOSEONG TIKEUT
+ᆼᄅ → ngn ; # HANGUL JONGSEONG IEUNG + CHOSEONG RIEUL
+ᆼᄆ → ngm ; # HANGUL JONGSEONG IEUNG + CHOSEONG MIEUM
+ᆼᄇ → ngb ; # HANGUL JONGSEONG IEUNG + CHOSEONG PIEUP
+ᆼᄉ → ngs ; # HANGUL JONGSEONG IEUNG + CHOSEONG SIOS
+ᆼᄋ → ng ; # HANGUL JONGSEONG IEUNG + CHOSEONG IEUNG
+ᆼᄌ → ngj ; # HANGUL JONGSEONG IEUNG + CHOSEONG CIEUC
+ᆼᄎ → ngch $aspirate ; # HANGUL JONGSEONG IEUNG + CHOSEONG CHIEUCH
+ᆼᄏ → ngk $aspirate ; # HANGUL JONGSEONG IEUNG + CHOSEONG KHIEUKH
+ᆼᄐ → ngt $aspirate ; # HANGUL JONGSEONG IEUNG + CHOSEONG THIEUTH
+ᆼᄑ → ngp $aspirate ; # HANGUL JONGSEONG IEUNG + CHOSEONG PHIEUPH
+ᆼᄒ → ngh ; # HANGUL JONGSEONG IEUNG + CHOSEONG HIEUH
+ᆼᄁ → ngkk ; # HANGUL JONGSEONG IEUNG + CHOSEONG SSANGKIYEOK
+ᆼᄄ → ngtt ; # HANGUL JONGSEONG IEUNG + CHOSEONG SSANGTIKEUT
+ᆼᄈ → ngpp ; # HANGUL JONGSEONG IEUNG + CHOSEONG SSANGPIEUP
+ᆼᄊ → ngss ; # HANGUL JONGSEONG IEUNG + CHOSEONG SSANGSIOS
+ᆼᄍ → ngtch ; # HANGUL JONGSEONG IEUNG + CHOSEONG SSANGCIEUC
+[$vowels]ᄀ → g ; # HANGUL JONGSEONG KIYEOK + CHOSEONG KIYEOK
+[$vowels]ᄂ → n ; # HANGUL JONGSEONG KIYEOK + CHOSEONG NIEUN
+[$vowels]ᄃ → d ; # HANGUL JONGSEONG KIYEOK + CHOSEONG TIKEUT
+[$vowels]ᄅ → r ; # HANGUL JONGSEONG KIYEOK + CHOSEONG RIEUL
+[$vowels]ᄆ → m ; # HANGUL JONGSEONG KIYEOK + CHOSEONG MIEUM
+[$vowels]ᄇ → b ; # HANGUL JONGSEONG KIYEOK + CHOSEONG PIEUP
+[$vowels]ᄉ → s ; # HANGUL JONGSEONG KIYEOK + CHOSEONG SIOS
+[$vowels]ᄋ →  ; # HANGUL JONGSEONG KIYEOK + CHOSEONG IEUNG
+[$vowels]ᄌ → j ; # HANGUL JONGSEONG KIYEOK + CHOSEONG CIEUC
+[$vowels]ᄎ → ch $aspirate ; # HANGUL JONGSEONG KIYEOK + CHOSEONG CHIEUCH
+[$vowels]ᄏ → k $aspirate ; # HANGUL JONGSEONG KIYEOK + CHOSEONG KHIEUKH
+[$vowels]ᄐ → t $aspirate ; # HANGUL JONGSEONG KIYEOK + CHOSEONG THIEUTH
+[$vowels]ᄑ → p $aspirate ; # HANGUL JONGSEONG KIYEOK + CHOSEONG PHIEUPH
+[$vowels]ᄒ → h ; # HANGUL JONGSEONG KIYEOK + CHOSEONG HIEUH
+[$vowels]ᄁ → kk ; # HANGUL JONGSEONG KIYEOK + CHOSEONG SSANGKIYEOK
+[$vowels]ᄄ → tt ; # HANGUL JONGSEONG KIYEOK + CHOSEONG SSANGTIKEUT
+[$vowels]ᄈ → pp ; # HANGUL JONGSEONG KIYEOK + CHOSEONG SSANGPIEUP
+[$vowels]ᄊ → ss ; # HANGUL JONGSEONG KIYEOK + CHOSEONG SSANGSIOS
+[$vowels]ᄍ → tch ; # HANGUL JONGSEONG KIYEOK + CHOSEONG SSANGCIEUC
+ᆰᄀ → lg ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG KIYEOK
+ᆰᄂ → ngn ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG NIEUN
+ᆰᄃ → kt ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG TIKEUT
+ᆰᄅ → ngl ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG RIEUL
+ᆰᄆ → ngm ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG MIEUM
+ᆰᄇ → kp ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG PIEUP
+ᆰᄉ → ks ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG SIOS
+ᆰᄋ → lg ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG IEUNG
+ᆰᄌ → kch ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG CIEUC
+ᆰᄎ → kch $aspirate ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG CHIEUCH
+ᆰᄏ → lk $aspirate ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG KHIEUKH
+ᆰᄐ → kt $aspirate ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG THIEUTH
+ᆰᄑ → kp $aspirate ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG PHIEUPH
+ᆰᄒ → lkh ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG HIEUH
+ᆰᄁ → lkk ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG SSANGKIYEOK
+ᆰᄄ → ktt ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG SSANGTIKEUT
+ᆰᄈ → kpp ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG SSANGPIEUP
+ᆰᄊ → kss ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG SSANGSIOS
+ᆰᄍ → ktch ; # HANGUL JONGSEONG RIEUL-KIYEOK + CHOSEONG SSANGCIEUC
+ᆱᄀ → mg ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG KIYEOK
+ᆱᄂ → mn ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG NIEUN
+ᆱᄃ → md ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG TIKEUT
+ᆱᄅ → ml ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG RIEUL
+ᆱᄆ → lm ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG MIEUM
+ᆱᄇ → mb ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG PIEUP
+ᆱᄉ → ms ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG SIOS
+ᆱᄋ → lm ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG IEUNG
+ᆱᄌ → mj ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG CIEUC
+ᆱᄎ → mch $aspirate ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG CHIEUCH
+ᆱᄏ → mk $aspirate ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG KHIEUKH
+ᆱᄐ → mt $aspirate ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG THIEUTH
+ᆱᄑ → mp $aspirate ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG PHIEUPH
+ᆱᄒ → mh ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG HIEUH
+ᆱᄁ → mkk ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG SSANGKIYEOK
+ᆱᄄ → mtt ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG SSANGTIKEUT
+ᆱᄈ → mpp ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG SSANGPIEUP
+ᆱᄊ → mss ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG SSANGSIOS
+ᆱᄍ → mtch ; # HANGUL JONGSEONG RIEUL-MIEUM + CHOSEONG SSANGCIEUC
+ᆲᄀ → pk ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG KIYEOK
+ᆲᄂ → mn ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG NIEUN
+ᆲᄃ → pt ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG TIKEUT
+ᆲᄅ → ml ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG RIEUL
+ᆲᄆ → mm ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG MIEUM
+ᆲᄇ → lb ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG PIEUP
+ᆲᄉ → ps ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG SIOS
+ᆲᄋ → lb ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG IEUNG
+ᆲᄌ → pch ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG CIEUC
+ᆲᄎ → pch $aspirate ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG CHIEUCH
+ᆲᄏ → pk $aspirate ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG KHIEUKH
+ᆲᄐ → pt $aspirate ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG THIEUTH
+ᆲᄑ → lp $aspirate ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG PHIEUPH
+ᆲᄒ → lph ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG HIEUH
+ᆲᄁ → pkk ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG SSANGKIYEOK
+ᆲᄄ → ptt ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG SSANGTIKEUT
+ᆲᄈ → lpp ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG SSANGPIEUP
+ᆲᄊ → pss ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG SSANGSIOS
+ᆲᄍ → ptch ; # HANGUL JONGSEONG RIEUL-PIEUP + CHOSEONG SSANGCIEUC
+#
+#
+########################################################################
+#
+# End of Rule 1
+#
+########################################################################
+#
+########################################################################
+#
+# Start of Transformations
+#
+########################################################################
+$wordBoundary{ᄀ → k ; # HANGUL CHOSEONG KIYEOK
+$wordBoundary{ᄂ → n ; # HANGUL CHOSEONG NIEUN
+$wordBoundary{ᄃ → t ; # HANGUL CHOSEONG TIKEUT
+$wordBoundary{ᄅ → n ; # HANGUL CHOSEONG RIEUL
+$wordBoundary{ᄆ → m ; # HANGUL CHOSEONG MIEUM
+$wordBoundary{ᄇ → p ; # HANGUL CHOSEONG PIEUP
+$wordBoundary{ᄉ → s ; # HANGUL CHOSEONG SIOS
+$wordBoundary{ᄋ →  ; # HANGUL CHOSEONG IEUNG
+$wordBoundary{ᄌ → ch ; # HANGUL CHOSEONG CIEUC
+$wordBoundary{ᄎ → ch $aspirate ; # HANGUL CHOSEONG CHIEUCH
+$wordBoundary{ᄏ → k $aspirate ; # HANGUL CHOSEONG KHIEUKH
+$wordBoundary{ᄐ → t $aspirate ; # HANGUL CHOSEONG THIEUTH
+$wordBoundary{ᄑ → p $aspirate ; # HANGUL CHOSEONG PHIEUPH
+$wordBoundary{ᄒ → h ; # HANGUL CHOSEONG HIEUH
+$wordBoundary{ᄁ → kk ; # HANGUL CHOSEONG SSANGKIYEOK
+$wordBoundary{ᄭ → kk ; # HANGUL CHOSEONG SIOS-KIYEOK
+$wordBoundary{ᄄ → tt ; # HANGUL CHOSEONG SSANGTIKEUT
+$wordBoundary{ᄯ → tt ; # HANGUL CHOSEONG SIOS-TIKEUT
+$wordBoundary{ᄈ → pp ; # HANGUL CHOSEONG SSANGPIEUP
+$wordBoundary{ᄲ → pp ; # HANGUL CHOSEONG SIOS-PIEUP
+$wordBoundary{ᄊ → ss ; # HANGUL CHOSEONG SSANGSIOS
+$wordBoundary{ᄍ → tch ; # HANGUL CHOSEONG SSANGCIEUC
+$wordBoundary{ᄶ → tch ; # HANGUL CHOSEONG SIOS-CIEUC
+ᅡ → a ; # HANGUL JUNGSEONG A
+ᅣ → ya ; # HANGUL JUNGSEONG YA
+ᅥ → ŏ ; # HANGUL JUNGSEONG EO
+ᅧ → yŏ ; # HANGUL JUNGSEONG YEO
+ᅩ → o ; # HANGUL JUNGSEONG O
+ᅭ → yo ; # HANGUL JUNGSEONG YO
+ᅮ → u ; # HANGUL JUNGSEONG U
+ᅲ → yu ; # HANGUL JUNGSEONG YU
+ᅳ → ŭ ; # HANGUL JUNGSEONG EU
+ᅵ → i ; # HANGUL JUNGSEONG I
+ᅢ → ae ; # HANGUL JUNGSEONG AE
+ᅤ → yae ; # HANGUL JUNGSEONG YAE
+ᅦ → e ; # HANGUL JUNGSEONG E
+ᅨ → ye ; # HANGUL JUNGSEONG YE
+ᅬ → oe ; # HANGUL JUNGSEONG OE
+ᅱ → wi ; # HANGUL JUNGSEONG WI
+ᅴ → ŭi ; # HANGUL JUNGSEONG YI
+ᅪ → wa ; # HANGUL JUNGSEONG WA
+ᅯ → wŏ ; # HANGUL JUNGSEONG WEO
+ᅫ → wae ; # HANGUL JUNGSEONG WAE
+ᅰ → we ; # HANGUL JUNGSEONG WE
+ᆨ}$wordBoundary → k ; # HANGUL JONGSEONG KIYEOK
+ᆫ}$wordBoundary → n ; # HANGUL JONGSEONG NIEUN
+ᆮ}$wordBoundary → t ; # HANGUL JONGSEONG TIKEUT
+ᆯ}$wordBoundary → l ; # HANGUL JONGSEONG RIEUL
+ᆷ}$wordBoundary → m ; # HANGUL JONGSEONG MIEUM
+ᆸ}$wordBoundary → p ; # HANGUL JONGSEONG PIEUP
+ᆺ}$wordBoundary → t ; # HANGUL JONGSEONG SIOS
+ᆼ}$wordBoundary → ng ; # HANGUL JONGSEONG IEUNG
+ᆽ}$wordBoundary → t ; # HANGUL JONGSEONG CIEUC
+ᆾ}$wordBoundary → t ; # HANGUL JONGSEONG CHIEUCH
+ᆿ}$wordBoundary → k ; # HANGUL JONGSEONG KHIEUKH
+ᇀ}$wordBoundary → t ; # HANGUL JONGSEONG THIEUTH
+ᇁ}$wordBoundary → p ; # HANGUL JONGSEONG PHIEUPH
+ᆰ}$wordBoundary → k ; # HANGUL JONGSEONG RIEUL-KIYEOK
+ᆲ}$wordBoundary → p ; # HANGUL JONGSEONG RIEUL-PIEUP
+#
+#
+########################################################################
+

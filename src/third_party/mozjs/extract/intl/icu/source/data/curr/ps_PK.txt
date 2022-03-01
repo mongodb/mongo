@@ -1,0 +1,25 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ps_PK{
+    Currencies{
+        PKR{
+            "Rs",
+            "پاکستانۍ کلداره",
+        }
+        XXX{
+            "¤",
+            "نامعلومه مروجه پېسے",
+        }
+    }
+    CurrencyPlurals{
+        PKR{
+            one{"پاکستانۍ کلداره"}
+            other{"پاکستانۍ کلدارے"}
+        }
+        XXX{
+            one{"(د نامعلومه مروجه پېسو واحد)"}
+            other{"(نامعلومه مروجه پېسے)"}
+        }
+    }
+}

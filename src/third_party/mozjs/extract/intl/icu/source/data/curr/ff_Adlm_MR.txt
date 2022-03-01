@@ -1,0 +1,15 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ff_Adlm_MR{
+    Currencies{
+        GNF{
+            "GNF",
+            "𞤊𞤢𞤪𞤢𞤲 𞤘𞤭𞤲𞤫𞤲𞤳𞤮",
+        }
+        MRU{
+            "UM",
+            "𞤓𞤺𞤭𞤴𞤢 𞤃𞤮𞤪𞤭𞤼𞤢𞤲𞤭𞤴𞤢𞤲𞤳𞤮",
+        }
+    }
+}

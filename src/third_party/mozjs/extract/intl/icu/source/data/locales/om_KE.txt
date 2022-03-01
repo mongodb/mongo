@@ -1,0 +1,75 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+om_KE{
+    calendar{
+        gregorian{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, MMMM d, y",
+                "dd MMMM y",
+                "dd-MMM-y",
+                "dd/MM/yy",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            dayNames{
+                stand-alone{
+                    narrow{
+                        "D",
+                        "W",
+                        "Q",
+                        "R",
+                        "K",
+                        "J",
+                        "S",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "KD",
+                    "CE",
+                }
+                abbreviated%variant{
+                    "BCE",
+                    "KB",
+                }
+            }
+            monthNames{
+                stand-alone{
+                    narrow{
+                        "A",
+                        "G",
+                        "B",
+                        "E",
+                        "C",
+                        "W",
+                        "A",
+                        "H",
+                        "F",
+                        "O",
+                        "S",
+                        "M",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "K1",
+                        "K2",
+                        "K3",
+                        "K4",
+                    }
+                }
+            }
+        }
+    }
+}

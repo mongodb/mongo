@@ -1,0 +1,28 @@
+Bug 915735 - Fix linking the ICU libraries on Mac
+
+diff --git a/intl/icu/source/config/mh-darwin b/intl/icu/source/config/mh-darwin
+--- a/intl/icu/source/config/mh-darwin
++++ b/intl/icu/source/config/mh-darwin
+@@ -25,21 +25,17 @@ ARFLAGS += -c
+ COMPILE.c=	$(CC) $(DEFS) $(CPPFLAGS) $(CFLAGS) -fno-common -c
+ COMPILE.cc=	$(CXX) $(DEFS) $(CPPFLAGS) $(CXXFLAGS) -fno-common -c
+ 
+ ## Commands to make a shared library
+ SHLIB.c=	$(CC) -dynamiclib -dynamic $(CFLAGS) $(LDFLAGS) $(LD_SOOPTIONS)
+ SHLIB.cc=	$(CXX) -dynamiclib -dynamic $(CXXFLAGS) $(LDFLAGS) $(LD_SOOPTIONS)
+ 
+ ## Compiler switches to embed a library name and version information
+-ifeq ($(ENABLE_RPATH),YES)
+-LD_SONAME = -Wl,-compatibility_version -Wl,$(SO_TARGET_VERSION_MAJOR) -Wl,-current_version -Wl,$(SO_TARGET_VERSION) -install_name $(libdir)/$(notdir $(MIDDLE_SO_TARGET))
+-else
+-LD_SONAME = -Wl,-compatibility_version -Wl,$(SO_TARGET_VERSION_MAJOR) -Wl,-current_version -Wl,$(SO_TARGET_VERSION) -install_name $(notdir $(MIDDLE_SO_TARGET)) $(PKGDATA_TRAILING_SPACE)
+-endif
++LD_SONAME = -Wl,-compatibility_version -Wl,$(SO_TARGET_VERSION_MAJOR) -Wl,-current_version -Wl,$(SO_TARGET_VERSION) -install_name @executable_path/$(notdir $(MIDDLE_SO_TARGET)) $(PKGDATA_TRAILING_SPACE)
+ 
+ ## Compiler switch to embed a runtime search path
+ LD_RPATH=
+ LD_RPATH_PRE= -Wl,-rpath,
+ 
+ ## Environment variable to set a runtime search path
+ LDLIBRARYPATH_ENVVAR = DYLD_LIBRARY_PATH
+ 

@@ -1,0 +1,1843 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+hy{
+    AuxExemplarCharacters{"[և]"}
+    Ellipsis{
+        final{"{0}…"}
+        initial{"…{0}"}
+        medial{"{0}…{1}"}
+        word-final{"{0} …"}
+        word-initial{"… {0}"}
+        word-medial{"{0} … {1}"}
+    }
+    ExemplarCharacters{
+        "[ա բ գ դ ե զ է ը թ ժ ի լ խ ծ կ հ ձ ղ ճ մ յ ն շ ո չ պ ջ ռ ս վ տ ր ց ւ փ ք օ ֆ"
+        "]"
+    }
+    ExemplarCharactersIndex{
+        "[Ա Բ Գ Դ Ե Զ Է Ը Թ Ժ Ի Լ Խ Ծ Կ Հ Ձ Ղ Ճ Մ Յ Ն Շ Ո Չ Պ Ջ Ռ Ս Վ Տ Ր Ց Ւ Փ Ք Օ Ֆ"
+        "]"
+    }
+    ExemplarCharactersNumbers{"[  \\- ‑ , % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    ExemplarCharactersPunctuation{"[֊ , ՝ \\: ՜ ՞ . « » ՚ ՛ ՟]"}
+    MoreInformation{"(՞)"}
+    NumberElements{
+        default{"latn"}
+        latn{
+            miscPatterns{
+                approximately{"~{0}"}
+                atLeast{"{0}+"}
+                atMost{"≤{0}"}
+                range{"{0}–{1}"}
+            }
+            patterns{
+                accountingFormat{"#,##0.00 ¤"}
+                currencyFormat{"#,##0.00 ¤"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"#,##0%"}
+                scientificFormat{"#E0"}
+            }
+            patternsLong{
+                decimalFormat{
+                    1000{
+                        one{"0 հազար"}
+                        other{"0 հազար"}
+                    }
+                    10000{
+                        one{"00 հազար"}
+                        other{"00 հազար"}
+                    }
+                    100000{
+                        one{"000 հազար"}
+                        other{"000 հազար"}
+                    }
+                    1000000{
+                        one{"0 միլիոն"}
+                        other{"0 միլիոն"}
+                    }
+                    10000000{
+                        one{"00 միլիոն"}
+                        other{"00 միլիոն"}
+                    }
+                    100000000{
+                        one{"000 միլիոն"}
+                        other{"000 միլիոն"}
+                    }
+                    1000000000{
+                        one{"0 միլիարդ"}
+                        other{"0 միլիարդ"}
+                    }
+                    10000000000{
+                        one{"00 միլիարդ"}
+                        other{"00 միլիարդ"}
+                    }
+                    100000000000{
+                        one{"000 միլիարդ"}
+                        other{"000 միլիարդ"}
+                    }
+                    1000000000000{
+                        one{"0 տրիլիոն"}
+                        other{"0 տրիլիոն"}
+                    }
+                    10000000000000{
+                        one{"00 տրիլիոն"}
+                        other{"00 տրիլիոն"}
+                    }
+                    100000000000000{
+                        one{"000 տրիլիոն"}
+                        other{"000 տրիլիոն"}
+                    }
+                }
+            }
+            patternsShort{
+                currencyFormat{
+                    1000{
+                        one{"0 հզր ¤"}
+                        other{"0 հզր ¤"}
+                    }
+                    10000{
+                        one{"00 հզր ¤"}
+                        other{"00 հզր ¤"}
+                    }
+                    100000{
+                        one{"000 հզր ¤"}
+                        other{"000 հզր ¤"}
+                    }
+                    1000000{
+                        one{"0 մլն ¤"}
+                        other{"0 մլն ¤"}
+                    }
+                    10000000{
+                        one{"00 մլն ¤"}
+                        other{"00 մլն ¤"}
+                    }
+                    100000000{
+                        one{"000 մլն ¤"}
+                        other{"000 մլն ¤"}
+                    }
+                    1000000000{
+                        one{"0 մլրդ ¤"}
+                        other{"0 մլրդ ¤"}
+                    }
+                    10000000000{
+                        one{"00 մլրդ ¤"}
+                        other{"00 մլրդ ¤"}
+                    }
+                    100000000000{
+                        one{"000 մլրդ ¤"}
+                        other{"000 մլրդ ¤"}
+                    }
+                    1000000000000{
+                        one{"0 տրլն ¤"}
+                        other{"0 տրլն ¤"}
+                    }
+                    10000000000000{
+                        one{"00 տրլն ¤"}
+                        other{"00 տրլն ¤"}
+                    }
+                    100000000000000{
+                        one{"000 տրլն ¤"}
+                        other{"000 տրլն ¤"}
+                    }
+                }
+                decimalFormat{
+                    1000{
+                        one{"0 հզր"}
+                        other{"0 հզր"}
+                    }
+                    10000{
+                        one{"00 հզր"}
+                        other{"00 հզր"}
+                    }
+                    100000{
+                        one{"000 հզր"}
+                        other{"000 հզր"}
+                    }
+                    1000000{
+                        one{"0 մլն"}
+                        other{"0 մլն"}
+                    }
+                    10000000{
+                        one{"00 մլն"}
+                        other{"00 մլն"}
+                    }
+                    100000000{
+                        one{"000 մլն"}
+                        other{"000 մլն"}
+                    }
+                    1000000000{
+                        one{"0 մլրդ"}
+                        other{"0 մլրդ"}
+                    }
+                    10000000000{
+                        one{"00 մլրդ"}
+                        other{"00 մլրդ"}
+                    }
+                    100000000000{
+                        one{"000 մլրդ"}
+                        other{"000 մլրդ"}
+                    }
+                    1000000000000{
+                        one{"0 տրլն"}
+                        other{"0 տրլն"}
+                    }
+                    10000000000000{
+                        one{"00 տրլն"}
+                        other{"00 տրլն"}
+                    }
+                    100000000000000{
+                        one{"000 տրլն"}
+                        other{"000 տրլն"}
+                    }
+                }
+            }
+            symbols{
+                decimal{","}
+                exponential{"E"}
+                group{" "}
+                infinity{"∞"}
+                list{";"}
+                minusSign{"-"}
+                nan{"ՈչԹ"}
+                perMille{"‰"}
+                percentSign{"%"}
+                plusSign{"+"}
+                superscriptingExponent{"×"}
+                timeSeparator{":"}
+            }
+        }
+        minimalPairs{
+            ordinal{
+                one{"Թեքվեք աջ {0}-ին խաչմերուկից:"}
+                other{"Թեքվեք աջ {0}-րդ խաչմերուկից:"}
+            }
+            plural{
+                one{"այդ {0} ժամը"}
+                other{"այդ {0} ժամերը"}
+            }
+        }
+        minimumGroupingDigits{"1"}
+        native{"latn"}
+        traditional{"armn"}
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "d MMMM, y թ. G, EEEE",
+                "dd MMMM, y թ. G",
+                "dd MMM, y թ. G",
+                "dd.MM.y GGGGG",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                Bh{"B h-ին"}
+                Bhm{"B h:mm-ին"}
+                Bhms{"B h:mm:ss"}
+                E{"ccc"}
+                EBhm{"E B h:mm-ին"}
+                EBhms{"E B h:mm:ss"}
+                EHm{"E HH:mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"d, ccc"}
+                Ehm{"E h:mm a"}
+                Ehms{"E h:mm:ss a"}
+                Gy{"G y թ․"}
+                GyMMM{"G y թ․ MMM"}
+                GyMMMEd{"G y թ․ MMM d, E"}
+                GyMMMd{"G y թ․ MMM d"}
+                H{"H"}
+                Hm{"H:mm"}
+                Hms{"H:mm:ss"}
+                M{"L"}
+                MEd{"dd.MM, E"}
+                MMM{"LLL"}
+                MMMEd{"d MMM, E"}
+                MMMMd{"MMMM d"}
+                MMMd{"d MMM"}
+                Md{"dd.MM"}
+                d{"d"}
+                h{"h a"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                ms{"mm:ss"}
+                y{"y, G"}
+                yyyy{"y, G"}
+                yyyyM{"G y թ. MM"}
+                yyyyMEd{"d.MM.y թ., G, E"}
+                yyyyMMM{"G y թ. LLL"}
+                yyyyMMMEd{"d MMM, y թ. G, E"}
+                yyyyMMMM{"G y MMMM"}
+                yyyyMMMd{"d MMM, y թ., G"}
+                yyyyMd{"d.M.y թ., G"}
+                yyyyQQQ{"G y թ, QQQ"}
+                yyyyQQQQ{"G y թ, QQQQ"}
+            }
+            intervalFormats{
+                Bh{
+                    B{"B h–ից B h-ը"}
+                    h{"B h–ից h-ը"}
+                }
+                Bhm{
+                    B{"B h:mm – B h:mm"}
+                    h{"B h:mm – h:mm"}
+                    m{"B h:mm – h:mm"}
+                }
+                H{
+                    H{"H–H"}
+                }
+                Hm{
+                    H{"H:mm–H:mm"}
+                    m{"H:mm–H:mm"}
+                }
+                Hmv{
+                    H{"H:mm–H:mm v"}
+                    m{"H:mm–H:mm v"}
+                }
+                Hv{
+                    H{"H–H v"}
+                }
+                M{
+                    M{"M–M"}
+                }
+                MEd{
+                    M{"E, dd.MM – E, dd.MM"}
+                    d{"E, dd.MM – E, dd.MM"}
+                }
+                MMM{
+                    M{"MMM–MMM"}
+                }
+                MMMEd{
+                    M{"E, MMM dd – E, MMM dd"}
+                    d{"E, MMM dd – E, MMM dd"}
+                }
+                MMMd{
+                    M{"MMM dd – MMM dd"}
+                    d{"MMM dd–dd"}
+                }
+                Md{
+                    M{"dd.MM – dd.MM"}
+                    d{"dd.MM – dd.MM"}
+                }
+                d{
+                    d{"d–d"}
+                }
+                fallback{"{0} - {1}"}
+                h{
+                    a{"h a – h a"}
+                    h{"h–h a"}
+                }
+                hm{
+                    a{"h:mm a – h:mm a"}
+                    h{"h:mm–h:mm a"}
+                    m{"h:mm–h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a – h:mm a v"}
+                    h{"h:mm–h:mm a v"}
+                    m{"h:mm–h:mm a v"}
+                }
+                hv{
+                    a{"h a – h a v"}
+                    h{"h–h a v"}
+                }
+                y{
+                    y{"y–y G"}
+                }
+                yM{
+                    M{"MM.y – MM.y G"}
+                    y{"MM.y – MM.y G"}
+                }
+                yMEd{
+                    M{"ccc, dd.MM.y – ccc, dd.MM.y G"}
+                    d{"ccc, dd.MM.y – ccc, dd.MM.y G"}
+                    y{"ccc, dd.MM.y – ccc, dd.MM.y G"}
+                }
+                yMMM{
+                    M{"MMM–MMM y թ. G"}
+                    y{"MMM y – MMM y թ. G"}
+                }
+                yMMMEd{
+                    M{"E, d MMM – E, d MMM, y թ. G"}
+                    d{"E, d MMM – E, d MMM, y թ. G"}
+                    y{"E, d MMM, y – E, d MMM, y թ. G"}
+                }
+                yMMMM{
+                    M{"G y թ. MMM – MMM"}
+                    y{"MMM y – MMM y թ G"}
+                }
+                yMMMd{
+                    M{"dd MMM – dd MMM, y թ. G"}
+                    d{"dd–dd MMM, y թ. G"}
+                    y{"dd MMM, y – dd MMM, y թ. G"}
+                }
+                yMd{
+                    M{"dd.MM.y – dd.MM.y G"}
+                    d{"dd.MM.y – dd.MM.y G"}
+                    y{"dd.MM.y – dd.MM.y G"}
+                }
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "AM",
+                "PM",
+            }
+            AmPmMarkersAbbr{
+                "AM",
+                "PM",
+            }
+            AmPmMarkersNarrow{
+                "ա",
+                "հ",
+            }
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "y թ. MMMM d, EEEE",
+                "dd MMMM, y թ.",
+                "dd MMM, y թ.",
+                "dd.MM.yy",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            appendItems{
+                Timezone{"{0} {1}"}
+            }
+            availableFormats{
+                Bh{"B h-ին"}
+                Bhm{"B h:mm-ին"}
+                Bhms{"B h:mm:ss"}
+                E{"ccc"}
+                EBhm{"E B h:mm-ին"}
+                EBhms{"E B h:mm:ss"}
+                EHm{"E, HH:mm"}
+                EHms{"E, HH:mm:ss"}
+                Ed{"d, ccc"}
+                Ehm{"E, h:mm a"}
+                Ehms{"E, h:mm:ss a"}
+                Gy{"G y թ."}
+                GyMMM{"G y թ. MMM"}
+                GyMMMEd{"G y թ. MMM d, E"}
+                GyMMMd{"d MMM, y թ."}
+                H{"H"}
+                Hm{"H:mm"}
+                Hms{"H:mm:ss"}
+                Hmsv{"HH:mm:ss v"}
+                Hmv{"HH:mm v"}
+                M{"L"}
+                MEd{"dd.MM, E"}
+                MMM{"LLL"}
+                MMMEd{"d MMM, E"}
+                MMMMW{
+                    one{"MMMM W-ին շաբաթ"}
+                    other{"MMMM W-րդ շաբաթ"}
+                }
+                MMMMd{"MMMM d"}
+                MMMd{"d MMM"}
+                Md{"dd.MM"}
+                d{"d"}
+                h{"h a"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                hmsv{"h:mm:ss a v"}
+                hmv{"h:mm a v"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"MM.y"}
+                yMEd{"d.MM.y թ., E"}
+                yMMM{"y թ. LLL"}
+                yMMMEd{"y թ. MMM d, E"}
+                yMMMM{"y թ․ LLLL"}
+                yMMMd{"d MMM, y թ."}
+                yMd{"dd.MM.y"}
+                yQQQ{"y թ. QQQ"}
+                yQQQQ{"y թ. QQQQ"}
+                yw{
+                    one{"Y թ․ w-ին շաբաթ"}
+                    other{"Y թ․ w-րդ շաբաթ"}
+                }
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "կիր",
+                        "երկ",
+                        "երք",
+                        "չրք",
+                        "հնգ",
+                        "ուր",
+                        "շբթ",
+                    }
+                    narrow{
+                        "Կ",
+                        "Ե",
+                        "Ե",
+                        "Չ",
+                        "Հ",
+                        "Ո",
+                        "Շ",
+                    }
+                    short{
+                        "կր",
+                        "եկ",
+                        "եք",
+                        "չք",
+                        "հգ",
+                        "ու",
+                        "շբ",
+                    }
+                    wide{
+                        "կիրակի",
+                        "երկուշաբթի",
+                        "երեքշաբթի",
+                        "չորեքշաբթի",
+                        "հինգշաբթի",
+                        "ուրբաթ",
+                        "շաբաթ",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "կիր",
+                        "երկ",
+                        "երք",
+                        "չրք",
+                        "հնգ",
+                        "ուր",
+                        "շբթ",
+                    }
+                    narrow{
+                        "Կ",
+                        "Ե",
+                        "Ե",
+                        "Չ",
+                        "Հ",
+                        "Ո",
+                        "Շ",
+                    }
+                    short{
+                        "կր",
+                        "եկ",
+                        "եք",
+                        "չք",
+                        "հգ",
+                        "ու",
+                        "շբ",
+                    }
+                    wide{
+                        "կիրակի",
+                        "երկուշաբթի",
+                        "երեքշաբթի",
+                        "չորեքշաբթի",
+                        "հինգշաբթի",
+                        "ուրբաթ",
+                        "շաբաթ",
+                    }
+                }
+            }
+            dayPeriod{
+                format{
+                    abbreviated{
+                        afternoon1{"ցերեկը"}
+                        evening1{"երեկոյան"}
+                        midnight{"կեսգիշեր"}
+                        morning1{"առավոտյան"}
+                        night1{"գիշերը"}
+                        noon{"կեսօր"}
+                    }
+                    narrow{
+                        afternoon1{"ցրկ"}
+                        evening1{"երկ"}
+                        midnight{"կգ․"}
+                        morning1{"առվ"}
+                        night1{"գշր"}
+                        noon{"կօ․"}
+                    }
+                    wide{
+                        afternoon1{"ցերեկվա"}
+                        evening1{"երեկոյան"}
+                        midnight{"կեսգիշերին"}
+                        morning1{"առավոտյան"}
+                        night1{"գիշերվա"}
+                        noon{"կեսօրին"}
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        afternoon1{"ցերեկ"}
+                        am{"AM"}
+                        evening1{"երեկո"}
+                        midnight{"կեսգիշեր"}
+                        morning1{"առավոտ"}
+                        night1{"գիշեր"}
+                        noon{"կեսօր"}
+                        pm{"PM"}
+                    }
+                    narrow{
+                        afternoon1{"ցերեկ"}
+                        am{"AM"}
+                        evening1{"երեկո"}
+                        midnight{"կեսգիշեր"}
+                        morning1{"առավոտ"}
+                        night1{"գիշեր"}
+                        noon{"կեսօր"}
+                        pm{"PM"}
+                    }
+                    wide{
+                        afternoon1{"ցերեկ"}
+                        am{"AM"}
+                        evening1{"երեկո"}
+                        midnight{"կեսգիշեր"}
+                        morning1{"առավոտ"}
+                        night1{"գիշեր"}
+                        noon{"կեսօր"}
+                        pm{"PM"}
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "մ.թ.ա.",
+                    "մ.թ.",
+                }
+                abbreviated%variant{
+                    "մ․թ․ա․",
+                    "մ․թ․",
+                }
+                wide{
+                    "Քրիստոսից առաջ",
+                    "Քրիստոսից հետո",
+                }
+                wide%variant{
+                    "մեր թվարկությունից առաջ",
+                    "մեր թվարկության",
+                }
+            }
+            intervalFormats{
+                Bh{
+                    B{"B h–ից B h-ը"}
+                    h{"B h–ից h-ը"}
+                }
+                Bhm{
+                    B{"B h:mm – B h:mm"}
+                    h{"B h:mm–h:mm"}
+                    m{"B h:mm – h:mm"}
+                }
+                Gy{
+                    y{"G y–y թթ․"}
+                }
+                GyM{
+                    G{"GGGGG MM.y – GGGGG MM.y"}
+                    M{"GGGGG MM.y – MM.y"}
+                    y{"GGGGG MM.y – MM.y"}
+                }
+                GyMEd{
+                    G{"GGGGG dd.MM.y ccc – GGGGG dd.MM.y ccc"}
+                    M{"GGGGG dd.MM.y ccc – dd.MM.y ccc"}
+                    d{"GGGGG dd.MM.y, ccc – dd.MM.y, ccc"}
+                    y{"GGGGG dd.MM.y ccc – dd.MM.y ccc"}
+                }
+                GyMMM{
+                    G{"G y MMM – G y MMM"}
+                    M{"G y թ. MMM – MMM"}
+                    y{"G y MMM – y MMM"}
+                }
+                GyMMMEd{
+                    G{"G y թ. MMM d E – G MMM d E"}
+                    M{"G y թ. MMM d E – MMM d E"}
+                    d{"G y թ. MMM d E – MMM d E"}
+                    y{"G y թ. MMM d E – y թ. MMM d E"}
+                }
+                GyMMMd{
+                    G{"G y թ․ MMM dd – G y թ. MMM dd"}
+                    M{"G y թ. MMM dd – MMM dd"}
+                    d{"G y թ. MMM dd–dd"}
+                    y{"G y թ․ MMM dd – G y թ. MMM dd"}
+                }
+                GyMd{
+                    G{"GGGGG dd.MM.y – GGGGG dd.MM.y"}
+                    M{"GGGGG dd.MM.y – dd.MM.y"}
+                    d{"GGGGG dd.MM.y – dd.MM.y"}
+                    y{"GGGGG dd.MM.y – dd.MM.y"}
+                }
+                H{
+                    H{"H–H"}
+                }
+                Hm{
+                    H{"H:mm–H:mm"}
+                    m{"H:mm–H:mm"}
+                }
+                Hmv{
+                    H{"H:mm–H:mm, v"}
+                    m{"H:mm–H:mm, v"}
+                }
+                Hv{
+                    H{"H–H, v"}
+                }
+                M{
+                    M{"M–M"}
+                }
+                MEd{
+                    M{"E, dd.MM – E, dd.MM"}
+                    d{"E, dd.MM – E, dd.MM"}
+                }
+                MMM{
+                    M{"MMM–MMM"}
+                }
+                MMMEd{
+                    M{"E, MMM dd – E, MMM dd"}
+                    d{"E, MMM dd – E, MMM dd"}
+                }
+                MMMd{
+                    M{"MMM dd – MMM dd"}
+                    d{"MMM dd–dd"}
+                }
+                Md{
+                    M{"dd.MM – dd.MM"}
+                    d{"dd.MM – dd.MM"}
+                }
+                d{
+                    d{"d–d"}
+                }
+                fallback{"{0} – {1}"}
+                h{
+                    a{"h a – h a"}
+                    h{"h–h a"}
+                }
+                hm{
+                    a{"h:mm a – h:mm a"}
+                    h{"h:mm–h:mm a"}
+                    m{"h:mm–h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a – h:mm a v"}
+                    h{"h:mm–h:mm a v"}
+                    m{"h:mm–h:mm a v"}
+                }
+                hv{
+                    a{"h a – h a v"}
+                    h{"h–h a v"}
+                }
+                y{
+                    y{"y–y"}
+                }
+                yM{
+                    M{"MM.y – MM.y"}
+                    y{"MM.y – MM.y"}
+                }
+                yMEd{
+                    M{"ccc, dd.MM.y – ccc, dd.MM.y"}
+                    d{"ccc, dd.MM.y – ccc, dd.MM.y"}
+                    y{"ccc, dd.MM.y – ccc, dd.MM.y"}
+                }
+                yMMM{
+                    M{"y թ. MMM – MMM"}
+                    y{"y MMM – y MMM"}
+                }
+                yMMMEd{
+                    M{"E, d MMM – E, d MMM, y թ."}
+                    d{"E, d MMM – E, d MMM, y թ."}
+                    y{"E, d MMM, y – E, d MMM, y թ."}
+                }
+                yMMMM{
+                    M{"y թ․ LLLL – LLLL"}
+                    y{"y թ․ LLLL – y թ․ LLLL"}
+                }
+                yMMMd{
+                    M{"dd MMM – dd MMM, y թ."}
+                    d{"dd–dd MMM, y թ."}
+                    y{"dd MMM, y թ․ – dd MMM, y թ."}
+                }
+                yMd{
+                    M{"dd.MM.y – dd.MM.y"}
+                    d{"dd.MM.y – dd.MM.y"}
+                    y{"dd.MM.y – dd.MM.y"}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "հնվ",
+                        "փտվ",
+                        "մրտ",
+                        "ապր",
+                        "մյս",
+                        "հնս",
+                        "հլս",
+                        "օգս",
+                        "սեպ",
+                        "հոկ",
+                        "նոյ",
+                        "դեկ",
+                    }
+                    narrow{
+                        "Հ",
+                        "Փ",
+                        "Մ",
+                        "Ա",
+                        "Մ",
+                        "Հ",
+                        "Հ",
+                        "Օ",
+                        "Ս",
+                        "Հ",
+                        "Ն",
+                        "Դ",
+                    }
+                    wide{
+                        "հունվարի",
+                        "փետրվարի",
+                        "մարտի",
+                        "ապրիլի",
+                        "մայիսի",
+                        "հունիսի",
+                        "հուլիսի",
+                        "օգոստոսի",
+                        "սեպտեմբերի",
+                        "հոկտեմբերի",
+                        "նոյեմբերի",
+                        "դեկտեմբերի",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "հնվ",
+                        "փտվ",
+                        "մրտ",
+                        "ապր",
+                        "մյս",
+                        "հնս",
+                        "հլս",
+                        "օգս",
+                        "սեպ",
+                        "հոկ",
+                        "նոյ",
+                        "դեկ",
+                    }
+                    narrow{
+                        "Հ",
+                        "Փ",
+                        "Մ",
+                        "Ա",
+                        "Մ",
+                        "Հ",
+                        "Հ",
+                        "Օ",
+                        "Ս",
+                        "Հ",
+                        "Ն",
+                        "Դ",
+                    }
+                    wide{
+                        "հունվար",
+                        "փետրվար",
+                        "մարտ",
+                        "ապրիլ",
+                        "մայիս",
+                        "հունիս",
+                        "հուլիս",
+                        "օգոստոս",
+                        "սեպտեմբեր",
+                        "հոկտեմբեր",
+                        "նոյեմբեր",
+                        "դեկտեմբեր",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "1-ին եռմս.",
+                        "2-րդ եռմս.",
+                        "3-րդ եռմս.",
+                        "4-րդ եռմս.",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "1-ին եռամսյակ",
+                        "2-րդ եռամսյակ",
+                        "3-րդ եռամսյակ",
+                        "4-րդ եռամսյակ",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "1-ին եռմս.",
+                        "2-րդ եռմս.",
+                        "3-րդ եռմս.",
+                        "4-րդ եռմս.",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "1-ին եռամսյակ",
+                        "2-րդ եռամսյակ",
+                        "3-րդ եռամսյակ",
+                        "4-րդ եռամսյակ",
+                    }
+                }
+            }
+        }
+    }
+    characterLabel{
+        activities{"զբաղմունք"}
+        african_scripts{"աֆրիկյան գիր"}
+        american_scripts{"ամերիկյան գիր"}
+        animal{"կենդանի"}
+        animals_nature{"կենդանիներ կամ բնություն"}
+        arrows{"սլաք"}
+        body{"մարմին"}
+        box_drawing{"Կեղծ գրաֆիկա"}
+        braille{"բրայլ"}
+        building{"շենք"}
+        bullets_stars{"պարբերակ կամ աստղանիշ"}
+        consonantal_jamo{"Ջամո բաղաձայններ"}
+        currency_symbols{"արժույթի նշան"}
+        dash_connector{"անջատման կամ միության գծիկ"}
+        digits{"թվանշան"}
+        dingbats{"նշագիր"}
+        divination_symbols{"գուշակության նշան"}
+        downwards_arrows{"վար ուղղված սլաք"}
+        downwards_upwards_arrows{"վար և վեր ուղղված սլաք"}
+        east_asian_scripts{"Արևելաասիական գրեր"}
+        emoji{"Էմոձի"}
+        european_scripts{"Եվրոպական գրեր"}
+        female{"կին"}
+        flag{"դրոշ"}
+        flags{"դրոշներ"}
+        food_drink{"ուտելիք և ըմպելիք"}
+        format{"ձևաչափ"}
+        format_whitespace{"ձևաչափ և բացատ"}
+        full_width_form_variant{"Ձևի ամբողջ լայնքով տարբերակներ"}
+        geometric_shapes{"երկրաչափական պատկեր"}
+        half_width_form_variant{"կիսալայն տարբերակ"}
+        han_characters{"խան գրանշան"}
+        han_radicals{"Հիերոգլիֆային բանալիներ"}
+        hanja{"Հանջա"}
+        hanzi_simplified{"Չինարենի պարզեցված հիերոգլիֆներ"}
+        hanzi_traditional{"Չինարենի ավանդական հիերոգլիֆներ"}
+        heart{"սիրտ"}
+        historic_scripts{"պատմական գիր"}
+        ideographic_desc_characters{"Հիերոգլիֆների նկարագրման նշաններ"}
+        japanese_kana{"ճապոնական կանա"}
+        kanbun{"Կամբուն"}
+        kanji{"Կանձի"}
+        keycap{"ստեղն"}
+        leftwards_arrows{"Ձախ ուղղված սլաքներ"}
+        leftwards_rightwards_arrows{"Ձախ և աջ ուղղված սլաքներ"}
+        letterlike_symbols{"տառակերպ նշան"}
+        limited_use{"Սահմանափակ գործածում"}
+        male{"տղամարդ"}
+        math_symbols{"Մաթեմատիկական նշաններ"}
+        middle_eastern_scripts{"Միջինարևելյան գրեր"}
+        miscellaneous{"խառը"}
+        modern_scripts{"ժամանակակից գիր"}
+        modifier{"փոփոխիչ"}
+        musical_symbols{"երաժշտական նշան"}
+        nature{"բնություն"}
+        nonspacing{"Առանց բացատի"}
+        numbers{"թվեր"}
+        objects{"առարկա"}
+        other{"այլ"}
+        paired{"Զույգ նշաններ"}
+        person{"անձ"}
+        phonetic_alphabet{"հնչյունային այբուբեն"}
+        pictographs{"պատկերագիր"}
+        place{"վայր"}
+        plant{"բույս"}
+        punctuation{"կետադրություն"}
+        rightwards_arrows{"Աջ ուղղված սլաքներ"}
+        sign_standard_symbols{"նիշ կամ նշան"}
+        small_form_variant{"փոքր տարբերակներ"}
+        smiley{"զմայլիկ"}
+        smileys_people{"զմայլիկ կամ անձ"}
+        south_asian_scripts{"հարավասիական գիր"}
+        southeast_asian_scripts{"Հարավարևելյան Ասիայի գրեր"}
+        spacing{"Բացատներ"}
+        sport{"սպորտ"}
+        symbols{"Նշաններ"}
+        technical_symbols{"տեխնիկական նշան"}
+        tone_marks{"ձայներանգի նշան"}
+        travel{"ճամփորդություն"}
+        travel_places{"Ճամփորդություն և վայրեր"}
+        upwards_arrows{"Վեր ուղղված սլաքներ"}
+        variant_forms{"Ձևի տարբերակներ"}
+        vocalic_jamo{"Ջամո ձայնավորներ"}
+        weather{"եղանակ"}
+        western_asian_scripts{"Արևմտաասիական գրեր"}
+        whitespace{"բացատ"}
+    }
+    delimiters{
+        alternateQuotationEnd{"»"}
+        alternateQuotationStart{"«"}
+        quotationEnd{"»"}
+        quotationStart{"«"}
+    }
+    fields{
+        day{
+            dn{"օր"}
+            relative{
+                "-1"{"երեկ"}
+                "-2"{"նախանցյալ օրը"}
+                "0"{"այսօր"}
+                "1"{"վաղը"}
+                "2"{"վաղը չէ մյուս օրը"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} օրից"}
+                    other{"{0} օրից"}
+                }
+                past{
+                    one{"{0} օր առաջ"}
+                    other{"{0} օր առաջ"}
+                }
+            }
+        }
+        day-narrow{
+            dn{"օր"}
+            relative{
+                "-1"{"երեկ"}
+                "-2"{"երեկ չէ առաջի օրը"}
+                "0"{"այսօր"}
+                "1"{"վաղը"}
+                "2"{"վաղը չէ մյուս օրը"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} օրից"}
+                    other{"{0} օրից"}
+                }
+                past{
+                    one{"{0} օր առաջ"}
+                    other{"{0} օր առաջ"}
+                }
+            }
+        }
+        day-short{
+            dn{"օր"}
+            relative{
+                "-1"{"երեկ"}
+                "-2"{"երեկ չէ առաջի օրը"}
+                "0"{"այսօր"}
+                "1"{"վաղը"}
+                "2"{"վաղը չէ մյուս օրը"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} օրից"}
+                    other{"{0} օրից"}
+                }
+                past{
+                    one{"{0} օր առաջ"}
+                    other{"{0} օր առաջ"}
+                }
+            }
+        }
+        dayOfYear{
+            dn{"տարվա օր"}
+        }
+        dayOfYear-narrow{
+            dn{"տարվա օր"}
+        }
+        dayOfYear-short{
+            dn{"տարվա օր"}
+        }
+        dayperiod{
+            dn{"ԿԱ/ԿՀ"}
+        }
+        dayperiod-narrow{
+            dn{"ԿԱ/ԿՀ"}
+        }
+        dayperiod-short{
+            dn{"ԿԱ/ԿՀ"}
+        }
+        era{
+            dn{"թվարկություն"}
+        }
+        era-narrow{
+            dn{"թ․"}
+        }
+        era-short{
+            dn{"թ․"}
+        }
+        fri{
+            relative{
+                "-1"{"նախորդ ուրբաթ"}
+                "0"{"այս ուրբաթ"}
+                "1"{"հաջորդ ուրբաթ"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ուրբաթ հետո"}
+                    other{"{0} ուրբաթ հետո"}
+                }
+                past{
+                    one{"{0} ուրբաթ առաջ"}
+                    other{"{0} ուրբաթ առաջ"}
+                }
+            }
+        }
+        fri-narrow{
+            relative{
+                "-1"{"նխրդ ուրբ"}
+                "0"{"այս ուրբ"}
+                "1"{"հջրդ ուրբ"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ուրբ հետո"}
+                    other{"{0} ուրբ հետո"}
+                }
+                past{
+                    one{"{0} ուրբ առաջ"}
+                    other{"{0} ուրբ առաջ"}
+                }
+            }
+        }
+        fri-short{
+            relative{
+                "-1"{"նխրդ ուրբ"}
+                "0"{"այս ուրբ"}
+                "1"{"հջրդ ուրբ"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ուրբ հետո"}
+                    other{"{0} ուրբ հետո"}
+                }
+                past{
+                    one{"{0} ուրբ առաջ"}
+                    other{"{0} ուրբ առաջ"}
+                }
+            }
+        }
+        hour{
+            dn{"ժամ"}
+            relative{
+                "0"{"այս ժամին"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ժամից"}
+                    other{"{0} ժամից"}
+                }
+                past{
+                    one{"{0} ժամ առաջ"}
+                    other{"{0} ժամ առաջ"}
+                }
+            }
+        }
+        hour-narrow{
+            dn{"ժ"}
+            relativeTime{
+                future{
+                    one{"{0} ժ-ից"}
+                    other{"{0} ժ-ից"}
+                }
+                past{
+                    one{"{0} ժ առաջ"}
+                    other{"{0} ժ առաջ"}
+                }
+            }
+        }
+        hour-short{
+            dn{"ժ"}
+            relativeTime{
+                future{
+                    one{"{0} ժ-ից"}
+                    other{"{0} ժ-ից"}
+                }
+                past{
+                    one{"{0} ժ առաջ"}
+                    other{"{0} ժ առաջ"}
+                }
+            }
+        }
+        minute{
+            dn{"րոպե"}
+            relative{
+                "0"{"այս րոպեին"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} րոպեից"}
+                    other{"{0} րոպեից"}
+                }
+                past{
+                    one{"{0} րոպե առաջ"}
+                    other{"{0} րոպե առաջ"}
+                }
+            }
+        }
+        minute-narrow{
+            dn{"ր"}
+            relativeTime{
+                future{
+                    one{"{0} ր-ից"}
+                    other{"{0} ր-ից"}
+                }
+                past{
+                    one{"{0} ր առաջ"}
+                    other{"{0} ր առաջ"}
+                }
+            }
+        }
+        minute-short{
+            dn{"ր"}
+            relativeTime{
+                future{
+                    one{"{0} ր-ից"}
+                    other{"{0} ր-ից"}
+                }
+                past{
+                    one{"{0} ր առաջ"}
+                    other{"{0} ր առաջ"}
+                }
+            }
+        }
+        mon{
+            relative{
+                "-1"{"նախորդ երկուշաբթի"}
+                "0"{"այս երկուշաբթի"}
+                "1"{"հաջորդ երկուշաբթի"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} երկուշաբթի հետո"}
+                    other{"{0} երկուշաբթի հետո"}
+                }
+                past{
+                    one{"{0} երկուշաբթի առաջ"}
+                    other{"{0} երկուշաբթի առաջ"}
+                }
+            }
+        }
+        mon-narrow{
+            relative{
+                "-1"{"նխրդ երկ"}
+                "0"{"այս երկ"}
+                "1"{"հջրդ երկ"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} երկ հետո"}
+                    other{"{0} երկ հետո"}
+                }
+                past{
+                    one{"{0} երկ առաջ"}
+                    other{"{0} երկ առաջ"}
+                }
+            }
+        }
+        mon-short{
+            relative{
+                "-1"{"նխրդ երկ"}
+                "0"{"այս երկ"}
+                "1"{"հջրդ երկ"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} երկ հետո"}
+                    other{"{0} երկ հետո"}
+                }
+                past{
+                    one{"{0} երկ առաջ"}
+                    other{"{0} երկ առաջ"}
+                }
+            }
+        }
+        month{
+            dn{"ամիս"}
+            relative{
+                "-1"{"նախորդ ամիս"}
+                "0"{"այս ամիս"}
+                "1"{"հաջորդ ամիս"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ամսից"}
+                    other{"{0} ամսից"}
+                }
+                past{
+                    one{"{0} ամիս առաջ"}
+                    other{"{0} ամիս առաջ"}
+                }
+            }
+        }
+        month-narrow{
+            dn{"ամս"}
+            relative{
+                "-1"{"նախորդ ամիս"}
+                "0"{"այս ամիս"}
+                "1"{"հաջորդ ամիս"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ամսից"}
+                    other{"{0} ամսից"}
+                }
+                past{
+                    one{"{0} ամիս առաջ"}
+                    other{"{0} ամիս առաջ"}
+                }
+            }
+        }
+        month-short{
+            dn{"ամս"}
+            relative{
+                "-1"{"նախորդ ամիս"}
+                "0"{"այս ամիս"}
+                "1"{"հաջորդ ամիս"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ամսից"}
+                    other{"{0} ամսից"}
+                }
+                past{
+                    one{"{0} ամիս առաջ"}
+                    other{"{0} ամիս առաջ"}
+                }
+            }
+        }
+        quarter{
+            dn{"եռամսյակ"}
+            relative{
+                "-1"{"նախորդ եռամսյակ"}
+                "0"{"այս եռամսյակ"}
+                "1"{"հաջորդ եռամսյակ"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} եռամսյակից"}
+                    other{"{0} եռամսյակից"}
+                }
+                past{
+                    one{"{0} եռամսյակ առաջ"}
+                    other{"{0} եռամսյակ առաջ"}
+                }
+            }
+        }
+        quarter-narrow{
+            dn{"եռմս"}
+            relativeTime{
+                future{
+                    one{"{0} եռմս-ից"}
+                    other{"{0} եռմս-ից"}
+                }
+                past{
+                    one{"{0} եռմս առաջ"}
+                    other{"{0} եռմս առաջ"}
+                }
+            }
+        }
+        quarter-short{
+            dn{"եռմս"}
+            relativeTime{
+                future{
+                    one{"{0} եռմս-ից"}
+                    other{"{0} եռմս-ից"}
+                }
+                past{
+                    one{"{0} եռմս առաջ"}
+                    other{"{0} եռմս առաջ"}
+                }
+            }
+        }
+        sat{
+            relative{
+                "-1"{"նախորդ շաբաթ օրը"}
+                "0"{"այս շաբաթ օրը"}
+                "1"{"հաջորդ շաբաթ օրը"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} շաբաթ օր հետո"}
+                    other{"{0} շաբաթ օր հետո"}
+                }
+                past{
+                    one{"{0} շաբաթ օր առաջ"}
+                    other{"{0} շաբաթ օր առաջ"}
+                }
+            }
+        }
+        sat-narrow{
+            relative{
+                "-1"{"նխրդ շբթ"}
+                "0"{"այս շբթ"}
+                "1"{"հջրդ շբթ"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} շբթ հետո"}
+                    other{"{0} շբթ հետո"}
+                }
+                past{
+                    one{"{0} շբթ առաջ"}
+                    other{"{0} շբթ առաջ"}
+                }
+            }
+        }
+        sat-short{
+            relative{
+                "-1"{"նխրդ շբթ"}
+                "0"{"այս շբթ"}
+                "1"{"հջրդ շբթ"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} շբթ հետո"}
+                    other{"{0} շբթ հետո"}
+                }
+                past{
+                    one{"{0} շբթ առաջ"}
+                    other{"{0} շբթ առաջ"}
+                }
+            }
+        }
+        second{
+            dn{"վայրկյան"}
+            relative{
+                "0"{"հիմա"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} վայրկյանից"}
+                    other{"{0} վայրկյանից"}
+                }
+                past{
+                    one{"{0} վայրկյան առաջ"}
+                    other{"{0} վայրկյան առաջ"}
+                }
+            }
+        }
+        second-narrow{
+            dn{"վ"}
+            relativeTime{
+                future{
+                    one{"{0} վ-ից"}
+                    other{"{0} վ-ից"}
+                }
+                past{
+                    one{"{0} վ առաջ"}
+                    other{"{0} վ առաջ"}
+                }
+            }
+        }
+        second-short{
+            dn{"վ"}
+            relativeTime{
+                future{
+                    one{"{0} վրկ-ից"}
+                    other{"{0} վրկ-ից"}
+                }
+                past{
+                    one{"{0} վրկ առաջ"}
+                    other{"{0} վրկ առաջ"}
+                }
+            }
+        }
+        sun{
+            relative{
+                "-1"{"նախորդ կիրակի"}
+                "0"{"այս կիրակի"}
+                "1"{"հաջորդ կիրակի"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} կիրակի հետո"}
+                    other{"{0} կիրակի հետո"}
+                }
+                past{
+                    one{"{0} կիրակի առաջ"}
+                    other{"{0} կիրակի առաջ"}
+                }
+            }
+        }
+        sun-narrow{
+            relative{
+                "-1"{"նխրդ կիր"}
+                "0"{"այս կիր"}
+                "1"{"հջրդ կիր"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} կիր հետո"}
+                    other{"{0} կիր հետո"}
+                }
+                past{
+                    one{"{0} կիր առաջ"}
+                    other{"{0} կիր առաջ"}
+                }
+            }
+        }
+        sun-short{
+            relative{
+                "-1"{"նխրդ կիր"}
+                "0"{"այս կիր"}
+                "1"{"հջրդ կիր"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} կիր հետո"}
+                    other{"{0} կիր հետո"}
+                }
+                past{
+                    one{"{0} կիր առաջ"}
+                    other{"{0} կիր առաջ"}
+                }
+            }
+        }
+        thu{
+            relative{
+                "-1"{"նախորդ հինգշաբթի"}
+                "0"{"այս հինգշաբթի"}
+                "1"{"հաջորդ հինգշաբթի"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} հինգշաբթի հետո"}
+                    other{"{0} հինգշաբթի հետո"}
+                }
+                past{
+                    one{"{0} հինգշաբթի առաջ"}
+                    other{"{0} հինգշաբթի առաջ"}
+                }
+            }
+        }
+        thu-narrow{
+            relative{
+                "-1"{"նխրդ հնգ"}
+                "0"{"այս հնգ"}
+                "1"{"հջրդ հնգ"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} հնգ հետո"}
+                    other{"{0} հնգ հետո"}
+                }
+                past{
+                    one{"{0} հնգ առաջ"}
+                    other{"{0} հնգ առաջ"}
+                }
+            }
+        }
+        thu-short{
+            relative{
+                "-1"{"նխրդ հնգ"}
+                "0"{"այս հնգ"}
+                "1"{"հջրդ հնգ"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} հնգ հետո"}
+                    other{"{0} հնգ հետո"}
+                }
+                past{
+                    one{"{0} հնգ առաջ"}
+                    other{"{0} հնգ առաջ"}
+                }
+            }
+        }
+        tue{
+            relative{
+                "-1"{"նախորդ երեքշաբթի"}
+                "0"{"այս երեքշաբթի"}
+                "1"{"հաջորդ երեքշաբթի"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} երեքշաբթի հետո"}
+                    other{"{0} երեքշաբթի հետո"}
+                }
+                past{
+                    one{"{0} երեքշաբթի առաջ"}
+                    other{"{0} երեքշաբթի առաջ"}
+                }
+            }
+        }
+        tue-narrow{
+            relative{
+                "-1"{"նխրդ երք"}
+                "0"{"այս երք"}
+                "1"{"հջրդ երք"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} երք հետո"}
+                    other{"{0} երք հետո"}
+                }
+                past{
+                    one{"{0} երք առաջ"}
+                    other{"{0} երք առաջ"}
+                }
+            }
+        }
+        tue-short{
+            relative{
+                "-1"{"նխրդ երք"}
+                "0"{"այս երք"}
+                "1"{"հջրդ երք"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} երք հետո"}
+                    other{"{0} երք հետո"}
+                }
+                past{
+                    one{"{0} երք առաջ"}
+                    other{"{0} երք առաջ"}
+                }
+            }
+        }
+        wed{
+            relative{
+                "-1"{"նախորդ չորեքշաբթի"}
+                "0"{"այս չորեքշաբթի"}
+                "1"{"հաջորդ չորեքշաբթի"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} չորեքշաբթի հետո"}
+                    other{"{0} չորեքշաբթի հետո"}
+                }
+                past{
+                    one{"{0} չորեքշաբթի առաջ"}
+                    other{"{0} չորեքշաբթի առաջ"}
+                }
+            }
+        }
+        wed-narrow{
+            relative{
+                "-1"{"նխրդ չրք"}
+                "0"{"այս չրք"}
+                "1"{"հջրդ չրք"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} չրք հետո"}
+                    other{"{0} չրք հետո"}
+                }
+                past{
+                    one{"{0} չրք առաջ"}
+                    other{"{0} չրք առաջ"}
+                }
+            }
+        }
+        wed-short{
+            relative{
+                "-1"{"նխրդ չրք"}
+                "0"{"այս չրք"}
+                "1"{"հջրդ չրք"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} չրք հետո"}
+                    other{"{0} չրք հետո"}
+                }
+                past{
+                    one{"{0} չրք առաջ"}
+                    other{"{0} չրք առաջ"}
+                }
+            }
+        }
+        week{
+            dn{"շաբաթ"}
+            relative{
+                "-1"{"նախորդ շաբաթ"}
+                "0"{"այս շաբաթ"}
+                "1"{"հաջորդ շաբաթ"}
+            }
+            relativePeriod{"{0} շաբաթում"}
+            relativeTime{
+                future{
+                    one{"{0} շաբաթից"}
+                    other{"{0} շաբաթից"}
+                }
+                past{
+                    one{"{0} շաբաթ առաջ"}
+                    other{"{0} շաբաթ առաջ"}
+                }
+            }
+        }
+        week-narrow{
+            dn{"շաբ"}
+            relativePeriod{"{0} շաբ-ում"}
+            relativeTime{
+                future{
+                    one{"{0} շաբ անց"}
+                    other{"{0} շաբ անց"}
+                }
+                past{
+                    one{"{0} շաբ առաջ"}
+                    other{"{0} շաբ առաջ"}
+                }
+            }
+        }
+        week-short{
+            dn{"շաբ"}
+            relativePeriod{"{0} շաբ-ում"}
+            relativeTime{
+                future{
+                    one{"{0} շաբ-ից"}
+                    other{"{0} շաբ-ից"}
+                }
+                past{
+                    one{"{0} շաբ առաջ"}
+                    other{"{0} շաբ առաջ"}
+                }
+            }
+        }
+        weekOfMonth{
+            dn{"ամսվա շաբաթ"}
+        }
+        weekOfMonth-narrow{
+            dn{"ամս շաբ"}
+        }
+        weekOfMonth-short{
+            dn{"ամսվա շաբ"}
+        }
+        weekday{
+            dn{"շաբաթվա օր"}
+        }
+        weekday-narrow{
+            dn{"շաբաթվա օր"}
+        }
+        weekday-short{
+            dn{"շաբաթվա օր"}
+        }
+        weekdayOfMonth{
+            dn{"ամսվա օր"}
+        }
+        weekdayOfMonth-narrow{
+            dn{"ամս օր"}
+        }
+        weekdayOfMonth-short{
+            dn{"ամսվա օր"}
+        }
+        year{
+            dn{"տարի"}
+            relative{
+                "-1"{"նախորդ տարի"}
+                "0"{"այս տարի"}
+                "1"{"հաջորդ տարի"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} տարուց"}
+                    other{"{0} տարուց"}
+                }
+                past{
+                    one{"{0} տարի առաջ"}
+                    other{"{0} տարի առաջ"}
+                }
+            }
+        }
+        year-narrow{
+            dn{"տ"}
+            relativeTime{
+                future{
+                    one{"{0} տարուց"}
+                    other{"{0} տարուց"}
+                }
+                past{
+                    one{"{0} տ առաջ"}
+                    other{"{0} տ առաջ"}
+                }
+            }
+        }
+        year-short{
+            dn{"տ"}
+            relativeTime{
+                future{
+                    one{"{0} տարուց"}
+                    other{"{0} տարուց"}
+                }
+                past{
+                    one{"{0} տ առաջ"}
+                    other{"{0} տ առաջ"}
+                }
+            }
+        }
+        zone{
+            dn{"ժամային գոտի"}
+        }
+        zone-narrow{
+            dn{"ժամային գոտի"}
+        }
+        zone-short{
+            dn{"ժամային գոտի"}
+        }
+    }
+    listPattern{
+        or{
+            2{"{0} կամ {1}"}
+            end{"{0} կամ {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        standard{
+            2{"{0} և {1}"}
+            end{"{0} և {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        standard-narrow{
+            2{"{0}, {1}"}
+            end{"{0}, {1}"}
+        }
+        standard-short{
+            2{"{0} և {1}"}
+            end{"{0} և {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        unit{
+            2{"{0} և {1}"}
+            end{"{0} և {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        unit-narrow{
+            2{"{0} {1}"}
+            end{"{0} {1}"}
+            middle{"{0} {1}"}
+            start{"{0} {1}"}
+        }
+        unit-short{
+            2{"{0} և {1}"}
+            end{"{0} և {1}"}
+            middle{"{0} {1}"}
+            start{"{0} {1}"}
+        }
+    }
+    measurementSystemNames{
+        UK{"Անգլիական"}
+        US{"Ամերիկյան"}
+        metric{"Մետրական"}
+    }
+}

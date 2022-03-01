@@ -58,8 +58,8 @@ function test(index) {
 
         // printjson(t.find( q ).explain())
 
-        // printjson( Array.sort( correct[i].map( function(z){ return z._id; } ) ) )
-        // printjson( Array.sort( t.find(q).map( function(z){ return z._id; } ) ) )
+        // printjson( correct[i].map( function(z){ return z._id; } ).sort() )
+        // printjson( t.find(q).map( function(z){ return z._id; } ).sort() )
 
         var numExpected = correct[i].length;
         var x = correct[i].map(function(z) {

@@ -1,0 +1,49 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sr_Latn_BA{
+    Keys{
+        collation{"redoslijed sortiranja"}
+        ms{"sistem mjernih jedinica"}
+    }
+    Languages{
+        ar_001{"savremeni standardni arapski"}
+        arn{"mapudungun"}
+        be{"bjeloruski"}
+        bm{"bamanankan"}
+        bn{"bangla"}
+        de{"njemački"}
+        en_GB{"engleski (Velika Britanija)"}
+        es_ES{"španski (Evropa)"}
+        fa_AF{"dari"}
+        gsw{"njemački (Švajcarska)"}
+        ht{"haićanski kreolski"}
+        lo{"laoški"}
+        lrc{"sjeverni luri"}
+        moh{"mohok"}
+        nd{"sjeverni ndebele"}
+        nds{"niskonjemački"}
+        nqo{"n’ko"}
+        pt_PT{"portugalski (Portugal)"}
+        se{"sjeverni sami"}
+        shi{"južni šilha"}
+        si{"sinhalski"}
+        sw_CD{"kisvahili"}
+        tzm{"centralnoatlaski tamašek"}
+        xh{"isikosa"}
+        zgh{"standardni marokanski tamašek"}
+        zh_Hans{"pojednostavljeni kineski"}
+        zh_Hant{"tradicionalni kineski"}
+        zu{"isizulu"}
+    }
+    Types{
+        collation{
+            ducet{"podrazumijevani Unicode redoslijed sortiranja"}
+            search{"pretraga opšte namjene"}
+            standard{"standardni redoslijed sortiranja"}
+        }
+        numbers{
+            mymr{"mjanmarske cifre"}
+        }
+    }
+}

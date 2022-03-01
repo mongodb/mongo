@@ -1,34 +1,40 @@
-window.tests.set('largeArrayPropertyAndElements', (function() {
-  var garbage;
-  var index;
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-  return {
-    description: "Large array with both properties and elements",
+tests.set(
+  "largeArrayPropertyAndElements",
+  (function() {
+    var garbage;
+    var index;
 
-    load: n => {
-      garbage = new Array(n);
-      garbage.fill(null);
-      index = 0;
-    },
+    return {
+      description: "Large array with both properties and elements",
 
-    unload: () => {
-      garbage = null;
-      index = 0;
-    },
+      load: n => {
+        garbage = new Array(n);
+        garbage.fill(null);
+        index = 0;
+      },
 
-    defaultGarbageTotal: "100K",
-    defaultGarbagePerFrame: "30K",
+      unload: () => {
+        garbage = null;
+        index = 0;
+      },
 
-    makeGarbage: n => {
-      for (var i = 0; i < n; i++) {
-        index++;
-        index %= garbage.length;
+      defaultGarbagePiles: "100K",
+      defaultGarbagePerFrame: "48K",
 
-        var obj = {};
-        garbage[index] = obj;
-        garbage["key-" + index] = obj;
-      }
-    }
-  };
+      makeGarbage: n => {
+        for (var i = 0; i < n; i++) {
+          index++;
+          index %= garbage.length;
 
-}()));
+          var obj = {};
+          garbage[index] = obj;
+          garbage["key-" + index] = obj;
+        }
+      },
+    };
+  })()
+);

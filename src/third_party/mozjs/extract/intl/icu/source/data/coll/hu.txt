@@ -1,0 +1,50 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+hu{
+    collations{
+        standard{
+            Sequence{
+                "&C<cs<<<Cs<<<CS"
+                "&D<dz<<<Dz<<<DZ"
+                "&DZ<dzs<<<Dzs<<<DZS"
+                "&G<gy<<<Gy<<<GY"
+                "&L<ly<<<Ly<<<LY"
+                "&N<ny<<<Ny<<<NY"
+                "&S<sz<<<Sz<<<SZ"
+                "&T<ty<<<Ty<<<TY"
+                "&Z<zs<<<Zs<<<ZS"
+                "&O<ö<<<Ö<<ő<<<Ő"
+                "&U<ü<<<Ü<<ű<<<Ű"
+                "&cs<<<ccs/cs"
+                "&Cs<<<Ccs/cs"
+                "&CS<<<CCS/CS"
+                "&dz<<<ddz/dz"
+                "&Dz<<<Ddz/dz"
+                "&DZ<<<DDZ/DZ"
+                "&dzs<<<ddzs/dzs"
+                "&Dzs<<<Ddzs/dzs"
+                "&DZS<<<DDZS/DZS"
+                "&gy<<<ggy/gy"
+                "&Gy<<<Ggy/gy"
+                "&GY<<<GGY/GY"
+                "&ly<<<lly/ly"
+                "&Ly<<<Lly/ly"
+                "&LY<<<LLY/LY"
+                "&ny<<<nny/ny"
+                "&Ny<<<Nny/ny"
+                "&NY<<<NNY/NY"
+                "&sz<<<ssz/sz"
+                "&Sz<<<Ssz/sz"
+                "&SZ<<<SSZ/SZ"
+                "&ty<<<tty/ty"
+                "&Ty<<<Tty/ty"
+                "&TY<<<TTY/TY"
+                "&zs<<<zzs/zs"
+                "&Zs<<<Zzs/zs"
+                "&ZS<<<ZZS/ZS"
+            }
+            Version{"39"}
+        }
+    }
+}

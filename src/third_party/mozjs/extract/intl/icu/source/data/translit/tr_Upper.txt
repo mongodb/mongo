@@ -1,0 +1,15 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: tr_Upper.txt
+# Generated from CLDR
+#
+
+# Copyright (C) 2011-2013, Apple Inc.; Unicode, Inc.; and others. All Rights Reserved.
+# I and i-dotless; I-dot and i are case pairs in Turkish and Azeri
+# When uppercasing, i turns into a dotted capital I
+# 0069; 0069; 0130; 0130; tr; # LATIN SMALL LETTER I
+i→İ;
+::Any-Upper();
+

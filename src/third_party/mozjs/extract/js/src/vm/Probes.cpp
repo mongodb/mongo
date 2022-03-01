@@ -1,18 +1,17 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "vm/Probes-inl.h"
 
+#include "js/CharacterEncoding.h"
 #include "vm/JSContext.h"
 
 #ifdef INCLUDE_MOZILLA_DTRACE
-#include "vm/JSScript-inl.h"
+#  include "vm/JSScript-inl.h"
 #endif
-
-#define TYPEOF(cx,v)    (v.isNull() ? JSTYPE_NULL : JS_TypeOfValue(cx,v))
 
 using namespace js;
 
@@ -22,24 +21,26 @@ const char probes::anonymousName[] = "(anonymous)";
 bool probes::ProfilingActive = true;
 
 #ifdef INCLUDE_MOZILLA_DTRACE
-static const char*
-ScriptFilename(const JSScript* script)
-{
-    if (!script)
-        return probes::nullName;
-    if (!script->filename())
-        return probes::anonymousName;
-    return script->filename();
+static const char* ScriptFilename(const JSScript* script) {
+  if (!script) {
+    return probes::nullName;
+  }
+  if (!script->filename()) {
+    return probes::anonymousName;
+  }
+  return script->filename();
 }
 
-static const char*
-FunctionName(JSContext* cx, JSFunction* fun, JSAutoByteString* bytes)
-{
-    if (!fun)
-        return probes::nullName;
-    if (!fun->displayAtom())
-        return probes::anonymousName;
-    return bytes->encodeLatin1(cx, fun->displayAtom()) ? bytes->ptr() : probes::nullName;
+static const char* FunctionName(JSContext* cx, JSFunction* fun,
+                                UniqueChars* bytes) {
+  if (!fun) {
+    return probes::nullName;
+  }
+  if (!fun->displayAtom()) {
+    return probes::anonymousName;
+  }
+  *bytes = JS_EncodeStringToLatin1(cx, fun->displayAtom());
+  return *bytes ? bytes->get() : probes::nullName;
 }
 
 /*
@@ -49,19 +50,16 @@ FunctionName(JSContext* cx, JSFunction* fun, JSAutoByteString* bytes)
  * to reduce any negative compiler optimization effect that the addition of
  * a number of usually unused lines of code would cause.
  */
-void
-probes::DTraceEnterJSFun(JSContext* cx, JSFunction* fun, JSScript* script)
-{
-    JSAutoByteString funNameBytes;
-    JAVASCRIPT_FUNCTION_ENTRY(ScriptFilename(script), probes::nullName,
-                              FunctionName(cx, fun, &funNameBytes));
+void probes::DTraceEnterJSFun(JSContext* cx, JSFunction* fun,
+                              JSScript* script) {
+  UniqueChars funNameBytes;
+  JAVASCRIPT_FUNCTION_ENTRY(ScriptFilename(script), probes::nullName,
+                            FunctionName(cx, fun, &funNameBytes));
 }
 
-void
-probes::DTraceExitJSFun(JSContext* cx, JSFunction* fun, JSScript* script)
-{
-    JSAutoByteString funNameBytes;
-    JAVASCRIPT_FUNCTION_RETURN(ScriptFilename(script), probes::nullName,
-                               FunctionName(cx, fun, &funNameBytes));
+void probes::DTraceExitJSFun(JSContext* cx, JSFunction* fun, JSScript* script) {
+  UniqueChars funNameBytes;
+  JAVASCRIPT_FUNCTION_RETURN(ScriptFilename(script), probes::nullName,
+                             FunctionName(cx, fun, &funNameBytes));
 }
 #endif

@@ -1,0 +1,373 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: my_my_Latn.txt
+# Generated from CLDR
+#
+
+# Author: Arne Mauser, Moe Aung Naing
+# Description: Myanmar Romanization
+$consonants = [\u1000-\u1021];
+# Character combinations: "1 consonant 5 vowels"
+# ($consonants) ြောင\u103A\u1037 > | $1 yount;
+($consonants) \u103C\u1031\u102C\u1004\u103A\u1037 > | $1 yount;
+# ($consonants) ျောင\u103A\u1037 > | $1 yount;
+($consonants)  \u103B\u1031\u102C\u1004\u103A\u1037 > | $1 yount;
+# ($consonants) ြောင\u103Aး > | $1 yaungg;
+($consonants) \u103C\u1031\u102C\u1004\u103A\u1038 > | $1 yaungg;
+# ($consonants) ျောင\u103Aး > | $1 yaungg;
+($consonants) \u103B\u1031\u102C\u1004\u103A\u1038  > | $1 yaungg;
+#  Character combinations: "1 consonant 4 vowels"
+# \u102D\u102Fင\u103Aး > ine;
+\u102D\u102F\u1004\u103A\u1038 > ine;
+# ($consonants) ြောင\u103A > | $1 yaung;
+($consonants) \u103C\u1031\u102C\u1004\u103A  > | $1 yaung;
+# ($consonants) ျောင\u103A > | $1 yaung;
+($consonants) \u103B\u1031\u102C\u1004\u103A  > | $1 yaung;
+#  Character combinations: "1 consonant 3 vowels"
+# ောက\u103A > out; # 1c3v
+\u1031\u102C\u1000\u103A > out;
+# ေါက\u103A > out; # 1c3v
+\u1031\u102B\u1000\u103A > out;
+# \u102D\u102Fက\u103A > ite; # 1c3v
+\u102D\u102F\u1000\u103A > ite;
+# \u102D\u102Fင\u103A > ine; # 1c3v
+\u102D\u102F\u1004\u103A > ine;
+# \u102D\u102Fယ\u103A > o; # 1c3v
+\u102D\u102F\u101A\u103A > o;
+# ျင\u103Aး > yinn;
+\u103B\u1004\u103A\u1038 > yinn;
+# ျ\u102Dန\u103A > yane;
+\u103B\u102D\u1014\u103A > yane;
+# ($consonants) ောင\u103Aး > | $1 aungg;
+($consonants) \u1031\u102C\u1004\u103A\u1038 > | $1 aungg;
+# ($consonants) ေါင\u103Aး > | $1 aungg;
+($consonants) \u1031\u102B\u1004\u103A\u1038 > | $1 aungg;
+# ($consonants) ောင\u103A > | $1 aung;
+($consonants) \u1031\u102C\u1004\u103A > | $1 aung;
+# ($consonants) ေါင\u103A >  | $1 aung;
+($consonants) \u1031\u102B\u1004\u103A > | $1 aung;
+# ($consonants) ြင\u103A\u1037 > | $1 yint;
+($consonants) \u103C\u1004\u103A\u1037 > | $1 yint;
+# ($consonants) ြင\u103Aး > | $1 yinn;
+($consonants) \u103C\u1004\u103A\u1038 > | $1 yinn;
+# ($consonants) ြင\u103A > | $1 yin;
+($consonants) \u103C\u1004\u103A > | $1 yin;
+# ($consonants) ျင\u103A\u1037 > | $1 yint;
+($consonants) \u103B\u1004\u103A\u1037 > | $1 yint;
+# ($consonants) ျင\u103Aး > | $1 yinn;
+($consonants) \u103B\u1004\u103A\u1038 > | $1 yinn;
+# ($consonants) ျင\u103A > | $1 yin;
+($consonants) \u103B\u1004\u103A > | $1 yin;
+# ($consonants) ြစ\u103A > | $1 yit;
+($consonants) \u103C\u1005\u103A > | $1 yit;
+# ($consonants) ျစ\u103A > | $1 yit;
+($consonants)  \u103B\u1005\u103A > | $1 yit;
+# ($consonants) ြည\u103A > | $1 yi;
+($consonants) \u103C\u100A\u103A > | $1 yi;
+# ($consonants) ြန\u103A > | $1 yan;
+($consonants) \u103C\u1014\u103A > | $1 yan;
+# ($consonants) ြန\u103Aး > | $1 yann;
+($consonants) \u103C\u1014\u103A\u1038 > | $1 yann;
+# ($consonants) ျန\u103Aး > | $1 yann;
+($consonants) \u103B\u1014\u103A\u1038 > | $1 yann;
+# \u102Dမ\u103Aး > aim;
+\u102D\u1019\u103A\u1038 > aim;
+# \u102Dန\u103Aး > ein;
+\u102D\u1014\u103A\u1038 > ein;
+#  Character combinations: "4 vowels"
+# ျ\u102D\u102Fး > yoe;
+\u103B\u102D\u102F\u1038 > yoe;
+# ($consonants) ြော\u103A > | $1 yaw;
+($consonants) \u103C\u1031\u102C\u103A > | $1 yaw;
+# ($consonants) ျော\u103A > | $1 yaw;
+($consonants) \u103B\u1031\u102C\u103A > | $1 yaw;
+# Character combinations: "1 consonant 2 vowels"
+# ဥ\u102Eး > u;
+\u1025\u102E\u1038 > u;  # this is a misspelling of \u1026
+# \u103Dက\u103A > wat;
+\u103D\u1000\u103A > wat;
+# \u103Dင\u103A > win;
+\u103D\u1004\u103A > win;
+# န\u103Aး > ann;
+\u1014\u103A\u1038 > ann;
+# န\u103A\u1037 > ant;
+\u1014\u103A\u1037 > ant;
+# င\u103Aး > inn;
+\u1004\u103A\u1038 > inn;
+# င\u103A\u1037 > int;
+\u1004\u103A\u1037 > int;
+# ည\u103Aး > ee;
+\u100A\u103A\u1038 > ee;
+# ည\u103A\u1037 > eet; # 1c2v
+\u100A\u103A\u1037 > eet;
+# \u102Dတ\u103A > ate; # 1c2v
+\u102D\u1010\u103A > ate;
+# \u102Fတ\u103A > ote; # 1c2v
+\u102F\u1010\u103A > ote;
+# \u102Fန\u103A > one; # 1c2v
+\u102F\u1014\u103A > one;
+# \u102Fပ\u103A > ote; # 1c2v
+\u102F\u1015\u103A > ote;
+# \u102Dမ\u103A > aim; # 1c2v
+\u102D\u1019\u103A > ain;
+# \u102Dန\u103A > ein;
+\u102D\u1014\u103A > ein;
+# ယ\u103A\u1037 > ae; # 1c2v
+\u101A\u103A\u1037 > ae;
+# သျ\u103E > sh; # 1c2v
+\u101E\u103B\u103E > sh;
+# လျ\u103E > sh; # 1c2v
+\u101C\u103B\u103E > sh;
+# ရ\u103D\u103E > shw; # 1c2v
+\u101B\u103D\u103E > shw;
+# ြတ\u103A > yat;
+\u103C\u1010\u103A > yat;
+# ျတ\u103A > yat;
+\u103B\u1010\u103A > yat;
+# ြက\u103A  > yet;
+\u103C\u1000\103A > yet;
+# ျက\u103A > yet;
+\u103B\u1000\u103A > yet;
+# ျင\u103A > yin;
+\u103B\u1004\u103A > yin;
+# ြင\u103A > yin;
+\u103C\u1004\u103A > yin;
+#  Character combinations: "3 vowels"
+# ော\u1037 > ot;
+\u1031\u102C\u1037 > ot;
+# ေါ\u1037 > ot;
+\u1031\u102B\u1037 > ot;
+# ော\u103A > aw;
+\u1031\u102C\u103A > aw;
+# ေါ\u103A > aw;
+\u1031\u102B\u103A > aw;
+# \u102D\u102F\u1037 > hoet; # 3v
+\u102D\u102F\u1037 > hoet;
+# \u102D\u102Fး > oe;
+\u102D\u102F\u1038 > oe;
+# \u102F\u1036း > one; # 3v
+\u102F\u1036\u1038 > one;
+# ျား > yarr;
+\u103B\u102C\u1038 > yarr;
+# ြား > yarr;
+\u103C\u102C\u1038 > yarr;
+# ြ\u102Eး > yee;
+\u103C\u102E\u1038 > yee;
+# ($consonants) ြော  > | $1 yaww;
+($consonants) \u103C\u1031\u102C > | $1 yaww;
+# ($consonants) ျော  > | $1 yaww;
+($consonants) \u103B\u1031\u102C > | $1 yaww;
+# \u103Dား > warr;
+\u103D\u102C\u1038 > warr;
+# \u103Dေ\u1037 > wae;
+\u103D\u1031\u1037 > wae;
+#  Character combinations: "1 consonant 1 vowel"
+#က\u103A > at;
+\u1000\u103A > at;
+# င\u103A > in;
+\u1004\u103A > in;
+# စ\u103A > it;
+\u1005\u103A > it;
+# ဥ\u103A > in;
+\u1009\u103A > in;
+\u1025\u103A > in;  # \u1025 is a misspelling of \u1009
+# ည\u103A > i;
+\u100A\u103A > i;
+# ပ\u103A > ut;
+\u1015\u103A > ut;
+# ယ\u103A > al;
+\u101A\u103A > al;
+# တ\u103A > at;
+\u1010\u103A > at;
+# န\u103A > an;
+\u1014\u103A > an;
+# ရ\u103E > sh; # 1c1v
+\u101B\u103E > sh;
+#  Character combinations: "2 vowel"
+# ြ\u102E > ye;
+\u103C\u102E > ye;
+# ြ\u102F > yu;
+\u103C\u102F > yu;
+# ြေ > yay;
+\u103C\u1031 > yay;
+# \u103Dေ > way;
+\u103D\u1031 > way;
+# \u103D\u1032 > wal;
+\u103D\u1032 > wal;
+# \u103E\u102F > hu;
+\u103E\u102F > hu;
+# \u1030\u1037 > hu;
+\u1030\u1037 > hu;
+# \u1030း > uu;
+\u1030\u1038 > uu;
+# ါး > arr;
+\u102B\u1038 > arr;
+# ား > arr;
+\u102C\u1038 > arr;
+# \u102Eး > ee;
+\u102E\u1038 > ee;
+# ေး > ayy;
+\u1031\u1038 > ayy;
+# ေ\u1037 > ae;
+\u1031\u1037 > ae;
+# \u1032\u1037 > ae;
+\u1032\u1037 > ae;
+# ော > aw;
+\u1031\u102C > aw;
+# ေါ > aw;
+\u1031\u102B > aw;
+# \u102D\u102F > o;
+\u102D\u102F > o;
+# \u102F\u1036 > one;
+\u102F\u1036 > one;
+# \u103Eာ > har;
+\u103E\u102C > har;
+# Character combinations: "1 vowel"
+# ါ > ar;
+\u102B > ar;
+# ာ  > ar;
+\u102C > ar;
+# \u102D > i;
+\u102D > i;
+# \u102E  > e;
+\u102E > e;
+# \u102F  > u;
+\u102F > u;
+# \u1030 > uu;
+\u1030 > uu;
+# ေ  > ay;
+\u1031 > ay;
+# \u1032  > ell;
+\u1032 > ell;
+# \u1036  > an;
+\u1036 > an;
+# ျ > ya;
+\u103B > ya;
+# ြ  > ya;
+\u103C > ya;
+#  \u103E  > ha;
+\u103E > ha;
+# Modern Myanmar digits
+\u1040 > 0 ;
+\u1041 > 1 ;
+\u1042 > 2 ;
+\u1043 > 3 ;
+\u1044 > 4 ;
+\u1045 > 5 ;
+\u1046 > 6 ;
+\u1047 > 7 ;
+\u1048 > 8 ;
+\u1049 > 9 ;
+# Myanmar Punctuation
+\u104A > \, ; # MYANMAR SIGN LITTLE SECTION
+\u104B > \. ; # MYANMAR SIGN SECTION
+\u104C > ; # MYANMAR SYMBOL LOCATIVE
+\u104D > ; # MYANMAR SYMBOL COMPLETED
+# Inserting 'a' in between to consonants.
+($consonants) ($consonants) > | $1 a $2 ;
+# Consonant clusters
+# က\u1039က > kk ;
+# က\u1039ခ > khk ;
+# ဂ\u1039ဂ > gg ;
+# ဂ\u1039ဃ > ggh ;
+# င\u103A\u1039ဂ > ngg ;
+# Fundamental Burmese Consonants:
+# က > k;
+\u1000 > k;
+# ခ > hk;
+\u1001 > hk;
+# ဂ > g;
+\u1002 > g;
+# ဃ > gh;
+\u1003 > gh;
+# င > ng;
+\u1004 > ng;
+# စ > hc;
+\u1005 > hc;
+# ဆ > s;
+\u1006 > s;
+# ဇ > j;
+\u1007 > j;
+# ဈ > jh;
+\u1008 > jh;
+# ဉ > ny;
+\u1009 > ny;
+# ည > ny;
+\u100A > ny;
+# ဋ > t;
+\u100B > t;
+# ဌ > ht;
+\u100C > ht;
+# ဍ > d;
+\u100D > d;
+# ဎ > dh;
+\u100E > dh;
+# ဏ > n;
+\u100F > n;
+# တ > t;
+\u1010 > t;
+# ထ > ht;
+\u1011 > ht;
+# ဒ > d;
+\u1012 > d;
+# ဓ > dh;
+\u1013 > dh;
+# န > n;
+\u1014 > n;
+# ပ > p;
+\u1015 > p;
+# ဖ > hp;
+\u1016 > hp;
+# ဗ > b;
+\u1017 > b;
+# ဘ > bh;
+\u1018 > bh;
+# မ > m;
+\u1019 > m;
+# ယ > y;
+\u101A > y;
+# ရ > r;
+\u101B > r;
+# လ > l;
+\u101C > l;
+# ဝ > w;
+\u101D > w;
+# သ > s;
+\u101E > s;
+# ဟ > h;
+\u101F > h;
+# ဠ > l;
+\u1020 > l;
+# အ > a;
+\u1021 > a;
+# ဣ > i;
+\u1023 > i;
+# ဤ > i;
+\u1024 > i;
+# ဥ > u;
+\u1025 > u;
+# ဦ > u;
+\u1026 > u;
+# ဧ > e;
+\u1027 > e;
+# ဩ > au;
+\u1029 > au;
+# ဪ > au;
+\u102A > au;
+# TODO: this character repeats the previous romanized letter
+# း > ;
+\u1038 > ;
+# \u1037  > ;
+\u1037 > ;
+#  \u103A  > ;
+\u103A > ;
+# ၏ > eat ;
+\u104F > eat;
+# \u1039  > ;
+\u1039 > ;
+# Leftovers
+\u103D > w;
+::NFC(NFD);
+

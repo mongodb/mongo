@@ -1,0 +1,74 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: dsb_dsb_FONIPA.txt
+# Generated from CLDR
+#
+
+# Transforms Lower Sorbian (dsb) to its IPA transcription (dsb_FONIPA).
+# http://en.wikipedia.org/wiki/Sorbian_alphabet
+# Transform input to normalized form NFC, and to lowercase.
+::NFC;
+::Lower;
+a → a ;
+b\u0301 → bʲ ; # old spelling
+bj → bʲ ; # modern spelling
+b → b ;
+ch → x ;
+č → t \u0361 ʃ ; # affricate indicated by ligature tie
+ć → t \u0361 ɕ ; # affricate indicated by ligature tie
+c → t \u0361 s ; # affricate indicated by ligature tie
+dź → d \u0361 ʑ ; # affricate indicated by ligature tie
+d → d ;
+ě → iɪ\u032F;
+e → ɛ ;
+f → f ;
+g → ɡ ;
+h → h ;
+i → i ;
+j → j ;
+k → k ;
+ł → v ;
+l → l ;
+ḿ → mʲ ; # old spelling
+mj → mʲ ; # modern spelling
+m → m ;
+ń → ɲ ;
+n → n ;
+ó → ɛ ;
+o → ɔ ;
+ṕ → pʲ ; # old spelling
+pj → pʲ ; # modern spelling
+p → p ;
+ř → ʃ ;
+ŕ → rʲ ;
+r → r ;
+š → ʃ ;
+ś → ɕ ;
+s → s ;
+t → t ;
+u → u ;
+ẃ → wʲ ; # old spelling
+wj → wʲ ; # modern spelling
+w → w ;
+y → ɨ ;
+ž → ʒ ;
+ź → ʑ ;
+z → z ;
+::NFC;
+# Assimilation.
+b } [k] → p ;
+d } [k] → t ;
+ʃt\u0361ɕ → ɕt\u0361ɕ ;
+# Final de-voicing.
+b } [$] → p ;
+d \u0361 z } [$] → t \u0361 s ;
+d } [$] → t ;
+ɡ } [$] → k ;
+v } [$] → f ;
+w } [$] → f ;
+ʑ } [$] → ɕ ;
+z } [$] → s ;
+ʒ } [$] → ʃ ;
+

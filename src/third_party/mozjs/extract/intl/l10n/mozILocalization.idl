@@ -1,0 +1,41 @@
+/* -*- Mode: IDL; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/**
+ * This is an internal XPIDL used to expose a JS based Localization class to be used
+ * by its C++ wrapper.
+ *
+ * Consumers should use the WebIDL Localization API instead of this one.
+ */
+#include "nsISupports.idl"
+
+/**
+ * mozILocalization is an internal API used by Localization class for formatting of translation
+ * units.
+ *
+ * There are three main formatting methods:
+ *    - formatMessages - formats a list of messages based on the requested keys.
+ *    - formatValues   - formats a list of values of messages based on the requested keys.
+ *    - formatValue    - formats a single value based on the requested id and args.
+ *
+ * Each method has a `Sync` variant that can be used if the instance is in the `sync` state.
+ * This mode is enabled via passing `true` to `aIsSync` either in `activate` or `onChange` method.
+ *
+ * When this value is set to `false`, those methods will throw.
+ */
+
+[scriptable, uuid(7d468600-551f-4fe0-98c9-92a53b63ec8d)]
+interface mozILocalization : nsISupports
+{
+  jsval generateBundles(in Array<AString> aResourceIds, in bool aIsSync, in bool eager, in jsval aGenerateBundles, in jsval aGenerateBundlesSync);
+
+  Promise formatMessages(in Array<AString> aResourceIds, in jsval aBundles, in Array<jsval> aKeys);
+  Promise formatValues(in Array<AString> aResourceIds, in jsval aBundles, in Array<jsval> aKeys);
+  Promise formatValue(in Array<AString> aResourceIds, in jsval aBundles, in AUTF8String aId, [optional] in jsval aArgs);
+
+  AUTF8String formatValueSync(in Array<AString> aResourceIds, in jsval aBundles, in AUTF8String aId, [optional] in jsval aArgs);
+  Array<AUTF8String> formatValuesSync(in Array<AString> aResourceIds, in jsval aBundles, in Array<jsval> aKeys);
+  Array<jsval> formatMessagesSync(in Array<AString> aResourceIds, in jsval aBundles, in Array<jsval> aKeys);
+};

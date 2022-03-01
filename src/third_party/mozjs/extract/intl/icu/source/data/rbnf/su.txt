@@ -1,0 +1,43 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+su{
+    RBNFRules{
+        SpelloutRules{
+            "%spellout-numbering-year:",
+            "x.x: =0.0=;",
+            "0: =%spellout-numbering=;",
+            "%spellout-numbering:",
+            "0: =%spellout-cardinal=;",
+            "%spellout-cardinal:",
+            "-x: mineus >>;",
+            "x.x: << titik >>;",
+            "0: nol;",
+            "1: hiji;",
+            "2: dua;",
+            "3: tilu;",
+            "4: opat;",
+            "5: lima;",
+            "6: genep;",
+            "7: tujuh;",
+            "8: dalapan;",
+            "9: salapan;",
+            "10: sapuluh;",
+            "11: sabelas;",
+            "12: >> belas;",
+            "20: << puluh[ >>];",
+            "100: <%%spellout-cardinal-large<ratus[ >>];",
+            "1000: <%%spellout-cardinal-large<rebu[ >>];",
+            "1000000: <%%spellout-cardinal-large<juta[ >>];",
+            "1000000000: <%%spellout-cardinal-large<miliar[ >>];",
+            "1000000000000: =#,##0=;",
+            "%%spellout-cardinal-large:",
+            "1: sa;",
+            "0: =%spellout-cardinal= ;",
+            "%spellout-ordinal:",
+            "-x: mineus >>;",
+            "x.x: =#,##0.0=;",
+            "0: ka=%spellout-cardinal=;",
+        }
+    }
+}

@@ -34,15 +34,15 @@ function SetForEach(callbackfn, thisArg = undefined) {
         ThrowTypeError(JSMSG_NOT_FUNCTION, DecompileArg(0, callbackfn));
 
     // Steps 5-8.
-    var values = callFunction(std_Set_iterator, S);
+    var values = callFunction(std_Set_values, S);
 
     // Inlined: SetIteratorNext
     var setIterationResult = setIteratorTemp.setIterationResult;
     if (!setIterationResult)
-        setIterationResult = setIteratorTemp.setIterationResult = _CreateSetIterationResult();
+        setIterationResult = setIteratorTemp.setIterationResult = CreateSetIterationResult();
 
     while (true) {
-        var done = _GetNextSetEntryForIterator(values, setIterationResult);
+        var done = GetNextSetEntryForIterator(values, setIterationResult);
         if (done)
             break;
 
@@ -53,17 +53,14 @@ function SetForEach(callbackfn, thisArg = undefined) {
     }
 }
 
-function SetValues() {
-    return callFunction(std_Set_iterator, this);
-}
-_SetCanonicalName(SetValues, "values");
-
 // ES6 final draft 23.2.2.2.
-function SetSpecies() {
+// Uncloned functions with `$` prefix are allocated as extended function
+// to store the original name in `SetCanonicalName`.
+function $SetSpecies() {
     // Step 1.
     return this;
 }
-_SetCanonicalName(SetSpecies, "get [Symbol.species]");
+SetCanonicalName($SetSpecies, "get [Symbol.species]");
 
 
 var setIteratorTemp = { setIterationResult: null };
@@ -76,17 +73,17 @@ function SetIteratorNext() {
     if (!IsObject(O) || (O = GuardToSetIterator(O)) === null)
         return callFunction(CallSetIteratorMethodIfWrapped, this, "SetIteratorNext");
 
-    // Steps 4-5 (implemented in _GetNextSetEntryForIterator).
+    // Steps 4-5 (implemented in GetNextSetEntryForIterator).
     // Steps 8-9 (omitted).
 
     var setIterationResult = setIteratorTemp.setIterationResult;
     if (!setIterationResult)
-        setIterationResult = setIteratorTemp.setIterationResult = _CreateSetIterationResult();
+        setIterationResult = setIteratorTemp.setIterationResult = CreateSetIterationResult();
 
     var retVal = {value: undefined, done: true};
 
     // Steps 10.a, 11.
-    var done = _GetNextSetEntryForIterator(O, setIterationResult);
+    var done = GetNextSetEntryForIterator(O, setIterationResult);
     if (!done) {
         // Steps 10.b-c (omitted).
 

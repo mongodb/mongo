@@ -1,0 +1,4 @@
+# https://github.com/mozilla-spidermonkey/jsparagus/issues/641
+class/class-static-01.js
+class/class-static-02.js
+class/class-static-03.js

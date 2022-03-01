@@ -30,7 +30,7 @@
 // Define platform specific functionalities.
 #include <signal.h>
 
-#include "js-config.h"
+#include "jstypes.h"
 
 namespace vixl {
 inline void HostBreakpoint(int64_t code = 0) { raise(SIGINT); }

@@ -18,15 +18,13 @@ namespace mozilla {
  * A convenience function for converting an object to a string representation.
  * Supports any object which can be streamed to an std::ostream.
  */
-template<typename T>
-std::string
-ToString(const T& aValue)
-{
+template <typename T>
+std::string ToString(const T& aValue) {
   std::ostringstream stream;
   stream << aValue;
   return stream.str();
 }
 
-} // namespace mozilla
+}  // namespace mozilla
 
 #endif /* mozilla_ToString_h */

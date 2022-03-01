@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "proxy/OpaqueCrossCompartmentWrapper.cpp"
+#include "vm/StructuredClone.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "proxy/OpaqueCrossCompartmentWrapper.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/StructuredClone.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "proxy/OpaqueCrossCompartmentWrapper.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/StructuredClone.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "proxy/Proxy.cpp"
+#include "vm/SymbolType.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "proxy/Proxy.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SymbolType.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "proxy/Proxy.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SymbolType.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "proxy/ScriptedProxyHandler.cpp"
+#include "vm/TaggedProto.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "proxy/ScriptedProxyHandler.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/TaggedProto.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "proxy/ScriptedProxyHandler.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/TaggedProto.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "proxy/SecurityWrapper.cpp"
+#include "vm/ThrowMsgKind.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "proxy/SecurityWrapper.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ThrowMsgKind.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "proxy/SecurityWrapper.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ThrowMsgKind.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "proxy/Wrapper.cpp"
+#include "vm/Time.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "proxy/Wrapper.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Time.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "proxy/Wrapper.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Time.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "threading/Mutex.cpp"
+#include "vm/ToSource.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "threading/Mutex.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ToSource.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "threading/Mutex.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ToSource.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

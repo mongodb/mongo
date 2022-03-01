@@ -1,0 +1,138 @@
+## -*-makefile-*-
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+## Copyright (c) 2003-2015 IBM, Ken Foskey, and others. All rights reserved.
+##
+## Aix-specific setup (for gcc)
+##
+## Please note: AIX does NOT have library versioning per se (there is no 'SONAME' capability). 
+## So, we are using 'windows' style library names, that is, libicuuc20.1.so instead of libicuuc.so.20.1
+
+# When building stubdata, special considerations need to be made when building on AIX with GCC
+BUILD_HOST_ICU=AIX_GCC
+
+# Certain files don't compile in -ansi mode (e.g. umutex.c, toolutil.c, and cdatatst.c)
+CFLAGS += -D_ALL_SOURCE
+
+## Commands to generate dependency files
+GEN_DEPS.c=	$(CC) -E -MM $(DEFS) $(CPPFLAGS)
+GEN_DEPS.cc=	$(CXX) -E -MM $(DEFS) $(CPPFLAGS)
+
+## Commands to link
+## We need to use the C++ linker, even when linking C programs, since
+##  our libraries contain C++ code (C++ static init not called)
+LINK.c=		$(AIX_PREDELETE) $(CXX) $(CXXFLAGS) $(LDFLAGS) 
+LINK.cc=	$(AIX_PREDELETE) $(CXX) $(CXXFLAGS) $(LDFLAGS) 
+
+## Shared library options
+LD_SOOPTIONS= -Wl,-bsymbolic
+
+## Commands to make a shared library
+SHLIB.c=    $(AIX_PREDELETE) $(CC) $(CFLAGS) $(LDFLAGS) -shared -Wl,-bexpall $(LD_SOOPTIONS)
+SHLIB.cc=   $(AIX_PREDELETE) $(CXX) $(CXXFLAGS) $(LDFLAGS) -shared -Wl,-bexpall $(LD_SOOPTIONS)
+
+## Compiler switch to embed a runtime search path
+LD_RPATH=	-I
+LD_RPATH_PRE=	
+
+## enable the shared lib loader
+LDFLAGS += -Wl,-bbigtoc
+
+## These are the library specific LDFLAGS
+LDFLAGSICUDT=-nodefaultlibs -nostdlib
+
+## We need to delete things prior to linking, or else we'll get
+## SEVERE ERROR: output file in use ..  on AIX. 
+## But, shell script version should NOT delete target as we don't
+## have $@ in that context.  (SH = only shell script, icu-config)
+AIX_PREDELETE=rm -f $@ ; 
+#SH# AIX_PREDELETE=
+
+## Environment variable to set a runtime search path
+LDLIBRARYPATH_ENVVAR = LIBPATH
+
+## Override Versioned target for a shared library.
+FINAL_SO_TARGET=  $(basename $(SO_TARGET))$(SO_TARGET_VERSION).$(SO)
+MIDDLE_SO_TARGET= $(basename $(SO_TARGET))$(SO_TARGET_VERSION_MAJOR).$(SO)
+SHARED_OBJECT = $(notdir $(FINAL_SO_TARGET:.$(SO)=.$(SOBJ)))
+SHARED_OBJECT_NO_VERSION = $(basename $(SO_TARGET)).$(SOBJ)
+
+# The following is for Makefile.inc's use.
+ICULIBSUFFIX_VERSION = $(LIB_VERSION_MAJOR)
+
+# this one is for icudefs.mk's use
+ifeq ($(ENABLE_SHARED),YES)
+SO_TARGET_VERSION_SUFFIX = $(SO_TARGET_VERSION_MAJOR)
+endif
+
+## Compiler switch to embed a library name. Not present on AIX.
+LD_SONAME = 
+
+## The type of assembly needed when pkgdata is used for generating shared libraries.
+GENCCODE_ASSEMBLY=-a xlc
+
+## Shared object suffix
+SOBJ=   so
+# without the -brtl option, the library names use .a. AIX is funny that way.
+SO=	a
+A=	a
+
+## Non-shared intermediate object suffix
+STATIC_O = o
+
+## Special AIX rules
+
+## Build archive from shared object
+%.a : %.so
+	ln -f $< $(SHARED_OBJECT_NO_VERSION)
+	$(AR) $(ARFLAGS) $@ $(SHARED_OBJECT_NO_VERSION)
+	rm -f $(SHARED_OBJECT_NO_VERSION)
+$(LIBDIR)/%.a : %.so
+	ln -f $< $(SHARED_OBJECT_NO_VERSION)
+	$(AR) $(ARFLAGS) $@ $(SHARED_OBJECT_NO_VERSION)
+	rm -f $(SHARED_OBJECT_NO_VERSION)
+
+## Build import list from export list
+%.e : %.exp
+	@echo "Building an import list for $<"
+	@$(SHELL) -ec "echo '#! $*.a($*.so)' | cat - $< > $@"
+
+## Compilation rules
+%.$(STATIC_O): $(srcdir)/%.c
+	$(COMPILE.c) $(STATICCPPFLAGS) $(STATICCFLAGS) -o $@ $<
+%.o: $(srcdir)/%.c
+	$(COMPILE.c) $(DYNAMICCPPFLAGS) $(DYNAMICCFLAGS) -o $@ $<
+
+%.$(STATIC_O): $(srcdir)/%.cpp
+	$(COMPILE.cc) $(STATICCPPFLAGS) $(STATICCXXFLAGS) -o $@ $<
+%.o: $(srcdir)/%.cpp
+	$(COMPILE.cc) $(DYNAMICCPPFLAGS) $(DYNAMICCXXFLAGS) -o $@ $<
+
+
+## Dependency rules
+%.d: $(srcdir)/%.c
+	@echo "generating dependency information for $<"
+	@$(SHELL) -ec '$(GEN_DEPS.c) $< \
+		| sed '\''s%\($*\)\.o[ :]*%\1.o $@ : %g'\'' > $@; \
+		[ -s $@ ] || rm -f $@'
+
+%.d: $(srcdir)/%.cpp
+	@echo "generating dependency information for $<"
+	@$(SHELL) -ec '$(GEN_DEPS.cc) $< \
+		| sed '\''s%\($*\)\.o[ :]*%\1.o $@ : %g'\'' > $@; \
+		[ -s $@ ] || rm -f $@'
+
+## Versioned libraries rules
+%$(SO_TARGET_VERSION_MAJOR).$(SO): %$(SO_TARGET_VERSION).$(SO)
+	$(RM) $@ && ln -s ${*F}$(SO_TARGET_VERSION).$(SO) $@
+%.$(SO): %$(SO_TARGET_VERSION).$(SO)
+	$(RM) $@ && ln -s ${*F}$(SO_TARGET_VERSION).$(SO) $@
+
+
+## BIR  - bind with internal references [so app data and icu data doesn't collide]
+# LDflags that pkgdata will use
+BIR_LDFLAGS= -Wl,-bE:$(NAME).map,-bnoexpall
+
+# Dependencies [i.e. map files] for the final library
+BIR_DEPS= $(NAME).map
+

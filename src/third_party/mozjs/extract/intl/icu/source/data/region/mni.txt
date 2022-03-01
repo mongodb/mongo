@@ -1,0 +1,18 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+mni{
+    Countries{
+        BR{"ব্রাজিল"}
+        CN{"চিনা"}
+        DE{"জর্মনি"}
+        FR{"ফ্রান্স"}
+        GB{"য়ুনাইটেদ কিংদম"}
+        IN{"ইন্দিয়া"}
+        IT{"ইটালি"}
+        JP{"জাপান"}
+        RU{"রুসিয়া"}
+        US{"য়ুনাইটেদ ষ্টেটস"}
+        ZZ{"মশকখংদবা লমদম"}
+    }
+}

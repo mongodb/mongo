@@ -1,0 +1,130 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: ja_Latn_ru.txt
+# Generated from CLDR
+#
+
+# Japanese (Rōmaji) to Russian (Cyrillic) Polivanov transliteration for ICU.
+# Can be run in sequence after e.g. Katakana-Latin.
+#
+# These rules cannot be used to target Bulgarian, Serbian, Tajik, or Ukrainian.
+#
+# TODO: Cyrillization needs to respect morpheme/Kanji boundaries.
+# 中井 becomes Накаи, but 北海道 becomes Хоккайдо.  We need boundary
+# markup in the input in order to do that properly.
+#
+::NFD(NFC);
+::[:Latin:] Lower();
+#
+#
+$lengthMarker = [\u0302\u0304];
+#
+#
+# Delete apostrophes.  Apostrophes after "n" are consumed below.
+\' → ;
+#
+#
+# Turn long /e:/ into diphthong /ei/.
+# Note that /ei/ across a morpheme boundary (e.g. 武井 Takei) becomes эи.
+e $lengthMarker → эй ;
+#
+#
+# Turn long /i:/ into two vowels /ii/.
+i $lengthMarker → | i i ;
+#
+#
+# Ignore vowel length everywhere else.
+$lengthMarker → ;
+#
+#
+# Vowels.
+#
+# TODO(mjansche): Enable diphthongs once we have Kanji boundaries.
+## ai → ай ;
+a  → а ;
+i\~e → | ye ;
+i  → и ;
+u\~ → в ;  # ウィ etc.
+#
+## ui → уй ;
+u  → у ;
+e  → э ;
+o  → о ;
+#
+#
+# Consonants.
+#
+k → к ;
+#
+#
+sh → | sy ;
+s → с ;
+#
+#
+ch     → | ty ;
+c } ch → t ;
+te\~   → | t ;   # テュ
+to\~   → | t ;   # トゥ
+tsu\~  → | ts ;  # ツァ, ツィ, etc.
+ts → ц ;
+t  → т ;
+#
+#
+\~tsu → | tsu ;
+#
+#
+n } [bpm] → м ;  # 群馬 → Гумма
+n\' → нъ ;
+n → н ;
+#
+#
+h → х ;
+fu\~ → | f ;  # フュ
+f → ф ;
+#
+#
+m → м ;
+#
+#
+ya → я ;
+yi → и ;  # Added for convenience, after sh, ch, j.
+yu → ю ;
+ye → е ;  # ?? unobserved
+yo → ё ;
+#
+#
+r → р ;
+#
+#
+wa → ва ;
+w → ;
+#
+#
+g → г ;
+#
+#
+j → | zy ;
+z → дз ;
+#
+#
+de\~  → | d ;  # デュ
+dji\~ → | z ;  # ヂャ, ヂュ, etc.
+dj    → | j ;  # ヂ
+do\~  → | d ;  # ドゥ
+dzu\~ → | z ;  # ヅァ, ヅィ, etc.
+dz    → | z ;  # ヅ
+d → д ;
+#
+#
+b → б ;
+vu\~ → | v ;  # ヴァ, etc.
+v → в ;  # ?? unobserved
+#
+#
+p → п ;
+#
+#
+::NFC(NFD);
+

@@ -9,23 +9,27 @@
 #ifndef mozilla_RefCounted_h
 #define mozilla_RefCounted_h
 
+#include <utility>
+
 #include "mozilla/AlreadyAddRefed.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/Atomics.h"
 #include "mozilla/Attributes.h"
-#include "mozilla/Move.h"
 #include "mozilla/RefCountType.h"
-#include "mozilla/TypeTraits.h"
 
-#include <atomic>
+#ifdef __wasi__
+#  include "mozilla/WasiAtomic.h"
+#else
+#  include <atomic>
+#endif  // __wasi__
 
 #if defined(MOZILLA_INTERNAL_API)
-#include "nsXPCOM.h"
+#  include "nsXPCOM.h"
 #endif
 
 #if defined(MOZILLA_INTERNAL_API) && \
     (defined(DEBUG) || defined(FORCE_BUILD_REFCNT_LOGGING))
-#define MOZ_REFCOUNTED_LEAK_CHECKING
+#  define MOZ_REFCOUNTED_LEAK_CHECKING
 #endif
 
 namespace mozilla {
@@ -63,59 +67,87 @@ const MozRefCountType DEAD = 0xffffdead;
 
 // When building code that gets compiled into Gecko, try to use the
 // trace-refcount leak logging facilities.
+class RefCountLogger {
+ public:
+  // Called by `RefCounted`-like classes to log a successful AddRef call in the
+  // Gecko leak-logging system. This call is a no-op outside of Gecko. Should be
+  // called afer incrementing the reference count.
+  template <class T>
+  static void logAddRef(const T* aPointer, MozRefCountType aRefCount) {
 #ifdef MOZ_REFCOUNTED_LEAK_CHECKING
-class RefCountLogger
-{
-public:
-  static void logAddRef(const void* aPointer, MozRefCountType aRefCount,
-                        const char* aTypeName, uint32_t aInstanceSize)
-  {
-    MOZ_ASSERT(aRefCount != DEAD);
-    NS_LogAddRef(const_cast<void*>(aPointer), aRefCount, aTypeName,
-                 aInstanceSize);
+    const void* pointer = aPointer;
+    const char* typeName = aPointer->typeName();
+    uint32_t typeSize = aPointer->typeSize();
+    NS_LogAddRef(const_cast<void*>(pointer), aRefCount, typeName, typeSize);
+#endif
   }
 
-  static void logRelease(const void* aPointer, MozRefCountType aRefCount,
-                         const char* aTypeName)
-  {
-    MOZ_ASSERT(aRefCount != DEAD);
-    NS_LogRelease(const_cast<void*>(aPointer), aRefCount, aTypeName);
-  }
-};
+  // Created by `RefCounted`-like classes to log a successful Release call in
+  // the Gecko leak-logging system. The constructor should be invoked before the
+  // refcount is decremented to avoid invoking `typeName()` with a zero
+  // reference count. This call is a no-op outside of Gecko.
+  class MOZ_STACK_CLASS ReleaseLogger final {
+   public:
+    template <class T>
+    explicit ReleaseLogger(const T* aPointer)
+#ifdef MOZ_REFCOUNTED_LEAK_CHECKING
+        : mPointer(aPointer),
+          mTypeName(aPointer->typeName())
 #endif
+    {
+    }
+
+    void logRelease(MozRefCountType aRefCount) {
+#ifdef MOZ_REFCOUNTED_LEAK_CHECKING
+      MOZ_ASSERT(aRefCount != DEAD);
+      NS_LogRelease(const_cast<void*>(mPointer), aRefCount, mTypeName);
+#endif
+    }
+
+#ifdef MOZ_REFCOUNTED_LEAK_CHECKING
+    const void* mPointer;
+    const char* mTypeName;
+#endif
+  };
+};
 
 // This is used WeakPtr.h as well as this file.
-enum RefCountAtomicity
-{
-  AtomicRefCount,
-  NonAtomicRefCount
-};
+enum RefCountAtomicity { AtomicRefCount, NonAtomicRefCount };
 
-template<typename T, RefCountAtomicity Atomicity>
-class RC
-{
-public:
+template <typename T, RefCountAtomicity Atomicity>
+class RC {
+ public:
   explicit RC(T aCount) : mValue(aCount) {}
+
+  RC(const RC&) = delete;
+  RC& operator=(const RC&) = delete;
+  RC(RC&&) = delete;
+  RC& operator=(RC&&) = delete;
 
   T operator++() { return ++mValue; }
   T operator--() { return --mValue; }
 
+#ifdef DEBUG
   void operator=(const T& aValue) { mValue = aValue; }
+#endif
 
   operator T() const { return mValue; }
 
-private:
+ private:
   T mValue;
 };
 
-template<typename T>
-class RC<T, AtomicRefCount>
-{
-public:
+template <typename T>
+class RC<T, AtomicRefCount> {
+ public:
   explicit RC(T aCount) : mValue(aCount) {}
 
-  T operator++()
-  {
+  RC(const RC&) = delete;
+  RC& operator=(const RC&) = delete;
+  RC(RC&&) = delete;
+  RC& operator=(RC&&) = delete;
+
+  T operator++() {
     // Memory synchronization is not required when incrementing a
     // reference count.  The first increment of a reference count on a
     // thread is not important, since the first use of the object on a
@@ -127,8 +159,7 @@ public:
     return mValue.fetch_add(1, std::memory_order_relaxed) + 1;
   }
 
-  T operator--()
-  {
+  T operator--() {
     // Since this may be the last release on this thread, we need
     // release semantics so that prior writes on this thread are visible
     // to the thread that destroys the object when it reads mValue with
@@ -139,64 +170,81 @@ public:
       // acquire semantics to synchronize with the memory released by
       // the last release on other threads, that is, to ensure that
       // writes prior to that release are now visible on this thread.
+#if defined(MOZ_TSAN) || defined(__wasi__)
+      // TSan doesn't understand std::atomic_thread_fence, so in order
+      // to avoid a false positive for every time a refcounted object
+      // is deleted, we replace the fence with an atomic operation.
+      mValue.load(std::memory_order_acquire);
+#else
       std::atomic_thread_fence(std::memory_order_acquire);
+#endif
     }
     return result;
   }
 
+#ifdef DEBUG
   // This method is only called in debug builds, so we're not too concerned
   // about its performance.
-  void operator=(const T& aValue) { mValue.store(aValue, std::memory_order_seq_cst); }
+  void operator=(const T& aValue) {
+    mValue.store(aValue, std::memory_order_seq_cst);
+  }
+#endif
 
-  operator T() const
-  {
+  operator T() const {
     // Use acquire semantics since we're not sure what the caller is
     // doing.
     return mValue.load(std::memory_order_acquire);
   }
 
-private:
+  T IncrementIfNonzero() {
+    // This can be a relaxed load as any write of 0 that we observe will leave
+    // the field in a permanently zero (or `DEAD`) state (so a "stale" read of 0
+    // is fine), and any other value is confirmed by the CAS below.
+    //
+    // This roughly matches rust's Arc::upgrade implementation as of rust 1.49.0
+    T prev = mValue.load(std::memory_order_relaxed);
+    while (prev != 0) {
+      MOZ_ASSERT(prev != detail::DEAD,
+                 "Cannot IncrementIfNonzero if marked as dead!");
+      // TODO: It may be possible to use relaxed success ordering here?
+      if (mValue.compare_exchange_weak(prev, prev + 1,
+                                       std::memory_order_acquire,
+                                       std::memory_order_relaxed)) {
+        return prev + 1;
+      }
+    }
+    return 0;
+  }
+
+ private:
   std::atomic<T> mValue;
 };
 
-template<typename T, RefCountAtomicity Atomicity>
-class RefCounted
-{
-protected:
+template <typename T, RefCountAtomicity Atomicity>
+class RefCounted {
+ protected:
   RefCounted() : mRefCnt(0) {}
+#ifdef DEBUG
   ~RefCounted() { MOZ_ASSERT(mRefCnt == detail::DEAD); }
+#endif
 
-public:
-  // Compatibility with nsRefPtr.
-  void AddRef() const
-  {
+ public:
+  // Compatibility with RefPtr.
+  void AddRef() const {
     // Note: this method must be thread safe for AtomicRefCounted.
     MOZ_ASSERT(int32_t(mRefCnt) >= 0);
-#ifndef MOZ_REFCOUNTED_LEAK_CHECKING
-    ++mRefCnt;
-#else
-    const char* type = static_cast<const T*>(this)->typeName();
-    uint32_t size = static_cast<const T*>(this)->typeSize();
-    const void* ptr = static_cast<const T*>(this);
     MozRefCountType cnt = ++mRefCnt;
-    detail::RefCountLogger::logAddRef(ptr, cnt, type, size);
-#endif
+    detail::RefCountLogger::logAddRef(static_cast<const T*>(this), cnt);
   }
 
-  void Release() const
-  {
+  void Release() const {
     // Note: this method must be thread safe for AtomicRefCounted.
     MOZ_ASSERT(int32_t(mRefCnt) > 0);
-#ifndef MOZ_REFCOUNTED_LEAK_CHECKING
-    MozRefCountType cnt = --mRefCnt;
-#else
-    const char* type = static_cast<const T*>(this)->typeName();
-    const void* ptr = static_cast<const T*>(this);
+    detail::RefCountLogger::ReleaseLogger logger(static_cast<const T*>(this));
     MozRefCountType cnt = --mRefCnt;
     // Note: it's not safe to touch |this| after decrementing the refcount,
     // except for below.
-    detail::RefCountLogger::logRelease(ptr, cnt, type);
-#endif
+    logger.logRelease(cnt);
     if (0 == cnt) {
       // Because we have atomically decremented the refcount above, only
       // one thread can get a 0 count here, so as long as we can assume that
@@ -213,42 +261,39 @@ public:
   void ref() { AddRef(); }
   void deref() { Release(); }
   MozRefCountType refCount() const { return mRefCnt; }
-  bool hasOneRef() const
-  {
+  bool hasOneRef() const {
     MOZ_ASSERT(mRefCnt > 0);
     return mRefCnt == 1;
   }
 
-private:
+ private:
   mutable RC<MozRefCountType, Atomicity> mRefCnt;
 };
 
 #ifdef MOZ_REFCOUNTED_LEAK_CHECKING
 // Passing override for the optional argument marks the typeName and
 // typeSize functions defined by this macro as overrides.
-#define MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(T, ...) \
-  virtual const char* typeName() const __VA_ARGS__ { return #T; } \
-  virtual size_t typeSize() const __VA_ARGS__ { return sizeof(*this); }
+#  define MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(T, ...)           \
+    virtual const char* typeName() const __VA_ARGS__ { return #T; } \
+    virtual size_t typeSize() const __VA_ARGS__ { return sizeof(*this); }
 #else
-#define MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(T, ...)
+#  define MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(T, ...)
 #endif
 
 // Note that this macro is expanded unconditionally because it declares only
 // two small inline functions which will hopefully get eliminated by the linker
 // in non-leak-checking builds.
-#define MOZ_DECLARE_REFCOUNTED_TYPENAME(T) \
+#define MOZ_DECLARE_REFCOUNTED_TYPENAME(T)    \
   const char* typeName() const { return #T; } \
   size_t typeSize() const { return sizeof(*this); }
 
-} // namespace detail
+}  // namespace detail
 
-template<typename T>
-class RefCounted : public detail::RefCounted<T, detail::NonAtomicRefCount>
-{
-public:
-  ~RefCounted()
-  {
-    static_assert(IsBaseOf<RefCounted, T>::value,
+template <typename T>
+class RefCounted : public detail::RefCounted<T, detail::NonAtomicRefCount> {
+ public:
+  ~RefCounted() {
+    static_assert(std::is_base_of<RefCounted, T>::value,
                   "T must derive from RefCounted<T>");
   }
 };
@@ -262,20 +307,18 @@ namespace external {
  * NOTE: Please do not use this class, use NS_INLINE_DECL_THREADSAFE_REFCOUNTING
  * instead.
  */
-template<typename T>
-class AtomicRefCounted :
-  public mozilla::detail::RefCounted<T, mozilla::detail::AtomicRefCount>
-{
-public:
-  ~AtomicRefCounted()
-  {
-    static_assert(IsBaseOf<AtomicRefCounted, T>::value,
+template <typename T>
+class AtomicRefCounted
+    : public mozilla::detail::RefCounted<T, mozilla::detail::AtomicRefCount> {
+ public:
+  ~AtomicRefCounted() {
+    static_assert(std::is_base_of<AtomicRefCounted, T>::value,
                   "T must derive from AtomicRefCounted<T>");
   }
 };
 
-} // namespace external
+}  // namespace external
 
-} // namespace mozilla
+}  // namespace mozilla
 
-#endif // mozilla_RefCounted_h
+#endif  // mozilla_RefCounted_h

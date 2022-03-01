@@ -1,0 +1,109 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+yi{
+    Currencies{
+        BRL{
+            "R$",
+            "בראזיל רעאל",
+        }
+        BZD{
+            "BZD",
+            "בעליז דאלאַר",
+        }
+        CHF{
+            "CHF",
+            "שווייצער פֿראַנק",
+        }
+        CNY{
+            "CN¥",
+            "כינעזישער יואן",
+        }
+        EUR{
+            "€",
+            "איירא",
+        }
+        GBP{
+            "£",
+            "פֿונט שטערלינג",
+        }
+        INR{
+            "₹",
+            "אינדישער רופי",
+        }
+        JPY{
+            "JP¥",
+            "יאפאנעזישער יען",
+        }
+        RUB{
+            "RUB",
+            "רוסישער רובל",
+        }
+        SEK{
+            "SEK",
+            "שוועדישע קראנע",
+        }
+        USD{
+            "US$",
+            "אמעריקאנער דאלאר",
+        }
+        XAG{
+            "XAG",
+            "זילבער",
+        }
+        XAU{
+            "XAU",
+            "גאלד",
+        }
+        XXX{
+            "¤",
+            "אומבאַוואוסטע וואַלוטע",
+        }
+    }
+    Currencies%narrow{
+        EUR{"€"}
+        GBP{"£"}
+        INR{"₹"}
+        JPY{"¥"}
+        RUB{"₽"}
+        USD{"$"}
+    }
+    CurrencyPlurals{
+        BRL{
+            one{"בראזיל רעאל"}
+            other{"בראזיל רעאלן"}
+        }
+        CNY{
+            one{"כינעזישער יואן"}
+            other{"כינעזישע יואן"}
+        }
+        EUR{
+            one{"איירא"}
+            other{"איירא"}
+        }
+        GBP{
+            one{"פֿונט שטערלינג"}
+            other{"פֿונט שטערלינג"}
+        }
+        INR{
+            one{"אינדישער רופי"}
+            other{"אינדישע רופי"}
+        }
+        JPY{
+            one{"יאפאנעזישער יען"}
+            other{"יאפאנעזישע יען"}
+        }
+        RUB{
+            one{"רוסישער רובל"}
+            other{"רוסישע רובל"}
+        }
+        USD{
+            one{"אמעריקאנער דאלאר"}
+            other{"אמעריקאנער דאלארן"}
+        }
+        XXX{
+            one{"אומבאַוואוסטע וואַלוטע"}
+            other{"אומבאַוואוסטע וואַלוטע"}
+        }
+    }
+}

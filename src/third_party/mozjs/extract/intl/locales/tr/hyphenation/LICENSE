@@ -1,0 +1,59 @@
+License information for hyph_tr.dic:
+
+This file is based on the TeX hyphenation patterns distributed under the
+LaTeX Project Public License (LPPL) as part of the hyph-utf8 package.
+
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+At the time this file was first modified, a complete, unmodified copy of
+the LPPL Work was available from:
+http://tug.org/svn/texhyphen/trunk/hyph-utf8/tex/generic/hyph-utf8/patterns/?pathrev=580
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+Portions of this file were originally made available under the following license
+(copied verbatim from hyph-tr.lic.txt in the original work):
+
+Turkish hyphenation patterns
+
+(more info about the licence to be added later)
+
+% hyph-tr.tex
+%
+% Turkish hyphenation patterns
+%
+% This file is auto-generated from source/generic/hyph-utf8/languages/tr/generate_patterns_tr.rb that is part of hyph-utf8.
+% Please don't modify this file; modify the generating script instead.
+%
+% Copyright (C) 1987 Pierre A. MacKay
+%               2008, 2011 TUG
+%
+% This program can redistributed and/or modified under the terms
+% of the LaTeX Project Public License Distributed from CTAN
+% archives in directory macros/latex/base/lppl.txt; either
+% version 1 of the License, or (at your option) any later version.
+%
+% Credits:
+% - algorithm developed by P. A. MacKay for the Ottoman Texts Project in 1987
+% - rules adapted for modern Turkish by H. Turgut Uyar <uyar at itu.edu.tr>
+% - initiative to improve Turkish patterns by S. Ekin Kocabas <kocabas at stanford.edu>
+% - script written by Mojca Miklavec <mojca.miklavec.lists at gmail.com> in June 2008
+%
+% See also:
+% - http://www.ctan.org/tex-archive/language/turkish/hyphen/turk_hyf.c
+% - http://www.tug.org/TUGboat/Articles/tb09-1/tb20mackay.pdf
+%
+% Differences with Ottoman patterns:
+% - adapted for the use on modern TeX engines, using UTF-8 charactes
+% - only letters for Modern Turkish + âîû (the first one often needed, the other two don't hurt)
+% - (if needed, support for Ottoman Turkish might be provided separately under language code 'ota')
+%
+% Changes:
+% - 2008-06-25/27/28 - create this file by adapting Ottoman rules for modern Turkish
+% - 2011-08-10 - add LPPL licence with permission of Pierre A. MacKay
+% 

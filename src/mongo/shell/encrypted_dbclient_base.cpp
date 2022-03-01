@@ -31,6 +31,9 @@
 
 #include "mongo/shell/encrypted_dbclient_base.h"
 
+#include <js/Object.h>
+#include <js/ValueArray.h>
+
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/data_type_validated.h"
 #include "mongo/bson/bson_depth.h"
@@ -359,7 +362,7 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
     BufBuilder plaintextBuilder;
     if (args.get(1).isObject()) {
         JS::RootedObject rootedObj(cx, &args.get(1).toObject());
-        auto jsclass = JS_GetClass(rootedObj);
+        auto jsclass = JS::GetClass(rootedObj);
 
         if (strcmp(jsclass->name, "Object") == 0 || strcmp(jsclass->name, "Array") == 0) {
             uassert(ErrorCodes::BadValue,
@@ -461,7 +464,7 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
     ConstDataRange ciphertextBlob(encryptionFrame.get());
     std::string blobStr =
         base64::encode(StringData(ciphertextBlob.data(), ciphertextBlob.length()));
-    JS::AutoValueArray<2> arr(cx);
+    JS::RootedValueArray<2> arr(cx);
 
     arr[0].setInt32(BinDataType::Encrypt);
     mozjs::ValueReader(cx, arr[1]).fromStringData(blobStr);
@@ -605,7 +608,7 @@ std::vector<uint8_t> EncryptedDBClientBase::getBinDataArg(
             str::stream() << "Incorrect bindata type, expected" << typeName(type) << " but got "
                           << typeName(binType),
             binType == type);
-    auto str = static_cast<std::string*>(JS_GetPrivate(args.get(index).toObjectOrNull()));
+    auto str = static_cast<std::string*>(JS::GetPrivate(args.get(index).toObjectOrNull()));
     uassert(ErrorCodes::BadValue, "Cannot call getter on BinData prototype", str);
     std::string string = base64::decode(*str);
     return std::vector<uint8_t>(string.data(), string.data() + string.length());
@@ -694,7 +697,7 @@ void createCollectionObject(JSContext* cx,
 
     // The collection object requires a database object to be constructed as well.
     JS::RootedValue databaseRV(cx);
-    JS::AutoValueArray<2> databaseArgs(cx);
+    JS::RootedValueArray<2> databaseArgs(cx);
 
     databaseArgs[0].setObject(client.toObject());
     mozjs::ValueReader(cx, databaseArgs[1]).fromStringData(ns.db());
@@ -703,7 +706,7 @@ void createCollectionObject(JSContext* cx,
     invariant(databaseRV.isObject());
     auto databaseObj = databaseRV.toObjectOrNull();
 
-    JS::AutoValueArray<4> collectionArgs(cx);
+    JS::RootedValueArray<4> collectionArgs(cx);
     collectionArgs[0].setObject(client.toObject());
     collectionArgs[1].setObject(*databaseObj);
     mozjs::ValueReader(cx, collectionArgs[2]).fromStringData(ns.coll());

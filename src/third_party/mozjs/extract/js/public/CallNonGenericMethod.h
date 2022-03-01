@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -23,10 +23,12 @@ typedef bool (*NativeImpl)(JSContext* cx, const CallArgs& args);
 namespace detail {
 
 // DON'T CALL THIS DIRECTLY.  It's for use only by CallNonGenericMethod!
-extern JS_PUBLIC_API(bool)
-CallMethodIfWrapped(JSContext* cx, IsAcceptableThis test, NativeImpl impl, const CallArgs& args);
+extern JS_PUBLIC_API bool CallMethodIfWrapped(JSContext* cx,
+                                              IsAcceptableThis test,
+                                              NativeImpl impl,
+                                              const CallArgs& args);
 
-} // namespace detail
+}  // namespace detail
 
 // Methods usually act upon |this| objects only from a single global object and
 // compartment.  Sometimes, however, a method must act upon |this| values from
@@ -46,8 +48,9 @@ CallMethodIfWrapped(JSContext* cx, IsAcceptableThis test, NativeImpl impl, const
 //   static bool
 //   IsAnswerObject(const Value& v)
 //   {
-//       if (!v.isObject())
+//       if (!v.isObject()) {
 //           return false;
+//       }
 //       return JS_GetClass(&v.toObject()) == &AnswerClass;
 //   }
 //
@@ -73,7 +76,8 @@ CallMethodIfWrapped(JSContext* cx, IsAcceptableThis test, NativeImpl impl, const
 //   answer_getAnswer(JSContext* cx, unsigned argc, JS::Value* vp)
 //   {
 //       JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-//       return JS::CallNonGenericMethod<IsAnswerObject, answer_getAnswer_impl>(cx, args);
+//       return JS::CallNonGenericMethod<IsAnswerObject,
+//                                       answer_getAnswer_impl>(cx, args);
 //   }
 //
 // Note that, because they are used as template arguments, the predicate
@@ -91,27 +95,29 @@ CallMethodIfWrapped(JSContext* cx, IsAcceptableThis test, NativeImpl impl, const
 // Note: JS::CallNonGenericMethod will only work correctly if it's called in
 //       tail position in a JSNative.  Do not call it from any other place.
 //
-template<IsAcceptableThis Test, NativeImpl Impl>
-MOZ_ALWAYS_INLINE bool
-CallNonGenericMethod(JSContext* cx, const CallArgs& args)
-{
-    HandleValue thisv = args.thisv();
-    if (Test(thisv))
-        return Impl(cx, args);
+template <IsAcceptableThis Test, NativeImpl Impl>
+MOZ_ALWAYS_INLINE bool CallNonGenericMethod(JSContext* cx,
+                                            const CallArgs& args) {
+  HandleValue thisv = args.thisv();
+  if (Test(thisv)) {
+    return Impl(cx, args);
+  }
 
-    return detail::CallMethodIfWrapped(cx, Test, Impl, args);
+  return detail::CallMethodIfWrapped(cx, Test, Impl, args);
 }
 
-MOZ_ALWAYS_INLINE bool
-CallNonGenericMethod(JSContext* cx, IsAcceptableThis Test, NativeImpl Impl, const CallArgs& args)
-{
-    HandleValue thisv = args.thisv();
-    if (Test(thisv))
-        return Impl(cx, args);
+MOZ_ALWAYS_INLINE bool CallNonGenericMethod(JSContext* cx,
+                                            IsAcceptableThis Test,
+                                            NativeImpl Impl,
+                                            const CallArgs& args) {
+  HandleValue thisv = args.thisv();
+  if (Test(thisv)) {
+    return Impl(cx, args);
+  }
 
-    return detail::CallMethodIfWrapped(cx, Test, Impl, args);
+  return detail::CallMethodIfWrapped(cx, Test, Impl, args);
 }
 
-} // namespace JS
+}  // namespace JS
 
 #endif /* js_CallNonGenericMethod_h */

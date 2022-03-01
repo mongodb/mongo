@@ -1,0 +1,182 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_GT{
+    %%Parent{"es_419"}
+    NumberElements{
+        latn{
+            patternsShort{
+                currencyFormat{
+                    1000{
+                        one{"¤0K"}
+                        other{"¤0K"}
+                    }
+                    10000{
+                        one{"¤00K"}
+                        other{"¤00K"}
+                    }
+                    100000{
+                        one{"¤000K"}
+                        other{"¤000K"}
+                    }
+                    1000000{
+                        one{"¤0M"}
+                        other{"¤0M"}
+                    }
+                    10000000{
+                        one{"¤00M"}
+                        other{"¤00M"}
+                    }
+                    100000000{
+                        one{"¤000M"}
+                        other{"¤000M"}
+                    }
+                    1000000000{
+                        one{"¤0000M"}
+                        other{"¤0000M"}
+                    }
+                    10000000000{
+                        one{"¤00MRD"}
+                        other{"¤00MRD"}
+                    }
+                    100000000000{
+                        one{"¤000MRD"}
+                        other{"¤000MRD"}
+                    }
+                }
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d 'de' MMMM 'de' y G",
+                "d 'de' MMMM 'de' y G",
+                "d/MM/y G",
+                "d/MM/yy GGGGG",
+                "{1} {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            intervalFormats{
+                MEd{
+                    M{"E d/MM – E d/MM"}
+                    d{"E d/MM – E d/MM"}
+                }
+                MMMEd{
+                    M{"E d 'de' MMM 'al' E d 'de' MMM"}
+                    d{"E d 'al' E d 'de' MMM"}
+                }
+                MMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM"}
+                }
+                Md{
+                    M{"d/MM – d/MM"}
+                    d{"d/MM – d/MM"}
+                }
+                fallback{"{0} a el {1}"}
+                yM{
+                    M{"MM/y – MM/y"}
+                    y{"MM/y – MM/y"}
+                }
+                yMEd{
+                    M{"E d/MM/y – E d/MM/y"}
+                    d{"E d/MM/y – E d/MM/y"}
+                    y{"E d/MM/y – E d/MM/y"}
+                }
+                yMMM{
+                    M{"MMM–MMM 'de' y"}
+                    y{"MMM 'de' y 'a' MMM 'de' y"}
+                }
+                yMMMEd{
+                    M{"E d 'de' MMM 'al' E d 'de' MMM 'de' y"}
+                    d{"E d 'al' E d 'de' MMM 'de' y"}
+                    y{"E d 'de' MMM 'de' y 'al' E d 'de' MMM 'de' y"}
+                }
+                yMMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM 'de' y"}
+                    d{"d–d 'de' MMM 'de' y"}
+                    y{"d 'de' MMM 'de' y 'al' d 'de' MMM 'de' y"}
+                }
+                yMd{
+                    M{"d/MM/y – d/MM/y"}
+                    d{"d/MM/y – d/MM/y"}
+                    y{"d/MM/y – d/MM/y"}
+                }
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d 'de' MMMM 'de' y",
+                "d 'de' MMMM 'de' y",
+                "d/MM/y",
+                "d/MM/yy",
+                "{1} {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            intervalFormats{
+                MEd{
+                    M{"E d/MM – E d/MM"}
+                    d{"E d/MM – E d/MM"}
+                }
+                MMMEd{
+                    M{"E d 'de' MMM 'al' E d 'de' MMM"}
+                    d{"E d 'al' E d 'de' MMM"}
+                }
+                MMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM"}
+                }
+                Md{
+                    M{"d/MM – d/MM"}
+                    d{"d/MM – d/MM"}
+                }
+                hm{
+                    h{"h:mm–h:mm a"}
+                    m{"h:mm–h:mm a"}
+                }
+                y{
+                    y{"y 'al' y"}
+                }
+                yM{
+                    M{"MM/y – MM/y"}
+                    y{"MM/y – MM/y"}
+                }
+                yMEd{
+                    M{"E d/MM/y – E d/MM/y"}
+                    d{"E d/MM/y – E d/MM/y"}
+                    y{"E d/MM/y – E d/MM/y"}
+                }
+                yMMM{
+                    y{"MMM 'de' y 'a' MMM 'de' y"}
+                }
+                yMMMEd{
+                    M{"E d 'de' MMM 'al' E d 'de' MMM 'de' y"}
+                    d{"E d 'al' E d 'de' MMM 'de' y"}
+                    y{"E d 'de' MMM 'de' y 'al' E d 'de' MMM 'de' y"}
+                }
+                yMMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM 'de' y"}
+                    y{"d 'de' MMM 'de' y 'al' d 'de' MMM 'de' y"}
+                }
+                yMd{
+                    M{"d/MM/y – d/MM/y"}
+                    d{"d/MM/y – d/MM/y"}
+                    y{"d/MM/y – d/MM/y"}
+                }
+            }
+        }
+    }
+}

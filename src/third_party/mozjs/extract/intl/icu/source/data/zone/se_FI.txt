@@ -1,0 +1,739 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+se_FI{
+    zoneStrings{
+        "Africa:Cairo"{
+            ec{"Kairo"}
+        }
+        "America:Danmarkshavn"{
+            ec{"Dánmárkkuhámman"}
+        }
+        "America:North_Dakota:Beulah"{
+            ec{"Beulah, Davvi-Dakota"}
+        }
+        "America:North_Dakota:Center"{
+            ec{"Guovddáš, Davvi-Dakota"}
+        }
+        "America:North_Dakota:New_Salem"{
+            ec{"New Salem, Davvi-Dakota"}
+        }
+        "Asia:Damascus"{
+            ec{"Damaskos"}
+        }
+        "Asia:Irkutsk"{
+            ec{"Irkuck"}
+        }
+        "Asia:Kamchatka"{
+            ec{"Kamčatka"}
+        }
+        "Asia:Krasnoyarsk"{
+            ec{"Krasnojarsk"}
+        }
+        "Asia:Novokuznetsk"{
+            ec{"Novokusneck"}
+        }
+        "Asia:Rangoon"{
+            ec{"Rangoon"}
+        }
+        "Asia:Sakhalin"{
+            ec{"Sahalin"}
+        }
+        "Asia:Tehran"{
+            ec{"Teheran"}
+        }
+        "Asia:Ulaanbaatar"{
+            ec{"Ulan-Bator"}
+        }
+        "Asia:Yakutsk"{
+            ec{"Jakuck"}
+        }
+        "Asia:Yekaterinburg"{
+            ec{"Jekaterinburg"}
+        }
+        "Asia:Yerevan"{
+            ec{"Jerevan"}
+        }
+        "Atlantic:Azores"{
+            ec{"Azorat"}
+        }
+        "Atlantic:Canary"{
+            ec{"Kanária"}
+        }
+        "Atlantic:Cape_Verde"{
+            ec{"Kap Verde"}
+        }
+        "Atlantic:South_Georgia"{
+            ec{"Lulli-Georgia"}
+        }
+        "Etc:UTC"{
+            ls{"koordinerejuvvon oktasaš áigi"}
+        }
+        "Etc:Unknown"{
+            ec{"Dovdameahttun gávpot"}
+        }
+        "Europe:Athens"{
+            ec{"Athena"}
+        }
+        "Europe:Belgrade"{
+            ec{"Belgrad"}
+        }
+        "Europe:Brussels"{
+            ec{"Brüssel"}
+        }
+        "Europe:Bucharest"{
+            ec{"Bukarest"}
+        }
+        "Europe:Copenhagen"{
+            ec{"København"}
+        }
+        "Europe:Dublin"{
+            ld{"Irlánddalaš dálveáigi"}
+        }
+        "Europe:Helsinki"{
+            ec{"Helsset"}
+        }
+        "Europe:Isle_of_Man"{
+            ec{"Mansuolu"}
+        }
+        "Europe:Lisbon"{
+            ec{"Lisboa"}
+        }
+        "Europe:London"{
+            ld{"Brihtalaš geasseáigi"}
+        }
+        "Europe:Luxembourg"{
+            ec{"Luxenburg"}
+        }
+        "Europe:Moscow"{
+            ec{"Moskva"}
+        }
+        "Europe:Prague"{
+            ec{"Praha"}
+        }
+        "Europe:Rome"{
+            ec{"Roma"}
+        }
+        "Europe:Tirane"{
+            ec{"Tirana"}
+        }
+        "Europe:Ulyanovsk"{
+            ec{"Uljanovsk"}
+        }
+        "Europe:Vienna"{
+            ec{"Wien"}
+        }
+        "Europe:Warsaw"{
+            ec{"Warsawa"}
+        }
+        "Europe:Zurich"{
+            ec{"Zürich"}
+        }
+        "Indian:Christmas"{
+            ec{"Juovlasuolu"}
+        }
+        "Indian:Cocos"{
+            ec{"Kokos"}
+        }
+        "Indian:Maldives"{
+            ec{"Malediivvat"}
+        }
+        "Pacific:Marquesas"{
+            ec{"Marquesasat"}
+        }
+        "meta:Afghanistan"{
+            ls{"Afganisthana áigi"}
+        }
+        "meta:Africa_Central"{
+            ls{"Gaska-Afrihká áigi"}
+        }
+        "meta:Africa_Eastern"{
+            ls{"Nuorta-Afrihká áigi"}
+        }
+        "meta:Africa_Southern"{
+            ls{"Lulli-Afrihká dálveáigi"}
+        }
+        "meta:Africa_Western"{
+            ld{"Oarje-Afrihká geasseáigi"}
+            lg{"Oarje-Afrihká áigi"}
+            ls{"Oarje-Afrihká dálveáigi"}
+        }
+        "meta:Alaska"{
+            ld{"Alaska geasseáigi"}
+            lg{"Alaska áigi"}
+            ls{"Alaska dálveáigi"}
+        }
+        "meta:Amazon"{
+            ld{"Amazona geasseáigi"}
+            lg{"Amazona áigi"}
+            ls{"Amazona dálveáigi"}
+        }
+        "meta:America_Central"{
+            ld{"dábálaš geasseáigi"}
+            lg{"dábálašáigi"}
+            ls{"dábálaš dálveáigi"}
+        }
+        "meta:America_Eastern"{
+            ld{"geasseáigi nuortan"}
+            lg{"áigi nuortan"}
+            ls{"dálveáigi nuortan"}
+        }
+        "meta:America_Mountain"{
+            ld{"geasseduottaráigi"}
+            lg{"duottaráigi"}
+            ls{"dálveduottaráigi"}
+        }
+        "meta:America_Pacific"{
+            ld{"Jaskesábi geasseáigi"}
+            lg{"Jaskesábi áigi"}
+            ls{"Jaskesábi dálveáigi"}
+        }
+        "meta:Apia"{
+            ld{"Apia geasseáigi"}
+            lg{"Apia áigi"}
+            ls{"Apia dálveáigi"}
+        }
+        "meta:Arabian"{
+            ld{"Arábia geasseáigi"}
+            lg{"Arábia áigi"}
+            ls{"Arábia dálveáigi"}
+        }
+        "meta:Argentina"{
+            ld{"Argentina geasseáigi"}
+            lg{"Argentina áigi"}
+            ls{"Argentina dálveáigi"}
+        }
+        "meta:Argentina_Western"{
+            ld{"Oarje-Argentina geasseáigi"}
+            lg{"Oarje-Argentina áigi"}
+            ls{"Oarje-Argentina dálveáigi"}
+        }
+        "meta:Armenia"{
+            ld{"Armenia geasseáigi"}
+            lg{"Armenia áigi"}
+            ls{"Armenia dálveáigi"}
+        }
+        "meta:Atlantic"{
+            ld{"atlántalaš geasseáigi"}
+            lg{"atlántalaš áigi"}
+            ls{"atlántalaš dálveáigi"}
+        }
+        "meta:Australia_Central"{
+            ld{"Gaska-Austrália geasseáigi"}
+            lg{"Gaska-Austrália áigi"}
+            ls{"Gaska-Austrália dálveáigi"}
+        }
+        "meta:Australia_CentralWestern"{
+            ld{"Gaska-Austrália oarjjabeali geasseáigi"}
+            lg{"Gaska-Austrália oarjjabeali áigi"}
+            ls{"Gaska-Austrália oarjjabeali dálveáigi"}
+        }
+        "meta:Australia_Eastern"{
+            ld{"Nuorta-Austrália geasseáigi"}
+            lg{"Nuorta-Austrália áigi"}
+            ls{"Nuorta-Austrália dálveáigi"}
+        }
+        "meta:Australia_Western"{
+            ld{"Oarje-Austrália geasseáigi"}
+            lg{"Oarje-Austrália áigi"}
+            ls{"Oarje-Austrália dálveáigi"}
+        }
+        "meta:Azerbaijan"{
+            ld{"Aserbaižana geasseáigi"}
+            lg{"Aserbaižana áigi"}
+            ls{"Aserbaižana dálveáigi"}
+        }
+        "meta:Azores"{
+            ld{"Azoraid geasseáigi"}
+            lg{"Azoraid áigi"}
+            ls{"Azoraid dálveáigi"}
+        }
+        "meta:Bangladesh"{
+            ld{"Bangladesha geasseáigi"}
+            lg{"Bangladesha áigi"}
+            ls{"Bangladesha dálveáigi"}
+        }
+        "meta:Bhutan"{
+            ls{"Bhutana áigi"}
+        }
+        "meta:Bolivia"{
+            ls{"Bolivia áigi"}
+        }
+        "meta:Brasilia"{
+            ld{"Brasilia geasseáigi"}
+            lg{"Brasilia áigi"}
+            ls{"Brasilia dálveáigi"}
+        }
+        "meta:Brunei"{
+            ls{"Brunei Darussalama áigi"}
+        }
+        "meta:Cape_Verde"{
+            ld{"Kap Verde geasseáigi"}
+            lg{"Kap Verde áigi"}
+            ls{"Kap Verde dálveáigi"}
+        }
+        "meta:Chamorro"{
+            ls{"Čamorro dálveáigi"}
+        }
+        "meta:Chatham"{
+            ld{"Chathama geasseáigi"}
+            lg{"Chathama áigi"}
+            ls{"Chathama dálveáigi"}
+        }
+        "meta:Chile"{
+            ld{"Chile geasseáigi"}
+            lg{"Chile áigi"}
+            ls{"Chile dálveáigi"}
+        }
+        "meta:China"{
+            ld{"Kiinná geasseáigi"}
+            lg{"Kiinná áigi"}
+            ls{"Kiinná dálveáigi"}
+        }
+        "meta:Choibalsan"{
+            ld{"Choibolsana geasseáigi"}
+            lg{"Choibolsana áigi"}
+            ls{"Choibolsana dálveáigi"}
+        }
+        "meta:Christmas"{
+            ls{"Juovlasullo áigi"}
+        }
+        "meta:Cocos"{
+            ls{"Kokossulloid áigi"}
+        }
+        "meta:Colombia"{
+            ld{"Colombia geasseáigi"}
+            lg{"Colombia áigi"}
+            ls{"Colombia dálveáigi"}
+        }
+        "meta:Cook"{
+            ld{"Cooksulloid geasi beallemuttu áigi"}
+            lg{"Cooksulloid áigi"}
+            ls{"Cooksulloid dálveáigi"}
+        }
+        "meta:Cuba"{
+            ld{"Cuba geasseáigi"}
+            lg{"Cuba áigi"}
+            ls{"Cuba dálveáigi"}
+        }
+        "meta:Davis"{
+            ls{"Davisa áigi"}
+        }
+        "meta:DumontDUrville"{
+            ls{"Dumont-d’Urville áigi"}
+        }
+        "meta:East_Timor"{
+            ls{"Nuorta-Timora áigi"}
+        }
+        "meta:Easter"{
+            ld{"Beassášsullo geasseáigi"}
+            lg{"Beassášsullo áigi"}
+            ls{"Beassášsullo dálveáigi"}
+        }
+        "meta:Ecuador"{
+            ls{"Ecuadora áigi"}
+        }
+        "meta:Europe_Central"{
+            ld{"Gaska-Eurohpá geasseáigi"}
+            lg{"Gaska-Eurohpá áigi"}
+            ls{"Gaska-Eurohpá dálveáigi"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"Nuorta-Eurohpa geasseáigi"}
+            lg{"Nuorta-Eurohpa áigi"}
+            ls{"Nuorta-Eurohpa dálveáigi"}
+        }
+        "meta:Europe_Further_Eastern"{
+            ls{"Gáiddus-Nuortti eurohpalaš áigi"}
+        }
+        "meta:Europe_Western"{
+            ld{"Oarje-Eurohpá geasseáigi"}
+            lg{"Oarje-Eurohpá áigi"}
+            ls{"Oarje-Eurohpá dálveáigi"}
+        }
+        "meta:Falkland"{
+            ld{"Falklandsulluid geasseáigi"}
+            lg{"Falklandsulluid áigi"}
+            ls{"Falklandsulluid dálveáigi"}
+        }
+        "meta:Fiji"{
+            ld{"Fiji geasseáigi"}
+            lg{"Fiji áigi"}
+            ls{"Fiji dálveáigi"}
+        }
+        "meta:French_Guiana"{
+            ls{"Frankriikka Guyana áigi"}
+        }
+        "meta:French_Southern"{
+            ls{"Frankriikka lulli & antárktisa áigi"}
+        }
+        "meta:GMT"{
+            ls{"Greenwicha áigi"}
+        }
+        "meta:Galapagos"{
+            ls{"Galapagosa áigi"}
+        }
+        "meta:Gambier"{
+            ls{"Gambiera áigi"}
+        }
+        "meta:Georgia"{
+            ld{"Georgia geasseáigi"}
+            lg{"Georgia áigi"}
+            ls{"Georgia dálveáigi"}
+        }
+        "meta:Gilbert_Islands"{
+            ls{"Gilbertsulloid áigi"}
+        }
+        "meta:Greenland_Eastern"{
+            ld{"Nuorta-Ruonáeatnama geasseáigi"}
+            lg{"Nuorta-Ruonáeatnama áigi"}
+            ls{"Nuorta-Ruonáeatnama dálveáigi"}
+        }
+        "meta:Greenland_Western"{
+            ld{"Oarje-Ruonáeatnama geasseáigi"}
+            lg{"Oarje-Ruonáeatnama áigi"}
+            ls{"Oarje-Ruonáeatnama dálveáigi"}
+        }
+        "meta:Gulf"{
+            ls{"Golfa dálveáigi"}
+        }
+        "meta:Guyana"{
+            ls{"Guyana áigi"}
+        }
+        "meta:Hawaii_Aleutian"{
+            ld{"Hawaii-aleuhtalaš geasseáigi"}
+            lg{"Hawaii-aleuhtalaš áigi"}
+            ls{"Hawaii-aleuhtalaš dálveáigi"}
+        }
+        "meta:Hong_Kong"{
+            ld{"Hong Konga geasseáigi"}
+            lg{"Hong Konga áigi"}
+            ls{"Hong Konga dálveáigi"}
+        }
+        "meta:Hovd"{
+            ld{"Hovda geasseáigi"}
+            lg{"Hovda áigi"}
+            ls{"Hovda dálveáigi"}
+        }
+        "meta:India"{
+            ls{"India dálveáigi"}
+        }
+        "meta:Indian_Ocean"{
+            ls{"Indiaábi áigi"}
+        }
+        "meta:Indochina"{
+            ls{"Indokiinná áigi"}
+        }
+        "meta:Indonesia_Central"{
+            ls{"Gaska-Indonesia áigi"}
+        }
+        "meta:Indonesia_Eastern"{
+            ls{"Nuorta-Indonesia áigi"}
+        }
+        "meta:Indonesia_Western"{
+            ls{"Oarje-Indonesia áigi"}
+        }
+        "meta:Iran"{
+            ld{"Irana geasseáigi"}
+            lg{"Irana áigi"}
+            ls{"Irana dálveáigi"}
+        }
+        "meta:Irkutsk"{
+            ld{"Irkucka geasseáigi"}
+            lg{"Irkucka áigi"}
+            ls{"Irkucka dálveáigi"}
+        }
+        "meta:Israel"{
+            ld{"Israela geasseáigi"}
+            lg{"Israela áigi"}
+            ls{"Israela dálveáigi"}
+        }
+        "meta:Japan"{
+            ld{"Japána geasseáigi"}
+            lg{"Japána áigi"}
+            ls{"Japána dálveáigi"}
+        }
+        "meta:Kazakhstan_Eastern"{
+            ls{"Nuorta-Kasakstana áigi"}
+        }
+        "meta:Kazakhstan_Western"{
+            ls{"Oarje-Kasakstana áigi"}
+        }
+        "meta:Korea"{
+            ld{"Korea geasseáigi"}
+            lg{"Korea áigi"}
+            ls{"Korea dálveáigi"}
+        }
+        "meta:Kosrae"{
+            ls{"Kosraea áigi"}
+        }
+        "meta:Krasnoyarsk"{
+            ld{"Krasnojarska geasseáigi"}
+            lg{"Krasnojarska áigi"}
+            ls{"Krasnojarska dálveáigi"}
+        }
+        "meta:Kyrgystan"{
+            ls{"Kirgisia áigi"}
+        }
+        "meta:Line_Islands"{
+            ls{"Linesulloid áigi"}
+        }
+        "meta:Lord_Howe"{
+            ld{"Lord Howe geasseáigi"}
+            lg{"Lord Howe áigi"}
+            ls{"Lord Howe dálveáigi"}
+        }
+        "meta:Macquarie"{
+            ls{"MacQuarie sullo áigi"}
+        }
+        "meta:Magadan"{
+            ld{"Magadana geasseáigi"}
+            lg{"Magadana áigi"}
+            ls{"Magadana dálveáigi"}
+        }
+        "meta:Malaysia"{
+            ls{"Malesia áigi"}
+        }
+        "meta:Maldives"{
+            ls{"Malediivvaid áigi"}
+        }
+        "meta:Marquesas"{
+            ls{"Marquesasiid áigi"}
+        }
+        "meta:Marshall_Islands"{
+            ls{"Marshallsulloid áigi"}
+        }
+        "meta:Mauritius"{
+            ld{"Mauritiusa geasseáigi"}
+            lg{"Mauritiusa áigi"}
+            ls{"Mauritiusa dálveáigi"}
+        }
+        "meta:Mawson"{
+            ls{"Mawsona áigi"}
+        }
+        "meta:Mexico_Northwest"{
+            ld{"Oarjedavvi-Meksiko geasseáigi"}
+            lg{"Oarjedavvi-Meksiko áigi"}
+            ls{"Oarjedavvi-Meksiko dálveáigi"}
+        }
+        "meta:Mexico_Pacific"{
+            ld{"Meksiko Jáskesábi geasseáigi"}
+            lg{"Meksiko Jáskesábi áigi"}
+            ls{"Meksiko Jáskesábi dálveáigi"}
+        }
+        "meta:Mongolia"{
+            ld{"Ulan-Batora geasseáigi"}
+            lg{"Ulan-Batora áigi"}
+            ls{"Ulan-Batora dálveáigi"}
+        }
+        "meta:Moscow"{
+            ld{"Moskva geasseáigi"}
+            lg{"Moskva áigi"}
+            ls{"Moskva dálveáigi"}
+        }
+        "meta:Myanmar"{
+            ls{"Myanmara áigi"}
+        }
+        "meta:Nauru"{
+            ls{"Nauru áigi"}
+        }
+        "meta:Nepal"{
+            ls{"Nepala áigi"}
+        }
+        "meta:New_Caledonia"{
+            ld{"Ođđa-Kaledonia geasseáigi"}
+            lg{"Ođđa-Kaledonia áigi"}
+            ls{"Ođđa-Kaledonia dálveáigi"}
+        }
+        "meta:New_Zealand"{
+            ld{"Ođđa-Selánda geasseáigi"}
+            lg{"Ođđa-Selánda áigi"}
+            ls{"Ođđa-Selánda dálveáigi"}
+        }
+        "meta:Newfoundland"{
+            ld{"Newfoundlanda geasseáigi"}
+            lg{"Newfoundlanda áigi"}
+            ls{"Newfoundlanda dálveáigi"}
+        }
+        "meta:Niue"{
+            ls{"Niuea áigi"}
+        }
+        "meta:Norfolk"{
+            ls{"Norfolksullo áigi"}
+        }
+        "meta:Noronha"{
+            ld{"Fernando de Noronha geasseáigi"}
+            lg{"Fernando de Noronha áigi"}
+            ls{"Fernando de Noronha dálveáigi"}
+        }
+        "meta:Novosibirsk"{
+            ld{"Novosibirska geasseáigi"}
+            lg{"Novosibirska áigi"}
+            ls{"Novosibirska dálveáigi"}
+        }
+        "meta:Omsk"{
+            ld{"Omska geasseáigi"}
+            lg{"Omska áigi"}
+            ls{"Omska dálveáigi"}
+        }
+        "meta:Pakistan"{
+            ld{"Pakistana geasseáigi"}
+            lg{"Pakistana áigi"}
+            ls{"Pakistana dálveáigi"}
+        }
+        "meta:Palau"{
+            ls{"Palaua áigi"}
+        }
+        "meta:Papua_New_Guinea"{
+            ls{"Papua Ođđa-Guinea áigi"}
+        }
+        "meta:Paraguay"{
+            ld{"Paraguaya geasseáigi"}
+            lg{"Paraguaya áigi"}
+            ls{"Paraguaya dálveáigi"}
+        }
+        "meta:Peru"{
+            ld{"Peru geasseáigi"}
+            lg{"Peru áigi"}
+            ls{"Peru dálveáigi"}
+        }
+        "meta:Philippines"{
+            ld{"Filippiinnaid geasseáigi"}
+            lg{"Filippiinnaid áigi"}
+            ls{"Filippiinnaid dálveáigi"}
+        }
+        "meta:Phoenix_Islands"{
+            ls{"Phoenixsulloid áigi"}
+        }
+        "meta:Pierre_Miquelon"{
+            ld{"St. Pierre & Miquelo geasseáigi"}
+            lg{"St. Pierre & Miquelo áigi"}
+            ls{"St. Pierre & Miquelo dálveáigi"}
+        }
+        "meta:Pitcairn"{
+            ls{"Pitcairnsulloid áigi"}
+        }
+        "meta:Ponape"{
+            ls{"Ponape áigi"}
+        }
+        "meta:Pyongyang"{
+            ls{"Pyongyanga áigi"}
+        }
+        "meta:Reunion"{
+            ls{"Reuniona áigi"}
+        }
+        "meta:Rothera"{
+            ls{"Rothera áigi"}
+        }
+        "meta:Sakhalin"{
+            ld{"Sahalina geasseáigi"}
+            lg{"Sahalina áigi"}
+            ls{"Sahalina dálveáigi"}
+        }
+        "meta:Samoa"{
+            ld{"Samoa geasseáigi"}
+            lg{"Samoa áigi"}
+            ls{"Samoa dálveáigi"}
+        }
+        "meta:Seychelles"{
+            ls{"Seychellaid áigi"}
+        }
+        "meta:Singapore"{
+            ls{"Singapore dálveáigi"}
+        }
+        "meta:Solomon"{
+            ls{"Salomonsulloid áigi"}
+        }
+        "meta:South_Georgia"{
+            ls{"Lulli-Georgia áigi"}
+        }
+        "meta:Suriname"{
+            ls{"Suriname áigi"}
+        }
+        "meta:Syowa"{
+            ls{"Syowa áigi"}
+        }
+        "meta:Tahiti"{
+            ls{"Tahiti áigi"}
+        }
+        "meta:Taipei"{
+            ld{"Taipeia geasseáigi"}
+            lg{"Taipeia áigi"}
+            ls{"Taipeia dálveáigi"}
+        }
+        "meta:Tajikistan"{
+            ls{"Tažikistana áigi"}
+        }
+        "meta:Tokelau"{
+            ls{"Tokelaua áigi"}
+        }
+        "meta:Tonga"{
+            ld{"Tonga geasseáigi"}
+            lg{"Tonga áigi"}
+            ls{"Tonga dálveáigi"}
+        }
+        "meta:Truk"{
+            ls{"Chuuka áigi"}
+        }
+        "meta:Turkmenistan"{
+            ld{"Turkmenistana geasseáigi"}
+            lg{"Turkmenistana áigi"}
+            ls{"Turkmenistana dálveáigi"}
+        }
+        "meta:Tuvalu"{
+            ls{"Tuvalu áigi"}
+        }
+        "meta:Uruguay"{
+            ld{"Uruguaya geasseáigi"}
+            lg{"Uruguaya áigi"}
+            ls{"Uruguaya dálveáigi"}
+        }
+        "meta:Uzbekistan"{
+            ld{"Usbekistana geasseáigi"}
+            lg{"Usbekistana áigi"}
+            ls{"Usbekistana dálveáigi"}
+        }
+        "meta:Vanuatu"{
+            ld{"Vanuatu geasseáigi"}
+            lg{"Vanuatu áigi"}
+            ls{"Vanuatu dálveáigi"}
+        }
+        "meta:Venezuela"{
+            ls{"Venezuela áigi"}
+        }
+        "meta:Vladivostok"{
+            ld{"Vladivostoka geasseáigi"}
+            lg{"Vladivostoka áigi"}
+            ls{"Vladivostoka dálveáigi"}
+        }
+        "meta:Volgograd"{
+            ld{"Volgograda geasseáigi"}
+            lg{"Volgograda áigi"}
+            ls{"Volgograda dálveáigi"}
+        }
+        "meta:Vostok"{
+            ls{"Vostoka áigi"}
+        }
+        "meta:Wake"{
+            ls{"Wakesullo áigi"}
+        }
+        "meta:Wallis"{
+            ls{"Wallis- ja Futuna áigi"}
+        }
+        "meta:Yakutsk"{
+            ld{"Jakucka geasseáigi"}
+            lg{"Jakucka áigi"}
+            ls{"Jakucka dálveáigi"}
+        }
+        "meta:Yekaterinburg"{
+            ld{"Jekaterinburga geasseáigi"}
+            lg{"Jekaterinburga áigi"}
+            ls{"Jekaterinburga dálveáigi"}
+        }
+        gmtFormat{"{0} GMT"}
+        gmtZeroFormat{"GMT"}
+        hourFormat{"+HH:mm;-HH:mm"}
+        regionFormatDaylight{"{0} geasseáigi"}
+        regionFormatStandard{"{0} dálveáigi"}
+    }
+}

@@ -1,0 +1,82 @@
+## Makefile.in for ICU - test/perf/utrie2perf
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+##
+## Copyright (c) 2001-2011, International Business Machines Corporation and
+## others. All Rights Reserved.
+
+## Source directory information
+srcdir = @srcdir@
+top_srcdir = @top_srcdir@
+
+top_builddir = ../../..
+
+include $(top_builddir)/icudefs.mk
+
+## Build directory information
+subdir = test/perf/utrie2perf
+
+## Extra files to remove for 'make clean'
+CLEANFILES = *~ $(DEPS)
+
+## Target information
+TARGET = utrie2perf
+
+CPPFLAGS += -I$(top_srcdir)/common -I$(top_srcdir)/tools/toolutil -I$(top_srcdir)/tools/ctestfw
+LIBS = $(LIBCTESTFW) $(LIBICUI18N) $(LIBICUUC) $(LIBICUTOOLUTIL) $(DEFAULT_LIBS) $(LIB_M)
+
+OBJECTS = utrie2perf.o
+
+DEPS = $(OBJECTS:.o=.d)
+
+## List of phony targets
+.PHONY : all all-local install install-local clean clean-local	\
+distclean distclean-local dist dist-local check check-local
+
+## Clear suffix list
+.SUFFIXES :
+
+## List of standard targets
+all: all-local
+install: install-local
+clean: clean-local
+distclean : distclean-local
+dist: dist-local
+check: all check-local
+
+all-local: $(TARGET)
+
+install-local:
+
+dist-local:
+
+clean-local:
+	test -z "$(CLEANFILES)" || $(RMV) $(CLEANFILES)
+	$(RMV) $(OBJECTS) $(TARGET)
+
+distclean-local: clean-local
+	$(RMV) Makefile
+
+check-local: all-local
+
+Makefile: $(srcdir)/Makefile.in  $(top_builddir)/config.status
+	cd $(top_builddir) \
+	 && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+
+$(TARGET) : $(OBJECTS)
+	$(LINK.cc) -o $@ $^ $(LIBS)
+	$(POST_BUILD_STEP)
+
+invoke:
+	ICU_DATA=$${ICU_DATA:-$(top_builddir)/data/} TZ=PST8PDT $(INVOKE) $(INVOCATION)
+
+ifeq (,$(MAKECMDGOALS))
+-include $(DEPS)
+else
+ifneq ($(patsubst %clean,,$(MAKECMDGOALS)),)
+ifneq ($(patsubst %install,,$(MAKECMDGOALS)),)
+-include $(DEPS)
+endif
+endif
+endif
+

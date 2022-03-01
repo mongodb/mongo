@@ -1,33 +1,46 @@
-window.tests.set('pairCyclicWeakMap', (function() {
-var garbage = [];
-var garbageIndex = 0;
-return {
-    description: "wm1[k1] = k2; wm2[k2] = k3; wm1[k3] = k4; wm2[k4] = ...",
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-    defaultGarbagePerFrame: "1K",
-    defaultGarbageTotal: "1K",
+tests.set(
+  "pairCyclicWeakMap",
+  (function() {
+    var garbage = [];
+    var garbageIndex = 0;
+    return {
+      description: "wm1[k1] = k2; wm2[k2] = k3; wm1[k3] = k4; wm2[k4] = ...",
 
-    load: (N) => { garbage = new Array(N); },
+      defaultGarbagePerFrame: "10K",
+      defaultGarbagePiles: "1K",
 
-    unload: () => { garbage = []; garbageIndex = 0; },
+      load: N => {
+        garbage = new Array(N);
+      },
 
-    makeGarbage: (M) => {
+      unload: () => {
+        garbage = [];
+        garbageIndex = 0;
+      },
+
+      makeGarbage: M => {
         var wm1 = new WeakMap();
         var wm2 = new WeakMap();
         var initialKey = {};
         var key = initialKey;
         var value = {};
-        for (var i = 0; i < M/2; i++) {
-            wm1.set(key, value);
-            key = value;
-            value = {};
-            wm2.set(key, value);
-            key = value;
-            value = {};
+        for (var i = 0; i < M / 2; i++) {
+          wm1.set(key, value);
+          key = value;
+          value = {};
+          wm2.set(key, value);
+          key = value;
+          value = {};
         }
-        garbage[garbageIndex++] = [ initialKey, wm1, wm2 ];
-        if (garbageIndex == garbage.length)
-            garbageIndex = 0;
-    }
-};
-})());
+        garbage[garbageIndex++] = [initialKey, wm1, wm2];
+        if (garbageIndex == garbage.length) {
+          garbageIndex = 0;
+        }
+      },
+    };
+  })()
+);

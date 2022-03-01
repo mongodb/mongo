@@ -1,0 +1,87 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: hy_AREVMDA_hy_AREVMDA_FONIPA.txt
+# Generated from CLDR
+#
+
+# https://en.wikipedia.org/wiki/Western_Armenian#Phonology
+# http://www.omniglot.com/writing/armenian.htm
+# https://en.wikipedia.org/wiki/Classical_Armenian_orthography
+::lower();
+$wordBoundary = [^[:L:][:M:][:N:]];
+$vowel = [աեէըիոևօւ];
+'՚' → ;   # կ՚ուտէ → /ɡudɛ/
+մ → m;
+ն → n;
+պ → b;
+տ → d;
+կ → ɡ;
+բ → pʰ;
+դ → tʰ;
+գ → kʰ;
+փ → pʰ;
+{թիւն} $wordBoundary → tʰjun;  # միութիւն → /mijutʰjun/, գիտութիւն → /kʰidutʰjun/
+թ → tʰ;
+ք → kʰ;
+ծ → d\u0361z;
+ճ → d\u0361ʒ;
+ձ → t\u0361sʰ;
+ջ → t\u0361ʃʰ;
+ց → t\u0361sʰ;
+չ → t\u0361ʃʰ;
+ֆ → f;
+ս → s;
+շ → ʃ;
+խ → χ;
+հ → h;
+վ → v;
+ւ → v;
+զ → z;
+ժ → ʒ;
+ղ → ʁ;
+լ → l;
+$wordBoundary {յ} → h;      # յետոյ → /hɛdo/, յատակ → /hɑdɑɡ/
+յ → j;
+ռ → ɾ;
+ր → ɾ;
+$wordBoundary {իւ} → ju;    # իւղ → /juʁ/
+իու → iju;                  # միութիւն → /mijutʰjun/
+իւ → ʏ;                     # հիւր → /hʏɾ/
+{իայ} $wordBoundary → ja;
+իա → ijɑ;                   # միասին → /mijɑsin/
+ի → i;
+{եայ} $wordBoundary → jɑ;   # առօրեայ → /ɑɾoɾjɑ/
+եա → jɑ;                    # Եանիքեան → /jɑnikʰjɑn/
+եօ → jo;                    # եօթը → /jotʰə/
+ով → ov;                    # երազով → /jɛɾɑzov/
+{ոյ} $wordBoundary → o;     # երեկոյ → /jɛɾɛɡo/
+{ոյ} $vowel → oj;           # գոյական → /kʰojɑɡɑn/
+ոյ → uj;                    # քոյր → /kʰujɾ/
+{ու} $vowel → v;            # վաղուընէ → /vɑʁvənɛ/, պահուըտիլ → /bɑhvədil/
+ու → u;                     # մուկ → /muɡ/
+$wordBoundary {ո} → vo;     # ոսկի → /vosɡi/
+ո → o;                      # ցորեն → /t\u0361sʰoɾɛn/
+$vowel {ե} → jɛ;            # հայելի → /hɑjɛli/
+$wordBoundary {ե} → jɛ;     # երազ → /jɛɾɑz/
+ե → ɛ;
+# և is Eastern Armenian, but let's be resilient and pronounce something.
+$wordBoundary {և}  → jɛv;
+և → ɛv;
+{էայ} $wordBoundary → ɛjɑ;
+էա → ɛjɑ;                   # էակ → /ɛjɑɡ/
+էի → ɛji;                   # էի → /ɛji/, կուզէին → /ɡuzɛjin/
+էու → ɛju;                  # էութիւն → /ɛjutʰjun/
+էօ → œ;                     # Էօժենի → /œʒɛni/
+էյ → ej;                    # թէյ → /tʰej/
+է → ɛ;
+ը → ə;
+օ → o;
+{այ} $wordBoundary → ɑ;     # ծառայ → /d\u0361zɑɾɑ/, կը դողայ → /ɡə tʰoʁɑ/
+ա → ɑ;
+::NULL;
+jj → j;                     # Գայեանէ → /kʰɑjjɑnɛ/ → /kʰɑjɑnɛ/
+nɡ → ŋɡ;                    # Քոնկօ → /kʰonɡo/ → /kʰoŋɡo/
+nk → ŋk;                    # օրէնք → /oɾɛnkʰ/ → /oɾɛŋkʰ/
+

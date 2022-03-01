@@ -8,4 +8,4 @@ MFBT uses standard Mozilla style, with the following exceptions.
   upper-case letter at the start of function names.
 
 - Imported third-party code (such as decimal/*, double-conversion/source/*, and
-  lz4*) remains in its original style.
+  lz4/*) remains in its original style.

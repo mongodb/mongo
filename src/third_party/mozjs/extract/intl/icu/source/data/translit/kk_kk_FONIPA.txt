@@ -1,0 +1,66 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: kk_kk_FONIPA.txt
+# Generated from CLDR
+#
+
+# http://en.wikipedia.org/wiki/Kazakh_language#Phonology
+#
+# Output:
+#     m n ŋ
+#     p b t d k ɡ q ɢ
+#     f v x h
+#     s z ʃ ʒ ɕ t\u0361s t\u0361ɕ
+#     j w l ɾ
+#     ʉ ʊ ɘ ə ɛ æ ɑ
+#     i\u032Fɘ y\u032Fʉ u\u032Fʊ
+::NFC;
+::Lower;
+ә → æ;
+а → ɑ;
+п → p;
+б → b;
+д → d;
+е → i\u032Fɘ;
+г → ɡ;
+ғ → ɢ;
+һ → h;
+і → ɘ;
+й → j;
+к → k;
+қ → q;
+л → l;
+м → m;
+н → n;
+ң → ŋ;
+р → ɾ;
+с → s;
+т → t;
+у → w;
+з → z;
+ш → ʃ;
+ж → ʒ;
+ы → ə;
+ө → y\u032Fʉ;
+о → u\u032Fʊ;
+ү → ʉ;
+ұ → ʊ;
+# Some characters that are not really Kazakh, but appear frequently
+# in Kazakh-language text as part of loanwords.
+в → v;
+и → i;
+ц → t\u0361s;
+ч → t\u0361ɕ;
+щ → ɕ;
+х → x;
+ф → f;
+э → ɛ;
+ю → ju;
+я → jɑ;
+ё → jo;
+ъ →;
+ь →;
+\- → ' ';
+

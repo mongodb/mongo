@@ -1,0 +1,1775 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+km{
+    AuxExemplarCharacters{"[\u17B4\u17B5\u200B \u17CC \u17CE \u17CF \u17D1 ឝ ឞ]"}
+    Ellipsis{
+        final{"{0}…"}
+        initial{"…{0}"}
+        medial{"{0}…{1}"}
+        word-final{"{0} …"}
+        word-initial{"… {0}"}
+        word-medial{"{0} … {1}"}
+    }
+    ExemplarCharacters{
+        "[\u17D0 ៈ \u17CB \u17C9 \u17CA \u17CD ក ខ គ ឃ ង ច ឆ ជ ឈ ញ ដ ឋ ឌ ឍ ណ ត ថ ទ ធ "
+        "ន ប ផ ព ភ ម យ រ ឫ ឬ ល ឭ ឮ វ ស ហ ឡ អ {អា} ឥ ឦ ឧ {ឧក} ឩ ឪ ឯ ឰ ឱ ឲ ឳ ា \u17B7 "
+        "\u17B8 \u17B9 \u17BA \u17BB \u17BC \u17BD ើ ឿ ៀ េ ែ ៃ ោ ៅ \u17C6 ះ \u17D2]"
+    }
+    ExemplarCharactersIndex{
+        "[ក ខ គ ឃ ង ច ឆ ជ ឈ ញ ដ ឋ ឌ ឍ ណ ត ថ ទ ធ ន ប ផ ព ភ ម យ រ ឫ ឬ ល ឭ ឮ វ ស ហ ឡ អ ឥ"
+        " ឦ ឧ ឩ ឪ ឯ ឰ ឱ ឳ]"
+    }
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    ExemplarCharactersPunctuation{"[\\- ‑ , ៖ ! ? . ។ ៕ ‘ ’ \u0022 “ ” ( ) \\[ \\] \\{ \\} ៙ ៚]"}
+    MoreInformation{"?"}
+    NumberElements{
+        default{"latn"}
+        latn{
+            miscPatterns{
+                approximately{"~{0}"}
+                atLeast{"{0}+"}
+                atMost{"≤{0}"}
+                range{"{0}–{1}"}
+            }
+            patterns{
+                accountingFormat{"#,##0.00¤;(#,##0.00¤)"}
+                currencyFormat{"#,##0.00¤"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"#,##0%"}
+                scientificFormat{"#E0"}
+            }
+            patternsLong{
+                decimalFormat{
+                    1000{
+                        other{"0 ពាន់"}
+                    }
+                    10000{
+                        other{"00 ពាន់"}
+                    }
+                    100000{
+                        other{"000ពាន់"}
+                    }
+                    1000000{
+                        other{"0 លាន"}
+                    }
+                    10000000{
+                        other{"00 លាន"}
+                    }
+                    100000000{
+                        other{"000 លាន"}
+                    }
+                    1000000000{
+                        other{"0 ប៊ីលាន"}
+                    }
+                    10000000000{
+                        other{"00 ប៊ីលាន"}
+                    }
+                    100000000000{
+                        other{"000 ប៊ីលាន"}
+                    }
+                    1000000000000{
+                        other{"0 ទ្រីលាន"}
+                    }
+                    10000000000000{
+                        other{"00 ទ្រីលាន"}
+                    }
+                    100000000000000{
+                        other{"000 ទ្រីលាន"}
+                    }
+                }
+            }
+            patternsShort{
+                currencyFormat{
+                    1000{
+                        other{"¤0 ពាន់"}
+                    }
+                    10000{
+                        other{"¤00 ពាន់"}
+                    }
+                    100000{
+                        other{"¤000 ពាន់"}
+                    }
+                    1000000{
+                        other{"¤0 លាន"}
+                    }
+                    10000000{
+                        other{"¤00 លាន"}
+                    }
+                    100000000{
+                        other{"¤000 លាន"}
+                    }
+                    1000000000{
+                        other{"¤0 ប៊ីលាន"}
+                    }
+                    10000000000{
+                        other{"¤00 ប៊ីលាន"}
+                    }
+                    100000000000{
+                        other{"¤000 ប៊ីលាន"}
+                    }
+                    1000000000000{
+                        other{"¤0 ទ្រីលាន"}
+                    }
+                    10000000000000{
+                        other{"¤00 ទ្រីលាន"}
+                    }
+                    100000000000000{
+                        other{"¤000 ទ្រីលាន"}
+                    }
+                }
+                decimalFormat{
+                    1000{
+                        other{"0ពាន់"}
+                    }
+                    10000{
+                        other{"00 ពាន់"}
+                    }
+                    100000{
+                        other{"000 ពាន់"}
+                    }
+                    1000000{
+                        other{"0 លាន"}
+                    }
+                    10000000{
+                        other{"00 លាន"}
+                    }
+                    100000000{
+                        other{"000 លាន"}
+                    }
+                    1000000000{
+                        other{"0 ប៊ីលាន"}
+                    }
+                    10000000000{
+                        other{"00 ប៊ីលាន"}
+                    }
+                    100000000000{
+                        other{"000 ប៊ីលាន"}
+                    }
+                    1000000000000{
+                        other{"0 ទ្រីលាន"}
+                    }
+                    10000000000000{
+                        other{"00 ទ្រីលាន"}
+                    }
+                    100000000000000{
+                        other{"000 ទ្រីលាន"}
+                    }
+                }
+            }
+            symbols{
+                decimal{","}
+                exponential{"E"}
+                group{"."}
+                infinity{"∞"}
+                list{";"}
+                minusSign{"-"}
+                nan{"NaN"}
+                perMille{"‰"}
+                percentSign{"%"}
+                plusSign{"+"}
+                superscriptingExponent{"×"}
+                timeSeparator{":"}
+            }
+        }
+        minimalPairs{
+            ordinal{
+                other{"បត់​ស្តាំ​លើក​ទី​ {0}"}
+            }
+            plural{
+                other{"{0} ថ្ងៃ"}
+            }
+        }
+        minimumGroupingDigits{"1"}
+        native{"khmr"}
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE d MMMM y G",
+                "d MMMM y G",
+                "d MMM y G",
+                "d/M/y GGGGG",
+                "{1}, {0}",
+                "{1} នៅ​ម៉ោង {0}",
+                "{1} នៅ​ម៉ោង {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                Bh{"h B"}
+                Bhm{"h:mm B"}
+                Bhms{"h:mm:ss B"}
+                E{"ccc"}
+                EBhm{"E h:mm B"}
+                EBhms{"E h:mm:ss B"}
+                EHm{"E HH:mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"d E"}
+                Ehm{"E h:mm a"}
+                Ehms{"E h:mm:ss a"}
+                Gy{"y G"}
+                GyMMM{"MMM y G"}
+                GyMMMEd{"E, d MMM y G"}
+                GyMMMd{"d MMM y G"}
+                H{"HH"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E d/M"}
+                MMM{"LLL"}
+                MMMEd{"E d MMM"}
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                Md{"d/M"}
+                d{"d"}
+                h{"h a"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                ms{"mm:ss"}
+                y{"y G"}
+                yyyy{"y G"}
+                yyyyM{"M/y GGGGG"}
+                yyyyMEd{"E d/M/y GGGGG"}
+                yyyyMMM{"MMM y G"}
+                yyyyMMMEd{"E, d MMM y G"}
+                yyyyMMMM{"G y MMMM"}
+                yyyyMMMd{"d MMM y G"}
+                yyyyMd{"d/M/y GGGGG"}
+                yyyyQQQ{"QQQ y G"}
+                yyyyQQQQ{"QQQQ y G"}
+            }
+            intervalFormats{
+                Bh{
+                    h{"h – h B"}
+                }
+                Bhm{
+                    h{"h:mm – h:mm B"}
+                    m{"h:mm – h:mm B"}
+                }
+                Gy{
+                    G{"y G – y G"}
+                    y{"y – y G"}
+                }
+                GyM{
+                    G{"M/y GGGGG – M/y GGGGG"}
+                    M{"M/y – M/y GGGGG"}
+                    y{"M/y – M/y GGGGG"}
+                }
+                GyMEd{
+                    G{"E d/M/y GGGGG – E d/M/y GGGGG"}
+                    M{"E d/M/y – E d/M/y GGGGG"}
+                    d{"E d/M/y – E d/M/y GGGGG"}
+                    y{"E d/M/y – E d/M/y GGGGG"}
+                }
+                GyMMM{
+                    G{"MMM y G – MMM y G"}
+                    M{"MMM – MMM y G"}
+                    y{"MMM y – MMM y G"}
+                }
+                GyMMMEd{
+                    G{"E d MMM y G – E d MMM y G"}
+                    M{"E d MMM – E d MMM y G"}
+                    d{"E d MMM – E d MMM y G"}
+                    y{"E d MMM y – E d MMM y G"}
+                }
+                GyMMMd{
+                    G{"d MMM y G – d MMM y G"}
+                    M{"d MMM – d MMM y G"}
+                    d{"d – d MMM y G"}
+                    y{"d MMM y – d MMM y G"}
+                }
+                GyMd{
+                    G{"d/M/y GGGGG – d/M/y GGGGG"}
+                    M{"d/M/y – d/M/y GGGGG"}
+                    d{"d/M/y – d/M/y GGGGG"}
+                    y{"d/M/y – d/M/y GGGGG"}
+                }
+                H{
+                    H{"H–H"}
+                }
+                Hm{
+                    H{"H:mm–H:mm"}
+                    m{"H:mm–H:mm"}
+                }
+                Hmv{
+                    H{"H:mm–H:mm v"}
+                    m{"H:mm–H:mm v"}
+                }
+                Hv{
+                    H{"H–H v"}
+                }
+                M{
+                    M{"M – M"}
+                }
+                MEd{
+                    M{"E, d/M – E, d/M"}
+                    d{"E, d/M– E, d/M"}
+                }
+                MMM{
+                    M{"MMM – MMM"}
+                }
+                MMMEd{
+                    M{"E, d MMM – E, d MMM"}
+                    d{"E, d MMM – E, d MMM"}
+                }
+                MMMd{
+                    M{"d MMM – d MMM"}
+                    d{"d – d MMM"}
+                }
+                Md{
+                    M{"d/M – d/M"}
+                    d{"d/M – d/M"}
+                }
+                d{
+                    d{"d – d"}
+                }
+                fallback{"{0} - {1}"}
+                h{
+                    a{"h a – h a"}
+                    h{"h–h a"}
+                }
+                hm{
+                    a{"h:mm a – h:mm a"}
+                    h{"h:mm–h:mm a"}
+                    m{"h:mm–h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a – h:mm a v"}
+                    h{"h:mm–h:mm a v"}
+                    m{"h:mm–h:mm a v"}
+                }
+                hv{
+                    a{"h a – h a v"}
+                    h{"h–h a v"}
+                }
+                y{
+                    y{"y – y G"}
+                }
+                yM{
+                    M{"M/y – M/y GGGGG"}
+                    y{"M/y – M/y GGGGG"}
+                }
+                yMEd{
+                    M{"E, d/M/y – E, d/M/y GGGGG"}
+                    d{"E, d/M/y – E, d/M/y GGGGG"}
+                    y{"E, d/M/y – E, d/M/y GGGGG"}
+                }
+                yMMM{
+                    M{"MMM – MMM y G"}
+                    y{"MM-y – MM-y G"}
+                }
+                yMMMEd{
+                    M{"E, d MMM – E, d MMM, y G"}
+                    d{"E, d MMM – E, d MMM, y G"}
+                    y{"E, d MMM, y – E, d MMM, y G"}
+                }
+                yMMMM{
+                    M{"MMMM – MMMM y G"}
+                    y{"MMMM y – MMMM y G"}
+                }
+                yMMMd{
+                    M{"d MMM – d MMM y G"}
+                    d{"d–d MMM y G"}
+                    y{"d MMM, y – d MMM, y G"}
+                }
+                yMd{
+                    M{"d/M/y – d/M/y GGGGG"}
+                    d{"d/M/y – d/M/y G"}
+                    y{"d/M/y – d/M/y GGGGG"}
+                }
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "AM",
+                "PM",
+            }
+            AmPmMarkersAbbr{
+                "AM",
+                "PM",
+            }
+            AmPmMarkersNarrow{
+                "a",
+                "p",
+            }
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE d MMMM y",
+                "d MMMM y",
+                "d MMM y",
+                "d/M/yy",
+                "{1}, {0}",
+                "{1} នៅ​ម៉ោង {0}",
+                "{1} នៅ​ម៉ោង {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            appendItems{
+                Timezone{"{0} {1}"}
+            }
+            availableFormats{
+                Bh{"h B"}
+                Bhm{"h:mm B"}
+                Bhms{"h:mm:ss B"}
+                E{"ccc"}
+                EBhm{"E h:mm B"}
+                EBhms{"E h:mm:ss B"}
+                EHm{"E HH:mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"d E"}
+                Ehm{"E h:mm a"}
+                Ehms{"E h:mm:ss a"}
+                Gy{"y G"}
+                GyMMM{"MMM y G"}
+                GyMMMEd{"E d MMM y G"}
+                GyMMMd{"d MMM y G"}
+                H{"HH"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                Hmsv{"HH:mm:ss v"}
+                Hmv{"HH:mm v"}
+                M{"L"}
+                MEd{"E d/M"}
+                MMM{"LLL"}
+                MMMEd{"E d MMM"}
+                MMMMW{
+                    other{"សប្តាហ៍ទី W នៃខែ MMMM"}
+                }
+                MMMMd{"MMMM d"}
+                MMMd{"d MMM"}
+                Md{"d/M"}
+                d{"d"}
+                h{"h a"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                hmsv{"h:mm:ss a v"}
+                hmv{"h:mm a v"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E d/M/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E d MMM y"}
+                yMMMM{"MMMM y"}
+                yMMMd{"d MMM y"}
+                yMd{"d/M/y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+                yw{
+                    other{"សប្តាហ៍ទី w នៃឆ្នាំ Y"}
+                }
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "អាទិត្យ",
+                        "ចន្ទ",
+                        "អង្គារ",
+                        "ពុធ",
+                        "ព្រហ",
+                        "សុក្រ",
+                        "សៅរ៍",
+                    }
+                    narrow{
+                        "អ",
+                        "ច",
+                        "អ",
+                        "ព",
+                        "ព",
+                        "ស",
+                        "ស",
+                    }
+                    short{
+                        "អា",
+                        "ច",
+                        "អ",
+                        "ពុ",
+                        "ព្រ",
+                        "សុ",
+                        "ស",
+                    }
+                    wide{
+                        "អាទិត្យ",
+                        "ច័ន្ទ",
+                        "អង្គារ",
+                        "ពុធ",
+                        "ព្រហស្បតិ៍",
+                        "សុក្រ",
+                        "សៅរ៍",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "អាទិត្យ",
+                        "ចន្ទ",
+                        "អង្គារ",
+                        "ពុធ",
+                        "ព្រហ",
+                        "សុក្រ",
+                        "សៅរ៍",
+                    }
+                    narrow{
+                        "អ",
+                        "ច",
+                        "អ",
+                        "ព",
+                        "ព",
+                        "ស",
+                        "ស",
+                    }
+                    short{
+                        "អា",
+                        "ច",
+                        "អ",
+                        "ពុ",
+                        "ព្រ",
+                        "សុ",
+                        "ស",
+                    }
+                    wide{
+                        "អាទិត្យ",
+                        "ចន្ទ",
+                        "អង្គារ",
+                        "ពុធ",
+                        "ព្រហស្បតិ៍",
+                        "សុក្រ",
+                        "សៅរ៍",
+                    }
+                }
+            }
+            dayPeriod{
+                format{
+                    abbreviated{
+                        afternoon1{"នៅពេលរសៀល"}
+                        evening1{"នៅពេល​ល្ងាច"}
+                        midnight{"អធ្រាត្រ"}
+                        morning1{"នៅពេល​ព្រឹក"}
+                        night1{"នៅពេល​យប់"}
+                        noon{"ថ្ងៃត្រង់"}
+                    }
+                    narrow{
+                        afternoon1{"នៅពេលរសៀល"}
+                        evening1{"នៅពេល​ល្ងាច"}
+                        midnight{"អធ្រាត្រ"}
+                        morning1{"នៅពេល​ព្រឹក"}
+                        night1{"នៅពេល​យប់"}
+                        noon{"ថ្ងៃត្រង់"}
+                    }
+                    wide{
+                        afternoon1{"នៅពេលរសៀល"}
+                        evening1{"នៅពេល​ល្ងាច"}
+                        midnight{"អធ្រាត្រ"}
+                        morning1{"នៅពេល​ព្រឹក"}
+                        night1{"នៅពេល​យប់"}
+                        noon{"ថ្ងៃត្រង់"}
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        afternoon1{"រសៀល"}
+                        am{"AM"}
+                        evening1{"ល្ងាច"}
+                        midnight{"អធ្រាត្រ"}
+                        morning1{"ព្រឹក"}
+                        night1{"យប់"}
+                        noon{"ថ្ងៃ​ត្រង់"}
+                        pm{"PM"}
+                    }
+                    narrow{
+                        afternoon1{"រសៀល"}
+                        am{"AM"}
+                        evening1{"ល្ងាច"}
+                        midnight{"អធ្រាត្រ"}
+                        morning1{"ព្រឹក"}
+                        night1{"យប់"}
+                        noon{"ថ្ងៃ​ត្រង់"}
+                        pm{"PM"}
+                    }
+                    wide{
+                        afternoon1{"រសៀល"}
+                        am{"AM"}
+                        evening1{"ល្ងាច"}
+                        midnight{"អធ្រាត្រ"}
+                        morning1{"ព្រឹក"}
+                        night1{"យប់"}
+                        noon{"ថ្ងៃ​ត្រង់"}
+                        pm{"PM"}
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "មុន គ.ស.",
+                    "គ.ស.",
+                }
+                abbreviated%variant{
+                    "BCE",
+                    "CE",
+                }
+                wide{
+                    "មុន​គ្រិស្តសករាជ",
+                    "គ្រិស្តសករាជ",
+                }
+                wide%variant{
+                    "BCE",
+                    "CE",
+                }
+            }
+            intervalFormats{
+                Bh{
+                    h{"h – h B"}
+                }
+                Bhm{
+                    h{"h:mm – h:mm B"}
+                    m{"h:mm – h:mm B"}
+                }
+                Gy{
+                    G{"y G – y G"}
+                    y{"y – y G"}
+                }
+                GyM{
+                    G{"M/y GGGGG – M/y GGGGG"}
+                    M{"M/y – M/y GGGGG"}
+                    y{"M/y – M/y GGGGG"}
+                }
+                GyMEd{
+                    G{"E d/M/y GGGGG – E d/M/y GGGGG"}
+                    M{"E d/M/y – E d/M/y GGGGG"}
+                    d{"E d/M/y – E d/M/y GGGGG"}
+                    y{"E d/M/y – E d/M/y GGGGG"}
+                }
+                GyMMM{
+                    G{"MMM y G – MMM y G"}
+                    M{"MMM – MMM y G"}
+                    y{"MMM y – MMM y G"}
+                }
+                GyMMMEd{
+                    G{"E d MMM y G – E d MMM y G"}
+                    M{"E d MMM – E d MMM y G"}
+                    d{"E d MMM – E d MMM y G"}
+                    y{"E d MMM y – E d MMM y G"}
+                }
+                GyMMMd{
+                    G{"d MMM y G – d MMM y G"}
+                    M{"d MMM – d MMM y G"}
+                    d{"d – d MMM y G"}
+                    y{"d MMM y – d MMM y G"}
+                }
+                GyMd{
+                    G{"d/M/y GGGGG – d/M/y GGGGG"}
+                    M{"d/M/y – d/M/y GGGGG"}
+                    d{"d/M/y – d/M/y GGGGG"}
+                    y{"d/M/y – d/M/y GGGGG"}
+                }
+                H{
+                    H{"HH – HH"}
+                }
+                Hm{
+                    H{"HH:mm – HH:mm"}
+                    m{"HH:mm – HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm – HH:mm v"}
+                    m{"HH:mm – HH:mm v"}
+                }
+                Hv{
+                    H{"HH – HH v"}
+                }
+                M{
+                    M{"M – M"}
+                }
+                MEd{
+                    M{"E d/M – E d/M"}
+                    d{"E d/M – E d/M"}
+                }
+                MMM{
+                    M{"MMM – MMM"}
+                }
+                MMMEd{
+                    M{"E d MMM – E d MMM"}
+                    d{"E d MMM – E d MMM"}
+                }
+                MMMd{
+                    M{"d MMM – d MMM"}
+                    d{"d–d MMM"}
+                }
+                Md{
+                    M{"d/M – d/M"}
+                    d{"d/M – d/M"}
+                }
+                d{
+                    d{"d – d"}
+                }
+                fallback{"{0} - {1}"}
+                h{
+                    a{"h a – h a"}
+                    h{"h – h a"}
+                }
+                hm{
+                    a{"h:mm a – h:mm a"}
+                    h{"h:mm – h:mm a"}
+                    m{"h:mm – h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a – h:mm a v"}
+                    h{"h:mm – h:mm a v"}
+                    m{"h:mm – h:mm a v"}
+                }
+                hv{
+                    a{"h a – h a v"}
+                    h{"h – h a v"}
+                }
+                y{
+                    y{"y – y"}
+                }
+                yM{
+                    M{"M/y – M/y"}
+                    y{"M/y – M/y"}
+                }
+                yMEd{
+                    M{"E d/M/y – E d/M/y"}
+                    d{"E d/M/y – E d/M/y"}
+                    y{"E d/M/y – E d/M/y"}
+                }
+                yMMM{
+                    M{"MMM–MMM​ y"}
+                    y{"MMM y – MMM y"}
+                }
+                yMMMEd{
+                    M{"E dd MMM y – E dd MMM y"}
+                    d{"E dd MMM y – E dd MMM y"}
+                    y{"E dd-MM-y – E dd MMM y"}
+                }
+                yMMMM{
+                    M{"MMMM – MMMM y"}
+                    y{"MMMM y – MMMM y"}
+                }
+                yMMMd{
+                    M{"d MMM – d MMM y"}
+                    d{"d – d MMM y"}
+                    y{"d MMM y – d MMM y"}
+                }
+                yMd{
+                    M{"d/M/y – d/M/y"}
+                    d{"d/M/y – d/M/y"}
+                    y{"d/M/y – d/M/y"}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "មករា",
+                        "កុម្ភៈ",
+                        "មីនា",
+                        "មេសា",
+                        "ឧសភា",
+                        "មិថុនា",
+                        "កក្កដា",
+                        "សីហា",
+                        "កញ្ញា",
+                        "តុលា",
+                        "វិច្ឆិកា",
+                        "ធ្នូ",
+                    }
+                    narrow{
+                        "ម",
+                        "ក",
+                        "ម",
+                        "ម",
+                        "ឧ",
+                        "ម",
+                        "ក",
+                        "ស",
+                        "ក",
+                        "ត",
+                        "វ",
+                        "ធ",
+                    }
+                    wide{
+                        "មករា",
+                        "កុម្ភៈ",
+                        "មីនា",
+                        "មេសា",
+                        "ឧសភា",
+                        "មិថុនា",
+                        "កក្កដា",
+                        "សីហា",
+                        "កញ្ញា",
+                        "តុលា",
+                        "វិច្ឆិកា",
+                        "ធ្នូ",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "មករា",
+                        "កុម្ភៈ",
+                        "មីនា",
+                        "មេសា",
+                        "ឧសភា",
+                        "មិថុនា",
+                        "កក្កដា",
+                        "សីហា",
+                        "កញ្ញា",
+                        "តុលា",
+                        "វិច្ឆិកា",
+                        "ធ្នូ",
+                    }
+                    narrow{
+                        "ម",
+                        "ក",
+                        "ម",
+                        "ម",
+                        "ឧ",
+                        "ម",
+                        "ក",
+                        "ស",
+                        "ក",
+                        "ត",
+                        "វ",
+                        "ធ",
+                    }
+                    wide{
+                        "មករា",
+                        "កុម្ភៈ",
+                        "មីនា",
+                        "មេសា",
+                        "ឧសភា",
+                        "មិថុនា",
+                        "កក្កដា",
+                        "សីហា",
+                        "កញ្ញា",
+                        "តុលា",
+                        "វិច្ឆិកា",
+                        "ធ្នូ",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "ត្រីមាសទី 1",
+                        "ត្រីមាសទី 2",
+                        "ត្រីមាសទី 3",
+                        "ត្រីមាសទី 4",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "ត្រីមាសទី 1",
+                        "ត្រីមាសទី 2",
+                        "ត្រីមាសទី 3",
+                        "ត្រីមាសទី 4",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ត្រីមាសទី 1",
+                        "ត្រីមាសទី 2",
+                        "ត្រីមាសទី 3",
+                        "ត្រីមាសទី 4",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "ត្រីមាសទី 1",
+                        "ត្រីមាសទី 2",
+                        "ត្រីមាសទី 3",
+                        "ត្រីមាសទី 4",
+                    }
+                }
+            }
+        }
+    }
+    characterLabel{
+        activities{"សកម្មភាព"}
+        african_scripts{"ក្រុមអក្សរអាហ្វ្រិក"}
+        american_scripts{"ក្រុមអក្សរអាមេរិក"}
+        animal{"សត្វពាហនៈ"}
+        animals_nature{"សត្វ និងធម្មជាតិ"}
+        arrows{"ព្រួញ"}
+        body{"ខ្លួប្រាណ"}
+        box_drawing{"ការគូរប្រអប់"}
+        braille{"ប្រែល"}
+        building{"អាគារ"}
+        bullets_stars{"ចំណុច/ផ្កាយ"}
+        consonantal_jamo{"ព្យញ្ជនៈចាម៉ូ"}
+        currency_symbols{"និមិត្តសញ្ញារូបិយប័ណ្ណ"}
+        dash_connector{"ដាស៍/សញ្ញាភ្ជាប់"}
+        digits{"ខ្ទង់"}
+        dingbats{"សញ្ញាឌីងប៊ែត"}
+        divination_symbols{"និមិត្តសញ្ញាពិសិដ្ឋ"}
+        downwards_arrows{"ព្រួញចុះក្រោម"}
+        downwards_upwards_arrows{"ព្រួញចុះឡើង"}
+        east_asian_scripts{"ក្រុមអក្សរអាស៊ីខាងកើត"}
+        emoji{"សញ្ញាអារម្មណ៍"}
+        european_scripts{"ក្រុមអក្សរអឺរ៉ុប"}
+        female{"នារី"}
+        flag{"ទីង់"}
+        flags{"ទង់ជាតិ"}
+        food_drink{"អាហារ និងភេសជ្ជៈ"}
+        format{"ទម្រង់"}
+        format_whitespace{"ទម្រង់ និងចន្លោះ"}
+        full_width_form_variant{"វ៉ារ្យ៉ង់ទម្រង់ទទឹងពេញលេញ"}
+        geometric_shapes{"ទម្រង់ធរណីមាត្រ"}
+        half_width_form_variant{"វ៉ារ្យ៉ង់ទម្រង់ទទឹង"}
+        han_characters{"តួអក្សរចិន"}
+        han_radicals{"​រ៉ាឌីកាល់អក្សរចិន"}
+        hanja{"ហានយ៉ា"}
+        hanzi_simplified{"ហានហ្ស៊ី (សាមញ្ញ)"}
+        hanzi_traditional{"ហានហ្ស៊ី (ប្រពៃណី)"}
+        heart{"បេះដូង"}
+        historic_scripts{"អក្សរជាប្រវត្តិសាស្ត្រ"}
+        ideographic_desc_characters{"តួអក្សរពិពណ៌នារូបសញ្ញា"}
+        japanese_kana{"អក្សរខាណាជប៉ុន"}
+        kanbun{"កានប៊ុន"}
+        kanji{"កានជី"}
+        keycap{"គម្របគ្រាប់ចុច"}
+        leftwards_arrows{"ព្រួញទៅឆ្វេង"}
+        leftwards_rightwards_arrows{"ព្រួញទៅឆ្វេងស្តាំ"}
+        letterlike_symbols{"និមិត្តសញ្ញាដូចតួអក្សរ"}
+        limited_use{"ប្រើមានកំណត់"}
+        male{"បុរស"}
+        math_symbols{"និមិត្តសញ្ញាគណិតវិទ្យា"}
+        middle_eastern_scripts{"ក្រុមអក្សរមជ្ឈិមបូព៌ា"}
+        miscellaneous{"ផ្សេងៗ"}
+        modern_scripts{"អក្សរសម័យទំនើប"}
+        modifier{"អង្គបញ្ជាក់ន័យ"}
+        musical_symbols{"និមិត្តសញ្ញាតន្ត្រី"}
+        nature{"ធម្មជាតិ"}
+        nonspacing{"មិនដកឃ្លា"}
+        numbers{"លេខ"}
+        objects{"កម្មបទ"}
+        other{"ផ្សេងទៀត"}
+        paired{"ផ្គូផ្គង"}
+        person{"មនុស្ស"}
+        phonetic_alphabet{"អក្ខរក្រមសូរសព្ទ"}
+        pictographs{"អក្សររូប"}
+        place{"ទីកន្លែង"}
+        plant{"រុក្ខជាតិ"}
+        punctuation{"វិធីប្រើវណ្ណយុត្ដ"}
+        rightwards_arrows{"ព្រួញទៅស្តាំ"}
+        sign_standard_symbols{"សញ្ញា/និមិត្តសញ្ញាបទដ្ឋាន"}
+        small_form_variant{"វ៉ារ្យ៉ង់ទម្រង់តូច"}
+        smiley{"ញញឺម"}
+        smileys_people{"រូបសញ្ញាសើច និងមនុស្ស"}
+        south_asian_scripts{"ក្រុមអក្សរអាស៊ីអាគ្នេយ៍ខាងត្បូង"}
+        southeast_asian_scripts{"ក្រុមអក្សរអាស៊ីអាគ្នេយ៍"}
+        spacing{"ដកឃ្លា"}
+        sport{"កីឡា"}
+        symbols{"និមិត្តសញ្ញា"}
+        technical_symbols{"និមិត្តសញ្ញាបច្ចេកទេស"}
+        tone_marks{"សញ្ញាសំឡេង"}
+        travel{"ធ្វើដំណើរ"}
+        travel_places{"ដំណើរកម្សាន្ត និងទីកន្លែង"}
+        upwards_arrows{"ព្រួញឡើងលើ"}
+        variant_forms{"ទម្រង់វ៉ារ្យ៉ង់"}
+        vocalic_jamo{"ស្រៈចាម៉ូ"}
+        weather{"អាកាសធាតុ"}
+        western_asian_scripts{"ក្រុមអក្សរអាស៊ីខាងលិច"}
+        whitespace{"ចន្លោះ"}
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"ថ្ងៃ"}
+            relative{
+                "-1"{"ម្សិលមិញ"}
+                "-2"{"ម្សិល​ម៉្ងៃ"}
+                "0"{"ថ្ងៃ​នេះ"}
+                "1"{"ថ្ងៃ​ស្អែក"}
+                "2"{"​ខាន​ស្អែក"}
+            }
+            relativeTime{
+                future{
+                    other{"{0} ថ្ងៃទៀត"}
+                }
+                past{
+                    other{"{0} ថ្ងៃ​មុន"}
+                }
+            }
+        }
+        day-narrow{
+            dn{"ថ្ងៃ"}
+            relative{
+                "-1"{"ម្សិលមិញ"}
+                "-2"{"ម្សិល​ម៉្ងៃ"}
+                "0"{"ថ្ងៃ​នេះ"}
+                "1"{"ថ្ងៃស្អែក"}
+                "2"{"​ខាន​ស្អែក"}
+            }
+            relativeTime{
+                future{
+                    other{"{0} ថ្ងៃទៀត"}
+                }
+                past{
+                    other{"{0} ថ្ងៃ​​មុន"}
+                }
+            }
+        }
+        day-short{
+            dn{"ថ្ងៃ"}
+            relative{
+                "-1"{"ម្សិលមិញ"}
+                "-2"{"ម្សិល​ម៉្ងៃ"}
+                "0"{"ថ្ងៃ​នេះ"}
+                "1"{"ថ្ងៃស្អែក"}
+                "2"{"​ខាន​ស្អែក"}
+            }
+            relativeTime{
+                future{
+                    other{"{0} ថ្ងៃទៀត"}
+                }
+                past{
+                    other{"{0} ថ្ងៃ​​មុន"}
+                }
+            }
+        }
+        dayOfYear{
+            dn{"ថ្ងៃនៃឆ្នាំ"}
+        }
+        dayOfYear-narrow{
+            dn{"ថ្ងៃនៃឆ្នាំ"}
+        }
+        dayOfYear-short{
+            dn{"ថ្ងៃនៃឆ្នាំ"}
+        }
+        dayperiod{
+            dn{"ព្រឹក/ល្ងាច"}
+        }
+        dayperiod-narrow{
+            dn{"ព្រឹក/ល្ងាច"}
+        }
+        dayperiod-short{
+            dn{"ព្រឹក/ល្ងាច"}
+        }
+        era{
+            dn{"សករាជ"}
+        }
+        era-narrow{
+            dn{"សករាជ"}
+        }
+        era-short{
+            dn{"សករាជ"}
+        }
+        fri{
+            relative{
+                "-1"{"ថ្ងៃ​សុក្រ​មុន"}
+                "0"{"ថ្ងៃ​សុក្រ​នេះ"}
+                "1"{"ថ្ងៃ​សុក្រ​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃសុក្រទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃសុក្រមុន"}
+                }
+            }
+        }
+        fri-narrow{
+            relative{
+                "-1"{"ថ្ងៃ​សុក្រ​មុន"}
+                "0"{"ថ្ងៃ​សុក្រ​នេះ"}
+                "1"{"ថ្ងៃ​សុក្រ​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃសុក្រទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃសុក្រមុន"}
+                }
+            }
+        }
+        fri-short{
+            relative{
+                "-1"{"ថ្ងៃ​សុក្រ​មុន"}
+                "0"{"ថ្ងៃ​សុក្រ​នេះ"}
+                "1"{"ថ្ងៃ​សុក្រ​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃសុក្រទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃសុក្រមុន"}
+                }
+            }
+        }
+        hour{
+            dn{"ម៉ោង"}
+            relative{
+                "0"{"ម៉ោងនេះ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុង​រយៈ​ពេល {0} ម៉ោង"}
+                }
+                past{
+                    other{"{0} ម៉ោង​មុន"}
+                }
+            }
+        }
+        hour-narrow{
+            dn{"ម៉ោង"}
+            relativeTime{
+                future{
+                    other{"{0} ម៉ោងទៀត"}
+                }
+                past{
+                    other{"{0} ម៉ោង​មុន"}
+                }
+            }
+        }
+        hour-short{
+            dn{"ម៉ោង"}
+            relativeTime{
+                future{
+                    other{"{0} ម៉ោងទៀត"}
+                }
+                past{
+                    other{"{0} ម៉ោង​មុន"}
+                }
+            }
+        }
+        minute{
+            dn{"នាទី"}
+            relative{
+                "0"{"នាទីនេះ"}
+            }
+            relativeTime{
+                future{
+                    other{"{0} នាទីទៀត"}
+                }
+                past{
+                    other{"{0} នាទី​មុន"}
+                }
+            }
+        }
+        minute-narrow{
+            dn{"នាទី"}
+            relativeTime{
+                future{
+                    other{"{0} នាទីទៀត"}
+                }
+                past{
+                    other{"{0} នាទី​​មុន"}
+                }
+            }
+        }
+        minute-short{
+            dn{"នាទី"}
+            relativeTime{
+                future{
+                    other{"{0} នាទីទៀត"}
+                }
+                past{
+                    other{"{0} នាទី​​មុន"}
+                }
+            }
+        }
+        mon{
+            relative{
+                "-1"{"ថ្ងៃចន្ទមុន"}
+                "0"{"ថ្ងៃចន្ទនេះ"}
+                "1"{"ថ្ងៃចន្ទក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃចន្ទទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃចន្ទមុន"}
+                }
+            }
+        }
+        mon-narrow{
+            relative{
+                "-1"{"ថ្ងៃចន្ទមុន"}
+                "0"{"ថ្ងៃចន្ទនេះ"}
+                "1"{"ថ្ងៃចន្ទក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃចន្ទទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃចន្ទមុន"}
+                }
+            }
+        }
+        mon-short{
+            relative{
+                "-1"{"ថ្ងៃចន្ទមុន"}
+                "0"{"ថ្ងៃចន្ទនេះ"}
+                "1"{"ថ្ងៃចន្ទក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃចន្ទទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃចន្ទមុន"}
+                }
+            }
+        }
+        month{
+            dn{"ខែ"}
+            relative{
+                "-1"{"ខែ​មុន"}
+                "0"{"ខែ​នេះ"}
+                "1"{"ខែ​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"{0} ខែទៀត"}
+                }
+                past{
+                    other{"{0} ខែមុន"}
+                }
+            }
+        }
+        month-narrow{
+            dn{"ខែ"}
+            relative{
+                "-1"{"ខែ​មុន"}
+                "0"{"ខែ​នេះ"}
+                "1"{"ខែ​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"{0} ខែទៀត"}
+                }
+                past{
+                    other{"{0} ខែមុន"}
+                }
+            }
+        }
+        month-short{
+            dn{"ខែ"}
+            relative{
+                "-1"{"ខែ​មុន"}
+                "0"{"ខែ​នេះ"}
+                "1"{"ខែ​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"{0} ខែទៀត"}
+                }
+                past{
+                    other{"{0} ខែមុន"}
+                }
+            }
+        }
+        quarter{
+            dn{"ត្រីមាស"}
+            relative{
+                "-1"{"ត្រីមាស​មុន"}
+                "0"{"ត្រីមាស​នេះ"}
+                "1"{"ត្រីមាស​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"{0} ត្រីមាសទៀត"}
+                }
+                past{
+                    other{"{0} ត្រីមាស​មុន"}
+                }
+            }
+        }
+        quarter-narrow{
+            dn{"ត្រីមាស"}
+            relative{
+                "-1"{"ត្រីមាស​មុន"}
+                "0"{"ត្រីមាស​នេះ"}
+                "1"{"ត្រីមាស​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"{0} ត្រីមាសទៀត"}
+                }
+                past{
+                    other{"{0} ត្រីមាស​មុន"}
+                }
+            }
+        }
+        quarter-short{
+            dn{"ត្រីមាស"}
+            relative{
+                "-1"{"ត្រីមាស​មុន"}
+                "0"{"ត្រីមាស​នេះ"}
+                "1"{"ត្រីមាស​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"{0} ត្រីមាសទៀត"}
+                }
+                past{
+                    other{"{0} ត្រីមាស​មុន"}
+                }
+            }
+        }
+        sat{
+            relative{
+                "-1"{"ថ្ងៃ​សៅរ៍​មុន"}
+                "0"{"ថ្ងៃ​សៅរ៍​នេះ"}
+                "1"{"ថ្ងៃ​សៅរ៍​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃសៅរ៍ ទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃសៅរ៍ មុន"}
+                }
+            }
+        }
+        sat-narrow{
+            relative{
+                "-1"{"ថ្ងៃ​សៅរ៍​មុន"}
+                "0"{"ថ្ងៃ​សៅរ៍​នេះ"}
+                "1"{"ថ្ងៃ​សៅរ៍​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃសៅរ៍ ទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃសៅរ៍ មុន"}
+                }
+            }
+        }
+        sat-short{
+            relative{
+                "-1"{"ថ្ងៃ​សៅរ៍​មុន"}
+                "0"{"ថ្ងៃ​សៅរ៍​នេះ"}
+                "1"{"ថ្ងៃ​សៅរ៍​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃសៅរ៍ ទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃសៅរ៍ មុន"}
+                }
+            }
+        }
+        second{
+            dn{"វិនាទី"}
+            relative{
+                "0"{"ឥឡូវ"}
+            }
+            relativeTime{
+                future{
+                    other{"{0} វិនាទីទៀត"}
+                }
+                past{
+                    other{"{0} វិនាទី​មុន"}
+                }
+            }
+        }
+        second-narrow{
+            dn{"វិនាទី"}
+            relativeTime{
+                future{
+                    other{"{0} វិនាទីទៀត"}
+                }
+                past{
+                    other{"{0} វិនាទី​មុន"}
+                }
+            }
+        }
+        second-short{
+            dn{"វិនាទី"}
+            relativeTime{
+                future{
+                    other{"{0} វិនាទីទៀត"}
+                }
+                past{
+                    other{"{0} វិនាទី​មុន"}
+                }
+            }
+        }
+        sun{
+            relative{
+                "-1"{"ថ្ងៃ​អាទិត្យ​មុន"}
+                "0"{"ថ្ងៃ​អាទិត្យ​នេះ"}
+                "1"{"ថ្ងៃ​អាទិត្យ​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ថ្ងៃអាទិត្យ {0} សប្តាហ៍ទៀត"}
+                }
+                past{
+                    other{"ថ្ងៃអាទិត្យ {0} សប្តាហ៍មុន"}
+                }
+            }
+        }
+        sun-narrow{
+            relative{
+                "-1"{"ថ្ងៃ​អាទិត្យ​មុន"}
+                "0"{"ថ្ងៃ​អាទិត្យ​នេះ"}
+                "1"{"ថ្ងៃ​អាទិត្យ​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃអាទិត្យទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃអាទិត្យមុន"}
+                }
+            }
+        }
+        sun-short{
+            relative{
+                "-1"{"ថ្ងៃ​អាទិត្យ​មុន"}
+                "0"{"ថ្ងៃ​អាទិត្យ​នេះ"}
+                "1"{"ថ្ងៃ​អាទិត្យ​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ថ្ងៃអាទិត្យ {0} សប្តាហ៍ទៀត"}
+                }
+                past{
+                    other{"ថ្ងៃអាទិត្យ {0} សប្តាហ៍មុន"}
+                }
+            }
+        }
+        thu{
+            relative{
+                "-1"{"ថ្ងៃ​ព្រហស្បតិ៍​មុន"}
+                "0"{"ថ្ងៃ​ព្រហស្បតិ៍​នេះ"}
+                "1"{"ថ្ងៃ​ព្រហស្បតិ៍​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃព្រហស្បតិ៍ទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃព្រហស្បតិ៍មុន"}
+                }
+            }
+        }
+        thu-narrow{
+            relative{
+                "-1"{"ថ្ងៃ​ព្រហស្បតិ៍​មុន"}
+                "0"{"ថ្ងៃ​ព្រហស្បតិ៍​នេះ"}
+                "1"{"ថ្ងៃ​ព្រហស្បតិ៍​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃព្រហស្បតិ៍ទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃព្រហស្បតិ៍មុន"}
+                }
+            }
+        }
+        thu-short{
+            relative{
+                "-1"{"ថ្ងៃ​ព្រហស្បតិ៍​មុន"}
+                "0"{"ថ្ងៃ​ព្រហស្បតិ៍​នេះ"}
+                "1"{"ថ្ងៃ​ព្រហស្បតិ៍​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃព្រហស្បតិ៍ទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃព្រហស្បតិ៍មុន"}
+                }
+            }
+        }
+        tue{
+            relative{
+                "-1"{"ថ្ងៃ​អង្គារ​មុន"}
+                "0"{"ថ្ងៃ​អង្គារ​នេះ"}
+                "1"{"ថ្ងៃ​អង្គារ​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃអង្គារទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃអង្គារមុន"}
+                }
+            }
+        }
+        tue-narrow{
+            relative{
+                "-1"{"ថ្ងៃ​អង្គារ​មុន"}
+                "0"{"ថ្ងៃ​អង្គារ​នេះ"}
+                "1"{"ថ្ងៃ​អង្គារ​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃអង្គារទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃអង្គារមុន"}
+                }
+            }
+        }
+        tue-short{
+            relative{
+                "-1"{"ថ្ងៃ​អង្គារ​មុន"}
+                "0"{"ថ្ងៃ​អង្គារ​នេះ"}
+                "1"{"ថ្ងៃ​អង្គារ​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃអង្គារទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃអង្គារមុន"}
+                }
+            }
+        }
+        wed{
+            relative{
+                "-1"{"ថ្ងៃ​ពុធ​មុន"}
+                "0"{"ថ្ងៃ​ពុធ​នេះ"}
+                "1"{"ថ្ងៃ​ពុធ​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃពុធទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃពុធមុន"}
+                }
+            }
+        }
+        wed-narrow{
+            relative{
+                "-1"{"ថ្ងៃ​ពុធ​មុន"}
+                "0"{"ថ្ងៃ​ពុធ​នេះ"}
+                "1"{"ថ្ងៃ​ពុធ​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃពុធទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃពុធមុន"}
+                }
+            }
+        }
+        wed-short{
+            relative{
+                "-1"{"ថ្ងៃ​ពុធ​មុន"}
+                "0"{"ថ្ងៃ​ពុធ​នេះ"}
+                "1"{"ថ្ងៃ​ពុធ​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"ក្នុងពេល {0} ថ្ងៃពុធទៀត"}
+                }
+                past{
+                    other{"កាលពី {0} ថ្ងៃពុធមុន"}
+                }
+            }
+        }
+        week{
+            dn{"សប្ដាហ៍"}
+            relative{
+                "-1"{"សប្ដាហ៍​មុន"}
+                "0"{"សប្ដាហ៍​នេះ"}
+                "1"{"សប្ដាហ៍​ក្រោយ"}
+            }
+            relativePeriod{"សប្តាហ៍នៃ {0}"}
+            relativeTime{
+                future{
+                    other{"{0} សប្ដាហ៍ទៀត"}
+                }
+                past{
+                    other{"{0} សប្ដាហ៍​មុន"}
+                }
+            }
+        }
+        week-narrow{
+            dn{"សប្ដាហ៍"}
+            relative{
+                "-1"{"សប្ដាហ៍​មុន"}
+                "0"{"សប្ដាហ៍​នេះ"}
+                "1"{"សប្ដាហ៍​ក្រោយ"}
+            }
+            relativePeriod{"សប្តាហ៍នៃ {0}"}
+            relativeTime{
+                future{
+                    other{"{0} សប្ដាហ៍ទៀត"}
+                }
+                past{
+                    other{"{0} សប្ដាហ៍​មុន"}
+                }
+            }
+        }
+        week-short{
+            dn{"សប្ដាហ៍"}
+            relative{
+                "-1"{"សប្ដាហ៍​មុន"}
+                "0"{"សប្ដាហ៍​នេះ"}
+                "1"{"សប្ដាហ៍​ក្រោយ"}
+            }
+            relativePeriod{"សប្តាហ៍នៃ {0}"}
+            relativeTime{
+                future{
+                    other{"{0} សប្ដាហ៍ទៀត"}
+                }
+                past{
+                    other{"{0} សប្ដាហ៍​មុន"}
+                }
+            }
+        }
+        weekOfMonth{
+            dn{"សប្ដាហ៍នៃខែ"}
+        }
+        weekOfMonth-narrow{
+            dn{"សប្ដាហ៍នៃខែ"}
+        }
+        weekOfMonth-short{
+            dn{"សប្ដាហ៍នៃខែ"}
+        }
+        weekday{
+            dn{"ថ្ងៃ​នៃ​សប្ដាហ៍"}
+        }
+        weekday-narrow{
+            dn{"ថ្ងៃ​នៃ​សប្ដាហ៍"}
+        }
+        weekday-short{
+            dn{"ថ្ងៃ​នៃ​សប្ដាហ៍"}
+        }
+        weekdayOfMonth{
+            dn{"ថ្ងៃសប្ដាហ៍នៃខែ"}
+        }
+        weekdayOfMonth-narrow{
+            dn{"ថ្ងៃសប្ដាហ៍នៃខែ"}
+        }
+        weekdayOfMonth-short{
+            dn{"ថ្ងៃសប្ដាហ៍នៃខែ"}
+        }
+        year{
+            dn{"ឆ្នាំ"}
+            relative{
+                "-1"{"ឆ្នាំ​មុន"}
+                "0"{"ឆ្នាំ​នេះ"}
+                "1"{"ឆ្នាំ​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"{0} ឆ្នាំទៀត"}
+                }
+                past{
+                    other{"{0} ឆ្នាំ​មុន"}
+                }
+            }
+        }
+        year-narrow{
+            dn{"ឆ្នាំ"}
+            relative{
+                "-1"{"ឆ្នាំ​មុន"}
+                "0"{"ឆ្នាំ​នេះ"}
+                "1"{"ឆ្នាំ​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"{0} ឆ្នាំទៀត"}
+                }
+                past{
+                    other{"{0} ឆ្នាំ​មុន"}
+                }
+            }
+        }
+        year-short{
+            dn{"ឆ្នាំ"}
+            relative{
+                "-1"{"ឆ្នាំ​មុន"}
+                "0"{"ឆ្នាំ​នេះ"}
+                "1"{"ឆ្នាំ​ក្រោយ"}
+            }
+            relativeTime{
+                future{
+                    other{"{0} ឆ្នាំទៀត"}
+                }
+                past{
+                    other{"{0} ឆ្នាំ​មុន"}
+                }
+            }
+        }
+        zone{
+            dn{"ល្វែងម៉ោង"}
+        }
+        zone-narrow{
+            dn{"ល្វែងម៉ោង"}
+        }
+        zone-short{
+            dn{"ល្វែងម៉ោង"}
+        }
+    }
+    listPattern{
+        or{
+            2{"{0} ឬ {1}"}
+            end{"{0} ឬ {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        standard{
+            2{"{0} និង​{1}"}
+            end{"{0} និង {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        standard-narrow{
+            2{"{0}, {1}"}
+            end{"{0}, {1}"}
+        }
+        standard-short{
+            2{"{0} និង {1}"}
+        }
+        unit{
+            2{"{0} {1}"}
+            end{"{0} {1}"}
+            middle{"{0} {1}"}
+            start{"{0} {1}"}
+        }
+        unit-narrow{
+            2{"{0} {1}"}
+            end{"{0} {1}"}
+            middle{"{0} {1}"}
+            start{"{0} {1}"}
+        }
+        unit-short{
+            2{"{0} {1}"}
+            end{"{0} {1}"}
+            middle{"{0} {1}"}
+            start{"{0} {1}"}
+        }
+    }
+    measurementSystemNames{
+        UK{"ចក្រភព​អង់គ្លេស"}
+        US{"សហរដ្ឋអាមេរិក"}
+        metric{"រង្វាស់​ប្រវែង"}
+    }
+}

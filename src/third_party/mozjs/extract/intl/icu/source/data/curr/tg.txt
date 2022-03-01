@@ -1,0 +1,92 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+tg{
+    Currencies{
+        BRL{
+            "R$",
+            "Реали бразилиягӣ",
+        }
+        CNY{
+            "CN¥",
+            "Иенаи хитоӣ",
+        }
+        EUR{
+            "€",
+            "Евро",
+        }
+        GBP{
+            "£",
+            "Фунт стерлинги британӣ",
+        }
+        INR{
+            "₹",
+            "Рупияи ҳиндустонӣ",
+        }
+        JPY{
+            "JP¥",
+            "Иенаи японӣ",
+        }
+        RUB{
+            "RUB",
+            "Рубли русӣ",
+        }
+        TJS{
+            "сом.",
+            "Сомонӣ",
+        }
+        USD{
+            "$",
+            "Доллари ИМА",
+        }
+        XXX{
+            "¤",
+            "Асъори номаълум",
+        }
+    }
+    Currencies%narrow{
+        BRL{"R$"}
+        CNY{"¥"}
+        EUR{"€"}
+        GBP{"£"}
+        INR{"₹"}
+        JPY{"¥"}
+        RUB{"₽"}
+        USD{"$"}
+    }
+    CurrencyPlurals{
+        BRL{
+            other{"реали бразилиягӣ"}
+        }
+        CNY{
+            other{"иенаи хитоӣ"}
+        }
+        EUR{
+            other{"евро"}
+        }
+        GBP{
+            other{"фунт стерлинги британӣ"}
+        }
+        INR{
+            other{"рупияи ҳиндустонӣ"}
+        }
+        JPY{
+            other{"иенаи японӣ"}
+        }
+        RUB{
+            other{"рубли русӣ"}
+        }
+        TJS{
+            other{"Сомонӣ"}
+        }
+        USD{
+            other{"доллари ИМА"}
+        }
+        XXX{
+            other{"(асъори номаълум)"}
+        }
+    }
+    CurrencyUnitPatterns{
+        other{"{0} {1}"}
+    }
+}

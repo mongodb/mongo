@@ -31,6 +31,8 @@
 
 #include "mongo/scripting/mozjs/mongohelpers.h"
 
+#include <js/ValueArray.h>
+
 #include <jsapi.h>
 
 #include "mongo/scripting/engine.h"

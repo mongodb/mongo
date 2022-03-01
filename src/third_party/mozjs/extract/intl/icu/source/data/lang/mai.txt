@@ -1,0 +1,75 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+mai{
+    Languages{
+        de{"जर्मन"}
+        de_AT{"ऑस्ट्रियाई जर्मन"}
+        de_CH{"स्विस उच्च जर्मन"}
+        en{"अंग्रेज़ी"}
+        en_AU{"ऑस्ट्रेलियाई अंग्रेज़ी"}
+        en_CA{"कनाडाई अंग्रेज़ी"}
+        en_GB{"ब्रिटिश अंग्रेज़ी"}
+        en_US{"अमेरिकी अंग्रेज़ी"}
+        es{"स्पेनी"}
+        es_419{"लैटिन अमेरिकी स्पेनिश"}
+        es_ES{"यूरोपीय स्पेनिश"}
+        es_MX{"मैक्सिकन स्पेनिश"}
+        fr{"फ़्रेंच"}
+        fr_CA{"कनाडाई फ़्रेंच"}
+        fr_CH{"स्विस फ़्रेंच"}
+        it{"इतालवी"}
+        ja{"जापानी"}
+        mai{"मैथिली"}
+        pt{"पुर्तगाली"}
+        pt_BR{"ब्राज़ीली पुर्तगाली"}
+        pt_PT{"यूरोपीय पुर्तगाली"}
+        ru{"रूसी"}
+        und{"अज्ञात भाषा"}
+        zh{"चीनी"}
+        zh_Hans{"सरलीकृत चीनी"}
+        zh_Hant{"पारंपरिक चीनी"}
+    }
+    Languages%long{
+        zh_Hans{"सरलीकृत मैंडेरिन चीनी"}
+        zh_Hant{"पारंपरिक मैंडेरिन चीनी"}
+    }
+    Languages%menu{
+        zh{"चीनी, मैंडेरिन"}
+    }
+    Languages%short{
+        en_GB{"यू॰के॰ अंग्रेज़ी"}
+        en_US{"अमेरिकी अंग्रेज़ी"}
+    }
+    Scripts{
+        Arab{"अरबी"}
+        Cyrl{"सिरिलिक"}
+        Deva{"देवनागरी"}
+        Hans{"सरलीकृत"}
+        Hant{"पारंपरिक"}
+        Latn{"लैटिन"}
+        Zxxx{"अलिखित"}
+        Zzzz{"अज्ञात लिपि"}
+    }
+    Scripts%stand-alone{
+        Hans{"सरलीकृत हान"}
+        Hant{"पारंपरिक हान"}
+    }
+    Types{
+        calendar{
+            gregorian{"ग्रेगोरियन कैलेंडर"}
+        }
+        collation{
+            standard{"मानक सॉर्ट क्रम"}
+        }
+        numbers{
+            deva{"देवनागरी अंक"}
+            latn{"पश्चिमी अंक"}
+        }
+    }
+    codePatterns{
+        language{"भाषा: {0}"}
+        script{"लिपि: {0}"}
+        territory{"क्षेत्र: {0}"}
+    }
+}

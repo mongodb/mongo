@@ -1,0 +1,1026 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+vi{
+    Keys{
+        calendar{"Lịch"}
+        cf{"Định dạng tiền tệ"}
+        colAlternate{"Bỏ qua sắp xếp biểu tượng"}
+        colBackwards{"Sắp xếp dấu trọng âm đảo ngược"}
+        colCaseFirst{"Sắp xếp chữ hoa/chữ thường"}
+        colCaseLevel{"Sắp xếp phân biệt chữ hoa/chữ thường"}
+        colNormalization{"Sắp xếp theo chuẩn hóa"}
+        colNumeric{"Sắp xếp theo số"}
+        colStrength{"Cường độ sắp xếp"}
+        collation{"Thứ tự sắp xếp"}
+        currency{"Tiền tệ"}
+        hc{"Chu kỳ giờ (12 với 24)"}
+        lb{"Kiểu xuống dòng"}
+        ms{"Hệ thống đo lường"}
+        numbers{"Số"}
+        timezone{"Múi giờ"}
+        va{"Biến thể ngôn ngữ"}
+        x{"Sử dụng cá nhân"}
+    }
+    Languages{
+        aa{"Tiếng Afar"}
+        ab{"Tiếng Abkhazia"}
+        ace{"Tiếng Achinese"}
+        ach{"Tiếng Acoli"}
+        ada{"Tiếng Adangme"}
+        ady{"Tiếng Adyghe"}
+        ae{"Tiếng Avestan"}
+        af{"Tiếng Afrikaans"}
+        afh{"Tiếng Afrihili"}
+        agq{"Tiếng Aghem"}
+        ain{"Tiếng Ainu"}
+        ak{"Tiếng Akan"}
+        akk{"Tiếng Akkadia"}
+        akz{"Tiếng Alabama"}
+        ale{"Tiếng Aleut"}
+        aln{"Tiếng Gheg Albani"}
+        alt{"Tiếng Altai Miền Nam"}
+        am{"Tiếng Amharic"}
+        an{"Tiếng Aragon"}
+        ang{"Tiếng Anh cổ"}
+        anp{"Tiếng Angika"}
+        ar{"Tiếng Ả Rập"}
+        ar_001{"Tiếng Ả Rập Hiện đại"}
+        arc{"Tiếng Aramaic"}
+        arn{"Tiếng Mapuche"}
+        aro{"Tiếng Araona"}
+        arp{"Tiếng Arapaho"}
+        arq{"Tiếng Ả Rập Algeria"}
+        ars{"Tiếng Ả Rập Najdi"}
+        arw{"Tiếng Arawak"}
+        arz{"Tiếng Ả Rập Ai Cập"}
+        as{"Tiếng Assam"}
+        asa{"Tiếng Asu"}
+        ase{"Ngôn ngữ Ký hiệu Mỹ"}
+        ast{"Tiếng Asturias"}
+        av{"Tiếng Avaric"}
+        awa{"Tiếng Awadhi"}
+        ay{"Tiếng Aymara"}
+        az{"Tiếng Azerbaijan"}
+        ba{"Tiếng Bashkir"}
+        bal{"Tiếng Baluchi"}
+        ban{"Tiếng Bali"}
+        bar{"Tiếng Bavaria"}
+        bas{"Tiếng Basaa"}
+        bax{"Tiếng Bamun"}
+        bbc{"Tiếng Batak Toba"}
+        bbj{"Tiếng Ghomala"}
+        be{"Tiếng Belarus"}
+        bej{"Tiếng Beja"}
+        bem{"Tiếng Bemba"}
+        bew{"Tiếng Betawi"}
+        bez{"Tiếng Bena"}
+        bfd{"Tiếng Bafut"}
+        bfq{"Tiếng Badaga"}
+        bg{"Tiếng Bulgaria"}
+        bgn{"Tiếng Tây Balochi"}
+        bho{"Tiếng Bhojpuri"}
+        bi{"Tiếng Bislama"}
+        bik{"Tiếng Bikol"}
+        bin{"Tiếng Bini"}
+        bjn{"Tiếng Banjar"}
+        bkm{"Tiếng Kom"}
+        bla{"Tiếng Siksika"}
+        bm{"Tiếng Bambara"}
+        bn{"Tiếng Bangla"}
+        bo{"Tiếng Tây Tạng"}
+        bpy{"Tiếng Bishnupriya"}
+        bqi{"Tiếng Bakhtiari"}
+        br{"Tiếng Breton"}
+        bra{"Tiếng Braj"}
+        brh{"Tiếng Brahui"}
+        brx{"Tiếng Bodo"}
+        bs{"Tiếng Bosnia"}
+        bss{"Tiếng Akoose"}
+        bua{"Tiếng Buriat"}
+        bug{"Tiếng Bugin"}
+        bum{"Tiếng Bulu"}
+        byn{"Tiếng Blin"}
+        byv{"Tiếng Medumba"}
+        ca{"Tiếng Catalan"}
+        cad{"Tiếng Caddo"}
+        car{"Tiếng Carib"}
+        cay{"Tiếng Cayuga"}
+        cch{"Tiếng Atsam"}
+        ccp{"Tiếng Chakma"}
+        ce{"Tiếng Chechen"}
+        ceb{"Tiếng Cebuano"}
+        cgg{"Tiếng Chiga"}
+        ch{"Tiếng Chamorro"}
+        chb{"Tiếng Chibcha"}
+        chg{"Tiếng Chagatai"}
+        chk{"Tiếng Chuuk"}
+        chm{"Tiếng Mari"}
+        chn{"Biệt ngữ Chinook"}
+        cho{"Tiếng Choctaw"}
+        chp{"Tiếng Chipewyan"}
+        chr{"Tiếng Cherokee"}
+        chy{"Tiếng Cheyenne"}
+        ckb{"Tiếng Kurd Miền Trung"}
+        co{"Tiếng Corsica"}
+        cop{"Tiếng Coptic"}
+        cps{"Tiếng Capiznon"}
+        cr{"Tiếng Cree"}
+        crh{"Tiếng Thổ Nhĩ Kỳ Crimean"}
+        crs{"Tiếng Pháp Seselwa Creole"}
+        cs{"Tiếng Séc"}
+        csb{"Tiếng Kashubia"}
+        cu{"Tiếng Slavơ Nhà thờ"}
+        cv{"Tiếng Chuvash"}
+        cy{"Tiếng Wales"}
+        da{"Tiếng Đan Mạch"}
+        dak{"Tiếng Dakota"}
+        dar{"Tiếng Dargwa"}
+        dav{"Tiếng Taita"}
+        de{"Tiếng Đức"}
+        de_CH{"Tiếng Thượng Giéc-man (Thụy Sĩ)"}
+        del{"Tiếng Delaware"}
+        den{"Tiếng Slave"}
+        dgr{"Tiếng Dogrib"}
+        din{"Tiếng Dinka"}
+        dje{"Tiếng Zarma"}
+        doi{"Tiếng Dogri"}
+        dsb{"Tiếng Hạ Sorbia"}
+        dtp{"Tiếng Dusun Miền Trung"}
+        dua{"Tiếng Duala"}
+        dum{"Tiếng Hà Lan Trung cổ"}
+        dv{"Tiếng Divehi"}
+        dyo{"Tiếng Jola-Fonyi"}
+        dyu{"Tiếng Dyula"}
+        dz{"Tiếng Dzongkha"}
+        dzg{"Tiếng Dazaga"}
+        ebu{"Tiếng Embu"}
+        ee{"Tiếng Ewe"}
+        efi{"Tiếng Efik"}
+        egl{"Tiếng Emilia"}
+        egy{"Tiếng Ai Cập cổ"}
+        eka{"Tiếng Ekajuk"}
+        el{"Tiếng Hy Lạp"}
+        elx{"Tiếng Elamite"}
+        en{"Tiếng Anh"}
+        en_GB{"Tiếng Anh (Anh)"}
+        en_US{"Tiếng Anh (Mỹ)"}
+        enm{"Tiếng Anh Trung cổ"}
+        eo{"Tiếng Quốc Tế Ngữ"}
+        es{"Tiếng Tây Ban Nha"}
+        es_419{"Tiếng Tây Ban Nha (Mỹ La tinh)"}
+        es_ES{"Tiếng Tây Ban Nha (Châu Âu)"}
+        esu{"Tiếng Yupik Miền Trung"}
+        et{"Tiếng Estonia"}
+        eu{"Tiếng Basque"}
+        ewo{"Tiếng Ewondo"}
+        ext{"Tiếng Extremadura"}
+        fa{"Tiếng Ba Tư"}
+        fa_AF{"Tiếng Dari"}
+        fan{"Tiếng Fang"}
+        fat{"Tiếng Fanti"}
+        ff{"Tiếng Fulah"}
+        fi{"Tiếng Phần Lan"}
+        fil{"Tiếng Philippines"}
+        fj{"Tiếng Fiji"}
+        fo{"Tiếng Faroe"}
+        fon{"Tiếng Fon"}
+        fr{"Tiếng Pháp"}
+        frc{"Tiếng Pháp Cajun"}
+        frm{"Tiếng Pháp Trung cổ"}
+        fro{"Tiếng Pháp cổ"}
+        frp{"Tiếng Arpitan"}
+        frr{"Tiếng Frisia Miền Bắc"}
+        frs{"Tiếng Frisian Miền Đông"}
+        fur{"Tiếng Friulian"}
+        fy{"Tiếng Frisia"}
+        ga{"Tiếng Ireland"}
+        gaa{"Tiếng Ga"}
+        gag{"Tiếng Gagauz"}
+        gan{"Tiếng Cám"}
+        gay{"Tiếng Gayo"}
+        gba{"Tiếng Gbaya"}
+        gd{"Tiếng Gael Scotland"}
+        gez{"Tiếng Geez"}
+        gil{"Tiếng Gilbert"}
+        gl{"Tiếng Galician"}
+        glk{"Tiếng Gilaki"}
+        gmh{"Tiếng Thượng Giéc-man Trung cổ"}
+        gn{"Tiếng Guarani"}
+        goh{"Tiếng Thượng Giéc-man cổ"}
+        gom{"Tiếng Goan Konkani"}
+        gon{"Tiếng Gondi"}
+        gor{"Tiếng Gorontalo"}
+        got{"Tiếng Gô-tích"}
+        grb{"Tiếng Grebo"}
+        grc{"Tiếng Hy Lạp cổ"}
+        gsw{"Tiếng Đức (Thụy Sĩ)"}
+        gu{"Tiếng Gujarati"}
+        gur{"Tiếng Frafra"}
+        guz{"Tiếng Gusii"}
+        gv{"Tiếng Manx"}
+        gwi{"Tiếng Gwichʼin"}
+        ha{"Tiếng Hausa"}
+        hai{"Tiếng Haida"}
+        hak{"Tiếng Khách Gia"}
+        haw{"Tiếng Hawaii"}
+        he{"Tiếng Do Thái"}
+        hi{"Tiếng Hindi"}
+        hif{"Tiếng Fiji Hindi"}
+        hil{"Tiếng Hiligaynon"}
+        hit{"Tiếng Hittite"}
+        hmn{"Tiếng H’Mông"}
+        ho{"Tiếng Hiri Motu"}
+        hr{"Tiếng Croatia"}
+        hsb{"Tiếng Thượng Sorbia"}
+        hsn{"Tiếng Tương"}
+        ht{"Tiếng Haiti"}
+        hu{"Tiếng Hungary"}
+        hup{"Tiếng Hupa"}
+        hy{"Tiếng Armenia"}
+        hz{"Tiếng Herero"}
+        ia{"Tiếng Khoa Học Quốc Tế"}
+        iba{"Tiếng Iban"}
+        ibb{"Tiếng Ibibio"}
+        id{"Tiếng Indonesia"}
+        ie{"Tiếng Interlingue"}
+        ig{"Tiếng Igbo"}
+        ii{"Tiếng Di Tứ Xuyên"}
+        ik{"Tiếng Inupiaq"}
+        ilo{"Tiếng Iloko"}
+        inh{"Tiếng Ingush"}
+        io{"Tiếng Ido"}
+        is{"Tiếng Iceland"}
+        it{"Tiếng Italy"}
+        iu{"Tiếng Inuktitut"}
+        izh{"Tiếng Ingria"}
+        ja{"Tiếng Nhật"}
+        jam{"Tiếng Anh Jamaica Creole"}
+        jbo{"Tiếng Lojban"}
+        jgo{"Tiếng Ngomba"}
+        jmc{"Tiếng Machame"}
+        jpr{"Tiếng Judeo-Ba Tư"}
+        jrb{"Tiếng Judeo-Ả Rập"}
+        jut{"Tiếng Jutish"}
+        jv{"Tiếng Java"}
+        ka{"Tiếng Georgia"}
+        kaa{"Tiếng Kara-Kalpak"}
+        kab{"Tiếng Kabyle"}
+        kac{"Tiếng Kachin"}
+        kaj{"Tiếng Jju"}
+        kam{"Tiếng Kamba"}
+        kaw{"Tiếng Kawi"}
+        kbd{"Tiếng Kabardian"}
+        kbl{"Tiếng Kanembu"}
+        kcg{"Tiếng Tyap"}
+        kde{"Tiếng Makonde"}
+        kea{"Tiếng Kabuverdianu"}
+        kfo{"Tiếng Koro"}
+        kg{"Tiếng Kongo"}
+        kha{"Tiếng Khasi"}
+        kho{"Tiếng Khotan"}
+        khq{"Tiếng Koyra Chiini"}
+        ki{"Tiếng Kikuyu"}
+        kj{"Tiếng Kuanyama"}
+        kk{"Tiếng Kazakh"}
+        kkj{"Tiếng Kako"}
+        kl{"Tiếng Kalaallisut"}
+        kln{"Tiếng Kalenjin"}
+        km{"Tiếng Khmer"}
+        kmb{"Tiếng Kimbundu"}
+        kn{"Tiếng Kannada"}
+        ko{"Tiếng Hàn"}
+        koi{"Tiếng Komi-Permyak"}
+        kok{"Tiếng Konkani"}
+        kos{"Tiếng Kosrae"}
+        kpe{"Tiếng Kpelle"}
+        kr{"Tiếng Kanuri"}
+        krc{"Tiếng Karachay-Balkar"}
+        krl{"Tiếng Karelian"}
+        kru{"Tiếng Kurukh"}
+        ks{"Tiếng Kashmir"}
+        ksb{"Tiếng Shambala"}
+        ksf{"Tiếng Bafia"}
+        ksh{"Tiếng Cologne"}
+        ku{"Tiếng Kurd"}
+        kum{"Tiếng Kumyk"}
+        kut{"Tiếng Kutenai"}
+        kv{"Tiếng Komi"}
+        kw{"Tiếng Cornwall"}
+        ky{"Tiếng Kyrgyz"}
+        la{"Tiếng La-tinh"}
+        lad{"Tiếng Ladino"}
+        lag{"Tiếng Langi"}
+        lah{"Tiếng Lahnda"}
+        lam{"Tiếng Lamba"}
+        lb{"Tiếng Luxembourg"}
+        lez{"Tiếng Lezghian"}
+        lg{"Tiếng Ganda"}
+        li{"Tiếng Limburg"}
+        lkt{"Tiếng Lakota"}
+        ln{"Tiếng Lingala"}
+        lo{"Tiếng Lào"}
+        lol{"Tiếng Mongo"}
+        lou{"Tiếng Creole Louisiana"}
+        loz{"Tiếng Lozi"}
+        lrc{"Tiếng Bắc Luri"}
+        lt{"Tiếng Litva"}
+        lu{"Tiếng Luba-Katanga"}
+        lua{"Tiếng Luba-Lulua"}
+        lui{"Tiếng Luiseno"}
+        lun{"Tiếng Lunda"}
+        luo{"Tiếng Luo"}
+        lus{"Tiếng Lushai"}
+        luy{"Tiếng Luyia"}
+        lv{"Tiếng Latvia"}
+        mad{"Tiếng Madura"}
+        maf{"Tiếng Mafa"}
+        mag{"Tiếng Magahi"}
+        mai{"Tiếng Maithili"}
+        mak{"Tiếng Makasar"}
+        man{"Tiếng Mandingo"}
+        mas{"Tiếng Masai"}
+        mde{"Tiếng Maba"}
+        mdf{"Tiếng Moksha"}
+        mdr{"Tiếng Mandar"}
+        men{"Tiếng Mende"}
+        mer{"Tiếng Meru"}
+        mfe{"Tiếng Morisyen"}
+        mg{"Tiếng Malagasy"}
+        mga{"Tiếng Ai-len Trung cổ"}
+        mgh{"Tiếng Makhuwa-Meetto"}
+        mgo{"Tiếng Meta’"}
+        mh{"Tiếng Marshall"}
+        mi{"Tiếng Maori"}
+        mic{"Tiếng Micmac"}
+        min{"Tiếng Minangkabau"}
+        mk{"Tiếng Macedonia"}
+        ml{"Tiếng Malayalam"}
+        mn{"Tiếng Mông Cổ"}
+        mnc{"Tiếng Mãn Châu"}
+        mni{"Tiếng Manipuri"}
+        moh{"Tiếng Mohawk"}
+        mos{"Tiếng Mossi"}
+        mr{"Tiếng Marathi"}
+        ms{"Tiếng Mã Lai"}
+        mt{"Tiếng Malta"}
+        mua{"Tiếng Mundang"}
+        mul{"Nhiều Ngôn ngữ"}
+        mus{"Tiếng Creek"}
+        mwl{"Tiếng Miranda"}
+        mwr{"Tiếng Marwari"}
+        my{"Tiếng Miến Điện"}
+        mye{"Tiếng Myene"}
+        myv{"Tiếng Erzya"}
+        mzn{"Tiếng Mazanderani"}
+        na{"Tiếng Nauru"}
+        nan{"Tiếng Mân Nam"}
+        nap{"Tiếng Napoli"}
+        naq{"Tiếng Nama"}
+        nb{"Tiếng Na Uy (Bokmål)"}
+        nd{"Tiếng Ndebele Miền Bắc"}
+        nds{"Tiếng Hạ Giéc-man"}
+        nds_NL{"Tiếng Hạ Saxon"}
+        ne{"Tiếng Nepal"}
+        new{"Tiếng Newari"}
+        ng{"Tiếng Ndonga"}
+        nia{"Tiếng Nias"}
+        niu{"Tiếng Niuean"}
+        njo{"Tiếng Ao Naga"}
+        nl{"Tiếng Hà Lan"}
+        nl_BE{"Tiếng Flemish"}
+        nmg{"Tiếng Kwasio"}
+        nn{"Tiếng Na Uy (Nynorsk)"}
+        nnh{"Tiếng Ngiemboon"}
+        no{"Tiếng Na Uy"}
+        nog{"Tiếng Nogai"}
+        non{"Tiếng Na Uy cổ"}
+        nqo{"Tiếng N’Ko"}
+        nr{"Tiếng Ndebele Miền Nam"}
+        nso{"Tiếng Sotho Miền Bắc"}
+        nus{"Tiếng Nuer"}
+        nv{"Tiếng Navajo"}
+        nwc{"Tiếng Newari cổ"}
+        ny{"Tiếng Nyanja"}
+        nym{"Tiếng Nyamwezi"}
+        nyn{"Tiếng Nyankole"}
+        nyo{"Tiếng Nyoro"}
+        nzi{"Tiếng Nzima"}
+        oc{"Tiếng Occitan"}
+        oj{"Tiếng Ojibwa"}
+        om{"Tiếng Oromo"}
+        or{"Tiếng Odia"}
+        os{"Tiếng Ossetic"}
+        osa{"Tiếng Osage"}
+        ota{"Tiếng Thổ Nhĩ Kỳ Ottoman"}
+        pa{"Tiếng Punjab"}
+        pag{"Tiếng Pangasinan"}
+        pal{"Tiếng Pahlavi"}
+        pam{"Tiếng Pampanga"}
+        pap{"Tiếng Papiamento"}
+        pau{"Tiếng Palauan"}
+        pcm{"Tiếng Nigeria Pidgin"}
+        peo{"Tiếng Ba Tư cổ"}
+        phn{"Tiếng Phoenicia"}
+        pi{"Tiếng Pali"}
+        pl{"Tiếng Ba Lan"}
+        pon{"Tiếng Pohnpeian"}
+        prg{"Tiếng Prussia"}
+        pro{"Tiếng Provençal cổ"}
+        ps{"Tiếng Pashto"}
+        pt{"Tiếng Bồ Đào Nha"}
+        pt_PT{"Tiếng Bồ Đào Nha (Châu Âu)"}
+        qu{"Tiếng Quechua"}
+        quc{"Tiếng Kʼicheʼ"}
+        qug{"Tiếng Quechua ở Cao nguyên Chimborazo"}
+        raj{"Tiếng Rajasthani"}
+        rap{"Tiếng Rapanui"}
+        rar{"Tiếng Rarotongan"}
+        rm{"Tiếng Romansh"}
+        rn{"Tiếng Rundi"}
+        ro{"Tiếng Romania"}
+        ro_MD{"Tiếng Moldova"}
+        rof{"Tiếng Rombo"}
+        rom{"Tiếng Romany"}
+        ru{"Tiếng Nga"}
+        rup{"Tiếng Aromania"}
+        rw{"Tiếng Kinyarwanda"}
+        rwk{"Tiếng Rwa"}
+        sa{"Tiếng Phạn"}
+        sad{"Tiếng Sandawe"}
+        sah{"Tiếng Sakha"}
+        sam{"Tiếng Samaritan Aramaic"}
+        saq{"Tiếng Samburu"}
+        sas{"Tiếng Sasak"}
+        sat{"Tiếng Santali"}
+        sba{"Tiếng Ngambay"}
+        sbp{"Tiếng Sangu"}
+        sc{"Tiếng Sardinia"}
+        scn{"Tiếng Sicilia"}
+        sco{"Tiếng Scots"}
+        sd{"Tiếng Sindhi"}
+        sdh{"Tiếng Kurd Miền Nam"}
+        se{"Tiếng Sami Miền Bắc"}
+        see{"Tiếng Seneca"}
+        seh{"Tiếng Sena"}
+        sel{"Tiếng Selkup"}
+        ses{"Tiếng Koyraboro Senni"}
+        sg{"Tiếng Sango"}
+        sga{"Tiếng Ai-len cổ"}
+        sh{"Tiếng Serbo-Croatia"}
+        shi{"Tiếng Tachelhit"}
+        shn{"Tiếng Shan"}
+        shu{"Tiếng Ả-Rập Chad"}
+        si{"Tiếng Sinhala"}
+        sid{"Tiếng Sidamo"}
+        sk{"Tiếng Slovak"}
+        sl{"Tiếng Slovenia"}
+        sm{"Tiếng Samoa"}
+        sma{"Tiếng Sami Miền Nam"}
+        smj{"Tiếng Lule Sami"}
+        smn{"Tiếng Inari Sami"}
+        sms{"Tiếng Skolt Sami"}
+        sn{"Tiếng Shona"}
+        snk{"Tiếng Soninke"}
+        so{"Tiếng Somali"}
+        sog{"Tiếng Sogdien"}
+        sq{"Tiếng Albania"}
+        sr{"Tiếng Serbia"}
+        srn{"Tiếng Sranan Tongo"}
+        srr{"Tiếng Serer"}
+        ss{"Tiếng Swati"}
+        ssy{"Tiếng Saho"}
+        st{"Tiếng Sotho Miền Nam"}
+        su{"Tiếng Sunda"}
+        suk{"Tiếng Sukuma"}
+        sus{"Tiếng Susu"}
+        sux{"Tiếng Sumeria"}
+        sv{"Tiếng Thụy Điển"}
+        sw{"Tiếng Swahili"}
+        sw_CD{"Tiếng Swahili Congo"}
+        swb{"Tiếng Cômo"}
+        syc{"Tiếng Syriac cổ"}
+        syr{"Tiếng Syriac"}
+        ta{"Tiếng Tamil"}
+        te{"Tiếng Telugu"}
+        tem{"Tiếng Timne"}
+        teo{"Tiếng Teso"}
+        ter{"Tiếng Tereno"}
+        tet{"Tiếng Tetum"}
+        tg{"Tiếng Tajik"}
+        th{"Tiếng Thái"}
+        ti{"Tiếng Tigrinya"}
+        tig{"Tiếng Tigre"}
+        tiv{"Tiếng Tiv"}
+        tk{"Tiếng Turkmen"}
+        tkl{"Tiếng Tokelau"}
+        tl{"Tiếng Tagalog"}
+        tlh{"Tiếng Klingon"}
+        tli{"Tiếng Tlingit"}
+        tmh{"Tiếng Tamashek"}
+        tn{"Tiếng Tswana"}
+        to{"Tiếng Tonga"}
+        tog{"Tiếng Nyasa Tonga"}
+        tpi{"Tiếng Tok Pisin"}
+        tr{"Tiếng Thổ Nhĩ Kỳ"}
+        trv{"Tiếng Taroko"}
+        ts{"Tiếng Tsonga"}
+        tsi{"Tiếng Tsimshian"}
+        tt{"Tiếng Tatar"}
+        tum{"Tiếng Tumbuka"}
+        tvl{"Tiếng Tuvalu"}
+        tw{"Tiếng Twi"}
+        twq{"Tiếng Tasawaq"}
+        ty{"Tiếng Tahiti"}
+        tyv{"Tiếng Tuvinian"}
+        tzm{"Tiếng Tamazight Miền Trung Ma-rốc"}
+        udm{"Tiếng Udmurt"}
+        ug{"Tiếng Uyghur"}
+        uga{"Tiếng Ugaritic"}
+        uk{"Tiếng Ukraina"}
+        umb{"Tiếng Umbundu"}
+        und{"Ngôn ngữ không xác định"}
+        ur{"Tiếng Urdu"}
+        uz{"Tiếng Uzbek"}
+        vai{"Tiếng Vai"}
+        ve{"Tiếng Venda"}
+        vi{"Tiếng Việt"}
+        vo{"Tiếng Volapük"}
+        vot{"Tiếng Votic"}
+        vun{"Tiếng Vunjo"}
+        wa{"Tiếng Walloon"}
+        wae{"Tiếng Walser"}
+        wal{"Tiếng Walamo"}
+        war{"Tiếng Waray"}
+        was{"Tiếng Washo"}
+        wbp{"Tiếng Warlpiri"}
+        wo{"Tiếng Wolof"}
+        wuu{"Tiếng Ngô"}
+        xal{"Tiếng Kalmyk"}
+        xh{"Tiếng Xhosa"}
+        xog{"Tiếng Soga"}
+        yao{"Tiếng Yao"}
+        yap{"Tiếng Yap"}
+        yav{"Tiếng Yangben"}
+        ybb{"Tiếng Yemba"}
+        yi{"Tiếng Yiddish"}
+        yo{"Tiếng Yoruba"}
+        yue{"Tiếng Quảng Đông"}
+        za{"Tiếng Choang"}
+        zap{"Tiếng Zapotec"}
+        zbl{"Ký hiệu Blissymbols"}
+        zen{"Tiếng Zenaga"}
+        zgh{"Tiếng Tamazight Chuẩn của Ma-rốc"}
+        zh{"Tiếng Trung"}
+        zu{"Tiếng Zulu"}
+        zun{"Tiếng Zuni"}
+        zxx{"Không có nội dung ngôn ngữ"}
+        zza{"Tiếng Zaza"}
+    }
+    Languages%long{
+        zh_Hans{"Tiếng Trung Phổ thông (Giản thể)"}
+        zh_Hant{"Tiếng Trung Phổ thông (Phồn thể)"}
+    }
+    Languages%menu{
+        yue{"Tiếng Trung (Tiếng Quảng Đông)"}
+        zh{"Tiếng Trung (Phổ thông)"}
+    }
+    Languages%short{
+        az{"Tiếng Azeri"}
+        en_GB{"Tiếng Anh (Anh)"}
+        en_US{"Tiếng Anh (Mỹ)"}
+    }
+    Languages%variant{
+        ckb{"Tiếng Kurd Sorani"}
+        ps{"Tiếng Pushto"}
+    }
+    Scripts{
+        Afak{"Chữ Afaka"}
+        Arab{"Chữ Ả Rập"}
+        Aran{"Chữ Nastaliq"}
+        Armi{"Chữ Imperial Aramaic"}
+        Armn{"Chữ Armenia"}
+        Avst{"Chữ Avestan"}
+        Bali{"Chữ Bali"}
+        Bamu{"Chữ Bamum"}
+        Bass{"Chữ Bassa Vah"}
+        Batk{"Chữ Batak"}
+        Beng{"Chữ Bangla"}
+        Blis{"Chữ Blissymbols"}
+        Bopo{"Chữ Bopomofo"}
+        Brah{"Chữ Brahmi"}
+        Brai{"Chữ nổi Braille"}
+        Bugi{"Chữ Bugin"}
+        Buhd{"Chữ Buhid"}
+        Cakm{"Chữ Chakma"}
+        Cans{"Âm tiết Thổ dân Canada Hợp nhất"}
+        Cari{"Chữ Caria"}
+        Cham{"Chữ Chăm"}
+        Cher{"Chữ Cherokee"}
+        Cirt{"Chữ Cirth"}
+        Copt{"Chữ Coptic"}
+        Cprt{"Chứ Síp"}
+        Cyrl{"Chữ Kirin"}
+        Cyrs{"Chữ Kirin Slavơ Nhà thờ cổ"}
+        Deva{"Chữ Devanagari"}
+        Dsrt{"Chữ Deseret"}
+        Dupl{"Chữ tốc ký Duployan"}
+        Egyd{"Chữ Ai Cập bình dân"}
+        Egyh{"Chữ Ai Cập thày tu"}
+        Egyp{"Chữ tượng hình Ai Cập"}
+        Ethi{"Chữ Ethiopia"}
+        Geok{"Chữ Khutsuri Georgia"}
+        Geor{"Chữ Georgia"}
+        Glag{"Chữ Glagolitic"}
+        Goth{"Chữ Gô-tích"}
+        Gran{"Chữ Grantha"}
+        Grek{"Chữ Hy Lạp"}
+        Gujr{"Chữ Gujarati"}
+        Guru{"Chữ Gurmukhi"}
+        Hanb{"Chữ Hán có chú âm"}
+        Hang{"Chữ Hàn"}
+        Hani{"Chữ Hán"}
+        Hano{"Chữ Hanunoo"}
+        Hans{"Giản thể"}
+        Hant{"Phồn thể"}
+        Hebr{"Chữ Do Thái"}
+        Hira{"Chữ Hiragana"}
+        Hluw{"Chữ tượng hình Anatolia"}
+        Hmng{"Chữ Pahawh Hmong"}
+        Hrkt{"Bảng ký hiệu âm tiết Tiếng Nhật"}
+        Hung{"Chữ Hungary cổ"}
+        Inds{"Chữ Indus"}
+        Ital{"Chữ Italic cổ"}
+        Jamo{"Chữ Jamo"}
+        Java{"Chữ Java"}
+        Jpan{"Chữ Nhật Bản"}
+        Jurc{"Chữ Jurchen"}
+        Kali{"Chữ Kayah Li"}
+        Kana{"Chữ Katakana"}
+        Khar{"Chữ Kharoshthi"}
+        Khmr{"Chữ Khơ-me"}
+        Khoj{"Chữ Khojki"}
+        Knda{"Chữ Kannada"}
+        Kore{"Chữ Hàn Quốc"}
+        Kpel{"Chữ Kpelle"}
+        Kthi{"Chữ Kaithi"}
+        Lana{"Chữ Lanna"}
+        Laoo{"Chữ Lào"}
+        Latf{"Chữ La-tinh Fraktur"}
+        Latg{"Chữ La-tinh Xcốt-len"}
+        Latn{"Chữ La tinh"}
+        Lepc{"Chữ Lepcha"}
+        Limb{"Chữ Limbu"}
+        Lina{"Chữ Linear A"}
+        Linb{"Chữ Linear B"}
+        Lisu{"Chữ Fraser"}
+        Loma{"Chữ Loma"}
+        Lyci{"Chữ Lycia"}
+        Lydi{"Chữ Lydia"}
+        Mand{"Chữ Mandaean"}
+        Mani{"Chữ Manichaean"}
+        Maya{"Chữ tượng hình Maya"}
+        Mend{"Chữ Mende"}
+        Merc{"Chữ Meroitic Nét thảo"}
+        Mero{"Chữ Meroitic"}
+        Mlym{"Chữ Malayalam"}
+        Mong{"Chữ Mông Cổ"}
+        Moon{"Chữ nổi Moon"}
+        Mroo{"Chữ Mro"}
+        Mtei{"Chữ Meitei Mayek"}
+        Mymr{"Chữ Myanmar"}
+        Narb{"Chữ Bắc Ả Rập cổ"}
+        Nbat{"Chữ Nabataean"}
+        Nkgb{"Chữ Naxi Geba"}
+        Nkoo{"Chữ N’Ko"}
+        Nshu{"Chữ Nüshu"}
+        Ogam{"Chữ Ogham"}
+        Olck{"Chữ Ol Chiki"}
+        Orkh{"Chữ Orkhon"}
+        Orya{"Chữ Odia"}
+        Osma{"Chữ Osmanya"}
+        Palm{"Chữ Palmyrene"}
+        Perm{"Chữ Permic cổ"}
+        Phag{"Chữ Phags-pa"}
+        Phli{"Chữ Pahlavi Văn bia"}
+        Phlp{"Chữ Pahlavi Thánh ca"}
+        Phlv{"Chữ Pahlavi Sách"}
+        Phnx{"Chữ Phoenicia"}
+        Plrd{"Ngữ âm Pollard"}
+        Prti{"Chữ Parthia Văn bia"}
+        Qaag{"Chữ Zawgyi"}
+        Rjng{"Chữ Rejang"}
+        Roro{"Chữ Rongorongo"}
+        Runr{"Chữ Runic"}
+        Samr{"Chữ Samaritan"}
+        Sara{"Chữ Sarati"}
+        Sarb{"Chữ Nam Ả Rập cổ"}
+        Saur{"Chữ Saurashtra"}
+        Sgnw{"Chữ viết Ký hiệu"}
+        Shaw{"Chữ Shavian"}
+        Shrd{"Chữ Sharada"}
+        Sind{"Chữ Khudawadi"}
+        Sinh{"Chữ Sinhala"}
+        Sora{"Chữ Sora Sompeng"}
+        Sund{"Chữ Xu-đăng"}
+        Sylo{"Chữ Syloti Nagri"}
+        Syrc{"Chữ Syria"}
+        Syre{"Chữ Estrangelo Syriac"}
+        Syrj{"Chữ Tây Syria"}
+        Syrn{"Chữ Đông Syria"}
+        Tagb{"Chữ Tagbanwa"}
+        Takr{"Chữ Takri"}
+        Tale{"Chữ Thái Na"}
+        Talu{"Chữ Thái Lặc mới"}
+        Taml{"Chữ Tamil"}
+        Tang{"Chữ Tangut"}
+        Tavt{"Chữ Thái Việt"}
+        Telu{"Chữ Telugu"}
+        Teng{"Chữ Tengwar"}
+        Tfng{"Chữ Tifinagh"}
+        Tglg{"Chữ Tagalog"}
+        Thaa{"Chữ Thaana"}
+        Thai{"Chữ Thái"}
+        Tibt{"Chữ Tây Tạng"}
+        Tirh{"Chữ Tirhuta"}
+        Ugar{"Chữ Ugarit"}
+        Vaii{"Chữ Vai"}
+        Visp{"Tiếng nói Nhìn thấy được"}
+        Wara{"Chữ Varang Kshiti"}
+        Wole{"Chữ Woleai"}
+        Xpeo{"Chữ Ba Tư cổ"}
+        Xsux{"Chữ hình nêm Sumero-Akkadian"}
+        Yiii{"Chữ Di"}
+        Zinh{"Chữ Kế thừa"}
+        Zmth{"Ký hiệu Toán học"}
+        Zsye{"Biểu tượng"}
+        Zsym{"Ký hiệu"}
+        Zxxx{"Chưa có chữ viết"}
+        Zyyy{"Chung"}
+        Zzzz{"Chữ viết không xác định"}
+    }
+    Scripts%stand-alone{
+        Hans{"Chữ Hán giản thể"}
+        Hant{"Chữ Hán phồn thể"}
+    }
+    Scripts%variant{
+        Arab{"Chữ Ba Tư-Ả Rập"}
+    }
+    Types{
+        calendar{
+            buddhist{"Lịch Phật Giáo"}
+            chinese{"Lịch Trung Quốc"}
+            coptic{"Lịch Copts"}
+            dangi{"Lịch Dangi"}
+            ethiopic{"Lịch Ethiopia"}
+            ethiopic-amete-alem{"Lịch Ethiopic Amete Alem"}
+            gregorian{"Lịch Gregory"}
+            hebrew{"Lịch Do Thái"}
+            indian{"Lịch Quốc gia Ấn Độ"}
+            islamic{"Lịch Hồi Giáo"}
+            islamic-civil{"Lịch Islamic-Civil"}
+            islamic-rgsa{"Lịch Hồi Giáo - Ả Rập Xê-út"}
+            islamic-tbla{"Lịch Hồi Giáo - Thiên văn"}
+            islamic-umalqura{"Lịch Hồi Giáo - Umm al-Qura"}
+            iso8601{"Lịch ISO-8601"}
+            japanese{"Lịch Nhật Bản"}
+            persian{"Lịch Ba Tư"}
+            roc{"Lịch Trung Hoa Dân Quốc"}
+        }
+        cf{
+            account{"Định dạng tiền tệ kế toán"}
+            standard{"Định dạng tiền tệ chuẩn"}
+        }
+        colAlternate{
+            non-ignorable{"Sắp xếp biểu tượng"}
+            shifted{"Sắp xếp biểu tượng bỏ qua"}
+        }
+        colBackwards{
+            no{"Sắp xếp dấu trọng âm bình thường"}
+            yes{"Sắp xếp dấu trọng âm đảo ngược"}
+        }
+        colCaseFirst{
+            lower{"Sắp xếp chữ thường đầu tiên"}
+            no{"Sắp xếp thứ tự chữ cái bình thường"}
+            upper{"Sắp xếp chữ hoa đầu tiên"}
+        }
+        colCaseLevel{
+            no{"Sắp xếp không phân biệt chữ hoa/chữ thường"}
+            yes{"Sắp xếp phân biệt chữ hoa/chữ thường"}
+        }
+        colNormalization{
+            no{"Sắp xếp không theo chuẩn hóa"}
+            yes{"Sắp xếp unicode được chuẩn hóa"}
+        }
+        colNumeric{
+            no{"Sắp xếp từng chữ số"}
+            yes{"Sắp xếp chữ số theo số"}
+        }
+        colStrength{
+            identical{"Sắp xếp tất cả"}
+            primary{"Chỉ sắp xếp chữ cái cơ sở"}
+            quaternary{"Sắp xếp dấu trọng âm/chữ cái/độ rộng/chữ Kana"}
+            secondary{"Sắp xếp dấu trọng âm"}
+            tertiary{"Sắp xếp dấu trọng âm/chữ cái/độ rộng"}
+        }
+        collation{
+            big5han{"Thứ tự sắp xếp theo tiếng Trung phồn thể - Big5"}
+            compat{"Thứ tự sắp xếp trước đây, để tương thích"}
+            dictionary{"Thứ tự sắp xếp theo từ điển"}
+            ducet{"Thứ tự sắp xếp unicode mặc định"}
+            emoji{"Thứ tự sắp xếp biểu tượng"}
+            eor{"Quy tắc sắp xếp Châu Âu"}
+            gb2312han{"Thứ tự sắp xếp theo tiếng Trung giản thể - GB2312"}
+            phonebook{"Thứ tự sắp xếp theo danh bạ điện thoại"}
+            phonetic{"Thứ tự sắp xếp theo ngữ âm"}
+            pinyin{"Thứ tự sắp xếp theo bính âm"}
+            reformed{"Thứ tự sắp xếp đã sửa đổi"}
+            search{"Tìm kiếm mục đích chung"}
+            searchjl{"Tìm kiếm theo Phụ âm Đầu Hangul"}
+            standard{"Thứ tự sắp xếp chuẩn"}
+            stroke{"Thứ tự sắp xếp theo nét chữ"}
+            traditional{"Thứ tự sắp xếp truyền thống"}
+            unihan{"Trình tự sắp xếp theo bộ-nét"}
+            zhuyin{"Thứ tự sắp xếp Zhuyin"}
+        }
+        d0{
+            fwidth{"Độ rộng tối đa"}
+            hwidth{"Nửa độ rộng"}
+            npinyin{"Số"}
+        }
+        hc{
+            h11{"Hệ thống 12 giờ (0–11)"}
+            h12{"Hệ thống 12 giờ (1–12)"}
+            h23{"Hệ thống 24 giờ (0–23)"}
+            h24{"Hệ thống 24 giờ (1–24)"}
+        }
+        lb{
+            loose{"Kiểu xuống dòng thoáng"}
+            normal{"Kiểu xuống dòng thường"}
+            strict{"Kiểu xuống dòng hẹp"}
+        }
+        m0{
+            bgn{"Chuyển tự US BGN"}
+            ungegn{"Chuyển tự UN GEGN"}
+        }
+        ms{
+            metric{"Hệ mét"}
+            uksystem{"Hệ đo lường Anh"}
+            ussystem{"Hệ đo lường Mỹ"}
+        }
+        numbers{
+            ahom{"Chữ số Ahom"}
+            arab{"Chữ số Ả Rập - Ấn Độ"}
+            arabext{"Chữ số Ả Rập - Ấn Độ mở rộng"}
+            armn{"Chữ số Armenia"}
+            armnlow{"Chữ số Armenia viết thường"}
+            bali{"Chữ số Bali"}
+            beng{"Chữ số Bangladesh"}
+            brah{"Chữ số Brahmi"}
+            cakm{"Chữ số Chakma"}
+            cham{"Chữ số Chăm"}
+            cyrl{"Số Kirin"}
+            deva{"Chữ số Devanagari"}
+            ethi{"Chữ số Ethiopia"}
+            finance{"Chữ số dùng trong tài chính"}
+            fullwide{"Chữ số có độ rộng đầy đủ"}
+            geor{"Chữ số Georgia"}
+            gong{"Chữ số Gong"}
+            gonm{"Chữ số Gonm"}
+            grek{"Chữ số Hy Lạp"}
+            greklow{"Chữ số Hy Lạp viết thường"}
+            gujr{"Chữ số Gujarati"}
+            guru{"Chữ số Gurmukhi"}
+            hanidec{"Chữ số thập phân Trung Quốc"}
+            hans{"Chữ số của tiếng Trung giản thể"}
+            hansfin{"Chữ số dùng trong tài chính của tiếng Trung giản thể"}
+            hant{"Chữ số tiếng Trung phồn thể"}
+            hantfin{"Chữ số dùng trong tài chính của tiếng Trung phồn thể"}
+            hebr{"Chữ số Do Thái"}
+            hmng{"Chữ số Hmng"}
+            hmnp{"Chữ số Hmnp"}
+            java{"Chữ số Java"}
+            jpan{"Chữ số Nhật Bản"}
+            jpanfin{"Chữ số dùng trong tài chính của tiếng Nhật"}
+            kali{"Chữ số Kayah Li"}
+            khmr{"Chữ số Khơ-me"}
+            knda{"Chữ số Kannada"}
+            lana{"Chữ số Hora Thái Đam"}
+            lanatham{"Chữ số Tham Thái Đam"}
+            laoo{"Chữ số Lào"}
+            latn{"Chữ số phương Tây"}
+            lepc{"Chữ số Lepcha"}
+            limb{"Chữ số Limbu"}
+            mathbold{"Chữ số Mathbold"}
+            mathdbl{"Chữ số Mathdbl"}
+            mathmono{"Chữ số Mathmono"}
+            mathsanb{"Chữ số Mathsanb"}
+            mathsans{"Chữ số Mathsans"}
+            mlym{"Chữ số Malayalam"}
+            modi{"Chữ số Modi"}
+            mong{"Chữ số Mông Cổ"}
+            mroo{"Chữ số Mroo"}
+            mtei{"Chữ số Meetei Mayek"}
+            mymr{"Chữ số Myanma"}
+            mymrshan{"Chữ số Myanmar Shan"}
+            mymrtlng{"Chữ số Mymrtlng"}
+            native{"Chữ số tự nhiên"}
+            nkoo{"Chữ số N’Ko"}
+            olck{"Chữ số Ol Chiki"}
+            orya{"Chữ số Odia"}
+            osma{"Chữ số Osmanya"}
+            rohg{"Chữ số Rohg"}
+            roman{"Chữ số La mã"}
+            romanlow{"Chữ số La Mã viết thường"}
+            saur{"Chữ số Saurashtra"}
+            shrd{"Chữ số Sharada"}
+            sind{"Chữ số Sind"}
+            sinh{"Chữ số Sinh"}
+            sora{"Chữ số Sora Sompeng"}
+            sund{"Chữ số Sudan"}
+            takr{"Chữ số Takri"}
+            talu{"Chữ số Thái Lặc mới"}
+            taml{"Chữ số Tamil Truyền thống"}
+            tamldec{"Chữ số Tamil"}
+            telu{"Chữ số Telugu"}
+            thai{"Chữ số Thái"}
+            tibt{"Chữ số Tây Tạng"}
+            tirh{"Chữ số Tirh"}
+            traditional{"Số truyền thống"}
+            vaii{"Chữ số Vai"}
+            wara{"Chữ số Wara"}
+            wcho{"Chữ số Wancho"}
+        }
+    }
+    Variants{
+        1606NICT{"Tiếng Pháp từ Cuối thời Trung cổ đến 1606"}
+        1694ACAD{"Tiếng Pháp Hiện đại Thời kỳ đầu"}
+        1901{"Phép chính tả Tiếng Đức Truyền thống"}
+        1959ACAD{"Hàn lâm"}
+        1994{"Phép chính tả Resian Chuẩn hóa"}
+        1996{"Phép chính tả Tiếng Đức năm 1996"}
+        ALALC97{"La Mã hóa ALA-LC, ấn bản năm 1997"}
+        ALUKU{"Phương ngữ Aluku"}
+        AREVELA{"Tiếng Armenia Miền Đông"}
+        AREVMDA{"Tiếng Armenia Miền Tây"}
+        BAKU1926{"Bảng chữ cái La-tinh Tiếng Turk Hợp nhất"}
+        BISKE{"Phương ngữ San Giorgio/Bila"}
+        BOHORIC{"Bảng chữ cái Bohorič"}
+        BOONT{"Tiếng Boontling"}
+        DAJNKO{"Bảng chữ cái Dajnko"}
+        EMODENG{"Tiếng Anh Hiện đại Thời kỳ đầu"}
+        FONIPA{"Ngữ âm học IPA"}
+        FONUPA{"Ngữ âm học UPA"}
+        HEPBURN{"La mã hóa Hepburn"}
+        KKCOR{"Phép chính tả Chung"}
+        KSCOR{"Phép chính tả Chuẩn"}
+        LIPAW{"Phương ngữ Lipovaz của người Resian"}
+        METELKO{"Bảng chữ cái Metelko"}
+        MONOTON{"Đơn âm"}
+        NDYUKA{"Phương ngữ Ndyuka"}
+        NEDIS{"Phương ngữ Natisone"}
+        NJIVA{"Phương ngữ Gniva/Njiva"}
+        NULIK{"Tiếng Volapük Hiện đại"}
+        OSOJS{"Phương ngữ Oseacco/Osojane"}
+        PAMAKA{"Phương ngữ Pamaka"}
+        PINYIN{"La Mã hóa Bính âm"}
+        POLYTON{"Đa âm"}
+        POSIX{"Máy tính"}
+        REVISED{"Phép chính tả Sửa đổi"}
+        RIGIK{"Tiếng Volapük Cổ điển"}
+        ROZAJ{"Tiếng Resian"}
+        SAAHO{"Tiếng Saho"}
+        SCOTLAND{"Tiếng Anh chuẩn tại Scotland"}
+        SCOUSE{"Phương ngữ Liverpool"}
+        SOLBA{"Phương ngữ Stolvizza/Solbica"}
+        TARASK{"Phép chính tả Taraskievica"}
+        UCCOR{"Phép chính tả Hợp nhất"}
+        UCRCOR{"Phép chính tả Sửa đổi Hợp nhất"}
+        VALENCIA{"Tiếng Valencia"}
+        WADEGILE{"La Mã hóa Wade-Giles"}
+    }
+    characterLabelPattern{
+        all{"{0} — tất cả"}
+        category-list{"{0}: {1}"}
+        compatibility{"{0} — tương thích"}
+        enclosed{"{0} — kín"}
+        extended{"{0} — mở rộng"}
+        historic{"{0} — lịch sử"}
+        miscellaneous{"{0} — hỗn hợp"}
+        other{"{0} — khác"}
+        scripts{"chữ viết — {0}"}
+        strokes{
+            other{"{0} nét"}
+        }
+        subscript{"chỉ số dưới {0}"}
+        superscript{"chỉ số trên {0}"}
+    }
+    codePatterns{
+        language{"Ngôn ngữ: {0}"}
+        script{"Chữ viết: {0}"}
+        territory{"Vùng: {0}"}
+    }
+    localeDisplayPattern{
+        keyTypePattern{"{0}: {1}"}
+    }
+}

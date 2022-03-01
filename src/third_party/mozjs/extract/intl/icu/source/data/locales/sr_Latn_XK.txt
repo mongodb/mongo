@@ -1,0 +1,77 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sr_Latn_XK{
+    calendar{
+        generic{
+            intervalFormats{
+                MMMEd{
+                    M{"E, d. MMM – E, d. MMM"}
+                    d{"E, d – E, d. MMM"}
+                }
+            }
+        }
+        gregorian{
+            dayPeriod{
+                format{
+                    abbreviated{
+                        afternoon1{"po pod."}
+                        evening1{"uveče"}
+                        midnight{"ponoć"}
+                        morning1{"jutro"}
+                        night1{"noću"}
+                        noon{"podne"}
+                    }
+                    narrow{
+                        afternoon1{"po pod."}
+                        evening1{"veče"}
+                        midnight{"ponoć"}
+                        morning1{"jutro"}
+                        night1{"noć"}
+                        noon{"podne"}
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        am{"a"}
+                        pm{"p"}
+                    }
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "jan",
+                        "feb",
+                        "mart",
+                        "apr",
+                        "maj",
+                        "jun",
+                        "jul",
+                        "avg",
+                        "sept",
+                        "okt",
+                        "nov",
+                        "dec",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "jan",
+                        "feb",
+                        "mart",
+                        "apr",
+                        "maj",
+                        "jun",
+                        "jul",
+                        "avg",
+                        "sept",
+                        "okt",
+                        "nov",
+                        "dec",
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,174 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sw_KE{
+    ExemplarCharacters{"[a b c d e f g h i j k l m n o p q r s t u v w x y z]"}
+    NumberElements{
+        latn{
+            patternsLong{
+                decimalFormat{
+                    1000{
+                        one{"elfu 0;elfu -0"}
+                        other{"elfu 0;elfu -0"}
+                    }
+                    10000{
+                        one{"elfu 00;elfu -00"}
+                        other{"elfu 00"}
+                    }
+                    100000{
+                        one{"elfu 000"}
+                        other{"elfu 000"}
+                    }
+                    1000000{
+                        one{"milioni 0"}
+                        other{"milioni 0"}
+                    }
+                    10000000{
+                        one{"milioni 00"}
+                        other{"milioni 00"}
+                    }
+                    100000000{
+                        one{"milioni 000"}
+                        other{"milioni 000"}
+                    }
+                    1000000000{
+                        one{"bilioni 0"}
+                        other{"bilioni 0"}
+                    }
+                    10000000000{
+                        one{"bilioni 00"}
+                        other{"bilioni 00"}
+                    }
+                    100000000000{
+                        one{"bilioni 000"}
+                        other{"bilioni 000"}
+                    }
+                    1000000000000{
+                        one{"trilioni 0"}
+                        other{"trilioni 0"}
+                    }
+                    10000000000000{
+                        one{"trilioni 00"}
+                        other{"trilioni 00"}
+                    }
+                    100000000000000{
+                        one{"trilioni 000"}
+                        other{"trilioni 000"}
+                    }
+                }
+            }
+            patternsShort{
+                currencyFormat{
+                    1000000{
+                        one{"¤ M0;¤-M0"}
+                        other{"¤ M0"}
+                    }
+                    10000000{
+                        one{"¤ M00;¤M-M00"}
+                        other{"¤ M00;¤-M00"}
+                    }
+                    100000000{
+                        one{"¤ M000;¤M-000"}
+                        other{"¤ M000"}
+                    }
+                    1000000000{
+                        one{"¤ B0;¤-B0"}
+                        other{"¤ B0;¤-B0"}
+                    }
+                    10000000000{
+                        one{"¤ B00;¤-B00"}
+                        other{"¤ B00;¤-B00"}
+                    }
+                    100000000000{
+                        one{"¤ B000;¤-B000"}
+                        other{"¤ B000;¤-B000"}
+                    }
+                    1000000000000{
+                        one{"¤ T0;¤-T0"}
+                        other{"¤ T0"}
+                    }
+                    10000000000000{
+                        one{"¤ T00;¤-T00"}
+                        other{"¤ T00"}
+                    }
+                    100000000000000{
+                        one{"¤ T000;¤-T000"}
+                        other{"¤ T000;¤-T000"}
+                    }
+                }
+                decimalFormat{
+                    1000{
+                        one{"elfu 0"}
+                        other{"elfu 0"}
+                    }
+                    10000{
+                        one{"elfu 00"}
+                        other{"elfu 00"}
+                    }
+                    100000{
+                        one{"elfu 000"}
+                        other{"elfu 000"}
+                    }
+                    1000000{
+                        one{"M0"}
+                        other{"M0"}
+                    }
+                    10000000{
+                        one{"M00"}
+                        other{"M00"}
+                    }
+                    100000000{
+                        one{"M000"}
+                        other{"M000"}
+                    }
+                    1000000000{
+                        one{"B0"}
+                        other{"B0"}
+                    }
+                    10000000000{
+                        one{"B00"}
+                        other{"B00"}
+                    }
+                    100000000000{
+                        one{"B000"}
+                        other{"B000"}
+                    }
+                    1000000000000{
+                        one{"T0"}
+                        other{"T0"}
+                    }
+                    10000000000000{
+                        one{"T00"}
+                        other{"T00"}
+                    }
+                    100000000000000{
+                        one{"T000"}
+                        other{"T000"}
+                    }
+                }
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d MMMM y G",
+                "d MMMM y G",
+                "d MMM y G",
+                "dd/MM/y GGGGG",
+                "{1}, {0}",
+                "{1} 'saa' {0}",
+                "{1} 'saa' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+        }
+    }
+    measurementSystemNames{
+        metric{"Kipimo"}
+    }
+}

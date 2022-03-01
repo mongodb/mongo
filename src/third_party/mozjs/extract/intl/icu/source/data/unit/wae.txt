@@ -1,0 +1,69 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+wae{
+    units{
+        duration{
+            day{
+                dnam{"täg"}
+                one{"{0} täg"}
+                other{"{0} täg"}
+            }
+            hour{
+                dnam{"stunde"}
+                one{"{0} stund"}
+                other{"{0} stunde"}
+            }
+            minute{
+                dnam{"minüte"}
+                one{"{0} minüta"}
+                other{"{0} minüte"}
+            }
+            month{
+                dnam{"mánet"}
+                one{"{0} mánet"}
+                other{"{0} mánet"}
+            }
+            second{
+                dnam{"sekunde"}
+                one{"{0} sekund"}
+                other{"{0} sekunde"}
+            }
+            week{
+                dnam{"wučä"}
+                one{"{0} wuča"}
+                other{"{0} wučä"}
+            }
+            year{
+                dnam{"jár"}
+                one{"{0} jár"}
+                other{"{0} jár"}
+            }
+        }
+    }
+    unitsShort{
+        duration{
+            day{
+                dnam{"täg"}
+            }
+            hour{
+                dnam{"stunde"}
+            }
+            minute{
+                dnam{"minüte"}
+            }
+            month{
+                dnam{"mánet"}
+            }
+            second{
+                dnam{"sekunde"}
+            }
+            week{
+                dnam{"wučä"}
+            }
+            year{
+                dnam{"jár"}
+            }
+        }
+    }
+}

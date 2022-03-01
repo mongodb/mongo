@@ -1,0 +1,137 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+zh_Hant_HK{
+    Keys{
+        ms{"度量衡系統"}
+        x{"專用區"}
+    }
+    Languages{
+        aa{"阿法爾文"}
+        az{"阿塞拜疆文"}
+        az_Arab{"南阿塞拜疆文"}
+        ba{"巴什基爾文"}
+        br{"布里多尼文"}
+        bs{"波斯尼亞文"}
+        ca{"加泰隆尼亞文"}
+        crh{"克里米亞韃靼文"}
+        crs{"塞舌爾克里奧爾法文"}
+        de_AT{"奧地利德文"}
+        de_CH{"瑞士德語"}
+        den{"斯拉夫文"}
+        en_AU{"澳洲英文"}
+        en_CA{"加拿大英文"}
+        en_GB{"英國英文"}
+        en_US{"美國英文"}
+        eo{"世界語"}
+        es_419{"拉丁美洲西班牙文"}
+        es_ES{"歐洲西班牙文"}
+        es_MX{"墨西哥西班牙文"}
+        fa_AF{"達利文"}
+        fr_CA{"加拿大法文"}
+        fr_CH{"瑞士法文"}
+        gil{"吉爾伯特文"}
+        gl{"加里西亞文"}
+        gsw{"瑞士德文"}
+        hmn{"苗語"}
+        hr{"克羅地亞文"}
+        it{"意大利文"}
+        jpr{"猶太波斯文"}
+        ka{"格魯吉亞文"}
+        kiu{"扎扎其文"}
+        kn{"坎納達文"}
+        kri{"克裡奧爾文"}
+        lo{"老撾文"}
+        luo{"盧歐文"}
+        mfe{"毛里裘斯克里奧爾文"}
+        mg{"馬拉加斯文"}
+        ml{"馬拉雅拉姆文"}
+        mt{"馬耳他文"}
+        nl_BE{"比利時荷蘭文"}
+        nqo{"西非書面語言（N’ko）"}
+        or{"奧里雅文"}
+        pcm{"尼日利亞皮欽文"}
+        pt_BR{"巴西葡萄牙文"}
+        pt_PT{"歐洲葡萄牙文"}
+        ro_MD{"摩爾多瓦羅馬尼亞文"}
+        rup{"阿羅馬尼亞語"}
+        rw{"盧旺達文"}
+        sl{"斯洛文尼亞文"}
+        sn{"修納文"}
+        so{"索馬里文"}
+        sw_CD{"剛果史瓦希里文"}
+        syr{"敍利亞文"}
+        ta{"泰米爾文"}
+        tn{"突尼西亞文"}
+        to{"湯加文"}
+        ur{"烏爾都文"}
+        wbp{"瓦爾皮里文"}
+        yue{"廣東話"}
+        zgh{"摩洛哥標準塔馬齊格特文"}
+    }
+    Languages%short{
+        az{"阿塞拜疆文"}
+        en_GB{"英式英文"}
+        en_US{"美式英文"}
+    }
+    Languages%variant{
+        ps{"普什圖語"}
+        ug{"維吾爾語"}
+    }
+    Scripts{
+        Cyrl{"西里爾文"}
+        Ethi{"埃塞俄比亞文"}
+        Geor{"格魯吉亞文"}
+        Guru{"古木基文"}
+        Hans{"簡體字"}
+        Hant{"繁體字"}
+        Knda{"坎納達文"}
+        Laoo{"老撾文"}
+        Latn{"拉丁字母"}
+        Mlym{"馬拉雅拉姆文"}
+        Newa{"尼瓦爾文"}
+        Orya{"奧里雅文"}
+        Sinh{"僧伽羅文"}
+        Taml{"泰米爾文"}
+        Thaa{"它拿字母"}
+    }
+    Types{
+        calendar{
+            ethiopic{"埃塞俄比亞曆"}
+            ethiopic-amete-alem{"埃塞俄比亞阿美德阿萊姆曆"}
+        }
+        collation{
+            big5han{"繁體中文排序 (Big5)"}
+            dictionary{"詞典排序"}
+            gb2312han{"簡體中文排序 (GB2312)"}
+            reformed{"改革版排序"}
+        }
+        ms{
+            uksystem{"英制"}
+            ussystem{"美制"}
+        }
+        numbers{
+            deva{"天城體數字"}
+            ethi{"埃塞俄比亞數字"}
+            geor{"格魯吉亞數字"}
+            knda{"卡納達數字"}
+            laoo{"老撾數字"}
+            mlym{"馬拉雅拉姆數字"}
+            orya{"奧里亞數字"}
+            taml{"泰米爾數字"}
+            tamldec{"泰米爾數字"}
+        }
+    }
+    Variants{
+        1901{"傳統德國拼字法"}
+        1996{"1996 德國拼字法"}
+        REVISED{"已修訂拼字法"}
+        SCOTLAND{"蘇格蘭標準英語"}
+    }
+    characterLabelPattern{
+        enclosed{"{0} — 包含"}
+        historic{"{0} — 舊式"}
+        miscellaneous{"{0} — 雜項"}
+        scripts{"書寫體 — {0}"}
+    }
+}

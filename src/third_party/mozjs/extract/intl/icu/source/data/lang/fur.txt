@@ -1,0 +1,312 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+fur{
+    Keys{
+        calendar{"calendari"}
+        collation{"ordenament"}
+        currency{"monede"}
+    }
+    Languages{
+        aa{"afar"}
+        ab{"abcazian"}
+        ae{"avestan"}
+        af{"afrikaans"}
+        am{"amaric"}
+        an{"aragonês"}
+        ang{"vieri inglês"}
+        ar{"arap"}
+        arc{"aramaic"}
+        as{"assamês"}
+        ast{"asturian"}
+        av{"avar"}
+        ay{"aymarà"}
+        az{"azerbaijani"}
+        be{"bielorùs"}
+        bg{"bulgar"}
+        bn{"bengalês"}
+        bo{"tibetan"}
+        br{"breton"}
+        bs{"bosniac"}
+        ca{"catalan"}
+        ce{"cecen"}
+        ch{"chamorro"}
+        co{"cors"}
+        cop{"coptic"}
+        cr{"cree"}
+        cs{"cec"}
+        cu{"sclâf de glesie"}
+        cy{"galês"}
+        da{"danês"}
+        de{"todesc"}
+        de_AT{"todesc de Austrie"}
+        de_CH{"alt todesc de Svuizare"}
+        den{"sclâf"}
+        egy{"vieri egjizian"}
+        el{"grêc"}
+        en{"inglês"}
+        en_AU{"inglês australian"}
+        en_CA{"inglês canadês"}
+        en_GB{"inglês britanic"}
+        en_US{"ingles merecan"}
+        eo{"esperanto"}
+        es{"spagnûl"}
+        es_419{"spagnûl de Americhe Latine"}
+        es_ES{"spagnûl iberic"}
+        et{"eston"}
+        eu{"basc"}
+        fa{"persian"}
+        ff{"fulah"}
+        fi{"finlandês"}
+        fil{"filipin"}
+        fj{"fizian"}
+        fo{"faroês"}
+        fr{"francês"}
+        fr_CA{"francês dal Canade"}
+        fr_CH{"francês de Svuizare"}
+        fro{"vieri francês"}
+        fur{"furlan"}
+        fy{"frisian"}
+        ga{"gaelic irlandês"}
+        gd{"gaelic scozês"}
+        gl{"galizian"}
+        gn{"guaranì"}
+        got{"gotic"}
+        grc{"vieri grêc"}
+        gu{"gujarati"}
+        gv{"manx"}
+        he{"ebraic"}
+        hi{"hindi"}
+        hr{"cravuat"}
+        ht{"haitian"}
+        hu{"ongjarês"}
+        hy{"armen"}
+        id{"indonesian"}
+        ig{"igbo"}
+        ik{"inupiaq"}
+        io{"ido"}
+        is{"islandês"}
+        it{"talian"}
+        iu{"inuktitut"}
+        ja{"gjaponês"}
+        ka{"gjeorgjian"}
+        kk{"kazac"}
+        kl{"kalaallisut"}
+        km{"khmer"}
+        kn{"kannada"}
+        ko{"corean"}
+        ku{"curd"}
+        kw{"cornualiês"}
+        la{"latin"}
+        lad{"ladin"}
+        lb{"lussemburghês"}
+        li{"limburghês"}
+        ln{"lingala"}
+        lo{"lao"}
+        lt{"lituan"}
+        lv{"leton"}
+        mg{"malagasy"}
+        mi{"maori"}
+        mk{"macedon"}
+        ml{"malayalam"}
+        mn{"mongul"}
+        mr{"marathi"}
+        ms{"malês"}
+        mt{"maltês"}
+        mul{"lenghis multiplis"}
+        mwl{"mirandês"}
+        nap{"napoletan"}
+        nb{"norvegjês bokmål"}
+        nd{"ndebele setentrionâl"}
+        nds{"bas todesc"}
+        ne{"nepalês"}
+        nl{"olandês"}
+        nl_BE{"flamant"}
+        nn{"norvegjês nynorsk"}
+        no{"norvegjês"}
+        non{"vieri norvegjês"}
+        nso{"sotho setentrionâl"}
+        nv{"navajo"}
+        oc{"ocitan"}
+        or{"oriya"}
+        os{"osetic"}
+        ota{"turc otoman"}
+        pa{"punjabi"}
+        pap{"papiamento"}
+        peo{"vieri persian"}
+        pl{"polac"}
+        pro{"vieri provenzâl"}
+        ps{"pashto"}
+        pt{"portughês"}
+        pt_BR{"portughês brasilian"}
+        pt_PT{"portughês iberic"}
+        qu{"quechua"}
+        rm{"rumanç"}
+        ro{"romen"}
+        ro_MD{"moldâf"}
+        ru{"rus"}
+        sa{"sanscrit"}
+        sc{"sardegnûl"}
+        scn{"sicilian"}
+        sco{"scozês"}
+        sd{"sindhi"}
+        se{"sami setentrionâl"}
+        sg{"sango"}
+        sga{"vieri irlandês"}
+        si{"sinalês"}
+        sk{"slovac"}
+        sl{"sloven"}
+        sm{"samoan"}
+        so{"somal"}
+        sq{"albanês"}
+        sr{"serp"}
+        ss{"swati"}
+        st{"sotho meridionâl"}
+        su{"sundanês"}
+        sux{"sumeric"}
+        sv{"svedês"}
+        sw{"swahili"}
+        ta{"tamil"}
+        te{"telegu"}
+        tet{"tetum"}
+        tg{"tagic"}
+        th{"thai"}
+        tk{"turcmen"}
+        tl{"tagalog"}
+        tr{"turc"}
+        tt{"tartar"}
+        ty{"tahitian"}
+        ug{"uigur"}
+        uk{"ucrain"}
+        und{"indeterminade"}
+        ur{"urdu"}
+        uz{"uzbec"}
+        ve{"venda"}
+        vi{"vietnamite"}
+        wa{"valon"}
+        wo{"wolof"}
+        xh{"xhosa"}
+        yi{"yiddish"}
+        yo{"yoruba"}
+        zh{"cinês"}
+        zh_Hans{"cinês semplificât"}
+        zh_Hant{"cinês tradizionâl"}
+        zu{"zulu"}
+    }
+    Scripts{
+        Arab{"arap"}
+        Armn{"armen"}
+        Bali{"balinês"}
+        Beng{"bengalês"}
+        Brai{"Braille"}
+        Bugi{"buginês"}
+        Cans{"Silabari unificât aborigjens canadês"}
+        Copt{"copt"}
+        Cprt{"cipriot"}
+        Cyrl{"cirilic"}
+        Cyrs{"cirilic dal vieri slavonic de glesie"}
+        Deva{"devanagari"}
+        Egyd{"demotic egjizian"}
+        Egyh{"jeratic egjizian"}
+        Egyp{"jeroglifics egjizians"}
+        Ethi{"etiopic"}
+        Geor{"georgjian"}
+        Glag{"glagolitic"}
+        Goth{"gotic"}
+        Grek{"grêc"}
+        Gujr{"gujarati"}
+        Hani{"han"}
+        Hans{"Han semplificât"}
+        Hant{"Han tradizionâl"}
+        Hebr{"ebreu"}
+        Hrkt{"katakana o hiragana"}
+        Hung{"vieri ongjarês"}
+        Ital{"vieri italic"}
+        Java{"gjavanês"}
+        Jpan{"gjaponês"}
+        Khmr{"khmer"}
+        Knda{"kannada"}
+        Kore{"corean"}
+        Laoo{"lao"}
+        Latf{"latin Fraktur"}
+        Latg{"latin gaelic"}
+        Latn{"latin"}
+        Lina{"lineâr A"}
+        Linb{"lineâr B"}
+        Maya{"jeroglifics Maya"}
+        Mlym{"malayalam"}
+        Mong{"mongul"}
+        Mymr{"myanmar"}
+        Orya{"oriya"}
+        Runr{"runic"}
+        Sinh{"sinhala"}
+        Syrc{"siriac"}
+        Syre{"siriac Estrangelo"}
+        Syrj{"siriac ocidentâl"}
+        Syrn{"siriac orientâl"}
+        Taml{"tamil"}
+        Telu{"telegu"}
+        Tglg{"tagalog"}
+        Thaa{"thaana"}
+        Thai{"thai"}
+        Tibt{"tibetan"}
+        Ugar{"ugaritic"}
+        Xpeo{"vieri persian"}
+        Xsux{"cuneiform sumeric-acadic"}
+        Zxxx{"codiç pes lenghis no scritis"}
+        Zyyy{"comun"}
+        Zzzz{"codiç par scrituris no codificadis"}
+    }
+    Types{
+        calendar{
+            buddhist{"calendari budist"}
+            chinese{"calendari cinês"}
+            gregorian{"calendari gregorian"}
+            hebrew{"calendari ebreu"}
+            indian{"calendari nazionâl indian"}
+            islamic{"calendari islamic"}
+            islamic-civil{"calendari islamic civîl"}
+            japanese{"calendari gjaponês"}
+            roc{"calendari de Republiche di Cine"}
+        }
+        collation{
+            big5han{"ordin cinês tradizionâl - Big5"}
+            ducet{"ordenament predeterminât Unicode"}
+            gb2312han{"ordin cinês semplificât - GB2312"}
+            phonebook{"ordin elenc telefonic"}
+            pinyin{"ordin pinyin"}
+            search{"ricercje par fins gjenerâi"}
+            stroke{"ordin segns"}
+            traditional{"ordin tradizionâl"}
+        }
+        numbers{
+            latn{"numars ocidentâi"}
+        }
+    }
+    Variants{
+        1901{"Ortografie todescje tradizionâl"}
+        1994{"Ortografie resiane standard"}
+        1996{"Ortografie todescje dal 1996"}
+        AREVELA{"armen orientâl"}
+        AREVMDA{"armen ocidentâl"}
+        BISKE{"dialet di San Zorç di Resie"}
+        LIPAW{"dialet di Lipovaz dal resian"}
+        NEDIS{"Dialet des valadis dal Nadison"}
+        NJIVA{"dialet di Gnive"}
+        OSOJS{"dialet di Oseac"}
+        POLYTON{"Politoniche"}
+        REVISED{"Ortografie revisade"}
+        ROZAJ{"Resian"}
+        SOLBA{"dialet di Stolvize"}
+        VALENCIA{"valenzian"}
+    }
+    codePatterns{
+        language{"Lenghe: {0}"}
+        script{"Scriture: {0}"}
+        territory{"Regjon: {0}"}
+    }
+    localeDisplayPattern{
+        pattern{"{0} ({1})"}
+        separator{"{0}, {1}"}
+    }
+}

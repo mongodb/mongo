@@ -1,0 +1,971 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+dsb{
+    zoneStrings{
+        "Africa:Accra"{
+            ec{"Akkra"}
+        }
+        "Africa:Addis_Ababa"{
+            ec{"Addis Abeba"}
+        }
+        "Africa:Algiers"{
+            ec{"Algier"}
+        }
+        "Africa:Asmera"{
+            ec{"Asmara"}
+        }
+        "Africa:Cairo"{
+            ec{"Kairo"}
+        }
+        "Africa:Dar_es_Salaam"{
+            ec{"Daressalam"}
+        }
+        "Africa:Djibouti"{
+            ec{"Džibuti"}
+        }
+        "Africa:El_Aaiun"{
+            ec{"El Aaiún"}
+        }
+        "Africa:Khartoum"{
+            ec{"Khartum"}
+        }
+        "Africa:Lome"{
+            ec{"Lomé"}
+        }
+        "Africa:Mogadishu"{
+            ec{"Mogadišu"}
+        }
+        "Africa:Ouagadougou"{
+            ec{"Wagadugu"}
+        }
+        "Africa:Porto-Novo"{
+            ec{"Porto Novo"}
+        }
+        "Africa:Sao_Tome"{
+            ec{"São Tomé"}
+        }
+        "Africa:Tripoli"{
+            ec{"Tripolis"}
+        }
+        "America:Asuncion"{
+            ec{"Asunción"}
+        }
+        "America:Bogota"{
+            ec{"Bogotá"}
+        }
+        "America:Cayman"{
+            ec{"Kaimaniske kupy"}
+        }
+        "America:Coral_Harbour"{
+            ec{"Atikokan"}
+        }
+        "America:Curacao"{
+            ec{"Curaçao"}
+        }
+        "America:El_Salvador"{
+            ec{"El Salvador"}
+        }
+        "America:Godthab"{
+            ec{"Nuuk"}
+        }
+        "America:Havana"{
+            ec{"Havanna"}
+        }
+        "America:Indiana:Knox"{
+            ec{"Knox, Indiana"}
+        }
+        "America:Indiana:Marengo"{
+            ec{"Marengo, Indiana"}
+        }
+        "America:Indiana:Petersburg"{
+            ec{"Petersburg, Indiana"}
+        }
+        "America:Indiana:Tell_City"{
+            ec{"Tell City, Indiana"}
+        }
+        "America:Indiana:Vevay"{
+            ec{"Vevay, Indiana"}
+        }
+        "America:Indiana:Vincennes"{
+            ec{"Vincennes, Indiana"}
+        }
+        "America:Indiana:Winamac"{
+            ec{"Winamac, Indiana"}
+        }
+        "America:Jamaica"{
+            ec{"Jamaika"}
+        }
+        "America:Kentucky:Monticello"{
+            ec{"Monticello, Kentucky"}
+        }
+        "America:Lower_Princes"{
+            ec{"Lower Prince’s Quarter"}
+        }
+        "America:Mexico_City"{
+            ec{"Mexiko-město"}
+        }
+        "America:North_Dakota:Beulah"{
+            ec{"Beulah, North Dakota"}
+        }
+        "America:North_Dakota:Center"{
+            ec{"Center, North Dakota"}
+        }
+        "America:North_Dakota:New_Salem"{
+            ec{"New Salem, North Dakota"}
+        }
+        "America:Port_of_Spain"{
+            ec{"Port-of-Spain"}
+        }
+        "America:Sao_Paulo"{
+            ec{"São Paulo"}
+        }
+        "America:Scoresbysund"{
+            ec{"Ittoqqortoormiit"}
+        }
+        "America:St_Barthelemy"{
+            ec{"St.Barthélemy"}
+        }
+        "America:St_Johns"{
+            ec{"St. John’s"}
+        }
+        "America:St_Kitts"{
+            ec{"St. Kitts"}
+        }
+        "America:St_Lucia"{
+            ec{"St. Lucia"}
+        }
+        "America:St_Thomas"{
+            ec{"St. Thomas"}
+        }
+        "America:St_Vincent"{
+            ec{"St. Vincent"}
+        }
+        "Antarctica:DumontDUrville"{
+            ec{"Dumont D’Urville"}
+        }
+        "Antarctica:Vostok"{
+            ec{"Wostok"}
+        }
+        "Asia:Aqtobe"{
+            ec{"Aktobe"}
+        }
+        "Asia:Baghdad"{
+            ec{"Bagdad"}
+        }
+        "Asia:Bishkek"{
+            ec{"Biškek"}
+        }
+        "Asia:Calcutta"{
+            ec{"Kalkutta"}
+        }
+        "Asia:Damascus"{
+            ec{"Damaskus"}
+        }
+        "Asia:Dushanbe"{
+            ec{"Dušanbe"}
+        }
+        "Asia:Hong_Kong"{
+            ec{"Hongkong"}
+        }
+        "Asia:Jayapura"{
+            ec{"Port Numbay"}
+        }
+        "Asia:Kamchatka"{
+            ec{"Kamčatka"}
+        }
+        "Asia:Katmandu"{
+            ec{"Kathmandu"}
+        }
+        "Asia:Krasnoyarsk"{
+            ec{"Krasnojarsk"}
+        }
+        "Asia:Macau"{
+            ec{"Macao"}
+        }
+        "Asia:Muscat"{
+            ec{"Muskat"}
+        }
+        "Asia:Nicosia"{
+            ec{"Nikosia"}
+        }
+        "Asia:Novokuznetsk"{
+            ec{"Nowokuznjetsk"}
+        }
+        "Asia:Novosibirsk"{
+            ec{"Nowosibirsk"}
+        }
+        "Asia:Pyongyang"{
+            ec{"Pjöngjang"}
+        }
+        "Asia:Qatar"{
+            ec{"Katar"}
+        }
+        "Asia:Riyadh"{
+            ec{"Riad"}
+        }
+        "Asia:Saigon"{
+            ec{"Ho-Chi-Minh-město"}
+        }
+        "Asia:Sakhalin"{
+            ec{"Sachalin"}
+        }
+        "Asia:Singapore"{
+            ec{"Singapur"}
+        }
+        "Asia:Taipei"{
+            ec{"Taipeh"}
+        }
+        "Asia:Tashkent"{
+            ec{"Taškent"}
+        }
+        "Asia:Tbilisi"{
+            ec{"Tbilisi"}
+        }
+        "Asia:Tehran"{
+            ec{"Teheran"}
+        }
+        "Asia:Tokyo"{
+            ec{"Tokio"}
+        }
+        "Asia:Vladivostok"{
+            ec{"Wladiwostok"}
+        }
+        "Asia:Yakutsk"{
+            ec{"Jakutsk"}
+        }
+        "Asia:Yekaterinburg"{
+            ec{"Jekaterinburg"}
+        }
+        "Asia:Yerevan"{
+            ec{"Jerewan"}
+        }
+        "Atlantic:Azores"{
+            ec{"Acory"}
+        }
+        "Atlantic:Bermuda"{
+            ec{"Bermudy"}
+        }
+        "Atlantic:Canary"{
+            ec{"Kanary"}
+        }
+        "Atlantic:Cape_Verde"{
+            ec{"Kap Verde"}
+        }
+        "Atlantic:Faeroe"{
+            ec{"Färöje"}
+        }
+        "Atlantic:Reykjavik"{
+            ec{"Reykjavík"}
+        }
+        "Atlantic:South_Georgia"{
+            ec{"Pódpołdnjowa Georgiska"}
+        }
+        "Atlantic:St_Helena"{
+            ec{"St. Helena"}
+        }
+        "Etc:Unknown"{
+            ec{"Njeznate"}
+        }
+        "Europe:Athens"{
+            ec{"Athen"}
+        }
+        "Europe:Belgrade"{
+            ec{"Běłogrod"}
+        }
+        "Europe:Brussels"{
+            ec{"Brüssel"}
+        }
+        "Europe:Bucharest"{
+            ec{"Bukarest"}
+        }
+        "Europe:Busingen"{
+            ec{"Büsingen"}
+        }
+        "Europe:Chisinau"{
+            ec{"Kišinau"}
+        }
+        "Europe:Copenhagen"{
+            ec{"Kopenhagen"}
+        }
+        "Europe:Dublin"{
+            ld{"Iriski lěśojski cas"}
+        }
+        "Europe:Kiev"{
+            ec{"Kiew"}
+        }
+        "Europe:Lisbon"{
+            ec{"Lissabon"}
+        }
+        "Europe:London"{
+            ld{"Britiski lěśojski cas"}
+        }
+        "Europe:Luxembourg"{
+            ec{"Luxemburg"}
+        }
+        "Europe:Moscow"{
+            ec{"Moskwa"}
+        }
+        "Europe:Prague"{
+            ec{"Praga"}
+        }
+        "Europe:Rome"{
+            ec{"Rom"}
+        }
+        "Europe:Tirane"{
+            ec{"Tirana"}
+        }
+        "Europe:Uzhgorod"{
+            ec{"Užgorod"}
+        }
+        "Europe:Vatican"{
+            ec{"Vatikan"}
+        }
+        "Europe:Vienna"{
+            ec{"Wien"}
+        }
+        "Europe:Vilnius"{
+            ec{"Wilna"}
+        }
+        "Europe:Volgograd"{
+            ec{"Wolgograd"}
+        }
+        "Europe:Warsaw"{
+            ec{"Waršawa"}
+        }
+        "Europe:Zaporozhye"{
+            ec{"Saporižja"}
+        }
+        "Europe:Zurich"{
+            ec{"Zürich"}
+        }
+        "Indian:Christmas"{
+            ec{"Gódowne kupy"}
+        }
+        "Indian:Comoro"{
+            ec{"Komory"}
+        }
+        "Indian:Maldives"{
+            ec{"Malediwy"}
+        }
+        "Indian:Reunion"{
+            ec{"Réunion"}
+        }
+        "Pacific:Easter"{
+            ec{"Jatšowne kupy"}
+        }
+        "Pacific:Fiji"{
+            ec{"Fidži"}
+        }
+        "Pacific:Ponape"{
+            ec{"Pohnpei"}
+        }
+        "Pacific:Truk"{
+            ec{"Chuuk"}
+        }
+        "meta:Afghanistan"{
+            ls{"Afghaniski cas"}
+        }
+        "meta:Africa_Central"{
+            ls{"Srjejźoafriski cas"}
+        }
+        "meta:Africa_Eastern"{
+            ls{"Pódzajtšnoafriski cas"}
+        }
+        "meta:Africa_Southern"{
+            ls{"Pódpołdnjowoafriski cas"}
+        }
+        "meta:Africa_Western"{
+            ld{"Pódwjacornoafriski lěśojski cas"}
+            lg{"Pódwjacornoafriski cas"}
+            ls{"Pódwjacornoafriski standardny cas"}
+        }
+        "meta:Alaska"{
+            ld{"Alaskojski lěśojski cas"}
+            lg{"Alaskojski cas"}
+            ls{"Alaskojski standardny cas"}
+        }
+        "meta:Amazon"{
+            ld{"Amaconaski lěśojski cas"}
+            lg{"Amaconaski cas"}
+            ls{"Amaconaski standardny cas"}
+        }
+        "meta:America_Central"{
+            ld{"Pódpołnocnoameriski centralny lěśojski cas"}
+            lg{"Pódpołnocnoameriski centralny cas"}
+            ls{"Pódpołnocnoameriski centralny standardny cas"}
+        }
+        "meta:America_Eastern"{
+            ld{"Pódpołnocnoameriski pódzajtšny lěśojski cas"}
+            lg{"Pódpołnocnoameriski pódzajtšny cas"}
+            ls{"Pódpołnocnoameriski pódzajtšny standardny cas"}
+        }
+        "meta:America_Mountain"{
+            ld{"Pódpołnocnoameriski górski lěśojski cas"}
+            lg{"Pódpołnocnoameriski górski cas"}
+            ls{"Pódpołnocnoameriski górski standardny cas"}
+        }
+        "meta:America_Pacific"{
+            ld{"Pódpołnocnoameriski pacifiski lěśojski cas"}
+            lg{"Pódpołnocnoameriski pacifiski cas"}
+            ls{"Pódpołnocnoameriski pacifiski standardny cas"}
+        }
+        "meta:Apia"{
+            ld{"Apiaski lěśojski cas"}
+            lg{"Apiaski cas"}
+            ls{"Apiaski standardny cas"}
+        }
+        "meta:Arabian"{
+            ld{"Arabiski lěśojski cas"}
+            lg{"Arabiski cas"}
+            ls{"Arabiski standardny cas"}
+        }
+        "meta:Argentina"{
+            ld{"Argentinski lěśojski cas"}
+            lg{"Argentinski cas"}
+            ls{"Argentinski standardny cas"}
+        }
+        "meta:Argentina_Western"{
+            ld{"Pódwjacornoargentinski lěśojski cas"}
+            lg{"Pódwjacornoargentinski cas"}
+            ls{"Pódwjacornoargentinski standardny cas"}
+        }
+        "meta:Armenia"{
+            ld{"Armeński lěśojski cas"}
+            lg{"Armeński cas"}
+            ls{"Armeński standardny cas"}
+        }
+        "meta:Atlantic"{
+            ld{"Atlantiski lěśojski cas"}
+            lg{"Atlantiski cas"}
+            ls{"Atlantiski standardny cas"}
+        }
+        "meta:Australia_Central"{
+            ld{"Srjejźoawstralski lěśojski cas"}
+            lg{"Srjejźoawstralski cas"}
+            ls{"Srjejźoawstralski standardny cas"}
+        }
+        "meta:Australia_CentralWestern"{
+            ld{"Srjejźopódwjacorny awstralski lěśojski cas"}
+            lg{"Srjejźopódwjacorny awstralski cas"}
+            ls{"Srjejźopódwjacorny awstralski standardny cas"}
+        }
+        "meta:Australia_Eastern"{
+            ld{"Pódzajtšnoawstralski lěśojski cas"}
+            lg{"Pódzajtšnoawstralski cas"}
+            ls{"Pódzajtšnoawstralski standardny cas"}
+        }
+        "meta:Australia_Western"{
+            ld{"Pódwjacornoawstralski lěśojski cas"}
+            lg{"Pódwjacornoawstralski cas"}
+            ls{"Pódwjacornoawstralski standardny cas"}
+        }
+        "meta:Azerbaijan"{
+            ld{"Azerbajdžaniski lěśojski cas"}
+            lg{"Azerbajdžaniski cas"}
+            ls{"Azerbajdžaniski standardny cas"}
+        }
+        "meta:Azores"{
+            ld{"Acorski lěśojski cas"}
+            lg{"Acorski cas"}
+            ls{"Acorski standardny cas"}
+        }
+        "meta:Bangladesh"{
+            ld{"Bangladešski lěśojski cas"}
+            lg{"Bangladešski cas"}
+            ls{"Bangladešski standardny cas"}
+        }
+        "meta:Bhutan"{
+            ls{"Bhutański cas"}
+        }
+        "meta:Bolivia"{
+            ls{"Boliwiski cas"}
+        }
+        "meta:Brasilia"{
+            ld{"Brasília lěśojski cas"}
+            lg{"Brasília cas"}
+            ls{"Brasília standardny cas"}
+        }
+        "meta:Brunei"{
+            ls{"Bruneiski cas"}
+        }
+        "meta:Cape_Verde"{
+            ld{"Kapverdski lěśojski cas"}
+            lg{"Kapverdski cas"}
+            ls{"Kapverdski standardny cas"}
+        }
+        "meta:Chamorro"{
+            ls{"Chamorrski cas"}
+        }
+        "meta:Chatham"{
+            ld{"Chathamski lěśojski cas"}
+            lg{"Chathamski cas"}
+            ls{"Chathamski standardny cas"}
+        }
+        "meta:Chile"{
+            ld{"Chilski lěśojski cas"}
+            lg{"Chilski cas"}
+            ls{"Chilski standardny cas"}
+        }
+        "meta:China"{
+            ld{"Chinski lěśojski cas"}
+            lg{"Chinski cas"}
+            ls{"Chinski standardny cas"}
+        }
+        "meta:Choibalsan"{
+            ld{"Choibalsański lěśojski cas"}
+            lg{"Choibalsański cas"}
+            ls{"Choibalsański standardny cas"}
+        }
+        "meta:Christmas"{
+            ls{"cas Gódownych kupow"}
+        }
+        "meta:Cocos"{
+            ls{"cas Kokosowych kupow"}
+        }
+        "meta:Colombia"{
+            ld{"Kolumbiski lěśojski cas"}
+            lg{"Kolumbiski cas"}
+            ls{"Kolumbiski standardny cas"}
+        }
+        "meta:Cook"{
+            ld{"lěśojski cas Cookowych kupow"}
+            lg{"cas Cookowych kupow"}
+            ls{"Standardny cas Cookowych kupow"}
+        }
+        "meta:Cuba"{
+            ld{"Kubański lěśojski cas"}
+            lg{"Kubański cas"}
+            ls{"Kubański standardny cas"}
+        }
+        "meta:Davis"{
+            ls{"Davis cas"}
+        }
+        "meta:DumontDUrville"{
+            ls{"DumontDUrville cas"}
+        }
+        "meta:East_Timor"{
+            ls{"Pódzajtšnotimorski cas"}
+        }
+        "meta:Easter"{
+            ld{"lěśojski cas Jatšowneje kupy"}
+            lg{"cas Jatšowneje kupy"}
+            ls{"standardny cas Jatšowneje kupy"}
+        }
+        "meta:Ecuador"{
+            ls{"Ekuadorski cas"}
+        }
+        "meta:Europe_Central"{
+            ld{"Srjejźoeuropski lěśojski cas"}
+            lg{"Srjejźoeuropski cas"}
+            ls{"Srjejźoeuropski standardny cas"}
+            sd{"MESZ"}
+            sg{"MEZ"}
+            ss{"MEZ"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"Pódzajtšnoeuropski lěśojski cas"}
+            lg{"Pódzajtšnoeuropski cas"}
+            ls{"Pódzajtšnoeuropski standardny cas"}
+            sd{"OESZ"}
+            sg{"OEZ"}
+            ss{"OEZ"}
+        }
+        "meta:Europe_Further_Eastern"{
+            ls{"Kaliningradski cas"}
+        }
+        "meta:Europe_Western"{
+            ld{"Pódwjacornoeuropski lěśojski cas"}
+            lg{"Pódwjacornoeuropski cas"}
+            ls{"Pódwjacornoeuropski standardny cas"}
+            sd{"WESZ"}
+            sg{"WEZ"}
+            ss{"WEZ"}
+        }
+        "meta:Falkland"{
+            ld{"Falklandski lěśojski cas"}
+            lg{"Falklandski cas"}
+            ls{"Falklandski standardny cas"}
+        }
+        "meta:Fiji"{
+            ld{"Fidźiski lěśojski cas"}
+            lg{"Fidźiski cas"}
+            ls{"Fidźiski standardny cas"}
+        }
+        "meta:French_Guiana"{
+            ls{"Francojskoguyański cas"}
+        }
+        "meta:French_Southern"{
+            ls{"cas francojskego pódpołdnjowego a antarktiskeho teritoriuma"}
+        }
+        "meta:GMT"{
+            ls{"Greenwichski cas"}
+        }
+        "meta:Galapagos"{
+            ls{"Galapagoski cas"}
+        }
+        "meta:Gambier"{
+            ls{"Gambierski cas"}
+        }
+        "meta:Georgia"{
+            ld{"Georgiski lěśojski cas"}
+            lg{"Georgiski cas"}
+            ls{"Georgiski standardny cas"}
+        }
+        "meta:Gilbert_Islands"{
+            ls{"cas Gilbertowych kupow"}
+        }
+        "meta:Greenland_Eastern"{
+            ld{"Pódzajtšnogrönlandski lěśojski cas"}
+            lg{"Pódzajtšnogrönlandski cas"}
+            ls{"Pódzajtšnogrönlandski standardny cas"}
+        }
+        "meta:Greenland_Western"{
+            ld{"Pódwjacornogrönlandski lěśojski cas"}
+            lg{"Pódwjacornogrönlandski cas"}
+            ls{"Pódwjacornogrönlandski standardny cas"}
+        }
+        "meta:Gulf"{
+            ls{"cas Persiskego golfa"}
+        }
+        "meta:Guyana"{
+            ls{"Guyański cas"}
+        }
+        "meta:Hawaii_Aleutian"{
+            ld{"Hawaiisko-aleutski lěśojski cas"}
+            lg{"Hawaiisko-aleutski cas"}
+            ls{"Hawaiisko-aleutski standardny cas"}
+        }
+        "meta:Hong_Kong"{
+            ld{"Hongkongski lěśojski cas"}
+            lg{"Hongkongski cas"}
+            ls{"Hongkongski standardny cas"}
+        }
+        "meta:Hovd"{
+            ld{"Chowdski lěśojski cas"}
+            lg{"Chowdski cas"}
+            ls{"Chowdski standardny cas"}
+        }
+        "meta:India"{
+            ls{"Indiski cas"}
+        }
+        "meta:Indian_Ocean"{
+            ls{"Indiskooceaniski cas"}
+        }
+        "meta:Indochina"{
+            ls{"Indochinski cas"}
+        }
+        "meta:Indonesia_Central"{
+            ls{"Srjejźoindoneski cas"}
+        }
+        "meta:Indonesia_Eastern"{
+            ls{"Pódzajtšnoindoneski"}
+        }
+        "meta:Indonesia_Western"{
+            ls{"Pódwjacornoindoneski cas"}
+        }
+        "meta:Iran"{
+            ld{"Irański lěśojski cas"}
+            lg{"Irański cas"}
+            ls{"Irański standardny cas"}
+        }
+        "meta:Irkutsk"{
+            ld{"Irkutski lěśojski cas"}
+            lg{"Irkutski cas"}
+            ls{"Irkutski standardny cas"}
+        }
+        "meta:Israel"{
+            ld{"Israelski lěśojski cas"}
+            lg{"Israelski cas"}
+            ls{"Israelski standardny cas"}
+        }
+        "meta:Japan"{
+            ld{"Japański lěśojski cas"}
+            lg{"Japański cas"}
+            ls{"Japański standardny cas"}
+        }
+        "meta:Kazakhstan_Eastern"{
+            ls{"Pódzajtšnokazachski cas"}
+        }
+        "meta:Kazakhstan_Western"{
+            ls{"Pódwjacornokazachski cas"}
+        }
+        "meta:Korea"{
+            ld{"Korejski lěśojski cas"}
+            lg{"Korejski cas"}
+            ls{"Korejski standardny cas"}
+        }
+        "meta:Kosrae"{
+            ls{"Kosraeski cas"}
+        }
+        "meta:Krasnoyarsk"{
+            ld{"Krasnojarski lěśojski cas"}
+            lg{"Krasnojarski cas"}
+            ls{"Krasnojarski standardny cas"}
+        }
+        "meta:Kyrgystan"{
+            ls{"Kirgiski cas"}
+        }
+        "meta:Line_Islands"{
+            ls{"cas Linijowych kupow"}
+        }
+        "meta:Lord_Howe"{
+            ld{"lěśojski cas kupy Lord-Howe"}
+            lg{"cas kupy Lord-Howe"}
+            ls{"Standardny cas kupy Lord-Howe"}
+        }
+        "meta:Macquarie"{
+            ls{"cas kupy Macquarie"}
+        }
+        "meta:Magadan"{
+            ld{"Magadański lěśojski cas"}
+            lg{"Magadański cas"}
+            ls{"Magadański standardny cas"}
+        }
+        "meta:Malaysia"{
+            ls{"Malajziski cas"}
+        }
+        "meta:Maldives"{
+            ls{"Malediwski cas"}
+        }
+        "meta:Marquesas"{
+            ls{"Marqueski cas"}
+        }
+        "meta:Marshall_Islands"{
+            ls{"cas Marshallowych kupow"}
+        }
+        "meta:Mauritius"{
+            ld{"Mauriciski lěśojski cas"}
+            lg{"Mauriciski cas"}
+            ls{"Mauriciski standardny cas"}
+        }
+        "meta:Mawson"{
+            ls{"Mawson cas"}
+        }
+        "meta:Mexico_Northwest"{
+            ld{"Mexiski dłujkowjacorny lěśojski cas"}
+            lg{"Mexiski dłujkowjacorny cas"}
+            ls{"Mexiski dłujkowjacorny standardny cas"}
+        }
+        "meta:Mexico_Pacific"{
+            ld{"Mexiski pacifiski lěśojski cas"}
+            lg{"Mexiski pacifiski cas"}
+            ls{"Mexiski pacifiski standardny cas"}
+        }
+        "meta:Mongolia"{
+            ld{"Ulan-Batorski lěśojski cas"}
+            lg{"Ulan-Batorski cas"}
+            ls{"Ulan-Batorski standardny cas"}
+        }
+        "meta:Moscow"{
+            ld{"Moskowski lěśojski cas"}
+            lg{"Moskowski cas"}
+            ls{"Moskowski standardny cas"}
+        }
+        "meta:Myanmar"{
+            ls{"Myanmarski cas"}
+        }
+        "meta:Nauru"{
+            ls{"Nauruski cas"}
+        }
+        "meta:Nepal"{
+            ls{"Nepalski cas"}
+        }
+        "meta:New_Caledonia"{
+            ld{"Nowokaledoniski lěśojski cas"}
+            lg{"Nowokaledoniski cas"}
+            ls{"Nowokaledoniski standardny cas"}
+        }
+        "meta:New_Zealand"{
+            ld{"Nowoseelandski lěśojski cas"}
+            lg{"Nowoseelandski cas"}
+            ls{"Nowoseelandski standardny cas"}
+        }
+        "meta:Newfoundland"{
+            ld{"Nowofundlandski lěśojski cas"}
+            lg{"Nowofundlandski cas"}
+            ls{"Nowofundlandski standardny cas"}
+        }
+        "meta:Niue"{
+            ls{"Niueski cas"}
+        }
+        "meta:Norfolk"{
+            ld{"lěśojski cas kupy Norfolk"}
+            lg{"cas kupy Norfolk"}
+            ls{"standardny cas kupy Norfolk"}
+        }
+        "meta:Noronha"{
+            ld{"lěśojski cas Fernando de Noronha"}
+            lg{"cas Fernando de Noronha"}
+            ls{"standardny cas Fernando de Noronha"}
+        }
+        "meta:Novosibirsk"{
+            ld{"Nowosibirski lěśojski cas"}
+            lg{"Nowosibirski cas"}
+            ls{"Nowosibirski standardny cas"}
+        }
+        "meta:Omsk"{
+            ld{"Omski lěśojski cas"}
+            lg{"Omski cas"}
+            ls{"Omski standardny cas"}
+        }
+        "meta:Pakistan"{
+            ld{"Pakistański lěśojski cas"}
+            lg{"Pakistański cas"}
+            ls{"Pakistański standardny cas"}
+        }
+        "meta:Palau"{
+            ls{"Palauski cas"}
+        }
+        "meta:Papua_New_Guinea"{
+            ls{"Papua-Nowoginejski cas"}
+        }
+        "meta:Paraguay"{
+            ld{"Paraguayski lěśojski cas"}
+            lg{"Paraguayski cas"}
+            ls{"Paraguayski standardny cas"}
+        }
+        "meta:Peru"{
+            ld{"Peruski lěśojski cas"}
+            lg{"Peruski cas"}
+            ls{"Peruski standardny cas"}
+        }
+        "meta:Philippines"{
+            ld{"Filipinski lěśojski cas"}
+            lg{"Filipinski cas"}
+            ls{"Filipinski standardny cas"}
+        }
+        "meta:Phoenix_Islands"{
+            ls{"cas Phoenixowych kupow"}
+        }
+        "meta:Pierre_Miquelon"{
+            ld{"St.-Pierre-a-Miqueloński lěśojski cas"}
+            lg{"St.-Pierre-a-Miqueloński cas"}
+            ls{"St.-Pierre-a-Miqueloński standardny cas"}
+        }
+        "meta:Pitcairn"{
+            ls{"cas Pitcairnowych kupow"}
+        }
+        "meta:Ponape"{
+            ls{"Ponapski cas"}
+        }
+        "meta:Reunion"{
+            ls{"Reunionski cas"}
+        }
+        "meta:Rothera"{
+            ls{"cas Rothera"}
+        }
+        "meta:Sakhalin"{
+            ld{"Sachalinski lěśojski cas"}
+            lg{"Sachalinski cas"}
+            ls{"Sachalinski standardny cas"}
+        }
+        "meta:Samoa"{
+            ld{"Samoaski lěśojski cas"}
+            lg{"Samoaski cas"}
+            ls{"Samoaski standardny cas"}
+        }
+        "meta:Seychelles"{
+            ls{"Seychelski cas"}
+        }
+        "meta:Singapore"{
+            ls{"Singapurski cas"}
+        }
+        "meta:Solomon"{
+            ls{"Salomoński cas"}
+        }
+        "meta:South_Georgia"{
+            ls{"Pódpołdnjowogeorgiski cas"}
+        }
+        "meta:Suriname"{
+            ls{"Surinamski cas"}
+        }
+        "meta:Syowa"{
+            ls{"Syowa cas"}
+        }
+        "meta:Tahiti"{
+            ls{"Tahitiski cas"}
+        }
+        "meta:Taipei"{
+            ld{"Tchajpejski lěśojski cas"}
+            lg{"Tchajpejski cas"}
+            ls{"Tchajpejski standardny cas"}
+        }
+        "meta:Tajikistan"{
+            ls{"Tadźikiski cas"}
+        }
+        "meta:Tokelau"{
+            ls{"Tokelauski cas"}
+        }
+        "meta:Tonga"{
+            ld{"Tongaski lěśojski cas"}
+            lg{"Tongaski cas"}
+            ls{"Tongaski standardny cas"}
+        }
+        "meta:Truk"{
+            ls{"Chuukski cas"}
+        }
+        "meta:Turkmenistan"{
+            ld{"Turkmeniski lěśojski cas"}
+            lg{"Turkmeniski cas"}
+            ls{"Turkmeniski standardny cas"}
+        }
+        "meta:Tuvalu"{
+            ls{"Tuvalski cas"}
+        }
+        "meta:Uruguay"{
+            ld{"Uruguayski lěśojski cas"}
+            lg{"Uruguayski cas"}
+            ls{"Uruguayski standardny cas"}
+        }
+        "meta:Uzbekistan"{
+            ld{"Uzbekiski lěśojski cas"}
+            lg{"Uzbekiski cas"}
+            ls{"Uzbekiski standardny cas"}
+        }
+        "meta:Vanuatu"{
+            ld{"Vanuatski lěśojski cas"}
+            lg{"Vanuatski cas"}
+            ls{"Vanuatski standardny cas"}
+        }
+        "meta:Venezuela"{
+            ls{"Venezuelski cas"}
+        }
+        "meta:Vladivostok"{
+            ld{"Wladiwostokski lěśojski cas"}
+            lg{"Wladiwostokski cas"}
+            ls{"Wladiwostokski standardny cas"}
+        }
+        "meta:Volgograd"{
+            ld{"Wolgogradski lěśojski cas"}
+            lg{"Wolgogradski cas"}
+            ls{"Wolgogradski standardny cas"}
+        }
+        "meta:Vostok"{
+            ls{"cas Wostok"}
+        }
+        "meta:Wake"{
+            ls{"cas kupy Wake"}
+        }
+        "meta:Wallis"{
+            ls{"cas kupow Wallis a Futuna"}
+        }
+        "meta:Yakutsk"{
+            ld{"Jakutski lěśojski cas"}
+            lg{"Jakutski cas"}
+            ls{"Jakutski standardny cas"}
+        }
+        "meta:Yekaterinburg"{
+            ld{"Jekaterinburgski lěśojski cas"}
+            lg{"Jekaterinburgski cas"}
+            ls{"Jekaterinburgski standardny cas"}
+        }
+        fallbackFormat{"{1} ({0})"}
+        gmtFormat{"GMT{0}"}
+        gmtZeroFormat{"GMT"}
+        hourFormat{"+HH:mm;-HH:mm"}
+        regionFormat{"Casowe pasmo {0}"}
+        regionFormatDaylight{"{0} lěśojski cas"}
+        regionFormatStandard{"{0} zymski cas"}
+    }
+}

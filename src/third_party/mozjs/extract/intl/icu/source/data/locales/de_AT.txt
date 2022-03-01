@@ -1,0 +1,97 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+de_AT{
+    ExemplarCharactersIndex{"[A Ä B C D E F G H I J K L M N O Ö P Q R S T U Ü V W X Y Z]"}
+    ExemplarCharactersNumbers{"[  \\- ‑ , % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"¤ #,##0.00"}
+            }
+            symbols{
+                currencyGroup{"."}
+                group{" "}
+            }
+        }
+    }
+    calendar{
+        gregorian{
+            dayPeriod{
+                stand-alone{
+                    narrow{
+                        am{"vm."}
+                        pm{"nm."}
+                    }
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Jän.",
+                        "Feb.",
+                        "März",
+                        "Apr.",
+                        "Mai",
+                        "Juni",
+                        "Juli",
+                        "Aug.",
+                        "Sep.",
+                        "Okt.",
+                        "Nov.",
+                        "Dez.",
+                    }
+                    wide{
+                        "Jänner",
+                        "Februar",
+                        "März",
+                        "April",
+                        "Mai",
+                        "Juni",
+                        "Juli",
+                        "August",
+                        "September",
+                        "Oktober",
+                        "November",
+                        "Dezember",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Jän",
+                        "Feb",
+                        "Mär",
+                        "Apr",
+                        "Mai",
+                        "Jun",
+                        "Jul",
+                        "Aug",
+                        "Sep",
+                        "Okt",
+                        "Nov",
+                        "Dez",
+                    }
+                    wide{
+                        "Jänner",
+                        "Februar",
+                        "März",
+                        "April",
+                        "Mai",
+                        "Juni",
+                        "Juli",
+                        "August",
+                        "September",
+                        "Oktober",
+                        "November",
+                        "Dezember",
+                    }
+                }
+            }
+        }
+    }
+    measurementSystemNames{
+        UK{"Englisches Maßsystem"}
+        US{"Angloamerikanisches Maßsystem"}
+        metric{"Internationales Maßsystem (SI)"}
+    }
+}

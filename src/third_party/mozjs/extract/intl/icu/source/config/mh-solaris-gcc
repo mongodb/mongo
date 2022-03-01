@@ -1,0 +1,80 @@
+## -*-makefile-*-
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+## Solaris-specific setup using gcc
+## Copyright (c) 1999-2014, International Business Machines Corporation and
+## others. All Rights Reserved.
+
+## Flags for position independent code
+SHAREDLIBCFLAGS = -fPIC
+SHAREDLIBCXXFLAGS = -fPIC
+SHAREDLIBCPPFLAGS = -DPIC
+
+## Commands to generate dependency files
+GEN_DEPS.c= 	$(CC) -E -MM $(DEFS) $(CPPFLAGS) $(CFLAGS)
+GEN_DEPS.cc=	$(CXX) -E -MM $(DEFS) $(CPPFLAGS) $(CXXFLAGS)
+
+## These are the library specific LDFLAGS
+LDFLAGSICUDT=-nodefaultlibs -nostdlib
+
+## Additional flags when building libraries and with threads
+THREADSCPPFLAGS = -D_REENTRANT
+
+## Compiler switch to embed a runtime search path
+LD_RPATH=       -R'$$'ORIGIN 
+LD_RPATH_PRE=   -R
+
+## Compiler switch to embed a library name
+LD_SONAME = -h $(notdir $(MIDDLE_SO_TARGET)) $(PKGDATA_TRAILING_SPACE)
+
+## Shared library options
+LD_SOOPTIONS= -Wl,-Bsymbolic
+
+## The type of assembly needed when pkgdata is used for generating shared libraries.
+## Only use this when not on x86 Solaris.
+ifeq (strip $(GENCCODE_ASSEMBLY),)
+GENCCODE_ASSEMBLY=-a sun
+endif
+
+## Shared object suffix
+SO=		so
+## Non-shared intermediate object suffix
+STATIC_O = ao
+
+## Compilation rules
+%.$(STATIC_O): $(srcdir)/%.c
+	$(COMPILE.c) $(STATICCPPFLAGS) $(STATICCFLAGS) -o $@ $<
+%.o: $(srcdir)/%.c
+	$(COMPILE.c) $(DYNAMICCPPFLAGS) $(DYNAMICCFLAGS) -o $@ $<
+
+%.$(STATIC_O): $(srcdir)/%.cpp
+	$(COMPILE.cc) $(STATICCPPFLAGS) $(STATICCXXFLAGS) -o $@ $<
+%.o: $(srcdir)/%.cpp
+	$(COMPILE.cc) $(DYNAMICCPPFLAGS) $(DYNAMICCXXFLAGS) -o $@ $<
+
+
+## Dependency rules
+%.d : $(srcdir)/%.c
+	@echo "generating dependency information for $<"
+	@$(SHELL) -ec '$(GEN_DEPS.c) $< \
+		| sed '\''s/\($*\)\.o[ :]*/\1.o $@ : /g'\'' > $@; \
+		[ -s $@ ] || rm -f $@'
+
+%.d : $(srcdir)/%.cpp
+	@echo "generating dependency information for $<"
+	@$(SHELL) -ec '$(GEN_DEPS.cc) $< \
+		| sed '\''s/\($*\)\.o[ :]*/\1.o $@ : /g'\'' > $@; \
+		[ -s $@ ] || rm -f $@'
+
+## Versioned libraries rules
+
+%.$(SO).$(SO_TARGET_VERSION_MAJOR): %.$(SO).$(SO_TARGET_VERSION)
+	$(RM) $@ && ln -s ${<F} $@
+%.$(SO): %.$(SO).$(SO_TARGET_VERSION_MAJOR)
+	$(RM) $@ && ln -s ${*F}.$(SO).$(SO_TARGET_VERSION) $@
+
+## Remove shared library 's'
+STATIC_PREFIX_WHEN_USED = 
+STATIC_PREFIX = 
+
+## End Solaris-specific setup

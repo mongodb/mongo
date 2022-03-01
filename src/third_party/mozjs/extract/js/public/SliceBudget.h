@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -7,87 +7,97 @@
 #ifndef js_SliceBudget_h
 #define js_SliceBudget_h
 
+#include "mozilla/Assertions.h"
+#include "mozilla/TimeStamp.h"
+#include "mozilla/Variant.h"
+
 #include <stdint.h>
 
 #include "jstypes.h"
 
 namespace js {
 
-struct JS_PUBLIC_API(TimeBudget)
-{
-    int64_t budget;
+struct JS_PUBLIC_API TimeBudget {
+  const int64_t budget;
+  mozilla::TimeStamp deadline;  // Calculated when SliceBudget is constructed.
 
-    explicit TimeBudget(int64_t milliseconds) { budget = milliseconds; }
+  explicit TimeBudget(int64_t milliseconds) : budget(milliseconds) {}
+  explicit TimeBudget(mozilla::TimeDuration duration)
+      : TimeBudget(duration.ToMilliseconds()) {}
 };
 
-struct JS_PUBLIC_API(WorkBudget)
-{
-    int64_t budget;
+struct JS_PUBLIC_API WorkBudget {
+  const int64_t budget;
 
-    explicit WorkBudget(int64_t work) { budget = work; }
+  explicit WorkBudget(int64_t work) : budget(work) {}
 };
+
+struct UnlimitedBudget {};
 
 /*
- * This class records how much work has been done in a given collection slice,
- * so that we can return before pausing for too long. Some slices are allowed
- * to run for unlimited time, and others are bounded. To reduce the number of
- * gettimeofday calls, we only check the time every 1000 operations.
+ * This class describes a limit to the amount of work to be performed in a GC
+ * slice, so that we can return to the mutator without pausing for too long. The
+ * budget may be based on a deadline time or an amount of work to be performed,
+ * or may be unlimited.
+ *
+ * To reduce the number of gettimeofday calls, we only check the time every 1000
+ * operations.
  */
-class JS_PUBLIC_API(SliceBudget)
-{
-    static const int64_t unlimitedDeadline = INT64_MAX;
-    static const intptr_t unlimitedStartCounter = INTPTR_MAX;
+class JS_PUBLIC_API SliceBudget {
+  static const intptr_t UnlimitedCounter = INTPTR_MAX;
+  static const intptr_t DefaultStepsPerTimeCheck = 1000;
 
-    bool checkOverBudget();
+  mozilla::Variant<TimeBudget, WorkBudget, UnlimitedBudget> budget;
+  int64_t stepsPerTimeCheck = DefaultStepsPerTimeCheck;
 
-    SliceBudget();
+  int64_t counter;
 
-  public:
-    // Memory of the originally requested budget. If isUnlimited, neither of
-    // these are in use. If deadline==0, then workBudget is valid. Otherwise
-    // timeBudget is valid.
-    TimeBudget timeBudget;
-    WorkBudget workBudget;
+  SliceBudget() : budget(UnlimitedBudget()), counter(UnlimitedCounter) {}
 
-    int64_t deadline; /* in microseconds */
-    intptr_t counter;
+  bool checkOverBudget();
 
-    static const intptr_t CounterReset = 1000;
+ public:
+  // Use to create an unlimited budget.
+  static SliceBudget unlimited() { return SliceBudget(); }
 
-    static const int64_t UnlimitedTimeBudget = -1;
-    static const int64_t UnlimitedWorkBudget = -1;
+  // Instantiate as SliceBudget(TimeBudget(n)).
+  explicit SliceBudget(TimeBudget time,
+                       int64_t stepsPerTimeCheck = DefaultStepsPerTimeCheck);
 
-    /* Use to create an unlimited budget. */
-    static SliceBudget unlimited() { return SliceBudget(); }
+  // Instantiate as SliceBudget(WorkBudget(n)).
+  explicit SliceBudget(WorkBudget work);
 
-    /* Instantiate as SliceBudget(TimeBudget(n)). */
-    explicit SliceBudget(TimeBudget time);
+  explicit SliceBudget(mozilla::TimeDuration time)
+      : SliceBudget(TimeBudget(time.ToMilliseconds())) {}
 
-    /* Instantiate as SliceBudget(WorkBudget(n)). */
-    explicit SliceBudget(WorkBudget work);
+  // Register having performed the given number of steps (counted against a
+  // work budget, or progress towards the next time or callback check).
+  void step(uint64_t steps = 1) {
+    MOZ_ASSERT(steps > 0);
+    counter -= steps;
+  }
 
-    void makeUnlimited() {
-        deadline = unlimitedDeadline;
-        counter = unlimitedStartCounter;
+  // Do enough steps to force an "expensive" (time and/or callback) check on
+  // the next call to isOverBudget. Useful when switching between major phases
+  // of an operation like a cycle collection.
+  void stepAndForceCheck() {
+    if (!isUnlimited()) {
+      counter = 0;
     }
+  }
 
-    void step(intptr_t amt = 1) {
-        counter -= amt;
-    }
+  bool isOverBudget() { return counter <= 0 && checkOverBudget(); }
 
-    bool isOverBudget() {
-        if (counter > 0)
-            return false;
-        return checkOverBudget();
-    }
+  bool isWorkBudget() const { return budget.is<WorkBudget>(); }
+  bool isTimeBudget() const { return budget.is<TimeBudget>(); }
+  bool isUnlimited() const { return budget.is<UnlimitedBudget>(); }
 
-    bool isWorkBudget() const { return deadline == 0; }
-    bool isTimeBudget() const { return deadline > 0 && !isUnlimited(); }
-    bool isUnlimited() const { return deadline == unlimitedDeadline; }
+  int64_t timeBudget() const { return budget.as<TimeBudget>().budget; }
+  int64_t workBudget() const { return budget.as<WorkBudget>().budget; }
 
-    int describe(char* buffer, size_t maxlen) const;
+  int describe(char* buffer, size_t maxlen) const;
 };
 
-} // namespace js
+}  // namespace js
 
 #endif /* js_SliceBudget_h */

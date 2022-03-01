@@ -1,0 +1,22 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+de_CH{
+    zoneStrings{
+        "Asia:Brunei"{
+            ec{"Brunei"}
+        }
+        "Asia:Macau"{
+            ec{"Macao"}
+        }
+        "Europe:Saratov"{
+            ec{"Saratov"}
+        }
+        "meta:Brunei"{
+            ls{"Brunei-Zeit"}
+        }
+        "meta:Solomon"{
+            ls{"Salomoninseln-Zeit"}
+        }
+    }
+}

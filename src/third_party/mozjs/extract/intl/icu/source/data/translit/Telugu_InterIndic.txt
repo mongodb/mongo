@@ -1,0 +1,94 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Telugu_InterIndic.txt
+# Generated from CLDR
+#
+
+# Telugu-InterIndic
+#:: NFD (NFC) ;
+\u0C46\u0C4D\u0C56→\uE048\uE04D;
+\u0C46\u0C56→\uE048;# VOWEL SIGN AI
+ఁ→\uE001;      # SIGN CANDRABINDU
+ం→\uE002;      # SIGN ANUSVARA
+ః→\uE003;      # SIGN VISARGA
+అ→\uE005;      # LETTER A
+ఆ→\uE006;      # LETTER AA
+ఇ→\uE007;      # LETTER I
+ఈ→\uE008;      # LETTER II
+ఉ→\uE009;      # LETTER U
+ఊ→\uE00A;      # LETTER UU
+ఋ→\uE00B;      # LETTER VOCALIC R
+ఌ→\uE00C;      # LETTER VOCALIC L
+ఎ→\uE00E;      # LETTER E
+ఏ→\uE00F;      # LETTER EE
+ఐ→\uE010;      # LETTER AI
+ఒ→\uE012;      # LETTER O
+ఓ→\uE013;      # LETTER OO
+ఔ→\uE014;      # LETTER AU
+క→\uE015;      # LETTER KA
+ఖ→\uE016;      # LETTER KHA
+గ→\uE017;      # LETTER GA
+ఘ→\uE018;      # LETTER GHA
+ఙ→\uE019;      # LETTER NGA
+చ→\uE01A;      # LETTER CA
+ఛ→\uE01B;      # LETTER CHA
+జ→\uE01C;      # LETTER JA
+ఝ→\uE01D;      # LETTER JHA
+ఞ→\uE01E;      # LETTER NYA
+ట→\uE01F;      # LETTER TTA
+ఠ→\uE020;      # LETTER TTHA
+డ→\uE021;      # LETTER DDA
+ఢ→\uE022;      # LETTER DDHA
+ణ→\uE023;      # LETTER NNA
+త→\uE024;      # LETTER TA
+థ→\uE025;      # LETTER THA
+ద→\uE026;      # LETTER DA
+ధ→\uE027;      # LETTER DHA
+న→\uE028;      # LETTER NA
+ప→\uE02A;      # LETTER PA
+ఫ→\uE02B;      # LETTER PHA
+బ→\uE02C;      # LETTER BA
+భ→\uE02D;      # LETTER BHA
+మ→\uE02E;      # LETTER MA
+య→\uE02F;      # LETTER YA
+ర→\uE030;      # LETTER RA
+ఱ→\uE031;      # LETTER RRA
+ల→\uE032;      # LETTER LA
+ళ→\uE033;      # LETTER LLA
+వ→\uE035;      # LETTER VA
+శ→\uE036;      # LETTER SHA
+ష→\uE037;      # LETTER SSA
+స→\uE038;      # LETTER SA
+హ→\uE039;      # LETTER HA
+\u0C3E→\uE03E;      # VOWEL SIGN AA
+\u0C3F→\uE03F;      # VOWEL SIGN I
+\u0C40→\uE040;      # VOWEL SIGN II
+ు→\uE041;      # VOWEL SIGN U
+ూ→\uE042;      # VOWEL SIGN UU
+ృ→\uE043;      # VOWEL SIGN VOCALIC R
+ౄ→\uE044;      # VOWEL SIGN VOCALIC RR
+\u0C46→\uE046;      # VOWEL SIGN E
+\u0C47→\uE047;      # VOWEL SIGN EE
+\u0C4A→\uE04A;      # VOWEL SIGN O
+\u0C4B→\uE04B;      # VOWEL SIGN OO
+\u0C4C→\uE04C;      # VOWEL SIGN AU
+\u0C4D→\uE04D;      # SIGN VIRAMA
+\u0C55→\uE055;      # LENGTH MARK
+\u0C56→\uE056;      # AI LENGTH MARK
+ౠ→\uE060;      # LETTER VOCALIC RR
+ౡ→\uE061;      # LETTER VOCALIC LL
+౦→\uE066;      # DIGIT ZERO
+౧→\uE067;      # DIGIT ONE
+౨→\uE068;      # DIGIT TWO
+౩→\uE069;      # DIGIT THREE
+౪→\uE06A;      # DIGIT FOUR
+౫→\uE06B;      # DIGIT FIVE
+౬→\uE06C;      # DIGIT SIX
+౭→\uE06D;      # DIGIT SEVEN
+౮→\uE06E;      # DIGIT EIGHT
+౯→\uE06F;      # DIGIT NINE
+#    :: NFC (NFD) ;
+# eof
+

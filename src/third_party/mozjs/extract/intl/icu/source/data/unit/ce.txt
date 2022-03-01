@@ -1,0 +1,258 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ce{
+    durationUnits{
+        hm{"h:mm"}
+        hms{"h:mm:ss"}
+        ms{"m:ss"}
+    }
+    units{
+        duration{
+            century{
+                dnam{"c"}
+                one{"{0} c"}
+                other{"{0} c"}
+            }
+            day{
+                dnam{"денош"}
+                one{"{0} де"}
+                other{"{0} де"}
+                per{"{0} дийнахь"}
+            }
+            hour{
+                dnam{"сахьташ"}
+                one{"{0} сахьт"}
+                other{"{0} сахьт"}
+                per{"{0} сахьтехь"}
+            }
+            microsecond{
+                dnam{"микросекундаш"}
+                one{"{0} микросекунд"}
+                other{"{0} микросекунд"}
+            }
+            millisecond{
+                dnam{"миллисекундаш"}
+                one{"{0} миллисекунд"}
+                other{"{0} миллисекунд"}
+            }
+            minute{
+                dnam{"миноташ"}
+                one{"{0} минот"}
+                other{"{0} минот"}
+                per{"{0} минотехь"}
+            }
+            month{
+                dnam{"беттанаш"}
+                one{"{0} бутт"}
+                other{"{0} бутт"}
+                per{"{0} баттахь"}
+            }
+            nanosecond{
+                dnam{"наносекундаш"}
+                one{"{0} наносекунд"}
+                other{"{0} наносекунд"}
+            }
+            second{
+                dnam{"секундаш"}
+                one{"{0} секунд"}
+                other{"{0} секунд"}
+                per{"{0} секундехь"}
+            }
+            week{
+                dnam{"кӀиранаш"}
+                one{"{0} кӀира"}
+                other{"{0} кӀира"}
+                per{"{0} кӀиранахь"}
+            }
+            year{
+                dnam{"шераш"}
+                one{"{0} шо"}
+                other{"{0} шо"}
+                per{"{0} шарахь"}
+            }
+        }
+        length{
+            astronomical-unit{
+                dnam{"астрономин дакъош"}
+                one{"{0} астрономин дакъа"}
+                other{"{0} астрономин дакъа"}
+            }
+            centimeter{
+                dnam{"сантиметраш"}
+                one{"{0} сантиметр"}
+                other{"{0} сантиметр"}
+                per{"{0} сантиметрехь"}
+            }
+            decimeter{
+                dnam{"дециметраш"}
+                one{"{0} дециметр"}
+                other{"{0} дециметр"}
+            }
+            foot{
+                dnam{"футаш"}
+                one{"{0} фут"}
+                other{"{0} фут"}
+            }
+            inch{
+                dnam{"дюймаш"}
+                one{"{0} дюйм"}
+                other{"{0} дюйм"}
+            }
+            kilometer{
+                dnam{"километраш"}
+                one{"{0} километр"}
+                other{"{0} километр"}
+            }
+        }
+    }
+    unitsNarrow{
+        duration{
+            day{
+                dnam{"д."}
+                one{"{0} д."}
+                other{"{0} д."}
+            }
+            hour{
+                dnam{"сахь"}
+                one{"{0} сахь."}
+                other{"{0} сахь."}
+            }
+            millisecond{
+                dnam{"мс"}
+                one{"{0} мс"}
+                other{"{0} мс"}
+            }
+            minute{
+                dnam{"мин"}
+                one{"{0} мин"}
+                other{"{0} мин"}
+            }
+            month{
+                dnam{"бут"}
+                one{"{0} б."}
+                other{"{0} б."}
+            }
+            second{
+                dnam{"с"}
+                one{"{0} с"}
+                other{"{0} с"}
+            }
+            week{
+                dnam{"кӀир"}
+                one{"{0} кӀ."}
+                other{"{0} кӀ."}
+            }
+            year{
+                dnam{"ш."}
+                one{"{0} ш."}
+                other{"{0} ш."}
+            }
+        }
+        length{
+            centimeter{
+                dnam{"см"}
+                one{"{0} см"}
+                other{"{0} cm"}
+            }
+            kilometer{
+                dnam{"км"}
+                one{"{0} км"}
+                other{"{0} км"}
+            }
+        }
+    }
+    unitsShort{
+        duration{
+            century{
+                dnam{"c"}
+                one{"{0} c"}
+                other{"{0} c"}
+            }
+            day{
+                dnam{"денош"}
+                one{"д."}
+                other{"{0} д."}
+            }
+            hour{
+                dnam{"сахь"}
+                one{"{0} сахь."}
+                other{"{0} сахь."}
+                per{"{0} сахь."}
+            }
+            microsecond{
+                dnam{"мкс"}
+                one{"{0} мкс"}
+                other{"{0} мкс"}
+            }
+            millisecond{
+                dnam{"мс"}
+                one{"{0} мс"}
+                other{"{0} мс"}
+            }
+            minute{
+                dnam{"мин"}
+                one{"{0} мин"}
+                other{"{0} мин"}
+            }
+            month{
+                dnam{"бут"}
+                one{"{0} бут."}
+                other{"{0} бут."}
+            }
+            nanosecond{
+                dnam{"нс"}
+                one{"{0} нс"}
+                other{"{0} нс"}
+            }
+            second{
+                dnam{"сек"}
+                one{"{0} сек"}
+                other{"{0} сек"}
+            }
+            week{
+                dnam{"кӀир"}
+                one{"{0} кӀир."}
+                other{"{0} кӀир."}
+            }
+            year{
+                dnam{"ш."}
+                one{"{0} ш."}
+                other{"{0} ш."}
+                per{"{0} ш."}
+            }
+        }
+        length{
+            astronomical-unit{
+                dnam{"а. д."}
+                one{"{0} а. д."}
+                other{"{0} а. д."}
+            }
+            centimeter{
+                dnam{"см"}
+                one{"{0} см"}
+                other{"{0} см"}
+            }
+            decimeter{
+                dnam{"дм"}
+                one{"{0} дм"}
+                other{"{0} дм"}
+            }
+            foot{
+                dnam{"футаш"}
+                one{"{0} фут"}
+                other{"{0} фут"}
+            }
+            inch{
+                dnam{"дюйм"}
+                one{"{0} дюйм."}
+                other{"{0} дюйм."}
+            }
+            kilometer{
+                dnam{"км"}
+                one{"{0} км"}
+                other{"{0} км"}
+            }
+        }
+    }
+}

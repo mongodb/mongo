@@ -1,0 +1,5 @@
+commit 0e7b4428866f3133b4abba2d932ee3faa708db1d
+Author: Long Nguyen <nguyen.long.908132@gmail.com>
+Date:   Thu Mar 25 22:26:56 2021 +0700
+
+    ICU-21560 mingw: Remove version numbers from link flags

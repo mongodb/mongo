@@ -1,0 +1,1452 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Latn_Bopo.txt
+# Generated from CLDR
+#
+
+#--- forward filter, transforms ----
+# currently in reverse it only goes back to Latin with numeric tones (not sure why); ok but would rather have marks.
+#
+:: [[:Latin:][:Mn:][1-5]];		# forward filter: only modifies Latin and tone marks/digits
+#
+#--- remap v (alternate for ü) to ü, one way ----
+[ln] { v → ü;
+#
+:: Latin-NumericPinyin(NumericPinyin-Latin);	# tone marks in middle ↔ digits at end to use numeric below; this leaves the pinyin in NFC
+#
+#--- variables ----
+#
+# basic pinyin and zhuyin consonant initials (not including vowel initials):
+$pCons = [b p m f d t n l g k h j q x r z c s]; # and zh ch sh, covered for this by h already in the set
+$zCons = [ㄅ-ㄙ];
+#
+# pinyin and zhuyin minus basic consonant initials that cannot take tones by themselves
+# (in some cases the exclusion is only for the pinyin, not the corresponding zhuyin: zh ch sh r z c s)
+$pToneOK = [[a-z] - [b p f d t l g k h j q x r z c s]]; # and minus zh ch sh, covered for this by h already in the exclusion set
+$zToneOK = [[ㄅ-ㄩ] - [ㄅ ㄆ ㄈ ㄉ ㄊ ㄌ ㄍ ㄎ ㄏ ㄐ ㄑ ㄒ]];
+#
+# basic consonant initials that can take tones by themselves
+# (in some cases this is only for the zhuyin, not the corresponding pinyin: ㄓ ㄔ ㄕ ㄖ ㄗ ㄘ ㄙ)
+# $pConsToneOK = [m n];
+# $zConsToneOK = [ㄇ ㄋ ㄓ ㄔ ㄕ ㄖ ㄗ ㄘ ㄙ];
+#
+# basic numeric pinyin and zhuyin tones
+$pTone = [1-5];
+$zTone = [ˉˊˇˋ˙];
+#
+#--- clusters with initial consonant ----
+#
+bang }$pTone    ↔ ㄅㄤ }$zTone;
+bang           →  ㄅㄤ˙;
+bang1          ← ㄅㄤ;
+beng }$pTone    ↔ ㄅㄥ }$zTone;
+beng           →  ㄅㄥ˙;
+beng1          ← ㄅㄥ;
+biao }$pTone    ↔ ㄅㄧㄠ }$zTone;
+biao           →  ㄅㄧㄠ˙;
+biao1          ← ㄅㄧㄠ;
+bian }$pTone    ↔ ㄅㄧㄢ }$zTone;
+bian           →  ㄅㄧㄢ˙;
+bian1          ← ㄅㄧㄢ;
+bing }$pTone    ↔ ㄅㄧㄥ }$zTone;
+bing           →  ㄅㄧㄥ˙;
+bing1          ← ㄅㄧㄥ;
+bai }$pTone     ↔ ㄅㄞ }$zTone;
+bai            →  ㄅㄞ˙;
+bai1           ← ㄅㄞ;
+bei }$pTone     ↔ ㄅㄟ }$zTone;
+bei            →  ㄅㄟ˙;
+bei1           ← ㄅㄟ;
+bao }$pTone     ↔ ㄅㄠ }$zTone;
+bao            →  ㄅㄠ˙;
+bao1           ← ㄅㄠ;
+ban }$pTone     ↔ ㄅㄢ }$zTone;
+ban            →  ㄅㄢ˙;
+ban1           ← ㄅㄢ;
+ben }$pTone     ↔ ㄅㄣ }$zTone;
+ben            →  ㄅㄣ˙;
+ben1           ← ㄅㄣ;
+bie }$pTone     ↔ ㄅㄧㄝ }$zTone;
+bie            →  ㄅㄧㄝ˙;
+bie1           ← ㄅㄧㄝ;
+bin }$pTone     ↔ ㄅㄧㄣ }$zTone;
+bin            →  ㄅㄧㄣ˙;
+bin1           ← ㄅㄧㄣ;
+bun }$pTone     ↔ ㄅㄨㄣ }$zTone;
+bun            →  ㄅㄨㄣ˙;
+bun1           ← ㄅㄨㄣ;
+ba }$pTone      ↔ ㄅㄚ }$zTone;
+ba             →  ㄅㄚ˙;
+ba1            ← ㄅㄚ;
+bo }$pTone      ↔ ㄅㄛ }$zTone;
+bo             →  ㄅㄛ˙;
+bo1            ← ㄅㄛ;
+bi }$pTone      ↔ ㄅㄧ }$zTone;
+bi             →  ㄅㄧ˙;
+bi1            ← ㄅㄧ;
+bu }$pTone      ↔ ㄅㄨ }$zTone;
+bu             →  ㄅㄨ˙;
+bu1            ← ㄅㄨ;
+#
+pang }$pTone    ↔ ㄆㄤ }$zTone;
+pang           →  ㄆㄤ˙;
+pang1          ← ㄆㄤ;
+peng }$pTone    ↔ ㄆㄥ }$zTone;
+peng           →  ㄆㄥ˙;
+peng1          ← ㄆㄥ;
+piao }$pTone    ↔ ㄆㄧㄠ }$zTone;
+piao           →  ㄆㄧㄠ˙;
+piao1          ← ㄆㄧㄠ;
+pian }$pTone    ↔ ㄆㄧㄢ }$zTone;
+pian           →  ㄆㄧㄢ˙;
+pian1          ← ㄆㄧㄢ;
+ping }$pTone    ↔ ㄆㄧㄥ }$zTone;
+ping           →  ㄆㄧㄥ˙;
+ping1          ← ㄆㄧㄥ;
+pai }$pTone     ↔ ㄆㄞ }$zTone;
+pai            →  ㄆㄞ˙;
+pai1           ← ㄆㄞ;
+pei }$pTone     ↔ ㄆㄟ }$zTone;
+pei            →  ㄆㄟ˙;
+pei1           ← ㄆㄟ;
+pao }$pTone     ↔ ㄆㄠ }$zTone;
+pao            →  ㄆㄠ˙;
+pao1           ← ㄆㄠ;
+pou }$pTone     ↔ ㄆㄡ }$zTone;
+pou            →  ㄆㄡ˙;
+pou1           ← ㄆㄡ;
+pan }$pTone     ↔ ㄆㄢ }$zTone;
+pan            →  ㄆㄢ˙;
+pan1           ← ㄆㄢ;
+pen }$pTone     ↔ ㄆㄣ }$zTone;
+pen            →  ㄆㄣ˙;
+pen1           ← ㄆㄣ;
+pie }$pTone     ↔ ㄆㄧㄝ }$zTone;
+pie            →  ㄆㄧㄝ˙;
+pie1           ← ㄆㄧㄝ;
+pin }$pTone     ↔ ㄆㄧㄣ }$zTone;
+pin            →  ㄆㄧㄣ˙;
+pin1           ← ㄆㄧㄣ;
+pa }$pTone      ↔ ㄆㄚ }$zTone;
+pa             →  ㄆㄚ˙;
+pa1            ← ㄆㄚ;
+po }$pTone      ↔ ㄆㄛ }$zTone;
+po             →  ㄆㄛ˙;
+po1            ← ㄆㄛ;
+pi }$pTone      ↔ ㄆㄧ }$zTone;
+pi             →  ㄆㄧ˙;
+pi1            ← ㄆㄧ;
+pu }$pTone      ↔ ㄆㄨ }$zTone;
+pu             →  ㄆㄨ˙;
+pu1            ← ㄆㄨ;
+#
+mang }$pTone    ↔ ㄇㄤ }$zTone;
+mang           →  ㄇㄤ˙;
+mang1          ← ㄇㄤ;
+meng }$pTone    ↔ ㄇㄥ }$zTone;
+meng           →  ㄇㄥ˙;
+meng1          ← ㄇㄥ;
+miao }$pTone    ↔ ㄇㄧㄠ }$zTone;
+miao           →  ㄇㄧㄠ˙;
+miao1          ← ㄇㄧㄠ;
+mian }$pTone    ↔ ㄇㄧㄢ }$zTone;
+mian           →  ㄇㄧㄢ˙;
+mian1          ← ㄇㄧㄢ;
+ming }$pTone    ↔ ㄇㄧㄥ }$zTone;
+ming           →  ㄇㄧㄥ˙;
+ming1          ← ㄇㄧㄥ;
+mai }$pTone     ↔ ㄇㄞ }$zTone;
+mai            →  ㄇㄞ˙;
+mai1           ← ㄇㄞ;
+mei }$pTone     ↔ ㄇㄟ }$zTone;
+mei            →  ㄇㄟ˙;
+mei1           ← ㄇㄟ;
+mao }$pTone     ↔ ㄇㄠ }$zTone;
+mao            →  ㄇㄠ˙;
+mao1           ← ㄇㄠ;
+mou }$pTone     ↔ ㄇㄡ }$zTone;
+mou            →  ㄇㄡ˙;
+mou1           ← ㄇㄡ;
+man }$pTone     ↔ ㄇㄢ }$zTone;
+man            →  ㄇㄢ˙;
+man1           ← ㄇㄢ;
+men }$pTone     ↔ ㄇㄣ }$zTone;
+men            →  ㄇㄣ˙;
+men1           ← ㄇㄣ;
+mie }$pTone     ↔ ㄇㄧㄝ }$zTone;
+mie            →  ㄇㄧㄝ˙;
+mie1           ← ㄇㄧㄝ;
+miu }$pTone     ↔ ㄇㄧㄡ }$zTone;
+miu            →  ㄇㄧㄡ˙;
+miu1           ← ㄇㄧㄡ;
+min }$pTone     ↔ ㄇㄧㄣ }$zTone;
+min            →  ㄇㄧㄣ˙;
+min1           ← ㄇㄧㄣ;
+ma }$pTone      ↔ ㄇㄚ }$zTone;
+ma             →  ㄇㄚ˙;
+ma1            ← ㄇㄚ;
+mo }$pTone      ↔ ㄇㄛ }$zTone;
+mo             →  ㄇㄛ˙;
+mo1            ← ㄇㄛ;
+me }$pTone      ↔ ㄇㄜ }$zTone;
+me             →  ㄇㄜ˙;
+me1            ← ㄇㄜ;
+mi }$pTone      ↔ ㄇㄧ }$zTone;
+mi             →  ㄇㄧ˙;
+mi1            ← ㄇㄧ;
+mu }$pTone      ↔ ㄇㄨ }$zTone;
+mu             →  ㄇㄨ˙;
+mu1            ← ㄇㄨ;
+# m handled below
+#
+fang }$pTone    ↔ ㄈㄤ }$zTone;
+fang           →  ㄈㄤ˙;
+fang1          ← ㄈㄤ;
+feng }$pTone    ↔ ㄈㄥ }$zTone;
+feng           →  ㄈㄥ˙;
+feng1          ← ㄈㄥ;
+fiao }$pTone    ↔ ㄈㄧㄠ }$zTone;
+fiao           →  ㄈㄧㄠ˙;
+fiao1          ← ㄈㄧㄠ;
+fei }$pTone     ↔ ㄈㄟ }$zTone;
+fei            →  ㄈㄟ˙;
+fei1           ← ㄈㄟ;
+fou }$pTone     ↔ ㄈㄡ }$zTone;
+fou            →  ㄈㄡ˙;
+fou1           ← ㄈㄡ;
+fan }$pTone     ↔ ㄈㄢ }$zTone;
+fan            →  ㄈㄢ˙;
+fan1           ← ㄈㄢ;
+fen }$pTone     ↔ ㄈㄣ }$zTone;
+fen            →  ㄈㄣ˙;
+fen1           ← ㄈㄣ;
+fa }$pTone      ↔ ㄈㄚ }$zTone;
+fa             →  ㄈㄚ˙;
+fa1            ← ㄈㄚ;
+fo }$pTone      ↔ ㄈㄛ }$zTone;
+fo             →  ㄈㄛ˙;
+fo1            ← ㄈㄛ;
+fu }$pTone      ↔ ㄈㄨ }$zTone;
+fu             →  ㄈㄨ˙;
+fu1            ← ㄈㄨ;
+#
+diang }$pTone   ↔ ㄉㄧㄤ }$zTone;	# (not in han-latin)
+diang          →  ㄉㄧㄤ˙;
+diang1         ← ㄉㄧㄤ;
+dang }$pTone    ↔ ㄉㄤ }$zTone;
+dang           →  ㄉㄤ˙;
+dang1          ← ㄉㄤ;
+deng }$pTone    ↔ ㄉㄥ }$zTone;
+deng           →  ㄉㄥ˙;
+deng1          ← ㄉㄥ;
+diao }$pTone    ↔ ㄉㄧㄠ }$zTone;
+diao           →  ㄉㄧㄠ˙;
+diao1          ← ㄉㄧㄠ;
+dian }$pTone    ↔ ㄉㄧㄢ }$zTone;
+dian           →  ㄉㄧㄢ˙;
+dian1          ← ㄉㄧㄢ;
+ding }$pTone    ↔ ㄉㄧㄥ }$zTone;
+ding           →  ㄉㄧㄥ˙;
+ding1          ← ㄉㄧㄥ;
+duan }$pTone    ↔ ㄉㄨㄢ }$zTone;
+duan           →  ㄉㄨㄢ˙;
+duan1          ← ㄉㄨㄢ;
+dong }$pTone    ↔ ㄉㄨㄥ }$zTone;
+dong           →  ㄉㄨㄥ˙;
+dong1          ← ㄉㄨㄥ;
+dai }$pTone     ↔ ㄉㄞ }$zTone;
+dai            →  ㄉㄞ˙;
+dai1           ← ㄉㄞ;
+dei }$pTone     ↔ ㄉㄟ }$zTone;		# (not in han-latin)
+dei            →  ㄉㄟ˙;
+dei1           ← ㄉㄟ;
+dao }$pTone     ↔ ㄉㄠ }$zTone;
+dao            →  ㄉㄠ˙;
+dao1           ← ㄉㄠ;
+dou }$pTone     ↔ ㄉㄡ }$zTone;
+dou            →  ㄉㄡ˙;
+dou1           ← ㄉㄡ;
+dan }$pTone     ↔ ㄉㄢ }$zTone;
+dan            →  ㄉㄢ˙;
+dan1           ← ㄉㄢ;
+den }$pTone     ↔ ㄉㄣ }$zTone;
+den            →  ㄉㄣ˙;
+den1           ← ㄉㄣ;
+dia }$pTone     ↔ ㄉㄧㄚ }$zTone;
+dia            →  ㄉㄧㄚ˙;
+dia1           ← ㄉㄧㄚ;
+die }$pTone     ↔ ㄉㄧㄝ }$zTone;
+die            →  ㄉㄧㄝ˙;
+die1           ← ㄉㄧㄝ;
+diu }$pTone     ↔ ㄉㄧㄡ }$zTone;
+diu            →  ㄉㄧㄡ˙;
+diu1           ← ㄉㄧㄡ;
+din }$pTone     ↔ ㄉㄧㄣ }$zTone;
+din            →  ㄉㄧㄣ˙;
+din1           ← ㄉㄧㄣ;
+duo }$pTone     ↔ ㄉㄨㄛ }$zTone;
+duo            →  ㄉㄨㄛ˙;
+duo1           ← ㄉㄨㄛ;
+dui }$pTone     ↔ ㄉㄨㄟ }$zTone;
+dui            →  ㄉㄨㄟ˙;
+dui1           ← ㄉㄨㄟ;
+dun }$pTone     ↔ ㄉㄨㄣ }$zTone;
+dun            →  ㄉㄨㄣ˙;
+dun1           ← ㄉㄨㄣ;
+da }$pTone      ↔ ㄉㄚ }$zTone;
+da             →  ㄉㄚ˙;
+da1            ← ㄉㄚ;
+de }$pTone      ↔ ㄉㄜ }$zTone;
+de             →  ㄉㄜ˙;
+de1            ← ㄉㄜ;
+di }$pTone      ↔ ㄉㄧ }$zTone;
+di             →  ㄉㄧ˙;
+di1            ← ㄉㄧ;
+du }$pTone      ↔ ㄉㄨ }$zTone;
+du             →  ㄉㄨ˙;
+du1            ← ㄉㄨ;
+#
+tang }$pTone    ↔ ㄊㄤ }$zTone;
+tang           →  ㄊㄤ˙;
+tang1          ← ㄊㄤ;
+teng }$pTone    ↔ ㄊㄥ }$zTone;
+teng           →  ㄊㄥ˙;
+teng1          ← ㄊㄥ;
+tiao }$pTone    ↔ ㄊㄧㄠ }$zTone;
+tiao           →  ㄊㄧㄠ˙;
+tiao1          ← ㄊㄧㄠ;
+tian }$pTone    ↔ ㄊㄧㄢ }$zTone;
+tian           →  ㄊㄧㄢ˙;
+tian1          ← ㄊㄧㄢ;
+ting }$pTone    ↔ ㄊㄧㄥ }$zTone;
+ting           →  ㄊㄧㄥ˙;
+ting1          ← ㄊㄧㄥ;
+tuan }$pTone    ↔ ㄊㄨㄢ }$zTone;
+tuan           →  ㄊㄨㄢ˙;
+tuan1          ← ㄊㄨㄢ;
+tong }$pTone    ↔ ㄊㄨㄥ }$zTone;
+tong           →  ㄊㄨㄥ˙;
+tong1          ← ㄊㄨㄥ;
+tai }$pTone     ↔ ㄊㄞ }$zTone;
+tai            →  ㄊㄞ˙;
+tai1           ← ㄊㄞ;
+tao }$pTone     ↔ ㄊㄠ }$zTone;
+tao            →  ㄊㄠ˙;
+tao1           ← ㄊㄠ;
+tou }$pTone     ↔ ㄊㄡ }$zTone;
+tou            →  ㄊㄡ˙;
+tou1           ← ㄊㄡ;
+tan }$pTone     ↔ ㄊㄢ }$zTone;
+tan            →  ㄊㄢ˙;
+tan1           ← ㄊㄢ;
+tie }$pTone     ↔ ㄊㄧㄝ }$zTone;
+tie            →  ㄊㄧㄝ˙;
+tie1           ← ㄊㄧㄝ;
+tuo }$pTone     ↔ ㄊㄨㄛ }$zTone;
+tuo            →  ㄊㄨㄛ˙;
+tuo1           ← ㄊㄨㄛ;
+tui }$pTone     ↔ ㄊㄨㄟ }$zTone;
+tui            →  ㄊㄨㄟ˙;
+tui1           ← ㄊㄨㄟ;
+tun }$pTone     ↔ ㄊㄨㄣ }$zTone;
+tun            →  ㄊㄨㄣ˙;
+tun1           ← ㄊㄨㄣ;
+ta }$pTone      ↔ ㄊㄚ }$zTone;
+ta             →  ㄊㄚ˙;
+ta1            ← ㄊㄚ;
+te }$pTone      ↔ ㄊㄜ }$zTone;
+te             →  ㄊㄜ˙;
+te1            ← ㄊㄜ;
+ti }$pTone      ↔ ㄊㄧ }$zTone;
+ti             →  ㄊㄧ˙;
+ti1            ← ㄊㄧ;
+tu }$pTone      ↔ ㄊㄨ }$zTone;
+tu             →  ㄊㄨ˙;
+tu1            ← ㄊㄨ;
+#
+niang }$pTone   ↔ ㄋㄧㄤ }$zTone;
+niang          →  ㄋㄧㄤ˙;
+niang1         ← ㄋㄧㄤ;
+nang }$pTone    ↔ ㄋㄤ }$zTone;
+nang           →  ㄋㄤ˙;
+nang1          ← ㄋㄤ;
+neng }$pTone    ↔ ㄋㄥ }$zTone;
+neng           →  ㄋㄥ˙;
+neng1          ← ㄋㄥ;
+niao }$pTone    ↔ ㄋㄧㄠ }$zTone;
+niao           →  ㄋㄧㄠ˙;
+niao1          ← ㄋㄧㄠ;
+nian }$pTone    ↔ ㄋㄧㄢ }$zTone;
+nian           →  ㄋㄧㄢ˙;
+nian1          ← ㄋㄧㄢ;
+ning }$pTone    ↔ ㄋㄧㄥ }$zTone;
+ning           →  ㄋㄧㄥ˙;
+ning1          ← ㄋㄧㄥ;
+nuan }$pTone    ↔ ㄋㄨㄢ }$zTone;
+nuan           →  ㄋㄨㄢ˙;
+nuan1          ← ㄋㄨㄢ;
+nong }$pTone    ↔ ㄋㄨㄥ }$zTone;
+nong           →  ㄋㄨㄥ˙;
+nong1          ← ㄋㄨㄥ;
+nai }$pTone     ↔ ㄋㄞ }$zTone;
+nai            →  ㄋㄞ˙;
+nai1           ← ㄋㄞ;
+nei }$pTone     ↔ ㄋㄟ }$zTone;
+nei            →  ㄋㄟ˙;
+nei1           ← ㄋㄟ;
+nao }$pTone     ↔ ㄋㄠ }$zTone;
+nao            →  ㄋㄠ˙;
+nao1           ← ㄋㄠ;
+nou }$pTone     ↔ ㄋㄡ }$zTone;
+nou            →  ㄋㄡ˙;
+nou1           ← ㄋㄡ;
+nan }$pTone     ↔ ㄋㄢ }$zTone;
+nan            →  ㄋㄢ˙;
+nan1           ← ㄋㄢ;
+nen }$pTone     ↔ ㄋㄣ }$zTone;
+nen            →  ㄋㄣ˙;
+nen1           ← ㄋㄣ;
+nia }$pTone     ↔ ㄋㄧㄚ }$zTone;	# (not in han-latin)
+nia            →  ㄋㄧㄚ˙;
+nia1           ← ㄋㄧㄚ;
+nie }$pTone     ↔ ㄋㄧㄝ }$zTone;
+nie            →  ㄋㄧㄝ˙;
+nie1           ← ㄋㄧㄝ;
+niu }$pTone     ↔ ㄋㄧㄡ }$zTone;
+niu            →  ㄋㄧㄡ˙;
+niu1           ← ㄋㄧㄡ;
+nin }$pTone     ↔ ㄋㄧㄣ }$zTone;
+nin            →  ㄋㄧㄣ˙;
+nin1           ← ㄋㄧㄣ;
+nuo }$pTone     ↔ ㄋㄨㄛ }$zTone;
+nuo            →  ㄋㄨㄛ˙;
+nuo1           ← ㄋㄨㄛ;
+nun }$pTone     ↔ ㄋㄨㄣ }$zTone;
+nun            →  ㄋㄨㄣ˙;
+nun1           ← ㄋㄨㄣ;
+nüe }$pTone     ↔ ㄋㄩㄝ }$zTone;
+nüe            →  ㄋㄩㄝ˙;
+nüe1           ← ㄋㄩㄝ;
+nue }$pTone     → ㄋㄩㄝ;			# (not in han-latin) one-way, handle wrong u
+nue            →  ㄋㄩㄝ˙;
+na }$pTone      ↔ ㄋㄚ }$zTone;
+na             →  ㄋㄚ˙;
+na1            ← ㄋㄚ;
+ne }$pTone      ↔ ㄋㄜ }$zTone;
+ne             →  ㄋㄜ˙;
+ne1            ← ㄋㄜ;
+ni }$pTone      ↔ ㄋㄧ }$zTone;
+ni             →  ㄋㄧ˙;
+ni1            ← ㄋㄧ;
+nu }$pTone      ↔ ㄋㄨ }$zTone;
+nu             →  ㄋㄨ˙;
+nu1            ← ㄋㄨ;
+nü }$pTone      ↔ ㄋㄩ }$zTone;
+nü             →  ㄋㄩ˙;
+nü1            ← ㄋㄩ;
+# n handled below
+#
+liang }$pTone   ↔ ㄌㄧㄤ }$zTone;
+liang          →  ㄌㄧㄤ˙;
+liang1         ← ㄌㄧㄤ;
+lang }$pTone    ↔ ㄌㄤ }$zTone;
+lang           →  ㄌㄤ˙;
+lang1          ← ㄌㄤ;
+leng }$pTone    ↔ ㄌㄥ }$zTone;
+leng           →  ㄌㄥ˙;
+leng1          ← ㄌㄥ;
+liao }$pTone    ↔ ㄌㄧㄠ }$zTone;
+liao           →  ㄌㄧㄠ˙;
+liao1          ← ㄌㄧㄠ;
+lian }$pTone    ↔ ㄌㄧㄢ }$zTone;
+lian           →  ㄌㄧㄢ˙;
+lian1          ← ㄌㄧㄢ;
+ling }$pTone    ↔ ㄌㄧㄥ }$zTone;
+ling           →  ㄌㄧㄥ˙;
+ling1          ← ㄌㄧㄥ;
+luan }$pTone    ↔ ㄌㄨㄢ }$zTone;
+luan           →  ㄌㄨㄢ˙;
+luan1          ← ㄌㄨㄢ;
+long }$pTone    ↔ ㄌㄨㄥ }$zTone;
+long           →  ㄌㄨㄥ˙;
+long1          ← ㄌㄨㄥ;
+lüan }$pTone    ↔ ㄌㄩㄢ }$zTone;	# (not in han-latin)
+lüan           →  ㄌㄩㄢ˙;
+lüan1          ← ㄌㄩㄢ;
+lai }$pTone     ↔ ㄌㄞ }$zTone;
+lai            →  ㄌㄞ˙;
+lai1           ← ㄌㄞ;
+lei }$pTone     ↔ ㄌㄟ }$zTone;
+lei            →  ㄌㄟ˙;
+lei1           ← ㄌㄟ;
+lao }$pTone     ↔ ㄌㄠ }$zTone;
+lao            →  ㄌㄠ˙;
+lao1           ← ㄌㄠ;
+lou }$pTone     ↔ ㄌㄡ }$zTone;
+lou            →  ㄌㄡ˙;
+lou1           ← ㄌㄡ;
+lan }$pTone     ↔ ㄌㄢ }$zTone;
+lan            →  ㄌㄢ˙;
+lan1           ← ㄌㄢ;
+lia }$pTone     ↔ ㄌㄧㄚ }$zTone;
+lia            →  ㄌㄧㄚ˙;
+lia1           ← ㄌㄧㄚ;
+lie }$pTone     ↔ ㄌㄧㄝ }$zTone;
+lie            →  ㄌㄧㄝ˙;
+lie1           ← ㄌㄧㄝ;
+liu }$pTone     ↔ ㄌㄧㄡ }$zTone;
+liu            →  ㄌㄧㄡ˙;
+liu1           ← ㄌㄧㄡ;
+lin }$pTone     ↔ ㄌㄧㄣ }$zTone;
+lin            →  ㄌㄧㄣ˙;
+lin1           ← ㄌㄧㄣ;
+luo }$pTone     ↔ ㄌㄨㄛ }$zTone;
+luo            →  ㄌㄨㄛ˙;
+luo1           ← ㄌㄨㄛ;
+lun }$pTone     ↔ ㄌㄨㄣ }$zTone;
+lun            →  ㄌㄨㄣ˙;
+lun1           ← ㄌㄨㄣ;
+lüe }$pTone     ↔ ㄌㄩㄝ }$zTone;
+lüe            →  ㄌㄩㄝ˙;
+lüe1           ← ㄌㄩㄝ;
+lue }$pTone     → ㄌㄩㄝ;			# (not in han-latin) one-way, handle wrong u
+lue            →  ㄌㄩㄝ˙;
+la }$pTone      ↔ ㄌㄚ }$zTone;
+la             →  ㄌㄚ˙;
+la1            ← ㄌㄚ;
+lo }$pTone      ↔ ㄌㄛ }$zTone;
+lo             →  ㄌㄛ˙;
+lo1            ← ㄌㄛ;
+le }$pTone      ↔ ㄌㄜ }$zTone;
+le             →  ㄌㄜ˙;
+le1            ← ㄌㄜ;
+li }$pTone      ↔ ㄌㄧ }$zTone;
+li             →  ㄌㄧ˙;
+li1            ← ㄌㄧ;
+lu }$pTone      ↔ ㄌㄨ }$zTone;
+lu             →  ㄌㄨ˙;
+lu1            ← ㄌㄨ;
+lü }$pTone      ↔ ㄌㄩ }$zTone;
+lü             →  ㄌㄩ˙;
+lü1            ← ㄌㄩ;
+#
+guang }$pTone   ↔ ㄍㄨㄤ }$zTone;
+guang          →  ㄍㄨㄤ˙;
+guang1         ← ㄍㄨㄤ;
+gang }$pTone    ↔ ㄍㄤ }$zTone;
+gang           →  ㄍㄤ˙;
+gang1          ← ㄍㄤ;
+geng }$pTone    ↔ ㄍㄥ }$zTone;
+geng           →  ㄍㄥ˙;
+geng1          ← ㄍㄥ;
+guai }$pTone    ↔ ㄍㄨㄞ }$zTone;
+guai           →  ㄍㄨㄞ˙;
+guai1          ← ㄍㄨㄞ;
+guan }$pTone    ↔ ㄍㄨㄢ }$zTone;
+guan           →  ㄍㄨㄢ˙;
+guan1          ← ㄍㄨㄢ;
+gong }$pTone    ↔ ㄍㄨㄥ }$zTone;
+gong           →  ㄍㄨㄥ˙;
+gong1          ← ㄍㄨㄥ;
+gai }$pTone     ↔ ㄍㄞ }$zTone;
+gai            →  ㄍㄞ˙;
+gai1           ← ㄍㄞ;
+gei }$pTone     ↔ ㄍㄟ }$zTone;
+gei            →  ㄍㄟ˙;
+gei1           ← ㄍㄟ;
+gao }$pTone     ↔ ㄍㄠ }$zTone;
+gao            →  ㄍㄠ˙;
+gao1           ← ㄍㄠ;
+gou }$pTone     ↔ ㄍㄡ }$zTone;
+gou            →  ㄍㄡ˙;
+gou1           ← ㄍㄡ;
+gan }$pTone     ↔ ㄍㄢ }$zTone;
+gan            →  ㄍㄢ˙;
+gan1           ← ㄍㄢ;
+gen }$pTone     ↔ ㄍㄣ }$zTone;
+gen            →  ㄍㄣ˙;
+gen1           ← ㄍㄣ;
+gua }$pTone     ↔ ㄍㄨㄚ }$zTone;
+gua            →  ㄍㄨㄚ˙;
+gua1           ← ㄍㄨㄚ;
+guo }$pTone     ↔ ㄍㄨㄛ }$zTone;
+guo            →  ㄍㄨㄛ˙;
+guo1           ← ㄍㄨㄛ;
+gui }$pTone     ↔ ㄍㄨㄟ }$zTone;
+gui            →  ㄍㄨㄟ˙;
+gui1           ← ㄍㄨㄟ;
+gun }$pTone     ↔ ㄍㄨㄣ }$zTone;
+gun            →  ㄍㄨㄣ˙;
+gun1           ← ㄍㄨㄣ;
+ga }$pTone      ↔ ㄍㄚ }$zTone;
+ga             →  ㄍㄚ˙;
+ga1            ← ㄍㄚ;
+ge }$pTone      ↔ ㄍㄜ }$zTone;
+ge             →  ㄍㄜ˙;
+ge1            ← ㄍㄜ;
+gi }$pTone      ↔ ㄍㄧ }$zTone;
+gi             →  ㄍㄧ˙;
+gi1            ← ㄍㄧ;
+gu }$pTone      ↔ ㄍㄨ }$zTone;
+gu             →  ㄍㄨ˙;
+gu1            ← ㄍㄨ;
+#
+kuang }$pTone   ↔ ㄎㄨㄤ }$zTone;
+kuang          →  ㄎㄨㄤ˙;
+kuang1         ← ㄎㄨㄤ;
+kang }$pTone    ↔ ㄎㄤ }$zTone;
+kang           →  ㄎㄤ˙;
+kang1          ← ㄎㄤ;
+keng }$pTone    ↔ ㄎㄥ }$zTone;
+keng           →  ㄎㄥ˙;
+keng1          ← ㄎㄥ;
+kuai }$pTone    ↔ ㄎㄨㄞ }$zTone;
+kuai           →  ㄎㄨㄞ˙;
+kuai1          ← ㄎㄨㄞ;
+kuan }$pTone    ↔ ㄎㄨㄢ }$zTone;
+kuan           →  ㄎㄨㄢ˙;
+kuan1          ← ㄎㄨㄢ;
+kong }$pTone    ↔ ㄎㄨㄥ }$zTone;
+kong           →  ㄎㄨㄥ˙;
+kong1          ← ㄎㄨㄥ;
+kai }$pTone     ↔ ㄎㄞ }$zTone;
+kai            →  ㄎㄞ˙;
+kai1           ← ㄎㄞ;
+kao }$pTone     ↔ ㄎㄠ }$zTone;
+kao            →  ㄎㄠ˙;
+kao1           ← ㄎㄠ;
+kou }$pTone     ↔ ㄎㄡ }$zTone;
+kou            →  ㄎㄡ˙;
+kou1           ← ㄎㄡ;
+kan }$pTone     ↔ ㄎㄢ }$zTone;
+kan            →  ㄎㄢ˙;
+kan1           ← ㄎㄢ;
+ken }$pTone     ↔ ㄎㄣ }$zTone;
+ken            →  ㄎㄣ˙;
+ken1           ← ㄎㄣ;
+kua }$pTone     ↔ ㄎㄨㄚ }$zTone;
+kua            →  ㄎㄨㄚ˙;
+kua1           ← ㄎㄨㄚ;
+kuo }$pTone     ↔ ㄎㄨㄛ }$zTone;
+kuo            →  ㄎㄨㄛ˙;
+kuo1           ← ㄎㄨㄛ;
+kui }$pTone     ↔ ㄎㄨㄟ }$zTone;
+kui            →  ㄎㄨㄟ˙;
+kui1           ← ㄎㄨㄟ;
+kun }$pTone     ↔ ㄎㄨㄣ }$zTone;
+kun            →  ㄎㄨㄣ˙;
+kun1           ← ㄎㄨㄣ;
+ka }$pTone      ↔ ㄎㄚ }$zTone;
+ka             →  ㄎㄚ˙;
+ka1            ← ㄎㄚ;
+ke }$pTone      ↔ ㄎㄜ }$zTone;
+ke             →  ㄎㄜ˙;
+ke1            ← ㄎㄜ;
+ku }$pTone      ↔ ㄎㄨ }$zTone;
+ku             →  ㄎㄨ˙;
+ku1            ← ㄎㄨ;
+#
+huang }$pTone   ↔ ㄏㄨㄤ }$zTone;
+huang          →  ㄏㄨㄤ˙;
+huang1         ← ㄏㄨㄤ;
+hang }$pTone    ↔ ㄏㄤ }$zTone;
+hang           →  ㄏㄤ˙;
+hang1          ← ㄏㄤ;
+heng }$pTone    ↔ ㄏㄥ }$zTone;
+heng           →  ㄏㄥ˙;
+heng1          ← ㄏㄥ;
+huai }$pTone    ↔ ㄏㄨㄞ }$zTone;
+huai           →  ㄏㄨㄞ˙;
+huai1          ← ㄏㄨㄞ;
+huan }$pTone    ↔ ㄏㄨㄢ }$zTone;
+huan           →  ㄏㄨㄢ˙;
+huan1          ← ㄏㄨㄢ;
+hong }$pTone    ↔ ㄏㄨㄥ }$zTone;
+hong           →  ㄏㄨㄥ˙;
+hong1          ← ㄏㄨㄥ;
+hai }$pTone     ↔ ㄏㄞ }$zTone;
+hai            →  ㄏㄞ˙;
+hai1           ← ㄏㄞ;
+hei }$pTone     ↔ ㄏㄟ }$zTone;
+hei            →  ㄏㄟ˙;
+hei1           ← ㄏㄟ;
+hao }$pTone     ↔ ㄏㄠ }$zTone;
+hao            →  ㄏㄠ˙;
+hao1           ← ㄏㄠ;
+hou }$pTone     ↔ ㄏㄡ }$zTone;
+hou            →  ㄏㄡ˙;
+hou1           ← ㄏㄡ;
+han }$pTone     ↔ ㄏㄢ }$zTone;
+han            →  ㄏㄢ˙;
+han1           ← ㄏㄢ;
+hen }$pTone     ↔ ㄏㄣ }$zTone;
+hen            →  ㄏㄣ˙;
+hen1           ← ㄏㄣ;
+hua }$pTone     ↔ ㄏㄨㄚ }$zTone;
+hua            →  ㄏㄨㄚ˙;
+hua1           ← ㄏㄨㄚ;
+huo }$pTone     ↔ ㄏㄨㄛ }$zTone;
+huo            →  ㄏㄨㄛ˙;
+huo1           ← ㄏㄨㄛ;
+hui }$pTone     ↔ ㄏㄨㄟ }$zTone;
+hui            →  ㄏㄨㄟ˙;
+hui1           ← ㄏㄨㄟ;
+hun }$pTone     ↔ ㄏㄨㄣ }$zTone;
+hun            →  ㄏㄨㄣ˙;
+hun1           ← ㄏㄨㄣ;
+hm }$pTone      ↔ ㄏㄇ }$zTone;
+hm             →  ㄏㄇ˙;
+hm1            ← ㄏㄇ;
+ha }$pTone      ↔ ㄏㄚ }$zTone;
+ha             →  ㄏㄚ˙;
+ha1            ← ㄏㄚ;
+ho }$pTone      ↔ ㄏㄛ }$zTone;
+ho             →  ㄏㄛ˙;
+ho1            ← ㄏㄛ;
+he }$pTone      ↔ ㄏㄜ }$zTone;
+he             →  ㄏㄜ˙;
+he1            ← ㄏㄜ;
+hu }$pTone      ↔ ㄏㄨ }$zTone;
+hu             →  ㄏㄨ˙;
+hu1            ← ㄏㄨ;
+#
+jiang }$pTone   ↔ ㄐㄧㄤ }$zTone;
+jiang          →  ㄐㄧㄤ˙;
+jiang1         ← ㄐㄧㄤ;
+jiong }$pTone   ↔ ㄐㄩㄥ }$zTone;
+jiong          →  ㄐㄩㄥ˙;
+jiong1         ← ㄐㄩㄥ;
+jiao }$pTone    ↔ ㄐㄧㄠ }$zTone;
+jiao           →  ㄐㄧㄠ˙;
+jiao1          ← ㄐㄧㄠ;
+jian }$pTone    ↔ ㄐㄧㄢ }$zTone;
+jian           →  ㄐㄧㄢ˙;
+jian1          ← ㄐㄧㄢ;
+jing }$pTone    ↔ ㄐㄧㄥ }$zTone;
+jing           →  ㄐㄧㄥ˙;
+jing1          ← ㄐㄧㄥ;
+juan }$pTone    ↔ ㄐㄩㄢ }$zTone;
+juan           →  ㄐㄩㄢ˙;
+juan1          ← ㄐㄩㄢ;
+jia }$pTone     ↔ ㄐㄧㄚ }$zTone;
+jia            →  ㄐㄧㄚ˙;
+jia1           ← ㄐㄧㄚ;
+jie }$pTone     ↔ ㄐㄧㄝ }$zTone;
+jie            →  ㄐㄧㄝ˙;
+jie1           ← ㄐㄧㄝ;
+jiu }$pTone     ↔ ㄐㄧㄡ }$zTone;
+jiu            →  ㄐㄧㄡ˙;
+jiu1           ← ㄐㄧㄡ;
+jin }$pTone     ↔ ㄐㄧㄣ }$zTone;
+jin            →  ㄐㄧㄣ˙;
+jin1           ← ㄐㄧㄣ;
+jue }$pTone     ↔ ㄐㄩㄝ }$zTone;
+jue            →  ㄐㄩㄝ˙;
+jue1           ← ㄐㄩㄝ;
+jun }$pTone     ↔ ㄐㄩㄣ }$zTone;
+jun            →  ㄐㄩㄣ˙;
+jun1           ← ㄐㄩㄣ;
+ji }$pTone      ↔ ㄐㄧ }$zTone;
+ji             →  ㄐㄧ˙;
+ji1            ← ㄐㄧ;
+ju }$pTone      ↔ ㄐㄩ }$zTone;
+ju             →  ㄐㄩ˙;
+ju1            ← ㄐㄩ;
+#
+qiang }$pTone   ↔ ㄑㄧㄤ }$zTone;
+qiang          →  ㄑㄧㄤ˙;
+qiang1         ← ㄑㄧㄤ;
+qiong }$pTone   ↔ ㄑㄩㄥ }$zTone;
+qiong          →  ㄑㄩㄥ˙;
+qiong1         ← ㄑㄩㄥ;
+qiao }$pTone    ↔ ㄑㄧㄠ }$zTone;
+qiao           →  ㄑㄧㄠ˙;
+qiao1          ← ㄑㄧㄠ;
+qian }$pTone    ↔ ㄑㄧㄢ }$zTone;
+qian           →  ㄑㄧㄢ˙;
+qian1          ← ㄑㄧㄢ;
+qing }$pTone    ↔ ㄑㄧㄥ }$zTone;
+qing           →  ㄑㄧㄥ˙;
+qing1          ← ㄑㄧㄥ;
+quan }$pTone    ↔ ㄑㄩㄢ }$zTone;
+quan           →  ㄑㄩㄢ˙;
+quan1          ← ㄑㄩㄢ;
+qia }$pTone     ↔ ㄑㄧㄚ }$zTone;
+qia            →  ㄑㄧㄚ˙;
+qia1           ← ㄑㄧㄚ;
+qie }$pTone     ↔ ㄑㄧㄝ }$zTone;
+qie            →  ㄑㄧㄝ˙;
+qie1           ← ㄑㄧㄝ;
+qiu }$pTone     ↔ ㄑㄧㄡ }$zTone;
+qiu            →  ㄑㄧㄡ˙;
+qiu1           ← ㄑㄧㄡ;
+qin }$pTone     ↔ ㄑㄧㄣ }$zTone;
+qin            →  ㄑㄧㄣ˙;
+qin1           ← ㄑㄧㄣ;
+que }$pTone     ↔ ㄑㄩㄝ }$zTone;
+que            →  ㄑㄩㄝ˙;
+que1           ← ㄑㄩㄝ;
+qun }$pTone     ↔ ㄑㄩㄣ }$zTone;
+qun            →  ㄑㄩㄣ˙;
+qun1           ← ㄑㄩㄣ;
+qi }$pTone      ↔ ㄑㄧ }$zTone;
+qi             →  ㄑㄧ˙;
+qi1            ← ㄑㄧ;
+qu }$pTone      ↔ ㄑㄩ }$zTone;
+qu             →  ㄑㄩ˙;
+qu1            ← ㄑㄩ;
+#
+xiang }$pTone   ↔ ㄒㄧㄤ }$zTone;
+xiang          →  ㄒㄧㄤ˙;
+xiang1         ← ㄒㄧㄤ;
+xiong }$pTone   ↔ ㄒㄩㄥ }$zTone;
+xiong          →  ㄒㄩㄥ˙;
+xiong1         ← ㄒㄩㄥ;
+xiao }$pTone    ↔ ㄒㄧㄠ }$zTone;
+xiao           →  ㄒㄧㄠ˙;
+xiao1          ← ㄒㄧㄠ;
+xian }$pTone    ↔ ㄒㄧㄢ }$zTone;
+xian           →  ㄒㄧㄢ˙;
+xian1          ← ㄒㄧㄢ;
+xing }$pTone    ↔ ㄒㄧㄥ }$zTone;
+xing           →  ㄒㄧㄥ˙;
+xing1          ← ㄒㄧㄥ;
+xuan }$pTone    ↔ ㄒㄩㄢ }$zTone;
+xuan           →  ㄒㄩㄢ˙;
+xuan1          ← ㄒㄩㄢ;
+xia }$pTone     ↔ ㄒㄧㄚ }$zTone;
+xia            →  ㄒㄧㄚ˙;
+xia1           ← ㄒㄧㄚ;
+xie }$pTone     ↔ ㄒㄧㄝ }$zTone;
+xie            →  ㄒㄧㄝ˙;
+xie1           ← ㄒㄧㄝ;
+xiu }$pTone     ↔ ㄒㄧㄡ }$zTone;
+xiu            →  ㄒㄧㄡ˙;
+xiu1           ← ㄒㄧㄡ;
+xin }$pTone     ↔ ㄒㄧㄣ }$zTone;
+xin            →  ㄒㄧㄣ˙;
+xin1           ← ㄒㄧㄣ;
+xue }$pTone     ↔ ㄒㄩㄝ }$zTone;
+xue            →  ㄒㄩㄝ˙;
+xue1           ← ㄒㄩㄝ;
+xun }$pTone     ↔ ㄒㄩㄣ }$zTone;
+xun            →  ㄒㄩㄣ˙;
+xun1           ← ㄒㄩㄣ;
+xi }$pTone      ↔ ㄒㄧ }$zTone;
+xi             →  ㄒㄧ˙;
+xi1            ← ㄒㄧ;
+xu }$pTone      ↔ ㄒㄩ }$zTone;
+xu             →  ㄒㄩ˙;
+xu1            ← ㄒㄩ;
+#
+zhuang }$pTone  ↔ ㄓㄨㄤ }$zTone;
+zhuang         →  ㄓㄨㄤ˙;
+zhuang1        ← ㄓㄨㄤ;
+zhang }$pTone   ↔ ㄓㄤ }$zTone;
+zhang          →  ㄓㄤ˙;
+zhang1         ← ㄓㄤ;
+zheng }$pTone   ↔ ㄓㄥ }$zTone;
+zheng          →  ㄓㄥ˙;
+zheng1         ← ㄓㄥ;
+zhuai }$pTone   ↔ ㄓㄨㄞ }$zTone;
+zhuai          →  ㄓㄨㄞ˙;
+zhuai1         ← ㄓㄨㄞ;
+zhuan }$pTone   ↔ ㄓㄨㄢ }$zTone;
+zhuan          →  ㄓㄨㄢ˙;
+zhuan1         ← ㄓㄨㄢ;
+zhong }$pTone   ↔ ㄓㄨㄥ }$zTone;
+zhong          →  ㄓㄨㄥ˙;
+zhong1         ← ㄓㄨㄥ;
+zhai }$pTone    ↔ ㄓㄞ }$zTone;
+zhai           →  ㄓㄞ˙;
+zhai1          ← ㄓㄞ;
+zhei }$pTone    ↔ ㄓㄟ }$zTone;		# (not in han-latin)
+zhei           →  ㄓㄟ˙;
+zhei1          ← ㄓㄟ;
+zhao }$pTone    ↔ ㄓㄠ }$zTone;
+zhao           →  ㄓㄠ˙;
+zhao1          ← ㄓㄠ;
+zhou }$pTone    ↔ ㄓㄡ }$zTone;
+zhou           →  ㄓㄡ˙;
+zhou1          ← ㄓㄡ;
+zhan }$pTone    ↔ ㄓㄢ }$zTone;
+zhan           →  ㄓㄢ˙;
+zhan1          ← ㄓㄢ;
+zhen }$pTone    ↔ ㄓㄣ }$zTone;
+zhen           →  ㄓㄣ˙;
+zhen1          ← ㄓㄣ;
+zhua }$pTone    ↔ ㄓㄨㄚ }$zTone;
+zhua           →  ㄓㄨㄚ˙;
+zhua1          ← ㄓㄨㄚ;
+zhuo }$pTone    ↔ ㄓㄨㄛ }$zTone;
+zhuo           →  ㄓㄨㄛ˙;
+zhuo1          ← ㄓㄨㄛ;
+zhui }$pTone    ↔ ㄓㄨㄟ }$zTone;
+zhui           →  ㄓㄨㄟ˙;
+zhui1          ← ㄓㄨㄟ;
+zhun }$pTone    ↔ ㄓㄨㄣ }$zTone;
+zhun           →  ㄓㄨㄣ˙;
+zhun1          ← ㄓㄨㄣ;
+zha }$pTone     ↔ ㄓㄚ }$zTone;
+zha            →  ㄓㄚ˙;
+zha1           ← ㄓㄚ;
+zhe }$pTone     ↔ ㄓㄜ }$zTone;
+zhe            →  ㄓㄜ˙;
+zhe1           ← ㄓㄜ;
+zhu }$pTone     ↔ ㄓㄨ }$zTone;
+zhu            →  ㄓㄨ˙;
+zhu1           ← ㄓㄨ;
+zhi }$pTone     ↔ ㄓ }$zTone;
+zhi            →  ㄓ˙;
+zhi1           ← ㄓ;
+#
+chuang }$pTone  ↔ ㄔㄨㄤ }$zTone;
+chuang         →  ㄔㄨㄤ˙;
+chuang1        ← ㄔㄨㄤ;
+chang }$pTone   ↔ ㄔㄤ }$zTone;
+chang          →  ㄔㄤ˙;
+chang1         ← ㄔㄤ;
+cheng }$pTone   ↔ ㄔㄥ }$zTone;
+cheng          →  ㄔㄥ˙;
+cheng1         ← ㄔㄥ;
+chuai }$pTone   ↔ ㄔㄨㄞ }$zTone;
+chuai          →  ㄔㄨㄞ˙;
+chuai1         ← ㄔㄨㄞ;
+chuan }$pTone   ↔ ㄔㄨㄢ }$zTone;
+chuan          →  ㄔㄨㄢ˙;
+chuan1         ← ㄔㄨㄢ;
+chong }$pTone   ↔ ㄔㄨㄥ }$zTone;
+chong          →  ㄔㄨㄥ˙;
+chong1         ← ㄔㄨㄥ;
+chai }$pTone    ↔ ㄔㄞ }$zTone;
+chai           →  ㄔㄞ˙;
+chai1          ← ㄔㄞ;
+chao }$pTone    ↔ ㄔㄠ }$zTone;
+chao           →  ㄔㄠ˙;
+chao1          ← ㄔㄠ;
+chou }$pTone    ↔ ㄔㄡ }$zTone;
+chou           →  ㄔㄡ˙;
+chou1          ← ㄔㄡ;
+chan }$pTone    ↔ ㄔㄢ }$zTone;
+chan           →  ㄔㄢ˙;
+chan1          ← ㄔㄢ;
+chen }$pTone    ↔ ㄔㄣ }$zTone;
+chen           →  ㄔㄣ˙;
+chen1          ← ㄔㄣ;
+chua }$pTone    ↔ ㄔㄨㄚ }$zTone;
+chua           →  ㄔㄨㄚ˙;
+chua1          ← ㄔㄨㄚ;
+chuo }$pTone    ↔ ㄔㄨㄛ }$zTone;
+chuo           →  ㄔㄨㄛ˙;
+chuo1          ← ㄔㄨㄛ;
+chui }$pTone    ↔ ㄔㄨㄟ }$zTone;
+chui           →  ㄔㄨㄟ˙;
+chui1          ← ㄔㄨㄟ;
+chun }$pTone    ↔ ㄔㄨㄣ }$zTone;
+chun           →  ㄔㄨㄣ˙;
+chun1          ← ㄔㄨㄣ;
+cha }$pTone     ↔ ㄔㄚ }$zTone;
+cha            →  ㄔㄚ˙;
+cha1           ← ㄔㄚ;
+che }$pTone     ↔ ㄔㄜ }$zTone;
+che            →  ㄔㄜ˙;
+che1           ← ㄔㄜ;
+chu }$pTone     ↔ ㄔㄨ }$zTone;
+chu            →  ㄔㄨ˙;
+chu1           ← ㄔㄨ;
+chi }$pTone     ↔ ㄔ }$zTone;
+chi            →  ㄔ˙;
+chi1           ← ㄔ;
+#
+shuang }$pTone  ↔ ㄕㄨㄤ }$zTone;
+shuang         →  ㄕㄨㄤ˙;
+shuang1        ← ㄕㄨㄤ;
+shong }$pTone   ↔ ㄕㄡㄥ }$zTone;	# (not in han-latin)
+shong          →  ㄕㄡㄥ˙;
+shong1         ← ㄕㄡㄥ;
+shang }$pTone   ↔ ㄕㄤ }$zTone;
+shang          →  ㄕㄤ˙;
+shang1         ← ㄕㄤ;
+sheng }$pTone   ↔ ㄕㄥ }$zTone;
+sheng          →  ㄕㄥ˙;
+sheng1         ← ㄕㄥ;
+shuai }$pTone   ↔ ㄕㄨㄞ }$zTone;
+shuai          →  ㄕㄨㄞ˙;
+shuai1         ← ㄕㄨㄞ;
+shuan }$pTone   ↔ ㄕㄨㄢ }$zTone;
+shuan          →  ㄕㄨㄢ˙;
+shuan1         ← ㄕㄨㄢ;
+shai }$pTone    ↔ ㄕㄞ }$zTone;
+shai           →  ㄕㄞ˙;
+shai1          ← ㄕㄞ;
+shei }$pTone    ↔ ㄕㄟ }$zTone;		# (not in han-latin)
+shei           →  ㄕㄟ˙;
+shei1          ← ㄕㄟ;
+shao }$pTone    ↔ ㄕㄠ }$zTone;
+shao           →  ㄕㄠ˙;
+shao1          ← ㄕㄠ;
+shou }$pTone    ↔ ㄕㄡ }$zTone;
+shou           →  ㄕㄡ˙;
+shou1          ← ㄕㄡ;
+shan }$pTone    ↔ ㄕㄢ }$zTone;
+shan           →  ㄕㄢ˙;
+shan1          ← ㄕㄢ;
+shen }$pTone    ↔ ㄕㄣ }$zTone;
+shen           →  ㄕㄣ˙;
+shen1          ← ㄕㄣ;
+shua }$pTone    ↔ ㄕㄨㄚ }$zTone;
+shua           →  ㄕㄨㄚ˙;
+shua1          ← ㄕㄨㄚ;
+shuo }$pTone    ↔ ㄕㄨㄛ }$zTone;
+shuo           →  ㄕㄨㄛ˙;
+shuo1          ← ㄕㄨㄛ;
+shui }$pTone    ↔ ㄕㄨㄟ }$zTone;
+shui           →  ㄕㄨㄟ˙;
+shui1          ← ㄕㄨㄟ;
+shun }$pTone    ↔ ㄕㄨㄣ }$zTone;
+shun           →  ㄕㄨㄣ˙;
+shun1          ← ㄕㄨㄣ;
+sha }$pTone     ↔ ㄕㄚ }$zTone;
+sha            →  ㄕㄚ˙;
+sha1           ← ㄕㄚ;
+she }$pTone     ↔ ㄕㄜ }$zTone;
+she            →  ㄕㄜ˙;
+she1           ← ㄕㄜ;
+shu }$pTone     ↔ ㄕㄨ }$zTone;
+shu            →  ㄕㄨ˙;
+shu1           ← ㄕㄨ;
+shi }$pTone     ↔ ㄕ }$zTone;
+shi            →  ㄕ˙;
+shi1           ← ㄕ;
+#
+rang }$pTone    ↔ ㄖㄤ }$zTone;
+rang           →  ㄖㄤ˙;
+rang1          ← ㄖㄤ;
+reng }$pTone    ↔ ㄖㄥ }$zTone;
+reng           →  ㄖㄥ˙;
+reng1          ← ㄖㄥ;
+ruan }$pTone    ↔ ㄖㄨㄢ }$zTone;
+ruan           →  ㄖㄨㄢ˙;
+ruan1          ← ㄖㄨㄢ;
+rong }$pTone    ↔ ㄖㄨㄥ }$zTone;
+rong           →  ㄖㄨㄥ˙;
+rong1          ← ㄖㄨㄥ;
+rao }$pTone     ↔ ㄖㄠ }$zTone;
+rao            →  ㄖㄠ˙;
+rao1           ← ㄖㄠ;
+rou }$pTone     ↔ ㄖㄡ }$zTone;
+rou            →  ㄖㄡ˙;
+rou1           ← ㄖㄡ;
+ran }$pTone     ↔ ㄖㄢ }$zTone;
+ran            →  ㄖㄢ˙;
+ran1           ← ㄖㄢ;
+ren }$pTone     ↔ ㄖㄣ }$zTone;
+ren            →  ㄖㄣ˙;
+ren1           ← ㄖㄣ;
+ruo }$pTone     ↔ ㄖㄨㄛ }$zTone;
+ruo            →  ㄖㄨㄛ˙;
+ruo1           ← ㄖㄨㄛ;
+rui }$pTone     ↔ ㄖㄨㄟ }$zTone;
+rui            →  ㄖㄨㄟ˙;
+rui1           ← ㄖㄨㄟ;
+run }$pTone     ↔ ㄖㄨㄣ }$zTone;
+run            →  ㄖㄨㄣ˙;
+run1           ← ㄖㄨㄣ;
+ra }$pTone      ↔ ㄖㄚ }$zTone;
+ra             →  ㄖㄚ˙;
+ra1            ← ㄖㄚ;
+re }$pTone      ↔ ㄖㄜ }$zTone;
+re             →  ㄖㄜ˙;
+re1            ← ㄖㄜ;
+ru }$pTone      ↔ ㄖㄨ }$zTone;
+ru             →  ㄖㄨ˙;
+ru1            ← ㄖㄨ;
+ri }$pTone      ↔ ㄖ }$zTone;
+ri             →  ㄖ˙;
+ri1            ← ㄖ;
+#
+zang }$pTone    ↔ ㄗㄤ }$zTone;
+zang           →  ㄗㄤ˙;
+zang1          ← ㄗㄤ;
+zeng }$pTone    ↔ ㄗㄥ }$zTone;
+zeng           →  ㄗㄥ˙;
+zeng1          ← ㄗㄥ;
+zuan }$pTone    ↔ ㄗㄨㄢ }$zTone;
+zuan           →  ㄗㄨㄢ˙;
+zuan1          ← ㄗㄨㄢ;
+zong }$pTone    ↔ ㄗㄨㄥ }$zTone;
+zong           →  ㄗㄨㄥ˙;
+zong1          ← ㄗㄨㄥ;
+zai }$pTone     ↔ ㄗㄞ }$zTone;
+zai            →  ㄗㄞ˙;
+zai1           ← ㄗㄞ;
+zei }$pTone     ↔ ㄗㄟ }$zTone;
+zei            →  ㄗㄟ˙;
+zei1           ← ㄗㄟ;
+zao }$pTone     ↔ ㄗㄠ }$zTone;
+zao            →  ㄗㄠ˙;
+zao1           ← ㄗㄠ;
+zou }$pTone     ↔ ㄗㄡ }$zTone;
+zou            →  ㄗㄡ˙;
+zou1           ← ㄗㄡ;
+zan }$pTone     ↔ ㄗㄢ }$zTone;
+zan            →  ㄗㄢ˙;
+zan1           ← ㄗㄢ;
+zen }$pTone     ↔ ㄗㄣ }$zTone;
+zen            →  ㄗㄣ˙;
+zen1           ← ㄗㄣ;
+zuo }$pTone     ↔ ㄗㄨㄛ }$zTone;
+zuo            →  ㄗㄨㄛ˙;
+zuo1           ← ㄗㄨㄛ;
+zui }$pTone     ↔ ㄗㄨㄟ }$zTone;
+zui            →  ㄗㄨㄟ˙;
+zui1           ← ㄗㄨㄟ;
+zun }$pTone     ↔ ㄗㄨㄣ }$zTone;
+zun            →  ㄗㄨㄣ˙;
+zun1           ← ㄗㄨㄣ;
+za }$pTone      ↔ ㄗㄚ }$zTone;
+za             →  ㄗㄚ˙;
+za1            ← ㄗㄚ;
+ze }$pTone      ↔ ㄗㄜ }$zTone;
+ze             →  ㄗㄜ˙;
+ze1            ← ㄗㄜ;
+zu }$pTone      ↔ ㄗㄨ }$zTone;
+zu             →  ㄗㄨ˙;
+zu1            ← ㄗㄨ;
+zi }$pTone      ↔ ㄗ }$zTone;
+zi             →  ㄗ˙;
+zi1            ← ㄗ;
+#
+cang }$pTone    ↔ ㄘㄤ }$zTone;
+cang           →  ㄘㄤ˙;
+cang1          ← ㄘㄤ;
+ceng }$pTone    ↔ ㄘㄥ }$zTone;
+ceng           →  ㄘㄥ˙;
+ceng1          ← ㄘㄥ;
+cuan }$pTone    ↔ ㄘㄨㄢ }$zTone;
+cuan           →  ㄘㄨㄢ˙;
+cuan1          ← ㄘㄨㄢ;
+cong }$pTone    ↔ ㄘㄨㄥ }$zTone;
+cong           →  ㄘㄨㄥ˙;
+cong1          ← ㄘㄨㄥ;
+cai }$pTone     ↔ ㄘㄞ }$zTone;
+cai            →  ㄘㄞ˙;
+cai1           ← ㄘㄞ;
+cao }$pTone     ↔ ㄘㄠ }$zTone;
+cao            →  ㄘㄠ˙;
+cao1           ← ㄘㄠ;
+cou }$pTone     ↔ ㄘㄡ }$zTone;
+cou            →  ㄘㄡ˙;
+cou1           ← ㄘㄡ;
+can }$pTone     ↔ ㄘㄢ }$zTone;
+can            →  ㄘㄢ˙;
+can1           ← ㄘㄢ;
+cen }$pTone     ↔ ㄘㄣ }$zTone;
+cen            →  ㄘㄣ˙;
+cen1           ← ㄘㄣ;
+cuo }$pTone     ↔ ㄘㄨㄛ }$zTone;
+cuo            →  ㄘㄨㄛ˙;
+cuo1           ← ㄘㄨㄛ;
+cui }$pTone     ↔ ㄘㄨㄟ }$zTone;
+cui            →  ㄘㄨㄟ˙;
+cui1           ← ㄘㄨㄟ;
+cun }$pTone     ↔ ㄘㄨㄣ }$zTone;
+cun            →  ㄘㄨㄣ˙;
+cun1           ← ㄘㄨㄣ;
+ca }$pTone      ↔ ㄘㄚ }$zTone;
+ca             →  ㄘㄚ˙;
+ca1            ← ㄘㄚ;
+ce }$pTone      ↔ ㄘㄜ }$zTone;
+ce             →  ㄘㄜ˙;
+ce1            ← ㄘㄜ;
+cu }$pTone      ↔ ㄘㄨ }$zTone;
+cu             →  ㄘㄨ˙;
+cu1            ← ㄘㄨ;
+ci }$pTone      ↔ ㄘ }$zTone;
+ci             →  ㄘ˙;
+ci1            ← ㄘ;
+#
+sang }$pTone    ↔ ㄙㄤ }$zTone;
+sang           →  ㄙㄤ˙;
+sang1          ← ㄙㄤ;
+seng }$pTone    ↔ ㄙㄥ }$zTone;
+seng           →  ㄙㄥ˙;
+seng1          ← ㄙㄥ;
+suan }$pTone    ↔ ㄙㄨㄢ }$zTone;
+suan           →  ㄙㄨㄢ˙;
+suan1          ← ㄙㄨㄢ;
+song }$pTone    ↔ ㄙㄨㄥ }$zTone;
+song           →  ㄙㄨㄥ˙;
+song1          ← ㄙㄨㄥ;
+sai }$pTone     ↔ ㄙㄞ }$zTone;
+sai            →  ㄙㄞ˙;
+sai1           ← ㄙㄞ;
+sei }$pTone     ↔ ㄙㄟ }$zTone;		# (not in han-latin)
+sei            →  ㄙㄟ˙;
+sei1           ← ㄙㄟ;
+sao }$pTone     ↔ ㄙㄠ }$zTone;
+sao            →  ㄙㄠ˙;
+sao1           ← ㄙㄠ;
+sou }$pTone     ↔ ㄙㄡ }$zTone;
+sou            →  ㄙㄡ˙;
+sou1           ← ㄙㄡ;
+san }$pTone     ↔ ㄙㄢ }$zTone;
+san            →  ㄙㄢ˙;
+san1           ← ㄙㄢ;
+sen }$pTone     ↔ ㄙㄣ }$zTone;
+sen            →  ㄙㄣ˙;
+sen1           ← ㄙㄣ;
+suo }$pTone     ↔ ㄙㄨㄛ }$zTone;
+suo            →  ㄙㄨㄛ˙;
+suo1           ← ㄙㄨㄛ;
+sui }$pTone     ↔ ㄙㄨㄟ }$zTone;
+sui            →  ㄙㄨㄟ˙;
+sui1           ← ㄙㄨㄟ;
+sun }$pTone     ↔ ㄙㄨㄣ }$zTone;
+sun            →  ㄙㄨㄣ˙;
+sun1           ← ㄙㄨㄣ;
+sa }$pTone      ↔ ㄙㄚ }$zTone;
+sa             →  ㄙㄚ˙;
+sa1            ← ㄙㄚ;
+se }$pTone      ↔ ㄙㄜ }$zTone;
+se             →  ㄙㄜ˙;
+se1            ← ㄙㄜ;
+su }$pTone      ↔ ㄙㄨ }$zTone;
+su             →  ㄙㄨ˙;
+su1            ← ㄙㄨ;
+si }$pTone      ↔ ㄙ }$zTone;
+si             →  ㄙ˙;
+si1            ← ㄙ;
+#
+#--- vowels and vowel compounds ----
+# most exist as syllables by themselves and they are also used as finals for initial consonants
+#
+yuan }$pTone    ↔ ㄩㄢ }$zTone;
+yuan           →  ㄩㄢ˙;
+yuan1          ← ㄩㄢ;
+yong }$pTone    ↔ ㄩㄥ }$zTone;
+yong        →  ㄩㄥ˙;
+yong1       ← ㄩㄥ;
+yue }$pTone     ↔ ㄩㄝ }$zTone;
+yue            →  ㄩㄝ˙;
+yue1           ← ㄩㄝ;
+yun }$pTone     ↔ ㄩㄣ }$zTone;
+yun            →  ㄩㄣ˙;
+yun1           ← ㄩㄣ;
+yu }$pTone      ↔ ㄩ }$zTone;
+yu             →  ㄩ˙;
+yu1            ← ㄩ;
+# iu handled below
+#
+yang }$pTone    ↔ ㄧㄤ }$zTone;
+yang           →  ㄧㄤ˙;
+yang1          ← ㄧㄤ;
+ying }$pTone    ↔ ㄧㄥ }$zTone;
+ying           →  ㄧㄥ˙;
+ying1          ← ㄧㄥ;
+yai }$pTone     ↔ ㄧㄞ }$zTone;		# (not in han-latin)
+yai            →  ㄧㄞ˙;
+yai1           ← ㄧㄞ;
+yao }$pTone     ↔ ㄧㄠ }$zTone;
+yao            →  ㄧㄠ˙;
+yao1           ← ㄧㄠ;
+you }$pTone     ↔ ㄧㄡ }$zTone;
+you            →  ㄧㄡ˙;
+you1           ← ㄧㄡ;
+yan }$pTone     ↔ ㄧㄢ }$zTone;
+yan            →  ㄧㄢ˙;
+yan1           ← ㄧㄢ;
+yin }$pTone     ↔ ㄧㄣ }$zTone;
+yin            →  ㄧㄣ˙;
+yin1           ← ㄧㄣ;
+ya }$pTone      ↔ ㄧㄚ }$zTone;
+ya             →  ㄧㄚ˙;
+ya1            ← ㄧㄚ;
+yo }$pTone      ↔ ㄧㄛ }$zTone;
+yo             →  ㄧㄛ˙;
+yo1            ← ㄧㄛ;
+ye }$pTone      ↔ ㄧㄝ }$zTone;
+ye             →  ㄧㄝ˙;
+ye1            ← ㄧㄝ;
+yi }$pTone      ↔ ㄧ }$zTone;
+yi             →  ㄧ˙;
+yi1            ← ㄧ;
+# i handled below
+#
+wong }$pTone    ↔ ㄨㄨㄥ }$zTone;
+wong           →  ㄨㄨㄥ˙;
+wong1          ← ㄨㄨㄥ;
+wang }$pTone    ↔ ㄨㄤ }$zTone;
+wang           →  ㄨㄤ˙;
+wang1          ← ㄨㄤ;
+weng }$pTone    ↔ ㄨㄥ }$zTone;
+weng           →  ㄨㄥ˙;
+weng1          ← ㄨㄥ;
+wai }$pTone     ↔ ㄨㄞ }$zTone;
+wai            →  ㄨㄞ˙;
+wai1           ← ㄨㄞ;
+wei }$pTone     ↔ ㄨㄟ }$zTone;
+wei            →  ㄨㄟ˙;
+wei1           ← ㄨㄟ;
+wan }$pTone     ↔ ㄨㄢ }$zTone;
+wan            →  ㄨㄢ˙;
+wan1           ← ㄨㄢ;
+wen }$pTone     ↔ ㄨㄣ }$zTone;
+wen            →  ㄨㄣ˙;
+wen1           ← ㄨㄣ;
+wa }$pTone      ↔ ㄨㄚ }$zTone;
+wa             →  ㄨㄚ˙;
+wa1            ← ㄨㄚ;
+wo }$pTone      ↔ ㄨㄛ }$zTone;
+wo             →  ㄨㄛ˙;
+wo1            ← ㄨㄛ;
+wu }$pTone      ↔ ㄨ }$zTone;
+wu             →  ㄨ˙;
+wu1            ← ㄨ;
+# u handled below
+#
+ang }$pTone     ↔ ㄤ }$zTone;
+ang            →  ㄤ˙;
+ang1           ← ㄤ;
+eng }$pTone     ↔ ㄥ }$zTone;
+eng            →  ㄥ˙;
+eng1           ← ㄥ;
+eh }$pTone      ↔ ㄝ }$zTone;		# (not in han-latin)
+eh             →  ㄝ˙;
+eh1            ← ㄝ;
+ea }$pTone      → ㄝ;				# (not in han-latin) one-way
+ea             →  ㄝ˙;
+ai }$pTone      ↔ ㄞ }$zTone;
+ai             →  ㄞ˙;
+ai1            ← ㄞ;
+ei }$pTone      ↔ ㄟ }$zTone;
+ei             →  ㄟ˙;
+ei1            ← ㄟ;
+ao }$pTone      ↔ ㄠ }$zTone;
+ao             →  ㄠ˙;
+ao1            ← ㄠ;
+au }$pTone      → ㄠ;				# (not in han-latin) one-way, handle unicode spelling
+au             →  ㄠ˙;
+ou }$pTone      ↔ ㄡ }$zTone;
+ou             →  ㄡ˙;
+ou1            ← ㄡ;
+an }$pTone      ↔ ㄢ }$zTone;
+an             →  ㄢ˙;
+an1            ← ㄢ;
+en }$pTone      ↔ ㄣ }$zTone;
+en             →  ㄣ˙;
+en1            ← ㄣ;
+er }$pTone      ↔ ㄦ }$zTone;
+er             →  ㄦ˙;
+er1            ← ㄦ;
+a }$pTone       ↔ ㄚ }$zTone;
+a              →  ㄚ˙;
+a1             ← ㄚ;
+o }$pTone       ↔ ㄛ }$zTone;
+o              →  ㄛ˙;
+o1             ← ㄛ;
+e }$pTone       ↔ ㄜ }$zTone;
+e              →  ㄜ˙;
+e1             ← ㄜ;
+#
+# handle unicode spellings of ㄧ,ㄨ,ㄩ above
+iu }$pTone      → ㄩ;				# (not in han-latin) one-way, handle unicode spelling
+iu             →  ㄩ˙;
+i }$pTone       → ㄧ;				# (not in han-latin) one-way, handle unicode spelling
+i              →  ㄧ˙;
+u }$pTone       → ㄨ;				# (not in han-latin) one-way, handle unicode spelling
+u              →  ㄨ˙;
+#
+#--- clusters with a single pinyin consonant that can apear in other clusters ----
+#
+m }$pTone       ↔ ㄇ }$zTone;
+m              →  ㄇ˙;
+m1             ← ㄇ;
+#
+n }$pTone       ↔ ㄋ }$zTone;
+n              →  ㄋ˙;
+n1             ← ㄋ;
+#
+#--- fallback mappings ----
+#
+# separate fallback mappings for some compound finals after consonants
+# (different pinyin than the standalone mappings for these zhuyin sequences).
+#
+#-------
+# would be nice to have these, need to work out how;
+# something like the following, but need to avoid conflicts with mappings above:
+# $pCons{ ia }$pTone   ↔ $zCons{ ㄧㄚ }$zTone;	# fallback mapping for unambiguous compound final
+#     $pCons{ ia       →  ㄧㄚ˙;
+#     ia1              ← $zCons{ ㄧㄚ
+#
+# the relevant mappings are:
+# ia ↔ ㄧㄚ
+# ie ↔ ㄧㄝ
+# iao ↔ ㄧㄠ
+# iu ↔ ㄧㄡ
+# ian ↔ ㄧㄢ
+# in ↔ ㄧㄣ
+# iang ↔ ㄧㄤ
+# ing ↔ ㄧㄥ
+# ua ↔ ㄨㄚ
+# uo ↔ ㄨㄛ
+# uai ↔ ㄨㄞ
+# ui ↔ ㄨㄟ
+# uang ↔ ㄨㄤ
+# ong ↔ ㄨㄥ
+# iong ↔ ㄩㄥ
+#-------
+#
+# separate fallback mappings for some initial consonants not handled above
+# none of the mapped consonants handled here can have tones, so this is simple
+b       ↔ ㄅ;
+p       ↔ ㄆ;
+# m     ↔ ㄇ;	# handled above
+f       ↔ ㄈ;
+d       ↔ ㄉ;
+t       ↔ ㄊ;
+# n     ↔ ㄋ;	# handled above
+l       ↔ ㄌ;
+g       ↔ ㄍ;
+k       ↔ ㄎ;
+h       ↔ ㄏ;
+j       ↔ ㄐ;
+q       ↔ ㄑ;
+x       ↔ ㄒ;
+zh      → ㄓ;	# reverse mapping to zhi handled above
+ch      → ㄔ;	# reverse mapping to chi handled above
+sh      → ㄕ;	# reverse mapping to shi handled above
+r       → ㄖ;	# reverse mapping to ri handled above
+z       → ㄗ;	# reverse mapping to zi handled above
+c       → ㄘ;	# reverse mapping to ci handled above
+s       → ㄙ;	# reverse mapping to si handled above
+#
+#--- tones (except for the ummarked cases handled above) ----
+#
+# tone 1: pinyin \u0304 or 1 ↔ zhuyin typically unmarked or use ˉ \u02C9
+1 → ;		# map to nothing
+1 ← ˉ	;	# transform if marked in zhuyin
+# did the following with rules for each cluster, above
+# 1 ← ;		# map nothing in zhuyin to pinyin mark
+#
+# tones 2-4 (easy)
+# $pToneOK{ 2 ↔ $zToneOK{ ˊ;	# pinyin \u0301 or 2 ↔ zhuyin \u02CA
+# $pToneOK{ 3 ↔ $zToneOK{ ˇ;	# pinyin \u030C or 3 ↔ zhuyin \u02C7
+# $pToneOK{ 4 ↔ $zToneOK{ ˋ;	# pinyin \u0300 or 4 ↔ zhuyin \u02CB
+# actually don't need context:
+2 ↔ ˊ;	# pinyin \u0301 or 2 ↔ zhuyin \u02CA
+3 ↔ ˇ;	# pinyin \u030C or 3 ↔ zhuyin \u02C7
+4 ↔ ˋ;	# pinyin \u0300 or 4 ↔ zhuyin \u02CB
+#
+# tone 5 (light): pinyin typically unmarked or use 5 ↔ zhuyin ˙ \u02D9
+← ˙;	# map to nothing
+5 → ˙;	# transform if marked in pinyin
+# did the following with rules for each cluster above
+#  → ˙;	# map nothing in pinyin to zhuyin mark
+#
+#--- reverse filter ----
+#
+:: ([[ㄅ-ㄩ][ˉˊˇˋ˙]]);		# reverse filter: only modifies basic Bopomofo and tone marks
+

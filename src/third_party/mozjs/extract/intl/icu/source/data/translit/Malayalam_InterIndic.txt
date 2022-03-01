@@ -1,0 +1,88 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Malayalam_InterIndic.txt
+# Generated from CLDR
+#
+
+# Malayalam-InterIndic
+#:: NFD (NFC) ;
+ം→\uE002;      # SIGN ANUSVARA
+ഃ→\uE003;      # SIGN VISARGA
+അ→\uE005;      # LETTER A
+ആ→\uE006;      # LETTER AA
+ഇ→\uE007;      # LETTER I
+ഈ→\uE008;      # LETTER II
+ഉ→\uE009;      # LETTER U
+ഊ→\uE00A;      # LETTER UU
+ഋ→\uE00B;      # LETTER VOCALIC R
+ഌ→\uE00C;      # LETTER VOCALIC L
+എ→\uE00E;      # LETTER E
+ഏ→\uE00F;      # LETTER EE
+ഐ→\uE010;      # LETTER AI
+ഒ→\uE012;      # LETTER O
+ഓ→\uE013;      # LETTER OO
+ഔ→\uE014;      # LETTER AU
+ക→\uE015;      # LETTER KA
+ഖ→\uE016;      # LETTER KHA
+ഗ→\uE017;      # LETTER GA
+ഘ→\uE018;      # LETTER GHA
+ങ→\uE019;      # LETTER NGA
+ച→\uE01A;      # LETTER CA
+ഛ→\uE01B;      # LETTER CHA
+ജ→\uE01C;      # LETTER JA
+ഝ→\uE01D;      # LETTER JHA
+ഞ→\uE01E;      # LETTER NYA
+ട→\uE01F;      # LETTER TTA
+ഠ→\uE020;      # LETTER TTHA
+ഡ→\uE021;      # LETTER DDA
+ഢ→\uE022;      # LETTER DDHA
+ണ→\uE023;      # LETTER NNA
+ത→\uE024;      # LETTER TA
+ഥ→\uE025;      # LETTER THA
+ദ→\uE026;      # LETTER DA
+ധ→\uE027;      # LETTER DHA
+ന→\uE028;      # LETTER NA
+പ→\uE02A;      # LETTER PA
+ഫ→\uE02B;      # LETTER PHA
+ബ→\uE02C;      # LETTER BA
+ഭ→\uE02D;      # LETTER BHA
+മ→\uE02E;      # LETTER MA
+യ→\uE02F;      # LETTER YA
+ര→\uE030;      # LETTER RA
+റ→\uE031;      # LETTER RRA
+ല→\uE032;      # LETTER LA
+ള→\uE033;      # LETTER LLA
+ഴ→\uE034;      # LETTER LLLA
+വ→\uE035;      # LETTER VA
+ശ→\uE036;      # LETTER SHA
+ഷ→\uE037;      # LETTER SSA
+സ→\uE038;      # LETTER SA
+ഹ→\uE039;      # LETTER HA
+ാ→\uE03E;      # VOWEL SIGN AA
+ി→\uE03F;      # VOWEL SIGN I
+ീ→\uE040;      # VOWEL SIGN II
+\u0D41→\uE041;      # VOWEL SIGN U
+\u0D42→\uE042;      # VOWEL SIGN UU
+\u0D43→\uE043;      # VOWEL SIGN VOCALIC R
+െ→\uE046;      # VOWEL SIGN E
+േ→\uE047;      # VOWEL SIGN EE
+ൈ→\uE048;      # VOWEL SIGN AI
+\u0D4D→\uE04D;      # SIGN VIRAMA
+ൗ→\uE057;      # AU LENGTH MARK
+ൠ→\uE060;      # LETTER VOCALIC RR
+ൡ→\uE061;      # LETTER VOCALIC LL
+൦→\uE066;      # DIGIT ZERO
+൧→\uE067;      # DIGIT ONE
+൨→\uE068;      # DIGIT TWO
+൩→\uE069;      # DIGIT THREE
+൪→\uE06A;      # DIGIT FOUR
+൫→\uE06B;      # DIGIT FIVE
+൬→\uE06C;      # DIGIT SIX
+൭→\uE06D;      # DIGIT SEVEN
+൮→\uE06E;      # DIGIT EIGHT
+൯→\uE06F;      # DIGIT NINE
+#    :: NFC (NFD) ;
+# eof
+

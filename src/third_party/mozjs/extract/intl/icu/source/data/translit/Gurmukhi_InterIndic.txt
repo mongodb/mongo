@@ -1,0 +1,95 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Gurmukhi_InterIndic.txt
+# Generated from CLDR
+#
+
+# Gurmukhi-InterIndic
+#:: NFD (NFC) ;
+#ਖ\u0A3C→\uE059; # LETTER KHHA
+#ਗ\u0A3C→\uE05A; # LETTER GHHA
+#ਜ\u0A3C→\uE05B; # LETTER ZA
+#ਸ\u0A3C→\uE036; # LETTER SHA
+#ਲ\u0A3C→\uE033; # LETTER LLA
+#ਫ\u0A3C→\uE05E; # LETTER FA
+\u0A01→\uE001;  # SIGN CHANDRABINDU
+\u0A02→\uE002;  # SIGN BINDI
+ਅ→\uE005;  # LETTER A
+ਆ→\uE006;  # LETTER AA
+ਇ→\uE007;  # LETTER I
+ਈ→\uE008;  # LETTER II
+ਉ→\uE009;  # LETTER U
+ਊ→\uE00A;  # LETTER UU
+\u0A0C→\uE032;  # FALLBACK : VOCALLIC LA
+ਏ→\uE00F;  # LETTER EE
+ਐ→\uE010;  # LETTER AI
+ਓ→\uE013;  # LETTER OO
+ਔ→\uE014;  # LETTER AU
+ਕ→\uE015;  # LETTER KA
+ਖ→\uE016;  # LETTER KHA
+ਗ→\uE017;  # LETTER GA
+ਘ→\uE018;  # LETTER GHA
+ਙ→\uE019;  # LETTER NGA
+ਚ→\uE01A;  # LETTER CA
+ਛ→\uE01B;  # LETTER CHA
+ਜ→\uE01C;  # LETTER JA
+ਝ→\uE01D;  # LETTER JHA
+ਞ→\uE01E;  # LETTER NYA
+ਟ→\uE01F;  # LETTER TTA
+ਠ→\uE020;  # LETTER TTHA
+ਡ→\uE021;  # LETTER DDA
+ਢ→\uE022;  # LETTER DDHA
+ਣ→\uE023;  # LETTER NNA
+ਤ→\uE024;  # LETTER TA
+ਥ→\uE025;  # LETTER THA
+ਦ→\uE026;  # LETTER DA
+ਧ→\uE027;  # LETTER DHA
+ਨ→\uE028;  # LETTER NA
+ਪ→\uE02A;  # LETTER PA
+ਫ→\uE02B;  # LETTER PHA
+ਬ→\uE02C;  # LETTER BA
+ਭ→\uE02D;  # LETTER BHA
+ਮ→\uE02E;  # LETTER MA
+ਯ→\uE02F;  # LETTER YA
+ਰ→\uE030;  # LETTER RA
+ਲ→\uE032;  # LETTER LA
+ਲ਼→\uE033; # FALLBACK
+ਵ→\uE035;  # LETTER VA
+ਸ਼→\uE036;
+ਸ\0a3c→\uE036; # FALLBACK
+ਸ→\uE038;  # LETTER SA
+ਹ→\uE039;  # LETTER HA
+\u0A3C→\uE03C;  # SIGN NUKTA
+ਾ→\uE03E;  # VOWEL SIGN AA
+ਿ→\uE03F;  # VOWEL SIGN I
+ੀ→\uE040;  # VOWEL SIGN II
+\u0A41→\uE041;  # VOWEL SIGN U
+\u0A42→\uE042;  # VOWEL SIGN UU
+\u0A47→\uE047;  # VOWEL SIGN EE
+\u0A48→\uE048;  # VOWEL SIGN AI
+\u0A4B→\uE04B;  # VOWEL SIGN OO
+\u0A4C→\uE04C;  # VOWEL SIGN AU
+\u0A4D→\uE04D;  # SIGN VIRAMA
+ੜ→\uE05C;  # LETTER RRA
+੦→\uE066;  # DIGIT ZERO
+੧→\uE067;  # DIGIT ONE
+੨→\uE068;  # DIGIT TWO
+੩→\uE069;  # DIGIT THREE
+੪→\uE06A;  # DIGIT FOUR
+੫→\uE06B;  # DIGIT FIVE
+੬→\uE06C;  # DIGIT SIX
+੭→\uE06D;  # DIGIT SEVEN
+੮→\uE06E;  # DIGIT EIGHT
+੯→\uE06F;  # DIGIT NINE
+\u0A70→\uE07C;  # TIPPI
+\u0A71→\uE07D;  # ADDAK
+ੲ→\uE07E;  # IRI
+ੳ→\uE07F;  # URA
+ੴ→\uE080;  # EK ONKAR
+।→\uE064;        # DANDA
+॥→\uE065;        # DOUBLE DANDA
+#    :: NFC (NFD) ;
+# eof
+

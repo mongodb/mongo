@@ -1,0 +1,22 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_GT{
+    %%Parent{"es_419"}
+    Currencies{
+        GTQ{
+            "Q",
+            "quetzal",
+        }
+    }
+    CurrencyPlurals{
+        GTQ{
+            one{"quetzal"}
+            other{"quetzales"}
+        }
+    }
+    CurrencyUnitPatterns{
+        one{"{1} {0}"}
+        other{"{1} {0}"}
+    }
+}

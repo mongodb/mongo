@@ -1,0 +1,16 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_DO{
+    %%Parent{"es_419"}
+    Currencies{
+        DOP{
+            "RD$",
+            "peso dominicano",
+        }
+        USD{
+            "US$",
+            "dólar estadounidense",
+        }
+    }
+}

@@ -1,0 +1,23 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ml{
+    collations{
+        standard{
+            Sequence{
+                "[reorder Mlym Latn Deva Arab Taml Knda Telu Beng Guru Gujr Orya Sinh]"
+                "&ഃ<<ഽ"
+                "&\u0D4C<<\u0D57"
+                "&ക്<<ക്\u200D<<<ൿ"
+                "&ണ്<<ണ്\u200D<<<ൺ"
+                "&ന്<<ന്\u200D<<<ൻ"
+                "&ര്<<ര്\u200D<<<ർ"
+                "&ല്<<ല്\u200D<<<ൽ"
+                "&ള്<<ള്\u200D<<<ൾ"
+                "&മ്<<ം"
+                "&ന്<<<ൻ്"
+            }
+            Version{"39"}
+        }
+    }
+}

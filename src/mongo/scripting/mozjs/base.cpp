@@ -51,9 +51,9 @@ void BaseInfo::delProperty(JSContext* cx,
                            JS::ObjectOpResult& result) {}
 void BaseInfo::enumerate(JSContext* cx,
                          JS::HandleObject obj,
-                         JS::AutoIdVector& properties,
+                         JS::MutableHandleIdVector properties,
                          bool enumerableOnly) {}
-void BaseInfo::finalize(js::FreeOp* fop, JSObject* obj) {}
+void BaseInfo::finalize(JSFreeOp* fop, JSObject* obj) {}
 void BaseInfo::getProperty(JSContext* cx,
                            JS::HandleObject obj,
                            JS::HandleId id,

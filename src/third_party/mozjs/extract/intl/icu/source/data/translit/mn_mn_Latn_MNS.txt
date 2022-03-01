@@ -1,0 +1,93 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: mn_mn_Latn_MNS.txt
+# Generated from CLDR
+#
+
+# Transliteration of Mongolian Cyrillic Characters into Mongolian Latin
+# Characters according to Mongolian National Standard MNS 5217:2012.
+# http://estandard.gov.mn/file.php?sid=2579
+::[[:Cyrl:]];
+$lower = [[:Ll:]];
+А → A;
+а → a;
+Б → B;
+б → b;
+В → V;
+в → v;
+Г → G;
+г → g;
+Д → D;
+д → d;
+Е} $lower → Ye;
+Е → YE;
+е → ye;
+Ё} $lower → Yo;
+Ё → YO;
+ё → yo;
+Ж → J;
+ж → j;
+З → Z;
+з → z;
+К → K;
+к → k;
+И → I;
+и → i;
+Й → I;
+й → i;
+Л → L;
+л → l;
+М → M;
+м → m;
+Н → N;
+н → n;
+О → O;
+о → o;
+Ө → Ö;
+ө → ö;
+П → P;
+п → p;
+Р → R;
+р → r;
+С → S;
+с → s;
+Т → T;
+т → t;
+У → U;
+у → u;
+Ү → Ü;
+ү → ü;
+Ф → F;
+ф → f;
+Х} $lower → Kh;
+Х → KH;
+х → kh;
+Ц} $lower → Ts;
+Ц → TS;
+ц → ts;
+Ч} $lower → Ch;
+Ч → CH;
+ч → ch;
+Ш} $lower → Sh;
+Ш → SH;
+ш → sh;
+Щ} $lower → Sh;
+Щ → SH;
+щ → sh;
+Ъ → I;
+ъ → i;
+Ы → Y;
+ы → y;
+Ь → I;
+ь → i;
+Э → E;
+э → e;
+Ю} $lower → Yu;
+Ю → YU;
+ю → yu;
+Я} $lower → Ya;
+Я → YA;
+я → ya;
+

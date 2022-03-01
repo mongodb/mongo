@@ -1,0 +1,725 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+en_CA{
+    %%Parent{"en_001"}
+    NumberElements{
+        latn{
+            symbols{
+                exponential{"e"}
+            }
+        }
+    }
+    calendar{
+        chinese{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, MMMM d, r(U)",
+                "MMMM d, r(U)",
+                "MMM d, r",
+                "r-MM-dd",
+                "{1}, {0}",
+                "{1} 'at' {0}",
+                "{1} 'at' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                Ed{"d E"}
+                GyMMMEd{"E, MMM d, r(U)"}
+                GyMMMd{"MMM d, r"}
+                MEd{"E, MM-dd"}
+                MMMEd{"E, MMM d"}
+                MMMMd{"MMMM d"}
+                MMMd{"MMM d"}
+                Md{"MM-dd"}
+                UMMMd{"MMM d, U"}
+                UMd{"U-MM-dd"}
+                yMd{"r-MM-dd"}
+                yyyyM{"r-MM"}
+                yyyyMEd{"E, r-MM-dd"}
+                yyyyMMMEd{"E, MMM d, r(U)"}
+                yyyyMMMd{"MMM d, r"}
+                yyyyMd{"r-MM-dd"}
+            }
+            intervalFormats{
+                MEd{
+                    M{"E, MM-dd – E, MM-dd"}
+                    d{"E, MM-dd – E, MM-dd"}
+                }
+                MMMEd{
+                    M{"E, MMM d – E, MMM d"}
+                    d{"E, MMM d – E, MMM d"}
+                }
+                MMMd{
+                    M{"MMM d – MMM d"}
+                    d{"MMM d – d"}
+                }
+                Md{
+                    M{"MM-dd – MM-dd"}
+                    d{"MM-dd – MM-dd"}
+                }
+                yM{
+                    M{"y-MM – y-MM"}
+                    y{"y-MM – y-MM"}
+                }
+                yMEd{
+                    M{"E, y-MM-dd – E, y-MM-dd"}
+                    d{"E, y-MM-dd – E, y-MM-dd"}
+                    y{"E, y-MM-dd – E, y-MM-dd"}
+                }
+                yMMMEd{
+                    M{"E, MMM d – E, MMM d, U"}
+                    d{"E, MMM d – E, MMM d, U"}
+                    y{"E, MMM d, U – E, MMM d, U"}
+                }
+                yMMMd{
+                    M{"MMM d – MMM d, U"}
+                    d{"MMM d – d, U"}
+                    y{"MMM d, U – MMM d, U"}
+                }
+                yMd{
+                    M{"y-MM-dd – y-MM-dd"}
+                    d{"y-MM-dd – y-MM-dd"}
+                    y{"y-MM-dd – y-MM-dd"}
+                }
+            }
+        }
+        generic{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, MMMM d, y G",
+                "MMMM d, y G",
+                "MMM d, y G",
+                "GGGGG y-MM-dd",
+                "{1}, {0}",
+                "{1} 'at' {0}",
+                "{1} 'at' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                Ed{"d E"}
+                GyMMMEd{"E, MMM d, y G"}
+                GyMMMd{"MMM d, y G"}
+                MEd{"E, MM-dd"}
+                MMMEd{"E, MMM d"}
+                MMMd{"MMM d"}
+                Md{"MM-dd"}
+                yyyyM{"GGGGG y-MM"}
+                yyyyMEd{"E, y-MM-dd GGGGG"}
+                yyyyMMMEd{"E, MMM d, y G"}
+                yyyyMMMd{"MMM d, y G"}
+                yyyyMd{"GGGGG y-MM-dd"}
+            }
+            intervalFormats{
+                MEd{
+                    M{"E, MM-dd – E, MM-dd"}
+                    d{"E, MM-dd – E, MM-dd"}
+                }
+                MMMEd{
+                    M{"E, MMM d – E, MMM d"}
+                    d{"E, MMM d – E, MMM d"}
+                }
+                MMMd{
+                    M{"MMM d – MMM d"}
+                    d{"MMM d – d"}
+                }
+                Md{
+                    M{"MM-dd – MM-dd"}
+                    d{"MM-dd – MM-dd"}
+                }
+                yM{
+                    M{"GGGGG y-MM – y-MM"}
+                    y{"GGGGG y-MM – y-MM"}
+                }
+                yMEd{
+                    M{"E, y-MM-dd – E, y-MM-dd"}
+                    d{"E, y-MM-dd – E, y-MM-dd"}
+                    y{"E, y-MM-dd – E, y-MM-dd"}
+                }
+                yMMMEd{
+                    M{"E, MMM d – E, MMM d, y G"}
+                    d{"E, MMM d – E, MMM d, y G"}
+                    y{"E, MMM d, y – E, MMM d, y G"}
+                }
+                yMMMd{
+                    M{"MMM d – MMM d, y G"}
+                    d{"MMM d – d, y G"}
+                    y{"MMM d, y – MMM d, y G"}
+                }
+                yMd{
+                    M{"GGGGG y-MM-dd – y-MM-dd"}
+                    d{"GGGGG y-MM-dd – y-MM-dd"}
+                    y{"GGGGG y-MM-dd – y-MM-dd"}
+                }
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "a.m.",
+                "p.m.",
+            }
+            AmPmMarkersAbbr{
+                "a.m.",
+                "p.m.",
+            }
+            AmPmMarkersNarrow{
+                "am",
+                "pm",
+            }
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, MMMM d, y",
+                "MMMM d, y",
+                "MMM d, y",
+                "y-MM-dd",
+                "{1}, {0}",
+                "{1} 'at' {0}",
+                "{1} 'at' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                GyMMMEd{"E, MMM d, y G"}
+                GyMMMd{"MMM d, y G"}
+                MEd{"E, MM-dd"}
+                MMMEd{"E, MMM d"}
+                MMMMd{"MMMM d"}
+                MMMd{"MMM d"}
+                MMdd{"MM-dd"}
+                Md{"MM-dd"}
+                yM{"y-MM"}
+                yMEd{"E, y-MM-dd"}
+                yMMMEd{"E, MMM d, y"}
+                yMMMd{"MMM d, y"}
+                yMd{"y-MM-dd"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Sun.",
+                        "Mon.",
+                        "Tue.",
+                        "Wed.",
+                        "Thu.",
+                        "Fri.",
+                        "Sat.",
+                    }
+                }
+            }
+            dayPeriod{
+                format{
+                    narrow{
+                        afternoon1{"aft"}
+                        evening1{"eve"}
+                        midnight{"mid"}
+                        morning1{"mor"}
+                        night1{"night"}
+                        noon{"n"}
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        am{"a.m."}
+                        pm{"p.m."}
+                    }
+                    narrow{
+                        afternoon1{"aft"}
+                        am{"a.m."}
+                        evening1{"eve"}
+                        midnight{"mid"}
+                        morning1{"mor"}
+                        night1{"night"}
+                        pm{"pm"}
+                    }
+                    wide{
+                        am{"a.m."}
+                        pm{"p.m."}
+                    }
+                }
+            }
+            intervalFormats{
+                MEd{
+                    M{"E, MM-dd – E, MM-dd"}
+                    d{"E, MM-dd – E, MM-dd"}
+                }
+                MMMEd{
+                    M{"E, MMM d – E, MMM d"}
+                    d{"E, MMM d – E, MMM d"}
+                }
+                MMMd{
+                    M{"MMM d – MMM d"}
+                    d{"MMM d – d"}
+                }
+                Md{
+                    M{"MM-dd – MM-dd"}
+                    d{"MM-dd – MM-dd"}
+                }
+                yM{
+                    M{"y-MM – y-MM"}
+                    y{"y-MM – y-MM"}
+                }
+                yMEd{
+                    M{"E, y-MM-dd – E, y-MM-dd"}
+                    d{"E, y-MM-dd – E, y-MM-dd"}
+                    y{"E, y-MM-dd – E, y-MM-dd"}
+                }
+                yMMMEd{
+                    M{"E, MMM d – E, MMM d, y"}
+                    d{"E, MMM d – E, MMM d, y"}
+                    y{"E, MMM d, y – E, MMM d, y"}
+                }
+                yMMMd{
+                    M{"MMM d – MMM d, y"}
+                    d{"MMM d – d, y"}
+                    y{"MMM d, y – MMM d, y"}
+                }
+                yMd{
+                    M{"y-MM-dd – y-MM-dd"}
+                    d{"y-MM-dd – y-MM-dd"}
+                    y{"y-MM-dd – y-MM-dd"}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Jan.",
+                        "Feb.",
+                        "Mar.",
+                        "Apr.",
+                        "May",
+                        "Jun.",
+                        "Jul.",
+                        "Aug.",
+                        "Sep.",
+                        "Oct.",
+                        "Nov.",
+                        "Dec.",
+                    }
+                }
+            }
+        }
+        islamic{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, MMMM d, y G",
+                "MMMM d, y G",
+                "MMM d, y G",
+                "GGGGG y-MM-dd",
+                "{1}, {0}",
+                "{1} 'at' {0}",
+                "{1} 'at' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                GyMMMEd{"E, MMM d, y G"}
+                GyMMMd{"MMM d, y G"}
+                MEd{"E, MM-dd"}
+                MMMd{"MMM d"}
+                yyyyM{"y-MM GGGG"}
+                yyyyMMMEd{"E, MMM d, y G"}
+                yyyyMMMd{"MMM d, y G"}
+                yyyyMd{"y-MM-dd GGGGG"}
+            }
+        }
+    }
+    characterLabel{
+        downwards_arrows{"downward arrow"}
+        downwards_upwards_arrows{"downward upward arrow"}
+        leftwards_arrows{"leftward arrow"}
+        leftwards_rightwards_arrows{"leftward rightward arrow"}
+        letterlike_symbols{"letter-like symbol"}
+        limited_use{"limited use"}
+        math_symbols{"math symbol"}
+        nonspacing{"non-spacing"}
+        rightwards_arrows{"rightward arrow"}
+        upwards_arrows{"upward arrows"}
+    }
+    fields{
+        dayperiod{
+            dn{"a.m./p.m."}
+        }
+        dayperiod-narrow{
+            dn{"a.m./p.m."}
+        }
+        dayperiod-short{
+            dn{"a.m./p.m."}
+        }
+        fri-narrow{
+            relative{
+                "-1"{"last Fr"}
+                "0"{"this Fr"}
+                "1"{"next Fr"}
+            }
+            relativeTime{
+                future{
+                    one{"in {0} Fr"}
+                    other{"in {0} Fr’s"}
+                }
+                past{
+                    one{"{0} Fr ago"}
+                    other{"{0} Fr’s ago"}
+                }
+            }
+        }
+        fri-short{
+            relativeTime{
+                future{
+                    one{"in {0} Fri."}
+                    other{"in {0} Fri’s."}
+                }
+                past{
+                    one{"{0} Fri. ago"}
+                    other{"{0} Fri’s. ago"}
+                }
+            }
+        }
+        hour-narrow{
+            dn{"hr."}
+            relativeTime{
+                future{
+                    one{"in {0} hr."}
+                    other{"in {0} hrs."}
+                }
+                past{
+                    one{"{0} hr. ago"}
+                    other{"{0} hrs. ago"}
+                }
+            }
+        }
+        hour-short{
+            dn{"hr."}
+            relativeTime{
+                future{
+                    one{"in {0} hr."}
+                    other{"in {0} hrs."}
+                }
+                past{
+                    one{"{0} hr. ago"}
+                    other{"{0} hrs. ago"}
+                }
+            }
+        }
+        minute-narrow{
+            dn{"min."}
+            relativeTime{
+                future{
+                    one{"in {0} min."}
+                    other{"in {0} mins."}
+                }
+                past{
+                    one{"{0} min. ago"}
+                    other{"{0} mins. ago"}
+                }
+            }
+        }
+        minute-short{
+            dn{"min."}
+            relativeTime{
+                future{
+                    one{"in {0} min."}
+                    other{"in {0} mins."}
+                }
+                past{
+                    one{"{0} min. ago"}
+                    other{"{0} mins. ago"}
+                }
+            }
+        }
+        mon-narrow{
+            relativeTime{
+                future{
+                    one{"in {0} M"}
+                    other{"in {0} Mo’s"}
+                }
+                past{
+                    one{"{0} M ago"}
+                    other{"{0} Mo’s ago"}
+                }
+            }
+        }
+        mon-short{
+            relativeTime{
+                future{
+                    one{"in {0} Mon."}
+                    other{"in {0} Mon’s."}
+                }
+                past{
+                    one{"{0} Mon. ago"}
+                    other{"{0} Mon’s. ago"}
+                }
+            }
+        }
+        month-narrow{
+            dn{"mo."}
+            relativeTime{
+                future{
+                    one{"in {0} mo."}
+                    other{"in {0} mos."}
+                }
+                past{
+                    one{"{0} mo. ago"}
+                    other{"{0} mos. ago"}
+                }
+            }
+        }
+        month-short{
+            dn{"mo."}
+            relativeTime{
+                future{
+                    one{"in {0} mo."}
+                    other{"in {0} mos."}
+                }
+                past{
+                    one{"{0} mo. ago"}
+                    other{"{0} mos. ago"}
+                }
+            }
+        }
+        quarter-narrow{
+            dn{"qtr."}
+            relativeTime{
+                future{
+                    one{"in {0} qtr."}
+                    other{"in {0} qtrs."}
+                }
+                past{
+                    one{"{0} qtr. ago"}
+                    other{"{0} qtrs. ago"}
+                }
+            }
+        }
+        quarter-short{
+            dn{"qtr."}
+            relativeTime{
+                future{
+                    one{"in {0} qtr."}
+                    other{"in {0} qtrs."}
+                }
+                past{
+                    one{"{0} qtr. ago"}
+                    other{"{0} qtrs. ago"}
+                }
+            }
+        }
+        sat-narrow{
+            relativeTime{
+                future{
+                    one{"in {0} Sa"}
+                    other{"in {0} Sa’s"}
+                }
+                past{
+                    one{"{0} Sa ago"}
+                    other{"{0} Sa’s ago"}
+                }
+            }
+        }
+        sat-short{
+            relativeTime{
+                future{
+                    one{"in {0} Sat."}
+                    other{"in {0} Sat’s."}
+                }
+                past{
+                    one{"{0} Sat. ago"}
+                    other{"{0} Sat’s. ago"}
+                }
+            }
+        }
+        second-narrow{
+            dn{"sec."}
+            relativeTime{
+                future{
+                    one{"in {0} sec."}
+                    other{"in {0} secs."}
+                }
+                past{
+                    one{"{0} sec. ago"}
+                    other{"{0} secs. ago"}
+                }
+            }
+        }
+        second-short{
+            dn{"sec."}
+            relativeTime{
+                future{
+                    one{"in {0} sec."}
+                    other{"in {0} secs."}
+                }
+                past{
+                    one{"{0} sec. ago"}
+                    other{"{0} secs. ago"}
+                }
+            }
+        }
+        sun-narrow{
+            relativeTime{
+                future{
+                    one{"in {0} Su"}
+                    other{"in {0} Su’s"}
+                }
+                past{
+                    one{"{0} Su ago"}
+                    other{"{0} Su’s ago"}
+                }
+            }
+        }
+        sun-short{
+            relativeTime{
+                future{
+                    one{"in {0} Sun."}
+                    other{"in {0} Sun’s."}
+                }
+                past{
+                    one{"{0} Sun. ago"}
+                    other{"{0} Sun’s. ago"}
+                }
+            }
+        }
+        thu-narrow{
+            relativeTime{
+                future{
+                    one{"in {0} Th"}
+                    other{"in {0} Th’s"}
+                }
+                past{
+                    one{"{0} Th ago"}
+                    other{"{0} Th’s ago"}
+                }
+            }
+        }
+        thu-short{
+            relativeTime{
+                future{
+                    one{"in {0} Thu."}
+                    other{"in {0} Thu’s."}
+                }
+                past{
+                    one{"{0} Thu. ago"}
+                    other{"{0} Thu’s ago"}
+                }
+            }
+        }
+        tue-narrow{
+            relativeTime{
+                future{
+                    one{"in {0} Tu"}
+                    other{"in {0} Tu’s"}
+                }
+                past{
+                    one{"{0} Tu ago"}
+                    other{"{0} Tu’s ago"}
+                }
+            }
+        }
+        tue-short{
+            relativeTime{
+                future{
+                    one{"in {0} Tue."}
+                    other{"in {0} Tue’s."}
+                }
+                past{
+                    one{"{0} Tue. ago"}
+                    other{"{0} Tue’s. ago"}
+                }
+            }
+        }
+        wed-narrow{
+            relative{
+                "-1"{"last We"}
+                "0"{"this We"}
+                "1"{"next We"}
+            }
+            relativeTime{
+                future{
+                    one{"in {0} We"}
+                    other{"in {0} We’s"}
+                }
+                past{
+                    one{"{0} We ago"}
+                    other{"{0} We’s ago"}
+                }
+            }
+        }
+        wed-short{
+            relativeTime{
+                future{
+                    one{"in {0} Wed."}
+                    other{"in {0} Wed’s."}
+                }
+                past{
+                    one{"{0} Wed. ago"}
+                    other{"{0} Wed’s. ago"}
+                }
+            }
+        }
+        week-narrow{
+            dn{"wk."}
+            relativePeriod{"the wk. of {0}"}
+            relativeTime{
+                future{
+                    one{"in {0} wk."}
+                    other{"in {0} wks."}
+                }
+                past{
+                    one{"{0} wk. ago"}
+                    other{"{0} wks. ago"}
+                }
+            }
+        }
+        week-short{
+            dn{"wk."}
+            relativePeriod{"the wk. of {0}"}
+            relativeTime{
+                future{
+                    one{"in {0} wk."}
+                    other{"in {0} wks."}
+                }
+                past{
+                    one{"{0} wk. ago"}
+                    other{"{0} wks. ago"}
+                }
+            }
+        }
+        year-narrow{
+            dn{"yr."}
+            relativeTime{
+                future{
+                    one{"in {0} yr."}
+                    other{"in {0} yrs."}
+                }
+                past{
+                    one{"{0} yr. ago"}
+                    other{"{0} yrs. ago"}
+                }
+            }
+        }
+        year-short{
+            dn{"yr."}
+            relativeTime{
+                future{
+                    one{"in {0} yr."}
+                    other{"in {0} yrs."}
+                }
+                past{
+                    one{"{0} yr. ago"}
+                    other{"{0} yrs. ago"}
+                }
+            }
+        }
+    }
+}

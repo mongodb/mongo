@@ -1,0 +1,52 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ksb{
+    Languages{
+        ak{"Kiakan"}
+        am{"Kiamhali"}
+        ar{"Kialabu"}
+        be{"Kibelaausi"}
+        bg{"Kibulgalia"}
+        bn{"Kibangla"}
+        cs{"Kichecki"}
+        de{"Kijeumani"}
+        el{"Kigiiki"}
+        en{"Kiingeeza"}
+        es{"Kihispania"}
+        fa{"Kiajemi"}
+        fr{"Kifalansa"}
+        ha{"Kihausa"}
+        hi{"Kihindi"}
+        hu{"Kihungai"}
+        id{"Kiindonesia"}
+        ig{"Kiigbo"}
+        it{"Kiitaliano"}
+        ja{"Kijapani"}
+        jv{"Kijava"}
+        km{"Kikambodia"}
+        ko{"Kikolea"}
+        ksb{"Kishambaa"}
+        ms{"Kimalesia"}
+        my{"Kibulma"}
+        ne{"Kinepali"}
+        nl{"Kiholanzi"}
+        pa{"Kipunjabi"}
+        pl{"Kipolandi"}
+        pt{"Kileno"}
+        ro{"Kiomania"}
+        ru{"Kilusi"}
+        rw{"Kinyalwanda"}
+        so{"Kisomali"}
+        sv{"Kiswidi"}
+        ta{"Kitamil"}
+        th{"Kitailandi"}
+        tr{"Kituuki"}
+        uk{"Kiuklania"}
+        ur{"Kiuldu"}
+        vi{"Kivietinamu"}
+        yo{"Kiyoluba"}
+        zh{"Kichina"}
+        zu{"Kizulu"}
+    }
+}

@@ -1,0 +1,92 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ceb{
+    Languages{
+        ar{"Arabic"}
+        ar_001{"Modernong Tamdanang Arabic"}
+        bn{"Bangla"}
+        ceb{"Binisaya"}
+        de{"Aleman"}
+        de_AT{"Austriano nga Aleman"}
+        de_CH{"Taas nga Aleman sa Switzerland"}
+        en{"Ingles"}
+        en_AU{"Ingles sa Australia"}
+        en_CA{"Ingles sa Canada"}
+        en_GB{"Britanikong Ingles"}
+        en_US{"Ingles sa Amerika"}
+        es{"Espanyol"}
+        es_419{"Espanyol sa Latin Amerika"}
+        es_ES{"Espanyol sa Europe"}
+        es_MX{"Espanyol sa Mexico"}
+        fr{"Pranses"}
+        fr_CA{"Pranses sa Canada"}
+        fr_CH{"Pranses sa Switzerland"}
+        hi{"Hindi"}
+        id{"Indonesian"}
+        it{"Italiano"}
+        ja{"Hinapon"}
+        ko{"Korean"}
+        nl{"Dutch"}
+        nl_BE{"Flemish"}
+        pl{"Polish"}
+        pt{"Portuguese"}
+        pt_BR{"Brazilyanong Portuguese"}
+        pt_PT{"Portuguese sa Europe"}
+        ru{"Ruso"}
+        th{"Thai"}
+        tr{"Turkish"}
+        und{"Wala Mailhing Lengguwahe"}
+        zh{"Inintsik"}
+        zh_Hans{"Pinasimpleng Inintsik"}
+        zh_Hant{"Tradisyonal nga Ininstsik"}
+    }
+    Languages%long{
+        zh_Hans{"Pinasimpleng Mandarin nga Inintsik"}
+        zh_Hant{"Tradisyonal nga Mandarin nga Inintsik"}
+    }
+    Languages%menu{
+        zh{"Inintsik, Mandarin"}
+    }
+    Languages%short{
+        en_GB{"Ingles sa UK"}
+        en_US{"Ingles sa US"}
+    }
+    Scripts{
+        Arab{"Arabo"}
+        Cyrl{"Sirilisko"}
+        Hans{"Pinasimple"}
+        Hant{"Tradisyonal"}
+        Jpan{"Hinapon"}
+        Kore{"Korean"}
+        Latn{"Latin"}
+        Zxxx{"Dili Sinulat"}
+        Zzzz{"Wala Mailhing Script"}
+    }
+    Scripts%stand-alone{
+        Hans{"Pinasimpleng Han"}
+        Hant{"Tradisyonal nga Han"}
+    }
+    Types{
+        calendar{
+            gregorian{"Gregorian nga Kalendaryo"}
+            iso8601{"Kalendaryo sa ISO-8601"}
+        }
+        collation{
+            standard{"Tamdanang Paagi sa Paghan-ay"}
+        }
+        numbers{
+            latn{"Mga Western Digit"}
+        }
+    }
+    codePatterns{
+        language{"Lengguwahe: {0}"}
+        script{"Script: {0}"}
+        territory{"Rehiyon: {0}"}
+    }
+    localeDisplayPattern{
+        keyTypePattern{"{0}: {1}"}
+        pattern{"{0} ({1})"}
+        separator{"{0}, {1}"}
+    }
+}

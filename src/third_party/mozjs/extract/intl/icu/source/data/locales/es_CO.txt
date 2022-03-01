@@ -1,0 +1,285 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_CO{
+    %%Parent{"es_419"}
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"¤ #,##0.00"}
+            }
+            symbols{
+                decimal{","}
+                group{"."}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, d 'de' MMMM 'de' y G",
+                "d 'de' MMMM 'de' y G",
+                "d/MM/y G",
+                "d/MM/yy GGGGG",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                GyMMMEd{"E, d MMM 'de' y G"}
+            }
+            intervalFormats{
+                M{
+                    M{"M 'a' M"}
+                }
+                MEd{
+                    M{"E d/MM 'al' E d/MM"}
+                    d{"E d/MM 'a' E d/MM"}
+                }
+                MMM{
+                    M{"MMM 'a' MMM"}
+                }
+                MMMEd{
+                    M{"E d 'de' MMM 'al' E d 'de' MMM"}
+                    d{"E d 'al' E d 'de' MMM"}
+                }
+                MMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM"}
+                    d{"d 'a' d 'de' MMM"}
+                }
+                Md{
+                    M{"d/MM 'al' d/MM"}
+                    d{"d/MM 'a' d/MM"}
+                }
+                d{
+                    d{"d 'a' d"}
+                }
+                fallback{"{0} ‘al’ {1}"}
+                y{
+                    y{"y 'a' y G"}
+                }
+                yM{
+                    M{"M/y 'a' M/y GGGGG"}
+                    y{"M/y 'al' M/y GGGGG"}
+                }
+                yMEd{
+                    M{"E, d/M/y 'al' E, d/M/y GGGGG"}
+                    d{"E, d/M/y 'a' E, d/M/y GGGGG"}
+                    y{"E, d/M/y 'al' E, d/M/y GGGGG"}
+                }
+                yMMM{
+                    M{"MMM 'a' MMM 'de' y G"}
+                    y{"MMM 'de' y 'a' MMM 'de' y"}
+                }
+                yMMMEd{
+                    M{"E d 'de' MMM 'al' E d 'de' MMM 'de' y G"}
+                    d{"E d 'de' MMM 'al' E d 'de' MMM 'de' y G"}
+                    y{"E d 'de' MMM 'de' y 'al' E d 'de' MMM 'de' y G"}
+                }
+                yMMMM{
+                    M{"MMMM 'a' MMMM 'de' y G"}
+                    y{"MMMM 'de' y 'a' MMMM 'de' y G"}
+                }
+                yMMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM y G"}
+                    d{"d 'a' d 'de' MMM 'de' y G"}
+                    y{"d 'de' MMM 'de' y 'al' d 'de' MMM 'de' y G"}
+                }
+                yMd{
+                    M{"d/M/y 'al' d/M/y GGGGG"}
+                    d{"d/M/y 'a' d/M/y GGGGG"}
+                    y{"d/M/y 'al' d/M/y GGGGG"}
+                }
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, d 'de' MMMM 'de' y",
+                "d 'de' MMMM 'de' y",
+                "d/MM/y",
+                "d/MM/yy",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                GyMMM{"MMM 'de' y G"}
+                GyMMMEd{"E, d MMM 'de' y G"}
+                H{"H"}
+                Hm{"H:mm"}
+                Hms{"H:mm:ss"}
+                MMMEd{"E, d 'de' MMM"}
+                MMMd{"d 'de' MMM"}
+                MMMdd{"d 'de' MMM"}
+                yMEd{"EEE, d/M/y"}
+            }
+            dayNames{
+                format{
+                    narrow{
+                        "D",
+                        "L",
+                        "M",
+                        "M",
+                        "J",
+                        "V",
+                        "S",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "d",
+                        "l",
+                        "m",
+                        "m",
+                        "j",
+                        "v",
+                        "s",
+                    }
+                }
+            }
+            dayPeriod{
+                format{
+                    abbreviated{
+                        evening1{"de la tarde"}
+                        morning2{"de la mañana"}
+                        night1{"de la noche"}
+                        noon{"m."}
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        noon{"m."}
+                    }
+                    narrow{
+                        noon{"m."}
+                    }
+                }
+            }
+            intervalFormats{
+                H{
+                    H{"HH 'a' HH"}
+                }
+                Hm{
+                    H{"HH:mm 'a' HH:mm"}
+                    m{"HH:mm 'a' HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm 'a' HH:mm v"}
+                    m{"HH:mm 'a' HH:mm v"}
+                }
+                Hv{
+                    H{"HH 'a' HH v"}
+                }
+                M{
+                    M{"M 'a' M"}
+                }
+                MEd{
+                    M{"E d/MM 'al' E d/MM"}
+                    d{"E d/MM 'a' E d/MM"}
+                }
+                MMM{
+                    M{"MMM 'a' MMM"}
+                }
+                MMMEd{
+                    M{"E d 'de' MMM 'al' E d 'de' MMM"}
+                    d{"E d 'al' E d 'de' MMM"}
+                }
+                MMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM"}
+                    d{"d 'a' d 'de' MMM"}
+                }
+                Md{
+                    M{"d/MM 'al' d/MM"}
+                    d{"d/MM 'a' d/MM"}
+                }
+                d{
+                    d{"d 'a' d"}
+                }
+                fallback{"{0} ‘al’ {1}"}
+                h{
+                    a{"h a 'a' h a"}
+                    h{"h 'a' h a"}
+                }
+                hm{
+                    a{"h:mm a 'a' h:mm a"}
+                    h{"h:mm 'a' h:mm a"}
+                    m{"h:mm 'a' h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a 'a' h:mm a v"}
+                    h{"h:mm 'a' h:mm a v"}
+                    m{"h:mm 'a' h:mm a v"}
+                }
+                hv{
+                    a{"h a 'a' h a v"}
+                    h{"h 'a' h a v"}
+                }
+                y{
+                    y{"y 'a' y"}
+                }
+                yM{
+                    M{"MM/y 'a' MM/y"}
+                    y{"MM/y 'al' MM/y"}
+                }
+                yMEd{
+                    M{"E d/MM/y 'al' E d/MM/y"}
+                    d{"E d/MM/y 'a' E d/MM/y"}
+                    y{"E d/MM/y 'al' E d/MM/y"}
+                }
+                yMMM{
+                    M{"MMM 'a' MMM 'de' y"}
+                    y{"MMM 'de' y 'a' MMM 'de' y"}
+                }
+                yMMMEd{
+                    M{"E d 'de' MMM 'al' E d 'de' MMM 'de' y"}
+                    d{"E d 'al' E d 'de' MMM 'de' y"}
+                    y{"E d 'de' MMM 'de' y 'al' E d 'de' MMM 'de' y"}
+                }
+                yMMMM{
+                    M{"MMMM 'a' MMMM 'de' y"}
+                    y{"MMMM 'de' y 'a' MMMM 'de' y"}
+                }
+                yMMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM 'de' y"}
+                    d{"d 'a' d 'de' MMM 'de' y"}
+                    y{"d 'de' MMM 'de' y 'al' d 'de' MMM 'de' y"}
+                }
+                yMd{
+                    M{"d/MM/y 'al' d/MM/y"}
+                    d{"d/MM/y 'a' d/MM/y"}
+                    y{"d/MM/y 'al' d/MM/y"}
+                }
+            }
+            monthNames{
+                stand-alone{
+                    abbreviated{
+                        "ene.",
+                        "feb.",
+                        "mar.",
+                        "abr.",
+                        "may.",
+                        "jun.",
+                        "jul.",
+                        "ago.",
+                        "sept.",
+                        "oct.",
+                        "nov.",
+                        "dic.",
+                    }
+                }
+            }
+        }
+    }
+}

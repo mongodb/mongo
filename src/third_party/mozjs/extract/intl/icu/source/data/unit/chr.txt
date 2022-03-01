@@ -1,0 +1,1940 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+chr{
+    durationUnits{
+        hm{"h:mm"}
+        hms{"h:mm:ss"}
+        ms{"m:ss"}
+    }
+    units{
+        acceleration{
+            g-force{
+                dnam{"ᎠᏓᎾᏌᏁᏍᎩ-ᎦᏌᏙᏯᏍᏗ"}
+                one{"{0} ᎠᏓᎾᏌᏁᏍᎩ-ᎦᏌᏙᏯᏍᏗ"}
+                other{"{0} ᎠᏓᎾᏌᏁᏍᎩ-ᎦᏌᏙᏯᏍᏗ"}
+            }
+            meter-per-square-second{
+                dnam{"ᏗᏟᎶᏗ ᎠᏎᏢ ᎢᏳᏓᎵ ᏅᎩ ᏧᏅᏏᎩ"}
+                one{"{0} ᎠᏟᎶᏗ ᎠᏎᏢ ᎢᏳᏓᎵ ᏅᎩ ᏧᏅᏏᎩ"}
+                other{"{0} ᏗᏟᎶᏗ ᎠᏎᏢ ᎢᏳᏓᎵ ᏅᎩ ᏧᏅᏏᎩ"}
+            }
+        }
+        angle{
+            arc-minute{
+                dnam{"ᎠᏥ ᎢᏧᏔᏬᏍᏔᏅ"}
+                one{"{0} ᎠᏥ ᎢᏯᎦᏔᏬᏍᏔᏅ"}
+                other{"{0} ᎠᏥ ᎢᏧᏔᏬᏍᏔᏅ"}
+            }
+            arc-second{
+                dnam{"ᎠᏥ ᏓᏓᎾᏬᏍᎬ"}
+                one{"{0} ᎠᏥ ᎠᏓᎾᏬᏍᎬ"}
+                other{"{0} ᎠᏥ ᏓᏓᎾᏬᏍᎬ"}
+            }
+            degree{
+                dnam{"ᎢᎦᎢ ᎢᏗᎦᏘ"}
+                one{"{0} ᎢᎦᎢ ᎢᎦ"}
+                other{"{0} ᎢᎦᎢ ᎢᏗᎦᏘ"}
+            }
+            radian{
+                dnam{"ᎠᏥ ᏗᏟᎶᏍᏙᏗ"}
+                one{"{0} ᎠᏥ ᎠᏟᎶᏍᏙᏗ"}
+                other{"{0} ᎠᏥ ᏗᏟᎶᏍᏙᏗ"}
+            }
+            revolution{
+                dnam{"ᎠᏕᏲᎲ"}
+                one{"{0} ᎠᏕᏲᎲ"}
+                other{"{0} ᏗᏕᏲᎯ"}
+            }
+        }
+        area{
+            acre{
+                dnam{"ᎢᏧᏟᎶᏓ"}
+                one{"{0} ᏑᏟᎶᏓᎢ"}
+                other{"{0} ᎢᏧᏟᎶᏓ"}
+            }
+            dunam{
+                dnam{"ᏚᎾᎹᏍ"}
+                one{"{0} ᏚᎾᎹ"}
+                other{"{0} ᏚᎾᎹᏍ"}
+            }
+            hectare{
+                dnam{"ᎮᏔ ᏑᏟᎶᏛ"}
+                one{"{0} ᎮᏔ ᏑᏟᎶᏛ"}
+                other{"{0} ᎮᏔ ᎢᏳᏟᎶᏛ"}
+            }
+            square-centimeter{
+                dnam{"ᏅᎩ ᏧᏍᏗ ᏗᏟᎶᏍᏗ"}
+                one{"{0} ᏅᎩ ᎤᏍᏗ ᎠᏟᎶᏍᏗ"}
+                other{"{0} ᏅᎩ ᏧᏍᏗ ᏗᏟᎶᏍᏗ"}
+                per{"{0} ᏅᎩ ᎤᏍᏗ ᎠᏟᎶᏍᏗ ᎢᏳᏓᎵ"}
+            }
+            square-foot{
+                dnam{"ᏅᎩ ᏧᏅᏏᏱ ᎢᏗᎳᏏᏗ"}
+                one{"{0} ᏅᎩ ᏧᏅᏏᏱ ᎢᏗᎳᏏᏗ"}
+                other{"{0} ᏅᎩ ᏧᏅᏏᏱ ᎢᏗᎳᏏᏗ"}
+            }
+            square-inch{
+                dnam{"ᏅᎩ ᏧᏅᏏᏱ ᎢᏗᏏᏔᏗᏍᏗ"}
+                one{"{0} ᏅᎩ ᏧᏅᏏᏱ ᎢᏏᏔᏗᏍᏗ"}
+                other{"{0} ᏅᎩ ᏧᏅᏏᏱ ᎢᏗᏏᏔᏗᏍᏗ"}
+                per{"{0} ᏅᎩ ᏧᏅᏏᏱ ᎢᏏᏔᏗᏍᏗ ᎢᏳᏓᎵ"}
+            }
+            square-kilometer{
+                dnam{"ᏅᎩ ᏧᏅᏏᏱ ᎠᎦᏴᎵ ᏗᏟᎶᏍᏗ"}
+                one{"{0} ᏅᎩ ᏧᏅᏏᏱ ᎠᎦᏴᎵ ᎠᏟᎶᏍᏗ"}
+                other{"{0} ᏅᎩ ᏧᏅᏏᏱ ᎠᎦᏴᎵ ᏗᏟᎶᏍᏗ"}
+                per{"{0} ᏅᎩ ᏧᏅᏏᏱ ᎠᎦᏴᎵ ᎠᏟᎶᏍᏗ ᎢᏳᏓᎵ"}
+            }
+            square-meter{
+                dnam{"ᏅᎩ ᏧᏅᏏᏱ ᏗᏟᎶᏍᏗ"}
+                one{"{0} ᏅᎩ ᏧᏅᏏᏱ ᎠᏟᎶᏍᏗ"}
+                other{"{0} ᏅᎩ ᏧᏅᏏᏱ ᏗᏟᎶᏍᏗ"}
+                per{"{0} ᏅᎩ ᏧᏅᏏᏱ ᎠᏟᎶᏍᏗ ᎢᏳᏓᎵ"}
+            }
+            square-mile{
+                dnam{"ᏅᎩ ᏧᏅᏏᏱ ᎢᏳᏟᎶᏓ"}
+                one{"{0} ᏅᎩ ᏧᏅᏏᏱ ᏑᏟᎶᏓ"}
+                other{"{0} ᏅᎩ ᏧᏅᏏᏱ ᎢᏳᏟᎶᏓ"}
+                per{"{0} ᏅᎩ ᏧᏅᏏᏱ ᏑᏟᎶᏓ ᎢᏳᏓᎵ"}
+            }
+            square-yard{
+                dnam{"ᏅᎩ ᏧᏅᏏᏱ ᏗᏯᏯᏗ"}
+                one{"{0} ᏅᎩ ᏧᏅᏏᏱ ᏯᏗ"}
+                other{"{0} ᏅᎩ ᏧᏅᏏᏱ ᏗᏯᏯᏗ"}
+            }
+        }
+        compound{
+            10p-1{"deci{0}"}
+            10p-12{"pico{0}"}
+            10p-15{"femto{0}"}
+            10p-18{"atto{0}"}
+            10p-2{"centi{0}"}
+            10p-21{"zepto{0}"}
+            10p-24{"yocto{0}"}
+            10p-3{"milli{0}"}
+            10p-6{"micro{0}"}
+            10p-9{"nano{0}"}
+            10p1{"deka{0}"}
+            10p12{"tera{0}"}
+            10p15{"peta{0}"}
+            10p18{"exa{0}"}
+            10p2{"hecto{0}"}
+            10p21{"zetta{0}"}
+            10p24{"yotta{0}"}
+            10p3{"kilo{0}"}
+            10p6{"mega{0}"}
+            10p9{"giga{0}"}
+            per{"{0} ᎾᎿ {1}"}
+            power2{
+                one{
+                    _{
+                        _{"ᏅᎩ ᏧᏅᏏᏱ {0}"}
+                    }
+                }
+                other{
+                    _{
+                        _{"ᏅᎩ ᏧᏅᏏᏱ {0}"}
+                    }
+                }
+            }
+            power3{
+                one{
+                    _{
+                        _{"ᏣᏁᎳ ᏧᏅᏏᏱ {0}"}
+                    }
+                }
+                other{
+                    _{
+                        _{"ᏣᏁᎳ ᏧᏅᏏᏱ {0}"}
+                    }
+                }
+            }
+        }
+        concentr{
+            karat{
+                dnam{"ᏗᎧᏇᏓ"}
+                one{"{0} ᎧᏇᏓ"}
+                other{"{0} ᏗᎧᏇᏓ"}
+            }
+            milligram-ofglucose-per-deciliter{
+                dnam{"ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᎤᏍᏗ ᏂᏚᏓᎨᏒ ᏌᏉ ᎢᏳᎾᏓᎢ ᏍᎪᎯ ᎵᏔᎢ ᎢᏳᏓᎵ"}
+                one{"{0} ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᎤᏍᏗ ᎤᏓᎨᏒ ᏌᏉ ᎢᏳᎾᏓᎢ ᏍᎪᎯ ᎵᏔᎢ ᎢᏳᏓᎵ"}
+                other{"{0} ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᎤᏍᏗ ᏂᏚᏓᎨᏒ ᏌᏉ ᎢᏳᎾᏓᎢ ᏍᎪᎯ ᎵᏔᎢ ᎢᏳᏓᎵ"}
+            }
+            millimole-per-liter{
+                dnam{"ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᎠᏂᎼᎵ ᎵᏔᎢ ᎢᏳᏓᎵ"}
+                one{"{0} ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᎼᎵ ᎵᏔᎢ ᎢᏳᏓᎵ"}
+                other{"{0} ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᎠᏂᎼᎵ ᎵᏔᎢ ᎢᏳᏓᎵ"}
+            }
+            mole{
+                dnam{"ᎼᎴᏍ"}
+                one{"{0} ᎼᎴ"}
+                other{"{0} ᎼᎴᏍ"}
+            }
+            percent{
+                dnam{"ᏓᎬᏩᎶᏛ"}
+                one{"{0} ᏓᎬᏩᎶᏛ"}
+                other{"{0} ᏓᎬᏩᎶᏛ"}
+            }
+            permille{
+                dnam{"ᏈᎻᎴ"}
+                one{"{0} ᏈᎻᎴ"}
+                other{"{0} ᏈᎻᎴ"}
+            }
+            permillion{
+                dnam{"ᏚᏙᏢᏒ ᎢᏳᏆᏗᏅᏛ ᎢᏳᏓᎵ"}
+                one{"{0} ᎤᏙᏢᏒ ᎢᏳᏆᏗᏅᏛ ᎢᏳᏓᎵ"}
+                other{"{0} ᏚᏙᏢᏒ ᎢᏳᏆᏗᏅᏛ ᎢᏳᏓᎵ"}
+            }
+            permyriad{
+                dnam{"ᏋᎻᎵᎠᏗ"}
+                one{"{0} ᏋᎻᎵᎠᏗ"}
+                other{"{0} ᏋᎻᎵᎠᏗ"}
+            }
+        }
+        consumption{
+            liter-per-100-kilometer{
+                dnam{"ᏗᎵᏔᎢ 100 ᎠᎦᏴᎵ ᏗᏟᎶᏍᏗ ᎢᏳᏓᎵ"}
+                one{"{0} ᎵᏔᎢ 100 ᎠᎦᏴᎵ ᏗᏟᎶᏍᏗ ᎢᏳᏓᎵ"}
+                other{"{0} ᏗᎵᏔᎢ 100 ᎠᎦᏴᎵ ᏗᏟᎶᏍᏗ ᎢᏳᏓᎵ"}
+            }
+            liter-per-kilometer{
+                dnam{"ᏗᎵᏔᎢ ᎠᎦᏴᎵ ᎠᏟᎶᏍᏗ ᎢᏳᏓᎵ"}
+                one{"{0} ᎵᏔᎢ ᎠᎦᏴᎵ ᎠᏟᎶᏍᏗ ᎢᏳᏓᎵ"}
+                other{"{0} ᏗᎵᏔᎢ ᎠᎦᏴᎵ ᎠᏟᎶᏍᏗ ᎢᏳᏓᎵ"}
+            }
+            mile-per-gallon{
+                dnam{"ᎢᏧᏟᎶᏓ ᎢᏳᎵᎶᏓ ᎢᏳᏓᎵ"}
+                one{"{0} ᏑᏟᎶᏓ ᎢᏳᎵᎶᏓ ᎢᏳᏓᎵ"}
+                other{"{0} ᎢᏧᏟᎶᏓ ᎢᏳᎵᎶᏓ ᎢᏳᏓᎵ"}
+            }
+            mile-per-gallon-imperial{
+                dnam{"ᎢᏧᏟᎶᏓ ᏂᎬᎾᏛᎢ ᎤᏓᏤᎵᎦᏯ ᎢᏳᎵᎶᏓ ᎢᏳᏓᎵ"}
+                one{"{0} ᏑᏟᎶᏓ ᏂᎬᎾᏛᎢ ᎤᏓᏤᎵᎦᏯ ᎢᏳᎵᎶᏓ ᎢᏳᏓᎵ"}
+                other{"{0} ᎢᏧᏟᎶᏓ ᏂᎬᎾᏛᎢ ᎤᏓᏤᎵᎦᏯ ᎢᏳᎵᎶᏓ ᎢᏳᏓᎵ"}
+            }
+        }
+        coordinate{
+            dnam{"ᏅᎩ ᏫᏂᏚᏳᎪᏛᎢ"}
+            east{"{0} ᏗᎧᎸᎬ"}
+            north{"{0} ᏧᏴᏢ"}
+            south{"{0} ᏧᎦᏄᏮ"}
+            west{"{0} ᏭᏕᎵᎬ"}
+        }
+        digital{
+            bit{
+                dnam{"ᎤᏍᎦᎵᏨ"}
+                one{"{0} ᎤᏍᎦᎳ"}
+                other{"{0} ᎤᏍᎦᎵᏨ"}
+            }
+            byte{
+                dnam{"ᏗᏓᏍᎦᎵᎩ"}
+                one{"{0} ᎠᏍᎦᎳ"}
+                other{"{0} ᏗᏓᏍᎦᎵᎩ"}
+            }
+            gigabit{
+                dnam{"ᎩᎦᎤᏍᎦᎵᏨ"}
+                one{"{0} ᎩᎦᎤᏍᎦᎳ"}
+                other{"{0} ᎩᎦᎤᏍᎦᎵᏨ"}
+            }
+            gigabyte{
+                dnam{"ᎩᎦᏗᏓᏍᎦᎵᎩ"}
+                one{"{0} ᎩᎦᎠᏍᎦᎳ"}
+                other{"{0} ᎩᎦᏗᏓᏍᎦᎵᎩ"}
+            }
+            kilobit{
+                dnam{"ᎠᎦᏴᎵ ᎤᏍᎦᎵᏨ"}
+                one{"{0} ᎠᎦᏴᎵ ᎤᏍᎦᎳ"}
+                other{"{0} ᎠᎦᏴᎵ ᎤᏍᎦᎵᏨ"}
+            }
+            kilobyte{
+                dnam{"ᎠᎦᏴᎵ ᏗᏓᏍᎦᎵᎩ"}
+                one{"{0} ᎠᎦᏴᎵ ᎠᏍᎦᎳ"}
+                other{"{0} ᎠᎦᏴᎵ ᏗᏓᏍᎦᎵᎩ"}
+            }
+            megabit{
+                dnam{"ᎺᎦ ᎤᏍᎦᎵᏨ"}
+                one{"{0} ᎺᎦ ᎤᏍᎦᎳ"}
+                other{"{0} ᎺᎦ ᎤᏍᎦᎵᏨ"}
+            }
+            megabyte{
+                dnam{"ᎺᎦ ᏗᏓᏍᎦᎵᎩ"}
+                one{"{0} ᎺᎦ ᎠᏍᎦᎳ"}
+                other{"{0} ᎺᎦ ᏗᏓᏍᎦᎵᎩ"}
+            }
+            petabyte{
+                dnam{"ᏇᏔ ᏗᏓᏍᎦᎵᎩ"}
+                one{"{0} ᏇᏔ ᏗᏓᏍᎦᎵᎩ"}
+                other{"{0} ᏇᏔ ᏗᏓᏍᎦᎵᎩ"}
+            }
+            terabit{
+                dnam{"ᏕᎳ ᎤᏍᎦᎵᏨ"}
+                one{"ᏕᎳ ᎤᏍᎦᎳ"}
+                other{"{0} ᏕᎳ ᎤᏍᎦᎵᏨ"}
+            }
+            terabyte{
+                dnam{"ᏕᎳ ᏗᏓᏍᎦᎵᎩ"}
+                one{"{0} ᏕᎳ ᎠᏍᎦᎳ"}
+                other{"{0} ᏕᎳ ᏗᏓᏍᎦᎵᎩ"}
+            }
+        }
+        duration{
+            century{
+                dnam{"ᏍᎪᎯᏧᏈ ᏧᏕᏘᏴᏓ"}
+                one{"{0} ᏍᎪᎯᏧᏈ ᏧᏕᏘᏴᏓ"}
+                other{"{0} ᏍᎪᎯᏧᏈ ᏧᏕᏘᏴᏓ"}
+            }
+            day{
+                dnam{"ᎯᎸᏍᎩ ᏧᏒᎯᏓ"}
+                one{"{0} ᎢᎦ"}
+                other{"{0} ᎯᎸᏍᎩ ᏧᏒᎯᏓ"}
+                per{"{0} ᎢᎦ ᎢᏳᏓᎵ"}
+            }
+            decade{
+                dnam{"ᏍᎪᎯ ᏧᏕᏘᏴᏓ"}
+                one{"{0} ᏍᎪᎯ ᏧᏕᏘᏴᏓ"}
+                other{"{0} ᏍᎪᎯ ᏧᏕᏘᏴᏓ"}
+            }
+            hour{
+                dnam{"ᎢᏳᏟᎶᏓ"}
+                one{"{0} ᏑᏟᎶᏓ"}
+                other{"{0} ᎢᏳᏟᎶᏓ"}
+                per{"{0} ᏑᏟᎶᏓ ᎢᏳᏓᎵ"}
+            }
+            microsecond{
+                dnam{"ᏌᏉ ᎢᏳᏆᏗᏅᏛ ᏗᏎᏢ"}
+                one{"{0} ᏌᏉ ᎢᏳᏆᏗᏅᏛ ᎠᏎᏢ"}
+                other{"{0} ᏌᏉ ᎢᏳᏆᏗᏅᏛ ᏗᏎᏢ"}
+            }
+            millisecond{
+                dnam{"ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᏗᏎᏢ"}
+                one{"{0} ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᎠᏎᏢ"}
+                other{"{0} ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᏗᏎᏢ"}
+            }
+            minute{
+                dnam{"ᎢᏯᏔᏬᏍᏔᏅ"}
+                one{"{0} ᎢᏯᏔᏬᏍᏔᏅ"}
+                other{"{0} ᎢᏯᏔᏬᏍᏔᏅ"}
+                per{"{0} ᎢᏯᏔᏬᏍᏔᏅ ᎢᏳᏓᎵ"}
+            }
+            month{
+                dnam{"ᏗᎧᎸᎢ"}
+                one{"{0} ᎧᎸᎢ"}
+                other{"{0} ᏗᎧᎸᎢ"}
+                per{"{0} ᎧᎸᎢ ᎢᏳᏓᎵ"}
+            }
+            nanosecond{
+                dnam{"ᎾᏃᏗᏎᏢ"}
+                one{"{0} ᎾᏃᎠᏎᏢ"}
+                other{"{0} ᎾᏃᏗᏎᏢ"}
+            }
+            second{
+                dnam{"ᏗᏎᏢ"}
+                one{"{0} ᎠᏎᏢ"}
+                other{"{0} ᏗᏎᏢ"}
+                per{"{0} ᎠᏎᏢ ᎢᏳᏓᎵ"}
+            }
+            week{
+                dnam{"ᎢᏳᎾᏙᏓᏆᏍᏗ"}
+                one{"{0} ᏒᎾᏙᏓᏆᏍᏗ"}
+                other{"{0} ᎢᏳᎾᏙᏓᏆᏍᏗ"}
+                per{"{0} ᏒᎾᏙᏓᏆᏍᏗ ᎢᏳᏓᎵ"}
+            }
+            year{
+                dnam{"ᏧᏕᏘᏴᏌᏗᏒᎢ"}
+                one{"{0} ᎤᏕᏘᏴᏌᏗᏒᎢ"}
+                other{"{0} ᏧᏕᏘᏴᏌᏗᏒᎢ"}
+                per{"{0} ᎤᏕᏘᏴᏌᏗᏒᎢ ᎢᏳᏓᎵ"}
+            }
+        }
+        electric{
+            ampere{
+                dnam{"ᏗᎾᎦᎵᏍᎩ ᎠᏟᎶᏍᏗ"}
+                one{"{0} ᎠᎾᎦᎵᏍᎩ ᎠᏟᎶᏍᏗ"}
+                other{"{0} ᏗᎾᎦᎵᏍᎩ ᎠᏟᎶᏍᏗ"}
+            }
+            milliampere{
+                dnam{"ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᏗᎾᎦᎵᏍᎩ ᎠᏟᎶᏍᏗ"}
+                one{"{0} ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᎠᎾᎦᎵᏍᎩ ᎠᏟᎶᏍᏗ"}
+                other{"{0} ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᏗᎾᎦᎵᏍᎩ ᎠᏟᎶᏍᏗ"}
+            }
+            ohm{
+                dnam{"ᏗᎣᎻ"}
+                one{"{0} ᎣᎻ"}
+                other{"{0} ᏗᎣᎻ"}
+            }
+            volt{
+                dnam{"ᎠᎾᎦᎵᏍᎩ ᎢᏧᏟᏂᏚᏓ"}
+                one{"{0} ᎠᎾᎦᎵᏍᎩ ᎢᏳᏟᏂᎩᏓ"}
+                other{"{0} ᎠᎾᎦᎵᏍᎩ ᎢᏧᏟᏂᏚᏓ"}
+            }
+        }
+        energy{
+            british-thermal-unit{
+                dnam{"ᏈᏗᏏ ᏗᎬᏍᎦᏢᏗ ᏂᎨᏒᎾ ᏓᎪᎵᏰᎥ ᏭᏍᏗᎬ ᎧᎵᎨᏒ"}
+                one{"{0} ᏈᏗᏏ ᏗᎬᏍᎦᏢᏗ ᏂᎨᏒᎾ ᏓᎪᎵᏰᎥ ᏭᏍᏗᎬ ᎧᎵᎨᏒ"}
+                other{"{0} ᏈᏗᏏ ᏗᎬᏍᎦᏢᏗ ᏂᎨᏒᎾ ᏓᎪᎵᏰᎥ ᏭᏍᏗᎬ ᎧᎵᎨᏒ"}
+            }
+            calorie{
+                dnam{"ᏗᏓᎵᏥᏍᏗᏍᎩ"}
+                one{"{0} ᎠᏓᎵᏥᏍᏗᏍᎩ"}
+                other{"{0} ᏗᏓᎵᏥᏍᏗᏍᎩ"}
+            }
+            electronvolt{
+                dnam{"ᎡᎴᏆᎾᏉᏔᏍ"}
+                one{"{0} ᎡᎴᏆᎾᏉᏔ"}
+                other{"{0} ᎡᎴᏆᎾᏉᏔᏍ"}
+            }
+            foodcalorie{
+                dnam{"ᏗᏓᎵᏥᏍᏗᏍᎩ"}
+                one{"{0} ᎠᏓᎵᏥᏍᏗᏍᎩ"}
+                other{"{0} ᏗᏓᎵᏥᏍᏗᏍᎩ"}
+            }
+            joule{
+                dnam{"ᏗᏦᎤᎵ"}
+                one{"{0} ᏦᎤᎵ"}
+                other{"{0} ᏗᏦᎤᎵ"}
+            }
+            kilocalorie{
+                dnam{"ᎠᎦᏴᎵ ᏗᏓᎵᏥᏍᏗᏍᎩ"}
+                one{"{0} ᎠᎦᏴᎵ ᎠᏓᎵᏥᏍᏗᏍᎩ"}
+                other{"{0} ᎠᎦᏴᎵ ᏗᏓᎵᏥᏍᏗᏍᎩ"}
+            }
+            kilojoule{
+                dnam{"ᎠᎦᏴᎵ ᏗᏦᎤᎵ"}
+                one{"{0} ᎠᎦᏴᎵ ᏦᎤᎵ"}
+                other{"{0} ᎠᎦᏴᎵ ᏗᏦᎤᎵ"}
+            }
+            kilowatt-hour{
+                dnam{"ᎠᎦᏴᎵ-ᎢᏧᏟᎶᏓ"}
+                one{"ᎠᎦᏴᎵ ᎠᏟᎶᏓ"}
+                other{"{0} ᎠᎦᏴᎵ-ᎢᏧᏟᎶᏓ"}
+            }
+            therm-us{
+                dnam{"US ᎤᏗᏞᎬᎢ"}
+                one{"{0} US ᎤᏗᏞᎬᎢ"}
+                other{"{0} US ᎤᏗᏞᎬᎢ"}
+            }
+        }
+        force{
+            newton{
+                dnam{"ᏄᏛᏅᏍ"}
+                one{"{0} ᏄᏛᏅ"}
+                other{"{0} ᏄᏛᏅᏍ"}
+            }
+            pound-force{
+                dnam{"ᏑᏓᎨᏓ ᎾᎿ ᎦᏌᏙᏯᏍᏗ"}
+                one{"{0} ᏑᏓᎨᏓ ᎾᎿ ᎦᏌᏙᏯᏍᏗ"}
+                other{"{0} ᏑᏓᎨᏓ ᎾᎿ ᎦᏌᏙᏯᏍᏗ"}
+            }
+        }
+        frequency{
+            gigahertz{
+                dnam{"ᎩᎦᎭᏥ"}
+                one{"{0} ᎩᎦᎭᏥ"}
+                other{"{0} ᎩᎦᎭᏥ"}
+            }
+            hertz{
+                dnam{"ᎭᏥ"}
+                one{"{0} ᎭᏥ"}
+                other{"{0} ᎭᏥ"}
+            }
+            kilohertz{
+                dnam{"ᎠᎦᏴᎵᎭᏥ"}
+                one{"{0} ᎠᎦᏴᎵᎭᏥ"}
+                other{"{0} ᎠᎦᏴᎵᎭᏥ"}
+            }
+            megahertz{
+                dnam{"ᎺᎦᎭᏥ"}
+                one{"{0} ᎺᎦᎭᏥ"}
+                other{"{0} ᎺᎦᎭᏥ"}
+            }
+        }
+        graphics{
+            dot-per-centimeter{
+                dnam{"ᏧᏓᏓᎸ ᎤᏍᏗ ᎠᏟᎶᏗ ᎢᏳᏓᎵ"}
+                one{"{0} ᎤᏓᏓᎸ ᎤᏍᏗ ᎠᏟᎶᏗ ᎢᏳᏓᎵ"}
+                other{"{0} ᏧᏓᏓᎸ ᎤᏍᏗ ᎠᏟᎶᏗ ᎢᏳᏓᎵ"}
+            }
+            dot-per-inch{
+                dnam{"ᏧᏓᏓᎸ ᎢᏏᎳᏗᏍᏗ ᎢᏳᏓᎵ"}
+                one{"{0} ᎤᏓᏓᎸ ᎢᏏᎳᏗᏍᏗ ᎢᏳᏓᎵ"}
+                other{"{0} ᏧᏓᏓᎸ ᎢᏏᎳᏗᏍᏗ ᎢᏳᏓᎵ"}
+            }
+            em{
+                dnam{"ᎪᏪᎸ em"}
+            }
+            megapixel{
+                dnam{"ᏧᏔᎾ ᏗᏇᎦᏎᎵ"}
+                one{"{0} ᎤᏔᎾ ᏇᎦᏎᎵ"}
+                other{"{0} ᏧᏔᎾ ᏗᏇᎦᏎᎵ"}
+            }
+            pixel{
+                dnam{"ᏗᏇᎦᏎᎵ"}
+                one{"{0} ᏇᎦᏎᎵ"}
+                other{"{0} ᏗᏇᎦᏎᎵ"}
+            }
+            pixel-per-centimeter{
+                dnam{"ᏗᏇᎦᏎᎵ ᎤᏍᏗ ᎠᏟᎶᏗ ᎢᏳᏓᎵ"}
+                one{"{0} ᏇᎦᏎᎵ ᎤᏍᏗ ᎠᏟᎶᏗ ᎢᏳᏓᎵ"}
+                other{"{0} ᏗᏇᎦᏎᎵ ᎤᏍᏗ ᎠᏟᎶᏗ ᎢᏳᏓᎵ"}
+            }
+            pixel-per-inch{
+                dnam{"ᏗᏇᎦᏎᎵ ᎢᏏᎳᏗᏍᏗ ᎢᏳᏓᎵ"}
+                one{"{0} ᏇᎦᏎᎵ ᎢᏏᎳᏗᏍᏗ ᎢᏳᏓᎵ"}
+                other{"{0} ᏗᏇᎦᏎᎵ ᎢᏏᎳᏗᏍᏗ ᎢᏳᏓᎵ"}
+            }
+        }
+        length{
+            astronomical-unit{
+                dnam{"ᎡᎶᎯ ᎠᎴ ᎤᏓ ᏭᏍᏗᎬ ᎧᎵ ᎨᏒᎢ"}
+                one{"{0} ᎡᎶᎯ ᎠᎴ ᎤᏓ ᏭᏍᏗᎬ ᎧᎵ ᎨᏒᎢ"}
+                other{"{0} ᎡᎶᎯ ᎠᎴ ᎤᏓ ᏭᏍᏗᎬ ᎧᎵ ᎨᏒᎢ"}
+            }
+            centimeter{
+                dnam{"ᏧᏍᏗ ᏗᏟᎶᏗ"}
+                one{"{0} ᎤᏍᏗ ᎠᏟᎶᏗ"}
+                other{"{0} ᏧᏍᏗ ᏗᏟᎶᏗ"}
+                per{"{0} ᎤᏍᏗ ᎠᏟᎶᏗ ᎢᏳᏓᎵ"}
+            }
+            decimeter{
+                dnam{"ᏌᏉ ᎢᏳᎾᏓᎢ ᏍᎪᎯ ᏗᏟᎶᏍᏗ"}
+                one{"{0} ᏌᏉ ᎢᏳᎾᏓᎢ ᏍᎪᎯ ᎠᏟᎶᏍᏗ"}
+                other{"{0} ᏌᏉ ᎢᏳᎾᏓᎢ ᏍᎪᎯ ᏗᏟᎶᏍᏗ"}
+            }
+            foot{
+                dnam{"ᎢᏗᎳᏏᏗ"}
+                one{"{0} ᎢᎳᏏᏗ"}
+                other{"{0} ᎢᏗᎳᏏᏗ"}
+                per{"{0} ᎢᎳᏏᏗ ᎢᏳᏓᎵ"}
+            }
+            inch{
+                dnam{"ᎢᏗᏏᏔᏗᏍᏗ"}
+                one{"{0} ᎢᏏᏔᏗᏍᏗ"}
+                other{"{0} ᎢᏗᏏᏔᏗᏍᏗ"}
+                per{"{0} ᎢᏏᏔᏗᏍᏗ ᎢᏳᏓᎵ"}
+            }
+            kilometer{
+                dnam{"ᎠᎦᏴᎵ ᏗᏟᎶᏍᏗ"}
+                one{"{0} ᎠᎦᏴᎵ ᎠᏟᎶᏍᏗ"}
+                other{"{0} ᎠᎦᏴᎵ ᏗᏟᎶᏍᏗ"}
+                per{"{0} ᎠᎦᏴᎵ ᎠᏟᎶᏍᏗ ᎢᏳᏓᎵ"}
+            }
+            light-year{
+                dnam{"ᏗᏨᏍᏗ ᏧᏕᏘᏴᏌᏗᏒᎢ"}
+                one{"{0} ᎠᏨᏍᏗ ᎤᏕᏘᏴᏌᏗᏒᎢ"}
+                other{"{0} ᏗᏨᏍᏗ ᏧᏕᏘᏴᏌᏗᏒᎢ"}
+            }
+            meter{
+                dnam{"ᏗᏟᎶᏍᏗ"}
+                one{"{0} ᎠᏟᎶᏍᏗ"}
+                other{"{0} ᏗᏟᎶᏍᏗ"}
+                per{"{0} ᎠᏟᎶᏍᏗ ᎢᏳᏓᎵ"}
+            }
+            micrometer{
+                dnam{"ᏌᏉ ᎢᏳᏆᏗᏅᏛ ᏗᏟᎶᏍᏗ"}
+                one{"{0} ᏌᏉ ᎢᏳᏆᏗᏅᏛ ᎠᏟᎶᏍᏗ"}
+                other{"{0} ᏌᏉ ᎢᏳᏆᏗᏅᏛ ᏗᏟᎶᏍᏗ"}
+            }
+            mile{
+                dnam{"ᎢᏳᏟᎶᏓ"}
+                one{"{0} ᏑᏟᎶᏓ"}
+                other{"{0} ᎢᏳᏟᎶᏓ"}
+            }
+            mile-scandinavian{
+                dnam{"ᏑᏟᎶᏓ-ᏍᎦᎾᏗᎾᏫᎠᏂ"}
+                one{"{0} ᏑᏟᎶᏓ-ᏍᎦᎾᏗᎾᏫᎠᏂ"}
+                other{"{0} ᎢᏳᏟᎶᏓ-ᏍᎦᎾᏗᎾᏫᎠᏂ"}
+            }
+            millimeter{
+                dnam{"ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᏗᏟᎶᏍᏗ"}
+                one{"ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᎠᏟᎶᏍᏗ"}
+                other{"{0} ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᏗᏟᎶᏍᏗ"}
+            }
+            nanometer{
+                dnam{"ᎾᏃ ᏗᏟᎶᏍᏗ"}
+                one{"{0} ᎾᏃ ᎠᏟᎶᏍᏗ"}
+                other{"{0} ᎾᏃ ᏗᏟᎶᏍᏗ"}
+            }
+            nautical-mile{
+                dnam{"ᎠᎺᏉᎯ ᎢᏳᏟᎶᏓ"}
+                one{"{0} ᎠᎺᏉᎯ ᏑᏟᎶᏓ"}
+                other{"{0} ᎠᎺᏉᎯ ᎢᏳᏟᎶᏓ"}
+            }
+            parsec{
+                dnam{"ᎢᏯᏆᏎᎦ"}
+                one{"{0} ᏆᏎᎦ"}
+                other{"{0} ᎢᏯᏆᏎᎦ"}
+            }
+            picometer{
+                dnam{"ᏇᎪ ᎢᏯᎦᎨᎵᏁᎢ ᏗᏟᎶᏍᏗ"}
+                one{"{0} ᏇᎪ ᎢᏯᎦᎨᎵᏁᎢ ᎠᏟᎶᏍᏗ"}
+                other{"{0} ᏇᎪ ᎢᏯᎦᎨᎵᏁᎢ ᏗᏟᎶᏍᏗ"}
+            }
+            point{
+                dnam{"ᏧᏓᏓᏟ"}
+                one{"{0} ᎤᏓᏓᏟ"}
+                other{"{0} ᏧᏓᏓᏟ"}
+            }
+            solar-radius{
+                dnam{"ᏅᏓ ᏇᏗ"}
+                one{"{0} ᏅᏓ ᏇᏗ"}
+                other{"{0} ᏅᏓ ᏇᏗ"}
+            }
+            yard{
+                dnam{"ᎢᏯᏯᏗ"}
+                one{"{0} ᏯᏗ"}
+                other{"{0} ᎢᏯᏯᏗ"}
+            }
+        }
+        light{
+            lux{
+                dnam{"ᎸᏏ"}
+                one{"{0} ᎸᏏ"}
+                other{"{0} ᎸᏏ"}
+            }
+            solar-luminosity{
+                dnam{"ᏅᏓ ᏗᏨᏍᏗ"}
+                one{"{0} ᏅᏓ ᎠᏨᏍᏗ"}
+                other{"{0} ᏅᏓ ᏗᏨᏍᏗ"}
+            }
+        }
+        mass{
+            carat{
+                dnam{"ᏗᎨᏇᏓ"}
+                one{"{0} ᎨᏇᏓ"}
+                other{"{0} ᏗᎨᏇᏓ"}
+            }
+            dalton{
+                dnam{"ᏓᏙᎾᏍ"}
+                one{"{0} ᏓᏙᎾᏍ"}
+                other{"{0} ᏓᏙᎾᏍ"}
+            }
+            earth-mass{
+                dnam{"ᎡᎶᎯ ᎹᏏ"}
+                one{"{0} ᎡᎶᎯ ᎹᏏ"}
+                other{"{0} ᎡᎶᎯ ᎹᏏ"}
+            }
+            gram{
+                dnam{"ᎤᏍᏗ ᏂᏚᏓᎨᏒ"}
+                one{"{0} ᎤᏍᏗ ᎤᏓᎨᏒ"}
+                other{"{0} ᎤᏍᏗ ᏂᏚᏓᎨᏒ"}
+                per{"{0} ᎤᏍᏗ ᎤᏓᎨᏒ ᎢᏳᏓᎵ"}
+            }
+            kilogram{
+                dnam{"ᎠᎦᏴᎵ ᎤᏍᏗ ᏂᏚᏓᎨᏒ"}
+                one{"{0} ᎠᎦᏴᎵ ᎤᏍᏗ ᎤᏓᎨᏒ"}
+                other{"{0} ᎠᎦᏴᎵ ᎤᏍᏗ ᏂᏚᏓᎨᏒ"}
+                per{"{0} ᎠᎦᏴᎵ ᎤᏍᏗ ᎤᏓᎨᏒ ᎢᏳᏓᎵ"}
+            }
+            metric-ton{
+                dnam{"ᎠᏂᎩᎸᏥ ᏂᏓᏳᏓᎴᏅᎯ ᏗᏎᏍᏗ ᏗᏈᏂ"}
+                one{"{0} ᎠᏂᎩᎸᏥ ᏂᏓᏳᏓᎴᏅᎯ ᏗᏎᏍᏗ ᏈᏂ"}
+                other{"{0} ᎠᏂᎩᎸᏥ ᏂᏓᏳᏓᎴᏅᎯ ᏗᏎᏍᏗ ᏗᏈᏂ"}
+            }
+            microgram{
+                dnam{"ᏌᏉ ᎢᏳᏆᏗᏅᏛ ᎤᏍᏗ ᏂᏚᏓᎨᏒ"}
+                one{"{0} ᏌᏉ ᎢᏳᏆᏗᏅᏛ ᎤᏍᏗ ᎤᏓᎨᏒ"}
+                other{"{0} ᏌᏉ ᎢᏳᏆᏗᏅᏛ ᎤᏍᏗ ᏂᏚᏓᎨᏒ"}
+            }
+            milligram{
+                dnam{"ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᎤᏍᏗ ᏂᏚᏓᎨᏒ"}
+                one{"{0} ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᎤᏍᏗ ᎤᏓᎨᏒ"}
+                other{"{0} ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᎤᏍᏗ ᏂᏚᏓᎨᏒ"}
+            }
+            ounce{
+                dnam{"ᎢᏯᎣᏂᏏ"}
+                one{"{0} ᎣᏂᏏ"}
+                other{"{0} ᎢᏯᎣᏂᏏ"}
+                per{"{0} ᎣᏂᏏ ᎢᏳᏓᎵ"}
+            }
+            ounce-troy{
+                dnam{"ᏆᏯ ᎢᏯᎣᏂᏏ"}
+                one{"{0} ᏆᏯ ᎣᏂᏏ"}
+                other{"{0} ᏆᏯ ᎢᏯᎣᏂᏏ"}
+            }
+            pound{
+                dnam{"ᎢᏧᏓᎨᏓ"}
+                one{"{0} ᏑᏓᎨᏓ"}
+                other{"{0} ᎢᏧᏓᎨᏓ"}
+                per{"{0} ᎢᏧᏓᎨᏓ ᎢᏳᏓᎵ"}
+            }
+            solar-mass{
+                dnam{"ᏅᏓ ᎹᏏ"}
+                one{"{0} ᏅᏓ ᎹᏏ"}
+                other{"{0} ᏅᏓ ᎹᏏ"}
+            }
+            ton{
+                dnam{"ᏗᏈᏂ"}
+                one{"{0} ᏈᏂ"}
+                other{"{0} ᏗᏈᏂ"}
+            }
+        }
+        power{
+            gigawatt{
+                dnam{"ᎩᎦᏩᏗ"}
+                one{"{0} ᎩᎦᏩᏗ"}
+                other{"{0} ᎩᎦᏩᏗ"}
+            }
+            horsepower{
+                dnam{"ᏐᏈᎵ ᎢᏳᎳᏂᎩᏛ"}
+                one{"{0} ᏐᏈᎵ ᎢᏳᎳᏂᎩᏛ"}
+                other{"{0} ᏐᏈᎵ ᎢᏳᎳᏂᎩᏛ"}
+            }
+            kilowatt{
+                dnam{"ᎠᎦᏴᎵ ᏗᏩᏗ"}
+                one{"{0} ᎠᎦᏴᎵ ᏩᏗ"}
+                other{"{0} ᎠᎦᏴᎵ ᏗᏩᏗ"}
+            }
+            megawatt{
+                dnam{"ᎺᎦ ᏗᏩᏗ"}
+                one{"{0} ᎺᎦ ᏩᏗ"}
+                other{"{0} ᎺᎦ ᏗᏩᏗ"}
+            }
+            milliwatt{
+                dnam{"ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᏗᏩᏗ"}
+                one{"{0} ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᏩᏗ"}
+                other{"{0} ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᏗᏩᏗ"}
+            }
+            watt{
+                dnam{"ᏗᏩᏗ"}
+                one{"{0} ᏗᏩᏗ"}
+                other{"{0} ᏗᏩᏗ"}
+            }
+        }
+        pressure{
+            atmosphere{
+                dnam{"ᏗᎦᏃᎴᏍᎬ"}
+                one{"{0} ᎦᏃᎴᏍᎬ"}
+                other{"{0} ᏗᎦᏃᎴᏍᎬ"}
+            }
+            bar{
+                dnam{"ᏕᎦᎾᎸᎢ"}
+                one{"{0} ᎦᎾᎸᎢ"}
+                other{"{0} ᏕᎦᎾᎸᎢ"}
+            }
+            hectopascal{
+                dnam{"ᎮᏔ ᏗᏆᏌᎵ"}
+                one{"{0} ᎮᏔ ᏆᏌᎵ"}
+                other{"{0} ᎮᏔ ᏗᏆᏌᎵ"}
+            }
+            inch-ofhg{
+                dnam{"ᎢᏏᏔᏗᏍᏗ ᎾᎿ ᎹᎫᎢ"}
+                one{"{0} ᎢᏗᎳᏏᏗ ᎾᎿ ᎹᎫᎢ"}
+                other{"{0} ᎢᏏᏔᏗᏍᏗ ᎾᎿ ᎹᎫᎢ"}
+            }
+            kilopascal{
+                dnam{"ᎩᎶᏆᏍᎧᎵᏍ"}
+                one{"{0} ᎩᎶᏆᏍᎧᎵᏍ"}
+                other{"{0} ᎩᎶᏆᏍᎧᎵᏍ"}
+            }
+            megapascal{
+                dnam{"ᎺᎦᏆᏍᎧᎵᏍ"}
+                one{"{0} ᎺᎦᏆᏍᎧᎵᏍ"}
+                other{"{0} ᎺᎦᏆᏍᎧᎵᏍ"}
+            }
+            millibar{
+                dnam{"ᎢᏯᎦᏴᎵ ᏕᎦᎾᎸᎢ"}
+                one{"{0} ᎢᎦᎦᏴᎵ ᎦᎾᎸᎢ"}
+                other{"{0} ᎢᏯᎦᏴᎵ ᏕᎦᎾᎸᎢ"}
+            }
+            millimeter-ofhg{
+                dnam{"ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᏗᏟᎶᏗ ᎾᎿ ᎹᎫᎢ"}
+                one{"{0} ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᎠᏟᎶᏗ ᎾᎿ ᎹᎫᎢ"}
+                other{"{0} ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᏗᏟᎶᏗ ᎾᎿ ᎹᎫᎢ"}
+            }
+            pascal{
+                dnam{"ᏗᏆᏌᎵ"}
+                one{"{0} ᏆᏌᎵ"}
+                other{"{0} ᏗᏆᏌᎵ"}
+            }
+            pound-force-per-square-inch{
+                dnam{"ᎢᏧᏓᎨᏓ ᏅᎩ ᏧᏅᏏᎩ ᎢᏏᏔᏗᏍᏗ ᎢᏳᏓᎵ"}
+                one{"{0} ᏑᏓᎨᏓ ᏅᎩ ᏧᏅᏏᎩ ᎢᏏᏔᏗᏍᏗ ᎢᏳᏓᎵ"}
+                other{"{0} ᎢᏧᏓᎨᏓ ᏅᎩ ᏧᏅᏏᎩ ᎢᏏᏔᏗᏍᏗ ᎢᏳᏓᎵ"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                dnam{"ᎠᎦᏴᎵ ᏗᏟᎶᏍᏗ ᏑᏟᎶᏓ ᎢᏳᏓᎵ"}
+                one{"{0} ᎠᎦᏴᎵ ᎠᏟᎶᏍᏗ ᏑᏟᎶᏓ ᎢᏳᏓᎵ"}
+                other{"{0} ᎠᎦᏴᎵ ᏗᏟᎶᏍᏗ ᏑᏟᎶᏓ ᎢᏳᏓᎵ"}
+            }
+            knot{
+                dnam{"ᏓᎧᏁᎲ"}
+                one{"{0} ᎠᎧᏁᎲ"}
+                other{"{0} ᏓᎧᏁᎲ"}
+            }
+            meter-per-second{
+                dnam{"ᏗᏟᎶᏗ ᎠᏎᏢ ᎢᏳᏓᎵ"}
+                one{"{0} ᎠᏟᎶᏗ ᎠᏎᏢ ᎢᏳᏓᎵ"}
+                other{"{0} ᏗᏟᎶᏗ ᎠᏎᏢ ᎢᏳᏓᎵ"}
+            }
+            mile-per-hour{
+                dnam{"ᎢᏧᏟᎶᏓ ᏑᏟᎶᏛ ᎢᏳᏓᎵ"}
+                one{"{0} ᏑᏟᎶᏓ ᏑᏟᎶᏛ ᎢᏳᏓᎵ"}
+                other{"{0} ᎢᏧᏟᎶᏓ ᏑᏟᎶᏛ ᎢᏳᏓᎵ"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"ᎢᎦᎢ ᎢᏗᎦᏘ ᎠᏤ ᎠᏟᎶᏍᏙᏗ"}
+                one{"{0} ᎢᎦᎢ ᎢᎦ ᎠᏤ ᎠᏟᎶᏍᏙᏗ"}
+                other{"{0} ᎢᎦᎢ ᎢᏗᎦᏘ ᎠᏤ ᎠᏟᎶᏍᏙᏗ"}
+            }
+            fahrenheit{
+                dnam{"ᎢᎦᎢ ᎢᏗᎦᏘ ᏅᎦᏃᏋ ᎠᎴ ᏅᏴᏢ ᎠᏟᎶᏍᏙᏗ"}
+                one{"ᎢᎦᎢ ᎢᎦ ᏅᎦᏃᏋ ᎠᎴ ᏅᏴᏢ ᎠᏟᎶᏍᏙᏗ"}
+                other{"{0} ᎢᎦᎢ ᎢᏗᎦᏘ ᏅᎦᏃᏋ ᎠᎴ ᏅᏴᏢ ᎠᏟᎶᏍᏙᏗ"}
+            }
+            generic{
+                dnam{"°"}
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+            kelvin{
+                dnam{"ᎢᏗᎨᎸᏂ"}
+                one{"{0} ᎨᎸᏂ"}
+                other{"{0} ᎢᏗᎨᎸᏂ"}
+            }
+        }
+        torque{
+            newton-meter{
+                dnam{"ᏄᏛᏅ-ᎠᏟᎶᏍᏗ"}
+                one{"{0} ᏄᏛᏅ-ᎠᏟᎶᏍᏗ"}
+                other{"{0} ᏄᏛᏅ-ᎠᏟᎶᏍᏗ"}
+            }
+            pound-force-foot{
+                dnam{"ᏑᏓᎨᏓ-ᏧᎳᏏᏕᏂ"}
+                one{"{0} ᏑᏓᎨᏓ-ᎤᎳᏏᏕᏂ"}
+                other{"{0} ᏑᏓᎨᏓ-ᏧᎳᏏᏕᏂ"}
+            }
+        }
+        volume{
+            acre-foot{
+                dnam{"ᏑᏟᎶᏛ-ᎢᏗᎳᏏᏗ"}
+                one{"{0} ᏑᏟᎶᏛ-ᎢᎳᏏᏗ"}
+                other{"{0} ᏑᏟᎶᏛ-ᎢᏗᎳᏏᏗ"}
+            }
+            barrel{
+                dnam{"ᏧᏒᏙᏂ"}
+                one{"{0} ᏒᏙᏂ"}
+                other{"{0} ᏧᏒᏙᏂ"}
+            }
+            centiliter{
+                dnam{"ᏧᎤᏍᏗ ᏗᎵᏔᎢ"}
+                one{"{0} ᎤᏍᏗ ᎵᏔᎢ"}
+                other{"{0} ᏧᎤᏍᏗ ᏗᎵᏔᎢ"}
+            }
+            cubic-centimeter{
+                dnam{"ᏅᎩ ᏧᏅᏏᏯ ᏧᏍᏗ ᏗᏟᎶᏍᏗ"}
+                one{"{0} ᏅᎩ ᏧᏅᏏᏯ ᎤᏍᏗ ᎠᏟᎶᏍᏗ"}
+                other{"{0} ᏅᎩ ᏧᏅᏏᏯ ᏧᏍᏗ ᏗᏟᎶᏍᏗ"}
+                per{"{0} ᏅᎩ ᏧᏅᏏᏯ ᎤᏍᏗ ᎠᏟᎶᏍᏗ ᎢᏳᏓᎵ"}
+            }
+            cubic-foot{
+                dnam{"ᏅᎩ ᏧᏅᏏᏯ ᎢᏗᎳᏏᏗ"}
+                one{"{0} ᏅᎩ ᏧᏅᏏᏯ ᎢᎳᏏᏗ"}
+                other{"{0} ᏅᎩ ᏧᏅᏏᏯ ᎢᏗᎳᏏᏗ"}
+            }
+            cubic-inch{
+                dnam{"ᏅᎩ ᏧᏅᏏᏯ ᎢᏗᏏᏔᏗᏍᏗ"}
+                one{"{0} ᏅᎩ ᏧᏅᏏᏯ ᎢᏏᏔᏗᏍᏗ"}
+                other{"{0} ᏅᎩ ᏧᏅᏏᏯ ᎢᏗᏏᏔᏗᏍᏗ"}
+            }
+            cubic-kilometer{
+                dnam{"ᏅᎩ ᏧᏅᏏᏯ ᎠᎦᏴᎵ ᏗᏟᎶᏍᏗ"}
+                one{"{0} ᏅᎩ ᏧᏅᏏᏯ ᎠᎦᏴᎵ ᎠᏟᎶᏍᏗ"}
+                other{"{0} ᏅᎩ ᏧᏅᏏᏯ ᎠᎦᏴᎵ ᏗᏟᎶᏍᏗ"}
+            }
+            cubic-meter{
+                dnam{"ᏅᎩ ᏧᏅᏏᏯ ᏗᏟᎶᏍᏗ"}
+                one{"{0} ᏅᎩ ᏧᏅᏏᏯ ᎠᏟᎶᏍᏗ"}
+                other{"{0} ᏅᎩ ᏧᏅᏏᏯ ᏗᏟᎶᏍᏗ"}
+                per{"{0} ᏅᎩ ᏧᏅᏏᏯ ᎠᏟᎶᏍᏗ ᎢᏳᏓᎵ"}
+            }
+            cubic-mile{
+                dnam{"ᏅᎩ ᏧᏅᏏᏯ ᎢᏳᏟᎶᏓ"}
+                one{"{0} ᏅᎩ ᏧᏅᏏᏯ ᏑᏟᎶᏓ"}
+                other{"{0} ᏅᎩ ᏧᏅᏏᏯ ᎤᏍᏗ ᎢᏳᏟᎶᏓ"}
+            }
+            cubic-yard{
+                dnam{"ᏅᎩ ᏧᏅᏏᏯ ᎢᏯᏯᏗ"}
+                one{"{0} ᏅᎩ ᏧᏅᏏᏯ ᏯᏗ"}
+                other{"{0} ᏅᎩ ᏧᏅᏏᏯ ᎢᏯᏯᏗ"}
+            }
+            cup{
+                dnam{"ᏧᎵᏍᏈᏗ"}
+                one{"{0} ᎤᎵᏍᏈᏗ"}
+                other{"{0} ᏧᎵᏍᏈᏗ"}
+            }
+            cup-metric{
+                dnam{"ᎠᏂᎩᎸᏥ ᏂᏓᏳᏓᎴᏅᎯ ᏗᏎᏍᏗ ᏧᎵᏍᏈᏗ"}
+                one{"{0} ᎠᏂᎩᎸᏥ ᏂᏓᏳᏓᎴᏅᎯ ᏗᏎᏍᏗ ᎤᎵᏍᏈᏗ"}
+                other{"{0} ᎠᏂᎩᎸᏥ ᏂᏓᏳᏓᎴᏅᎯ ᏗᏎᏍᏗ ᏧᎵᏍᏈᏗ"}
+            }
+            deciliter{
+                dnam{"ᏌᏉ ᎢᏳᎾᏓᎢ ᏍᎪᎯ ᎢᏧᏆᏗᏅᏛ"}
+                one{"{0} ᏌᏉ ᎢᏳᎾᏓᎢ ᏍᎪᎯ ᎢᏳᏆᏗᏅᏛ"}
+                other{"{0} ᏌᏉ ᎢᏳᎾᏓᎢ ᏍᎪᎯ ᎢᏧᏆᏗᏅᏛ"}
+            }
+            fluid-ounce{
+                dnam{"ᎤᏓᏁᎯ ᎢᏯᎣᏂᏏ"}
+                one{"{0} ᎤᏓᏁᎯ ᎣᏂᏏ"}
+                other{"{0} ᎤᏓᏁᎯ ᎢᏯᎣᏂᏏ"}
+            }
+            fluid-ounce-imperial{
+                dnam{"Imp. ᎤᏓᏁᎯ ᎢᏯᎣᏂᏏ"}
+                one{"{0} Imp. ᎤᏓᏁᎯ ᎣᏂᏏ"}
+                other{"{0} Imp. ᎤᏓᏁᎯ ᎢᏯᎣᏂᏏ"}
+            }
+            gallon{
+                dnam{"ᎢᏧᎵᎶᏓ"}
+                one{"{0} ᎢᏳᎵᎶᏓ"}
+                other{"{0} ᎢᏧᎵᎶᏓ"}
+                per{"{0} ᎢᏳᎵᎶᏓ ᎢᏳᏓᎵ"}
+            }
+            gallon-imperial{
+                dnam{"ᏂᎬᎾᏛᎢ ᎤᏓᏤᎵᎦᏯ ᎢᏧᎵᎶᏓ"}
+                one{"{0} ᏂᎬᎾᏛᎢ ᎤᏓᏤᎵᎦᏯ ᎢᏳᎵᎶᏓ"}
+                other{"{0} ᏂᎬᎾᏛᎢ ᎤᏓᏤᎵᎦᏯ ᎢᏧᎵᎶᏓ"}
+                per{"{0} ᏂᎬᎾᏛᎢ ᎤᏓᏤᎵᎦᏯ ᎢᏳᎵᎶᏓ ᎢᏳᏓᎵ"}
+            }
+            hectoliter{
+                dnam{"ᎮᏙ ᎢᏧᏆᏗᏅᏛ"}
+                one{"{0} ᎮᏙ ᎢᏳᏆᏗᏅᏛ"}
+                other{"{0} ᎮᏙ ᎢᏧᏆᏗᏅᏛ"}
+            }
+            liter{
+                dnam{"ᎢᏧᏆᏗᏅᏛ"}
+                one{"{0} ᎢᏳᏆᏗᏅᏛ"}
+                other{"{0} ᎢᏧᏆᏗᏅᏛ"}
+                per{"{0} ᎢᏳᏆᏗᏅᏛ ᎢᏳᏓᎵ"}
+            }
+            megaliter{
+                dnam{"ᎺᎦ ᎢᏧᏆᏗᏅᏛ"}
+                one{"{0} ᎺᎦ ᎢᏳᏆᏗᏅᏛ"}
+                other{"{0} ᎺᎦ ᎢᏧᏆᏗᏅᏛ"}
+            }
+            milliliter{
+                dnam{"ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᏗᎵᏔᎵ"}
+                one{"{0} ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᎵᏔᎢ"}
+                other{"{0} ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᏗᎵᏔᎵ"}
+            }
+            pint{
+                dnam{"ᏔᎵ ᏧᎵᏍᏈᏗ ᎠᎧᎵ"}
+                one{"{0} ᏔᎵ ᎤᎵᏍᏈᏗ ᎠᎧᎵ"}
+                other{"{0} ᏔᎵ ᏧᎵᏍᏈᏗ ᎠᎧᎵ"}
+            }
+            pint-metric{
+                dnam{"ᎠᏂᎩᎸᏥ ᏂᏓᏳᏓᎴᏅᎯ ᏗᏎᏍᏗ ᏔᎵ ᏧᎵᏍᏈᏗ ᎠᎧᎵ"}
+                one{"{0} ᎠᏂᎩᎸᏥ ᏂᏓᏳᏓᎴᏅᎯ ᏗᏎᏍᏗ ᏔᎵ ᎤᎵᏍᏈᏗ ᎠᎧᎵ"}
+                other{"{0} ᎠᏂᎩᎸᏥ ᏂᏓᏳᏓᎴᏅᎯ ᏗᏎᏍᏗ ᏔᎵ ᏧᎵᏍᏈᏗ ᎠᎧᎵ"}
+            }
+            quart{
+                dnam{"ᏅᎩ ᎢᏗᎧᎵᎢ"}
+                one{"{0} ᏅᎩ ᎢᏯᎧᎵᎢ"}
+                other{"{0} ᏅᎩ ᎢᏗᎧᎵᎢ"}
+            }
+            tablespoon{
+                dnam{"ᎤᏔᏂ ᏗᏗᏙᏗ"}
+                one{"{0} ᎤᏔᏂ ᎠᏗᏙᏗ"}
+                other{"{0} ᎤᏔᏂ ᏗᏗᏙᏗ"}
+            }
+            teaspoon{
+                dnam{"ᎤᏍᏗ ᏗᏗᏙᏗ"}
+                one{"{0} ᎤᏍᏗ ᎠᏗᏙᏗ"}
+                other{"{0} ᎤᏍᏗ ᏗᏗᏙᏗ"}
+            }
+        }
+    }
+    unitsNarrow{
+        compound{
+            per{"{0}/{1}"}
+        }
+        concentr{
+            percent{
+                dnam{"%"}
+                one{"{0}%"}
+                other{"{0}%"}
+            }
+        }
+        consumption{
+            liter-per-100-kilometer{
+                dnam{"L/100km"}
+                one{"{0}L/100km"}
+                other{"{0}L/100km"}
+            }
+        }
+        coordinate{
+            dnam{"ᏫᏚᏳᎪᏛ"}
+            east{"{0}Ꮧ"}
+            north{"{0}ᏧᏴ"}
+            south{"{0}ᏧᎦ"}
+            west{"{0}Ꮽ"}
+        }
+        duration{
+            day{
+                dnam{"ᎢᎦ"}
+                one{"{0}Ꭲ"}
+                other{"{0}Ꭲ"}
+            }
+            hour{
+                dnam{"ᏑᏟᎶᏓ"}
+                one{"{0}Ꮡ"}
+                other{"{0}Ꮡ"}
+            }
+            millisecond{
+                dnam{"ᏌᎠ"}
+                one{"{0}ᏌᎠ"}
+                other{"{0}ᏌᎠ"}
+            }
+            minute{
+                dnam{"ᎢᏯᏔ"}
+                one{"{0}Ꭲ"}
+                other{"{0}Ꭲ"}
+            }
+            month{
+                dnam{"ᎧᎸᎢ"}
+                one{"{0}Ꭷ"}
+                other{"{0}Ꭷ"}
+            }
+            second{
+                dnam{"ᎠᏎᏢ"}
+                one{"{0}ᎠᏎ"}
+                other{"{0}ᎠᏎ"}
+            }
+            week{
+                dnam{"ᏒᎾ"}
+                one{"{0}Ꮢ"}
+                other{"{0}Ꮢ"}
+            }
+            year{
+                dnam{"ᎤᏕ"}
+                one{"{0}Ꭴ"}
+                other{"{0}Ꭴ"}
+            }
+        }
+        length{
+            centimeter{
+                dnam{"ᏧᎠ"}
+                one{"{0}ᏧᎠ"}
+                other{"{0}ᏧᎠ"}
+            }
+            kilometer{
+                dnam{"ᎠᏗ"}
+                one{"{0}ᎠᏗ"}
+                other{"{0}ᎠᏗ"}
+            }
+            meter{
+                dnam{"ᎠᏟ"}
+                one{"{0}ᎠᏟ"}
+                other{"{0}ᎠᏟ"}
+            }
+            millimeter{
+                dnam{"ᏌᎢᎠ"}
+                one{"{0}ᏌᎢᎠ"}
+                other{"{0}ᏌᎢᎠ"}
+            }
+        }
+        mass{
+            gram{
+                dnam{"ᎤᏍᏗ ᎤᏓᎨᏒ"}
+                one{"{0}g"}
+                other{"{0}g"}
+            }
+            kilogram{
+                dnam{"kg"}
+                one{"{0}kg"}
+                other{"{0}kg"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                dnam{"km/hr"}
+                one{"{0}km/h"}
+                other{"{0}km/h"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"°C"}
+                one{"{0}°C"}
+                other{"{0}°C"}
+            }
+            fahrenheit{
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+        }
+        volume{
+            liter{
+                dnam{"ᎢᏳᏆᏗᏅᏛ"}
+                one{"{0}L"}
+                other{"{0}L"}
+            }
+        }
+    }
+    unitsShort{
+        acceleration{
+            g-force{
+                dnam{"ᎠᏓᎾᏌᏁᏍᎩ-ᎦᏌᏙᏯᏍᏗ"}
+                one{"{0} G"}
+                other{"{0} G"}
+            }
+            meter-per-square-second{
+                dnam{"ᏗᏟᎶᏍᏗ/sec²"}
+                one{"{0} m/s²"}
+                other{"{0} m/s²"}
+            }
+        }
+        angle{
+            arc-minute{
+                dnam{"ᎠᏥ ᎢᏧᏔᏬᏍᏔᏅ"}
+                one{"{0} arcmin"}
+                other{"{0} arcmins"}
+            }
+            arc-second{
+                dnam{"ᎠᏥ ᏓᏓᎾᏬᏍᎬ"}
+                one{"{0} arcsec"}
+                other{"{0} arcsecs"}
+            }
+            degree{
+                dnam{"ᎢᎦᎢ ᎢᏗᎦᏘ"}
+                one{"{0} deg"}
+                other{"{0} deg"}
+            }
+            radian{
+                dnam{"ᎠᏥ ᎠᏟᎶᏍᏙᏗ"}
+                one{"{0} rad"}
+                other{"{0} rad"}
+            }
+            revolution{
+                dnam{"ᎠᏕᏲᎲ"}
+                one{"{0} ᎠᏕᏲᎲ"}
+                other{"{0} ᎠᏕᏲᎲ"}
+            }
+        }
+        area{
+            acre{
+                dnam{"ᎢᏧᏟᎶᏓ"}
+                one{"{0} ᏑᏟᎶ"}
+                other{"{0} ᏑᏟᎶ"}
+            }
+            dunam{
+                dnam{"ᏚᎾᎹᏍ"}
+                one{"{0} ᏚᎾᎹ"}
+                other{"{0} ᏚᎾᎹ"}
+            }
+            hectare{
+                dnam{"ᎮᏔ ᎢᏳᏟᎶᏛ"}
+                one{"{0} ᎨᏑ"}
+                other{"{0} ᎨᏑ"}
+            }
+            square-centimeter{
+                dnam{"cm²"}
+                one{"{0} cm²"}
+                other{"{0} cm²"}
+                per{"{0}/cm²"}
+            }
+            square-foot{
+                dnam{"ᏅᎩ ᏧᏅᏏᏱ ᎢᏗᎳᏏᏗ"}
+                one{"{0} sq ft"}
+                other{"{0} sq ft"}
+            }
+            square-inch{
+                dnam{"ᎢᏗᏏᏔᏗᏍᏗ²"}
+                one{"{0} in²"}
+                other{"{0} in²"}
+                per{"{0}/in²"}
+            }
+            square-kilometer{
+                dnam{"km²"}
+                one{"{0} km²"}
+                other{"{0} km²"}
+                per{"{0}/km²"}
+            }
+            square-meter{
+                dnam{"ᏗᏟᎶᏍᏗ²"}
+                one{"{0} m²"}
+                other{"{0} m²"}
+                per{"{0}/m²"}
+            }
+            square-mile{
+                dnam{"ᏅᎩ ᏧᏅᏏᏱ ᎢᏳᏟᎶᏓ"}
+                one{"{0} ᏅᏧᎢ"}
+                other{"{0} ᏅᏧᎢ"}
+                per{"{0}/mi²"}
+            }
+            square-yard{
+                dnam{"ᏗᏯᏯᏗ²"}
+                one{"{0} yd²"}
+                other{"{0} yd²"}
+            }
+        }
+        compound{
+            per{"{0}/{1}"}
+        }
+        concentr{
+            karat{
+                dnam{"ᏗᎧᏇᏓ"}
+                one{"{0} kt"}
+                other{"{0} kt"}
+            }
+            milligram-ofglucose-per-deciliter{
+                dnam{"mg/dL"}
+                one{"{0} mg/dL"}
+                other{"{0} mg/dL"}
+            }
+            millimole-per-liter{
+                dnam{"ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᎼᎵ ᎵᏔᎢ ᎢᏳᏓᎵ"}
+                one{"{0} mmol/L"}
+                other{"{0} mmol/L"}
+            }
+            mole{
+                dnam{"ᎼᎴ"}
+                one{"{0} mol"}
+                other{"{0} mol"}
+            }
+            percent{
+                dnam{"ᏓᎬᏩᎶᏛ"}
+                one{"{0}%"}
+                other{"{0}%"}
+            }
+            permille{
+                dnam{"ᏈᎻᎴ"}
+                one{"{0}‰"}
+                other{"{0}‰"}
+            }
+            permillion{
+                dnam{"ᏚᏙᏢᏒ/ᎢᏳᏆᏗᏅᏛ"}
+                one{"{0} ppm"}
+                other{"{0} ppm"}
+            }
+            permyriad{
+                dnam{"ᏋᎻᎵᎠᏗ"}
+                one{"{0}‱"}
+                other{"{0}‱"}
+            }
+        }
+        consumption{
+            liter-per-100-kilometer{
+                dnam{"L/100km"}
+                one{"{0} L/100km"}
+                other{"{0} L/100km"}
+            }
+            liter-per-kilometer{
+                dnam{"ᏗᎵᏔᎢ/ᎠᎦᏴᎵ ᎠᏟᎶᏍᏗ"}
+                one{"{0} L/km"}
+                other{"{0} L/km"}
+            }
+            mile-per-gallon{
+                dnam{"ᎢᏧᏟᎶᏓ/ᎢᏳᎵᎶᏓ"}
+                one{"{0} mpg"}
+                other{"{0} mpg"}
+            }
+            mile-per-gallon-imperial{
+                dnam{"ᎢᏧᏟᎶᏓ/ᏂᎬᎾᏛᎢ ᎤᏓᏤᎵᎦᏯ ᎢᏳᎵᎶᏓ"}
+                one{"{0} mpg Imp."}
+                other{"{0} mpg Imp."}
+            }
+        }
+        coordinate{
+            dnam{"ᏫᏚᏳᎪᏛ"}
+            east{"{0} Ꮧ"}
+            north{"{0} ᏧᏴ"}
+            south{"{0} ᏧᎦ"}
+            west{"{0} Ꮽ"}
+        }
+        digital{
+            bit{
+                dnam{"ᎤᏍᎦᎳ"}
+                one{"{0} ᎤᏍᎦᎳ"}
+                other{"{0} ᎤᏍᎦᎳ"}
+            }
+            byte{
+                dnam{"ᎠᏍᎦᎳ"}
+                one{"{0} ᎠᏍᎦᎳ"}
+                other{"{0} ᎠᏍᎦᎳ"}
+            }
+            gigabit{
+                dnam{"ᎩᎦᎤᏍᎦᎳ"}
+                one{"{0} Gb"}
+                other{"{0} Gb"}
+            }
+            gigabyte{
+                dnam{"ᎩᎦᎠᏍᎦᎳ"}
+                one{"{0} GB"}
+                other{"{0} GB"}
+            }
+            kilobit{
+                dnam{"ᎠᎦᏴᎵ ᎤᏍᎦᎳ"}
+                one{"{0} kb"}
+                other{"{0} kb"}
+            }
+            kilobyte{
+                dnam{"ᎠᎦᏴᎵ ᎠᏍᎦᎳ"}
+                one{"{0} kB"}
+                other{"{0} kB"}
+            }
+            megabit{
+                dnam{"ᎺᎦ ᎤᏍᎦᎳ"}
+                one{"{0} Mb"}
+                other{"{0} Mb"}
+            }
+            megabyte{
+                dnam{"ᎺᎦ ᏗᏓᏍᎦᎵᎩ"}
+                one{"{0} MB"}
+                other{"{0} MB"}
+            }
+            petabyte{
+                dnam{"PByte"}
+                one{"{0} PB"}
+                other{"{0} PB"}
+            }
+            terabit{
+                dnam{"ᏕᎳ ᎤᏍᎦᎳ"}
+                one{"{0} Tb"}
+                other{"{0} Tb"}
+            }
+            terabyte{
+                dnam{"ᏕᎳ ᎠᏍᎦᎳ"}
+                one{"{0} TB"}
+                other{"{0} TB"}
+            }
+        }
+        duration{
+            century{
+                dnam{"ᏍᏧ"}
+                one{"{0} ᏍᏧ"}
+                other{"{0} ᏍᏧ"}
+            }
+            day{
+                dnam{"ᎯᎸᏍᎩ ᏧᏒᎯᏓ"}
+                one{"{0} ᎢᎦ"}
+                other{"{0} ᏧᏒᎯᏓ"}
+                per{"{0}/Ꭲ"}
+            }
+            decade{
+                dnam{"ᏍᎪᎯ"}
+                one{"{0} ᏍᎪᎯ"}
+                other{"{0} ᏍᎪᎯ"}
+            }
+            hour{
+                dnam{"ᎢᏳᏟᎶᏓ"}
+                one{"{0} ᏑᏟ"}
+                other{"{0} ᏑᏟ"}
+                per{"{0}/Ꮡ"}
+            }
+            microsecond{
+                dnam{"μsecs"}
+                one{"{0} μs"}
+                other{"{0} μs"}
+            }
+            millisecond{
+                dnam{"ᏌᏉ ᎢᏯᎦᎨᎵᏁᎢ ᏗᏎᏢ"}
+                one{"{0} ᏌᎠ"}
+                other{"{0} ᏌᎠ"}
+            }
+            minute{
+                dnam{"ᎢᏯᏔᏬᏍᏔᏅ"}
+                one{"{0} ᎢᏯᏔ"}
+                other{"{0} ᎢᏯᏔ"}
+                per{"{0}/ᎢᏯᏔ"}
+            }
+            month{
+                dnam{"ᏗᎧᎸᎢ"}
+                one{"{0} ᎧᎸᎢ"}
+                other{"{0} ᏗᎧᎸᎢ"}
+                per{"{0}/Ꭷ"}
+            }
+            nanosecond{
+                dnam{"ᎾᏃᏗᏎᏢ"}
+                one{"{0} ᎾᏃ"}
+                other{"{0} ᎾᏃ"}
+            }
+            second{
+                dnam{"ᏓᏓᎾ"}
+                one{"{0} ᎠᏎᏢ"}
+                other{"{0} ᎠᏎᏢ"}
+                per{"{0}/ᎠᏎ"}
+            }
+            week{
+                dnam{"ᎢᏳᎾᏙᏓᏆᏍᏗ"}
+                one{"{0} ᏒᎾ"}
+                other{"{0} ᎢᏳᎾ"}
+                per{"{0}/Ꮢ"}
+            }
+            year{
+                dnam{"ᏧᏕᏘᏴᏌᏗᏒᎢ"}
+                one{"{0} ᎤᏕ"}
+                other{"{0} ᏧᏕ"}
+                per{"{0}/Ꭴ"}
+            }
+        }
+        electric{
+            ampere{
+                dnam{"amps"}
+                one{"{0} A"}
+                other{"{0} A"}
+            }
+            milliampere{
+                dnam{"milliamps"}
+                one{"{0} mA"}
+                other{"{0} mA"}
+            }
+            ohm{
+                dnam{"ᏗᎣᎻ"}
+                one{"{0} Ω"}
+                other{"{0} Ω"}
+            }
+            volt{
+                dnam{"ᎠᎾᎦᎵᏍᎩ ᎢᏧᏟᏂᏚᏓ"}
+                one{"{0} V"}
+                other{"{0} V"}
+            }
+        }
+        energy{
+            british-thermal-unit{
+                dnam{"BTU"}
+                one{"{0} Btu"}
+                other{"{0} Btu"}
+            }
+            calorie{
+                dnam{"cal"}
+                one{"{0} cal"}
+                other{"{0} cal"}
+            }
+            electronvolt{
+                dnam{"ᎡᎴᏆᎾᏉᏔ"}
+                one{"{0} eV"}
+                other{"{0} eV"}
+            }
+            foodcalorie{
+                dnam{"Cal"}
+                one{"{0} Cal"}
+                other{"{0} Cal"}
+            }
+            joule{
+                dnam{"ᏗᏦᎤᎵ"}
+                one{"{0} J"}
+                other{"{0} J"}
+            }
+            kilocalorie{
+                dnam{"kcal"}
+                one{"{0} kcal"}
+                other{"{0} kcal"}
+            }
+            kilojoule{
+                dnam{"ᎠᎦᏴᎵ ᏦᎤᎵ"}
+                one{"{0} kJ"}
+                other{"{0} kJ"}
+            }
+            kilowatt-hour{
+                dnam{"kW-ᎠᏟᎶᏓ"}
+                one{"{0} kWh"}
+                other{"{0} kWh"}
+            }
+            therm-us{
+                dnam{"US ᎤᏗᏞᎬᎢ"}
+                one{"{0} US ᎤᏗᏞᎬ"}
+                other{"{0} US ᎤᏗᏞᎬ"}
+            }
+        }
+        force{
+            newton{
+                dnam{"ᏄᏛᏅ"}
+                one{"{0} N"}
+                other{"{0} N"}
+            }
+            pound-force{
+                dnam{"ᏑᏓᎨᏓ-ᎦᏌᏙᏯᏍᏗ"}
+                one{"{0} lbf"}
+                other{"{0} lbf"}
+            }
+        }
+        frequency{
+            gigahertz{
+                dnam{"GHz"}
+                one{"{0} GHz"}
+                other{"{0} GHz"}
+            }
+            hertz{
+                dnam{"Hz"}
+                one{"{0} Hz"}
+                other{"{0} Hz"}
+            }
+            kilohertz{
+                dnam{"kHz"}
+                one{"{0} kHz"}
+                other{"{0} kHz"}
+            }
+            megahertz{
+                dnam{"MHz"}
+                one{"{0} MHz"}
+                other{"{0} MHz"}
+            }
+        }
+        graphics{
+            megapixel{
+                dnam{"ᏧᏔᎾ ᏗᏇᎦᏎᎵ"}
+            }
+            pixel{
+                dnam{"ᏗᏇᎦᏎᎵ"}
+            }
+        }
+        length{
+            astronomical-unit{
+                dnam{"ᎡᎨ"}
+                one{"{0} ᎡᎨ"}
+                other{"{0} ᎡᎨ"}
+            }
+            centimeter{
+                dnam{"ᏧᎠ"}
+                one{"{0} ᏧᎠ"}
+                other{"{0} ᏧᎠ"}
+                per{"{0}/ᏧᎠ"}
+            }
+            decimeter{
+                dnam{"ᏌᏟ"}
+                one{"{0} ᏌᏟ"}
+                other{"{0} ᏌᏟ"}
+            }
+            foot{
+                dnam{"ᎢᏗᎳᏏᏗ"}
+                one{"{0} ᎢᏗᎳ"}
+                other{"{0} ᎢᏗᎳ"}
+                per{"{0}/ᎢᏗᎳ"}
+            }
+            inch{
+                dnam{"ᎢᏗᏏᏔᏗᏍᏗ"}
+                one{"{0} ᎢᏏᏔ"}
+                other{"{0} ᎢᏏᏔ"}
+                per{"{0}/ᎢᏏᏔ"}
+            }
+            kilometer{
+                dnam{"ᎠᏗ"}
+                one{"{0} ᎠᏗ"}
+                other{"{0} ᎠᏗ"}
+                per{"{0}/ᎠᏗ"}
+            }
+            light-year{
+                dnam{"ᏗᏨᏍᏗ ᏧᏕᏘ"}
+                one{"{0} ᏗᏧ"}
+                other{"{0} ᏗᏧ"}
+            }
+            meter{
+                dnam{"ᎠᏟ"}
+                one{"{0} ᎠᏟ"}
+                other{"{0} ᎠᏟ"}
+                per{"{0}/ᎠᏟ"}
+            }
+            micrometer{
+                dnam{"μm"}
+                one{"{0} μm"}
+                other{"{0} μm"}
+            }
+            mile{
+                dnam{"ᎢᏳᏟᎶᏓ"}
+                one{"{0} ᎢᏳ"}
+                other{"{0} ᎢᏳ"}
+            }
+            mile-scandinavian{
+                dnam{"ᏍᏑ"}
+                one{"{0} ᏍᏑ"}
+                other{"{0} ᏍᏑ"}
+            }
+            millimeter{
+                dnam{"ᏌᎢᎠ"}
+                one{"{0} ᏌᎢᎠ"}
+                other{"{0} ᏌᎢᎠ"}
+            }
+            nanometer{
+                dnam{"ᎾᎠ"}
+                one{"{0} ᎾᎠ"}
+                other{"{0} ᎾᎠ"}
+            }
+            nautical-mile{
+                dnam{"ᎠᎺᎢ"}
+                one{"{0} ᎠᎺᎢ"}
+                other{"{0} ᎠᎺᎢ"}
+            }
+            parsec{
+                dnam{"ᎢᏯᏆᏎᎦ"}
+                one{"{0} ᎢᏆ"}
+                other{"{0} ᎢᏆ"}
+            }
+            picometer{
+                dnam{"ᏇᎢᎠ"}
+                one{"{0} ᏇᎢᎠ"}
+                other{"{0} ᏇᎢᎠ"}
+            }
+            point{
+                dnam{"ᏧᏓᏓᏟ"}
+                one{"{0} ᏧᏓ"}
+                other{"{0} ᏧᏓ"}
+            }
+            solar-radius{
+                dnam{"ᏅᏓ ᏇᏗ"}
+                one{"{0} R☉"}
+                other{"{0} R☉"}
+            }
+            yard{
+                dnam{"ᎢᏯᏯᏗ"}
+                one{"{0} ᏯᏗ"}
+                other{"{0} ᏯᏗ"}
+            }
+        }
+        light{
+            lux{
+                dnam{"ᎸᏏ"}
+                one{"{0} ᎸᏏ"}
+                other{"{0} ᎸᏏ"}
+            }
+            solar-luminosity{
+                dnam{"ᏅᏓ ᏗᏨᏍᏗ"}
+                one{"{0} L☉"}
+                other{"{0} L☉"}
+            }
+        }
+        mass{
+            carat{
+                dnam{"ᏗᎨᏇᏓ"}
+                one{"{0} CD"}
+                other{"{0} CD"}
+            }
+            dalton{
+                dnam{"ᏓᏙᎾᏍ"}
+                one{"{0} Da"}
+                other{"{0} Da"}
+            }
+            earth-mass{
+                dnam{"ᎡᎶᎯ ᎹᏏ"}
+                one{"{0} M⊕"}
+                other{"{0} M⊕"}
+            }
+            gram{
+                dnam{"ᎤᏍᏗ ᏂᏚᏓᎨᏒ"}
+                one{"{0} g"}
+                other{"{0} g"}
+                per{"{0}/g"}
+            }
+            kilogram{
+                dnam{"kg"}
+                one{"{0} kg"}
+                other{"{0} kg"}
+                per{"{0}/kg"}
+            }
+            metric-ton{
+                dnam{"t"}
+                one{"{0} t"}
+                other{"{0} t"}
+            }
+            microgram{
+                dnam{"μg"}
+                one{"{0} μg"}
+                other{"{0} μg"}
+            }
+            milligram{
+                dnam{"mg"}
+                one{"{0} mg"}
+                other{"{0} mg"}
+            }
+            ounce{
+                dnam{"oz"}
+                one{"{0} oz"}
+                other{"{0} oz"}
+                per{"{0}/oz"}
+            }
+            ounce-troy{
+                dnam{"oz ᏆᏯ"}
+                one{"{0} oz t"}
+                other{"{0} oz t"}
+            }
+            pound{
+                dnam{"ᎢᏧᏓᎨᏓ"}
+                one{"{0} lb"}
+                other{"{0} lb"}
+                per{"{0}/lb"}
+            }
+            solar-mass{
+                dnam{"ᏅᏓ ᎹᏏ"}
+                one{"{0} M☉"}
+                other{"{0} M☉"}
+            }
+            ton{
+                dnam{"ᏗᏈᏂ"}
+                one{"{0} tn"}
+                other{"{0} tn"}
+            }
+        }
+        power{
+            gigawatt{
+                dnam{"GW"}
+                one{"{0} GW"}
+                other{"{0} GW"}
+            }
+            horsepower{
+                dnam{"hp"}
+                one{"{0} hp"}
+                other{"{0} hp"}
+            }
+            kilowatt{
+                dnam{"kW"}
+                one{"{0} kW"}
+                other{"{0} kW"}
+            }
+            megawatt{
+                dnam{"MW"}
+                one{"{0} MW"}
+                other{"{0} MW"}
+            }
+            milliwatt{
+                dnam{"mW"}
+                one{"{0} mW"}
+                other{"{0} mW"}
+            }
+            watt{
+                dnam{"ᏗᏩᏗ"}
+                one{"{0} W"}
+                other{"{0} W"}
+            }
+        }
+        pressure{
+            atmosphere{
+                dnam{"atm"}
+                one{"{0} atm"}
+                other{"{0} atm"}
+            }
+            hectopascal{
+                dnam{"hPa"}
+                one{"{0} hPa"}
+                other{"{0} hPa"}
+            }
+            inch-ofhg{
+                dnam{"inHg"}
+                one{"{0} inHg"}
+                other{"{0} inHg"}
+            }
+            kilopascal{
+                dnam{"kPa"}
+                one{"{0} kPa"}
+                other{"{0} kPa"}
+            }
+            megapascal{
+                dnam{"MPa"}
+                one{"{0} MPa"}
+                other{"{0} MPa"}
+            }
+            millibar{
+                dnam{"mbar"}
+                one{"{0} mbar"}
+                other{"{0} mbar"}
+            }
+            millimeter-ofhg{
+                dnam{"mmHg"}
+                one{"{0} mmHg"}
+                other{"{0} mmHg"}
+            }
+            pound-force-per-square-inch{
+                dnam{"psi"}
+                one{"{0} psi"}
+                other{"{0} psi"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                dnam{"km/ᏑᏟᎶᏓ"}
+                one{"{0} km/h"}
+                other{"{0} km/h"}
+            }
+            knot{
+                dnam{"kn"}
+                one{"{0} kn"}
+                other{"{0} kn"}
+            }
+            meter-per-second{
+                dnam{"ᏗᏟᎶᏗ/ᎠᏎ"}
+                one{"{0} m/s"}
+                other{"{0} m/s"}
+            }
+            mile-per-hour{
+                dnam{"ᎢᏧᏟᎶᏓ/ᏑᏟᎶᏛ"}
+                one{"{0} mph"}
+                other{"{0} mph"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"deg. C"}
+                one{"{0}°C"}
+                other{"{0}°C"}
+            }
+            fahrenheit{
+                dnam{"deg. F"}
+                one{"{0}°F"}
+                other{"{0}°F"}
+            }
+            generic{
+                dnam{"°"}
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+            kelvin{
+                dnam{"K"}
+                one{"{0} K"}
+                other{"{0} K"}
+            }
+        }
+        torque{
+            newton-meter{
+                dnam{"N⋅m"}
+                one{"{0} N⋅m"}
+                other{"{0} N⋅m"}
+            }
+            pound-force-foot{
+                dnam{"lbf⋅ft"}
+                one{"{0} lbf⋅ft"}
+                other{"{0} lbf⋅ft"}
+            }
+        }
+        volume{
+            acre-foot{
+                dnam{"ᏑᏟᎶᏛ-ᎢᏗᎳᏏᏗ"}
+                one{"{0} ac ft"}
+                other{"{0} ac ft"}
+            }
+            barrel{
+                dnam{"ᏒᏙᏂ"}
+                one{"{0} bbl"}
+                other{"{0} bbl"}
+            }
+            centiliter{
+                dnam{"cL"}
+                one{"{0} cL"}
+                other{"{0} cL"}
+            }
+            cubic-centimeter{
+                dnam{"cm³"}
+                one{"{0} cm³"}
+                other{"{0} cm³"}
+                per{"{0}/cm³"}
+            }
+            cubic-foot{
+                dnam{"ᎢᏗᎳᏏᏗ³"}
+                one{"{0} ft³"}
+                other{"{0} ft³"}
+            }
+            cubic-inch{
+                dnam{"ᎢᏗᏏᏔᏗᏍᏗ³"}
+                one{"{0} in³"}
+                other{"{0} in³"}
+            }
+            cubic-kilometer{
+                dnam{"km³"}
+                one{"{0} km³"}
+                other{"{0} km³"}
+            }
+            cubic-meter{
+                dnam{"m³"}
+                one{"{0} m³"}
+                other{"{0} m³"}
+                per{"{0}/m³"}
+            }
+            cubic-mile{
+                dnam{"mi³"}
+                one{"{0} mi³"}
+                other{"{0} mi³"}
+            }
+            cubic-yard{
+                dnam{"ᎢᏯᏯᏗ³"}
+                one{"{0} yd³"}
+                other{"{0} yd³"}
+            }
+            cup{
+                dnam{"ᏧᎵᏍᏈᏗ"}
+                one{"{0} c"}
+                other{"{0} c"}
+            }
+            cup-metric{
+                dnam{"mcup"}
+                one{"{0} mc"}
+                other{"{0} mc"}
+            }
+            deciliter{
+                dnam{"dL"}
+                one{"{0} dL"}
+                other{"{0} dL"}
+            }
+            fluid-ounce{
+                dnam{"fl oz"}
+                one{"{0} fl oz"}
+                other{"{0} fl oz"}
+            }
+            fluid-ounce-imperial{
+                dnam{"Imp. fl oz"}
+                one{"{0} fl oz Imp."}
+                other{"{0} fl oz Imp."}
+            }
+            gallon{
+                dnam{"ᎢᏧᎵᎶᏓ"}
+                one{"{0} gal"}
+                other{"{0} gal"}
+                per{"{0}/gal US"}
+            }
+            gallon-imperial{
+                dnam{"ᏂᎬᎾᏛᎢ ᎤᏓᏤᎵᎦᏯ ᎢᏳᎵᎶᏓ ᎢᏳᏓᎵ"}
+                one{"{0} gal Imp."}
+                other{"{0} gal Imp."}
+                per{"{0}/gal Imp."}
+            }
+            hectoliter{
+                dnam{"hL"}
+                one{"{0} hL"}
+                other{"{0} hL"}
+            }
+            liter{
+                dnam{"ᎢᏧᏆᏗᏅᏛ"}
+                one{"{0} L"}
+                other{"{0} L"}
+                per{"{0}/l"}
+            }
+            megaliter{
+                dnam{"ML"}
+                one{"{0} ML"}
+                other{"{0} ML"}
+            }
+            milliliter{
+                dnam{"mL"}
+                one{"{0} mL"}
+                other{"{0} mL"}
+            }
+            pint{
+                dnam{"ᏔᎵ ᏧᎵᏍᏈᏗ ᎠᎧᎵ"}
+                one{"{0} pt"}
+                other{"{0} pt"}
+            }
+            pint-metric{
+                dnam{"mpt"}
+                one{"{0} mpt"}
+                other{"{0} mpt"}
+            }
+            quart{
+                dnam{"qts"}
+                one{"{0} qt"}
+                other{"{0} qt"}
+            }
+            tablespoon{
+                dnam{"tbsp"}
+                one{"{0} tbsp"}
+                other{"{0} tbsp"}
+            }
+            teaspoon{
+                dnam{"tsp"}
+                one{"{0} tsp"}
+                other{"{0} tsp"}
+            }
+        }
+    }
+}

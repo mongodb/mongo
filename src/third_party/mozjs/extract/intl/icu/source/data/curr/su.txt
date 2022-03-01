@@ -1,0 +1,93 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+su{
+    Currencies{
+        BRL{
+            "R$",
+            "Real Brasil",
+        }
+        CNY{
+            "CN¥",
+            "Yuan Tiongkok",
+        }
+        EUR{
+            "€",
+            "Euro",
+        }
+        GBP{
+            "£",
+            "Pound Inggris",
+        }
+        IDR{
+            "Rp",
+            "Rupee Indonésia",
+        }
+        INR{
+            "₹",
+            "Rupee India",
+        }
+        JPY{
+            "¥",
+            "Yén Jepang",
+        }
+        RUB{
+            "RUB",
+            "Rubel Rusia",
+        }
+        USD{
+            "$",
+            "Dolar A.S.",
+        }
+        XXX{
+            "¤",
+            "Mata Uang Teu Dikenal",
+        }
+    }
+    Currencies%narrow{
+        BRL{"R$"}
+        CNY{"¥"}
+        EUR{"€"}
+        GBP{"£"}
+        IDR{"Rp"}
+        INR{"₹"}
+        JPY{"¥"}
+        RUB{"₽"}
+        USD{"$"}
+    }
+    CurrencyPlurals{
+        BRL{
+            other{"real Brasil"}
+        }
+        CNY{
+            other{"yuan Tiongkok"}
+        }
+        EUR{
+            other{"euro"}
+        }
+        GBP{
+            other{"pound Inggris"}
+        }
+        IDR{
+            other{"rupee Indonésia"}
+        }
+        INR{
+            other{"rupee India"}
+        }
+        JPY{
+            other{"yén Jepang"}
+        }
+        RUB{
+            other{"rubel Rusia"}
+        }
+        USD{
+            other{"dolar A.S."}
+        }
+        XXX{
+            other{"(mata uang teu dikenal)"}
+        }
+    }
+    CurrencyUnitPatterns{
+        other{"{0} {1}"}
+    }
+}

@@ -1,0 +1,34 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+yi{
+    collations{
+        search{
+            Sequence{
+                "[import und-u-co-search]"
+                "‎&׳"
+                "<<''"
+                "‎&״"
+                "<<'\u0022'"
+            }
+            Version{"39"}
+        }
+        standard{
+            Sequence{
+                "[normalization on]"
+                "[reorder Hebr]"
+                "&[before 2]''<<׳"
+                "&[before 2]'\u0022'<<״"
+                "&ב<בֿ"
+                "&ו<<וּ<<וו<<וי"
+                "&י<<יִ<<יי<<ײַ"
+                "&[before 1]כ<כּ"
+                "&[before 1]פ<פּ"
+                "&פֿ<<<ף"
+                "&ש<שׂ"
+                "&[before 1]ת<תּ"
+            }
+            Version{"39"}
+        }
+    }
+}

@@ -1,0 +1,410 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+su{
+    AuxExemplarCharacters{"[á à ă â å ä ã ā æ ç è ĕ ê ë ē í ì ĭ î ï ī ñ ó ò ŏ ô ö ø ō œ ú ù ŭ û ü ū ÿ]"}
+    ExemplarCharacters{"[a b c d e é f g h i j k l m n o p q r s t u v w x y z]"}
+    ExemplarCharactersIndex{"[A B C D E É F G H I J K L M N O P Q R S T U V W X Y Z]"}
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    ExemplarCharactersPunctuation{
+        "[\\- ‐ ‑ – — , ; \\: ! ? . … ' ‘ ’ \u0022 “ ” ( ) \\[ \\] § @ * / \\& # † ‡ "
+        "′ ″]"
+    }
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"¤#,##0.00"}
+                decimalFormat{"#,##0.###"}
+            }
+            symbols{
+                decimal{","}
+                group{"."}
+                plusSign{"+"}
+                timeSeparator{"."}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "H.mm.ss zzzz",
+                "H.mm.ss z",
+                "H.mm.ss",
+                "H.mm",
+                "EEEE, d MMMM y G",
+                "d MMMM y G",
+                "d MMM y G",
+                "d/M/y GGGGG",
+                "{1}, {0}",
+                "{1} 'jam' {0}",
+                "{1} 'jam' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            intervalFormats{
+                fallback{"{0} – {1}"}
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "H.mm.ss zzzz",
+                "H.mm.ss z",
+                "H.mm.ss",
+                "H.mm",
+                "EEEE, d MMMM y",
+                "d MMMM y",
+                "d MMM y",
+                "d/M/yy",
+                "{1}, {0}",
+                "{1} 'jam' {0}",
+                "{1} 'jam' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                Bhm{"h.mm B"}
+                Bhms{"h.mm.ss B"}
+                EBhm{"E h.mm B"}
+                EBhms{"E h.mm.ss B"}
+                EHm{"E HH.mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"E d"}
+                Ehm{"E h.mm a"}
+                Ehms{"E h.mm.ss a"}
+                Gy{"y G"}
+                GyMMM{"MMM y G"}
+                GyMMMEd{"E, d MMM y G"}
+                GyMMMd{"d MMM y G"}
+                Hm{"HH.mm"}
+                Hms{"HH.mm.ss"}
+                Hmsv{"HH.mm.ss v"}
+                Hmv{"HH.mm v"}
+                M{"L"}
+                MEd{"E, d/M"}
+                MMMEd{"E, d MMM"}
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                Md{"d/M"}
+                h{"h a"}
+                hm{"h.mm a"}
+                hms{"h.mm.ss a"}
+                hmsv{"h.mm.ss a v"}
+                hmv{"h.mm a v"}
+                ms{"mm.ss"}
+                yM{"M/y"}
+                yMEd{"E, d/M/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, d MMM y"}
+                yMMMM{"MMMM y"}
+                yMMMd{"d MMM, y"}
+                yMd{"d/M/y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Mng",
+                        "Sen",
+                        "Sal",
+                        "Reb",
+                        "Kem",
+                        "Jum",
+                        "Sap",
+                    }
+                    narrow{
+                        "M",
+                        "S",
+                        "S",
+                        "R",
+                        "K",
+                        "J",
+                        "S",
+                    }
+                    wide{
+                        "Minggu",
+                        "Senén",
+                        "Salasa",
+                        "Rebo",
+                        "Kemis",
+                        "Jumaah",
+                        "Saptu",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Mng",
+                        "Sen",
+                        "Sal",
+                        "Reb",
+                        "Kem",
+                        "Jum",
+                        "Sap",
+                    }
+                    narrow{
+                        "M",
+                        "S",
+                        "S",
+                        "R",
+                        "K",
+                        "J",
+                        "S",
+                    }
+                    wide{
+                        "Minggu",
+                        "Senén",
+                        "Salasa",
+                        "Rebo",
+                        "Kemis",
+                        "Jumaah",
+                        "Saptu",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "SM",
+                    "M",
+                }
+            }
+            intervalFormats{
+                fallback{"{0} – {1}"}
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Jan",
+                        "Péb",
+                        "Mar",
+                        "Apr",
+                        "Méi",
+                        "Jun",
+                        "Jul",
+                        "Ags",
+                        "Sép",
+                        "Okt",
+                        "Nop",
+                        "Dés",
+                    }
+                    narrow{
+                        "J",
+                        "P",
+                        "M",
+                        "A",
+                        "M",
+                        "J",
+                        "J",
+                        "A",
+                        "S",
+                        "O",
+                        "N",
+                        "D",
+                    }
+                    wide{
+                        "Januari",
+                        "Pébruari",
+                        "Maret",
+                        "April",
+                        "Méi",
+                        "Juni",
+                        "Juli",
+                        "Agustus",
+                        "Séptémber",
+                        "Oktober",
+                        "Nopémber",
+                        "Désémber",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "J",
+                        "P",
+                        "M",
+                        "A",
+                        "M",
+                        "J",
+                        "J",
+                        "A",
+                        "S",
+                        "O",
+                        "N",
+                        "D",
+                    }
+                    wide{
+                        "Januari",
+                        "Pébruari",
+                        "Maret",
+                        "April",
+                        "Méi",
+                        "Juni",
+                        "Juli",
+                        "Agustus",
+                        "Séptémber",
+                        "Oktober",
+                        "Nopémber",
+                        "Désémber",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "K1",
+                        "K2",
+                        "K3",
+                        "K4",
+                    }
+                    wide{
+                        "kuartal ka-1",
+                        "kuartal ka-2",
+                        "kuartal ka-3",
+                        "kuartal ka-4",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "K1",
+                        "K2",
+                        "K3",
+                        "K4",
+                    }
+                    wide{
+                        "kuartal ka-1",
+                        "kuartal ka-2",
+                        "kuartal ka-3",
+                        "kuartal-ka 4",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        quotationEnd{"”"}
+    }
+    fields{
+        day{
+            dn{"dinten"}
+            relative{
+                "-1"{"kamari"}
+                "0"{"dinten ieu"}
+                "1"{"énjing"}
+            }
+        }
+        day-narrow{
+            dn{"dinten"}
+            relative{
+                "-1"{"kamari"}
+                "0"{"dinten ieu"}
+                "1"{"énjing"}
+            }
+        }
+        day-short{
+            dn{"dinten"}
+            relative{
+                "-1"{"kamari"}
+                "0"{"dinten ieu"}
+                "1"{"énjing"}
+            }
+        }
+        dayperiod{
+            dn{"AM/PM"}
+        }
+        era{
+            dn{"éra"}
+        }
+        hour{
+            dn{"jam"}
+        }
+        hour-narrow{
+            dn{"j."}
+        }
+        hour-short{
+            dn{"j."}
+        }
+        minute{
+            dn{"menit"}
+        }
+        minute-narrow{
+            dn{"mnt."}
+        }
+        minute-short{
+            dn{"mnt."}
+        }
+        month{
+            dn{"sasih"}
+        }
+        month-narrow{
+            dn{"sa."}
+        }
+        month-short{
+            dn{"sa."}
+        }
+        quarter{
+            dn{"triwulan"}
+        }
+        quarter-narrow{
+            dn{"tri."}
+        }
+        quarter-short{
+            dn{"tri."}
+        }
+        second{
+            dn{"detik"}
+        }
+        second-narrow{
+            dn{"dtk."}
+        }
+        second-short{
+            dn{"dtk."}
+        }
+        sun{
+            relative{
+                "-1"{"Minggu kamari"}
+                "0"{"Minggu ieu"}
+                "1"{"Minggu payun"}
+            }
+        }
+        week{
+            dn{"minggu"}
+        }
+        week-narrow{
+            dn{"mgg."}
+        }
+        week-short{
+            dn{"mgg."}
+        }
+        weekday{
+            dn{"dinten dina saminggu"}
+        }
+        year{
+            dn{"taun"}
+            relative{
+                "-1"{"taun kamari"}
+                "0"{"taun ieu"}
+                "1"{"taun payun"}
+            }
+        }
+        year-narrow{
+            dn{"tn."}
+        }
+        year-short{
+            dn{"tn."}
+        }
+        zone{
+            dn{"zona waktu"}
+        }
+    }
+    listPattern{
+        standard{
+            2{"{0} sareng {1}"}
+            end{"{0}, sareng {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+    }
+    measurementSystemNames{
+        UK{"U.K."}
+        US{"A.S."}
+        metric{"Métrik"}
+    }
+}

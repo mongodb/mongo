@@ -1,0 +1,72 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Han_Latin_Names.txt
+# Generated from CLDR
+#
+
+# This transform is primarily intended to produce readings for Chinese surnames, or for full
+# Chinese personal names - surname first - that occur at the beginning of a contiguous Han substring
+# (i.e. at the beginning of text, or immediately preceded by space or other non-Han characters).
+# Several Han characters have different readings in surnames, than the readings found in Han-Latin.
+# ----
+# Insert marker at start of each Han sequence (including Han after space).
+# Do this before ::Han-Spacedhan() to catch Han after space in original text,
+# and to apply before all other rules.
+$startOfHanMarker = \uFDD1;
+[:^script=Han:] { ([:script=Han:]) → $startOfHanMarker $1;
+# Need Spacedhan so the name transliterations get spaced properly
+::Han-Spacedhan();
+# Convert special name readings that depend on next character
+令 } \u0020? 狐 →líng;
+万 } \u0020? 俟 →mò;
+澹 } \u0020? 台 →tán;
+# The following maps 长 to the standard Han-Latin reading zhǎng for this case,
+# to override the normal Han-Latin/Names reading 长→cháng further below
+$startOfHanMarker{ 长 } \u0020? 孙 →zhǎng;
+# Convert single characters with special name readings
+$startOfHanMarker{ 秘→bì;
+$startOfHanMarker{ 卜→bǔ;
+长→cháng;
+$startOfHanMarker{ 种→chóng;
+$startOfHanMarker{ 重→chóng;
+$startOfHanMarker{ 刀→diāo;
+干→gān;
+葛→gě;
+$startOfHanMarker{ 盖→gě;
+$startOfHanMarker{ 过→guō;
+$startOfHanMarker{ 华→huà;
+$startOfHanMarker{ 纪→jǐ;
+筠→jūn;
+靓→liàng;
+$startOfHanMarker{ 牟→mù;
+$startOfHanMarker{ 粘→nián;
+$startOfHanMarker{ 区→ōu;
+$startOfHanMarker{ 繁→pó;
+仇→qiú;
+$startOfHanMarker{ 任→rén;
+$startOfHanMarker{ 单→shàn;
+$startOfHanMarker{ 召→shào;
+$startOfHanMarker{ 折→shé;
+$startOfHanMarker{ 舍→shè;
+$startOfHanMarker{ 沈→shěn;
+峙→shì;
+隗→wěi;
+$startOfHanMarker{ 解→xiè;
+莘→xīn;
+$startOfHanMarker{ 燕→yān;
+$startOfHanMarker{ 尉→yù;
+$startOfHanMarker{ 乐→yuè;
+$startOfHanMarker{ 员→yùn;
+$startOfHanMarker{ 查→zhā;
+翟→zhái;
+曾→zēng;
+# Convert $startOfHanMarkers to space, or to nothing if they are at the beginning of text.
+# Need to do this as a separate pass to get the spacing right.
+::Null();
+[^$]{ $startOfHanMarker →\u0020;
+$startOfHanMarker →;
+# Then run the normal Han-Latin transform for the rest
+::Han-Latin();
+

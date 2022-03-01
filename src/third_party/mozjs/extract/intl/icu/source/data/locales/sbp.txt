@@ -1,0 +1,251 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sbp{
+    AuxExemplarCharacters{"[q r x z]"}
+    ExemplarCharacters{"[a b c d e f g h i j k l m n o p s t u v w y]"}
+    ExemplarCharactersIndex{"[A B C D E F G H I J K L M N O P S T U V W Y]"}
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"#,##0.00¤"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"#,##0%"}
+            }
+            symbols{
+                decimal{"."}
+                group{","}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d MMMM y G",
+                "d MMMM y G",
+                "d MMM y G",
+                "dd/MM/y GGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Ed{"E d"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, M/d"}
+                MMM{"LLL"}
+                MMMEd{"E, MMM d"}
+                MMMd{"MMM d"}
+                Md{"M/d"}
+                d{"d"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                ms{"m:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E, M/d/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, MMM d, y"}
+                yMMMd{"MMM d y"}
+                yMd{"M/d/y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "Lwamilawu",
+                "Pashamihe",
+            }
+            AmPmMarkersAbbr{
+                "Lwamilawu",
+                "Pashamihe",
+            }
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d MMMM y",
+                "d MMMM y",
+                "d MMM y",
+                "dd/MM/y",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Ed{"E d"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, M/d"}
+                MMM{"LLL"}
+                MMMEd{"E, MMM d"}
+                MMMd{"MMM d"}
+                Md{"M/d"}
+                d{"d"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                ms{"m:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E, M/d/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, MMM d, y"}
+                yMMMd{"MMM d y"}
+                yMd{"M/d/y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Mul",
+                        "Jtt",
+                        "Jnn",
+                        "Jtn",
+                        "Alh",
+                        "Iju",
+                        "Jmo",
+                    }
+                    wide{
+                        "Mulungu",
+                        "Jumatatu",
+                        "Jumanne",
+                        "Jumatano",
+                        "Alahamisi",
+                        "Ijumaa",
+                        "Jumamosi",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "M",
+                        "J",
+                        "J",
+                        "J",
+                        "A",
+                        "I",
+                        "J",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "AK",
+                    "PK",
+                }
+                wide{
+                    "Ashanali uKilisito",
+                    "Pamwandi ya Kilisto",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Mup",
+                        "Mwi",
+                        "Msh",
+                        "Mun",
+                        "Mag",
+                        "Muj",
+                        "Msp",
+                        "Mpg",
+                        "Mye",
+                        "Mok",
+                        "Mus",
+                        "Muh",
+                    }
+                    wide{
+                        "Mupalangulwa",
+                        "Mwitope",
+                        "Mushende",
+                        "Munyi",
+                        "Mushende Magali",
+                        "Mujimbi",
+                        "Mushipepo",
+                        "Mupuguto",
+                        "Munyense",
+                        "Mokhu",
+                        "Musongandembwe",
+                        "Muhaano",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "L1",
+                        "L2",
+                        "L3",
+                        "L4",
+                    }
+                    wide{
+                        "Lobo 1",
+                        "Lobo 2",
+                        "Lobo 3",
+                        "Lobo 4",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"Lusiku"}
+            relative{
+                "-1"{"Imehe"}
+                "0"{"Ineng’uni"}
+                "1"{"Pamulaawu"}
+            }
+        }
+        dayperiod{
+            dn{"Uluhaavi lwa lusiku"}
+        }
+        era{
+            dn{"Uluhaavi lwa"}
+        }
+        hour{
+            dn{"Ilisala"}
+        }
+        minute{
+            dn{"Idakika"}
+        }
+        month{
+            dn{"Mwesi"}
+        }
+        second{
+            dn{"Isekunde"}
+        }
+        week{
+            dn{"Ilijuma"}
+        }
+        weekday{
+            dn{"Ulusiku lwa Lijuma"}
+        }
+        year{
+            dn{"Mwakha"}
+        }
+        zone{
+            dn{"Uluhaavi lwa lisaa"}
+        }
+    }
+}

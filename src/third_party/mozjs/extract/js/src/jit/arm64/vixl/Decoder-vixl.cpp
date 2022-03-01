@@ -209,7 +209,11 @@ void Decoder::DecodeBranchSystemException(const Instruction* instr) {
               (instr->Mask(0x00E0001C) == 0x00800000) ||
               (instr->Mask(0x00E0001F) == 0x00A00000) ||
               (instr->Mask(0x00C0001C) == 0x00C00000)) {
-            VisitUnallocated(instr);
+            if (instr->InstructionBits() == UNDEFINED_INST_PATTERN) {
+                VisitException(instr);
+            } else {
+                VisitUnallocated(instr);
+            }
           } else {
             VisitException(instr);
           }

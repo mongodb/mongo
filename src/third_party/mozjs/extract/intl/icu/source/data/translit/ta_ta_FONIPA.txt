@@ -1,0 +1,80 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: ta_ta_FONIPA.txt
+# Generated from CLDR
+#
+
+$c = [\u0B95\u0B99\u0B9A\u0B9C\u0B9E\u0B9F\u0BA3\u0BA4\u0BA8-\u0BAA\u0BAE-\u0BB9];
+$v = [\u0BBE-\u0BC2\u0BC6-\u0BC8\u0BCA-\u0BCC];
+$nasal = [ŋɲɳnm];
+# Delete ZWNJ and ZWJ to simplify further processing.
+\u200C → ;
+\u200D → ;
+::NFC;
+# Manifest the implicit vowel after every consonant that is not followed by a
+# dependent vowel or virama.
+($c) } [^$v \u0BCD] → $1 a;
+::Null;
+ஃப → f;
+ஃ → x;
+அ → a;
+ஆ → aː;
+இ → i;
+ஈ → iː;
+உ → u;
+ஊ → uː;
+எ → e;
+ஏ → eː;
+ஐ → aɪ\u032F;
+ஒ → o;
+ஓ → oː;
+ஔ → aʊ\u032F;
+$nasal { க → g;
+க → k;
+ங → ŋ;
+$nasal { ச → d\u0361ʒ;
+ச\u0BCDச → t\u0361ʃ;
+[ʈr] { ச → t\u0361ʃ;
+ச → s \u02BC;
+ஜ → d\u0361ʒ;
+ஞ → ɲ;
+$nasal { ட → ɖ;
+ட → ʈ;
+ண → ɳ;
+$nasal { த → d\u032A;
+த → t\u032A;
+ந → n;
+ன → n;
+$nasal { ப → b;
+ப → p;
+ம → m;
+ய → j;
+ர → r;
+ற\u0BCDற → tʳ;
+ற } \u0BCD → tʳ;
+$nasal { ற → tʳ;
+ற → r;
+ல → l;
+ள → ɭ;
+ழ → ɻ;
+வ → ʋ;
+ஶ → ʃ;
+ஷ → ʂ;
+ஸ\u0BCD } ர → ʃ;
+ஸ → s;
+ஹ → h;
+\u0BBE → aː;
+\u0BBF → i;
+\u0BC0 → iː;
+\u0BC1 → u;
+\u0BC2 → uː;
+\u0BC6 → e;
+\u0BC7 → eː;
+\u0BC8 → aɪ\u032F;
+\u0BCA → o;
+\u0BCB → oː;
+\u0BCC → aʊ\u032F;
+\u0BCD → ;
+

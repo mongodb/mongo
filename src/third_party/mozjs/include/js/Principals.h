@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -13,73 +13,75 @@
 
 #include <stdint.h>
 
-#include "jspubtd.h"
+#include "jstypes.h"
 
-#include "js/StructuredClone.h"
+#include "js/TypeDecls.h"
 
-namespace js {
-    struct JS_PUBLIC_API(PerformanceGroup);
-} // namespace js
+struct JSStructuredCloneReader;
+struct JSStructuredCloneWriter;
 
 struct JSPrincipals {
-    /* Don't call "destroy"; use reference counting macros below. */
-    mozilla::Atomic<int32_t> refcount;
+  /* Don't call "destroy"; use reference counting macros below. */
+  mozilla::Atomic<int32_t, mozilla::SequentiallyConsistent> refcount{0};
 
 #ifdef JS_DEBUG
-    /* A helper to facilitate principals debugging. */
-    uint32_t    debugToken;
+  /* A helper to facilitate principals debugging. */
+  uint32_t debugToken;
 #endif
 
-    JSPrincipals() : refcount(0) {}
+  JSPrincipals() = default;
 
-    void setDebugToken(uint32_t token) {
-# ifdef JS_DEBUG
-        debugToken = token;
-# endif
-    }
+  void setDebugToken(uint32_t token) {
+#ifdef JS_DEBUG
+    debugToken = token;
+#endif
+  }
 
-    /*
-     * Write the principals with the given |writer|. Return false on failure,
-     * true on success.
-     */
-    virtual bool write(JSContext* cx, JSStructuredCloneWriter* writer) = 0;
+  /*
+   * Write the principals with the given |writer|. Return false on failure,
+   * true on success.
+   */
+  virtual bool write(JSContext* cx, JSStructuredCloneWriter* writer) = 0;
 
-    /*
-     * This is not defined by the JS engine but should be provided by the
-     * embedding.
-     */
-    JS_PUBLIC_API(void) dump();
+  /*
+   * Whether the principal corresponds to a System or AddOn Principal.
+   * Technically this also checks for an ExpandedAddonPrincipal.
+   */
+  virtual bool isSystemOrAddonPrincipal() = 0;
+
+  /*
+   * This is not defined by the JS engine but should be provided by the
+   * embedding.
+   */
+  JS_PUBLIC_API void dump();
 };
 
-extern JS_PUBLIC_API(void)
-JS_HoldPrincipals(JSPrincipals* principals);
+extern JS_PUBLIC_API void JS_HoldPrincipals(JSPrincipals* principals);
 
-extern JS_PUBLIC_API(void)
-JS_DropPrincipals(JSContext* cx, JSPrincipals* principals);
+extern JS_PUBLIC_API void JS_DropPrincipals(JSContext* cx,
+                                            JSPrincipals* principals);
 
 // Return whether the first principal subsumes the second. The exact meaning of
 // 'subsumes' is left up to the browser. Subsumption is checked inside the JS
 // engine when determining, e.g., which stack frames to display in a backtrace.
-typedef bool
-(* JSSubsumesOp)(JSPrincipals* first, JSPrincipals* second);
+typedef bool (*JSSubsumesOp)(JSPrincipals* first, JSPrincipals* second);
 
 /*
  * Used to check if a CSP instance wants to disable eval() and friends.
- * See js_CheckCSPPermitsJSAction() in jsobj.
+ * See GlobalObject::isRuntimeCodeGenEnabled() in vm/GlobalObject.cpp.
  */
-typedef bool
-(* JSCSPEvalChecker)(JSContext* cx);
+typedef bool (*JSCSPEvalChecker)(JSContext* cx, JS::HandleString code);
 
 struct JSSecurityCallbacks {
-    JSCSPEvalChecker           contentSecurityPolicyAllows;
-    JSSubsumesOp               subsumes;
+  JSCSPEvalChecker contentSecurityPolicyAllows;
+  JSSubsumesOp subsumes;
 };
 
-extern JS_PUBLIC_API(void)
-JS_SetSecurityCallbacks(JSContext* cx, const JSSecurityCallbacks* callbacks);
+extern JS_PUBLIC_API void JS_SetSecurityCallbacks(
+    JSContext* cx, const JSSecurityCallbacks* callbacks);
 
-extern JS_PUBLIC_API(const JSSecurityCallbacks*)
-JS_GetSecurityCallbacks(JSContext* cx);
+extern JS_PUBLIC_API const JSSecurityCallbacks* JS_GetSecurityCallbacks(
+    JSContext* cx);
 
 /*
  * Code running with "trusted" principals will be given a deeper stack
@@ -93,19 +95,18 @@ JS_GetSecurityCallbacks(JSContext* cx);
  * 'cx', JS_SetTrustedPrincipals must be called again, passing nullptr for
  * 'prin'.
  */
-extern JS_PUBLIC_API(void)
-JS_SetTrustedPrincipals(JSContext* cx, JSPrincipals* prin);
+extern JS_PUBLIC_API void JS_SetTrustedPrincipals(JSContext* cx,
+                                                  JSPrincipals* prin);
 
-typedef void
-(* JSDestroyPrincipalsOp)(JSPrincipals* principals);
+typedef void (*JSDestroyPrincipalsOp)(JSPrincipals* principals);
 
 /*
  * Initialize the callback that is called to destroy JSPrincipals instance
  * when its reference counter drops to zero. The initialization can be done
  * only once per JS runtime.
  */
-extern JS_PUBLIC_API(void)
-JS_InitDestroyPrincipalsCallback(JSContext* cx, JSDestroyPrincipalsOp destroyPrincipals);
+extern JS_PUBLIC_API void JS_InitDestroyPrincipalsCallback(
+    JSContext* cx, JSDestroyPrincipalsOp destroyPrincipals);
 
 /*
  * Read a JSPrincipals instance from the given |reader| and initialize the out
@@ -118,15 +119,44 @@ JS_InitDestroyPrincipalsCallback(JSContext* cx, JSDestroyPrincipalsOp destroyPri
  * JSPrincipals instance, the JSReadPrincipalsOp must increment the refcount of
  * the resulting JSPrincipals on behalf of the caller.
  */
-using JSReadPrincipalsOp = bool (*)(JSContext* cx, JSStructuredCloneReader* reader,
+using JSReadPrincipalsOp = bool (*)(JSContext* cx,
+                                    JSStructuredCloneReader* reader,
                                     JSPrincipals** outPrincipals);
 
 /*
  * Initialize the callback that is called to read JSPrincipals instances from a
  * buffer. The initialization can be done only once per JS runtime.
  */
-extern JS_PUBLIC_API(void)
-JS_InitReadPrincipalsCallback(JSContext* cx, JSReadPrincipalsOp read);
+extern JS_PUBLIC_API void JS_InitReadPrincipalsCallback(
+    JSContext* cx, JSReadPrincipalsOp read);
 
+namespace JS {
 
-#endif  /* js_Principals_h */
+class MOZ_RAII AutoHoldPrincipals {
+  JSContext* cx_;
+  JSPrincipals* principals_ = nullptr;
+
+ public:
+  explicit AutoHoldPrincipals(JSContext* cx, JSPrincipals* principals = nullptr)
+      : cx_(cx) {
+    reset(principals);
+  }
+
+  ~AutoHoldPrincipals() { reset(nullptr); }
+
+  void reset(JSPrincipals* principals) {
+    if (principals) {
+      JS_HoldPrincipals(principals);
+    }
+    if (principals_) {
+      JS_DropPrincipals(cx_, principals_);
+    }
+    principals_ = principals;
+  }
+
+  JSPrincipals* get() const { return principals_; }
+};
+
+}  // namespace JS
+
+#endif /* js_Principals_h */

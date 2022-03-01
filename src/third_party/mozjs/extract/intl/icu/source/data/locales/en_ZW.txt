@@ -1,0 +1,61 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+en_ZW{
+    %%Parent{"en_001"}
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, dd MMMM y G",
+                "dd MMMM y G",
+                "dd MMM,y G",
+                "d/M/y GGGGG",
+                "{1}, {0}",
+                "{1} 'at' {0}",
+                "{1} 'at' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                MMMEd{"E, dd MMM"}
+                MMMd{"dd MMM"}
+                Md{"d/M"}
+                yyyyMEd{"E, d/M/y G"}
+                yyyyMMMEd{"E, dd MMM, y G"}
+                yyyyMMMd{"dd MMM, y G"}
+                yyyyMd{"d/M/y G"}
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, dd MMMM y",
+                "dd MMMM y",
+                "dd MMM,y",
+                "d/M/y",
+                "{1}, {0}",
+                "{1} 'at' {0}",
+                "{1} 'at' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                MEd{"E, d/M"}
+                MMMEd{"E, dd MMM"}
+                MMMd{"dd MMM"}
+                Md{"d/M"}
+                yMEd{"E, d/M/y"}
+                yMMMEd{"E, dd MMM, y"}
+                yMMMd{"dd MMM, y"}
+                yMd{"d/M/y"}
+            }
+        }
+    }
+}

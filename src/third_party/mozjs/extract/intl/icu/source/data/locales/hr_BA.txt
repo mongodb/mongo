@@ -1,0 +1,47 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+hr_BA{
+    calendar{
+        gregorian{
+            DateTimePatterns{
+                "HH:mm:ss (zzzz)",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d. MMMM y.",
+                "d. MMMM y.",
+                "d. MMM y.",
+                "d. M. yy.",
+                "{1} {0}",
+                "{1} 'u' {0}",
+                "{1} 'u' {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            dayNames{
+                stand-alone{
+                    narrow{
+                        "N",
+                        "P",
+                        "U",
+                        "S",
+                        "Č",
+                        "P",
+                        "S",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "1. kv.",
+                        "2. kv.",
+                        "3. kv.",
+                        "4. kv.",
+                    }
+                }
+            }
+        }
+    }
+}

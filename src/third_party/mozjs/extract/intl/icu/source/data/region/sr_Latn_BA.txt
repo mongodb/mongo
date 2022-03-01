@@ -1,0 +1,42 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sr_Latn_BA{
+    Countries{
+        001{"svijet"}
+        003{"Sjevernoamerički kontinent"}
+        015{"Sjeverna Afrika"}
+        019{"Sjeverna i Južna Amerika"}
+        021{"Sjeverna Amerika"}
+        154{"Sjeverna Evropa"}
+        AC{"ostrvo Asension"}
+        BY{"Bjelorusija"}
+        CC{"Kokosova (Kiling) ostrva"}
+        CG{"Kongo"}
+        CP{"ostrvo Kliperton"}
+        CV{"Kabo Verde"}
+        CZ{"Češka Republika"}
+        DE{"Njemačka"}
+        GS{"Južna Džordžija i Južna Sendvička ostrva"}
+        GU{"Gvam"}
+        HK{"Hongkong (SAO Kine)"}
+        HM{"ostrvo Herd i ostrva Makdonald"}
+        KN{"Sveti Kits i Nevis"}
+        KP{"Sjeverna Koreja"}
+        MK{"Sjeverna Makedonija"}
+        MO{"SAR Makao"}
+        MP{"Sjeverna Marijanska ostrva"}
+        NF{"ostrvo Norfok"}
+        NU{"Nijue"}
+        PM{"Sveti Pjer i Mikelon"}
+        PS{"palestinske teritorije"}
+        RE{"Reunion"}
+        UM{"Spoljna ostrva SAD"}
+        VC{"Sveti Vinsent i Grenadini"}
+        VG{"Britanska Djevičanska Ostrva"}
+        VI{"Američka Djevičanska Ostrva"}
+    }
+    Countries%variant{
+        FK{"Folklandska (Malvinska) ostrva"}
+    }
+}

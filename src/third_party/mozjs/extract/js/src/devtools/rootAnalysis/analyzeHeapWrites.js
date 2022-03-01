@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 /* -*- indent-tabs-mode: nil; js-indent-level: 4 -*- */
 
 "use strict";
@@ -28,16 +32,12 @@ function checkExternalFunction(entry)
         "atof",
         /memchr/,
         "strlen",
-        "Servo_ComputedValues_EqualCustomProperties",
         /Servo_DeclarationBlock_GetCssText/,
         "Servo_GetArcStringData",
         "Servo_IsWorkerThread",
         /nsIFrame::AppendOwnedAnonBoxes/,
         // Assume that atomic accesses are threadsafe.
-        /^__atomic_fetch_/,
-        /^__atomic_load_/,
-        /^__atomic_store_/,
-        /^__atomic_thread_fence/,
+        /^__atomic_/,
     ];
     if (entry.matches(whitelist))
         return;
@@ -154,7 +154,6 @@ function treatAsSafeArgument(entry, varName, csuName)
         // to be a way to indicate which params are out parameters, either using
         // an attribute or a naming convention.
         ["Gecko_CopyAnimationNames", "aDest", null],
-        ["Gecko_CopyFontFamilyFrom", "dst", null],
         ["Gecko_SetAnimationName", "aStyleAnimation", null],
         ["Gecko_SetCounterStyleToName", "aPtr", null],
         ["Gecko_SetCounterStyleToSymbols", "aPtr", null],
@@ -166,9 +165,6 @@ function treatAsSafeArgument(entry, varName, csuName)
         ["Gecko_CopyMozBindingFrom", "aDest", null],
         ["Gecko_SetNullImageValue", "aImage", null],
         ["Gecko_SetGradientImageValue", "aImage", null],
-        ["Gecko_SetImageOrientation", "aVisibility", null],
-        ["Gecko_SetImageOrientationAsFromImage", "aVisibility", null],
-        ["Gecko_CopyImageOrientationFrom", "aDst", null],
         ["Gecko_SetImageElement", "aImage", null],
         ["Gecko_SetLayerImageImageValue", "aImage", null],
         ["Gecko_CopyImageValueFrom", "aImage", null],
@@ -185,7 +181,6 @@ function treatAsSafeArgument(entry, varName, csuName)
         ["Gecko_CopyClipPathValueFrom", "aDst", null],
         ["Gecko_DestroyClipPath", "aClip", null],
         ["Gecko_ResetFilters", "effects", null],
-        ["Gecko_CopyFiltersFrom", "aDest", null],
         [/Gecko_CSSValue_Set/, "aCSSValue", null],
         ["Gecko_CSSValue_Drop", "aCSSValue", null],
         ["Gecko_CSSFontFaceRule_GetCssText", "aResult", null],
@@ -207,9 +202,6 @@ function treatAsSafeArgument(entry, varName, csuName)
         ["Gecko_SetStyleCoordCalcValue", null, null],
         ["Gecko_StyleClipPath_SetURLValue", "aClip", null],
         ["Gecko_nsStyleFilter_SetURLValue", "aEffects", null],
-        ["Gecko_nsStyleSVGPaint_CopyFrom", "aDest", null],
-        ["Gecko_nsStyleSVGPaint_SetURLValue", "aPaint", null],
-        ["Gecko_nsStyleSVGPaint_Reset", "aPaint", null],
         ["Gecko_nsStyleSVG_SetDashArrayLength", "aSvg", null],
         ["Gecko_nsStyleSVG_CopyDashArray", "aDst", null],
         ["Gecko_nsStyleFont_SetLang", "aFont", null],
@@ -300,6 +292,10 @@ function checkFieldWrite(entry, location, fields)
 
         if (/\bThreadLocal<\b/.test(field))
             return;
+
+        // Debugging check for string corruption.
+        if (field == "nsStringBuffer.mCanary")
+            return;
     }
 
     var str = "";
@@ -348,12 +344,12 @@ function ignoreCallEdge(entry, callee)
         return true;
     }
 
-    // nsIDocument::PropertyTable calls GetExtraPropertyTable (which has side
+    // Document::PropertyTable calls GetExtraPropertyTable (which has side
     // effects) if the input category is non-zero. If a literal zero was passed
     // in for the category then we treat it as a safe argument, per
     // isEdgeSafeArgument, so just watch for that.
-    if (/nsIDocument::GetExtraPropertyTable/.test(callee) &&
-        /nsIDocument::PropertyTable/.test(name) &&
+    if (/Document::GetExtraPropertyTable/.test(callee) &&
+        /Document::PropertyTable/.test(name) &&
         entry.isSafeArgument(1))
     {
         return true;
@@ -426,8 +422,8 @@ function ignoreContents(entry)
         "abort",
         /MOZ_ReportAssertionFailure/,
         /MOZ_ReportCrash/,
+        /MOZ_Crash/,
         /MOZ_CrashPrintf/,
-        /MOZ_CrashOOL/,
         /AnnotateMozCrashReason/,
         /InvalidArrayIndex_CRASH/,
         /NS_ABORT_OOM/,
@@ -437,10 +433,10 @@ function ignoreContents(entry)
         /mozalloc_handle_oom/,
         /^NS_Log/, /log_print/, /LazyLogModule::operator/,
         /SprintfLiteral/, "PR_smprintf", "PR_smprintf_free",
-        /NS_DispatchToMainThread/, /NS_ReleaseOnMainThreadSystemGroup/,
+        /NS_DispatchToMainThread/, /NS_ReleaseOnMainThread/,
         /NS_NewRunnableFunction/, /NS_Atomize/,
         /nsCSSValue::BufferFromString/,
-        /NS_strdup/,
+        /NS_xstrdup/,
         /Assert_NoQueryNeeded/,
         /AssertCurrentThreadOwnsMe/,
         /PlatformThread::CurrentId/,
@@ -464,9 +460,6 @@ function ignoreContents(entry)
         // These all create static strings in local storage, which is threadsafe
         // to do but not understood by the analysis yet.
         / EmptyString\(\)/,
-        /nsCSSProps::LookupPropertyValue/,
-        /nsCSSProps::ValueToKeyword/,
-        /nsCSSKeywords::GetStringValue/,
 
         // These could probably be handled by treating the scope of PSAutoLock
         // aka BaseAutoLock<PSMutex> as threadsafe.
@@ -475,7 +468,7 @@ function ignoreContents(entry)
 
         // The analysis thinks we'll write to mBits in the DoGetStyleFoo<false>
         // call.  Maybe the template parameter confuses it?
-        /nsStyleContext::PeekStyle/,
+        /ComputedStyle::PeekStyle/,
 
         // The analysis can't cope with the indirection used for the objects
         // being initialized here, from nsCSSValue::Array::Create to the return
@@ -924,6 +917,7 @@ function processAssign(body, entry, location, lhs, edge)
                 return;
         } else if (lhs.Exp[0].Kind == "Fld") {
             const {
+                Name: [ fieldName ],
                 Type: {Kind, Type: fieldType},
                 FieldCSU: {Type: {Kind: containerTypeKind,
                                   Name: containerTypeName}}
@@ -933,11 +927,10 @@ function processAssign(body, entry, location, lhs, edge)
             if (containerTypeKind == 'CSU' &&
                 Kind == 'Pointer' &&
                 isEdgeSafeArgument(entry, containerExpr) &&
-                isSafeMemberPointer(containerTypeName, fieldType))
+                isSafeMemberPointer(containerTypeName, fieldName, fieldType))
             {
                 return;
             }
-
         }
         if (fields.length)
             checkFieldWrite(entry, location, fields);
@@ -1072,7 +1065,7 @@ function maybeProcessMissingFunction(entry, addCallee)
     // This is a bug in the sixgill GCC plugin I think, since sixgill is
     // supposed to follow any typedefs itself.
     if (/mozilla::dom::Element/.test(name)) {
-        var callee = name.replace("mozilla::dom::Element", "nsIDocument::Element");
+        var callee = name.replace("mozilla::dom::Element", "Document::Element");
         addCallee(new CallSite(name, entry.safeArguments, entry.stack[0].location, entry.parameterNames));
         return true;
     }
@@ -1198,6 +1191,16 @@ function expressionValueEdge(exp) {
     return edge;
 }
 
+// Examples:
+//
+//   void foo(type* aSafe) {
+//     type* safeBecauseNew = new type(...);
+//     type* unsafeBecauseMultipleAssignments = new type(...);
+//     if (rand())
+//       unsafeBecauseMultipleAssignments = bar();
+//     type* safeBecauseSingleAssignmentOfSafe = aSafe;
+//   }
+//
 function isSafeVariable(entry, variable)
 {
     var index = safeArgumentIndex(variable);
@@ -1244,7 +1247,8 @@ function isSafeLocalVariable(entry, name)
             // itself is threadsafe.
             if ((isDirectCall(edge, /operator\[\]/) ||
                  isDirectCall(edge, /nsTArray.*?::InsertElementAt\b/) ||
-                 isDirectCall(edge, /nsStyleContent::ContentAt/)) &&
+                 isDirectCall(edge, /nsStyleContent::ContentAt/) ||
+                 isDirectCall(edge, /nsTArray_base.*?::GetAutoArrayBuffer\b/)) &&
                 isEdgeSafeArgument(entry, edge.PEdgeCallInstance.Exp))
             {
                 return true;
@@ -1343,8 +1347,12 @@ function isSafeLocalVariable(entry, name)
     return true;
 }
 
-function isSafeMemberPointer(containerType, memberType)
+function isSafeMemberPointer(containerType, memberName, memberType)
 {
+    // nsTArray owns its header.
+    if (containerType.includes("nsTArray_base") && memberName == "mHdr")
+        return true;
+
     if (memberType.Kind != 'Pointer')
         return false;
 

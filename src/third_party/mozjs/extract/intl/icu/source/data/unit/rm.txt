@@ -1,0 +1,436 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+rm{
+    durationUnits{
+        hm{"h:mm"}
+        hms{"h:mm:ss"}
+        ms{"m:ss"}
+    }
+    units{
+        digital{
+            bit{
+                dnam{"bits"}
+                one{"{0} bit"}
+                other{"{0} bits"}
+            }
+            byte{
+                dnam{"bytes"}
+                one{"{0} byte"}
+                other{"{0} bytes"}
+            }
+            gigabit{
+                dnam{"gigabits"}
+                one{"{0} gigabit"}
+                other{"{0} gigabits"}
+            }
+            gigabyte{
+                dnam{"gigabytes"}
+                one{"{0} gigabyte"}
+                other{"{0} gigabytes"}
+            }
+            kilobit{
+                dnam{"kilobits"}
+                one{"{0} kilobit"}
+                other{"{0} kilobits"}
+            }
+            kilobyte{
+                dnam{"kilobytes"}
+                one{"{0} kilobyte"}
+                other{"{0} kilobytes"}
+            }
+            megabit{
+                dnam{"megabits"}
+                one{"{0} megabit"}
+                other{"{0} megabits"}
+            }
+            megabyte{
+                dnam{"megabytes"}
+                one{"{0} megabyte"}
+                other{"{0} megabytes"}
+            }
+            petabyte{
+                dnam{"petabytes"}
+                one{"{0} petabyte"}
+                other{"{0} petabytes"}
+            }
+            terabit{
+                dnam{"terabits"}
+                one{"{0} terabit"}
+                other{"{0} terabits"}
+            }
+            terabyte{
+                dnam{"terabytes"}
+                one{"{0} terabyte"}
+                other{"{0} terabytes"}
+            }
+        }
+        duration{
+            day{
+                dnam{"dis"}
+                one{"{0} di"}
+                other{"{0} dis"}
+            }
+            hour{
+                dnam{"uras"}
+                one{"{0} ura"}
+                other{"{0} uras"}
+            }
+            millisecond{
+                dnam{"millisecundas"}
+                one{"{0} millisecunda"}
+                other{"{0} millisecundas"}
+            }
+            minute{
+                dnam{"minutas"}
+                one{"{0} minuta"}
+                other{"{0} minutas"}
+                per{"{0} per minuta"}
+            }
+            month{
+                dnam{"mais"}
+                one{"{0} mais"}
+                other{"{0} mais"}
+            }
+            second{
+                dnam{"secundas"}
+                one{"{0} secunda"}
+                other{"{0} secundas"}
+                per{"{0} per secunda"}
+            }
+            week{
+                dnam{"emnas"}
+                one{"{0} emna"}
+                other{"{0} emnas"}
+            }
+            year{
+                dnam{"onns"}
+                one{"{0} onn"}
+                other{"{0} onns"}
+            }
+        }
+        graphics{
+            pixel{
+                dnam{"pixels"}
+                one{"{0} pixel"}
+                other{"{0} pixels"}
+            }
+        }
+        length{
+            centimeter{
+                dnam{"centimeters"}
+                one{"{0} centimeter"}
+                other{"{0} centimeters"}
+            }
+            kilometer{
+                dnam{"kilometers"}
+                one{"{0} kilometer"}
+                other{"{0} kilometers"}
+            }
+            meter{
+                dnam{"meters"}
+                one{"{0} meter"}
+                other{"{0} meters"}
+            }
+            millimeter{
+                dnam{"millimeters"}
+                one{"{0} millimeter"}
+                other{"{0} millimeters"}
+            }
+        }
+        mass{
+            gram{
+                dnam{"grams"}
+                one{"{0} gram"}
+                other{"{0} grams"}
+            }
+            kilogram{
+                dnam{"kilograms"}
+                one{"{0} kilogram"}
+                other{"{0} kilograms"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                dnam{"kilometers per ura"}
+                one{"{0} kilometer per ura"}
+                other{"{0} kilometers per ura"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"grads celsius"}
+                one{"{0} grad celsius"}
+                other{"{0} grads celsius"}
+            }
+        }
+        volume{
+            liter{
+                dnam{"liters"}
+                one{"{0} liter"}
+                other{"{0} liters"}
+                per{"{0} per liter"}
+            }
+        }
+    }
+    unitsNarrow{
+        duration{
+            day{
+                dnam{"di"}
+                one{"{0} dis"}
+                other{"{0} dis"}
+            }
+            hour{
+                dnam{"ura"}
+                one{"{0} uras"}
+                other{"{0} uras"}
+            }
+            millisecond{
+                dnam{"ms"}
+                one{"{0}ms"}
+                other{"{0}ms"}
+            }
+            minute{
+                dnam{"min"}
+                one{"{0} mins."}
+                other{"{0} mins."}
+            }
+            month{
+                dnam{"mais"}
+                one{"{0} mais"}
+                other{"{0} mais"}
+            }
+            second{
+                dnam{"sec"}
+                one{"{0} secs."}
+                other{"{0} secs."}
+            }
+            week{
+                dnam{"emna"}
+                one{"{0} emnas"}
+                other{"{0} emnas"}
+            }
+            year{
+                dnam{"onn"}
+                one{"{0} onns"}
+                other{"{0} onns"}
+            }
+        }
+        length{
+            centimeter{
+                dnam{"cm"}
+                one{"{0}cm"}
+                other{"{0}cm"}
+            }
+            kilometer{
+                dnam{"km"}
+                one{"{0}km"}
+                other{"{0}km"}
+            }
+            meter{
+                dnam{"meter"}
+                one{"{0}m"}
+                other{"{0}m"}
+            }
+            millimeter{
+                dnam{"mm"}
+                one{"{0}mm"}
+                other{"{0}mm"}
+            }
+        }
+        mass{
+            gram{
+                dnam{"gram"}
+                one{"{0} g"}
+                other{"{0} g"}
+            }
+            kilogram{
+                dnam{"kg"}
+                one{"{0} kg"}
+                other{"{0} kg"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                dnam{"km/h"}
+                one{"{0} km/h"}
+                other{"{0} km/h"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"°C"}
+                one{"{0}°C"}
+                other{"{0}°C"}
+            }
+        }
+        volume{
+            liter{
+                dnam{"liter"}
+                one{"{0} l"}
+                other{"{0} l"}
+            }
+        }
+    }
+    unitsShort{
+        digital{
+            bit{
+                one{"{0} bit"}
+                other{"{0} bit"}
+            }
+            byte{
+                one{"{0} byte"}
+                other{"{0} byte"}
+            }
+            gigabit{
+                dnam{"Gbit"}
+                one{"{0} Gb"}
+                other{"{0} Gb"}
+            }
+            gigabyte{
+                dnam{"GByte"}
+                one{"{0} GB"}
+                other{"{0} GB"}
+            }
+            kilobit{
+                dnam{"kbit"}
+                one{"{0} kb"}
+                other{"{0} kb"}
+            }
+            kilobyte{
+                dnam{"kByte"}
+                one{"{0} kB"}
+                other{"{0} kB"}
+            }
+            megabit{
+                dnam{"Mbit"}
+                one{"{0} Mb"}
+                other{"{0} Mb"}
+            }
+            megabyte{
+                dnam{"MByte"}
+                one{"{0} MB"}
+                other{"{0} MB"}
+            }
+            petabyte{
+                dnam{"PByte"}
+                one{"{0} PB"}
+                other{"{0} PB"}
+            }
+            terabit{
+                dnam{"Tbit"}
+                one{"{0} Tb"}
+                other{"{0} Tb"}
+            }
+            terabyte{
+                dnam{"TByte"}
+                one{"{0} TB"}
+                other{"{0} TB"}
+            }
+        }
+        duration{
+            day{
+                dnam{"dis"}
+                one{"{0} di"}
+                other{"{0} dis"}
+            }
+            hour{
+                dnam{"uras"}
+                one{"{0} ura"}
+                other{"{0} uras"}
+            }
+            millisecond{
+                dnam{"ms"}
+                one{"{0} ms"}
+                other{"{0} ms"}
+            }
+            minute{
+                dnam{"minutas"}
+                one{"{0} min."}
+                other{"{0} mins."}
+            }
+            month{
+                dnam{"mais"}
+                one{"{0} mais"}
+                other{"{0} mais"}
+            }
+            second{
+                dnam{"secundas"}
+                one{"{0} sec."}
+                other{"{0} secs."}
+            }
+            week{
+                dnam{"emnas"}
+                one{"{0} emna"}
+                other{"{0} emnas"}
+            }
+            year{
+                dnam{"onns"}
+                one{"{0} onn"}
+                other{"{0} onns"}
+            }
+        }
+        graphics{
+            pixel{
+                dnam{"pixels"}
+                one{"{0} px"}
+                other{"{0} px"}
+            }
+        }
+        length{
+            centimeter{
+                dnam{"cm"}
+                one{"{0} cm"}
+                other{"{0} cm"}
+            }
+            kilometer{
+                dnam{"km"}
+                one{"{0} km"}
+                other{"{0} km"}
+            }
+            meter{
+                dnam{"meters"}
+                one{"{0} m"}
+                other{"{0} m"}
+            }
+            millimeter{
+                dnam{"mm"}
+                one{"{0} mm"}
+                other{"{0} mm"}
+            }
+        }
+        mass{
+            gram{
+                dnam{"grams"}
+                one{"{0} g"}
+                other{"{0} g"}
+            }
+            kilogram{
+                dnam{"kg"}
+                one{"{0} kg"}
+                other{"{0} kg"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                dnam{"km/ura"}
+                one{"{0} km/h"}
+                other{"{0} km/h"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"°C"}
+                one{"{0} °C"}
+                other{"{0} °C"}
+            }
+        }
+        volume{
+            liter{
+                dnam{"liters"}
+                one{"{0} l"}
+                other{"{0} l"}
+            }
+        }
+    }
+}

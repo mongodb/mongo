@@ -59,7 +59,7 @@ runReadOnlyTest(function() {
             var actualIndexes = indexes.map((fullSpec) => {
                 return fullSpec.key;
             });
-            var expectedIndexes = Array.concat([{_id: 1}], this.indexSpecs);
+            var expectedIndexes = [{_id: 1}].concat(this.indexSpecs);
 
             assert.docEq(actualIndexes, expectedIndexes);
 

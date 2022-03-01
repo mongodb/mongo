@@ -1,0 +1,758 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+kea{
+    Currencies{
+        AED{
+            "AED",
+            "Diren di Emiradus Arabi Unidu",
+        }
+        AFN{
+            "AFN",
+            "AFN",
+        }
+        ALL{
+            "ALL",
+            "ALL",
+        }
+        AMD{
+            "AMD",
+            "AMD",
+        }
+        ANG{
+            "ANG",
+            "ANG",
+        }
+        AOA{
+            "AOA",
+            "Kuanza",
+        }
+        AUD{
+            "AU$",
+            "Dola australianu",
+        }
+        AWG{
+            "AWG",
+            "AWG",
+        }
+        AZN{
+            "AZN",
+            "AZN",
+        }
+        BAM{
+            "BAM",
+            "BAM",
+        }
+        BGN{
+            "BGN",
+            "BGN",
+        }
+        BHD{
+            "BHD",
+            "Dinar di Barain",
+        }
+        BIF{
+            "BIF",
+            "Franku borundes",
+        }
+        BOB{
+            "BOB",
+            "BOB",
+        }
+        BRL{
+            "R$",
+            "Rial brazileru",
+        }
+        BTN{
+            "BTN",
+            "BTN",
+        }
+        BWP{
+            "BWP",
+            "Pula di Botsuana",
+        }
+        CAD{
+            "CA$",
+            "Dola kanadianu",
+        }
+        CDF{
+            "CDF",
+            "Franku kongoles",
+        }
+        CHF{
+            "CHF",
+            "Franku suisu",
+        }
+        CNY{
+            "CN¥",
+            "Iuan xines",
+        }
+        CVE{
+            "​",
+            "Skudu Kabuverdianu",
+            {
+                "#,##0.00 ¤",
+                "$",
+                " ",
+            }
+        }
+        CZK{
+            "CZK",
+            "CZK",
+        }
+        DJF{
+            "DJF",
+            "Franku di Djibuti",
+        }
+        DKK{
+            "DKK",
+            "Kuroa dinamarkeza",
+        }
+        DZD{
+            "DZD",
+            "Dinar arjelinu",
+        }
+        EGP{
+            "EGP",
+            "Libra ejípsiu",
+        }
+        ERN{
+            "ERN",
+            "Nafka di Eritreia",
+        }
+        ETB{
+            "ETB",
+            "Bir etiópiku",
+        }
+        EUR{
+            "€",
+            "euro",
+        }
+        FKP{
+            "FKP",
+            "FKP",
+        }
+        GBP{
+            "£",
+            "Libra britániku",
+        }
+        GEL{
+            "GEL",
+            "GEL",
+        }
+        GHC{
+            "GHC",
+            "Sedi di Gana (1979–2007)",
+        }
+        GMD{
+            "GMD",
+            "Dalasi",
+        }
+        GNF{
+            "GNF",
+            "GNF",
+        }
+        GNS{
+            "GNS",
+            "Sili",
+        }
+        GTQ{
+            "GTQ",
+            "GTQ",
+        }
+        HKD{
+            "HK$",
+            "Dola di Ong Kong",
+        }
+        HNL{
+            "HNL",
+            "HNL",
+        }
+        HRK{
+            "HRK",
+            "HRK",
+        }
+        HTG{
+            "HTG",
+            "HTG",
+        }
+        HUF{
+            "HUF",
+            "HUF",
+        }
+        IDR{
+            "IDR",
+            "Rupia indoneziu",
+        }
+        ILS{
+            "₪",
+            "ILS",
+        }
+        INR{
+            "₹",
+            "Rupia indianu",
+        }
+        IQD{
+            "IQD",
+            "IQD",
+        }
+        IRR{
+            "IRR",
+            "IRR",
+        }
+        ISK{
+            "ISK",
+            "ISK",
+        }
+        JOD{
+            "JOD",
+            "JOD",
+        }
+        JPY{
+            "JP¥",
+            "Ieni japones",
+        }
+        KES{
+            "KES",
+            "Xelin kenianu",
+        }
+        KGS{
+            "KGS",
+            "KGS",
+        }
+        KMF{
+            "KMF",
+            "Franku di Komoris",
+        }
+        KPW{
+            "KPW",
+            "KPW",
+        }
+        KRW{
+            "₩",
+            "Won sul-koreanu",
+        }
+        KWD{
+            "KWD",
+            "KWD",
+        }
+        LBP{
+            "LBP",
+            "LBP",
+        }
+        LKR{
+            "LKR",
+            "LKR",
+        }
+        LRD{
+            "LRD",
+            "Dola liberianu",
+        }
+        LSL{
+            "LSL",
+            "Loti di Lezotu",
+        }
+        LTL{
+            "LTL",
+            "LTL",
+        }
+        LYD{
+            "LYD",
+            "Dinar líbiu",
+        }
+        MAD{
+            "MAD",
+            "Diren marokinu",
+        }
+        MDL{
+            "MDL",
+            "MDL",
+        }
+        MGA{
+            "MGA",
+            "Ariari di Madagaskar",
+        }
+        MKD{
+            "MKD",
+            "MKD",
+        }
+        MMK{
+            "MMK",
+            "MMK",
+        }
+        MOP{
+            "MOP",
+            "MOP",
+        }
+        MRO{
+            "MRO",
+            "Ougia (1973–2017)",
+        }
+        MRU{
+            "MRU",
+            "Ougia",
+        }
+        MUR{
+            "MUR",
+            "Rupia di Maurisias",
+        }
+        MVR{
+            "MVR",
+            "MVR",
+        }
+        MWK{
+            "MWK",
+            "Kuaxa di Malaui",
+        }
+        MXN{
+            "MX$",
+            "Pezu mexikanu",
+        }
+        MYR{
+            "MYR",
+            "MYR",
+        }
+        MZM{
+            "MZM",
+            "Metikal",
+        }
+        MZN{
+            "MZN",
+            "MZN",
+        }
+        NAD{
+            "NAD",
+            "Dola namibianu",
+        }
+        NGN{
+            "NGN",
+            "Naira",
+        }
+        NIO{
+            "NIO",
+            "NIO",
+        }
+        NOK{
+            "NOK",
+            "Kuroa norueges",
+        }
+        NPR{
+            "NPR",
+            "NPR",
+        }
+        NZD{
+            "NZ$",
+            "NZD",
+        }
+        OMR{
+            "OMR",
+            "OMR",
+        }
+        PAB{
+            "PAB",
+            "PAB",
+        }
+        PEN{
+            "PEN",
+            "PEN",
+        }
+        PGK{
+            "PGK",
+            "PGK",
+        }
+        PKR{
+            "PKR",
+            "PKR",
+        }
+        PLN{
+            "PLN",
+            "Zloty polaku",
+        }
+        QAR{
+            "QAR",
+            "QAR",
+        }
+        RSD{
+            "RSD",
+            "RSD",
+        }
+        RUB{
+            "RUB",
+            "Rublu rusu",
+        }
+        RWF{
+            "RWF",
+            "Franku ruandes",
+        }
+        SAR{
+            "SAR",
+            "Rial saudita",
+        }
+        SCR{
+            "SCR",
+            "Rupia di Seixelis",
+        }
+        SDG{
+            "SDG",
+            "Libra sudanes",
+        }
+        SDP{
+            "SDP",
+            "Libra sudanes antigu (1957–1998)",
+        }
+        SEK{
+            "SEK",
+            "Kuroa sueku",
+        }
+        SHP{
+            "SHP",
+            "Libra di Santa Ilena",
+        }
+        SLL{
+            "SLL",
+            "Leone di Sera Leoa",
+        }
+        SOS{
+            "SOS",
+            "Xelin somalianu",
+        }
+        STD{
+            "STD",
+            "Dobra di San Tume i Prínsipi (1977–2017)",
+        }
+        STN{
+            "STN",
+            "Dobra di San Tume i Prínsipi",
+        }
+        SYP{
+            "SYP",
+            "SYP",
+        }
+        SZL{
+            "SZL",
+            "Lilanjeni",
+        }
+        THB{
+            "฿",
+            "Baht tailandes",
+        }
+        TJS{
+            "TJS",
+            "TJS",
+        }
+        TMT{
+            "TMT",
+            "TMT",
+        }
+        TND{
+            "TND",
+            "Dinar tunizianu",
+        }
+        TOP{
+            "TOP",
+            "TOP",
+        }
+        TRY{
+            "TRY",
+            "Lira turku",
+        }
+        TWD{
+            "NT$",
+            "Dola Novu di Taiwan",
+        }
+        TZS{
+            "TZS",
+            "Xelin di Tanzánia",
+        }
+        UGX{
+            "UGX",
+            "Xelin ugandensi",
+        }
+        USD{
+            "US$",
+            "Dola merkanu",
+        }
+        UZS{
+            "UZS",
+            "UZS",
+        }
+        VEF{
+            "VEF",
+            "VEF",
+        }
+        VND{
+            "₫",
+            "VND",
+        }
+        VUV{
+            "VUV",
+            "VUV",
+        }
+        WST{
+            "WST",
+            "WST",
+        }
+        XAF{
+            "FCFA",
+            "Franku CFA (BEAC)",
+        }
+        XCD{
+            "EC$",
+            "XCD",
+        }
+        XOF{
+            "F CFA",
+            "Franku CFA (BCEAO)",
+        }
+        XPF{
+            "CFPF",
+            "XPF",
+        }
+        XXX{
+            "¤",
+            "Mueda diskonxedu",
+        }
+        YER{
+            "YER",
+            "YER",
+        }
+        ZAR{
+            "ZAR",
+            "Rand sulafrikanu",
+        }
+        ZMK{
+            "ZMK",
+            "Kuaxa zambianu (1968–2012)",
+        }
+        ZMW{
+            "ZMW",
+            "Kuaxa zambianu",
+        }
+        ZWD{
+            "ZWD",
+            "Dola di Zimbabue (1980–2008)",
+        }
+    }
+    Currencies%narrow{
+        AUD{"$"}
+        BDT{"৳"}
+        BND{"$"}
+        BRL{"R$"}
+        CNY{"¥"}
+        EUR{"€"}
+        FJD{"$"}
+        GBP{"£"}
+        HKD{"$"}
+        ILS{"₪"}
+        INR{"₹"}
+        JPY{"¥"}
+        KHR{"៛"}
+        KRW{"₩"}
+        KZT{"₸"}
+        LAK{"₭"}
+        MNT{"₮"}
+        NZD{"$"}
+        PHP{"₱"}
+        SBD{"$"}
+        SGD{"$"}
+        TRY{"₺"}
+        VND{"₫"}
+    }
+    CurrencyPlurals{
+        AED{
+            other{"Diren di Emiradus Arabi Unidu"}
+        }
+        AOA{
+            other{"Kuanza"}
+        }
+        AUD{
+            other{"Dola australianu"}
+        }
+        BHD{
+            other{"Dinar di Barain"}
+        }
+        BIF{
+            other{"Franku borundes"}
+        }
+        BRL{
+            other{"Rial brazileru"}
+        }
+        BWP{
+            other{"Pula di Botsuana"}
+        }
+        CAD{
+            other{"Dola kanadianu"}
+        }
+        CDF{
+            other{"Franku kongoles"}
+        }
+        CHF{
+            other{"Franku suisu"}
+        }
+        CNY{
+            other{"Iuan xines"}
+        }
+        CVE{
+            other{"Skudu Kabuverdianu"}
+        }
+        DJF{
+            other{"Franku di Djibuti"}
+        }
+        DKK{
+            other{"Kuroa dinamarkeza"}
+        }
+        DZD{
+            other{"Dinar arjelinu"}
+        }
+        EGP{
+            other{"Libra ejípsiu"}
+        }
+        ERN{
+            other{"Nafka di Eritreia"}
+        }
+        ETB{
+            other{"Bir etiópiku"}
+        }
+        EUR{
+            other{"euro"}
+        }
+        GBP{
+            other{"Libra britániku"}
+        }
+        GMD{
+            other{"Dalasi"}
+        }
+        HKD{
+            other{"Dola di Ong Kong"}
+        }
+        IDR{
+            other{"Rupia indoneziu"}
+        }
+        INR{
+            other{"Rupia indianu"}
+        }
+        JPY{
+            other{"Ieni japones"}
+        }
+        KES{
+            other{"Xelin kenianu"}
+        }
+        KMF{
+            other{"Franku di Komoris"}
+        }
+        KRW{
+            other{"Won sul-koreanu"}
+        }
+        LRD{
+            other{"Dola liberianu"}
+        }
+        LYD{
+            other{"Dinar líbiu"}
+        }
+        MAD{
+            other{"Diren marokinu"}
+        }
+        MGA{
+            other{"Ariari di Madagaskar"}
+        }
+        MRO{
+            other{"Ougia (1973–2017)"}
+        }
+        MRU{
+            other{"Ougia"}
+        }
+        MUR{
+            other{"Rupia di Maurisias"}
+        }
+        MWK{
+            other{"Kuaxa di Malaui"}
+        }
+        MXN{
+            other{"Pezu mexikanu"}
+        }
+        NAD{
+            other{"Dola namibianu"}
+        }
+        NGN{
+            other{"Naira"}
+        }
+        NOK{
+            other{"Kuroa norueges"}
+        }
+        PLN{
+            other{"Zloty polaku"}
+        }
+        RUB{
+            other{"Rublu rusu"}
+        }
+        RWF{
+            other{"Franku ruandes"}
+        }
+        SAR{
+            other{"Rial saudita"}
+        }
+        SCR{
+            other{"Rupia di Seixelis"}
+        }
+        SDG{
+            other{"Libra sudanes"}
+        }
+        SEK{
+            other{"Kuroa sueku"}
+        }
+        SHP{
+            other{"Libra di Santa Ilena"}
+        }
+        SLL{
+            other{"Leone di Sera Leoa"}
+        }
+        SOS{
+            other{"Xelin somalianu"}
+        }
+        STD{
+            other{"Dobra di San Tume i Prínsipi (1977–2017)"}
+        }
+        SZL{
+            other{"Lilanjeni"}
+        }
+        THB{
+            other{"Baht tailandes"}
+        }
+        TND{
+            other{"Dinar tunizianu"}
+        }
+        TRY{
+            other{"Lira turku"}
+        }
+        TWD{
+            other{"Dola Novu di Taiwan"}
+        }
+        TZS{
+            other{"Xelin di Tanzánia"}
+        }
+        UGX{
+            other{"Xelin ugandensi"}
+        }
+        USD{
+            other{"Dola merkanu"}
+        }
+        XAF{
+            other{"Franku CFA (BEAC)"}
+        }
+        XOF{
+            other{"Franku CFA (BCEAO)"}
+        }
+        XXX{
+            other{"(mueda diskonxedu)"}
+        }
+        ZAR{
+            other{"Rand sulafrikanu"}
+        }
+        ZMW{
+            other{"Kuaxa zambianu"}
+        }
+    }
+    CurrencyUnitPatterns{
+        other{"{0} {1}"}
+    }
+}

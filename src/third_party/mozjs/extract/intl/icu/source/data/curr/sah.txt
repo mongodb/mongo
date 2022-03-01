@@ -1,0 +1,29 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sah{
+    Currencies{
+        RUB{
+            "₽",
+            "Арассыыйа солкуобайа",
+        }
+        USD{
+            "US$",
+            "АХШ дуоллара",
+        }
+    }
+    Currencies%narrow{
+        RUB{"₽"}
+    }
+    CurrencyPlurals{
+        RUB{
+            other{"Арассыыйа солкуобайа"}
+        }
+        USD{
+            other{"АХШ дуоллара"}
+        }
+    }
+    CurrencyUnitPatterns{
+        other{"{0} {1}"}
+    }
+}

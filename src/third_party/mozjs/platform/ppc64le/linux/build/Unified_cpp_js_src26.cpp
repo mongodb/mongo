@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "threading/ProtectedData.cpp"
+#include "vm/TypedArrayObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "threading/ProtectedData.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/TypedArrayObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "threading/ProtectedData.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/TypedArrayObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "threading/posix/CpuCount.cpp"
+#include "vm/UbiNode.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "threading/posix/CpuCount.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/UbiNode.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "threading/posix/CpuCount.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/UbiNode.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "threading/posix/Thread.cpp"
+#include "vm/UbiNodeCensus.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "threading/posix/Thread.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/UbiNodeCensus.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "threading/posix/Thread.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/UbiNodeCensus.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "util/AllocPolicy.cpp"
+#include "vm/UbiNodeShortestPaths.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "util/AllocPolicy.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/UbiNodeShortestPaths.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "util/AllocPolicy.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/UbiNodeShortestPaths.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "util/NativeStack.cpp"
+#include "vm/UsageStatistics.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "util/NativeStack.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/UsageStatistics.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "util/NativeStack.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/UsageStatistics.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "util/Printf.cpp"
+#include "vm/Value.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "util/Printf.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Value.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "util/Printf.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Value.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

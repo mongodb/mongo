@@ -1,0 +1,26 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+he{
+    collations{
+        search{
+            Sequence{
+                "[import und-u-co-search]"
+                "‎&׳"
+                "<<''"
+                "‎&״"
+                "<<'\u0022'"
+            }
+            Version{"39"}
+        }
+        standard{
+            Sequence{
+                "[normalization on]"
+                "[reorder Hebr]"
+                "&[before 2]''<<׳"
+                "&[before 2]'\u0022'<<״"
+            }
+            Version{"39"}
+        }
+    }
+}

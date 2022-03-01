@@ -1,0 +1,11 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+br{
+    collations{
+        standard{
+            Sequence{"&C<ch<<<Ch<<<CH<c''h=c\u2019h<<<C''h=C\u2019h<<<C''H=C\u2019H"}
+            Version{"39"}
+        }
+    }
+}

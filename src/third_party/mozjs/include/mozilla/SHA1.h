@@ -34,18 +34,16 @@ namespace mozilla {
  * The finish method may only be called once and cannot be followed by calls
  * to update.
  */
-class SHA1Sum
-{
-  union
-  {
+class SHA1Sum {
+  union {
     uint32_t mW[16]; /* input buffer */
     uint8_t mB[64];
   } mU;
-  uint64_t mSize; /* count of hashed bytes. */
+  uint64_t mSize;  /* count of hashed bytes. */
   unsigned mH[22]; /* 5 state variables, 16 tmp values, 1 extra */
   bool mDone;
 
-public:
+ public:
   MFBT_API SHA1Sum();
 
   static const size_t kHashSize = 20;

@@ -1,0 +1,1894 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ka{
+    zoneStrings{
+        "Africa:Abidjan"{
+            ec{"აბიჯანი"}
+        }
+        "Africa:Accra"{
+            ec{"აკრა"}
+        }
+        "Africa:Addis_Ababa"{
+            ec{"ადის-აბება"}
+        }
+        "Africa:Algiers"{
+            ec{"ალჟირი"}
+        }
+        "Africa:Asmera"{
+            ec{"ასმარა"}
+        }
+        "Africa:Bamako"{
+            ec{"ბამაკო"}
+        }
+        "Africa:Bangui"{
+            ec{"ბანგი"}
+        }
+        "Africa:Banjul"{
+            ec{"ბანჯული"}
+        }
+        "Africa:Bissau"{
+            ec{"ბისაუ"}
+        }
+        "Africa:Blantyre"{
+            ec{"ბლანტირი"}
+        }
+        "Africa:Brazzaville"{
+            ec{"ბრაზავილი"}
+        }
+        "Africa:Bujumbura"{
+            ec{"ბუჯუმბურა"}
+        }
+        "Africa:Cairo"{
+            ec{"კაირო"}
+        }
+        "Africa:Casablanca"{
+            ec{"კასაბლანკა"}
+        }
+        "Africa:Ceuta"{
+            ec{"სეუტა"}
+        }
+        "Africa:Conakry"{
+            ec{"კონაკრი"}
+        }
+        "Africa:Dakar"{
+            ec{"დაკარი"}
+        }
+        "Africa:Dar_es_Salaam"{
+            ec{"დარ-ეს-სალამი"}
+        }
+        "Africa:Djibouti"{
+            ec{"ჯიბუტი"}
+        }
+        "Africa:Douala"{
+            ec{"დუალა"}
+        }
+        "Africa:El_Aaiun"{
+            ec{"ელ-ააიუნი"}
+        }
+        "Africa:Freetown"{
+            ec{"ფრიტაუნი"}
+        }
+        "Africa:Gaborone"{
+            ec{"გაბორონე"}
+        }
+        "Africa:Harare"{
+            ec{"ჰარარე"}
+        }
+        "Africa:Johannesburg"{
+            ec{"იოჰანესბურგი"}
+        }
+        "Africa:Juba"{
+            ec{"ჯუბა"}
+        }
+        "Africa:Kampala"{
+            ec{"კამპალა"}
+        }
+        "Africa:Khartoum"{
+            ec{"ხარტუმი"}
+        }
+        "Africa:Kigali"{
+            ec{"კიგალი"}
+        }
+        "Africa:Kinshasa"{
+            ec{"კინშასა"}
+        }
+        "Africa:Lagos"{
+            ec{"ლაგოსი"}
+        }
+        "Africa:Libreville"{
+            ec{"ლიბრევილი"}
+        }
+        "Africa:Lome"{
+            ec{"ლომე"}
+        }
+        "Africa:Luanda"{
+            ec{"ლუანდა"}
+        }
+        "Africa:Lubumbashi"{
+            ec{"ლუბუმბაში"}
+        }
+        "Africa:Lusaka"{
+            ec{"ლუსაკა"}
+        }
+        "Africa:Malabo"{
+            ec{"მალაბო"}
+        }
+        "Africa:Maputo"{
+            ec{"მაპუტო"}
+        }
+        "Africa:Maseru"{
+            ec{"მასერუ"}
+        }
+        "Africa:Mbabane"{
+            ec{"მბაბანე"}
+        }
+        "Africa:Mogadishu"{
+            ec{"მოგადიშუ"}
+        }
+        "Africa:Monrovia"{
+            ec{"მონროვია"}
+        }
+        "Africa:Nairobi"{
+            ec{"ნაირობი"}
+        }
+        "Africa:Ndjamena"{
+            ec{"ნჯამენა"}
+        }
+        "Africa:Niamey"{
+            ec{"ნიამეი"}
+        }
+        "Africa:Nouakchott"{
+            ec{"ნუაკშოტი"}
+        }
+        "Africa:Ouagadougou"{
+            ec{"უაგადუგუ"}
+        }
+        "Africa:Porto-Novo"{
+            ec{"პორტო-ნოვო"}
+        }
+        "Africa:Sao_Tome"{
+            ec{"სენ-ტომე"}
+        }
+        "Africa:Tripoli"{
+            ec{"ტრიპოლი"}
+        }
+        "Africa:Tunis"{
+            ec{"ტუნისი"}
+        }
+        "Africa:Windhoek"{
+            ec{"ვინდხუკი"}
+        }
+        "America:Adak"{
+            ec{"ადაკი"}
+        }
+        "America:Anchorage"{
+            ec{"ენქორაჯი"}
+        }
+        "America:Anguilla"{
+            ec{"ანგილია"}
+        }
+        "America:Antigua"{
+            ec{"ანტიგუა"}
+        }
+        "America:Araguaina"{
+            ec{"არაგუაინა"}
+        }
+        "America:Argentina:La_Rioja"{
+            ec{"ლა რიოხა"}
+        }
+        "America:Argentina:Rio_Gallegos"{
+            ec{"რიო გალეგოსი"}
+        }
+        "America:Argentina:Salta"{
+            ec{"სალტა"}
+        }
+        "America:Argentina:San_Juan"{
+            ec{"სან ხუანი"}
+        }
+        "America:Argentina:San_Luis"{
+            ec{"სან-ლუისი"}
+        }
+        "America:Argentina:Tucuman"{
+            ec{"ტუკუმანი"}
+        }
+        "America:Argentina:Ushuaia"{
+            ec{"უშუაია"}
+        }
+        "America:Aruba"{
+            ec{"არუბა"}
+        }
+        "America:Asuncion"{
+            ec{"ასუნსიონი"}
+        }
+        "America:Bahia"{
+            ec{"ბაია"}
+        }
+        "America:Bahia_Banderas"{
+            ec{"ბაჰია ბანდერასი"}
+        }
+        "America:Barbados"{
+            ec{"ბარბადოსი"}
+        }
+        "America:Belem"{
+            ec{"ბელემი"}
+        }
+        "America:Belize"{
+            ec{"ბელიზი"}
+        }
+        "America:Blanc-Sablon"{
+            ec{"ბლან-საბლონი"}
+        }
+        "America:Boa_Vista"{
+            ec{"ბოა ვისტა"}
+        }
+        "America:Bogota"{
+            ec{"ბოგოტა"}
+        }
+        "America:Boise"{
+            ec{"ბუასი"}
+        }
+        "America:Buenos_Aires"{
+            ec{"ბუენოს-აირესი"}
+        }
+        "America:Cambridge_Bay"{
+            ec{"კემბრიჯ ბეი"}
+        }
+        "America:Campo_Grande"{
+            ec{"კამპო გრანდე"}
+        }
+        "America:Cancun"{
+            ec{"კანკუნი"}
+        }
+        "America:Caracas"{
+            ec{"კარაკასი"}
+        }
+        "America:Catamarca"{
+            ec{"კატამარკა"}
+        }
+        "America:Cayenne"{
+            ec{"კაიენა"}
+        }
+        "America:Cayman"{
+            ec{"კაიმანი"}
+        }
+        "America:Chicago"{
+            ec{"ჩიკაგო"}
+        }
+        "America:Chihuahua"{
+            ec{"ჩიჰუაჰუა"}
+        }
+        "America:Coral_Harbour"{
+            ec{"ატიკოკანი"}
+        }
+        "America:Cordoba"{
+            ec{"კორდობა"}
+        }
+        "America:Costa_Rica"{
+            ec{"კოსტა-რიკა"}
+        }
+        "America:Creston"{
+            ec{"კრესტონი"}
+        }
+        "America:Cuiaba"{
+            ec{"კუიაბა"}
+        }
+        "America:Curacao"{
+            ec{"კიურასაო"}
+        }
+        "America:Danmarkshavn"{
+            ec{"დენმარკშავნი"}
+        }
+        "America:Dawson"{
+            ec{"დოუსონი"}
+        }
+        "America:Dawson_Creek"{
+            ec{"დოუსონ ქრიკი"}
+        }
+        "America:Denver"{
+            ec{"დენვერი"}
+        }
+        "America:Detroit"{
+            ec{"დეტროიტი"}
+        }
+        "America:Dominica"{
+            ec{"დომინიკა"}
+        }
+        "America:Edmonton"{
+            ec{"ედმონტონი"}
+        }
+        "America:Eirunepe"{
+            ec{"ეირუნეპე"}
+        }
+        "America:El_Salvador"{
+            ec{"სალვადორი"}
+        }
+        "America:Fort_Nelson"{
+            ec{"ფორტ-ნელსონი"}
+        }
+        "America:Fortaleza"{
+            ec{"ფორტალეზა"}
+        }
+        "America:Glace_Bay"{
+            ec{"გლეის ბეი"}
+        }
+        "America:Godthab"{
+            ec{"გოდთები"}
+        }
+        "America:Goose_Bay"{
+            ec{"გუზ ბეი"}
+        }
+        "America:Grand_Turk"{
+            ec{"გრანდ-ტურკი"}
+        }
+        "America:Grenada"{
+            ec{"გრენადა"}
+        }
+        "America:Guadeloupe"{
+            ec{"გვადელუპა"}
+        }
+        "America:Guatemala"{
+            ec{"გვატემალა"}
+        }
+        "America:Guayaquil"{
+            ec{"გუაიაკილი"}
+        }
+        "America:Guyana"{
+            ec{"გაიანა"}
+        }
+        "America:Halifax"{
+            ec{"ჰალიფაქსი"}
+        }
+        "America:Havana"{
+            ec{"ჰავანა"}
+        }
+        "America:Hermosillo"{
+            ec{"ჰერმოსილო"}
+        }
+        "America:Indiana:Knox"{
+            ec{"ნოქსი, ინდიანა"}
+        }
+        "America:Indiana:Marengo"{
+            ec{"მარენგო, ინდიანა"}
+        }
+        "America:Indiana:Petersburg"{
+            ec{"პიტერსბურგი, ინდიანა"}
+        }
+        "America:Indiana:Tell_City"{
+            ec{"თელ სითი, ინდიანა"}
+        }
+        "America:Indiana:Vevay"{
+            ec{"ვივეი, ინდიანა"}
+        }
+        "America:Indiana:Vincennes"{
+            ec{"ვინსენი, ინდიანა"}
+        }
+        "America:Indiana:Winamac"{
+            ec{"უინემაკი, ინდიანა"}
+        }
+        "America:Indianapolis"{
+            ec{"ინდიანაპოლისი"}
+        }
+        "America:Inuvik"{
+            ec{"ინუვიკი"}
+        }
+        "America:Iqaluit"{
+            ec{"იქალუიტი"}
+        }
+        "America:Jamaica"{
+            ec{"იამაიკა"}
+        }
+        "America:Jujuy"{
+            ec{"ჯუჯუი"}
+        }
+        "America:Juneau"{
+            ec{"ჯუნო"}
+        }
+        "America:Kentucky:Monticello"{
+            ec{"მონტიჩელო, კენტუკი"}
+        }
+        "America:Kralendijk"{
+            ec{"კრალენდიიკი"}
+        }
+        "America:La_Paz"{
+            ec{"ლა-პაზი"}
+        }
+        "America:Lima"{
+            ec{"ლიმა"}
+        }
+        "America:Los_Angeles"{
+            ec{"ლოს-ანჯელესი"}
+        }
+        "America:Louisville"{
+            ec{"ლუისვილი"}
+        }
+        "America:Lower_Princes"{
+            ec{"ლოერ პრინც კვორტერი"}
+        }
+        "America:Maceio"{
+            ec{"მასეიო"}
+        }
+        "America:Managua"{
+            ec{"მანაგუა"}
+        }
+        "America:Manaus"{
+            ec{"მანაუსი"}
+        }
+        "America:Marigot"{
+            ec{"მარიგო"}
+        }
+        "America:Martinique"{
+            ec{"მარტინიკი"}
+        }
+        "America:Matamoros"{
+            ec{"მატამოროსი"}
+        }
+        "America:Mazatlan"{
+            ec{"მაზატლანი"}
+        }
+        "America:Mendoza"{
+            ec{"მენდოზა"}
+        }
+        "America:Menominee"{
+            ec{"მენომინი"}
+        }
+        "America:Merida"{
+            ec{"მერიდა"}
+        }
+        "America:Metlakatla"{
+            ec{"მეტლაკატლა"}
+        }
+        "America:Mexico_City"{
+            ec{"მეხიკო"}
+        }
+        "America:Miquelon"{
+            ec{"მიკელონი"}
+        }
+        "America:Moncton"{
+            ec{"მონქტონი"}
+        }
+        "America:Monterrey"{
+            ec{"მონტერეი"}
+        }
+        "America:Montevideo"{
+            ec{"მონტევიდეო"}
+        }
+        "America:Montserrat"{
+            ec{"მონსერატი"}
+        }
+        "America:Nassau"{
+            ec{"ნასაუ"}
+        }
+        "America:New_York"{
+            ec{"ნიუ-იორკი"}
+        }
+        "America:Nipigon"{
+            ec{"ნიპიგონი"}
+        }
+        "America:Nome"{
+            ec{"ნომი"}
+        }
+        "America:Noronha"{
+            ec{"ნორონია"}
+        }
+        "America:North_Dakota:Beulah"{
+            ec{"ბიულა, ჩრდილოეთი დაკოტა"}
+        }
+        "America:North_Dakota:Center"{
+            ec{"ცენტრი, ჩრდილოეთი დაკოტა"}
+        }
+        "America:North_Dakota:New_Salem"{
+            ec{"ნიუ-სალემი, ჩრდილოეთი დაკოტა"}
+        }
+        "America:Ojinaga"{
+            ec{"ოხინაგა"}
+        }
+        "America:Panama"{
+            ec{"პანამა"}
+        }
+        "America:Pangnirtung"{
+            ec{"პანგნირტუნგი"}
+        }
+        "America:Paramaribo"{
+            ec{"პარამარიბო"}
+        }
+        "America:Phoenix"{
+            ec{"ფენიქსი"}
+        }
+        "America:Port-au-Prince"{
+            ec{"პორტ-ა-პრინსი"}
+        }
+        "America:Port_of_Spain"{
+            ec{"პორტ-ოვ-სპეინი"}
+        }
+        "America:Porto_Velho"{
+            ec{"პორტუ-ველიო"}
+        }
+        "America:Puerto_Rico"{
+            ec{"პუერტო-რიკო"}
+        }
+        "America:Punta_Arenas"{
+            ec{"პუნტა-არენასი"}
+        }
+        "America:Rainy_River"{
+            ec{"რეინი რივერი"}
+        }
+        "America:Rankin_Inlet"{
+            ec{"რენკინ ინლეტი"}
+        }
+        "America:Recife"{
+            ec{"რეციფე"}
+        }
+        "America:Regina"{
+            ec{"რეჯინა"}
+        }
+        "America:Resolute"{
+            ec{"რეზოლუტე"}
+        }
+        "America:Rio_Branco"{
+            ec{"რიო ბრანკო"}
+        }
+        "America:Santa_Isabel"{
+            ec{"სანტა ისაბელი"}
+        }
+        "America:Santarem"{
+            ec{"სანტარემი"}
+        }
+        "America:Santiago"{
+            ec{"სანტიაგო"}
+        }
+        "America:Santo_Domingo"{
+            ec{"სანტო-დომინგო"}
+        }
+        "America:Sao_Paulo"{
+            ec{"სან-პაულუ"}
+        }
+        "America:Scoresbysund"{
+            ec{"სკორსბისუნდი"}
+        }
+        "America:Sitka"{
+            ec{"სიტკა"}
+        }
+        "America:St_Barthelemy"{
+            ec{"სენ-ბართელემი"}
+        }
+        "America:St_Johns"{
+            ec{"სენტ-ჯონსი"}
+        }
+        "America:St_Kitts"{
+            ec{"სენტ-კიტსი"}
+        }
+        "America:St_Lucia"{
+            ec{"სენტ-ლუსია"}
+        }
+        "America:St_Thomas"{
+            ec{"სენ-ტომასი"}
+        }
+        "America:St_Vincent"{
+            ec{"სენ-ვინსენტი"}
+        }
+        "America:Swift_Current"{
+            ec{"სვიფტ კარენტი"}
+        }
+        "America:Tegucigalpa"{
+            ec{"ტეგუჩიგალპა"}
+        }
+        "America:Thule"{
+            ec{"თულე"}
+        }
+        "America:Thunder_Bay"{
+            ec{"თანდერ ბეი"}
+        }
+        "America:Tijuana"{
+            ec{"ტიხუანა"}
+        }
+        "America:Toronto"{
+            ec{"ტორონტო"}
+        }
+        "America:Tortola"{
+            ec{"ტორტოლა"}
+        }
+        "America:Vancouver"{
+            ec{"ვანკუვერი"}
+        }
+        "America:Whitehorse"{
+            ec{"უაითჰორსი"}
+        }
+        "America:Winnipeg"{
+            ec{"უინიპეგი"}
+        }
+        "America:Yakutat"{
+            ec{"იაკუტატი"}
+        }
+        "America:Yellowknife"{
+            ec{"იელოუნაიფი"}
+        }
+        "Antarctica:Casey"{
+            ec{"კეისი"}
+        }
+        "Antarctica:Davis"{
+            ec{"დევისი"}
+        }
+        "Antarctica:DumontDUrville"{
+            ec{"დიუმონ დ’ურვილი"}
+        }
+        "Antarctica:Macquarie"{
+            ec{"მექვორი"}
+        }
+        "Antarctica:Mawson"{
+            ec{"მოუსონი"}
+        }
+        "Antarctica:McMurdo"{
+            ec{"მაკმურდო"}
+        }
+        "Antarctica:Palmer"{
+            ec{"პალმერი"}
+        }
+        "Antarctica:Rothera"{
+            ec{"როთერა"}
+        }
+        "Antarctica:Syowa"{
+            ec{"სიოუა"}
+        }
+        "Antarctica:Troll"{
+            ec{"ტროლი"}
+        }
+        "Antarctica:Vostok"{
+            ec{"ვოსტოკი"}
+        }
+        "Arctic:Longyearbyen"{
+            ec{"ლონგირბიენი"}
+        }
+        "Asia:Aden"{
+            ec{"ადენი"}
+        }
+        "Asia:Almaty"{
+            ec{"ალმატი"}
+        }
+        "Asia:Amman"{
+            ec{"ამანი"}
+        }
+        "Asia:Anadyr"{
+            ec{"ანადირი"}
+        }
+        "Asia:Aqtau"{
+            ec{"აქტაუ"}
+        }
+        "Asia:Aqtobe"{
+            ec{"აქტობე"}
+        }
+        "Asia:Ashgabat"{
+            ec{"აშხაბადი"}
+        }
+        "Asia:Atyrau"{
+            ec{"ატირაუ"}
+        }
+        "Asia:Baghdad"{
+            ec{"ბაღდადი"}
+        }
+        "Asia:Bahrain"{
+            ec{"ბაჰრეინი"}
+        }
+        "Asia:Baku"{
+            ec{"ბაქო"}
+        }
+        "Asia:Bangkok"{
+            ec{"ბანგკოკი"}
+        }
+        "Asia:Barnaul"{
+            ec{"ბარნაული"}
+        }
+        "Asia:Beirut"{
+            ec{"ბეირუთი"}
+        }
+        "Asia:Bishkek"{
+            ec{"ბიშკეკი"}
+        }
+        "Asia:Brunei"{
+            ec{"ბრუნეი"}
+        }
+        "Asia:Calcutta"{
+            ec{"კალკუტა"}
+        }
+        "Asia:Chita"{
+            ec{"ჩიტა"}
+        }
+        "Asia:Choibalsan"{
+            ec{"ჩოიბალსანი"}
+        }
+        "Asia:Colombo"{
+            ec{"კოლომბო"}
+        }
+        "Asia:Damascus"{
+            ec{"დამასკი"}
+        }
+        "Asia:Dhaka"{
+            ec{"დაკა"}
+        }
+        "Asia:Dili"{
+            ec{"დილი"}
+        }
+        "Asia:Dubai"{
+            ec{"დუბაი"}
+        }
+        "Asia:Dushanbe"{
+            ec{"დუშანბე"}
+        }
+        "Asia:Famagusta"{
+            ec{"ფამაგუსტა"}
+        }
+        "Asia:Gaza"{
+            ec{"გაზა"}
+        }
+        "Asia:Hebron"{
+            ec{"ჰებრონი"}
+        }
+        "Asia:Hong_Kong"{
+            ec{"ჰონკონგი"}
+        }
+        "Asia:Hovd"{
+            ec{"ჰოვდი"}
+        }
+        "Asia:Irkutsk"{
+            ec{"ირკუტსკი"}
+        }
+        "Asia:Jakarta"{
+            ec{"ჯაკარტა"}
+        }
+        "Asia:Jayapura"{
+            ec{"ჯაიაპურა"}
+        }
+        "Asia:Jerusalem"{
+            ec{"იერუსალიმი"}
+        }
+        "Asia:Kabul"{
+            ec{"ქაბული"}
+        }
+        "Asia:Kamchatka"{
+            ec{"კამჩატკა"}
+        }
+        "Asia:Karachi"{
+            ec{"კარაჩი"}
+        }
+        "Asia:Katmandu"{
+            ec{"კატმანდუ"}
+        }
+        "Asia:Khandyga"{
+            ec{"ხანდიგა"}
+        }
+        "Asia:Krasnoyarsk"{
+            ec{"კრასნოიარსკი"}
+        }
+        "Asia:Kuala_Lumpur"{
+            ec{"კუალა-ლუმპური"}
+        }
+        "Asia:Kuching"{
+            ec{"კუჩინგი"}
+        }
+        "Asia:Kuwait"{
+            ec{"ქუვეითი"}
+        }
+        "Asia:Macau"{
+            ec{"მაკაო"}
+        }
+        "Asia:Magadan"{
+            ec{"მაგადანი"}
+        }
+        "Asia:Makassar"{
+            ec{"მაკასარი"}
+        }
+        "Asia:Manila"{
+            ec{"მანილა"}
+        }
+        "Asia:Muscat"{
+            ec{"მუსკატი"}
+        }
+        "Asia:Nicosia"{
+            ec{"ნიკოსია"}
+        }
+        "Asia:Novokuznetsk"{
+            ec{"ნოვოკუზნეცკი"}
+        }
+        "Asia:Novosibirsk"{
+            ec{"ნოვოსიბირსკი"}
+        }
+        "Asia:Omsk"{
+            ec{"ომსკი"}
+        }
+        "Asia:Oral"{
+            ec{"ორალი"}
+        }
+        "Asia:Phnom_Penh"{
+            ec{"პნომპენი"}
+        }
+        "Asia:Pontianak"{
+            ec{"პონტიანაკი"}
+        }
+        "Asia:Pyongyang"{
+            ec{"ფხენიანი"}
+        }
+        "Asia:Qatar"{
+            ec{"კატარი"}
+        }
+        "Asia:Qostanay"{
+            ec{"კოსტანაი"}
+        }
+        "Asia:Qyzylorda"{
+            ec{"ყიზილორდა"}
+        }
+        "Asia:Rangoon"{
+            ec{"რანგუნი"}
+        }
+        "Asia:Riyadh"{
+            ec{"ერ-რიადი"}
+        }
+        "Asia:Saigon"{
+            ec{"ჰოჩიმინი"}
+        }
+        "Asia:Sakhalin"{
+            ec{"სახალინი"}
+        }
+        "Asia:Samarkand"{
+            ec{"სამარყანდი"}
+        }
+        "Asia:Seoul"{
+            ec{"სეული"}
+        }
+        "Asia:Shanghai"{
+            ec{"შანხაი"}
+        }
+        "Asia:Singapore"{
+            ec{"სინგაპური"}
+        }
+        "Asia:Srednekolymsk"{
+            ec{"სრედნეკოლიმსკი"}
+        }
+        "Asia:Taipei"{
+            ec{"ტაიპეი"}
+        }
+        "Asia:Tashkent"{
+            ec{"ტაშკენტი"}
+        }
+        "Asia:Tbilisi"{
+            ec{"თბილისი"}
+        }
+        "Asia:Tehran"{
+            ec{"თეირანი"}
+        }
+        "Asia:Thimphu"{
+            ec{"თხიმფხუ"}
+        }
+        "Asia:Tokyo"{
+            ec{"ტოკიო"}
+        }
+        "Asia:Tomsk"{
+            ec{"ტომსკი"}
+        }
+        "Asia:Ulaanbaatar"{
+            ec{"ულანბატარი"}
+        }
+        "Asia:Urumqi"{
+            ec{"ურუმქი"}
+        }
+        "Asia:Ust-Nera"{
+            ec{"უსტ-ნერა"}
+        }
+        "Asia:Vientiane"{
+            ec{"ვიენტიანი"}
+        }
+        "Asia:Vladivostok"{
+            ec{"ვლადივოსტოკი"}
+        }
+        "Asia:Yakutsk"{
+            ec{"იაკუტსკი"}
+        }
+        "Asia:Yekaterinburg"{
+            ec{"ეკატერინბურგი"}
+        }
+        "Asia:Yerevan"{
+            ec{"ერევანი"}
+        }
+        "Atlantic:Azores"{
+            ec{"აზორის კუნძულები"}
+        }
+        "Atlantic:Bermuda"{
+            ec{"ბერმუდა"}
+        }
+        "Atlantic:Canary"{
+            ec{"კანარი"}
+        }
+        "Atlantic:Cape_Verde"{
+            ec{"კაბო-ვერდე"}
+        }
+        "Atlantic:Faeroe"{
+            ec{"ფარერის კუნძულები"}
+        }
+        "Atlantic:Madeira"{
+            ec{"მადეირა"}
+        }
+        "Atlantic:Reykjavik"{
+            ec{"რეიკიავიკი"}
+        }
+        "Atlantic:South_Georgia"{
+            ec{"სამხრეთ ჯორჯია"}
+        }
+        "Atlantic:St_Helena"{
+            ec{"წმ. ელენეს კუნძული"}
+        }
+        "Atlantic:Stanley"{
+            ec{"სტენლი"}
+        }
+        "Australia:Adelaide"{
+            ec{"ადელაიდა"}
+        }
+        "Australia:Brisbane"{
+            ec{"ბრისბეინი"}
+        }
+        "Australia:Broken_Hill"{
+            ec{"ბროუკენ ჰილი"}
+        }
+        "Australia:Currie"{
+            ec{"ქური"}
+        }
+        "Australia:Darwin"{
+            ec{"დარვინი"}
+        }
+        "Australia:Eucla"{
+            ec{"ეუკლა"}
+        }
+        "Australia:Hobart"{
+            ec{"ჰობარტი"}
+        }
+        "Australia:Lindeman"{
+            ec{"ლინდმანი"}
+        }
+        "Australia:Lord_Howe"{
+            ec{"ლორდ ჰოუი"}
+        }
+        "Australia:Melbourne"{
+            ec{"მელბურნი"}
+        }
+        "Australia:Perth"{
+            ec{"პერთი"}
+        }
+        "Australia:Sydney"{
+            ec{"სიდნეი"}
+        }
+        "Etc:UTC"{
+            ls{"მსოფლიო კოორდინირებული დრო"}
+        }
+        "Etc:Unknown"{
+            ec{"უცნობი ქალაქი"}
+        }
+        "Europe:Amsterdam"{
+            ec{"ამსტერდამი"}
+        }
+        "Europe:Andorra"{
+            ec{"ანდორა"}
+        }
+        "Europe:Astrakhan"{
+            ec{"ასტრახანი"}
+        }
+        "Europe:Athens"{
+            ec{"ათენი"}
+        }
+        "Europe:Belgrade"{
+            ec{"ბელგრადი"}
+        }
+        "Europe:Berlin"{
+            ec{"ბერლინი"}
+        }
+        "Europe:Bratislava"{
+            ec{"ბრატისლავა"}
+        }
+        "Europe:Brussels"{
+            ec{"ბრიუსელი"}
+        }
+        "Europe:Bucharest"{
+            ec{"ბუქარესტი"}
+        }
+        "Europe:Budapest"{
+            ec{"ბუდაპეშტი"}
+        }
+        "Europe:Busingen"{
+            ec{"ბუსინგენი"}
+        }
+        "Europe:Chisinau"{
+            ec{"კიშინიოვი"}
+        }
+        "Europe:Copenhagen"{
+            ec{"კოპენჰაგენი"}
+        }
+        "Europe:Dublin"{
+            ec{"დუბლინი"}
+            ld{"ირლანდიის სტანდარტული დრო"}
+        }
+        "Europe:Gibraltar"{
+            ec{"გიბრალტარი"}
+        }
+        "Europe:Guernsey"{
+            ec{"გერნსი"}
+        }
+        "Europe:Helsinki"{
+            ec{"ჰელსინკი"}
+        }
+        "Europe:Isle_of_Man"{
+            ec{"მენის კუნძული"}
+        }
+        "Europe:Istanbul"{
+            ec{"სტამბოლი"}
+        }
+        "Europe:Jersey"{
+            ec{"ჯერსი"}
+        }
+        "Europe:Kaliningrad"{
+            ec{"კალინინგრადი"}
+        }
+        "Europe:Kiev"{
+            ec{"კიევი"}
+        }
+        "Europe:Kirov"{
+            ec{"კიროვი"}
+        }
+        "Europe:Lisbon"{
+            ec{"ლისაბონი"}
+        }
+        "Europe:Ljubljana"{
+            ec{"ლიუბლიანა"}
+        }
+        "Europe:London"{
+            ec{"ლონდონი"}
+            ld{"ბრიტანეთის ზაფხულის დრო"}
+        }
+        "Europe:Luxembourg"{
+            ec{"ლუქსემბურგი"}
+        }
+        "Europe:Madrid"{
+            ec{"მადრიდი"}
+        }
+        "Europe:Malta"{
+            ec{"მალტა"}
+        }
+        "Europe:Mariehamn"{
+            ec{"მარიჰამნი"}
+        }
+        "Europe:Minsk"{
+            ec{"მინსკი"}
+        }
+        "Europe:Monaco"{
+            ec{"მონაკო"}
+        }
+        "Europe:Moscow"{
+            ec{"მოსკოვი"}
+        }
+        "Europe:Oslo"{
+            ec{"ოსლო"}
+        }
+        "Europe:Paris"{
+            ec{"პარიზი"}
+        }
+        "Europe:Podgorica"{
+            ec{"პოდგორიცა"}
+        }
+        "Europe:Prague"{
+            ec{"პრაღა"}
+        }
+        "Europe:Riga"{
+            ec{"რიგა"}
+        }
+        "Europe:Rome"{
+            ec{"რომი"}
+        }
+        "Europe:Samara"{
+            ec{"სამარა"}
+        }
+        "Europe:San_Marino"{
+            ec{"სან-მარინო"}
+        }
+        "Europe:Sarajevo"{
+            ec{"სარაევო"}
+        }
+        "Europe:Saratov"{
+            ec{"სარატოვი"}
+        }
+        "Europe:Simferopol"{
+            ec{"სიმფეროპოლი"}
+        }
+        "Europe:Skopje"{
+            ec{"სკოპიე"}
+        }
+        "Europe:Sofia"{
+            ec{"სოფია"}
+        }
+        "Europe:Stockholm"{
+            ec{"სტოკჰოლმი"}
+        }
+        "Europe:Tallinn"{
+            ec{"ტალინი"}
+        }
+        "Europe:Tirane"{
+            ec{"ტირანა"}
+        }
+        "Europe:Ulyanovsk"{
+            ec{"ულიანოვსკი"}
+        }
+        "Europe:Uzhgorod"{
+            ec{"უჟგოროდი"}
+        }
+        "Europe:Vaduz"{
+            ec{"ვადუცი"}
+        }
+        "Europe:Vatican"{
+            ec{"ვატიკანი"}
+        }
+        "Europe:Vienna"{
+            ec{"ვენა"}
+        }
+        "Europe:Vilnius"{
+            ec{"ვილნიუსი"}
+        }
+        "Europe:Volgograd"{
+            ec{"ვოლგოგრადი"}
+        }
+        "Europe:Warsaw"{
+            ec{"ვარშავა"}
+        }
+        "Europe:Zagreb"{
+            ec{"ზაგრები"}
+        }
+        "Europe:Zaporozhye"{
+            ec{"ზაპოროჟიე"}
+        }
+        "Europe:Zurich"{
+            ec{"ციურიხი"}
+        }
+        "Indian:Antananarivo"{
+            ec{"ანტანანარივუ"}
+        }
+        "Indian:Chagos"{
+            ec{"ჩაგოსი"}
+        }
+        "Indian:Christmas"{
+            ec{"შობის კუნძული"}
+        }
+        "Indian:Cocos"{
+            ec{"ქოქოსი"}
+        }
+        "Indian:Comoro"{
+            ec{"კომორო"}
+        }
+        "Indian:Kerguelen"{
+            ec{"კერგელენი"}
+        }
+        "Indian:Mahe"{
+            ec{"მაჰე"}
+        }
+        "Indian:Maldives"{
+            ec{"მალდივები"}
+        }
+        "Indian:Mauritius"{
+            ec{"მავრიკი"}
+        }
+        "Indian:Mayotte"{
+            ec{"მაიოტი"}
+        }
+        "Indian:Reunion"{
+            ec{"რეიუნიონი"}
+        }
+        "Pacific:Apia"{
+            ec{"აპია"}
+        }
+        "Pacific:Auckland"{
+            ec{"ოკლენდი"}
+        }
+        "Pacific:Bougainville"{
+            ec{"ბუგენვილი"}
+        }
+        "Pacific:Chatham"{
+            ec{"ჩათამი"}
+        }
+        "Pacific:Easter"{
+            ec{"ისთერი"}
+        }
+        "Pacific:Efate"{
+            ec{"ეფატე"}
+        }
+        "Pacific:Enderbury"{
+            ec{"ენდერბური"}
+        }
+        "Pacific:Fakaofo"{
+            ec{"ფაკაოფო"}
+        }
+        "Pacific:Fiji"{
+            ec{"ფიჯი"}
+        }
+        "Pacific:Funafuti"{
+            ec{"ფუნაფუტი"}
+        }
+        "Pacific:Galapagos"{
+            ec{"გალაპაგოსი"}
+        }
+        "Pacific:Gambier"{
+            ec{"გამბიერი"}
+        }
+        "Pacific:Guadalcanal"{
+            ec{"გვადალკანალი"}
+        }
+        "Pacific:Guam"{
+            ec{"გუამი"}
+        }
+        "Pacific:Honolulu"{
+            ec{"ჰონოლულუ"}
+        }
+        "Pacific:Johnston"{
+            ec{"ჯონსტონი"}
+        }
+        "Pacific:Kiritimati"{
+            ec{"კირიტიმატი"}
+        }
+        "Pacific:Kosrae"{
+            ec{"კოსრაე"}
+        }
+        "Pacific:Kwajalein"{
+            ec{"კვაჯალეინი"}
+        }
+        "Pacific:Majuro"{
+            ec{"მახურო"}
+        }
+        "Pacific:Marquesas"{
+            ec{"მარკეზასი"}
+        }
+        "Pacific:Midway"{
+            ec{"მიდუეი"}
+        }
+        "Pacific:Nauru"{
+            ec{"ნაურუ"}
+        }
+        "Pacific:Niue"{
+            ec{"ნიუე"}
+        }
+        "Pacific:Norfolk"{
+            ec{"ნორფოლკი"}
+        }
+        "Pacific:Noumea"{
+            ec{"ნუმეა"}
+        }
+        "Pacific:Pago_Pago"{
+            ec{"პაგო-პაგო"}
+        }
+        "Pacific:Palau"{
+            ec{"პალაუ"}
+        }
+        "Pacific:Pitcairn"{
+            ec{"პიტკერნი"}
+        }
+        "Pacific:Ponape"{
+            ec{"პონპეი"}
+        }
+        "Pacific:Port_Moresby"{
+            ec{"პორტ მორსბი"}
+        }
+        "Pacific:Rarotonga"{
+            ec{"რაროტონგა"}
+        }
+        "Pacific:Saipan"{
+            ec{"საიპანი"}
+        }
+        "Pacific:Tahiti"{
+            ec{"ტაიტი"}
+        }
+        "Pacific:Tarawa"{
+            ec{"ტარაუა"}
+        }
+        "Pacific:Tongatapu"{
+            ec{"ტონგატაპუ"}
+        }
+        "Pacific:Truk"{
+            ec{"ჩუუკი"}
+        }
+        "Pacific:Wake"{
+            ec{"უეიკი"}
+        }
+        "Pacific:Wallis"{
+            ec{"ვალისი"}
+        }
+        "meta:Afghanistan"{
+            ls{"ავღანეთის დრო"}
+        }
+        "meta:Africa_Central"{
+            ls{"ცენტრალური აფრიკის დრო"}
+        }
+        "meta:Africa_Eastern"{
+            ls{"აღმოსავლეთ აფრიკის დრო"}
+        }
+        "meta:Africa_Southern"{
+            ls{"სამხრეთ აფრიკის დრო"}
+        }
+        "meta:Africa_Western"{
+            ld{"დასავლეთ აფრიკის ზაფხულის დრო"}
+            lg{"დასავლეთ აფრიკის დრო"}
+            ls{"დასავლეთ აფრიკის სტანდარტული დრო"}
+        }
+        "meta:Alaska"{
+            ld{"ალასკის ზაფხულის დრო"}
+            lg{"ალასკის დრო"}
+            ls{"ალასკის სტანდარტული დრო"}
+        }
+        "meta:Amazon"{
+            ld{"ამაზონიის ზაფხულის დრო"}
+            lg{"ამაზონიის დრო"}
+            ls{"ამაზონიის სტანდარტული დრო"}
+        }
+        "meta:America_Central"{
+            ld{"ჩრდილოეთ ამერიკის ცენტრალური ზაფხულის დრო"}
+            lg{"ჩრდილოეთ ამერიკის ცენტრალური დრო"}
+            ls{"ჩრდილოეთ ამერიკის ცენტრალური სტანდარტული დრო"}
+        }
+        "meta:America_Eastern"{
+            ld{"ჩრდილოეთ ამერიკის აღმოსავლეთის ზაფხულის დრო"}
+            lg{"ჩრდილოეთ ამერიკის აღმოსავლეთის დრო"}
+            ls{"ჩრდილოეთ ამერიკის აღმოსავლეთის სტანდარტული დრო"}
+        }
+        "meta:America_Mountain"{
+            ld{"ჩრდილოეთ ამერიკის მაუნთინის ზაფხულის დრო"}
+            lg{"ჩრდილოეთ ამერიკის მაუნთინის დრო"}
+            ls{"ჩრდილოეთ ამერიკის მაუნთინის სტანდარტული დრო"}
+        }
+        "meta:America_Pacific"{
+            ld{"ჩრდილოეთ ამერიკის წყნარი ოკეანის ზაფხულის დრო"}
+            lg{"ჩრდილოეთ ამერიკის წყნარი ოკეანის დრო"}
+            ls{"ჩრდილოეთ ამერიკის წყნარი ოკეანის სტანდარტული დრო"}
+        }
+        "meta:Apia"{
+            ld{"აპიას ზაფხულის დრო"}
+            lg{"აპიას დრო"}
+            ls{"აპიას სტანდარტული დრო"}
+        }
+        "meta:Arabian"{
+            ld{"არაბეთის ზაფხულის დრო"}
+            lg{"არაბეთის დრო"}
+            ls{"არაბეთის სტანდარტული დრო"}
+        }
+        "meta:Argentina"{
+            ld{"არგენტინის ზაფხულის დრო"}
+            lg{"არგენტინის დრო"}
+            ls{"არგენტინის სტანდარტული დრო"}
+        }
+        "meta:Argentina_Western"{
+            ld{"დასავლეთ არგენტინის ზაფხულის დრო"}
+            lg{"დასავლეთ არგენტინის დრო"}
+            ls{"დასავლეთ არგენტინის სტანდარტული დრო"}
+        }
+        "meta:Armenia"{
+            ld{"სომხეთის ზაფხულის დრო"}
+            lg{"სომხეთის დრო"}
+            ls{"სომხეთის სტანდარტული დრო"}
+        }
+        "meta:Atlantic"{
+            ld{"ატლანტიკის ოკეანის ზაფხულის დრო"}
+            lg{"ატლანტიკის ოკეანის დრო"}
+            ls{"ატლანტიკის ოკეანის სტანდარტული დრო"}
+        }
+        "meta:Australia_Central"{
+            ld{"ავსტრალიის ცენტრალური ზაფხულის დრო"}
+            lg{"ცენტრალური ავსტრალიის დრო"}
+            ls{"ავსტრალიის ცენტრალური სტანდარტული დრო"}
+        }
+        "meta:Australia_CentralWestern"{
+            ld{"ცენტრალური და დასავლეთ ავსტრალიის ზაფხულის დრო"}
+            lg{"ცენტრალური და დასავლეთ ავსტრალიის დრო"}
+            ls{"ცენტრალური და დასავლეთ ავსტრალიის სტანდარტული დრო"}
+        }
+        "meta:Australia_Eastern"{
+            ld{"აღმოსავლეთ ავსტრალიის ზაფხულის დრო"}
+            lg{"აღმოსავლეთ ავსტრალიის დრო"}
+            ls{"აღმოსავლეთ ავსტრალიის სტანდარტული დრო"}
+        }
+        "meta:Australia_Western"{
+            ld{"დასავლეთ ავსტრალიის ზაფხულის დრო"}
+            lg{"დასავლეთ ავსტრალიის დრო"}
+            ls{"დასავლეთ ავსტრალიის სტანდარტული დრო"}
+        }
+        "meta:Azerbaijan"{
+            ld{"აზერბაიჯანის ზაფხულის დრო"}
+            lg{"აზერბაიჯანის დრო"}
+            ls{"აზერბაიჯანის სტანდარტული დრო"}
+        }
+        "meta:Azores"{
+            ld{"აზორის კუნძულების ზაფხულის დრო"}
+            lg{"აზორის კუნძულების დრო"}
+            ls{"აზორის კუნძულების სტანდარტული დრო"}
+        }
+        "meta:Bangladesh"{
+            ld{"ბანგლადეშის ზაფხულის დრო"}
+            lg{"ბანგლადეშის დრო"}
+            ls{"ბანგლადეშის სტანდარტული დრო"}
+        }
+        "meta:Bhutan"{
+            ls{"ბუტანის დრო"}
+        }
+        "meta:Bolivia"{
+            ls{"ბოლივიის დრო"}
+        }
+        "meta:Brasilia"{
+            ld{"ბრაზილიის ზაფხულის დრო"}
+            lg{"ბრაზილიის დრო"}
+            ls{"ბრაზილიის სტანდარტული დრო"}
+        }
+        "meta:Brunei"{
+            ls{"ბრუნეი-დარუსალამის დრო"}
+        }
+        "meta:Cape_Verde"{
+            ld{"კაბო-ვერდეს ზაფხულის დრო"}
+            lg{"კაბო-ვერდეს დრო"}
+            ls{"კაბო-ვერდეს სტანდარტული დრო"}
+        }
+        "meta:Chamorro"{
+            ls{"ჩამოროს დრო"}
+        }
+        "meta:Chatham"{
+            ld{"ჩატემის ზაფხულის დრო"}
+            lg{"ჩატემის დრო"}
+            ls{"ჩატემის სტანდარტული დრო"}
+        }
+        "meta:Chile"{
+            ld{"ჩილეს ზაფხულის დრო"}
+            lg{"ჩილეს დრო"}
+            ls{"ჩილეს სტანდარტული დრო"}
+        }
+        "meta:China"{
+            ld{"ჩინეთის დროის სარტყელი"}
+            lg{"ჩინეთის დრო"}
+            ls{"ჩინეთის სტანდარტული დრო"}
+        }
+        "meta:Choibalsan"{
+            ld{"ჩოიბალსანის ზაფხულის დრო"}
+            lg{"ჩოიბალსანის დრო"}
+            ls{"ჩოიბალსანის სტანდარტული დრო"}
+        }
+        "meta:Christmas"{
+            ls{"შობის კუნძულის დრო"}
+        }
+        "meta:Cocos"{
+            ls{"ქოქოსის კუნძულების დრო"}
+        }
+        "meta:Colombia"{
+            ld{"კოლუმბიის ზაფხულის დრო"}
+            lg{"კოლუმბიის დრო"}
+            ls{"კოლუმბიის სტანდარტული დრო"}
+        }
+        "meta:Cook"{
+            ld{"კუკის კუნძულების ნახევრად ზაფხულის დრო"}
+            lg{"კუკის კუნძულების დრო"}
+            ls{"კუკის კუნძულების სტანდარტული დრო"}
+        }
+        "meta:Cuba"{
+            ld{"კუბის ზაფხულის დრო"}
+            lg{"კუბის დრო"}
+            ls{"კუბის სტანდარტული დრო"}
+        }
+        "meta:Davis"{
+            ls{"დევისის დრო"}
+        }
+        "meta:DumontDUrville"{
+            ls{"დუმონ-დურვილის დრო"}
+        }
+        "meta:East_Timor"{
+            ls{"აღმოსავლეთ ტიმორის დრო"}
+        }
+        "meta:Easter"{
+            ld{"აღდგომის კუნძულის ზაფხულის დრო"}
+            lg{"აღდგომის კუნძულის დრო"}
+            ls{"აღდგომის კუნძულის სტანდარტული დრო"}
+        }
+        "meta:Ecuador"{
+            ls{"ეკვადორის დრო"}
+        }
+        "meta:Europe_Central"{
+            ld{"ცენტრალური ევროპის ზაფხულის დრო"}
+            lg{"ცენტრალური ევროპის დრო"}
+            ls{"ცენტრალური ევროპის სტანდარტული დრო"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"აღმოსავლეთ ევროპის ზაფხულის დრო"}
+            lg{"აღმოსავლეთ ევროპის დრო"}
+            ls{"აღმოსავლეთ ევროპის სტანდარტული დრო"}
+        }
+        "meta:Europe_Further_Eastern"{
+            ls{"შორეული აღმოსავლეთ ევროპის დრო"}
+        }
+        "meta:Europe_Western"{
+            ld{"დასავლეთ ევროპის ზაფხულის დრო"}
+            lg{"დასავლეთ ევროპის დრო"}
+            ls{"დასავლეთ ევროპის სტანდარტული დრო"}
+        }
+        "meta:Falkland"{
+            ld{"ფოლკლენდის კუნძულების ზაფხულის დრო"}
+            lg{"ფოლკლენდის კუნძულების დრო"}
+            ls{"ფოლკლენდის კუნძულების სტანდარტული დრო"}
+        }
+        "meta:Fiji"{
+            ld{"ფიჯის ზაფხულის დრო"}
+            lg{"ფიჯის დრო"}
+            ls{"ფიჯის სტანდარტული დრო"}
+        }
+        "meta:French_Guiana"{
+            ls{"საფრანგეთის გვიანის დრო"}
+        }
+        "meta:French_Southern"{
+            ls{"ფრანგული სამხრეთის და ანტარქტიკის დრო"}
+        }
+        "meta:GMT"{
+            ls{"გრინვიჩის საშუალო დრო"}
+        }
+        "meta:Galapagos"{
+            ls{"გალაპაგოსის დრო"}
+        }
+        "meta:Gambier"{
+            ls{"გამბიერის დრო"}
+        }
+        "meta:Georgia"{
+            ld{"საქართველოს ზაფხულის დრო"}
+            lg{"საქართველოს დრო"}
+            ls{"საქართველოს სტანდარტული დრო"}
+        }
+        "meta:Gilbert_Islands"{
+            ls{"გილბერტის კუნძულების დრო"}
+        }
+        "meta:Greenland_Eastern"{
+            ld{"აღმოსავლეთ გრენლანდიის ზაფხულის დრო"}
+            lg{"აღმოსავლეთ გრენლანდიის დრო"}
+            ls{"აღმოსავლეთ გრენლანდიის სტანდარტული დრო"}
+        }
+        "meta:Greenland_Western"{
+            ld{"დასავლეთ გრენლანდიის ზაფხულის დრო"}
+            lg{"დასავლეთ გრენლანდიის დრო"}
+            ls{"დასავლეთ გრენლანდიის სტანდარტული დრო"}
+        }
+        "meta:Gulf"{
+            ls{"სპარსეთის ყურის სტანდარტული დრო"}
+        }
+        "meta:Guyana"{
+            ls{"გაიანის დრო"}
+        }
+        "meta:Hawaii_Aleutian"{
+            ld{"ჰავაისა და ალეუტის ზაფხულის დრო"}
+            lg{"ჰავაისა და ალეუტის დრო"}
+            ls{"ჰავაისა და ალეუტის სტანდარტული დრო"}
+        }
+        "meta:Hong_Kong"{
+            ld{"ჰონკონგის ზაფხულის დრო"}
+            lg{"ჰონკონგის დრო"}
+            ls{"ჰონკონგის სტანდარტული დრო"}
+        }
+        "meta:Hovd"{
+            ld{"ჰოვდის ზაფხულის დრო"}
+            lg{"ჰოვდის დრო"}
+            ls{"ჰოვდის სტანდარტული დრო"}
+        }
+        "meta:India"{
+            ls{"ინდოეთის დრო"}
+        }
+        "meta:Indian_Ocean"{
+            ls{"ინდოეთის ოკეანის კუნძულების დრო"}
+        }
+        "meta:Indochina"{
+            ls{"ინდოჩინეთის დრო"}
+        }
+        "meta:Indonesia_Central"{
+            ls{"ცენტრალური ინდონეზიის დრო"}
+        }
+        "meta:Indonesia_Eastern"{
+            ls{"აღმოსავლეთ ინდონეზიის დრო"}
+        }
+        "meta:Indonesia_Western"{
+            ls{"დასავლეთ ინდონეზიის დრო"}
+        }
+        "meta:Iran"{
+            ld{"ირანის დროის სარტყელი"}
+            lg{"ირანის დრო"}
+            ls{"ირანის სტანდარტული დრო"}
+        }
+        "meta:Irkutsk"{
+            ld{"ირკუტსკის ზაფხულის დრო"}
+            lg{"ირკუტსკის დრო"}
+            ls{"ირკუტსკის სტანდარტული დრო"}
+        }
+        "meta:Israel"{
+            ld{"ისრაელის ზაფხულის დრო"}
+            lg{"ისრაელის დრო"}
+            ls{"ისრაელის სტანდარტული დრო"}
+        }
+        "meta:Japan"{
+            ld{"იაპონიის ზაფხულის დრო"}
+            lg{"იაპონიის დრო"}
+            ls{"იაპონიის სტანდარტული დრო"}
+        }
+        "meta:Kazakhstan_Eastern"{
+            ls{"აღმოსავლეთ ყაზახეთის დრო"}
+        }
+        "meta:Kazakhstan_Western"{
+            ls{"დასავლეთ ყაზახეთის დრო"}
+        }
+        "meta:Korea"{
+            ld{"კორეის ზაფხულის დრო"}
+            lg{"კორეის დრო"}
+            ls{"კორეის სტანდარტული დრო"}
+        }
+        "meta:Kosrae"{
+            ls{"კოსრეს დრო"}
+        }
+        "meta:Krasnoyarsk"{
+            ld{"კრასნოიარსკის ზაფხულის დრო"}
+            lg{"კრასნოიარსკის დრო"}
+            ls{"კრასნოიარსკის სტანდარტული დრო"}
+        }
+        "meta:Kyrgystan"{
+            ls{"ყირგიზეთის დრო"}
+        }
+        "meta:Line_Islands"{
+            ls{"ლაინის კუნძულების დრო"}
+        }
+        "meta:Lord_Howe"{
+            ld{"ლორდ-ჰაუს ზაფხულის დრო"}
+            lg{"ლორდ-ჰაუს დრო"}
+            ls{"ლორდ-ჰაუს სტანდარტული დრო"}
+        }
+        "meta:Macquarie"{
+            ls{"მაქკუორის კუნძულის დრო"}
+        }
+        "meta:Magadan"{
+            ld{"მაგადანის ზაფხულის დრო"}
+            lg{"მაგადანის დრო"}
+            ls{"მაგადანის სტანდარტული დრო"}
+        }
+        "meta:Malaysia"{
+            ls{"მალაიზიის დრო"}
+        }
+        "meta:Maldives"{
+            ls{"მალდივების დრო"}
+        }
+        "meta:Marquesas"{
+            ls{"მარკიზის კუნძულების დრო"}
+        }
+        "meta:Marshall_Islands"{
+            ls{"მარშალის კუნძულების დრო"}
+        }
+        "meta:Mauritius"{
+            ld{"მავრიკის ზაფხულის დრო"}
+            lg{"მავრიკის დრო"}
+            ls{"მავრიკის სტანდარტული დრო"}
+        }
+        "meta:Mawson"{
+            ls{"მოუსონის დრო"}
+        }
+        "meta:Mexico_Northwest"{
+            ld{"ჩრდილო-დასავლეთ მექსიკის ზაფხულის დრო"}
+            lg{"ჩრდილო-აღმოსავლეთ მექსიკის დრო"}
+            ls{"ჩრდილო-დასავლეთ მექსიკის დრო"}
+        }
+        "meta:Mexico_Pacific"{
+            ld{"მექსიკის წყნარი ოკეანის ზაფხულის დრო"}
+            lg{"მექსიკის წყნარი ოკეანის დრო"}
+            ls{"მექსიკის წყნარი ოკეანის სტანდარტული დრო"}
+        }
+        "meta:Mongolia"{
+            ld{"ულან-ბატორის ზაფხულის დრო"}
+            lg{"ულან-ბატორის დრო"}
+            ls{"ულან-ბატორის სტანდარტული დრო"}
+        }
+        "meta:Moscow"{
+            ld{"მოსკოვის ზაფხულის დრო"}
+            lg{"მოსკოვის დრო"}
+            ls{"მოსკოვის სტანდარტული დრო"}
+        }
+        "meta:Myanmar"{
+            ls{"მიანმარის დრო"}
+        }
+        "meta:Nauru"{
+            ls{"ნაურუს დრო"}
+        }
+        "meta:Nepal"{
+            ls{"ნეპალის დრო"}
+        }
+        "meta:New_Caledonia"{
+            ld{"ახალი კალედონიის ზაფხულის დრო"}
+            lg{"ახალი კალედონიის დრო"}
+            ls{"ახალი კალედონიის სტანდარტული დრო"}
+        }
+        "meta:New_Zealand"{
+            ld{"ახალი ზელანდიის ზაფხულის დრო"}
+            lg{"ახალი ზელანდიის დრო"}
+            ls{"ახალი ზელანდიის სტანდარტული დრო"}
+        }
+        "meta:Newfoundland"{
+            ld{"ნიუფაუნდლენდის ზაფხულის დრო"}
+            lg{"ნიუფაუნდლენდის დრო"}
+            ls{"ნიუფაუნდლენდის სტანდარტული დრო"}
+        }
+        "meta:Niue"{
+            ls{"ნიუეს დრო"}
+        }
+        "meta:Norfolk"{
+            ld{"ნორფოლკის კუნძულის ზაფხულის დრო"}
+            lg{"ნორფოლკის კუნძულის დრო"}
+            ls{"ნორფოლკის კუნძულის სტანდარტული დრო"}
+        }
+        "meta:Noronha"{
+            ld{"ფერნანდო-დე-ნორონიას ზაფხულის დრო"}
+            lg{"ფერნანდო-დე-ნორონიას დრო"}
+            ls{"ფერნანდო-დე-ნორონიას სტანდარტული დრო"}
+        }
+        "meta:Novosibirsk"{
+            ld{"ნოვოსიბირსკის ზაფხულის დრო"}
+            lg{"ნოვოსიბირსკის დრო"}
+            ls{"ნოვოსიბირსკის სტანდარტული დრო"}
+        }
+        "meta:Omsk"{
+            ld{"ომსკის ზაფხულის დრო"}
+            lg{"ომსკის დრო"}
+            ls{"ომსკის სტანდარტული დრო"}
+        }
+        "meta:Pakistan"{
+            ld{"პაკისტანის ზაფხულის დრო"}
+            lg{"პაკისტანის დრო"}
+            ls{"პაკისტანის სტანდარტული დრო"}
+        }
+        "meta:Palau"{
+            ls{"პალაუს დრო"}
+        }
+        "meta:Papua_New_Guinea"{
+            ls{"პაპუა-ახალი გვინეის დრო"}
+        }
+        "meta:Paraguay"{
+            ld{"პარაგვაის ზაფხულის დრო"}
+            lg{"პარაგვაის დრო"}
+            ls{"პარაგვაის სტანდარტული დრო"}
+        }
+        "meta:Peru"{
+            ld{"პერუს ზაფხულის დრო"}
+            lg{"პერუს დრო"}
+            ls{"პერუს სტანდარტული დრო"}
+        }
+        "meta:Philippines"{
+            ld{"ფილიპინების ზაფხულის დრო"}
+            lg{"ფილიპინების დრო"}
+            ls{"ფილიპინების სტანდარტული დრო"}
+        }
+        "meta:Phoenix_Islands"{
+            ls{"ფენიქსის კუნძულების დრო"}
+        }
+        "meta:Pierre_Miquelon"{
+            ld{"სენ-პიერის და მიკელონის ზაფხულის დრო"}
+            lg{"სენ-პიერის და მიკელონის დრო"}
+            ls{"სენ-პიერის და მიკელონის სტანდარტული დრო"}
+        }
+        "meta:Pitcairn"{
+            ls{"პიტკერნის დრო"}
+        }
+        "meta:Ponape"{
+            ls{"პონაპეს დრო"}
+        }
+        "meta:Pyongyang"{
+            ls{"ფხენიანის დრო"}
+        }
+        "meta:Reunion"{
+            ls{"რეიუნიონის დრო"}
+        }
+        "meta:Rothera"{
+            ls{"როთერის დრო"}
+        }
+        "meta:Sakhalin"{
+            ld{"სახალინის ზაფხულის დრო"}
+            lg{"სახალინის დრო"}
+            ls{"სახალინის სტანდარტული დრო"}
+        }
+        "meta:Samoa"{
+            ld{"სამოას ზაფხულის დრო"}
+            lg{"სამოას დრო"}
+            ls{"სამოას სტანდარტული დრო"}
+        }
+        "meta:Seychelles"{
+            ls{"სეიშელის კუნძულების დრო"}
+        }
+        "meta:Singapore"{
+            ls{"სინგაპურის დრო"}
+        }
+        "meta:Solomon"{
+            ls{"სოლომონის კუნძულების დრო"}
+        }
+        "meta:South_Georgia"{
+            ls{"სამხრეთ გეორგიის დრო"}
+        }
+        "meta:Suriname"{
+            ls{"სურინამის დრო"}
+        }
+        "meta:Syowa"{
+            ls{"სიოვას დრო"}
+        }
+        "meta:Tahiti"{
+            ls{"ტაიტის დრო"}
+        }
+        "meta:Taipei"{
+            ld{"ტაიბეის ზაფხულის დრო"}
+            lg{"ტაიბეის დრო"}
+            ls{"ტაიბეის სტანდარტული დრო"}
+        }
+        "meta:Tajikistan"{
+            ls{"ტაჯიკეთის დრო"}
+        }
+        "meta:Tokelau"{
+            ls{"ტოკელაუს დრო"}
+        }
+        "meta:Tonga"{
+            ld{"ტონგის ზაფხულის დრო"}
+            lg{"ტონგის დრო"}
+            ls{"ტონგის სტანდარტული დრო"}
+        }
+        "meta:Truk"{
+            ls{"ჩუუკის დრო"}
+        }
+        "meta:Turkmenistan"{
+            ld{"თურქმენეთის ზაფხულის დრო"}
+            lg{"თურქმენეთის დრო"}
+            ls{"თურქმენეთის სტანდარტული დრო"}
+        }
+        "meta:Tuvalu"{
+            ls{"ტუვალუს დრო"}
+        }
+        "meta:Uruguay"{
+            ld{"ურუგვაის ზაფხულის დრო"}
+            lg{"ურუგვაის დრო"}
+            ls{"ურუგვაის სტანდარტული დრო"}
+        }
+        "meta:Uzbekistan"{
+            ld{"უზბეკეთის ზაფხულის დრო"}
+            lg{"უზბეკეთის დრო"}
+            ls{"უზბეკეთის სტანდარტული დრო"}
+        }
+        "meta:Vanuatu"{
+            ld{"ვანუატუს ზაფხულის დრო"}
+            lg{"ვანუატუს დრო"}
+            ls{"ვანუატუს სტანდარტული დრო"}
+        }
+        "meta:Venezuela"{
+            ls{"ვენესუელის დრო"}
+        }
+        "meta:Vladivostok"{
+            ld{"ვლადივოსტოკის ზაფხულის დრო"}
+            lg{"ვლადივოსტოკის დრო"}
+            ls{"ვლადივოსტოკის სტანდარტული დრო"}
+        }
+        "meta:Volgograd"{
+            ld{"ვოლგოგრადის ზაფხულის დრო"}
+            lg{"ვოლგოგრადის დრო"}
+            ls{"ვოლგოგრადის სტანდარტული დრო"}
+        }
+        "meta:Vostok"{
+            ls{"ვოსტოკის დრო"}
+        }
+        "meta:Wake"{
+            ls{"ვეიკის კუნძულის დრო"}
+        }
+        "meta:Wallis"{
+            ls{"ვოლისი და ფუტუნას დრო"}
+        }
+        "meta:Yakutsk"{
+            ld{"იაკუტსკის ზაფხულის დრო"}
+            lg{"იაკუტსკის დრო"}
+            ls{"იაკუტსკის სტანდარტული დრო"}
+        }
+        "meta:Yekaterinburg"{
+            ld{"ეკატერინბურგის ზაფხულის დრო"}
+            lg{"ეკატერინბურგის დრო"}
+            ls{"ეკატერინბურგის სტანდარტული დრო"}
+        }
+        fallbackFormat{"{1} ({0})"}
+        gmtFormat{"GMT{0}"}
+        gmtZeroFormat{"GMT"}
+        hourFormat{"+HH:mm;-HH:mm"}
+        regionFormat{"დრო: {0}"}
+        regionFormatDaylight{"{0} ზაფხულის დრო"}
+        regionFormatStandard{"{0} სტანდარტული დრო"}
+    }
+}

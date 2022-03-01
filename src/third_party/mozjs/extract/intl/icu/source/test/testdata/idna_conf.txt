@@ -1,0 +1,1267 @@
+﻿=====
+desc: Copyright 2003-2005 http://idnconnect.jdna.jp/testbed.html 
+namebase: <00ED>dn
+nameutf8: ídn
+namezone: xn--dn-mja
+failzone1: 
+failzone2: 
+token: 25029153
+passfail: pass
+type: toascii
+
+=====
+desc: 1-1-1 Has one IDN
+namebase: <00ED>dn
+nameutf8: ídn
+namezone: xn--dn-mja
+failzone1: 
+failzone2: 
+token: 25029153
+passfail: pass
+type: toascii
+
+=====
+desc: 1-1-2 Has two IDNs
+namebase: <00EB>x.<00ED>dn
+nameutf8: ëx.ídn
+namezone: xn--x-ega.xn--dn-mja
+failzone1: 
+failzone2: 
+token: 02721141
+passfail: pass
+type: toascii
+
+=====
+desc: 1-2-1 Latin-1
+namebase: <00E5><00FE><00E7>
+nameutf8: åþç
+namezone: xn--5cae2e
+failzone1: 
+failzone2: 
+token: 41542620
+passfail: pass
+type: toascii
+
+=====
+desc: 1-2-2 Latin Extended A
+namebase: <0103>b<0109>
+nameutf8: ăbĉ
+namezone: xn--b-rhat
+failzone1: 
+failzone2: 
+token: 72238617
+passfail: pass
+type: toascii
+
+=====
+desc: 1-2-3 Latin Extended B
+namebase: <0227><0180><0188>
+nameutf8: ȧƀƈ
+namezone: xn--lhaq98b
+failzone1: 
+failzone2: 
+token: 48464361
+passfail: pass
+type: toascii
+
+=====
+desc: 1-2-4 Latin Extended Additional
+namebase: <1E01><1E03><1E09>
+nameutf8: ḁḃḉ
+namezone: xn--2fges
+failzone1: 
+failzone2: 
+token: 49301230
+passfail: pass
+type: toascii
+
+=====
+desc: 1-3-1 Han
+namebase: <4E3F><4EBA><5C38>
+nameutf8: 丿人尸
+namezone: xn--xiqplj17a
+failzone1: 
+failzone2: 
+token: 58367113
+passfail: pass
+type: toascii
+
+=====
+desc: 1-3-2 Hiragana
+namebase: <304B><304C><304D>
+nameutf8: かがき
+namezone: xn--u8jcd
+failzone1: 
+failzone2: 
+token: 57006197
+passfail: pass
+type: toascii
+
+=====
+desc: 1-3-3 Katakana
+namebase: <30AB><30AC><30AD>
+nameutf8: カガキ
+namezone: xn--lckcd
+failzone1: 
+failzone2: 
+token: 81826992
+passfail: pass
+type: toascii
+
+=====
+desc: 1-3-4 Hangul Jamo
+namebase: <1100><1161><11A8>
+nameutf8: 각
+namezone: xn--p39a
+failzone1: xn--ypd8qrh
+failzone2: 
+token: 44228346
+passfail: pass
+type: toascii
+
+=====
+desc: 1-3-5 Hangul
+namebase: <AC69><B4C6><C03A>
+nameutf8: 걩듆쀺
+namezone: xn--o69aq2nl0j
+failzone1: 
+failzone2: 
+token: 79235608
+passfail: pass
+type: toascii
+
+=====
+desc: 1-3-6 Yi
+namebase: <A00A><A020><A2B8>
+nameutf8: ꀊꀠꊸ
+namezone: xn--6l7arby7j
+failzone1: 
+failzone2: 
+token: 99549720
+passfail: pass
+type: toascii
+
+=====
+desc: 1-3-7 Greek
+namebase: <03B1><03B2><03B3>
+nameutf8: αβγ
+namezone: xn--mxacd
+failzone1: 
+failzone2: 
+token: 83859912
+passfail: pass
+type: toascii
+
+=====
+desc: 1-3-8 Greek Extended
+namebase: <1F02><1F26><1F55>
+nameutf8: ἂἦὕ
+namezone: xn--fng7dpg
+failzone1: 
+failzone2: 
+token: 22501339
+passfail: pass
+type: toascii
+
+=====
+desc: 1-3-9 Cyrillic
+namebase: <0430><0431><0432>
+nameutf8: абв
+namezone: xn--80acd
+failzone1: 
+failzone2: 
+token: 98871751
+passfail: pass
+type: toascii
+
+=====
+desc: 1-3-10 Armeian
+namebase: <0561><0562><0563>
+nameutf8: աբգ
+namezone: xn--y9acd
+failzone1: 
+failzone2: 
+token: 23687015
+passfail: pass
+type: toascii
+
+=====
+desc: 1-3-11 Georgian
+namebase: <10D0><10D1><10D2>
+nameutf8: აბგ
+namezone: xn--lodcd
+failzone1: 
+failzone2: 
+token: 70499589
+passfail: pass
+type: toascii
+
+=====
+desc: 1-4-1 Symbols
+namebase: <2221><21BA><2282>
+nameutf8: ∡↺⊂
+namezone: xn--b7gxomk
+failzone1: 
+failzone2: 
+token: 24617638
+passfail: pass
+type: toascii
+
+=====
+desc: 1-5-1 Devanagari
+namebase: <0915><0916><0917>
+nameutf8: कखग
+namezone: xn--11bcd
+failzone1: 
+failzone2: 
+token: 18477223
+passfail: pass
+type: toascii
+
+=====
+desc: 1-5-2 Bengali
+namebase: <0995><0996><0997>
+nameutf8: কখগ
+namezone: xn--p5bcd
+failzone1: 
+failzone2: 
+token: 11477904
+passfail: pass
+type: toascii
+
+=====
+desc: 1-5-3 Gurmukhi
+namebase: <0A15><0A16><0A17>
+nameutf8: ਕਖਗ
+namezone: xn--d9bcd
+failzone1: 
+failzone2: 
+token: 71543506
+passfail: pass
+type: toascii
+
+=====
+desc: 1-5-4 Gujarati
+namebase: <0A95><0A96><0A97>
+nameutf8: કખગ
+namezone: xn--0dccd
+failzone1: 
+failzone2: 
+token: 75268760
+passfail: pass
+type: toascii
+
+=====
+desc: 1-5-5 Oriya
+namebase: <0B15><0B16><0B17>
+nameutf8: କଖଗ
+namezone: xn--ohccd
+failzone1: 
+failzone2: 
+token: 36079747
+passfail: pass
+type: toascii
+
+=====
+desc: 1-5-6 Tamil
+namebase: <0B95><0B99><0B9A>
+nameutf8: கஙச
+namezone: xn--clcid
+failzone1: 
+failzone2: 
+token: 39841446
+passfail: pass
+type: toascii
+
+=====
+desc: 1-5-7 Telugu
+namebase: <0C15><0C16><0C17>
+nameutf8: కఖగ
+namezone: xn--zoccd
+failzone1: 
+failzone2: 
+token: 34438808
+passfail: pass
+type: toascii
+
+=====
+desc: 1-5-8 Kannada
+namebase: <0C95><0C96><0C97>
+nameutf8: ಕಖಗ
+namezone: xn--nsccd
+failzone1: 
+failzone2: 
+token: 42303465
+passfail: pass
+type: toascii
+
+=====
+desc: 1-5-9 Malayalam
+namebase: <0D15><0D16><0D17>
+nameutf8: കഖഗ
+namezone: xn--bwccd
+failzone1: 
+failzone2: 
+token: 11813559
+passfail: pass
+type: toascii
+
+=====
+desc: 1-5-10 Sinhala
+namebase: <0D9A><0D9B><0D9C>
+nameutf8: කඛග
+namezone: xn--3zccd
+failzone1: 
+failzone2: 
+token: 89823209
+passfail: pass
+type: toascii
+
+=====
+desc: 1-5-11 Thai
+namebase: <0E01><0E02><0E03>
+nameutf8: กขฃ
+namezone: xn--12ccd
+failzone1: 
+failzone2: 
+token: 94992842
+passfail: pass
+type: toascii
+
+=====
+desc: 1-5-12 Lao
+namebase: <0E81><0E82><0E84>
+nameutf8: ກຂຄ
+namezone: xn--p6ccg
+failzone1: 
+failzone2: 
+token: 42424338
+passfail: pass
+type: toascii
+
+=====
+desc: 1-5-13 Tibetan
+namebase: <0F40><0F41><0F42>
+nameutf8: ཀཁག
+namezone: xn--5cdcd
+failzone1: 
+failzone2: 
+token: 26962778
+passfail: pass
+type: toascii
+
+=====
+desc: 1-5-14 Myanmar
+namebase: <1000><1001><1002>
+nameutf8: ကခဂ
+namezone: xn--nidcd
+failzone1: 
+failzone2: 
+token: 09824611
+passfail: pass
+type: toascii
+
+=====
+desc: 1-5-15 Khmer
+namebase: <1780><1781><1782>
+nameutf8: កខគ
+namezone: xn--i2ecd
+failzone1: 
+failzone2: 
+token: 48071156
+passfail: pass
+type: toascii
+
+=====
+desc: 1-5-16 Mongolian
+namebase: <1820><1821><1822>
+nameutf8: ᠠᠡᠢ
+namezone: xn--26ecd
+failzone1: 
+failzone2: 
+token: 40131572
+passfail: pass
+type: toascii
+
+=====
+desc: 1-6-1 Arabic
+namebase: <0627><0628><0629>
+nameutf8: ابة
+namezone: xn--mgbcd
+failzone1: 
+failzone2: 
+token: 06414817
+passfail: pass
+type: toascii
+
+=====
+desc: 1-6-2 Hebrew
+namebase: <05D0><05D1><05D2>
+nameutf8: אבג
+namezone: xn--4dbcd
+failzone1: 
+failzone2: 
+token: 41996705
+passfail: pass
+type: toascii
+
+=====
+desc: 1-6-3 Syriac
+namebase: <0710><0711><0712>
+nameutf8: ܐܑܒ
+namezone: xn--9mbcd
+failzone1: 
+failzone2: 
+token: 77925080
+passfail: pass
+type: toascii
+
+=====
+desc: 1-7-1 ASCII and non-Latin
+namebase: abc<30AB><30AC><30AD>
+nameutf8: abcカガキ
+namezone: xn--abc-mj4bfg
+failzone1: 
+failzone2: 
+token: 14333380
+passfail: pass
+type: toascii
+
+=====
+desc: 1-7-2 Latin (non-ASCII) and non-Latin
+namebase: <00E5><00FE><00E7><30AB><30AC><30AD>
+nameutf8: åþçカガキ
+namezone: xn--5cae2e328wfag
+failzone1: 
+failzone2: 
+token: 00848299
+passfail: pass
+type: toascii
+
+=====
+desc: 2-3-1-1 If UseSTD3ASCIIRules: Includes ! before Nameprep
+namebase: <00ED><0021>dn
+nameutf8: í!dn
+namezone: 
+failzone1: xn--!dn-qma
+failzone2: 
+token: 89571181
+passfail: fail
+type: toascii
+
+=====
+desc: 2-3-1-2 If UseSTD3ASCIIRules: Includes $ before Nameprep
+namebase: <00ED><0024>dn
+nameutf8: í$dn
+namezone: 
+failzone1: xn--$dn-qma
+failzone2: 
+token: 06965937
+passfail: fail
+type: toascii
+
+=====
+desc: 2-3-1-3 If UseSTD3ASCIIRules: Includes + before Nameprep
+namebase: <00ED><002B>dn
+nameutf8: í+dn
+namezone: 
+failzone1: xn--+dn-qma
+failzone2: 
+token: 98967951
+passfail: fail
+type: toascii
+
+=====
+desc: 2-3-2-1 If UseSTD3ASCIIRules: Leading hyphen before Nameprep
+namebase: <002D><00ED>1dn
+nameutf8: -í1dn
+namezone: 
+failzone1: xn---1dn-vpa
+failzone2: 
+token: 65457100
+passfail: fail
+type: toascii
+
+=====
+desc: 2-3-2-2 If UseSTD3ASCIIRules: Trailing hyphen before Nameprep
+namebase: <00ED>1dn<002D>
+nameutf8: í1dn-
+namezone: 
+failzone1: xn--1dn--upa
+failzone2: 
+token: 85629714
+passfail: fail
+type: toascii
+
+=====
+desc: 2-3-3-1 If UseSTD3ASCIIRules: Gets a + after Nameprep
+namebase: <00ED><FF0B>dn
+nameutf8: í＋dn
+namezone: 
+failzone1: xn--dn-mja0331x
+failzone2: 
+token: 95236620
+passfail: fail
+type: toascii
+
+=====
+desc: 2-3-3-2 If UseSTD3ASCIIRules: Gets a = after Nameprep
+namebase: <00ED><207C>dn
+nameutf8: í⁼dn
+namezone: 
+failzone1: xn--dn-mja0343a
+failzone2: 
+token: 04960664
+passfail: fail
+type: toascii
+
+=====
+desc: 2-3-4-1 If UseSTD3ASCIIRules: Leading hyphen after Nameprep
+namebase: <FE63><00ED>2dn
+nameutf8: ﹣í2dn
+namezone: 
+failzone1: xn--2dn-qma32863a
+failzone2: xn---2dn-vpa
+token: 53512069
+passfail: fail
+type: toascii
+
+=====
+desc: 2-3-4-2 If UseSTD3ASCIIRules: Trailing hyphen after Nameprep
+namebase: <00ED>2dn<FF0D>
+nameutf8: í2dn－
+namezone: 
+failzone1: xn--2dn-qma79363a
+failzone2: xn--2dn--upa
+token: 39938653
+passfail: fail
+type: toascii
+
+=====
+desc: 2-4-1 All-ASCII check, Latin
+namebase: <00B9>1
+nameutf8: ¹1
+namezone: 11
+failzone1: 
+failzone2: 
+token: 43611374
+passfail: pass
+type: toascii
+
+=====
+desc: 2-4-2 All-ASCII check, symbol
+namebase: <2165>vi
+nameutf8: Ⅵvi
+namezone: vivi
+failzone1: 
+failzone2: 
+token: 79939993
+passfail: pass
+type: toascii
+
+=====
+desc: 2-4-3 All-ASCII check, sharp S
+namebase: <00DF>ss
+nameutf8: ßss
+namezone: ssss
+failzone1: 
+failzone2: 
+token: 71292530
+passfail: pass
+type: toascii
+
+=====
+desc: 2-5-1 ACE prefix exists before Nameprep
+namebase: xn--<00EF>dn
+nameutf8: xn--ïdn
+namezone: 
+failzone1: xn--xn--dn-sja
+failzone2: xn--dn-sja
+token: 32841515
+passfail: fail
+type: toascii
+
+=====
+desc: 2-5-2 ACE prefix appears after Nameprep
+namebase: <2179>n--<00E4>dn
+nameutf8: ⅹn--ädn
+namezone: 
+failzone1: xn--xn--dn-uia
+failzone2: xn--dn-uia
+token: 52994631
+passfail: fail
+type: toascii
+
+=====
+desc: 2-8-1 Zero-length label after Nameprep
+namebase: <00AD>
+nameutf8: 
+namezone: 
+failzone1: xn--kba
+failzone2: xn--
+token: 18420037
+passfail: fail
+type: toascii
+
+=====
+desc: 2-9-1 U+3002 acts as a label separator
+namebase: 3002-test<3002><00ED>dn
+nameutf8: 3002-test。ídn
+namezone: 3002-test.xn--dn-mja
+failzone1: xn--3002-testdn-wcb2087m
+failzone2: 
+token: 14217422
+passfail: pass
+type: toascii
+
+=====
+desc: 2-9-2 U+FF0E acts as a label separator
+namebase: ff0e-test<FF0E><00ED>dn
+nameutf8: ff0e-test．ídn
+namezone: ff0e-test.xn--dn-mja
+failzone1: xn--ff0e-testdn-wcb45865f
+failzone2: 
+token: 94579179
+passfail: pass
+type: toascii
+
+=====
+desc: 2-9-3 U+FF61 acts as a label separator
+namebase: ff61-test<FF61><00ED>dn
+nameutf8: ff61-test｡ídn
+namezone: ff61-test.xn--dn-mja
+failzone1: xn--ff61-testdn-wcb33975f
+failzone2: 
+token: 27084042
+passfail: pass
+type: toascii
+
+=====
+desc: 3-2-1 Sharp S conversion; should display as m<00EB>ss
+namebase: xn--m<00DF>-jma
+nameutf8: xn--mß-jma
+namezone: m<00EB>ss
+failzone1: 
+failzone2: 
+token: 85142449
+passfail: pass
+type: tounicode
+
+=====
+desc: 3-3-1 Old prefix; should not display as Unicode;<icu> ICU will treat this as ASCII. This sequence is not explicitly prohibited by the RFC.</icu>
+namebase: iesg--dn-mja
+nameutf8: iesg--dn-mja
+namezone: 
+failzone1: 
+failzone2: 
+token: 35996358
+passfail: fail
+type: tounicode
+
+=====
+desc: 3-3-2 Old prefix; should not display as Unicode;<icu> ICU will treat this as ASCII. This sequence is not explicitly prohibited by the RFC.</icu>
+namebase: iesgdn-mja
+nameutf8: iesgdn-mja
+namezone: 
+failzone1: 
+failzone2: 
+token: 13693467
+passfail: fail
+type: tounicode
+
+=====
+desc: 3-3-3 Old prefix; should not display as Unicode;<icu> ICU will treat this as ASCII. This sequence is not explicitly prohibited by the RFC.</icu>
+namebase: bq--dn-mja
+nameutf8: bq--dn-mja
+namezone: 
+failzone1: 
+failzone2: 
+token: 77049719
+passfail: fail
+type: tounicode
+
+=====
+desc: 3-5-1 Non-ASCII code point before the last hyphen;\
+ should not display as Unicode
+namebase: xn--d<00F1>-mja
+nameutf8: xn--dñ-mja
+namezone: 
+failzone1: 
+failzone2: 
+token: 53043171
+passfail: fail
+type: tounicode
+
+=====
+desc: 3-5-2 Non-alphanumeric code point after the last hyphen;\
+ should not display as Unicode
+namebase: xn--dn-mj+
+nameutf8: xn--dn-mj+
+namezone: 
+failzone1: 
+failzone2: 
+token: 24626494
+passfail: fail
+type: tounicode
+
+=====
+desc: 3-5-3 Ends in the middle of an encoded delta value;\
+ should not display as Unicode
+namebase: xn--dn-mj
+nameutf8: xn--dn-mj
+namezone: 
+failzone1: 
+failzone2: 
+token: 30921132
+passfail: fail
+type: tounicode
+
+=====
+desc: 3-6-1 Nameprep -- prohibited character U+E000;\
+ should not display as Unicode
+namebase: xn--e000dn-l704a
+nameutf8: xn--e000dn-l704a
+namezone: 
+failzone1: 
+failzone2: 
+token: 02359753
+passfail: fail
+type: tounicode
+
+=====
+desc: 3-6-2 If using UseSTD3ASCIIRules, Step 3a -- leading hyphen; should not display as Unicode
+namebase: xn---3dn-vpa
+nameutf8: xn---3dn-vpa
+namezone: 
+failzone1: 
+failzone2: 
+token: 99795165
+passfail: fail
+type: tounicode
+
+=====
+desc: 3-6-3 If using UseSTD3ASCIIRules, Step 3b -- trailing hyphen; should not display as Unicode
+namebase: xn--3dn--upa
+nameutf8: xn--3dn--upa
+namezone: 
+failzone1: 
+failzone2: 
+token: 86051717
+passfail: fail
+type: tounicode
+
+=====
+desc: 3-6-4 Step 5 -- prefix exists; should not display as Unicode
+namebase: xn--xn--dn-6va
+nameutf8: xn--xn--dn-6va
+namezone: 
+failzone1: 
+failzone2: 
+token: 02506789
+passfail: fail
+type: tounicode
+
+=====
+desc: 3-7-1 Punycode was not necessary; should not display as Unicode
+namebase: xn--idn-
+nameutf8: xn--idn-
+namezone: 
+failzone1: 
+failzone2: 
+token: 21675918
+passfail: fail
+type: tounicode
+
+=====
+desc: 3-7-2 String did not go through Nameprep;\
+ should not display as Unicode
+namebase: xn--dn-vga
+nameutf8: xn--dn-vga
+namezone: 
+failzone1: 
+failzone2: 
+token: 18832454
+passfail: fail
+type: tounicode
+
+=====
+desc: 3-8-1 Should show the Unicode <00E3>4dn
+namebase: xn--4dn-lla
+nameutf8: xn--4dn-lla
+namezone: <00E3>4dn
+failzone1: 
+failzone2: 
+token: 23377435
+passfail: pass
+type: tounicode
+
+=====
+desc: 4-1-1-1 00adout<00AD><00ED>dn ->\
+ 00adout<00ED>dn
+namebase: 00adout<00AD><00ED>dn
+nameutf8: 00adout­ídn
+namezone: xn--00adoutdn-m5a
+failzone1: xn--00adoutdn-cna81e
+failzone2: 
+token: 04299950
+passfail: pass
+type: toascii
+
+=====
+desc: 4-1-1-2 200dout<200D><00ED>dn ->\
+ 200dout<00ED>dn
+namebase: 200dout<200D><00ED>dn
+nameutf8: 200dout‍ídn
+namezone: xn--200doutdn-m5a
+failzone1: xn--200doutdn-m5a1678f
+failzone2: 
+token: 00643243
+passfail: pass
+type: toascii
+
+=====
+desc: 4-1-2-1 simplecap<0044><00ED>dn ->\
+ simplecap<0064><00ED>dn
+namebase: simplecap<0044><00ED>dn
+nameutf8: simplecapDídn
+namezone: xn--simplecapddn-1fb
+failzone1: 
+failzone2: 
+token: 36249795
+passfail: pass
+type: toascii
+
+=====
+desc: 4-1-2-2 latintogreek<00B5><00ED>dn ->\
+ latintogreek<03BC><00ED>dn
+namebase: latintogreek<00B5><00ED>dn
+nameutf8: latintogreekµídn
+namezone: xn--latintogreekdn-cmb716i
+failzone1: xn--latintogreekdn-cxa01g
+failzone2: 
+token: 03117407
+passfail: pass
+type: toascii
+
+=====
+desc: 4-1-2-3 latinext<00C7><00ED>dn ->\
+ latinext<00E7><00ED>dn
+namebase: latinext<00C7><00ED>dn
+nameutf8: latinextÇídn
+namezone: xn--latinextdn-v6a6e
+failzone1: xn--latinextdn-twa07b
+failzone2: 
+token: 10243505
+passfail: pass
+type: toascii
+
+=====
+desc: 4-1-2-4 sharps<00DF><00ED>dn ->\
+ sharpsss<00ED>dn
+namebase: sharps<00DF><00ED>dn
+nameutf8: sharpsßídn
+namezone: xn--sharpsssdn-r8a
+failzone1: xn--sharpsdn-vya4l
+failzone2: 
+token: 84921656
+passfail: pass
+type: toascii
+
+=====
+desc: 4-1-2-5 turkishi<0130><00ED>dn ->\
+ turkishi<0069><0307><00ED>dn
+namebase: turkishi<0130><00ED>dn
+nameutf8: turkishiİídn
+namezone: xn--turkishiidn-wcb701e
+failzone1: xn--turkishidn-r8a71f
+failzone2: 
+token: 02381730
+passfail: pass
+type: toascii
+
+=====
+desc: 4-1-2-6 exptwo<0149><00ED>dn ->\
+ exptwo<02BC><006E><00ED>dn
+namebase: exptwo<0149><00ED>dn
+nameutf8: exptwoŉídn
+namezone: xn--exptwondn-m5a502c
+failzone1: xn--exptwodn-h2a33g
+failzone2: 
+token: 10575203
+passfail: pass
+type: toascii
+
+=====
+desc: 4-1-2-7 addfold<03D2><00ED>dn ->\
+ addfold<03C5><00ED>dn
+namebase: addfold<03D2><00ED>dn
+nameutf8: addfoldϒídn
+namezone: xn--addfolddn-m5a121f
+failzone1: xn--addfolddn-m5a462f
+failzone2: 
+token: 31493044
+passfail: pass
+type: toascii
+
+=====
+desc: 4-1-2-8 expthree<1F52><00ED>dn ->\
+ expthree<03C5><0313><0300><00ED>dn
+namebase: expthree<1F52><00ED>dn
+nameutf8: expthreeὒídn
+namezone: xn--expthreedn-r8a5844g
+failzone1: 
+failzone2: 
+token: 68144622
+passfail: pass
+type: toascii
+
+=====
+desc: 4-1-2-9 nonbmp<10400><00ED>dn ->\
+ nonbmp<10428><00ED>dn
+namebase: nonbmp<10400><00ED>dn
+nameutf8: nonbmp������ídn
+namezone: xn--nonbmpdn-h2a34747d
+failzone1: xn--nonbmpdn-h2a37046d
+failzone2: 
+token: 35393212
+passfail: pass
+type: toascii
+
+=====
+desc: 4-1-2-10 nonbmptoascii<1D400><00ED>dn ->\
+ nonbmptoasciia<00ED>dn
+namebase: nonbmptoascii<1D400><00ED>dn
+nameutf8: nonbmptoascii������ídn
+namezone: xn--nonbmptoasciiadn-msb
+failzone1: xn--nonbmptoasciidn-hpb54112i
+failzone2: 
+token: 78182502
+passfail: pass
+type: toascii
+
+=====
+desc: 4-2-1-1 regcomb<0065><0301><00ED>dn ->\
+ regcomb<00E9><00ED>dn
+namebase: regcomb<0065><0301><00ED>dn
+nameutf8: regcombéídn
+namezone: xn--regcombdn-h4a8b
+failzone1: xn--regcombedn-r8a794d
+failzone2: 
+token: 87647045
+passfail: pass
+type: toascii
+
+=====
+desc: 4-2-1-2 combandcase<0045><0301><00ED>dn ->\
+ combandcase<00E9><00ED>dn
+namebase: combandcase<0045><0301><00ED>dn
+nameutf8: combandcaseÉídn
+namezone: xn--combandcasedn-lhb4d
+failzone1: xn--combandcaseedn-cmb526f
+failzone2: 
+token: 61741185
+passfail: pass
+type: toascii
+
+=====
+desc: 4-2-1-3 adjcomb<00BA><0301><00ED>dn ->\
+ adjcomb<00F3><00ED>dn
+namebase: adjcomb<00BA><0301><00ED>dn
+nameutf8: adjcombº́ídn
+namezone: xn--adjcombdn-m5a9d
+failzone1: xn--adjcombdn-1qa57cp3r
+failzone2: 
+token: 14828402
+passfail: pass
+type: toascii
+
+=====
+desc: 4-2-1-4 extcombo<0063><0301><00ED>dn ->\
+ extcombo<0107><00ED>dn
+namebase: extcombo<0063><0301><00ED>dn
+nameutf8: extcomboćídn
+namezone: xn--extcombodn-r8a52a
+failzone1: xn--extcombocdn-wcb920e
+failzone2: 
+token: 26651277
+passfail: pass
+type: toascii
+
+=====
+desc: 4-2-1-5 doublediac1<0075><0308><0301><00ED>dn ->\
+ doublediac2<01D8><00ED>dn
+namebase: doublediac1<0075><0308><0301><00ED>dn
+nameutf8: doublediac1ǘídn
+namezone: xn--doublediac1dn-6ib836a
+failzone1: xn--doublediac1udn-cmb526fnd
+failzone2: 
+token: 30175595
+passfail: pass
+type: toascii
+
+=====
+desc: 4-2-1-6 doublediac2<0075><0301><0308><00ED>dn ->\
+ doublediac2<01D8><00ED>dn
+namebase: doublediac2<0075><0301><0308><00ED>dn
+nameutf8: doublediac2ú̈ídn
+namezone: xn--doublediac2dn-6ib8qs73a
+failzone1: xn--doublediac2udn-cmb526fod
+failzone2: 
+token: 35606109
+passfail: pass
+type: toascii
+
+=====
+desc: 4-2-2-1 newnorm<2F874><00ED>dn ->\
+ newnorm<5F33><00ED>dn should not become <5F53>
+namebase: newnorm<2F874><00ED>dn
+nameutf8: newnorm������ídn
+namezone: xn--newnormdn-m5a7856x
+failzone1: xn--newnormdn-m5a9396x
+failzone2: xn--newnormdn-m5a9968x
+token: 61901810
+passfail: pass
+type: toascii
+
+=====
+desc: 4-3-1 If UseSTD3ASCIIRules: Spacing; <icu> \u0020 is prohibited from the output only when UseSTD3ASCIIRules is set </icu>
+namebase: <2000><00ED>dn
+nameutf8:  ídn
+namezone: 
+failzone1: xn--dn-mja3392a
+failzone2: 
+token: 13226878
+passfail: fail
+type: toascii
+
+=====
+desc: 4-3-2 Control
+namebase: <06DD><00ED>dn-2
+nameutf8: ۝ídn-2
+namezone: 
+failzone1: xn--dn-2-upa332g
+failzone2: 
+token: 09873312
+passfail: fail
+type: toascii
+
+=====
+desc: 4-3-3 Private use
+namebase: <E005><00ED>dn
+nameutf8: ídn
+namezone: 
+failzone1: xn--dn-mja1659t
+failzone2: 
+token: 03937183
+passfail: fail
+type: toascii
+
+=====
+desc: 4-3-4 Private use, non-BMP
+namebase: <F0005><00ED>dn
+nameutf8: ������ídn
+namezone: 
+failzone1: xn--dn-mja7922x
+failzone2: 
+token: 78707823
+passfail: fail
+type: toascii
+
+=====
+desc: 4-3-5 Non-character
+namebase: <FDDD><00ED>dn
+nameutf8: ﷝ídn
+namezone: 
+failzone1: xn--dn-mja1210x
+failzone2: 
+token: 44432178
+passfail: fail
+type: toascii
+
+=====
+desc: 4-3-6 Non-character, non-BMP
+namebase: <1FFFE><00ED>dn
+nameutf8: ������ídn
+namezone: 
+failzone1: xn--dn-mja7922x
+failzone2: 
+token: 69142686
+passfail: fail
+type: toascii
+
+=====
+desc: 4-3-7 Surrogate points
+namebase: <D805><00ED>dn
+nameutf8: �ídn
+namezone: 
+failzone1: xn--dn-mja7922x
+failzone2: 
+token: 05424571
+passfail: fail
+type: toascii
+
+=====
+desc: 4-3-8 Inappropriate for plain
+namebase: <FFFA><00ED>dn
+nameutf8: ￺ídn
+namezone: 
+failzone1: xn--dn-mja5822x
+failzone2: 
+token: 44825824
+passfail: fail
+type: toascii
+
+=====
+desc: 4-3-9 Inappropriate for canonical
+namebase: <2FF5><00ED>dn
+nameutf8: ⿵ídn
+namezone: 
+failzone1: xn--dn-mja3729b
+failzone2: 
+token: 50926136
+passfail: fail
+type: toascii
+
+=====
+desc: 4-3-10 Change display simple
+namebase: <206A><00ED>dn
+nameutf8: ⁪ídn
+namezone: 
+failzone1: xn--dn-mja7533a
+failzone2: 
+token: 57953313
+passfail: fail
+type: toascii
+
+=====
+desc: 4-3-11 Change display RTL
+namebase: <200F><00ED>dn
+nameutf8: ‏ídn
+namezone: 
+failzone1: xn--dn-mja3992a
+failzone2: 
+token: 30705279
+passfail: fail
+type: toascii
+
+=====
+desc: 4-3-12 Language tags
+namebase: <E0001><E0045><E004E><0068><0069>idn
+nameutf8: ������������������hiidn
+namezone: 
+failzone1: xn--hiidn-km43aaa
+failzone2: 
+token: 44598039
+passfail: fail
+type: toascii
+
+=====
+desc: 4-4-1 Arabic RandALCat-LCat-RandALCat
+namebase: <0628><006F><0638>
+nameutf8: بoظ
+namezone: 
+failzone1: xn--o-0mc3c
+failzone2: 
+token: 78233053
+passfail: fail
+type: toascii
+
+=====
+desc: 4-4-2 Arabic RandALCat-RandALCat-other
+namebase: <0628><0638><006F>
+nameutf8: بظo
+namezone: 
+failzone1: xn--o-0mc2c
+failzone2: 
+token: 95299621
+passfail: fail
+type: toascii
+
+=====
+desc: 4-4-3 Arabic other-RandALCat-RandALCat
+namebase: <006F><0628><0638>
+nameutf8: oبظ
+namezone: 
+failzone1: xn--o-1mc2c
+failzone2: 
+token: 79807176
+passfail: fail
+type: toascii
+
+=====
+desc: 4-4-4 Hebrew RandALCat-LCat-RandALCat
+namebase: <05D1><006F><05E1>
+nameutf8: בoס
+namezone: 
+failzone1: xn--o-1hc3c
+failzone2: 
+token: 32229450
+passfail: fail
+type: toascii
+
+=====
+desc: 4-4-5 Hebrew RandALCat-RandALCat-other
+namebase: <05D1><05E1><006F>
+nameutf8: בסo
+namezone: 
+failzone1: xn--o-1hc2c
+failzone2: 
+token: 53213348
+passfail: fail
+type: toascii
+
+=====
+desc: 4-4-6 Hebrew other-RandALCat-RandALCat
+namebase: <006F><05D1><05E1>
+nameutf8: oבס
+namezone: 
+failzone1: xn--o-2hc2c
+failzone2: 
+token: 90835860
+passfail: fail
+type: toascii
+
+=====
+desc: 5-1-1 Unassigned in BMP; zone editors should reject
+namebase: <0237><00ED>dn
+nameutf8: ȷídn
+namezone: xn--dn-mja33k
+failzone1: 
+failzone2: 
+token: 83079602
+passfail: pass
+type: toascii
+
+=====
+desc: 5-1-2 Unassinged outside BMP; zone editors should reject
+namebase: <10205><00ED>dn
+nameutf8: ������ídn
+namezone: xn--dn-mja7734x
+failzone1: xn--dn-mja7922x
+failzone2: 
+token: 03682900
+passfail: pass
+type: toascii
+
+=====
+desc: 5-2-1 Newly assigned in BMP; zone editors should reject
+namebase: <0234><00ED>dn
+nameutf8: ȴídn
+namezone: xn--dn-mja12k
+failzone1: 
+failzone2: 
+token: 96637501
+passfail: pass
+type: toascii
+
+=====
+desc: 5-2-2 Newly assigned outside of BMP; zone editors should reject
+namebase: <10005><00ED>dn
+nameutf8: ������ídn
+namezone: xn--dn-mja9232x
+failzone1: xn--dn-mja7922x
+failzone2: 
+token: 95537699
+passfail: pass
+type: toascii
+

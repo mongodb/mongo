@@ -26,6 +26,14 @@
 #include "mozilla/EndianUtils.h"
 
 /*
+ * Emulate FreeBSD internal double types.
+ * Adapted from https://github.com/freebsd/freebsd-src/search?q=__double_t
+ */
+
+typedef double      __double_t;
+typedef __double_t  double_t;
+
+/*
  * The original fdlibm code used statements like:
  *	n0 = ((*(int*)&one)>>29)^1;		* index of high word *
  *	ix0 = *(n0+(int*)&x);			* high word of x *
@@ -45,12 +53,53 @@
 #define u_int64_t uint64_t
 #endif
 
+/* A union which permits us to convert between a long double and
+   four 32 bit ints.  */
+
+#if MOZ_BIG_ENDIAN()
+
+typedef union
+{
+  long double value;
+  struct {
+    u_int32_t mswhi;
+    u_int32_t mswlo;
+    u_int32_t lswhi;
+    u_int32_t lswlo;
+  } parts32;
+  struct {
+    u_int64_t msw;
+    u_int64_t lsw;
+  } parts64;
+} ieee_quad_shape_type;
+
+#endif
+
+#if MOZ_LITTLE_ENDIAN()
+
+typedef union
+{
+  long double value;
+  struct {
+    u_int32_t lswlo;
+    u_int32_t lswhi;
+    u_int32_t mswlo;
+    u_int32_t mswhi;
+  } parts32;
+  struct {
+    u_int64_t lsw;
+    u_int64_t msw;
+  } parts64;
+} ieee_quad_shape_type;
+
+#endif
+
 /*
  * A union which permits us to convert between a double and two 32 bit
  * ints.
  */
 
-#if MOZ_BIG_ENDIAN
+#if MOZ_BIG_ENDIAN()
 
 typedef union
 {
@@ -68,7 +117,7 @@ typedef union
 
 #endif
 
-#if MOZ_LITTLE_ENDIAN
+#if MOZ_LITTLE_ENDIAN()
 
 typedef union
 {
@@ -307,8 +356,9 @@ do {								\
 
 /* Support switching the mode to FP_PE if necessary. */
 #if defined(__i386__) && !defined(NO_FPSETPREC)
-#define	ENTERI()				\
-	long double __retval;			\
+#define	ENTERI() ENTERIT(long double)
+#define	ENTERIT(returntype)			\
+	returntype __retval;			\
 	fp_prec_t __oprec;			\
 						\
 	if ((__oprec = fpgetprec()) != FP_PE)	\
@@ -331,6 +381,7 @@ do {								\
 } while (0)
 #else
 #define	ENTERI()
+#define	ENTERIT(x)
 #define	RETURNI(x)	RETURNF(x)
 #define	ENTERV()
 #define	RETURNV()	return
@@ -448,6 +499,31 @@ do {								\
  */
 void _scan_nan(uint32_t *__words, int __num_words, const char *__s);
 
+/*
+ * Mix 0, 1 or 2 NaNs.  First add 0 to each arg.  This normally just turns
+ * signaling NaNs into quiet NaNs by setting a quiet bit.  We do this
+ * because we want to never return a signaling NaN, and also because we
+ * don't want the quiet bit to affect the result.  Then mix the converted
+ * args using the specified operation.
+ *
+ * When one arg is NaN, the result is typically that arg quieted.  When both
+ * args are NaNs, the result is typically the quietening of the arg whose
+ * mantissa is largest after quietening.  When neither arg is NaN, the
+ * result may be NaN because it is indeterminate, or finite for subsequent
+ * construction of a NaN as the indeterminate 0.0L/0.0L.
+ *
+ * Technical complications: the result in bits after rounding to the final
+ * precision might depend on the runtime precision and/or on compiler
+ * optimizations, especially when different register sets are used for
+ * different precisions.  Try to make the result not depend on at least the
+ * runtime precision by always doing the main mixing step in long double
+ * precision.  Try to reduce dependencies on optimizations by adding the
+ * the 0's in different precisions (unless everything is in long double
+ * precision).
+ */
+#define	nan_mix(x, y)		(nan_mix_op((x), (y), +))
+#define	nan_mix_op(x, y, op)	(((x) + 0.0L) op ((y) + 0))
+
 #ifdef _COMPLEX_H
 
 /*
@@ -523,47 +599,52 @@ CMPLXL(long double x, long double y)
 
 #endif /* _COMPLEX_H */
  
-#ifdef __GNUCLIKE_ASM
+/*
+ * The rnint() family rounds to the nearest integer for a restricted range
+ * range of args (up to about 2**MANT_DIG).  We assume that the current
+ * rounding mode is FE_TONEAREST so that this can be done efficiently.
+ * Extra precision causes more problems in practice, and we only centralize
+ * this here to reduce those problems, and have not solved the efficiency
+ * problems.  The exp2() family uses a more delicate version of this that
+ * requires extracting bits from the intermediate value, so it is not
+ * centralized here and should copy any solution of the efficiency problems.
+ */
 
-/* Asm versions of some functions. */
-
-#ifdef __amd64__
-static __inline int
-irint(double x)
+static inline double
+rnint(__double_t x)
 {
-	int n;
-
-	asm("cvtsd2si %1,%0" : "=r" (n) : "x" (x));
-	return (n);
+	/*
+	 * This casts to double to kill any extra precision.  This depends
+	 * on the cast being applied to a double_t to avoid compiler bugs
+	 * (this is a cleaner version of STRICT_ASSIGN()).  This is
+	 * inefficient if there actually is extra precision, but is hard
+	 * to improve on.  We use double_t in the API to minimise conversions
+	 * for just calling here.  Note that we cannot easily change the
+	 * magic number to the one that works directly with double_t, since
+	 * the rounding precision is variable at runtime on x86 so the
+	 * magic number would need to be variable.  Assuming that the
+	 * rounding precision is always the default is too fragile.  This
+	 * and many other complications will move when the default is
+	 * changed to FP_PE.
+	 */
+	return ((double)(x + 0x1.8p52) - 0x1.8p52);
 }
-#define	HAVE_EFFICIENT_IRINT
+
+/*
+ * irint() and i64rint() give the same result as casting to their integer
+ * return type provided their arg is a floating point integer.  They can
+ * sometimes be more efficient because no rounding is required.
+ */
+#if (defined(amd64) || defined(__i386__)) && defined(__GNUCLIKE_ASM)
+#define	irint(x)						\
+    (sizeof(x) == sizeof(float) &&				\
+    sizeof(__float_t) == sizeof(long double) ? irintf(x) :	\
+    sizeof(x) == sizeof(double) &&				\
+    sizeof(__double_t) == sizeof(long double) ? irintd(x) :	\
+    sizeof(x) == sizeof(long double) ? irintl(x) : (int)(x))
+#else
+#define	irint(x)	((int)(x))
 #endif
-
-#ifdef __i386__
-static __inline int
-irint(double x)
-{
-	int n;
-
-	asm("fistl %0" : "=m" (n) : "t" (x));
-	return (n);
-}
-#define	HAVE_EFFICIENT_IRINT
-#endif
-
-#if defined(__amd64__) || defined(__i386__)
-static __inline int
-irintl(long double x)
-{
-	int n;
-
-	asm("fistl %0" : "=m" (n) : "t" (x));
-	return (n);
-}
-#define	HAVE_EFFICIENT_IRINTL
-#endif
-
-#endif /* __GNUCLIKE_ASM */
 
 #ifdef DEBUG
 #if defined(__amd64__) || defined(__i386__)
@@ -764,6 +845,9 @@ irintl(long double x)
 #define asin fdlibm::asin
 #define atan fdlibm::atan
 #define atan2 fdlibm::atan2
+#define cos fdlibm::cos
+#define sin fdlibm::sin
+#define tan fdlibm::tan
 #define cosh fdlibm::cosh
 #define sinh fdlibm::sinh
 #define tanh fdlibm::tanh
@@ -771,7 +855,6 @@ irintl(long double x)
 #define log fdlibm::log
 #define log10 fdlibm::log10
 #define pow fdlibm::pow
-#define sqrt fdlibm::sqrt
 #define ceil fdlibm::ceil
 #define ceilf fdlibm::ceilf
 #define fabs fdlibm::fabs

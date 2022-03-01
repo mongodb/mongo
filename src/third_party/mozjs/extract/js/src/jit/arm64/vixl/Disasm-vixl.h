@@ -174,6 +174,7 @@ class PrintDisassembler: public Disassembler {
 };
 
 void DisassembleInstruction(char* buffer, size_t bufsize, const Instruction* instr);
+char* GdbDisassembleInstruction(const Instruction* instr);
 
 }  // namespace vixl
 

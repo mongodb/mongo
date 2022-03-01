@@ -1,0 +1,97 @@
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# *******************************************************************************
+# *
+# *   Copyright (C) 2010, International Business Machines
+# *   Corporation and others.  All Rights Reserved.
+# *
+# *******************************************************************************
+#
+# File created by JDKConverter2UCM.java
+#
+<code_set_name>               icu-internal-compound-s2
+<char_name_mask>              "AXXXX"
+<subchar>                     \x3f
+<uconv_class>                 "SBCS"
+
+CHARMAP
+<U003F> \x3F |2
+<U02BC> \xA2 |1
+<U02BD> \xA1 |1
+<U0384> \xB4 |0
+<U0385> \xB5 |0
+<U0386> \xB6 |0
+<U0387> \xBF |1
+<U0388> \xB8 |0
+<U0389> \xB9 |0
+<U038A> \xBA |0
+<U038B> \xBF |1
+<U038C> \xBC |0
+<U038D> \xBF |1
+<U038E> \xBE |0
+<U038F> \xBF |0
+<U0390> \xC0 |0
+<U0391> \xC1 |0
+<U0392> \xC2 |0
+<U0393> \xC3 |0
+<U0394> \xC4 |0
+<U0395> \xC5 |0
+<U0396> \xC6 |0
+<U0397> \xC7 |0
+<U0398> \xC8 |0
+<U0399> \xC9 |0
+<U039A> \xCA |0
+<U039B> \xCB |0
+<U039C> \xCC |0
+<U039D> \xCD |0
+<U039E> \xCE |0
+<U039F> \xCF |0
+<U03A0> \xD0 |0
+<U03A1> \xD1 |0
+<U03A2> \xBF |1
+<U03A3> \xD3 |0
+<U03A4> \xD4 |0
+<U03A5> \xD5 |0
+<U03A6> \xD6 |0
+<U03A7> \xD7 |0
+<U03A8> \xD8 |0
+<U03A9> \xD9 |0
+<U03AA> \xDA |0
+<U03AB> \xDB |0
+<U03AC> \xDC |0
+<U03AD> \xDD |0
+<U03AE> \xDE |0
+<U03AF> \xDF |0
+<U03B0> \xE0 |0
+<U03B1> \xE1 |0
+<U03B2> \xE2 |0
+<U03B3> \xE3 |0
+<U03B4> \xE4 |0
+<U03B5> \xE5 |0
+<U03B6> \xE6 |0
+<U03B7> \xE7 |0
+<U03B8> \xE8 |0
+<U03B9> \xE9 |0
+<U03BA> \xEA |0
+<U03BB> \xEB |0
+<U03BC> \xEC |0
+<U03BD> \xED |0
+<U03BE> \xEE |0
+<U03BF> \xEF |0
+<U03C0> \xF0 |0
+<U03C1> \xF1 |0
+<U03C2> \xF2 |0
+<U03C3> \xF3 |0
+<U03C4> \xF4 |0
+<U03C5> \xF5 |0
+<U03C6> \xF6 |0
+<U03C7> \xF7 |0
+<U03C8> \xF8 |0
+<U03C9> \xF9 |0
+<U03CA> \xFA |0
+<U03CB> \xFB |0
+<U03CC> \xFC |0
+<U03CD> \xFD |0
+<U03CE> \xFE |0
+<U2015> \xAF |0
+END CHARMAP

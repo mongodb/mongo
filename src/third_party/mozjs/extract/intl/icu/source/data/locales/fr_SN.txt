@@ -1,0 +1,37 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+fr_SN{
+    calendar{
+        gregorian{
+            dayPeriod{
+                format{
+                    abbreviated{
+                        afternoon1{"ap.m."}
+                        evening1{"soir"}
+                        midnight{"min."}
+                        morning1{"mat."}
+                        night1{"nuit"}
+                        noon{"midi"}
+                    }
+                    narrow{
+                        afternoon1{"ap.m."}
+                        evening1{"soir"}
+                        midnight{"min."}
+                        morning1{"mat."}
+                        night1{"nuit"}
+                        noon{"midi"}
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        midnight{"min."}
+                    }
+                    narrow{
+                        midnight{"min."}
+                    }
+                }
+            }
+        }
+    }
+}

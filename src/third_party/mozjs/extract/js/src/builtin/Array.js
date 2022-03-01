@@ -2,71 +2,67 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
- /* ES5 15.4.4.14. */
+// ES2020 draft rev dc1e21c454bd316810be1c0e7af0131a2d7f38e9
+// 22.1.3.14 Array.prototype.indexOf ( searchElement [ , fromIndex ] )
 function ArrayIndexOf(searchElement/*, fromIndex*/) {
-    /* Step 1. */
+    // Step 1.
     var O = ToObject(this);
 
-    /* Steps 2-3. */
+    // Step 2.
     var len = ToLength(O.length);
 
-    /* Step 4. */
+    // Step 3.
     if (len === 0)
         return -1;
 
-    /* Step 5.  Add zero to convert -0 to +0, per ES6 5.2. */
-    var n = arguments.length > 1 ? ToInteger(arguments[1]) + 0 : 0;
+    // Steps 4-5.
+    var n = arguments.length > 1 ? ToInteger(arguments[1]) : 0;
 
-    /* Step 6. */
+    // Step 6.
     if (n >= len)
         return -1;
 
+    // Steps 7-8.
     var k;
-    /* Step 7. */
-    if (n >= 0)
+    if (n >= 0) {
+        // Step 7.a.
         k = n;
-    /* Step 8. */
-    else {
-        /* Step a. */
+    } else {
+        // Step 8.a.
         k = len + n;
-        /* Step b. */
+
+        // Step 8.b.
         if (k < 0)
             k = 0;
     }
 
-    /* Step 9. */
+    // Step 9.
     for (; k < len; k++) {
         if (k in O && O[k] === searchElement)
             return k;
     }
 
-    /* Step 10. */
+    // Step 10.
     return -1;
 }
 
-function ArrayStaticIndexOf(list, searchElement/*, fromIndex*/) {
-    if (arguments.length < 1)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.indexOf");
-    var fromIndex = arguments.length > 2 ? arguments[2] : 0;
-    return callFunction(ArrayIndexOf, list, searchElement, fromIndex);
-}
-
-/* ES5 15.4.4.15. */
+// ES2020 draft rev dc1e21c454bd316810be1c0e7af0131a2d7f38e9
+// 22.1.3.17 Array.prototype.lastIndexOf ( searchElement [ , fromIndex ] )
 function ArrayLastIndexOf(searchElement/*, fromIndex*/) {
-    /* Step 1. */
+    // Step 1.
     var O = ToObject(this);
 
-    /* Steps 2-3. */
+    // Step 2.
     var len = ToLength(O.length);
 
-    /* Step 4. */
+    // Step 3.
     if (len === 0)
         return -1;
 
-    /* Step 5.  Add zero to convert -0 to +0, per ES6 5.2. */
-    var n = arguments.length > 1 ? ToInteger(arguments[1]) + 0 : len - 1;
+    // Step 4.
+    var n = arguments.length > 1 ? ToInteger(arguments[1]) : len - 1;
 
-    /* Steps 6-7. */
+    // Steps 5-6.
     var k;
     if (n > len - 1)
         k = len - 1;
@@ -75,28 +71,14 @@ function ArrayLastIndexOf(searchElement/*, fromIndex*/) {
     else
         k = n;
 
-    /* Step 8. */
+    // Step 7.
     for (; k >= 0; k--) {
         if (k in O && O[k] === searchElement)
             return k;
     }
 
-    /* Step 9. */
+    // Step 8.
     return -1;
-}
-
-function ArrayStaticLastIndexOf(list, searchElement/*, fromIndex*/) {
-    if (arguments.length < 1)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.lastIndexOf");
-    var fromIndex;
-    if (arguments.length > 2) {
-        fromIndex = arguments[2];
-    } else {
-        var O = ToObject(list);
-        var len = ToLength(O.length);
-        fromIndex = len - 1;
-    }
-    return callFunction(ArrayLastIndexOf, list, searchElement, fromIndex);
 }
 
 /* ES5 15.4.4.16. */
@@ -130,15 +112,8 @@ function ArrayEvery(callbackfn/*, thisArg*/) {
     /* Step 8. */
     return true;
 }
-
-function ArrayStaticEvery(list, callbackfn/*, thisArg*/) {
-    if (arguments.length < 2)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.every");
-    if (!IsCallable(callbackfn))
-        ThrowTypeError(JSMSG_NOT_FUNCTION, DecompileArg(1, callbackfn));
-    var T = arguments.length > 2 ? arguments[2] : void 0;
-    return callFunction(ArrayEvery, list, callbackfn, T);
-}
+// Inlining this enables inlining of the callback function.
+SetIsInlinableLargeFunction(ArrayEvery);
 
 /* ES5 15.4.4.17. */
 function ArraySome(callbackfn/*, thisArg*/) {
@@ -171,15 +146,8 @@ function ArraySome(callbackfn/*, thisArg*/) {
     /* Step 8. */
     return false;
 }
-
-function ArrayStaticSome(list, callbackfn/*, thisArg*/) {
-    if (arguments.length < 2)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.some");
-    if (!IsCallable(callbackfn))
-        ThrowTypeError(JSMSG_NOT_FUNCTION, DecompileArg(1, callbackfn));
-    var T = arguments.length > 2 ? arguments[2] : void 0;
-    return callFunction(ArraySome, list, callbackfn, T);
-}
+// Inlining this enables inlining of the callback function.
+SetIsInlinableLargeFunction(ArraySome);
 
 // ES2018 draft rev 3bbc87cd1b9d3bf64c3e68ca2fe9c5a3f2c304c0
 // 22.1.3.25 Array.prototype.sort ( comparefn )
@@ -256,15 +224,8 @@ function ArrayForEach(callbackfn/*, thisArg*/) {
     /* Step 8. */
     return void 0;
 }
-
-function ArrayStaticForEach(list, callbackfn/*, thisArg*/) {
-    if (arguments.length < 2)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.forEach");
-    if (!IsCallable(callbackfn))
-        ThrowTypeError(JSMSG_NOT_FUNCTION, DecompileArg(1, callbackfn));
-    var T = arguments.length > 2 ? arguments[2] : void 0;
-    callFunction(ArrayForEach, list, callbackfn, T);
-}
+// Inlining this enables inlining of the callback function.
+SetIsInlinableLargeFunction(ArrayForEach);
 
 /* ES 2016 draft Mar 25, 2016 22.1.3.15. */
 function ArrayMap(callbackfn/*, thisArg*/) {
@@ -293,22 +254,15 @@ function ArrayMap(callbackfn/*, thisArg*/) {
         if (k in O) {
             /* Steps 7.c.i-iii. */
             var mappedValue = callContentFunction(callbackfn, T, O[k], k, O);
-            _DefineDataProperty(A, k, mappedValue);
+            DefineDataProperty(A, k, mappedValue);
         }
     }
 
     /* Step 8. */
     return A;
 }
-
-function ArrayStaticMap(list, callbackfn/*, thisArg*/) {
-    if (arguments.length < 2)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.map");
-    if (!IsCallable(callbackfn))
-        ThrowTypeError(JSMSG_NOT_FUNCTION, DecompileArg(1, callbackfn));
-    var T = arguments.length > 2 ? arguments[2] : void 0;
-    return callFunction(ArrayMap, list, callbackfn, T);
-}
+// Inlining this enables inlining of the callback function.
+SetIsInlinableLargeFunction(ArrayMap);
 
 /* ES 2016 draft Mar 25, 2016 22.1.3.7 Array.prototype.filter. */
 function ArrayFilter(callbackfn/*, thisArg*/) {
@@ -341,21 +295,12 @@ function ArrayFilter(callbackfn/*, thisArg*/) {
             var selected = callContentFunction(callbackfn, T, kValue, k, O);
             /* Step 8.c.iii. */
             if (selected)
-                _DefineDataProperty(A, to++, kValue);
+                DefineDataProperty(A, to++, kValue);
         }
     }
 
     /* Step 9. */
     return A;
-}
-
-function ArrayStaticFilter(list, callbackfn/*, thisArg*/) {
-    if (arguments.length < 2)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.filter");
-    if (!IsCallable(callbackfn))
-        ThrowTypeError(JSMSG_NOT_FUNCTION, DecompileArg(1, callbackfn));
-    var T = arguments.length > 2 ? arguments[2] : void 0;
-    return callFunction(ArrayFilter, list, callbackfn, T);
 }
 
 /* ES5 15.4.4.21. */
@@ -381,23 +326,26 @@ function ArrayReduce(callbackfn/*, initialValue*/) {
         accumulator = arguments[1];
     } else {
         /* Step 5. */
+        // Add an explicit |throw| here and below to inform Ion that the
+        // ThrowTypeError calls exit this function.
         if (len === 0)
-            ThrowTypeError(JSMSG_EMPTY_ARRAY_REDUCE);
-        if (IsPackedArray(O)) {
-            accumulator = O[k++];
-        } else {
-            var kPresent = false;
-            for (; k < len; k++) {
-                if (k in O) {
-                    accumulator = O[k];
-                    kPresent = true;
-                    k++;
-                    break;
-                }
+            throw ThrowTypeError(JSMSG_EMPTY_ARRAY_REDUCE);
+
+        // Use a |do-while| loop to let Ion know that the loop will definitely
+        // be entered at least once. When Ion is then also able to inline the
+        // |in| operator, it can optimize away the whole loop.
+        var kPresent = false;
+        do {
+            if (k in O) {
+                kPresent = true;
+                break;
             }
-            if (!kPresent)
-              ThrowTypeError(JSMSG_EMPTY_ARRAY_REDUCE);
-        }
+        } while (++k < len);
+        if (!kPresent)
+          throw ThrowTypeError(JSMSG_EMPTY_ARRAY_REDUCE);
+
+        // Moved outside of the loop to ensure the assignment is non-conditional.
+        accumulator = O[k++];
     }
 
     /* Step 9. */
@@ -412,18 +360,6 @@ function ArrayReduce(callbackfn/*, initialValue*/) {
 
     /* Step 10. */
     return accumulator;
-}
-
-function ArrayStaticReduce(list, callbackfn) {
-    if (arguments.length < 2)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.reduce");
-    if (!IsCallable(callbackfn))
-        ThrowTypeError(JSMSG_NOT_FUNCTION, DecompileArg(1, callbackfn));
-
-    if (arguments.length > 2)
-        return callFunction(ArrayReduce, list, callbackfn, arguments[2]);
-
-    return callFunction(ArrayReduce, list, callbackfn);
 }
 
 /* ES5 15.4.4.22. */
@@ -449,23 +385,26 @@ function ArrayReduceRight(callbackfn/*, initialValue*/) {
         accumulator = arguments[1];
     } else {
         /* Step 5. */
+        // Add an explicit |throw| here and below to inform Ion that the
+        // ThrowTypeError calls exit this function.
         if (len === 0)
-            ThrowTypeError(JSMSG_EMPTY_ARRAY_REDUCE);
-        if (IsPackedArray(O)) {
-            accumulator = O[k--];
-        } else {
-            var kPresent = false;
-            for (; k >= 0; k--) {
-                if (k in O) {
-                    accumulator = O[k];
-                    kPresent = true;
-                    k--;
-                    break;
-                }
+            throw ThrowTypeError(JSMSG_EMPTY_ARRAY_REDUCE);
+
+        // Use a |do-while| loop to let Ion know that the loop will definitely
+        // be entered at least once. When Ion is then also able to inline the
+        // |in| operator, it can optimize away the whole loop.
+        var kPresent = false;
+        do {
+            if (k in O) {
+                kPresent = true;
+                break;
             }
-            if (!kPresent)
-                ThrowTypeError(JSMSG_EMPTY_ARRAY_REDUCE);
-        }
+        } while (--k >= 0);
+        if (!kPresent)
+            throw ThrowTypeError(JSMSG_EMPTY_ARRAY_REDUCE);
+
+        // Moved outside of the loop to ensure the assignment is non-conditional.
+        accumulator = O[k--];
     }
 
     /* Step 9. */
@@ -480,18 +419,6 @@ function ArrayReduceRight(callbackfn/*, initialValue*/) {
 
     /* Step 10. */
     return accumulator;
-}
-
-function ArrayStaticReduceRight(list, callbackfn) {
-    if (arguments.length < 2)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.reduceRight");
-    if (!IsCallable(callbackfn))
-        ThrowTypeError(JSMSG_NOT_FUNCTION, DecompileArg(1, callbackfn));
-
-    if (arguments.length > 2)
-        return callFunction(ArrayReduceRight, list, callbackfn, arguments[2]);
-
-    return callFunction(ArrayReduceRight, list, callbackfn);
 }
 
 /* ES6 draft 2013-05-14 15.4.3.23. */
@@ -554,41 +481,46 @@ function ArrayFindIndex(predicate/*, thisArg*/) {
     return -1;
 }
 
-/* ES6 draft 2013-09-27 22.1.3.3. */
+// ES2020 draft rev dc1e21c454bd316810be1c0e7af0131a2d7f38e9
+// 22.1.3.3 Array.prototype.copyWithin ( target, start [ , end ] )
 function ArrayCopyWithin(target, start, end = undefined) {
-    /* Steps 1-2. */
+    // Step 1.
     var O = ToObject(this);
 
-    /* Steps 3-5. */
+    // Step 2.
     var len = ToLength(O.length);
 
-    /* Steps 6-8. */
+    // Step 3.
     var relativeTarget = ToInteger(target);
 
+    // Step 4.
     var to = relativeTarget < 0 ? std_Math_max(len + relativeTarget, 0)
                                 : std_Math_min(relativeTarget, len);
 
-    /* Steps 9-11. */
+    // Step 5.
     var relativeStart = ToInteger(start);
 
+    // Step 6.
     var from = relativeStart < 0 ? std_Math_max(len + relativeStart, 0)
                                  : std_Math_min(relativeStart, len);
 
-    /* Steps 12-14. */
-    var relativeEnd = end === undefined ? len
-                                        : ToInteger(end);
+    // Step 7.
+    var relativeEnd = end === undefined ? len : ToInteger(end);
 
+    // Step 8.
     var final = relativeEnd < 0 ? std_Math_max(len + relativeEnd, 0)
                                 : std_Math_min(relativeEnd, len);
 
-    /* Step 15. */
+    // Step 9.
     var count = std_Math_min(final - from, len - to);
 
-    /* Steps 16-17. */
+    // Steps 10-12.
     if (from < to && to < (from + count)) {
+        // Steps 10.b-c.
         from = from + count - 1;
         to = to + count - 1;
-        /* Step 18. */
+
+        // Step 12.
         while (count > 0) {
             if (from in O)
                 O[to] = O[from];
@@ -600,7 +532,7 @@ function ArrayCopyWithin(target, start, end = undefined) {
             count--;
         }
     } else {
-        /* Step 18. */
+        // Step 12.
         while (count > 0) {
             if (from in O)
                 O[to] = O[from];
@@ -613,84 +545,85 @@ function ArrayCopyWithin(target, start, end = undefined) {
         }
     }
 
-    /* Step 19. */
-    return O;
-}
-
-// ES6 draft 2014-04-05 22.1.3.6
-function ArrayFill(value, start = 0, end = undefined) {
-    // Steps 1-2.
-    var O = ToObject(this);
-
-    // Steps 3-5.
-    var len = ToLength(O.length);
-
-    // Steps 6-7.
-    var relativeStart = ToInteger(start);
-
-    // Step 8.
-    var k = relativeStart < 0
-            ? std_Math_max(len + relativeStart, 0)
-            : std_Math_min(relativeStart, len);
-
-    // Steps 9-10.
-    var relativeEnd = end === undefined ? len : ToInteger(end);
-
-    // Step 11.
-    var final = relativeEnd < 0
-                ? std_Math_max(len + relativeEnd, 0)
-                : std_Math_min(relativeEnd, len);
-
-    // Step 12.
-    for (; k < final; k++) {
-        O[k] = value;
-    }
-
     // Step 13.
     return O;
 }
 
-// Proposed for ES7:
-// https://github.com/tc39/Array.prototype.includes/blob/7c023c19a0/spec.md
-function ArrayIncludes(searchElement, fromIndex = 0) {
-    // Steps 1-2.
+// ES2020 draft rev dc1e21c454bd316810be1c0e7af0131a2d7f38e9
+// 22.1.3.6 Array.prototype.fill ( value [ , start [ , end ] ] )
+function ArrayFill(value, start = 0, end = undefined) {
+    // Step 1.
     var O = ToObject(this);
 
-    // Steps 3-4.
+    // Step 2.
     var len = ToLength(O.length);
 
+    // Step 3.
+    var relativeStart = ToInteger(start);
+
+    // Step 4.
+    var k = relativeStart < 0
+            ? std_Math_max(len + relativeStart, 0)
+            : std_Math_min(relativeStart, len);
+
     // Step 5.
+    var relativeEnd = end === undefined ? len : ToInteger(end);
+
+    // Step 6.
+    var final = relativeEnd < 0
+                ? std_Math_max(len + relativeEnd, 0)
+                : std_Math_min(relativeEnd, len);
+
+    // Step 7.
+    for (; k < final; k++) {
+        O[k] = value;
+    }
+
+    // Step 8.
+    return O;
+}
+
+// ES2020 draft rev dc1e21c454bd316810be1c0e7af0131a2d7f38e9
+// 22.1.3.13 Array.prototype.includes ( searchElement [ , fromIndex ] )
+function ArrayIncludes(searchElement, fromIndex = 0) {
+    // Step 1.
+    var O = ToObject(this);
+
+    // Step 2.
+    var len = ToLength(O.length);
+
+    // Step 3.
     if (len === 0)
         return false;
 
-    // Steps 6-7.
+    // Steps 4-5.
     var n = ToInteger(fromIndex);
 
-    // Step 8.
+    // Steps 6-7.
     var k;
     if (n >= 0) {
+        // Step 6.a.
         k = n;
-    }
-    // Step 9.
-    else {
-        // Step a.
+    } else {
+        // Step 7.a.
         k = len + n;
-        // Step b.
+
+        // Step 7.b.
         if (k < 0)
             k = 0;
     }
 
-    // Step 10.
+    // Step 8.
     while (k < len) {
-        // Steps a-c.
+        // Steps 8.a-c.
         if (SameValueZero(searchElement, O[k]))
             return true;
 
-        // Step d.
+        // Step 8.d.
         k++;
     }
 
-    // Step 11.
+    // Step 9.
     return false;
 }
 
@@ -773,11 +706,16 @@ function ArrayIteratorNext() {
     result.value = index;
     return result;
 }
+// We want to inline this to do scalar replacement of the result object.
+SetIsInlinableLargeFunction(ArrayIteratorNext);
 
-function ArrayValues() {
+
+// Uncloned functions with `$` prefix are allocated as extended function
+// to store the original name in `SetCanonicalName`.
+function $ArrayValues() {
     return CreateArrayIterator(this, ITEM_KIND_VALUE);
 }
-_SetCanonicalName(ArrayValues, "values");
+SetCanonicalName($ArrayValues, "values");
 
 function ArrayEntries() {
     return CreateArrayIterator(this, ITEM_KIND_KEY_AND_VALUE);
@@ -800,7 +738,7 @@ function ArrayFrom(items, mapfn = undefined, thisArg = undefined) {
 
     // Step 4.
     // Inlined: GetMethod, steps 1-2.
-    var usingIterator = items[std_iterator];
+    var usingIterator = items[GetBuiltinSymbol("iterator")];
 
     // Step 5.
     // Inlined: GetMethod, step 3.
@@ -822,9 +760,9 @@ function ArrayFrom(items, mapfn = undefined, thisArg = undefined) {
         for (var nextValue of allowContentIter(iterator)) {
             // Step 5.e.i.
             // Disabled for performance reason.  We won't hit this case on
-            // normal array, since _DefineDataProperty will throw before it.
+            // normal array, since DefineDataProperty will throw before it.
             // We could hit this when |A| is a proxy and it ignores
-            // |_DefineDataProperty|, but it happens only after too long loop.
+            // |DefineDataProperty|, but it happens only after too long loop.
             /*
             if (k >= 0x1fffffffffffff)
                 ThrowTypeError(JSMSG_TOO_LONG_ARRAY);
@@ -834,7 +772,7 @@ function ArrayFrom(items, mapfn = undefined, thisArg = undefined) {
             var mappedValue = mapping ? callContentFunction(mapfn, T, nextValue, k) : nextValue;
 
             // Steps 5.e.ii (reordered), 5.e.viii.
-            _DefineDataProperty(A, k++, mappedValue);
+            DefineDataProperty(A, k++, mappedValue);
         }
 
         // Step 5.e.iv.
@@ -863,7 +801,7 @@ function ArrayFrom(items, mapfn = undefined, thisArg = undefined) {
         var mappedValue = mapping ? callContentFunction(mapfn, T, kValue, k) : kValue;
 
         // Steps 16.f-g.
-        _DefineDataProperty(A, k, mappedValue);
+        DefineDataProperty(A, k, mappedValue);
     }
 
     // Steps 17-18.
@@ -882,9 +820,9 @@ function MakeIteratorWrapper(items, method) {
     return {
         // Use a named function expression instead of a method definition, so
         // we don't create an inferred name for this function at runtime.
-        [std_iterator]: function IteratorMethod() {
+        [GetBuiltinSymbol("iterator")]: function IteratorMethod() {
             return callContentFunction(method, items);
-        }
+        },
     };
 }
 
@@ -926,7 +864,7 @@ function ArrayToLocaleString(locales, options) {
     if (firstElement === undefined || firstElement === null) {
         R = "";
     } else {
-#if EXPOSE_INTL_API
+#if JS_HAS_INTL_API
         R = ToString(callContentFunction(firstElement.toLocaleString, firstElement, locales, options));
 #else
         R = ToString(callContentFunction(firstElement.toLocaleString, firstElement));
@@ -945,7 +883,7 @@ function ArrayToLocaleString(locales, options) {
         // Steps 9.a, 9.c-e.
         R += separator;
         if (!(nextElement === undefined || nextElement === null)) {
-#if EXPOSE_INTL_API
+#if JS_HAS_INTL_API
             R += ToString(callContentFunction(nextElement.toLocaleString, nextElement, locales, options));
 #else
             R += ToString(callContentFunction(nextElement.toLocaleString, nextElement));
@@ -958,11 +896,11 @@ function ArrayToLocaleString(locales, options) {
 }
 
 // ES 2016 draft Mar 25, 2016 22.1.2.5.
-function ArraySpecies() {
+function $ArraySpecies() {
     // Step 1.
     return this;
 }
-_SetCanonicalName(ArraySpecies, "get [Symbol.species]");
+SetCanonicalName($ArraySpecies, "get [Symbol.species]");
 
 // ES 2016 draft Mar 25, 2016 9.4.2.3.
 function ArraySpeciesCreate(originalArray, length) {
@@ -971,6 +909,7 @@ function ArraySpeciesCreate(originalArray, length) {
     assert(length >= 0, "length should be a non-negative number");
 
     // Step 2.
+    // eslint-disable-next-line no-compare-neg-zero
     if (length === -0)
         length = 0;
 
@@ -982,13 +921,13 @@ function ArraySpeciesCreate(originalArray, length) {
     var C = originalArray.constructor;
 
     // Step 5.b.
-    if (IsConstructor(C) && IsWrappedArrayConstructor(C))
+    if (IsConstructor(C) && IsCrossRealmArrayConstructor(C))
         return std_Array(length);
 
     // Step 5.c.
     if (IsObject(C)) {
         // Step 5.c.i.
-        C = C[std_species];
+        C = C[GetBuiltinSymbol("species")];
 
         // Optimized path for an ordinary Array.
         if (C === GetBuiltinConstructor("Array"))
@@ -1018,7 +957,7 @@ function IsConcatSpreadable(O) {
         return false;
 
     // Step 2.
-    var spreadable = O[std_isConcatSpreadable];
+    var spreadable = O[GetBuiltinSymbol("isConcatSpreadable")];
 
     // Step 3.
     if (spreadable !== undefined)
@@ -1064,7 +1003,7 @@ function ArrayConcat(arg1) {
                 for (k = 0; k < len; k++) {
                     // Steps 5.c.iv.1-3.
                     // IsPackedArray(E) ensures that |k in E| is always true.
-                    _DefineDataProperty(A, n, E[k]);
+                    DefineDataProperty(A, n, E[k]);
 
                     // Step 5.c.iv.4.
                     n++;
@@ -1074,7 +1013,7 @@ function ArrayConcat(arg1) {
                 for (k = 0; k < len; k++) {
                     // Steps 5.c.iv.1-3.
                     if (k in E)
-                        _DefineDataProperty(A, n, E[k]);
+                        DefineDataProperty(A, n, E[k]);
 
                     // Step 5.c.iv.4.
                     n++;
@@ -1086,7 +1025,7 @@ function ArrayConcat(arg1) {
                 ThrowTypeError(JSMSG_TOO_LONG_ARRAY);
 
             // Step 5.d.ii.
-            _DefineDataProperty(A, n, E);
+            DefineDataProperty(A, n, E);
 
             // Step 5.d.iii.
             n++;
@@ -1106,8 +1045,8 @@ function ArrayConcat(arg1) {
     return A;
 }
 
-// https://tc39.github.io/proposal-flatMap/
-// January 16, 2018
+// ES2020 draft rev dc1e21c454bd316810be1c0e7af0131a2d7f38e9
+// 22.1.3.11 Array.prototype.flatMap ( mapperFunction [ , thisArg ] )
 function ArrayFlatMap(mapperFunction/*, thisArg*/) {
     // Step 1.
     var O = ToObject(this);
@@ -1132,9 +1071,9 @@ function ArrayFlatMap(mapperFunction/*, thisArg*/) {
     return A;
 }
 
-// https://tc39.github.io/proposal-flatMap/
-// January 16, 2018
-function ArrayFlatten(/* depth */) {
+// ES2020 draft rev dc1e21c454bd316810be1c0e7af0131a2d7f38e9
+// 22.1.3.10 Array.prototype.flat ( [ depth ] )
+function ArrayFlat(/* depth */) {
      // Step 1.
     var O = ToObject(this);
 
@@ -1158,6 +1097,8 @@ function ArrayFlatten(/* depth */) {
     return A;
 }
 
+// ES2020 draft rev dc1e21c454bd316810be1c0e7af0131a2d7f38e9
+// 22.1.3.10.1 FlattenIntoArray ( target, source, sourceLen, start, depth [ , mapperFunction, thisArg ] )
 function FlattenIntoArray(target, source, sourceLen, start, depth, mapperFunction, thisArg) {
     // Step 1.
     var targetIndex = start;
@@ -1178,24 +1119,30 @@ function FlattenIntoArray(target, source, sourceLen, start, depth, mapperFunctio
             }
 
             // Step 3.c.iii.
-            var flattenable = IsArray(element);
+            var shouldFlatten = false;
 
             // Step 3.c.iv.
-            if (flattenable && depth > 0) {
+            if (depth > 0) {
                 // Step 3.c.iv.1.
+                shouldFlatten = IsArray(element);
+            }
+
+            // Step 3.c.v.
+            if (shouldFlatten) {
+                // Step 3.c.v.1.
                 var elementLen = ToLength(element.length);
 
-                // Step 3.c.iv.2.
+                // Step 3.c.v.2.
                 targetIndex = FlattenIntoArray(target, element, elementLen, targetIndex, depth - 1);
             } else {
-                // Step 3.c.v.1.
+                // Step 3.c.vi.1.
                 if (targetIndex >= MAX_NUMERIC_INDEX)
                     ThrowTypeError(JSMSG_TOO_LONG_ARRAY);
 
-                // Step 3.c.v.2.
-                _DefineDataProperty(target, targetIndex, element);
+                // Step 3.c.vi.2.
+                DefineDataProperty(target, targetIndex, element);
 
-                // Step 3.c.v.3.
+                // Step 3.c.vi.3.
                 targetIndex++;
             }
         }
@@ -1205,66 +1152,33 @@ function FlattenIntoArray(target, source, sourceLen, start, depth, mapperFunctio
     return targetIndex;
 }
 
-function ArrayStaticConcat(arr, arg1) {
-    if (arguments.length < 1)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.concat");
-    var args = callFunction(std_Array_slice, arguments, 1);
-    return callFunction(std_Function_apply, ArrayConcat, arr, args);
-}
+// https://github.com/tc39/proposal-relative-indexing-method
+// Array.prototype.at ( index )
+function ArrayAt(index) {
+     // Step 1.
+    var O = ToObject(this);
 
-function ArrayStaticJoin(arr, separator) {
-    if (arguments.length < 1)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.join");
-    return callFunction(std_Array_join, arr, separator);
-}
+    // Step 2.
+    var len = ToLength(O.length);
 
-function ArrayStaticReverse(arr) {
-    if (arguments.length < 1)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.reverse");
-    return callFunction(std_Array_reverse, arr);
-}
+    // Step 3.
+    var relativeIndex = ToInteger(index);
 
-function ArrayStaticSort(arr, comparefn) {
-    if (arguments.length < 1)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.sort");
-    return callFunction(ArraySort, arr, comparefn);
-}
+    // Steps 4-5.
+    var k;
+    if (relativeIndex >= 0) {
+        k = relativeIndex;
+    } else {
+        k = len + relativeIndex;
+    }
 
-function ArrayStaticPush(arr, arg1) {
-    if (arguments.length < 1)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.push");
-    var args = callFunction(std_Array_slice, arguments, 1);
-    return callFunction(std_Function_apply, std_Array_push, arr, args);
-}
+    // Step 6.
+    if (k < 0 || k >= len) {
+        return undefined;
+    }
 
-function ArrayStaticPop(arr) {
-    if (arguments.length < 1)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.pop");
-    return callFunction(std_Array_pop, arr);
+    // Step 7.
+    return O[k];
 }
-
-function ArrayStaticShift(arr) {
-    if (arguments.length < 1)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.shift");
-    return callFunction(std_Array_shift, arr);
-}
-
-function ArrayStaticUnshift(arr, arg1) {
-    if (arguments.length < 1)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.unshift");
-    var args = callFunction(std_Array_slice, arguments, 1);
-    return callFunction(std_Function_apply, std_Array_unshift, arr, args);
-}
-
-function ArrayStaticSplice(arr, start, deleteCount) {
-    if (arguments.length < 1)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.splice");
-    var args = callFunction(std_Array_slice, arguments, 1);
-    return callFunction(std_Function_apply, std_Array_splice, arr, args);
-}
-
-function ArrayStaticSlice(arr, start, end) {
-    if (arguments.length < 1)
-        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, "Array.slice");
-    return callFunction(std_Array_slice, arr, start, end);
-}
+// This function is only barely too long for normal inlining.
+SetIsInlinableLargeFunction(ArrayAt);

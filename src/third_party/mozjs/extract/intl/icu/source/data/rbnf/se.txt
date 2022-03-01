@@ -1,0 +1,40 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+se{
+    RBNFRules{
+        SpelloutRules{
+            "%spellout-numbering-year:",
+            "-x: eret >>;",
+            "x.x: =0.0=;",
+            "0: =%spellout-numbering=;",
+            "1100/100: <<\u00AD\u010Duo\u0111i[\u00AD>>];",
+            "10000: =%spellout-numbering=;",
+            "%spellout-numbering:",
+            "0: =%spellout-cardinal=;",
+            "%spellout-cardinal:",
+            "-x: eret >>;",
+            "x.x: << pilkku >>;",
+            "0: nolla;",
+            "1: okta;",
+            "2: guokte;",
+            "3: golbma;",
+            "4: njeallje;",
+            "5: vihtta;",
+            "6: guhtta;",
+            "7: \u010Die\u017Ea;",
+            "8: g\u00E1vcci;",
+            "9: ovcci;",
+            "10: logi;",
+            "11: >>\u00ADnuppe\u00ADlohk\u00E1i;",
+            "20: <<\u00ADlogi[\u00AD>>];",
+            "100: <<\u00AD\u010Duo\u0111i[\u00AD>>];",
+            "1000: <<\u00ADduh\u00E1t[ >>];",
+            "1000000: << miljon[ >>];",
+            "1000000000: << miljard[ >>];",
+            "1000000000000: << biljon[ >>];",
+            "1000000000000000: << biljard[ >>];",
+            "1000000000000000000: =#,##0=;",
+        }
+    }
+}

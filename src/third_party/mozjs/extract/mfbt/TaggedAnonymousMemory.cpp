@@ -6,45 +6,40 @@
 
 #ifdef ANDROID
 
-#include "mozilla/TaggedAnonymousMemory.h"
+#  include "mozilla/TaggedAnonymousMemory.h"
 
-#include <sys/types.h>
-#include <sys/mman.h>
-#include <sys/prctl.h>
-#include <sys/syscall.h>
-#include <unistd.h>
+#  include <sys/types.h>
+#  include <sys/mman.h>
+#  include <sys/prctl.h>
+#  include <sys/syscall.h>
+#  include <unistd.h>
 
-#include "mozilla/Assertions.h"
+#  include "mozilla/Assertions.h"
 
 // These constants are copied from <sys/prctl.h>, because the headers
 // used for building may not have them even though the running kernel
 // supports them.
-#ifndef PR_SET_VMA
-#define PR_SET_VMA		0x53564d41
-#endif
-#ifndef PR_SET_VMA_ANON_NAME
-#define PR_SET_VMA_ANON_NAME		0
-#endif
+#  ifndef PR_SET_VMA
+#    define PR_SET_VMA 0x53564d41
+#  endif
+#  ifndef PR_SET_VMA_ANON_NAME
+#    define PR_SET_VMA_ANON_NAME 0
+#  endif
 
 namespace mozilla {
 
 // Returns 0 for success and -1 (with errno) for error.
-static int
-TagAnonymousMemoryAligned(const void* aPtr, size_t aLength, const char* aTag)
-{
-  return prctl(PR_SET_VMA,
-               PR_SET_VMA_ANON_NAME,
-               reinterpret_cast<unsigned long>(aPtr),
-               aLength,
+static int TagAnonymousMemoryAligned(const void* aPtr, size_t aLength,
+                                     const char* aTag) {
+  return prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME,
+               reinterpret_cast<unsigned long>(aPtr), aLength,
                reinterpret_cast<unsigned long>(aTag));
 }
 
 // On some architectures, it's possible for the page size to be larger
 // than the PAGE_SIZE we were compiled with.  This computes the
 // equivalent of PAGE_MASK.
-static uintptr_t
-GetPageMask()
-{
+static uintptr_t GetPageMask() {
   static uintptr_t mask = 0;
 
   if (mask == 0) {
@@ -56,11 +51,9 @@ GetPageMask()
   return mask;
 }
 
-} // namespace mozilla
+}  // namespace mozilla
 
-int
-MozTaggedMemoryIsSupported(void)
-{
+int MozTaggedMemoryIsSupported(void) {
   static int supported = -1;
 
   if (supported == -1) {
@@ -71,9 +64,7 @@ MozTaggedMemoryIsSupported(void)
   return supported;
 }
 
-void
-MozTagAnonymousMemory(const void* aPtr, size_t aLength, const char* aTag)
-{
+void MozTagAnonymousMemory(const void* aPtr, size_t aLength, const char* aTag) {
   if (MozTaggedMemoryIsSupported()) {
     // The kernel will round up the end of the range to the next page
     // boundary if it's not aligned (comments indicate this behavior
@@ -89,17 +80,14 @@ MozTagAnonymousMemory(const void* aPtr, size_t aLength, const char* aTag)
   }
 }
 
-void*
-MozTaggedAnonymousMmap(void* aAddr, size_t aLength, int aProt, int aFlags,
-                       int aFd, off_t aOffset, const char* aTag)
-{
+void* MozTaggedAnonymousMmap(void* aAddr, size_t aLength, int aProt, int aFlags,
+                             int aFd, off_t aOffset, const char* aTag) {
   void* mapped = mmap(aAddr, aLength, aProt, aFlags, aFd, aOffset);
   if (MozTaggedMemoryIsSupported() &&
-      (aFlags & MAP_ANONYMOUS) == MAP_ANONYMOUS &&
-      mapped != MAP_FAILED) {
+      (aFlags & MAP_ANONYMOUS) == MAP_ANONYMOUS && mapped != MAP_FAILED) {
     mozilla::TagAnonymousMemoryAligned(mapped, aLength, aTag);
   }
   return mapped;
 }
 
-#endif // ANDROID
+#endif  // ANDROID

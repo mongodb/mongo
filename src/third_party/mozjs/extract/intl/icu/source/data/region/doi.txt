@@ -1,0 +1,18 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+doi{
+    Countries{
+        BR{"ब्राजील"}
+        CN{"चीन"}
+        DE{"जर्मनी"}
+        FR{"फ्रांस"}
+        GB{"यूनाइटेड किंगडम"}
+        IN{"भारत"}
+        IT{"इटली"}
+        JP{"जापान"}
+        RU{"रूस"}
+        US{"यूएस"}
+        ZZ{"अनजांता खेत्तर"}
+    }
+}

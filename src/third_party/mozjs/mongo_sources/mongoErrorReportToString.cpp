@@ -37,7 +37,6 @@
 #include "jsapi.h"
 #include "jsnum.h"
 #include "jstypes.h"
-#include "jsutil.h"
 
 #include "gc/FreeOp.h"
 #include "gc/Marking.h"
@@ -55,7 +54,6 @@
 #include "vm/StringType.h"
 
 #include "vm/ErrorObject-inl.h"
-#include "vm/JSObject-inl.h"
 #include "vm/SavedStacks-inl.h"
 
 #include "mongo/scripting/mozjs/mongoErrorReportToString.h"
@@ -63,9 +61,7 @@
 using namespace js;
 using namespace js::gc;
 
-JSString*
-mongoErrorReportToString(JSContext* cx, JSErrorReport* reportp)
-{
+JSString* mongoErrorReportToString(JSContext* cx, JSErrorReport* reportp) {
     /*
      * We do NOT want to use GetErrorTypeName() here because it will not do the
      * "right thing" for JSEXN_INTERNALERR.  That is, the caller of this API

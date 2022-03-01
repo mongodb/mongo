@@ -16,9 +16,8 @@ namespace filesystem {
  * Mozilla vaiant of std::filesystem::path.
  * Only |value_type| is implemented at the moment.
  */
-class Path
-{
-public:
+class Path {
+ public:
 #ifdef XP_WIN
   using value_type = char16_t;
 #else
@@ -26,7 +25,7 @@ public:
 #endif
 };
 
-}  /* namespace filesystem */
-}  /* namespace mozilla */
+} /* namespace filesystem */
+} /* namespace mozilla */
 
 #endif /* mozilla_Path_h */

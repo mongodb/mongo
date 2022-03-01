@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "irregexp/NativeRegExpMacroAssembler.cpp"
+#include "proxy/DOMProxy.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "irregexp/NativeRegExpMacroAssembler.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "proxy/DOMProxy.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "irregexp/NativeRegExpMacroAssembler.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "proxy/DOMProxy.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "irregexp/RegExpAST.cpp"
+#include "proxy/DeadObjectProxy.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "irregexp/RegExpAST.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "proxy/DeadObjectProxy.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "irregexp/RegExpAST.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "proxy/DeadObjectProxy.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "irregexp/RegExpCharacters.cpp"
+#include "proxy/OpaqueCrossCompartmentWrapper.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "irregexp/RegExpCharacters.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "proxy/OpaqueCrossCompartmentWrapper.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "irregexp/RegExpCharacters.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "proxy/OpaqueCrossCompartmentWrapper.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "irregexp/RegExpEngine.cpp"
+#include "proxy/Proxy.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "irregexp/RegExpEngine.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "proxy/Proxy.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "irregexp/RegExpEngine.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "proxy/Proxy.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "irregexp/RegExpInterpreter.cpp"
+#include "proxy/ScriptedProxyHandler.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "irregexp/RegExpInterpreter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "proxy/ScriptedProxyHandler.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "irregexp/RegExpInterpreter.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "proxy/ScriptedProxyHandler.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "irregexp/RegExpMacroAssembler.cpp"
+#include "proxy/SecurityWrapper.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "irregexp/RegExpMacroAssembler.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "proxy/SecurityWrapper.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "irregexp/RegExpMacroAssembler.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "proxy/SecurityWrapper.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

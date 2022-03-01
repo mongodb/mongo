@@ -1,0 +1,119 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_419{
+    Keys{
+        colNormalization{"orden normalizado"}
+    }
+    Languages{
+        ace{"achenés"}
+        ady{"adigeo"}
+        alt{"altái del sur"}
+        ar_001{"árabe estándar moderno"}
+        arp{"arapajó"}
+        ars{"árabe de Néyed"}
+        bla{"siksiká"}
+        de_AT{"alemán austríaco"}
+        de_CH{"alto alemán suizo"}
+        en_AU{"inglés australiano"}
+        en_CA{"inglés canadiense"}
+        en_GB{"inglés británico"}
+        en_US{"inglés estadounidense"}
+        es_419{"español latinoamericano"}
+        es_ES{"español de España"}
+        es_MX{"español de México"}
+        eu{"vasco"}
+        fa_AF{"darí"}
+        fr_CA{"francés canadiense"}
+        fr_CH{"francés suizo"}
+        goh{"alemán de la alta edad antigua"}
+        grc{"griego clásico"}
+        gu{"gujarati"}
+        ht{"haitiano"}
+        kbd{"cabardiano"}
+        krc{"karachái-bálkaro"}
+        lo{"laosiano"}
+        nl_BE{"flamenco"}
+        nr{"ndebele del sur"}
+        nso{"sesotho del norte"}
+        pa{"panyabí"}
+        prg{"prusiano antiguo"}
+        pt_BR{"portugués de Brasil"}
+        pt_PT{"portugués de Portugal"}
+        rm{"retorrománico"}
+        ro_MD{"moldavo"}
+        shu{"árabe (Chad)"}
+        sma{"sami del sur"}
+        st{"sesotho del sur"}
+        sw{"swahili"}
+        sw_CD{"swahili (Congo)"}
+        syr{"siríaco"}
+        tet{"tetun"}
+        tyv{"tuvano"}
+        wal{"walamo"}
+        wuu{"wu"}
+        xal{"calmuco"}
+        zh_Hans{"chino simplificado"}
+        zh_Hant{"chino tradicional"}
+        zun{"zuni"}
+    }
+    Languages%long{
+        zh_Hans{"chino mandarín simplificado"}
+        zh_Hant{"chino mandarín tradicional"}
+    }
+    Languages%variant{
+        ps{"pashtún"}
+        ug{"uighur"}
+    }
+    Scripts{
+        Hanb{"han con bopomofo"}
+        Hrkt{"katakana o hiragana"}
+        Laoo{"lao"}
+        Latn{"latín"}
+        Mlym{"malayalam"}
+        Olck{"ol chiki"}
+    }
+    Types{
+        calendar{
+            islamic-rgsa{"calendario islámico (Arabia Saudita)"}
+            islamic-tbla{"calendario islámico tabular"}
+        }
+        colAlternate{
+            non-ignorable{"ordenar símbolos"}
+            shifted{"ordenar ignorando símbolos"}
+        }
+        colBackwards{
+            no{"ordenar acentos normalmente"}
+            yes{"ordenar acentos con inversión"}
+        }
+        colCaseFirst{
+            lower{"ordenar empezando por minúsculas"}
+            no{"ordenar siguiendo orden normal de mayúsculas y minúsculas"}
+            upper{"ordenar empezando por mayúsculas"}
+        }
+        colCaseLevel{
+            no{"ordenar sin distinguir entre mayúsculas y minúsculas"}
+            yes{"ordenar distinguiendo entre mayúsculas y minúsculas"}
+        }
+        collation{
+            compat{"orden anterior, para compatibilidad"}
+            eor{"reglas de orden europeas"}
+            phonebook{"orden de agenda telefónica"}
+        }
+        numbers{
+            tirh{"dígitos en tirh"}
+            traditional{"números traducionales"}
+            wara{"dígitos en Warang Citi"}
+        }
+    }
+    characterLabelPattern{
+        enclosed{"{0} — Adjunto"}
+        extended{"{0} — Extendido"}
+        historic{"{0} — Histórico"}
+        miscellaneous{"{0} — Miscelánea"}
+        scripts{"Símbolos de escritura — {0}"}
+    }
+    codePatterns{
+        script{"Alfabeto: {0}"}
+    }
+}

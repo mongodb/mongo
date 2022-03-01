@@ -1,0 +1,29 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+mgo{
+    units{
+        duration{
+            day{
+                one{"{0} d"}
+                other{"{0} d"}
+            }
+            hour{
+                one{"{0} h"}
+                other{"{0} h"}
+            }
+            minute{
+                one{"{0} min"}
+                other{"{0} min"}
+            }
+            month{
+                one{"{0} m"}
+                other{"{0} m"}
+            }
+            second{
+                one{"{0} s"}
+                other{"{0} s"}
+            }
+        }
+    }
+}

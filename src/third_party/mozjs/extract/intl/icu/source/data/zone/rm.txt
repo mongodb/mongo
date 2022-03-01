@@ -1,0 +1,458 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+rm{
+    zoneStrings{
+        "Africa:Addis_Ababa"{
+            ec{"Addis Abeba"}
+        }
+        "Africa:Algiers"{
+            ec{"Algier"}
+        }
+        "Africa:Asmera"{
+            ec{"Asmara"}
+        }
+        "Africa:Dar_es_Salaam"{
+            ec{"Daressalam"}
+        }
+        "Africa:Djibouti"{
+            ec{"Dschibuti"}
+        }
+        "Africa:El_Aaiun"{
+            ec{"El Aaiún"}
+        }
+        "Africa:Khartoum"{
+            ec{"Khartum"}
+        }
+        "Africa:Lome"{
+            ec{"Lomé"}
+        }
+        "Africa:Mogadishu"{
+            ec{"Mogadischu"}
+        }
+        "Africa:Sao_Tome"{
+            ec{"São Tomé"}
+        }
+        "America:Anchorage"{
+            ec{"Alasca"}
+        }
+        "America:Anguilla"{
+            ec{"The Valley"}
+        }
+        "America:Araguaina"{
+            ec{"Araguaína"}
+        }
+        "America:Argentina:San_Juan"{
+            ec{"San Juan, Argentinia"}
+        }
+        "America:Argentina:Tucuman"{
+            ec{"Tucumán"}
+        }
+        "America:Argentina:Ushuaia"{
+            ec{"Ushuaïa"}
+        }
+        "America:Aruba"{
+            ec{"Oranjestad"}
+        }
+        "America:Asuncion"{
+            ec{"Asunción"}
+        }
+        "America:Belem"{
+            ec{"Belém"}
+        }
+        "America:Belize"{
+            ec{"Belmopan"}
+        }
+        "America:Cancun"{
+            ec{"Cancún"}
+        }
+        "America:Cayman"{
+            ec{"Inslas Cayman"}
+        }
+        "America:Cordoba"{
+            ec{"Córdoba"}
+        }
+        "America:Cuiaba"{
+            ec{"Cuiabá"}
+        }
+        "America:Curacao"{
+            ec{"Curaçao"}
+        }
+        "America:Eirunepe"{
+            ec{"Eirunepé"}
+        }
+        "America:El_Salvador"{
+            ec{"Salvador"}
+        }
+        "America:Godthab"{
+            ec{"Godthåb"}
+        }
+        "America:Grand_Turk"{
+            ec{"Cockburn Town"}
+        }
+        "America:Guadeloupe"{
+            ec{"Basse-Terre"}
+        }
+        "America:Indiana:Knox"{
+            ec{"Knox"}
+        }
+        "America:Indiana:Marengo"{
+            ec{"Marengo"}
+        }
+        "America:Indiana:Petersburg"{
+            ec{"Petersburg"}
+        }
+        "America:Indiana:Tell_City"{
+            ec{"Tell City"}
+        }
+        "America:Indiana:Vevay"{
+            ec{"Vevay"}
+        }
+        "America:Indiana:Vincennes"{
+            ec{"Vincennes"}
+        }
+        "America:Indiana:Winamac"{
+            ec{"Winamac"}
+        }
+        "America:Jamaica"{
+            ec{"Giamaica"}
+        }
+        "America:Jujuy"{
+            ec{"San Salvador de Jujuy"}
+        }
+        "America:Kentucky:Monticello"{
+            ec{"Monticello"}
+        }
+        "America:Mazatlan"{
+            ec{"Mazatlán"}
+        }
+        "America:Merida"{
+            ec{"Mérida"}
+        }
+        "America:Mexico_City"{
+            ec{"Citad da Mexico"}
+        }
+        "America:Miquelon"{
+            ec{"Saint Pierre"}
+        }
+        "America:Montserrat"{
+            ec{"Brades"}
+        }
+        "America:Noronha"{
+            ec{"Fernando de Noronha"}
+        }
+        "America:North_Dakota:Center"{
+            ec{"North Dakota (Central)"}
+        }
+        "America:North_Dakota:New_Salem"{
+            ec{"North Dakota (New Salem)"}
+        }
+        "America:Sao_Paulo"{
+            ec{"São Paulo"}
+        }
+        "America:St_Johns"{
+            ec{"Saint John’s"}
+        }
+        "America:St_Kitts"{
+            ec{"Saint Kitts"}
+        }
+        "America:St_Lucia"{
+            ec{"Santa Lucia"}
+        }
+        "America:St_Thomas"{
+            ec{"Saint Thomas"}
+        }
+        "America:St_Vincent"{
+            ec{"Saint Vincent"}
+        }
+        "America:Tortola"{
+            ec{"Road Town"}
+        }
+        "Antarctica:DumontDUrville"{
+            ec{"Dumont d’Urville"}
+        }
+        "Antarctica:McMurdo"{
+            ec{"Mac Murdo"}
+        }
+        "Antarctica:Syowa"{
+            ec{"Showa"}
+        }
+        "Asia:Aqtobe"{
+            ec{"Aqtöbe"}
+        }
+        "Asia:Ashgabat"{
+            ec{"Aşgabat"}
+        }
+        "Asia:Baghdad"{
+            ec{"Bagdad"}
+        }
+        "Asia:Bishkek"{
+            ec{"Bischkek"}
+        }
+        "Asia:Brunei"{
+            ec{"Bandar Seri Begawan"}
+        }
+        "Asia:Choibalsan"{
+            ec{"Tschoibalsan"}
+        }
+        "Asia:Dushanbe"{
+            ec{"Duschanbe"}
+        }
+        "Asia:Hong_Kong"{
+            ec{"Hongkong"}
+        }
+        "Asia:Kamchatka"{
+            ec{"Kamtschatka"}
+        }
+        "Asia:Karachi"{
+            ec{"Karatschi"}
+        }
+        "Asia:Krasnoyarsk"{
+            ec{"Krasnojarsk"}
+        }
+        "Asia:Macau"{
+            ec{"Macao"}
+        }
+        "Asia:Makassar"{
+            ec{"Macassar"}
+        }
+        "Asia:Muscat"{
+            ec{"Mascate"}
+        }
+        "Asia:Novosibirsk"{
+            ec{"Nowosibirsk"}
+        }
+        "Asia:Riyadh"{
+            ec{"Riyad"}
+        }
+        "Asia:Saigon"{
+            ec{"Citad da Ho Chi Minh"}
+        }
+        "Asia:Sakhalin"{
+            ec{"Sachalin"}
+        }
+        "Asia:Samarkand"{
+            ec{"Samarcanda"}
+        }
+        "Asia:Seoul"{
+            ec{"Seul"}
+        }
+        "Asia:Singapore"{
+            ec{"Singapur"}
+        }
+        "Asia:Tashkent"{
+            ec{"Taschkent"}
+        }
+        "Asia:Tehran"{
+            ec{"Teheran"}
+        }
+        "Asia:Tokyo"{
+            ec{"Tokio"}
+        }
+        "Asia:Urumqi"{
+            ec{"Ürümqi"}
+        }
+        "Asia:Yakutsk"{
+            ec{"Jakutsk"}
+        }
+        "Asia:Yekaterinburg"{
+            ec{"Jekaterinburg"}
+        }
+        "Asia:Yerevan"{
+            ec{"Jerevan"}
+        }
+        "Atlantic:Azores"{
+            ec{"Azoras"}
+        }
+        "Atlantic:Bermuda"{
+            ec{"Bermudas"}
+        }
+        "Atlantic:Canary"{
+            ec{"Inslas Canarias"}
+        }
+        "Atlantic:Cape_Verde"{
+            ec{"Cap Verd"}
+        }
+        "Atlantic:Faeroe"{
+            ec{"Inslas Feroe"}
+        }
+        "Atlantic:South_Georgia"{
+            ec{"Georgia dal Sid"}
+        }
+        "Atlantic:St_Helena"{
+            ec{"Sontg’elena"}
+        }
+        "Atlantic:Stanley"{
+            ec{"Port Stanley"}
+        }
+        "Etc:UTC"{
+            ls{"Temp universal coordinà"}
+        }
+        "Etc:Unknown"{
+            ec{"citad nunenconuschenta"}
+        }
+        "Europe:Athens"{
+            ec{"Athen"}
+        }
+        "Europe:Brussels"{
+            ec{"Bruxelles"}
+        }
+        "Europe:Bucharest"{
+            ec{"Bucarest"}
+        }
+        "Europe:Guernsey"{
+            ec{"Saint Peter Port"}
+        }
+        "Europe:Isle_of_Man"{
+            ec{"Douglas"}
+        }
+        "Europe:Jersey"{
+            ec{"Saint Helier"}
+        }
+        "Europe:Lisbon"{
+            ec{"Lissabon"}
+        }
+        "Europe:London"{
+            ec{"Londra"}
+        }
+        "Europe:Luxembourg"{
+            ec{"Luxemburg"}
+        }
+        "Europe:Moscow"{
+            ec{"Moscau"}
+        }
+        "Europe:Rome"{
+            ec{"Roma"}
+        }
+        "Europe:Tirane"{
+            ec{"Tirana"}
+        }
+        "Europe:Uzhgorod"{
+            ec{"Uschhorod"}
+        }
+        "Europe:Warsaw"{
+            ec{"Varsovia"}
+        }
+        "Europe:Zaporozhye"{
+            ec{"Saporischja"}
+        }
+        "Europe:Zurich"{
+            ec{"Turitg"}
+        }
+        "Indian:Christmas"{
+            ec{"Flying Fish Cove"}
+        }
+        "Indian:Cocos"{
+            ec{"West Island"}
+        }
+        "Indian:Comoro"{
+            ec{"Comoras"}
+        }
+        "Indian:Maldives"{
+            ec{"Maldivas"}
+        }
+        "Indian:Reunion"{
+            ec{"Réunion"}
+        }
+        "Pacific:Easter"{
+            ec{"Insla da Pasca"}
+        }
+        "Pacific:Fiji"{
+            ec{"Fidschi"}
+        }
+        "Pacific:Galapagos"{
+            ec{"Galápagos"}
+        }
+        "Pacific:Gambier"{
+            ec{"Rikitea"}
+        }
+        "Pacific:Guadalcanal"{
+            ec{"Honiara"}
+        }
+        "Pacific:Guam"{
+            ec{"Hagåtña"}
+        }
+        "Pacific:Kosrae"{
+            ec{"Tofol"}
+        }
+        "Pacific:Nauru"{
+            ec{"Yaren"}
+        }
+        "Pacific:Niue"{
+            ec{"Alofi"}
+        }
+        "Pacific:Norfolk"{
+            ec{"Kingston"}
+        }
+        "Pacific:Noumea"{
+            ec{"Nouméa"}
+        }
+        "Pacific:Palau"{
+            ec{"Melekok"}
+        }
+        "Pacific:Ponape"{
+            ec{"Palikir"}
+        }
+        "Pacific:Tarawa"{
+            ec{"South Tarawa"}
+        }
+        "Pacific:Tongatapu"{
+            ec{"Nukuʻalofa"}
+        }
+        "Pacific:Truk"{
+            ec{"Weno"}
+        }
+        "Pacific:Wallis"{
+            ec{"Matāʻutu"}
+        }
+        "meta:America_Central"{
+            ld{"Temp da stad central"}
+            lg{"Temp central"}
+            ls{"Temp da standard central"}
+        }
+        "meta:America_Eastern"{
+            ld{"Temp da stad oriental"}
+            lg{"Temp oriental"}
+            ls{"Temp da standard oriental"}
+        }
+        "meta:America_Mountain"{
+            ld{"Temp da stad da muntogna"}
+            lg{"Temp da muntogna"}
+            ls{"Temp da standard da muntogna"}
+        }
+        "meta:America_Pacific"{
+            ld{"Temp da stad pacific"}
+            lg{"Temp pacific"}
+            ls{"Temp da standard pacific"}
+        }
+        "meta:Atlantic"{
+            ld{"Temp da stad atlantic"}
+            lg{"Temp atlantic"}
+            ls{"Temp da standard atlantic"}
+        }
+        "meta:Europe_Central"{
+            ld{"Temp da stad da l’Europa Centrala"}
+            lg{"Temp da l’Europa Centrala"}
+            ls{"Temp da standard da l’Europa Centrala"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"Temp da stad da l’Europa Orientala"}
+            lg{"Temp da l’Europa Orientala"}
+            ls{"Temp da standard da l’Europa Orientala"}
+        }
+        "meta:Europe_Western"{
+            ld{"Temp da stad da l’Europa dal Vest"}
+            lg{"Temp da l’Europa dal Vest"}
+            ls{"Temp da standard da l’Europa dal Vest"}
+        }
+        "meta:GMT"{
+            ls{"Temp Greenwich"}
+        }
+        fallbackFormat{"{1} ({0})"}
+        gmtFormat{"GMT{0}"}
+        hourFormat{"+HH:mm;-HH:mm"}
+        regionFormat{"temp: {0}"}
+        regionFormatDaylight{"temp da stad: {0}"}
+        regionFormatStandard{"temp normal: {0}"}
+    }
+}

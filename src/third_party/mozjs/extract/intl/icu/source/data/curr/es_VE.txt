@@ -1,0 +1,25 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_VE{
+    %%Parent{"es_419"}
+    Currencies{
+        VEF{
+            "Bs.",
+            "bolívar venezolano (2008–2018)",
+        }
+        VES{
+            "Bs.S",
+            "bolívar soberano",
+        }
+    }
+    Currencies%narrow{
+        VEF{"Bs."}
+    }
+    CurrencyPlurals{
+        VES{
+            one{"bolívar soberano"}
+            other{"bolívares soberanos"}
+        }
+    }
+}

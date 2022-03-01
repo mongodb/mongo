@@ -1,0 +1,2565 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+bs{
+    durationUnits{
+        hm{"h:mm"}
+        hms{"h:mm:ss"}
+        ms{"m:ss"}
+    }
+    units{
+        acceleration{
+            g-force{
+                dnam{"G"}
+                few{"{0} G"}
+                one{"{0} G"}
+                other{"{0} G"}
+            }
+            meter-per-square-second{
+                dnam{"metri u sekundi na kvadrat"}
+                few{"{0} metra u sekundi na kvadrat"}
+                one{"{0} metar u sekundi na kvadrat"}
+                other{"{0} metara u sekundi na kvadrat"}
+            }
+        }
+        angle{
+            arc-minute{
+                dnam{"ugaone minute"}
+                few{"{0} ugaona minuta"}
+                one{"{0} ugaona minuta"}
+                other{"{0} ugaonih minuta"}
+            }
+            arc-second{
+                dnam{"ugaone sekunde"}
+                few{"{0} ugaone sekunde"}
+                one{"{0} ugaona sekunda"}
+                other{"{0} ugaonih sekundi"}
+            }
+            degree{
+                dnam{"stepeni"}
+                few{"{0} stepena"}
+                one{"{0} stepen"}
+                other{"{0} stepeni"}
+            }
+            radian{
+                dnam{"radijani"}
+                few{"{0} radijana"}
+                one{"{0} radijan"}
+                other{"{0} radijana"}
+            }
+            revolution{
+                dnam{"okret"}
+                few{"{0} okreta"}
+                one{"{0} okret"}
+                other{"{0} okreta"}
+            }
+        }
+        area{
+            acre{
+                dnam{"katastarska jutra"}
+                few{"{0} katastarska jutra"}
+                one{"{0} katastarsko jutro"}
+                other{"{0} katastarskih jutara"}
+            }
+            dunam{
+                dnam{"dunumi"}
+                few{"{0} dunuma"}
+                one{"{0} dunum"}
+                other{"{0} dunuma"}
+            }
+            hectare{
+                dnam{"hektari"}
+                few{"{0} hektara"}
+                one{"{0} hektar"}
+                other{"{0} hektara"}
+            }
+            square-centimeter{
+                dnam{"kvadratni centimetri"}
+                few{"{0} kvadratna centimetra"}
+                one{"{0} kvadratni centimetar"}
+                other{"{0} kvadratnih centimetara"}
+                per{"{0} po kvadratnom centimetru"}
+            }
+            square-foot{
+                dnam{"kvadratne stope"}
+                few{"{0} kvadratne stope"}
+                one{"{0} kvadratna stopa"}
+                other{"{0} kvadratnih stopa"}
+            }
+            square-inch{
+                dnam{"kvadratni inči"}
+                few{"{0} kvadratna inča"}
+                one{"{0} kvadratni inč"}
+                other{"{0} kvadratnih inča"}
+                per{"{0} po kvadratnom inču"}
+            }
+            square-kilometer{
+                dnam{"kvadratni kilometri"}
+                few{"{0} kvadratna kilometra"}
+                one{"{0} kvadratni kilometar"}
+                other{"{0} kvadratnih kilometara"}
+                per{"{0} po kvadratnom kilometru"}
+            }
+            square-meter{
+                dnam{"kvadratni metri"}
+                few{"{0} kvadratna metra"}
+                one{"{0} kvadratni metar"}
+                other{"{0} kvadratnih metara"}
+                per{"{0} po kvadratnom metru"}
+            }
+            square-mile{
+                dnam{"kvadratne milje"}
+                few{"{0} kvadratne milje"}
+                one{"{0} kvadratna milja"}
+                other{"{0} kvadratnih milja"}
+                per{"{0} po kvadratnoj milji"}
+            }
+            square-yard{
+                dnam{"kvadratni jardi"}
+                few{"{0} kvadratna jarda"}
+                one{"{0} kvadratni jard"}
+                other{"{0} kvadratnih jarda"}
+            }
+        }
+        compound{
+            1024p1{"kibi{0}"}
+            1024p2{"mebi{0}"}
+            1024p3{"gibi{0}"}
+            1024p4{"tebi{0}"}
+            1024p5{"pebi{0}"}
+            1024p6{"exbi{0}"}
+            1024p7{"zebi{0}"}
+            1024p8{"yobe{0}"}
+            per{"{0}/{1}"}
+            power2{
+                few{
+                    _{
+                        _{"kvadratna {0}"}
+                    }
+                }
+                one{
+                    _{
+                        _{"kvadratni {0}"}
+                    }
+                }
+                other{
+                    _{
+                        _{"kvadratnih {0}"}
+                    }
+                }
+            }
+            power3{
+                few{
+                    _{
+                        _{"kubna {0}"}
+                    }
+                }
+                one{
+                    _{
+                        _{"kubni {0}"}
+                    }
+                }
+                other{
+                    _{
+                        _{"kubnih {0}"}
+                    }
+                }
+            }
+        }
+        concentr{
+            karat{
+                dnam{"karati"}
+                few{"{0} karata"}
+                one{"{0} karat"}
+                other{"{0} karata"}
+            }
+            milligram-ofglucose-per-deciliter{
+                dnam{"miligrami po decilitru"}
+                few{"{0} miligrama po decilitru"}
+                one{"{0} miligram po decilitru"}
+                other{"{0} miligrama po decilitru"}
+            }
+            millimole-per-liter{
+                dnam{"milimoli po litru"}
+                few{"{0} milimola po litru"}
+                one{"{0} milimol po litru"}
+                other{"{0} milimola po litru"}
+            }
+            mole{
+                dnam{"moli"}
+                few{"{0} mola"}
+                one{"{0} mol"}
+                other{"{0} mola"}
+            }
+            percent{
+                dnam{"procenat"}
+                few{"{0} procenta"}
+                one{"{0} procenat"}
+                other{"{0} procenata"}
+            }
+            permille{
+                dnam{"promil"}
+                few{"{0} promila"}
+                one{"{0} promil"}
+                other{"{0} promila"}
+            }
+            permillion{
+                dnam{"dijelovi na milion"}
+                few{"{0} dijela na milion"}
+                one{"{0} dio na milion"}
+                other{"{0} dijelova na milion"}
+            }
+            permyriad{
+                dnam{"permyriad"}
+                few{"{0} permyriada"}
+                one{"{0} permyriad"}
+                other{"{0} permyriada"}
+            }
+        }
+        consumption{
+            liter-per-100-kilometer{
+                dnam{"litri na 100 kilometara"}
+                few{"{0} litra na 100 kilometara"}
+                one{"{0} litar na 100 kilometara"}
+                other{"{0} litara na 100 kilometara"}
+            }
+            liter-per-kilometer{
+                dnam{"litri po kilometru"}
+                few{"{0} litra po kilometru"}
+                one{"{0} litar po kilometru"}
+                other{"{0} litara po kilometru"}
+            }
+            mile-per-gallon{
+                dnam{"milje po galonu"}
+                few{"{0} milje po galonu"}
+                one{"{0} milja po galonu"}
+                other{"{0} milja po galonu"}
+            }
+            mile-per-gallon-imperial{
+                dnam{"milje po brit. galonu"}
+                few{"{0} milje po brit. galonu"}
+                one{"{0} milja po brit. galonu"}
+                other{"{0} milja po brit. galonu"}
+            }
+        }
+        coordinate{
+            dnam{"glavni pravac"}
+            east{"{0} istok"}
+            north{"{0} sjever"}
+            south{"{0} jug"}
+            west{"{0} zapad"}
+        }
+        digital{
+            bit{
+                dnam{"biti"}
+                few{"{0} bita"}
+                one{"{0} bit"}
+                other{"{0} bita"}
+            }
+            byte{
+                dnam{"bajtovi"}
+                few{"{0} bajta"}
+                one{"{0} bajt"}
+                other{"{0} bajtova"}
+            }
+            gigabit{
+                dnam{"gigabiti"}
+                few{"{0} gigabita"}
+                one{"{0} gigabit"}
+                other{"{0} gigabita"}
+            }
+            gigabyte{
+                dnam{"gigabajti"}
+                few{"{0} gigabajta"}
+                one{"{0} gigabajt"}
+                other{"{0} gigabajta"}
+            }
+            kilobit{
+                dnam{"kilobiti"}
+                few{"{0} kilobita"}
+                one{"{0} kilobit"}
+                other{"{0} kilobita"}
+            }
+            kilobyte{
+                dnam{"kilobajti"}
+                few{"{0} kilobajta"}
+                one{"{0} kilobajt"}
+                other{"{0} kilobajta"}
+            }
+            megabit{
+                dnam{"megabiti"}
+                few{"{0} megabita"}
+                one{"{0} megabit"}
+                other{"{0} megabita"}
+            }
+            megabyte{
+                dnam{"megabajti"}
+                few{"{0} megabajta"}
+                one{"{0} megabajt"}
+                other{"{0} megabajta"}
+            }
+            petabyte{
+                dnam{"petabajti"}
+                few{"{0} petabajta"}
+                one{"{0} petabajt"}
+                other{"{0} petabajta"}
+            }
+            terabit{
+                dnam{"terabiti"}
+                few{"{0} terabita"}
+                one{"{0} terabit"}
+                other{"{0} terabita"}
+            }
+            terabyte{
+                dnam{"terabajti"}
+                few{"{0} terabajta"}
+                one{"{0} terabajt"}
+                other{"{0} terabajta"}
+            }
+        }
+        duration{
+            century{
+                dnam{"stoljeća"}
+                few{"{0} stoljeća"}
+                one{"{0} stoljeće"}
+                other{"{0} stoljeća"}
+            }
+            day{
+                dnam{"dani"}
+                few{"{0} dana"}
+                one{"{0} dan"}
+                other{"{0} dana"}
+                per{"{0} dnevno"}
+            }
+            decade{
+                dnam{"decenije"}
+                few{"{0} decenije"}
+                one{"{0} decenija"}
+                other{"{0} decenija"}
+            }
+            hour{
+                dnam{"sati"}
+                few{"{0} sata"}
+                one{"{0} sat"}
+                other{"{0} sati"}
+                per{"{0} na sat"}
+            }
+            microsecond{
+                dnam{"mikrosekunde"}
+                few{"{0} mikrosekunde"}
+                one{"{0} mikrosekunda"}
+                other{"{0} mikrosekundi"}
+            }
+            millisecond{
+                dnam{"milisekunde"}
+                few{"{0} milisekunde"}
+                one{"{0} milisekunda"}
+                other{"{0} milisekundi"}
+            }
+            minute{
+                dnam{"minute"}
+                few{"{0} minute"}
+                one{"{0} minuta"}
+                other{"{0} minuta"}
+                per{"{0} po minuti"}
+            }
+            month{
+                dnam{"mjeseci"}
+                few{"{0} mjeseca"}
+                one{"{0} mjesec"}
+                other{"{0} mjeseci"}
+                per{"{0} mjesečno"}
+            }
+            nanosecond{
+                dnam{"nanosekunde"}
+                few{"{0} nanosekunde"}
+                one{"{0} nanosekunda"}
+                other{"{0} nanosekundi"}
+            }
+            second{
+                dnam{"sekunde"}
+                few{"{0} sekunde"}
+                one{"{0} sekunda"}
+                other{"{0} sekundi"}
+                per{"{0} po sekundi"}
+            }
+            week{
+                dnam{"sedmice"}
+                few{"{0} sedmice"}
+                one{"{0} sedmica"}
+                other{"{0} sedmica"}
+                per{"{0} sedmično"}
+            }
+            year{
+                dnam{"godine"}
+                few{"{0} godine"}
+                one{"{0} godina"}
+                other{"{0} godina"}
+                per{"{0} godišnje"}
+            }
+        }
+        electric{
+            ampere{
+                dnam{"amperi"}
+                few{"{0} ampera"}
+                one{"{0} amper"}
+                other{"{0} ampera"}
+            }
+            milliampere{
+                dnam{"miliamperi"}
+                few{"{0} miliampera"}
+                one{"{0} miliamper"}
+                other{"{0} miliampera"}
+            }
+            ohm{
+                dnam{"omi"}
+                few{"{0} oma"}
+                one{"{0} om"}
+                other{"{0} oma"}
+            }
+            volt{
+                dnam{"volti"}
+                few{"{0} volta"}
+                one{"{0} volt"}
+                other{"{0} volti"}
+            }
+        }
+        energy{
+            british-thermal-unit{
+                dnam{"britanske termalne jedinice"}
+                few{"{0} britanske termalne jedinice"}
+                one{"{0} britanska termalna jedinica"}
+                other{"{0} britanskih termalnih jedinica"}
+            }
+            calorie{
+                dnam{"kalorije"}
+                few{"{0} kalorije"}
+                one{"{0} kalorija"}
+                other{"{0} kalorija"}
+            }
+            electronvolt{
+                dnam{"elektron volti"}
+                few{"{0} elektron volta"}
+                one{"{0} elektron volt"}
+                other{"{0} elektron volti"}
+            }
+            foodcalorie{
+                dnam{"kalorije"}
+                few{"{0} kalorije"}
+                one{"{0} kalorija"}
+                other{"{0} kalorija"}
+            }
+            joule{
+                dnam{"džuli"}
+                few{"{0} džula"}
+                one{"{0} džul"}
+                other{"{0} džula"}
+            }
+            kilocalorie{
+                dnam{"kilokalorije"}
+                few{"{0} kilokalorije"}
+                one{"{0} kilokalorija"}
+                other{"{0} kilokalorija"}
+            }
+            kilojoule{
+                dnam{"kilodžuli"}
+                few{"{0} kilodžula"}
+                one{"{0} kilodžul"}
+                other{"{0} kilodžula"}
+            }
+            kilowatt-hour{
+                dnam{"kilovat-sat"}
+                few{"{0} kilovat-sata"}
+                one{"{0} kilovat-sat"}
+                other{"{0} kilovat-sati"}
+            }
+        }
+        force{
+            newton{
+                dnam{"njutni"}
+                few{"{0} njutna"}
+                one{"{0} njutn"}
+                other{"{0} njutna"}
+            }
+            pound-force{
+                dnam{"funte sile"}
+                few{"{0} funte sile"}
+                one{"{0} funta sile"}
+                other{"{0} funti sile"}
+            }
+        }
+        frequency{
+            gigahertz{
+                dnam{"gigaherci"}
+                few{"{0} gigaherca"}
+                one{"{0} gigaherc"}
+                other{"{0} gigaherca"}
+            }
+            hertz{
+                dnam{"herci"}
+                few{"{0} herca"}
+                one{"{0} herc"}
+                other{"{0} herca"}
+            }
+            kilohertz{
+                dnam{"kiloherci"}
+                few{"{0} kiloherca"}
+                one{"{0} kiloherc"}
+                other{"{0} kiloherca"}
+            }
+            megahertz{
+                dnam{"megaherci"}
+                few{"{0} megaherca"}
+                one{"{0} megaherc"}
+                other{"{0} megaherca"}
+            }
+        }
+        graphics{
+            dot{
+                dnam{"tačka"}
+                few{"{0} tačke"}
+                one{"{0} tačka"}
+                other{"{0} tačaka"}
+            }
+            megapixel{
+                dnam{"megapikseli"}
+            }
+            pixel{
+                dnam{"pikseli"}
+            }
+        }
+        length{
+            astronomical-unit{
+                dnam{"astronomske jedinice"}
+                few{"{0} astronomske jedinice"}
+                one{"{0} astronomska jedinica"}
+                other{"{0} astronomskih jedinica"}
+            }
+            centimeter{
+                dnam{"centimetri"}
+                few{"{0} centimetra"}
+                one{"{0} centimetar"}
+                other{"{0} centimetara"}
+                per{"{0} po centimetru"}
+            }
+            decimeter{
+                dnam{"decimetri"}
+                few{"{0} decimetra"}
+                one{"{0} decimetar"}
+                other{"{0} decimetara"}
+            }
+            earth-radius{
+                dnam{"radijus zemlje"}
+                few{"{0} radijusa zemlje"}
+                one{"{0} radijus zemlje"}
+                other{"{0} radijus zemlje"}
+            }
+            fathom{
+                dnam{"hvat"}
+                few{"{0} hvata"}
+                one{"{0} hvat"}
+                other{"{0} hvata"}
+            }
+            foot{
+                dnam{"stope"}
+                few{"{0} stope"}
+                one{"{0} stopa"}
+                other{"{0} stopa"}
+                per{"{0} po stopi"}
+            }
+            furlong{
+                dnam{"osmina milje"}
+                few{"{0} osmine milje"}
+                one{"{0} osmina milje"}
+                other{"{0} osmina milje"}
+            }
+            inch{
+                dnam{"inči"}
+                few{"{0} inča"}
+                one{"{0} inč"}
+                other{"{0} inča"}
+                per{"{0} po inču"}
+            }
+            kilometer{
+                dnam{"kilometri"}
+                few{"{0} kilometra"}
+                one{"{0} kilometar"}
+                other{"{0} kilometara"}
+                per{"{0} po kilometru"}
+            }
+            light-year{
+                dnam{"svjetlosne godine"}
+                few{"{0} svjetlosne godine"}
+                one{"{0} svjetlosna godina"}
+                other{"{0} svjetlosnih godina"}
+            }
+            meter{
+                dnam{"metri"}
+                few{"{0} metra"}
+                one{"{0} metar"}
+                other{"{0} metara"}
+                per{"{0} po metru"}
+            }
+            micrometer{
+                dnam{"mikrometri"}
+                few{"{0} mikrometra"}
+                one{"{0} mikrometar"}
+                other{"{0} mikrometara"}
+            }
+            mile{
+                dnam{"milje"}
+                few{"{0} milje"}
+                one{"{0} milja"}
+                other{"{0} milja"}
+            }
+            mile-scandinavian{
+                dnam{"skandinavske milje"}
+                few{"{0} skandinavske milje"}
+                one{"{0} skandinavska milja"}
+                other{"{0} skandinavskih milja"}
+            }
+            millimeter{
+                dnam{"milimetri"}
+                few{"{0} milimetra"}
+                one{"{0} milimetar"}
+                other{"{0} milimetara"}
+            }
+            nanometer{
+                dnam{"nanometri"}
+                few{"{0} nanometra"}
+                one{"{0} nanometar"}
+                other{"{0} nanometara"}
+            }
+            nautical-mile{
+                dnam{"nautičke milje"}
+                few{"{0} nautičke milje"}
+                one{"{0} nautička milja"}
+                other{"{0} nautičkih milja"}
+            }
+            parsec{
+                dnam{"parseci"}
+                few{"{0} parseka"}
+                one{"{0} parsek"}
+                other{"{0} parseka"}
+            }
+            picometer{
+                dnam{"pikometri"}
+                few{"{0} pikometra"}
+                one{"{0} pikometar"}
+                other{"{0} pikometara"}
+            }
+            point{
+                dnam{"DTP tačke"}
+                few{"{0} DTP tačke"}
+                one{"{0} DTP tačka"}
+                other{"{0} DTP tačaka"}
+            }
+            solar-radius{
+                dnam{"Sunčevi radijusi"}
+                few{"{0} Sunčeva radijusa"}
+                one{"{0} Sunčev radijus"}
+                other{"{0} Sunčevih radijusa"}
+            }
+            yard{
+                dnam{"jardi"}
+                few{"{0} jarda"}
+                one{"{0} jard"}
+                other{"{0} jardi"}
+            }
+        }
+        light{
+            candela{
+                dnam{"kandela"}
+                few{"{0} kandele"}
+                one{"{0} kandela"}
+                other{"{0} kandela"}
+            }
+            lumen{
+                dnam{"lumen"}
+                few{"{0} lumena"}
+                one{"{0} lumen"}
+                other{"{0} lumena"}
+            }
+            lux{
+                dnam{"luksi"}
+                few{"{0} luksa"}
+                one{"{0} luks"}
+                other{"{0} luksa"}
+            }
+            solar-luminosity{
+                dnam{"Sunčeva zračenja"}
+                few{"{0} Sunčeva zračenja"}
+                one{"{0} Sunčevo zračenje"}
+                other{"{0} Sunčevih zračenja"}
+            }
+        }
+        mass{
+            carat{
+                dnam{"karati"}
+                few{"{0} karata"}
+                one{"{0} karat"}
+                other{"{0} karata"}
+            }
+            dalton{
+                dnam{"daltoni"}
+                few{"{0} daltona"}
+                one{"{0} dalton"}
+                other{"{0} daltona"}
+            }
+            earth-mass{
+                dnam{"Zemljine mase"}
+                few{"{0} Zemljine mase"}
+                one{"{0} Zemljina masa"}
+                other{"{0} Zemljinih masa"}
+            }
+            gram{
+                dnam{"grami"}
+                few{"{0} grama"}
+                one{"{0} gram"}
+                other{"{0} grama"}
+                per{"{0} po gramu"}
+            }
+            kilogram{
+                dnam{"kilogrami"}
+                few{"{0} kilograma"}
+                one{"{0} kilogram"}
+                other{"{0} kilograma"}
+                per{"{0} po kilogramu"}
+            }
+            metric-ton{
+                dnam{"metričke tone"}
+                few{"{0} metričke tone"}
+                one{"{0} metrička tona"}
+                other{"{0} metričkih tona"}
+            }
+            microgram{
+                dnam{"mikrogrami"}
+                few{"{0} mikrograma"}
+                one{"{0} mikrogram"}
+                other{"{0} mikrograma"}
+            }
+            milligram{
+                dnam{"miligrami"}
+                few{"{0} miligrama"}
+                one{"{0} miligram"}
+                other{"{0} miligrama"}
+            }
+            ounce{
+                dnam{"unce"}
+                few{"{0} unce"}
+                one{"{0} unca"}
+                other{"{0} unci"}
+                per{"{0} po unci"}
+            }
+            ounce-troy{
+                dnam{"fine unce"}
+                few{"{0} fine unce"}
+                one{"{0} fina unca"}
+                other{"{0} finih unci"}
+            }
+            pound{
+                dnam{"funte"}
+                few{"{0} funte"}
+                one{"{0} funta"}
+                other{"{0} funti"}
+                per{"{0} po funti"}
+            }
+            solar-mass{
+                dnam{"Sunčeve mase"}
+                few{"{0} Sunčeve mase"}
+                one{"{0} Sunčeva masa"}
+                other{"{0} Sunčevih masa"}
+            }
+            stone{
+                dnam{"stone"}
+                few{"{0} stone"}
+                one{"{0} stone"}
+                other{"{0} stone"}
+            }
+            ton{
+                dnam{"tone"}
+                few{"{0} tone"}
+                one{"{0} tona"}
+                other{"{0} tona"}
+            }
+        }
+        power{
+            gigawatt{
+                dnam{"gigavati"}
+                few{"{0} gigavata"}
+                one{"{0} gigavat"}
+                other{"{0} gigavata"}
+            }
+            horsepower{
+                dnam{"konjske snage"}
+                few{"{0} konjske snage"}
+                one{"{0} konjska snaga"}
+                other{"{0} konjskih snaga"}
+            }
+            kilowatt{
+                dnam{"kilovati"}
+                few{"{0} kilovata"}
+                one{"{0} kilovat"}
+                other{"{0} kilovata"}
+            }
+            megawatt{
+                dnam{"megavati"}
+                few{"{0} megavata"}
+                one{"{0} megavat"}
+                other{"{0} megavata"}
+            }
+            milliwatt{
+                dnam{"milivati"}
+                few{"{0} milivata"}
+                one{"{0} milivat"}
+                other{"{0} milivata"}
+            }
+            watt{
+                dnam{"vati"}
+                few{"{0} vata"}
+                one{"{0} vat"}
+                other{"{0} vati"}
+            }
+        }
+        pressure{
+            atmosphere{
+                dnam{"atmosfere"}
+                few{"{0} atmosfere"}
+                one{"{0} atmosfera"}
+                other{"{0} atmosfera"}
+            }
+            bar{
+                few{"{0} bara"}
+                one{"{0} bar"}
+                other{"{0} bara"}
+            }
+            hectopascal{
+                dnam{"hektopaskali"}
+                few{"{0} hektopaskala"}
+                one{"{0} hektopaskal"}
+                other{"{0} hektopaskala"}
+            }
+            inch-ofhg{
+                dnam{"inči živinog stuba"}
+                few{"{0} inča živinog stuba"}
+                one{"{0} inč živinog stuba"}
+                other{"{0} inča živinog stuba"}
+            }
+            kilopascal{
+                dnam{"kilopaskali"}
+                few{"{0} kilopaskala"}
+                one{"{0} kilopaskal"}
+                other{"{0} kilopaskala"}
+            }
+            megapascal{
+                dnam{"megapaskali"}
+                few{"{0} megapaskala"}
+                one{"{0} megapaskal"}
+                other{"{0} megapaskala"}
+            }
+            millibar{
+                dnam{"milibari"}
+                few{"{0} milibara"}
+                one{"{0} milibar"}
+                other{"{0} milibara"}
+            }
+            millimeter-ofhg{
+                dnam{"milimetri živinog stuba"}
+                few{"{0} milimetra živinog stuba"}
+                one{"{0} milimetar živinog stuba"}
+                other{"{0} milimetara živinog stuba"}
+            }
+            pascal{
+                dnam{"paskali"}
+                few{"{0} paskala"}
+                one{"{0} paskal"}
+                other{"{0} paskala"}
+            }
+            pound-force-per-square-inch{
+                dnam{"funte po kvadratnom inču"}
+                few{"{0} funte po kvadratnom inču"}
+                one{"{0} funta po kvadratnom inču"}
+                other{"{0} funti po kvadratnom inču"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                dnam{"kilometri na sat"}
+                few{"{0} kilometra na sat"}
+                one{"{0} kilometar na sat"}
+                other{"{0} kilometara na sat"}
+            }
+            knot{
+                dnam{"čvorovi"}
+                few{"{0} čvora"}
+                one{"{0} čvor"}
+                other{"{0} čvorova"}
+            }
+            meter-per-second{
+                dnam{"metri u sekundi"}
+                few{"{0} metra u sekundi"}
+                one{"{0} metar u sekundi"}
+                other{"{0} metara u sekundi"}
+            }
+            mile-per-hour{
+                dnam{"milje na sat"}
+                few{"{0} milje na sat"}
+                one{"{0} milja na sat"}
+                other{"{0} milja na sat"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"stepeni Celzijusa"}
+                few{"{0} stepena Celzijusa"}
+                one{"{0} stepen Celzijusa"}
+                other{"{0} stepeni Celzijusa"}
+            }
+            fahrenheit{
+                dnam{"stepeni Farenhajta"}
+                few{"{0} stepena Farenhajta"}
+                one{"{0} stepen Farenhajta"}
+                other{"{0} stepeni Farenhajta"}
+            }
+            generic{
+                dnam{"°"}
+                few{"{0}°"}
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+            kelvin{
+                dnam{"kelvini"}
+                few{"{0} kelvina"}
+                one{"{0} kelvin"}
+                other{"{0} kelvina"}
+            }
+        }
+        torque{
+            newton-meter{
+                dnam{"njutn-metri"}
+                few{"{0} njutn-metra"}
+                one{"{0} njutn-metar"}
+                other{"{0} njutn-metara"}
+            }
+            pound-force-foot{
+                dnam{"funte sile po stopi"}
+                few{"{0} funte sile po stopi"}
+                one{"{0} funta sile po stopi"}
+                other{"{0} funti sile po stopi"}
+            }
+        }
+        volume{
+            acre-foot{
+                dnam{"jutar-stope"}
+                few{"{0} jutar-stope"}
+                one{"{0} jutar-stopa"}
+                other{"{0} jutar-stopa"}
+            }
+            barrel{
+                dnam{"bareli"}
+                few{"{0} barela"}
+                one{"{0} barel"}
+                other{"{0} barela"}
+            }
+            bushel{
+                dnam{"bušeli"}
+                few{"{0} bušela"}
+                one{"{0} bušel"}
+                other{"{0} bušela"}
+            }
+            centiliter{
+                dnam{"centilitri"}
+                few{"{0} centilitra"}
+                one{"{0} centilitar"}
+                other{"{0} centilitara"}
+            }
+            cubic-centimeter{
+                dnam{"kubni centimetri"}
+                few{"{0} kubna centimetra"}
+                one{"{0} kubni centimetar"}
+                other{"{0} kubnih centimetara"}
+                per{"{0} po kubnom centimetru"}
+            }
+            cubic-foot{
+                dnam{"kubne stope"}
+                few{"{0} kubne stope"}
+                one{"{0} kubna stopa"}
+                other{"{0} kubnih stopa"}
+            }
+            cubic-inch{
+                dnam{"kubni inči"}
+                few{"{0} kubna inča"}
+                one{"{0} kubni inč"}
+                other{"{0} kubnih inča"}
+            }
+            cubic-kilometer{
+                dnam{"kubni kilometri"}
+                few{"{0} kubna kilometra"}
+                one{"{0} kubni kilometar"}
+                other{"{0} kubnih kilometara"}
+            }
+            cubic-meter{
+                dnam{"kubni metri"}
+                few{"{0} kubna metra"}
+                one{"{0} kubni metar"}
+                other{"{0} kubnih metara"}
+                per{"{0} po kubnom metru"}
+            }
+            cubic-mile{
+                dnam{"kubne milje"}
+                few{"{0} kubne milje"}
+                one{"{0} kubna milja"}
+                other{"{0} kubnih milja"}
+            }
+            cubic-yard{
+                dnam{"kubni jardi"}
+                few{"{0} kubna jarda"}
+                one{"{0} kubni jard"}
+                other{"{0} kubnih jarda"}
+            }
+            cup{
+                dnam{"šolje"}
+                few{"{0} šolje"}
+                one{"{0} šolja"}
+                other{"{0} šolja"}
+            }
+            cup-metric{
+                dnam{"metričke šolje"}
+                few{"{0} metričke šolje"}
+                one{"{0} metrička šolja"}
+                other{"{0} metričkih šolja"}
+            }
+            deciliter{
+                dnam{"decilitri"}
+                few{"{0} decilitra"}
+                one{"{0} decilitar"}
+                other{"{0} decilitara"}
+            }
+            dessert-spoon{
+                dnam{"kašika za desert"}
+                few{"{0} kašike za desert"}
+                one{"{0} kašika za desert"}
+                other{"{0} kašika za desert"}
+            }
+            dessert-spoon-imperial{
+                dnam{"imperijalna kašika za desert"}
+                few{"{0} imperijalne kašike za desert"}
+                one{"{0} imperijalna kašika za desert"}
+                other{"{0} imperijalnih kašika za desert"}
+            }
+            dram{
+                dnam{"tečni dram"}
+                few{"{0} tečna drama"}
+                one{"{0} tečni dram"}
+                other{"{0} tečnih drama"}
+            }
+            drop{
+                dnam{"kap"}
+                few{"{0} kapi"}
+                one{"{0} kap"}
+                other{"{0} kapi"}
+            }
+            fluid-ounce{
+                dnam{"tečne unce"}
+                few{"{0} tečne unce"}
+                one{"{0} tečna unca"}
+                other{"{0} tečnih unci"}
+            }
+            fluid-ounce-imperial{
+                dnam{"imp. tekuće unce"}
+                few{"{0} imp. tekuće unce"}
+                one{"{0} imp. tekuća unca"}
+                other{"{0} imp. tekućih unci"}
+            }
+            gallon{
+                dnam{"galoni"}
+                few{"{0} galona"}
+                one{"{0} galon"}
+                other{"{0} galona"}
+                per{"{0} po galonu"}
+            }
+            gallon-imperial{
+                dnam{"Brit. galoni"}
+                few{"{0} brit. galona"}
+                one{"{0} brit. galon"}
+                other{"{0} brit. galona"}
+                per{"{0} po brit. galonu"}
+            }
+            hectoliter{
+                dnam{"hektolitri"}
+                few{"{0} hektolitra"}
+                one{"{0} hektolitar"}
+                other{"{0} hektolitara"}
+            }
+            jigger{
+                dnam{"mala čašica"}
+                few{"{0} male čašice"}
+                one{"{0} mala čašica"}
+                other{"{0} malih čašica"}
+            }
+            liter{
+                dnam{"litri"}
+                few{"{0} litra"}
+                one{"{0} litar"}
+                other{"{0} litara"}
+                per{"{0} po litru"}
+            }
+            megaliter{
+                dnam{"megalitri"}
+                few{"{0} megalitra"}
+                one{"{0} megalitar"}
+                other{"{0} megalitara"}
+            }
+            milliliter{
+                dnam{"mililitri"}
+                few{"{0} mililitra"}
+                one{"{0} mililitar"}
+                other{"{0} mililitara"}
+            }
+            pinch{
+                dnam{"prstohvat"}
+                few{"{0} prstohvata"}
+                one{"{0} prstohvat"}
+                other{"{0} prstohvata"}
+            }
+            pint{
+                dnam{"pinte"}
+                few{"{0} pinte"}
+                one{"{0} pinta"}
+                other{"{0} pinti"}
+            }
+            pint-metric{
+                dnam{"metričke pinte"}
+                few{"{0} metričke pinte"}
+                one{"{0} metrička pinta"}
+                other{"{0} metričkih pinti"}
+            }
+            quart{
+                dnam{"četvrtine"}
+                few{"{0} četvrtine"}
+                one{"{0} četvrtina"}
+                other{"{0} četvrtina"}
+            }
+            quart-imperial{
+                dnam{"imperijalni kvarc"}
+                few{"{0} imperijalna kvarca"}
+                one{"{0} imperijalni kvarc"}
+                other{"{0} imperijalnih kvarca"}
+            }
+            tablespoon{
+                dnam{"kašike"}
+                few{"{0} kašike"}
+                one{"{0} kašika"}
+                other{"{0} kašika"}
+            }
+            teaspoon{
+                dnam{"kašičice"}
+                few{"{0} kašičice"}
+                one{"{0} kašičica"}
+                other{"{0} kašičica"}
+            }
+        }
+    }
+    unitsNarrow{
+        acceleration{
+            g-force{
+                few{"{0} G"}
+                one{"{0} G"}
+                other{"{0} G"}
+            }
+        }
+        angle{
+            arc-minute{
+                few{"{0}′"}
+                one{"{0}′"}
+                other{"{0}′"}
+            }
+            arc-second{
+                few{"{0}″"}
+                one{"{0}″"}
+                other{"{0}″"}
+            }
+            degree{
+                few{"{0}°"}
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+        }
+        area{
+            acre{
+                few{"{0} kj"}
+                one{"{0} kj"}
+                other{"{0} kj"}
+            }
+            hectare{
+                few{"{0} ha"}
+                one{"{0} ha"}
+                other{"{0} ha"}
+            }
+            square-foot{
+                few{"{0} ft²"}
+                one{"{0} ft²"}
+                other{"{0} ft²"}
+            }
+            square-kilometer{
+                few{"{0} km²"}
+                one{"{0} km²"}
+                other{"{0} km²"}
+            }
+            square-meter{
+                few{"{0} m²"}
+                one{"{0} m²"}
+                other{"{0} m²"}
+            }
+            square-mile{
+                few{"{0} mi²"}
+                one{"{0} mi²"}
+                other{"{0} mi²"}
+            }
+        }
+        compound{
+            per{"{0}/{1}"}
+        }
+        concentr{
+            percent{
+                dnam{"%"}
+                few{"{0}%"}
+                one{"{0}%"}
+                other{"{0}%"}
+            }
+        }
+        consumption{
+            liter-per-100-kilometer{
+                dnam{"L/100 km"}
+                few{"{0} L/100 km"}
+                one{"{0} L/100 km"}
+                other{"{0} L/100 km"}
+            }
+        }
+        coordinate{
+            dnam{"pravac"}
+            east{"{0}I"}
+            north{"{0}S"}
+            south{"{0}J"}
+            west{"{0}Z"}
+        }
+        duration{
+            day{
+                dnam{"dan"}
+                few{"{0} d."}
+                one{"{0} d."}
+                other{"{0} d."}
+            }
+            hour{
+                dnam{"sat"}
+                few{"{0} h"}
+                one{"{0} h"}
+                other{"{0} h"}
+            }
+            millisecond{
+                dnam{"milisekunda"}
+                few{"{0} ms"}
+                one{"{0} ms"}
+                other{"{0} ms"}
+            }
+            minute{
+                dnam{"minuta"}
+                few{"{0} m"}
+                one{"{0} m"}
+                other{"{0} m"}
+            }
+            month{
+                dnam{"mjesec"}
+                few{"{0} mj."}
+                one{"{0} mj."}
+                other{"{0} mj."}
+            }
+            second{
+                dnam{"sekunda"}
+                few{"{0} s"}
+                one{"{0} s"}
+                other{"{0} s"}
+            }
+            week{
+                dnam{"sedm."}
+                few{"{0} sedm."}
+                one{"{0} sedm."}
+                other{"{0} sedm."}
+            }
+            year{
+                dnam{"god."}
+                few{"{0} god."}
+                one{"{0} god."}
+                other{"{0} god."}
+            }
+        }
+        length{
+            centimeter{
+                dnam{"cm"}
+                few{"{0} cm"}
+                one{"{0} cm"}
+                other{"{0} cm"}
+            }
+            kilometer{
+                dnam{"km"}
+                few{"{0} km"}
+                one{"{0} km"}
+                other{"{0} km"}
+            }
+            meter{
+                dnam{"metar"}
+                few{"{0} m"}
+                one{"{0} m"}
+                other{"{0} m"}
+            }
+            mile{
+                few{"{0} mi"}
+                one{"{0} mi"}
+                other{"{0} mi"}
+            }
+            millimeter{
+                dnam{"mm"}
+                few{"{0} mm"}
+                one{"{0} mm"}
+                other{"{0} mm"}
+            }
+            picometer{
+                few{"{0} pm"}
+                one{"{0} pm"}
+                other{"{0} pm"}
+            }
+            yard{
+                few{"{0} yd"}
+                one{"{0} yd"}
+                other{"{0} yd"}
+            }
+        }
+        mass{
+            gram{
+                dnam{"gram"}
+                few{"{0} g"}
+                one{"{0} g"}
+                other{"{0} g"}
+            }
+            kilogram{
+                dnam{"kg"}
+                few{"{0} kg"}
+                one{"{0} kg"}
+                other{"{0} kg"}
+            }
+            ounce{
+                few{"{0} oz"}
+                one{"{0} oz"}
+                other{"{0} oz"}
+            }
+            pound{
+                few{"{0} lb"}
+                one{"{0} lb"}
+                other{"{0} lb"}
+            }
+        }
+        power{
+            kilowatt{
+                few{"{0} kW"}
+                one{"{0} kW"}
+                other{"{0} kW"}
+            }
+            watt{
+                few{"{0} W"}
+                one{"{0} W"}
+                other{"{0} W"}
+            }
+        }
+        pressure{
+            hectopascal{
+                few{"{0} hPa"}
+                one{"{0} hPa"}
+                other{"{0} hPa"}
+            }
+            inch-ofhg{
+                few{"{0} inHg"}
+                one{"{0} inHg"}
+                other{"{0} inHg"}
+            }
+            millibar{
+                few{"{0} mbar"}
+                one{"{0} mb"}
+                other{"{0} mb"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                dnam{"km/h"}
+                few{"{0} km/h"}
+                one{"{0} km/h"}
+                other{"{0} km/h"}
+            }
+            meter-per-second{
+                few{"{0} m/s"}
+                one{"{0} m/s"}
+                other{"{0} m/s"}
+            }
+            mile-per-hour{
+                few{"{0} mi/h"}
+                one{"{0} mi/h"}
+                other{"{0} mi/h"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"°C"}
+                few{"{0}°"}
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+            fahrenheit{
+                few{"{0}°F"}
+                one{"{0}°F"}
+                other{"{0}°F"}
+            }
+        }
+        volume{
+            cubic-kilometer{
+                few{"{0} km³"}
+                one{"{0} km³"}
+                other{"{0} km³"}
+            }
+            cubic-mile{
+                few{"{0} mi³"}
+                one{"{0} mi³"}
+                other{"{0} mi³"}
+            }
+            liter{
+                dnam{"litar"}
+                few{"{0}l"}
+                one{"{0}l"}
+                other{"{0}l"}
+            }
+        }
+    }
+    unitsShort{
+        acceleration{
+            g-force{
+                dnam{"G"}
+                few{"{0} G"}
+                one{"{0} G"}
+                other{"{0} G"}
+            }
+            meter-per-square-second{
+                dnam{"m/s²"}
+                few{"{0} m/s²"}
+                one{"{0} m/s²"}
+                other{"{0} m/s²"}
+            }
+        }
+        angle{
+            arc-minute{
+                dnam{"ugaone minute"}
+                few{"{0}′"}
+                one{"{0}′"}
+                other{"{0}′"}
+            }
+            arc-second{
+                dnam{"ugaone sekunde"}
+                few{"{0}″"}
+                one{"{0}″"}
+                other{"{0}″"}
+            }
+            degree{
+                dnam{"stepeni"}
+                few{"{0}°"}
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+            radian{
+                dnam{"radijani"}
+                few{"{0} rad"}
+                one{"{0} rad"}
+                other{"{0} rad"}
+            }
+            revolution{
+                dnam{"okret"}
+                few{"{0} okr."}
+                one{"{0} okr."}
+                other{"{0} okr."}
+            }
+        }
+        area{
+            acre{
+                dnam{"katastarska jutra"}
+                few{"{0} kj"}
+                one{"{0} kj"}
+                other{"{0} kj"}
+            }
+            dunam{
+                dnam{"dunumi"}
+                few{"{0} dunuma"}
+                one{"{0} dunum"}
+                other{"{0} dunuma"}
+            }
+            hectare{
+                dnam{"hektari"}
+                few{"{0} ha"}
+                one{"{0} ha"}
+                other{"{0} ha"}
+            }
+            square-centimeter{
+                dnam{"cm²"}
+                few{"{0} cm²"}
+                one{"{0} cm²"}
+                other{"{0} cm²"}
+                per{"{0}/cm²"}
+            }
+            square-foot{
+                dnam{"ft²"}
+                few{"{0} ft²"}
+                one{"{0} ft²"}
+                other{"{0} ft²"}
+            }
+            square-inch{
+                dnam{"in²"}
+                few{"{0} in²"}
+                one{"{0} in²"}
+                other{"{0} in²"}
+                per{"{0}/in²"}
+            }
+            square-kilometer{
+                dnam{"km²"}
+                few{"{0} km²"}
+                one{"{0} km²"}
+                other{"{0} km²"}
+                per{"{0}/km²"}
+            }
+            square-meter{
+                dnam{"m²"}
+                few{"{0} m²"}
+                one{"{0} m²"}
+                other{"{0} m²"}
+                per{"{0}/m²"}
+            }
+            square-mile{
+                dnam{"mi²"}
+                few{"{0} mi²"}
+                one{"{0} mi²"}
+                other{"{0} mi²"}
+                per{"{0}/mi²"}
+            }
+            square-yard{
+                dnam{"yd²"}
+                few{"{0} yd²"}
+                one{"{0} yd²"}
+                other{"{0} yd²"}
+            }
+        }
+        compound{
+            per{"{0}/{1}"}
+            times{"{0}⋅{1}"}
+        }
+        concentr{
+            karat{
+                dnam{"karati"}
+                few{"{0} kt"}
+                one{"{0} kt"}
+                other{"{0} kt"}
+            }
+            milligram-ofglucose-per-deciliter{
+                dnam{"mg/dL"}
+                few{"{0} mg/dL"}
+                one{"{0} mg/dL"}
+                other{"{0} mg/dL"}
+            }
+            millimole-per-liter{
+                dnam{"milimol/litar"}
+                few{"{0} mmol/L"}
+                one{"{0} mmol/L"}
+                other{"{0} mmol/L"}
+            }
+            mole{
+                dnam{"mol"}
+                few{"{0} mol"}
+                one{"{0} mol"}
+                other{"{0} mol"}
+            }
+            percent{
+                dnam{"%"}
+                few{"{0}%"}
+                one{"{0}%"}
+                other{"{0}%"}
+            }
+            permille{
+                dnam{"‰"}
+                few{"{0}‰"}
+                one{"{0}‰"}
+                other{"{0}‰"}
+            }
+            permillion{
+                dnam{"dijelovi/milion"}
+                few{"{0} ppm"}
+                one{"{0} ppm"}
+                other{"{0} ppm"}
+            }
+            permyriad{
+                dnam{"‱"}
+                few{"{0}‱"}
+                one{"{0}‱"}
+                other{"{0}‱"}
+            }
+        }
+        consumption{
+            liter-per-100-kilometer{
+                dnam{"L/100 km"}
+                few{"{0} L/100 km"}
+                one{"{0} L/100 km"}
+                other{"{0} L/100 km"}
+            }
+            liter-per-kilometer{
+                dnam{"L/km"}
+                few{"{0} L/km"}
+                one{"{0} L/km"}
+                other{"{0} L/km"}
+            }
+            mile-per-gallon{
+                dnam{"mpg"}
+                few{"{0} mpg"}
+                one{"{0} mpg"}
+                other{"{0} mpg"}
+            }
+            mile-per-gallon-imperial{
+                dnam{"milje/b. gal"}
+                few{"{0} mi/b. gal"}
+                one{"{0} mi/b. gal"}
+                other{"{0} mi/b. gal"}
+            }
+        }
+        coordinate{
+            dnam{"pravac"}
+            east{"{0} I"}
+            north{"{0} S"}
+            south{"{0} J"}
+            west{"{0} Z"}
+        }
+        digital{
+            bit{
+                dnam{"bit"}
+                few{"{0} bit"}
+                one{"{0} bit"}
+                other{"{0} bit"}
+            }
+            byte{
+                dnam{"bajt"}
+                few{"{0} bajt"}
+                one{"{0} bajt"}
+                other{"{0} bajt"}
+            }
+            gigabit{
+                dnam{"Gb"}
+                few{"{0} Gb"}
+                one{"{0} Gb"}
+                other{"{0} Gb"}
+            }
+            gigabyte{
+                dnam{"GB"}
+                few{"{0} GB"}
+                one{"{0} GB"}
+                other{"{0} GB"}
+            }
+            kilobit{
+                dnam{"kb"}
+                few{"{0} kb"}
+                one{"{0} kb"}
+                other{"{0} kb"}
+            }
+            kilobyte{
+                dnam{"kB"}
+                few{"{0} kB"}
+                one{"{0} kB"}
+                other{"{0} kB"}
+            }
+            megabit{
+                dnam{"Mb"}
+                few{"{0} Mb"}
+                one{"{0} Mb"}
+                other{"{0} Mb"}
+            }
+            megabyte{
+                dnam{"MB"}
+                few{"{0} MB"}
+                one{"{0} MB"}
+                other{"{0} MB"}
+            }
+            petabyte{
+                dnam{"PB"}
+                few{"{0} PB"}
+                one{"{0} PB"}
+                other{"{0} PB"}
+            }
+            terabit{
+                dnam{"Tb"}
+                few{"{0} Tb"}
+                one{"{0} Tb"}
+                other{"{0} Tb"}
+            }
+            terabyte{
+                dnam{"TB"}
+                few{"{0} TB"}
+                one{"{0} TB"}
+                other{"{0} TB"}
+            }
+        }
+        duration{
+            century{
+                dnam{"st."}
+                few{"{0} st."}
+                one{"{0} st."}
+                other{"{0} st."}
+            }
+            day{
+                dnam{"dani"}
+                few{"{0} dana"}
+                one{"{0} dan"}
+                other{"{0} dana"}
+                per{"{0}/d."}
+            }
+            decade{
+                dnam{"dec."}
+                few{"{0} dec."}
+                one{"{0} dec."}
+                other{"{0} dec."}
+            }
+            hour{
+                dnam{"sati"}
+                few{"{0} h"}
+                one{"{0} h"}
+                other{"{0} h"}
+                per{"{0}/h"}
+            }
+            microsecond{
+                dnam{"mikrosekunde"}
+                few{"{0} μs"}
+                one{"{0} μs"}
+                other{"{0} μs"}
+            }
+            millisecond{
+                dnam{"milisekunde"}
+                few{"{0} ms"}
+                one{"{0} ms"}
+                other{"{0} ms"}
+            }
+            minute{
+                dnam{"minute"}
+                few{"{0} min."}
+                one{"{0} min."}
+                other{"{0} min."}
+                per{"{0}/min."}
+            }
+            month{
+                dnam{"mjeseci"}
+                few{"{0} mj."}
+                one{"{0} mj."}
+                other{"{0} mj."}
+                per{"{0} mj."}
+            }
+            nanosecond{
+                dnam{"nanosekunde"}
+                few{"{0} ns"}
+                one{"{0} ns"}
+                other{"{0} ns"}
+            }
+            second{
+                dnam{"sekunde"}
+                few{"{0} sek."}
+                one{"{0} sek."}
+                other{"{0} sek."}
+                per{"{0}/s"}
+            }
+            week{
+                dnam{"sedmice"}
+                few{"{0} sedm."}
+                one{"{0} sedm."}
+                other{"{0} sedm."}
+                per{"{0}/sedm."}
+            }
+            year{
+                dnam{"godine"}
+                few{"{0} god."}
+                one{"{0} god."}
+                other{"{0} god."}
+                per{"{0}/god."}
+            }
+        }
+        electric{
+            ampere{
+                dnam{"amperi"}
+                few{"{0} A"}
+                one{"{0} A"}
+                other{"{0} A"}
+            }
+            milliampere{
+                dnam{"mA"}
+                few{"{0} mA"}
+                one{"{0} mA"}
+                other{"{0} mA"}
+            }
+            ohm{
+                dnam{"omi"}
+                few{"{0} Ω"}
+                one{"{0} Ω"}
+                other{"{0} Ω"}
+            }
+            volt{
+                dnam{"volti"}
+                few{"{0} V"}
+                one{"{0} V"}
+                other{"{0} V"}
+            }
+        }
+        energy{
+            british-thermal-unit{
+                dnam{"BTU"}
+                few{"{0} BTU"}
+                one{"{0} BTU"}
+                other{"{0} BTU"}
+            }
+            calorie{
+                dnam{"kal."}
+                few{"{0} kal."}
+                one{"{0} kal."}
+                other{"{0} kal."}
+            }
+            electronvolt{
+                dnam{"eV"}
+                few{"{0} eV"}
+                one{"{0} eV"}
+                other{"{0} eV"}
+            }
+            foodcalorie{
+                dnam{"kal."}
+                few{"{0} kal."}
+                one{"{0} kal."}
+                other{"{0} kal."}
+            }
+            joule{
+                dnam{"džuli"}
+                few{"{0} J"}
+                one{"{0} J"}
+                other{"{0} J"}
+            }
+            kilocalorie{
+                dnam{"kcal"}
+                few{"{0} kcal"}
+                one{"{0} kcal"}
+                other{"{0} kcal"}
+            }
+            kilojoule{
+                dnam{"kilodžul"}
+                few{"{0} kJ"}
+                one{"{0} kJ"}
+                other{"{0} kJ"}
+            }
+            kilowatt-hour{
+                dnam{"kW-sat"}
+                few{"{0} kWh"}
+                one{"{0} kWh"}
+                other{"{0} kWh"}
+            }
+            therm-us{
+                dnam{"US therm"}
+                few{"{0} US therm"}
+                one{"{0} US therm"}
+                other{"{0} US therm"}
+            }
+        }
+        force{
+            newton{
+                dnam{"N"}
+                few{"{0} N"}
+                one{"{0} N"}
+                other{"{0} N"}
+            }
+            pound-force{
+                dnam{"lbf"}
+                few{"{0} lbf"}
+                one{"{0} lbf"}
+                other{"{0} lbf"}
+            }
+        }
+        frequency{
+            gigahertz{
+                dnam{"GHz"}
+                few{"{0} GHz"}
+                one{"{0} GHz"}
+                other{"{0} GHz"}
+            }
+            hertz{
+                dnam{"Hz"}
+                few{"{0} Hz"}
+                one{"{0} Hz"}
+                other{"{0} Hz"}
+            }
+            kilohertz{
+                dnam{"kHz"}
+                few{"{0} kHz"}
+                one{"{0} kHz"}
+                other{"{0} kHz"}
+            }
+            megahertz{
+                dnam{"MHz"}
+                few{"{0} MHz"}
+                one{"{0} MHz"}
+                other{"{0} MHz"}
+            }
+        }
+        graphics{
+            dot-per-centimeter{
+                dnam{"dpcm"}
+                few{"{0} ppcm"}
+                one{"{0} ppcm"}
+                other{"{0} dpcm"}
+            }
+            dot-per-inch{
+                dnam{"dpi"}
+                few{"{0} ppi"}
+                one{"{0} ppi"}
+                other{"{0} dpi"}
+            }
+            em{
+                dnam{"em"}
+                few{"{0} em"}
+                one{"{0} em"}
+                other{"{0} em"}
+            }
+            megapixel{
+                dnam{"MP"}
+                few{"{0} MP"}
+                one{"{0} MP"}
+                other{"{0} MP"}
+            }
+            pixel{
+                dnam{"px"}
+                few{"{0} px"}
+                one{"{0} px"}
+                other{"{0} px"}
+            }
+            pixel-per-centimeter{
+                dnam{"ppcm"}
+                few{"{0} ppcm"}
+                one{"{0} ppcm"}
+                other{"{0} ppcm"}
+            }
+            pixel-per-inch{
+                dnam{"ppi"}
+                few{"{0} ppi"}
+                one{"{0} ppi"}
+                other{"{0} ppi"}
+            }
+        }
+        length{
+            astronomical-unit{
+                dnam{"aj"}
+                few{"{0} aj"}
+                one{"{0} aj"}
+                other{"{0} aj"}
+            }
+            centimeter{
+                dnam{"cm"}
+                few{"{0} cm"}
+                one{"{0} cm"}
+                other{"{0} cm"}
+                per{"{0}/cm"}
+            }
+            decimeter{
+                dnam{"dm"}
+                few{"{0} dm"}
+                one{"{0} dm"}
+                other{"{0} dm"}
+            }
+            fathom{
+                dnam{"hvat"}
+                few{"{0} hvata"}
+                one{"{0} hvat"}
+                other{"{0} hvata"}
+            }
+            foot{
+                dnam{"stope"}
+                few{"{0} ft"}
+                one{"{0} ft"}
+                other{"{0} ft"}
+                per{"{0}/ft"}
+            }
+            furlong{
+                dnam{"osmina milje"}
+                few{"{0} osmine milje"}
+                one{"{0} osmina milje"}
+                other{"{0} osmina milje"}
+            }
+            inch{
+                dnam{"inči"}
+                few{"{0} in"}
+                one{"{0} in"}
+                other{"{0} in"}
+                per{"{0}/in"}
+            }
+            kilometer{
+                dnam{"km"}
+                few{"{0} km"}
+                one{"{0} km"}
+                other{"{0} km"}
+                per{"{0}/km"}
+            }
+            light-year{
+                dnam{"svjetlosne godine"}
+                few{"{0} sg"}
+                one{"{0} sg"}
+                other{"{0} sg"}
+            }
+            meter{
+                dnam{"metri"}
+                few{"{0} m"}
+                one{"{0} m"}
+                other{"{0} m"}
+                per{"{0}/m"}
+            }
+            micrometer{
+                dnam{"μm"}
+                few{"{0} μm"}
+                one{"{0} μm"}
+                other{"{0} μm"}
+            }
+            mile{
+                dnam{"milje"}
+                few{"{0} mi"}
+                one{"{0} mi"}
+                other{"{0} mi"}
+            }
+            mile-scandinavian{
+                dnam{"smi"}
+                few{"{0} smi"}
+                one{"{0} smi"}
+                other{"{0} smi"}
+            }
+            millimeter{
+                dnam{"mm"}
+                few{"{0} mm"}
+                one{"{0} mm"}
+                other{"{0} mm"}
+            }
+            nanometer{
+                dnam{"nm"}
+                few{"{0} nm"}
+                one{"{0} nm"}
+                other{"{0} nm"}
+            }
+            nautical-mile{
+                dnam{"nmi"}
+                few{"{0} nmi"}
+                one{"{0} nmi"}
+                other{"{0} nmi"}
+            }
+            parsec{
+                dnam{"parseci"}
+                few{"{0} pc"}
+                one{"{0} pc"}
+                other{"{0} pc"}
+            }
+            picometer{
+                dnam{"pm"}
+                few{"{0} pm"}
+                one{"{0} pm"}
+                other{"{0} pm"}
+            }
+            point{
+                dnam{"DTP tč"}
+                few{"{0} DTP tč"}
+                one{"{0} DTP tč"}
+                other{"{0} DTP tč"}
+            }
+            solar-radius{
+                dnam{"R☉"}
+                few{"{0} R☉"}
+                one{"{0} R☉"}
+                other{"{0} R☉"}
+            }
+            yard{
+                dnam{"jardi"}
+                few{"{0} yd"}
+                one{"{0} yd"}
+                other{"{0} yd"}
+            }
+        }
+        light{
+            lux{
+                dnam{"luks"}
+                few{"{0} lx"}
+                one{"{0} lx"}
+                other{"{0} lx"}
+            }
+            solar-luminosity{
+                dnam{"L☉"}
+                few{"{0} L☉"}
+                one{"{0} L☉"}
+                other{"{0} L☉"}
+            }
+        }
+        mass{
+            carat{
+                dnam{"karati"}
+                few{"{0} CD"}
+                one{"{0} CD"}
+                other{"{0} CD"}
+            }
+            dalton{
+                dnam{"Da"}
+                few{"{0} Da"}
+                one{"{0} Da"}
+                other{"{0} Da"}
+            }
+            earth-mass{
+                dnam{"M⊕"}
+                few{"{0} M⊕"}
+                one{"{0} M⊕"}
+                other{"{0} M⊕"}
+            }
+            gram{
+                dnam{"grami"}
+                few{"{0} g"}
+                one{"{0} g"}
+                other{"{0} g"}
+                per{"{0}/g"}
+            }
+            kilogram{
+                dnam{"kg"}
+                few{"{0} kg"}
+                one{"{0} kg"}
+                other{"{0} kg"}
+                per{"{0}/kg"}
+            }
+            metric-ton{
+                dnam{"t"}
+                few{"{0} t"}
+                one{"{0} t"}
+                other{"{0} t"}
+            }
+            microgram{
+                dnam{"μg"}
+                few{"{0} μg"}
+                one{"{0} μg"}
+                other{"{0} μg"}
+            }
+            milligram{
+                dnam{"mg"}
+                few{"{0} mg"}
+                one{"{0} mg"}
+                other{"{0} mg"}
+            }
+            ounce{
+                dnam{"oz"}
+                few{"{0} oz"}
+                one{"{0} oz"}
+                other{"{0} oz"}
+                per{"{0}/oz"}
+            }
+            ounce-troy{
+                dnam{"oz t"}
+                few{"{0} oz t"}
+                one{"{0} oz t"}
+                other{"{0} oz t"}
+            }
+            pound{
+                dnam{"lb"}
+                few{"{0} lb"}
+                one{"{0} lb"}
+                other{"{0} lbs"}
+                per{"{0}/lb"}
+            }
+            solar-mass{
+                dnam{"M☉"}
+                few{"{0} M☉"}
+                one{"{0} M☉"}
+                other{"{0} M☉"}
+            }
+            ton{
+                dnam{"tone"}
+                few{"{0} tn"}
+                one{"{0} tn"}
+                other{"{0} tn"}
+            }
+        }
+        power{
+            gigawatt{
+                dnam{"GW"}
+                few{"{0} GW"}
+                one{"{0} GW"}
+                other{"{0} GW"}
+            }
+            horsepower{
+                dnam{"ks"}
+                few{"{0} ks"}
+                one{"{0} ks"}
+                other{"{0} ks"}
+            }
+            kilowatt{
+                dnam{"kW"}
+                few{"{0} kW"}
+                one{"{0} kW"}
+                other{"{0} kW"}
+            }
+            megawatt{
+                dnam{"MW"}
+                few{"{0} MW"}
+                one{"{0} MW"}
+                other{"{0} MW"}
+            }
+            milliwatt{
+                dnam{"mW"}
+                few{"{0} mW"}
+                one{"{0} mW"}
+                other{"{0} mW"}
+            }
+            watt{
+                dnam{"vati"}
+                few{"{0} W"}
+                one{"{0} W"}
+                other{"{0} W"}
+            }
+        }
+        pressure{
+            atmosphere{
+                dnam{"atm"}
+                few{"{0} atm"}
+                one{"{0} atm"}
+                other{"{0} atm"}
+            }
+            bar{
+                dnam{"bar"}
+                few{"{0} bar"}
+                one{"{0} bar"}
+                other{"{0} bar"}
+            }
+            hectopascal{
+                dnam{"hPa"}
+                few{"{0} hPa"}
+                one{"{0} hPa"}
+                other{"{0} hPa"}
+            }
+            inch-ofhg{
+                dnam{"inHg"}
+                few{"{0} inHg"}
+                one{"{0} inHg"}
+                other{"{0} inHg"}
+            }
+            kilopascal{
+                dnam{"kPa"}
+                few{"{0} kPa"}
+                one{"{0} kPa"}
+                other{"{0} kPa"}
+            }
+            megapascal{
+                dnam{"MPa"}
+                few{"{0} MPa"}
+                one{"{0} MPa"}
+                other{"{0} MPa"}
+            }
+            millibar{
+                dnam{"mbar"}
+                few{"{0} mbar"}
+                one{"{0} mbar"}
+                other{"{0} mbar"}
+            }
+            millimeter-ofhg{
+                dnam{"mmHg"}
+                few{"{0} mmHg"}
+                one{"{0} mmHg"}
+                other{"{0} mmHg"}
+            }
+            pascal{
+                dnam{"Pa"}
+                few{"{0} Pa"}
+                one{"{0} Pa"}
+                other{"{0} Pa"}
+            }
+            pound-force-per-square-inch{
+                dnam{"psi"}
+                few{"{0} psi"}
+                one{"{0} psi"}
+                other{"{0} psi"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                dnam{"km/h"}
+                few{"{0} km/h"}
+                one{"{0} km/h"}
+                other{"{0} km/h"}
+            }
+            knot{
+                dnam{"čv"}
+                few{"{0} čv"}
+                one{"{0} čv"}
+                other{"{0} čv"}
+            }
+            meter-per-second{
+                dnam{"m/s"}
+                few{"{0} m/s"}
+                one{"{0} m/s"}
+                other{"{0} m/s"}
+            }
+            mile-per-hour{
+                dnam{"mi/h"}
+                few{"{0} mi/h"}
+                one{"{0} mi/h"}
+                other{"{0} mi/h"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"°C"}
+                few{"{0}°C"}
+                one{"{0}°C"}
+                other{"{0}°C"}
+            }
+            fahrenheit{
+                dnam{"°F"}
+                few{"{0}°F"}
+                one{"{0}°F"}
+                other{"{0}°F"}
+            }
+            generic{
+                dnam{"°"}
+                few{"{0}°"}
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+            kelvin{
+                dnam{"K"}
+                few{"{0} K"}
+                one{"{0} K"}
+                other{"{0} K"}
+            }
+        }
+        torque{
+            newton-meter{
+                dnam{"Nm"}
+                few{"{0} Nm"}
+                one{"{0} Nm"}
+                other{"{0} Nm"}
+            }
+            pound-force-foot{
+                dnam{"lbf⋅ft"}
+                few{"{0} lbf⋅ft"}
+                one{"{0} lbf⋅ft"}
+                other{"{0} lbf⋅ft"}
+            }
+        }
+        volume{
+            acre-foot{
+                dnam{"ac ft"}
+                few{"{0} ac ft"}
+                one{"{0} ac ft"}
+                other{"{0} ac ft"}
+            }
+            barrel{
+                dnam{"bbl"}
+                few{"{0} bbl"}
+                one{"{0} bbl"}
+                other{"{0} bbl"}
+            }
+            bushel{
+                dnam{"bu"}
+                few{"{0} bu"}
+                one{"{0} bu"}
+                other{"{0} bu"}
+            }
+            centiliter{
+                dnam{"cL"}
+                few{"{0} cL"}
+                one{"{0} cL"}
+                other{"{0} cL"}
+            }
+            cubic-centimeter{
+                dnam{"cm³"}
+                few{"{0} cm³"}
+                one{"{0} cm³"}
+                other{"{0} cm³"}
+                per{"{0}/cm³"}
+            }
+            cubic-foot{
+                dnam{"ft³"}
+                few{"{0} ft³"}
+                one{"{0} ft³"}
+                other{"{0} ft³"}
+            }
+            cubic-inch{
+                dnam{"in³"}
+                few{"{0} in³"}
+                one{"{0} in³"}
+                other{"{0} in³"}
+            }
+            cubic-kilometer{
+                dnam{"km³"}
+                few{"{0} km³"}
+                one{"{0} km³"}
+                other{"{0} km³"}
+            }
+            cubic-meter{
+                dnam{"m³"}
+                few{"{0} m³"}
+                one{"{0} m³"}
+                other{"{0} m³"}
+                per{"{0}/m³"}
+            }
+            cubic-mile{
+                dnam{"mi³"}
+                few{"{0} mi³"}
+                one{"{0} mi³"}
+                other{"{0} mi³"}
+            }
+            cubic-yard{
+                dnam{"yd³"}
+                few{"{0} yd³"}
+                one{"{0} yd³"}
+                other{"{0} yd³"}
+            }
+            cup{
+                dnam{"šolje"}
+                few{"{0} c"}
+                one{"{0} c"}
+                other{"{0} c"}
+            }
+            cup-metric{
+                dnam{"mcup"}
+                few{"{0} mc"}
+                one{"{0} mc"}
+                other{"{0} mc"}
+            }
+            deciliter{
+                dnam{"dL"}
+                few{"{0} dL"}
+                one{"{0} dL"}
+                other{"{0} dL"}
+            }
+            dessert-spoon{
+                dnam{"kš. des."}
+                few{"{0} kš. des."}
+                one{"{0} kš. des."}
+                other{"{0} kš. des."}
+            }
+            dessert-spoon-imperial{
+                dnam{"imp. kš. des."}
+                few{"{0} imp. kš. des."}
+                one{"{0} imp. kš. des."}
+                other{"{0} imp. kš. des."}
+            }
+            dram{
+                dnam{"teč. dram"}
+                few{"{0} teč. drama"}
+                one{"{0} teč. dram"}
+                other{"{0} teč. drama"}
+            }
+            drop{
+                dnam{"kap"}
+                few{"{0} kapi"}
+                one{"{0} kap"}
+                other{"{0} kapi"}
+            }
+            fluid-ounce{
+                dnam{"fl oz"}
+                few{"{0} fl oz"}
+                one{"{0} fl oz"}
+                other{"{0} fl oz"}
+            }
+            fluid-ounce-imperial{
+                dnam{"imp. fl oz"}
+                few{"{0} imp. fl oz"}
+                one{"{0} imp. fl oz"}
+                other{"{0} imp. fl oz"}
+            }
+            gallon{
+                dnam{"gal"}
+                few{"{0} gal"}
+                one{"{0} gal"}
+                other{"{0} gal"}
+                per{"{0}/gal"}
+            }
+            gallon-imperial{
+                dnam{"B. gal"}
+                few{"{0} b. gal"}
+                one{"{0} b. gal"}
+                other{"{0} b. gal"}
+                per{"{0}/b. gal"}
+            }
+            hectoliter{
+                dnam{"hL"}
+                few{"{0} hL"}
+                one{"{0} hL"}
+                other{"{0} hL"}
+            }
+            jigger{
+                dnam{"mala čašica"}
+                few{"{0} male čašice"}
+                one{"{0} mala čašica"}
+                other{"{0} malih čašica"}
+            }
+            liter{
+                dnam{"litri"}
+                few{"{0} l"}
+                one{"{0} l"}
+                other{"{0} l"}
+                per{"{0}/l"}
+            }
+            megaliter{
+                dnam{"ML"}
+                few{"{0} ML"}
+                one{"{0} ML"}
+                other{"{0} ML"}
+            }
+            milliliter{
+                dnam{"mL"}
+                few{"{0} mL"}
+                one{"{0} mL"}
+                other{"{0} mL"}
+            }
+            pinch{
+                dnam{"prstohvat"}
+                few{"{0} prstohvata"}
+                one{"{0} prstohvat"}
+                other{"{0} prstohvata"}
+            }
+            pint{
+                dnam{"pinte"}
+                few{"{0} pt"}
+                one{"{0} pt"}
+                other{"{0} pt"}
+            }
+            pint-metric{
+                dnam{"mpt"}
+                few{"{0} mpt"}
+                one{"{0} mpt"}
+                other{"{0} mpt"}
+            }
+            quart{
+                dnam{"qt"}
+                few{"{0} qt"}
+                one{"{0} qt"}
+                other{"{0} qt"}
+            }
+            quart-imperial{
+                dnam{"imp. kvarc"}
+                few{"{0} imp. kvarca"}
+                one{"{0} imp. kvarc"}
+                other{"{0} imp. kvarca"}
+            }
+            tablespoon{
+                dnam{"tbsp"}
+                few{"{0} tbsp"}
+                one{"{0} tbsp"}
+                other{"{0} tbsp"}
+            }
+            teaspoon{
+                dnam{"tsp"}
+                few{"{0} tsp"}
+                one{"{0} tsp"}
+                other{"{0} tsp"}
+            }
+        }
+    }
+}

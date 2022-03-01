@@ -1,0 +1,63 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+se_FI{
+    Languages{
+        ace{"ačehgiella"}
+        ar_001{"standárda arábagiella"}
+        be{"vilgesruoššagiella"}
+        bn{"bengalagiella"}
+        de_AT{"nuortariikkalaš duiskkagiella"}
+        de_CH{"šveicalaš duiskkagiella"}
+        en_AU{"austrálialaš eaŋgalsgiella"}
+        en_CA{"kanádalaš eaŋgalsgiella"}
+        en_GB{"brihttalaš eaŋgalsgiella"}
+        en_US{"amerihkálaš eaŋgalsgiella"}
+        es_419{"latiinna-amerihkalaš spánskkagiella"}
+        es_ES{"espánjalaš spánskkagiella"}
+        es_MX{"meksikolaš spánskkagiella"}
+        fj{"fižigiella"}
+        fr_CA{"kanádalaš fránskkagiella"}
+        fr_CH{"šveicalaš fránskkagiella"}
+        hy{"armenagiella"}
+        kk{"kazakhgiella"}
+        km{"kambožagiella"}
+        ne{"nepalagiella"}
+        nl_BE{"belgialaš hollánddagiella"}
+        pa{"panjabagiella"}
+        pt_BR{"brasilialaš portugálagiella"}
+        pt_PT{"portugálalaš portugálagiella"}
+        ro_MD{"moldávialaš romániagiella"}
+        swb{"komoragiella"}
+        th{"thaigiella"}
+        vi{"vietnamagiella"}
+        zh_Hans{"álkes kiinnágiella"}
+        zh_Hant{"árbevirolaš kiinnágiella"}
+    }
+    Languages%short{
+        en_GB{"brihttalaš eaŋgalsgiella"}
+        en_US{"amerihkálaš eaŋgalsgiella"}
+    }
+    Scripts{
+        Arab{"arábalaš"}
+        Hani{"kiinnálaš"}
+        Hans{"álkes kiinnálaš"}
+        Hant{"árbevirolaš kiinnálaš"}
+        Zxxx{"orrut čállojuvvot"}
+        Zzzz{"dovdameahttun čállin"}
+    }
+    Types{
+        calendar{
+            buddhist{"buddhista kaleandar"}
+            chinese{"kiinná kaleandar"}
+            coptic{"koptalaš kaleandar"}
+            dangi{"dangi kaleandar"}
+            ethiopic{"etiohpalaš kaleandar"}
+            ethiopic-amete-alem{"etiohpalaš-amete-alem kaleandar"}
+            gregorian{"gregorialaš kalendar"}
+        }
+    }
+    codePatterns{
+        script{"čállin: {0}"}
+    }
+}

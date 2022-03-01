@@ -1,0 +1,26 @@
+#!/bin/sh
+## -*-sh-*-
+#set -x
+# BEGIN of icu-config-top
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+#******************************************************************************
+#   Copyright (C) 1999-2013, International Business Machines
+#   Corporation and others.  All Rights Reserved.
+#******************************************************************************
+# This script is designed to aid configuration of ICU.
+# rpath links a library search path right into the binaries.
+#
+# Note: it's preferred to use the .pc files rather than icu-config.
+#
+
+### END of icu-config-top
+
+## Zero out prefix.
+execprefix=
+prefix=
+
+
+loaddefs()
+{
+

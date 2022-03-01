@@ -1,0 +1,185 @@
+/* -*- Mode: IDL; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "nsISupports.idl"
+
+%{C++
+// Define Contractid and CID
+#define MOZ_LOCALESERVICE_CID \
+  { 0x92735ff4, 0x6384, 0x4ad6, { 0x85, 0x08, 0x75, 0x70, 0x10, 0xe1, 0x49, 0xee } }
+
+#define MOZ_LOCALESERVICE_CONTRACTID "@mozilla.org/intl/localeservice;1"
+%}
+
+[scriptable, uuid(C27F8983-B48B-4D1A-92D7-FEB8106F212D)]
+interface mozILocaleService : nsISupports
+{
+  /**
+   * List of language negotiation strategies to use.
+   * For an example list of requested and available locales:
+   *
+   *   Requested: ['es-MX', 'fr-FR']
+   *   Available: ['fr', 'fr-CA', 'es', 'es-MX', 'it']
+   *   DefaultLocale: ['en-US']
+   *
+   * each of those strategies will build a different result:
+   *
+   *
+   * filtering (default) -
+   *   Matches as many of the available locales as possible.
+   *
+   *   Result:
+   *     Supported: ['es-MX', 'es', 'fr', 'fr-CA', 'en-US']
+   *
+   * matching -
+   *   Matches the best match from the available locales for every requested
+   *   locale.
+   *
+   *   Result:
+   *     Supported: ['es-MX', 'fr', 'en-US']
+   *
+   * lookup -
+   *   Matches a single best locale. This strategy always returns a list
+   *   of the length 1 and requires a defaultLocale to be set.
+   *
+   *   Result:
+   *     Supported: ['es-MX']
+   */
+  const long langNegStrategyFiltering = 0;
+  const long langNegStrategyMatching  = 1;
+  const long langNegStrategyLookup    = 2;
+
+  /**
+   * Default locale of the browser. The locale we are guaranteed to have
+   * resources for that should be used as a last resort fallack in cases
+   * where requested locales do not match available locales.
+   */
+  readonly attribute ACString defaultLocale;
+
+  /**
+   * Last fallback is the final fallback locale we're going to attempt if all
+   * else fails in any language negotiation or locale resource retrieval situations.
+   *
+   * At the moment it returns `en-US`.
+   */
+  readonly attribute ACString lastFallbackLocale;
+
+  /**
+   * Returns a list of locales that the application should be localized to.
+   *
+   * The result is a ordered list of valid locale IDs and it should be
+   * used for all APIs that accept list of locales, like ECMA402 and L10n APIs.
+   *
+   * This API always returns at least one locale.
+   *
+   * When retrieving the locales for language negotiation and matching
+   * to language resources, use the language tag form.
+   * When retrieving the locales for Intl API or ICU locale settings,
+   * use the BCP47 form.
+   *
+   * Example: ["en-US", "de", "pl", "sr-Cyrl", "zh-Hans-HK"]
+   */
+  readonly attribute Array<ACString> appLocalesAsLangTags;
+  readonly attribute Array<ACString> appLocalesAsBCP47;
+
+  /**
+   * Returns a list of locales to use for any regional specific operations
+   * like date formatting, calendars, unit formatting etc.
+   *
+   * The result is a ordered list of valid locale IDs and it should be
+   * used for all APIs that accept list of locales, like ECMA402 and L10n APIs.
+   *
+   * This API always returns at least one locale.
+   *
+   * Example: ["en-US", "de", "pl", "sr-Cyrl", "zh-Hans-HK"]
+   */
+  readonly attribute Array<ACString> regionalPrefsLocales;
+
+  readonly attribute Array<ACString> webExposedLocales;
+
+  /**
+   * Negotiates the best locales out of a ordered list of requested locales and
+   * a list of available locales.
+   *
+   * Internally it uses the following naming scheme:
+   *
+   *  Requested - locales requested by the user
+   *  Available - locales for which the data is available
+   *  Supported - locales negotiated by the algorithm
+   *
+   * Additionally, if defaultLocale is provided, it adds it to the end of the
+   * result list as a "last resort" locale.
+   *
+   * Strategy is one of the three strategies described at the top of this file.
+   *
+   * The result list is canonicalized and ordered according to the order
+   * of the requested locales.
+   *
+   * (See LocaleService.h for a more C++-friendly version of this.)
+   */
+  Array<ACString> negotiateLanguages(in Array<AUTF8String> aRequested,
+                                     in Array<AUTF8String> aAvailable,
+                                     [optional] in ACString aDefaultLocale,
+                                     [optional] in long langNegStrategy);
+
+  /**
+   * Returns the best locale that the application should be localized to.
+   *
+   * The result is a valid locale ID and it should be
+   * used for all APIs that do not handle language negotiation.
+   *
+   * When retrieving the locales for language negotiation and matching
+   * to language resources, use the language tag form.
+   * When retrieving the locales for Intl API or ICU locale settings,
+   * use the BCP47 form.
+   *
+   * Where possible, appLocales* should be preferred over this API and
+   * all callsites should handle some form of "best effort" language
+   * negotiation to respect user preferences in case the use case does
+   * not have data for the first locale in the list.
+   *
+   * Example: "zh-Hans-HK"
+   */
+  readonly attribute ACString appLocaleAsLangTag;
+  readonly attribute ACString appLocaleAsBCP47;
+
+  /**
+   * Returns a list of locales that the user requested the app to be
+   * localized to.
+   *
+   * The result is an ordered list of locale IDs which should be
+   * used as a requestedLocales input list for language negotiation.
+   *
+   * Example: ["en-US", "de", "pl", "sr-Cyrl", "zh-Hans-HK"]
+   */
+  attribute Array<ACString> requestedLocales;
+
+  /**
+   * Returns the top-requested locale from the user, or an empty string if none is set.
+   */
+  readonly attribute ACString requestedLocale;
+
+  /**
+   * Returns a list of locales that the app can be localized to.
+   *
+   * The result is an unordered list of locale IDs which should be
+   * used as a availableLocales input list for language negotiation.
+   *
+   * Example: ["en-US", "de", "pl", "sr-Cyrl", "zh-Hans-HK"]
+   */
+  attribute Array<ACString> availableLocales;
+
+  /**
+   * Returns whether the current app locale is RTL.
+   */
+  readonly attribute boolean isAppLocaleRTL;
+
+  /**
+   * Returns a list of locales packaged into the app bundle.
+   *
+   * Example: ["en-US", "de", "pl", "sr-Cyrl", "zh-Hans-HK"]
+   */
+  readonly attribute Array<ACString> packagedLocales;
+};

@@ -1,0 +1,21 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sr_Latn_XK{
+    Languages{
+        bm{"bamanankan"}
+        bn{"bangla"}
+        ff{"fulah"}
+        gsw{"švajcarski nemački"}
+        ht{"haićanski kreolski"}
+        lo{"laoški"}
+        moh{"mohok"}
+        nqo{"n’ko"}
+        shi{"južni šilha"}
+        si{"sinhalski"}
+        tzm{"centralnoatlaski tamašek"}
+        xh{"isikosa"}
+        zgh{"standardni marokanski tamašek"}
+        zu{"isizulu"}
+    }
+}

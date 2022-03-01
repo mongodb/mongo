@@ -92,7 +92,7 @@ class XorShift128PlusRNG {
      * to get the mantissa's range.
      */
     static constexpr int kMantissaBits =
-      mozilla::FloatingPoint<double>::kExponentShift + 1;
+        mozilla::FloatingPoint<double>::kExponentShift + 1;
     uint64_t mantissa = next() & ((UINT64_C(1) << kMantissaBits) - 1);
     return double(mantissa) / (UINT64_C(1) << kMantissaBits);
   }
@@ -116,7 +116,7 @@ class XorShift128PlusRNG {
   }
 };
 
-} // namespace non_crypto
-} // namespace mozilla
+}  // namespace non_crypto
+}  // namespace mozilla
 
-#endif // mozilla_XorShift128Plus_h
+#endif  // mozilla_XorShift128Plus_h

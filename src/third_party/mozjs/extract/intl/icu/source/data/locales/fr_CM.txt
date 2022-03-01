@@ -1,0 +1,66 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+fr_CM{
+    calendar{
+        gregorian{
+            AmPmMarkers{
+                "matin",
+                "soir",
+            }
+            AmPmMarkersAbbr{
+                "mat.",
+                "soir",
+            }
+            AmPmMarkersNarrow{
+                "mat.",
+                "soir",
+            }
+            availableFormats{
+                Ehm{"E h:mm"}
+                Ehms{"E h:mm:ss"}
+                h{"h"}
+                hm{"h:mm"}
+                hms{"h:mm:ss"}
+                hmsv{"h:mm:ss v"}
+                hmv{"h:mm v"}
+            }
+            dayPeriod{
+                stand-alone{
+                    abbreviated{
+                        am{"mat."}
+                        pm{"soir"}
+                    }
+                    narrow{
+                        am{"mat."}
+                        pm{"soir"}
+                    }
+                    wide{
+                        am{"matin"}
+                        pm{"soir"}
+                    }
+                }
+            }
+            intervalFormats{
+                h{
+                    a{"h – h"}
+                    h{"h – h"}
+                }
+                hm{
+                    a{"h:mm – h:mm"}
+                    h{"h:mm – h:mm"}
+                    m{"h:mm – h:mm"}
+                }
+                hmv{
+                    a{"h:mm – h:mm v"}
+                    h{"h:mm – h:mm v"}
+                    m{"h:mm – h:mm v"}
+                }
+                hv{
+                    a{"h – h v"}
+                    h{"h – h v"}
+                }
+            }
+        }
+    }
+}

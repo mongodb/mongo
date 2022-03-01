@@ -1,0 +1,66 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+wo{
+    zoneStrings{
+        "Africa:Dakar"{
+            ec{"Dakar"}
+        }
+        "Etc:UTC"{
+            ls{"CUT (waxtu iniwelsel yuñ boole)"}
+        }
+        "Etc:Unknown"{
+            ec{"Dëkk buñ xamul"}
+        }
+        "meta:America_Central"{
+            ld{"CDT (waxtu bëccëgu sàntaraal"}
+            lg{"CT (waxtu sàntaral)"}
+            ls{"CST (waxtu estàndaaru sàntaraal)"}
+        }
+        "meta:America_Eastern"{
+            ld{"EDT (waxtu bëccëgu penku)"}
+            lg{"ET waxtu penku"}
+            ls{"EST (waxtu estàndaaru penku)"}
+        }
+        "meta:America_Mountain"{
+            ld{"MDT (waxtu bëccëgu tundu)"}
+            lg{"MT (waxtu tundu)"}
+            ls{"MST (waxtu estàndaaru tundu)"}
+        }
+        "meta:America_Pacific"{
+            ld{"PDT (waxtu bëccëgu pasifik)"}
+            lg{"PT (waxtu pasifik)"}
+            ls{"PST (waxtu estàndaaru pasifik)"}
+        }
+        "meta:Atlantic"{
+            ld{"ADT (waxtu bëccëgu atlàntik)"}
+            lg{"AT (waxtu atlàntik)"}
+            ls{"AST (waxtu estàndaaru penku)"}
+        }
+        "meta:Europe_Central"{
+            ld{"CEST (waxtu ete wu ëroop sàntaraal)"}
+            lg{"CTE (waxtu ëroop sàntaraal)"}
+            ls{"CEST (waxtu estàndaaru ëroop sàntaraal)"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"EEST (waxtu ete wu ëroop u penku)"}
+            lg{"EET (waxtu ëroop u penku)"}
+            ls{"EEST (waxtu estàndaaru ëroop u penku)"}
+        }
+        "meta:Europe_Western"{
+            ld{"WEST (waxtu ete wu ëroop u sowwu-jant)"}
+            lg{"WET (waxtu ëroop u sowwu-jant"}
+            ls{"WEST (waxtu estàndaaru ëroop u sowwu-jant)"}
+        }
+        "meta:GMT"{
+            ls{"GMT (waxtu Greenwich)"}
+        }
+        fallbackFormat{"{1} ({0})"}
+        gmtFormat{"GMT{0}"}
+        gmtZeroFormat{"GMT"}
+        hourFormat{"+HH:mm;-HH:mm"}
+        regionFormat{"{0}"}
+        regionFormatDaylight{"{0} (+1)"}
+        regionFormatStandard{"{0} (+0)"}
+    }
+}

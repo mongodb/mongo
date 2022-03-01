@@ -1,0 +1,158 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: InterIndic_Devanagari.txt
+# Generated from CLDR
+#
+
+# InterIndic-Devanagari
+#:: NFD (NFC) ;
+#Rules for Decomposed characters
+\uE028\uE03C → ऩ;  #\uE029
+\uE030\uE03C → ऱ;  #\uE031
+\uE033\uE03C → ऴ;  #\uE034
+\uE015\uE03C → क़;  #\uE058 LETTER QA   (For Urdu)
+\uE016\uE03C → ख़;  #\uE059 LETTER KHHA (For Urdu)
+\uE017\uE03C → ग़;  #\uE05A LETTER GHHA (For Urdu)
+\uE01C\uE03C → ज़;  #\uE05B LETTER ZA   (For Urdu)
+\uE021\uE03C → ड़;  #\uE05C LETTER DDDHA (pronounced RRA)
+\uE022\uE03C → ढ़;  #\uE05D LETTER RHA   (pronounced RRHA)
+\uE02B\uE03C → फ़;  #\uE05E LETTER FA
+\uE02F\uE03C → य़;  #\uE05F LETTER YYA
+#Decomposed compatibility transliterations
+\uE012\uE057→औ;   # FALLBACK FOR TAMIL AU
+0 → ०;       # FALLBACK FOR TAMIL
+1 → १;
+\uE055→; # FALLBACK BLOW AWAY KANNADA AND TELUGU LENGTH MARK
+\uE056→; # FALLBACK BLOW AWAY KANNADA AND TELUGU AI LENGTH MARK
+\uE057→; # FALLBACK BLOW AWAY TAMIL AU LENGTH MARK
+\uE001 →  \u0901;  # SIGN CANDRABINDU
+\uE002 →  \u0902;  # SIGN ANUSVARA
+\uE003 →  ः;  # SIGN VISARGA
+\uE004 →  ऄ;  # SIGN SHORT A
+\uE005 →  अ;  # LETTER A
+\uE006 →  आ;  # LETTER AA
+\uE007 →  इ;  # LETTER I
+\uE008 →  ई;  # LETTER II
+\uE009 →  उ;  # LETTER U
+\uE00A →  ऊ;  # LETTER UU
+\uE00B →  ऋ;  # LETTER VOCALIC R
+\uE00C →  ऌ;  # LETTER VOCALIC L
+\uE00D →  ऍ;  # LETTER CANDRA E (For representing English sounds)
+\uE00E →  ऎ;  # LETTER SHORT E(For Southern Scripts)
+\uE00F →  ए;  # LETTER E
+\uE010 →  ऐ;  # LETTER AI
+\uE011 →  ऑ;  # LETTER CANDRA O (For representing English sounds)
+\uE012 →  ऒ;  # LETTER SHORT O (For Southern Scripts)
+\uE013 →  ओ;  # LETTER O
+\uE014 →  औ;  # LETTER AU
+\uE015 →  क;  # LETTER KA
+\uE016 →  ख;  # LETTER KHA
+\uE017 →  ग;  # LETTER GA
+\uE018 →  घ;  # LETTER GHA
+\uE019 →  ङ;  # LETTER NGA
+\uE01A →  च;  # LETTER CA
+\uE01B →  छ;  # LETTER CHA
+\uE01C →  ज;  # LETTER JA
+\uE01D →  झ;  # LETTER JHA
+\uE01E →  ञ;  # LETTER NYA
+\uE01F →  ट;  # LETTER TTA
+\uE020 →  ठ;  # LETTER TTHA
+\uE021 →  ड;  # LETTER DDA
+\uE022 →  ढ;  # LETTER DDHA
+\uE023 →  ण;  # LETTER NNA
+\uE024 →  त;  # LETTER TA
+\uE025 →  थ;  # LETTER THA
+\uE026 →  द;  # LETTER DA
+\uE027 →  ध;  # LETTER DHA
+\uE028 →  न;  # LETTER NA
+\uE029 →  ऩ;  # LETTER NNNA
+\uE02A →  प;  # LETTER PA
+\uE02B →  फ;  # LETTER PHA
+\uE02C →  ब;  # LETTER BA
+\uE02D →  भ;  # LETTER BHA
+\uE02E →  म;  # LETTER MA
+\uE02F →  य;  # LETTER YA
+\uE030 →  र;  # LETTER RA
+\uE031 →  ऱ;  # LETTER RRA (Eyelash RA for Southern scripts)
+#\uE031 →  र;
+\uE032 →  ल;  # LETTER LA
+\uE033 →  ळ;  # LETTER LLA
+\uE034 →  ऴ;  # LETTER LLLA (LLLA for Southern scripts)
+#\uE034 →  ळ;
+\uE035 →  व;  # LETTER VA
+\uE036 →  श;  # LETTER SHA
+\uE037 →  ष;  # LETTER SSA
+\uE038 →  स;  # LETTER SA
+\uE039 →  ह;  # LETTER HA
+\uE03C →  \u093C;  # SIGN NUKTA
+\uE03D →  ऽ;  # SIGN AVAGRAHA
+\uE03E →  ा;  # VOWEL SIGN AA
+\uE03F →  ि;  # VOWEL SIGN I
+\uE040 →  ी;  # VOWEL SIGN II
+\uE041 →  \u0941;  # VOWEL SIGN U
+\uE042 →  \u0942;  # VOWEL SIGN UU
+\uE043 →  \u0943;  # VOWEL SIGN VOCALIC R
+\uE044 →  \u0944;  # VOWEL SIGN VOCALIC RR
+\uE045 →  \u0945;  # VOWEL SIGN CANDRA E
+\uE046 →  \u0946;  # VOWEL SIGN SHORT E
+\uE047 →  \u0947;  # VOWEL SIGN E
+\uE048 →  \u0948;  # VOWEL SIGN AI
+\uE049 →  ॉ;  # VOWEL SIGN CANDRA O
+\uE04A →  ॊ;  # VOWEL SIGN SHORT O
+\uE04B →  ो;  # VOWEL SIGN O
+\uE04C →  ौ;  # VOWEL SIGN AU
+\uE04D →  \u094D;  # SIGN VIRAMA
+\uE050 →  ॐ;  # OM
+\uE051 →  \u0951;  # STRESS SIGN UDATTA
+\uE052 →  \u0952;  # STRESS SIGN ANUDATTA
+\uE053 →  \u0953;  # GRAVE ACCENT
+\uE054 →  \u0954;  # ACUTE ACCENT
+\uE058 →  क़;  # LETTER QA   (For Urdu)
+\uE059 →  ख़;  # LETTER KHHA (For Urdu)
+\uE05A →  ग़;  # LETTER GHHA (For Urdu)
+\uE05B →  ज़;  # LETTER ZA   (For Urdu)
+\uE05C →  ड़;  # LETTER DDDHA (pronounced RRA)
+\uE05D →  ढ़;  # LETTER RHA   (pronounced RRHA)
+\uE05E →  फ़;  # LETTER FA
+\uE05F →  य़;  # LETTER YYA
+\uE060 →  ॠ;  # LETTER VOCALIC RR
+\uE061 →  ॡ;  # LETTER VOCALIC LL
+\uE062 →  \u0962;  # VOWEL SIGN VOCALIC L
+\uE063 →  \u0963;  # VOWEL SIGN VOCALIC LL
+\uE064 →  ।;  # DANDA
+\uE065 →  ॥;  # DOUBLE DANDA
+\uE066 →  ०;  # DIGIT ZERO
+\uE067 →  १;  # DIGIT ONE
+\uE068 →  २;  # DIGIT TWO
+\uE069 →  ३;  # DIGIT THREE
+\uE06A →  ४;  # DIGIT FOUR
+\uE06B →  ५;  # DIGIT FIVE
+\uE06C →  ६;  # DIGIT SIX
+\uE06D →  ७;  # DIGIT SEVEN
+\uE06E →  ८;  # DIGIT EIGHT
+\uE06F →  ९;  # DIGIT NINE
+\uE070→॰;     # ABBREVIATION SIGN
+\uE071→र;     # LETTER RA WITH MIDDLE DIAGONAL
+\uE072→र;     # LETTER RA WITH LOWER DIAGONAL
+\uE073→;           # RUPEE MARK
+\uE074→र\u0942;           # RUPEE SIGN
+\uE075→;           # CURRENCY NUMERATOR ONE
+\uE076→;           # CURRENCY NUMERATOR TWO
+\uE077→;           # CURRENCY NUMERATOR THREE
+\uE078→;           # CURRENCY NUMERATOR FOUR
+\uE079→;           # CURRENCY NUMERATOR ONE LESS THAN THE DENOMINATOR
+\uE07A→;           # CURRENCY DENOMINATOR SIXTEEN
+\uE07B→;           # ISSHAR
+\uE07C→;           # TIPPI
+\uE07D→;           # ADDAK
+\uE07E→;           # IRI
+\uE07F→;           # URA
+\uE080→;           # EK ONKAR
+\uE081→व;  # FALLBACK FOR ORIYA LETTER WA
+\uE082→ॽ;     # Devanagari Glottal Sign
+\uE083→त\u094D;  # Bengali Khanda-ta
+#    :: NFC;
+# eof
+

@@ -46,8 +46,8 @@ for (let i = 0; i < searches.length; i++) {
     // printjson( q );
     // t.find( q ).forEach( printjson )
 
-    // printjson( Array.sort( correct[i].map( function(z){ return z._id; } ) ) )
-    // printjson( Array.sort( t.find(q).map( function(z){ return z._id; } ) ) )
+    // printjson( correct[i].map( function(z){ return z._id; } ).sort() )
+    // printjson( t.find(q).map( function(z){ return z._id; } ).sort() )
 
     assert.eq(correct[i].length, t.find(q).itcount(), "itcount : " + tojson(searches[i]));
     assert.eq(correct[i].length, t.find(q).count(), "count : " + tojson(searches[i]));

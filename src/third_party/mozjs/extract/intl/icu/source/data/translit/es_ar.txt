@@ -1,0 +1,20 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: es_ar.txt
+# Generated from CLDR
+#
+
+$Boundary =  [^[:L:][:M:][:N:]];
+$Vowel = [i e o u a];
+::es-es_FONIPA;
+# In Ararbic transcription of Spanish, un-stressed [e] should be treated
+# like [ə] which gets stripped off.  However, we currently do have not
+# have a good way of finding stress in Spanish words.  In the long term,
+# it would be _much_ better to look at stress markers, but for now
+# we do this trivial heuristics to find unstressed [e] in the first
+# syllable.
+$Boundary [^Vowel] {e} [^$Vowel]* $Vowel → ə;
+::und_FONIPA-ar;
+

@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "jit/shared/Disassembler-shared.cpp"
+#include "vm/Runtime.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/shared/Disassembler-shared.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Runtime.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/shared/Disassembler-shared.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Runtime.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/shared/Lowering-shared.cpp"
+#include "vm/SavedStacks.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/shared/Lowering-shared.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SavedStacks.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/shared/Lowering-shared.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SavedStacks.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jsapi.cpp"
+#include "vm/Scope.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jsapi.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Scope.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jsapi.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Scope.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jsbool.cpp"
+#include "vm/SelfHosting.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jsbool.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SelfHosting.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jsbool.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SelfHosting.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jsdate.cpp"
+#include "vm/Shape.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jsdate.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Shape.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jsdate.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Shape.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jsexn.cpp"
+#include "vm/ShapeZone.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jsexn.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ShapeZone.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jsexn.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ShapeZone.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

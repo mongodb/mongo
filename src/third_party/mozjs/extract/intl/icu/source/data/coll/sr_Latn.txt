@@ -1,0 +1,15 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sr_Latn{
+    collations{
+        search{
+            Sequence{"[import hr-u-co-search]"}
+            Version{"39"}
+        }
+        standard{
+            Sequence{"[import hr]"}
+            Version{"39"}
+        }
+    }
+}

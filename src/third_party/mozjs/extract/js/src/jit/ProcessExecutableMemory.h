@@ -7,7 +7,7 @@
 #ifndef jit_ProcessExecutableMemory_h
 #define jit_ProcessExecutableMemory_h
 
-#include "mozilla/Attributes.h"
+#include "util/Poison.h"
 
 namespace js {
 namespace jit {
@@ -17,7 +17,44 @@ namespace jit {
 #if JS_BITS_PER_WORD == 32
 static const size_t MaxCodeBytesPerProcess = 140 * 1024 * 1024;
 #else
-static const size_t MaxCodeBytesPerProcess = 1 * 1024 * 1024 * 1024;
+// This is the largest number which satisfies various alignment static
+// asserts that is <= INT32_MAX. The INT32_MAX limit is required for making a
+// single call to RtlInstallFunctionTableCallback(). (This limit could be
+// relaxed in the future by making multiple calls.)
+static const size_t MaxCodeBytesPerProcess = 2044 * 1024 * 1024;
+#endif
+
+// Limit on the number of bytes of code memory per buffer.  This limit comes
+// about because we encode an unresolved relative unconditional branch during
+// assembly as a branch instruction that carries the absolute offset of the next
+// branch instruction in the chain of branches that all reference the same
+// unresolved label.  For this architecture to work, no branch instruction may
+// lie at an offset greater than the maximum forward branch distance.  This is
+// true on both ARM and ARM64.
+//
+// Notably, even though we know that the offsets thus encoded are always
+// positive offsets, we use only the positive part of the signed range of the
+// branch offset.
+//
+// On ARM-32, we are limited by BOffImm::IsInRange(), which checks that the
+// offset is no greater than 2^25-4 in the offset's 26-bit signed field.
+//
+// On ARM-64, we are limited by Instruction::ImmBranchMaxForwardOffset(), which
+// checks that the offset is no greater than 2^27-4 in the offset's 28-bit
+// signed field.
+//
+// On MIPS, there are no limitations because the assembler has to implement
+// jump chaining to be effective at all (jump offsets are quite small).
+//
+// On x86 and x64, there are no limitations here because the assembler
+// MOZ_CRASHes if the 32-bit offset is exceeded.
+
+#if defined(JS_CODEGEN_ARM)
+static const size_t MaxCodeBytesPerBuffer = (1 << 25) - 4;
+#elif defined(JS_CODEGEN_ARM64)
+static const size_t MaxCodeBytesPerBuffer = (1 << 27) - 4;
+#else
+static const size_t MaxCodeBytesPerBuffer = MaxCodeBytesPerProcess;
 #endif
 
 // Executable code is allocated in 64K chunks. ExecutableAllocator uses pools
@@ -26,20 +63,34 @@ static const size_t MaxCodeBytesPerProcess = 1 * 1024 * 1024 * 1024;
 static const size_t ExecutableCodePageSize = 64 * 1024;
 
 enum class ProtectionSetting {
-    Protected, // Not readable, writable, or executable.
-    Writable,
-    Executable,
+  Protected,  // Not readable, writable, or executable.
+  Writable,
+  Executable,
 };
 
-extern MOZ_MUST_USE bool ReprotectRegion(void* start, size_t size, ProtectionSetting protection);
+/// Whether the instruction cache must be flushed:
+//- No means no flushing will happen.
+//- LocalThreadOnly means only the local thread's icache will be flushed.
+//- AllThreads means all the threads' icaches will be flushed; this must be used
+// when the compiling thread and the executing thread might be different.
+
+enum class MustFlushICache { No, LocalThreadOnly, AllThreads };
+
+enum class FlushICacheSpec { LocalThreadOnly, AllThreads };
+
+[[nodiscard]] extern bool ReprotectRegion(void* start, size_t size,
+                                          ProtectionSetting protection,
+                                          MustFlushICache flushICache);
 
 // Functions called at process start-up/shutdown to initialize/release the
 // executable memory region.
-extern MOZ_MUST_USE bool InitProcessExecutableMemory();
+[[nodiscard]] extern bool InitProcessExecutableMemory();
 extern void ReleaseProcessExecutableMemory();
 
 // Allocate/deallocate executable pages.
-extern void* AllocateExecutableMemory(size_t bytes, ProtectionSetting protection);
+extern void* AllocateExecutableMemory(size_t bytes,
+                                      ProtectionSetting protection,
+                                      MemCheckKind checkKind);
 extern void DeallocateExecutableMemory(void* addr, size_t bytes);
 
 // Returns true if we can allocate a few more MB of executable code without
@@ -55,7 +106,10 @@ extern bool CanLikelyAllocateMoreExecutableMemory();
 // the process allocate executable memory.
 extern size_t LikelyAvailableExecutableMemory();
 
-} // namespace jit
-} // namespace js
+// Returns whether |p| is stored in the executable code buffer.
+extern bool AddressIsInExecutableMemory(const void* p);
 
-#endif // jit_ProcessExecutableMemory_h
+}  // namespace jit
+}  // namespace js
+
+#endif  // jit_ProcessExecutableMemory_h

@@ -1,0 +1,43 @@
+<!DOCTYPE HTML>
+<html>
+<!--
+https://bugzilla.mozilla.org/show_bug.cgi?id=912470
+-->
+<head>
+  <meta http-equiv="Content-type" content="text/html; charset=UTF-8">
+  <title>Test for Unicode non-characters</title>
+  <script src="/tests/SimpleTest/SimpleTest.js"></script>
+  <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
+</head>
+<body onload="test()">
+<pre id="test">
+<script class="testbody" type="text/javascript">
+/* NOTE:
+ * When we make our data: URL origin work as in Blink, this test will fail.
+ * Hopefully, by that time are URL parser has become spec-compliant, so that
+ * we'll pass the Web Platform Test for the big5 encoder
+ * (testing/web-platform/tests/encoding/big5-encoder.html) and this test can
+ * simply be removed.
+ */
+SimpleTest.waitForExplicitFinish();
+
+function test() {
+  var f = document.getElementsByTagName("iframe")[0];
+  f.onload = function() {
+    var href = SpecialPowers.wrap(f).contentWindow.location.href;
+    var index = href.indexOf("?foo=");
+    var actual = href.substring(index + 5);
+    var expected = "h%26%2340614%3Bi%26%23156267%3Bj%A1%40k%A3%E1l%A4%40m%C8%A4n%C8%CDo%FE%FEp%26%238365%3Bq%FDjr%F9%F9s%26%23128169%3Bt";
+    is(actual, expected, "Should have gotten the expected encode.");
+    SimpleTest.finish();
+  }
+  SpecialPowers.wrap(f).contentDocument.forms[0].submit();
+}
+</script>
+</pre>
+<a target="_blank" href="https://bugzilla.mozilla.org/show_bug.cgi?id=912470">Mozilla Bug 912470</a>
+<p id="display"></p>
+<div id="content" style="display: none"><iframe src="data:text/html;charset=big5,<form><input name=foo value=h&amp;%23x9EA6;i&amp;%23x2626B;j&amp;%23x3000;k&amp;%23x20AC;l&amp;%23x4E00;m&amp;%23x27607;n&amp;%23xFFE2;o&amp;%23x79D4;p&amp;%23x20AD;q&amp;%23x203B5;r&amp;%23x2550;s&amp;%23x1F4A9;t></form>">
+</div>
+</body>
+</html>

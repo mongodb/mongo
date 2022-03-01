@@ -1,0 +1,25 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+yi{
+    zoneStrings{
+        "Africa:Abidjan"{
+            ec{"אַבידזשאַן"}
+        }
+        "Africa:Asmera"{
+            ec{"אַסמאַראַ"}
+        }
+        "Africa:Tunis"{
+            ec{"טוניס"}
+        }
+        "Africa:Windhoek"{
+            ec{"ווינטהוק"}
+        }
+        "Asia:Saigon"{
+            ec{"הא טשי מין שטאָט"}
+        }
+        "Etc:Unknown"{
+            ec{"אומבאַוואוסטע שטאָט"}
+        }
+    }
+}

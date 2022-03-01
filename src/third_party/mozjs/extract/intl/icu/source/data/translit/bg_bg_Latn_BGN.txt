@@ -1,0 +1,244 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: bg_bg_Latn_BGN.txt
+# Generated from CLDR
+#
+
+#
+########################################################################
+# BGN/PCGN 1952 System
+#
+# This system was adopted by the BGN in 1949 and by the PCGN in 1952.
+# It reflects the much simplified Bulgarian orthography as officially
+# revised in February 1945. The Bulgarian alphabet contains all of
+# the characters present in the Russian alphabet with the exception
+# of Ёё, Ыы, and Ээ. Two obsolete letters Ѫѫ and Ѣѣ are also given.
+#
+# The Bulgarian Alphabet as defined by the BGN (Page 15):
+#
+#   АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЬЮЯѪѢ
+#   абвгдежзийклмнопрстуфхцчшщъьюяѫѣ
+#
+# Originally prepared by Michael Everson <everson@evertype.com>
+########################################################################
+#
+# MINIMAL FILTER: Bulgarian-Latin
+#
+:: [АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЬЮЯѪѢабвгдежзийклмнопрстуфхцчшщъьюяѫѣ] ;
+:: NFD (NFC) ;
+#
+#
+########################################################################
+#
+########################################################################
+#
+# Define All Transformation Variables
+#
+########################################################################
+#
+$upperConsonants = [БВГДЖЗЙКЛМНПРСТФХЦЧШЩЬ] ;
+$lowerConsonants = [бвгджзйклмнпрстфхцчшщь] ;
+$consonants = [$upperConsonants $lowerConsonants] ;
+$upperVowels = [АЕИОУЪЮЯѪѢ] ;
+$lowerVowels = [аеиоуъюяѫѣ] ;
+$vowels = [$upperVowels $lowerVowels] ;
+$lower = [$lowerConsonants $lowerVowels] ;
+$bulgarian = [ $lower $upperConsonants $upperVowels ] ;
+#
+#
+# Use this $wordBoundary until bug 2034 is fixed in ICU:
+# http://bugs.icu-project.org/cgi-bin/icu-bugs/transliterate?id=2034;expression=boundary;user=guest
+#
+$wordBoundary =  [^[:L:][:M:][:N:]] ;
+#
+#
+########################################################################
+#
+########################################################################
+#
+# Start of Alphabetic Transformations
+#
+########################################################################
+#
+А → A ; # CYRILLIC CAPITAL LETTER A
+а → a ; # CYRILLIC SMALL LETTER A
+Б → B ; # CYRILLIC CAPITAL LETTER BE
+б → b ; # CYRILLIC SMALL LETTER BE
+В → V ; # CYRILLIC CAPITAL LETTER VE
+в → v ; # CYRILLIC SMALL LETTER VE
+Г → G ; # CYRILLIC CAPITAL LETTER GHE
+г → g ; # CYRILLIC SMALL LETTER GHE
+Д → D ; # CYRILLIC CAPITAL LETTER DE
+д → d ; # CYRILLIC SMALL LETTER DE
+Е → E ; # CYRILLIC CAPITAL LETTER DE
+е → e ; # CYRILLIC SMALL LETTER DE
+Ж} $lower → Zh ; # CYRILLIC CAPITAL LETTER ZHE
+Ж → ZH ; # CYRILLIC CAPITAL LETTER ZHE
+ж → zh ; # CYRILLIC SMALL LETTER ZHE
+З → Z ; # CYRILLIC CAPITAL LETTER ZE
+з → z ; # CYRILLIC SMALL LETTER ZE
+И → I ; # CYRILLIC CAPITAL LETTER I
+и → i ; # CYRILLIC SMALL LETTER I
+Й → Y ; # CYRILLIC CAPITAL LETTER I
+й → y ; # CYRILLIC SMALL LETTER I
+К → K ; # CYRILLIC CAPITAL LETTER KA
+к → k ; # CYRILLIC SMALL LETTER KA
+Л → L ; # CYRILLIC CAPITAL LETTER EL
+л → l ; # CYRILLIC SMALL LETTER EL
+М → M ; # CYRILLIC CAPITAL LETTER EM
+м → m ; # CYRILLIC SMALL LETTER EM
+Н → N ; # CYRILLIC CAPITAL LETTER EN
+н → n ; # CYRILLIC SMALL LETTER EN
+О → O ; # CYRILLIC CAPITAL LETTER O
+о → o ; # CYRILLIC SMALL LETTER O
+П → P ; # CYRILLIC CAPITAL LETTER PE
+п → p ; # CYRILLIC SMALL LETTER PE
+Р → R ; # CYRILLIC CAPITAL LETTER ER
+р → r ; # CYRILLIC SMALL LETTER ER
+С → S ; # CYRILLIC CAPITAL LETTER ES
+с → s ; # CYRILLIC SMALL LETTER ES
+#
+#
+########################################################################
+#
+# BGN Page 16 Note 4
+#
+# тс becomes t·s
+#
+########################################################################
+#
+ТС → T·S ; # CYRILLIC CAPITAL LETTER TE
+Тс → T·s ; # CYRILLIC CAPITAL LETTER TE
+тс → t·s ; # CYRILLIC SMALL LETTER TE
+Т → T ; # CYRILLIC CAPITAL LETTER TE
+т → t ; # CYRILLIC SMALL LETTER TE
+#
+#
+########################################################################
+#
+# End Note 4
+#
+########################################################################
+У → U ; # CYRILLIC CAPITAL LETTER U
+у → u ; # CYRILLIC SMALL LETTER U
+Ф → F ; # CYRILLIC CAPITAL LETTER EF
+ф → f ; # CYRILLIC SMALL LETTER EF
+Х} $lower → Kh ; # CYRILLIC CAPITAL LETTER HA
+Х → KH ; # CYRILLIC CAPITAL LETTER HA
+х → kh ; # CYRILLIC SMALL LETTER HA
+Ц} $lower → Ts ; # CYRILLIC CAPITAL LETTER TSE
+Ц → TS ; # CYRILLIC CAPITAL LETTER TSE
+ц → ts ; # CYRILLIC SMALL LETTER TSE
+Ч} $lower → Ch ; # CYRILLIC CAPITAL LETTER CHE
+Ч → CH ; # CYRILLIC CAPITAL LETTER CHE
+ч → ch ; # CYRILLIC SMALL LETTER CHE
+#
+########################################################################
+#
+# Implied rule from BGN Russian-Latin transliteration (Page 94 Note 3.6).
+#
+# шт becomes sh·t
+#
+########################################################################
+#
+ШТ → SH·T ; # CYRILLIC CAPITAL LETTER SHA
+Шт → Sh·t ; # CYRILLIC CAPITAL LETTER SHA
+шт → sh·t ; # CYRILLIC SMALL LETTER SHA
+Ш} $lower → Sh ; # CYRILLIC CAPITAL LETTER SHA
+Ш → SH ; # CYRILLIC CAPITAL LETTER SHA
+ш → sh ; # CYRILLIC SMALL LETTER SHA
+Щ} $lower → Sht ; # CYRILLIC CAPITAL LETTER SHCHA
+Щ → SHT ; # CYRILLIC CAPITAL LETTER SHCHA
+щ → sht ; # CYRILLIC SMALL LETTER SHCHA
+#
+#
+########################################################################
+#
+# End Implied rule
+#
+########################################################################
+Ъ → Ŭ ; # CYRILLIC CAPITAL LETTER HARD SIGN
+ъ → ŭ ; # CYRILLIC SMALL LETTER HARD SIGN
+#
+########################################################################
+#
+# BGN Page 16 Note 1
+#
+# In modern Bulgarian orthography, the character ъ does not occur in
+# word-final position.  It should be omitted in romanization when found
+# on older sources.
+#
+# The following rule removes all Ъъ at the end of a word. It is assumed
+# that when the condition is met, the text must be from an older source.
+# Comment out with a '#' at the start of a line to disable.
+#
+#
+########################################################################
+#
+$bulgarian { [Ъъ]  } $wordBoundary > ;
+#
+#
+########################################################################
+#
+# End BGN Page 16 Note 1
+#
+########################################################################
+Ь → ’ ; # CYRILLIC CAPITAL LETTER SOFT SIGN
+ь → ’ ; # CYRILLIC SMALL LETTER SOFT SIGN
+Ю} $lower → Yu ; # CYRILLIC CAPITAL LETTER YU
+Ю → YU ; # CYRILLIC CAPITAL LETTER YU
+ю → yu ; # CYRILLIC SMALL LETTER YU
+Я} $lower → Ya ; # CYRILLIC CAPITAL LETTER YA
+Я → YA ; # CYRILLIC CAPITAL LETTER YA
+я → ya ; # CYRILLIC SMALL LETTER YA
+#
+########################################################################
+#
+# BGN Page 16 Note 2
+#
+# The obsolete character Ѫ, which was replaced by Ъ in 1945, should be
+# romanized Ŭ.
+#
+########################################################################
+#
+Ѫ → Ŭ ; # CYRILLIC CAPITAL LETTER BIG YUS
+ѫ → ŭ ; # CYRILLIC SMALL LETTER BIG YUS
+#
+#
+########################################################################
+#
+# End BGN Page 16 Note 2
+#
+########################################################################
+#
+########################################################################
+#
+# BGN Page 16 Note 3
+#
+# The obsolete character Ѣ, replaced in 1945 by Я or Е according to local
+# pronunciation, should be romanized as e or ya, accordingly, if the
+# pronunciation is known; otherwise as ye.
+#
+########################################################################
+#
+Ѣ} $lower → Ye ; # CYRILLIC CAPITAL LETTER YAT
+Ѣ → YE ; # CYRILLIC CAPITAL LETTER YAT
+ѣ → ye ; # CYRILLIC SMALL LETTER YAT
+#
+#
+# Alternative rule where appropriate for local pronounciation. To apply
+# uncomment the following by removing the '#' mark at the start of the
+# line and insert before the three rule lines above.
+#
+# Ѣ} $lower → e ; # CYRILLIC CAPITAL LETTER YAT
+# Ѣ → E ; # CYRILLIC CAPITAL LETTER YAT
+# ѣ → e ; # CYRILLIC SMALL LETTER YAT
+#
+########################################################################
+#
+# End BGN Page 16 Note 3
+#
+########################################################################
+

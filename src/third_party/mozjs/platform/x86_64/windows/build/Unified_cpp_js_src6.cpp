@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "frontend/TokenStream.cpp"
+#include "builtin/streams/StreamAPI.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "frontend/TokenStream.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/StreamAPI.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "frontend/TokenStream.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/StreamAPI.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "gc/Allocator.cpp"
+#include "builtin/streams/TeeState.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "gc/Allocator.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/TeeState.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "gc/Allocator.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/TeeState.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "gc/AtomMarking.cpp"
+#include "builtin/streams/WritableStream.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "gc/AtomMarking.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/WritableStream.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "gc/AtomMarking.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/WritableStream.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "gc/Barrier.cpp"
+#include "builtin/streams/WritableStreamDefaultController.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "gc/Barrier.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/WritableStreamDefaultController.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "gc/Barrier.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/WritableStreamDefaultController.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "gc/GC.cpp"
+#include "builtin/streams/WritableStreamDefaultControllerOperations.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "gc/GC.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/WritableStreamDefaultControllerOperations.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "gc/GC.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/WritableStreamDefaultControllerOperations.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "gc/GCTrace.cpp"
+#include "builtin/streams/WritableStreamDefaultWriter.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "gc/GCTrace.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/WritableStreamDefaultWriter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "gc/GCTrace.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/WritableStreamDefaultWriter.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

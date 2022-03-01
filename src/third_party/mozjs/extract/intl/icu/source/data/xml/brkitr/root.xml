@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+ Copyright (C) 2016 and later: Unicode, Inc. and others.
+ License & terms of use: http://www.unicode.org/copyright.html
+ Copyright (c) 2010-2015 International Business Machines Corporation and others. All rights reserved.
+-->
+<!DOCTYPE ldml SYSTEM "../../dtd/cldr-35.1/common/dtd/ldml.dtd"
+[
+   <!ENTITY % icu SYSTEM "../../dtd/cldr-35.1/common/dtd/ldmlICU.dtd">
+   %icu;
+]
+>
+<ldml>
+    <identity>
+        <version number="$Revision$"/>
+        <language type="root"/> 
+    </identity>
+    <special xmlns:icu="http://www.icu-project.org/">
+        <icu:breakIteratorData>
+            <icu:boundaries>
+                <icu:grapheme icu:dependency="char.brk"/>
+                <icu:word     icu:dependency="word.brk"/>
+                <icu:line     icu:dependency="line.brk"/>
+                <icu:line     alt="loose"  icu:dependency="line_loose.brk"/>
+                <icu:line     alt="normal" icu:dependency="line_normal.brk"/>
+                <icu:line     alt="strict" icu:dependency="line.brk"/>
+                <icu:sentence icu:dependency="sent.brk"/>
+                <icu:title    icu:dependency="title.brk"/>
+            </icu:boundaries>
+            <icu:dictionaries>
+                <icu:dictionary type="Hani" icu:dependency="cjdict.dict"/>
+                <icu:dictionary type="Hira" icu:dependency="cjdict.dict"/>
+                <icu:dictionary type="Kana" icu:dependency="cjdict.dict"/>
+                <icu:dictionary type="Khmr" icu:dependency="khmerdict.dict"/>
+                <icu:dictionary type="Laoo" icu:dependency="laodict.dict"/>
+                <icu:dictionary type="Mymr" icu:dependency="burmesedict.dict"/>
+                <icu:dictionary type="Thai" icu:dependency="thaidict.dict"/>
+            </icu:dictionaries>
+        </icu:breakIteratorData>
+    </special>
+</ldml>
+

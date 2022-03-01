@@ -31,6 +31,9 @@
 
 #include "mongo/scripting/mozjs/dbquery.h"
 
+#include <js/ValueArray.h>
+#include <jsfriendapi.h>
+
 #include "mongo/scripting/mozjs/idwrapper.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
@@ -125,8 +128,8 @@ void DBQueryInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, 
     JS::RootedValue arrayAccess(cx);
     parentWrapper.getValue(InternedString::arrayAccess, &arrayAccess);
 
-    if (arrayAccess.isObject() && JS_ObjectIsFunction(cx, arrayAccess.toObjectOrNull())) {
-        JS::AutoValueArray<1> args(cx);
+    if (arrayAccess.isObject() && js::IsFunctionObject(arrayAccess.toObjectOrNull())) {
+        JS::RootedValueArray<1> args(cx);
 
         args[0].setInt32(wid.toInt32());
 

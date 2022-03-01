@@ -32,6 +32,8 @@
 #include "mongo/scripting/mozjs/bindata.h"
 
 #include <iomanip>
+#include <js/Object.h>
+#include <js/ValueArray.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/scripting/mozjs/implscope.h"
@@ -80,7 +82,7 @@ void hexToBinData(JSContext* cx,
         ErrorCodes::BadValue, "BinData hex string must be an even length", hexstr.size() % 2 == 0);
 
     std::string encoded = base64::encode(hexblob::decode(hexstr));
-    JS::AutoValueArray<2> args(cx);
+    JS::RootedValueArray<2> args(cx);
 
     args[0].setInt32(type);
     ValueReader(cx, args[1]).fromStringData(encoded);
@@ -88,16 +90,16 @@ void hexToBinData(JSContext* cx,
 }
 
 std::string* getEncoded(JS::HandleValue thisv) {
-    return static_cast<std::string*>(JS_GetPrivate(thisv.toObjectOrNull()));
+    return static_cast<std::string*>(JS::GetPrivate(thisv.toObjectOrNull()));
 }
 
 std::string* getEncoded(JSObject* thisv) {
-    return static_cast<std::string*>(JS_GetPrivate(thisv));
+    return static_cast<std::string*>(JS::GetPrivate(thisv));
 }
 
 }  // namespace
 
-void BinDataInfo::finalize(js::FreeOp* fop, JSObject* obj) {
+void BinDataInfo::finalize(JSFreeOp* fop, JSObject* obj) {
     auto str = getEncoded(obj);
 
     if (str) {
@@ -126,7 +128,7 @@ void BinDataInfo::Functions::UUID::call(JSContext* cx, JS::CallArgs args) {
     ConstDataRange cdr = uuid->toCDR();
     std::string encoded = mongo::base64::encode(StringData(cdr.data(), cdr.length()));
 
-    JS::AutoValueArray<2> newArgs(cx);
+    JS::RootedValueArray<2> newArgs(cx);
     newArgs[0].setInt32(newUUID);
     ValueReader(cx, newArgs[1]).fromStringData(encoded);
     getScope(cx)->getProto<BinDataInfo>().newInstance(newArgs, args.rval());
@@ -253,7 +255,7 @@ void BinDataInfo::construct(JSContext* cx, JS::CallArgs args) {
     o.defineProperty(InternedString::len, len, JSPROP_READONLY);
     o.defineProperty(InternedString::type, type, JSPROP_READONLY);
 
-    JS_SetPrivate(thisv, scope->trackedNew<std::string>(std::move(str)));
+    JS::SetPrivate(thisv, scope->trackedNew<std::string>(std::move(str)));
 
     args.rval().setObjectOrNull(thisv);
 }

@@ -31,6 +31,9 @@
 
 #include "mongo/scripting/mozjs/db.h"
 
+#include <js/ValueArray.h>
+#include <jsfriendapi.h>
+
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/scripting/mozjs/idwrapper.h"
@@ -91,11 +94,11 @@ void DBInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool*
     // Check if getCollection has been installed yet
     // It is undefined if the user has a db name the same as one of methods/properties of the DB
     // object.
-    if (!(getCollection.isObject() && JS_ObjectIsFunction(cx, getCollection.toObjectOrNull()))) {
+    if (!(getCollection.isObject() && js::IsFunctionObject(getCollection.toObjectOrNull()))) {
         return;
     }
 
-    JS::AutoValueArray<1> args(cx);
+    JS::RootedValueArray<1> args(cx);
 
     idw.toValue(args[0]);
 

@@ -1,0 +1,601 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+mzn{
+    AuxExemplarCharacters{"[\u200C\u200D\u200E\u200F \u064E \u064F \u0650 \u0652 \u0656 \u0670 إ ك ى ي]"}
+    Ellipsis{
+        final{"{0}…"}
+        initial{"…{0}"}
+        medial{"{0}…{1}"}
+        word-final{"{0} …"}
+        word-initial{"… {0}"}
+        word-medial{"{0} … {1}"}
+    }
+    ExemplarCharacters{
+        "[\u064B \u064C \u064D \u0651 \u0654 ء آ أ ؤ ئ ا ب پ ة ت ث ج چ ح خ د ذ ر ز ژ "
+        "س ش ص ض ط ظ ع غ ف ق ک گ ل م ن ه و ی]"
+    }
+    ExemplarCharactersIndex{"[آ ا ب پ ت ث ج چ ح خ د ذ ر ز ژ س ش ص ض ط ظ ع غ ف ق ک گ ل م ن ه و ی]"}
+    ExemplarCharactersPunctuation{"[\\- ‐ ‑ ، ٫ ٬ ؛ \\: ! ؟ . … ‹ › « » ( ) \\[ \\] * / \\\\]"}
+    MoreInformation{"؟"}
+    NumberElements{
+        arabext{
+            symbols{
+                timeSeparator{":"}
+            }
+        }
+        default{"arabext"}
+        native{"arabext"}
+    }
+    calendar{
+        default{"persian"}
+        gregorian{
+            eras{
+                abbreviated{
+                    "پ.م",
+                    "م.",
+                }
+                abbreviated%variant{
+                    "پ.م.",
+                    "م",
+                }
+                wide{
+                    "قبل میلاد",
+                    "بعد میلاد",
+                }
+                wide%variant{
+                    "قبل میلادی تقویم",
+                    "میلادی",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "ژانویه",
+                        "فوریه",
+                        "مارس",
+                        "آوریل",
+                        "مه",
+                        "ژوئن",
+                        "ژوئیه",
+                        "اوت",
+                        "سپتامبر",
+                        "اکتبر",
+                        "نوامبر",
+                        "دسامبر",
+                    }
+                    wide{
+                        "ژانویه",
+                        "فوریه",
+                        "مارس",
+                        "آوریل",
+                        "مه",
+                        "ژوئن",
+                        "ژوئیه",
+                        "اوت",
+                        "سپتامبر",
+                        "اکتبر",
+                        "نوامبر",
+                        "دسامبر",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ژانویه",
+                        "فوریه",
+                        "مارس",
+                        "آوریل",
+                        "مه",
+                        "ژوئن",
+                        "ژوئیه",
+                        "اوت",
+                        "سپتامبر",
+                        "اکتبر",
+                        "نوامبر",
+                        "دسامبر",
+                    }
+                    wide{
+                        "ژانویه",
+                        "فوریه",
+                        "مارس",
+                        "آوریل",
+                        "مه",
+                        "ژوئن",
+                        "ژوئیه",
+                        "اوت",
+                        "سپتامبر",
+                        "اکتبر",
+                        "نوامبر",
+                        "دسامبر",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"›"}
+        alternateQuotationStart{"‹"}
+        quotationEnd{"»"}
+        quotationStart{"«"}
+    }
+    fields{
+        day{
+            dn{"روز"}
+            relative{
+                "-1"{"دیروز"}
+                "0"{"اَمروز"}
+                "1"{"فِردا"}
+            }
+            relativeTime{
+                future{
+                    other{"{0} روز دله"}
+                }
+                past{
+                    other{"{0} روز پیش"}
+                }
+            }
+        }
+        day-narrow{
+            dn{"روز"}
+            relativeTime{
+                future{
+                    other{"{0} روز دله"}
+                }
+                past{
+                    other{"{0} روز پیش"}
+                }
+            }
+        }
+        day-short{
+            dn{"روز"}
+            relativeTime{
+                future{
+                    other{"{0} روز دله"}
+                }
+                past{
+                    other{"{0} روز پیش"}
+                }
+            }
+        }
+        dayperiod{
+            dn{"صواحی/ظُر"}
+        }
+        era{
+            dn{"تقویم"}
+        }
+        fri{
+            relative{
+                "-1"{"قبلی جومه"}
+                "0"{"این جومه"}
+                "1"{"بعدی جومه"}
+            }
+        }
+        fri-narrow{
+            relative{
+                "-1"{"قبلی جومه"}
+                "0"{"این جومه"}
+                "1"{"بعدی جومه"}
+            }
+        }
+        fri-short{
+            relative{
+                "-1"{"قبلی جومه"}
+                "0"{"این جومه"}
+                "1"{"بعدی جومه"}
+            }
+        }
+        hour{
+            dn{"ساعِت"}
+            relativeTime{
+                future{
+                    other{"{0} ساعِت دله"}
+                }
+                past{
+                    other{"{0} ساعِت پیش"}
+                }
+            }
+        }
+        hour-narrow{
+            dn{"ساعت"}
+            relativeTime{
+                future{
+                    other{"{0} ساعت دله"}
+                }
+                past{
+                    other{"{0} ساعت پیش"}
+                }
+            }
+        }
+        hour-short{
+            dn{"ساعت"}
+            relativeTime{
+                future{
+                    other{"{0} ساعت دله"}
+                }
+                past{
+                    other{"{0} ساعت پیش"}
+                }
+            }
+        }
+        minute{
+            dn{"دقیقه"}
+            relativeTime{
+                future{
+                    other{"{0} دقیقه دله"}
+                }
+                past{
+                    other{"{0} دَقه پیش"}
+                }
+            }
+        }
+        minute-narrow{
+            dn{"دَقه"}
+            relativeTime{
+                future{
+                    other{"{0} دَقه دله"}
+                }
+                past{
+                    other{"{0} دَقه پیش"}
+                }
+            }
+        }
+        minute-short{
+            dn{"دَقه"}
+            relativeTime{
+                future{
+                    other{"{0} دَقه دله"}
+                }
+                past{
+                    other{"{0} دَقه پیش"}
+                }
+            }
+        }
+        mon{
+            relative{
+                "-1"{"قبلی دِشنبه"}
+                "0"{"این دِشنبه"}
+                "1"{"بعدی دِشنبه"}
+            }
+        }
+        mon-narrow{
+            relative{
+                "-1"{"قبلی دِشنبه"}
+                "0"{"این دِشنبه"}
+                "1"{"بعدی دِشنبه"}
+            }
+        }
+        mon-short{
+            relative{
+                "-1"{"قبلی دِشنبه"}
+                "0"{"این دِشنبه"}
+                "1"{"بعدی دِشنبه"}
+            }
+        }
+        month{
+            dn{"ماه"}
+            relative{
+                "-1"{"ماه قبل"}
+                "0"{"این ماه"}
+                "1"{"ماه ِبعد"}
+            }
+            relativeTime{
+                future{
+                    other{"{0} ماه دله"}
+                }
+                past{
+                    other{"{0} ماه پیش"}
+                }
+            }
+        }
+        month-narrow{
+            dn{"ماه"}
+            relativeTime{
+                future{
+                    other{"{0} ماه دله"}
+                }
+                past{
+                    other{"{0} ماه پیش"}
+                }
+            }
+        }
+        month-short{
+            dn{"ماه"}
+            relativeTime{
+                future{
+                    other{"{0} ماه دله"}
+                }
+                past{
+                    other{"{0} ماه پیش"}
+                }
+            }
+        }
+        quarter{
+            dn{"ربع"}
+            relativeTime{
+                future{
+                    other{"{0} ربع دله"}
+                }
+                past{
+                    other{"{0} ربع پیش"}
+                }
+            }
+        }
+        quarter-narrow{
+            dn{"ربع"}
+            relativeTime{
+                future{
+                    other{"{0} ربع دله"}
+                }
+                past{
+                    other{"{0} ربع پیش"}
+                }
+            }
+        }
+        quarter-short{
+            dn{"ربع"}
+            relativeTime{
+                future{
+                    other{"{0} ربع دله"}
+                }
+                past{
+                    other{"{0} ربع پیش"}
+                }
+            }
+        }
+        sat{
+            relative{
+                "-1"{"قبلی شنبه"}
+                "0"{"این شنبه"}
+                "1"{"بعدی شنبه"}
+            }
+        }
+        sat-narrow{
+            relative{
+                "-1"{"قبلی شنبه"}
+                "0"{"این شنبه"}
+                "1"{"بعدی شنبه"}
+            }
+        }
+        sat-short{
+            relative{
+                "-1"{"قبلی شنبه"}
+                "0"{"این شنبه"}
+                "1"{"بعدی شنبه"}
+            }
+        }
+        second{
+            dn{"ثانیه"}
+            relativeTime{
+                future{
+                    other{"{0} ثانیه دله"}
+                }
+                past{
+                    other{"{0} ثانیه پیش"}
+                }
+            }
+        }
+        second-narrow{
+            dn{"ثانیه"}
+            relativeTime{
+                future{
+                    other{"{0} ثانیه دله"}
+                }
+                past{
+                    other{"{0} ثانیه پیش"}
+                }
+            }
+        }
+        second-short{
+            dn{"ثانیه"}
+            relativeTime{
+                future{
+                    other{"{0} ثانیه دله"}
+                }
+                past{
+                    other{"{0} ثانیه پیش"}
+                }
+            }
+        }
+        sun{
+            relative{
+                "-1"{"قبلی یکشنبه"}
+                "0"{"این یکشنبه"}
+                "1"{"بعدی یکشنبه"}
+            }
+        }
+        sun-narrow{
+            relative{
+                "-1"{"قبلی یکشنبه"}
+                "0"{"این یکشنبه"}
+                "1"{"بعدی یکشنبه"}
+            }
+        }
+        sun-short{
+            relative{
+                "-1"{"یکشنبه قبل"}
+                "0"{"این یکشنبه"}
+                "1"{"یکشنبه بعد"}
+            }
+        }
+        thu{
+            relative{
+                "-1"{"قبلی پنجشنبه"}
+                "0"{"این پنجشنبه"}
+                "1"{"بعدی پنجشنبه"}
+            }
+        }
+        thu-narrow{
+            relative{
+                "-1"{"قبلی پنجشنبه"}
+                "0"{"این پنجشنبه"}
+                "1"{"بعدی پنجشنبه"}
+            }
+        }
+        thu-short{
+            relative{
+                "-1"{"قبلی پنجشنبه"}
+                "0"{"این پنجشنبه"}
+                "1"{"بعدی پنجشنبه"}
+            }
+        }
+        tue{
+            relative{
+                "-1"{"قبلی سه‌شنبه"}
+                "0"{"این سه‌شنبه"}
+                "1"{"بعدی سه‌شنبه"}
+            }
+        }
+        tue-narrow{
+            relative{
+                "-1"{"قبلی سه‌شنبه"}
+                "0"{"این سه‌شنبه"}
+                "1"{"بعدی سه‌شنبه"}
+            }
+        }
+        tue-short{
+            relative{
+                "-1"{"قبلی سه‌شنبه"}
+                "0"{"این سه‌شنبه"}
+                "1"{"بعدی سه‌شنبه"}
+            }
+        }
+        wed{
+            relative{
+                "-1"{"قبلی چارشنبه"}
+                "0"{"این چارشنبه"}
+                "1"{"بعدی چارشنبه"}
+            }
+        }
+        wed-narrow{
+            relative{
+                "-1"{"قبلی چارشنبه"}
+                "0"{"این چارشنبه"}
+                "1"{"بعدی چارشنبه"}
+            }
+        }
+        wed-short{
+            relative{
+                "-1"{"قبلی چارشنبه"}
+                "0"{"این چارشنبه"}
+                "1"{"بعدی چارشنبه"}
+            }
+        }
+        week{
+            dn{"هفته"}
+            relative{
+                "-1"{"قبلی هفته"}
+                "0"{"این هفته"}
+                "1"{"بعدی هفته"}
+            }
+            relativeTime{
+                future{
+                    other{"{0} هفته دله"}
+                }
+                past{
+                    other{"{0} هفته پیش"}
+                }
+            }
+        }
+        week-narrow{
+            dn{"هفته"}
+            relativeTime{
+                future{
+                    other{"{0} هفته دله"}
+                }
+                past{
+                    other{"{0} هفته پیش"}
+                }
+            }
+        }
+        week-short{
+            dn{"هفته"}
+            relativeTime{
+                future{
+                    other{"{0} هفته دله"}
+                }
+                past{
+                    other{"{0} هفته پیش"}
+                }
+            }
+        }
+        weekday{
+            dn{"هفته‌ی ِروز"}
+        }
+        year{
+            dn{"سال"}
+            relative{
+                "-1"{"پارسال"}
+                "0"{"امسال"}
+                "1"{"سال دیگه"}
+            }
+            relativeTime{
+                future{
+                    other{"{0} سال دله"}
+                }
+                past{
+                    other{"{0} سال پیش"}
+                }
+            }
+        }
+        year-narrow{
+            dn{"سال"}
+            relativeTime{
+                future{
+                    other{"{0} سال دله"}
+                }
+                past{
+                    other{"{0} سال پیش"}
+                }
+            }
+        }
+        year-short{
+            dn{"سال"}
+            relativeTime{
+                future{
+                    other{"{0} سال دله"}
+                }
+                past{
+                    other{"{0} سال پیش"}
+                }
+            }
+        }
+        zone{
+            dn{"زمونی منقطه"}
+        }
+    }
+    layout{
+        characters{"right-to-left"}
+        lines{"top-to-bottom"}
+    }
+    listPattern{
+        standard{
+            2{"{0}, {1}"}
+            end{"{0}, {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        unit{
+            2{"{0}, {1}"}
+            end{"{0}, {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        unit-narrow{
+            2{"{0}, {1}"}
+            end{"{0}, {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        unit-short{
+            2{"{0}, {1}"}
+            end{"{0}, {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+    }
+    measurementSystemNames{
+        UK{"بریتانیایی"}
+        US{"آمریکایی"}
+        metric{"متریک"}
+    }
+}

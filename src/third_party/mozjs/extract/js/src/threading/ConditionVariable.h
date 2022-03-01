@@ -7,14 +7,13 @@
 #ifndef threading_ConditionVariable_h
 #define threading_ConditionVariable_h
 
-#include "mozilla/Attributes.h"
-#include "mozilla/Move.h"
 #include "mozilla/PlatformConditionVariable.h"
 #include "mozilla/TimeStamp.h"
 
 #include <stdint.h>
-#ifndef XP_WIN
-# include <pthread.h>
+#include <utility>
+#if !defined(XP_WIN) && !defined(__wasi__)
+#  include <pthread.h>
 #endif
 
 #include "threading/LockGuard.h"
@@ -22,39 +21,41 @@
 
 namespace js {
 
-template <class T> class ExclusiveData;
+template <class T>
+class ExclusiveData;
 
-enum class CVStatus {
-  NoTimeout,
-  Timeout
-};
+enum class CVStatus { NoTimeout, Timeout };
 
-template <typename T> using UniqueLock = LockGuard<T>;
+template <typename T>
+using UniqueLock = LockGuard<T>;
 
 // A poly-fill for std::condition_variable.
-class ConditionVariable
-{
-public:
+class ConditionVariable {
+ public:
   struct PlatformData;
 
   ConditionVariable() = default;
   ~ConditionVariable() = default;
 
   // Wake one thread that is waiting on this condition.
-  void notify_one() {
-    impl_.notify_one();
-  }
+  void notify_one() { impl_.notify_one(); }
 
   // Wake all threads that are waiting on this condition.
-  void notify_all() {
-    impl_.notify_all();
-  }
+  void notify_all() { impl_.notify_all(); }
 
   // Block the current thread of execution until this condition variable is
   // woken from another thread via notify_one or notify_all.
-  void wait(UniqueLock<Mutex>& lock) {
-    impl_.wait(lock.lock);
+  void wait(Mutex& lock) {
+#ifdef DEBUG
+    lock.preUnlockChecks();
+#endif
+    impl_.wait(lock.impl_);
+#ifdef DEBUG
+    lock.preLockChecks();
+    lock.postLockChecks();
+#endif
   }
+  void wait(UniqueLock<Mutex>& lock) { wait(lock.lock); }
 
   // As with |wait|, block the current thread of execution until woken from
   // another thread. This method will resume waiting once woken until the given
@@ -98,8 +99,18 @@ public:
   // encounter substantially longer delays, depending on system load.
   CVStatus wait_for(UniqueLock<Mutex>& lock,
                     const mozilla::TimeDuration& rel_time) {
-    return impl_.wait_for(lock.lock, rel_time) == mozilla::detail::CVStatus::Timeout
-      ? CVStatus::Timeout : CVStatus::NoTimeout;
+#ifdef DEBUG
+    lock.lock.preUnlockChecks();
+#endif
+    CVStatus res =
+        impl_.wait_for(lock.lock.impl_, rel_time) == mozilla::CVStatus::Timeout
+            ? CVStatus::Timeout
+            : CVStatus::NoTimeout;
+#ifdef DEBUG
+    lock.lock.preLockChecks();
+    lock.lock.postLockChecks();
+#endif
+    return res;
   }
 
   // As with |wait_for|, block the current thread of execution until woken from
@@ -110,18 +121,18 @@ public:
   bool wait_for(UniqueLock<Mutex>& lock, const mozilla::TimeDuration& rel_time,
                 Predicate pred) {
     return wait_until(lock, mozilla::TimeStamp::Now() + rel_time,
-                      mozilla::Move(pred));
+                      std::move(pred));
   }
 
-
-private:
+ private:
   ConditionVariable(const ConditionVariable&) = delete;
   ConditionVariable& operator=(const ConditionVariable&) = delete;
-  template <class T> friend class ExclusiveWaitableData;
+  template <class T>
+  friend class ExclusiveWaitableData;
 
   mozilla::detail::ConditionVariableImpl impl_;
 };
 
-} // namespace js
+}  // namespace js
 
-#endif // threading_ConditionVariable_h
+#endif  // threading_ConditionVariable_h

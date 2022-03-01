@@ -10,26 +10,56 @@
 #include <stdint.h>
 #include <algorithm>  // for std::min, std::max
 #include <ostream>
+#include <type_traits>
 #include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/FloatingPoint.h"
-#include "mozilla/TypeTraits.h"
 #include "mozilla/Types.h"
 
 namespace IPC {
-template<typename T> struct ParamTraits;
-} // namespace IPC
+template <typename T>
+struct ParamTraits;
+}  // namespace IPC
 
 #ifdef XP_WIN
 // defines TimeStampValue as a complex value keeping both
 // GetTickCount and QueryPerformanceCounter values
-#include "TimeStamp_windows.h"
+#  include "TimeStamp_windows.h"
 #endif
 
 namespace mozilla {
 
 #ifndef XP_WIN
-typedef uint64_t TimeStampValue;
+struct TimeStamp63Bit {
+  uint64_t mUsedCanonicalNow : 1;
+  uint64_t mTimeStamp : 63;
+
+  constexpr TimeStamp63Bit() : mUsedCanonicalNow(0), mTimeStamp(0) {}
+
+  MOZ_IMPLICIT constexpr TimeStamp63Bit(const uint64_t aValue)
+      : mUsedCanonicalNow(0), mTimeStamp(aValue) {}
+
+  constexpr TimeStamp63Bit(const bool aUsedCanonicalNow,
+                           const int64_t aTimeStamp)
+      : mUsedCanonicalNow(aUsedCanonicalNow ? 1 : 0), mTimeStamp(aTimeStamp) {}
+
+  bool operator==(const TimeStamp63Bit aOther) const {
+    uint64_t here, there;
+    memcpy(&here, this, sizeof(TimeStamp63Bit));
+    memcpy(&there, &aOther, sizeof(TimeStamp63Bit));
+    return here == there;
+  }
+
+  operator uint64_t() const { return mTimeStamp; }
+
+  bool IsNull() const { return mTimeStamp == 0; }
+
+  bool UsedCanonicalNow() const { return mUsedCanonicalNow; }
+
+  void SetCanonicalNow() { mUsedCanonicalNow = 1; }
+};
+
+typedef TimeStamp63Bit TimeStampValue;
 #endif
 
 class TimeStamp;
@@ -37,9 +67,8 @@ class TimeStamp;
 /**
  * Platform-specific implementation details of BaseTimeDuration.
  */
-class BaseTimeDurationPlatformUtils
-{
-public:
+class BaseTimeDurationPlatformUtils {
+ public:
   static MFBT_API double ToSeconds(int64_t aTicks);
   static MFBT_API double ToSecondsSigDigits(int64_t aTicks);
   static MFBT_API int64_t TicksFromMilliseconds(double aMilliseconds);
@@ -60,16 +89,14 @@ public:
  * operations are performed on the integer count of ticks (mValue).
  */
 template <typename ValueCalculator>
-class BaseTimeDuration
-{
-public:
+class BaseTimeDuration {
+ public:
   // The default duration is 0.
   constexpr BaseTimeDuration() : mValue(0) {}
   // Allow construction using '0' as the initial value, for readability,
   // but no other numbers (so we don't have any implicit unit conversions).
   struct _SomethingVeryRandomHere;
-  MOZ_IMPLICIT BaseTimeDuration(_SomethingVeryRandomHere* aZero) : mValue(0)
-  {
+  MOZ_IMPLICIT BaseTimeDuration(_SomethingVeryRandomHere* aZero) : mValue(0) {
     MOZ_ASSERT(!aZero, "Who's playing funny games here?");
   }
   // Default copy-constructor and assignment are OK
@@ -77,18 +104,15 @@ public:
   // Converting copy-constructor and assignment operator
   template <typename E>
   explicit BaseTimeDuration(const BaseTimeDuration<E>& aOther)
-    : mValue(aOther.mValue)
-  { }
+      : mValue(aOther.mValue) {}
 
   template <typename E>
-  BaseTimeDuration& operator=(const BaseTimeDuration<E>& aOther)
-  {
+  BaseTimeDuration& operator=(const BaseTimeDuration<E>& aOther) {
     mValue = aOther.mValue;
     return *this;
   }
 
-  double ToSeconds() const
-  {
+  double ToSeconds() const {
     if (mValue == INT64_MAX) {
       return PositiveInfinity<double>();
     }
@@ -100,8 +124,7 @@ public:
   // Return a duration value that includes digits of time we think to
   // be significant.  This method should be used when displaying a
   // time to humans.
-  double ToSecondsSigDigits() const
-  {
+  double ToSecondsSigDigits() const {
     if (mValue == INT64_MAX) {
       return PositiveInfinity<double>();
     }
@@ -118,12 +141,10 @@ public:
   // mValue do not allow us to represent durations of that length,
   // long durations are clamped to the max/min representable value
   // instead of overflowing.
-  static inline BaseTimeDuration FromSeconds(double aSeconds)
-  {
+  static inline BaseTimeDuration FromSeconds(double aSeconds) {
     return FromMilliseconds(aSeconds * 1000.0);
   }
-  static BaseTimeDuration FromMilliseconds(double aMilliseconds)
-  {
+  static BaseTimeDuration FromMilliseconds(double aMilliseconds) {
     if (aMilliseconds == PositiveInfinity<double>()) {
       return Forever();
     }
@@ -131,38 +152,29 @@ public:
       return FromTicks(INT64_MIN);
     }
     return FromTicks(
-      BaseTimeDurationPlatformUtils::TicksFromMilliseconds(aMilliseconds));
+        BaseTimeDurationPlatformUtils::TicksFromMilliseconds(aMilliseconds));
   }
-  static inline BaseTimeDuration FromMicroseconds(double aMicroseconds)
-  {
+  static inline BaseTimeDuration FromMicroseconds(double aMicroseconds) {
     return FromMilliseconds(aMicroseconds / 1000.0);
   }
 
-  static constexpr BaseTimeDuration Forever()
-  {
-    return FromTicks(INT64_MAX);
-  }
+  static constexpr BaseTimeDuration Forever() { return FromTicks(INT64_MAX); }
 
-  BaseTimeDuration operator+(const BaseTimeDuration& aOther) const
-  {
+  BaseTimeDuration operator+(const BaseTimeDuration& aOther) const {
     return FromTicks(ValueCalculator::Add(mValue, aOther.mValue));
   }
-  BaseTimeDuration operator-(const BaseTimeDuration& aOther) const
-  {
+  BaseTimeDuration operator-(const BaseTimeDuration& aOther) const {
     return FromTicks(ValueCalculator::Subtract(mValue, aOther.mValue));
   }
-  BaseTimeDuration& operator+=(const BaseTimeDuration& aOther)
-  {
+  BaseTimeDuration& operator+=(const BaseTimeDuration& aOther) {
     mValue = ValueCalculator::Add(mValue, aOther.mValue);
     return *this;
   }
-  BaseTimeDuration& operator-=(const BaseTimeDuration& aOther)
-  {
+  BaseTimeDuration& operator-=(const BaseTimeDuration& aOther) {
     mValue = ValueCalculator::Subtract(mValue, aOther.mValue);
     return *this;
   }
-  BaseTimeDuration operator-() const
-  {
+  BaseTimeDuration operator-() const {
     // We don't just use FromTicks(ValueCalculator::Subtract(0, mValue))
     // since that won't give the correct result for -TimeDuration::Forever().
     int64_t ticks;
@@ -178,17 +190,15 @@ public:
   }
 
   static BaseTimeDuration Max(const BaseTimeDuration& aA,
-                              const BaseTimeDuration& aB)
-  {
+                              const BaseTimeDuration& aB) {
     return FromTicks(std::max(aA.mValue, aB.mValue));
   }
   static BaseTimeDuration Min(const BaseTimeDuration& aA,
-                              const BaseTimeDuration& aB)
-  {
+                              const BaseTimeDuration& aB) {
     return FromTicks(std::min(aA.mValue, aB.mValue));
   }
 
-private:
+ private:
   // Block double multiplier (slower, imprecise if long duration) - Bug 853398.
   // If required, use MultDouble explicitly and with care.
   BaseTimeDuration operator*(const double aMultiplier) const = delete;
@@ -198,84 +208,64 @@ private:
   // the passed argument can then cause divide-by-zero) - Bug 1147491.
   BaseTimeDuration operator/(const double aDivisor) const = delete;
 
-public:
-  BaseTimeDuration MultDouble(double aMultiplier) const
-  {
+ public:
+  BaseTimeDuration MultDouble(double aMultiplier) const {
     return FromTicks(ValueCalculator::Multiply(mValue, aMultiplier));
   }
-  BaseTimeDuration operator*(const int32_t aMultiplier) const
-  {
+  BaseTimeDuration operator*(const int32_t aMultiplier) const {
     return FromTicks(ValueCalculator::Multiply(mValue, aMultiplier));
   }
-  BaseTimeDuration operator*(const uint32_t aMultiplier) const
-  {
+  BaseTimeDuration operator*(const uint32_t aMultiplier) const {
     return FromTicks(ValueCalculator::Multiply(mValue, aMultiplier));
   }
-  BaseTimeDuration operator*(const int64_t aMultiplier) const
-  {
+  BaseTimeDuration operator*(const int64_t aMultiplier) const {
     return FromTicks(ValueCalculator::Multiply(mValue, aMultiplier));
   }
-  BaseTimeDuration operator*(const uint64_t aMultiplier) const
-  {
+  BaseTimeDuration operator*(const uint64_t aMultiplier) const {
     if (aMultiplier > INT64_MAX) {
       return Forever();
     }
     return FromTicks(ValueCalculator::Multiply(mValue, aMultiplier));
   }
-  BaseTimeDuration operator/(const int64_t aDivisor) const
-  {
+  BaseTimeDuration operator/(const int64_t aDivisor) const {
     MOZ_ASSERT(aDivisor != 0, "Division by zero");
     return FromTicks(ValueCalculator::Divide(mValue, aDivisor));
   }
-  double operator/(const BaseTimeDuration& aOther) const
-  {
+  double operator/(const BaseTimeDuration& aOther) const {
     MOZ_ASSERT(aOther.mValue != 0, "Division by zero");
     return ValueCalculator::DivideDouble(mValue, aOther.mValue);
   }
-  BaseTimeDuration operator%(const BaseTimeDuration& aOther) const
-  {
+  BaseTimeDuration operator%(const BaseTimeDuration& aOther) const {
     MOZ_ASSERT(aOther.mValue != 0, "Division by zero");
     return FromTicks(ValueCalculator::Modulo(mValue, aOther.mValue));
   }
 
-  template<typename E>
-  bool operator<(const BaseTimeDuration<E>& aOther) const
-  {
+  template <typename E>
+  bool operator<(const BaseTimeDuration<E>& aOther) const {
     return mValue < aOther.mValue;
   }
-  template<typename E>
-  bool operator<=(const BaseTimeDuration<E>& aOther) const
-  {
+  template <typename E>
+  bool operator<=(const BaseTimeDuration<E>& aOther) const {
     return mValue <= aOther.mValue;
   }
-  template<typename E>
-  bool operator>=(const BaseTimeDuration<E>& aOther) const
-  {
+  template <typename E>
+  bool operator>=(const BaseTimeDuration<E>& aOther) const {
     return mValue >= aOther.mValue;
   }
-  template<typename E>
-  bool operator>(const BaseTimeDuration<E>& aOther) const
-  {
+  template <typename E>
+  bool operator>(const BaseTimeDuration<E>& aOther) const {
     return mValue > aOther.mValue;
   }
-  template<typename E>
-  bool operator==(const BaseTimeDuration<E>& aOther) const
-  {
+  template <typename E>
+  bool operator==(const BaseTimeDuration<E>& aOther) const {
     return mValue == aOther.mValue;
   }
-  template<typename E>
-  bool operator!=(const BaseTimeDuration<E>& aOther) const
-  {
+  template <typename E>
+  bool operator!=(const BaseTimeDuration<E>& aOther) const {
     return mValue != aOther.mValue;
   }
-  bool IsZero() const
-  {
-    return mValue == 0;
-  }
-  explicit operator bool() const
-  {
-    return mValue != 0;
-  }
+  bool IsZero() const { return mValue == 0; }
+  explicit operator bool() const { return mValue != 0; }
 
   friend std::ostream& operator<<(std::ostream& aStream,
                                   const BaseTimeDuration& aDuration) {
@@ -297,21 +287,19 @@ public:
   // Comparing durations for equality will only lead to bugs on
   // platforms with high-resolution timers.
 
-private:
+ private:
   friend class TimeStamp;
   friend struct IPC::ParamTraits<mozilla::BaseTimeDuration<ValueCalculator>>;
   template <typename>
   friend class BaseTimeDuration;
 
-  static BaseTimeDuration FromTicks(int64_t aTicks)
-  {
+  static BaseTimeDuration FromTicks(int64_t aTicks) {
     BaseTimeDuration t;
     t.mValue = aTicks;
     return t;
   }
 
-  static BaseTimeDuration FromTicks(double aTicks)
-  {
+  static BaseTimeDuration FromTicks(double aTicks) {
     // NOTE: this MUST be a >= test, because int64_t(double(INT64_MAX))
     // overflows and gives INT64_MIN.
     if (aTicks >= double(INT64_MAX)) {
@@ -334,33 +322,29 @@ private:
  * Perform arithmetic operations on the value of a BaseTimeDuration without
  * doing strict checks on the range of values.
  */
-class TimeDurationValueCalculator
-{
-public:
+class TimeDurationValueCalculator {
+ public:
   static int64_t Add(int64_t aA, int64_t aB) { return aA + aB; }
   static int64_t Subtract(int64_t aA, int64_t aB) { return aA - aB; }
 
   template <typename T>
-  static int64_t Multiply(int64_t aA, T aB)
-  {
-    static_assert(IsIntegral<T>::value,
+  static int64_t Multiply(int64_t aA, T aB) {
+    static_assert(std::is_integral_v<T>,
                   "Using integer multiplication routine with non-integer type."
                   " Further specialization required");
     return aA * static_cast<int64_t>(aB);
   }
 
   static int64_t Divide(int64_t aA, int64_t aB) { return aA / aB; }
-  static double DivideDouble(int64_t aA, int64_t aB)
-  {
+  static double DivideDouble(int64_t aA, int64_t aB) {
     return static_cast<double>(aA) / aB;
   }
   static int64_t Modulo(int64_t aA, int64_t aB) { return aA % aB; }
 };
 
 template <>
-inline int64_t
-TimeDurationValueCalculator::Multiply<double>(int64_t aA, double aB)
-{
+inline int64_t TimeDurationValueCalculator::Multiply<double>(int64_t aA,
+                                                             double aB) {
   return static_cast<int64_t>(aA * aB);
 }
 
@@ -402,15 +386,18 @@ typedef BaseTimeDuration<TimeDurationValueCalculator> TimeDuration;
  * explicitly nullable and provides an IsNull() method. time_point
  * is initialized to the clock's epoch and provides a
  * time_since_epoch() method that functions similiarly. i.e.
- * t.IsNull() is equivalent to t.time_since_epoch() == decltype(t)::duration::zero();
+ * t.IsNull() is equivalent to t.time_since_epoch() ==
+ * decltype(t)::duration::zero();
+ *
+ * Note that, since TimeStamp objects are small, prefer to pass them by value
+ * unless there is a specific reason not to do so.
  */
-class TimeStamp
-{
-public:
+class TimeStamp {
+ public:
   /**
    * Initialize to the "null" moment
    */
-  constexpr TimeStamp() : mValue(0) {}
+  constexpr TimeStamp() : mValue() {}
   // Default copy-constructor and assignment are OK
 
   /**
@@ -427,27 +414,27 @@ public:
    * UNTESTED ON OTHER PLATFORMS
    */
 #if defined(XP_DARWIN) || defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GTK)
-  static TimeStamp FromSystemTime(int64_t aSystemTime)
-  {
+  static TimeStamp FromSystemTime(int64_t aSystemTime) {
     static_assert(sizeof(aSystemTime) == sizeof(TimeStampValue),
                   "System timestamp should be same units as TimeStampValue");
-    return TimeStamp(aSystemTime);
+    return TimeStamp(TimeStampValue(false, aSystemTime));
   }
 #endif
 
   /**
    * Return true if this is the "null" moment
    */
-  bool IsNull() const { return mValue == 0; }
+  bool IsNull() const { return mValue.IsNull(); }
 
   /**
    * Return true if this is not the "null" moment, may be used in tests, e.g.:
    * |if (timestamp) { ... }|
    */
-  explicit operator bool() const
-  {
-    return mValue != 0;
-  }
+  explicit operator bool() const { return !IsNull(); }
+
+  bool UsedCanonicalNow() const { return mValue.UsedCanonicalNow(); }
+  static MFBT_API bool GetFuzzyfoxEnabled();
+  static MFBT_API void SetFuzzyfoxEnabled(bool aValue);
 
   /**
    * Return a timestamp reflecting the current elapsed system time. This
@@ -464,7 +451,9 @@ public:
    */
   static TimeStamp Now() { return Now(true); }
   static TimeStamp NowLoRes() { return Now(false); }
+  static TimeStamp NowUnfuzzed() { return NowUnfuzzed(true); }
 
+  static MFBT_API int64_t NowFuzzyTime();
   /**
    * Return a timestamp representing the time when the current process was
    * created which will be comparable with other timestamps taken with this
@@ -489,8 +478,7 @@ public:
   /**
    * Compute the difference between two timestamps. Both must be non-null.
    */
-  TimeDuration operator-(const TimeStamp& aOther) const
-  {
+  TimeDuration operator-(const TimeStamp& aOther) const {
     MOZ_ASSERT(!IsNull(), "Cannot compute with a null value");
     MOZ_ASSERT(!aOther.IsNull(), "Cannot compute with aOther null value");
     static_assert(-INT64_MAX > INT64_MIN, "int64_t sanity check");
@@ -508,79 +496,72 @@ public:
     return TimeDuration::FromTicks(ticks);
   }
 
-  TimeStamp operator+(const TimeDuration& aOther) const
-  {
+  TimeStamp operator+(const TimeDuration& aOther) const {
     TimeStamp result = *this;
     result += aOther;
     return result;
   }
-  TimeStamp operator-(const TimeDuration& aOther) const
-  {
+  TimeStamp operator-(const TimeDuration& aOther) const {
     TimeStamp result = *this;
     result -= aOther;
     return result;
   }
-  TimeStamp& operator+=(const TimeDuration& aOther)
-  {
+  TimeStamp& operator+=(const TimeDuration& aOther) {
     MOZ_ASSERT(!IsNull(), "Cannot compute with a null value");
     TimeStampValue value = mValue + aOther.mValue;
     // Check for underflow.
     // (We don't check for overflow because it's not obvious what the error
     //  behavior should be in that case.)
     if (aOther.mValue < 0 && value > mValue) {
-      value = 0;
+      value = TimeStampValue();
+    }
+    if (mValue.UsedCanonicalNow()) {
+      value.SetCanonicalNow();
     }
     mValue = value;
     return *this;
   }
-  TimeStamp& operator-=(const TimeDuration& aOther)
-  {
+  TimeStamp& operator-=(const TimeDuration& aOther) {
     MOZ_ASSERT(!IsNull(), "Cannot compute with a null value");
     TimeStampValue value = mValue - aOther.mValue;
     // Check for underflow.
     // (We don't check for overflow because it's not obvious what the error
     //  behavior should be in that case.)
     if (aOther.mValue > 0 && value > mValue) {
-      value = 0;
+      value = TimeStampValue();
+    }
+    if (mValue.UsedCanonicalNow()) {
+      value.SetCanonicalNow();
     }
     mValue = value;
     return *this;
   }
 
-  bool operator<(const TimeStamp& aOther) const
-  {
+  bool operator<(const TimeStamp& aOther) const {
     MOZ_ASSERT(!IsNull(), "Cannot compute with a null value");
     MOZ_ASSERT(!aOther.IsNull(), "Cannot compute with aOther null value");
     return mValue < aOther.mValue;
   }
-  bool operator<=(const TimeStamp& aOther) const
-  {
+  bool operator<=(const TimeStamp& aOther) const {
     MOZ_ASSERT(!IsNull(), "Cannot compute with a null value");
     MOZ_ASSERT(!aOther.IsNull(), "Cannot compute with aOther null value");
     return mValue <= aOther.mValue;
   }
-  bool operator>=(const TimeStamp& aOther) const
-  {
+  bool operator>=(const TimeStamp& aOther) const {
     MOZ_ASSERT(!IsNull(), "Cannot compute with a null value");
     MOZ_ASSERT(!aOther.IsNull(), "Cannot compute with aOther null value");
     return mValue >= aOther.mValue;
   }
-  bool operator>(const TimeStamp& aOther) const
-  {
+  bool operator>(const TimeStamp& aOther) const {
     MOZ_ASSERT(!IsNull(), "Cannot compute with a null value");
     MOZ_ASSERT(!aOther.IsNull(), "Cannot compute with aOther null value");
     return mValue > aOther.mValue;
   }
-  bool operator==(const TimeStamp& aOther) const
-  {
-    return IsNull()
-           ? aOther.IsNull()
-           : !aOther.IsNull() && mValue == aOther.mValue;
+  bool operator==(const TimeStamp& aOther) const {
+    return IsNull() ? aOther.IsNull()
+                    : !aOther.IsNull() && mValue == aOther.mValue;
   }
-  bool operator!=(const TimeStamp& aOther) const
-  {
-    return !(*this == aOther);
-  }
+  bool operator!=(const TimeStamp& aOther) const { return !(*this == aOther); }
 
   // Comparing TimeStamps for equality should be discouraged. Adding
   // two TimeStamps, or scaling TimeStamps, is nonsense and must never
@@ -589,13 +570,17 @@ public:
   static MFBT_API void Startup();
   static MFBT_API void Shutdown();
 
-private:
+ private:
   friend struct IPC::ParamTraits<mozilla::TimeStamp>;
-  friend void StartupTimelineRecordExternal(int, uint64_t);
 
   MOZ_IMPLICIT TimeStamp(TimeStampValue aValue) : mValue(aValue) {}
 
   static MFBT_API TimeStamp Now(bool aHighResolution);
+  static MFBT_API TimeStamp NowUnfuzzed(bool aHighResolution);
+  static MFBT_API TimeStamp NowFuzzy(TimeStampValue aValue);
+
+  static MFBT_API void UpdateFuzzyTime(int64_t aValue);
+  static MFBT_API void UpdateFuzzyTimeStamp(TimeStamp aValue);
 
   /**
    * Computes the uptime of the current process in microseconds. The result
@@ -621,8 +606,10 @@ private:
    * When using a system clock, a value is system dependent.
    */
   TimeStampValue mValue;
+
+  friend class Fuzzyfox;
 };
 
-} // namespace mozilla
+}  // namespace mozilla
 
 #endif /* mozilla_TimeStamp_h */

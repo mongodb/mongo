@@ -1,0 +1,246 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ku{
+    units{
+        angle{
+            arc-minute{
+                dnam{"xuleka kevanî"}
+                one{"{0} xuleka kevanî"}
+                other{"{0} xulekên kevanî"}
+            }
+            arc-second{
+                dnam{"çirkeya kevanî"}
+                one{"{0} çirkeya kevanî"}
+                other{"{0} çirkeyên kevanî"}
+            }
+            degree{
+                dnam{"derece"}
+                one{"{0} derece"}
+                other{"{0} derece"}
+            }
+            radian{
+                dnam{"radyan"}
+                one{"{0} radyan"}
+                other{"{0} radyan"}
+            }
+            revolution{
+                dnam{"dewr"}
+                one{"{0} dewr"}
+                other{"{0} dewr"}
+            }
+        }
+        concentr{
+            karat{
+                dnam{"qerat"}
+                one{"{0} qerat"}
+                other{"{0} qerat"}
+            }
+            percent{
+                dnam{"ji sedî"}
+                one{"ji sedî {0}"}
+                other{"ji sedî {0}"}
+            }
+        }
+        coordinate{
+            east{"{0} rojhilat"}
+            north{"{0} bakur"}
+            south{"{0} başûr"}
+            west{"{0} rojava"}
+        }
+        duration{
+            day{
+                dnam{"roj"}
+                one{"{0} roj"}
+                other{"{0} roj"}
+                per{"{0}/roj"}
+            }
+            hour{
+                dnam{"saet"}
+                one{"{0} saet"}
+                other{"{0} saet"}
+                per{"{0}/st"}
+            }
+            minute{
+                dnam{"deqîqe"}
+                one{"{0} deqîqe"}
+                other{"{0} deqîqe"}
+                per{"{0}/d"}
+            }
+            month{
+                dnam{"meh"}
+                one{"{0} meh"}
+                other{"{0} meh"}
+                per{"{0}/meh"}
+            }
+            second{
+                dnam{"sanî"}
+                one{"{0} saniye"}
+                other{"{0} saniye"}
+                per{"{0}/s"}
+            }
+            week{
+                dnam{"hefte"}
+                one{"{0} hefte"}
+                other{"{0} hefte"}
+                per{"{0}/hefte"}
+            }
+            year{
+                dnam{"sal"}
+                one{"{0} sal"}
+                other{"{0} sal"}
+            }
+        }
+    }
+    unitsNarrow{
+        concentr{
+            percent{
+                one{"%{0}"}
+                other{"%{0}"}
+            }
+        }
+        consumption{
+            liter-per-100-kilometer{
+                dnam{"l/100km"}
+                one{"{0}l/100km"}
+                other{"{0}l/100km"}
+            }
+        }
+        coordinate{
+            east{"{0}Rh"}
+            north{"{0}Bk"}
+            south{"{0}Bş"}
+            west{"{0}Ra"}
+        }
+        duration{
+            day{
+                dnam{"roj"}
+                one{"{0}r"}
+                other{"{0}r"}
+            }
+            hour{
+                dnam{"saet"}
+                one{"{0}st"}
+                other{"{0}st"}
+            }
+            minute{
+                dnam{"d"}
+                one{"{0}d"}
+                other{"{0}d"}
+            }
+            month{
+                dnam{"meh"}
+                one{"{0}m"}
+                other{"{0}m"}
+            }
+            second{
+                dnam{"s"}
+                one{"{0}s"}
+                other{"{0}s"}
+            }
+            week{
+                one{"{0}hf"}
+                other{"{0}hf"}
+            }
+            year{
+                dnam{"sl"}
+                one{"{0}sl"}
+                other{"{0}sl"}
+            }
+        }
+    }
+    unitsShort{
+        angle{
+            arc-minute{
+                dnam{"xlk. kevanî"}
+            }
+            arc-second{
+                dnam{"çrk. kevanî"}
+            }
+            degree{
+                dnam{"derece"}
+            }
+            radian{
+                dnam{"radyan"}
+                one{"{0} rad"}
+                other{"{0} rad"}
+            }
+            revolution{
+                dnam{"dwr"}
+                one{"{0} dwr"}
+                other{"{0} dwr"}
+            }
+        }
+        concentr{
+            karat{
+                dnam{"qerat"}
+            }
+            percent{
+                one{"%{0}"}
+                other{"%{0}"}
+            }
+        }
+        consumption{
+            liter-per-100-kilometer{
+                dnam{"l/100 km"}
+                one{"{0} l/100 km"}
+                other{"{0} l/100 km"}
+            }
+            liter-per-kilometer{
+                dnam{"l/km"}
+                one{"{0} l/km"}
+                other{"{0} l/km"}
+            }
+        }
+        coordinate{
+            east{"{0} Rh"}
+            north{"{0} Bk"}
+            south{"{0} Bş"}
+            west{"{0} Ra"}
+        }
+        duration{
+            day{
+                dnam{"roj"}
+                one{"{0} roj"}
+                other{"{0} roj"}
+                per{"{0}/r"}
+            }
+            hour{
+                dnam{"saet"}
+                one{"{0} st"}
+                other{"{0} st"}
+                per{"{0}/st"}
+            }
+            minute{
+                dnam{"d"}
+                one{"{0} d"}
+                other{"{0} d"}
+                per{"{0}/d"}
+            }
+            month{
+                dnam{"meh"}
+                one{"{0} m"}
+                other{"{0} m"}
+                per{"{0}/m"}
+            }
+            second{
+                dnam{"s"}
+                one{"{0} s"}
+                other{"{0} s"}
+                per{"{0}/s"}
+            }
+            week{
+                dnam{"hf"}
+                one{"{0} hf"}
+                other{"{0} hf"}
+                per{"{0}/hf"}
+            }
+            year{
+                dnam{"sal"}
+                one{"{0} sal"}
+                other{"{0} sal"}
+                per{"{0}/sal"}
+            }
+        }
+    }
+}

@@ -1,0 +1,274 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ff{
+    AuxExemplarCharacters{"[q v x z]"}
+    ExemplarCharacters{"[a b ɓ c d ɗ e f g h i j k l m n ñ ŋ o p r s t u w y ƴ]"}
+    ExemplarCharactersIndex{"[A B Ɓ C D Ɗ E F G H I J K L M N Ñ Ŋ O P R S T U W Y Ƴ]"}
+    ExemplarCharactersNumbers{"[  \\- ‑ , % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"#,##0.00 ¤"}
+            }
+            symbols{
+                decimal{","}
+                group{" "}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE d MMMM y G",
+                "d MMMM y G",
+                "d MMM, y G",
+                "d/M/y GGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                M{"M"}
+                MMM{"MMM"}
+                MMMEd{"E d MMM"}
+                MMMMEd{"E d MMMM"}
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                MMd{"d/MM"}
+                MMdd{"dd/MM"}
+                Md{"d/M"}
+                ms{"m:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E d/M/y"}
+                yMM{"MM/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E d MMM y"}
+                yMMMM{"MMMM y"}
+                yMMMd{"d MMM y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "subaka",
+                "kikiiɗe",
+            }
+            AmPmMarkersAbbr{
+                "subaka",
+                "kikiiɗe",
+            }
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE d MMMM y",
+                "d MMMM y",
+                "d MMM, y",
+                "d/M/y",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            appendItems{
+                Day{"{0} ({2}: {1})"}
+                Day-Of-Week{"{0} {1}"}
+                Era{"{1} {0}"}
+                Hour{"{0} ({2}: {1})"}
+                Minute{"{0} ({2}: {1})"}
+                Month{"{0} ({2}: {1})"}
+                Quarter{"{0} ({2}: {1})"}
+                Second{"{0} ({2}: {1})"}
+                Timezone{"{0} {1}"}
+                Week{"{0} ({2}: {1})"}
+                Year{"{1} {0}"}
+            }
+            availableFormats{
+                M{"M"}
+                MMM{"MMM"}
+                MMMEd{"E d MMM"}
+                MMMMEd{"E d MMMM"}
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                MMd{"d/MM"}
+                MMdd{"dd/MM"}
+                Md{"d/M"}
+                ms{"m:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E d/M/y"}
+                yMM{"MM/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E d MMM y"}
+                yMMMM{"MMMM y"}
+                yMMMd{"d MMM y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "dew",
+                        "aaɓ",
+                        "maw",
+                        "nje",
+                        "naa",
+                        "mwd",
+                        "hbi",
+                    }
+                    wide{
+                        "dewo",
+                        "aaɓnde",
+                        "mawbaare",
+                        "njeslaare",
+                        "naasaande",
+                        "mawnde",
+                        "hoore-biir",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "d",
+                        "a",
+                        "m",
+                        "n",
+                        "n",
+                        "m",
+                        "h",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "H-I",
+                    "C-I",
+                }
+                wide{
+                    "Hade Iisa",
+                    "Caggal Iisa",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "sii",
+                        "col",
+                        "mbo",
+                        "see",
+                        "duu",
+                        "kor",
+                        "mor",
+                        "juk",
+                        "slt",
+                        "yar",
+                        "jol",
+                        "bow",
+                    }
+                    wide{
+                        "siilo",
+                        "colte",
+                        "mbooy",
+                        "seeɗto",
+                        "duujal",
+                        "korse",
+                        "morso",
+                        "juko",
+                        "siilto",
+                        "yarkomaa",
+                        "jolal",
+                        "bowte",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "s",
+                        "c",
+                        "m",
+                        "s",
+                        "d",
+                        "k",
+                        "m",
+                        "j",
+                        "s",
+                        "y",
+                        "j",
+                        "b",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "T1",
+                        "T2",
+                        "T3",
+                        "T4",
+                    }
+                    wide{
+                        "Termes 1",
+                        "Termes 2",
+                        "Termes 3",
+                        "Termes 4",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‚"}
+        quotationEnd{"”"}
+        quotationStart{"„"}
+    }
+    fields{
+        day{
+            dn{"Ñalnde"}
+            relative{
+                "-1"{"Haŋki"}
+                "0"{"Hannde"}
+                "1"{"Jaŋngo"}
+            }
+        }
+        dayperiod{
+            dn{"Sahnga"}
+        }
+        era{
+            dn{"Jamaanu"}
+        }
+        hour{
+            dn{"Waktu"}
+        }
+        minute{
+            dn{"Hoƴom"}
+        }
+        month{
+            dn{"Lewru"}
+        }
+        second{
+            dn{"Majaango"}
+        }
+        week{
+            dn{"Yontere"}
+        }
+        weekday{
+            dn{"Ñalɗi yontere"}
+        }
+        year{
+            dn{"Hitaande"}
+        }
+        zone{
+            dn{"Diiwaan waktu"}
+        }
+    }
+}

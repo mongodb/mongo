@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "jsfriendapi.cpp"
+#include "vm/SharedArrayObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jsfriendapi.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SharedArrayObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jsfriendapi.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SharedArrayObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jsnum.cpp"
+#include "vm/SharedImmutableStringsCache.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jsnum.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SharedImmutableStringsCache.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jsnum.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SharedImmutableStringsCache.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "perf/jsperf.cpp"
+#include "vm/SourceHook.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "perf/jsperf.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SourceHook.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "perf/jsperf.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SourceHook.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "proxy/BaseProxyHandler.cpp"
+#include "vm/Stack.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "proxy/BaseProxyHandler.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Stack.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "proxy/BaseProxyHandler.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Stack.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "proxy/CrossCompartmentWrapper.cpp"
+#include "vm/StencilObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "proxy/CrossCompartmentWrapper.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/StencilObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "proxy/CrossCompartmentWrapper.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/StencilObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "proxy/DeadObjectProxy.cpp"
+#include "vm/StringType.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "proxy/DeadObjectProxy.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/StringType.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "proxy/DeadObjectProxy.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/StringType.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

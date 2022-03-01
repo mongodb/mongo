@@ -1,0 +1,120 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: he_he_Latn_BGN.txt
+# Generated from CLDR
+#
+
+#
+########################################################################
+# BGN/PCGN 1981 System
+#
+# The BGN/PCGN system for Hebrew was designed for use in romanizing
+# names written in the Hebrew alphabet. The Roman letters and letter
+# combinations shown as equivalents to the Hebrew characters reflect
+# the eastern variety of Hebrew, i.e., the language spoken in
+# the Republic of Armenia.
+#
+# The Hebrew Alphabet as defined by the BGN (Page 33-35):
+#
+# אבגדהוזחטיכךלמםנןסעפףצץקרששת
+#
+# Originally prepared by Michael Everson <everson@evertype.com>
+########################################################################
+#
+# MINIMAL FILTER: Hebrew-Latin
+#
+:: [ \u05B0\u05B1\u05B2\u05B3\u05B4\u05B5\u05B6\u05B7\u05B8\u05B9\u05BB\u05BC\u05C1\u05C2אבגדהוזחטיךכלםמןנסעףפץצקרשת׳] ;
+:: NFD (NFC) ;
+#
+#
+########################################################################
+#
+########################################################################
+#
+# Define All Transformation Variables
+#
+########################################################################
+#
+$alef = ’;
+$ayin = ‘;
+#
+#
+# Use this $wordBoundary until bug 2034 is fixed in ICU:
+# http://bugs.icu-project.org/cgi-bin/icu-bugs/transliterate?id=2034;expression=boundary;user=guest
+#
+$wordBoundary = [^[:L:][:M:][:N:]] ;
+#
+#
+########################################################################
+#
+########################################################################
+#
+# Rules moved to front to avoid masking
+#
+########################################################################
+#
+ב\u05BC → b ; # HEBREW LETTER BET + DAGESH
+פ\u05BC → P ; # HEBREW LETTER PE + DAGESH
+ג\u05BC → g ; # HEBREW LETTER GIMEL + DAGESH
+ג׳ → ǧ ; # HEBREW LETTER GIMEL + GERESH
+ו\u05BC → u ; # HEBREW LETTER VAV + POINT DAGESH
+ו\u05B9 → o ; # HEBREW LETTER VAV + POINT HOLAM
+צ׳ → č ; # HEBREW LETTER TSADI + GERESH
+ז׳ → ž ; # HEBREW LETTER ZAYIN + GERESH
+ד\u05BC → d ; # HEBREW LETTER DALET + DAGESH
+ה\u05BC → h ; # HEBREW LETTER HE + DAGESH
+ך\u05BC → k ; # HEBREW LETTER FINAL KAF + DAGESH
+כ\u05BC → k ; # HEBREW LETTER KAF + DAGESH
+ך\u05B0 → kh ; # HEBREW LETTER FINAL KAF + SHEVA
+ת\u05BC → t ; # HEBREW LETTER TAV + DAGESH
+#
+#
+########################################################################
+#
+########################################################################
+#
+# Start of Alphabetic Transformations
+#
+########################################################################
+#
+א → $alef ; # HEBREW LETTER ALEF
+ב → v ; # HEBREW LETTER BET
+ג → g ; # HEBREW LETTER GIMEL
+ד → d ; # HEBREW LETTER DALET
+ה → h ; # HEBREW LETTER HE
+ח → h\u0331 ; # HEBREW LETTER HET
+ו → w ; # HEBREW LETTER VAV
+ז → z ; # HEBREW LETTER ZAYIN
+[טת] → t ; # HEBREW LETTER TET
+י → y ; # HEBREW LETTER YOD
+[כך] → kh ; # HEBREW LETTER KAF and FINAL KAF
+ל → l ; # HEBREW LETTER LAMED
+[מם] → m ; # HEBREW LETTER MEM and FINAL MEM
+[נן] → n ; # HEBREW LETTER NUN and FINAL NUN
+ס → s ; # HEBREW LETTER SAMEKH
+ע → $ayin ; # HEBREW LETTER AYIN
+[פף] → f ; # HEBREW LETTER PE and FINAL PE
+[צץ] → z\u0331 ; # HEBREW LETTER TSADI and FINAL TSADI
+ק → q ; # HEBREW LETTER QOF
+ר → r ; # HEBREW LETTER RESH
+ש\u05C1 → sh ; # HEBREW LETTER SHIN
+ש\u05C2 → s ; # HEBREW LETTER SHIN
+\u05B7 → a ; # HEBREW POINT PATAH
+\u05B2 → a ; # HEBREW POINT HATAF PATAH
+\u05B8 → o ; # HEBREW POINT QAMATS
+\u05B6 → e ; # HEBREW POINT SEGOL
+\u05B1 → e ; # HEBREW POINT HATAF SEGOL
+\u05B5י → e ; # HEBREW POINT TSERE + LETTER YOD
+\u05B5 → e ; # HEBREW POINT TSERE
+\u05B0 → e ; # HEBREW POINT SHEVA
+\u05B4י → i ; # HEBREW POINT HIRIQ + LETTER YOD
+\u05B4 → i ; # HEBREW POINT HIRIQ
+\u05B3 → o ; # HEBREW LETTER HATAF QAMATS
+\u05B9 → o ; # HEBREW POINT HOLAM
+\u05BB → u ; # HEBREW POINT QUBUTS
+#
+#
+########################################################################
+

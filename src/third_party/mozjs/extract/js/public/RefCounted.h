@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -23,69 +23,69 @@
 namespace js {
 
 template <typename T>
-class RefCounted
-{
-    static const MozRefCountType DEAD = 0xffffdead;
+class RefCounted {
+  static const MozRefCountType DEAD = 0xffffdead;
 
-  protected:
-    RefCounted() : mRefCnt(0) {}
-    ~RefCounted() { MOZ_ASSERT(mRefCnt == DEAD); }
+ protected:
+  RefCounted() : mRefCnt(0) {}
+  ~RefCounted() { MOZ_ASSERT(mRefCnt == DEAD); }
 
-  public:
-    void AddRef() const
-    {
-        MOZ_ASSERT(int32_t(mRefCnt) >= 0);
-        ++mRefCnt;
-    }
+ public:
+  void AddRef() const {
+    MOZ_ASSERT(int32_t(mRefCnt) >= 0);
+    ++mRefCnt;
+  }
 
-    void Release() const
-    {
-      MOZ_ASSERT(int32_t(mRefCnt) > 0);
-      MozRefCountType cnt = --mRefCnt;
-      if (0 == cnt) {
+  void Release() const {
+    MOZ_ASSERT(int32_t(mRefCnt) > 0);
+    MozRefCountType cnt = --mRefCnt;
+    if (0 == cnt) {
 #ifdef DEBUG
-          mRefCnt = DEAD;
+      mRefCnt = DEAD;
 #endif
-          js_delete(const_cast<T*>(static_cast<const T*>(this)));
-      }
+      js_delete(const_cast<T*>(static_cast<const T*>(this)));
     }
+  }
 
-  private:
-    mutable MozRefCountType mRefCnt;
+ private:
+  mutable MozRefCountType mRefCnt;
 };
 
 template <typename T>
-class AtomicRefCounted
-{
-    static const MozRefCountType DEAD = 0xffffdead;
+class AtomicRefCounted {
+  // On 64-bit systems, if the refcount type is small (say, 32 bits), there's
+  // a risk that it could overflow.  So require it to be large enough.
 
-  protected:
-    AtomicRefCounted() : mRefCnt(0) {}
-    ~AtomicRefCounted() { MOZ_ASSERT(mRefCnt == DEAD); }
+  static_assert(sizeof(MozRefCountType) == sizeof(uintptr_t),
+                "You're at risk for ref count overflow.");
 
-  public:
-    void AddRef() const
-    {
-        MOZ_ASSERT(int32_t(mRefCnt) >= 0);
-        ++mRefCnt;
-    }
+  static const MozRefCountType DEAD = ~MozRefCountType(0xffff) | 0xdead;
 
-    void Release() const
-    {
-        MOZ_ASSERT(int32_t(mRefCnt) > 0);
-        MozRefCountType cnt = --mRefCnt;
-        if (0 == cnt) {
+ protected:
+  AtomicRefCounted() = default;
+  ~AtomicRefCounted() { MOZ_ASSERT(mRefCnt == DEAD); }
+
+ public:
+  void AddRef() const {
+    ++mRefCnt;
+    MOZ_ASSERT(mRefCnt != DEAD);
+  }
+
+  void Release() const {
+    MOZ_ASSERT(mRefCnt != 0);
+    MozRefCountType cnt = --mRefCnt;
+    if (0 == cnt) {
 #ifdef DEBUG
-            mRefCnt = DEAD;
+      mRefCnt = DEAD;
 #endif
-            js_delete(const_cast<T*>(static_cast<const T*>(this)));
-        }
+      js_delete(const_cast<T*>(static_cast<const T*>(this)));
     }
+  }
 
-  private:
-    mutable mozilla::Atomic<MozRefCountType> mRefCnt;
+ private:
+  mutable mozilla::Atomic<MozRefCountType> mRefCnt{0};
 };
 
-} // namespace js
+}  // namespace js
 
 #endif /* js_RefCounted_h */

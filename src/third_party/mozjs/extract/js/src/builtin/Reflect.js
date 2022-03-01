@@ -20,7 +20,7 @@ function CreateListFromArrayLikeForArgs(obj) {
     // Steps 4-6.
     var list = std_Array(len);
     for (var i = 0; i < len; i++)
-        _DefineDataProperty(list, i, obj[i]);
+        DefineDataProperty(list, i, obj[i]);
 
     // Step 7.
     return list;
@@ -35,7 +35,7 @@ function Reflect_apply(target, thisArgument, argumentsList) {
 
     // Step 2.
     if (!IsObject(argumentsList)) {
-        ThrowTypeError(JSMSG_NOT_NONNULL_OBJECT_ARG, "`argumentsList`", "Reflect.apply",
+        ThrowTypeError(JSMSG_OBJECT_REQUIRED_ARG, "`argumentsList`", "Reflect.apply",
                        ToSource(argumentsList));
     }
 
@@ -62,7 +62,7 @@ function Reflect_construct(target, argumentsList/*, newTarget*/) {
 
     // Step 4.
     if (!IsObject(argumentsList)) {
-        ThrowTypeError(JSMSG_NOT_NONNULL_OBJECT_ARG, "`argumentsList`", "Reflect.construct",
+        ThrowTypeError(JSMSG_OBJECT_REQUIRED_ARG, "`argumentsList`", "Reflect.construct",
                        ToSource(argumentsList));
     }
 
@@ -100,7 +100,7 @@ function Reflect_construct(target, argumentsList/*, newTarget*/) {
       case 12:
         return constructContentFunction(target, newTarget, SPREAD(args, 12));
       default:
-        return _ConstructFunction(target, newTarget, args);
+        return ConstructFunction(target, newTarget, args);
     }
 }
 
@@ -116,7 +116,7 @@ function Reflect_defineProperty(obj, propertyKey, attributes) {
 function Reflect_getOwnPropertyDescriptor(target, propertyKey) {
     // Step 1.
     if (!IsObject(target))
-        ThrowTypeError(JSMSG_NOT_NONNULL_OBJECT, DecompileArg(0, target));
+        ThrowTypeError(JSMSG_OBJECT_REQUIRED, DecompileArg(0, target));
 
     // Steps 2-3.
     // The other steps are identical to Object.getOwnPropertyDescriptor().
@@ -128,7 +128,7 @@ function Reflect_getOwnPropertyDescriptor(target, propertyKey) {
 function Reflect_has(target, propertyKey) {
     // Step 1.
     if (!IsObject(target)) {
-        ThrowTypeError(JSMSG_NOT_NONNULL_OBJECT_ARG, "`target`", "Reflect.has",
+        ThrowTypeError(JSMSG_OBJECT_REQUIRED_ARG, "`target`", "Reflect.has",
                        ToSource(target));
     }
 
@@ -141,7 +141,7 @@ function Reflect_has(target, propertyKey) {
 function Reflect_get(target, propertyKey/*, receiver*/) {
     // Step 1.
     if (!IsObject(target)) {
-        ThrowTypeError(JSMSG_NOT_NONNULL_OBJECT_ARG, "`target`", "Reflect.get",
+        ThrowTypeError(JSMSG_OBJECT_REQUIRED_ARG, "`target`", "Reflect.get",
                        ToSource(target));
     }
 

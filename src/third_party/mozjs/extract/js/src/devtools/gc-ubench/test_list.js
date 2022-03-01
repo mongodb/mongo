@@ -1,0 +1,20 @@
+function foreach_test_file(callback) {
+  callback("benchmarks/noAllocation.js");
+  callback("benchmarks/globalArrayNewObject.js");
+  callback("benchmarks/globalArrayArrayLiteral.js");
+  callback("benchmarks/globalArrayLargeArray.js");
+  callback("benchmarks/globalArrayLargeObject.js");
+  callback("benchmarks/globalArrayObjectLiteral.js");
+  callback("benchmarks/globalArrayReallocArray.js");
+  callback("benchmarks/globalArrayBuffer.js");
+  callback("benchmarks/globalArrayFgFinalized.js");
+  callback("benchmarks/largeArrayPropertyAndElements.js");
+  callback("benchmarks/selfCyclicWeakMap.js");
+  callback("benchmarks/pairCyclicWeakMap.js");
+  callback("benchmarks/deepWeakMap.js");
+  callback("benchmarks/textNodes.js");
+  callback("benchmarks/bigTextNodes.js");
+  callback("benchmarks/events.js");
+  callback("benchmarks/expandoEvents.js");
+  callback("benchmarks/propertyTreeSplitting.js");
+}

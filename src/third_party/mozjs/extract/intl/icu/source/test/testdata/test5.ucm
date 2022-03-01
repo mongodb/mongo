@@ -1,0 +1,30 @@
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html# *******************************************************************************
+# * Copyright (C) 2009, International Business Machines
+# * Corporation and others.  All Rights Reserved.
+# *******************************************************************************
+#
+# test5.ucm
+#
+# Test file for MBCS conversion with three-byte codepage data.
+# Also contains extension mappings (m:n).
+
+<code_set_name>     "test5"
+<mb_cur_max>        3
+<mb_cur_min>        1
+<uconv_class>       "MBCS"
+<subchar>           \xff
+<icu:state>         0, 1:1, 5-9, ff
+<icu:state>         2:2, 3, 7, 4.p, a-d.u
+<icu:state>         a-f.p
+CHARMAP
+
+<U0006>     \x06 |0
+<U102345>   \x09 |0
+<U0034>     \x01\x03 |3
+<U0074>     \x01\x07 |1
+
+# extensions
+<U00c0>     \x05+\x01\x02\x0d |0
+
+END CHARMAP

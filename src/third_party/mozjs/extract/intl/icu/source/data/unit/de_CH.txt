@@ -1,0 +1,123 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+de_CH{
+    units{
+        area{
+            square-foot{
+                case{
+                    accusative{
+                        one{"{0} Quadratfuss"}
+                        other{"{0} Quadratfuss"}
+                    }
+                    dative{
+                        one{"{0} Quadratfuss"}
+                        other{"{0} Quadratfuss"}
+                    }
+                    genitive{
+                        one{"{0} Quadratfusses"}
+                        other{"{0} Quadratfuss"}
+                    }
+                }
+                dnam{"Quadratfuss"}
+                one{"{0} Quadratfuss"}
+                other{"{0} Quadratfuss"}
+            }
+        }
+        concentr{
+            milligram-ofglucose-per-deciliter{
+                dnam{"mg/dL"}
+            }
+        }
+        length{
+            foot{
+                case{
+                    accusative{
+                        one{"{0} Fuss"}
+                        other{"{0} Fuss"}
+                    }
+                    dative{
+                        one{"{0} Fuss"}
+                        other{"{0} Fuss"}
+                    }
+                    genitive{
+                        one{"{0} Fusses"}
+                        other{"{0} Fuss"}
+                    }
+                }
+                dnam{"Fuss"}
+                one{"{0} Fuss"}
+                other{"{0} Fuss"}
+                per{"{0} pro Fuss"}
+            }
+        }
+        mass{
+            grain{
+                dnam{"Messerspitze"}
+            }
+        }
+        volume{
+            cubic-foot{
+                case{
+                    accusative{
+                        one{"{0} Kubikfuss"}
+                        other{"{0} Kubikfuss"}
+                    }
+                    dative{
+                        one{"{0} Kubikfuss"}
+                        other{"{0} Kubikfuss"}
+                    }
+                    genitive{
+                        one{"{0} Kubikfusses"}
+                        other{"{0} Kubikfuss"}
+                    }
+                }
+                dnam{"Kubikfuss"}
+                one{"{0} Kubikfuss"}
+                other{"{0} Kubikfuss"}
+            }
+            gallon-imperial{
+                one{"{0} gal Imp."}
+                other{"{0} gal Imp."}
+                per{"{0}/gal Imp."}
+            }
+            jigger{
+                dnam{"Schuss"}
+            }
+        }
+    }
+    unitsShort{
+        length{
+            foot{
+                dnam{"Fuss"}
+            }
+        }
+        mass{
+            grain{
+                dnam{"Messerspitze"}
+                other{"{0} Msp."}
+            }
+        }
+        volume{
+            dram{
+                dnam{"Dram"}
+                one{"{0} dr."}
+                other{"{0} dr."}
+            }
+            gallon-imperial{
+                one{"{0} gal Imp."}
+                other{"{0} gal Imp."}
+                per{"{0}/gal Imp."}
+            }
+            jigger{
+                dnam{"Schuss"}
+                one{"Schuss"}
+                other{"{0} Schuss"}
+            }
+            pinch{
+                one{"{0} Prise"}
+                other{"{0} Prise"}
+            }
+        }
+    }
+}

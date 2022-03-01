@@ -1,0 +1,218 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: ky_ky_Latn_BGN.txt
+# Generated from CLDR
+#
+
+#
+########################################################################
+# BGN/PCGN 1979 System
+#
+# The BGN/PCGN system for Kirghiz Cyrillic was designed for use in
+# romanizing names written in the Kirghiz Cyrillic alphabet.
+# The Kirghiz Cyrillic alphabet contains three letters not present
+# in the Russian alphabet: Ңң, Өө, and Үү.
+#
+# The Kirghiz Cyrillic Alphabet as defined by the BGN (Page 55):
+#
+#   АБВГДЕЁЖЗИЙКЛМНҢОӨПРСТУҮФХЦЧШЩЪЫЬЭЮЯ
+#   абвгдеёжзийклмнңоөпрстуүфхцчшщъыьэюя
+#
+# Originally prepared by Michael Everson <everson@evertype.com>
+########################################################################
+#
+# MINIMAL FILTER: KirghizCyrl-Latin
+#
+:: [АБВГДЕЁЖЗИЙКЛМНҢОӨПРСТУҮФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнңоөпрстуүфхцчшщъыьэюя] ;
+:: NFD (NFC) ;
+#
+#
+########################################################################
+#
+########################################################################
+#
+# Define All Transformation Variables
+#
+########################################################################
+#
+$prime  = ʹ ;
+$doublePrime = ʺ ;
+$upperConsonants = [БВГДЖЗЙКЛМНҢПРСТФХЦЧШЩЪЬ] ;
+$lowerConsonants = [бвгджзйклмнңпрстфхцчшщъь] ;
+$consonants = [$upperConsonants $lowerConsonants] ;
+$upperVowels = [АЕЁИОӨУҮЫЭЮЯ] ;
+$lowerVowels = [аеёиоөуүыэюя] ;
+$vowels = [$upperVowels $lowerVowels] ;
+$lower = [$lowerConsonants $lowerVowels] ;
+#
+#
+# Use this $wordBoundary until bug 2034 is fixed in ICU:
+# http://bugs.icu-project.org/cgi-bin/icu-bugs/transliterate?id=2034;expression=boundary;user=guest
+#
+$wordBoundary =  [^[:L:][:M:][:N:]] ;
+#
+#
+########################################################################
+#
+########################################################################
+#
+# Start of Alphabetic Transformations
+#
+########################################################################
+#
+А → A ; # CYRILLIC CAPITAL LETTER A
+а → a ; # CYRILLIC SMALL LETTER A
+Б → B ; # CYRILLIC CAPITAL LETTER BE
+б → b ; # CYRILLIC SMALL LETTER BE
+В → V ; # CYRILLIC CAPITAL LETTER VE
+в → v ; # CYRILLIC SMALL LETTER VE
+Г → G ; # CYRILLIC CAPITAL LETTER GHE
+г → g ; # CYRILLIC SMALL LETTER GHE
+Д → D ; # CYRILLIC CAPITAL LETTER DE
+д → d ; # CYRILLIC SMALL LETTER DE
+Е → E ; # CYRILLIC CAPITAL LETTER IE
+е → e ; # CYRILLIC SMALL LETTER IE
+Ё} $lower → Yo ; # CYRILLIC CAPITAL LETTER IO
+Ё → YO ; # CYRILLIC CAPITAL LETTER IO
+ё → yo ; # CYRILLIC SMALL LETTER IO
+Ж → J ; # CYRILLIC CAPITAL LETTER ZHE
+ж → j ; # CYRILLIC SMALL LETTER ZHE
+З → Z ; # CYRILLIC CAPITAL LETTER ZE
+з → z ; # CYRILLIC SMALL LETTER ZE
+И → I ; # CYRILLIC CAPITAL LETTER I
+и → i ; # CYRILLIC SMALL LETTER I
+Й → Y ; # CYRILLIC CAPITAL LETTER I
+й → y ; # CYRILLIC SMALL LETTER I
+К → K ; # CYRILLIC CAPITAL LETTER KA
+к → k ; # CYRILLIC SMALL LETTER KA
+Л → L ; # CYRILLIC CAPITAL LETTER EL
+л → l ; # CYRILLIC SMALL LETTER EL
+М → M ; # CYRILLIC CAPITAL LETTER EM
+м → m ; # CYRILLIC SMALL LETTER EM
+#
+#
+########################################################################
+#
+# BGN Page 56 Rule 1
+#
+# The character sequence нг may be romanized n·g in order to differentiate
+# that romanizations from the digraph ng, which is used to render the
+# character ң.
+#
+########################################################################
+#
+НГ → N·G ; # CYRILLIC CAPITAL LETTER EN
+Нг → N·g ; # CYRILLIC CAPITAL LETTER EN
+нг → n·g ; # CYRILLIC SMALL LETTER EN
+Н → N ; # CYRILLIC CAPITAL LETTER EN
+н → n ; # CYRILLIC SMALL LETTER EN
+#
+#
+########################################################################
+#
+# End Rule 1
+#
+########################################################################
+#
+Ң} $lower → Ng ; # CYRILLIC CAPITAL LETTER EN WITH DESCENDER
+Ң → NG ; # CYRILLIC CAPITAL LETTER EN WITH DESCENDER
+ң → ng ; # CYRILLIC SMALL LETTER EN WITH DESCENDER
+О → O ; # CYRILLIC CAPITAL LETTER O
+о → o ; # CYRILLIC SMALL LETTER O
+Ө → Ö ; # CYRILLIC CAPITAL LETTER BARRED O
+ө → ö ; # CYRILLIC SMALL LETTER BARRED O
+П → P ; # CYRILLIC CAPITAL LETTER PE
+п → p ; # CYRILLIC SMALL LETTER PE
+Р → R ; # CYRILLIC CAPITAL LETTER ER
+р → r ; # CYRILLIC SMALL LETTER ER
+С → S ; # CYRILLIC CAPITAL LETTER ES
+с → s ; # CYRILLIC SMALL LETTER ES
+Т → T ; # CYRILLIC CAPITAL LETTER TE
+т → t ; # CYRILLIC SMALL LETTER TE
+У → U ; # CYRILLIC CAPITAL LETTER U
+у → u ; # CYRILLIC SMALL LETTER U
+Ү → Ü ; # CYRILLIC CAPITAL LETTER STRAIGHT U
+ү → ü ; # CYRILLIC SMALL LETTER STRAIGHT U
+Ф → F ; # CYRILLIC CAPITAL LETTER EF
+ф → f ; # CYRILLIC SMALL LETTER EF
+Х} $lower → Kh ; # CYRILLIC CAPITAL LETTER HA
+Х → KH ; # CYRILLIC CAPITAL LETTER HA
+х → kh ; # CYRILLIC SMALL LETTER HA
+Ц} $lower → Ts ; # CYRILLIC CAPITAL LETTER TSE
+Ц → TS ; # CYRILLIC CAPITAL LETTER TSE
+ц → ts ; # CYRILLIC SMALL LETTER TSE
+Ч} $lower → Ch ; # CYRILLIC CAPITAL LETTER CHE
+Ч → CH ; # CYRILLIC CAPITAL LETTER CHE
+ч → ch ; # CYRILLIC SMALL LETTER CHE
+#
+#
+########################################################################
+#
+# Implied rule from BGN Russian-Latin transliteration (Page 94 Note 3.6).
+#
+# шч becomes sh·ch
+#
+########################################################################
+#
+ШЧ → SH·CH ; # CYRILLIC CAPITAL LETTER SHA
+Шч → Sh·ch ; # CYRILLIC CAPITAL LETTER SHA
+шч → sh·ch ; # CYRILLIC SMALL LETTER SHA
+Ш} $lower → Sh ; # CYRILLIC CAPITAL LETTER SHA
+Ш → SH ; # CYRILLIC CAPITAL LETTER SHA
+ш → sh ; # CYRILLIC SMALL LETTER SHA
+Щ} $lower → Shch ; # CYRILLIC CAPITAL LETTER SHCHA
+Щ → SHCH ; # CYRILLIC CAPITAL LETTER SHCHA
+щ → shch ; # CYRILLIC SMALL LETTER SHCHA
+#
+#
+########################################################################
+#
+# End Rule 3.6
+#
+########################################################################
+#
+Ъ → $doublePrime ; # CYRILLIC CAPITAL LETTER HARD SIGN
+ъ → $doublePrime ; # CYRILLIC SMALL LETTER HARD SIGN
+#
+#
+########################################################################
+#
+# BGN Page 56 Note 2
+#
+# The character Ыы may be romanized Ɨɨ instead of Yy, if so desired.
+#
+########################################################################
+#
+Ы → Y ; # CYRILLIC CAPITAL LETTER YERU
+ы → y ; # CYRILLIC SMALL LETTER YERU
+#
+#
+# Alternative rule to implement the option described here. To apply
+# uncomment the following by removing the '#' mark at the start of the
+# line and insert before the two rule lines above.
+#
+#Ы → Ɨ ; # CYRILLIC CAPITAL LETTER YERU
+#ы → ɨ ; # CYRILLIC SMALL LETTER YERU
+#
+########################################################################
+#
+# End BGN Page 56 Note 2
+#
+########################################################################
+#
+Ь → $prime ; # CYRILLIC CAPITAL LETTER SOFT SIGN
+ь → $prime ; # CYRILLIC SMALL LETTER SOFT SIGN
+Э → E ; # CYRILLIC CAPITAL LETTER E
+э → e ; # CYRILLIC SMALL LETTER E
+Ю} $lower → Yu ; # CYRILLIC CAPITAL LETTER YU
+Ю → YU ; # CYRILLIC CAPITAL LETTER YU
+ю → yu ; # CYRILLIC SMALL LETTER YU
+Я} $lower → Ya ; # CYRILLIC CAPITAL LETTER YA
+Я → YA ; # CYRILLIC CAPITAL LETTER YA
+я → ya ; # CYRILLIC SMALL LETTER YA
+#
+#
+########################################################################
+

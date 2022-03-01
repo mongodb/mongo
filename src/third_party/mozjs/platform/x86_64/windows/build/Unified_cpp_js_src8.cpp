@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "gc/Tracer.cpp"
+#include "jsdate.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "gc/Tracer.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "jsdate.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "gc/Tracer.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "jsdate.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "gc/Verifier.cpp"
+#include "jsexn.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "gc/Verifier.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "jsexn.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "gc/Verifier.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "jsexn.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "gc/WeakMap.cpp"
+#include "jsfriendapi.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "gc/WeakMap.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "jsfriendapi.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "gc/WeakMap.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "jsfriendapi.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "gc/WeakMapPtr.cpp"
+#include "jsnum.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "gc/WeakMapPtr.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "jsnum.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "gc/WeakMapPtr.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "jsnum.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "gc/Zone.cpp"
+#include "proxy/BaseProxyHandler.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "gc/Zone.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "proxy/BaseProxyHandler.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "gc/Zone.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "proxy/BaseProxyHandler.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "gc/ZoneGroup.cpp"
+#include "proxy/CrossCompartmentWrapper.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "gc/ZoneGroup.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "proxy/CrossCompartmentWrapper.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "gc/ZoneGroup.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "proxy/CrossCompartmentWrapper.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

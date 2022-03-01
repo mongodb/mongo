@@ -1,0 +1,14 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Beng_Gujr.txt
+# Generated from CLDR
+#
+
+::[।-॥\u0981-ঃঅ-ঌএ-ঐও-নপ-রলশ-হ\u09BC-\u09C4ে-ৈো-\u09CDৗড়-ঢ়য়-\u09E3০-৺ৎ];
+::NFD;
+::Bengali-InterIndic;
+::InterIndic-Gujarati;
+::NFC;
+

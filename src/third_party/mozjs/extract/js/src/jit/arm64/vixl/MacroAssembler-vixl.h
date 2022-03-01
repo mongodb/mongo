@@ -656,8 +656,12 @@ class MacroAssembler : public js::jit::Assembler {
              const Register& rm,
              Condition cond) {
     VIXL_ASSERT(!rd.IsZero());
-    VIXL_ASSERT(!rn.IsZero());
-    VIXL_ASSERT(!rm.IsZero());
+    // The VIXL source code contains these assertions, but the AArch64 ISR
+    // explicitly permits the use of zero registers. CSET itself is defined
+    // in terms of CSINC with WZR/XZR.
+    //
+    // VIXL_ASSERT(!rn.IsZero());
+    // VIXL_ASSERT(!rm.IsZero());
     VIXL_ASSERT((cond != al) && (cond != nv));
     SingleEmissionCheckScope guard(this);
     csinc(rd, rn, rm, cond);
@@ -813,6 +817,11 @@ class MacroAssembler : public js::jit::Assembler {
     SingleEmissionCheckScope guard(this);
     fcvtzs(rd, vn, fbits);
   }
+  void Fjcvtzs(const Register& rd, const VRegister& vn) {
+    VIXL_ASSERT(!rd.IsZero());
+    SingleEmissionCheckScope guard(this);
+    fjcvtzs(rd, vn);
+  }
   void Fcvtzu(const Register& rd, const VRegister& vn, int fbits = 0) {
     VIXL_ASSERT(!rd.IsZero());
     SingleEmissionCheckScope guard(this);
@@ -853,7 +862,6 @@ class MacroAssembler : public js::jit::Assembler {
     }
   }
   void Fmov(VRegister vd, Register rn) {
-    VIXL_ASSERT(!rn.IsZero());
     SingleEmissionCheckScope guard(this);
     fmov(vd, rn);
   }
@@ -1479,32 +1487,12 @@ class MacroAssembler : public js::jit::Assembler {
     SingleEmissionCheckScope guard(this);
     umsubl(rd, rn, rm, ra);
   }
+
   void Unreachable() {
     SingleEmissionCheckScope guard(this);
-#ifdef JS_SIMULATOR_ARM64
-    hlt(kUnreachableOpcode);
-#else
-    // A couple of strategies we can use here.  There are no unencoded
-    // instructions in the instruction set that are guaranteed to remain that
-    // way.  However there are some currently (as of 2018) unencoded
-    // instructions that are good candidates.
-    //
-    // Ideally, unencoded instructions should be non-destructive to the register
-    // state, and should be unencoded at all exception levels.
-    //
-    // At the trap the pc will hold the address of the offending instruction.
-
-    // Some candidates for unencoded instructions:
-    //
-    // 0xd4a00000 (essentially dcps0, a good one since it is nonsensical and may
-    //             remain unencoded in the future for that reason)
-    // 0x33000000 (bfm variant)
-    // 0xd67f0000 (br variant)
-    // 0x5ac00c00 (rbit variant)
-
-    Emit(0xd4a00000);		// "dcps0", also has 16-bit payload if needed
-#endif
+    Emit(UNDEFINED_INST_PATTERN);
   }
+
   void Uxtb(const Register& rd, const Register& rn) {
     VIXL_ASSERT(!rd.IsZero());
     VIXL_ASSERT(!rn.IsZero());
@@ -2261,7 +2249,7 @@ class MacroAssembler : public js::jit::Assembler {
     return sp_;
   }
 
-  const js::jit::RegisterOrSP getStackPointer() const {
+  js::jit::RegisterOrSP getStackPointer() const {
       return js::jit::RegisterOrSP(sp_.code());
   }
 
@@ -2441,6 +2429,7 @@ class UseScratchRegisterScope {
   Register AcquireX() { return AcquireNextAvailable(available_).X(); }
   VRegister AcquireS() { return AcquireNextAvailable(availablefp_).S(); }
   VRegister AcquireD() { return AcquireNextAvailable(availablefp_).D(); }
+  VRegister AcquireQ() { return AcquireNextAvailable(availablefp_).Q(); }
 
 
   Register AcquireSameSizeAs(const Register& reg);

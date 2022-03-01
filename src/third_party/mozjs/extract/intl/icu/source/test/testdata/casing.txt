@@ -1,0 +1,72 @@
+﻿//*******************************************************************************
+// Copyright (C) 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+//*
+//*   Copyright (C) 2002-2010, International Business Machines
+//*   Corporation and others.  All Rights Reserved.
+//*
+//*******************************************************************************
+
+casing:table(nofallback) {
+    Info {
+        Description { "This is test data file for string casing." }
+
+        LongDescription {
+            "each item is an array with\n"
+            "input string, result string, locale ID[, break iterator]\n"
+            "the break iterator (only for titlecasing) is specified as an int, same as in UBreakIteratorType:\n"
+            "0=UBRK_CHARACTER  1=UBRK_WORD  2=UBRK_LINE  3=UBRK_SENTENCE  4=UBRK_TITLE  -1=default (NULL=words) -2=no breaks (.*)\n"
+            "options: T=U_FOLD_CASE_EXCLUDE_SPECIAL_I  L=U_TITLECASE_NO_LOWERCASE  A=U_TITLECASE_NO_BREAK_ADJUSTMENT\n"
+        }
+    }
+    TestData {
+      lowercasing {
+        Headers { "Input", "Output", "Locale" }
+        Cases {
+            { " tHe QUIcK bRoWn", " the quick brown", "" },
+            { "aBIΣßΣ/񟿿𐐅", "abiσßς/񟿿𐐭", "" },
+            { "aBIΣßΣ/񟿿𐐅", "abıσßς/񟿿𐐭", "tur" } // tur: 3-letter code for Turkish
+        }
+      }
+      uppercasing {
+        Headers { "Input", "Output", "Locale" }
+        Cases {
+            { " tHe QUIcK bRoWn", " THE QUICK BROWN", "" },
+            { "aBiσßς/ﬃ񟿿𐐭", "ABIΣSSΣ/FFI񟿿𐐅", "" },
+            { "aBiσßς/ﬃ񟿿𐐭", "ABİΣSSΣ/FFI񟿿𐐅", "az" } // az same casing as tr
+        }
+      }
+      titlecasing {
+        Headers { "Input", "Output", "Locale", "Type", "Options" }
+        Cases {
+            { "ʻaMeLikA huI Pū ʻʻʻiA", "ʻAmelika Hui Pū ʻʻʻIa", "", "-1", "" }, // titlecase first _cased_ letter, j4933
+            { " tHe QUIcK bRoWn", " The Quick Brown", "", "4", "" },
+            { "ǄǅǆǇǈǉǊǋǌ", "ǅǅǅǈǈǈǋǋǋ", "", "0", "" }, // UBRK_CHARACTER
+            { "ǉubav ljubav", "ǈubav Ljubav", "", "-1", "" }, // Lj vs. L+j
+            { "ijssel igloo IJMUIDEN", "Ijssel Igloo Ijmuiden", "", "1", "" }, // Dutch titlecasing default
+            { "ijssel igloo IJMUIDEN", "IJssel Igloo IJmuiden", "nl", "1", "" }, // Dutch titlecasing
+            { "'oH dOn'T tItLeCaSe AfTeR lEtTeR+'", "'Oh Don't Titlecase After Letter+'", "", "-1", "" },
+            
+            { "a ʻCaT. A ʻdOg! ʻeTc.", "A ʻCat. A ʻDog! ʻEtc.", "", "-1", "" }, // default
+            { "a ʻCaT. A ʻdOg! ʻeTc.", "A ʻcat. A ʻdog! ʻetc.", "", "-1", "A" }, // U_TITLECASE_NO_BREAK_ADJUSTMENT
+            { "a ʻCaT. A ʻdOg! ʻeTc.", "A ʻCaT. A ʻdOg! ʻETc.", "", "3", "L" }, // UBRK_SENTENCE and U_TITLECASE_NO_LOWERCASE
+            
+            { "ʻcAt! ʻeTc.", "ʻCat! ʻetc.", "", "-2", "" }, // -2=Trivial break iterator
+            { "ʻcAt! ʻeTc.", "ʻcat! ʻetc.", "", "-2", "A" }, // U_TITLECASE_NO_BREAK_ADJUSTMENT
+            { "ʻcAt! ʻeTc.", "ʻCAt! ʻeTc.", "", "-2", "L" }, // U_TITLECASE_NO_LOWERCASE
+            { "ʻcAt! ʻeTc.", "ʻcAt! ʻeTc.", "", "-2", "AL" }, // Both options
+
+            // Test case for ticket #7251: UCharacter.toTitleCase() throws OutOfMemoryError
+            // when TITLECASE_NO_LOWERCASE encounters a single-letter word
+            { "a b c", "A B C", "", "1", "L" } // U_TITLECASE_NO_LOWERCASE
+        }
+      }
+      casefolding {
+        Headers { "Input", "Output", "Options" }
+        Cases {
+            { "aBİIıϐßﬃ񟿿", "abi̇iıβssffi񟿿", "" },
+            { "aBİIıϐßﬃ񟿿", "abiııβssffi񟿿", "T" } // U_FOLD_CASE_EXCLUDE_SPECIAL_I
+        }
+      }
+    }
+}

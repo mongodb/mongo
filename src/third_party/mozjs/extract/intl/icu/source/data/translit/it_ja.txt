@@ -1,0 +1,266 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: it_ja.txt
+# Generated from CLDR
+#
+
+# Italian to Katakana Transliteration Table for ICU
+# Based on:
+#   "現代イタリア語入門" (大学書林, 1974. ISBN:978-4475017176)
+#   http://ja.wikipedia.org/wiki/%E3%82%A4%E3%82%BF%E3%83%AA%E3%82%A2%E8%AA%9E
+::NFD(NFC);
+::Lower();
+::[:Latin:] fullwidth-halfwidth();
+#
+#
+# Variables.
+$vowel = [aeiou];
+$consonant = [bcdfghjklmnpqrstvwxyz];
+#
+#
+# Ignore apostrophe.
+($consonant) \' → | $1;
+\' → ;
+#
+#
+cqu → ック;
+cc → ッ | c;
+ca → カ;
+ッ { cia → チャ;
+cio → チョ;
+ci → チ;
+cu → ク;
+ce → チェ;
+co → コ;
+#
+#
+cha → シャ;
+chi → キ;
+chu → チュ;
+che → ケ;
+cho → チョ;
+#
+#
+gg → ッ | g;
+ghi → ギ;
+ghe → ゲ;
+ghu → グ;
+gli → | li;
+gna → ニャ;
+gni → ニ;
+gnu → ヌ;
+gne → ニェ;
+gno → ニョ;
+#
+#
+ga → ガ;
+gia → ジャ;
+giu → ジュ;
+gio → ジョ;
+gi → ジ;
+gu → グ;
+ge → ジェ;
+go → ゴ;
+#
+#
+rr → ッ | r;
+ra → ラ;
+ri → リ;
+ru → ル;
+re → レ;
+ro → ロ;
+#
+#
+ll → ッ | l;
+la → ラ;
+li → リ;
+lu → ル;
+le → レ;
+lo → ロ;
+#
+#
+tt → ッ | t;
+ta → タ;
+ti → ティ;
+thi → ティ;
+tu → トゥ;
+thu → トゥ;
+te → テ;
+the → テ;
+to → ト;
+tho → ト;
+tzu → | ッツ;
+tz → | zz;
+#
+#
+dd → ッ | d;
+da → ダ;
+di → ディ;
+du → ドゥ;
+de → デ;
+do → ド;
+#
+#
+ma → マ;
+mi → ミ;
+mu → ム;
+me → メ;
+mo → モ;
+m } $consonant → ン;
+#
+#
+na → ナ;
+ni → ニ;
+nu → ヌ;
+ne → ネ;
+no → ノ;
+#
+#
+ff → ッ | f;
+fa → ファ;
+fi → フィ;
+fu → フ;
+fe → フェ;
+fo → フォ;
+#
+#
+bb → ッ | b;
+ba → バ;
+bi → ビ;
+bu → ブ;
+be → ベ;
+bo → ボ;
+#
+#
+pp → ッ | p;
+pa → パ;
+pi → ピ;
+pu → プ;
+pe → ペ;
+po → ポ;
+#
+#
+vv → ッ | v;
+va → ヴァ;
+vi → ヴィ;
+vu → ヴ;
+ve → ヴェ;
+vo → ヴォ;
+#
+#
+sa } nt[ao] → サ;
+ss → ッ | \~s;
+#
+#
+# 's' is voiced before [bdglmnrv].
+sb → ズ | b;
+sd → ズ | d;
+sg → ズ | g;
+sl → ズ | l;
+sm → ズ | m;
+sn → ズ | n;
+sr → ズ | r;
+sv → ズ | v;
+#
+#
+# Force 's' after a consonat to be unvoiced.
+($consonant) s } $vowel → | $1 \~ s;
+\~sa → サ;
+\~si → シ;
+\~su → ス;
+\~se → セ;
+\~so → ソ;
+#
+#
+# 's' at the beginning is usually unvoiced.
+[:^Letter:] { sa → サ;
+[:^Letter:] { si → シ;
+[:^Letter:] { su → ス;
+[:^Letter:] { se → セ;
+[:^Letter:] { so → ソ;
+#
+#
+# Otherwise voiced 's' are common.
+sa → ザ;
+si → ジ;
+su → ズ;
+se → ゼ;
+so → ゾ;
+#
+#
+scia → シャ;
+sci → シ;
+sce → シェ;
+#
+#
+zz → ッ | \~z;
+#
+# Force 'z' after a consonat to be unvoiced.
+($consonant) z → | $1 \~z;
+\~za → ツァ;
+\~zi → ツィ;
+\~zu → ツ;
+\~ze → ツェ;
+\~zo → ツォ;
+#
+#
+# Otherwise voiced 'z' are common except for 'zi'.
+za → ザ;
+[:^Letter:] { zi → ジ;
+zi → ツィ;
+zu → ズ;
+ze → ゼ;
+zo → ゾ;
+#
+#
+ja → ヤ;
+je → イェ;
+j → | i;
+#
+#
+# Standalone vowels and consonants.
+a → ア;
+i → イ;
+u → ウ;
+e → エ;
+o → オ;
+#
+#
+b → ブ;
+c → ク;
+d → ド;
+f → フ;
+g → グ;
+h → ;
+k → | c;
+l → ル;
+m → ム;
+n → ン;
+p → プ;
+q → | c;
+r → ル;
+s → ス;
+t → ト;
+v → ヴ;
+x → | cs;
+y → | i;
+z → ツ;
+#
+#
+# word delimiter of transliterated foreign phrase is '・'.
+' ' → ・;
+#
+#
+# Latin hyphen should be transliterated to U+30A0 (KATAKANA-HIRAGANA
+# DOUBLE HYPHEN), ideally. But since the character isn't supported by
+# many fonts or softwares, we use U+FF1D (FULLWIDTH EQUALS SIGN),
+# which is widely used as "double hyphen".
+#
+\- → ＝;
+#
+#
+[:nonspacing mark:] → ;
+::NFC(NFD);
+

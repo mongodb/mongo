@@ -1,0 +1,5000 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+zh{
+    AuxExemplarCharacters{
+        "[乒 乓 乳 仂 仓 伞 伪 侣 傈 傣 僳 僵 冥 冻 净 凉 凸 刨 刮 剃 剽 劈 勺 匕 匠 匮 卑 卜 卞 卦 厕 厘 厦 厨 叮 吕 吴 呕"
+        " 呣 咒 哨 哺 唇 啤 啮 喱 嗅 嘘 嘟 噘 噜 噢 嚏 坏 坝 垫 堤 堵 墅 墓 墙 墟 壳 壶 奎 奸 妆 姜 娥 婴 媚 孪 宅 宠 宫 寺"
+        " 尬 尴 尸 屈 屎 屑 屡 履 屿 岩 巽 巾 帆 帚 帜 帧 庇 庵 弓 彗 御 徽 怜 恒 恤 恳 悬 悯 惊 惫 愤 戟 扔 扰 扳 抖 抛 拄"
+        " 拇 拐 挂 挎 捂 捏 掘 掠 揭 搏 携 摇 撅 撕 撤 攀 敞 斑 斧 昙 晕 朔 杆 杖 杠 枯 柄 柑 柜 柠 柩 柱 柿 栓 栗 栽 桔 桶"
+        " 梨 棍 棕 棺 椒 楔 楠 榄 榈 槌 槟 槿 横 橄 橇 橘 橙 橡 檬 汁 沐 沫 泪 泵 洁 洒 浆 浣 涂 涌 涎 涕 涩 淇 渗 湘 滕 滚"
+        " 滩 澡 灾 炽 烘 烙 烛 烟 烹 焊 焙 焰 煎 熏 燥 犀 犄 犬 犸 狡 狸 猎 猕 猩 猫 猬 猾 猿 獭 獾 瑚 瓢 瓮 甫 畜 疟 皂 皱"
+        " 皿 盆 盐 盔 盗 盥 盲 眨 眩 眯 睿 瞌 瞒 瞪 矿 砖 砸 碑 祈 祭 祷 禄 禽 秃 稻 稽 窃 窄 窥 竖 竿 笆 笺 笼 筐 筒 筝 筷"
+        " 箸 篓 篱 篷 粑 粟 粥 粮 粽 絮 纠 纫 纬 纱 纹 绒 绣 绳 绷 缄 缆 缎 缝 罩 羹 翱 耸 聋 肌 肢 肺 脏 脚 腋 腕 腮 膀 膏"
+        " 舔 舵 艇 艮 艳 芙 芽 苜 苞 苣 苹 茄 莓 莴 菇 菌 菠 菱 萎 萝 葩 葫 葬 葱 葵 蒜 蒲 蒸 蓄 蓿 蔬 蔽 蕉 蕾 薯 蘑 蚂 蚊"
+        " 蚓 蚝 蚯 蛆 蛎 蛐 蛛 蛰 蛾 蜗 蜘 蜡 蜥 蜴 蝇 蝎 蝙 蝠 蝴 螂 螃 螺 蟀 蟋 蟑 蠕 衫 衬 袜 裙 裹 褂 讶 讽 诊 诱 谍 谎"
+        " 谚 谬 豚 豹 账 贷 赣 趾 跆 跛 跤 跨 跪 踪 蹄 蹈 蹦 蹬 躬 躺 轴 轿 辐 辣 迹 郁 鄙 酢 酥 酪 酱 醺 钉 钞 钥 钩 钮 钯"
+        " 钳 铂 铅 铛 铰 锄 锑 锚 锤 锯 镐 镑 镖 闺 闽 阱 隧 雀 雌 雕 霜 霾 靴 靶 鞠 颈 颜 颠 颤 飓 饪 饵 饺 馍 馏 驰 驼 骂"
+        " 骄 骆 骰 骷 骼 髅 髦 鬈 魁 鱿 鲤 鲨 鲸 鳄 鸢 鸵 鸽 鹉 鹦 黏 黛 鼬 龇]"
+    }
+    Ellipsis{
+        final{"{0}…"}
+        initial{"…{0}"}
+        medial{"{0}…{1}"}
+        word-final{"{0}…"}
+        word-initial{"…{0}"}
+        word-medial{"{0}…{1}"}
+    }
+    ExemplarCharacters{
+        "[一 丁 七 万-与 丑 专 且 世 丘-业 东 丝 丢 两 严 丧 个 中 丰 串 临 丸-主 丽 举 乃 久 么 义 之-乐 乔 乖 乘 乙 九 也"
+        "-乡 书 买 乱 乾 了 予 争 事 二 于 亏 云 互 五 井 亚 些 亡 交-亨 享 京 亮 亲 人 亿-仁 仅 仇 今 介 仍 从 仔 他 付 仙"
+        " 代-以 仪 们 仰 仲 件 价 任 份 仿 企 伊 伍 伏-休 众-会 伟 传 伤 伦 伯 估 伴 伸 似 伽 但 位-佑 体 何 余 佛 作 你 佤"
+        " 佩 佳 使 例 供 依 侠 侦-侨 侬 侯 侵 便 促 俄 俊 俗 保 信 俩 修 俱 俾 倍 倒 候 倚 借 倦 值 倾 假 偌 偏 做 停 健 偶"
+        " 偷 储 催 傲 傻 像 僧 儒 儿 允 元-兆 先 光 克 免 兑 兔 党 入 全 八-兮 兰 共 关-兹 养-兽 内 冈 册 再 冒 写 军 农 冠"
+        " 冬 冰 冲 决 况 冷 准 凌 减 凝 几 凡 凤 凭 凯 凰 出 击 函 刀 分 切 刊 刑 划 列-创 初 判 利 别 到 制-券 刺 刻 剂 前"
+        " 剑 剧 剩 剪 副 割 力 劝-务 劣 动-劫 励-劳 势 勇 勉 勋 勒 勤 勾 勿 包 匆 匈 化 北 匙 匹-医 十 千 升 午 半 华 协 卒"
+        " 卓 单-南 博 占-卢 卫 卯-危 即 却 卷 厂 厄-历 厉 压-厍 厚 原 去 县 参 又-反 发 叔 取-叙 口-另 只-叭 可 台 史 右 叶"
+        "-叹 吃 各 合-吊 同-后 吐 向 吓 吗 君 吝 吟 否 吧 含 听 启 吵 吸 吹 吻 吾 呀 呆 呈 告 呐 员 呜 呢 呦 周 味 呵 呼 命"
+        " 和 咖 咦-咨 咪 咬 咯 咱 哀 品 哇-哉 响 哎 哟 哥 哦 哩 哪 哭 哲 唉 唐 唤 唬 售 唯 唱 唷 商 啊 啡 啥 啦 啪 喀 喂 善"
+        " 喇 喊 喏 喔 喜 喝 喵 喷 喻 嗒 嗨 嗯 嘉 嘛 嘴 嘻 嘿 器 四 回 因 团 园 困 围 固 国 图 圆 圈 土 圣 在 圭 地 圳 场 圾"
+        " 址 均 坎 坐 坑 块 坚-坜 坡 坤 坦 坪 垂 垃 型 垒 埃 埋 城 埔 域 培 基 堂 堆 堕 堡 堪 塑 塔 塞 填 境 增 墨 壁 壤 士"
+        " 壬 壮 声 处 备 复 夏 夕 外 多 夜 够 夥 大 天-夫 央 失 头 夷-夺 奇-奉 奋 奏 契 奔 奖 套 奥 女 奴 奶 她 好 如 妇 妈"
+        " 妖 妙 妥 妨 妮 妹 妻 姆 姊 始 姐 姑 姓 委 姿 威 娃 娄 娘 娜 娟 娱 婆 婚 媒 嫁 嫌 嫩 子 孔 孕 字-孙 孜 孝 孟 季 孤"
+        " 学 孩 宁 它 宇-安 宋 完 宏 宗-实 审-室 宪 害 宴 家 容 宽-宿 寂 寄-寇 富 寒 寝-察 寡 寨 寸 对 寻 导 寿 封 射 将 尊"
+        " 小 少 尔 尖 尘 尚 尝 尤 就 尺 尼-尾 局-层 居 屋 屏 展 属 屠 山 岁 岂 岗 岘 岚 岛 岳 岸 峡 峰 崇 崩 崴 川 州 巡 工"
+        "-巨 巫 差 己-巴 巷 币-布 帅 师 希 帐 帕 帖 帝 带 席 帮 常 帽 幅 幕 干-年 并 幸 幻-幽 广 庆 床 序 库-底 店 庙 庚 府"
+        " 庞 废 度 座 庭 康 庸 廉 廖 延 廷 建 开 异-弄 弊 式 引 弗 弘 弟 张 弥 弦 弯 弱 弹 强 归 当 录 彝 形 彩 彬 彭 彰 影"
+        " 彷 役 彻 彼 往 征 径 待 很 律 後 徐 徒 得 循 微 徵 德 心 必 忆 忌 忍 志-忙 忠 忧 快 念 忽 怀 态 怎 怒 怕 怖 思 怡"
+        " 急 性 怨 怪 总 恋 恐 恢 恨 恩 恭 息 恰 恶 恼 悄 悉 悔 悟 悠 患 您 悲 情 惑 惜 惠 惧 惨 惯 想 惹 愁 愈 愉 意 愚 感"
+        " 愧 慈 慎 慕 慢 慧 慰 憾 懂 懒 戈 戊 戌 戏-戒 或 战 截 戴 户 房-扁 扇 手 才 扎 扑 打 托 扣 执 扩 扫-扯 批 找-技 抄"
+        " 把 抑 抓 投 抗 折 抢 护 报 披 抬 抱 抵 抹 抽 担 拆 拉 拍 拒 拔 拖 拘 招 拜 拟 拥 拦 拨 择 括 拳 拷 拼 拾 拿 持 指"
+        " 按 挑 挖 挝 挡 挤 挥 挪 振 挺 捉 捐 捕 损 捡 换 据 捷 授 掉 掌 排 探 接 控-措 掸 描 提 插 握 援 搜 搞 搬 搭 摄 摆"
+        " 摊 摔 摘 摩 摸 撒 撞 播 操 擎 擦 支 收 改 攻 放 政 故 效 敌 敏 救 教 敝 敢 散 敦 敬 数 敲 整 文 斋 斐 斗 料 斜 斥"
+        " 断 斯 新 方 於 施 旁 旅 旋 族 旗 无 既 日-早 旭 时 旺 昂 昆 昌 明 昏 易 星 映 春 昨 昭 是 显 晃 晋 晒 晓 晚 晨 普"
+        " 景 晴 晶 智 暂 暑 暖 暗 暮 暴 曰 曲 更 曹 曼 曾-最 月 有 朋 服 朗 望 朝 期 木 未-札 术 朱 朵 机 杀 杂 权 杉 李 材"
+        " 村 杜 束 条 来 杨 杯 杰 松 板 极 构 析 林 果 枝 枢 枪 枫 架 柏 某 染 柔 查 柬 柯 柳 柴 标 栋 栏 树 校 样-根 格 桃"
+        " 框 案 桌 桑 档 桥 梁 梅 梦 梯 械 梵 检 棉 棋 棒 棚 森 椅 植 椰 楚 楼 概 榜 模 樱 檀 欠-欣 欧 欲 欺 款 歉 歌 止-武"
+        " 歪 死 殊 残 段 毅 母 每 毒 比 毕 毛 毫 氏 民 气 氛 水 永 求 汇 汉 汗 汝 江-污 汤 汪 汶 汽 沃 沈 沉 沙 沟 没 沧 河"
+        " 油 治 沿 泉 泊 法 泛 泡-泣 泥 注 泰 泳 泽 洋 洗 洛 洞 津 洪 洲 活 洽 派 流 浅 测 济 浏 浑 浓 浙 浦 浩 浪 浮 浴 海"
+        " 涅 消 涉 涛 涨 涯 液 涵 淋 淑 淘 淡 深 混 添 清 渐 渡 渣 温 港 渴 游 湖 湾 源 溜 溪 滋 滑 满 滥 滨 滴 漂 漏 演 漠"
+        " 漫 潘 潜 潮 澎 澳 激 灌 火 灭 灯 灰 灵 灿 炉 炎 炮 炸 点 烂 烈 烤 烦 烧 热 焦 然 煌 煞 照 煮 熊 熟 燃 燕 爆 爪 爬"
+        " 爱 爵-爸 爽 片 版 牌 牙 牛 牡 牢 牧 物 牲 牵 特 牺 犯 状 犹 狂 狐 狗 狠 独 狮 狱 狼 猛 猜 猪 献 猴 玄 率 玉 王 玛"
+        " 玩 玫 环 现 玲 玻 珀 珊 珍 珠 班 球 理 琊 琪 琳 琴 琼 瑙 瑜 瑞 瑟 瑰 瑶 璃 瓜 瓦 瓶 甘 甚 甜 生 用 田-申 电 男 甸"
+        " 画 畅 界 留 略 番 疆 疏 疑 疗 疯 疲 疼 疾 病 痕 痛 痴 癸 登 白 百 的 皆 皇 皮 盈 益 监 盒 盖 盘 盛 盟 目 直 相 盼"
+        " 盾 省 眉 看 真 眠 眼 着 睛 睡 督 瞧 矛 矣 知 短 石 矶 码 砂 砍 研 破 础 硕 硬 确 碍 碎 碗 碟 碧 碰 磁 磅 磨 示 礼"
+        " 社 祖 祚 祝 神 祥 票 祯 祸 禁 禅 福 离 秀 私 秋 种 科 秒 秘 租 秤 秦 秩 积 称 移 稀 程 稍 税 稣 稳 稿 穆 究 穷 穹"
+        " 空 穿 突 窗 窝 立 站 竞-章 童 端 竹 笑 笔 笛 符 笨 第 等 筋 筑 答 策 筹 签 简 算 管 箭 箱 篇 篮 簿 籍 米 类 粉 粒"
+        " 粗 粤 粹 精 糊 糕 糖 糟 系 素 索 紧 紫 累 繁 红 约 级 纪 纯 纲 纳 纵 纷 纸 纽 线 练 组 细-终 绍 经 结 绕 绘 给 络"
+        " 绝 统 继 绩 绪 续 维 绵 综 绿 缅 缓 编 缘 缠 缩 缴 缶 缸 缺 罐 网 罕 罗 罚 罢 罪 置 署 羊 美 羞 群 羯 羽 翁 翅 翔"
+        " 翘 翠 翰 翻 翼 耀 老 考 者 而 耍 耐 耗 耳 耶 聊 职 联 聘 聚 聪 肉 肖 肚 股 肤 肥 肩 肯 育 胁 胆 背 胎 胖 胜 胞 胡"
+        " 胶 胸 能 脆 脑 脱 脸 腊 腐 腓 腰 腹 腾 腿 臂 臣 自 臭 至 致 舌 舍 舒 舞 舟 航 般 舰 船 良 色 艺 艾 节 芒 芝 芦 芬"
+        " 芭 花 芳 苍 苏 苗 若 苦 英 茂 范 茨 茫 茶 草 荐 荒 荣 药 荷 莉 莎 莪 莫 莱 莲 获 菜 菩 菲 萄 萍 萤 营 萧 萨 落 著"
+        " 葛 葡 蒂 蒋 蒙 蓉 蓝 蓬 蔑 蔡 薄 薪 藉 藏 藤 虎 虑 虫 虹 虽 虾 蚁 蛇 蛋 蛙 蛮 蜂 蜜 蝶 融 蟹 蠢 血 行 街 衡 衣 补"
+        " 表 袋 被 袭 裁 裂 装 裕 裤 西 要 覆 见 观 规 视 览 觉 角 解 言 誉 誓 警 计 订 认 讨 让 训-记 讲 讷 许 论 设 访 证"
+        " 评 识 诉 词 译 试 诗 诚 话 诞 询 该 详 语 误 说 请 诸 诺 读 课 谁 调 谅 谈 谊 谋 谓 谜 谢 谨 谱 谷 豆 象 豪 貌 贝"
+        "-负 贡-败 货-贪 购 贯 贱 贴 贵 贸-贺 贼 贾 资 赋 赌 赏 赐 赔 赖 赚 赛 赞 赠 赢 赤 赫 走 赵 起 趁 超 越 趋 趣 足 跃"
+        " 跌 跑 距 跟 路 跳 踏 踢 踩 身 躲 车 轨 轩 转 轮-轰 轻 载 较 辅 辆 辈 辉 辑 输 辛 辞 辨 辩 辰 辱 边 达 迁 迅 过 迈"
+        " 迎 运 近 返 还 这 进-迟 迦 迪 迫 述 迷 追 退-逃 逆 选 逊 透 逐 递 途 通 逛 逝 速 造 逢 逸 逻 逼 遇 遍 道 遗 遭 遮"
+        " 遵 避 邀 邓 那 邦 邪 邮 邱 邻 郎 郑 部 郭 都 鄂 酉 酋 配 酒 酷 酸 醉 醒 采 释 里-量 金 针 钓 钟 钢 钦 钱 钻 铁 铃"
+        " 铜 铢 铭 银 铺 链 销 锁 锅 锋 错 锡 锦 键 锺 镇 镜 镭 长 门 闪 闭 问 闰 闲 间 闷 闹 闻 阁 阅 阐 阔 队 阮 防-阶 阻"
+        " 阿 陀 附-陆 陈 降 限 院 除 险 陪 陵-陷 隆 随 隐 隔 障 难 雄-集 雉 雨 雪 雯 雳 零 雷 雾 需 震 霍 霖 露 霸 霹 青 靖"
+        " 静 非 靠 面 革 靼 鞋 鞑 韦 韩 音 页 顶 项-须 顽-顿 预 领 颇 频 颗 题 额 风 飘 飙 飞 食 餐 饭 饮 饰 饱 饼 馆 首 香"
+        " 馨 马 驱 驶 驻 驾 验 骑 骗 骚 骤 骨 高 鬼 魂 魅 魔 鱼 鲁 鲜 鸟 鸡 鸣 鸭 鸿 鹅 鹤 鹰 鹿 麦 麻 黄 黎 黑 默 鼓 鼠 鼻"
+        " 齐 齿 龄 龙 龟]"
+    }
+    ExemplarCharactersIndex{"[A B C D E F G H I J K L M N O P Q R S T U V W X Y Z]"}
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9 〇 一 七 三 九 二 五 八 六 四]"}
+    ExemplarCharactersPunctuation{
+        "[﹉﹊﹋﹌ _ ＿ ﹍﹎﹏ ︳︴ \\- － ﹣ ‐ ‑ – — ︱ ― , ， ﹐ 、 ﹑ ; ； ﹔ \\: ： ﹕ ! ！ ﹗ ? ？ ﹖ . ．"
+        " ﹒ ‥ ︰ … 。 · ＇ ‘ ’ \u0022 ＂ “ ” 〝 〞 ( （ ﹙ ︵ ) ） ﹚ ︶ \\[ ［ \\] ］ \\{ ｛ ﹛ ︷ "
+        "\\} ｝ ﹜ ︸ 〈 ︿ 〉 ﹀ 《 ︽ 》 ︾ 「 ﹁ 」 ﹂ 『 ﹃ 』 ﹄ 【 ︻ 】 ︼ 〔 ﹝ ︹ 〕 ﹞ ︺ 〖 〗 ‖ § @ ＠ ﹫ "
+        "* ＊ ﹡ / ／ \\\\ ＼ ﹨ \\& ＆ ﹠ # ＃ ﹟ % ％ ﹪ ‰ ′ ″ ‵ 〃 ※]"
+    }
+    MoreInformation{"？"}
+    NumberElements{
+        arab{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00"}
+                currencyFormat{"¤#,##0.00"}
+                percentFormat{"#,##0%"}
+            }
+            symbols{
+                decimal{"٫"}
+                exponential{"اس"}
+                group{"٬"}
+                infinity{"∞"}
+                list{"؛"}
+                nan{"NaN"}
+                perMille{"؉"}
+                superscriptingExponent{"×"}
+                timeSeparator{":"}
+            }
+        }
+        arabext{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+            symbols{
+                decimal{"٫"}
+                exponential{"×۱۰^"}
+                group{"٬"}
+                infinity{"∞"}
+                list{"؛"}
+                minusSign{"‎-‎"}
+                nan{"NaN"}
+                perMille{"؉"}
+                percentSign{"٪"}
+                plusSign{"‎+‎"}
+                superscriptingExponent{"×"}
+                timeSeparator{"٫"}
+            }
+        }
+        bali{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        beng{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        brah{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        cakm{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        cham{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        default{"latn"}
+        deva{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        finance{"hansfin"}
+        fullwide{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        gonm{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        gujr{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        guru{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        hanidec{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"#,##0%"}
+                scientificFormat{"#E0"}
+            }
+            symbols{
+                decimal{"."}
+                exponential{"E"}
+                group{","}
+                infinity{"∞"}
+                minusSign{"-"}
+                nan{"NaN"}
+                perMille{"‰"}
+                percentSign{"%"}
+                plusSign{"+"}
+                superscriptingExponent{"×"}
+            }
+        }
+        java{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        kali{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        khmr{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        knda{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        lana{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        lanatham{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        laoo{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        latn{
+            miscPatterns{
+                approximately{"~{0}"}
+                atLeast{"{0}+"}
+                atMost{"≤{0}"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"#,##0%"}
+                scientificFormat{"#E0"}
+            }
+            patternsLong{
+                decimalFormat{
+                    1000{
+                        other{"0"}
+                    }
+                    10000{
+                        other{"0万"}
+                    }
+                    100000{
+                        other{"00万"}
+                    }
+                    1000000{
+                        other{"000万"}
+                    }
+                    10000000{
+                        other{"0000万"}
+                    }
+                    100000000{
+                        other{"0亿"}
+                    }
+                    1000000000{
+                        other{"00亿"}
+                    }
+                    10000000000{
+                        other{"000亿"}
+                    }
+                    100000000000{
+                        other{"0000亿"}
+                    }
+                    1000000000000{
+                        other{"0万亿"}
+                    }
+                    10000000000000{
+                        other{"00万亿"}
+                    }
+                    100000000000000{
+                        other{"000万亿"}
+                    }
+                }
+            }
+            patternsShort{
+                currencyFormat{
+                    1000{
+                        other{"0"}
+                    }
+                    10000{
+                        other{"¤0万"}
+                    }
+                    100000{
+                        other{"¤00万"}
+                    }
+                    1000000{
+                        other{"¤000万"}
+                    }
+                    10000000{
+                        other{"¤0000万"}
+                    }
+                    100000000{
+                        other{"¤0亿"}
+                    }
+                    1000000000{
+                        other{"¤00亿"}
+                    }
+                    10000000000{
+                        other{"¤000亿"}
+                    }
+                    100000000000{
+                        other{"¤0000亿"}
+                    }
+                    1000000000000{
+                        other{"¤0万亿"}
+                    }
+                    10000000000000{
+                        other{"¤00万亿"}
+                    }
+                    100000000000000{
+                        other{"¤000万亿"}
+                    }
+                }
+                decimalFormat{
+                    1000{
+                        other{"0"}
+                    }
+                    10000{
+                        other{"0万"}
+                    }
+                    100000{
+                        other{"00万"}
+                    }
+                    1000000{
+                        other{"000万"}
+                    }
+                    10000000{
+                        other{"0000万"}
+                    }
+                    100000000{
+                        other{"0亿"}
+                    }
+                    1000000000{
+                        other{"00亿"}
+                    }
+                    10000000000{
+                        other{"000亿"}
+                    }
+                    100000000000{
+                        other{"0000亿"}
+                    }
+                    1000000000000{
+                        other{"0万亿"}
+                    }
+                    10000000000000{
+                        other{"00万亿"}
+                    }
+                    100000000000000{
+                        other{"000万亿"}
+                    }
+                }
+            }
+            symbols{
+                decimal{"."}
+                exponential{"E"}
+                group{","}
+                infinity{"∞"}
+                list{";"}
+                minusSign{"-"}
+                nan{"NaN"}
+                perMille{"‰"}
+                percentSign{"%"}
+                plusSign{"+"}
+                superscriptingExponent{"×"}
+                timeSeparator{":"}
+            }
+        }
+        lepc{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        limb{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        minimalPairs{
+            ordinal{
+                other{"在第 {0} 个路口右转。"}
+            }
+            plural{
+                other{"{0} 天"}
+            }
+        }
+        minimumGroupingDigits{"1"}
+        mlym{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        mong{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        mtei{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        mymr{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        mymrshan{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        native{"hanidec"}
+        nkoo{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        olck{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        orya{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        osma{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        saur{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        shrd{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        sora{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        sund{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        takr{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        talu{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        tamldec{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        telu{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        thai{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        tibt{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+        traditional{"hans"}
+        vaii{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+    }
+    calendar{
+        buddhist{
+            DateTimePatterns{
+                "zzzz ah:mm:ss",
+                "z ah:mm:ss",
+                "ah:mm:ss",
+                "ah:mm",
+                "Gy年M月d日EEEE",
+                "Gy年M月d日",
+                "Gy年M月d日",
+                "Gy-M-d",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Ed{"d日E"}
+                Gy{"Gy年"}
+                GyMMM{"Gy年MM月"}
+                GyMMMEd{"Gy年MM月d日E"}
+                GyMMMd{"Gy年MM月d日"}
+                M{"M月"}
+                MEd{"M-dE"}
+                MMMEd{"M月d日E"}
+                MMMMd{"M月d日"}
+                MMMd{"M月d日"}
+                Md{"M-d"}
+                d{"d日"}
+                y{"Gy年"}
+                yyyy{"Gy年"}
+                yyyyM{"Gy-M"}
+                yyyyMEd{"Gy-M-d（E）"}
+                yyyyMMM{"Gy年M月"}
+                yyyyMMMEd{"Gy年M月d日E"}
+                yyyyMMMM{"Gy年M月"}
+                yyyyMMMd{"Gy年M月d日"}
+                yyyyMd{"Gy-M-d"}
+                yyyyQQQ{"Gy年第Q季度"}
+                yyyyQQQQ{"Gy年QQQQ"}
+            }
+            eras{
+                abbreviated{
+                    "佛历",
+                }
+                narrow{
+                    "佛历",
+                }
+                wide{
+                    "佛历",
+                }
+            }
+            intervalFormats{
+                Bh{
+                    B{"Bh时至Bh时"}
+                    h{"Bh时至h时"}
+                }
+                Bhm{
+                    B{"Bh:mm至Bh:mm"}
+                    h{"Bh:mm至h:mm"}
+                    m{"Bh:mm至h:mm"}
+                }
+                Hmv{
+                    H{"v HH:mm – HH:mm"}
+                    m{"v HH:mm – HH:mm"}
+                }
+                M{
+                    M{"M–M月"}
+                }
+                MEd{
+                    M{"M/dE至M/dE"}
+                    d{"M/dE至M/dE"}
+                }
+                MMM{
+                    M{"MMM – MMM"}
+                }
+                MMMEd{
+                    M{"M月d日E至M月d日E"}
+                    d{"M月d日E至d日E"}
+                }
+                MMMd{
+                    M{"M月d日至M月d日"}
+                    d{"M月d日至d日"}
+                }
+                Md{
+                    M{"M/d – M/d"}
+                    d{"M/d – M/d"}
+                }
+                d{
+                    d{"d至d日"}
+                }
+                h{
+                    a{"ah时至ah时"}
+                    h{"ah时至h时"}
+                }
+                hm{
+                    a{"ah:mm至ah:mm"}
+                    h{"ah:mm至h:mm"}
+                    m{"ah:mm至h:mm"}
+                }
+                hmv{
+                    a{"v ah:mm至ah:mm"}
+                    h{"v ah:mm至h:mm"}
+                    m{"v ah:mm至h:mm"}
+                }
+                hv{
+                    a{"v ah时至ah时"}
+                    h{"v ah时至h时"}
+                }
+                y{
+                    y{"Gy–y年"}
+                }
+                yM{
+                    M{"Gy年M月至M月"}
+                    y{"Gy年M月至y年M月"}
+                }
+                yMEd{
+                    M{"Gy/M/dE至y/M/dE"}
+                    d{"Gy/M/dE至y/M/dE"}
+                    y{"Gy/M/dE至y/M/dE"}
+                }
+                yMMM{
+                    M{"Gy年M月至M月"}
+                    y{"Gy年M月至y年M月"}
+                }
+                yMMMEd{
+                    M{"Gy年M月d日E至M月d日E"}
+                    d{"Gy年M月d日E至d日E"}
+                    y{"Gy年M月d日E至y年M月d日E"}
+                }
+                yMMMM{
+                    M{"Gy年M月至M月"}
+                    y{"Gy年M月至y年M月"}
+                }
+                yMMMd{
+                    M{"Gy年M月d日至M月d日"}
+                    d{"Gy年M月d日至d日"}
+                    y{"Gy年M月d日至y年M月d日"}
+                }
+                yMd{
+                    M{"Gy/M/d – y/M/d"}
+                    d{"Gy/M/d – y/M/d"}
+                    y{"Gy/M/d – y/M/d"}
+                }
+            }
+        }
+        chinese{
+            DateTimePatterns{
+                "zzzz ah:mm:ss",
+                "z ah:mm:ss",
+                "ah:mm:ss",
+                "ah:mm",
+                {
+                    "rU年MMMdEEEE",
+                    "d=hanidays",
+                }
+                {
+                    "rU年MMMd",
+                    "d=hanidays",
+                }
+                {
+                    "r年MMMd",
+                    "d=hanidays",
+                }
+                "r/M/d",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Bh{"Bh时"}
+                Bhm{"Bh:mm"}
+                Bhms{"Bh:mm:ss"}
+                E{"ccc"}
+                EBhm{"EB h:mm"}
+                EBhms{"EB h:mm:ss"}
+                Ed{"d日E"}
+                Gy{"rU年"}
+                GyMMM{"rU年MMM"}
+                GyMMMEd{"rU年MMMdE"}
+                GyMMMd{"r年MMMd"}
+                H{"HH"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"MMM"}
+                MEd{"M-dE"}
+                MMM{"LLL"}
+                MMMEd{"MMMd日E"}
+                MMMMd{"MMMMd日"}
+                MMMd{"MMMd日"}
+                Md{"M-d"}
+                UM{"U年MMM"}
+                UMMM{"U年MMM"}
+                UMMMd{"U年MMMd"}
+                UMd{"U年MMMd"}
+                d{"d日"}
+                h{"ah时"}
+                hm{"ah:mm"}
+                hms{"ah:mm:ss"}
+                ms{"mm:ss"}
+                y{"rU年"}
+                yMd{"r年MMMd"}
+                yyyy{"rU年"}
+                yyyyM{"rU年MMM"}
+                yyyyMEd{"rU年MMMd，E"}
+                yyyyMMM{"rU年MMM"}
+                yyyyMMMEd{"rU年MMMdE"}
+                yyyyMMMM{"rU年MMMM"}
+                yyyyMMMd{"r年MMMd"}
+                yyyyMd{"r年MMMd"}
+                yyyyQQQ{"rU年QQQQ"}
+                yyyyQQQQ{"rU年QQQQ"}
+            }
+            cyclicNameSets{
+                dayParts{
+                    format{
+                        abbreviated{
+                            "子",
+                            "丑",
+                            "寅",
+                            "卯",
+                            "辰",
+                            "巳",
+                            "午",
+                            "未",
+                            "申",
+                            "酉",
+                            "戌",
+                            "亥",
+                        }
+                    }
+                }
+                solarTerms{
+                    format{
+                        abbreviated{
+                            "立春",
+                            "雨水",
+                            "惊蛰",
+                            "春分",
+                            "清明",
+                            "谷雨",
+                            "立夏",
+                            "小满",
+                            "芒种",
+                            "夏至",
+                            "小暑",
+                            "大暑",
+                            "立秋",
+                            "处暑",
+                            "白露",
+                            "秋分",
+                            "寒露",
+                            "霜降",
+                            "立冬",
+                            "小雪",
+                            "大雪",
+                            "冬至",
+                            "小寒",
+                            "大寒",
+                        }
+                    }
+                }
+                years{
+                    format{
+                        abbreviated{
+                            "甲子",
+                            "乙丑",
+                            "丙寅",
+                            "丁卯",
+                            "戊辰",
+                            "己巳",
+                            "庚午",
+                            "辛未",
+                            "壬申",
+                            "癸酉",
+                            "甲戌",
+                            "乙亥",
+                            "丙子",
+                            "丁丑",
+                            "戊寅",
+                            "己卯",
+                            "庚辰",
+                            "辛巳",
+                            "壬午",
+                            "癸未",
+                            "甲申",
+                            "乙酉",
+                            "丙戌",
+                            "丁亥",
+                            "戊子",
+                            "己丑",
+                            "庚寅",
+                            "辛卯",
+                            "壬辰",
+                            "癸巳",
+                            "甲午",
+                            "乙未",
+                            "丙申",
+                            "丁酉",
+                            "戊戌",
+                            "己亥",
+                            "庚子",
+                            "辛丑",
+                            "壬寅",
+                            "癸卯",
+                            "甲辰",
+                            "乙巳",
+                            "丙午",
+                            "丁未",
+                            "戊申",
+                            "己酉",
+                            "庚戌",
+                            "辛亥",
+                            "壬子",
+                            "癸丑",
+                            "甲寅",
+                            "乙卯",
+                            "丙辰",
+                            "丁巳",
+                            "戊午",
+                            "己未",
+                            "庚申",
+                            "辛酉",
+                            "壬戌",
+                            "癸亥",
+                        }
+                    }
+                }
+                zodiacs{
+                    format{
+                        abbreviated{
+                            "鼠",
+                            "牛",
+                            "虎",
+                            "兔",
+                            "龙",
+                            "蛇",
+                            "马",
+                            "羊",
+                            "猴",
+                            "鸡",
+                            "狗",
+                            "猪",
+                        }
+                    }
+                }
+            }
+            intervalFormats{
+                Bh{
+                    B{"Bh至Bh时"}
+                    h{"Bh至h时"}
+                }
+                Bhm{
+                    B{"Bh:mm至Bh:mm"}
+                    h{"Bh:mm至h:mm"}
+                    m{"Bh:mm至h:mm"}
+                }
+                H{
+                    H{"HH至HH"}
+                }
+                Hm{
+                    H{"HH:mm至HH:mm"}
+                    m{"HH:mm至HH:mm"}
+                }
+                Hmv{
+                    H{"v HH:mm至HH:mm"}
+                    m{"v HH:mm至HH:mm"}
+                }
+                Hv{
+                    H{"v HH–HH"}
+                }
+                M{
+                    M{"L至L"}
+                }
+                MEd{
+                    M{"M-dE至M-dE"}
+                    d{"M-dE至M-dE"}
+                }
+                MMM{
+                    M{"LLL至LLL"}
+                }
+                MMMEd{
+                    M{"MMMd日E至MMMd日E"}
+                    d{"MMMd日E至d日E"}
+                }
+                MMMd{
+                    M{"MMMd日至MMMd日"}
+                    d{"MMMd日至d日"}
+                }
+                Md{
+                    M{"M-d至M-d"}
+                    d{"M-d至M-d"}
+                }
+                d{
+                    d{"d日至d日"}
+                }
+                fallback{"{0}–{1}"}
+                h{
+                    a{"ah至ah时"}
+                    h{"ah至h时"}
+                }
+                hm{
+                    a{"ah:mm至ah:mm"}
+                    h{"ah:mm至h:mm"}
+                    m{"ah:mm至h:mm"}
+                }
+                hmv{
+                    a{"v ah:mm至ah:mm"}
+                    h{"v ah:mm至h:mm"}
+                    m{"v ah:mm至h:mm"}
+                }
+                hv{
+                    a{"v ah至ah时"}
+                    h{"v ah至h时"}
+                }
+                y{
+                    y{"rU至rU"}
+                }
+                yM{
+                    M{"r-M至r-M"}
+                    y{"r-M至r-M"}
+                }
+                yMEd{
+                    M{"r-M-dE至r-M-dE"}
+                    d{"r-M-dE至r-M-dE"}
+                    y{"r-M-dE至r-M-dE"}
+                }
+                yMMM{
+                    M{"rU年MMM至MMM"}
+                    y{"rU年MMM至rU年MMM"}
+                }
+                yMMMEd{
+                    M{"rU年MMMdE至MMMdE"}
+                    d{"rU年MMMdE至dE"}
+                    y{"rU年MMMdE至rU年MMMdE"}
+                }
+                yMMMM{
+                    M{"rU年MMMM至MMMM"}
+                    y{"rU年MMMM至rU年MMMM"}
+                }
+                yMMMd{
+                    M{"r年MMMd至MMMd"}
+                    d{"r年MMMd至d"}
+                    y{"r年MMMd至r年MMMd"}
+                }
+                yMd{
+                    M{"r-M-d至r-M-d"}
+                    d{"r-M-d至r-M-d"}
+                    y{"r-M-d至r-M-d"}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "正月",
+                        "二月",
+                        "三月",
+                        "四月",
+                        "五月",
+                        "六月",
+                        "七月",
+                        "八月",
+                        "九月",
+                        "十月",
+                        "十一月",
+                        "腊月",
+                    }
+                    narrow{
+                        "正",
+                        "二",
+                        "三",
+                        "四",
+                        "五",
+                        "六",
+                        "七",
+                        "八",
+                        "九",
+                        "十",
+                        "十一",
+                        "腊",
+                    }
+                    wide{
+                        "正月",
+                        "二月",
+                        "三月",
+                        "四月",
+                        "五月",
+                        "六月",
+                        "七月",
+                        "八月",
+                        "九月",
+                        "十月",
+                        "十一月",
+                        "腊月",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "正月",
+                        "二月",
+                        "三月",
+                        "四月",
+                        "五月",
+                        "六月",
+                        "七月",
+                        "八月",
+                        "九月",
+                        "十月",
+                        "十一月",
+                        "腊月",
+                    }
+                    narrow{
+                        "正",
+                        "二",
+                        "三",
+                        "四",
+                        "五",
+                        "六",
+                        "七",
+                        "八",
+                        "九",
+                        "十",
+                        "冬",
+                        "腊",
+                    }
+                    wide{
+                        "正月",
+                        "二月",
+                        "三月",
+                        "四月",
+                        "五月",
+                        "六月",
+                        "七月",
+                        "八月",
+                        "九月",
+                        "十月",
+                        "十一月",
+                        "腊月",
+                    }
+                }
+            }
+            monthPatterns{
+                format{
+                    wide{
+                        leap{"闰{0}"}
+                    }
+                }
+                numeric{
+                    all{
+                        leap{"闰{0}"}
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        leap{"闰{0}"}
+                    }
+                }
+            }
+        }
+        coptic{
+            DateTimePatterns{
+                "zzzz ah:mm:ss",
+                "z ah:mm:ss",
+                "ah:mm:ss",
+                "ah:mm",
+                "Gy年MM月d日EEEE",
+                "Gy年M月d日",
+                "Gy年M月d日",
+                "Gy/M/d",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            eras{
+                abbreviated{
+                    "科普特历前",
+                    "科普特历",
+                }
+                narrow{
+                    "科普特历前",
+                    "科普特历",
+                }
+                wide{
+                    "科普特历前",
+                    "科普特历",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "1月",
+                        "2月",
+                        "3月",
+                        "4月",
+                        "5月",
+                        "6月",
+                        "7月",
+                        "8月",
+                        "9月",
+                        "10月",
+                        "11月",
+                        "12月",
+                        "13月",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                        "13",
+                    }
+                    wide{
+                        "一月",
+                        "二月",
+                        "三月",
+                        "四月",
+                        "五月",
+                        "六月",
+                        "七月",
+                        "八月",
+                        "九月",
+                        "十月",
+                        "十一月",
+                        "十二月",
+                        "十三月",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "1月",
+                        "2月",
+                        "3月",
+                        "4月",
+                        "5月",
+                        "6月",
+                        "7月",
+                        "8月",
+                        "9月",
+                        "10月",
+                        "11月",
+                        "12月",
+                        "13月",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                        "13",
+                    }
+                    wide{
+                        "一月",
+                        "二月",
+                        "三月",
+                        "四月",
+                        "五月",
+                        "六月",
+                        "七月",
+                        "八月",
+                        "九月",
+                        "十月",
+                        "十一月",
+                        "十二月",
+                        "十三月",
+                    }
+                }
+            }
+        }
+        dangi{
+            cyclicNameSets{
+                dayParts{
+                    format{
+                        abbreviated{
+                            "子",
+                            "丑",
+                            "寅",
+                            "卯",
+                            "辰",
+                            "巳",
+                            "午",
+                            "未",
+                            "申",
+                            "酉",
+                            "戌",
+                            "亥",
+                        }
+                        narrow{
+                            "子",
+                            "丑",
+                            "寅",
+                            "卯",
+                            "辰",
+                            "巳",
+                            "午",
+                            "未",
+                            "申",
+                            "酉",
+                            "戌",
+                            "亥",
+                        }
+                        wide{
+                            "子",
+                            "丑",
+                            "寅",
+                            "卯",
+                            "辰",
+                            "巳",
+                            "午",
+                            "未",
+                            "申",
+                            "酉",
+                            "戌",
+                            "亥",
+                        }
+                    }
+                }
+                days{
+                    format{
+                        abbreviated{
+                            "甲子",
+                            "乙丑",
+                            "丙寅",
+                            "丁卯",
+                            "戊辰",
+                            "己巳",
+                            "庚午",
+                            "辛未",
+                            "壬申",
+                            "癸酉",
+                            "甲戌",
+                            "乙亥",
+                            "丙子",
+                            "丁丑",
+                            "戊寅",
+                            "己卯",
+                            "庚辰",
+                            "辛巳",
+                            "壬午",
+                            "癸未",
+                            "甲申",
+                            "乙酉",
+                            "丙戌",
+                            "丁亥",
+                            "戊子",
+                            "己丑",
+                            "庚寅",
+                            "辛卯",
+                            "壬辰",
+                            "癸巳",
+                            "甲午",
+                            "乙未",
+                            "丙申",
+                            "丁酉",
+                            "戊戌",
+                            "己亥",
+                            "庚子",
+                            "辛丑",
+                            "壬寅",
+                            "癸卯",
+                            "甲辰",
+                            "乙巳",
+                            "丙午",
+                            "丁未",
+                            "戊申",
+                            "己酉",
+                            "庚戌",
+                            "辛亥",
+                            "壬子",
+                            "癸丑",
+                            "甲寅",
+                            "乙卯",
+                            "丙辰",
+                            "丁巳",
+                            "戊午",
+                            "己未",
+                            "庚申",
+                            "辛酉",
+                            "壬戌",
+                            "癸亥",
+                        }
+                        narrow{
+                            "甲子",
+                            "乙丑",
+                            "丙寅",
+                            "丁卯",
+                            "戊辰",
+                            "己巳",
+                            "庚午",
+                            "辛未",
+                            "壬申",
+                            "癸酉",
+                            "甲戌",
+                            "乙亥",
+                            "丙子",
+                            "丁丑",
+                            "戊寅",
+                            "己卯",
+                            "庚辰",
+                            "辛巳",
+                            "壬午",
+                            "癸未",
+                            "甲申",
+                            "乙酉",
+                            "丙戌",
+                            "丁亥",
+                            "戊子",
+                            "己丑",
+                            "庚寅",
+                            "辛卯",
+                            "壬辰",
+                            "癸巳",
+                            "甲午",
+                            "乙未",
+                            "丙申",
+                            "丁酉",
+                            "戊戌",
+                            "己亥",
+                            "庚子",
+                            "辛丑",
+                            "壬寅",
+                            "癸卯",
+                            "甲辰",
+                            "乙巳",
+                            "丙午",
+                            "丁未",
+                            "戊申",
+                            "己酉",
+                            "庚戌",
+                            "辛亥",
+                            "壬子",
+                            "癸丑",
+                            "甲寅",
+                            "乙卯",
+                            "丙辰",
+                            "丁巳",
+                            "戊午",
+                            "己未",
+                            "庚申",
+                            "辛酉",
+                            "壬戌",
+                            "癸亥",
+                        }
+                        wide{
+                            "甲子",
+                            "乙丑",
+                            "丙寅",
+                            "丁卯",
+                            "戊辰",
+                            "己巳",
+                            "庚午",
+                            "辛未",
+                            "壬申",
+                            "癸酉",
+                            "甲戌",
+                            "乙亥",
+                            "丙子",
+                            "丁丑",
+                            "戊寅",
+                            "己卯",
+                            "庚辰",
+                            "辛巳",
+                            "壬午",
+                            "癸未",
+                            "甲申",
+                            "乙酉",
+                            "丙戌",
+                            "丁亥",
+                            "戊子",
+                            "己丑",
+                            "庚寅",
+                            "辛卯",
+                            "壬辰",
+                            "癸巳",
+                            "甲午",
+                            "乙未",
+                            "丙申",
+                            "丁酉",
+                            "戊戌",
+                            "己亥",
+                            "庚子",
+                            "辛丑",
+                            "壬寅",
+                            "癸卯",
+                            "甲辰",
+                            "乙巳",
+                            "丙午",
+                            "丁未",
+                            "戊申",
+                            "己酉",
+                            "庚戌",
+                            "辛亥",
+                            "壬子",
+                            "癸丑",
+                            "甲寅",
+                            "乙卯",
+                            "丙辰",
+                            "丁巳",
+                            "戊午",
+                            "己未",
+                            "庚申",
+                            "辛酉",
+                            "壬戌",
+                            "癸亥",
+                        }
+                    }
+                }
+            }
+        }
+        ethiopic{
+            DateTimePatterns{
+                "zzzz ah:mm:ss",
+                "z ah:mm:ss",
+                "ah:mm:ss",
+                "ah:mm",
+                "Gy年MM月d日EEEE",
+                "Gy年M月d日",
+                "Gy年M月d日",
+                "Gy/M/d",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            eras{
+                abbreviated{
+                    "埃历前",
+                    "埃历",
+                }
+                narrow{
+                    "埃历前",
+                    "埃历",
+                }
+                wide{
+                    "埃塞俄比亚历前",
+                    "埃塞俄比亚历",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "1月",
+                        "2月",
+                        "3月",
+                        "4月",
+                        "5月",
+                        "6月",
+                        "7月",
+                        "8月",
+                        "9月",
+                        "10月",
+                        "11月",
+                        "12月",
+                        "13月",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                        "13",
+                    }
+                    wide{
+                        "一月",
+                        "二月",
+                        "三月",
+                        "四月",
+                        "五月",
+                        "六月",
+                        "七月",
+                        "八月",
+                        "九月",
+                        "十月",
+                        "十一月",
+                        "十二月",
+                        "十三月",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "1月",
+                        "2月",
+                        "3月",
+                        "4月",
+                        "5月",
+                        "6月",
+                        "7月",
+                        "8月",
+                        "9月",
+                        "10月",
+                        "11月",
+                        "12月",
+                        "13月",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                        "13",
+                    }
+                    wide{
+                        "一月",
+                        "二月",
+                        "三月",
+                        "四月",
+                        "五月",
+                        "六月",
+                        "七月",
+                        "八月",
+                        "九月",
+                        "十月",
+                        "十一月",
+                        "十二月",
+                        "十三月",
+                    }
+                }
+            }
+        }
+        ethiopic-amete-alem{
+            eras{
+                wide{
+                    "埃塞俄比亚阿米特阿莱姆历",
+                }
+            }
+        }
+        generic{
+            DateTimePatterns{
+                "zzzz ah:mm:ss",
+                "z ah:mm:ss",
+                "ah:mm:ss",
+                "ah:mm",
+                "Gy年M月d日EEEE",
+                "Gy年M月d日",
+                "Gy年M月d日",
+                "Gy/M/d",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Bh{"Bh时"}
+                Bhm{"Bh:mm"}
+                Bhms{"Bh:mm:ss"}
+                E{"ccc"}
+                EBhm{"EB h:mm"}
+                EBhms{"EB h:mm:ss"}
+                EHm{"E HH:mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"d日E"}
+                Ehm{"Ea h:mm"}
+                Ehms{"Ea h:mm:ss"}
+                Gy{"Gy年"}
+                GyMMM{"Gy年M月"}
+                GyMMMEd{"Gy年M月d日E"}
+                GyMMMd{"Gy年M月d日"}
+                H{"H时"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"M/dE"}
+                MMM{"LL"}
+                MMMEd{"M月d日E"}
+                MMMMd{"M月d日"}
+                MMMd{"M月d日"}
+                Md{"M/d"}
+                d{"d日"}
+                h{"ah时"}
+                hm{"ah:mm"}
+                hms{"ah:mm:ss"}
+                ms{"mm:ss"}
+                y{"Gy年"}
+                yyyy{"Gy年"}
+                yyyyM{"Gy年M月"}
+                yyyyMEd{"G y/M/dE"}
+                yyyyMMM{"Gy年M月"}
+                yyyyMMMEd{"Gy年MM月d日E"}
+                yyyyMMMM{"Gy年M月"}
+                yyyyMMMd{"Gy年M月d日"}
+                yyyyMd{"G y/M/d"}
+                yyyyQQQ{"Gy年第Q季度"}
+                yyyyQQQQ{"Gy年第Q季度"}
+            }
+            intervalFormats{
+                Bh{
+                    B{"Bh时至Bh时"}
+                    h{"Bh时至h时"}
+                }
+                Bhm{
+                    B{"Bh:mm至Bh:mm"}
+                    h{"Bh:mm至h:mm"}
+                    m{"Bh:mm至h:mm"}
+                }
+                Gy{
+                    G{"Gy年 – Gy年"}
+                    y{"Gy年–y年"}
+                }
+                GyM{
+                    G{"GGGGGy-MM – GGGGGy-MM"}
+                    M{"GGGGGy-MM – y-MM"}
+                    y{"GGGGGy-MM – y-MM"}
+                }
+                GyMEd{
+                    G{"GGGGGy-MM-ddE – GGGGGy-MM-ddE"}
+                    M{"GGGGGy-MM-ddE – y-MM-ddE"}
+                    d{"GGGGGy-MM-ddE – y-MM-ddE"}
+                    y{"GGGGGy-MM-ddE – y-MM-ddE"}
+                }
+                GyMMM{
+                    G{"Gy年MMM – Gy年MMM"}
+                    M{"Gy年MMM–MMM"}
+                    y{"Gy年MMM – y年MMM"}
+                }
+                GyMMMEd{
+                    G{"Gy年MMMd日E – Gy年MMMd日E"}
+                    M{"Gy年MMMd日E – MMMd日E"}
+                    d{"Gy年MMMd日E – MMMd日E"}
+                    y{"Gy年MMMd日E – y年MMMd日E"}
+                }
+                GyMMMd{
+                    G{"Gy年MMMd日 – Gy年MMMd日"}
+                    M{"Gy年MMMd日 – MMMd日"}
+                    d{"Gy年MMMd日–d日"}
+                    y{"Gy年MMMd日 – y年MMMd日"}
+                }
+                GyMd{
+                    G{"GGGGGy-MM-dd – GGGGGy-MM-dd"}
+                    M{"GGGGGy-MM-dd – y-MM-dd"}
+                    d{"GGGGGy-MM-dd – y-MM-dd"}
+                    y{"GGGGGy-MM-dd – y-MM-dd"}
+                }
+                Hmv{
+                    H{"v HH:mm – HH:mm"}
+                    m{"v HH:mm – HH:mm"}
+                }
+                M{
+                    M{"M–M月"}
+                }
+                MEd{
+                    M{"M/dE至M/dE"}
+                    d{"M/dE至M/dE"}
+                }
+                MMM{
+                    M{"M月至M月"}
+                }
+                MMMEd{
+                    M{"M月d日E至M月d日E"}
+                    d{"M月d日E至d日E"}
+                }
+                MMMd{
+                    M{"M月d日至M月d日"}
+                    d{"M月d日至d日"}
+                }
+                Md{
+                    M{"M/d – M/d"}
+                    d{"M/d – M/d"}
+                }
+                d{
+                    d{"d至d日"}
+                }
+                fallback{"{0} – {1}"}
+                h{
+                    a{"ah时至ah时"}
+                    h{"ah时至h时"}
+                }
+                hm{
+                    a{"ah:mm至ah:mm"}
+                    h{"ah:mm至h:mm"}
+                    m{"ah:mm至h:mm"}
+                }
+                hmv{
+                    a{"v ah:mm至ah:mm"}
+                    h{"v ah:mm至h:mm"}
+                    m{"v ah:mm至h:mm"}
+                }
+                hv{
+                    a{"v ah时至ah时"}
+                    h{"v ah时至h时"}
+                }
+                y{
+                    y{"Gy–y年"}
+                }
+                yM{
+                    M{"Gy年M月至M月"}
+                    y{"Gy年M月至y年M月"}
+                }
+                yMEd{
+                    M{"Gy/M/dE至y/M/dE"}
+                    d{"Gy/M/dE至y/M/dE"}
+                    y{"Gy/M/dE至y/M/dE"}
+                }
+                yMMM{
+                    M{"Gy年M月至M月"}
+                    y{"Gy年M月至y年M月"}
+                }
+                yMMMEd{
+                    M{"Gy年M月d日E至M月d日E"}
+                    d{"Gy年M月d日E至d日E"}
+                    y{"Gy年M月d日E至y年M月d日E"}
+                }
+                yMMMM{
+                    M{"Gy年M月至M月"}
+                    y{"Gy年M月至y年M月"}
+                }
+                yMMMd{
+                    M{"Gy年M月d日至M月d日"}
+                    d{"Gy年M月d日至d日"}
+                    y{"Gy年M月d日至y年M月d日"}
+                }
+                yMd{
+                    M{"Gy/M/d – y/M/d"}
+                    d{"Gy/M/d – y/M/d"}
+                    y{"Gy/M/d – y/M/d"}
+                }
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "上午",
+                "下午",
+            }
+            AmPmMarkersAbbr{
+                "上午",
+                "下午",
+            }
+            AmPmMarkersNarrow{
+                "上午",
+                "下午",
+            }
+            DateTimePatterns{
+                "zzzz ah:mm:ss",
+                "z ah:mm:ss",
+                "ah:mm:ss",
+                "ah:mm",
+                "y年M月d日EEEE",
+                "y年M月d日",
+                "y年M月d日",
+                "y/M/d",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            appendItems{
+                Timezone{"{1}{0}"}
+            }
+            availableFormats{
+                Bh{"Bh时"}
+                Bhm{"Bh:mm"}
+                Bhms{"Bh:mm:ss"}
+                E{"ccc"}
+                EBhm{"EBh:mm"}
+                EBhms{"EBh:mm:ss"}
+                EHm{"EHH:mm"}
+                EHms{"EHH:mm:ss"}
+                Ed{"d日E"}
+                Ehm{"Eah:mm"}
+                Ehms{"Eah:mm:ss"}
+                Gy{"Gy年"}
+                GyMMM{"Gy年M月"}
+                GyMMMEd{"Gy年M月d日E"}
+                GyMMMd{"Gy年M月d日"}
+                H{"H时"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                Hmsv{"v HH:mm:ss"}
+                Hmv{"v HH:mm"}
+                M{"M月"}
+                MEd{"M/dE"}
+                MMM{"LLL"}
+                MMMEd{"M月d日E"}
+                MMMMW{
+                    other{"MMMM第W周"}
+                }
+                MMMMd{"M月d日"}
+                MMMd{"M月d日"}
+                MMdd{"MM/dd"}
+                Md{"M/d"}
+                d{"d日"}
+                h{"ah时"}
+                hm{"ah:mm"}
+                hms{"ah:mm:ss"}
+                hmsv{"v ah:mm:ss"}
+                hmv{"v ah:mm"}
+                ms{"mm:ss"}
+                y{"y年"}
+                yM{"y年M月"}
+                yMEd{"y/M/dE"}
+                yMM{"y年M月"}
+                yMMM{"y年M月"}
+                yMMMEd{"y年M月d日E"}
+                yMMMM{"y年M月"}
+                yMMMd{"y年M月d日"}
+                yMd{"y/M/d"}
+                yQQQ{"y年第Q季度"}
+                yQQQQ{"y年第Q季度"}
+                yw{
+                    other{"Y年第w周"}
+                }
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "周日",
+                        "周一",
+                        "周二",
+                        "周三",
+                        "周四",
+                        "周五",
+                        "周六",
+                    }
+                    narrow{
+                        "日",
+                        "一",
+                        "二",
+                        "三",
+                        "四",
+                        "五",
+                        "六",
+                    }
+                    short{
+                        "周日",
+                        "周一",
+                        "周二",
+                        "周三",
+                        "周四",
+                        "周五",
+                        "周六",
+                    }
+                    wide{
+                        "星期日",
+                        "星期一",
+                        "星期二",
+                        "星期三",
+                        "星期四",
+                        "星期五",
+                        "星期六",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "周日",
+                        "周一",
+                        "周二",
+                        "周三",
+                        "周四",
+                        "周五",
+                        "周六",
+                    }
+                    narrow{
+                        "日",
+                        "一",
+                        "二",
+                        "三",
+                        "四",
+                        "五",
+                        "六",
+                    }
+                    short{
+                        "周日",
+                        "周一",
+                        "周二",
+                        "周三",
+                        "周四",
+                        "周五",
+                        "周六",
+                    }
+                    wide{
+                        "星期日",
+                        "星期一",
+                        "星期二",
+                        "星期三",
+                        "星期四",
+                        "星期五",
+                        "星期六",
+                    }
+                }
+            }
+            dayPeriod{
+                format{
+                    abbreviated{
+                        afternoon1{"中午"}
+                        afternoon2{"下午"}
+                        evening1{"晚上"}
+                        midnight{"午夜"}
+                        morning1{"早上"}
+                        morning2{"上午"}
+                        night1{"凌晨"}
+                    }
+                    narrow{
+                        afternoon1{"中午"}
+                        afternoon2{"下午"}
+                        evening1{"晚上"}
+                        midnight{"午夜"}
+                        morning1{"早上"}
+                        morning2{"上午"}
+                        night1{"凌晨"}
+                    }
+                    wide{
+                        afternoon1{"中午"}
+                        afternoon2{"下午"}
+                        evening1{"晚上"}
+                        midnight{"午夜"}
+                        morning1{"清晨"}
+                        morning2{"上午"}
+                        night1{"凌晨"}
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        afternoon1{"中午"}
+                        afternoon2{"下午"}
+                        am{"上午"}
+                        evening1{"晚上"}
+                        midnight{"午夜"}
+                        morning1{"早上"}
+                        morning2{"上午"}
+                        night1{"凌晨"}
+                        pm{"下午"}
+                    }
+                    narrow{
+                        afternoon1{"中午"}
+                        afternoon2{"下午"}
+                        am{"上午"}
+                        evening1{"晚上"}
+                        midnight{"午夜"}
+                        morning1{"早上"}
+                        morning2{"上午"}
+                        night1{"凌晨"}
+                        pm{"下午"}
+                    }
+                    wide{
+                        afternoon1{"中午"}
+                        afternoon2{"下午"}
+                        am{"上午"}
+                        evening1{"晚上"}
+                        midnight{"午夜"}
+                        morning1{"早上"}
+                        morning2{"上午"}
+                        night1{"凌晨"}
+                        pm{"下午"}
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "公元前",
+                    "公元",
+                }
+                narrow{
+                    "公元前",
+                    "公元",
+                }
+                wide{
+                    "公元前",
+                    "公元",
+                }
+            }
+            intervalFormats{
+                Bh{
+                    B{"Bh时至Bh时"}
+                    h{"Bh时至h时"}
+                }
+                Bhm{
+                    B{"Bh:mm至Bh:mm"}
+                    h{"Bh:mm至h:mm"}
+                    m{"Bh:mm至h:mm"}
+                }
+                Gy{
+                    G{"Gy年 – Gy年"}
+                    y{"Gy年–y年"}
+                }
+                GyM{
+                    G{"GGGGGy-MM – GGGGGy-MM"}
+                    M{"GGGGGy-MM – y-MM"}
+                    y{"GGGGGy-MM – y-MM"}
+                }
+                GyMEd{
+                    G{"GGGGGy-MM-ddE – GGGGGy-MM-ddE"}
+                    M{"GGGGGy-MM-ddE – y-MM-ddE"}
+                    d{"GGGGGy-MM-ddE – y-MM-ddE"}
+                    y{"GGGGGy-MM-ddE – y-MM-ddE"}
+                }
+                GyMMM{
+                    G{"Gy年MMM – Gy年MMM"}
+                    M{"Gy年MMM–MMM"}
+                    y{"Gy年MMM – y年MMM"}
+                }
+                GyMMMEd{
+                    G{"Gy年MMMd日E – Gy年MMMd日E"}
+                    M{"Gy年MMMd日E – MMMd日E"}
+                    d{"Gy年MMMd日E – MMMd日E"}
+                    y{"Gy年MMMd日E – y年MMMd日E"}
+                }
+                GyMMMd{
+                    G{"Gy年MMMd日 – Gy年MMMd日"}
+                    M{"Gy年MMMd日 – MMMd日"}
+                    d{"Gy年MMMd–d日"}
+                    y{"Gy年MMMd日 – y年MMMd日"}
+                }
+                GyMd{
+                    G{"GGGGGy-MM-dd – GGGGGy-MM-dd"}
+                    M{"GGGGGy-MM-dd – y-MM-dd"}
+                    d{"GGGGGy-MM-dd – y-MM-dd"}
+                    y{"GGGGGy-MM-dd – y-MM-dd"}
+                }
+                H{
+                    H{"HH–HH"}
+                }
+                Hm{
+                    H{"HH:mm–HH:mm"}
+                    m{"HH:mm–HH:mm"}
+                }
+                Hmv{
+                    H{"v HH:mm–HH:mm"}
+                    m{"v HH:mm–HH:mm"}
+                }
+                Hv{
+                    H{"v HH–HH"}
+                }
+                M{
+                    M{"M–M月"}
+                }
+                MEd{
+                    M{"M/dE至M/dE"}
+                    d{"M/dE至M/dE"}
+                }
+                MMM{
+                    M{"MMM – MMM"}
+                }
+                MMMEd{
+                    M{"M月d日E至M月d日E"}
+                    d{"M月d日E至d日E"}
+                }
+                MMMd{
+                    M{"M月d日至M月d日"}
+                    d{"M月d日至d日"}
+                }
+                Md{
+                    M{"M/d – M/d"}
+                    d{"M/d – M/d"}
+                }
+                d{
+                    d{"d–d日"}
+                }
+                fallback{"{0} – {1}"}
+                h{
+                    a{"ah时至ah时"}
+                    h{"ah时至h时"}
+                }
+                hm{
+                    a{"ah:mm至ah:mm"}
+                    h{"ah:mm至h:mm"}
+                    m{"ah:mm至h:mm"}
+                }
+                hmv{
+                    a{"v ah:mm至ah:mm"}
+                    h{"v ah:mm至h:mm"}
+                    m{"v ah:mm至h:mm"}
+                }
+                hv{
+                    a{"v ah时至ah时"}
+                    h{"v ah时至h时"}
+                }
+                y{
+                    y{"y–y年"}
+                }
+                yM{
+                    M{"y年M月至M月"}
+                    y{"y年M月至y年M月"}
+                }
+                yMEd{
+                    M{"y/M/dE至y/M/dE"}
+                    d{"y/M/dE至y/M/dE"}
+                    y{"y/M/dE至y/M/dE"}
+                }
+                yMMM{
+                    M{"y年M月至M月"}
+                    y{"y年M月至y年M月"}
+                }
+                yMMMEd{
+                    M{"y年M月d日E至M月d日E"}
+                    d{"y年M月d日E至d日E"}
+                    y{"y年M月d日E至y年M月d日E"}
+                }
+                yMMMM{
+                    M{"y年M月至M月"}
+                    y{"y年M月至y年M月"}
+                }
+                yMMMd{
+                    M{"y年M月d日至M月d日"}
+                    d{"y年M月d日至d日"}
+                    y{"y年M月d日至y年M月d日"}
+                }
+                yMd{
+                    M{"y/M/d – y/M/d"}
+                    d{"y/M/d – y/M/d"}
+                    y{"y/M/d – y/M/d"}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "1月",
+                        "2月",
+                        "3月",
+                        "4月",
+                        "5月",
+                        "6月",
+                        "7月",
+                        "8月",
+                        "9月",
+                        "10月",
+                        "11月",
+                        "12月",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "一月",
+                        "二月",
+                        "三月",
+                        "四月",
+                        "五月",
+                        "六月",
+                        "七月",
+                        "八月",
+                        "九月",
+                        "十月",
+                        "十一月",
+                        "十二月",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "1月",
+                        "2月",
+                        "3月",
+                        "4月",
+                        "5月",
+                        "6月",
+                        "7月",
+                        "8月",
+                        "9月",
+                        "10月",
+                        "11月",
+                        "12月",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "一月",
+                        "二月",
+                        "三月",
+                        "四月",
+                        "五月",
+                        "六月",
+                        "七月",
+                        "八月",
+                        "九月",
+                        "十月",
+                        "十一月",
+                        "十二月",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "1季度",
+                        "2季度",
+                        "3季度",
+                        "4季度",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "第一季度",
+                        "第二季度",
+                        "第三季度",
+                        "第四季度",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "1季度",
+                        "2季度",
+                        "3季度",
+                        "4季度",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "第一季度",
+                        "第二季度",
+                        "第三季度",
+                        "第四季度",
+                    }
+                }
+            }
+        }
+        hebrew{
+            DateTimePatterns{
+                "zzzz ah:mm:ss",
+                "z ah:mm:ss",
+                "ah:mm:ss",
+                "ah:mm",
+                "Gy年M月d日EEEE",
+                "Gy年M月d日",
+                "Gy年M月d日",
+                "Gy-M-d",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Ed{"d日E"}
+                Gy{"Gy年"}
+                GyMMM{"Gy年MM月"}
+                GyMMMEd{"Gy年MM月d日E"}
+                GyMMMd{"Gy年MM月d日"}
+                MEd{"M/dE"}
+                MMM{"LL"}
+                MMMEd{"M月d日E"}
+                MMMMd{"M月d日"}
+                MMMd{"M月d日"}
+                Md{"M/d"}
+                d{"d日"}
+                y{"Gy年"}
+                yyyy{"Gy年"}
+                yyyyM{"Gy年M月"}
+                yyyyMEd{"G y/M/dE"}
+                yyyyMMM{"Gy年MM月"}
+                yyyyMMMEd{"Gy年MM月d日E"}
+                yyyyMMMM{"Gy年M月"}
+                yyyyMMMd{"Gy年MM月d日"}
+                yyyyMd{"G y/M/d"}
+                yyyyQQQ{"Gy年第Q季度"}
+                yyyyQQQQ{"Gy年第Q季度"}
+            }
+            eras{
+                abbreviated{
+                    "希伯来历",
+                }
+                narrow{
+                    "希伯来历",
+                }
+                wide{
+                    "希伯来历",
+                }
+            }
+            intervalFormats{
+                Bh{
+                    B{"Bh时至Bh时"}
+                    h{"Bh时至h时"}
+                }
+                Bhm{
+                    B{"Bh:mm至Bh:mm"}
+                    h{"Bh:mm至h:mm"}
+                    m{"Bh:mm至h:mm"}
+                }
+                Hmv{
+                    H{"v HH:mm – HH:mm"}
+                    m{"v HH:mm – HH:mm"}
+                }
+                M{
+                    M{"M–M月"}
+                }
+                MEd{
+                    M{"M/dE至M/dE"}
+                    d{"M/dE至M/dE"}
+                }
+                MMM{
+                    M{"MMM – MMM"}
+                }
+                MMMEd{
+                    M{"M月d日E至M月d日E"}
+                    d{"M月d日E至d日E"}
+                }
+                MMMd{
+                    M{"M月d日至M月d日"}
+                    d{"M月d日至d日"}
+                }
+                Md{
+                    M{"M/d – M/d"}
+                    d{"M/d – M/d"}
+                }
+                d{
+                    d{"d至d日"}
+                }
+                h{
+                    a{"ah时至ah时"}
+                    h{"ah时至h时"}
+                }
+                hm{
+                    a{"ah:mm至ah:mm"}
+                    h{"ah:mm至h:mm"}
+                    m{"ah:mm至h:mm"}
+                }
+                hmv{
+                    a{"v ah:mm至ah:mm"}
+                    h{"v ah:mm至h:mm"}
+                    m{"v ah:mm至h:mm"}
+                }
+                hv{
+                    a{"v ah时至ah时"}
+                    h{"v ah时至h时"}
+                }
+                y{
+                    y{"Gy–y年"}
+                }
+                yM{
+                    M{"Gy年M月至M月"}
+                    y{"Gy年M月至y年M月"}
+                }
+                yMEd{
+                    M{"Gy/M/dE至y/M/dE"}
+                    d{"Gy/M/dE至y/M/dE"}
+                    y{"Gy/M/dE至y/M/dE"}
+                }
+                yMMM{
+                    M{"Gy年M月至M月"}
+                    y{"Gy年M月至y年M月"}
+                }
+                yMMMEd{
+                    M{"Gy年M月d日E至M月d日E"}
+                    d{"Gy年M月d日E至d日E"}
+                    y{"Gy年M月d日E至y年M月d日E"}
+                }
+                yMMMM{
+                    M{"Gy年M月至M月"}
+                    y{"Gy年M月至y年M月"}
+                }
+                yMMMd{
+                    M{"Gy年M月d日至M月d日"}
+                    d{"Gy年M月d日至d日"}
+                    y{"Gy年M月d日至y年M月d日"}
+                }
+                yMd{
+                    M{"Gy/M/d – y/M/d"}
+                    d{"Gy/M/d – y/M/d"}
+                    y{"Gy/M/d – y/M/d"}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "1月",
+                        "2月",
+                        "3月",
+                        "4月",
+                        "5月",
+                        "6月",
+                        "7月",
+                        "8月",
+                        "9月",
+                        "10月",
+                        "11月",
+                        "12月",
+                        "13月",
+                        "闰7月",
+                    }
+                    wide{
+                        "一月",
+                        "二月",
+                        "三月",
+                        "四月",
+                        "五月",
+                        "六月",
+                        "七月",
+                        "八月",
+                        "九月",
+                        "十月",
+                        "十一月",
+                        "十二月",
+                        "十三月",
+                        "闰七月",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "1月",
+                        "2月",
+                        "3月",
+                        "4月",
+                        "5月",
+                        "6月",
+                        "7月",
+                        "8月",
+                        "9月",
+                        "10月",
+                        "11月",
+                        "12月",
+                        "13月",
+                        "闰7月",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                        "13",
+                        "7",
+                    }
+                    wide{
+                        "一月",
+                        "二月",
+                        "三月",
+                        "四月",
+                        "五月",
+                        "六月",
+                        "七月",
+                        "八月",
+                        "九月",
+                        "十月",
+                        "十一月",
+                        "十二月",
+                        "十三月",
+                        "闰七月",
+                    }
+                }
+            }
+        }
+        indian{
+            DateTimePatterns{
+                "zzzz ah:mm:ss",
+                "z ah:mm:ss",
+                "ah:mm:ss",
+                "ah:mm",
+                "Gy年MM月d日EEEE",
+                "Gy年MM月d日",
+                "Gy年MM月d日",
+                "Gy/M/d",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Ed{"d日E"}
+                Gy{"Gy年"}
+                GyMMM{"Gy年MM月"}
+                GyMMMEd{"Gy年MM月d日E"}
+                GyMMMd{"Gy年MM月d日"}
+                MEd{"M/dE"}
+                MMM{"LL"}
+                MMMEd{"M月d日E"}
+                MMMMd{"M月d日"}
+                MMMd{"M月d日"}
+                Md{"M/d"}
+                d{"d日"}
+                y{"Gy年"}
+                yyyy{"Gy年"}
+                yyyyM{"Gy年M月"}
+                yyyyMEd{"G y/M/dE"}
+                yyyyMMM{"Gy年MM月"}
+                yyyyMMMEd{"Gy年MM月d日E"}
+                yyyyMMMM{"Gy年M月"}
+                yyyyMMMd{"Gy年MM月d日"}
+                yyyyMd{"G y/M/d"}
+                yyyyQQQ{"Gy年第Q季度"}
+                yyyyQQQQ{"Gy年第Q季度"}
+            }
+            eras{
+                abbreviated{
+                    "印度历",
+                }
+                narrow{
+                    "印度历",
+                }
+                wide{
+                    "印度历",
+                }
+            }
+            intervalFormats{
+                Bh{
+                    B{"Bh时至Bh时"}
+                    h{"Bh时至h时"}
+                }
+                Bhm{
+                    B{"Bh:mm至Bh:mm"}
+                    h{"Bh:mm至h:mm"}
+                    m{"Bh:mm至h:mm"}
+                }
+                Hmv{
+                    H{"v HH:mm – HH:mm"}
+                    m{"v HH:mm – HH:mm"}
+                }
+                M{
+                    M{"M–M月"}
+                }
+                MEd{
+                    M{"M/dE至M/dE"}
+                    d{"M/dE至M/dE"}
+                }
+                MMM{
+                    M{"MMM – MMM"}
+                }
+                MMMEd{
+                    M{"M月d日E至M月d日E"}
+                    d{"M月d日E至d日E"}
+                }
+                MMMd{
+                    M{"M月d日至M月d日"}
+                    d{"M月d日至d日"}
+                }
+                Md{
+                    M{"M/d – M/d"}
+                    d{"M/d – M/d"}
+                }
+                d{
+                    d{"d至d日"}
+                }
+                h{
+                    a{"ah时至ah时"}
+                    h{"ah时至h时"}
+                }
+                hm{
+                    a{"ah:mm至ah:mm"}
+                    h{"ah:mm至h:mm"}
+                    m{"ah:mm至h:mm"}
+                }
+                hmv{
+                    a{"v ah:mm至ah:mm"}
+                    h{"v ah:mm至h:mm"}
+                    m{"v ah:mm至h:mm"}
+                }
+                hv{
+                    a{"v ah时至ah时"}
+                    h{"v ah时至h时"}
+                }
+                y{
+                    y{"Gy–y年"}
+                }
+                yM{
+                    M{"Gy年M月至M月"}
+                    y{"Gy年M月至y年M月"}
+                }
+                yMEd{
+                    M{"Gy/M/dE至y/M/dE"}
+                    d{"Gy/M/dE至y/M/dE"}
+                    y{"Gy/M/dE至y/M/dE"}
+                }
+                yMMM{
+                    M{"Gy年M月至M月"}
+                    y{"Gy年M月至y年M月"}
+                }
+                yMMMEd{
+                    M{"Gy年M月d日E至M月d日E"}
+                    d{"Gy年M月d日E至d日E"}
+                    y{"Gy年M月d日E至y年M月d日E"}
+                }
+                yMMMM{
+                    M{"Gy年M月至M月"}
+                    y{"Gy年M月至y年M月"}
+                }
+                yMMMd{
+                    M{"Gy年M月d日至M月d日"}
+                    d{"Gy年M月d日至d日"}
+                    y{"Gy年M月d日至y年M月d日"}
+                }
+                yMd{
+                    M{"Gy/M/d – y/M/d"}
+                    d{"Gy/M/d – y/M/d"}
+                    y{"Gy/M/d – y/M/d"}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "1月",
+                        "2月",
+                        "3月",
+                        "4月",
+                        "5月",
+                        "6月",
+                        "7月",
+                        "8月",
+                        "9月",
+                        "10月",
+                        "11月",
+                        "12月",
+                    }
+                    wide{
+                        "一月",
+                        "二月",
+                        "三月",
+                        "四月",
+                        "五月",
+                        "六月",
+                        "七月",
+                        "八月",
+                        "九月",
+                        "十月",
+                        "十一月",
+                        "十二月",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "1月",
+                        "2月",
+                        "3月",
+                        "4月",
+                        "5月",
+                        "6月",
+                        "7月",
+                        "8月",
+                        "9月",
+                        "10月",
+                        "11月",
+                        "12月",
+                    }
+                    wide{
+                        "一月",
+                        "二月",
+                        "三月",
+                        "四月",
+                        "五月",
+                        "六月",
+                        "七月",
+                        "八月",
+                        "九月",
+                        "十月",
+                        "十一月",
+                        "十二月",
+                    }
+                }
+            }
+        }
+        islamic{
+            DateTimePatterns{
+                "zzzz ah:mm:ss",
+                "z ah:mm:ss",
+                "ah:mm:ss",
+                "ah:mm",
+                "Gy年M月d日EEEE",
+                "Gy年M月d日",
+                "Gy年M月d日",
+                "Gy/M/d",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                M{"M月"}
+                MEd{"M-dE"}
+                MMM{"LLL"}
+                MMMEd{"M月d日E"}
+                MMMMd{"M月d日"}
+                MMMd{"M月d日"}
+                Md{"M-d"}
+                d{"d日"}
+            }
+            eras{
+                abbreviated{
+                    "伊斯兰历",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "1月",
+                        "2月",
+                        "3月",
+                        "4月",
+                        "5月",
+                        "6月",
+                        "7月",
+                        "8月",
+                        "9月",
+                        "10月",
+                        "11月",
+                        "12月",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "一月",
+                        "二月",
+                        "三月",
+                        "四月",
+                        "五月",
+                        "六月",
+                        "七月",
+                        "八月",
+                        "九月",
+                        "十月",
+                        "十一月",
+                        "十二月",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "1月",
+                        "2月",
+                        "3月",
+                        "4月",
+                        "5月",
+                        "6月",
+                        "7月",
+                        "8月",
+                        "9月",
+                        "10月",
+                        "11月",
+                        "12月",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "一月",
+                        "二月",
+                        "三月",
+                        "四月",
+                        "五月",
+                        "六月",
+                        "七月",
+                        "八月",
+                        "九月",
+                        "十月",
+                        "十一月",
+                        "十二月",
+                    }
+                }
+            }
+        }
+        japanese{
+            DateTimePatterns{
+                "zzzz ah:mm:ss",
+                "z ah:mm:ss",
+                "ah:mm:ss",
+                "ah:mm",
+                "Gy年M月d日EEEE",
+                "Gy年M月d日",
+                "Gy年M月d日",
+                "Gy-MM-dd",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Ed{"d日E"}
+                Gy{"Gy年"}
+                GyMMM{"Gy年M月"}
+                GyMMMEd{"Gy年M月d日E"}
+                GyMMMd{"Gy年M月d日"}
+                H{"H时"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"M月"}
+                MEd{"M-dE"}
+                MMM{"LLL"}
+                MMMEd{"M月d日E"}
+                MMMMd{"M月d日"}
+                MMMd{"M月d日"}
+                Md{"M-d"}
+                d{"d日"}
+                h{"ah时"}
+                hm{"ah:mm"}
+                hms{"ah:mm:ss"}
+                ms{"mm:ss"}
+                y{"Gy年"}
+                yyyy{"Gy年"}
+                yyyyM{"Gy-MM"}
+                yyyyMEd{"Gy-M-d（E）"}
+                yyyyMMM{"Gy年M月"}
+                yyyyMMMEd{"Gy年M月d日E"}
+                yyyyMMMM{"Gy年M月"}
+                yyyyMMMd{"Gy年M月d日"}
+                yyyyMd{"Gy-MM-dd"}
+                yyyyQQQ{"Gy年第Q季度"}
+                yyyyQQQQ{"Gy年QQQQ"}
+            }
+            eras{
+                abbreviated{
+                    "大化 (645–650)",
+                    "白雉 (650–671)",
+                    "白凤 (672–686)",
+                    "朱鸟 (686–701)",
+                    "大宝 (701–704)",
+                    "庆云 (704–708)",
+                    "和铜 (708–715)",
+                    "灵龟 (715–717)",
+                    "养老 (717–724)",
+                    "神龟 (724–729)",
+                    "天平 (729–749)",
+                    "天平感宝 (749–749)",
+                    "天平胜宝 (749–757)",
+                    "天平宝字 (757–765)",
+                    "天平神护 (765–767)",
+                    "神护景云 (767–770)",
+                    "宝龟 (770–780)",
+                    "天应 (781–782)",
+                    "延历 (782–806)",
+                    "大同 (806–810)",
+                    "弘仁 (810–824)",
+                    "天长 (824–834)",
+                    "承和 (834–848)",
+                    "嘉祥 (848–851)",
+                    "仁寿 (851–854)",
+                    "齐衡 (854–857)",
+                    "天安 (857–859)",
+                    "贞观 (859–877)",
+                    "元庆 (877–885)",
+                    "仁和 (885–889)",
+                    "宽平 (889–898)",
+                    "昌泰 (898–901)",
+                    "延喜 (901–923)",
+                    "延长 (923–931)",
+                    "承平 (931–938)",
+                    "天庆 (938–947)",
+                    "天历 (947–957)",
+                    "天德 (957–961)",
+                    "应和 (961–964)",
+                    "康保 (964–968)",
+                    "安和 (968–970)",
+                    "天禄 (970–973)",
+                    "天延 (973–976)",
+                    "贞元 (976–978)",
+                    "天元 (978–983)",
+                    "永观 (983–985)",
+                    "宽和 (985–987)",
+                    "永延 (987–989)",
+                    "永祚 (989–990)",
+                    "正历 (990–995)",
+                    "长德 (995–999)",
+                    "长保 (999–1004)",
+                    "宽弘 (1004–1012)",
+                    "长和 (1012–1017)",
+                    "宽仁 (1017–1021)",
+                    "治安 (1021–1024)",
+                    "万寿 (1024–1028)",
+                    "长元 (1028–1037)",
+                    "长历 (1037–1040)",
+                    "长久 (1040–1044)",
+                    "宽德 (1044–1046)",
+                    "永承 (1046–1053)",
+                    "天喜 (1053–1058)",
+                    "康平 (1058–1065)",
+                    "治历 (1065–1069)",
+                    "延久 (1069–1074)",
+                    "承保 (1074–1077)",
+                    "正历 (1077–1081)",
+                    "永保 (1081–1084)",
+                    "应德 (1084–1087)",
+                    "宽治 (1087–1094)",
+                    "嘉保 (1094–1096)",
+                    "永长 (1096–1097)",
+                    "承德 (1097–1099)",
+                    "康和 (1099–1104)",
+                    "长治 (1104–1106)",
+                    "嘉承 (1106–1108)",
+                    "天仁 (1108–1110)",
+                    "天永 (1110–1113)",
+                    "永久 (1113–1118)",
+                    "元永 (1118–1120)",
+                    "保安 (1120–1124)",
+                    "天治 (1124–1126)",
+                    "大治 (1126–1131)",
+                    "天承 (1131–1132)",
+                    "长承 (1132–1135)",
+                    "保延 (1135–1141)",
+                    "永治 (1141–1142)",
+                    "康治 (1142–1144)",
+                    "天养 (1144–1145)",
+                    "久安 (1145–1151)",
+                    "仁平 (1151–1154)",
+                    "久寿 (1154–1156)",
+                    "保元 (1156–1159)",
+                    "平治 (1159–1160)",
+                    "永历 (1160–1161)",
+                    "应保 (1161–1163)",
+                    "长宽 (1163–1165)",
+                    "永万 (1165–1166)",
+                    "仁安 (1166–1169)",
+                    "嘉应 (1169–1171)",
+                    "承安 (1171–1175)",
+                    "安元 (1175–1177)",
+                    "治承 (1177–1181)",
+                    "养和 (1181–1182)",
+                    "寿永 (1182–1184)",
+                    "元历 (1184–1185)",
+                    "文治 (1185–1190)",
+                    "建久 (1190–1199)",
+                    "正治 (1199–1201)",
+                    "建仁 (1201–1204)",
+                    "元久 (1204–1206)",
+                    "建永 (1206–1207)",
+                    "承元 (1207–1211)",
+                    "建历 (1211–1213)",
+                    "建保 (1213–1219)",
+                    "承久 (1219–1222)",
+                    "贞应 (1222–1224)",
+                    "元仁 (1224–1225)",
+                    "嘉禄 (1225–1227)",
+                    "安贞 (1227–1229)",
+                    "宽喜 (1229–1232)",
+                    "贞永 (1232–1233)",
+                    "天福 (1233–1234)",
+                    "文历 (1234–1235)",
+                    "嘉祯 (1235–1238)",
+                    "历仁 (1238–1239)",
+                    "延应 (1239–1240)",
+                    "仁治 (1240–1243)",
+                    "宽元 (1243–1247)",
+                    "宝治 (1247–1249)",
+                    "建长 (1249–1256)",
+                    "康元 (1256–1257)",
+                    "正嘉 (1257–1259)",
+                    "正元 (1259–1260)",
+                    "文应 (1260–1261)",
+                    "弘长 (1261–1264)",
+                    "文永 (1264–1275)",
+                    "建治 (1275–1278)",
+                    "弘安 (1278–1288)",
+                    "正应 (1288–1293)",
+                    "永仁 (1293–1299)",
+                    "正安 (1299–1302)",
+                    "干元 (1302–1303)",
+                    "嘉元 (1303–1306)",
+                    "德治 (1306–1308)",
+                    "延庆 (1308–1311)",
+                    "应长 (1311–1312)",
+                    "正和 (1312–1317)",
+                    "文保 (1317–1319)",
+                    "元应 (1319–1321)",
+                    "元亨 (1321–1324)",
+                    "正中 (1324–1326)",
+                    "嘉历 (1326–1329)",
+                    "元德 (1329–1331)",
+                    "元弘 (1331–1334)",
+                    "建武 (1334–1336)",
+                    "延元 (1336–1340)",
+                    "兴国 (1340–1346)",
+                    "正平 (1346–1370)",
+                    "建德 (1370–1372)",
+                    "文中 (1372–1375)",
+                    "天授 (1375–1379)",
+                    "康历 (1379–1381)",
+                    "弘和 (1381–1384)",
+                    "元中 (1384–1392)",
+                    "至德 (1384–1387)",
+                    "嘉庆 (1387–1389)",
+                    "康应 (1389–1390)",
+                    "明德 (1390–1394)",
+                    "应永 (1394–1428)",
+                    "正长 (1428–1429)",
+                    "永享 (1429–1441)",
+                    "嘉吉 (1441–1444)",
+                    "文安 (1444–1449)",
+                    "宝德 (1449–1452)",
+                    "享德 (1452–1455)",
+                    "康正 (1455–1457)",
+                    "长禄 (1457–1460)",
+                    "宽正 (1460–1466)",
+                    "文正 (1466–1467)",
+                    "应仁 (1467–1469)",
+                    "文明 (1469–1487)",
+                    "长享 (1487–1489)",
+                    "延德 (1489–1492)",
+                    "明应 (1492–1501)",
+                    "文龟 (1501–1504)",
+                    "永正 (1504–1521)",
+                    "大永 (1521–1528)",
+                    "享禄 (1528–1532)",
+                    "天文 (1532–1555)",
+                    "弘治 (1555–1558)",
+                    "永禄 (1558–1570)",
+                    "元龟 (1570–1573)",
+                    "天正 (1573–1592)",
+                    "文禄 (1592–1596)",
+                    "庆长 (1596–1615)",
+                    "元和 (1615–1624)",
+                    "宽永 (1624–1644)",
+                    "正保 (1644–1648)",
+                    "庆安 (1648–1652)",
+                    "承应 (1652–1655)",
+                    "明历 (1655–1658)",
+                    "万治 (1658–1661)",
+                    "宽文 (1661–1673)",
+                    "延宝 (1673–1681)",
+                    "天和 (1681–1684)",
+                    "贞享 (1684–1688)",
+                    "元禄 (1688–1704)",
+                    "宝永 (1704–1711)",
+                    "正德 (1711–1716)",
+                    "享保 (1716–1736)",
+                    "元文 (1736–1741)",
+                    "宽保 (1741–1744)",
+                    "延享 (1744–1748)",
+                    "宽延 (1748–1751)",
+                    "宝历 (1751–1764)",
+                    "明和 (1764–1772)",
+                    "安永 (1772–1781)",
+                    "天明 (1781–1789)",
+                    "宽政 (1789–1801)",
+                    "享和 (1801–1804)",
+                    "文化 (1804–1818)",
+                    "文政 (1818–1830)",
+                    "天保 (1830–1844)",
+                    "弘化 (1844–1848)",
+                    "嘉永 (1848–1854)",
+                    "安政 (1854–1860)",
+                    "万延 (1860–1861)",
+                    "文久 (1861–1864)",
+                    "元治 (1864–1865)",
+                    "庆应 (1865–1868)",
+                    "明治",
+                    "大正",
+                    "昭和",
+                    "平成",
+                    "令和",
+                }
+                narrow{
+                    "大化(645–650)",
+                    "白雉(650–671)",
+                    "白凤(672–686)",
+                    "朱鸟(686–701)",
+                    "大宝(701–704)",
+                    "庆云(704–708)",
+                    "和铜(708–715)",
+                    "灵龟(715–717)",
+                    "养老(717–724)",
+                    "神龟(724–729)",
+                    "天平(729–749)",
+                    "天平感宝(749–749)",
+                    "天平胜宝(749–757)",
+                    "天平宝字(757–765)",
+                    "天平神护(765–767)",
+                    "神护景云(767–770)",
+                    "宝龟(770–780)",
+                    "天应(781–782)",
+                    "延历(782–806)",
+                    "大同(806–810)",
+                    "弘仁(810–824)",
+                    "天长(824–834)",
+                    "承和(834–848)",
+                    "嘉祥(848–851)",
+                    "仁寿(851–854)",
+                    "齐衡(854–857)",
+                    "天安(857–859)",
+                    "贞观(859–877)",
+                    "元庆(877–885)",
+                    "仁和(885–889)",
+                    "宽平(889–898)",
+                    "昌泰(898–901)",
+                    "延喜(901–923)",
+                    "延长(923–931)",
+                    "承平(931–938)",
+                    "天庆(938–947)",
+                    "天历(947–957)",
+                    "天德(957–961)",
+                    "应和(961–964)",
+                    "康保(964–968)",
+                    "安和(968–970)",
+                    "天禄(970–973)",
+                    "天延(973–976)",
+                    "贞元(976–978)",
+                    "天元(978–983)",
+                    "永观(983–985)",
+                    "宽和(985–987)",
+                    "永延(987–989)",
+                    "永祚(989–990)",
+                    "正历(990–995)",
+                    "长德(995–999)",
+                    "长保(999–1004)",
+                    "宽弘(1004–1012)",
+                    "长和(1012–1017)",
+                    "宽仁(1017–1021)",
+                    "治安(1021–1024)",
+                    "万寿(1024–1028)",
+                    "长元(1028–1037)",
+                    "长历(1037–1040)",
+                    "长久(1040–1044)",
+                    "宽德(1044–1046)",
+                    "永承(1046–1053)",
+                    "天喜(1053–1058)",
+                    "康平(1058–1065)",
+                    "治历(1065–1069)",
+                    "延久(1069–1074)",
+                    "承保(1074–1077)",
+                    "承历(1077–1081)",
+                    "永保(1081–1084)",
+                    "应德(1084–1087)",
+                    "宽治(1087–1094)",
+                    "嘉保(1094–1096)",
+                    "永长(1096–1097)",
+                    "承德(1097–1099)",
+                    "康和(1099–1104)",
+                    "长治(1104–1106)",
+                    "嘉承(1106–1108)",
+                    "天仁(1108–1110)",
+                    "天永(1110–1113)",
+                    "永久(1113–1118)",
+                    "元永(1118–1120)",
+                    "保安(1120–1124)",
+                    "天治(1124–1126)",
+                    "大治(1126–1131)",
+                    "天承(1131–1132)",
+                    "长承(1132–1135)",
+                    "保延(1135–1141)",
+                    "永治(1141–1142)",
+                    "康治(1142–1144)",
+                    "天养(1144–1145)",
+                    "久安(1145–1151)",
+                    "仁平(1151–1154)",
+                    "久寿(1154–1156)",
+                    "保元(1156–1159)",
+                    "平治(1159–1160)",
+                    "永历(1160–1161)",
+                    "应保(1161–1163)",
+                    "长宽(1163–1165)",
+                    "永万(1165–1166)",
+                    "仁安(1166–1169)",
+                    "嘉应(1169–1171)",
+                    "承安(1171–1175)",
+                    "安元(1175–1177)",
+                    "治承(1177–1181)",
+                    "养和(1181–1182)",
+                    "寿永(1182–1184)",
+                    "元历(1184–1185)",
+                    "文治(1185–1190)",
+                    "建久(1190–1199)",
+                    "正治(1199–1201)",
+                    "建仁(1201–1204)",
+                    "元久(1204–1206)",
+                    "建永(1206–1207)",
+                    "承元(1207–1211)",
+                    "建历(1211–1213)",
+                    "建保(1213–1219)",
+                    "承久(1219–1222)",
+                    "贞应(1222–1224)",
+                    "元仁(1224–1225)",
+                    "嘉禄(1225–1227)",
+                    "安贞(1227–1229)",
+                    "宽喜(1229–1232)",
+                    "贞永(1232–1233)",
+                    "天福(1233–1234)",
+                    "文历(1234–1235)",
+                    "嘉祯(1235–1238)",
+                    "历仁(1238–1239)",
+                    "延应(1239–1240)",
+                    "仁治(1240–1243)",
+                    "宽元(1243–1247)",
+                    "宝治(1247–1249)",
+                    "建长(1249–1256)",
+                    "康元(1256–1257)",
+                    "正嘉(1257–1259)",
+                    "正元(1259–1260)",
+                    "文应(1260–1261)",
+                    "弘长(1261–1264)",
+                    "文永(1264–1275)",
+                    "建治(1275–1278)",
+                    "弘安(1278–1288)",
+                    "正应(1288–1293)",
+                    "永仁(1293–1299)",
+                    "正安(1299–1302)",
+                    "乾元(1302–1303)",
+                    "嘉元(1303–1306)",
+                    "德治(1306–1308)",
+                    "延庆(1308–1311)",
+                    "应长(1311–1312)",
+                    "正和(1312–1317)",
+                    "文保(1317–1319)",
+                    "元应(1319–1321)",
+                    "元亨(1321–1324)",
+                    "正中(1324–1326)",
+                    "嘉历(1326–1329)",
+                    "元德(1329–1331)",
+                    "元弘(1331–1334)",
+                    "建武(1334–1336)",
+                    "延元(1336–1340)",
+                    "兴国(1340–1346)",
+                    "正平(1346–1370)",
+                    "建德(1370–1372)",
+                    "文中(1372–1375)",
+                    "天授(1375–1379)",
+                    "康历(1379–1381)",
+                    "弘和(1381–1384)",
+                    "元中(1384–1392)",
+                    "明德(1384–1387)",
+                    "Kakei (1387–1389)",
+                    "Kōō (1389–1390)",
+                    "Meitoku (1390–1394)",
+                    "Ōei (1394–1428)",
+                    "Shōchō (1428–1429)",
+                    "Eikyō (1429–1441)",
+                    "Kakitsu (1441–1444)",
+                    "Bun’an (1444–1449)",
+                    "Hōtoku (1449–1452)",
+                    "Kyōtoku (1452–1455)",
+                    "Kōshō (1455–1457)",
+                    "Chōroku (1457–1460)",
+                    "Kanshō (1460–1466)",
+                    "Bunshō (1466–1467)",
+                    "Ōnin (1467–1469)",
+                    "Bunmei (1469–1487)",
+                    "Chōkyō (1487–1489)",
+                    "Entoku (1489–1492)",
+                    "Meiō (1492–1501)",
+                    "Bunki (1501–1504)",
+                    "Eishō (1504–1521)",
+                    "Taiei (1521–1528)",
+                    "Kyōroku (1528–1532)",
+                    "Tenbun (1532–1555)",
+                    "Kōji (1555–1558)",
+                    "Eiroku (1558–1570)",
+                    "Genki (1570–1573)",
+                    "Tenshō (1573–1592)",
+                    "Bunroku (1592–1596)",
+                    "Keichō (1596–1615)",
+                    "Genna (1615–1624)",
+                    "Kan’ei (1624–1644)",
+                    "Shōho (1644–1648)",
+                    "Keian (1648–1652)",
+                    "Jōō (1652–1655)",
+                    "Meireki (1655–1658)",
+                    "Manji (1658–1661)",
+                    "Kanbun (1661–1673)",
+                    "Enpō (1673–1681)",
+                    "Tenna (1681–1684)",
+                    "Jōkyō (1684–1688)",
+                    "Genroku (1688–1704)",
+                    "Hōei (1704–1711)",
+                    "Shōtoku (1711–1716)",
+                    "Kyōhō (1716–1736)",
+                    "Genbun (1736–1741)",
+                    "Kanpō (1741–1744)",
+                    "Enkyō (1744–1748)",
+                    "Kan’en (1748–1751)",
+                    "Hōreki (1751–1764)",
+                    "Meiwa (1764–1772)",
+                    "An’ei (1772–1781)",
+                    "Tenmei (1781–1789)",
+                    "Kansei (1789–1801)",
+                    "Kyōwa (1801–1804)",
+                    "Bunka (1804–1818)",
+                    "Bunsei (1818–1830)",
+                    "Tenpō (1830–1844)",
+                    "Kōka (1844–1848)",
+                    "Kaei (1848–1854)",
+                    "Ansei (1854–1860)",
+                    "Man’en (1860–1861)",
+                    "Bunkyū (1861–1864)",
+                    "Genji (1864–1865)",
+                    "Keiō (1865–1868)",
+                    "M",
+                    "T",
+                    "S",
+                    "H",
+                    "R",
+                }
+                wide{
+                    "大化 (645–650)",
+                    "白雉 (650–671)",
+                    "白凤 (672–686)",
+                    "朱鸟 (686–701)",
+                    "大宝 (701–704)",
+                    "庆云 (704–708)",
+                    "和铜 (708–715)",
+                    "灵龟 (715–717)",
+                    "养老 (717–724)",
+                    "神龟 (724–729)",
+                    "天平 (729–749)",
+                    "天平感宝 (749–749)",
+                    "天平胜宝 (749–757)",
+                    "天平宝字 (757–765)",
+                    "天平神护 (765–767)",
+                    "神护景云 (767–770)",
+                    "宝龟 (770–780)",
+                    "天应 (781–782)",
+                    "延历 (782–806)",
+                    "大同 (806–810)",
+                    "弘仁 (810–824)",
+                    "天长 (824–834)",
+                    "承和 (834–848)",
+                    "嘉祥 (848–851)",
+                    "仁寿 (851–854)",
+                    "齐衡 (854–857)",
+                    "天安 (857–859)",
+                    "贞观 (859–877)",
+                    "元庆 (877–885)",
+                    "仁和 (885–889)",
+                    "宽平 (889–898)",
+                    "昌泰 (898–901)",
+                    "延喜 (901–923)",
+                    "延长 (923–931)",
+                    "承平 (931–938)",
+                    "天庆 (938–947)",
+                    "天历 (947–957)",
+                    "天德 (957–961)",
+                    "应和 (961–964)",
+                    "康保 (964–968)",
+                    "安和 (968–970)",
+                    "天禄 (970–973)",
+                    "天延 (973–976)",
+                    "贞元 (976–978)",
+                    "天元 (978–983)",
+                    "永观 (983–985)",
+                    "宽和 (985–987)",
+                    "永延 (987–989)",
+                    "永祚 (989–990)",
+                    "正历 (990–995)",
+                    "长德 (995–999)",
+                    "长保 (999–1004)",
+                    "宽弘 (1004–1012)",
+                    "长和 (1012–1017)",
+                    "宽仁 (1017–1021)",
+                    "治安 (1021–1024)",
+                    "万寿 (1024–1028)",
+                    "长元 (1028–1037)",
+                    "长历 (1037–1040)",
+                    "长久 (1040–1044)",
+                    "宽德 (1044–1046)",
+                    "永承 (1046–1053)",
+                    "天喜 (1053–1058)",
+                    "康平 (1058–1065)",
+                    "治历 (1065–1069)",
+                    "延久 (1069–1074)",
+                    "承保 (1074–1077)",
+                    "正历 (1077–1081)",
+                    "永保 (1081–1084)",
+                    "应德 (1084–1087)",
+                    "宽治 (1087–1094)",
+                    "嘉保 (1094–1096)",
+                    "永长 (1096–1097)",
+                    "承德 (1097–1099)",
+                    "康和 (1099–1104)",
+                    "长治 (1104–1106)",
+                    "嘉承 (1106–1108)",
+                    "天仁 (1108–1110)",
+                    "天永 (1110–1113)",
+                    "永久 (1113–1118)",
+                    "元永 (1118–1120)",
+                    "保安 (1120–1124)",
+                    "天治 (1124–1126)",
+                    "大治 (1126–1131)",
+                    "天承 (1131–1132)",
+                    "长承 (1132–1135)",
+                    "保延 (1135–1141)",
+                    "永治 (1141–1142)",
+                    "康治 (1142–1144)",
+                    "天养 (1144–1145)",
+                    "久安 (1145–1151)",
+                    "仁平 (1151–1154)",
+                    "久寿 (1154–1156)",
+                    "保元 (1156–1159)",
+                    "平治 (1159–1160)",
+                    "永历 (1160–1161)",
+                    "应保 (1161–1163)",
+                    "长宽 (1163–1165)",
+                    "永万 (1165–1166)",
+                    "仁安 (1166–1169)",
+                    "嘉应 (1169–1171)",
+                    "承安 (1171–1175)",
+                    "安元 (1175–1177)",
+                    "治承 (1177–1181)",
+                    "养和 (1181–1182)",
+                    "寿永 (1182–1184)",
+                    "元历 (1184–1185)",
+                    "文治 (1185–1190)",
+                    "建久 (1190–1199)",
+                    "正治 (1199–1201)",
+                    "建仁 (1201–1204)",
+                    "元久 (1204–1206)",
+                    "建永 (1206–1207)",
+                    "承元 (1207–1211)",
+                    "建历 (1211–1213)",
+                    "建保 (1213–1219)",
+                    "承久 (1219–1222)",
+                    "贞应 (1222–1224)",
+                    "元仁 (1224–1225)",
+                    "嘉禄 (1225–1227)",
+                    "安贞 (1227–1229)",
+                    "宽喜 (1229–1232)",
+                    "贞永 (1232–1233)",
+                    "天福 (1233–1234)",
+                    "文历 (1234–1235)",
+                    "嘉祯 (1235–1238)",
+                    "历仁 (1238–1239)",
+                    "延应 (1239–1240)",
+                    "仁治 (1240–1243)",
+                    "宽元 (1243–1247)",
+                    "宝治 (1247–1249)",
+                    "建长 (1249–1256)",
+                    "康元 (1256–1257)",
+                    "正嘉 (1257–1259)",
+                    "正元 (1259–1260)",
+                    "文应 (1260–1261)",
+                    "弘长 (1261–1264)",
+                    "文永 (1264–1275)",
+                    "建治 (1275–1278)",
+                    "弘安 (1278–1288)",
+                    "正应 (1288–1293)",
+                    "永仁 (1293–1299)",
+                    "正安 (1299–1302)",
+                    "干元 (1302–1303)",
+                    "嘉元 (1303–1306)",
+                    "德治 (1306–1308)",
+                    "延庆 (1308–1311)",
+                    "应长 (1311–1312)",
+                    "正和 (1312–1317)",
+                    "文保 (1317–1319)",
+                    "元应 (1319–1321)",
+                    "元亨 (1321–1324)",
+                    "正中 (1324–1326)",
+                    "嘉历 (1326–1329)",
+                    "元德 (1329–1331)",
+                    "元弘 (1331–1334)",
+                    "建武 (1334–1336)",
+                    "延元 (1336–1340)",
+                    "兴国 (1340–1346)",
+                    "正平 (1346–1370)",
+                    "建德 (1370–1372)",
+                    "文中 (1372–1375)",
+                    "天授 (1375–1379)",
+                    "康历 (1379–1381)",
+                    "弘和 (1381–1384)",
+                    "元中 (1384–1392)",
+                    "至德 (1384–1387)",
+                    "嘉庆 (1387–1389)",
+                    "康应 (1389–1390)",
+                    "明德 (1390–1394)",
+                    "应永 (1394–1428)",
+                    "正长 (1428–1429)",
+                    "永享 (1429–1441)",
+                    "嘉吉 (1441–1444)",
+                    "文安 (1444–1449)",
+                    "宝德 (1449–1452)",
+                    "享德 (1452–1455)",
+                    "康正 (1455–1457)",
+                    "长禄 (1457–1460)",
+                    "宽正 (1460–1466)",
+                    "文正 (1466–1467)",
+                    "应仁 (1467–1469)",
+                    "文明 (1469–1487)",
+                    "长享 (1487–1489)",
+                    "延德 (1489–1492)",
+                    "明应 (1492–1501)",
+                    "文龟 (1501–1504)",
+                    "永正 (1504–1521)",
+                    "大永 (1521–1528)",
+                    "享禄 (1528–1532)",
+                    "天文 (1532–1555)",
+                    "弘治 (1555–1558)",
+                    "永禄 (1558–1570)",
+                    "元龟 (1570–1573)",
+                    "天正 (1573–1592)",
+                    "文禄 (1592–1596)",
+                    "庆长 (1596–1615)",
+                    "元和 (1615–1624)",
+                    "宽永 (1624–1644)",
+                    "正保 (1644–1648)",
+                    "庆安 (1648–1652)",
+                    "承应 (1652–1655)",
+                    "明历 (1655–1658)",
+                    "万治 (1658–1661)",
+                    "宽文 (1661–1673)",
+                    "延宝 (1673–1681)",
+                    "天和 (1681–1684)",
+                    "贞享 (1684–1688)",
+                    "元禄 (1688–1704)",
+                    "宝永 (1704–1711)",
+                    "正德 (1711–1716)",
+                    "享保 (1716–1736)",
+                    "元文 (1736–1741)",
+                    "宽保 (1741–1744)",
+                    "延享 (1744–1748)",
+                    "宽延 (1748–1751)",
+                    "宝历 (1751–1764)",
+                    "明和 (1764–1772)",
+                    "安永 (1772–1781)",
+                    "天明 (1781–1789)",
+                    "宽政 (1789–1801)",
+                    "享和 (1801–1804)",
+                    "文化 (1804–1818)",
+                    "文政 (1818–1830)",
+                    "天保 (1830–1844)",
+                    "弘化 (1844–1848)",
+                    "嘉永 (1848–1854)",
+                    "安政 (1854–1860)",
+                    "万延 (1860–1861)",
+                    "文久 (1861–1864)",
+                    "元治 (1864–1865)",
+                    "庆应 (1865–1868)",
+                    "明治",
+                    "大正",
+                    "昭和",
+                    "平成",
+                    "令和",
+                }
+            }
+        }
+        persian{
+            eras{
+                abbreviated{
+                    "波斯历",
+                }
+                narrow{
+                    "波斯历",
+                }
+                wide{
+                    "波斯历",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "1月",
+                        "2月",
+                        "3月",
+                        "4月",
+                        "5月",
+                        "6月",
+                        "7月",
+                        "8月",
+                        "9月",
+                        "10月",
+                        "11月",
+                        "12月",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "一月",
+                        "二月",
+                        "三月",
+                        "四月",
+                        "五月",
+                        "六月",
+                        "七月",
+                        "八月",
+                        "九月",
+                        "十月",
+                        "十一月",
+                        "十二月",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "1月",
+                        "2月",
+                        "3月",
+                        "4月",
+                        "5月",
+                        "6月",
+                        "7月",
+                        "8月",
+                        "9月",
+                        "10月",
+                        "11月",
+                        "12月",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "一月",
+                        "二月",
+                        "三月",
+                        "四月",
+                        "五月",
+                        "六月",
+                        "七月",
+                        "八月",
+                        "九月",
+                        "十月",
+                        "十一月",
+                        "十二月",
+                    }
+                }
+            }
+        }
+        roc{
+            DateTimePatterns{
+                "zzzz ah:mm:ss",
+                "z ah:mm:ss",
+                "ah:mm:ss",
+                "ah:mm",
+                "Gy年M月d日EEEE",
+                "Gy年M月d日",
+                "Gy年M月d日",
+                "Gy/M/d",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                E{"ccc"}
+                Ed{"d日E"}
+                Gy{"Gy年"}
+                GyMMM{"Gy年M月"}
+                GyMMMEd{"Gy年M月d日E"}
+                GyMMMd{"Gy年M月d日"}
+                M{"M月"}
+                MEd{"M/dE"}
+                MMM{"LLL"}
+                MMMEd{"M月d日E"}
+                MMMMd{"M月d日"}
+                MMMd{"M月d日"}
+                Md{"M/d"}
+                d{"d日"}
+                y{"Gy年"}
+                yyyy{"Gy年"}
+                yyyyM{"Gy年M月"}
+                yyyyMEd{"Gy/M/dE"}
+                yyyyMMM{"Gy年M月"}
+                yyyyMMMEd{"Gy年M月d日E"}
+                yyyyMMMM{"Gy年M月"}
+                yyyyMMMd{"Gy年M月d日"}
+                yyyyMd{"Gy/M/d"}
+                yyyyQQQ{"Gy年第Q季度"}
+                yyyyQQQQ{"Gy年第Q季度"}
+            }
+            eras{
+                abbreviated{
+                    "民国前",
+                    "民国",
+                }
+                narrow{
+                    "民国前",
+                    "民国",
+                }
+                wide{
+                    "民国前",
+                    "民国",
+                }
+            }
+            intervalFormats{
+                Bh{
+                    B{"Bh时至Bh时"}
+                    h{"Bh时至h时"}
+                }
+                Bhm{
+                    B{"Bh:mm至Bh:mm"}
+                    h{"Bh:mm至h:mm"}
+                    m{"Bh:mm至h:mm"}
+                }
+                Hmv{
+                    H{"v HH:mm – HH:mm"}
+                    m{"v HH:mm – HH:mm"}
+                }
+                M{
+                    M{"M–M月"}
+                }
+                MEd{
+                    M{"M/dE至M/dE"}
+                    d{"M/dE至M/dE"}
+                }
+                MMM{
+                    M{"MMM – MMM"}
+                }
+                MMMEd{
+                    M{"M月d日E至M月d日E"}
+                    d{"M月d日E至d日E"}
+                }
+                MMMd{
+                    M{"M月d日至M月d日"}
+                    d{"M月d日至d日"}
+                }
+                Md{
+                    M{"M/d – M/d"}
+                    d{"M/d – M/d"}
+                }
+                d{
+                    d{"d至d日"}
+                }
+                h{
+                    a{"ah时至ah时"}
+                    h{"ah时至h时"}
+                }
+                hm{
+                    a{"ah:mm至ah:mm"}
+                    h{"ah:mm至h:mm"}
+                    m{"ah:mm至h:mm"}
+                }
+                hmv{
+                    a{"v ah:mm至ah:mm"}
+                    h{"v ah:mm至h:mm"}
+                    m{"v ah:mm至h:mm"}
+                }
+                hv{
+                    a{"v ah时至ah时"}
+                    h{"v ah时至h时"}
+                }
+                y{
+                    y{"Gy–y年"}
+                }
+                yM{
+                    M{"Gy年M月至M月"}
+                    y{"Gy年M月至y年M月"}
+                }
+                yMEd{
+                    M{"Gy/M/dE至y/M/dE"}
+                    d{"Gy/M/dE至y/M/dE"}
+                    y{"Gy/M/dE至y/M/dE"}
+                }
+                yMMM{
+                    M{"Gy年M月至M月"}
+                    y{"Gy年M月至y年M月"}
+                }
+                yMMMEd{
+                    M{"Gy年M月d日E至M月d日E"}
+                    d{"Gy年M月d日E至d日E"}
+                    y{"Gy年M月d日E至y年M月d日E"}
+                }
+                yMMMM{
+                    M{"Gy年M月至M月"}
+                    y{"Gy年M月至y年M月"}
+                }
+                yMMMd{
+                    M{"Gy年M月d日至M月d日"}
+                    d{"Gy年M月d日至d日"}
+                    y{"Gy年M月d日至y年M月d日"}
+                }
+                yMd{
+                    M{"Gy/M/d – y/M/d"}
+                    d{"Gy/M/d – y/M/d"}
+                    y{"Gy/M/d – y/M/d"}
+                }
+            }
+        }
+    }
+    characterLabel{
+        activities{"行为"}
+        african_scripts{"非洲文字"}
+        american_scripts{"美洲文字"}
+        animal{"动物"}
+        animals_nature{"动物与自然"}
+        arrows{"箭头"}
+        body{"身体"}
+        box_drawing{"方框"}
+        braille{"盲文"}
+        building{"建筑"}
+        bullets_stars{"项目符号/星形"}
+        consonantal_jamo{"谚文辅音字母"}
+        currency_symbols{"货币符号"}
+        dash_connector{"破折号/连接号"}
+        digits{"数字"}
+        dingbats{"装饰符号"}
+        divination_symbols{"八卦符号"}
+        downwards_arrows{"向下箭头"}
+        downwards_upwards_arrows{"上下箭头"}
+        east_asian_scripts{"东亚文字"}
+        emoji{"表情符号"}
+        european_scripts{"欧洲文字"}
+        female{"女"}
+        flag{"旗"}
+        flags{"旗帜"}
+        food_drink{"饮食"}
+        format{"格式"}
+        format_whitespace{"格式与空白"}
+        full_width_form_variant{"全角变体"}
+        geometric_shapes{"几何图形"}
+        half_width_form_variant{"半角变体"}
+        han_characters{"汉字"}
+        han_radicals{"汉字部首"}
+        hanja{"朝鲜汉字"}
+        hanzi_simplified{"简体字"}
+        hanzi_traditional{"繁体字"}
+        heart{"心"}
+        historic_scripts{"古代文字"}
+        ideographic_desc_characters{"表意文字描述符"}
+        japanese_kana{"日语假名"}
+        kanbun{"汉文训读"}
+        kanji{"日语汉字"}
+        keycap{"按键"}
+        leftwards_arrows{"向左箭头"}
+        leftwards_rightwards_arrows{"左右箭头"}
+        letterlike_symbols{"类字母符号"}
+        limited_use{"限制使用"}
+        male{"男"}
+        math_symbols{"数学符号"}
+        middle_eastern_scripts{"中东文字"}
+        miscellaneous{"杂项"}
+        modern_scripts{"现代文字"}
+        modifier{"修饰符"}
+        musical_symbols{"音乐符号"}
+        nature{"自然"}
+        nonspacing{"非间距"}
+        numbers{"数字"}
+        objects{"物体"}
+        other{"其它"}
+        paired{"成对"}
+        person{"人物"}
+        phonetic_alphabet{"音标"}
+        pictographs{"象形文字"}
+        place{"地点"}
+        plant{"植物"}
+        punctuation{"标点符号"}
+        rightwards_arrows{"向右箭头"}
+        sign_standard_symbols{"标志/标准符号"}
+        small_form_variant{"小型变体形式"}
+        smiley{"笑脸"}
+        smileys_people{"笑脸与人"}
+        south_asian_scripts{"南亚文字"}
+        southeast_asian_scripts{"东南亚文字"}
+        spacing{"间距"}
+        sport{"运动"}
+        symbols{"符号"}
+        technical_symbols{"技术符号"}
+        tone_marks{"声调标记"}
+        travel{"出行"}
+        travel_places{"出行与地点"}
+        upwards_arrows{"向上箭头"}
+        variant_forms{"变体形式"}
+        vocalic_jamo{"谚文元音符号"}
+        weather{"天气"}
+        western_asian_scripts{"西亚文字"}
+        whitespace{"空白区"}
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"日"}
+            relative{
+                "-1"{"昨天"}
+                "-2"{"前天"}
+                "0"{"今天"}
+                "1"{"明天"}
+                "2"{"后天"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}天后"}
+                }
+                past{
+                    other{"{0}天前"}
+                }
+            }
+        }
+        day-narrow{
+            dn{"日"}
+            relative{
+                "-1"{"昨天"}
+                "-2"{"前天"}
+                "0"{"今天"}
+                "1"{"明天"}
+                "2"{"后天"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}天后"}
+                }
+                past{
+                    other{"{0}天前"}
+                }
+            }
+        }
+        day-short{
+            dn{"日"}
+            relative{
+                "-1"{"昨天"}
+                "-2"{"前天"}
+                "0"{"今天"}
+                "1"{"明天"}
+                "2"{"后天"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}天后"}
+                }
+                past{
+                    other{"{0}天前"}
+                }
+            }
+        }
+        dayOfYear{
+            dn{"年中日"}
+        }
+        dayOfYear-narrow{
+            dn{"年中日"}
+        }
+        dayOfYear-short{
+            dn{"年中日"}
+        }
+        dayperiod{
+            dn{"上午/下午"}
+        }
+        dayperiod-narrow{
+            dn{"上午/下午"}
+        }
+        dayperiod-short{
+            dn{"上午/下午"}
+        }
+        era{
+            dn{"纪元"}
+        }
+        era-narrow{
+            dn{"纪元"}
+        }
+        era-short{
+            dn{"纪元"}
+        }
+        fri{
+            relative{
+                "-1"{"上周五"}
+                "0"{"本周五"}
+                "1"{"下周五"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周五后"}
+                }
+                past{
+                    other{"{0}个周五前"}
+                }
+            }
+        }
+        fri-narrow{
+            relative{
+                "-1"{"上周五"}
+                "0"{"本周五"}
+                "1"{"下周五"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周五后"}
+                }
+                past{
+                    other{"{0}个周五前"}
+                }
+            }
+        }
+        fri-short{
+            relative{
+                "-1"{"上周五"}
+                "0"{"本周五"}
+                "1"{"下周五"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周五后"}
+                }
+                past{
+                    other{"{0}个周五前"}
+                }
+            }
+        }
+        hour{
+            dn{"小时"}
+            relative{
+                "0"{"这一时间 / 此时"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}小时后"}
+                }
+                past{
+                    other{"{0}小时前"}
+                }
+            }
+        }
+        hour-narrow{
+            dn{"小时"}
+            relative{
+                "0"{"这一时间 / 此时"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}小时后"}
+                }
+                past{
+                    other{"{0}小时前"}
+                }
+            }
+        }
+        hour-short{
+            dn{"小时"}
+            relative{
+                "0"{"这一时间 / 此时"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}小时后"}
+                }
+                past{
+                    other{"{0}小时前"}
+                }
+            }
+        }
+        minute{
+            dn{"分钟"}
+            relative{
+                "0"{"此刻"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}分钟后"}
+                }
+                past{
+                    other{"{0}分钟前"}
+                }
+            }
+        }
+        minute-narrow{
+            dn{"分"}
+            relative{
+                "0"{"此刻"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}分钟后"}
+                }
+                past{
+                    other{"{0}分钟前"}
+                }
+            }
+        }
+        minute-short{
+            dn{"分"}
+            relative{
+                "0"{"此刻"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}分钟后"}
+                }
+                past{
+                    other{"{0}分钟前"}
+                }
+            }
+        }
+        mon{
+            relative{
+                "-1"{"上周一"}
+                "0"{"本周一"}
+                "1"{"下周一"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周一后"}
+                }
+                past{
+                    other{"{0}个周一前"}
+                }
+            }
+        }
+        mon-narrow{
+            relative{
+                "-1"{"上周一"}
+                "0"{"本周一"}
+                "1"{"下周一"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周一后"}
+                }
+                past{
+                    other{"{0}个周一前"}
+                }
+            }
+        }
+        mon-short{
+            relative{
+                "-1"{"上周一"}
+                "0"{"本周一"}
+                "1"{"下周一"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周一后"}
+                }
+                past{
+                    other{"{0}个周一前"}
+                }
+            }
+        }
+        month{
+            dn{"月"}
+            relative{
+                "-1"{"上个月"}
+                "0"{"本月"}
+                "1"{"下个月"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个月后"}
+                }
+                past{
+                    other{"{0}个月前"}
+                }
+            }
+        }
+        month-narrow{
+            dn{"月"}
+            relative{
+                "-1"{"上个月"}
+                "0"{"本月"}
+                "1"{"下个月"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个月后"}
+                }
+                past{
+                    other{"{0}个月前"}
+                }
+            }
+        }
+        month-short{
+            dn{"月"}
+            relative{
+                "-1"{"上个月"}
+                "0"{"本月"}
+                "1"{"下个月"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个月后"}
+                }
+                past{
+                    other{"{0}个月前"}
+                }
+            }
+        }
+        quarter{
+            dn{"季度"}
+            relative{
+                "-1"{"上季度"}
+                "0"{"本季度"}
+                "1"{"下季度"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个季度后"}
+                }
+                past{
+                    other{"{0}个季度前"}
+                }
+            }
+        }
+        quarter-narrow{
+            dn{"季"}
+            relative{
+                "-1"{"上季度"}
+                "0"{"本季度"}
+                "1"{"下季度"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个季度后"}
+                }
+                past{
+                    other{"{0}个季度前"}
+                }
+            }
+        }
+        quarter-short{
+            dn{"季"}
+            relative{
+                "-1"{"上季度"}
+                "0"{"本季度"}
+                "1"{"下季度"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个季度后"}
+                }
+                past{
+                    other{"{0}个季度前"}
+                }
+            }
+        }
+        sat{
+            relative{
+                "-1"{"上周六"}
+                "0"{"本周六"}
+                "1"{"下周六"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周六后"}
+                }
+                past{
+                    other{"{0}个周六前"}
+                }
+            }
+        }
+        sat-narrow{
+            relative{
+                "-1"{"上周六"}
+                "0"{"本周六"}
+                "1"{"下周六"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周六后"}
+                }
+                past{
+                    other{"{0}个周六前"}
+                }
+            }
+        }
+        sat-short{
+            relative{
+                "-1"{"上周六"}
+                "0"{"本周六"}
+                "1"{"下周六"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周六后"}
+                }
+                past{
+                    other{"{0}个周六前"}
+                }
+            }
+        }
+        second{
+            dn{"秒"}
+            relative{
+                "0"{"现在"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}秒钟后"}
+                }
+                past{
+                    other{"{0}秒钟前"}
+                }
+            }
+        }
+        second-narrow{
+            dn{"秒"}
+            relative{
+                "0"{"现在"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}秒后"}
+                }
+                past{
+                    other{"{0}秒前"}
+                }
+            }
+        }
+        second-short{
+            dn{"秒"}
+            relative{
+                "0"{"现在"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}秒后"}
+                }
+                past{
+                    other{"{0}秒前"}
+                }
+            }
+        }
+        sun{
+            relative{
+                "-1"{"上周日"}
+                "0"{"本周日"}
+                "1"{"下周日"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周日后"}
+                }
+                past{
+                    other{"{0}个周日前"}
+                }
+            }
+        }
+        sun-narrow{
+            relative{
+                "-1"{"上周日"}
+                "0"{"本周日"}
+                "1"{"下周日"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周日后"}
+                }
+                past{
+                    other{"{0}个周日前"}
+                }
+            }
+        }
+        sun-short{
+            relative{
+                "-1"{"上周日"}
+                "0"{"本周日"}
+                "1"{"下周日"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周日后"}
+                }
+                past{
+                    other{"{0}个周日前"}
+                }
+            }
+        }
+        thu{
+            relative{
+                "-1"{"上周四"}
+                "0"{"本周四"}
+                "1"{"下周四"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周四后"}
+                }
+                past{
+                    other{"{0}个周四前"}
+                }
+            }
+        }
+        thu-narrow{
+            relative{
+                "-1"{"上周四"}
+                "0"{"本周四"}
+                "1"{"下周四"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周四后"}
+                }
+                past{
+                    other{"{0}个周四前"}
+                }
+            }
+        }
+        thu-short{
+            relative{
+                "-1"{"上周四"}
+                "0"{"本周四"}
+                "1"{"下周四"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周四后"}
+                }
+                past{
+                    other{"{0}个周四前"}
+                }
+            }
+        }
+        tue{
+            relative{
+                "-1"{"上周二"}
+                "0"{"本周二"}
+                "1"{"下周二"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周二后"}
+                }
+                past{
+                    other{"{0}个周二前"}
+                }
+            }
+        }
+        tue-narrow{
+            relative{
+                "-1"{"上周二"}
+                "0"{"本周二"}
+                "1"{"下周二"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周二后"}
+                }
+                past{
+                    other{"{0}个周二前"}
+                }
+            }
+        }
+        tue-short{
+            relative{
+                "-1"{"上周二"}
+                "0"{"本周二"}
+                "1"{"下周二"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周二后"}
+                }
+                past{
+                    other{"{0}个周二前"}
+                }
+            }
+        }
+        wed{
+            relative{
+                "-1"{"上周三"}
+                "0"{"本周三"}
+                "1"{"下周三"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周三后"}
+                }
+                past{
+                    other{"{0}个周三前"}
+                }
+            }
+        }
+        wed-narrow{
+            relative{
+                "-1"{"上周三"}
+                "0"{"本周三"}
+                "1"{"下周三"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周三后"}
+                }
+                past{
+                    other{"{0}个周三前"}
+                }
+            }
+        }
+        wed-short{
+            relative{
+                "-1"{"上周三"}
+                "0"{"本周三"}
+                "1"{"下周三"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}个周三后"}
+                }
+                past{
+                    other{"{0}个周三前"}
+                }
+            }
+        }
+        week{
+            dn{"周"}
+            relative{
+                "-1"{"上周"}
+                "0"{"本周"}
+                "1"{"下周"}
+            }
+            relativePeriod{"{0}这周"}
+            relativeTime{
+                future{
+                    other{"{0}周后"}
+                }
+                past{
+                    other{"{0}周前"}
+                }
+            }
+        }
+        week-narrow{
+            dn{"周"}
+            relative{
+                "-1"{"上周"}
+                "0"{"本周"}
+                "1"{"下周"}
+            }
+            relativePeriod{"{0}这周"}
+            relativeTime{
+                future{
+                    other{"{0}周后"}
+                }
+                past{
+                    other{"{0}周前"}
+                }
+            }
+        }
+        week-short{
+            dn{"周"}
+            relative{
+                "-1"{"上周"}
+                "0"{"本周"}
+                "1"{"下周"}
+            }
+            relativePeriod{"{0}这周"}
+            relativeTime{
+                future{
+                    other{"{0}周后"}
+                }
+                past{
+                    other{"{0}周前"}
+                }
+            }
+        }
+        weekOfMonth{
+            dn{"月中周"}
+        }
+        weekOfMonth-narrow{
+            dn{"月中周"}
+        }
+        weekOfMonth-short{
+            dn{"月中周"}
+        }
+        weekday{
+            dn{"工作日"}
+        }
+        weekday-narrow{
+            dn{"工作日"}
+        }
+        weekday-short{
+            dn{"工作日"}
+        }
+        weekdayOfMonth{
+            dn{"月中日"}
+        }
+        weekdayOfMonth-narrow{
+            dn{"月中日"}
+        }
+        weekdayOfMonth-short{
+            dn{"月中日"}
+        }
+        year{
+            dn{"年"}
+            relative{
+                "-1"{"去年"}
+                "0"{"今年"}
+                "1"{"明年"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}年后"}
+                }
+                past{
+                    other{"{0}年前"}
+                }
+            }
+        }
+        year-narrow{
+            dn{"年"}
+            relative{
+                "-1"{"去年"}
+                "0"{"今年"}
+                "1"{"明年"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}年后"}
+                }
+                past{
+                    other{"{0}年前"}
+                }
+            }
+        }
+        year-short{
+            dn{"年"}
+            relative{
+                "-1"{"去年"}
+                "0"{"今年"}
+                "1"{"明年"}
+            }
+            relativeTime{
+                future{
+                    other{"{0}年后"}
+                }
+                past{
+                    other{"{0}年前"}
+                }
+            }
+        }
+        zone{
+            dn{"时区"}
+        }
+        zone-narrow{
+            dn{"时区"}
+        }
+        zone-short{
+            dn{"时区"}
+        }
+    }
+    listPattern{
+        or{
+            2{"{0}或{1}"}
+            end{"{0}或{1}"}
+            middle{"{0}、{1}"}
+            start{"{0}、{1}"}
+        }
+        standard{
+            2{"{0}和{1}"}
+            end{"{0}和{1}"}
+            middle{"{0}、{1}"}
+            start{"{0}、{1}"}
+        }
+        standard-short{
+            2{"{0}和{1}"}
+            end{"{0}和{1}"}
+            middle{"{0}、{1}"}
+            start{"{0}、{1}"}
+        }
+        unit{
+            2{"{0}{1}"}
+            end{"{0}{1}"}
+            middle{"{0}{1}"}
+            start{"{0}{1}"}
+        }
+        unit-narrow{
+            2{"{0}{1}"}
+            end{"{0}{1}"}
+            middle{"{0}{1}"}
+            start{"{0}{1}"}
+        }
+        unit-short{
+            2{"{0}{1}"}
+            end{"{0}{1}"}
+            middle{"{0}{1}"}
+            start{"{0}{1}"}
+        }
+    }
+    measurementSystemNames{
+        UK{"英制"}
+        US{"美制"}
+        metric{"公制"}
+    }
+    parse{
+        date{
+            lenient{
+                "[\\--/]",
+                "[\\:∶]",
+            }
+        }
+        general{
+            lenient{
+                "[.․。︒﹒．｡]",
+                "['ʼ՚᾽᾿’＇]",
+                "[%٪﹪％]",
+                "[؉‰]",
+                "[\$﹩＄$]",
+                "[£₤]",
+                "[¥￥]",
+                "[₩￦]",
+                "[₨₹{Rp}{Rs}]",
+            }
+        }
+        number{
+            lenient{
+                "[\\-‒⁻₋−➖﹣－]",
+                "[,،٫、︐︑﹐﹑，､]",
+                "[+⁺₊➕﬩﹢＋]",
+            }
+            stricter{
+                "[,٫︐﹐，]",
+                "[.․﹒．｡]",
+            }
+        }
+    }
+}

@@ -1,0 +1,1889 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+kok{
+    zoneStrings{
+        "Africa:Abidjan"{
+            ec{"अबिदजान"}
+        }
+        "Africa:Accra"{
+            ec{"आकरा"}
+        }
+        "Africa:Addis_Ababa"{
+            ec{"आदीस अबाबा"}
+        }
+        "Africa:Algiers"{
+            ec{"आल्जियार्स"}
+        }
+        "Africa:Asmera"{
+            ec{"अस्मारा"}
+        }
+        "Africa:Bamako"{
+            ec{"बामाको"}
+        }
+        "Africa:Bangui"{
+            ec{"बांगी"}
+        }
+        "Africa:Banjul"{
+            ec{"बानजुल"}
+        }
+        "Africa:Bissau"{
+            ec{"बिसाउ"}
+        }
+        "Africa:Blantyre"{
+            ec{"ब्लानटायर"}
+        }
+        "Africa:Brazzaville"{
+            ec{"ब्राझाविले"}
+        }
+        "Africa:Bujumbura"{
+            ec{"बुजुमबुरा"}
+        }
+        "Africa:Cairo"{
+            ec{"कायरो"}
+        }
+        "Africa:Casablanca"{
+            ec{"कासाब्लांका"}
+        }
+        "Africa:Ceuta"{
+            ec{"सेउटा"}
+        }
+        "Africa:Conakry"{
+            ec{"कोनाक्रा"}
+        }
+        "Africa:Dakar"{
+            ec{"डकार"}
+        }
+        "Africa:Dar_es_Salaam"{
+            ec{"दार इ सलाम"}
+        }
+        "Africa:Djibouti"{
+            ec{"जिबूती"}
+        }
+        "Africa:Douala"{
+            ec{"डौआला"}
+        }
+        "Africa:El_Aaiun"{
+            ec{"अल आयुन"}
+        }
+        "Africa:Freetown"{
+            ec{"फ्रिटावन"}
+        }
+        "Africa:Gaborone"{
+            ec{"गाबोरोन"}
+        }
+        "Africa:Harare"{
+            ec{"हरारे"}
+        }
+        "Africa:Johannesburg"{
+            ec{"जोहान्सबर्ग"}
+        }
+        "Africa:Juba"{
+            ec{"जुबा"}
+        }
+        "Africa:Kampala"{
+            ec{"काम्पाला"}
+        }
+        "Africa:Khartoum"{
+            ec{"खार्टोम"}
+        }
+        "Africa:Kigali"{
+            ec{"किगाली"}
+        }
+        "Africa:Kinshasa"{
+            ec{"किनशासा"}
+        }
+        "Africa:Lagos"{
+            ec{"लागोस"}
+        }
+        "Africa:Libreville"{
+            ec{"लिब्रेविले"}
+        }
+        "Africa:Lome"{
+            ec{"लोम"}
+        }
+        "Africa:Luanda"{
+            ec{"लुआंडा"}
+        }
+        "Africa:Lubumbashi"{
+            ec{"लुबुमबाशी"}
+        }
+        "Africa:Lusaka"{
+            ec{"लुसाका"}
+        }
+        "Africa:Malabo"{
+            ec{"मलाबो"}
+        }
+        "Africa:Maputo"{
+            ec{"मापुटो"}
+        }
+        "Africa:Maseru"{
+            ec{"मासेरु"}
+        }
+        "Africa:Mbabane"{
+            ec{"एमबाबेन"}
+        }
+        "Africa:Mogadishu"{
+            ec{"मोगादिशू"}
+        }
+        "Africa:Monrovia"{
+            ec{"मोनरोविया"}
+        }
+        "Africa:Nairobi"{
+            ec{"नायरोबी"}
+        }
+        "Africa:Ndjamena"{
+            ec{"एनजामेना"}
+        }
+        "Africa:Niamey"{
+            ec{"नियामी"}
+        }
+        "Africa:Nouakchott"{
+            ec{"नवाकसुत"}
+        }
+        "Africa:Ouagadougou"{
+            ec{"ओगादौगो"}
+        }
+        "Africa:Porto-Novo"{
+            ec{"पोर्टो-नोवो"}
+        }
+        "Africa:Sao_Tome"{
+            ec{"साओ टोम"}
+        }
+        "Africa:Tripoli"{
+            ec{"त्रिपोली"}
+        }
+        "Africa:Tunis"{
+            ec{"टुनिस"}
+        }
+        "Africa:Windhoek"{
+            ec{"विंडहोक"}
+        }
+        "America:Adak"{
+            ec{"अडाक"}
+        }
+        "America:Anchorage"{
+            ec{"ऐंकरज"}
+        }
+        "America:Anguilla"{
+            ec{"अंगुला"}
+        }
+        "America:Antigua"{
+            ec{"एँटिगुआ"}
+        }
+        "America:Araguaina"{
+            ec{"अरगुयेना"}
+        }
+        "America:Argentina:La_Rioja"{
+            ec{"ला रियोजा"}
+        }
+        "America:Argentina:Rio_Gallegos"{
+            ec{"रियो गलेगॉस"}
+        }
+        "America:Argentina:Salta"{
+            ec{"साल्टा"}
+        }
+        "America:Argentina:San_Juan"{
+            ec{"सान जुआन"}
+        }
+        "America:Argentina:San_Luis"{
+            ec{"सान लुईस"}
+        }
+        "America:Argentina:Tucuman"{
+            ec{"टुकुमॅन"}
+        }
+        "America:Argentina:Ushuaia"{
+            ec{"उशुआइया"}
+        }
+        "America:Aruba"{
+            ec{"अरुबा"}
+        }
+        "America:Asuncion"{
+            ec{"असंसियन"}
+        }
+        "America:Bahia"{
+            ec{"बहिया"}
+        }
+        "America:Bahia_Banderas"{
+            ec{"बहिया बंदेरस"}
+        }
+        "America:Barbados"{
+            ec{"बारबाडोस"}
+        }
+        "America:Belem"{
+            ec{"बेलेम"}
+        }
+        "America:Belize"{
+            ec{"बेलिझ"}
+        }
+        "America:Blanc-Sablon"{
+            ec{"ब्लांक-साब्लोन"}
+        }
+        "America:Boa_Vista"{
+            ec{"बाओ विस्टा"}
+        }
+        "America:Bogota"{
+            ec{"बोगोटा"}
+        }
+        "America:Boise"{
+            ec{"बोयस"}
+        }
+        "America:Buenos_Aires"{
+            ec{"ब्यूनस आयर्स"}
+        }
+        "America:Cambridge_Bay"{
+            ec{"केंब्रिज बे"}
+        }
+        "America:Campo_Grande"{
+            ec{"कॅम्पो ग्रांड"}
+        }
+        "America:Cancun"{
+            ec{"कानकुन"}
+        }
+        "America:Caracas"{
+            ec{"कराकस"}
+        }
+        "America:Catamarca"{
+            ec{"काटामारका"}
+        }
+        "America:Cayenne"{
+            ec{"केइन"}
+        }
+        "America:Cayman"{
+            ec{"कैमेन"}
+        }
+        "America:Chicago"{
+            ec{"शिकागो"}
+        }
+        "America:Chihuahua"{
+            ec{"चिहुआहुआ"}
+        }
+        "America:Coral_Harbour"{
+            ec{"अतिकोकॉन"}
+        }
+        "America:Cordoba"{
+            ec{"कोरडोबा"}
+        }
+        "America:Costa_Rica"{
+            ec{"कोस्ता रिका"}
+        }
+        "America:Creston"{
+            ec{"क्रेस्टोन"}
+        }
+        "America:Cuiaba"{
+            ec{"कुययबा"}
+        }
+        "America:Curacao"{
+            ec{"कुराकाओ"}
+        }
+        "America:Danmarkshavn"{
+            ec{"डेन्मार्कशॉन"}
+        }
+        "America:Dawson"{
+            ec{"डौसन"}
+        }
+        "America:Dawson_Creek"{
+            ec{"डौसन क्रिक"}
+        }
+        "America:Denver"{
+            ec{"डेन्वेर"}
+        }
+        "America:Detroit"{
+            ec{"डेट्रॉईट"}
+        }
+        "America:Dominica"{
+            ec{"डोमिनीका"}
+        }
+        "America:Edmonton"{
+            ec{"ऍडमोंटन"}
+        }
+        "America:Eirunepe"{
+            ec{"ईरुनेपे"}
+        }
+        "America:El_Salvador"{
+            ec{"एल साल्वाडोर"}
+        }
+        "America:Fort_Nelson"{
+            ec{"फोर्ट नेल्सन"}
+        }
+        "America:Fortaleza"{
+            ec{"फोर्टालेझा"}
+        }
+        "America:Glace_Bay"{
+            ec{"ग्लेस बे"}
+        }
+        "America:Godthab"{
+            ec{"नूक"}
+        }
+        "America:Goose_Bay"{
+            ec{"गूस बे"}
+        }
+        "America:Grand_Turk"{
+            ec{"ग्रँड तुर्क"}
+        }
+        "America:Grenada"{
+            ec{"ग्रेनॅडा"}
+        }
+        "America:Guadeloupe"{
+            ec{"ग्वाडेलोप"}
+        }
+        "America:Guatemala"{
+            ec{"ग्वाटेमाला"}
+        }
+        "America:Guayaquil"{
+            ec{"ग्वायेकिल"}
+        }
+        "America:Guyana"{
+            ec{"गुयाना"}
+        }
+        "America:Halifax"{
+            ec{"हेलिफॅक्स"}
+        }
+        "America:Havana"{
+            ec{"हवाना"}
+        }
+        "America:Hermosillo"{
+            ec{"हर्मोसिलो"}
+        }
+        "America:Indiana:Knox"{
+            ec{"नॉक्स, इंडियाना"}
+        }
+        "America:Indiana:Marengo"{
+            ec{"मारेंगो, इंडियाना"}
+        }
+        "America:Indiana:Petersburg"{
+            ec{"पिटर्सबर्ग, इंडियाना"}
+        }
+        "America:Indiana:Tell_City"{
+            ec{"टेल सिटी, इंडियाना"}
+        }
+        "America:Indiana:Vevay"{
+            ec{"वेवय, इंडियाना"}
+        }
+        "America:Indiana:Vincennes"{
+            ec{"विंसेनस, इंडियाना"}
+        }
+        "America:Indiana:Winamac"{
+            ec{"विनामॅक, इंडियाना"}
+        }
+        "America:Indianapolis"{
+            ec{"इंडियानापोलीस"}
+        }
+        "America:Inuvik"{
+            ec{"इनुविक"}
+        }
+        "America:Iqaluit"{
+            ec{"इकालुयीट"}
+        }
+        "America:Jamaica"{
+            ec{"जमैका"}
+        }
+        "America:Jujuy"{
+            ec{"जुजेय"}
+        }
+        "America:Juneau"{
+            ec{"जूनो"}
+        }
+        "America:Kentucky:Monticello"{
+            ec{"मोंटीसॅलो, केंटुकाय"}
+        }
+        "America:Kralendijk"{
+            ec{"क्रालेनडीक"}
+        }
+        "America:La_Paz"{
+            ec{"ला पाझ"}
+        }
+        "America:Lima"{
+            ec{"लिमा"}
+        }
+        "America:Los_Angeles"{
+            ec{"लॉस एंजलीस"}
+        }
+        "America:Louisville"{
+            ec{"लुईजविले"}
+        }
+        "America:Lower_Princes"{
+            ec{"लोवर प्रिंसेस क्वार्टर"}
+        }
+        "America:Maceio"{
+            ec{"मासियो"}
+        }
+        "America:Managua"{
+            ec{"मॅनाग्वा"}
+        }
+        "America:Manaus"{
+            ec{"मनौस"}
+        }
+        "America:Marigot"{
+            ec{"मेरीगॉट"}
+        }
+        "America:Martinique"{
+            ec{"मार्टिनिक"}
+        }
+        "America:Matamoros"{
+            ec{"माटामोरोस"}
+        }
+        "America:Mazatlan"{
+            ec{"माझाट्लान"}
+        }
+        "America:Mendoza"{
+            ec{"मेन्डोझा"}
+        }
+        "America:Menominee"{
+            ec{"मेनोमिनी"}
+        }
+        "America:Merida"{
+            ec{"मेरिडा"}
+        }
+        "America:Metlakatla"{
+            ec{"मेट्लाकाट्ला"}
+        }
+        "America:Mexico_City"{
+            ec{"मेक्सिको शार"}
+        }
+        "America:Miquelon"{
+            ec{"मिक्वेलोन"}
+        }
+        "America:Moncton"{
+            ec{"मोंक्टॉन"}
+        }
+        "America:Monterrey"{
+            ec{"मोंटेरी"}
+        }
+        "America:Montevideo"{
+            ec{"मोंटेव्हिडियो"}
+        }
+        "America:Montserrat"{
+            ec{"मॉन्टसेराट"}
+        }
+        "America:Nassau"{
+            ec{"नसाऊ"}
+        }
+        "America:New_York"{
+            ec{"न्यु यॉर्क"}
+        }
+        "America:Nipigon"{
+            ec{"निपिगोन"}
+        }
+        "America:Nome"{
+            ec{"नोमे"}
+        }
+        "America:Noronha"{
+            ec{"नोरोन्हा"}
+        }
+        "America:North_Dakota:Beulah"{
+            ec{"ब्यूल्लाह, उत्तर डाकोटा"}
+        }
+        "America:North_Dakota:Center"{
+            ec{"मध्य, उत्तर डाकोटा"}
+        }
+        "America:North_Dakota:New_Salem"{
+            ec{"न्यु सालेम, उत्तर डाकोटा"}
+        }
+        "America:Ojinaga"{
+            ec{"ओजिनागा"}
+        }
+        "America:Panama"{
+            ec{"पनामा"}
+        }
+        "America:Pangnirtung"{
+            ec{"पंगनिर्टुंग"}
+        }
+        "America:Paramaribo"{
+            ec{"परामारिबो"}
+        }
+        "America:Phoenix"{
+            ec{"फिनिक्स"}
+        }
+        "America:Port-au-Prince"{
+            ec{"पोर्ट-औ-प्रिन्स"}
+        }
+        "America:Port_of_Spain"{
+            ec{"पोर्ट ऑफ स्पेन"}
+        }
+        "America:Porto_Velho"{
+            ec{"पोर्टो वेल्हो"}
+        }
+        "America:Puerto_Rico"{
+            ec{"पिर्टो रिको"}
+        }
+        "America:Punta_Arenas"{
+            ec{"पुंटा अरेनास"}
+        }
+        "America:Rainy_River"{
+            ec{"पावसाळी न्हंय"}
+        }
+        "America:Rankin_Inlet"{
+            ec{"रँकिन इनलॅट"}
+        }
+        "America:Recife"{
+            ec{"रेसीफ"}
+        }
+        "America:Regina"{
+            ec{"रेजीना"}
+        }
+        "America:Resolute"{
+            ec{"रिसोल्युट"}
+        }
+        "America:Rio_Branco"{
+            ec{"रियो ब्रांको"}
+        }
+        "America:Santarem"{
+            ec{"सांतारेम"}
+        }
+        "America:Santiago"{
+            ec{"सँटियागो"}
+        }
+        "America:Santo_Domingo"{
+            ec{"सांतो डोमिंगो"}
+        }
+        "America:Sao_Paulo"{
+            ec{"साओ पावलो"}
+        }
+        "America:Scoresbysund"{
+            ec{"इटोकॉरटॉर्मीट"}
+        }
+        "America:Sitka"{
+            ec{"सिट्का"}
+        }
+        "America:St_Barthelemy"{
+            ec{"सेंट बार्थेलेमी"}
+        }
+        "America:St_Johns"{
+            ec{"सेंट जॉन्स"}
+        }
+        "America:St_Kitts"{
+            ec{"सेंट किट्स"}
+        }
+        "America:St_Lucia"{
+            ec{"सेंट लुसीया"}
+        }
+        "America:St_Thomas"{
+            ec{"सेंट थॉमस"}
+        }
+        "America:St_Vincent"{
+            ec{"सेंट विन्सेंट"}
+        }
+        "America:Swift_Current"{
+            ec{"स्विफ्ट करंट"}
+        }
+        "America:Tegucigalpa"{
+            ec{"तेगुसिगल्पा"}
+        }
+        "America:Thule"{
+            ec{"थुले"}
+        }
+        "America:Thunder_Bay"{
+            ec{"थंडर बे"}
+        }
+        "America:Tijuana"{
+            ec{"तिजुआना"}
+        }
+        "America:Toronto"{
+            ec{"टॉरंटो"}
+        }
+        "America:Tortola"{
+            ec{"टोरटोला"}
+        }
+        "America:Vancouver"{
+            ec{"व्हँकुव्हर"}
+        }
+        "America:Whitehorse"{
+            ec{"व्हायटहॉर्स"}
+        }
+        "America:Winnipeg"{
+            ec{"विनीपेग"}
+        }
+        "America:Yakutat"{
+            ec{"याकुटाट"}
+        }
+        "America:Yellowknife"{
+            ec{"यलोक्नायफ"}
+        }
+        "Antarctica:Casey"{
+            ec{"केसी"}
+        }
+        "Antarctica:Davis"{
+            ec{"डेव्हीस"}
+        }
+        "Antarctica:DumontDUrville"{
+            ec{"द्युमाँ दूरवीय"}
+        }
+        "Antarctica:Macquarie"{
+            ec{"मॅक्वेरी"}
+        }
+        "Antarctica:Mawson"{
+            ec{"मॉसन"}
+        }
+        "Antarctica:McMurdo"{
+            ec{"मॅकमुर्दो"}
+        }
+        "Antarctica:Palmer"{
+            ec{"पाल्मेर"}
+        }
+        "Antarctica:Rothera"{
+            ec{"रोथेरा"}
+        }
+        "Antarctica:Syowa"{
+            ec{"स्योवा"}
+        }
+        "Antarctica:Troll"{
+            ec{"ट्रोल"}
+        }
+        "Antarctica:Vostok"{
+            ec{"वोस्तोक"}
+        }
+        "Arctic:Longyearbyen"{
+            ec{"लोंगयेअरब्येन"}
+        }
+        "Asia:Aden"{
+            ec{"ऍडन"}
+        }
+        "Asia:Almaty"{
+            ec{"अल्माटी"}
+        }
+        "Asia:Amman"{
+            ec{"अम्मान"}
+        }
+        "Asia:Anadyr"{
+            ec{"अनादिर"}
+        }
+        "Asia:Aqtau"{
+            ec{"ऍक्टो"}
+        }
+        "Asia:Aqtobe"{
+            ec{"अक्टोबे"}
+        }
+        "Asia:Ashgabat"{
+            ec{"अशगाबाट"}
+        }
+        "Asia:Atyrau"{
+            ec{"अत्यारो"}
+        }
+        "Asia:Baghdad"{
+            ec{"बगदाद"}
+        }
+        "Asia:Bahrain"{
+            ec{"बेहरेन"}
+        }
+        "Asia:Baku"{
+            ec{"बाकू"}
+        }
+        "Asia:Bangkok"{
+            ec{"बँकॉक"}
+        }
+        "Asia:Barnaul"{
+            ec{"बरनौल"}
+        }
+        "Asia:Beirut"{
+            ec{"बेरूत"}
+        }
+        "Asia:Bishkek"{
+            ec{"बिश्केक"}
+        }
+        "Asia:Brunei"{
+            ec{"ब्रूनेई"}
+        }
+        "Asia:Calcutta"{
+            ec{"कोलकाता"}
+        }
+        "Asia:Chita"{
+            ec{"चिटा"}
+        }
+        "Asia:Choibalsan"{
+            ec{"चोईबाल्सन"}
+        }
+        "Asia:Colombo"{
+            ec{"कोलंबो"}
+        }
+        "Asia:Damascus"{
+            ec{"दमस्कस"}
+        }
+        "Asia:Dhaka"{
+            ec{"ढाका"}
+        }
+        "Asia:Dili"{
+            ec{"दिली"}
+        }
+        "Asia:Dubai"{
+            ec{"दुबय"}
+        }
+        "Asia:Dushanbe"{
+            ec{"दुशान्बे"}
+        }
+        "Asia:Famagusta"{
+            ec{"फमागुस्ता"}
+        }
+        "Asia:Gaza"{
+            ec{"गाझा"}
+        }
+        "Asia:Hebron"{
+            ec{"हेब्रॉन"}
+        }
+        "Asia:Hong_Kong"{
+            ec{"हाँग काँग"}
+        }
+        "Asia:Hovd"{
+            ec{"होव्हड"}
+        }
+        "Asia:Irkutsk"{
+            ec{"इर्कुटस्क"}
+        }
+        "Asia:Jakarta"{
+            ec{"जकार्ता"}
+        }
+        "Asia:Jayapura"{
+            ec{"जायापुरा"}
+        }
+        "Asia:Jerusalem"{
+            ec{"जेरुसालेम"}
+        }
+        "Asia:Kabul"{
+            ec{"काबुल"}
+        }
+        "Asia:Kamchatka"{
+            ec{"कामचाट्का"}
+        }
+        "Asia:Karachi"{
+            ec{"कराची"}
+        }
+        "Asia:Katmandu"{
+            ec{"काठमांडू"}
+        }
+        "Asia:Khandyga"{
+            ec{"खा़ंडिगा"}
+        }
+        "Asia:Krasnoyarsk"{
+            ec{"क्रास्नोयार्स्क"}
+        }
+        "Asia:Kuala_Lumpur"{
+            ec{"कुआलालम्पूर"}
+        }
+        "Asia:Kuching"{
+            ec{"कुचींग"}
+        }
+        "Asia:Kuwait"{
+            ec{"कुवेत"}
+        }
+        "Asia:Macau"{
+            ec{"मकाव"}
+        }
+        "Asia:Magadan"{
+            ec{"मगादान"}
+        }
+        "Asia:Makassar"{
+            ec{"मकास्सार"}
+        }
+        "Asia:Manila"{
+            ec{"मनिला"}
+        }
+        "Asia:Muscat"{
+            ec{"मस्कट"}
+        }
+        "Asia:Nicosia"{
+            ec{"निकोसिया"}
+        }
+        "Asia:Novokuznetsk"{
+            ec{"नोवोकुझनेत्स्क"}
+        }
+        "Asia:Novosibirsk"{
+            ec{"नोवोसिबिर्स्क"}
+        }
+        "Asia:Omsk"{
+            ec{"ओम्स्क"}
+        }
+        "Asia:Oral"{
+            ec{"ओरल"}
+        }
+        "Asia:Phnom_Penh"{
+            ec{"फ्नोम पेन्ह"}
+        }
+        "Asia:Pontianak"{
+            ec{"पोण्टीअनाक"}
+        }
+        "Asia:Pyongyang"{
+            ec{"प्योंगयांग"}
+        }
+        "Asia:Qatar"{
+            ec{"कतार"}
+        }
+        "Asia:Qostanay"{
+            ec{"कोस्टानाय"}
+        }
+        "Asia:Qyzylorda"{
+            ec{"क्य्ज्यलॉरडा"}
+        }
+        "Asia:Rangoon"{
+            ec{"यानगॉन"}
+        }
+        "Asia:Riyadh"{
+            ec{"रियाध"}
+        }
+        "Asia:Saigon"{
+            ec{"हो ची मिन्ह"}
+        }
+        "Asia:Sakhalin"{
+            ec{"सखलिन"}
+        }
+        "Asia:Samarkand"{
+            ec{"समरकंद"}
+        }
+        "Asia:Seoul"{
+            ec{"सोल"}
+        }
+        "Asia:Shanghai"{
+            ec{"शांघाय"}
+        }
+        "Asia:Singapore"{
+            ec{"सिंगापूर"}
+        }
+        "Asia:Srednekolymsk"{
+            ec{"स्रेदनेकॉलय्मस्क"}
+        }
+        "Asia:Taipei"{
+            ec{"तैपेई"}
+        }
+        "Asia:Tashkent"{
+            ec{"ताश्कंद"}
+        }
+        "Asia:Tbilisi"{
+            ec{"तुबलीसी"}
+        }
+        "Asia:Tehran"{
+            ec{"तेहरान"}
+        }
+        "Asia:Thimphu"{
+            ec{"थिम्फू"}
+        }
+        "Asia:Tokyo"{
+            ec{"तोक्यो"}
+        }
+        "Asia:Tomsk"{
+            ec{"टॉमस्क"}
+        }
+        "Asia:Ulaanbaatar"{
+            ec{"उलानबतार"}
+        }
+        "Asia:Urumqi"{
+            ec{"उरुम्की"}
+        }
+        "Asia:Ust-Nera"{
+            ec{"उस्त नेरा"}
+        }
+        "Asia:Vientiane"{
+            ec{"व्हिएन्टियन"}
+        }
+        "Asia:Vladivostok"{
+            ec{"व्लादिवोस्तोक"}
+        }
+        "Asia:Yakutsk"{
+            ec{"यकुत्स्क"}
+        }
+        "Asia:Yekaterinburg"{
+            ec{"येकातेरिनबर्ग"}
+        }
+        "Asia:Yerevan"{
+            ec{"येरेवान"}
+        }
+        "Atlantic:Azores"{
+            ec{"अझोरेस"}
+        }
+        "Atlantic:Bermuda"{
+            ec{"बर्मुडा"}
+        }
+        "Atlantic:Canary"{
+            ec{"कॅनरी"}
+        }
+        "Atlantic:Cape_Verde"{
+            ec{"केप वर्दे"}
+        }
+        "Atlantic:Faeroe"{
+            ec{"फैरो"}
+        }
+        "Atlantic:Madeira"{
+            ec{"मदिरा"}
+        }
+        "Atlantic:Reykjavik"{
+            ec{"रिक्जेविक"}
+        }
+        "Atlantic:South_Georgia"{
+            ec{"दक्षिण जॉर्जिया"}
+        }
+        "Atlantic:St_Helena"{
+            ec{"सें. हेलेना"}
+        }
+        "Atlantic:Stanley"{
+            ec{"स्टेन्ले"}
+        }
+        "Australia:Adelaide"{
+            ec{"एडिलेड"}
+        }
+        "Australia:Brisbane"{
+            ec{"ब्रिस्बेन"}
+        }
+        "Australia:Broken_Hill"{
+            ec{"ब्रोकन हिल"}
+        }
+        "Australia:Currie"{
+            ec{"क्युरी"}
+        }
+        "Australia:Darwin"{
+            ec{"डार्विन"}
+        }
+        "Australia:Eucla"{
+            ec{"उक्ला"}
+        }
+        "Australia:Hobart"{
+            ec{"होबार्ट"}
+        }
+        "Australia:Lindeman"{
+            ec{"लिडेमॅन"}
+        }
+        "Australia:Lord_Howe"{
+            ec{"लॉर्ड होवे"}
+        }
+        "Australia:Melbourne"{
+            ec{"मेलबर्न"}
+        }
+        "Australia:Perth"{
+            ec{"पर्थ"}
+        }
+        "Australia:Sydney"{
+            ec{"सिडनी"}
+        }
+        "Etc:UTC"{
+            ls{"समन्वित वैश्विक वेळ"}
+        }
+        "Etc:Unknown"{
+            ec{"अज्ञात शार"}
+        }
+        "Europe:Amsterdam"{
+            ec{"ऍम्स्टरडॅम"}
+        }
+        "Europe:Andorra"{
+            ec{"अंडोरा"}
+        }
+        "Europe:Astrakhan"{
+            ec{"आस्ट्रखन"}
+        }
+        "Europe:Athens"{
+            ec{"अथेन्स"}
+        }
+        "Europe:Belgrade"{
+            ec{"बेलग्रेड"}
+        }
+        "Europe:Berlin"{
+            ec{"बर्लिन"}
+        }
+        "Europe:Bratislava"{
+            ec{"ब्राटिस्लाव्हा"}
+        }
+        "Europe:Brussels"{
+            ec{"ब्रुसेल्स"}
+        }
+        "Europe:Bucharest"{
+            ec{"बुखारेस्ट"}
+        }
+        "Europe:Budapest"{
+            ec{"बुडापेस्ट"}
+        }
+        "Europe:Busingen"{
+            ec{"बुसिंजेन"}
+        }
+        "Europe:Chisinau"{
+            ec{"चिसीनाऊ"}
+        }
+        "Europe:Copenhagen"{
+            ec{"कोपनहेगन"}
+        }
+        "Europe:Dublin"{
+            ec{"डब्लिन"}
+            ld{"आयरिश प्रमाणित वेळ"}
+        }
+        "Europe:Gibraltar"{
+            ec{"जिब्राल्टर"}
+        }
+        "Europe:Guernsey"{
+            ec{"गर्नसी"}
+        }
+        "Europe:Helsinki"{
+            ec{"हेलसिंकी"}
+        }
+        "Europe:Isle_of_Man"{
+            ec{"इसले ऑफ मॅन"}
+        }
+        "Europe:Istanbul"{
+            ec{"इस्तंबूल"}
+        }
+        "Europe:Jersey"{
+            ec{"जर्सी"}
+        }
+        "Europe:Kaliningrad"{
+            ec{"कालिनिनग्राड"}
+        }
+        "Europe:Kiev"{
+            ec{"कीव"}
+        }
+        "Europe:Kirov"{
+            ec{"किरोव"}
+        }
+        "Europe:Lisbon"{
+            ec{"लिस्बन"}
+        }
+        "Europe:Ljubljana"{
+            ec{"जुब्लजाना"}
+        }
+        "Europe:London"{
+            ec{"लंडन"}
+            ld{"ब्रिटिश ग्रीष्म वेळ"}
+        }
+        "Europe:Luxembourg"{
+            ec{"लक्सेमबर्ग"}
+        }
+        "Europe:Madrid"{
+            ec{"माद्रीद"}
+        }
+        "Europe:Malta"{
+            ec{"माल्टा"}
+        }
+        "Europe:Mariehamn"{
+            ec{"मॅरीहाम्न"}
+        }
+        "Europe:Minsk"{
+            ec{"मिंस्क"}
+        }
+        "Europe:Monaco"{
+            ec{"मोनॅको"}
+        }
+        "Europe:Moscow"{
+            ec{"मॉस्को"}
+        }
+        "Europe:Oslo"{
+            ec{"ओस्लो"}
+        }
+        "Europe:Paris"{
+            ec{"पॅरिस"}
+        }
+        "Europe:Podgorica"{
+            ec{"पॉडगोरिका"}
+        }
+        "Europe:Prague"{
+            ec{"प्राग"}
+        }
+        "Europe:Riga"{
+            ec{"रीगा"}
+        }
+        "Europe:Rome"{
+            ec{"रोम"}
+        }
+        "Europe:Samara"{
+            ec{"समारा"}
+        }
+        "Europe:San_Marino"{
+            ec{"सॅन मारीनो"}
+        }
+        "Europe:Sarajevo"{
+            ec{"साराजिवो"}
+        }
+        "Europe:Saratov"{
+            ec{"साराटोव"}
+        }
+        "Europe:Simferopol"{
+            ec{"सिमफरोपोल"}
+        }
+        "Europe:Skopje"{
+            ec{"स्कोप्जे"}
+        }
+        "Europe:Sofia"{
+            ec{"सोफिया"}
+        }
+        "Europe:Stockholm"{
+            ec{"स्टॉकहोम"}
+        }
+        "Europe:Tallinn"{
+            ec{"टॅलिन"}
+        }
+        "Europe:Tirane"{
+            ec{"तिराना"}
+        }
+        "Europe:Ulyanovsk"{
+            ec{"उल्यानोव्स्क"}
+        }
+        "Europe:Uzhgorod"{
+            ec{"उझगोरोड"}
+        }
+        "Europe:Vaduz"{
+            ec{"वडुज"}
+        }
+        "Europe:Vatican"{
+            ec{"वॅटिकन"}
+        }
+        "Europe:Vienna"{
+            ec{"वियेना"}
+        }
+        "Europe:Vilnius"{
+            ec{"विल्नियस"}
+        }
+        "Europe:Volgograd"{
+            ec{"व्होल्गोग्राड"}
+        }
+        "Europe:Warsaw"{
+            ec{"वारसॉ"}
+        }
+        "Europe:Zagreb"{
+            ec{"झाग्रेब"}
+        }
+        "Europe:Zaporozhye"{
+            ec{"झापोरोझे"}
+        }
+        "Europe:Zurich"{
+            ec{"झुरिच"}
+        }
+        "Indian:Antananarivo"{
+            ec{"अंटानानारिवो"}
+        }
+        "Indian:Chagos"{
+            ec{"चागोस"}
+        }
+        "Indian:Christmas"{
+            ec{"क्रिसमस"}
+        }
+        "Indian:Cocos"{
+            ec{"कोकोस"}
+        }
+        "Indian:Comoro"{
+            ec{"कोमोरो"}
+        }
+        "Indian:Kerguelen"{
+            ec{"केरगुलेन"}
+        }
+        "Indian:Mahe"{
+            ec{"माहे"}
+        }
+        "Indian:Maldives"{
+            ec{"मालदीव"}
+        }
+        "Indian:Mauritius"{
+            ec{"मॉरिशस"}
+        }
+        "Indian:Mayotte"{
+            ec{"मेयोट"}
+        }
+        "Indian:Reunion"{
+            ec{"रियुनियन"}
+        }
+        "Pacific:Apia"{
+            ec{"अपिया"}
+        }
+        "Pacific:Auckland"{
+            ec{"ऑकलँड"}
+        }
+        "Pacific:Bougainville"{
+            ec{"बोगेनविले"}
+        }
+        "Pacific:Chatham"{
+            ec{"चॅथम"}
+        }
+        "Pacific:Easter"{
+            ec{"ईस्टर"}
+        }
+        "Pacific:Efate"{
+            ec{"इफेट"}
+        }
+        "Pacific:Enderbury"{
+            ec{"इंडरबरी"}
+        }
+        "Pacific:Fakaofo"{
+            ec{"फाकाओफो"}
+        }
+        "Pacific:Fiji"{
+            ec{"फिजी"}
+        }
+        "Pacific:Funafuti"{
+            ec{"फुनाफुटी"}
+        }
+        "Pacific:Galapagos"{
+            ec{"गालापागोस"}
+        }
+        "Pacific:Gambier"{
+            ec{"गाम्बियर"}
+        }
+        "Pacific:Guadalcanal"{
+            ec{"ग्वादालकॅनाल"}
+        }
+        "Pacific:Guam"{
+            ec{"गुआम"}
+        }
+        "Pacific:Johnston"{
+            ec{"जॉन्स्टन"}
+        }
+        "Pacific:Kiritimati"{
+            ec{"किरितिमाती"}
+        }
+        "Pacific:Kosrae"{
+            ec{"कोसरे"}
+        }
+        "Pacific:Kwajalein"{
+            ec{"क्वाजलेन"}
+        }
+        "Pacific:Majuro"{
+            ec{"माजुरो"}
+        }
+        "Pacific:Marquesas"{
+            ec{"मार्किसस"}
+        }
+        "Pacific:Midway"{
+            ec{"मिडवे"}
+        }
+        "Pacific:Nauru"{
+            ec{"नावरू"}
+        }
+        "Pacific:Niue"{
+            ec{"नीयू"}
+        }
+        "Pacific:Norfolk"{
+            ec{"नॉरफोक"}
+        }
+        "Pacific:Noumea"{
+            ec{"नूमेआ"}
+        }
+        "Pacific:Pago_Pago"{
+            ec{"पागो पागो"}
+        }
+        "Pacific:Palau"{
+            ec{"पलाऊ"}
+        }
+        "Pacific:Pitcairn"{
+            ec{"पिटकॅरन"}
+        }
+        "Pacific:Ponape"{
+            ec{"पोह्नपेई"}
+        }
+        "Pacific:Port_Moresby"{
+            ec{"पोर्ट मॉरेस्बी"}
+        }
+        "Pacific:Rarotonga"{
+            ec{"रारोटोंगा"}
+        }
+        "Pacific:Saipan"{
+            ec{"सायपान"}
+        }
+        "Pacific:Tahiti"{
+            ec{"ताहिती"}
+        }
+        "Pacific:Tarawa"{
+            ec{"तारवा"}
+        }
+        "Pacific:Tongatapu"{
+            ec{"टोंगाटापू"}
+        }
+        "Pacific:Truk"{
+            ec{"चुक"}
+        }
+        "Pacific:Wake"{
+            ec{"वैक"}
+        }
+        "Pacific:Wallis"{
+            ec{"वालिस"}
+        }
+        "meta:Afghanistan"{
+            ls{"अफगानिस्तान वेळ"}
+        }
+        "meta:Africa_Central"{
+            ls{"मध्य आफ्रिका वेळ"}
+        }
+        "meta:Africa_Eastern"{
+            ls{"उदेंत आफ्रिका वेळ"}
+        }
+        "meta:Africa_Southern"{
+            ls{"दक्षिण आफ्रिका प्रमाणित वेळ"}
+        }
+        "meta:Africa_Western"{
+            ld{"अस्तंत आफ्रिका ग्रीष्म वेळ"}
+            lg{"अस्तंत आफ्रिका वेळ"}
+            ls{"अस्तंत आफ्रिका प्रमाणित वेळ"}
+        }
+        "meta:Alaska"{
+            ld{"अलास्का डेलायट वेळ"}
+            lg{"अलास्का वेळ"}
+            ls{"अलास्का प्रमाणीत वेळ"}
+        }
+        "meta:Amazon"{
+            ld{"अमेझोन ग्रीष्म वेळ"}
+            lg{"अमेझोन वेळ"}
+            ls{"अमेझोन प्रमाणित वेळ"}
+        }
+        "meta:America_Central"{
+            ld{"मध्य डेलायट वेळ"}
+            lg{"मध्य वेळ"}
+            ls{"मध्य प्रमाणित वेळ"}
+        }
+        "meta:America_Eastern"{
+            ld{"उदेंत डेलायट वेळ"}
+            lg{"उदेंत वेळ"}
+            ls{"उदेंत प्रमाणित वेळ"}
+        }
+        "meta:America_Mountain"{
+            ld{"पर्वतीय डेलायट वेळ"}
+            lg{"पर्वतीय वेळ"}
+            ls{"पर्वतीय प्रमाणित वेळ"}
+        }
+        "meta:America_Pacific"{
+            ld{"प्रशांत डेलायट वेळ"}
+            lg{"प्रशांत वेळ"}
+            ls{"प्रशांत प्रमाणित वेळ"}
+        }
+        "meta:Apia"{
+            ld{"अपिया डेलायट वेळ"}
+            lg{"अपिया वेळ"}
+            ls{"अपिया प्रमाणित वेळ"}
+        }
+        "meta:Arabian"{
+            ld{"अरबी डेलायट वेळ"}
+            lg{"अरबी वेळ"}
+            ls{"अरबी प्रमाणित वेळ"}
+        }
+        "meta:Argentina"{
+            ld{"अर्जेंटिना ग्रीष्म वेळ"}
+            lg{"अर्जेंटिना वेळ"}
+            ls{"अर्जेंटिना प्रमाणित वेळ"}
+        }
+        "meta:Argentina_Western"{
+            ld{"अस्तंत अर्जेंटिना ग्रीष्म वेळ"}
+            lg{"अस्तंत अर्जेंटिना वेळ"}
+            ls{"अस्तंत अर्जेंटिना प्रमाणित वेळ"}
+        }
+        "meta:Armenia"{
+            ld{"आर्मेनिया ग्रीष्म वेळ"}
+            lg{"आर्मेनिया वेळ"}
+            ls{"आर्मेनिया प्रमाणित वेळ"}
+        }
+        "meta:Atlantic"{
+            ld{"अटलांटीक डेलायट वेळ"}
+            lg{"अटलांटीक वेळ"}
+            ls{"अटलांटीक प्रमाणित वेळ"}
+        }
+        "meta:Australia_Central"{
+            ld{"ऑस्ट्रेलीयन मध्य डेलायट वेळ"}
+            lg{"मध्य ऑस्ट्रेलीया वेळ"}
+            ls{"ऑस्ट्रेलीयन मध्य प्रमाणित वेळ"}
+        }
+        "meta:Australia_CentralWestern"{
+            ld{"ऑस्ट्रेलीयन मध्य अस्तंत डेलायट वेळ"}
+            lg{"ऑस्ट्रेलीयन मध्य अस्तंत वेळ"}
+            ls{"ऑस्ट्रेलीयन मध्य अस्तंत प्रमाणित वेळ"}
+        }
+        "meta:Australia_Eastern"{
+            ld{"ऑस्ट्रेलीयन उदेंत डेलायट वेळ"}
+            lg{"उदेंत ऑस्ट्रेलीया वेळ"}
+            ls{"ऑस्ट्रेलीयन उदेंत प्रमाणित वेळ"}
+        }
+        "meta:Australia_Western"{
+            ld{"ऑस्ट्रेलीयन अस्तंत डेलायट वेळ"}
+            lg{"अस्तंत ऑस्ट्रेलीया वेळ"}
+            ls{"ऑस्ट्रेलीयन अस्तंत प्रमाणित वेळ"}
+        }
+        "meta:Azerbaijan"{
+            ld{"अजरबैजान ग्रीष्म वेळ"}
+            lg{"अजरबैजान वेळ"}
+            ls{"अजरबैजान प्रमाणित वेळ"}
+        }
+        "meta:Azores"{
+            ld{"अझोरेस ग्रीष्म वेळ"}
+            lg{"अझोरेस"}
+            ls{"अझोरेस प्रमाणित वेळ"}
+        }
+        "meta:Bangladesh"{
+            ld{"बांगलादेश ग्रीष्म वेळ"}
+            lg{"बांगलादेश वेळ"}
+            ls{"बांगलादेश प्रमाणित वेळ"}
+        }
+        "meta:Bhutan"{
+            ls{"भूतान"}
+        }
+        "meta:Bolivia"{
+            ls{"बोलिव्हिया वेळ"}
+        }
+        "meta:Brasilia"{
+            ld{"ब्राझिलिया ग्रीष्म वेळ"}
+            lg{"ब्राझिलिया वेळ"}
+            ls{"ब्राझिलिया प्रमाणित वेळ"}
+        }
+        "meta:Brunei"{
+            ls{"ब्रुनेइ दारूस्सलाम वेळ"}
+        }
+        "meta:Cape_Verde"{
+            ld{"केप वर्दे ग्रीष्म वेळ"}
+            lg{"केप वर्दे वेळ"}
+            ls{"केप वर्दे प्रमाणित वेळ"}
+        }
+        "meta:Chamorro"{
+            ls{"कॅमोरा प्रमाणित वेळ"}
+        }
+        "meta:Chatham"{
+            ld{"चॅथम डेलायट वेळ"}
+            lg{"चॅथम वेळ"}
+            ls{"चॅथम प्रमाणित वेळ"}
+        }
+        "meta:Chile"{
+            ld{"चिली ग्रीष्म वेळ"}
+            lg{"चिली वेळ"}
+            ls{"चिली प्रमाणित वेळ"}
+        }
+        "meta:China"{
+            ld{"चीन डेलायट वेळ"}
+            lg{"चीन वेळ"}
+            ls{"चीन प्रमाणित वेळ"}
+        }
+        "meta:Choibalsan"{
+            ld{"चोईबाल्सन ग्रीष्म वेळ"}
+            lg{"चोईबाल्सन वेळ"}
+            ls{"चोईबाल्सन प्रमाणित वेळ"}
+        }
+        "meta:Christmas"{
+            ls{"क्रिसमस आयलँड वेळ"}
+        }
+        "meta:Cocos"{
+            ls{"कोकोस आयलँड वेळ"}
+        }
+        "meta:Colombia"{
+            ld{"कोलंबिया ग्रीष्म वेळ"}
+            lg{"कोलंबिया वेळ"}
+            ls{"कोलंबिया प्रमाणित वेळ"}
+        }
+        "meta:Cook"{
+            ld{"कूक आयलँड अर्द ग्रीष्म वेळ"}
+            lg{"कूक आयलँड वेळ"}
+            ls{"कूक आयलँड प्रमाणित वेळ"}
+        }
+        "meta:Cuba"{
+            ld{"क्युबा डेलायट वेळ"}
+            lg{"क्युबा वेळ"}
+            ls{"क्युबा प्रमाणीत वेळ"}
+        }
+        "meta:Davis"{
+            ls{"डेव्हीस वेळ"}
+        }
+        "meta:DumontDUrville"{
+            ls{"द्युमाँ दूरवीय वेळ"}
+        }
+        "meta:East_Timor"{
+            ls{"उदेंत तिमोर वेळ"}
+        }
+        "meta:Easter"{
+            ld{"ईस्टर आयलँड ग्रीष्म वेळ"}
+            lg{"ईस्टर आयलँड वेळ"}
+            ls{"ईस्टर आयलँड प्रमाणित वेळ"}
+        }
+        "meta:Ecuador"{
+            ls{"इक्वेडोर वेळ"}
+        }
+        "meta:Europe_Central"{
+            ld{"मध्य युरोपियन ग्रीष्म वेळ"}
+            lg{"मध्य युरोपियन वेळ"}
+            ls{"मध्य युरोपियन प्रमाणित वेळ"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"उदेंत युरोपियन ग्रीष्म वेळ"}
+            lg{"उदेंत युरोपियन वेळ"}
+            ls{"उदेंत युरोपियन प्रमाणित वेळ"}
+        }
+        "meta:Europe_Further_Eastern"{
+            ls{"आनीक-उदेंत युरोपियन वेळ"}
+        }
+        "meta:Europe_Western"{
+            ld{"अस्तंत युरोपियन ग्रीष्म वेळ"}
+            lg{"अस्तंत युरोपियन वेळ"}
+            ls{"अस्तंत युरोपियन प्रमाणित वेळ"}
+        }
+        "meta:Falkland"{
+            ld{"फॉकलँड आयलँड्स ग्रीष्म वेळ"}
+            lg{"फॉकलँड आयलँड्स वेळ"}
+            ls{"फॉकलँड आयलँड्स प्रमाणित वेळ"}
+        }
+        "meta:Fiji"{
+            ld{"फिजी ग्रीष्म वेळ"}
+            lg{"फिजी वेळ"}
+            ls{"फिजी प्रमाणित वेळ"}
+        }
+        "meta:French_Guiana"{
+            ls{"फ्रेंच गयाना वेळ"}
+        }
+        "meta:French_Southern"{
+            ls{"फ्रेन्च दक्षिण आनी अंटार्क्टिक वेळ"}
+        }
+        "meta:GMT"{
+            ls{"ग्रीनविच मध्य वेळ"}
+        }
+        "meta:Galapagos"{
+            ls{"गालापागोस वेळ"}
+        }
+        "meta:Gambier"{
+            ls{"गाम्बियर वेळ"}
+        }
+        "meta:Georgia"{
+            ld{"जॉर्जिया ग्रीष्म वेळ"}
+            lg{"जॉर्जिया वेळ"}
+            ls{"जॉर्जिया प्रमाणित वेळ"}
+        }
+        "meta:Gilbert_Islands"{
+            ls{"गिल्बर्ट आयलँड वेळ"}
+        }
+        "meta:Greenland_Eastern"{
+            ld{"उदेंत ग्रीनलँड ग्रीष्म वेळ"}
+            lg{"उदेंत ग्रीनलँड वेळ"}
+            ls{"उदेंत ग्रीनलँड प्रमाणीत वेळ"}
+        }
+        "meta:Greenland_Western"{
+            ld{"अस्तंत ग्रीनलँड ग्रीष्म वेळ"}
+            lg{"अस्तंत ग्रीनलँड वेळ"}
+            ls{"अस्तंत ग्रीनलँड प्रमाणीत वेळ"}
+        }
+        "meta:Gulf"{
+            ls{"गल्फ प्रमाणित वेळ"}
+        }
+        "meta:Guyana"{
+            ls{"गुयाना वेळ"}
+        }
+        "meta:Hawaii_Aleutian"{
+            ld{"हवाई-अलेयुशिन डेलायट वेळ"}
+            lg{"हवाई-अलेयुशिन वेळ"}
+            ls{"हवाई-अलेयुशिन प्रमाणीत वेळ"}
+        }
+        "meta:Hong_Kong"{
+            ld{"हाँग काँग ग्रीष्म वेळ"}
+            lg{"हाँग काँग वेळ"}
+            ls{"हाँग काँग प्रमाणित वेळ"}
+        }
+        "meta:Hovd"{
+            ld{"होव्हड ग्रीष्म वेळ"}
+            lg{"होव्हड"}
+            ls{"होव्हड प्रमाणित वेळ"}
+        }
+        "meta:India"{
+            ls{"भारतीय प्रमाणित वेळ"}
+            ss{"IST"}
+        }
+        "meta:Indian_Ocean"{
+            ls{"हिंद म्हासागर वेळ"}
+        }
+        "meta:Indochina"{
+            ls{"इंडोचीन वेळ"}
+        }
+        "meta:Indonesia_Central"{
+            ls{"मध्य इंडोनेशिया वेळ"}
+        }
+        "meta:Indonesia_Eastern"{
+            ls{"उदेंत इंडोनेशिया वेळ"}
+        }
+        "meta:Indonesia_Western"{
+            ls{"अस्तंत इंडोनेशिया वेळ"}
+        }
+        "meta:Iran"{
+            ld{"इरान डेलायट वेळ"}
+            lg{"इरान"}
+            ls{"इरान प्रमाणित वेळ"}
+        }
+        "meta:Irkutsk"{
+            ld{"ईर्कुटस्क ग्रीष्म वेळ"}
+            lg{"इर्कुटस्क वेळ"}
+            ls{"ईर्कुटस्क प्रमाणित वेळ"}
+        }
+        "meta:Israel"{
+            ld{"इज़राइल डेलायट वेळ"}
+            lg{"इज़राइल वेळ"}
+            ls{"इज़राइल प्रमाणित वेळ"}
+        }
+        "meta:Japan"{
+            ld{"जपान डेलायट वेळ"}
+            lg{"जपान वेळ"}
+            ls{"जपान प्रमाणित वेळ"}
+        }
+        "meta:Kazakhstan_Eastern"{
+            ls{"उदेंत कझाकस्तान वेळ"}
+        }
+        "meta:Kazakhstan_Western"{
+            ls{"अस्तंत कझाकस्तान वेळ"}
+        }
+        "meta:Korea"{
+            ld{"कोरियन डेलायट वेळ"}
+            lg{"कोरियन वेळ"}
+            ls{"कोरियन प्रमाणित वेळ"}
+        }
+        "meta:Kosrae"{
+            ls{"कोसरे वेळ"}
+        }
+        "meta:Krasnoyarsk"{
+            ld{"क्रास्नोयार्स्क ग्रीष्म वेळ"}
+            lg{"क्रास्नोयार्स्क वेळ"}
+            ls{"क्रास्नोयार्स्क प्रमाणित वेळ"}
+        }
+        "meta:Kyrgystan"{
+            ls{"किर्गिज़स्तान वेळ"}
+        }
+        "meta:Line_Islands"{
+            ls{"लायन आयलँड वेळ"}
+        }
+        "meta:Lord_Howe"{
+            ld{"लॉर्ड होवे डेलायट वेळ"}
+            lg{"लॉर्ड होवे वेळ"}
+            ls{"लॉर्ड होवे प्रमाणित वेळ"}
+        }
+        "meta:Macquarie"{
+            ls{"मॅक्वेरी आयलँड वेळ"}
+        }
+        "meta:Magadan"{
+            ld{"मगादान ग्रीष्म वेळ"}
+            lg{"मगादान वेळ"}
+            ls{"मगादान प्रमाणित वेळ"}
+        }
+        "meta:Malaysia"{
+            ls{"मलेशिया वेळ"}
+        }
+        "meta:Maldives"{
+            ls{"मालदीव वेळ"}
+        }
+        "meta:Marquesas"{
+            ls{"मार्किसस वेळ"}
+        }
+        "meta:Marshall_Islands"{
+            ls{"मार्शल आयलँड वेळ"}
+        }
+        "meta:Mauritius"{
+            ld{"मॉरिशस ग्रीष्म वेळ"}
+            lg{"मॉरिशस वेळ"}
+            ls{"मॉरिशस प्रमाणित वेळ"}
+        }
+        "meta:Mawson"{
+            ls{"मॉसन वेळ"}
+        }
+        "meta:Mexico_Northwest"{
+            ld{"वायव्य मेक्सिको डेलायट वेळ"}
+            lg{"वायव्य मेक्सिको वेळ"}
+            ls{"वायव्य मेक्सिको प्रमाणीत वेळ"}
+        }
+        "meta:Mexico_Pacific"{
+            ld{"मेक्सिकन प्रशांत डेलायट वेळ"}
+            lg{"मेक्सिकन प्रशांत वेळ"}
+            ls{"मेक्सिकन प्रशांत प्रमाणीत वेळ"}
+        }
+        "meta:Mongolia"{
+            ld{"उलानबतार ग्रीष्म वेळ"}
+            lg{"उलानबतार वेळ"}
+            ls{"उलानबतार प्रमाणित वेळ"}
+        }
+        "meta:Moscow"{
+            ld{"मॉस्को ग्रीष्म वेळ"}
+            lg{"मॉस्को वेळ"}
+            ls{"मॉस्को प्रमाणित वेळ"}
+        }
+        "meta:Myanmar"{
+            ls{"म्यानमार वेळ"}
+        }
+        "meta:Nauru"{
+            ls{"नरू वेळ"}
+        }
+        "meta:Nepal"{
+            ls{"नेपाळ वेळ"}
+        }
+        "meta:New_Caledonia"{
+            ld{"न्यु कॅलेडोनिया ग्रीष्म वेळ"}
+            lg{"न्यु कॅलेडोनिया वेळ"}
+            ls{"न्यु कॅलेडोनिया प्रमाणित वेळ"}
+        }
+        "meta:New_Zealand"{
+            ld{"न्युझीलॅन्ड डेलायट वेळ"}
+            lg{"न्युझीलॅन्ड वेळ"}
+            ls{"न्युझीलॅन्ड प्रमाणित वेळ"}
+        }
+        "meta:Newfoundland"{
+            ld{"न्युफावंडलँड डेलायट वेळ"}
+            lg{"न्युफावंडलँड वेळ"}
+            ls{"न्युफावंडलँड प्रमाणीत वेळ"}
+        }
+        "meta:Niue"{
+            ls{"न्युए वेळ"}
+        }
+        "meta:Norfolk"{
+            ld{"नॉरफॉक आयलँड ग्रीष्म वेळ"}
+            lg{"नॉरफॉक आयलँड वेळ"}
+            ls{"नॉरफॉक आयलँड प्रमाणित वेळ"}
+        }
+        "meta:Noronha"{
+            ld{"फर्नांडो दी नोरोन्हा ग्रीष्म वेळ"}
+            lg{"फर्नांडो दी नोरोन्हा वेळ"}
+            ls{"फर्नांडो दी नोरोन्हा प्रमाणित वेळ"}
+        }
+        "meta:Novosibirsk"{
+            ld{"नोवोसिबिर्स्क ग्रीष्म वेळ"}
+            lg{"नोवोसिबिर्स्क"}
+            ls{"नोवोसिबिर्स्क प्रमाणित वेळ"}
+        }
+        "meta:Omsk"{
+            ld{"ओम्स्क ग्रीष्म वेळ"}
+            lg{"ओम्स्क वेळ"}
+            ls{"ओम्स्क प्रमाणित वेळ"}
+        }
+        "meta:Pakistan"{
+            ld{"पाकिस्तान ग्रीष्म वेळ"}
+            lg{"पाकिस्तान"}
+            ls{"पाकिस्तान प्रमाणित वेळ"}
+        }
+        "meta:Palau"{
+            ls{"पलाऊ वेळ"}
+        }
+        "meta:Papua_New_Guinea"{
+            ls{"पापुआ न्यु गिनी वेळ"}
+        }
+        "meta:Paraguay"{
+            ld{"परागुआ ग्रीष्म वेळ"}
+            lg{"परागुआ वेळ"}
+            ls{"परागुआ प्रमाणित वेळ"}
+        }
+        "meta:Peru"{
+            ld{"पेरू ग्रीष्म वेळ"}
+            lg{"पेरू वेळ"}
+            ls{"पेरू प्रमाणित वेळ"}
+        }
+        "meta:Philippines"{
+            ld{"फिलिपायन ग्रीष्म वेळ"}
+            lg{"फिलिपायन वेळ"}
+            ls{"फिलिपायन प्रमाणित वेळ"}
+        }
+        "meta:Phoenix_Islands"{
+            ls{"फिनिक्स आयलँड वेळ"}
+        }
+        "meta:Pierre_Miquelon"{
+            ld{"सेंट पियर आनी मिकलान डेलायट वेळ"}
+            lg{"सेंट पियर आनी मिकलान वेळ"}
+            ls{"सेंट पियर आनी मिकलान प्रमाणीत वेळ"}
+        }
+        "meta:Pitcairn"{
+            ls{"पिटकॅरन वेळ"}
+        }
+        "meta:Ponape"{
+            ls{"पोनेप वेळ"}
+        }
+        "meta:Pyongyang"{
+            ls{"प्योंगयांग वेळ"}
+        }
+        "meta:Reunion"{
+            ls{"रियुनियन वेळ"}
+        }
+        "meta:Rothera"{
+            ls{"रोथेरा वेळ"}
+        }
+        "meta:Sakhalin"{
+            ld{"सखलिन ग्रीष्म वेळ"}
+            lg{"सखलिन वेळ"}
+            ls{"सखलिन प्रमाणित वेळ"}
+        }
+        "meta:Samoa"{
+            ld{"सामोआ डेलायट वेळ"}
+            lg{"सामोआ वेळ"}
+            ls{"सामोआ प्रमाणित वेळ"}
+        }
+        "meta:Seychelles"{
+            ls{"सेशेल्स वेळ"}
+        }
+        "meta:Singapore"{
+            ls{"सिंगापूर प्रमाणित वेळ"}
+        }
+        "meta:Solomon"{
+            ls{"सोलोमन आइलँड्स वेळ"}
+        }
+        "meta:South_Georgia"{
+            ls{"दक्षिण जॉर्जिया वेळ"}
+        }
+        "meta:Suriname"{
+            ls{"सुरिनाम वेळ"}
+        }
+        "meta:Syowa"{
+            ls{"स्योवा वेळ"}
+        }
+        "meta:Tahiti"{
+            ls{"ताहिती वेळ"}
+        }
+        "meta:Taipei"{
+            ld{"तैपेई डेलायट वेळ"}
+            lg{"तैपेई वेळ"}
+            ls{"तैपेई प्रमाणित वेळ"}
+        }
+        "meta:Tajikistan"{
+            ls{"तजीकिस्तान वेळ"}
+        }
+        "meta:Tokelau"{
+            ls{"टोकलाऊ वेळ"}
+        }
+        "meta:Tonga"{
+            ld{"टोंगा ग्रीष्म वेळ"}
+            lg{"टोंगा वेळ"}
+            ls{"टोंगा प्रमाणित वेळ"}
+        }
+        "meta:Truk"{
+            ls{"चुक वेळ"}
+        }
+        "meta:Turkmenistan"{
+            ld{"तुर्कमेनिस्तान ग्रीष्म वेळ"}
+            lg{"तुर्कमेनिस्तान"}
+            ls{"तुर्कमेनिस्तान प्रमाणित वेळ"}
+        }
+        "meta:Tuvalu"{
+            ls{"टुवालू वेळ"}
+        }
+        "meta:Uruguay"{
+            ld{"उरुग्वे ग्रीष्म वेळ"}
+            lg{"उरुग्वे वेळ"}
+            ls{"उरुग्वे प्रमाणित वेळ"}
+        }
+        "meta:Uzbekistan"{
+            ld{"उज़्बेकिस्तान ग्रीष्म वेळ"}
+            lg{"उज़्बेकिस्तान वेळ"}
+            ls{"उज़्बेकिस्तान प्रमाणित वेळ"}
+        }
+        "meta:Vanuatu"{
+            ld{"वनातू ग्रीष्म वेळ"}
+            lg{"वनातू वेळ"}
+            ls{"वनातू प्रमाणित वेळ"}
+        }
+        "meta:Venezuela"{
+            ls{"वेनेझुएला वेळ"}
+        }
+        "meta:Vladivostok"{
+            ld{"व्लादिवोस्तोक ग्रीष्म वेळ"}
+            lg{"व्लादिवोस्तोक वेळ"}
+            ls{"व्लादिवोस्तोक प्रमाणित वेळ"}
+        }
+        "meta:Volgograd"{
+            ld{"व्होल्गोग्राड ग्रीष्म वेळ"}
+            lg{"व्होल्गोग्राड वेळ"}
+            ls{"व्होल्गोग्राड प्रमाणित वेळ"}
+        }
+        "meta:Vostok"{
+            ls{"वोस्तोक वेळ"}
+        }
+        "meta:Wake"{
+            ls{"वैक आयलँड वेळ"}
+        }
+        "meta:Wallis"{
+            ls{"वालिस आनी फ्यूचूना वेळ"}
+        }
+        "meta:Yakutsk"{
+            ld{"यकुत्स्क ग्रीष्म वेळ"}
+            lg{"यकुत्स्क वेळ"}
+            ls{"यकुत्स्क प्रमाणित वेळ"}
+        }
+        "meta:Yekaterinburg"{
+            ld{"येकातेरिनबर्ग ग्रीष्म वेळ"}
+            lg{"येकातेरिनबर्ग वेळ"}
+            ls{"येकातेरिनबर्ग प्रमाणित वेळ"}
+        }
+        fallbackFormat{"{1} ({0})"}
+        gmtFormat{"GMT{0}"}
+        gmtZeroFormat{"GMT"}
+        hourFormat{"+HH:mm;-HH:mm"}
+        regionFormat{"{0} वेळ"}
+        regionFormatDaylight{"{0} डेलायट वेळ"}
+        regionFormatStandard{"{0} प्रमाणित वेळ"}
+    }
+}

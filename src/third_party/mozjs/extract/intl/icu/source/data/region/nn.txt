@@ -1,0 +1,59 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+nn{
+    %%Parent{"no"}
+    Countries{
+        001{"verda"}
+        013{"Sentral-Amerika"}
+        014{"Aust-Afrika"}
+        018{"Sørlege Afrika"}
+        021{"Nordlege Amerika"}
+        030{"Aust-Asia"}
+        035{"Søraust-Asia"}
+        151{"Aust-Europa"}
+        AE{"Dei sameinte arabiske emirata"}
+        AT{"Austerrike"}
+        BL{"Saint Barthélemy"}
+        BY{"Kviterussland"}
+        CC{"Kokosøyane"}
+        CD{"Kongo-Kinshasa"}
+        CF{"Den sentralafrikanske republikken"}
+        CI{"Elfenbeinskysten"}
+        CK{"Cookøyane"}
+        DO{"Den dominikanske republikken"}
+        EU{"Den europeiske unionen"}
+        EZ{"eurosona"}
+        FK{"Falklandsøyane"}
+        FO{"Færøyane"}
+        GS{"Sør-Georgia og Sør-Sandwichøyane"}
+        HM{"Heardøya og McDonaldøyane"}
+        IC{"Kanariøyane"}
+        KM{"Komorane"}
+        KY{"Caymanøyane"}
+        LU{"Luxembourg"}
+        MH{"Marshalløyane"}
+        MP{"Nord-Marianane"}
+        MV{"Maldivane"}
+        NO{"Noreg"}
+        PH{"Filippinane"}
+        PN{"Pitcairn"}
+        SB{"Salomonøyane"}
+        SC{"Seychellane"}
+        SH{"Saint Helena"}
+        TC{"Turks- og Caicosøyane"}
+        TF{"Dei franske sørterritoria"}
+        TL{"Aust-Timor"}
+        UM{"USAs ytre småøyar"}
+        UN{"SN"}
+        VC{"St. Vincent og Grenadinane"}
+        VG{"Dei britiske Jomfruøyane"}
+        VI{"Dei amerikanske Jomfruøyane"}
+        XA{"pseudospråk – aksentar"}
+        XB{"pseudospråk – RTL"}
+    }
+    Countries%variant{
+        FK{"Falklandsøyane (Islas Malvinas)"}
+        TL{"Aust-Timor"}
+    }
+}

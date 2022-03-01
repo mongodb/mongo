@@ -1,0 +1,30 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ps{
+    collations{
+        standard{
+            Sequence{
+                "[normalization on]"
+                "[reorder Arab]"
+                "&َ<<ِ<<ُ<<ً<<ٍ<<ٌ"
+                "&[before 1]ا<آ"
+                "&ا<<أ<<ٲ<<ٱ<<إ<<ٳ<ء"
+                "&ت<ټ<<ٹ"
+                "&ج<ځ<<حٔ"
+                "&چ<څ"
+                "&د<ډ<<ڈ"
+                "&ر<ړ<<ڑ"
+                "&ژ<ږ"
+                "&ک<<*ڪك"
+                "&ګ<<گ"
+                "&ڼ<<ڻ"
+                "&و<<ؤ<<ۇ<<ۉ"
+                "&ه<<<ۀ<<<هٔ<<*ەہھةۃ"
+                "&ی<<*ىےيېۍ<<یٔ<<<ىٔ<<<ئ"
+                "&\u00A0<<\u200C<<\u200D"
+            }
+            Version{"39"}
+        }
+    }
+}

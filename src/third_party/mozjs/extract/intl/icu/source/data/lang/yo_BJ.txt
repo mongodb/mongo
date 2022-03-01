@@ -1,0 +1,181 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+yo_BJ{
+    Keys{
+        calendar{"Kàlɛ́ńdà"}
+        cf{"Ìgúnrégé Kɔ́rɛ́ńsì"}
+        collation{"Ètò Ɛlɛ́sɛɛsɛ"}
+        currency{"Kɔ́rɛ́ńsì"}
+        ms{"Èto Ìdiwɔ̀n"}
+        numbers{"Àwɔn nɔ́ńbà"}
+    }
+    Languages{
+        agq{"Èdè Ágɛ̀ɛ̀mù"}
+        bez{"Èdè Bɛ́nà"}
+        chr{"Èdè Shɛ́rókiì"}
+        cu{"Èdè Síláfííkì Ilé Ìjɔ́sìn"}
+        da{"Èdè Ilɛ̀ Denmark"}
+        de_AT{"Èdè Jámánì (Ɔ́síríà )"}
+        de_CH{"Èdè Ilɛ̀ Jámánì (Orílɛ́ède swítsàlandì)"}
+        dje{"Shárúmà"}
+        dsb{"Shóbíánù Apá Ìshàlɛ̀"}
+        ebu{"Èdè Ɛmbù"}
+        en{"Èdè Gɛ̀ɛ́sì"}
+        en_AU{"Èdè Gɛ̀ɛ́sì (órílɛ̀-èdè Ɔsirélíà)"}
+        en_CA{"Èdè Gɛ̀ɛ́sì (Orílɛ̀-èdè Kánádà)"}
+        en_GB{"Èdè òyìnbó Gɛ̀ɛ́sì"}
+        es{"Èdè Sípáníìshì"}
+        es_419{"Èdè Sípáníìshì (orílɛ̀-èdè Látìn-Amɛ́ríkà)"}
+        es_ES{"Èdè Sípáníìshì (orílɛ̀-èdè Yúróòpù)"}
+        es_MX{"Èdè Sípáníìshì (orílɛ̀-èdè Mɛ́síkò)"}
+        fr_CA{"Èdè Faransé (orílɛ̀-èdè Kánádà)"}
+        fr_CH{"Èdè Faranshé (Súwísàlaǹdì)"}
+        id{"Èdè Indonéshíà"}
+        ii{"Shíkuán Yì"}
+        jmc{"Máshámè"}
+        khq{"Koira Shíínì"}
+        kk{"Kashakì"}
+        kln{"Kálɛnjín"}
+        ks{"Kashímirì"}
+        ksb{"Sháńbálà"}
+        ku{"Kɔdishì"}
+        kw{"Èdè Kɔ́nììshì"}
+        lb{"Lùshɛ́mbɔ́ɔ̀gì"}
+        mul{"Ɔlɔ́pɔ̀ èdè"}
+        nb{"Nɔ́ɔ́wè Bokímàl"}
+        nds{"Jámánì ìpìlɛ̀"}
+        nl{"Èdè Dɔ́ɔ̀shì"}
+        nmg{"Kíwáshíò"}
+        nn{"Nɔ́ɔ́wè Nínɔ̀sìkì"}
+        nus{"Núɛ̀"}
+        nyn{"Ńyákɔ́lè"}
+        om{"Òròmɔ́"}
+        os{"Ɔshɛ́tíìkì"}
+        prg{"Púrúshíànù"}
+        pt{"Èdè Pɔtogí"}
+        pt_BR{"Èdè Pɔtogí (Orilɛ̀-èdè Bràsíl)"}
+        pt_PT{"Èdè Pɔtogí (orílɛ̀-èdè Yúróòpù)"}
+        qu{"Kúɛ́ńjùà"}
+        rm{"Rómáǹshì"}
+        ru{"Èdè Rɔ́shíà"}
+        seh{"Shɛnà"}
+        shi{"Tashelíìtì"}
+        sn{"Shɔnà"}
+        teo{"Tɛ́sò"}
+        tr{"Èdè Tɔɔkisi"}
+        ug{"Yúgɔ̀"}
+        und{"Èdè àìmɔ̀"}
+        vo{"Fɔ́lápùùkù"}
+        wae{"Wɔsà"}
+        wo{"Wɔ́lɔ́ɔ̀fù"}
+        xog{"Shógà"}
+        yav{"Yangbɛn"}
+        zgh{"Àfɛnùkò Támásáìtì ti Mòrókò"}
+        zh{"Edè Sháínà"}
+        zh_Hans{"Ɛdè Sháínà Onírɔ̀rùn"}
+        zh_Hant{"Èdè Sháínà Ìbílɛ̀"}
+        zu{"Èdè Shulu"}
+    }
+    Languages%long{
+        zh_Hans{"Èdè Mandárínì Sháínà Onírɔ̀rùn"}
+        zh_Hant{"Èdè Mandárínì Sháínà Ìbílɛ̀"}
+    }
+    Languages%menu{
+        zh{"Edè Sháínà, Mandárínì"}
+    }
+    Languages%short{
+        en_GB{"Èdè Gɛ̀ɛ́sì (GB)"}
+        en_US{"Èdè Gɛ̀ɛ́sì (US)"}
+    }
+    Scripts{
+        Armn{"Àmɛ́níà"}
+        Cyrl{"èdè ilɛ̀ Rɔ́shíà"}
+        Deva{"Dɛfanagárì"}
+        Ethi{"Ɛtiópíìkì"}
+        Geor{"Jɔ́jíànù"}
+        Grek{"Jɔ́jíà"}
+        Hanb{"Han pɛ̀lú Bopomófò"}
+        Hans{"tí wɔ́n mú rɔrùn."}
+        Hant{"Hans àtɔwɔ́dɔ́wɔ́"}
+        Hrkt{"ìlànà àfɔwɔ́kɔ ará Jàpánù"}
+        Khmr{"Kɛmɛ̀"}
+        Zmth{"Àmì Ìshèsìrò"}
+        Zsym{"Àwɔn àmì"}
+        Zxxx{"Aikɔsilɛ"}
+        Zyyy{"Wɔ́pɔ̀"}
+        Zzzz{"Ìshɔwɔ́kɔ̀wé àìmɔ̀"}
+    }
+    Scripts%stand-alone{
+        Hans{"Hans tí wɔ́n mú rɔrùn."}
+        Hant{"Hans àtɔwɔ́dɔ́wɔ́"}
+    }
+    Types{
+        calendar{
+            buddhist{"Kàlɛ́ńdà Buddhist"}
+            chinese{"Kàlɛ́ńdà ti Sháìnà"}
+            dangi{"Kàlɛ́ńdà dangi"}
+            ethiopic{"Kàlɛ́ńdà Ɛtíópíìkì"}
+            gregorian{"Kàlɛ́ńdà Gregory"}
+            hebrew{"Kàlɛ́ńdà Hébérù"}
+            islamic{"Kàlɛ́ńdà Lárúbáwá"}
+            iso8601{"Kàlɛ́ńdà ISO-8601"}
+            japanese{"Kàlɛ́ńdà ti Jàpánù"}
+            persian{"Kàlɛ́ńdà Pásíànù"}
+            roc{"Kàlɛ́ńdà Minguo"}
+        }
+        cf{
+            account{"Ìgúnrégé Ìshirò Owó Kɔ́rɛ́ńsì"}
+            standard{"Ìgúnrégé Gbèdéke Kɔ́rɛ́ńsì"}
+        }
+        collation{
+            ducet{"Ètò Ɛlɛ́sɛɛsɛ Àkùàyàn Unicode"}
+            search{"Ìshàwárí Ète-Gbogbogbò"}
+        }
+        ms{
+            metric{"Èto Mɛ́tíríìkì"}
+            uksystem{"Èto Ìdiwɔ̀n Ɔba"}
+            ussystem{"Èto Ìdiwɔ̀n US"}
+        }
+        numbers{
+            arab{"àwɔn díjítì Làrubáwá-Índíà"}
+            arabext{"Àwɔn Díjíìtì Lárúbáwá-Índíà fífɛ̀"}
+            armn{"Àwɔn nɔ́ńbà Àmɛ́níà"}
+            armnlow{"Àwɔn Nɔ́ńbà Kékèké ti Amɛ́ríkà"}
+            beng{"Àwɔn díjíìtì Báńgílà"}
+            deva{"Àwɔn díjììtì Defanagárì"}
+            ethi{"Àwɔn nɔ́ńbà Ɛtiópíìkì"}
+            fullwide{"Àwɔn Díjíìtì Fífɛ̀-Ɛ̀kún"}
+            geor{"Àwɔn nɔ́ńbà Jɔ́jíà"}
+            grek{"Àwɔn nɔ́ńbà Gíríìkì"}
+            greklow{"Àwɔn Nɔ́ńbà Gíríìkì Kékèké"}
+            gujr{"Àwɔn díjíìtì Gùjárátì"}
+            guru{"Àwɔn Díjíìtì Gurumukì"}
+            hanidec{"Àwɔn nɔ́ńbà Dɛ́símà Sháìnà"}
+            hans{"Àwɔn nɔ́ńbà Ìrɔ̀rùn ti Sháìnà"}
+            hansfin{"Àwɔn nɔ́ńbà Ìshúná Ìrɔ̀rùn Sháìnà"}
+            hant{"Àwɔn nɔ́ńbà Ìbílɛ̀ Sháìnà"}
+            hantfin{"Àwɔn nɔ́ńbà Ìshúná Ìbílɛ̀ Sháìnà"}
+            hebr{"Àwɔn nɔ́ńbà Hébérù"}
+            jpan{"Àwɔn nɔ́ńbà Jápànù"}
+            jpanfin{"Àwɔn nɔ́ńbà Ìshúná Jàpáànù"}
+            khmr{"Àwɔn díjíìtì Kɛ́mɛ̀"}
+            knda{"Àwɔn díjíìtì kanada"}
+            laoo{"Àwɔn díjíìtì Láó"}
+            latn{"Díjíítì Ìwɔ̀ Oòrùn"}
+            mlym{"Àwɔn díjíìtì Málàyálámù"}
+            mymr{"Àwɔn díjíìtì Myánmarí"}
+            orya{"Àwɔn díjíìtì Òdíà"}
+            roman{"Àwɔn díjíìtì Rómánù"}
+            romanlow{"Àwɔn díjíìtì Rómánù Kékeré"}
+            taml{"Àwɔn díjíìtì Ìbílɛ̀ Támílù"}
+            tamldec{"Àwɔn díjíìtì Tàmílù"}
+            telu{"Àwɔn díjíìtì Télúgù"}
+            thai{"Àwɔn díjíìtì Thai"}
+            tibt{"Àwɔn díjíìtì Tibetán"}
+        }
+    }
+    codePatterns{
+        script{"Ìshɔwɔ́kɔ̀wé: {0}"}
+    }
+}

@@ -1,0 +1,15 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: lt_Upper.txt
+# Generated from CLDR
+#
+
+# Copyright (C) 2011-2013, Apple Inc.; Unicode, Inc.; and others. All Rights Reserved.
+# Remove \u0307 following soft-dotteds (i, j, and the like), with possible intervening non-230 marks.
+::NFD();
+[:Soft_Dotted:] [^[:ccc=Not_Reordered:][:ccc=Above:]]* { \u0307 → ;
+::Any-Upper();
+::NFC();
+

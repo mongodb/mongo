@@ -1,0 +1,75 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+en_ZA{
+    %%Parent{"en_001"}
+    AuxExemplarCharacters{
+        "[á à ă â å ä ā æ ç ḓ é è ĕ ê ë ē í ì ĭ î ï ī ḽ ñ ṅ ṋ ó ò ŏ ô ö ø ō œ š ṱ ú ù"
+        " ŭ û ü ū ÿ]"
+    }
+    ExemplarCharactersNumbers{"[  \\- ‑ , % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    NumberElements{
+        latn{
+            symbols{
+                decimal{","}
+                group{" "}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, dd MMMM y G",
+                "dd MMMM y G",
+                "dd MMM y G",
+                "GGGGG y/MM/dd",
+                "{1}, {0}",
+                "{1} 'at' {0}",
+                "{1} 'at' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                MEd{"E, MM/dd"}
+                MMMEd{"E, dd MMM"}
+                MMMd{"dd MMM"}
+                Md{"MM/dd"}
+                yyyyMEd{"E, G y/MM/dd"}
+                yyyyMMMEd{"E, dd MMM y G"}
+                yyyyMMMd{"dd MMM y G"}
+                yyyyMd{"G y/MM/dd"}
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, dd MMMM y",
+                "dd MMMM y",
+                "dd MMM y",
+                "y/MM/dd",
+                "{1}, {0}",
+                "{1} 'at' {0}",
+                "{1} 'at' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                MEd{"E, MM/dd"}
+                MMMEd{"E, dd MMM"}
+                MMMd{"dd MMM"}
+                Md{"MM/dd"}
+                yMEd{"E, y/MM/dd"}
+                yMMMEd{"E, dd MMM y"}
+                yMMMd{"dd MMM y"}
+                yMd{"y/MM/dd"}
+            }
+        }
+    }
+}

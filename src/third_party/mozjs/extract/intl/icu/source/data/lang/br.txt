@@ -1,0 +1,921 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+br{
+    Keys{
+        calendar{"deiziadur"}
+        cf{"furmad moneiz"}
+        collation{"doare rummañ"}
+        currency{"moneiz"}
+        hc{"kelcʼhiad eurioù"}
+        lb{"stil torr linenn"}
+        ms{"reizhiad vuzuliañ"}
+        numbers{"niveroù"}
+    }
+    Languages{
+        aa{"afar"}
+        ab{"abkhazeg"}
+        ace{"achineg"}
+        ach{"acoli"}
+        ada{"adangme"}
+        ady{"adygeieg"}
+        ae{"avesteg"}
+        aeb{"arabeg Tunizia"}
+        af{"afrikaans"}
+        afh{"afrihili"}
+        agq{"aghem"}
+        ain{"ainoueg"}
+        ak{"akan"}
+        akk{"akadeg"}
+        akz{"alabamaeg"}
+        ale{"aleouteg"}
+        aln{"gegeg"}
+        alt{"altaieg ar Su"}
+        am{"amhareg"}
+        an{"aragoneg"}
+        ang{"hensaozneg"}
+        anp{"angika"}
+        ar{"arabeg"}
+        ar_001{"arabeg modern"}
+        arc{"arameeg"}
+        arn{"araoukaneg"}
+        aro{"araona"}
+        arp{"arapaho"}
+        arq{"arabeg Aljeria"}
+        arw{"arawakeg"}
+        ary{"arabeg Maroko"}
+        arz{"arabeg Egipt"}
+        as{"asameg"}
+        asa{"asu"}
+        ase{"yezh sinoù Amerika"}
+        ast{"asturianeg"}
+        av{"avar"}
+        awa{"awadhi"}
+        ay{"aymara"}
+        az{"azerbaidjaneg"}
+        ba{"bachkir"}
+        bal{"baloutchi"}
+        ban{"balineg"}
+        bar{"bavarieg"}
+        bas{"basaa"}
+        be{"belaruseg"}
+        bej{"bedawieg"}
+        bem{"bemba"}
+        bez{"bena"}
+        bg{"bulgareg"}
+        bgn{"baloutchi ar Cʼhornôg"}
+        bho{"bhojpuri"}
+        bi{"bislama"}
+        bik{"bikol"}
+        bin{"bini"}
+        bla{"siksika"}
+        bm{"bambara"}
+        bn{"bengali"}
+        bo{"tibetaneg"}
+        br{"brezhoneg"}
+        bra{"braj"}
+        brh{"brahweg"}
+        brx{"bodo"}
+        bs{"bosneg"}
+        bss{"akoose"}
+        bua{"bouriat"}
+        bug{"bugi"}
+        byn{"blin"}
+        ca{"katalaneg"}
+        cad{"caddo"}
+        car{"karibeg"}
+        cch{"atsam"}
+        ccp{"chakmaeg"}
+        ce{"tchetcheneg"}
+        ceb{"cebuano"}
+        cgg{"chigaeg"}
+        ch{"chamorru"}
+        chb{"chibcha"}
+        chk{"chuuk"}
+        chm{"marieg"}
+        cho{"choktaw"}
+        chp{"chipewyan"}
+        chr{"cherokee"}
+        chy{"cheyenne"}
+        ckb{"kurdeg sorani"}
+        co{"korseg"}
+        cop{"kopteg"}
+        cr{"kri"}
+        crh{"turkeg Krimea"}
+        crs{"kreoleg Sechelez"}
+        cs{"tchekeg"}
+        csb{"kachoubeg"}
+        cu{"slavoneg iliz"}
+        cv{"tchouvatch"}
+        cy{"kembraeg"}
+        da{"daneg"}
+        dak{"dakota"}
+        dar{"dargwa"}
+        dav{"taita"}
+        de{"alamaneg"}
+        de_AT{"alamaneg Aostria"}
+        de_CH{"alamaneg uhel Suis"}
+        del{"delaware"}
+        dgr{"dogrib"}
+        din{"dinka"}
+        dje{"zarma"}
+        doi{"dogri"}
+        dsb{"izelsorabeg"}
+        dua{"douala"}
+        dum{"nederlandeg krenn"}
+        dv{"divehi"}
+        dyo{"diola"}
+        dyu{"dyula"}
+        dz{"dzongkha"}
+        dzg{"dazagaeg"}
+        ebu{"embu"}
+        ee{"ewe"}
+        efi{"efik"}
+        egy{"henegipteg"}
+        eka{"ekajuk"}
+        el{"gresianeg"}
+        elx{"elameg"}
+        en{"saozneg"}
+        en_AU{"saozneg Aostralia"}
+        en_CA{"saozneg Kanada"}
+        en_GB{"saozneg Breizh-Veur"}
+        en_US{"saozneg Amerika"}
+        enm{"krennsaozneg"}
+        eo{"esperanteg"}
+        es{"spagnoleg"}
+        es_419{"spagnoleg Amerika latin"}
+        es_ES{"spagnoleg Europa"}
+        es_MX{"spagnoleg Mecʼhiko"}
+        et{"estoneg"}
+        eu{"euskareg"}
+        ewo{"ewondo"}
+        fa{"perseg"}
+        fa_AF{"dareg"}
+        fan{"fang"}
+        fat{"fanti"}
+        ff{"fula"}
+        fi{"finneg"}
+        fil{"filipineg"}
+        fit{"finneg traoñienn an Torne"}
+        fj{"fidjieg"}
+        fo{"faeroeg"}
+        fon{"fon"}
+        fr{"galleg"}
+        fr_CA{"galleg Kanada"}
+        fr_CH{"galleg Suis"}
+        frc{"galleg cajun"}
+        frm{"krenncʼhalleg"}
+        fro{"hencʼhalleg"}
+        frp{"arpitaneg"}
+        frr{"frizeg an Norzh"}
+        frs{"frizeg ar Reter"}
+        fur{"frioulaneg"}
+        fy{"frizeg ar Cʼhornôg"}
+        ga{"iwerzhoneg"}
+        gaa{"ga"}
+        gag{"gagaouzeg"}
+        gan{"sinaeg Gan"}
+        gay{"gayo"}
+        gba{"gbaya"}
+        gd{"skoseg"}
+        gez{"gezeg"}
+        gil{"gilberteg"}
+        gl{"galizeg"}
+        gmh{"krennalamaneg uhel"}
+        gn{"guarani"}
+        goh{"henalamaneg uhel"}
+        gor{"gorontalo"}
+        got{"goteg"}
+        grb{"grebo"}
+        grc{"hencʼhresianeg"}
+        gsw{"alamaneg Suis"}
+        gu{"gujarati"}
+        guz{"gusiieg"}
+        gv{"manaveg"}
+        gwi{"gwich’in"}
+        ha{"haousa"}
+        hai{"haida"}
+        hak{"sinaeg Hakka"}
+        haw{"hawaieg"}
+        he{"hebraeg"}
+        hi{"hindi"}
+        hil{"hiligaynon"}
+        hmn{"hmong"}
+        ho{"hiri motu"}
+        hr{"kroateg"}
+        hsb{"uhelsorabeg"}
+        hsn{"sinaeg Xian"}
+        ht{"haitieg"}
+        hu{"hungareg"}
+        hup{"hupa"}
+        hy{"armenianeg"}
+        hz{"herero"}
+        ia{"interlingua"}
+        iba{"iban"}
+        ibb{"ibibio"}
+        id{"indonezeg"}
+        ie{"interlingue"}
+        ig{"igbo"}
+        ii{"yieg Sichuan"}
+        ik{"inupiaq"}
+        ilo{"ilokanoeg"}
+        inh{"ingoucheg"}
+        io{"ido"}
+        is{"islandeg"}
+        it{"italianeg"}
+        iu{"inuktitut"}
+        ja{"japaneg"}
+        jam{"kreoleg Jamaika"}
+        jbo{"lojban"}
+        jgo{"ngomba"}
+        jmc{"machame"}
+        jpr{"yuzev-perseg"}
+        jrb{"yuzev-arabeg"}
+        jv{"javaneg"}
+        ka{"jorjianeg"}
+        kaa{"karakalpak"}
+        kab{"kabileg"}
+        kac{"kachin"}
+        kaj{"jju"}
+        kam{"kamba"}
+        kbd{"kabardeg"}
+        kcg{"tyap"}
+        kde{"makonde"}
+        kea{"kabuverdianu"}
+        kfo{"koroeg"}
+        kg{"kongo"}
+        kha{"khasi"}
+        kho{"khotaneg"}
+        khq{"koyra chiini"}
+        ki{"kikuyu"}
+        kj{"kwanyama"}
+        kk{"kazak"}
+        kkj{"kakoeg"}
+        kl{"greunlandeg"}
+        kln{"kalendjineg"}
+        km{"khmer"}
+        kmb{"kimbundu"}
+        kn{"kanareg"}
+        ko{"koreaneg"}
+        kok{"konkani"}
+        kos{"kosrae"}
+        kpe{"kpelle"}
+        kr{"kanouri"}
+        krc{"karatchay-balkar"}
+        kri{"krio"}
+        krl{"karelieg"}
+        kru{"kurukh"}
+        ks{"kashmiri"}
+        ksb{"shambala"}
+        ksf{"bafiaeg"}
+        ksh{"koluneg"}
+        ku{"kurdeg"}
+        kum{"koumikeg"}
+        kut{"kutenai"}
+        kv{"komieg"}
+        kw{"kerneveureg"}
+        ky{"kirgiz"}
+        la{"latin"}
+        lad{"ladino"}
+        lag{"langi"}
+        lah{"lahnda"}
+        lam{"lamba"}
+        lb{"luksembourgeg"}
+        lez{"lezgi"}
+        lfn{"lingua franca nova"}
+        lg{"ganda"}
+        li{"limbourgeg"}
+        lij{"ligurieg"}
+        lkt{"lakota"}
+        ln{"lingala"}
+        lo{"laoseg"}
+        lol{"mongo"}
+        lou{"kreoleg Louiziana"}
+        loz{"lozi"}
+        lrc{"loureg an Norzh"}
+        lt{"lituaneg"}
+        lu{"luba-katanga"}
+        lua{"luba-lulua"}
+        lui{"luiseno"}
+        lun{"lunda"}
+        luo{"luo"}
+        lus{"lushai"}
+        luy{"luyia"}
+        lv{"latvieg"}
+        lzh{"sinaeg lennegel"}
+        mad{"madoureg"}
+        mag{"magahi"}
+        mai{"maithili"}
+        mak{"makasar"}
+        mas{"masai"}
+        mdf{"moksha"}
+        mdr{"mandar"}
+        men{"mende"}
+        mer{"meru"}
+        mfe{"moriseg"}
+        mg{"malgacheg"}
+        mga{"krenniwerzhoneg"}
+        mgh{"makhuwa-meetto"}
+        mgo{"metaʼ"}
+        mh{"marshall"}
+        mi{"maori"}
+        mic{"mikmakeg"}
+        min{"minangkabau"}
+        mk{"makedoneg"}
+        ml{"malayalam"}
+        mn{"mongoleg"}
+        mnc{"manchou"}
+        mni{"manipuri"}
+        moh{"mohawk"}
+        mos{"more"}
+        mr{"marathi"}
+        mrj{"marieg ar Cʼhornôg"}
+        ms{"malayseg"}
+        mt{"malteg"}
+        mua{"moundangeg"}
+        mul{"yezhoù lies"}
+        mus{"muskogi"}
+        mwl{"mirandeg"}
+        my{"birmaneg"}
+        myv{"erza"}
+        mzn{"mazanderaneg"}
+        na{"naurueg"}
+        nan{"sinaeg Min Nan"}
+        nap{"napolitaneg"}
+        naq{"nama"}
+        nb{"norvegeg bokmål"}
+        nd{"ndebele an Norzh"}
+        nds{"alamaneg izel"}
+        nds_NL{"saksoneg izel"}
+        ne{"nepaleg"}
+        new{"newari"}
+        ng{"ndonga"}
+        nia{"nias"}
+        niu{"niue"}
+        njo{"aoeg"}
+        nl{"nederlandeg"}
+        nl_BE{"flandrezeg"}
+        nmg{"ngoumbeg"}
+        nn{"norvegeg nynorsk"}
+        nnh{"ngiemboon"}
+        no{"norvegeg"}
+        nog{"nogay"}
+        non{"hennorseg"}
+        nov{"novial"}
+        nqo{"nkoeg"}
+        nr{"ndebele ar Su"}
+        nso{"sotho an Norzh"}
+        nus{"nouereg"}
+        nv{"navacʼho"}
+        nwc{"newari klasel"}
+        ny{"nyanja"}
+        nym{"nyamwezi"}
+        nyn{"nyankole"}
+        nyo{"nyoro"}
+        oc{"okitaneg"}
+        oj{"ojibwa"}
+        om{"oromoeg"}
+        or{"oriya"}
+        os{"oseteg"}
+        osa{"osage"}
+        ota{"turkeg otoman"}
+        pa{"punjabi"}
+        pag{"pangasinan"}
+        pal{"pahlavi"}
+        pam{"pampanga"}
+        pap{"papiamento"}
+        pau{"palau"}
+        pcd{"pikardeg"}
+        pcm{"pidjin Nigeria"}
+        pdc{"alamaneg Pennsylvania"}
+        peo{"henberseg"}
+        phn{"fenikianeg"}
+        pi{"pali"}
+        pl{"poloneg"}
+        pms{"piemonteg"}
+        pnt{"ponteg"}
+        pon{"pohnpei"}
+        prg{"henbruseg"}
+        pro{"henbrovañseg"}
+        ps{"pachto"}
+        pt{"portugaleg"}
+        pt_BR{"portugaleg Brazil"}
+        pt_PT{"portugaleg Europa"}
+        qu{"kechuaeg"}
+        quc{"kʼicheʼ"}
+        qug{"kichuaeg Chimborazo"}
+        raj{"rajasthani"}
+        rap{"rapanui"}
+        rar{"rarotonga"}
+        rgn{"romagnoleg"}
+        rm{"romañcheg"}
+        rn{"rundi"}
+        ro{"roumaneg"}
+        ro_MD{"moldoveg"}
+        rof{"rombo"}
+        rom{"romanieg"}
+        ru{"rusianeg"}
+        rup{"aroumaneg"}
+        rw{"kinyarwanda"}
+        rwk{"rwa"}
+        sa{"sanskriteg"}
+        sad{"sandawe"}
+        sah{"yakouteg"}
+        sam{"arameeg ar Samaritaned"}
+        saq{"samburu"}
+        sas{"sasak"}
+        sat{"santali"}
+        sba{"ngambayeg"}
+        sbp{"sangu"}
+        sc{"sardeg"}
+        scn{"sikilieg"}
+        sco{"skoteg"}
+        sd{"sindhi"}
+        sdc{"sasareseg"}
+        se{"sámi an Norzh"}
+        seh{"sena"}
+        ses{"koyraboro senni"}
+        sg{"sango"}
+        sga{"heniwerzhoneg"}
+        sh{"serb-kroateg"}
+        shi{"tacheliteg"}
+        shn{"shan"}
+        shu{"arabeg Tchad"}
+        si{"singhaleg"}
+        sid{"sidamo"}
+        sk{"slovakeg"}
+        sl{"sloveneg"}
+        sm{"samoan"}
+        sma{"sámi ar Su"}
+        smj{"sámi Luleå"}
+        smn{"sámi Inari"}
+        sms{"sámi Skolt"}
+        sn{"shona"}
+        snk{"soninke"}
+        so{"somali"}
+        sog{"sogdieg"}
+        sq{"albaneg"}
+        sr{"serbeg"}
+        srn{"sranan tongo"}
+        srr{"serer"}
+        ss{"swati"}
+        ssy{"sahoeg"}
+        st{"sotho ar Su"}
+        su{"sundaneg"}
+        suk{"sukuma"}
+        sux{"sumereg"}
+        sv{"svedeg"}
+        sw{"swahili"}
+        sw_CD{"swahili Kongo"}
+        swb{"komoreg"}
+        syc{"sirieg klasel"}
+        syr{"sirieg"}
+        szl{"silezieg"}
+        ta{"tamileg"}
+        tcy{"touloueg"}
+        te{"telougou"}
+        tem{"temne"}
+        teo{"tesoeg"}
+        ter{"tereno"}
+        tet{"tetum"}
+        tg{"tadjik"}
+        th{"thai"}
+        ti{"tigrigna"}
+        tig{"tigreaneg"}
+        tiv{"tiv"}
+        tk{"turkmeneg"}
+        tkl{"tokelau"}
+        tl{"tagalog"}
+        tlh{"klingon"}
+        tli{"tinglit"}
+        tmh{"tamacheg"}
+        tn{"tswana"}
+        to{"tonga"}
+        tog{"nyasa tonga"}
+        tpi{"tok pisin"}
+        tr{"turkeg"}
+        tru{"turoyoeg"}
+        trv{"taroko"}
+        ts{"tsonga"}
+        tsi{"tsimshian"}
+        tt{"tatar"}
+        tum{"tumbuka"}
+        tvl{"tuvalu"}
+        tw{"twi"}
+        twq{"tasawakeg"}
+        ty{"tahitianeg"}
+        tyv{"touva"}
+        tzm{"tamazigteg Kreizatlas"}
+        udm{"oudmourteg"}
+        ug{"ouigoureg"}
+        uga{"ougariteg"}
+        uk{"ukraineg"}
+        umb{"umbundu"}
+        und{"yezh dianav"}
+        ur{"ourdou"}
+        uz{"ouzbekeg"}
+        vai{"vai"}
+        ve{"venda"}
+        vec{"venezieg"}
+        vep{"vepseg"}
+        vi{"vietnameg"}
+        vls{"flandrezeg ar c’hornôg"}
+        vo{"volapük"}
+        vot{"votyakeg"}
+        vro{"voroeg"}
+        vun{"vunjo"}
+        wa{"walloneg"}
+        wae{"walser"}
+        wal{"walamo"}
+        war{"waray"}
+        was{"washo"}
+        wo{"wolof"}
+        wuu{"sinaeg Wu"}
+        xal{"kalmouk"}
+        xh{"xhosa"}
+        xmf{"megreleg"}
+        xog{"sogaeg"}
+        yao{"yao"}
+        yap{"yapeg"}
+        yav{"yangben"}
+        ybb{"yemba"}
+        yi{"yiddish"}
+        yo{"yorouba"}
+        yue{"kantoneg"}
+        za{"zhuang"}
+        zap{"zapoteg"}
+        zbl{"arouezioù Bliss"}
+        zea{"zelandeg"}
+        zen{"zenaga"}
+        zgh{"tamacheg Maroko standart"}
+        zh{"sinaeg"}
+        zh_Hans{"sinaeg eeunaet"}
+        zh_Hant{"sinaeg hengounel"}
+        zu{"zouloueg"}
+        zun{"zuni"}
+        zxx{"diyezh"}
+        zza{"zazakeg"}
+    }
+    Languages%long{
+        zh_Hans{"sinaeg mandarinek eeunaet"}
+        zh_Hant{"sinaeg mandarinek hengounel"}
+    }
+    Languages%menu{
+        ckb{"kurdeg kreiz"}
+        yue{"sinaeg, kantoneg"}
+        zh{"sinaeg, mandarineg"}
+    }
+    Languages%short{
+        az{"azeri"}
+        en_GB{"saozneg RU"}
+        en_US{"saozneg SU"}
+    }
+    Scripts{
+        Adlm{"adlam"}
+        Arab{"arabek"}
+        Armi{"arameek impalaerel"}
+        Armn{"armenianek"}
+        Avst{"avestek"}
+        Bali{"balinek"}
+        Bamu{"bamounek"}
+        Batk{"batak"}
+        Beng{"bengali"}
+        Bopo{"bopomofo"}
+        Brai{"Braille"}
+        Bugi{"bougiek"}
+        Cakm{"chakmaek"}
+        Cans{"silabennaoueg engenidik unvan Kanada"}
+        Cham{"cham"}
+        Cher{"cherokee"}
+        Copt{"koptek"}
+        Cprt{"silabennaoueg kipriek"}
+        Cyrl{"kirillek"}
+        Cyrs{"kirillek henslavonek"}
+        Deva{"devanagari"}
+        Dupl{"berrskriverezh Duployé"}
+        Egyp{"hieroglifoù egiptek"}
+        Ethi{"etiopek"}
+        Geor{"jorjianek"}
+        Glag{"glagolitek"}
+        Goth{"gotek"}
+        Grek{"gresianek"}
+        Gujr{"gujarati"}
+        Guru{"gurmukhi"}
+        Hanb{"han gant bopomofo"}
+        Hang{"hangeul"}
+        Hani{"sinalunioù (han)"}
+        Hans{"eeunaet"}
+        Hant{"hengounel"}
+        Hebr{"hebraek"}
+        Hira{"hiragana"}
+        Hluw{"hieroglifoù Anatolia"}
+        Hrkt{"silabennaouegoù japanek"}
+        Hung{"henhungarek"}
+        Ital{"henitalek"}
+        Jamo{"jamo"}
+        Java{"javanek"}
+        Jpan{"japanek"}
+        Kana{"katakana"}
+        Khmr{"khmer"}
+        Knda{"kannada"}
+        Kore{"koreanek"}
+        Laoo{"laosek"}
+        Latg{"latin gouezelek"}
+        Latn{"latin"}
+        Lyci{"likiek"}
+        Lydi{"lidiek"}
+        Mani{"manikeek"}
+        Maya{"hieroglifoù mayaek"}
+        Mlym{"malayalam"}
+        Mong{"mongolek"}
+        Mymr{"myanmar"}
+        Narb{"henarabek an Norzh"}
+        Ogam{"ogam"}
+        Orya{"oriya"}
+        Phnx{"fenikianek"}
+        Runr{"runek"}
+        Samr{"samaritek"}
+        Sarb{"henarabek ar Su"}
+        Sinh{"singhalek"}
+        Sund{"sundanek"}
+        Syrc{"siriek"}
+        Syre{"siriek Estrangelā"}
+        Syrj{"siriek ar C’hornôg"}
+        Syrn{"siriek ar Reter"}
+        Taml{"tamilek"}
+        Telu{"telougou"}
+        Tglg{"tagalog"}
+        Thaa{"thaana"}
+        Thai{"thai"}
+        Tibt{"tibetanek"}
+        Ugar{"ougaritek"}
+        Vaii{"vai"}
+        Xpeo{"persek kozh"}
+        Xsux{"gennheñvel"}
+        Zinh{"hêrezh"}
+        Zmth{"notadur jedoniel"}
+        Zsye{"fromlunioù"}
+        Zsym{"arouezioù"}
+        Zxxx{"anskrivet"}
+        Zyyy{"boutin"}
+        Zzzz{"skritur dianav"}
+    }
+    Scripts%stand-alone{
+        Hans{"sinalunioù (han) eeunaet"}
+        Hant{"sinalunioù (han) hengounel"}
+    }
+    Types{
+        calendar{
+            buddhist{"deiziadur boudaat"}
+            chinese{"deiziadur sinaat"}
+            coptic{"deiziadur kopt"}
+            dangi{"deiziadur dangi"}
+            ethiopic{"deiziadur etiopiat"}
+            ethiopic-amete-alem{"deiziadur etiopiat Amete Alem"}
+            gregorian{"deiziadur gregorian"}
+            hebrew{"deiziadur hebraek"}
+            indian{"deiziadur indian"}
+            islamic{"deiziadur islamek"}
+            islamic-civil{"deiziadur islamek keodedel"}
+            islamic-rgsa{"deiziadur islamek (Arabia Saoudat)"}
+            islamic-tbla{"deiziadur islamek steredoniel"}
+            islamic-umalqura{"deiziadur islamek (Umm al-Qura)"}
+            iso8601{"deiziadur ISO-8601"}
+            japanese{"deiziadur japanat"}
+            persian{"deiziadur persek"}
+            roc{"deiziadur Republik Sina"}
+        }
+        cf{
+            account{"furmad unanenn jediñ"}
+            standard{"furmad moneiz standart"}
+        }
+        collation{
+            big5han{"urzh rummañ sinaek hengounel - Big5"}
+            dictionary{"urzh rummañ ar geriadur"}
+            ducet{"urzh rummañ Unicode dre ziouer"}
+            emoji{"urzh rummañ ar fromlunioù"}
+            eor{"reolennoù urzhiañ europat"}
+            gb2312han{"urzh rummañ sinaek eeunaet - GB2312"}
+            phonebook{"urzh rummañ al levr-pellgomz"}
+            pinyin{"urzh rummañ pinyin"}
+            reformed{"urzh rummañ adreizhet"}
+            search{"enklask hollek"}
+            standard{"urzh rummañ standart"}
+            stroke{"urzh rummañ an tresoù"}
+            traditional{"urzh rummañ hengounel"}
+            unihan{"urzh rummañ UniHan"}
+            zhuyin{"urzh rummañ Zhuyin"}
+        }
+        hc{
+            h11{"reizhiad 12 eurvezh (0–11)"}
+            h12{"reizhiad 12 eurvezh (1–12)"}
+            h23{"reizhiad 24 eurvezh (0–23)"}
+            h24{"reizhiad 24 eurvezh (1–24)"}
+        }
+        lb{
+            loose{"stil torr linenn lezober"}
+            normal{"stil torr linenn boas"}
+            strict{"stil torr linenn strizh"}
+        }
+        ms{
+            metric{"reizhiad vetrek"}
+            uksystem{"reizhiad vuzuliañ RU"}
+            ussystem{"reizhiad vuzuliañ SU"}
+        }
+        numbers{
+            arab{"sifroù arabek indian"}
+            arabext{"sifroù arabek indian astennet"}
+            armn{"niveroù armenianek"}
+            armnlow{"niveroù armenianek bihan"}
+            bali{"sifroù balinek"}
+            beng{"sifroù bengali"}
+            brah{"sifroù brahmi"}
+            cakm{"sifroù chakma"}
+            cham{"sifroù cham"}
+            cyrl{"niveroù kirillek"}
+            deva{"sifroù devanagari"}
+            ethi{"niveroù etiopiat"}
+            fullwide{"sifroù led plaen"}
+            geor{"niveroù jorjianek"}
+            grek{"niveroù gresianek"}
+            greklow{"niveroù gresianek bihan"}
+            gujr{"sifroù gujarati"}
+            guru{"sifroù gurmukhi"}
+            hanidec{"niveroù sinaek dekvedennek"}
+            hans{"niveroù sinaek eeunaet"}
+            hansfin{"niveroù sinaek eeunaet an arcʼhant"}
+            hant{"niveroù sinaek hengounel"}
+            hantfin{"niveroù sinaek hengounel an arcʼhant"}
+            hebr{"niveroù hebraek"}
+            java{"sifroù javanek"}
+            jpan{"niveroù japanek"}
+            jpanfin{"niveroù japanek an arcʼhant"}
+            kali{"sifroù Kayah Li"}
+            khmr{"sifroù khmer"}
+            knda{"sifroù kanarek"}
+            lana{"sifroù Tai Tham Hora"}
+            lanatham{"sifroù Tai Tham Tham"}
+            laoo{"sifroù laosek"}
+            latn{"sifroù arabek ar Cʼhornôg"}
+            lepc{"sifroù lepcha"}
+            limb{"sifroù limbu"}
+            mlym{"sifroù malayalam"}
+            mong{"sifroù mongolek"}
+            mtei{"sifroù meitei mayek"}
+            mymr{"sifroù myanmar"}
+            mymrshan{"sifroù shan Myanmar"}
+            nkoo{"sifroù nʼko"}
+            olck{"sifroù ol chiki"}
+            orya{"sifroù oriya"}
+            osma{"sifroù osmanya"}
+            roman{"niveroù roman"}
+            romanlow{"niveroù roman bihan"}
+            sora{"sifroù Sora Sompeng"}
+            sund{"sifroù sundanek"}
+            takr{"sifroù takri"}
+            taml{"niveroù tamilek hengounel"}
+            tamldec{"sifroù tamilek"}
+            telu{"sifroù telougou"}
+            thai{"sifroù thai"}
+            tibt{"sifroù tibetan"}
+            vaii{"sifroù vai"}
+            wara{"sifroù warang"}
+            wcho{"sifroù wantcho"}
+        }
+    }
+    Variants{
+        1606NICT{"krenncʼhalleg diwezhañ"}
+        1694ACAD{"galleg rakvodern"}
+        1901{"reizhskrivadur alamanek hengounel"}
+        1959ACAD{"belaruseg akademek"}
+        1994{"reizhskrivadur resianek skoueriekaet"}
+        1996{"reizhskrivadur alamanek 1996"}
+        ABL1943{"doare reizhskrivañ 1943"}
+        AKUAPEM{"akuapem"}
+        ALALC97{"romanekadur ALA-LC 1997"}
+        ALUKU{"rannyezh aloukou"}
+        AO1990{"emglev 1990 war ar reizhskrivadur portugalek"}
+        ARANES{"araneg"}
+        AREVELA{"armenianeg ar Reter"}
+        AREVMDA{"armenianeg ar Cʼhornôg"}
+        ASANTE{"achanti"}
+        AUVERN{"arverneg"}
+        BAKU1926{"lizherenneg latin turkek unvan"}
+        BALANKA{"rannyezh aniiek Balanka"}
+        BARLA{"rannyezhoù Barlavento kreoleg ar Cʼhab-Glas"}
+        BASICENG{"saozneg diazez"}
+        BAUDDHA{"sanskriteg hiron boudaat"}
+        BISCAYAN{"rannyezh euskarek Bizkaia"}
+        BISKE{"rannyezh San Giorgio/Bila"}
+        BOHORIC{"lizherenneg Bohorič"}
+        BOONT{"boontling"}
+        BORNHOLM{"rannyezh Bornholm"}
+        CISAUP{"kizalpeg"}
+        COLB1945{"emglev 1945 war reizhskrivadur portugaleg Brazil"}
+        CORNU{"saozneg Kerne-Veur"}
+        CREISS{"rannyezhoù Creissent"}
+        DAJNKO{"lizherenneg Dajnko"}
+        EKAVSK{"serbeg gant distagadur ekavian"}
+        EMODENG{"saozneg rakvodern"}
+        FONIPA{"lizherenneg fonetek etrebroadel"}
+        FONKIRSH{"lizherenneg fonetek Kirshenbaum"}
+        FONNAPA{"lizherenneg fonetek Norzh Amerika"}
+        FONUPA{"lizherenneg fonetek ouralek"}
+        FONXSAMP{"treuzskrivadur X-SAMPA"}
+        GASCON{"gwaskoneg"}
+        GRCLASS{"skritur okitanek klasel"}
+        GRITAL{"skritur okitanek Italia"}
+        GRMISTR{"skritur okitanek mistralek"}
+        HEPBURN{"romanekadur Hepburn"}
+        HOGNORSK{"uhelnorvegeg"}
+        HSISTEMO{"esperanteg sistem H"}
+        IJEKAVSK{"serbeg gant distagadur ijekavian"}
+        ITIHASA{"sanskriteg itihâsa"}
+        IVANCHOV{"reizhskrivadur bulgarek Ivanchov"}
+        JAUER{"rannyezh romañchek Jauer"}
+        JYUTPING{"romanekadur kantonek Jyutping"}
+        KKCOR{"kerneveureg kumun"}
+        KOCIEWIE{"rannyezh polonek Kociewie"}
+        KSCOR{"kerneveureg standart"}
+        LAUKIKA{"sanskriteg klasel"}
+        LEMOSIN{"rannyezh Limousin"}
+        LENGADOC{"lengadokeg"}
+        LIPAW{"rannyezh resianek Lipovaz"}
+        LUNA1918{"reizhskrivadur rusianek goude 1917"}
+        METELKO{"lizherenneg Metelko"}
+        MONOTON{"gresianeg untonel"}
+        NDYUKA{"rannyezh Ndyuka"}
+        NEDIS{"rannyezh Natisone"}
+        NEWFOUND{"saozneg an Douar-Nevez"}
+        NICARD{"nisardeg"}
+        NJIVA{"rannyezh Gniva/Njiva"}
+        NULIK{"volapük modern"}
+        OSOJS{"rannyezh Oseacco/Osojane"}
+        OXENDICT{"skritur Oxford English Dictionary"}
+        PAHAWH2{"reizhskrivadur pahawh hmong lankad 2"}
+        PAHAWH3{"reizhskrivadur pahawh hmong lankad 3"}
+        PAHAWH4{"reizhskrivadur pahawh hmong doare diwezhañ"}
+        PAMAKA{"rannyezh Pamaka"}
+        PETR1708{"reizhskrivadur rusianek 1708 Pêr I"}
+        PINYIN{"romanekadur pinyin"}
+        POLYTON{"gresianeg liestonel"}
+        POSIX{"stlenneg"}
+        PROVENC{"provañseg"}
+        PUTER{"rannyezh romañchek Puter"}
+        REVISED{"reizhskrivadur reizhet"}
+        RIGIK{"volapük klasel"}
+        ROZAJ{"resianeg"}
+        RUMGR{"romañcheg Grischun"}
+        SAAHO{"saho"}
+        SCOTLAND{"saozneg standart Skos"}
+        SCOUSE{"saozneg Liverpool (scouse)"}
+        SIMPLE{"eeunaet"}
+        SOLBA{"rannyezh Stolvizza/Solbica"}
+        SOTAV{"rannyezhoù Sotavento kreoleg ar Cʼhab-Glas"}
+        SPANGLIS{"spanglish"}
+        SURMIRAN{"rannyezh romañchek surmiran"}
+        SURSILV{"rannyezh romañchek sursilvan"}
+        SUTSILV{"rannyezh romañchek sutsilvan"}
+        TARASK{"belaruseg Taraskievica"}
+        UCCOR{"kerneveureg unvan"}
+        UCRCOR{"kerneveureg unvan reizhet"}
+        ULSTER{"rannyezh skotek Ulad"}
+        UNIFON{"lizherenneg fonetek Unifon"}
+        VAIDIKA{"sanskriteg vedek"}
+        VALENCIA{"valensianeg"}
+        VALLADER{"rannyezh romañchek Vallader"}
+        VIVARAUP{"vivaroalpeg"}
+        WADEGILE{"romanekadur Wade-Giles"}
+        XSISTEMO{"esperanteg sistem X"}
+    }
+    characterLabelPattern{
+        all{"{0} — holl"}
+        category-list{"{0} : {1}"}
+        compatibility{"{0} — kenglotusted"}
+        enclosed{"{0} — kelcʼhiet"}
+        extended{"{0} — astennet"}
+        historic{"{0} — istorel"}
+        miscellaneous{"{0} — liesseurt"}
+        other{"{0} — all"}
+        scripts{"skriturioù — {0}"}
+        strokes{
+            few{"{0} linenn"}
+            many{"{0} a linennoù"}
+            one{"{0} linenn"}
+            other{"{0} linenn"}
+            two{"{0} linenn"}
+        }
+        subscript{"isskridad {0}"}
+        superscript{"usskridad {0}"}
+    }
+    codePatterns{
+        language{"yezh : {0}"}
+        script{"skritur : {0}"}
+        territory{"rannved : {0}"}
+    }
+    localeDisplayPattern{
+        keyTypePattern{"{0} : {1}"}
+        pattern{"{0} ({1})"}
+        separator{"{0}, {1}"}
+    }
+}

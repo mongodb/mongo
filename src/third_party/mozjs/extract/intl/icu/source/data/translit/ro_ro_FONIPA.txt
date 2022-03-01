@@ -1,0 +1,128 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: ro_ro_FONIPA.txt
+# Generated from CLDR
+#
+
+# Romanian orthography to phonemic transcription.
+# http://en.wikipedia.org/wiki/Romanian_phonology
+#
+# TODO: Currently this transform does not palatalize consonants.
+$VowelEI = [e i î];
+$VowelAOU = [a â ă o u];
+$Vowel = [$VowelEI $VowelAOU];
+$Boundary =  [^[:L:][:M:][:N:]];
+:: NFC () ;
+:: Lower () ;
+# Special cases.
+eoai → eo\u032Faj ;  # eg. leoaică → /leo\u032Fajkə/, not /le\u032Fo\u032Faikə/
+# Triphthongs.
+eai → e\u032Faj ;
+eau → e\u032Faw ;
+eoa → e\u032Fo\u032Fa ;
+i\-ai → jaj ;
+ia\-i → jaj ;
+iau → jaw ;
+iei → jej ;
+ieu → jew ;
+$Boundary {eu} → jew ;
+ioa → jo\u032Fa ;
+ioi → joj ;
+i\-oi → joj ;
+iou → jow ;
+oai → o\u032Faj ;
+uai → waj ;
+uau → waw ;
+uăi → wəj ;
+# Diphthongs.
+ai → aj ;
+âi → ɨj ;
+ăi → əj ;
+au} r → au ;
+au → aw ;
+âu → ɨw ;
+ău → əw ;
+ea → e\u032Fa ;
+ei → ej ;
+eo → e\u032Fo ;
+e\-o → e\u032Fo ;
+eu → ew ;
+e\-u → e\u032Fu ;
+ia → ja ;
+i\-a → ja ;
+ie → je ;
+ii → ij ;
+io → jo ;
+iu} [$Vowel $Boundary] → iw ;
+iu → ju ;
+oa → o\u032Fa ;
+oi → oj ;
+ou → ow ;
+ua → wa ;
+uâ → wɨ ;
+uă → wə ;
+ue → we ;
+ui → uj ;
+uu → uw ;
+a → a ;
+â → ɨ ;
+ă → ə ;
+b → b ;
+ch → k ;
+{c} [ei] → t\u0361ʃ ;
+c → k ;
+d → d ;
+e → e ;
+f → f ;
+gh → ɡ ;
+{g} [ei] → d\u0361ʒ ;
+g → ɡ ;
+h → h ;
+i → i ;
+î → ɨ ;
+j → ʒ ;
+k → k ;
+l → l ;
+m → m ;
+ng → ŋ ;
+n → n ;
+o → o ;
+p → p ;
+q → k ;
+r → r ;
+s → s ;
+ş → ʃ ;
+ș → ʃ ;
+t → t ;
+ţ → t\u0361s ;
+ț → t\u0361s ;
+u → u ;
+v → v ;
+x → ks ;
+y → i ;
+z → z ;
+[:P:]+ → ' ';
+# Romanian does not have any gemination.
+# https://en.wikipedia.org/wiki/Gemination#Latin_and_Romance_languages
+::null;
+pp+ → p;
+bb+ → b;
+tt+ → t;
+dd+ → d;
+kk+ → k;
+dd+ → d;
+ɡɡ+ → ɡ;
+ff+ → f;
+vv+ → v;
+hh+ → h;
+ss+ → s;
+zz+ → z;
+ʃʃ+ → ʃ;
+ʒʒ+ → ʒ;
+rr+ → r;
+ll+ → l;
+jj+ → j;
+ww+ → w;
+

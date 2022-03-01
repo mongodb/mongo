@@ -1,0 +1,40 @@
+// Copyright (C) 2018 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+
+filtertest {
+    alabama {
+        alaska {
+            arizona {"arkansas"}
+            california {"colorado"}
+        }
+        connecticut {
+            arizona {"delaware"}
+            california {"florida"}
+        }
+    }
+    // test suffixes
+    fornia {
+        hawaii {"idaho"}
+        illinois {"indiana"}
+    }
+    mississippi {
+        louisiana {
+            maine {"maryland"}
+            iowa {"kansas"}
+            missouri {"montana"}
+        }
+        michigan {
+            maine {"minnesota"}
+            iowa {"kentucky"}
+            missouri {"nebraska"}
+        }
+        nevada {
+            maine {"new-hampshire"}
+            iowa {"new-mexico"}
+            missouri {"new-york"}
+        }
+    }
+    northCarolina {
+        northDakota {"west-virginia"}
+    }
+}

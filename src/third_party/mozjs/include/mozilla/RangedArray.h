@@ -19,29 +19,29 @@
 
 namespace mozilla {
 
-template<typename T, size_t MinIndex, size_t Length>
-class RangedArray
-{
-private:
+template <typename T, size_t MinIndex, size_t Length>
+class RangedArray {
+ private:
   typedef Array<T, Length> ArrayType;
   ArrayType mArr;
 
-public:
-  T& operator[](size_t aIndex)
-  {
+ public:
+  static size_t length() { return Length; }
+  static size_t minIndex() { return MinIndex; }
+
+  T& operator[](size_t aIndex) {
     MOZ_ASSERT(aIndex == MinIndex || aIndex > MinIndex);
     return mArr[aIndex - MinIndex];
   }
 
-  const T& operator[](size_t aIndex) const
-  {
+  const T& operator[](size_t aIndex) const {
     MOZ_ASSERT(aIndex == MinIndex || aIndex > MinIndex);
     return mArr[aIndex - MinIndex];
   }
 
-  typedef typename ArrayType::iterator               iterator;
-  typedef typename ArrayType::const_iterator         const_iterator;
-  typedef typename ArrayType::reverse_iterator       reverse_iterator;
+  typedef typename ArrayType::iterator iterator;
+  typedef typename ArrayType::const_iterator const_iterator;
+  typedef typename ArrayType::reverse_iterator reverse_iterator;
   typedef typename ArrayType::const_reverse_iterator const_reverse_iterator;
 
   // Methods for range-based for loops.
@@ -61,6 +61,6 @@ public:
   const_reverse_iterator crend() const { return mArr.crend(); }
 };
 
-} // namespace mozilla
+}  // namespace mozilla
 
-#endif // mozilla_RangedArray_h
+#endif  // mozilla_RangedArray_h

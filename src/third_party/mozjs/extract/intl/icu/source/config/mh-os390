@@ -1,0 +1,258 @@
+## -*-makefile-*-
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+## os/390, z/OS specific setup 
+## Copyright (c) 1999-2014, International Business Machines Corporation and
+## others. All Rights Reserved.
+
+###################################################################
+#                    IMPORTANT NOTE                               #
+###################################################################
+# Before you try to run the Makefile, make sure you have the      #
+# environment variables set.                                      #
+#                                                                 #
+# If you are going to do the OS390BATCH build, make sure you have #
+# the OS390BATCH environment variable set.                        #
+#                                                                 #
+#   export OS390BATCH=1                                           #
+#                                                                 #
+# To build a version of ICU that does not use IEEE Floating point #
+#                                                                 #
+#   export IEEE390=0                                              #
+#                                                                 #
+# To build a version of ICU which uses a two data libraries       #
+# where the smaller one is loaded first, use OS390_STUBDATA.      #
+# USAGE OF THIS OPTION IS DEPRECATED. You should look into using  #
+# Link Pack Area (LPA), library lookaside facility (LLA) or other #
+# z/OS options that enable page fault based loading of read-only  #
+# code/data instead of this option.                               #
+# This option will be removed in a future version of ICU.         #
+#                                                                 #
+#   export OS390_STUBDATA=1                                       #
+#                                                                 #
+# To build a version of ICU which exploits the C/C++ compiler     #
+# and runtime Extra Performance Linkage (XPLINK), specify         #
+#                                                                 #
+#   export OS390_XPLINK=1                                         #
+#                                                                 #
+###################################################################
+
+# TODO: Fix this configuration so that icu-config will work!
+#       If statements don't work well when icu-config is generated.
+ifeq (${IEEE390},)
+IEEE390=1#M#
+endif
+
+ifeq (${IEEE390}, 1)
+ICU_IEEE          = -Wc,'FLOAT(IEEE)' -DIEEE_754=0#M#
+else
+ICU_IEEE          =#M#
+endif
+
+## Additional flags when building libraries and with threads
+THREADSCPPFLAGS = -D_OPEN_THREADS=3
+
+# For a dynamically called DLL module to share access to the POSIX external
+# variables, with its caller, the DLL module must define these _SHR_* macros.
+SHAREDLIBCPPFLAGS	= -D_SHR_TZNAME -D_SHR_TIMEZONE
+
+# -Wc,expo is used to export all functions
+SHAREDLIBCFLAGS	= -Wc,expo
+SHAREDLIBCXXFLAGS	= -Wc,expo
+
+# TODO: Consider using  -Wc,roc,ros for making the data and strings readonly
+#       -Wc,"ros" seems to work, but not the "roc"
+# The RENT option makes the program reentrant. This may not really have the same
+#       meaning as normal reentrancy on other platforms. See the z/OS documentation
+#       for details. This is the default for C++, but not C.
+# The DLL option must be used by the callee and caller code when using shared libraries.
+# NOCSECT might be used as an optimization option.
+# -+ means accept any file extension as a C++ file. By default only .C is accepted.
+CFLAGS          += -Wc,DLL,ROS,RENT,'ARCH(7)','LOC(POSIX)',NOANSIALIAS,'LANGLVL(EXTENDED)' $(ICU_IEEE)
+CXXFLAGS        += -Wc,DLL,ROS,RTTI,'ARCH(7)','LOC(POSIX)',NOANSIALIAS,'LANGLVL(EXTENDED0X)' $(ICU_IEEE) -+
+ARFLAGS         = -cr
+
+# _MSE_PROTOS usually interacts with _XOPEN_SOURCE. It affects some standard
+# C functions that use wchar_t, and it selects behavior for
+# multibyte extension support (MSE) functions.
+#DEFS            += -D_MSE_PROTOS
+
+ifeq (${OS390_XPLINK}, 1)
+#SH# if [ "x$OS390_XPLINK" = "x1" ]; then
+# These lines must be the last options specified.
+# GOFF is is the strategic object module format for S/390. It is required for XPLINK.
+# NOTEMPINC could be used if ICU starts using templates.
+ICU_XPLINK_C      = -Wc,'xplink(backchain,storeargs),goff'
+ICU_XPLINK_CXX    = -Wc,'xplink(backchain,storeargs),goff' -Wc,'NOTEMPINC'
+ICU_XPLINK_L      = -Wl,xplink
+#SH# fi
+endif
+
+## OS390BATCH
+ifeq (${OS390BATCH},1)
+DEFS            += -DOS390BATCH#M#
+endif
+
+## Commands to generate dependency files
+GEN_DEPS.c=	makedep                        
+GEN_DEPS.cc=	makedep
+
+## Commands to compile
+# _CXX_STEPS="-1" is a prelink step when compiling C and C++, and
+# it's only needed for long function names
+COMPILE.c       = $(COMPILE_LINK_ENVVAR) $(CC) $(DEFS) $(CPPFLAGS) $(CFLAGS) $(ICU_XPLINK_C) -c
+COMPILE.cc      = $(COMPILE_LINK_ENVVAR) $(CXX) $(DEFS) $(CPPFLAGS) $(CXXFLAGS) $(ICU_XPLINK_CXX) -c
+
+# Commands to link
+LINK.c=		$(COMPILE_LINK_ENVVAR) $(CC) $(CFLAGS) -Wl,dll $(LDFLAGS) $(ICU_XPLINK_L)
+LINK.cc=	$(COMPILE_LINK_ENVVAR) $(CXX) $(CXXFLAGS) -Wl,dll $(LDFLAGS) $(ICU_XPLINK_L)
+
+## Commands for shared library (dll)
+SHLIB.c=	$(LINK.c)
+SHLIB.cc=	$(LINK.cc)
+
+## Compiler switch to embed a runtime search path
+LD_RPATH=	-I
+
+## Environment variable to set a runtime search path
+LDLIBRARYPATH_ENVVAR = LIBPATH
+
+## An import library (a.k.a. sidedeck) is needed for z/OS and MSVC
+IMPORT_LIB_EXT = .x
+
+## Versioned target for a shared library.
+FINAL_SO_TARGET=  $(basename $(SO_TARGET))$(SO_TARGET_VERSION).$(SO)
+MIDDLE_SO_TARGET= $(basename $(SO_TARGET))$(SO_TARGET_VERSION_MAJOR).$(SO)
+
+## Versioned import library names.
+IMPORT_LIB = $(basename $(notdir $(SO_TARGET)))$(IMPORT_LIB_EXT)#M#
+MIDDLE_IMPORT_LIB = $(basename $(notdir $(MIDDLE_SO_TARGET)))$(IMPORT_LIB_EXT)#M#
+FINAL_IMPORT_LIB = $(basename $(notdir $(FINAL_SO_TARGET)))$(IMPORT_LIB_EXT)#M#
+
+## Non-shared intermediate object suffix
+STATIC_O = o
+
+ifeq ($(OS390_STUBDATA),1)
+## Suffix of the subset data library for dual common library support
+STUB_SUFFIX=_stub#M#
+DEFS      += -DOS390_STUBDATA -DU_LIBICUDATA_NAME=\"$(ICUPREFIX)$(DATA_STUBNAME)$(ICULIBSUFFIX)\"#M#
+endif
+
+ifeq ($(OS390BATCH),1)
+## PDS_NAME_PREFIX sets the prefix of the PDS dataset name while keeping the ICU version number.
+## To use custom names set ICU_PDS_NAME and ICU_PDS_NAME_SUFFIX
+## IXM is used as a name prefix for XML Toolkit, default value
+ifeq ($(PDS_NAME_PREFIX),)
+PDS_NAME_PREFIX= IXMI
+endif
+ifeq ($(ICU_PDS_NAME),)
+PDS_FULL_NAME=${PDS_NAME_PREFIX}${SO_TARGET_VERSION_MAJOR}
+else
+PDS_FULL_NAME=${ICU_PDS_NAME}
+endif
+ifeq ($(OS390_STUBDATA),1)
+BATCH_STUB_TARGET=	"//'${LOADMOD}(${PDS_FULL_NAME}D1${ICU_PDS_NAME_SUFFIX})'"
+BATCH_LIBICUDT=		"//'${LOADEXP}(${PDS_FULL_NAME}D1${ICU_PDS_NAME_SUFFIX})'"
+else
+BATCH_STUB_TARGET=	"//'${LOADMOD}(${PDS_FULL_NAME}DA${ICU_PDS_NAME_SUFFIX})'"
+BATCH_LIBICUDT=		"//'${LOADEXP}(${PDS_FULL_NAME}DA${ICU_PDS_NAME_SUFFIX})'"
+PKGDATA_DEFS        += -DU_LIBICUDATA_NAME=\"$(ICUPREFIX)$(DATA_STUBNAME)$(ICULIBSUFFIX)\"
+endif
+
+BATCH_COMMON_TARGET="//'${LOADMOD}(${PDS_FULL_NAME}UC${ICU_PDS_NAME_SUFFIX})'"
+BATCH_I18N_TARGET="//'${LOADMOD}(${PDS_FULL_NAME}IN${ICU_PDS_NAME_SUFFIX})'"
+BATCH_IO_TARGET="//'${LOADMOD}(${PDS_FULL_NAME}IO${ICU_PDS_NAME_SUFFIX})'"
+BATCH_LAYOUT_TARGET="//'${LOADMOD}(${PDS_FULL_NAME}LE${ICU_PDS_NAME_SUFFIX})'"
+BATCH_LAYOUTEX_TARGET="//'${LOADMOD}(${PDS_FULL_NAME}LX${ICU_PDS_NAME_SUFFIX})'"
+
+BATCH_LIBICUUC=		"//'${LOADEXP}(${PDS_FULL_NAME}UC${ICU_PDS_NAME_SUFFIX})'"
+BATCH_LIBICUI18N=	"//'${LOADEXP}(${PDS_FULL_NAME}IN${ICU_PDS_NAME_SUFFIX})'"
+BATCH_LIBICUIO=		"//'${LOADEXP}(${PDS_FULL_NAME}IO${ICU_PDS_NAME_SUFFIX})'"
+BATCH_LIBICULE=		"//'${LOADEXP}(${PDS_FULL_NAME}LE${ICU_PDS_NAME_SUFFIX})'"
+BATCH_LIBICULX=		"//'${LOADEXP}(${PDS_FULL_NAME}LX${ICU_PDS_NAME_SUFFIX})'"
+endif
+
+
+## Link commands to link to ICU libs
+LIBICUDT=	$(top_builddir)/stubdata/$(LIBICU)data$(ICULIBSUFFIX)$(STUB_SUFFIX)$(SO_TARGET_VERSION).x
+LIBICUUC=	$(top_builddir)/common/$(LIBICU)uc$(ICULIBSUFFIX)$(SO_TARGET_VERSION).x
+LIBICUI18N=	$(top_builddir)/i18n/$(LIBICU)i18n$(ICULIBSUFFIX)$(SO_TARGET_VERSION).x
+LIBICULX=	$(top_builddir)/layoutex/$(LIBICU)lx$(ICULIBSUFFIX)$(SO_TARGET_VERSION).x
+LIBICUIO=	$(top_builddir)/io/$(LIBICU)io$(ICULIBSUFFIX)$(SO_TARGET_VERSION).x
+LIBCTESTFW=	$(top_builddir)/tools/ctestfw/$(LIBICU)test$(ICULIBSUFFIX)$(SO_TARGET_VERSION).x
+LIBICUTOOLUTIL=	$(top_builddir)/tools/toolutil/$(LIBICU)tu$(ICULIBSUFFIX)$(SO_TARGET_VERSION).x
+
+ifneq (${ICUDATA_CHAR},e)
+#SH# if [ "$ICUDATA_CHAR" != "e" ]; then
+## We're in ASCII mode.
+CFLAGS		+= -Wc,'ascii'
+CXXFLAGS	+= -Wc,'ascii'
+SO = so
+else
+#SH# else
+## We're in EBCDIC mode.
+## Shared object suffix
+SO = dll
+endif
+#SH# fi
+
+## Special 390 rules
+
+## Build archive from object
+%.a : $(OBJECTS)
+	$(AR) $(ARFLAGS) $@ $(OBJECTS)
+
+## Compilation rules
+%.$(STATIC_O): $(srcdir)/%.c
+	$(COMPILE.c) $(STATICCPPFLAGS) $(STATICCFLAGS) -o $@ $<
+%.o: $(srcdir)/%.c
+	$(COMPILE.c) $(DYNAMICCPPFLAGS) $(DYNAMICCFLAGS) -o $@ $<
+
+# This causes escapesrc to be built before other ICU targets.
+NEED_ESCAPING=YES
+
+ifneq ($(SKIP_ESCAPING),)
+%.$(STATIC_O): $(srcdir)/%.cpp
+	$(COMPILE.cc) $(STATICCPPFLAGS) $(STATICCXXFLAGS) -o $@ $<
+%.o: $(srcdir)/%.cpp
+	$(COMPILE.cc) $(DYNAMICCPPFLAGS) $(DYNAMICCXXFLAGS) -o $@ $<
+else
+# convert *.cpp files to _*.cpp with \u / \U escaping
+CLEANFILES += _*.cpp
+
+# the actual escaping
+_%.cpp: $(srcdir)/%.cpp
+	@$(BINDIR)/escapesrc$(EXEEXT) $< $@
+
+%.$(STATIC_O): _%.cpp
+	$(COMPILE.cc) $(STATICCPPFLAGS) $(STATICCXXFLAGS) -o $@ $<
+%.o: _%.cpp
+	$(COMPILE.cc) $(DYNAMICCPPFLAGS) $(DYNAMICCXXFLAGS) -o $@ $<
+endif
+
+## Dependency rules
+%.d : %.u
+	@$(SHELL) -ec 'cat $<  \
+		| sed '\''s/\($*\)\.o[ :]*/\1.o $@ : /g'\'' > $@; \
+		[ -s $@ ] || rm -f $@ ; rm -f $<'
+
+%.u : $(srcdir)/%.c
+	@echo "generating dependency information for $<"
+	@$(SHELL) -ec 'touch            $*.u  > /dev/null 2>&1'
+	@$(SHELL) -ec '$(GEN_DEPS.c) -f $*.u $< > /dev/null 2>&1'
+
+%.u : $(srcdir)/%.cpp
+	@echo "generating dependency information for $<"
+	@$(SHELL) -ec 'touch              $*.u  > /dev/null 2>&1'
+	@$(SHELL) -ec '$(GEN_DEPS.cc)  -f $*.u $< > /dev/null 2>&1'
+
+## Versioned libraries rules
+%$(SO_TARGET_VERSION_MAJOR).$(SO): %$(SO_TARGET_VERSION).$(SO)
+	$(RM) $@ && ln -s ${*F}$(SO_TARGET_VERSION).$(SO) $@
+%.$(SO): %$(SO_TARGET_VERSION).$(SO)
+	$(RM) $@ && ln -s ${*F}$(SO_TARGET_VERSION).$(SO) $@
+
+## Install libraries as executable
+INSTALL-L=$(INSTALL_PROGRAM)
+
+## End 390-specific setup

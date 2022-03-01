@@ -1,0 +1,210 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: fa_fa_Latn_BGN.txt
+# Generated from CLDR
+#
+
+#
+########################################################################
+# BGN/PCGN 1956 System
+#
+# This system was adopted by the BGN in 1946 and by the PCGN in 1958.
+# It is used for the romanization of geographic names in Iran and
+# for Persian-language names in Afghanistan.
+#
+# Originally prepared by Michael Everson <everson@evertype.com>
+########################################################################
+#
+# MINIMAL FILTER: Persian-Latin
+#
+:: [[:arabic:][:block=ARABIC:][ءآابةتثجحخدذرزسشصضطظعغفقكلمنهویي\u064E\u064F\u0650\u0651\u0652٠١٢٣٤٥٦٧٨٩پچژگی]] ;
+:: NFKD (NFC) ;
+#
+#
+########################################################################
+#
+########################################################################
+#
+# Define All Transformation Variables
+#
+########################################################################
+#
+$alef = ’;
+$ayin = ‘;
+$disambig =  \u0331 ;
+#
+#
+# Use this $wordBoundary until bug 2034 is fixed in ICU:
+# http://bugs.icu-project.org/cgi-bin/icu-bugs/transliterate?id=2034;expression=boundary;user=guest
+#
+$wordBoundary =  [^[:L:][:M:][:N:]] ;
+#
+#
+########################################################################
+# non-letters
+[:Nd:]{٫}[:Nd:] ↔ [:Nd:]{','}[:Nd:] ; # ARABIC DECIMAL SEPARATOR
+[:Nd:]{٬}[:Nd:] ↔ [:Nd:]{'.'}[:Nd:] ; # ARABIC THOUSANDS SEPARATOR
+٫ ↔ ',' $disambig ; # ARABIC DECIMAL SEPARATOR
+٬ ↔ '.' $disambig ; # ARABIC THOUSANDS SEPARATOR
+#  ٭ ↔ ; # ARABIC FIVE POINTED STAR // no need to transliterate
+، ↔ ',' ; # ARABIC COMMA
+؛ ↔ ';' ; # ARABIC SEMICOLON
+؟ ↔ '?' ; # ARABIC QUESTION MARK
+٪ ↔ '%' ; # ARABIC PERCENT SIGN
+٠ ↔ 0 $disambig ; # ARABIC-INDIC DIGIT ZERO
+١ ↔ 1 $disambig ; # ARABIC-INDIC DIGIT ONE
+٢ ↔ 2 $disambig ; # ARABIC-INDIC DIGIT TWO
+٣ ↔ 3 $disambig ; # ARABIC-INDIC DIGIT THREE
+٤ ↔ 4 $disambig ; # ARABIC-INDIC DIGIT FOUR
+٥ ↔ 5 $disambig ; # ARABIC-INDIC DIGIT FIVE
+٦ ↔ 6 $disambig ; # ARABIC-INDIC DIGIT SIX
+٧ ↔ 7 $disambig ; # ARABIC-INDIC DIGIT SEVEN
+٨ ↔ 8 $disambig ; # ARABIC-INDIC DIGIT EIGHT
+٩ ↔ 9 $disambig ; # ARABIC-INDIC DIGIT NINE
+۰ ↔ 0 ; # EXTENDED ARABIC-INDIC DIGIT ZERO
+۱ ↔ 1 ; # EXTENDED ARABIC-INDIC DIGIT ONE
+۲ ↔ 2 ; # EXTENDED ARABIC-INDIC DIGIT TWO
+۳ ↔ 3 ; # EXTENDED ARABIC-INDIC DIGIT THREE
+۴ ↔ 4 ; # EXTENDED ARABIC-INDIC DIGIT FOUR
+۵ ↔ 5 ; # EXTENDED ARABIC-INDIC DIGIT FIVE
+۶ ↔ 6 ; # EXTENDED ARABIC-INDIC DIGIT SIX
+۷ ↔ 7 ; # EXTENDED ARABIC-INDIC DIGIT SEVEN
+۸ ↔ 8 ; # EXTENDED ARABIC-INDIC DIGIT EIGHT
+۹ ↔ 9 ; # EXTENDED ARABIC-INDIC DIGIT NINE
+#
+########################################################################
+#
+# Rules moved to front to avoid masking
+#
+########################################################################
+#
+########################################################################
+#
+# BGN Page 89 Rule 4
+#
+# The character sequences كه , زه , سه , and گه may be romanized k·h, z·h,
+# s·h, and g·h in order to differentiate those romanizations from the
+# digraphs kh, zh, sh, and gh.
+#
+########################################################################
+#
+كه → k·h ; # ARABIC LETTER KAF + HEH
+زه → z·h ; # ARABIC LETTER ZAIN + HEH
+سه → s·h ; # ARABIC LETTER SEEN + HEH
+گه → g·h ; # ARABIC LETTER GAF + HEH
+#
+#
+########################################################################
+#
+# End Rule 4
+#
+########################################################################
+#
+########################################################################
+#
+# BGN Page 91 Rule 7
+#
+# Doubles consonant sounds are represented in Arabic script by
+# placing a shaddah ( \u0651 ) over a consonant character. In romanization
+# the letter should be doubled. [The remainder of this rule deals with
+# the definite article and is lexical.]
+#
+########################################################################
+#
+ب\u0651 → bb ; # ARABIC LETTER BEH + SHADDA
+پ\u0651 → pp ; # ARABIC LETTER PEH + SHADDA
+ت\u0651 → tt ; # ARABIC LETTER TEH + SHADDA
+ث\u0651 → s\u0304s\u0304 ; # ARABIC LETTER THEH + SHADDA
+ج\u0651 → jj ; # ARABIC LETTER JEEM + SHADDA
+چ\u0651 → chch ; # ARABIC LETTER TCHEH + SHADDA
+ح\u0651 → ḥḥ ; # ARABIC LETTER HAH + SHADDA
+خ\u0651 → khkh ; # ARABIC LETTER KHAH + SHADDA
+د\u0651 → dd ; # ARABIC LETTER DAL + SHADDA
+ذ\u0651 → z\u0304z\u0304 ; # ARABIC LETTER THAL + SHADDA
+ر\u0651 → rr ; # ARABIC LETTER REH + SHADDA
+ز\u0651 → zz ; # ARABIC LETTER ZAIN + SHADDA
+ژ\u0651 → zhzh ; # ARABIC LETTER JEH + SHADDA
+س\u0651 → ss ; # ARABIC LETTER SEEN + SHADDA
+ش\u0651 → shsh ; # ARABIC LETTER SHEEN + SHADDA
+ص\u0651 → ṣṣ ; # ARABIC LETTER SAD + SHADDA
+ض\u0651 → ḍḍ ; # ARABIC LETTER DAD + SHADDA
+ط\u0651 → ṭṭ ; # ARABIC LETTER TAH + SHADDA
+ظ\u0651 → ẓẓ ; # ARABIC LETTER ZAH + SHADDA
+ع\u0651 → $ayin $ayin ; # ARABIC LETTER AIN + SHADDA
+غ\u0651 → ghgh ; # ARABIC LETTER GHAIN + SHADDA
+ف\u0651 → ff ; # ARABIC LETTER FEH + SHADDA
+ق\u0651 → qq ; # ARABIC LETTER QAF + SHADDA
+ك\u0651 → kk ; # ARABIC LETTER KAF + SHADDA
+ل\u0651 → ll ; # ARABIC LETTER LAM + SHADDA
+م\u0651 → mm ; # ARABIC LETTER MEEM + SHADDA
+ن\u0651 → nn ; # ARABIC LETTER NOON + SHADDA
+ه\u0651 → hh ; # ARABIC LETTER HEH + SHADDA
+و\u0651 → ww ; # ARABIC LETTER WAW + SHADDA
+ی\u0651 → yy ; # ARABIC LETTER FARSI YEH + SHADDA
+#
+#
+########################################################################
+#
+# End Rule 7
+#
+########################################################################
+#
+########################################################################
+#
+# Start of Transformations
+#
+########################################################################
+#
+$wordBoundary{ء →  ; # ARABIC LETTER HAMZA
+ء → $alef ; # ARABIC LETTER HAMZA
+$wordBoundary{ا →  ; # ARABIC LETTER ALEF
+آ → $alef ā ; # ARABIC FATHA ALEF WITH MADDA ABOVE
+ب → b ; # ARABIC LETTER BEH
+پ → p ; # ARABIC LETTER PEH
+ت → t ; # ARABIC LETTER TEH
+ة → h ; # ARABIC LETTER TEH MARBUTA
+ث → s\u0304 ; # ARABIC LETTER THEH
+ج → j ; # ARABIC LETTER JEEM
+چ → ch ; # ARABIC LETTER TCHEH
+ح → ḥ ; # ARABIC LETTER HAH
+خ → kh ; # ARABIC LETTER KHAH
+د → d ; # ARABIC LETTER DAL
+ذ → z\u0304 ; # ARABIC LETTER THAL
+ر → r ; # ARABIC LETTER REH
+ز → z ; # ARABIC LETTER ZAIN
+ژ → zh ; # ARABIC LETTER JEH
+س → s ; # ARABIC LETTER SEEN
+ش → sh ; # ARABIC LETTER SHEEN
+ص → ṣ ; # ARABIC LETTER SAD
+ض → ẕ ; # ARABIC LETTER DAD
+ط → ṭ ; # ARABIC LETTER TAH
+ظ → ẓ ; # ARABIC LETTER ZAH
+ع → $ayin ; # ARABIC LETTER AIN
+غ → gh ; # ARABIC LETTER GHAIN
+ف → f ; # ARABIC LETTER FEH
+ق → q ; # ARABIC LETTER QAF
+ک ↔ k ; # ARABIC LETTER KEHEH
+ك ↔ k $disambig ; # ARABIC LETTER KAF
+گ → g ; # ARABIC LETTER GAF
+ل → l ; # ARABIC LETTER LAM
+م → m ; # ARABIC LETTER MEEM
+ن → n ; # ARABIC LETTER NOON
+ه → h ; # ARABIC LETTER HEH
+و → v ; # ARABIC LETTER WAW
+ی → y ; # ARABIC LETTER FARSI YEH
+\u064Eا → ā ; # ARABIC FATHA + ALEF
+\u064Eی → á ; # ARABIC FATHA + FARSI YEH
+\u064Eو\u0652 → ow ; # ARABIC FATHA + WAW + SUKUN
+\u064E → a ; # ARABIC FATHA
+\u0650ي → ī ; # ARABIC KASRA + YEH
+\u0650 → e ; # ARABIC KASRA
+\u064Fو → ū ; # ARABIC DAMMA + WAW
+\u064F → o ; # ARABIC DAMMA
+\u0652 →  ; # ARABIC SUKUN
+::NFC (NFD) ;
+#
+#
+########################################################################
+

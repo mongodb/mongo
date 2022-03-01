@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -8,6 +8,7 @@
 #define jit_IonIC_h
 
 #include "jit/CacheIR.h"
+#include "jit/shared/Assembler-shared.h"
 
 namespace js {
 namespace jit {
@@ -15,45 +16,49 @@ namespace jit {
 class CacheIRStubInfo;
 
 // An optimized stub attached to an IonIC.
-class IonICStub
-{
-    // Code to jump to when this stub fails. This is either the next optimized
-    // stub or the OOL fallback path.
-    uint8_t* nextCodeRaw_;
+class IonICStub {
+  // Code to jump to when this stub fails. This is either the next optimized
+  // stub or the OOL fallback path.
+  uint8_t* nextCodeRaw_;
 
-    // The next optimized stub in this chain, or nullptr if this is the last
-    // one.
-    IonICStub* next_;
+  // The next optimized stub in this chain, or nullptr if this is the last
+  // one.
+  IonICStub* next_;
 
-    // Info about this stub.
-    CacheIRStubInfo* stubInfo_;
+  // Info about this stub.
+  CacheIRStubInfo* stubInfo_;
 
-  public:
-    IonICStub(uint8_t* fallbackCode, CacheIRStubInfo* stubInfo)
-      : nextCodeRaw_(fallbackCode), next_(nullptr), stubInfo_(stubInfo)
-    {}
+#ifndef JS_64BIT
+ protected:  // Silence Clang warning about unused private fields.
+  // Ensure stub data is 8-byte aligned on 32-bit.
+  uintptr_t padding_ = 0;
+#endif
 
-    uint8_t* nextCodeRaw() const { return nextCodeRaw_; }
-    uint8_t** nextCodeRawPtr() { return &nextCodeRaw_; }
-    CacheIRStubInfo* stubInfo() const { return stubInfo_; }
-    IonICStub* next() const { return next_; }
+ public:
+  IonICStub(uint8_t* fallbackCode, CacheIRStubInfo* stubInfo)
+      : nextCodeRaw_(fallbackCode), next_(nullptr), stubInfo_(stubInfo) {}
 
-    uint8_t* stubDataStart();
+  uint8_t* nextCodeRaw() const { return nextCodeRaw_; }
+  uint8_t** nextCodeRawPtr() { return &nextCodeRaw_; }
+  CacheIRStubInfo* stubInfo() const { return stubInfo_; }
+  IonICStub* next() const { return next_; }
 
-    void setNext(IonICStub* next, JitCode* nextCode) {
-        MOZ_ASSERT(!next_);
-        MOZ_ASSERT(next && nextCode);
-        next_ = next;
-        nextCodeRaw_ = nextCode->raw();
-    }
+  uint8_t* stubDataStart();
 
-    // Null out pointers when we unlink stubs, to ensure we never use
-    // discarded stubs.
-    void poison() {
-        nextCodeRaw_ = nullptr;
-        next_ = nullptr;
-        stubInfo_ = nullptr;
-    }
+  void setNext(IonICStub* next, uint8_t* nextCodeRaw) {
+    MOZ_ASSERT(!next_);
+    MOZ_ASSERT(next && nextCodeRaw);
+    next_ = next;
+    nextCodeRaw_ = nextCodeRaw;
+  }
+
+  // Null out pointers when we unlink stubs, to ensure we never use
+  // discarded stubs.
+  void poison() {
+    nextCodeRaw_ = nullptr;
+    next_ = nullptr;
+    stubInfo_ = nullptr;
+  }
 };
 
 class IonGetPropertyIC;
@@ -63,419 +68,564 @@ class IonGetNameIC;
 class IonBindNameIC;
 class IonGetIteratorIC;
 class IonHasOwnIC;
+class IonCheckPrivateFieldIC;
 class IonInIC;
 class IonInstanceOfIC;
+class IonCompareIC;
+class IonUnaryArithIC;
+class IonBinaryArithIC;
+class IonToPropertyKeyIC;
+class IonOptimizeSpreadCallIC;
 
-class IonIC
-{
-    // This either points at the OOL path for the fallback path, or the code for
-    // the first stub.
-    uint8_t* codeRaw_;
+class IonIC {
+  // This either points at the OOL path for the fallback path, or the code for
+  // the first stub.
+  uint8_t* codeRaw_;
 
-    // The first optimized stub, or nullptr.
-    IonICStub* firstStub_;
+  // The first optimized stub, or nullptr.
+  IonICStub* firstStub_;
 
-    // The address stubs should jump to when done.
-    CodeLocationLabel rejoinLabel_;
+  // Location of this IC.
+  JSScript* script_;
+  jsbytecode* pc_;
 
-    // The OOL path that calls the IC's update function.
-    CodeLocationLabel fallbackLabel_;
+  // The offset of the rejoin location in the IonScript's code (stubs jump to
+  // this location).
+  uint32_t rejoinOffset_;
 
-    // Location of this IC, nullptr for idempotent caches.
-    JSScript* script_;
-    jsbytecode* pc_;
+  // The offset of the OOL path in the IonScript's code that calls the IC's
+  // update function.
+  uint32_t fallbackOffset_;
 
-    CacheKind kind_;
-    bool idempotent_ : 1;
-    ICState state_;
+  CacheKind kind_;
+  ICState state_;
 
-  protected:
-    explicit IonIC(CacheKind kind)
+ protected:
+  explicit IonIC(CacheKind kind)
       : codeRaw_(nullptr),
         firstStub_(nullptr),
-        rejoinLabel_(),
-        fallbackLabel_(),
         script_(nullptr),
         pc_(nullptr),
+        rejoinOffset_(0),
+        fallbackOffset_(0),
         kind_(kind),
-        idempotent_(false),
-        state_()
-    {}
+        state_() {}
 
-    void attachStub(IonICStub* newStub, JitCode* code);
+  void attachStub(IonICStub* newStub, JitCode* code);
 
-  public:
-    void setScriptedLocation(JSScript* script, jsbytecode* pc) {
-        MOZ_ASSERT(!script_ && !pc_);
-        MOZ_ASSERT(script && pc);
-        script_ = script;
-        pc_ = pc;
-    }
+ public:
+  void setScriptedLocation(JSScript* script, jsbytecode* pc) {
+    MOZ_ASSERT(!script_ && !pc_);
+    MOZ_ASSERT(script && pc);
+    script_ = script;
+    pc_ = pc;
+  }
 
-    JSScript* script() const { MOZ_ASSERT(script_); return script_; }
-    jsbytecode* pc() const { MOZ_ASSERT(pc_); return pc_; }
+  JSScript* script() const {
+    MOZ_ASSERT(script_);
+    return script_;
+  }
+  jsbytecode* pc() const {
+    MOZ_ASSERT(pc_);
+    return pc_;
+  }
 
-    CodeLocationLabel rejoinLabel() const { return rejoinLabel_; }
+  // Discard all stubs.
+  void discardStubs(Zone* zone, IonScript* ionScript);
 
-    // Discard all stubs.
-    void discardStubs(Zone* zone);
+  // Discard all stubs and reset the ICState.
+  void reset(Zone* zone, IonScript* ionScript);
 
-    // Discard all stubs and reset the ICState.
-    void reset(Zone* zone);
+  ICState& state() { return state_; }
 
-    ICState& state() {
-        return state_;
-    }
+  CacheKind kind() const { return kind_; }
+  uint8_t** codeRawPtr() { return &codeRaw_; }
 
-    CacheKind kind() const { return kind_; }
-    uint8_t** codeRawPtr() { return &codeRaw_; }
+  void setFallbackOffset(CodeOffset offset) {
+    fallbackOffset_ = offset.offset();
+  }
+  void setRejoinOffset(CodeOffset offset) { rejoinOffset_ = offset.offset(); }
 
-    bool idempotent() const { return idempotent_; }
-    void setIdempotent() { idempotent_ = true; }
+  void resetCodeRaw(IonScript* ionScript);
 
-    void setFallbackLabel(CodeOffset fallbackLabel) { fallbackLabel_ = fallbackLabel; }
-    void setRejoinLabel(CodeOffset rejoinLabel) { rejoinLabel_ = rejoinLabel; }
+  uint8_t* fallbackAddr(IonScript* ionScript) const;
+  uint8_t* rejoinAddr(IonScript* ionScript) const;
 
-    IonGetPropertyIC* asGetPropertyIC() {
-        MOZ_ASSERT(kind_ == CacheKind::GetProp || kind_ == CacheKind::GetElem);
-        return (IonGetPropertyIC*)this;
-    }
-    IonSetPropertyIC* asSetPropertyIC() {
-        MOZ_ASSERT(kind_ == CacheKind::SetProp || kind_ == CacheKind::SetElem);
-        return (IonSetPropertyIC*)this;
-    }
-    IonGetPropSuperIC* asGetPropSuperIC() {
-        MOZ_ASSERT(kind_ == CacheKind::GetPropSuper || kind_ == CacheKind::GetElemSuper);
-        return (IonGetPropSuperIC*)this;
-    }
-    IonGetNameIC* asGetNameIC() {
-        MOZ_ASSERT(kind_ == CacheKind::GetName);
-        return (IonGetNameIC*)this;
-    }
-    IonBindNameIC* asBindNameIC() {
-        MOZ_ASSERT(kind_ == CacheKind::BindName);
-        return (IonBindNameIC*)this;
-    }
-    IonGetIteratorIC* asGetIteratorIC() {
-        MOZ_ASSERT(kind_ == CacheKind::GetIterator);
-        return (IonGetIteratorIC*)this;
-    }
-    IonHasOwnIC* asHasOwnIC() {
-        MOZ_ASSERT(kind_ == CacheKind::HasOwn);
-        return (IonHasOwnIC*)this;
-    }
-    IonInIC* asInIC() {
-        MOZ_ASSERT(kind_ == CacheKind::In);
-        return (IonInIC*)this;
-    }
-    IonInstanceOfIC* asInstanceOfIC() {
-        MOZ_ASSERT(kind_ == CacheKind::InstanceOf);
-        return (IonInstanceOfIC*)this;
-    }
+  IonGetPropertyIC* asGetPropertyIC() {
+    MOZ_ASSERT(kind_ == CacheKind::GetProp || kind_ == CacheKind::GetElem);
+    return (IonGetPropertyIC*)this;
+  }
+  IonSetPropertyIC* asSetPropertyIC() {
+    MOZ_ASSERT(kind_ == CacheKind::SetProp || kind_ == CacheKind::SetElem);
+    return (IonSetPropertyIC*)this;
+  }
+  IonGetPropSuperIC* asGetPropSuperIC() {
+    MOZ_ASSERT(kind_ == CacheKind::GetPropSuper ||
+               kind_ == CacheKind::GetElemSuper);
+    return (IonGetPropSuperIC*)this;
+  }
+  IonGetNameIC* asGetNameIC() {
+    MOZ_ASSERT(kind_ == CacheKind::GetName);
+    return (IonGetNameIC*)this;
+  }
+  IonBindNameIC* asBindNameIC() {
+    MOZ_ASSERT(kind_ == CacheKind::BindName);
+    return (IonBindNameIC*)this;
+  }
+  IonGetIteratorIC* asGetIteratorIC() {
+    MOZ_ASSERT(kind_ == CacheKind::GetIterator);
+    return (IonGetIteratorIC*)this;
+  }
+  IonOptimizeSpreadCallIC* asOptimizeSpreadCallIC() {
+    MOZ_ASSERT(kind_ == CacheKind::OptimizeSpreadCall);
+    return (IonOptimizeSpreadCallIC*)this;
+  }
+  IonHasOwnIC* asHasOwnIC() {
+    MOZ_ASSERT(kind_ == CacheKind::HasOwn);
+    return (IonHasOwnIC*)this;
+  }
+  IonCheckPrivateFieldIC* asCheckPrivateFieldIC() {
+    MOZ_ASSERT(kind_ == CacheKind::CheckPrivateField);
+    return (IonCheckPrivateFieldIC*)this;
+  }
+  IonInIC* asInIC() {
+    MOZ_ASSERT(kind_ == CacheKind::In);
+    return (IonInIC*)this;
+  }
+  IonInstanceOfIC* asInstanceOfIC() {
+    MOZ_ASSERT(kind_ == CacheKind::InstanceOf);
+    return (IonInstanceOfIC*)this;
+  }
+  IonCompareIC* asCompareIC() {
+    MOZ_ASSERT(kind_ == CacheKind::Compare);
+    return (IonCompareIC*)this;
+  }
+  IonUnaryArithIC* asUnaryArithIC() {
+    MOZ_ASSERT(kind_ == CacheKind::UnaryArith);
+    return (IonUnaryArithIC*)this;
+  }
+  IonBinaryArithIC* asBinaryArithIC() {
+    MOZ_ASSERT(kind_ == CacheKind::BinaryArith);
+    return (IonBinaryArithIC*)this;
+  }
+  IonToPropertyKeyIC* asToPropertyKeyIC() {
+    MOZ_ASSERT(kind_ == CacheKind::ToPropertyKey);
+    return (IonToPropertyKeyIC*)this;
+  }
 
-    void updateBaseAddress(JitCode* code, MacroAssembler& masm);
+  // Returns the Register to use as scratch when entering IC stubs. This
+  // should either be an output register or a temp.
+  Register scratchRegisterForEntryJump();
 
-    // Returns the Register to use as scratch when entering IC stubs. This
-    // should either be an output register or a temp.
-    Register scratchRegisterForEntryJump();
+  void trace(JSTracer* trc, IonScript* ionScript);
 
-    void trace(JSTracer* trc);
-
-    void attachCacheIRStub(JSContext* cx, const CacheIRWriter& writer, CacheKind kind,
-                           IonScript* ionScript, bool* attached,
-                           const PropertyTypeCheckInfo* typeCheckInfo = nullptr);
+  void attachCacheIRStub(JSContext* cx, const CacheIRWriter& writer,
+                         CacheKind kind, IonScript* ionScript, bool* attached);
 };
 
-class IonGetPropertyIC : public IonIC
-{
-  private:
-    LiveRegisterSet liveRegs_;
+class IonGetPropertyIC : public IonIC {
+ private:
+  LiveRegisterSet liveRegs_;
 
-    TypedOrValueRegister value_;
-    ConstantOrRegister id_;
-    TypedOrValueRegister output_;
-    Register maybeTemp_; // Might be InvalidReg.
+  TypedOrValueRegister value_;
+  ConstantOrRegister id_;
+  ValueOperand output_;
 
-    GetPropertyResultFlags resultFlags_;
-
-  public:
-    IonGetPropertyIC(CacheKind kind, LiveRegisterSet liveRegs, TypedOrValueRegister value,
-                     const ConstantOrRegister& id, TypedOrValueRegister output, Register maybeTemp,
-                     GetPropertyResultFlags resultFlags)
+ public:
+  IonGetPropertyIC(CacheKind kind, LiveRegisterSet liveRegs,
+                   TypedOrValueRegister value, const ConstantOrRegister& id,
+                   ValueOperand output)
       : IonIC(kind),
         liveRegs_(liveRegs),
         value_(value),
         id_(id),
-        output_(output),
-        maybeTemp_(maybeTemp),
-        resultFlags_(resultFlags)
-    { }
+        output_(output) {}
 
-    TypedOrValueRegister value() const { return value_; }
-    ConstantOrRegister id() const { return id_; }
-    TypedOrValueRegister output() const { return output_; }
-    Register maybeTemp() const { return maybeTemp_; }
-    LiveRegisterSet liveRegs() const { return liveRegs_; }
-    GetPropertyResultFlags resultFlags() const { return resultFlags_; }
-    bool monitoredResult() const { return resultFlags_ & GetPropertyResultFlags::Monitored; }
-    bool allowDoubleResult() const { return resultFlags_ & GetPropertyResultFlags::AllowDouble; }
+  TypedOrValueRegister value() const { return value_; }
+  ConstantOrRegister id() const { return id_; }
+  ValueOperand output() const { return output_; }
+  LiveRegisterSet liveRegs() const { return liveRegs_; }
 
-    static MOZ_MUST_USE bool update(JSContext* cx, HandleScript outerScript, IonGetPropertyIC* ic,
-                                    HandleValue val, HandleValue idVal, MutableHandleValue res);
+  [[nodiscard]] static bool update(JSContext* cx, HandleScript outerScript,
+                                   IonGetPropertyIC* ic, HandleValue val,
+                                   HandleValue idVal, MutableHandleValue res);
 };
 
-class IonGetPropSuperIC : public IonIC
-{
-    LiveRegisterSet liveRegs_;
+class IonGetPropSuperIC : public IonIC {
+  LiveRegisterSet liveRegs_;
 
-    Register object_;
-    TypedOrValueRegister receiver_;
-    ConstantOrRegister id_;
-    TypedOrValueRegister output_;
+  Register object_;
+  TypedOrValueRegister receiver_;
+  ConstantOrRegister id_;
+  ValueOperand output_;
 
-  public:
-    IonGetPropSuperIC(CacheKind kind, LiveRegisterSet liveRegs, Register object, TypedOrValueRegister receiver,
-                      const ConstantOrRegister& id, TypedOrValueRegister output)
+ public:
+  IonGetPropSuperIC(CacheKind kind, LiveRegisterSet liveRegs, Register object,
+                    TypedOrValueRegister receiver, const ConstantOrRegister& id,
+                    ValueOperand output)
       : IonIC(kind),
         liveRegs_(liveRegs),
         object_(object),
         receiver_(receiver),
         id_(id),
-        output_(output)
-    { }
+        output_(output) {}
 
-    Register object() const { return object_; }
-    TypedOrValueRegister receiver() const { return receiver_; }
-    ConstantOrRegister id() const { return id_; }
-    TypedOrValueRegister output() const { return output_; }
-    LiveRegisterSet liveRegs() const { return liveRegs_; }
+  Register object() const { return object_; }
+  TypedOrValueRegister receiver() const { return receiver_; }
+  ConstantOrRegister id() const { return id_; }
+  ValueOperand output() const { return output_; }
+  LiveRegisterSet liveRegs() const { return liveRegs_; }
 
-    static MOZ_MUST_USE bool update(JSContext* cx, HandleScript outerScript, IonGetPropSuperIC* ic,
-                                    HandleObject obj, HandleValue receiver, HandleValue idVal,
-                                    MutableHandleValue res);
+  [[nodiscard]] static bool update(JSContext* cx, HandleScript outerScript,
+                                   IonGetPropSuperIC* ic, HandleObject obj,
+                                   HandleValue receiver, HandleValue idVal,
+                                   MutableHandleValue res);
 };
 
-class IonSetPropertyIC : public IonIC
-{
-    LiveRegisterSet liveRegs_;
+class IonSetPropertyIC : public IonIC {
+  LiveRegisterSet liveRegs_;
 
-    Register object_;
-    Register temp_;
-    FloatRegister maybeTempDouble_;
-    FloatRegister maybeTempFloat32_;
-    ConstantOrRegister id_;
-    ConstantOrRegister rhs_;
-    bool strict_ : 1;
-    bool needsPostBarrier_ : 1;
-    bool needsTypeBarrier_ : 1;
-    bool guardHoles_ : 1;
+  Register object_;
+  Register temp_;
+  ConstantOrRegister id_;
+  ConstantOrRegister rhs_;
+  bool strict_ : 1;
 
-  public:
-    IonSetPropertyIC(CacheKind kind, LiveRegisterSet liveRegs, Register object, Register temp,
-                     FloatRegister maybeTempDouble, FloatRegister maybeTempFloat32,
-                     const ConstantOrRegister& id, const ConstantOrRegister& rhs, bool strict,
-                     bool needsPostBarrier, bool needsTypeBarrier, bool guardHoles)
+ public:
+  IonSetPropertyIC(CacheKind kind, LiveRegisterSet liveRegs, Register object,
+                   Register temp, const ConstantOrRegister& id,
+                   const ConstantOrRegister& rhs, bool strict)
       : IonIC(kind),
         liveRegs_(liveRegs),
         object_(object),
         temp_(temp),
-        maybeTempDouble_(maybeTempDouble),
-        maybeTempFloat32_(maybeTempFloat32),
         id_(id),
         rhs_(rhs),
-        strict_(strict),
-        needsPostBarrier_(needsPostBarrier),
-        needsTypeBarrier_(needsTypeBarrier),
-        guardHoles_(guardHoles)
-    { }
+        strict_(strict) {}
 
-    LiveRegisterSet liveRegs() const { return liveRegs_; }
-    Register object() const { return object_; }
-    ConstantOrRegister id() const { return id_; }
-    ConstantOrRegister rhs() const { return rhs_; }
+  LiveRegisterSet liveRegs() const { return liveRegs_; }
+  Register object() const { return object_; }
+  ConstantOrRegister id() const { return id_; }
+  ConstantOrRegister rhs() const { return rhs_; }
 
-    Register temp() const { return temp_; }
-    FloatRegister maybeTempDouble() const { return maybeTempDouble_; }
-    FloatRegister maybeTempFloat32() const { return maybeTempFloat32_; }
+  Register temp() const { return temp_; }
 
-    bool strict() const { return strict_; }
-    bool needsPostBarrier() const { return needsPostBarrier_; }
-    bool needsTypeBarrier() const { return needsTypeBarrier_; }
-    bool guardHoles() const { return guardHoles_; }
+  bool strict() const { return strict_; }
 
-    static MOZ_MUST_USE bool update(JSContext* cx, HandleScript outerScript, IonSetPropertyIC* ic,
-                                    HandleObject obj, HandleValue idVal, HandleValue rhs);
+  [[nodiscard]] static bool update(JSContext* cx, HandleScript outerScript,
+                                   IonSetPropertyIC* ic, HandleObject obj,
+                                   HandleValue idVal, HandleValue rhs);
 };
 
-class IonGetNameIC : public IonIC
-{
-    LiveRegisterSet liveRegs_;
+class IonGetNameIC : public IonIC {
+  LiveRegisterSet liveRegs_;
 
-    Register environment_;
-    ValueOperand output_;
-    Register temp_;
+  Register environment_;
+  ValueOperand output_;
+  Register temp_;
 
-  public:
-    IonGetNameIC(LiveRegisterSet liveRegs, Register environment, ValueOperand output,
-                 Register temp)
+ public:
+  IonGetNameIC(LiveRegisterSet liveRegs, Register environment,
+               ValueOperand output, Register temp)
       : IonIC(CacheKind::GetName),
         liveRegs_(liveRegs),
         environment_(environment),
         output_(output),
-        temp_(temp)
-    { }
+        temp_(temp) {}
 
-    Register environment() const { return environment_; }
-    ValueOperand output() const { return output_; }
-    Register temp() const { return temp_; }
-    LiveRegisterSet liveRegs() const { return liveRegs_; }
+  Register environment() const { return environment_; }
+  ValueOperand output() const { return output_; }
+  Register temp() const { return temp_; }
+  LiveRegisterSet liveRegs() const { return liveRegs_; }
 
-    static MOZ_MUST_USE bool update(JSContext* cx, HandleScript outerScript, IonGetNameIC* ic,
-                                    HandleObject envChain, MutableHandleValue res);
+  [[nodiscard]] static bool update(JSContext* cx, HandleScript outerScript,
+                                   IonGetNameIC* ic, HandleObject envChain,
+                                   MutableHandleValue res);
 };
 
-class IonBindNameIC : public IonIC
-{
-    LiveRegisterSet liveRegs_;
+class IonBindNameIC : public IonIC {
+  LiveRegisterSet liveRegs_;
 
-    Register environment_;
-    Register output_;
-    Register temp_;
+  Register environment_;
+  Register output_;
+  Register temp_;
 
-  public:
-    IonBindNameIC(LiveRegisterSet liveRegs, Register environment, Register output, Register temp)
+ public:
+  IonBindNameIC(LiveRegisterSet liveRegs, Register environment, Register output,
+                Register temp)
       : IonIC(CacheKind::BindName),
         liveRegs_(liveRegs),
         environment_(environment),
         output_(output),
-        temp_(temp)
-    { }
+        temp_(temp) {}
 
-    Register environment() const { return environment_; }
-    Register output() const { return output_; }
-    Register temp() const { return temp_; }
-    LiveRegisterSet liveRegs() const { return liveRegs_; }
+  Register environment() const { return environment_; }
+  Register output() const { return output_; }
+  Register temp() const { return temp_; }
+  LiveRegisterSet liveRegs() const { return liveRegs_; }
 
-    static JSObject* update(JSContext* cx, HandleScript outerScript, IonBindNameIC* ic,
-                            HandleObject envChain);
+  static JSObject* update(JSContext* cx, HandleScript outerScript,
+                          IonBindNameIC* ic, HandleObject envChain);
 };
 
-class IonGetIteratorIC : public IonIC
-{
-    LiveRegisterSet liveRegs_;
-    TypedOrValueRegister value_;
-    Register output_;
-    Register temp1_;
-    Register temp2_;
+class IonGetIteratorIC : public IonIC {
+  LiveRegisterSet liveRegs_;
+  TypedOrValueRegister value_;
+  Register output_;
+  Register temp1_;
+  Register temp2_;
 
-  public:
-    IonGetIteratorIC(LiveRegisterSet liveRegs, TypedOrValueRegister value, Register output,
-                     Register temp1, Register temp2)
+ public:
+  IonGetIteratorIC(LiveRegisterSet liveRegs, TypedOrValueRegister value,
+                   Register output, Register temp1, Register temp2)
       : IonIC(CacheKind::GetIterator),
         liveRegs_(liveRegs),
         value_(value),
         output_(output),
         temp1_(temp1),
-        temp2_(temp2)
-    { }
+        temp2_(temp2) {}
 
-    TypedOrValueRegister value() const { return value_; }
-    Register output() const { return output_; }
-    Register temp1() const { return temp1_; }
-    Register temp2() const { return temp2_; }
-    LiveRegisterSet liveRegs() const { return liveRegs_; }
+  TypedOrValueRegister value() const { return value_; }
+  Register output() const { return output_; }
+  Register temp1() const { return temp1_; }
+  Register temp2() const { return temp2_; }
+  LiveRegisterSet liveRegs() const { return liveRegs_; }
 
-    static JSObject* update(JSContext* cx, HandleScript outerScript, IonGetIteratorIC* ic,
-                            HandleValue value);
+  static JSObject* update(JSContext* cx, HandleScript outerScript,
+                          IonGetIteratorIC* ic, HandleValue value);
 };
 
-class IonHasOwnIC : public IonIC
-{
-    LiveRegisterSet liveRegs_;
+class IonOptimizeSpreadCallIC : public IonIC {
+  LiveRegisterSet liveRegs_;
+  ValueOperand value_;
+  Register output_;
+  Register temp_;
 
-    TypedOrValueRegister value_;
-    TypedOrValueRegister id_;
-    Register output_;
+ public:
+  IonOptimizeSpreadCallIC(LiveRegisterSet liveRegs, ValueOperand value,
+                          Register output, Register temp)
+      : IonIC(CacheKind::OptimizeSpreadCall),
+        liveRegs_(liveRegs),
+        value_(value),
+        output_(output),
+        temp_(temp) {}
 
-  public:
-    IonHasOwnIC(LiveRegisterSet liveRegs, TypedOrValueRegister value,
-                TypedOrValueRegister id, Register output)
+  ValueOperand value() const { return value_; }
+  Register output() const { return output_; }
+  Register temp() const { return temp_; }
+  LiveRegisterSet liveRegs() const { return liveRegs_; }
+
+  static bool update(JSContext* cx, HandleScript outerScript,
+                     IonOptimizeSpreadCallIC* ic, HandleValue value,
+                     bool* result);
+};
+
+class IonHasOwnIC : public IonIC {
+  LiveRegisterSet liveRegs_;
+
+  TypedOrValueRegister value_;
+  TypedOrValueRegister id_;
+  Register output_;
+
+ public:
+  IonHasOwnIC(LiveRegisterSet liveRegs, TypedOrValueRegister value,
+              TypedOrValueRegister id, Register output)
       : IonIC(CacheKind::HasOwn),
         liveRegs_(liveRegs),
         value_(value),
         id_(id),
-        output_(output)
-    { }
+        output_(output) {}
 
-    TypedOrValueRegister value() const { return value_; }
-    TypedOrValueRegister id() const { return id_; }
-    Register output() const { return output_; }
-    LiveRegisterSet liveRegs() const { return liveRegs_; }
+  TypedOrValueRegister value() const { return value_; }
+  TypedOrValueRegister id() const { return id_; }
+  Register output() const { return output_; }
+  LiveRegisterSet liveRegs() const { return liveRegs_; }
 
-    static MOZ_MUST_USE bool update(JSContext* cx, HandleScript outerScript, IonHasOwnIC* ic,
-                                    HandleValue val, HandleValue idVal, int32_t* res);
+  [[nodiscard]] static bool update(JSContext* cx, HandleScript outerScript,
+                                   IonHasOwnIC* ic, HandleValue val,
+                                   HandleValue idVal, int32_t* res);
 };
 
-class IonInIC : public IonIC
-{
-    LiveRegisterSet liveRegs_;
+class IonCheckPrivateFieldIC : public IonIC {
+  LiveRegisterSet liveRegs_;
 
-    ConstantOrRegister key_;
-    Register object_;
-    Register output_;
-    Register temp_;
+  TypedOrValueRegister value_;
+  TypedOrValueRegister id_;
+  Register output_;
 
-  public:
-    IonInIC(LiveRegisterSet liveRegs, const ConstantOrRegister& key,
-            Register object, Register output, Register temp)
+ public:
+  IonCheckPrivateFieldIC(LiveRegisterSet liveRegs, TypedOrValueRegister value,
+                         TypedOrValueRegister id, Register output)
+      : IonIC(CacheKind::CheckPrivateField),
+        liveRegs_(liveRegs),
+        value_(value),
+        id_(id),
+        output_(output) {}
+
+  TypedOrValueRegister value() const { return value_; }
+  TypedOrValueRegister id() const { return id_; }
+  Register output() const { return output_; }
+  LiveRegisterSet liveRegs() const { return liveRegs_; }
+
+  [[nodiscard]] static bool update(JSContext* cx, HandleScript outerScript,
+                                   IonCheckPrivateFieldIC* ic, HandleValue val,
+                                   HandleValue idVal, bool* res);
+};
+
+class IonInIC : public IonIC {
+  LiveRegisterSet liveRegs_;
+
+  ConstantOrRegister key_;
+  Register object_;
+  Register output_;
+  Register temp_;
+
+ public:
+  IonInIC(LiveRegisterSet liveRegs, const ConstantOrRegister& key,
+          Register object, Register output, Register temp)
       : IonIC(CacheKind::In),
         liveRegs_(liveRegs),
         key_(key),
         object_(object),
         output_(output),
-        temp_(temp)
-    { }
+        temp_(temp) {}
 
-    ConstantOrRegister key() const { return key_; }
-    Register object() const { return object_; }
-    Register output() const { return output_; }
-    Register temp() const { return temp_; }
-    LiveRegisterSet liveRegs() const { return liveRegs_; }
+  ConstantOrRegister key() const { return key_; }
+  Register object() const { return object_; }
+  Register output() const { return output_; }
+  Register temp() const { return temp_; }
+  LiveRegisterSet liveRegs() const { return liveRegs_; }
 
-    static MOZ_MUST_USE bool update(JSContext* cx, HandleScript outerScript, IonInIC* ic,
-                                    HandleValue key, HandleObject obj, bool* res);
+  [[nodiscard]] static bool update(JSContext* cx, HandleScript outerScript,
+                                   IonInIC* ic, HandleValue key,
+                                   HandleObject obj, bool* res);
 };
 
-class IonInstanceOfIC : public IonIC
-{
-    LiveRegisterSet liveRegs_;
+class IonInstanceOfIC : public IonIC {
+  LiveRegisterSet liveRegs_;
 
-    TypedOrValueRegister lhs_;
-    Register rhs_;
-    Register output_;
+  TypedOrValueRegister lhs_;
+  Register rhs_;
+  Register output_;
 
-    public:
-
-    IonInstanceOfIC(LiveRegisterSet liveRegs, TypedOrValueRegister lhs, Register rhs,
-                    Register output)
+ public:
+  IonInstanceOfIC(LiveRegisterSet liveRegs, TypedOrValueRegister lhs,
+                  Register rhs, Register output)
       : IonIC(CacheKind::InstanceOf),
         liveRegs_(liveRegs),
         lhs_(lhs),
         rhs_(rhs),
-        output_(output)
-    { }
+        output_(output) {}
 
-    LiveRegisterSet liveRegs() const { return liveRegs_; }
-    TypedOrValueRegister lhs() const { return lhs_; }
-    Register rhs() const { return rhs_; }
-    Register output() const { return output_; }
+  LiveRegisterSet liveRegs() const { return liveRegs_; }
+  TypedOrValueRegister lhs() const { return lhs_; }
+  Register rhs() const { return rhs_; }
+  Register output() const { return output_; }
 
-    // This signature mimics that of TryAttachInstanceOfStub in baseline
-    static MOZ_MUST_USE bool update(JSContext* cx, HandleScript outerScript, IonInstanceOfIC* ic,
-                                    HandleValue lhs, HandleObject rhs, bool* attached);
+  // This signature mimics that of TryAttachInstanceOfStub in baseline
+  [[nodiscard]] static bool update(JSContext* cx, HandleScript outerScript,
+                                   IonInstanceOfIC* ic, HandleValue lhs,
+                                   HandleObject rhs, bool* attached);
 };
 
-} // namespace jit
-} // namespace js
+class IonCompareIC : public IonIC {
+  LiveRegisterSet liveRegs_;
+
+  TypedOrValueRegister lhs_;
+  TypedOrValueRegister rhs_;
+  Register output_;
+
+ public:
+  IonCompareIC(LiveRegisterSet liveRegs, TypedOrValueRegister lhs,
+               TypedOrValueRegister rhs, Register output)
+      : IonIC(CacheKind::Compare),
+        liveRegs_(liveRegs),
+        lhs_(lhs),
+        rhs_(rhs),
+        output_(output) {}
+
+  LiveRegisterSet liveRegs() const { return liveRegs_; }
+  TypedOrValueRegister lhs() const { return lhs_; }
+  TypedOrValueRegister rhs() const { return rhs_; }
+  Register output() const { return output_; }
+
+  [[nodiscard]] static bool update(JSContext* cx, HandleScript outerScript,
+                                   IonCompareIC* stub, HandleValue lhs,
+                                   HandleValue rhs, bool* res);
+};
+
+class IonUnaryArithIC : public IonIC {
+  LiveRegisterSet liveRegs_;
+
+  TypedOrValueRegister input_;
+  ValueOperand output_;
+
+ public:
+  IonUnaryArithIC(LiveRegisterSet liveRegs, TypedOrValueRegister input,
+                  ValueOperand output)
+      : IonIC(CacheKind::UnaryArith),
+        liveRegs_(liveRegs),
+        input_(input),
+        output_(output) {}
+
+  LiveRegisterSet liveRegs() const { return liveRegs_; }
+  TypedOrValueRegister input() const { return input_; }
+  ValueOperand output() const { return output_; }
+
+  [[nodiscard]] static bool update(JSContext* cx, HandleScript outerScript,
+                                   IonUnaryArithIC* stub, HandleValue val,
+                                   MutableHandleValue res);
+};
+
+class IonToPropertyKeyIC : public IonIC {
+  LiveRegisterSet liveRegs_;
+  ValueOperand input_;
+  ValueOperand output_;
+
+ public:
+  IonToPropertyKeyIC(LiveRegisterSet liveRegs, ValueOperand input,
+                     ValueOperand output)
+      : IonIC(CacheKind::ToPropertyKey),
+        liveRegs_(liveRegs),
+        input_(input),
+        output_(output) {}
+
+  LiveRegisterSet liveRegs() const { return liveRegs_; }
+  ValueOperand input() const { return input_; }
+  ValueOperand output() const { return output_; }
+
+  [[nodiscard]] static bool update(JSContext* cx, HandleScript outerScript,
+                                   IonToPropertyKeyIC* ic, HandleValue val,
+                                   MutableHandleValue res);
+};
+
+class IonBinaryArithIC : public IonIC {
+  LiveRegisterSet liveRegs_;
+
+  TypedOrValueRegister lhs_;
+  TypedOrValueRegister rhs_;
+  ValueOperand output_;
+
+ public:
+  IonBinaryArithIC(LiveRegisterSet liveRegs, TypedOrValueRegister lhs,
+                   TypedOrValueRegister rhs, ValueOperand output)
+      : IonIC(CacheKind::BinaryArith),
+        liveRegs_(liveRegs),
+        lhs_(lhs),
+        rhs_(rhs),
+        output_(output) {}
+
+  LiveRegisterSet liveRegs() const { return liveRegs_; }
+  TypedOrValueRegister lhs() const { return lhs_; }
+  TypedOrValueRegister rhs() const { return rhs_; }
+  ValueOperand output() const { return output_; }
+
+  [[nodiscard]] static bool update(JSContext* cx, HandleScript outerScript,
+                                   IonBinaryArithIC* stub, HandleValue lhs,
+                                   HandleValue rhs, MutableHandleValue res);
+};
+
+}  // namespace jit
+}  // namespace js
 
 #endif /* jit_IonIC_h */

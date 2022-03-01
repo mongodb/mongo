@@ -1,0 +1,58 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_DO{
+    %%Parent{"es_419"}
+    units{
+        electric{
+            ampere{
+                dnam{"amperios"}
+                one{"{0} amperio"}
+                other{"{0} amperios"}
+            }
+            milliampere{
+                dnam{"miliamperios"}
+                one{"{0} miliamperio"}
+                other{"{0} miliamperios"}
+            }
+            ohm{
+                one{"{0} ohmio"}
+                other{"{0} ohmios"}
+            }
+        }
+    }
+    unitsNarrow{
+        duration{
+            day{
+                one{"{0}d."}
+                other{"{0}d."}
+            }
+            month{
+                one{"{0}m."}
+                other{"{0}m."}
+            }
+        }
+    }
+    unitsShort{
+        duration{
+            day{
+                dnam{"d."}
+            }
+            second{
+                dnam{"seg."}
+                one{"{0} seg."}
+                other{"{0} seg."}
+            }
+        }
+        electric{
+            volt{
+                dnam{"voltios"}
+            }
+        }
+        power{
+            watt{
+                dnam{"vatios"}
+            }
+        }
+    }
+}

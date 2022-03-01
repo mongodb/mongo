@@ -1,0 +1,80 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+de_CH{
+    ExemplarCharacters{"[a ä b c d e f g h i j k l m n o ö p q r s t u ü v w x y z]"}
+    ExemplarCharactersNumbers{"[\\- ‑ . ’ % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"¤ #,##0.00;¤-#,##0.00"}
+                percentFormat{"#,##0%"}
+            }
+            symbols{
+                decimal{"."}
+                group{"’"}
+            }
+        }
+    }
+    calendar{
+        gregorian{
+            dayNames{
+                format{
+                    short{
+                        "So",
+                        "Mo",
+                        "Di",
+                        "Mi",
+                        "Do",
+                        "Fr",
+                        "Sa",
+                    }
+                }
+            }
+        }
+    }
+    fields{
+        dayOfYear-short{
+            dn{"Tag d. J."}
+        }
+        era-narrow{
+            dn{"Epoche"}
+        }
+        weekOfMonth{
+            dn{"Woche im Monat"}
+        }
+        weekOfMonth-narrow{
+            dn{"W. i. Mon."}
+        }
+        weekOfMonth-short{
+            dn{"Wo. i. M."}
+        }
+        weekday-narrow{
+            dn{"Wochentag"}
+        }
+        weekdayOfMonth{
+            dn{"Wochentag im Monat"}
+        }
+        weekdayOfMonth-narrow{
+            dn{"Wochent. i. Mon."}
+        }
+        weekdayOfMonth-short{
+            dn{"Wochent. i. Mo."}
+        }
+    }
+    parse{
+        general{
+            lenient{
+                "[.․。︒﹒．｡]",
+                "['ʼ՚᾽᾿’＇]",
+                "[%٪﹪％]",
+                "[؉‰]",
+                "[\$﹩＄$]",
+                "[£₤]",
+                "[¥￥]",
+                "[₩￦]",
+                "[₨₹{Rp}{Rs}]",
+            }
+        }
+    }
+}

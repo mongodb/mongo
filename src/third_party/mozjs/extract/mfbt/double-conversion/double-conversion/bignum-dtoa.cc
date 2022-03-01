@@ -27,15 +27,15 @@
 
 #include <cmath>
 
-#include <double-conversion/bignum-dtoa.h>
+#include "bignum-dtoa.h"
 
-#include <double-conversion/bignum.h>
-#include <double-conversion/ieee.h>
+#include "bignum.h"
+#include "ieee.h"
 
 namespace double_conversion {
 
 static int NormalizedExponent(uint64_t significand, int exponent) {
-  ASSERT(significand != 0);
+  DOUBLE_CONVERSION_ASSERT(significand != 0);
   while ((significand & Double::kHiddenBit) == 0) {
     significand = significand << 1;
     exponent = exponent - 1;
@@ -76,26 +76,26 @@ static void GenerateShortestDigits(Bignum* numerator, Bignum* denominator,
 // Generates 'requested_digits' after the decimal point.
 static void BignumToFixed(int requested_digits, int* decimal_point,
                           Bignum* numerator, Bignum* denominator,
-                          Vector<char>(buffer), int* length);
+                          Vector<char> buffer, int* length);
 // Generates 'count' digits of numerator/denominator.
 // Once 'count' digits have been produced rounds the result depending on the
 // remainder (remainders of exactly .5 round upwards). Might update the
 // decimal_point when rounding up (for example for 0.9999).
 static void GenerateCountedDigits(int count, int* decimal_point,
                                   Bignum* numerator, Bignum* denominator,
-                                  Vector<char>(buffer), int* length);
+                                  Vector<char> buffer, int* length);
 
 
 void BignumDtoa(double v, BignumDtoaMode mode, int requested_digits,
                 Vector<char> buffer, int* length, int* decimal_point) {
-  ASSERT(v > 0);
-  ASSERT(!Double(v).IsSpecial());
+  DOUBLE_CONVERSION_ASSERT(v > 0);
+  DOUBLE_CONVERSION_ASSERT(!Double(v).IsSpecial());
   uint64_t significand;
   int exponent;
   bool lower_boundary_is_closer;
   if (mode == BIGNUM_DTOA_SHORTEST_SINGLE) {
     float f = static_cast<float>(v);
-    ASSERT(f == v);
+    DOUBLE_CONVERSION_ASSERT(f == v);
     significand = Single(f).Significand();
     exponent = Single(f).Exponent();
     lower_boundary_is_closer = Single(f).LowerBoundaryIsCloser();
@@ -134,7 +134,7 @@ void BignumDtoa(double v, BignumDtoaMode mode, int requested_digits,
   // 4e-324. In this case the denominator needs fewer than 324*4 binary digits.
   // The maximum double is 1.7976931348623157e308 which needs fewer than
   // 308*4 binary digits.
-  ASSERT(Bignum::kMaxSignificantBits >= 324*4);
+  DOUBLE_CONVERSION_ASSERT(Bignum::kMaxSignificantBits >= 324*4);
   InitialScaledStartValues(significand, exponent, lower_boundary_is_closer,
                            estimated_power, need_boundary_deltas,
                            &numerator, &denominator,
@@ -163,7 +163,7 @@ void BignumDtoa(double v, BignumDtoaMode mode, int requested_digits,
                             buffer, length);
       break;
     default:
-      UNREACHABLE();
+      DOUBLE_CONVERSION_UNREACHABLE();
   }
   buffer[*length] = '\0';
 }
@@ -195,7 +195,7 @@ static void GenerateShortestDigits(Bignum* numerator, Bignum* denominator,
   for (;;) {
     uint16_t digit;
     digit = numerator->DivideModuloIntBignum(*denominator);
-    ASSERT(digit <= 9);  // digit is a uint16_t and therefore always positive.
+    DOUBLE_CONVERSION_ASSERT(digit <= 9);  // digit is a uint16_t and therefore always positive.
     // digit = numerator / denominator (integer division).
     // numerator = numerator % denominator.
     buffer[(*length)++] = static_cast<char>(digit + '0');
@@ -241,7 +241,7 @@ static void GenerateShortestDigits(Bignum* numerator, Bignum* denominator,
         // loop would have stopped earlier.
         // We still have an assert here in case the preconditions were not
         // satisfied.
-        ASSERT(buffer[(*length) - 1] != '9');
+        DOUBLE_CONVERSION_ASSERT(buffer[(*length) - 1] != '9');
         buffer[(*length) - 1]++;
       } else {
         // Halfway case.
@@ -252,7 +252,7 @@ static void GenerateShortestDigits(Bignum* numerator, Bignum* denominator,
         if ((buffer[(*length) - 1] - '0') % 2 == 0) {
           // Round down => Do nothing.
         } else {
-          ASSERT(buffer[(*length) - 1] != '9');
+          DOUBLE_CONVERSION_ASSERT(buffer[(*length) - 1] != '9');
           buffer[(*length) - 1]++;
         }
       }
@@ -264,9 +264,9 @@ static void GenerateShortestDigits(Bignum* numerator, Bignum* denominator,
       // Round up.
       // Note again that the last digit could not be '9' since this would have
       // stopped the loop earlier.
-      // We still have an ASSERT here, in case the preconditions were not
+      // We still have an DOUBLE_CONVERSION_ASSERT here, in case the preconditions were not
       // satisfied.
-      ASSERT(buffer[(*length) -1] != '9');
+      DOUBLE_CONVERSION_ASSERT(buffer[(*length) -1] != '9');
       buffer[(*length) - 1]++;
       return;
     }
@@ -283,11 +283,11 @@ static void GenerateShortestDigits(Bignum* numerator, Bignum* denominator,
 static void GenerateCountedDigits(int count, int* decimal_point,
                                   Bignum* numerator, Bignum* denominator,
                                   Vector<char> buffer, int* length) {
-  ASSERT(count >= 0);
+  DOUBLE_CONVERSION_ASSERT(count >= 0);
   for (int i = 0; i < count - 1; ++i) {
     uint16_t digit;
     digit = numerator->DivideModuloIntBignum(*denominator);
-    ASSERT(digit <= 9);  // digit is a uint16_t and therefore always positive.
+    DOUBLE_CONVERSION_ASSERT(digit <= 9);  // digit is a uint16_t and therefore always positive.
     // digit = numerator / denominator (integer division).
     // numerator = numerator % denominator.
     buffer[i] = static_cast<char>(digit + '0');
@@ -300,7 +300,7 @@ static void GenerateCountedDigits(int count, int* decimal_point,
   if (Bignum::PlusCompare(*numerator, *numerator, *denominator) >= 0) {
     digit++;
   }
-  ASSERT(digit <= 10);
+  DOUBLE_CONVERSION_ASSERT(digit <= 10);
   buffer[count - 1] = static_cast<char>(digit + '0');
   // Correct bad digits (in case we had a sequence of '9's). Propagate the
   // carry until we hat a non-'9' or til we reach the first digit.
@@ -325,7 +325,7 @@ static void GenerateCountedDigits(int count, int* decimal_point,
 // Input verifies:  1 <= (numerator + delta) / denominator < 10.
 static void BignumToFixed(int requested_digits, int* decimal_point,
                           Bignum* numerator, Bignum* denominator,
-                          Vector<char>(buffer), int* length) {
+                          Vector<char> buffer, int* length) {
   // Note that we have to look at more than just the requested_digits, since
   // a number could be rounded up. Example: v=0.5 with requested_digits=0.
   // Even though the power of v equals 0 we can't just stop here.
@@ -341,7 +341,7 @@ static void BignumToFixed(int requested_digits, int* decimal_point,
   } else if (-(*decimal_point) == requested_digits) {
     // We only need to verify if the number rounds down or up.
     // Ex: 0.04 and 0.06 with requested_digits == 1.
-    ASSERT(*decimal_point == -requested_digits);
+    DOUBLE_CONVERSION_ASSERT(*decimal_point == -requested_digits);
     // Initially the fraction lies in range (1, 10]. Multiply the denominator
     // by 10 so that we can compare more easily.
     denominator->Times10();
@@ -370,7 +370,7 @@ static void BignumToFixed(int requested_digits, int* decimal_point,
 // Returns an estimation of k such that 10^(k-1) <= v < 10^k where
 // v = f * 2^exponent and 2^52 <= f < 2^53.
 // v is hence a normalized double with the given exponent. The output is an
-// approximation for the exponent of the decimal approimation .digits * 10^k.
+// approximation for the exponent of the decimal approximation .digits * 10^k.
 //
 // The result might undershoot by 1 in which case 10^k <= v < 10^k+1.
 // Note: this property holds for v's upper boundary m+ too.
@@ -420,7 +420,7 @@ static void InitialScaledStartValuesPositiveExponent(
     Bignum* numerator, Bignum* denominator,
     Bignum* delta_minus, Bignum* delta_plus) {
   // A positive exponent implies a positive power.
-  ASSERT(estimated_power >= 0);
+  DOUBLE_CONVERSION_ASSERT(estimated_power >= 0);
   // Since the estimated_power is positive we simply multiply the denominator
   // by 10^estimated_power.
 
@@ -506,7 +506,7 @@ static void InitialScaledStartValuesNegativeExponentNegativePower(
   // numerator = v * 10^-estimated_power * 2 * 2^-exponent.
   // Remember: numerator has been abused as power_ten. So no need to assign it
   //  to itself.
-  ASSERT(numerator == power_ten);
+  DOUBLE_CONVERSION_ASSERT(numerator == power_ten);
   numerator->MultiplyByUInt64(significand);
 
   // denominator = 2 * 2^-exponent with exponent < 0.
@@ -548,7 +548,7 @@ static void InitialScaledStartValuesNegativeExponentNegativePower(
 //
 // Let ep == estimated_power, then the returned values will satisfy:
 //  v / 10^ep = numerator / denominator.
-//  v's boundarys m- and m+:
+//  v's boundaries m- and m+:
 //    m- / 10^ep == v / 10^ep - delta_minus / denominator
 //    m+ / 10^ep == v / 10^ep + delta_plus / denominator
 //  Or in other words:

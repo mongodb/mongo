@@ -20,6 +20,7 @@
 #ifndef mozilla_EnumeratedRange_h
 #define mozilla_EnumeratedRange_h
 
+#include <limits>
 #include <type_traits>
 
 #include "mozilla/ReverseIterator.h"
@@ -28,42 +29,37 @@ namespace mozilla {
 
 namespace detail {
 
-template<typename EnumTypeT>
-class EnumeratedIterator
-{
-public:
+template <typename EnumTypeT>
+class EnumeratedIterator {
+ public:
   typedef typename std::underlying_type<EnumTypeT>::type IntTypeT;
 
-  template<typename EnumType>
-  explicit EnumeratedIterator(EnumType aCurrent)
-    : mCurrent(aCurrent) { }
+  template <typename EnumType>
+  constexpr explicit EnumeratedIterator(EnumType aCurrent)
+      : mCurrent(aCurrent) {}
 
-  template<typename EnumType>
+  template <typename EnumType>
   explicit EnumeratedIterator(const EnumeratedIterator<EnumType>& aOther)
-    : mCurrent(aOther.mCurrent) { }
+      : mCurrent(aOther.mCurrent) {}
 
   EnumTypeT operator*() const { return mCurrent; }
 
   /* Increment and decrement operators */
 
-  EnumeratedIterator& operator++()
-  {
+  EnumeratedIterator& operator++() {
     mCurrent = EnumTypeT(IntTypeT(mCurrent) + IntTypeT(1));
     return *this;
   }
-  EnumeratedIterator& operator--()
-  {
+  EnumeratedIterator& operator--() {
     mCurrent = EnumTypeT(IntTypeT(mCurrent) - IntTypeT(1));
     return *this;
   }
-  EnumeratedIterator operator++(int)
-  {
+  EnumeratedIterator operator++(int) {
     auto ret = *this;
     mCurrent = EnumTypeT(IntTypeT(mCurrent) + IntTypeT(1));
     return ret;
   }
-  EnumeratedIterator operator--(int)
-  {
+  EnumeratedIterator operator--(int) {
     auto ret = *this;
     mCurrent = EnumTypeT(IntTypeT(mCurrent) - IntTypeT(1));
     return ret;
@@ -71,83 +67,76 @@ public:
 
   /* Comparison operators */
 
-  template<typename EnumType>
+  template <typename EnumType>
   friend bool operator==(const EnumeratedIterator<EnumType>& aIter1,
                          const EnumeratedIterator<EnumType>& aIter2);
-  template<typename EnumType>
+  template <typename EnumType>
   friend bool operator!=(const EnumeratedIterator<EnumType>& aIter1,
                          const EnumeratedIterator<EnumType>& aIter2);
-  template<typename EnumType>
+  template <typename EnumType>
   friend bool operator<(const EnumeratedIterator<EnumType>& aIter1,
                         const EnumeratedIterator<EnumType>& aIter2);
-  template<typename EnumType>
+  template <typename EnumType>
   friend bool operator<=(const EnumeratedIterator<EnumType>& aIter1,
                          const EnumeratedIterator<EnumType>& aIter2);
-  template<typename EnumType>
+  template <typename EnumType>
   friend bool operator>(const EnumeratedIterator<EnumType>& aIter1,
                         const EnumeratedIterator<EnumType>& aIter2);
-  template<typename EnumType>
+  template <typename EnumType>
   friend bool operator>=(const EnumeratedIterator<EnumType>& aIter1,
                          const EnumeratedIterator<EnumType>& aIter2);
 
-private:
+ private:
   EnumTypeT mCurrent;
 };
 
-template<typename EnumType>
+template <typename EnumType>
 bool operator==(const EnumeratedIterator<EnumType>& aIter1,
-                const EnumeratedIterator<EnumType>& aIter2)
-{
+                const EnumeratedIterator<EnumType>& aIter2) {
   return aIter1.mCurrent == aIter2.mCurrent;
 }
 
-template<typename EnumType>
+template <typename EnumType>
 bool operator!=(const EnumeratedIterator<EnumType>& aIter1,
-                const EnumeratedIterator<EnumType>& aIter2)
-{
+                const EnumeratedIterator<EnumType>& aIter2) {
   return aIter1.mCurrent != aIter2.mCurrent;
 }
 
-template<typename EnumType>
+template <typename EnumType>
 bool operator<(const EnumeratedIterator<EnumType>& aIter1,
-               const EnumeratedIterator<EnumType>& aIter2)
-{
+               const EnumeratedIterator<EnumType>& aIter2) {
   return aIter1.mCurrent < aIter2.mCurrent;
 }
 
-template<typename EnumType>
+template <typename EnumType>
 bool operator<=(const EnumeratedIterator<EnumType>& aIter1,
-                const EnumeratedIterator<EnumType>& aIter2)
-{
+                const EnumeratedIterator<EnumType>& aIter2) {
   return aIter1.mCurrent <= aIter2.mCurrent;
 }
 
-template<typename EnumType>
+template <typename EnumType>
 bool operator>(const EnumeratedIterator<EnumType>& aIter1,
-               const EnumeratedIterator<EnumType>& aIter2)
-{
+               const EnumeratedIterator<EnumType>& aIter2) {
   return aIter1.mCurrent > aIter2.mCurrent;
 }
 
-template<typename EnumType>
+template <typename EnumType>
 bool operator>=(const EnumeratedIterator<EnumType>& aIter1,
-                const EnumeratedIterator<EnumType>& aIter2)
-{
+                const EnumeratedIterator<EnumType>& aIter2) {
   return aIter1.mCurrent >= aIter2.mCurrent;
 }
 
-template<typename EnumTypeT>
-class EnumeratedRange
-{
-public:
+template <typename EnumTypeT>
+class EnumeratedRange {
+ public:
   typedef EnumeratedIterator<EnumTypeT> iterator;
   typedef EnumeratedIterator<EnumTypeT> const_iterator;
   typedef ReverseIterator<iterator> reverse_iterator;
   typedef ReverseIterator<const_iterator> const_reverse_iterator;
 
-  template<typename EnumType>
-  EnumeratedRange(EnumType aBegin, EnumType aEnd)
-    : mBegin(aBegin), mEnd(aEnd) { }
+  template <typename EnumType>
+  constexpr EnumeratedRange(EnumType aBegin, EnumType aEnd)
+      : mBegin(aBegin), mEnd(aEnd) {}
 
   iterator begin() const { return iterator(mBegin); }
   const_iterator cbegin() const { return begin(); }
@@ -158,12 +147,12 @@ public:
   reverse_iterator rend() const { return reverse_iterator(mBegin); }
   const_reverse_iterator crend() const { return rend(); }
 
-private:
+ private:
   EnumTypeT mBegin;
   EnumTypeT mEnd;
 };
 
-} // namespace detail
+}  // namespace detail
 
 #ifdef __GNUC__
 // Enums can have an unsigned underlying type, which makes some of the
@@ -174,28 +163,43 @@ private:
 #endif
 
 // Create a range to iterate from aBegin to aEnd, exclusive.
-template<typename EnumType>
-inline detail::EnumeratedRange<EnumType>
-MakeEnumeratedRange(EnumType aBegin, EnumType aEnd)
-{
+template <typename EnumType>
+constexpr detail::EnumeratedRange<EnumType> MakeEnumeratedRange(EnumType aBegin,
+                                                                EnumType aEnd) {
   MOZ_ASSERT(aBegin <= aEnd, "Cannot generate invalid, unbounded range!");
   return detail::EnumeratedRange<EnumType>(aBegin, aEnd);
 }
 
 // Create a range to iterate from EnumType(0) to aEnd, exclusive. EnumType(0)
 // should exist, but note that there is no way for us to ensure that it does!
-template<typename EnumType>
-inline detail::EnumeratedRange<EnumType>
-MakeEnumeratedRange(EnumType aEnd)
-{
+template <typename EnumType>
+constexpr detail::EnumeratedRange<EnumType> MakeEnumeratedRange(EnumType aEnd) {
   return MakeEnumeratedRange(EnumType(0), aEnd);
+}
+
+// Create a range to iterate from aBegin to aEnd, inclusive.
+//
+// NOTE: This internally constructs a value that is one past `aEnd`, so the
+// enumeration needs to either have a fixed underlying type, or `aEnd + 1` must
+// be inside the range of the enumeration, in order to not be undefined
+// behavior.
+//
+// See bug 1614512.
+template <typename EnumType>
+constexpr detail::EnumeratedRange<EnumType> MakeInclusiveEnumeratedRange(
+    EnumType aBegin, EnumType aEnd) {
+  using EnumUnderlyingType = typename std::underlying_type_t<EnumType>;
+  const auto end = static_cast<EnumUnderlyingType>(aEnd);
+
+  MOZ_ASSERT(end != std::numeric_limits<EnumUnderlyingType>::max(),
+             "aEnd shouldn't overflow!");
+  return MakeEnumeratedRange(aBegin, static_cast<EnumType>(end + 1));
 }
 
 #ifdef __GNUC__
 #  pragma GCC diagnostic pop
 #endif
 
-} // namespace mozilla
+}  // namespace mozilla
 
-#endif // mozilla_EnumeratedRange_h
-
+#endif  // mozilla_EnumeratedRange_h

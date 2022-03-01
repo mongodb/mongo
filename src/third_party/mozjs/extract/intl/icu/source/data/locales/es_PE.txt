@@ -1,0 +1,163 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_PE{
+    %%Parent{"es_419"}
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"¤ #,##0.00"}
+            }
+            patternsShort{
+                currencyFormat{
+                    1000{
+                        one{"¤ 0 K"}
+                        other{"¤ 0 K"}
+                    }
+                    10000{
+                        one{"¤ 00 K"}
+                        other{"¤ 00 K"}
+                    }
+                    100000{
+                        one{"¤ 000 K"}
+                        other{"¤ 000 K"}
+                    }
+                    1000000{
+                        one{"¤ 0 M"}
+                        other{"¤ 0 M"}
+                    }
+                    10000000{
+                        one{"¤ 00 M"}
+                        other{"¤ 00 M"}
+                    }
+                    100000000{
+                        one{"¤ 000 M"}
+                        other{"¤ 000 M"}
+                    }
+                    1000000000{
+                        one{"¤ 0000 M"}
+                        other{"¤ 0000 M"}
+                    }
+                    10000000000{
+                        one{"¤ 00 MRD"}
+                        other{"¤ 00 MRD"}
+                    }
+                    100000000000{
+                        one{"¤ 000 MRD"}
+                        other{"¤ 000 MRD"}
+                    }
+                    1000000000000{
+                        one{"¤ 0 B"}
+                        other{"¤ 0 B"}
+                    }
+                    10000000000000{
+                        one{"¤ 00 B"}
+                        other{"¤ 00 B"}
+                    }
+                    100000000000000{
+                        one{"¤ 000 B"}
+                        other{"¤ 000 B"}
+                    }
+                }
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d 'de' MMMM 'de' y G",
+                "d 'de' MMMM 'de' y G",
+                "d 'de' MMM 'de' y G",
+                "d/MM/yy GGGGG",
+                "{1} {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d 'de' MMMM 'de' y",
+                "d 'de' MMMM 'de' y",
+                "d MMM y",
+                "d/MM/yy",
+                "{1} {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "ene.",
+                        "feb.",
+                        "mar.",
+                        "abr.",
+                        "may.",
+                        "jun.",
+                        "jul.",
+                        "ago.",
+                        "set.",
+                        "oct.",
+                        "nov.",
+                        "dic.",
+                    }
+                    wide{
+                        "enero",
+                        "febrero",
+                        "marzo",
+                        "abril",
+                        "mayo",
+                        "junio",
+                        "julio",
+                        "agosto",
+                        "setiembre",
+                        "octubre",
+                        "noviembre",
+                        "diciembre",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Ene.",
+                        "Feb.",
+                        "Mar.",
+                        "Abr.",
+                        "May.",
+                        "Jun.",
+                        "Jul.",
+                        "Ago.",
+                        "Set.",
+                        "Oct.",
+                        "Nov.",
+                        "Dic.",
+                    }
+                    wide{
+                        "Enero",
+                        "Febrero",
+                        "Marzo",
+                        "Abril",
+                        "Mayo",
+                        "Junio",
+                        "Julio",
+                        "Agosto",
+                        "Setiembre",
+                        "Octubre",
+                        "Noviembre",
+                        "Diciembre",
+                    }
+                }
+            }
+        }
+    }
+}

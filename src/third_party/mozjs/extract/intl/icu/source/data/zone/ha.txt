@@ -1,0 +1,643 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ha{
+    zoneStrings{
+        "America:North_Dakota:Beulah"{
+            ec{"Beulah, Arewacin Dakota"}
+        }
+        "America:North_Dakota:Center"{
+            ec{"Center, Arewacin Dakota"}
+        }
+        "America:North_Dakota:New_Salem"{
+            ec{"New Salem, Arewacin Dakota"}
+        }
+        "Asia:Aden"{
+            ec{"Aden"}
+        }
+        "Asia:Amman"{
+            ec{"Amman"}
+        }
+        "Asia:Baghdad"{
+            ec{"Baghdad"}
+        }
+        "Asia:Bahrain"{
+            ec{"Bahrain"}
+        }
+        "Asia:Baku"{
+            ec{"Baku"}
+        }
+        "Asia:Bangkok"{
+            ec{"Bangkok"}
+        }
+        "Asia:Beirut"{
+            ec{"Beirut"}
+        }
+        "Etc:UTC"{
+            ls{"Hadewa Lokaci na Duniya"}
+        }
+        "Etc:Unknown"{
+            ec{"Birni da ba a sani ba"}
+        }
+        "Europe:Dublin"{
+            ld{"Tsayayyen Lokacin Irish"}
+        }
+        "Europe:London"{
+            ld{"Lokacin Bazara na Birtaniya"}
+        }
+        "meta:Afghanistan"{
+            ls{"Lokacin Afghanistan"}
+        }
+        "meta:Africa_Central"{
+            ls{"Lokacin Afirka ta Tsakiya"}
+        }
+        "meta:Africa_Eastern"{
+            ls{"Lokacin Gabashin Afirka"}
+        }
+        "meta:Africa_Southern"{
+            ls{"South Africa Standard Time"}
+        }
+        "meta:Africa_Western"{
+            ld{"Lokacin Bazara na Afirka ta Yamma"}
+            lg{"Lokacin Afirka ta Yamma"}
+            ls{"Tsayayyen Lokacin Afirka ta Yamma"}
+        }
+        "meta:Alaska"{
+            ld{"Lokacin Rana na Alaska"}
+            lg{"Lokacin Alaska"}
+            ls{"Tsayayyen Lokacin Alaska"}
+        }
+        "meta:Amazon"{
+            ld{"Lokacin Bazara na Amazon"}
+            lg{"Lokacin Amazon"}
+            ls{"Tsayayyen Lokacin Amazon"}
+        }
+        "meta:America_Central"{
+            ld{"Lokacin Rana dake Arewacin Amurika ta Tsakiya"}
+            lg{"Lokaci dake Amurika arewa ta tsakiyar"}
+            ls{"Tsayayyen Lokaci dake Arewacin Amurika ta Tsakiya"}
+        }
+        "meta:America_Eastern"{
+            ld{"Lokacin Rana ta Gabas dake Arewacin Amurika"}
+            lg{"Lokacin Gabas dake Arewacin Amurikaa"}
+            ls{"Tsayayyen Lokacin Gabas dake Arewacin Amurika"}
+        }
+        "meta:America_Mountain"{
+            ld{"Lokacin Rana na Tsaunin Arewacin Amurka"}
+            lg{"Lokacin Tsauni na Arewacin Amurka"}
+            ls{"Lokaci tsayayye na tsauni a Arewacin Amurica"}
+        }
+        "meta:America_Pacific"{
+            ld{"Lokacin Rana na Arewacin Amurka"}
+            lg{"Lokacin Arewacin Amurika"}
+            ls{"Lokaci Tsayayye na Arewacin Amurika"}
+        }
+        "meta:Apia"{
+            ld{"Lokacin Rana na Apia"}
+            lg{"Lokacin Apia"}
+            ls{"Tsayayyen Lokacin Apia"}
+        }
+        "meta:Arabian"{
+            ld{"Lokacin Rana na Arebiya"}
+            lg{"Lokacin Arebiya"}
+            ls{"Arabian Standard Time"}
+        }
+        "meta:Argentina"{
+            ld{"Lokacin Bazara na Argentina"}
+            lg{"Lokacin Argentina"}
+            ls{"Tsayayyen Lokacin Argentina"}
+        }
+        "meta:Argentina_Western"{
+            ld{"Lokacin Bazara na Yammacin Argentina"}
+            lg{"Lokacin Yammacin Argentina"}
+            ls{"Tsayayyen Lokacin Yammacin Argentina"}
+        }
+        "meta:Armenia"{
+            ld{"Lokacin Bazara na Armenia"}
+            lg{"Lokacin Armenia"}
+            ls{"Tsayayyen Lokacin Armenia"}
+        }
+        "meta:Atlantic"{
+            ld{"Lokacin Rana na Kanada, Puerto Rico da Virgin Islands"}
+            lg{"Lokacin Kanada, Puerto Rico da Virgin Islands"}
+            ls{"Tsayayyen Lokacin Kanada, Puerto Rico da Virgin Islands"}
+        }
+        "meta:Australia_Central"{
+            ld{"Lokacin Rana na Tsakiyar Austiraliya"}
+            lg{"Central Australia Time"}
+            ls{"Tsayayyen Lokacin Tsakiyar Austiraliya"}
+        }
+        "meta:Australia_CentralWestern"{
+            ld{"Lokacin Rana na Yammacin Tsakiyar Austiraliya"}
+            lg{"Lokacin Yammacin Tsakiyar Austiraliya"}
+            ls{"Tsayayyen Lokacin Yammacin Tsakiyar Austiraliya"}
+        }
+        "meta:Australia_Eastern"{
+            ld{"Lokacin Rana na Gabashin Austiraliya"}
+            lg{"Lokacin Gabashin Austiraliya"}
+            ls{"Australian Eastern Standard Time"}
+        }
+        "meta:Australia_Western"{
+            ld{"Lokacin Rana na Yammacin Austiralia"}
+            lg{"Lokacin Yammacin Austiralia"}
+            ls{"Tsayayyen Lokacin Yammacin Austiralia"}
+        }
+        "meta:Azerbaijan"{
+            ld{"Lokacin Bazara na Azerbaijan"}
+            lg{"Lokacin Azerbaijan"}
+            ls{"Tsayayyen Lokacin Azerbaijan"}
+        }
+        "meta:Azores"{
+            ld{"Lokacin Azure na Bazara"}
+            lg{"Lokacin Azores"}
+            ls{"Lokacin Azores Daidaitacce"}
+        }
+        "meta:Bangladesh"{
+            ld{"Lokacin Bazara na Bangladesh"}
+            lg{"Lokacin Bangladesh"}
+            ls{"Tsayayyen Lokacin Bangladesh"}
+        }
+        "meta:Bhutan"{
+            ls{"Bhutan Time"}
+        }
+        "meta:Bolivia"{
+            ls{"Lokacin Bolivia"}
+        }
+        "meta:Brasilia"{
+            ld{"Lokacin Bazara na Brasillia"}
+            lg{"Lokacin Brasillia"}
+            ls{"Tsayayyen Lokacin Brasillia"}
+        }
+        "meta:Brunei"{
+            ls{"Lokacin Brunei Darussalam"}
+        }
+        "meta:Cape_Verde"{
+            ld{"Lokacin Bazara na Cape Verde"}
+            lg{"Lokacin Cape Verde"}
+            ls{"Cape Verde Standard Time"}
+        }
+        "meta:Chamorro"{
+            ls{"Tsayayyen Lokacin Chamorro"}
+        }
+        "meta:Chatham"{
+            ld{"Lokacin Rana na Chatham"}
+            lg{"Lokacin Chatham"}
+            ls{"Tsayayyen Lokacin Chatham"}
+        }
+        "meta:Chile"{
+            ld{"Lokacin Bazara na Chile"}
+            lg{"Lokacin Chile"}
+            ls{"Tsayayyen Lokacin Chile"}
+        }
+        "meta:China"{
+            ld{"Lokacin Rana na Sin"}
+            lg{"Lokacin Sin"}
+            ls{"Tsayayyen Lokacin Sin"}
+        }
+        "meta:Choibalsan"{
+            ld{"Lokacin Bazara na Choibalsan"}
+            lg{"Lokacin Choibalsan"}
+            ls{"Tsayayyen Lokacin Choibalsan"}
+        }
+        "meta:Christmas"{
+            ls{"Lokacin Christmas Island"}
+        }
+        "meta:Cocos"{
+            ls{"Lokacin Cocos Islands"}
+        }
+        "meta:Colombia"{
+            ld{"Lokacin Bazara na Colombia"}
+            lg{"Lokacin Colombia"}
+            ls{"Tsayayyen Lokacin Colombia"}
+        }
+        "meta:Cook"{
+            ld{"Rabin Lokacin Bazara na Cook Islands"}
+            lg{"Lokacin Cook Islands"}
+            ls{"Tsayayyen Lokacin Cook Islands"}
+        }
+        "meta:Cuba"{
+            ld{"Lokacin Rana na Kuba"}
+            lg{"Lokaci na Kuba"}
+            ls{"Tsayayyen Lokacin Kuba"}
+        }
+        "meta:Davis"{
+            ls{"Lokacin Davis"}
+        }
+        "meta:DumontDUrville"{
+            ls{"Lokacin Dumont-d’Urville"}
+        }
+        "meta:East_Timor"{
+            ls{"Lokacin East Timor"}
+        }
+        "meta:Easter"{
+            ld{"Lokacin Bazara na Easter Island"}
+            lg{"Lokacin Easter Island"}
+            ls{"Tsayayyen Lokacin Easter Island"}
+        }
+        "meta:Ecuador"{
+            ls{"Lokacin Ecuador"}
+        }
+        "meta:Europe_Central"{
+            ld{"Tsakiyar bazara a lokaci turai"}
+            lg{"Tsakiyar a lokaci turai"}
+            ls{"Ida Tsakiyar a Lokaci Turai"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"Gabas a lokaci turai da bazara"}
+            lg{"Lokaci a turai gabas"}
+            ls{"Ida lokaci a turai gabas"}
+        }
+        "meta:Europe_Further_Eastern"{
+            ls{"Lokacin Gabashin Turai mai Nisa"}
+        }
+        "meta:Europe_Western"{
+            ld{"Ida lokaci ta yammacin turai da bazara"}
+            lg{"Lokaci ta yammacin turai"}
+            ls{"Ida lokaci ta yammacin turai"}
+        }
+        "meta:Falkland"{
+            ld{"Lokacin Bazara na Falkland Islands"}
+            lg{"Lokacin Falkland Islands"}
+            ls{"Tsayayyen Lokacin Falkland Islands"}
+        }
+        "meta:Fiji"{
+            ld{"Lokacin Bazara na Fiji"}
+            lg{"Lokacin Fiji"}
+            ls{"Tsayayyen Lokacin Fiji"}
+        }
+        "meta:French_Guiana"{
+            ls{"Lokacin French Guiana"}
+        }
+        "meta:French_Southern"{
+            ls{"Lokacin Kudancin Faransa da Antarctic"}
+        }
+        "meta:GMT"{
+            ls{"Lokacin Greenwhich a London"}
+        }
+        "meta:Galapagos"{
+            ls{"Lokacin Galapagos"}
+        }
+        "meta:Gambier"{
+            ls{"Lokacin Gambier"}
+        }
+        "meta:Georgia"{
+            ld{"Georgia Summer Time"}
+            lg{"Lokacin Georgia"}
+            ls{"Tsayayyen Lokacin Georgia"}
+        }
+        "meta:Gilbert_Islands"{
+            ls{"Lokacin Gilbert Islands"}
+        }
+        "meta:Greenland_Eastern"{
+            ld{"Lokacin Rana na Gabashin Greenland"}
+            lg{"Lokacin Gabas na Greenland"}
+            ls{"Tsayayyen Lokacin Gabashin Greenland"}
+        }
+        "meta:Greenland_Western"{
+            ld{"Lokacin Rana na Yammacin Greenland"}
+            lg{"Lokacin Yammacin Greenland"}
+            ls{"Tsayayyen Lokacin Yammacin Greenland"}
+        }
+        "meta:Gulf"{
+            ls{"Lokacin Golf"}
+        }
+        "meta:Guyana"{
+            ls{"Lokacin Guyana"}
+        }
+        "meta:Hawaii_Aleutian"{
+            ld{"Lokacin Rana na Hawaii-Aleutian"}
+            lg{"Lokaci na Hawaii-Aleutian"}
+            ls{"Tsayayyen Lokacin Hawaii-Aleutian"}
+        }
+        "meta:Hong_Kong"{
+            ld{"Lokacin Bazara na Hong Kong"}
+            lg{"Lokacin Hong Kong"}
+            ls{"Tsayayyen Lokacin Hong Kong"}
+        }
+        "meta:Hovd"{
+            ld{"Lokacin Bazara na Hovd"}
+            lg{"Lokacin Hovd"}
+            ls{"Tsayayyen Lokacin Hovd"}
+        }
+        "meta:India"{
+            ls{"India Standard Time"}
+        }
+        "meta:Indian_Ocean"{
+            ls{"Lokacin Tekun Indiya"}
+        }
+        "meta:Indochina"{
+            ls{"Lokacin Indochina"}
+        }
+        "meta:Indonesia_Central"{
+            ls{"Lokacin Indonesia ta Tsakiya"}
+        }
+        "meta:Indonesia_Eastern"{
+            ls{"Eastern Indonesia Time"}
+        }
+        "meta:Indonesia_Western"{
+            ls{"Lokacin Yammacin Indonesia"}
+        }
+        "meta:Iran"{
+            ld{"Lokacin Rana na Iran"}
+            lg{"Lokacin Iran"}
+            ls{"Tsayayyen Lokacin Iran"}
+        }
+        "meta:Irkutsk"{
+            ld{"Lokacin Bazara na Irkutsk"}
+            lg{"Lokacin Irkutsk"}
+            ls{"Tsayayyen Lokacin Irkutsk"}
+        }
+        "meta:Israel"{
+            ld{"Israel Daylight Time"}
+            lg{"Lokacin Israʼila"}
+            ls{"Israel Standard Time"}
+        }
+        "meta:Japan"{
+            ld{"Japan Daylight Time"}
+            lg{"Lokacin Japan"}
+            ls{"Japan Standard Time"}
+        }
+        "meta:Kazakhstan_Eastern"{
+            ls{"Lokacin Gabashin Kazakhstan"}
+        }
+        "meta:Kazakhstan_Western"{
+            ls{"Lokacin Yammacin Kazakhstan"}
+        }
+        "meta:Korea"{
+            ld{"Lokacin Rana na Koriya"}
+            lg{"Lokacin Koriya"}
+            ls{"Tsayayyen Lokacin Koriya"}
+        }
+        "meta:Kosrae"{
+            ls{"Lokacin Kosrae"}
+        }
+        "meta:Krasnoyarsk"{
+            ld{"Lokacin Bazara na Krasnoyarsk"}
+            lg{"Lokacin Krasnoyarsk"}
+            ls{"Tsayayyen Lokacin Krasnoyarsk"}
+        }
+        "meta:Kyrgystan"{
+            ls{"Lokacin Kazakhstan"}
+        }
+        "meta:Line_Islands"{
+            ls{"Lokacin Line Islands"}
+        }
+        "meta:Lord_Howe"{
+            ld{"Lokacin Rana na Vote Lord Howe"}
+            lg{"Lokacin Lord Howe"}
+            ls{"Tsayayyen Lokacin Lord Howe"}
+        }
+        "meta:Macquarie"{
+            ls{"Lokacin Macquarie Island"}
+        }
+        "meta:Magadan"{
+            ld{"Lokacin Bazara na Magadan"}
+            lg{"Lokacin Magadan"}
+            ls{"Tsayayyen Lokacin Magadan"}
+        }
+        "meta:Malaysia"{
+            ls{"Lokacin Malaysia"}
+        }
+        "meta:Maldives"{
+            ls{"Lokacin Maldives"}
+        }
+        "meta:Marquesas"{
+            ls{"Lokacin Marquesas"}
+        }
+        "meta:Marshall_Islands"{
+            ls{"Lokacin Marshall Islands"}
+        }
+        "meta:Mauritius"{
+            ld{"Lokacin Bazara na Mauritius"}
+            lg{"Lokacin Mauritius"}
+            ls{"Tsayayyen Lokacin Mauritius"}
+        }
+        "meta:Mawson"{
+            ls{"Lokacin Mawson"}
+        }
+        "meta:Mexico_Northwest"{
+            ld{"Lokacin Rana na Arewa Maso Yammacin Mekziko"}
+            lg{"Lokacin Arewa Maso Yammacin Mekziko"}
+            ls{"Tsayayyen Lokacin Arewa Maso Yammacin Mekziko"}
+        }
+        "meta:Mexico_Pacific"{
+            ld{"Lokacin Rana na Mekziko Pacific"}
+            lg{"Lokacin Mekziko Pacific"}
+            ls{"Tsayayyen Lokacin Mekziko Pacific"}
+        }
+        "meta:Mongolia"{
+            ld{"Lokacin Bazara na Ulaanbaatar"}
+            lg{"Lokacin Ulaanbaatar"}
+            ls{"Tsayayyen Lokacin Ulaanbaatar"}
+        }
+        "meta:Moscow"{
+            ld{"Lokacin Bazara na Moscow"}
+            lg{"Lokacin Moscow"}
+            ls{"Tsayayyen Lokacin Moscow"}
+        }
+        "meta:Myanmar"{
+            ls{"Lokacin Myanmar"}
+        }
+        "meta:Nauru"{
+            ls{"Lokacin Nauru"}
+        }
+        "meta:Nepal"{
+            ls{"Lokacin Nepal"}
+        }
+        "meta:New_Caledonia"{
+            ld{"Lokacin Bazara na New Caledonia"}
+            lg{"Lokacin New Caledonia"}
+            ls{"Tsayayyen Lokacin New Caledonia"}
+        }
+        "meta:New_Zealand"{
+            ld{"Lokacin Rana na New Zealand"}
+            lg{"Lokacin New Zealand"}
+            ls{"Tsayayyen Lokacin New Zealand"}
+        }
+        "meta:Newfoundland"{
+            ld{"Lokaci rana ta Newfoundland"}
+            lg{"Lokacin Newfoundland"}
+            ls{"Lokaci Tsayayye ta Newfoundland"}
+        }
+        "meta:Niue"{
+            ls{"Lokacin Niue"}
+        }
+        "meta:Norfolk"{
+            ld{"Lokacin Rana na Norfolk Island"}
+            lg{"Lokacin Norfolk Island"}
+            ls{"Tsayayyen Lokacin Norfolk Island"}
+        }
+        "meta:Noronha"{
+            ld{"Lokacin Bazara na Fernando de Noronha"}
+            lg{"Lokacin Fernando de Noronha"}
+            ls{"Tsayayyen Lokacin Fernando de Noronha"}
+        }
+        "meta:Novosibirsk"{
+            ld{"Lokacin Bazara na Novosibirsk"}
+            lg{"Lokacin Novosibirsk"}
+            ls{"Novosibirsk Standard Time"}
+        }
+        "meta:Omsk"{
+            ld{"Lokacin Bazara na Omsk"}
+            lg{"Lokacin Omsk"}
+            ls{"Tsayayyen Lokacin Omsk"}
+        }
+        "meta:Pakistan"{
+            ld{"Lokacin Bazara na Pakistan"}
+            lg{"Lokacin Pakistan"}
+            ls{"Tsayayyen Lokacin Pakistan"}
+        }
+        "meta:Palau"{
+            ls{"Lokacin Palau"}
+        }
+        "meta:Papua_New_Guinea"{
+            ls{"Lokacin Papua New Guinea"}
+        }
+        "meta:Paraguay"{
+            ld{"Lokacin Bazara na Paraguay"}
+            lg{"Lokacin Paraguay"}
+            ls{"Tsayayyen Lokacin Paraguay"}
+        }
+        "meta:Peru"{
+            ld{"Lokacin Bazara na Peru"}
+            lg{"Lokacin Peru"}
+            ls{"Tsayayyen Lokacin Peru"}
+        }
+        "meta:Philippines"{
+            ld{"Lokacin Bazara na Philippine"}
+            lg{"Lokacin Philippine"}
+            ls{"Tsayayyen Lokacin Philippine"}
+        }
+        "meta:Phoenix_Islands"{
+            ls{"Lokacin Phoenix Islands"}
+        }
+        "meta:Pierre_Miquelon"{
+            ld{"Lokacin Rana na St. Pierre da Miquelon"}
+            lg{"Lokacin St. Pierre da Miquelon"}
+            ls{"Tsayayyen Lokacin St. Pierre da Miquelon"}
+        }
+        "meta:Pitcairn"{
+            ls{"Lokacin Pitcairn"}
+        }
+        "meta:Ponape"{
+            ls{"Lokacin Ponape"}
+        }
+        "meta:Pyongyang"{
+            ls{"Lokacin Pyongyang"}
+        }
+        "meta:Reunion"{
+            ls{"Lokacin Réunion"}
+        }
+        "meta:Rothera"{
+            ls{"Lokacin Rothera"}
+        }
+        "meta:Sakhalin"{
+            ld{"Lokacin Bazara na Sakhalin"}
+            lg{"Lokacin Sakhalin"}
+            ls{"Tsayayyen Lokacin Sakhalin"}
+        }
+        "meta:Samoa"{
+            ld{"Lokacin Rana na Vote Samoa"}
+            lg{"Lokacin Samoa"}
+            ls{"Tsayayyen Lokacin Samoa"}
+        }
+        "meta:Seychelles"{
+            ls{"Lokacin Seychelles"}
+        }
+        "meta:Singapore"{
+            ls{"Tsayayyen Lokacin Singapore"}
+        }
+        "meta:Solomon"{
+            ls{"Lokacin Rana na Solomon"}
+        }
+        "meta:South_Georgia"{
+            ls{"Lokacin Kudancin Georgia"}
+        }
+        "meta:Suriname"{
+            ls{"Lokacin Suriname"}
+        }
+        "meta:Syowa"{
+            ls{"Lokacin Syowa"}
+        }
+        "meta:Tahiti"{
+            ls{"Lokacin Tahiti"}
+        }
+        "meta:Taipei"{
+            ld{"Lokacin Rana na Taipei"}
+            lg{"Lokacin Taipei"}
+            ls{"Tsayayyen Lokacin Taipei"}
+        }
+        "meta:Tajikistan"{
+            ls{"Lokacin Tajikistan"}
+        }
+        "meta:Tokelau"{
+            ls{"Tokelau Time"}
+        }
+        "meta:Tonga"{
+            ld{"Lokacin Bazara na Tonga"}
+            lg{"Lokacin Tonga"}
+            ls{"Tsayayyen Lokacin Tonga"}
+        }
+        "meta:Truk"{
+            ls{"Lokacin Chuuk"}
+        }
+        "meta:Turkmenistan"{
+            ld{"Turkmenistan Summer Time"}
+            lg{"Lokacin Turkmenistan"}
+            ls{"Tsayayyen Lokacin Turkmenistan"}
+        }
+        "meta:Tuvalu"{
+            ls{"Lokacin Tuvalu"}
+        }
+        "meta:Uruguay"{
+            ld{"Lokacin Bazara na Uruguay"}
+            lg{"Lokacin Uruguay"}
+            ls{"Tsayayyen Lokacin Uruguay"}
+        }
+        "meta:Uzbekistan"{
+            ld{"Lokacin Bazara na Uzbekistan"}
+            lg{"Lokacin Uzbekistan"}
+            ls{"Tsayayyen Lokacin Uzbekistan"}
+        }
+        "meta:Vanuatu"{
+            ld{"Lokacin Bazara na Vanuatu"}
+            lg{"Lokacin Vanuatu"}
+            ls{"Tsayayyen Lokacin Vanuatu"}
+        }
+        "meta:Venezuela"{
+            ls{"Lokacin Venezuela"}
+        }
+        "meta:Vladivostok"{
+            ld{"Lokacin Bazara na Vladivostok"}
+            lg{"Lokacin Vladivostok"}
+            ls{"Tsayayyen Lokacin Vladivostok"}
+        }
+        "meta:Volgograd"{
+            ld{"Lokacin Bazara na Volgograd"}
+            lg{"Lokacin Volgograd"}
+            ls{"Tsayayyen Lokacin Volgograd"}
+        }
+        "meta:Vostok"{
+            ls{"Lokacin Vostok"}
+        }
+        "meta:Wake"{
+            ls{"Lokacin Wake Island"}
+        }
+        "meta:Wallis"{
+            ls{"Lokacin Wallis da Futuna"}
+        }
+        "meta:Yakutsk"{
+            ld{"Lokacin Bazara na Yakutsk"}
+            lg{"Lokacin Yakutsk"}
+            ls{"Tsayayyen Lokacin Yakutsk"}
+        }
+        "meta:Yekaterinburg"{
+            ld{"Lokacin Bazara na Yekaterinburg"}
+            lg{"Lokacin Yekaterinburg"}
+            ls{"Tsayayyen Lokacin Yekaterinburg"}
+        }
+        regionFormat{"{0} Lokaci"}
+        regionFormatDaylight{"{0} Lokacin Rana"}
+        regionFormatStandard{"{0} Daidaitaccen Lokaci"}
+    }
+}

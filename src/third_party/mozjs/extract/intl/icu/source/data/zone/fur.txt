@@ -1,0 +1,84 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+fur{
+    zoneStrings{
+        "America:New_York"{
+            ec{"Gnove York"}
+        }
+        "America:Sao_Paulo"{
+            ec{"San Pauli dal Brasîl"}
+        }
+        "Atlantic:Azores"{
+            ec{"Azoris"}
+        }
+        "Atlantic:Canary"{
+            ec{"Canariis"}
+        }
+        "Etc:Unknown"{
+            ec{"Citât no cognossude"}
+        }
+        "Europe:Belgrade"{
+            ec{"Belgrât"}
+        }
+        "Europe:Lisbon"{
+            ec{"Lisbone"}
+        }
+        "Europe:Ljubljana"{
+            ec{"Lubiane"}
+        }
+        "Europe:Luxembourg"{
+            ec{"Lussemburc"}
+        }
+        "Europe:Malta"{
+            ec{"Malte"}
+        }
+        "Europe:Moscow"{
+            ec{"Mosche"}
+        }
+        "Europe:Prague"{
+            ec{"Praghe"}
+        }
+        "Europe:San_Marino"{
+            ec{"San Marin"}
+        }
+        "Europe:Vienna"{
+            ec{"Viene"}
+        }
+        "meta:Europe_Central"{
+            ld{"Ore estive de Europe centrâl"}
+            lg{"Ore de Europe centrâl"}
+            ls{"Ore standard de Europe centrâl"}
+            sd{"CEST"}
+            sg{"CET"}
+            ss{"CET"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"Ore estive de Europe orientâl"}
+            lg{"Ore de Europe orientâl"}
+            ls{"Ore standard de Europe orientâl"}
+            sd{"EEST"}
+            sg{"EET"}
+            ss{"EET"}
+        }
+        "meta:Europe_Western"{
+            ld{"Ore estive de Europe ocidentâl"}
+            lg{"Ore de Europe ocidentâl"}
+            ls{"Ore standard de Europe ocidentâl"}
+            sd{"WEST"}
+            sg{"WET"}
+            ss{"WET"}
+        }
+        "meta:GMT"{
+            ss{"GMT"}
+        }
+        "meta:Moscow"{
+            ld{"Ore estive di Mosche"}
+            lg{"Ore di Mosche"}
+            ls{"Ore standard di Mosche"}
+        }
+        fallbackFormat{"{1} ({0})"}
+        gmtFormat{"GMT{0}"}
+        hourFormat{"+HH:mm;-HH:mm"}
+    }
+}

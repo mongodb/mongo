@@ -1,0 +1,333 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sd_Deva{
+    %%Parent{"root"}
+    AuxExemplarCharacters{"[\u200C\u200D]"}
+    ExemplarCharacters{
+        "[\u093C \u0902 अ आ इ ई उ ऊ ए ऐ ओ औ क ख ग ॻ घ ङ च छ ज ॼ झ ञ ट ठ ड ॾ ढ ण त थ द"
+        " ध न प फ ब ॿ भ म य र ल व श ष स ह ा ि ी \u0941 \u0942 \u0943 \u0944 \u0945 "
+        "\u0947 \u0948 ॉ ो ौ \u094D]"
+    }
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    ExemplarCharactersPunctuation{
+        "[\\- ‐ ‑ – — , ; \\: ! ? . … ' ‘ ’ \u0022 “ ” ( ) \\[ \\] § @ * / \\& # † ‡ "
+        "′ ″]"
+    }
+    NumberElements{
+        default{"latn"}
+        native{"latn"}
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "a h:mm:ss zzzz",
+                "a h:mm:ss z",
+                "a h:mm:ss",
+                "a h:mm",
+                "EEEE, MMMM d, y G",
+                "MMMM d, y G",
+                "MMM d, y G",
+                "M/d/y GGGGG",
+                "{1}, {0}",
+                "{1} 'at' {0}",
+                "{1} 'at' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            intervalFormats{
+                fallback{"{0} – {1}"}
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "मंझंदि का पहिंरो",
+                "मंझंदि को पोए",
+            }
+            DateTimePatterns{
+                "a h:mm:ss zzzz",
+                "a h:mm:ss z",
+                "a h:mm:ss",
+                "a h:mm",
+                "EEEE, d MMMM y",
+                "d MMMM y",
+                "d MMM y",
+                "d/M/yy",
+                "{1}, {0}",
+                "{1} 'at' {0}",
+                "{1} {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                Bh{"h B"}
+                Bhm{"h:mm B"}
+                Bhms{"h:mm:ss B"}
+                EBhm{"E h:mm B"}
+                EBhms{"E h:mm:ss B"}
+                EHm{"E HH:mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"d E"}
+                Ehm{"E h:mm a"}
+                Ehms{"E h:mm:ss a"}
+                GyMMMEd{"E, MMM d, y G"}
+                H{"HH"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                Hmsv{"HH:mm:ss v"}
+                Hmv{"HH:mm v"}
+                MEd{"E, M/d"}
+                MMMEd{"E, MMM d"}
+                Md{"M/d"}
+                h{"h a"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                hmsv{"h:mm:ss a v"}
+                hmv{"h:mm a v"}
+                ms{"mm:ss"}
+                yM{"M/y"}
+                yMEd{"E, M/d/y"}
+                yMMM{"MMM y"}
+                yMMMM{"MMMM y"}
+                yMMMd{"MMM d, y"}
+                yMd{"M/d/y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "आर्त",
+                        "सू",
+                        "मंग",
+                        "बुध",
+                        "विस",
+                        "जुम",
+                        "छंछ",
+                    }
+                    narrow{
+                        "आ",
+                        "म",
+                        "मं",
+                        "बु",
+                        "वि",
+                        "शु",
+                        "छं",
+                    }
+                    wide{
+                        "आर्तवार",
+                        "सूमर",
+                        "मंगलु",
+                        "बुधर",
+                        "विस्पत",
+                        "जुमओ",
+                        "छंछर",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "आ",
+                        "सू",
+                        "मं",
+                        "बुध",
+                        "विस्",
+                        "जुम",
+                        "छंछ",
+                    }
+                    narrow{
+                        "आ",
+                        "सू",
+                        "मं",
+                        "बु",
+                        "वि",
+                        "शु",
+                        "छं",
+                    }
+                    wide{
+                        "आर्त",
+                        "सू",
+                        "मं",
+                        "बुध",
+                        "विस",
+                        "जुम",
+                        "छंछ",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "बीसी",
+                    "एडी",
+                }
+                abbreviated%variant{
+                    "बीसीई",
+                    "सीई",
+                }
+            }
+            intervalFormats{
+                fallback{"{0} – {1}"}
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "जन",
+                        "फर",
+                        "मार्च",
+                        "अप्रै",
+                        "मई",
+                        "जून",
+                        "जु",
+                        "अग",
+                        "सितं",
+                        "अक्टू",
+                        "नवं",
+                        "दिसं",
+                    }
+                    wide{
+                        "जनवरी",
+                        "फरवरी",
+                        "मार्चु",
+                        "अप्रैल",
+                        "मई",
+                        "जून",
+                        "जुलाई",
+                        "अगस्त",
+                        "सितंबर",
+                        "अक्टूबर",
+                        "नवंबर",
+                        "दिसंबर",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "जन",
+                        "फर",
+                        "मार्च",
+                        "अप्रै",
+                        "मई",
+                        "जून",
+                        "जुला",
+                        "अग",
+                        "सितं",
+                        "अक्टू",
+                        "नवं",
+                        "दिसं",
+                    }
+                    narrow{
+                        "ज",
+                        "फ़",
+                        "म",
+                        "अ",
+                        "म",
+                        "जू",
+                        "जु",
+                        "अ",
+                        "सि",
+                        "अ",
+                        "न",
+                        "द",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "पहिरों पाड़ो",
+                        "ॿियो पाड़ो",
+                        "टियो पाड़ो",
+                        "चोथो पाड़ो",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "पहिरों पाड़ो",
+                        "ॿियो पाड़ो",
+                        "टियो पाड़ो",
+                        "चोथो पाड़ो",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "पहिरों पाड़ो",
+                        "ॿियो पाड़ो",
+                        "टियो पाड़ो",
+                        "चोथो पाड़ो",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "पहिरों पाड़ो",
+                        "ॿियो पाड़ो",
+                        "टियो पाड़ो",
+                        "चोथो पाड़ो",
+                    }
+                }
+            }
+        }
+    }
+    fields{
+        day{
+            dn{"ॾींहु"}
+            relative{
+                "-1"{"कल"}
+                "0"{"अॼु"}
+                "1"{"सुभाणे"}
+            }
+        }
+        dayperiod{
+            dn{"ॾींहु/रातु"}
+        }
+        era{
+            dn{"दौर"}
+        }
+        hour{
+            dn{"कलाक"}
+        }
+        minute{
+            dn{"मिंटु"}
+        }
+        minute-narrow{
+            dn{"मिंटु"}
+        }
+        minute-short{
+            dn{"मिंटु"}
+        }
+        month{
+            dn{"महीनो"}
+        }
+        quarter{
+            dn{"चोथो"}
+        }
+        second{
+            dn{"सेकिंडु"}
+        }
+        week{
+            dn{"हफ्तो"}
+        }
+        weekday{
+            dn{"हफ्ते जो ॾींहु"}
+        }
+        year{
+            dn{"साल"}
+        }
+        year-short{
+            dn{"साल"}
+        }
+        zone{
+            dn{"वक्तु जो दायरो"}
+        }
+    }
+    measurementSystemNames{
+        UK{"यूके"}
+        US{"यूएस"}
+        metric{"मीट्रिकु"}
+    }
+}

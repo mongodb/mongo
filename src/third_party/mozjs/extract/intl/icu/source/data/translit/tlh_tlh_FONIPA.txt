@@ -1,0 +1,53 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: tlh_tlh_FONIPA.txt
+# Generated from CLDR
+#
+
+# Transformation from Klingon (tlh) to its IPA transcription (tlh_FONIPA).
+# http://en.wikipedia.org/wiki/Klingon_language#Phonology
+# http://www.kli.org/tlh/sounds.html
+::NFC;
+tlh → t\u0361ɬ;
+# Dipthongs as per http://www.kli.org/tlh/sounds.html. For those that
+# exist in English, we following the American English pronunciation.
+# http://en.wikipedia.org/wiki/Diphthong#English
+aw → aʊ\u032F; # similar to English ‹cow›
+ew → ɛʊ\u032F; # does not exist in English
+Iw → ɪʊ\u032F; # des not exist English
+ay → aɪ\u032F; # similar to English ‹why›
+ey → eɪ\u032F; # similar to English ‹may›
+Iy → ɪː; # KLI says like English ‹key›, which is not a diphthong
+oy → oɪ\u032F; # KLI says English ‹boy›, which would be [ɔɪ\u032F], but ‹o› is [o]
+uy → uɪ\u032F; # similar to English ‹gooey› but in on syllable
+ch → t\u0361ʃ;
+gh → ɣ;
+ng → ŋ;
+p → pʰ;
+t → tʰ;
+q → qʰ;
+’ → ʔ;
+\' → ʔ;
+b → b;
+D → ɖ;
+Q → q\u0361χ;
+j → d\u0361ʒ;
+S → ʂ;
+H → x;
+v → v;
+m → m;
+n → n;
+r → r;
+w → w;
+l → l;
+y → j;
+a → ɑ;
+e → ɛ;
+I → ɪ;
+o → o;
+u → u;
+\- → ;
+::NFC;
+

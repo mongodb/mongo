@@ -1,0 +1,172 @@
+#
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Copyright (C) 2002-2016, International Business Machines Corporation
+# and others. All Rights Reserved.
+#
+# file:  word_POSIX.txt
+#
+# ICU Word Break Rules, POSIX locale.
+#      See Unicode Standard Annex #29.
+#      These rules are based on UAX #29 Revision 34 for Unicode Version 12.0
+#
+# Note:  Updates to word.txt will usually need to be merged into
+#        word_POSIX.txt also.
+
+##############################################################################
+#
+#  Character class definitions from TR 29
+#
+##############################################################################
+
+!!chain;
+!!quoted_literals_only;
+
+
+#
+#  Character Class Definitions.
+#
+
+$Han                = [:Han:];
+
+$CR                 = [\p{Word_Break = CR}];
+$LF                 = [\p{Word_Break = LF}];
+$Newline            = [\p{Word_Break = Newline}];
+$Extend             = [\p{Word_Break = Extend}-$Han];
+$ZWJ                = [\p{Word_Break = ZWJ}];
+$Regional_Indicator = [\p{Word_Break = Regional_Indicator}];
+$Format             = [\p{Word_Break = Format}];
+$Katakana           = [\p{Word_Break = Katakana}];
+$Hebrew_Letter      = [\p{Word_Break = Hebrew_Letter}];
+$ALetter            = [\p{Word_Break = ALetter}];
+$Single_Quote       = [\p{Word_Break = Single_Quote}];
+$Double_Quote       = [\p{Word_Break = Double_Quote}];
+$MidNumLet          = [\p{Word_Break = MidNumLet} - [.]];
+$MidLetter          = [\p{Word_Break = MidLetter} - [\:]];
+$MidNum             = [\p{Word_Break = MidNum} [.]];
+$Numeric            = [\p{Word_Break = Numeric}];
+$ExtendNumLet       = [\p{Word_Break = ExtendNumLet}];
+$WSegSpace          = [\p{Word_Break = WSegSpace}];
+$Extended_Pict      = [\p{Extended_Pictographic}];
+
+$Hiragana           = [:Hiragana:];
+$Ideographic        = [\p{Ideographic}];
+
+
+#   Dictionary character set, for triggering language-based break engines. Currently
+#   limited to LineBreak=Complex_Context. Note that this set only works in Unicode
+#   5.0 or later as the definition of Complex_Context was corrected to include all
+#   characters requiring dictionary break.
+
+$Control        = [\p{Grapheme_Cluster_Break = Control}];
+$HangulSyllable = [\uac00-\ud7a3];
+$ComplexContext = [:LineBreak = Complex_Context:];
+$KanaKanji      = [$Han $Hiragana $Katakana];
+$dictionaryCJK  = [$KanaKanji $HangulSyllable];
+$dictionary     = [$ComplexContext $dictionaryCJK];
+
+# TODO: check if handling of katakana in dictionary makes rules incorrect/void
+
+# leave CJK scripts out of ALetterPlus
+$ALetterPlus  = [$ALetter-$dictionaryCJK [$ComplexContext-$Extend-$Control]];
+
+
+## -------------------------------------------------
+
+# Rule 3 - CR x LF
+#
+$CR $LF;
+
+# Rule 3c   Do not break within emoji zwj sequences.
+#             ZWJ ×  \p{Extended_Pictographic}.  Precedes WB4, so no intervening Extend chars allowed.
+#
+$ZWJ $Extended_Pict;
+
+# Rule 3d - Keep horizontal whitespace together.
+#
+$WSegSpace $WSegSpace;
+
+# Rule 4 - ignore Format and Extend characters, except when they appear at the beginning
+#          of a region of Text.
+
+$ExFm  = [$Extend $Format $ZWJ];
+
+^$ExFm+;            # This rule fires only when there are format or extend characters at the
+                    # start of text, or immediately following another boundary. It groups them, in
+                    # the event there are more than one.
+
+[^$CR $LF $Newline $ExFm] $ExFm*;   # This rule rule attaches trailing format/extends to words,
+                                    # with no special rule status value.
+
+$Numeric $ExFm* {100};              # This group of rules also attach trailing format/extends, but
+$ALetterPlus $ExFm* {200};          # with rule status set based on the word's final base character.
+$HangulSyllable {200};
+$Hebrew_Letter $ExFm* {200};
+$Katakana $ExFm* {400};             # note:  these status values override those from rule 5
+$Hiragana $ExFm* {400};             #        by virtue of being numerically larger.
+$Ideographic $ExFm* {400};          #
+
+#
+# rule 5
+#    Do not break between most letters.
+#
+($ALetterPlus | $Hebrew_Letter) $ExFm* ($ALetterPlus | $Hebrew_Letter);
+
+# rule 6 and 7
+($ALetterPlus | $Hebrew_Letter)  $ExFm* ($MidLetter | $MidNumLet | $Single_Quote) $ExFm* ($ALetterPlus | $Hebrew_Letter) {200};
+
+# rule 7a
+$Hebrew_Letter $ExFm* $Single_Quote {200};
+
+# rule 7b and 7c
+$Hebrew_Letter $ExFm* $Double_Quote $ExFm* $Hebrew_Letter;
+
+# rule 8
+
+$Numeric $ExFm* $Numeric;
+
+# rule 9
+
+($ALetterPlus | $Hebrew_Letter)  $ExFm* $Numeric;
+
+# rule 10
+
+$Numeric $ExFm* ($ALetterPlus | $Hebrew_Letter);
+
+# rule 11 and 12
+
+$Numeric $ExFm* ($MidNum | $MidNumLet | $Single_Quote) $ExFm* $Numeric;
+
+# rule 13
+# to be consistent with $KanaKanji $KanaKanhi, changed
+# from 300 to 400.
+# See also TestRuleStatus in intltest/rbbiapts.cpp
+$Katakana $ExFm*  $Katakana {400};
+
+# rule 13a/b
+
+$ALetterPlus   $ExFm* $ExtendNumLet {200};    #  (13a)
+$Hebrew_Letter $ExFm* $ExtendNumLet {200};    #  (13a)
+$Numeric       $ExFm* $ExtendNumLet {100};    #  (13a)
+$Katakana      $ExFm* $ExtendNumLet {400};    #  (13a)
+$ExtendNumLet  $ExFm* $ExtendNumLet {200};    #  (13a)
+
+$ExtendNumLet  $ExFm* $ALetterPlus  {200};    #  (13b)
+$ExtendNumLet  $ExFm* $Hebrew_Letter {200};    #  (13b)
+$ExtendNumLet  $ExFm* $Numeric      {100};    #  (13b)
+$ExtendNumLet  $ExFm* $Katakana     {400};    #  (13b)
+
+# rules 15 - 17
+#    Pairs of Regional Indicators stay together.
+#    With incoming rule chaining disabled by ^, this rule will match exactly two of them.
+#    No other rule begins with a Regional_Indicator, so chaining cannot extend the match.
+#
+^$Regional_Indicator $ExFm* $Regional_Indicator;
+
+# special handling for CJK characters: chain for later dictionary segmentation
+$HangulSyllable $HangulSyllable {200};
+$KanaKanji $KanaKanji {400}; # different rule status if both kana and kanji found
+
+# Rule 999
+#     Match a single code point if no other rule applies.
+.;

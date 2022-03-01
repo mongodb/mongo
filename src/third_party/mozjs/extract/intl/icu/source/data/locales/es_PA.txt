@@ -1,0 +1,146 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_PA{
+    %%Parent{"es_419"}
+    calendar{
+        generic{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, d 'de' MMMM 'de' y G",
+                "d 'de' MMMM 'de' y G",
+                "MM/dd/y G",
+                "MM/dd/yy GGGGG",
+                "{1} {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                MEd{"E, MM/dd"}
+                Md{"MM/dd"}
+                yM{"MM/y"}
+                yMEd{"E MM/dd/y"}
+                yMd{"MM/dd/y"}
+            }
+            intervalFormats{
+                MMMEd{
+                    M{"E d 'de' MMM 'al' E d 'de' MMM"}
+                    d{"E d 'al' E d 'de' MMM"}
+                }
+                MMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM"}
+                }
+                fallback{"{0} a el {1}"}
+                y{
+                    y{"y–y"}
+                }
+                yMMM{
+                    M{"MMM–MMM 'de' y"}
+                    y{"MMM 'de' y 'a' MMM 'de' y"}
+                }
+                yMMMEd{
+                    M{"E d 'de' MMM 'al' E d 'de' MMM 'de' y"}
+                    d{"E d 'al' E d 'de' MMM 'de' y"}
+                    y{"E d 'de' MMM 'de' y 'al' E d 'de' MMM 'de' y"}
+                }
+                yMMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM 'de' y"}
+                    d{"d–d 'de' MMM 'de' y"}
+                    y{"d 'de' MMM 'de' y 'al' d 'de' MMM 'de' y"}
+                }
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, d 'de' MMMM 'de' y",
+                "d 'de' MMMM 'de' y",
+                "MM/dd/y",
+                "MM/dd/yy",
+                "{1} {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                MEd{"E, MM/dd"}
+                Md{"MM/dd"}
+                yM{"MM/y"}
+                yMEd{"E MM/dd/y"}
+                yMMM{"MMM y"}
+                yMMMd{"d MMM y"}
+                yMd{"MM/dd/y"}
+            }
+            dayPeriod{
+                format{
+                    abbreviated{
+                        evening1{"de la tarde"}
+                        morning1{"de la madrugada"}
+                        morning2{"de la mañana"}
+                        night1{"de la noche"}
+                        noon{"mediodía"}
+                    }
+                    wide{
+                        evening1{"de la tarde"}
+                        morning1{"de la madrugada"}
+                        morning2{"de la mañana"}
+                        night1{"de la noche"}
+                        noon{"mediodía"}
+                    }
+                }
+            }
+            intervalFormats{
+                MMMEd{
+                    M{"E d 'de' MMM 'al' E d 'de' MMM"}
+                    d{"E d 'al' E d 'de' MMM"}
+                }
+                MMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM"}
+                }
+                yM{
+                    M{"MM/y – MM/y"}
+                    y{"MM/y – MM/y"}
+                }
+                yMMM{
+                    y{"MMM 'de' y 'a' MMM 'de' y"}
+                }
+                yMMMEd{
+                    M{"E d 'de' MMM 'al' E d 'de' MMM 'de' y"}
+                    d{"E d 'al' E d 'de' MMM 'de' y"}
+                    y{"E d 'de' MMM 'de' y 'al' E d 'de' MMM 'de' y"}
+                }
+                yMMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM 'de' y"}
+                    y{"d 'de' MMM 'de' y 'al' d 'de' MMM 'de' y"}
+                }
+            }
+            quarters{
+                format{
+                    wide{
+                        "1er. trimestre",
+                        "2do. trimestre",
+                        "3er. trimestre",
+                        "4.º trimestre",
+                    }
+                }
+                stand-alone{
+                    wide{
+                        "1er. trimestre",
+                        "2do. trimestre",
+                        "3er. trimestre",
+                        "4.º trimestre",
+                    }
+                }
+            }
+        }
+    }
+}

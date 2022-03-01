@@ -1,0 +1,67 @@
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# *******************************************************************************
+# * Copyright (C) 2001-2013, International Business Machines
+# * Corporation and others.  All Rights Reserved.
+# *******************************************************************************
+#
+# test3.ucm
+#
+# Test file for MBCS conversion with three-byte codepage data.
+# Also contains extension mappings (m:n).
+
+<code_set_name>     "test3"
+<mb_cur_max>        3
+<mb_cur_min>        1
+<uconv_class>       "MBCS"
+<subchar>           \xff
+<icu:state>         0, 1:1, 5-9, ff
+<icu:state>         2:2
+<icu:state>         4, a-f.p
+
+CHARMAP
+
+# fromUnicode result is zero byte from other than U+0000
+<U20ac>     \x00 |0
+
+# nothing special
+<U0005>     \x05 |0
+
+# extensions
+<U00c0>     \x05+\x01\x02\x0d |0
+<U00c0>     \x05+\x01\x02\x0e |3
+<U00c0>     \x05+\xff |3
+
+# toUnicode result is fallback direct
+<U0006>     \x06 |3
+
+# toUnicode result is direct non-BMP code point
+<U101234>   \x07 |0
+<Ufebcd>    \x08 |3
+
+# extensions
+<U101234>+<U50005>+<U60006> \x07+\x00+\x01\x02\x0f+\x09 |0
+<U101234>+<U50005>          \x07+\x00+\x01\x02\x0e+\x05 |0
+<U101234>+<U60006>          \x07+\x00+\x01\x02\x0f+\x06 |0
+<U101234>+<U70007>          \x07+\x00+\x01\x02\x0f |1
+
+#unassigned \x09
+
+# extensions where the first code point is unassigned, for replay testing
+#<U00c4><U0300> \x09+\x09 |0
+<U00c4><U00c4><U101234><U0005> \x05+\x01\x02\x0c |0
+
+# toUnicode result is surrogate pair: test real pair, single unit, unassigned
+<U23456>    \x01\x02\x0a |0
+<U000b>     \x01\x02\x0b |0
+#unassigned \x01\x02\x0c
+<U34567>    \x01\x02\x0d |3
+<U000e>     \x01\x02\x0e |3
+#unassigned \x01\x02\x0f
+
+# "good one-way" mappings
+<U0023>         \x01\x02\x04 |4
+<U0023>+<UFE0E> \x01\x02\x04 |4
+<U0023>+<UFE0F> \x01\x02\x04 |0
+
+END CHARMAP

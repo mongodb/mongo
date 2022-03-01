@@ -1,0 +1,29 @@
+## -*-makefile-*-
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+## Copyright (c) 2003, International Business Machines Corporation and
+## others. All Rights Reserved.
+##
+
+# Note, this is not a real mh- file. You got here because configure
+# (specifically, aclocal.m4) could not determine a suitable mh- file.
+#
+# Perhaps your platform wasn't detected- try changing aclocal.m4 and
+# re-running autoconf. 
+#
+# If your platform is truly new/different:
+# As a start, try copying mh-linux (which is fairly generic) over this
+# file, and re-run config.status.
+
+%.$(STATIC_O) %.o %.$(STATIC_O) %.o ../data/%.o %.d %.d %.$(SO).$(SO_TARGET_VERSION_MAJOR) %.$(SO):
+	@echo 
+	@echo 
+	@echo "*** ERROR - configure could not detect your platform"
+	@echo "*** see the readme.html"
+	@echo "*** or, try copying icu/source/config/mh-linux to mh-unknown"
+	@echo "***   and editing it."
+	@echo 
+	@echo 
+	exit 1
+
+

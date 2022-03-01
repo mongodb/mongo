@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -7,98 +7,38 @@
 #ifndef builtin_Promise_h
 #define builtin_Promise_h
 
-#include "builtin/SelfHostingDefines.h"
-#include "threading/ConditionVariable.h"
-#include "threading/Mutex.h"
-#include "vm/NativeObject.h"
+#include "js/Promise.h"
+
+#include "jsapi.h"    // js::CompletionKind
+#include "jstypes.h"  // JS_PUBLIC_API
+
+#include "js/CallArgs.h"    // JS::CallArgs
+#include "js/RootingAPI.h"  // JS::{,Mutable}Handle
+#include "js/TypeDecls.h"   // JS::HandleObjectVector
+#include "js/Value.h"       // JS::Value
+
+struct JS_PUBLIC_API JSContext;
+class JS_PUBLIC_API JSObject;
 
 namespace js {
 
-enum PromiseSlots {
-    PromiseSlot_Flags = 0,
-    PromiseSlot_ReactionsOrResult,
-    PromiseSlot_RejectFunction,
-    PromiseSlot_AwaitGenerator = PromiseSlot_RejectFunction,
-    PromiseSlot_DebugInfo,
-    PromiseSlots,
-};
+class AsyncFunctionGeneratorObject;
+class AsyncGeneratorObject;
+class PromiseObject;
 
-#define PROMISE_FLAG_RESOLVED  0x1
-#define PROMISE_FLAG_FULFILLED 0x2
-#define PROMISE_FLAG_HANDLED   0x4
-#define PROMISE_FLAG_REPORTED  0x8
-#define PROMISE_FLAG_DEFAULT_RESOLVE_FUNCTION 0x10
-#define PROMISE_FLAG_DEFAULT_REJECT_FUNCTION  0x20
-#define PROMISE_FLAG_ASYNC    0x40
+// Promise.prototype.then.
+extern bool Promise_then(JSContext* cx, unsigned argc, JS::Value* vp);
 
-class AutoSetNewObjectMetadata;
+// Promise[Symbol.species].
+extern bool Promise_static_species(JSContext* cx, unsigned argc, JS::Value* vp);
 
-class PromiseObject : public NativeObject
-{
-  public:
-    static const unsigned RESERVED_SLOTS = PromiseSlots;
-    static const Class class_;
-    static const Class protoClass_;
-    static PromiseObject* create(JSContext* cx, HandleObject executor,
-                                 HandleObject proto = nullptr, bool needsWrapping = false);
-
-    static PromiseObject* createSkippingExecutor(JSContext* cx);
-
-    static JSObject* unforgeableResolve(JSContext* cx, HandleValue value);
-    static JSObject* unforgeableReject(JSContext* cx, HandleValue value);
-
-    JS::PromiseState state() {
-        int32_t flags = getFixedSlot(PromiseSlot_Flags).toInt32();
-        if (!(flags & PROMISE_FLAG_RESOLVED)) {
-            MOZ_ASSERT(!(flags & PROMISE_FLAG_FULFILLED));
-            return JS::PromiseState::Pending;
-        }
-        if (flags & PROMISE_FLAG_FULFILLED)
-            return JS::PromiseState::Fulfilled;
-        return JS::PromiseState::Rejected;
-    }
-    Value value()  {
-        MOZ_ASSERT(state() == JS::PromiseState::Fulfilled);
-        return getFixedSlot(PromiseSlot_ReactionsOrResult);
-    }
-    Value reason() {
-        MOZ_ASSERT(state() == JS::PromiseState::Rejected);
-        return getFixedSlot(PromiseSlot_ReactionsOrResult);
-    }
-
-    static MOZ_MUST_USE bool resolve(JSContext* cx, Handle<PromiseObject*> promise,
-                                     HandleValue resolutionValue);
-    static MOZ_MUST_USE bool reject(JSContext* cx, Handle<PromiseObject*> promise,
-                                    HandleValue rejectionValue);
-
-    static void onSettled(JSContext* cx, Handle<PromiseObject*> promise);
-
-    double allocationTime();
-    double resolutionTime();
-    JSObject* allocationSite();
-    JSObject* resolutionSite();
-    double lifetime();
-    double timeToResolution() {
-        MOZ_ASSERT(state() != JS::PromiseState::Pending);
-        return resolutionTime() - allocationTime();
-    }
-    MOZ_MUST_USE bool dependentPromises(JSContext* cx, MutableHandle<GCVector<Value>> values);
-    uint64_t getID();
-    bool isUnhandled() {
-        MOZ_ASSERT(state() == JS::PromiseState::Rejected);
-        return !(getFixedSlot(PromiseSlot_Flags).toInt32() & PROMISE_FLAG_HANDLED);
-    }
-    void markAsReported() {
-        MOZ_ASSERT(isUnhandled());
-        int32_t flags = getFixedSlot(PromiseSlot_Flags).toInt32();
-        setFixedSlot(PromiseSlot_Flags, Int32Value(flags | PROMISE_FLAG_REPORTED));
-    }
-};
+// Promise.resolve.
+extern bool Promise_static_resolve(JSContext* cx, unsigned argc, JS::Value* vp);
 
 /**
  * Unforgeable version of the JS builtin Promise.all.
  *
- * Takes an AutoObjectVector of Promise objects and returns a promise that's
+ * Takes a HandleValueVector of Promise objects and returns a promise that's
  * resolved with an array of resolution values when all those promises have
  * been resolved, or rejected with the rejection value of the first rejected
  * promise.
@@ -106,23 +46,46 @@ class PromiseObject : public NativeObject
  * Asserts that all objects in the `promises` vector are, maybe wrapped,
  * instances of `Promise` or a subclass of `Promise`.
  */
-MOZ_MUST_USE JSObject*
-GetWaitForAllPromise(JSContext* cx, const JS::AutoObjectVector& promises);
+[[nodiscard]] JSObject* GetWaitForAllPromise(JSContext* cx,
+                                             JS::HandleObjectVector promises);
 
 /**
  * Enqueues resolve/reject reactions in the given Promise's reactions lists
- * as though calling the original value of Promise.prototype.then.
- *
- * If the `createDependent` flag is not set, no dependent Promise will be
- * created. This is used internally to implement DOM functionality.
- * Note: In this case, the reactions pushed using this function contain a
- * `promise` field that can contain null. That field is only ever used by
- * devtools, which have to treat these reactions specially.
+ * as though by calling the original value of Promise.prototype.then, and
+ * without regard to any Promise subclassing used in `promiseObj` itself.
  */
-MOZ_MUST_USE bool
-OriginalPromiseThen(JSContext* cx, Handle<PromiseObject*> promise,
-                    HandleValue onFulfilled, HandleValue onRejected,
-                    MutableHandleObject dependent, bool createDependent);
+[[nodiscard]] PromiseObject* OriginalPromiseThen(
+    JSContext* cx, JS::Handle<JSObject*> promiseObj,
+    JS::Handle<JSObject*> onFulfilled, JS::Handle<JSObject*> onRejected);
+
+enum class UnhandledRejectionBehavior { Ignore, Report };
+
+/**
+ * React to[0] `unwrappedPromise` (which may not be from the current realm) as
+ * if by using a fresh promise created for the provided nullable fulfill/reject
+ * IsCallable objects.
+ *
+ * However, no dependent Promise will be created, and mucking with `Promise`,
+ * `Promise.prototype.then`, and `Promise[Symbol.species]` will not alter this
+ * function's behavior.
+ *
+ * If `unwrappedPromise` rejects and `onRejected_` is null, handling is
+ * determined by `behavior`.  If `behavior == Report`, a fresh Promise will be
+ * constructed and rejected on the fly (and thus will be reported as unhandled).
+ * But if `behavior == Ignore`, the rejection is ignored and is not reported as
+ * unhandled.
+ *
+ * Note: Reactions pushed using this function contain a null `promise` field.
+ * That field is only ever used by devtools, which have to treat these reactions
+ * specially.
+ *
+ * 0. The sense of "react" here is the sense of the term as defined by Web IDL:
+ *    https://heycam.github.io/webidl/#dfn-perform-steps-once-promise-is-settled
+ */
+[[nodiscard]] extern bool ReactToUnwrappedPromise(
+    JSContext* cx, JS::Handle<PromiseObject*> unwrappedPromise,
+    JS::Handle<JSObject*> onFulfilled_, JS::Handle<JSObject*> onRejected_,
+    UnhandledRejectionBehavior behavior);
 
 /**
  * PromiseResolve ( C, x )
@@ -130,142 +93,122 @@ OriginalPromiseThen(JSContext* cx, Handle<PromiseObject*> promise,
  * The abstract operation PromiseResolve, given a constructor and a value,
  * returns a new promise resolved with that value.
  */
-MOZ_MUST_USE JSObject*
-PromiseResolve(JSContext* cx, HandleObject constructor, HandleValue value);
+[[nodiscard]] JSObject* PromiseResolve(JSContext* cx,
+                                       JS::Handle<JSObject*> constructor,
+                                       JS::Handle<JS::Value> value);
 
+/**
+ * Reject |promise| with the value of the current pending exception.
+ *
+ * |promise| must be from the current realm.  Callers must enter the realm of
+ * |promise| if they are not already in it.
+ */
+[[nodiscard]] bool RejectPromiseWithPendingError(
+    JSContext* cx, JS::Handle<PromiseObject*> promise);
 
-MOZ_MUST_USE PromiseObject*
-CreatePromiseObjectForAsync(JSContext* cx, HandleValue generatorVal);
+/**
+ * Create the promise object which will be used as the return value of an async
+ * function.
+ */
+[[nodiscard]] PromiseObject* CreatePromiseObjectForAsync(JSContext* cx);
 
-MOZ_MUST_USE bool
-IsPromiseForAsync(JSObject* promise);
+/**
+ * Returns true if the given object is a promise created by
+ * either CreatePromiseObjectForAsync function or async generator's method.
+ */
+[[nodiscard]] bool IsPromiseForAsyncFunctionOrGenerator(JSObject* promise);
 
-MOZ_MUST_USE bool
-AsyncFunctionReturned(JSContext* cx, Handle<PromiseObject*> resultPromise, HandleValue value);
+[[nodiscard]] bool AsyncFunctionReturned(
+    JSContext* cx, JS::Handle<PromiseObject*> resultPromise,
+    JS::Handle<JS::Value> value);
 
-MOZ_MUST_USE bool
-AsyncFunctionThrown(JSContext* cx, Handle<PromiseObject*> resultPromise);
+[[nodiscard]] bool AsyncFunctionThrown(JSContext* cx,
+                                       JS::Handle<PromiseObject*> resultPromise,
+                                       JS::Handle<JS::Value> reason);
 
-MOZ_MUST_USE bool
-AsyncFunctionAwait(JSContext* cx, Handle<PromiseObject*> resultPromise, HandleValue value);
+// Start awaiting `value` in an async function (, but doesn't suspend the
+// async function's execution!). Returns the async function's result promise.
+[[nodiscard]] JSObject* AsyncFunctionAwait(
+    JSContext* cx, JS::Handle<AsyncFunctionGeneratorObject*> genObj,
+    JS::Handle<JS::Value> value);
 
-class AsyncGeneratorObject;
+// If the await operation can be skipped and the resolution value for `val` can
+// be acquired, stored the resolved value to `resolved` and `true` to
+// `*canSkip`.  Otherwise, stores `false` to `*canSkip`.
+[[nodiscard]] bool CanSkipAwait(JSContext* cx, JS::Handle<JS::Value> val,
+                                bool* canSkip);
+[[nodiscard]] bool ExtractAwaitValue(JSContext* cx, JS::Handle<JS::Value> val,
+                                     JS::MutableHandle<JS::Value> resolved);
 
-MOZ_MUST_USE bool
-AsyncGeneratorAwait(JSContext* cx, Handle<AsyncGeneratorObject*> asyncGenObj, HandleValue value);
+[[nodiscard]] bool AsyncGeneratorAwait(
+    JSContext* cx, JS::Handle<AsyncGeneratorObject*> asyncGenObj,
+    JS::Handle<JS::Value> value);
 
-MOZ_MUST_USE bool
-AsyncGeneratorResolve(JSContext* cx, Handle<AsyncGeneratorObject*> asyncGenObj,
-                      HandleValue value, bool done);
+[[nodiscard]] bool AsyncGeneratorResolve(
+    JSContext* cx, JS::Handle<AsyncGeneratorObject*> asyncGenObj,
+    JS::Handle<JS::Value> value, bool done);
 
-MOZ_MUST_USE bool
-AsyncGeneratorReject(JSContext* cx, Handle<AsyncGeneratorObject*> asyncGenObj,
-                     HandleValue exception);
+[[nodiscard]] bool AsyncGeneratorReject(
+    JSContext* cx, JS::Handle<AsyncGeneratorObject*> asyncGenObj,
+    JS::Handle<JS::Value> exception);
 
-MOZ_MUST_USE bool
-AsyncGeneratorEnqueue(JSContext* cx, HandleValue asyncGenVal, CompletionKind completionKind,
-                      HandleValue completionValue, MutableHandleValue result);
+[[nodiscard]] bool AsyncGeneratorEnqueue(JSContext* cx,
+                                         JS::Handle<JS::Value> asyncGenVal,
+                                         CompletionKind completionKind,
+                                         JS::Handle<JS::Value> completionValue,
+                                         JS::MutableHandle<JS::Value> result);
 
-bool
-AsyncFromSyncIteratorMethod(JSContext* cx, CallArgs& args, CompletionKind completionKind);
+bool AsyncFromSyncIteratorMethod(JSContext* cx, JS::CallArgs& args,
+                                 CompletionKind completionKind);
 
-// An OffThreadPromiseTask holds a rooted Promise JSObject while executing an
-// off-thread task (defined by the subclass) that needs to resolve the Promise
-// on completion. Because OffThreadPromiseTask contains a PersistentRooted, it
-// must be destroyed on an active JSContext thread of the Promise's JSRuntime.
-// OffThreadPromiseTasks may be run off-thread in various ways (e.g., see
-// PromiseHelperTask). At any time, the task can be dispatched to an active
-// JSContext of the Promise's JSRuntime by calling dispatchResolve().
+// Callback for describing promise reaction records, for use with
+// PromiseObject::getReactionRecords.
+struct PromiseReactionRecordBuilder {
+  // A reaction record created by a call to 'then' or 'catch', with functions to
+  // call on resolution or rejection, and the promise that will be settled
+  // according to the result of calling them.
+  //
+  // Note that resolve, reject, and result may not be same-compartment with cx,
+  // or with the promise we're inspecting. This function presents the values
+  // exactly as they appear in the reaction record. They may also be wrapped or
+  // unwrapped.
+  //
+  // Some reaction records refer to internal resolution or rejection functions
+  // that are not naturally represented as debuggee JavaScript functions. In
+  // this case, resolve and reject may be nullptr.
+  [[nodiscard]] virtual bool then(JSContext* cx, JS::Handle<JSObject*> resolve,
+                                  JS::Handle<JSObject*> reject,
+                                  JS::Handle<JSObject*> result) = 0;
 
-class OffThreadPromiseTask : public JS::Dispatchable
-{
-    friend class OffThreadPromiseRuntimeState;
+  // A reaction record created when one native promise is resolved to another.
+  // The 'promise' argument is the promise that will be settled in the same way
+  // the promise this reaction record is attached to is settled.
+  //
+  // Note that promise may not be same-compartment with cx. This function
+  // presents the promise exactly as it appears in the reaction record.
+  [[nodiscard]] virtual bool direct(
+      JSContext* cx, JS::Handle<PromiseObject*> unwrappedPromise) = 0;
 
-    JSRuntime*                       runtime_;
-    PersistentRooted<PromiseObject*> promise_;
-    bool                             registered_;
+  // A reaction record that resumes an asynchronous function suspended at an
+  // await expression. The 'generator' argument is the generator object
+  // representing the call.
+  //
+  // Note that generator may not be same-compartment with cx. This function
+  // presents the generator exactly as it appears in the reaction record.
+  [[nodiscard]] virtual bool asyncFunction(
+      JSContext* cx,
+      JS::Handle<AsyncFunctionGeneratorObject*> unwrappedGenerator) = 0;
 
-    void operator=(const OffThreadPromiseTask&) = delete;
-    OffThreadPromiseTask(const OffThreadPromiseTask&) = delete;
-
-  protected:
-    OffThreadPromiseTask(JSContext* cx, Handle<PromiseObject*> promise);
-
-    // To be called by OffThreadPromiseTask and implemented by the derived class.
-    virtual bool resolve(JSContext* cx, Handle<PromiseObject*> promise) = 0;
-
-    // JS::Dispatchable implementation. Ends with 'delete this'.
-    void run(JSContext* cx, MaybeShuttingDown maybeShuttingDown) final;
-
-  public:
-    ~OffThreadPromiseTask() override;
-
-    // Initializing an OffThreadPromiseTask informs the runtime that it must
-    // wait on shutdown for this task to rejoin the active JSContext by calling
-    // dispatchResolveAndDestroy().
-    bool init(JSContext* cx);
-
-    // An initialized OffThreadPromiseTask can be dispatched to an active
-    // JSContext of its Promise's JSRuntime from any thread. Normally, this will
-    // lead to resolve() being called on JSContext thread, given the Promise.
-    // However, if shutdown interrupts, resolve() may not be called, though the
-    // OffThreadPromiseTask will be destroyed on a JSContext thread.
-    void dispatchResolveAndDestroy();
+  // A reaction record that resumes an asynchronous generator suspended at an
+  // await expression. The 'generator' argument is the generator object
+  // representing the call.
+  //
+  // Note that generator may not be same-compartment with cx. This function
+  // presents the generator exactly as it appears in the reaction record.
+  [[nodiscard]] virtual bool asyncGenerator(
+      JSContext* cx, JS::Handle<AsyncGeneratorObject*> unwrappedGenerator) = 0;
 };
 
-using OffThreadPromiseTaskSet = HashSet<OffThreadPromiseTask*,
-                                        DefaultHasher<OffThreadPromiseTask*>,
-                                        SystemAllocPolicy>;
+}  // namespace js
 
-using DispatchableVector = Vector<JS::Dispatchable*, 0, SystemAllocPolicy>;
-
-class OffThreadPromiseRuntimeState
-{
-    friend class OffThreadPromiseTask;
-
-    // These fields are initialized once before any off-thread usage and thus do
-    // not require a lock.
-    JS::DispatchToEventLoopCallback dispatchToEventLoopCallback_;
-    void*                           dispatchToEventLoopClosure_;
-
-    // These fields are mutated by any thread and are guarded by mutex_.
-    Mutex                           mutex_;
-    ConditionVariable               allCanceled_;
-    OffThreadPromiseTaskSet         live_;
-    size_t                          numCanceled_;
-    DispatchableVector              internalDispatchQueue_;
-    ConditionVariable               internalDispatchQueueAppended_;
-    bool                            internalDispatchQueueClosed_;
-
-    static bool internalDispatchToEventLoop(void*, JS::Dispatchable*);
-    bool usingInternalDispatchQueue() const;
-
-    void operator=(const OffThreadPromiseRuntimeState&) = delete;
-    OffThreadPromiseRuntimeState(const OffThreadPromiseRuntimeState&) = delete;
-
-  public:
-    OffThreadPromiseRuntimeState();
-    ~OffThreadPromiseRuntimeState();
-    void init(JS::DispatchToEventLoopCallback callback, void* closure);
-    void initInternalDispatchQueue();
-    bool initialized() const;
-
-    // If initInternalDispatchQueue() was called, internalDrain() can be
-    // called to periodically drain the dispatch queue before shutdown.
-    void internalDrain(JSContext* cx);
-    bool internalHasPending();
-
-    // shutdown() must be called by the JSRuntime while the JSRuntime is valid.
-    void shutdown(JSContext* cx);
-};
-
-bool
-Promise_static_resolve(JSContext* cx, unsigned argc, Value* vp);
-bool
-Promise_reject(JSContext* cx, unsigned argc, Value* vp);
-bool
-Promise_then(JSContext* cx, unsigned argc, Value* vp);
-
-} // namespace js
-
-#endif /* builtin_Promise_h */
+#endif  // builtin_Promise_h

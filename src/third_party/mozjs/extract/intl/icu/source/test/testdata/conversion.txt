@@ -1,0 +1,2073 @@
+// Copyright (C) 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+//*******************************************************************************
+//
+//   Copyright (C) 2003-2015, International Business Machines
+//   Corporation and others.  All Rights Reserved.
+//
+//   file name:  conversion.txt
+//   encoding:   US-ASCII
+//   tab size:   8 (not used)
+//   indentation:4
+//
+//   created on: 2003jul15
+//   created by: Markus W. Scherer
+//
+//   ICU resource bundle source file with test data for data-driven conversion tests.
+//
+//*******************************************************************************
+
+conversion:table(nofallback) {
+  Info {
+    Description { "Test data for conversion" }
+    LongDescription {
+      "Test data for data-driven conversion tests in icu/source/test/intltest/convtest.cpp\n"
+      "Run intltest conversion\n"
+
+      "Charset names starting with '*' are for testdata names.\n"
+      "Charset names starting with '+' are for charsets currently not supported in ICU4J.\n"
+
+      "ICU callbacks are specified as strings with pairs of characters, each optional.\n"
+      "Callback function - '?'=Sub '0'=Skip '.'=Stop '&'=Escape\n"
+      "Callback option - a letter is passed in directly as const char * see ucnv_err.h\n"
+      "Empty string: Sub callback with NULL option\n"
+
+      "In order to specify a charset substitution character (for ucnv_setSubstChars()),\n"
+      "add a NUL (U+0000) to the callback string followed by the subchar bytes as Latin-1\n"
+      "characters. For example, for a Sub callback with no option and a subchar of FC FC,\n"
+      "use the string \"?\x00\xFC\xFC\"\n"
+
+      "In order to specify a substitution string (for ucnv_setSubstString()),\n"
+      "add an '=' to the callback string followed by the substitution string.\n"
+      "For example, for a Sub callback with no option and a substitution string\n"
+      "of \"ab\", use the string \"?=ab\"\n"
+
+      "fallbacks: per-direction boolean, currently only for fromUnicode; see Jitterbug 2401\n"
+
+      "errorCode: (empty)==zero | invalid | illegal | truncated | illesc | unsuppesc\n"
+    }
+  }
+  TestData {
+    toUnicode {
+      Headers { "charset", "bytes", "unicode", "offsets", "flush", "fallbacks", "errorCode", "callback", "invalidChars" }
+      Cases {
+        // Test ticket 6789: implement Java-compatible Unicode, UnicodeBig and UnicodeLittle converters
+        // For details about these encodings see convrtrs.txt.
+        // Standard UTF-16
+        { "UTF-16",             :bin{ 00610062 }, "ab",           :intvector{ 0,2 }, :int{1}, :int{0}, "", "&C", :bin{""} }
+        { "UTF-16",             :bin{ feff0061 }, "a",            :intvector{ 2 },   :int{1}, :int{0}, "", "&C", :bin{""} }
+        { "UTF-16",             :bin{ fffe0061 }, "\u6100",       :intvector{ 2 },   :int{1}, :int{0}, "", "&C", :bin{""} }
+        // Java "Unicode" requires a BOM
+        { "+UTF-16,version=1",  :bin{ 00610062 }, "\\x00\\x61b",  :intvector{ 0,0,0,0,0,0,0,0,2 }, :int{1}, :int{0}, "", "&C", :bin{""} }
+        { "+UTF-16,version=1",  :bin{ feff0061 }, "a",            :intvector{ 2 },   :int{1}, :int{0}, "", "&C", :bin{""} }
+        { "+UTF-16,version=1",  :bin{ fffe0061 }, "\u6100",       :intvector{ 2 },   :int{1}, :int{0}, "", "&C", :bin{""} }
+        // Standard UTF-16BE
+        { "UTF-16BE",           :bin{ 00610062 }, "ab",           :intvector{ 0,2 }, :int{1}, :int{0}, "", "&C", :bin{""} }
+        { "UTF-16BE",           :bin{ feff0061 }, "\ufeffa",      :intvector{ 0,2 }, :int{1}, :int{0}, "", "&C", :bin{""} }
+        { "UTF-16BE",           :bin{ fffe0061 }, "\ufffea",      :intvector{ 0,2 }, :int{1}, :int{0}, "", "&C", :bin{""} }
+        // Java "UnicodeBig" requires a BE BOM or no BOM; it consumes the BE BOM
+        { "UTF-16BE,version=1",:bin{ 00610062 }, "ab",           :intvector{ 0,2 }, :int{1}, :int{0}, "", "&C", :bin{""} }
+        { "UnicodeBig",        :bin{ feff0061 }, "a",            :intvector{ 2 },   :int{1}, :int{0}, "", "&C", :bin{""} }
+        { "UnicodeBig",        :bin{ fffe0061 }, "\\xFF\\xFEa",  :intvector{ 0,0,0,0,0,0,0,0,2 }, :int{1}, :int{0}, "", "&C", :bin{""} }
+        // Standard UTF-16LE
+        { "UTF-16LE",           :bin{ 61006200 }, "ab",           :intvector{ 0,2 }, :int{1}, :int{0}, "", "&C", :bin{""} }
+        { "UTF-16LE",           :bin{ fffe6100 }, "\ufeffa",      :intvector{ 0,2 }, :int{1}, :int{0}, "", "&C", :bin{""} }
+        { "UTF-16LE",           :bin{ feff6100 }, "\ufffea",      :intvector{ 0,2 }, :int{1}, :int{0}, "", "&C", :bin{""} }
+        // Java "UnicodeLittle" requires an LE BOM or no BOM; it consumes the LE BOM
+        { "UTF-16LE,version=1",:bin{ 61006200 }, "ab",           :intvector{ 0,2 }, :int{1}, :int{0}, "", "&C", :bin{""} }
+        { "UnicodeLittle",     :bin{ fffe6100 }, "a",            :intvector{ 2 },   :int{1}, :int{0}, "", "&C", :bin{""} }
+        { "x-UTF-16LE-BOM",    :bin{ feff6100 }, "\\xFE\\xFFa",  :intvector{ 0,0,0,0,0,0,0,0,2 }, :int{1}, :int{0}, "", "&C", :bin{""} }
+
+        // Test ticket 7704: implement Java-compatible "UTF-16" converter.
+        // Same as standard UTF-16 but fromUnicode always writes big-endian byte stream.
+        { "+UTF-16,version=2",  :bin{ 00610062 }, "ab",           :intvector{ 0,2 }, :int{1}, :int{0}, "", "&C", :bin{""} }
+        { "+UTF-16,version=2",  :bin{ feff0061 }, "a",            :intvector{ 2 },   :int{1}, :int{0}, "", "&C", :bin{""} }
+        { "+UTF-16,version=2",  :bin{ fffe0061 }, "\u6100",       :intvector{ 2 },   :int{1}, :int{0}, "", "&C", :bin{""} }
+
+        // Test ticket 5691: consistent illegal sequences
+        // The following test cases are for illegal character byte sequences.
+        //
+        // Unfortunately, we cannot use the Shift-JIS examples from the ticket
+        // comments because our Shift-JIS table is Windows-compatible and
+        // therefore has no illegal single bytes. Same for GBK.
+        // Instead, we use the stricter GB 18030 also for 2-byte examples.
+        // The byte sequences are generally slightly different from the ticket
+        // comment, simply using assigned characters rather than just
+        // theoretically valid sequences.
+        {
+          "gb18030",
+          :bin{ 618140813c81ff7a },
+          "a\u4e02\\x81<\\x81\\xFFz",
+          :intvector{ 0,1,3,3,3,3,4,5,5,5,5,5,5,5,5,7 },
+          :int{1}, :int{0}, "", "&C", :bin{""}
+        }
+        {
+          "EUC-JP",
+          :bin{ 618fb0a98fb03c8f3cb0a97a },
+          "a\u4e28\\x8F\\xB0<\\x8F<\u9022z",
+          :intvector{ 0,1,4,4,4,4,5,5,5,5,6,7,7,7,7,8,9,11 },
+          :int{1}, :int{0}, "", "&C", :bin{""}
+        }
+        {
+          "gb18030",
+          :bin{ 618130fc318130fc8181303c3e813cfc817afe90a8bc },
+          "a\u05ed\\x810\u9f07\\x810<>\\x81<\u9f07z\ue854\u1e3f",
+          :intvector{ 0,1,5,5,5,5,6,7,9,9,9,9,10,11,12,13,13,13,13,14,15,17,18,20 },
+          :int{1}, :int{0}, "", "&C", :bin{""}
+        }
+        {
+          "UTF-8",
+          :bin{ 61f1808182f180813cf18081fff180ff3cf1ff3c3e7a },
+          "a\U00040042\\xF1\\x80\\x81<\\xF1\\x80\\x81\\xFF\\xF1\\x80\\xFF<\\xF1\\xFF<>z",
+          :intvector{ 0,1,1,5,5,5,5,5,5,5,5,5,5,5,5,8,9,9,9,9,9,9,9,9,9,9,9,9,12,12,12,12,13,13,13,13,13,13,13,13,15,15,15,15,16,17,17,17,17,18,18,18,18,19,20,21 },
+          :int{1}, :int{0}, "", "&C", :bin{""}
+        }
+        {
+          "ISO-2022-JP",
+          :bin{ 1b24424141af4142affe41431b2842 },
+          "\u758f\\xAF\u758e\\xAF\\xFE\u790e",
+          :intvector{ 3,5,5,5,5,6,8,8,8,8,8,8,8,8,10 },
+          :int{1}, :int{0}, "", "&C", :bin{""}
+        }
+        {
+          "ibm-25546",
+          :bin{ 411b242943420e4141af4142affe41430f5a },
+          "AB\uc88b\\xAF\uc88c\\xAF\\xFE\uc88dZ",
+          :intvector{ 0,5,7,9,9,9,9,10,12,12,12,12,12,12,12,12,14,17 },
+          :int{1}, :int{0}, "", "&C", :bin{""}
+        }
+        {
+          "ISO-2022-KR",
+          :bin{ 411b242943420e4141af4142affe41430f5a },
+          "AB\uc88b\\xAF\uc88c\\xAF\\xFE\uc88dZ",
+          :intvector{ 0,5,7,9,9,9,9,10,12,12,12,12,12,12,12,12,14,17 },
+          :int{1}, :int{0}, "", "&C", :bin{""}
+        }
+        {
+          "ISO-2022-CN",
+          :bin{ 411b242941420e4141af4142affe41430f5a },
+          "AB\u4eae\\xAF\u8c05\\xAF\\xFE\u64a9Z",
+          :intvector{ 0,5,7,9,9,9,9,10,12,12,12,12,12,12,12,12,14,17 },
+          :int{1}, :int{0}, "", "&C", :bin{""}
+        }
+        {
+          "ISO-2022-CN-CNS",
+          :bin{ 411b2429470e21702541256f0f },
+          "A\u00a7\u03c4\u02c7",
+          :intvector{ 0,6,8,10 },
+          :int{1}, :int{0}, "", "&C", :bin{""}
+        }
+        {
+          "HZ",
+          :bin{ 417e7b4141af4142affe41437e7d5a },
+          "A\u4eae\\xAF\u8c05\\xAF\\xFE\u64a9Z",
+          :intvector{ 0,3,5,5,5,5,6,8,8,8,8,8,8,8,8,10,14 },
+          :int{1}, :int{0}, "", "&C", :bin{""}
+        }
+        // Test ticket 5691: consistent illegal sequences
+        // The following test cases are for illegal escape/designator/shift sequences.
+        //
+        // ISO-2022-JP and -CN with illegal escape sequences.
+        {
+          "ISO-2022-JP",
+          :bin{ 611b24201b244241411b283f1b28427a },
+          "a\\x1B$ \u758f\\x1B\u2538z",
+          :intvector{ 0,1,1,1,1,2,3,7,9,9,9,9,10,15 },
+          :int{1}, :int{0}, "", "&C", :bin{""}
+        }
+        {
+          "ISO-2022-CN",
+          :bin{ 611b2429201b2429410e41410f7a },
+          "a\\x1B$) \u4eaez",
+          :intvector{ 0,1,1,1,1,2,3,4,10,13 },
+          :int{1}, :int{0}, "", "&C", :bin{""}
+        }
+        // Test ticket 5691: ISO-2022-JP-2 with illegal single-shift SS2 and SS3 sequences.
+        // The first ESC N comes before its designator sequence, the last sequence is ESC+space.
+        {
+          "ISO-2022-JP-2",
+          :bin{ 4e1b4e4e1b2e414e1b4e4e4e1b204e },
+          "N\\x1BNNN\xceN\\x1B N",
+          :intvector{ 0,1,1,1,1,2,3,7,10,11,12,12,12,12,13,14 },
+          :int{1}, :int{0}, "", "&C", :bin{""}
+        }
+        {
+          "ISO-2022-CN-EXT",
+          :bin{ 4e1b4e4e1b242a484e1b4e4e4e4e1b204e },
+          "N\\x1BNNN\u8f0eN\\x1B N",
+          :intvector{ 0,1,1,1,1,2,3,8,11,13,14,14,14,14,15,16 },
+          :int{1}, :int{0}, "", "&C", :bin{""}
+        }
+        /*
+         * ICU 4.4 (ticket #7314) removes mappings for CNS 11643 planes 3..7
+        {
+          "ISO-2022-CN-EXT",
+          :bin{ 4f1b4f4f1b242b494f1b4f4f4f4f1b204f },
+          "O\\x1BOOO\u492bO\\x1B O",
+          :intvector{ 0,1,1,1,1,2,3,8,11,13,14,14,14,14,15,16 },
+          :int{1}, :int{0}, "", "&C", :bin{""}
+        }
+         */
+        // Test ticket 5691: HZ with illegal tilde sequences.
+        {
+          "HZ",
+          :bin{ 417e20427e21437e80447e7b41417e207e41427e7f41437e7d5a },
+          "A\\x7E B\\x7E!C\\x7E\\x80D\u4eae\\x7E\\x20\\x7E\u8c05\\x7E\\x7F\u64a9Z",
+          :intvector{ 0,1,1,1,1,2,3,4,4,4,4,5,6,7,7,7,7,7,7,7,7,9,                          // SBCS
+                      12,14,14,14,14,14,14,14,14,16,16,16,16,17,19,19,19,19,19,19,19,19,21, // DBCS
+                      25 },                                                                 // SBCS
+          :int{1}, :int{0}, "", "&C", :bin{""}
+        }
+        // Test ticket 5691: Example from Peter Edberg.
+        {
+          "ISO-2022-JP",
+          :bin{ 1b244230212f7e742630801b284a621b2458631b2842648061 },
+          "\u4e9c\ufffd\u7199\ufffdb\ufffd$Xcd\ufffda",
+          :intvector{ 3,5,7,9,14,15,16,17,18,22,23,24 },
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+        // Test bug 6071 (2:1 Unicode:charset SBCS mapping).
+        {
+          "*test1bmp",
+          :bin{ 050008 },
+          "e@uv",
+          :intvector{ 0,1,2,2 },
+          :int{1}, :int{1}, "", "?", :bin{""}
+        }
+        // test that HZ limits its byte values to lead bytes 21..7d and trail bytes 21..7e
+        {
+          "HZ",
+          :bin{ 7e7b21212120217e217f772100007e217e7e7d207e7e807e0a2b },
+          "\u3000\ufffd\u3013\ufffd\u9ccc\ufffd\ufffd\u3013 ~\ufffd+",
+          :intvector{ 2,4,6,8,10,12,14,15,19,20,22,25 },
+          :int{1}, :int{1}, "", "?", :bin{""}
+        }
+        // improve coverage of ISO-2022-JP converter with hardcoded JIS X 0201 and
+        // using the Shift-JIS table for JIS X 0208 (ticket #5797)
+        {
+          "ISO-2022-JP",
+          :bin{ 1b284a7d7e801b2442306c20217f7e21202160217f22202225227f5f211b2842 },
+          "}\u203e\ufffd\u4e00\ufffd\ufffd\ufffd\ufffd\xf7\ufffd\ufffd\u25b2\ufffd\u6f3e",
+          :intvector{ 3,4,5,9,11,12,14,16,17,19,21,23,25,27 },
+          :int{1}, :int{1}, "", "?", :bin{""}
+        }
+        // improve coverage of ISO-2022-JP converter by simulating erroneous input
+        {
+          "ISO-2022-JP-2",
+          :bin{ 0f0ed11b2e41461b244141411b4e411b2e4147451b4ed31b2e4641411b4ed2 },
+          "\u0046\u4eae\u00c1\u6865\u4eae",
+          :intvector{ 6, 10, 14, 18, 26 },
+          :int{1}, :int{0}, "", "0", :bin{""}
+        }
+        // improve coverage of JIS7 converter by simulating incomplete shifted input
+        {
+          "JIS7",
+          :bin{ 0e11 },
+          "",
+          :intvector{},
+          :int{1}, :int{0}, "", "0", :bin{""}
+        }
+        // improve coverage of unrolled loops in ucnvmbcs.c/ucnv_MBCSSingleToBMPWithOffsets()
+        {
+          "ISO-8859-3",
+          :bin{ 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2021222324252627 },
+          "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f !\x22#$%&'",
+          :intvector{ 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39 },
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+        // test that ISO-2022-JP encodes ASCII as itself
+        {
+          "ISO-2022-JP",
+          :bin{ 3f4041424344454647 },
+          "?@ABCDEFG",
+          :intvector{ 0,1,2,3,4,5,6,7,8 },
+          :int{1}, :int{1}, "", "?", :bin{""}
+        }
+        // test that ISO-2022-CN encodes ASCII as itself
+        {
+          "ISO-2022-CN",
+          :bin{ 3f4041424344454647 },
+          "?@ABCDEFG",
+          :intvector{ 0,1,2,3,4,5,6,7,8 },
+          :int{1}, :int{1}, "", "?", :bin{""}
+        }
+
+        // ISO-2022-KR
+
+        // truncated, partial escape sequence
+        {
+          "ibm-25546",
+          :bin{ 1b }, "", :intvector{},
+          :int{1}, :int{1}, "truncated", ".", :bin{ 1b }
+        }
+        {
+          "ibm-25546",
+          :bin{ 1b24 }, "", :intvector{},
+          :int{1}, :int{1}, "truncated", ".", :bin{ 1b24 }
+        }
+        {
+          "ibm-25546",
+          :bin{ 1b2429 }, "", :intvector{},
+          :int{1}, :int{1}, "truncated", ".", :bin{ 1b2429 }
+        }
+        // complete escape sequence but nothing else
+        {
+          "ibm-25546",
+          :bin{ 1b242943 }, "", :intvector{},
+          :int{1}, :int{1}, "", ".", :bin{""}
+        }
+        {
+          "ibm-25546",
+          :bin{ 1b2429430e }, "", :intvector{},
+          :int{1}, :int{1}, "", ".", :bin{""}
+        }
+        // escape plus ASCII character
+        {
+          "ibm-25546",
+          :bin{ 1b24294341 }, "A", :intvector{ 4 },
+          :int{1}, :int{1}, "", ".", :bin{""}
+        }
+        // escape plus incomplete DBCS character
+        {
+          "ibm-25546",
+          :bin{ 1b2429430e41 }, "", :intvector{},
+          :int{1}, :int{1}, "truncated", ".", :bin{ 41 }
+        }
+        // all complete with DBCS character
+        {
+          "ibm-25546",
+          :bin{ 1b2429430e4141 }, "\uc88b", :intvector{ 5 },
+          :int{1}, :int{1}, "", ".", :bin{""}
+        }
+        // more complicated example
+        {
+          "ibm-25546",
+          :bin{ 411b242943420e4141affe0f43 },
+          "AB\uc88b%XAF%XFEC",
+          :intvector{ 0, 5, 7, 9, 9, 9, 9, 9, 9, 9, 9, 12 },
+          :int{1}, :int{1}, "", "&", :bin{""}
+        }
+
+        // truncated, partial escape sequence
+        {
+          "ISO-2022-KR",
+          :bin{ 1b }, "", :intvector{},
+          :int{1}, :int{1}, "truncated", ".", :bin{ 1b }
+        }
+        {
+          "ISO-2022-KR",
+          :bin{ 1b24 }, "", :intvector{},
+          :int{1}, :int{1}, "truncated", ".", :bin{ 1b24 }
+        }
+        {
+          "ISO-2022-KR",
+          :bin{ 1b2429 }, "", :intvector{},
+          :int{1}, :int{1}, "truncated", ".", :bin{ 1b2429 }
+        }
+        // complete escape sequence but nothing else
+        {
+          "ISO-2022-KR",
+          :bin{ 1b242943 }, "", :intvector{},
+          :int{1}, :int{1}, "", ".", :bin{""}
+        }
+        {
+          "ISO-2022-KR",
+          :bin{ 1b2429430e }, "", :intvector{},
+          :int{1}, :int{1}, "", ".", :bin{""}
+        }
+        // escape plus ASCII character
+        {
+          "ISO-2022-KR",
+          :bin{ 1b24294341 }, "A", :intvector{ 4 },
+          :int{1}, :int{1}, "", ".", :bin{""}
+        }
+        // escape plus incomplete DBCS character
+        {
+          "ISO-2022-KR",
+          :bin{ 1b2429430e41 }, "", :intvector{},
+          :int{1}, :int{1}, "truncated", ".", :bin{ 41 }
+        }
+        // all complete with DBCS character
+        {
+          "ISO-2022-KR",
+          :bin{ 1b2429430e4141 }, "\uc88b", :intvector{ 5 },
+          :int{1}, :int{1}, "", ".", :bin{""}
+        }
+        // more complicated example
+        {
+          "ISO-2022-KR",
+          :bin{ 411b242943420e4141affe0f43 },
+          "AB\uc88b%XAF%XFEC",
+          :intvector{ 0, 5, 7, 9, 9, 9, 9, 9, 9, 9, 9, 12 },
+          :int{1}, :int{1}, "", "&", :bin{""}
+        }
+        // empty segment (using substitution and stop)
+        {
+          "ISO-2022-KR",
+          :bin{ 1b242943610e0f620d0a },
+          "a\uFFFDb\u000D\u000A",
+          :intvector{ 4, 6, 7, 8, 9 },
+          :int{1}, :int{1}, "", "?", :bin{""}
+        }
+        {
+          "ISO-2022-KR",
+          :bin{ 1b242943610e0f620d0a },
+          "a",
+          :intvector{ 4 },
+          :int{1}, :int{1}, "illesc", ".", :bin{"0f"}
+        }
+
+        // ISO-2022-JP
+
+        // truncated, partial escape sequence
+        {
+          "ISO-2022-JP",
+          :bin{ 1b }, "", :intvector{},
+          :int{1}, :int{1}, "truncated", ".", :bin{ 1b }
+        }
+        {
+          "ISO-2022-JP-2",
+          :bin{ 1b24 }, "", :intvector{},
+          :int{1}, :int{1}, "truncated", ".", :bin{ 1b24 }
+        }
+        // complete escape sequence but nothing else
+        {
+          "ISO-2022-JP-2",
+          :bin{ 1b2442 }, "", :intvector{},
+          :int{1}, :int{1}, "", ".", :bin{""}
+        }
+        // escape plus incomplete DBCS character
+        {
+          "ISO-2022-JP-2",
+          :bin{ 1b244241 }, "", :intvector{},
+          :int{1}, :int{1}, "truncated", ".", :bin{ 41 }
+        }
+        // all complete with DBCS character
+        {
+          "ISO-2022-JP-2",
+          :bin{ 1b24424141 }, "\u758f", :intvector{ 3 },
+          :int{1}, :int{1}, "", ".", :bin{""}
+        }
+        // test the G2 designator & SS2 shift
+        {
+          "ISO-2022-JP-2",
+          :bin{ 431b2e46461b244241411b4e4e353f }, "CF\u758f\u039e\u7591", :intvector{ 0, 4, 8, 12, 13 },
+          :int{1}, :int{1}, "", ".", :bin{""}
+        }
+        // JIS7 with Katakana
+        {
+          "JIS7",
+          :bin{ 41420e41420f4142 }, "AB\uff81\uff82AB", :intvector{ 0, 1, 3, 4, 6, 7 },
+          :int{1}, :int{1}, "", ".", :bin{""}
+        }
+        // JIS8 with Katakana
+        {
+          "JIS8",
+          :bin{ 41c15c1b284a5cc242 }, "A\uff81\\\xa5\uff82B", :intvector{ 0, 1, 2, 6, 7, 8 },
+          :int{1}, :int{1}, "", ".", :bin{""}
+        }
+        // empty segment (using substitution and stop)
+        {
+          "ISO-2022-JP",
+          :bin{ 61621b24421b284263640d0a },
+          "ab\uFFFDcd\u000D\u000A",
+          :intvector{ 0, 1, 5, 8, 9, 10, 11 },
+          :int{1}, :int{1}, "", "?", :bin{""}
+        }
+        {
+          "ISO-2022-JP",
+          :bin{ 61621b24421b284263640d0a },
+          "ab",
+          :intvector{ 0, 1 },
+          :int{1}, :int{1}, "illesc", ".", :bin{"1b2842"}
+        }
+
+        // ISO-2022-CN
+
+        // truncated, partial escape sequence
+        {
+          "ISO_2022,locale=zh,version=1",
+          :bin{ 1b }, "", :intvector{},
+          :int{1}, :int{1}, "truncated", ".", :bin{ 1b }
+        }
+        {
+          "ISO_2022,locale=zh,version=1",
+          :bin{ 1b24 }, "", :intvector{},
+          :int{1}, :int{1}, "truncated", ".", :bin{ 1b24 }
+        }
+        {
+          "ISO_2022,locale=zh,version=1",
+          :bin{ 1b2429 }, "", :intvector{},
+          :int{1}, :int{1}, "truncated", ".", :bin{ 1b2429 }
+        }
+        // complete escape sequence but nothing else
+        {
+          "ISO_2022,locale=zh,version=1",
+          :bin{ 1b242941 }, "", :intvector{},
+          :int{1}, :int{1}, "", ".", :bin{""}
+        }
+        {
+          "ISO_2022,locale=zh,version=1",
+          :bin{ 1b2429410e }, "", :intvector{},
+          :int{1}, :int{1}, "", ".", :bin{""}
+        }
+        // escape plus ASCII character
+        {
+          "ISO_2022,locale=zh,version=1",
+          :bin{ 1b24294141 }, "\x41", :intvector{ 4 },
+          :int{1}, :int{1}, "", ".", :bin{""}
+        }
+        // escape plus incomplete DBCS character
+        {
+          "ISO_2022,locale=zh,version=1",
+          :bin{ 1b2429410e41 }, "", :intvector{},
+          :int{1}, :int{1}, "truncated", ".", :bin{ 41 }
+        }
+        // all complete with DBCS character
+        {
+          "ISO_2022,locale=zh,version=1",
+          :bin{ 1b2429410e4141 }, "\u4eae", :intvector{ 5 },
+          :int{1}, :int{1}, "", ".", :bin{""}
+        }
+        /*
+         * ICU 4.4 (ticket #7314) removes mappings for CNS 11643 planes 3..7
+        // ISO-2022-CN-EXT with all subcharsets and shifts and with supplementary code points
+        {
+          "ISO-2022-CN-EXT",
+          :bin{ 1b2429411b242a480e41411b2429457e7c1b4e70341b242b4d1b2429477c341b4f664c2421 },
+          "\u4eae\u9f82\u56cd\u56cc\U0002a6d6\x30",
+          :intvector{ 9, 15, 19, 29, 33, 33, 35 },
+          :int{1}, :int{1}, "", ".", :bin{""}
+        }
+         */
+
+        // illegal and unsupported escape sequences
+        // SS2 without designator: illegal
+        {
+          "ISO-2022-CN-EXT",
+          :bin{ 411b4e2121 }, "\x41", :intvector{ 0 },
+          :int{1}, :int{1}, "illesc", ".", :bin{ 1b }
+        }
+        // G3 designator: recognized, but not supported for -CN (only for -CN-EXT)
+        {
+          "ISO-2022-CN",
+          :bin{ 411b242b491b4f2121 }, "\x41", :intvector{ 0 },
+          :int{1}, :int{1}, "unsuppesc", ".", :bin{ 1b242b49 }
+        }
+        // empty segment 1 (using substitution and stop)
+        {
+          "ISO-2022-CN",
+          :bin{ 611b242941620e0f1b242a481b4e6a65630d0a },
+          "ab\uFFFD\u994Cc\u000D\u000A",
+          :intvector{ 0, 5, 7, 14, 16, 17, 18 },
+          :int{1}, :int{1}, "", "?", :bin{""}
+        }
+        {
+          "ISO-2022-CN",
+          :bin{ 611b242941620e0f1b242a481b4e6a65630d0a },
+          "ab",
+          :intvector{ 0, 5 },
+          :int{1}, :int{1}, "illesc", ".", :bin{"0f"}
+        }
+        // empty segment 2 (using substitution and stop)
+        {
+          "ISO-2022-CN",
+          :bin{ 611b242941620e1b24294768640f630d0a },
+          "ab\uFFFD\u5F70c\u000D\u000A",
+          :intvector{ 0, 5, 7, 11, 14, 15, 16 },
+          :int{1}, :int{1}, "", "?", :bin{""}
+        }
+        {
+          "ISO-2022-CN",
+          :bin{ 611b242941620e1b24294768640f630d0a },
+          "ab",
+          :intvector{ 0, 5 },
+          :int{1}, :int{1}, "illesc", ".", :bin{"1b242947"}
+        }
+
+        // ISO-2022 SBCS
+        // [U_ENABLE_GENERIC_ISO_2022]
+        // The _generic_ ISO-2022 converter is disabled starting 2003-dec-03 (ICU 2.8).
+        // For details see the icu mailing list from 2003-dec-01 and the ucnv2022.c file.
+        // Language-specific variants of ISO-2022 continue to be available as listed below.
+        //{
+        //  "ISO_2022",
+        //  :bin{ 0008090a0d1a1c1f203f415c7d7e7f },
+        //  "\x00\x08\t\n\r\x1a\x1c\x1f ?A\\}~\x7f",
+        //  :intvector{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 },
+        //  :int{1}, :int{1}, "", ".", :bin{""}
+        //}
+
+        // HZ-GB-2312
+
+        // empty segment 1 (using substitution and stop)
+        {
+          "HZ-GB-2312",
+          :bin{ 61627e7b7e7d6364 },
+          "ab\uFFFDcd",
+          :intvector{ 0, 1, 4, 6, 7 },
+          :int{1}, :int{1}, "", "?", :bin{""}
+        }
+        {
+          "HZ-GB-2312",
+          :bin{ 61627e7b7e7d63640d0a },
+          "ab",
+          :intvector{ 0, 1 },
+          :int{1}, :int{1}, "illesc", ".", :bin{"7e7d"}
+        }
+        // empty segment 2 & legal redundant switches (using substitution and stop)
+        {
+          "HZ-GB-2312",
+          :bin{ 61627e7b323b3f557e7b7e7b523b7e7d63647e7d65667e7d7e7d },
+          "ab\u4E0D\u7A7A\uFFFD\u4E00cdef\uFFFD",
+          :intvector{ 0, 1, 4, 6, 10, 12, 16, 17, 20, 21, 24 },
+          :int{1}, :int{1}, "", "?", :bin{""}
+        }
+        {
+          "HZ-GB-2312",
+          :bin{ 61627e7b323b3f557e7b7e7b523b7e7d63647e7d65667e7d7e7d },
+          "ab\u4E0D\u7A7A",
+          :intvector{ 0, 1, 4, 6 },
+          :int{1}, :int{1}, "illesc", ".", :bin{"7e7b"}
+        }
+
+        // DBCS-only extensions
+        {
+          "ibm-970",
+          :bin{ 617eece9b2eb },
+          "\x61\x7e\u4e00\ub000",
+          :intvector{ 0, 1, 2, 4 },
+          :int{1}, :int{1}, "", "?", :bin{""}
+        }
+
+        {
+          "ibm-971",
+          :bin{ 617eece9b2eb },
+          "\ufffd\u4e00\ub000",
+          :intvector{ 0, 2, 4 },
+          :int{1}, :int{1}, "", "?", :bin{""}
+        }
+
+        {
+          "ibm-16684",
+          :bin{ 430e4395ecc1404042e1 },
+          "\ufffd\u30C8\u30C8\u309A\u3000\u20ac",
+          :intvector{ 0, 2, 4, 4, 6, 8 },
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+
+        {
+          "ibm-1399",
+          :bin{ 430e4395ecc140400fe1 },
+          "\uff62\u30C8\u30C8\u309A\u3000\u20ac",
+          :intvector{ 0, 2, 4, 4, 6, 9 },
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+
+        // extensions
+        {
+          "ibm-1390",
+          :bin{ 430e4395ecc1 },
+          "\uff63\u30C8\u30C8\u309A",
+          :intvector{ 0, 2, 4, 4 },
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+
+        {
+          "ibm-16684",
+          :bin{ ececec8bec8cec8d4386ecb5ecb6ecb7 },
+          "\ufffd\u31f6\u31f7\u31f8\u30ab\u304b\u309a\u304d\u309a\u304f\u309a",
+          :intvector{ 0, 2, 4, 6, 8, 10, 10, 12, 12, 14, 14 },
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+
+        {
+          "ibm-1390",
+          :bin{ 43860eececec8bec8cec8d4386ecb5ecb6ecb7ecc10fec },
+          "\uff63\uff76\ufffd\u31f6\u31f7\u31f8\u30ab\u304b\u309a\u304d\u309a\u304f\u309a\u30C8\u309A\x1a",
+          :intvector{ 0, 1, 3, 5, 7, 9, 11, 13, 13, 15, 15, 17, 17, 19, 19, 22 },
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+
+        {
+          "*test3",
+          :bin{ 00050601020b0701020a01020c },
+          "\u20ac\x05\x06\x0b\U00101234\U00023456\ufffd",
+          :intvector{ 0, 1, 2, 3, 6, 6, 7, 7, 10 },
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+
+        // test mapping to sequence of multiple Unicode characters which includes nonBMP (ticket #9235)
+        {
+          "*test3",
+          :bin{ 05070001020e050501020c06 },
+          "\x05\U00101234\U00050005\u00c4\u00c4\U00101234\x05\x06",
+          :intvector{ 0, 1, 1, 1, 1, 7, 7, 7, 7, 7, 11 },
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+
+        // normal conversions
+        {
+          "UTF-16LE",
+          :bin{ 310000d801dc00d902dc320000d8330001dc3400 },
+          "1\U00010001\U000500022\ufffd3\ufffd4",
+          :intvector{ 0, 2, 2, 6, 6, 10, 12, 14, 16, 18 },
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+        { "UTF-16LE", :bin{ 00 }, "", :intvector{}, :int{1}, :int{0}, "truncated", ".", :bin{ 00 } }
+        { "UTF-16LE", :bin{ 00d800 }, "", :intvector{}, :int{1}, :int{0}, "truncated", ".", :bin{ 00d800 } }
+
+        {
+          "UTF-16BE",
+          :bin{ 0031d800dc01d900dc020032d8000033dc010034 },
+          "1\U00010001\U000500022\ufffd3\ufffd4",
+          :intvector{ 0, 2, 2, 6, 6, 10, 12, 14, 16, 18 },
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+        { "UTF-16BE", :bin{ 00 }, "", :intvector{}, :int{1}, :int{0}, "truncated", ".", :bin{ 00 } }
+        { "UTF-16BE", :bin{ d800dc }, "", :intvector{}, :int{1}, :int{0}, "truncated", ".", :bin{ d800dc } }
+
+        // e4b8 is a partial sequence
+        { "UTF-8", :bin{ 31e4ba8ce4b8 }, "1\u4e8c", :intvector{ 0, 1 }, :int{1}, :int{0}, "truncated", ".", :bin{ e4b8 } }
+        { "UTF-8", :bin{ 31e4ba8ce4b8 }, "1\u4e8c\ufffd", :intvector{ 0, 1, 4 }, :int{1}, :int{0}, "", "?", :bin{""} }
+
+        // LMBCS with escape callback (1292a0 is unassigned)
+        {
+          "LMBCS",
+          :bin{ 12c9501292a01292a1 },
+          "\u4e2e%X12%X92%XA0\ue5c4",
+          :intvector{ 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 6 },
+          :int{1}, :int{0}, "", "&", :bin{""}
+        }
+        {
+          "LMBCS",
+          :bin{ 61012981a00f270f91140a7414f60214d84d14dc561088a0 },
+          "\u0061\u2013\u00fc\u00e1\u0007\u0091\u0a74\u0200\ud84d\udc56\u5516",
+          :intvector{ 0, 1, 3, 4, 5, 7, 9, 12, 15, 18, 21 },
+          :int{1}, :int{0}, "", ".", :bin{""}
+        }
+
+        // IMAP-mailbox-name with SUB
+        // a<DEL> a&AB~ a&AB\x0c a&AB- a&AB. a&.
+        {
+          "IMAP-mailbox-name",
+          :bin{ 617f612641427e612641420c612641422d612641422e61262e },
+          "a\ufffda\ufffda\ufffda\ufffda\ufffda\ufffd",
+          :intvector{ 0, 1, 2, 4, 7, 9, 12, 14, 17, 19, 22, 23 },
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+
+        // using testdata_test1.cnv
+        { "*test1", :bin{ 000506070809 }, "\u20ac\x05\x06\U00101234\ufffd\ufffd", :intvector{ 0, 1, 2, 3, 3, 4, 5 }, :int{1}, :int{0}, "", "", :bin{""} }
+
+        // surrogates in CESU-8
+        { "CESU-8", :bin{ eda080eda081edb081 }, "\ud800\U00010401", :intvector{ 0, 3, 6 }, :int{1}, :int{0}, "", "", :bin{""} }
+        // e080 is a partial sequence
+        { "UTF-8", :bin{ 31ffe4ba8ce08061 }, "1\ufffd\u4e8c\ufffd\ufffda", :intvector{ 0, 1, 2, 5, 6, 7 }, :int{0}, :int{0}, "", "", :bin{ 80 } }
+        // fbbfbfbfbf exceedes U+10ffff
+        { "UTF-8", :bin{ 31fbbfbfbfbf61 }, "1\ufffd\ufffd\ufffd\ufffd\ufffda", :intvector{ 0, 1, 2, 3, 4, 5, 6 }, :int{0}, :int{0}, "", "", :bin{ bf } }
+
+        // lead byte a2 without trail byte
+        { "ibm-1363", :bin{ a2aea2 }, "\u00a1", :intvector{ 0 }, :int{1}, :int{0}, "truncated", ".", :bin{ a2 } }
+        { "ibm-1363", :bin{ a2aea2 }, "\u00a1\u001a", :intvector{ 0, 2 }, :int{1}, :int{0}, "", "?", :bin{""} }
+
+        // simple sample, no error handling
+        { "UTF-8", :bin{ 61F48FBFBF }, "a\U0010FFFF", :intvector{ 0, 1, 1 }, :int{1}, :int{0}, "", "", :bin{""} }
+        //      Headers { "charset", "bytes", "unicode", "offsets", "flush", "fallbacks", "errorCode", "callback", "invalidChars" }
+        {
+            "iscii-dev",
+            :bin{ EF4BC0E9BFE9E8D80AEF4AC0D4BFD4E8D80AEF4838B30AEF4939B30AEF4A3AB30AEF4B3BB30A},  
+            "\u0A5C\u0A4D\u0A39\u0A5C\u0A4D\u0A39\u000A" /* Gurmukhi test */
+            "\u0AA2\u0AB5\u0AA1\u0AB5\u0ACD\u0AB9\u000A"     /* Gujarati test */
+            "\u0038\u0C95\u000A" /* Kannada test */
+            "\u0039\u0D15\u000A" /* Malayalam test */
+            "\u003A\u0A95\u000A" /* Gujarati test */
+            "\u003B\u0A15\u000A" /* Punjabi test */,
+            :intvector  {  2,  2,  2,  4,  6,  7,  8,  11,  12,  13,  14,  15,  16,  17,  20,  21,  22,  25,  26,  27,  30,  31, 32,  35,  36,  37  },
+            :int{1}, :int{0}, "", "", :bin{ "" }
+        }
+        {
+            "iscii-gur",
+            :bin{3BB30AC0E9BFE9E8D80AEF43C0E9BFE9E8D80A3BB30AEF403BB30A},
+            "\u003b\u0a15\u000a" /* Easy characters */
+            "\u0a5c\u0a4d\u0a39\u0a5c\u0a4d\u0a39\u000a" /* Gurmukhi test */
+            "\u09dd\u09dc\u09cd\u09b9\u000a" /* Switch script: to Bengali*/ 
+            "\u003b\u0a15\u000a" /* Easy characters - new line" so should default!*/
+            "\u003b\u0a15\u000a", /* Back to Gurmukhi*/
+            :intvector { 0,  1,  2,  3,  3,  3,  5,  7,  8,  9,  13,  15,  16,  17,  18,  19,  20,  21,  24,  25,  26  }, 
+            :int{1}, :int{0}, "", "", :bin{ "" }
+        }
+        // Test Gurmukhi (Bindi Tippi and Consonant Cluster)
+        {
+            "iscii-gur",
+            :bin{EF4BB3A2A2B3E8B3C0E9BFE9E8D8},
+            "\u0a15\u0a70\u0a02\u0a71\u0a15\u0a5c\u0a4d\u0a39\u0a5c\u0a4d\u0a39",
+            :intvector { 2,  3,  4,  5,  5,  8,  8,  8,  10,  12,  13  }, 
+            :int{1}, :int{0}, "", ".", :bin{ "" }
+        }
+        { // Verify Supplementary support
+          "Big5-HKSCS",
+          :bin{ fcfcfcfd },
+          "\U000233E6\U00026DA0",
+          :intvector{ 0, 0, 2, 2 },
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+        { // Verify non-supplementary support
+          "big5-hkscs:unicode3.0",
+          :bin{ fcfcfcfd },
+          "\uE1D4\uE1D5",
+          :intvector{ 0, 2 },
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+        { // Verify gb18030 enumeration
+          "gb18030",
+          :bin{ 8130D2398130D3308136A5318136A532 },
+          "\u0450\u0452\u200F\u2011",
+          :intvector{ 0, 4, 8, 12 },
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+        {
+          "x11-compound-text",
+          :bin{ 1b242944b5ac1b2d41a5e31b2d43d5f51b2d4dd01b2d41411b2d43bc1b2d42ff1b2d54df1b2d44c0b31b2d46b41b2d47b01b2d48e01b2d4ca1 },
+          "\u54A1\u00A5\u00E3\u0120\u0121\u011E\u0041\u0135\u02D9\u0E3F\u0100\u0157\u0384\u0660\u05D0\u0401",
+          :intvector{ },
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+        // Improve coverage of ISCII
+        {
+          "iscii-bng",
+          :bin{ f0a0f0b0b8 },
+          "",
+          :intvector{},
+          :int{1}, :int{0}, "", "0", :bin{""} 
+        }
+        // Test iso-2022-jp-2 miscellaneous symbols
+        {
+          "iso-2022-jp-2",
+          :bin{ 1b242843224f224e1b2842 },
+          "\u260E\u260F",
+          :intvector{ 4, 6 },
+          :int{1}, :int{0}, "", ".", :bin{""}
+        }
+        
+        // Improve Code Coverage for BOCU-1
+        {
+          "BOCU-1",
+          :bin{ 91fbc555fd6349 },
+          "\u0041\ud841\ud888\udc81",
+          :intvector{ 0, 1, 4, 4 },
+          :int{1}, :int{0}, "", ".", :bin{""}
+        }
+        {
+          "BOCU-1",
+          :bin{ fbeda44ff0fe189bb821f05926 },
+          "\ufe88\ufe70\udbff\udfff\u0061",
+          :intvector{},
+          :int{1}, :int{0}, "", ".", :bin{""}
+        }
+        {
+          "BOCU-1",
+          :bin{ 5b4bccf9 },
+          "\u000b",
+          :intvector{},
+          :int{1}, :int{0}, "", "0", :bin{""}
+        }
+        {
+          "BOCU-1",
+          :bin{ fe0053c6 },
+          "\u0003\u0076",
+          :intvector{},
+          :int{1}, :int{0}, "", "0", :bin{""}
+        }
+
+        //Improve code coverage for SCSU
+        {
+          "SCSU",
+          :bin{ 0fd899dc7fd888dc99e041424361 },
+          "\ud899\udc7f\ud888\udc99\u0041\u0042\u0043\u0061",
+          :intvector{},
+          :int{1}, :int{0}, "", "0", :bin{""}
+        }
+        {
+          "SCSU",
+          :bin{ 41df1281035f10df1b03df1c88800bbfffff },
+          "\u0041\u00df\u0401\u015f\u00df\u01df\uf000\udbff\udfff",
+          :intvector{},
+          :int{1}, :int{0}, "", ".", :bin{""}
+        }
+        {
+          "SCSU",
+          :bin{ 1b9a1b541bb2411bfd1b0041 },
+          "",
+          :intvector{},
+          :int{1}, :int{0}, "", ".", :bin{""}
+        }
+        {
+          "SCSU",
+          :bin{ 0f6441b413a733f2 },
+          "\u6441\ub413\ua733",
+          :intvector{},
+          :int{1}, :int{0}, "illegal", ".", :bin{ f2 }
+        }
+
+        //Improve code coverage for MBCS
+        {
+          "*test5",
+          :bin{ 0506 },
+          "\ufffd\x06",
+          :intvector{},
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+        {
+          "ibm-1390,swaplfnl",
+          :bin{ 430e4395ecc140400fc1e115 },
+          "\uff63\u30C8\u30C8\u309A\u3000\x41\u20ac\x0a",
+          :intvector{ 0, 2, 4, 4, 6, 9, 10, 11 },
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+        /*
+         * ICU 4.4 (ticket #7314) removes mappings for CNS 11643 planes 3..7
+        {
+          "ISO-2022-CN-EXT",
+          :bin{ 1b242b4d1b4f66791b242b4d1b4f216a },
+          "\u3667",
+          :intvector{ 14 },
+          :int{1}, :int{0}, "", "0", :bin{""}
+        }
+         */
+        {
+          "*test1bmp",
+          :bin{ 060a05 },
+          "\u0066\ufffd\u0065",
+          :intvector{ 0, 2, 2 },
+          :int{0}, :int{1}, "", "?", :bin{""}
+        }
+        {
+          "*test1bmp",
+          :bin{ 060708 },
+          "\u0066",
+          :intvector{},
+          :int{1}, :int{0}, "invalid", ".", :bin{ 07 }
+        }
+        {
+          "*test5",
+          :bin{ 010304 },
+          "\u0034\ufffd",
+          :intvector{},
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+        {
+          "*test1",
+          :bin{ 0a0b },
+          "",
+          :intvector{},
+          :int{1}, :int{0}, "", "0", :bin{""}
+        }
+        {
+          "*test1bmp",
+          :bin{ 0c06 },
+          "\u0066",
+          :intvector{},
+          :int{0}, :int{0}, "", ".", :bin{""}
+        }
+        {
+          "*test5",
+          :bin{ 0906 },
+          "\udbc8\udf45\u0006",
+          :intvector{},
+          :int{0}, :int{0}, "", ".", :bin{""}
+        }
+        {
+          "ibm-16684",
+          :bin{ 0e },
+          "",
+          :intvector{},
+          :int{0}, :int{0}, "illegal", ".", :bin{ 0e }
+        }
+        {
+          "UTF-7",
+          :bin{ 2b414b4d2d492b414b4d4170412d },
+          "\u00a3I\u00a3\u00a4",
+          :intvector{ 1,5,7,9 },
+          :int{0}, :int{0}, "", ".", :bin{""}
+        }
+        {
+          "x11-compound-text",
+          :bin{ 1e6ddc9b26bc10801bbcad50a040fc },
+          "\u001e\u006d\u00dc\u009b\u0026\u00bc\u0010\u0080\ufffd\u00bc\u00ad\u0050\u00a0\u0040\u00fc",
+          :intvector{ },
+          :int{1}, :int{0}, "", "?", :bin{""}
+        }
+      }
+    }
+
+    // --------------------------------------------------------------------- ***
+
+    fromUnicode {
+      Headers { "charset", "unicode", "bytes", "offsets", "flush", "fallbacks", "errorCode", "callback", "invalidUChars" }
+      Cases {
+        // Test ticket 9602: Add "good one-way" mapping type (|4).
+        // Such mappings are used regardless of the fallback flag.
+        {
+          "+*test3", "##\uFE0E#\uFE0F",
+          :bin{ 010204010204010204 }, :intvector{ 0,0,0,1,1,1,3,3,3 },
+          :int{1}, :int{0},  // no fallbacks
+          "", "?", ""
+        }
+        {
+          "+*test3", "##\uFE0E#\uFE0F",
+          :bin{ 010204010204010204 }, :intvector{ 0,0,0,1,1,1,3,3,3 },
+          :int{1}, :int{1},  // with fallbacks
+          "", "?", ""
+        }
+        // Test ticket 6789: implement Java-compatible Unicode, UnicodeBig and UnicodeLittle converters
+        // For details about these encodings see convrtrs.txt.
+        // Standard UTF-16BE
+        { "UTF-16BE", "a", :bin{ 0061 }, :intvector{ 0,0 }, :int{1}, :int{0}, "", "?", "" }
+        // Java "UnicodeBig" writes a BOM
+        { "UnicodeBig", "a", :bin{ feff0061 }, :intvector{ -1,-1,0,0 }, :int{1}, :int{0}, "", "?", "" }
+        // Standard UTF-16LE
+        { "UTF-16LE", "a", :bin{ 6100 }, :intvector{ 0,0 }, :int{1}, :int{0}, "", "?", "" }
+        // Java "UnicodeLittle" writes a BOM
+        { "UnicodeLittle", "a", :bin{ fffe6100 }, :intvector{ -1,-1,0,0 }, :int{1}, :int{0}, "", "?", "" }
+
+        // Test ticket 7704: implement Java-compatible "UTF-16" converter.
+        // Same as standard UTF-16 but fromUnicode always writes big-endian byte stream.
+        { "+UTF-16,version=2", "a", :bin{ feff0061 }, :intvector{ -1,-1,0,0 }, :int{1}, :int{0}, "", "?", "" }
+
+        // Test bug 6071 (1:2 Unicode:charset SBCS mapping).
+        {
+          "*test1bmp",
+          "e@t",
+          :bin{       05000709 },
+          :intvector{ 0,1,2,2 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+        // improve coverage of ISO-2022-JP converter with hardcoded JIS X 0201 and
+        // using the Shift-JIS table for JIS X 0208 (ticket #5797)
+        {
+          "ISO-2022-JP",
+          "\u203e\xa5\u4e00\ufa10\u6f3e\u0391",
+          :bin{       1b284a7e5c1b2442306c222e5f2126211b2842 },
+          :intvector{ 0,0,0,0,1,2,2,2,2,2,3,3,4,4,5,5,5,5,5 },
+          :int{1}, :int{0}, "", "?=\u3013", ""  // U+3013 Geta Mark converts to 222e
+        }
+        // Verify that mappings that would result in byte values outside 20..7F (for SBCS)
+        // or 21..7E (for DBCS) are not used.
+        // ibm-9005_X110-2007.ucm (ISO 8859-7, <ESC>.F=1b2e46):
+        //   <U009F> \x9F |0 (also in ISO 8859-1)
+        //   <U0387> \xB7 |1
+        // windows-949-2000 (KSC_5601, <ESC>$(C=1b242843):
+        //   <UC829> \xA0\xA1 |0
+        //   <UD4FE> \xC0\x41 |0
+        //   <UD79D> \xC8\xFE |0
+        {
+          "JIS8",  // =ISO_2022,locale=ja,version=4
+          "\u009f\u0387\uc829\ud4fe\ud79d",
+          :bin{       1a1b2e461b4e371a1a1b242843487e1b2842 },
+          :intvector{ 0,1,1,1,1,1,1,2,3,4,4,4,4,4,4,4,4,4 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+        // Ticket 5483: ISO 2022 converter incorrectly using fallback mapping
+        // Verify that a roundtrip mapping is used even when a fallback mapping is
+        // available in the current state.
+        //   U+FF61 is handled in code
+        // jisx-208.ucm (<ESC>$B=1b2442):
+        //   <U30FE> \x21\x34 |0
+        //   <UFF5D> \x21\x51 |0  and
+        // ibm-897_P100-1995.ucm (JIS X 0201, <ESC>(J=1b284a):
+        //   <UFF5D> \x7D |1
+        // ibm-9005_X110-2007.ucm (ISO 8859-7, <ESC>.F=1b2e46):
+        //   <U03D5> \xF6 |1
+        //   <U2015> \xAF |0
+        //   <UFF5D> \x7D |1 (not legal for ISO 2022)
+        // windows-949-2000 (KSC_5601, <ESC>$(C=1b242843):
+        //   <UAC00> \xB0\xA1 |0
+        //   <UFF5D> \xA3\xFD |0
+        //   <U223C> \xA1\xAD |0 (in extension table)
+        {
+          "JIS8",  // =ISO_2022,locale=ja,version=4
+          "a\uff61\u03d5\uff5d\uac00\u223c\uff5d\u30fe\uff5d",  // Make it switch to ISO-8859-7, KSC 5601 and JIS X 0208.
+          :bin{       61a11b2e461b4e761b244221511b2428433021212d237d1b2442213421511b2842 },
+          :intvector{ 0,1,2,2,2,2,2,2,3,3,3,3,3,4,4,4,4,4,4,5,5,6,6,7,7,7,7,7,8,8,8,8,8 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+        // Code coverage for UTF-8->SBCS conversion (ucnv_convertEx()).
+        // Test code path for non-roundtripping ASCII characters
+        // (try EBCDIC SBCS, and IBM PC SBCS with control code rotation).
+        {
+          "ibm-37",
+          "a\x85c",
+          :bin{       811583 },
+          :intvector{ 0,1,2 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+        {
+          "ibm-850",
+          "a\x1ac",
+          :bin{       617f63 },
+          :intvector{ 0,1,2 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+        // Code coverage for UTF-8->DBCS conversion (ucnv_convertEx()).
+        // Test code path for non-roundtripping ASCII characters
+        // (try IBM PC DBCS with control code rotation).
+        {
+          "ibm-943",
+          "a\x1ac\u30a1\x7ff",
+          :bin{       617f6383401c66 },
+          :intvector{ 0,1,2,3,3,4,5 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+        // SCSU regression test.
+        {
+          "SCSU",
+          "1\U00010001\u0085\U000500022\ud8003\udc014\ue001",
+          :bin{       310be0008102050fd900dc02e7320efffd330efffd34186881 },
+          :intvector{ 0,1,1,1,1,3,3,4,4,4,4,4,6,6,7,7,7,8,9,9,9,10,11,11,11 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+        // LMBCS
+        {
+          "lmbcs",
+          "\u0061\u2013\u00fc\u00e1\u0007\u0091\u0a74\u0200\ud84d\udc56\u5516",
+          :bin { 61039681a00f270f91140a7414f60214d84d14dc561088a0 },
+          :intvector{ 0, 1, 1, 2, 3, 4, 4, 5, 5, 6, 6, 6, 7, 7, 7, 8, 8, 8, 9, 9, 9, 10, 10, 10 },
+          :int{1}, :int{0}, "", ".", ""
+        }
+        // Test substitution strings.
+        {
+          "windows-1252", // stateless MBCS with WriteSub(), should internally set char *
+          "a\ufdd0c",
+          :bin{       61402421402463 },
+          :intvector{ 0,1,1,1,1,1,2 },
+          :int{1}, :int{0}, "", "?=@$!@$", ""
+        }
+        {
+          "windows-1252",
+          "1\U00010001\u0085\U000500022\ud8003\udc014\ue001",
+          :bin{ 311a1a1a321a331a341a },
+          :intvector{ 0,1,3,4,6,7,8,9,10,11 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+        {
+          "windows-1252",
+          "\uD87E", // lone surrogate can cause an offset overflow
+          :bin{ 1a },
+          :intvector{ 0 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+        {
+          "windows-1252",
+          "\uD87E", // lone surrogate can cause an offset overflow
+          :bin{ 6875683f },
+          :intvector{ 0,0,0,0 },
+          :int{1}, :int{0}, "", "?=huh?", "" // Use a long substitution character
+        }
+        {
+          "*test4",
+          "\u30ab", // An incomplete multi-codepoint character
+          :bin{ ff },
+          :intvector{ 0 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+        {
+          "ibm-930", // stateful MBCS
+          "a\ufdd0\u4e00\ufdd0e",
+          :bin{       620e4bce0f400e45414bce0f4066 },
+          :intvector{ 0,1,1,1,1,1,2,2,2,3,3,3,3,4 },
+          :int{1}, :int{0}, "", "?=\u4e01 ", ""
+        }
+        {
+          "iso-2022-jp",
+          "a\x1bc", // Unicode ESC must not occur as a character
+          :bin{       6163 },
+          :intvector{ 0,2 },
+          :int{1}, :int{0}, "", "?=", "" // empty substitution string
+        }
+        {
+          "iso-2022-cn",
+          "a\x1bc", // Unicode ESC must not occur as a character
+          :bin{       61202063 },
+          :intvector{ 0,1,1,2 },
+          :int{1}, :int{0}, "", "?=  ", ""
+        }
+        {
+          "iso-2022-cn",
+          "a\x1bc", // Unicode ESC must not occur as a character
+          :bin{       611b2429410e523b0f2063 },
+          :intvector{ 0,1,1,1,1,1,1,1,1,1,2 },
+          :int{1}, :int{0}, "", "?=\u4e00 ", ""
+        }
+        {
+          "us-ascii",
+          "a\x85c",
+          :bin{       61402421402463 },
+          :intvector{ 0,1,1,1,1,1,2 },
+          :int{1}, :int{0}, "", "?=@$!@$", ""
+        }
+        // ISO 2022-CN: test a single-byte subchar, j5171
+        {
+          "iso-2022-cn",
+          "a\x1bc", // Unicode ESC must not occur as a character
+          :bin{       612163 },
+          :intvector{ 0,1,2 },
+          :int{1}, :int{0}, "", "?\x00\x21", ""
+        }
+        // UTF-16/32: do not output a BOM if there is no data at all
+        {
+          "UTF-16",
+          "",
+          :bin{       "" },
+          :intvector{  },
+          :int{1}, :int{1}, "", "?", ""
+        }
+        {
+          "UTF-32",
+          "",
+          :bin{       "" },
+          :intvector{  },
+          :int{1}, :int{1}, "", "?", ""
+        }
+
+        // do not convert SO/SI/ESC
+        {
+          "iso-2022-jp",
+          "A\x0eB\x0f\x09\x1bC",
+          :bin{       411a421a091a43 },
+          :intvector{ 0,1,2,3,4,5,6 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+        {
+          "iso-2022-cn",
+          "A\x0eB\x0f\x09\x1bC",
+          :bin{       411a421a091a43 },
+          :intvector{ 0,1,2,3,4,5,6 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+        {
+          "iso-2022-kr",
+          "A\x0eB\x0f\x09\x1bC",
+          :bin{           1b242943411a421a091a43 },
+          :intvector{ -1,-1,-1,-1,0,1,2,3,4,5,6 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+        {
+          "ibm-25546",
+          "A\x0eB\x0f\x09\x1bC",
+          :bin{           1b242943411a421a091a43 },
+          :intvector{ -1,-1,-1,-1,0,1,2,3,4,5,6 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+
+        // test ISO 8859-1/7 vs. JIS X 0201
+        {
+          "ISO-2022-JP-2",
+          "?@A\u00e4\u03b1\u203EB",
+          :bin{       3f40411B2E411B4E641b244226411b284a7e421b2842 },
+          :intvector{ 0,1,2,3,3,3,3,3,3,4,4,4,4,4,5,5,5,5,6,6,6,6 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+
+        // Improve ucnv_ext.c code coverage:
+        // There will be a partial match up to the lead surrogate of U+603ff
+        // which then results in one more unit in the prefetch buffer
+        // than the match length when converting one code unit at a time.
+        // See ucnv_extContinueMatchFromU() comment
+        // "the match did not use all of preFromU[] - keep the rest for replay"
+        {
+          "*test3",
+          "\U00101234\U00101234\U00050005\U000603ff",
+          :bin{ 07070001020e05ff },
+          :intvector{ 0, 2, 2, 2, 2, 2, 2, 6 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+
+        // test that ISO-2022-JP encodes ASCII as itself
+        {
+          "ISO-2022-JP",
+          "?@ABCDEFG",
+          :bin{       3f4041424344454647 },
+          :intvector{ 0,1,2,3,4,5,6,7,8 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+        // test that ISO-2022-CN encodes ASCII as itself
+        {
+          "ISO-2022-CN",
+          "?@ABCDEFG",
+          :bin{       3f4041424344454647 },
+          :intvector{ 0,1,2,3,4,5,6,7,8 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+
+        // moved from cintltst /tsconv/nccbtst/TestSkipCallBack
+        {
+          "iso-2022-jp",
+          "\u3000\xe9\u3001",
+          :bin{       1b2442212121221b2842 },
+          :intvector{ 0,0,0,0,0,2,2,2,2,2 },
+          :int{1}, :int{1}, "", "0", ""
+        }
+        // moved from cintltst /tsconv/nccbtst/TestSubCallBack
+        {
+          "iso-2022-jp",
+          "A\xe9B\xe9\u3000",
+          :bin{       411a421a1b244221211b2842 },
+          :intvector{ 0,1,2,3,4,4,4,4,4,4,4,4 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+        // moved from cintltst /tsconv/nccbtst/TestSubWithValueCallBack
+        {
+          "iso-2022-jp",
+          "A\xe9B\xe9\u3000",
+          :bin{       41255530304539422555303045391b244221211b2842 },
+          :intvector{ 0,1,1,1,1,1,1,2,3,3,3,3,3,3,4,4,4,4,4,4,4,4 },
+          :int{1}, :int{1}, "", "&", ""
+        }
+        {
+          "iso-2022-cn",
+          "\u4e00\u3712\u4e01",
+          :bin{       1b2429410e523b0f2555333731320e36210f },
+          :intvector{ 0,0,0,0,0,0,0,1,1,1,1,1,1,1,2,2,2,2 },
+          :int{1}, :int{1}, "", "&", ""
+        }
+        {
+          "iso-2022-cn",
+          "A\u3712\u4e00",
+          :bin{       412555333731321b2429410e523b0f },
+          :intvector{ 0,1,1,1,1,1,1,2,2,2,2,2,2,2,2 },
+          :int{1}, :int{1}, "", "&", ""
+        }
+        {
+          "iso-2022-cn",
+          "\u3000\u3712\u3001",
+          :bin{       1b2429410e21210f2555333731320e21220f },
+          :intvector{ 0,0,0,0,0,0,0,1,1,1,1,1,1,1,2,2,2,2 },
+          :int{1}, :int{1}, "", "&", ""
+        }
+
+        // moved from cintltst /tsconv/nucnvtst/TestJIS
+        {
+          "JIS",
+          "\uFF81\uFF82\u30EC\u30ED\u30EE\u30EF\uFF93\uFF94\uFF95\uFF96\uFF97\uFF98",
+          :bin{       1b244225412544256c256d256e256F25622564256625682569256a1b2842 },
+          :intvector{ 0,0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,11,11,11 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+        {
+          "JIS7",
+          "\uFF81\uFF82\u30EC\u30ED\u30EE\u30EF\uFF93\uFF94\uFF95\uFF96\uFF97\uFF98",
+          :bin{       0e41420f1b2442256c256d256e256F0e5354555657580f1b2842 },
+          :intvector{ 0,0,1,2,2,2,2,2,2,3,3,4,4,5,5,6,6,7,8,9,10,11,11,11,11,11 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+        {
+          "JIS8",
+          "\uFF81\uFF82\u30EC\u30ED\u30EE\u30EF\uFF93\uFF94\uFF95\uFF96\uFF97\uFF98",
+          :bin{       C1C21b2442256c256d256e256F1b284AD3D4D5D6D7D81b2842 },
+          :intvector{ 0,1,2,2,2,2,2,3,3,4,4,5,5,6,6,6,6,7,8,9,10,11,11,11,11 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+        {
+          "JIS8",
+          "\u2019Aaa10\u4ED5\u5165\u5148\u30B3",
+          :bin{      1b244221471b284241616131301b24423b45467e406825331b2842 },
+          :intvector{ 0,0,0,0,0,1,1,1,1,2,3,4,5,6,6,6,6,6,7,7,8,8,9,9,9,9,9 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+
+        // moved from cintltst /tsconv/ncnvtst/TestErrorBehaviour
+        {
+          "iso-2022-jp",
+          "\u3000\x50\udc01\u3001",
+          :bin{       1B244221211B2842501A1B24422122 },
+          :intvector{ 0,0,0,0,0,1,1,1,1,2,3,3,3,3,3 },
+          :int{0}, :int{1}, "", "?", "\udc01"
+        }
+        {
+          "iso-2022-jp",
+          "\u3000\x50\udc01\u3001",
+          :bin{       1B244221211B2842501A1B244221221b2842 },
+          :intvector{ 0,0,0,0,0,1,1,1,1,2,3,3,3,3,3,3,3,3 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+        {
+          "iso-2022-kr",
+          "\x61\u4e00\udc01\u4e00",
+          :bin{           1b242943610e6c690f1a0e6c69 },
+          :intvector{ -1,-1,-1,-1,0,1,1,1,2,2,3,3,3 },
+          :int{0}, :int{1}, "", "?", "\udc01"
+        }
+        {
+          "iso-2022-kr",
+          "\x61\u4e00\udc01\u4e00",
+          :bin{           1b242943610e6c690f1a0e6c690f },
+          :intvector{ -1,-1,-1,-1,0,1,1,1,2,2,3,3,3,3 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+
+        // ISO-2022-KR
+        {
+          "ibm-25546",
+          "AB\uc88b\U00050005\uacccC",
+          :bin{           1b24294341420e41410f7b552b35303030357d0e306a0f43 },
+          :intvector{ -1,-1,-1,-1,0,1,2,2,2,3,3,3,3,3,3,3,3,3,3,5,5,5,6,6 },
+          :int{1}, :int{1}, "", "&U", ""
+        }
+        {
+          "ibm-25546",
+          "AB\uc88b\U00050005\uacccC",
+          :bin{           1b24294341420e41410f1a0e306a0f43 },
+          :intvector{ -1,-1,-1,-1,0,1,2,2,2,3,3,5,5,5,6,6 },
+          :int{1}, :int{1}, "", "?\x00\x1a", ""
+        }
+        {
+          "ibm-25546",
+          "AB\uc88b\U00050005\uacccC",
+          :bin{           1b24294341420e41412f7e306a0f43 },
+          :intvector{ -1,-1,-1,-1,0,1,2,2,2,3,3,5,5,6,6 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+        {
+          "ibm-25546",
+          "AB\uc88b\U00050005\uaccc",
+          :bin{           1b24294341420e41412f7e306a0f },
+          :intvector{ -1,-1,-1,-1,0,1,2,2,2,3,3,5,5,5 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+        {
+          "ISO-2022-KR",
+          "AB\uc88b\U00050005\uacccC",
+          :bin{           1b24294341420e41410f7b552b35303030357d0e306a0f43 },
+          :intvector{ -1,-1,-1,-1,0,1,2,2,2,3,3,3,3,3,3,3,3,3,3,5,5,5,6,6 },
+          :int{1}, :int{1}, "", "&U", ""
+        }
+        {
+          "ISO-2022-KR",
+          "AB\uc88b\U00050005\uacccC",
+          :bin{           1b24294341420e41410f1a0e306a0f43 },
+          :intvector{ -1,-1,-1,-1,0,1,2,2,2,3,3,5,5,5,6,6 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+        {
+          "ISO-2022-KR",
+          "AB\uc88b\U00050005\uacccC",
+          :bin{           1b24294341420e41412f7e306a0f43 },
+          :intvector{ -1,-1,-1,-1,0,1,2,2,2,3,3,5,5,6,6 },
+          :int{1}, :int{1}, "", "?\x00\x2f\x7e", ""
+        }
+        {
+          "ISO-2022-KR",
+          "AB\uc88b\U00050005\uaccc",
+          :bin{           1b24294341420e41412f7e306a0f },
+          :intvector{ -1,-1,-1,-1,0,1,2,2,2,3,3,5,5,5 },
+          :int{1}, :int{1}, "", "?\x00\x2f\x7e", ""
+        }
+        // ISO-2022-KR
+        {
+          "ibm-25546",
+          "AB\uc88b\U00050005\uacccC",
+          :bin{           1b24294341420e41410f5c3530303035200e306a0f43 },
+          :intvector{ -1,-1,-1,-1,0,1,2,2,2,3,3,3,3,3,3,3,3,5,5,5,6,6 },
+          :int{1}, :int{1}, "", "&S", ""
+        }
+
+        // ISO-2022-JP-2 with G2 designator & SS2 shift
+        {
+          "ISO-2022-JP-2",
+          "CF\u758f\u038f\u7591",
+          :bin{       43461b244241411b2e461b4e3f353f1b2842 },
+          :intvector{ 0,1,2,2,2,2,2,3,3,3,3,3,3,4,4,4,4,4 },
+          :int{1}, :int{1}, "", ".", ""
+        }
+        // JIS7 with Katakana
+        {
+          "JIS7",
+          "AB\uff81\uff82AB",
+          :bin{       41420e41420f4142 },
+          :intvector{ 0,1,2,2,3,4,4,5 },
+          :int{1}, :int{1}, "", ".", ""
+        }
+        // JIS7 with shift to ASCII at the very end
+        {
+          "JIS7",
+          "AB\uff81\uff82",
+          :bin{       41420e41420f },
+          :intvector{ 0,1,2,2,3,3 },
+          :int{1}, :int{1}, "", ".", ""
+        }
+        // JIS8 with Katakana
+        {
+          "JIS8",
+          "A\uff81\\\xa5\uff82B",
+          :bin{       41c15c1b284a5cc2421b2842 },
+          :intvector{ 0,1,2,3,3,3,3,4,5,5,5,5 },
+          :int{1}, :int{1}, "", ".", ""
+        }
+
+        /*
+         * ICU 4.4 (ticket #7314) removes mappings for CNS 11643 planes 3..7
+        // ISO-2022-CN-EXT with all subcharsets and shifts and with supplementary code points
+        {
+          "ISO-2022-CN-EXT",
+          "\u4eae\u9f82\u56cd\u56cc\U0002a6d6\x30",
+          :bin{       1b2429410e41411b2429457e7c1b242a481b4e70341b2429477c341b242b4d1b4f664c0f30 },
+          :intvector{ 0,0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,4,4,4,4,4,4,4,4,6,6 },
+          :int{1}, :int{1}, "", ".", ""
+        }
+        // ISO-2022-CN-EXT with shift to ASCII at the very end
+        {
+          "ISO-2022-CN-EXT",
+          "\u4eae\u9f82\u56cd\u56cc\U0002a6d6",
+          :bin{       1b2429410e41411b2429457e7c1b242a481b4e70341b2429477c341b242b4d1b4f664c0f },
+          :intvector{ 0,0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4 },
+          :int{1}, :int{1}, "", ".", ""
+        }
+        // ISO-2022-CN-EXT without flush so do not shift to ASCII at the very end
+        {
+          "ISO-2022-CN-EXT",
+          "\u4eae\u9f82\u56cd\u56cc\U0002a6d6",
+          :bin{       1b2429410e41411b2429457e7c1b242a481b4e70341b2429477c341b242b4d1b4f664c },
+          :intvector{ 0,0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,2,2,2,2,2,3,3,3,3,3,3,4,4,4,4,4,4,4,4 },
+          :int{0}, :int{1}, "", ".", ""
+        }
+         */
+
+        // windows-936 vs. ibm-1386
+        {
+          "ibm-1386",
+          "\x1a\u20ac\u5555\x80\x81\U00055555",
+          :bin{ 7fa2e3dffb7f7fa1a1 },
+          :intvector{ 0, 1, 1, 2, 2, 3, 4, 5, 5 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+        {
+          "windows-936",
+          "\x1a\u20ac\u5555\x80\x81\U00055555",
+          :bin{ 1a80dffb3f3f3f },
+          :intvector{ 0, 1, 2, 2, 3, 4, 5 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+
+        // verify that if a conversion table does not have any mapping for U+0000,
+        // then there will not even be a phantom fallback to 00
+        {
+          "ibm-971",
+          "\x00",
+          :bin{ affe },
+          :intvector{ 0, 0 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+
+        {
+          "*test4",
+          "\x00",
+          :bin{ ff },
+          :intvector{ 0 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+
+        // extension in testdata
+        {
+          "*test4x",
+          "\u20ac\x09",
+          :bin{ 0009 },
+          :intvector{ 0, 1 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+
+        // DBCS-only extensions
+        {
+          "ibm-970",
+          "\x61\uffa1\u2015\ub000",
+          :bin{ 611aa1aab2eb },
+          :intvector{ 0, 1, 2, 2, 3, 3 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+
+        {
+          "ibm-971",
+          "\x61\uffa1\u2015\ub000",
+          :bin{ affeaffeaffeb2eb },
+          :intvector{ 0, 0, 1, 1, 2, 2, 3, 3 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+
+        {
+          "ibm-1390,swaplfnl",
+          "\uff63\u30C8\u30C8\u309A\u3000\x41\u20ac\x0a",
+          :bin{ 430e4395ecc140400fc1e115 },
+          :intvector{ 0, 1, 1, 1, 2, 2, 4, 4, 5, 5, 6, 7 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+
+        {
+          "ibm-16684",
+          "\uff63\u30C8\u30C8\u309A\u3000\x41\u20ac\x0a",
+          :bin{ fefe4395ecc14040fefe42e1fefe },
+          :intvector{ 0, 0, 1, 1, 2, 2, 4, 4, 5, 5, 6, 6, 7, 7 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+
+        {
+          "ibm-1399",
+          "\uff63\u30C8\u30C8\u309A\u3000\x41\u20ac\x0a",
+          :bin{ 440e4395ecc140400fc1e125 },
+          :intvector{ 0, 1, 1, 1, 2, 2, 4, 4, 5, 5, 6, 7 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+
+        // <subchar1> from |2 mappings
+        {
+          "ibm-1390",
+          "\x0e\x0f\u0901\U00050000\uffe8\uffee",
+          :bin{ 3f3f0efefefefe0f3f3f },
+          :intvector{ 0, 1, 2, 2, 2, 3, 3, 5, 5, 6 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+
+        // <subchar1> from |2 mappings, and also contains a fallback to 00
+        {
+          "*test4",
+          "\u20ac\u20ad\U00050005\U00023456\U0010ffff\x30",
+          :bin{ 0000e10102030affff },
+          :intvector{ 0, 1, 2, 4, 4, 4, 4, 6, 8 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+
+        // setting a <subchar> resets the <subchar1>
+        {
+          "*test4",
+          "\u20ac\u20ad\U00050005\U00023456\U0010ffff\x30",
+          :bin{ 00000102030f0102030a0102030f0102030f },
+          :intvector{ 0, 1, 2, 2, 2, 2, 4, 4, 4, 4, 6, 6, 6, 6, 8, 8, 8, 8 },
+          :int{1}, :int{1}, "", "?\x00\x01\x02\x03\x0f", ""
+        }
+
+        // fallback to 00 with old single-byte data structure
+        {
+          "*test1",
+          "\u20ac\u20ad\U00101234\U00050000",
+          :bin{ 000007ff },
+          :intvector{ 0, 1, 2, 4 },
+          :int{1}, :int{1}, "", "?", ""
+        }
+
+        // extensions
+        {
+          "ibm-1390",
+          "\u025a\u025a\u0300\u025a\u0301\u025a\u0302\uffe8\U0002a0f9",
+          :bin{ 0ed896eccaeccbd896ea530f3f0eb7c20f },
+          :intvector{ 0, 0, 0, 1, 1, 3, 3, 5, 5, 6, 6, 7, 7, 8, 8, 8, 8 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+
+        {
+          "*test3",
+          "\xc4\xc4\xc4\U00101234\xc4\xc4\U00101234\x05",
+          :bin{ ffffff070501020c },
+          :intvector{ 0, 1, 2, 3, 5, 5, 5, 5 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+
+        {
+          "*test3",
+          "\U00101234\U00101234\U00050005\U00101234\U00050005\U00060006",
+          :bin{ 07070001020e05070001020f09 },
+          :intvector{ 0, 2, 2, 2, 2, 2, 2, 6, 6, 6, 6, 6, 6 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+
+        // normal conversions
+        {
+          "UTF-16LE",
+          "1\U00010001\U000500022\ud8003\udc014",
+          :bin{ 310000d801dc00d902dc3200fdff3300fdff3400 },
+          :intvector{ 0, 0, 1, 1, 1, 1, 3, 3, 3, 3, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+        { "UTF-16LE", "\ud800", :bin{""}, :intvector{}, :int{1}, :int{0}, "truncated", ".", "\ud800" }
+
+        {
+          "UTF-16BE",
+          "1\U00010001\U000500022\ud8003\udc014",
+          :bin{ 0031d800dc01d900dc020032fffd0033fffd0034 },
+          :intvector{ 0, 0, 1, 1, 1, 1, 3, 3, 3, 3, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+        { "UTF-16BE", "\ud800", :bin{""}, :intvector{}, :int{1}, :int{0}, "truncated", ".", "\ud800" }
+
+        {
+          "SCSU",
+          "1\U00010001\u00082\ud8003\udc014\ue001",
+          :bin{ 310be000810108320efffd330efffd34186881 },
+          :intvector{ 0, 1, 1, 1, 1, 3, 3, 4, 5, 5, 5, 6, 7, 7, 7, 8, 9, 9, 9 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+        {
+          "x11-compound-text",
+          "\u54A1\u00A5\u00E3\u0120\u0121\u011E\u0041\u0135\u02D9\u0E3F\u0100\u0157\u0384\u0660\u05D0\u0401",
+          :bin{ 1b242944b5ac1b2d41a5e31b2d43d5f51b2d4dd01b2d41411b2d43bc1b2d42ff1b2d54df1b2d44c0b31b2d46b41b2d47b01b2d48e01b2d4ca1 },
+          :intvector{ },
+          :int{1}, :int{0}, "", "?", ""
+        }
+        // Test Gurmukhi (Bindi Tippi and Consonant clusters)
+        {
+          "iscii-gur",
+          "\u0a15\u0a70\u0a02\u0a71\u0a15\u0a5c\u0a4d\u0a39\u000a\u0043\u0041\u000a",
+          :bin { ef4bb3a2a2b3e8b3bfe9e8d80aef4b43410a },
+          :intvector{ 0, 0, 0, 1, 2, 3, 3, 3, 5, 5, 6, 7, 8, 8, 8, 9, 10, 11  },
+          :int{1}, :int{0}, "", ".", ""
+        }
+        // escape callback
+        {
+          "iscii-dev",
+          "A\u0901\U00023456\u0902B\U00023456C",
+          :bin{ 41ef42a1255544383444255544433536a24225554438344425554443353643 },
+          :intvector{
+            0,
+            1,1,1,
+            2,2,2,2,2,2,
+            2,2,2,2,2,2,
+            4,
+            5,
+            6,6,6,6,6,6,
+            6,6,6,6,6,6,
+            8
+          },
+          :int{1}, :int{0}, "", "&", ""
+        }
+
+        // escape callback (hex)
+        {
+          "iso-2022-jp",
+          "\u3000\U00023456\u3001\U00023456B\u901c",
+          :bin{ 1b244221211b284226237832333435363b1b244221221b284226237832333435363b42262378393031433b },
+          :intvector{
+            0,0,0,0,0,
+            1,1,1,1,1,1,1,1,1,1,1,1,
+            3,3,3,3,3,
+            4,4,4,4,4,4,4,4,4,4,4,4,
+            6,
+            7,7,7,7,7,7,7,7
+          },
+          :int{1}, :int{0}, "", "&X", ""
+        }
+
+        // sub callback
+        {
+          "gb18030",
+          "$\x7f\x80\u01f9\u20ac\u4e00\u9fa6\uffff\U00010000\U0010ffff",
+          :bin{ 247f81308130a8bfa2e3d2bb82358f338431a43990308130e3329a35 },
+          :intvector{ 0, 1, 2, 2, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8, 10, 10, 10, 10 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+
+        // skip callback
+        { "ibm-930", "\u6D63\u6D64\u6D65\u6D66", :bin{ 0e5d5f5d63466b0f }, :intvector{ 0, 0, 0, 1, 1, 3, 3, 3 }, :int{1}, :int{0}, "", "0", "" }
+        { "ibm-930", "\u6D63\u6D64\ud89a\u6D66", :bin{ 0e5d5f5d63466b0f }, :intvector{ 0, 0, 0, 1, 1, 3, 3, 3 }, :int{1}, :int{0}, "", "0", "" }
+        { "ibm-930", "\u6D63\u6D64\ud89a\u6D66", :bin{ 0e5d5f5d63 }, :intvector{ 0, 0, 0, 1, 1 }, :int{1}, :int{0}, "illegal", "0i", "\ud89a" }
+
+        // sub callback for supplementary code point
+        { "LATIN1",  "1\U000104012", :bin{ 311a32 }, :intvector{ 0, 1, 3 }, :int{1}, :int{0}, "", "", "" }
+        { "ibm-920", "1\U000104012", :bin{ 311a32 }, :intvector{ 0, 1, 3 }, :int{1}, :int{0}, "", "", "" }
+
+        // sub callback with AA as subchar
+        { "ibm-920", "1\U000104012", :bin{ 31AA32 }, :intvector{ 0, 1, 3 }, :int{1}, :int{0}, "", "?\x00\xAA", "" }
+
+        // same but not flushing
+        { "LATIN1",  "1\U000104012", :bin{ 311a32 }, :intvector{ 0, 1, 3 }, :int{0}, :int{0}, "", "", "\U00010401" }
+        { "ibm-920", "1\U000104012", :bin{ 311a32 }, :intvector{ 0, 1, 3 }, :int{0}, :int{0}, "", "", "\U00010401" }
+
+        // simple sample, no error handling
+        { "UTF-8", "a\U0010FFFF", :bin{ 61F48FBFBF }, :intvector{ 0, 1, 1, 1, 1 }, :int{1}, :int{0}, "", "", "" }
+
+        // Verify that incomplete surrogates are handled as an error
+        { "UTF-8", "a\udc00", :bin{ 61efbfbd }, :intvector{ 0, 1, 1, 1 }, :int{1}, :int{0}, "", "", "" }
+        { "UTF-8", "a\ud800", :bin{ 61efbfbd }, :intvector{ 0, 1, 1, 1 }, :int{1}, :int{0}, "", "", "" }
+        { "UTF-8", "a\udc00b", :bin{ 61efbfbd62 }, :intvector{ 0, 1, 1, 1, 2 }, :int{1}, :int{0}, "", "", "" }
+        { "UTF-8", "a\ud800b", :bin{ 61efbfbd62 }, :intvector{ 0, 1, 1, 1, 2 }, :int{1}, :int{0}, "", "", "" }
+
+        // Code coverage for the EUC variants.
+        { "IBM-eucJP", "\u0061\u4edd\u5bec\ud801\udc01\ud801\u0061\u00a2", :bin{ 61a1b88ff4ae618ee0 }, :intvector{ 0, 1, 1, 2, 2, 2, 6, 7, 7 }, :int{1}, :int{0}, "", "0", "" }
+        { "IBM-eucJP", "\u0061\u4edd\u5bec\ud801\udc01\ud801\u0061\u00a2", :bin{ 61a1b88ff4aef4fef4fe618ee0 }, :intvector{ 0, 1, 1, 2, 2, 2, 3, 3, 5, 5, 6, 7, 7 }, :int{1}, :int{0}, "", "", "" }
+        { "EUC-TW", "\u0061\u2295\u5BF2\ud801\udc01\ud801\u0061\u8706\u008a", :bin{ 61a2d38ea2dce561e6ca8a }, :intvector{ 0, 1, 1, 2, 2, 2, 2, 6, 7, 7, 8 }, :int{1}, :int{0}, "", "0", "" }
+        { "EUC-TW", "\u0061\u2295\u5BF2\ud801\udc01\ud801\u0061\u8706\u008a", :bin{ 61a2d38ea2dce5fdfefdfe61e6ca8a }, :intvector{ 0, 1, 1, 2, 2, 2, 2, 3, 3, 5, 5, 6, 7, 7, 8 }, :int{1}, :int{0}, "", "", "" }
+        
+        // Code Coverage for BOCU-1
+        {
+          "BOCU-1",
+          "\u0041\ud841\ud888\udc81",
+          :bin{ 91fbc555fd6349 },
+          :intvector{ 0, 1, 1, 1, 2, 2, 2 },
+          :int{1}, :int{0}, "", ".", ""
+        }
+        {
+          "BOCU-1",
+          "\ufe88\ufe70\udbff\udfff\u0061",
+          :bin{ fbeda44ff0fe189bb821f05926 },
+          :intvector{},
+          :int{1}, :int{0}, "", ".", ""
+        }
+        // Improve code coverage for SCSU
+        {
+          "SCSU",
+          "\ud899\udc7f\ud977\ud888\udc99\ud888\u0041",
+          :bin{ 0fd899dc7fd888dc99e041 },
+          :intvector{},
+          :int{1}, :int{0}, "", "0", ""
+        }
+        {
+          "gb18030",
+          "\U00020087\ue790\ue78f\u1e3f",
+          :bin{ 95329031a6dca6dba8bc },
+          :intvector{ 0,0,0,0,2,2,3,3,4,4 },
+          :int{1}, :int{0}, "", "0", ""
+        }
+        {
+          "UTF-7",
+          "\u00a3I\u00a3\u00a4",
+          :bin{ 2b414b4d2d492b414b4d4170412d },
+          :intvector{ 0,0,0,0,0,1,2,2,2,3,3,3,3,3 },
+          :int{1}, :int{0}, "", "0", ""
+        }
+        // Bug #9601 direct-from-UTF-8 m:n Unicode:charset conversion.
+        {
+          "*test1bmp",
+          "uv",
+          :bin{       08 },
+          :intvector{ 0 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+        {
+          "*test2",
+          "\U00101234\U00050005",
+          :bin{       0700010e05 },
+          :intvector{ 0,0,0,0,0 },
+          :int{1}, :int{0}, "", "?", ""
+        }
+      }
+    }
+
+    getUnicodeSet {
+      // charset - will be opened, and ucnv_getUnicodeSet() called on it
+      // map - set of code points and strings that must be in the returned set
+      // mapnot - set of code points and strings that must *not* be in the returned set
+      // which - numeric UConverterUnicodeSet value
+      Headers { "charset", "map", "mapnot", "which" }
+      Cases {
+        // Test ticket 9602: Add "good one-way" mapping type (|4).
+        // Excluded from roundtrip set, included in the set with fallbacks.
+        {
+          "+*test3",
+          "[{#\uFE0F}]",
+          "[#{#\uFE0E}]",
+          :int{0}
+        }
+        {
+          "+*test3",
+          "[#{#\uFE0E}{#\uFE0F}]",
+          "[]",
+          :int{1}
+        }
+        // Unicode charsets that do not map surrogate code points
+        {
+          "UTF-8",
+          "[\x00-\ud7ff\ue000-\U0010ffff]",
+          "[\ud800-\udfff]",
+          :int{0}
+        }
+        {
+          "UTF-16",
+          "[\x00-\ud7ff\ue000-\U0010ffff]",
+          "[\ud800-\udfff]",
+          :int{0}
+        }
+        {
+          "UTF-16BE",
+          "[\x00-\ud7ff\ue000-\U0010ffff]",
+          "[\ud800-\udfff]",
+          :int{0}
+        }
+        {
+          "UTF-16LE",
+          "[\x00-\ud7ff\ue000-\U0010ffff]",
+          "[\ud800-\udfff]",
+          :int{0}
+        }
+        {
+          "UTF-32",
+          "[\x00-\ud7ff\ue000-\U0010ffff]",
+          "[\ud800-\udfff]",
+          :int{0}
+        }
+        {
+          "UTF-32BE",
+          "[\x00-\ud7ff\ue000-\U0010ffff]",
+          "[\ud800-\udfff]",
+          :int{0}
+        }
+        {
+          "UTF-32LE",
+          "[\x00-\ud7ff\ue000-\U0010ffff]",
+          "[\ud800-\udfff]",
+          :int{0}
+        }
+
+        // Unicode charsets that do map surrogate code points
+        {
+          "UTF-7",
+          "[\x00-\U0010ffff]",
+          "[]",
+          :int{0}
+        }
+        {
+          "SCSU",
+          "[\x00-\U0010ffff]",
+          "[]",
+          :int{0}
+        }
+        {
+          "BOCU-1",
+          "[\x00-\U0010ffff]",
+          "[]",
+          :int{0}
+        }
+        {
+          "CESU-8",
+          "[\x00-\U0010ffff]",
+          "[]",
+          :int{0}
+        }
+
+        // versions of ISO-2022-KR
+        {
+          "ISO-2022-KR",
+          "[\x00-\x0d\x10-\x1a\x1c-\x7f\xa1\xa4\xfe\u0111\u4e00\u4e01\uac00-\uac02\uffe6]",
+          "[\x0e\x0f\x1b\x80-\xa0\xa3\xa5\xff-\u0110\uac03\uffe7-\U0010ffff]",
+          :int{0}
+        }
+        {
+          "ibm-25546",
+          "[\x00-\x0d\x10-\x1a\x1c-\x7f\xa1\xa4\xfe\u0111\u4e00\u4e01\uac00-\uac01\uffe6]",
+          "[\x0e\x0f\x1b\x80-\xa0\xa3\xa5\xff-\u0110\uac02\uffe7-\U0010ffff]",
+          :int{0}
+        }
+
+        // versions of ISO-2022-JP
+        {
+          "ISO-2022-JP",
+          "[\x00-\x0d\x10-\x1a\x1c-\x7f\xa5\u0391-\u03a1\u2015\u203e\u4e00\u4e01\uffe5]",
+          "[\x0e\x0f\x1b\u0100-\u0113\u0385-\u038a\u2014\u301c\u4e02\u4e27-\u4e29\u4fe0\u663b\u9eb5\ufa0e-\ufa2d\uff61-\uff9f\uffe4\uffe6-\U0010ffff]",
+          :int{0}
+        }
+        {
+          "ISO-2022-JP-2",
+          "[\x00-\x0d\x10-\x1a\x1c-\x7f\xa0-\u0113\u0384-\u0386\u0388-\u038a\u0390-\u03a1\u203e\u4e00-\u4e05\u4fe0\u663b\uffe6]",
+          "[\x0e\x0f\x1b\uff61-\uff9f\uffe4\uffe7-\U0010ffff]",
+          :int{0}
+        }
+        {
+          "JIS7",
+          "[\x00-\x0d\x10-\x1a\x1c-\x7f\xa0-\u0113\u0384-\u0386\u0388-\u038a\u0390-\u03a1\u203e\u4e00-\u4e05\u4fe0\u663b\uff61-\uff9f\uffe6]",
+          "[\x0e\x0f\x1b\uffe4\uffe7-\U0010ffff]",
+          :int{0}
+        }
+        // with fallbacks
+        {
+          "ISO-2022-JP",
+          "[\x00-\x0d\x10-\x1a\x1c-\x7f\xa5\u0391-\u03a1\u2014\u2015\u203e\u301c\u4e00\u4e01\u4fe0\u9eb5\uff61-\uff9f\uffe5]",
+          "[\x0e\x0f\x1b\xa6\u0100-\u0113\u0385-\u038a\u4e02\u4e27-\u4e29\u663b\ufa0e-\ufa2d\uffe4\uffe6-\U0010ffff]",
+          :int{1}
+        }
+
+        // versions of ISO-2022-CN
+        {
+          "ISO-2022-CN",
+          "[\x00-\x0d\x10-\x1a\x1c-\x7f\u4e00\u4e01\u9f98\ufe6b]",
+          "[\x0e\x0f\x1b\u4e29\uffe6-\U0010ffff]",
+          :int{0}
+        }
+        /*
+         * ICU 4.4 (ticket #7314) removes mappings for CNS 11643 planes 3..7
+        {
+          "ISO-2022-CN-EXT",
+          "[\x00-\x0d\x10-\x1a\x1c-\x7f\u4e00-\u4e05\u9f98\ufe6b\u4e28-\u4e2b\U00020000\U00020003-\U00020005\U00029664]",
+          "[\x0e\x0f\x1b\U00020001\U00020002\U0002a6d7-\U0010ffff]",
+          :int{0}
+        }
+         */
+
+        // HZ
+        {
+          "HZ",
+          "[\u0410-\u044f\u4e00\u4e01\u4e03]",
+          "[\u4e02\u4e04-\u4e06\uac00-\ud7ff]",
+          :int{0}
+        }
+        
+        // LMBCS
+        {
+          "LMBCS",
+          "[\x00-\U0010ffff]",
+          "[]",
+          :int{0}
+        }
+        
+        // ISCII,version=0 (note: all versions of ISCII generates the same Unicodeset)
+        {
+          "iscii-dev",
+          "[\x00-\xa0\u0909-\u0939\u0993-\u09a8\u0a13-\u0a28\u0a93-\u0aa8\u0ae6-\u0aef\u0b05-\u0b0c\u0b13-\u0b28\u0bae-\u0bb5\u0c12-\u0c28\u0c92-\u0ca8\u0d12-\u0d28]",
+          "[\u0971-\u0975\u09e4\u0a4e-\u0a58\u0a80\u0b72-\u0b7a\u0bfb-\u0bff\u0c70-\u0c7f\u0c80\u0d00]",
+          :int{0}
+        }
+        
+        {
+          "iso-8859-1",
+          "[\x00-\xff]",
+          "[\u0100-\u01ff]",
+          :int{0}
+        }
+        
+        {
+          "us-ascii",
+          "[\x00-\x7f]",
+          "[\u0100-\u01ff]",
+          :int{0}
+        }
+        // DBCS-only
+        {
+          "ibm-971",
+          "[\xa1\xa4\uac01\ub000]",
+          "[\x00-\x9f\u2015]",
+          :int{0}
+        }
+
+        {
+          "ibm-16684",
+          "[\xa0\xa1\xa4\xa6-\xab\xad-\u017f\u0254\u309b-\u30ff\u4e00-\u4e05\U00023d00\U000243bc\U0002a6b2"
+              "{\u0254\u0300}{\u0254\u0301}{\u304b\u309a}{\u30ad\u309a}{\u30af\u309a}]",
+          "[\x00-0x9f\xa2\xa3\xa5\xac\u0200-\u024f\U00010000-\U0001ffff\U0002a61b-\U0002a6b1]",
+          :int{0}
+        }
+
+        // extensions
+        {
+          "ibm-1390",
+          "[\x00-\x0d\x10-\u017f\u0254\u309b-\u30ff\u4e00-\u4e05\U00023d00\U000243bc\U0002a6b2"
+              "{\u0254\u0300}{\u0254\u0301}{\u304b\u309a}{\u30ad\u309a}{\u30af\u309a}]",
+          "[\x0e\x0f\u0200-\u024f\U00010000-\U0001ffff\U0002a61b-\U0002a6b1]",
+          :int{0}
+        }
+
+        {
+          "*test3",
+          "[\x05\x0b\xc0\u20ac\U00023456\U00101234"
+              "{\U00101234\U00050005\U00060006}{\U00101234\U00050005}{\U00101234\U00060006}{\xc4\xc4\U00101234\x05}]",
+          "[\x06\x0e\U00034567\U000febcd{\U00101234\U00070007}]",
+          :int{0}
+        }
+      }
+    }
+  }
+}

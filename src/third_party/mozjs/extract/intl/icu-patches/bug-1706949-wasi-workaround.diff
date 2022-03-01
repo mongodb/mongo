@@ -1,0 +1,720 @@
+# Handle WASI lack of support for <thread> and <atomic>.
+#
+# WASI issue: https://github.com/WebAssembly/wasi-sdk/issues/180
+
+diff --git a/intl/icu/source/common/putilimp.h b/intl/icu/source/common/putilimp.h
+index 5b95a68..7097232 100644
+--- a/intl/icu/source/common/putilimp.h
++++ b/intl/icu/source/common/putilimp.h
+@@ -103,6 +103,8 @@ typedef size_t uintptr_t;
+ #endif
+ #elif U_PLATFORM == U_PF_OS400
+    /* not defined */
++#elif defined(__wasi__)
++   /* not defined */
+ #else
+ #   define U_TZSET tzset
+ #endif
+@@ -128,6 +130,8 @@ typedef size_t uintptr_t;
+    /* not defined */
+ #elif U_PLATFORM == U_PF_IPHONE
+    /* not defined */
++#elif defined(__wasi__)
++   /* not defined */
+ #else
+ #   define U_TIMEZONE timezone
+ #endif
+@@ -141,6 +145,8 @@ typedef size_t uintptr_t;
+ #endif
+ #elif U_PLATFORM == U_PF_OS400
+    /* not defined */
++#elif defined(__wasi__)
++   /* not defined */
+ #else
+ #   define U_TZNAME tzname
+ #endif
+diff --git a/intl/icu/source/common/umapfile.h b/intl/icu/source/common/umapfile.h
+index 92bd567..4ed1112 100644
+--- a/intl/icu/source/common/umapfile.h
++++ b/intl/icu/source/common/umapfile.h
+@@ -41,6 +41,8 @@ U_CFUNC void  uprv_unmapFile(UDataMemory *pData);
+ 
+ #if UCONFIG_NO_FILE_IO
+ #   define MAP_IMPLEMENTATION MAP_NONE
++#elif defined(__wasi__)
++#   define MAP_IMPLEMENTATION MAP_STDIO
+ #elif U_PLATFORM_USES_ONLY_WIN32_API
+ #   define MAP_IMPLEMENTATION MAP_WIN32
+ #elif U_HAVE_MMAP || U_PLATFORM == U_PF_OS390
+diff --git a/intl/icu/source/common/umutex.cpp b/intl/icu/source/common/umutex.cpp
+index ccbee99..6c3452c 100644
+--- a/intl/icu/source/common/umutex.cpp
++++ b/intl/icu/source/common/umutex.cpp
+@@ -43,6 +43,7 @@ U_NAMESPACE_BEGIN
+  *
+  *************************************************************************************************/
+ 
++#ifndef __wasi__
+ namespace {
+ std::mutex *initMutex;
+ std::condition_variable *initCondition;
+@@ -55,9 +56,11 @@ std::once_flag initFlag;
+ std::once_flag *pInitFlag = &initFlag;
+ 
+ }  // Anonymous namespace
++#endif
+ 
+ U_CDECL_BEGIN
+ static UBool U_CALLCONV umtx_cleanup() {
++#ifndef __wasi__
+     initMutex->~mutex();
+     initCondition->~condition_variable();
+     UMutex::cleanup();
+@@ -66,17 +69,21 @@ static UBool U_CALLCONV umtx_cleanup() {
+     // Do not use this trick anywhere else in ICU; use umtx_initOnce, not std::call_once().
+     pInitFlag->~once_flag();
+     pInitFlag = new(&initFlag) std::once_flag();
++#endif
+     return true;
+ }
+ 
+ static void U_CALLCONV umtx_init() {
++#ifndef __wasi__
+     initMutex = STATIC_NEW(std::mutex);
+     initCondition = STATIC_NEW(std::condition_variable);
+     ucln_common_registerCleanup(UCLN_COMMON_MUTEX, umtx_cleanup);
++#endif
+ }
+ U_CDECL_END
+ 
+ 
++#ifndef __wasi__
+ std::mutex *UMutex::getMutex() {
+     std::mutex *retPtr = fMutex.load(std::memory_order_acquire);
+     if (retPtr == nullptr) {
+@@ -93,14 +100,17 @@ std::mutex *UMutex::getMutex() {
+     U_ASSERT(retPtr != nullptr);
+     return retPtr;
+ }
++#endif
+ 
+ UMutex *UMutex::gListHead = nullptr;
+ 
+ void UMutex::cleanup() {
+     UMutex *next = nullptr;
+     for (UMutex *m = gListHead; m != nullptr; m = next) {
++#ifndef __wasi__
+         (*m->fMutex).~mutex();
+         m->fMutex = nullptr;
++#endif
+         next = m->fListLink;
+         m->fListLink = nullptr;
+     }
+@@ -110,20 +120,24 @@ void UMutex::cleanup() {
+ 
+ U_CAPI void  U_EXPORT2
+ umtx_lock(UMutex *mutex) {
++#ifndef __wasi__
+     if (mutex == nullptr) {
+         mutex = &globalMutex;
+     }
+     mutex->lock();
++#endif
+ }
+ 
+ 
+ U_CAPI void  U_EXPORT2
+ umtx_unlock(UMutex* mutex)
+ {
++#ifndef __wasi__
+     if (mutex == nullptr) {
+         mutex = &globalMutex;
+     }
+     mutex->unlock();
++#endif
+ }
+ 
+ 
+@@ -143,18 +157,22 @@ umtx_unlock(UMutex* mutex)
+ //
+ U_COMMON_API UBool U_EXPORT2
+ umtx_initImplPreInit(UInitOnce &uio) {
++#ifndef __wasi__
+     std::call_once(*pInitFlag, umtx_init);
+     std::unique_lock<std::mutex> lock(*initMutex);
++#endif
+     if (umtx_loadAcquire(uio.fState) == 0) {
+         umtx_storeRelease(uio.fState, 1);
+         return true;      // Caller will next call the init function.
+     } else {
++#ifndef __wasi__
+         while (umtx_loadAcquire(uio.fState) == 1) {
+             // Another thread is currently running the initialization.
+             // Wait until it completes.
+             initCondition->wait(lock);
+         }
+         U_ASSERT(uio.fState == 2);
++#endif
+         return false;
+     }
+ }
+@@ -168,11 +186,13 @@ umtx_initImplPreInit(UInitOnce &uio) {
+ 
+ U_COMMON_API void U_EXPORT2
+ umtx_initImplPostInit(UInitOnce &uio) {
++#ifndef __wasi__
+     {
+         std::unique_lock<std::mutex> lock(*initMutex);
+         umtx_storeRelease(uio.fState, 2);
+     }
+     initCondition->notify_all();
++#endif
+ }
+ 
+ U_NAMESPACE_END
+diff --git a/intl/icu/source/common/umutex.h b/intl/icu/source/common/umutex.h
+index 8d76b3f..c1a58db 100644
+--- a/intl/icu/source/common/umutex.h
++++ b/intl/icu/source/common/umutex.h
+@@ -20,9 +20,12 @@
+ #ifndef UMUTEX_H
+ #define UMUTEX_H
+ 
++#ifndef __wasi__
+ #include <atomic>
+ #include <condition_variable>
+ #include <mutex>
++#endif
++
+ #include <type_traits>
+ 
+ #include "unicode/utypes.h"
+@@ -37,6 +40,8 @@
+ #error U_USER_ATOMICS and U_USER_MUTEX_H are not supported
+ #endif
+ 
++#ifndef __wasi__
++
+ // Export an explicit template instantiation of std::atomic<int32_t>. 
+ // When building DLLs for Windows this is required as it is used as a data member of the exported SharedObject class.
+ // See digitlst.h, pluralaffix.h, datefmt.h, and others for similar examples.
+@@ -61,6 +66,7 @@ template struct std::atomic<std::mutex *>;
+ #endif
+ #endif
+ 
++#endif
+ 
+ U_NAMESPACE_BEGIN
+ 
+@@ -70,6 +76,8 @@ U_NAMESPACE_BEGIN
+  *
+  ****************************************************************************/
+ 
++#ifndef __wasi__
++
+ typedef std::atomic<int32_t> u_atomic_int32_t;
+ #define ATOMIC_INT32_T_INITIALIZER(val) ATOMIC_VAR_INIT(val)
+ 
+@@ -89,6 +97,28 @@ inline int32_t umtx_atomic_dec(u_atomic_int32_t *var) {
+     return var->fetch_sub(1) - 1;
+ }
+ 
++#else
++
++typedef int32_t u_atomic_int32_t;
++#define ATOMIC_INT32_T_INITIALIZER(val) val
++
++inline int32_t umtx_loadAcquire(u_atomic_int32_t &var) {
++    return var;
++}
++
++inline void umtx_storeRelease(u_atomic_int32_t &var, int32_t val) {
++    var = val;
++}
++
++inline int32_t umtx_atomic_inc(u_atomic_int32_t *var) {
++    return ++(*var);
++}
++
++inline int32_t umtx_atomic_dec(u_atomic_int32_t *var) {
++    return --(*var);
++}
++
++#endif
+ 
+ /*************************************************************************************************
+  *
+@@ -231,17 +261,25 @@ class U_COMMON_API UMutex {
+ 
+     // requirements for C++ BasicLockable, allows UMutex to work with std::lock_guard
+     void lock() {
++#ifndef __wasi__
+         std::mutex *m = fMutex.load(std::memory_order_acquire);
+         if (m == nullptr) { m = getMutex(); }
+         m->lock();
++#endif
++    }
++    void unlock() {
++#ifndef __wasi__
++        fMutex.load(std::memory_order_relaxed)->unlock();
++#endif
+     }
+-    void unlock() { fMutex.load(std::memory_order_relaxed)->unlock(); }
+ 
+     static void cleanup();
+ 
+ private:
++#ifndef __wasi__
+     alignas(std::mutex) char fStorage[sizeof(std::mutex)] {};
+     std::atomic<std::mutex *> fMutex { nullptr };
++#endif
+ 
+     /** All initialized UMutexes are kept in a linked list, so that they can be found,
+      * and the underlying std::mutex destructed, by u_cleanup().
+@@ -253,7 +291,9 @@ class U_COMMON_API UMutex {
+      * Initial fast check is inline, in lock().  The returned value may never
+      * be nullptr.
+      */
++#ifndef __wasi__
+     std::mutex *getMutex();
++#endif
+ };
+ 
+ 
+diff --git a/intl/icu/source/common/unifiedcache.cpp b/intl/icu/source/common/unifiedcache.cpp
+index 493ab79..a13eed8 100644
+--- a/intl/icu/source/common/unifiedcache.cpp
++++ b/intl/icu/source/common/unifiedcache.cpp
+@@ -13,15 +13,19 @@
+ #include "unifiedcache.h"
+ 
+ #include <algorithm>      // For std::max()
++#ifndef __wasi__
+ #include <mutex>
++#endif
+ 
+ #include "uassert.h"
+ #include "uhash.h"
+ #include "ucln_cmn.h"
+ 
+ static icu::UnifiedCache *gCache = NULL;
++#ifndef __wasi__
+ static std::mutex *gCacheMutex = nullptr;
+ static std::condition_variable *gInProgressValueAddedCond;
++#endif
+ static icu::UInitOnce gCacheInitOnce = U_INITONCE_INITIALIZER;
+ 
+ static const int32_t MAX_EVICT_ITERATIONS = 10;
+@@ -34,10 +38,12 @@ static UBool U_CALLCONV unifiedcache_cleanup() {
+     gCacheInitOnce.reset();
+     delete gCache;
+     gCache = nullptr;
++#ifndef __wasi__
+     gCacheMutex->~mutex();
+     gCacheMutex = nullptr;
+     gInProgressValueAddedCond->~condition_variable();
+     gInProgressValueAddedCond = nullptr;
++#endif
+     return TRUE;
+ }
+ U_CDECL_END
+@@ -72,8 +78,10 @@ static void U_CALLCONV cacheInit(UErrorCode &status) {
+     ucln_common_registerCleanup(
+             UCLN_COMMON_UNIFIED_CACHE, unifiedcache_cleanup);
+ 
++#ifndef __wasi__
+     gCacheMutex = STATIC_NEW(std::mutex);
+     gInProgressValueAddedCond = STATIC_NEW(std::condition_variable);
++#endif
+     gCache = new UnifiedCache(status);
+     if (gCache == NULL) {
+         status = U_MEMORY_ALLOCATION_ERROR;
+@@ -135,28 +143,38 @@ void UnifiedCache::setEvictionPolicy(
+         status = U_ILLEGAL_ARGUMENT_ERROR;
+         return;
+     }
++#ifndef __wasi__
+     std::lock_guard<std::mutex> lock(*gCacheMutex);
++#endif
+     fMaxUnused = count;
+     fMaxPercentageOfInUse = percentageOfInUseItems;
+ }
+ 
+ int32_t UnifiedCache::unusedCount() const {
++#ifndef __wasi__
+     std::lock_guard<std::mutex> lock(*gCacheMutex);
++#endif
+     return uhash_count(fHashtable) - fNumValuesInUse;
+ }
+ 
+ int64_t UnifiedCache::autoEvictedCount() const {
++#ifndef __wasi__
+     std::lock_guard<std::mutex> lock(*gCacheMutex);
++#endif
+     return fAutoEvictedCount;
+ }
+ 
+ int32_t UnifiedCache::keyCount() const {
++#ifndef __wasi__
+     std::lock_guard<std::mutex> lock(*gCacheMutex);
++#endif
+     return uhash_count(fHashtable);
+ }
+ 
+ void UnifiedCache::flush() const {
++#ifndef __wasi__
+     std::lock_guard<std::mutex> lock(*gCacheMutex);
++#endif
+ 
+     // Use a loop in case cache items that are flushed held hard references to
+     // other cache items making those additional cache items eligible for
+@@ -165,7 +183,9 @@ void UnifiedCache::flush() const {
+ }
+ 
+ void UnifiedCache::handleUnreferencedObject() const {
++#ifndef __wasi__
+     std::lock_guard<std::mutex> lock(*gCacheMutex);
++#endif
+     --fNumValuesInUse;
+     _runEvictionSlice();
+ }
+@@ -184,7 +204,9 @@ void UnifiedCache::dump() {
+ }
+ 
+ void UnifiedCache::dumpContents() const {
++#ifndef __wasi__
+     std::lock_guard<std::mutex> lock(*gCacheMutex);
++#endif
+     _dumpContents();
+ }
+ 
+@@ -224,7 +246,9 @@ UnifiedCache::~UnifiedCache() {
+         // Now all that should be left in the cache are entries that refer to
+         // each other and entries with hard references from outside the cache.
+         // Nothing we can do about these so proceed to wipe out the cache.
++#ifndef __wasi__
+         std::lock_guard<std::mutex> lock(*gCacheMutex);
++#endif
+         _flush(TRUE);
+     }
+     uhash_close(fHashtable);
+@@ -325,7 +349,9 @@ void UnifiedCache::_putIfAbsentAndGet(
+         const CacheKeyBase &key,
+         const SharedObject *&value,
+         UErrorCode &status) const {
++#ifndef __wasi__
+     std::lock_guard<std::mutex> lock(*gCacheMutex);
++#endif
+     const UHashElement *element = uhash_find(fHashtable, &key);
+     if (element != NULL && !_inProgress(element)) {
+         _fetch(element, value, status);
+@@ -350,14 +376,18 @@ UBool UnifiedCache::_poll(
+         UErrorCode &status) const {
+     U_ASSERT(value == NULL);
+     U_ASSERT(status == U_ZERO_ERROR);
++#ifndef __wasi__
+     std::unique_lock<std::mutex> lock(*gCacheMutex);
++#endif
+     const UHashElement *element = uhash_find(fHashtable, &key);
+ 
+     // If the hash table contains an inProgress placeholder entry for this key,
+     // this means that another thread is currently constructing the value object.
+     // Loop, waiting for that construction to complete.
+      while (element != NULL && _inProgress(element)) {
++#ifndef __wasi__
+          gInProgressValueAddedCond->wait(lock);
++#endif
+          element = uhash_find(fHashtable, &key);
+     }
+ 
+@@ -428,9 +458,11 @@ void UnifiedCache::_put(
+     U_ASSERT(oldValue == fNoValue);
+     removeSoftRef(oldValue);
+ 
++#ifndef __wasi__
+     // Tell waiting threads that we replace in-progress status with
+     // an error.
+     gInProgressValueAddedCond->notify_all();
++#endif
+ }
+ 
+ void UnifiedCache::_fetch(
+diff --git a/intl/icu/source/i18n/decContext.h b/intl/icu/source/i18n/decContext.h
+index 59ab65e..20f3526 100644
+--- a/intl/icu/source/i18n/decContext.h
++++ b/intl/icu/source/i18n/decContext.h
+@@ -61,7 +61,9 @@
+ /* #include <stdint.h>   */         /* C99 standard integers           */
+   #endif
+   #include <stdio.h>               /* for printf, etc.                */
++#ifndef __wasi__
+   #include <signal.h>              /* for traps                       */
++#endif
+ 
+   /* Extended flags setting -- set this to 0 to use only IEEE flags   */
+   #if !defined(DECEXTFLAG)
+diff --git a/intl/icu/source/i18n/decimfmt.cpp b/intl/icu/source/i18n/decimfmt.cpp
+index daa1129..c8f1eda 100644
+--- a/intl/icu/source/i18n/decimfmt.cpp
++++ b/intl/icu/source/i18n/decimfmt.cpp
+@@ -480,8 +480,13 @@ DecimalFormat& DecimalFormat::operator=(const DecimalFormat& rhs) {
+ DecimalFormat::~DecimalFormat() {
+     if (fields == nullptr) { return; }
+ 
++#ifndef __wasi__
+     delete fields->atomicParser.exchange(nullptr);
+     delete fields->atomicCurrencyParser.exchange(nullptr);
++#else
++    delete fields->atomicParser;
++    delete fields->atomicCurrencyParser;
++#endif
+     delete fields;
+ }
+ 
+@@ -1626,8 +1631,13 @@ void DecimalFormat::touch(UErrorCode& status) {
+     setupFastFormat();
+ 
+     // Delete the parsers if they were made previously
++#ifndef __wasi__
+     delete fields->atomicParser.exchange(nullptr);
+     delete fields->atomicCurrencyParser.exchange(nullptr);
++#else
++    delete fields->atomicParser;
++    delete fields->atomicCurrencyParser;
++#endif
+ 
+     // In order for the getters to work, we need to populate some fields in NumberFormat.
+     NumberFormat::setCurrency(fields->exportedProperties.currency.get(status).getISOCurrency(), status);
+@@ -1662,7 +1672,11 @@ const numparse::impl::NumberParserImpl* DecimalFormat::getParser(UErrorCode& sta
+     }
+ 
+     // First try to get the pre-computed parser
++#ifndef __wasi__
+     auto* ptr = fields->atomicParser.load();
++#else
++    auto* ptr = fields->atomicParser;
++#endif
+     if (ptr != nullptr) {
+         return ptr;
+     }
+@@ -1681,6 +1695,7 @@ const numparse::impl::NumberParserImpl* DecimalFormat::getParser(UErrorCode& sta
+     // it is set to what is actually stored in the atomic
+     // if another thread beat us to computing the parser object.
+     auto* nonConstThis = const_cast<DecimalFormat*>(this);
++#ifndef __wasi__
+     if (!nonConstThis->fields->atomicParser.compare_exchange_strong(ptr, temp)) {
+         // Another thread beat us to computing the parser
+         delete temp;
+@@ -1689,13 +1704,21 @@ const numparse::impl::NumberParserImpl* DecimalFormat::getParser(UErrorCode& sta
+         // Our copy of the parser got stored in the atomic
+         return temp;
+     }
++#else
++    nonConstThis->fields->atomicParser = temp;
++    return temp;
++#endif
+ }
+ 
+ const numparse::impl::NumberParserImpl* DecimalFormat::getCurrencyParser(UErrorCode& status) const {
+     if (U_FAILURE(status)) { return nullptr; }
+ 
+     // First try to get the pre-computed parser
++#ifndef __wasi__
+     auto* ptr = fields->atomicCurrencyParser.load();
++#else
++    auto* ptr = fields->atomicCurrencyParser;
++#endif
+     if (ptr != nullptr) {
+         return ptr;
+     }
+@@ -1710,6 +1733,7 @@ const numparse::impl::NumberParserImpl* DecimalFormat::getCurrencyParser(UErrorC
+     // Note: ptr starts as nullptr; during compare_exchange, it is set to what is actually stored in the
+     // atomic if another thread beat us to computing the parser object.
+     auto* nonConstThis = const_cast<DecimalFormat*>(this);
++#ifndef __wasi__
+     if (!nonConstThis->fields->atomicCurrencyParser.compare_exchange_strong(ptr, temp)) {
+         // Another thread beat us to computing the parser
+         delete temp;
+@@ -1718,6 +1742,10 @@ const numparse::impl::NumberParserImpl* DecimalFormat::getCurrencyParser(UErrorC
+         // Our copy of the parser got stored in the atomic
+         return temp;
+     }
++#else
++    nonConstThis->fields->atomicCurrencyParser = temp;
++    return temp;
++#endif
+ }
+ 
+ void
+diff --git a/intl/icu/source/i18n/number_mapper.h b/intl/icu/source/i18n/number_mapper.h
+index 9ecd776..d094289 100644
+--- a/intl/icu/source/i18n/number_mapper.h
++++ b/intl/icu/source/i18n/number_mapper.h
+@@ -7,7 +7,6 @@
+ #ifndef __NUMBER_MAPPER_H__
+ #define __NUMBER_MAPPER_H__
+ 
+-#include <atomic>
+ #include "number_types.h"
+ #include "unicode/currpinf.h"
+ #include "standardplural.h"
+@@ -15,6 +14,10 @@
+ #include "number_currencysymbols.h"
+ #include "numparse_impl.h"
+ 
++#ifndef __wasi__
++#include <atomic>
++#endif
++
+ U_NAMESPACE_BEGIN
+ namespace number {
+ namespace impl {
+@@ -193,10 +196,18 @@ struct DecimalFormatFields : public UMemory {
+     LocalizedNumberFormatter formatter;
+ 
+     /** The lazy-computed parser for .parse() */
++#ifndef __wasi__
+     std::atomic<::icu::numparse::impl::NumberParserImpl*> atomicParser = {};
++#else
++    ::icu::numparse::impl::NumberParserImpl* atomicParser = nullptr;
++#endif
+ 
+     /** The lazy-computed parser for .parseCurrency() */
++#ifndef __wasi__
+     std::atomic<::icu::numparse::impl::NumberParserImpl*> atomicCurrencyParser = {};
++#else
++    ::icu::numparse::impl::NumberParserImpl* atomicCurrencyParser = {};
++#endif
+ 
+     /** Small object ownership warehouse for the formatter and parser */
+     DecimalFormatWarehouse warehouse;
+diff --git a/intl/icu/source/i18n/numrange_fluent.cpp b/intl/icu/source/i18n/numrange_fluent.cpp
+index f1060b3..66e12ee 100644
+--- a/intl/icu/source/i18n/numrange_fluent.cpp
++++ b/intl/icu/source/i18n/numrange_fluent.cpp
+@@ -240,29 +240,49 @@ LocalizedNumberRangeFormatter::LocalizedNumberRangeFormatter(NFS<LNF>&& src) U_N
+         : NFS<LNF>(std::move(src)) {
+     // Steal the compiled formatter
+     LNF&& _src = static_cast<LNF&&>(src);
++#ifndef __wasi__
+     auto* stolen = _src.fAtomicFormatter.exchange(nullptr);
+     delete fAtomicFormatter.exchange(stolen);
++#else
++    delete fAtomicFormatter;
++    fAtomicFormatter = _src.fAtomicFormatter;
++    _src.fAtomicFormatter = nullptr;
++#endif
+ }
+ 
+ LocalizedNumberRangeFormatter& LocalizedNumberRangeFormatter::operator=(const LNF& other) {
+     if (this == &other) { return *this; }  // self-assignment: no-op
+     NFS<LNF>::operator=(static_cast<const NFS<LNF>&>(other));
+     // Do not steal; just clear
++#ifndef __wasi__
+     delete fAtomicFormatter.exchange(nullptr);
++#else
++    delete fAtomicFormatter;
++#endif
+     return *this;
+ }
+ 
+ LocalizedNumberRangeFormatter& LocalizedNumberRangeFormatter::operator=(LNF&& src) U_NOEXCEPT {
+     NFS<LNF>::operator=(static_cast<NFS<LNF>&&>(src));
+     // Steal the compiled formatter
++#ifndef __wasi__
+     auto* stolen = src.fAtomicFormatter.exchange(nullptr);
+     delete fAtomicFormatter.exchange(stolen);
++#else
++    delete fAtomicFormatter;
++    fAtomicFormatter = src.fAtomicFormatter;
++    src.fAtomicFormatter = nullptr;
++#endif
+     return *this;
+ }
+ 
+ 
+ LocalizedNumberRangeFormatter::~LocalizedNumberRangeFormatter() {
++#ifndef __wasi__
+     delete fAtomicFormatter.exchange(nullptr);
++#else
++    delete fAtomicFormatter;
++#endif
+ }
+ 
+ LocalizedNumberRangeFormatter::LocalizedNumberRangeFormatter(const RangeMacroProps& macros, const Locale& locale) {
+@@ -346,7 +366,11 @@ LocalizedNumberRangeFormatter::getFormatter(UErrorCode& status) const {
+     }
+ 
+     // First try to get the pre-computed formatter
++#ifndef __wasi__
+     auto* ptr = fAtomicFormatter.load();
++#else
++    auto* ptr = fAtomicFormatter;
++#endif
+     if (ptr != nullptr) {
+         return ptr;
+     }
+@@ -365,6 +389,7 @@ LocalizedNumberRangeFormatter::getFormatter(UErrorCode& status) const {
+     // it is set to what is actually stored in the atomic
+     // if another thread beat us to computing the formatter object.
+     auto* nonConstThis = const_cast<LocalizedNumberRangeFormatter*>(this);
++#ifndef __wasi__
+     if (!nonConstThis->fAtomicFormatter.compare_exchange_strong(ptr, temp)) {
+         // Another thread beat us to computing the formatter
+         delete temp;
+@@ -373,6 +398,10 @@ LocalizedNumberRangeFormatter::getFormatter(UErrorCode& status) const {
+         // Our copy of the formatter got stored in the atomic
+         return temp;
+     }
++#else
++    nonConstThis->fAtomicFormatter = temp;
++    return temp;
++#endif
+ 
+ }
+ 
+diff --git a/intl/icu/source/i18n/unicode/numberrangeformatter.h b/intl/icu/source/i18n/unicode/numberrangeformatter.h
+index b9a4600..0ba2fa0 100644
+--- a/intl/icu/source/i18n/unicode/numberrangeformatter.h
++++ b/intl/icu/source/i18n/unicode/numberrangeformatter.h
+@@ -10,7 +10,6 @@
+ 
+ #if !UCONFIG_NO_FORMATTING
+ 
+-#include <atomic>
+ #include "unicode/appendable.h"
+ #include "unicode/fieldpos.h"
+ #include "unicode/formattedvalue.h"
+@@ -18,6 +17,10 @@
+ #include "unicode/numberformatter.h"
+ #include "unicode/unumberrangeformatter.h"
+ 
++#ifndef __wasi__
++#include <atomic>
++#endif
++
+ /**
+  * \file
+  * \brief C++ API: Library for localized formatting of number, currency, and unit ranges.
+@@ -77,7 +80,9 @@ struct UFormattedNumberRangeImpl;
+ } // namespace icu::number
+ U_NAMESPACE_END
+ 
++#ifndef __wasi__
+ template struct U_I18N_API std::atomic< U_NAMESPACE_QUALIFIER number::impl::NumberRangeFormatterImpl*>;
++#endif
+ 
+ U_NAMESPACE_BEGIN
+ namespace number {  // icu::number
+@@ -546,7 +551,11 @@ class U_I18N_API LocalizedNumberRangeFormatter
+     ~LocalizedNumberRangeFormatter();
+ 
+   private:
++#ifndef __wasi__
+     std::atomic<impl::NumberRangeFormatterImpl*> fAtomicFormatter = {};
++#else
++    impl::NumberRangeFormatterImpl* fAtomicFormatter = nullptr;
++#endif
+ 
+     const impl::NumberRangeFormatterImpl* getFormatter(UErrorCode& stauts) const;
+ 

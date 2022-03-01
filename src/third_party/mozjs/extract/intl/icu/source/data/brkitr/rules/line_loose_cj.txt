@@ -1,0 +1,388 @@
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Copyright (c) 2002-2016  International Business Machines Corporation and
+# others. All Rights Reserved.
+#
+#  file:  line_loose_cj.txt
+#
+#         Line Breaking Rules
+#         Implement default line breaking as defined by
+#         Unicode Standard Annex #14 Revision 44 for Unicode 13.0
+#         http://www.unicode.org/reports/tr14/, with the following modification:
+#
+#         Boundaries between hyphens and following letters are suppressed when
+#         there is a boundary preceding the hyphen. See rule 20.9
+#
+#         This tailors the line break behavior to correspond to CSS
+#         line-break=loose (BCP47 -u-lb-loose) as defined for Chinese & Japanese.
+#         It sets characters of class CJ to behave like ID.
+#         In addition, it allows breaks:
+#         * before hyphens 2010 & 2013 (both BA) and 301C, 30A0 (both NS)
+#         * before iteration marks 3005, 303B, 309D, 309E, 30FD, 30FE (all NS)
+#         * between characters of LineBreak class IN such as 2026
+#         * before some centered punct 203C, 2047, 2048, 2049, 30FB, FF1A, FF1B,
+#           FF65 (all NS) and FF01, FF1F (both EX).
+#         * before suffix characters with LineBreak class PO and EastAsianWidth A,F,W;
+#           this includes: 00B0 2030 2032 2033 2035 2103 2109 FE6A FF05 FFE0
+#         * after prefix characters with LineBreak class PR and EastAsianWidth A,F,W;
+#           this includes: 00A4 00B1 20AC 2116 FE69 FF04 FFE1 FFE5 FFE6
+#         It allows breaking before 201C and after 201D, for zh_Hans, zh_Hant, and ja.
+
+
+#
+#  Character Classes defined by TR 14.
+#
+
+!!chain;
+!!quoted_literals_only;
+
+$AI = [:LineBreak =  Ambiguous:];
+$AL = [:LineBreak =  Alphabetic:];
+$BAX = [\u2010 \u2013];
+$BA = [[:LineBreak =  Break_After:] - $BAX];
+$HH = [\u2010];     # \u2010 is HYPHEN, default line break is BA.
+$BB = [:LineBreak =  Break_Before:];
+$BK = [:LineBreak =  Mandatory_Break:];
+$B2 = [:LineBreak =  Break_Both:];
+$CB = [:LineBreak =  Contingent_Break:];
+$CJ = [:LineBreak =  Conditional_Japanese_Starter:];
+$CL = [[:LineBreak =  Close_Punctuation:] \u201d];
+# $CM = [:LineBreak =  Combining_Mark:];
+$CP = [:LineBreak =  Close_Parenthesis:];
+$CR = [:LineBreak =  Carriage_Return:];
+$EB = [:LineBreak =  EB:];
+$EM = [:LineBreak =  EM:];
+$EXX = [\uFF01 \uFF1F];
+$EX = [[:LineBreak =  Exclamation:] - $EXX];
+$GL = [:LineBreak =  Glue:];
+$HL = [:LineBreak =  Hebrew_Letter:];
+$HY = [:LineBreak =  Hyphen:];
+$H2 = [:LineBreak =  H2:];
+$H3 = [:LineBreak =  H3:];
+# CSS Loose tailoring: CJ resolves to ID
+$ID = [[:LineBreak =  Ideographic:] $CJ];
+$IN = [:LineBreak =  Inseperable:];
+$IS = [:LineBreak =  Infix_Numeric:];
+$JL = [:LineBreak =  JL:];
+$JV = [:LineBreak =  JV:];
+$JT = [:LineBreak =  JT:];
+$LF = [:LineBreak =  Line_Feed:];
+$NL = [:LineBreak =  Next_Line:];
+$NSX = [\u301C \u30A0 \u3005 \u303B \u309D \u309E \u30FD \u30FE \u203C \u2047 \u2048 \u2049 \u30FB \uFF1A \uFF1B \uFF65];
+$NS = [[:LineBreak =  Nonstarter:] - $NSX];
+$NU = [:LineBreak =  Numeric:];
+$OP = [[:LineBreak =  Open_Punctuation:] \u201c];
+$POX = [\u00B0 \u2030 \u2032 \u2033 \u2035 \u2103 \u2109 \uFE6A \uFF05 \uFFE0];
+$PO = [[:LineBreak =  Postfix_Numeric:] - $POX];
+$PRX = [\u00A4 \u00B1 \u20AC \u2116 \uFE69 \uFF04 \uFFE1 \uFFE5 \uFFE6];
+$PR = [[:LineBreak =  Prefix_Numeric:] - $PRX];
+$QU = [[:LineBreak =  Quotation:] - [\u201c\u201d]];
+$RI = [:LineBreak =  Regional_Indicator:];
+$SA = [:LineBreak =  Complex_Context:];
+$SG = [:LineBreak =  Surrogate:];
+$SP = [:LineBreak =  Space:];
+$SY = [:LineBreak =  Break_Symbols:];
+$WJ = [:LineBreak =  Word_Joiner:];
+$XX = [:LineBreak =  Unknown:];
+$ZW = [:LineBreak =  ZWSpace:];
+$ZWJ = [:LineBreak = ZWJ:];
+
+# OP30 and CP30 are variants of OP and CP that appear in-line in rule LB30 from UAX 14,
+# without a formal name. Because ICU rules require multiple uses of the expressions,
+# give them a single definition with a name
+
+$OP30 = [$OP - [\p{ea=F}\p{ea=W}\p{ea=H}]];
+$CP30 = [$CP - [\p{ea=F}\p{ea=W}\p{ea=H}]];
+
+# By LB9, a ZWJ also behaves as a CM. Including it in the definition of CM avoids having to explicitly
+#         list it in the numerous rules that use CM.
+# By LB1, SA characters with general categor of Mn or Mc also resolve to CM.
+
+$CM = [[:LineBreak = Combining_Mark:] $ZWJ [$SA & [[:Mn:][:Mc:]]]];
+$CMX = [[$CM] - [$ZWJ]];
+
+#   Dictionary character set, for triggering language-based break engines. Currently
+#   limited to LineBreak=Complex_Context (SA).
+
+$dictionary = [$SA];
+
+#
+#  Rule LB1.  By default, treat AI  (characters with ambiguous east Asian width),
+#                               SA  (Dictionary chars, excluding Mn and Mc)
+#                               SG  (Unpaired Surrogates)
+#                               XX  (Unknown, unassigned)
+#                         as $AL  (Alphabetic)
+#
+$ALPlus = [$AL $AI $SG $XX [$SA-[[:Mn:][:Mc:]]]];
+
+
+## -------------------------------------------------
+
+#
+# CAN_CM  is the set of characters that may combine with CM combining chars.
+#         Note that Linebreak UAX 14's concept of a combining char and the rules
+#         for what they can combine with are _very_ different from the rest of Unicode.
+#
+#         Note that $CM itself is left out of this set.  If CM is needed as a base
+#         it must be listed separately in the rule.
+#
+$CAN_CM  = [^$SP $BK $CR $LF $NL $ZW $CM];       # Bases that can   take CMs
+$CANT_CM = [ $SP $BK $CR $LF $NL $ZW $CM];       # Bases that can't take CMs
+
+#
+# AL_FOLLOW  set of chars that can unconditionally follow an AL
+#            Needed in rules where stand-alone $CM s are treated as AL.
+#
+$AL_FOLLOW      = [$BK $CR $LF $NL $ZW $SP $CL $CP $EX $HL $IS $SY $WJ $GL $OP30 $QU $BA $HY $NS $IN $NU $PR $PO $POX $ALPlus];
+
+
+#
+#  Rule LB 4, 5    Mandatory (Hard) breaks.
+#
+$LB4Breaks    = [$BK $CR $LF $NL];
+$LB4NonBreaks = [^$BK $CR $LF $NL $CM];
+$CR $LF {100};
+
+#
+#  LB 6    Do not break before hard line breaks.
+#
+$LB4NonBreaks?  $LB4Breaks {100};    # LB 5  do not break before hard breaks.
+$CAN_CM $CM*    $LB4Breaks {100};
+^$CM+           $LB4Breaks {100};
+
+# LB 7         x SP
+#              x ZW
+$LB4NonBreaks [$SP $ZW];
+$CAN_CM $CM*  [$SP $ZW];
+^$CM+         [$SP $ZW];
+
+#
+# LB 8         Break after zero width space
+#              ZW SP* ÷
+#
+$LB8Breaks    = [$LB4Breaks $ZW];
+$LB8NonBreaks = [[$LB4NonBreaks] - [$ZW]];
+$ZW $SP* / [^$SP $ZW $LB4Breaks];
+
+# LB 8a        ZWJ x            Do not break Emoji ZWJ sequences.
+#
+$ZWJ [^$CM];
+
+# LB 9     Combining marks.      X   $CM needs to behave like X, where X is not $SP, $BK $CR $LF $NL
+#                                $CM not covered by the above needs to behave like $AL
+#                                See definition of $CAN_CM.
+
+$CAN_CM $CM+;                   #  Stick together any combining sequences that don't match other rules.
+^$CM+;
+
+#
+# LB 11  Do not break before or after WORD JOINER & related characters.
+#
+$CAN_CM $CM*  $WJ;
+$LB8NonBreaks $WJ;
+^$CM+         $WJ;
+
+$WJ $CM* .;
+
+#
+# LB 12  Do not break after NBSP and related characters.
+#         GL  x
+#
+$GL $CM* .;
+
+#
+# LB 12a  Do not break before NBSP and related characters ...
+#            [^SP BA HY] x GL
+#
+[[$LB8NonBreaks] - [$SP $BA $BAX $HY]] $CM* $GL;
+^$CM+ $GL;
+
+
+
+# LB 13   Don't break before ']' or '!' or or '/', even after spaces.
+#
+# Do not include $EXX here
+$LB8NonBreaks $CL;
+$CAN_CM $CM*  $CL;
+^$CM+         $CL;              # by rule 10, stand-alone CM behaves as AL
+
+$LB8NonBreaks $CP;
+$CAN_CM $CM*  $CP;
+^$CM+         $CP;              # by rule 10, stand-alone CM behaves as AL
+
+$LB8NonBreaks $EX;
+$CAN_CM $CM*  $EX;
+^$CM+         $EX;              # by rule 10, stand-alone CM behaves as AL
+
+$LB8NonBreaks $SY;
+$CAN_CM $CM*  $SY;
+^$CM+         $SY;              # by rule 10, stand-alone CM behaves as AL
+
+
+#
+# LB 14  Do not break after OP, even after spaces
+#        Note subtle interaction with "SP IS /" rules in LB14a.
+#        This rule consumes the SP, chaining happens on the IS, effectivley overriding the  SP IS rules,
+#        which is the desired behavior.
+#
+$OP $CM* $SP* .;
+
+$OP $CM* $SP+ $CM+ $AL_FOLLOW?;    # by rule 10, stand-alone CM behaves as AL
+                                   # by rule 8, CM following a SP is stand-alone.
+
+
+# LB 14a Force a break before start of a number with a leading decimal pt, e.g. " .23"
+#        Note: would be simpler to express as "$SP / $IS $CM* $NU;", but ICU rules have limitations.
+#        See issue ICU-20303
+
+
+$CanFollowIS = [$BK $CR $LF $NL $SP $ZW $WJ $GL $CL $CP $EX $IS $SY $QU $BA $HY $NS $ALPlus $HL $IN];
+$SP $IS           / [^ $CanFollowIS $NU $CM];
+$SP $IS $CM* $CMX / [^ $CanFollowIS $NU $CM];
+
+#
+# LB 14b Do not break before numeric separators (IS), even after spaces.
+
+[$LB8NonBreaks - $SP] $IS;
+$SP $IS $CM* [$CanFollowIS {eof}];
+$SP $IS $CM* $ZWJ [^$CM $NU];
+
+$CAN_CM $CM*  $IS;
+^$CM+         $IS;              # by rule 10, stand-alone CM behaves as AL
+
+
+# LB 15
+$QU $CM* $SP* $OP;
+
+# LB 16
+# Do not break between closing punctuation and $NS, even with intervening spaces
+# But DO allow a break between closing punctuation and $NSX, don't include it here
+($CL | $CP) $CM* $SP* $NS;
+
+# LB 17
+$B2 $CM* $SP* $B2;
+
+#
+# LB 18  Break after spaces.
+#
+$LB18NonBreaks = [$LB8NonBreaks - [$SP]];
+$LB18Breaks    = [$LB8Breaks $SP];
+
+
+# LB 19
+#         x QU
+$LB18NonBreaks $CM* $QU;
+^$CM+               $QU;
+
+#         QU  x
+$QU $CM* .;
+
+# LB 20
+#        <break>  $CB
+#        $CB   <break>
+#
+$LB20NonBreaks = [$LB18NonBreaks - $CB];
+
+# LB 20.09    Don't break between Hyphens and Letters when there is a break preceding the hyphen.
+#             Originally added as a Finnish tailoring, now promoted to default ICU behavior.
+#             Note: this is not default UAX-14 behaviour. See issue ICU-8151.
+#
+^($HY | $HH) $CM* $ALPlus;
+
+# LB 21        x   (BA | HY | NS)
+#           BB x
+#
+# DO allow breaks here before $BAX and $NSX, so don't include them
+$LB20NonBreaks $CM* ($BA | $HY | $NS);
+
+
+^$CM+ ($BA | $HY | $NS);
+
+$BB $CM* [^$CB];                                  #  $BB  x
+$BB $CM* $LB20NonBreaks;
+
+# LB 21a Don't break after Hebrew + Hyphen
+#   HL (HY | BA) x
+#
+$HL $CM* ($HY | $BA | $BAX) $CM* [^$CB]?;
+
+# LB 21b (forward) Don't break between SY and HL
+# (break between HL and SY already disallowed by LB 13 above)
+$SY $CM* $HL;
+
+
+# LB 22  Do not break before ellipses
+#
+[$LB20NonBreaks - $IN] $CM*    $IN;    # line_loose tailoring
+^$CM+ $IN;
+
+
+# LB 23
+#
+($ALPlus | $HL) $CM* $NU;
+^$CM+  $NU;       # Rule 10, any otherwise unattached CM behaves as AL
+$NU $CM* ($ALPlus | $HL);
+
+# LB 23a
+# Do not include $POX here
+#
+$PR $CM* ($ID | $EB | $EM);
+($ID | $EB | $EM) $CM*  $PO;
+
+
+#
+# LB 24
+#
+# Do not include $PRX here
+($PR | $PO | $POX) $CM* ($ALPlus | $HL);
+($ALPlus | $HL) $CM* ($PR | $PO | $POX);     # TODO: should this be ($PR | $PRX | $PO)
+^$CM+ ($PR | $PO | $POX);       # Rule 10, any otherwise unattached CM behaves as AL
+
+#
+# LB 25   Numbers.
+#
+# Here do not include $PRX at the beginning or $POX at the end
+(($PR | $PO | $POX) $CM*)? (($OP | $HY) $CM*)? ($IS $CM*)? $NU ($CM* ($NU | $SY | $IS))*
+    ($CM* ($CL | $CP))? ($CM* ($PR | $PRX | $PO))?;
+
+# LB 26  Do not break a Korean syllable
+#
+$JL $CM* ($JL | $JV | $H2 | $H3);
+($JV | $H2) $CM* ($JV | $JT);
+($JT | $H3) $CM* $JT;
+
+# LB 27  Treat korean Syllable Block the same as ID  (don't break it)
+# Do not include $POX or $PRX here
+($JL | $JV | $JT | $H2 | $H3) $CM* $IN;
+($JL | $JV | $JT | $H2 | $H3) $CM* $PO;
+$PR $CM* ($JL | $JV | $JT | $H2 | $H3);
+
+
+# LB 28   Do not break between alphabetics
+#
+($ALPlus | $HL) $CM* ($ALPlus | $HL);
+^$CM+ ($ALPlus | $HL);      # The $CM+ is from rule 10, an unattached CM is treated as AL
+
+# LB 29
+$IS $CM* ($ALPlus | $HL);
+
+# LB 30
+($ALPlus | $HL | $NU) $CM* $OP30;
+^$CM+ $OP30;         # The $CM+ is from rule 10, an unattached CM is treated as AL.
+$CP30 $CM* ($ALPlus | $HL | $NU);
+
+# LB 30a  Do not break between regional indicators. Break after pairs of them.
+#         Tricky interaction with LB8a: ZWJ x .   together with ZWJ acting like a CM.
+$RI $CM* $RI                 / [[^$BK $CR $LF $NL $SP $ZW $WJ $CL $CP $EX $IS $SY $GL $QU $BA $HY $NS $IN $CM]];
+$RI $CM* $RI $CM* [$CM-$ZWJ] / [[^$BK $CR $LF $NL $SP $ZW $WJ $CL $CP $EX $IS $SY $GL $QU $BA $HY $NS $IN $CM]];
+$RI $CM* $RI $CM* [$BK $CR $LF $NL $SP $ZW $WJ $CL $CP $EX $IS $SY $GL $QU $BA $HY $NS $IN $ZWJ {eof}];
+# note: the preceding rule includes {eof} rather than having the last [set] term qualified with '?'
+#       because of the chain-out behavior difference. The rule must chain out only from the [set characters],
+#       not from the preceding $RI or $CM, which it would be able to do if the set were optional.
+
+# LB 30b Do not break between an Emoji Base and an Emoji Modifier
+$EB $CM* $EM;
+
+# LB 31 Break everywhere else.
+#       Match a single code point if no other rule applies.
+.;

@@ -1,0 +1,85 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+kw{
+    ExemplarCharacters{"[a b c d e f g h i j k l m n o p q r s t u v w x y z]"}
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+    }
+    calendar{
+        gregorian{
+            AmPmMarkers{
+                "a.m.",
+                "p.m.",
+            }
+            AmPmMarkersAbbr{
+                "a.m.",
+                "p.m.",
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Sul",
+                        "Lun",
+                        "Mth",
+                        "Mhr",
+                        "Yow",
+                        "Gwe",
+                        "Sad",
+                    }
+                    wide{
+                        "dy Sul",
+                        "dy Lun",
+                        "dy Meurth",
+                        "dy Merher",
+                        "dy Yow",
+                        "dy Gwener",
+                        "dy Sadorn",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "RC",
+                    "AD",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Gen",
+                        "Hwe",
+                        "Meu",
+                        "Ebr",
+                        "Me",
+                        "Met",
+                        "Gor",
+                        "Est",
+                        "Gwn",
+                        "Hed",
+                        "Du",
+                        "Kev",
+                    }
+                    wide{
+                        "mis Genver",
+                        "mis Hwevrer",
+                        "mis Meurth",
+                        "mis Ebrel",
+                        "mis Me",
+                        "mis Metheven",
+                        "mis Gortheren",
+                        "mis Est",
+                        "mis Gwynngala",
+                        "mis Hedra",
+                        "mis Du",
+                        "mis Kevardhu",
+                    }
+                }
+            }
+        }
+    }
+}

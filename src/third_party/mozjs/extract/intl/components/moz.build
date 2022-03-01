@@ -1,0 +1,34 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+EXPORTS.mozilla.intl = [
+    "src/Calendar.h",
+    "src/DateTimeFormat.h",
+    "src/DateTimePatternGenerator.h",
+    "src/ICU4CGlue.h",
+    "src/NumberFormat.h",
+    "src/PluralRules.h",
+]
+
+UNIFIED_SOURCES += [
+    "src/Calendar.cpp",
+    "src/DateTimeFormat.cpp",
+    "src/DateTimePatternGenerator.cpp",
+    "src/NumberFormat.cpp",
+    "src/NumberFormatFields.cpp",
+    "src/NumberFormatterSkeleton.cpp",
+    "src/PluralRules.cpp",
+]
+
+if not CONFIG["JS_STANDALONE"]:
+    TEST_DIRS += ["gtest"]
+
+# At the time of this writing the MOZ_HAS_MOZGLUE define must be true in order to
+# correctly include ConvertUtf8toUtf16 in certain include paths, otherwise it results
+# in a compile time "undeclared identifier" error. See:
+# https://searchfox.org/mozilla-central/rev/6371054f6260a5f8844846439297547f7cfeeedd/mfbt/Utf8.h#277
+DEFINES["MOZ_HAS_MOZGLUE"] = True
+
+Library("intlcomponents")

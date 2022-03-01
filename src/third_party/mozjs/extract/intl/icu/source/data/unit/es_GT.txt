@@ -1,0 +1,87 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_GT{
+    %%Parent{"es_419"}
+    units{
+        duration{
+            day{
+                per{"{0} al día"}
+            }
+            month{
+                per{"{0} al mes"}
+            }
+            year{
+                per{"{0} al año"}
+            }
+        }
+        electric{
+            ampere{
+                dnam{"amperios"}
+                one{"{0} amperio"}
+                other{"{0} amperios"}
+            }
+            milliampere{
+                dnam{"miliamperios"}
+                one{"{0} miliamperio"}
+                other{"{0} miliamperios"}
+            }
+            ohm{
+                one{"{0} ohmio"}
+                other{"{0} ohmios"}
+            }
+        }
+        energy{
+            joule{
+                dnam{"julios"}
+                one{"{0} julio"}
+                other{"{0} julios"}
+            }
+            kilojoule{
+                dnam{"kilojulios"}
+                one{"{0} kilojulio"}
+                other{"{0} kilojulios"}
+            }
+        }
+        power{
+            horsepower{
+                one{"{0} caballos de fuerza"}
+                other{"{0} caballos de fuerza"}
+            }
+        }
+        volume{
+            cubic-centimeter{
+                per{"{0} por pie cúbico"}
+            }
+        }
+    }
+    unitsNarrow{
+        duration{
+            hour{
+                dnam{"hora"}
+            }
+        }
+    }
+    unitsShort{
+        electric{
+            volt{
+                dnam{"voltios"}
+            }
+        }
+        length{
+            foot{
+                dnam{"pie"}
+            }
+        }
+        power{
+            watt{
+                dnam{"vatios"}
+            }
+        }
+        volume{
+            acre-foot{
+                dnam{"acre pie"}
+            }
+        }
+    }
+}

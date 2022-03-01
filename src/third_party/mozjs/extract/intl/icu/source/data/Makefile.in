@@ -1,0 +1,401 @@
+## Makefile.in for ICU data
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+## Copyright (c) 1999-2015, International Business Machines Corporation and
+## others. All Rights Reserved.
+
+## Source directory information
+srcdir = @srcdir@
+top_srcdir = @top_srcdir@
+
+# So that you have $(top_builddir)/config.status
+top_builddir = ..
+
+## All the flags and other definitions are included here.
+include $(top_builddir)/icudefs.mk
+
+## Build directory information
+# So that  $(top_builddir)/$(subdir) ~= "here"
+subdir = data
+
+#lib icu data for link
+LIB_ICUDATA_NAME=$(LIBICU)$(DATA_STUBNAME)$(ICULIBSUFFIX)
+LIB_STATIC_ICUDATA_NAME=$(LIBSICU)$(DATA_STUBNAME)$(ICULIBSUFFIX)
+
+# Allow Windows to override these options
+ifeq ($(PKGDATA_OPTS),)
+PKGDATA_OPTS = -O $(top_builddir)/data/icupkg.inc
+endif
+ifeq ($(PKGDATA_VERSIONING),)
+PKGDATA_VERSIONING = -r $(SO_TARGET_VERSION)
+endif
+
+# This allows all the data to be in one directory
+ifeq ($(PKGDATA_MODE),dll)
+ICUPKGDATA_OUTDIR = $(LIBDIR)
+else
+ifeq ($(PKGDATA_MODE),static)
+ICUPKGDATA_OUTDIR = $(LIBDIR)
+else
+ICUPKGDATA_OUTDIR = $(OUTDIR)
+endif
+endif
+
+CURDIR:=$(CURR_FULL_DIR)
+# current directory should not be blank
+ifeq ($(CURDIR),)
+CURDIR=.
+endif
+ifeq ($(OS390BATCH),1)
+PKGDATA = $(TOOLBINDIR)/pkgdata $(PKGDATA_OPTS) -z -q -c -s $(CURDIR)/out/build/$(ICUDATA_PLATFORM_NAME) -d $(ICUPKGDATA_OUTDIR)
+else
+PKGDATA = $(TOOLBINDIR)/pkgdata $(PKGDATA_OPTS) -q -c -s $(CURDIR)/out/build/$(ICUDATA_PLATFORM_NAME) -d $(ICUPKGDATA_OUTDIR)
+endif
+OS390_PDS_NAME = -z -L $(BATCH_STUB_TARGET)
+
+ifeq ($(OS390_STUBDATA),1)
+OS390PKG=package390
+OS390INSTALL=install390
+
+# Additional data for 390
+OS390LIST=$(OUTTMPDIR)/icudata390.lst
+OUTTMPDIR_390STUB=$(top_builddir)/data/out/tmp_390stub
+endif
+
+ifeq ($(OS390BATCH),1)
+CPPFLAGS += -Wc,'ros,roc'
+endif
+
+# OBJDATADIR must be a short path (with ..'s) to the data.
+
+ifeq ($(top_srcdir),..)
+SRCDATADIR=.
+else
+SRCDATADIR=$(top_srcdir)/data
+endif
+ifeq ($(top_builddir),..)
+OUTDIR=./out
+else
+OUTDIR=$(top_builddir)/data/out
+endif
+
+OUTTMPDIR=$(OUTDIR)/tmp
+MAINBUILDDIR=$(OUTDIR)/build
+BUILDDIR=$(MAINBUILDDIR)/$(ICUDATA_PLATFORM_NAME)
+MISCSRCDIR=$(SRCDATADIR)/misc
+SRCLISTDEPS=Makefile $(srcdir)/Makefile.in
+
+# Variable names for rules.mk
+OUT_DIR=$(BUILDDIR)
+TMP_DIR=$(OUTTMPDIR)
+
+# relative lib links from pkgdata are the same as for tmp
+TOOLDIR=$(top_builddir)/tools
+
+## List of phony targets
+.PHONY : all all-local all-recursive install install-local install-files	\
+install-recursive clean clean-local clean-recursive distclean		\
+distclean-local distclean-recursive dist dist-local dist-recursive	\
+check check-local check-recursive clean-resindex icudata.jar	\
+check-exhaustive
+
+## Clear suffix list
+.SUFFIXES :
+
+## List of standard targets
+all: all-local
+install: all-local install-local 
+clean: clean-local
+distclean : distclean-local
+dist: 
+check: all check-local
+
+check-exhaustive: check
+
+-include Makefile.local
+
+
+distclean-local: clean
+	$(RMV) Makefile
+
+all-local: icupkg.inc build-local packagedata $(POST_DATA_BUILD) $(OS390PKG)
+
+dist-local:
+
+clean-map:
+	-test -z *.map || $(RMV) *.map
+
+clean-local: cleanpackage cleanfiles clean-map
+	$(RMV) $(OUTDIR) build-local packagedata uni-core-data
+
+cleanfiles:
+	test -z "$(CLEANFILES)" || $(RMV) $(CLEANFILES)
+
+cleanpackage:
+	$(RMV) $(OUTDIR)
+	$(RMV) $(LIBDIR)/*$(LIB_ICUDATA_NAME)*.$(SO)* $(LIBDIR)/$(LIB_STATIC_ICUDATA_NAME).$(A)
+
+check-local:
+	PYTHONPATH=$(top_srcdir)/python @PYTHON@ -m icutools.databuilder.test
+
+# Find out if we have a source archive.
+# If we have that, then use that instead of building everything from scratch.
+ICUDATA_SOURCE_ARCHIVE = $(wildcard $(srcdir)/in/$(ICUDATA_PLATFORM_NAME).dat)
+ifeq ($(ICUDATA_SOURCE_ARCHIVE),)
+ICUDATA_ARCHIVE = $(firstword $(wildcard $(srcdir)/in/$(ICUDATA_BASENAME_VERSION)*.dat))
+# We don't have the data in the current endianess or charset.
+# See if we can find data of any archive type,
+# and convert it to the current type.
+ifneq ($(ICUDATA_ARCHIVE),)
+ICUDATA_SOURCE_ARCHIVE = $(OUTDIR)/$(ICUDATA_PLATFORM_NAME).dat
+$(ICUDATA_SOURCE_ARCHIVE): $(ICUDATA_ARCHIVE)
+	$(MKINSTALLDIRS) $(OUTDIR)
+	$(INVOKE) $(TOOLBINDIR)/icupkg -t$(ICUDATA_CHAR) $(ICUDATA_ARCHIVE) $(ICUDATA_SOURCE_ARCHIVE)
+	
+$(OUTDIR):
+	mkdir -p $(OUTDIR)
+
+endif
+else
+ifneq ($(ENABLE_STATIC),YES)
+ifeq ($(PKGDATA_MODE),common)
+# We have a source data common archive in the native endianess,
+# and it's what we want to build. Try to not run any of ICU's tools.
+ICUDATA_SOURCE_IS_NATIVE_TARGET=YES
+endif
+endif
+endif
+
+packagedata: icupkg.inc $(PKGDATA_LIST) build-local
+ifneq ($(ENABLE_STATIC),)
+ifeq ($(PKGDATA_MODE),dll)
+	$(PKGDATA_INVOKE) $(PKGDATA) -e $(ICUDATA_ENTRY_POINT) -T $(OUTTMPDIR) -p $(ICUDATA_NAME) $(PKGDATA_LIBSTATICNAME) -m static $(PKGDATA_VERSIONING) $(PKGDATA_LIST)
+endif
+endif
+ifneq ($(ICUDATA_SOURCE_IS_NATIVE_TARGET),YES)
+	$(PKGDATA_INVOKE) $(PKGDATA) -e $(ICUDATA_ENTRY_POINT) -T $(OUTTMPDIR) -p $(ICUDATA_NAME) -m $(PKGDATA_MODE) $(PKGDATA_VERSIONING) $(PKGDATA_LIBNAME) $(PKGDATA_LIST)
+else
+	$(INSTALL_DATA) $(ICUDATA_SOURCE_ARCHIVE) $(OUTDIR)
+endif
+	echo timestamp > $@
+
+## Install ICU data.
+install-local: $(PKGDATA_LIST) ./icupkg.inc packagedata $(OS390INSTALL)
+	$(MKINSTALLDIRS) $(TMPDATADIR) $(DESTDIR)$(ICUPKGDATA_DIR)
+ifeq ($(PKGDATA_MODE),files)
+	$(MKINSTALLDIRS) $(ICUPKGDATA_DIR)/$(ICUDATA_NAME)
+	$(MKINSTALLDIRS) $(ICUPKGDATA_DIR)/$(ICUDATA_NAME)/$(CURR_TREE)
+	$(MKINSTALLDIRS) $(ICUPKGDATA_DIR)/$(ICUDATA_NAME)/$(LANG_TREE)
+	$(MKINSTALLDIRS) $(ICUPKGDATA_DIR)/$(ICUDATA_NAME)/$(REGION_TREE)
+	$(MKINSTALLDIRS) $(ICUPKGDATA_DIR)/$(ICUDATA_NAME)/$(ZONE_TREE)
+	$(MKINSTALLDIRS) $(ICUPKGDATA_DIR)/$(ICUDATA_NAME)/$(UNIT_TREE)
+	$(MKINSTALLDIRS) $(ICUPKGDATA_DIR)/$(ICUDATA_NAME)/$(BREAK_TREE)
+	$(MKINSTALLDIRS) $(ICUPKGDATA_DIR)/$(ICUDATA_NAME)/$(COLLATION_TREE)
+	$(MKINSTALLDIRS) $(ICUPKGDATA_DIR)/$(ICUDATA_NAME)/$(RBNF_TREE)
+	$(MKINSTALLDIRS) $(ICUPKGDATA_DIR)/$(ICUDATA_NAME)/$(TRANSLIT_TREE)
+endif
+ifneq ($(ENABLE_STATIC),)
+ifeq ($(PKGDATA_MODE),dll)
+# For MinGW, do we want the DLL to go in the bin location?
+ifeq ($(MINGW_MOVEDLLSTOBINDIR),YES)
+	$(PKGDATA_INVOKE) $(PKGDATA) -m static -e $(ICUDATA_ENTRY_POINT) -T $(OUTTMPDIR) -s $(BUILDDIR) -p $(ICUDATA_NAME) $(PKGDATA_LIBSTATICNAME) $(PKGDATA_LIST) -I $(DESTDIR)$(bindir)
+else
+	$(PKGDATA_INVOKE) $(PKGDATA) -m static -e $(ICUDATA_ENTRY_POINT) -T $(OUTTMPDIR) -s $(BUILDDIR) -p $(ICUDATA_NAME) $(PKGDATA_LIBSTATICNAME) $(PKGDATA_LIST) -I $(ICUPKGDATA_INSTALL_LIBDIR)
+endif
+endif
+endif
+ifneq ($(ICUDATA_SOURCE_IS_NATIVE_TARGET),YES)
+# For MinGW, do we want the DLL to go in the bin location?
+ifeq ($(MINGW_MOVEDLLSTOBINDIR),YES)
+	$(PKGDATA_INVOKE) $(PKGDATA) -m $(PKGDATA_MODE) $(PKGDATA_VERSIONING) -e $(ICUDATA_ENTRY_POINT) -T $(OUTTMPDIR) -s $(BUILDDIR) -p $(ICUDATA_NAME) $(PKGDATA_LIBNAME) $(PKGDATA_LIST) -I $(DESTDIR)$(bindir)
+else
+	$(PKGDATA_INVOKE) $(PKGDATA) -m $(PKGDATA_MODE) $(PKGDATA_VERSIONING) -e $(ICUDATA_ENTRY_POINT) -T $(OUTTMPDIR) -s $(BUILDDIR) -p $(ICUDATA_NAME) $(PKGDATA_LIBNAME) $(PKGDATA_LIST) -I $(ICUPKGDATA_INSTALL_DIR)
+endif
+else
+	$(INSTALL_DATA) $(ICUDATA_SOURCE_ARCHIVE) $(DESTDIR)$(ICUPKGDATA_DIR)
+endif
+
+
+####
+####
+#### 390 support
+install390: package390
+	$(MKINSTALLDIRS) $(TMPDATADIR) $(DESTDIR)$(libdir)
+	$(INVOKE) $(PKGDATA) -s $(BUILDDIR)$(STUB_SUFFIX) -T $(OUTTMPDIR_390STUB) -p $(ICUDATA_NAME)$(STUB_SUFFIX) $(PKGDATA_LIBNAME)$(STUB_SUFFIX) -e $(ICUDATA_ENTRY_POINT) $(OS390LIST) -m dll $(PKGDATA_VERSIONING) -I $(DESTDIR)$(ICUPKGDATA_DIR)
+ifeq ($(PKGDATA_MODE),dll)
+	$(INSTALL-L) $(ICUPKGDATA_OUTDIR)/$(FINAL_IMPORT_LIB) $(DESTDIR)$(ICUPKGDATA_DIR)/$(FINAL_IMPORT_LIB)
+endif
+
+#### $(LIB_ICUDATA_NAME)$(STUB_SUFFIX) is the subset data for batch mode
+package390: $(OUTTMPDIR)/icudata390.lst $(PKGDATA_LIST) ./icupkg.inc packagedata
+	ln -s $(ICUDATA_NAME) $(OUTDIR)/build/$(ICUDATA_NAME)$(STUB_SUFFIX)
+	$(INVOKE) $(PKGDATA) -s $(BUILDDIR)$(STUB_SUFFIX) -T $(OUTTMPDIR_390STUB) -p $(ICUDATA_NAME)$(STUB_SUFFIX) $(PKGDATA_LIBNAME)$(STUB_SUFFIX) -e $(ICUDATA_ENTRY_POINT) $(OS390LIST) -m dll $(PKGDATA_VERSIONING)
+	cp $(ICUPKGDATA_OUTDIR)/$(LIB_ICUDATA_NAME)$(STUB_SUFFIX).$(SO) $(top_builddir)/stubdata/$(LIB_ICUDATA_NAME)$(STUB_SUFFIX).$(SO)
+
+
+## Include the main build rules for data files
+include $(top_builddir)/$(subdir)/rules.mk
+
+
+ifeq ($(ENABLE_SO_VERSION_DATA),1)
+ifeq ($(PKGDATA_MODE),dll)
+SO_VERSION_DATA = $(OUTTMPDIR)/icudata.res
+$(SO_VERSION_DATA) : $(MISCSRCDIR)/icudata.rc | $(TMP_DIR)/dirs.timestamp
+ifeq ($(MSYS_RC_MODE),1)
+	rc.exe -i$(srcdir)/../common -i$(top_builddir)/common -fo$@ $(CPPFLAGS) $<
+else
+	rc.exe /i$(srcdir)/../common /i$(top_builddir)/common /fo$@ $(CPPFLAGS) $(SOURCE_FILE)
+endif
+endif
+endif
+
+PKGDATA_LIST = $(TMP_DIR)/icudata.lst
+
+
+#####################################################
+# General data build rules
+
+## Files to remove for 'make clean'
+CLEANFILES = *~ icupkg.inc *.x
+
+ifeq ($(ICUDATA_SOURCE_ARCHIVE),)
+build-local: $(SO_VERSION_DATA) $(ICUDATA_ALL_OUTPUT_FILES) $(PKGDATA_LIST) $(OS390LIST)
+	echo timestamp > $@
+else
+build-local: $(SO_VERSION_DATA) $(PKGDATA_LIST) $(OS390LIST)
+	echo timestamp > $@
+$(PKGDATA_LIST): $(SRCLISTDEPS) $(ICUDATA_SOURCE_ARCHIVE)
+ifneq ($(ICUDATA_SOURCE_IS_NATIVE_TARGET),YES)
+	$(MKINSTALLDIRS) $(OUTTMPDIR) $(BUILDDIR)
+	@echo "Unpacking $(ICUDATA_SOURCE_ARCHIVE) and generating $@ (list of data files)"
+	@-$(RMV) $@
+	$(INVOKE) $(TOOLBINDIR)/icupkg -d $(BUILDDIR) --list -x \* $(ICUDATA_SOURCE_ARCHIVE) -o $@
+else
+	@echo "$@" > $@
+endif
+endif
+
+
+# if the tzcode directory contains a new tzdata*.tar.gz file, use it for zoneinfo
+ifeq ($(TZDATA),)
+TZDATA = $(firstword $(wildcard $(top_builddir)/tools/tzcode/tzdata*.tar.gz) $(wildcard $(top_srcdir)/tools/tzcode/tzdata*.tar.gz))
+endif
+
+# TODO(ICU-20466): Make the TZDATA override part of Python icutools.databuilder
+ifneq ($(TZDATA),)
+
+TZCODE_DIR=$(top_builddir)/tools/tzcode
+ZONEINFO=$(TZCODE_DIR)/zoneinfo64.txt
+
+# Override the normal genrb for zoneinfo to always pull from
+# icu/source/tools/tzcode/zoneinfo64.txt
+$(BUILDDIR)/zoneinfo64.res: $(ZONEINFO) $(TOOLBINDIR)/genrb$(TOOLEXEEXT) | $(BUILDDIR)/cnvalias.icu
+	@echo Note: $(MISCSRCDIR)/zoneinfo.txt is IGNORED because $(TZDATA) is present.
+	$(INVOKE) $(TOOLBINDIR)/genrb $(GENRBOPTS) -q -i $(BUILDDIR) -d $(BUILDDIR) $(ZONEINFO)
+
+# Create the tzcode tool and zoneinfo as needed.
+$(ZONEINFO): $(TZDATA)
+	@echo "$(MAKE)[$(MAKELEVEL)]: Making \`$(ZONEINFO)' in \`$(TZCODE_DIR)'"; \
+	(cd $(TZCODE_DIR) && $(MAKE)) || exit; \
+
+# end of zoneinfo-generation
+endif
+
+# Build the ICU4J icudata.jar.
+# Command line:
+#   (Run this from the output data folder which may not be .../source/data in an out-of-source build.)
+#   ~/svn.icu/trunk/source/data> make JAR=jar ICU4J_ROOT=~/svn.icu4j/trunk icudata.jar
+# You can omit the ICU4J_ROOT for just building the .jar files without copying them.
+# You can omit the JAR if it's just jar.
+JAR=jar
+
+# For building the testdata.jar see ../test/testdata/Makefile.
+
+ICU4J_TZDATA=$(OUTDIR)/icu4j/icutzdata.jar
+ICU4J_TZDATA_FILES=zoneinfo64 metaZones timezoneTypes windowsZones
+ICU4J_DATA_DIRNAME=com/ibm/icu/impl/data/$(ICUDATA_BASENAME_VERSION)b
+ICU4J_TZDATA_PATHS=$(ICU4J_TZDATA_FILES:%="$(ICU4J_DATA_DIRNAME)/%.res")
+
+# generate icu4j-related data to $(OUTDIR)/icu4j/com/ibm/icu/impl/data/...
+generate-data: packagedata $(OUTTMPDIR)/$(ICUDATA_PLATFORM_NAME).dat
+	mkdir -p $(OUTDIR)/icu4j/$(ICU4J_DATA_DIRNAME)
+	mkdir -p $(OUTDIR)/icu4j/tzdata/$(ICU4J_DATA_DIRNAME)
+	$(INVOKE) $(TOOLBINDIR)/icupkg $(OUTTMPDIR)/$(ICUDATA_PLATFORM_NAME).dat $(OUTDIR)/icu4j/$(ICUDATA_BASENAME_VERSION)b.dat -s $(BUILDDIR) -x '*' -tb -d $(OUTDIR)/icu4j/$(ICU4J_DATA_DIRNAME)
+	mv $(ICU4J_TZDATA_PATHS:%=$(OUTDIR)/icu4j/%) "$(OUTDIR)/icu4j/tzdata/$(ICU4J_DATA_DIRNAME)"
+
+$(OUTDIR)/icu4j/icutzdata.jar: generate-data
+	$(JAR) cf $(OUTDIR)/icu4j/icutzdata.jar -C $(OUTDIR)/icu4j/tzdata $(ICU4J_DATA_DIRNAME)/
+
+# Build icudata.jar:
+# - add the uni-core-data to the ICU package
+# - swap the ICU data
+# - extract all data items
+# - package them into the .jar file
+# TODO(ICU-20466): Move this to Python
+# NOTE: If you get the error "No rule to make target 'out/build/icudt64l/uprops.icu'",
+# you need to reconfigure with unicore data.  See icu4j-readme.txt
+$(OUTDIR)/icu4j/icudata.jar: generate-data | $(OUT_DIR)/uprops.icu
+	$(JAR) cf $(OUTDIR)/icu4j/icudata.jar -C $(OUTDIR)/icu4j $(ICU4J_DATA_DIRNAME)/
+
+ICU4J_DATA=$(OUTDIR)/icu4j/icudata.jar
+
+ifdef ICU4J_ROOT
+
+ICU4J_DATA_INSTALLED=$(ICU4J_ROOT)/main/shared/data/icudata.jar $(ICU4J_ROOT)/main/shared/data/icutzdata.jar
+
+$(ICU4J_ROOT)/main/shared/data/icudata.jar: $(OUTDIR)/icu4j/icudata.jar
+	mkdir -p $(ICU4J_ROOT)/main/shared/data
+	cp $(OUTDIR)/icu4j/icudata.jar $(ICU4J_ROOT)/main/shared/data
+
+$(ICU4J_ROOT)/main/shared/data/icutzdata.jar: $(OUTDIR)/icu4j/icutzdata.jar
+	mkdir -p $(ICU4J_ROOT)/main/shared/data
+	cp $(OUTDIR)/icu4j/icutzdata.jar $(ICU4J_ROOT)/main/shared/data
+
+icu4j-data-install: $(ICU4J_DATA_INSTALLED)
+
+else
+
+icu4j-data-install: icu4j-data
+	@echo data is built into $(OUTDIR)/icu4j
+	@echo '** Error:' ICU4J_ROOT was not set, could not install
+	exit 1
+
+endif
+
+icu4j-data: $(ICU4J_DATA) $(ICU4J_TZDATA)
+
+
+###################################################################
+Makefile: $(srcdir)/Makefile.in  $(top_builddir)/config.status
+	cd $(top_builddir) \
+	&& CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+
+icupkg.inc: pkgdataMakefile
+	$(MAKE) -f pkgdataMakefile
+
+pkgdataMakefile:
+	cd $(top_builddir) \
+	&& CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+
+###########
+########### 390 (z/OS) support
+UCMFILES390=ebcdic-xml-us.ucm ibm-37_P100-1995.ucm ibm-1047_P100-1995.ucm ibm-4909_P100-1999.ucm
+# used to depend on pnames.icu uprops.icu ucase.icu ubidi.icu
+# These are now hardcoded in ICU4C and only loaded in ICU4J.
+ALLFILES390=cnvalias.icu $(UCMFILES390:.ucm=.cnv)
+
+$(OUTTMPDIR)/icudata390.lst: $(SRCLISTDEPS)
+	@echo "generating $@ (list of 390 data files)"
+	@-$(RMV) $@
+	@for file in $(ALLFILES390); do \
+	  echo $$file >> $@; \
+	done;
+
+ifeq ($(POST_DATA_BUILD), os400-data-rebind)
+os400-data-rebind: $(LIBICUUC)
+
+$(LIBICUUC): $(LIBICUDT)
+	$(RMV) $(LIBICUUC)
+	(cd ../common && $(MAKE) RECURSIVE=YES) || exit;
+endif
+

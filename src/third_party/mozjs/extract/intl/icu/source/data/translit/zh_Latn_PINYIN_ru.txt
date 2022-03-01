@@ -1,0 +1,155 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: zh_Latn_PINYIN_ru.txt
+# Generated from CLDR
+#
+
+# Cyrillization of Mandarin Chinese from Pinyin into Russian (Palladius system).
+#
+# References:
+#   http://ru.wikipedia.org/wiki/Транскрипционная_система_Палладия
+#   http://www.omniglot.com/writing/mandarin_pts.htm
+#   http://www.pinyin.info/romanization/russian/index.html
+# These differ in the treatment of some syllables (e.g. <jue>) from the rules
+# below.
+#
+# Further commentary:
+#   http://languagelog.ldc.upenn.edu/nll/?p=604
+#
+# Remove tone marks.
+:: NFD (NFC);
+[\u0304\u0301\u030C\u0300\u0306] → ;
+:: NFC (NFD);
+#
+#
+# Syllabify. Add apostrophes to disambiguate whether <n> and <g> belong to the
+# coda or onset of a syllable.
+:: Null ();
+ng } [aeou] → n\'g;
+ng → ng\';
+n } [aeiouü] → \'n;
+n → n\';
+#
+#
+# Main pass.
+:: Null ();
+#
+#
+Ai → Ай;
+A  → А;
+B  → Б;
+Ch → Ч;
+Ci → Цы;
+C  → Ц;
+D  → Д;
+E  → Э;
+F  → Ф;
+G  → Г;
+H  → Х;
+Ju → Цз | ü;
+J  → Цз;
+K  → К;
+L  → Л;
+M  → М;
+N  → Н;
+O  → О;
+P  → П;
+Qu → Ц | ü;
+Q  → Ц;
+R  → Ж;
+Sh → Ш;
+Si → Сы;
+S  → С;
+T  → Т;
+Wu → У;
+W  → В;
+Xu → С | ü;
+X  → С;
+Yai → Яй;
+Ya → Я;
+Ye → Е;
+Yi → И;
+You → Ю;
+Yo } ng → Ю;
+Yo → Ё;
+Yu → Ю | v;
+Zh → Чж;
+Zi → Цзы;
+Z  → Цз;
+#
+#
+[$] { n → н;
+\'n → н;
+\'  → ;
+#
+#
+ai → ай;
+a  → а;
+b  → б;
+ch → ч;
+ci → цы;
+c  → ц;
+d  → д;
+ei → эй;
+e  → э;
+f  → ф;
+g  → г;
+h  → х;
+ia → я;
+ie → е;
+io } ng → ю;
+iu → ю;
+i  → и;
+ju → цз | ü;
+j  → цз;
+k  → к;
+l  → л;
+m  → м;
+ng → н;
+n  → нь;
+o } ng → у;
+o  → о;
+p  → п;
+qu → ц | ü;
+q  → ц;
+r } [^aeiou] → р;
+r  → ж;
+sh → ш;
+si → сы;
+s  → с;
+t  → т;
+[Хх] { ui → уэй;  # special exception
+ui → уй;
+uo → о;
+u  → у;
+ü  → ю | v;
+#
+# We use the dummy symbol <v> to signal that an <ü> or equivalent character has
+# just been processed.
+ve → э;
+#
+#alternative: ve → е;
+v } [an] → ;
+v  → й;
+wu → у;
+w  → в;
+xu → с | ü;
+x  → с;
+yai → яй;
+ya → я;
+ye → е;
+yi → и;
+you → ю;
+yo } ng → ю;
+yo → ё;
+yu → ю | v;
+zh → чж;
+zi → цзы;
+z  → цз;
+#
+#
+# Final pass: Make sure that the output consists entirely of Cyrillic letters.
+:: NFC ();
+

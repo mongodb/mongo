@@ -1,0 +1,55 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ti_ER{
+    calendar{
+        generic{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE፡ dd MMMM መዓልቲ y G",
+                "dd MMMM y G",
+                "dd-MMM-y G",
+                "dd/MM/yy GGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+        }
+        gregorian{
+            dayNames{
+                stand-alone{
+                    narrow{
+                        "ሰ",
+                        "ሰ",
+                        "ሰ",
+                        "ረ",
+                        "ሓ",
+                        "ዓ",
+                        "ቀ",
+                    }
+                }
+            }
+            eras{
+                wide{
+                    "ዓመተ ዓለም",
+                    "ዓመተ ምህረት",
+                }
+                wide%variant{
+                    "ቅድሚ ልደተ ክርስቶስ",
+                    "ድሕሪ ልደተ ክርስቶስ",
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"”"}
+        alternateQuotationStart{"“"}
+        quotationEnd{"’"}
+        quotationStart{"‘"}
+    }
+}

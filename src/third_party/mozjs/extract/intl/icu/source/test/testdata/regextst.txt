@@ -1,0 +1,2792 @@
+﻿# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Copyright (c) 2001-2015 International Business Machines
+# Corporation and others. All Rights Reserved.
+#
+#  file:
+#
+#   ICU regular expression test cases.
+#
+#   format:   one test case per line,
+#               <test case>    =  <pattern>   <flags>  <match string>  [# comment]
+#               <pattern>      =  "<regular expression pattern>"
+#               <match string> =  "<tagged string>"
+#                                 the quotes on the pattern and match string can be " or ' or /
+#               <tagged string> = text, with the start and end of each
+#                                 capture group tagged with <n>...</n>.  The overall match,
+#                                 if any, is group 0, as in <0>matched text</0>
+#                                  A region can be specified with <r>...</r> tags.
+#                                 Standard ICU unescape will be applied, allowing \u, \U, etc. to appear.
+#
+#               <flags>         = any combination of
+#                                   i      case insensitive match
+#                                   x      free spacing and comments
+#                                   s      dot-matches-all mode
+#                                   m      multi-line mode.  
+#                                            ($ and ^ match at embedded new-lines)
+#                                   D      Unix Lines mode (only recognize 0x0a as new-line)
+#                                   Q      UREGEX_LITERAL flag.  Entire pattern is literal string.
+#                                   v      If icu configured without break iteration, this
+#                                          regex test pattern should not compile.
+#                                   e      set the UREGEX_ERROR_ON_UNKNOWN_ESCAPES flag
+#                                   d      dump the compiled pattern
+#                                   t      trace operation of match engine.
+#                                   2-9    a digit between 2 and 9, specifies the number of
+#                                          times to execute find().  The expected results are
+#                                          for the last find() in the sequence.
+#                                   G      Only check match / no match.  Do not check capture groups.
+#                                   E      Pattern compilation error expected
+#                                   L      Use LookingAt() rather than find()
+#                                   M      Use matches() rather than find().
+#
+#                                   a      Use non-Anchoring Bounds.
+#                                   b      Use Transparent Bounds.
+#                                          The a and b options only make a difference if
+#                                          a <r>region</r> has been specified in the string.
+#                                   z|Z    hitEnd was expected(z) or not expected (Z).
+#                                          With neither, hitEnd is not checked.
+#                                   y|Y    Require End expected(y) or not expected (Y).
+#
+#                                 White space must be present between the flags and the match string.
+#
+
+# Look-ahead expressions
+#
+"(?!0{5})(\d{5})"              "<0><1>00001</1></0>zzzz"
+"(?!0{5})(\d{5})z"             "<0><1>00001</1>z</0>zzz"
+"(?!0{5})(\d{5})(?!y)"         "<0><1>00001</1></0>zzzz"
+"abc(?=def)"                   "<0>abc</0>def"
+"(.*)(?=c)"                    "<0><1>ab</1></0>cdef"
+
+"(?:.*)(?=c)"                  "<r>ab</r>cdef"
+"(?:.*)(?=c)"             b    "<r><0>ab</0></r>cdef"      # transparent bounds
+"(?:.*)(?=c)"             bM   "<r><0>ab</0></r>cdef"      # transparent bounds
+
+"(?:.*)(?=(c))"           b    "<0>ab</0><1>c</1>def"      # Capture in look-ahead
+"(?=(.)\1\1)\1"                "abcc<0><1>d</1></0>ddefg"  # Backrefs to look-ahead capture
+
+".(?!\p{L})"                   "abc<0>d</0> "              # Negated look-ahead
+".(?!(\p{L}))"                 "abc<0>d</0> "              # Negated look-ahead, no capture
+                                                           #   visible outside of look-ahead
+"and(?=roid)"            L     "<0>and</0>roid"
+"and(?=roid)"            M     "<r>and</r>roid"
+"and(?=roid)"            bM    "<r><0>and</0></r>roid"
+
+"and(?!roid)"            L     "<0>and</0>roix"
+"and(?!roid)"            L     "android"
+
+"and(?!roid)"            M     "<r><0>and</0></r>roid"     # Opaque bounds
+"and(?!roid)"            bM    "<r>and</r>roid"
+"and(?!roid)"            bM    "<r><0>and</0></r>roix"
+
+#
+# Negated Lookahead, various regions and region transparency
+#
+"abc(?!def)"                   "<0>abc</0>xyz"
+"abc(?!def)"                   "abcdef"
+"abc(?!def)"                   "<r><0>abc</0></r>def"
+"abc(?!def)"              b    "<r>abc</r>def"
+"abc(?!def)"              b    "<r><0>abc</0></r>xyz"
+
+#
+# Nested Lookahead / Behind
+#
+"one(?=(?:(?!<out>).)*</out>)"  "<out><0>one</0> stuff</out>"
+"one(?=(?:(?!<out>).)*</out>)"  "<out>one  <out></out>"
+
+# More nesting lookaround: pattern matches "qq" when not preceded by 'a' and followed by 'z'
+"(?<!a(?!...z))qq"               "<0>qq</0>c"
+"(?<!a(?!...z))qq"               "f<0>qq</0>c"
+"(?<!a(?!...z))qq"               "aqqz"
+
+# More nested lookaround: match any two chars preceded and followed by an upper case letter.
+# With gratuitious nesting of look-arounds and capture from the look-arounds.
+
+"(?=(?<=(\p{Lu})(?=..(\p{Lu})))).."     "<1>A</1><0>jk</0><2>B</2>"
+"(?=(?<=(\p{Lu})(?=..(\p{Lu})))).."     "ajkB"
+"(?=(?<=(\p{Lu})(?=..(\p{Lu})))).."     "Ajkb"
+
+# Nested lookaround cases from bug ICU-20564
+"(?<=(?<=((?=)){0}+))"         "<0></0>abc"
+"(?<=c(?<=c((?=c)){1}+))"      "c<0><1></1></0>cc"
+
+#
+#  Anchoring Bounds
+#
+"^def$"                        "abc<r><0>def</0></r>ghi"           # anchoring (default) bounds
+"^def$"                  a     "abc<r>def</r>ghi"                  # non-anchoring bounds
+"^def"                   a     "<r><0>def</0></r>ghi"              # non-anchoring bounds
+"def$"                   a     "abc<r><0>def</0></r>"              # non-anchoring bounds
+
+"^.*$"                   m     "<0>line 1</0>\n line 2"
+"^.*$"                   m2    "line 1\n<0> line 2</0>"
+"^.*$"                   m3    "line 1\n line 2"
+"^.*$"                   m     "li<r><0>ne </0></r>1\n line 2"     # anchoring bounds
+"^.*$"                   m2    "li<r>ne </r>1\n line 2"            # anchoring bounds
+"^.*$"                  am     "li<r>ne </r>1\n line 2"            # non-anchoring bounds
+"^.*$"                  am     "li\n<r><0>ne </0></r>\n1\n line 2" # non-anchoring bounds
+
+#
+#  HitEnd and RequireEnd for new-lines just before end-of-input
+#
+"xyz$"                  yz     "<0>xyz</0>\n"
+"xyz$"                  yz     "<0>xyz</0>\x{d}\x{a}"
+
+"xyz$"                 myz     "<0>xyz</0>"                        # multi-line mode
+"xyz$"                 mYZ     "<0>xyz</0>\n" 
+"xyz$"                 mYZ     "<0>xyz</0>\r\n"
+"xyz$"                 mYZ     "<0>xyz</0>\x{85}abcd"
+
+"xyz$"                  Yz     "xyz\nx"
+"xyz$"                  Yz     "xyza"
+"xyz$"                  yz     "<0>xyz</0>"
+
+#
+#  HitEnd 
+#
+"abcd"                  Lz      "a"
+"abcd"                  Lz      "ab"
+"abcd"                  Lz      "abc"
+"abcd"                  LZ      "<0>abcd</0>"
+"abcd"                  LZ      "<0>abcd</0>e"
+"abcd"                  LZ      "abcx"
+"abcd"                  LZ      "abx"
+"abcd"                  Lzi     "a"
+"abcd"                  Lzi     "ab"
+"abcd"                  Lzi     "abc"
+"abcd"                  LZi     "<0>abcd</0>"
+"abcd"                  LZi     "<0>abcd</0>e"
+"abcd"                  LZi     "abcx"
+"abcd"                  LZi     "abx"
+
+#
+#  All Unicode line endings recognized.
+#     0a, 0b, 0c, 0d, 0x85, 0x2028, 0x2029
+#     Multi-line and non-multiline mode take different paths, so repeated tests.
+#
+"^def$"                 mYZ    "abc\x{a}<0>def</0>\x{a}ghi"
+"^def$"                 mYZ    "abc\x{b}<0>def</0>\x{b}ghi"
+"^def$"                 mYZ    "abc\x{c}<0>def</0>\x{c}ghi"
+"^def$"                 mYZ    "abc\x{d}<0>def</0>\x{d}ghi"
+"^def$"                 mYZ    "abc\x{85}<0>def</0>\x{85}ghi"
+"^def$"                 mYZ    "abc\x{2028}<0>def</0>\x{2028}ghi"
+"^def$"                 mYZ    "abc\x{2029}<0>def</0>\x{2029}ghi"
+"^def$"                 mYZ    "abc\r\n<0>def</0>\r\nghi"
+
+"^def$"                 yz     "<0>def</0>\x{a}"
+"^def$"                 yz     "<0>def</0>\x{b}"
+"^def$"                 yz     "<0>def</0>\x{c}"
+"^def$"                 yz     "<0>def</0>\x{d}"
+"^def$"                 yz     "<0>def</0>\x{85}"
+"^def$"                 yz     "<0>def</0>\x{2028}"
+"^def$"                 yz     "<0>def</0>\x{2029}"
+"^def$"                 yz     "<0>def</0>\r\n"
+"^def$"                 yz     "<0>def</0>"
+
+
+"^def$"                       "<0>def</0>\x{2028"    #TODO: should be an error of some sort.
+
+#
+#  UNIX_LINES mode
+#
+"abc$"                 D      "<0>abc</0>\n"
+"abc$"                 D      "abc\r"
+"abc$"                 D      "abc\u0085"
+"a.b"                  D      "<0>a\rb</0>"
+"a.b"                  D      "a\nb"
+"(?d)abc$"                    "<0>abc</0>\n"
+"(?d)abc$"                    "abc\r"
+"abc$"                 mD     "<0>abc</0>\ndef"
+"abc$"                 mD     "abc\rdef"
+
+".*def"                L      "abc\r def xyz"          # Normal mode, LookingAt() stops at \r
+".*def"                DL     "<0>abc\r def</0> xyz"   # Unix Lines mode, \r not line end.
+".*def"                DL     "abc\n def xyz"   
+
+"(?d)a.b"                     "a\nb"
+"(?d)a.b"                     "<0>a\rb</0>"
+
+"^abc"                 m      "xyz\r<0>abc</0>"
+"^abc"                 Dm     "xyz\rabc"
+"^abc"                 Dm     "xyz\n<0>abc</0>"
+
+
+
+# Capturing parens
+".(..)."                       "<0>a<1>bc</1>d</0>"
+ ".*\A( +hello)"               "<0><1>      hello</1></0>"
+"(hello)|(goodbye)"            "<0><1>hello</1></0>"
+"(hello)|(goodbye)"            "<0><2>goodbye</2></0>"
+"abc( +(  inner(X?) +)  xyz)"  "leading cruft <0>abc<1>     <2>  inner<3></3>    </2>  xyz</1></0> cruft"
+"\s*([ixsmdt]*)([:letter:]*)"  "<0>   <1>d</1><2></2></0>  "
+"(a|b)c*d"                     "a<0><1>b</1>cd</0>"
+
+# Non-capturing parens (?: stuff).   Groups, but does not capture.
+"(?:abc)*(tail)"               "<0>abcabcabc<1>tail</1></0>"
+
+# Non-greedy  *? quantifier
+".*?(abc)"                     "<0>    abx    <1>abc</1></0> abc abc abc"
+".*(abc)"                      "<0>    abx     abc abc abc <1>abc</1></0>"
+
+"((?:abc |xyz )*?)abc "        "<0><1>xyz </1>abc </0>abc abc "
+"((?:abc |xyz )*)abc "         "<0><1>xyz abc abc </1>abc </0>"
+
+# Non-greedy  +? quantifier
+"(a+?)(a*)"                    "<0><1>a</1><2>aaaaaaaaaaaa</2></0>"
+"(a+)(a*)"                     "<0><1>aaaaaaaaaaaaa</1><2></2></0>"
+
+"((ab)+?)((ab)*)"              "<0><1><2>ab</2></1><3>ababababab<4>ab</4></3></0>"
+"((ab)+)((ab)*)"               "<0><1>abababababab<2>ab</2></1><3></3></0>"
+
+# Non-greedy ?? quantifier
+"(ab)(ab)??(ab)??(ab)??(ab)??c"      "<0><1>ab</1><4>ab</4><5>ab</5>c</0>"
+
+# Unicode Properties as naked elements in a pattern
+"\p{Lu}+"                      "here we go ... <0>ABC</0> and no more."
+"(\p{L}+)(\P{L}*?) (\p{Zs}*)"  "7999<0><1>letters</1><2>4949%^&*(</2> <3>   </3></0>"
+
+# \w and \W
+"\w+"                          "  $%^&*( <0>hello123</0>%^&*("
+"\W+"                          "<0>  $%^&*( </0>hello123%^&*("
+
+# \A   match at beginning of input only.
+ ".*\Ahello"                   "<0>hello</0> hello"
+ ".*hello"                     "<0>hello hello</0>"
+".*\Ahello"                    "stuff\nhello" # don't match after embedded new-line.
+
+# \b \B
+#
+".*?\b(.).*"                   "<0>  $%^&*( <1>h</1>ello123%^&*()gxx</0>"
+"\ba\b"                        "-<0>a</0>"
+"\by\b"                        "xy"
+"[ \b]"                        "<0>b</0>"     # in a set, \b is a literal b.
+
+# Finds first chars of up to 5 words
+"(?:.*?\b(\w))?(?:.*?\b(\w))?(?:.*?\b(\w))?(?:.*?\b(\w))?(?:.*?\b(\w))?"   "<0><1>T</1>the <2>q</2>ick <3>b</3>rown <4>f</4></0>ox"
+
+"H.*?((?:\B.)+)"              "<0>H<1>ello</1></0> "
+".*?((?:\B.)+).*?((?:\B.)+).*?((?:\B.)+)"    "<0>H<1>ello</1> <2>    </2>g<3>oodbye</3></0> "
+
+"(?:.*?\b(.))?(?:.*?\b(.))?(?:.*?\b(.))?(?:.*?\b(.))?(?:.*?\b(.))?.*"   "<0>   \u0301 \u0301<1>A</1>\u0302BC\u0303\u0304<2> </2>\u0305 \u0306<3>X</3>\u0307Y\u0308</0>"
+
+
+#
+#  Unicode word boundary mode
+#
+"(?w).*?\b"                      v   "<0></0>hello, world"
+"(?w).*?(\b.+?\b).*"             v   "<0><1>  </1>123.45   </0>"
+"(?w).*?(\b\d.*?\b).*"           v   "<0>  <1>123.45</1>   </0>"
+".*?(\b.+?\b).*"                     "<0>  <1>123</1>.45   </0>"
+"(?w:.*?(\b\d.*?\b).*)"          v   "<0>  <1>123.45</1>   </0>"
+"(?w:.*?(\b.+?\b).*)"            v   "<0><1>don't</1>   </0>"
+"(?w:.+?(\b\S.+?\b).*)"          v   "<0>  <1>don't</1>   </0>"
+"(?w:(\b.+?)(\b.+?)(\b.+?)(\b.+?)(\b.+?)(\b.+?)(\b.+?).*)"     v "<0><1>.</1><2> </2><3>,</3><4>:</4><5>$</5><6>37,000.50</6><7> </7>   </0>"
+
+#
+#  Unicode word boundaries with Regions
+#
+"(?w).*?\b"                      v   "abc<r><0>def</0></r>ghi"
+"(?w).*?\b"                      v2  "abc<r>def<0></0></r>ghi"
+"(?w).*?\b"                      v3  "abc<r>def</r>ghi"
+#"(?w).*?\b"                      vb  "abc<r><0>def</0></r>ghi"    # TODO:  bug.  Ticket 6073
+#"(?w).*?\b"                      vb2 "abc<r>def</r>ghi"
+
+
+
+# . does not match new-lines
+"."                            "\u000a\u000d\u0085\u000c\u000b\u2028\u2029<0>X</0>\u000aY"
+"A."                           "A\u000a "# no match
+
+# \d for decimal digits
+"\d*"                          "<0>0123456789\u0660\u06F9\u0969\u0A66\u17E2\uFF10\U0001D7CE\U0001D7FF</0>non-digits"
+"\D+"                          "<0>non digits</0>"
+"\D*(\d*)(\D*)"                "<0>non-digits<1>3456666</1><2>more non digits</2></0>"
+
+# \Q...\E quote mode
+"hel\Qlo, worl\Ed"             "<0>hello, world</0>"
+"\Q$*^^(*)?\A\E(a*)"           "<0>$*^^(*)?\\A<1>aaaaaaaaaaaaaaa</1></0>"
+"[abc\Q]\r\E]+"                "<0>aaaccc]]]\\\\\\</0>\r..."   # \Q ... \E escape in a [set]
+
+# UREGEX_LITERAL - entire pattern is a literal string, no escapes recognized.
+#                  Note that data strings in test cases still get escape processing.
+"abc\an\r\E\\abcd\u0031bye"     Q  "lead<0>abc\\an\\r\\E\\\\abcd\\u0031bye</0>extra"
+"case insensitive \\ (l)iteral" Qi "stuff!! <0>cAsE InSenSiTiVE \\\\ (L)ITeral</0>"
+
+# \S and \s  space characters
+"\s+"                          "not_space<0> \t \r \n \u3000 \u2004 \u2028 \u2029</0>xyz"
+"(\S+).*?(\S+).*"              "<0><1>Not-spaces</1>   <2>more-non-spaces</2>  </0>"
+
+# \X  consume one Grapheme Cluster.
+"(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?"  v  "<0><1>A</1><2>B</2><3> </3><4>\r\n</4></0>"
+"(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?"  v  "<0><1>A\u0301</1><2>\n</2><3>\u0305</3><4>a\u0302\u0303\u0304</4></0>"
+"(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?"  v  "<0><1>\u1100\u1161\u11a8</1><2>\u115f\u11a2\u11f9</2></0>"
+"(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?"  v  "<0><1>\u1100\uac01</1><2>\uac02</2><3>\uac03\u11b0</3></0>"
+"(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?"  v  "<0><1>\u1100\u1101\uac02\u0301</1><2>\u1100</2></0>"
+# Regional indicator pairs are grapheme clusters
+"(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?"  v  "<0><1>\U0001f1e6\U0001f1e8</1><2>\U0001f1ea\U0001f1ff</2></0>"
+# Grapheme Break rule 9b:  Prepend x
+"(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?(\X)?"	v  "<0><1>\U000111C2x</1></0>"
+
+# Grapheme clusters that straddle a match region. Matching is pinned to the region limits,
+# giving boundaries inside grapheme clusters
+"(\X)?(\X)?(\X)?"        v      "a\u0301<r><0><1>\u0301\u0301</1><2>z\u0302</2></0></r>\u0302\u0302"
+# Same as previous test case, but without the region limits.
+"(\X)?(\X)?(\X)?"        v      "<0><1>a\u0301\u0301\u0301</1><2>z\u0302\u0302\u0302</2></0>"
+
+# ^ matches only at beginning of line
+".*^(Hello)"                   "<0><1>Hello</1></0> Hello Hello Hello Goodbye"
+".*(Hello)"                    "<0>Hello Hello Hello <1>Hello</1></0> Goodbye"
+".*^(Hello)"                   " Hello Hello Hello Hello Goodbye"# No Match
+
+# $ matches only at end of line, or before a newline preceding the end of line
+".*?(Goodbye)$"           zy   "<0>Hello Goodbye Goodbye <1>Goodbye</1></0>"
+".*?(Goodbye)"            ZY   "<0>Hello <1>Goodbye</1></0> Goodbye Goodbye"
+".*?(Goodbye)$"           z    "Hello Goodbye> Goodbye Goodbye "# No Match
+
+".*?(Goodbye)$"           zy   "<0>Hello Goodbye Goodbye <1>Goodbye</1></0>\n"
+".*?(Goodbye)$"           zy   "<0>Hello Goodbye Goodbye <1>Goodbye</1></0>\n"
+".*?(Goodbye)$"           zy   "<0>Hello Goodbye Goodbye <1>Goodbye</1></0>\r\n"
+".*?(Goodbye)$"           z    "Hello Goodbye Goodbye Goodbye\n\n"# No Match
+
+# \Z matches at end of input, like $ with default flags.
+".*?(Goodbye)\Z"          zy   "<0>Hello Goodbye Goodbye <1>Goodbye</1></0>"
+".*?(Goodbye)"            ZY   "<0>Hello <1>Goodbye</1></0> Goodbye Goodbye"
+".*?(Goodbye)\Z"          z    "Hello Goodbye> Goodbye Goodbye "# No Match
+"here$"                   z    "here\nthe end"# No Match
+
+".*?(Goodbye)\Z"               "<0>Hello Goodbye Goodbye <1>Goodbye</1></0>\n"
+".*?(Goodbye)\Z"               "<0>Hello Goodbye Goodbye <1>Goodbye</1></0>\n"
+".*?(Goodbye)\Z"               "<0>Hello Goodbye Goodbye <1>Goodbye</1></0>\r\n"
+".*?(Goodbye)\Z"               "Hello Goodbye Goodbye Goodbye\n\n"# No Match
+
+# \z matches only at the end of string.
+#    no special treatment of new lines.
+#    no dependencies on flag settings.
+".*?(Goodbye)\z"          zy   "<0>Hello Goodbye Goodbye <1>Goodbye</1></0>"
+".*?(Goodbye)\z"          z    "Hello Goodbye Goodbye Goodbye "# No Match
+"here$"                   z    "here\nthe end"# No Match
+
+".*?(Goodbye)\z"          z    "Hello Goodbye Goodbye Goodbye\n"# No Match
+".*?(Goodbye)\n\z"        zy   "<0>Hello Goodbye Goodbye <1>Goodbye</1>\n</0>"
+"abc\z|def"               ZY   "abc<0>def</0>"
+
+# (?# comment) doesn't muck up pattern
+"Hello (?# this is a comment) world"  "  <0>Hello  world</0>..."
+
+# Check some implementation corner cases base on the way literal strings are compiled.
+"A"                            "<0>A</0>"
+"AB"                           "<0>AB</0>ABABAB"
+"AB+"                          "<0>ABBB</0>A"
+"AB+"                          "<0>AB</0>ABAB"
+"ABC+"                         "<0>ABC</0>ABC"
+"ABC+"                         "<0>ABCCCC</0>ABC"
+"(?:ABC)+"                     "<0>ABCABCABC</0>D"
+"(?:ABC)DEF+"                  "<0>ABCDEFFF</0>D"
+"AB\.C\eD\u0666E"              "<0>AB.C\u001BD\u0666E</0>F"
+"ab\Bde"                        "<0>abde</0>"
+
+# loop breaking
+"(a?)*"                        "<0><1></1></0>xyz"
+"(a?)+"                        "<0><1></1></0>xyz"
+"^(?:a?b?)*$"	               "a--"
+"(x?)*xyz"                     "<0>xx<1></1>xyz</0>"    # Sligthly wierd, but correct.  The "last" time through (x?),
+                                                        #   it matches the empty string.
+
+# Set expressions, basic operators and escapes work
+#
+"[\d]+"                        "<0>0123</0>abc/.,"
+"[^\d]+"                       "0123<0>abc/.,</0>"
+"[\D]+"                        "0123<0>abc/.,</0>"
+"[^\D]+"                       "<0>0123</0>abc/.,"
+
+"[\s]+"                        "<0> \t</0>abc/.,"
+"[^\s]+"                       " \t<0>abc/.,</0>"
+"[\S]+"                        " \t<0>abc/.,</0>"
+"[^\S]+"                       "<0> \t</0>abc/.,"
+
+"[\w]+"                        "<0>abc123</0> .,;"
+"[^\w]+"                       "abc123<0> .,;</0>"
+"[\W]+"                        "abc123<0> .,;</0>"
+"[^\W]+"                       "<0>abc123</0> .,;"
+
+"[\z]+"                        "abc<0>zzz</0>def"     # \z has no special meaning
+"[^\z]+"                       "<0>abc</0>zzzdef"
+"[\^]+"                        "abc<0>^^</0>"
+"[^\^]+"                       "<0>abc</0>^^"
+
+"[\u0041c]+"                   "<0>AcAc</0>def"
+"[\U00010002]+"                "<0>\ud800\udc02</0>\U00010003"
+"[^\U00010002]+"               "<0>Hello</0>\x{10002}"
+"[\x61b]+"                     "<0>abab</0>cde"
+#"[\x6z]+"                      "\x06"                  #TODO:  single hex digits should fail
+"[\x{9}\x{75}\x{6d6}\x{6ba6}\x{6146B}\x{10ffe3}]+"  "<0>\u0009\u0075\u06d6\u6ba6\U0006146B\U0010ffe3</0>abc"
+
+"[\N{LATIN CAPITAL LETTER TONE SIX}ab\N{VARIATION SELECTOR-70} ]+"       "x<0> \u0184\U000E0135 ab</0>c"
+"[\N{LATIN SMALL LETTER C}-\N{LATIN SMALL LETTER F}]+"    "ab<0>cdef</0>ghi"
+
+
+
+#
+#  [set expressions], check the precedence of '-', '&', '--', '&&'
+#      '-' and '&', for compatibility with ICU UnicodeSet, have the same
+#                   precedence as the implicit Union between adjacent items.
+#      '--' and '&&', for compatibility with Java, have lower precedence than
+#                   the implicit Union operations.  '--' and '&&' themselves
+#                   have the same precedence, and group left to right.
+#
+"[[a-m]-[f-w]p]+"              "<0>dep</0>fgwxyz"
+"[^[a-m]-[f-w]p]+"             "dep<0>fgwxyz</0>"
+
+"[[a-m]--[f-w]p]+"             "<0>de</0>pfgwxyz"
+"[^[a-m]--[f-w]p]+"            "de<0>pfgwxyz</0>"
+
+"[[a-m]&[e-s]w]+"              "<0>efmw</0>adnst"
+"[^[a-m]&[e-s]w]+"             "efmw<0>adnst</0>"
+
+"[[a-m]&[e-s]]+"              "<0>efm</0>adnst"
+
+
+
+# {min,max} iteration qualifier
+"A{3}BC"                       "<0>AAABC</0>"
+
+"(ABC){2,3}AB"                 "no matchAB"
+"(ABC){2,3}AB"                 "ABCAB"
+"(ABC){2,3}AB"                 "<0>ABC<1>ABC</1>AB</0>"
+"(ABC){2,3}AB"                 "<0>ABCABC<1>ABC</1>AB</0>"
+"(ABC){2,3}AB"                 "<0>ABCABC<1>ABC</1>AB</0>CAB"
+
+"(ABC){2}AB"                   "ABCAB"
+"(ABC){2}AB"                   "<0>ABC<1>ABC</1>AB</0>"
+"(ABC){2}AB"                   "<0>ABC<1>ABC</1>AB</0>CAB"
+"(ABC){2}AB"                   "<0>ABC<1>ABC</1>AB</0>CABCAB"
+
+"(ABC){2,}AB"                  "ABCAB"
+"(ABC){2,}AB"                  "<0>ABC<1>ABC</1>AB</0>"
+"(ABC){2,}AB"                  "<0>ABCABC<1>ABC</1>AB</0>"
+"(ABC){2,}AB"                  "<0>ABCABCABC<1>ABC</1>AB</0>"
+
+"X{0,0}ABC"                    "<0>ABC</0>"
+"X{0,1}ABC"                    "<0>ABC</0>"
+
+"(?:Hello(!{1,3}) there){1}"   "Hello there"
+"(?:Hello(!{1,3}) there){1}"   "<0>Hello<1>!</1> there</0>"
+"(?:Hello(!{1,3}) there){1}"   "<0>Hello<1>!!</1> there</0>"
+"(?:Hello(!{1,3}) there){1}"   "<0>Hello<1>!!!</1> there</0>"
+"(?:Hello(!{1,3}) there){1}"   "Hello!!!! there"
+
+# Nongreedy {min,max}? intervals
+"(ABC){2,3}?AB"                "no matchAB"
+"(ABC){2,3}?AB"                "ABCAB"
+"(ABC){2,3}?AB"                "<0>ABC<1>ABC</1>AB</0>"
+"(ABC){2,3}?AB"                "<0>ABC<1>ABC</1>AB</0>CAB"
+"(ABC){2,3}?AB"                "<0>ABC<1>ABC</1>AB</0>CABCAB"
+"(ABC){2,3}?AX"                "<0>ABCABC<1>ABC</1>AX</0>"
+"(ABC){2,3}?AX"                "ABC<0>ABCABC<1>ABC</1>AX</0>"
+
+# Possessive {min,max}+ intervals
+"(ABC){2,3}+ABC"               "ABCABCABC"
+"(ABC){1,2}+ABC"               "<0>ABC<1>ABC</1>ABC</0>"
+"(?:(.)\1){2,5}+."              "<0>aabbcc<1>d</1>de</0>x"
+
+
+# Atomic Grouping
+"(?>.*)abc"                    "abcabcabc"  # no match.  .* consumed entire string.
+"(?>(abc{2,4}?))(c*)"          "<0><1>abcc</1><2>ccc</2></0>ddd"
+"(\.\d\d(?>[1-9]?))\d+"        "1.625"
+"(\.\d\d(?>[1-9]?))\d+"        "1<0><1>.625</1>0</0>"
+
+# Possessive *+
+"(abc)*+a"                     "abcabcabc"
+"(abc)*+a"                     "<0>abc<1>abc</1>a</0>b"
+"(a*b)*+a"                     "<0><1>aaaab</1>a</0>aaa"
+
+# Possessive ?+
+"c?+ddd"                       "<0>cddd</0>"
+"c?+cddd"                      "cddd"
+"c?cddd"                       "<0>cddd</0>"
+
+# Back Reference
+"(?:ab(..)cd\1)*"              "<0>ab23cd23ab<1>ww</1>cdww</0>abxxcdyy"
+"ab(?:c|(d?))(\1)"             "<0>ab<1><2></2></1></0>c"
+"ab(?:c|(d?))(\1)"             "<0>ab<1>d</1><2>d</2></0>"
+"ab(?:c|(d?))(\1)"             "<0>ab<1></1><2></2></0>e"
+"ab(?:c|(d?))(\1)"             "<0>ab<1></1><2></2></0>"
+
+# Back References that hit/don't hit end
+"(abcd) \1"                z   "abcd abc"
+"(abcd) \1"                Z   "<0><1>abcd</1> abcd</0>"
+"(abcd) \1"                Z   "<0><1>abcd</1> abcd</0> "
+
+# Case Insensitve back references that hit/don't hit end.
+"(abcd) \1"                zi  "abcd abc"
+"(abcd) \1"                Zi  "<0><1>abcd</1> ABCD</0>"
+"(abcd) \1"                Zi  "<0><1>abcd</1> ABCD</0> "
+
+# Back references that hit/don't hit boundary limits.
+
+"(abcd) \1"                z   "<r>abcd abc</r>d "
+"(abcd) \1"                Z   "<r><0><1>abcd</1> abcd</0></r> "
+"(abcd) \1"                Z   "<r><0><1>abcd</1> abcd</0> </r>"
+
+"(abcd) \1"                zi  "<r>abcd abc</r>d "
+"(abcd) \1"                Zi  "<r><0><1>abcd</1> abcd</0></r> "
+"(abcd) \1"                Zi  "<r><0><1>abcd</1> abcd</0> </r>"
+
+# Back reference that fails match near the end of input without actually hitting the end.
+"(abcd) \1"                ZL  "abcd abd"
+"(abcd) \1"                ZLi "abcd abd"
+
+# Back reference to a zero-length match.  They are always a successful match.
+"ab(x?)cd(\1)ef"               "<0>ab<1></1>cd<2></2>ef</0>"
+"ab(x?)cd(\1)ef"            i  "<0>ab<1></1>cd<2></2>ef</0>"
+
+# Back refs to capture groups that didn't participate in the match.
+"ab(?:(c)|(d))\1"              "abde"
+"ab(?:(c)|(d))\1"              "<0>ab<1>c</1>c</0>e"
+"ab(?:(c)|(d))\1"            i "abde"
+"ab(?:(c)|(d))\1"            i "<0>ab<1>c</1>c</0>e"
+
+# Named back references
+"(?<one>abcd)\k<one>"          "<0><1>abcd</1>abcd</0>"
+"(no)?(?<one>abcd)\k<one>"     "<0><2>abcd</2>abcd</0>"
+
+"(?<a_1>...)"               E  "  "   # backref names are ascii letters & numbers only"
+"(?<1a>...)"                E  "  "   # backref names must begin with a letter"
+"(?<a>.)(?<a>.)"            E  "  "   # Repeated names are illegal.
+
+
+# Case Insensitive
+"aBc"                    i      "<0>ABC</0>"
+"a[^bc]d"                i      "ABD"
+'((((((((((a))))))))))\10' i    "<0><1><2><3><4><5><6><7><8><9><10>A</10></9></8></7></6></5></4></3></2></1>A</0>"
+
+"(?:(?i)a)b"                    "<0>Ab</0>"
+"ab(?i)cd"	                    "<0>abCd</0>"
+"ab$cd"                         "abcd"
+
+"ssl"                      i    "abc<0>ßl</0>xyz"
+"ssl"                      i    "abc<0>ẞl</0>xyz"
+"FIND"                     i    "can <0>ﬁnd</0> ?"  # fi ligature, \ufb01
+"ﬁnd"                      i    "can <0>FIND</0> ?"
+"ῧ"                        i    "xxx<0>ῧ</0>xxx"    # Composed char (match string) decomposes when case-folded (pattern)
+
+# White space handling
+"a b"                           "ab"
+"abc "                          "abc"
+"abc "                          "<0>abc </0>"
+"ab[cd e]z"                     "<0>ab z</0>"
+"ab\ c"                         "<0>ab c</0> "
+"ab c"                          "<0>ab c</0> "
+"ab c"                        x "ab c "
+"ab\ c"                       x "<0>ab c</0> "
+
+#
+# Pattern Flags
+#
+"(?u)abc"                       "<0>abc</0>"
+"(?-u)abc"                      "<0>abc</0>"
+
+#
+#  \c escapes  (Control-whatever)
+#
+"\cA"                           "<0>\u0001</0>"
+"\ca"                           "<0>\u0001</0>"
+"\c\x"                          "<0>\u001cx</0>"
+
+
+#Multi-line mode
+'b\s^'                        m "a\nb\n"
+"(?m)^abc$"                     "abc \n abc\n<0>abc</0>\nabc"
+"(?m)^abc$"                   2 "abc \n abc\nabc\n<0>abc</0>"
+"^abc$"                       2 "abc \n abc\nabc\nabc"
+
+# Empty and full range
+"[\u0000-\U0010ffff]+"          "<0>abc\u0000\uffff\U00010000\U0010ffffzz</0>"
+"[^\u0000-\U0010ffff]"          "abc\u0000\uffff\U00010000\U0010ffffzz"
+"[^a--a]+"                      "<0>abc\u0000\uffff\U00010000\U0010ffffzz</0>"
+
+# Free-spacing mode
+"a b c  # this is a comment"  x "<0>abc</0> "
+'^a (?#xxx) (?#yyy) {3}c'  x    "<0>aaac</0>"
+"a b c [x y z]"               x "abc "
+"a b c [x y z]"               x "a b c "
+"a b c [x y z]"               x "<0>abcx</0>yz"
+"a b c [x y z]"               x "<0>abcy</0>yz"
+
+#
+#  Look Behind
+#
+"(?<=a)b"	                   "a<0>b</0>"
+"(.*)(?<=[bc])"                "<0><1>abc</1></0>d"
+"(?<=(abc))def"                "<1>abc</1><0>def</0>"   # lookbehind precedes main match.
+"(?<=ab|abc)xyz"               "abwxyz"                 # ab matches, but not far enough.
+"(?<=abc)cde"                  "abcde"
+"(?<=abc|ab)cde"               "ab<0>cde</0>"
+"(?<=abc|ab)cde"               "abc<0>cde</0>"
+
+"(?<=bc?c?c?)cd"               "ab<0>cd</0>"
+"(?<=bc?c?c?)cd"               "abc<0>cd</0>"
+"(?<=bc?c?c?)cd"               "abcc<0>cd</0>"
+"(?<=bc?c?c?)cd"               "abccc<0>cd</0>"
+"(?<=bc?c?c?)cd"               "abcccccd"
+"(?<=bc?c?c?)c+d"              "ab<0>cccccd</0>"
+
+".*(?<=: ?)(\w*)"                "<0>1:one  2: two 3:<1>three</1></0>   "
+
+#
+# Named Characters
+#
+"a\N{LATIN SMALL LETTER B}c"    "<0>abc</0>"
+"a\N{LATIN SMALL LETTER B}c"  i  "<0>abc</0>"
+"a\N{LATIN SMALL LETTER B}c"  i  "<0>aBc</0>"
+"a\N{LATIN SMALL LETTER B}c"     "aBc"
+
+"\N{FULL STOP}*"                 "<0>...</0>abc"
+
+"$"                              "abc<0></0>"
+
+#
+#  Optimizations of .* at end of patterns
+#
+"abc.*"                          "<0>abcdef</0>"
+"abc.*$"                         "<0>abcdef</0>"
+"abc(.*)"                        "<0>abc<1>def</1></0>"
+"abc(.*)"                        "<0>abc<1></1></0>"
+"abc.*"                          "<0>abc</0>\ndef"
+"abc.*"                     s    "<0>abc\ndef</0>"
+"abc.*$"                    s    "<0>abc\ndef</0>"
+"abc.*$"                         "abc\ndef"
+"abc.*$"                    m    "<0>abc</0>\ndef"
+"abc.*\Z"                   m    "abc\ndef"
+"abc.*\Z"                   sm   "<0>abc\ndef</0>"
+
+"abc*"                           "<0>abccc</0>d"
+"abc*$"                          "<0>abccc</0>"
+"ab(?:ab[xyz]\s)*"               "<0>ababy abx </0>abc"
+
+"(?:(abc)|a)(?:bc)+"             "<0>abc</0>"
+"(?:(abc)|a)(?:bc)*"             "<0><1>abc</1></0>"
+"^[+\-]?[0-9]*\.?[0-9]*"         "<0>123.456</0>"
+
+"ab.+yz"                         "<0>abc12345xyz</0>ttt"
+"ab.+yz"                    s    "<0>abc12345xyz</0>ttt"
+
+"ab.+yz"                         "abc123\n45xyzttt"
+"ab.+yz"                    s    "<0>abc12\n345xyz</0>ttt"
+
+"ab[0-9]+yz"                     "---abyz+++"
+"ab[0-9]+yz"                     "---<0>ab1yz</0>+++"
+"ab[0-9]+yz"                     "---<0>ab12yz</0>+++"
+"ab[0-9]+yz"                     "---<0>ab123456yz</0>+++"
+
+"ab([0-9]+|[A-Z]+)yz"            "---abyz+++"
+"ab([0-9]+|[A-Z]+)yz"            "---<0>ab<1>1</1>yz</0>+++"
+"ab([0-9]+|[A-Z]+)yz"            "---<0>ab<1>12</1>yz</0>+++"
+"ab([0-9]+|[A-Z]+)yz"            "---<0>ab<1>A</1>yz</0>+++"
+"ab([0-9]+|[A-Z]+)yz"            "---<0>ab<1>AB</1>yz</0>+++"
+"ab([0-9]+|[A-Z]+)yz"            "---<0>ab<1>ABCDE</1>yz</0>+++"
+
+#
+#  Hex format \x escaping
+#
+"ab\x63"                         "<0>abc</0>"
+"ab\x09w"                        "<0>ab\u0009w</0>"
+"ab\xabcdc"                      "<0>ab\u00abcdc</0>"
+"ab\x{abcd}c"                    "<0>ab\uabcdc</0>"
+"ab\x{101234}c"                  "<0>ab\U00101234c</0>"
+"abα"                            "<0>abα</0>"
+
+#
+#  Octal Escaping.   This conforms to Java conventions, not Perl.
+"\0101\00\03\073\0154\01442"      "<0>A\u0000\u0003\u003b\u006c\u0064\u0032</0>"
+"\0776"                          "<0>\u003f\u0036</0>"  # overflow, the 6 is literal.
+"\0376xyz"                       "<0>\u00fexyz</0>"
+"\08"                        E   "<0>\u00008</0>"
+"\0"                         E   "x"
+
+#
+#  \u Surrogate Pairs
+#
+"\ud800\udc00"                    "<0>\U00010000</0>"
+"\ud800\udc00*"                   "<0>\U00010000\U00010000\U00010000</0>\U00010001"
+"\ud800\ud800\udc00"              "<0>\ud800\U00010000</0>\U00010000\U00010000\U00010001"
+"(\ud800)(\udc00)"                "\U00010000"
+"\U00010001+"                     "<0>\U00010001\U00010001</0>\udc01"
+
+#
+# hitEnd with find()
+#
+"abc"                        Z    "aa<0>abc</0>  abcab"
+"abc"                       2Z    "aaabc  <0>abc</0>ab"
+"abc"                       3z    "aa>abc  abcab"
+
+#
+# \ escaping
+#
+"abc\jkl"                         "<0>abcjkl</0>"    # escape of a non-special letter is just itself.
+"abc[ \j]kl"                      "<0>abcjkl</0>"
+
+#
+# \R  all newline sequences.
+#
+"abc\Rxyz"                        "<0>abc\u000axyz</0>gh"
+"abc\Rxyz"                        "<0>abc\u000bxyz</0>gh"
+"abc\Rxyz"                        "<0>abc\u000cxyz</0>gh"
+"abc\Rxyz"                        "<0>abc\u000dxyz</0>gh"
+"abc\Rxyz"                        "<0>abc\u0085xyz</0>gh"
+"abc\Rxyz"                        "<0>abc\u2028xyz</0>gh"
+"abc\Rxyz"                        "<0>abc\u2029xyz</0>gh"
+"abc\Rxyz"                        "<0>abc\u000d\u000axyz</0>gh"
+
+"abc\R\nxyz"                      "abc\u000d\u000axyzgh"          # \R cannot match only the CR from a CR/LF sequence.
+"abc\r\nxyz"                      "<0>abc\u000d\u000axyz</0>gh"
+
+"abc\Rxyz"                        "abc\u0009xyz"                  # Assorted non-matches.
+"abc\Rxyz"                        "abc\u000exyz"
+"abc\Rxyz"                        "abc\u202axyz"
+
+# \v \V single character new line sequences.
+
+"abc\vxyz"                        "<0>abc\u000axyz</0>gh"
+"abc\vxyz"                        "<0>abc\u000bxyz</0>gh"
+"abc\vxyz"                        "<0>abc\u000cxyz</0>gh"
+"abc\vxyz"                        "<0>abc\u000dxyz</0>gh"
+"abc\vxyz"                        "<0>abc\u0085xyz</0>gh"
+"abc\vxyz"                        "<0>abc\u2028xyz</0>gh"
+"abc\vxyz"                        "<0>abc\u2029xyz</0>gh"
+"abc\vxyz"                        "abc\u000d\u000axyzgh"
+"abc\vxyz"                        "abc?xyzgh"
+
+"abc[\v]xyz"                      "<0>abc\u000axyz</0>gh"
+"abc[\v]xyz"                      "<0>abc\u000bxyz</0>gh"
+"abc[\v]xyz"                      "<0>abc\u000cxyz</0>gh"
+"abc[\v]xyz"                      "<0>abc\u000dxyz</0>gh"
+"abc[\v]xyz"                      "<0>abc\u0085xyz</0>gh"
+"abc[\v]xyz"                      "<0>abc\u2028xyz</0>gh"
+"abc[\v]xyz"                      "<0>abc\u2029xyz</0>gh"
+"abc[\v]xyz"                      "abc\u000d\u000axyzgh"
+"abc[\v]xyz"                      "abc?xyzgh"
+
+"abc\Vxyz"                        "abc\u000axyzgh"
+"abc\Vxyz"                        "abc\u000bxyzgh"
+"abc\Vxyz"                        "abc\u000cxyzgh"
+"abc\Vxyz"                        "abc\u000dxyzgh"
+"abc\Vxyz"                        "abc\u0085xyzgh"
+"abc\Vxyz"                        "abc\u2028xyzgh"
+"abc\Vxyz"                        "abc\u2029xyzgh"
+"abc\Vxyz"                        "abc\u000d\u000axyzgh"
+"abc\Vxyz"                        "<0>abc?xyz</0>gh"
+
+# \h \H horizontal white space. Defined as gc=space_separator plus ascii tab
+
+"abc\hxyz"                        "<0>abc xyz</0>gh"
+"abc\Hxyz"                        "abc xyzgh"
+"abc\hxyz"                        "<0>abc\u2003xyz</0>gh"
+"abc\Hxyz"                        "abc\u2003xyzgh"
+"abc\hxyz"                        "<0>abc\u0009xyz</0>gh"
+"abc\Hxyz"                        "abc\u0009xyzgh"
+"abc\hxyz"                        "abc?xyzgh"
+"abc\Hxyz"                        "<0>abc?xyz</0>gh"
+
+"abc[\h]xyz"                      "<0>abc xyz</0>gh"
+"abc[\H]xyz"                      "abc xyzgh"
+"abc[\h]xyz"                      "<0>abc\u2003xyz</0>gh"
+"abc[\H]xyz"                      "abc\u2003xyzgh"
+"abc[\h]xyz"                      "<0>abc\u0009xyz</0>gh"
+"abc[\H]xyz"                      "abc\u0009xyzgh"
+"abc[\h]xyz"                      "abc?xyzgh"
+"abc[\H]xyz"                      "<0>abc?xyz</0>gh"
+
+
+#
+# Bug xxxx
+#
+"(?:\-|(\-?\d+\d\d\d))?(?:\-|\-(\d\d))?(?:\-|\-(\d\d))?(T)?(?:(\d\d):(\d\d):(\d\d)(\.\d+)?)?(?:(?:((?:\+|\-)\d\d):(\d\d))|(Z))?"   MG  "<0>-1234-21-31T41:51:61.789+71:81</0>"
+
+
+#
+# A random, complex, meaningless pattern that should at least compile
+#
+"(?![^\<C\f\0146\0270\}&&[|\02-\x3E\}|X-\|]]{7,}+)[|\\\x98\<\?\u4FCFr\,\0025\}\004|\0025-\0521]|(?<![|\01-\u829E])|(?<!\p{Alpha})|^|(?-s:[^\x15\\\x24F\a\,\a\u97D8[\x38\a[\0224-\0306[^\0020-\u6A57]]]]??)(?xix:[^|\{\[\0367\t\e\x8C\{\[\074c\]V[|b\fu\r\0175\<\07f\066s[^D-\x5D]]])(?xx:^{5,}+)(?d)(?=^\D)|(?!\G)(?>\G)(?![^|\]\070\ne\{\t\[\053\?\\\x51\a\075\0023-\[&&[|\022-\xEA\00-\u41C2&&[^|a-\xCC&&[^\037\uECB3\u3D9A\x31\|\<b\0206\uF2EC\01m\,\ak\a\03&&\p{Punct}]]]])(?-dxs:[|\06-\07|\e-\x63&&[|Tp\u18A3\00\|\xE4\05\061\015\0116C|\r\{\}\006\xEA\0367\xC4\01\0042\0267\xBB\01T\}\0100\?[|\[-\u459B|\x23\x91\rF\0376[|\?-\x94\0113-\\\s]]]]{6}?)(?<=[^\t-\x42H\04\f\03\0172\?i\u97B6\e\f\uDAC2])(?=\B)(?>[^\016\r\{\,\uA29D\034\02[\02-\[|\t\056\uF599\x62\e\<\032\uF0AC\0026\0205Q\|\\\06\0164[|\057-\u7A98&&[\061-g|\|\0276\n\042\011\e\xE8\x64B\04\u6D0EDW^\p{Lower}]]]]?)(?<=[^\n\\\t\u8E13\,\0114\u656E\xA5\]&&[\03-\026|\uF39D\01\{i\u3BC2\u14FE]])(?<=[^|\uAE62\054H\|\}&&^\p{Space}])(?sxx)(?<=[\f\006\a\r\xB4]{1,5})|(?x-xd:^{5}+)()"  "<0></0>abc"
+
+
+#
+# Bug 3225
+
+"1|9"                             "<0>1</0>"
+"1|9"                             "<0>9</0>"
+"1*|9"                            "<0>1</0>"
+"1*|9"                            "<0></0>9"
+
+"(?:a|ac)d"                       "<0>acd</0>"
+"a|ac"                            "<0>a</0>c"
+
+#
+# Bug 3320
+#
+"(a([^ ]+)){0,} (c)"              "<0><1>a<2>b</2></1> <3>c</3></0> "
+"(a([^ ]+))* (c)"                 "<0><1>a<2>b</2></1> <3>c</3></0> "
+
+#
+# Bug 3436
+#
+"(.*?) *$"                        "<0><1>test</1>    </0>"
+
+#
+# Bug 4034
+#
+"\D"                              "<0>A</0>BC\u00ffDEF"
+"\d"                              "ABC\u00ffDEF"
+"\D"                              "<0>\u00ff</0>DEF"
+"\d"                              "\u00ffDEF"
+"\D"                              "123<0>\u00ff</0>DEF"
+"\D"                              "<0>\u0100</0>DEF"
+"\D"                              "123<0>\u0100</0>DEF"
+
+#
+#bug 4024, new line sequence handling
+#
+"(?m)^"                           "<0></0>AA\u000d\u000aBB\u000d\u000aCC\u000d\u000a"
+"(?m)^"                       2   "AA\u000d\u000a<0></0>BB\u000d\u000aCC\u000d\u000a"
+"(?m)^"                       3   "AA\u000d\u000aBB\u000d\u000a<0></0>CC\u000d\u000a"
+"(?m)^"                       4   "AA\u000d\u000aBB\u000d\u000aCC\u000d\u000a"
+
+"(?m)$"                           "AA<0></0>\u000d\u000aBB\u000d\u000aCC\u000d\u000a"
+"(?m)$"                       2   "AA\u000d\u000aBB<0></0>\u000d\u000aCC\u000d\u000a"
+"(?m)$"                       3   "AA\u000d\u000aBB\u000d\u000aCC<0></0>\u000d\u000a"
+"(?m)$"                       4   "AA\u000d\u000aBB\u000d\u000aCC\u000d\u000a<0></0>"
+"(?m)$"                       5   "AA\u000d\u000aBB\u000d\u000aCC\u000d\u000a"
+
+"$"                               "AA\u000d\u000aBB\u000d\u000aCC<0></0>\u000d\u000a"
+"$"                           2   "AA\u000d\u000aBB\u000d\u000aCC\u000d\u000a<0></0>"
+"$"                           3   "AA\u000d\u000aBB\u000d\u000aCC\u000d\u000a"
+
+"$"                               "\u000a\u0000a<0></0>\u000a"
+"$"                           2   "\u000a\u0000a\u000a<0></0>"
+"$"                           3   "\u000a\u0000a\u000a"
+
+"$"                               "<0></0>"
+"$"                           2   ""
+
+"$"                               "<0></0>\u000a"
+"$"                           2   "\u000a<0></0>"
+"$"                           3   "\u000a"
+
+"^"                               "<0></0>"
+"^"                           2   ""
+
+"\Z"                              "<0></0>"
+"\Z"                          2   ""
+"\Z"                          2   "\u000a<0></0>"
+"\Z"                              "<0></0>\u000d\u000a"
+"\Z"                          2   "\u000d\u000a<0></0>"
+
+
+# No matching ^ at interior new-lines if not in multi-line mode.
+"^"                               "<0></0>AA\u000d\u000aBB\u000d\u000aCC\u000d\u000a"
+"^"                           2   "AA\u000d\u000aBB\u000d\u000aCC\u000d\u000a"
+
+#
+# Dot-matches-any mode, and stopping at new-lines if off.
+#
+"."                               "<0>1</0>23\u000aXYZ"
+"."                           2   "1<0>2</0>3\u000aXYZ"
+"."                           3   "12<0>3</0>\u000aXYZ"
+"."                           4   "123\u000a<0>X</0>YZ"    # . doesn't match newlines
+"."                           4   "123\u000b<0>X</0>YZ"
+"."                           4   "123\u000c<0>X</0>YZ"
+"."                           4   "123\u000d<0>X</0>YZ"
+"."                           4   "123\u000d\u000a<0>X</0>YZ"
+"."                           4   "123\u0085<0>X</0>YZ"
+"."                           4   "123\u2028<0>X</0>YZ"
+"."                           4   "123\u2029<0>X</0>YZ"
+"."                           4s  "123<0>\u000a</0>XYZ"    # . matches any
+"."                           4s  "123<0>\u000b</0>XYZ"
+"."                           4s  "123<0>\u000c</0>XYZ"
+"."                           4s  "123<0>\u000d</0>XYZ"
+"."                           4s  "123<0>\u000d\u000a</0>XYZ"
+"."                           4s  "123<0>\u0085</0>XYZ"
+"."                           4s  "123<0>\u2028</0>XYZ"
+"."                           4s  "123<0>\u2029</0>XYZ"
+".{6}"                            "123\u000a\u000dXYZ"
+".{6}"                         s  "<0>123\u000a\u000dX</0>Y"
+
+
+#
+# Ranges
+#
+".*"                              "abc<r><0>def</0></r>ghi"
+"a"                               "aaa<r><0>a</0>aa</r>aaa"
+"a"                           2   "aaa<r>a<0>a</0>a</r>aaa"
+"a"                           3   "aaa<r>aa<0>a</0></r>aaa"
+"a"                           4   "aaa<r>aaa</r>aaa"
+"a"                               "aaa<r><0>a</0>aa</r>aaa"
+
+#
+# [set] parsing, systematically run through all of the parser states.
+#
+#
+"[def]+"                          "abc<0>ddeeff</0>ghi"       # set-open
+"[^def]+"                         "<0>abc</0>defghi"
+"[:digit:]+"                      "abc<0>123</0>def"
+"[:^digit:]+"                     "<0>abc</0>123def"
+"[\u005edef]+"                    "abc<0>de^f</0>ghi"
+
+"[]]+"                            "abc<0>]]]</0>[def"         # set-open2
+"[^]]+"                           "<0>abc</0>]]][def"
+
+"[:Lu:]+"                         "abc<0>ABC</0>def"          # set-posix
+"[:Lu]+"                          "abc<0>uL::Lu</0>"
+"[:^Lu]+"                         "abc<0>uL:^:Lu</0>"
+"[:]+"                            "abc<0>:::</0>def"
+"[:whats this:]"               E  " "
+"[--]+"                       dE  "-------"
+
+"[[nested]]+"                      "xyz[<0>nnetsteed</0>]abc"   #set-start
+"[\x{41}]+"                        "CB<0>AA</0>ZYX"
+"[\[\]\\]+"                        "&*<0>[]\\</0>..."
+"[*({<]+"                          "^&<0>{{(<<*</0>)))"
+
+
+"[-def]+"                          "abc<0>def-ef-d</0>xyz"     # set-start-dash
+"[abc[--def]]"                 E   " "
+
+"[x[&def]]+"                        "abc<0>def&</0>ghi"        # set-start-amp
+"[&& is bad at start]"         E   " "
+
+"[abc"                         E   " "                         # set-after-lit
+"[def]]"                           "abcdef"
+"[def]]"                           "abcde<0>f]</0>]"
+
+"[[def][ghi]]+"                    "abc]<0>defghi</0>[xyz"     # set-after-set
+"[[def]ghi]+"                      "abc]<0>defghi</0>[xyz" 
+"[[[[[[[[[[[abc]"              E   " "
+"[[abc]\p{Lu}]+"                   "def<0>abcABC</0>xyz"
+
+"[d-f]+"                           "abc<0>def</0>ghi"          # set-after-range
+"[d-f[x-z]]+"                      "abc<0>defxyzzz</0>gw"
+"[\s\d]+"                          "abc<0>  123</0>def"
+"[d-f\d]+"                         "abc<0>def123</0>ghi"
+"[d-fr-t]+"                        "abc<0>defrst</0>uvw"
+
+"[abc--]"                      E   " "                         # set-after-op
+"[[def]&&]"                    E   " "
+"[-abcd---]+"                     "<0>abc</0>--"                 #[-abcd]--[-]
+"[&abcd&&&ac]+"                   "b<0>ac&&ca</0>d"              #[&abcd]&&[&ac]
+
+"[[abcd]&[ac]]+"                  "b<0>acac</0>d"              # set-set-amp
+"[[abcd]&&[ac]]+"                 "b<0>acac</0>d"
+"[[abcd]&&ac]+"                   "b<0>acac</0>d"
+"[[abcd]&ac]+"                    "<0>bacacd&&&</0>"
+
+"[abcd&[ac]]+"                    "<0>bacacd&&&</0>"           #set-lit-amp
+"[abcd&&[ac]]+"                   "b<0>acac</0>d"
+"[abcd&&ac]+"                     "b<0>acac</0>d"
+
+"[[abcd]-[ac]]+"                  "a<0>bdbd</0>c"              # set-set-dash
+"[[abcd]--[ac]]+"                 "a<0>bdbd</0>c"
+"[[abcd]--ac]+"                   "a<0>bdbd</0>c"
+"[[abcd]-ac]+"                    "<0>bacacd---</0>"
+
+"[a-d--[b-c]]+"                   "b<0>adad</0>c"              # set-range-dash
+"[a-d--b-c]+"                     "b<0>adad</0>c"   
+"[a-d-[b-c]]+"                    "<0>bad-adc</0>"
+"[a-d-b-c]+"                      "<0>bad-adc</0>"
+"[\w--[b-c]]+"                    "b<0>adad</0>c"  
+"[\w--b-c]+"                      "b<0>adad</0>c"   
+"[\w-[b-c]]+"                     "<0>bad-adc</0>"
+"[\w-b-c]+"                       "<0>bad-adc</0>"
+
+"[a-d&&[b-c]]+"                   "a<0>bcbc</0>d"              # set-range-amp
+"[a-d&&b-c]+"                     "a<0>bcbc</0>d"
+"[a-d&[b-c]]+"                    "<0>abc&bcd</0>"
+"[a-d&b-c]+"                      "<0>abc&bcd</0>"
+
+"[abcd--bc]+"                     "b<0>adda</0>c"              # set-lit-dash
+"[abcd--[bc]]+"                   "b<0>adda</0>c"
+"[abcd-[bc]]+"                    "<0>bad--dac</0>xyz"
+"[abcd-]+"                        "<0>bad--dac</0>xyz"
+
+"[abcd-\s]+"                 E    "xyz<0>abcd  --</0>xyz"      # set-lit-dash-esc
+"[abcd-\N{LATIN SMALL LETTER G}]+"  "xyz-<0>abcdefg</0>hij-"
+"[bcd-\{]+"                       "a<0>bcdefyz{</0>|}"
+
+"[\p{Ll}]+"                       "ABC<0>abc</0>^&*&"          # set-escape
+"[\P{Ll}]+"                       "abc<0>ABC^&*&</0>xyz"
+"[\N{LATIN SMALL LETTER Q}]+"     "mnop<0>qqq</0>rst"
+"[\sa]+"                          "cb<0>a  a  </0>(*&"
+"[\S]+"                           "   <0>hello</0>  "
+"[\w]+"                           "   <0>hello_world</0>!  "
+"[\W]+"                           "a<0>   *$%#,</0>hello "
+"[\d]+"                           "abc<0>123</0>def"
+"[\D]+"                           "123<0>abc</0>567"
+"[\$\#]+"                         "123<0>$#$#</0>\\"
+
+#
+#  Try each of the Java compatibility properties.
+#    These are checked here, while normal Unicode properties aren't, because
+#    these Java compatibility properties are implemented directly by regexp, while other
+#    properties are handled by ICU's Property and UnicodeSet APIs.
+#
+#    These tests are only to verify that the names are recognized and the
+#    implementation isn't dead.  They are not intended to verify that the
+#    function defintions are 100% correct.
+#
+"[:InBasic Latin:]+"               "ΓΔΕΖΗΘ<0>hello, world.</0>ニヌネノハバパ"
+"[:^InBasic Latin:]+"              "<0>ΓΔΕΖΗΘ</0>hello, world.ニヌネノハバパ"
+"\p{InBasicLatin}+"                "ΓΔΕΖΗΘ<0>hello, world.</0>ニヌネノハバパ"
+"\P{InBasicLatin}+"                "<0>ΓΔΕΖΗΘ</0>hello, world.ニヌネノハバパ"
+"\p{InGreek}+"                     "<0>ΓΔΕΖΗΘ</0>hello, world.ニヌネノハバパ"
+"\p{InCombining Marks for Symbols}" "<0>\u20d0</0>"
+"\p{Incombiningmarksforsymbols}"    "<0>\u20d0</0>"
+
+
+"\p{javaDefined}+"                 "\uffff<0>abcd</0>\U00045678"
+"\p{javaDigit}+"                   "abc<0>1234</0>xyz"
+"\p{javaIdentifierIgnorable}+"     "abc<0>\u0000\u000e\u009f</0>xyz"
+"\p{javaISOControl}+"              "abc<0>\u0000\u000d\u0083</0>xyz"
+"\p{javaJavaIdentifierPart}+"      "#@!<0>abc123_$</0>;"
+"\p{javaJavaIdentifierStart}+"     "123\u0301<0>abc$_</0>%^&"
+"\p{javaLetter}+"                  "123<0>abcDEF</0>&*()("
+"\p{javaLetterOrDigit}+"           "$%^&*<0>123abcகஙசஜஞ</0>☺♘♚☔☎♬⚄⚡"
+"\p{javaLowerCase}+"               "ABC<0>def</0>&^%#:="
+"\p{javaMirrored}+"                "ab$%<0>(){}[]</0>xyz"
+"\p{javaSpaceChar}+"               "abc<0> \u00ao\u2028</0>!@#"
+"\p{javaSupplementaryCodePoint}+"  "abc\uffff<0>\U00010000\U0010ffff</0>\u0000"
+"\p{javaTitleCase}+"               "abCE<0>ǅῌᾨ</0>123"
+"\p{javaUnicodeIdentifierStart}+"  "123<0>abcⅣ</0>%^&&*"
+"\p{javaUnicodeIdentifierPart}+"   "%&&^<0>abc123\u0301\u0002</0>..."
+"\p{javaUpperCase}+"               "abc<0>ABC</0>123"
+"\p{javaValidCodePoint}+"          "<0>\u0000abc\ud800 unpaired \udfff |\U0010ffff</0>"
+"\p{javaWhitespace}+"              "abc\u00a0\u2007\u202f<0> \u0009\u001c\u001f\u2028</0>42"
+"\p{all}+"                         "<0>123\u0000\U0010ffff</0>"
+"\P{all}+"                         "123\u0000\U0010ffff"
+
+# [:word:] is implemented directly by regexp.  Not a java compat property, but PCRE and others.
+
+"[:word:]+"                        ".??$<0>abc123ΓΔΕΖΗ_</0>%%%"
+"\P{WORD}+"                        "<0>.??$</0>abc123ΓΔΕΖΗ_%%%"
+
+#
+#  Errors on unrecognized ASCII letter escape sequences.
+#
+"[abc\Y]+"                         "<0>abcY</0>"
+"[abc\Y]+"                     eE  "<0>abcY</0>"
+
+"(?:a|b|c|\Y)+"                    "<0>abcY</0>"
+"(?:a|b|c|\Y)+"                eE  "<0>abcY</0>"
+
+"\Q\Y\E"                       e   "<0>\\Y</0>"
+
+#
+# Reported problem
+#
+"[a-\w]"                       E  "x"
+
+#
+# Bug 4045
+#
+"A*"                              "<0>AAAA</0>"
+"A*"                           2  "AAAA<0></0>"
+"A*"                           3  "AAAA"
+"A*"                           4  "AAAA"
+"A*"                           5  "AAAA"
+"A*"                           6  "AAAA"
+"A*"                              "<0></0>"
+"A*"                           2  ""
+"A*"                           3  ""
+"A*"                           4  ""
+"A*"                           5  ""
+
+#
+# Bug 4046
+#
+"(?m)^"                           "<0></0>AA\u000dBB\u000dCC\u000d"
+"(?m)^"                        2  "AA\u000d<0></0>BB\u000dCC\u000d"
+"(?m)^"                        3  "AA\u000dBB\u000d<0></0>CC\u000d"
+"(?m)^"                        4  "AA\u000dBB\u000dCC\u000d"
+"(?m)^"                        5  "AA\u000dBB\u000dCC\u000d"
+"(?m)^"                        6  "AA\u000dBB\u000dCC\u000d"
+
+"(?m)^"                           "<0></0>AA\u000d\u000aBB\u000d\u000aCC\u000d\u000a"
+"(?m)^"                        2  "AA\u000d\u000a<0></0>BB\u000d\u000aCC\u000d\u000a"
+"(?m)^"                        3  "AA\u000d\u000aBB\u000d\u000a<0></0>CC\u000d\u000a"
+"(?m)^"                        4  "AA\u000d\u000aBB\u000d\u000aCC\u000d\u000a"
+
+#
+# Bug 4059
+#
+"\w+"				  "<0>イチロー</0>"
+"\b....\b."                       "<0>イチロー?</0>"
+
+
+#
+# Bug 4058    ICU Unicode Set patterns have an odd feature -
+#             A $ as the last character before the close bracket means match
+#             a \uffff, which means off the end of the string in transliterators.
+#             Didn't make sense for regular expressions, and is now fixed.
+#
+"[\$](P|C|D);"                    "<0>$<1>P</1>;</0>"
+"[$](P|C|D);"                     "<0>$<1>P</1>;</0>"
+"[$$](P|C|D);"                    "<0>$<1>P</1>;</0>"
+
+#
+# bug 4888    Flag settings lost in some cases.
+#
+"((a){2})|(#)"              is    "no"
+"((a){2})|(#)"              is    "<0><1>a<2>a</2></1></0>#"
+"((a){2})|(#)"              is    "a<0><3>#</3></0>"
+
+"((a|b){2})|c"              is    "<0>c</0>"
+"((a|b){2})|c"              is    "<0>C</0>"
+"((a|b){2})|c"              s     "C"
+
+#
+# bug 5617  ZWJ \u200d shoudn't cause word boundaries
+#
+".+?\b"                           "<0> </0>\u0935\u0915\u094D\u200D\u0924\u0947 "
+".+?\b"                       2   " <0>\u0935\u0915\u094D\u200D\u0924\u0947</0> "
+".+?\b"                       3   " \u0935\u0915\u094D\u200D\u0924\u0947 "
+
+#
+# bug 5386  "^.*$" should match empty input
+#
+"^.*$"                            "<0></0>"
+"^.*$"                     m      "<0></0>"
+"^.*$"                            "<0></0>\n"
+"(?s)^.*$"                        "<0>\n</0>"
+
+#
+# bug 5386  Empty pattern and empty input should match.
+#
+""                                "<0></0>abc"
+""                                "<0></0>"
+
+#
+# bug 5386   Range upper and lower bounds can be equal
+#
+"[a-a]"                           "<0>a</0>"
+
+#
+# bug 5386  $* should not fail, should match empty string.
+#
+"$*"                              "<0></0>abc"
+
+#
+# bug 5386  \Q ... \E escaping problem
+#
+"[a-z\Q-$\E]+"                    "QE<0>abc-def$</0>."
+
+# More reported 5386 Java comaptibility failures
+#
+"[^]*abb]*"                       "<0>kkkk</0>"
+"\xa"                             "huh"              # Java would like to be warned.
+"^.*$"                            "<0></0>"
+
+#
+# bug 5386  Empty left alternation should produce a zero length match.
+#
+"|a"                              "<0></0>a"
+"$|ab"                            "<0>ab</0>"
+"$|ba"                            "ab<0></0>"
+
+#
+# bug 5386  Java compatibility for set expressions
+#
+"[a-z&&[cde]]+"                   "ab<0>cde</0>fg"
+
+#
+# bug 6019  matches() needs to backtrack and check for a longer match if the
+#                     first match(es) found don't match the entire input.
+#
+"a?|b"                            "<0></0>b"
+"a?|b"                         M  "<0>b</0>"
+"a?|.*?u|stuff|d"              M  "<0>stuff</0>"
+"a?|.*?(u)|stuff|d"            M  "<0>stuff<1>u</1></0>"
+"a+?"                             "<0>a</0>aaaaaaaaaaaa"
+"a+?"                          M  "<0>aaaaaaaaaaaaa</0>"
+
+#
+#   Bug 7724.  Expression to validate zip codes.
+#
+"(?!0{5})(\d{5})(?!-?0{4})(-?\d{4})?"    "<0><1>94040</1><2>-3344</2></0>"
+"(?!0{5})(\d{5})(?!-?0{4})(-?\d{4})?"    "94040-0000"
+"(?!0{5})(\d{5})(?!-?0{4})(-?\d{4})?"    "00000-3344"
+
+#
+#    Bug 8666.  Assertion failure on match, bad operand to JMP_SAV_X opcode.
+#
+"((.??)+|A)*"                     "<0><1><2></2></1></0>AAAAABBBBBCCCCCDDDDEEEEE"
+
+#
+#    Bug 8826.  Incorrect results with case insensitive matches.
+#
+"AS(X)"                         i "aßx"
+"AS.*"                          i "aßx"           # Expansion of sharp s can't split between pattern terms.
+"ASßS"                          i "<0>aßß</0>"    # All one literal string, does match.
+"ASß{1}S"                       i "aßß"           # Pattern with terms, no match.
+"aßx"                           i "<0>assx</0>"
+"aßx"                           i "<0>ASSX</0>"
+"aßx"                           i "<0>aßx</0>"
+"ASS(.)"                        i "<0>aß<1>x</1></0>"
+
+# Case Insensitive, probe some corner cases.
+"ass+"                          i "aß"            # Second 's' in pattern is qualified, can't combine with first.
+"as+"                           i "aß"
+"aßs"                           i "as"            # Can't match half of a ß
+"aß+"                           i "<0>assssssss</0>s"
+"aß+"                           i "<0>assßSssSSS</0>s"
+"a(ß?)+"                        i "<0>assssssss<1></1></0>s"
+"a(ß?)+"                        i "<0>a<1></1></0>zzzzzzzzs"
+
+"\U00010400"                    i "<0>\U00010428</0>"   # case folded supplemental code point.
+
+"sstuff"                        i "<0>ßtuff</0>"    # exercise optimizations on what chars can start a match.
+"sstuff"                        i "s<0>ßtuff</0>"    # exercise optimizations on what chars can start a match.
+"ßtuff"                         i "s<0>sstuff</0>"
+"ßtuff"                         i "s<0>Sstuff</0>"
+
+"a(..)\1"                       i "<0>A<1>bc</1>BC</0>def"
+"(ß)\1"                         i "aa<0><1>ss</1>ß</0>zz"          # Case insensitive back reference
+"..(.)\1"                       i "<0>aa<1>ß</1>ss</0>"
+"ab(..)\1"                      i "xx<0>ab<1>ss</1>ß</0>ss" 
+
+" (ss) ((\1.*)|(.*))"           i "<0> <1>ss</1> <2><4>sß</4></2></0>"       # The back reference 'ss' must not match in 'sß'
+
+# Bug 9057
+#   \u200c and \u200d should be word characters.
+#
+"\w+"                             "  <0>abc\u200cdef\u200dghi</0>   "
+"\w+"                           i "  <0>abc\u200cdef\u200dghi</0>   "
+"[\w]+"                           "  <0>abc\u200cdef\u200dghi</0>   "
+"[\w]+"                         i "  <0>abc\u200cdef\u200dghi</0>   "
+
+# Bug 9283
+#  uregex_open fails for look-behind assertion + case-insensitive
+
+"(ab)?(?<=ab)cd|ef"             i  "<0><1>ab</1>cd</0>"
+
+# Bug 9719  Loop breaking on (zero length match){3,}   (unlimited upper bound).
+#
+
+"(?:abc){1,}abc"                   "<0>abcabcabcabcabc</0>"
+"(?:2*){2,}?a2\z"                  "<0>2a2</0>" 
+"(?:2*){2,}?a2\z"                  "2a3" 
+"(?:x?+){3,}+yz"                   "w<0>yz</0>"
+"(2*){2,}?a2\\z"                   "2a3"
+"(2*){2,}?a2\\z"                   "<0>2<1></1>a2\\z</0>"
+"(2*){2,}?a2\z"                    "<0>2<1></1>a2</0>"
+
+
+# Bug 10024
+#   Incorrect (unbounded) longest match length with {1, 20} style quantifiers.
+#   Unbounded match is disallowed in look-behind expressions.
+#   Max match length is used to limit where to check for look-behind matches.
+
+"(?<=a{1,5})bc"                   "aaaa<0>bc</0>def"
+"(?<=(?:aa){3,20})bc"             "aaaaaa<0>bc</0>def"
+"(?<!abc {1,100}|def {1,100}|ghi {1,100})jkl"      "def jkl"
+"(?<!abc {1,100}|def {1,100}|ghi {1,100})jkl"      "rst <0>jkl</0>"
+"(?<=a{11})bc"                   "aaaaaaaaaaa<0>bc</0>"
+"(?<=a{11})bc"                   "aaaaaaaaaabc"
+"(?<=a{1,})bc"           E       "aaaa<0>bc</0>def"   # U_REGEX_LOOK_BEHIND_LIMIT error.
+"(?<=(?:){11})bc"                "<0>bc</0>"          # Empty (?:) expression.
+
+# Bug 10835
+#   Match Start Set not being correctly computed for case insensitive patterns.
+#   (Test here is to dump the compiled pattern & manually check the start set.)
+
+"(private|secret|confidential|classified|restricted)"  i   "hmm, <0><1>Classified</1></0> stuff"
+"(private|secret|confidential|classified|restricted)"      "hmm, Classified stuff"
+
+# Bug 10844
+
+"^([\w\d:]+)$"                  "<0><1>DiesIst1Beispiel:text</1></0>"
+"^([\w\d:]+)$"           i      "<0><1>DiesIst1Beispiel:text</1></0>"
+"^(\w+\d\w+:\w+)$"              "<0><1>DiesIst1Beispiel:text</1></0>"
+"^(\w+\d\w+:\w+)$"       i      "<0><1>DiesIst1Beispiel:text</1></0>"
+
+# Bug 11049
+#   Edge cases in find() when pattern match begins with set of code points
+#   and the match begins at the end of the string.
+
+"A|B|C"                         "hello <0>A</0>"
+"A|B|C"                         "hello \U00011234"
+"A|B|\U00012345"                "hello <0>\U00012345</0>"
+"A|B|\U00010000"                "hello \ud800"
+
+# Bug 11369
+#   Incorrect optimization of patterns with a zero length quantifier {0}
+
+"(.|b)(|b){0}\$(?#xxx){3}(?>\D*)"   "AAAAABBBBBCCCCCDDDDEEEEE"
+"(|b)ab(c)"                     "<0><1></1>ab<2>c</2></0>"
+"(|b){0}a{3}(D*)"               "<0>aaa<2></2></0>"
+"(|b){0,1}a{3}(D*)"             "<0><1></1>aaa<2></2></0>"
+"((|b){0})a{3}(D*)"             "<0><1></1>aaa<3></3></0>"
+
+# Bug 11370
+#   Max match length computation of look-behind expression gives result that is too big to fit in the
+#   in the 24 bit operand portion of the compiled code. Expressions should fail to compile
+#   (Look-behind match length must be bounded. This case is treated as unbounded, an error.)
+
+"(?<!(0123456789a){10000000})x"         E  "no match"
+"(?<!\\ubeaf(\\ubeaf{11000}){11000})"   E  "no match"
+
+# Bug 11374 Bad integer overflow check in number conversion.
+#           4294967300 converts to 4 with 32 bit overflow.
+
+"x{4294967300}"                         E  "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+"x{0,4294967300}"                       E  "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# Bug 11373
+#
+#    Overflow checking in max match length computation for loops.
+#    Value here is 10 * 100000 * 3000 = 3E9, overflowing a 32 bit signed value.
+#    Before fixing, this case gave an assertion failure.
+
+"(?<=((0123456789){100000}){3000})abc"  E  "abc"
+
+# Bug 11507  Capture of an unpaired surrogate shouldn't allow a back reference to 
+#            match half of a surrogate pair, but only another unpaired surrogate.
+# 
+"pre(.)post\1"                  "pre\ud800post\ud800\udc00"
+"pre(.)post\1"                  "<0>pre<1>\ud800</1>post\ud800</0> fin"
+"pre(.)post\1"          i       "pre\ud800post\ud800\udc00"         # case insensiteve backrefs take a different code path
+"pre(.)post\1"          i       "<0>pre<1>\ud800</1>post\ud800</0> fin"
+
+# Bug 11554
+#
+#    Maximum match length computation was assuming UTF-16.
+#    Used in look-behind matches to constrain how far back to look.
+
+"(?<=a\x{100000})spam"          "***a\x{100000}<0>spam</0>**"
+"(?<=aą)spam"                   "**aą<0>spam</0>**"
+"(?<=ąabc)spam"                 "**ąabc<0>spam</0>**"
+
+"(?<=a\x{100000})spam"          "***a\x{100001}spam**"
+"(?<=aą)spam"                   "**bąspam**"
+"(?<=ąabc)spam"                 "**ąabxspam**"
+
+# with negative look-behind
+
+"(?<!a\x{100000})spam"          "***a\x{100000}spam**"
+"(?<!aą)spam"                   "**aąspam**"
+"(?<!ąabc)spam"                 "**ąabcspam**"
+
+"(?<!a\x{100000})spam"          "***a\x{100001}<0>spam</0>**"
+"(?<!aą)spam"                   "**bą<0>spam</0>**"
+"(?<!ąabc)spam"                 "**ąabx<0>spam</0>**"
+
+# Bug #12930
+#
+#   Minimum Match Length computation, int32_t overflow on an empty set in the pattern.
+#   The empty set, with no match possible, has a min match length of INT32_MAX.
+#   Was incremented subsequently. Caused assertion failure on pattern compile.
+
+"[^\u0000-\U0010ffff]bc?"       "bc no match"
+"[^\u0000-\U0010ffff]?bc?"      "<0>bc</0> has a match"
+
+# Bug #12160  Hit End behavior after find fails to find.
+#             To match Java, should be true if find fails to find.
+#
+"abc"                  Z        "<0>abc</0> abc abc xyz"
+"abc"                  Z2       "abc <0>abc</0> abc xyz"
+"abc"                  Z3       "abc abc <0>abc</0> xyz"
+"abc"                  z4       "abc abc abc xyz"
+
+# Bug #13844  Verify that non-standard Java property names are recognized.
+"[\p{IsAlphabetic}]"            " <0>A</0>"
+"[\P{IsAlphabetic}]"            "A<0> </0>"
+"[\p{IsIdeographic}]"           "A<0>〆</0>"
+"[\P{IsIdeographic}]"           "〆<0>A</0>"
+"[\p{IsLetter}]"                " <0>A</0>"
+"[\P{IsLetter}]"                "A<0> </0>"
+"[\p{Letter}]"                  " <0>A</0>"
+"[\p{IsLowercase}]"             "A<0>a</0>"
+"[\P{IsLowercase}]"             "a<0>A</0>"
+"[\p{IsUppercase}]"             "a<0>A</0>"
+"[\P{IsUppercase}]"             "A<0>a</0>"
+"[\p{IsTitlecase}]"             "D<0>ǲ</0>"
+"[\P{IsTitlecase}]"             "ǲ<0>D</0>"
+"[\p{IsPunctuation}]"           " <0>&</0>"
+"[\P{IsPunctuation}]"           "&<0> </0>"
+"[\p{IsControl}]"               " <0>\x{82}</0>"
+"[\P{IsControl}]"               "\x{82}<0> </0>"
+"[\p{IsWhite_Space}]"           "x<0> </0>"
+"[\P{IsWhite_Space}]"           " <0>x</0>"
+"[\p{IsDigit}]"                 " <0>4</0>"
+"[\P{IsDigit}]"                 "4<0> </0>"
+"[\p{IsHex_Digit}]"             " <0>F</0>"
+"[\P{IsHex_Digit}]"             "F<0> </0>"
+"[\p{IsJoin_Control}]"          " <0>\x{200d}</0>"
+"[\P{IsJoin_Control}]"          "\x{200d}<0> </0>"
+"[\p{IsNoncharacter_Code_Point}]"     "A<0>\x{5fffe}</0>"
+"[\p{IsAssigned}]"              "\x{10ffff}<0>a</0>"
+"[\P{IsAssigned}]"              "a<0>\x{10ffff}</0>"
+
+"[\p{InBasic Latin}]"           "〆<0>A</0>"
+"[\p{InBasicLatin}]"            "〆<0>A</0>"
+"[\p{InBasic-Latin}]"           "〆<0>A</0>"    # ICU accepts '-'; Java does not.
+"[\p{InBasic_Latin}]"           "〆<0>A</0>"
+"[\p{Inbasiclatin}]"            "〆<0>A</0>"
+"[\p{inbasiclatin}]"       E    "〆<0>A</0>"    # "In" must be cased as shown. Property name part is case insensitive.
+"[\p{InCombining_Marks_for_Symbols}]"    "a<0>\x{20DD}</0>"    # COMBINING ENCLOSING CIRCLE
+
+"[\p{all}]*"                    "<0>\x{00}abc\x{10ffff}</0>"
+"[\p{javaBadProperty}]"    E    "whatever"
+"[\p{IsBadProperty}]"      E    "whatever"
+"[\p{InBadBlock}]"         E    "whatever"
+"[\p{In}]"                 E    "whatever"
+"[\p{Is}]"                 E    "whatever"
+"[\p{java}]"                    "x<0>ꦉ</0>"      # Note: "java" is a valid script code.
+
+"[\p{javaLowerCase}]+"             "A<0>a</0>"
+"[\p{javaLowerCase}]+"     i       "<0>Aa</0>"
+"[\P{javaLowerCase}]+"             "<0>A</0>a"
+"[\P{javaLowerCase}]+"     i       "Aa"          # No Match because case fold of the set happens first, then negation.
+                                                 #  JDK is not case insensitive w named properties, even though
+                                                 #  the insensitive match flag is set. A JDK bug?
+
+"[a-z]+"                   i       "<0>Aa</0>"   # Matches JDK behavior.
+"[^a-z]+"                  i       "Aa"          # (no match) which is JDK behavior. Case fold first, then negation.
+
+# Bug 20385.  Assertion failure while compiling a negative look-behind expression consisting of a set with
+#             no contents. Meaning the [set] can never match. There is no syntax to directly express
+#             an empty set, so generate it by negating (^) a set of all code points.
+#             Also check empty sets in other contexts.
+
+"(?<![^[^a]a])"                    "<0></0>abc"
+
+"(?<![^\u0000-\U0010ffff])"        "<0></0>abc"
+"x(?<![^\u0000-\U0010ffff])"       "<0>x</0>abc"
+"x(?<![^\u0000-\U0010ffff]{1,5})"  "<0>x</0>abc"
+"x(?<![^\u0000-\U0010ffff]{0,5})"  "xabc"
+
+"(?<=[^\u0000-\U0010ffff])"        "abc"
+"(x?<=[^\u0000-\U0010ffff])"       "abc"
+"x(?<=[^\u0000-\U0010ffff]{1,5})"  "xabc"
+"x(?<=[^\u0000-\U0010ffff]{0,5})"  "<0>x</0>abc"
+
+"[^\u0000-\U0010ffff]"             "a"
+"[^[^\u0000-\U0010ffff]]"          "<0>a</0>"
+
+"This is a string with (?:one |two |three )endings"   "<0>This is a string with two endings</0>"
+
+# Bug ICU-20544. Similar to 20385, above. Assertion failure with a negative look-behind assertion containing
+#                a set with no contents. Look-behind pattern includes more than just the empty set.
+
+"(?<![ⰿ&&m]c)"                     "<0></0>abc"   # note: first 'ⰿ' is \u2c3f, hence empty set.
+"(?<![^\u0000-\U0010ffff]c)"       "<0></0>abc"
+"(?<=[^[^]]†)"                 "abc"          # Problem also exists w positive look-behind
+
+# Bug ICU-20391. Crash in computation of minimum match length with nested look-around patterns.
+#
+"(?<=(?<=((?=)){0}+)"         E    "aaa"
+"(?<=(?<=((?=)){0}+))"             "<0></0>"
+"(?<=c(?<=b((?=a)){1}+))"          "aaa"
+"abc(?=de(?=f))...g"               "<0>abcdefg</0>"
+"abc(?=de(?=f))...g"               "abcdxfg"
+
+# Bug ICU-20618 Assertion failure with nested look-around expressions.
+#
+"(?<=(?<=b?(?=a)))"               "hello, world."
+
+# Bug ICU-20939
+# Incorrect word \b boundaries w UTF-8 input and non-ASCII text
+#
+"(?w)\b"                     v2     "äää<0></0> äää"
+
+# Bug ICU-21492 Assertion failure with nested look-around expressions.
+#
+"(?<=(?:(?<=(?:(?<=(?:(?<=)){2})){3})){4}"   E  "<0></0>"  # orig failure from bug report, w mismatched parens.
+"(?:(?<=(?:(?<=)){2}))"            "<0></0>"               # Simplified case, with a valid pattern.
+
+#  Random debugging, Temporary
+#
+
+#
+#  Regexps from http://www.regexlib.com
+#
+"^[a-zA-Z]{1,2}[0-9][0-9A-Za-z]{0,1} {0,1}[0-9][A-Za-z]{2}$"   G "<0>G1 1AA</0>"
+"^[a-zA-Z]{1,2}[0-9][0-9A-Za-z]{0,1} {0,1}[0-9][A-Za-z]{2}$"   G "<0>EH10 2QQ</0>"
+"^[a-zA-Z]{1,2}[0-9][0-9A-Za-z]{0,1} {0,1}[0-9][A-Za-z]{2}$"   G "<0>SW1 1ZZ</0>"
+"^[a-zA-Z]{1,2}[0-9][0-9A-Za-z]{0,1} {0,1}[0-9][A-Za-z]{2}$"     "G111 1AA"
+"^[a-zA-Z]{1,2}[0-9][0-9A-Za-z]{0,1} {0,1}[0-9][A-Za-z]{2}$"     "X10 WW"
+"^[a-zA-Z]{1,2}[0-9][0-9A-Za-z]{0,1} {0,1}[0-9][A-Za-z]{2}$"     "DDD 5WW"
+#"^[\w\-]+(?:\.[\w\-]+)*@(?:[\w\-]+\.)+[a-zA-Z]{2,7}$"   dG "<0>joe.tillis@unit.army.mil</0>"   # TODO:  \w in pattern
+#"^[\w-]+(?:\.[\w-]+)*@(?:[\w-]+\.)+[a-zA-Z]{2,7}$"   G "<0>jack_rabbit@slims.com</0>"   # TODO:  \w in pattern
+#"^[\w-]+(?:\.[\w-]+)*@(?:[\w-]+\.)+[a-zA-Z]{2,7}$"   G "<0>foo99@foo.co.uk</0>"   # TODO:  \w in pattern
+#"^[\w-]+(?:\.[\w-]+)*@(?:[\w-]+\.)+[a-zA-Z]{2,7}$"     "find_the_mistake.@foo.org"   # TODO:  \w in pattern
+#"^[\w-]+(?:\.[\w-]+)*@(?:[\w-]+\.)+[a-zA-Z]{2,7}$"     ".prefix.@some.net"
+"^([a-zA-Z0-9_\-\.]+)@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.)|(([a-zA-Z0-9\-]+\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\]?)$"   G "<0>asmith@mactec.com</0>"
+"^([a-zA-Z0-9_\-\.]+)@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.)|(([a-zA-Z0-9\-]+\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\]?)$"   G "<0>foo12@foo.edu</0>"
+"^([a-zA-Z0-9_\-\.]+)@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.)|(([a-zA-Z0-9\-]+\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\]?)$"   G "<0>bob.smith@foo.tv</0>"
+"^([a-zA-Z0-9_\-\.]+)@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.)|(([a-zA-Z0-9\-]+\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\]?)$"     "joe"
+"^([a-zA-Z0-9_\-\.]+)@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.)|(([a-zA-Z0-9\-]+\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\]?)$"     "@foo.com"
+"^([a-zA-Z0-9_\-\.]+)@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.)|(([a-zA-Z0-9\-]+\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\]?)$"     "a@a"
+"^\d{1,2}\/\d{1,2}\/\d{4}$"   G "<0>4/1/2001</0>"
+"^\d{1,2}\/\d{1,2}\/\d{4}$"   G "<0>12/12/2001</0>"
+"^\d{1,2}\/\d{1,2}\/\d{4}$"   G "<0>55/5/3434</0>"
+"^\d{1,2}\/\d{1,2}\/\d{4}$"     "1/1/01"
+"^\d{1,2}\/\d{1,2}\/\d{4}$"     "12 Jan 01"
+"^\d{1,2}\/\d{1,2}\/\d{4}$"     "1-1-2001"
+"^(?:(?:(?:0?[13578]|1[02])(\/|-|\.)31)\1|(?:(?:0?[1,3-9]|1[0-2])(\/|-|\.)(?:29|30)\2))(?:(?:1[6-9]|[2-9]\d)?\d{2})$|^(?:0?2(\/|-|\.)29\3(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00))))$|^(?:(?:0?[1-9])|(?:1[0-2]))(\/|-|\.)(?:0?[1-9]|1\d|2[0-8])\4(?:(?:1[6-9]|[2-9]\d)?\d{2})$"   G "<0>01.1.02</0>"
+"^(?:(?:(?:0?[13578]|1[02])(\/|-|\.)31)\1|(?:(?:0?[1,3-9]|1[0-2])(\/|-|\.)(?:29|30)\2))(?:(?:1[6-9]|[2-9]\d)?\d{2})$|^(?:0?2(\/|-|\.)29\3(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00))))$|^(?:(?:0?[1-9])|(?:1[0-2]))(\/|-|\.)(?:0?[1-9]|1\d|2[0-8])\4(?:(?:1[6-9]|[2-9]\d)?\d{2})$"   G "<0>11-30-2001</0>"
+"^(?:(?:(?:0?[13578]|1[02])(\/|-|\.)31)\1|(?:(?:0?[1,3-9]|1[0-2])(\/|-|\.)(?:29|30)\2))(?:(?:1[6-9]|[2-9]\d)?\d{2})$|^(?:0?2(\/|-|\.)29\3(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00))))$|^(?:(?:0?[1-9])|(?:1[0-2]))(\/|-|\.)(?:0?[1-9]|1\d|2[0-8])\4(?:(?:1[6-9]|[2-9]\d)?\d{2})$"   G "<0>2/29/2000</0>"
+"^(?:(?:(?:0?[13578]|1[02])(\/|-|\.)31)\1|(?:(?:0?[1,3-9]|1[0-2])(\/|-|\.)(?:29|30)\2))(?:(?:1[6-9]|[2-9]\d)?\d{2})$|^(?:0?2(\/|-|\.)29\3(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00))))$|^(?:(?:0?[1-9])|(?:1[0-2]))(\/|-|\.)(?:0?[1-9]|1\d|2[0-8])\4(?:(?:1[6-9]|[2-9]\d)?\d{2})$"     "02/29/01"
+"^(?:(?:(?:0?[13578]|1[02])(\/|-|\.)31)\1|(?:(?:0?[1,3-9]|1[0-2])(\/|-|\.)(?:29|30)\2))(?:(?:1[6-9]|[2-9]\d)?\d{2})$|^(?:0?2(\/|-|\.)29\3(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00))))$|^(?:(?:0?[1-9])|(?:1[0-2]))(\/|-|\.)(?:0?[1-9]|1\d|2[0-8])\4(?:(?:1[6-9]|[2-9]\d)?\d{2})$"     "13/01/2002"
+"^(?:(?:(?:0?[13578]|1[02])(\/|-|\.)31)\1|(?:(?:0?[1,3-9]|1[0-2])(\/|-|\.)(?:29|30)\2))(?:(?:1[6-9]|[2-9]\d)?\d{2})$|^(?:0?2(\/|-|\.)29\3(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00))))$|^(?:(?:0?[1-9])|(?:1[0-2]))(\/|-|\.)(?:0?[1-9]|1\d|2[0-8])\4(?:(?:1[6-9]|[2-9]\d)?\d{2})$"     "11/00/02"
+"^(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9])\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9]|0)\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9]|0)\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[0-9])$"   G "<0>127.0.0.1</0>"
+"^(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9])\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9]|0)\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9]|0)\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[0-9])$"   G "<0>255.255.255.0</0>"
+"^(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9])\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9]|0)\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9]|0)\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[0-9])$"   G "<0>192.168.0.1</0>"
+"^(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9])\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9]|0)\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9]|0)\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[0-9])$"     "1200.5.4.3"
+"^(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9])\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9]|0)\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9]|0)\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[0-9])$"     "abc.def.ghi.jkl"
+"^(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9])\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9]|0)\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9]|0)\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[0-9])$"     "255.foo.bar.1"
+"(AUX|PRN|NUL|COM\d|LPT\d)+\s*$"   G "<0>COM1</0>"
+"(AUX|PRN|NUL|COM\d|LPT\d)+\s*$"   G "<0>AUX</0>"
+"(AUX|PRN|NUL|COM\d|LPT\d)+\s*$"   G "<0>LPT1</0>"
+"(AUX|PRN|NUL|COM\d|LPT\d)+\s*$"     "image.jpg"
+"(AUX|PRN|NUL|COM\d|LPT\d)+\s*$"     "index.html"
+"(AUX|PRN|NUL|COM\d|LPT\d)+\s*$"     "readme.txt"
+"^(?:(?:31(\/|-|\.)(?:0?[13578]|1[02]))\1|(?:(?:29|30)(\/|-|\.)(?:0?[1,3-9]|1[0-2])\2))(?:(?:1[6-9]|[2-9]\d)?\d{2})$|^(?:29(\/|-|\.)0?2\3(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00))))$|^(?:0?[1-9]|1\d|2[0-8])(\/|-|\.)(?:(?:0?[1-9])|(?:1[0-2]))\4(?:(?:1[6-9]|[2-9]\d)?\d{2})$"   G "<0>29/02/1972</0>"
+"^(?:(?:31(\/|-|\.)(?:0?[13578]|1[02]))\1|(?:(?:29|30)(\/|-|\.)(?:0?[1,3-9]|1[0-2])\2))(?:(?:1[6-9]|[2-9]\d)?\d{2})$|^(?:29(\/|-|\.)0?2\3(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00))))$|^(?:0?[1-9]|1\d|2[0-8])(\/|-|\.)(?:(?:0?[1-9])|(?:1[0-2]))\4(?:(?:1[6-9]|[2-9]\d)?\d{2})$"   G "<0>5-9-98</0>"
+"^(?:(?:31(\/|-|\.)(?:0?[13578]|1[02]))\1|(?:(?:29|30)(\/|-|\.)(?:0?[1,3-9]|1[0-2])\2))(?:(?:1[6-9]|[2-9]\d)?\d{2})$|^(?:29(\/|-|\.)0?2\3(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00))))$|^(?:0?[1-9]|1\d|2[0-8])(\/|-|\.)(?:(?:0?[1-9])|(?:1[0-2]))\4(?:(?:1[6-9]|[2-9]\d)?\d{2})$"   G "<0>10-11-2002</0>"
+"^(?:(?:31(\/|-|\.)(?:0?[13578]|1[02]))\1|(?:(?:29|30)(\/|-|\.)(?:0?[1,3-9]|1[0-2])\2))(?:(?:1[6-9]|[2-9]\d)?\d{2})$|^(?:29(\/|-|\.)0?2\3(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00))))$|^(?:0?[1-9]|1\d|2[0-8])(\/|-|\.)(?:(?:0?[1-9])|(?:1[0-2]))\4(?:(?:1[6-9]|[2-9]\d)?\d{2})$"     "29/02/2003"
+"^(?:(?:31(\/|-|\.)(?:0?[13578]|1[02]))\1|(?:(?:29|30)(\/|-|\.)(?:0?[1,3-9]|1[0-2])\2))(?:(?:1[6-9]|[2-9]\d)?\d{2})$|^(?:29(\/|-|\.)0?2\3(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00))))$|^(?:0?[1-9]|1\d|2[0-8])(\/|-|\.)(?:(?:0?[1-9])|(?:1[0-2]))\4(?:(?:1[6-9]|[2-9]\d)?\d{2})$"     "12/13/2002"
+"^(?:(?:31(\/|-|\.)(?:0?[13578]|1[02]))\1|(?:(?:29|30)(\/|-|\.)(?:0?[1,3-9]|1[0-2])\2))(?:(?:1[6-9]|[2-9]\d)?\d{2})$|^(?:29(\/|-|\.)0?2\3(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00))))$|^(?:0?[1-9]|1\d|2[0-8])(\/|-|\.)(?:(?:0?[1-9])|(?:1[0-2]))\4(?:(?:1[6-9]|[2-9]\d)?\d{2})$"     "1-1-1500"
+"^(user=([a-z0-9]+,)*(([a-z0-9]+){1});)?(group=([a-z0-9]+,)*(([a-z0-9]+){1});)?(level=[0-9]+;)?$"   G "<0>user=foo,bar,quux;group=manager,admin;level=100;</0>"
+"^(user=([a-z0-9]+,)*(([a-z0-9]+){1});)?(group=([a-z0-9]+,)*(([a-z0-9]+){1});)?(level=[0-9]+;)?$"   G "<0>group=nobody;level=24;</0>"
+"^(user=([a-z0-9]+,)*(([a-z0-9]+){1});)?(group=([a-z0-9]+,)*(([a-z0-9]+){1});)?(level=[0-9]+;)?$"     "user=foo"
+"^(user=([a-z0-9]+,)*(([a-z0-9]+){1});)?(group=([a-z0-9]+,)*(([a-z0-9]+){1});)?(level=[0-9]+;)?$"     "blahh"
+"^(\(?\+?[0-9]*\)?)?[0-9_\- \(\)]*$"   G "<0>(+44)(0)20-12341234</0>"
+"^(\(?\+?[0-9]*\)?)?[0-9_\- \(\)]*$"   G "<0>02012341234</0>"
+"^(\(?\+?[0-9]*\)?)?[0-9_\- \(\)]*$"   G "<0>+44 (0) 1234-1234</0>"
+"^(\(?\+?[0-9]*\)?)?[0-9_\- \(\)]*$"     "(44+)020-12341234"
+"^(\(?\+?[0-9]*\)?)?[0-9_\- \(\)]*$"     "12341234(+020)"
+"\b(\w+)\s+\1\b"   G "<0>Tell the the preacher</0>"
+"\b(\w+)\s+\1\b"   G "<0>some some</0>"
+"\b(\w+)\s+\1\b"   G "<0>hubba hubba</0>"
+"\b(\w+)\s+\1\b"     "once an annual report"
+"\b(\w+)\s+\1\b"     "mandate dated submissions"
+"\b(\w+)\s+\1\b"     "Hubba hubba"
+"(^\+[0-9]{2}|^\+[0-9]{2}\(0\)|^\(\+[0-9]{2}\)\(0\)|^00[0-9]{2}|^0)([0-9]{9}$|[0-9\-\s]{10}$)"   G "<0>+31235256677</0>"
+"(^\+[0-9]{2}|^\+[0-9]{2}\(0\)|^\(\+[0-9]{2}\)\(0\)|^00[0-9]{2}|^0)([0-9]{9}$|[0-9\-\s]{10}$)"   G "<0>+31(0)235256677</0>"
+"(^\+[0-9]{2}|^\+[0-9]{2}\(0\)|^\(\+[0-9]{2}\)\(0\)|^00[0-9]{2}|^0)([0-9]{9}$|[0-9\-\s]{10}$)"   G "<0>023-5256677</0>"
+"(^\+[0-9]{2}|^\+[0-9]{2}\(0\)|^\(\+[0-9]{2}\)\(0\)|^00[0-9]{2}|^0)([0-9]{9}$|[0-9\-\s]{10}$)"     "+3123525667788999"
+"(^\+[0-9]{2}|^\+[0-9]{2}\(0\)|^\(\+[0-9]{2}\)\(0\)|^00[0-9]{2}|^0)([0-9]{9}$|[0-9\-\s]{10}$)"     "3123525667788"
+"(^\+[0-9]{2}|^\+[0-9]{2}\(0\)|^\(\+[0-9]{2}\)\(0\)|^00[0-9]{2}|^0)([0-9]{9}$|[0-9\-\s]{10}$)"     "232-2566778"
+"^[-+]?\d*\.?\d*$"   G "<0>123</0>"
+"^[-+]?\d*\.?\d*$"   G "<0>+3.14159</0>"
+"^[-+]?\d*\.?\d*$"   G "<0>-3.14159</0>"
+"^[-+]?\d*\.?\d*$"     "abc"
+"^[-+]?\d*\.?\d*$"     "3.4.5"
+"^[-+]?\d*\.?\d*$"     "$99.95"
+"^\$?([1-9]{1}[0-9]{0,2}(\,[0-9]{3})*(\.[0-9]{0,2})?|[1-9]{1}[0-9]{0,}(\.[0-9]{0,2})?|0(\.[0-9]{0,2})?|(\.[0-9]{1,2})?)$"   G "<0>$1,234.50</0>"
+"^\$?([1-9]{1}[0-9]{0,2}(\,[0-9]{3})*(\.[0-9]{0,2})?|[1-9]{1}[0-9]{0,}(\.[0-9]{0,2})?|0(\.[0-9]{0,2})?|(\.[0-9]{1,2})?)$"   G "<0>$0.70</0>"
+"^\$?([1-9]{1}[0-9]{0,2}(\,[0-9]{3})*(\.[0-9]{0,2})?|[1-9]{1}[0-9]{0,}(\.[0-9]{0,2})?|0(\.[0-9]{0,2})?|(\.[0-9]{1,2})?)$"   G "<0>.7</0>"
+"^\$?([1-9]{1}[0-9]{0,2}(\,[0-9]{3})*(\.[0-9]{0,2})?|[1-9]{1}[0-9]{0,}(\.[0-9]{0,2})?|0(\.[0-9]{0,2})?|(\.[0-9]{1,2})?)$"     "$0,123.50"
+"^\$?([1-9]{1}[0-9]{0,2}(\,[0-9]{3})*(\.[0-9]{0,2})?|[1-9]{1}[0-9]{0,}(\.[0-9]{0,2})?|0(\.[0-9]{0,2})?|(\.[0-9]{1,2})?)$"     "$00.5"
+"^[A-Z]{2}[0-9]{6}[A-DFM]{1}$"   G "<0>AB123456D</0>"
+"^[A-Z]{2}[0-9]{6}[A-DFM]{1}$"   G "<0>AB123456F</0>"
+"^[A-Z]{2}[0-9]{6}[A-DFM]{1}$"   G "<0>AB123456M</0>"
+"^[A-Z]{2}[0-9]{6}[A-DFM]{1}$"     "AB123456E"
+"^[A-Z]{2}[0-9]{6}[A-DFM]{1}$"     "ab123456d"
+#"(http|ftp|https):\/\/[\w]+(.[\w]+)([\w\-\.,@?^=%&:/~\+#]*[\w\-\@?^=%&/~\+#])?"   G "<0>http://regxlib.com/Default.aspx</0>"     # TODO:  \w in pattern
+#"(http|ftp|https):\/\/[\w]+(.[\w]+)([\w\-\.,@?^=%&:/~\+#]*[\w\-\@?^=%&/~\+#])?"   G "<0>http://electronics.cnet.com/electronics/0-6342366-8-8994967-1.html</0>"     # TODO:  \w in pattern
+#"(http|ftp|https):\/\/[\w]+(.[\w]+)([\w\-\.,@?^=%&:/~\+#]*[\w\-\@?^=%&/~\+#])?"     "www.yahoo.com"     # TODO:  \w in pattern
+"^[0-9]{4}\s{0,1}[a-zA-Z]{2}$"   G "<0>2034AK</0>"
+"^[0-9]{4}\s{0,1}[a-zA-Z]{2}$"   G "<0>2034 AK</0>"
+"^[0-9]{4}\s{0,1}[a-zA-Z]{2}$"   G "<0>2034 ak</0>"
+"^[0-9]{4}\s{0,1}[a-zA-Z]{2}$"     "2034     AK"
+"^[0-9]{4}\s{0,1}[a-zA-Z]{2}$"     "321321 AKSSAA"
+"((\d{2})|(\d))\/((\d{2})|(\d))\/((\d{4})|(\d{2}))"   G "<0>4/5/91</0>"
+"((\d{2})|(\d))\/((\d{2})|(\d))\/((\d{4})|(\d{2}))"   G "<0>04/5/1991</0>"
+"((\d{2})|(\d))\/((\d{2})|(\d))\/((\d{4})|(\d{2}))"   G "<0>4/05/89</0>"
+"((\d{2})|(\d))\/((\d{2})|(\d))\/((\d{4})|(\d{2}))"     "4/5/1"
+#"(^|\s|\()((([1-9]){1}|([0][1-9]){1}|([1][012]){1}){1}[\/-]((2[0-9]){1}|(3[01]){1}|([01][1-9]){1}|([1-9]){1}){1}[\/-](((19|20)([0-9][0-9]){1}|([0-9][0-9]){1})){1}(([\s|\)|:])|(^|\s|\()((([0-9]){1}|([0][1-9]){1}|([1][012]){1}){1}[\/-](([11-31]){1}|([01][1-9]){1}|([1-9]){1}){1}[\/-](((19|20)([0-9][0-9]){1}|([0-9][0-9]){1})){1}(([\s|\)|:|$|\>])){1}){1}){1}){1}"   G "<0>01/01/2001 </0>"   #TODO - \s in pattern.
+"(^|\s|\()((([1-9]){1}|([0][1-9]){1}|([1][012]){1}){1}[\/-]((2[0-9]){1}|(3[01]){1}|([01][1-9]){1}|([1-9]){1}){1}[\/-](((19|20)([0-9][0-9]){1}|([0-9][0-9]){1})){1}(([\s|\)|:])|(^|\s|\()((([0-9]){1}|([0][1-9]){1}|([1][012]){1}){1}[\/-](([11-31]){1}|([01][1-9]){1}|([1-9]){1}){1}[\/-](((19|20)([0-9][0-9]){1}|([0-9][0-9]){1})){1}(([\s|\)|:|$|\>])){1}){1}){1}){1}"   G "<0>01-01-2001:</0>"
+"(^|\s|\()((([1-9]){1}|([0][1-9]){1}|([1][012]){1}){1}[\/-]((2[0-9]){1}|(3[01]){1}|([01][1-9]){1}|([1-9]){1}){1}[\/-](((19|20)([0-9][0-9]){1}|([0-9][0-9]){1})){1}(([\s|\)|:])|(^|\s|\()((([0-9]){1}|([0][1-9]){1}|([1][012]){1}){1}[\/-](([11-31]){1}|([01][1-9]){1}|([1-9]){1}){1}[\/-](((19|20)([0-9][0-9]){1}|([0-9][0-9]){1})){1}(([\s|\)|:|$|\>])){1}){1}){1}){1}"   G "<0>(1-1-01)</0>"
+"(^|\s|\()((([1-9]){1}|([0][1-9]){1}|([1][012]){1}){1}[\/-]((2[0-9]){1}|(3[01]){1}|([01][1-9]){1}|([1-9]){1}){1}[\/-](((19|20)([0-9][0-9]){1}|([0-9][0-9]){1})){1}(([\s|\)|:])|(^|\s|\()((([0-9]){1}|([0][1-9]){1}|([1][012]){1}){1}[\/-](([11-31]){1}|([01][1-9]){1}|([1-9]){1}){1}[\/-](((19|20)([0-9][0-9]){1}|([0-9][0-9]){1})){1}(([\s|\)|:|$|\>])){1}){1}){1}){1}"     "13/1/2001"
+"(^|\s|\()((([1-9]){1}|([0][1-9]){1}|([1][012]){1}){1}[\/-]((2[0-9]){1}|(3[01]){1}|([01][1-9]){1}|([1-9]){1}){1}[\/-](((19|20)([0-9][0-9]){1}|([0-9][0-9]){1})){1}(([\s|\)|:])|(^|\s|\()((([0-9]){1}|([0][1-9]){1}|([1][012]){1}){1}[\/-](([11-31]){1}|([01][1-9]){1}|([1-9]){1}){1}[\/-](((19|20)([0-9][0-9]){1}|([0-9][0-9]){1})){1}(([\s|\)|:|$|\>])){1}){1}){1}){1}"     "1-32-2001"
+"(^|\s|\()((([1-9]){1}|([0][1-9]){1}|([1][012]){1}){1}[\/-]((2[0-9]){1}|(3[01]){1}|([01][1-9]){1}|([1-9]){1}){1}[\/-](((19|20)([0-9][0-9]){1}|([0-9][0-9]){1})){1}(([\s|\)|:])|(^|\s|\()((([0-9]){1}|([0][1-9]){1}|([1][012]){1}){1}[\/-](([11-31]){1}|([01][1-9]){1}|([1-9]){1}){1}[\/-](((19|20)([0-9][0-9]){1}|([0-9][0-9]){1})){1}(([\s|\)|:|$|\>])){1}){1}){1}){1}"     "1-1-1801"
+"^\d{3}\s?\d{3}$"   G "<0>400 099</0>"
+"^\d{3}\s?\d{3}$"   G "<0>400099</0>"
+"^\d{3}\s?\d{3}$"   G "<0>400050</0>"
+"^\d{3}\s?\d{3}$"     "2345678"
+"^\d{3}\s?\d{3}$"     "12345"
+"^\d{3}\s?\d{3}$"     "asdf"
+"^\D?(\d{3})\D?\D?(\d{3})\D?(\d{4})$"   G "<0>(111) 222-3333</0>"
+"^\D?(\d{3})\D?\D?(\d{3})\D?(\d{4})$"   G "<0>1112223333</0>"
+"^\D?(\d{3})\D?\D?(\d{3})\D?(\d{4})$"   G "<0>111-222-3333</0>"
+"^\D?(\d{3})\D?\D?(\d{3})\D?(\d{4})$"     "11122223333"
+"^\D?(\d{3})\D?\D?(\d{3})\D?(\d{4})$"     "11112223333"
+"^\D?(\d{3})\D?\D?(\d{3})\D?(\d{4})$"     "11122233333"
+"^#?([a-f]|[A-F]|[0-9]){3}(([a-f]|[A-F]|[0-9]){3})?$"   G "<0>#00ccff</0>"
+"^#?([a-f]|[A-F]|[0-9]){3}(([a-f]|[A-F]|[0-9]){3})?$"   G "<0>#039</0>"
+"^#?([a-f]|[A-F]|[0-9]){3}(([a-f]|[A-F]|[0-9]){3})?$"   G "<0>ffffcc</0>"
+"^#?([a-f]|[A-F]|[0-9]){3}(([a-f]|[A-F]|[0-9]){3})?$"     "blue"
+"^#?([a-f]|[A-F]|[0-9]){3}(([a-f]|[A-F]|[0-9]){3})?$"     "0x000000"
+"^#?([a-f]|[A-F]|[0-9]){3}(([a-f]|[A-F]|[0-9]){3})?$"     "#ff000"
+"^([0-9a-fA-F][0-9a-fA-F]:){5}([0-9a-fA-F][0-9a-fA-F])$"   G "<0>01:23:45:67:89:ab</0>"
+"^([0-9a-fA-F][0-9a-fA-F]:){5}([0-9a-fA-F][0-9a-fA-F])$"   G "<0>01:23:45:67:89:AB</0>"
+"^([0-9a-fA-F][0-9a-fA-F]:){5}([0-9a-fA-F][0-9a-fA-F])$"   G "<0>fE:dC:bA:98:76:54</0>"
+"^([0-9a-fA-F][0-9a-fA-F]:){5}([0-9a-fA-F][0-9a-fA-F])$"     "01:23:45:67:89:ab:cd"
+"^([0-9a-fA-F][0-9a-fA-F]:){5}([0-9a-fA-F][0-9a-fA-F])$"     "01:23:45:67:89:Az"
+"^([0-9a-fA-F][0-9a-fA-F]:){5}([0-9a-fA-F][0-9a-fA-F])$"     "01:23:45:56:"
+"^(http|https|ftp)\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(:[a-zA-Z0-9]*)?/?([a-zA-Z0-9\-\._\?\,\'/\\\+\&%\$#\=~])*$"   G "<0>http://www.blah.com/~joe</0>"
+"^(http|https|ftp)\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(:[a-zA-Z0-9]*)?/?([a-zA-Z0-9\-\._\?\,\'/\\\+\&%\$#\=~])*$"   G "<0>ftp://ftp.blah.co.uk:2828/blah%20blah.gif</0>"
+"^(http|https|ftp)\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(:[a-zA-Z0-9]*)?/?([a-zA-Z0-9\-\._\?\,\'/\\\+\&%\$#\=~])*$"   G "<0>https://blah.gov/blah-blah.as</0>"
+"^(http|https|ftp)\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(:[a-zA-Z0-9]*)?/?([a-zA-Z0-9\-\._\?\,\'/\\\+\&%\$#\=~])*$"     "www.blah.com"
+"^(http|https|ftp)\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(:[a-zA-Z0-9]*)?/?([a-zA-Z0-9\-\._\?\,\'/\\\+\&%\$#\=~])*$"     "http://www.blah.com/I have spaces!"
+"^(http|https|ftp)\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(:[a-zA-Z0-9]*)?/?([a-zA-Z0-9\-\._\?\,\'/\\\+\&%\$#\=~])*$"     "ftp://blah_underscore/[nope]"
+"^(([0-2]\d|[3][0-1])\/([0]\d|[1][0-2])\/[2][0]\d{2})$|^(([0-2]\d|[3][0-1])\/([0]\d|[1][0-2])\/[2][0]\d{2}\s([0-1]\d|[2][0-3])\:[0-5]\d\:[0-5]\d)$"   G "<0>12/01/2002</0>"
+"^(([0-2]\d|[3][0-1])\/([0]\d|[1][0-2])\/[2][0]\d{2})$|^(([0-2]\d|[3][0-1])\/([0]\d|[1][0-2])\/[2][0]\d{2}\s([0-1]\d|[2][0-3])\:[0-5]\d\:[0-5]\d)$"   G "<0>12/01/2002 12:32:10</0>"
+"^(([0-2]\d|[3][0-1])\/([0]\d|[1][0-2])\/[2][0]\d{2})$|^(([0-2]\d|[3][0-1])\/([0]\d|[1][0-2])\/[2][0]\d{2}\s([0-1]\d|[2][0-3])\:[0-5]\d\:[0-5]\d)$"     "32/12/2002"
+"^(([0-2]\d|[3][0-1])\/([0]\d|[1][0-2])\/[2][0]\d{2})$|^(([0-2]\d|[3][0-1])\/([0]\d|[1][0-2])\/[2][0]\d{2}\s([0-1]\d|[2][0-3])\:[0-5]\d\:[0-5]\d)$"     "12/13/2001"
+"^(([0-2]\d|[3][0-1])\/([0]\d|[1][0-2])\/[2][0]\d{2})$|^(([0-2]\d|[3][0-1])\/([0]\d|[1][0-2])\/[2][0]\d{2}\s([0-1]\d|[2][0-3])\:[0-5]\d\:[0-5]\d)$"     "12/02/06"
+"^[0-9](\.[0-9]+)?$"   G "<0>1.2345</0>"
+"^[0-9](\.[0-9]+)?$"   G "<0>0.00001</0>"
+"^[0-9](\.[0-9]+)?$"   G "<0>7</0>"
+"^[0-9](\.[0-9]+)?$"     "12.2"
+"^[0-9](\.[0-9]+)?$"     "1.10.1"
+"^[0-9](\.[0-9]+)?$"     "15.98"
+"^(?:[mM]{1,3})?(?:(?:[cC][dDmM])|(?:[dD]?(?:[cC]{1,3})?))?[lL]?(([xX])(?:\2{1,2}|[lL]|[cC])?)?((([iI])((\5{1,2})|[vV]|[xX]|[lL])?)|([vV]?([iI]{1,3})?))?$"   G "<0>III</0>"
+"^(?:[mM]{1,3})?(?:(?:[cC][dDmM])|(?:[dD]?(?:[cC]{1,3})?))?[lL]?(([xX])(?:\2{1,2}|[lL]|[cC])?)?((([iI])((\5{1,2})|[vV]|[xX]|[lL])?)|([vV]?([iI]{1,3})?))?$"   G "<0>xiv</0>"
+"^(?:[mM]{1,3})?(?:(?:[cC][dDmM])|(?:[dD]?(?:[cC]{1,3})?))?[lL]?(([xX])(?:\2{1,2}|[lL]|[cC])?)?((([iI])((\5{1,2})|[vV]|[xX]|[lL])?)|([vV]?([iI]{1,3})?))?$"   G "<0>MCMLXLIX</0>"
+"^(?:[mM]{1,3})?(?:(?:[cC][dDmM])|(?:[dD]?(?:[cC]{1,3})?))?[lL]?(([xX])(?:\2{1,2}|[lL]|[cC])?)?((([iI])((\5{1,2})|[vV]|[xX]|[lL])?)|([vV]?([iI]{1,3})?))?$"     "iiV"
+"^(?:[mM]{1,3})?(?:(?:[cC][dDmM])|(?:[dD]?(?:[cC]{1,3})?))?[lL]?(([xX])(?:\2{1,2}|[lL]|[cC])?)?((([iI])((\5{1,2})|[vV]|[xX]|[lL])?)|([vV]?([iI]{1,3})?))?$"     "MCCM"
+"^(?:[mM]{1,3})?(?:(?:[cC][dDmM])|(?:[dD]?(?:[cC]{1,3})?))?[lL]?(([xX])(?:\2{1,2}|[lL]|[cC])?)?((([iI])((\5{1,2})|[vV]|[xX]|[lL])?)|([vV]?([iI]{1,3})?))?$"     "XXXX"
+"^[-+]?[0-9]+[.]?[0-9]*([eE][-+]?[0-9]+)?$"   G "<0>123</0>"
+"^[-+]?[0-9]+[.]?[0-9]*([eE][-+]?[0-9]+)?$"   G "<0>-123.35</0>"
+"^[-+]?[0-9]+[.]?[0-9]*([eE][-+]?[0-9]+)?$"   G "<0>-123.35e-2</0>"
+"^[-+]?[0-9]+[.]?[0-9]*([eE][-+]?[0-9]+)?$"     "abc"
+"^[-+]?[0-9]+[.]?[0-9]*([eE][-+]?[0-9]+)?$"     "123.32e"
+"^[-+]?[0-9]+[.]?[0-9]*([eE][-+]?[0-9]+)?$"     "123.32.3"
+"^[a-zA-Z]+(([\'\,\.\- ][a-zA-Z ])?[a-zA-Z]*)*$"   G "<0>T.F. Johnson</0>"
+"^[a-zA-Z]+(([\'\,\.\- ][a-zA-Z ])?[a-zA-Z]*)*$"   G "<0>John O'Neil</0>"
+"^[a-zA-Z]+(([\'\,\.\- ][a-zA-Z ])?[a-zA-Z]*)*$"   G "<0>Mary-Kate Johnson</0>"
+"^[a-zA-Z]+(([\'\,\.\- ][a-zA-Z ])?[a-zA-Z]*)*$"     "sam_johnson"
+"^[a-zA-Z]+(([\'\,\.\- ][a-zA-Z ])?[a-zA-Z]*)*$"     "Joe--Bob Jones"
+"^[a-zA-Z]+(([\'\,\.\- ][a-zA-Z ])?[a-zA-Z]*)*$"     "dfjsd0rd"
+"^(20|21|22|23|[0-1]\d)[0-5]\d$"   G "<0>1200</0>"
+"^(20|21|22|23|[0-1]\d)[0-5]\d$"   G "<0>1645</0>"
+"^(20|21|22|23|[0-1]\d)[0-5]\d$"   G "<0>2359</0>"
+"^(20|21|22|23|[0-1]\d)[0-5]\d$"     "2400"
+"^(20|21|22|23|[0-1]\d)[0-5]\d$"     "asbc"
+"^(20|21|22|23|[0-1]\d)[0-5]\d$"     "12:45"
+/<[^>]*\n?.*=("|')?(.*\.jpg)("|')?.*\n?[^<]*>/   G '<0><td background="../img/img.jpg" ></0>'
+/<[^>]*\n?.*=("|')?(.*\.jpg)("|')?.*\n?[^<]*>/   G "<0><img src=img.jpg ></0>"
+/<[^>]*\n?.*=("|')?(.*\.jpg)("|')?.*\n?[^<]*>/   G "<0><img src='img.jpg'></0>"
+/<[^>]*\n?.*=("|')?(.*\.jpg)("|')?.*\n?[^<]*>/     "= img.jpg"
+/<[^>]*\n?.*=("|')?(.*\.jpg)("|')?.*\n?[^<]*>/     "img.jpg"
+"^(\d{5}-\d{4}|\d{5})$|^([a-zA-Z]\d[a-zA-Z] \d[a-zA-Z]\d)$"   G "<0>78754</0>"
+"^(\d{5}-\d{4}|\d{5})$|^([a-zA-Z]\d[a-zA-Z] \d[a-zA-Z]\d)$"   G "<0>78754-1234</0>"
+"^(\d{5}-\d{4}|\d{5})$|^([a-zA-Z]\d[a-zA-Z] \d[a-zA-Z]\d)$"   G "<0>G3H 6A3</0>"
+"^(\d{5}-\d{4}|\d{5})$|^([a-zA-Z]\d[a-zA-Z] \d[a-zA-Z]\d)$"     "78754-12aA"
+"^(\d{5}-\d{4}|\d{5})$|^([a-zA-Z]\d[a-zA-Z] \d[a-zA-Z]\d)$"     "7875A"
+"^(\d{5}-\d{4}|\d{5})$|^([a-zA-Z]\d[a-zA-Z] \d[a-zA-Z]\d)$"     "g3h6a3"
+#"^([\w\-\.]+)@((\[([0-9]{1,3}\.){3}[0-9]{1,3}\])|(([\w\-]+\.)+)([a-zA-Z]{2,4}))$"   G "<0>bob@somewhere.com</0>"    # TODO:  \w in pattern
+#"^([\w\-\.]+)@((\[([0-9]{1,3}\.){3}[0-9]{1,3}\])|(([\w\-]+\.)+)([a-zA-Z]{2,4}))$"   G "<0>bob.jones@[1.1.1.1]</0   # TODO:  \w in pattern>"
+#"^([\w\-\.]+)@((\[([0-9]{1,3}\.){3}[0-9]{1,3}\])|(([\w\-]+\.)+)([a-zA-Z]{2,4}))$"   G "<0>bob@a.b.c.d.info</0>"   # TODO:  \w in pattern
+#"^([\w\-\.]+)@((\[([0-9]{1,3}\.){3}[0-9]{1,3}\])|(([\w\-]+\.)+)([a-zA-Z]{2,4}))$"     "bob@com"   # TODO:  \w in pattern
+#"^([\w\-\.]+)@((\[([0-9]{1,3}\.){3}[0-9]{1,3}\])|(([\w\-]+\.)+)([a-zA-Z]{2,4}))$"     "bob.jones@some.where"   # TODO:  \w in pattern
+#"^([\w\-\.]+)@((\[([0-9]{1,3}\.){3}[0-9]{1,3}\])|(([\w\-]+\.)+)([a-zA-Z]{2,4}))$"     "bob@1.1.1.123"   # TODO:  \w in pattern
+#"^(([-\w \.]+)|(""[-\w \.]+"") )?<([\w\-\.]+)@((\[([0-9]{1,3}\.){3}[0-9]{1,3}\])|(([\w\-]+\.)+)([a-zA-Z]{2,4}))>$"   G "<0><ab@cd.ef></0>"   # TODO:  \w in pattern
+#"^(([-\w \.]+)|(""[-\w \.]+"") )?<([\w\-\.]+)@((\[([0-9]{1,3}\.){3}[0-9]{1,3}\])|(([\w\-]+\.)+)([a-zA-Z]{2,4}))>$"   G "<0>bob A. jones <ab@cd.ef></0>"   # TODO:  \w in pattern
+#"^(([-\w \.]+)|(""[-\w \.]+"") )?<([\w\-\.]+)@((\[([0-9]{1,3}\.){3}[0-9]{1,3}\])|(([\w\-]+\.)+)([a-zA-Z]{2,4}))>$"   G "<0>bob A. jones <ab@[1.1.1.111]></0>"   # TODO:  \w in pattern
+#"^(([-\w \.]+)|(""[-\w \.]+"") )?<([\w\-\.]+)@((\[([0-9]{1,3}\.){3}[0-9]{1,3}\])|(([\w\-]+\.)+)([a-zA-Z]{2,4}))>$"     "ab@cd.ef"   # TODO:  \w in pattern
+#"^(([-\w \.]+)|(""[-\w \.]+"") )?<([\w\-\.]+)@((\[([0-9]{1,3}\.){3}[0-9]{1,3}\])|(([\w\-]+\.)+)([a-zA-Z]{2,4}))>$"     ""bob A. jones <ab@cd.ef>"   # TODO:  \w in pattern
+#"^(([-\w \.]+)|(""[-\w \.]+"") )?<([\w\-\.]+)@((\[([0-9]{1,3}\.){3}[0-9]{1,3}\])|(([\w\-]+\.)+)([a-zA-Z]{2,4}))>$"     "bob A. jones <ab@1.1.1.111>"   # TODO:  \w in pattern
+"^[A-Za-z]{1,2}[0-9A-Za-z]{1,2}[ ]?[0-9]{0,1}[A-Za-z]{2}$"   G "<0>SW112LE</0>"
+"^[A-Za-z]{1,2}[0-9A-Za-z]{1,2}[ ]?[0-9]{0,1}[A-Za-z]{2}$"   G "<0>SW11 2LE</0>"
+"^[A-Za-z]{1,2}[0-9A-Za-z]{1,2}[ ]?[0-9]{0,1}[A-Za-z]{2}$"   G "<0>CR05LE</0>"
+"^[A-Za-z]{1,2}[0-9A-Za-z]{1,2}[ ]?[0-9]{0,1}[A-Za-z]{2}$"     "12CR0LE"
+"^[A-Za-z]{1,2}[0-9A-Za-z]{1,2}[ ]?[0-9]{0,1}[A-Za-z]{2}$"     "12CR 0LE"
+"^[A-Za-z]{1,2}[0-9A-Za-z]{1,2}[ ]?[0-9]{0,1}[A-Za-z]{2}$"     "SWLE05"
+"20\d{2}(-|\/)((0[1-9])|(1[0-2]))(-|\/)((0[1-9])|([1-2][0-9])|(3[0-1]))(T|\s)(([0-1][0-9])|(2[0-3])):([0-5][0-9]):([0-5][0-9])"   G "<0>2099-12-31T23:59:59</0>"
+"20\d{2}(-|\/)((0[1-9])|(1[0-2]))(-|\/)((0[1-9])|([1-2][0-9])|(3[0-1]))(T|\s)(([0-1][0-9])|(2[0-3])):([0-5][0-9]):([0-5][0-9])"   G "<0>2002/02/09 16:30:00</0>"
+"20\d{2}(-|\/)((0[1-9])|(1[0-2]))(-|\/)((0[1-9])|([1-2][0-9])|(3[0-1]))(T|\s)(([0-1][0-9])|(2[0-3])):([0-5][0-9]):([0-5][0-9])"   G "<0>2000-01-01T00:00:00</0>"
+"20\d{2}(-|\/)((0[1-9])|(1[0-2]))(-|\/)((0[1-9])|([1-2][0-9])|(3[0-1]))(T|\s)(([0-1][0-9])|(2[0-3])):([0-5][0-9]):([0-5][0-9])"     "2000-13-31T00:00:00"
+"20\d{2}(-|\/)((0[1-9])|(1[0-2]))(-|\/)((0[1-9])|([1-2][0-9])|(3[0-1]))(T|\s)(([0-1][0-9])|(2[0-3])):([0-5][0-9]):([0-5][0-9])"     "2002/02/33 24:00:00"
+"20\d{2}(-|\/)((0[1-9])|(1[0-2]))(-|\/)((0[1-9])|([1-2][0-9])|(3[0-1]))(T|\s)(([0-1][0-9])|(2[0-3])):([0-5][0-9]):([0-5][0-9])"     "2000-01-01 60:00:00"
+"^((?:4\d{3})|(?:5[1-5]\d{2})|(?:6011)|(?:3[68]\d{2})|(?:30[012345]\d))[ -]?(\d{4})[ -]?(\d{4})[ -]?(\d{4}|3[4,7]\d{13})$"   G "<0>6011567812345678</0>"
+"^((?:4\d{3})|(?:5[1-5]\d{2})|(?:6011)|(?:3[68]\d{2})|(?:30[012345]\d))[ -]?(\d{4})[ -]?(\d{4})[ -]?(\d{4}|3[4,7]\d{13})$"   G "<0>6011 5678 1234 5678</0>"
+"^((?:4\d{3})|(?:5[1-5]\d{2})|(?:6011)|(?:3[68]\d{2})|(?:30[012345]\d))[ -]?(\d{4})[ -]?(\d{4})[ -]?(\d{4}|3[4,7]\d{13})$"   G "<0>6011-5678-1234-5678</0>"
+"^((?:4\d{3})|(?:5[1-5]\d{2})|(?:6011)|(?:3[68]\d{2})|(?:30[012345]\d))[ -]?(\d{4})[ -]?(\d{4})[ -]?(\d{4}|3[4,7]\d{13})$"     "1234567890123456"
+"^((((0[13578])|(1[02]))[\/]?(([0-2][0-9])|(3[01])))|(((0[469])|(11))[\/]?(([0-2][0-9])|(30)))|(02[\/]?[0-2][0-9]))[\/]?\d{4}$"   G "<0>01/01/2001</0>"
+"^((((0[13578])|(1[02]))[\/]?(([0-2][0-9])|(3[01])))|(((0[469])|(11))[\/]?(([0-2][0-9])|(30)))|(02[\/]?[0-2][0-9]))[\/]?\d{4}$"   G "<0>02/29/2002</0>"
+"^((((0[13578])|(1[02]))[\/]?(([0-2][0-9])|(3[01])))|(((0[469])|(11))[\/]?(([0-2][0-9])|(30)))|(02[\/]?[0-2][0-9]))[\/]?\d{4}$"   G "<0>12/31/2002</0>"
+"^((((0[13578])|(1[02]))[\/]?(([0-2][0-9])|(3[01])))|(((0[469])|(11))[\/]?(([0-2][0-9])|(30)))|(02[\/]?[0-2][0-9]))[\/]?\d{4}$"     "1/1/02"
+"^((((0[13578])|(1[02]))[\/]?(([0-2][0-9])|(3[01])))|(((0[469])|(11))[\/]?(([0-2][0-9])|(30)))|(02[\/]?[0-2][0-9]))[\/]?\d{4}$"     "02/30/2002"
+"^((((0[13578])|(1[02]))[\/]?(([0-2][0-9])|(3[01])))|(((0[469])|(11))[\/]?(([0-2][0-9])|(30)))|(02[\/]?[0-2][0-9]))[\/]?\d{4}$"     "1/25/2002"
+#"^(?=[^\&])(?:(?<scheme>[^:/?#]+):)?(?://(?<authority>[^/?#]*))?(?<path>[^?#]*)(?:\?(?<query>[^#]*))?(?:#(?<fragment>.*))?"   G "<0>http://regexlib.com/REDetails.aspx?regexp_id=x#Details</0>"  # out of context, can't work stand-alone
+#"^(?=[^\&])(?:(?<scheme>[^:/?#]+):)?(?://(?<authority>[^/?#]*))?(?<path>[^?#]*)(?:\?(?<query>[^#]*))?(?:#(?<fragment>.*))?"     "&"           # out of context, can't work stand-alone
+"^[-+]?\d+(\.\d+)?$"   G "<0>123</0>"
+"^[-+]?\d+(\.\d+)?$"   G "<0>-123.45</0>"
+"^[-+]?\d+(\.\d+)?$"   G "<0>+123.56</0>"
+"^[-+]?\d+(\.\d+)?$"     "123x"
+"^[-+]?\d+(\.\d+)?$"     ".123"
+"^[-+]?\d+(\.\d+)?$"     "-123."
+"^(\d{4}[- ]){3}\d{4}|\d{16}$"   G "<0>1234-1234-1234-1234</0>"
+"^(\d{4}[- ]){3}\d{4}|\d{16}$"   G "<0>1234 1234 1234 1234</0>"
+"^(\d{4}[- ]){3}\d{4}|\d{16}$"   G "<0>1234123412341234</0>"
+"^(\d{4}[- ]){3}\d{4}|\d{16}$"     "Visa"
+"^(\d{4}[- ]){3}\d{4}|\d{16}$"     "1234"
+"^(\d{4}[- ]){3}\d{4}|\d{16}$"     "123-1234-12345"
+"^((4\d{3})|(5[1-5]\d{2})|(6011))-?\d{4}-?\d{4}-?\d{4}|3[4,7]\d{13}$"   G "<0>6011-1111-1111-1111</0>"
+"^((4\d{3})|(5[1-5]\d{2})|(6011))-?\d{4}-?\d{4}-?\d{4}|3[4,7]\d{13}$"   G "<0>5423-1111-1111-1111</0>"
+"^((4\d{3})|(5[1-5]\d{2})|(6011))-?\d{4}-?\d{4}-?\d{4}|3[4,7]\d{13}$"   G "<0>341111111111111</0>"
+"^((4\d{3})|(5[1-5]\d{2})|(6011))-?\d{4}-?\d{4}-?\d{4}|3[4,7]\d{13}$"     "4111-111-111-111"
+"^((4\d{3})|(5[1-5]\d{2})|(6011))-?\d{4}-?\d{4}-?\d{4}|3[4,7]\d{13}$"     "3411-1111-1111-111"
+"^((4\d{3})|(5[1-5]\d{2})|(6011))-?\d{4}-?\d{4}-?\d{4}|3[4,7]\d{13}$"     "Visa"
+"^[A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12}$"   G "<0>4D28C5AD-6482-41CD-B84E-4573F384BB5C</0>"
+"^[A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12}$"   G "<0>B1E1282C-A35C-4D5A-BF8B-7A3A51D9E388</0>"
+"^[A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12}$"   G "91036A4A-A0F4-43F0-8CD"
+"^[A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12}$"     "{B1E1282C-A35C-4D3A-BF8B-7A3A51D9E388}"
+"^[A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12}$"     "AAAAAAAAAAAAAAAAA"
+"^[A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12}$"     "B;E1282C-A35C-4D3A-BF8B-7A3A51D9E38"
+"(^(4|5)\d{3}-?\d{4}-?\d{4}-?\d{4}|(4|5)\d{15})|(^(6011)-?\d{4}-?\d{4}-?\d{4}|(6011)-?\d{12})|(^((3\d{3}))-\d{6}-\d{5}|^((3\d{14})))"   G "<0>4111-1234-1234-1234</0>"
+"(^(4|5)\d{3}-?\d{4}-?\d{4}-?\d{4}|(4|5)\d{15})|(^(6011)-?\d{4}-?\d{4}-?\d{4}|(6011)-?\d{12})|(^((3\d{3}))-\d{6}-\d{5}|^((3\d{14})))"   G "<0>6011123412341234</0>"
+"(^(4|5)\d{3}-?\d{4}-?\d{4}-?\d{4}|(4|5)\d{15})|(^(6011)-?\d{4}-?\d{4}-?\d{4}|(6011)-?\d{12})|(^((3\d{3}))-\d{6}-\d{5}|^((3\d{14})))"   G "<0>3711-123456-12345</0>"
+"(^(4|5)\d{3}-?\d{4}-?\d{4}-?\d{4}|(4|5)\d{15})|(^(6011)-?\d{4}-?\d{4}-?\d{4}|(6011)-?\d{12})|(^((3\d{3}))-\d{6}-\d{5}|^((3\d{14})))"     "1234567890123456"
+"(^(4|5)\d{3}-?\d{4}-?\d{4}-?\d{4}|(4|5)\d{15})|(^(6011)-?\d{4}-?\d{4}-?\d{4}|(6011)-?\d{12})|(^((3\d{3}))-\d{6}-\d{5}|^((3\d{14})))"     "4111-123-1234-1234"
+"(^(4|5)\d{3}-?\d{4}-?\d{4}-?\d{4}|(4|5)\d{15})|(^(6011)-?\d{4}-?\d{4}-?\d{4}|(6011)-?\d{12})|(^((3\d{3}))-\d{6}-\d{5}|^((3\d{14})))"     "412-1234-1234-1234"
+#'\[link="(?<link>((.|\n)*?))"\](?<text>((.|\n)*?))\[\/link\]'   G '<0>[link="http://www.yahoo.com"]Yahoo[/link]</0>'   #named capture
+#'\[link="(?<link>((.|\n)*?))"\](?<text>((.|\n)*?))\[\/link\]'     "[link]http://www.yahoo.com[/link]"                  #named capture
+#'\[link="(?<link>((.|\n)*?))"\](?<text>((.|\n)*?))\[\/link\]'     "[link=http://www.yahoo.com]Yahoo[/link]"            #named capture
+"^[a-zA-Z0-9]+$"   G "<0>10a</0>"
+"^[a-zA-Z0-9]+$"   G "<0>ABC</0>"
+"^[a-zA-Z0-9]+$"   G "<0>A3fg</0>"
+"^[a-zA-Z0-9]+$"     "45.3"
+"^[a-zA-Z0-9]+$"     "this or that"
+"^[a-zA-Z0-9]+$"     "$23"
+"((\(\d{3}\) ?)|(\d{3}-))?\d{3}-\d{4}"   G "<0>(123) 456-7890</0>"
+"((\(\d{3}\) ?)|(\d{3}-))?\d{3}-\d{4}"   G "<0>123-456-7890</0>"
+"((\(\d{3}\) ?)|(\d{3}-))?\d{3}-\d{4}"     "1234567890"
+"^[a-zA-Z]\w{3,14}$"   G "<0>abcd</0>"
+"^[a-zA-Z]\w{3,14}$"   G "<0>aBc45DSD_sdf</0>"
+"^[a-zA-Z]\w{3,14}$"   G "<0>password</0>"
+"^[a-zA-Z]\w{3,14}$"     "afv"
+"^[a-zA-Z]\w{3,14}$"     "1234"
+"^[a-zA-Z]\w{3,14}$"     "reallylongpassword"
+"^[A-Z]{1,2}[1-9][0-9]?[A-Z]? [0-9][A-Z]{2,}|GIR 0AA$"   G "<0>G1 1AA </0>"
+"^[A-Z]{1,2}[1-9][0-9]?[A-Z]? [0-9][A-Z]{2,}|GIR 0AA$"   G "<0>GIR 0AA</0>"
+"^[A-Z]{1,2}[1-9][0-9]?[A-Z]? [0-9][A-Z]{2,}|GIR 0AA$"   G "<0>SW1 1ZZ</0>"
+"^[A-Z]{1,2}[1-9][0-9]?[A-Z]? [0-9][A-Z]{2,}|GIR 0AA$"     "BT01 3RT"
+"^[A-Z]{1,2}[1-9][0-9]?[A-Z]? [0-9][A-Z]{2,}|GIR 0AA$"     "G111 1AA"
+"^0[23489]{1}(\-)?[^0\D]{1}\d{6}$"   G "<0>03-6106666</0>"
+"^0[23489]{1}(\-)?[^0\D]{1}\d{6}$"   G "<0>036106666</0>"
+"^0[23489]{1}(\-)?[^0\D]{1}\d{6}$"   G "<0>02-5523344</0>"
+"^0[23489]{1}(\-)?[^0\D]{1}\d{6}$"     "00-6106666"
+"^0[23489]{1}(\-)?[^0\D]{1}\d{6}$"     "03-0106666"
+"^0[23489]{1}(\-)?[^0\D]{1}\d{6}$"     "02-55812346"
+"^0(5[012345678]|6[47]){1}(\-)?[^0\D]{1}\d{5}$"   G "<0>050-346634</0>"
+"^0(5[012345678]|6[47]){1}(\-)?[^0\D]{1}\d{5}$"   G "<0>058633633</0>"
+"^0(5[012345678]|6[47]){1}(\-)?[^0\D]{1}\d{5}$"   G "<0>064-228226</0>"
+"^0(5[012345678]|6[47]){1}(\-)?[^0\D]{1}\d{5}$"     "059-336622"
+"^0(5[012345678]|6[47]){1}(\-)?[^0\D]{1}\d{5}$"     "064-022663"
+"^0(5[012345678]|6[47]){1}(\-)?[^0\D]{1}\d{5}$"     "0545454545"
+"^([A-Z]{1,2}[0-9]{1,2}|[A-Z]{3}|[A-Z]{1,2}[0-9][A-Z])( |-)[0-9][A-Z]{2}"   G "<0>AA11 1AA</0>"
+"^([A-Z]{1,2}[0-9]{1,2}|[A-Z]{3}|[A-Z]{1,2}[0-9][A-Z])( |-)[0-9][A-Z]{2}"   G "<0>AA1A 1AA</0>"
+"^([A-Z]{1,2}[0-9]{1,2}|[A-Z]{3}|[A-Z]{1,2}[0-9][A-Z])( |-)[0-9][A-Z]{2}"   G "<0>A11-1AA</0>"
+"^([A-Z]{1,2}[0-9]{1,2}|[A-Z]{3}|[A-Z]{1,2}[0-9][A-Z])( |-)[0-9][A-Z]{2}"     "111 AAA"
+"^([A-Z]{1,2}[0-9]{1,2}|[A-Z]{3}|[A-Z]{1,2}[0-9][A-Z])( |-)[0-9][A-Z]{2}"     "1AAA 1AA"
+"^([A-Z]{1,2}[0-9]{1,2}|[A-Z]{3}|[A-Z]{1,2}[0-9][A-Z])( |-)[0-9][A-Z]{2}"     "A1AA 1AA"
+"@{2}((\S)+)@{2}"   G "<0>@@test@@</0>"
+"@{2}((\S)+)@{2}"   G "<0>@@name@@</0>"
+"@{2}((\S)+)@{2}"   G "<0>@@2342@@</0>"
+"@{2}((\S)+)@{2}"     "@test@"
+"@{2}((\S)+)@{2}"     "@@na me@@"
+"@{2}((\S)+)@{2}"     "@@ name@@"
+"([0-1][0-9]|2[0-3]):[0-5][0-9]"   G "<0>00:00</0>"
+"([0-1][0-9]|2[0-3]):[0-5][0-9]"   G "<0>13:59</0>"
+"([0-1][0-9]|2[0-3]):[0-5][0-9]"   G "<0>23:59</0>"
+"([0-1][0-9]|2[0-3]):[0-5][0-9]"     "24:00"
+"([0-1][0-9]|2[0-3]):[0-5][0-9]"     "23:60"
+"^[+-]?([0-9]*\.?[0-9]+|[0-9]+\.?[0-9]*)([eE][+-]?[0-9]+)?$"   G "<0>23</0>"
+"^[+-]?([0-9]*\.?[0-9]+|[0-9]+\.?[0-9]*)([eE][+-]?[0-9]+)?$"   G "<0>-17.e23</0>"
+"^[+-]?([0-9]*\.?[0-9]+|[0-9]+\.?[0-9]*)([eE][+-]?[0-9]+)?$"   G "<0>+.23e+2</0>"
+"^[+-]?([0-9]*\.?[0-9]+|[0-9]+\.?[0-9]*)([eE][+-]?[0-9]+)?$"     "+.e2"
+"^[+-]?([0-9]*\.?[0-9]+|[0-9]+\.?[0-9]*)([eE][+-]?[0-9]+)?$"     "23.17.5"
+"^[+-]?([0-9]*\.?[0-9]+|[0-9]+\.?[0-9]*)([eE][+-]?[0-9]+)?$"     "10e2.0"
+"^([1-zA-Z0-1@.\s ]{1,255})$"   G "<0>email@email.com</0>"
+"^([1-zA-Z0-1@.\s ]{1,255})$"   G "<0>My Name</0>"
+"^([1-zA-Z0-1@.\s ]{1,255})$"   G "<0>asdf12df</0>"
+"^([1-zA-Z0-1@.\s ]{1,255})$"     "‘,\*&$<>"
+"^([1-zA-Z0-1@.\s ]{1,255})$"     "1001' string"
+"^((0[1-9])|(1[0-2]))\/(\d{4})$"   G "<0>12/2002</0>"
+"^((0[1-9])|(1[0-2]))\/(\d{4})$"   G "<0>11/1900</0>"
+"^((0[1-9])|(1[0-2]))\/(\d{4})$"   G "<0>02/1977</0>"
+"^((0[1-9])|(1[0-2]))\/(\d{4})$"     "1/1977"
+"^((0[1-9])|(1[0-2]))\/(\d{4})$"     "00/000"
+"^((0[1-9])|(1[0-2]))\/(\d{4})$"     "15/2002"
+"^\(\d{1,2}(\s\d{1,2}){1,2}\)\s(\d{1,2}(\s\d{1,2}){1,2})((-(\d{1,4})){0,1})$"   G "<0>(0 34 56) 34 56 67</0>"
+"^\(\d{1,2}(\s\d{1,2}){1,2}\)\s(\d{1,2}(\s\d{1,2}){1,2})((-(\d{1,4})){0,1})$"   G "<0>(03 45) 5 67 67</0>"
+"^\(\d{1,2}(\s\d{1,2}){1,2}\)\s(\d{1,2}(\s\d{1,2}){1,2})((-(\d{1,4})){0,1})$"   G "<0>(0 45) 2 33 45-45</0>"
+"^\(\d{1,2}(\s\d{1,2}){1,2}\)\s(\d{1,2}(\s\d{1,2}){1,2})((-(\d{1,4})){0,1})$"     "(2345) 34 34"
+"^\(\d{1,2}(\s\d{1,2}){1,2}\)\s(\d{1,2}(\s\d{1,2}){1,2})((-(\d{1,4})){0,1})$"     "(0 56) 456 456"
+"^\(\d{1,2}(\s\d{1,2}){1,2}\)\s(\d{1,2}(\s\d{1,2}){1,2})((-(\d{1,4})){0,1})$"     "(3 45) 2 34-45678"
+"(?:\d|I{1,3})?\s?\w{2,}\.?\s*\d{1,}\:\d{1,}-?,?\d{0,2}(?:,\d{0,2}){0,2}"   G "<0>Genesis 3:3-4,6</0>"
+"(?:\d|I{1,3})?\s?\w{2,}\.?\s*\d{1,}\:\d{1,}-?,?\d{0,2}(?:,\d{0,2}){0,2}"   G "<0>II Sam 2:11,2</0>"
+"(?:\d|I{1,3})?\s?\w{2,}\.?\s*\d{1,}\:\d{1,}-?,?\d{0,2}(?:,\d{0,2}){0,2}"   G "<0>2 Tim 3:16</0>"
+"(?:\d|I{1,3})?\s?\w{2,}\.?\s*\d{1,}\:\d{1,}-?,?\d{0,2}(?:,\d{0,2}){0,2}"     "Genesis chap 3, verse 3"
+"(?:\d|I{1,3})?\s?\w{2,}\.?\s*\d{1,}\:\d{1,}-?,?\d{0,2}(?:,\d{0,2}){0,2}"     "2nd Samuel 2"
+"(\[[Ii][Mm][Gg]\])(\S+?)(\[\/[Ii][Mm][Gg]\])"   G "<0>[IMG]http://bleh.jpg[/IMG]</0>"
+"(\[[Ii][Mm][Gg]\])(\S+?)(\[\/[Ii][Mm][Gg]\])"   G "<0>[ImG]bleh[/imG]</0>"
+"(\[[Ii][Mm][Gg]\])(\S+?)(\[\/[Ii][Mm][Gg]\])"   G "<0>[img]ftp://login:pass@bleh.gif[/img]</0>"
+"(\[[Ii][Mm][Gg]\])(\S+?)(\[\/[Ii][Mm][Gg]\])"     '<img src="bleh.jpg">'
+"^([0-9]{1,2})[./-]+([0-9]{1,2})[./-]+([0-9]{2}|[0-9]{4})$"   G "<0>10/03/1979</0>"
+"^([0-9]{1,2})[./-]+([0-9]{1,2})[./-]+([0-9]{2}|[0-9]{4})$"   G "<0>1-1-02</0>"
+"^([0-9]{1,2})[./-]+([0-9]{1,2})[./-]+([0-9]{2}|[0-9]{4})$"   G "<0>01.1.2003</0>"
+"^([0-9]{1,2})[./-]+([0-9]{1,2})[./-]+([0-9]{2}|[0-9]{4})$"     "10/03/197"
+"^([0-9]{1,2})[./-]+([0-9]{1,2})[./-]+([0-9]{2}|[0-9]{4})$"     "01-02-003"
+"^([0-9]{1,2})[./-]+([0-9]{1,2})[./-]+([0-9]{2}|[0-9]{4})$"     "01 02 03"
+#"^(?(^00000(|-0000))|(\d{5}(|-\d{4})))$"   G "<0>12345</0>"         # No Conditionals?
+#"^(?(^00000(|-0000))|(\d{5}(|-\d{4})))$"   G "<0>12345-6789</0>"    # No Conditionals?
+#"^(?(^00000(|-0000))|(\d{5}(|-\d{4})))$"     "00000"                # No Conditionals?
+#"^(?(^00000(|-0000))|(\d{5}(|-\d{4})))$"     "00000-0000"           # No Conditionals?
+#"^(?(^00000(|-0000))|(\d{5}(|-\d{4})))$"     "a4650-465s"           # No Conditionals?
+"^((0?[1-9])|((1|2)[0-9])|30|31)$"   G "<0>01</0>"
+"^((0?[1-9])|((1|2)[0-9])|30|31)$"   G "<0>12</0>"
+"^((0?[1-9])|((1|2)[0-9])|30|31)$"   G "<0>31</0>"
+"^((0?[1-9])|((1|2)[0-9])|30|31)$"     "123"
+"^((0?[1-9])|((1|2)[0-9])|30|31)$"     "32"
+"^((0?[1-9])|((1|2)[0-9])|30|31)$"     "abc"
+"^([0-1]([\s\-./\\])?)?(\(?[2-9]\d{2}\)?|[2-9]\d{3})([\s\-./\\])?(\d{3}([\s\-./\\])?\d{4}|[a-zA-Z0-9]{7})$"   G "<0>1.222.333.1234</0>"
+"^([0-1]([\s\-./\\])?)?(\(?[2-9]\d{2}\)?|[2-9]\d{3})([\s\-./\\])?(\d{3}([\s\-./\\])?\d{4}|[a-zA-Z0-9]{7})$"   G "<0>1-223-123-1232</0>"
+"^([0-1]([\s\-./\\])?)?(\(?[2-9]\d{2}\)?|[2-9]\d{3})([\s\-./\\])?(\d{3}([\s\-./\\])?\d{4}|[a-zA-Z0-9]{7})$"   G "<0>12223334444</0>"
+"^([0-1]([\s\-./\\])?)?(\(?[2-9]\d{2}\)?|[2-9]\d{3})([\s\-./\\])?(\d{3}([\s\-./\\])?\d{4}|[a-zA-Z0-9]{7})$"     "1.1.123123.123"
+"^([0-1]([\s\-./\\])?)?(\(?[2-9]\d{2}\)?|[2-9]\d{3})([\s\-./\\])?(\d{3}([\s\-./\\])?\d{4}|[a-zA-Z0-9]{7})$"     "12-1322-112-31"
+"^([0-1]([\s\-./\\])?)?(\(?[2-9]\d{2}\)?|[2-9]\d{3})([\s\-./\\])?(\d{3}([\s\-./\\])?\d{4}|[a-zA-Z0-9]{7})$"     "11231321131"
+"^([A-PR-UWYZ0-9][A-HK-Y0-9][AEHMNPRTVXY0-9]?[ABEHMNPRVWXY0-9]? {1,2}[0-9][ABD-HJLN-UW-Z]{2}|GIR 0AA)$"   G "<0>DN3 6GB</0>"
+"^([A-PR-UWYZ0-9][A-HK-Y0-9][AEHMNPRTVXY0-9]?[ABEHMNPRVWXY0-9]? {1,2}[0-9][ABD-HJLN-UW-Z]{2}|GIR 0AA)$"   G "<0>SW42 4RG</0>"
+"^([A-PR-UWYZ0-9][A-HK-Y0-9][AEHMNPRTVXY0-9]?[ABEHMNPRVWXY0-9]? {1,2}[0-9][ABD-HJLN-UW-Z]{2}|GIR 0AA)$"   G "<0>GIR 0AA</0>"
+"^([A-PR-UWYZ0-9][A-HK-Y0-9][AEHMNPRTVXY0-9]?[ABEHMNPRVWXY0-9]? {1,2}[0-9][ABD-HJLN-UW-Z]{2}|GIR 0AA)$"     "SEW4 5TY"
+"^([A-PR-UWYZ0-9][A-HK-Y0-9][AEHMNPRTVXY0-9]?[ABEHMNPRVWXY0-9]? {1,2}[0-9][ABD-HJLN-UW-Z]{2}|GIR 0AA)$"     "AA2C 4FG"
+"^([A-PR-UWYZ0-9][A-HK-Y0-9][AEHMNPRTVXY0-9]?[ABEHMNPRVWXY0-9]? {1,2}[0-9][ABD-HJLN-UW-Z]{2}|GIR 0AA)$"     "AA2 4CV"
+"^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{4,8}$"   G "<0>asD1</0>"
+"^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{4,8}$"   G "<0>asDF1234</0>"
+"^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{4,8}$"   G "<0>ASPgo123</0>"
+"^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{4,8}$"     "asdf"
+"^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{4,8}$"     "1234"
+"^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{4,8}$"     "ASDF12345"
+"^([0-1]([\s\-./\\])?)?(\(?[2-9]\d{2}\)?|[2-9]\d{3})([\s\-./\\])?([0-9]{3}([\s\-./\\])?[0-9]{4}|[a-zA-Z0-9]{7}|([0-9]{3}[-][a-zA-Z0-9]{4}))"   G "<0>1.222.333.1234</0>"
+"^([0-1]([\s\-./\\])?)?(\(?[2-9]\d{2}\)?|[2-9]\d{3})([\s\-./\\])?([0-9]{3}([\s\-./\\])?[0-9]{4}|[a-zA-Z0-9]{7}|([0-9]{3}[-][a-zA-Z0-9]{4}))"   G "<0>1-223-123-1232</0>"
+"^([0-1]([\s\-./\\])?)?(\(?[2-9]\d{2}\)?|[2-9]\d{3})([\s\-./\\])?([0-9]{3}([\s\-./\\])?[0-9]{4}|[a-zA-Z0-9]{7}|([0-9]{3}[-][a-zA-Z0-9]{4}))"   G "<0>1-888-425-DELL</0>"
+"^([0-1]([\s\-./\\])?)?(\(?[2-9]\d{2}\)?|[2-9]\d{3})([\s\-./\\])?([0-9]{3}([\s\-./\\])?[0-9]{4}|[a-zA-Z0-9]{7}|([0-9]{3}[-][a-zA-Z0-9]{4}))"     "1.1.123123.123"
+"^([0-1]([\s\-./\\])?)?(\(?[2-9]\d{2}\)?|[2-9]\d{3})([\s\-./\\])?([0-9]{3}([\s\-./\\])?[0-9]{4}|[a-zA-Z0-9]{7}|([0-9]{3}[-][a-zA-Z0-9]{4}))"     "12-1322-112-31"
+"^([0-1]([\s\-./\\])?)?(\(?[2-9]\d{2}\)?|[2-9]\d{3})([\s\-./\\])?([0-9]{3}([\s\-./\\])?[0-9]{4}|[a-zA-Z0-9]{7}|([0-9]{3}[-][a-zA-Z0-9]{4}))"     "1-800-CALL-DEL"
+"^(([0]?[1-9]|1[0-2])(:)([0-5][0-9]))$"   G "<0>09:00</0>"
+"^(([0]?[1-9]|1[0-2])(:)([0-5][0-9]))$"   G "<0>9:00</0>"
+"^(([0]?[1-9]|1[0-2])(:)([0-5][0-9]))$"   G "<0>11:35</0>"
+"^(([0]?[1-9]|1[0-2])(:)([0-5][0-9]))$"     "13:00"
+"^(([0]?[1-9]|1[0-2])(:)([0-5][0-9]))$"     "9.00"
+"^(([0]?[1-9]|1[0-2])(:)([0-5][0-9]))$"     "6:60"
+"^([1-9]|[1-9]\d|1\d{2}|2[0-4]\d|25[0-5])$"   G "<0>1</0>"
+"^([1-9]|[1-9]\d|1\d{2}|2[0-4]\d|25[0-5])$"   G "<0>108</0>"
+"^([1-9]|[1-9]\d|1\d{2}|2[0-4]\d|25[0-5])$"   G "<0>255</0>"
+"^([1-9]|[1-9]\d|1\d{2}|2[0-4]\d|25[0-5])$"     "01"
+"^([1-9]|[1-9]\d|1\d{2}|2[0-4]\d|25[0-5])$"     "256"
+"^((((0[13578])|([13578])|(1[02]))[\/](([1-9])|([0-2][0-9])|(3[01])))|(((0[469])|([469])|(11))[\/](([1-9])|([0-2][0-9])|(30)))|((2|02)[\/](([1-9])|([0-2][0-9]))))[\/]\d{4}$|^\d{4}$"   G "<0>01/01/2001</0>"
+"^((((0[13578])|([13578])|(1[02]))[\/](([1-9])|([0-2][0-9])|(3[01])))|(((0[469])|([469])|(11))[\/](([1-9])|([0-2][0-9])|(30)))|((2|02)[\/](([1-9])|([0-2][0-9]))))[\/]\d{4}$|^\d{4}$"   G "<0>1/01/2001</0>"
+"^((((0[13578])|([13578])|(1[02]))[\/](([1-9])|([0-2][0-9])|(3[01])))|(((0[469])|([469])|(11))[\/](([1-9])|([0-2][0-9])|(30)))|((2|02)[\/](([1-9])|([0-2][0-9]))))[\/]\d{4}$|^\d{4}$"   G "<0>2002</0>"
+"^((((0[13578])|([13578])|(1[02]))[\/](([1-9])|([0-2][0-9])|(3[01])))|(((0[469])|([469])|(11))[\/](([1-9])|([0-2][0-9])|(30)))|((2|02)[\/](([1-9])|([0-2][0-9]))))[\/]\d{4}$|^\d{4}$"     "2/30/2002"
+"^((((0[13578])|([13578])|(1[02]))[\/](([1-9])|([0-2][0-9])|(3[01])))|(((0[469])|([469])|(11))[\/](([1-9])|([0-2][0-9])|(30)))|((2|02)[\/](([1-9])|([0-2][0-9]))))[\/]\d{4}$|^\d{4}$"     "13/23/2002"
+"^((((0[13578])|([13578])|(1[02]))[\/](([1-9])|([0-2][0-9])|(3[01])))|(((0[469])|([469])|(11))[\/](([1-9])|([0-2][0-9])|(30)))|((2|02)[\/](([1-9])|([0-2][0-9]))))[\/]\d{4}$|^\d{4}$"     "12345"
+"^[A-Za-z]{2}[0-9]{6}[A-Za-z]{1}$"   G "<0>SP939393H</0>"
+"^[A-Za-z]{2}[0-9]{6}[A-Za-z]{1}$"   G "<0>PX123456D</0>"
+"^[A-Za-z]{2}[0-9]{6}[A-Za-z]{1}$"   G "<0>SW355667G</0>"
+"^[A-Za-z]{2}[0-9]{6}[A-Za-z]{1}$"     "12SP9393H"
+"^[A-Za-z]{2}[0-9]{6}[A-Za-z]{1}$"     "S3P93930D"
+"^[A-Za-z]{2}[0-9]{6}[A-Za-z]{1}$"     "11223344SP00ddSS"
+"(^0[78][2347][0-9]{7})"   G "<0>0834128458</0>"
+"(^0[78][2347][0-9]{7})"   G "<0>0749526308</0>"
+"(^0[78][2347][0-9]{7})"     "0861212308"
+"(^0[78][2347][0-9]{7})"     "0892549851"
+"^([A-HJ-TP-Z]{1}\d{4}[A-Z]{3}|[a-z]{1}\d{4}[a-hj-tp-z]{3})$"   G "<0>C1406HHA</0>"
+"^([A-HJ-TP-Z]{1}\d{4}[A-Z]{3}|[a-z]{1}\d{4}[a-hj-tp-z]{3})$"   G "<0>A4126AAB</0>"
+"^([A-HJ-TP-Z]{1}\d{4}[A-Z]{3}|[a-z]{1}\d{4}[a-hj-tp-z]{3})$"   G "<0>c1406hha</0>"
+"^([A-HJ-TP-Z]{1}\d{4}[A-Z]{3}|[a-z]{1}\d{4}[a-hj-tp-z]{3})$"     "c1406HHA"
+"^([A-HJ-TP-Z]{1}\d{4}[A-Z]{3}|[a-z]{1}\d{4}[a-hj-tp-z]{3})$"     "4126"
+"^([A-HJ-TP-Z]{1}\d{4}[A-Z]{3}|[a-z]{1}\d{4}[a-hj-tp-z]{3})$"     "C1406hha"
+"^(((25[0-5]|2[0-4][0-9]|19[0-1]|19[3-9]|18[0-9]|17[0-1]|17[3-9]|1[0-6][0-9]|1[1-9]|[2-9][0-9]|[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9]))|(192\.(25[0-5]|2[0-4][0-9]|16[0-7]|169|1[0-5][0-9]|1[7-9][0-9]|[1-9][0-9]|[0-9]))|(172\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|1[0-5]|3[2-9]|[4-9][0-9]|[0-9])))\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$"   G "<0>66.129.71.120</0>"
+"^(((25[0-5]|2[0-4][0-9]|19[0-1]|19[3-9]|18[0-9]|17[0-1]|17[3-9]|1[0-6][0-9]|1[1-9]|[2-9][0-9]|[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9]))|(192\.(25[0-5]|2[0-4][0-9]|16[0-7]|169|1[0-5][0-9]|1[7-9][0-9]|[1-9][0-9]|[0-9]))|(172\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|1[0-5]|3[2-9]|[4-9][0-9]|[0-9])))\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$"   G "<0>207.46.230.218</0>"
+"^(((25[0-5]|2[0-4][0-9]|19[0-1]|19[3-9]|18[0-9]|17[0-1]|17[3-9]|1[0-6][0-9]|1[1-9]|[2-9][0-9]|[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9]))|(192\.(25[0-5]|2[0-4][0-9]|16[0-7]|169|1[0-5][0-9]|1[7-9][0-9]|[1-9][0-9]|[0-9]))|(172\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|1[0-5]|3[2-9]|[4-9][0-9]|[0-9])))\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$"   G "<0>64.58.76.225</0>"
+"^(((25[0-5]|2[0-4][0-9]|19[0-1]|19[3-9]|18[0-9]|17[0-1]|17[3-9]|1[0-6][0-9]|1[1-9]|[2-9][0-9]|[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9]))|(192\.(25[0-5]|2[0-4][0-9]|16[0-7]|169|1[0-5][0-9]|1[7-9][0-9]|[1-9][0-9]|[0-9]))|(172\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|1[0-5]|3[2-9]|[4-9][0-9]|[0-9])))\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$"     "10.0.5.4"
+"^(((25[0-5]|2[0-4][0-9]|19[0-1]|19[3-9]|18[0-9]|17[0-1]|17[3-9]|1[0-6][0-9]|1[1-9]|[2-9][0-9]|[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9]))|(192\.(25[0-5]|2[0-4][0-9]|16[0-7]|169|1[0-5][0-9]|1[7-9][0-9]|[1-9][0-9]|[0-9]))|(172\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|1[0-5]|3[2-9]|[4-9][0-9]|[0-9])))\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$"     "192.168.0.1"
+"^(((25[0-5]|2[0-4][0-9]|19[0-1]|19[3-9]|18[0-9]|17[0-1]|17[3-9]|1[0-6][0-9]|1[1-9]|[2-9][0-9]|[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9]))|(192\.(25[0-5]|2[0-4][0-9]|16[0-7]|169|1[0-5][0-9]|1[7-9][0-9]|[1-9][0-9]|[0-9]))|(172\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|1[0-5]|3[2-9]|[4-9][0-9]|[0-9])))\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$"     "my ip address"
+"^([\w\d\-\.]+)@{1}(([\w\d\-]{1,67})|([\w\d\-]+\.[\w\d\-]{1,67}))\.(([a-zA-Z\d]{2,4})(\.[a-zA-Z\d]{2})?)$"   G "<0>foo@foo.com</0>"
+"^([\w\d\-\.]+)@{1}(([\w\d\-]{1,67})|([\w\d\-]+\.[\w\d\-]{1,67}))\.(([a-zA-Z\d]{2,4})(\.[a-zA-Z\d]{2})?)$"   G "<0>foo@foo-foo.com.au</0>"
+"^([\w\d\-\.]+)@{1}(([\w\d\-]{1,67})|([\w\d\-]+\.[\w\d\-]{1,67}))\.(([a-zA-Z\d]{2,4})(\.[a-zA-Z\d]{2})?)$"   G "<0>foo@foo.foo.info</0>"
+"^([\w\d\-\.]+)@{1}(([\w\d\-]{1,67})|([\w\d\-]+\.[\w\d\-]{1,67}))\.(([a-zA-Z\d]{2,4})(\.[a-zA-Z\d]{2})?)$"     "foo@.com"
+"^([\w\d\-\.]+)@{1}(([\w\d\-]{1,67})|([\w\d\-]+\.[\w\d\-]{1,67}))\.(([a-zA-Z\d]{2,4})(\.[a-zA-Z\d]{2})?)$"     "foo@foo..com"
+"^([\w\d\-\.]+)@{1}(([\w\d\-]{1,67})|([\w\d\-]+\.[\w\d\-]{1,67}))\.(([a-zA-Z\d]{2,4})(\.[a-zA-Z\d]{2})?)$"     "foo@me@.com"
+"/\*[\d\D]*?\*/"   G "<0>/* my comment */</0>"
+"/\*[\d\D]*?\*/"   G "<0>/* my multiline comment */</0>"
+"/\*[\d\D]*?\*/"   G "<0>/* my nested comment */</0>"
+"/\*[\d\D]*?\*/"     "*/ anything here /*"
+"/\*[\d\D]*?\*/"     "anything between 2 seperate comments"
+"/\*[\d\D]*?\*/"     "\* *\"
+"/\*[\p{N}\P{N}]*?\*/"   G "<0>/* my comment */</0>"
+"/\*[\p{N}\P{N}]*?\*/"   G "<0>/* my multiline comment */</0>"
+"/\*[\p{N}\P{N}]*?\*/"   G "<0>/* my nested comment */</0>"
+"/\*[\p{N}\P{N}]*?\*/"     "*/ anything here /*"
+"/\*[\p{N}\P{N}]*?\*/"     "anything between 2 seperate comments"
+"/\*[\p{N}\P{N}]*?\*/"     "\* *\"
+"((0?[13578]|10|12)(-|\/)((0[0-9])|([12])([0-9]?)|(3[01]?))(-|\/)((\d{4})|(\d{2}))|(0?[2469]|11)(-|\/)((0[0-9])|([12])([0-9]?)|(3[0]?))(-|\/)((\d{4}|\d{2})))"   G "<0>1/31/2002</0>"
+"((0?[13578]|10|12)(-|\/)((0[0-9])|([12])([0-9]?)|(3[01]?))(-|\/)((\d{4})|(\d{2}))|(0?[2469]|11)(-|\/)((0[0-9])|([12])([0-9]?)|(3[0]?))(-|\/)((\d{4}|\d{2})))"   G "<0>04-30-02</0>"
+"((0?[13578]|10|12)(-|\/)((0[0-9])|([12])([0-9]?)|(3[01]?))(-|\/)((\d{4})|(\d{2}))|(0?[2469]|11)(-|\/)((0[0-9])|([12])([0-9]?)|(3[0]?))(-|\/)((\d{4}|\d{2})))"   G "<0>12-01/2002</0>"
+"((0?[13578]|10|12)(-|\/)((0[0-9])|([12])([0-9]?)|(3[01]?))(-|\/)((\d{4})|(\d{2}))|(0?[2469]|11)(-|\/)((0[0-9])|([12])([0-9]?)|(3[0]?))(-|\/)((\d{4}|\d{2})))"     "2/31/2002"
+"((0?[13578]|10|12)(-|\/)((0[0-9])|([12])([0-9]?)|(3[01]?))(-|\/)((\d{4})|(\d{2}))|(0?[2469]|11)(-|\/)((0[0-9])|([12])([0-9]?)|(3[0]?))(-|\/)((\d{4}|\d{2})))"     "13/0/02"
+"((0?[13578]|10|12)(-|\/)((0[0-9])|([12])([0-9]?)|(3[01]?))(-|\/)((\d{4})|(\d{2}))|(0?[2469]|11)(-|\/)((0[0-9])|([12])([0-9]?)|(3[0]?))(-|\/)((\d{4}|\d{2})))"     "Jan 1, 2001"
+'^(([^<>;()\[\]\\.,;:@"]+(\.[^<>()\[\]\\.,;:@"]+)*)|(".+"))@((([a-z]([-a-z0-9]*[a-z0-9])?)|(#[0-9]+)|(\[((([01]?[0-9]{0,2})|(2(([0-4][0-9])|(5[0-5]))))\.){3}(([01]?[0-9]{0,2})|(2(([0-4][0-9])|(5[0-5]))))\]))\.)*(([a-z]([-a-z0-9]*[a-z0-9])?)|(#[0-9]+)|(\[((([01]?[0-9]{0,2})|(2(([0-4][0-9])|(5[0-5]))))\.){3}(([01]?[0-9]{0,2})|(2(([0-4][0-9])|(5[0-5]))))\]))$'   G "<0>blah@[10.0.0.1]</0>"
+'^(([^<>;()\[\]\\.,;:@"]+(\.[^<>()\[\]\\.,;:@"]+)*)|(".+"))@((([a-z]([-a-z0-9]*[a-z0-9])?)|(#[0-9]+)|(\[((([01]?[0-9]{0,2})|(2(([0-4][0-9])|(5[0-5]))))\.){3}(([01]?[0-9]{0,2})|(2(([0-4][0-9])|(5[0-5]))))\]))\.)*(([a-z]([-a-z0-9]*[a-z0-9])?)|(#[0-9]+)|(\[((([01]?[0-9]{0,2})|(2(([0-4][0-9])|(5[0-5]))))\.){3}(([01]?[0-9]{0,2})|(2(([0-4][0-9])|(5[0-5]))))\]))$'   G "<0>a@b.c</0>"
+'^(([^<>;()\[\]\\.,;:@"]+(\.[^<>()\[\]\\.,;:@"]+)*)|(".+"))@((([a-z]([-a-z0-9]*[a-z0-9])?)|(#[0-9]+)|(\[((([01]?[0-9]{0,2})|(2(([0-4][0-9])|(5[0-5]))))\.){3}(([01]?[0-9]{0,2})|(2(([0-4][0-9])|(5[0-5]))))\]))\.)*(([a-z]([-a-z0-9]*[a-z0-9])?)|(#[0-9]+)|(\[((([01]?[0-9]{0,2})|(2(([0-4][0-9])|(5[0-5]))))\.){3}(([01]?[0-9]{0,2})|(2(([0-4][0-9])|(5[0-5]))))\]))$'     "non@match@."
+"^\d{9}[\d|X]$"   G "<0>1234123412</0>"
+"^\d{9}[\d|X]$"   G "<0>123412341X</0>"
+"^\d{9}[\d|X]$"     "not an isbn"
+"^\d{9}(\d|X)$"   G "<0>1234123412</0>"
+"^\d{9}(\d|X)$"   G "<0>123412341X</0>"
+"^\d{9}(\d|X)$"     "not an isbn"
+"^(([1-9])|(0[1-9])|(1[0-2]))\/(([0-9])|([0-2][0-9])|(3[0-1]))\/(([0-9][0-9])|([1-2][0,9][0-9][0-9]))$"   G "<0>01/01/2001</0>"
+"^(([1-9])|(0[1-9])|(1[0-2]))\/(([0-9])|([0-2][0-9])|(3[0-1]))\/(([0-9][0-9])|([1-2][0,9][0-9][0-9]))$"   G "<0>1/1/1999</0>"
+"^(([1-9])|(0[1-9])|(1[0-2]))\/(([0-9])|([0-2][0-9])|(3[0-1]))\/(([0-9][0-9])|([1-2][0,9][0-9][0-9]))$"   G "<0>10/20/2080</0>"
+"^(([1-9])|(0[1-9])|(1[0-2]))\/(([0-9])|([0-2][0-9])|(3[0-1]))\/(([0-9][0-9])|([1-2][0,9][0-9][0-9]))$"     "13/01/2001"
+"^(([1-9])|(0[1-9])|(1[0-2]))\/(([0-9])|([0-2][0-9])|(3[0-1]))\/(([0-9][0-9])|([1-2][0,9][0-9][0-9]))$"     "1/1/1800"
+"^(([1-9])|(0[1-9])|(1[0-2]))\/(([0-9])|([0-2][0-9])|(3[0-1]))\/(([0-9][0-9])|([1-2][0,9][0-9][0-9]))$"     "10/32/2080"
+"^\d*\.?((25)|(50)|(5)|(75)|(0)|(00))?$"   G "<0>0.25</0>"
+"^\d*\.?((25)|(50)|(5)|(75)|(0)|(00))?$"   G "<0>.75</0>"
+"^\d*\.?((25)|(50)|(5)|(75)|(0)|(00))?$"   G "<0>123.50</0>"
+"^\d*\.?((25)|(50)|(5)|(75)|(0)|(00))?$"     ".77"
+"^\d*\.?((25)|(50)|(5)|(75)|(0)|(00))?$"     "1.435"
+"^(s-|S-){0,1}[0-9]{3}\s?[0-9]{2}$"   G "<0>12345</0>"
+"^(s-|S-){0,1}[0-9]{3}\s?[0-9]{2}$"   G "<0>932 68</0>"
+"^(s-|S-){0,1}[0-9]{3}\s?[0-9]{2}$"   G "<0>S-621 46</0>"
+"^(s-|S-){0,1}[0-9]{3}\s?[0-9]{2}$"     "5367"
+"^(s-|S-){0,1}[0-9]{3}\s?[0-9]{2}$"     "425611"
+"^(s-|S-){0,1}[0-9]{3}\s?[0-9]{2}$"     "31 545"
+"^\d{5}(-\d{4})?$"   G "<0>48222</0>"
+"^\d{5}(-\d{4})?$"   G "<0>48222-1746</0>"
+"^\d{5}(-\d{4})?$"     "4632"
+"^\d{5}(-\d{4})?$"     "Blake"
+"^\d{5}(-\d{4})?$"     "37333-32"
+'^(?!^(PRN|AUX|CLOCK\$|NUL|CON|COM\d|LPT\d|\..*)(\..+)?$)[^\x00-\x1f\\?*:\";|/]+$'   G "<0>test.txt</0>"
+'^(?!^(PRN|AUX|CLOCK\$|NUL|CON|COM\d|LPT\d|\..*)(\..+)?$)[^\x00-\x1f\\?*:\";|/]+$'   G "<0>test.jpg.txt</0>"
+'^(?!^(PRN|AUX|CLOCK\$|NUL|CON|COM\d|LPT\d|\..*)(\..+)?$)[^\x00-\x1f\\?*:\";|/]+$'   G "<0>a&b c.bmp</0>"
+'^(?!^(PRN|AUX|CLOCK\$|NUL|CON|COM\d|LPT\d|\..*)(\..+)?$)[^\x00-\x1f\\?*:\";|/]+$'     "CON"
+'^(?!^(PRN|AUX|CLOCK\$|NUL|CON|COM\d|LPT\d|\..*)(\..+)?$)[^\x00-\x1f\\?*:\";|/]+$'     ".pdf"
+'^(?!^(PRN|AUX|CLOCK\$|NUL|CON|COM\d|LPT\d|\..*)(\..+)?$)[^\x00-\x1f\\?*:\";|/]+$'     "test:2.pdf"
+"^(\d{1,3}'(\d{3}')*\d{3}(\.\d{1,3})?|\d{1,3}(\.\d{3})?)$"   G "<0>1'235.140</0>"
+"^(\d{1,3}'(\d{3}')*\d{3}(\.\d{1,3})?|\d{1,3}(\.\d{3})?)$"   G "<0>1'222'333.120</0>"
+"^(\d{1,3}'(\d{3}')*\d{3}(\.\d{1,3})?|\d{1,3}(\.\d{3})?)$"   G "<0>456</0>"
+"^(\d{1,3}'(\d{3}')*\d{3}(\.\d{1,3})?|\d{1,3}(\.\d{3})?)$"     "1234.500"
+"^(\d{1,3}'(\d{3}')*\d{3}(\.\d{1,3})?|\d{1,3}(\.\d{3})?)$"     "78'45.123"
+"^(\d{1,3}'(\d{3}')*\d{3}(\.\d{1,3})?|\d{1,3}(\.\d{3})?)$"     "123,0012"
+"^[a-zA-Z][0-9][a-zA-Z]\s?[0-9][a-zA-Z][0-9]$"   G "<0>T2p 3c7</0>"
+"^[a-zA-Z][0-9][a-zA-Z]\s?[0-9][a-zA-Z][0-9]$"   G "<0>T3P3c7</0>"
+"^[a-zA-Z][0-9][a-zA-Z]\s?[0-9][a-zA-Z][0-9]$"   G "<0>T2P 3C7</0>"
+"^[a-zA-Z][0-9][a-zA-Z]\s?[0-9][a-zA-Z][0-9]$"     "123456"
+"^[a-zA-Z][0-9][a-zA-Z]\s?[0-9][a-zA-Z][0-9]$"     "3C7T2P"
+"^[a-zA-Z][0-9][a-zA-Z]\s?[0-9][a-zA-Z][0-9]$"     "11T21RWW"
+"^\$[0-9]+(\.[0-9][0-9])?$"   G "<0>$1.50</0>"
+"^\$[0-9]+(\.[0-9][0-9])?$"   G "<0>$49</0>"
+"^\$[0-9]+(\.[0-9][0-9])?$"   G "<0>$0.50</0>"
+"^\$[0-9]+(\.[0-9][0-9])?$"     "1.5"
+"^\$[0-9]+(\.[0-9][0-9])?$"     "$1.333"
+"^\$[0-9]+(\.[0-9][0-9])?$"     "this $5.12 fails"
+"\b((25[0-5]|2[0-4]\d|[01]\d\d|\d?\d)\.){3}(25[0-5]|2[0-4]\d|[01]\d\d|\d?\d)\b"   G "<0>217.6.9.89</0>"
+"\b((25[0-5]|2[0-4]\d|[01]\d\d|\d?\d)\.){3}(25[0-5]|2[0-4]\d|[01]\d\d|\d?\d)\b"   G "<0>0.0.0.0</0>"
+"\b((25[0-5]|2[0-4]\d|[01]\d\d|\d?\d)\.){3}(25[0-5]|2[0-4]\d|[01]\d\d|\d?\d)\b"   G "<0>255.255.255.255</0>"
+"\b((25[0-5]|2[0-4]\d|[01]\d\d|\d?\d)\.){3}(25[0-5]|2[0-4]\d|[01]\d\d|\d?\d)\b"     "256.0.0.0"
+"\b((25[0-5]|2[0-4]\d|[01]\d\d|\d?\d)\.){3}(25[0-5]|2[0-4]\d|[01]\d\d|\d?\d)\b"     "0978.3.3.3"
+"\b((25[0-5]|2[0-4]\d|[01]\d\d|\d?\d)\.){3}(25[0-5]|2[0-4]\d|[01]\d\d|\d?\d)\b"     "65.4t.54.3"
+"((mailto\:|(news|(ht|f)tp(s?))\://){1}\S+)"   G "<0>http://www.aspemporium.com</0>"
+"((mailto\:|(news|(ht|f)tp(s?))\://){1}\S+)"   G "<0>mailto:dominionx@hotmail.com</0>"
+"((mailto\:|(news|(ht|f)tp(s?))\://){1}\S+)"   G "<0>ftp://ftp.test.com</0>"
+"((mailto\:|(news|(ht|f)tp(s?))\://){1}\S+)"     "www.aspemporium.com"
+"((mailto\:|(news|(ht|f)tp(s?))\://){1}\S+)"     "dominionx@hotmail.com"
+"((mailto\:|(news|(ht|f)tp(s?))\://){1}\S+)"     "bloggs"
+"\(([0-9]{2}|0{1}((x|[0-9]){2}[0-9]{2}))\)\s*[0-9]{3,4}[- ]*[0-9]{4}"   G "<0>(12) 123 1234</0>"
+"\(([0-9]{2}|0{1}((x|[0-9]){2}[0-9]{2}))\)\s*[0-9]{3,4}[- ]*[0-9]{4}"   G "<0>(01512) 123 1234</0>"
+"\(([0-9]{2}|0{1}((x|[0-9]){2}[0-9]{2}))\)\s*[0-9]{3,4}[- ]*[0-9]{4}"   G "<0>(0xx12) 1234 1234</0>"
+"\(([0-9]{2}|0{1}((x|[0-9]){2}[0-9]{2}))\)\s*[0-9]{3,4}[- ]*[0-9]{4}"     "12 123 1234"
+"\(([0-9]{2}|0{1}((x|[0-9]){2}[0-9]{2}))\)\s*[0-9]{3,4}[- ]*[0-9]{4}"     "(012) 123/1234"
+"\(([0-9]{2}|0{1}((x|[0-9]){2}[0-9]{2}))\)\s*[0-9]{3,4}[- ]*[0-9]{4}"     "(012) 123 12345"
+"^\w+[\w-\.]*\@\w+((-\w+)|(\w*))\.[a-z]{2,3}$"   G "<0>bob-smith@foo.com</0>"
+"^\w+[\w-\.]*\@\w+((-\w+)|(\w*))\.[a-z]{2,3}$"   G "<0>bob.smith@foo.com</0>"
+"^\w+[\w-\.]*\@\w+((-\w+)|(\w*))\.[a-z]{2,3}$"   G "<0>bob_smith@foo.com</0>"
+"^\w+[\w-\.]*\@\w+((-\w+)|(\w*))\.[a-z]{2,3}$"     "-smith@foo.com"
+"^\w+[\w-\.]*\@\w+((-\w+)|(\w*))\.[a-z]{2,3}$"     ".smith@foo.com"
+"^\w+[\w-\.]*\@\w+((-\w+)|(\w*))\.[a-z]{2,3}$"     "smith@foo_com"
+"^(?=.*\d).{4,8}$"   G "<0>1234</0>"
+"^(?=.*\d).{4,8}$"   G "<0>asdf1234</0>"
+"^(?=.*\d).{4,8}$"   G "<0>asp123</0>"
+"^(?=.*\d).{4,8}$"     "asdf"
+"^(?=.*\d).{4,8}$"     "asdf12345"
+"^(?=.*\d).{4,8}$"     "password"
+"[^A-Za-z0-9_@\.]|@{2,}|\.{5,}"   G "<0>user name</0>"
+"[^A-Za-z0-9_@\.]|@{2,}|\.{5,}"   G "<0>user#name</0>"
+"[^A-Za-z0-9_@\.]|@{2,}|\.{5,}"   G "<0>.....</0>"
+"[^A-Za-z0-9_@\.]|@{2,}|\.{5,}"     "User_Name1"
+"[^A-Za-z0-9_@\.]|@{2,}|\.{5,}"     "username@foo.com"
+"[^A-Za-z0-9_@\.]|@{2,}|\.{5,}"     "user.name@mail.foo.com"
+"^100$|^[0-9]{1,2}$|^[0-9]{1,2}\,[0-9]{1,3}$"   G "<0>12,654</0>"
+"^100$|^[0-9]{1,2}$|^[0-9]{1,2}\,[0-9]{1,3}$"   G "<0>1,987</0>"
+"^100$|^[0-9]{1,2}$|^[0-9]{1,2}\,[0-9]{1,3}$"     "128,2"
+"^100$|^[0-9]{1,2}$|^[0-9]{1,2}\,[0-9]{1,3}$"     "12,"
+"^(http|https|ftp)\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(:[a-zA-Z0-9]*)?/?([a-zA-Z0-9\-\._\?\,\'/\\\+\&%\$#\=~])*[^\.\,\)\(\s]$"   G "<0>https://www.restrictd.com/~myhome/</0>"
+"^(http|https|ftp)\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(:[a-zA-Z0-9]*)?/?([a-zA-Z0-9\-\._\?\,\'/\\\+\&%\$#\=~])*[^\.\,\)\(\s]$"     "http://www.krumedia.com."
+"^(http|https|ftp)\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(:[a-zA-Z0-9]*)?/?([a-zA-Z0-9\-\._\?\,\'/\\\+\&%\$#\=~])*[^\.\,\)\(\s]$"     "(http://www.krumedia.com)"
+"^(http|https|ftp)\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(:[a-zA-Z0-9]*)?/?([a-zA-Z0-9\-\._\?\,\'/\\\+\&%\$#\=~])*[^\.\,\)\(\s]$"     "http://www.krumedia.com,"
+"(\d{1,3},(\d{3},)*\d{3}(\.\d{1,3})?|\d{1,3}(\.\d{3})?)$"   G "<0>2&651.50</0>"
+"(\d{1,3},(\d{3},)*\d{3}(\.\d{1,3})?|\d{1,3}(\.\d{3})?)$"   G "<0>987.895</0>"
+"(\d{1,3},(\d{3},)*\d{3}(\.\d{1,3})?|\d{1,3}(\.\d{3})?)$"     "25$%787*"
+"\$[0-9]?[0-9]?[0-9]?((\,[0-9][0-9][0-9])*)?(\.[0-9][0-9]?)?$"   G "<0>$1,456,983.00</0>"
+"\$[0-9]?[0-9]?[0-9]?((\,[0-9][0-9][0-9])*)?(\.[0-9][0-9]?)?$"   G "<0>$1,700.07</0>"
+"\$[0-9]?[0-9]?[0-9]?((\,[0-9][0-9][0-9])*)?(\.[0-9][0-9]?)?$"   G "<0>$68,944.23</0>"
+"\$[0-9]?[0-9]?[0-9]?((\,[0-9][0-9][0-9])*)?(\.[0-9][0-9]?)?$"     "$20,86.93"
+"\$[0-9]?[0-9]?[0-9]?((\,[0-9][0-9][0-9])*)?(\.[0-9][0-9]?)?$"     "$1098.84"
+"\$[0-9]?[0-9]?[0-9]?((\,[0-9][0-9][0-9])*)?(\.[0-9][0-9]?)?$"     "$150."
+"\$[0-9]?[0-9]?[0-9]?((\,[0-9][0-9][0-9])*)?(\.[0-9][0-9])?$"   G "<0>$28,009,987.88</0>"
+"\$[0-9]?[0-9]?[0-9]?((\,[0-9][0-9][0-9])*)?(\.[0-9][0-9])?$"   G "<0>$23,099.05</0>"
+"\$[0-9]?[0-9]?[0-9]?((\,[0-9][0-9][0-9])*)?(\.[0-9][0-9])?$"   G "<0>$.88</0>"
+"\$[0-9]?[0-9]?[0-9]?((\,[0-9][0-9][0-9])*)?(\.[0-9][0-9])?$"     "$234,5.99"
+"^((((31\/(0?[13578]|1[02]))|((29|30)\/(0?[1,3-9]|1[0-2])))\/(1[6-9]|[2-9]\d)?\d{2})|(29\/0?2\/(((1[6-9]|[2-9]\d)?(0[48]|[2468][048]|[13579][26])|((16|[2468][048]|[3579][26])00))))|(0?[1-9]|1\d|2[0-8])\/((0?[1-9])|(1[0-2]))\/((1[6-9]|[2-9]\d)?\d{2})) (20|21|22|23|[0-1]?\d):[0-5]?\d:[0-5]?\d$"   G "<0>29/02/2004 20:15:27</0>"
+"^((((31\/(0?[13578]|1[02]))|((29|30)\/(0?[1,3-9]|1[0-2])))\/(1[6-9]|[2-9]\d)?\d{2})|(29\/0?2\/(((1[6-9]|[2-9]\d)?(0[48]|[2468][048]|[13579][26])|((16|[2468][048]|[3579][26])00))))|(0?[1-9]|1\d|2[0-8])\/((0?[1-9])|(1[0-2]))\/((1[6-9]|[2-9]\d)?\d{2})) (20|21|22|23|[0-1]?\d):[0-5]?\d:[0-5]?\d$"   G "<0>29/2/04 8:9:5</0>"
+"^((((31\/(0?[13578]|1[02]))|((29|30)\/(0?[1,3-9]|1[0-2])))\/(1[6-9]|[2-9]\d)?\d{2})|(29\/0?2\/(((1[6-9]|[2-9]\d)?(0[48]|[2468][048]|[13579][26])|((16|[2468][048]|[3579][26])00))))|(0?[1-9]|1\d|2[0-8])\/((0?[1-9])|(1[0-2]))\/((1[6-9]|[2-9]\d)?\d{2})) (20|21|22|23|[0-1]?\d):[0-5]?\d:[0-5]?\d$"   G "<0>31/3/2004 9:20:17</0>"
+"^((((31\/(0?[13578]|1[02]))|((29|30)\/(0?[1,3-9]|1[0-2])))\/(1[6-9]|[2-9]\d)?\d{2})|(29\/0?2\/(((1[6-9]|[2-9]\d)?(0[48]|[2468][048]|[13579][26])|((16|[2468][048]|[3579][26])00))))|(0?[1-9]|1\d|2[0-8])\/((0?[1-9])|(1[0-2]))\/((1[6-9]|[2-9]\d)?\d{2})) (20|21|22|23|[0-1]?\d):[0-5]?\d:[0-5]?\d$"     "29/02/2003 20:15:15"
+"^((((31\/(0?[13578]|1[02]))|((29|30)\/(0?[1,3-9]|1[0-2])))\/(1[6-9]|[2-9]\d)?\d{2})|(29\/0?2\/(((1[6-9]|[2-9]\d)?(0[48]|[2468][048]|[13579][26])|((16|[2468][048]|[3579][26])00))))|(0?[1-9]|1\d|2[0-8])\/((0?[1-9])|(1[0-2]))\/((1[6-9]|[2-9]\d)?\d{2})) (20|21|22|23|[0-1]?\d):[0-5]?\d:[0-5]?\d$"     "2/29/04 20:15:15"
+"^((((31\/(0?[13578]|1[02]))|((29|30)\/(0?[1,3-9]|1[0-2])))\/(1[6-9]|[2-9]\d)?\d{2})|(29\/0?2\/(((1[6-9]|[2-9]\d)?(0[48]|[2468][048]|[13579][26])|((16|[2468][048]|[3579][26])00))))|(0?[1-9]|1\d|2[0-8])\/((0?[1-9])|(1[0-2]))\/((1[6-9]|[2-9]\d)?\d{2})) (20|21|22|23|[0-1]?\d):[0-5]?\d:[0-5]?\d$"     "31/3/4 9:20:17"
+"^([a-zA-Z0-9_\-\.]+)@([a-zA-Z0-9_\-\.]+)\.([a-zA-Z]{2,5})$"   G "<0>somthing@someserver.com</0>"
+"^([a-zA-Z0-9_\-\.]+)@([a-zA-Z0-9_\-\.]+)\.([a-zA-Z]{2,5})$"   G "<0>firstname.lastname@mailserver.domain.com</0>"
+"^([a-zA-Z0-9_\-\.]+)@([a-zA-Z0-9_\-\.]+)\.([a-zA-Z]{2,5})$"   G "<0>username-something@some-server.nl</0>"
+"^([a-zA-Z0-9_\-\.]+)@([a-zA-Z0-9_\-\.]+)\.([a-zA-Z]{2,5})$"     "username@someserver.domain.c"
+"^([a-zA-Z0-9_\-\.]+)@([a-zA-Z0-9_\-\.]+)\.([a-zA-Z]{2,5})$"     "somename@server.domain-com"
+"^([a-zA-Z0-9_\-\.]+)@([a-zA-Z0-9_\-\.]+)\.([a-zA-Z]{2,5})$"     "someone@something.se_eo"
+"(^([0-9]|[0-1][0-9]|[2][0-3]):([0-5][0-9])(\s{0,1})(AM|PM|am|pm|aM|Am|pM|Pm{2,2})$)|(^([0-9]|[1][0-9]|[2][0-3])(\s{0,1})(AM|PM|am|pm|aM|Am|pM|Pm{2,2})$)"   G "<0>8am</0>"
+"(^([0-9]|[0-1][0-9]|[2][0-3]):([0-5][0-9])(\s{0,1})(AM|PM|am|pm|aM|Am|pM|Pm{2,2})$)|(^([0-9]|[1][0-9]|[2][0-3])(\s{0,1})(AM|PM|am|pm|aM|Am|pM|Pm{2,2})$)"   G "<0>8 am</0>"
+"(^([0-9]|[0-1][0-9]|[2][0-3]):([0-5][0-9])(\s{0,1})(AM|PM|am|pm|aM|Am|pM|Pm{2,2})$)|(^([0-9]|[1][0-9]|[2][0-3])(\s{0,1})(AM|PM|am|pm|aM|Am|pM|Pm{2,2})$)"   G "<0>8:00 am</0>"
+"(^([0-9]|[0-1][0-9]|[2][0-3]):([0-5][0-9])(\s{0,1})(AM|PM|am|pm|aM|Am|pM|Pm{2,2})$)|(^([0-9]|[1][0-9]|[2][0-3])(\s{0,1})(AM|PM|am|pm|aM|Am|pM|Pm{2,2})$)"     "8a"
+"(^([0-9]|[0-1][0-9]|[2][0-3]):([0-5][0-9])(\s{0,1})(AM|PM|am|pm|aM|Am|pM|Pm{2,2})$)|(^([0-9]|[1][0-9]|[2][0-3])(\s{0,1})(AM|PM|am|pm|aM|Am|pM|Pm{2,2})$)"     "8 a"
+"(^([0-9]|[0-1][0-9]|[2][0-3]):([0-5][0-9])(\s{0,1})(AM|PM|am|pm|aM|Am|pM|Pm{2,2})$)|(^([0-9]|[1][0-9]|[2][0-3])(\s{0,1})(AM|PM|am|pm|aM|Am|pM|Pm{2,2})$)"     "8:00 a"
+"^([0-9]{2})?(\([0-9]{2})\)([0-9]{3}|[0-9]{4})-[0-9]{4}$"   G "<0>55(21)123-4567</0>"
+"^([0-9]{2})?(\([0-9]{2})\)([0-9]{3}|[0-9]{4})-[0-9]{4}$"   G "<0>(11)1234-5678</0>"
+"^([0-9]{2})?(\([0-9]{2})\)([0-9]{3}|[0-9]{4})-[0-9]{4}$"   G "<0>55(71)4562-2234</0>"
+"^([0-9]{2})?(\([0-9]{2})\)([0-9]{3}|[0-9]{4})-[0-9]{4}$"     "3434-3432"
+"^([0-9]{2})?(\([0-9]{2})\)([0-9]{3}|[0-9]{4})-[0-9]{4}$"     "4(23)232-3232"
+"^([0-9]{2})?(\([0-9]{2})\)([0-9]{3}|[0-9]{4})-[0-9]{4}$"     "55(2)232-232"
+"^((([0]?[1-9]|1[0-2])(:|\.)[0-5][0-9]((:|\.)[0-5][0-9])?( )?(AM|am|aM|Am|PM|pm|pM|Pm))|(([0]?[0-9]|1[0-9]|2[0-3])(:|\.)[0-5][0-9]((:|\.)[0-5][0-9])?))$"   G "<0>1:01 AM</0>"
+"^((([0]?[1-9]|1[0-2])(:|\.)[0-5][0-9]((:|\.)[0-5][0-9])?( )?(AM|am|aM|Am|PM|pm|pM|Pm))|(([0]?[0-9]|1[0-9]|2[0-3])(:|\.)[0-5][0-9]((:|\.)[0-5][0-9])?))$"   G "<0>23:52:01</0>"
+"^((([0]?[1-9]|1[0-2])(:|\.)[0-5][0-9]((:|\.)[0-5][0-9])?( )?(AM|am|aM|Am|PM|pm|pM|Pm))|(([0]?[0-9]|1[0-9]|2[0-3])(:|\.)[0-5][0-9]((:|\.)[0-5][0-9])?))$"   G "<0>03.24.36 AM</0>"
+"^((([0]?[1-9]|1[0-2])(:|\.)[0-5][0-9]((:|\.)[0-5][0-9])?( )?(AM|am|aM|Am|PM|pm|pM|Pm))|(([0]?[0-9]|1[0-9]|2[0-3])(:|\.)[0-5][0-9]((:|\.)[0-5][0-9])?))$"     "19:31 AM"
+"^((([0]?[1-9]|1[0-2])(:|\.)[0-5][0-9]((:|\.)[0-5][0-9])?( )?(AM|am|aM|Am|PM|pm|pM|Pm))|(([0]?[0-9]|1[0-9]|2[0-3])(:|\.)[0-5][0-9]((:|\.)[0-5][0-9])?))$"     "9:9 PM"
+"^((([0]?[1-9]|1[0-2])(:|\.)[0-5][0-9]((:|\.)[0-5][0-9])?( )?(AM|am|aM|Am|PM|pm|pM|Pm))|(([0]?[0-9]|1[0-9]|2[0-3])(:|\.)[0-5][0-9]((:|\.)[0-5][0-9])?))$"     "25:60:61"
+"^\d{0,2}(\.\d{1,2})?$"   G "<0>99.99</0>"
+"^\d{0,2}(\.\d{1,2})?$"   G "<0>99</0>"
+"^\d{0,2}(\.\d{1,2})?$"   G "<0>.99</0>"
+"^\d{0,2}(\.\d{1,2})?$"     "999.999"
+"^\d{0,2}(\.\d{1,2})?$"     "999"
+"^\d{0,2}(\.\d{1,2})?$"     ".999"
+"^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?!.*\s).{4,8}$"   G "<0>1agdA*$#</0>"
+"^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?!.*\s).{4,8}$"   G "<0>1agdA*$#</0>"
+"^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?!.*\s).{4,8}$"   G "<0>1agdA*$#</0>"
+"^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?!.*\s).{4,8}$"     "wyrn%@*&$# f"
+"^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?!.*\s).{4,8}$"     "mbndkfh782"
+"^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?!.*\s).{4,8}$"     "BNfhjdhfjd&*)%#$)"
+"^([a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9]\.)+([a-zA-Z0-9]{3,5})$"   G "<0>freshmeat.net</0>"
+"^([a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9]\.)+([a-zA-Z0-9]{3,5})$"   G "<0>123.com</0>"
+"^([a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9]\.)+([a-zA-Z0-9]{3,5})$"   G "<0>TempLate-toolkKt.orG</0>"
+"^([a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9]\.)+([a-zA-Z0-9]{3,5})$"     "-dog.com"
+"^([a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9]\.)+([a-zA-Z0-9]{3,5})$"     "?boy.net"
+"^([a-zA-Z0-9][-a-zA-Z0-9]*[a-zA-Z0-9]\.)+([a-zA-Z0-9]{3,5})$"     "this.domain"
+"^[^']*$"   G "<0>asljas</0>"
+"^[^']*$"   G "<0>%/&89uhuhadjkh</0>"
+"^[^']*$"   G '<0>"hi there!"</0>'
+"^[^']*$"     "'hi there!'"
+"^[^']*$"     "It's 9 o'clock"
+"^[^']*$"     "'''''"
+"(^\(\)$|^\(((\([0-9]+,(\((\([0-9]+,[0-9]+,[0-9]+\),)*(\([0-9]+,[0-9]+,[0-9]+\)){1}\))+\),)*(\([0-9]+,(\((\([0-9]+,[0-9]+,[0-9]+\),)*(\([0-9]+,[0-9]+,[0-9]+\)){1}\))+\)){1}\)))$"   G "<0>((24,((1,2,3),(3,4,5))))</0>"
+"(^\(\)$|^\(((\([0-9]+,(\((\([0-9]+,[0-9]+,[0-9]+\),)*(\([0-9]+,[0-9]+,[0-9]+\)){1}\))+\),)*(\([0-9]+,(\((\([0-9]+,[0-9]+,[0-9]+\),)*(\([0-9]+,[0-9]+,[0-9]+\)){1}\))+\)){1}\)))$"   G "<0>((1,((2,3,4),(4,5,6),(96,34,26))),(12,((1,3,4),(4,5,6),(7,8,9))))</0>"
+"(^\(\)$|^\(((\([0-9]+,(\((\([0-9]+,[0-9]+,[0-9]+\),)*(\([0-9]+,[0-9]+,[0-9]+\)){1}\))+\),)*(\([0-9]+,(\((\([0-9]+,[0-9]+,[0-9]+\),)*(\([0-9]+,[0-9]+,[0-9]+\)){1}\))+\)){1}\)))$"   G "<0>()</0>"
+"(^\(\)$|^\(((\([0-9]+,(\((\([0-9]+,[0-9]+,[0-9]+\),)*(\([0-9]+,[0-9]+,[0-9]+\)){1}\))+\),)*(\([0-9]+,(\((\([0-9]+,[0-9]+,[0-9]+\),)*(\([0-9]+,[0-9]+,[0-9]+\)){1}\))+\)){1}\)))$"     "(24,((1,2,3),(3,4,5)))"
+"(^\(\)$|^\(((\([0-9]+,(\((\([0-9]+,[0-9]+,[0-9]+\),)*(\([0-9]+,[0-9]+,[0-9]+\)){1}\))+\),)*(\([0-9]+,(\((\([0-9]+,[0-9]+,[0-9]+\),)*(\([0-9]+,[0-9]+,[0-9]+\)){1}\))+\)){1}\)))$"     "(  )"
+"(^\(\)$|^\(((\([0-9]+,(\((\([0-9]+,[0-9]+,[0-9]+\),)*(\([0-9]+,[0-9]+,[0-9]+\)){1}\))+\),)*(\([0-9]+,(\((\([0-9]+,[0-9]+,[0-9]+\),)*(\([0-9]+,[0-9]+,[0-9]+\)){1}\))+\)){1}\)))$"     "((23,(12,3,4),(4,5,6)))"
+"^[a-zA-Z0-9\s .\-_']+$"   G "<0>dony d'gsa</0>"
+"^[a-zA-Z0-9\s .\-_']+$"     "^[a-zA-Z0-9\s.\-_']+$"
+"^[_a-zA-Z0-9-]+(\.[_a-zA-Z0-9-]+)*@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.(([0-9]{1,3})|([a-zA-Z]{2,3})|(aero|coop|info|museum|name))$"   G "<0>example@example.com</0>"
+"^[_a-zA-Z0-9-]+(\.[_a-zA-Z0-9-]+)*@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.(([0-9]{1,3})|([a-zA-Z]{2,3})|(aero|coop|info|museum|name))$"   G "<0>foo@bar.info</0>"
+"^[_a-zA-Z0-9-]+(\.[_a-zA-Z0-9-]+)*@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.(([0-9]{1,3})|([a-zA-Z]{2,3})|(aero|coop|info|museum|name))$"   G "<0>blah@127.0.0.1</0>"
+"^[_a-zA-Z0-9-]+(\.[_a-zA-Z0-9-]+)*@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.(([0-9]{1,3})|([a-zA-Z]{2,3})|(aero|coop|info|museum|name))$"     "broken@@example.com"
+"^[_a-zA-Z0-9-]+(\.[_a-zA-Z0-9-]+)*@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.(([0-9]{1,3})|([a-zA-Z]{2,3})|(aero|coop|info|museum|name))$"     "foo@bar.infp"
+"^[_a-zA-Z0-9-]+(\.[_a-zA-Z0-9-]+)*@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.(([0-9]{1,3})|([a-zA-Z]{2,3})|(aero|coop|info|museum|name))$"     "blah@.nospam.biz"
+"^\d{5}(-\d{3})?$"   G "<0>13165-000</0>"
+"^\d{5}(-\d{3})?$"   G "<0>38175-000</0>"
+"^\d{5}(-\d{3})?$"   G "<0>81470-276</0>"
+"^\d{5}(-\d{3})?$"     "13165-00"
+"^\d{5}(-\d{3})?$"     "38175-abc"
+"^\d{5}(-\d{3})?$"     "81470-2763"
+"^\$(\d{1,3}(\,\d{3})*|(\d+))(\.\d{2})?$"   G "<0>$0.84</0>"
+"^\$(\d{1,3}(\,\d{3})*|(\d+))(\.\d{2})?$"   G "<0>$123458</0>"
+"^\$(\d{1,3}(\,\d{3})*|(\d+))(\.\d{2})?$"   G "<0>$1,234,567.89</0>"
+"^\$(\d{1,3}(\,\d{3})*|(\d+))(\.\d{2})?$"     "$12,3456.01"
+"^\$(\d{1,3}(\,\d{3})*|(\d+))(\.\d{2})?$"     "12345"
+"^\$(\d{1,3}(\,\d{3})*|(\d+))(\.\d{2})?$"     "$1.234"
+"([A-Z]:\\[^/:\*\?<>\|]+\.\w{2,6})|(\\{2}[^/:\*\?<>\|]+\.\w{2,6})"   G "<0>C:\\temp\\this allows spaces\\web.config</0>"
+"([A-Z]:\\[^/:\*\?<>\|]+\.\w{2,6})|(\\{2}[^/:\*\?<>\|]+\.\w{2,6})"   G "<0>\\\\Andromeda\\share\\file name.123</0>"
+"([A-Z]:\\[^/:\*\?<>\|]+\.\w{2,6})|(\\{2}[^/:\*\?<>\|]+\.\w{2,6})"     "tz:\temp\ fi*le?na:m<e>.doc"
+"([A-Z]:\\[^/:\*\?<>\|]+\.\w{2,6})|(\\{2}[^/:\*\?<>\|]+\.\w{2,6})"     "\\Andromeda\share\filename.a"
+"(^([0-9]|[0-1][0-9]|[2][0-3]):([0-5][0-9])$)|(^([0-9]|[1][0-9]|[2][0-3])$)"   G "<0>10:35</0>"
+"(^([0-9]|[0-1][0-9]|[2][0-3]):([0-5][0-9])$)|(^([0-9]|[1][0-9]|[2][0-3])$)"   G "<0>9:20</0>"
+"(^([0-9]|[0-1][0-9]|[2][0-3]):([0-5][0-9])$)|(^([0-9]|[1][0-9]|[2][0-3])$)"   G "<0>23</0>"
+"(^([0-9]|[0-1][0-9]|[2][0-3]):([0-5][0-9])$)|(^([0-9]|[1][0-9]|[2][0-3])$)"     "24:00"
+"(^([0-9]|[0-1][0-9]|[2][0-3]):([0-5][0-9])$)|(^([0-9]|[1][0-9]|[2][0-3])$)"     "20 PM"
+"(^([0-9]|[0-1][0-9]|[2][0-3]):([0-5][0-9])$)|(^([0-9]|[1][0-9]|[2][0-3])$)"     "20:15 PM"
+"^\$?([0-9]{1,3},([0-9]{3},)*[0-9]{3}|[0-9]+)(\.[0-9][0-9])?$"   G "<0>$3,023,123.34</0>"
+"^\$?([0-9]{1,3},([0-9]{3},)*[0-9]{3}|[0-9]+)(\.[0-9][0-9])?$"   G "<0>9,876,453</0>"
+"^\$?([0-9]{1,3},([0-9]{3},)*[0-9]{3}|[0-9]+)(\.[0-9][0-9])?$"   G "<0>123456.78</0>"
+"^\$?([0-9]{1,3},([0-9]{3},)*[0-9]{3}|[0-9]+)(\.[0-9][0-9])?$"     "4,33,234.34"
+"^\$?([0-9]{1,3},([0-9]{3},)*[0-9]{3}|[0-9]+)(\.[0-9][0-9])?$"     "$1.234"
+"^\$?([0-9]{1,3},([0-9]{3},)*[0-9]{3}|[0-9]+)(\.[0-9][0-9])?$"     "abc"
+"^\$?\d+(\.(\d{2}))?$"   G "<0>$2.43</0>"
+"^\$?\d+(\.(\d{2}))?$"   G "<0>2.02</0>"
+"^\$?\d+(\.(\d{2}))?$"   G "<0>$2112</0>"
+"^\$?\d+(\.(\d{2}))?$"     "2.1"
+"^\$?\d+(\.(\d{2}))?$"     "$.14"
+"^\$?\d+(\.(\d{2}))?$"     "$2,222.12"
+/("[^"]*")|('[^\r]*)(\r\n)?/   G '<0>"my string"</0>'
+/("[^"]*")|('[^\r]*)(\r\n)?/   G '<0>"a string with \u0027 in it"</0>'
+/("[^"]*")|('[^\r]*)(\r\n)?/   G "<0>' comment</0>"
+/("[^"]*")|('[^\r]*)(\r\n)?/     /asd "/
+"^[A-Za-z0-9]{8}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{12}$"   G "<0>BFDB4D31-3E35-4DAB-AFCA-5E6E5C8F61EA</0>"
+"^[A-Za-z0-9]{8}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{12}$"   G "<0>BFDB4d31-3e35-4dab-afca-5e6e5c8f61ea</0>"
+"^[A-Za-z0-9]{8}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{12}$"     "qqqBFDB4D31-3E35-4DAB-AFCA-5E6E5C8F61EA"
+"^[A-Za-z0-9]{8}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{12}$"     "BFDB4D31-3E-4DAB-AFCA-5E6E5C8F61EA"
+"^[A-Za-z0-9]{8}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{12}$"     "BFDB4D31-3E35-4DAB-AF"
+"^\d{2}(\x2e)(\d{3})(-\d{3})?$"   G "<0>12.345-678</0>"
+"^\d{2}(\x2e)(\d{3})(-\d{3})?$"   G "<0>23.345-123</0>"
+"^\d{2}(\x2e)(\d{3})(-\d{3})?$"   G "<0>99.999</0>"
+"^\d{2}(\x2e)(\d{3})(-\d{3})?$"     "41222-222"
+"^\d{2}(\x2e)(\d{3})(-\d{3})?$"     "3.444-233"
+"^\d{2}(\x2e)(\d{3})(-\d{3})?$"     "43.324444"
+"^\d{2}(\u002e)(\d{3})(-\d{3})?$"   G "<0>12.345-678</0>"
+"^\d{2}(\u002e)(\d{3})(-\d{3})?$"   G "<0>23.345-123</0>"
+"^\d{2}(\u002e)(\d{3})(-\d{3})?$"   G "<0>99.999</0>"
+"^\d{2}(\u002e)(\d{3})(-\d{3})?$"     "41222-222"
+"^\d{2}(\u002e)(\d{3})(-\d{3})?$"     "3.444-233"
+"^\d{2}(\u002e)(\d{3})(-\d{3})?$"     "43.324444"
+#"^(([a-zA-Z]:)|(\\{2}\w+)\$?)(\\(\w[\w ]*))+\.(txt|TXT)$"   G "<0>c:\file.txt</0>"   # TODO:  debug
+#"^(([a-zA-Z]:)|(\\{2}\w+)\$?)(\\(\w[\w ]*))+\.(txt|TXT)$"   G "<0>c:\folder\sub folder\file.txt</0>"   # TODO:  debug
+#"^(([a-zA-Z]:)|(\\{2}\w+)\$?)(\\(\w[\w ]*))+\.(txt|TXT)$"   G "<0>\\network\folder\file.txt</0>"    # TODO:  debug
+"^(([a-zA-Z]:)|(\\{2}\w+)\$?)(\\(\w[\w ]*))+\.(txt|TXT)$"     "C:"
+"^(([a-zA-Z]:)|(\\{2}\w+)\$?)(\\(\w[\w ]*))+\.(txt|TXT)$"     "C:\file.xls"
+"^(([a-zA-Z]:)|(\\{2}\w+)\$?)(\\(\w[\w ]*))+\.(txt|TXT)$"     "folder.txt"
+"^[a-zA-Z0-9]+([a-zA-Z0-9\-\.]+)?\.(com|org|net|mil|edu|COM|ORG|NET|MIL|EDU)$"   G "<0>my.domain.com</0>"
+"^[a-zA-Z0-9]+([a-zA-Z0-9\-\.]+)?\.(com|org|net|mil|edu|COM|ORG|NET|MIL|EDU)$"   G "<0>regexlib.com</0>"
+"^[a-zA-Z0-9]+([a-zA-Z0-9\-\.]+)?\.(com|org|net|mil|edu|COM|ORG|NET|MIL|EDU)$"   G "<0>big-reg.com</0>"
+"^[a-zA-Z0-9]+([a-zA-Z0-9\-\.]+)?\.(com|org|net|mil|edu|COM|ORG|NET|MIL|EDU)$"     ".mydomain.com"
+"^[a-zA-Z0-9]+([a-zA-Z0-9\-\.]+)?\.(com|org|net|mil|edu|COM|ORG|NET|MIL|EDU)$"     "regexlib.comm"
+"^[a-zA-Z0-9]+([a-zA-Z0-9\-\.]+)?\.(com|org|net|mil|edu|COM|ORG|NET|MIL|EDU)$"     "-bigreg.com"
+"^\d{4}[\-\/\s]?((((0[13578])|(1[02]))[\-\/\s]?(([0-2][0-9])|(3[01])))|(((0[469])|(11))[\-\/\s]?(([0-2][0-9])|(30)))|(02[\-\/\s]?[0-2][0-9]))$"   G "<0>0001-12-31</0>"
+"^\d{4}[\-\/\s ]?((((0[13578])|(1[02]))[\-\/\s ]?(([0-2][0-9])|(3[01])))|(((0[469])|(11))[\-\/\s ]?(([0-2][0-9])|(30)))|(02[\-\/\s ]?[0-2][0-9]))$"   G "<0>9999 09 30</0>"
+"^\d{4}[\-\/\s]?((((0[13578])|(1[02]))[\-\/\s]?(([0-2][0-9])|(3[01])))|(((0[469])|(11))[\-\/\s]?(([0-2][0-9])|(30)))|(02[\-\/\s]?[0-2][0-9]))$"   G "<0>2002/03/03</0>"
+"^\d{4}[\-\/\s]?((((0[13578])|(1[02]))[\-\/\s]?(([0-2][0-9])|(3[01])))|(((0[469])|(11))[\-\/\s]?(([0-2][0-9])|(30)))|(02[\-\/\s]?[0-2][0-9]))$"     "0001\02\30"
+"^\d{4}[\-\/\s]?((((0[13578])|(1[02]))[\-\/\s]?(([0-2][0-9])|(3[01])))|(((0[469])|(11))[\-\/\s]?(([0-2][0-9])|(30)))|(02[\-\/\s]?[0-2][0-9]))$"     "9999.15.01"
+"^\d{4}[\-\/\s]?((((0[13578])|(1[02]))[\-\/\s]?(([0-2][0-9])|(3[01])))|(((0[469])|(11))[\-\/\s]?(([0-2][0-9])|(30)))|(02[\-\/\s]?[0-2][0-9]))$"     "2002/3/3"
+"^http\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(/\S*)?$"   G "<0>http://psychopop.org</0>"
+"^http\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(/\S*)?$"   G "<0>http://www.edsroom.com/newUser.asp</0>"
+"^http\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(/\S*)?$"   G "<0>http://unpleasant.jarrin.net/markov/inde</0>"
+"^http\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(/\S*)?$"     "ftp://psychopop.org"
+"^http\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(/\S*)?$"     "http://www.edsroom/"
+"^http\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(/\S*)?$"     "http://un/pleasant.jarrin.net/markov/index.asp"
+"^( [1-9]|[1-9]|0[1-9]|10|11|12)[0-5]\d$"   G "<0>1145</0>"
+"^( [1-9]|[1-9]|0[1-9]|10|11|12)[0-5]\d$"   G "<0>933</0>"
+"^( [1-9]|[1-9]|0[1-9]|10|11|12)[0-5]\d$"   G "<0> 801</0>"
+"^( [1-9]|[1-9]|0[1-9]|10|11|12)[0-5]\d$"     "0000"
+"^( [1-9]|[1-9]|0[1-9]|10|11|12)[0-5]\d$"     "1330"
+"^( [1-9]|[1-9]|0[1-9]|10|11|12)[0-5]\d$"     "8:30"
+"^\d{1,2}\/\d{2,4}$"   G "<0>9/02</0>"
+"^\d{1,2}\/\d{2,4}$"   G "<0>09/2002</0>"
+"^\d{1,2}\/\d{2,4}$"   G "<0>09/02</0>"
+"^\d{1,2}\/\d{2,4}$"     "Fall 2002"
+"^\d{1,2}\/\d{2,4}$"     "Sept 2002"
+"^(|(0[1-9])|(1[0-2]))\/((0[1-9])|(1\d)|(2\d)|(3[0-1]))\/((\d{4}))$"   G "<0>01/01/2001</0>"
+"^(|(0[1-9])|(1[0-2]))\/((0[1-9])|(1\d)|(2\d)|(3[0-1]))\/((\d{4}))$"   G "<0>02/30/2001</0>"
+"^(|(0[1-9])|(1[0-2]))\/((0[1-9])|(1\d)|(2\d)|(3[0-1]))\/((\d{4}))$"   G "<0>12/31/2002</0>"
+"^(|(0[1-9])|(1[0-2]))\/((0[1-9])|(1\d)|(2\d)|(3[0-1]))\/((\d{4}))$"     "1/1/02"
+"^(|(0[1-9])|(1[0-2]))\/((0[1-9])|(1\d)|(2\d)|(3[0-1]))\/((\d{4}))$"     "1/1/2002"
+"^(|(0[1-9])|(1[0-2]))\/((0[1-9])|(1\d)|(2\d)|(3[0-1]))\/((\d{4}))$"     "1/25/2002"
+"^(1?(-?\d{3})-?)?(\d{3})(-?\d{4})$"   G "<0>15615552323</0>"
+"^(1?(-?\d{3})-?)?(\d{3})(-?\d{4})$"   G "<0>1-561-555-1212</0>"
+"^(1?(-?\d{3})-?)?(\d{3})(-?\d{4})$"   G "<0>5613333</0>"
+"^(1?(-?\d{3})-?)?(\d{3})(-?\d{4})$"     "1-555-5555"
+"^(1?(-?\d{3})-?)?(\d{3})(-?\d{4})$"     "15553333"
+"^(1?(-?\d{3})-?)?(\d{3})(-?\d{4})$"     "0-561-555-1212"
+'<[^>]*name[\s]*=[\s]*"?[^\w_]*"?[^>]*>'   G '<0><input type = text name = "bob"></0>'
+'<[^>]*name[\s]*=[\s]*"?[^\w_]*"?[^>]*>'   G '<0><select name = "fred"></0>'
+#'<[^>]*name[\s]*=[\s]*"?[^\w_]*"?[^>]*>'   G '<0><form></0>'    #TODO:  Debug
+'<[^>]*name[\s]*=[\s]*"?[^\w_]*"?[^>]*>'     "<input type = submit>"   # TODO:  \w in pattern
+'<[^>]*name[\s]*=[\s]*"?[^\w_]*"?[^>]*>'     '<font face = "arial">'   # TODO:  \w in pattern
+'<[^>]*name[\s]*=[\s]*"?[^\w_]*"?[^>]*>'      "The drity brown fox stank like"
+"^(1|01|2|02|3|03|4|04|5|05|6|06|7|07|8|08|9|09|10|11|12{1,2}):(([0-5]{1}[0-9]{1}\s{0,1})([AM|PM|am|pm]{2,2}))\W{0}$"   G "<0>1:00 AM</0>"
+"^(1|01|2|02|3|03|4|04|5|05|6|06|7|07|8|08|9|09|10|11|12{1,2}):(([0-5]{1}[0-9]{1}\s{0,1})([AM|PM|am|pm]{2,2}))\W{0}$"   G "<0>12:00 PM</0>"
+"^(1|01|2|02|3|03|4|04|5|05|6|06|7|07|8|08|9|09|10|11|12{1,2}):(([0-5]{1}[0-9]{1}\s{0,1})([AM|PM|am|pm]{2,2}))\W{0}$"   G "<0>1:00am</0>"
+"^(1|01|2|02|3|03|4|04|5|05|6|06|7|07|8|08|9|09|10|11|12{1,2}):(([0-5]{1}[0-9]{1}\s{0,1})([AM|PM|am|pm]{2,2}))\W{0}$"     "24:00"
+"^\d*$"   G "<0>123</0>"
+"^\d*$"   G "<0>000</0>"
+"^\d*$"   G "<0>43</0>"
+"^\d*$"     "asbc"
+"^\d*$"     "-34"
+"^\d*$"     "3.1415"
+"^[-+]?\d*$"   G "<0>123</0>"
+"^[-+]?\d*$"   G "<0>-123</0>"
+"^[-+]?\d*$"   G "<0>+123</0>"
+"^[-+]?\d*$"     "abc"
+"^[-+]?\d*$"     "3.14159"
+"^[-+]?\d*$"     "-3.14159"
+"^\d*\.?\d*$"   G "<0>123</0>"
+"^\d*\.?\d*$"   G "<0>3.14159</0>"
+"^\d*\.?\d*$"   G "<0>.234</0>"
+"^\d*\.?\d*$"     "abc"
+"^\d*\.?\d*$"     "-3.14159"
+"^\d*\.?\d*$"     "3.4.2"
+"^((\d{5}-\d{4})|(\d{5})|([A-Z]\d[A-Z]\s\d[A-Z]\d))$"   G "<0>44240</0>"
+"^((\d{5}-\d{4})|(\d{5})|([A-Z]\d[A-Z]\s\d[A-Z]\d))$"   G "<0>44240-5555</0>"
+"^((\d{5}-\d{4})|(\d{5})|([A-Z]\d[A-Z]\s\d[A-Z]\d))$"   G "<0>T2P 3C7</0>"
+"^((\d{5}-\d{4})|(\d{5})|([A-Z]\d[A-Z]\s\d[A-Z]\d))$"     "44240ddd"
+"^((\d{5}-\d{4})|(\d{5})|([A-Z]\d[A-Z]\s\d[A-Z]\d))$"     "t44240-55"
+"^((\d{5}-\d{4})|(\d{5})|([A-Z]\d[A-Z]\s\d[A-Z]\d))$"     "t2p3c7"
+"^[\\(]{0,1}([0-9]){3}[\\)]{0,1}[ ]?([^0-1]){1}([0-9]){2}[ ]?[-]?[ ]?([0-9]){4}[ ]*((x){0,1}([0-9]){1,5}){0,1}$"   G "<0>(910)456-7890</0>"
+"^[\\(]{0,1}([0-9]){3}[\\)]{0,1}[ ]?([^0-1]){1}([0-9]){2}[ ]?[-]?[ ]?([0-9]){4}[ ]*((x){0,1}([0-9]){1,5}){0,1}$"   G "<0>(910)456-8970 x12</0>"
+"^[\\(]{0,1}([0-9]){3}[\\)]{0,1}[ ]?([^0-1]){1}([0-9]){2}[ ]?[-]?[ ]?([0-9]){4}[ ]*((x){0,1}([0-9]){1,5}){0,1}$"   G "<0>(910)456-8970 1211</0>"
+"^[\\(]{0,1}([0-9]){3}[\\)]{0,1}[ ]?([^0-1]){1}([0-9]){2}[ ]?[-]?[ ]?([0-9]){4}[ ]*((x){0,1}([0-9]){1,5}){0,1}$"     "(910) 156-7890"
+"^[\\(]{0,1}([0-9]){3}[\\)]{0,1}[ ]?([^0-1]){1}([0-9]){2}[ ]?[-]?[ ]?([0-9]){4}[ ]*((x){0,1}([0-9]){1,5}){0,1}$"     "(910) 056-7890"
+"^[\\(]{0,1}([0-9]){3}[\\)]{0,1}[ ]?([^0-1]){1}([0-9]){2}[ ]?[-]?[ ]?([0-9]){4}[ ]*((x){0,1}([0-9]){1,5}){0,1}$"     "(910) 556-7890 x"
+"^((0?[1-9]|[12][1-9]|3[01])\.(0?[13578]|1[02])\.20[0-9]{2}|(0?[1-9]|[12][1-9]|30)\.(0?[13456789]|1[012])\.20[0-9]{2}|(0?[1-9]|1[1-9]|2[0-8])\.(0?[123456789]|1[012])\.20[0-9]{2}|(0?[1-9]|[12][1-9])\.(0?[123456789]|1[012])\.20(00|04|08|12|16|20|24|28|32|36|40|44|48|52|56|60|64|68|72|76|80|84|88|92|96))$"   G "<0>31.01.2002</0>"
+"^((0?[1-9]|[12][1-9]|3[01])\.(0?[13578]|1[02])\.20[0-9]{2}|(0?[1-9]|[12][1-9]|30)\.(0?[13456789]|1[012])\.20[0-9]{2}|(0?[1-9]|1[1-9]|2[0-8])\.(0?[123456789]|1[012])\.20[0-9]{2}|(0?[1-9]|[12][1-9])\.(0?[123456789]|1[012])\.20(00|04|08|12|16|20|24|28|32|36|40|44|48|52|56|60|64|68|72|76|80|84|88|92|96))$"   G "<0>29.2.2004</0>"
+"^((0?[1-9]|[12][1-9]|3[01])\.(0?[13578]|1[02])\.20[0-9]{2}|(0?[1-9]|[12][1-9]|30)\.(0?[13456789]|1[012])\.20[0-9]{2}|(0?[1-9]|1[1-9]|2[0-8])\.(0?[123456789]|1[012])\.20[0-9]{2}|(0?[1-9]|[12][1-9])\.(0?[123456789]|1[012])\.20(00|04|08|12|16|20|24|28|32|36|40|44|48|52|56|60|64|68|72|76|80|84|88|92|96))$"   G "<0>09.02.2005</0>"
+"^((0?[1-9]|[12][1-9]|3[01])\.(0?[13578]|1[02])\.20[0-9]{2}|(0?[1-9]|[12][1-9]|30)\.(0?[13456789]|1[012])\.20[0-9]{2}|(0?[1-9]|1[1-9]|2[0-8])\.(0?[123456789]|1[012])\.20[0-9]{2}|(0?[1-9]|[12][1-9])\.(0?[123456789]|1[012])\.20(00|04|08|12|16|20|24|28|32|36|40|44|48|52|56|60|64|68|72|76|80|84|88|92|96))$"     "31.11.2002"
+"^((0?[1-9]|[12][1-9]|3[01])\.(0?[13578]|1[02])\.20[0-9]{2}|(0?[1-9]|[12][1-9]|30)\.(0?[13456789]|1[012])\.20[0-9]{2}|(0?[1-9]|1[1-9]|2[0-8])\.(0?[123456789]|1[012])\.20[0-9]{2}|(0?[1-9]|[12][1-9])\.(0?[123456789]|1[012])\.20(00|04|08|12|16|20|24|28|32|36|40|44|48|52|56|60|64|68|72|76|80|84|88|92|96))$"     "29.2.2002"
+"^((0?[1-9]|[12][1-9]|3[01])\.(0?[13578]|1[02])\.20[0-9]{2}|(0?[1-9]|[12][1-9]|30)\.(0?[13456789]|1[012])\.20[0-9]{2}|(0?[1-9]|1[1-9]|2[0-8])\.(0?[123456789]|1[012])\.20[0-9]{2}|(0?[1-9]|[12][1-9])\.(0?[123456789]|1[012])\.20(00|04|08|12|16|20|24|28|32|36|40|44|48|52|56|60|64|68|72|76|80|84|88|92|96))$"     "33.06.2000"
+"^(0[1-9]|1[0-2])\/((0[1-9]|2\d)|3[0-1])\/(19\d\d|200[0-3])$"   G "<0>12/31/2003</0>"
+"^(0[1-9]|1[0-2])\/((0[1-9]|2\d)|3[0-1])\/(19\d\d|200[0-3])$"   G "<0>01/01/1900</0>"
+"^(0[1-9]|1[0-2])\/((0[1-9]|2\d)|3[0-1])\/(19\d\d|200[0-3])$"   G "<0>11/31/2002</0>"
+"^(0[1-9]|1[0-2])\/((0[1-9]|2\d)|3[0-1])\/(19\d\d|200[0-3])$"     "1/1/2002"
+"^(0[1-9]|1[0-2])\/((0[1-9]|2\d)|3[0-1])\/(19\d\d|200[0-3])$"     "01/01/02"
+"^(0[1-9]|1[0-2])\/((0[1-9]|2\d)|3[0-1])\/(19\d\d|200[0-3])$"     "01/01/2004"
+"^((((([13578])|(1[0-2]))[\-\/\s]?(([1-9])|([1-2][0-9])|(3[01])))|((([469])|(11))[\-\/\s]?(([1-9])|([1-2][0-9])|(30)))|(2[\-\/\s]?(([1-9])|([1-2][0-9]))))[\-\/\s]?\d{4})(\s((([1-9])|(1[02]))\:([0-5][0-9])((\s)|(\:([0-5][0-9])\s))([AM|PM|am|pm]{2,2})))?$"   G "<0>3/3/2003</0>"
+"^((((([13578])|(1[0-2]))[\-\/\s]?(([1-9])|([1-2][0-9])|(3[01])))|((([469])|(11))[\-\/\s]?(([1-9])|([1-2][0-9])|(30)))|(2[\-\/\s]?(([1-9])|([1-2][0-9]))))[\-\/\s]?\d{4})(\s((([1-9])|(1[02]))\:([0-5][0-9])((\s)|(\:([0-5][0-9])\s))([AM|PM|am|pm]{2,2})))?$"   G "<0>3/3/2002 3:33 pm</0>"
+"^((((([13578])|(1[0-2]))[\-\/\s]?(([1-9])|([1-2][0-9])|(3[01])))|((([469])|(11))[\-\/\s]?(([1-9])|([1-2][0-9])|(30)))|(2[\-\/\s]?(([1-9])|([1-2][0-9]))))[\-\/\s]?\d{4})(\s((([1-9])|(1[02]))\:([0-5][0-9])((\s)|(\:([0-5][0-9])\s))([AM|PM|am|pm]{2,2})))?$"   G "<0>3/3/2003 3:33:33 am</0>"
+"^((((([13578])|(1[0-2]))[\-\/\s]?(([1-9])|([1-2][0-9])|(3[01])))|((([469])|(11))[\-\/\s]?(([1-9])|([1-2][0-9])|(30)))|(2[\-\/\s]?(([1-9])|([1-2][0-9]))))[\-\/\s]?\d{4})(\s((([1-9])|(1[02]))\:([0-5][0-9])((\s)|(\:([0-5][0-9])\s))([AM|PM|am|pm]{2,2})))?$"     "13/1/2002"
+"^((((([13578])|(1[0-2]))[\-\/\s]?(([1-9])|([1-2][0-9])|(3[01])))|((([469])|(11))[\-\/\s]?(([1-9])|([1-2][0-9])|(30)))|(2[\-\/\s]?(([1-9])|([1-2][0-9]))))[\-\/\s]?\d{4})(\s((([1-9])|(1[02]))\:([0-5][0-9])((\s)|(\:([0-5][0-9])\s))([AM|PM|am|pm]{2,2})))?$"     "3/3/2002 3:33"
+"^((((([13578])|(1[0-2]))[\-\/\s]?(([1-9])|([1-2][0-9])|(3[01])))|((([469])|(11))[\-\/\s]?(([1-9])|([1-2][0-9])|(30)))|(2[\-\/\s]?(([1-9])|([1-2][0-9]))))[\-\/\s]?\d{4})(\s((([1-9])|(1[02]))\:([0-5][0-9])((\s)|(\:([0-5][0-9])\s))([AM|PM|am|pm]{2,2})))?$"     "31/3/2002"
+"([a-zA-Z]:(\\w+)*\\[a-zA-Z0_9]+)?.xls"   G "<0>E:\DyAGT\SD01A_specV2.xls</0>"
+"([a-zA-Z]:(\\w+)*\\[a-zA-Z0_9]+)?.xls"     "E:\DyAGT\SD01A_specV2.txt"
+"(((0[13578]|10|12)([-./])(0[1-9]|[12][0-9]|3[01])([-./])(\d{4}))|((0[469]|11)([-./])([0][1-9]|[12][0-9]|30)([-./])(\d{4}))|((2)([-./])(0[1-9]|1[0-9]|2[0-8])([-./])(\d{4}))|((2)(\.|-|\/)(29)([-./])([02468][048]00))|((2)([-./])(29)([-./])([13579][26]00))|((2)([-./])(29)([-./])([0-9][0-9][0][48]))|((2)([-./])(29)([-./])([0-9][0-9][2468][048]))|((2)([-./])(29)([-./])([0-9][0-9][13579][26])))"   G "<0>02/29/2084</0>"
+"(((0[13578]|10|12)([-./])(0[1-9]|[12][0-9]|3[01])([-./])(\d{4}))|((0[469]|11)([-./])([0][1-9]|[12][0-9]|30)([-./])(\d{4}))|((2)([-./])(0[1-9]|1[0-9]|2[0-8])([-./])(\d{4}))|((2)(\.|-|\/)(29)([-./])([02468][048]00))|((2)([-./])(29)([-./])([13579][26]00))|((2)([-./])(29)([-./])([0-9][0-9][0][48]))|((2)([-./])(29)([-./])([0-9][0-9][2468][048]))|((2)([-./])(29)([-./])([0-9][0-9][13579][26])))"   G "<0>01/31/2000</0>"
+"(((0[13578]|10|12)([-./])(0[1-9]|[12][0-9]|3[01])([-./])(\d{4}))|((0[469]|11)([-./])([0][1-9]|[12][0-9]|30)([-./])(\d{4}))|((2)([-./])(0[1-9]|1[0-9]|2[0-8])([-./])(\d{4}))|((2)(\.|-|\/)(29)([-./])([02468][048]00))|((2)([-./])(29)([-./])([13579][26]00))|((2)([-./])(29)([-./])([0-9][0-9][0][48]))|((2)([-./])(29)([-./])([0-9][0-9][2468][048]))|((2)([-./])(29)([-./])([0-9][0-9][13579][26])))"   G "<0>11/30/2000</0>"
+"(((0[13578]|10|12)([-./])(0[1-9]|[12][0-9]|3[01])([-./])(\d{4}))|((0[469]|11)([-./])([0][1-9]|[12][0-9]|30)([-./])(\d{4}))|((2)([-./])(0[1-9]|1[0-9]|2[0-8])([-./])(\d{4}))|((2)(\.|-|\/)(29)([-./])([02468][048]00))|((2)([-./])(29)([-./])([13579][26]00))|((2)([-./])(29)([-./])([0-9][0-9][0][48]))|((2)([-./])(29)([-./])([0-9][0-9][2468][048]))|((2)([-./])(29)([-./])([0-9][0-9][13579][26])))"     "02/29/2083"
+"(((0[13578]|10|12)([-./])(0[1-9]|[12][0-9]|3[01])([-./])(\d{4}))|((0[469]|11)([-./])([0][1-9]|[12][0-9]|30)([-./])(\d{4}))|((2)([-./])(0[1-9]|1[0-9]|2[0-8])([-./])(\d{4}))|((2)(\.|-|\/)(29)([-./])([02468][048]00))|((2)([-./])(29)([-./])([13579][26]00))|((2)([-./])(29)([-./])([0-9][0-9][0][48]))|((2)([-./])(29)([-./])([0-9][0-9][2468][048]))|((2)([-./])(29)([-./])([0-9][0-9][13579][26])))"     "11/31/2000"
+"(((0[13578]|10|12)([-./])(0[1-9]|[12][0-9]|3[01])([-./])(\d{4}))|((0[469]|11)([-./])([0][1-9]|[12][0-9]|30)([-./])(\d{4}))|((2)([-./])(0[1-9]|1[0-9]|2[0-8])([-./])(\d{4}))|((2)(\.|-|\/)(29)([-./])([02468][048]00))|((2)([-./])(29)([-./])([13579][26]00))|((2)([-./])(29)([-./])([0-9][0-9][0][48]))|((2)([-./])(29)([-./])([0-9][0-9][2468][048]))|((2)([-./])(29)([-./])([0-9][0-9][13579][26])))"     "01/32/2000"
+"^[a-zA-Z0-9\s .\-]+$"   G "<0>2222 Mock St.</0>"   # TODO:  \s in patterns not implemented
+"^[a-zA-Z0-9\s .\-]+$"   G "<0>1 A St.</0>"
+"^[a-zA-Z0-9\s .\-]+$"   G "<0>555-1212</0>"
+"^[a-zA-Z0-9\s.\-]+$"     "[A Street]"
+"^[a-zA-Z0-9\s.\-]+$"     "(3 A St.)"
+"^[a-zA-Z0-9\s.\-]+$"     "{34 C Ave.}"
+"^[a-zA-Z0-9\s.\-]+$"     "Last.*?(\d+.?\d*)"
+"^[a-zA-Z0-9\s .\-]+$"   G "<TR><TD ALIGN=RIGHT> </TD><TD>Last</TD><TD ALIGN=RIGHT NOW"
+"^[a-zA-Z0-9\s.\-]+$"     "[AADDSS]"
+"^([0-9]( |-)?)?(\(?[0-9]{3}\)?|[0-9]{3})( |-)?([0-9]{3}( |-)?[0-9]{4}|[a-zA-Z0-9]{7})$"   G "<0>1-(123)-123-1234</0>"
+"^([0-9]( |-)?)?(\(?[0-9]{3}\)?|[0-9]{3})( |-)?([0-9]{3}( |-)?[0-9]{4}|[a-zA-Z0-9]{7})$"   G "<0>123 123 1234</0>"
+"^([0-9]( |-)?)?(\(?[0-9]{3}\)?|[0-9]{3})( |-)?([0-9]{3}( |-)?[0-9]{4}|[a-zA-Z0-9]{7})$"   G "<0>1-800-ALPHNUM</0>"
+"^([0-9]( |-)?)?(\(?[0-9]{3}\)?|[0-9]{3})( |-)?([0-9]{3}( |-)?[0-9]{4}|[a-zA-Z0-9]{7})$"     "1.123.123.1234"
+"^([0-9]( |-)?)?(\(?[0-9]{3}\)?|[0-9]{3})( |-)?([0-9]{3}( |-)?[0-9]{4}|[a-zA-Z0-9]{7})$"     "(123)-1234-123"
+"^([0-9]( |-)?)?(\(?[0-9]{3}\)?|[0-9]{3})( |-)?([0-9]{3}( |-)?[0-9]{4}|[a-zA-Z0-9]{7})$"     "123-1234"
+"^([0-1][0-9]|[2][0-3]):([0-5][0-9])$"   G "<0>02:04</0>"
+"^([0-1][0-9]|[2][0-3]):([0-5][0-9])$"   G "<0>16:56</0>"
+"^([0-1][0-9]|[2][0-3]):([0-5][0-9])$"   G "<0>23:59</0>"
+"^([0-1][0-9]|[2][0-3]):([0-5][0-9])$"     "02:00 PM"
+"^([0-1][0-9]|[2][0-3]):([0-5][0-9])$"     "PM2:00"
+"^([0-1][0-9]|[2][0-3]):([0-5][0-9])$"     "24:00"
+"^[0,1]?\d{1}\/(([0-2]?\d{1})|([3][0,1]{1}))\/(([1]{1}[9]{1}[9]{1}\d{1})|([2-9]{1}\d{3}))$"   G "<0>01/01/1990</0>"
+"^[0,1]?\d{1}\/(([0-2]?\d{1})|([3][0,1]{1}))\/(([1]{1}[9]{1}[9]{1}\d{1})|([2-9]{1}\d{3}))$"   G "<0>12/12/9999</0>"
+"^[0,1]?\d{1}\/(([0-2]?\d{1})|([3][0,1]{1}))\/(([1]{1}[9]{1}[9]{1}\d{1})|([2-9]{1}\d{3}))$"   G "<0>3/28/2001</0>"
+"^[0,1]?\d{1}\/(([0-2]?\d{1})|([3][0,1]{1}))\/(([1]{1}[9]{1}[9]{1}\d{1})|([2-9]{1}\d{3}))$"     "3-8-01"
+"^[0,1]?\d{1}\/(([0-2]?\d{1})|([3][0,1]{1}))\/(([1]{1}[9]{1}[9]{1}\d{1})|([2-9]{1}\d{3}))$"     "13/32/1001"
+"^[0,1]?\d{1}\/(([0-2]?\d{1})|([3][0,1]{1}))\/(([1]{1}[9]{1}[9]{1}\d{1})|([2-9]{1}\d{3}))$"     "03/32/1989"
+"((\(\d{3}\)?)|(\d{3}))([\s \-./]?)(\d{3})([\s \-./]?)(\d{4})"   G "<0>1.2123644567</0>"
+"((\(\d{3}\)?)|(\d{3}))([\s \-./]?)(\d{3})([\s \-./]?)(\d{4})"   G "<0>0-234.567/8912</0>"
+"((\(\d{3}\)?)|(\d{3}))([\s \-./]?)(\d{3})([\s \-./]?)(\d{4})"   G "<0>1-(212)-123 4567</0>"
+"((\(\d{3}\)?)|(\d{3}))([\s \-./]?)(\d{3})([\s \-./]?)(\d{4})"     "0-212364345"
+"((\(\d{3}\)?)|(\d{3}))([\s \-./]?)(\d{3})([\s \-./]?)(\d{4})"     "1212-364,4321"
+"((\(\d{3}\)?)|(\d{3}))([\s \-./]?)(\d{3})([\s \-./]?)(\d{4})"     "0212\345/6789"
+"^([0-9]{6}[\s \-]{1}[0-9]{12}|[0-9]{18})$"   G "<0>000000 000000000000</0>"
+"^([0-9]{6}[\s \-]{1}[0-9]{12}|[0-9]{18})$"   G "<0>000000-000000000000</0>"
+"^([0-9]{6}[\s \-]{1}[0-9]{12}|[0-9]{18})$"   G "<0>000000000000000000</0>"
+"^([0-9]{6}[\s \-]{1}[0-9]{12}|[0-9]{18})$"     "000000_000000000000"
+"^(([1-9])|(0[1-9])|(1[0-2]))\/((0[1-9])|([1-31]))\/((\d{2})|(\d{4}))$"   G "<0>01/01/2001</0>"
+"^(([1-9])|(0[1-9])|(1[0-2]))\/((0[1-9])|([1-31]))\/((\d{2})|(\d{4}))$"   G "<0>1/1/2001</0>"
+"^(([1-9])|(0[1-9])|(1[0-2]))\/((0[1-9])|([1-31]))\/((\d{2})|(\d{4}))$"   G "<0>01/1/01</0>"
+"^(([1-9])|(0[1-9])|(1[0-2]))\/((0[1-9])|([1-31]))\/((\d{2})|(\d{4}))$"     "13/01/2001"
+"^(([1-9])|(0[1-9])|(1[0-2]))\/((0[1-9])|([1-31]))\/((\d{2})|(\d{4}))$"     "1/2/100"
+"^(([1-9])|(0[1-9])|(1[0-2]))\/((0[1-9])|([1-31]))\/((\d{2})|(\d{4}))$"     "09/32/2001"
+"^\$?([0-9]{1,3},([0-9]{3},)*[0-9]{3}|[0-9]+)(.[0-9][0-9])?$"   G "<0>$3,023,123.34</0>"
+"^\$?([0-9]{1,3},([0-9]{3},)*[0-9]{3}|[0-9]+)(.[0-9][0-9])?$"   G "<0>9,876,453</0>"
+"^\$?([0-9]{1,3},([0-9]{3},)*[0-9]{3}|[0-9]+)(.[0-9][0-9])?$"   G "<0>123456.78</0>"
+"^\$?([0-9]{1,3},([0-9]{3},)*[0-9]{3}|[0-9]+)(.[0-9][0-9])?$"     "4,33,234.34"
+"^\$?([0-9]{1,3},([0-9]{3},)*[0-9]{3}|[0-9]+)(.[0-9][0-9])?$"     "$1.234"
+"^\$?([0-9]{1,3},([0-9]{3},)*[0-9]{3}|[0-9]+)(.[0-9][0-9])?$"     "abc"
+"^\d{5}$|^\d{5}-\d{4}$"   G "<0>55555-5555</0>"
+"^\d{5}$|^\d{5}-\d{4}$"   G "<0>34564-3342</0>"
+"^\d{5}$|^\d{5}-\d{4}$"   G "<0>90210</0>"
+"^\d{5}$|^\d{5}-\d{4}$"     "434454444"
+"^\d{5}$|^\d{5}-\d{4}$"     "645-32-2345"
+"^\d{5}$|^\d{5}-\d{4}$"     "abc"
+"^\d{3}-\d{2}-\d{4}$"   G "<0>333-22-4444</0>"
+"^\d{3}-\d{2}-\d{4}$"   G "<0>123-45-6789</0>"
+"^\d{3}-\d{2}-\d{4}$"     "123456789"
+"^\d{3}-\d{2}-\d{4}$"     "SSN"
+"^[2-9]\d{2}-\d{3}-\d{4}$"   G "<0>800-555-5555</0>"
+"^[2-9]\d{2}-\d{3}-\d{4}$"   G "<0>333-444-5555</0>"
+"^[2-9]\d{2}-\d{3}-\d{4}$"   G "<0>212-666-1234</0>"
+"^[2-9]\d{2}-\d{3}-\d{4}$"     "000-000-0000"
+"^[2-9]\d{2}-\d{3}-\d{4}$"     "123-456-7890"
+"^[2-9]\d{2}-\d{3}-\d{4}$"     "2126661234"
+"^\d{5}-\d{4}|\d{5}|[A-Z]\d[A-Z] \d[A-Z]\d$"   G "<0>44240</0>"
+"^\d{5}-\d{4}|\d{5}|[A-Z]\d[A-Z] \d[A-Z]\d$"   G "<0>44240-5555</0>"
+"^\d{5}-\d{4}|\d{5}|[A-Z]\d[A-Z] \d[A-Z]\d$"   G "<0>G3H 6A3</0>"
+"^\d{5}-\d{4}|\d{5}|[A-Z]\d[A-Z] \d[A-Z]\d$"     "Ohio"
+"^\d{5}-\d{4}|\d{5}|[A-Z]\d[A-Z] \d[A-Z]\d$"     "abc"
+"^\d{5}-\d{4}|\d{5}|[A-Z]\d[A-Z] \d[A-Z]\d$"     "g3h6a3"
+"[0-9]{4}\s*[a-zA-Z]{2}"   G "<0>1054 WD</0>"
+"[0-9]{4}\s*[a-zA-Z]{2}"   G "<0>1054WD</0>"
+"[0-9]{4}\s*[a-zA-Z]{2}"   G "<0>1054 wd</0>"
+"[0-9]{4}\s*[a-zA-Z]{2}"     "10543"
+"(^1300\d{6}$)|(^1800|1900|1902\d{6}$)|(^0[2|3|7|8]{1}[0-9]{8}$)|(^13\d{4}$)|(^04\d{2,3}\d{6}$)"   G "<0>0732105432</0>"
+"(^1300\d{6}$)|(^1800|1900|1902\d{6}$)|(^0[2|3|7|8]{1}[0-9]{8}$)|(^13\d{4}$)|(^04\d{2,3}\d{6}$)"   G "<0>1300333444</0>"
+"(^1300\d{6}$)|(^1800|1900|1902\d{6}$)|(^0[2|3|7|8]{1}[0-9]{8}$)|(^13\d{4}$)|(^04\d{2,3}\d{6}$)"   G "<0>131313</0>"
+"(^1300\d{6}$)|(^1800|1900|1902\d{6}$)|(^0[2|3|7|8]{1}[0-9]{8}$)|(^13\d{4}$)|(^04\d{2,3}\d{6}$)"     "32105432"
+"(^1300\d{6}$)|(^1800|1900|1902\d{6}$)|(^0[2|3|7|8]{1}[0-9]{8}$)|(^13\d{4}$)|(^04\d{2,3}\d{6}$)"     "13000456"
+"^((https?|ftp)\://((\[?(\d{1,3}\.){3}\d{1,3}\]?)|(([\-a-zA-Z0-9]+\.)+[a-zA-Z]{2,4}))(\:\d+)?(/[\-a-zA-Z0-9._?,'+\&%$#=~\\]+)*/?)$"   G "<0>http://207.68.172.254/home.ashx</0>"
+"^((https?|ftp)\://((\[?(\d{1,3}\.){3}\d{1,3}\]?)|(([\-a-zA-Z0-9]+\.)+[a-zA-Z]{2,4}))(\:\d+)?(/[\-a-zA-Z0-9._?,'+\&%$#=~\\]+)*/?)$"   G "<0>ftp://ftp.netscape.com/</0>"
+"^((https?|ftp)\://((\[?(\d{1,3}\.){3}\d{1,3}\]?)|(([\-a-zA-Z0-9]+\.)+[a-zA-Z]{2,4}))(\:\d+)?(/[\-a-zA-Z0-9._?,'+\&%$#=~\\]+)*/?)$"   G "<0>https://www.brinkster.com/login.asp</0>"
+"^((https?|ftp)\://((\[?(\d{1,3}\.){3}\d{1,3}\]?)|(([\-a-zA-Z0-9]+\.)+[a-zA-Z]{2,4}))(\:\d+)?(/[\-a-zA-Z0-9._?,'+\&%$#=~\\]+)*/?)$"     "htp://mistake.com/"
+"^((https?|ftp)\://((\[?(\d{1,3}\.){3}\d{1,3}\]?)|(([\-a-zA-Z0-9]+\.)+[a-zA-Z]{2,4}))(\:\d+)?(/[\-a-zA-Z0-9._?,'+\&%$#=~\\]+)*/?)$"     "http://www_address.com/"
+"^((https?|ftp)\://((\[?(\d{1,3}\.){3}\d{1,3}\]?)|(([\-a-zA-Z0-9]+\.)+[a-zA-Z]{2,4}))(\:\d+)?(/[\-a-zA-Z0-9._?,'+\&%$#=~\\]+)*/?)$"     "ftp://www.files.com/file with spaces.txt"
+"([0-9]{4})-([0-9]{1,2})-([0-9]{1,2})"   G "<0>2002-11-03</0>"
+"([0-9]{4})-([0-9]{1,2})-([0-9]{1,2})"   G "<0>2007-17-08</0>"
+"([0-9]{4})-([0-9]{1,2})-([0-9]{1,2})"   G "<0>9999-99-99</0>"
+"([0-9]{4})-([0-9]{1,2})-([0-9]{1,2})"     "2002/17/18"
+"([0-9]{4})-([0-9]{1,2})-([0-9]{1,2})"     "2002.18.45"
+"([0-9]{4})-([0-9]{1,2})-([0-9]{1,2})"     "18.45.2002"
+"^\$?(\d{1,3}(\,\d{3})*|(\d+))(\.\d{0,2})?$"   G "<0>$0,234.50</0>"
+"^\$?(\d{1,3}(\,\d{3})*|(\d+))(\.\d{0,2})?$"   G "<0>0234.5</0>"
+"^\$?(\d{1,3}(\,\d{3})*|(\d+))(\.\d{0,2})?$"   G "<0>0,234.</0>"
+"^\$?(\d{1,3}(\,\d{3})*|(\d+))(\.\d{0,2})?$"     "$1,23,50"
+"^\$?(\d{1,3}(\,\d{3})*|(\d+))(\.\d{0,2})?$"     "$123.123"
+"(^\d{5}-\d{3}|^\d{2}.\d{3}-\d{3}|\d{8})"   G "<0>12.345-678</0>"
+"(^\d{5}-\d{3}|^\d{2}.\d{3}-\d{3}|\d{8})"   G "<0>12345-678</0>"
+"(^\d{5}-\d{3}|^\d{2}.\d{3}-\d{3}|\d{8})"   G "<0>12345678</0>"
+"(^\d{5}-\d{3}|^\d{2}.\d{3}-\d{3}|\d{8})"     "12.345678"
+"(^\d{5}-\d{3}|^\d{2}.\d{3}-\d{3}|\d{8})"     "12345-1"
+"(^\d{5}-\d{3}|^\d{2}.\d{3}-\d{3}|\d{8})"     "123"
+'^([a-zA-Z]\:|\\)\\([^\\]+\\)*[^\/:*?"<>|]+\.htm(l)?$'   G "<0>x:\\test\\testing.htm</0>"
+'^([a-zA-Z]\:|\\)\\([^\\]+\\)*[^\/:*?"<>|]+\.htm(l)?$'   G "<0>x:\\test\\test#$ ing.html</0>"
+'^([a-zA-Z]\:|\\)\\([^\\]+\\)*[^\/:*?"<>|]+\.htm(l)?$'   G "<0>\\\\test\testing.html</0>"
+'^([a-zA-Z]\:|\\)\\([^\\]+\\)*[^\/:*?"<>|]+\.htm(l)?$'     "x:\test\test/ing.htm"
+'^([a-zA-Z]\:|\\)\\([^\\]+\\)*[^\/:*?"<>|]+\.htm(l)?$'     "x:\test\test*.htm"
+'^([a-zA-Z]\:|\\)\\([^\\]+\\)*[^\/:*?"<>|]+\.htm(l)?$'     "\\test?<.htm"
+"^[1-9]{1}[0-9]{3}$"   G "<0>1234</0>"
+"^[1-9]{1}[0-9]{3}$"     "123"
+"^[1-9]{1}[0-9]{3}$"     "123A"
+"^[A-Z]{1}( |-)?[1-9]{1}[0-9]{3}$"   G "<0>A-1234</0>"
+"^[A-Z]{1}( |-)?[1-9]{1}[0-9]{3}$"   G "<0>A 1234</0>"
+"^[A-Z]{1}( |-)?[1-9]{1}[0-9]{3}$"   G "<0>A1234</0>"
+"^[A-Z]{1}( |-)?[1-9]{1}[0-9]{3}$"     "AA-1234"
+"^[A-Z]{1}( |-)?[1-9]{1}[0-9]{3}$"     "A12345"
+"^(F-)?[0-9]{5}$"   G "<0>12345</0>"
+"^(F-)?[0-9]{5}$"   G "<0>F-12345</0>"
+"^(F-)?[0-9]{5}$"     "F12345"
+"^(F-)?[0-9]{5}$"     "F-123456"
+"^(F-)?[0-9]{5}$"     "123456"
+"^(V-|I-)?[0-9]{4}$"   G "<0>1234</0>"
+"^(V-|I-)?[0-9]{4}$"   G "<0>V-1234</0>"
+"^(V-|I-)?[0-9]{4}$"     "12345"
+"^[1-9]{1}[0-9]{3} ?[A-Z]{2}$"   G "<0>1234 AB</0>"
+"^[1-9]{1}[0-9]{3} ?[A-Z]{2}$"   G "<0>1234AB</0>"
+"^[1-9]{1}[0-9]{3} ?[A-Z]{2}$"     "123AB"
+"^[1-9]{1}[0-9]{3} ?[A-Z]{2}$"     "1234AAA"
+"^([1-9]{2}|[0-9][1-9]|[1-9][0-9])[0-9]{3}$"   G "<0>12345</0>"
+"^([1-9]{2}|[0-9][1-9]|[1-9][0-9])[0-9]{3}$"   G "<0>10234</0>"
+"^([1-9]{2}|[0-9][1-9]|[1-9][0-9])[0-9]{3}$"   G "<0>01234</0>"
+"^([1-9]{2}|[0-9][1-9]|[1-9][0-9])[0-9]{3}$"     "00123"
+"^(/w|/W|[^<>+?$%\{}\&])+$"   G "<0>John Doe Sr.</0>"
+"^(/w|/W|[^<>+?$%\{}\&])+$"   G "<0>100 Elm St., Suite 25</0>"
+"^(/w|/W|[^<>+?$%\{}\&])+$"   G "<0>Valerie's Gift Shop</0>"
+"^(/w|/W|[^<>+?$%\{}\&])+$"     "<h1>Hey</h1>"
+/<[a-zA-Z][^>]*\son\w+=(\w+|'[^']*'|"[^"]*")[^>]*>/   G '<0><IMG onmouseover="window.close()"></0>'
+/<[a-zA-Z][^>]*\son\w+=(\w+|'[^']*'|"[^"]*")[^>]*>/     '<IMG src="star.gif">'
+"(?!^0*$)(?!^0*\.0*$)^\d{1,5}(\.\d{1,3})?$"   G "<0>1</0>"
+"(?!^0*$)(?!^0*\.0*$)^\d{1,5}(\.\d{1,3})?$"   G "<0>12345.123</0>"
+"(?!^0*$)(?!^0*\.0*$)^\d{1,5}(\.\d{1,3})?$"   G "<0>0.5</0>"
+"(?!^0*$)(?!^0*\.0*$)^\d{1,5}(\.\d{1,3})?$"     "0"
+"(?!^0*$)(?!^0*\.0*$)^\d{1,5}(\.\d{1,3})?$"     "0.0"
+"(?!^0*$)(?!^0*\.0*$)^\d{1,5}(\.\d{1,3})?$"     "123456.1234"
+"^.+@[^\.].*\.[a-z]{2,}$"   G "<0>whatever@somewhere.museum</0>"
+"^.+@[^\.].*\.[a-z]{2,}$"   G "<0>foreignchars@myforeigncharsdomain.nu</0>"
+"^.+@[^\.].*\.[a-z]{2,}$"   G "<0>me+mysomething@mydomain.com</0>"
+"^.+@[^\.].*\.[a-z]{2,}$"     "a@b.c"
+"^.+@[^\.].*\.[a-z]{2,}$"     "me@.my.com"
+"^.+@[^\.].*\.[a-z]{2,}$"     "a@b.comFOREIGNCHAR"
+"^(\d{5}-\d{4}|\d{5})$"   G "<0>12345</0>"
+"^(\d{5}-\d{4}|\d{5})$"   G "<0>12345-1234</0>"
+"^(\d{5}-\d{4}|\d{5})$"     "12345-12345"
+"^(\d{5}-\d{4}|\d{5})$"     "123"
+"^(\d{5}-\d{4}|\d{5})$"     "12345-abcd"
+"^(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$"   G "<0>0.0.0.0</0>"
+"^(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$"   G "<0>255.255.255.02</0>"
+"^(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$"   G "<0>192.168.0.136</0>"
+"^(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$"     "256.1.3.4"
+"^(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$"     "023.44.33.22"
+"^(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$"     "10.57.98.23."
+"<img([^>]*[^/])>"   G '<0><img src="bob"></0>'
+"<img([^>]*[^/])>"     '<img src="bob" />'
+"<!--[\s\S]*?-->"   G "<0><!-- comments --></0>"
+"<!--[\s\S]*?-->"   G "<0><!-- x = a > b - 3 --></0>"
+"<!--[\s\S]*?-->"     "<COMMENTS>this is a comment</COMMENTS>"
+"<!--[\p{Zs}\P{Zs}]*?-->"   G "<0><!-- comments --></0>"
+"<!--[\p{Zs}\P{Zs}]*?-->"   G "<0><!-- x = a > b - 3 --></0>"
+"<!--[\p{Zs}\P{Zs}]*?-->"     "<COMMENTS>this is a comment</COMMENTS>"
+/<\u002f?(\w+)(\s+\w+=(\w+|"[^"]*"|'[^']*'))*>/   G "<0><TD></0>"
+/<\u002f?(\w+)(\s+\w+=(\w+|"[^"]*"|'[^']*'))*>/   G '<0><TD bgColor="FFFFFF"></0>'
+/<\u002f?(\w+)(\s+\w+=(\w+|"[^"]*"|'[^']*'))*>/   G "<0></TD></0>"
+/<\u002f?(\w+)(\s+\w+=(\w+|"[^"]*"|'[^']*'))*>/     "No Tag Here ..."
+"(\{\\f\d*)\\([^;]+;)"   G "<0>{\\f0\\Some Font names here;</0>"
+"(\{\\f\d*)\\([^;]+;)"   G "<0>{\\f1\\fswiss\\fcharset0\\fprq2{\\*\\panose 020b0604020202020204}Arial;</0>"
+"(\{\\f\d*)\\([^;]+;)"   G "{\\f"
+"(\{\\f\d*)\\([^;]+;)"     "{f0fs20 some text}"
+#"</?([a-zA-Z][-A-Za-z\d\.]{0,71})(\s+(\S+)(\s*=\s*([-\w\.]{1,1024}|"[^"]{0,1024}"|'[^']{0,1024}'))?)*\s*>"   G '<0><IMG src='stars.gif' alt="space" height=1></0>'    # TODO:  Can't quote this pattern with the test syntax!
+#"</?([a-zA-Z][-A-Za-z\d\.]{0,71})(\s+(\S+)(\s*=\s*([-\w\.]{1,1024}|"[^"]{0,1024}"|'[^']{0,1024}'))?)*\s*>"     "this is not a tag"
+"^([0]\d|[1][0-2])\/([0-2]\d|[3][0-1])\/([2][01]|[1][6-9])\d{2}(\s([0-1]\d|[2][0-3])(\:[0-5]\d){1,2})?$"   G "<0>12/30/2002</0>"
+"^([0]\d|[1][0-2])\/([0-2]\d|[3][0-1])\/([2][01]|[1][6-9])\d{2}(\s([0-1]\d|[2][0-3])(\:[0-5]\d){1,2})?$"   G "<0>01/12/1998 13:30</0>"
+"^([0]\d|[1][0-2])\/([0-2]\d|[3][0-1])\/([2][01]|[1][6-9])\d{2}(\s([0-1]\d|[2][0-3])(\:[0-5]\d){1,2})?$"   G "<0>01/28/2002 22:35:00</0>"
+"^([0]\d|[1][0-2])\/([0-2]\d|[3][0-1])\/([2][01]|[1][6-9])\d{2}(\s([0-1]\d|[2][0-3])(\:[0-5]\d){1,2})?$"     "13/30/2002"
+"^([0]\d|[1][0-2])\/([0-2]\d|[3][0-1])\/([2][01]|[1][6-9])\d{2}(\s([0-1]\d|[2][0-3])(\:[0-5]\d){1,2})?$"     "01/12/1998 24:30"
+"^([0]\d|[1][0-2])\/([0-2]\d|[3][0-1])\/([2][01]|[1][6-9])\d{2}(\s([0-1]\d|[2][0-3])(\:[0-5]\d){1,2})?$"     "01/28/2002 22:35:64"
+#"((?<strElement>(^[A-Z0-9-;=]*:))(?<strValue>(.*)))"   G "<0>BEGIN:</0>"            #named capture
+#"((?<strElement>(^[A-Z0-9-;=]*:))(?<strValue>(.*)))"   G "<0>TEL;WORK;VOICE:</0>"   #named capture
+#"((?<strElement>(^[A-Z0-9-;=]*:))(?<strValue>(.*)))"   G "<0>TEL:</0>"              #named capture
+#"((?<strElement>(^[A-Z0-9-;=]*:))(?<strValue>(.*)))"     "begin:"                   #named capture
+#"((?<strElement>(^[A-Z0-9-;=]*:))(?<strValue>(.*)))"     "TEL;PREF;"                #named capture
+'^<a\s+href\s*=\s*"http:\/\/([^"]*)"([^>]*)>(.*?(?=<\/a>))<\/a>$'   G '<0><a href="http://www.mysite.com">my external link</a></0>'
+'^<a\s+href\s*=\s*"http:\/\/([^"]*)"([^>]*)>(.*?(?=<\/a>))<\/a>$'   G '<a href="http:/'
+'^<a\s+href\s*=\s*"http:\/\/([^"]*)"([^>]*)>(.*?(?=<\/a>))<\/a>$'     '<a href="myinternalpage.html">my internal link</a>'
+"^([0]\d|[1][0-2])\/([0-2]\d|[3][0-1])\/([2][01]|[1][6-9])\d{2}(\s([0]\d|[1][0-2])(\:[0-5]\d){1,2})*\s*([aApP][mM]{0,2})?$"   G "<0>12/31/2002</0>"
+"^([0]\d|[1][0-2])\/([0-2]\d|[3][0-1])\/([2][01]|[1][6-9])\d{2}(\s([0]\d|[1][0-2])(\:[0-5]\d){1,2})*\s*([aApP][mM]{0,2})?$"   G "<0>12/31/2002 08:00</0>"
+"^([0]\d|[1][0-2])\/([0-2]\d|[3][0-1])\/([2][01]|[1][6-9])\d{2}(\s([0]\d|[1][0-2])(\:[0-5]\d){1,2})*\s*([aApP][mM]{0,2})?$"   G "<0>12/31/2002 08:00 AM</0>"
+"^([0]\d|[1][0-2])\/([0-2]\d|[3][0-1])\/([2][01]|[1][6-9])\d{2}(\s([0]\d|[1][0-2])(\:[0-5]\d){1,2})*\s*([aApP][mM]{0,2})?$"     "12/31/02"
+"^([0]\d|[1][0-2])\/([0-2]\d|[3][0-1])\/([2][01]|[1][6-9])\d{2}(\s([0]\d|[1][0-2])(\:[0-5]\d){1,2})*\s*([aApP][mM]{0,2})?$"     "12/31/2002 14:00"
+"<blockquote>(?:\s*([^<]+)<br>\s*)+</blockquote>"   G "<0><blockquote>string1<br>string2<br>string3<br></blockquote></0>"
+"<blockquote>(?:\s*([^<]+)<br>\s*)+</blockquote>"     ".."
+"^((0?[13578]|10|12)(-|\/)((0[0-9])|([12])([0-9]?)|(3[01]?))(-|\/)((19)([2-9])(\d{1})|(20)([01])(\d{1})|([8901])(\d{1}))|(0?[2469]|11)(-|\/)((0[0-9])|([12])([0-9]?)|(3[0]?))(-|\/)((19)([2-9])(\d{1})|(20)([01])(\d{1})|([8901])(\d{1})))$"   G "<0>1/2/03</0>"
+"^((0?[13578]|10|12)(-|\/)((0[0-9])|([12])([0-9]?)|(3[01]?))(-|\/)((19)([2-9])(\d{1})|(20)([01])(\d{1})|([8901])(\d{1}))|(0?[2469]|11)(-|\/)((0[0-9])|([12])([0-9]?)|(3[0]?))(-|\/)((19)([2-9])(\d{1})|(20)([01])(\d{1})|([8901])(\d{1})))$"   G "<0>2/30/1999</0>"
+"^((0?[13578]|10|12)(-|\/)((0[0-9])|([12])([0-9]?)|(3[01]?))(-|\/)((19)([2-9])(\d{1})|(20)([01])(\d{1})|([8901])(\d{1}))|(0?[2469]|11)(-|\/)((0[0-9])|([12])([0-9]?)|(3[0]?))(-|\/)((19)([2-9])(\d{1})|(20)([01])(\d{1})|([8901])(\d{1})))$"   G "<0>03/04/19</0>"
+"^((0?[13578]|10|12)(-|\/)((0[0-9])|([12])([0-9]?)|(3[01]?))(-|\/)((19)([2-9])(\d{1})|(20)([01])(\d{1})|([8901])(\d{1}))|(0?[2469]|11)(-|\/)((0[0-9])|([12])([0-9]?)|(3[0]?))(-|\/)((19)([2-9])(\d{1})|(20)([01])(\d{1})|([8901])(\d{1})))$"     "3/4/2020"
+"^((0?[13578]|10|12)(-|\/)((0[0-9])|([12])([0-9]?)|(3[01]?))(-|\/)((19)([2-9])(\d{1})|(20)([01])(\d{1})|([8901])(\d{1}))|(0?[2469]|11)(-|\/)((0[0-9])|([12])([0-9]?)|(3[0]?))(-|\/)((19)([2-9])(\d{1})|(20)([01])(\d{1})|([8901])(\d{1})))$"     "3/4/1919"
+'</?(\w+)(\s*\w*\s*=\s*("[^"]*"|\u0027[^\u0027]\u0027|[^>]*))*|/?>'   G '<0><font color="blue"></0>'
+'</?(\w+)(\s*\w*\s*=\s*("[^"]*"|\u0027[^\u0027]\u0027|[^>]*))*|/?>'   G "<0></font></0>"
+'</?(\w+)(\s*\w*\s*=\s*("[^"]*"|\u0027[^\u0027]\u0027|[^>]*))*|/?>'   G "<0><br /></0>"
+'</?(\w+)(\s*\w*\s*=\s*("[^"]*"|\u0027[^\u0027]\u0027|[^>]*))*|/?>'     "this is a test..."
+"^ *(1[0-2]|[1-9]):[0-5][0-9] *(a|p|A|P)(m|M) *$"   G "<0>12:00am</0>"
+"^ *(1[0-2]|[1-9]):[0-5][0-9] *(a|p|A|P)(m|M) *$"   G "<0>1:00 PM</0>"
+"^ *(1[0-2]|[1-9]):[0-5][0-9] *(a|p|A|P)(m|M) *$"   G "<0>  12:59   pm</0>"
+"^ *(1[0-2]|[1-9]):[0-5][0-9] *(a|p|A|P)(m|M) *$"     "0:00"
+"^ *(1[0-2]|[1-9]):[0-5][0-9] *(a|p|A|P)(m|M) *$"     "0:01 am"
+"^ *(1[0-2]|[1-9]):[0-5][0-9] *(a|p|A|P)(m|M) *$"     "13:00 pm"
+"\({1}[0-9]{3}\){1}\-{1}[0-9]{3}\-{1}[0-9]{4}"   G "<0>(111)-111-1111</0>"
+"\({1}[0-9]{3}\){1}\-{1}[0-9]{3}\-{1}[0-9]{4}"     "11111111111"
+"[^abc]"   G "<0>def</0>"
+"[^abc]"     "abc"
+"^(([0]?[1-9]|[1][0-2])[\/|\-|\.]([0-2]\d|[3][0-1]|[1-9])[\/|\-|\.]([2][0])?\d{2}\s+((([0][0-9]|[1][0-2]|[0-9])[\:|\-|\.]([0-5]\d)\s*([aApP][mM])?)|(([0-1][0-9]|[2][0-3]|[0-9])[\:|\-|\.]([0-5]\d))))$"   G "<0>01/01/2002 04:42</0>"
+"^(([0]?[1-9]|[1][0-2])[\/|\-|\.]([0-2]\d|[3][0-1]|[1-9])[\/|\-|\.]([2][0])?\d{2}\s+((([0][0-9]|[1][0-2]|[0-9])[\:|\-|\.]([0-5]\d)\s*([aApP][mM])?)|(([0-1][0-9]|[2][0-3]|[0-9])[\:|\-|\.]([0-5]\d))))$"   G "<0>5-12-02 04:42 AM</0>"
+"^(([0]?[1-9]|[1][0-2])[\/|\-|\.]([0-2]\d|[3][0-1]|[1-9])[\/|\-|\.]([2][0])?\d{2}\s+((([0][0-9]|[1][0-2]|[0-9])[\:|\-|\.]([0-5]\d)\s*([aApP][mM])?)|(([0-1][0-9]|[2][0-3]|[0-9])[\:|\-|\.]([0-5]\d))))$"   G "<0>01.01/02    04-42aM</0>"
+"^(([0]?[1-9]|[1][0-2])[\/|\-|\.]([0-2]\d|[3][0-1]|[1-9])[\/|\-|\.]([2][0])?\d{2}\s+((([0][0-9]|[1][0-2]|[0-9])[\:|\-|\.]([0-5]\d)\s*([aApP][mM])?)|(([0-1][0-9]|[2][0-3]|[0-9])[\:|\-|\.]([0-5]\d))))$"     "01-12-1999 4:50PM"
+"^(([0]?[1-9]|[1][0-2])[\/|\-|\.]([0-2]\d|[3][0-1]|[1-9])[\/|\-|\.]([2][0])?\d{2}\s+((([0][0-9]|[1][0-2]|[0-9])[\:|\-|\.]([0-5]\d)\s*([aApP][mM])?)|(([0-1][0-9]|[2][0-3]|[0-9])[\:|\-|\.]([0-5]\d))))$"     "01-12-2002 15:10PM"
+"^(([0]?[1-9]|[1][0-2])[\/|\-|\.]([0-2]\d|[3][0-1]|[1-9])[\/|\-|\.]([2][0])?\d{2}\s+((([0][0-9]|[1][0-2]|[0-9])[\:|\-|\.]([0-5]\d)\s*([aApP][mM])?)|(([0-1][0-9]|[2][0-3]|[0-9])[\:|\-|\.]([0-5]\d))))$"     "01-12-002 8:20PM"
+"^([1][12]|[0]?[1-9])[\/-]([3][01]|[12]\d|[0]?[1-9])[\/-](\d{4}|\d{2})$"   G "<0>11-02-02</0>"
+"^([1][12]|[0]?[1-9])[\/-]([3][01]|[12]\d|[0]?[1-9])[\/-](\d{4}|\d{2})$"   G "<0>1-25-2002</0>"
+"^([1][12]|[0]?[1-9])[\/-]([3][01]|[12]\d|[0]?[1-9])[\/-](\d{4}|\d{2})$"   G "<0>01/25/2002</0>"
+"^([1][12]|[0]?[1-9])[\/-]([3][01]|[12]\d|[0]?[1-9])[\/-](\d{4}|\d{2})$"     "13-02-02"
+"^([1][12]|[0]?[1-9])[\/-]([3][01]|[12]\d|[0]?[1-9])[\/-](\d{4}|\d{2})$"     "11.02.02"
+"^([1][12]|[0]?[1-9])[\/-]([3][01]|[12]\d|[0]?[1-9])[\/-](\d{4}|\d{2})$"     "11/32/2002"
+"(([0-1][0-9])|([2][0-3])):([0-5][0-9]):([0-5][0-9])"   G "<0>09:30:00</0>"
+"(([0-1][0-9])|([2][0-3])):([0-5][0-9]):([0-5][0-9])"   G "<0>17:45:20</0>"
+"(([0-1][0-9])|([2][0-3])):([0-5][0-9]):([0-5][0-9])"   G "<0>23:59:59</0>"
+"(([0-1][0-9])|([2][0-3])):([0-5][0-9]):([0-5][0-9])"     "24:00:00"
+"(((0[1-9]|[12][0-9]|3[01])([-./])(0[13578]|10|12)([-./])(\d{4}))|(([0][1-9]|[12][0-9]|30)([-./])(0[469]|11)([-./])(\d{4}))|((0[1-9]|1[0-9]|2[0-8])([-./])(02)([-./])(\d{4}))|((29)(\.|-|\/)(02)([-./])([02468][048]00))|((29)([-./])(02)([-./])([13579][26]00))|((29)([-./])(02)([-./])([0-9][0-9][0][48]))|((29)([-./])(02)([-./])([0-9][0-9][2468][048]))|((29)([-./])(02)([-./])([0-9][0-9][13579][26])))"   G "<0>29/02/2000</0>"
+"(((0[1-9]|[12][0-9]|3[01])([-./])(0[13578]|10|12)([-./])(\d{4}))|(([0][1-9]|[12][0-9]|30)([-./])(0[469]|11)([-./])(\d{4}))|((0[1-9]|1[0-9]|2[0-8])([-./])(02)([-./])(\d{4}))|((29)(\.|-|\/)(02)([-./])([02468][048]00))|((29)([-./])(02)([-./])([13579][26]00))|((29)([-./])(02)([-./])([0-9][0-9][0][48]))|((29)([-./])(02)([-./])([0-9][0-9][2468][048]))|((29)([-./])(02)([-./])([0-9][0-9][13579][26])))"   G "<0>31/01/2000</0>"
+"(((0[1-9]|[12][0-9]|3[01])([-./])(0[13578]|10|12)([-./])(\d{4}))|(([0][1-9]|[12][0-9]|30)([-./])(0[469]|11)([-./])(\d{4}))|((0[1-9]|1[0-9]|2[0-8])([-./])(02)([-./])(\d{4}))|((29)(\.|-|\/)(02)([-./])([02468][048]00))|((29)([-./])(02)([-./])([13579][26]00))|((29)([-./])(02)([-./])([0-9][0-9][0][48]))|((29)([-./])(02)([-./])([0-9][0-9][2468][048]))|((29)([-./])(02)([-./])([0-9][0-9][13579][26])))"   G "<0>30-01-2000</0>"
+"(((0[1-9]|[12][0-9]|3[01])([-./])(0[13578]|10|12)([-./])(\d{4}))|(([0][1-9]|[12][0-9]|30)([-./])(0[469]|11)([-./])(\d{4}))|((0[1-9]|1[0-9]|2[0-8])([-./])(02)([-./])(\d{4}))|((29)(\.|-|\/)(02)([-./])([02468][048]00))|((29)([-./])(02)([-./])([13579][26]00))|((29)([-./])(02)([-./])([0-9][0-9][0][48]))|((29)([-./])(02)([-./])([0-9][0-9][2468][048]))|((29)([-./])(02)([-./])([0-9][0-9][13579][26])))"     "29/02/2002"
+"(((0[1-9]|[12][0-9]|3[01])([-./])(0[13578]|10|12)([-./])(\d{4}))|(([0][1-9]|[12][0-9]|30)([-./])(0[469]|11)([-./])(\d{4}))|((0[1-9]|1[0-9]|2[0-8])([-./])(02)([-./])(\d{4}))|((29)(\.|-|\/)(02)([-./])([02468][048]00))|((29)([-./])(02)([-./])([13579][26]00))|((29)([-./])(02)([-./])([0-9][0-9][0][48]))|((29)([-./])(02)([-./])([0-9][0-9][2468][048]))|((29)([-./])(02)([-./])([0-9][0-9][13579][26])))"     "32/01/2002"
+"(((0[1-9]|[12][0-9]|3[01])([-./])(0[13578]|10|12)([-./])(\d{4}))|(([0][1-9]|[12][0-9]|30)([-./])(0[469]|11)([-./])(\d{4}))|((0[1-9]|1[0-9]|2[0-8])([-./])(02)([-./])(\d{4}))|((29)(\.|-|\/)(02)([-./])([02468][048]00))|((29)([-./])(02)([-./])([13579][26]00))|((29)([-./])(02)([-./])([0-9][0-9][0][48]))|((29)([-./])(02)([-./])([0-9][0-9][2468][048]))|((29)([-./])(02)([-./])([0-9][0-9][13579][26])))"     "10/2/2002"
+"^0[1-6]{1}(([0-9]{2}){4})|((\s[0-9]{2}){4})|((-[0-9]{2}){4})$"   G "<0>01 46 70 89 12</0>"
+"^0[1-6]{1}(([0-9]{2}){4})|((\s[0-9]{2}){4})|((-[0-9]{2}){4})$"   G "<0>01-46-70-89-12</0>"
+"^0[1-6]{1}(([0-9]{2}){4})|((\s[0-9]{2}){4})|((-[0-9]{2}){4})$"   G "<0>0146708912</0>"
+"^0[1-6]{1}(([0-9]{2}){4})|((\s[0-9]{2}){4})|((-[0-9]{2}){4})$"     "01-46708912"
+"^0[1-6]{1}(([0-9]{2}){4})|((\s[0-9]{2}){4})|((-[0-9]{2}){4})$"     "01 46708912"
+"^0[1-6]{1}(([0-9]{2}){4})|((\s[0-9]{2}){4})|((-[0-9]{2}){4})$"     "+33235256677"
+"^[0-9A-Za-z_ ]+(.[jJ][pP][gG]|.[gG][iI][fF])$"   G "<0>good.gif</0>"
+"^[0-9A-Za-z_ ]+(.[jJ][pP][gG]|.[gG][iI][fF])$"   G "<0>go d.GIf</0>"
+"^[0-9A-Za-z_ ]+(.[jJ][pP][gG]|.[gG][iI][fF])$"   G "<0>goo_d.jPg</0>"
+"^[0-9A-Za-z_ ]+(.[jJ][pP][gG]|.[gG][iI][fF])$"     "junk"
+"^[0-9A-Za-z_ ]+(.[jJ][pP][gG]|.[gG][iI][fF])$"     "bad.bad.gif"
+"^[0-9A-Za-z_ ]+(.[jJ][pP][gG]|.[gG][iI][fF])$"     "slash\gif."
+"<[^>\s]*\bauthor\b[^>]*>"   G '<0><author name="Daniel"></0>'
+"<[^>\s]*\bauthor\b[^>]*>"   G "<0></sch:author></0>"
+# "<[^>\s]*\bauthor\b[^>]*>"   G '<0><pp:author name="Daniel"</0>'  #Debug  should work
+"<[^> ]*\bauthor\b[^>]*>"   G "<0></sch:author></0>"
+"<[^> ]*\bauthor\b[^>]*>"   G '<0><pp:author name="Daniel"></0>'
+"<[^>\s]*\bauthor\b[^>]*>"     "<other>"
+"<[^>\s]*\bauthor\b[^>]*>"     "</authors>"
+"<[^>\s]*\bauthor\b[^>]*>"     "<work>author</work>"
+"^(?:(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00)))(\/|-|\.)(?:0?2\1(?:29))$)|(?:(?:1[6-9]|[2-9]\d)?\d{2})(\/|-|\.)(?:(?:(?:0?[13578]|1[02])\2(?:31))|(?:(?:0?[1,3-9]|1[0-2])\2(29|30))|(?:(?:0?[1-9])|(?:1[0-2]))\2(?:0?[1-9]|1\d|2[0-8]))$"   G "<0>04/2/29</0>"
+"^(?:(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00)))(\/|-|\.)(?:0?2\1(?:29))$)|(?:(?:1[6-9]|[2-9]\d)?\d{2})(\/|-|\.)(?:(?:(?:0?[13578]|1[02])\2(?:31))|(?:(?:0?[1,3-9]|1[0-2])\2(29|30))|(?:(?:0?[1-9])|(?:1[0-2]))\2(?:0?[1-9]|1\d|2[0-8]))$"   G "<0>2002-4-30</0>"
+"^(?:(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00)))(\/|-|\.)(?:0?2\1(?:29))$)|(?:(?:1[6-9]|[2-9]\d)?\d{2})(\/|-|\.)(?:(?:(?:0?[13578]|1[02])\2(?:31))|(?:(?:0?[1,3-9]|1[0-2])\2(29|30))|(?:(?:0?[1-9])|(?:1[0-2]))\2(?:0?[1-9]|1\d|2[0-8]))$"   G "<0>02.10.31</0>"
+"^(?:(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00)))(\/|-|\.)(?:0?2\1(?:29))$)|(?:(?:1[6-9]|[2-9]\d)?\d{2})(\/|-|\.)(?:(?:(?:0?[13578]|1[02])\2(?:31))|(?:(?:0?[1,3-9]|1[0-2])\2(29|30))|(?:(?:0?[1-9])|(?:1[0-2]))\2(?:0?[1-9]|1\d|2[0-8]))$"     "2003/2/29"
+"^(?:(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00)))(\/|-|\.)(?:0?2\1(?:29))$)|(?:(?:1[6-9]|[2-9]\d)?\d{2})(\/|-|\.)(?:(?:(?:0?[13578]|1[02])\2(?:31))|(?:(?:0?[1,3-9]|1[0-2])\2(29|30))|(?:(?:0?[1-9])|(?:1[0-2]))\2(?:0?[1-9]|1\d|2[0-8]))$"     "02.4.31"
+"^(?:(?:(?:(?:1[6-9]|[2-9]\d)?(?:0[48]|[2468][048]|[13579][26])|(?:(?:16|[2468][048]|[3579][26])00)))(\/|-|\.)(?:0?2\1(?:29))$)|(?:(?:1[6-9]|[2-9]\d)?\d{2})(\/|-|\.)(?:(?:(?:0?[13578]|1[02])\2(?:31))|(?:(?:0?[1,3-9]|1[0-2])\2(29|30))|(?:(?:0?[1-9])|(?:1[0-2]))\2(?:0?[1-9]|1\d|2[0-8]))$"     "00/00/00"
+'(\d*)\u0027*-*(\d*)/*(\d*)"'   G '<0>5\u0027-3/16"</0>'
+'(\d*)\u0027*-*(\d*)/*(\d*)"'   G '<0>1\u0027-2"</0>'
+'(\d*)\u0027*-*(\d*)/*(\d*)"'   G '<0>5/16"</0>'
+'(\d*)\u0027*-*(\d*)/*(\d*)"'     '1 3/16'
+"^[1-9]{1}$|^[1-4]{1}[0-9]{1}$|^50$"   G "<0>1</0>"
+"^[1-9]{1}$|^[1-4]{1}[0-9]{1}$|^50$"   G "<0>23</0>"
+"^[1-9]{1}$|^[1-4]{1}[0-9]{1}$|^50$"   G "<0>50</0>"
+"^[1-9]{1}$|^[1-4]{1}[0-9]{1}$|^50$"     "0"
+"^[1-9]{1}$|^[1-4]{1}[0-9]{1}$|^50$"     "111"
+"^[1-9]{1}$|^[1-4]{1}[0-9]{1}$|^50$"     "xyz"
+"^([ \u00c0-\u01ffa-zA-Z'])+$"   G "<0>Jon Doe</0>"
+"^([ \u00c0-\u01ffa-zA-Z'])+$"   G "<0>J\u00f8rn</0>"
+"^([ \u00c0-\u01ffa-zA-Z'])+$"   G "<0>Mc'Neelan</0>"
+"^([ \u00c0-\u01ffa-zA-Z'])+$"     "Henry); hacking attempt"
+"^((([0]?[1-9]|1[0-2])(:|\.)(00|15|30|45)?( )?(AM|am|aM|Am|PM|pm|pM|Pm))|(([0]?[0-9]|1[0-9]|2[0-3])(:|\.)(00|15|30|45)?))$"   G "<0>1:00 PM</0>"
+"^((([0]?[1-9]|1[0-2])(:|\.)(00|15|30|45)?( )?(AM|am|aM|Am|PM|pm|pM|Pm))|(([0]?[0-9]|1[0-9]|2[0-3])(:|\.)(00|15|30|45)?))$"   G "<0>6:45 am</0>"
+"^((([0]?[1-9]|1[0-2])(:|\.)(00|15|30|45)?( )?(AM|am|aM|Am|PM|pm|pM|Pm))|(([0]?[0-9]|1[0-9]|2[0-3])(:|\.)(00|15|30|45)?))$"   G "<0>17:30</0>"
+"^((([0]?[1-9]|1[0-2])(:|\.)(00|15|30|45)?( )?(AM|am|aM|Am|PM|pm|pM|Pm))|(([0]?[0-9]|1[0-9]|2[0-3])(:|\.)(00|15|30|45)?))$"     "4:32 am"
+"^((([0]?[1-9]|1[0-2])(:|\.)(00|15|30|45)?( )?(AM|am|aM|Am|PM|pm|pM|Pm))|(([0]?[0-9]|1[0-9]|2[0-3])(:|\.)(00|15|30|45)?))$"     "5:30:00 am"
+"^((([0]?[1-9]|1[0-2])(:|\.)(00|15|30|45)?( )?(AM|am|aM|Am|PM|pm|pM|Pm))|(([0]?[0-9]|1[0-9]|2[0-3])(:|\.)(00|15|30|45)?))$"     "17:01"
+"(^\d*\.?\d*[1-9]+\d*$)|(^[1-9]+\d*\.\d*$)"   G "<0>0.050</0>"
+"(^\d*\.?\d*[1-9]+\d*$)|(^[1-9]+\d*\.\d*$)"   G "<0>5.0000</0>"
+"(^\d*\.?\d*[1-9]+\d*$)|(^[1-9]+\d*\.\d*$)"   G "<0>5000</0>"
+"(^\d*\.?\d*[1-9]+\d*$)|(^[1-9]+\d*\.\d*$)"     "0"
+"(^\d*\.?\d*[1-9]+\d*$)|(^[1-9]+\d*\.\d*$)"     "0.0"
+"(^\d*\.?\d*[1-9]+\d*$)|(^[1-9]+\d*\.\d*$)"     ".0"
+"^([A-Z]{1}[a-z]{1,})$|^([A-Z]{1}[a-z]{1,}\040[A-Z]{1}[a-z]{1,})$|^([A-Z]{1}[a-z]{1,}\040[A-Z]{1}[a-z]{1,}\040[A-Z]{1}[a-z]{1,})$|^$"   G "<0>Sacramento</0>"
+"^([A-Z]{1}[a-z]{1,})$|^([A-Z]{1}[a-z]{1,}\040[A-Z]{1}[a-z]{1,})$|^([A-Z]{1}[a-z]{1,}\040[A-Z]{1}[a-z]{1,}\040[A-Z]{1}[a-z]{1,})$|^$"     "<0><2>San Francisco</2></0>"
+"^([A-Z]{1}[a-z]{1,})$|^([A-Z]{1}[a-z]{1,}\040[A-Z]{1}[a-z]{1,})$|^([A-Z]{1}[a-z]{1,}\040[A-Z]{1}[a-z]{1,}\040[A-Z]{1}[a-z]{1,})$|^$"     "<0><3>San Luis Obispo</3></0>"
+"^([A-Z]{1}[a-z]{1,})$|^([A-Z]{1}[a-z]{1,}\040[A-Z]{1}[a-z]{1,})$|^([A-Z]{1}[a-z]{1,}\040[A-Z]{1}[a-z]{1,}\040[A-Z]{1}[a-z]{1,})$|^$"     "SanFrancisco"
+"^([A-Z]{1}[a-z]{1,})$|^([A-Z]{1}[a-z]{1,}\040[A-Z]{1}[a-z]{1,})$|^([A-Z]{1}[a-z]{1,}\040[A-Z]{1}[a-z]{1,}\040[A-Z]{1}[a-z]{1,})$|^$"     "SanLuisObispo"
+"^([A-Z]{1}[a-z]{1,})$|^([A-Z]{1}[a-z]{1,}\040[A-Z]{1}[a-z]{1,})$|^([A-Z]{1}[a-z]{1,}\040[A-Z]{1}[a-z]{1,}\040[A-Z]{1}[a-z]{1,})$|^$"     "San francisco"
+"^\{?[a-fA-F\d]{8}-([a-fA-F\d]{4}-){3}[a-fA-F\d]{12}\}?$"   G "<0>{e02ff0e4-00ad-090A-c030-0d00a0008ba0}</0>"
+"^\{?[a-fA-F\d]{8}-([a-fA-F\d]{4}-){3}[a-fA-F\d]{12}\}?$"   G "<0>e02ff0e4-00ad-090A-c030-0d00a0008ba0</0>"
+"^\{?[a-fA-F\d]{8}-([a-fA-F\d]{4}-){3}[a-fA-F\d]{12}\}?$"     "0xe02ff0e400ad090Ac0300d00a0008ba0"
+"^\{?[a-fA-F0-9]{8}-([a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}\}?$"   G "<0>{e02ff0e4-00ad-090A-c030-0d00a0008ba0}</0>"
+"^\{?[a-fA-F0-9]{8}-([a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}\}?$"   G "<0>e02ff0e4-00ad-090A-c030-0d00a0008ba0</0>"
+"^\{?[a-fA-F0-9]{8}-([a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}\}?$"     "0xe02ff0e400ad090Ac0300d00a0008ba0"
+"^([a-zA-Z0-9@*#]{8,15})$"   G "<0>@12X*567</0>"
+"^([a-zA-Z0-9@*#]{8,15})$"   G "<0>1#Zv96g@*Yfasd4</0>"
+"^([a-zA-Z0-9@*#]{8,15})$"   G "<0>#67jhgt@erd</0>"
+"^([a-zA-Z0-9@*#]{8,15})$"     "$12X*567"
+"^([a-zA-Z0-9@*#]{8,15})$"     "1#Zv_96"
+"^([a-zA-Z0-9@*#]{8,15})$"     "+678jhgt@erd"
+'(("|\u0027)[a-z0-9\/\.\?\=\&]*(\.htm|\.asp|\.php|\.jsp)[a-z0-9\/\.\?\=\&]*("|\u0027))|(href=*?[a-z0-9\/\.\?\=\&"\u0027]*)'   G '<0>href="produktsida.asp?kategori2=218"</0>'
+'(("|\u0027)[a-z0-9\/\.\?\=\&]*(\.htm|\.asp|\.php|\.jsp)[a-z0-9\/\.\?\=\&]*("|\u0027))|(href=*?[a-z0-9\/\.\?\=\&"\u0027]*)'   G '<0>href="NuclearTesting.htm"</0>'
+'(("|\u0027)[a-z0-9\/\.\?\=\&]*(\.htm|\.asp|\.php|\.jsp)[a-z0-9\/\.\?\=\&]*("|\u0027))|(href=*?[a-z0-9\/\.\?\=\&"\u0027]*)'     'U Suck'
+"^(((((0[1-9])|(1\d)|(2[0-8]))-((0[1-9])|(1[0-2])))|((31-((0[13578])|(1[02])))|((29|30)-((0[1,3-9])|(1[0-2])))))-((20[0-9][0-9]))|(29-02-20(([02468][048])|([13579][26]))))$"   G "<0>05-01-2002</0>"
+"^(((((0[1-9])|(1\d)|(2[0-8]))-((0[1-9])|(1[0-2])))|((31-((0[13578])|(1[02])))|((29|30)-((0[1,3-9])|(1[0-2])))))-((20[0-9][0-9]))|(29-02-20(([02468][048])|([13579][26]))))$"   G "<0>29-02-2004</0>"
+"^(((((0[1-9])|(1\d)|(2[0-8]))-((0[1-9])|(1[0-2])))|((31-((0[13578])|(1[02])))|((29|30)-((0[1,3-9])|(1[0-2])))))-((20[0-9][0-9]))|(29-02-20(([02468][048])|([13579][26]))))$"   G "<0>31-12-2002</0>"
+"^(((((0[1-9])|(1\d)|(2[0-8]))-((0[1-9])|(1[0-2])))|((31-((0[13578])|(1[02])))|((29|30)-((0[1,3-9])|(1[0-2])))))-((20[0-9][0-9]))|(29-02-20(([02468][048])|([13579][26]))))$"     "1-1-02"
+"^(((((0[1-9])|(1\d)|(2[0-8]))-((0[1-9])|(1[0-2])))|((31-((0[13578])|(1[02])))|((29|30)-((0[1,3-9])|(1[0-2])))))-((20[0-9][0-9]))|(29-02-20(([02468][048])|([13579][26]))))$"     "29-02-2002"
+"^(((((0[1-9])|(1\d)|(2[0-8]))-((0[1-9])|(1[0-2])))|((31-((0[13578])|(1[02])))|((29|30)-((0[1,3-9])|(1[0-2])))))-((20[0-9][0-9]))|(29-02-20(([02468][048])|([13579][26]))))$"     "31-11-2002"
+"^\d*[0-9](|.\d*[0-9]|,\d*[0-9])?$"   G "<0>123456.123456</0>"
+"^\d*[0-9](|.\d*[0-9]|,\d*[0-9])?$"   G "<0>123456,123456</0>"
+"^\d*[0-9](|.\d*[0-9]|,\d*[0-9])?$"   G "<0>123456</0>"
+"^\d*[0-9](|.\d*[0-9]|,\d*[0-9])?$"     "123a.123"
+"^\d*[0-9](|.\d*[0-9]|,\d*[0-9])?$"     "123a,123"
+"^\d*[0-9](|.\d*[0-9]|,\d*[0-9])?$"     "a"
+"^(ac|AC|al|AL|am|AM|ap|AP|ba|BA|ce|CE|df|DF|es|ES|go|GO|ma|MA|mg|MG|ms|MS|mt|MT|pa|PA|pb|PB|pe|PE|pi|PI|pr|PR|rj|RJ|rn|RN|ro|RO|rr|RR|rs|RS|sc|SC|se|SE|sp|SP|to|TO)$"   G "<0>AC</0>"
+"^(ac|AC|al|AL|am|AM|ap|AP|ba|BA|ce|CE|df|DF|es|ES|go|GO|ma|MA|mg|MG|ms|MS|mt|MT|pa|PA|pb|PB|pe|PE|pi|PI|pr|PR|rj|RJ|rn|RN|ro|RO|rr|RR|rs|RS|sc|SC|se|SE|sp|SP|to|TO)$"   G "<0>RJ</0>"
+"^(ac|AC|al|AL|am|AM|ap|AP|ba|BA|ce|CE|df|DF|es|ES|go|GO|ma|MA|mg|MG|ms|MS|mt|MT|pa|PA|pb|PB|pe|PE|pi|PI|pr|PR|rj|RJ|rn|RN|ro|RO|rr|RR|rs|RS|sc|SC|se|SE|sp|SP|to|TO)$"   G "<0>SP</0>"
+"^(ac|AC|al|AL|am|AM|ap|AP|ba|BA|ce|CE|df|DF|es|ES|go|GO|ma|MA|mg|MG|ms|MS|mt|MT|pa|PA|pb|PB|pe|PE|pi|PI|pr|PR|rj|RJ|rn|RN|ro|RO|rr|RR|rs|RS|sc|SC|se|SE|sp|SP|to|TO)$"     "XX"
+"^(ac|AC|al|AL|am|AM|ap|AP|ba|BA|ce|CE|df|DF|es|ES|go|GO|ma|MA|mg|MG|ms|MS|mt|MT|pa|PA|pb|PB|pe|PE|pi|PI|pr|PR|rj|RJ|rn|RN|ro|RO|rr|RR|rs|RS|sc|SC|se|SE|sp|SP|to|TO)$"     "AB"
+"^(ac|AC|al|AL|am|AM|ap|AP|ba|BA|ce|CE|df|DF|es|ES|go|GO|ma|MA|mg|MG|ms|MS|mt|MT|pa|PA|pb|PB|pe|PE|pi|PI|pr|PR|rj|RJ|rn|RN|ro|RO|rr|RR|rs|RS|sc|SC|se|SE|sp|SP|to|TO)$"     "HJ"
+"^[+]?\d*$"   G "<0>0123456789</0>"
+"^[+]?\d*$"   G "<0>1234</0>"
+"^[+]?\d*$"   G "<0>1</0>"
+"^[+]?\d*$"     "1.0?&"
+"^[+]?\d*$"     "a1"
+"^[+]?\d*$"     "2a-"
+#/<[aA][ ]{0,}([a-zA-Z0-9"'_,.:;!?@$\&()%=\u002f ]|[\-]|[    \f]){0,}>((<(([a-zA-Z0-9"'_,.:;!?@$\&()%=\u002f ]|[\-]|[    \f]){0,})>([a-zA-Z0-9"'_,.:;!?@$\&()%=\u002f ]|[\-]|[  \f]){0,})|(([a-zA-Z0-9"'_,.:;!?@$\&()%=\u002f ]|[\-]|[	\f]){0,})){1,}/    G "<0><a href='javascript:functionA();'><i>this text is italicized</i></a></0>"  #TODO:  Need infinite loop breaking
+#/<[aA][ ]{0,}([a-zA-Z0-9"'_,.:;!?@$\&()%=\u002f ]|[\-]|[    \f]){0,}>((<(([a-zA-Z0-9"'_,.:;!?@$\&()%=\u002f ]|[\-]|[    \f]){0,})>([a-zA-Z0-9"'_,.:;!?@$\&()%=\u002f ]|[\-]|[  \f]){0,})|(([a-zA-Z0-9"'_,.:;!?@$\&()%=\u002f ]|[\-]|[	\f]){0,})){1,}/     "<A href='#'><P</A></P>"    #TODO:  need infinite loop breaking.
+"^([0-1]?[0-9]|[2][0-3]):([0-5][0-9])$"   G "<0>0:00</0>"
+"^([0-1]?[0-9]|[2][0-3]):([0-5][0-9])$"   G "<0>23:00</0>"
+"^([0-1]?[0-9]|[2][0-3]):([0-5][0-9])$"   G "<0>00:59</0>"
+"^([0-1]?[0-9]|[2][0-3]):([0-5][0-9])$"     "0:0"
+"^([0-1]?[0-9]|[2][0-3]):([0-5][0-9])$"     "24:00"
+"^([0-1]?[0-9]|[2][0-3]):([0-5][0-9])$"     "00:60"
+"^((0[1-9])|(1[0-2]))\/(\d{2})$"   G "<0>11/03</0>"
+"^((0[1-9])|(1[0-2]))\/(\d{2})$"   G "<0>01/04</0>"
+"^((0[1-9])|(1[0-2]))\/(\d{2})$"     "13/03"
+"^((0[1-9])|(1[0-2]))\/(\d{2})$"     "10/2003"
+"<script[^>]*>[\w|\t|\r|\W]*</script>"   G '<0><script language=javascript>document.write("one");</script></0>'
+"<script[^>]*>[\w|\t|\r|\W]*</script>"     "--"
+"<script[^>]*>[\w|\t|\r|\W]*</script>"     "A-Z][a-z]+"
+#"<script[^>]*>[\w|\t|\r|\W]*</script>"   G "<0>strFirstName</0>"   # Test Case damaged?
+#"<script[^>]*>[\w|\t|\r|\W]*</script>"   G "<0>intAgeInYears</0>"   # Test Case damaged?
+#"<script[^>]*>[\w|\t|\r|\W]*</script>"   G "<0>Where the Wild Things Are</0>"   #  Test Case damaged?
+"<script[^>]*>[\w|\t|\r|\W]*</script>"     "123"
+"<script[^>]*>[\w|\t|\r|\W]*</script>"     "abc"
+"<script[^>]*>[\w|\t|\r|\W]*</script>"     "this has no caps in it"
+"(^-\d*\.?\d*[1-9]+\d*$)|(^-[1-9]+\d*\.\d*$)"   G "<0>-0.050</0>"
+"(^-\d*\.?\d*[1-9]+\d*$)|(^-[1-9]+\d*\.\d*$)"   G "<0>-5.000</0>"
+"(^-\d*\.?\d*[1-9]+\d*$)|(^-[1-9]+\d*\.\d*$)"   G "<0>-5</0>"
+"(^-\d*\.?\d*[1-9]+\d*$)|(^-[1-9]+\d*\.\d*$)"     "0"
+"(^-\d*\.?\d*[1-9]+\d*$)|(^-[1-9]+\d*\.\d*$)"     "0.0"
+"(^-\d*\.?\d*[1-9]+\d*$)|(^-[1-9]+\d*\.\d*$)"     ".0"
+"^([2][0]\d{2}\/([0]\d|[1][0-2])\/([0-2]\d|[3][0-1]))$|^([2][0]\d{2}\/([0]\d|[1][0-2])\/([0-2]\d|[3][0-1])\s([0-1]\d|[2][0-3])\:[0-5]\d\:[0-5]\d)$"   G "<0>2002/02/03</0>"
+"^([2][0]\d{2}\/([0]\d|[1][0-2])\/([0-2]\d|[3][0-1]))$|^([2][0]\d{2}\/([0]\d|[1][0-2])\/([0-2]\d|[3][0-1])\s([0-1]\d|[2][0-3])\:[0-5]\d\:[0-5]\d)$"   G "<0>2002/02/03 12:12:18</0>"
+"^([2][0]\d{2}\/([0]\d|[1][0-2])\/([0-2]\d|[3][0-1]))$|^([2][0]\d{2}\/([0]\d|[1][0-2])\/([0-2]\d|[3][0-1])\s([0-1]\d|[2][0-3])\:[0-5]\d\:[0-5]\d)$"     "2002/02/36"
+"^([2][0]\d{2}\/([0]\d|[1][0-2])\/([0-2]\d|[3][0-1]))$|^([2][0]\d{2}\/([0]\d|[1][0-2])\/([0-2]\d|[3][0-1])\s([0-1]\d|[2][0-3])\:[0-5]\d\:[0-5]\d)$"     "02/03/2002"
+"^(\d|,)*\.?\d*$"   G "<0>1,000</0>"
+"^(\d|,)*\.?\d*$"   G "<0>3,000.05</0>"
+"^(\d|,)*\.?\d*$"   G "<0>5,000,000</0>"
+"^(\d|,)*\.?\d*$"     "abc"
+"^(\d|,)*\.?\d*$"     "$100,000"
+"^(\d|,)*\.?\d*$"     "Forty"
+"^\d$"   G "<0>1</0>"
+"^\d$"   G "<0>2</0>"
+"^\d$"   G "<0>3</0>"
+"^\d$"     "a"
+"^\d$"     "324"
+"^\d$"     "num"
+"^[0-9]+$"   G "<0>1234567890</0>"
+"^[0-9]+$"   G "<0>1234567890</0>"
+"^[0-9]+$"   G "<0>1234567890</0>"
+"^[0-9]+$"     "http://none"
+"^[0-9]+$"     "http://none"
+"^[0-9]+$"     "http://none"
+"^.{4,8}$"   G "<0>asdf</0>"
+"^.{4,8}$"   G "<0>1234</0>"
+"^.{4,8}$"   G "<0>asdf1234</0>"
+"^.{4,8}$"     "asd"
+"^.{4,8}$"     "123"
+"^.{4,8}$"     "asdfe12345"
+"^[\w\.=-]+@[\w\.-]+\.[\w]{2,3}$"   G "<0>a@a.com</0>"
+"^[\w\.=-]+@[\w\.-]+\.[\w]{2,3}$"   G "<0>a@a.com.au</0>"
+"^[\w\.=-]+@[\w\.-]+\.[\w]{2,3}$"   G "<0>a@a.au</0>"
+"^[\w\.=-]+@[\w\.-]+\.[\w]{2,3}$"     "word"
+"^[\w\.=-]+@[\w\.-]+\.[\w]{2,3}$"     "word@"
+"^[\w\.=-]+@[\w\.-]+\.[\w]{2,3}$"     "@word"
+"^\d{5}-\d{4}$"   G "<0>22222-3333</0>"
+"^\d{5}-\d{4}$"   G "<0>34545-2367</0>"
+"^\d{5}-\d{4}$"   G "<0>56334-2343</0>"
+"^\d{5}-\d{4}$"     "123456789"
+"^\d{5}-\d{4}$"     "A3B 4C5"
+"^\d{5}-\d{4}$"     "55335"
+"(a|b|c).(a.b)*.b+.c"   G "<0>autbfc</0>"
+"(a|b|c).(a.b)*.b+.c"     "attc"
+'"((\\")|[^"(\\")])+"'   G '<0>"test"</0>'
+'"((\\")|[^"(\\")])+"'   G '<0>"escape\"quote"</0>'
+'"((\\")|[^"(\\")])+"'   G '<0>"\\""</0>'
+'"((\\")|[^"(\\")])+"'     "test"
+'"((\\")|[^"(\\")])+"'     '"test'
+'"((\\")|[^"(\\")])+"'     '""test\\"'
+"((0[1-9])|(1[02]))/\d{2}"   G "<0>01/00</0>"
+"((0[1-9])|(1[02]))/\d{2}"   G "<0>12/99</0>"
+"((0[1-9])|(1[02]))/\d{2}"     "13/00"
+"((0[1-9])|(1[02]))/\d{2}"     "12/AS"
+"^[a-zA-Z]$"   G "<0>a</0>"
+"^[a-zA-Z]$"   G "<0>B</0>"
+"^[a-zA-Z]$"   G "<0>c</0>"
+"^[a-zA-Z]$"     "0"
+"^[a-zA-Z]$"     "&"
+"^[a-zA-Z]$"     "AbC"
+"^[a-zA-Z]+$"   G "<0>abc</0>"
+"^[a-zA-Z]+$"   G "<0>ABC</0>"
+"^[a-zA-Z]+$"   G "<0>aBcDeF</0>"
+"^[a-zA-Z]+$"     "abc123"
+"^[a-zA-Z]+$"     "mr."
+"^[a-zA-Z]+$"     "a word"
+"^\s*[a-zA-Z,\p{Zs}]+\s*$"   G "<0>Smith, Ed</0>"
+"^\s*[a-zA-Z,\p{Zs}]+\s*$"   G "<0>Ed Smith</0>"
+"^\s*[a-zA-Z,\p{Zs}]+\s*$"   G "<0>aBcDeFgH</0>"
+"^\s*[a-zA-Z,\p{Zs}]+\s*$"     "a123"
+"^\s*[a-zA-Z,\p{Zs}]+\s*$"     "AB5"
+"^\s*[a-zA-Z,\p{Zs}]+\s*$"     "Mr. Ed"
+"(\w+?@\w+?\u002E.+)"   G "<0>bob@vsnl.com</0>"
+"(\w+?@\w+?\u002E.+)"     "[AABB]"
+"^\d+$"   G "<0>123</0>"
+"^\d+$"   G "<0>10</0>"
+"^\d+$"   G "<0>54</0>"
+"^\d+$"     "-54"
+"^\d+$"     "54.234"
+"^\d+$"     "abc"
+"^(\+|-)?\d+$"   G "<0>-34</0>"
+"^(\+|-)?\d+$"   G "<0>34</0>"
+"^(\+|-)?\d+$"   G "<0>+5</0>"
+"^(\+|-)?\d+$"     "abc"
+"^(\+|-)?\d+$"     "3.1415"
+"^(\+|-)?\d+$"     "-5.3"
+"foo"   G "<0>foo</0>"
+"foo"     "bar"
+"^[1-5]$"   G "<0>1</0>"
+"^[1-5]$"   G "<0>3</0>"
+"^[1-5]$"   G "<0>4</0>"
+"^[1-5]$"     "6"
+"^[1-5]$"     "23"
+"^[1-5]$"     "a"
+"^[12345]$"   G "<0>1</0>"
+"^[12345]$"   G "<0>2</0>"
+"^[12345]$"   G "<0>4</0>"
+"^[12345]$"     "6"
+"^[12345]$"     "-1"
+"^[12345]$"     "abc"
+"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$"   G "<0>joe@aol.com</0>"
+"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$"   G "<0>joe@wrox.co.uk</0>"
+"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$"   G "<0>joe@domain.info</0>"
+"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$"     "a@b"
+"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$"     "notanemail"
+"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$"     "joe@@."
+"^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$"   G "<0>joe@aol.com</0>"
+"^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$"   G "<0>ssmith@aspalliance.com</0>"
+"^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$"   G "<0>a@b.cc</0>"
+"^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$"     "joe@123aspx.com"
+"^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$"     "joe@web.info"
+"^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$"     "joe@company.co.uk"
+"[\w-]+@([\w-]+\.)+[\w-]+"   G "<0>joe@aol.com</0>"
+"[\w-]+@([\w-]+\.)+[\w-]+"   G "<0>a@b.c</0>"
+"[\w-]+@([\w-]+\.)+[\w-]+"     "asdf"
+"[\w-]+@([\w-]+\.)+[\w-]+"     "1234"
+"\d{4}-?\d{4}-?\d{4}-?\d{4}"   G "<0>1234-1234-1234-1234</0>"
+"\d{4}-?\d{4}-?\d{4}-?\d{4}"   G "<0>1234123412341234</0>"
+"\d{4}-?\d{4}-?\d{4}-?\d{4}"     "1234123412345"
+"^\d{5}$"   G "<0>33333</0>"
+"^\d{5}$"   G "<0>55555</0>"
+"^\d{5}$"   G "<0>23445</0>"
+"^\d{5}$"     "abcd"
+"^\d{5}$"     "1324"
+"^\d{5}$"     "as;lkjdf"
+"(\w+)\s+\1"   G "<0>hubba hubba</0>"
+"(\w+)\s+\1"   G "<0>mandate dated</0>"
+"(\w+)\s+\1"   G "<0>an annual</0>"
+"(\w+)\s+\1"     "may day"
+"(\w+)\s+\1"     "gogo"
+"(\w+)\s+\1"     "1212"
+"^[a-zA-Z0-9\-\.]+\.(com|org|net|mil|edu|COM|ORG|NET|MIL|EDU)$"   G "<0>3SquareBand.com</0>"
+"^[a-zA-Z0-9\-\.]+\.(com|org|net|mil|edu|COM|ORG|NET|MIL|EDU)$"   G "<0>asp.net</0>"
+"^[a-zA-Z0-9\-\.]+\.(com|org|net|mil|edu|COM|ORG|NET|MIL|EDU)$"   G "<0>army.mil</0>"
+"^[a-zA-Z0-9\-\.]+\.(com|org|net|mil|edu|COM|ORG|NET|MIL|EDU)$"     "$SquareBand.com"
+"^[a-zA-Z0-9\-\.]+\.(com|org|net|mil|edu|COM|ORG|NET|MIL|EDU)$"     "asp/dot.net"
+"^[a-zA-Z0-9\-\.]+\.(com|org|net|mil|edu|COM|ORG|NET|MIL|EDU)$"     "army.military"
+

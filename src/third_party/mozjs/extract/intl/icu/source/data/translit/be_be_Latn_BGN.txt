@@ -1,0 +1,201 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: be_be_Latn_BGN.txt
+# Generated from CLDR
+#
+
+# BGN/PCGN 1979 System
+#
+# The BGN/PCGN system for Belarusian (formerly Byelorussian) was
+# designed for use in romanizing names written in the Belarusian
+# Cyrillic alphabet. The Belarusian alphabet contains three
+# letters not present in the Russian alphabet: Іі, Ўў, ’.
+# One obsolete letter Ґґ is included.
+#
+# The Belarusian Alphabet as defined by the BGN (Page 23):
+#
+#   АБВГДЕЁЖЗІЙКЛМНОПРСТУЎФХЦЧШЫЬЭЮЯҐ
+#   абвгдеёжзійклмнопрстуўфхцчшыьэюя’ґ
+#
+# Originally prepared by Michael Everson <everson@evertype.com>
+########################################################################
+::[АБВГДЕЁЖЗІЙКЛМНОПРСТУЎФХЦЧШЩЪЫЬЭЮЯҐабвгдеёжзійклмнопрстуўфхцчшщъыьэюя’ґ] ;
+::NFC;
+$prime  = ʹ ;
+$doublePrime = ʺ ;
+$upperConsonants = [БВГДЖЗЙКЛМНПРСТЎФХЦЧШЬҐ] ;
+$lowerConsonants = [бвгджзйклмнпрстўфхцчшь’ґ] ;
+$consonants = [$upperConsonants $lowerConsonants] ;
+$upperVowels = [АЕЁІОУЫЭЮЯ] ;
+$lowerVowels = [аеёіоуыэюя] ;
+$vowels = [$upperVowels $lowerVowels] ;
+$lower = [$lowerConsonants $lowerVowels] ;
+# Use this $wordBoundary until bug 2034 is fixed in ICU:
+# http://bugs.icu-project.org/cgi-bin/icu-bugs/transliterate?id=2034;expression=boundary;user=guest
+$wordBoundary =  [^[:L:][:M:][:N:]] ;
+# Start of Alphabetic Transformations
+А → A ; # CYRILLIC CAPITAL LETTER A
+а → a ; # CYRILLIC SMALL LETTER A
+Б → B ; # CYRILLIC CAPITAL LETTER BE
+б → b ; # CYRILLIC SMALL LETTER BE
+В → V ; # CYRILLIC CAPITAL LETTER VE
+в → v ; # CYRILLIC SMALL LETTER VE
+Г → H ; # CYRILLIC CAPITAL LETTER GHE
+г → h ; # CYRILLIC SMALL LETTER GHE
+Д → D ; # CYRILLIC CAPITAL LETTER DE
+д → d ; # CYRILLIC SMALL LETTER DE
+Е} $lower → Ye ; # CYRILLIC CAPITAL LETTER IE
+Е → YE ; # CYRILLIC CAPITAL LETTER IE
+е → ye ; # CYRILLIC SMALL LETTER IE
+Ё} $lower → Yo ; # CYRILLIC CAPITAL LETTER IO
+Ё → YO ; # CYRILLIC CAPITAL LETTER IO
+ё → yo ; # CYRILLIC SMALL LETTER IO
+Ж} $lower → Zh ; # CYRILLIC CAPITAL LETTER ZHE
+Ж → ZH ; # CYRILLIC CAPITAL LETTER ZHE
+ж → zh ; # CYRILLIC SMALL LETTER ZHE
+Ш} $lower → Sh;
+Ш → SH;
+ш → sh;
+########################################################################
+#
+# BGN Page 23 Note 1
+#
+# The character sequences зг, цг, сг, тс, and кг may be romanized z·h,
+# k·h, s·h, t·s and ts·h in order to differentiate those romanizations
+# from the digraphs zh, kh, sh, ts, and the letter sequence tsh, which
+# are used to render characters ж, х, ш, ц, and the character sequence тш.
+#
+########################################################################
+ЗГ → Z·H ; # CYRILLIC CAPITAL LETTER ZE
+Зг → Z·h ; # CYRILLIC CAPITAL LETTER ZE
+зг → z·h ; # CYRILLIC SMALL LETTER ZE
+З → Z ; # CYRILLIC CAPITAL LETTER ZE
+з → z ; # CYRILLIC SMALL LETTER ZE
+########################################################################
+#
+# End Rule 1
+#
+########################################################################
+І → I ; # CYRILLIC CAPITAL LETTER BYELORUSSIAN-UKRAINIAN I
+і → i ; # CYRILLIC SMALL LETTER BYELORUSSIAN-UKRAINIAN I
+Й → Y ; # CYRILLIC CAPITAL LETTER I
+й → y ; # CYRILLIC SMALL LETTER I
+########################################################################
+#
+# BGN Page 23 Rule 1
+#
+# кг becomes k·h
+#
+########################################################################
+КГ → K·H ; # CYRILLIC CAPITAL LETTER KA
+Кг → K·h ; # CYRILLIC CAPITAL LETTER KA
+кг → k·h ; # CYRILLIC SMALL LETTER KA
+К → K ; # CYRILLIC CAPITAL LETTER KA
+к → k ; # CYRILLIC SMALL LETTER KA
+########################################################################
+#
+# End Rule 1
+#
+########################################################################
+Л → L ; # CYRILLIC CAPITAL LETTER EL
+л → l ; # CYRILLIC SMALL LETTER EL
+М → M ; # CYRILLIC CAPITAL LETTER EM
+м → m ; # CYRILLIC SMALL LETTER EM
+Н → N ; # CYRILLIC CAPITAL LETTER EN
+н → n ; # CYRILLIC SMALL LETTER EN
+О → O ; # CYRILLIC CAPITAL LETTER O
+о → o ; # CYRILLIC SMALL LETTER O
+П → P ; # CYRILLIC CAPITAL LETTER PE
+п → p ; # CYRILLIC SMALL LETTER PE
+Р → R ; # CYRILLIC CAPITAL LETTER ER
+р → r ; # CYRILLIC SMALL LETTER ER
+########################################################################
+#
+# BGN Page 23 Rule 1
+#
+# сг becomes s·h
+#
+########################################################################
+СГ → S·H ; # CYRILLIC CAPITAL LETTER ES
+Сг → S·h ; # CYRILLIC CAPITAL LETTER ES
+сг → s·h ; # CYRILLIC SMALL LETTER ES
+С → S ; # CYRILLIC CAPITAL LETTER ES
+с → s ; # CYRILLIC SMALL LETTER ES
+########################################################################
+#
+# End Rule 1
+#
+########################################################################
+#
+########################################################################
+#
+# BGN Page 23 Rule 1
+#
+# тс becomes t·s
+#
+########################################################################
+ТС → T·S ; # CYRILLIC CAPITAL LETTER TE
+Тс → T·s ; # CYRILLIC CAPITAL LETTER TE
+тс → t·s ; # CYRILLIC SMALL LETTER TE
+Т → T ; # CYRILLIC CAPITAL LETTER TE
+т → t ; # CYRILLIC SMALL LETTER TE
+########################################################################
+#
+# End Rule 1
+#
+########################################################################
+У → U ; # CYRILLIC CAPITAL LETTER U
+у → u ; # CYRILLIC SMALL LETTER U
+Ў → W ; # CYRILLIC CAPITAL LETTER SHORT U
+ў → w ; # CYRILLIC SMALL LETTER SHORT U
+Ф → F ; # CYRILLIC CAPITAL LETTER EF
+ф → f ; # CYRILLIC SMALL LETTER EF
+Х} $lower → Kh ; # CYRILLIC CAPITAL LETTER HA
+Х → KH ; # CYRILLIC CAPITAL LETTER HA
+х → kh ; # CYRILLIC SMALL LETTER HA
+########################################################################
+#
+# BGN Page 23 Rule 1
+#
+# цг becomes ts·h
+#
+########################################################################
+ЦГ → TS·H ; # CYRILLIC CAPITAL LETTER TSE
+Цг → Ts·h ; # CYRILLIC CAPITAL LETTER TSE
+цг → ts·h ; # CYRILLIC SMALL LETTER TSE
+Ц} $lower → Ts ; # CYRILLIC CAPITAL LETTER TSE
+Ц → TS ; # CYRILLIC CAPITAL LETTER TSE
+ц → ts ; # CYRILLIC SMALL LETTER TSE
+########################################################################
+#
+# End Rule 1
+#
+########################################################################
+Ч} $lower → Ch ; # CYRILLIC CAPITAL LETTER CHE
+Ч → CH ; # CYRILLIC CAPITAL LETTER CHE
+ч → ch ; # CYRILLIC SMALL LETTER CHE
+Ы → Y ; # CYRILLIC CAPITAL LETTER YERU
+ы → y ; # CYRILLIC SMALL LETTER YERU
+Ь → $prime ; # CYRILLIC CAPITAL LETTER SOFT SIGN
+ь → $prime ; # CYRILLIC SMALL LETTER SOFT SIGN
+Э → E ; # CYRILLIC CAPITAL LETTER E
+э → e ; # CYRILLIC SMALL LETTER E
+Ю} $lower → Yu ; # CYRILLIC CAPITAL LETTER YU
+Ю → YU ; # CYRILLIC CAPITAL LETTER YU
+ю → yu ; # CYRILLIC SMALL LETTER YU
+Я} $lower → Ya ; # CYRILLIC CAPITAL LETTER YA
+Я → YA ; # CYRILLIC CAPITAL LETTER YA
+я → ya ; # CYRILLIC SMALL LETTER YA
+’ → $doublePrime ; # LEFT SINGLE QUOTATION MARK
+########################################################################
+#
+# BGN Page 23 Note 2
+#
+# The obsolete character ґ should be romanized g.
+#
+########################################################################
+Ґ → G ; # CYRILLIC CAPITAL LETTER GHE WITH UPTURN
+ґ → g ; # CYRILLIC SMALL LETTER GHE WITH UPTURN
+

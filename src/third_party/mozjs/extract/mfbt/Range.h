@@ -8,55 +8,55 @@
 #define mozilla_Range_h
 
 #include "mozilla/RangedPtr.h"
-#include "mozilla/TypeTraits.h"
 #include "mozilla/Span.h"
 
 #include <stddef.h>
+#include <type_traits>
 
 namespace mozilla {
 
 // Range<T> is a tuple containing a pointer and a length.
 template <typename T>
-class Range
-{
+class Range {
+  template <typename U>
+  friend class Range;
+
+  // Reassignment of RangedPtrs is so (subtly) restrictive that we just make
+  // Range immutable.
   const RangedPtr<T> mStart;
   const RangedPtr<T> mEnd;
 
-public:
+ public:
   Range() : mStart(nullptr, 0), mEnd(nullptr, 0) {}
   Range(T* aPtr, size_t aLength)
-    : mStart(aPtr, aPtr, aPtr + aLength),
-      mEnd(aPtr + aLength, aPtr, aPtr + aLength)
-  {}
+      : mStart(aPtr, aPtr, aPtr + aLength),
+        mEnd(aPtr + aLength, aPtr, aPtr + aLength) {
+    if (!aPtr) {
+      MOZ_ASSERT(!aLength,
+                 "Range does not support nullptr with non-zero length.");
+      // ...because merely having a pointer to `nullptr + 1` is undefined
+      // behavior. UBSAN catches this as of clang-10.
+    }
+  }
   Range(const RangedPtr<T>& aStart, const RangedPtr<T>& aEnd)
-    : mStart(aStart.get(), aStart.get(), aEnd.get()),
-      mEnd(aEnd.get(), aStart.get(), aEnd.get())
-  {
+      : mStart(aStart.get(), aStart.get(), aEnd.get()),
+        mEnd(aEnd.get(), aStart.get(), aEnd.get()) {
     // Only accept two RangedPtrs within the same range.
     aStart.checkIdenticalRange(aEnd);
     MOZ_ASSERT(aStart <= aEnd);
   }
 
-  template<typename U,
-           class = typename EnableIf<IsConvertible<U (*)[], T (*)[]>::value,
-                                     int>::Type>
+  template <typename U, class = std::enable_if_t<
+                            std::is_convertible_v<U (*)[], T (*)[]>, int>>
   MOZ_IMPLICIT Range(const Range<U>& aOther)
-    : mStart(aOther.mStart),
-      mEnd(aOther.mEnd)
-  {}
+      : mStart(aOther.mStart), mEnd(aOther.mEnd) {}
 
-  MOZ_IMPLICIT Range(Span<T> aSpan)
-    : Range(aSpan.Elements(), aSpan.Length())
-  {
-  }
+  MOZ_IMPLICIT Range(Span<T> aSpan) : Range(aSpan.Elements(), aSpan.Length()) {}
 
-  template<typename U,
-           class = typename EnableIf<IsConvertible<U (*)[], T (*)[]>::value,
-                                     int>::Type>
+  template <typename U, class = std::enable_if_t<
+                            std::is_convertible_v<U (*)[], T (*)[]>, int>>
   MOZ_IMPLICIT Range(const Span<U>& aSpan)
-    : Range(aSpan.Elements(), aSpan.Length())
-  {
-  }
+      : Range(aSpan.Elements(), aSpan.Length()) {}
 
   RangedPtr<T> begin() const { return mStart; }
   RangedPtr<T> end() const { return mEnd; }
@@ -71,20 +71,12 @@ public:
   operator Span<const T>() const { return Span<T>(mStart.get(), length()); }
 };
 
-template<class T>
-Span<T>
-MakeSpan(Range<T>& aRange)
-{
-  return aRange;
-}
+template <typename T>
+Span(Range<T>&) -> Span<T>;
 
-template<class T>
-Span<const T>
-MakeSpan(const Range<T>& aRange)
-{
-  return aRange;
-}
+template <typename T>
+Span(const Range<T>&) -> Span<const T>;
 
-} // namespace mozilla
+}  // namespace mozilla
 
 #endif /* mozilla_Range_h */

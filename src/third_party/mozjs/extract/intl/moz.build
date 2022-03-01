@@ -1,0 +1,60 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+TEST_DIRS += [
+    "gtest",
+]
+
+DIRS += [
+    "components",
+    "hyphenation/glue",
+    "locale",
+    "locales",
+    "lwbrk",
+    "strres",
+    "unicharutil",
+    "l10n",
+]
+
+DIRS += [
+    "uconv",
+    "build",
+]
+
+EXPORTS.mozilla += [
+    "Encoding.h",
+    "EncodingDetector.h",
+]
+
+EXPORTS += [
+    "../third_party/rust/chardetng_c/include/chardetng.h",
+    "../third_party/rust/encoding_c/include/encoding_rs.h",
+    "../third_party/rust/encoding_c/include/encoding_rs_statics.h",
+]
+
+
+PERFTESTS_MANIFESTS += ["benchmarks/perftest.ini"]
+XPCSHELL_TESTS_MANIFESTS += ["benchmarks/xpcshell.ini"]
+
+with Files("**"):
+    BUG_COMPONENT = ("Core", "Internationalization")
+
+with Files("icu/**"):
+    BUG_COMPONENT = ("Core", "JavaScript: Internationalization API")
+
+with Files("icu-patches/**"):
+    BUG_COMPONENT = ("Core", "JavaScript: Internationalization API")
+
+with Files("tzdata/**"):
+    BUG_COMPONENT = ("Core", "JavaScript: Internationalization API")
+
+with Files("update*"):
+    BUG_COMPONENT = ("Core", "JavaScript: Internationalization API")
+
+with Files("icu_sources_data.py"):
+    BUG_COMPONENT = ("Firefox Build System", "General")
+
+SPHINX_TREES["/intl"] = "docs"

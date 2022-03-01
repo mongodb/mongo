@@ -1,0 +1,69 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+os{
+    Currencies{
+        BRL{
+            "R$",
+            "Бразилиаг реал",
+        }
+        EUR{
+            "€",
+            "Евро",
+        }
+        GBP{
+            "£",
+            "Бритайнаг Фунт",
+        }
+        GEL{
+            "₾",
+            "Лар",
+        }
+        RUB{
+            "RUB",
+            "Сом",
+        }
+        USD{
+            "$",
+            "АИШ-ы Доллар",
+        }
+        XXX{
+            "¤",
+            "Нӕзонгӕ валютӕ",
+        }
+    }
+    CurrencyPlurals{
+        BRL{
+            one{"бразилиаг реал"}
+            other{"бразилиаг реалы"}
+        }
+        EUR{
+            one{"евро"}
+            other{"евройы"}
+        }
+        GBP{
+            one{"бритайнаг фунт"}
+            other{"бритайнаг фунты"}
+        }
+        GEL{
+            one{"лар"}
+            other{"лары"}
+        }
+        RUB{
+            one{"сом"}
+            other{"сомы"}
+        }
+        USD{
+            one{"АИШ-ы доллар"}
+            other{"АИШ-ы доллары"}
+        }
+        XXX{
+            one{"нӕзонгӕ валютӕ"}
+            other{"нӕзонгӕ валютӕйы"}
+        }
+    }
+    CurrencyUnitPatterns{
+        one{"{0} {1}"}
+        other{"{0} {1}"}
+    }
+}

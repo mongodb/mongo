@@ -28,7 +28,7 @@
 #ifndef DOUBLE_CONVERSION_STRTOD_H_
 #define DOUBLE_CONVERSION_STRTOD_H_
 
-#include <double-conversion/utils.h>
+#include "utils.h"
 
 namespace double_conversion {
 
@@ -39,6 +39,11 @@ double Strtod(Vector<const char> buffer, int exponent);
 // The buffer must only contain digits in the range [0-9]. It must not
 // contain a dot or a sign. It must not start with '0', and must not be empty.
 float Strtof(Vector<const char> buffer, int exponent);
+
+// For special use cases, the heart of the Strtod() function is also available
+// separately, it assumes that 'trimmed' is as produced by TrimAndCut(), i.e.
+// no leading or trailing zeros, also no lone zero, and not 'too many' digits.
+double StrtodTrimmed(Vector<const char> trimmed, int exponent);
 
 }  // namespace double_conversion
 

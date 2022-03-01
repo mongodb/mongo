@@ -46,7 +46,7 @@ namespace mozjs {
  * traces, and instanceOf Error.
  */
 struct MongoStatusInfo : public BaseInfo {
-    static void finalize(js::FreeOp* fop, JSObject* obj);
+    static void finalize(JSFreeOp* fop, JSObject* obj);
 
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(code);

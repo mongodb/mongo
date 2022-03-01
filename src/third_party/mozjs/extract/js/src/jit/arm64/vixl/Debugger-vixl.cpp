@@ -24,13 +24,12 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 // EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "js-config.h"
+#include "jstypes.h"
 
 #ifdef JS_SIMULATOR_ARM64
 
 #include "jit/arm64/vixl/Debugger-vixl.h"
 
-#include "mozilla/Unused.h"
 #include "mozilla/Vector.h"
 
 #include "js/AllocPolicy.h"
@@ -136,7 +135,7 @@ class IdentifierToken : public ValueToken<char*> {
  public:
   explicit IdentifierToken(const char* name) {
     size_t size = strlen(name) + 1;
-    value_ = (char*)js_malloc(size);
+    value_ = js_pod_malloc<char>(size);
     strncpy(value_, name, size);
   }
   virtual ~IdentifierToken() { js_free(value_); }
@@ -244,7 +243,7 @@ class UnknownToken : public Token {
  public:
   explicit UnknownToken(const char* arg) {
     size_t size = strlen(arg) + 1;
-    unknown_ = (char*)js_malloc(size);
+    unknown_ = js_pod_malloc<char>(size);
     strncpy(unknown_, arg, size);
   }
   virtual ~UnknownToken() { js_free(unknown_); }
@@ -404,7 +403,7 @@ class ExamineCommand : public DebugCommand {
 // Commands which name does not match any of the known commnand.
 class UnknownCommand : public DebugCommand {
  public:
-  explicit UnknownCommand(TokenVector&& args) : args_(Move(args)) {}
+  explicit UnknownCommand(TokenVector&& args) : args_(std::move(args)) {}
   virtual ~UnknownCommand();
 
   virtual bool Run(Debugger* debugger) override;
@@ -417,7 +416,7 @@ class UnknownCommand : public DebugCommand {
 class InvalidCommand : public DebugCommand {
  public:
   InvalidCommand(TokenVector&& args, int index, const char* cause)
-      : args_(Move(args)), index_(index), cause_(cause) {}
+      : args_(std::move(args)), index_(index), cause_(cause) {}
   virtual ~InvalidCommand();
 
   virtual bool Run(Debugger* debugger) override;
@@ -545,8 +544,8 @@ const char* RegisterToken::kWAliases[kNumberOfRegisters][kMaxAliasNumber] = {
 };
 
 
-Debugger::Debugger(JSContext* cx, Decoder* decoder, FILE* stream)
-    : Simulator(cx, decoder, stream),
+Debugger::Debugger(Decoder* decoder, FILE* stream)
+    : Simulator(decoder, stream),
       debug_parameters_(DBG_INACTIVE),
       pending_request_(false),
       steps_(0),
@@ -1110,7 +1109,6 @@ bool DebugCommand::Match(const char* name, const char** aliases) {
 
 
 DebugCommand* DebugCommand::Parse(char* line) {
-  using mozilla::Unused;
   TokenVector args;
 
   for (char* chunk = strtok(line, " \t");
@@ -1122,15 +1120,15 @@ DebugCommand* DebugCommand::Parse(char* line) {
       Token* format = FormatToken::Tokenize(dot + 1);
       if (format != NULL) {
         *dot = '\0';
-        Unused << args.append(Token::Tokenize(chunk));
-        Unused << args.append(format);
+        (void)args.append(Token::Tokenize(chunk));
+        (void)args.append(format);
       } else {
         // Error while parsing the format, push the UnknownToken so an error
         // can be accurately reported.
-        Unused << args.append(Token::Tokenize(chunk));
+        (void)args.append(Token::Tokenize(chunk));
       }
     } else {
-      Unused << args.append(Token::Tokenize(chunk));
+      (void)args.append(Token::Tokenize(chunk));
     }
   }
 
@@ -1139,18 +1137,18 @@ DebugCommand* DebugCommand::Parse(char* line) {
   }
 
   if (!args[0]->IsIdentifier()) {
-    return js_new<InvalidCommand>(Move(args), 0, "command name is not valid");
+    return js_new<InvalidCommand>(std::move(args), 0, "command name is not valid");
   }
 
   const char* name = IdentifierToken::Cast(args[0])->value();
   #define RETURN_IF_MATCH(Command)       \
   if (Match(name, Command::kAliases)) {  \
-    return Command::Build(Move(args));   \
+    return Command::Build(std::move(args));   \
   }
   DEBUG_COMMAND_LIST(RETURN_IF_MATCH);
   #undef RETURN_IF_MATCH
 
-  return js_new<UnknownCommand>(Move(args));
+  return js_new<UnknownCommand>(std::move(args));
 }
 
 
@@ -1190,7 +1188,7 @@ bool HelpCommand::Run(Debugger* debugger) {
 
 DebugCommand* HelpCommand::Build(TokenVector&& args) {
   if (args.length() != 1) {
-    return js_new<InvalidCommand>(Move(args), -1, "too many arguments");
+    return js_new<InvalidCommand>(std::move(args), -1, "too many arguments");
   }
 
   return js_new<HelpCommand>(args[0]);
@@ -1207,7 +1205,7 @@ bool ContinueCommand::Run(Debugger* debugger) {
 
 DebugCommand* ContinueCommand::Build(TokenVector&& args) {
   if (args.length() != 1) {
-    return js_new<InvalidCommand>(Move(args), -1, "too many arguments");
+    return js_new<InvalidCommand>(std::move(args), -1, "too many arguments");
   }
 
   return js_new<ContinueCommand>(args[0]);
@@ -1243,13 +1241,13 @@ DebugCommand* StepCommand::Build(TokenVector&& args) {
     case 2: {  // step n
       Token* first = args[1];
       if (!first->IsInteger()) {
-        return js_new<InvalidCommand>(Move(args), 1, "expects int");
+        return js_new<InvalidCommand>(std::move(args), 1, "expects int");
       }
       count = IntegerToken::Cast(first);
       break;
     }
     default:
-      return js_new<InvalidCommand>(Move(args), -1, "too many arguments");
+      return js_new<InvalidCommand>(std::move(args), -1, "too many arguments");
   }
 
   return js_new<StepCommand>(args[0], count);
@@ -1266,14 +1264,14 @@ DebugCommand* DisasmCommand::Build(TokenVector&& args) {
     case 2: {  // disasm n
       Token* first = args[1];
       if (!first->IsInteger()) {
-        return js_new<InvalidCommand>(Move(args), 1, "expects int");
+        return js_new<InvalidCommand>(std::move(args), 1, "expects int");
       }
 
       count = IntegerToken::Cast(first);
       break;
     }
     default:
-      return js_new<InvalidCommand>(Move(args), -1, "too many arguments");
+      return js_new<InvalidCommand>(std::move(args), -1, "too many arguments");
   }
 
   Token* target = js_new<IdentifierToken>("pc");
@@ -1338,14 +1336,14 @@ bool PrintCommand::Run(Debugger* debugger) {
 
 DebugCommand* PrintCommand::Build(TokenVector&& args) {
   if (args.length() < 2) {
-    return js_new<InvalidCommand>(Move(args), -1, "too few arguments");
+    return js_new<InvalidCommand>(std::move(args), -1, "too few arguments");
   }
 
   Token* target = args[1];
   if (!target->IsRegister() &&
       !target->IsFPRegister() &&
       !target->IsIdentifier()) {
-    return js_new<InvalidCommand>(Move(args), 1, "expects reg or identifier");
+    return js_new<InvalidCommand>(std::move(args), 1, "expects reg or identifier");
   }
 
   FormatToken* format = NULL;
@@ -1379,24 +1377,24 @@ DebugCommand* PrintCommand::Build(TokenVector&& args) {
     }
     case 3: {
       if (target->IsIdentifier()) {
-        return js_new<InvalidCommand>(Move(args), 2,
+        return js_new<InvalidCommand>(std::move(args), 2,
             "format is only allowed with registers");
       }
 
       Token* second = args[2];
       if (!second->IsFormat()) {
-        return js_new<InvalidCommand>(Move(args), 2, "expects format");
+        return js_new<InvalidCommand>(std::move(args), 2, "expects format");
       }
       format = FormatToken::Cast(second);
 
       if (format->SizeOf() > target_size) {
-        return js_new<InvalidCommand>(Move(args), 2, "format too wide");
+        return js_new<InvalidCommand>(std::move(args), 2, "format too wide");
       }
 
       break;
     }
     default:
-      return js_new<InvalidCommand>(Move(args), -1, "too many arguments");
+      return js_new<InvalidCommand>(std::move(args), -1, "too many arguments");
   }
 
   return js_new<PrintCommand>(args[0], target, format);
@@ -1427,12 +1425,12 @@ void ExamineCommand::Print(FILE* out) {
 
 DebugCommand* ExamineCommand::Build(TokenVector&& args) {
   if (args.length() < 2) {
-    return js_new<InvalidCommand>(Move(args), -1, "too few arguments");
+    return js_new<InvalidCommand>(std::move(args), -1, "too few arguments");
   }
 
   Token* target = args[1];
   if (!target->CanAddressMemory()) {
-    return js_new<InvalidCommand>(Move(args), 1, "expects address");
+    return js_new<InvalidCommand>(std::move(args), 1, "expects address");
   }
 
   FormatToken* format = NULL;
@@ -1455,7 +1453,7 @@ DebugCommand* ExamineCommand::Build(TokenVector&& args) {
         format = js_new<Format<uint64_t>>("%016" PRIx64, 'x');
         count = IntegerToken::Cast(second);
       } else {
-        return js_new<InvalidCommand>(Move(args), 2, "expects format or integer");
+        return js_new<InvalidCommand>(std::move(args), 2, "expects format or integer");
       }
       VIXL_UNREACHABLE();
       break;
@@ -1464,14 +1462,14 @@ DebugCommand* ExamineCommand::Build(TokenVector&& args) {
       Token* second = args[2];
       Token* third = args[3];
       if (!second->IsFormat() || !third->IsInteger()) {
-        return js_new<InvalidCommand>(Move(args), -1, "expects addr[.format] [n]");
+        return js_new<InvalidCommand>(std::move(args), -1, "expects addr[.format] [n]");
       }
       format = FormatToken::Cast(second);
       count = IntegerToken::Cast(third);
       break;
     }
     default:
-      return js_new<InvalidCommand>(Move(args), -1, "too many arguments");
+      return js_new<InvalidCommand>(std::move(args), -1, "too many arguments");
   }
 
   return js_new<ExamineCommand>(args[0], target, format, count);

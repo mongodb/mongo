@@ -1,0 +1,93 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ps_PK{
+    zoneStrings{
+        "Africa:Harare"{
+            ec{"هرارے"}
+        }
+        "America:Lower_Princes"{
+            ec{"د کمتر شهزاده درے میاشتنۍ"}
+        }
+        "meta:Alaska"{
+            ld{"د الاسکا د ورځے روښانه کول"}
+        }
+        "meta:America_Central"{
+            ld{"مرکزي رڼا ورځے وخت"}
+        }
+        "meta:America_Eastern"{
+            ld{"ختيځ د رڼا ورځے وخت"}
+        }
+        "meta:America_Mountain"{
+            ld{"د غره د رڼا ورځے وخت"}
+        }
+        "meta:America_Pacific"{
+            ld{"پیسفک د رڼا ورځے وخت"}
+        }
+        "meta:Apia"{
+            ld{"د اپیا د ورځے وخت"}
+        }
+        "meta:Arabian"{
+            ld{"د عربي ورځپاڼے وخت"}
+        }
+        "meta:Atlantic"{
+            ld{"اتلانتیک د رڼا ورځے وخت"}
+        }
+        "meta:Australia_Western"{
+            ld{"د اسټرالیا لویدیځ د ورځے وخت"}
+        }
+        "meta:China"{
+            ld{"د چين د رڼا ورځے وخت"}
+        }
+        "meta:Cuba"{
+            ld{"کیوبا د رڼا ورځے وخت"}
+        }
+        "meta:Europe_Western"{
+            ld{"د لودیځے اورپا د اوړي وخت"}
+            lg{"لوېديزے اروپا وخت"}
+            ls{"د لودیځے اروپا معیاري وخت"}
+        }
+        "meta:French_Southern"{
+            ls{"د فرانسے سویل او انټارټيک وخت"}
+        }
+        "meta:Hawaii_Aleutian"{
+            ld{"هوایی الیوتین رڼا ورځے وخت"}
+        }
+        "meta:Iran"{
+            ld{"د ایران د ورځے وخت"}
+        }
+        "meta:Israel"{
+            ld{"د اسراییلو د ورځے وخت"}
+        }
+        "meta:Japan"{
+            ld{"جاپان د رڼا ورځے وخت"}
+        }
+        "meta:Korea"{
+            ld{"د کوریا د ورځے د ورځے وخت"}
+        }
+        "meta:Line_Islands"{
+            ls{"د کرښے ټاټوبي وخت"}
+        }
+        "meta:Lord_Howe"{
+            ld{"رب هاو د ورځے د رڼا وخت"}
+        }
+        "meta:Mexico_Northwest"{
+            ld{"د شمال لویدیځ مکسیکو رڼا ورځے وخت"}
+        }
+        "meta:Mexico_Pacific"{
+            ld{"مکسیکن پیسفک رڼا ورځے وخت"}
+        }
+        "meta:New_Zealand"{
+            ld{"د نیوزی لینڈ د ورځے د رڼا وخت"}
+        }
+        "meta:Newfoundland"{
+            ld{"د نوي فیلډلینډ رڼا ورځے وخت"}
+        }
+        "meta:Pierre_Miquelon"{
+            ld{"سینټ پییرا و ميکلين رڼا ورځے وخت"}
+        }
+        "meta:Samoa"{
+            ld{"د سموا د ورځے روښانه کول"}
+        }
+    }
+}

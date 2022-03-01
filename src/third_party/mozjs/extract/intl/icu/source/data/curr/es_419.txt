@@ -1,0 +1,84 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_419{
+    Currencies{
+        ANG{
+            "ANG",
+            "florín de las Antillas Neerlandesas",
+        }
+        BMD{
+            "BMD",
+            "dólar de Bermudas",
+        }
+        EUR{
+            "EUR",
+            "euro",
+        }
+        MWK{
+            "MWK",
+            "kwacha malauí",
+        }
+        NIO{
+            "NIO",
+            "córdoba nicaragüense",
+        }
+        THB{
+            "THB",
+            "baht tailandes",
+        }
+        USD{
+            "USD",
+            "dólar estadounidense",
+        }
+        UZS{
+            "UZS",
+            "som uzbeko",
+        }
+        VND{
+            "VND",
+            "dong",
+        }
+    }
+    Currencies%narrow{
+        EGP{"E£"}
+        FKP{"FK£"}
+        SSP{"SD£"}
+        SYP{"S£"}
+        VEF{"BsF"}
+    }
+    CurrencyPlurals{
+        ANG{
+            one{"florín de las Antillas Neerlandesas"}
+            other{"florines de las Antillas Neerlandesas"}
+        }
+        BGN{
+            one{"lev búlgaro"}
+            other{"leva búlgaros"}
+        }
+        BMD{
+            one{"dólar de Bermudas"}
+            other{"dólares de Bermudas"}
+        }
+        MWK{
+            one{"kwacha malauí"}
+            other{"kwachas malauís"}
+        }
+        NIO{
+            one{"córdoba nicaragüense"}
+            other{"córdobas nicaragüenses"}
+        }
+        THB{
+            one{"baht tailandes"}
+            other{"bahts tailandeses"}
+        }
+        UZS{
+            one{"som uzbeko"}
+            other{"soms uzbekos"}
+        }
+        XXX{
+            one{"(unidad de moneda desconocida)"}
+            other{"(moneda desconocida)"}
+        }
+    }
+}

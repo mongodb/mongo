@@ -1,0 +1,47 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+om{
+    Currencies{
+        BRL{
+            "R$",
+            "Brazilian Real",
+        }
+        CNY{
+            "CN¥",
+            "Chinese Yuan Renminbi",
+        }
+        ETB{
+            "Br",
+            "Itoophiyaa Birrii",
+        }
+        EUR{
+            "€",
+            "Euro",
+        }
+        GBP{
+            "£",
+            "British Pound",
+        }
+        INR{
+            "₹",
+            "Indian Rupee",
+        }
+        JPY{
+            "JP¥",
+            "Japanese Yen",
+        }
+        RUB{
+            "RUB",
+            "Russian Ruble",
+        }
+        USD{
+            "US$",
+            "US Dollar",
+        }
+    }
+    CurrencyUnitPatterns{
+        one{"{0} {1}"}
+        other{"{0} {1}"}
+    }
+}

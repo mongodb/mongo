@@ -1,0 +1,595 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+wae{
+    AuxExemplarCharacters{"[à ă â å ā æ ç è ĕ ê ë ē ì ĭ î ï ī ñ ò ŏ ô ø ō œ ß ù ŭ û ū ÿ]"}
+    ExemplarCharacters{
+        "[a á ä ã b c č d e é f g h i í j k l m n o ó ö õ p q r s š t u ú ü ũ v w x y"
+        " z]"
+    }
+    ExemplarCharactersIndex{"[A B C D E F G H I J K L M N O P Q R S T U V W X Y Z]"}
+    ExemplarCharactersNumbers{"[\\- ‑ , ’ % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    NumberElements{
+        latn{
+            symbols{
+                decimal{","}
+                group{"’"}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d. MMMM y G",
+                "d. MMMM y G",
+                "d. MMM y G",
+                "GGGGG y-MM-dd",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Ed{"E d."}
+                M{"LLL"}
+                MEd{"E, d. MMM"}
+                MMMEd{"E, d. MMM"}
+                MMMd{"d. MMM"}
+                Md{"d. MMM"}
+                h{"h a"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, d. MMM y"}
+                yMMMd{"d. MMM y"}
+            }
+            intervalFormats{
+                H{
+                    H{"HH – HH"}
+                }
+                Hm{
+                    H{"HH:mm – HH:mm"}
+                    m{"HH:mm – HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm – HH:mm v"}
+                    m{"HH:mm – HH:mm v"}
+                }
+                Hv{
+                    H{"HH – HH v"}
+                }
+                M{
+                    M{"MMM – MMM"}
+                }
+                MEd{
+                    M{"E, d. MMM – E, d. MMM"}
+                    d{"E, d. MMM – E, d. MMM"}
+                }
+                MMM{
+                    M{"MMM – MMM"}
+                }
+                MMMEd{
+                    M{"E, d. MMM – E, d. MMM"}
+                    d{"E, d. MMM – E, d. MMM"}
+                }
+                MMMd{
+                    M{"d. – d. MMM"}
+                    d{"d. – d. MMM"}
+                }
+                Md{
+                    M{"d. MMM – d. MMM"}
+                    d{"d. MMM – d. MMM"}
+                }
+                d{
+                    d{"d – d"}
+                }
+                fallback{"{0} - {1}"}
+                h{
+                    a{"h a – h a"}
+                    h{"h – h a"}
+                }
+                hm{
+                    a{"h:mm a – h:mm a"}
+                    h{"h:mm – h:mm a"}
+                    m{"h:mm – h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a – h:mm a v"}
+                    h{"h:mm – h:mm a v"}
+                    m{"h:mm – h:mm a v"}
+                }
+                hv{
+                    a{"h a – h a v"}
+                    h{"h – h a v"}
+                }
+                y{
+                    y{"y – y"}
+                }
+                yM{
+                    M{"y-MM – y-MM"}
+                    y{"y-MM – y-MM"}
+                }
+                yMEd{
+                    M{"E, d. MMM y – E, d. MMM y"}
+                    d{"E, d. MMM y – E, d. MMM y"}
+                    y{"E, d. MMM y – E, d. MMM y"}
+                }
+                yMMM{
+                    M{"MMM – MMM y"}
+                    y{"MMM y – MMM y"}
+                }
+                yMMMEd{
+                    M{"E, d. MMM – E, d. MMM y"}
+                    d{"E, d. – E, d. MMM y"}
+                    y{"E, d. MMM y – E, d. MMM y"}
+                }
+                yMMMM{
+                    M{"MMMM – MMMM y"}
+                    y{"MMMM y – MMMM y"}
+                }
+                yMMMd{
+                    M{"d. MMM – d. MMM y"}
+                    d{"d. – d. MMM y"}
+                    y{"d. MMM y – d. MMM y"}
+                }
+                yMd{
+                    M{"y-MM-dd – y-MM-dd"}
+                    d{"y-MM-dd – y-MM-dd"}
+                    y{"y-MM-dd – y-MM-dd"}
+                }
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d. MMMM y",
+                "d. MMMM y",
+                "d. MMM y",
+                "y-MM-dd",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Ed{"E d."}
+                M{"LLL"}
+                MEd{"E, d. MMM"}
+                MMMEd{"E, d. MMM"}
+                MMMd{"d. MMM"}
+                Md{"d. MMM"}
+                h{"h a"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, d. MMM y"}
+                yMMMd{"d. MMM y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Sun",
+                        "Män",
+                        "Ziš",
+                        "Mit",
+                        "Fró",
+                        "Fri",
+                        "Sam",
+                    }
+                    narrow{
+                        "S",
+                        "M",
+                        "Z",
+                        "M",
+                        "F",
+                        "F",
+                        "S",
+                    }
+                    wide{
+                        "Sunntag",
+                        "Mäntag",
+                        "Zištag",
+                        "Mittwuč",
+                        "Fróntag",
+                        "Fritag",
+                        "Samštag",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Sun",
+                        "Män",
+                        "Ziš",
+                        "Mit",
+                        "Fró",
+                        "Fri",
+                        "Sam",
+                    }
+                    narrow{
+                        "S",
+                        "M",
+                        "Z",
+                        "M",
+                        "F",
+                        "F",
+                        "S",
+                    }
+                    wide{
+                        "Sunntag",
+                        "Mäntag",
+                        "Zištag",
+                        "Mittwuč",
+                        "Fróntag",
+                        "Fritag",
+                        "Samštag",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "v. Chr.",
+                    "n. Chr",
+                }
+            }
+            intervalFormats{
+                H{
+                    H{"HH – HH"}
+                }
+                Hm{
+                    H{"HH:mm – HH:mm"}
+                    m{"HH:mm – HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm – HH:mm v"}
+                    m{"HH:mm – HH:mm v"}
+                }
+                Hv{
+                    H{"HH – HH v"}
+                }
+                M{
+                    M{"MMM – MMM"}
+                }
+                MEd{
+                    M{"E, d. MMM – E, d. MMM"}
+                    d{"E, d. MMM – E, d. MMM"}
+                }
+                MMM{
+                    M{"MMM – MMM"}
+                }
+                MMMEd{
+                    M{"E, d. MMM – E, d. MMM"}
+                    d{"E, d. MMM – E, d. MMM"}
+                }
+                MMMd{
+                    M{"d. – d. MMM"}
+                    d{"d. – d. MMM"}
+                }
+                Md{
+                    M{"d. MMM – d. MMM"}
+                    d{"d. MMM – d. MMM"}
+                }
+                d{
+                    d{"d – d"}
+                }
+                fallback{"{0} - {1}"}
+                h{
+                    a{"h a – h a"}
+                    h{"h – h a"}
+                }
+                hm{
+                    a{"h:mm a – h:mm a"}
+                    h{"h:mm – h:mm a"}
+                    m{"h:mm – h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a – h:mm a v"}
+                    h{"h:mm – h:mm a v"}
+                    m{"h:mm – h:mm a v"}
+                }
+                hv{
+                    a{"h a – h a v"}
+                    h{"h – h a v"}
+                }
+                y{
+                    y{"y – y"}
+                }
+                yM{
+                    M{"y-MM – y-MM"}
+                    y{"y-MM – y-MM"}
+                }
+                yMEd{
+                    M{"E, d. MMM y – E, d. MMM y"}
+                    d{"E, d. MMM y – E, d. MMM y"}
+                    y{"E, d. MMM y – E, d. MMM y"}
+                }
+                yMMM{
+                    M{"MMM – MMM y"}
+                    y{"MMM y – MMM y"}
+                }
+                yMMMEd{
+                    M{"E, d. MMM – E, d. MMM y"}
+                    d{"E, d. – E, d. MMM y"}
+                    y{"E, d. MMM y – E, d. MMM y"}
+                }
+                yMMMM{
+                    M{"MMMM – MMMM y"}
+                    y{"MMMM y – MMMM y"}
+                }
+                yMMMd{
+                    M{"d. MMM – d. MMM y"}
+                    d{"d. – d. MMM y"}
+                    y{"d. MMM y – d. MMM y"}
+                }
+                yMd{
+                    M{"y-MM-dd – y-MM-dd"}
+                    d{"y-MM-dd – y-MM-dd"}
+                    y{"y-MM-dd – y-MM-dd"}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Jen",
+                        "Hor",
+                        "Mär",
+                        "Abr",
+                        "Mei",
+                        "Brá",
+                        "Hei",
+                        "Öig",
+                        "Her",
+                        "Wím",
+                        "Win",
+                        "Chr",
+                    }
+                    narrow{
+                        "J",
+                        "H",
+                        "M",
+                        "A",
+                        "M",
+                        "B",
+                        "H",
+                        "Ö",
+                        "H",
+                        "W",
+                        "W",
+                        "C",
+                    }
+                    wide{
+                        "Jenner",
+                        "Hornig",
+                        "Märze",
+                        "Abrille",
+                        "Meije",
+                        "Bráčet",
+                        "Heiwet",
+                        "Öigšte",
+                        "Herbštmánet",
+                        "Wímánet",
+                        "Wintermánet",
+                        "Chrištmánet",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Jen",
+                        "Hor",
+                        "Mär",
+                        "Abr",
+                        "Mei",
+                        "Brá",
+                        "Hei",
+                        "Öig",
+                        "Her",
+                        "Wím",
+                        "Win",
+                        "Chr",
+                    }
+                    narrow{
+                        "J",
+                        "H",
+                        "M",
+                        "A",
+                        "M",
+                        "B",
+                        "H",
+                        "Ö",
+                        "H",
+                        "W",
+                        "W",
+                        "C",
+                    }
+                    wide{
+                        "Jenner",
+                        "Hornig",
+                        "Märze",
+                        "Abrille",
+                        "Meije",
+                        "Bráčet",
+                        "Heiwet",
+                        "Öigšte",
+                        "Herbštmánet",
+                        "Wímánet",
+                        "Wintermánet",
+                        "Chrištmánet",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "Q1",
+                        "Q2",
+                        "Q3",
+                        "Q4",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "1. quartal",
+                        "2. quartal",
+                        "3. quartal",
+                        "4. quartal",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Q1",
+                        "Q2",
+                        "Q3",
+                        "Q4",
+                    }
+                    wide{
+                        "1. quartal",
+                        "2. quartal",
+                        "3. quartal",
+                        "4. quartal",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"›"}
+        alternateQuotationStart{"‹"}
+        quotationEnd{"»"}
+        quotationStart{"«"}
+    }
+    fields{
+        day{
+            dn{"Tag"}
+            relative{
+                "-1"{"Gešter"}
+                "-2"{"Vorgešter"}
+                "0"{"Hitte"}
+                "1"{"Móre"}
+                "2"{"Ubermóre"}
+            }
+            relativeTime{
+                future{
+                    one{"i {0} tag"}
+                    other{"i {0} täg"}
+                }
+                past{
+                    one{"vor {0} tag"}
+                    other{"vor {0} täg"}
+                }
+            }
+        }
+        dayperiod{
+            dn{"AM/PM"}
+        }
+        era{
+            dn{"Epoča"}
+        }
+        hour{
+            dn{"Schtund"}
+            relativeTime{
+                future{
+                    one{"i {0} stund"}
+                    other{"i {0} stunde"}
+                }
+                past{
+                    one{"vor {0} stund"}
+                    other{"vor {0} stunde"}
+                }
+            }
+        }
+        minute{
+            dn{"Mínütta"}
+            relativeTime{
+                future{
+                    one{"i {0} minüta"}
+                    other{"i {0} minüte"}
+                }
+                past{
+                    one{"vor {0} minüta"}
+                    other{"vor {0} minüte"}
+                }
+            }
+        }
+        month{
+            dn{"Mánet"}
+            relativeTime{
+                future{
+                    one{"I {0} mánet"}
+                    other{"I {0} mánet"}
+                }
+                past{
+                    one{"vor {0} mánet"}
+                    other{"vor {0} mánet"}
+                }
+            }
+        }
+        second{
+            dn{"Sekunda"}
+            relativeTime{
+                future{
+                    one{"i {0} sekund"}
+                    other{"i {0} sekunde"}
+                }
+                past{
+                    one{"vor {0} sekund"}
+                    other{"vor {0} sekunde"}
+                }
+            }
+        }
+        week{
+            dn{"Wuča"}
+            relativeTime{
+                future{
+                    one{"i {0} wuča"}
+                    other{"i {0} wučä"}
+                }
+                past{
+                    one{"vor {0} wuča"}
+                    other{"cor {0} wučä"}
+                }
+            }
+        }
+        weekday{
+            dn{"Wučetag"}
+        }
+        year{
+            dn{"Jár"}
+            relativeTime{
+                future{
+                    one{"I {0} jár"}
+                    other{"I {0} jár"}
+                }
+                past{
+                    one{"vor {0} jár"}
+                    other{"cor {0} jár"}
+                }
+            }
+        }
+        zone{
+            dn{"Zitzóna"}
+        }
+    }
+    listPattern{
+        standard{
+            2{"{0} und {1}"}
+            end{"{0} und {1}"}
+        }
+    }
+    measurementSystemNames{
+        UK{"Angelsä"}
+        US{"Angloamerikaniš"}
+        metric{"Metriš"}
+    }
+}

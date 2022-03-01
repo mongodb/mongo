@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "jit/ValueNumbering.cpp"
+#include "vm/PromiseLookup.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/ValueNumbering.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/PromiseLookup.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/ValueNumbering.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/PromiseLookup.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/WasmBCE.cpp"
+#include "vm/PropMap.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/WasmBCE.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/PropMap.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/WasmBCE.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/PropMap.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/none/Trampoline-none.cpp"
+#include "vm/ProxyObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/none/Trampoline-none.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ProxyObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/none/Trampoline-none.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ProxyObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/shared/Assembler-shared.cpp"
+#include "vm/Realm.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/shared/Assembler-shared.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Realm.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/shared/Assembler-shared.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Realm.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/shared/BaselineCompiler-shared.cpp"
+#include "vm/RegExpObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/shared/BaselineCompiler-shared.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/RegExpObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/shared/BaselineCompiler-shared.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/RegExpObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/shared/CodeGenerator-shared.cpp"
+#include "vm/RegExpStatics.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/shared/CodeGenerator-shared.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/RegExpStatics.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/shared/CodeGenerator-shared.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/RegExpStatics.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

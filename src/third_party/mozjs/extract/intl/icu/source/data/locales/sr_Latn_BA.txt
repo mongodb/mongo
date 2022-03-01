@@ -1,0 +1,754 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sr_Latn_BA{
+    calendar{
+        generic{
+            intervalFormats{
+                MMMEd{
+                    M{"E, d. MMM – E, d. MMM"}
+                    d{"E, d. MMM – E, d. MMM"}
+                }
+                yMd{
+                    M{"d.M.y. – d.M.y. GGGGG"}
+                }
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "prije podne",
+                "po podne",
+            }
+            AmPmMarkersAbbr{
+                "prije podne",
+                "po podne",
+            }
+            dayNames{
+                format{
+                    wide{
+                        "nedjelja",
+                        "ponedjeljak",
+                        "utorak",
+                        "srijeda",
+                        "četvrtak",
+                        "petak",
+                        "subota",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ned",
+                        "pon",
+                        "uto",
+                        "sri",
+                        "čet",
+                        "pet",
+                        "sub",
+                    }
+                    wide{
+                        "nedjelja",
+                        "ponedjeljak",
+                        "utorak",
+                        "srijeda",
+                        "četvrtak",
+                        "petak",
+                        "subota",
+                    }
+                }
+            }
+            dayPeriod{
+                format{
+                    abbreviated{
+                        afternoon1{"po pod."}
+                        evening1{"veče"}
+                        midnight{"ponoć"}
+                        morning1{"jutro"}
+                        noon{"podne"}
+                    }
+                    narrow{
+                        afternoon1{"po pod."}
+                        evening1{"veče"}
+                        midnight{"ponoć"}
+                        morning1{"jutro"}
+                        night1{"noć"}
+                        noon{"podne"}
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        am{"prije podne"}
+                        pm{"po podne"}
+                    }
+                    narrow{
+                        am{"a"}
+                        pm{"p"}
+                    }
+                    wide{
+                        am{"prije podne"}
+                        pm{"po podne"}
+                    }
+                }
+            }
+            eras{
+                wide{
+                    "prije nove ere",
+                    "nove ere",
+                }
+                wide%variant{
+                    "pre naše ere",
+                    "nove ere",
+                }
+            }
+            intervalFormats{
+                MEd{
+                    M{"E, MM-dd – E, MM-dd"}
+                    d{"E, MM-dd – E, MM-dd"}
+                }
+                Md{
+                    M{"MM-dd – MM-dd"}
+                    d{"MM-dd – MM-dd"}
+                }
+                yM{
+                    M{"y-MM – y-MM"}
+                    y{"y-MM – y-MM"}
+                }
+                yMEd{
+                    M{"E, y-MM-dd – E, y-MM-dd"}
+                    d{"E, y-MM-dd – E, y-MM-dd"}
+                    y{"E, y-MM-dd – E, y-MM-dd"}
+                }
+                yMd{
+                    M{"y-MM-dd – y-MM-dd"}
+                    d{"y-MM-dd – y-MM-dd"}
+                    y{"y-MM-dd – y-MM-dd"}
+                }
+            }
+        }
+    }
+    characterLabel{
+        body{"tijelo"}
+        bullets_stars{"Znakovi za nabrajanje/zvjezdice"}
+        downwards_arrows{"Strelice nadolje"}
+        downwards_upwards_arrows{"Strelice nadolje i nagore"}
+        leftwards_arrows{"Strelice nalijevo"}
+        leftwards_rightwards_arrows{"Strelice nalijevo i nadesno"}
+        place{"mjesto"}
+        travel_places{"Putovanja i mjesta"}
+        weather{"vrijeme"}
+    }
+    fields{
+        day{
+            relativeTime{
+                past{
+                    few{"prije {0} dana"}
+                    one{"prije {0} dana"}
+                    other{"prije {0} dana"}
+                }
+            }
+        }
+        day-narrow{
+            relativeTime{
+                past{
+                    few{"prije {0} d."}
+                    one{"prije {0} d."}
+                    other{"prije {0} d."}
+                }
+            }
+        }
+        day-short{
+            relativeTime{
+                past{
+                    few{"prije {0} d."}
+                    one{"prije {0} d."}
+                    other{"prije {0} d."}
+                }
+            }
+        }
+        dayperiod{
+            dn{"prije podne/po podne"}
+        }
+        dayperiod-narrow{
+            dn{"prije podne/po podne"}
+        }
+        dayperiod-short{
+            dn{"prije podne/po podne"}
+        }
+        fri{
+            relative{
+                "1"{"sljedećeg petka"}
+            }
+            relativeTime{
+                past{
+                    few{"prije {0} petka"}
+                    one{"prije {0} petka"}
+                    other{"prije {0} petaka"}
+                }
+            }
+        }
+        fri-narrow{
+            relative{
+                "1"{"sljedećeg pet"}
+            }
+            relativeTime{
+                past{
+                    few{"prije {0} petka"}
+                    one{"prije {0} petka"}
+                    other{"prije {0} petaka"}
+                }
+            }
+        }
+        fri-short{
+            relative{
+                "1"{"sljedećeg pet"}
+            }
+            relativeTime{
+                past{
+                    few{"prije {0} petka"}
+                    one{"prije {0} petka"}
+                    other{"prije {0} petaka"}
+                }
+            }
+        }
+        hour{
+            relativeTime{
+                past{
+                    few{"prije {0} sata"}
+                    one{"prije {0} sata"}
+                    other{"prije {0} sati"}
+                }
+            }
+        }
+        hour-narrow{
+            relativeTime{
+                past{
+                    few{"prije {0} č."}
+                    one{"prije {0} č."}
+                    other{"prije {0} č."}
+                }
+            }
+        }
+        hour-short{
+            relativeTime{
+                past{
+                    few{"prije {0} č."}
+                    one{"prije {0} č."}
+                    other{"prije {0} č."}
+                }
+            }
+        }
+        minute{
+            relativeTime{
+                past{
+                    few{"prije {0} minuta"}
+                    one{"prije {0} minuta"}
+                    other{"prije {0} minuta"}
+                }
+            }
+        }
+        minute-narrow{
+            relativeTime{
+                past{
+                    few{"prije {0} min."}
+                    one{"prije {0} min."}
+                    other{"prije {0} min."}
+                }
+            }
+        }
+        minute-short{
+            relativeTime{
+                past{
+                    few{"prije {0} min."}
+                    one{"prije {0} min."}
+                    other{"prije {0} min."}
+                }
+            }
+        }
+        mon{
+            relative{
+                "-1"{"prošlog ponedjeljka"}
+                "0"{"u ponedjeljak"}
+                "1"{"sljedećeg ponedjeljka"}
+            }
+            relativeTime{
+                future{
+                    few{"za {0} ponedjeljka"}
+                    one{"za {0} ponedjeljak"}
+                    other{"za {0} ponedjeljaka"}
+                }
+                past{
+                    few{"prije {0} ponedjeljka"}
+                    one{"prije {0} ponedjeljka"}
+                    other{"prije {0} ponedjeljaka"}
+                }
+            }
+        }
+        mon-narrow{
+            relative{
+                "1"{"sljedećeg pon"}
+            }
+            relativeTime{
+                future{
+                    few{"za {0} ponedjeljka"}
+                    one{"za {0} ponedjeljak"}
+                    other{"za {0} ponedjeljaka"}
+                }
+                past{
+                    few{"prije {0} ponedjeljka"}
+                    one{"prije {0} ponedjeljka"}
+                    other{"prije {0} ponedjeljaka"}
+                }
+            }
+        }
+        mon-short{
+            relative{
+                "1"{"sljedećeg pon"}
+            }
+            relativeTime{
+                future{
+                    few{"za {0} ponedjeljka"}
+                    one{"za {0} ponedjeljak"}
+                    other{"za {0} ponedjeljaka"}
+                }
+                past{
+                    few{"prije {0} ponedjeljka"}
+                    one{"prije {0} ponedjeljka"}
+                    other{"prije {0} ponedjeljaka"}
+                }
+            }
+        }
+        month{
+            dn{"mjesec"}
+            relative{
+                "-1"{"prošlog mjeseca"}
+                "0"{"ovog mjeseca"}
+                "1"{"sljedećeg mjeseca"}
+            }
+            relativeTime{
+                future{
+                    few{"za {0} mjeseca"}
+                    one{"za {0} mjesec"}
+                    other{"za {0} mjeseci"}
+                }
+                past{
+                    few{"prije {0} mjeseca"}
+                    one{"prije {0} mjeseca"}
+                    other{"prije {0} mjeseci"}
+                }
+            }
+        }
+        month-narrow{
+            relative{
+                "1"{"sljedećeg m."}
+            }
+            relativeTime{
+                past{
+                    few{"prije {0} m."}
+                    one{"prije {0} m."}
+                    other{"prije {0} m."}
+                }
+            }
+        }
+        month-short{
+            dn{"mjes."}
+            relative{
+                "-1"{"prošlog mjes."}
+                "0"{"ovog mjes."}
+                "1"{"sljedećeg mjes."}
+            }
+            relativeTime{
+                future{
+                    few{"za {0} mjes."}
+                    one{"za {0} mjes."}
+                    other{"za {0} mjes."}
+                }
+                past{
+                    few{"prije {0} mjes."}
+                    one{"prije {0} mjes."}
+                    other{"prije {0} mjes."}
+                }
+            }
+        }
+        quarter{
+            relative{
+                "1"{"sljedećeg kvartala"}
+            }
+            relativeTime{
+                past{
+                    few{"prije {0} kvartala"}
+                    one{"prije {0} kvartala"}
+                    other{"prije {0} kvartala"}
+                }
+            }
+        }
+        quarter-narrow{
+            relativeTime{
+                past{
+                    few{"prije {0} kv."}
+                    one{"prije {0} kv."}
+                    other{"prije {0} kv."}
+                }
+            }
+        }
+        quarter-short{
+            relativeTime{
+                past{
+                    few{"prije {0} kv."}
+                    one{"prije {0} kv."}
+                    other{"prije {0} kv."}
+                }
+            }
+        }
+        sat{
+            relative{
+                "1"{"sljedeće subote"}
+            }
+            relativeTime{
+                past{
+                    few{"prije {0} subote"}
+                    one{"prije {0} subote"}
+                    other{"prije {0} subota"}
+                }
+            }
+        }
+        sat-narrow{
+            relative{
+                "1"{"sljedeće sub"}
+            }
+            relativeTime{
+                past{
+                    few{"prije {0} subote"}
+                    one{"prije {0} subote"}
+                    other{"prije {0} subota"}
+                }
+            }
+        }
+        sat-short{
+            relative{
+                "1"{"sljedeće sub"}
+            }
+            relativeTime{
+                past{
+                    few{"prije {0} subote"}
+                    one{"prije {0} subote"}
+                    other{"prije {0} subota"}
+                }
+            }
+        }
+        second{
+            relativeTime{
+                past{
+                    few{"prije {0} sekunde"}
+                    one{"prije {0} sekunde"}
+                    other{"prije {0} sekundi"}
+                }
+            }
+        }
+        second-narrow{
+            relativeTime{
+                past{
+                    few{"prije {0} s."}
+                    one{"prije {0} s."}
+                    other{"prije {0} s."}
+                }
+            }
+        }
+        second-short{
+            relativeTime{
+                past{
+                    few{"prije {0} sek."}
+                    one{"prije {0} sek."}
+                    other{"prije {0} sek."}
+                }
+            }
+        }
+        sun{
+            relative{
+                "-1"{"prošle nedjelje"}
+                "0"{"u nedjelju"}
+                "1"{"sljedeće nedjelje"}
+            }
+            relativeTime{
+                future{
+                    few{"za {0} nedjelje"}
+                    one{"za {0} nedjelju"}
+                    other{"za {0} nedjelja"}
+                }
+                past{
+                    few{"prije {0} nedjelje"}
+                    one{"prije {0} nedjelje"}
+                    other{"prije {0} nedjelja"}
+                }
+            }
+        }
+        sun-narrow{
+            relative{
+                "1"{"slj. ned."}
+            }
+            relativeTime{
+                future{
+                    few{"za {0} nedjelje"}
+                    one{"za {0} nedjelju"}
+                    other{"za {0} nedjelja"}
+                }
+                past{
+                    few{"prije {0} nedjelje"}
+                    one{"prije {0} nedjelje"}
+                    other{"prije {0} nedjelja"}
+                }
+            }
+        }
+        sun-short{
+            relative{
+                "1"{"slj. ned."}
+            }
+            relativeTime{
+                future{
+                    few{"za {0} nedjelje"}
+                    one{"za {0} nedjelju"}
+                    other{"za {0} nedjelja"}
+                }
+                past{
+                    few{"prije {0} nedjelje"}
+                    one{"prije {0} nedjelje"}
+                    other{"prije {0} nedjelja"}
+                }
+            }
+        }
+        thu{
+            relative{
+                "1"{"sljedećeg četvrtka"}
+            }
+            relativeTime{
+                past{
+                    few{"prije {0} četvrtka"}
+                    one{"prije {0} četvrtka"}
+                    other{"prije {0} četvrtaka"}
+                }
+            }
+        }
+        thu-narrow{
+            relative{
+                "1"{"sljedećeg čet"}
+            }
+            relativeTime{
+                past{
+                    few{"prije {0} četvrtka"}
+                    one{"prije {0} četvrtka"}
+                    other{"prije {0} četvrtaka"}
+                }
+            }
+        }
+        thu-short{
+            relative{
+                "1"{"sljedećeg čet"}
+            }
+            relativeTime{
+                past{
+                    few{"prije {0} četvrtka"}
+                    one{"prije {0} četvrtka"}
+                    other{"prije {0} četvrtaka"}
+                }
+            }
+        }
+        tue{
+            relative{
+                "1"{"sljedećeg utorka"}
+            }
+            relativeTime{
+                past{
+                    few{"prije {0} utorka"}
+                    one{"prije {0} utorka"}
+                    other{"prije {0} utoraka"}
+                }
+            }
+        }
+        tue-narrow{
+            relative{
+                "1"{"sljedećeg uto"}
+            }
+            relativeTime{
+                past{
+                    few{"prije {0} utorka"}
+                    one{"prije {0} utorka"}
+                    other{"prije {0} utoraka"}
+                }
+            }
+        }
+        tue-short{
+            relative{
+                "1"{"sljedećeg uto"}
+            }
+            relativeTime{
+                past{
+                    few{"prije {0} utorka"}
+                    one{"prije {0} utorka"}
+                    other{"prije {0} utoraka"}
+                }
+            }
+        }
+        wed{
+            relative{
+                "-1"{"prošle srijede"}
+                "0"{"u srijedu"}
+                "1"{"sljedeće srijede"}
+            }
+            relativeTime{
+                future{
+                    few{"za {0} srijede"}
+                    one{"za {0} srijedu"}
+                    other{"za {0} srijeda"}
+                }
+                past{
+                    few{"prije {0} srijede"}
+                    one{"prije {0} srijede"}
+                    other{"prije {0} srijeda"}
+                }
+            }
+        }
+        wed-narrow{
+            relative{
+                "-1"{"prošle sri"}
+                "0"{"u sri"}
+                "1"{"sljedeće sri"}
+            }
+            relativeTime{
+                future{
+                    few{"za {0} srijede"}
+                    one{"za {0} srijedu"}
+                    other{"za {0} srijeda"}
+                }
+                past{
+                    few{"prije {0} srijede"}
+                    one{"prije {0} srijede"}
+                    other{"prije {0} srijeda"}
+                }
+            }
+        }
+        wed-short{
+            relative{
+                "-1"{"prošle sri"}
+                "0"{"u sri"}
+                "1"{"sljedeće sri"}
+            }
+            relativeTime{
+                future{
+                    few{"za {0} srijede"}
+                    one{"za {0} srijedu"}
+                    other{"za {0} srijeda"}
+                }
+                past{
+                    few{"prije {0} srijede"}
+                    one{"prije {0} srijede"}
+                    other{"prije {0} srijeda"}
+                }
+            }
+        }
+        week{
+            dn{"nedjelja"}
+            relative{
+                "-1"{"prethodne nedelje"}
+                "0"{"ove nedjelje"}
+                "1"{"naredne nedelje"}
+            }
+            relativePeriod{"nedjelja koja počinje {0}."}
+            relativeTime{
+                future{
+                    few{"za {0} nedjelje"}
+                    one{"za {0} nedjelju"}
+                    other{"za {0} nedjelja"}
+                }
+                past{
+                    few{"prije {0} nedjelje"}
+                    one{"prije {0} nedjelje"}
+                    other{"prije {0} nedjelja"}
+                }
+            }
+        }
+        week-narrow{
+            relative{
+                "1"{"sljedeće n."}
+            }
+            relativePeriod{"nedjelja koja počinje {0}."}
+            relativeTime{
+                past{
+                    few{"prije {0} n."}
+                    one{"prije {0} n."}
+                    other{"prije {0} n."}
+                }
+            }
+        }
+        week-short{
+            relativePeriod{"nedjelja koja počinje {0}."}
+            relativeTime{
+                past{
+                    few{"prije {0} ned."}
+                    one{"prije {0} ned."}
+                    other{"prije {0} ned."}
+                }
+            }
+        }
+        weekOfMonth{
+            dn{"nedjelja u mjesecu"}
+        }
+        weekOfMonth-narrow{
+            dn{"ned. u mjes."}
+        }
+        weekOfMonth-short{
+            dn{"ned. u mjes."}
+        }
+        weekday{
+            dn{"dan u nedjelji"}
+        }
+        weekday-narrow{
+            dn{"dan u nedjelji"}
+        }
+        weekday-short{
+            dn{"dan u nedjelji"}
+        }
+        weekdayOfMonth{
+            dn{"dan u mjesecu"}
+        }
+        weekdayOfMonth-narrow{
+            dn{"dan u mjesecu"}
+        }
+        weekdayOfMonth-short{
+            dn{"dan u mjesecu"}
+        }
+        year{
+            relative{
+                "1"{"sljedeće godine"}
+            }
+            relativeTime{
+                past{
+                    few{"prije {0} godine"}
+                    one{"prije {0} godine"}
+                    other{"prije {0} godina"}
+                }
+            }
+        }
+        year-narrow{
+            relative{
+                "1"{"sljedeće g."}
+            }
+            relativeTime{
+                past{
+                    few{"prije {0} g."}
+                    one{"prije {0} g."}
+                    other{"prije {0} g."}
+                }
+            }
+        }
+        year-short{
+            relative{
+                "1"{"sljedeće god."}
+            }
+            relativeTime{
+                past{
+                    few{"prije {0} god."}
+                    one{"prije {0} god."}
+                    other{"prije {0} god."}
+                }
+            }
+        }
+    }
+}

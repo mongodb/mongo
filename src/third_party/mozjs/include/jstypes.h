@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -21,43 +21,15 @@
 #ifndef jstypes_h
 #define jstypes_h
 
-#include "mozilla/Attributes.h"
 #include "mozilla/Casting.h"
 #include "mozilla/Types.h"
 
+#include <stddef.h>
+#include <stdint.h>
+
 // jstypes.h is (or should be!) included by every file in SpiderMonkey.
 // js-config.h also should be included by every file. So include it here.
-// XXX: including it in js/RequiredDefines.h should be a better option, since
-// that is by definition the header file that should be included in all
-// SpiderMonkey code.  However, Gecko doesn't do this!  See bug 909576.
 #include "js-config.h"
-
-/***********************************************************************
-** MACROS:      JS_EXTERN_API
-**              JS_EXPORT_API
-** DESCRIPTION:
-**      These are only for externally visible routines and globals.  For
-**      internal routines, just use "extern" for type checking and that
-**      will not export internal cross-file or forward-declared symbols.
-**      Define a macro for declaring procedures return types. We use this to
-**      deal with windoze specific type hackery for DLL definitions. Use
-**      JS_EXTERN_API when the prototype for the method is declared. Use
-**      JS_EXPORT_API for the implementation of the method.
-**
-** Example:
-**   in dowhim.h
-**     JS_EXTERN_API( void ) DoWhatIMean( void );
-**   in dowhim.c
-**     JS_EXPORT_API( void ) DoWhatIMean( void ) { return; }
-**
-**
-***********************************************************************/
-
-#define JS_EXTERN_API(type)  extern MOZ_EXPORT type
-#define JS_EXPORT_API(type)  MOZ_EXPORT type
-#define JS_EXPORT_DATA(type) MOZ_EXPORT type
-#define JS_IMPORT_API(type)  MOZ_IMPORT_API type
-#define JS_IMPORT_DATA(type) MOZ_IMPORT_DATA type
 
 /*
  * The linkage of JS API functions differs depending on whether the file is
@@ -66,39 +38,14 @@
  * should not. STATIC_JS_API is used to build JS as a static library.
  */
 #if defined(STATIC_JS_API)
-#  define JS_PUBLIC_API(t)   t
-#  define JS_PUBLIC_DATA(t)  t
-#  define JS_FRIEND_API(t)   t
-#  define JS_FRIEND_DATA(t)  t
+#  define JS_PUBLIC_API
+#  define JS_PUBLIC_DATA
 #elif defined(EXPORT_JS_API) || defined(STATIC_EXPORTABLE_JS_API)
-#  define JS_PUBLIC_API(t)   MOZ_EXPORT t
-#  define JS_PUBLIC_DATA(t)  MOZ_EXPORT t
-#  define JS_FRIEND_API(t)    MOZ_EXPORT t
-#  define JS_FRIEND_DATA(t)   MOZ_EXPORT t
+#  define JS_PUBLIC_API MOZ_EXPORT
+#  define JS_PUBLIC_DATA MOZ_EXPORT
 #else
-#  define JS_PUBLIC_API(t)   MOZ_IMPORT_API t
-#  define JS_PUBLIC_DATA(t)  MOZ_IMPORT_DATA t
-#  define JS_FRIEND_API(t)   MOZ_IMPORT_API t
-#  define JS_FRIEND_DATA(t)  MOZ_IMPORT_DATA t
-#endif
-
-#if defined(_MSC_VER) && defined(_M_IX86)
-#define JS_FASTCALL __fastcall
-#elif defined(__GNUC__) && defined(__i386__)
-#define JS_FASTCALL __attribute__((fastcall))
-#else
-#define JS_FASTCALL
-#define JS_NO_FASTCALL
-#endif
-
-// gcc is buggy and warns on our attempts to JS_PUBLIC_API our
-// forward-declarations or explicit template instantiations.  See
-// <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=50044>.  Add a way to detect
-// that so we can locally disable that warning.
-#if MOZ_IS_GCC
-#  if MOZ_GCC_VERSION_AT_MOST(8, 0, 0)
-#    define JS_BROKEN_GCC_ATTRIBUTE_WARNING
-#  endif
+#  define JS_PUBLIC_API MOZ_IMPORT_API
+#  define JS_PUBLIC_DATA MOZ_IMPORT_DATA
 #endif
 
 /***********************************************************************
@@ -108,42 +55,51 @@
 **      Macro body brackets so that macros with compound statement definitions
 **      behave syntactically more like functions when called.
 ***********************************************************************/
-#define JS_BEGIN_MACRO  do {
-
-#if defined(_MSC_VER)
-# define JS_END_MACRO                                                         \
-    } __pragma(warning(push)) __pragma(warning(disable:4127))                 \
-    while (0) __pragma(warning(pop))
-#else
-# define JS_END_MACRO   } while (0)
-#endif
+#define JS_BEGIN_MACRO do {
+#define JS_END_MACRO \
+  }                  \
+  while (0)
 
 /***********************************************************************
-** MACROS:      JS_BIT
-**              JS_BITMASK
+** FUNCTIONS:   Bit
+**              BitMask
 ** DESCRIPTION:
-** Bit masking macros.  XXX n must be <= 31 to be portable
+** Bit masking functions.  XXX n must be <= 31 to be portable
 ***********************************************************************/
-#define JS_BIT(n)       ((uint32_t)1 << (n))
-#define JS_BITMASK(n)   (JS_BIT(n) - 1)
+namespace js {
+constexpr uint32_t Bit(uint32_t n) { return uint32_t(1) << n; }
+
+constexpr uint32_t BitMask(uint32_t n) { return Bit(n) - 1; }
+}  // namespace js
 
 /***********************************************************************
-** MACROS:      JS_HOWMANY
-**              JS_ROUNDUP
+** FUNCTIONS:   HowMany
+**              RoundUp
+**              RoundDown
+**              Round
 ** DESCRIPTION:
-**      Commonly used macros for operations on compatible types.
+**      Commonly used functions for operations on compatible types.
 ***********************************************************************/
-#define JS_HOWMANY(x,y) (((x)+(y)-1)/(y))
-#define JS_ROUNDUP(x,y) (JS_HOWMANY(x,y)*(y))
+namespace js {
+constexpr size_t HowMany(size_t x, size_t y) { return (x + y - 1) / y; }
 
-#define JS_BITS_PER_BYTE 8
-#define JS_BITS_PER_BYTE_LOG2 3
+constexpr size_t RoundUp(size_t x, size_t y) { return HowMany(x, y) * y; }
 
-#if defined(JS_64BIT)
-# define JS_BITS_PER_WORD 64
+constexpr size_t RoundDown(size_t x, size_t y) { return (x / y) * y; }
+
+constexpr size_t Round(size_t x, size_t y) { return ((x + y / 2) / y) * y; }
+}  // namespace js
+
+#if (defined(__SIZEOF_POINTER__) && __SIZEOF_POINTER__ == 8) || \
+    (defined(UINTPTR_MAX) && UINTPTR_MAX == 0xFFFFFFFFFFFFFFFFu)
+#  define JS_BITS_PER_WORD 64
 #else
-# define JS_BITS_PER_WORD 32
+#  define JS_BITS_PER_WORD 32
 #endif
+
+static_assert(sizeof(void*) == 8 ? JS_BITS_PER_WORD == 64
+                                 : JS_BITS_PER_WORD == 32,
+              "preprocessor and compiler must agree");
 
 /***********************************************************************
 ** MACROS:      JS_FUNC_TO_DATA_PTR
@@ -161,15 +117,7 @@
 **
 ***********************************************************************/
 
-#define JS_FUNC_TO_DATA_PTR(type, fun)  (mozilla::BitwiseCast<type>(fun))
-#define JS_DATA_TO_FUNC_PTR(type, ptr)  (mozilla::BitwiseCast<type>(ptr))
-
-#ifdef __GNUC__
-# define JS_EXTENSION __extension__
-# define JS_EXTENSION_(s) __extension__ ({ s; })
-#else
-# define JS_EXTENSION
-# define JS_EXTENSION_(s) s
-#endif
+#define JS_FUNC_TO_DATA_PTR(type, fun) (mozilla::BitwiseCast<type>(fun))
+#define JS_DATA_TO_FUNC_PTR(type, ptr) (mozilla::BitwiseCast<type>(ptr))
 
 #endif /* jstypes_h */

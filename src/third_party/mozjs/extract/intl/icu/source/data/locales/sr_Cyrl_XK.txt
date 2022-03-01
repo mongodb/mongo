@@ -1,0 +1,77 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sr_Cyrl_XK{
+    calendar{
+        generic{
+            intervalFormats{
+                MMMEd{
+                    M{"E, d. MMM – E, d. MMM"}
+                    d{"E, d – E, d. MMM"}
+                }
+            }
+        }
+        gregorian{
+            dayPeriod{
+                format{
+                    abbreviated{
+                        afternoon1{"по под."}
+                        evening1{"увече"}
+                        midnight{"поноћ"}
+                        morning1{"јутро"}
+                        night1{"ноћу"}
+                        noon{"подне"}
+                    }
+                    narrow{
+                        afternoon1{"по под."}
+                        evening1{"вече"}
+                        midnight{"поноћ"}
+                        morning1{"јутро"}
+                        night1{"ноћ"}
+                        noon{"подне"}
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        am{"a"}
+                        pm{"p"}
+                    }
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "јан",
+                        "феб",
+                        "март",
+                        "апр",
+                        "мај",
+                        "јун",
+                        "јул",
+                        "авг",
+                        "септ",
+                        "окт",
+                        "нов",
+                        "дец",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "јан",
+                        "феб",
+                        "март",
+                        "апр",
+                        "мај",
+                        "јун",
+                        "јул",
+                        "авг",
+                        "септ",
+                        "окт",
+                        "нов",
+                        "дец",
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,43 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+en_NZ{
+    %%Parent{"en_001"}
+    zoneStrings{
+        "meta:Australia_Central"{
+            sd{"ACDT"}
+            sg{"ACT"}
+            ss{"ACST"}
+        }
+        "meta:Australia_CentralWestern"{
+            sd{"ACWDT"}
+            sg{"ACWT"}
+            ss{"ACWST"}
+        }
+        "meta:Australia_Eastern"{
+            sd{"AEDT"}
+            sg{"AET"}
+            ss{"AEST"}
+        }
+        "meta:Australia_Western"{
+            sd{"AWDT"}
+            sg{"AWT"}
+            ss{"AWST"}
+        }
+        "meta:Chatham"{
+            sd{"CHADT"}
+            sg{"CHAT"}
+            ss{"CHAST"}
+        }
+        "meta:Lord_Howe"{
+            sd{"LHDT"}
+            sg{"LHT"}
+            ss{"LHST"}
+        }
+        "meta:New_Zealand"{
+            sd{"NZDT"}
+            sg{"NZT"}
+            ss{"NZST"}
+        }
+    }
+}

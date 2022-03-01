@@ -1,0 +1,60 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+fil{
+    RBNFRules{
+        OrdinalRules{
+            "%digits-ordinal:",
+            "-x: \u2212>>;",
+            "0: ika=#,##0=;",
+        }
+        SpelloutRules{
+            "%spellout-numbering-year:",
+            "x.x: =0.0=;",
+            "0: =%spellout-numbering=;",
+            "%spellout-numbering:",
+            "0: =%spellout-cardinal=;",
+            "%%number-times:",
+            "1: is\u00E1ng;",
+            "2: dalaw\u00E1ng;",
+            "3: tatl\u00F3ng;",
+            "4: \u00E1pat na;",
+            "5: lim\u00E1ng;",
+            "6: anim na;",
+            "7: pit\u00F3ng;",
+            "8: wal\u00F3ng;",
+            "9: siy\u00E1m na;",
+            "10: samp\u00FBng;",
+            "11: lab\u00EDng->>;",
+            "20: <%%number-times< p\u00FB[\u2019t >>];",
+            "100: <%%number-times< da\u00E1n[ at >>];",
+            "1000: <%%number-times< lib\u00F3[\u2019t >>];",
+            "%spellout-cardinal:",
+            "-x: minus >>;",
+            "x.x: << tuldok >>;",
+            "0: wal\u00E2;",
+            "1: is\u00E1;",
+            "2: dalaw\u00E1;",
+            "3: tatl\u00F3;",
+            "4: \u00E1pat;",
+            "5: lim\u00E1;",
+            "6: anim;",
+            "7: pit\u00F3;",
+            "8: wal\u00F3;",
+            "9: siy\u00E1m;",
+            "10: samp\u00FB;",
+            "11: lab\u00EDng->>;",
+            "20: <%%number-times< p\u00FB[\u2019t >>];",
+            "100: <%%number-times< da\u00E1n[ at >>];",
+            "1000: <%%number-times< lib\u00F3[\u2019t >>];",
+            "1000000: <%%number-times< mily\u00F3n[ at >>];",
+            "1000000000: <%%number-times< bily\u00F3n[ at >>];",
+            "1000000000000: <%%number-times< trily\u00F3n[ at >>];",
+            "1000000000000000: <%%number-times< katrily\u00F3n[ at >>];",
+            "1000000000000000000: =#,##0=;",
+            "%spellout-ordinal:",
+            "x.x: =#,##0.#=;",
+            "0: ika =%spellout-cardinal=;",
+        }
+    }
+}

@@ -1,0 +1,30 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+se_FI{
+    Countries{
+        001{"Máilbmi"}
+        002{"Afrihka"}
+        003{"Davvi-Amerihká ja Gaska-Amerihká"}
+        005{"Lulli-Amerihká"}
+        011{"Oarje-Afrihká"}
+        013{"Gaska-Amerihká"}
+        014{"Nuorta-Afrihká"}
+        015{"Davvi-Afrihká"}
+        017{"Gaska-Afrihká"}
+        018{"Lulli-Afrihká"}
+        019{"Amerihka"}
+        021{"Davvi-Amerihká"}
+        057{"Mikronesia guovlu"}
+        419{"Latiinnalaš Amerihká"}
+        BA{"Bosnia ja Hercegovina"}
+        EZ{"Euroavádat"}
+        KH{"Kamboža"}
+        SD{"Sudan"}
+        TD{"Chad"}
+        UN{"Ovttastuvvan Našuvnnat"}
+    }
+    Countries%variant{
+        CI{"Côte d’Ivoire"}
+    }
+}

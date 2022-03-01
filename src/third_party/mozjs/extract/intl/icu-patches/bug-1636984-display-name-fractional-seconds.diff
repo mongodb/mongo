@@ -1,0 +1,39 @@
+# Give fractional seconds a more useful display name than "F14".
+#
+# CLDR bug: https://unicode-org.atlassian.net/browse/CLDR-13623
+
+diff --git a/intl/icu/source/data/locales/root.txt b/intl/icu/source/data/locales/root.txt
+--- a/intl/icu/source/data/locales/root.txt
++++ b/intl/icu/source/data/locales/root.txt
+@@ -2527,10 +2527,15 @@ root{
+         zone{
+             dn{"Zone"}
+         }
+         zone-narrow:alias{"/LOCALE/fields/zone-short"}
+         zone-short:alias{"/LOCALE/fields/zone"}
++        fractionalSecond{
++            dn{"Fractional Second"}
++        }
++        fractionalSecond-narrow:alias{"/LOCALE/fields/fractionalSecond-short"}
++        fractionalSecond-short:alias{"/LOCALE/fields/fractionalSecond"}
+     }
+     layout{
+         characters{"left-to-right"}
+         lines{"top-to-bottom"}
+     }
+diff --git a/intl/icu/source/i18n/dtptngen.cpp b/intl/icu/source/i18n/dtptngen.cpp
+--- a/intl/icu/source/i18n/dtptngen.cpp
++++ b/intl/icu/source/i18n/dtptngen.cpp
+@@ -264,11 +264,11 @@ static const char* const CLDR_FIELD_APPE
+ };
+ 
+ static const char* const CLDR_FIELD_NAME[UDATPG_FIELD_COUNT] = {
+     "era", "year", "quarter", "month", "week", "weekOfMonth", "weekday",
+     "dayOfYear", "weekdayOfMonth", "day", "dayperiod", // The UDATPG_x_FIELD constants and these fields have a different order than in ICU4J
+-    "hour", "minute", "second", "*", "zone"
++    "hour", "minute", "second", "fractionalSecond", "zone"
+ };
+ 
+ static const char* const CLDR_FIELD_WIDTH[] = { // [UDATPG_WIDTH_COUNT]
+     "", "-short", "-narrow"
+ };

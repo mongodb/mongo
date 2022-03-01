@@ -1,0 +1,1837 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ka{
+    AuxExemplarCharacters{
+        "[ⴀ ⴁ ⴂ ⴃ ⴄ ⴅ ⴆ ჱ ⴡ ⴇ ⴈ ⴉ ⴊ ⴋ ⴌ ჲ ⴢ ⴍ ⴎ ⴏ ⴐ ⴑ ⴒ ჳ ⴣ ⴓ ⴔ ⴕ ⴖ ⴗ ⴘ ⴙ ⴚ ⴛ ⴜ ⴝ ⴞ ჴ"
+        " ⴤ ⴟ ⴠ ჵ ⴥ ჶ ჷ ჸ ჹ ჺ]"
+    }
+    Ellipsis{
+        final{"{0}…"}
+        initial{"…{0}"}
+        medial{"{0}…{1}"}
+        word-final{"{0} …"}
+        word-initial{"… {0}"}
+        word-medial{"{0} … {1}"}
+    }
+    ExemplarCharacters{"[ა ბ გ დ ე ვ ზ თ ი კ ლ მ ნ ო პ ჟ რ ს ტ უ ფ ქ ღ ყ შ ჩ ც ძ წ ჭ ხ ჯ ჰ]"}
+    ExemplarCharactersIndex{"[ა ბ გ დ ე ვ ზ თ ი კ ლ მ ნ ო პ ჟ რ ს ტ უ ფ ქ ღ ყ შ ჩ ც ძ წ ჭ ხ ჯ ჰ]"}
+    ExemplarCharactersNumbers{"[  \\- ‑ , % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    ExemplarCharactersPunctuation{
+        "[\\- ‐ ‑ – — , ; \\: ! ? . … ჻ ' ‘ ‚ “ „ « » ( ) \\[ \\] \\{ \\} § @ * / \\&"
+        " # † ‡ ′ ″ №]"
+    }
+    MoreInformation{"?"}
+    NumberElements{
+        default{"latn"}
+        latn{
+            miscPatterns{
+                approximately{"≈{0}"}
+                atLeast{"{0}+"}
+                atMost{"≤{0}"}
+                range{"{0}-{1}"}
+            }
+            patterns{
+                accountingFormat{"#,##0.00 ¤"}
+                currencyFormat{"#,##0.00 ¤"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"#,##0%"}
+                scientificFormat{"#E0"}
+            }
+            patternsLong{
+                decimalFormat{
+                    1000{
+                        one{"0 ათასი"}
+                        other{"0 ათასი"}
+                    }
+                    10000{
+                        one{"00 ათასი"}
+                        other{"00 ათასი"}
+                    }
+                    100000{
+                        one{"000 ათასი"}
+                        other{"000 ათასი"}
+                    }
+                    1000000{
+                        one{"0 მილიონი"}
+                        other{"0 მილიონი"}
+                    }
+                    10000000{
+                        one{"00 მილიონი"}
+                        other{"00 მილიონი"}
+                    }
+                    100000000{
+                        one{"000 მილიონი"}
+                        other{"000 მილიონი"}
+                    }
+                    1000000000{
+                        one{"0 მილიარდი"}
+                        other{"0 მილიარდი"}
+                    }
+                    10000000000{
+                        one{"00 მილიარდი"}
+                        other{"00 მილიარდი"}
+                    }
+                    100000000000{
+                        one{"000 მილიარდი"}
+                        other{"000 მილიარდი"}
+                    }
+                    1000000000000{
+                        one{"0 ტრილიონი"}
+                        other{"0 ტრილიონი"}
+                    }
+                    10000000000000{
+                        one{"00 ტრილიონი"}
+                        other{"00 ტრილიონი"}
+                    }
+                    100000000000000{
+                        one{"000 ტრილიონი"}
+                        other{"000 ტრილიონი"}
+                    }
+                }
+            }
+            patternsShort{
+                currencyFormat{
+                    1000{
+                        one{"0 ათ'.' ¤"}
+                        other{"0 ათ'.' ¤"}
+                    }
+                    10000{
+                        one{"00 ათ'.' ¤"}
+                        other{"00 ათ'.' ¤"}
+                    }
+                    100000{
+                        one{"000 ათ'.' ¤"}
+                        other{"000 ათ'.' ¤"}
+                    }
+                    1000000{
+                        one{"0 მლნ'.' ¤"}
+                        other{"0 მლნ'.' ¤"}
+                    }
+                    10000000{
+                        one{"00 მლნ'.' ¤"}
+                        other{"00 მლნ'.' ¤"}
+                    }
+                    100000000{
+                        one{"000 მლნ'.' ¤"}
+                        other{"000 მლნ'.' ¤"}
+                    }
+                    1000000000{
+                        one{"0 მლრდ'.' ¤"}
+                        other{"0 მლრდ'.' ¤"}
+                    }
+                    10000000000{
+                        one{"00 მლრდ'.' ¤"}
+                        other{"00 მლრდ'.' ¤"}
+                    }
+                    100000000000{
+                        one{"000 მლრ'.' ¤"}
+                        other{"000 მლრ'.' ¤"}
+                    }
+                    1000000000000{
+                        one{"0 ტრლ'.' ¤"}
+                        other{"0 ტრლ'.' ¤"}
+                    }
+                    10000000000000{
+                        one{"00 ტრლ'.' ¤"}
+                        other{"00 ტრლ'.' ¤"}
+                    }
+                    100000000000000{
+                        one{"000 ტრლ'.' ¤"}
+                        other{"000 ტრლ'.' ¤"}
+                    }
+                }
+                decimalFormat{
+                    1000{
+                        one{"0 ათ'.'"}
+                        other{"0 ათ'.'"}
+                    }
+                    10000{
+                        one{"00 ათ'.'"}
+                        other{"00 ათ'.'"}
+                    }
+                    100000{
+                        one{"000 ათ'.'"}
+                        other{"000 ათ'.'"}
+                    }
+                    1000000{
+                        one{"0 მლნ'.'"}
+                        other{"0 მლნ'.'"}
+                    }
+                    10000000{
+                        one{"00 მლნ'.'"}
+                        other{"00 მლნ'.'"}
+                    }
+                    100000000{
+                        one{"000 მლნ'.'"}
+                        other{"000 მლნ'.'"}
+                    }
+                    1000000000{
+                        one{"0 მლრდ'.'"}
+                        other{"0 მლრდ'.'"}
+                    }
+                    10000000000{
+                        one{"00 მლრდ'.'"}
+                        other{"00 მლრდ'.'"}
+                    }
+                    100000000000{
+                        one{"000 მლრ'.'"}
+                        other{"000 მლრ'.'"}
+                    }
+                    1000000000000{
+                        one{"0 ტრლ'.'"}
+                        other{"0 ტრლ'.'"}
+                    }
+                    10000000000000{
+                        one{"00 ტრლ'.'"}
+                        other{"00 ტრლ'.'"}
+                    }
+                    100000000000000{
+                        one{"000 ტრლ'.'"}
+                        other{"000 ტრლ'.'"}
+                    }
+                }
+            }
+            symbols{
+                approximatelySign{"≈"}
+                decimal{","}
+                exponential{"E"}
+                group{" "}
+                infinity{"∞"}
+                list{";"}
+                minusSign{"-"}
+                nan{"არ არის რიცხვი"}
+                perMille{"‰"}
+                percentSign{"%"}
+                plusSign{"+"}
+                superscriptingExponent{"×"}
+                timeSeparator{":"}
+            }
+        }
+        minimalPairs{
+            ordinal{
+                many{"მე-{0}"}
+                one{"{0}-ლი"}
+                other{"{0}-ე"}
+            }
+            plural{
+                one{"კალათში {0} X-ია. შეიძენთ მას?"}
+                other{"კალათში {0} X-ია. შეიძენთ მათ?"}
+            }
+        }
+        minimumGroupingDigits{"2"}
+        native{"latn"}
+        traditional{"geor"}
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, dd MMMM, y G",
+                "d MMMM, y G",
+                "d MMM, y G",
+                "dd.MM.y GGGGG",
+                "{1}, {0}",
+                "{1} {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                Bh{"h B"}
+                Bhm{"h:mm B"}
+                Bhms{"h:mm:ss B"}
+                E{"ccc"}
+                EBhm{"E h:mm B"}
+                EBhms{"E h:mm:ss B"}
+                EHm{"E HH:mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"d E"}
+                Ehm{"E h:mm a"}
+                Ehms{"E h:mm:ss a"}
+                Gy{"y G"}
+                GyMMM{"MMM, y G"}
+                GyMMMEd{"E, d MMM, y G"}
+                GyMMMd{"d MMM, y G"}
+                H{"HH"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, d.M"}
+                MMM{"LLL"}
+                MMMEd{"E, d MMM"}
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                Md{"d.M"}
+                d{"d"}
+                h{"h a"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                ms{"mm:ss"}
+                y{"y G"}
+                yyyy{"y G"}
+                yyyyM{"M.y G"}
+                yyyyMEd{"E, d.M.y G"}
+                yyyyMMM{"MMM, y G"}
+                yyyyMMMEd{"E, d MMM, y G"}
+                yyyyMMMM{"MMMM y G"}
+                yyyyMMMd{"d MMM, y G"}
+                yyyyMd{"d.M.y G"}
+                yyyyQQQ{"QQQ, y G"}
+                yyyyQQQQ{"QQQQ, y G"}
+            }
+            intervalFormats{
+                Bh{
+                    B{"h B – h B"}
+                    h{"h – h B"}
+                }
+                Bhm{
+                    B{"h:mm B – h:mm B"}
+                    h{"h:mm – h:mm B"}
+                    m{"h:mm–h:mm B"}
+                }
+                Gy{
+                    G{"G y – G y"}
+                    y{"G y–y"}
+                }
+                GyM{
+                    G{"GGGGG y-MM – GGGGG y-MM"}
+                    M{"GGGGG y-MM – y-MM"}
+                    y{"GGGGG y-MM – y-MM"}
+                }
+                H{
+                    H{"HH–HH"}
+                }
+                Hm{
+                    H{"HH:mm–HH:mm"}
+                    m{"HH:mm–HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm–HH:mm v"}
+                    m{"HH:mm–HH:mm v"}
+                }
+                Hv{
+                    H{"HH–HH v"}
+                }
+                M{
+                    M{"M–M"}
+                }
+                MEd{
+                    M{"E, dd.MM. – E, dd.MM."}
+                    d{"E, dd.MM. – E, dd.MM."}
+                }
+                MMM{
+                    M{"MMM–MMM"}
+                }
+                MMMEd{
+                    M{"E, d MMM – E, d MMM"}
+                    d{"E, d – E, d MMM"}
+                }
+                MMMd{
+                    M{"d MMM – d MMM"}
+                    d{"d–d MMM"}
+                }
+                Md{
+                    M{"dd.MM. – dd.MM."}
+                    d{"dd.MM. – dd.MM."}
+                }
+                d{
+                    d{"d–d"}
+                }
+                fallback{"{0} – {1}"}
+                h{
+                    a{"h a – h a"}
+                    h{"h–h a"}
+                }
+                hm{
+                    a{"h:mm a – h:mm a"}
+                    h{"h:mm–h:mm a"}
+                    m{"h:mm–h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a – h:mm a v"}
+                    h{"h:mm–h:mm a v"}
+                    m{"h:mm–h:mm a v"}
+                }
+                hv{
+                    a{"h a – h a v"}
+                    h{"h–h a v"}
+                }
+                y{
+                    y{"y–y G"}
+                }
+                yM{
+                    M{"MM.y – MM.y G"}
+                    y{"MM.y – MM.y G"}
+                }
+                yMEd{
+                    M{"E, dd.MM.y – E, dd.MM.y G"}
+                    d{"E, dd.MM.y – E, dd.MM.y G"}
+                    y{"E, dd.MM.y – E, dd.MM.y G"}
+                }
+                yMMM{
+                    M{"MMM–MMM y G"}
+                    y{"MMM y – MMM y G"}
+                }
+                yMMMEd{
+                    M{"E, d MMM – E, d MMM, y G"}
+                    d{"E, d – E, d MMM y G"}
+                    y{"E, d MMM, y – E, d MMM, y G"}
+                }
+                yMMMM{
+                    M{"MM – MM.y G"}
+                    y{"MM.y – MM.y G"}
+                }
+                yMMMd{
+                    M{"dd MM – dd MM, y"}
+                    d{"d – d MMM, y"}
+                    y{"dd MMM, y – d MMM, y"}
+                }
+                yMd{
+                    M{"dd.MM.y – dd.MM.y G"}
+                    d{"dd.MM.y – dd.MM.y G"}
+                    y{"dd.MM.y – dd.MM.y G"}
+                }
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "AM",
+                "PM",
+            }
+            AmPmMarkersAbbr{
+                "AM",
+                "PM",
+            }
+            AmPmMarkersNarrow{
+                "a",
+                "p",
+            }
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, dd MMMM, y",
+                "d MMMM, y",
+                "d MMM. y",
+                "dd.MM.yy",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            appendItems{
+                Timezone{"{0} {1}"}
+            }
+            availableFormats{
+                Bh{"h B"}
+                Bhm{"h:mm B"}
+                Bhms{"h:mm:ss B"}
+                E{"ccc"}
+                EBhm{"E h:mm B"}
+                EBhms{"E h:mm:ss B"}
+                EHm{"E, HH:mm"}
+                EHms{"E, HH:mm:ss"}
+                Ed{"d E"}
+                Ehm{"E, h:mm a"}
+                Ehms{"E, h:mm:ss a"}
+                Gy{"y G"}
+                GyMMM{"MMM. y G"}
+                GyMMMEd{"E, d MMM. y G"}
+                GyMMMd{"d MMM. y G"}
+                H{"HH"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                Hmsv{"HH:mm:ss v"}
+                Hmv{"HH:mm v"}
+                M{"L"}
+                MEd{"E, d.M"}
+                MMM{"LLL"}
+                MMMEd{"E, d MMM"}
+                MMMMW{
+                    one{"MMMMს კვირა W"}
+                    other{"MMMMს კვირა W"}
+                }
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                Md{"d.M"}
+                d{"d"}
+                h{"h a"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                hmsv{"h:mm:ss a v"}
+                hmv{"h:mm a v"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M.y"}
+                yMEd{"E, d.M.y"}
+                yMMM{"MMM. y"}
+                yMMMEd{"E, d MMM. y"}
+                yMMMM{"MMMM, y"}
+                yMMMd{"d MMM. y"}
+                yMd{"d.M.y"}
+                yQQQ{"QQQ, y"}
+                yQQQQ{"QQQQ, y"}
+                yw{
+                    one{"კვირა w, Y"}
+                    other{"კვირა w, Y"}
+                }
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "კვი",
+                        "ორშ",
+                        "სამ",
+                        "ოთხ",
+                        "ხუთ",
+                        "პარ",
+                        "შაბ",
+                    }
+                    narrow{
+                        "კ",
+                        "ო",
+                        "ს",
+                        "ო",
+                        "ხ",
+                        "პ",
+                        "შ",
+                    }
+                    short{
+                        "კვ",
+                        "ორ",
+                        "სმ",
+                        "ოთ",
+                        "ხთ",
+                        "პრ",
+                        "შბ",
+                    }
+                    wide{
+                        "კვირა",
+                        "ორშაბათი",
+                        "სამშაბათი",
+                        "ოთხშაბათი",
+                        "ხუთშაბათი",
+                        "პარასკევი",
+                        "შაბათი",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "კვი",
+                        "ორშ",
+                        "სამ",
+                        "ოთხ",
+                        "ხუთ",
+                        "პარ",
+                        "შაბ",
+                    }
+                    narrow{
+                        "კ",
+                        "ო",
+                        "ს",
+                        "ო",
+                        "ხ",
+                        "პ",
+                        "შ",
+                    }
+                    short{
+                        "კვ",
+                        "ორ",
+                        "სმ",
+                        "ოთ",
+                        "ხთ",
+                        "პრ",
+                        "შბ",
+                    }
+                    wide{
+                        "კვირა",
+                        "ორშაბათი",
+                        "სამშაბათი",
+                        "ოთხშაბათი",
+                        "ხუთშაბათი",
+                        "პარასკევი",
+                        "შაბათი",
+                    }
+                }
+            }
+            dayPeriod{
+                format{
+                    abbreviated{
+                        afternoon1{"ნაშუადღ."}
+                        evening1{"საღ."}
+                        midnight{"შუაღამეს"}
+                        morning1{"დილ."}
+                        night1{"ღამ."}
+                        noon{"შუადღ."}
+                    }
+                    narrow{
+                        afternoon1{"ნაშუადღ."}
+                        evening1{"საღ."}
+                        midnight{"შუაღამეს"}
+                        morning1{"დილ."}
+                        night1{"ღამ."}
+                        noon{"შუადღ."}
+                    }
+                    wide{
+                        afternoon1{"ნაშუადღევს"}
+                        evening1{"საღამოს"}
+                        midnight{"შუაღამეს"}
+                        morning1{"დილით"}
+                        night1{"ღამით"}
+                        noon{"შუადღეს"}
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        afternoon1{"ნაშუადღევი"}
+                        am{"AM"}
+                        evening1{"საღამო"}
+                        midnight{"შუაღამე"}
+                        morning1{"დილა"}
+                        night1{"ღამე"}
+                        noon{"შუადღე"}
+                        pm{"PM"}
+                    }
+                    narrow{
+                        afternoon1{"ნაშუადღევი"}
+                        am{"AM"}
+                        evening1{"საღამო"}
+                        midnight{"შუაღამე"}
+                        morning1{"დილა"}
+                        night1{"ღამე"}
+                        noon{"შუადღე"}
+                        pm{"PM"}
+                    }
+                    wide{
+                        afternoon1{"ნაშუადღევი"}
+                        am{"AM"}
+                        evening1{"საღამო"}
+                        midnight{"შუაღამე"}
+                        morning1{"დილა"}
+                        night1{"ღამე"}
+                        noon{"შუადღე"}
+                        pm{"PM"}
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "ძვ. წ.",
+                    "ახ. წ.",
+                }
+                abbreviated%variant{
+                    "ჩვ. ერამდე",
+                    "ჩვ. ერა",
+                }
+                wide{
+                    "ძველი წელთაღრიცხვით",
+                    "ახალი წელთაღრიცხვით",
+                }
+                wide%variant{
+                    "ჩვენს ერამდე",
+                    "ჩვენი ერა",
+                }
+            }
+            intervalFormats{
+                Bh{
+                    B{"h B – h B"}
+                    h{"h–h B"}
+                }
+                Bhm{
+                    B{"h:mm B – h:mm B"}
+                    h{"h:mm–h:mm B"}
+                    m{"h:mm–h:mm B"}
+                }
+                Gy{
+                    G{"G y – G y"}
+                    y{"G y–y"}
+                }
+                H{
+                    H{"HH–HH"}
+                }
+                Hm{
+                    H{"HH:mm–HH:mm"}
+                    m{"HH:mm–HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm–HH:mm v"}
+                    m{"HH:mm–HH:mm v"}
+                }
+                Hv{
+                    H{"HH–HH v"}
+                }
+                M{
+                    M{"M–M"}
+                }
+                MEd{
+                    M{"E, dd.MM. – E, dd.MM."}
+                    d{"E, dd.MM. – E, dd.MM."}
+                }
+                MMM{
+                    M{"MMM–MMM"}
+                }
+                MMMEd{
+                    M{"E, d MMM – E, d MMM"}
+                    d{"E, d – E, d MMM"}
+                }
+                MMMd{
+                    M{"d MMM – d MMM"}
+                    d{"d–d MMM"}
+                }
+                Md{
+                    M{"dd.MM. – dd.MM."}
+                    d{"dd.MM. – dd.MM."}
+                }
+                d{
+                    d{"d–d"}
+                }
+                fallback{"{0} – {1}"}
+                h{
+                    a{"h a – h a"}
+                    h{"h–h a"}
+                }
+                hm{
+                    a{"h:mm a – h:mm a"}
+                    h{"h:mm–h:mm a"}
+                    m{"h:mm–h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a – h:mm a v"}
+                    h{"h:mm–h:mm a v"}
+                    m{"h:mm–h:mm a v"}
+                }
+                hv{
+                    a{"h a – h a v"}
+                    h{"h–h a v"}
+                }
+                y{
+                    y{"y–y"}
+                }
+                yM{
+                    M{"MM.y – MM.y"}
+                    y{"MM.y – MM.y"}
+                }
+                yMEd{
+                    M{"E, dd.MM.y – E, dd.MM.y"}
+                    d{"E, dd.MM.y – E, dd.MM.y"}
+                    y{"E, dd.MM.y – E, dd.MM.y"}
+                }
+                yMMM{
+                    M{"MMM–MMM y"}
+                    y{"MMM y – MMM y"}
+                }
+                yMMMEd{
+                    M{"E, d MMM. – E, d MMM. y"}
+                    d{"E, d MMM. – E, d MMM. y"}
+                    y{"E, d MMM. y – E, d MMM. y"}
+                }
+                yMMMM{
+                    M{"MMMM – MMMM, y"}
+                    y{"MMMM y – MMMM y"}
+                }
+                yMMMd{
+                    M{"dd MMM. – dd MMM. y"}
+                    d{"d–d MMM, y"}
+                    y{"dd MMM. y – d MMM. y"}
+                }
+                yMd{
+                    M{"dd.MM.y – dd.MM.y"}
+                    d{"dd.MM.y – dd.MM.y"}
+                    y{"dd.MM.y – dd.MM.y"}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "იან",
+                        "თებ",
+                        "მარ",
+                        "აპრ",
+                        "მაი",
+                        "ივნ",
+                        "ივლ",
+                        "აგვ",
+                        "სექ",
+                        "ოქტ",
+                        "ნოე",
+                        "დეკ",
+                    }
+                    narrow{
+                        "ი",
+                        "თ",
+                        "მ",
+                        "ა",
+                        "მ",
+                        "ი",
+                        "ი",
+                        "ა",
+                        "ს",
+                        "ო",
+                        "ნ",
+                        "დ",
+                    }
+                    wide{
+                        "იანვარი",
+                        "თებერვალი",
+                        "მარტი",
+                        "აპრილი",
+                        "მაისი",
+                        "ივნისი",
+                        "ივლისი",
+                        "აგვისტო",
+                        "სექტემბერი",
+                        "ოქტომბერი",
+                        "ნოემბერი",
+                        "დეკემბერი",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "იან",
+                        "თებ",
+                        "მარ",
+                        "აპრ",
+                        "მაი",
+                        "ივნ",
+                        "ივლ",
+                        "აგვ",
+                        "სექ",
+                        "ოქტ",
+                        "ნოე",
+                        "დეკ",
+                    }
+                    narrow{
+                        "ი",
+                        "თ",
+                        "მ",
+                        "ა",
+                        "მ",
+                        "ი",
+                        "ი",
+                        "ა",
+                        "ს",
+                        "ო",
+                        "ნ",
+                        "დ",
+                    }
+                    wide{
+                        "იანვარი",
+                        "თებერვალი",
+                        "მარტი",
+                        "აპრილი",
+                        "მაისი",
+                        "ივნისი",
+                        "ივლისი",
+                        "აგვისტო",
+                        "სექტემბერი",
+                        "ოქტომბერი",
+                        "ნოემბერი",
+                        "დეკემბერი",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "I კვ.",
+                        "II კვ.",
+                        "III კვ.",
+                        "IV კვ.",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "I კვარტალი",
+                        "II კვარტალი",
+                        "III კვარტალი",
+                        "IV კვარტალი",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "I კვ.",
+                        "II კვ.",
+                        "III კვ.",
+                        "IV კვ.",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "I კვარტალი",
+                        "II კვარტალი",
+                        "III კვარტალი",
+                        "IV კვარტალი",
+                    }
+                }
+            }
+        }
+    }
+    characterLabel{
+        activities{"აქტივობები"}
+        african_scripts{"აფრიკული დამწერლობები"}
+        american_scripts{"ამერიკული დამწერლობები"}
+        animal{"ცხოველი"}
+        animals_nature{"ფლორა და ფაუნა"}
+        arrows{"ისრები"}
+        body{"სხეული"}
+        box_drawing{"ჩარჩოების სიმბოლოები"}
+        braille{"ბრაილი"}
+        building{"შენობა"}
+        bullets_stars{"ბურთულები/ვარსკვლავები"}
+        consonantal_jamo{"Jamo-თანხმოვნები"}
+        currency_symbols{"ვალუტის სიმბოლოები"}
+        dash_connector{"ტირე/დეფისი"}
+        digits{"ციფრები"}
+        dingbats{"ტიპოგრაფიული ორნამენტები"}
+        divination_symbols{"გაყოფის სიმბოლოები"}
+        downwards_arrows{"ქვემოთ მიმართული ისრები"}
+        downwards_upwards_arrows{"ქვემოთ და ზემოთ მიმართული ისრები"}
+        east_asian_scripts{"აღმოსავლეთ აზიური დამწერლობები"}
+        emoji{"Emoji"}
+        european_scripts{"ევროპული დამწერლობები"}
+        female{"ქალი"}
+        flag{"დროშა"}
+        flags{"დროშები"}
+        food_drink{"სასმელი და საჭმელი"}
+        format{"ფორმატირება"}
+        format_whitespace{"ფორმატირება და შორისები"}
+        full_width_form_variant{"ნახევარი სიგანის ფორმის ვარიანტები"}
+        geometric_shapes{"გეომეტრიული ფიგურები"}
+        half_width_form_variant{"ნახევარი სიგანის ფორმის ვარიანტები"}
+        han_characters{"ჩინური სიმბოლოები"}
+        han_radicals{"იეროგლიფური გასაღებები"}
+        hanja{"ჰანჯა"}
+        hanzi_simplified{"გამარტივებული ჩინური იეროგლიფები"}
+        hanzi_traditional{"ტრადიციული ჩინური იეროგლიფები"}
+        heart{"გული"}
+        historic_scripts{"ისტორიული დამწერლობები"}
+        ideographic_desc_characters{"იეროგლიფების აღმწერი სიმბოლოები"}
+        japanese_kana{"კანა"}
+        kanbun{"კანბუნი"}
+        kanji{"კანჯი"}
+        keycap{"კლავიში"}
+        leftwards_arrows{"მარცხნივ მიმართული ისრები"}
+        leftwards_rightwards_arrows{"მარცხნივ და მარჯვნივ მიმართული ისრები"}
+        letterlike_symbols{"ასოების მაგვარი ნიშნები"}
+        limited_use{"შეზღუდული გამოყენების"}
+        male{"კაცი"}
+        math_symbols{"მათემატიკური ნიშნები"}
+        middle_eastern_scripts{"ახლო აღმოსავლეთის დამწერლობები"}
+        miscellaneous{"სხვადასხვა"}
+        modern_scripts{"თანამედროვე დამწერლობები"}
+        modifier{"მოდიფიკატორი"}
+        musical_symbols{"მუსიკალური სიმბოლოები"}
+        nature{"ბუნება"}
+        nonspacing{"დაცული შორისები"}
+        numbers{"ციფრები"}
+        objects{"ობიექტები"}
+        other{"სხვა"}
+        paired{"დაწყვილებული"}
+        person{"ადამიანი"}
+        phonetic_alphabet{"ფონეტიკური ანბანი"}
+        pictographs{"პიკტოგრამები"}
+        place{"ადგილი"}
+        plant{"მცენარე"}
+        punctuation{"სასვენი ნიშები"}
+        rightwards_arrows{"მერჯვნივ მიმართული ისრები"}
+        sign_standard_symbols{"ნიშნები/სტანდარტული სიმბოლოები"}
+        small_form_variant{"პატარა ფორმის ვარიანტები"}
+        smiley{"სიცილაკი"}
+        smileys_people{"სიცილაკები და ხალხი"}
+        south_asian_scripts{"სამხრეთ აზიური დამწერლობები"}
+        southeast_asian_scripts{"სამხრეთ-აღმოსავლეთ აზიური დამწერლობები"}
+        spacing{"დაშორება"}
+        sport{"სპორტი"}
+        symbols{"სიმბოლოები"}
+        technical_symbols{"ტექნიკური სიმბოლოები"}
+        tone_marks{"ტონის ნიშნები"}
+        travel{"მოგზაურობა"}
+        travel_places{"მოგზაურობა და ადგილები"}
+        upwards_arrows{"ზემოთ მიმართული ისრები"}
+        variant_forms{"ფორმის ვარიანტები"}
+        vocalic_jamo{"Jamo-ხმოვნები"}
+        weather{"ამინდი"}
+        western_asian_scripts{"დასავლეთ აზიური დამწერლობები"}
+        whitespace{"შორისები"}
+    }
+    delimiters{
+        alternateQuotationEnd{"»"}
+        alternateQuotationStart{"«"}
+        quotationEnd{"“"}
+        quotationStart{"„"}
+    }
+    fields{
+        day{
+            dn{"დღე"}
+            relative{
+                "-1"{"გუშინ"}
+                "-2"{"გუშინწინ"}
+                "0"{"დღეს"}
+                "1"{"ხვალ"}
+                "2"{"ზეგ"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} დღეში"}
+                    other{"{0} დღეში"}
+                }
+                past{
+                    one{"{0} დღის წინ"}
+                    other{"{0} დღის წინ"}
+                }
+            }
+        }
+        day-narrow{
+            dn{"დღე"}
+            relative{
+                "-1"{"გუშინ"}
+                "-2"{"გუშინწინ"}
+                "0"{"დღეს"}
+                "1"{"ხვალ"}
+                "2"{"ზეგ"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} დღეში"}
+                    other{"{0} დღეში"}
+                }
+                past{
+                    one{"{0} დღის წინ"}
+                    other{"{0} დღის წინ"}
+                }
+            }
+        }
+        day-short{
+            dn{"დღე"}
+            relative{
+                "-1"{"გუშინ"}
+                "-2"{"გუშინწინ"}
+                "0"{"დღეს"}
+                "1"{"ხვალ"}
+                "2"{"ზეგ"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} დღეში"}
+                    other{"{0} დღეში"}
+                }
+                past{
+                    one{"{0} დღის წინ"}
+                    other{"{0} დღის წინ"}
+                }
+            }
+        }
+        dayOfYear{
+            dn{"წლის დღე"}
+        }
+        dayOfYear-narrow{
+            dn{"წლ. დღე"}
+        }
+        dayOfYear-short{
+            dn{"წლ. დღე"}
+        }
+        dayperiod{
+            dn{"დღის ნახევარი"}
+        }
+        dayperiod-narrow{
+            dn{"დღ. ნახევარი"}
+        }
+        dayperiod-short{
+            dn{"დღ. ნახევარი"}
+        }
+        era{
+            dn{"ეპოქა"}
+        }
+        era-narrow{
+            dn{"ეპოქა"}
+        }
+        era-short{
+            dn{"ეპოქა"}
+        }
+        fri{
+            relative{
+                "-1"{"გასულ პარასკევს"}
+                "0"{"ამ პარასკევს"}
+                "1"{"მომავალ პარასკევს"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} პარასკევში"}
+                    other{"{0} პარასკევში"}
+                }
+                past{
+                    one{"{0} პარასკევის წინ"}
+                    other{"{0} პარასკევის წინ"}
+                }
+            }
+        }
+        fri-narrow{
+            relative{
+                "-1"{"წინა პა."}
+                "0"{"ამ პა."}
+                "1"{"მომ. პა."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} პარასკევში"}
+                    other{"{0} პარასკევში"}
+                }
+                past{
+                    one{"{0} პარასკევის წინ"}
+                    other{"{0} პარასკევის წინ"}
+                }
+            }
+        }
+        fri-short{
+            relative{
+                "-1"{"წინა პარ."}
+                "0"{"ამ პარ."}
+                "1"{"მომ. პარ."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} პარასკევში"}
+                    other{"{0} პარასკევში"}
+                }
+                past{
+                    one{"{0} პარასკევის წინ"}
+                    other{"{0} პარასკევის წინ"}
+                }
+            }
+        }
+        hour{
+            dn{"საათი"}
+            relative{
+                "0"{"ამ საათში"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} საათში"}
+                    other{"{0} საათში"}
+                }
+                past{
+                    one{"{0} საათის წინ"}
+                    other{"{0} საათის წინ"}
+                }
+            }
+        }
+        hour-narrow{
+            dn{"სთ."}
+            relativeTime{
+                future{
+                    one{"{0} საათში"}
+                    other{"{0} საათში"}
+                }
+                past{
+                    one{"{0} სთ წინ"}
+                    other{"{0} სთ წინ"}
+                }
+            }
+        }
+        hour-short{
+            dn{"სთ."}
+            relativeTime{
+                future{
+                    one{"{0} საათში"}
+                    other{"{0} საათში"}
+                }
+                past{
+                    one{"{0} სთ წინ"}
+                    other{"{0} სთ წინ"}
+                }
+            }
+        }
+        minute{
+            dn{"წუთი"}
+            relative{
+                "0"{"ამ წუთში"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} წუთში"}
+                    other{"{0} წუთში"}
+                }
+                past{
+                    one{"{0} წუთის წინ"}
+                    other{"{0} წუთის წინ"}
+                }
+            }
+        }
+        minute-narrow{
+            dn{"წთ."}
+            relativeTime{
+                future{
+                    one{"{0} წუთში"}
+                    other{"{0} წუთში"}
+                }
+                past{
+                    one{"{0} წთ წინ"}
+                    other{"{0} წთ წინ"}
+                }
+            }
+        }
+        minute-short{
+            dn{"წთ."}
+            relativeTime{
+                future{
+                    one{"{0} წუთში"}
+                    other{"{0} წუთში"}
+                }
+                past{
+                    one{"{0} წთ წინ"}
+                    other{"{0} წთ წინ"}
+                }
+            }
+        }
+        mon{
+            relative{
+                "-1"{"გასულ ორშაბათს"}
+                "0"{"ამ ორშაბათს"}
+                "1"{"მომავალ ორშაბათს"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ორშაბათში"}
+                    other{"{0} ორშაბათში"}
+                }
+                past{
+                    one{"{0} ორშაბათის წინ"}
+                    other{"{0} ორშაბათის წინ"}
+                }
+            }
+        }
+        mon-narrow{
+            relative{
+                "-1"{"გას. ორ."}
+                "0"{"ამ ორ."}
+                "1"{"მომ. ორ."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ორშაბათში"}
+                    other{"{0} ორშაბათში"}
+                }
+                past{
+                    one{"{0} ორშაბათის წინ"}
+                    other{"{0} ორშაბათის წინ"}
+                }
+            }
+        }
+        mon-short{
+            relative{
+                "-1"{"წინა ორშ."}
+                "0"{"ამ ორშ."}
+                "1"{"მომ. ორშ."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ორშაბათში"}
+                    other{"{0} ორშაბათში"}
+                }
+                past{
+                    one{"{0} ორშაბათის წინ"}
+                    other{"{0} ორშაბათის წინ"}
+                }
+            }
+        }
+        month{
+            dn{"თვე"}
+            relative{
+                "-1"{"გასულ თვეს"}
+                "0"{"ამ თვეში"}
+                "1"{"მომავალ თვეს"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} თვეში"}
+                    other{"{0} თვეში"}
+                }
+                past{
+                    one{"{0} თვის წინ"}
+                    other{"{0} თვის წინ"}
+                }
+            }
+        }
+        month-narrow{
+            dn{"თვე"}
+            relative{
+                "-1"{"გასულ თვეს"}
+                "0"{"ამ თვეში"}
+                "1"{"მომავალ თვეს"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} თვეში"}
+                    other{"{0} თვეში"}
+                }
+                past{
+                    one{"{0} თვის წინ"}
+                    other{"{0} თვის წინ"}
+                }
+            }
+        }
+        month-short{
+            dn{"თვე"}
+            relative{
+                "-1"{"გასულ თვეს"}
+                "0"{"ამ თვეში"}
+                "1"{"მომავალ თვეს"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} თვეში"}
+                    other{"{0} თვეში"}
+                }
+                past{
+                    one{"{0} თვის წინ"}
+                    other{"{0} თვის წინ"}
+                }
+            }
+        }
+        quarter{
+            dn{"კვარტალი"}
+            relative{
+                "-1"{"გასულ კვარტალში"}
+                "0"{"ამ კვარტალში"}
+                "1"{"შემდეგ კვარტალში"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} კვარტალში"}
+                    other{"{0} კვარტალში"}
+                }
+                past{
+                    one{"{0} კვარტალის წინ"}
+                    other{"{0} კვარტალის წინ"}
+                }
+            }
+        }
+        quarter-narrow{
+            dn{"კვარტ."}
+            relativeTime{
+                future{
+                    one{"{0} კვარტალში"}
+                    other{"{0} კვარტალში"}
+                }
+                past{
+                    one{"{0} კვარტ. წინ"}
+                    other{"{0} კვარტ. წინ"}
+                }
+            }
+        }
+        quarter-short{
+            dn{"კვარტ."}
+            relativeTime{
+                future{
+                    one{"{0} კვარტალში"}
+                    other{"{0} კვარტალში"}
+                }
+                past{
+                    one{"{0} კვარტ. წინ"}
+                    other{"{0} კვარტ. წინ"}
+                }
+            }
+        }
+        sat{
+            relative{
+                "-1"{"გასულ შაბათს"}
+                "0"{"ამ შაბათს"}
+                "1"{"მომავალ შაბათს"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} შაბათში"}
+                    other{"{0} შაბათში"}
+                }
+                past{
+                    one{"{0} შაბათის წინ"}
+                    other{"{0} შაბათის წინ"}
+                }
+            }
+        }
+        sat-narrow{
+            relative{
+                "-1"{"წინა შბ."}
+                "0"{"ამ შა."}
+                "1"{"მომ. შბ."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} შაბათში"}
+                    other{"{0} შაბათში"}
+                }
+                past{
+                    one{"{0} შაბათის წინ"}
+                    other{"{0} შაბათის წინ"}
+                }
+            }
+        }
+        sat-short{
+            relative{
+                "-1"{"წინა შაბ."}
+                "0"{"ამ შაბ."}
+                "1"{"მომ. შაბ."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} შაბათში"}
+                    other{"{0} შაბათში"}
+                }
+                past{
+                    one{"{0} შაბათის წინ"}
+                    other{"{0} შაბათის წინ"}
+                }
+            }
+        }
+        second{
+            dn{"წამი"}
+            relative{
+                "0"{"ახლა"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} წამში"}
+                    other{"{0} წამში"}
+                }
+                past{
+                    one{"{0} წამის წინ"}
+                    other{"{0} წამის წინ"}
+                }
+            }
+        }
+        second-narrow{
+            dn{"წმ."}
+            relativeTime{
+                future{
+                    one{"{0} წამში"}
+                    other{"{0} წამში"}
+                }
+                past{
+                    one{"{0} წმ წინ"}
+                    other{"{0} წმ წინ"}
+                }
+            }
+        }
+        second-short{
+            dn{"წმ."}
+            relativeTime{
+                future{
+                    one{"{0} წამში"}
+                    other{"{0} წამში"}
+                }
+                past{
+                    one{"{0} წმ წინ"}
+                    other{"{0} წმ წინ"}
+                }
+            }
+        }
+        sun{
+            relative{
+                "-1"{"გასულ კვირას"}
+                "0"{"ამ კვირას"}
+                "1"{"მომავალ კვირას"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} კვირაში"}
+                    other{"{0} კვირაში"}
+                }
+                past{
+                    one{"{0} კვირის წინ"}
+                    other{"{0} კვირი წინ"}
+                }
+            }
+        }
+        sun-narrow{
+            relative{
+                "-1"{"გასულ კვირას"}
+                "0"{"ამ კვირას"}
+                "1"{"მომავალ კვირას"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} კვირაში"}
+                    other{"{0} კვირაში"}
+                }
+                past{
+                    one{"{0} კვირის წინ"}
+                    other{"{0} კვირი წინ"}
+                }
+            }
+        }
+        sun-short{
+            relative{
+                "-1"{"გასულ კვირას"}
+                "0"{"ამ კვირას"}
+                "1"{"მომავალ კვირას"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} კვირაში"}
+                    other{"{0} კვირაში"}
+                }
+                past{
+                    one{"{0} კვირის წინ"}
+                    other{"{0} კვირის წინ"}
+                }
+            }
+        }
+        thu{
+            relative{
+                "-1"{"გასულ ხუთშაბათს"}
+                "0"{"ამ ხუთშაბათს"}
+                "1"{"მომავალ ხუთშაბათს"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ხუთშაბათში"}
+                    other{"{0} ხუთშაბათში"}
+                }
+                past{
+                    one{"{0} ხუთშაბათის წინ"}
+                    other{"{0} ხუთშაბათის წინ"}
+                }
+            }
+        }
+        thu-narrow{
+            relative{
+                "-1"{"წინა ხთ."}
+                "0"{"ამ ხთ."}
+                "1"{"მომ. ხთ."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ხუთშაბათში"}
+                    other{"{0} ხუთშაბათში"}
+                }
+                past{
+                    one{"{0} ხუთშაბათის წინ"}
+                    other{"{0} ხუთშაბათის წინ"}
+                }
+            }
+        }
+        thu-short{
+            relative{
+                "-1"{"წინა ხუთ."}
+                "0"{"ამ ხუთ."}
+                "1"{"მომ. ხუთ."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ხუთშაბათში"}
+                    other{"{0} ხუთშაბათში"}
+                }
+                past{
+                    one{"{0} ხუთშაბათის წინ"}
+                    other{"{0} ხუთშაბათის წინ"}
+                }
+            }
+        }
+        tue{
+            relative{
+                "-1"{"გასულ სამშაბათს"}
+                "0"{"ამ სამშაბათს"}
+                "1"{"მომავალ სამშაბათს"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} სამშაბათში"}
+                    other{"{0} სამშაბათში"}
+                }
+                past{
+                    one{"{0} სამშაბათის წინ"}
+                    other{"{0} სამშაბათის წინ"}
+                }
+            }
+        }
+        tue-narrow{
+            relative{
+                "-1"{"წინ სა."}
+                "0"{"ამ სა."}
+                "1"{"მომმ სა."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} სამშაბათში"}
+                    other{"{0} სამშაბათში"}
+                }
+                past{
+                    one{"{0} სამშაბათის წინ"}
+                    other{"{0} სამშაბათის წინ"}
+                }
+            }
+        }
+        tue-short{
+            relative{
+                "-1"{"წინა სამ."}
+                "0"{"ამ სამ."}
+                "1"{"მომ. სამ."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} სამშაბათში"}
+                    other{"{0} სამშაბათში"}
+                }
+                past{
+                    one{"{0} სამშაბათის წინ"}
+                    other{"{0} სამშაბათის წინ"}
+                }
+            }
+        }
+        wed{
+            relative{
+                "-1"{"გასულ ოთხშაბათს"}
+                "0"{"ამ ოთხშაბათს"}
+                "1"{"მომავალ ოთხშაბათს"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ოთხშაბათში"}
+                    other{"{0} ოთხშაბათში"}
+                }
+                past{
+                    one{"{0} ოთხშაბათის წინ"}
+                    other{"{0} ოთხშაბათის წინ"}
+                }
+            }
+        }
+        wed-narrow{
+            relative{
+                "-1"{"წინა ოთ."}
+                "0"{"ამ ოთ."}
+                "1"{"მომ. ოთ."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ოთხშაბათში"}
+                    other{"{0} ოთხშაბათში"}
+                }
+                past{
+                    one{"{0} ოთხშაბათის წინ"}
+                    other{"{0} ოთხშაბათის წინ"}
+                }
+            }
+        }
+        wed-short{
+            relative{
+                "-1"{"წინა ოთხ."}
+                "0"{"ამ ოთხ."}
+                "1"{"მომ. ოთხ."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ოთხშაბათში"}
+                    other{"{0} ოთხშაბათში"}
+                }
+                past{
+                    one{"{0} ოთხშაბათის წინ"}
+                    other{"{0} ოთხშაბათის წინ"}
+                }
+            }
+        }
+        week{
+            dn{"კვირა"}
+            relative{
+                "-1"{"გასულ კვირაში"}
+                "0"{"ამ კვირაში"}
+                "1"{"მომავალ კვირაში"}
+            }
+            relativePeriod{"{0}-ის კვირაში"}
+            relativeTime{
+                future{
+                    one{"{0} კვირაში"}
+                    other{"{0} კვირაში"}
+                }
+                past{
+                    one{"{0} კვირის წინ"}
+                    other{"{0} კვირის წინ"}
+                }
+            }
+        }
+        week-narrow{
+            dn{"კვ."}
+            relative{
+                "-1"{"გასულ კვირაში"}
+                "0"{"ამ კვირაში"}
+                "1"{"მომავალ კვირაში"}
+            }
+            relativePeriod{"{0}-ის კვირაში"}
+            relativeTime{
+                future{
+                    one{"{0} კვირაში"}
+                    other{"{0} კვირაში"}
+                }
+                past{
+                    one{"{0} კვირის წინ"}
+                    other{"{0} კვირის წინ"}
+                }
+            }
+        }
+        week-short{
+            dn{"კვ."}
+            relative{
+                "-1"{"გასულ კვირაში"}
+                "0"{"ამ კვირაში"}
+                "1"{"მომავალ კვირაში"}
+            }
+            relativePeriod{"{0}-ის კვირაში"}
+            relativeTime{
+                future{
+                    one{"{0} კვირაში"}
+                    other{"{0} კვირაში"}
+                }
+                past{
+                    one{"{0} კვ. წინ"}
+                    other{"{0} კვ. წინ"}
+                }
+            }
+        }
+        weekOfMonth{
+            dn{"თვის კვირა"}
+        }
+        weekOfMonth-narrow{
+            dn{"თვ. კვირა"}
+        }
+        weekOfMonth-short{
+            dn{"თვ. კვირა"}
+        }
+        weekday{
+            dn{"კვირის დღე"}
+        }
+        weekday-narrow{
+            dn{"კვ. დღე"}
+        }
+        weekday-short{
+            dn{"კვ. დღე"}
+        }
+        weekdayOfMonth{
+            dn{"კვირის დღე თვეში"}
+        }
+        weekdayOfMonth-narrow{
+            dn{"კვ. დღე თვეში"}
+        }
+        weekdayOfMonth-short{
+            dn{"კვ. დღე თვეში"}
+        }
+        year{
+            dn{"წელი"}
+            relative{
+                "-1"{"გასულ წელს"}
+                "0"{"ამ წელს"}
+                "1"{"მომავალ წელს"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} წელიწადში"}
+                    other{"{0} წელიწადში"}
+                }
+                past{
+                    one{"{0} წლის წინ"}
+                    other{"{0} წლის წინ"}
+                }
+            }
+        }
+        year-narrow{
+            dn{"წ."}
+            relative{
+                "-1"{"გასულ წელს"}
+                "0"{"ამ წელს"}
+                "1"{"მომავალ წელს"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} წელში"}
+                    other{"{0} წელში"}
+                }
+                past{
+                    one{"{0} წლის წინ"}
+                    other{"{0} წლის წინ"}
+                }
+            }
+        }
+        year-short{
+            dn{"წ."}
+            relative{
+                "-1"{"გასულ წელს"}
+                "0"{"ამ წელს"}
+                "1"{"მომავალ წელს"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} წელში"}
+                    other{"{0} წელში"}
+                }
+                past{
+                    one{"{0} წლის წინ"}
+                    other{"{0} წლის წინ"}
+                }
+            }
+        }
+        zone{
+            dn{"დროის სარტყელი"}
+        }
+        zone-narrow{
+            dn{"დროის სარტყ."}
+        }
+        zone-short{
+            dn{"დროის სარტყ."}
+        }
+    }
+    listPattern{
+        or{
+            2{"{0} ან {1}"}
+            end{"{0} ან {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        standard{
+            2{"{0} და {1}"}
+            end{"{0} და {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        standard-short{
+            2{"{0} და {1}"}
+            end{"{0} და {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        unit{
+            2{"{0}, {1}"}
+            end{"{0}, {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        unit-narrow{
+            2{"{0}, {1}"}
+            end{"{0}, {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        unit-short{
+            2{"{0}, {1}"}
+            end{"{0}, {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+    }
+    measurementSystemNames{
+        UK{"ბრიტანული"}
+        US{"ამერიკული"}
+        metric{"მეტრული"}
+    }
+}

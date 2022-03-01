@@ -1,0 +1,79 @@
+License information for hyph_sh.dic:
+
+This file is based on the TeX hyphenation patterns distributed under the
+LaTeX Project Public License (LPPL) as part of the hyph-utf8 package.
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+At the time this file was first modified, a complete, unmodified copy of
+the LPPL Work was available from:
+http://tug.org/svn/texhyphen/trunk/hyph-utf8/tex/generic/hyph-utf8/patterns/?pathrev=580
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+Portions of this file were originally made available under the following license
+(combined information from hyph-sh-{latn,cyrl}.lic.txt in the original work):
+
+Serbian hyphenation patterns in {Latin,Cyrillic} script
+
+(more info about the licence to be added later)
+
+% This is `hyph-sh-{latn,cyrl}.tex' version 2.02 as of Jun 22, 2008.
+%
+% Copyright (C) 1990,2008 Dejan Muhamedagi\'c
+%               [hyphen patterns for Serbocroatian language]
+%
+%%% ====================================================================
+%%%  @TeX-hyphen-file{
+%%%     author          = "Dejan Muhamedagi\'c",
+%%%     version         = "2.02",
+%%%     date            = "22 June 2008",
+%%%     filename        = "hyph-sh-{latn,cyrl}.tex",
+%%%     email           = "dejan@hello-penguin.com",
+%%%     codetable       = "UTF-8",
+%%%     keywords        = "TeX, hyphen, serbocroatian, {latinic,cyrillic}",
+%%%     supported       = "yes",
+%%%     abstract        = "Serbocroatian hyphenation patterns",
+%%%     docstring       = "This file contains the hyphenation patterns
+%%%                        for the Serbocroatian language and the
+%%%                        {latinic,cyrillic} alphabet."
+%%%  }
+%%% ====================================================================
+%
+% Just the usual stuff:  This work is published without any
+% waranty, express or implied. And in hope that it will be useful.
+%
+% This file can be redistributed and/or modified under the terms
+% of the LaTeX Project Public License distributed from CTAN
+% archives in directory macros/latex/base/lppl.txt; either
+% version 1 of the License, or any later version.
+%
+% NB:
+% It is allowed to leave one character at the end of the row.
+% If you find that awkward these patterns will work well with
+% \lefthyphenmin=2.
+% \lefthyphenmin=1 \righthyphenmin=2
+%
+% Osnovni skup paterna dobijen je na osnovu fonolo\v skih osobina
+% srpskohrvatskog jezika.  Pravila i preporuke sam preuzeo iz:
+%
+% M. Pe\v sikan, J. Jerkovi\'c, M. Pi\v zurica:
+% Pravopis srpskoga jezika
+% Matica srpska, Novi Sad, 1995.
+%
+% U drugom delu se nalaze izuzeci od fonolo\v skih pravila bazirani
+% na boljem psiholo\v skom prelomu re\v ci. Izradjen je kori\v s\'cenjem
+% slede\'cih re\v cnika:
+%
+% Re\v cnik srpskohrvatskoga knji\v zevnog jezika
+% Matica srpska, Matica hrvatska, Novi Sad, Zagreb, 1967-1976.
+%
+% Milan Vujaklija: Leksikon stranih re\v ci i izraza
+% Prosveta, Beograd, 1992.
+%
+% -----------------------------------------------------------------
+%

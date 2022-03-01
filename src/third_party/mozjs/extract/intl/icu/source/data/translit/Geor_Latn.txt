@@ -1,0 +1,60 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Geor_Latn.txt
+# Generated from CLDR
+#
+
+# long items moved up
+წ ↔ tsʼ ;
+კ ↔ kʼ ;
+პ ↔ pʼ ;
+ჟ ↔ zh ;
+ტ ↔ tʼ ;
+ღ ↔ gh ;
+ყ ↔ qʼ ;
+შ ↔ sh ;
+ჭ ↔ chʼ ;
+ჩ ↔ ch ;
+ც ↔ ts ;
+ძ ↔ dz ;
+ხ ↔ kh ;
+ჳ ↔ ŭi ;
+# normal order
+ა ↔ a ;
+ბ ↔ b ;
+გ ↔ g ;
+დ ↔ d ;
+ე ↔ e ;
+ვ ↔ v ;
+ზ ↔ z ;
+თ ↔ t ;
+ი ↔ i ;
+#კ ↔ kʼ ;
+ლ ↔ l ;
+მ ↔ m ;
+ნ ↔ n ;
+ო ↔ o ;
+#პ ↔ pʼ ;
+#ჟ ↔ zh ;
+რ ↔ r ;
+ს ↔ s ;
+#ტ ↔ tʼ ;
+უ ↔ u ;
+ფ ↔ p ;
+ქ ↔ k ;
+#ღ ↔ gh ;
+#ყ ↔ qʼ ;
+#შ ↔ sh ;
+#ჩ ↔ ch ;
+#ც ↔ ts ;
+#ძ ↔ dz ;
+#წ ↔ tsʼ ;
+#ჭ ↔ chʼ ;
+#ხ ↔ kh ;
+ჯ ↔ j ;
+ჰ ↔ h ;
+#ჳ ↔ ŭi ;
+ჴ ↔ q ;
+

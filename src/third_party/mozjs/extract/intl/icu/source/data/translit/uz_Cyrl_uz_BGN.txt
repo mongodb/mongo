@@ -1,0 +1,268 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: uz_Cyrl_uz_BGN.txt
+# Generated from CLDR
+#
+
+#
+########################################################################
+# BGN/PCGN 1979 System
+#
+# The BGN/PCGN system for Uzbek was designed for use in
+# romanizing names written in the Uzbek alphabet.
+# The Uzbek alphabet contains four letters not present
+# in the Russian alphabet: Ўў, Ққ, Ғғ, and Ҳҳ.
+#
+# The Uzbek Alphabet as defined by the BGN (Page 107):
+#
+#   АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЪЬЭЮЯЎҚҒҲ
+#   абвгдеёжзийклмнопрстуфхцчшъьэюяўқғҳ
+#
+# Originally prepared by Michael Everson <everson@evertype.com>
+########################################################################
+#
+# MINIMAL FILTER: Uzbek-Latin
+#
+:: [АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЪЬЭЮЯЎҚҒҲабвгдеёжзийклмнопрстуфхцчшъьэюяўқғҳ] ;
+:: NFD (NFC) ;
+#
+#
+########################################################################
+#
+########################################################################
+#
+# Define All Transformation Variables
+#
+########################################################################
+#
+$prime  = ʹ ;
+$doublePrime = ʺ ;
+$upperConsonants = [БВГДЖЗЙКЛМНПРСТФХЦЧШЪЬҚҒҲ] ;
+$lowerConsonants = [бвгджзйклмнпрстфхцчшъьқғҳ] ;
+$consonants = [$upperConsonants $lowerConsonants] ;
+$upperVowels = [АЕЁИОУЭЮЯЎ] ;
+$lowerVowels = [аеёиоуэюяў] ;
+$vowels = [$upperVowels $lowerVowels] ;
+$lower = [$lowerConsonants $lowerVowels] ;
+#
+#
+# Use this $wordBoundary until bug 2034 is fixed in ICU:
+# http://bugs.icu-project.org/cgi-bin/icu-bugs/transliterate?id=2034;expression=boundary;user=guest
+#
+$wordBoundary =  [^[:L:][:M:][:N:]] ;
+#
+#
+########################################################################
+#
+########################################################################
+#
+# Rules moved to front to avoid masking
+#
+########################################################################
+#
+$lowerVowels ы → y ;
+$upperVowels[Ыы] → Y ;
+#
+#
+########################################################################
+#
+# Start of Alphabetic Transformations
+#
+########################################################################
+#
+А → A ; # CYRILLIC CAPITAL LETTER A
+а → a ; # CYRILLIC SMALL LETTER A
+Б → B ; # CYRILLIC CAPITAL LETTER BE
+б → b ; # CYRILLIC SMALL LETTER BE
+В → W ; # CYRILLIC CAPITAL LETTER VE
+в → w ; # CYRILLIC SMALL LETTER VE
+#
+#
+########################################################################
+#
+# BGN Page 108 Rule 2
+#
+# The character sequences гҳ, кҳ, сҳ, and цҳ may be romanized g·h,
+# k·h, s·h, and ts·h in order to differentiate those romanizations from
+# the digraphs gh, kh, sh, and the letter sequence tsh, which are used
+# to render the chаracters г, х, ш, and the character sequence тш.
+#
+########################################################################
+#
+ГҲ → G·H ; # CYRILLIC CAPITAL LETTER GHE
+Гҳ → G·h ; # CYRILLIC CAPITAL LETTER GHE
+гҳ → g·h ; # CYRILLIC SMALL LETTER GHE
+Г → G ; # CYRILLIC CAPITAL LETTER GHE
+г → g ; # CYRILLIC SMALL LETTER GHE
+#
+#
+########################################################################
+#
+# End Rule 2
+#
+########################################################################
+#
+Д → D ; # CYRILLIC CAPITAL LETTER DE
+д → d ; # CYRILLIC SMALL LETTER DE
+#
+#
+########################################################################
+#
+# BGN Page 108 Rule 1:
+#
+# The character e should be romanized ye initially, after the vowel
+# characters a, e, ё, и, о, у, э, ю, я, and ў, and after й and ь.
+# In all other instances, it should be romanized e.
+#
+########################################################################
+#
+Е}[$upperVowels [ЙЬ]] → YE ; # CYRILLIC CAPITAL LETTER IE
+Е}[$lowerVowels [йь]] → Ye ; # CYRILLIC CAPITAL LETTER IE
+$wordBoundary{Е → Ye ; # CYRILLIC CAPITAL LETTER IE
+Е →  E ; # CYRILLIC CAPITAL LETTER IE
+е}[$upperVowels $lowerVowels [ЙйЬь]] → ye ; # CYRILLIC SMALL LETTER IE
+$wordBoundary{е → ye ; # CYRILLIC SMALL LETTER IE
+е →  e ; # CYRILLIC SMALL LETTER IE
+#
+#
+########################################################################
+#
+# End of Rule 1
+#
+########################################################################
+#
+Ё} $lower → Yo ; # CYRILLIC CAPITAL LETTER IO
+Ё → YO ; # CYRILLIC CAPITAL LETTER IO
+ё → yo ; # CYRILLIC SMALL LETTER IO
+Ж → J ; # CYRILLIC CAPITAL LETTER ZHE
+ж → j ; # CYRILLIC SMALL LETTER ZHE
+З → Z ; # CYRILLIC CAPITAL LETTER ZE
+з → z ; # CYRILLIC SMALL LETTER ZE
+И → I ; # CYRILLIC CAPITAL LETTER I
+и → i ; # CYRILLIC SMALL LETTER I
+Й → Y ; # CYRILLIC CAPITAL LETTER I
+й → y ; # CYRILLIC SMALL LETTER I
+#
+#
+########################################################################
+#
+# BGN Page 108 Rule 2
+#
+# кҳ becomes k·h
+#
+########################################################################
+#
+КҲ → K·H ; # CYRILLIC CAPITAL LETTER KA
+Кҳ → K·h ; # CYRILLIC CAPITAL LETTER KA
+кҳ → k·h ; # CYRILLIC SMALL LETTER KA
+К → K ; # CYRILLIC CAPITAL LETTER KA
+к → k ; # CYRILLIC SMALL LETTER KA
+#
+#
+########################################################################
+#
+# End Rule 2
+#
+########################################################################
+#
+Л → L ; # CYRILLIC CAPITAL LETTER EL
+л → l ; # CYRILLIC SMALL LETTER EL
+М → M ; # CYRILLIC CAPITAL LETTER EM
+м → m ; # CYRILLIC SMALL LETTER EM
+Н → N ; # CYRILLIC CAPITAL LETTER EN
+н → n ; # CYRILLIC SMALL LETTER EN
+О → O ; # CYRILLIC CAPITAL LETTER O
+о → o ; # CYRILLIC SMALL LETTER O
+П → P ; # CYRILLIC CAPITAL LETTER PE
+п → p ; # CYRILLIC SMALL LETTER PE
+Р → R ; # CYRILLIC CAPITAL LETTER ER
+р → r ; # CYRILLIC SMALL LETTER ER
+#
+#
+########################################################################
+#
+# BGN Page 108 Rule 2
+#
+# сҳ becomes s·h
+#
+########################################################################
+#
+СҲ → S·H ; # CYRILLIC CAPITAL LETTER ES
+Сҳ → S·h ; # CYRILLIC CAPITAL LETTER ES
+сҳ → s·h ; # CYRILLIC SMALL LETTER ES
+С → S ; # CYRILLIC CAPITAL LETTER ES
+с → s ; # CYRILLIC SMALL LETTER ES
+#
+#
+########################################################################
+#
+# End Rule 2
+#
+########################################################################
+#
+Т → T ; # CYRILLIC CAPITAL LETTER TE
+т → t ; # CYRILLIC SMALL LETTER TE
+У → Ū ; # CYRILLIC CAPITAL LETTER U
+у → ū ; # CYRILLIC SMALL LETTER U
+Ф → F ; # CYRILLIC CAPITAL LETTER EF
+ф → f ; # CYRILLIC SMALL LETTER EF
+Х} $lower → Kh ; # CYRILLIC CAPITAL LETTER HA
+Х → KH ; # CYRILLIC CAPITAL LETTER HA
+х → kh ; # CYRILLIC SMALL LETTER HA
+#
+#
+########################################################################
+#
+# BGN Page 108 Rule 2
+#
+# цҳ becomes ts·h
+#
+########################################################################
+#
+ЦҲ → TS·H ; # CYRILLIC CAPITAL LETTER GHE
+Цҳ → Ts·h ; # CYRILLIC CAPITAL LETTER GHE
+цҳ → ts·h ; # CYRILLIC SMALL LETTER GHE
+Ц} $lower → Ts ; # CYRILLIC CAPITAL LETTER TSE
+Ц → TS ; # CYRILLIC CAPITAL LETTER TSE
+ц → ts ; # CYRILLIC SMALL LETTER TSE
+#
+#
+########################################################################
+#
+# End Rule 2
+#
+########################################################################
+#
+Ч} $lower → Ch ; # CYRILLIC CAPITAL LETTER CHE
+Ч → CH ; # CYRILLIC CAPITAL LETTER CHE
+ч → ch ; # CYRILLIC SMALL LETTER CHE
+Ш} $lower → Sh ; # CYRILLIC CAPITAL LETTER SHA
+Ш → SH ; # CYRILLIC CAPITAL LETTER SHA
+ш → sh ; # CYRILLIC SMALL LETTER SHA
+Ъ → $prime ; # CYRILLIC CAPITAL LETTER HARD SIGN
+ъ → $prime ; # CYRILLIC SMALL LETTER HARD SIGN
+Ь → $prime ; # CYRILLIC CAPITAL LETTER SOFT SIGN
+ь → $prime ; # CYRILLIC SMALL LETTER SOFT SIGN
+Э → e ; # CYRILLIC CAPITAL LETTER E
+э → e ; # CYRILLIC SMALL LETTER E
+Ю} $lower → Yu ; # CYRILLIC CAPITAL LETTER YU
+Ю → YU ; # CYRILLIC CAPITAL LETTER YU
+ю → yu ; # CYRILLIC SMALL LETTER YU
+Я} $lower → Ya ; # CYRILLIC CAPITAL LETTER YA
+Я → YA ; # CYRILLIC CAPITAL LETTER YA
+я → ya ; # CYRILLIC SMALL LETTER YA
+Ў → Ŭ ; # CYRILLIC CAPITAL LETTER SHORT U
+ў → ŭ ; # CYRILLIC SMALL LETTER SHORT U
+Қ → Q ; # CYRILLIC CAPITAL LETTER KA WITH DESCENDER
+қ → q ; # CYRILLIC SMALL LETTER KA WITH DESCENDER
+Ғ} $lower → Gh ; # CYRILLIC CAPITAL LETTER GHE WITH STROKE
+Ғ → GH ; # CYRILLIC CAPITAL LETTER GHE WITH STROKE
+ғ → gh ; # CYRILLIC SMALL LETTER GHE WITH STROKE
+Ҳ → H ; # CYRILLIC CAPITAL LETTER HA WITH DESCENDER
+ҳ → h ; # CYRILLIC SMALL LETTER HA WITH DESCENDER
+#
+#
+########################################################################
+

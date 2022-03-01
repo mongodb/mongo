@@ -1,0 +1,101 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_MX{
+    %%Parent{"es_419"}
+    zoneStrings{
+        "Africa:Bujumbura"{
+            ec{"Buyumbura"}
+        }
+        "Africa:Conakry"{
+            ec{"Conakri"}
+        }
+        "Africa:Dar_es_Salaam"{
+            ec{"Dar es-Salaam"}
+        }
+        "Africa:Khartoum"{
+            ec{"Jartum"}
+        }
+        "America:Fort_Nelson"{
+            ec{"Fort Nelson"}
+        }
+        "America:Rio_Branco"{
+            ec{"Rio Branco"}
+        }
+        "America:St_Thomas"{
+            ec{"St. Thomas"}
+        }
+        "Asia:Almaty"{
+            ec{"Almatý"}
+        }
+        "Asia:Aqtobe"{
+            ec{"Aktobé"}
+        }
+        "Asia:Atyrau"{
+            ec{"Atirau"}
+        }
+        "Pacific:Honolulu"{
+            ec{"Honolulu"}
+        }
+        "Pacific:Wake"{
+            ec{"Wake"}
+        }
+        "meta:Apia"{
+            ld{"hora de verano de Apia"}
+            lg{"hora de Apia"}
+            ls{"hora estándar de Apia"}
+        }
+        "meta:Christmas"{
+            ls{"hora de la isla de Navidad"}
+        }
+        "meta:Cocos"{
+            ls{"hora de las Islas Cocos"}
+        }
+        "meta:Cook"{
+            ld{"hora de verano media de las Islas Cook"}
+            lg{"hora de las Islas Cook"}
+            ls{"hora estándar de las Islas Cook"}
+        }
+        "meta:Easter"{
+            ld{"hora de verano de la isla de Pascua"}
+            lg{"hora de Isla de Pascua"}
+            ls{"hora estándar de la isla de Pascua"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"hora de verano de Europa oriental"}
+            lg{"hora de Europa oriental"}
+            ls{"hora estándar de Europa oriental"}
+        }
+        "meta:Europe_Further_Eastern"{
+            ls{"hora del extremo oriental de Europa"}
+        }
+        "meta:Europe_Western"{
+            ld{"hora de verano de Europa occidental"}
+            lg{"hora de Europa occidental"}
+            ls{"hora estándar de Europa occidental"}
+        }
+        "meta:Falkland"{
+            ld{"hora de verano de Islas Malvinas"}
+            lg{"hora de Islas Malvinas"}
+            ls{"hora estándar de Islas Malvinas"}
+        }
+        "meta:Gilbert_Islands"{
+            ls{"hora de las Islas Gilbert"}
+        }
+        "meta:Macquarie"{
+            ls{"hora de la isla Macquarie"}
+        }
+        "meta:Marshall_Islands"{
+            ls{"hora de las Islas Marshall"}
+        }
+        "meta:Pyongyang"{
+            ls{"hora de Pyongyang"}
+        }
+        "meta:Solomon"{
+            ls{"hora de las Islas Salomón"}
+        }
+        "meta:Wake"{
+            ls{"hora de la Isla Wake"}
+        }
+    }
+}

@@ -1,0 +1,119 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ee{
+    units{
+        duration{
+            day{
+                dnam{"ŋkekewo"}
+                one{"ŋkeke {0}"}
+                other{"ŋkeke {0}"}
+            }
+            hour{
+                dnam{"gaƒoƒowo"}
+                one{"gaƒoƒo {0}"}
+                other{"gaƒoƒo {0}"}
+            }
+            minute{
+                dnam{"aɖabaƒoƒowo"}
+                one{"aɖabaƒoƒo {0}"}
+                other{"aɖabaƒoƒo {0}"}
+            }
+            month{
+                dnam{"ɣletiwo"}
+                one{"ɣleti {0}"}
+                other{"ɣleti {0}"}
+            }
+            second{
+                one{"sekend {0} wo"}
+                other{"sekend {0} wo"}
+            }
+            week{
+                dnam{"kɔsiɖawo"}
+                one{"kɔsiɖa {0}"}
+                other{"kɔsiɖa {0}"}
+            }
+            year{
+                dnam{"ƒewo"}
+                one{"ƒe {0}"}
+                other{"ƒe {0}"}
+            }
+        }
+    }
+    unitsNarrow{
+        duration{
+            day{
+                dnam{"ŋkeke"}
+                one{"ŋkeke {0}"}
+                other{"ŋkeke {0}"}
+            }
+            hour{
+                dnam{"gaƒoƒo"}
+                one{"gaƒoƒo {0}"}
+                other{"gaƒoƒo {0}"}
+            }
+            minute{
+                dnam{"aɖabaƒoƒo"}
+                one{"a {0}"}
+                other{"a {0}"}
+            }
+            month{
+                dnam{"ɣletiwo"}
+                one{"ɣleti {0}"}
+                other{"ɣleti {0}"}
+            }
+            second{
+                one{"s {0}"}
+                other{"s {0}"}
+            }
+            week{
+                dnam{"kɔsiɖa"}
+                one{"kɔsiɖa {0}"}
+                other{"kɔsiɖa {0}"}
+            }
+            year{
+                dnam{"ƒe"}
+                one{"ƒe {0}"}
+                other{"ƒe {0}"}
+            }
+        }
+    }
+    unitsShort{
+        duration{
+            day{
+                dnam{"ŋkekewo"}
+                one{"ŋkeke {0}"}
+                other{"ŋkeke {0}"}
+            }
+            hour{
+                dnam{"gaƒoƒowo"}
+                one{"gaƒoƒo {0}"}
+                other{"gaƒoƒo {0}"}
+            }
+            minute{
+                dnam{"aɖabaƒoƒowo"}
+                one{"aɖabaƒoƒo {0}"}
+                other{"aɖabaƒoƒo {0}"}
+            }
+            month{
+                dnam{"ɣletiwo"}
+                one{"ɣleti {0}"}
+                other{"ɣleti {0}"}
+            }
+            second{
+                one{"sekend {0}"}
+                other{"sekend {0}"}
+            }
+            week{
+                dnam{"kɔsiɖawo"}
+                one{"kɔsiɖa {0}"}
+                other{"kɔsiɖa {0}"}
+            }
+            year{
+                dnam{"ƒewo"}
+                one{"ƒe {0}"}
+                other{"ƒe {0}"}
+            }
+        }
+    }
+}

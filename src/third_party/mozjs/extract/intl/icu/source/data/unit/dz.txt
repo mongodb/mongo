@@ -1,0 +1,30 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+dz{
+    units{
+        duration{
+            day{
+                other{"ཉིན་ཞག་ {0}"}
+            }
+            hour{
+                other{"ཆུ་ཚོད་ {0}"}
+            }
+            minute{
+                other{"སྐར་མ་ {0}"}
+            }
+            month{
+                other{"ཟླཝ་ {0}"}
+            }
+            second{
+                other{"སྐར་ཆ་ {0}"}
+            }
+            week{
+                other{"བངུན་ཕྲག་ {0}"}
+            }
+            year{
+                other{"ལོ་འཁོར་ {0}"}
+            }
+        }
+    }
+}

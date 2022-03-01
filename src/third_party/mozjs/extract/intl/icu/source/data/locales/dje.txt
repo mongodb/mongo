@@ -1,0 +1,264 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+dje{
+    AuxExemplarCharacters{"[v]"}
+    ExemplarCharacters{"[a ã b c d e ẽ f g h i j k l m n ɲ ŋ o õ p q r s š t u w x y z ž]"}
+    ExemplarCharactersIndex{"[A B C D E F G H I J K L M N Ɲ Ŋ O P Q R S T U W X Y Z]"}
+    ExemplarCharactersNumbers{"[  \\- ‑ . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"#,##0.00¤"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"#,##0%"}
+            }
+            symbols{
+                decimal{"."}
+                group{" "}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE d MMMM y G",
+                "d MMMM y G",
+                "d MMM, y G",
+                "d/M/y GGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Ed{"E d"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E d/M"}
+                MMM{"LLL"}
+                MMMEd{"E d MMM"}
+                MMMd{"d MMM"}
+                Md{"d/M"}
+                d{"d"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                ms{"m:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E d/M/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E d MMM y"}
+                yMMMd{"d MMM y"}
+                yMd{"d/M/y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "Subbaahi",
+                "Zaarikay b",
+            }
+            AmPmMarkersAbbr{
+                "Subbaahi",
+                "Zaarikay b",
+            }
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE d MMMM y",
+                "d MMMM y",
+                "d MMM, y",
+                "d/M/y",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Ed{"E d"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E d/M"}
+                MMM{"LLL"}
+                MMMEd{"E d MMM"}
+                MMMd{"d MMM"}
+                Md{"d/M"}
+                d{"d"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                ms{"m:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E d/M/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E d MMM y"}
+                yMMMd{"d MMM y"}
+                yMd{"d/M/y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Alh",
+                        "Ati",
+                        "Ata",
+                        "Ala",
+                        "Alm",
+                        "Alz",
+                        "Asi",
+                    }
+                    wide{
+                        "Alhadi",
+                        "Atinni",
+                        "Atalaata",
+                        "Alarba",
+                        "Alhamisi",
+                        "Alzuma",
+                        "Asibti",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "H",
+                        "T",
+                        "T",
+                        "L",
+                        "M",
+                        "Z",
+                        "S",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "IJ",
+                    "IZ",
+                }
+                wide{
+                    "Isaa jine",
+                    "Isaa zamanoo",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Žan",
+                        "Fee",
+                        "Mar",
+                        "Awi",
+                        "Me",
+                        "Žuw",
+                        "Žuy",
+                        "Ut",
+                        "Sek",
+                        "Okt",
+                        "Noo",
+                        "Dee",
+                    }
+                    wide{
+                        "Žanwiye",
+                        "Feewiriye",
+                        "Marsi",
+                        "Awiril",
+                        "Me",
+                        "Žuweŋ",
+                        "Žuyye",
+                        "Ut",
+                        "Sektanbur",
+                        "Oktoobur",
+                        "Noowanbur",
+                        "Deesanbur",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "Ž",
+                        "F",
+                        "M",
+                        "A",
+                        "M",
+                        "Ž",
+                        "Ž",
+                        "U",
+                        "S",
+                        "O",
+                        "N",
+                        "D",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "A1",
+                        "A2",
+                        "A3",
+                        "A4",
+                    }
+                    wide{
+                        "Arrubu 1",
+                        "Arrubu 2",
+                        "Arrubu 3",
+                        "Arrubu 4",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"Zaari"}
+            relative{
+                "-1"{"Bi"}
+                "0"{"Hõo"}
+                "1"{"Suba"}
+            }
+        }
+        dayperiod{
+            dn{"Subbaahi/Zaarikay banda"}
+        }
+        era{
+            dn{"Zaman"}
+        }
+        hour{
+            dn{"Guuru"}
+        }
+        minute{
+            dn{"Miniti"}
+        }
+        month{
+            dn{"Handu"}
+        }
+        second{
+            dn{"Miti"}
+        }
+        week{
+            dn{"Hebu"}
+        }
+        year{
+            dn{"Jiiri"}
+        }
+        zone{
+            dn{"Leerazuu"}
+        }
+    }
+}

@@ -1,0 +1,14 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: nl_Title.txt
+# Generated from CLDR
+#
+
+# Copyright (C) 2011-2013, Apple Inc. and others. All Rights Reserved.
+# Special titlecasing for Dutch initial "ij".
+::Any-Title();
+# Fix up Ij at the beginning of a "word" (per Any-Title, notUAX #29)
+[:^WB=ALetter:] [:WB=Extend:]* [[:WB=MidLetter:][:WB=MidNumLet:]]? { Ij } → IJ ;
+

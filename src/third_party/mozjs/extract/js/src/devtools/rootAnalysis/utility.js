@@ -1,6 +1,26 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 /* -*- indent-tabs-mode: nil; js-indent-level: 4 -*- */
 
 "use strict";
+
+loadRelativeToScript('dumpCFG.js');
+
+// Limit inset bits - each call edge may carry a set of 'limit' bits, saying eg
+// that the edge takes place within a scope where GC is suppressed, for
+// example.
+var LIMIT_NONE = 0;
+var LIMIT_CANNOT_GC = 1;
+var LIMIT_ALL = 1;
+
+// The traversal algorithms we run will recurse into children if you change any
+// limit bit to zero. Use all bits set to maximally limited, including
+// additional bits that all just mean "unvisited", so that the first time we
+// see a node with this limit, we're guaranteed to turn at least one bit off
+// and thereby keep going.
+var LIMIT_UNVISITED = 0xffff;
 
 // gcc appends this to mangled function names for "not in charge"
 // constructors/destructors.
@@ -263,6 +283,7 @@ function addToKeyedList(collection, key, entry)
     if (!(key in collection))
         collection[key] = [];
     collection[key].push(entry);
+    return collection[key];
 }
 
 function loadTypeInfo(filename)

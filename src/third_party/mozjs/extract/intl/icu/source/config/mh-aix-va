@@ -1,0 +1,160 @@
+## -*-makefile-*-
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+## Aix-specific setup (for Visual Age 5+)
+## Copyright (c) 1999-2010, International Business Machines Corporation and
+## others. All Rights Reserved.
+
+## Commands to generate dependency files
+GEN_DEPS.c=	$(CC) -E -M $(DEFS) $(CPPFLAGS)
+GEN_DEPS.cc=	$(CXX) -E -M $(DEFS) $(CPPFLAGS)
+
+# -qroconst make the strings readonly, which is usually the default.
+#           This helps in the data library,
+# -qproto assumes all functions are prototyped (for optimization)
+# -qrtti turns on compiler RTTI, required beginning with ICU 4.6
+CFLAGS += -qproto -qroconst -qlanglvl=extended
+CXXFLAGS += -qproto -qroconst -qrtti -qlanglvl=extended0x
+
+# If you readd this line, you must change the SO value
+#LDFLAGS += -brtl
+
+ifeq ($(UCLN_NO_AUTO_CLEANUP),0)
+# set up init point.
+UCLN_FINI =  ucln_fini$(TARGET_STUBNAME)_$(SO_TARGET_VERSION_MAJOR)$(ICULIBSUFFIXCNAME)
+CPPFLAGS_FINI = -DUCLN_FINI=$(UCLN_FINI)
+LDFLAGS_FINI = -binitfini::$(UCLN_FINI)
+
+CPPFLAGSICUUC += $(CPPFLAGS_FINI)
+LDFLAGSICUUC += $(LDFLAGS_FINI)
+CPPFLAGSICUIO += $(CPPFLAGS_FINI)
+LDFLAGSICUIO += $(LDFLAGS_FINI)
+CPPFLAGSICUI18N += $(CPPFLAGS_FINI)
+LDFLAGSICUI18N += $(LDFLAGS_FINI)
+CPPFLAGSCTESTFW += $(CPPFLAGS_FINI)
+LDFLAGSCTESTFW += $(LDFLAGS_FINI)
+
+# ICUUC, ICUIO, ICUI18N, CTESTFW
+endif
+
+## We need to delete things prior to linking, or else we'll get
+## SEVERE ERROR: output file in use ..  on AIX. 
+## But, shell script version should NOT delete target as we don't
+## have $@ in that context.  (SH = only shell script, icu-config)
+AIX_PREDELETE=rm -f $@ ; 
+#SH# AIX_PREDELETE=
+
+## Commands to link
+## We need to use the C++ linker, even when linking C programs, since
+##  our libraries contain C++ code (C++ static init not called)
+LINK.c=		$(AIX_PREDELETE) $(CXX) $(CXXFLAGS) $(LDFLAGS)
+LINK.cc=	$(AIX_PREDELETE) $(CXX) $(CXXFLAGS) $(LDFLAGS)
+
+## Commands to make a shared library
+## -G means -berok -brtl -bnortllib -bnosymbolic -bnoautoexp
+## -bh:8 means halt on errors or worse.  We don't display warnings about
+##      duplicate inline symbols.
+SHLIB.c=	$(AIX_PREDELETE) $(CXX) -qmkshrobj -G $(LDFLAGS)
+SHLIB.cc=	$(AIX_PREDELETE) $(CXX) -qmkshrobj -G $(LDFLAGS)
+
+## Compiler switch to embed a runtime search path
+LD_RPATH=	-I
+LD_RPATH_PRE=	
+
+## Environment variable to set a runtime search path
+LDLIBRARYPATH_ENVVAR = LIBPATH
+
+# The following is for Makefile.inc's use.
+ICULIBSUFFIX_VERSION = $(LIB_VERSION_MAJOR)
+
+# this one is for icudefs.mk's use
+ifeq ($(ENABLE_SHARED),YES)
+SO_TARGET_VERSION_SUFFIX = $(SO_TARGET_VERSION_MAJOR)
+endif
+
+LD_SONAME = 
+
+## The type of assembly needed when pkgdata is used for generating shared libraries.
+GENCCODE_ASSEMBLY=-a xlc
+
+## Shared object suffix
+SOBJ=	so
+# without the -brtl option, the library names use .a. AIX is funny that way.
+SO=	a
+## Non-shared intermediate object suffix
+STATIC_O = o
+
+## Override Versioned target for a shared library.
+FINAL_SO_TARGET=  $(basename $(SO_TARGET))$(SO_TARGET_VERSION).$(SO)
+MIDDLE_SO_TARGET= $(basename $(SO_TARGET))$(SO_TARGET_VERSION_MAJOR).$(SO)
+SHARED_OBJECT = $(notdir $(FINAL_SO_TARGET:.$(SO)=.$(SOBJ)))
+SHARED_OBJECT_NO_VERSION=  $(basename $(SO_TARGET)).$(SOBJ)
+
+## Build archive from shared object
+%.a : %.so
+	ln -f $< $(SHARED_OBJECT_NO_VERSION) 
+	$(AIX_PREDELETE) $(AR) $(ARFLAGS) $@ $(SHARED_OBJECT_NO_VERSION)
+	rm -f $(SHARED_OBJECT_NO_VERSION)
+$(LIBDIR)/%.a : %.so
+	ln -f $< $(SHARED_OBJECT_NO_VERSION) 
+	$(AIX_PREDELETE) $(AR) $(ARFLAGS) $@ $(SHARED_OBJECT_NO_VERSION)
+	rm -f $(SHARED_OBJECT_NO_VERSION)
+
+## Build import list from export list
+%.e : %.exp
+	@echo "Building an import list for $<"
+	@$(SHELL) -ec "echo '#! $*.a($*.so)' | cat - $< > $@"
+
+## Compilation rules
+%.$(STATIC_O): $(srcdir)/%.c
+	$(COMPILE.c) $(STATICCPPFLAGS) $(STATICCFLAGS) -o $@ $<
+%.o: $(srcdir)/%.c
+	$(COMPILE.c) $(DYNAMICCPPFLAGS) $(DYNAMICCFLAGS) -o $@ $<
+
+
+## C++ compilation rules.
+
+# This causes escapesrc to be built before other ICU targets.
+NEED_ESCAPING=YES
+
+ifneq ($(SKIP_ESCAPING),)
+# no escaping - bootstrap
+%.o: $(srcdir)/%.cpp
+	$(COMPILE.cc) $(DYNAMICCPPFLAGS) $(DYNAMICCXXFLAGS) -o $@ $<
+else
+# convert *.cpp files to _*.cpp with \u / \U escaping
+CLEANFILES += _*.cpp
+
+# the actual escaping
+_%.cpp: $(srcdir)/%.cpp
+	@$(BINDIR)/escapesrc$(EXEEXT) $< $@
+
+# compilation for static obj
+%.$(STATIC_O): _%.cpp
+	$(COMPILE.cc) $(STATICCPPFLAGS) $(STATICCXXFLAGS) -o $@ $<
+# compilation for dynamic obj
+%.o: _%.cpp
+	$(COMPILE.cc) $(DYNAMICCPPFLAGS) $(DYNAMICCXXFLAGS) -o $@ $<
+endif
+
+## Dependency rules
+%.d : %.u
+	@$(SHELL) -ec 'cat $<  \
+		| sed '\''s/\($*\)\.o[ :]*/\1.o $@ : /g'\'' > $@; \
+		[ -s $@ ] || rm -f $@ ; rm -f $<'
+
+%.u : $(srcdir)/%.c
+	@echo "generating dependency information for $<"
+	@$(GEN_DEPS.c) $< > /dev/null
+
+%.u : $(srcdir)/%.cpp
+	@echo "generating dependency information for $<"
+	@$(GEN_DEPS.cc) $< > /dev/null
+
+## Versioned libraries rules
+%$(SO_TARGET_VERSION_MAJOR).$(SO): %$(SO_TARGET_VERSION).$(SO)
+	$(RM) $@ && ln -s ${*F}$(SO_TARGET_VERSION).$(SO) $@
+%.$(SO): %$(SO_TARGET_VERSION).$(SO)
+	$(RM) $@ && ln -s ${*F}$(SO_TARGET_VERSION).$(SO) $@
+
+## End Aix-specific setup

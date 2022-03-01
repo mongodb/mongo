@@ -17,28 +17,22 @@
 
 namespace mozilla {
 
-template<class T, class C>
+template <class T, class C>
 class SplayTree;
 
-template<typename T>
-class SplayTreeNode
-{
-public:
-  template<class A, class B>
+template <typename T>
+class SplayTreeNode {
+ public:
+  template <class A, class B>
   friend class SplayTree;
 
-  SplayTreeNode()
-    : mLeft(nullptr)
-    , mRight(nullptr)
-    , mParent(nullptr)
-  {}
+  SplayTreeNode() : mLeft(nullptr), mRight(nullptr), mParent(nullptr) {}
 
-private:
+ private:
   T* mLeft;
   T* mRight;
   T* mParent;
 };
-
 
 /**
  * Class which represents a splay tree.
@@ -50,23 +44,16 @@ private:
  * compare(const T&, const T&) method ordering the elements. The compare
  * method must be free from side effects.
  */
-template<typename T, class Comparator>
-class SplayTree
-{
+template <typename T, class Comparator>
+class SplayTree {
   T* mRoot;
 
-public:
-  constexpr SplayTree()
-    : mRoot(nullptr)
-  {}
+ public:
+  constexpr SplayTree() : mRoot(nullptr) {}
 
-  bool empty() const
-  {
-    return !mRoot;
-  }
+  bool empty() const { return !mRoot; }
 
-  T* find(const T& aValue)
-  {
+  T* find(const T& aValue) {
     if (empty()) {
       return nullptr;
     }
@@ -76,8 +63,7 @@ public:
     return Comparator::compare(aValue, *last) == 0 ? last : nullptr;
   }
 
-  void insert(T* aValue)
-  {
+  void insert(T* aValue) {
     MOZ_ASSERT(!find(*aValue), "Duplicate elements are not allowed.");
 
     if (!mRoot) {
@@ -92,8 +78,7 @@ public:
 
   T* findOrInsert(const T& aValue);
 
-  T* remove(const T& aValue)
-  {
+  T* remove(const T& aValue) {
     T* last = lookup(aValue);
     MOZ_ASSERT(last, "This tree must contain the element being removed.");
     MOZ_ASSERT(Comparator::compare(aValue, *last) == 0);
@@ -148,11 +133,12 @@ public:
       mRoot->mRight->mParent = mRoot;
     }
 
+    last->mLeft = nullptr;
+    last->mRight = nullptr;
     return last;
   }
 
-  T* removeMin()
-  {
+  T* removeMin() {
     MOZ_ASSERT(mRoot, "No min to remove!");
 
     T* min = mRoot;
@@ -163,18 +149,14 @@ public:
   }
 
   // For testing purposes only.
-  void checkCoherency()
-  {
-    checkCoherency(mRoot, nullptr);
-  }
+  void checkCoherency() { checkCoherency(mRoot, nullptr); }
 
-private:
+ private:
   /**
    * Returns the node in this comparing equal to |aValue|, or a node just
    * greater or just less than |aValue| if there is no such node.
    */
-  T* lookup(const T& aValue)
-  {
+  T* lookup(const T& aValue) {
     MOZ_ASSERT(!empty());
 
     T* node = mRoot;
@@ -193,8 +175,7 @@ private:
     return parent;
   }
 
-  void finishInsertion(T* aLast, int32_t aCmp, T* aNew)
-  {
+  void finishInsertion(T* aLast, int32_t aCmp, T* aNew) {
     MOZ_ASSERT(aCmp, "Nodes shouldn't be equal!");
 
     T** parentPointer = (aCmp < 0) ? &aLast->mLeft : &aLast->mRight;
@@ -210,8 +191,7 @@ private:
    * the rotations in this fashion preserves the amortized balancing of
    * the tree.
    */
-  void splay(T* aNode)
-  {
+  void splay(T* aNode) {
     MOZ_ASSERT(aNode);
 
     while (aNode != mRoot) {
@@ -235,8 +215,7 @@ private:
     }
   }
 
-  void rotate(T* aNode)
-  {
+  void rotate(T* aNode) {
     // Rearrange nodes so that aNode becomes the parent of its current
     // parent, while preserving the sortedness of the tree.
     T* parent = aNode->mParent;
@@ -273,8 +252,7 @@ private:
     }
   }
 
-  T* checkCoherency(T* aNode, T* aMinimum)
-  {
+  T* checkCoherency(T* aNode, T* aMinimum) {
     if (mRoot) {
       MOZ_RELEASE_ASSERT(!mRoot->mParent);
     }
@@ -304,10 +282,8 @@ private:
   void operator=(const SplayTree&) = delete;
 };
 
-template<typename T, class Comparator>
-T*
-SplayTree<T, Comparator>::findOrInsert(const T& aValue)
-{
+template <typename T, class Comparator>
+T* SplayTree<T, Comparator>::findOrInsert(const T& aValue) {
   if (!mRoot) {
     mRoot = new T(aValue);
     return mRoot;
@@ -324,6 +300,6 @@ SplayTree<T, Comparator>::findOrInsert(const T& aValue)
   return t;
 }
 
-}  /* namespace mozilla */
+} /* namespace mozilla */
 
 #endif /* mozilla_SplayTree_h */

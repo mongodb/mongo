@@ -1,0 +1,98 @@
+<!DOCTYPE HTML>
+<html>
+<!--
+https://bugzilla.mozilla.org/show_bug.cgi?id=718573
+-->
+<head>
+  <title>Test for Bug 718573</title>
+  <script src="/tests/SimpleTest/SimpleTest.js"></script>
+  <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
+</head>
+<body>
+<a target="_blank" href="https://bugzilla.mozilla.org/show_bug.cgi?id=718573">Mozilla Bug 718573</a>
+<p id="display"></p>
+<div id="content" style="display: none">
+</div>
+<pre id="test">
+<script class="testbody" type="text/javascript">
+/** Test for Bug 718573 **/
+
+/* Text longer than 2K bytes to ensure that it crosses a block boundary
+   while decoding */
+const inString = "Many years ago, I contracted an intimacy with a Mr. William Legrand. He was of an ancient Huguenot family, and had once been wealthy; but a series of misfortunes had reduced him to want. To avoid the mortification consequent upon his disasters, he left New Orleans, the city of his forefathers, and took up his residence at Sullivan's Island, near Charleston, South Carolina. This island is a very singular one. It consists of little else than the sea sand, and is about three miles long. Its breadth at no point exceeds a quarter of a mile. It is separated from the mainland by a scarcely perceptible creek, oozing its way through a wilderness of reeds and slime, a favorite resort of the marsh-hen. The vegetation, as might be supposed, is scant, or at least dwarfish. No trees of any magnitude are to be seen. Near the western extremity, where Fort Moultrie stands, and where are some miserable frame buildings, tenanted, during summer, by the fugitives from Charleston dust and fever, may be found, indeed, the bristly palmetto; but the whole island, with the exception of this western point, and a line of hard, white beach on the sea-coast, is covered with a dense undergrowth of the sweet myrtle so much prized by the horticulturists of England. The shrub here often attains the height of fifteen or twenty feet, and forms an almost impenetrable coppice, burthening the air with its fragrance. In the inmost recesses of this coppice, not far from the eastern or more remote end of the island, Legrand had built himself a small hut, which he occupied when I first, by mere accident, made his acquaintance. This soon ripened into friendship -- for there was much in the recluse to excite interest and esteem. I found him well educated, with unusual powers of mind, but infected with misanthropy, and subject to perverse moods of alternate enthusiasm and melancholy. He had with him many books, but rarely employed them. His chief amusements were gunning and fishing, or sauntering along the beach and through the myrtles, in quest of shells or entomological specimens -- his collection of the latter might have been envied by a Swammerdamm. In these excursions he was usually accompanied by an old negro, called Jupiter, who had been manumitted before the reverses of the family, but who could be induced, neither by threats nor by promises, to abandon what he considered his right of attendance upon the footsteps of his young 'Massa Will.' It is not improbable that the relatives of Legrand, conceiving him to be somewhat unsettled in intellect, had contrived to instil this obstinacy into Jupiter, with a view to the supervision and guardianship of the wanderer. ";
+
+const testContent = "<pre id='testPara'>" + inString;
+
+const Ci = SpecialPowers.Ci;
+const Cc = SpecialPowers.Cc;
+
+var decoders = [
+    "Big5",
+    "Big5-HKSCS",
+    "EUC-JP",
+    "EUC-KR",
+    "gb18030",
+    "IBM866",
+    "ISO-2022-JP",
+    "ISO-8859-3",
+    "ISO-8859-4",
+    "ISO-8859-5",
+    "ISO-8859-6",
+    "ISO-8859-7",
+    "ISO-8859-8",
+    "ISO-8859-8-I",
+    "ISO-8859-10",
+    "ISO-8859-13",
+    "ISO-8859-14",
+    "ISO-8859-15",
+    "ISO-8859-16",
+    "ISO-8859-2",
+    "KOI8-R",
+    "KOI8-U",
+    "Shift_JIS",
+    "windows-1250",
+    "windows-1251",
+    "windows-1252",
+    "windows-1253",
+    "windows-1254",
+    "windows-1255",
+    "windows-1256",
+    "windows-1257",
+    "windows-1258",
+    "windows-874",
+    "x-mac-cyrillic",
+    "UTF-8"
+];
+
+for (var i = 0; i < decoders.length; i++) {
+    var decoder = decoders[i];
+    var data = encodeURI(testContent);
+    var dataURI = "data:text/html;charset=" + decoder + "," + data;
+
+    var testFrame = document.createElement("iframe");
+    let frameID = decoder;
+    testFrame.setAttribute("id", frameID);
+    var testFrameObj = document.body.appendChild(testFrame);
+    if (i < decoders.length)
+        testFrameObj.setAttribute("onload", "testDecoding('" + decoder + "')");
+    else
+        testFrameObj.setAttribute("onload", "lastTest('" + decoder + "')");
+    testFrameObj.contentDocument.location.assign(dataURI);
+}
+
+function lastTest(frame)
+{
+    testDecoding(frame);
+    SimpleTest.finish();
+}
+
+function testDecoding(frame)
+{
+    var iframeDoc = SpecialPowers.wrap($(frame)).contentDocument;
+    var outString = iframeDoc.getElementById("testPara").innerHTML;
+    is(outString, inString, "content decoded as " + frame);
+}
+</script>
+</pre>
+</body>
+</html>

@@ -1,0 +1,59 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: hy_hy_FONIPA.txt
+# Generated from CLDR
+#
+
+# https://en.wikipedia.org/wiki/Armenian_language#Phonology
+::lower();
+$wordBoundary = [^[:L:][:M:][:N:]];
+$vowel = [աեէըիոևօւ];
+# Special cases
+ով → ov;
+մ → m;
+ն → n;
+պ → p;
+տ → t;
+կ → k;
+բ → b;
+դ → d;
+գ → ɡ;
+փ → pʰ;
+թ → tʰ;
+ք → kʰ;
+ծ → t\u0361s;
+ճ → t\u0361ʃ;
+ձ → d\u0361z;
+ջ → d\u0361ʒ;
+ց → t\u0361sʰ;
+չ → t\u0361ʃʰ;
+ֆ → f;
+ս → s;
+շ → ʃ;
+խ → x;
+հ → h;
+վ → v;
+ւ → v;
+զ → z;
+ժ → ʒ;
+ղ → ɣ;
+լ → l;
+յ → j;
+ռ → r;
+ր → ɾ;
+ի → i;
+ու → u;
+$wordBoundary {ո} → vo;
+ո → o;
+$vowel {ե} → jɛ;
+$wordBoundary {ե} → jɛ;
+ե → ɛ;
+$wordBoundary {և}  → jɛv;
+և  → ɛv;
+է → ɛ;
+ը → ə;
+օ → o;
+ա → a;
+

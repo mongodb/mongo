@@ -1,0 +1,23 @@
+# Skip tests that run too slowly under tsan.
+basic/spread-call-maxarg.js
+basic/spread-call-near-maxarg.js
+arrays/too-long-array-splice.js
+bug-1698543.js
+# Skip tests that use too much memory under tsan - see bug 1519263.
+bug1355573.js
+max-string-length.js
+expr-decompiler-bug1475953.js
+regress-303213.js
+f32.wast.js
+f64.wast.js
+f32_cmp.wast.js
+f64_cmp.wast.js
+bug1470732.js
+bug1238815.js
+bug1315943.js
+bug-1382431.js
+float_exprs.wast.js
+bug858586.js
+bug1296667.js
+bug-1465695.js
+integer.js

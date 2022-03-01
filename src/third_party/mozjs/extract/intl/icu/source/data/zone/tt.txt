@@ -1,0 +1,63 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+tt{
+    zoneStrings{
+        "Etc:UTC"{
+            ls{"Бөтендөнья килештерелгән вакыты"}
+        }
+        "Etc:Unknown"{
+            ec{"билгесез шәһәр"}
+        }
+        "meta:America_Central"{
+            ld{"Төньяк Америка җәйге үзәк вакыты"}
+            lg{"Төньяк Америка үзәк вакыты"}
+            ls{"Төньяк Америка гадәти үзәк вакыты"}
+        }
+        "meta:America_Eastern"{
+            ld{"Төньяк Америка җәйге көнчыгыш вакыты"}
+            lg{"Төньяк Америка көнчыгыш вакыты"}
+            ls{"Төньяк Америка гадәти көнчыгыш вакыты"}
+        }
+        "meta:America_Mountain"{
+            ld{"Төньяк Америка җәйге тау вакыты"}
+            lg{"Төньяк Америка тау вакыты"}
+            ls{"Төньяк Америка гадәти тау вакыты"}
+        }
+        "meta:America_Pacific"{
+            ld{"Төньяк Америка җәйге Тын океан вакыты"}
+            lg{"Төньяк Америка Тын океан вакыты"}
+            ls{"Төньяк Америка гадәти Тын океан вакыты"}
+        }
+        "meta:Atlantic"{
+            ld{"Төньяк Америка җәйге атлантик вакыты"}
+            lg{"Төньяк Америка атлантик вакыты"}
+            ls{"Төньяк Америка гадәти атлантик вакыты"}
+        }
+        "meta:Europe_Central"{
+            ld{"җәйге Үзәк Европа вакыты"}
+            lg{"Үзәк Европа вакыты"}
+            ls{"гадәти Үзәк Европа вакыты"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"җәйге Көнчыгыш Европа вакыты"}
+            lg{"Көнчыгыш Европа вакыты"}
+            ls{"гадәти Көнчыгыш Европа вакыты"}
+        }
+        "meta:Europe_Western"{
+            ld{"җәйге Көнбатыш Европа вакыты"}
+            lg{"Көнбатыш Европа вакыты"}
+            ls{"гадәти Көнбатыш Европа вакыты"}
+        }
+        "meta:GMT"{
+            ls{"Гринвич уртача вакыты"}
+        }
+        fallbackFormat{"{1} ({0})"}
+        gmtFormat{"GMT{0}"}
+        gmtZeroFormat{"GMT"}
+        hourFormat{"+HH:mm;-HH:mm"}
+        regionFormat{"{0} вакыты"}
+        regionFormatDaylight{"{0} җәйге вакыты"}
+        regionFormatStandard{"{0} гадәти вакыты"}
+    }
+}

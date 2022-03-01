@@ -1,0 +1,46 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+qu{
+    RBNFRules{
+        SpelloutRules{
+            "%spellout-numbering-year:",
+            "x.x: =0.0=;",
+            "0: =%spellout-numbering=;",
+            "%spellout-numbering:",
+            "0: =%spellout-cardinal=;",
+            "%%spellout-cardinal-with:",
+            "0: =%spellout-cardinal=-ni-yuq;",
+            "3: =%spellout-cardinal=-yuq;",
+            "7: =%spellout-cardinal=-ni-yuq;",
+            "%spellout-cardinal:",
+            "NaN: mana yupay;",
+            "Inf: mana usay;",
+            "-x: minusu >>;",
+            "x.x: << comma >>;",
+            "0: chusaq;",
+            "1: huk;",
+            "2: iskay;",
+            "3: kinsa;",
+            "4: tawa;",
+            "5: phisqa;",
+            "6: suqta;",
+            "7: qanchis;",
+            "8: pusaq;",
+            "9: isqun;",
+            "10: chunka[ >%%spellout-cardinal-with>];",
+            "20: << chunka[ >%%spellout-cardinal-with>];",
+            "100: << pachak[ >>];",
+            "1000: << waranqa[ >>];",
+            "1000000: << hunu[ >>];",
+            "1000000000: << lluna[ >>];",
+            "1000000000000: << trilionu[ >>];",
+            "1000000000000000: << kvadrilionu[ >>];",
+            "1000000000000000000: =#,##0.#=;",
+            "%spellout-ordinal:",
+            "-x: minusu >>;",
+            "x.x: =0.0=;",
+            "0: =%spellout-cardinal=-\u00F1iqin;",
+        }
+    }
+}

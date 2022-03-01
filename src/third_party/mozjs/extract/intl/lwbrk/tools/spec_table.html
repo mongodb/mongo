@@ -1,0 +1,127 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title></title>
+<style type="text/css">
+table {
+	border: solid 1px;
+	border-collapse: collapse;
+}
+tbody, tfoot {
+	border-top: solid 2px;
+}
+td, th {
+	border: solid 1px;
+}
+td {
+	text-align: center;
+}
+</style>
+</head>
+<body>
+<p>This is a specification table for line breaking.</p>
+<p>The values of IE7 and Opera9: 'A' means that the line is breakable After the character, and 'B' means Before. 'BA' means Before and After.</p>
+<p>(C) which is the tail of the IE7 and the Opera9 means Character. (N) means Numeric.
+This means that they are around the character at testing. E.g., "a$a" is a testcase for (C), "0$0" is a testcase for (N).</p>
+<p>Gecko is not breaking the lines on most western language context. But for file paths, URLs and very long word which is connected hyphens,
+some characters might be breakable. They are 'breakable' in the table. However, they are not always breakable,
+they <em>depend on the context</em> in the word.</p>
+<table border="1">
+<thead>
+<tr><th colspan="2">character</th><th>Gecko</th><th>IE7(C)</th><th>IE7(N)</th><th>Opera9.2(C)</th><th>Opera9.2(N)</th></tr>
+</thead>
+<tfoot>
+<tr><th colspan="2">character</th><th>Gecko</th><th>IE7(C)</th><th>IE7(N)</th><th>Opera9.2(C)</th><th>Opera9.2(N)</th></tr>
+</tfoot>
+<tbody>
+<tr><th>0x21</th><th>&#x21;</th><td></td><td>A</td><td>A</td><td></td><td></td></tr>
+<tr><th>0x22</th><th>&#x22;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0x23</th><th>&#x23;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0x24</th><th>&#x24;</th><td></td><td></td><td>B</td><td></td><td></td></tr>
+<tr><th>0x25</th><th>&#x25;</th><td>breakable</td><td>A</td><td>A</td><td></td><td></td></tr>
+<tr><th>0x26</th><th>&#x26;</th><td>breakable</td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0x27</th><th>&#x27;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0x28</th><th>&#x28;</th><td></td><td>B</td><td>B</td><td></td><td></td></tr>
+<tr><th>0x29</th><th>&#x29;</th><td></td><td>A</td><td>A</td><td></td><td></td></tr>
+<tr><th>0x2A</th><th>&#x2A;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0x2B</th><th>&#x2B;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0x2C</th><th>&#x2C;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0x2D</th><th>&#x2D;</th><td>breakable</td><td>BA</td><td>BA</td><td>A</td><td>A</td></tr>
+<tr><th>0x2E</th><th>&#x2E;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0x2F</th><th>&#x2F;</th><td>breakable</td><td></td><td></td><td>A</td><td>A</td></tr>
+</tbody>
+<tbody>
+<tr><th>0x3A</th><th>&#x3A;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0x3B</th><th>&#x3B;</th><td>breakable</td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0x3C</th><th>&#x3C;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0x3D</th><th>&#x3D;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0x3E</th><th>&#x3E;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0x3F</th><th>&#x3F;</th><td></td><td>A</td><td>A</td><td></td><td></td></tr>
+</tbody>
+<tbody>
+<tr><th>0x40</th><th>&#x40;</th><td></td><td></td><td></td><td></td></tr>
+</tbody>
+<tbody>
+<tr><th>0x5B</th><th>&#x5B;</th><td></td><td>B</td><td>B</td><td></td><td></td></tr>
+<tr><th>0x5C</th><th>&#x5C;</th><td>breakable</td><td></td><td>B</td><td></td><td></td></tr>
+<tr><th>0x5D</th><th>&#x5D;</th><td></td><td>A</td><td>A</td><td></td><td></td></tr>
+<tr><th>0x5E</th><th>&#x5E;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0x5F</th><th>&#x5F;</th><td></td><td></td><td></td><td></td><td></td></tr>
+</tbody>
+<tbody>
+<tr><th>0x60</th><th>&#x60;</th><td></td><td></td><td></td><td></td><td></td></tr>
+</tbody>
+<tbody>
+<tr><th>0x7B</th><th>&#x7B;</th><td></td><td>B</td><td>B</td><td></td><td></td></tr>
+<tr><th>0x7C</th><th>&#x7C;</th><td></td><td></td><td></td><td>A</td><td>A</td></tr>
+<tr><th>0x7D</th><th>&#x7D;</th><td></td><td>A</td><td>A</td><td></td><td></td></tr>
+<tr><th>0x7E</th><th>&#x7E;</th><td></td><td></td><td></td><td></td><td></td></tr>
+</tbody>
+<tbody>
+<tr><th>0xA1</th><th>&#xA1;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xA2</th><th>&#xA2;</th><td></td><td>A</td><td>A</td><td></td><td></td></tr>
+<tr><th>0xA3</th><th>&#xA3;</th><td></td><td></td><td>B</td><td></td><td></td></tr>
+<tr><th>0xA4</th><th>&#xA4;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xA5</th><th>&#xA5;</th><td></td><td></td><td>B</td><td></td><td></td></tr>
+<tr><th>0xA6</th><th>&#xA6;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xA7</th><th>&#xA7;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xA8</th><th>&#xA8;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xA9</th><th>&#xA9;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xAA</th><th>&#xAA;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xAB</th><th>&#xAB;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xAC</th><th>&#xAC;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xAE</th><th>&#xAE;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xAF</th><th>&#xAF;</th><td></td><td></td><td></td><td></td><td></td></tr>
+</tbody>
+<tbody>
+<tr><th>0xB0</th><th>&#xB0;</th><td></td><td>A</td><td>A</td><td></td><td></td></tr>
+<tr><th>0xB1</th><th>&#xB1;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xB2</th><th>&#xB2;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xB3</th><th>&#xB3;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xB4</th><th>&#xB4;</th><td></td><td></td><td></td><td>B</td><td>B</td></tr>
+<tr><th>0xB5</th><th>&#xB5;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xB6</th><th>&#xB6;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xB7</th><th>&#xB7;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xB8</th><th>&#xB8;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xB9</th><th>&#xB9;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xBA</th><th>&#xBA;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xBB</th><th>&#xBB;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xBC</th><th>&#xBC;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xBD</th><th>&#xBD;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xBE</th><th>&#xBE;</th><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th>0xBF</th><th>&#xBF;</th><td></td><td></td><td></td><td></td><td></td></tr>
+</tbody>
+<tbody>
+<tr><th>0xD7</th><th>&#xD7;</th><td></td><td></td><td></td><td></td><td></td></tr>
+</tbody>
+<tbody>
+<tr><th>0xF7</th><th>&#xF7;</th><td></td><td></td><td></td><td></td><td></td></tr>
+</tbody>
+</table>
+</body>
+</html>

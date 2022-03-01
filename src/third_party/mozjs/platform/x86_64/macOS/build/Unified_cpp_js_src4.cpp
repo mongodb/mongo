@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "builtin/intl/PluralRules.cpp"
+#include "builtin/streams/PipeToState.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "builtin/intl/PluralRules.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/PipeToState.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "builtin/intl/PluralRules.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/PipeToState.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "builtin/intl/RelativeTimeFormat.cpp"
+#include "builtin/streams/PullIntoDescriptor.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "builtin/intl/RelativeTimeFormat.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/PullIntoDescriptor.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "builtin/intl/RelativeTimeFormat.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/PullIntoDescriptor.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "builtin/intl/SharedIntlData.cpp"
+#include "builtin/streams/QueueWithSizes.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "builtin/intl/SharedIntlData.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/QueueWithSizes.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "builtin/intl/SharedIntlData.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/QueueWithSizes.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "devtools/sharkctl.cpp"
+#include "builtin/streams/QueueingStrategies.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "devtools/sharkctl.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/QueueingStrategies.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "devtools/sharkctl.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/QueueingStrategies.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "ds/Bitmap.cpp"
+#include "builtin/streams/ReadableStream.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "ds/Bitmap.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/ReadableStream.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "ds/Bitmap.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/ReadableStream.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "ds/LifoAlloc.cpp"
+#include "builtin/streams/ReadableStreamBYOBReader.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "ds/LifoAlloc.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/ReadableStreamBYOBReader.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "ds/LifoAlloc.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/ReadableStreamBYOBReader.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

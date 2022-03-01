@@ -1,0 +1,14 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Orya_Latn.txt
+# Generated from CLDR
+#
+
+::[।-॥\u0B01-ଃଅ-ଌଏ-ଐଓ-ନପ-ରଲ-ଳଵଶ-ହ\u0B3C-\u0B43େ-ୈୋ-\u0B4D\u0B56-ୗଡ଼-ଢ଼ୟ-ୡ୦-୰ୱ];
+::NFD;
+::Oriya-InterIndic;
+::InterIndic-Latin;
+::NFC;
+

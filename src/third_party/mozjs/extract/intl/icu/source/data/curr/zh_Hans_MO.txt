@@ -1,0 +1,30 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+zh_Hans_MO{
+    Currencies{
+        CNY{
+            "CN¥",
+            "人民币",
+        }
+        MOP{
+            "MOP$",
+            "澳门币",
+        }
+        XAG{
+            "XAG",
+            "白银",
+        }
+    }
+    CurrencyPlurals{
+        ANG{
+            other{"荷兰安的列斯盾"}
+        }
+        NIO{
+            other{"尼加拉瓜科多巴"}
+        }
+    }
+    CurrencyUnitPatterns{
+        other{"{0} {1}"}
+    }
+}

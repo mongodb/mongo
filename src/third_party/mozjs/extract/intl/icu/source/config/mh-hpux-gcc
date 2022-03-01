@@ -1,0 +1,92 @@
+## -*-makefile-*-
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+## HPUX/gcc specific setup
+## Copyright (c) 1999-2012, International Business Machines Corporation and
+## others. All Rights Reserved.
+
+## Commands to generate dependency files
+GEN_DEPS.c=	$(CC) -E -MM $(DEFS) $(CPPFLAGS)
+GEN_DEPS.cc=	$(CXX) -E -MM $(DEFS) $(CPPFLAGS)
+
+## Flags for position independent code
+SHAREDLIBCFLAGS = -fPIC
+SHAREDLIBCXXFLAGS = -fPIC
+SHAREDLIBCPPFLAGS = -DPIC
+
+## Common 'default' path to ensure the sanity of users.  Search the current
+## directory, at least.
+LD_DEFAULTPATH= -Wl,+b,.:'$$'ORIGIN/
+
+# Need to override this or we will get unworking assembly
+#GENCCODE_ASSEMBLY=-a gcc
+GENCCODE_ASSEMBLY=
+
+# Get some handy functions defined properly
+DEFS += -D_HPUX_SOURCE -D_POSIX_C_SOURCE=199506L
+
+## Commands to link
+## For aCC, use the C++ linker so that __shlinit gets defined
+LINK.c=     $(CXX) $(DEFS) $(LDFLAGS) -Wl,+s $(LD_DEFAULTPATH)
+LINK.cc=    $(CXX) $(DEFS) $(LDFLAGS) -Wl,+s $(LD_DEFAULTPATH)
+
+## Shared library options
+LD_SOOPTIONS= -Wl,-Bsymbolic
+
+## Commands to make a shared library
+SHLIB.c=  $(CC) $(DEFS) $(CFLAGS) $(LDFLAGS) $(SHAREDLIBCXXFLAGS) -shared -Wl,+s $(LD_DEFAULTPATH) $(LD_SOOPTIONS)
+SHLIB.cc= $(CXX) $(DEFS) $(CXXFLAGS) $(LDFLAGS) $(SHAREDLIBCXXFLAGS) -shared -Wl,+s $(LD_DEFAULTPATH) $(LD_SOOPTIONS)
+
+## Compiler switch to embed a runtime search path
+LD_RPATH=   -Wl,+b,
+LD_RPATH_PRE=
+
+## Compiler switch to embed a library name
+LD_SONAME = -Wl,+h,$(notdir $(MIDDLE_SO_TARGET))
+
+## Environment variable to set a runtime search path
+LDLIBRARYPATH_ENVVAR = SHLIB_PATH
+
+## Shared object suffix
+SO=		sl
+## Non-shared intermediate object suffix
+STATIC_O = o
+
+## Compilation rules
+%.$(STATIC_O): $(srcdir)/%.c
+	$(COMPILE.c) $(STATICCPPFLAGS) $(STATICCFLAGS) -o $@ $<
+%.o: $(srcdir)/%.c
+	$(COMPILE.c) $(DYNAMICCPPFLAGS) $(DYNAMICCFLAGS) -o $@ $<
+
+%.$(STATIC_O): $(srcdir)/%.cpp
+	$(COMPILE.cc) $(STATICCPPFLAGS) $(STATICCXXFLAGS) -o $@ $<
+%.o: $(srcdir)/%.cpp
+	$(COMPILE.cc) $(DYNAMICCPPFLAGS) $(DYNAMICCXXFLAGS) -o $@ $<
+
+
+## Dependency rules
+%.d : $(srcdir)/%.c
+	@echo "Generating dependency information for $<"
+	@$(SHELL) -ec '$(GEN_DEPS.c) $< \
+		| sed '\''s/\($*\)\.o[ :]*/\1.o $@ : /g'\'' > $@; \
+		[ -s $@ ] || rm -f $@'
+
+%.d : $(srcdir)/%.cpp
+	@echo "Generating dependency information for $<"
+	@$(SHELL) -ec '$(GEN_DEPS.cc) $< \
+		| sed '\''s/\($*\)\.o[ :]*/\1.o $@ : /g'\'' > $@; \
+		[ -s $@ ] || rm -f $@'
+
+## Versioned libraries rules
+
+%.$(SO).$(SO_TARGET_VERSION_MAJOR): %.$(SO).$(SO_TARGET_VERSION)
+	$(RM) $@ && ln -s ${<F} $@
+%.$(SO): %.$(SO).$(SO_TARGET_VERSION_MAJOR)
+	$(RM) $@ && ln -s ${*F}.$(SO).$(SO_TARGET_VERSION) $@
+
+## Remove shared library 's'
+STATIC_PREFIX_WHEN_USED = 
+STATIC_PREFIX = 
+
+## End HPUX/gcc specific setup
+

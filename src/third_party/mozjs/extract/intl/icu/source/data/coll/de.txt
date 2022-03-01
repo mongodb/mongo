@@ -1,0 +1,22 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+de{
+    collations{
+        phonebook{
+            Sequence{
+                "&AE<<ä<<<Ä"
+                "&OE<<ö<<<Ö"
+                "&UE<<ü<<<Ü"
+            }
+            Version{"39"}
+        }
+        search{
+            Sequence{
+                "[import und-u-co-search]"
+                "[import de-u-co-phonebk]"
+            }
+            Version{"39"}
+        }
+    }
+}

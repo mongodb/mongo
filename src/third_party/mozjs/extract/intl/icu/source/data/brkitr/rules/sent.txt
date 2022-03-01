@@ -1,0 +1,83 @@
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+#
+#   Copyright (C) 2002-2015, International Business Machines Corporation and others.
+#       All Rights Reserved.
+#
+#   file:  sent.txt
+#
+#   ICU Sentence Break Rules
+#      See Unicode Standard Annex #29.
+#      These rules are based on UAX #29 Revision 34 for Unicode Version 12.0
+#
+
+!!quoted_literals_only;
+
+#
+# Character categories as defined in TR 29
+#
+$CR        = [\p{Sentence_Break = CR}];
+$LF        = [\p{Sentence_Break = LF}];
+$Extend    = [\p{Sentence_Break = Extend}];
+$Sep       = [\p{Sentence_Break = Sep}];
+$Format    = [\p{Sentence_Break = Format}];
+$Sp        = [\p{Sentence_Break = Sp}];
+$Lower     = [\p{Sentence_Break = Lower}];
+$Upper     = [\p{Sentence_Break = Upper}];
+$OLetter   = [\p{Sentence_Break = OLetter}];
+$Numeric   = [\p{Sentence_Break = Numeric}];
+$ATerm     = [\p{Sentence_Break = ATerm}];
+$SContinue = [\p{Sentence_Break = SContinue}];
+$STerm     = [\p{Sentence_Break = STerm}];
+$Close     = [\p{Sentence_Break = Close}];
+
+#
+# Define extended forms of the character classes,
+#   incorporate trailing Extend or Format chars.
+#   Rules 4 and 5.
+
+$SpEx       = $Sp      ($Extend | $Format)*;
+$LowerEx    = $Lower   ($Extend | $Format)*;
+$UpperEx    = $Upper   ($Extend | $Format)*;
+$OLetterEx  = $OLetter ($Extend | $Format)*;
+$NumericEx  = $Numeric ($Extend | $Format)*;
+$ATermEx    = $ATerm   ($Extend | $Format)*;
+$SContinueEx= $SContinue ($Extend | $Format)*;
+$STermEx    = $STerm   ($Extend | $Format)*;
+$CloseEx    = $Close   ($Extend | $Format)*;
+
+
+## -------------------------------------------------
+
+!!chain;
+
+# Rule 3 - break after separators.  Keep CR/LF together.
+#
+$CR $LF;
+
+
+# Rule 4 - Break after $Sep.
+# Rule 5 - Ignore $Format and $Extend
+#
+[^$Sep $CR $LF]? ($Extend | $Format)*;
+
+
+# Rule 6
+$ATermEx $NumericEx;
+
+# Rule 7
+($UpperEx | $LowerEx) $ATermEx $UpperEx;
+
+#Rule 8
+$NotLettersEx = [^$OLetter $Upper $Lower $Sep $CR $LF $ATerm $STerm] ($Extend | $Format)*;
+$ATermEx $CloseEx* $SpEx* $NotLettersEx* $Lower;
+
+# Rule 8a
+($STermEx | $ATermEx) $CloseEx* $SpEx* ($SContinueEx | $STermEx | $ATermEx);
+
+#Rule 9, 10, 11
+($STermEx | $ATermEx) $CloseEx* $SpEx* ($Sep | $CR | $LF)?;
+
+#Rule 998
+[[^$STerm $ATerm $Close $Sp $Sep $LF $CR $Format $Extend]{bof}] ($Extend | $Format | $Close | $Sp)* .;
+[[^$STerm $ATerm $Close $Sp $Sep $LF $CR $Format $Extend]{bof}] ($Extend | $Format | $Close | $Sp)* ([$Sep $LF $CR {eof}] | $CR $LF){100};

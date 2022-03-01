@@ -17,6 +17,15 @@
 #error "ChaosMode.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
+#include "Compression.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "Compression.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "Compression.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "FloatingPoint.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "FloatingPoint.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -53,6 +62,15 @@
 #error "Poison.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
+#include "RandomNum.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "RandomNum.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "RandomNum.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "SHA1.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "SHA1.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -71,6 +89,15 @@
 #error "TaggedAnonymousMemory.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
+#include "UniquePtrExtensions.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "UniquePtrExtensions.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "UniquePtrExtensions.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "Unused.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "Unused.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -78,6 +105,15 @@
 #endif
 #ifdef INITGUID
 #error "Unused.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "Utf8.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "Utf8.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "Utf8.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
 #include "double-conversion/double-conversion/bignum-dtoa.cc"
@@ -105,41 +141,5 @@
 #endif
 #ifdef INITGUID
 #error "double-conversion/double-conversion/cached-powers.cc defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "double-conversion/double-conversion/diy-fp.cc"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "double-conversion/double-conversion/diy-fp.cc uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "double-conversion/double-conversion/diy-fp.cc defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "double-conversion/double-conversion/double-conversion.cc"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "double-conversion/double-conversion/double-conversion.cc uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "double-conversion/double-conversion/double-conversion.cc defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "double-conversion/double-conversion/fast-dtoa.cc"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "double-conversion/double-conversion/fast-dtoa.cc uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "double-conversion/double-conversion/fast-dtoa.cc defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "double-conversion/double-conversion/fixed-dtoa.cc"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "double-conversion/double-conversion/fixed-dtoa.cc uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "double-conversion/double-conversion/fixed-dtoa.cc defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

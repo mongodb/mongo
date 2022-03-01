@@ -1,0 +1,157 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+eo{
+    AuxExemplarCharacters{"[q w x y]"}
+    ExemplarCharacters{"[a b c ĉ d e f g ĝ h ĥ i j ĵ k l m n o p r s ŝ t u ŭ v z]"}
+    ExemplarCharactersIndex{"[A B C Ĉ D E F G Ĝ H Ĥ I J Ĵ K L M N O P R S Ŝ T U Ŭ V Z]"}
+    ExemplarCharactersNumbers{"[  , % ‰ + − 0 1 2 3 4 5 6 7 8 9]"}
+    ExemplarCharactersPunctuation{"[\\- ‐ ‑ – — , ; \\: ! ? . … ' ‘ ’ \u0022 “ ” ( ) \\[ \\] \\{ \\} /]"}
+    NumberElements{
+        latn{
+            symbols{
+                decimal{","}
+                group{" "}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "H-'a' 'horo' 'kaj' m:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d-'a' 'de' MMMM y G",
+                "G y-MMMM-dd",
+                "G y-MMM-dd",
+                "GGGGG y-MM-dd",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "atm",
+                "ptm",
+            }
+            AmPmMarkersAbbr{
+                "atm",
+                "ptm",
+            }
+            DateTimePatterns{
+                "H-'a' 'horo' 'kaj' m:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d-'a' 'de' MMMM y",
+                "y-MMMM-dd",
+                "y-MMM-dd",
+                "yy-MM-dd",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "di",
+                        "lu",
+                        "ma",
+                        "me",
+                        "ĵa",
+                        "ve",
+                        "sa",
+                    }
+                    wide{
+                        "dimanĉo",
+                        "lundo",
+                        "mardo",
+                        "merkredo",
+                        "ĵaŭdo",
+                        "vendredo",
+                        "sabato",
+                    }
+                }
+                stand-alone{
+                    wide{
+                        "dimanĉo",
+                        "lundo",
+                        "mardo",
+                        "merkredo",
+                        "ĵaŭdo",
+                        "vendredo",
+                        "sabato",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "aK",
+                    "pK",
+                }
+                narrow{
+                    "aK",
+                    "pK",
+                }
+                wide{
+                    "aK",
+                    "pK",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "jan",
+                        "feb",
+                        "mar",
+                        "apr",
+                        "maj",
+                        "jun",
+                        "jul",
+                        "aŭg",
+                        "sep",
+                        "okt",
+                        "nov",
+                        "dec",
+                    }
+                    wide{
+                        "januaro",
+                        "februaro",
+                        "marto",
+                        "aprilo",
+                        "majo",
+                        "junio",
+                        "julio",
+                        "aŭgusto",
+                        "septembro",
+                        "oktobro",
+                        "novembro",
+                        "decembro",
+                    }
+                }
+                stand-alone{
+                    wide{
+                        "januaro",
+                        "februaro",
+                        "marto",
+                        "aprilo",
+                        "majo",
+                        "junio",
+                        "julio",
+                        "aŭgusto",
+                        "septembro",
+                        "oktobro",
+                        "novembro",
+                        "decembro",
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,61 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: ka_ka_Latn_BGN_1981.txt
+# Generated from CLDR
+#
+
+########################################################################
+# BGN/PCGN 1981 System
+#
+# The BGN/PCGN system for Georgian was designed for use in romanizing
+# names written in the Georgian alphabet. The alphabet shown here is
+# known as the Mkhedruli alphabet and is the alphabet presently
+# used in the Republic of Georgia.
+#
+# The Georgian Alphabet as defined by the BGN (Page 27):
+#
+#   აბგდევზთიკლმნოპჟრსტუფქღყშჩცძწჭხჯჰ
+#
+# Originally prepared by Michael Everson <everson@evertype.com>
+########################################################################
+:: [აბგდევზთიკლმნოპჟრსტუფქღყშჩცძწჭხჯჰ] ;
+:: NFD (NFC) ;
+# Use this $wordBoundary until bug 2034 is fixed in ICU:
+# http://bugs.icu-project.org/cgi-bin/icu-bugs/transliterate?id=2034;expression=boundary;user=guest
+$wordBoundary =  [^[:L:][:M:][:N:]] ;
+ა → a ; # GEORGIAN LETTER AN
+ბ → b ; # GEORGIAN LETTER BAN
+გ → g ; # GEORGIAN LETTER GAN
+დ → d ; # GEORGIAN LETTER DON
+ე → e ; # GEORGIAN LETTER EN
+ვ → v ; # GEORGIAN LETTER VIN
+ზ → z ; # GEORGIAN LETTER ZEN
+თ → t’ ; # GEORGIAN LETTER TAN
+ი → i ; # GEORGIAN LETTER IN
+კ → k ; # GEORGIAN LETTER KAN
+ლ → l ; # GEORGIAN LETTER LAS
+მ → m ; # GEORGIAN LETTER MAN
+ნ → n ; # GEORGIAN LETTER NAR
+ო → o ; # GEORGIAN LETTER ON
+პ → p ; # GEORGIAN LETTER PAR
+ჟ → zh ; # GEORGIAN LETTER ZHAR
+რ → r ; # GEORGIAN LETTER RAE
+ს → s ; # GEORGIAN LETTER SAN
+ტ → t ; # GEORGIAN LETTER TAR
+უ → u ; # GEORGIAN LETTER UN
+ფ → p’ ; # GEORGIAN LETTER PHAR
+ქ → k’ ; # GEORGIAN LETTER KHAR
+ღ → gh ; # GEORGIAN LETTER GHAN
+ყ → q ; # GEORGIAN LETTER QAR
+შ → sh ; # GEORGIAN LETTER SHIN
+ჩ → ch’ ; # GEORGIAN LETTER CHIN
+ც → ts’ ; # GEORGIAN LETTER CAN
+ძ → dz ; # GEORGIAN LETTER JIL
+წ → ts ; # GEORGIAN LETTER CIL
+ჭ → ch ; # GEORGIAN LETTER CHAR
+ხ → kh ; # GEORGIAN LETTER XAN
+ჯ → j ; # GEORGIAN LETTER JHAN
+ჰ → h ; # GEORGIAN LETTER HAE
+

@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "jit/x86-shared/AssemblerBuffer-x86-shared.cpp"
+#include "vm/StructuredClone.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/x86-shared/AssemblerBuffer-x86-shared.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/StructuredClone.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/x86-shared/AssemblerBuffer-x86-shared.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/StructuredClone.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/x86-shared/BaselineCompiler-x86-shared.cpp"
+#include "vm/SymbolType.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/x86-shared/BaselineCompiler-x86-shared.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SymbolType.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/x86-shared/BaselineCompiler-x86-shared.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SymbolType.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/x86-shared/BaselineIC-x86-shared.cpp"
+#include "vm/TaggedProto.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/x86-shared/BaselineIC-x86-shared.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/TaggedProto.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/x86-shared/BaselineIC-x86-shared.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/TaggedProto.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/x86-shared/CodeGenerator-x86-shared.cpp"
+#include "vm/ThrowMsgKind.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/x86-shared/CodeGenerator-x86-shared.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ThrowMsgKind.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/x86-shared/CodeGenerator-x86-shared.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ThrowMsgKind.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/x86-shared/Lowering-x86-shared.cpp"
+#include "vm/Time.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/x86-shared/Lowering-x86-shared.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Time.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/x86-shared/Lowering-x86-shared.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Time.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/x86-shared/MacroAssembler-x86-shared.cpp"
+#include "vm/ToSource.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/x86-shared/MacroAssembler-x86-shared.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ToSource.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/x86-shared/MacroAssembler-x86-shared.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ToSource.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

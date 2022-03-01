@@ -1,0 +1,274 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+en_IN{
+    %%Parent{"en_001"}
+    NumberElements{
+        latn{
+            miscPatterns{
+                range{"{0}–{1}"}
+            }
+            patterns{
+                currencyFormat{"¤#,##,##0.00"}
+                decimalFormat{"#,##,##0.###"}
+                percentFormat{"#,##,##0%"}
+            }
+            patternsShort{
+                currencyFormat{
+                    1000{
+                        one{"¤0T"}
+                        other{"¤0T"}
+                    }
+                    10000{
+                        one{"¤00T"}
+                        other{"¤00T"}
+                    }
+                    100000{
+                        one{"¤0L"}
+                        other{"¤0L"}
+                    }
+                    1000000{
+                        one{"¤00L"}
+                        other{"¤00L"}
+                    }
+                    10000000{
+                        one{"¤0Cr"}
+                        other{"¤0Cr"}
+                    }
+                    100000000{
+                        one{"¤00Cr"}
+                        other{"¤00Cr"}
+                    }
+                    1000000000{
+                        one{"¤000Cr"}
+                        other{"¤000Cr"}
+                    }
+                    10000000000{
+                        one{"¤0TCr"}
+                        other{"¤0TCr"}
+                    }
+                    100000000000{
+                        one{"¤00TCr"}
+                        other{"¤00TCr"}
+                    }
+                    1000000000000{
+                        one{"¤0LCr"}
+                        other{"¤0LCr"}
+                    }
+                    10000000000000{
+                        one{"¤00LCr"}
+                        other{"¤00LCr"}
+                    }
+                    100000000000000{
+                        one{"¤000LCr"}
+                        other{"¤000LCr"}
+                    }
+                }
+                decimalFormat{
+                    1000{
+                        one{"0T"}
+                        other{"0T"}
+                    }
+                    10000{
+                        one{"00T"}
+                        other{"00T"}
+                    }
+                    100000{
+                        one{"0L"}
+                        other{"0L"}
+                    }
+                    1000000{
+                        one{"00L"}
+                        other{"00L"}
+                    }
+                    10000000{
+                        one{"0Cr"}
+                        other{"0Cr"}
+                    }
+                    100000000{
+                        one{"00Cr"}
+                        other{"00Cr"}
+                    }
+                    1000000000{
+                        one{"000Cr"}
+                        other{"000Cr"}
+                    }
+                    10000000000{
+                        one{"0TCr"}
+                        other{"0TCr"}
+                    }
+                    100000000000{
+                        one{"00TCr"}
+                        other{"00TCr"}
+                    }
+                    1000000000000{
+                        one{"0LCr"}
+                        other{"0LCr"}
+                    }
+                    10000000000000{
+                        one{"00LCr"}
+                        other{"00LCr"}
+                    }
+                    100000000000000{
+                        one{"000LCr"}
+                    }
+                }
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, d MMMM, y G",
+                "d MMMM, y G",
+                "d MMM, y G",
+                "d/M/y/ GGGGG",
+                "{1}, {0}",
+                "{1} 'at' {0}",
+                "{1} 'at' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                GyMMM{"MMM, y G"}
+                GyMMMEd{"E, d MMM, y G"}
+                GyMMMd{"d MMM, y G"}
+                MEd{"E, d/M"}
+                Md{"d/M"}
+                yyyyM{"M/y GGGGG"}
+                yyyyMEd{"E, d/M/y GGGGG"}
+                yyyyMMM{"MMM, y G"}
+                yyyyMMMEd{"E, d MMM, y G"}
+                yyyyMMMM{"MMMM, y G"}
+                yyyyMMMd{"d MMM, y G"}
+                yyyyMd{"d/M/y G"}
+            }
+            intervalFormats{
+                GyMEd{
+                    G{"E, d/M/y GGGGG – E, d/M/y GGGGG"}
+                    M{"E, d/M/y – E, d/M/y GGGGG"}
+                    d{"E, d/M/y – E, d/M/y GGGGG"}
+                    y{"E, d/M/y – E, d/M/y GGGGG"}
+                }
+                GyMd{
+                    G{"d/M/y GGGGG – d/M/y GGGGG"}
+                    M{"d/M/y – d/M/y GGGGG"}
+                    d{"d/M/y – d/M/y GGGGG"}
+                    y{"d/M/y – d/M/y GGGGG"}
+                }
+                MEd{
+                    M{"E, dd/MM – E, dd/MM"}
+                    d{"E, dd/MM – E, dd/MM"}
+                }
+                MMMEd{
+                    M{"E, d MMM – E, d MMM"}
+                    d{"E, d – E, d MMM"}
+                }
+                Md{
+                    M{"d/M – d/M"}
+                    d{"d/M – d/M"}
+                }
+                yM{
+                    M{"MM/y – MM/y G"}
+                    y{"MM/y – MM/y G"}
+                }
+                yMEd{
+                    M{"E, dd/MM/y – E, dd/MM/y G"}
+                    d{"E, dd/MM/y – E, dd/MM/y G"}
+                    y{"E, dd/MM/y – E, dd/MM/y G"}
+                }
+                yMMMEd{
+                    M{"E d MMM – E d MMM y G"}
+                    d{"E d – E d MMM y G"}
+                    y{"E d MMM y – E d MMM y G"}
+                }
+                yMd{
+                    M{"dd/MM/y – dd/MM/y G"}
+                    d{"dd/MM/y – dd/MM/y G"}
+                    y{"dd/MM/y – dd/MM/y G"}
+                }
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, d MMMM, y",
+                "d MMMM y",
+                "dd-MMM-y",
+                "dd/MM/yy",
+                "{1}, {0}",
+                "{1} 'at' {0}",
+                "{1} 'at' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                EHm{"E, HH:mm"}
+                EHms{"E, HH:mm:ss"}
+                Ehm{"E, h:mm a"}
+                Ehms{"E, h:mm:ss a"}
+                yMEd{"E, d/M/y"}
+                yMMMEd{"E, d MMM, y"}
+                yMd{"d/M/y"}
+            }
+            intervalFormats{
+                MEd{
+                    M{"E, dd/MM – E, dd/MM"}
+                    d{"E, dd/MM – E, dd/MM"}
+                }
+                MMMEd{
+                    M{"E, d MMM – E, d MMM"}
+                    d{"E, d – E, d MMM"}
+                }
+            }
+        }
+        islamic{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE d MMMM y G",
+                "d MMMM, y G",
+                "dd-MMM-y G",
+                "d/M/y/ GGGGG",
+                "{1}, {0}",
+                "{1} 'at' {0}",
+                "{1} 'at' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                GyMMM{"MMM, y G"}
+                GyMMMEd{"E, d MMM, y G"}
+                GyMMMd{"d MMM, y G"}
+                MEd{"E, d/M"}
+                Md{"d/M"}
+                yyyyM{"M/y GGGGG"}
+                yyyyMEd{"E d/M/y G"}
+                yyyyMMM{"MMM, y G"}
+                yyyyMMMEd{"E, d MMM, y G"}
+                yyyyMMMM{"MMMM, y G"}
+                yyyyMMMd{"d MMM, y G"}
+                yyyyMd{"d/M/y G"}
+            }
+        }
+    }
+    fields{
+        dayperiod{
+            dn{"AM/PM"}
+        }
+    }
+    listPattern{
+        standard-narrow{
+            end{"{0}, and {1}"}
+        }
+    }
+}

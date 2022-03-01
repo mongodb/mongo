@@ -32,6 +32,8 @@
 #include "mongo/scripting/mozjs/nativefunction.h"
 
 #include <cstdio>
+#include <js/Array.h>
+#include <js/Object.h>
 
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
@@ -65,7 +67,7 @@ public:
 };
 
 NativeHolder* getHolder(JS::CallArgs args) {
-    return static_cast<NativeHolder*>(JS_GetPrivate(&args.callee()));
+    return static_cast<NativeHolder*>(JS::GetPrivate(&args.callee()));
 }
 
 }  // namespace
@@ -79,9 +81,9 @@ void NativeFunctionInfo::call(JSContext* cx, JS::CallArgs args) {
         return;
     }
 
-    JS::RootedObject robj(cx, JS_NewArrayObject(cx, args));
+    JS::RootedObject robj(cx, JS::NewArrayObject(cx, args));
     if (!robj) {
-        uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_NewArrayObject");
+        uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS::NewArrayObject");
     }
 
     BSONObj out = holder->_func(ObjectWrapper(cx, robj).toBSON(), holder->_ctx);
@@ -89,8 +91,8 @@ void NativeFunctionInfo::call(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval()).fromBSONElement(out.firstElement(), out, false);
 }
 
-void NativeFunctionInfo::finalize(js::FreeOp* fop, JSObject* obj) {
-    auto holder = static_cast<NativeHolder*>(JS_GetPrivate(obj));
+void NativeFunctionInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+    auto holder = static_cast<NativeHolder*>(JS::GetPrivate(obj));
 
     if (holder)
         getScope(fop)->trackedDelete(holder);
@@ -114,7 +116,7 @@ void NativeFunctionInfo::make(JSContext* cx,
 
     scope->getProto<NativeFunctionInfo>().newObject(obj);
 
-    JS_SetPrivate(obj, scope->trackedNew<NativeHolder>(function, data));
+    JS::SetPrivate(obj, scope->trackedNew<NativeHolder>(function, data));
 }
 
 }  // namespace mozjs

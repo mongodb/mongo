@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  *
  * Copyright 2015 Mozilla Foundation
  *
@@ -19,63 +19,22 @@
 #ifndef wasm_compile_h
 #define wasm_compile_h
 
+#include "vm/Runtime.h"
 #include "wasm/WasmModule.h"
 
 namespace js {
 namespace wasm {
 
-// Describes the JS scripted caller of a request to compile a wasm module.
+// Return a uint32_t which captures the observed properties of the CPU that
+// affect compilation. If code compiled now is to be serialized and executed
+// later, the ObservedCPUFeatures() must be ensured to be the same.
 
-struct ScriptedCaller
-{
-    UniqueChars filename;
-    unsigned line;
-    unsigned column;
-};
-
-struct ResponseURLs
-{
-    UniqueChars baseURL;
-    UniqueChars sourceMapURL;
-};
-
-// Describes all the parameters that control wasm compilation.
-
-struct CompileArgs : ShareableBase<CompileArgs>
-{
-    Assumptions assumptions;
-    ScriptedCaller scriptedCaller;
-    ResponseURLs responseURLs;
-    bool baselineEnabled;
-    bool debugEnabled;
-    bool ionEnabled;
-    bool sharedMemoryEnabled;
-    bool testTiering;
-
-    CompileArgs(Assumptions&& assumptions, ScriptedCaller&& scriptedCaller)
-      : assumptions(Move(assumptions)),
-        scriptedCaller(Move(scriptedCaller)),
-        baselineEnabled(false),
-        debugEnabled(false),
-        ionEnabled(false),
-        sharedMemoryEnabled(false),
-        testTiering(false)
-    {}
-
-    // If CompileArgs is constructed without arguments, initFromContext() must
-    // be called to complete initialization.
-    CompileArgs() = default;
-    bool initFromContext(JSContext* cx, ScriptedCaller&& scriptedCaller);
-};
-
-typedef RefPtr<CompileArgs> MutableCompileArgs;
-typedef RefPtr<const CompileArgs> SharedCompileArgs;
+uint32_t ObservedCPUFeatures();
 
 // Return the estimated compiled (machine) code size for the given bytecode size
 // compiled at the given tier.
 
-double
-EstimateCompiledCodeSize(Tier tier, size_t bytecodeSize);
+double EstimateCompiledCodeSize(Tier tier, size_t bytecodeSize);
 
 // Compile the given WebAssembly bytecode with the given arguments into a
 // wasm::Module. On success, the Module is returned. On failure, the returned
@@ -83,14 +42,15 @@ EstimateCompiledCodeSize(Tier tier, size_t bytecodeSize);
 //  - *error points to a string description of the error
 //  - *error is null and the caller should report out-of-memory.
 
-SharedModule
-CompileBuffer(const CompileArgs& args, const ShareableBytes& bytecode, UniqueChars* error);
+SharedModule CompileBuffer(const CompileArgs& args,
+                           const ShareableBytes& bytecode, UniqueChars* error,
+                           UniqueCharsVector* warnings,
+                           JS::OptimizedEncodingListener* listener = nullptr);
 
-// Attempt to compile the second tier of the given wasm::Module, returning whether
-// tier-2 compilation succeeded and Module::finishTier2 was called.
+// Attempt to compile the second tier of the given wasm::Module.
 
-bool
-CompileTier2(const CompileArgs& args, Module& module, Atomic<bool>* cancelled);
+void CompileTier2(const CompileArgs& args, const Bytes& bytecode,
+                  const Module& module, Atomic<bool>* cancelled);
 
 // Compile the given WebAssembly module which has been broken into three
 // partitions:
@@ -98,30 +58,37 @@ CompileTier2(const CompileArgs& args, Module& module, Atomic<bool>* cancelled);
 //    copied in from the stream.
 //  - codeBytes is pre-sized to hold the complete code section when the stream
 //    completes.
-//  - The range [codeBytes.begin(), codeStreamEnd) contains the bytes currently
-//    read from the stream and codeStreamEnd will advance until either
-//    the stream is cancelled or codeStreamEnd == codeBytes.end().
-//  - tailBytesPtr is null until the module has finished streaming at which
-//    point tailBytesPtr will point to the complete tail bytes.
+//  - The range [codeBytes.begin(), codeBytesEnd) contains the bytes currently
+//    read from the stream and codeBytesEnd will advance until either
+//    the stream is cancelled or codeBytesEnd == codeBytes.end().
+//  - streamEnd contains the final information received after the code section:
+//    the remaining module bytecodes and maybe a JS::OptimizedEncodingListener.
+//    When the stream is successfully closed, streamEnd.reached is set.
 // The ExclusiveWaitableData are notified when CompileStreaming() can make
-// progress (i.e., codeStreamEnd advances or tailBytes is set to non-null).
+// progress (i.e., codeBytesEnd advances or streamEnd.reached is set).
 // If cancelled is set to true, compilation aborts and returns null. After
 // cancellation is set, both ExclusiveWaitableData will be notified and so every
 // wait() loop must check cancelled.
 
-typedef ExclusiveWaitableData<const uint8_t*> ExclusiveStreamEnd;
-typedef ExclusiveWaitableData<const Bytes*> ExclusiveTailBytesPtr;
+using ExclusiveBytesPtr = ExclusiveWaitableData<const uint8_t*>;
 
-SharedModule
-CompileStreaming(const CompileArgs& args,
-                 const Bytes& envBytes,
-                 const Bytes& codeBytes,
-                 const ExclusiveStreamEnd& codeStreamEnd,
-                 const ExclusiveTailBytesPtr& tailBytesPtr,
-                 const Atomic<bool>& cancelled,
-                 UniqueChars* error);
+struct StreamEndData {
+  bool reached;
+  const Bytes* tailBytes;
+  Tier2Listener tier2Listener;
+
+  StreamEndData() : reached(false) {}
+};
+using ExclusiveStreamEndData = ExclusiveWaitableData<StreamEndData>;
+
+SharedModule CompileStreaming(const CompileArgs& args, const Bytes& envBytes,
+                              const Bytes& codeBytes,
+                              const ExclusiveBytesPtr& codeBytesEnd,
+                              const ExclusiveStreamEndData& streamEnd,
+                              const Atomic<bool>& cancelled, UniqueChars* error,
+                              UniqueCharsVector* warnings);
 
 }  // namespace wasm
 }  // namespace js
 
-#endif // namespace wasm_compile_h
+#endif  // namespace wasm_compile_h

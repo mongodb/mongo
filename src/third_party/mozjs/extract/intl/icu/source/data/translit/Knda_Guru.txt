@@ -1,0 +1,14 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Knda_Guru.txt
+# Generated from CLDR
+#
+
+::[ಂ-ಃಅ-ಌಎ-ಐಒ-ನಪ-ಳವ-ಹ\u0CBCಽಾ-ೄ\u0CC6-ೈೊ-\u0CCDೕ-ೖೞೠ-ೡ೦-೯];
+::NFD;
+::Kannada-InterIndic;
+::InterIndic-Gurmukhi;
+::NFC;
+

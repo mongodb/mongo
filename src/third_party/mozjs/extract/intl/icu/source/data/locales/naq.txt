@@ -1,0 +1,258 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+naq{
+    AuxExemplarCharacters{"[j l v]"}
+    ExemplarCharacters{"[a â b c d e f g h i î k m n o ô p q r s t u û w x y z ǀ ǁ ǂ ǃ]"}
+    ExemplarCharactersIndex{"[A B C D E F G H I K M N O P Q R S T U W X Y Z]"}
+    NumberElements{
+        latn{
+            patterns{
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, d MMMM y G",
+                "d MMMM y G",
+                "d MMM y G",
+                "dd/MM/y GGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, M/d"}
+                MMM{"LLL"}
+                MMMEd{"E, MMM d"}
+                MMMMEd{"E, MMMM d"}
+                MMMMd{"MMMM d"}
+                MMMd{"MMM d"}
+                Md{"M/d"}
+                d{"d"}
+                hm{"h:mm a"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E, M/d/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, MMM d, y"}
+                yMMMM{"MMMM y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "ǁgoagas",
+                "ǃuias",
+            }
+            AmPmMarkersAbbr{
+                "ǁgoagas",
+                "ǃuias",
+            }
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, d MMMM y",
+                "d MMMM y",
+                "d MMM y",
+                "dd/MM/y",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, M/d"}
+                MMM{"LLL"}
+                MMMEd{"E, MMM d"}
+                MMMMEd{"E, MMMM d"}
+                MMMMd{"MMMM d"}
+                MMMd{"MMM d"}
+                Md{"M/d"}
+                d{"d"}
+                hm{"h:mm a"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E, M/d/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, MMM d, y"}
+                yMMMM{"MMMM y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Son",
+                        "Ma",
+                        "De",
+                        "Wu",
+                        "Do",
+                        "Fr",
+                        "Sat",
+                    }
+                    wide{
+                        "Sontaxtsees",
+                        "Mantaxtsees",
+                        "Denstaxtsees",
+                        "Wunstaxtsees",
+                        "Dondertaxtsees",
+                        "Fraitaxtsees",
+                        "Satertaxtsees",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "S",
+                        "M",
+                        "E",
+                        "W",
+                        "D",
+                        "F",
+                        "A",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "BC",
+                    "AD",
+                }
+                wide{
+                    "Xristub aiǃâ",
+                    "Xristub khaoǃgâ",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Jan",
+                        "Feb",
+                        "Mar",
+                        "Apr",
+                        "May",
+                        "Jun",
+                        "Jul",
+                        "Aug",
+                        "Sep",
+                        "Oct",
+                        "Nov",
+                        "Dec",
+                    }
+                    wide{
+                        "ǃKhanni",
+                        "ǃKhanǀgôab",
+                        "ǀKhuuǁkhâb",
+                        "ǃHôaǂkhaib",
+                        "ǃKhaitsâb",
+                        "Gamaǀaeb",
+                        "ǂKhoesaob",
+                        "Aoǁkhuumûǁkhâb",
+                        "Taraǀkhuumûǁkhâb",
+                        "ǂNûǁnâiseb",
+                        "ǀHooǂgaeb",
+                        "Hôasoreǁkhâb",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "J",
+                        "F",
+                        "M",
+                        "A",
+                        "M",
+                        "J",
+                        "J",
+                        "A",
+                        "S",
+                        "O",
+                        "N",
+                        "D",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "KW1",
+                        "KW2",
+                        "KW3",
+                        "KW4",
+                    }
+                    wide{
+                        "1ro kwartals",
+                        "2ǁî kwartals",
+                        "3ǁî kwartals",
+                        "4ǁî kwartals",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"Tsees"}
+            relative{
+                "-1"{"yesterday"}
+                "0"{"Neetsee"}
+                "1"{"tomorrow"}
+            }
+        }
+        dayperiod{
+            dn{"ǁgoas/ǃuis"}
+        }
+        era{
+            dn{"ǁAeǃgâs"}
+        }
+        hour{
+            dn{"Iiri"}
+        }
+        minute{
+            dn{"Haib"}
+        }
+        month{
+            dn{"ǁKhâb"}
+        }
+        second{
+            dn{"ǀGâub"}
+        }
+        week{
+            dn{"Wekheb"}
+        }
+        weekday{
+            dn{"Wekheb tsees"}
+        }
+        year{
+            dn{"Kurib"}
+        }
+        zone{
+            dn{"ǁAeb ǀharib"}
+        }
+    }
+}

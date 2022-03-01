@@ -10,9 +10,10 @@
 #define mozilla_Casting_h
 
 #include "mozilla/Assertions.h"
-#include "mozilla/TypeTraits.h"
 
+#include <cstring>
 #include <limits.h>
+#include <type_traits>
 
 namespace mozilla {
 
@@ -37,25 +38,26 @@ namespace mozilla {
  * important to you, you should use the outparam version.  In all other cases,
  * you should use the direct return version.
  */
-template<typename To, typename From>
-inline void
-BitwiseCast(const From aFrom, To* aResult)
-{
+template <typename To, typename From>
+inline void BitwiseCast(const From aFrom, To* aResult) {
   static_assert(sizeof(From) == sizeof(To),
                 "To and From must have the same size");
-  union
-  {
-    From mFrom;
-    To mTo;
-  } u;
-  u.mFrom = aFrom;
-  *aResult = u.mTo;
+
+  // We could maybe downgrade these to std::is_trivially_copyable, but the
+  // various STLs we use don't all provide it.
+  static_assert(std::is_trivial<From>::value,
+                "shouldn't bitwise-copy a type having non-trivial "
+                "initialization");
+  static_assert(std::is_trivial<To>::value,
+                "shouldn't bitwise-copy a type having non-trivial "
+                "initialization");
+
+  std::memcpy(static_cast<void*>(aResult), static_cast<const void*>(&aFrom),
+              sizeof(From));
 }
 
-template<typename To, typename From>
-inline To
-BitwiseCast(const From aFrom)
-{
+template <typename To, typename From>
+inline To BitwiseCast(const From aFrom) {
   To temp;
   BitwiseCast<To, From>(aFrom, &temp);
   return temp;
@@ -66,10 +68,10 @@ namespace detail {
 enum ToSignedness { ToIsSigned, ToIsUnsigned };
 enum FromSignedness { FromIsSigned, FromIsUnsigned };
 
-template<typename From,
-         typename To,
-         FromSignedness = IsSigned<From>::value ? FromIsSigned : FromIsUnsigned,
-         ToSignedness = IsSigned<To>::value ? ToIsSigned : ToIsUnsigned>
+template <typename From, typename To,
+          FromSignedness =
+              std::is_signed_v<From> ? FromIsSigned : FromIsUnsigned,
+          ToSignedness = std::is_signed_v<To> ? ToIsSigned : ToIsUnsigned>
 struct BoundsCheckImpl;
 
 // Implicit conversions on operands to binary operations make this all a bit
@@ -81,50 +83,37 @@ enum UUComparison { FromIsBigger, FromIsNotBigger };
 
 // Unsigned-to-unsigned range check
 
-template<typename From, typename To,
-         UUComparison = (sizeof(From) > sizeof(To))
-                        ? FromIsBigger
-                        : FromIsNotBigger>
+template <typename From, typename To,
+          UUComparison =
+              (sizeof(From) > sizeof(To)) ? FromIsBigger : FromIsNotBigger>
 struct UnsignedUnsignedCheck;
 
-template<typename From, typename To>
-struct UnsignedUnsignedCheck<From, To, FromIsBigger>
-{
-public:
-  static bool checkBounds(const From aFrom)
-  {
-    return aFrom <= From(To(-1));
-  }
+template <typename From, typename To>
+struct UnsignedUnsignedCheck<From, To, FromIsBigger> {
+ public:
+  static bool checkBounds(const From aFrom) { return aFrom <= From(To(-1)); }
 };
 
-template<typename From, typename To>
-struct UnsignedUnsignedCheck<From, To, FromIsNotBigger>
-{
-public:
-  static bool checkBounds(const From aFrom)
-  {
-    return true;
-  }
+template <typename From, typename To>
+struct UnsignedUnsignedCheck<From, To, FromIsNotBigger> {
+ public:
+  static bool checkBounds(const From aFrom) { return true; }
 };
 
-template<typename From, typename To>
-struct BoundsCheckImpl<From, To, FromIsUnsigned, ToIsUnsigned>
-{
-public:
-  static bool checkBounds(const From aFrom)
-  {
+template <typename From, typename To>
+struct BoundsCheckImpl<From, To, FromIsUnsigned, ToIsUnsigned> {
+ public:
+  static bool checkBounds(const From aFrom) {
     return UnsignedUnsignedCheck<From, To>::checkBounds(aFrom);
   }
 };
 
 // Signed-to-unsigned range check
 
-template<typename From, typename To>
-struct BoundsCheckImpl<From, To, FromIsSigned, ToIsUnsigned>
-{
-public:
-  static bool checkBounds(const From aFrom)
-  {
+template <typename From, typename To>
+struct BoundsCheckImpl<From, To, FromIsSigned, ToIsUnsigned> {
+ public:
+  static bool checkBounds(const From aFrom) {
     if (aFrom < 0) {
       return false;
     }
@@ -139,101 +128,82 @@ public:
 
 enum USComparison { FromIsSmaller, FromIsNotSmaller };
 
-template<typename From, typename To,
-         USComparison = (sizeof(From) < sizeof(To))
-                        ? FromIsSmaller
-                        : FromIsNotSmaller>
+template <typename From, typename To,
+          USComparison =
+              (sizeof(From) < sizeof(To)) ? FromIsSmaller : FromIsNotSmaller>
 struct UnsignedSignedCheck;
 
-template<typename From, typename To>
-struct UnsignedSignedCheck<From, To, FromIsSmaller>
-{
-public:
-  static bool checkBounds(const From aFrom)
-  {
-    return true;
-  }
+template <typename From, typename To>
+struct UnsignedSignedCheck<From, To, FromIsSmaller> {
+ public:
+  static bool checkBounds(const From aFrom) { return true; }
 };
 
-template<typename From, typename To>
-struct UnsignedSignedCheck<From, To, FromIsNotSmaller>
-{
-public:
-  static bool checkBounds(const From aFrom)
-  {
+template <typename From, typename To>
+struct UnsignedSignedCheck<From, To, FromIsNotSmaller> {
+ public:
+  static bool checkBounds(const From aFrom) {
     const To MaxValue = To((1ULL << (CHAR_BIT * sizeof(To) - 1)) - 1);
     return aFrom <= From(MaxValue);
   }
 };
 
-template<typename From, typename To>
-struct BoundsCheckImpl<From, To, FromIsUnsigned, ToIsSigned>
-{
-public:
-  static bool checkBounds(const From aFrom)
-  {
+template <typename From, typename To>
+struct BoundsCheckImpl<From, To, FromIsUnsigned, ToIsSigned> {
+ public:
+  static bool checkBounds(const From aFrom) {
     return UnsignedSignedCheck<From, To>::checkBounds(aFrom);
   }
 };
 
 // Signed-to-signed range check
 
-template<typename From, typename To>
-struct BoundsCheckImpl<From, To, FromIsSigned, ToIsSigned>
-{
-public:
-  static bool checkBounds(const From aFrom)
-  {
+template <typename From, typename To>
+struct BoundsCheckImpl<From, To, FromIsSigned, ToIsSigned> {
+ public:
+  static bool checkBounds(const From aFrom) {
     if (sizeof(From) <= sizeof(To)) {
       return true;
     }
     const To MaxValue = To((1ULL << (CHAR_BIT * sizeof(To) - 1)) - 1);
     const To MinValue = -MaxValue - To(1);
-    return From(MinValue) <= aFrom &&
-           From(aFrom) <= From(MaxValue);
+    return From(MinValue) <= aFrom && From(aFrom) <= From(MaxValue);
   }
 };
 
-template<typename From, typename To,
-         bool TypesAreIntegral = IsIntegral<From>::value &&
-                                 IsIntegral<To>::value>
+template <typename From, typename To,
+          bool TypesAreIntegral =
+              std::is_integral_v<From>&& std::is_integral_v<To>>
 class BoundsChecker;
 
-template<typename From>
-class BoundsChecker<From, From, true>
-{
-public:
+template <typename From>
+class BoundsChecker<From, From, true> {
+ public:
   static bool checkBounds(const From aFrom) { return true; }
 };
 
-template<typename From, typename To>
-class BoundsChecker<From, To, true>
-{
-public:
-  static bool checkBounds(const From aFrom)
-  {
+template <typename From, typename To>
+class BoundsChecker<From, To, true> {
+ public:
+  static bool checkBounds(const From aFrom) {
     return BoundsCheckImpl<From, To>::checkBounds(aFrom);
   }
 };
 
-template<typename From, typename To>
-inline bool
-IsInBounds(const From aFrom)
-{
+template <typename From, typename To>
+inline bool IsInBounds(const From aFrom) {
   return BoundsChecker<From, To>::checkBounds(aFrom);
 }
 
-} // namespace detail
+}  // namespace detail
 
 /**
  * Cast a value of integral type |From| to a value of integral type |To|,
  * asserting that the cast will be a safe cast per C++ (that is, that |to| is in
  * the range of values permitted for the type |From|).
  */
-template<typename To, typename From>
-inline To
-AssertedCast(const From aFrom)
-{
+template <typename To, typename From>
+inline To AssertedCast(const From aFrom) {
   MOZ_ASSERT((detail::IsInBounds<From, To>(aFrom)));
   return static_cast<To>(aFrom);
 }
@@ -243,14 +213,12 @@ AssertedCast(const From aFrom)
  * release asserting that the cast will be a safe cast per C++ (that is, that
  * |to| is in the range of values permitted for the type |From|).
  */
-template<typename To, typename From>
-inline To
-ReleaseAssertedCast(const From aFrom)
-{
+template <typename To, typename From>
+inline To ReleaseAssertedCast(const From aFrom) {
   MOZ_RELEASE_ASSERT((detail::IsInBounds<From, To>(aFrom)));
   return static_cast<To>(aFrom);
 }
 
-} // namespace mozilla
+}  // namespace mozilla
 
 #endif /* mozilla_Casting_h */

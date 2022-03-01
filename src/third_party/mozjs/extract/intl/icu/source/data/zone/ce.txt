@@ -1,0 +1,1888 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ce{
+    zoneStrings{
+        "Africa:Abidjan"{
+            ec{"Абиджан"}
+        }
+        "Africa:Accra"{
+            ec{"Аккра"}
+        }
+        "Africa:Addis_Ababa"{
+            ec{"Аддис-Абеба"}
+        }
+        "Africa:Algiers"{
+            ec{"Алжир"}
+        }
+        "Africa:Asmera"{
+            ec{"Асмера"}
+        }
+        "Africa:Bamako"{
+            ec{"Бамако"}
+        }
+        "Africa:Bangui"{
+            ec{"Банги"}
+        }
+        "Africa:Banjul"{
+            ec{"Банжул"}
+        }
+        "Africa:Bissau"{
+            ec{"Бисау"}
+        }
+        "Africa:Blantyre"{
+            ec{"Блантайр"}
+        }
+        "Africa:Brazzaville"{
+            ec{"Браззавиль"}
+        }
+        "Africa:Bujumbura"{
+            ec{"Бужумбура"}
+        }
+        "Africa:Cairo"{
+            ec{"КъахӀира"}
+        }
+        "Africa:Casablanca"{
+            ec{"Касабланка"}
+        }
+        "Africa:Ceuta"{
+            ec{"Сеута"}
+        }
+        "Africa:Conakry"{
+            ec{"Конакри"}
+        }
+        "Africa:Dakar"{
+            ec{"Дакар"}
+        }
+        "Africa:Dar_es_Salaam"{
+            ec{"Дар-эс-Салам"}
+        }
+        "Africa:Djibouti"{
+            ec{"Джибути"}
+        }
+        "Africa:Douala"{
+            ec{"Дуала"}
+        }
+        "Africa:El_Aaiun"{
+            ec{"Эль-Аюн"}
+        }
+        "Africa:Freetown"{
+            ec{"Фритаун"}
+        }
+        "Africa:Gaborone"{
+            ec{"Габороне"}
+        }
+        "Africa:Harare"{
+            ec{"Хараре"}
+        }
+        "Africa:Johannesburg"{
+            ec{"Йоханнесбург"}
+        }
+        "Africa:Juba"{
+            ec{"Джуба"}
+        }
+        "Africa:Kampala"{
+            ec{"Кампала"}
+        }
+        "Africa:Khartoum"{
+            ec{"Хартум"}
+        }
+        "Africa:Kigali"{
+            ec{"Кигали"}
+        }
+        "Africa:Kinshasa"{
+            ec{"Киншаса"}
+        }
+        "Africa:Lagos"{
+            ec{"Лагос"}
+        }
+        "Africa:Libreville"{
+            ec{"Либревиль"}
+        }
+        "Africa:Lome"{
+            ec{"Ломе"}
+        }
+        "Africa:Luanda"{
+            ec{"Луанда"}
+        }
+        "Africa:Lubumbashi"{
+            ec{"Лубумбаши"}
+        }
+        "Africa:Lusaka"{
+            ec{"Лусака"}
+        }
+        "Africa:Malabo"{
+            ec{"Малабо"}
+        }
+        "Africa:Maputo"{
+            ec{"Мапуту"}
+        }
+        "Africa:Maseru"{
+            ec{"Масеру"}
+        }
+        "Africa:Mbabane"{
+            ec{"Мбабане"}
+        }
+        "Africa:Mogadishu"{
+            ec{"Могадишо"}
+        }
+        "Africa:Monrovia"{
+            ec{"Монрови"}
+        }
+        "Africa:Nairobi"{
+            ec{"Найроби"}
+        }
+        "Africa:Ndjamena"{
+            ec{"Нджамена"}
+        }
+        "Africa:Niamey"{
+            ec{"Ниамей"}
+        }
+        "Africa:Nouakchott"{
+            ec{"Нуакшот"}
+        }
+        "Africa:Ouagadougou"{
+            ec{"Уагадугу"}
+        }
+        "Africa:Porto-Novo"{
+            ec{"Порто-Ново"}
+        }
+        "Africa:Sao_Tome"{
+            ec{"Сан-Томе"}
+        }
+        "Africa:Tripoli"{
+            ec{"Триполи"}
+        }
+        "Africa:Tunis"{
+            ec{"Тунис"}
+        }
+        "Africa:Windhoek"{
+            ec{"Виндхук"}
+        }
+        "America:Adak"{
+            ec{"Адак"}
+        }
+        "America:Anchorage"{
+            ec{"Анкоридж"}
+        }
+        "America:Anguilla"{
+            ec{"Ангилья"}
+        }
+        "America:Antigua"{
+            ec{"Антигуа"}
+        }
+        "America:Araguaina"{
+            ec{"Арагуаина"}
+        }
+        "America:Argentina:La_Rioja"{
+            ec{"Ла-Риоха"}
+        }
+        "America:Argentina:Rio_Gallegos"{
+            ec{"Рио-Гальегос"}
+        }
+        "America:Argentina:Salta"{
+            ec{"Сальта"}
+        }
+        "America:Argentina:San_Juan"{
+            ec{"Сан-Хуан"}
+        }
+        "America:Argentina:San_Luis"{
+            ec{"Сан-Луис"}
+        }
+        "America:Argentina:Tucuman"{
+            ec{"Тукуман"}
+        }
+        "America:Argentina:Ushuaia"{
+            ec{"Ушуая"}
+        }
+        "America:Aruba"{
+            ec{"Аруба"}
+        }
+        "America:Asuncion"{
+            ec{"Асунсьон"}
+        }
+        "America:Bahia"{
+            ec{"Баи"}
+        }
+        "America:Bahia_Banderas"{
+            ec{"Баия-де-Бандерас"}
+        }
+        "America:Barbados"{
+            ec{"Барбадос"}
+        }
+        "America:Belem"{
+            ec{"Белен"}
+        }
+        "America:Belize"{
+            ec{"Белиз"}
+        }
+        "America:Blanc-Sablon"{
+            ec{"Бланк-Саблон"}
+        }
+        "America:Boa_Vista"{
+            ec{"Боа-Виста"}
+        }
+        "America:Bogota"{
+            ec{"Богота"}
+        }
+        "America:Boise"{
+            ec{"Бойсе"}
+        }
+        "America:Buenos_Aires"{
+            ec{"Буэнос-Айрес"}
+        }
+        "America:Cambridge_Bay"{
+            ec{"Кеймбридж-Бей"}
+        }
+        "America:Campo_Grande"{
+            ec{"Кампу-Гранди"}
+        }
+        "America:Cancun"{
+            ec{"Канкун"}
+        }
+        "America:Caracas"{
+            ec{"Каракас"}
+        }
+        "America:Catamarca"{
+            ec{"Катамарка"}
+        }
+        "America:Cayenne"{
+            ec{"Кайенна"}
+        }
+        "America:Cayman"{
+            ec{"Кайман"}
+        }
+        "America:Chicago"{
+            ec{"Чикаго"}
+        }
+        "America:Chihuahua"{
+            ec{"Чиуауа"}
+        }
+        "America:Coral_Harbour"{
+            ec{"Корал-Харбор"}
+        }
+        "America:Cordoba"{
+            ec{"Кордова"}
+        }
+        "America:Costa_Rica"{
+            ec{"Коста-Рика"}
+        }
+        "America:Creston"{
+            ec{"Крестон"}
+        }
+        "America:Cuiaba"{
+            ec{"Куяба"}
+        }
+        "America:Curacao"{
+            ec{"Кюрасао"}
+        }
+        "America:Danmarkshavn"{
+            ec{"Денмарксхавн"}
+        }
+        "America:Dawson"{
+            ec{"Доусон"}
+        }
+        "America:Dawson_Creek"{
+            ec{"Доусон-Крик"}
+        }
+        "America:Denver"{
+            ec{"Денвер"}
+        }
+        "America:Detroit"{
+            ec{"Детройт"}
+        }
+        "America:Dominica"{
+            ec{"Доминика"}
+        }
+        "America:Edmonton"{
+            ec{"Эдмонтон"}
+        }
+        "America:Eirunepe"{
+            ec{"Эйрунепе"}
+        }
+        "America:El_Salvador"{
+            ec{"Сальвадор"}
+        }
+        "America:Fort_Nelson"{
+            ec{"Форт Нельсон"}
+        }
+        "America:Fortaleza"{
+            ec{"Форталеза"}
+        }
+        "America:Glace_Bay"{
+            ec{"Глейс-Бей"}
+        }
+        "America:Godthab"{
+            ec{"Готхоб"}
+        }
+        "America:Goose_Bay"{
+            ec{"Гус-Бей"}
+        }
+        "America:Grand_Turk"{
+            ec{"Гранд Турк"}
+        }
+        "America:Grenada"{
+            ec{"Гренада"}
+        }
+        "America:Guadeloupe"{
+            ec{"Гваделупа"}
+        }
+        "America:Guatemala"{
+            ec{"Гватемала"}
+        }
+        "America:Guayaquil"{
+            ec{"Гуаякиль"}
+        }
+        "America:Guyana"{
+            ec{"Гайана"}
+        }
+        "America:Halifax"{
+            ec{"Галифакс"}
+        }
+        "America:Havana"{
+            ec{"Гавана"}
+        }
+        "America:Hermosillo"{
+            ec{"Эрмосильо"}
+        }
+        "America:Indiana:Knox"{
+            ec{"Нокс"}
+        }
+        "America:Indiana:Marengo"{
+            ec{"Маренго"}
+        }
+        "America:Indiana:Petersburg"{
+            ec{"Петерсбург"}
+        }
+        "America:Indiana:Tell_City"{
+            ec{"Телл-Сити"}
+        }
+        "America:Indiana:Vevay"{
+            ec{"Вивэй"}
+        }
+        "America:Indiana:Vincennes"{
+            ec{"Винсенс"}
+        }
+        "America:Indiana:Winamac"{
+            ec{"Винамак"}
+        }
+        "America:Indianapolis"{
+            ec{"Индианаполис"}
+        }
+        "America:Inuvik"{
+            ec{"Инувик"}
+        }
+        "America:Iqaluit"{
+            ec{"Икалуит"}
+        }
+        "America:Jamaica"{
+            ec{"Ямайка"}
+        }
+        "America:Jujuy"{
+            ec{"Жужуй"}
+        }
+        "America:Juneau"{
+            ec{"Джуно"}
+        }
+        "America:Kentucky:Monticello"{
+            ec{"Монтиселло"}
+        }
+        "America:Kralendijk"{
+            ec{"Кралендейк"}
+        }
+        "America:La_Paz"{
+            ec{"Ла-Пас"}
+        }
+        "America:Lima"{
+            ec{"Лима"}
+        }
+        "America:Los_Angeles"{
+            ec{"Лос-Анджелес"}
+        }
+        "America:Louisville"{
+            ec{"Луисвилл"}
+        }
+        "America:Lower_Princes"{
+            ec{"Лоуэр-Принсес-Куортер"}
+        }
+        "America:Maceio"{
+            ec{"Масейо"}
+        }
+        "America:Managua"{
+            ec{"Манагуа"}
+        }
+        "America:Manaus"{
+            ec{"Манаус"}
+        }
+        "America:Marigot"{
+            ec{"Мариго"}
+        }
+        "America:Martinique"{
+            ec{"Мартиника"}
+        }
+        "America:Matamoros"{
+            ec{"Матаморос"}
+        }
+        "America:Mazatlan"{
+            ec{"Масатлан"}
+        }
+        "America:Mendoza"{
+            ec{"Мендоса"}
+        }
+        "America:Menominee"{
+            ec{"Меномини"}
+        }
+        "America:Merida"{
+            ec{"Мерида"}
+        }
+        "America:Metlakatla"{
+            ec{"Метлакатла"}
+        }
+        "America:Mexico_City"{
+            ec{"Мехико"}
+        }
+        "America:Miquelon"{
+            ec{"Микелон"}
+        }
+        "America:Moncton"{
+            ec{"Монктон"}
+        }
+        "America:Monterrey"{
+            ec{"Монтеррей"}
+        }
+        "America:Montevideo"{
+            ec{"Монтевидео"}
+        }
+        "America:Montserrat"{
+            ec{"Монсеррат"}
+        }
+        "America:Nassau"{
+            ec{"Нассау"}
+        }
+        "America:New_York"{
+            ec{"Нью-Йорк"}
+        }
+        "America:Nipigon"{
+            ec{"Нипигон"}
+        }
+        "America:Nome"{
+            ec{"Ном"}
+        }
+        "America:Noronha"{
+            ec{"Норонха"}
+        }
+        "America:North_Dakota:Beulah"{
+            ec{"Бойла, Къилбаседа Дакота"}
+        }
+        "America:North_Dakota:Center"{
+            ec{"Юкъ, Къилбаседа Дакота"}
+        }
+        "America:North_Dakota:New_Salem"{
+            ec{"Нью-Салем"}
+        }
+        "America:Ojinaga"{
+            ec{"Охинага"}
+        }
+        "America:Panama"{
+            ec{"Панама"}
+        }
+        "America:Pangnirtung"{
+            ec{"Пангниртанг"}
+        }
+        "America:Paramaribo"{
+            ec{"Парамарибо"}
+        }
+        "America:Phoenix"{
+            ec{"Финикс"}
+        }
+        "America:Port-au-Prince"{
+            ec{"Порт-о-Пренс"}
+        }
+        "America:Port_of_Spain"{
+            ec{"Порт-оф-Спейн"}
+        }
+        "America:Porto_Velho"{
+            ec{"Порту-Велью"}
+        }
+        "America:Puerto_Rico"{
+            ec{"Пуэрто-Рико"}
+        }
+        "America:Punta_Arenas"{
+            ec{"Пунта-Аренас"}
+        }
+        "America:Rainy_River"{
+            ec{"Рейни-Ривер"}
+        }
+        "America:Rankin_Inlet"{
+            ec{"Ранкин-Инлет"}
+        }
+        "America:Recife"{
+            ec{"Ресифи"}
+        }
+        "America:Regina"{
+            ec{"Реджайна"}
+        }
+        "America:Resolute"{
+            ec{"Резолют"}
+        }
+        "America:Rio_Branco"{
+            ec{"Риу-Бранку"}
+        }
+        "America:Santa_Isabel"{
+            ec{"Санта-Изабел"}
+        }
+        "America:Santarem"{
+            ec{"Сантарен"}
+        }
+        "America:Santiago"{
+            ec{"Сантьяго"}
+        }
+        "America:Santo_Domingo"{
+            ec{"Санто-Доминго"}
+        }
+        "America:Sao_Paulo"{
+            ec{"Сан-Паулу"}
+        }
+        "America:Scoresbysund"{
+            ec{"Скорсбисунн"}
+        }
+        "America:Sitka"{
+            ec{"Ситка"}
+        }
+        "America:St_Barthelemy"{
+            ec{"Сен-Бартельми"}
+        }
+        "America:St_Johns"{
+            ec{"Сент-Джонс"}
+        }
+        "America:St_Kitts"{
+            ec{"Сент-Китс"}
+        }
+        "America:St_Lucia"{
+            ec{"Сент-Люси"}
+        }
+        "America:St_Thomas"{
+            ec{"Сент-Томас"}
+        }
+        "America:St_Vincent"{
+            ec{"Сент-Винсент"}
+        }
+        "America:Swift_Current"{
+            ec{"Свифт-Карент"}
+        }
+        "America:Tegucigalpa"{
+            ec{"Тегусигальпа"}
+        }
+        "America:Thule"{
+            ec{"Туле"}
+        }
+        "America:Thunder_Bay"{
+            ec{"Тандер-Бей"}
+        }
+        "America:Tijuana"{
+            ec{"Тихуана"}
+        }
+        "America:Toronto"{
+            ec{"Торонто"}
+        }
+        "America:Tortola"{
+            ec{"Тортола"}
+        }
+        "America:Vancouver"{
+            ec{"Ванкувер"}
+        }
+        "America:Whitehorse"{
+            ec{"Уайтхорс"}
+        }
+        "America:Winnipeg"{
+            ec{"Виннипег"}
+        }
+        "America:Yakutat"{
+            ec{"Якутат"}
+        }
+        "America:Yellowknife"{
+            ec{"Йеллоунайф"}
+        }
+        "Antarctica:Casey"{
+            ec{"Кейси"}
+        }
+        "Antarctica:Davis"{
+            ec{"Дейвис"}
+        }
+        "Antarctica:DumontDUrville"{
+            ec{"Дюмон-д’Юрвиль"}
+        }
+        "Antarctica:Macquarie"{
+            ec{"Маккуори"}
+        }
+        "Antarctica:Mawson"{
+            ec{"Моусон"}
+        }
+        "Antarctica:McMurdo"{
+            ec{"Мак-Мердо"}
+        }
+        "Antarctica:Palmer"{
+            ec{"Палмер"}
+        }
+        "Antarctica:Rothera"{
+            ec{"Ротера"}
+        }
+        "Antarctica:Syowa"{
+            ec{"Сёва"}
+        }
+        "Antarctica:Troll"{
+            ec{"Тролль"}
+        }
+        "Antarctica:Vostok"{
+            ec{"Восток"}
+        }
+        "Arctic:Longyearbyen"{
+            ec{"Лонгйир"}
+        }
+        "Asia:Aden"{
+            ec{"Аден"}
+        }
+        "Asia:Almaty"{
+            ec{"Алма-Ата"}
+        }
+        "Asia:Amman"{
+            ec{"Ӏамман"}
+        }
+        "Asia:Anadyr"{
+            ec{"Анадырь"}
+        }
+        "Asia:Aqtau"{
+            ec{"Актау"}
+        }
+        "Asia:Aqtobe"{
+            ec{"Актобе"}
+        }
+        "Asia:Ashgabat"{
+            ec{"Ашхабад"}
+        }
+        "Asia:Atyrau"{
+            ec{"Атирау"}
+        }
+        "Asia:Baghdad"{
+            ec{"БагӀдад"}
+        }
+        "Asia:Bahrain"{
+            ec{"Бахрейн"}
+        }
+        "Asia:Baku"{
+            ec{"Бакох"}
+        }
+        "Asia:Bangkok"{
+            ec{"Бангкок"}
+        }
+        "Asia:Barnaul"{
+            ec{"Барнаул"}
+        }
+        "Asia:Beirut"{
+            ec{"Бейрут"}
+        }
+        "Asia:Bishkek"{
+            ec{"Бишкек"}
+        }
+        "Asia:Brunei"{
+            ec{"Бруней"}
+        }
+        "Asia:Calcutta"{
+            ec{"Калькутта"}
+        }
+        "Asia:Chita"{
+            ec{"Чита"}
+        }
+        "Asia:Choibalsan"{
+            ec{"Чойбалсан"}
+        }
+        "Asia:Colombo"{
+            ec{"Коломбо"}
+        }
+        "Asia:Damascus"{
+            ec{"Димашкъ"}
+        }
+        "Asia:Dhaka"{
+            ec{"Дакка"}
+        }
+        "Asia:Dili"{
+            ec{"Дили"}
+        }
+        "Asia:Dubai"{
+            ec{"Дубай"}
+        }
+        "Asia:Dushanbe"{
+            ec{"Душанбе"}
+        }
+        "Asia:Famagusta"{
+            ec{"Фамагуста"}
+        }
+        "Asia:Gaza"{
+            ec{"Газа"}
+        }
+        "Asia:Hebron"{
+            ec{"Хеврон"}
+        }
+        "Asia:Hong_Kong"{
+            ec{"Гонконг"}
+        }
+        "Asia:Hovd"{
+            ec{"Ховд"}
+        }
+        "Asia:Irkutsk"{
+            ec{"Иркутск"}
+        }
+        "Asia:Jakarta"{
+            ec{"Джакарта"}
+        }
+        "Asia:Jayapura"{
+            ec{"Джайпур"}
+        }
+        "Asia:Jerusalem"{
+            ec{"Къудс-ГӀала"}
+        }
+        "Asia:Kabul"{
+            ec{"Кабул"}
+        }
+        "Asia:Kamchatka"{
+            ec{"Петропавловск-Камчатски"}
+        }
+        "Asia:Karachi"{
+            ec{"Карачи"}
+        }
+        "Asia:Katmandu"{
+            ec{"Катманду"}
+        }
+        "Asia:Khandyga"{
+            ec{"Хандыга"}
+        }
+        "Asia:Krasnoyarsk"{
+            ec{"Красноярск"}
+        }
+        "Asia:Kuala_Lumpur"{
+            ec{"Куала-Лумпур"}
+        }
+        "Asia:Kuching"{
+            ec{"Кучинг"}
+        }
+        "Asia:Kuwait"{
+            ec{"Кувейт"}
+        }
+        "Asia:Macau"{
+            ec{"Макао"}
+        }
+        "Asia:Magadan"{
+            ec{"Магадан"}
+        }
+        "Asia:Makassar"{
+            ec{"Макасар"}
+        }
+        "Asia:Manila"{
+            ec{"Манила"}
+        }
+        "Asia:Muscat"{
+            ec{"Маскат"}
+        }
+        "Asia:Nicosia"{
+            ec{"Никоси"}
+        }
+        "Asia:Novokuznetsk"{
+            ec{"Новокузнецк"}
+        }
+        "Asia:Novosibirsk"{
+            ec{"Новосибирск"}
+        }
+        "Asia:Omsk"{
+            ec{"Омск"}
+        }
+        "Asia:Oral"{
+            ec{"Орал"}
+        }
+        "Asia:Phnom_Penh"{
+            ec{"Пномпень"}
+        }
+        "Asia:Pontianak"{
+            ec{"Понтианак"}
+        }
+        "Asia:Pyongyang"{
+            ec{"Пхеньян"}
+        }
+        "Asia:Qatar"{
+            ec{"Катар"}
+        }
+        "Asia:Qyzylorda"{
+            ec{"Кызылорда"}
+        }
+        "Asia:Rangoon"{
+            ec{"Рангун"}
+        }
+        "Asia:Riyadh"{
+            ec{"Эр-Рияд"}
+        }
+        "Asia:Saigon"{
+            ec{"Хошимин"}
+        }
+        "Asia:Sakhalin"{
+            ec{"Сахалин гӀ-е"}
+        }
+        "Asia:Samarkand"{
+            ec{"Самарканд"}
+        }
+        "Asia:Seoul"{
+            ec{"Сеул"}
+        }
+        "Asia:Shanghai"{
+            ec{"Шанхай"}
+        }
+        "Asia:Singapore"{
+            ec{"Сингапур"}
+        }
+        "Asia:Srednekolymsk"{
+            ec{"Среднеколымск"}
+        }
+        "Asia:Taipei"{
+            ec{"Тайбэй"}
+        }
+        "Asia:Tashkent"{
+            ec{"Ташкент"}
+        }
+        "Asia:Tbilisi"{
+            ec{"Тбилиси"}
+        }
+        "Asia:Tehran"{
+            ec{"ТехӀран"}
+        }
+        "Asia:Thimphu"{
+            ec{"Тимпу"}
+        }
+        "Asia:Tokyo"{
+            ec{"Токио"}
+        }
+        "Asia:Tomsk"{
+            ec{"Томск"}
+        }
+        "Asia:Ulaanbaatar"{
+            ec{"Улан-Батор"}
+        }
+        "Asia:Urumqi"{
+            ec{"Урумчи"}
+        }
+        "Asia:Ust-Nera"{
+            ec{"Усть-Нера"}
+        }
+        "Asia:Vientiane"{
+            ec{"Вьентьян"}
+        }
+        "Asia:Vladivostok"{
+            ec{"Владивосток"}
+        }
+        "Asia:Yakutsk"{
+            ec{"Якутск"}
+        }
+        "Asia:Yekaterinburg"{
+            ec{"Екатеринбург"}
+        }
+        "Asia:Yerevan"{
+            ec{"Ереван"}
+        }
+        "Atlantic:Azores"{
+            ec{"Азоран гӀайренаш"}
+        }
+        "Atlantic:Bermuda"{
+            ec{"Бермудаш"}
+        }
+        "Atlantic:Canary"{
+            ec{"Канаран гӀайренаш"}
+        }
+        "Atlantic:Cape_Verde"{
+            ec{"Кабо-Верде"}
+        }
+        "Atlantic:Faeroe"{
+            ec{"Фарерийн гӀайренаш"}
+        }
+        "Atlantic:Madeira"{
+            ec{"Мадейра, гӀ-е"}
+        }
+        "Atlantic:Reykjavik"{
+            ec{"Рейкьявик"}
+        }
+        "Atlantic:South_Georgia"{
+            ec{"Къилба Джорджи"}
+        }
+        "Atlantic:St_Helena"{
+            ec{"Езачу Еленин гӀайре"}
+        }
+        "Atlantic:Stanley"{
+            ec{"Стэнли"}
+        }
+        "Australia:Adelaide"{
+            ec{"Аделаида"}
+        }
+        "Australia:Brisbane"{
+            ec{"Брисбен"}
+        }
+        "Australia:Broken_Hill"{
+            ec{"Брокен-Хилл"}
+        }
+        "Australia:Currie"{
+            ec{"Керри"}
+        }
+        "Australia:Darwin"{
+            ec{"Дарвин"}
+        }
+        "Australia:Eucla"{
+            ec{"Юкла"}
+        }
+        "Australia:Hobart"{
+            ec{"Хобарт"}
+        }
+        "Australia:Lindeman"{
+            ec{"Линдеман"}
+        }
+        "Australia:Lord_Howe"{
+            ec{"Лорд-Хау, гӀ-е"}
+        }
+        "Australia:Melbourne"{
+            ec{"Мельбурн"}
+        }
+        "Australia:Perth"{
+            ec{"Перт"}
+        }
+        "Australia:Sydney"{
+            ec{"Сидней"}
+        }
+        "Etc:Unknown"{
+            ec{"Йоьвзуш йоцу гӀала"}
+        }
+        "Europe:Amsterdam"{
+            ec{"Амстердам"}
+        }
+        "Europe:Andorra"{
+            ec{"Андорра"}
+        }
+        "Europe:Astrakhan"{
+            ec{"Аштаркхне"}
+        }
+        "Europe:Athens"{
+            ec{"Афина"}
+        }
+        "Europe:Belgrade"{
+            ec{"Белград"}
+        }
+        "Europe:Berlin"{
+            ec{"Берлин"}
+        }
+        "Europe:Bratislava"{
+            ec{"Братислава"}
+        }
+        "Europe:Brussels"{
+            ec{"Брюссель"}
+        }
+        "Europe:Bucharest"{
+            ec{"Бухарест"}
+        }
+        "Europe:Budapest"{
+            ec{"Будапешт"}
+        }
+        "Europe:Busingen"{
+            ec{"Бюзинген-ам-Хохрайн"}
+        }
+        "Europe:Chisinau"{
+            ec{"Кишинев"}
+        }
+        "Europe:Copenhagen"{
+            ec{"Копенгаген"}
+        }
+        "Europe:Dublin"{
+            ec{"Дублин"}
+            ld{"Ирланди, аьхкенан хан"}
+        }
+        "Europe:Gibraltar"{
+            ec{"Гибралтар"}
+        }
+        "Europe:Guernsey"{
+            ec{"Гернси"}
+        }
+        "Europe:Helsinki"{
+            ec{"Хельсинки"}
+        }
+        "Europe:Isle_of_Man"{
+            ec{"Мэн, гӀ-е"}
+        }
+        "Europe:Istanbul"{
+            ec{"Стамбул"}
+        }
+        "Europe:Jersey"{
+            ec{"Джерси"}
+        }
+        "Europe:Kaliningrad"{
+            ec{"Калининград"}
+        }
+        "Europe:Kiev"{
+            ec{"Киев"}
+        }
+        "Europe:Kirov"{
+            ec{"Киров"}
+        }
+        "Europe:Lisbon"{
+            ec{"Лиссабон"}
+        }
+        "Europe:Ljubljana"{
+            ec{"Любляна"}
+        }
+        "Europe:London"{
+            ec{"Лондон"}
+            ld{"Британин, аьхкенан хан"}
+        }
+        "Europe:Luxembourg"{
+            ec{"Люксембург"}
+        }
+        "Europe:Madrid"{
+            ec{"Мадрид"}
+        }
+        "Europe:Malta"{
+            ec{"Мальта"}
+        }
+        "Europe:Mariehamn"{
+            ec{"Мариехамн"}
+        }
+        "Europe:Minsk"{
+            ec{"Минск"}
+        }
+        "Europe:Monaco"{
+            ec{"Монако"}
+        }
+        "Europe:Moscow"{
+            ec{"Москва"}
+        }
+        "Europe:Oslo"{
+            ec{"Осло"}
+        }
+        "Europe:Paris"{
+            ec{"Париж"}
+        }
+        "Europe:Podgorica"{
+            ec{"Подгорица"}
+        }
+        "Europe:Prague"{
+            ec{"Прага"}
+        }
+        "Europe:Riga"{
+            ec{"Рига"}
+        }
+        "Europe:Rome"{
+            ec{"Рим"}
+        }
+        "Europe:Samara"{
+            ec{"Самара"}
+        }
+        "Europe:San_Marino"{
+            ec{"Сан-Марино"}
+        }
+        "Europe:Sarajevo"{
+            ec{"Сараево"}
+        }
+        "Europe:Saratov"{
+            ec{"Саратов"}
+        }
+        "Europe:Simferopol"{
+            ec{"Симферополь"}
+        }
+        "Europe:Skopje"{
+            ec{"Скопье"}
+        }
+        "Europe:Sofia"{
+            ec{"Софи"}
+        }
+        "Europe:Stockholm"{
+            ec{"Стокгольм"}
+        }
+        "Europe:Tallinn"{
+            ec{"Таллин"}
+        }
+        "Europe:Tirane"{
+            ec{"Тирана"}
+        }
+        "Europe:Ulyanovsk"{
+            ec{"Ульяновск"}
+        }
+        "Europe:Uzhgorod"{
+            ec{"Ужгород"}
+        }
+        "Europe:Vaduz"{
+            ec{"Вадуц"}
+        }
+        "Europe:Vatican"{
+            ec{"Ватикан"}
+        }
+        "Europe:Vienna"{
+            ec{"Вена"}
+        }
+        "Europe:Vilnius"{
+            ec{"Вильнюс"}
+        }
+        "Europe:Volgograd"{
+            ec{"Волгоград"}
+        }
+        "Europe:Warsaw"{
+            ec{"Варшава"}
+        }
+        "Europe:Zagreb"{
+            ec{"Загреб"}
+        }
+        "Europe:Zaporozhye"{
+            ec{"Запорожье"}
+        }
+        "Europe:Zurich"{
+            ec{"Цюрих"}
+        }
+        "Indian:Antananarivo"{
+            ec{"Антананариву"}
+        }
+        "Indian:Chagos"{
+            ec{"Чагос"}
+        }
+        "Indian:Christmas"{
+            ec{"Ӏийса пайхамар винчу ден гӀайре"}
+        }
+        "Indian:Cocos"{
+            ec{"Кокосийн, гӀ-наш"}
+        }
+        "Indian:Comoro"{
+            ec{"Коморийн гӀайренаш"}
+        }
+        "Indian:Kerguelen"{
+            ec{"Кергелен"}
+        }
+        "Indian:Mahe"{
+            ec{"Маэ"}
+        }
+        "Indian:Maldives"{
+            ec{"Мальдиваш"}
+        }
+        "Indian:Mauritius"{
+            ec{"Маврики"}
+        }
+        "Indian:Mayotte"{
+            ec{"Майорка"}
+        }
+        "Indian:Reunion"{
+            ec{"Реюньон"}
+        }
+        "Pacific:Apia"{
+            ec{"Апи"}
+        }
+        "Pacific:Auckland"{
+            ec{"Окленд"}
+        }
+        "Pacific:Bougainville"{
+            ec{"Бугенвиль, гӀ-е"}
+        }
+        "Pacific:Chatham"{
+            ec{"Чатем, гӀ-е"}
+        }
+        "Pacific:Easter"{
+            ec{"Мархин гӀайренаш"}
+        }
+        "Pacific:Efate"{
+            ec{"Эфате"}
+        }
+        "Pacific:Enderbury"{
+            ec{"Эндерберин, гӀ-е"}
+        }
+        "Pacific:Fakaofo"{
+            ec{"Факаофо"}
+        }
+        "Pacific:Fiji"{
+            ec{"Фиджи"}
+        }
+        "Pacific:Funafuti"{
+            ec{"Фунафути"}
+        }
+        "Pacific:Galapagos"{
+            ec{"Галапагосан гӀайренаш"}
+        }
+        "Pacific:Gambier"{
+            ec{"Гамбьен, гӀ-наш"}
+        }
+        "Pacific:Guadalcanal"{
+            ec{"Гвадалканал"}
+        }
+        "Pacific:Guam"{
+            ec{"Гуам"}
+        }
+        "Pacific:Honolulu"{
+            ec{"Гонолулу"}
+        }
+        "Pacific:Johnston"{
+            ec{"Джонстон"}
+        }
+        "Pacific:Kiritimati"{
+            ec{"Киритимати"}
+        }
+        "Pacific:Kosrae"{
+            ec{"Косрае"}
+        }
+        "Pacific:Kwajalein"{
+            ec{"Кваджалейн"}
+        }
+        "Pacific:Majuro"{
+            ec{"Маджуро"}
+        }
+        "Pacific:Marquesas"{
+            ec{"Маркизан, гӀ-наш"}
+        }
+        "Pacific:Midway"{
+            ec{"Мидуэй, гӀ-наш"}
+        }
+        "Pacific:Nauru"{
+            ec{"Науру"}
+        }
+        "Pacific:Niue"{
+            ec{"Ниуэ"}
+        }
+        "Pacific:Norfolk"{
+            ec{"Норфолк"}
+        }
+        "Pacific:Noumea"{
+            ec{"Нумеа"}
+        }
+        "Pacific:Pago_Pago"{
+            ec{"Паго-Паго"}
+        }
+        "Pacific:Palau"{
+            ec{"Палау"}
+        }
+        "Pacific:Pitcairn"{
+            ec{"Питкерн"}
+        }
+        "Pacific:Ponape"{
+            ec{"Понапе, гӀ-наш"}
+        }
+        "Pacific:Port_Moresby"{
+            ec{"Порт-Морсби"}
+        }
+        "Pacific:Rarotonga"{
+            ec{"Раротонга"}
+        }
+        "Pacific:Saipan"{
+            ec{"Сайпан"}
+        }
+        "Pacific:Tahiti"{
+            ec{"Таити, гӀ-наш"}
+        }
+        "Pacific:Tarawa"{
+            ec{"Тарава"}
+        }
+        "Pacific:Tongatapu"{
+            ec{"Тонгатапу"}
+        }
+        "Pacific:Truk"{
+            ec{"Трук, гӀ-наш"}
+        }
+        "Pacific:Wake"{
+            ec{"Уэйк, гӀ-е"}
+        }
+        "Pacific:Wallis"{
+            ec{"Уоллис"}
+        }
+        "meta:Afghanistan"{
+            ls{"ОвхӀан"}
+        }
+        "meta:Africa_Central"{
+            ls{"Юккъера Африка"}
+        }
+        "meta:Africa_Eastern"{
+            ls{"Малхбален Африка"}
+        }
+        "meta:Africa_Southern"{
+            ls{"Къилба Африка"}
+        }
+        "meta:Africa_Western"{
+            ld{"Малхбузен Африка, аьхкенан хан"}
+            lg{"Малхбузен Африка"}
+            ls{"Малхбузен Африка, стандартан хан"}
+        }
+        "meta:Alaska"{
+            ld{"Аляска, аьхкенан хан"}
+            lg{"Аляска"}
+            ls{"Аляска, стандартан хан"}
+        }
+        "meta:Amazon"{
+            ld{"Амазонка, аьхкенан хан"}
+            lg{"Амазонка"}
+            ls{"Амазонка, стандартан хан"}
+        }
+        "meta:America_Central"{
+            ld{"Юккъера Америка, аьхкенан хан"}
+            lg{"Юккъера Америка"}
+            ls{"Юккъера Америка, стандартан хан"}
+        }
+        "meta:America_Eastern"{
+            ld{"Малхбален Америка, аьхкенан хан"}
+            lg{"Малхбален Америка"}
+            ls{"Малхбален Америка, стандартан хан"}
+        }
+        "meta:America_Mountain"{
+            ld{"Лаьмнийн аьхкенан хан (АЦШ)"}
+            lg{"Лаьмнийн хан (АЦШ)"}
+            ls{"Лаьмнийн стандартан хан (АЦШ)"}
+        }
+        "meta:America_Pacific"{
+            ld{"Тийна океанан аьхкенан хан"}
+            lg{"Тийна океанан хан"}
+            ls{"Тийна океанан стандартан хан"}
+        }
+        "meta:Apia"{
+            ld{"аьхкенан хан Апиа, Самоа"}
+            lg{"хан Апиа, Самоа"}
+            ls{"стандартан хан Апиа, Самоа"}
+        }
+        "meta:Arabian"{
+            ld{"СаӀудийн Ӏаьрбийчоьнан, аьхкенан хан"}
+            lg{"СаӀудийн Ӏаьрбийчоь"}
+            ls{"СаӀудийн Ӏаьрбийчоьнан стандартан хан"}
+        }
+        "meta:Argentina"{
+            ld{"Аргентина, аьхкенан хан"}
+            lg{"Аргентина"}
+            ls{"Аргентина, стандартан хан"}
+        }
+        "meta:Argentina_Western"{
+            ld{"Малхбузен Аргентина, аьхкенан хан"}
+            lg{"Малхбузен Аргентина"}
+            ls{"Малхбузен Аргентина, стандартан хан"}
+        }
+        "meta:Armenia"{
+            ld{"Эрмалойчоь, аьхкенан хан"}
+            lg{"Эрмалойчоь"}
+            ls{"Эрмалойчоь, стандартан хан"}
+        }
+        "meta:Atlantic"{
+            ld{"Атлантикан аьхкенан хан"}
+            lg{"Атлантикан хан"}
+            ls{"Атлантикан стандартан хан"}
+        }
+        "meta:Australia_Central"{
+            ld{"Юккъера Австрали, аьхкенан хан"}
+            lg{"Юккъера Австрали"}
+            ls{"Юккъера Австрали, стандартан хан"}
+        }
+        "meta:Australia_CentralWestern"{
+            ld{"Юккъера Австрали, малхбузен аьхкенан хан"}
+            lg{"Юккъера Австрали, малхбузен хан"}
+            ls{"Юккъера Австрали, малхбузен стандартан хан"}
+        }
+        "meta:Australia_Eastern"{
+            ld{"Малхбален Австрали, аьхкенан хан"}
+            lg{"Малхбален Австрали"}
+            ls{"Малхбален Австрали, стандартан хан"}
+        }
+        "meta:Australia_Western"{
+            ld{"Малхбузен Австрали, аьхкенан хан"}
+            lg{"Малхбузен Австрали"}
+            ls{"Малхбузен Австрали, стандартан хан"}
+        }
+        "meta:Azerbaijan"{
+            ld{"Азербайджан, аьхкенан хан"}
+            lg{"Азербайджан"}
+            ls{"Азербайджан, стандартан хан"}
+        }
+        "meta:Azores"{
+            ld{"Азоран гӀайренаш, аьхкенан хан"}
+            lg{"Азоран гӀайренаш"}
+            ls{"Азоран гӀайренаш, стандартан хан"}
+        }
+        "meta:Bangladesh"{
+            ld{"Бангладеш, аьхкенан хан"}
+            lg{"Бангладеш"}
+            ls{"Бангладеш, стандартан хан"}
+        }
+        "meta:Bhutan"{
+            ls{"Бутан"}
+        }
+        "meta:Bolivia"{
+            ls{"Боливи"}
+        }
+        "meta:Brasilia"{
+            ld{"Бразили, аьхкенан хан"}
+            lg{"Бразили"}
+            ls{"Бразили, стандартан хан"}
+        }
+        "meta:Brunei"{
+            ls{"Бруней-Даруссалам"}
+        }
+        "meta:Cape_Verde"{
+            ld{"Кабо-Верде, аьхкенан хан"}
+            lg{"Кабо-Верде"}
+            ls{"Кабо-Верде, стандартан хан"}
+        }
+        "meta:Chamorro"{
+            ls{"Чаморро"}
+        }
+        "meta:Chatham"{
+            ld{"Чатем, аьхкенан хан"}
+            lg{"Чатем"}
+            ls{"Чатем, стандартан хан"}
+        }
+        "meta:Chile"{
+            ld{"Чили, аьхкенан хан"}
+            lg{"Чили"}
+            ls{"Чили, стандартан хан"}
+        }
+        "meta:China"{
+            ld{"Цийчоьнан, аьхкенан хан"}
+            lg{"Цийчоь"}
+            ls{"Цийчоьнан, стандартан хан"}
+        }
+        "meta:Choibalsan"{
+            ld{"Чойбалсан, аьхкенан хан"}
+            lg{"Чойбалсан"}
+            ls{"Чойбалсан, стандартан хан"}
+        }
+        "meta:Christmas"{
+            ls{"Ӏийса пайхамар винчу ден гӀайре"}
+        }
+        "meta:Cocos"{
+            ls{"Кокосийн, гӀ-наш"}
+        }
+        "meta:Colombia"{
+            ld{"Колумби, аьхкенан хан"}
+            lg{"Колумби"}
+            ls{"Колумби, стандартан хан"}
+        }
+        "meta:Cook"{
+            ld{"Кукан, гӀ-наш, аьхкенан хан"}
+            lg{"Кукан, гӀ-наш"}
+            ls{"Кукан, гӀ-наш, стандартан хан"}
+        }
+        "meta:Cuba"{
+            ld{"Куба, аьхкенан хан"}
+            lg{"Куба"}
+            ls{"Куба, стандартан хан"}
+        }
+        "meta:Davis"{
+            ls{"Дейвис"}
+        }
+        "meta:DumontDUrville"{
+            ls{"Дюмон-д’Юрвиль"}
+        }
+        "meta:East_Timor"{
+            ls{"Малхбален Тимор"}
+        }
+        "meta:Easter"{
+            ld{"Мархин гӀайре, аьхкенан хан"}
+            lg{"Мархин гӀайре"}
+            ls{"Мархин гӀайре, стандартан хан"}
+        }
+        "meta:Ecuador"{
+            ls{"Эквадор"}
+        }
+        "meta:Europe_Central"{
+            ld{"Юккъера Европа, аьхкенан хан"}
+            lg{"Юккъера Европа"}
+            ls{"Юккъера Европа, стандартан хан"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"Малхбален Европа, аьхкенан хан"}
+            lg{"Малхбален Европа"}
+            ls{"Малхбален Европа, стандартан хан"}
+        }
+        "meta:Europe_Further_Eastern"{
+            ls{"Калининградера а, Минскера а хан"}
+        }
+        "meta:Europe_Western"{
+            ld{"Малхбузен Европа, аьхкенан хан"}
+            lg{"Малхбузен Европа"}
+            ls{"Малхбузен Европа, стандартан хан"}
+        }
+        "meta:Falkland"{
+            ld{"Фолклендан гӀайренаш, аьхкенан хан"}
+            lg{"Фолклендан гӀайренаш"}
+            ls{"Фолклендан гӀайренаш, стандартан хан"}
+        }
+        "meta:Fiji"{
+            ld{"Фиджи, аьхкенан хан"}
+            lg{"Фиджи"}
+            ls{"Фиджи, стандартан хан"}
+        }
+        "meta:French_Guiana"{
+            ls{"Французийн Гвиана"}
+        }
+        "meta:French_Southern"{
+            ls{"Французийн къилба а, Антарктидан а хан"}
+        }
+        "meta:GMT"{
+            ls{"Гринвичица юкъара хан"}
+        }
+        "meta:Galapagos"{
+            ls{"Галапагосан гӀайренаш"}
+        }
+        "meta:Gambier"{
+            ls{"Гамбье"}
+        }
+        "meta:Georgia"{
+            ld{"Гуьржийчоь, аьхкенан хан"}
+            lg{"Гуьржийчоь"}
+            ls{"Гуьржийчоь, стандартан хан"}
+        }
+        "meta:Gilbert_Islands"{
+            ls{"Гилбертан, гӀ-наш"}
+        }
+        "meta:Greenland_Eastern"{
+            ld{"Малхбален Гренланди, аьхкенан хан"}
+            lg{"Малхбален Гренланди"}
+            ls{"Малхбален Гренланди, стандартан хан"}
+        }
+        "meta:Greenland_Western"{
+            ld{"Малхбузен Гренланди, аьхкенан хан"}
+            lg{"Малхбузен Гренланди"}
+            ls{"Малхбузен Гренланди, стандартан хан"}
+        }
+        "meta:Gulf"{
+            ls{"ГӀажарийн айма"}
+        }
+        "meta:Guyana"{
+            ls{"Гайана"}
+        }
+        "meta:Hawaii_Aleutian"{
+            ld{"Гавайн-алеутийн аьхкенан хан"}
+            lg{"Гавайн-алеутийн хан"}
+            ls{"Гавайн-алеутийн стандартан хан"}
+        }
+        "meta:Hong_Kong"{
+            ld{"Гонконг, аьхкенан хан"}
+            lg{"Гонконг"}
+            ls{"Гонконг, стандартан хан"}
+        }
+        "meta:Hovd"{
+            ld{"Ховд, аьхкенан хан"}
+            lg{"Ховд"}
+            ls{"Ховд, стандартан хан"}
+        }
+        "meta:India"{
+            ls{"ХӀинди"}
+        }
+        "meta:Indian_Ocean"{
+            ls{"Индин океан"}
+        }
+        "meta:Indochina"{
+            ls{"Индокитай"}
+        }
+        "meta:Indonesia_Central"{
+            ls{"Юккъера Индонези"}
+        }
+        "meta:Indonesia_Eastern"{
+            ls{"Малхбален Индонези"}
+        }
+        "meta:Indonesia_Western"{
+            ls{"Малхбузен Индонези"}
+        }
+        "meta:Iran"{
+            ld{"ГӀажарийчоь, аьхкенан хан"}
+            lg{"ГӀажарийчоь"}
+            ls{"ГӀажарийчоь, стандартан хан"}
+        }
+        "meta:Irkutsk"{
+            ld{"Иркутск, аьхкенан хан"}
+            lg{"Иркутск"}
+            ls{"Иркутск, стандартан хан"}
+        }
+        "meta:Israel"{
+            ld{"Израиль, аьхкенан хан"}
+            lg{"Израиль"}
+            ls{"Израиль, стандартан хан"}
+        }
+        "meta:Japan"{
+            ld{"Япон, аьхкенан хан"}
+            lg{"Япон"}
+            ls{"Япон, стандартан хан"}
+        }
+        "meta:Kazakhstan_Eastern"{
+            ls{"Малхбален Казахстан"}
+        }
+        "meta:Kazakhstan_Western"{
+            ls{"Малхбузен Казахстан"}
+        }
+        "meta:Korea"{
+            ld{"Корей, аьхкенан хан"}
+            lg{"Корей"}
+            ls{"Корей, стандартан хан"}
+        }
+        "meta:Kosrae"{
+            ls{"Косраэ"}
+        }
+        "meta:Krasnoyarsk"{
+            ld{"Красноярск, аьхкенан хан"}
+            lg{"Красноярск"}
+            ls{"Красноярск, стандартан хан"}
+        }
+        "meta:Kyrgystan"{
+            ls{"Киргизи"}
+        }
+        "meta:Line_Islands"{
+            ls{"Лайн, гӀ-наш"}
+        }
+        "meta:Lord_Howe"{
+            ld{"Лорд-Хау, аьхкенан хан"}
+            lg{"Лорд-Хау"}
+            ls{"Лорд-Хау, стандартан хан"}
+        }
+        "meta:Macquarie"{
+            ls{"Маккуори"}
+        }
+        "meta:Magadan"{
+            ld{"Магадан, аьхкенан хан"}
+            lg{"Магадан"}
+            ls{"Магадан, стандартан хан"}
+        }
+        "meta:Malaysia"{
+            ls{"Малайзи"}
+        }
+        "meta:Maldives"{
+            ls{"Мальдиваш"}
+        }
+        "meta:Marquesas"{
+            ls{"Маркизан, гӀ-наш"}
+        }
+        "meta:Marshall_Islands"{
+            ls{"Маршалан , гӀ-наш"}
+        }
+        "meta:Mauritius"{
+            ld{"Маврики, аьхкенан хан"}
+            lg{"Маврики"}
+            ls{"Маврики, стандартан хан"}
+        }
+        "meta:Mawson"{
+            ls{"Моусон"}
+        }
+        "meta:Mexico_Northwest"{
+            ld{"Къилбаседа Американ Мексикан аьхкенан хан"}
+            lg{"Къилбаседа Американ Мексикан хан"}
+            ls{"Къилбаседа Американ Мексикан стандартан хан"}
+        }
+        "meta:Mexico_Pacific"{
+            ld{"Тийна океанан Мексикан аьхкенан хан"}
+            lg{"Тийна океанан Мексикан хан"}
+            ls{"Тийна океанан Мексикан стандартан хан"}
+        }
+        "meta:Mongolia"{
+            ld{"Улан-Батор, аьхкенан хан"}
+            lg{"Улан-Батор"}
+            ls{"Улан-Батор, стандартан хан"}
+        }
+        "meta:Moscow"{
+            ld{"Москва, аьхкенан хан"}
+            lg{"Москва"}
+            ls{"Москва, стандартан хан"}
+        }
+        "meta:Myanmar"{
+            ls{"Мьянма"}
+        }
+        "meta:Nauru"{
+            ls{"Науру"}
+        }
+        "meta:Nepal"{
+            ls{"Непал"}
+        }
+        "meta:New_Caledonia"{
+            ld{"Керла Каледони, аьхкенан хан"}
+            lg{"Керла Каледони"}
+            ls{"Керла Каледони, стандартан хан"}
+        }
+        "meta:New_Zealand"{
+            ld{"Керла Зеланди, аьхкенан хан"}
+            lg{"Керла Зеланди"}
+            ls{"Керла Зеланди, стандартан хан"}
+        }
+        "meta:Newfoundland"{
+            ld{"Ньюфаундленд, аьхкенан хан"}
+            lg{"Ньюфаундленд"}
+            ls{"Ньюфаундленд, стандартан хан"}
+        }
+        "meta:Niue"{
+            ls{"Ниуэ"}
+        }
+        "meta:Norfolk"{
+            ld{"Норфолк, аьхкенан хан"}
+            lg{"Норфолк"}
+            ls{"Норфолк, стандартан хан"}
+        }
+        "meta:Noronha"{
+            ld{"Фернанду-ди-Норонья, аьхкенан хан"}
+            lg{"Фернанду-ди-Норонья"}
+            ls{"Фернанду-ди-Норонья, стандартан хан"}
+        }
+        "meta:Novosibirsk"{
+            ld{"Новосибирск, аьхкенан хан"}
+            lg{"Новосибирск"}
+            ls{"Новосибирск, стандартан хан"}
+        }
+        "meta:Omsk"{
+            ld{"Омск, аьхкенан хан"}
+            lg{"Омск"}
+            ls{"Омск, стандартан хан"}
+        }
+        "meta:Pakistan"{
+            ld{"Пакистан, аьхкенан хан"}
+            lg{"Пакистан"}
+            ls{"Пакистан, стандартан хан"}
+        }
+        "meta:Palau"{
+            ls{"Палау"}
+        }
+        "meta:Papua_New_Guinea"{
+            ls{"Папуа – Керла Гвиней"}
+        }
+        "meta:Paraguay"{
+            ld{"Парагвай, аьхкенан хан"}
+            lg{"Парагвай"}
+            ls{"Парагвай, стандартан хан"}
+        }
+        "meta:Peru"{
+            ld{"Перу, аьхкенан хан"}
+            lg{"Перу"}
+            ls{"Перу, стандартан хан"}
+        }
+        "meta:Philippines"{
+            ld{"Филиппинаш, аьхкенан хан"}
+            lg{"Филиппинаш"}
+            ls{"Филиппинаш, стандартан хан"}
+        }
+        "meta:Phoenix_Islands"{
+            ls{"Феникс, гӀ-наш"}
+        }
+        "meta:Pierre_Miquelon"{
+            ld{"Сен-Пьер а, Микелон а, аьхкенан хан"}
+            lg{"Сен-Пьер а, Микелон а"}
+            ls{"Сен-Пьер а, Микелон а, стандартан хан"}
+        }
+        "meta:Pitcairn"{
+            ls{"Питкэрн"}
+        }
+        "meta:Ponape"{
+            ls{"Понапе, гӀ-наш"}
+        }
+        "meta:Pyongyang"{
+            ls{"Пхеньян"}
+        }
+        "meta:Reunion"{
+            ls{"Реюньон"}
+        }
+        "meta:Rothera"{
+            ls{"Ротера"}
+        }
+        "meta:Sakhalin"{
+            ld{"Сахалин, аьхкенан хан"}
+            lg{"Сахалин"}
+            ls{"Сахалин, стандартан хан"}
+        }
+        "meta:Samoa"{
+            ld{"Самоа, аьхкенан хан"}
+            lg{"Самоа"}
+            ls{"Самоа, стандартан хан"}
+        }
+        "meta:Seychelles"{
+            ls{"Сейшелан гӀайренаш"}
+        }
+        "meta:Singapore"{
+            ls{"Сингапур"}
+        }
+        "meta:Solomon"{
+            ls{"Соломонан, гӀ-наш"}
+        }
+        "meta:South_Georgia"{
+            ls{"Къилба Георги"}
+        }
+        "meta:Suriname"{
+            ls{"Суринам"}
+        }
+        "meta:Syowa"{
+            ls{"Сёва"}
+        }
+        "meta:Tahiti"{
+            ls{"Таити, гӀ-наш"}
+        }
+        "meta:Taipei"{
+            ld{"Тайвань, аьхкенан хан"}
+            lg{"Тайвань"}
+            ls{"Тайвань, стандартан хан"}
+        }
+        "meta:Tajikistan"{
+            ls{"Таджикистан"}
+        }
+        "meta:Tokelau"{
+            ls{"Токелау"}
+        }
+        "meta:Tonga"{
+            ld{"Тонга, аьхкенан хан"}
+            lg{"Тонга"}
+            ls{"Тонга, стандартан хан"}
+        }
+        "meta:Truk"{
+            ls{"Чуук"}
+        }
+        "meta:Turkmenistan"{
+            ld{"Туркменин аьхкенан хан"}
+            lg{"Туркмени"}
+            ls{"Туркменин стандартан хан"}
+        }
+        "meta:Tuvalu"{
+            ls{"Тувалу"}
+        }
+        "meta:Uruguay"{
+            ld{"Уругвай, аьхкенан хан"}
+            lg{"Уругвай"}
+            ls{"Уругвай, стандартан хан"}
+        }
+        "meta:Uzbekistan"{
+            ld{"Узбекистанан аьхкенан хан"}
+            lg{"Узбекистан"}
+            ls{"Узбекистанан стандартан хан"}
+        }
+        "meta:Vanuatu"{
+            ld{"Вануату, аьхкенан хан"}
+            lg{"Вануату"}
+            ls{"Вануату, стандартан хан"}
+        }
+        "meta:Venezuela"{
+            ls{"Венесуэла"}
+        }
+        "meta:Vladivostok"{
+            ld{"Владивосток, аьхкенан хан"}
+            lg{"Владивосток"}
+            ls{"Владивосток, стандартан хан"}
+        }
+        "meta:Volgograd"{
+            ld{"Волгоград, аьхкенан хан"}
+            lg{"Волгоград"}
+            ls{"Волгоград, стандартан хан"}
+        }
+        "meta:Vostok"{
+            ls{"Восток"}
+        }
+        "meta:Wake"{
+            ls{"Уэйк, гӀ-е"}
+        }
+        "meta:Wallis"{
+            ls{"Уоллис а, Футуна а"}
+        }
+        "meta:Yakutsk"{
+            ld{"Якутск, аьхкенан хан"}
+            lg{"Якутск"}
+            ls{"Якутск, стандартан хан"}
+        }
+        "meta:Yekaterinburg"{
+            ld{"Екатеринбург, аьхкенан хан"}
+            lg{"Екатеринбург"}
+            ls{"Екатеринбург, стандартан хан"}
+        }
+        fallbackFormat{"{1} ({0})"}
+        gmtFormat{"GMT{0}"}
+        gmtZeroFormat{"GMT"}
+        hourFormat{"+HH:mm;-HH:mm"}
+        regionFormat{"{0}"}
+        regionFormatDaylight{"{0} (+1)"}
+        regionFormatStandard{"{0} (+0)"}
+    }
+}

@@ -1,0 +1,86 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: ch_ch_FONIPA.txt
+# Generated from CLDR
+#
+
+# Transformation from Chamorro (ch) to its IPA transcription (ch_FONIPA).
+#
+# http://en.wikipedia.org/wiki/Chamorro_language#Orthography
+# http://www.omniglot.com/writing/chamorro.htm
+# http://guampedia.com/chamorro-orthography-rules/
+# http://finochamoru.blogspot.com/2009/04/leksion-chamoru-pronunsiasion.html
+#
+# Recorded sound samples: http://www.chamorro.com/fino/fino.html
+#
+# http://guampedia.com/chamorro-orthography-rules/ lists in section 3.b)
+# graphemes that would be used for loanwords/proper names. Most examples
+# are Spanish. Our rules thus generate the Spanish sounds [θ], [x], [β]
+# and [w] even though these sounds are not used by the Chamorro language.
+::Lower;
+::NFC;
+\' → ʔ;
+’ → ʔ;
+# The IPA chart from Omniglot appears to be mixing up [æ] and [ɑ] when
+# explaining how to pronounce ‹a› and ‹å›. The language course on
+# finochamoru.blogspot.com copies the pronunciation chart from Omniglot,
+# but then explains that ‹å› gets prounounced like in English ‹father›,
+# which would be [ɑ]. Also, the sound samples on www.chamorro.com pronounce
+# ‹a› as [æ] and ‹å› as [ɑ].
+a → æ;
+å → ɑ;
+b → b;
+ch → t\u0361s;
+{c} [eéií] → θ; # loanwords
+c → k; # loanwords
+d → d;
+e → e;
+f → f;
+gu → ɡʷ;
+g → ɡ;
+h → h;
+i → i;
+j → x ; # loanwords
+k → k;
+l → l;
+m → m;
+ng → ŋ;
+ñ → ɲ;
+n → n;
+o → o;
+p → p;
+{qu} [eéiíy] → k; # loanwords
+q → k; # loanwords
+rr → r;
+r → ɾ;
+s → s;
+t → t;
+u → u;
+v → β; # loanwords
+w → w; # loanwords
+{x} h?[aáåeéiíoóuú$] → ks; # loanwords
+{x} [^aáåeéiíoóuú$] → s; # loanwords
+x → ks ; # loanwords
+# Wikipedia [http://en.wikipedia.org/wiki/Chamorro_language#Orthography]
+# writes that ‹y› gets pronounced as [d\u0361z], while Omniglot says [d\u0361ʒ].
+y → d\u0361z;
+\- → \.; # hyphen is a syllable boundary, eg ‹sena-ta›
+# Handle geminated consonants.
+::Null;
+bb → bː;
+dd → dː;
+ff → fː;
+ɡɡ → ɡː;
+hh → hː;
+kk → kː;
+ll → lː;
+mm → mː;
+nn → nː;
+pp → pː;
+rr → rː;
+ss → sː;
+tt → tː;
+::NFC;
+

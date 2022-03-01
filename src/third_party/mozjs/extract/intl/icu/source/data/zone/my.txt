@@ -1,0 +1,1902 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+my{
+    zoneStrings{
+        "Africa:Abidjan"{
+            ec{"အာဘီဂျန်"}
+        }
+        "Africa:Accra"{
+            ec{"အက်ကရာ"}
+        }
+        "Africa:Addis_Ababa"{
+            ec{"အားဒစ် အဘာဘာ"}
+        }
+        "Africa:Algiers"{
+            ec{"အယ်လ်ဂျီးရီးယား"}
+        }
+        "Africa:Asmera"{
+            ec{"အားစ်မားရာ"}
+        }
+        "Africa:Bamako"{
+            ec{"ဘာမာကို"}
+        }
+        "Africa:Bangui"{
+            ec{"ဘာန်ဂီး"}
+        }
+        "Africa:Banjul"{
+            ec{"ဘန်ဂျုးလ်"}
+        }
+        "Africa:Bissau"{
+            ec{"ဘီစာအို"}
+        }
+        "Africa:Blantyre"{
+            ec{"ဘလန်တိုင်းရဲလ်"}
+        }
+        "Africa:Brazzaville"{
+            ec{"ဘရားဇာဗီးလ်"}
+        }
+        "Africa:Bujumbura"{
+            ec{"ဘူဂျွန်ဘူးရာ"}
+        }
+        "Africa:Cairo"{
+            ec{"ကိုင်ရို"}
+        }
+        "Africa:Casablanca"{
+            ec{"ကာဆာဘလန်ကာ"}
+        }
+        "Africa:Ceuta"{
+            ec{"ဆီရူးတာ"}
+        }
+        "Africa:Conakry"{
+            ec{"ကိုနာကရီး"}
+        }
+        "Africa:Dakar"{
+            ec{"ဒကျကား"}
+        }
+        "Africa:Dar_es_Salaam"{
+            ec{"ဒါရက်စ်ဆာလမ်"}
+        }
+        "Africa:Djibouti"{
+            ec{"ဂျီဘူတီ"}
+        }
+        "Africa:Douala"{
+            ec{"ဒိုအူအာလာ"}
+        }
+        "Africa:El_Aaiun"{
+            ec{"အယ်လ်အာယွန်း"}
+        }
+        "Africa:Freetown"{
+            ec{"ဖရီးတောင်းန်"}
+        }
+        "Africa:Gaborone"{
+            ec{"ဂါဘာရွန်းနီ"}
+        }
+        "Africa:Harare"{
+            ec{"ဟာရားရဲယ်"}
+        }
+        "Africa:Johannesburg"{
+            ec{"ဂျိုဟန်းနက်စဘတ်"}
+        }
+        "Africa:Juba"{
+            ec{"ဂျုဘာ"}
+        }
+        "Africa:Kampala"{
+            ec{"ကမ်ပါလာ"}
+        }
+        "Africa:Khartoum"{
+            ec{"ခါတိုအန်"}
+        }
+        "Africa:Kigali"{
+            ec{"ကီဂါးလီ"}
+        }
+        "Africa:Kinshasa"{
+            ec{"ကင်ရှာစာ"}
+        }
+        "Africa:Lagos"{
+            ec{"လာဂိုစ်"}
+        }
+        "Africa:Libreville"{
+            ec{"လီဗရာဗီးလ်"}
+        }
+        "Africa:Lome"{
+            ec{"လိုမီ"}
+        }
+        "Africa:Luanda"{
+            ec{"လူဝမ်ဒါ"}
+        }
+        "Africa:Lubumbashi"{
+            ec{"လူဘွန်းဘာရှီ"}
+        }
+        "Africa:Lusaka"{
+            ec{"လူစာကာ"}
+        }
+        "Africa:Malabo"{
+            ec{"မာလာဘို"}
+        }
+        "Africa:Maputo"{
+            ec{"မာပူးတို"}
+        }
+        "Africa:Maseru"{
+            ec{"မာဆူရူး"}
+        }
+        "Africa:Mbabane"{
+            ec{"ဘားဘာန်း"}
+        }
+        "Africa:Mogadishu"{
+            ec{"မော်ဂါဒီးသျုး"}
+        }
+        "Africa:Monrovia"{
+            ec{"မွန်ရိုးဗီးယား"}
+        }
+        "Africa:Nairobi"{
+            ec{"နိုင်ရိုဘီ"}
+        }
+        "Africa:Ndjamena"{
+            ec{"အင်ဂျာမီနာ"}
+        }
+        "Africa:Niamey"{
+            ec{"ညာမဲယ်"}
+        }
+        "Africa:Nouakchott"{
+            ec{"နိုအာ့ခ်ရှော့တ်"}
+        }
+        "Africa:Ouagadougou"{
+            ec{"ဝါဂါဒူးဂူ"}
+        }
+        "Africa:Porto-Novo"{
+            ec{"ပိုတို-နိုဗို"}
+        }
+        "Africa:Sao_Tome"{
+            ec{"ဆောင်တူမေး"}
+        }
+        "Africa:Tripoli"{
+            ec{"ထရီပိုလီ"}
+        }
+        "Africa:Tunis"{
+            ec{"တူနီစ်"}
+        }
+        "Africa:Windhoek"{
+            ec{"ဗင်းဟူးခ်"}
+        }
+        "America:Adak"{
+            ec{"အာဒချ"}
+        }
+        "America:Anchorage"{
+            ec{"အန်ကာရေ့ဂျ်"}
+        }
+        "America:Anguilla"{
+            ec{"အန်ဂီလာ"}
+        }
+        "America:Antigua"{
+            ec{"အန်တီဂွါ"}
+        }
+        "America:Araguaina"{
+            ec{"အာရာဂွါအီနာ"}
+        }
+        "America:Argentina:La_Rioja"{
+            ec{"လာ ရီယိုဟာ"}
+        }
+        "America:Argentina:Rio_Gallegos"{
+            ec{"ရီယို ဂါလီဂိုစ်"}
+        }
+        "America:Argentina:Salta"{
+            ec{"ဆာလ်တာ"}
+        }
+        "America:Argentina:San_Juan"{
+            ec{"ဆန် ဂွမ်"}
+        }
+        "America:Argentina:San_Luis"{
+            ec{"ဆန် လူဝီစ်"}
+        }
+        "America:Argentina:Tucuman"{
+            ec{"တူကူမန်"}
+        }
+        "America:Argentina:Ushuaia"{
+            ec{"ဥဆွာအီအာ"}
+        }
+        "America:Aruba"{
+            ec{"အာရူးဗာ"}
+        }
+        "America:Asuncion"{
+            ec{"အာဆူစီအွန်း"}
+        }
+        "America:Bahia"{
+            ec{"ဘာဟီအာ"}
+        }
+        "America:Bahia_Banderas"{
+            ec{"ဘာဟီအာ ဘန်ဒရက်စ်"}
+        }
+        "America:Barbados"{
+            ec{"ဘာဘေးဒိုးစ်"}
+        }
+        "America:Belem"{
+            ec{"ဘီလင်မ်"}
+        }
+        "America:Belize"{
+            ec{"ဘလိဇ်"}
+        }
+        "America:Blanc-Sablon"{
+            ec{"ဘလွန်ခ်-စာဘလွန်"}
+        }
+        "America:Boa_Vista"{
+            ec{"ဘိုအာဗီစ်တာ"}
+        }
+        "America:Bogota"{
+            ec{"ဘိုဂိုတာ"}
+        }
+        "America:Boise"{
+            ec{"ဗွိုက်စီ"}
+        }
+        "America:Buenos_Aires"{
+            ec{"ဗျူနိုအေးရိစ်"}
+        }
+        "America:Cambridge_Bay"{
+            ec{"ကိန်းဘရစ်ချ် ဘေး"}
+        }
+        "America:Campo_Grande"{
+            ec{"ကိမ်ပို ဂရန်ဒီ"}
+        }
+        "America:Cancun"{
+            ec{"ကန်ခန်"}
+        }
+        "America:Caracas"{
+            ec{"ကာရာကာစ်"}
+        }
+        "America:Catamarca"{
+            ec{"ကာတာမာရကာ"}
+        }
+        "America:Cayenne"{
+            ec{"ကေညင်န်"}
+        }
+        "America:Cayman"{
+            ec{"ကေမန်"}
+        }
+        "America:Chicago"{
+            ec{"ချီကာကို"}
+        }
+        "America:Chihuahua"{
+            ec{"ချီဟူအာဟူအာ"}
+        }
+        "America:Coral_Harbour"{
+            ec{"အာတီကိုကန်"}
+        }
+        "America:Cordoba"{
+            ec{"ကိုဒိုဘာ"}
+        }
+        "America:Costa_Rica"{
+            ec{"ကို့စတာရီကာ"}
+        }
+        "America:Creston"{
+            ec{"ကရစ်စတွန်"}
+        }
+        "America:Cuiaba"{
+            ec{"ကွီရာဘာ"}
+        }
+        "America:Curacao"{
+            ec{"ကျူရေးကိုး"}
+        }
+        "America:Danmarkshavn"{
+            ec{"ဒန်မတ်ရှ်ဗာန်"}
+        }
+        "America:Dawson"{
+            ec{"ဒေါ်ဆန်"}
+        }
+        "America:Dawson_Creek"{
+            ec{"ဒေါ်ဆန် ခရိခ်"}
+        }
+        "America:Denver"{
+            ec{"ဒင်န်ဗာ"}
+        }
+        "America:Detroit"{
+            ec{"ဒက်ထရွိုက်"}
+        }
+        "America:Dominica"{
+            ec{"ဒိုမီနီကာ"}
+        }
+        "America:Edmonton"{
+            ec{"အက်ဒ်မွန်တန်"}
+        }
+        "America:Eirunepe"{
+            ec{"အီရူနီပီ"}
+        }
+        "America:El_Salvador"{
+            ec{"အယ်လ်ဆာဗေဒို"}
+        }
+        "America:Fort_Nelson"{
+            ec{"ဖို့တ် နယ်လ်ဆင်"}
+        }
+        "America:Fortaleza"{
+            ec{"ဖို့တ်တာလီဇာ"}
+        }
+        "America:Glace_Bay"{
+            ec{"ဂလဲစ်ဘေး"}
+        }
+        "America:Godthab"{
+            ec{"နုခ်"}
+        }
+        "America:Goose_Bay"{
+            ec{"ဂူးစ်ဘေး"}
+        }
+        "America:Grand_Turk"{
+            ec{"ဂရန်ဒ် တခ်"}
+        }
+        "America:Grenada"{
+            ec{"ဂရီနေဒါ"}
+        }
+        "America:Guadeloupe"{
+            ec{"ဂွါဒီလုပ်"}
+        }
+        "America:Guatemala"{
+            ec{"ဂွါတီမာလာ"}
+        }
+        "America:Guayaquil"{
+            ec{"ဂွါရာကွီးလ်"}
+        }
+        "America:Guyana"{
+            ec{"ဂိုင်ယာနာ"}
+        }
+        "America:Halifax"{
+            ec{"ဟလီဖက်စ်"}
+        }
+        "America:Havana"{
+            ec{"ဟာဗာနာ"}
+        }
+        "America:Hermosillo"{
+            ec{"ဟာမိုစ်စီလို"}
+        }
+        "America:Indiana:Knox"{
+            ec{"နောက်ခ်စ် အင်ဒီယားနား"}
+        }
+        "America:Indiana:Marengo"{
+            ec{"မာရန်ဂို အင်ဒီယားနား"}
+        }
+        "America:Indiana:Petersburg"{
+            ec{"ပီတာစ်ဘတ်ခ် အင်ဒီယားနား"}
+        }
+        "America:Indiana:Tell_City"{
+            ec{"တဲလ်စီးတီး အင်ဒီယားနား"}
+        }
+        "America:Indiana:Vevay"{
+            ec{"ဗီဗဲ အင်ဒီယားနား"}
+        }
+        "America:Indiana:Vincennes"{
+            ec{"ဗင်ဆင့်စ် အင်ဒီယားနား"}
+        }
+        "America:Indiana:Winamac"{
+            ec{"ဝီနာမက်ခ် အင်ဒီယားနား"}
+        }
+        "America:Indianapolis"{
+            ec{"အင်ဒီယားနား ပိုလိစ်"}
+        }
+        "America:Inuvik"{
+            ec{"အီနုဗီခ်"}
+        }
+        "America:Iqaluit"{
+            ec{"အီကာလူအီတ်"}
+        }
+        "America:Jamaica"{
+            ec{"ဂျမေကာ"}
+        }
+        "America:Jujuy"{
+            ec{"ဂျုဂျေ"}
+        }
+        "America:Juneau"{
+            ec{"ဂျုနိုအော"}
+        }
+        "America:Kentucky:Monticello"{
+            ec{"မွန်တီချယ်လို ကင်တပ်ကီ"}
+        }
+        "America:Kralendijk"{
+            ec{"ခရာလဲန်းဒစ်ချ်"}
+        }
+        "America:La_Paz"{
+            ec{"လာပါဇ်"}
+        }
+        "America:Lima"{
+            ec{"လီမာ"}
+        }
+        "America:Los_Angeles"{
+            ec{"လော့စ်အိန်ဂျယ်လိစ်"}
+        }
+        "America:Louisville"{
+            ec{"လူဝီဗီးလ်"}
+        }
+        "America:Lower_Princes"{
+            ec{"လိုအာပရင့်စ် ကွာတာ"}
+        }
+        "America:Maceio"{
+            ec{"မာဆဲသွာ"}
+        }
+        "America:Managua"{
+            ec{"မာနာဂွါ"}
+        }
+        "America:Manaus"{
+            ec{"မာနောက်စ်"}
+        }
+        "America:Marigot"{
+            ec{"မာရီဂေါ့"}
+        }
+        "America:Martinique"{
+            ec{"မာတီနီဂ်"}
+        }
+        "America:Matamoros"{
+            ec{"မာတာမိုရိုစ်"}
+        }
+        "America:Mazatlan"{
+            ec{"မာဇတ်လန်"}
+        }
+        "America:Mendoza"{
+            ec{"မန်ဒိုဇာ"}
+        }
+        "America:Menominee"{
+            ec{"မီနိုမီနီး"}
+        }
+        "America:Merida"{
+            ec{"မီရီဒါ"}
+        }
+        "America:Metlakatla"{
+            ec{"မက်တ်လာကက်လာ"}
+        }
+        "America:Mexico_City"{
+            ec{"မက်ကဆီကို စီးတီး"}
+        }
+        "America:Miquelon"{
+            ec{"မီကွီလွန်"}
+        }
+        "America:Moncton"{
+            ec{"မွန်ခ်တွန်"}
+        }
+        "America:Monterrey"{
+            ec{"မွန်တဲရေး"}
+        }
+        "America:Montevideo"{
+            ec{"မွန်တီဗီဒီအို"}
+        }
+        "America:Montserrat"{
+            ec{"မွန့်(တ်)ဆေးရတ်"}
+        }
+        "America:Nassau"{
+            ec{"နာ့ဆော်"}
+        }
+        "America:New_York"{
+            ec{"နယူးယောက်"}
+        }
+        "America:Nipigon"{
+            ec{"နီပီဂွန်"}
+        }
+        "America:Nome"{
+            ec{"နိုမီ"}
+        }
+        "America:Noronha"{
+            ec{"နိုရိုညာ"}
+        }
+        "America:North_Dakota:Beulah"{
+            ec{"ဗြူလာ၊ မြောက်ဒါကိုတာ"}
+        }
+        "America:North_Dakota:Center"{
+            ec{"စင်တာ၊ မြောက်ဒါကိုတာ"}
+        }
+        "America:North_Dakota:New_Salem"{
+            ec{"နယူးဆေးလမ်၊ မြောက်ဒါကိုတာ"}
+        }
+        "America:Ojinaga"{
+            ec{"အိုခီနဂါ"}
+        }
+        "America:Panama"{
+            ec{"ပနားမား"}
+        }
+        "America:Pangnirtung"{
+            ec{"ဖန်ဂ်နသ်တံ"}
+        }
+        "America:Paramaribo"{
+            ec{"ပါရာမာရီဘို"}
+        }
+        "America:Phoenix"{
+            ec{"ဖီးနစ်"}
+        }
+        "America:Port-au-Prince"{
+            ec{"ပို့တ်-အို-ပရင့်စ်"}
+        }
+        "America:Port_of_Spain"{
+            ec{"ပို့တ် အော့ဖ် စပိန်"}
+        }
+        "America:Porto_Velho"{
+            ec{"ပို့တ်တို ဗဲလီယို"}
+        }
+        "America:Puerto_Rico"{
+            ec{"ပေါ်တိုရီကို"}
+        }
+        "America:Punta_Arenas"{
+            ec{"ပွန်တာ အရီနာစ်"}
+        }
+        "America:Rainy_River"{
+            ec{"ရိမ်းနီး ရီဗာ"}
+        }
+        "America:Rankin_Inlet"{
+            ec{"ရန်ကင် အင်းလက်"}
+        }
+        "America:Recife"{
+            ec{"ဟေစီဖီလ်"}
+        }
+        "America:Regina"{
+            ec{"ရယ်ဂျီနာ"}
+        }
+        "America:Resolute"{
+            ec{"ရီဆိုလုပ်(တ်)"}
+        }
+        "America:Rio_Branco"{
+            ec{"ရီယို ဘရန်ကို"}
+        }
+        "America:Santa_Isabel"{
+            ec{"ဆန်တာ အစ္ဇဘဲလ်"}
+        }
+        "America:Santarem"{
+            ec{"ဆန်တာရမ်"}
+        }
+        "America:Santiago"{
+            ec{"ဆန်တီအာဂို"}
+        }
+        "America:Santo_Domingo"{
+            ec{"ဆန်တို ဒိုမင်းဂို"}
+        }
+        "America:Sao_Paulo"{
+            ec{"ဆော်ပိုလို"}
+        }
+        "America:Scoresbysund"{
+            ec{"အစ်တာကာ တိုးမိရက်တ်"}
+        }
+        "America:Sitka"{
+            ec{"စစ်ကာ"}
+        }
+        "America:St_Barthelemy"{
+            ec{"စိန့်ဘာသယ်လမီ"}
+        }
+        "America:St_Johns"{
+            ec{"စိန့်ဂျွန်း"}
+        }
+        "America:St_Kitts"{
+            ec{"စိန့်ကိစ်"}
+        }
+        "America:St_Lucia"{
+            ec{"စိန့်လူစီယာ"}
+        }
+        "America:St_Thomas"{
+            ec{"စိန့်သောမတ်စ်"}
+        }
+        "America:St_Vincent"{
+            ec{"စိန့်ဗင်းဆင့်"}
+        }
+        "America:Swift_Current"{
+            ec{"စွတ်ဖ်တ် ကားရင့်"}
+        }
+        "America:Tegucigalpa"{
+            ec{"တီဂူစီဂလ်ပါ"}
+        }
+        "America:Thule"{
+            ec{"သုလီ"}
+        }
+        "America:Thunder_Bay"{
+            ec{"သန်းန်ဒါး ဘေး"}
+        }
+        "America:Tijuana"{
+            ec{"တီဂွါနာ"}
+        }
+        "America:Toronto"{
+            ec{"တိုရန်တို"}
+        }
+        "America:Tortola"{
+            ec{"တောတိုလာ"}
+        }
+        "America:Vancouver"{
+            ec{"ဗန်ကူးဗား"}
+        }
+        "America:Whitehorse"{
+            ec{"ဝိုက်(တ်)ဟိုစ်"}
+        }
+        "America:Winnipeg"{
+            ec{"ဝီနီဗက်ဂ်"}
+        }
+        "America:Yakutat"{
+            ec{"ရာကုတတ်"}
+        }
+        "America:Yellowknife"{
+            ec{"ရဲလိုနိုက်ဖ်"}
+        }
+        "Antarctica:Casey"{
+            ec{"ကေစီ"}
+        }
+        "Antarctica:Davis"{
+            ec{"ဒေးဗစ်"}
+        }
+        "Antarctica:DumontDUrville"{
+            ec{"ဒူးမော့တ် ဒါရ်ဗီးလ်"}
+        }
+        "Antarctica:Macquarie"{
+            ec{"မက်ကွယ်ရီ"}
+        }
+        "Antarctica:Mawson"{
+            ec{"မော်စွန်"}
+        }
+        "Antarctica:McMurdo"{
+            ec{"မက်မူဒိုး"}
+        }
+        "Antarctica:Palmer"{
+            ec{"ပါလ်မာ"}
+        }
+        "Antarctica:Rothera"{
+            ec{"ရိုသီရာ"}
+        }
+        "Antarctica:Syowa"{
+            ec{"ရှိုးဝါ"}
+        }
+        "Antarctica:Troll"{
+            ec{"ထရိုလ်"}
+        }
+        "Antarctica:Vostok"{
+            ec{"ဗိုစ်တိုခ်"}
+        }
+        "Arctic:Longyearbyen"{
+            ec{"လောင်ရီယားဘရံ"}
+        }
+        "Asia:Aden"{
+            ec{"အာဒင်"}
+        }
+        "Asia:Almaty"{
+            ec{"အော်မာတီ"}
+        }
+        "Asia:Amman"{
+            ec{"အာမာန်း"}
+        }
+        "Asia:Anadyr"{
+            ec{"အန်အာဒီအာ"}
+        }
+        "Asia:Aqtau"{
+            ec{"အက်တာဥု"}
+        }
+        "Asia:Aqtobe"{
+            ec{"အာချတူးဘီ"}
+        }
+        "Asia:Ashgabat"{
+            ec{"အာရှ်ဂါဘာဒ်"}
+        }
+        "Asia:Atyrau"{
+            ec{"အာတီရအူ"}
+        }
+        "Asia:Baghdad"{
+            ec{"ဘဂ္ဂဒက်"}
+        }
+        "Asia:Bahrain"{
+            ec{"ဘာရိန်း"}
+        }
+        "Asia:Baku"{
+            ec{"ဘာကူ"}
+        }
+        "Asia:Bangkok"{
+            ec{"ဘန်ကောက်"}
+        }
+        "Asia:Barnaul"{
+            ec{"ဘရ်နာအူ"}
+        }
+        "Asia:Beirut"{
+            ec{"ဘေရွတ်"}
+        }
+        "Asia:Bishkek"{
+            ec{"ဘီရှ်ခက်"}
+        }
+        "Asia:Brunei"{
+            ec{"ဘရူနိုင်း"}
+        }
+        "Asia:Calcutta"{
+            ec{"ကိုလျကတ်တား"}
+        }
+        "Asia:Chita"{
+            ec{"ချီတာ"}
+        }
+        "Asia:Choibalsan"{
+            ec{"ချွဲဘောဆန်"}
+        }
+        "Asia:Colombo"{
+            ec{"ကိုလံဘို"}
+        }
+        "Asia:Damascus"{
+            ec{"ဒမားစကပ်"}
+        }
+        "Asia:Dhaka"{
+            ec{"ဒက်ကာ"}
+        }
+        "Asia:Dili"{
+            ec{"ဒစ်လီ"}
+        }
+        "Asia:Dubai"{
+            ec{"ဒူဘိုင်း"}
+        }
+        "Asia:Dushanbe"{
+            ec{"ဒူရှန်းဘဲ"}
+        }
+        "Asia:Famagusta"{
+            ec{"ဖာမာဂူစတာ"}
+        }
+        "Asia:Gaza"{
+            ec{"ဂါဇာ"}
+        }
+        "Asia:Hebron"{
+            ec{"ဟီဘရွန်"}
+        }
+        "Asia:Hong_Kong"{
+            ec{"ဟောင်ကောင်"}
+        }
+        "Asia:Hovd"{
+            ec{"ဟိုးဗျ"}
+        }
+        "Asia:Irkutsk"{
+            ec{"အီရူခူတ်"}
+        }
+        "Asia:Jakarta"{
+            ec{"ဂျကာတာ"}
+        }
+        "Asia:Jayapura"{
+            ec{"ဂျာရာပူရာ"}
+        }
+        "Asia:Jerusalem"{
+            ec{"ဂျေရုဆလင်"}
+        }
+        "Asia:Kabul"{
+            ec{"ကဘူးလျ"}
+        }
+        "Asia:Kamchatka"{
+            ec{"ခမ်ချာ့ခါ"}
+        }
+        "Asia:Karachi"{
+            ec{"ကရာချိ"}
+        }
+        "Asia:Katmandu"{
+            ec{"ခတ်တမန်ဒူ"}
+        }
+        "Asia:Khandyga"{
+            ec{"ခန်ဒိုင်ဂါ"}
+        }
+        "Asia:Krasnoyarsk"{
+            ec{"ခရာ့စ်နိုရာစ်"}
+        }
+        "Asia:Kuala_Lumpur"{
+            ec{"ကွာလာလမ်ပူ"}
+        }
+        "Asia:Kuching"{
+            ec{"ကူချင်"}
+        }
+        "Asia:Kuwait"{
+            ec{"ကူဝိတ်"}
+        }
+        "Asia:Macau"{
+            ec{"မကာအို"}
+        }
+        "Asia:Magadan"{
+            ec{"မာဂါဒန်း"}
+        }
+        "Asia:Makassar"{
+            ec{"မခက်စ်ဆာ"}
+        }
+        "Asia:Manila"{
+            ec{"မနီလာ"}
+        }
+        "Asia:Muscat"{
+            ec{"မတ်စ်ကက်တ်"}
+        }
+        "Asia:Nicosia"{
+            ec{"နီကိုရှား"}
+        }
+        "Asia:Novokuznetsk"{
+            ec{"နိုဗိုခူဇ်နက်စ်"}
+        }
+        "Asia:Novosibirsk"{
+            ec{"နိုဗိုစဲဘီအဲယ်စ်"}
+        }
+        "Asia:Omsk"{
+            ec{"အွမ်းစ်ခ်"}
+        }
+        "Asia:Oral"{
+            ec{"အော်ရဲလ်"}
+        }
+        "Asia:Phnom_Penh"{
+            ec{"ဖနွမ်ပင်"}
+        }
+        "Asia:Pontianak"{
+            ec{"ပွန်တီအားနာ့ခ်"}
+        }
+        "Asia:Pyongyang"{
+            ec{"ပြုံယန်း"}
+        }
+        "Asia:Qatar"{
+            ec{"ကာတာ"}
+        }
+        "Asia:Qostanay"{
+            ec{"ကော့စ်တနေ"}
+        }
+        "Asia:Qyzylorda"{
+            ec{"ကီဇလော်ဒါ"}
+        }
+        "Asia:Rangoon"{
+            ec{"ရန်ကုန်"}
+        }
+        "Asia:Riyadh"{
+            ec{"ရီယားဒ်"}
+        }
+        "Asia:Saigon"{
+            ec{"ဟိုချီမင်းစီးတီး"}
+        }
+        "Asia:Sakhalin"{
+            ec{"ဆာခါလင်"}
+        }
+        "Asia:Samarkand"{
+            ec{"ဆမ်းမာခန်းဒ်"}
+        }
+        "Asia:Seoul"{
+            ec{"ဆိုးလ်"}
+        }
+        "Asia:Shanghai"{
+            ec{"ရှန်ဟိုင်း"}
+        }
+        "Asia:Singapore"{
+            ec{"စင်္ကာပူ"}
+        }
+        "Asia:Srednekolymsk"{
+            ec{"ဆရစ်နစ်ကာလင်မ်စ်"}
+        }
+        "Asia:Taipei"{
+            ec{"တိုင်ပေ"}
+        }
+        "Asia:Tashkent"{
+            ec{"တာရှ်ကဲန့်"}
+        }
+        "Asia:Tbilisi"{
+            ec{"တဘီးလီစီ"}
+        }
+        "Asia:Tehran"{
+            ec{"တီဟီရန်"}
+        }
+        "Asia:Thimphu"{
+            ec{"တင်ဖူး"}
+        }
+        "Asia:Tokyo"{
+            ec{"တိုကျို"}
+        }
+        "Asia:Tomsk"{
+            ec{"တွန်မ်စ်ခ်"}
+        }
+        "Asia:Ulaanbaatar"{
+            ec{"ဥလန်ဘာတော"}
+        }
+        "Asia:Urumqi"{
+            ec{"အူရုမ်ချီ"}
+        }
+        "Asia:Ust-Nera"{
+            ec{"အူးစ် နီရား"}
+        }
+        "Asia:Vientiane"{
+            ec{"ဗီယင်ကျန်း"}
+        }
+        "Asia:Vladivostok"{
+            ec{"ဗလာဒီဗော့စတော့ခ်"}
+        }
+        "Asia:Yakutsk"{
+            ec{"ယူခူးတ်စ်"}
+        }
+        "Asia:Yekaterinburg"{
+            ec{"ရယ်ခါးတီရင်ဘားခ်"}
+        }
+        "Asia:Yerevan"{
+            ec{"ရဲယ်ရေဗန်း"}
+        }
+        "Atlantic:Azores"{
+            ec{"အေဇိုးရီးစ်"}
+        }
+        "Atlantic:Bermuda"{
+            ec{"ဘာမြူဒါ"}
+        }
+        "Atlantic:Canary"{
+            ec{"ကနေရီ"}
+        }
+        "Atlantic:Cape_Verde"{
+            ec{"ကိတ်ပ် ဗာဒီ"}
+        }
+        "Atlantic:Faeroe"{
+            ec{"ဖါရို"}
+        }
+        "Atlantic:Madeira"{
+            ec{"မဒီးရာ"}
+        }
+        "Atlantic:Reykjavik"{
+            ec{"ရေးကီဗစ်ခ်"}
+        }
+        "Atlantic:South_Georgia"{
+            ec{"တောင်ဂျော်ဂျီယာ"}
+        }
+        "Atlantic:St_Helena"{
+            ec{"စိန့်ဟယ်လယ်နာ"}
+        }
+        "Atlantic:Stanley"{
+            ec{"စတန်လေ"}
+        }
+        "Australia:Adelaide"{
+            ec{"အန္ဒီလိတ်ဒ်"}
+        }
+        "Australia:Brisbane"{
+            ec{"ဘရစ္စဘိန်း"}
+        }
+        "Australia:Broken_Hill"{
+            ec{"ဘရိုကင်ဟီးလ်"}
+        }
+        "Australia:Currie"{
+            ec{"ကာရီ"}
+        }
+        "Australia:Darwin"{
+            ec{"ဒါဝင်"}
+        }
+        "Australia:Eucla"{
+            ec{"ယူးခလာ"}
+        }
+        "Australia:Hobart"{
+            ec{"ဟိုးဘားတ်"}
+        }
+        "Australia:Lindeman"{
+            ec{"လင်းဒီမန်း"}
+        }
+        "Australia:Lord_Howe"{
+            ec{"လော့ဒ် ဟောင်"}
+        }
+        "Australia:Melbourne"{
+            ec{"မဲလ်ဘုန်း"}
+        }
+        "Australia:Perth"{
+            ec{"ပါးသ်"}
+        }
+        "Australia:Sydney"{
+            ec{"ဆစ်ဒနီ"}
+        }
+        "Etc:UTC"{
+            ls{"ညှိထားသည့် ကမ္ဘာ့ စံတော်ချိန်"}
+        }
+        "Etc:Unknown"{
+            ec{"အမည်မသိသောမြို့"}
+        }
+        "Europe:Amsterdam"{
+            ec{"အမ်စတာဒမ်"}
+        }
+        "Europe:Andorra"{
+            ec{"အန်ဒိုရာ"}
+        }
+        "Europe:Astrakhan"{
+            ec{"အားစ်တရခန်း"}
+        }
+        "Europe:Athens"{
+            ec{"အေသင်"}
+        }
+        "Europe:Belgrade"{
+            ec{"ဘဲလ်ဂရိတ်"}
+        }
+        "Europe:Berlin"{
+            ec{"ဘာလင်"}
+        }
+        "Europe:Bratislava"{
+            ec{"ဘရာတီးစ်လားဗာ"}
+        }
+        "Europe:Brussels"{
+            ec{"ဘရပ်ဆဲလ်"}
+        }
+        "Europe:Bucharest"{
+            ec{"ဘူခါရက်စ်"}
+        }
+        "Europe:Budapest"{
+            ec{"ဘူဒါပက်စ်"}
+        }
+        "Europe:Busingen"{
+            ec{"ဘူရှင်ဂျင်"}
+        }
+        "Europe:Chisinau"{
+            ec{"ချီရှီနားအူ"}
+        }
+        "Europe:Copenhagen"{
+            ec{"ကိုပင်ဟေဂင်"}
+        }
+        "Europe:Dublin"{
+            ec{"ဒတ်ဘလင်"}
+            ld{"အိုင်းရစ်ရှ် စံတော်ချိန်"}
+        }
+        "Europe:Gibraltar"{
+            ec{"ဂျီဘရော်လ်တာ"}
+        }
+        "Europe:Guernsey"{
+            ec{"ဂွန်းဇီ"}
+        }
+        "Europe:Helsinki"{
+            ec{"ဟဲလ်စင်ကီ"}
+        }
+        "Europe:Isle_of_Man"{
+            ec{"မန်းကျွန်း"}
+        }
+        "Europe:Istanbul"{
+            ec{"အစ္စတန်ဘူလ်"}
+        }
+        "Europe:Jersey"{
+            ec{"ဂျာစီ"}
+        }
+        "Europe:Kaliningrad"{
+            ec{"ခါလီနင်ဂရက်"}
+        }
+        "Europe:Kiev"{
+            ec{"ခီးအက်ဖ်"}
+        }
+        "Europe:Kirov"{
+            ec{"ခီရိုဗ်"}
+        }
+        "Europe:Lisbon"{
+            ec{"လစ္စဘွန်း"}
+        }
+        "Europe:Ljubljana"{
+            ec{"လူဘလီအားနား"}
+        }
+        "Europe:London"{
+            ec{"လန်ဒန်"}
+            ld{"ဗြိတိန် နွေရာသီ အချိန်"}
+        }
+        "Europe:Luxembourg"{
+            ec{"လူဇင်ဘတ်"}
+        }
+        "Europe:Madrid"{
+            ec{"မဒရစ်"}
+        }
+        "Europe:Malta"{
+            ec{"မော်လ်တာ"}
+        }
+        "Europe:Mariehamn"{
+            ec{"မရီအာ ဟားမန်"}
+        }
+        "Europe:Minsk"{
+            ec{"မင်းစခ်"}
+        }
+        "Europe:Monaco"{
+            ec{"မိုနာကို"}
+        }
+        "Europe:Moscow"{
+            ec{"မော်စကို"}
+        }
+        "Europe:Oslo"{
+            ec{"အော်စလို"}
+        }
+        "Europe:Paris"{
+            ec{"ပဲရစ်"}
+        }
+        "Europe:Podgorica"{
+            ec{"ပေါ့ဂိုရီကာ"}
+        }
+        "Europe:Prague"{
+            ec{"ပရက်ဂ်"}
+        }
+        "Europe:Riga"{
+            ec{"ရီဂါ"}
+        }
+        "Europe:Rome"{
+            ec{"ရောမ"}
+        }
+        "Europe:Samara"{
+            ec{"ဆာမားရာ"}
+        }
+        "Europe:San_Marino"{
+            ec{"ဆန်မရီးနို"}
+        }
+        "Europe:Sarajevo"{
+            ec{"ဆာရာယေဗို"}
+        }
+        "Europe:Saratov"{
+            ec{"ဆာရာတို့ဖ်"}
+        }
+        "Europe:Simferopol"{
+            ec{"စင်ဖာရိုးဖို"}
+        }
+        "Europe:Skopje"{
+            ec{"စကော့ပ်ရာ"}
+        }
+        "Europe:Sofia"{
+            ec{"ဆိုဖီအာ"}
+        }
+        "Europe:Stockholm"{
+            ec{"စတော့ဟုမ်း"}
+        }
+        "Europe:Tallinn"{
+            ec{"ထားလင်"}
+        }
+        "Europe:Tirane"{
+            ec{"တီရာနီ"}
+        }
+        "Europe:Ulyanovsk"{
+            ec{"အူလီယာနိုစကစ်ဖ်"}
+        }
+        "Europe:Uzhgorod"{
+            ec{"ဥဇ်ဂိုရို့တ်"}
+        }
+        "Europe:Vaduz"{
+            ec{"ဗာဒူးစ်"}
+        }
+        "Europe:Vatican"{
+            ec{"ဗာတီကန်"}
+        }
+        "Europe:Vienna"{
+            ec{"ဗီယင်နာ"}
+        }
+        "Europe:Vilnius"{
+            ec{"ဗီးလ်နီအိုးစ်"}
+        }
+        "Europe:Volgograd"{
+            ec{"ဗိုလ်ဂိုဂရက်"}
+        }
+        "Europe:Warsaw"{
+            ec{"ဝါဆော"}
+        }
+        "Europe:Zagreb"{
+            ec{"ဇာဂ်ဂရက်ဘ်"}
+        }
+        "Europe:Zaporozhye"{
+            ec{"ဇာဖိုရိုးစ်ဂျာ"}
+        }
+        "Europe:Zurich"{
+            ec{"ဇူးရစ်ချ်"}
+        }
+        "Indian:Antananarivo"{
+            ec{"အန်တာနာနာရီးဘို"}
+        }
+        "Indian:Chagos"{
+            ec{"ချာဂိုစ်"}
+        }
+        "Indian:Christmas"{
+            ec{"ခရစ်စမတ်"}
+        }
+        "Indian:Cocos"{
+            ec{"ကိုကိုးစ်"}
+        }
+        "Indian:Comoro"{
+            ec{"ကိုမိုရို"}
+        }
+        "Indian:Kerguelen"{
+            ec{"ခါဂါလန်"}
+        }
+        "Indian:Mahe"{
+            ec{"မာဟီ"}
+        }
+        "Indian:Maldives"{
+            ec{"မော်လဒိုက်"}
+        }
+        "Indian:Mauritius"{
+            ec{"မောရစ်ရှ"}
+        }
+        "Indian:Mayotte"{
+            ec{"မာယိုတဲ"}
+        }
+        "Indian:Reunion"{
+            ec{"ရီယူနီယန်"}
+        }
+        "Pacific:Apia"{
+            ec{"အားပီအား"}
+        }
+        "Pacific:Auckland"{
+            ec{"အော့ကလန်"}
+        }
+        "Pacific:Bougainville"{
+            ec{"ဘူဂန်ဗီးလီးယား"}
+        }
+        "Pacific:Chatham"{
+            ec{"ချားသမ်"}
+        }
+        "Pacific:Easter"{
+            ec{"အီစတာ"}
+        }
+        "Pacific:Efate"{
+            ec{"အီဖာတီ"}
+        }
+        "Pacific:Enderbury"{
+            ec{"အန်ဒါဘူရီ"}
+        }
+        "Pacific:Fakaofo"{
+            ec{"ဖာခါအိုဖို"}
+        }
+        "Pacific:Fiji"{
+            ec{"ဖီဂျီ"}
+        }
+        "Pacific:Funafuti"{
+            ec{"ဖူနာဖူတီ"}
+        }
+        "Pacific:Galapagos"{
+            ec{"ဂါလာပါကပ်စ်"}
+        }
+        "Pacific:Gambier"{
+            ec{"ဂမ်ဘီယာ"}
+        }
+        "Pacific:Guadalcanal"{
+            ec{"ဂွါဒါကနဲလ်"}
+        }
+        "Pacific:Guam"{
+            ec{"ဂူအမ်"}
+        }
+        "Pacific:Honolulu"{
+            ec{"ဟိုနိုလူလူ"}
+        }
+        "Pacific:Johnston"{
+            ec{"ဂျွန်စတန်"}
+        }
+        "Pacific:Kiritimati"{
+            ec{"ခရိဒီမတီ"}
+        }
+        "Pacific:Kosrae"{
+            ec{"ခိုစ်ရိုင်"}
+        }
+        "Pacific:Kwajalein"{
+            ec{"ခွာဂျာလိန်"}
+        }
+        "Pacific:Majuro"{
+            ec{"မာဂျူးရို"}
+        }
+        "Pacific:Marquesas"{
+            ec{"မာခေးအပ်စ်"}
+        }
+        "Pacific:Midway"{
+            ec{"မစ်ဒ်ဝေး"}
+        }
+        "Pacific:Nauru"{
+            ec{"နာဥူရူ"}
+        }
+        "Pacific:Niue"{
+            ec{"နီဦးအေ"}
+        }
+        "Pacific:Norfolk"{
+            ec{"နော်ဖော့ခ်"}
+        }
+        "Pacific:Noumea"{
+            ec{"နူမယ်အာ"}
+        }
+        "Pacific:Pago_Pago"{
+            ec{"ပါဂိုပါဂို"}
+        }
+        "Pacific:Palau"{
+            ec{"ပလာအို"}
+        }
+        "Pacific:Pitcairn"{
+            ec{"ပါတ်ကယ်ရင်"}
+        }
+        "Pacific:Ponape"{
+            ec{"ဖိုနာဖဲအ်"}
+        }
+        "Pacific:Port_Moresby"{
+            ec{"ဖို့တ် မိုရက်စ်ဘီ"}
+        }
+        "Pacific:Rarotonga"{
+            ec{"ရာရိုတွန်းဂါ"}
+        }
+        "Pacific:Saipan"{
+            ec{"ဆိုင်ပန်"}
+        }
+        "Pacific:Tahiti"{
+            ec{"တဟီတီ"}
+        }
+        "Pacific:Tarawa"{
+            ec{"တာရာဝါ"}
+        }
+        "Pacific:Tongatapu"{
+            ec{"တွန်ဂါတာပု"}
+        }
+        "Pacific:Truk"{
+            ec{"ချုခ်"}
+        }
+        "Pacific:Wake"{
+            ec{"ဝိက်ခ်"}
+        }
+        "Pacific:Wallis"{
+            ec{"ဝေါလီစ်"}
+        }
+        "meta:Afghanistan"{
+            ls{"အာဖဂန်နစ္စတန် အချိန်"}
+        }
+        "meta:Africa_Central"{
+            ls{"အလယ်အာဖရိက အချိန်"}
+        }
+        "meta:Africa_Eastern"{
+            ls{"အရှေ့အာဖရိက အချိန်"}
+        }
+        "meta:Africa_Southern"{
+            ls{"တောင်အာဖရိက အချိန်"}
+        }
+        "meta:Africa_Western"{
+            ld{"အနောက်အာဖရိက နွေရာသီ အချိန်"}
+            lg{"အနောက်အာဖရိက အချိန်"}
+            ls{"အနောက်အာဖရိက စံတော်ချိန်"}
+        }
+        "meta:Alaska"{
+            ld{"အလာစကာ နွေရာသီ စံတော်ချိန်"}
+            lg{"အလာစကာ အချိန်"}
+            ls{"အလာစကာ စံတော်ချိန်"}
+        }
+        "meta:Amazon"{
+            ld{"အမေဇုံ နွေရာသီအချိန်"}
+            lg{"အမေဇုံ အချိန်"}
+            ls{"အမေဇုံ စံတော်ချိန်"}
+        }
+        "meta:America_Central"{
+            ld{"မြောက်အမေရိက အလယ်ပိုင်း နွေရာသီစံတော်ချိန်"}
+            lg{"မြောက်အမေရိက အလယ်ပိုင်းအချိန်"}
+            ls{"မြောက်အမေရိက အလယ်ပိုင်းစံတော်ချိန်"}
+        }
+        "meta:America_Eastern"{
+            ld{"မြောက်အမေရိက အရှေ့ပိုင်း နွေရာသီစံတော်ချိန်"}
+            lg{"မြောက်အမေရိက အရှေ့ပိုင်းအချိန်"}
+            ls{"မြောက်အမေရိက အရှေ့ပိုင်းစံတော်ချိန်"}
+        }
+        "meta:America_Mountain"{
+            ld{"မြောက်အမေရိက တောင်တန်းဒေသ နွေရာသီစံတော်ချိန်"}
+            lg{"မြောက်အမေရိက တောင်တန်းဒေသအချိန်"}
+            ls{"မြောက်အမေရိက တောင်တန်းဒေသစံတော်ချိန်"}
+        }
+        "meta:America_Pacific"{
+            ld{"မြောက်အမေရိက ပစိဖိတ် နွေရာသီစံတော်ချိန်"}
+            lg{"မြောက်အမေရိက ပစိဖိတ်အချိန်"}
+            ls{"မြောက်အမေရိက ပစိဖိတ်စံတော်ချိန်"}
+        }
+        "meta:Apia"{
+            ld{"အပီယာ နွေရာသီ အချိန်"}
+            lg{"အပီယာ အချိန်"}
+            ls{"အပီယာ စံတော်ချိန်"}
+        }
+        "meta:Arabian"{
+            ld{"အာရေဗျ နွေရာသီ အချိန်"}
+            lg{"အာရေဗျ အချိန်"}
+            ls{"အာရေဗျ စံတော်ချိန်"}
+        }
+        "meta:Argentina"{
+            ld{"အာဂျင်တီးနား နွေရာသီအချိန်"}
+            lg{"အာဂျင်တီးနား အချိန်"}
+            ls{"အာဂျင်တီးနား စံတော်ချိန်"}
+        }
+        "meta:Argentina_Western"{
+            ld{"အနောက် အာဂျင်တီးနား နွေရာသီ အချိန်"}
+            lg{"အနောက် အာဂျင်တီးနား အချိန်"}
+            ls{"အနောက် အာဂျင်တီးနား စံတော်ချိန်"}
+        }
+        "meta:Armenia"{
+            ld{"အာမေးနီးယား နွေရာသီ အချိန်"}
+            lg{"အာမေးနီးယား အချိန်"}
+            ls{"အာမေးနီးယား စံတော်ချိန်"}
+        }
+        "meta:Atlantic"{
+            ld{"အတ္တလန်တစ် နွေရာသီ စံတော်ချိန်"}
+            lg{"အတ္တလန်တစ် အချိန်"}
+            ls{"အတ္တလန်တစ် စံတော်ချိန်"}
+        }
+        "meta:Australia_Central"{
+            ld{"ဩစတြေးလျ အလယ်ပိုင်း နွေရာသီ အချိန်"}
+            lg{"ဩစတြေးလျ အလယ်ပိုင်း အချိန်"}
+            ls{"ဩစတြေးလျ အလယ်ပိုင်း စံတော်ချိန်"}
+        }
+        "meta:Australia_CentralWestern"{
+            ld{"သြစတြေးလျား အနောက်အလယ်ပိုင်း နွေရာသီ အချိန်"}
+            lg{"သြစတြေးလျား အနောက်အလယ်ပိုင်း အချိန်"}
+            ls{"သြစတြေးလျား အနောက်အလယ်ပိုင်း စံတော်ချိန်"}
+        }
+        "meta:Australia_Eastern"{
+            ld{"အရှေ့ဩစတြေးလျ နွေရာသီ အချိန်"}
+            lg{"အရှေ့ဩစတြေးလျ အချိန်"}
+            ls{"အရှေ့ဩစတြေးလျ စံတော်ချိန်"}
+        }
+        "meta:Australia_Western"{
+            ld{"ဩစတြေးလျ နွေရာသီ အချိန်"}
+            lg{"အနောက်ဩစတြေးလျ အချိန်"}
+            ls{"အနောက်ဩစတြေးလျ စံတော်ချိန်"}
+        }
+        "meta:Azerbaijan"{
+            ld{"အဇာဘိုင်ဂျန် နွေရာသီ အချိန်"}
+            lg{"အဇာဘိုင်ဂျန် အချိန်"}
+            ls{"အဇာဘိုင်ဂျန် စံတော်ချိန်"}
+        }
+        "meta:Azores"{
+            ld{"အေဇိုးရီးစ် နွေရာသီ အချိန်"}
+            lg{"အေဇိုးရီးစ် အချိန်"}
+            ls{"အေဇိုးရီးစ် စံတော်ချိန်"}
+        }
+        "meta:Bangladesh"{
+            ld{"ဘင်္ဂလားဒေ့ရှ် နွေရာသီ အချိန်"}
+            lg{"ဘင်္ဂလားဒေ့ရှ် အချိန်"}
+            ls{"ဘင်္ဂလားဒေ့ရှ် စံတော်ချိန်"}
+        }
+        "meta:Bhutan"{
+            ls{"ဘူတန် အချိန်"}
+        }
+        "meta:Bolivia"{
+            ls{"ဘိုလီးဘီးယား အချိန်"}
+        }
+        "meta:Brasilia"{
+            ld{"ဘရာဇီး နွေရာသီ အချိန်"}
+            lg{"ဘရာဇီး အချိန်"}
+            ls{"ဘရာဇီး စံတော်ချိန်"}
+        }
+        "meta:Brunei"{
+            ls{"ဘရူနိုင်း စံတော်ချိန်"}
+        }
+        "meta:Cape_Verde"{
+            ld{"ကိတ်ပ် ဗာဒီ နွေရာသီ အချိန်"}
+            lg{"ကိတ်ပ် ဗာဒီ အချိန်"}
+            ls{"ကိတ်ပ် ဗာဒီ စံတော်ချိန်"}
+        }
+        "meta:Chamorro"{
+            ls{"ချာမိုရို အချိန်"}
+        }
+        "meta:Chatham"{
+            ld{"ချာသမ် နွေရာသီ အချိန်"}
+            lg{"ချားသမ်အချိန်"}
+            ls{"ချားသမ်စံတော်ချိန်"}
+        }
+        "meta:Chile"{
+            ld{"ချီလီ နွေရာသီ အချိန်"}
+            lg{"ချီလီ အချိန်"}
+            ls{"ချီလီ စံတော်ချိန်"}
+        }
+        "meta:China"{
+            ld{"တရုတ် နွေရာသီ အချိန်"}
+            lg{"တရုတ် အချိန်"}
+            ls{"တရုတ် စံတော်ချိန်"}
+        }
+        "meta:Choibalsan"{
+            ld{"ချွဲဘော်ဆန်း နွေရာသီ အချိန်"}
+            lg{"ချွဲဘော်ဆန်း အချိန်"}
+            ls{"ချွဲဘော်ဆန်း စံတော်ချိန်"}
+        }
+        "meta:Christmas"{
+            ls{"ခရစ်စမတ်ကျွန်း အချိန်"}
+        }
+        "meta:Cocos"{
+            ls{"ကိုကိုးကျွန်း အချိန်"}
+        }
+        "meta:Colombia"{
+            ld{"ကိုလံဘီယာ နွေရာသီ အချိန်"}
+            lg{"ကိုလံဘီယာ အချိန်"}
+            ls{"ကိုလံဘီယာ စံတော်ချိန်"}
+        }
+        "meta:Cook"{
+            ld{"ကွတ်က်ကျွန်းစု နွေရာသီ အချိန်"}
+            lg{"ကွတ်ခ်ကျွန်းစု အချိန်"}
+            ls{"ကွတ်ခ်ကျွန်းစု စံတော်ချိန်"}
+        }
+        "meta:Cuba"{
+            ld{"ကျူးဘား နွေရာသီ စံတော်ချိန်"}
+            lg{"ကျူးဘား အချိန်"}
+            ls{"ကျူးဘား စံတော်ချိန်"}
+        }
+        "meta:Davis"{
+            ls{"ဒေးဗစ် အချိန်"}
+        }
+        "meta:DumontDUrville"{
+            ls{"ဒူးမော့တ် ဒါရ်ဗီးလ် အချိန်"}
+        }
+        "meta:East_Timor"{
+            ls{"အရှေ့တီမော အချိန်"}
+        }
+        "meta:Easter"{
+            ld{"အီစတာကျွန်း နွေရာသီ အချိန်"}
+            lg{"အီစတာကျွန်း အချိန်"}
+            ls{"အီစတာကျွန်း စံတော်ချိန်"}
+        }
+        "meta:Ecuador"{
+            ls{"အီကွေဒေါ အချိန်"}
+        }
+        "meta:Europe_Central"{
+            ld{"ဥရောပအလယ်ပိုင်း နွေရာသီ အချိန်"}
+            lg{"ဥရောပအလယ်ပိုင်း အချိန်"}
+            ls{"ဥရောပအလယ်ပိုင်း စံတော်ချိန်"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"အရှေ့ဥရောပ နွေရာသီ အချိန်"}
+            lg{"အရှေ့ဥရောပ အချိန်"}
+            ls{"အရှေ့ဥရောပ စံတော်ချိန်"}
+        }
+        "meta:Europe_Further_Eastern"{
+            ls{"အရှေ့ဖျား ဥရောပဒေသ အချိန်"}
+        }
+        "meta:Europe_Western"{
+            ld{"အနောက်ဥရောပ နွေရာသီ အချိန်"}
+            lg{"အနောက်ဥရောပ အချိန်"}
+            ls{"အနောက်ဥရောပ စံတော်ချိန်"}
+        }
+        "meta:Falkland"{
+            ld{"ဖော့ကလန်ကျွန်းစု နွေရာသီ အချိန်"}
+            lg{"ဖော့ကလန်ကျွန်းစု အချိန်"}
+            ls{"ဖော့ကလန်ကျွန်းစု စံတော်ချိန်"}
+        }
+        "meta:Fiji"{
+            ld{"ဖီဂျီ နွေရာသီ အချိန်"}
+            lg{"ဖီဂျီ အချိန်"}
+            ls{"ဖီဂျီ စံတော်ချိန်"}
+        }
+        "meta:French_Guiana"{
+            ls{"ပြင်သစ် ဂီအားနား အချိန်"}
+        }
+        "meta:French_Southern"{
+            ls{"ပြင်သစ်တောင်ပိုင်းနှင့် အန္တာတိတ် အချိန်"}
+        }
+        "meta:GMT"{
+            ls{"ဂရင်းနစ် စံတော်ချိန်"}
+        }
+        "meta:Galapagos"{
+            ls{"ဂါလားပါဂိုးစ် အချိန်"}
+        }
+        "meta:Gambier"{
+            ls{"ဂမ်ဘီယာ အချိန်"}
+        }
+        "meta:Georgia"{
+            ld{"ဂျော်ဂျီယာ နွေရာသီ အချိန်"}
+            lg{"ဂျော်ဂျီယာ အချိန်"}
+            ls{"ဂျော်ဂျီယာ စံတော်ချိန်"}
+        }
+        "meta:Gilbert_Islands"{
+            ls{"ဂီလ်ဘတ်ကျွန်းစု အချိန်"}
+        }
+        "meta:Greenland_Eastern"{
+            ld{"အရှေ့ဂရင်းလန် နွေရာသီ စံတော်ချိန်"}
+            lg{"အရှေ့ဂရင်းလန်း အချိန်"}
+            ls{"အရှေ့ဂရင်းလန်း စံတော်ချိန်"}
+        }
+        "meta:Greenland_Western"{
+            ld{"အနောက် ဂရင်းလန် နွေရာသီ စံတော်ချိန်"}
+            lg{"အနောက် ဂရင်းလန်း အချိန်"}
+            ls{"အနောက် ဂရင်းလန်း စံတော်ချိန်"}
+        }
+        "meta:Gulf"{
+            ls{"ပင်လယ်ကွေ့ အချိန်"}
+        }
+        "meta:Guyana"{
+            ls{"ဂိုင်ယာနာ အချိန်"}
+        }
+        "meta:Hawaii_Aleutian"{
+            ld{"ဟာဝိုင်ယီ အယ်လူးရှန်း နွေရာသီ စံတော်ချိန်"}
+            lg{"ဟာဝိုင်ယီ အယ်လူးရှန်း အချိန်"}
+            ls{"ဟာဝိုင်ယီ အယ်လူးရှန်း စံတော်ချိန်"}
+        }
+        "meta:Hong_Kong"{
+            ld{"ဟောင်ကောင် နွေရာသီ အချိန်"}
+            lg{"ဟောင်ကောင် အချိန်"}
+            ls{"ဟောင်ကောင် စံတော်ချိန်"}
+        }
+        "meta:Hovd"{
+            ld{"ဟိုးဗ် နွေရာသီ အချိန်"}
+            lg{"ဟိုးဗ် အချိန်"}
+            ls{"ဟိုးဗ် စံတော်ချိန်"}
+        }
+        "meta:India"{
+            ls{"အိန္ဒိယ စံတော်ချိန်"}
+        }
+        "meta:Indian_Ocean"{
+            ls{"အိန္ဒိယသမုဒ္ဒရာ အချိန်"}
+        }
+        "meta:Indochina"{
+            ls{"အင်ဒိုချိုင်းနား အချိန်"}
+        }
+        "meta:Indonesia_Central"{
+            ls{"အလယ်ပိုင်း အင်ဒိုနီးရှား အချိန်"}
+        }
+        "meta:Indonesia_Eastern"{
+            ls{"အရှေ့ပိုင်း အင်ဒိုနီးရှား အချိန်"}
+        }
+        "meta:Indonesia_Western"{
+            ls{"အနောက်ပိုင်း အင်ဒိုနီးရှား အချိန်"}
+        }
+        "meta:Iran"{
+            ld{"အီရန် နွေရာသီ အချိန်"}
+            lg{"အီရန် အချိန်"}
+            ls{"အီရန် စံတော်ချိန်"}
+        }
+        "meta:Irkutsk"{
+            ld{"အီရူခူတ် နွေရာသီ အချိန်"}
+            lg{"အီရူခူတ် အချိန်"}
+            ls{"အီရူခူတ် စံတော်ချိန်"}
+        }
+        "meta:Israel"{
+            ld{"အစ္စရေး နွေရာသီ အချိန်"}
+            lg{"အစ္စရေး အချိန်"}
+            ls{"အစ္စရေး စံတော်ချိန်"}
+        }
+        "meta:Japan"{
+            ld{"ဂျပန် နွေရာသီ အချိန်"}
+            lg{"ဂျပန် အချိန်"}
+            ls{"ဂျပန် စံတော်ချိန်"}
+        }
+        "meta:Kazakhstan_Eastern"{
+            ls{"အရှေ့ကာဇက်စတန် အချိန်"}
+        }
+        "meta:Kazakhstan_Western"{
+            ls{"အနောက်ကာဇက်စတန် အချိန်"}
+        }
+        "meta:Korea"{
+            ld{"ကိုရီးယား နွေရာသီ အချိန်"}
+            lg{"ကိုရီးယား အချိန်"}
+            ls{"ကိုရီးယား စံတော်ချိန်"}
+        }
+        "meta:Kosrae"{
+            ls{"ခိုစ်ရိုင် အချိန်"}
+        }
+        "meta:Krasnoyarsk"{
+            ld{"ခရာ့စ်နိုရာစ် နွေရာသီ အချိန်"}
+            lg{"ခရာ့စ်နိုရာစ် အချိန်"}
+            ls{"ခရာ့စ်နိုရာစ် စံတော်ချိန်"}
+        }
+        "meta:Kyrgystan"{
+            ls{"ကာဂျစ္စတန် အချိန်"}
+        }
+        "meta:Lanka"{
+            ls{"သီရိလင်္ကာ အချိန်"}
+        }
+        "meta:Line_Islands"{
+            ls{"လိုင်းကျွန်းစု အချိန်"}
+        }
+        "meta:Lord_Howe"{
+            ld{"လော့ဒ်ဟောင် နွေရာသီ အချိန်"}
+            lg{"လော့ဒ်ဟောင် အချိန်"}
+            ls{"လော့ဒ်ဟောင် စံတော်ချိန်"}
+        }
+        "meta:Macau"{
+            ld{"မကာအို နွေရာသီ အချိန်"}
+            lg{"မကာအို အချိန်"}
+            ls{"မကာအို စံတော်ချိန်"}
+        }
+        "meta:Macquarie"{
+            ls{"မက်ကွယ်ရီကျွန်း အချိန်"}
+        }
+        "meta:Magadan"{
+            ld{"မာဂါဒန်း နွေရာသီ အချိန်"}
+            lg{"မာဂါဒန်း အချိန်"}
+            ls{"မာဂါဒန်း စံတော်ချိန်"}
+        }
+        "meta:Malaysia"{
+            ls{"မလေးရှား အချိန်"}
+        }
+        "meta:Maldives"{
+            ls{"မော်လဒိုက် အချိန်"}
+        }
+        "meta:Marquesas"{
+            ls{"မာခေးအပ်စ် အချိန်"}
+        }
+        "meta:Marshall_Islands"{
+            ls{"မာရှယ်ကျွန်းစု အချိန်"}
+        }
+        "meta:Mauritius"{
+            ld{"မောရစ်ရှ် နွေရာသီ အချိန်"}
+            lg{"မောရစ်ရှ် အချိန်"}
+            ls{"မောရစ်ရှ် စံတော်ချိန်"}
+        }
+        "meta:Mawson"{
+            ls{"မော်စွန် အချိန်"}
+        }
+        "meta:Mexico_Northwest"{
+            ld{"အနောက်တောင် မက္ကစီကို နွေရာသီ စံတော်ချိန်"}
+            lg{"အနောက်တောင် မက္ကဆီကို အချိန်"}
+            ls{"အနောက်တောင် မက္ကဆီကို စံတော်ချိန်"}
+        }
+        "meta:Mexico_Pacific"{
+            ld{"မက္ကစီကန် ပစိဖိတ် နွေရာသီ စံတော်ချိန်"}
+            lg{"မက္ကဆီကန် ပစိဖိတ် အချိန်"}
+            ls{"မက္ကဆီကန် ပစိဖိတ် စံတော်ချိန်"}
+        }
+        "meta:Mongolia"{
+            ld{"ဥလန်ဘာတော နွေရာသီ အချိန်"}
+            lg{"ဥလန်ဘာတော အချိန်"}
+            ls{"ဥလန်ဘာတော စံတော်ချိန်"}
+        }
+        "meta:Moscow"{
+            ld{"မော်စကို နွေရာသီ အချိန်"}
+            lg{"မော်စကို အချိန်"}
+            ls{"မော်စကို စံတော်ချိန်"}
+        }
+        "meta:Myanmar"{
+            ls{"မြန်မာ အချိန်"}
+        }
+        "meta:Nauru"{
+            ls{"နာဥူရူ အချိန်"}
+        }
+        "meta:Nepal"{
+            ls{"နီပေါ အချိန်"}
+        }
+        "meta:New_Caledonia"{
+            ld{"နယူးကာလီဒိုးနီးယား နွေရာသီ အချိန်"}
+            lg{"နယူးကယ်လီဒိုးနီးယား အချိန်"}
+            ls{"နယူးကာလီဒိုးနီးယား စံတော်ချိန်"}
+        }
+        "meta:New_Zealand"{
+            ld{"နယူးဇီလန် နွေရာသီ အချိန်"}
+            lg{"နယူးဇီလန် အချိန်"}
+            ls{"နယူးဇီလန် စံတော်ချိန်"}
+        }
+        "meta:Newfoundland"{
+            ld{"နယူးဖောင်လန် နွေရာသီ စံတော်ချိန်"}
+            lg{"နယူးဖောင်လန် အချိန်"}
+            ls{"နယူးဖောင်လန် စံတော်ချိန်"}
+        }
+        "meta:Niue"{
+            ls{"နီဦးအေ အချိန်"}
+        }
+        "meta:Norfolk"{
+            ld{"နောဖော့ခ်ကျွန်း နွေရာသီ စံတော်ချိန်"}
+            lg{"နောဖော့ခ်ကျွန်း အချိန်"}
+            ls{"နောဖော့ခ်ကျွန်း စံတော်ချိန်"}
+        }
+        "meta:Noronha"{
+            ld{"ဖာနန်ဒိုးဒီနိုးရိုးညာ နွေရာသီ အချိန်"}
+            lg{"ဖာနန်ဒိုးဒီနိုးရိုးညာ အချိန်"}
+            ls{"ဖာနန်ဒိုးဒီနိုးရိုးညာ စံတော်ချိန်"}
+        }
+        "meta:Novosibirsk"{
+            ld{"နိုဗိုစဲဘီအဲယ်စ် နွေရာသီ အချိန်"}
+            lg{"နိုဗိုစဲဘီအဲယ်စ် အချိန်"}
+            ls{"နိုဗိုစဲဘီအဲယ်စ် စံတော်ချိန်"}
+        }
+        "meta:Omsk"{
+            ld{"အွမ်းစ်ခ် နွေရာသီ အချိန်"}
+            lg{"အွမ်းစ်ခ် အချိန်"}
+            ls{"အွမ်းစ်ခ် စံတော်ချိန်"}
+        }
+        "meta:Pakistan"{
+            ld{"ပါကစ္စတန် နွေရာသီ အချိန်"}
+            lg{"ပါကစ္စတန် အချိန်"}
+            ls{"ပါကစ္စတန် စံတော်ချိန်"}
+        }
+        "meta:Palau"{
+            ls{"ပလာအို အချိန်"}
+        }
+        "meta:Papua_New_Guinea"{
+            ls{"ပါပူအာနယူးဂီနီ အချိန်"}
+        }
+        "meta:Paraguay"{
+            ld{"ပါရာဂွေး နွေရာသီ အချိန်"}
+            lg{"ပါရာဂွေး အချိန်"}
+            ls{"ပါရာဂွေး စံတော်ချိန်"}
+        }
+        "meta:Peru"{
+            ld{"ပီရူး နွေရာသီ အချိန်"}
+            lg{"ပီရူး အချိန်"}
+            ls{"ပီရူး စံတော်ချိန်"}
+        }
+        "meta:Philippines"{
+            ld{"ဖိလစ်ပိုင် နွေရာသီ အချိန်"}
+            lg{"ဖိလစ်ပိုင် အချိန်"}
+            ls{"ဖိလစ်ပိုင် စံတော်ချိန်"}
+        }
+        "meta:Phoenix_Islands"{
+            ls{"ဖီးနစ်ကျွန်းစု အချိန်"}
+        }
+        "meta:Pierre_Miquelon"{
+            ld{"စိန့်ပီအဲနှင့် မီခွီလွန် နွေရာသီ စံတော်ချိန်"}
+            lg{"စိန့်ပီအဲနှင့်မီခွီလွန်အချိန်"}
+            ls{"စိန့်ပီအဲနှင့်မီခွီလွန်စံတော်ချိန်"}
+        }
+        "meta:Pitcairn"{
+            ls{"ပါတ်ကယ်ရင် အချိန်"}
+        }
+        "meta:Ponape"{
+            ls{"ဖိုနာဖဲအ် အချိန်"}
+        }
+        "meta:Pyongyang"{
+            ls{"ပြုံယန်း အချိန်"}
+        }
+        "meta:Reunion"{
+            ls{"ရီယူနီယံ အချိန်"}
+        }
+        "meta:Rothera"{
+            ls{"ရိုသီရာ အချိန်"}
+        }
+        "meta:Sakhalin"{
+            ld{"ဆာခါလင် နွေရာသီ အချိန်"}
+            lg{"ဆာခါလင် အချိန်"}
+            ls{"ဆာခါလင် စံတော်ချိန်"}
+        }
+        "meta:Samoa"{
+            ld{"ဆမိုးအား နွေရာသီ အချိန်"}
+            lg{"ဆမိုအာ အချိန်"}
+            ls{"ဆမိုအာ စံတော်ချိန်"}
+        }
+        "meta:Seychelles"{
+            ls{"ဆေးရှဲ အချိန်"}
+        }
+        "meta:Singapore"{
+            ls{"စင်္ကာပူ အချိန်"}
+        }
+        "meta:Solomon"{
+            ls{"ဆော်လမွန်ကျွန်းစု အချိန်"}
+        }
+        "meta:South_Georgia"{
+            ls{"တောင်ဂျော်ဂျီယာ အချိန်"}
+        }
+        "meta:Suriname"{
+            ls{"စူးရီနာမ်အချိန်"}
+        }
+        "meta:Syowa"{
+            ls{"ရှိုဝါ အချိန်"}
+        }
+        "meta:Tahiti"{
+            ls{"တဟီတီ အချိန်"}
+        }
+        "meta:Taipei"{
+            ld{"ထိုင်ပေ နွေရာသီ အချိန်"}
+            lg{"ထိုင်ပေ အချိန်"}
+            ls{"ထိုင်ပေ စံတော်ချိန်"}
+        }
+        "meta:Tajikistan"{
+            ls{"တာဂျစ်ကစ္စတန် အချိန်"}
+        }
+        "meta:Tokelau"{
+            ls{"တိုကီလာဥ အချိန်"}
+        }
+        "meta:Tonga"{
+            ld{"တွန်ဂါ နွေရာသီ အချိန်"}
+            lg{"တွန်ဂါ အချိန်"}
+            ls{"တွန်ဂါ စံတော်ချိန်"}
+        }
+        "meta:Truk"{
+            ls{"ချုခ် အချိန်"}
+        }
+        "meta:Turkmenistan"{
+            ld{"တာ့ခ်မင်နစ္စတန် နွေရာသီ အချိန်"}
+            lg{"တာ့ခ်မင်နစ္စတန် အချိန်"}
+            ls{"တာ့ခ်မင်နစ္စတန် စံတော်ချိန်"}
+        }
+        "meta:Tuvalu"{
+            ls{"တူဗားလူ အချိန်"}
+        }
+        "meta:Uruguay"{
+            ld{"ဥရုဂွေး နွေရာသီ အချိန်"}
+            lg{"ဥရုဂွေး အချိန်"}
+            ls{"ဥရုဂွေး စံတော်ချိန်"}
+        }
+        "meta:Uzbekistan"{
+            ld{"ဥဇဘက်ကစ္စတန် နွေရာသီ အချိန်"}
+            lg{"ဥဇဘက်ကစ္စတန် အချိန်"}
+            ls{"ဥဇဘက်ကစ္စတန် စံတော်ချိန်"}
+        }
+        "meta:Vanuatu"{
+            ld{"ဗနွားတူ နွေရာသီ အချိန်"}
+            lg{"ဗနွားတူ အချိန်"}
+            ls{"ဗနွားတူ စံတော်ချိန်"}
+        }
+        "meta:Venezuela"{
+            ls{"ဗင်နီဇွဲလား အချိန်"}
+        }
+        "meta:Vladivostok"{
+            ld{"ဗလာဒီဗော့စတော့ခ် နွေရာသီ အချိန်"}
+            lg{"ဗလာဒီဗော့စတော့ခ် အချိန်"}
+            ls{"ဗလာဒီဗော့စတော့ခ် စံတော်ချိန်"}
+        }
+        "meta:Volgograd"{
+            ld{"ဗိုဂိုဂရက် နွေရာသီ အချိန်"}
+            lg{"ဗိုလ်ဂိုဂရက် အချိန်"}
+            ls{"ဗိုလ်ဂိုဂရက် စံတော်ချိန်"}
+        }
+        "meta:Vostok"{
+            ls{"ဗိုစ်တိုခ် အချိန်"}
+        }
+        "meta:Wake"{
+            ls{"ဝိတ်ခ်ကျွန်း အချိန်"}
+        }
+        "meta:Wallis"{
+            ls{"ဝေါလီစ်နှင့် ဖူကျူနာ အချိန်"}
+        }
+        "meta:Yakutsk"{
+            ld{"ယူခူးတ်စ် နွေရာသီ အချိန်"}
+            lg{"ယူခူးတ်စ် အချိန်"}
+            ls{"ယူခူးတ်စ် စံတော်ချိန်"}
+        }
+        "meta:Yekaterinburg"{
+            ld{"ရယ်ခါးတီရင်ဘာခ် နွေရာသီ အချိန်"}
+            lg{"ရယ်ခါးတီရင်ဘားခ် အချိန်"}
+            ls{"ရယ်ခါးတီရင်ဘားခ် စံတော်ချိန်"}
+        }
+        fallbackFormat{"{1} ({0})"}
+        gmtFormat{"GMT{0}"}
+        gmtZeroFormat{"GMT"}
+        hourFormat{"+HH:mm;-HH:mm"}
+        regionFormat{"{0} အချိန်"}
+        regionFormatDaylight{"{0} နွေရာသီ စံတော်ချိန်"}
+        regionFormatStandard{"{0} စံတော်ချိန်"}
+    }
+}

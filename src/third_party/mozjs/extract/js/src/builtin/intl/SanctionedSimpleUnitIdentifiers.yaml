@@ -1,0 +1,56 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# 6.5.2 IsSanctionedSimpleUnitIdentifier ( unitIdentifier )
+#
+# Simple units sanctioned for use in ECMAScript
+#
+# https://tc39.es/ecma402/#table-sanctioned-simple-unit-identifiers
+
+# Run |make_intl_data units| to regenerate all files which reference this list
+# of sanctioned unit identifiers.
+
+- acre
+- bit
+- byte
+- celsius
+- centimeter
+- day
+- degree
+- fahrenheit
+- fluid-ounce
+- foot
+- gallon
+- gigabit
+- gigabyte
+- gram
+- hectare
+- hour
+- inch
+- kilobit
+- kilobyte
+- kilogram
+- kilometer
+- liter
+- megabit
+- megabyte
+- meter
+- mile
+- mile-scandinavian
+- milliliter
+- millimeter
+- millisecond
+- minute
+- month
+- ounce
+- percent
+- petabyte
+- pound
+- second
+- stone
+- terabit
+- terabyte
+- week
+- yard
+- year

@@ -1,0 +1,137 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ro_MD{
+    calendar{
+        gregorian{
+            dayNames{
+                format{
+                    abbreviated{
+                        "Dum",
+                        "Lun",
+                        "Mar",
+                        "Mie",
+                        "Joi",
+                        "Vin",
+                        "Sâm",
+                    }
+                    narrow{
+                        "D",
+                        "L",
+                        "Ma",
+                        "Mi",
+                        "J",
+                        "V",
+                        "S",
+                    }
+                    short{
+                        "Du",
+                        "Lu",
+                        "Ma",
+                        "Mi",
+                        "Jo",
+                        "Vi",
+                        "Sâ",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Dum",
+                        "Lun",
+                        "Mar",
+                        "Mie",
+                        "Joi",
+                        "Vin",
+                        "Sâm",
+                    }
+                    narrow{
+                        "D",
+                        "L",
+                        "Ma",
+                        "Mi",
+                        "J",
+                        "V",
+                        "S",
+                    }
+                    short{
+                        "Du",
+                        "Lu",
+                        "Ma",
+                        "Mi",
+                        "Jo",
+                        "Vi",
+                        "Sâ",
+                    }
+                }
+            }
+            dayPeriod{
+                format{
+                    narrow{
+                        afternoon1{"după-amiază"}
+                        evening1{"seară"}
+                        midnight{"miezul nopții"}
+                        morning1{"dimineață"}
+                        night1{"noapte"}
+                        noon{"amiază"}
+                    }
+                    wide{
+                        afternoon1{"după-amiaza"}
+                        evening1{"seara"}
+                        midnight{"miezul nopții"}
+                        morning1{"dimineața"}
+                        night1{"noaptea"}
+                        noon{"amiază"}
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        afternoon1{"după-amiază"}
+                        evening1{"seară"}
+                        morning1{"dimineață"}
+                        night1{"noapte"}
+                    }
+                    wide{
+                        midnight{"miezul nopții"}
+                        noon{"amiază"}
+                    }
+                }
+            }
+            eras{
+                abbreviated%variant{
+                    "î.e.n.",
+                    "e.n.",
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "trim. 1",
+                        "trim. 2",
+                        "trim. 3",
+                        "trim. 4",
+                    }
+                    wide{
+                        "trimestrul 1",
+                        "trimestrul 2",
+                        "trimestrul 3",
+                        "trimestrul 4",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Trim. 1",
+                        "Trim. 2",
+                        "Trim. 3",
+                        "Trim. 4",
+                    }
+                    wide{
+                        "Trimestrul 1",
+                        "Trimestrul 2",
+                        "Trimestrul 3",
+                        "Trimestrul 4",
+                    }
+                }
+            }
+        }
+    }
+}

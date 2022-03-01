@@ -1,0 +1,101 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sr_Cyrl_BA{
+    units{
+        compound{
+            1024p8{"јоби{0}"}
+        }
+        duration{
+            century{
+                dnam{"вијекови"}
+                few{"{0} вијека"}
+                one{"{0} вијек"}
+                other{"{0} вијекова"}
+            }
+            month{
+                dnam{"мјесеци"}
+                few{"{0} мјесеца"}
+                one{"{0} мјесец"}
+                other{"{0} мјесеци"}
+                per{"{0} мјесечно"}
+            }
+            week{
+                dnam{"недјеље"}
+                few{"{0} недјеље"}
+                one{"{0} недјеља"}
+                other{"{0} недјеља"}
+                per{"{0} недјељно"}
+            }
+        }
+        length{
+            light-year{
+                dnam{"свјетлосне године"}
+                few{"{0} свјетлосне године"}
+                one{"{0} свјетлосна година"}
+                other{"{0} свјетлосних година"}
+            }
+        }
+        mass{
+            grain{
+                dnam{"гран"}
+                few{"{0} грана"}
+                one{"{0} гран"}
+                other{"{0} гранова"}
+            }
+        }
+    }
+    unitsNarrow{
+        volume{
+            barrel{
+                dnam{"bbl"}
+                few{"{0} bbl"}
+                one{"{0}bbl"}
+                other{"{0}bbl"}
+            }
+            dessert-spoon{
+                dnam{"д. каш."}
+                few{"{0} д. каш."}
+                one{"{0} д. каш."}
+                other{"{0} д. каш."}
+            }
+            dessert-spoon-imperial{
+                dnam{"и. д. к."}
+                few{"{0} и. д. к."}
+                one{"{0} и. д. к."}
+                other{"{0} и. д. к."}
+            }
+        }
+    }
+    unitsShort{
+        duration{
+            month{
+                dnam{"мјесеци"}
+                few{"{0} мјес."}
+                one{"{0} мјес."}
+                other{"{0} мјес."}
+            }
+        }
+        length{
+            light-year{
+                dnam{"свјетлосне год."}
+            }
+        }
+        mass{
+            grain{
+                dnam{"гран"}
+                few{"{0} грана"}
+                one{"{0} гран"}
+                other{"{0} гранова"}
+            }
+        }
+        volume{
+            dessert-spoon{
+                dnam{"dstspn"}
+                few{"{0} dstspn"}
+                one{"{0} dstspn"}
+                other{"{0} dstspn"}
+            }
+        }
+    }
+}

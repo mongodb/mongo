@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+ Copyright (C) 2016 and later: Unicode, Inc. and others.
+ License & terms of use: http://www.unicode.org/copyright.html
+ Copyright (c) 2013-2015 International Business Machines Corporation and others. All rights reserved.
+-->
+<!DOCTYPE ldml SYSTEM "../../dtd/cldr-35.1/common/dtd/ldml.dtd">
+<ldml>
+	<identity>
+
+		<version number="$Revision$"/>
+		<language type="mt"/>
+	</identity>
+    <rbnf>
+        <rulesetGrouping type="DurationRules">
+            <ruleset type="with-words">
+                <rbnfrule value="0">0 sekondi; 1 sekonda; =0= sekondi;</rbnfrule>
+                <rbnfrule value="60" radix="60">←%%min←[, →→];</rbnfrule>
+                <rbnfrule value="3600" radix="60">←%%hr←[, →→→];</rbnfrule>
+            </ruleset>
+            <ruleset type="min" access="private">
+                <rbnfrule value="0">0 minuti; 1 minuta; =0= minuti;</rbnfrule>
+            </ruleset>
+            <ruleset type="hr" access="private">
+                <rbnfrule value="0">0 siegħat; 1 siegħa; =0= siegħat;</rbnfrule>
+            </ruleset>
+            <ruleset type="in-numerals">
+                <rbnfrule value="0">=0= sek.;</rbnfrule>
+                <rbnfrule value="60">=%%min-sec=;</rbnfrule>
+                <rbnfrule value="3600">=%%hr-min-sec=;</rbnfrule>
+            </ruleset>
+            <ruleset type="min-sec" access="private">
+                <rbnfrule value="0">:=00=;</rbnfrule>
+                <rbnfrule value="60" radix="60">←0←→→;</rbnfrule>
+            </ruleset>
+            <ruleset type="hr-min-sec" access="private">
+                <rbnfrule value="0">:=00=;</rbnfrule>
+                <rbnfrule value="60" radix="60">←00←→→;</rbnfrule>
+                <rbnfrule value="3600" radix="60">←#,##0←:→→→;</rbnfrule>
+            </ruleset>
+            <ruleset type="duration">
+                <rbnfrule value="0">=%in-numerals=;</rbnfrule>
+            </ruleset>
+            <ruleset type="lenient-parse" access="private">
+                <rbnfrule value="0">&amp; ':' = '.' = ' ' = '-';</rbnfrule>
+            </ruleset>
+        </rulesetGrouping>
+   </rbnf>
+</ldml>

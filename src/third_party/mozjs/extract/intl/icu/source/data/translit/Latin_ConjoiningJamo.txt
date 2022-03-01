@@ -1,0 +1,484 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Latin_ConjoiningJamo.txt
+# Generated from CLDR
+#
+
+# Follows the Ministry of Culture and Tourism romanization: see http://www.korea.net/korea/kor_loca.asp?code=A020303
+# http://www.unicode.org/cldr/transliteration_guidelines.html#Korean
+#- N.B. DO NOT put any filters, NFD, etc. here -- those are aliased in
+#- the INDEX file.  This transliterator is, by itself, not
+#- instantiated.  It is used as a part of Latin-Jamo, Latin-Hangul, or
+#- inverses thereof.
+# Transliteration from Latin characters to Korean script is done in
+# two steps: Latin to Jamo, then Jamo to Hangul.  The Jamo-Hangul
+# transliteration is done algorithmically following Unicode 3.0
+# section 3.11.  This file implements the Latin to Jamo
+# transliteration using rules.
+# Jamo occupy the block 1100-11FF.  Within this block there are three
+# groups of characters: initial consonants or choseong (I), medial
+# vowels or jungseong (M), and trailing consonants or jongseong (F).
+# Standard Korean syllables are of the form I+M+F*.
+# Section 3.11 describes the use of 'filler' jamo to convert
+# nonstandard syllables to standard form: the choseong filler 115F and
+# the junseong filler 1160.  In this transliterator, we will not use
+# 115F or 1160.
+# We will, however, insert two 'null' jamo to make foreign words
+# conform to Korean syllable structure.  These are the null initial
+# consonant 110B (IEUNG) and the null vowel 1173 (EU).  In Latin text,
+# we will use the separator in order to disambiguate strings,
+# e.g. "kan-ggan" (initial GG) vs. "kanggan" (final NG + initial G).
+# We will not use all of the characters in the jamo block.  We will
+# only use the 19 initials, 21 medials, and 27 finals possessing a
+# jamo short name as defined in section 4.4 of the Unicode book.
+# Rules of thumb.  These guidelines provide the basic framework
+# for the rules.  They are phrased in terms of Latin-Jamo transliteration.
+# The Jamo-Latin rules derive from these, since the Jamo-Latin rules are
+# just context-free transliteration of jamo to corresponding short names,
+# with the addition of separators to maintain round-trip integrity
+# in the context of the Latin-Jamo rules.
+# A sequence of vowels:
+# - Take the longest sequence you can. If there are too many, or you don't
+#   have a starting consonant, introduce a 110B necessary.
+# A sequence of consonants.
+# - First join the double consonants: G + G -→ GG
+# - In the remaining list,
+# -- If there is no preceding vowel, take the first consonant, and insert EU
+#    after it. Continue with the rest of the consonants.
+# -- If there is one consonant, attach to the following vowel
+# -- If there are two consonants and a following vowel, attach one to the
+#    preceeding vowel, and one to the following vowel.
+# -- If there are more than two consonants, join the first two together if you
+#    can: L + G =→ LG
+# -- If you still end up with more than 2 consonants, insert EU after the
+#    first one, and continue with the rest of the consonants.
+#----------------------------------------------------------------------
+# Variables
+# Some latin consonants or consonant pairs only occur as initials, and
+# some only as finals, but some occur as both.  This makes some jamo
+# consonants ambiguous when transliterated into latin.
+#   Initial only: IEUNG BB DD JJ R
+#   Final only: BS GS L LB LG LH LM LP LS LT NG NH NJ
+#   Initial and Final: B C D G GG H J K M N P S SS T
+$Gi = ᄀ;
+$KKi = ᄁ;
+$Ni = ᄂ;
+$Di = ᄃ;
+$TTi = ᄄ;
+$Li = ᄅ;
+$Mi = ᄆ;
+$Bi = ᄇ;
+$PPi = ᄈ;
+$Si = ᄉ;
+$SSi = ᄊ;
+$IEUNG = ᄋ; # null initial, inserted during Latin-Jamo
+$Ji = ᄌ;
+$JJi = ᄍ;
+$CHi = ᄎ;
+$Ki = ᄏ;
+$Ti = ᄐ;
+$Pi = ᄑ;
+$Hi = ᄒ;
+$A = ᅡ;
+$AE = ᅢ;
+$YA = ᅣ;
+$YAE = ᅤ;
+$EO = ᅥ;
+$E = ᅦ;
+$YEO = ᅧ;
+$YE = ᅨ;
+$O = ᅩ;
+$WA = ᅪ;
+$WAE = ᅫ;
+$OE = ᅬ;
+$YO = ᅭ;
+$U = ᅮ;
+$WO = ᅯ;
+$WE = ᅰ;
+$WI = ᅱ;
+$YU = ᅲ;
+$EU = ᅳ; # null medial, inserted during Latin-Jamo
+$UI = ᅴ;
+$I = ᅵ;
+$Gf = ᆨ;
+$GGf = ᆩ;
+$GS = ᆪ;
+$Nf = ᆫ;
+$NJ = ᆬ;
+$NH = ᆭ;
+$Df = ᆮ;
+$L = ᆯ;
+$LG = ᆰ;
+$LM = ᆱ;
+$LB = ᆲ;
+$LS = ᆳ;
+$LT = ᆴ;
+$LP = ᆵ;
+$LH = ᆶ;
+$Mf = ᆷ;
+$Bf = ᆸ;
+$BS = ᆹ;
+$Sf = ᆺ;
+$SSf = ᆻ;
+$NG = ᆼ;
+$Jf = ᆽ;
+$Cf = ᆾ;
+$Kf = ᆿ;
+$Tf = ᇀ;
+$Pf = ᇁ;
+$Hf = ᇂ;
+$jamoInitial = [ᄀ-ᄒ];
+$jamoMedial = [ᅡ-ᅵ];
+$latinInitial = [bcdghjklmnprst];
+# Any character in the latin transliteration of a medial
+$latinMedial = [aeiouwy];
+# The last character of the latin transliteration of a medial
+$latinMedialEnd = [aeiou];
+# Disambiguation separator
+$sep = \-;
+#----------------------------------------------------------------------
+# Jamo-Latin
+#
+# Jamo to latin is relatively simple, since it is the latin that is
+# ambiguous.  Most rules are straightforward, and we encode them below
+# as simple add-on back rule, e.g.:
+#   $jamoMedial {bs} → $BS;
+# becomes
+#   $jamoMedial {bs} ↔ $BS;
+#
+# Furthermore, we don't care about the ordering for Jamo-Latin because
+# we are going from single characters, so we can very easily piggyback
+# on the Latin-Jamo.
+#
+# The main issue with Jamo-Latin is when to insert separators.
+# Separators are inserted to obtain correct round trip behavior.  For
+# example, the sequence Ki A Gf Gi E, if transliterated to "kagge",
+# would then round trip to Ki A GGi E.  To prevent this, we insert a
+# separator: "kag-ge".  IMPORTANT: The need for separators depends
+# very specifically on the behavior of the Latin-Jamo rules.  A change
+# in the Latin-Jamo behavior can completely change the way the
+# separator insertion must be done.
+# First try to preserve actual separators in the jamo text by doubling
+# them.  This fixes problems like:
+# (Di)(A)(Ji)(U)(NG)-(IEUNG)(YEO)(Nf)(Gi)(YEO)(L) =→ dajung-yeongyeol
+# =→ (Di)(A)(Ji)(U)(NG)(IEUNG)(YEO)(Nf)(Gi)(YEO)(L).  This is optional
+# -- if we don't care about losing separators in the jamo, we can delete
+# this rule.
+$sep $sep ↔ $sep;
+# Triple consonants.  For three consonants "axxx" we insert a
+# separator between the first and second "x" if XXf, Xf, and Xi all
+# exist, and we have A Xf XXi.  This prevents the reverse
+# transliteration to A XXf Xi.
+$sep ← $latinMedialEnd s {} $SSi;
+# For vowels the rule is similar.  If there is a vowel "ae" such that
+# "a" by itself and "e" by itself are vowels, then we want to map A E
+# to "a-e" so as not to round trip to AE.  However, in the text Ki EO
+# IEUNG E we don't need to map to "keo-e".  "keoe" suffices.  For
+# vowels of the form "aei", both "ae" + "i" and "a" + "ei" must be
+# tested.  NOTE: These rules used to have a left context of
+# $latinInitial instead of [^$latinMedial].  The problem with this is
+# sequences where an initial IEUNG is transliterated away:
+#   (IEUNG)(A)(IEUNG)(EO) =→ aeo =→ (IEUNG)(AE)(IEUNG)(O)
+# Also problems in cases like gayeo, which needs to be gaye-o
+# The hard case is a chain, like aeoeu. Normally interpreted as ae oe u. So for a-eoeu, we have to insert $sep
+# But, we don't insert between the o and the e.
+#
+# a ae
+# e eo eu
+# i
+# o oe
+# u
+# ui
+# wa wae we wi
+# yae ya yeo ye yo yu
+# These are simple, since they can't chain. Note that we don't handle extreme cases like [ga][eo][e][o]
+$sep ← a {} [$E $EO $EU];
+$sep ← [^aow] e {} [$O $OE];
+$sep ← [^aowy] e {} [$U $UI];
+$sep ← [^ey] o {} [$E $EO $EU];
+$sep ← [^y] u {} [$I];
+# Similar to the above, but with an intervening $IEUNG.
+$sep ← [^$latinMedial] [y] e {} $IEUNG [$O $OE];
+$sep ← [^$latinMedial] e {} $IEUNG [$O $OE $U];
+$sep ← [^$latinMedial] [o a] {} $IEUNG [$E $EO $EU];
+$sep ← [^$latinMedial] [w y] a {} $IEUNG [$E $EO $EU];
+# Single finals followed by IEUNG.  The jamo sequence A Xf IEUNG E,
+# where Xi also exists, must be transliterated as "ax-e" to prevent
+# the round trip conversion to A Xi E.
+$sep ← $latinMedialEnd b {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd d {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd g {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd h {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd j {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd k {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd m {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd n {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd p {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd s {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd t {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd l {} $IEUNG $jamoMedial;
+# Double finals followed by IEUNG.  Similar to the single finals
+# followed by IEUNG.  Any latin consonant pair X Y, between medials,
+# that we would split by Latin-Jamo, we must handle when it occurs as
+# part of A XYf IEUNG E, to prevent round trip conversion to A Xf Yi E
+$sep ← $latinMedialEnd b s {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd k k {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd g s {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd l b {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd l g {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd l h {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd l m {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd l p {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd l s {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd l t {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd n g {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd n h {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd n j {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd s s {} $IEUNG $jamoMedial;
+$sep ← $latinMedialEnd ch {} $IEUNG $jamoMedial;
+# Split doubles.  Text of the form A Xi Xf E, where XXi also occurs,
+# we transliterate as "ax-xe" to prevent round trip transliteration as
+# A XXi E.
+$sep ← $latinMedialEnd j {} $Ji $jamoMedial;
+$sep ← $latinMedialEnd k {} $Ki $jamoMedial;
+$sep ← $latinMedialEnd s {} $Si $jamoMedial;
+# XYY.  This corresponds to the XYY rule in Latin-Jamo.  By default
+# Latin-Jamo maps "xyy" to Xf YYi, to keep YY together.  As a result,
+# "xyy" forms that correspond to XYf Yi must be transliterated as
+# "xy-y".
+$sep ← $latinMedialEnd b s {} [$Si $SSi];
+$sep ← $latinMedialEnd g s {} [$Si $SSi];
+$sep ← $latinMedialEnd l b {} [$Bi];
+$sep ← $latinMedialEnd l g {} [$Gi];
+$sep ← $latinMedialEnd l s {} [$Si $SSi];
+$sep ← $latinMedialEnd n g {} [$Gi];
+$sep ← $latinMedialEnd n j {} [$Ji $JJi];
+# $sep ← $latinMedialEnd l  {} [$PPi];
+# $sep ← $latinMedialEnd l  {} [$TTi];
+$sep ← $latinMedialEnd l p {} [$Pi];
+$sep ← $latinMedialEnd l t {} [$Ti];
+$sep ← $latinMedialEnd k {} [$KKi $Ki];
+$sep ← $latinMedialEnd p {} $Pi;
+$sep ← $latinMedialEnd t {} $Ti;
+$sep ← $latinMedialEnd c {} [$Hi];
+# Deletion of IEUNG is handled below.
+#----------------------------------------------------------------------
+# Latin-Jamo
+# [Basic, context-free Jamo-Latin rules are embedded here too.  See
+# above.]
+# Split digraphs: Text of the form 'axye', where 'xy' is a final
+# digraph, 'x' is a final (by itself), 'y' is an initial, and 'a' and
+# 'e' are medials, we want to transliterate this as A Xf Yi E rather
+# than A XYf IEUNG E.  We do NOT include text of the form "axxe",
+# since that is handled differently below.  These rules are generated
+# programmatically from the jamo data.
+$jamoMedial {b s} $latinMedial → $Bf $Si;
+$jamoMedial {g s} $latinMedial → $Gf $Si;
+$jamoMedial {l b} $latinMedial → $L $Bi;
+$jamoMedial {l g} $latinMedial → $L $Gi;
+$jamoMedial {l h} $latinMedial → $L $Hi;
+$jamoMedial {l m} $latinMedial → $L $Mi;
+$jamoMedial {l p} $latinMedial → $L $Pi;
+$jamoMedial {l s} $latinMedial → $L $Si;
+$jamoMedial {l t} $latinMedial → $L $Ti;
+$jamoMedial {n g} $latinMedial → $Nf $Gi;
+$jamoMedial {n h} $latinMedial → $Nf $Hi;
+$jamoMedial {n j} $latinMedial → $Nf $Ji;
+# Single consonants are initials: Text of the form 'axe', where 'x'
+# can be an initial or a final, and 'a' and 'e' are medials, we want
+# to transliterate as A Xi E rather than A Xf IEUNG E.
+$jamoMedial {b} $latinMedial → $Bi;
+$jamoMedial {ch} $latinMedial → $CHi;
+$jamoMedial {d} $latinMedial → $Di;
+$jamoMedial {g} $latinMedial → $Gi;
+$jamoMedial {h} $latinMedial → $Hi;
+$jamoMedial {j} $latinMedial → $Ji;
+$jamoMedial {k} $latinMedial → $Ki;
+$jamoMedial {m} $latinMedial → $Mi;
+$jamoMedial {n} $latinMedial → $Ni;
+$jamoMedial {p} $latinMedial → $Pi;
+$jamoMedial {s} $latinMedial → $Si;
+$jamoMedial {t} $latinMedial → $Ti;
+$jamoMedial {l} $latinMedial → $Li;
+# Doubled initials.  The sequence "axxe", where XX exists as an initial
+# (XXi), and also Xi and Xf exist (true of all digraphs XX), we want
+# to transliterate as A XXi E, rather than split to A Xf Xi E.
+$jamoMedial {p p} $latinMedial → $PPi;
+$jamoMedial {t t} $latinMedial → $TTi;
+$jamoMedial {j j} $latinMedial → $JJi;
+$jamoMedial {k k} $latinMedial → $KKi;
+$jamoMedial {s s} $latinMedial → $SSi;
+# XYY.  Because doubled consonants bind more strongly than XY
+# consonants, we must handle the sequence "axyy" specially.  Here XYf
+# and YYi must exist.  In these cases, we map to Xf YYi rather than
+# XYf.
+# However, there are two special cases.
+$jamoMedial {lp} p p → $LP;
+$jamoMedial {lt} t t → $LT;
+# End special cases
+$jamoMedial {b} s s → $Bf;
+$jamoMedial {g} s s → $Gf;
+$jamoMedial {l} b b → $L;
+$jamoMedial {l} g g → $L;
+$jamoMedial {l} s s → $L;
+$jamoMedial {l} t t → $L;
+$jamoMedial {l} p p → $L;
+$jamoMedial {n} g g → $Nf;
+$jamoMedial {n} j j → $Nf;
+# Finals: Attach consonant with preceding medial to preceding medial.
+# Do this BEFORE mapping consonants to initials.  Longer keys must
+# precede shorter keys that they start with, e.g., the rule for 'bs'
+# must precede 'b'.
+# [BASIC Jamo-Latin FINALS handled here.  Order irrelevant within this
+# block for Jamo-Latin.]
+$jamoMedial {bs} ↔ $BS;
+$jamoMedial {b} ↔ $Bf;
+$jamoMedial {ch} ↔ $Cf;
+$jamoMedial {c} → $Cf;
+$jamoMedial {d} ↔ $Df;
+$jamoMedial {kk} ↔ $GGf;
+$jamoMedial {gs} ↔ $GS;
+$jamoMedial {g} ↔ $Gf;
+$jamoMedial {h} ↔ $Hf;
+$jamoMedial {j} ↔ $Jf;
+$jamoMedial {k} ↔ $Kf;
+$jamoMedial {lb} ↔ $LB;  $jamoMedial {lg} ↔ $LG;
+$jamoMedial {lh} ↔ $LH;
+$jamoMedial {lm} ↔ $LM;
+$jamoMedial {lp} ↔ $LP;
+$jamoMedial {ls} ↔ $LS;
+$jamoMedial {lt} ↔ $LT;
+$jamoMedial {l} ↔ $L;
+$jamoMedial {m} ↔ $Mf;
+$jamoMedial {ng} ↔ $NG;
+$jamoMedial {nh} ↔ $NH;
+$jamoMedial {nj} ↔ $NJ;
+$jamoMedial {n} ↔ $Nf;
+$jamoMedial {p} ↔ $Pf;
+$jamoMedial {ss} ↔ $SSf;
+$jamoMedial {s} ↔ $Sf;
+$jamoMedial {t} ↔ $Tf;
+# Initials: Attach single consonant to following medial.  Do this
+# AFTER mapping finals.  Longer keys must precede shorter keys that
+# they start with, e.g., the rule for 'gg' must precede 'g'.
+# [BASIC Jamo-Latin INITIALS handled here.  Order irrelevant within
+# this block for Jamo-Latin.]
+{kk} $latinMedial ↔ $KKi;
+{g} $latinMedial ↔ $Gi;
+{n} $latinMedial ↔ $Ni;
+{tt} $latinMedial ↔ $TTi;
+{d} $latinMedial ↔ $Di;
+{l} $latinMedial ↔ $Li;
+{m} $latinMedial ↔ $Mi;
+{pp} $latinMedial ↔ $PPi;
+{b} $latinMedial ↔ $Bi;
+{ss} $latinMedial ↔ $SSi;
+{s} $latinMedial ↔ $Si;
+{jj} $latinMedial ↔ $JJi;
+{j} $latinMedial ↔ $Ji;
+{ch} $latinMedial ↔ $CHi;
+{c} $latinMedial → $CHi;
+{k} $latinMedial ↔ $Ki;
+{t} $latinMedial ↔ $Ti;
+{p} $latinMedial ↔ $Pi;
+{h} $latinMedial ↔ $Hi;
+# 'r' in final position.  Because of the equivalency of the 'l' and
+# 'r' jamo (the glyphs are the same), we try to provide the same
+# equivalency in Latin-Jamo.  The 'l' to 'r' conversion is handled
+# below.  If we see an 'r' in an apparent final position, treat it
+# like 'l'.  For example, "karka" =→ Ki A R EU Ki A without this rule.
+# Instead, we want Ki A L Ki A.
+# Initial + Final: If we match the next rule, we have initial then
+# final consonant with no intervening medial.  We insert the null
+# vowel BEFORE it to create a well-formed syllable.  (In the next rule
+# we insert a null vowel AFTER an anomalous initial.)
+# Initial + X: This block matches an initial consonant not followed by
+# a medial.  We insert the null vowel after it.  We handle double
+# initials explicitly here; for single initial consonants we insert EU
+# (as Latin) after them and let standard rules do the rest.
+# BREAKS ROUND TRIP INTEGRITY
+kk → $KKi $EU;
+tt → $TTi $EU;
+pp → $PPi $EU;
+ss → $SSi $EU;
+jj → $JJi $EU;
+ch → $CHi $EU;
+([lbdghjkmnpst]) → | $1 eu;
+# X + Final: Finally we have to deal with a consonant that can only be
+# interpreted as a final (not an initial) and which is preceded
+# neither by an initial nor a medial.  It is the start of the
+# syllable, but cannot be.  Most of these will already be handled by
+# the above rules.  'bs' splits into Bi EU Sf.  Similar for 'gs' 'ng'
+# 'nh' 'nj'.  The only problem is 'l' and digraphs starting with 'l'.
+# For this isolated case, we could add a null initial and medial,
+# which would give "la" =→ IEUNG EU L IEUNG A, for example.  A more
+# economical solution is to transliterate isolated "l" (that is,
+# initial "l") to "r".  (Other similar conversions of consonants that
+# occur neither as initials nor as finals are handled below.)
+l → | r;
+# Medials.  If a medial is preceded by an initial, then we proceed
+# normally.  As usual, longer keys must precede shorter ones.
+# [BASIC Jamo-Latin MEDIALS handled here.  Order irrelevant within
+# this block for Jamo-Latin.]
+#
+# a e i o u
+# ae
+# eo eu
+# oe
+# ui
+# wa we wi
+# wae
+# yae ya yeo ye yo yu
+$jamoInitial {ae} ↔ $AE;
+$jamoInitial {a} ↔ $A;
+$jamoInitial {eo} ↔ $EO;
+$jamoInitial {eu} ↔ $EU;
+$jamoInitial {e} ↔ $E;
+$jamoInitial {i} ↔ $I;
+$jamoInitial {oe} ↔ $OE;
+$jamoInitial {o} ↔ $O;
+$jamoInitial {ui} ↔ $UI;
+$jamoInitial {u} ↔ $U;
+$jamoInitial {wae} ↔ $WAE;
+$jamoInitial {wa} ↔ $WA;
+$jamoInitial {wo} ↔ $WO;
+$jamoInitial {we} ↔ $WE;
+$jamoInitial {wi} ↔ $WI;
+$jamoInitial {yae} ↔ $YAE;
+$jamoInitial {ya} ↔ $YA;
+$jamoInitial {yeo} ↔ $YEO;
+$jamoInitial {ye} ↔ $YE;
+$jamoInitial {yo} ↔ $YO;
+$jamoInitial {yu} ↔ $YU;
+# We may see an anomalous isolated 'w' or 'y'.  In that case, we
+# interpret it as 'wi' and 'yu', respectively.
+# BREAKS ROUND TRIP INTEGRITY
+$jamoInitial {w} → | wi;
+$jamoInitial {y} → | yu;
+# Otherwise, insert a null consonant IEUNG before the medial (which is
+# still an untransliterated latin vowel).
+($latinMedial) → $IEUNG | $1;
+# Convert non-jamo latin consonants to equivalents.  These occur as
+# neither initials nor finals in jamo.  'l' occurs as a final, but not
+# an initial; it is handled above.  The following letters (left hand
+# side) will never be output by Jamo-Latin.
+f → | p;
+q → | k;
+v → | b;
+x → | ks;
+z → | s;
+r → | l;
+c → | k;
+# Delete separators (Latin-Jamo).
+$sep → ;
+# Delete null consonants (Jamo-Latin).  Do NOT delete null EU vowels,
+# since these may also occur in text.
+← $IEUNG;
+#- N.B. DO NOT put any filters, NFD, etc. here -- those are aliased in
+#- the INDEX file.  This transliterator is, by itself, not
+#- instantiated.  It is used as a part of Latin-Jamo, Latin-Hangul, or
+#- inverses thereof.
+# eof
+

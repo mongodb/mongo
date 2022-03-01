@@ -1,0 +1,2317 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sw{
+    durationUnits{
+        hm{"h:mm"}
+        hms{"h:mm:ss"}
+        ms{"m:ss"}
+    }
+    units{
+        acceleration{
+            g-force{
+                dnam{"mvuto wa graviti"}
+                one{"mvuto wa graviti {0}"}
+                other{"mvuto wa graviti {0}"}
+            }
+            meter-per-square-second{
+                dnam{"mita kwa kila sekunde mraba"}
+                one{"mita {0} kwa kila sekunde mraba"}
+                other{"mita {0} kwa kila sekunde mraba"}
+            }
+        }
+        angle{
+            arc-minute{
+                dnam{"dakika"}
+                one{"dakika {0}"}
+                other{"dakika {0}"}
+            }
+            arc-second{
+                dnam{"sekunde"}
+                one{"sekunde {0}"}
+                other{"sekunde {0}"}
+            }
+            degree{
+                dnam{"digrii"}
+                one{"digrii {0}"}
+                other{"digrii {0}"}
+            }
+            radian{
+                dnam{"radiani"}
+                one{"radiani {0}"}
+                other{"radiani {0}"}
+            }
+            revolution{
+                dnam{"mzunguko"}
+                one{"mzunguko {0}"}
+                other{"mizunguko {0}"}
+            }
+        }
+        area{
+            acre{
+                dnam{"ekari"}
+                one{"ekari {0}"}
+                other{"ekari {0}"}
+            }
+            dunam{
+                dnam{"dunamu"}
+                one{"dunamu {0}"}
+                other{"dunamu {0}"}
+            }
+            hectare{
+                dnam{"hekta"}
+                one{"hekta {0}"}
+                other{"hekta {0}"}
+            }
+            square-centimeter{
+                dnam{"sentimita za mraba"}
+                one{"sentimita {0} ya mraba"}
+                other{"sentimita {0} za mraba"}
+                per{"{0} kwa kila sentimita ya mraba"}
+            }
+            square-foot{
+                dnam{"futi za mraba"}
+                one{"futi {0} ya mraba"}
+                other{"futi {0} za mraba"}
+            }
+            square-inch{
+                dnam{"inchi za mraba"}
+                one{"inchi {0} ya mraba"}
+                other{"inchi {0} za mraba"}
+                per{"{0} kwa kila inchi mraba"}
+            }
+            square-kilometer{
+                dnam{"kilomita za mraba"}
+                one{"kilomita {0} ya mraba"}
+                other{"kilomita {0} za mraba"}
+                per{"{0} kwa kila kilomita mraba"}
+            }
+            square-meter{
+                dnam{"mita za mraba"}
+                one{"mita {0} ya mraba"}
+                other{"mita {0} za mraba"}
+                per{"{0} kwa kila mita ya mraba"}
+            }
+            square-mile{
+                dnam{"maili za mraba"}
+                one{"maili {0} ya mraba"}
+                other{"maili {0} za mraba"}
+                per{"{0} kwa kila maili ya mraba"}
+            }
+            square-yard{
+                dnam{"yadi za mraba"}
+                one{"yadi {0} ya mraba"}
+                other{"yadi {0} za mraba"}
+            }
+        }
+        compound{
+            1024p1{"kibi{0}"}
+            1024p2{"mebi{0}"}
+            1024p3{"gibi{0}"}
+            1024p4{"tebi{0}"}
+            1024p5{"pebi{0}"}
+            1024p6{"eksibi{0}"}
+            1024p7{"zebi{0}"}
+            1024p8{"yobi{0}"}
+            10p-1{"desi{0}"}
+            10p-12{"piko{0}"}
+            10p-15{"femto{0}"}
+            10p-18{"atto{0}"}
+            10p-2{"senti{0}"}
+            10p-21{"zepto{0}"}
+            10p-24{"yokto{0}"}
+            10p-3{"mili{0}"}
+            10p-6{"mikro{0}"}
+            10p-9{"nano{0}"}
+            10p1{"deka{0}"}
+            10p12{"tera{0}"}
+            10p15{"peta{0}"}
+            10p18{"exa{0}"}
+            10p2{"hekta{0}"}
+            10p21{"zetta{0}"}
+            10p24{"yotta{0}"}
+            10p3{"kilo{0}"}
+            10p6{"mega{0}"}
+            10p9{"giga{0}"}
+            per{"{0} kwa kila {1}"}
+            power2{
+                one{
+                    _{
+                        _{"{0} mraba"}
+                    }
+                }
+                other{
+                    _{
+                        _{"{0} mraba"}
+                    }
+                }
+            }
+            power3{
+                one{
+                    _{
+                        _{"{0} mchemraba"}
+                    }
+                }
+                other{
+                    _{
+                        _{"{0} mchemraba"}
+                    }
+                }
+            }
+        }
+        concentr{
+            karat{
+                dnam{"karati"}
+                one{"karati {0}"}
+                other{"karati {0}"}
+            }
+            milligram-ofglucose-per-deciliter{
+                dnam{"miligramu kwa kila desilita"}
+                one{"miligramu kwa kila desilita"}
+                other{"miligramu {0} kwa kila desilita"}
+            }
+            millimole-per-liter{
+                dnam{"milimoli kwa kila lita"}
+                one{"milimoli {0} kwa kila lita"}
+                other{"milimoli {0} kwa kila lita"}
+            }
+            mole{
+                dnam{"moli"}
+                one{"moli {0}"}
+                other{"moli {0}"}
+            }
+            percent{
+                dnam{"asilimia"}
+                one{"asilimia {0}"}
+                other{"asilimia {0}"}
+            }
+            permille{
+                dnam{"kwa elfu"}
+                one{"{0} kwa kila elfu"}
+                other{"{0} kwa kila elfu"}
+            }
+            permillion{
+                dnam{"sehemu kwa kila milioni"}
+                one{"sehemu {0} kwa kila milioni"}
+                other{"sehemu {0} kwa kila milioni"}
+            }
+            permyriad{
+                dnam{"permyriadi"}
+                one{"permyriadi {0}"}
+                other{"permyriadi {0}"}
+            }
+        }
+        consumption{
+            liter-per-100-kilometer{
+                dnam{"lita kwa kilomita 100"}
+                one{"lita {0} kwa kilomita 100"}
+                other{"lita {0} kwa kilomita 100"}
+            }
+            liter-per-kilometer{
+                dnam{"lita kwa kila kilomita"}
+                one{"lita {0} kwa kilomita"}
+                other{"lita {0} kwa kilomita"}
+            }
+            mile-per-gallon{
+                dnam{"maili kwa kila galoni"}
+                one{"maili {0} kwa kila galoni"}
+                other{"maili {0} kwa kila galoni"}
+            }
+            mile-per-gallon-imperial{
+                dnam{"maili kwa kila galoni la Uingereza"}
+                one{"maili {0} kwa kila galoni la Uingereza"}
+                other{"maili {0} kwa kila galoni la Uingereza"}
+            }
+        }
+        coordinate{
+            dnam{"sehemu kuu za dira"}
+            east{"{0} Mashariki"}
+            north{"{0} Kaskazini"}
+            south{"{0} Kusini"}
+            west{"{0} Magharibi"}
+        }
+        digital{
+            bit{
+                dnam{"biti"}
+                one{"biti {0}"}
+                other{"biti {0}"}
+            }
+            byte{
+                dnam{"baiti"}
+                one{"baiti {0}"}
+                other{"baiti {0}"}
+            }
+            gigabit{
+                dnam{"gigabiti"}
+                one{"gigabiti {0}"}
+                other{"gigabiti {0}"}
+            }
+            gigabyte{
+                dnam{"gigabaiti"}
+                one{"gigabaiti {0}"}
+                other{"gigabaiti {0}"}
+            }
+            kilobit{
+                dnam{"kilobiti"}
+                one{"kilobiti {0}"}
+                other{"kilobiti {0}"}
+            }
+            kilobyte{
+                dnam{"kilobaiti"}
+                one{"kilobaiti {0}"}
+                other{"kilobaiti {0}"}
+            }
+            megabit{
+                dnam{"megabiti"}
+                one{"megabiti {0}"}
+                other{"megabiti {0}"}
+            }
+            megabyte{
+                dnam{"megabaiti"}
+                one{"megabaiti {0}"}
+                other{"megabaiti {0}"}
+            }
+            petabyte{
+                dnam{"petabaiti"}
+                one{"petabaiti {0}"}
+                other{"petabaiti {0}"}
+            }
+            terabit{
+                dnam{"terabiti"}
+                one{"terabiti {0}"}
+                other{"terabiti {0}"}
+            }
+            terabyte{
+                dnam{"terabaiti"}
+                one{"terabaiti {0}"}
+                other{"terabaiti {0}"}
+            }
+        }
+        duration{
+            century{
+                dnam{"karne"}
+                one{"karne {0}"}
+                other{"karne {0}"}
+            }
+            day{
+                dnam{"siku"}
+                one{"siku {0}"}
+                other{"siku {0}"}
+                per{"{0} kwa siku"}
+            }
+            decade{
+                dnam{"miongo"}
+                one{"mwongo {0}"}
+                other{"miongo {0}"}
+            }
+            hour{
+                dnam{"saa"}
+                one{"saa {0}"}
+                other{"saa {0}"}
+                per{"{0} kwa saa"}
+            }
+            microsecond{
+                dnam{"mikrosekunde"}
+                one{"mikrosekunde {0}"}
+                other{"mikrosekunde {0}"}
+            }
+            millisecond{
+                dnam{"millisekunde"}
+                one{"millisekunde {0}"}
+                other{"millisekunde {0}"}
+            }
+            minute{
+                dnam{"dakika"}
+                one{"dakika {0}"}
+                other{"dakika {0}"}
+                per{"{0} kwa kila dakika"}
+            }
+            month{
+                dnam{"miezi"}
+                one{"mwezi {0}"}
+                other{"miezi {0}"}
+                per{"{0} kwa mwezi"}
+            }
+            nanosecond{
+                dnam{"nanosekunde"}
+                one{"nanosekunde {0}"}
+                other{"nanosekunde {0}"}
+            }
+            second{
+                dnam{"sekunde"}
+                one{"sekunde {0}"}
+                other{"sekunde {0}"}
+                per{"{0} kwa kila sekunde"}
+            }
+            week{
+                dnam{"wiki"}
+                one{"wiki {0}"}
+                other{"wiki {0}"}
+                per{"{0} kwa wiki"}
+            }
+            year{
+                dnam{"miaka"}
+                one{"mwaka {0}"}
+                other{"miaka {0}"}
+                per{"{0} kwa mwaka"}
+            }
+        }
+        electric{
+            ampere{
+                dnam{"ampea"}
+                one{"ampea {0}"}
+                other{"ampea {0}"}
+            }
+            milliampere{
+                dnam{"miliampea"}
+                one{"miliampea {0}"}
+                other{"miliampea {0}"}
+            }
+            ohm{
+                dnam{"ohm"}
+                one{"{0} Ω"}
+                other{"{0} Ω"}
+            }
+            volt{
+                dnam{"volti"}
+                one{"volti {0}"}
+                other{"volti {0}"}
+            }
+        }
+        energy{
+            british-thermal-unit{
+                dnam{"vipimo vya joto vya Uingereza"}
+                one{"kipimo {0} cha joto cha Uingereza"}
+                other{"vipimo {0} vya joto vya Uingereza"}
+            }
+            calorie{
+                dnam{"kalori"}
+                one{"kalori {0}"}
+                other{"kalori {0}"}
+            }
+            electronvolt{
+                dnam{"elektrovolti"}
+                one{"elektrovolti {0}"}
+                other{"elektrovolti {0}"}
+            }
+            foodcalorie{
+                dnam{"kalori"}
+                one{"kalori {0}"}
+                other{"kalori {0}"}
+            }
+            joule{
+                dnam{"jouli"}
+                one{"jouli {0}"}
+                other{"jouli {0}"}
+            }
+            kilocalorie{
+                dnam{"kilokalori"}
+                one{"kilokalori {0}"}
+                other{"kilokalori {0}"}
+            }
+            kilojoule{
+                dnam{"kilojuli"}
+                one{"kilojuli {0}"}
+                other{"kilojuli {0}"}
+            }
+            kilowatt-hour{
+                dnam{"kilowati kwa saa"}
+                one{"kilowati {0} kwa saa"}
+                other{"kilowati {0} kwa saa"}
+            }
+            therm-us{
+                dnam{"vipimo vya gesi, Marekani"}
+                one{"kipimo {0} cha gesi, Marekani"}
+                other{"vipimo {0} vya gesi, Marekani"}
+            }
+        }
+        force{
+            newton{
+                dnam{"newtoni"}
+                one{"newtoni {0}"}
+                other{"newtoni {0}"}
+            }
+            pound-force{
+                dnam{"pauni za kani"}
+                one{"pauni {0} ya kani"}
+                other{"pauni {0} za kani"}
+            }
+        }
+        frequency{
+            gigahertz{
+                dnam{"gigahezi"}
+                one{"gigahezi {0}"}
+                other{"gigahezi {0}"}
+            }
+            hertz{
+                dnam{"hezi"}
+                one{"hezi {0}"}
+                other{"hezi {0}"}
+            }
+            kilohertz{
+                dnam{"kilohezi"}
+                one{"kilohezi {0}"}
+                other{"kilohezi {0}"}
+            }
+            megahertz{
+                dnam{"megahezi"}
+                one{"megahezi {0}"}
+                other{"megahezi {0}"}
+            }
+        }
+        graphics{
+            dot{
+                dnam{"kitone"}
+                one{"kitone {0}"}
+                other{"vitone {0}"}
+            }
+            dot-per-centimeter{
+                dnam{"vitone kwa kila sentimita"}
+                one{"kitone {0} kwa kila sentimita"}
+                other{"vitone {0} kwa kila sentimita"}
+            }
+            dot-per-inch{
+                dnam{"vitone kwa kila inchi"}
+                one{"kitone {0} kwa kila inchi"}
+                other{"vitone {0} kwa kila inchi"}
+            }
+            em{
+                dnam{"em ya kupiga chapa"}
+                one{"em {0}"}
+                other{"em {0}"}
+            }
+            megapixel{
+                dnam{"megapikseli"}
+                one{"megapikseli {0}"}
+                other{"megapikseli {0}"}
+            }
+            pixel{
+                dnam{"pikseli"}
+                one{"pikseli {0}"}
+                other{"pikseli {0}"}
+            }
+            pixel-per-centimeter{
+                dnam{"pikseli kwa kila sentimita"}
+                one{"pikseli {0} kwa kila sentimita"}
+                other{"pikseli {0} kwa kila sentimita"}
+            }
+            pixel-per-inch{
+                dnam{"pikseli kwa kila inchi"}
+                one{"pikseli {0} kwa kila inchi"}
+                other{"pikseli {0} kwa kila inchi"}
+            }
+        }
+        length{
+            astronomical-unit{
+                dnam{"vipimo vya astronomia"}
+                one{"kipimo {0} cha astronomia"}
+                other{"vipimo {0} vya astronomia"}
+            }
+            centimeter{
+                dnam{"sentimita"}
+                one{"sentimita {0}"}
+                other{"sentimita {0}"}
+                per{"{0} kwa kila sentimita"}
+            }
+            decimeter{
+                dnam{"desimita"}
+                one{"desimita {0}"}
+                other{"desimita {0}"}
+            }
+            earth-radius{
+                dnam{"nusu kipenyo cha dunia"}
+                one{"nusu kipenyo cha dunia {0}"}
+                other{"nusu kipenyo cha dunia {0}"}
+            }
+            fathom{
+                dnam{"fathom"}
+                one{"fathom {0}"}
+                other{"fathom {0}"}
+            }
+            foot{
+                dnam{"futi"}
+                one{"futi {0}"}
+                other{"futi {0}"}
+                per{"{0} kwa kila futi"}
+            }
+            furlong{
+                dnam{"furlong"}
+                one{"furlong {0}"}
+                other{"furlong {0}"}
+            }
+            inch{
+                dnam{"inchi"}
+                one{"inchi {0}"}
+                other{"inchi {0}"}
+                per{"{0} kwa kila inchi"}
+            }
+            kilometer{
+                dnam{"kilomita"}
+                one{"kilomita {0}"}
+                other{"kilomita {0}"}
+                per{"{0} kwa kila kilomita"}
+            }
+            light-year{
+                dnam{"miaka ya mwanga"}
+                one{"miaka ya mwanga {0}"}
+                other{"miaka ya mwanga {0}"}
+            }
+            meter{
+                dnam{"mita"}
+                one{"mita {0}"}
+                other{"mita {0}"}
+                per{"{0} kwa kila mita"}
+            }
+            micrometer{
+                dnam{"mikromita"}
+                one{"mikromita {0}"}
+                other{"mikromita {0}"}
+            }
+            mile{
+                dnam{"maili"}
+                one{"maili {0}"}
+                other{"maili {0}"}
+            }
+            mile-scandinavian{
+                dnam{"maili ya skandinavia"}
+                one{"maili {0} ya skandinavia"}
+                other{"maili {0} za skandinavia"}
+            }
+            millimeter{
+                dnam{"milimita"}
+                one{"milimita {0}"}
+                other{"milimita {0}"}
+            }
+            nanometer{
+                dnam{"nanomita"}
+                one{"nanomita {0}"}
+                other{"nanomita {0}"}
+            }
+            nautical-mile{
+                dnam{"maili za kibaharia"}
+                one{"maili {0} ya kibaharia"}
+                other{"maili {0} za kibaharia"}
+            }
+            parsec{
+                dnam{"kila sekunde"}
+                one{"{0} kila sekunde"}
+                other{"{0} kila sekunde"}
+            }
+            picometer{
+                dnam{"pikomita"}
+                one{"pikomita {0}"}
+                other{"pikomita {0}"}
+            }
+            point{
+                dnam{"pointi"}
+                one{"pointi {0}"}
+                other{"pointi {0}"}
+            }
+            solar-radius{
+                dnam{"nusu vipenyo vya jua"}
+                one{"nusu kipenyo cha jua {0}"}
+                other{"nusu vipenyo vya jua {0}"}
+            }
+            yard{
+                dnam{"yadi"}
+                one{"yadi {0}"}
+                other{"yadi {0}"}
+            }
+        }
+        light{
+            candela{
+                dnam{"kandela"}
+                one{"kandela {0}"}
+                other{"kandela {0}"}
+            }
+            lumen{
+                dnam{"lumeni"}
+                one{"lumeni {0}"}
+                other{"lumeni {0}"}
+            }
+            lux{
+                dnam{"lux"}
+                one{"lux {0}"}
+                other{"lux {0}"}
+            }
+            solar-luminosity{
+                dnam{"ung’avu wa jua"}
+                one{"ung'avu wa jua {0}"}
+                other{"ung'avu wa jua {0}"}
+            }
+        }
+        mass{
+            carat{
+                dnam{"karati"}
+                one{"karati {0}"}
+                other{"karati {0}"}
+            }
+            dalton{
+                dnam{"daltoni"}
+                one{"daltoni {0}"}
+                other{"daltoni {0}"}
+            }
+            earth-mass{
+                dnam{"uzito wa dunia"}
+                one{"uzito wa dunia {0}"}
+                other{"uzito wa dunia {0}"}
+            }
+            grain{
+                dnam{"nafaka"}
+                one{"nafaka {0}"}
+                other{"nafaka {0}"}
+            }
+            gram{
+                dnam{"gramu"}
+                one{"gramu {0}"}
+                other{"gramu {0}"}
+                per{"{0} kwa kila gramu"}
+            }
+            kilogram{
+                dnam{"kilogramu"}
+                one{"kilogramu {0}"}
+                other{"kilogramu {0}"}
+                per{"{0} kwa kila kilogramu"}
+            }
+            metric-ton{
+                dnam{"tani mita"}
+                one{"tani mita {0}"}
+                other{"tani mita {0}"}
+            }
+            microgram{
+                dnam{"mikrogramu"}
+                one{"mikrogramu {0}"}
+                other{"mikrogramu {0}"}
+            }
+            milligram{
+                dnam{"miligramu"}
+                one{"miligramu {0}"}
+                other{"miligramu {0}"}
+            }
+            ounce{
+                dnam{"aunsi"}
+                one{"aunsi {0}"}
+                other{"aunsi {0}"}
+                per{"{0} kwa kila aunsi"}
+            }
+            ounce-troy{
+                dnam{"tola aunsi"}
+                one{"tola aunsi {0}"}
+                other{"tola aunsi {0}"}
+            }
+            pound{
+                dnam{"ratili"}
+                one{"ratili {0}"}
+                other{"ratili {0}"}
+                per{"{0} kwa kila ratili"}
+            }
+            solar-mass{
+                dnam{"uzito wa jua"}
+                one{"uzito wa jua {0}"}
+                other{"uzito wa jua {0}"}
+            }
+            stone{
+                dnam{"mawe"}
+                one{"jiwe {0}"}
+                other{"mawe {0}"}
+            }
+            ton{
+                dnam{"tani fupi"}
+                one{"tani fupi {0}"}
+                other{"tani fupi {0}"}
+            }
+        }
+        power{
+            gigawatt{
+                dnam{"gigawati"}
+                one{"gigawati {0}"}
+                other{"gigawati {0}"}
+            }
+            horsepower{
+                dnam{"kipimo cha hospawa"}
+                one{"kipimo cha hospawa {0}"}
+                other{"kipimo cha hospawa {0}"}
+            }
+            kilowatt{
+                dnam{"kilowati"}
+                one{"kilowati {0}"}
+                other{"kilowati {0}"}
+            }
+            megawatt{
+                dnam{"megawati"}
+                one{"megawati {0}"}
+                other{"megawati {0}"}
+            }
+            milliwatt{
+                dnam{"miliwati"}
+                one{"miliwati {0}"}
+                other{"miliwati {0}"}
+            }
+            watt{
+                dnam{"wati"}
+                one{"wati {0}"}
+                other{"wati {0}"}
+            }
+        }
+        pressure{
+            atmosphere{
+                dnam{"kanieneo ya hewa"}
+                one{"kanieneo {0}"}
+                other{"kanieneo {0}"}
+            }
+            bar{
+                dnam{"bari"}
+                one{"bari {0}"}
+                other{"bari {0}"}
+            }
+            hectopascal{
+                dnam{"hektopaskali"}
+                one{"hektopaskali {0}"}
+                other{"hektopaskali {0}"}
+            }
+            inch-ofhg{
+                dnam{"inchi za zebaki"}
+                one{"inchi {0} ya zebaki"}
+                other{"inchi {0} za zebaki"}
+            }
+            kilopascal{
+                dnam{"kilopaskali"}
+                one{"kilopaskali {0}"}
+                other{"kilopaskali {0}"}
+            }
+            megapascal{
+                dnam{"megapaskali"}
+                one{"megapaskali {0}"}
+                other{"megapaskali {0}"}
+            }
+            millibar{
+                dnam{"kipimo cha milibari"}
+                one{"kipimo cha milibari {0}"}
+                other{"kipimo cha milibari {0}"}
+            }
+            millimeter-ofhg{
+                dnam{"milimita za zebaki"}
+                one{"milimita {0} ya zebaki"}
+                other{"milimita {0} za zebaki"}
+            }
+            pascal{
+                dnam{"paskali"}
+                one{"paskali {0}"}
+                other{"paskali {0}"}
+            }
+            pound-force-per-square-inch{
+                dnam{"pauni kwa kila inchi mraba"}
+                one{"pauni {0} kwa kila inchi mraba"}
+                other{"pauni {0} kwa kila inchi mraba"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                dnam{"kilomita kwa saa"}
+                one{"kilomita {0} kwa saa"}
+                other{"kilomita {0} kwa saa"}
+            }
+            knot{
+                dnam{"noti"}
+                one{"noti {0}"}
+                other{"noti {0}"}
+            }
+            meter-per-second{
+                dnam{"mita kwa kila sekunde"}
+                one{"mita {0} kwa sekunde"}
+                other{"mita {0} kwa sekunde"}
+            }
+            mile-per-hour{
+                dnam{"maili kwa kila saa"}
+                one{"maili {0} kwa saa"}
+                other{"maili {0} kwa saa"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"nyuzi"}
+                one{"nyuzi {0}"}
+                other{"nyuzi {0}"}
+            }
+            fahrenheit{
+                dnam{"nyuzi za farenheiti"}
+                one{"nyuzi za farenheiti {0}"}
+                other{"nyuzi za farenheiti {0}"}
+            }
+            generic{
+                dnam{"°"}
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+            kelvin{
+                dnam{"kelvini"}
+                one{"kelvini {0}"}
+                other{"kelvini {0}"}
+            }
+        }
+        torque{
+            newton-meter{
+                dnam{"newtonimita"}
+                one{"newtonimita {0}"}
+                other{"newtonimita {0}"}
+            }
+            pound-force-foot{
+                dnam{"paunifuti"}
+                one{"paunifuti {0}"}
+                other{"paunifuti {0}"}
+            }
+        }
+        volume{
+            acre-foot{
+                dnam{"ekari futi"}
+                one{"ekari futi {0}"}
+                other{"ekari futi {0}"}
+            }
+            barrel{
+                dnam{"mapipa"}
+                one{"pipa {0}"}
+                other{"mapipa {0}"}
+            }
+            bushel{
+                dnam{"busheli"}
+                one{"busheli {0}"}
+                other{"busheli {0}"}
+            }
+            centiliter{
+                dnam{"sentilita"}
+                one{"sentilita {0}"}
+                other{"sentilita {0}"}
+            }
+            cubic-centimeter{
+                dnam{"sentimita za ujazo"}
+                one{"sentimita {0} ya ujazo"}
+                other{"sentimita {0} za ujazo"}
+                per{"{0} kwa kila sentimita ya ujazo"}
+            }
+            cubic-foot{
+                dnam{"futi za ujazo"}
+                one{"futi {0} ya ujazo"}
+                other{"futi {0} za ujazo"}
+            }
+            cubic-inch{
+                dnam{"inchi za ujazo"}
+                one{"inchi {0} ya ujazo"}
+                other{"inchi {0} za ujazo"}
+            }
+            cubic-kilometer{
+                dnam{"kilomita za ujazo"}
+                one{"kilomita {0} ya ujazo"}
+                other{"kilomita {0} za ujazo"}
+            }
+            cubic-meter{
+                dnam{"mita za ujazo"}
+                one{"mita {0} ya ujazo"}
+                other{"mita {0} za ujazo"}
+                per{"{0} kwa kila mita ya ujazo"}
+            }
+            cubic-mile{
+                dnam{"maili za ujazo"}
+                one{"maili {0} ya ujazo"}
+                other{"maili {0} za ujazo"}
+            }
+            cubic-yard{
+                dnam{"yadi za ujazo"}
+                one{"yadi {0} ya ujazo"}
+                other{"yadi {0} za ujazo"}
+            }
+            cup{
+                dnam{"vikombe"}
+                one{"kikombe {0}"}
+                other{"vikombe {0}"}
+            }
+            cup-metric{
+                dnam{"vikombe vya mizani"}
+                one{"kikombe {0} cha mizani"}
+                other{"vikombe {0} vya mizani"}
+            }
+            deciliter{
+                dnam{"desilita"}
+                one{"desilita {0}"}
+                other{"desilita {0}"}
+            }
+            dessert-spoon{
+                dnam{"kijiko cha kitindamlo"}
+                one{"kijiko {0} cha kitindamlo"}
+                other{"vijiko {0} vya kitindamlo"}
+            }
+            dessert-spoon-imperial{
+                dnam{"Kijiko cha kitindamlo cha Uingireza"}
+                one{"kijiko {0} cha kitindamlo cha Uingereza"}
+                other{"vijiko {0} vya kitindamlo vya Uingereza"}
+            }
+            dram{
+                dnam{"dramu"}
+                one{"dramu {0}"}
+                other{"dramu {0}"}
+            }
+            drop{
+                dnam{"tone"}
+                one{"tone {0}"}
+                other{"matone {0}"}
+            }
+            fluid-ounce{
+                dnam{"aunsi za ujazo"}
+                one{"aunsi {0} ya ujazo"}
+                other{"aunsi {0} za ujazo"}
+            }
+            fluid-ounce-imperial{
+                dnam{"aunsi za ujazo za Uingereza"}
+                one{"aunsi {0} ya ujazo ya Uingereza"}
+                other{"aunsi {0} za ujazo za Uingereza"}
+            }
+            gallon{
+                dnam{"galoni"}
+                one{"galoni {0}"}
+                other{"galoni {0}"}
+                per{"{0} kwa kila galoni"}
+            }
+            gallon-imperial{
+                dnam{"Imp. gal"}
+                one{"gal Imp. {0}"}
+                other{"gal Imp. {0}"}
+                per{"{0}/gal Imp."}
+            }
+            hectoliter{
+                dnam{"hektolita"}
+                one{"hektolita {0}"}
+                other{"hektolita {0}"}
+            }
+            jigger{
+                dnam{"toti"}
+                one{"toti {0}"}
+                other{"toti {0}"}
+            }
+            liter{
+                dnam{"lita"}
+                one{"lita {0}"}
+                other{"lita {0}"}
+                per{"{0} kwa kila lita"}
+            }
+            megaliter{
+                dnam{"megalita"}
+                one{"megalita {0}"}
+                other{"megalita {0}"}
+            }
+            milliliter{
+                dnam{"mililita"}
+                one{"mililita {0}"}
+                other{"mililita {0}"}
+            }
+            pinch{
+                dnam{"mfinyo kwa vidole"}
+                one{"mfinyo {0} kwa vidole"}
+                other{"mifinyo {0} kwa vidole"}
+            }
+            pint{
+                dnam{"painti"}
+                one{"painti {0}"}
+                other{"painti {0}"}
+            }
+            pint-metric{
+                dnam{"painti za mizani"}
+                one{"painti {0} ya mizani"}
+                other{"painti {0} za mizani"}
+            }
+            quart{
+                dnam{"kwati"}
+                one{"kwati {0}"}
+                other{"kwati {0}"}
+            }
+            quart-imperial{
+                dnam{"kwati ya Uingereza"}
+                one{"kwati {0} ya Uingereza"}
+                other{"kwati {0} za Uingereza"}
+            }
+            tablespoon{
+                dnam{"vijiko vikubwa"}
+                one{"kijiko {0} kikubwa"}
+                other{"vijiko {0} vikubwa"}
+            }
+            teaspoon{
+                dnam{"vijiko vidogo"}
+                one{"kijiko {0} kidogo"}
+                other{"vijiko {0} vidogo"}
+            }
+        }
+    }
+    unitsNarrow{
+        acceleration{
+            g-force{
+                one{"G {0}"}
+                other{"G {0}"}
+            }
+        }
+        angle{
+            arc-minute{
+                one{"{0}′"}
+                other{"{0}′"}
+            }
+            arc-second{
+                one{"{0}″"}
+                other{"{0}″"}
+            }
+            degree{
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+        }
+        area{
+            acre{
+                one{"Ekari {0}"}
+                other{"Ekari {0}"}
+            }
+            hectare{
+                one{"ha {0}"}
+                other{"ha {0}"}
+            }
+            square-foot{
+                one{"ft² {0}"}
+                other{"ft² {0}"}
+            }
+            square-kilometer{
+                one{"km² {0}"}
+                other{"km² {0}"}
+            }
+            square-meter{
+                one{"m² {0}"}
+                other{"m² {0}"}
+            }
+            square-mile{
+                one{"mi² {0}"}
+                other{"mi² {0}"}
+            }
+        }
+        compound{
+            1024p1{"kibi{0}"}
+            1024p2{"mebi{0}"}
+            1024p3{"gibi{0}"}
+            1024p4{"tebi{0}"}
+            1024p5{"pebi{0}"}
+            1024p6{"eksibi{0}"}
+            1024p7{"zebi{0}"}
+            1024p8{"yobi{0}"}
+            10p-1{"desi{0}"}
+            10p-12{"piko{0}"}
+            10p-15{"femto{0}"}
+            10p-18{"atto{0}"}
+            10p-2{"senti{0}"}
+            10p-21{"zepto{0}"}
+            10p-24{"yokto{0}"}
+            10p-3{"mili{0}"}
+            10p-6{"mikro{0}"}
+            10p-9{"nano{0}"}
+            10p1{"deka{0}"}
+            10p12{"tera{0}"}
+            10p15{"peta{0}"}
+            10p18{"exa{0}"}
+            10p2{"hekta{0}"}
+            10p21{"zetta{0}"}
+            10p24{"yotta{0}"}
+            10p3{"kilo{0}"}
+            10p6{"mega{0}"}
+            10p9{"giga{0}"}
+            per{"{0}/{1}"}
+        }
+        concentr{
+            percent{
+                dnam{"asilimia"}
+                one{"asilimia {0}"}
+                other{"asilimia {0}"}
+            }
+        }
+        consumption{
+            liter-per-100-kilometer{
+                dnam{"lita kwa kilomita 100"}
+                one{"L/100km {0}"}
+                other{"L/100km {0}"}
+            }
+        }
+        coordinate{
+            dnam{"mwelekeo"}
+            east{"{0} Mashariki"}
+            north{"{0} Kaskazini"}
+            south{"{0} Kusini"}
+            west{"{0} Magharibi"}
+        }
+        duration{
+            day{
+                dnam{"siku"}
+                one{"siku {0}"}
+                other{"siku {0}"}
+            }
+            hour{
+                dnam{"saa"}
+                one{"saa {0}"}
+                other{"saa {0}"}
+            }
+            millisecond{
+                dnam{"millisekunde"}
+                one{"ms {0}"}
+                other{"ms {0}"}
+            }
+            minute{
+                dnam{"dakika"}
+                one{"dak {0}"}
+                other{"dak {0}"}
+            }
+            month{
+                dnam{"mwezi"}
+                one{"mwezi {0}"}
+                other{"miezi {0}"}
+            }
+            second{
+                dnam{"sekunde"}
+                one{"sek {0}"}
+                other{"sek {0}"}
+            }
+            week{
+                dnam{"wiki"}
+                one{"wiki {0}"}
+                other{"wiki {0}"}
+            }
+            year{
+                dnam{"mwaka"}
+                one{"mwaka {0}"}
+                other{"miaka {0}"}
+            }
+        }
+        electric{
+            volt{
+                dnam{"volti"}
+            }
+        }
+        length{
+            centimeter{
+                dnam{"sentimita"}
+                one{"cm {0}"}
+                other{"cm {0}"}
+            }
+            foot{
+                one{"Futi {0}"}
+                other{"Futi {0}"}
+            }
+            inch{
+                dnam{"Inchi"}
+                one{"Inchi {0}"}
+                other{"Inchi {0}"}
+            }
+            kilometer{
+                dnam{"km"}
+                one{"km {0}"}
+                other{"km {0}"}
+            }
+            light-year{
+                one{"ly {0}"}
+                other{"ly {0}"}
+            }
+            meter{
+                dnam{"mita"}
+                one{"mita {0}"}
+                other{"mita {0}"}
+            }
+            mile{
+                one{"Maili {0}"}
+                other{"Maili {0}"}
+            }
+            millimeter{
+                dnam{"milimita"}
+                one{"mm {0}"}
+                other{"mm {0}"}
+            }
+            picometer{
+                one{"pm {0}"}
+                other{"pm {0}"}
+            }
+            yard{
+                one{"Yadi {0}"}
+                other{"Yadi {0}"}
+            }
+        }
+        mass{
+            gram{
+                dnam{"gramu"}
+                one{"gramu {0}"}
+                other{"gramu {0}"}
+            }
+            kilogram{
+                dnam{"kilogramu"}
+                one{"kg {0}"}
+                other{"kg {0}"}
+            }
+            ounce{
+                one{"Aunsi {0}"}
+                other{"Aunsi {0}"}
+            }
+            pound{
+                one{"Ratili {0}"}
+                other{"Ratili {0}"}
+            }
+        }
+        power{
+            horsepower{
+                one{"hp {0}"}
+                other{"hp {0}"}
+            }
+            kilowatt{
+                one{"kW {0}"}
+                other{"kW {0}"}
+            }
+            watt{
+                dnam{"wati"}
+                one{"Wati {0}"}
+                other{"Wati {0}"}
+            }
+        }
+        pressure{
+            hectopascal{
+                one{"hPa {0}"}
+                other{"hPa {0}"}
+            }
+            inch-ofhg{
+                one{"{0} inHg"}
+                other{"{0} inHg"}
+            }
+            millibar{
+                one{"mbar {0}"}
+                other{"mbar {0}"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                dnam{"kilomita kwa saa"}
+                one{"km {0}/saa"}
+                other{"km {0}/saa"}
+            }
+            meter-per-second{
+                one{"m {0}/s"}
+                other{"m {0}/s"}
+            }
+            mile-per-hour{
+                one{"mi {0}/saa"}
+                other{"mi {0}/saa"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"°C"}
+                one{"{0}°C"}
+                other{"{0}°C"}
+            }
+            fahrenheit{
+                one{"{0}°F"}
+                other{"{0}°F"}
+            }
+        }
+        volume{
+            cubic-kilometer{
+                one{"km³ {0}"}
+                other{"km³ {0}"}
+            }
+            cubic-mile{
+                one{"mi³ {0}"}
+                other{"mi³ {0}"}
+            }
+            liter{
+                dnam{"lita"}
+                one{"lita {0}"}
+                other{"lita {0}"}
+            }
+        }
+    }
+    unitsShort{
+        acceleration{
+            g-force{
+                dnam{"mvuto wa graviti"}
+                one{"G {0}"}
+                other{"G {0}"}
+            }
+            meter-per-square-second{
+                dnam{"mita kwa kila sekunde mraba"}
+                one{"m {0}/s²"}
+                other{"m {0}/s²"}
+            }
+        }
+        angle{
+            arc-minute{
+                dnam{"dakika"}
+                one{"dakika {0}"}
+                other{"dakika {0}"}
+            }
+            arc-second{
+                dnam{"sekunde"}
+                one{"sekunde {0}"}
+                other{"sekunde {0}"}
+            }
+            degree{
+                dnam{"digrii"}
+                one{"digrii {0}"}
+                other{"digrii {0}"}
+            }
+            radian{
+                dnam{"radiani"}
+                one{"radiani {0}"}
+                other{"radiani {0}"}
+            }
+            revolution{
+                dnam{"mzunguko"}
+                one{"mzunguko {0}"}
+                other{"mizunguko {0}"}
+            }
+        }
+        area{
+            acre{
+                dnam{"ekari"}
+                one{"ekari {0}"}
+                other{"ekari {0}"}
+            }
+            dunam{
+                dnam{"dunamu"}
+                one{"dunamu {0}"}
+                other{"dunamu {0}"}
+            }
+            hectare{
+                dnam{"hekta"}
+                one{"hekta {0}"}
+                other{"hekta {0}"}
+            }
+            square-centimeter{
+                dnam{"sentimita za mraba"}
+                one{"cm² {0}"}
+                other{"cm² {0}"}
+                per{"{0}/cm²"}
+            }
+            square-foot{
+                dnam{"futi za mraba"}
+                one{"ft² {0}"}
+                other{"ft² {0}"}
+            }
+            square-inch{
+                dnam{"inchi za mraba"}
+                one{"in² {0}"}
+                other{"in² {0}"}
+                per{"{0}/in²"}
+            }
+            square-kilometer{
+                dnam{"kilomita za mraba"}
+                one{"km² {0}"}
+                other{"km² {0}"}
+                per{"{0}/km²"}
+            }
+            square-meter{
+                dnam{"mita za mraba"}
+                one{"m² {0}"}
+                other{"m² {0}"}
+                per{"{0}/m²"}
+            }
+            square-mile{
+                dnam{"maili za mraba"}
+                one{"sq mi {0}"}
+                other{"sq mi {0}"}
+                per{"{0}/mi²"}
+            }
+            square-yard{
+                dnam{"yadi za mraba"}
+                one{"yd² {0}"}
+                other{"yd² {0}"}
+            }
+        }
+        compound{
+            1024p1{"kibi{0}"}
+            1024p2{"mebi{0}"}
+            1024p3{"gibi{0}"}
+            1024p4{"tebi{0}"}
+            1024p5{"pebi{0}"}
+            1024p6{"eksibi{0}"}
+            1024p7{"zebi{0}"}
+            1024p8{"yobi{0}"}
+            10p-1{"desi{0}"}
+            10p-12{"piko{0}"}
+            10p-15{"femto{0}"}
+            10p-18{"atto{0}"}
+            10p-2{"senti{0}"}
+            10p-21{"zepto{0}"}
+            10p-24{"yokto{0}"}
+            10p-3{"mili{0}"}
+            10p-6{"mikro{0}"}
+            10p-9{"nano{0}"}
+            10p1{"deka{0}"}
+            10p12{"tera{0}"}
+            10p15{"peta{0}"}
+            10p18{"exa{0}"}
+            10p2{"hekta{0}"}
+            10p21{"zetta{0}"}
+            10p24{"yotta{0}"}
+            10p3{"kilo{0}"}
+            10p6{"mega{0}"}
+            10p9{"giga{0}"}
+            per{"{0}/{1}"}
+        }
+        concentr{
+            karat{
+                dnam{"karati"}
+                one{"karati {0}"}
+                other{"karati {0}"}
+            }
+            milligram-ofglucose-per-deciliter{
+                dnam{"mg/dL"}
+                one{"{0} mg/dL"}
+                other{"{0} mg/dL"}
+            }
+            millimole-per-liter{
+                dnam{"milimoli kwa kila lita"}
+                one{"mmol {0}/lita"}
+                other{"mmol {0}/L"}
+            }
+            mole{
+                dnam{"moli"}
+                one{"moli {0}"}
+                other{"moli {0}"}
+            }
+            percent{
+                dnam{"asilimia"}
+                one{"asilimia {0}"}
+                other{"asilimia {0}"}
+            }
+            permille{
+                dnam{"kwa elfu"}
+                one{"{0} kwa elfu"}
+                other{"{0} kwa elfu"}
+            }
+            permillion{
+                dnam{"sehemu kwa kila milioni"}
+                one{"ppm {0}"}
+                other{"ppm {0}"}
+            }
+            permyriad{
+                dnam{"permyriadi"}
+            }
+        }
+        consumption{
+            liter-per-100-kilometer{
+                dnam{"lita kwa kilomita 100"}
+                one{"lita {0}/km 100"}
+                other{"lita {0}/km 100"}
+            }
+            liter-per-kilometer{
+                dnam{"lita kwa kila kilomita"}
+                one{"lita {0} kwa kilomita"}
+                other{"lita {0} kwa kilomita"}
+            }
+            mile-per-gallon{
+                dnam{"maili kwa kila galoni"}
+                one{"mpg {0}"}
+                other{"mpg {0}"}
+            }
+            mile-per-gallon-imperial{
+                dnam{"mpg Imp."}
+                one{"mpg Imp. {0}"}
+                other{"mpg Imp. {0}"}
+            }
+        }
+        coordinate{
+            dnam{"mwelekeo"}
+            east{"{0} Mashariki"}
+            north{"{0} Kaskazini"}
+            south{"{0} Kusini"}
+            west{"{0} Magharibi"}
+        }
+        digital{
+            bit{
+                dnam{"biti"}
+                one{"biti {0}"}
+                other{"biti {0}"}
+            }
+            byte{
+                dnam{"baiti"}
+                one{"baiti {0}"}
+                other{"baiti {0}"}
+            }
+            gigabit{
+                dnam{"gigabiti"}
+                one{"gigabiti {0}"}
+                other{"gigabiti {0}"}
+            }
+            gigabyte{
+                dnam{"GB"}
+                one{"GB {0}"}
+                other{"GB {0}"}
+            }
+            kilobit{
+                dnam{"kilobiti"}
+                one{"kilobiti {0}"}
+                other{"kilobiti {0}"}
+            }
+            kilobyte{
+                dnam{"kilobaiti"}
+                one{"kilobaiti {0}"}
+                other{"kilobaiti {0}"}
+            }
+            megabit{
+                dnam{"Mb"}
+                one{"megabiti {0}"}
+                other{"megabiti {0}"}
+            }
+            megabyte{
+                dnam{"MB"}
+                one{"MB {0}"}
+                other{"MB {0}"}
+            }
+            petabyte{
+                dnam{"petabaiti"}
+                one{"PB {0}"}
+                other{"PB {0}"}
+            }
+            terabit{
+                dnam{"terabiti"}
+                one{"terabiti {0}"}
+                other{"terabiti {0}"}
+            }
+            terabyte{
+                dnam{"terabaiti"}
+                one{"terabaiti {0}"}
+                other{"terabaiti {0}"}
+            }
+        }
+        duration{
+            century{
+                dnam{"karne"}
+                one{"karne {0}"}
+                other{"karne {0}"}
+            }
+            day{
+                dnam{"siku"}
+                one{"siku {0}"}
+                other{"siku {0}"}
+                per{"{0} kwa siku"}
+            }
+            decade{
+                dnam{"miongo"}
+                one{"mwongo {0}"}
+                other{"miongo {0}"}
+            }
+            hour{
+                dnam{"saa"}
+                one{"saa {0}"}
+                other{"saa {0}"}
+                per{"{0} kwa saa"}
+            }
+            microsecond{
+                dnam{"mikrosekunde"}
+                one{"mikrosekunde {0}"}
+                other{"mikrosekunde {0}"}
+            }
+            millisecond{
+                dnam{"millisekunde"}
+                one{"ms {0}"}
+                other{"ms {0}"}
+            }
+            minute{
+                dnam{"dakika"}
+                one{"dakika {0}"}
+                other{"dakika {0}"}
+                per{"{0} kwa kila dakika"}
+            }
+            month{
+                dnam{"miezi"}
+                one{"mwezi {0}"}
+                other{"miezi {0}"}
+                per{"{0} kwa mwezi"}
+            }
+            nanosecond{
+                dnam{"nanosekunde"}
+                one{"nanosekunde {0}"}
+                other{"nanosekunde {0}"}
+            }
+            second{
+                dnam{"sekunde"}
+                one{"sekunde {0}"}
+                other{"sekunde {0}"}
+                per{"{0} kwa kila sekunde"}
+            }
+            week{
+                dnam{"wiki"}
+                one{"wiki {0}"}
+                other{"wiki {0}"}
+                per{"{0} kwa wiki"}
+            }
+            year{
+                dnam{"miaka"}
+                one{"mwaka {0}"}
+                other{"miaka {0}"}
+                per{"{0} kwa mwaka"}
+            }
+        }
+        electric{
+            ampere{
+                dnam{"ampea"}
+                one{"ampea {0}"}
+                other{"ampea {0}"}
+            }
+            milliampere{
+                dnam{"miliampea"}
+                one{"mA {0}"}
+                other{"mA {0}"}
+            }
+            ohm{
+                dnam{"ohm"}
+                one{"{0} Ω"}
+                other{"{0} Ω"}
+            }
+            volt{
+                dnam{"volti"}
+                one{"volti {0}"}
+                other{"volti {0}"}
+            }
+        }
+        energy{
+            british-thermal-unit{
+                dnam{"BTU"}
+                one{"Btu {0}"}
+                other{"Btu {0}"}
+            }
+            calorie{
+                dnam{"kalori"}
+                one{"kalori {0}"}
+                other{"kalori {0}"}
+            }
+            electronvolt{
+                dnam{"elektrovolti"}
+                one{"eV {0}"}
+                other{"eV {0}"}
+            }
+            foodcalorie{
+                dnam{"kalori"}
+                one{"kalori {0}"}
+                other{"kalori {0}"}
+            }
+            joule{
+                dnam{"jouli"}
+                one{"jouli {0}"}
+                other{"jouli {0}"}
+            }
+            kilocalorie{
+                dnam{"kilokalori"}
+                one{"kilokalori {0}"}
+                other{"kilokalori {0}"}
+            }
+            kilojoule{
+                dnam{"kilojuli"}
+                one{"kilojuli {0}"}
+                other{"kilojuli {0}"}
+            }
+            kilowatt-hour{
+                dnam{"kilowati kwa saa"}
+                one{"kWh {0}"}
+                other{"kWh {0}"}
+            }
+            therm-us{
+                dnam{"kipimo cha gesi, Marekani"}
+                one{"kipimo {0} cha gesi, US"}
+                other{"vipimo {0} vya gesi, US"}
+            }
+        }
+        force{
+            newton{
+                dnam{"newtoni"}
+                one{"N {0}"}
+                other{"N {0}"}
+            }
+            pound-force{
+                dnam{"paunikani"}
+                one{"lbf {0}"}
+                other{"lbf {0}"}
+            }
+        }
+        frequency{
+            gigahertz{
+                dnam{"gigahezi"}
+                one{"gigahezi {0}"}
+                other{"gigahezi {0}"}
+            }
+            hertz{
+                dnam{"hezi"}
+                one{"hezi {0}"}
+                other{"hezi {0}"}
+            }
+            kilohertz{
+                dnam{"kilohezi"}
+                one{"kilohezi {0}"}
+                other{"kilohezi {0}"}
+            }
+            megahertz{
+                dnam{"megahezi"}
+                one{"megahezi {0}"}
+                other{"megahezi {0}"}
+            }
+        }
+        graphics{
+            dot{
+                dnam{"kitone"}
+                one{"kitone {0}"}
+                other{"vitone {0}"}
+            }
+            dot-per-centimeter{
+                one{"dpcm {0}"}
+                other{"dpcm {0}"}
+            }
+            dot-per-inch{
+                one{"dpi {0}"}
+                other{"dpi {0}"}
+            }
+            em{
+                one{"em {0}"}
+                other{"em {0}"}
+            }
+            megapixel{
+                one{"MP {0}"}
+                other{"MP {0}"}
+            }
+            pixel{
+                dnam{"pikseli"}
+                one{"px {0}"}
+                other{"px {0}"}
+            }
+            pixel-per-centimeter{
+                one{"ppcm {0}"}
+                other{"ppcm {0}"}
+            }
+            pixel-per-inch{
+                one{"ppi {0}"}
+                other{"ppi {0}"}
+            }
+        }
+        length{
+            astronomical-unit{
+                dnam{"vipimo vya astronomia"}
+                one{"au {0}"}
+                other{"au {0}"}
+            }
+            centimeter{
+                dnam{"sentimita"}
+                one{"sentimita {0}"}
+                other{"sentimita {0}"}
+                per{"{0} kwa kila sentimita"}
+            }
+            decimeter{
+                dnam{"desimita"}
+                one{"desimita {0}"}
+                other{"desimita {0}"}
+            }
+            earth-radius{
+                one{"R⊕ {0}"}
+                other{"R⊕ {0}"}
+            }
+            fathom{
+                dnam{"fathom"}
+                one{"fth {0}"}
+                other{"fth {0}"}
+            }
+            foot{
+                dnam{"futi"}
+                one{"futi {0}"}
+                other{"futi {0}"}
+                per{"{0} kwa kila futi"}
+            }
+            furlong{
+                dnam{"furlong"}
+                one{"fur {0}"}
+                other{"fur {0}"}
+            }
+            inch{
+                dnam{"inchi"}
+                one{"inchi {0}"}
+                other{"inchi {0}"}
+                per{"{0} kwa kila inchi"}
+            }
+            kilometer{
+                dnam{"kilomita"}
+                one{"km {0}"}
+                other{"km {0}"}
+                per{"{0} kwa kila kilomita"}
+            }
+            light-year{
+                dnam{"miaka ya mwanga"}
+                one{"ly {0}"}
+                other{"ly {0}"}
+            }
+            meter{
+                dnam{"mita"}
+                one{"mita {0}"}
+                other{"mita {0}"}
+                per{"{0} kwa kila mita"}
+            }
+            micrometer{
+                dnam{"mikromita"}
+                one{"mikromita {0}"}
+                other{"mikromita {0}"}
+            }
+            mile{
+                dnam{"maili"}
+                one{"maili {0}"}
+                other{"maili {0}"}
+            }
+            mile-scandinavian{
+                dnam{"smi"}
+                one{"smi {0}"}
+                other{"smi {0}"}
+            }
+            millimeter{
+                dnam{"milimita"}
+                one{"milimita {0}"}
+                other{"milimita {0}"}
+            }
+            nanometer{
+                dnam{"nanomita"}
+                one{"nanomita {0}"}
+                other{"nanomita {0}"}
+            }
+            nautical-mile{
+                dnam{"maili za kibaharia"}
+                one{"maili {0} ya kibaharia"}
+                other{"maili {0} za kibaharia"}
+            }
+            parsec{
+                dnam{"kila sekunde"}
+                one{"pc {0}"}
+                other{"pc {0}"}
+            }
+            picometer{
+                dnam{"pikomita"}
+                one{"pikomita {0}"}
+                other{"pikomita {0}"}
+            }
+            point{
+                dnam{"pointi"}
+                one{"pointi {0}"}
+                other{"pointi {0}"}
+            }
+            solar-radius{
+                dnam{"nusu vipenyo vya jua"}
+                one{"R☉ {0}"}
+                other{"R☉ {0}"}
+            }
+            yard{
+                dnam{"yadi"}
+                one{"yadi {0}"}
+                other{"yadi {0}"}
+            }
+        }
+        light{
+            candela{
+                one{"cd {0}"}
+                other{"cd {0}"}
+            }
+            lumen{
+                one{"lm {0}"}
+                other{"lm {0}"}
+            }
+            lux{
+                dnam{"lux"}
+                one{"lx {0}"}
+                other{"lx {0}"}
+            }
+            solar-luminosity{
+                dnam{"ung’avu wa jua"}
+                one{"L☉ {0}"}
+                other{"L☉ {0}"}
+            }
+        }
+        mass{
+            carat{
+                dnam{"karati"}
+                one{"karati {0}"}
+                other{"karati {0}"}
+            }
+            dalton{
+                dnam{"daltoni"}
+                one{"Da {0}"}
+                other{"Da {0}"}
+            }
+            earth-mass{
+                dnam{"uzito wa dunia"}
+                one{"M⊕ {0}"}
+                other{"M⊕ {0}"}
+            }
+            grain{
+                dnam{"nafaka"}
+                one{"nafaka {0}"}
+                other{"nafaka {0}"}
+            }
+            gram{
+                dnam{"gramu"}
+                one{"gramu {0}"}
+                other{"gramu {0}"}
+                per{"{0} kwa kila gramu"}
+            }
+            kilogram{
+                dnam{"kilogramu"}
+                one{"kg {0}"}
+                other{"kg {0}"}
+                per{"{0}/kg"}
+            }
+            metric-ton{
+                dnam{"tani mita"}
+                one{"tani mita {0}"}
+                other{"tani mita {0}"}
+            }
+            microgram{
+                dnam{"mikrogramu"}
+                one{"mikrogramu {0}"}
+                other{"mikrogramu {0}"}
+            }
+            milligram{
+                dnam{"miligramu"}
+                one{"mg {0}"}
+                other{"mg {0}"}
+            }
+            ounce{
+                dnam{"aunsi"}
+                one{"aunsi {0}"}
+                other{"aunsi {0}"}
+                per{"{0}/oz"}
+            }
+            ounce-troy{
+                dnam{"tola aunsi"}
+                one{"tola aunsi {0}"}
+                other{"tola aunsi {0}"}
+            }
+            pound{
+                dnam{"ratili"}
+                one{"ratili {0}"}
+                other{"ratili {0}"}
+                per{"{0}/lb"}
+            }
+            solar-mass{
+                dnam{"uzito wa jua"}
+                one{"M☉ {0}"}
+                other{"M☉ {0}"}
+            }
+            stone{
+                dnam{"mawe"}
+                one{"st {0}"}
+                other{"st {0}"}
+            }
+            ton{
+                dnam{"tani fupi"}
+                one{"tani fupi {0}"}
+                other{"tani fupi {0}"}
+            }
+        }
+        power{
+            gigawatt{
+                dnam{"gigawati"}
+                one{"gigawati {0}"}
+                other{"gigawati {0}"}
+            }
+            horsepower{
+                dnam{"kipimo cha hospawa"}
+                one{"hp {0}"}
+                other{"hp {0}"}
+            }
+            kilowatt{
+                dnam{"kilowati"}
+                one{"kilowati {0}"}
+                other{"kilowati {0}"}
+            }
+            megawatt{
+                dnam{"megawati"}
+                one{"megawati {0}"}
+                other{"megawati {0}"}
+            }
+            milliwatt{
+                dnam{"miliwati"}
+                one{"miliwati {0}"}
+                other{"miliwati {0}"}
+            }
+            watt{
+                dnam{"wati"}
+                one{"wati {0}"}
+                other{"wati {0}"}
+            }
+        }
+        pressure{
+            atmosphere{
+                dnam{"atm"}
+                one{"atm {0}"}
+                other{"atm {0}"}
+            }
+            bar{
+                dnam{"bari"}
+                one{"bari {0}"}
+                other{"bari {0}"}
+            }
+            hectopascal{
+                dnam{"hektopaskali"}
+                one{"hPa {0}"}
+                other{"hPa {0}"}
+            }
+            inch-ofhg{
+                dnam{"inchi za zebaki"}
+                one{"inHg {0}"}
+                other{"inHg {0}"}
+            }
+            kilopascal{
+                one{"kPa {0}"}
+                other{"kPa {0}"}
+            }
+            megapascal{
+                one{"MPa {0}"}
+                other{"MPa {0}"}
+            }
+            millibar{
+                dnam{"kipimo cha milibari"}
+                one{"mbar {0}"}
+                other{"mbar {0}"}
+            }
+            millimeter-ofhg{
+                dnam{"milimita za zebaki"}
+                one{"mmHg {0}"}
+                other{"mmHg {0}"}
+            }
+            pascal{
+                one{"Pa {0}"}
+                other{"Pa {0}"}
+            }
+            pound-force-per-square-inch{
+                dnam{"pauni kwa kila inchi mraba"}
+                one{"psi {0}"}
+                other{"psi {0}"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                dnam{"kilomita kwa saa"}
+                one{"km {0}/saa"}
+                other{"km {0}/saa"}
+            }
+            knot{
+                dnam{"noti"}
+                one{"noti {0}"}
+                other{"noti {0}"}
+            }
+            meter-per-second{
+                dnam{"mita kwa kila sekunde"}
+                one{"m/s {0}"}
+                other{"m/s {0}"}
+            }
+            mile-per-hour{
+                dnam{"maili kwa kila saa"}
+                one{"mph {0}"}
+                other{"mph {0}"}
+            }
+        }
+        temperature{
+            celsius{
+                dnam{"nyuzi"}
+                one{"{0}°C"}
+                other{"{0}°C"}
+            }
+            fahrenheit{
+                dnam{"nyuzi za farenheiti"}
+                one{"{0}°F"}
+                other{"{0}°F"}
+            }
+            generic{
+                dnam{"°"}
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+            kelvin{
+                dnam{"K"}
+                one{"{0} K"}
+                other{"{0} K"}
+            }
+        }
+        torque{
+            newton-meter{
+                one{"N⋅m {0}"}
+                other{"N⋅m {0}"}
+            }
+            pound-force-foot{
+                one{"lbf⋅ft {0}"}
+                other{"lbf⋅ft {0}"}
+            }
+        }
+        volume{
+            acre-foot{
+                dnam{"ekari futi"}
+                one{"ekari futi {0}"}
+                other{"ekari futi {0}"}
+            }
+            barrel{
+                dnam{"pipa"}
+                one{"pipa {0}"}
+                other{"mapipa {0}"}
+            }
+            bushel{
+                dnam{"busheli"}
+                one{"bu {0}"}
+                other{"bu {0}"}
+            }
+            centiliter{
+                dnam{"sentilita"}
+                one{"sentilita {0}"}
+                other{"sentilita {0}"}
+            }
+            cubic-centimeter{
+                dnam{"sentimita za ujazo"}
+                one{"cm³ {0}"}
+                other{"cm³ {0}"}
+                per{"{0}/cm³"}
+            }
+            cubic-foot{
+                dnam{"futi za ujazo"}
+                one{"ft³ {0}"}
+                other{"ft³ {0}"}
+            }
+            cubic-inch{
+                dnam{"inchi za ujazo"}
+                one{"in³ {0}"}
+                other{"in³ {0}"}
+            }
+            cubic-kilometer{
+                dnam{"kilomita za ujazo"}
+                one{"km³ {0}"}
+                other{"km³ {0}"}
+            }
+            cubic-meter{
+                dnam{"mita za ujazo"}
+                one{"m³ {0}"}
+                other{"mita {0} za ujazo"}
+                per{"{0}/m³"}
+            }
+            cubic-mile{
+                dnam{"maili za ujazo"}
+                one{"mi³ {0}"}
+                other{"mi³ {0}"}
+            }
+            cubic-yard{
+                dnam{"yadi za ujazo"}
+                one{"yd³ {0}"}
+                other{"yd³ {0}"}
+            }
+            cup{
+                dnam{"vikombe"}
+                one{"kikombe {0}"}
+                other{"vikombe {0}"}
+            }
+            cup-metric{
+                dnam{"vikombe vya mizani"}
+                one{"mc {0}"}
+                other{"vikombe {0} vya mizani"}
+            }
+            deciliter{
+                dnam{"desilita"}
+                one{"desilita {0}"}
+                other{"desilita {0}"}
+            }
+            dessert-spoon{
+                one{"dstspn {0}"}
+                other{"dstspn {0}"}
+            }
+            dessert-spoon-imperial{
+                dnam{"dstspn Imp"}
+                one{"dstspn Imp {0}"}
+                other{"dstspn Imp {0}"}
+            }
+            dram{
+                dnam{"ujazo wa dramu"}
+                one{"ujazo wa dramu {0}"}
+                other{"ujazo wa dramu {0}"}
+            }
+            drop{
+                dnam{"tone"}
+                one{"tone {0}"}
+                other{"matone {0}"}
+            }
+            fluid-ounce{
+                dnam{"aunsi za ujazo"}
+                one{"fl oz {0}"}
+                other{"fl oz {0}"}
+            }
+            fluid-ounce-imperial{
+                dnam{"Imp. fl oz"}
+                one{"fl oz Imp. {0}"}
+                other{"fl oz Imp. {0}"}
+            }
+            gallon{
+                dnam{"galoni"}
+                one{"galoni {0}"}
+                other{"galoni {0}"}
+                per{"{0}/gal"}
+            }
+            gallon-imperial{
+                dnam{"Imp. gal"}
+                one{"gal Imp. {0}"}
+                other{"gal Imp. {0}"}
+                per{"{0}/gal Imp."}
+            }
+            hectoliter{
+                dnam{"hektolita"}
+                one{"hektolita {0}"}
+                other{"hektolita {0}"}
+            }
+            jigger{
+                dnam{"toti"}
+                one{"toti {0}"}
+                other{"toti {0}"}
+            }
+            liter{
+                dnam{"lita"}
+                one{"lita {0}"}
+                other{"lita {0}"}
+                per{"{0} kwa kila lita"}
+            }
+            megaliter{
+                dnam{"megalita"}
+                one{"megalita {0}"}
+                other{"megalita {0}"}
+            }
+            milliliter{
+                dnam{"mililita"}
+                one{"mililita {0}"}
+                other{"mililita {0}"}
+            }
+            pinch{
+                dnam{"mfinyo kwa vidole"}
+                one{"mfinyo {0} kwa vidole"}
+                other{"mifinyo {0} kwa vidole"}
+            }
+            pint{
+                dnam{"painti"}
+                one{"painti {0}"}
+                other{"painti {0}"}
+            }
+            pint-metric{
+                dnam{"painti za mizani"}
+                one{"mpt {0}"}
+                other{"mpt {0}"}
+            }
+            quart{
+                dnam{"kwati"}
+                one{"kwati {0}"}
+                other{"kwati {0}"}
+            }
+            quart-imperial{
+                dnam{"qt Imp"}
+                one{"qt Imp. {0}"}
+                other{"qt Imp. {0}"}
+            }
+            tablespoon{
+                dnam{"vijiko vikubwa"}
+                one{"tbsp {0}"}
+                other{"tbsp {0}"}
+            }
+            teaspoon{
+                dnam{"vijiko vidogo"}
+                one{"tsp {0}"}
+                other{"tsp {0}"}
+            }
+        }
+    }
+}

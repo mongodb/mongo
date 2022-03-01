@@ -1,0 +1,19 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: el_Title.txt
+# Generated from CLDR
+#
+
+::NFD();
+# Remove \0301 following Greek, with possible intervening 0308 marks.
+# [[:Greek:] & [:Ll:]] [\u0308]? { \u0301 → ;
+# Make any string of letters after a cased letter be lower, with rules for sigma
+[:cased:] [:case-ignorable:]* { Σ } [:case-ignorable:]* [:cased:] → σ;
+[:cased:] [:case-ignorable:]* { Σ → ς;
+[:cased:] [:case-ignorable:]* { (.) → &Any-Lower($1) ;
+# Otherwise all lowercase go to upper (titlecase stay as is)
+([:Lowercase:]) → &Any-Title($1) ;
+::NFC();
+

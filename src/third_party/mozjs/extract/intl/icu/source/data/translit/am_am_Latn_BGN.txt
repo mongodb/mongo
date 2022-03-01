@@ -1,0 +1,448 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: am_am_Latn_BGN.txt
+# Generated from CLDR
+#
+
+########################################################################
+# BGN/PCGN 1967 System
+#
+# The BGN/PCGN system for Amharic was designed for use in romanizing
+# names written in Amharic characters. The Roman letters and letter
+# combinations shown as equivalents to the Amharic characters reflect
+# modern Amharic pronunciation. Different consonant characters in three
+# groups are pronounced alike in modern Amharic and are therefore
+# romanized identically for use in geographic names.
+#
+# https://www.gov.uk/government/uploads/system/uploads/attachment_data/file/320088/Amharic_Romanization.pdf
+#
+# Originally prepared by Michael Everson <everson@evertype.com>
+########################################################################
+# MINIMAL FILTER: Amharic-Latin
+:: [ሀ-᎙] ;
+:: NFD (NFC) ;
+$ejective = ’;
+$glottal  = ’;
+$pharyngeal = ‘;
+# Use this $wordBoundary until bug 2034 is fixed in ICU:
+# http://bugs.icu-project.org/trac/ticket/2034
+$wordBoundary =  [^[:L:][:M:][:N:]] ;
+########################################################################
+# Start of Syllabic Transformations
+########################################################################
+ሀ → hā ; # ETHIOPIC SYLLABLE HA
+ሁ → hu ; # ETHIOPIC SYLLABLE HU
+ሂ → hī ; # ETHIOPIC SYLLABLE HI
+ሃ → ha ; # ETHIOPIC SYLLABLE HAA
+ሄ → hē ; # ETHIOPIC SYLLABLE HEE
+ህ → hi ; # ETHIOPIC SYLLABLE HE
+ሆ → ho ; # ETHIOPIC SYLLABLE HO
+ለ → le ; # ETHIOPIC SYLLABLE LA
+ሉ → lu ; # ETHIOPIC SYLLABLE LU
+ሊ → lī ; # ETHIOPIC SYLLABLE LI
+ላ → la ; # ETHIOPIC SYLLABLE LAA
+ሌ → lē ; # ETHIOPIC SYLLABLE LEE
+ል → li ; # ETHIOPIC SYLLABLE LE
+ሎ → lo ; # ETHIOPIC SYLLABLE LO
+ሏ → lwa ; # ETHIOPIC SYLLABLE LWA
+########################################################################
+# BGN Page 3 Rule 2:
+#
+# For documentation purposes the characters romanized with h in rows
+# 1, 3, 13 and 18 may be romanized with h, h\u0323, h\u032E, and h\u0331, respectively.
+########################################################################
+ሐ → h\u0323ā ; # ETHIOPIC SYLLABLE HHA
+ሑ → h\u0323u ; # ETHIOPIC SYLLABLE HHU
+ሒ → h\u0323ī ; # ETHIOPIC SYLLABLE HHI
+ሓ → h\u0323a ; # ETHIOPIC SYLLABLE HHAA
+ሔ → h\u0323ē ; # ETHIOPIC SYLLABLE HHEE
+ሕ → h\u0323i ; # ETHIOPIC SYLLABLE HHE
+ሖ → h\u0323o ; # ETHIOPIC SYLLABLE HHO
+########################################################################
+# End of Rule 2
+########################################################################
+መ → me ; # ETHIOPIC SYLLABLE MA
+ሙ → mu ; # ETHIOPIC SYLLABLE MU
+ሚ → mī ; # ETHIOPIC SYLLABLE MI
+ማ → ma ; # ETHIOPIC SYLLABLE MAA
+ሜ → mē ; # ETHIOPIC SYLLABLE MEE
+ም → mi ; # ETHIOPIC SYLLABLE ME
+ሞ → mo ; # ETHIOPIC SYLLABLE MO
+ሟ → mwa ; # ETHIOPIC SYLLABLE MWA
+########################################################################
+# BGN Page 3 Rule 2:
+#
+# The characters romanized with s in rows 5 and 7 may, instead, be
+# romanized with š and s, respectively; and the characters romanized
+# with ts’ in rows 30 and 31 may, instead, be romanized with ts’ and
+# t\u035Fs’ respectively.
+########################################################################
+ሠ → še ; # ETHIOPIC SYLLABLE SZA
+ሡ → šu ; # ETHIOPIC SYLLABLE SZU
+ሢ → šī ; # ETHIOPIC SYLLABLE SZI
+ሣ → ša ; # ETHIOPIC SYLLABLE SZAA
+ሤ → šē ; # ETHIOPIC SYLLABLE SZEE
+ሥ → ši ; # ETHIOPIC SYLLABLE SZE
+ሦ → šo ; # ETHIOPIC SYLLABLE SZO
+########################################################################
+# End of Rule 2
+########################################################################
+ረ → re ; # ETHIOPIC SYLLABLE RA
+ሩ → ru ; # ETHIOPIC SYLLABLE RU
+ሪ → rī ; # ETHIOPIC SYLLABLE RI
+ራ → ra ; # ETHIOPIC SYLLABLE RAA
+ሬ → rē ; # ETHIOPIC SYLLABLE REE
+ር → ri ; # ETHIOPIC SYLLABLE RE
+ሮ → ro ; # ETHIOPIC SYLLABLE RO
+ሯ → rwa ; # ETHIOPIC SYLLABLE RWA not in BGN
+ሰ → se ; # ETHIOPIC SYLLABLE SA
+ሱ → su ; # ETHIOPIC SYLLABLE SU
+ሲ → sī ; # ETHIOPIC SYLLABLE SI
+ሳ → sa ; # ETHIOPIC SYLLABLE SAA
+ሴ → sē ; # ETHIOPIC SYLLABLE SEE
+ስ → si ; # ETHIOPIC SYLLABLE SE
+ሶ → so ; # ETHIOPIC SYLLABLE SO
+ሷ → swa ; # ETHIOPIC SYLLABLE SWA
+ሸ → she ; # ETHIOPIC SYLLABLE SHA
+ሹ → shu ; # ETHIOPIC SYLLABLE SHU
+ሺ → shī ; # ETHIOPIC SYLLABLE SHI
+ሻ → sha ; # ETHIOPIC SYLLABLE SHAA
+ሼ → shē ; # ETHIOPIC SYLLABLE SHEE
+ሽ → shi ; # ETHIOPIC SYLLABLE SHE
+ሾ → sho ; # ETHIOPIC SYLLABLE SHO
+ሿ → shwa ; # ETHIOPIC SYLLABLE SHWA
+ቀ → k $ejective e ; # ETHIOPIC SYLLABLE QA
+ቁ → k $ejective u ; # ETHIOPIC SYLLABLE QU
+ቂ → k $ejective ī ; # ETHIOPIC SYLLABLE QI
+ቃ → k $ejective a ; # ETHIOPIC SYLLABLE QAA
+ቄ → k $ejective ē ; # ETHIOPIC SYLLABLE QEE
+ቅ → k $ejective i ; # ETHIOPIC SYLLABLE QE
+ቆ → k $ejective o ; # ETHIOPIC SYLLABLE QO
+#
+# No rule yet for ቇ U+1247 ETHIOPIC SYLLABLE QOA
+ቈ → k $ejective o ; # ETHIOPIC SYLLABLE QWA
+ቍ → k $ejective wi ; # ETHIOPIC SYLLABLE QWE
+ቋ → k $ejective wa ; # ETHIOPIC SYLLABLE QWAA
+ቌ → k $ejective wē ; # ETHIOPIC SYLLABLE QWEE
+ቊ → k $ejective wī ; # ETHIOPIC SYLLABLE QWI
+########################################################################
+# BGN Page 3 Rule 3:
+#
+# The character ቐ which occurs only in the writing system of the Tigre
+# and # Tigrinya languages, should be romanized with k’ in geographic
+# names but may be romanized with k\u0331 in documentation.
+########################################################################
+ቐ → k\u0331 $ejective e ; # ETHIOPIC SYLLABLE QHA
+ቑ → k\u0331 $ejective u ; # ETHIOPIC SYLLABLE QHU
+ቒ → k\u0331 $ejective ī ; # ETHIOPIC SYLLABLE QHI
+ቓ → k\u0331 $ejective a ; # ETHIOPIC SYLLABLE QHAA
+ቔ → k\u0331 $ejective ē ; # ETHIOPIC SYLLABLE QHEE
+ቕ → k\u0331 $ejective i ; # ETHIOPIC SYLLABLE QHE
+ቖ → k\u0331 $ejective o ; # ETHIOPIC SYLLABLE QHO
+ቘ → k\u0331 $ejective wo ; # ETHIOPIC SYLLABLE QHWA
+ቚ → k\u0331 $ejective wī ; # ETHIOPIC SYLLABLE QHWI
+ቛ → k\u0331 $ejective wa ; # ETHIOPIC SYLLABLE QHWAA
+ቜ → k\u0331 $ejective wē ; # ETHIOPIC SYLLABLE QHWEE
+ቝ → k\u0331 $ejective wi ; # ETHIOPIC SYLLABLE QHWE
+########################################################################
+# End of Rule 3
+########################################################################
+በ → be ; # ETHIOPIC SYLLABLE BA
+ቡ → bu ; # ETHIOPIC SYLLABLE BU
+ቢ → bī ; # ETHIOPIC SYLLABLE BI
+ባ → ba ; # ETHIOPIC SYLLABLE BAA
+ቤ → bē ; # ETHIOPIC SYLLABLE BEE
+ብ → bi ; # ETHIOPIC SYLLABLE BE
+ቦ → bo ; # ETHIOPIC SYLLABLE BO
+ቧ → bwa ; # ETHIOPIC SYLLABLE BWA
+ተ → te ; # ETHIOPIC SYLLABLE TA
+ቱ → tu ; # ETHIOPIC SYLLABLE TU
+ቲ → tī ; # ETHIOPIC SYLLABLE TI
+ታ → ta ; # ETHIOPIC SYLLABLE TAA
+ቴ → tē ; # ETHIOPIC SYLLABLE TEE
+ት → ti ; # ETHIOPIC SYLLABLE TE
+ቶ → to ; # ETHIOPIC SYLLABLE TO
+ቷ → twa ; # ETHIOPIC SYLLABLE TWA
+ቸ → che ; # ETHIOPIC SYLLABLE CA
+ቹ → chu ; # ETHIOPIC SYLLABLE CU
+ቺ → chī ; # ETHIOPIC SYLLABLE CI
+ቻ → cha ; # ETHIOPIC SYLLABLE CAA
+ቼ → chē ; # ETHIOPIC SYLLABLE CEE
+ች → chi ; # ETHIOPIC SYLLABLE CE
+ቾ → cho ; # ETHIOPIC SYLLABLE CO
+ቿ → chwa ; # ETHIOPIC SYLLABLE CWA
+########################################################################
+# BGN Page 3 Rule 2:
+#
+# For documentation purposes the characters romanized with h in rows
+# 1, 3, 13 and 18 may be romanized with h, h\u0323, h\u032E, and h\u0331, respectively.
+########################################################################
+ኀ → h\u032Eā ; # ETHIOPIC SYLLABLE XA
+ኁ → h\u032Eu ; # ETHIOPIC SYLLABLE XU
+ኂ → h\u032Eī ; # ETHIOPIC SYLLABLE XI
+ኃ → h\u032Ea ; # ETHIOPIC SYLLABLE XAA
+ኄ → h\u032Eē ; # ETHIOPIC SYLLABLE XEE
+ኅ → h\u032Ei ; # ETHIOPIC SYLLABLE XE
+ኆ → h\u032Eo ; # ETHIOPIC SYLLABLE XO
+# No rule yet for ኇ U+1287 ETHIOPIC SYLLABLE XOA
+ኈ → h\u032Eo; # ETHIOPIC SYLLABLE XWA
+ኊ → h\u032Ewī ; # ETHIOPIC SYLLABLE XWI
+ኋ → h\u032Ewa ; # ETHIOPIC SYLLABLE XWAA
+ኌ → h\u032Ewē ; # ETHIOPIC SYLLABLE XWEE
+ኍ → h\u032Ewi ; # ETHIOPIC SYLLABLE XWE
+########################################################################
+# End of Rule 2
+########################################################################
+ነ → ne ; # ETHIOPIC SYLLABLE NA
+ኑ → nu ; # ETHIOPIC SYLLABLE NU
+ኒ → nī ; # ETHIOPIC SYLLABLE NI
+ና → na ; # ETHIOPIC SYLLABLE NAA
+ኔ → nē ; # ETHIOPIC SYLLABLE NEE
+ን → ni ; # ETHIOPIC SYLLABLE NE
+ኖ → no ; # ETHIOPIC SYLLABLE NO
+ኗ → nwa ; # ETHIOPIC SYLLABLE NWA
+ኘ → nye ; # ETHIOPIC SYLLABLE NYA
+ኙ → nyu ; # ETHIOPIC SYLLABLE NYU
+ኚ → nyī ; # ETHIOPIC SYLLABLE NYI
+ኛ → nya ; # ETHIOPIC SYLLABLE NYAA
+ኜ → nyē ; # ETHIOPIC SYLLABLE NYEE
+ኝ → nyi ; # ETHIOPIC SYLLABLE NYE
+ኞ → nyo ; # ETHIOPIC SYLLABLE NYO
+ኟ → nywa ; # ETHIOPIC SYLLABLE NYWA
+########################################################################
+# BGN Page 3 Rule 5:
+#
+# The vowel characters in row 16 should be Romanized ā, u, ī, a, ē, i,
+# and o initially and ’ā, ’u, ’ī, ’a, ’ē, ’i, and ’o in all other
+# positions.
+########################################################################
+$wordBoundary{አ → ā ; # ETHIOPIC SYLLABLE GLOTTAL A
+$wordBoundary{ኡ → u ; # ETHIOPIC SYLLABLE GLOTTAL U
+$wordBoundary{ኢ → ī ; # ETHIOPIC SYLLABLE GLOTTAL I
+$wordBoundary{ኣ → a ; # ETHIOPIC SYLLABLE GLOTTAL AA
+$wordBoundary{ኤ → ē ; # ETHIOPIC SYLLABLE GLOTTAL EE
+$wordBoundary{እ → i ; # ETHIOPIC SYLLABLE GLOTTAL E
+$wordBoundary{ኦ → o ; # ETHIOPIC SYLLABLE GLOTTAL O
+$wordBoundary{ኧ → e ; # ETHIOPIC SYLLABLE GLOTTAL WA
+አ → $glottal ā ; # ETHIOPIC SYLLABLE GLOTTAL A
+ኡ → $glottal u ; # ETHIOPIC SYLLABLE GLOTTAL U
+ኢ → $glottal ī ; # ETHIOPIC SYLLABLE GLOTTAL I
+ኣ → $glottal a ; # ETHIOPIC SYLLABLE GLOTTAL AA
+ኤ → $glottal ē ; # ETHIOPIC SYLLABLE GLOTTAL EE
+እ → $glottal i ; # ETHIOPIC SYLLABLE GLOTTAL E
+ኦ → $glottal o ; # ETHIOPIC SYLLABLE GLOTTAL O
+ኧ → $glottal e ; # ETHIOPIC SYLLABLE GLOTTAL WA
+########################################################################
+# End of Rule 5
+########################################################################
+ከ → ke ; # ETHIOPIC SYLLABLE KA
+ኩ → ku ; # ETHIOPIC SYLLABLE KU
+ኪ → kī ; # ETHIOPIC SYLLABLE KI
+ካ → ka ; # ETHIOPIC SYLLABLE KAA
+ኬ → kē ; # ETHIOPIC SYLLABLE KEE
+ክ → ki ; # ETHIOPIC SYLLABLE KE
+ኮ → ko ; # ETHIOPIC SYLLABLE KO
+# No rule yet for ኯ U+12AF ETHIOPIC SYLLABLE KOA
+ኰ → ko ; # ETHIOPIC SYLLABLE KWA
+ኲ → kwī ; # ETHIOPIC SYLLABLE KWI
+ኳ → kwa ; # ETHIOPIC SYLLABLE KWAA
+ኴ → kwē ; # ETHIOPIC SYLLABLE KWEE
+ኵ → kwi ; # ETHIOPIC SYLLABLE KWE
+########################################################################
+# BGN Page 3 Rule 2:
+#
+# For documentation purposes the characters romanized with h in rows
+# 1, 3, 13 and 18 may be romanized with h, h\u0323, h\u032E, and h\u0331, respectively.
+########################################################################
+ኸ → h\u0331e ; # ETHIOPIC SYLLABLE KXA
+ኹ → h\u0331u ; # ETHIOPIC SYLLABLE KXU
+ኺ → h\u0331ī ; # ETHIOPIC SYLLABLE KXI
+ኻ → h\u0331a ; # ETHIOPIC SYLLABLE KXAA
+ኼ → h\u0331ē ; # ETHIOPIC SYLLABLE KXEE
+ኽ → h\u0331i ; # ETHIOPIC SYLLABLE KXE
+ኾ → h\u0331o ; # ETHIOPIC SYLLABLE KXO
+# No rule yet for ዀ U+12C0 ETHIOPIC SYLLABLE KXWA
+# No rule yet for ዂ U+12C2 ETHIOPIC SYLLABLE KXWI
+# No rule yet for ዃ U+12C3 ETHIOPIC SYLLABLE KXWAA
+# No rule yet for ዄ U+12C4 ETHIOPIC SYLLABLE KXWEE
+# No rule yet for ዅ U+12C5 ETHIOPIC SYLLABLE KXWE
+########################################################################
+# End of Rule 2
+########################################################################
+ወ → we ; # ETHIOPIC SYLLABLE WA
+ዉ → wu ; # ETHIOPIC SYLLABLE WU
+ዊ → wī ; # ETHIOPIC SYLLABLE WI
+ዋ → wa ; # ETHIOPIC SYLLABLE WAA
+ዌ → wē ; # ETHIOPIC SYLLABLE WEE
+ው → wi ; # ETHIOPIC SYLLABLE WE
+ዎ → wo ; # ETHIOPIC SYLLABLE WO
+# No rule yet for ዏ U+12CF ETHIOPIC SYLLABLE WOA
+ዐ → $pharyngeal ā ; # ETHIOPIC SYLLABLE PHARYNGEAL A
+ዑ → $pharyngeal u ; # ETHIOPIC SYLLABLE PHARYNGEAL U
+ዒ → $pharyngeal ī ; # ETHIOPIC SYLLABLE PHARYNGEAL I
+ዓ → $pharyngeal a ; # ETHIOPIC SYLLABLE PHARYNGEAL AA
+ዔ → $pharyngeal ē ; # ETHIOPIC SYLLABLE PHARYNGEAL EE
+ዕ → $pharyngeal i ; # ETHIOPIC SYLLABLE PHARYNGEAL E
+ዖ → $pharyngeal o ; # ETHIOPIC SYLLABLE PHARYNGEAL O
+ዘ → ze ; # ETHIOPIC SYLLABLE ZA
+ዙ → zu ; # ETHIOPIC SYLLABLE ZU
+ዚ → zī ; # ETHIOPIC SYLLABLE ZI
+ዛ → za ; # ETHIOPIC SYLLABLE ZAA
+ዜ → zē ; # ETHIOPIC SYLLABLE ZEE
+ዝ → zi ; # ETHIOPIC SYLLABLE ZE
+ዞ → zo ; # ETHIOPIC SYLLABLE ZO
+ዟ → zwa ; # ETHIOPIC SYLLABLE ZWA
+ዠ → zhe ; # ETHIOPIC SYLLABLE ZHA
+ዡ → zhu ; # ETHIOPIC SYLLABLE ZHU
+ዢ → zhī ; # ETHIOPIC SYLLABLE ZHI
+ዣ → zha ; # ETHIOPIC SYLLABLE ZHAA
+ዤ → zhē ; # ETHIOPIC SYLLABLE ZHEE
+ዥ → zhi ; # ETHIOPIC SYLLABLE ZHE
+ዦ → zho ; # ETHIOPIC SYLLABLE ZHO
+ዧ → zhwa ; # ETHIOPIC SYLLABLE ZHWA
+የ → ye ; # ETHIOPIC SYLLABLE YA
+ዩ → yu ; # ETHIOPIC SYLLABLE YU
+ዪ → yī ; # ETHIOPIC SYLLABLE YI
+ያ → ya ; # ETHIOPIC SYLLABLE YAA
+ዬ → yē ; # ETHIOPIC SYLLABLE YEE
+ይ → yi ; # ETHIOPIC SYLLABLE YE
+ዮ → yo ; # ETHIOPIC SYLLABLE YO
+ደ → de ; # ETHIOPIC SYLLABLE DA
+ዱ → du ; # ETHIOPIC SYLLABLE DU
+ዲ → dī ; # ETHIOPIC SYLLABLE DI
+ዳ → da ; # ETHIOPIC SYLLABLE DAA
+ዴ → dē ; # ETHIOPIC SYLLABLE DEE
+ድ → di ; # ETHIOPIC SYLLABLE DE
+ዶ → do ; # ETHIOPIC SYLLABLE DO
+ዷ → dwa ; # ETHIOPIC SYLLABLE DWA
+# No rule yet for ዸ U+12F8 ETHIOPIC SYLLABLE DDA ...
+ጀ → je ; # ETHIOPIC SYLLABLE JA
+ጁ → ju ; # ETHIOPIC SYLLABLE JU
+ጂ → jī ; # ETHIOPIC SYLLABLE JI
+ጃ → ja ; # ETHIOPIC SYLLABLE JAA
+ጄ → jē ; # ETHIOPIC SYLLABLE JEE
+ጅ → ji ; # ETHIOPIC SYLLABLE JE
+ጆ → jo ; # ETHIOPIC SYLLABLE JO
+ጇ → jwa ; # ETHIOPIC SYLLABLE JWA
+ገ → ge ; # ETHIOPIC SYLLABLE GA
+ጉ → gu ; # ETHIOPIC SYLLABLE GU
+ጊ → gī ; # ETHIOPIC SYLLABLE GI
+ጋ → ga ; # ETHIOPIC SYLLABLE GAA
+ጌ → gē ; # ETHIOPIC SYLLABLE GEE
+ግ → gi ; # ETHIOPIC SYLLABLE GE
+ጎ → go ; # ETHIOPIC SYLLABLE GO
+# No rule yet for ጏ U+130F ETHIOPIC SYLLABLE GOA
+ጐ → go ; # ETHIOPIC SYLLABLE GWA
+ጒ → gwī ; # ETHIOPIC SYLLABLE GWI
+ጓ → gwa ; # ETHIOPIC SYLLABLE GWAA
+ጔ → gwē ; # ETHIOPIC SYLLABLE GWEE
+ጕ → gwi ; # ETHIOPIC SYLLABLE GWE
+# No rule yet for ጘ U+1318 ETHIOPIC SYLLABLE GGA
+# ...ጙጚጛጜጝጞ...
+# No rule yet for ጟ U+131F ETHIOPIC SYLLABLE GGWAA
+ጠ → t $ejective e ; # ETHIOPIC SYLLABLE THA
+ጡ → t $ejective u ; # ETHIOPIC SYLLABLE THU
+ጢ → t $ejective ī ; # ETHIOPIC SYLLABLE THI
+ጣ → t $ejective a ; # ETHIOPIC SYLLABLE THAA
+ጤ → t $ejective ē ; # ETHIOPIC SYLLABLE THEE
+ጥ → t $ejective i ; # ETHIOPIC SYLLABLE THE
+ጦ → t $ejective o ; # ETHIOPIC SYLLABLE THO
+ጧ → t $ejective wa ; # ETHIOPIC SYLLABLE THWA
+ጨ → ch $ejective e ; # ETHIOPIC SYLLABLE CHA
+ጩ → ch $ejective u ; # ETHIOPIC SYLLABLE CHU
+ጪ → ch $ejective ī ; # ETHIOPIC SYLLABLE CHI
+ጫ → ch $ejective a ; # ETHIOPIC SYLLABLE CHAA
+ጬ → ch $ejective ē ; # ETHIOPIC SYLLABLE CHEE
+ጭ → ch $ejective i ; # ETHIOPIC SYLLABLE CHE
+ጮ → ch $ejective o ; # ETHIOPIC SYLLABLE CHO
+ጯ → ch $ejective wa ; # ETHIOPIC SYLLABLE CHWA
+ጰ → p $ejective e ; # ETHIOPIC SYLLABLE PHA
+ጱ → p $ejective u ; # ETHIOPIC SYLLABLE PHU
+ጲ → p $ejective ī ; # ETHIOPIC SYLLABLE PHI
+ጳ → p $ejective a ; # ETHIOPIC SYLLABLE PHAA
+ጴ → p $ejective ē ; # ETHIOPIC SYLLABLE PHEE
+ጵ → p $ejective i ; # ETHIOPIC SYLLABLE PHE
+ጶ → p $ejective o ; # ETHIOPIC SYLLABLE PHO
+ጷ → p $ejective wa ; # ETHIOPIC SYLLABLE PHWA
+########################################################################
+# BGN Page 3 Rule 2:
+#
+# The characters romanized with s in rows 5 and 7 may, instead, be
+# romanized with š and s, respectively; and the characters romanized
+# with ts’ in rows 30 and 31 may, instead, be romanized with ts’ and
+# t\u035Fs’ respectively.
+########################################################################
+ጸ → ts $ejective e ; # ETHIOPIC SYLLABLE TSA
+ጹ → ts $ejective u ; # ETHIOPIC SYLLABLE TSU
+ጺ → ts $ejective ī ; # ETHIOPIC SYLLABLE TSI
+ጻ → ts $ejective a ; # ETHIOPIC SYLLABLE TSAA
+ጼ → ts $ejective ē ; # ETHIOPIC SYLLABLE TSEE
+ጽ → ts $ejective i ; # ETHIOPIC SYLLABLE TSE
+ጾ → ts $ejective o ; # ETHIOPIC SYLLABLE TSO
+ጿ → ts $ejective wa ; # ETHIOPIC SYLLABLE TSWA
+ፀ → t\u035Fs $ejective e ; # ETHIOPIC SYLLABLE TZA
+ፁ → t\u035Fs $ejective u ; # ETHIOPIC SYLLABLE TZU
+ፂ → t\u035Fs $ejective ī ; # ETHIOPIC SYLLABLE TZI
+ፃ → t\u035Fs $ejective a ; # ETHIOPIC SYLLABLE TZAA
+ፄ → t\u035Fs $ejective ē ; # ETHIOPIC SYLLABLE TZEE
+ፅ → t\u035Fs $ejective i ; # ETHIOPIC SYLLABLE TZE
+ፆ → t\u035Fs $ejective o ; # ETHIOPIC SYLLABLE TZO
+# No rule yet for ፇ U+1347 ETHIOPIC SYLLABLE TZOA
+########################################################################
+# End of Rule 2
+########################################################################
+ፈ → fe ; # ETHIOPIC SYLLABLE FA
+ፉ → fu ; # ETHIOPIC SYLLABLE FU
+ፊ → fī ; # ETHIOPIC SYLLABLE FI
+ፋ → fa ; # ETHIOPIC SYLLABLE FAA
+ፌ → fē ; # ETHIOPIC SYLLABLE FEE
+ፍ → fi ; # ETHIOPIC SYLLABLE FE
+ፎ → fo ; # ETHIOPIC SYLLABLE FO
+ፏ → fwa ; # ETHIOPIC SYLLABLE FWA
+ፐ → pe ; # ETHIOPIC SYLLABLE PA
+ፑ → pu ; # ETHIOPIC SYLLABLE PU
+ፒ → pī ; # ETHIOPIC SYLLABLE PI
+ፓ → pa ; # ETHIOPIC SYLLABLE PAA
+ፔ → pē ; # ETHIOPIC SYLLABLE PEE
+ፕ → pi ; # ETHIOPIC SYLLABLE PE
+ፖ → po ; # ETHIOPIC SYLLABLE PO
+ፗ → pwa ; # ETHIOPIC SYLLABLE PWA
+ፘ → rya ; # ETHIOPIC SYLLABLE RYA
+ፙ → mya ; # ETHIOPIC SYLLABLE MYA
+ፚ → fya ; # ETHIOPIC SYLLABLE FYA
+# No rule yet for ፚ U+135A ETHIOPIC SYLLABLE FYA
+ቨ → ve ; # ETHIOPIC SYLLABLE VA
+ቩ → vu ; # ETHIOPIC SYLLABLE VU
+ቪ → vī ; # ETHIOPIC SYLLABLE VI
+ቫ → va ; # ETHIOPIC SYLLABLE VAA
+ቬ → vē ; # ETHIOPIC SYLLABLE VEE
+ቭ → vi ; # ETHIOPIC SYLLABLE VE
+ቮ → vo ; # ETHIOPIC SYLLABLE VO
+ቯ → vwa ; # ETHIOPIC SYLLABLE VWA
+########################################################################
+# Start of Numeric Transformations
+#
+# The BGN table on page 3 does not include ፼.
+########################################################################
+፩ → 1 ; # ETHIOPIC DIGIT ONE
+፪ → 2 ; # ETHIOPIC DIGIT TWO
+፫ → 3 ; # ETHIOPIC DIGIT THREE
+፬ → 4 ; # ETHIOPIC DIGIT FOUR
+፭ → 5 ; # ETHIOPIC DIGIT FIVE
+፮ → 6 ; # ETHIOPIC DIGIT SIX
+፯ → 7 ; # ETHIOPIC DIGIT SEVEN
+፰ → 8 ; # ETHIOPIC DIGIT EIGHT
+፱ → 9 ; # ETHIOPIC DIGIT NINE
+፲ → 10 ; # ETHIOPIC NUMBER TEN
+፳ → 20 ; # ETHIOPIC NUMBER TWENTY
+፴ → 30 ; # ETHIOPIC NUMBER THIRTY
+፵ → 40 ; # ETHIOPIC NUMBER FORTY
+፶ → 50 ; # ETHIOPIC NUMBER FIFTY
+፷ → 60 ; # ETHIOPIC NUMBER SIXTY
+፸ → 70 ; # ETHIOPIC NUMBER SEVENTY
+፹ → 80 ; # ETHIOPIC NUMBER EIGHTY
+፺ → 90 ; # ETHIOPIC NUMBER NINETY
+፻ → 100 ; # ETHIOPIC NUMBER HUNDRED
+

@@ -1,0 +1,32 @@
+Directory Structure :
+================================
+
+idl        - public .idl files
+public     - public header file
+src        - source directory of charset converter manager and utilities, and
+             charset converters for ISO-8859-1, CP1252, MacRoman and UTF-8
+tests      - tests program and application for charset converter 
+tests/unit - xpcshell tests
+tools      - tools to build the tables used by the converters
+util       - utility functions used by the converters
+
+The following directories contain different charset converters:
+
+ucvcn    - Simplified Chinese charsets - GB2312, HZ, ISO-2022-CN, GBK, GB18030
+ucvja    - Japanese charsets - Shift-JIS, ISO-2022-JP, EUC-JP
+ucvko    - Korean charsets - ISO-2022-KR, EUC-KR, Johab
+ucvlatin - Latin charsets and others - ISO-8859-x, CP1250-1258
+                            CP866, 874, KOI8,
+                            Mac charsets, TIS620, UTF16
+ucvtw    - Traditional Chinese charsets Set 1 - Big5
+ucvtw2   - Traditional Chinese charsets Set 2 - EUC-TW
+
+Within the directories containing charset converters:
+
+*.ut - tables used to convert to Unicode from a charset
+*.uf - tables used to convert to a charset from Unicode
+
+The following directories are obsolete and should not be used:
+
+ucvth
+ucvvt

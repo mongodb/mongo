@@ -1,0 +1,498 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+nn{
+    %%Parent{"no"}
+    zoneStrings{
+        "America:Cayman"{
+            ec{"Caymanøyane"}
+        }
+        "America:Cuiaba"{
+            ec{"Cuiaba"}
+        }
+        "America:Merida"{
+            ec{"Merida"}
+        }
+        "Asia:Aqtobe"{
+            ec{"Aktobe"}
+        }
+        "Asia:Ashgabat"{
+            ec{"Asjgabat"}
+        }
+        "Asia:Choibalsan"{
+            ec{"Tsjojbalsan"}
+        }
+        "Asia:Hovd"{
+            ec{"Khovd"}
+        }
+        "Asia:Rangoon"{
+            ec{"Yangôn"}
+        }
+        "Atlantic:Azores"{
+            ec{"Asorane"}
+        }
+        "Atlantic:Canary"{
+            ec{"Kanariøyane"}
+        }
+        "Atlantic:Faeroe"{
+            ec{"Færøyane"}
+        }
+        "Etc:Unknown"{
+            ec{"ukjend by"}
+        }
+        "Europe:Dublin"{
+            ld{"irsk sommartid"}
+        }
+        "Europe:London"{
+            ld{"britisk sommartid"}
+        }
+        "Indian:Cocos"{
+            ec{"Kokosøyane"}
+        }
+        "Indian:Comoro"{
+            ec{"Komorane"}
+        }
+        "Indian:Maldives"{
+            ec{"Maldivane"}
+        }
+        "Pacific:Galapagos"{
+            ec{"Galápagosøyane"}
+        }
+        "meta:Africa_Eastern"{
+            ls{"austafrikansk tid"}
+        }
+        "meta:Africa_Western"{
+            ld{"vestafrikansk sommartid"}
+            lg{"vestafrikansk tid"}
+            ls{"vestafrikansk standardtid"}
+        }
+        "meta:Alaska"{
+            ld{"alaskisk sommartid"}
+            lg{"alaskisk tid"}
+            ls{"alaskisk normaltid"}
+        }
+        "meta:Amazon"{
+            ld{"sommartid for Amazonas"}
+            lg{"tidssone for Amazonas"}
+            ls{"normaltid for Amazonas"}
+        }
+        "meta:America_Central"{
+            ld{"sommartid for sentrale Nord-Amerika"}
+            lg{"tidssone for sentrale Nord-Amerika"}
+            ls{"normaltid for sentrale Nord-Amerika"}
+        }
+        "meta:America_Eastern"{
+            ld{"sommartid for den nordamerikansk austkysten"}
+            lg{"tidssone for den nordamerikanske austkysten"}
+            ls{"normaltid for den nordamerikanske austkysten"}
+        }
+        "meta:America_Mountain"{
+            ld{"sommartid for Rocky Mountains (USA)"}
+            lg{"tidssone for Rocky Mountains (USA)"}
+            ls{"normaltid for Rocky Mountains (USA)"}
+        }
+        "meta:America_Pacific"{
+            ld{"sommartid for den nordamerikanske stillehavskysten"}
+            lg{"tidssone for den nordamerikanske stillehavskysten"}
+            ls{"normaltid for den nordamerikanske stillehavskysten"}
+        }
+        "meta:Apia"{
+            ld{"sommartid for Apia"}
+            lg{"tidssone for Apia"}
+            ls{"normaltid for Apia"}
+        }
+        "meta:Arabian"{
+            ld{"arabisk sommartid"}
+            lg{"arabisk tid"}
+            ls{"arabisk normaltid"}
+        }
+        "meta:Argentina"{
+            ld{"argentinsk sommartid"}
+            lg{"argentinsk tid"}
+            ls{"argentinsk normaltid"}
+        }
+        "meta:Argentina_Western"{
+            ld{"vestargentinsk sommartid"}
+            lg{"vestargentinsk tid"}
+            ls{"vestargentinsk normaltid"}
+        }
+        "meta:Armenia"{
+            ld{"armensk sommartid"}
+            lg{"armensk tid"}
+            ls{"armensk normaltid"}
+        }
+        "meta:Atlantic"{
+            ld{"sommartid for den nordamerikanske atlanterhavskysten"}
+            lg{"tidssone for den nordamerikanske atlanterhavskysten"}
+            ls{"normaltid for den nordamerikanske atlanterhavskysten"}
+        }
+        "meta:Australia_Central"{
+            ld{"sentralaustralsk sommartid"}
+            lg{"sentralaustralsk tid"}
+            ls{"sentralaustralsk standardtid"}
+        }
+        "meta:Australia_CentralWestern"{
+            ld{"vest-sentralaustralsk sommartid"}
+            lg{"vest-sentralaustralsk tid"}
+            ls{"vest-sentralaustralsk standardtid"}
+        }
+        "meta:Australia_Eastern"{
+            ld{"austaustralsk sommartid"}
+            lg{"austaustralsk tid"}
+            ls{"austaustralsk standardtid"}
+        }
+        "meta:Australia_Western"{
+            ld{"vestaustralsk sommartid"}
+            lg{"vestaustralsk tid"}
+            ls{"vestaustralsk standardtid"}
+        }
+        "meta:Azerbaijan"{
+            ld{"aserbajdsjansk sommartid"}
+            lg{"aserbajdsjansk tid"}
+            ls{"aserbajdsjansk normaltid"}
+        }
+        "meta:Azores"{
+            ld{"asorisk sommartid"}
+            lg{"asorisk tid"}
+            ls{"asorisk normaltid"}
+        }
+        "meta:Bangladesh"{
+            ld{"bangladeshisk sommartid"}
+            lg{"bangladeshisk tid"}
+            ls{"bangladeshisk normaltid"}
+        }
+        "meta:Brasilia"{
+            ld{"sommartid for Brasilia"}
+            lg{"tidssone for Brasilia"}
+            ls{"normaltid for Brasilia"}
+        }
+        "meta:Cape_Verde"{
+            ld{"kappverdisk sommartid"}
+            lg{"kappverdisk tid"}
+            ls{"kappverdisk normaltid"}
+        }
+        "meta:Chatham"{
+            ld{"sommartid for Chatham"}
+            lg{"tidssone for Chatham"}
+            ls{"normaltid for Chatham"}
+        }
+        "meta:Chile"{
+            ld{"chilensk sommartid"}
+            lg{"chilensk tid"}
+            ls{"chilensk normaltid"}
+        }
+        "meta:China"{
+            ld{"kinesisk sommartid"}
+            lg{"kinesisk tid"}
+            ls{"kinesisk normaltid"}
+        }
+        "meta:Choibalsan"{
+            ld{"sommartid for Tsjojbalsan"}
+            lg{"tidssone for Tsjojbalsan"}
+            ls{"normaltid for Tsjojbalsan"}
+        }
+        "meta:Cocos"{
+            ls{"tidssone for Kokosøyane"}
+        }
+        "meta:Colombia"{
+            ld{"kolombiansk sommartid"}
+            lg{"kolombiansk tid"}
+            ls{"kolombiansk normaltid"}
+        }
+        "meta:Cook"{
+            ld{"sommartid for Cookøyane"}
+            lg{"tidssone for Cookøyane"}
+            ls{"normaltid for Cookøyane"}
+        }
+        "meta:Cuba"{
+            ld{"kubansk sommartid"}
+            lg{"kubansk tid"}
+            ls{"kubansk normaltid"}
+        }
+        "meta:DumontDUrville"{
+            ls{"tidssone for Dumont-d’Urville"}
+        }
+        "meta:East_Timor"{
+            ls{"austtimoresisk tid"}
+        }
+        "meta:Easter"{
+            ld{"sommartid for Påskeøya"}
+            lg{"tidssone for Påskeøya"}
+            ls{"normaltid for Påskeøya"}
+        }
+        "meta:Europe_Central"{
+            ld{"sentraleuropeisk sommartid"}
+            lg{"sentraleuropeisk tid"}
+            ls{"sentraleuropeisk standardtid"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"austeuropeisk sommartid"}
+            lg{"austeuropeisk tid"}
+            ls{"austeuropeisk standardtid"}
+        }
+        "meta:Europe_Further_Eastern"{
+            ls{"fjern-austeuropeisk tid"}
+        }
+        "meta:Europe_Western"{
+            ld{"vesteuropeisk sommartid"}
+            lg{"vesteuropeisk tid"}
+            ls{"vesteuropeisk standardtid"}
+        }
+        "meta:Falkland"{
+            ld{"sommartid for Falklandsøyane"}
+            lg{"tidssone for Falklandsøyane"}
+            ls{"normaltid for Falklandsøyane"}
+        }
+        "meta:Fiji"{
+            ld{"fijiansk sommartid"}
+            lg{"fijiansk tid"}
+            ls{"fijiansk normaltid"}
+        }
+        "meta:French_Southern"{
+            ls{"tidssone for Dei franske sørterritoria"}
+        }
+        "meta:Galapagos"{
+            ls{"tidssone for Galápagosøyane"}
+        }
+        "meta:Georgia"{
+            ld{"georgisk sommartid"}
+            lg{"georgisk tid"}
+            ls{"georgisk normaltid"}
+        }
+        "meta:Gilbert_Islands"{
+            ls{"tidssone for Gilbertøyane"}
+        }
+        "meta:Greenland_Eastern"{
+            ld{"austgrønlandsk sommartid"}
+            lg{"austgrønlandsk tid"}
+            ls{"austgrønlandsk normaltid"}
+        }
+        "meta:Greenland_Western"{
+            ld{"vestgrønlandsk sommartid"}
+            lg{"vestgrønlandsk tid"}
+            ls{"vestgrønlandsk normaltid"}
+        }
+        "meta:Hawaii_Aleutian"{
+            ld{"sommartid for Hawaii og Aleutene"}
+            lg{"tidssone for Hawaii og Aleutene"}
+            ls{"normaltid for Hawaii og Aleutene"}
+        }
+        "meta:Hong_Kong"{
+            ld{"hongkongkinesisk sommartid"}
+            lg{"hongkongkinesisk tid"}
+            ls{"hongkongkinesisk normaltid"}
+        }
+        "meta:Hovd"{
+            ld{"sommartid for Khovd"}
+            lg{"tidssone for Khovd"}
+            ls{"normaltid for Khovd"}
+        }
+        "meta:Indonesia_Eastern"{
+            ls{"austindonesisk tid"}
+        }
+        "meta:Iran"{
+            ld{"iransk sommartid"}
+            lg{"iransk tid"}
+            ls{"iransk normaltid"}
+        }
+        "meta:Irkutsk"{
+            ld{"sommartid for Irkutsk"}
+            lg{"tidssone for Irkutsk"}
+            ls{"normaltid for Irkutsk"}
+        }
+        "meta:Israel"{
+            ld{"israelsk sommartid"}
+            lg{"israelsk tid"}
+            ls{"israelsk normaltid"}
+        }
+        "meta:Japan"{
+            ld{"japansk sommartid"}
+            lg{"japansk tid"}
+            ls{"japansk normaltid"}
+        }
+        "meta:Kazakhstan_Eastern"{
+            ls{"austkasakhstansk tid"}
+        }
+        "meta:Korea"{
+            ld{"koreansk sommartid"}
+            lg{"koreansk tid"}
+            ls{"koreansk normaltid"}
+        }
+        "meta:Krasnoyarsk"{
+            ld{"sommartid for Krasnojarsk"}
+            lg{"tidssone for Krasnojarsk"}
+            ls{"normaltid for Krasnojarsk"}
+        }
+        "meta:Line_Islands"{
+            ls{"tidssone for Lineøyane"}
+        }
+        "meta:Lord_Howe"{
+            ld{"sommartid for Lord Howe-øya"}
+            lg{"tidssone for Lord Howe-øya"}
+            ls{"normaltid for Lord Howe-øya"}
+        }
+        "meta:Magadan"{
+            ld{"sommartid for Magadan"}
+            lg{"tidssone for Magadan"}
+            ls{"normaltid for Magadan"}
+        }
+        "meta:Marquesas"{
+            ls{"tidssone for Marquesasøyane"}
+        }
+        "meta:Mauritius"{
+            ld{"mauritisk sommartid"}
+            lg{"mauritisk tid"}
+            ls{"mauritisk normaltid"}
+        }
+        "meta:Mexico_Northwest"{
+            ld{"sommartid for nordvestlege Mexico"}
+            lg{"tidssone for nordvestlege Mexico"}
+            ls{"normaltid for nordvestlege Mexico"}
+        }
+        "meta:Mexico_Pacific"{
+            ld{"sommartid for den meksikanske stillehavskysten"}
+            lg{"tidssone for den meksikanske stillehavskysten"}
+            ls{"normaltid for den meksikanske stillehavskysten"}
+        }
+        "meta:Mongolia"{
+            ld{"sommartid for Ulan Bator"}
+            lg{"tidssone for Ulan Bator"}
+            ls{"normaltid for Ulan Bator"}
+        }
+        "meta:Moscow"{
+            ld{"sommartid for Moskva"}
+            lg{"tidssone for Moskva"}
+            ls{"normaltid for Moskva"}
+        }
+        "meta:New_Caledonia"{
+            ld{"kaledonsk sommartid"}
+            lg{"kaledonsk tid"}
+            ls{"kaledonsk normaltid"}
+        }
+        "meta:New_Zealand"{
+            ld{"nyzealandsk sumartid"}
+            lg{"nyzealandsk tid"}
+            ls{"nyzealandsk normaltid"}
+        }
+        "meta:Newfoundland"{
+            ld{"sommartid for Newfoundland"}
+            lg{"tidssone for Newfoundland"}
+            ls{"normaltid for Newfoundland"}
+        }
+        "meta:Norfolk"{
+            ld{"sommartid for Norfolkøya"}
+            lg{"tidssone for Norfolkøya"}
+            ls{"normaltid for Norfolkøya"}
+        }
+        "meta:Noronha"{
+            ld{"sommartid for Fernando de Noronha"}
+            lg{"tidssone for Fernando de Noronha"}
+            ls{"normaltid for Fernando de Noronha"}
+        }
+        "meta:Novosibirsk"{
+            ld{"sommartid for Novosibirsk"}
+            lg{"tidssone for Novosibirsk"}
+            ls{"normaltid for Novosibirsk"}
+        }
+        "meta:Omsk"{
+            ld{"sommartid for Omsk"}
+            lg{"tidssone for Omsk"}
+            ls{"normaltid for Omsk"}
+        }
+        "meta:Pakistan"{
+            ld{"pakistansk sommartid"}
+            lg{"pakistansk tid"}
+            ls{"pakistansk normaltid"}
+        }
+        "meta:Paraguay"{
+            ld{"paraguayansk sommartid"}
+            lg{"paraguayansk tid"}
+            ls{"paraguayansk normaltid"}
+        }
+        "meta:Peru"{
+            ld{"peruansk sommartid"}
+            lg{"peruansk tid"}
+            ls{"peruansk normaltid"}
+        }
+        "meta:Philippines"{
+            ld{"filippinsk sommartid"}
+            lg{"filippinsk tid"}
+            ls{"filippinsk normaltid"}
+        }
+        "meta:Phoenix_Islands"{
+            ls{"tidssone for Phoenixøyane"}
+        }
+        "meta:Pierre_Miquelon"{
+            ld{"sommartid for Saint-Pierre-et-Miquelon"}
+            lg{"tidssone for Saint-Pierre-et-Miquelon"}
+            ls{"normaltid for Saint-Pierre-et-Miquelon"}
+        }
+        "meta:Sakhalin"{
+            ld{"sommartid for Sakhalin"}
+            lg{"tidssone for Sakhalin"}
+            ls{"normaltid for Sakhalin"}
+        }
+        "meta:Samoa"{
+            ld{"samoansk sommartid"}
+            lg{"samoansk tid"}
+            ls{"samoansk normaltid"}
+        }
+        "meta:Taipei"{
+            ld{"sommartid for Taipei"}
+            lg{"tidssone for Taipei"}
+            ls{"normaltid for Taipei"}
+        }
+        "meta:Tonga"{
+            ld{"tongansk sommartid"}
+            lg{"tongansk tid"}
+            ls{"tongansk normaltid"}
+        }
+        "meta:Truk"{
+            ls{"tidssone for Chuukøyane"}
+        }
+        "meta:Turkmenistan"{
+            ld{"turkmensk sommartid"}
+            lg{"turkmensk tid"}
+            ls{"turkmensk normaltid"}
+        }
+        "meta:Uruguay"{
+            ld{"uruguayansk sommartid"}
+            lg{"uruguayansk tid"}
+            ls{"uruguayansk normaltid"}
+        }
+        "meta:Uzbekistan"{
+            ld{"usbekisk sommartid"}
+            lg{"usbekisk tid"}
+            ls{"usbekisk normaltid"}
+        }
+        "meta:Vanuatu"{
+            ld{"vanuatisk sommartid"}
+            lg{"vanuatisk tid"}
+            ls{"vanuatisk normaltid"}
+        }
+        "meta:Vladivostok"{
+            ld{"sommartid for Vladivostok"}
+            lg{"tidssone for Vladivostok"}
+            ls{"normaltid for Vladivostok"}
+        }
+        "meta:Volgograd"{
+            ld{"sommartid for Volgograd"}
+            lg{"tidssone for Volgograd"}
+            ls{"normaltid for Volgograd"}
+        }
+        "meta:Wallis"{
+            ls{"tidssone for Wallis- og Futunaøyane"}
+        }
+        "meta:Yakutsk"{
+            ld{"sommartid for Jakutsk"}
+            lg{"tidssone for Jakutsk"}
+            ls{"normaltid for Jakutsk"}
+        }
+        "meta:Yekaterinburg"{
+            ld{"sommartid for Jekaterinburg"}
+            lg{"tidssone for Jekaterinburg"}
+            ls{"normaltid for Jekaterinburg"}
+        }
+        regionFormatDaylight{"sommartid – {0}"}
+    }
+}

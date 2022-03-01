@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2016 and later: Unicode, Inc. and others. License & terms of use: http://www.unicode.org/copyright.html -->
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- This file is used to set configuration option for all projects. -->
+
+  <!-- Automatic PlatformToolset version selection. -->
+  <!-- If there is no DefaultPlatformToolset set, we will try to detect the version based on version of the build tools. -->
+  <PropertyGroup>
+    <BuildToolVersion>$(VisualStudioVersion)</BuildToolVersion>
+    <!-- Only use the MSBuildToolsVersion if we don't have the VisualStudioVersion and MSBuildToolsVersion is set to something other than Current. -->
+    <BuildToolVersion Condition="'$(BuildToolVersion)'=='' and '$(MSBuildToolsVersion)' != 'Current'">$(MSBuildToolsVersion)</BuildToolVersion>
+    <!-- Note:
+      v140 is the Visual Studio 2015 toolset. (14.0)
+      v141 is the Visual Studio 2017 toolset. (15.0)
+      v142 is the Visual Studio 2019 toolset. (16.0)
+    -->
+    <AutoDetectedPlatformToolset Condition="'$(BuildToolVersion)'=='14.0'">v140</AutoDetectedPlatformToolset>
+    <AutoDetectedPlatformToolset Condition="'$(BuildToolVersion)'=='15.0'">v141</AutoDetectedPlatformToolset>
+    <AutoDetectedPlatformToolset Condition="'$(BuildToolVersion)'=='16.0'">v142</AutoDetectedPlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="EmptyDefaultPlatformToolset">
+    <DefaultPlatformToolset Condition=" '$(DefaultPlatformToolset)' == '' ">$(AutoDetectedPlatformToolset)</DefaultPlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="PlatformToolset">
+    <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
+  </PropertyGroup>
+
+  <!-- This is the default SDK target. -->
+  <!--
+    If not already set, use the latest installed version of the Windows 10 SDK.
+    The Windows 10 SDK is backwards compatible to Windows 7, as long as WINVER and _WIN32_WINNT are set before compiling.
+    Note:
+      - With VS2019, using a value of "10.0" means that it will use the latest installed version.
+      - With VS2017, we need to manually detect the latest SDK version from the registry.
+      - With VS2015, use the Windows 8.1 SDK.
+  -->
+  <PropertyGroup Condition="'$(WindowsTargetPlatformVersion)'=='' and '$(PlatformToolset)'=='v142'">
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(WindowsTargetPlatformVersion)'=='' and ('$(PlatformToolset)'=='v141' or '$(AutodetectWin10SDK)'=='true')">
+    <!-- Detect the SDK version. -->
+    <WindowsSdkInstallFolder_10 Condition="'$(WindowsSdkInstallFolder_10)' == ''">$(Registry:HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Microsoft SDKs\Windows\v10.0@InstallationFolder)</WindowsSdkInstallFolder_10>
+    <WindowsSdkInstallFolder_10 Condition="'$(WindowsSdkInstallFolder_10)' == ''">$(Registry:HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Microsoft\Microsoft SDKs\Windows\v10.0@InstallationFolder)</WindowsSdkInstallFolder_10>
+    <WindowsTargetPlatformVersion_10 Condition="'$(WindowsTargetPlatformVersion_10)' == ''">$(Registry:HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Microsoft SDKs\Windows\v10.0@ProductVersion)</WindowsTargetPlatformVersion_10>
+    <WindowsTargetPlatformVersion_10 Condition="'$(WindowsTargetPlatformVersion_10)' == ''">$(Registry:HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Microsoft\Microsoft SDKs\Windows\v10.0@ProductVersion)</WindowsTargetPlatformVersion_10>
+    <!-- Sometimes the version in the registry has the '.0' suffix, and sometimes it doesn't. Check and add it. -->
+    <WindowsTargetPlatformVersion_10 Condition="'$(WindowsTargetPlatformVersion_10)' != '' and !$(WindowsTargetPlatformVersion_10.EndsWith('.0'))">$(WindowsTargetPlatformVersion_10).0</WindowsTargetPlatformVersion_10>
+    <!-- Set the default. -->
+    <WindowsTargetPlatformVersion>$(WindowsTargetPlatformVersion_10)</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(WindowsTargetPlatformVersion)'=='' and '$(PlatformToolset)'=='v140'">
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <!-- Disable MSBuild warning about Linker OutputFile. -->
+  <PropertyGroup>
+    <!-- For example: MSBuild complains that the common project creates "icuuc62.dll" rather than "common.dll". However, this is intentional. -->
+    <MSBuildWarningsAsMessages>MSB8012</MSBuildWarningsAsMessages>
+  </PropertyGroup>
+</Project>

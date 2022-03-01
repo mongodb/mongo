@@ -1,0 +1,32 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+az{
+    collations{
+        search{
+            Sequence{
+                "[import und-u-co-search]"
+                "[import az-u-co-standard]"
+                "[reorder others]"
+            }
+            Version{"39"}
+        }
+        standard{
+            Sequence{
+                "[reorder Latn Cyrl]"
+                "&C<ç<<<Ç"
+                "&G<ğ<<<Ğ"
+                "&[before 1]i<ı<<<I"
+                "&i<<<İ"
+                "&O<ö<<<Ö"
+                "&S<ş<<<Ş"
+                "&U<ü<<<Ü"
+                "&K<q<<<Q"
+                "&E<ə<<<Ə"
+                "&H<x<<<X"
+                "&Z<w<<<W"
+            }
+            Version{"39"}
+        }
+    }
+}

@@ -1,0 +1,660 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+af{
+    Keys{
+        calendar{"Kalender"}
+        cf{"Geldeenheidformaat"}
+        colAlternate{"Ignoreer simboolrangskikking"}
+        colBackwards{"Omgekeerde aksentrangskikking"}
+        colCaseFirst{"Hoofletter-/kleinletter-rangskikking"}
+        colCaseLevel{"Kassensitiewe rangskikking"}
+        colNormalization{"Genormaliseerde rangskikking"}
+        colNumeric{"Numeriese rangskikking"}
+        colStrength{"Rangskiksterkte"}
+        collation{"Rangskikvolgorde"}
+        currency{"Geldeenheid"}
+        hc{"Uursiklus (12 vs 24)"}
+        lb{"Reëlafbreek-styl"}
+        ms{"Maatstelsel"}
+        numbers{"Syfers"}
+        timezone{"Tydsone"}
+        va{"Lokaalvariant"}
+        x{"Privaat gebruik"}
+    }
+    Languages{
+        aa{"Afar"}
+        ab{"Abkasies"}
+        ace{"Atsjenees"}
+        ach{"Akoli"}
+        ada{"Adangme"}
+        ady{"Adyghe"}
+        af{"Afrikaans"}
+        agq{"Aghem"}
+        ain{"Ainu"}
+        ak{"Akan"}
+        ale{"Aleut"}
+        alt{"Suid-Altai"}
+        am{"Amharies"}
+        an{"Aragonees"}
+        anp{"Angika"}
+        ar{"Arabies"}
+        ar_001{"Moderne Standaardarabies"}
+        arc{"Aramees"}
+        arn{"Mapuche"}
+        arp{"Arapaho"}
+        as{"Assamees"}
+        asa{"Asu"}
+        ast{"Asturies"}
+        av{"Avaries"}
+        awa{"Awadhi"}
+        ay{"Aymara"}
+        az{"Azerbeidjans"}
+        ba{"Baskir"}
+        ban{"Balinees"}
+        bas{"Basaa"}
+        be{"Belarussies"}
+        bem{"Bemba"}
+        bez{"Bena"}
+        bg{"Bulgaars"}
+        bgn{"Wes-Balochi"}
+        bho{"Bhojpuri"}
+        bi{"Bislama"}
+        bin{"Bini"}
+        bla{"Siksika"}
+        bm{"Bambara"}
+        bn{"Bengaals"}
+        bo{"Tibettaans"}
+        br{"Bretons"}
+        brx{"Bodo"}
+        bs{"Bosnies"}
+        bug{"Buginees"}
+        byn{"Blin"}
+        ca{"Katalaans"}
+        ccp{"Tsjaakma"}
+        ce{"Tsjetsjeens"}
+        ceb{"Cebuano"}
+        cgg{"Kiga"}
+        ch{"Chamorro"}
+        chk{"Chuukees"}
+        chm{"Mari"}
+        cho{"Choctaw"}
+        chr{"Cherokees"}
+        chy{"Cheyennees"}
+        ckb{"Sorani"}
+        co{"Korsikaans"}
+        cop{"Kopties"}
+        crs{"Seselwa Franskreools"}
+        cs{"Tsjeggies"}
+        cu{"Kerkslawies"}
+        cv{"Chuvash"}
+        cy{"Wallies"}
+        da{"Deens"}
+        dak{"Dakotaans"}
+        dar{"Dakota"}
+        dav{"Taita"}
+        de{"Duits"}
+        dgr{"Dogrib"}
+        dje{"Zarma"}
+        dsb{"Benedesorbies"}
+        dua{"Duala"}
+        dv{"Divehi"}
+        dyo{"Jola-Fonyi"}
+        dz{"Dzongkha"}
+        dzg{"Dazaga"}
+        ebu{"Embu"}
+        ee{"Ewe"}
+        efi{"Efik"}
+        egy{"Antieke Egipties"}
+        eka{"Ekajuk"}
+        el{"Grieks"}
+        en{"Engels"}
+        en_GB{"Engels (VK)"}
+        en_US{"Engels (VSA)"}
+        eo{"Esperanto"}
+        es{"Spaans"}
+        et{"Estnies"}
+        eu{"Baskies"}
+        ewo{"Ewondo"}
+        fa{"Persies"}
+        fa_AF{"Dari"}
+        ff{"Fulah"}
+        fi{"Fins"}
+        fil{"Filippyns"}
+        fj{"Fidjiaans"}
+        fo{"Faroëes"}
+        fon{"Fon"}
+        fr{"Frans"}
+        fur{"Friuliaans"}
+        fy{"Fries"}
+        ga{"Iers"}
+        gaa{"Gaa"}
+        gag{"Gagauz"}
+        gan{"Gan-Sjinees"}
+        gd{"Skotse Gallies"}
+        gez{"Geez"}
+        gil{"Gilbertees"}
+        gl{"Galisies"}
+        gn{"Guarani"}
+        gor{"Gorontalo"}
+        got{"Goties"}
+        grc{"Antieke Grieks"}
+        gsw{"Switserse Duits"}
+        gu{"Goedjarati"}
+        guz{"Gusii"}
+        gv{"Manx"}
+        gwi{"Gwichʼin"}
+        ha{"Hausa"}
+        hak{"Hakka-Sjinees"}
+        haw{"Hawais"}
+        he{"Hebreeus"}
+        hi{"Hindi"}
+        hil{"Hiligaynon"}
+        hit{"Hetities"}
+        hmn{"Hmong"}
+        hr{"Kroaties"}
+        hsb{"Oppersorbies"}
+        hsn{"Xiang-Sjinees"}
+        ht{"Haïtiaans"}
+        hu{"Hongaars"}
+        hup{"Hupa"}
+        hy{"Armeens"}
+        hz{"Herero"}
+        ia{"Interlingua"}
+        iba{"Ibanees"}
+        ibb{"Ibibio"}
+        id{"Indonesies"}
+        ie{"Interlingue"}
+        ig{"Igbo"}
+        ii{"Sichuan Yi"}
+        ilo{"Iloko"}
+        inh{"Ingush"}
+        io{"Ido"}
+        is{"Yslands"}
+        it{"Italiaans"}
+        iu{"Inoektitoet"}
+        ja{"Japannees"}
+        jbo{"Lojban"}
+        jgo{"Ngomba"}
+        jmc{"Machame"}
+        jv{"Javaans"}
+        ka{"Georgies"}
+        kab{"Kabyle"}
+        kac{"Kachin"}
+        kaj{"Jju"}
+        kam{"Kamba"}
+        kbd{"Kabardiaans"}
+        kcg{"Tyap"}
+        kde{"Makonde"}
+        kea{"Kabuverdianu"}
+        kfo{"Koro"}
+        kg{"Kongolees"}
+        kha{"Khasi"}
+        khq{"Koyra Chiini"}
+        ki{"Kikuyu"}
+        kj{"Kuanyama"}
+        kk{"Kazaks"}
+        kkj{"Kako"}
+        kl{"Kalaallisut"}
+        kln{"Kalenjin"}
+        km{"Khmer"}
+        kmb{"Kimbundu"}
+        kn{"Kannada"}
+        ko{"Koreaans"}
+        koi{"Komi-Permyaks"}
+        kok{"Konkani"}
+        kpe{"Kpellees"}
+        kr{"Kanuri"}
+        krc{"Karachay-Balkar"}
+        krl{"Karelies"}
+        kru{"Kurukh"}
+        ks{"Kasjmirs"}
+        ksb{"Shambala"}
+        ksf{"Bafia"}
+        ksh{"Keuls"}
+        ku{"Koerdies"}
+        kum{"Kumyk"}
+        kv{"Komi"}
+        kw{"Kornies"}
+        ky{"Kirgisies"}
+        la{"Latyn"}
+        lad{"Ladino"}
+        lag{"Langi"}
+        lb{"Luxemburgs"}
+        lez{"Lezghies"}
+        lg{"Ganda"}
+        li{"Limburgs"}
+        lkt{"Lakota"}
+        ln{"Lingaals"}
+        lo{"Lao"}
+        loz{"Lozi"}
+        lrc{"Noord-Luri"}
+        lt{"Litaus"}
+        lu{"Luba-Katanga"}
+        lua{"Luba-Lulua"}
+        lun{"Lunda"}
+        luo{"Luo"}
+        lus{"Mizo"}
+        luy{"Luyia"}
+        lv{"Letties"}
+        mad{"Madurees"}
+        mag{"Magahi"}
+        mai{"Maithili"}
+        mak{"Makasar"}
+        mas{"Masai"}
+        mdf{"Moksha"}
+        men{"Mende"}
+        mer{"Meru"}
+        mfe{"Morisjen"}
+        mg{"Malgassies"}
+        mgh{"Makhuwa-Meetto"}
+        mgo{"Meta’"}
+        mh{"Marshallees"}
+        mi{"Maori"}
+        mic{"Micmac"}
+        min{"Minangkabaus"}
+        mk{"Masedonies"}
+        ml{"Malabaars"}
+        mn{"Mongools"}
+        mni{"Manipuri"}
+        moh{"Mohawk"}
+        mos{"Mossi"}
+        mr{"Marathi"}
+        ms{"Maleis"}
+        mt{"Maltees"}
+        mua{"Mundang"}
+        mul{"Verskeie tale"}
+        mus{"Kreek"}
+        mwl{"Mirandees"}
+        my{"Birmaans"}
+        myv{"Erzya"}
+        mzn{"Masanderani"}
+        na{"Nauru"}
+        nan{"Min Nan-Sjinees"}
+        nap{"Neapolitaans"}
+        naq{"Nama"}
+        nb{"Boeknoors"}
+        nd{"Noord-Ndebele"}
+        nds{"Nederduits"}
+        nds_NL{"Nedersaksies"}
+        ne{"Nepalees"}
+        new{"Newari"}
+        ng{"Ndonga"}
+        nia{"Nias"}
+        niu{"Niueaans"}
+        nl{"Nederlands"}
+        nl_BE{"Vlaams"}
+        nmg{"Kwasio"}
+        nn{"Nuwe Noors"}
+        nnh{"Ngiemboon"}
+        no{"Noors"}
+        nog{"Nogai"}
+        nqo{"N’Ko"}
+        nr{"Suid-Ndebele"}
+        nso{"Noord-Sotho"}
+        nus{"Nuer"}
+        nv{"Navajo"}
+        ny{"Nyanja"}
+        nyn{"Nyankole"}
+        oc{"Oksitaans"}
+        om{"Oromo"}
+        or{"Oriya"}
+        os{"Osseties"}
+        pa{"Pandjabi"}
+        pag{"Pangasinan"}
+        pam{"Pampanga"}
+        pap{"Papiamento"}
+        pau{"Palauaans"}
+        pcm{"Nigeriese Pidgin"}
+        phn{"Fenisies"}
+        pl{"Pools"}
+        prg{"Pruisies"}
+        ps{"Pasjto"}
+        pt{"Portugees"}
+        qu{"Quechua"}
+        quc{"K’iche’"}
+        rap{"Rapanui"}
+        rar{"Rarotongaans"}
+        rm{"Reto-Romaans"}
+        rn{"Rundi"}
+        ro{"Roemeens"}
+        rof{"Rombo"}
+        ru{"Russies"}
+        rup{"Aromanies"}
+        rw{"Rwandees"}
+        rwk{"Rwa"}
+        sa{"Sanskrit"}
+        sad{"Sandawees"}
+        sah{"Sakhaans"}
+        saq{"Samburu"}
+        sat{"Santalies"}
+        sba{"Ngambay"}
+        sbp{"Sangu"}
+        sc{"Sardinies"}
+        scn{"Sisiliaans"}
+        sco{"Skots"}
+        sd{"Sindhi"}
+        sdh{"Suid-Koerdies"}
+        se{"Noord-Sami"}
+        seh{"Sena"}
+        ses{"Koyraboro Senni"}
+        sg{"Sango"}
+        sh{"Serwo-Kroaties"}
+        shi{"Tachelhit"}
+        shn{"Shan"}
+        si{"Sinhala"}
+        sk{"Slowaaks"}
+        sl{"Sloweens"}
+        sm{"Samoaans"}
+        sma{"Suid-Sami"}
+        smj{"Lule Sami"}
+        smn{"Inari Sami"}
+        sms{"Skolt Sami"}
+        sn{"Shona"}
+        snk{"Soninke"}
+        so{"Somalies"}
+        sq{"Albanees"}
+        sr{"Serwies"}
+        srn{"Sranan Tongo"}
+        ss{"Swazi"}
+        ssy{"Saho"}
+        st{"Suid-Sotho"}
+        su{"Sundanees"}
+        suk{"Sukuma"}
+        sv{"Sweeds"}
+        sw{"Swahili"}
+        swb{"Comoraans"}
+        syr{"Siries"}
+        ta{"Tamil"}
+        te{"Teloegoe"}
+        tem{"Timne"}
+        teo{"Teso"}
+        tet{"Tetoem"}
+        tg{"Tadjiks"}
+        th{"Thai"}
+        ti{"Tigrinya"}
+        tig{"Tigre"}
+        tk{"Turkmeens"}
+        tlh{"Klingon"}
+        tn{"Tswana"}
+        to{"Tongaans"}
+        tpi{"Tok Pisin"}
+        tr{"Turks"}
+        trv{"Taroko"}
+        ts{"Tsonga"}
+        tt{"Tataars"}
+        tum{"Toemboeka"}
+        tvl{"Tuvalu"}
+        tw{"Twi"}
+        twq{"Tasawaq"}
+        ty{"Tahities"}
+        tyv{"Tuvinees"}
+        tzm{"Sentraal-Atlas-Tamazight"}
+        udm{"Udmurt"}
+        ug{"Uighur"}
+        uk{"Oekraïens"}
+        umb{"Umbundu"}
+        und{"Onbekende taal"}
+        ur{"Oerdoe"}
+        uz{"Oezbeeks"}
+        vai{"Vai"}
+        ve{"Venda"}
+        vi{"Viëtnamees"}
+        vo{"Volapük"}
+        vun{"Vunjo"}
+        wa{"Walloon"}
+        wae{"Walser"}
+        wal{"Wolaytta"}
+        war{"Waray"}
+        wbp{"Warlpiri"}
+        wo{"Wolof"}
+        wuu{"Wu-Sjinees"}
+        xal{"Kalmyk"}
+        xh{"Xhosa"}
+        xog{"Soga"}
+        yav{"Yangben"}
+        ybb{"Yemba"}
+        yi{"Jiddisj"}
+        yo{"Yoruba"}
+        yue{"Kantonees"}
+        zgh{"Standaard Marokkaanse Tamazight"}
+        zh{"Chinees"}
+        zu{"Zoeloe"}
+        zun{"Zuni"}
+        zxx{"Geen taalinhoud nie"}
+        zza{"Zaza"}
+    }
+    Languages%long{
+        zh_Hans{"Mandarynse Chinees (Vereenvoudigd)"}
+        zh_Hant{"Mandarynse Chinees (Tradisioneel)"}
+    }
+    Languages%menu{
+        yue{"Kantonese Chinees"}
+        zh{"Mandarynse Chinees"}
+    }
+    Languages%short{
+        az{"Azeri"}
+    }
+    Languages%variant{
+        ckb{"Koerdies Sorani"}
+        ps{"Pushto"}
+    }
+    Scripts{
+        Arab{"Arabies"}
+        Armn{"Armeens"}
+        Beng{"Bengaals"}
+        Bopo{"Bopomofo"}
+        Brai{"Braille"}
+        Cyrl{"Sirillies"}
+        Deva{"Devanagari"}
+        Ethi{"Etiopies"}
+        Geor{"Georgies"}
+        Grek{"Grieks"}
+        Gujr{"Gudjarati"}
+        Guru{"Gurmukhi"}
+        Hanb{"Han met Bopomofo"}
+        Hang{"Hangul"}
+        Hani{"Han"}
+        Hans{"Vereenvoudig"}
+        Hant{"Tradisioneel"}
+        Hebr{"Hebreeus"}
+        Hira{"Hiragana"}
+        Hrkt{"Japannese lettergreepskrif"}
+        Jamo{"Jamo"}
+        Jpan{"Japannees"}
+        Kana{"Katakana"}
+        Khmr{"Khmer"}
+        Knda{"Kannada"}
+        Kore{"Koreaans"}
+        Laoo{"Lao"}
+        Latn{"Latyn"}
+        Mlym{"Malabaars"}
+        Mong{"Mongools"}
+        Mymr{"Mianmar"}
+        Orya{"Oriya"}
+        Sinh{"Sinhala"}
+        Taml{"Tamil"}
+        Telu{"Teloegoe"}
+        Thaa{"Thaana"}
+        Thai{"Thai"}
+        Tibt{"Tibettaans"}
+        Zmth{"Wiskundige notasie"}
+        Zsye{"Emoji"}
+        Zsym{"Simbole"}
+        Zxxx{"Ongeskrewe"}
+        Zyyy{"Gemeenskaplik"}
+        Zzzz{"Onbekende skryfstelsel"}
+    }
+    Scripts%stand-alone{
+        Hans{"Vereenvoudigde Han"}
+        Hant{"Tradisionele Han"}
+    }
+    Scripts%variant{
+        Arab{"Perso-Arabies"}
+    }
+    Types{
+        calendar{
+            buddhist{"Boeddhistiese kalender"}
+            chinese{"Sjinese kalender"}
+            coptic{"Koptiese kalender"}
+            dangi{"Dangi-kalender"}
+            ethiopic{"Etiopiese kalender"}
+            ethiopic-amete-alem{"Etiopiese Amete Alem-kalender"}
+            gregorian{"Gregoriaanse kalender"}
+            hebrew{"Hebreeuse kalender"}
+            indian{"Indiese nasionale kalender"}
+            islamic{"Islamitiese kalender"}
+            islamic-civil{"Islamitiese siviele kalender"}
+            iso8601{"ISO-8601-kalender"}
+            japanese{"Japannese kalender"}
+            persian{"Persiese kalender"}
+            roc{"Minguo-kalender"}
+        }
+        cf{
+            account{"Rekeningkundige geldeenheidformaat"}
+            standard{"Standaard geldeenheidformaat"}
+        }
+        colAlternate{
+            non-ignorable{"Sorteer simbole"}
+            shifted{"Sorteer ignoreersimbole"}
+        }
+        colBackwards{
+            no{"Sorteer aksente gewoonweg"}
+            yes{"Sorteer aksente omgekeerd"}
+        }
+        colCaseFirst{
+            lower{"Sorteer kleinletters veerste"}
+            no{"Sorteer gewone letterorde"}
+            upper{"Sorteer hoofletters eerste"}
+        }
+        colCaseLevel{
+            no{"Sorteer nie kassensitief nie"}
+            yes{"Sorteer kassensitief"}
+        }
+        colNormalization{
+            no{"Sorteer sonder normalisering"}
+            yes{"Sorteer Unicode genormaliseer"}
+        }
+        colNumeric{
+            no{"Sorteer syfers individueel"}
+            yes{"Sorteer syfers numeries"}
+        }
+        colStrength{
+            identical{"Sorteer almal"}
+            primary{"Sorteer slegs basisletters"}
+            quaternary{"Sorteer aksente/kas/breedte/Kana"}
+            secondary{"Sorteer aksente"}
+            tertiary{"Sorteer aksente/kas/breedte"}
+        }
+        collation{
+            big5han{"Tradisionele Chinese sorteervolgorde - Groot5"}
+            dictionary{"Woordeboek-sorteervolgorde"}
+            ducet{"Verstek Unicode-rangskikvolgorde"}
+            gb2312han{"Vereenvoudigde Chinese sorteervolgorde - GB2312"}
+            phonebook{"Foonboek-sorteervolgorde"}
+            phonetic{"Fonetiese sorteerorde"}
+            pinyin{"Pinyin-sorteervolgorde"}
+            reformed{"Gereformeerde sorteervolgorde"}
+            search{"Algemenedoel-soektog"}
+            searchjl{"Soek volgens Hangul-beginkonsonant"}
+            standard{"Standaard rangskikvolgorde"}
+            stroke{"Slag-sorteervolgorde"}
+            traditional{"Tradisionele sorteervolgorde"}
+            unihan{"Radikale-slag-sorteervolgorde"}
+        }
+        d0{
+            fwidth{"Vollewydte"}
+            hwidth{"Halfwydte"}
+            npinyin{"Numeries"}
+        }
+        hc{
+            h11{"12-uur-stelsel (0-11)"}
+            h12{"12-uur-stelsel (1-12)"}
+            h23{"24-uur-stelsel (0-23)"}
+            h24{"24-uur-stelsel (1-24)"}
+        }
+        lb{
+            loose{"Losse reëlafbreek-styl"}
+            normal{"Normale reëlafbreek-styl"}
+            strict{"Streng reëlafbreek-styl"}
+        }
+        m0{
+            bgn{"BGN-transliterasie"}
+            ungegn{"UNGEGN-transliterasie"}
+        }
+        ms{
+            metric{"Metrieke stelsel"}
+            uksystem{"Imperiale maatstelsel"}
+            ussystem{"VSA-maatstelsel"}
+        }
+        numbers{
+            arab{"Arabies-Indiese syfers"}
+            arabext{"Uitgebreide Arabies-Indiese syfers"}
+            armn{"Armeense syfers"}
+            armnlow{"Armeense kleinletter-syfers"}
+            beng{"Bengaalse syfers"}
+            deva{"Devanagari-syfers"}
+            ethi{"Etiopiese syfers"}
+            finance{"Finansiële syfers"}
+            fullwide{"Vollewydte-syfers"}
+            geor{"Georgiese syfers"}
+            grek{"Griekse syfers"}
+            greklow{"Griekse kleinletter-syfers"}
+            gujr{"Goedjarati-syfers"}
+            guru{"Gurmukhi-syfers"}
+            hanidec{"Sjinese desimale syfers"}
+            hans{"Vereenvoudigde Sjinese syfers"}
+            hansfin{"Vereenvoudigde Sjinese finansiële syfers"}
+            hant{"Tradisionele Sjinese syfers"}
+            hantfin{"Tradisionele Sjinese finansiële syfers"}
+            hebr{"Hebreeuse syfers"}
+            jpan{"Japannese syfers"}
+            jpanfin{"Japannese finansiële syfers"}
+            khmr{"Khmer-syfers"}
+            knda{"Kannada-syfers"}
+            laoo{"Lao-syfers"}
+            latn{"Westerse syfers"}
+            mlym{"Malabaarse syfers"}
+            mong{"Mongoliese syfers"}
+            mymr{"Mianmar-syfers"}
+            native{"Inheemse syfers"}
+            orya{"Odia-syfers"}
+            roman{"Romeinse syfers"}
+            romanlow{"Romeinse kleinletter-syfers"}
+            taml{"Tradisionele Tamil-syfers"}
+            tamldec{"Tamil-syfers"}
+            telu{"Teloegoe-syfers"}
+            thai{"Thaise syfers"}
+            tibt{"Tibettaanse syfers"}
+            traditional{"Tradisionele syfers"}
+            vaii{"Vai-syfers"}
+        }
+    }
+    characterLabelPattern{
+        all{"{0} – alle"}
+        category-list{"{0}: {1}"}
+        compatibility{"{0} – versoenbaarheid"}
+        enclosed{"{0} ingeslote"}
+        extended{"{0} – uitgebreid"}
+        historic{"{0} – histories"}
+        miscellaneous{"{0} – allerlei"}
+        other{"{0} – ander"}
+        scripts{"skrifte – {0}"}
+        strokes{
+            one{"{0} haal"}
+            other{"{0} hale"}
+        }
+        subscript{"onderskrif {0}"}
+        superscript{"boskrif {0}"}
+    }
+    codePatterns{
+        language{"Taal: {0}"}
+        script{"Skrif: {0}"}
+        territory{"Streek: {0}"}
+    }
+    localeDisplayPattern{
+        keyTypePattern{"{0}: {1}"}
+        pattern{"{0} ({1})"}
+        separator{"{0}, {1}"}
+    }
+}

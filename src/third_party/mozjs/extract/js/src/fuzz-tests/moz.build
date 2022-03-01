@@ -4,54 +4,41 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-GeckoProgram('fuzz-tests', linkage=None)
+GeckoProgram("fuzz-tests", linkage=None)
+
+include("../js-cxxflags.mozbuild")
+include("../js-standalone.mozbuild")
 
 UNIFIED_SOURCES += [
-    'testExample.cpp',
-    'tests.cpp',
+    "testExample.cpp",
+    "testRegExp.cpp",
+    "tests.cpp",
+    "testStructuredCloneReader.cpp",
+    "testWasm.cpp",
 ]
 
-if CONFIG['JS_BUILD_BINAST']:
-    UNIFIED_SOURCES += [
-        'testBinASTReader.cpp',
-    ]
-
-DEFINES['EXPORT_JS_API'] = True
+DEFINES["EXPORT_JS_API"] = True
 
 LOCAL_INCLUDES += [
-    '!..',
-    '..',
+    "!..",
+    "..",
 ]
 
-if CONFIG['ENABLE_INTL_API'] and CONFIG['MOZ_ICU_DATA_ARCHIVE']:
-    # The ICU libraries linked into libmozjs will not include the ICU data,
-    # so link it directly.
-    USE_LIBS += ['icudata']
-
-if CONFIG['FUZZING']:
+if CONFIG["FUZZING"]:
     USE_LIBS += [
-        'static:fuzzer-registry',
+        "static:fuzzer-registry",
     ]
 
-if CONFIG['LIBFUZZER']:
-    USE_LIBS += [
-        'static:fuzzer',
-    ]
+    # Add libFuzzer configuration directives
+    include("/tools/fuzzing/libfuzzer-config.mozbuild")
 
-    # Add trace-pc coverage for libfuzzer
-    CFLAGS += ['-fsanitize-coverage=trace-pc-guard']
-    CXXFLAGS += ['-fsanitize-coverage=trace-pc-guard']
+if CONFIG["FUZZING_INTERFACES"]:
+    USE_LIBS += [
+        "static:fuzzer",
+    ]
 
 USE_LIBS += [
-    'static:js',
+    "static:js",
 ]
 
-if CONFIG['MOZ_NEEDS_LIBATOMIC']:
-    OS_LIBS += ['atomic']
-
-OS_LIBS += CONFIG['MOZ_ZLIB_LIBS']
-
-if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
-    CXXFLAGS += ['-Wno-shadow', '-Werror=format', '-fno-strict-aliasing']
-
-DEFINES['topsrcdir'] = '%s/js/src' % TOPSRCDIR
+DEFINES["topsrcdir"] = "%s/js/src" % TOPSRCDIR

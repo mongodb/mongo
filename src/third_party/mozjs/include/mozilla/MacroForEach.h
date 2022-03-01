@@ -54,169 +54,166 @@
  */
 #define MOZ_FOR_EACH_EXPAND_HELPER(...) __VA_ARGS__
 #define MOZ_FOR_EACH_GLUE(a, b) a b
-#define MOZ_FOR_EACH_SEPARATED(aMacro, aSeparator, aFixedArgs, aArgs) \
-  MOZ_FOR_EACH_GLUE( \
-    MOZ_PASTE_PREFIX_AND_ARG_COUNT(MOZ_FOR_EACH_, \
-                                   MOZ_FOR_EACH_EXPAND_HELPER aArgs), \
-    (aMacro, aSeparator, aFixedArgs, aArgs))
+#define MOZ_FOR_EACH_SEPARATED(aMacro, aSeparator, aFixedArgs, aArgs)     \
+  MOZ_FOR_EACH_GLUE(MOZ_PASTE_PREFIX_AND_ARG_COUNT(                       \
+                        MOZ_FOR_EACH_, MOZ_FOR_EACH_EXPAND_HELPER aArgs), \
+                    (aMacro, aSeparator, aFixedArgs, aArgs))
 #define MOZ_FOR_EACH(aMacro, aFixedArgs, aArgs) \
   MOZ_FOR_EACH_SEPARATED(aMacro, (), aFixedArgs, aArgs)
 
 #define MOZ_FOR_EACH_HELPER_GLUE(a, b) a b
 #define MOZ_FOR_EACH_HELPER(aMacro, aFixedArgs, aArgs) \
-  MOZ_FOR_EACH_HELPER_GLUE( \
-    aMacro, \
-    (MOZ_FOR_EACH_EXPAND_HELPER aFixedArgs MOZ_ARG_1 aArgs))
+  MOZ_FOR_EACH_HELPER_GLUE(                            \
+      aMacro, (MOZ_FOR_EACH_EXPAND_HELPER aFixedArgs MOZ_ARG_1 aArgs))
 
 #define MOZ_FOR_EACH_0(m, s, fa, a)
-#define MOZ_FOR_EACH_1(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a)
+#define MOZ_FOR_EACH_1(m, s, fa, a) MOZ_FOR_EACH_HELPER(m, fa, a)
 #define MOZ_FOR_EACH_2(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_1(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)     \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_1(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_3(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_2(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)     \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_2(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_4(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_3(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)     \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_3(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_5(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_4(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)     \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_4(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_6(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_5(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)     \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_5(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_7(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_6(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)     \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_6(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_8(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_7(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)     \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_7(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_9(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_8(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)     \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_8(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_10(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_9(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_9(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_11(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_10(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_10(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_12(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_11(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_11(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_13(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_12(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_12(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_14(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_13(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_13(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_15(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_14(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_14(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_16(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_15(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_15(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_17(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_16(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_16(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_18(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_17(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_17(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_19(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_18(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_18(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_20(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_19(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_19(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_21(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_20(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_20(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_22(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_21(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_21(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_23(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_22(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_22(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_24(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_23(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_23(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_25(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_24(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_24(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_26(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_25(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_25(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_27(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_26(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_26(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_28(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_27(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_27(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_29(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_28(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_28(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_30(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_29(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_29(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_31(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_30(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_30(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_32(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_31(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_31(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_33(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_32(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_32(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_34(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_33(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_33(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_35(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_34(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_34(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_36(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_35(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_35(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_37(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_36(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_36(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_38(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_37(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_37(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_39(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_38(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_38(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_40(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_39(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_39(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_41(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_40(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_40(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_42(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_41(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_41(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_43(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_42(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_42(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_44(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_43(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_43(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_45(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_44(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_44(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_46(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_45(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_45(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_47(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_46(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_46(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_48(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_47(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_47(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_49(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_48(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_48(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 #define MOZ_FOR_EACH_50(m, s, fa, a) \
-  MOZ_FOR_EACH_HELPER(m, fa, a) MOZ_FOR_EACH_EXPAND_HELPER s \
-  MOZ_FOR_EACH_49(m, s, fa, (MOZ_ARGS_AFTER_1 a))
+  MOZ_FOR_EACH_HELPER(m, fa, a)      \
+  MOZ_FOR_EACH_EXPAND_HELPER s MOZ_FOR_EACH_49(m, s, fa, (MOZ_ARGS_AFTER_1 a))
 
 #endif /* mozilla_MacroForEach_h */

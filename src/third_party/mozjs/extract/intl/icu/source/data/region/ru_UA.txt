@@ -1,0 +1,17 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ru_UA{
+    Countries{
+        AC{"О-в Вознесения"}
+        AE{"Объединенные Арабские Эмираты"}
+        BV{"О-в Буве"}
+        CK{"О-ва Кука"}
+        CP{"О-в Клиппертон"}
+        CX{"О-в Рождества"}
+        HM{"О-ва Херд и Макдональд"}
+        NF{"О-в Норфолк"}
+        TL{"Тимор-Лесте"}
+        UM{"Малые Тихоокеанские Отдаленные Острова США"}
+    }
+}

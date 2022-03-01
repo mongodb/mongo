@@ -1,0 +1,15 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Pinyin_NumericPinyin.txt
+# Generated from CLDR
+#
+
+# Only intended for internal use
+\u0304 ↔ 1;
+\u0301 ↔ 2;
+\u030C ↔ 3;
+\u0300 ↔ 4;
+← 5;
+

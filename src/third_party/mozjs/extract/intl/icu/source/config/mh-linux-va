@@ -1,0 +1,79 @@
+## -*-makefile-*-
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+## Linux-specific setup for Visual Age
+## Copyright (c) 2003-2010, International Business Machines Corporation and
+## others. All Rights Reserved.
+
+## Commands to generate dependency files
+GEN_DEPS.c=  $(CC) -E -MM $(DEFS) $(CPPFLAGS)
+GEN_DEPS.cc= $(CXX) -E -MM $(DEFS) $(CPPFLAGS)
+
+# -qroconst make the strings readonly, which is usually the default.
+#           This helps in the data library,
+# -qproto assumes all functions are prototyped (for optimization)
+CFLAGS += -qproto -qroconst
+CXXFLAGS += -qproto -qroconst
+
+GENCCODE_ASSEMBLY=-a gcc
+## Flags for position independent code
+SHAREDLIBCFLAGS = -qpic=large
+SHAREDLIBCXXFLAGS = -qpic=large
+SHAREDLIBCPPFLAGS = -DPIC
+
+## Additional flags when building libraries and with threads
+THREADSCPPFLAGS = -D_REENTRANT
+LIBCPPFLAGS =
+
+## Compiler switch to embed a runtime search path
+LD_RPATH= -Wl,-zorigin,-rpath,'$$'ORIGIN 
+#LD_RPATH_PRE = -Wl,-rpath,
+
+## Compiler switch to embed a library name
+# The initial tab in the next line is to prevent icu-config from reading it.
+	LD_SONAME = -Wl,-soname -Wl,$(notdir $(MIDDLE_SO_TARGET))
+#SH# # We can't depend on MIDDLE_SO_TARGET being set.
+#SH# LD_SONAME=
+
+## The type of assembly needed when pkgdata is used for generating shared libraries.
+GENCCODE_ASSEMBLY=-a gcc
+
+## Shared object suffix
+SO = so
+## Non-shared intermediate object suffix
+STATIC_O = ao
+
+## Override the default mechanism for building shared objects
+SHLIB.c=      $(CC)  $(CFLAGS)   -qmkshrobj -qpic=large -G $(LDFLAGS) 
+SHLIB.cc=     $(CXX) $(CXXFLAGS) -qmkshrobj -qpic=large -G $(LDFLAGS)
+
+## Compilation rules
+%.$(STATIC_O): $(srcdir)/%.c
+	$(COMPILE.c) $(STATICCPPFLAGS) $(STATICCFLAGS) -o $@ $<
+%.o: $(srcdir)/%.c
+	$(COMPILE.c) $(DYNAMICCPPFLAGS) $(DYNAMICCFLAGS) -o $@ $<
+
+%.$(STATIC_O): $(srcdir)/%.cpp
+	$(COMPILE.cc) $(STATICCPPFLAGS) $(STATICCXXFLAGS) -o $@ $<
+%.o: $(srcdir)/%.cpp
+	$(COMPILE.cc) $(DYNAMICCPPFLAGS) $(DYNAMICCXXFLAGS) -o $@ $<
+
+
+## Dependency rules
+%.d: $(srcdir)/%.c
+	@echo "generating dependency information for $<"
+	@$(SHELL) -ec '$(GEN_DEPS.c) $< > /dev/null'
+
+%.d: $(srcdir)/%.cpp
+	@echo "generating dependency information for $<"
+	@$(SHELL) -ec '$(GEN_DEPS.cc) $< > /dev/null'
+
+## Versioned libraries rules
+
+%.$(SO).$(SO_TARGET_VERSION_MAJOR): %.$(SO).$(SO_TARGET_VERSION)
+	$(RM) $@ && ln -s ${<F} $@
+%.$(SO): %.$(SO).$(SO_TARGET_VERSION_MAJOR)
+	$(RM) $@ && ln -s ${*F}.$(SO).$(SO_TARGET_VERSION) $@
+
+## End Linux-specific setup
+

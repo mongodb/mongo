@@ -19,76 +19,67 @@
 
 #include <limits.h>
 #include <stddef.h>
-
-#include "mozilla/TypeTraits.h"
+#include <type_traits>
 
 namespace mozilla {
 
 namespace tl {
 
 /** Compute min/max. */
-template<size_t Size, size_t... Rest>
-struct Min
-{
+template <size_t Size, size_t... Rest>
+struct Min {
   static constexpr size_t value =
-    Size < Min<Rest...>::value
-    ? Size
-    : Min<Rest...>::value;
+      Size < Min<Rest...>::value ? Size : Min<Rest...>::value;
 };
 
-template<size_t Size>
-struct Min<Size>
-{
+template <size_t Size>
+struct Min<Size> {
   static constexpr size_t value = Size;
 };
 
-template<size_t Size, size_t... Rest>
-struct Max
-{
+template <size_t Size, size_t... Rest>
+struct Max {
   static constexpr size_t value =
-    Size > Max<Rest...>::value
-    ? Size
-    : Max<Rest...>::value;
+      Size > Max<Rest...>::value ? Size : Max<Rest...>::value;
 };
 
-template<size_t Size>
-struct Max<Size>
-{
+template <size_t Size>
+struct Max<Size> {
   static constexpr size_t value = Size;
 };
 
 /** Compute floor(log2(i)). */
-template<size_t I>
-struct FloorLog2
-{
+template <size_t I>
+struct FloorLog2 {
   static const size_t value = 1 + FloorLog2<I / 2>::value;
 };
-template<> struct FloorLog2<0> { /* Error */ };
-template<> struct FloorLog2<1> { static const size_t value = 0; };
+template <>
+struct FloorLog2<0> { /* Error */
+};
+template <>
+struct FloorLog2<1> {
+  static const size_t value = 0;
+};
 
 /** Compute ceiling(log2(i)). */
-template<size_t I>
-struct CeilingLog2
-{
+template <size_t I>
+struct CeilingLog2 {
   static const size_t value = FloorLog2<2 * I - 1>::value;
 };
 
 /** Round up to the nearest power of 2. */
-template<size_t I>
-struct RoundUpPow2
-{
+template <size_t I>
+struct RoundUpPow2 {
   static const size_t value = size_t(1) << CeilingLog2<I>::value;
 };
-template<>
-struct RoundUpPow2<0>
-{
+template <>
+struct RoundUpPow2<0> {
   static const size_t value = 1;
 };
 
 /** Compute the number of bits in the given unsigned type. */
-template<typename T>
-struct BitSize
-{
+template <typename T>
+struct BitSize {
   static const size_t value = sizeof(T) * CHAR_BIT;
 };
 
@@ -96,20 +87,18 @@ struct BitSize
  * Produce an N-bit mask, where N <= BitSize<size_t>::value.  Handle the
  * language-undefined edge case when N = BitSize<size_t>::value.
  */
-template<size_t N>
-struct NBitMask
-{
+template <size_t N>
+struct NBitMask {
   // Assert the precondition.  On success this evaluates to 0.  Otherwise it
   // triggers divide-by-zero at compile time: a guaranteed compile error in
   // C++11, and usually one in C++98.  Add this value to |value| to assure
   // its computation.
   static const size_t checkPrecondition =
-    0 / size_t(N < BitSize<size_t>::value);
+      0 / size_t(N < BitSize<size_t>::value);
   static const size_t value = (size_t(1) << N) - 1 + checkPrecondition;
 };
-template<>
-struct NBitMask<BitSize<size_t>::value>
-{
+template <>
+struct NBitMask<BitSize<size_t>::value> {
   static const size_t value = size_t(-1);
 };
 
@@ -117,14 +106,18 @@ struct NBitMask<BitSize<size_t>::value>
  * For the unsigned integral type size_t, compute a mask M for N such that
  * for all X, !(X & M) implies X * N will not overflow (w.r.t size_t)
  */
-template<size_t N>
-struct MulOverflowMask
-{
+template <size_t N>
+struct MulOverflowMask {
   static const size_t value =
-    ~NBitMask<BitSize<size_t>::value - CeilingLog2<N>::value>::value;
+      ~NBitMask<BitSize<size_t>::value - CeilingLog2<N>::value>::value;
 };
-template<> struct MulOverflowMask<0> { /* Error */ };
-template<> struct MulOverflowMask<1> { static const size_t value = 0; };
+template <>
+struct MulOverflowMask<0> { /* Error */
+};
+template <>
+struct MulOverflowMask<1> {
+  static const size_t value = 0;
+};
 
 /**
  * And<bool...> computes the logical 'and' of its argument booleans.
@@ -135,18 +128,11 @@ template<> struct MulOverflowMask<1> { static const size_t value = 0; };
  *   mozilla::t1::And<>::value is true.
  */
 
-template<bool...>
-struct And;
+template <bool... C>
+struct And : std::integral_constant<bool, (C && ...)> {};
 
-template<>
-struct And<> : public TrueType { };
+}  // namespace tl
 
-template<bool C1, bool... Cn>
-struct And<C1, Cn...>
-  : public Conditional<C1, And<Cn...>, FalseType>::Type { };
-
-} // namespace tl
-
-} // namespace mozilla
+}  // namespace mozilla
 
 #endif /* mozilla_TemplateLib_h */

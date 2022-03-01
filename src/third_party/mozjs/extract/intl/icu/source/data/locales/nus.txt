@@ -1,0 +1,265 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+nus{
+    ExemplarCharacters{
+        "[a ä {a\u0331} b c d e ë {e\u0331} ɛ {ɛ\u0308} {ɛ\u0331} {ɛ\u0331\u0308} f g"
+        " ɣ h i ï {i\u0331} j k l m n ŋ o ö {o\u0331} ɔ {ɔ\u0308} {ɔ\u0331} p q r s t"
+        " u v w x y z]"
+    }
+    ExemplarCharactersIndex{"[A B C D E Ɛ F G Ɣ H I J K L M N Ŋ O Ɔ P Q R S T U V W X Y Z]"}
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    NumberElements{
+        latn{
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"#,##0%"}
+            }
+            symbols{
+                decimal{"."}
+                group{","}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "zzzz h:mm:ss a",
+                "z h:mm:ss a",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE d MMMM y G",
+                "d MMMM y G",
+                "d MMM y G",
+                "d/MM/y GGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Ed{"E d"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E، d-M"}
+                MMM{"LLL"}
+                MMMEd{"E d MMM"}
+                MMMd{"d MMM"}
+                Md{"d/M"}
+                d{"d"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                ms{"m:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E، d/M/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E، d MMM y"}
+                yMMMd{"d MMM y"}
+                yMd{"d/M/y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "RW",
+                "TŊ",
+            }
+            AmPmMarkersAbbr{
+                "RW",
+                "TŊ",
+            }
+            DateTimePatterns{
+                "zzzz h:mm:ss a",
+                "z h:mm:ss a",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE d MMMM y",
+                "d MMMM y",
+                "d MMM y",
+                "d/MM/y",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Ed{"E d"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E، d-M"}
+                MMM{"LLL"}
+                MMMEd{"E d MMM"}
+                MMMd{"d MMM"}
+                Md{"d/M"}
+                d{"d"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                ms{"m:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E، d/M/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E، d MMM y"}
+                yMMMd{"d MMM y"}
+                yMd{"d/M/y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Cäŋ",
+                        "Jiec",
+                        "Rɛw",
+                        "Diɔ̱k",
+                        "Ŋuaan",
+                        "Dhieec",
+                        "Bäkɛl",
+                    }
+                    wide{
+                        "Cäŋ kuɔth",
+                        "Jiec la̱t",
+                        "Rɛw lätni",
+                        "Diɔ̱k lätni",
+                        "Ŋuaan lätni",
+                        "Dhieec lätni",
+                        "Bäkɛl lätni",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "C",
+                        "J",
+                        "R",
+                        "D",
+                        "Ŋ",
+                        "D",
+                        "B",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "AY",
+                    "ƐY",
+                }
+                wide{
+                    "A ka̱n Yecu ni dap",
+                    "Ɛ ca Yecu dap",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Tiop",
+                        "Pɛt",
+                        "Duɔ̱ɔ̱",
+                        "Guak",
+                        "Duä",
+                        "Kor",
+                        "Pay",
+                        "Thoo",
+                        "Tɛɛ",
+                        "Laa",
+                        "Kur",
+                        "Tid",
+                    }
+                    wide{
+                        "Tiop thar pɛt",
+                        "Pɛt",
+                        "Duɔ̱ɔ̱ŋ",
+                        "Guak",
+                        "Duät",
+                        "Kornyoot",
+                        "Pay yie̱tni",
+                        "Tho̱o̱r",
+                        "Tɛɛr",
+                        "Laath",
+                        "Kur",
+                        "Tio̱p in di̱i̱t",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "T",
+                        "P",
+                        "D",
+                        "G",
+                        "D",
+                        "K",
+                        "P",
+                        "T",
+                        "T",
+                        "L",
+                        "K",
+                        "T",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "P1",
+                        "P2",
+                        "P3",
+                        "P4",
+                    }
+                    wide{
+                        "Päth diɔk tin nhiam",
+                        "Päth diɔk tin guurɛ",
+                        "Päth diɔk tin wä kɔɔriɛn",
+                        "Päth diɔk tin jiɔakdiɛn",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"Cäŋ"}
+            relative{
+                "-1"{"Pan"}
+                "0"{"Walɛ"}
+                "1"{"Ruun"}
+            }
+        }
+        era{
+            dn{"Gua̱a̱th Ruëc"}
+        }
+        hour{
+            dn{"Thaak"}
+        }
+        minute{
+            dn{"Minit"}
+        }
+        month{
+            dn{"Pay"}
+        }
+        second{
+            dn{"Thɛkɛni"}
+        }
+        week{
+            dn{"Jiɔk"}
+        }
+        weekday{
+            dn{"Ni̱n jokä"}
+        }
+        year{
+            dn{"Ruɔ̱n"}
+        }
+    }
+}

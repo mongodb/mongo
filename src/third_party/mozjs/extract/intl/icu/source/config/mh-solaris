@@ -1,0 +1,121 @@
+## -*-makefile-*-
+## Copyright (C) 2016 and later: Unicode, Inc. and others.
+## License & terms of use: http://www.unicode.org/copyright.html
+## Solaris-specific setup using Sun's compilers
+## Copyright (c) 1999-2010, International Business Machines Corporation and
+## others. All Rights Reserved.
+
+## Flags for ICU 59+
+CXXFLAGS += -std=c++11
+CFLAGS   += -std=c11
+
+## Flags for position independent code
+SHAREDLIBCFLAGS = -KPIC
+SHAREDLIBCXXFLAGS = -KPIC
+SHAREDLIBCPPFLAGS = -DPIC
+
+## Commands to generate dependency files
+GEN_DEPS.c=  $(CC) -xM $(DEFS) $(CPPFLAGS)
+GEN_DEPS.cc= $(CXX) -xM $(DEFS) $(CPPFLAGS)
+
+ifeq ($(UCLN_NO_AUTO_CLEANUP),0)
+# set up init point.
+UCLN_FINI =  ucln_fini$(TARGET_STUBNAME)_$(SO_TARGET_VERSION_MAJOR)$(ICULIBSUFFIXCNAME)
+CPPFLAGS_FINI = -DUCLN_FINI=$(UCLN_FINI)
+LDFLAGS_FINI = -zfiniarray=$(UCLN_FINI)
+
+CPPFLAGSICUUC += $(CPPFLAGS_FINI)
+LDFLAGSICUUC += $(LDFLAGS_FINI)
+CPPFLAGSICUIO += $(CPPFLAGS_FINI)
+LDFLAGSICUIO += $(LDFLAGS_FINI)
+CPPFLAGSICUI18N += $(CPPFLAGS_FINI)
+LDFLAGSICUI18N += $(LDFLAGS_FINI)
+CPPFLAGSCTESTFW += $(CPPFLAGS_FINI)
+LDFLAGSCTESTFW += $(LDFLAGS_FINI)
+
+# ICUUC, ICUIO, ICUI18N, CTESTFW
+endif
+
+# -mt means 'compiles and links a multithreaded program'
+THREADSCFLAGS += -mt
+THREADSCXXFLAGS += -mt
+
+## Commands to link
+## For Sun Workshop, use CC to link to bring in C++ runtime
+LINK.c=		$(CXX) $(CXXFLAGS) $(LDFLAGS)
+LINK.cc=	$(CXX) $(CXXFLAGS) $(LDFLAGS)
+
+## Commands to make a shared library
+SHLIB.c=	$(CC) $(CFLAGS) $(LDFLAGS) -G
+SHLIB.cc=	$(CXX) $(CXXFLAGS) $(LDFLAGS) -G
+
+## Compiler switch to embed a runtime search path
+LD_RPATH=       -R'$$'ORIGIN 
+LD_RPATH_PRE=   -R
+
+#LIBRARY_PATH_PREFIX=/usr/lib/lwp:
+
+## Compiler switch to embed a library name
+LD_SONAME = -h $(notdir $(MIDDLE_SO_TARGET)) $(PKGDATA_TRAILING_SPACE)
+
+## Shared object suffix
+SO=		so
+## Non-shared intermediate object suffix
+STATIC_O = o
+
+# This causes escapesrc to be built before other ICU targets.
+NEED_ESCAPING=YES
+
+## Compilation rules
+%.$(STATIC_O): $(srcdir)/%.c
+	$(COMPILE.c) $(STATICCPPFLAGS) $(STATICCFLAGS) -o $@ $<
+%.o: $(srcdir)/%.c
+	$(COMPILE.c) $(DYNAMICCPPFLAGS) $(DYNAMICCFLAGS) -o $@ $<
+
+ifneq ($(SKIP_ESCAPING),)
+%.o: $(srcdir)/%.cpp
+	$(COMPILE.cc) $(DYNAMICCPPFLAGS) $(DYNAMICCXXFLAGS) -o $@ $<
+%.$(STATIC_O): $(srcdir)/%.cpp
+	$(COMPILE.cc) $(STATICCPPFLAGS) $(STATICCXXFLAGS) -o $@ $<
+else
+# convert *.cpp files to _*.cpp with \u / \U escaping
+CLEANFILES += _*.cpp
+
+# the actual escaping
+_%.cpp: $(srcdir)/%.cpp
+	@$(BINDIR)/escapesrc$(EXEEXT) $< $@
+
+# no escaping - bootstrap
+%.$(STATIC_O): _%.cpp
+	$(COMPILE.cc) $(STATICCPPFLAGS) $(STATICCXXFLAGS) -o $@ $<
+%.o: _%.cpp
+	$(COMPILE.cc) $(DYNAMICCPPFLAGS) $(DYNAMICCXXFLAGS) -o $@ $<
+endif
+
+## Dependency rules
+%.d : $(srcdir)/%.c
+	@echo "generating dependency information for $<"
+	@$(GEN_DEPS.c) $< > $@
+
+%.d : $(srcdir)/%.cpp
+	@echo "generating dependency information for $<"
+	@$(GEN_DEPS.cc) $< > $@
+
+## Versioned libraries rules
+
+%.$(SO).$(SO_TARGET_VERSION_MAJOR): %.$(SO).$(SO_TARGET_VERSION)
+	$(RM) $@ && ln -s ${<F} $@
+%.$(SO): %.$(SO).$(SO_TARGET_VERSION_MAJOR)
+	$(RM) $@ && ln -s ${*F}.$(SO).$(SO_TARGET_VERSION) $@
+
+# 
+ifeq (strip $(GENCCODE_ASSEMBLY),)
+BIR_LDFLAGS=  -Wl,-M,$(NAME).map -Wl,-B,symbolic -Wl,-B,eliminate
+BIR_DEPS=   $(NAME).map
+endif
+
+## Remove shared library 's'
+STATIC_PREFIX_WHEN_USED = 
+STATIC_PREFIX = 
+
+## End Solaris-specific setup

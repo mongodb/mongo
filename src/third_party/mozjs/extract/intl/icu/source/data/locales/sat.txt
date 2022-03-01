@@ -1,0 +1,306 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sat{
+    ExemplarCharacters{"[ᱚ ᱛ ᱜ ᱝ ᱞ ᱟ ᱠ ᱡ ᱢ ᱣ ᱤ ᱥ ᱦ ᱧ ᱨ ᱩ ᱪ ᱫ ᱬ ᱭ ᱮ ᱯ ᱰ ᱱ ᱲ ᱳ ᱴ ᱵ ᱶ ᱷ ᱸ ᱹ ᱺ ᱻ ᱼ ᱽ]"}
+    ExemplarCharactersNumbers{"[\\- ‑ , . % + 0᱐ 1᱑ 2᱒ 3᱓ 4᱔ 5᱕ 6᱖ 7᱗ 8᱘ 9᱙]"}
+    NumberElements{
+        default{"olck"}
+        latn{
+            symbols{
+                decimal{"."}
+                group{","}
+                minusSign{"-"}
+                percentSign{"%"}
+                plusSign{"+"}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "G y MMMM d, EEEE",
+                "G y MMMM d",
+                "G y MMM d",
+                "GGGGG y-MM-dd",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "ᱥᱮᱛᱟᱜ",
+                "ᱧᱤᱫᱟᱹ",
+            }
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, d MMMM y",
+                "d MMMM y",
+                "d MMM y",
+                "d/M/yy",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "ᱥᱤᱸ",
+                        "ᱚᱛ",
+                        "ᱵᱟ",
+                        "ᱥᱟᱹ",
+                        "ᱥᱟᱹᱨ",
+                        "ᱡᱟᱹ",
+                        "ᱧᱩ",
+                    }
+                    narrow{
+                        "ᱥ",
+                        "ᱚ",
+                        "ᱵ",
+                        "ᱥ",
+                        "ᱥ",
+                        "ᱡ",
+                        "ᱧ",
+                    }
+                    wide{
+                        "ᱥᱤᱸᱜᱮ",
+                        "ᱚᱛᱮ",
+                        "ᱵᱟᱞᱮ",
+                        "ᱥᱟᱹᱜᱩᱱ",
+                        "ᱥᱟᱹᱨᱫᱤ",
+                        "ᱡᱟᱹᱨᱩᱢ",
+                        "ᱧᱩᱦᱩᱢ",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ᱥᱤᱸ",
+                        "ᱚᱛ",
+                        "ᱵᱟ",
+                        "ᱥᱟᱹ",
+                        "ᱥᱟᱹᱨ",
+                        "ᱡᱟᱹ",
+                        "ᱧᱩ",
+                    }
+                    narrow{
+                        "ᱥ",
+                        "ᱚ",
+                        "ᱵ",
+                        "ᱥ",
+                        "ᱥ",
+                        "ᱡ",
+                        "ᱧ",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "ᱥᱮᱨᱢᱟ ᱞᱟᱦᱟ",
+                    "ᱤᱥᱣᱤ",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "ᱡᱟᱱ",
+                        "ᱯᱷᱟ",
+                        "ᱢᱟᱨ",
+                        "ᱟᱯᱨ",
+                        "ᱢᱮ",
+                        "ᱡᱩᱱ",
+                        "ᱡᱩᱞ",
+                        "ᱟᱜᱟ",
+                        "ᱥᱮᱯ",
+                        "ᱚᱠᱴ",
+                        "ᱱᱟᱣ",
+                        "ᱫᱤᱥ",
+                    }
+                    narrow{
+                        "ᱡ",
+                        "ᱯ",
+                        "ᱢ",
+                        "ᱟ",
+                        "ᱢ",
+                        "ᱡ",
+                        "ᱡ",
+                        "ᱟ",
+                        "ᱥ",
+                        "ᱚ",
+                        "ᱱ",
+                        "ᱫ",
+                    }
+                    wide{
+                        "ᱡᱟᱱᱣᱟᱨᱤ",
+                        "ᱯᱷᱟᱨᱣᱟᱨᱤ",
+                        "ᱢᱟᱨᱪ",
+                        "ᱟᱯᱨᱮᱞ",
+                        "ᱢᱮ",
+                        "ᱡᱩᱱ",
+                        "ᱡᱩᱞᱟᱭ",
+                        "ᱟᱜᱟᱥᱛ",
+                        "ᱥᱮᱯᱴᱮᱢᱵᱟᱨ",
+                        "ᱚᱠᱴᱚᱵᱟᱨ",
+                        "ᱱᱟᱣᱟᱢᱵᱟᱨ",
+                        "ᱫᱤᱥᱟᱢᱵᱟᱨ",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ᱡᱟᱱ",
+                        "ᱯᱷᱟ",
+                        "ᱢᱟᱨ",
+                        "ᱟᱯᱨ",
+                        "ᱢᱮ",
+                        "ᱡᱩᱱ",
+                        "ᱡᱩᱞ",
+                        "ᱟᱜᱟ",
+                        "ᱥᱮᱯ",
+                        "ᱚᱠᱴ",
+                        "ᱱᱟᱣ",
+                        "ᱫᱤᱥ",
+                    }
+                    narrow{
+                        "ᱡ",
+                        "ᱯ",
+                        "ᱢ",
+                        "ᱟ",
+                        "ᱢ",
+                        "ᱡ",
+                        "ᱡ",
+                        "ᱟ",
+                        "ᱥ",
+                        "ᱚ",
+                        "ᱱ",
+                        "ᱫ",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "᱑ᱟᱜ ᱯᱮ ᱪᱟᱸᱫᱚᱠᱤᱭᱟᱹ",
+                        "᱒ᱟᱜ ᱯᱮ ᱪᱟᱸᱫᱚᱠᱤᱭᱟᱹ",
+                        "᱓ᱭᱟᱜ ᱯᱮ ᱪᱟᱸᱫᱚᱠᱤᱭᱟᱹ",
+                        "᱔ᱟᱜ ᱯᱮ ᱪᱟᱸᱫᱚᱠᱤᱭᱟᱹ",
+                    }
+                    narrow{
+                        "᱑",
+                        "᱒",
+                        "᱓",
+                        "᱔",
+                    }
+                    wide{
+                        "᱑ᱟᱜ ᱯᱮ ᱪᱟᱸᱫᱚᱠᱤᱭᱟᱹ",
+                        "᱒ᱟᱜ ᱯᱮ ᱪᱟᱸᱫᱚᱠᱤᱭᱟᱹ",
+                        "᱓ᱭᱟᱜ ᱯᱮ ᱪᱟᱸᱫᱚᱠᱤᱭᱟᱹ",
+                        "᱔ᱟᱜ ᱯᱮ ᱪᱟᱸᱫᱚᱠᱤᱭᱟᱹ",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "᱑",
+                        "᱒",
+                        "᱓",
+                        "᱔",
+                    }
+                    wide{
+                        "᱑ᱟᱜ ᱯᱮ ᱪᱟᱸᱫᱚᱠᱤᱭᱟᱹ",
+                        "᱒ᱟᱜ ᱯᱮ ᱪᱟᱸᱫᱚᱠᱤᱭᱟᱹ",
+                        "᱓ᱭᱟᱜ ᱯᱮ ᱪᱟᱸᱫᱚᱠᱤᱭᱟᱹ",
+                        "᱔ᱟᱜ ᱯᱮ ᱪᱟᱸᱫᱚᱠᱤᱭᱟᱹ",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"ᱢᱟᱦᱟ"}
+            relative{
+                "-1"{"ᱦᱚᱞᱟ"}
+                "0"{"ᱛᱮᱦᱮᱧ"}
+                "1"{"ᱜᱟᱯᱟ"}
+            }
+        }
+        day-narrow{
+            dn{"ᱢᱟᱦᱟ"}
+        }
+        day-short{
+            dn{"ᱢᱟᱦᱟ"}
+        }
+        dayperiod{
+            dn{"ᱥᱮᱛᱟᱜ/ᱟᱹᱭᱩᱵ"}
+        }
+        era{
+            dn{"ᱡᱩᱜᱽ"}
+        }
+        hour{
+            dn{"ᱴᱟᱲᱟᱝ"}
+        }
+        minute{
+            dn{"ᱴᱤᱯᱤᱡ"}
+        }
+        month{
+            dn{"ᱪᱟᱸᱫᱚ"}
+        }
+        month-narrow{
+            dn{"ᱪᱟᱸᱫᱚ"}
+        }
+        month-short{
+            dn{"ᱪᱟᱸᱫᱚ"}
+        }
+        quarter{
+            dn{"ᱯᱮᱪᱟᱸᱫᱚ"}
+        }
+        quarter-narrow{
+            dn{"ᱯᱮᱪᱟᱸᱫᱚ"}
+        }
+        quarter-short{
+            dn{"ᱯᱮᱪᱟᱸᱫᱚ"}
+        }
+        second{
+            dn{"ᱴᱤᱡ"}
+        }
+        week{
+            dn{"ᱦᱟᱯᱛᱟ/ᱮᱢᱦᱟ"}
+        }
+        week-narrow{
+            dn{"ᱦᱟᱯᱛᱟ/ᱮᱢᱦᱟ"}
+        }
+        week-short{
+            dn{"ᱦᱟᱯᱛᱟ/ᱮᱢᱦᱟ"}
+        }
+        weekday{
+            dn{"ᱦᱟᱯᱛᱟ ᱨᱮᱭᱟᱜ ᱢᱟᱦᱟ"}
+        }
+        year{
+            dn{"ᱥᱮᱨᱢᱟ/ᱵᱚᱪᱷᱚᱞᱨ"}
+        }
+        zone{
+            dn{"ᱴᱚᱴᱷᱟ"}
+        }
+    }
+    measurementSystemNames{
+        UK{"ᱭᱩᱠᱮ"}
+        US{"ᱭᱩᱮᱥ"}
+        metric{"ᱢᱮᱴᱨᱤᱠ"}
+    }
+}

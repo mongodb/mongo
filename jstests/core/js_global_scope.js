@@ -19,8 +19,12 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: 1}));
 
 const expectedGlobalVars = [
+    "AggregateError",
     "Array",
     "ArrayBuffer",
+    "BigInt",
+    "BigInt64Array",
+    "BigUint64Array",
     "BinData",
     "Boolean",
     "Code",
@@ -90,6 +94,7 @@ const expectedGlobalVars = [
     "eval",
     "gc",
     "getJSHeapLimitMB",
+    "globalThis",
     "hex_md5",
     "isFinite",
     "isNaN",
@@ -109,7 +114,6 @@ const expectedGlobalVars = [
     "tostrictjson",
     "undefined",
     "unescape",
-    "uneval",
     "version",
 ];
 

@@ -1,0 +1,157 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+wae{
+    zoneStrings{
+        "Africa:Accra"{
+            ec{"Akra"}
+        }
+        "Africa:Algiers"{
+            ec{"Algier"}
+        }
+        "Africa:Cairo"{
+            ec{"Kairo"}
+        }
+        "Africa:Djibouti"{
+            ec{"Dšibuti"}
+        }
+        "Africa:Khartoum"{
+            ec{"Kartum"}
+        }
+        "Africa:Mogadishu"{
+            ec{"Mogadišu"}
+        }
+        "Africa:Ouagadougou"{
+            ec{"Wagadugu"}
+        }
+        "Africa:Tripoli"{
+            ec{"Tripolis"}
+        }
+        "America:Cayman"{
+            ec{"Kaimaninsla"}
+        }
+        "America:Cordoba"{
+            ec{"Kordoba"}
+        }
+        "America:Havana"{
+            ec{"Hawanna"}
+        }
+        "America:Jamaica"{
+            ec{"Jamaika"}
+        }
+        "America:Montserrat"{
+            ec{"Monserat"}
+        }
+        "Asia:Baghdad"{
+            ec{"Bagdad"}
+        }
+        "Asia:Damascus"{
+            ec{"Damaskus"}
+        }
+        "Asia:Hong_Kong"{
+            ec{"Hongkong"}
+        }
+        "Asia:Singapore"{
+            ec{"Singapur"}
+        }
+        "Asia:Tokyo"{
+            ec{"Tokio"}
+        }
+        "Atlantic:Reykjavik"{
+            ec{"Rikjawik"}
+        }
+        "Australia:Sydney"{
+            ec{"Sidnei"}
+        }
+        "Etc:Unknown"{
+            ec{"Unbekannti Stadt"}
+        }
+        "Europe:Amsterdam"{
+            ec{"Amšterdam"}
+        }
+        "Europe:Belgrade"{
+            ec{"Belgrad"}
+        }
+        "Europe:Brussels"{
+            ec{"Brüssel"}
+        }
+        "Europe:Bucharest"{
+            ec{"Bukarešt"}
+        }
+        "Europe:Budapest"{
+            ec{"Budapešt"}
+        }
+        "Europe:Copenhagen"{
+            ec{"Kopehage"}
+        }
+        "Europe:Istanbul"{
+            ec{"Konštantinopel"}
+        }
+        "Europe:Kaliningrad"{
+            ec{"Königsbärg"}
+        }
+        "Europe:Ljubljana"{
+            ec{"Laibač"}
+        }
+        "Europe:Prague"{
+            ec{"Prag"}
+        }
+        "Europe:Rome"{
+            ec{"Rom"}
+        }
+        "Europe:Tallinn"{
+            ec{"Reval"}
+        }
+        "Europe:Tirane"{
+            ec{"Tiran"}
+        }
+        "Europe:Vatican"{
+            ec{"Vatikan"}
+        }
+        "Europe:Vienna"{
+            ec{"Wien"}
+        }
+        "Europe:Vilnius"{
+            ec{"Wilna"}
+        }
+        "Europe:Volgograd"{
+            ec{"Wolgograd"}
+        }
+        "Europe:Warsaw"{
+            ec{"Waršau"}
+        }
+        "Europe:Zurich"{
+            ec{"Zürič"}
+        }
+        "meta:Atlantic"{
+            ld{"Atlantiši Summerzit"}
+            lg{"Atlantiši Zit"}
+            ls{"Atlantiši Standardzit"}
+        }
+        "meta:Europe_Central"{
+            ld{"Mitteleuropäiši Summerzit"}
+            lg{"Mitteleuropäiši Zit"}
+            ls{"Mitteleuropäiši Standardzit"}
+            sd{"MESZ"}
+            sg{"MEZ"}
+            ss{"MEZ"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"Ošteuropäiši Summerzit"}
+            lg{"Ošteuropäiši Zit"}
+            ls{"Ošteuropäiši Standardzit"}
+            sd{"OESZ"}
+            sg{"OEZ"}
+            ss{"OEZ"}
+        }
+        "meta:Europe_Western"{
+            ld{"Wešteuropäiši Summerzit"}
+            lg{"Wešteuropäiši Zit"}
+            ls{"Wešteuropäiši Standardzit"}
+            sd{"WESZ"}
+            sg{"WEZ"}
+            ss{"WEZ"}
+        }
+        regionFormat{"{0} zit"}
+    }
+}

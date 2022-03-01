@@ -1,0 +1,59 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sa{
+    zoneStrings{
+        "Etc:UTC"{
+            ls{"समन्वितः वैश्विक समय:"}
+        }
+        "Etc:Unknown"{
+            ec{"अज्ञात नगरी"}
+        }
+        "meta:America_Central"{
+            ld{"उत्तर अमेरिका: मध्य अयाम समयः"}
+            lg{"उत्तर अमेरिका: मध्य समयः"}
+            ls{"उत्तर अमेरिका: मध्य आदर्श समयः"}
+        }
+        "meta:America_Eastern"{
+            ld{"उत्तर अमेरिका: पौर्व अयाम समय:"}
+            lg{"उत्तर अमेरिका: पौर्व समयः"}
+            ls{"उत्तर अमेरिका: पौर्व आदर्श समयः"}
+        }
+        "meta:America_Mountain"{
+            ld{"उत्तर अमेरिका: शैल अयाम समयः"}
+            lg{"उत्तर अमेरिका: शैल समयः"}
+            ls{"उत्तर अमेरिका: शैल आदर्श समयः"}
+        }
+        "meta:America_Pacific"{
+            ld{"उत्तर अमेरिका: सन्धिप्रिय अयाम समयः"}
+            lg{"उत्तर अमेरिका: सन्धिप्रिय समयः"}
+            ls{"उत्तर अमेरिका: सन्धिप्रिय आदर्श समयः"}
+        }
+        "meta:Atlantic"{
+            ld{"अटलाण्टिक अयाम समयः"}
+            lg{"अटलाण्टिक समयः"}
+            ls{"अटलाण्टिक आदर्श समयः"}
+        }
+        "meta:Europe_Central"{
+            ld{"मध्य यूरोपीय ग्रीष्म समयः"}
+            lg{"मध्य यूरोपीय समयः"}
+            ls{"मध्य यूरोपीय आदर्श समयः"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"पौर्व यूरोपीय ग्रीष्म समयः"}
+            lg{"पौर्व यूरोपीय समयः"}
+            ls{"पौर्व यूरोपीय आदर्श समयः"}
+        }
+        "meta:Europe_Western"{
+            ld{"पाश्चात्य यूरोपीय ग्रीष्म समयः"}
+            lg{"पाश्चात्य यूरोपीय समयः"}
+            ls{"पाश्चात्य यूरोपीय आदर्श समयः"}
+        }
+        "meta:GMT"{
+            ls{"ग्रीनविच मीन समयः"}
+        }
+        regionFormat{"{0} समय:"}
+        regionFormatDaylight{"{0} डेलाइट समय:"}
+        regionFormatStandard{"{0} मानक समय:"}
+    }
+}

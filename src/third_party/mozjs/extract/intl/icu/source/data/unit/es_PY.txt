@@ -1,0 +1,80 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_PY{
+    %%Parent{"es_419"}
+    units{
+        duration{
+            year{
+                per{"{0}/año"}
+            }
+        }
+        electric{
+            ampere{
+                dnam{"amperios"}
+                one{"{0} amperio"}
+                other{"{0} amperios"}
+            }
+            milliampere{
+                dnam{"miliamperios"}
+                one{"{0} miliamperio"}
+                other{"{0} miliamperios"}
+            }
+            ohm{
+                one{"{0} ohmio"}
+                other{"{0} ohmios"}
+            }
+        }
+    }
+    unitsNarrow{
+        duration{
+            day{
+                dnam{"día"}
+            }
+            month{
+                dnam{"mes"}
+            }
+            year{
+                dnam{"año"}
+            }
+        }
+    }
+    unitsShort{
+        duration{
+            day{
+                dnam{"días"}
+                one{"{0} día"}
+                other{"{0} días"}
+                per{"{0}/día"}
+            }
+            month{
+                dnam{"meses"}
+                one{"{0} mes"}
+                other{"{0} meses"}
+                per{"{0}/mes"}
+            }
+            second{
+                dnam{"seg."}
+                one{"{0} seg."}
+                other{"{0} seg."}
+                per{"{0}/seg."}
+            }
+            year{
+                dnam{"años"}
+                one{"{0} año"}
+                other{"{0} años"}
+                per{"{0}/año"}
+            }
+        }
+        electric{
+            volt{
+                dnam{"voltios"}
+            }
+        }
+        power{
+            watt{
+                dnam{"vatios"}
+            }
+        }
+    }
+}

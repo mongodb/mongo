@@ -29,29 +29,30 @@ enum ChaosFeature {
   HashTableIteration = 0x10,
   // Randomly refuse to use cached version of image (when allowed by spec).
   ImageCache = 0x20,
+  // Delay dispatching threads to encourage dispatched tasks to run.
+  TaskDispatching = 0x40,
+  // Delay task running to encourage sending threads to run.
+  TaskRunning = 0x80,
   Any = 0xffffffff,
 };
 
 namespace detail {
-extern MFBT_DATA Atomic<uint32_t> gChaosModeCounter;
+extern MFBT_DATA Atomic<uint32_t, SequentiallyConsistent> gChaosModeCounter;
 extern MFBT_DATA ChaosFeature gChaosFeatures;
-} // namespace detail
+}  // namespace detail
 
 /**
  * When "chaos mode" is activated, code that makes implicitly nondeterministic
  * choices is encouraged to make random and extreme choices, to test more
  * code paths and uncover bugs.
  */
-class ChaosMode
-{
-public:
-  static void SetChaosFeature(ChaosFeature aChaosFeature)
-  {
+class ChaosMode {
+ public:
+  static void SetChaosFeature(ChaosFeature aChaosFeature) {
     detail::gChaosFeatures = aChaosFeature;
   }
 
-  static bool isActive(ChaosFeature aFeature)
-  {
+  static bool isActive(ChaosFeature aFeature) {
     if (detail::gChaosModeCounter > 0) {
       return true;
     }
@@ -64,16 +65,12 @@ public:
    * chaos mode state. If the activation level is nonzero all chaos mode
    * features are activated.
    */
-  static void enterChaosMode()
-  {
-    detail::gChaosModeCounter++;
-  }
+  static void enterChaosMode() { detail::gChaosModeCounter++; }
 
   /**
    * Decrease the chaos mode activation level. See enterChaosMode().
    */
-  static void leaveChaosMode()
-  {
+  static void leaveChaosMode() {
     MOZ_ASSERT(detail::gChaosModeCounter > 0);
     detail::gChaosModeCounter--;
   }
@@ -82,8 +79,7 @@ public:
    * Returns a somewhat (but not uniformly) random uint32_t < aBound.
    * Not to be used for anything except ChaosMode, since it's not very random.
    */
-  static uint32_t randomUint32LessThan(uint32_t aBound)
-  {
+  static uint32_t randomUint32LessThan(uint32_t aBound) {
     MOZ_ASSERT(aBound != 0);
     return uint32_t(rand()) % aBound;
   }

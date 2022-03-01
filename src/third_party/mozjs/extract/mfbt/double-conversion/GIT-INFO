@@ -1,9 +1,12 @@
-commit fe9b384793c4e79bd32133dc9053f27b75a5eeae
-Merge: 2a257b7 1d5a688
-Author: Florian Loitsch <floitsch@google.com>
-Date:   Fri Sep 15 11:32:00 2017 +0200
+commit bf4607277fa7133825cb7899015374917cd06b8f
+Author: Mike Hommey <mhommey@mozilla.com>
+Date:   Tue Jan 26 19:46:13 2021 +0900
 
-    Merge pull request #52 from uburuntu/master
+    Add a flag to make precision mode like printf's %g (#149)
     
-    Some refactorings: remove unused static, replace deprecated headers, init member in constructor
-
+    With this, %g can be emulated with:
+    ```
+    DoubleToStringConverter cvt(
+      UNIQUE_ZERO | NO_TRAILING_ZERO | EMIT_POSITIVE_EXPONENT_SIGN,
+      "inf", "nan", 'e', 0, 0, 4, 0, 2)
+    ```

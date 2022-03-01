@@ -1,0 +1,95 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+XPCSHELL_TESTS_MANIFESTS += ["tests/unit/xpcshell.ini"]
+
+toolkit = CONFIG["MOZ_WIDGET_TOOLKIT"]
+
+if toolkit == "windows":
+    DIRS += ["windows"]
+elif toolkit == "cocoa":
+    DIRS += ["mac"]
+elif toolkit == "gtk":
+    DIRS += ["gtk"]
+elif toolkit == "android":
+    DIRS += ["android"]
+
+XPIDL_SOURCES += [
+    "mozILocaleService.idl",
+    "mozIOSPreferences.idl",
+    "nsICollation.idl",
+]
+
+XPIDL_MODULE = "locale"
+
+EXPORTS += [
+    "DateTimeFormat.h",
+    "nsCollationCID.h",
+    "nsLanguageAtomService.h",
+    "nsUConvPropertySearch.h",
+]
+
+EXPORTS.mozilla.intl += [
+    "LocaleService.h",
+    "MozLocale.h",
+    "MozLocaleBindings.h",
+    "OSPreferences.h",
+    "Quotes.h",
+]
+
+UNIFIED_SOURCES += [
+    "DateTimeFormat.cpp",
+    "LocaleService.cpp",
+    "MozLocale.cpp",
+    "nsCollation.cpp",
+    "nsCollationFactory.cpp",
+    "nsLanguageAtomService.cpp",
+    "nsUConvPropertySearch.cpp",
+    "OSPreferences.cpp",
+    "Quotes.cpp",
+]
+
+EXTRA_JS_MODULES += [
+    "PluralForm.jsm",
+]
+
+XPCOM_MANIFESTS += [
+    "components.conf",
+]
+
+FINAL_LIBRARY = "xul"
+
+LOCAL_INCLUDES += [
+    "/intl/uconv",
+]
+
+RESOURCE_FILES += [
+    "language.properties",
+]
+
+prefixes = ("encodingsgroups",)
+
+for prefix in prefixes:
+    input_file = prefix + ".properties"
+    header = prefix + ".properties.h"
+    GeneratedFile(header, script="props2arrays.py", inputs=[input_file])
+
+if CONFIG["ENABLE_TESTS"]:
+    DIRS += ["tests/gtest"]
+
+if CONFIG["COMPILE_ENVIRONMENT"]:
+    CbindgenHeader(
+        "fluent_langneg_ffi_generated.h",
+        inputs=["/intl/locale/rust/fluent-langneg-ffi"],
+    )
+    CbindgenHeader(
+        "unic_langid_ffi_generated.h", inputs=["/intl/locale/rust/unic-langid-ffi"]
+    )
+
+    EXPORTS.mozilla.intl += [
+        "!fluent_langneg_ffi_generated.h",
+        "!unic_langid_ffi_generated.h",
+    ]

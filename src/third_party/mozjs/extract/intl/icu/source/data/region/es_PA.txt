@@ -1,0 +1,14 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_PA{
+    %%Parent{"es_419"}
+    Countries{
+        BA{"Bosnia y Herzegovina"}
+        TA{"Tristán de Acuña"}
+        UM{"Islas menores alejadas de EE. UU."}
+    }
+    Countries%short{
+        GB{"RU"}
+    }
+}

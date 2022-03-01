@@ -1,0 +1,75 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+os{
+    units{
+        duration{
+            day{
+                dnam{"боны"}
+                one{"{0} бон"}
+                other{"{0} боны"}
+            }
+            hour{
+                dnam{"сахаты"}
+                one{"{0} сахат"}
+                other{"{0} сахаты"}
+            }
+            minute{
+                dnam{"минуты"}
+                one{"{0} минут"}
+                other{"{0} минуты"}
+            }
+            month{
+                dnam{"мӕйы"}
+                one{"{0} мӕй"}
+                other{"{0} мӕйы"}
+            }
+            second{
+                dnam{"секунды"}
+                one{"{0} секунд"}
+                other{"{0} секунды"}
+            }
+            week{
+                dnam{"къуырийы"}
+                one{"{0} къуыри"}
+                other{"{0} къуырийы"}
+            }
+            year{
+                dnam{"азы"}
+                one{"{0} аз"}
+                other{"{0} азы"}
+            }
+        }
+    }
+    unitsShort{
+        duration{
+            day{
+                dnam{"боны"}
+                one{"{0} бон"}
+                other{"{0} боны"}
+            }
+            hour{
+                dnam{"сахаты"}
+                one{"{0} с."}
+                other{"{0} с."}
+            }
+            minute{
+                dnam{"минуты"}
+                one{"{0} мин."}
+                other{"{0} мин."}
+            }
+            month{
+                dnam{"мӕйы"}
+            }
+            second{
+                dnam{"секунды"}
+            }
+            week{
+                dnam{"къуырийы"}
+            }
+            year{
+                dnam{"азы"}
+            }
+        }
+    }
+}

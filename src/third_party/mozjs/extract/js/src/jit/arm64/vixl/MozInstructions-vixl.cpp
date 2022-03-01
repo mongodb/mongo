@@ -116,18 +116,18 @@ bool Instruction::IsBranchLinkImm() const {
 }
 
 
-bool Instruction::IsTargetReachable(Instruction* target) const {
+bool Instruction::IsTargetReachable(const Instruction* target) const {
     VIXL_ASSERT(((target - this) & 3) == 0);
     int offset = (target - this) >> kInstructionSizeLog2;
     switch (BranchType()) {
       case CondBranchType:
-        return is_int19(offset);
+        return IsInt19(offset);
       case UncondBranchType:
-        return is_int26(offset);
+        return IsInt26(offset);
       case CompareBranchType:
-        return is_int19(offset);
+        return IsInt19(offset);
       case TestBranchType:
-        return is_int14(offset);
+        return IsInt14(offset);
       default:
         VIXL_UNREACHABLE();
     }

@@ -1,0 +1,36 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sr_Cyrl_BA{
+    Currencies{
+        BAM{
+            "КМ",
+            "Босанскохерцеговачка конвертибилна марка",
+        }
+        BYN{
+            "BYN",
+            "Бјелоруска рубља",
+        }
+        KPW{
+            "KPW",
+            "Сјевернокорејски вон",
+        }
+    }
+    CurrencyPlurals{
+        BAM{
+            few{"босанскохерцеговачке конвертибилне маркe"}
+            one{"босанскохерцеговачка конвертибилна марка"}
+            other{"босанскохерцеговачких конвертибилних марака"}
+        }
+        BYN{
+            few{"бјелоруске рубље"}
+            one{"бјелоруска рубља"}
+            other{"бјелоруских рубљи"}
+        }
+        KPW{
+            few{"сјевернокорејска вона"}
+            one{"сјевернокорејски вон"}
+            other{"сјевернокорејских вона"}
+        }
+    }
+}

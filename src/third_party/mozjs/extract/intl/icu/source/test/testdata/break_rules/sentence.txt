@@ -1,0 +1,50 @@
+﻿#
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+
+# Copyright (c) 2016, International Business Machines Corporation and others. All Rights Reserved.
+# file: sentence.txt
+
+type = sentence;      # one of grapheme | word | line | sentence
+locale = en;
+
+CR        = [\p{Sentence_Break = CR}];
+LF        = [\p{Sentence_Break = LF}];
+Extend    = [\p{Sentence_Break = Extend}];
+Sep       = [\p{Sentence_Break = Sep}];
+Format    = [\p{Sentence_Break = Format}];
+Sp        = [\p{Sentence_Break = Sp}];
+Lower     = [\p{Sentence_Break = Lower}];
+Upper     = [\p{Sentence_Break = Upper}];
+OLetter   = [\p{Sentence_Break = OLetter}];
+Numeric   = [\p{Sentence_Break = Numeric}];
+ATerm     = [\p{Sentence_Break = ATerm}];
+SContinue = [\p{Sentence_Break = SContinue}];
+STerm     = [\p{Sentence_Break = STerm}];
+Close     = [\p{Sentence_Break = Close}];
+
+ParaSep   = [Sep CR LF];
+SATerm    = [STerm ATerm];
+ExtFmt    = [Extend Format];
+
+# SB2:  ÷  eot
+#       Conventional regular expression matching for '$' as end-of-text also matches
+#       at a line separator just preceding the physical end of text.
+#       Instead, use a look-ahead assertion that there is no following character.
+SB2:    . ÷ (?!.);
+
+SB3:    CR LF;
+SB4:    ParaSep ÷;
+
+# SB5: ignore Format and Extend characters.
+
+SB6:    ATerm ExtFmt* Numeric;
+SB7:    (Upper | Lower) ExtFmt* ATerm ExtFmt* Upper;
+SB8:    ATerm ExtFmt* (Close ExtFmt*)* (Sp ExtFmt*)* ([^OLetter Upper Lower ParaSep SATerm ExtFmt] ExtFmt *)* Lower;
+SB8a:   SATerm ExtFmt* (Close ExtFmt*)* (Sp ExtFmt*)* (SContinue | SATerm);
+
+SB9:    SATerm ExtFmt* (Close ExtFmt*)* (Sp ExtFmt*)* (CR LF | ParaSep)? ÷;
+        # Also covers SB10, SB11.
+
+SB12:   . ExtFmt* [^ExtFmt]?;
+

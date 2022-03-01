@@ -24,7 +24,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "js-config.h"
+#include "jstypes.h"
 
 #ifdef JS_SIMULATOR_ARM64
 
@@ -33,13 +33,15 @@
 #include <cmath>
 #include <string.h>
 
+#include "jit/AtomicOperations.h"
+
 namespace vixl {
 
 const Instruction* Simulator::kEndOfSimAddress = NULL;
 
 void SimSystemRegister::SetBits(int msb, int lsb, uint32_t bits) {
   int width = msb - lsb + 1;
-  VIXL_ASSERT(is_uintn(width, bits) || is_intn(width, bits));
+  VIXL_ASSERT(IsUintN(width, bits) || IsIntN(width, bits));
 
   bits <<= lsb;
   uint32_t mask = ((1 << width) - 1) << lsb;
@@ -202,6 +204,10 @@ void Simulator::set_trace_parameters(int parameters) {
 
 
 void Simulator::set_instruction_stats(bool value) {
+  if (instrumentation_ == nullptr) {
+    return;
+  }
+
   if (value != instruction_stats_) {
     if (value) {
       decoder_->AppendVisitor(instrumentation_);
@@ -1340,7 +1346,7 @@ void Simulator::VisitLoadStoreExclusive(const Instruction* instr) {
 
     if (is_acquire_release) {
       // Approximate load-acquire by issuing a full barrier after the load.
-      __sync_synchronize();
+      js::jit::AtomicOperations::fenceSeqCst();
     }
 
     LogRead(address, rt, GetPrintRegisterFormatForSize(element_size));
@@ -1351,7 +1357,7 @@ void Simulator::VisitLoadStoreExclusive(const Instruction* instr) {
   } else {
     if (is_acquire_release) {
       // Approximate store-release by issuing a full barrier before the store.
-      __sync_synchronize();
+      js::jit::AtomicOperations::fenceSeqCst();
     }
 
     bool do_store = true;
@@ -1959,6 +1965,7 @@ void Simulator::VisitFPIntegerConvert(const Instruction* instr) {
     case FCVTZU_xs: set_xreg(dst, FPToUInt64(sreg(src), FPZero)); break;
     case FCVTZU_wd: set_wreg(dst, FPToUInt32(dreg(src), FPZero)); break;
     case FCVTZU_xd: set_xreg(dst, FPToUInt64(dreg(src), FPZero)); break;
+    case FJCVTZS: set_wreg(dst, FPToFixedJS(dreg(src))); break;
     case FMOV_ws: set_wreg(dst, sreg_bits(src)); break;
     case FMOV_xd: set_xreg(dst, dreg_bits(src)); break;
     case FMOV_sw: set_sreg_bits(dst, wreg(src)); break;
@@ -2146,12 +2153,24 @@ void Simulator::VisitFPDataProcessing1Source(const Instruction* instr) {
     case FABS_d: fabs_(kFormatD, vreg(fd), vreg(fn)); return;
     case FNEG_s: fneg(kFormatS, vreg(fd), vreg(fn)); return;
     case FNEG_d: fneg(kFormatD, vreg(fd), vreg(fn)); return;
-    case FCVT_ds: set_dreg(fd, FPToDouble(sreg(fn))); return;
-    case FCVT_sd: set_sreg(fd, FPToFloat(dreg(fn), FPTieEven)); return;
-    case FCVT_hs: set_hreg(fd, FPToFloat16(sreg(fn), FPTieEven)); return;
-    case FCVT_sh: set_sreg(fd, FPToFloat(hreg(fn))); return;
-    case FCVT_dh: set_dreg(fd, FPToDouble(FPToFloat(hreg(fn)))); return;
-    case FCVT_hd: set_hreg(fd, FPToFloat16(dreg(fn), FPTieEven)); return;
+    case FCVT_ds:
+      set_dreg(fd, FPToDouble(sreg(fn), ReadDN()));
+      return;
+    case FCVT_sd:
+      set_sreg(fd, FPToFloat(dreg(fn), FPTieEven, ReadDN()));
+      return;
+    case FCVT_hs:
+      set_hreg(fd, Float16ToRawbits(FPToFloat16(sreg(fn), FPTieEven, ReadDN())));
+      return;
+    case FCVT_sh:
+      set_sreg(fd, FPToFloat(RawbitsToFloat16(hreg(fn)), ReadDN()));
+      return;
+    case FCVT_dh:
+      set_dreg(fd, FPToDouble(hreg(fn), ReadDN()));
+      return;
+    case FCVT_hd:
+      set_hreg(fd, Float16ToRawbits(FPToFloat16(dreg(fn), FPTieEven, ReadDN())));
+      return;
     case FSQRT_s:
     case FSQRT_d: fsqrt(vform, rd, rn); return;
     case FRINTI_s:
@@ -2330,7 +2349,7 @@ void Simulator::VisitSystem(const Instruction* instr) {
       default: VIXL_UNIMPLEMENTED();
     }
   } else if (instr->Mask(MemBarrierFMask) == MemBarrierFixed) {
-    __sync_synchronize();
+    js::jit::AtomicOperations::fenceSeqCst();
   } else if ((instr->Mask(SystemSysFMask) == SystemSysFixed)) {
     switch (instr->Mask(SystemSysMask)) {
       case SYS: SysOp_W(instr->SysOp(), xreg(instr->Rt())); break;
@@ -3037,6 +3056,8 @@ void Simulator::NEONLoadStoreSingleStructHelper(const Instruction* instr,
   // and PostIndex addressing.
   bool do_load = false;
 
+  bool replicating = false;
+
   NEONFormatDecoder nfd(instr, NEONFormatDecoder::LoadStoreFormatMap());
   VectorFormat vf_t = nfd.GetVectorFormat();
 
@@ -3105,40 +3126,16 @@ void Simulator::NEONLoadStoreSingleStructHelper(const Instruction* instr,
     }
 
     case NEON_LD1R:
-    case NEON_LD1R_post: {
-      vf = vf_t;
-      ld1r(vf, vreg(rt), addr);
-      do_load = true;
-      break;
-    }
-
+    case NEON_LD1R_post:
     case NEON_LD2R:
-    case NEON_LD2R_post: {
-      vf = vf_t;
-      int rt2 = (rt + 1) % kNumberOfVRegisters;
-      ld2r(vf, vreg(rt), vreg(rt2), addr);
-      do_load = true;
-      break;
-    }
-
+    case NEON_LD2R_post:
     case NEON_LD3R:
-    case NEON_LD3R_post: {
-      vf = vf_t;
-      int rt2 = (rt + 1) % kNumberOfVRegisters;
-      int rt3 = (rt2 + 1) % kNumberOfVRegisters;
-      ld3r(vf, vreg(rt), vreg(rt2), vreg(rt3), addr);
-      do_load = true;
-      break;
-    }
-
+    case NEON_LD3R_post:
     case NEON_LD4R:
     case NEON_LD4R_post: {
       vf = vf_t;
-      int rt2 = (rt + 1) % kNumberOfVRegisters;
-      int rt3 = (rt2 + 1) % kNumberOfVRegisters;
-      int rt4 = (rt3 + 1) % kNumberOfVRegisters;
-      ld4r(vf, vreg(rt), vreg(rt2), vreg(rt3), vreg(rt4), addr);
       do_load = true;
+      replicating = true;
       break;
     }
     default: VIXL_UNIMPLEMENTED();
@@ -3161,7 +3158,11 @@ void Simulator::NEONLoadStoreSingleStructHelper(const Instruction* instr,
     case NEONLoadStoreSingle1:
       scale = 1;
       if (do_load) {
-        ld1(vf, vreg(rt), lane, addr);
+        if (replicating) {
+          ld1r(vf, vreg(rt), addr);
+        } else  {
+          ld1(vf, vreg(rt), lane, addr);
+        }
         LogVRead(addr, rt, print_format, lane);
       } else {
         st1(vf, vreg(rt), lane, addr);
@@ -3171,7 +3172,11 @@ void Simulator::NEONLoadStoreSingleStructHelper(const Instruction* instr,
     case NEONLoadStoreSingle2:
       scale = 2;
       if (do_load) {
-        ld2(vf, vreg(rt), vreg(rt2), lane, addr);
+        if (replicating) {
+          ld2r(vf, vreg(rt), vreg(rt2), addr);
+        } else {
+          ld2(vf, vreg(rt), vreg(rt2), lane, addr);
+        }
         LogVRead(addr, rt, print_format, lane);
         LogVRead(addr + esize, rt2, print_format, lane);
       } else {
@@ -3183,7 +3188,11 @@ void Simulator::NEONLoadStoreSingleStructHelper(const Instruction* instr,
     case NEONLoadStoreSingle3:
       scale = 3;
       if (do_load) {
-        ld3(vf, vreg(rt), vreg(rt2), vreg(rt3), lane, addr);
+        if (replicating) {
+          ld3r(vf, vreg(rt), vreg(rt2), vreg(rt3), addr);
+        } else {
+          ld3(vf, vreg(rt), vreg(rt2), vreg(rt3), lane, addr);
+        }
         LogVRead(addr, rt, print_format, lane);
         LogVRead(addr + esize, rt2, print_format, lane);
         LogVRead(addr + (2 * esize), rt3, print_format, lane);
@@ -3197,7 +3206,11 @@ void Simulator::NEONLoadStoreSingleStructHelper(const Instruction* instr,
     case NEONLoadStoreSingle4:
       scale = 4;
       if (do_load) {
-        ld4(vf, vreg(rt), vreg(rt2), vreg(rt3), vreg(rt4), lane, addr);
+        if (replicating) {
+          ld4r(vf, vreg(rt), vreg(rt2), vreg(rt3), vreg(rt4), addr);
+        } else {
+          ld4(vf, vreg(rt), vreg(rt2), vreg(rt3), vreg(rt4), lane, addr);
+        }
         LogVRead(addr, rt, print_format, lane);
         LogVRead(addr + esize, rt2, print_format, lane);
         LogVRead(addr + (2 * esize), rt3, print_format, lane);
@@ -3276,17 +3289,17 @@ void Simulator::VisitNEONModifiedImmediate(const Instruction* instr) {
         vform = q ? kFormat2D : kFormat1D;
         imm = 0;
         for (int i = 0; i < 8; ++i) {
-          if (imm8 & (1 << i)) {
+          if (imm8 & (1ULL << i)) {
             imm |= (UINT64_C(0xff) << (8 * i));
           }
         }
       } else {  // cmode_0 == 1, cmode == 0xf.
         if (op_bit == 0) {
           vform = q ? kFormat4S : kFormat2S;
-          imm = float_to_rawbits(instr->ImmNEONFP32());
+          imm = FloatToRawbits(instr->ImmNEONFP32());
         } else if (q == 1) {
           vform = kFormat2D;
-          imm = double_to_rawbits(instr->ImmNEONFP64());
+          imm = DoubleToRawbits(instr->ImmNEONFP64());
         } else {
           VIXL_ASSERT((q == 0) && (op_bit == 1) && (cmode == 0xf));
           VisitUnallocated(instr);
@@ -3810,8 +3823,7 @@ void Simulator::VisitNEONPerm(const Instruction* instr) {
 
 
 void Simulator::DoUnreachable(const Instruction* instr) {
-  VIXL_ASSERT((instr->Mask(ExceptionMask) == HLT) &&
-              (instr->ImmException() == kUnreachableOpcode));
+  VIXL_ASSERT(instr->InstructionBits() == UNDEFINED_INST_PATTERN);
 
   fprintf(stream_, "Hit UNREACHABLE marker at pc=%p.\n",
           reinterpret_cast<const void*>(instr));

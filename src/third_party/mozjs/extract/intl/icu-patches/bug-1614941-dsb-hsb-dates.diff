@@ -1,0 +1,68 @@
+diff --git a/intl/icu/source/data/locales/dsb.txt b/intl/icu/source/data/locales/dsb.txt
+--- a/intl/icu/source/data/locales/dsb.txt
++++ b/intl/icu/source/data/locales/dsb.txt
+@@ -349,25 +349,29 @@ dsb{
+                 Hms{"H:mm:ss"}
+                 M{"L"}
+                 MEd{"E, d.M."}
+                 MMM{"LLL"}
+                 MMMEd{"E, d. MMM"}
+-                MMMMd{"d MMMM"}
++                MMMMd{"d. MMMM"}
+                 MMMd{"d. MMM"}
++                MMd{"d. MM"}
++                MMdd{"dd. MM"}
+                 Md{"d.M."}
+                 d{"d"}
+                 h{"h a"}
+                 hm{"h:mm a"}
+                 hms{"h:mm:ss a"}
+                 ms{"mm:ss"}
+                 y{"y"}
+                 yM{"M.y"}
+                 yMEd{"E, d.M.y"}
++                yMM{"MM y"}
+                 yMMM{"MMM y"}
+                 yMMMEd{"E, d. MMM y"}
+                 yMMMM{"LLLL y"}
+                 yMMMd{"d. MMM y"}
++                yMMdd{"dd. MM y"}
+                 yMd{"d.M.y"}
+                 yQQQ{"QQQ y"}
+                 yQQQQ{"QQQQ y"}
+             }
+             dayNames{
+diff --git a/intl/icu/source/data/locales/hsb.txt b/intl/icu/source/data/locales/hsb.txt
+--- a/intl/icu/source/data/locales/hsb.txt
++++ b/intl/icu/source/data/locales/hsb.txt
+@@ -349,25 +349,29 @@ hsb{
+                 Hms{"H:mm:ss"}
+                 M{"L"}
+                 MEd{"E, d.M."}
+                 MMM{"LLL"}
+                 MMMEd{"E, d. MMM"}
+-                MMMMd{"d MMMM"}
++                MMMMd{"d. MMMM"}
+                 MMMd{"d. MMM"}
++                MMd{"d. MM"}
++                MMdd{"dd. MM"}
+                 Md{"d.M."}
+                 d{"d"}
+                 h{"h a"}
+                 hm{"h:mm a"}
+                 hms{"h:mm:ss a"}
+                 ms{"mm:ss"}
+                 y{"y"}
+                 yM{"M.y"}
+                 yMEd{"E, d.M.y"}
++                yMM{"MM y"}
+                 yMMM{"MMM y"}
+                 yMMMEd{"E, d. MMM y"}
+                 yMMMM{"LLLL y"}
+                 yMMMd{"d. MMM y"}
++                yMMdd{"dd. MM y"}
+                 yMd{"d.M.y"}
+                 yQQQ{"QQQ y"}
+                 yQQQQ{"QQQQ y"}
+             }
+             dayNames{

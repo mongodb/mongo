@@ -1,0 +1,245 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+nd{
+    AuxExemplarCharacters{"[r]"}
+    ExemplarCharacters{"[a b c d e f g h i j k l m n o p q s t u v w x y z]"}
+    ExemplarCharactersIndex{"[A B C D E F G H I J K L M N O P Q S T U V W X Y Z]"}
+    NumberElements{
+        latn{
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d MMMM y G",
+                "d MMMM y G",
+                "d MMM y G",
+                "dd/MM/y GGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, M/d"}
+                MMM{"LLL"}
+                MMMEd{"E, MMM d"}
+                MMMMEd{"E, MMMM d"}
+                MMMMd{"MMMM d"}
+                MMMd{"MMM d"}
+                Md{"M/d"}
+                d{"d"}
+                hm{"h:mm a"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E, M/d/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, MMM d, y"}
+                yMMMM{"MMMM y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d MMMM y",
+                "d MMMM y",
+                "d MMM y",
+                "dd/MM/y",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, M/d"}
+                MMM{"LLL"}
+                MMMEd{"E, MMM d"}
+                MMMMEd{"E, MMMM d"}
+                MMMMd{"MMMM d"}
+                MMMd{"MMM d"}
+                Md{"M/d"}
+                d{"d"}
+                hm{"h:mm a"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E, M/d/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, MMM d, y"}
+                yMMMM{"MMMM y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Son",
+                        "Mvu",
+                        "Sib",
+                        "Sit",
+                        "Sin",
+                        "Sih",
+                        "Mgq",
+                    }
+                    wide{
+                        "Sonto",
+                        "Mvulo",
+                        "Sibili",
+                        "Sithathu",
+                        "Sine",
+                        "Sihlanu",
+                        "Mgqibelo",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "S",
+                        "M",
+                        "S",
+                        "S",
+                        "S",
+                        "S",
+                        "M",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "BC",
+                    "AD",
+                }
+                wide{
+                    "UKristo angakabuyi",
+                    "Ukristo ebuyile",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Zib",
+                        "Nhlo",
+                        "Mbi",
+                        "Mab",
+                        "Nkw",
+                        "Nhla",
+                        "Ntu",
+                        "Ncw",
+                        "Mpan",
+                        "Mfu",
+                        "Lwe",
+                        "Mpal",
+                    }
+                    wide{
+                        "Zibandlela",
+                        "Nhlolanja",
+                        "Mbimbitho",
+                        "Mabasa",
+                        "Nkwenkwezi",
+                        "Nhlangula",
+                        "Ntulikazi",
+                        "Ncwabakazi",
+                        "Mpandula",
+                        "Mfumfu",
+                        "Lwezi",
+                        "Mpalakazi",
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        "Z",
+                        "N",
+                        "M",
+                        "M",
+                        "N",
+                        "N",
+                        "N",
+                        "N",
+                        "M",
+                        "M",
+                        "L",
+                        "M",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "K1",
+                        "K2",
+                        "K3",
+                        "K4",
+                    }
+                    wide{
+                        "Kota 1",
+                        "Kota 2",
+                        "Kota 3",
+                        "Kota 4",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"Ilanga"}
+            relative{
+                "-1"{"Izolo"}
+                "0"{"Lamuhla"}
+                "1"{"Kusasa"}
+            }
+        }
+        hour{
+            dn{"Ihola"}
+        }
+        minute{
+            dn{"Umuzuzu"}
+        }
+        month{
+            dn{"Inyangacale"}
+        }
+        second{
+            dn{"Isekendi"}
+        }
+        week{
+            dn{"Iviki"}
+        }
+        weekday{
+            dn{"Ilanga leviki"}
+        }
+        year{
+            dn{"Umnyaka"}
+        }
+        zone{
+            dn{"Isikhathi"}
+        }
+    }
+}

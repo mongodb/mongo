@@ -1,0 +1,1357 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ha{
+    AuxExemplarCharacters{"[á à â é è ê í ì î ó ò ô p q {r\u0303} ú ù û v x]"}
+    ExemplarCharacters{"[a b ɓ c d ɗ e f g h i j k ƙ l m n o r s {sh} t {ts} u w y ƴ z ʼ]"}
+    ExemplarCharactersIndex{"[A B Ɓ C D Ɗ E F G H I J K Ƙ L M N O R S T U W Y Ƴ Z]"}
+    ExemplarCharactersPunctuation{"[\\- ‑ , ; \\: ! ? . ' ‘ ’ \u0022 “ ” ( ) \\[ \\] \\{ \\} ′ ″]"}
+    NumberElements{
+        latn{
+            miscPatterns{
+                atLeast{"{0}+"}
+            }
+            patternsLong{
+                decimalFormat{
+                    1000{
+                        one{"Dubu 0"}
+                        other{"Dubu 0"}
+                    }
+                    10000{
+                        one{"Dubu 00"}
+                        other{"Dubu 00"}
+                    }
+                    100000{
+                        one{"Dubu 000"}
+                        other{"Dubu 000"}
+                    }
+                    1000000{
+                        one{"Miliyan 0"}
+                        other{"Miliyan 0"}
+                    }
+                    10000000{
+                        one{"Miliyan 00"}
+                        other{"Miliyan 00"}
+                    }
+                    100000000{
+                        one{"Miliyan 000"}
+                        other{"Miliyan 000"}
+                    }
+                    1000000000{
+                        one{"Biliyan 0"}
+                        other{"Biliyan 0"}
+                    }
+                    10000000000{
+                        one{"Biliyan 00"}
+                        other{"Biliyan 00"}
+                    }
+                    100000000000{
+                        one{"Biliyan 000"}
+                        other{"Biliyan 000"}
+                    }
+                    1000000000000{
+                        one{"Triliyan 0"}
+                        other{"Triliyan 0"}
+                    }
+                    10000000000000{
+                        one{"Triliyan 00"}
+                        other{"Triliyan 00"}
+                    }
+                    100000000000000{
+                        one{"Triliyan 000"}
+                        other{"Triliyan 000"}
+                    }
+                }
+            }
+            patternsShort{
+                currencyFormat{
+                    1000{
+                        one{"¤ 0D"}
+                        other{"¤ 0D"}
+                    }
+                    10000{
+                        one{"¤ 00D"}
+                        other{"¤ 00D"}
+                    }
+                    100000{
+                        one{"¤ 000K"}
+                        other{"¤ 000D"}
+                    }
+                    1000000{
+                        one{"¤ 0M"}
+                        other{"¤ 0M"}
+                    }
+                    10000000{
+                        one{"¤ 00M"}
+                        other{"¤ 00M"}
+                    }
+                    100000000{
+                        one{"¤ 000M"}
+                        other{"¤ 000M"}
+                    }
+                    1000000000{
+                        one{"¤0B"}
+                        other{"¤0B"}
+                    }
+                    10000000000{
+                        one{"¤00B"}
+                        other{"¤00B"}
+                    }
+                    100000000000{
+                        one{"¤000B"}
+                        other{"¤000B"}
+                    }
+                    1000000000000{
+                        one{"¤0T"}
+                        other{"¤0T"}
+                    }
+                    10000000000000{
+                        one{"¤00T"}
+                        other{"¤00T"}
+                    }
+                    100000000000000{
+                        one{"¤000T"}
+                        other{"¤000T"}
+                    }
+                }
+                decimalFormat{
+                    1000{
+                        one{"0D"}
+                        other{"0D"}
+                    }
+                    10000{
+                        one{"00D"}
+                        other{"00D"}
+                    }
+                    100000{
+                        one{"000D"}
+                        other{"000D"}
+                    }
+                    1000000{
+                        one{"0M"}
+                        other{"0M"}
+                    }
+                    10000000{
+                        one{"00M"}
+                        other{"00M"}
+                    }
+                    100000000{
+                        one{"000M"}
+                        other{"000M"}
+                    }
+                    1000000000{
+                        one{"0B"}
+                        other{"0B"}
+                    }
+                    10000000000{
+                        one{"00B"}
+                        other{"00B"}
+                    }
+                    100000000000{
+                        one{"000B"}
+                        other{"000B"}
+                    }
+                    1000000000000{
+                        one{"0T"}
+                        other{"0T"}
+                    }
+                    10000000000000{
+                        one{"00T"}
+                        other{"00T"}
+                    }
+                    100000000000000{
+                        one{"000T"}
+                        other{"000T"}
+                    }
+                }
+            }
+        }
+        minimalPairs{
+            plural{
+                one{"rana {0}"}
+                other{"ranaku {0}"}
+            }
+        }
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d MMMM, y G",
+                "d MMMM, y G",
+                "d MMM, y G",
+                "d/M/yy GGGGG",
+                "{0}, {1}",
+                "{0} 'da' {1}",
+                "{0} 'da' {1}",
+                "{0}, {1}",
+                "{0}, {1}",
+            }
+            availableFormats{
+                MEd{"E, M/d"}
+                MMMEd{"E, MMM d"}
+                MMMMEd{"E, MMMM d"}
+                Md{"M/d"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E, M/d/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, MMM d, y"}
+                yMMMM{"MMMM y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "Safiya",
+                "Yamma",
+            }
+            AmPmMarkersAbbr{
+                "SF",
+                "YM",
+            }
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE d MMMM, y",
+                "d MMMM, y",
+                "d MMM, y",
+                "d/M/yy",
+                "{1}, {0}",
+                "{1} {0}",
+                "{1} 'da' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                Ed{"E, d"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, M/d"}
+                MMM{"LLL"}
+                MMMEd{"E, MMM d"}
+                MMMMEd{"E, MMMM d"}
+                MMMMW{
+                    one{"'satin' W 'cikin' MMMM"}
+                    other{"'satin' W 'cikin' MMMM"}
+                }
+                MMMMd{"MMMM d"}
+                MMMd{"MMM d"}
+                Md{"M/d"}
+                d{"d"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E, M/d/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"y MMM d, E"}
+                yMMMM{"MMMM y"}
+                yMMMd{"d MMM, y"}
+                yMd{"y-MM-dd"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+                yw{
+                    one{"'sati' w 'cikin' Y"}
+                    other{"'sati' w 'cikin' Y"}
+                }
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Lah",
+                        "Lit",
+                        "Tal",
+                        "Lar",
+                        "Alh",
+                        "Jum",
+                        "Asa",
+                    }
+                    narrow{
+                        "L",
+                        "L",
+                        "T",
+                        "L",
+                        "A",
+                        "J",
+                        "A",
+                    }
+                    short{
+                        "Lh",
+                        "Li",
+                        "Ta",
+                        "Lr",
+                        "Al",
+                        "Ju",
+                        "As",
+                    }
+                    wide{
+                        "Lahadi",
+                        "Litinin",
+                        "Talata",
+                        "Laraba",
+                        "Alhamis",
+                        "Jummaʼa",
+                        "Asabar",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Lah",
+                        "Lit",
+                        "Tal",
+                        "Lar",
+                        "Alh",
+                        "Jum",
+                        "Asa",
+                    }
+                    narrow{
+                        "L",
+                        "L",
+                        "T",
+                        "L",
+                        "A",
+                        "J",
+                        "A",
+                    }
+                    short{
+                        "Lh",
+                        "Li",
+                        "Ta",
+                        "Lr",
+                        "Al",
+                        "Ju",
+                        "As",
+                    }
+                    wide{
+                        "Lahadi",
+                        "Litinin",
+                        "Talata",
+                        "Laraba",
+                        "Alhamis",
+                        "Jummaʼa",
+                        "Asabar",
+                    }
+                }
+            }
+            dayPeriod{
+                stand-alone{
+                    abbreviated{
+                        am{"SF"}
+                        pm{"YM"}
+                    }
+                    narrow{
+                        am{"SF"}
+                        pm{"YM"}
+                    }
+                    wide{
+                        am{"SF"}
+                        pm{"YM"}
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "K.H",
+                    "BHAI",
+                }
+                abbreviated%variant{
+                    "K.H.Y",
+                    "B.H.Y",
+                }
+                wide{
+                    "Kafin haihuwar annab",
+                    "Bayan haihuwar annab",
+                }
+                wide%variant{
+                    "K.H.Y",
+                    "Sanannen Zamani",
+                }
+            }
+            intervalFormats{
+                H{
+                    H{"HH–HH"}
+                }
+                Hm{
+                    H{"HH:mm–HH:mm"}
+                    m{"HH:mm–HH:mm"}
+                }
+                MEd{
+                    d{"E, dd/M – E, dd/M"}
+                }
+                h{
+                    a{"h a – h a"}
+                }
+                hm{
+                    a{"h:mm a – h:mm a"}
+                }
+                yM{
+                    M{"MM/y – MM/y"}
+                    y{"MM/y – MM/y"}
+                }
+                yMEd{
+                    M{"y-MM-dd, E – y-MM-dd, E"}
+                    y{"y-MM-dd, E – y-MM-dd, E"}
+                }
+                yMMM{
+                    y{"y MMM – y MMM"}
+                }
+                yMMMEd{
+                    y{"y MMM d, E – y MMM d, E"}
+                }
+                yMMMM{
+                    y{"y MMMM – y MMMM"}
+                }
+                yMMMd{
+                    y{"y MMM d – y MMM d"}
+                }
+                yMd{
+                    M{"dd/MM/y – dd/MM/y"}
+                    d{"dd/MM/y – dd/MM/y"}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Jan",
+                        "Fab",
+                        "Mar",
+                        "Afi",
+                        "May",
+                        "Yun",
+                        "Yul",
+                        "Agu",
+                        "Sat",
+                        "Okt",
+                        "Nuw",
+                        "Dis",
+                    }
+                    narrow{
+                        "J",
+                        "F",
+                        "M",
+                        "A",
+                        "M",
+                        "Y",
+                        "Y",
+                        "A",
+                        "S",
+                        "O",
+                        "N",
+                        "D",
+                    }
+                    wide{
+                        "Janairu",
+                        "Faburairu",
+                        "Maris",
+                        "Afirilu",
+                        "Mayu",
+                        "Yuni",
+                        "Yuli",
+                        "Agusta",
+                        "Satumba",
+                        "Oktoba",
+                        "Nuwamba",
+                        "Disamba",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Jan",
+                        "Fab",
+                        "Mar",
+                        "Afi",
+                        "May",
+                        "Yun",
+                        "Yul",
+                        "Agu",
+                        "Sat",
+                        "Okt",
+                        "Nuw",
+                        "Dis",
+                    }
+                    narrow{
+                        "J",
+                        "F",
+                        "M",
+                        "A",
+                        "M",
+                        "Y",
+                        "Y",
+                        "A",
+                        "S",
+                        "O",
+                        "N",
+                        "D",
+                    }
+                    wide{
+                        "Janairu",
+                        "Faburairu",
+                        "Maris",
+                        "Afirilu",
+                        "Mayu",
+                        "Yuni",
+                        "Yuli",
+                        "Agusta",
+                        "Satumba",
+                        "Oktoba",
+                        "Nuwamba",
+                        "Disamba",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "K1",
+                        "K2",
+                        "K3",
+                        "K4",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "Kwata na ɗaya",
+                        "Kwata na biyu",
+                        "Kwata na uku",
+                        "Kwata na huɗu",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "K1",
+                        "K2",
+                        "K3",
+                        "K4",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "Kwata na ɗaya",
+                        "Kwata na biyu",
+                        "Kwata na uku",
+                        "Kwata na huɗu",
+                    }
+                }
+            }
+        }
+    }
+    fields{
+        day{
+            dn{"kwana"}
+            relative{
+                "-1"{"jiya"}
+                "0"{"yau"}
+                "1"{"gobe"}
+            }
+            relativeTime{
+                future{
+                    one{"a cikin rana {0}"}
+                    other{"a cikin kwanaki {0}"}
+                }
+                past{
+                    one{"rana da ya gabata {0}"}
+                    other{"kwanaki da suka gabata {0}"}
+                }
+            }
+        }
+        day-narrow{
+            dn{"kwana"}
+            relativeTime{
+                future{
+                    one{"a cikin rana {0}"}
+                    other{"a cikin kwanaki {0}"}
+                }
+                past{
+                    one{"rana da ya gabata {0}"}
+                    other{"kwanaki da suka gabata {0}"}
+                }
+            }
+        }
+        day-short{
+            dn{"kwana"}
+            relativeTime{
+                future{
+                    one{"a cikin rana {0}"}
+                    other{"a cikin kwanaki {0}"}
+                }
+                past{
+                    one{"rana da ya gabata {0}"}
+                    other{"kwanaki da suka gabata {0}"}
+                }
+            }
+        }
+        dayOfYear{
+            dn{"Kwanan Shekara"}
+        }
+        dayOfYear-narrow{
+            dn{"Kwanan Shekara"}
+        }
+        dayOfYear-short{
+            dn{"Kwanan Shekara"}
+        }
+        dayperiod{
+            dn{"SF/YM"}
+        }
+        era{
+            dn{"zamani"}
+        }
+        fri{
+            relative{
+                "-1"{"Jumaʼa da ta gabata"}
+                "0"{"wannan Jumaʼar"}
+                "1"{"Jumaʼa mai zuwa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Jumaʼa"}
+                    other{"cikin {0} Jumaʼa"}
+                }
+                past{
+                    one{"{0} Jumaʼa da ta wuce"}
+                    other{"{0} Jumaʼa da ta wuce"}
+                }
+            }
+        }
+        fri-narrow{
+            relative{
+                "-1"{"Jumaʼa da ta gabata"}
+                "0"{"wannan Jumaʼar"}
+                "1"{"Jumaʼa mai zuwa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Jumaʼa"}
+                    other{"cikin {0} Jumaʼa"}
+                }
+                past{
+                    one{"{0} Jumaʼa da ta wuce"}
+                    other{"{0} Jumaʼa da ta wuce"}
+                }
+            }
+        }
+        fri-short{
+            relative{
+                "-1"{"Jumaʼa da ta gabata"}
+                "0"{"wannan Jumaʼar"}
+                "1"{"Jumaʼa mai zuwa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Jumaʼa"}
+                    other{"cikin {0} Jumaʼa"}
+                }
+                past{
+                    one{"{0} Jumaʼa da ta wuce"}
+                    other{"{0} Jumaʼa da ta wuce"}
+                }
+            }
+        }
+        hour{
+            dn{"awa"}
+            relative{
+                "0"{"wannan awa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} awa"}
+                    other{"cikin {0} awa"}
+                }
+                past{
+                    one{"{0} awa da ya gabata"}
+                    other{"{0} awa da ya gabata"}
+                }
+            }
+        }
+        hour-narrow{
+            dn{"awa"}
+            relativeTime{
+                future{
+                    one{"cikin {0} awa"}
+                    other{"cikin {0} awa"}
+                }
+                past{
+                    one{"{0} awa da ya gabata"}
+                    other{"{0} awa da ya gabata"}
+                }
+            }
+        }
+        hour-short{
+            dn{"awa"}
+            relativeTime{
+                future{
+                    one{"cikin {0} awa"}
+                    other{"cikin {0} awa"}
+                }
+                past{
+                    one{"{0} awa da ya gabata"}
+                    other{"{0} awa da ya gabata"}
+                }
+            }
+        }
+        minute{
+            dn{"minti"}
+            relative{
+                "0"{"wannan mintin"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} minti"}
+                    other{"cikin {0} minti"}
+                }
+                past{
+                    one{"{0} minti da ya gabata"}
+                    other{"{0} minti da ya gabata"}
+                }
+            }
+        }
+        minute-narrow{
+            dn{"minti"}
+            relativeTime{
+                future{
+                    one{"cikin {0} minti"}
+                    other{"cikin {0} minti"}
+                }
+                past{
+                    one{"{0} minti da ya gabata"}
+                    other{"{0} minti da ya gabata"}
+                }
+            }
+        }
+        minute-short{
+            dn{"minti"}
+            relativeTime{
+                future{
+                    one{"cikin {0} minti"}
+                    other{"cikin {0} minti"}
+                }
+                past{
+                    one{"{0} minti da ya gabata"}
+                    other{"{0} minti da ya gabata"}
+                }
+            }
+        }
+        mon{
+            relative{
+                "-1"{"Litinin din da ta gabata"}
+                "0"{"wannan Litinin din"}
+                "1"{"Litinin din da ya gabata"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Litinin"}
+                    other{"cikin {0} Litinin"}
+                }
+                past{
+                    one{"{0} Litinin din da ta gabata"}
+                    other{"{0} Litinin din da ta gabata"}
+                }
+            }
+        }
+        mon-narrow{
+            relative{
+                "-1"{"Litinin din da ta gabata"}
+                "0"{"wannan Litinin din"}
+                "1"{"Litinin din da ya gabata"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Litinin"}
+                    other{"cikin {0} Litinin"}
+                }
+                past{
+                    one{"{0} Litinin din da ta"}
+                    other{"{0} Litinin din da ta"}
+                }
+            }
+        }
+        mon-short{
+            relative{
+                "-1"{"Litinin din da ta gabata"}
+                "0"{"wannan Litinin din"}
+                "1"{"Litinin din da ya gabata"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Litinin"}
+                    other{"cikin {0} Litinin"}
+                }
+                past{
+                    one{"{0} Litinin din da ta gabata"}
+                    other{"{0} Litinin din da ta gabata"}
+                }
+            }
+        }
+        month{
+            dn{"wata"}
+            relative{
+                "-1"{"watan da ya gabata"}
+                "0"{"wannan watan"}
+                "1"{"wata na gaba"}
+            }
+            relativeTime{
+                future{
+                    one{"a cikin watan {0}"}
+                    other{"a cikin watanni {0}"}
+                }
+                past{
+                    one{"watan da ya gabata"}
+                    other{"watanni da suka gabata {0}}"}
+                }
+            }
+        }
+        month-narrow{
+            dn{"wata"}
+            relative{
+                "-1"{"watan da ya gabata"}
+                "0"{"wannan watan"}
+                "1"{"wata na gaba"}
+            }
+            relativeTime{
+                future{
+                    one{"a cikin watan {0}"}
+                    other{"a cikin watan {0}"}
+                }
+                past{
+                    one{"watan da ya gabata {0}"}
+                    other{"watan da ya gabata {0}"}
+                }
+            }
+        }
+        month-short{
+            dn{"wata"}
+            relative{
+                "-1"{"watan da ya gabata"}
+                "0"{"wannan watan"}
+                "1"{"wata na gaba"}
+            }
+            relativeTime{
+                future{
+                    one{"a cikin watan {0}"}
+                    other{"a cikin watan {0}"}
+                }
+                past{
+                    one{"watan da ya gabata"}
+                    other{"watan da ya gabata {0}"}
+                }
+            }
+        }
+        quarter{
+            dn{"kwata"}
+            relative{
+                "-1"{"kwatan karshe"}
+                "0"{"wannan kwatan"}
+                "1"{"kwata na gaba"}
+            }
+            relativeTime{
+                future{
+                    one{"a cikin kwata {0}"}
+                    other{"a cikin kwatas {0}"}
+                }
+                past{
+                    one{"kwata da suka gabata {0}"}
+                    other{"kwatas da suka gabata {0}"}
+                }
+            }
+        }
+        quarter-narrow{
+            dn{"kwata"}
+            relativeTime{
+                future{
+                    one{"a cikin kwata {0}"}
+                    other{"a cikin kwatas {0}"}
+                }
+                past{
+                    one{"kwata da suka gabata {0}"}
+                    other{"kwatas da suka gabata {0}"}
+                }
+            }
+        }
+        quarter-short{
+            dn{"kwata"}
+            relativeTime{
+                future{
+                    one{"a cikin kwata {0}"}
+                    other{"a cikin kwatas {0}"}
+                }
+                past{
+                    one{"kwata da suka gabata {0}"}
+                    other{"kwatas da suka gabata {0}"}
+                }
+            }
+        }
+        sat{
+            relative{
+                "-1"{"Asabar din da ya gabata"}
+                "0"{"wannan Asabar din"}
+                "1"{"Asabar mai zuwa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Asabar"}
+                    other{"cikin {0} Asabar"}
+                }
+                past{
+                    one{"{0} Asabar din da ya wuce"}
+                    other{"{0} Asabar din da ya wuce"}
+                }
+            }
+        }
+        sat-narrow{
+            relative{
+                "-1"{"Asabar din da ya gabata"}
+                "0"{"wannan Asabar din"}
+                "1"{"Asabar mai zuwa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Asabar"}
+                    other{"cikin {0} Asabar"}
+                }
+                past{
+                    one{"{0} Asabar din da ya wuce"}
+                    other{"{0} Asabar din da ya wuce"}
+                }
+            }
+        }
+        sat-short{
+            relative{
+                "-1"{"Asabar din da ya gabata"}
+                "0"{"wannan Asabar din"}
+                "1"{"Asabar mai zuwa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Asabar"}
+                    other{"cikin {0} Asabar"}
+                }
+                past{
+                    one{"{0} Asabar din da ya wuce"}
+                    other{"{0} Asabar din da ya wuce"}
+                }
+            }
+        }
+        second{
+            dn{"daƙiƙa"}
+            relative{
+                "0"{"yanzu"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} dakika"}
+                    other{"cikin {0} dakika"}
+                }
+                past{
+                    one{"{0} dakika da ya gabata"}
+                    other{"{0} dakika da ya gabata"}
+                }
+            }
+        }
+        second-narrow{
+            relativeTime{
+                future{
+                    one{"cikin {0} dakika"}
+                    other{"cikin {0} dakika"}
+                }
+                past{
+                    one{"{0} dakika da ya gabata"}
+                    other{"{0} dakika da ya gabata"}
+                }
+            }
+        }
+        second-short{
+            relativeTime{
+                future{
+                    one{"cikin {0} dakika"}
+                    other{"cikin {0} dakika"}
+                }
+                past{
+                    one{"{0} dakika da ya gabata"}
+                    other{"{0} dakika da ya gabata"}
+                }
+            }
+        }
+        sun{
+            relative{
+                "-1"{"Lahadin da ya gabata"}
+                "0"{"wanan Lahadi"}
+                "1"{"Lahadi mai zuwa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Lahadi"}
+                    other{"cikin {0} Lahadi"}
+                }
+                past{
+                    one{"{0} Lahadin da ta gabata"}
+                    other{"{0} Lahadin da ta gabata"}
+                }
+            }
+        }
+        sun-narrow{
+            relative{
+                "-1"{"Lahadin da ya gabata"}
+                "0"{"wanan Lahadi"}
+                "1"{"Lahadi mai zuwa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Lahadi"}
+                    other{"cikin {0} Lahadi"}
+                }
+                past{
+                    one{"{0} Lahadin da ta gabata"}
+                    other{"{0} Lahadin da ta gabata"}
+                }
+            }
+        }
+        sun-short{
+            relative{
+                "-1"{"Lahadin da ya gabata"}
+                "0"{"wanan Lahadi"}
+                "1"{"Lahadi mai zuwa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Lahadi"}
+                    other{"cikin {0} Lahadi"}
+                }
+                past{
+                    one{"{0} Lahadin da ta gabata"}
+                    other{"{0} Lahadin da ta gabata"}
+                }
+            }
+        }
+        thu{
+            relative{
+                "-1"{"Alhamis din da ya Gabata"}
+                "0"{"wannan Alhamis din"}
+                "1"{"Alhamis din mai zuwa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Alhamis"}
+                    other{"cikin {0} Alhamis"}
+                }
+                past{
+                    one{"{0} Alhamis din da ya gabata"}
+                    other{"{0} Alhamis din da ya gabata"}
+                }
+            }
+        }
+        thu-narrow{
+            relative{
+                "-1"{"Alhamis din da ya Gabata"}
+                "0"{"wannan Alhamis din"}
+                "1"{"Alhamis din mai zuwa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Alhamis"}
+                    other{"cikin {0} Alhamis"}
+                }
+                past{
+                    one{"{0} Alhamis din da ya gabata"}
+                    other{"{0} Alhamis din da ya gabata"}
+                }
+            }
+        }
+        thu-short{
+            relative{
+                "-1"{"Alhamis din da ya Gabata"}
+                "0"{"wannan Alhamis din"}
+                "1"{"Alhamis din mai zuwa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Alhamis"}
+                    other{"cikin {0} Alhamis"}
+                }
+                past{
+                    one{"{0} Alhamis din da ya gabata"}
+                    other{"{0} Alhamis din da ya gabata"}
+                }
+            }
+        }
+        tue{
+            relative{
+                "-1"{"Talata da ta gabata"}
+                "0"{"wannan Talata"}
+                "1"{"Talata mai zuwa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Talata"}
+                    other{"cikin {0} Talata"}
+                }
+                past{
+                    one{"{0} Talatar da ta gabata"}
+                    other{"{0} Talatar da ta gabata"}
+                }
+            }
+        }
+        tue-narrow{
+            relative{
+                "-1"{"Talata da ta gabata"}
+                "0"{"wannan Talata"}
+                "1"{"Talata mai zuwa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Talata"}
+                    other{"cikin {0} Talata"}
+                }
+                past{
+                    one{"{0} Talatar da ta gabata"}
+                    other{"{0} Talatar da ta gabata"}
+                }
+            }
+        }
+        tue-short{
+            relative{
+                "-1"{"Talata da ta gabata"}
+                "0"{"wannan Talata"}
+                "1"{"Talata mai zuwa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Talata"}
+                    other{"cikin {0} Talata"}
+                }
+                past{
+                    one{"{0} Talatar da ta gabata"}
+                    other{"{0} Talatar da ta gabata"}
+                }
+            }
+        }
+        wed{
+            relative{
+                "-1"{"Laraba da ta gabata"}
+                "0"{"wannan Larabar"}
+                "1"{"Laraba mai zuwa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Laraba"}
+                    other{"cikin {0} Laraba"}
+                }
+                past{
+                    one{"{0} Laraba da ta gabata"}
+                    other{"{0} Laraba da ta gabata"}
+                }
+            }
+        }
+        wed-narrow{
+            relative{
+                "-1"{"Laraba da ta gabata"}
+                "0"{"wannan Larabar"}
+                "1"{"Laraba mai zuwa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Laraba"}
+                    other{"cikin {0} Laraba"}
+                }
+                past{
+                    one{"{0} Laraba da ta gabata"}
+                    other{"{0} Laraba da ta gabata"}
+                }
+            }
+        }
+        wed-short{
+            relative{
+                "-1"{"Laraba da ta gabata"}
+                "0"{"wannan Larabar"}
+                "1"{"Laraba mai zuwa"}
+            }
+            relativeTime{
+                future{
+                    one{"cikin {0} Laraba"}
+                    other{"cikin {0} Laraba"}
+                }
+                past{
+                    one{"{0} Laraba da ta gabata"}
+                    other{"{0} Laraba da ta gabata"}
+                }
+            }
+        }
+        week{
+            dn{"mako"}
+            relative{
+                "-1"{"satin da ya gabata"}
+                "0"{"wannan satin"}
+                "1"{"sati na gaba"}
+            }
+            relativePeriod{"sati na {0}"}
+            relativeTime{
+                future{
+                    one{"a cikin mako {0}"}
+                    other{"a cikin makonni {0}"}
+                }
+                past{
+                    one{"mako da ya gabata {0}"}
+                    other{"makonni da suka gabata {0}"}
+                }
+            }
+        }
+        week-narrow{
+            dn{"mako"}
+            relative{
+                "-1"{"satin da ya gabata"}
+                "0"{"wannan satin"}
+                "1"{"sati na gaba"}
+            }
+            relativePeriod{"sati na {0}"}
+            relativeTime{
+                future{
+                    one{"a cikin mako {0}"}
+                    other{"a cikin mako {0}"}
+                }
+                past{
+                    one{"mako da suka gabata {0}"}
+                    other{"mako da ya gabata {0}"}
+                }
+            }
+        }
+        week-short{
+            dn{"mako"}
+            relative{
+                "-1"{"satin da ya gabata"}
+                "0"{"wannan satin"}
+                "1"{"sati na gaba"}
+            }
+            relativePeriod{"sati na {0}"}
+            relativeTime{
+                future{
+                    one{"a cikin mako {0}"}
+                    other{"a cikin mako {0}"}
+                }
+                past{
+                    one{"mako da ya gabata {0}"}
+                    other{"mako da ya gabata {0}"}
+                }
+            }
+        }
+        weekOfMonth{
+            dn{"Makon Wata"}
+        }
+        weekOfMonth-narrow{
+            dn{"Makon Wata"}
+        }
+        weekOfMonth-short{
+            dn{"Makon Wata"}
+        }
+        weekday{
+            dn{"ranar mako"}
+        }
+        weekdayOfMonth{
+            dn{"Ranar Aikin Wata"}
+        }
+        weekdayOfMonth-narrow{
+            dn{"Ranar Aikin Wata"}
+        }
+        weekdayOfMonth-short{
+            dn{"Ranar Aikin Wata"}
+        }
+        year{
+            dn{"shekara"}
+            relative{
+                "-1"{"bara"}
+                "0"{"bana"}
+                "1"{"badi"}
+            }
+            relativeTime{
+                future{
+                    one{"a shekarar {0}"}
+                    other{"a shekaru {0}"}
+                }
+                past{
+                    one{"shekara da suka gabata {0}"}
+                    other{"shekara da suka gabata {0}"}
+                }
+            }
+        }
+        year-narrow{
+            dn{"shekara"}
+            relative{
+                "-1"{"bara"}
+                "0"{"bana"}
+                "1"{"badi"}
+            }
+            relativeTime{
+                past{
+                    one{"shekara da suka gabata {0}"}
+                    other{"shekara da suka gabata {0}"}
+                }
+            }
+        }
+        year-short{
+            dn{"shekara"}
+            relative{
+                "-1"{"bara"}
+                "0"{"bana"}
+                "1"{"badi"}
+            }
+            relativeTime{
+                past{
+                    one{"shekara da suka gabata {0}"}
+                    other{"shekara da suka gabata {0}"}
+                }
+            }
+        }
+        zone{
+            dn{"Lokacin yanki"}
+        }
+    }
+    listPattern{
+        or{
+            2{"{0} ko {1}"}
+            end{"{0} ko {1}"}
+        }
+        or-narrow{
+            2{"{0} ko {1}"}
+            end{"{0} ko {1}"}
+        }
+        or-short{
+            2{"{0} ko {1}"}
+            end{"{0} ko {1}"}
+        }
+        standard{
+            2{"{0} da {1}"}
+            end{"{0}, da {1}"}
+        }
+        unit{
+            2{"{0}, {1}"}
+            end{"{0}, {1}"}
+        }
+        unit-narrow{
+            2{"{0}, {1}"}
+            end{"{0}, {1}"}
+        }
+        unit-short{
+            2{"{0}, {1}"}
+            end{"{0}, {1}"}
+        }
+    }
+    measurementSystemNames{
+        UK{"Tsarin awo kasar Ingila"}
+        US{"Tsarin awo kasar Amirka"}
+        metric{"Tsarin awo"}
+    }
+}

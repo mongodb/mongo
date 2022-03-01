@@ -1,0 +1,27 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ar_IL{
+    NumberElements{
+        default{"arab"}
+    }
+    calendar{
+        gregorian{
+            DateTimePatterns{
+                "H:mm:ss zzzz",
+                "H:mm:ss z",
+                "H:mm:ss",
+                "H:mm",
+                "EEEE، d MMMM y",
+                "d MMMM y",
+                "dd‏/MM‏/y",
+                "d‏/M‏/y",
+                "{1}, {0}",
+                "{1} في {0}",
+                "{1} في {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+        }
+    }
+}

@@ -11,6 +11,12 @@
 
 #include "mozilla/Assertions.h"
 #include "mozilla/Types.h"
+#include "mozilla/ResultVariant.h"
+#include "mozilla/Span.h"
+#include "mozilla/UniquePtr.h"
+
+struct LZ4F_cctx_s;  // compression context
+struct LZ4F_dctx_s;  // decompression context
 
 namespace mozilla {
 namespace Compression {
@@ -25,9 +31,8 @@ namespace Compression {
  * 4x the speed and produces output of about 1.5x the size.
  */
 
-class LZ4
-{
-public:
+class LZ4 {
+ public:
   /**
    * Compresses |aInputSize| bytes from |aSource| into |aDest|. Destination
    * buffer must be already allocated, and must be sized to handle worst cases
@@ -37,8 +42,8 @@ public:
    * @param aInputSize is the input size. Max supported value is ~1.9GB
    * @return the number of bytes written in buffer |aDest|
    */
-  static MFBT_API size_t
-  compress(const char* aSource, size_t aInputSize, char* aDest);
+  static MFBT_API size_t compress(const char* aSource, size_t aInputSize,
+                                  char* aDest);
 
   /**
    * Compress |aInputSize| bytes from |aSource| into an output buffer
@@ -55,25 +60,9 @@ public:
    * @return the number of bytes written in buffer |aDest| or 0 if the
    *   compression fails
    */
-  static MFBT_API size_t
-  compressLimitedOutput(const char* aSource, size_t aInputSize, char* aDest,
-                        size_t aMaxOutputSize);
-
-  /**
-   * If the source stream is malformed, the function will stop decoding
-   * and return false.
-   *
-   * This function never writes outside of provided buffers, and never
-   * modifies input buffer.
-   *
-   * Note: destination buffer must be already allocated, and its size must be a
-   *       minimum of |aOutputSize| bytes.
-   *
-   * @param aOutputSize is the output size, therefore the original size
-   * @return true on success, false on failure
-   */
-  static MFBT_API MOZ_MUST_USE bool
-  decompress(const char* aSource, char* aDest, size_t aOutputSize);
+  static MFBT_API size_t compressLimitedOutput(const char* aSource,
+                                               size_t aInputSize, char* aDest,
+                                               size_t aMaxOutputSize);
 
   /**
    * If the source stream is malformed, the function will stop decoding
@@ -92,9 +81,10 @@ public:
    *   buffer (necessarily <= aMaxOutputSize)
    * @return true on success, false on failure
    */
-  static MFBT_API MOZ_MUST_USE bool
-  decompress(const char* aSource, size_t aInputSize, char* aDest,
-             size_t aMaxOutputSize, size_t* aOutputSize);
+  [[nodiscard]] static MFBT_API bool decompress(const char* aSource,
+                                                size_t aInputSize, char* aDest,
+                                                size_t aMaxOutputSize,
+                                                size_t* aOutputSize);
 
   /**
    * If the source stream is malformed, the function will stop decoding
@@ -115,9 +105,11 @@ public:
    *   buffer (necessarily <= aMaxOutputSize)
    * @return true on success, false on failure
    */
-  static MFBT_API MOZ_MUST_USE bool
-  decompressPartial(const char* aSource, size_t aInputSize, char* aDest,
-                    size_t aMaxOutputSize, size_t* aOutputSize);
+  [[nodiscard]] static MFBT_API bool decompressPartial(const char* aSource,
+                                                       size_t aInputSize,
+                                                       char* aDest,
+                                                       size_t aMaxOutputSize,
+                                                       size_t* aOutputSize);
 
   /*
    * Provides the maximum size that LZ4 may output in a "worst case"
@@ -128,12 +120,96 @@ public:
    * @param aInputSize is the input size. Max supported value is ~1.9GB
    * @return maximum output size in a "worst case" scenario
    */
-  static inline size_t maxCompressedSize(size_t aInputSize)
-  {
+  static inline size_t maxCompressedSize(size_t aInputSize) {
     size_t max = (aInputSize + (aInputSize / 255) + 16);
     MOZ_ASSERT(max > aInputSize);
     return max;
   }
+};
+
+/**
+ * Context for LZ4 Frame-based streaming compression. Use this if you
+ * want to incrementally compress something or if you want to compress
+ * something such that another application can read it.
+ */
+class LZ4FrameCompressionContext final {
+ public:
+  MFBT_API LZ4FrameCompressionContext(int aCompressionLevel, size_t aMaxSrcSize,
+                                      bool aChecksum, bool aStableSrc = false);
+
+  MFBT_API ~LZ4FrameCompressionContext();
+
+  size_t GetRequiredWriteBufferLength() { return mWriteBufLen; }
+
+  /**
+   * Begin streaming frame-based compression.
+   *
+   * @return a Result with a Span containing the frame header, or an lz4 error
+   * code (size_t).
+   */
+  MFBT_API Result<Span<const char>, size_t> BeginCompressing(
+      Span<char> aWriteBuffer);
+
+  /**
+   * Continue streaming frame-based compression with the provided input.
+   *
+   * @param aInput input buffer to be compressed.
+   * @return a Result with a Span containing compressed output, or an lz4 error
+   * code (size_t).
+   */
+  MFBT_API Result<Span<const char>, size_t> ContinueCompressing(
+      Span<const char> aInput);
+
+  /**
+   * Finalize streaming frame-based compression with the provided input.
+   *
+   * @return a Result with a Span containing compressed output and the frame
+   * footer, or an lz4 error code (size_t).
+   */
+  MFBT_API Result<Span<const char>, size_t> EndCompressing();
+
+ private:
+  LZ4F_cctx_s* mContext;
+  int mCompressionLevel;
+  bool mGenerateChecksum;
+  bool mStableSrc;
+  size_t mMaxSrcSize;
+  size_t mWriteBufLen;
+  Span<char> mWriteBuffer;
+};
+
+struct LZ4FrameDecompressionResult {
+  size_t mSizeRead;
+  size_t mSizeWritten;
+  bool mFinished;
+};
+
+/**
+ * Context for LZ4 Frame-based streaming decompression. Use this if you
+ * want to decompress something compressed by LZ4FrameCompressionContext
+ * or by another application.
+ */
+class LZ4FrameDecompressionContext final {
+ public:
+  explicit MFBT_API LZ4FrameDecompressionContext(bool aStableDest = false);
+  MFBT_API ~LZ4FrameDecompressionContext();
+
+  /**
+   * Decompress a buffer/part of a buffer compressed with
+   * LZ4FrameCompressionContext or another application.
+   *
+   * @param aOutput output buffer to be write results into.
+   * @param aInput input buffer to be decompressed.
+   * @return a Result with information on bytes read/written and whether we
+   * completely decompressed the input into the output, or an lz4 error code
+   * (size_t).
+   */
+  MFBT_API Result<LZ4FrameDecompressionResult, size_t> Decompress(
+      Span<char> aOutput, Span<const char> aInput);
+
+ private:
+  LZ4F_dctx_s* mContext;
+  bool mStableDest;
 };
 
 } /* namespace Compression */

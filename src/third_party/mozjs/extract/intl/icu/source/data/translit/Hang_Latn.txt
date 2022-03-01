@@ -1,0 +1,13 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Hang_Latn.txt
+# Generated from CLDR
+#
+
+::['ᄀ-하-ᅵᆨ-ᇂㄱ-ㄿㅁ-ㅃㅅ-ㅣ㈀-㈜㉠-㉻가-힣＇ﾡ-ﾯﾱ-ﾳﾵ-ﾾￂ-ￇￊ-ￏￒ-ￗￚ-ￜ];
+::NFKD;
+::ConjoiningJamo-Latin;
+::NFC;
+

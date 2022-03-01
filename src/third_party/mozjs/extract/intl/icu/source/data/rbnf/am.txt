@@ -1,0 +1,51 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+am{
+    RBNFRules{
+        OrdinalRules{
+            "%digits-ordinal:",
+            "-x: \u2212>>;",
+            "0: =#,##0=\u129B;",
+        }
+        SpelloutRules{
+            "%spellout-numbering-year:",
+            "-x: \u1245\u1295\u1235\u1293\u123D >>;",
+            "x.x: =0.0=;",
+            "0: =%spellout-numbering=;",
+            "1100/100: << \u1218\u1276[ >>];",
+            "10000: =%spellout-numbering=;",
+            "%spellout-numbering:",
+            "0: =%spellout-cardinal=;",
+            "%spellout-cardinal:",
+            "-x: \u1245\u1295\u1235\u1293\u123D >>;",
+            "x.x: << \u1290\u1325\u1265 >>;",
+            "0: \u1263\u12F6;",
+            "1: \u12A0\u1295\u12F5;",
+            "2: \u1201\u1208\u1275;",
+            "3: \u1226\u1235\u1275;",
+            "4: \u12A0\u122B\u1275;",
+            "5: \u12A0\u121D\u1235\u1275;",
+            "6: \u1235\u12F5\u1235\u1275;",
+            "7: \u1230\u1263\u1275;",
+            "8: \u1235\u121D\u1295\u1275;",
+            "9: \u12D8\u1320\u129D;",
+            "10: \u12A0\u1235\u122D[ >>];",
+            "20: << \u12A0\u1235\u122D[ >>];",
+            "100: \u1218\u1276[ >>];",
+            "200: << \u1218\u1276[ >>];",
+            "1000: \u123A[ >>];",
+            "2000: << \u123A[ >>];",
+            "1000000: \u121A\u120A\u12EE\u1295[ >>];",
+            "2000000: << \u121A\u120A\u12EE\u1295[ >>];",
+            "1000000000: << \u1262\u120A\u12EE\u1295[ >>];",
+            "1000000000000: << \u1272\u122A\u120A\u12EE\u1295[ >>];",
+            "1000000000000000: << \u1248\u12F2\u122A\u120A\u12EE\u1295[ >>];",
+            "1000000000000000000: =#,##0=;",
+            "%spellout-ordinal:",
+            "-x: \u1245\u1295\u1235\u1293\u123D >>;",
+            "x.x: =#,##0.#=;",
+            "0: =%spellout-numbering=\u129B;",
+        }
+    }
+}

@@ -1,0 +1,944 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+yo{
+    zoneStrings{
+        "America:Adak"{
+            ec{"ìlú Adákì"}
+        }
+        "America:Anchorage"{
+            ec{"ìlú Ankọ́réèjì"}
+        }
+        "America:Anguilla"{
+            ec{"ìlú Angúílà"}
+        }
+        "America:Antigua"{
+            ec{"ìlú Antígùà"}
+        }
+        "America:Aruba"{
+            ec{"ìlú Arúbá"}
+        }
+        "America:Bahia_Banderas"{
+            ec{"ìlú Báhì Bándẹ́rásì"}
+        }
+        "America:Barbados"{
+            ec{"ìlú Bábádọ́ọ̀sì"}
+        }
+        "America:Belize"{
+            ec{"ìlú Bẹ̀líìsì"}
+        }
+        "America:Blanc-Sablon"{
+            ec{"ìlú Blank Sabulọ́ọ̀nì"}
+        }
+        "America:Boise"{
+            ec{"ìlú Bọ́isè"}
+        }
+        "America:Cambridge_Bay"{
+            ec{"ìlú òkun kambíríìjì"}
+        }
+        "America:Cancun"{
+            ec{"ìlú Kancun"}
+        }
+        "America:Cayman"{
+            ec{"ilú Kayman"}
+        }
+        "America:Chicago"{
+            ec{"ìlú Chicago"}
+        }
+        "America:Chihuahua"{
+            ec{"ìlú Ṣihuahua"}
+        }
+        "America:Coral_Harbour"{
+            ec{"ìlú àtikọkàn"}
+        }
+        "America:Costa_Rica"{
+            ec{"ìlú Kosta Ríkà"}
+        }
+        "America:Creston"{
+            ec{"ìlú Kírẹstọ́ọ̀nù"}
+        }
+        "America:Curacao"{
+            ec{"ìlú Kuraṣao"}
+        }
+        "America:Danmarkshavn"{
+            ec{"ìlú Banmarkshan"}
+        }
+        "America:Dawson"{
+            ec{"ìlú Dawson"}
+        }
+        "America:Dawson_Creek"{
+            ec{"ìlú Dawson Creek"}
+        }
+        "America:Denver"{
+            ec{"ìlú Denver"}
+        }
+        "America:Detroit"{
+            ec{"ìlú Detroit"}
+        }
+        "America:Dominica"{
+            ec{"ìlú Dominika"}
+        }
+        "America:Edmonton"{
+            ec{"ìlú Edmonton"}
+        }
+        "America:El_Salvador"{
+            ec{"ìlú El Savador"}
+        }
+        "America:Fort_Nelson"{
+            ec{"ìlú Fort Nelson"}
+        }
+        "America:Glace_Bay"{
+            ec{"ìlú omi Glace"}
+        }
+        "America:Godthab"{
+            ec{"ìlú Nuuk"}
+        }
+        "America:Goose_Bay"{
+            ec{"ìlú omi Goosù"}
+        }
+        "America:Grand_Turk"{
+            ec{"ìlú Grand Turk"}
+        }
+        "America:Grenada"{
+            ec{"ìlú Grenada"}
+        }
+        "America:Guadeloupe"{
+            ec{"ìlú Guadeloupe"}
+        }
+        "America:Guatemala"{
+            ec{"ìlú Guatemala"}
+        }
+        "America:Halifax"{
+            ec{"ìlú Halifásì"}
+        }
+        "America:Havana"{
+            ec{"ìlú Havana"}
+        }
+        "America:Hermosillo"{
+            ec{"ìlú Hermosilo"}
+        }
+        "America:Indiana:Knox"{
+            ec{"ìlú nọ́sì"}
+        }
+        "America:Indiana:Marengo"{
+            ec{"ìlú Marẹ́ngo"}
+        }
+        "America:Indiana:Petersburg"{
+            ec{"ìlú Petersburg"}
+        }
+        "America:Indiana:Tell_City"{
+            ec{"ìlú Tell City"}
+        }
+        "America:Indiana:Vevay"{
+            ec{"ìlú Vevay"}
+        }
+        "America:Indiana:Vincennes"{
+            ec{"ìlú Vincennes ní Indiana"}
+        }
+        "America:Indiana:Winamac"{
+            ec{"ìlú Winamak ní Indiana"}
+        }
+        "America:Indianapolis"{
+            ec{"ìlú Indianapolis"}
+        }
+        "America:Inuvik"{
+            ec{"ìlú Inuvik"}
+        }
+        "America:Iqaluit"{
+            ec{"ìlú Iqaluit"}
+        }
+        "America:Jamaica"{
+            ec{"ìlú Jamaikà"}
+        }
+        "America:Juneau"{
+            ec{"ìlú Junu"}
+        }
+        "America:Kentucky:Monticello"{
+            ec{"ìlú Montisẹ́lò"}
+        }
+        "America:Kralendijk"{
+            ec{"ìlú Kíralẹ́ndáikì"}
+        }
+        "America:Los_Angeles"{
+            ec{"ìlú Los Angeles"}
+        }
+        "America:Louisville"{
+            ec{"ìlú Lúífíìlì"}
+        }
+        "America:Lower_Princes"{
+            ec{"ìlú Lower Prince’s Quarter"}
+        }
+        "America:Managua"{
+            ec{"ìlú Managua"}
+        }
+        "America:Marigot"{
+            ec{"ìlú Marigọ́ọ̀tì"}
+        }
+        "America:Martinique"{
+            ec{"ìlú Mátíníkì"}
+        }
+        "America:Matamoros"{
+            ec{"ìlú Matamorosì"}
+        }
+        "America:Mazatlan"{
+            ec{"ìlú Masatiani"}
+        }
+        "America:Menominee"{
+            ec{"ìlú Menominì"}
+        }
+        "America:Merida"{
+            ec{"ìlú Merida"}
+        }
+        "America:Metlakatla"{
+            ec{"ìlú Metilakatila"}
+        }
+        "America:Mexico_City"{
+            ec{"ìlú Mẹ́síkò"}
+        }
+        "America:Miquelon"{
+            ec{"ìlú Mikulọ́nì"}
+        }
+        "America:Moncton"{
+            ec{"ìlú Montoni"}
+        }
+        "America:Monterrey"{
+            ec{"ìlú Monteri"}
+        }
+        "America:Montserrat"{
+            ec{"ìlú Monseratì"}
+        }
+        "America:Nassau"{
+            ec{"ìlú Nasaò"}
+        }
+        "America:New_York"{
+            ec{"ìlú New York"}
+        }
+        "America:Nipigon"{
+            ec{"ìlú Nipigoni"}
+        }
+        "America:Nome"{
+            ec{"ìlú Nomi"}
+        }
+        "America:North_Dakota:Beulah"{
+            ec{"ìlú Beulà ní North Dakota"}
+        }
+        "America:North_Dakota:Center"{
+            ec{"ìlú Senta North Dakota"}
+        }
+        "America:North_Dakota:New_Salem"{
+            ec{"ìlú New Salem ni North Dakota"}
+        }
+        "America:Ojinaga"{
+            ec{"ìlú Ojinaga"}
+        }
+        "America:Panama"{
+            ec{"ìlú Panama"}
+        }
+        "America:Pangnirtung"{
+            ec{"ìlú Panituni"}
+        }
+        "America:Phoenix"{
+            ec{"ìlú Fínísì"}
+        }
+        "America:Port-au-Prince"{
+            ec{"ìlú Port-au-Prince"}
+        }
+        "America:Port_of_Spain"{
+            ec{"ìlú etí omi Sípéènì"}
+        }
+        "America:Puerto_Rico"{
+            ec{"ìlú Puerto Riko"}
+        }
+        "America:Rainy_River"{
+            ec{"ìlú Raini Rifà"}
+        }
+        "America:Rankin_Inlet"{
+            ec{"ìlú Rankin Inlet"}
+        }
+        "America:Regina"{
+            ec{"ìlú Regina"}
+        }
+        "America:Resolute"{
+            ec{"ìlú Resolútì"}
+        }
+        "America:Santo_Domingo"{
+            ec{"ìlú Santo Domigo"}
+        }
+        "America:Scoresbysund"{
+            ec{"ìlú Itokotomiti"}
+        }
+        "America:Sitka"{
+            ec{"ìlú Sika"}
+        }
+        "America:St_Barthelemy"{
+            ec{"ìlú Batilemì"}
+        }
+        "America:St_Johns"{
+            ec{"ìlú St Jọ́ọ̀nù"}
+        }
+        "America:St_Kitts"{
+            ec{"ìlú St kitisì"}
+        }
+        "America:St_Lucia"{
+            ec{"ìlú St Lusia"}
+        }
+        "America:St_Thomas"{
+            ec{"ìlú St Tọ́màsì"}
+        }
+        "America:St_Vincent"{
+            ec{"ìlú Finsentì"}
+        }
+        "America:Swift_Current"{
+            ec{"ìlú Súfítù Kọ̀rentì"}
+        }
+        "America:Tegucigalpa"{
+            ec{"ìlú Tegusigapà"}
+        }
+        "America:Thule"{
+            ec{"ìlú Tulè"}
+        }
+        "America:Thunder_Bay"{
+            ec{"ìlú Omi Thunder"}
+        }
+        "America:Tijuana"{
+            ec{"ìlú Tíjúana"}
+        }
+        "America:Toronto"{
+            ec{"ìlú Toronto"}
+        }
+        "America:Tortola"{
+            ec{"ìlú Totola"}
+        }
+        "America:Vancouver"{
+            ec{"ìlú Vankuva"}
+        }
+        "America:Whitehorse"{
+            ec{"ìlú Whitehosì"}
+        }
+        "America:Winnipeg"{
+            ec{"ìlú Winipegì"}
+        }
+        "America:Yakutat"{
+            ec{"ìlú Yakuta"}
+        }
+        "America:Yellowknife"{
+            ec{"ìlú Yelonáfù"}
+        }
+        "Atlantic:Bermuda"{
+            ec{"ìlú Bẹ̀múdà"}
+        }
+        "Etc:UTC"{
+            ls{"Àpapọ̀ Àkókò Àgbáyé"}
+        }
+        "Etc:Unknown"{
+            ec{"Ìlú Àìmọ̀"}
+        }
+        "Europe:Dublin"{
+            ld{"Irish Standard Time"}
+        }
+        "Europe:London"{
+            ld{"British Summer Time"}
+        }
+        "meta:Afghanistan"{
+            ls{"Afghanistan Time"}
+        }
+        "meta:Africa_Central"{
+            ls{"Central Africa Time"}
+        }
+        "meta:Africa_Eastern"{
+            ls{"East Africa Time"}
+        }
+        "meta:Africa_Southern"{
+            ls{"South Africa Standard Time"}
+        }
+        "meta:Africa_Western"{
+            ld{"West Africa Summer Time"}
+            lg{"West Africa Time"}
+            ls{"West Africa Standard Time"}
+        }
+        "meta:Alaska"{
+            ld{"Alaska Daylight Time"}
+            lg{"Alaska Time"}
+            ls{"Alaska Standard Time"}
+        }
+        "meta:Amazon"{
+            ld{"Amazon Summer Time"}
+            lg{"Amazon Time"}
+            ls{"Amazon Standard Time"}
+        }
+        "meta:America_Central"{
+            ld{"Akókò àárín gbùngbùn ojúmọmọ"}
+            lg{"àkókò àárín gbùngbùn"}
+            ls{"àkókò asiko àárín gbùngbùn"}
+        }
+        "meta:America_Eastern"{
+            ld{"Àkókò ojúmọmọ Ìhà Ìlà Oòrun"}
+            lg{"Àkókò ìhà ìlà oòrùn"}
+            ls{"Akókò Àsikò Ìha Ìla Oòrùn"}
+        }
+        "meta:America_Mountain"{
+            ld{"Àkókò ojúmọmọ Ori-òkè"}
+            lg{"Àkókò òkè"}
+            ls{"Àkókò asiko òkè"}
+        }
+        "meta:America_Pacific"{
+            ld{"Àkókò Ìyálẹta Pàsífíìkì"}
+            lg{"Àkókò Pàsífíìkì"}
+            ls{"Àkókò àsikò Pàsífíìkì"}
+        }
+        "meta:Apia"{
+            ld{"Apia Daylight Time"}
+            lg{"Apia Time"}
+            ls{"Apia Standard Time"}
+        }
+        "meta:Arabian"{
+            ld{"Arabian Daylight Time"}
+            lg{"Arabian Time"}
+            ls{"Arabian Standard Time"}
+        }
+        "meta:Argentina"{
+            ld{"Aago Soma Argentina"}
+            lg{"Aago Ajẹntìnà"}
+            ls{"Aago àsìkò Argentina"}
+        }
+        "meta:Argentina_Western"{
+            ld{"Western Argentina Summer Time"}
+            lg{"Western Argentina Time"}
+            ls{"Western Argentina Standard Time"}
+        }
+        "meta:Armenia"{
+            ld{"Armenia Summer Time"}
+            lg{"Armenia Time"}
+            ls{"Armenia Standard Time"}
+        }
+        "meta:Atlantic"{
+            ld{"Àkókò Ìyálẹta Àtìláńtíìkì"}
+            lg{"Àkókò Àtìláńtíìkì"}
+            ls{"Àkókò àsikò Àtìláńtíìkì"}
+        }
+        "meta:Australia_Central"{
+            ld{"Australian Central Daylight Time"}
+            lg{"Central Australia Time"}
+            ls{"Australian Central Standard Time"}
+        }
+        "meta:Australia_CentralWestern"{
+            ld{"Australian Central Western Daylight Time"}
+            lg{"Australian Central Western Time"}
+            ls{"Australian Central Western Standard Time"}
+        }
+        "meta:Australia_Eastern"{
+            ld{"Australian Eastern Daylight Time"}
+            lg{"Eastern Australia Time"}
+            ls{"Australian Eastern Standard Time"}
+        }
+        "meta:Australia_Western"{
+            ld{"Australian Western Daylight Time"}
+            lg{"Western Australia Time"}
+            ls{"Australian Western Standard Time"}
+        }
+        "meta:Azerbaijan"{
+            ld{"Azerbaijan Summer Time"}
+            lg{"Azerbaijan Time"}
+            ls{"Azerbaijan Standard Time"}
+        }
+        "meta:Azores"{
+            ld{"Azores Summer Time"}
+            lg{"Azores Time"}
+            ls{"Azores Standard Time"}
+        }
+        "meta:Bangladesh"{
+            ld{"Bangladesh Summer Time"}
+            lg{"Bangladesh Time"}
+            ls{"Bangladesh Standard Time"}
+        }
+        "meta:Bhutan"{
+            ls{"Bhutan Time"}
+        }
+        "meta:Bolivia"{
+            ls{"Aago Bolivia"}
+        }
+        "meta:Brasilia"{
+            ld{"Aago Soma Brasilia"}
+            lg{"Aago Bùràsílíà"}
+            ls{"Aago àsìkò Bùràsílíà"}
+        }
+        "meta:Brunei"{
+            ls{"Brunei Darussalam Time"}
+        }
+        "meta:Cape_Verde"{
+            ld{"Cape Verde Summer Time"}
+            lg{"Cape Verde Time"}
+            ls{"Cape Verde Standard Time"}
+        }
+        "meta:Chamorro"{
+            ls{"Chamorro Standard Time"}
+        }
+        "meta:Chatham"{
+            ld{"Chatham Daylight Time"}
+            lg{"Chatham Time"}
+            ls{"Chatham Standard Time"}
+        }
+        "meta:Chile"{
+            ld{"Chile Summer Time"}
+            lg{"Chile Time"}
+            ls{"Chile Standard Time"}
+        }
+        "meta:China"{
+            ld{"Àkókò Ojúmọmọ Ṣáínà"}
+            lg{"Àkókò Ṣáínà"}
+            ls{"Àkókò Ìfẹnukòsí Ṣáínà"}
+        }
+        "meta:Choibalsan"{
+            ld{"Choibalsan Summer Time"}
+            lg{"Choibalsan Time"}
+            ls{"Choibalsan Standard Time"}
+        }
+        "meta:Christmas"{
+            ls{"Christmas Island Time"}
+        }
+        "meta:Cocos"{
+            ls{"Cocos Islands Time"}
+        }
+        "meta:Colombia"{
+            ld{"Aago Soma Colombia"}
+            lg{"Aago Kolombia"}
+            ls{"Aago àsìkò Kolombia"}
+        }
+        "meta:Cook"{
+            ld{"Cook Islands Half Summer Time"}
+            lg{"Cook Islands Time"}
+            ls{"Cook Islands Standard Time"}
+        }
+        "meta:Cuba"{
+            ld{"Àkókò Ojúmọmọ Kúbà"}
+            lg{"Àkókò Kúbà"}
+            ls{"Àkókò Àfẹnukò Kúbà"}
+        }
+        "meta:Davis"{
+            ls{"Davis Time"}
+        }
+        "meta:DumontDUrville"{
+            ls{"Dumont-d’Urville Time"}
+        }
+        "meta:East_Timor"{
+            ls{"Àkókò Ìlà oorùn Timor"}
+        }
+        "meta:Easter"{
+            ld{"Aago Soma Easter Island"}
+            lg{"Aago Ajnde Ibùgbé Omi"}
+            ls{"Aago àsìkò Easter Island"}
+        }
+        "meta:Ecuador"{
+            ls{"Aago Ecuador"}
+        }
+        "meta:Europe_Central"{
+            ld{"Àkókò Àárin Sọmà Europe"}
+            lg{"Àkókò Àárin Europe"}
+            ls{"Àkókò Àárin àsikò Europe"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"Àkókò Sọmà Ìha Ìlà Oòrùn Europe"}
+            lg{"Àkókò Ìhà Ìlà Oòrùn Europe"}
+            ls{"Àkókò àsikò Ìhà Ìlà Oòrùn Europe"}
+        }
+        "meta:Europe_Further_Eastern"{
+            ls{"Further-eastern European Time"}
+        }
+        "meta:Europe_Western"{
+            ld{"Àkókò Sọmà Ìhà Ìwọ Oòrùn Europe"}
+            lg{"Àkókò Ìwọ Oòrùn Europe"}
+            ls{"Àkókò àsikò Ìwọ Oòrùn Europe"}
+        }
+        "meta:Falkland"{
+            ld{"Falkland Islands Summer Time"}
+            lg{"Falkland Islands Time"}
+            ls{"Falkland Islands Standard Time"}
+        }
+        "meta:Fiji"{
+            ld{"Fiji Summer Time"}
+            lg{"Fiji Time"}
+            ls{"Fiji Standard Time"}
+        }
+        "meta:French_Guiana"{
+            ls{"French Guiana Time"}
+        }
+        "meta:French_Southern"{
+            ls{"French Southern & Antarctic Time"}
+        }
+        "meta:GMT"{
+            ls{"Greenwich Mean Time"}
+        }
+        "meta:Galapagos"{
+            ls{"Aago Galapago"}
+        }
+        "meta:Gambier"{
+            ls{"Gambier Time"}
+        }
+        "meta:Georgia"{
+            ld{"Georgia Summer Time"}
+            lg{"Georgia Time"}
+            ls{"Georgia Standard Time"}
+        }
+        "meta:Gilbert_Islands"{
+            ls{"Gilbert Islands Time"}
+        }
+        "meta:Greenland_Eastern"{
+            ld{"Àkókò ìgbà Ooru Greenland"}
+            lg{"Àkókò Ìlà oorùn Greenland"}
+            ls{"Àkókò Ìwọ̀ Ìfẹnukò oorùn Greenland"}
+        }
+        "meta:Greenland_Western"{
+            ld{"Àkókò Àfẹnukò Ìgba Oòru Greenland"}
+            lg{"Àkókò Ìwọ̀ oorùn Greenland"}
+            ls{"Àkókò Àfẹnukò Ìwọ̀ Oòrùn Greenland"}
+        }
+        "meta:Gulf"{
+            ls{
+                "Gulf Standard Time [translation hint: translate as just \u0022Gulf T"
+                "ime\u0022]"
+            }
+        }
+        "meta:Guyana"{
+            ls{"Guyana Time"}
+        }
+        "meta:Hawaii_Aleutian"{
+            ld{"Àkókò Ojúmọmọ Hawaii-Aleutian"}
+            lg{"Àkókò Hawaii-Aleutian"}
+            ls{"Àkókò Àfẹnukò Hawaii-Aleutian"}
+        }
+        "meta:Hong_Kong"{
+            ld{"Hong Kong Summer Time"}
+            lg{"Hong Kong Time"}
+            ls{"Hong Kong Standard Time"}
+        }
+        "meta:Hovd"{
+            ld{"Hovd Summer Time"}
+            lg{"Hovd Time"}
+            ls{"Hovd Standard Time"}
+        }
+        "meta:India"{
+            ls{"India Standard Time"}
+        }
+        "meta:Indian_Ocean"{
+            ls{"Indian Ocean Time"}
+        }
+        "meta:Indochina"{
+            ls{"Àkókò Indochina"}
+        }
+        "meta:Indonesia_Central"{
+            ls{"Àkókò Ààrin Gbùngbùn Indonesia"}
+        }
+        "meta:Indonesia_Eastern"{
+            ls{"Eastern Indonesia Time"}
+        }
+        "meta:Indonesia_Western"{
+            ls{"Àkókò Ìwọ̀ oorùn Indonesia"}
+        }
+        "meta:Iran"{
+            ld{"Iran Daylight Time"}
+            lg{"Iran Time"}
+            ls{"Iran Standard Time"}
+        }
+        "meta:Irkutsk"{
+            ld{"Irkutsk Summer Time"}
+            lg{"Irkutsk Time"}
+            ls{"Irkutsk Standard Time"}
+        }
+        "meta:Israel"{
+            ld{"Israel Daylight Time"}
+            lg{"Israel Time"}
+            ls{"Israel Standard Time"}
+        }
+        "meta:Japan"{
+            ld{"Japan Daylight Time"}
+            lg{"Japan Time"}
+            ls{"Japan Standard Time"}
+        }
+        "meta:Kazakhstan_Eastern"{
+            ls{"East Kazakhstan Time"}
+        }
+        "meta:Kazakhstan_Western"{
+            ls{"West Kazakhstan Time"}
+        }
+        "meta:Korea"{
+            ld{"Korean Daylight Time"}
+            lg{"Korean Time"}
+            ls{"Korean Standard Time"}
+        }
+        "meta:Kosrae"{
+            ls{"Kosrae Time"}
+        }
+        "meta:Krasnoyarsk"{
+            ld{"Krasnoyarsk Summer Time"}
+            lg{"Krasnoyarsk Time"}
+            ls{"Krasnoyarsk Standard Time"}
+        }
+        "meta:Kyrgystan"{
+            ls{"Kyrgyzstan Time"}
+        }
+        "meta:Line_Islands"{
+            ls{"Line Islands Time"}
+        }
+        "meta:Lord_Howe"{
+            ld{"Lord Howe Daylight Time"}
+            lg{"Lord Howe Time"}
+            ls{"Lord Howe Standard Time"}
+        }
+        "meta:Macquarie"{
+            ls{"Macquarie Island Time"}
+        }
+        "meta:Magadan"{
+            ld{"Magadan Summer Time"}
+            lg{"Magadan Time"}
+            ls{"Magadan Standard Time"}
+        }
+        "meta:Malaysia"{
+            ls{"Malaysia Time"}
+        }
+        "meta:Maldives"{
+            ls{"Maldives Time"}
+        }
+        "meta:Marquesas"{
+            ls{"Marquesas Time"}
+        }
+        "meta:Marshall_Islands"{
+            ls{"Marshall Islands Time"}
+        }
+        "meta:Mauritius"{
+            ld{"Mauritius Summer Time"}
+            lg{"Mauritius Time"}
+            ls{"Mauritius Standard Time"}
+        }
+        "meta:Mawson"{
+            ls{"Mawson Time"}
+        }
+        "meta:Mexico_Northwest"{
+            ld{"Àkókò Ojúmọmọ Apá Ìwọ̀ Oorùn Mẹ́ṣíkò"}
+            lg{"Àkókò Apá Ìwọ̀ Oorùn Mẹ́ṣíkò"}
+            ls{"Àkókò Àfẹnukò Apá Ìwọ̀ Oorùn Mẹ́ṣíkò"}
+        }
+        "meta:Mexico_Pacific"{
+            ld{"Àkókò Ojúmọmọ Pásífíìkì Mẹ́síkò"}
+            lg{"Àkókò Pásífíìkì Mẹ́ṣíkò"}
+            ls{"Àkókò Àfẹnukò Pásífíìkì Mẹ́síkò"}
+        }
+        "meta:Mongolia"{
+            ld{"Ulaanbaatar Summer Time"}
+            lg{"Ulaanbaatar Time"}
+            ls{"Ulaanbaatar Standard Time"}
+        }
+        "meta:Moscow"{
+            ld{"Moscow Summer Time"}
+            lg{"Moscow Time"}
+            ls{"Moscow Standard Time"}
+        }
+        "meta:Myanmar"{
+            ls{"Myanmar Time"}
+        }
+        "meta:Nauru"{
+            ls{"Nauru Time"}
+        }
+        "meta:Nepal"{
+            ls{"Nepal Time"}
+        }
+        "meta:New_Caledonia"{
+            ld{"New Caledonia Summer Time"}
+            lg{"New Caledonia Time"}
+            ls{"New Caledonia Standard Time"}
+        }
+        "meta:New_Zealand"{
+            ld{"New Zealand Daylight Time"}
+            lg{"New Zealand Time"}
+            ls{"New Zealand Standard Time"}
+        }
+        "meta:Newfoundland"{
+            ld{"Àkókò Ojúmọmọ Newfoundland"}
+            lg{"Àkókò Newfoundland"}
+            ls{"Àkókò Àfẹnukò Newfoundland"}
+        }
+        "meta:Niue"{
+            ls{"Niue Time"}
+        }
+        "meta:Norfolk"{
+            ld{"Norfolk Island Daylight Time"}
+            lg{"Norfolk Island Time"}
+            ls{"Norfolk Island Standard Time"}
+        }
+        "meta:Noronha"{
+            ld{"Aago Soma Fernando de Noronha"}
+            lg{"Aago Fenando de Norona"}
+            ls{"Aago àsìkò Fenando de Norona"}
+        }
+        "meta:Novosibirsk"{
+            ld{"Novosibirsk Summer Time"}
+            lg{"Novosibirsk Time"}
+            ls{"Novosibirsk Standard Time"}
+        }
+        "meta:Omsk"{
+            ld{"Omsk Summer Time"}
+            lg{"Omsk Time"}
+            ls{"Omsk Standard Time"}
+        }
+        "meta:Pakistan"{
+            ld{"Pakistan Summer Time"}
+            lg{"Pakistan Time"}
+            ls{"Pakistan Standard Time"}
+        }
+        "meta:Palau"{
+            ls{"Palau Time"}
+        }
+        "meta:Papua_New_Guinea"{
+            ls{"Papua New Guinea Time"}
+        }
+        "meta:Paraguay"{
+            ld{"Paraguay Summer Time"}
+            lg{"Paraguay Time"}
+            ls{"Paraguay Standard Time"}
+        }
+        "meta:Peru"{
+            ld{"Peru Summer Time"}
+            lg{"Peru Time"}
+            ls{"Peru Standard Time"}
+        }
+        "meta:Philippines"{
+            ld{"Philippine Summer Time"}
+            lg{"Philippine Time"}
+            ls{"Philippine Standard Time"}
+        }
+        "meta:Phoenix_Islands"{
+            ls{"Phoenix Islands Time"}
+        }
+        "meta:Pierre_Miquelon"{
+            ld{"Àkókò Ojúmọmọ Pierre & Miquelon"}
+            lg{"Àkókò Pierre & Miquelon"}
+            ls{"Àkókò Àfẹnukò Pierre & Miquelon"}
+        }
+        "meta:Pitcairn"{
+            ls{"Pitcairn Time"}
+        }
+        "meta:Ponape"{
+            ls{"Ponape Time"}
+        }
+        "meta:Pyongyang"{
+            ls{"Pyongyang Time"}
+        }
+        "meta:Reunion"{
+            ls{"Réunion Time"}
+        }
+        "meta:Rothera"{
+            ls{"Rothera Time"}
+        }
+        "meta:Sakhalin"{
+            ld{"Sakhalin Summer Time"}
+            lg{"Sakhalin Time"}
+            ls{"Sakhalin Standard Time"}
+        }
+        "meta:Samoa"{
+            ld{"Samoa Daylight Time"}
+            lg{"Samoa Time"}
+            ls{"Samoa Standard Time"}
+        }
+        "meta:Seychelles"{
+            ls{"Seychelles Time"}
+        }
+        "meta:Singapore"{
+            ls{"Singapore Standard Time"}
+        }
+        "meta:Solomon"{
+            ls{"Solomon Islands Time"}
+        }
+        "meta:South_Georgia"{
+            ls{"South Georgia Time"}
+        }
+        "meta:Suriname"{
+            ls{"Suriname Time"}
+        }
+        "meta:Syowa"{
+            ls{"Syowa Time"}
+        }
+        "meta:Tahiti"{
+            ls{"Tahiti Time"}
+        }
+        "meta:Taipei"{
+            ld{"Taipei Daylight Time"}
+            lg{"Taipei Time"}
+            ls{"Taipei Standard Time"}
+        }
+        "meta:Tajikistan"{
+            ls{"Tajikistan Time"}
+        }
+        "meta:Tokelau"{
+            ls{"Tokelau Time"}
+        }
+        "meta:Tonga"{
+            ld{"Tonga Summer Time"}
+            lg{"Tonga Time"}
+            ls{"Tonga Standard Time"}
+        }
+        "meta:Truk"{
+            ls{"Chuuk Time"}
+        }
+        "meta:Turkmenistan"{
+            ld{"Turkmenistan Summer Time"}
+            lg{"Turkmenistan Time"}
+            ls{"Turkmenistan Standard Time"}
+        }
+        "meta:Tuvalu"{
+            ls{"Tuvalu Time"}
+        }
+        "meta:Uruguay"{
+            ld{"Aago Soma Uruguay"}
+            lg{"Aago Uruguay"}
+            ls{"Uruguay Standard Time"}
+        }
+        "meta:Uzbekistan"{
+            ld{"Uzbekistan Summer Time"}
+            lg{"Uzbekistan Time"}
+            ls{"Uzbekistan Standard Time"}
+        }
+        "meta:Vanuatu"{
+            ld{"Vanuatu Summer Time"}
+            lg{"Vanuatu Time"}
+            ls{"Vanuatu Standard Time"}
+        }
+        "meta:Venezuela"{
+            ls{"Aago Venezuela"}
+        }
+        "meta:Vladivostok"{
+            ld{"Vladivostok Summer Time"}
+            lg{"Vladivostok Time"}
+            ls{"Vladivostok Standard Time"}
+        }
+        "meta:Volgograd"{
+            ld{"Volgograd Summer Time"}
+            lg{"Volgograd Time"}
+            ls{"Volgograd Standard Time"}
+        }
+        "meta:Vostok"{
+            ls{"Vostok Time"}
+        }
+        "meta:Wake"{
+            ls{"Wake Island Time"}
+        }
+        "meta:Wallis"{
+            ls{"Wallis & Futuna Time"}
+        }
+        "meta:Yakutsk"{
+            ld{"Yakutsk Summer Time"}
+            lg{"Yakutsk Time"}
+            ls{"Yakutsk Standard Time"}
+        }
+        "meta:Yekaterinburg"{
+            ld{"Yekaterinburg Summer Time"}
+            lg{"Yekaterinburg Time"}
+            ls{"Yekaterinburg Standard Time"}
+        }
+        fallbackFormat{"{1} ({0})"}
+        gmtFormat{"WAT{0}"}
+        gmtZeroFormat{"WAT"}
+        hourFormat{"+HH:mm;-HH:mm"}
+        regionFormat{"Ìgbà {0}"}
+        regionFormatDaylight{"{0} Àkókò ojúmọmọ"}
+        regionFormatStandard{"{0} Ìlànà Àkókò"}
+    }
+}

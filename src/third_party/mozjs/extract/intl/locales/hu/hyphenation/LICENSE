@@ -1,0 +1,11 @@
+License information for hyph_hu.dic:
+
+Derived from hyph_hu.tex in the "huhyphn" package <https://github.com/nagybence/huhyphn>,
+by processing the TeX hyphenation patterns with substrings.pl.
+
+% Huhyphn - hungarian hyphenation patterns v20110815
+%
+% This Source Code Form is subject to the terms of the Mozilla Public
+% License, v. 2.0. If a copy of the MPL was not distributed with this
+% file, You can obtain one at http://mozilla.org/MPL/2.0/.
+%

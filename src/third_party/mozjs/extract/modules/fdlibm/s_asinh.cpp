@@ -24,6 +24,7 @@
  *		 := sign(x)*log1p(|x| + x^2/(1 + sqrt(1+x^2)))
  */
 
+#include <cmath>
 #include <float.h>
 
 #include "math_private.h"
@@ -48,10 +49,10 @@ asinh(double x)
 	    w = __ieee754_log(fabs(x))+ln2;
 	} else if (ix>0x40000000) {	/* 2**28 > |x| > 2.0 */
 	    t = fabs(x);
-	    w = __ieee754_log(2.0*t+one/(__ieee754_sqrt(x*x+one)+t));
+	    w = __ieee754_log(2.0*t+one/(std::sqrt(x*x+one)+t));
 	} else {		/* 2.0 > |x| > 2**-28 */
 	    t = x*x;
-	    w =log1p(fabs(x)+t/(one+__ieee754_sqrt(one+t)));
+	    w =log1p(fabs(x)+t/(one+std::sqrt(one+t)));
 	}
 	if(hx>0) return w; else return -w;
 }

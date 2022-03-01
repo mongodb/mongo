@@ -38,7 +38,7 @@ CPURegister CPURegList::PopLowestIndex() {
     return NoCPUReg;
   }
   int index = CountTrailingZeros(list_);
-  VIXL_ASSERT((1 << index) & list_);
+  VIXL_ASSERT((1ULL << index) & list_);
   Remove(index);
   return CPURegister(index, size_, type_);
 }
@@ -51,7 +51,7 @@ CPURegister CPURegList::PopHighestIndex() {
   }
   int index = CountLeadingZeros(list_);
   index = kRegListSizeInBits - 1 - index;
-  VIXL_ASSERT((1 << index) & list_);
+  VIXL_ASSERT((1ULL << index) & list_);
   Remove(index);
   return CPURegister(index, size_, type_);
 }
@@ -474,7 +474,20 @@ void MemOperand::AddOffset(int64_t offset) {
 
 // Assembler
 Assembler::Assembler(PositionIndependentCodeOption pic)
-    : pic_(pic) {
+    : pic_(pic),
+      cpu_features_(CPUFeatures::AArch64LegacyBaseline())
+{
+  // Mozilla change: always use maximally-present features.
+  cpu_features_.Combine(CPUFeatures::InferFromOS());
+
+  // Mozilla change: Compile time hard-coded value from js-config.mozbuild.
+#ifndef MOZ_AARCH64_JSCVT
+#  error "MOZ_AARCH64_JSCVT must be defined."
+#elif MOZ_AARCH64_JSCVT >= 1
+  // Note, vixl backend implements the JSCVT flag as a boolean despite having 3
+  // extra bits reserved for forward compatibility in the ARMv8 documentation.
+  cpu_features_.Combine(CPUFeatures::kJSCVT);
+#endif
 }
 
 
@@ -2441,6 +2454,12 @@ void Assembler::fcsel(const VRegister& vd,
   Emit(FPType(vd) | FCSEL | Rm(vm) | Cond(cond) | Rn(vn) | Rd(vd));
 }
 
+void Assembler::fjcvtzs(const Register& rd, const VRegister& vn) {
+  VIXL_ASSERT(CPUHas(CPUFeatures::kFP, CPUFeatures::kJSCVT));
+  VIXL_ASSERT(rd.IsW() && vn.Is1D());
+  Emit(FJCVTZS | Rn(vn) | Rd(rd));
+}
+
 
 void Assembler::NEONFPConvertToInt(const Register& rd,
                                    const VRegister& vn,
@@ -3083,11 +3102,11 @@ void Assembler::movi(const VRegister& vd,
     Emit(q | NEONModImmOp(1) | NEONModifiedImmediate_MOVI |
          ImmNEONabcdefgh(imm8) | NEONCmode(0xe) | Rd(vd));
   } else if (shift == LSL) {
-    VIXL_ASSERT(is_uint8(imm));
+    VIXL_ASSERT(IsUint8(imm));
     NEONModifiedImmShiftLsl(vd, static_cast<int>(imm), shift_amount,
                             NEONModifiedImmediate_MOVI);
   } else {
-    VIXL_ASSERT(is_uint8(imm));
+    VIXL_ASSERT(IsUint8(imm));
     NEONModifiedImmShiftMsl(vd, static_cast<int>(imm), shift_amount,
                             NEONModifiedImmediate_MOVI);
   }
@@ -4198,7 +4217,7 @@ void Assembler::uqrshrn2(const VRegister& vd,
 uint32_t Assembler::FP32ToImm8(float imm) {
   VIXL_ASSERT(IsImmFP32(imm));
   // bits: aBbb.bbbc.defg.h000.0000.0000.0000.0000
-  uint32_t bits = float_to_rawbits(imm);
+  uint32_t bits = FloatToRawbits(imm);
   // bit7: a000.0000
   uint32_t bit7 = ((bits >> 31) & 0x1) << 7;
   // bit6: 0b00.0000
@@ -4219,7 +4238,7 @@ uint32_t Assembler::FP64ToImm8(double imm) {
   VIXL_ASSERT(IsImmFP64(imm));
   // bits: aBbb.bbbb.bbcd.efgh.0000.0000.0000.0000
   //       0000.0000.0000.0000.0000.0000.0000.0000
-  uint64_t bits = double_to_rawbits(imm);
+  uint64_t bits = DoubleToRawbits(imm);
   // bit7: a000.0000
   uint64_t bit7 = ((bits >> 63) & 0x1) << 7;
   // bit6: 0b00.0000
@@ -4276,7 +4295,7 @@ void Assembler::MoveWide(const Register& rd,
     }
   }
 
-  VIXL_ASSERT(is_uint16(imm));
+  VIXL_ASSERT(IsUint16(imm));
 
   Emit(SF(rd) | MoveWideImmediateFixed | mov_op |
        Rd(rd) | ImmMoveWide(imm) | ShiftMoveWide(shift));
@@ -4333,13 +4352,13 @@ void Assembler::AddSubWithCarry(const Register& rd,
 
 
 void Assembler::hlt(int code) {
-  VIXL_ASSERT(is_uint16(code));
+  VIXL_ASSERT(IsUint16(code));
   Emit(HLT | ImmException(code));
 }
 
 
 void Assembler::brk(int code) {
-  VIXL_ASSERT(is_uint16(code));
+  VIXL_ASSERT(IsUint16(code));
   Emit(BRK | ImmException(code));
 }
 
@@ -4403,7 +4422,7 @@ void Assembler::NEONModifiedImmShiftLsl(const VRegister& vd,
               vd.Is2S() || vd.Is4S());
   VIXL_ASSERT((left_shift == 0) || (left_shift == 8) ||
               (left_shift == 16) || (left_shift == 24));
-  VIXL_ASSERT(is_uint8(imm8));
+  VIXL_ASSERT(IsUint8(imm8));
 
   int cmode_1, cmode_2, cmode_3;
   if (vd.Is8B() || vd.Is16B()) {
@@ -4434,7 +4453,7 @@ void Assembler::NEONModifiedImmShiftMsl(const VRegister& vd,
                                         NEONModifiedImmediateOp op) {
   VIXL_ASSERT(vd.Is2S() || vd.Is4S());
   VIXL_ASSERT((shift_amount == 8) || (shift_amount == 16));
-  VIXL_ASSERT(is_uint8(imm8));
+  VIXL_ASSERT(IsUint8(imm8));
 
   int cmode_0 = (shift_amount >> 4) & 1;
   int cmode = 0xc | cmode_0;
@@ -4601,20 +4620,20 @@ void Assembler::Prefetch(PrefetchOperation op,
 
 
 bool Assembler::IsImmAddSub(int64_t immediate) {
-  return is_uint12(immediate) ||
-         (is_uint12(immediate >> 12) && ((immediate & 0xfff) == 0));
+  return IsUint12(immediate) ||
+         (IsUint12(immediate >> 12) && ((immediate & 0xfff) == 0));
 }
 
 
 bool Assembler::IsImmConditionalCompare(int64_t immediate) {
-  return is_uint5(immediate);
+  return IsUint5(immediate);
 }
 
 
 bool Assembler::IsImmFP32(float imm) {
   // Valid values will have the form:
   // aBbb.bbbc.defg.h000.0000.0000.0000.0000
-  uint32_t bits = float_to_rawbits(imm);
+  uint32_t bits = FloatToRawbits(imm);
   // bits[19..0] are cleared.
   if ((bits & 0x7ffff) != 0) {
     return false;
@@ -4639,7 +4658,7 @@ bool Assembler::IsImmFP64(double imm) {
   // Valid values will have the form:
   // aBbb.bbbb.bbcd.efgh.0000.0000.0000.0000
   // 0000.0000.0000.0000.0000.0000.0000.0000
-  uint64_t bits = double_to_rawbits(imm);
+  uint64_t bits = DoubleToRawbits(imm);
   // bits[47..0] are cleared.
   if ((bits & 0x0000ffffffffffff) != 0) {
     return false;
@@ -4664,7 +4683,7 @@ bool Assembler::IsImmLSPair(int64_t offset, unsigned access_size) {
   VIXL_ASSERT(access_size <= kQRegSizeInBytesLog2);
   bool offset_is_size_multiple =
       (((offset >> access_size) << access_size) == offset);
-  return offset_is_size_multiple && is_int7(offset >> access_size);
+  return offset_is_size_multiple && IsInt7(offset >> access_size);
 }
 
 
@@ -4672,12 +4691,12 @@ bool Assembler::IsImmLSScaled(int64_t offset, unsigned access_size) {
   VIXL_ASSERT(access_size <= kQRegSizeInBytesLog2);
   bool offset_is_size_multiple =
       (((offset >> access_size) << access_size) == offset);
-  return offset_is_size_multiple && is_uint12(offset >> access_size);
+  return offset_is_size_multiple && IsUint12(offset >> access_size);
 }
 
 
 bool Assembler::IsImmLSUnscaled(int64_t offset) {
-  return is_int9(offset);
+  return IsInt9(offset);
 }
 
 
@@ -5007,6 +5026,44 @@ LoadLiteralOp Assembler::LoadLiteralOpFor(const CPURegister& rt) {
         return LDR_q_lit;
     }
   }
+}
+
+
+bool Assembler::CPUHas(const CPURegister& rt) const {
+  // Core registers are available without any particular CPU features.
+  if (rt.IsRegister()) return true;
+  VIXL_ASSERT(rt.IsVRegister());
+  // The architecture does not allow FP and NEON to be implemented separately,
+  // but we can crudely categorise them based on register size, since FP only
+  // uses D, S and (occasionally) H registers.
+  if (rt.IsH() || rt.IsS() || rt.IsD()) {
+    return CPUHas(CPUFeatures::kFP) || CPUHas(CPUFeatures::kNEON);
+  }
+  VIXL_ASSERT(rt.IsB() || rt.IsQ());
+  return CPUHas(CPUFeatures::kNEON);
+}
+
+
+bool Assembler::CPUHas(const CPURegister& rt, const CPURegister& rt2) const {
+  // This is currently only used for loads and stores, where rt and rt2 must
+  // have the same size and type. We could extend this to cover other cases if
+  // necessary, but for now we can avoid checking both registers.
+  VIXL_ASSERT(AreSameSizeAndType(rt, rt2));
+  USE(rt2);
+  return CPUHas(rt);
+}
+
+
+bool Assembler::CPUHas(SystemRegister sysreg) const {
+  switch (sysreg) {
+    case RNDR:
+    case RNDRRS:
+      return CPUHas(CPUFeatures::kRNG);
+    case FPCR:
+    case NZCV:
+      break;
+  }
+  return true;
 }
 
 

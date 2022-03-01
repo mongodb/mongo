@@ -1,0 +1,370 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+mgo{
+    AuxExemplarCharacters{"[c h l q v x]"}
+    Ellipsis{
+        final{"{0}…"}
+        initial{"…{0}"}
+        medial{"{0}…{1}"}
+    }
+    ExemplarCharacters{
+        "[a à b {ch} d e è ə {ə\u0300} f g {gh} i ì j k m n ŋ o ò ɔ {ɔ\u0300} p r s t"
+        " u ù w y z ʼ]"
+    }
+    ExemplarCharactersIndex{"[A B {CH} D E Ə F G {GH} I J K M N Ŋ O Ɔ P R S T U W Y Z ʼ]"}
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    ExemplarCharactersPunctuation{"[, ; \\: ! ? . ' ‘ ’ \u0022 “ ”]"}
+    MoreInformation{"?"}
+    NumberElements{
+        default{"latn"}
+        latn{
+            patterns{
+                currencyFormat{"¤ #,##0.00"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"#,##0%"}
+                scientificFormat{"#E0"}
+            }
+            symbols{
+                decimal{"."}
+                exponential{"E"}
+                group{","}
+                infinity{"∞"}
+                list{";"}
+                minusSign{"-"}
+                nan{"NaN"}
+                perMille{"‰"}
+                percentSign{"%"}
+                plusSign{"+"}
+            }
+        }
+        native{"latn"}
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, G y MMMM dd",
+                "G y MMMM d",
+                "G y MMM d",
+                "GGGGG y-MM-dd",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                d{"d"}
+            }
+            intervalFormats{
+                fallback{"{0} – {1}"}
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "AM",
+                "PM",
+            }
+            AmPmMarkersAbbr{
+                "AM",
+                "PM",
+            }
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, y MMMM dd",
+                "y MMMM d",
+                "y MMM d",
+                "y-MM-dd",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                d{"d"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Aneg 1",
+                        "Aneg 2",
+                        "Aneg 3",
+                        "Aneg 4",
+                        "Aneg 5",
+                        "Aneg 6",
+                        "Aneg 7",
+                    }
+                    narrow{
+                        "A1",
+                        "A2",
+                        "A3",
+                        "A4",
+                        "A5",
+                        "A6",
+                        "A7",
+                    }
+                    short{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                    }
+                    wide{
+                        "Aneg 1",
+                        "Aneg 2",
+                        "Aneg 3",
+                        "Aneg 4",
+                        "Aneg 5",
+                        "Aneg 6",
+                        "Aneg 7",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Aneg 1",
+                        "Aneg 2",
+                        "Aneg 3",
+                        "Aneg 4",
+                        "Aneg 5",
+                        "Aneg 6",
+                        "Aneg 7",
+                    }
+                    narrow{
+                        "A1",
+                        "A2",
+                        "A3",
+                        "A4",
+                        "A5",
+                        "A6",
+                        "A7",
+                    }
+                    short{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                    }
+                    wide{
+                        "Aneg 1",
+                        "Aneg 2",
+                        "Aneg 3",
+                        "Aneg 4",
+                        "Aneg 5",
+                        "Aneg 6",
+                        "Aneg 7",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "BCE",
+                    "CE",
+                }
+            }
+            intervalFormats{
+                fallback{"{0} – {1}"}
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "mbegtug",
+                        "imeg àbùbì",
+                        "imeg mbəŋchubi",
+                        "iməg ngwə̀t",
+                        "iməg fog",
+                        "iməg ichiibɔd",
+                        "iməg àdùmbə̀ŋ",
+                        "iməg ichika",
+                        "iməg kud",
+                        "iməg tèsiʼe",
+                        "iməg zò",
+                        "iməg krizmed",
+                    }
+                    narrow{
+                        "M1",
+                        "A2",
+                        "M3",
+                        "N4",
+                        "F5",
+                        "I6",
+                        "A7",
+                        "I8",
+                        "K9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "iməg mbegtug",
+                        "imeg àbùbì",
+                        "imeg mbəŋchubi",
+                        "iməg ngwə̀t",
+                        "iməg fog",
+                        "iməg ichiibɔd",
+                        "iməg àdùmbə̀ŋ",
+                        "iməg ichika",
+                        "iməg kud",
+                        "iməg tèsiʼe",
+                        "iməg zò",
+                        "iməg krizmed",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "mbegtug",
+                        "imeg àbùbì",
+                        "imeg mbəŋchubi",
+                        "iməg ngwə̀t",
+                        "iməg fog",
+                        "iməg ichiibɔd",
+                        "iməg àdùmbə̀ŋ",
+                        "iməg ichika",
+                        "iməg kud",
+                        "iməg tèsiʼe",
+                        "iməg zò",
+                        "iməg krizmed",
+                    }
+                    narrow{
+                        "M1",
+                        "A2",
+                        "M3",
+                        "N4",
+                        "F5",
+                        "I6",
+                        "A7",
+                        "I8",
+                        "K9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "iməg mbegtug",
+                        "imeg àbùbì",
+                        "imeg mbəŋchubi",
+                        "iməg ngwə̀t",
+                        "iməg fog",
+                        "iməg ichiibɔd",
+                        "iməg àdùmbə̀ŋ",
+                        "iməg ichika",
+                        "iməg kud",
+                        "iməg tèsiʼe",
+                        "iməg zò",
+                        "iməg krizmed",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"anəg"}
+            relative{
+                "-1"{"ikwiri"}
+                "0"{"tèchɔ̀ŋ"}
+                "1"{"isu"}
+                "2"{"isu ywi"}
+            }
+            relativeTime{
+                future{
+                    one{"+{0} d"}
+                    other{"+{0} d"}
+                }
+                past{
+                    one{"-{0} d"}
+                    other{"-{0} d"}
+                }
+            }
+        }
+        dayperiod{
+            dn{"Dayperiod"}
+        }
+        era{
+            dn{"Era"}
+        }
+        hour{
+            dn{"Hour"}
+            relativeTime{
+                future{
+                    one{"+{0} h"}
+                    other{"+{0} h"}
+                }
+                past{
+                    one{"-{0} h"}
+                    other{"-{0} h"}
+                }
+            }
+        }
+        minute{
+            dn{"Minute"}
+            relativeTime{
+                future{
+                    one{"+{0} min"}
+                    other{"+{0} min"}
+                }
+                past{
+                    one{"-{0} min"}
+                    other{"-{0} min"}
+                }
+            }
+        }
+        month{
+            dn{"iməg"}
+            relativeTime{
+                future{
+                    one{"+{0} m"}
+                    other{"+{0} m"}
+                }
+                past{
+                    one{"-{0} m"}
+                    other{"-{0} m"}
+                }
+            }
+        }
+        second{
+            dn{"Second"}
+            relativeTime{
+                future{
+                    one{"+{0} s"}
+                    other{"+{0} s"}
+                }
+                past{
+                    one{"-{0} s"}
+                    other{"-{0} s"}
+                }
+            }
+        }
+        week{
+            dn{"nkap"}
+        }
+        weekday{
+            dn{"anəg agu nkap"}
+        }
+        year{
+            dn{"fituʼ"}
+        }
+        zone{
+            dn{"Zone"}
+        }
+    }
+}

@@ -1,0 +1,65 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+su{
+    zoneStrings{
+        "Etc:UTC"{
+            ls{"Waktu Universal Terkoordinasi"}
+        }
+        "Etc:Unknown"{
+            ec{"Kota Teu Dikenal"}
+        }
+        "meta:America_Central"{
+            ld{"Waktu Usum Panas Tengah"}
+            lg{"Waktu Tengah"}
+            ls{"Waktu Standar Tengah"}
+        }
+        "meta:America_Eastern"{
+            ld{"Waktu Usum Panas Wétan"}
+            lg{"Waktu Wétan"}
+            ls{"Waktu Standar Wétan"}
+        }
+        "meta:America_Mountain"{
+            ld{"Waktu Usum Panas Pagunungan"}
+            lg{"Waktu Pagunungan"}
+            ls{"Waktu Standar Pagunungan"}
+        }
+        "meta:America_Pacific"{
+            ld{"Waktu Usum Panas Pasifik"}
+            lg{"Waktu Pasifik"}
+            ls{"Waktu Standar Pasifik"}
+        }
+        "meta:Atlantic"{
+            ld{"Waktu Usum Panas Atlantik"}
+            lg{"Waktu Atlantik"}
+            ls{"Waktu Standar Atlantik"}
+        }
+        "meta:Colombia"{
+            ld{"Waktu Usum Panas Kolombia"}
+            lg{"Waktu Kolombia"}
+            ls{"Waktu Standar Kolombia"}
+        }
+        "meta:Europe_Central"{
+            ld{"Waktu Usum Panas Éropa Tengah"}
+            lg{"Waktu Éropa Tengah"}
+            ls{"Waktu Standar Éropa Tengah"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"Waktu Usum Panas Éropa Timur"}
+            lg{"Waktu Éropa Timur"}
+            ls{"Waktu Standar Éropa Timur"}
+        }
+        "meta:Europe_Western"{
+            ld{"Waktu Usum Panas Éropa Barat"}
+            lg{"Waktu Éropa Barat"}
+            ls{"Waktu Standar Éropa Barat"}
+        }
+        "meta:GMT"{
+            ls{"Waktu Greenwich"}
+        }
+        "meta:Galapagos"{
+            ls{"Waktu Galapagos"}
+        }
+        fallbackFormat{"{1} ({0})"}
+    }
+}

@@ -1,0 +1,840 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+lv{
+    Keys{
+        calendar{"Kalendārs"}
+        cf{"valūtas formāts"}
+        colAlternate{"kārtošana, ignorējot simbolus"}
+        colBackwards{"akcentēto burtu kārtošana apgrieztā secībā"}
+        colCaseFirst{"kārtošana pēc lielajiem/mazajiem burtiem"}
+        colCaseLevel{"reģistrjutīga kārtošana"}
+        colNormalization{"normalizēta kārtošana"}
+        colNumeric{"kārtošana skaitliskā secībā"}
+        colStrength{"kārtošanas pakāpe"}
+        collation{"kārtošanas secība"}
+        currency{"valūta"}
+        hc{"Stundu formāts (12 vai 24)"}
+        lb{"Rindiņas pārtraukuma stils"}
+        ms{"mērvienību sistēma"}
+        numbers{"Cipari"}
+        timezone{"laika josla"}
+        va{"lokalizācijas variants"}
+        x{"personīgai lietošanai"}
+    }
+    Languages{
+        aa{"afāru"}
+        ab{"abhāzu"}
+        ace{"ačinu"}
+        ach{"ačolu"}
+        ada{"adangmu"}
+        ady{"adigu"}
+        ae{"avesta"}
+        af{"afrikandu"}
+        afh{"afrihili"}
+        agq{"aghemu"}
+        ain{"ainu"}
+        ak{"akanu"}
+        akk{"akadiešu"}
+        ale{"aleutu"}
+        alt{"dienvidaltajiešu"}
+        am{"amharu"}
+        an{"aragoniešu"}
+        ang{"senangļu"}
+        anp{"angika"}
+        ar{"arābu"}
+        ar_001{"mūsdienu standarta arābu"}
+        arc{"aramiešu"}
+        arn{"araukāņu"}
+        arp{"arapahu"}
+        arw{"aravaku"}
+        as{"asamiešu"}
+        asa{"asu"}
+        ast{"astūriešu"}
+        av{"avāru"}
+        awa{"avadhu"}
+        ay{"aimaru"}
+        az{"azerbaidžāņu"}
+        az_Arab{"dienvidazerbaidžāņu"}
+        ba{"baškīru"}
+        bal{"beludžu"}
+        ban{"baliešu"}
+        bas{"basu"}
+        bax{"bamumu"}
+        bbj{"gomalu"}
+        be{"baltkrievu"}
+        bej{"bedžu"}
+        bem{"bembu"}
+        bez{"bena"}
+        bfd{"bafutu"}
+        bg{"bulgāru"}
+        bgn{"rietumbeludžu"}
+        bho{"bhodžpūru"}
+        bi{"bišlamā"}
+        bik{"bikolu"}
+        bin{"binu"}
+        bkm{"komu"}
+        bla{"siksiku"}
+        bm{"bambaru"}
+        bn{"bengāļu"}
+        bo{"tibetiešu"}
+        br{"bretoņu"}
+        bra{"bradžiešu"}
+        brx{"bodo"}
+        bs{"bosniešu"}
+        bss{"nkosi"}
+        bua{"burjatu"}
+        bug{"bugu"}
+        bum{"bulu"}
+        byn{"bilinu"}
+        byv{"medumbu"}
+        ca{"katalāņu"}
+        cad{"kadu"}
+        car{"karību"}
+        cay{"kajuga"}
+        cch{"atsamu"}
+        ccp{"čakmu"}
+        ce{"čečenu"}
+        ceb{"sebuāņu"}
+        cgg{"kiga"}
+        ch{"čamorru"}
+        chb{"čibču"}
+        chg{"džagatajs"}
+        chk{"čūku"}
+        chm{"mariešu"}
+        chn{"činuku žargons"}
+        cho{"čoktavu"}
+        chp{"čipevaianu"}
+        chr{"čiroku"}
+        chy{"šejenu"}
+        ckb{"centrālkurdu"}
+        co{"korsikāņu"}
+        cop{"koptu"}
+        cr{"krī"}
+        crh{"Krimas tatāru"}
+        crs{"franciskā kreoliskā valoda (Seišelu salas)"}
+        cs{"čehu"}
+        csb{"kašubu"}
+        cu{"baznīcslāvu"}
+        cv{"čuvašu"}
+        cy{"velsiešu"}
+        da{"dāņu"}
+        dak{"dakotu"}
+        dar{"dargu"}
+        dav{"taitu"}
+        de{"vācu"}
+        de_CH{"augšvācu (Šveice)"}
+        del{"delavēru"}
+        den{"sleivu"}
+        dgr{"dogribu"}
+        din{"dinku"}
+        dje{"zarmu"}
+        doi{"dogru"}
+        dsb{"lejassorbu"}
+        dua{"dualu"}
+        dum{"vidusholandiešu"}
+        dv{"maldīviešu"}
+        dyo{"diola-fonjī"}
+        dyu{"diūlu"}
+        dz{"dzongke"}
+        dzg{"dazu"}
+        ebu{"kjembu"}
+        ee{"evu"}
+        efi{"efiku"}
+        egy{"ēģiptiešu"}
+        eka{"ekadžuku"}
+        el{"grieķu"}
+        elx{"elamiešu"}
+        en{"angļu"}
+        en_GB{"angļu (Lielbritānija)"}
+        enm{"vidusangļu"}
+        eo{"esperanto"}
+        es{"spāņu"}
+        et{"igauņu"}
+        eu{"basku"}
+        ewo{"evondu"}
+        fa{"persiešu"}
+        fa_AF{"darī"}
+        fan{"fangu"}
+        fat{"fantu"}
+        ff{"fulu"}
+        fi{"somu"}
+        fil{"filipīniešu"}
+        fj{"fidžiešu"}
+        fo{"fēru"}
+        fon{"fonu"}
+        fr{"franču"}
+        frc{"kadžūnu franču"}
+        frm{"vidusfranču"}
+        fro{"senfranču"}
+        frr{"ziemeļfrīzu"}
+        frs{"austrumfrīzu"}
+        fur{"friūlu"}
+        fy{"rietumfrīzu"}
+        ga{"īru"}
+        gaa{"ga"}
+        gag{"gagauzu"}
+        gay{"gajo"}
+        gba{"gbaju"}
+        gd{"skotu gēlu"}
+        gez{"gēzu"}
+        gil{"kiribatiešu"}
+        gl{"galisiešu"}
+        gmh{"vidusaugšvācu"}
+        gn{"gvaranu"}
+        goh{"senaugšvācu"}
+        gon{"gondu valodas"}
+        gor{"gorontalu"}
+        got{"gotu"}
+        grb{"grebo"}
+        grc{"sengrieķu"}
+        gsw{"Šveices vācu"}
+        gu{"gudžaratu"}
+        guz{"gusii"}
+        gv{"meniešu"}
+        gwi{"kučinu"}
+        ha{"hausu"}
+        hai{"haidu"}
+        haw{"havajiešu"}
+        he{"ivrits"}
+        hi{"hindi"}
+        hil{"hiligainonu"}
+        hit{"hetu"}
+        hmn{"hmongu"}
+        ho{"hirimotu"}
+        hr{"horvātu"}
+        hsb{"augšsorbu"}
+        ht{"haitiešu"}
+        hu{"ungāru"}
+        hup{"hupu"}
+        hy{"armēņu"}
+        hz{"hereru"}
+        ia{"interlingva"}
+        iba{"ibanu"}
+        ibb{"ibibio"}
+        id{"indonēziešu"}
+        ie{"interlingve"}
+        ig{"igbo"}
+        ii{"Sičuaņas ji"}
+        ik{"inupiaku"}
+        ilo{"iloku"}
+        inh{"ingušu"}
+        io{"ido"}
+        is{"islandiešu"}
+        it{"itāļu"}
+        iu{"inuītu"}
+        ja{"japāņu"}
+        jbo{"ložbans"}
+        jgo{"ngomba"}
+        jmc{"mačamu"}
+        jpr{"jūdpersiešu"}
+        jrb{"jūdarābu"}
+        jv{"javiešu"}
+        ka{"gruzīnu"}
+        kaa{"karakalpaku"}
+        kab{"kabilu"}
+        kac{"kačinu"}
+        kaj{"kadži"}
+        kam{"kambu"}
+        kaw{"kāvi"}
+        kbd{"kabardiešu"}
+        kbl{"kaņembu"}
+        kcg{"katabu"}
+        kde{"makonde"}
+        kea{"kaboverdiešu"}
+        kfo{"koru"}
+        kg{"kongu"}
+        kha{"khasu"}
+        kho{"hotaniešu"}
+        khq{"koiračiinī"}
+        ki{"kikuju"}
+        kj{"kvaņamu"}
+        kk{"kazahu"}
+        kkj{"kako"}
+        kl{"grenlandiešu"}
+        kln{"kalendžīnu"}
+        km{"khmeru"}
+        kmb{"kimbundu"}
+        kn{"kannadu"}
+        ko{"korejiešu"}
+        koi{"komiešu-permiešu"}
+        kok{"konkanu"}
+        kos{"kosrājiešu"}
+        kpe{"kpellu"}
+        kr{"kanuru"}
+        krc{"karačaju un balkāru"}
+        krl{"karēļu"}
+        kru{"kuruhu"}
+        ks{"kašmiriešu"}
+        ksb{"šambalu"}
+        ksf{"bafiju"}
+        ksh{"Ķelnes vācu"}
+        ku{"kurdu"}
+        kum{"kumiku"}
+        kut{"kutenaju"}
+        kv{"komiešu"}
+        kw{"korniešu"}
+        ky{"kirgīzu"}
+        la{"latīņu"}
+        lad{"ladino"}
+        lag{"langi"}
+        lah{"landu"}
+        lam{"lambu"}
+        lb{"luksemburgiešu"}
+        lez{"lezgīnu"}
+        lg{"gandu"}
+        li{"limburgiešu"}
+        lkt{"lakotu"}
+        ln{"lingala"}
+        lo{"laosiešu"}
+        lol{"mongu"}
+        lou{"Luiziānas kreolu"}
+        loz{"lozu"}
+        lrc{"ziemeļluru"}
+        lt{"lietuviešu"}
+        lu{"lubakatanga"}
+        lua{"lubalulva"}
+        lui{"luisenu"}
+        lun{"lundu"}
+        luo{"luo"}
+        lus{"lušeju"}
+        luy{"luhju"}
+        lv{"latviešu"}
+        mad{"maduriešu"}
+        maf{"mafu"}
+        mag{"magahiešu"}
+        mai{"maithili"}
+        mak{"makasaru"}
+        man{"mandingu"}
+        mas{"masaju"}
+        mde{"mabu"}
+        mdf{"mokšu"}
+        mdr{"mandaru"}
+        men{"mendu"}
+        mer{"meru"}
+        mfe{"Maurīcijas kreolu"}
+        mg{"malagasu"}
+        mga{"vidusīru"}
+        mgh{"makua"}
+        mgo{"metu"}
+        mh{"māršaliešu"}
+        mi{"maoru"}
+        mic{"mikmaku"}
+        min{"minangkabavu"}
+        mk{"maķedoniešu"}
+        ml{"malajalu"}
+        mn{"mongoļu"}
+        mnc{"mandžūru"}
+        mni{"manipūru"}
+        moh{"mohauku"}
+        mos{"mosu"}
+        mr{"marathu"}
+        ms{"malajiešu"}
+        mt{"maltiešu"}
+        mua{"mundangu"}
+        mul{"vairākas valodas"}
+        mus{"krīku"}
+        mwl{"mirandiešu"}
+        mwr{"marvaru"}
+        my{"birmiešu"}
+        mye{"mjenu"}
+        myv{"erzju"}
+        mzn{"mazanderāņu"}
+        na{"nauruiešu"}
+        nap{"neapoliešu"}
+        naq{"nama"}
+        nb{"norvēģu bukmols"}
+        nd{"ziemeļndebelu"}
+        nds{"lejasvācu"}
+        nds_NL{"lejassakšu"}
+        ne{"nepāliešu"}
+        new{"nevaru"}
+        ng{"ndongu"}
+        nia{"njasu"}
+        niu{"niuāņu"}
+        nl{"holandiešu"}
+        nl_BE{"flāmu"}
+        nmg{"kvasio"}
+        nn{"jaunnorvēģu"}
+        nnh{"ngjembūnu"}
+        no{"norvēģu"}
+        nog{"nogaju"}
+        non{"sennorvēģu"}
+        nqo{"nko"}
+        nr{"dienvidndebelu"}
+        nso{"ziemeļsotu"}
+        nus{"nueru"}
+        nv{"navahu"}
+        nwc{"klasiskā nevaru"}
+        ny{"čičeva"}
+        nym{"ņamvezu"}
+        nyn{"ņankolu"}
+        nyo{"ņoru"}
+        nzi{"nzemu"}
+        oc{"oksitāņu"}
+        oj{"odžibvu"}
+        om{"oromu"}
+        or{"oriju"}
+        os{"osetīnu"}
+        osa{"važāžu"}
+        ota{"turku osmaņu"}
+        pa{"pandžabu"}
+        pag{"pangasinanu"}
+        pal{"pehlevi"}
+        pam{"pampanganu"}
+        pap{"papjamento"}
+        pau{"palaviešu"}
+        pcm{"Nigērijas pidžinvaloda"}
+        peo{"senpersu"}
+        phn{"feniķiešu"}
+        pi{"pāli"}
+        pl{"poļu"}
+        pon{"ponapiešu"}
+        prg{"prūšu"}
+        pro{"senprovansiešu"}
+        ps{"puštu"}
+        pt{"portugāļu"}
+        qu{"kečvu"}
+        quc{"kiče"}
+        raj{"radžastāņu"}
+        rap{"rapanuju"}
+        rar{"rarotongiešu"}
+        rm{"retoromāņu"}
+        rn{"rundu"}
+        ro{"rumāņu"}
+        ro_MD{"moldāvu"}
+        rof{"rombo"}
+        rom{"čigānu"}
+        ru{"krievu"}
+        rup{"aromūnu"}
+        rw{"kiņaruanda"}
+        rwk{"ruanda"}
+        sa{"sanskrits"}
+        sad{"sandavu"}
+        sah{"jakutu"}
+        sam{"Samārijas aramiešu"}
+        saq{"samburu"}
+        sas{"sasaku"}
+        sat{"santalu"}
+        sba{"ngambeju"}
+        sbp{"sangu"}
+        sc{"sardīniešu"}
+        scn{"sicīliešu"}
+        sco{"skotu"}
+        sd{"sindhu"}
+        sdh{"dienvidkurdu"}
+        se{"ziemeļsāmu"}
+        see{"seneku"}
+        seh{"senu"}
+        sel{"selkupu"}
+        ses{"koiraboro senni"}
+        sg{"sango"}
+        sga{"senīru"}
+        sh{"serbu–horvātu"}
+        shi{"šilhu"}
+        shn{"šanu"}
+        shu{"Čadas arābu"}
+        si{"singāļu"}
+        sid{"sidamu"}
+        sk{"slovāku"}
+        sl{"slovēņu"}
+        sm{"samoāņu"}
+        sma{"dienvidsāmu"}
+        smj{"Luleo sāmu"}
+        smn{"Inari sāmu"}
+        sms{"skoltsāmu"}
+        sn{"šonu"}
+        snk{"soninku"}
+        so{"somāļu"}
+        sog{"sogdiešu"}
+        sq{"albāņu"}
+        sr{"serbu"}
+        srn{"sranantogo"}
+        srr{"serēru"}
+        ss{"svatu"}
+        ssy{"saho"}
+        st{"dienvidsotu"}
+        su{"zundu"}
+        suk{"sukumu"}
+        sus{"susu"}
+        sux{"šumeru"}
+        sv{"zviedru"}
+        sw{"svahili"}
+        sw_CD{"svahili (Kongo)"}
+        swb{"komoru"}
+        syc{"klasiskā sīriešu"}
+        syr{"sīriešu"}
+        ta{"tamilu"}
+        te{"telugu"}
+        tem{"temnu"}
+        teo{"teso"}
+        ter{"tereno"}
+        tet{"tetumu"}
+        tg{"tadžiku"}
+        th{"taju"}
+        ti{"tigrinja"}
+        tig{"tigru"}
+        tiv{"tivu"}
+        tk{"turkmēņu"}
+        tkl{"tokelaviešu"}
+        tl{"tagalu"}
+        tlh{"klingoņu"}
+        tli{"tlinkitu"}
+        tmh{"tuaregu"}
+        tn{"cvanu"}
+        to{"tongiešu"}
+        tog{"Njasas tongu"}
+        tpi{"tokpisins"}
+        tr{"turku"}
+        trv{"taroko"}
+        ts{"congu"}
+        tsi{"cimšiāņu"}
+        tt{"tatāru"}
+        tum{"tumbuku"}
+        tvl{"tuvaliešu"}
+        tw{"tvī"}
+        twq{"tasavaku"}
+        ty{"taitiešu"}
+        tyv{"tuviešu"}
+        tzm{"Centrālmarokas tamazīts"}
+        udm{"udmurtu"}
+        ug{"uiguru"}
+        uga{"ugaritiešu"}
+        uk{"ukraiņu"}
+        umb{"umbundu"}
+        und{"nezināma valoda"}
+        ur{"urdu"}
+        uz{"uzbeku"}
+        vai{"vaju"}
+        ve{"vendu"}
+        vi{"vjetnamiešu"}
+        vo{"volapiks"}
+        vot{"votu"}
+        vun{"vundžo"}
+        wa{"valoņu"}
+        wae{"Vallisas vācu"}
+        wal{"valamu"}
+        war{"varaju"}
+        was{"vašo"}
+        wbp{"varlpirī"}
+        wo{"volofu"}
+        xal{"kalmiku"}
+        xh{"khosu"}
+        xog{"sogu"}
+        yao{"jao"}
+        yap{"japiešu"}
+        yav{"janbaņu"}
+        ybb{"jembu"}
+        yi{"jidišs"}
+        yo{"jorubu"}
+        yue{"kantoniešu"}
+        za{"džuanu"}
+        zap{"sapoteku"}
+        zbl{"blissimbolika"}
+        zen{"zenagu"}
+        zgh{"standarta tamazigtu (Maroka)"}
+        zh{"ķīniešu"}
+        zh_Hans{"ķīniešu vienkāršotā"}
+        zh_Hant{"ķīniešu tradicionālā"}
+        zu{"zulu"}
+        zun{"zunju"}
+        zxx{"bez lingvistiska satura"}
+        zza{"zazaki"}
+    }
+    Languages%long{
+        zh_Hans{"ķīniešu vienkāršotā (mandarīnu)"}
+        zh_Hant{"ķīniešu tradicionālā (mandarīnu)"}
+    }
+    Languages%menu{
+        yue{"ķīniešu (kantoniešu)"}
+        zh{"ķīniešu (mandarīnu)"}
+    }
+    Languages%short{
+        en_GB{"angļu (Lielbritānija)"}
+    }
+    Languages%variant{
+        ckb{"sorani kurdu"}
+    }
+    Scripts{
+        Arab{"arābu"}
+        Armi{"aramiešu"}
+        Armn{"armēņu"}
+        Bali{"baliešu"}
+        Beng{"bengāļu"}
+        Bopo{"bopomofo"}
+        Brah{"brahmi"}
+        Brai{"Braila raksts"}
+        Cher{"irokēzu"}
+        Copt{"koptu"}
+        Cyrl{"kirilica"}
+        Cyrs{"senslāvu"}
+        Deva{"dēvanāgari"}
+        Egyd{"demotiskais raksts"}
+        Egyh{"hierātiskais raksts"}
+        Egyp{"ēģiptiešu hieroglifi"}
+        Ethi{"etiopiešu"}
+        Geor{"gruzīnu"}
+        Goth{"gotu"}
+        Grek{"grieķu"}
+        Gujr{"gudžaratu"}
+        Guru{"pandžabu"}
+        Hanb{"haņu ar bopomofo"}
+        Hang{"hangils"}
+        Hani{"haņu"}
+        Hans{"vienkāršotā"}
+        Hant{"tradicionālā"}
+        Hebr{"ivrits"}
+        Hira{"hiragana"}
+        Hrkt{"japāņu zilbju alfabēts"}
+        Hung{"senungāru"}
+        Ital{"vecitāļu"}
+        Jamo{"jamo"}
+        Java{"javiešu"}
+        Jpan{"japāņu"}
+        Kana{"katakana"}
+        Khmr{"khmeru"}
+        Knda{"kannadu"}
+        Kore{"korejiešu"}
+        Laoo{"laosiešu"}
+        Latn{"latīņu"}
+        Lina{"lineārā A"}
+        Linb{"lineārā B"}
+        Lydi{"līdiešu"}
+        Maya{"maiju"}
+        Mlym{"malajalu"}
+        Mong{"mongoļu"}
+        Moon{"Mūna raksts"}
+        Mymr{"birmiešu"}
+        Ogam{"ogamiskais raksts"}
+        Orya{"oriju"}
+        Osma{"osmaņu turku"}
+        Phnx{"feniķiešu"}
+        Roro{"rongorongo"}
+        Runr{"rūnu raksts"}
+        Samr{"samariešu"}
+        Sinh{"singāļu"}
+        Sund{"zundu"}
+        Syrc{"sīriešu"}
+        Syrj{"rietumsīriešu"}
+        Syrn{"austrumsīriešu"}
+        Taml{"tamilu"}
+        Telu{"telugu"}
+        Tglg{"tagalu"}
+        Thaa{"tāna"}
+        Thai{"taju"}
+        Tibt{"tibetiešu"}
+        Xpeo{"senperiešu"}
+        Xsux{"šumeru-akadiešu ķīļraksts"}
+        Yiii{"ji"}
+        Zinh{"mantotā"}
+        Zmth{"matemātiskais pieraksts"}
+        Zsye{"emocijzīmes"}
+        Zsym{"simboli"}
+        Zxxx{"bez rakstības"}
+        Zyyy{"vispārējā"}
+        Zzzz{"nezināma rakstība"}
+    }
+    Scripts%stand-alone{
+        Hans{"haņu vienkāršotā"}
+        Hant{"haņu tradicionālā"}
+    }
+    Scripts%variant{
+        Arab{"persiešu-arābu"}
+    }
+    Types{
+        calendar{
+            buddhist{"budistu kalendārs"}
+            chinese{"ķīniešu kalendārs"}
+            coptic{"Koptu kalendārs"}
+            dangi{"dangi kalendārs"}
+            ethiopic{"etiopiešu kalendārs"}
+            ethiopic-amete-alem{"Etiopiešu kalendārs"}
+            gregorian{"Gregora kalendārs"}
+            hebrew{"ebreju kalendārs"}
+            indian{"Indijas nacionālais kalendārs"}
+            islamic{"islāma kalendārs"}
+            islamic-civil{"islāma pilsoņu kalendārs"}
+            islamic-umalqura{"islāma kalendārs (Umm al-kura)"}
+            iso8601{"ISO 8601 kalendārs"}
+            japanese{"japāņu kalendārs"}
+            persian{"persiešu kalendārs"}
+            roc{"Ķīnas Republikas kalendārs"}
+        }
+        cf{
+            account{"uzskaites valūtas formāts"}
+            standard{"standarta valūtas formāts"}
+        }
+        colAlternate{
+            non-ignorable{"Kārtot simbolus"}
+            shifted{"Kārtot, ignorējot simbolus"}
+        }
+        colBackwards{
+            no{"Kārtot diakritiskās zīmes parastā secībā"}
+            yes{"Kārtot diakritiskās zīmes apgrieztā secībā"}
+        }
+        colCaseFirst{
+            lower{"Kārtot pēc pirmā mazā burta"}
+            no{"Kārtot burtu reģistra parastā secībā"}
+            upper{"Kārtot pēc pirmā lielā burta"}
+        }
+        colCaseLevel{
+            no{"Kārtot reģistrnejutīgas rakstzīmes"}
+            yes{"Kārtot reģistrjutīgās rakstzīmes"}
+        }
+        colNormalization{
+            no{"Kārtot bez normalizēšanas"}
+            yes{"Kārtot unikodu normalizējot"}
+        }
+        colNumeric{
+            no{"Kārtot ciparus atsevišķi"}
+            yes{"Kārtot ciparus skaitliskā secībā"}
+        }
+        colStrength{
+            identical{"Kārtot visus"}
+            primary{"Kārtot tikai pamata burtus"}
+            quaternary{
+                "Kārtot diakritiskās zīmes/reģistrjutīgās rakstzīmes/rakstzīmes pēc p"
+                "latuma/Kana rakstzīmes"
+            }
+            secondary{"Kārtot diakritiskās zīmes"}
+            tertiary{
+                "Kārtot diakritiskās zīmes/reģistrjutīgās rakstzīmes/rakstzīmes pēc p"
+                "latuma"
+            }
+        }
+        collation{
+            big5han{"tradicionālās ķīniešu valodas kārtošanas secība - Big5"}
+            compat{"saderīgā kārtošanas secība"}
+            dictionary{"Vārdnīcas kārtošanas secība"}
+            ducet{"noklusējuma unikoda kārtošanas secība"}
+            eor{"Eiropas rakstību kārtošanas secīa"}
+            gb2312han{"vienkāršotās ķīniešu valodas kārtošanas secība - GB2312"}
+            phonebook{"tālruņu grāmatas kārtošanas secība"}
+            phonetic{"Fonētiskā kārtošanas secība"}
+            pinyin{"piņjiņa kārtošanas secība"}
+            reformed{"Reformētā kārtošanas secība"}
+            search{"vispārīga meklēšana"}
+            searchjl{"Meklēt pēc Hangul sākuma līdzskaņa"}
+            standard{"standarta kārtošanas secība"}
+            stroke{"Stroke kārtošanas secība"}
+            traditional{"tradicionālā kārtošanas secība"}
+            unihan{"Radikālā kārtošanas secība pēc vilkumu skaita"}
+        }
+        d0{
+            fwidth{"Pilna platuma"}
+            hwidth{"Pusplatuma"}
+            npinyin{"Ciparu"}
+        }
+        hc{
+            h11{"12 stundu sistēma (0–11)"}
+            h12{"12 stundu sistēma (1–12)"}
+            h23{"24 stundu sistēma (0–23)"}
+            h24{"24 stundu sistēma (1–24)"}
+        }
+        lb{
+            loose{"Brīvais rindiņas pārtraukuma stils"}
+            normal{"Parastais rindiņas pārtraukuma stils"}
+            strict{"Stingrais rindiņas pārtraukuma stils"}
+        }
+        m0{
+            bgn{"transliterācijas sistēma US BGN"}
+            ungegn{"transliterācijas sistēma UN GEGN"}
+        }
+        ms{
+            metric{"metriskā sistēma"}
+            uksystem{"britu mērvienību sistēma"}
+            ussystem{"amerikāņu mērvienību sistēma"}
+        }
+        numbers{
+            arab{"Arābu-indiešu cipari"}
+            arabext{"Izvērstie arābu-indiešu cipari"}
+            armn{"Armēņu cipari"}
+            armnlow{"Mazie armēņu cipari"}
+            beng{"Bengāļu cipari"}
+            deva{"Devanāgarī cipari"}
+            ethi{"Etiopiešu cipari"}
+            finance{"Finanšu cipari"}
+            fullwide{"Pilna platuma cipari"}
+            geor{"Gruzīnu cipari"}
+            grek{"Grieķu cipari"}
+            greklow{"Mazie grieķu cipari"}
+            gujr{"Gudžaratu cipari"}
+            guru{"Gurmuki cipari"}
+            hanidec{"Ķīniešu decimāldaļskaitļi"}
+            hans{"Vienkāršotie ķīniešu cipari"}
+            hansfin{"Vienkāršotie ķīniešu cipari finanšu dokumentiem"}
+            hant{"Tradicionālie ķīniešu cipari"}
+            hantfin{"Tradicionālie ķīniešu cipari finanšu dokumentiem"}
+            hebr{"Ivrita cipari"}
+            jpan{"Japāņu cipari"}
+            jpanfin{"Japāņu cipari finanšu dokumentiem"}
+            khmr{"Khmeru cipari"}
+            knda{"Kannadu cipari"}
+            laoo{"Laosiešu cipari"}
+            latn{"Arābu cipari"}
+            mlym{"Malajalu cipari"}
+            mong{"Mongoļu cipari"}
+            mymr{"Birmiešu cipari"}
+            native{"Vietējie cipari"}
+            orya{"Oriju cipari"}
+            roman{"Romiešu cipari"}
+            romanlow{"Mazie romiešu cipari"}
+            taml{"Tamilu tradicionālie cipari"}
+            tamldec{"Tamilu cipari"}
+            telu{"Telugu cipari"}
+            thai{"Tajiešu cipari"}
+            tibt{"Tibetiešu cipari"}
+            traditional{"Tradicionālā ciparu sistēma"}
+            vaii{"VAI cipari"}
+        }
+    }
+    Variants{
+        1901{"tradicionālā vācu ortogrāfija"}
+        1959ACAD{"akadēmiskā"}
+        1996{"vācu ortogrāfija no 1996. gada"}
+        AREVELA{"austrumarmēņu"}
+        AREVMDA{"rietumarmēņu"}
+        FONIPA{"Starptautiskais fonētiskais alfabēts"}
+        FONUPA{"UPA fonētika"}
+        KKCOR{"tradicionālā ortogrāfija"}
+        MONOTON{"monotons"}
+        NEDIS{"Natisona dialekts"}
+        PINYIN{"piņjiņa romanizācija"}
+        POLYTON{"politons"}
+        POSIX{"datoru"}
+        SAAHO{"saho"}
+        SCOTLAND{"Skotijas angļu"}
+        TARASK{"Taraškeviča ortogrāfija"}
+        UCCOR{"vienotā ortogrāfija"}
+        VALENCIA{"valensiešu"}
+        WADEGILE{"Veida-Džailza romanizācija"}
+    }
+    characterLabelPattern{
+        all{"{0} — visas"}
+        category-list{"{0}: {1}"}
+        compatibility{"{0} — saderība"}
+        enclosed{"{0} — noslēgtās"}
+        extended{"{0} — speciālās"}
+        historic{"{0} — vēsturiskās"}
+        miscellaneous{"{0} — dažādi"}
+        other{"{0} — citas"}
+        scripts{"rakstības — {0}"}
+        strokes{
+            one{"{0} vilkums"}
+            other{"{0} vilkumi"}
+            zero{"{0} vilkumu"}
+        }
+        subscript{"apakšraksts {0}"}
+        superscript{"augšraksts {0}"}
+    }
+    codePatterns{
+        language{"Valoda: {0}"}
+        script{"Rakstība: {0}"}
+        territory{"Reģions: {0}"}
+    }
+    localeDisplayPattern{
+        keyTypePattern{"{0}: {1}"}
+        pattern{"{0} ({1})"}
+        separator{"{0}, {1}"}
+    }
+}

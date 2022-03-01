@@ -1,0 +1,14 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Mlym_Guru.txt
+# Generated from CLDR
+#
+
+::[ം-ഃഅ-ഌഎ-ഐഒ-നപ-ഹാ-\u0D43െ-ൈൊ-\u0D4Dൗൠ-ൡ൦-൯];
+::NFD;
+::Malayalam-InterIndic;
+::InterIndic-Gurmukhi;
+::NFC;
+

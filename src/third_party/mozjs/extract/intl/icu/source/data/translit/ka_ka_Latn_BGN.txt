@@ -1,0 +1,50 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: ka_ka_Latn_BGN.txt
+# Generated from CLDR
+#
+
+# BGN/PCGN 2009 System
+#
+# The BGN/PCGN system for Georgian was designed for use in romanizing
+# Georgian-language names written in the Mkhedruli alphabet.
+#
+# https://www.gov.uk/government/uploads/system/uploads/attachment_data/file/499646/ROMANIZATION_SYSTEM_FOR_GEORGIAN.PDF
+::[აბგდევზთიკლმნოპჟრსტუფქღყშჩცძწჭხჯჰ];
+::NFC;
+ა → a;
+ბ → b;
+გ → g;
+დ → d;
+ე → e;
+ვ → v;
+ზ → z;
+თ → t;
+ი → i;
+კ → k’;
+ლ → l;
+მ → m;
+ნ → n;
+ო → o;
+პ → p’;
+ჟ → zh;
+რ → r;
+ს → s;
+ტ → t’;
+უ → u;
+ფ → p;
+ქ → k;
+ღ → gh;
+ყ → q’;
+შ → sh;
+ჩ → ch;
+ც → ts;
+ძ → dz;
+წ → ts’;
+ჭ → ch’;
+ხ → kh;
+ჯ → j;
+ჰ → h;
+

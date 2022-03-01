@@ -1,0 +1,49 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+fr_ML{
+    NumberElements{
+        latn{
+            miscPatterns{
+                atLeast{"au moins {0}"}
+            }
+        }
+    }
+    calendar{
+        gregorian{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE d MMMM y",
+                "d MMMM y",
+                "d MMM y",
+                "dd/MM/y",
+                "{1}, {0}",
+                "{1} 'à' {0}",
+                "{1} 'à' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            quarters{
+                format{
+                    wide{
+                        "le 1er trimestre",
+                        "le 2ème trimestre",
+                        "le 3ème trimestre",
+                        "le 4ème trimestre",
+                    }
+                }
+                stand-alone{
+                    wide{
+                        "1er trimestre",
+                        "2ème trimestre",
+                        "3ème trimestre",
+                        "4ème trimestre",
+                    }
+                }
+            }
+        }
+    }
+}

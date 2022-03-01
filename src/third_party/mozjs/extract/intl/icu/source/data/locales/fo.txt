@@ -1,0 +1,1869 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+fo{
+    AuxExemplarCharacters{"[c q w x z]"}
+    Ellipsis{
+        final{"{0}…"}
+        initial{"…{0}"}
+        medial{"{0}…{1}"}
+        word-final{"{0} …"}
+        word-initial{"… {0}"}
+        word-medial{"{0} … {1}"}
+    }
+    ExemplarCharacters{"[a á b d ð e f g h i í j k l m n o ó p r s t u ú v y ý æ ø]"}
+    ExemplarCharactersIndex{"[A Á B C D Ð E F G H I Í J K L M N O Ó P Q R S T U Ú V W X Y Ý Z Æ Ø]"}
+    ExemplarCharactersNumbers{"[, . % ‰ + − 0 1 2 3 4 5 6 7 8 9]"}
+    ExemplarCharactersPunctuation{"[\\- ‐ ‑ – , ; \\: ! ? . … ' ‘ ’ \u0022 “ ” ( ) \\[ \\] § @ * / \\& # † ′ ″]"}
+    MoreInformation{"?"}
+    NumberElements{
+        default{"latn"}
+        latn{
+            miscPatterns{
+                approximately{"~{0}"}
+                atLeast{"{0}+"}
+                atMost{"≤{0}"}
+                range{"{0}–{1}"}
+            }
+            patterns{
+                accountingFormat{"#,##0.00 ¤;(#,##0.00 ¤)"}
+                currencyFormat{"#,##0.00 ¤"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"#,##0 %"}
+                scientificFormat{"#E0"}
+            }
+            patternsLong{
+                decimalFormat{
+                    1000{
+                        one{"0 túsund"}
+                        other{"0 túsund"}
+                    }
+                    10000{
+                        one{"00 túsund"}
+                        other{"00 túsund"}
+                    }
+                    100000{
+                        one{"000 túsund"}
+                        other{"000 túsund"}
+                    }
+                    1000000{
+                        one{"0 millión"}
+                        other{"0 milliónir"}
+                    }
+                    10000000{
+                        one{"00 milliónir"}
+                        other{"00 milliónir"}
+                    }
+                    100000000{
+                        one{"000 milliónir"}
+                        other{"000 milliónir"}
+                    }
+                    1000000000{
+                        one{"0 milliard"}
+                        other{"0 milliardir"}
+                    }
+                    10000000000{
+                        one{"00 milliardir"}
+                        other{"00 milliardir"}
+                    }
+                    100000000000{
+                        one{"000 milliardir"}
+                        other{"000 milliardir"}
+                    }
+                    1000000000000{
+                        one{"0 billión"}
+                        other{"0 billiónir"}
+                    }
+                    10000000000000{
+                        one{"00 billiónir"}
+                        other{"00 billiónir"}
+                    }
+                    100000000000000{
+                        one{"000 billiónir"}
+                        other{"000 billiónir"}
+                    }
+                }
+            }
+            patternsShort{
+                currencyFormat{
+                    1000{
+                        one{"0 tús'.' ¤"}
+                        other{"0 tús'.' ¤"}
+                    }
+                    10000{
+                        one{"00 tús'.' ¤"}
+                        other{"00 tús'.' ¤"}
+                    }
+                    100000{
+                        one{"000 tús'.' ¤"}
+                        other{"000 tús'.' ¤"}
+                    }
+                    1000000{
+                        one{"0 mió'.' ¤"}
+                        other{"0 mió'.' ¤"}
+                    }
+                    10000000{
+                        one{"00 mió'.' ¤"}
+                        other{"00 mió'.' ¤"}
+                    }
+                    100000000{
+                        one{"000 mió'.' ¤"}
+                        other{"000 mió'.' ¤"}
+                    }
+                    1000000000{
+                        one{"0 mia'.' ¤"}
+                        other{"0 mia'.' ¤"}
+                    }
+                    10000000000{
+                        one{"00 mia'.' ¤"}
+                        other{"00 mia'.' ¤"}
+                    }
+                    100000000000{
+                        one{"000 mia'.' ¤"}
+                        other{"000 mia'.' ¤"}
+                    }
+                    1000000000000{
+                        one{"0 bió'.' ¤"}
+                        other{"0 bió'.' ¤"}
+                    }
+                    10000000000000{
+                        one{"00 bió'.' ¤"}
+                        other{"00 bió'.' ¤"}
+                    }
+                    100000000000000{
+                        one{"000 bió'.' ¤"}
+                        other{"000 bió'.' ¤"}
+                    }
+                }
+                decimalFormat{
+                    1000{
+                        one{"0 tús'.'"}
+                        other{"0 tús'.'"}
+                    }
+                    10000{
+                        one{"00 tús'.'"}
+                        other{"00 tús'.'"}
+                    }
+                    100000{
+                        one{"000 tús'.'"}
+                        other{"000 tús'.'"}
+                    }
+                    1000000{
+                        one{"0 mió'.'"}
+                        other{"0 mió'.'"}
+                    }
+                    10000000{
+                        one{"00 mió'.'"}
+                        other{"00 mió'.'"}
+                    }
+                    100000000{
+                        one{"000 mió'.'"}
+                        other{"000 mió'.'"}
+                    }
+                    1000000000{
+                        one{"0 mia'.'"}
+                        other{"0 mia'.'"}
+                    }
+                    10000000000{
+                        one{"00 mia'.'"}
+                        other{"00 mia'.'"}
+                    }
+                    100000000000{
+                        one{"000 mia'.'"}
+                        other{"000 mia'.'"}
+                    }
+                    1000000000000{
+                        one{"0 bió'.'"}
+                        other{"0 bió'.'"}
+                    }
+                    10000000000000{
+                        one{"00 bió'.'"}
+                        other{"00 bió'.'"}
+                    }
+                    100000000000000{
+                        one{"000 bió'.'"}
+                        other{"000 bió'.'"}
+                    }
+                }
+            }
+            symbols{
+                decimal{","}
+                exponential{"E"}
+                group{"."}
+                infinity{"∞"}
+                list{";"}
+                minusSign{"−"}
+                nan{"NaN"}
+                perMille{"‰"}
+                percentSign{"%"}
+                plusSign{"+"}
+                superscriptingExponent{"×"}
+                timeSeparator{":"}
+            }
+        }
+        minimalPairs{
+            ordinal{
+                other{"Tak {0}. vegin til høgru."}
+            }
+            plural{
+                one{"{0} dag"}
+                other{"{0} dagar"}
+            }
+        }
+        minimumGroupingDigits{"1"}
+        native{"latn"}
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, dd. MMMM y G",
+                "d. MMMM y G",
+                "d. MMM y G",
+                "dd.MM.y GGGGG",
+                "{1}, {0}",
+                "{1} 'kl'. {0}",
+                "{1} 'kl'. {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                Bh{"h B"}
+                Bhm{"h:mm B"}
+                Bhms{"h:mm:ss B"}
+                E{"ccc"}
+                EBhm{"E h:mm B"}
+                EBhms{"E h:mm:ss B"}
+                EHm{"E HH:mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"E d."}
+                Ehm{"E h:mm a"}
+                Ehms{"E h:mm:ss a"}
+                Gy{"y G"}
+                GyMMM{"MMM y G"}
+                GyMMMEd{"E d. MMM y G"}
+                GyMMMd{"d. MMM y G"}
+                H{"HH"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E dd.MM"}
+                MMM{"LLL"}
+                MMMEd{"E d. MMM"}
+                MMMMd{"d. MMMM"}
+                MMMd{"d. MMM"}
+                Md{"dd.MM"}
+                d{"d."}
+                h{"h a"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                ms{"mm:ss"}
+                y{"y G"}
+                yM{"MM.y"}
+                yMEd{"E dd.MM.y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E d. MMM y"}
+                yMMMd{"d. MMM y"}
+                yMd{"dd.MM.y"}
+                yQQQ{"QQQ 'í' y"}
+                yQQQQ{"QQQQ 'í' y"}
+                yyyy{"y G"}
+                yyyyM{"MM.y GGGGG"}
+                yyyyMEd{"E dd.MM.y GGGGG"}
+                yyyyMMM{"MMM y G"}
+                yyyyMMMEd{"E d. MMM y G"}
+                yyyyMMMM{"MMMM y G"}
+                yyyyMMMd{"d. MMM y G"}
+                yyyyMd{"dd.MM.y GGGGG"}
+                yyyyQQQ{"QQQ 'í' y G"}
+                yyyyQQQQ{"QQQQ 'í' y G"}
+            }
+            intervalFormats{
+                Bh{
+                    B{"h B – h B"}
+                    h{"h–h B"}
+                }
+                Bhm{
+                    B{"h:mm B – h:mm B"}
+                    h{"h:mm–h:mm B"}
+                    m{"h:mm–h:mm B"}
+                }
+                Gy{
+                    G{"y G – y G"}
+                    y{"y–y G"}
+                }
+                GyM{
+                    G{"MM.y GGGGG – MM.y GGGGG"}
+                    M{"MM.y–MM.y GGGGG"}
+                    y{"MM.y–MM.y GGGGG"}
+                }
+                GyMEd{
+                    G{"E, dd.MM.y GGGGG – E, dd.MM.y GGGGG"}
+                    M{"E, dd.MM.y – E, dd.MM.y GGGGG"}
+                    d{"E, dd.MM.y – E, dd.MM.y GGGGG"}
+                    y{"E, dd.MM.y – E, dd.MM.y GGGGG"}
+                }
+                GyMMM{
+                    G{"MMM y G – MMM y G"}
+                    M{"MMM–MMM y G"}
+                    y{"MMM y – MMM y G"}
+                }
+                GyMMMEd{
+                    G{"E, d. MMM y G – E, d. MMM y G"}
+                    M{"E, d. MMM – E, d. MMM y G"}
+                    d{"E, d. MMM – E, d. MMM y G"}
+                    y{"E, d. MMM y – E, d. MMM y G"}
+                }
+                GyMMMd{
+                    G{"d. MMM y G – d. MMM y G"}
+                    M{"d. MMM – d. MMM y G"}
+                    d{"d.–d. MMM y G"}
+                    y{"d. MMM y – d. MMM y G"}
+                }
+                GyMd{
+                    G{"dd.MM.y GGGGG – dd.MM.y GGGGG"}
+                    M{"dd.MM.y–dd.MM.y GGGGG"}
+                    d{"dd.MM.y–dd.MM.y GGGGG"}
+                    y{"dd.MM.y–dd.MM.y GGGGG"}
+                }
+                H{
+                    H{"HH–HH"}
+                }
+                Hm{
+                    H{"HH:mm–HH:mm"}
+                    m{"HH:mm–HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm–HH:mm v"}
+                    m{"HH:mm–HH:mm v"}
+                }
+                Hv{
+                    H{"HH–HH v"}
+                }
+                M{
+                    M{"MM–MM"}
+                }
+                MEd{
+                    M{"E dd.MM–E dd.MM"}
+                    d{"E dd.MM–E dd.MM"}
+                }
+                MMM{
+                    M{"MMM–MMM"}
+                }
+                MMMEd{
+                    M{"E d. MMM–E d. MMM"}
+                    d{"E d. MMM–E d. MMM"}
+                }
+                MMMd{
+                    M{"d. MMM–d. MMM"}
+                    d{"d.–d. MMM"}
+                }
+                Md{
+                    M{"dd.MM–dd.MM"}
+                    d{"dd.MM–dd.MM"}
+                }
+                d{
+                    d{"d.–d."}
+                }
+                fallback{"{0} – {1}"}
+                h{
+                    a{"h a – h a"}
+                    h{"h–h a"}
+                }
+                hm{
+                    a{"h:mm a – h:mm a"}
+                    h{"h:mm–h:mm a"}
+                    m{"h:mm–h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a – h:mm a v"}
+                    h{"h:mm–h:mm a v"}
+                    m{"h:mm–h:mm a v"}
+                }
+                hv{
+                    a{"h a – h a v"}
+                    h{"h–h a v"}
+                }
+                y{
+                    y{"y–y G"}
+                }
+                yM{
+                    M{"MM.y–MM.y GGGGG"}
+                    y{"MM.y–MM.y GGGGG"}
+                }
+                yMEd{
+                    M{"E dd.MM.y–E dd.MM.y GGGGG"}
+                    d{"E dd.MM.y–E dd.MM.y GGGGG"}
+                    y{"E dd.MM.y–E dd.MM.y GGGGG"}
+                }
+                yMMM{
+                    M{"MMM–MMM y G"}
+                    y{"MMM y–MMM y G"}
+                }
+                yMMMEd{
+                    M{"E d. MMM–E d. MMM y"}
+                    d{"E d. MMM–E d. MMM y"}
+                    y{"E d. MMM y–E d. MMM y G"}
+                }
+                yMMMM{
+                    M{"MMMM–MMMM y G"}
+                    y{"MMMM y–MMMM y G"}
+                }
+                yMMMd{
+                    M{"d. MMM–d. MMM y G"}
+                    d{"d.–d. MMM y G"}
+                    y{"d. MMM y–d. MMM y G"}
+                }
+                yMd{
+                    M{"dd.MM.y–dd.MM.y GGGGG"}
+                    d{"dd.MM.y–dd.MM.y GGGGG"}
+                    y{"dd.MM.y–dd.MM.y GGGGG"}
+                }
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "AM",
+                "PM",
+            }
+            AmPmMarkersAbbr{
+                "AM",
+                "PM",
+            }
+            AmPmMarkersNarrow{
+                "AM",
+                "PM",
+            }
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, d. MMMM y",
+                "d. MMMM y",
+                "dd.MM.y",
+                "dd.MM.yy",
+                "{1}, {0}",
+                "{1} 'kl'. {0}",
+                "{1} 'kl'. {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            appendItems{
+                Timezone{"{0} {1}"}
+            }
+            availableFormats{
+                Bh{"h B"}
+                Bhm{"h:mm B"}
+                Bhms{"h:mm:ss B"}
+                E{"ccc"}
+                EBhm{"E h:mm B"}
+                EBhms{"E h:mm:ss B"}
+                EHm{"E HH:mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"E d."}
+                Ehm{"E h:mm a"}
+                Ehms{"E h:mm:ss a"}
+                Gy{"y G"}
+                GyMMM{"MMM y G"}
+                GyMMMEd{"E d. MMM y G"}
+                GyMMMd{"d. MMM y G"}
+                H{"HH"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                Hmsv{"HH:mm:ss v"}
+                Hmv{"HH:mm v"}
+                M{"LL"}
+                MEd{"E dd.MM"}
+                MMM{"LLL"}
+                MMMEd{"E d. MMM"}
+                MMMMW{
+                    one{"W. 'vika' 'í' MMMM"}
+                    other{"W. 'vika' 'í' MMMM"}
+                }
+                MMMMd{"d. MMMM"}
+                MMMd{"d. MMM"}
+                Md{"dd.MM"}
+                d{"d."}
+                h{"h a"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                hmsv{"h:mm:ss a v"}
+                hmv{"h:mm a v"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"MM.y"}
+                yMEd{"E dd.MM.y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E d. MMM y"}
+                yMMMM{"MMMM y"}
+                yMMMd{"d. MMM y"}
+                yMd{"dd.MM.y"}
+                yQQQ{"QQQ 'í' y"}
+                yQQQQ{"QQQQ 'í' y"}
+                yw{
+                    one{"w. 'vika' 'í' Y"}
+                    other{"w. 'vika' 'í' Y"}
+                }
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "sun.",
+                        "mán.",
+                        "týs.",
+                        "mik.",
+                        "hós.",
+                        "frí.",
+                        "ley.",
+                    }
+                    narrow{
+                        "S",
+                        "M",
+                        "T",
+                        "M",
+                        "H",
+                        "F",
+                        "L",
+                    }
+                    short{
+                        "su.",
+                        "má.",
+                        "tý.",
+                        "mi.",
+                        "hó.",
+                        "fr.",
+                        "le.",
+                    }
+                    wide{
+                        "sunnudagur",
+                        "mánadagur",
+                        "týsdagur",
+                        "mikudagur",
+                        "hósdagur",
+                        "fríggjadagur",
+                        "leygardagur",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "sun",
+                        "mán",
+                        "týs",
+                        "mik",
+                        "hós",
+                        "frí",
+                        "ley",
+                    }
+                    narrow{
+                        "S",
+                        "M",
+                        "T",
+                        "M",
+                        "H",
+                        "F",
+                        "L",
+                    }
+                    short{
+                        "su",
+                        "má",
+                        "tý",
+                        "mi",
+                        "hó",
+                        "fr",
+                        "le",
+                    }
+                    wide{
+                        "sunnudagur",
+                        "mánadagur",
+                        "týsdagur",
+                        "mikudagur",
+                        "hósdagur",
+                        "fríggjadagur",
+                        "leygardagur",
+                    }
+                }
+            }
+            dayPeriod{
+                stand-alone{
+                    abbreviated{
+                        am{"AM"}
+                        pm{"PM"}
+                    }
+                    narrow{
+                        am{"AM"}
+                        pm{"PM"}
+                    }
+                    wide{
+                        am{"AM"}
+                        pm{"PM"}
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "f.Kr.",
+                    "e.Kr.",
+                }
+                abbreviated%variant{
+                    "f.o.tíðr.",
+                    "o.tíðr.",
+                }
+                narrow{
+                    "fKr",
+                    "eKr",
+                }
+                narrow%variant{
+                    "flt",
+                    "lt",
+                }
+                wide{
+                    "fyri Krist",
+                    "eftir Krist",
+                }
+                wide%variant{
+                    "fyri okkara tíðarrokning",
+                    "okkara tíðarrokning",
+                }
+            }
+            intervalFormats{
+                Bh{
+                    B{"h B – h B"}
+                }
+                Bhm{
+                    B{"h:mm B – h:mm B"}
+                    h{"h:mm–h:mm B"}
+                    m{"h:mm–h:mm B"}
+                }
+                Gy{
+                    G{"y G – y G"}
+                    y{"y–y G"}
+                }
+                GyM{
+                    G{"MM.y GGGGG – MM.y GGGGG"}
+                    M{"MM.y–MM.y GGGGG"}
+                    y{"MM.y–MM.y GGGGG"}
+                }
+                GyMEd{
+                    G{"E, dd.MM.y GGGGG – E, dd.MM.y GGGGG"}
+                    M{"E, dd.MM.y – E, dd.MM.y GGGGG"}
+                    d{"E, dd.MM.y – E, dd.MM.y GGGGG"}
+                    y{"E, dd.MM.y – E, dd.MM.y GGGGG"}
+                }
+                GyMMM{
+                    G{"MMM y G – MMM y G"}
+                    M{"MMM–MMM y G"}
+                    y{"MMM y – MMM y G"}
+                }
+                GyMMMEd{
+                    G{"E, d. MMM y G – E, d. MMM y G"}
+                    M{"E, d. MMM – E, d. MMM y G"}
+                    d{"E, d. MMM – E, d. MMM y G"}
+                    y{"E, d. MMM y – E, d. MMM y G"}
+                }
+                GyMMMd{
+                    G{"d. MMM y G – d. MMM y G"}
+                    M{"d. MMM – d. MMM y G"}
+                    d{"d.–d. MMM y G"}
+                    y{"d. MMM y – d. MMM y G"}
+                }
+                GyMd{
+                    G{"dd.MM.y GGGGG – dd.MM.y GGGGG"}
+                    M{"dd.MM.y – dd.MM.y GGGGG"}
+                    d{"dd.MM.y–dd.MM.y GGGGG"}
+                    y{"dd.MM.y – dd.MM.y GGGGG"}
+                }
+                H{
+                    H{"HH–HH"}
+                }
+                Hm{
+                    H{"HH:mm–HH:mm"}
+                    m{"HH:mm–HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm–HH:mm v"}
+                    m{"HH:mm–HH:mm v"}
+                }
+                Hv{
+                    H{"HH–HH v"}
+                }
+                M{
+                    M{"MM–MM"}
+                }
+                MEd{
+                    M{"E dd.MM–E dd.MM"}
+                    d{"E dd.MM–E dd.MM"}
+                }
+                MMM{
+                    M{"MMM–MMM"}
+                }
+                MMMEd{
+                    M{"E d. MMM–E d. MMM"}
+                    d{"E d. MMM–E d. MMM"}
+                }
+                MMMd{
+                    M{"d. MMM–d. MMM"}
+                    d{"d.–d. MMM"}
+                }
+                Md{
+                    M{"dd.MM–dd.MM"}
+                    d{"dd.MM–dd.MM"}
+                }
+                d{
+                    d{"d.–d."}
+                }
+                fallback{"{0} – {1}"}
+                h{
+                    a{"h a–h a"}
+                    h{"h–h a"}
+                }
+                hm{
+                    a{"h:mm a–h:mm a"}
+                    h{"h:mm–h:mm a"}
+                    m{"h:mm–h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a–h:mm a v"}
+                    h{"h:mm–h:mm a v"}
+                    m{"h:mm–h:mm a v"}
+                }
+                hv{
+                    a{"h a–h a v"}
+                    h{"h–h a v"}
+                }
+                y{
+                    y{"y–y"}
+                }
+                yM{
+                    M{"MM.y–MM.y"}
+                    y{"MM.y–MM.y"}
+                }
+                yMEd{
+                    M{"E dd.MM.y–E dd.MM.y"}
+                    d{"E dd.MM.y–E dd.MM.y"}
+                    y{"E dd.MM.y–E dd.MM.y"}
+                }
+                yMMM{
+                    M{"MMM–MMM y"}
+                    y{"MMM y–MMM y"}
+                }
+                yMMMEd{
+                    M{"E dd. MMM–E dd. MMM y"}
+                    d{"E dd. MMM–E dd. MMM y"}
+                    y{"E dd. MMM y–E dd. MMM y"}
+                }
+                yMMMM{
+                    M{"MMMM–MMMM y"}
+                    y{"MMMM y–MMMM y"}
+                }
+                yMMMd{
+                    M{"dd. MMM–dd. MMM y"}
+                    d{"d.–d. MMM y"}
+                    y{"dd. MMM y–dd. MMM y"}
+                }
+                yMd{
+                    M{"dd.MM.y–dd.MM.y"}
+                    d{"dd.MM.y–dd.MM.y"}
+                    y{"dd.MM.y–dd.MM.y"}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "jan.",
+                        "feb.",
+                        "mar.",
+                        "apr.",
+                        "mai",
+                        "jun.",
+                        "jul.",
+                        "aug.",
+                        "sep.",
+                        "okt.",
+                        "nov.",
+                        "des.",
+                    }
+                    narrow{
+                        "J",
+                        "F",
+                        "M",
+                        "A",
+                        "M",
+                        "J",
+                        "J",
+                        "A",
+                        "S",
+                        "O",
+                        "N",
+                        "D",
+                    }
+                    wide{
+                        "januar",
+                        "februar",
+                        "mars",
+                        "apríl",
+                        "mai",
+                        "juni",
+                        "juli",
+                        "august",
+                        "september",
+                        "oktober",
+                        "november",
+                        "desember",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "jan",
+                        "feb",
+                        "mar",
+                        "apr",
+                        "mai",
+                        "jun",
+                        "jul",
+                        "aug",
+                        "sep",
+                        "okt",
+                        "nov",
+                        "des",
+                    }
+                    narrow{
+                        "J",
+                        "F",
+                        "M",
+                        "A",
+                        "M",
+                        "J",
+                        "J",
+                        "A",
+                        "S",
+                        "O",
+                        "N",
+                        "D",
+                    }
+                    wide{
+                        "januar",
+                        "februar",
+                        "mars",
+                        "apríl",
+                        "mai",
+                        "juni",
+                        "juli",
+                        "august",
+                        "september",
+                        "oktober",
+                        "november",
+                        "desember",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "1. ársfj.",
+                        "2. ársfj.",
+                        "3. ársfj.",
+                        "4. ársfj.",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "1. ársfjórðingur",
+                        "2. ársfjórðingur",
+                        "3. ársfjórðingur",
+                        "4. ársfjórðingur",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "1. ársfj.",
+                        "2. ársfj.",
+                        "3. ársfj.",
+                        "4. ársfj.",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "1. ársfjórðingur",
+                        "2. ársfjórðingur",
+                        "3. ársfjórðingur",
+                        "4. ársfjórðingur",
+                    }
+                }
+            }
+        }
+    }
+    characterLabel{
+        activities{"Virksemi"}
+        african_scripts{"Afrikanskar skriftir"}
+        american_scripts{"Amerikanskar skriftir"}
+        animal{"Dýr"}
+        animals_nature{"Dýr og náttúra"}
+        arrows{"Pílur"}
+        body{"Kroppur"}
+        box_drawing{"Kassatekning"}
+        braille{"Blindaskrift"}
+        building{"Bygningur"}
+        bullets_stars{"Prikkar/Stjørnur"}
+        consonantal_jamo{"Jamo hjáljóð"}
+        currency_symbols{"Gjaldoyra tekin"}
+        dash_connector{"Bindistrika/sambindari"}
+        digits{"Talstavir"}
+        dingbats{"Dingbats"}
+        divination_symbols{"Spádóms tekin"}
+        downwards_arrows{"Pílar peikandi niðureftir"}
+        downwards_upwards_arrows{"Pílar peikandi niður og uppeftir"}
+        east_asian_scripts{"Eysturasiatiskar skriftir"}
+        emoji{"Emoji"}
+        european_scripts{"Evropeiskar skriftir"}
+        female{"Kvinna"}
+        flag{"Flagg"}
+        flags{"Fløgg"}
+        food_drink{"Matur og drekka"}
+        format{"Forsniða"}
+        format_whitespace{"Forsnið og hvíttglopp"}
+        full_width_form_variant{"Full breidd avbrigdir formur"}
+        geometric_shapes{"Mátingarfrøðiligir formar"}
+        half_width_form_variant{"Hálv breidd avbrigdir formur"}
+        han_characters{"Han bókstavar"}
+        han_radicals{"Han rótmerkir"}
+        hanja{"Hanja"}
+        hanzi_simplified{"Hanzi (einkult)"}
+        hanzi_traditional{"Hanzi (vanligt)"}
+        heart{"Hjarta"}
+        historic_scripts{"Søguligar skriftir"}
+        ideographic_desc_characters{"Hugtaksskrift eftirkomandi bókstavar"}
+        japanese_kana{"Japanskt kana"}
+        kanbun{"Kanbun"}
+        kanji{"Kanji"}
+        keycap{"Knappahetta"}
+        leftwards_arrows{"Pílar peikandi til vinstru"}
+        leftwards_rightwards_arrows{"Pílar peikandi til vinstru og høgru"}
+        letterlike_symbols{"Bókstavalíknandi tekin"}
+        limited_use{"Avmarkað brúk"}
+        male{"Mannfólk"}
+        math_symbols{"Støddfrøðilig tekin"}
+        middle_eastern_scripts{"Miðeystur skiftir"}
+        miscellaneous{"Ymiskt"}
+        modern_scripts{"Nútíðar skriftir"}
+        modifier{"Laga eftir"}
+        musical_symbols{"Tónleika tekin"}
+        nature{"Natúr"}
+        nonspacing{"Einki glopp"}
+        numbers{"Tøl"}
+        objects{"Lutir"}
+        other{"Annað"}
+        paired{"Greipa saman"}
+        person{"Persónur"}
+        phonetic_alphabet{"Ljóðstavrað"}
+        pictographs{"Myndatekin"}
+        place{"Staður"}
+        plant{"Planta"}
+        punctuation{"Teknseting"}
+        rightwards_arrows{"Pílar peikandi til høgru"}
+        sign_standard_symbols{"Tekn/vanlig tekin"}
+        small_form_variant{"Lítil avbrigdir formur"}
+        smiley{"Brostekn"}
+        smileys_people{"Brostekin og fólk"}
+        south_asian_scripts{"Suðurasiatiskar skriftir"}
+        southeast_asian_scripts{"Útsynningsasiatiskar skriftir"}
+        spacing{"Regluglopp"}
+        sport{"Ítróttur"}
+        symbols{"Tekin"}
+        technical_symbols{"Tøknilig tekin"}
+        tone_marks{"Litdámt merkir"}
+        travel{"Ferðing"}
+        travel_places{"Ferðing og støð"}
+        upwards_arrows{"Pílar peikandi uppeftir"}
+        variant_forms{"Frábrigdi formar"}
+        vocalic_jamo{"Jamo sjálvljóð"}
+        weather{"Veður"}
+        western_asian_scripts{"Vesturasiatiskar skriftir"}
+        whitespace{"Hvíttglopp"}
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"dagur"}
+            relative{
+                "-1"{"í gjár"}
+                "-2"{"fyrradagin"}
+                "0"{"í dag"}
+                "1"{"í morgin"}
+                "2"{"í ovurmorgin"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} dag"}
+                    other{"um {0} dagar"}
+                }
+                past{
+                    one{"{0} dagur síðan"}
+                    other{"{0} dagar síðan"}
+                }
+            }
+        }
+        day-narrow{
+            dn{"d."}
+            relativeTime{
+                future{
+                    one{"um {0} d."}
+                    other{"um {0} d."}
+                }
+                past{
+                    one{"{0} d. síðan"}
+                    other{"{0} d. síðan"}
+                }
+            }
+        }
+        day-short{
+            dn{"da."}
+            relativeTime{
+                future{
+                    one{"um {0} da."}
+                    other{"um {0} da."}
+                }
+                past{
+                    one{"{0} da. síðan"}
+                    other{"{0} da. síðan"}
+                }
+            }
+        }
+        dayOfYear{
+            dn{"dagur í árinum"}
+        }
+        dayOfYear-narrow{
+            dn{"dagur í ár."}
+        }
+        dayOfYear-short{
+            dn{"dagur í ár."}
+        }
+        dayperiod{
+            dn{"AM/PM"}
+        }
+        dayperiod-narrow{
+            dn{"AM/PM"}
+        }
+        dayperiod-short{
+            dn{"AM/PM"}
+        }
+        era{
+            dn{"tíðarrokning"}
+        }
+        era-narrow{
+            dn{"tíðarrokning"}
+        }
+        era-short{
+            dn{"tíðarrokning"}
+        }
+        fri{
+            relative{
+                "-1"{"seinasta fríggjadag"}
+                "0"{"næsta fríggjadag"}
+                "1"{"fríggjadagin í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} fríggjadag"}
+                    other{"um {0} fríggjadagar"}
+                }
+                past{
+                    one{"{0} fríggjadag síðani"}
+                    other{"{0} fríggjadagar síðani"}
+                }
+            }
+        }
+        fri-narrow{
+            relative{
+                "-1"{"seinasta fr."}
+                "0"{"næsta fr."}
+                "1"{"fr. í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} fr."}
+                    other{"um {0} fr."}
+                }
+                past{
+                    one{"{0} fr. síðani"}
+                    other{"{0} fr. síðani"}
+                }
+            }
+        }
+        fri-short{
+            relative{
+                "-1"{"seinasta frí."}
+                "0"{"næsta frí."}
+                "1"{"frí. í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} frí."}
+                    other{"um {0} frí."}
+                }
+                past{
+                    one{"{0} frí. síðani"}
+                    other{"{0} frí. síðani"}
+                }
+            }
+        }
+        hour{
+            dn{"tími"}
+            relative{
+                "0"{"hendan tíman"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} tíma"}
+                    other{"um {0} tímar"}
+                }
+                past{
+                    one{"{0} tími síðan"}
+                    other{"{0} tímar síðan"}
+                }
+            }
+        }
+        hour-narrow{
+            dn{"t."}
+            relativeTime{
+                future{
+                    one{"um {0} t."}
+                    other{"um {0} t."}
+                }
+                past{
+                    one{"{0} t. síðan"}
+                    other{"{0} t. síðan"}
+                }
+            }
+        }
+        hour-short{
+            dn{"t."}
+            relativeTime{
+                future{
+                    one{"um {0} t."}
+                    other{"um {0} t."}
+                }
+                past{
+                    one{"{0} t. síðan"}
+                    other{"{0} t. síðan"}
+                }
+            }
+        }
+        minute{
+            dn{"minuttur"}
+            relative{
+                "0"{"hendan minuttin"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} minutt"}
+                    other{"um {0} minuttir"}
+                }
+                past{
+                    one{"{0} minutt síðan"}
+                    other{"{0} minuttir síðan"}
+                }
+            }
+        }
+        minute-narrow{
+            dn{"m."}
+            relativeTime{
+                future{
+                    one{"um {0} m."}
+                    other{"um {0} m."}
+                }
+                past{
+                    one{"{0} m. síðan"}
+                    other{"{0} m. síðan"}
+                }
+            }
+        }
+        minute-short{
+            dn{"min."}
+            relativeTime{
+                future{
+                    one{"um {0} min."}
+                    other{"um {0} min."}
+                }
+                past{
+                    one{"{0} min. síðan"}
+                    other{"{0} min. síðan"}
+                }
+            }
+        }
+        mon{
+            relative{
+                "-1"{"seinasta mánadag"}
+                "0"{"næsta mánadag"}
+                "1"{"mánadagin í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} mánadag"}
+                    other{"um {0} mánadagar"}
+                }
+                past{
+                    one{"{0} mánadag síðani"}
+                    other{"{0} mánadagar síðani"}
+                }
+            }
+        }
+        mon-narrow{
+            relative{
+                "-1"{"seinasta má."}
+                "0"{"næsta má."}
+                "1"{"má. í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} má."}
+                    other{"um {0} má."}
+                }
+                past{
+                    one{"{0} má. síðani"}
+                    other{"{0} má. síðani"}
+                }
+            }
+        }
+        mon-short{
+            relative{
+                "-1"{"seinasta mán."}
+                "0"{"næsta mán."}
+                "1"{"mán. í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} mán."}
+                    other{"um {0} mán."}
+                }
+                past{
+                    one{"{0} mán. síðani"}
+                    other{"{0} mán. síðani"}
+                }
+            }
+        }
+        month{
+            dn{"mánaður"}
+            relative{
+                "-1"{"seinasta mánað"}
+                "0"{"henda mánaðin"}
+                "1"{"næsta mánað"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} mánað"}
+                    other{"um {0} mánaðir"}
+                }
+                past{
+                    one{"{0} mánað síðan"}
+                    other{"{0} mánaðir síðan"}
+                }
+            }
+        }
+        month-narrow{
+            dn{"mnð."}
+            relative{
+                "-1"{"seinasta mnð."}
+                "0"{"henda mnð."}
+                "1"{"næsta mnð."}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} mnð."}
+                    other{"um {0} mnð."}
+                }
+                past{
+                    one{"{0} mnð. síðan"}
+                    other{"{0} mnð. síðan"}
+                }
+            }
+        }
+        month-short{
+            dn{"mnð."}
+            relative{
+                "-1"{"seinasta mnð."}
+                "0"{"henda mnð."}
+                "1"{"næsta mnð."}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} mnð."}
+                    other{"um {0} mnð."}
+                }
+                past{
+                    one{"{0} mnð. síðan"}
+                    other{"{0} mnð. síðan"}
+                }
+            }
+        }
+        quarter{
+            dn{"ársfjórðingur"}
+            relative{
+                "-1"{"seinasta ársfjórðing"}
+                "0"{"hendan ársfjórðingin"}
+                "1"{"næsta ársfjórðing"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} ársfjórðing"}
+                    other{"um {0} ársfjórðingar"}
+                }
+                past{
+                    one{"{0} ársfjórðing síðan"}
+                    other{"{0} ársfjórðingar síðan"}
+                }
+            }
+        }
+        quarter-narrow{
+            dn{"ársfj."}
+            relativeTime{
+                future{
+                    one{"um {0} ársfj."}
+                    other{"um {0} ársfj."}
+                }
+                past{
+                    one{"{0} ársfj. síðan"}
+                    other{"{0} ársfj. síðan"}
+                }
+            }
+        }
+        quarter-short{
+            dn{"ársfj."}
+            relativeTime{
+                future{
+                    one{"um {0} ársfj."}
+                    other{"um {0} ársfj."}
+                }
+                past{
+                    one{"{0} ársfj. síðan"}
+                    other{"{0} ársfj. síðan"}
+                }
+            }
+        }
+        sat{
+            relative{
+                "-1"{"seinasta leygardag"}
+                "0"{"næsta leygardag"}
+                "1"{"leygardagin í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} leygardag"}
+                    other{"um {0} leygardagar"}
+                }
+                past{
+                    one{"{0} leygardag síðani"}
+                    other{"{0} leygardagar síðani"}
+                }
+            }
+        }
+        sat-narrow{
+            relative{
+                "-1"{"seinasta le."}
+                "0"{"næsta le."}
+                "1"{"le. í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} le."}
+                    other{"um {0} le."}
+                }
+                past{
+                    one{"{0} le. síðani"}
+                    other{"{0} le. síðani"}
+                }
+            }
+        }
+        sat-short{
+            relative{
+                "-1"{"seinasta ley."}
+                "0"{"næsta ley."}
+                "1"{"ley. í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} ley."}
+                    other{"um {0} ley."}
+                }
+                past{
+                    one{"{0} ley. síðani"}
+                    other{"{0} ley. síðani"}
+                }
+            }
+        }
+        second{
+            dn{"sekund"}
+            relative{
+                "0"{"nú"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} sekund"}
+                    other{"um {0} sekund"}
+                }
+                past{
+                    one{"{0} sekund síðan"}
+                    other{"{0} sekund síðan"}
+                }
+            }
+        }
+        second-narrow{
+            dn{"s."}
+            relativeTime{
+                future{
+                    one{"um {0} s."}
+                    other{"um {0} s."}
+                }
+                past{
+                    one{"{0} s. síðan"}
+                    other{"{0} s. síðan"}
+                }
+            }
+        }
+        second-short{
+            dn{"sek."}
+            relativeTime{
+                future{
+                    one{"um {0} sek."}
+                    other{"um {0} sek."}
+                }
+                past{
+                    one{"{0} sek. síðan"}
+                    other{"{0} sek. síðan"}
+                }
+            }
+        }
+        sun{
+            relative{
+                "-1"{"seinasta sunnudag"}
+                "0"{"næsta sunnudag"}
+                "1"{"sunnudagin í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} sunnudag"}
+                    other{"um {0} sunnudagar"}
+                }
+                past{
+                    one{"{0} sunnudag síðani"}
+                    other{"{0} sunnudagar síðani"}
+                }
+            }
+        }
+        sun-narrow{
+            relative{
+                "-1"{"seinasta su."}
+                "0"{"næsta su."}
+                "1"{"su. í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} su."}
+                    other{"um {0} su."}
+                }
+                past{
+                    one{"{0} su. síðani"}
+                    other{"{0} su. síðani"}
+                }
+            }
+        }
+        sun-short{
+            relative{
+                "-1"{"seinasta sun."}
+                "0"{"næsta sun."}
+                "1"{"sun. í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} sun."}
+                    other{"um {0} sun."}
+                }
+                past{
+                    one{"{0} sun. síðani"}
+                    other{"{0} sun. síðani"}
+                }
+            }
+        }
+        thu{
+            relative{
+                "-1"{"seinasta hósdag"}
+                "0"{"næsta hósdag"}
+                "1"{"hósdagin í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} hósdag"}
+                    other{"um {0} hósdagar"}
+                }
+                past{
+                    one{"{0} hósdag síðani"}
+                    other{"{0} hósdagar síðani"}
+                }
+            }
+        }
+        thu-narrow{
+            relative{
+                "-1"{"seinasta hó."}
+                "0"{"næsta hó."}
+                "1"{"hó. í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} hó."}
+                    other{"um {0} hó."}
+                }
+                past{
+                    one{"{0} hó. síðani"}
+                    other{"{0} hó. síðani"}
+                }
+            }
+        }
+        thu-short{
+            relative{
+                "-1"{"seinasta hós."}
+                "0"{"næsta hós."}
+                "1"{"hós. í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} hós."}
+                    other{"um {0} hós."}
+                }
+                past{
+                    one{"{0} hós. síðani"}
+                    other{"{0} hós. síðani"}
+                }
+            }
+        }
+        tue{
+            relative{
+                "-1"{"seinasta týsdag"}
+                "0"{"næsta týsdag"}
+                "1"{"týsdagin í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} týsdag"}
+                    other{"um {0} týsdagar"}
+                }
+                past{
+                    one{"{0} týsdag síðani"}
+                    other{"{0} týsdagar síðani"}
+                }
+            }
+        }
+        tue-narrow{
+            relative{
+                "-1"{"seinasta tý."}
+                "0"{"næsta tý."}
+                "1"{"tý. í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} tý."}
+                    other{"um {0} tý."}
+                }
+                past{
+                    one{"{0} tý. síðani"}
+                    other{"{0} tý. síðani"}
+                }
+            }
+        }
+        tue-short{
+            relative{
+                "-1"{"seinasta týs."}
+                "0"{"næsta týs."}
+                "1"{"týs. í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} týs."}
+                    other{"um {0} týs."}
+                }
+                past{
+                    one{"{0} týs. síðani"}
+                    other{"{0} týs. síðani"}
+                }
+            }
+        }
+        wed{
+            relative{
+                "-1"{"seinasta mikudag"}
+                "0"{"næsta mikudag"}
+                "1"{"mikudagin í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} mikudag"}
+                    other{"um {0} mikudagar"}
+                }
+                past{
+                    one{"{0} mikudag síðani"}
+                    other{"{0} mikudagar síðani"}
+                }
+            }
+        }
+        wed-narrow{
+            relative{
+                "-1"{"seinasta mi."}
+                "0"{"næsta mi."}
+                "1"{"mi. í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} mi."}
+                    other{"um {0} mi."}
+                }
+                past{
+                    one{"{0} mi. síðani"}
+                    other{"{0} mi. síðani"}
+                }
+            }
+        }
+        wed-short{
+            relative{
+                "-1"{"seinasta mik."}
+                "0"{"næsta mik."}
+                "1"{"mik. í næstu viku"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} mik."}
+                    other{"um {0} mik."}
+                }
+                past{
+                    one{"{0} mik. síðani"}
+                    other{"{0} mik. síðani"}
+                }
+            }
+        }
+        week{
+            dn{"vika"}
+            relative{
+                "-1"{"seinastu viku"}
+                "0"{"hesu viku"}
+                "1"{"næstu viku"}
+            }
+            relativePeriod{"vika nummar {0}"}
+            relativeTime{
+                future{
+                    one{"um {0} viku"}
+                    other{"um {0} vikur"}
+                }
+                past{
+                    one{"{0} vika síðan"}
+                    other{"{0} vikur síðan"}
+                }
+            }
+        }
+        week-narrow{
+            dn{"v."}
+            relative{
+                "-1"{"seinastu v."}
+                "0"{"hesu v."}
+                "1"{"næstu v."}
+            }
+            relativePeriod{"vika nummar {0}"}
+            relativeTime{
+                future{
+                    one{"um {0} v."}
+                    other{"um {0} v."}
+                }
+                past{
+                    one{"{0} v. síðan"}
+                    other{"{0} v. síðan"}
+                }
+            }
+        }
+        week-short{
+            dn{"vi."}
+            relative{
+                "-1"{"seinastu vi."}
+                "0"{"hesu vi."}
+                "1"{"næstu vi."}
+            }
+            relativePeriod{"vika nummar {0}"}
+            relativeTime{
+                future{
+                    one{"um {0} vi."}
+                    other{"um {0} vi."}
+                }
+                past{
+                    one{"{0} vi. síðan"}
+                    other{"{0} vi. síðan"}
+                }
+            }
+        }
+        weekOfMonth{
+            dn{"vika í mánaðinum"}
+        }
+        weekOfMonth-narrow{
+            dn{"vi. í mnð."}
+        }
+        weekOfMonth-short{
+            dn{"vi. í mnð."}
+        }
+        weekday{
+            dn{"vikudagur"}
+        }
+        weekday-narrow{
+            dn{"vikudagur"}
+        }
+        weekday-short{
+            dn{"vikudagur"}
+        }
+        weekdayOfMonth{
+            dn{"vikudagur í mánaðinum"}
+        }
+        weekdayOfMonth-narrow{
+            dn{"vikudagur í mnð."}
+        }
+        weekdayOfMonth-short{
+            dn{"vikudagur í mnð."}
+        }
+        year{
+            dn{"ár"}
+            relative{
+                "-1"{"í fjør"}
+                "0"{"í ár"}
+                "1"{"næsta ár"}
+            }
+            relativeTime{
+                future{
+                    one{"um {0} ár"}
+                    other{"um {0} ár"}
+                }
+                past{
+                    one{"{0} ár síðan"}
+                    other{"{0} ár síðan"}
+                }
+            }
+        }
+        year-narrow{
+            dn{"ár"}
+            relativeTime{
+                future{
+                    one{"um {0} ár"}
+                    other{"um {0} ár"}
+                }
+                past{
+                    one{"{0} ár síðan"}
+                    other{"{0} ár síðan"}
+                }
+            }
+        }
+        year-short{
+            dn{"ár"}
+            relativeTime{
+                future{
+                    one{"um {0} ár"}
+                    other{"um {0} ár"}
+                }
+                past{
+                    one{"{0} ár síðan"}
+                    other{"{0} ár síðan"}
+                }
+            }
+        }
+        zone{
+            dn{"tíðarøki"}
+        }
+        zone-narrow{
+            dn{"tíðarøki"}
+        }
+        zone-short{
+            dn{"tíðarøki"}
+        }
+    }
+    listPattern{
+        or{
+            2{"{0} ella {1}"}
+            end{"{0}, ella {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        standard{
+            2{"{0} og {1}"}
+            end{"{0} og {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        standard-short{
+            2{"{0} og {1}"}
+            end{"{0} og {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        unit{
+            2{"{0}, {1}"}
+            end{"{0} og {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        unit-narrow{
+            2{"{0} {1}"}
+            end{"{0} {1}"}
+            middle{"{0} {1}"}
+            start{"{0} {1}"}
+        }
+        unit-short{
+            2{"{0}, {1}"}
+            end{"{0}, {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+    }
+    measurementSystemNames{
+        UK{"UK"}
+        US{"US"}
+        metric{"metralagið"}
+    }
+    parse{
+        date{
+            lenient{
+                "[\\--/]",
+                "[\\:∶]",
+            }
+        }
+        general{
+            lenient{
+                "[.․。︒﹒．｡]",
+                "['ʼ՚᾽᾿’＇]",
+                "[%٪﹪％]",
+                "[؉‰]",
+                "[\$﹩＄$]",
+                "[£₤]",
+                "[¥￥]",
+                "[₩￦]",
+                "[₨₹{Rp}{Rs}]",
+            }
+        }
+        number{
+            lenient{
+                "[\\-‒⁻₋−➖﹣－]",
+                "[,،٫、︐︑﹐﹑，､]",
+                "[+⁺₊➕﬩﹢＋]",
+            }
+            stricter{
+                "[,٫︐﹐，]",
+                "[.․﹒．｡]",
+            }
+        }
+    }
+}

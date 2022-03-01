@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "jit/IonControlFlow.cpp"
+#include "vm/EnvironmentObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/IonControlFlow.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/EnvironmentObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/IonControlFlow.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/EnvironmentObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/IonIC.cpp"
+#include "vm/EqualityOperations.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/IonIC.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/EqualityOperations.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/IonIC.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/EqualityOperations.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/IonOptimizationLevels.cpp"
+#include "vm/ErrorMessages.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/IonOptimizationLevels.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ErrorMessages.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/IonOptimizationLevels.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ErrorMessages.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/JSJitFrameIter.cpp"
+#include "vm/ErrorObject.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/JSJitFrameIter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ErrorObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/JSJitFrameIter.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ErrorObject.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/JSONSpewer.cpp"
+#include "vm/ErrorReporting.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/JSONSpewer.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ErrorReporting.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/JSONSpewer.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ErrorReporting.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/Jit.cpp"
+#include "vm/Exception.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/Jit.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Exception.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/Jit.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Exception.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

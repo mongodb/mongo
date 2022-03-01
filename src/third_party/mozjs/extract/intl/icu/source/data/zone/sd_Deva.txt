@@ -1,0 +1,61 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sd_Deva{
+    %%Parent{"root"}
+    zoneStrings{
+        "Etc:UTC"{
+            ls{"आस्थानी चालू टाइमु"}
+        }
+        "Etc:Unknown"{
+            ec{"बेखबरो शहरु"}
+        }
+        "meta:America_Central"{
+            ld{"विचो ॾींह वारो भेरो"}
+            lg{"विचो भेरो"}
+            ls{"विचो मअयारी भेरो"}
+        }
+        "meta:America_Eastern"{
+            ld{"उभिरंदो विचो वारो भेरो"}
+            lg{"उभिरंदो भेरो"}
+            ls{"उभिरंदो मअयारी वारो भेरो"}
+        }
+        "meta:America_Mountain"{
+            ld{"टकरु जो ॾींह वारो भेरो"}
+            lg{"टकरु वारो भेरो"}
+            ls{"टकरु वारो मअयारी भेरो"}
+        }
+        "meta:America_Pacific"{
+            ld{"पेसीफिक जो ॾींह वारो भेरो"}
+            lg{"पेसीफिक वारो टाइमु"}
+            ls{"पेसीफिक वारो मअयारी वारो भेरो"}
+        }
+        "meta:Atlantic"{
+            ld{"अंटलांटिक जे ॾींह वारो भेरो"}
+            lg{"अटलांटिक टाइमु"}
+            ls{"अंटलांटिक जे मअयारी वारो भेरो"}
+        }
+        "meta:Europe_Central"{
+            ld{"सेंटरलु यूरपी गरमी वारो टाइमु"}
+            lg{"सेंटरलु यूरपी टाइमु"}
+            ls{"सेंटरलु यूरपी मयआरी वारो टाइमु"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"उभिरंदो यूरोपी गरमी वारो वक्तु"}
+            lg{"उभिरंदो यूरोपी टाइमु"}
+            ls{"उभिरंदो यूरोपी मअयारी वारो वक्तु"}
+        }
+        "meta:Europe_Western"{
+            ld{"उलहंदो जे यूरोपीअ गरमी वारो वक्तु"}
+            lg{"उलहंदो वारो यूरोपी वारो वक्तु"}
+            ls{"उलहंदो जे मअयारी वारो वक्तु"}
+        }
+        "meta:GMT"{
+            ls{"ग्रीन विचु मीन टाइमु"}
+        }
+        fallbackFormat{"{1} ({0})"}
+        gmtZeroFormat{"जीएमटी"}
+        regionFormat{"{0} भेरो"}
+        regionFormatStandard{"{0} (+0) मअयारी भेरो"}
+    }
+}

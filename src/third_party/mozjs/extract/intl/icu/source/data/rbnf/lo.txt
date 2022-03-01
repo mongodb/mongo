@@ -1,0 +1,47 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+lo{
+    RBNFRules{
+        OrdinalRules{
+            "%digits-ordinal:",
+            "-x: \u0E17\u0E35\u0E48\u2212>#,##0>;",
+            "0: \u0E17\u0E35\u0E48\u200B=#,##0=;",
+        }
+        SpelloutRules{
+            "%spellout-numbering-year:",
+            "x.x: =0.0=;",
+            "0: =%spellout-numbering=;",
+            "%spellout-numbering:",
+            "0: =%spellout-cardinal=;",
+            "%spellout-cardinal:",
+            "-x: \u0E25\u0E1A\u200B>>;",
+            "x.x: <<\u200B\u0E08\u0E38\u0E14\u200B>>>;",
+            "0: \u0E28\u0E39\u0E19\u0E22\u0E4C;",
+            "1: \u0EDC\u0EB6\u0EC8\u0E87;",
+            "2: \u0EAA\u0EAD\u0E87;",
+            "3: \u0EAA\u0EB2\u0EA1;",
+            "4: \u0EAA\u0EB5\u0EC8;",
+            "5: \u0EAB\u0EC9\u0EB2;",
+            "6: \u0EAB\u0EBB\u0E81;",
+            "7: \u0EC0\u0E88\u0EB1\u0E94;",
+            "8: \u0EC1\u0E9B\u0E94;",
+            "9: \u0EC0\u0E81\u0EBB\u0EC9\u0EB2;",
+            "10: \u0EAA\u0EB4\u0E9A[\u200B>%%alt-ones>];",
+            "20: \u0E8A\u0EB2\u0EA7[\u200B>%%alt-ones>];",
+            "30: <<\u200B\u0EAA\u0EB4\u0E9A[\u200B>%%alt-ones>];",
+            "100: <<\u200B\u0E23\u0E49\u0E2D\u0E22[\u200B>>];",
+            "1000: <<\u200B\u0E1E\u0E31\u0E19[\u200B>>];",
+            "10000: <<\u200B\u0E2B\u0E21\u0E37\u0E48\u0E19[\u200B>>];",
+            "100000: <<\u200B\u0E41\u0E2A\u0E19[\u200B>>];",
+            "1000000: <<\u200B\u0E25\u0E49\u0E32\u0E19[\u200B>>];",
+            "1000000000000000000: =#,##0=;",
+            "%%alt-ones:",
+            "1: \u0EC0\u0EAD\u0EB1\u0E94;",
+            "2: =%spellout-cardinal=;",
+            "%spellout-ordinal:",
+            "x.x: =#,##0.#=;",
+            "0: \u0E17\u0E35\u0E48\u200B=%spellout-cardinal=;",
+        }
+    }
+}

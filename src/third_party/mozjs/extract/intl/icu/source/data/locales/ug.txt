@@ -1,0 +1,1038 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ug{
+    AuxExemplarCharacters{"[\u200E\u200F ئ]"}
+    ExemplarCharacters{
+        "[{ئا} {ئه} {ئو} {ئۇ} {ئۆ} {ئۈ} {ئې} {ئى} ا ە ب پ ت ج چ خ د ر ز ژ س ش غ ف ق ك"
+        " گ ڭ ل م ن ھ و ۇ ۆ ۈ ۋ ې ى ي]"
+    }
+    ExemplarCharactersIndex{
+        "[{ئا} {ئه} {ئو} {ئۇ} {ئۆ} {ئۈ} {ئې} {ئى} ا ە ب پ ت ج چ خ د ر ز ژ س ش غ ف ق ك"
+        " گ ڭ ل م ن ھ و ۇ ۆ ۈ ۋ ې ى ي]"
+    }
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    NumberElements{
+        latn{
+            miscPatterns{
+                atLeast{"{0}+"}
+                range{"{0}–{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;(¤#,##0.00)"}
+                currencyFormat{"¤#,##0.00"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"#,##0%"}
+                scientificFormat{"#E0"}
+            }
+            patternsLong{
+                decimalFormat{
+                    1000{
+                        one{"0 مىڭ"}
+                        other{"0 مىڭ"}
+                    }
+                    10000{
+                        one{"00 مىڭ"}
+                        other{"00 مىڭ"}
+                    }
+                    100000{
+                        one{"000 مىڭ"}
+                        other{"000 مىڭ"}
+                    }
+                    1000000{
+                        one{"0 مىليون"}
+                        other{"0 مىليون"}
+                    }
+                    10000000{
+                        one{"00 مىليون"}
+                        other{"00 مىليون"}
+                    }
+                    100000000{
+                        one{"000 مىليون"}
+                        other{"000 مىليون"}
+                    }
+                    1000000000{
+                        one{"0 مىليارد"}
+                        other{"0 مىليارد"}
+                    }
+                    10000000000{
+                        one{"00 مىليارد"}
+                        other{"00 مىليارد"}
+                    }
+                    100000000000{
+                        one{"000 مىليارد"}
+                        other{"000 مىليارد"}
+                    }
+                    1000000000000{
+                        one{"0 تىرىليون"}
+                        other{"0 تىرىليون"}
+                    }
+                    10000000000000{
+                        one{"00 تىرىليون"}
+                        other{"00 تىرىليون"}
+                    }
+                    100000000000000{
+                        one{"000 تىرىليون"}
+                        other{"000 تىرىليون"}
+                    }
+                }
+            }
+            patternsShort{
+                decimalFormat{
+                    1000{
+                        one{"0مىڭ"}
+                        other{"0مىڭ"}
+                    }
+                    10000{
+                        one{"00مىڭ"}
+                        other{"00مىڭ"}
+                    }
+                    100000{
+                        one{"000مىڭ"}
+                        other{"000مىڭ"}
+                    }
+                    1000000{
+                        one{"0مىليون"}
+                        other{"0مىليون"}
+                    }
+                    10000000{
+                        one{"00مىليون"}
+                        other{"00مىليون"}
+                    }
+                    100000000{
+                        one{"000مىليون"}
+                        other{"000مىليون"}
+                    }
+                    1000000000{
+                        one{"0مىليارد"}
+                        other{"0مىليارد"}
+                    }
+                    10000000000{
+                        one{"00مىليارد"}
+                        other{"00مىليارد"}
+                    }
+                    100000000000{
+                        one{"000مىليارد"}
+                        other{"000مىليارد"}
+                    }
+                    1000000000000{
+                        one{"0T"}
+                        other{"0T"}
+                    }
+                    10000000000000{
+                        one{"00T"}
+                        other{"00T"}
+                    }
+                    100000000000000{
+                        one{"000T"}
+                        other{"000T"}
+                    }
+                }
+            }
+            symbols{
+                decimal{"."}
+                exponential{"E"}
+                group{","}
+                infinity{"∞"}
+                minusSign{"-"}
+                nan{"NaN"}
+                perMille{"‰"}
+                percentSign{"%"}
+                plusSign{"+"}
+                superscriptingExponent{"×"}
+            }
+        }
+        minimalPairs{
+            plural{
+                one{"{0} كىتاب"}
+                other{"{0} بېلىق كۆردۈم ۋە ئۇنى يەۋەتتىم."}
+            }
+        }
+        native{"arabext"}
+    }
+    calendar{
+        buddhist{
+            eras{
+                abbreviated{
+                    "BE",
+                }
+                narrow{
+                    "BE",
+                }
+                wide{
+                    "بۇددا يىلنامەسى",
+                }
+            }
+        }
+        chinese{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE، MMMM d، U",
+                "MMMM d، U",
+                "MMM d، U",
+                "M/d/yy",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            cyclicNameSets{
+                zodiacs{
+                    format{
+                        abbreviated{
+                            "چاشقان",
+                            "كالا",
+                            "يولۋاس",
+                            "توشقان",
+                            "ئەجدىھا",
+                            "يىلان",
+                            "ئات",
+                            "قوي",
+                            "مايمۇن",
+                            "توخۇ",
+                            "ئىت",
+                            "چوشقا",
+                        }
+                    }
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Mo1",
+                        "Mo2",
+                        "Mo3",
+                        "Mo4",
+                        "Mo5",
+                        "Mo6",
+                        "Mo7",
+                        "Mo8",
+                        "Mo9",
+                        "Mo10",
+                        "Mo11",
+                        "Mo12",
+                    }
+                    wide{
+                        "Month1",
+                        "Month2",
+                        "Month3",
+                        "Month4",
+                        "Month5",
+                        "Month6",
+                        "Month7",
+                        "Month8",
+                        "Month9",
+                        "Month10",
+                        "Month11",
+                        "Month12",
+                    }
+                }
+            }
+        }
+        generic{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE، MMMM d، y G",
+                "MMMM d، y G",
+                "MMM d، y G",
+                "M/d/y GGGGG",
+                "{1}، {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1}، {0}",
+                "{1}، {0}",
+            }
+            availableFormats{
+                Ed{"d E"}
+                Gy{"y G"}
+                GyMMM{"MMM y G"}
+                GyMMMEd{"E، MMM d، y G"}
+                GyMMMd{"MMM d، y G"}
+                M{"L"}
+                MEd{"E، M/d"}
+                MMM{"LLL"}
+                MMMEd{"E، MMM d"}
+                MMMd{"MMM d"}
+                Md{"M/d"}
+                d{"d"}
+                y{"y G"}
+                yyyy{"y G"}
+                yyyyM{"M/y GGGGG"}
+                yyyyMEd{"E، M/d/y GGGGG"}
+                yyyyMMM{"MMM y G"}
+                yyyyMMMEd{"E، MMM d، y G"}
+                yyyyMMMd{"MMM d، y G"}
+                yyyyMd{"M/d/y GGGGG"}
+                yyyyQQQ{"QQQ y G"}
+                yyyyQQQQ{"QQQQ y G"}
+            }
+            intervalFormats{
+                M{
+                    M{"M – M"}
+                }
+                MEd{
+                    M{"E، M/d – E، M/d"}
+                    d{"E، M/d – E، M/d"}
+                }
+                MMM{
+                    M{"MMM – MMM"}
+                }
+                MMMEd{
+                    M{"E، MMM d – E، MMM d"}
+                    d{"E، MMM d – E، MMM d"}
+                }
+                MMMd{
+                    M{"MMM d – MMM d"}
+                    d{"MMM d – d"}
+                }
+                Md{
+                    M{"M/d – M/d"}
+                    d{"M/d – M/d"}
+                }
+                d{
+                    d{"d – d"}
+                }
+                fallback{"{0} – {1}"}
+                y{
+                    y{"y – y G"}
+                }
+                yM{
+                    M{"M/y – M/y GGGGG"}
+                    y{"M/y – M/y GGGGG"}
+                }
+                yMEd{
+                    M{"E، M/d/y – E، M/d/y GGGGG"}
+                    d{"E، M/d/y – E، M/d/y GGGGG"}
+                    y{"E، M/d/y – E، M/d/y GGGGG"}
+                }
+                yMMM{
+                    M{"MMM – MMM y G"}
+                    y{"MMM y – MMM y G"}
+                }
+                yMMMEd{
+                    M{"E، MMM d – E، MMM d، y G"}
+                    d{"E، MMM d – E، MMM d، y G"}
+                    y{"E، MMM d، y – E، MMM d، y G"}
+                }
+                yMMMM{
+                    M{"MMMM – MMMM y G"}
+                    y{"MMMM y – MMMM y G"}
+                }
+                yMMMd{
+                    M{"MMM d – MMM d، y G"}
+                    d{"MMM d – d، y G"}
+                    y{"MMM d، y – MMM d، y G"}
+                }
+                yMd{
+                    M{"M/d/y – M/d/y GGGGG"}
+                    d{"M/d/y – M/d/y GGGGG"}
+                    y{"M/d/y – M/d/y GGGGG"}
+                }
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "چۈشتىن بۇرۇن",
+                "چۈشتىن كېيىن",
+            }
+            AmPmMarkersAbbr{
+                "چ.ب",
+                "چ.ك",
+            }
+            AmPmMarkersNarrow{
+                "ب",
+                "ك",
+            }
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "y d-MMMM، EEEE",
+                "d-MMMM، y",
+                "d-MMM، y",
+                "y-MM-dd",
+                "{1}، {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1}، {0}",
+                "{1}، {0}",
+            }
+            appendItems{
+                Timezone{"{0} {1}"}
+            }
+            availableFormats{
+                E{"ccc"}
+                EHm{"E HH:mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"d E"}
+                Ehm{"E h:mm a"}
+                Ehms{"E h:mm:ss a"}
+                Gy{"y G"}
+                GyMMM{"y MMM G"}
+                GyMMMEd{"y d-MMM، E G"}
+                GyMMMd{"y d-MMM G"}
+                H{"HH"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                Hmsv{"HH:mm:ss v"}
+                Hmv{"HH:mm v"}
+                M{"L"}
+                MEd{"d-M، E"}
+                MMM{"LLL"}
+                MMMEd{"d-MMM، E"}
+                MMMMW{
+                    one{"MMMM، W-ھەپتە"}
+                    other{"MMMM، W-ھەپتە"}
+                }
+                MMMMd{"d-MMMM"}
+                MMMd{"d-MMM"}
+                Md{"d-M"}
+                d{"d"}
+                h{"h a"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                hmsv{"h:mm:ss a v"}
+                hmv{"h:mm a v"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M-y"}
+                yMEd{"y-d-M، E"}
+                yMMM{"y MMM"}
+                yMMMEd{"y d-MMM، E"}
+                yMMMM{"y MMMM"}
+                yMMMd{"y d-MMM"}
+                yMd{"y-d-M"}
+                yQQQ{"y QQQ"}
+                yQQQQ{"y QQQQ"}
+                yw{
+                    one{"Y، w-ھەپتە"}
+                    other{"Y، w-ھەپتە"}
+                }
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "يە",
+                        "دۈ",
+                        "سە",
+                        "چا",
+                        "پە",
+                        "جۈ",
+                        "شە",
+                    }
+                    narrow{
+                        "ي",
+                        "د",
+                        "س",
+                        "چ",
+                        "پ",
+                        "ج",
+                        "ش",
+                    }
+                    short{
+                        "ي",
+                        "د",
+                        "س",
+                        "چ",
+                        "پ",
+                        "ج",
+                        "ش",
+                    }
+                    wide{
+                        "يەكشەنبە",
+                        "دۈشەنبە",
+                        "سەيشەنبە",
+                        "چارشەنبە",
+                        "پەيشەنبە",
+                        "جۈمە",
+                        "شەنبە",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "يە",
+                        "دۈ",
+                        "سە",
+                        "چا",
+                        "پە",
+                        "جۈ",
+                        "شە",
+                    }
+                    narrow{
+                        "ي",
+                        "د",
+                        "س",
+                        "چ",
+                        "پ",
+                        "ج",
+                        "ش",
+                    }
+                    short{
+                        "ي",
+                        "د",
+                        "س",
+                        "چ",
+                        "پ",
+                        "ج",
+                        "ش",
+                    }
+                    wide{
+                        "يەكشەنبە",
+                        "دۈشەنبە",
+                        "سەيشەنبە",
+                        "چارشەنبە",
+                        "پەيشەنبە",
+                        "جۈمە",
+                        "شەنبە",
+                    }
+                }
+            }
+            dayPeriod{
+                stand-alone{
+                    abbreviated{
+                        am{"چ.ب"}
+                        pm{"چ.ك"}
+                    }
+                    narrow{
+                        am{"چ.ب"}
+                        pm{"چ.ك"}
+                    }
+                    wide{
+                        am{"چ.ب"}
+                        pm{"چ.ك"}
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "BCE",
+                    "مىلادىيە",
+                }
+                narrow{
+                    "BCE",
+                    "مىلادىيە",
+                }
+                wide{
+                    "مىلادىيەدىن بۇرۇن",
+                    "مىلادىيە",
+                }
+            }
+            intervalFormats{
+                H{
+                    H{"HH – HH"}
+                }
+                Hm{
+                    H{"HH:mm – HH:mm"}
+                    m{"HH:mm – HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm – HH:mm v"}
+                    m{"HH:mm – HH:mm v"}
+                }
+                Hv{
+                    H{"HH – HH v"}
+                }
+                M{
+                    M{"M – M"}
+                }
+                MEd{
+                    M{"E، M/d – E، M/d"}
+                    d{"E، M/d – E، M/d"}
+                }
+                MMM{
+                    M{"MMM – MMM"}
+                }
+                MMMEd{
+                    M{"E، MMM d – E، MMM d"}
+                    d{"E، MMM d – E، MMM d"}
+                }
+                MMMd{
+                    M{"MMM d – MMM d"}
+                    d{"MMM d – d"}
+                }
+                Md{
+                    M{"M/d – M/d"}
+                    d{"M/d – M/d"}
+                }
+                d{
+                    d{"d – d"}
+                }
+                fallback{"{0} – {1}"}
+                h{
+                    a{"h a – h a"}
+                    h{"h – h a"}
+                }
+                hm{
+                    a{"h:mm a – h:mm a"}
+                    h{"h:mm – h:mm a"}
+                    m{"h:mm – h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a – h:mm a v"}
+                    h{"h:mm – h:mm a v"}
+                    m{"h:mm – h:mm a v"}
+                }
+                hv{
+                    a{"h a – h a v"}
+                    h{"h – h a v"}
+                }
+                y{
+                    y{"y – y"}
+                }
+                yM{
+                    M{"M/y – M/y"}
+                    y{"M/y – M/y"}
+                }
+                yMEd{
+                    M{"E، M/d/y – E، M/d/y"}
+                    d{"E، M/d/y – E، M/d/y"}
+                    y{"E، M/d/y – E، M/d/y"}
+                }
+                yMMM{
+                    M{"MMM – MMM y"}
+                    y{"MMM y – MMM y"}
+                }
+                yMMMEd{
+                    M{"E، MMM d – E، MMM d، y"}
+                    d{"E، MMM d – E، MMM d، y"}
+                    y{"E، MMM d، y – E، MMM d، y"}
+                }
+                yMMMM{
+                    M{"MMMM – MMMM y"}
+                    y{"MMMM y – MMMM y"}
+                }
+                yMMMd{
+                    M{"MMM d – MMM d، y"}
+                    d{"MMM d – d، y"}
+                    y{"MMM d، y – MMM d، y"}
+                }
+                yMd{
+                    M{"M/d/y – M/d/y"}
+                    d{"M/d/y – M/d/y"}
+                    y{"M/d/y – M/d/y"}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "يانۋار",
+                        "فېۋرال",
+                        "مارت",
+                        "ئاپرېل",
+                        "ماي",
+                        "ئىيۇن",
+                        "ئىيۇل",
+                        "ئاۋغۇست",
+                        "سېنتەبىر",
+                        "ئۆكتەبىر",
+                        "نويابىر",
+                        "دېكابىر",
+                    }
+                    wide{
+                        "يانۋار",
+                        "فېۋرال",
+                        "مارت",
+                        "ئاپرېل",
+                        "ماي",
+                        "ئىيۇن",
+                        "ئىيۇل",
+                        "ئاۋغۇست",
+                        "سېنتەبىر",
+                        "ئۆكتەبىر",
+                        "نويابىر",
+                        "دېكابىر",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "يانۋار",
+                        "فېۋرال",
+                        "مارت",
+                        "ئاپرېل",
+                        "ماي",
+                        "ئىيۇن",
+                        "ئىيۇل",
+                        "ئاۋغۇست",
+                        "سېنتەبىر",
+                        "ئۆكتەبىر",
+                        "نويابىر",
+                        "دېكابىر",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "يانۋار",
+                        "فېۋرال",
+                        "مارت",
+                        "ئاپرېل",
+                        "ماي",
+                        "ئىيۇن",
+                        "ئىيۇل",
+                        "ئاۋغۇست",
+                        "سېنتەبىر",
+                        "ئۆكتەبىر",
+                        "نويابىر",
+                        "دېكابىر",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "1-پەسىل",
+                        "2-پەسىل",
+                        "3-پەسىل",
+                        "4-پەسىل",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "بىرىنچى پەسىل",
+                        "ئىككىنچى پەسىل",
+                        "ئۈچىنچى پەسىل",
+                        "تۆتىنچى پەسىل",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "1-پەسىل",
+                        "2-پەسىل",
+                        "3-پەسىل",
+                        "4-پەسىل",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "بىرىنچى پەسىل",
+                        "ئىككىنچى پەسىل",
+                        "ئۈچىنچى پەسىل",
+                        "تۆتىنچى پەسىل",
+                    }
+                }
+            }
+        }
+        hebrew{
+            eras{
+                abbreviated{
+                    "AM",
+                }
+            }
+        }
+        islamic{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE، d MMMM، y G",
+                "d MMMM، y G",
+                "d MMM، y G",
+                "d‏/M‏/y GGGGG",
+                "{1}، {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1}، {0}",
+                "{1}، {0}",
+            }
+            availableFormats{
+                M{"L"}
+                Md{"d/‏M"}
+                d{"d"}
+                yyyyM{"M‏/y G"}
+                yyyyMEd{"E، d/‏M/‏y G"}
+                yyyyMMM{"MMM y G"}
+                yyyyMd{"d‏/M‏/y G"}
+            }
+            eras{
+                abbreviated{
+                    "ھىجرىيە",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "مۇھەررەم",
+                        "سەپەر",
+                        "رەبىئۇلئەۋۋەل",
+                        "رەبىئۇلئاخىر",
+                        "جەمادىيەلئەۋۋەل",
+                        "جەمادىيەلئاخىر",
+                        "رەجەب",
+                        "شەئبان",
+                        "رامىزان",
+                        "شەۋۋال",
+                        "زۇلقەئدە",
+                        "زۇلھەججە",
+                    }
+                    wide{
+                        "مۇھەررەم",
+                        "سەپەر",
+                        "رەبىئۇلئەۋۋەل",
+                        "رەبىئۇلئاخىر",
+                        "جەمادىيەلئەۋۋەل",
+                        "جەمادىيەلئاخىر",
+                        "رەجەب",
+                        "شەئبان",
+                        "رامىزان",
+                        "شەۋۋال",
+                        "زۇلقەئدە",
+                        "زۇلھەججە",
+                    }
+                }
+            }
+        }
+        japanese{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE, MMMM d، y G",
+                "MMMM d، y G",
+                "MMM d، y G",
+                "M/d/y GGGGG",
+                "{1}، {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1}، {0}",
+                "{1}، {0}",
+            }
+        }
+        roc{
+            eras{
+                abbreviated{
+                    "Before R.O.C.",
+                    "مىنگو",
+                }
+                wide{
+                    "جۇڭخۇا مىنگودىن بۇرۇن",
+                    "مىنگو",
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"‹"}
+        alternateQuotationStart{"›"}
+        quotationEnd{"«"}
+        quotationStart{"»"}
+    }
+    fields{
+        day{
+            dn{"كۈن"}
+            relative{
+                "-1"{"تۈنۈگۈن"}
+                "0"{"بۈگۈن"}
+                "1"{"ئەتە"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} كۈندىن كېيىن"}
+                    other{"{0} كۈندىن كېيىن"}
+                }
+                past{
+                    one{"{0} كۈن ئىلگىرى"}
+                    other{"{0} كۈن ئىلگىرى"}
+                }
+            }
+        }
+        dayperiod{
+            dn{"چۈشتىن بۇرۇن/چۈشتىن كېيىن"}
+        }
+        era{
+            dn{"مىلادىيە"}
+        }
+        fri{
+            relative{
+                "-1"{"ئۆتكەن جۈمە"}
+                "0"{"بۇ جۈمە"}
+                "1"{"كېلەر جۈمە"}
+            }
+        }
+        hour{
+            dn{"سائەت"}
+            relativeTime{
+                future{
+                    one{"{0} سائەتتىن كېيىن"}
+                    other{"{0} سائەتتىن كېيىن"}
+                }
+                past{
+                    one{"{0} سائەت ئىلگىرى"}
+                    other{"{0} سائەت ئىلگىرى"}
+                }
+            }
+        }
+        minute{
+            dn{"مىنۇت"}
+            relativeTime{
+                future{
+                    one{"{0} مىنۇتتىن كېيىن"}
+                    other{"{0} مىنۇتتىن كېيىن"}
+                }
+                past{
+                    one{"{0} مىنۇت ئىلگىرى"}
+                    other{"{0} مىنۇت ئىلگىرى"}
+                }
+            }
+        }
+        mon{
+            relative{
+                "-1"{"ئۆتكەن دۈشەنبە"}
+                "0"{"بۇ دۈشەنبە"}
+                "1"{"كېلەر دۈشەنبە"}
+            }
+        }
+        month{
+            dn{"ئاي"}
+            relative{
+                "-1"{"ئۆتكەن ئاي"}
+                "0"{"بۇ ئاي"}
+                "1"{"كېلەر ئاي"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ئايدىن كېيىن"}
+                    other{"{0} ئايدىن كېيىن"}
+                }
+                past{
+                    one{"{0} ئاي ئىلگىرى"}
+                    other{"{0} ئاي ئىلگىرى"}
+                }
+            }
+        }
+        sat{
+            relative{
+                "-1"{"ئۆتكەن شەنبە"}
+                "0"{"بۇ شەنبە"}
+                "1"{"كېلەر شەنبە"}
+            }
+        }
+        second{
+            dn{"سېكۇنت"}
+            relativeTime{
+                future{
+                    one{"{0} سېكۇنتتىن كېيىن"}
+                    other{"{0} سېكۇنتتىن كېيىن"}
+                }
+                past{
+                    one{"{0} سېكۇنت ئىلگىرى"}
+                    other{"{0} سېكۇنت ئىلگىرى"}
+                }
+            }
+        }
+        sun{
+            relative{
+                "-1"{"ئۆتكەن يەكشەنبە"}
+                "0"{"بۇ يەكشەنبە"}
+                "1"{"كېلەر يەكشەنبە"}
+            }
+        }
+        thu{
+            relative{
+                "-1"{"ئۆتكەن پەيشەنبە"}
+                "0"{"بۇ پەيشەنبە"}
+                "1"{"كېلەر پەيشەنبە"}
+            }
+        }
+        tue{
+            relative{
+                "-1"{"ئۆتكەن سەيشەنبە"}
+                "0"{"بۇ سەيشەنبە"}
+                "1"{"كېلەر سەيشەنبە"}
+            }
+        }
+        wed{
+            relative{
+                "-1"{"ئۆتكەن چارشەنبە"}
+                "0"{"بۇ چارشەنبە"}
+                "1"{"كېلەر چارشەنبە"}
+            }
+        }
+        week{
+            dn{"ھەپتە"}
+            relative{
+                "-1"{"ئۆتكەن ھەپتە"}
+                "0"{"بۇ ھەپتە"}
+                "1"{"كېلەر ھەپتە"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ھەپتىدىن كېيىن"}
+                    other{"{0} ھەپتىدىن كېيىن"}
+                }
+                past{
+                    one{"{0} ھەپتە ئىلگىرى"}
+                    other{"{0} ھەپتە ئىلگىرى"}
+                }
+            }
+        }
+        weekday{
+            dn{"ھەپتە كۈنلىرى"}
+        }
+        year{
+            dn{"يىل"}
+            relative{
+                "-1"{"ئۆتكەن يىل"}
+                "0"{"بۇ يىل"}
+                "1"{"كېلەر يىل"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} يىلدىن كېيىن"}
+                    other{"{0} يىلدىن كېيىن"}
+                }
+                past{
+                    one{"{0} يىل ئىلگىرى"}
+                    other{"{0} يىل ئىلگىرى"}
+                }
+            }
+        }
+        zone{
+            dn{"ۋاقىت رايونى"}
+        }
+    }
+    layout{
+        characters{"right-to-left"}
+    }
+    listPattern{
+        standard{
+            2{"{0} and {1}"}
+            end{"{0}, and {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+    }
+    measurementSystemNames{
+        UK{"ئەنگلىيە ئۆلچىمى"}
+        US{"ئامېرىكا ئۆلچىمى"}
+        metric{"مېتىر"}
+    }
+}

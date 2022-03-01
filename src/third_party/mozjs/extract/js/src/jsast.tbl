@@ -27,10 +27,14 @@ ASTDEF(AST_LOGICAL_EXPR,          "LogicalExpression",              "logicalExpr
 ASTDEF(AST_UPDATE_EXPR,           "UpdateExpression",               "updateExpression")
 ASTDEF(AST_NEW_EXPR,              "NewExpression",                  "newExpression")
 ASTDEF(AST_CALL_EXPR,             "CallExpression",                 "callExpression")
+ASTDEF(AST_OPT_CALL_EXPR,         "OptionalCallExpression",         "optionalCallExpression")
 ASTDEF(AST_MEMBER_EXPR,           "MemberExpression",               "memberExpression")
+ASTDEF(AST_OPT_MEMBER_EXPR,       "OptionalMemberExpression",       "optionalMemberExpression")
 ASTDEF(AST_FUNC_EXPR,             "FunctionExpression",             "functionExpression")
 ASTDEF(AST_ARROW_EXPR,            "ArrowFunctionExpression",        "arrowFunctionExpression")
 ASTDEF(AST_ARRAY_EXPR,            "ArrayExpression",                "arrayExpression")
+ASTDEF(AST_DELETE_OPTIONAL_EXPR,  "DeleteOptionalExpression",       "deleteOptionalExpression")
+ASTDEF(AST_OPTIONAL_EXPR,         "OptionalExpression",             "optionalExpression")
 ASTDEF(AST_SPREAD_EXPR,           "SpreadExpression",               "spreadExpression")
 ASTDEF(AST_OBJECT_EXPR,           "ObjectExpression",               "objectExpression")
 ASTDEF(AST_THIS_EXPR,             "ThisExpression",                 "thisExpression")
@@ -38,6 +42,7 @@ ASTDEF(AST_YIELD_EXPR,            "YieldExpression",                "yieldExpres
 ASTDEF(AST_CLASS_EXPR,            "ClassExpression",                "classExpression")
 ASTDEF(AST_METAPROPERTY,          "MetaProperty",                   "metaProperty")
 ASTDEF(AST_SUPER,                 "Super",                          "super")
+ASTDEF(AST_CALL_IMPORT,           "CallImport",                     "callImport")
 
 ASTDEF(AST_EMPTY_STMT,            "EmptyStatement",                 "emptyStatement")
 ASTDEF(AST_BLOCK_STMT,            "BlockStatement",                 "blockStatement")
@@ -60,8 +65,10 @@ ASTDEF(AST_DEBUGGER_STMT,         "DebuggerStatement",              "debuggerSta
 ASTDEF(AST_LET_STMT,              "LetStatement",                   "letStatement")
 ASTDEF(AST_IMPORT_DECL,           "ImportDeclaration",              "importDeclaration")
 ASTDEF(AST_IMPORT_SPEC,           "ImportSpecifier",                "importSpecifier")
+ASTDEF(AST_IMPORT_NAMESPACE_SPEC, "ImportNamespaceSpecifier",       "importNamespaceSpecifier")
 ASTDEF(AST_EXPORT_DECL,           "ExportDeclaration",              "exportDeclaration")
 ASTDEF(AST_EXPORT_SPEC,           "ExportSpecifier",                "exportSpecifier")
+ASTDEF(AST_EXPORT_NAMESPACE_SPEC, "ExportNamespaceSpecifier",       "exportNamespaceSpecifier")
 ASTDEF(AST_EXPORT_BATCH_SPEC,     "ExportBatchSpecifier",           "exportBatchSpecifier")
 
 ASTDEF(AST_CASE,                  "SwitchCase",                     "switchCase")
@@ -77,4 +84,6 @@ ASTDEF(AST_COMPUTED_NAME,         "ComputedName",                   "computedNam
 
 ASTDEF(AST_CLASS_STMT,            "ClassStatement",                 "classStatement")
 ASTDEF(AST_CLASS_METHOD,          "ClassMethod",                    "classMethod")
+ASTDEF(AST_CLASS_FIELD,           "ClassField",                     "classField")
+ASTDEF(AST_STATIC_CLASS_BLOCK,    "StaticClassBlock",               "staticClassBlock")
 /* AST_LIMIT = last + 1 */

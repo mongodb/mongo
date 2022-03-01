@@ -1,0 +1,70 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+en_DK{
+    %%Parent{"en_150"}
+    NumberElements{
+        latn{
+            patterns{
+                percentFormat{"#,##0 %"}
+            }
+            symbols{
+                decimal{","}
+                group{"."}
+                superscriptingExponent{"·"}
+                timeSeparator{"."}
+            }
+        }
+    }
+    calendar{
+        generic{
+            availableFormats{
+                EHm{"E HH.mm"}
+                EHms{"E HH.mm.ss"}
+                Ehm{"E h.mm a"}
+                Ehms{"E h.mm.ss a"}
+                Hm{"HH.mm"}
+                Hms{"HH.mm.ss"}
+                Hmsv{"HH.mm.ss v"}
+                Hmv{"HH.mm v"}
+                hm{"h.mm a"}
+                hms{"h.mm.ss a"}
+                hmsv{"h.mm.ss a v"}
+                hmv{"h.mm a v"}
+                ms{"mm.ss"}
+            }
+        }
+        gregorian{
+            DateTimePatterns{
+                "HH.mm.ss zzzz",
+                "HH.mm.ss z",
+                "HH.mm.ss",
+                "HH.mm",
+                "EEEE, d MMMM y",
+                "d MMMM y",
+                "d MMM y",
+                "dd/MM/y",
+                "{1}, {0}",
+                "{1} 'at' {0}",
+                "{1} 'at' {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                EHm{"E HH.mm"}
+                EHms{"E HH.mm.ss"}
+                Ehm{"E h.mm a"}
+                Ehms{"E h.mm.ss a"}
+                Hm{"HH.mm"}
+                Hms{"HH.mm.ss"}
+                Hmsv{"HH.mm.ss v"}
+                Hmv{"HH.mm v"}
+                hm{"h.mm a"}
+                hms{"h.mm.ss a"}
+                hmsv{"h.mm.ss a v"}
+                hmv{"h.mm a v"}
+                ms{"mm.ss"}
+            }
+        }
+    }
+}

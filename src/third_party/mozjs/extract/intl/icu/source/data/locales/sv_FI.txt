@@ -1,0 +1,57 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sv_FI{
+    NumberElements{
+        latn{
+            symbols{
+                timeSeparator{"."}
+            }
+        }
+    }
+    calendar{
+        gregorian{
+            availableFormats{
+                Bhm{"h.mm B"}
+                Bhms{"h.mm.ss B"}
+                EBhm{"E h.mm B"}
+                EBhms{"E h.mm.ss B"}
+                EHm{"E HH.mm"}
+                EHms{"E HH.mm.ss"}
+                Ehm{"E h.mm a"}
+                Ehms{"E h.mm.ss a"}
+                Hm{"HH.mm"}
+                Hms{"HH.mm.ss"}
+                Hmsv{"HH.mm.ss v"}
+                Hmv{"HH.mm v"}
+                MEd{"E d.M"}
+                MMd{"d.M"}
+                MMdd{"dd.MM"}
+                Md{"d.M"}
+                hm{"h.mm a"}
+                hms{"h.mm.ss a"}
+                hmsv{"h.mm.ss a v"}
+                hmv{"h.mm a v"}
+                ms{"mm.ss"}
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "Q1",
+                        "Q2",
+                        "Q3",
+                        "Q4",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Q1",
+                        "Q2",
+                        "Q3",
+                        "Q4",
+                    }
+                }
+            }
+        }
+    }
+}

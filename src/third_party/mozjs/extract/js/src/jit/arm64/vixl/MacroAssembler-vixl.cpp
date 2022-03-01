@@ -48,7 +48,7 @@ int MacroAssembler::MoveImmediateHelper(MacroAssembler* masm,
                                         const Register &rd,
                                         uint64_t imm) {
   bool emit_code = (masm != NULL);
-  VIXL_ASSERT(is_uint32(imm) || is_int32(imm) || rd.Is64Bits());
+  VIXL_ASSERT(IsUint32(imm) || IsInt32(imm) || rd.Is64Bits());
   // The worst case for size is mov 64-bit immediate to sp:
   //  * up to 4 instructions to materialise the constant
   //  * 1 instruction to move to sp
@@ -208,9 +208,6 @@ void MacroAssembler::B(Label* label, Condition cond) {
     b(label);
     bind(&done);
   } else {
-    // TODO: Need to register a slot in a literal pool, so that we can
-    // write a branch instruction there and use that to branch in case
-    // the unbound label winds up being out of range.
     b(label, cond);
   }
 }
@@ -226,9 +223,6 @@ void MacroAssembler::Cbnz(const Register& rt, Label* label) {
     b(label);
     bind(&done);
   } else {
-    // TODO: Need to register a slot in a literal pool, so that we can
-    // write a branch instruction there and use that to branch in case
-    // the unbound label winds up being out of range.
     cbnz(rt, label);
   }
 }
@@ -244,9 +238,6 @@ void MacroAssembler::Cbz(const Register& rt, Label* label) {
     b(label);
     bind(&done);
   } else {
-    // TODO: Nede to register a slot in a literal pool, so that we can
-    // write a branch instruction there and use that to branch in case
-    // the unbound label winds up being out of range.
     cbz(rt, label);
   }
 }
@@ -262,9 +253,6 @@ void MacroAssembler::Tbnz(const Register& rt, unsigned bit_pos, Label* label) {
     b(label);
     bind(&done);
   } else {
-    // TODO: Nede to register a slot in a literal pool, so that we can
-    // write a branch instruction there and use that to branch in case
-    // the unbound label winds up being out of range.
     tbnz(rt, bit_pos, label);
   }
 }
@@ -280,9 +268,6 @@ void MacroAssembler::Tbz(const Register& rt, unsigned bit_pos, Label* label) {
     b(label);
     bind(&done);
   } else {
-    // TODO: Nede to register a slot in a literal pool, so that we can
-    // write a branch instruction there and use that to branch in case
-    // the unbound label winds up being out of range.
     tbz(rt, bit_pos, label);
   }
 }
@@ -379,7 +364,7 @@ void MacroAssembler::LogicalMacro(const Register& rd,
       immediate &= kWRegMask;
     }
 
-    VIXL_ASSERT(rd.Is64Bits() || is_uint32(immediate));
+    VIXL_ASSERT(rd.Is64Bits() || IsUint32(immediate));
 
     // Special cases for all set or all clear immediates.
     if (immediate == 0) {
@@ -510,7 +495,7 @@ void MacroAssembler::Mov(const Register& rd,
 
 
 void MacroAssembler::Movi16bitHelper(const VRegister& vd, uint64_t imm) {
-  VIXL_ASSERT(is_uint16(imm));
+  VIXL_ASSERT(IsUint16(imm));
   int byte1 = (imm & 0xff);
   int byte2 = ((imm >> 8) & 0xff);
   if (byte1 == byte2) {
@@ -533,7 +518,7 @@ void MacroAssembler::Movi16bitHelper(const VRegister& vd, uint64_t imm) {
 
 
 void MacroAssembler::Movi32bitHelper(const VRegister& vd, uint64_t imm) {
-  VIXL_ASSERT(is_uint32(imm));
+  VIXL_ASSERT(IsUint32(imm));
 
   uint8_t bytes[sizeof(imm)];
   memcpy(bytes, &imm, sizeof(imm));
@@ -656,7 +641,7 @@ void MacroAssembler::Movi(const VRegister& vd,
     movi(vd, imm, shift, shift_amount);
   } else if (vd.Is8B() || vd.Is16B()) {
     // 8-bit immediate.
-    VIXL_ASSERT(is_uint8(imm));
+    VIXL_ASSERT(IsUint8(imm));
     movi(vd, imm);
   } else if (vd.Is4H() || vd.Is8H()) {
     // 16-bit immediate.
@@ -674,13 +659,27 @@ void MacroAssembler::Movi(const VRegister& vd,
 void MacroAssembler::Movi(const VRegister& vd,
                           uint64_t hi,
                           uint64_t lo) {
-  // TODO: Move 128-bit values in a more efficient way.
   VIXL_ASSERT(vd.Is128Bits());
   UseScratchRegisterScope temps(this);
+
+  // When hi == lo, the following generates good code.
+  //
+  // In situations where the constants are complex and hi != lo, the following
+  // can turn into up to 10 instructions: 2*(mov + 3*movk + dup/insert).  To do
+  // any better, we could try to estimate whether splatting the high value and
+  // updating the low value would generate fewer instructions than vice versa
+  // (what we do now).
+  //
+  // (A PC-relative load from memory to the vector register (ADR + LD2) is going
+  // to have fairly high latency but is fairly compact; not clear what the best
+  // tradeoff is.)
+
   Movi(vd.V2D(), lo);
-  Register temp = temps.AcquireX();
-  Mov(temp, hi);
-  Ins(vd.V2D(), 1, temp);
+  if (hi != lo) {
+    Register temp = temps.AcquireX();
+    Mov(temp, hi);
+    Ins(vd.V2D(), 1, temp);
+  }
 }
 
 
@@ -902,7 +901,7 @@ void MacroAssembler::Fmov(VRegister vd, double imm) {
   if (IsImmFP64(imm)) {
     fmov(vd, imm);
   } else {
-    uint64_t rawbits = double_to_rawbits(imm);
+    uint64_t rawbits = DoubleToRawbits(imm);
     if (vd.IsScalar()) {
       if (rawbits == 0) {
         fmov(vd, xzr);
@@ -930,7 +929,7 @@ void MacroAssembler::Fmov(VRegister vd, float imm) {
   if (IsImmFP32(imm)) {
     fmov(vd, imm);
   } else {
-    uint32_t rawbits = float_to_rawbits(imm);
+    uint32_t rawbits = FloatToRawbits(imm);
     if (vd.IsScalar()) {
       if (rawbits == 0) {
         fmov(vd, wzr);
@@ -1146,7 +1145,7 @@ void MacroAssembler::AddSubWithCarryMacro(const Register& rd,
     // Add/sub with carry (shifted register).
     VIXL_ASSERT(operand.reg().size() == rd.size());
     VIXL_ASSERT(operand.shift() != ROR);
-    VIXL_ASSERT(is_uintn(rd.size() == kXRegSize ? kXRegSizeLog2 : kWRegSizeLog2,
+    VIXL_ASSERT(IsUintN(rd.size() == kXRegSize ? kXRegSizeLog2 : kWRegSizeLog2,
                     operand.shift_amount()));
     temps.Exclude(operand.reg());
     Register temp = temps.AcquireSameSizeAs(rn);

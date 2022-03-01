@@ -1,0 +1,18 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+su{
+    Countries{
+        BR{"Brasil"}
+        CN{"Tiongkok"}
+        DE{"Jérman"}
+        FR{"Prancis"}
+        GB{"Britania Raya"}
+        IN{"India"}
+        IT{"Italia"}
+        JP{"Jepang"}
+        RU{"Rusia"}
+        US{"Amérika Sarikat"}
+        ZZ{"Wilayah Teu Dikenal"}
+    }
+}

@@ -1,0 +1,54 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: eo_eo_FONIPA.txt
+# Generated from CLDR
+#
+
+# https://en.wikipedia.org/wiki/Esperanto_phonology
+::NFC;
+::Lower;
+[\-\'’] → ;  # eg. vorto-provizo, famili’
+aj → ai\u032F;
+aŭ → au\u032F;
+á → a;
+a → a;
+b → b;
+ĉ → t\u0361ʃ;
+c → t\u0361s;
+dz → d\u0361z;
+d → d;
+ej → ei\u032F;
+eŭ → eu\u032F;
+é → e;
+e → e;
+f → f;
+ĝ → d\u0361ʒ;
+g → ɡ;
+ĥ → x;
+h → h;
+í → i;
+i → i;
+ĵ → ʒ;
+j → j;
+k → k;
+l → l;
+m → m;
+n → n;
+oj → oi\u032F;
+ó → o;
+o → o;
+p → p;
+r → r;
+ŝ → ʃ;
+s → s;
+t → t;
+uj → ui\u032F;
+ŭ → w;  # eg. ŭa!
+ú → u;
+u → u;
+v → v;
+z → z;
+::NFC;
+

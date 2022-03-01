@@ -1,0 +1,76 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+en_001{
+    zoneStrings{
+        "America:St_Barthelemy"{
+            ec{"St Barthélemy"}
+        }
+        "America:St_Johns"{
+            ec{"St John’s"}
+        }
+        "America:St_Kitts"{
+            ec{"St Kitts"}
+        }
+        "America:St_Lucia"{
+            ec{"St Lucia"}
+        }
+        "America:St_Thomas"{
+            ec{"St Thomas"}
+        }
+        "America:St_Vincent"{
+            ec{"St Vincent"}
+        }
+        "Asia:Aqtau"{
+            ec{"Aktau"}
+        }
+        "Atlantic:St_Helena"{
+            ec{"St Helena"}
+        }
+        "Pacific:Honolulu"{
+            sd{"∅∅∅"}
+            sg{"∅∅∅"}
+            ss{"∅∅∅"}
+        }
+        "meta:Alaska"{
+            sd{"∅∅∅"}
+            sg{"∅∅∅"}
+            ss{"∅∅∅"}
+        }
+        "meta:America_Central"{
+            sd{"∅∅∅"}
+            sg{"∅∅∅"}
+            ss{"∅∅∅"}
+        }
+        "meta:America_Eastern"{
+            sd{"∅∅∅"}
+            sg{"∅∅∅"}
+            ss{"∅∅∅"}
+        }
+        "meta:America_Mountain"{
+            sd{"∅∅∅"}
+            sg{"∅∅∅"}
+            ss{"∅∅∅"}
+        }
+        "meta:America_Pacific"{
+            sd{"∅∅∅"}
+            sg{"∅∅∅"}
+            ss{"∅∅∅"}
+        }
+        "meta:Atlantic"{
+            sd{"∅∅∅"}
+            sg{"∅∅∅"}
+            ss{"∅∅∅"}
+        }
+        "meta:Hawaii_Aleutian"{
+            sd{"∅∅∅"}
+            sg{"∅∅∅"}
+            ss{"∅∅∅"}
+        }
+        "meta:Pierre_Miquelon"{
+            ld{"St Pierre & Miquelon Daylight Time"}
+            lg{"St Pierre & Miquelon Time"}
+            ls{"St Pierre & Miquelon Standard Time"}
+        }
+    }
+}

@@ -1,0 +1,51 @@
+/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "nsISupports.idl"
+
+
+%{C++
+// {8B042E22-6F87-11d3-B3C8-00805F8A6670}
+#define NS_TEXTTOSUBURI_CID { 0x8b042e22, 0x6f87, 0x11d3, { 0xb3, 0xc8, 0x0, 0x80, 0x5f, 0x8a, 0x66, 0x70 } }
+#define NS_ITEXTTOSUBURI_CONTRACTID "@mozilla.org/intl/texttosuburi;1"
+%}
+
+[scriptable, uuid(8B042E24-6F87-11d3-B3C8-00805F8A6670)]
+interface nsITextToSubURI : nsISupports
+{
+	ACString ConvertAndEscape(in ACString charset, in AString text);
+	AString UnEscapeAndConvert(in ACString charset, in ACString text);
+
+  /**
+   * Unescapes the given URI fragment (for UI purpose only)
+   * Note:
+   * <ul>
+   *  <li> escaping back the result (unescaped string) is not guaranteed to
+   *       give the original escaped string
+   *  <li> The URI fragment (escaped) is assumed to be in UTF-8 and converted
+   *       to AString (UTF-16)
+   *  <li> In case of successful conversion any resulting character listed
+   *       in netwerk/dns/IDNCharacterBlocklist.inc (except space) is escaped
+   *  <li> Always succeeeds (callers don't need to do error checking)
+   * </ul>
+   *
+   * @param aURIFragment the URI (or URI fragment) to unescape
+   * @return Unescaped aURIFragment  converted to unicode
+   */
+  AString unEscapeURIForUI(in AUTF8String aURIFragment);
+
+  /**
+   * Unescapes only non ASCII characters in the given URI fragment
+   * note: this method assumes the URI as UTF-8 and fallbacks to the given
+   * charset if the charset is an ASCII superset
+   *
+   * @param aCharset the charset to convert from
+   * @param aURIFragment the URI (or URI fragment) to unescape
+   * @return Unescaped aURIFragment  converted to unicode
+   * @throws NS_ERROR_UCONV_NOCONV when there is no decoder for aCharset
+   *         or NS_ERROR_UDEC_ILLEGALINPUT in case of conversion failure
+   */
+  AString unEscapeNonAsciiURI(in ACString aCharset, in AUTF8String aURIFragment);
+};

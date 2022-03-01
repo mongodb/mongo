@@ -1,0 +1,120 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: pl_pl_FONIPA.txt
+# Generated from CLDR
+#
+
+# Polish orthography to phonemic transcription.
+# http://en.wikipedia.org/wiki/Polish_phonology
+#
+# Transform input to normalized form NFC, and to lowercase.
+:: NFC () ;
+:: Lower () ;
+#
+#
+# Definitions.
+$voiceless = [cfhkpst];
+$vowel = [ aąeęioóuy ];
+#
+#
+# Digraphs and Trigraphs.
+#
+ch } i → ç ;
+ch → x ;
+ci } $vowel → t \u0361 ɕ ;
+ci → t \u0361 ɕ i ;
+cz → t \u0361 ʂ ;
+dzi } $vowel → d \u0361 ʑ ;
+dzi → d \u0361 ʑ i ;
+dz } $voiceless → t \u0361 s ;
+dz → d \u0361 z ;
+dź } $voiceless → t \u0361 ɕ ;
+dź → d \u0361 ʑ ;
+dż } $voiceless → t \u0361 ʂ ;
+dż → d \u0361 ʐ ;
+kw → kf ;
+krw → krf ;
+ni } $vowel → ɲ ;
+ni → ɲ i ;
+$voiceless { rz → ʂ ;
+rz } $voiceless → ʂ ;
+rz → ʐ ;
+sz → ʂ ;
+trw → trf ;
+tw → tf ;
+zi } $vowel → ʑ ;
+zi → ʑ i ;
+#
+#
+a → a ;
+ą } [bp] → ɔm ;
+ą } [kg] → ɔŋ ;
+ą } [cdt] → ɔn ;
+ą → ɔ\u0303 ;
+b } $voiceless → p ;
+b → b ;
+c → t \u0361 s ;
+ć → t \u0361 ɕ ;
+d } $voiceless → t ;
+d → d ;
+e → ɛ ;
+ę } [bp] → ɛm ;
+ę } [dt] → ɛn ;
+ę } [gk] → ɛŋ ;
+ę → ɛ\u0303;
+f → f ;
+g } $voiceless → k ;
+g → ɡ ;
+h } i → ç ;
+h → x ;
+i } $vowel → ʲ ;
+i → i ;
+j → j ;
+k } [bdzż] → ɡ ;
+k → k ;
+l } i → ʎ ;
+l → l ;
+ł → w ;
+m → m ;
+n → n ;
+ń → ɲ ;
+o → ɔ ;
+ó → u ;
+r → r ;
+si } $vowel → ɕ ;
+si → ɕi ;
+s → s ;
+ś → ɕ ;
+t → t ;
+u → u ;
+w } $voiceless → f ;
+w → v ;
+y → ɨ ;
+ź } $voiceless → ɕ ;
+ź → ʑ ;
+ż } $voiceless → ʂ ;
+ż → ʐ ;
+#
+#
+# Second pass: Phoneme-to-phone rules.
+:: Null ;
+#
+#
+tʐ → tʂ ;
+pʐ → pʂ ;
+xʐ → xʂ ;
+ʐt\u0361ʂ → ʂt\u0361ʂ ;
+#
+#
+# Final de-voicing.
+b } [$] → p ;
+d \u0361 z } [$] → t \u0361 s ;  # rydz → rɨt\u0361s
+d } [$] → t ;
+ɡ } [$] → k ;
+v } [$] → f ;
+ʐ } [$] → ʂ ;
+ʑ } [$] → ɕ ;
+z } [$] → s ;
+

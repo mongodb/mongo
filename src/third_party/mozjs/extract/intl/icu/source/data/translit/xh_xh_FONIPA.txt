@@ -1,0 +1,92 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: xh_xh_FONIPA.txt
+# Generated from CLDR
+#
+
+# Pronunciation rules for isiXhosa.
+#
+# Author: mjansche@google.com (Martin Jansche)
+#
+# These rules transcribe isiXhosa into the phoneme inventory used within the
+# NCHLT Speech Corpus (https://sites.google.com/site/nchltspeechcorpus/home).
+#
+# The rules were tested using the NCHLT-inlang isiXhosa pronunciation dictionary
+# (http://rma.nwu.ac.za/index.php/resource-catalogue/nchlt-inlang-dictionaries.html).
+# They correctly account for 14,999 out of 15,000 entries in the dictionary.
+#
+# The NCHLT 2013 phone set does not distinguish short and long vowels and does
+# not indicate tone in any way. Transcription of tone is out of scope without a
+# dictionary, since tone is generally not indicated in the orthography. Nasal
+# clicks are not treated as separated phonemes in the NCHLT 2013 phone set and
+# are transcribed as a sequence of nasal plus click instead.
+#
+# One minor notational deviation from the NCHLT 2013 phone set is that we use a
+# tie bar within the complex (slack voiced) clicks, e.g. ɡ\u0361ǀ instead of ɡǀ, to
+# avoid ambiguity and make the phoneme inventory uniquely decodable.
+::Lower;
+nyh → ɲʰ;
+n { tsh → t\u0361ʃʼ;
+tsh → t\u0361ʃʰ;
+tyh → cʰ;
+bh → bʰ;
+ch → ǀʰ;
+dl → ɮ;
+dy → ɟ;
+gc → ɡ\u0361ǀ;
+gq → ɡ\u0361ǃ;
+gr → ɣ;
+gx → ɡ\u0361ǁ;
+hl → ɬ;
+kh → kʰ;
+kr → k\u0361x;
+mh } [^l] → mʰ;  # <mhl> denotes /mɬ/ instead
+nh → nʰ;
+ny → ɲ;
+ph → pʰ;
+qh → ǃʰ;
+sh → ʃ;
+th → tʰ;
+tl → t\u0361ɬʼ;
+ts → t\u0361sʼ;
+ty → cʼ;
+xh → ǁʰ;
+aa → | a;
+ee → | e;
+ii → | i;
+kc → | c;
+kq → | q;
+mm → | m;
+oo → | o;
+rh → | r;
+uu → | u;
+a → a;
+b → ɓ;
+c → ǀ;
+d → d;
+e → ɛ;
+f → f;
+g → ɡ;
+h → h;
+i → i;
+j → d\u0361ʒ;
+k → kʼ;
+l → l;
+m → m;
+n } g → ŋ;
+n → n;
+o → ɔ;
+p → pʼ;
+q → ǃ;
+r → r;
+s → s;
+t → tʼ;
+u → u;
+v → v;
+w → w;
+x → ǁ;
+y → j;
+z → z;
+

@@ -1,0 +1,1820 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+kk{
+    AuxExemplarCharacters{"[]"}
+    Ellipsis{
+        final{"{0}…"}
+        initial{"…{0}"}
+        medial{"{0}…{1}"}
+        word-final{"{0} …"}
+        word-initial{"… {0}"}
+        word-medial{"{0} … {1}"}
+    }
+    ExemplarCharacters{
+        "[а ә б в г ғ д е ё ж з и й к қ л м н ң о ө п р с т у ұ ү ф х һ ц ч ш щ ъ ы і"
+        " ь э ю я]"
+    }
+    ExemplarCharactersIndex{
+        "[А Ә Б В Г Ғ Д Е Ё Ж З И Й К Қ Л М Н Ң О Ө П Р С Т У Ұ Ү Ф Х Һ Ц Ч Ш Щ Ъ Ы І"
+        " Ь Э Ю Я]"
+    }
+    ExemplarCharactersNumbers{"[  \\- ‑ , % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    ExemplarCharactersPunctuation{
+        "[\\- ‐ ‑ – — , ; \\: ! ? . … ' ‘ ’ \u0022 “ ” « » ( ) \\[ \\] \\{ \\} § @ * "
+        "/ \\& #]"
+    }
+    MoreInformation{"?"}
+    NumberElements{
+        default{"latn"}
+        latn{
+            miscPatterns{
+                approximately{"~{0}"}
+                atLeast{"{0}+"}
+                atMost{"≤{0}"}
+                range{"{0}–{1}"}
+            }
+            patterns{
+                accountingFormat{"#,##0.00 ¤"}
+                currencyFormat{"#,##0.00 ¤"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"#,##0%"}
+                scientificFormat{"#E0"}
+            }
+            patternsLong{
+                decimalFormat{
+                    1000{
+                        one{"0 мың"}
+                        other{"0 мың"}
+                    }
+                    10000{
+                        one{"00 мың"}
+                        other{"00 мың"}
+                    }
+                    100000{
+                        one{"000 мың"}
+                        other{"000 мың"}
+                    }
+                    1000000{
+                        one{"0 миллион"}
+                        other{"0 миллион"}
+                    }
+                    10000000{
+                        one{"00 миллион"}
+                        other{"00 миллион"}
+                    }
+                    100000000{
+                        one{"000 миллион"}
+                        other{"000 миллион"}
+                    }
+                    1000000000{
+                        one{"0 миллиард"}
+                        other{"0 миллиард"}
+                    }
+                    10000000000{
+                        one{"00 миллиард"}
+                        other{"00 миллиард"}
+                    }
+                    100000000000{
+                        one{"000 миллиард"}
+                        other{"000 миллиард"}
+                    }
+                    1000000000000{
+                        one{"0 триллион"}
+                        other{"0 триллион"}
+                    }
+                    10000000000000{
+                        one{"00 триллион"}
+                        other{"00 триллион"}
+                    }
+                    100000000000000{
+                        one{"000 триллион"}
+                        other{"000 триллион"}
+                    }
+                }
+            }
+            patternsShort{
+                currencyFormat{
+                    1000{
+                        one{"0 мың ¤"}
+                        other{"0 мың ¤"}
+                    }
+                    10000{
+                        one{"00 мың ¤"}
+                        other{"00 мың ¤"}
+                    }
+                    100000{
+                        one{"000 мың ¤"}
+                        other{"000 мың ¤"}
+                    }
+                    1000000{
+                        one{"0 млн ¤"}
+                        other{"0 млн ¤"}
+                    }
+                    10000000{
+                        one{"00 млн ¤"}
+                        other{"00 млн ¤"}
+                    }
+                    100000000{
+                        one{"000 млн ¤"}
+                        other{"000 млн ¤"}
+                    }
+                    1000000000{
+                        one{"0 млрд ¤"}
+                        other{"0 млрд ¤"}
+                    }
+                    10000000000{
+                        one{"00 млрд ¤"}
+                        other{"00 млрд ¤"}
+                    }
+                    100000000000{
+                        one{"000 млрд ¤"}
+                        other{"000 млрд ¤"}
+                    }
+                    1000000000000{
+                        one{"0 трлн ¤"}
+                        other{"0 трлн ¤"}
+                    }
+                    10000000000000{
+                        one{"00 трлн ¤"}
+                        other{"00 трлн ¤"}
+                    }
+                    100000000000000{
+                        one{"000 трлн ¤"}
+                        other{"000 трлн ¤"}
+                    }
+                }
+                decimalFormat{
+                    1000{
+                        one{"0 мың"}
+                        other{"0 мың"}
+                    }
+                    10000{
+                        one{"00 мың"}
+                        other{"00 мың"}
+                    }
+                    100000{
+                        one{"000 м'.'"}
+                        other{"000 м'.'"}
+                    }
+                    1000000{
+                        one{"0 млн"}
+                        other{"0 млн"}
+                    }
+                    10000000{
+                        one{"00 млн"}
+                        other{"00 млн"}
+                    }
+                    100000000{
+                        one{"000 млн"}
+                        other{"000 млн"}
+                    }
+                    1000000000{
+                        one{"0 млрд"}
+                        other{"0 млрд"}
+                    }
+                    10000000000{
+                        one{"00 млрд"}
+                        other{"00 млрд"}
+                    }
+                    100000000000{
+                        one{"000 млрд"}
+                        other{"000 млрд"}
+                    }
+                    1000000000000{
+                        one{"0 трлн"}
+                        other{"0 трлн"}
+                    }
+                    10000000000000{
+                        one{"00 трлн"}
+                        other{"00 трлн"}
+                    }
+                    100000000000000{
+                        one{"000 трлн"}
+                        other{"000 трлн"}
+                    }
+                }
+            }
+            symbols{
+                decimal{","}
+                exponential{"E"}
+                group{" "}
+                infinity{"∞"}
+                minusSign{"-"}
+                nan{"сан емес"}
+                perMille{"‰"}
+                percentSign{"%"}
+                plusSign{"+"}
+                superscriptingExponent{"×"}
+                timeSeparator{":"}
+            }
+        }
+        minimalPairs{
+            ordinal{
+                many{"{0}-ші бұрылыстан оңға бұрылыңыз."}
+                other{"{0}-шы бұрылыстан оңға бұрылыңыз."}
+            }
+            plural{
+                one{"Cебетте {0} Х бар. Ол сіздікі ме?"}
+                other{"Себетте {0} Х бар. Олар сіздікі ме?"}
+            }
+        }
+        minimumGroupingDigits{"1"}
+        native{"latn"}
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "G y 'ж'. d MMMM, EEEE",
+                "G y 'ж'. d MMMM",
+                "G dd.MM.y",
+                "GGGGG dd.MM.y",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Bh{"B h"}
+                Bhm{"B h:mm"}
+                Bhms{"B h:mm:ss"}
+                E{"ccc"}
+                EBhm{"E B h:mm"}
+                EBhms{"E B h:mm:ss"}
+                EHm{"E HH:mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"d, E"}
+                Ehm{"E h:mm a"}
+                Ehms{"E h:mm:ss a"}
+                Gy{"G y 'ж'."}
+                GyMMM{"G y 'ж'. MMM"}
+                GyMMMEd{"G y 'ж'. d MMM, E"}
+                GyMMMd{"G y 'ж'. d MMM"}
+                H{"HH"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"dd.MM, E"}
+                MMM{"LLL"}
+                MMMEd{"d MMM, E"}
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                Md{"dd.MM"}
+                d{"d"}
+                h{"h a"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                ms{"mm:ss"}
+                y{"G y 'ж'."}
+                yyyy{"G y 'ж'."}
+                yyyyM{"GGGGG MM.y"}
+                yyyyMEd{"GGGGG dd.MM.y, E"}
+                yyyyMMM{"G y 'ж'. MMM"}
+                yyyyMMMEd{"G y 'ж'. d MMM, E"}
+                yyyyMMMM{"G y 'ж'. MMMM"}
+                yyyyMMMd{"G y 'ж'. d MMM"}
+                yyyyMd{"GGGGG dd.MM.y"}
+                yyyyQQQ{"G y 'ж'. QQQ"}
+                yyyyQQQQ{"G y 'ж'. QQQQ"}
+            }
+            intervalFormats{
+                Bh{
+                    B{"h B – h B"}
+                    h{"h – h B"}
+                }
+                Bhm{
+                    B{"h:mm B – h:mm B"}
+                    h{"h:mm – h:mm B"}
+                    m{"h:mm – h:mm B"}
+                }
+                GyMMMEd{
+                    G{"G y 'ж'. d MMM, E – G y 'ж'. d MMM, E"}
+                    M{"G y 'ж'. d MMM, E – d MMM, E"}
+                    d{"G y 'ж'. d MMM, E – d MMM, E"}
+                    y{"G y 'ж'. d MMM, E – y 'ж'. d MMM, E"}
+                }
+                GyMMMd{
+                    G{"G y 'ж'. d MMM – G y 'ж'. d MMM"}
+                    M{"G y 'ж'. d MMM – d MMM"}
+                    d{"G y 'ж'. d–d MMM"}
+                    y{"G y 'ж'. d MMM – y 'ж'. d MMM"}
+                }
+                H{
+                    H{"HH–HH"}
+                }
+                Hm{
+                    H{"HH:mm–HH:mm"}
+                    m{"HH:mm–HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm–HH:mm v"}
+                    m{"HH:mm–HH:mm v"}
+                }
+                Hv{
+                    H{"HH–HH v"}
+                }
+                M{
+                    M{"M–M"}
+                }
+                MEd{
+                    M{"dd.MM, E – dd.MM, E"}
+                    d{"dd.MM, E – dd.MM, E"}
+                }
+                MMM{
+                    M{"MMM–MMM"}
+                }
+                MMMEd{
+                    M{"d MMM, E – d MMM, E"}
+                    d{"d (E) – d (E) MMM"}
+                }
+                MMMd{
+                    M{"d MMM – d MMM"}
+                    d{"d–d MMM"}
+                }
+                Md{
+                    M{"dd.MM – dd.MM"}
+                    d{"dd.MM – dd.MM"}
+                }
+                d{
+                    d{"d–d"}
+                }
+                fallback{"{0} - {1}"}
+                h{
+                    h{"h–h a"}
+                }
+                hm{
+                    h{"h:mm–h:mm a"}
+                    m{"h:mm–h:mm a"}
+                }
+                hmv{
+                    h{"h:mm–h:mm a v"}
+                    m{"h:mm–h:mm a v"}
+                }
+                hv{
+                    h{"h–h a v"}
+                }
+                y{
+                    y{"G y–y 'жж'."}
+                }
+                yM{
+                    M{"GGGGG MM.y – MM.y"}
+                    y{"GGGGG MM.y – MM.y"}
+                }
+                yMEd{
+                    M{"GGGGG dd.MM.y, E – dd.MM.y, E"}
+                    d{"GGGGG dd.MM.y, E – dd.MM.y, E"}
+                    y{"GGGGG dd.MM.y, E – dd.MM.y, E"}
+                }
+                yMMM{
+                    M{"G y 'ж'. MMM–MMM"}
+                    y{"G y 'ж'. MMM – y 'ж'. MMM"}
+                }
+                yMMMEd{
+                    M{"G y 'ж'. d MMM, E – d MMM, E"}
+                    d{"G y 'ж'. d MMM, E – d MMM, E"}
+                    y{"G y 'ж'. d MMM, E – y 'ж'. d MMM, E"}
+                }
+                yMMMM{
+                    M{"G y 'ж'. MMMM – MMMM"}
+                    y{"G y 'ж'. MMMM – y 'ж'. MMMM"}
+                }
+                yMMMd{
+                    M{"G y 'ж'. d MMM – d MMM"}
+                    d{"G y 'ж'. d–d MMM"}
+                    y{"G y 'ж'. d MMM – y 'ж'. d MMM"}
+                }
+                yMd{
+                    M{"GGGGG dd.MM.y – dd.MM.y"}
+                    d{"GGGGG dd.MM.y – dd.MM.y"}
+                    y{"GGGGG dd.MM.y – dd.MM.y"}
+                }
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "AM",
+                "PM",
+            }
+            AmPmMarkersAbbr{
+                "AM",
+                "PM",
+            }
+            AmPmMarkersNarrow{
+                "AM",
+                "PM",
+            }
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "y 'ж'. d MMMM, EEEE",
+                "y 'ж'. d MMMM",
+                "y 'ж'. dd MMM",
+                "dd.MM.yy",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            appendItems{
+                Timezone{"{0} {1}"}
+            }
+            availableFormats{
+                Bh{"B h"}
+                Bhm{"B h:mm"}
+                Bhms{"B h:mm:ss"}
+                E{"ccc"}
+                EBhm{"E, B h:mm"}
+                EBhms{"E, B h:mm:ss"}
+                EHm{"E HH:mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"d, E"}
+                Ehm{"E h:mm a"}
+                Ehms{"E h:mm:ss a"}
+                Gy{"G y 'ж'."}
+                GyMMM{"G y 'ж'. MMM"}
+                GyMMMEd{"G y 'ж'. d MMM, E"}
+                GyMMMd{"G y 'ж'. d MMM"}
+                H{"HH"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                Hmsv{"HH:mm:ss v"}
+                Hmv{"HH:mm v"}
+                M{"L"}
+                MEd{"dd.MM, E"}
+                MMM{"LLL"}
+                MMMEd{"d MMM, E"}
+                MMMMW{
+                    one{"MMMM 'айының' W-'аптасы'"}
+                    other{"MMMM 'айының' W-'аптасы'"}
+                }
+                MMMMd{"d MMMM"}
+                MMMd{"d MMM"}
+                Md{"dd.MM"}
+                d{"d"}
+                h{"h a"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                hmsv{"h:mm:ss a v"}
+                hmv{"h:mm a v"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"MM.y"}
+                yMEd{"dd.MM.y, E"}
+                yMMM{"y 'ж'. MMM"}
+                yMMMEd{"y 'ж'. d MMM, E"}
+                yMMMM{"y 'ж'. MMMM"}
+                yMMMd{"y 'ж'. d MMM"}
+                yMd{"dd.MM.y"}
+                yQQQ{"y 'ж'. QQQ"}
+                yQQQQ{"y 'ж'. QQQQ"}
+                yw{
+                    one{"Y 'жылдың' w-'аптасы'"}
+                    other{"Y 'жылдың' w-'аптасы'"}
+                }
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "жс",
+                        "дс",
+                        "сс",
+                        "ср",
+                        "бс",
+                        "жм",
+                        "сб",
+                    }
+                    narrow{
+                        "Ж",
+                        "Д",
+                        "С",
+                        "С",
+                        "Б",
+                        "Ж",
+                        "С",
+                    }
+                    short{
+                        "жс",
+                        "дс",
+                        "сс",
+                        "ср",
+                        "бс",
+                        "жм",
+                        "сб",
+                    }
+                    wide{
+                        "жексенбі",
+                        "дүйсенбі",
+                        "сейсенбі",
+                        "сәрсенбі",
+                        "бейсенбі",
+                        "жұма",
+                        "сенбі",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "жс",
+                        "дс",
+                        "сс",
+                        "ср",
+                        "бс",
+                        "жм",
+                        "сб",
+                    }
+                    narrow{
+                        "Ж",
+                        "Д",
+                        "С",
+                        "С",
+                        "Б",
+                        "Ж",
+                        "С",
+                    }
+                    short{
+                        "жс",
+                        "дс",
+                        "сс",
+                        "ср",
+                        "бс",
+                        "жм",
+                        "сб",
+                    }
+                    wide{
+                        "жексенбі",
+                        "дүйсенбі",
+                        "сейсенбі",
+                        "сәрсенбі",
+                        "бейсенбі",
+                        "жұма",
+                        "сенбі",
+                    }
+                }
+            }
+            dayPeriod{
+                format{
+                    abbreviated{
+                        afternoon1{"түстен кейінгі"}
+                        evening1{"кешкі"}
+                        midnight{"түн жарымы"}
+                        morning1{"таңғы"}
+                        night1{"түнгі"}
+                        noon{"түскі"}
+                    }
+                    narrow{
+                        afternoon1{"түстен кейінгі"}
+                        evening1{"кешкі"}
+                        midnight{"түнгі"}
+                        morning1{"таңғы"}
+                        night1{"түнгі"}
+                        noon{"түскі"}
+                    }
+                    wide{
+                        afternoon1{"түстен кейінгі"}
+                        evening1{"кешкі"}
+                        midnight{"түн жарымы"}
+                        morning1{"таңғы"}
+                        night1{"түнгі"}
+                        noon{"түскі"}
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        afternoon1{"түстен кейін"}
+                        am{"AM"}
+                        evening1{"кеш"}
+                        midnight{"түн жарымы"}
+                        morning1{"таң"}
+                        night1{"түн"}
+                        noon{"талтүс"}
+                        pm{"PM"}
+                    }
+                    narrow{
+                        afternoon1{"түстен кейін"}
+                        am{"AM"}
+                        evening1{"кеш"}
+                        midnight{"түн жарымы"}
+                        morning1{"таң"}
+                        night1{"түн"}
+                        noon{"талтүс"}
+                        pm{"PM"}
+                    }
+                    wide{
+                        afternoon1{"түстен кейін"}
+                        am{"AM"}
+                        evening1{"кеш"}
+                        midnight{"түн жарымы"}
+                        morning1{"таң"}
+                        night1{"түн"}
+                        noon{"талтүс"}
+                        pm{"PM"}
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "б.з.д.",
+                    "б.з.",
+                }
+                abbreviated%variant{
+                    "BCE",
+                    "CE",
+                }
+                wide{
+                    "Біздің заманымызға дейін",
+                    "біздің заманымыз",
+                }
+                wide%variant{
+                    "біздің заманымызға дейін",
+                    "Біздің заманымыз",
+                }
+            }
+            intervalFormats{
+                Bh{
+                    B{"h B – h B"}
+                    h{"h – h B"}
+                }
+                Bhm{
+                    B{"h:mm B – h:mm B"}
+                    h{"h:mm – h:mm B"}
+                    m{"h:mm – h:mm B"}
+                }
+                GyMMMEd{
+                    G{"G y 'ж'. d MMM, E – G y 'ж'. d MMM, E"}
+                    M{"G y 'ж'. d MMM, E – d MMM, E"}
+                    d{"G y 'ж'. d MMM, E – d MMM, E"}
+                    y{"G y 'ж'. d MMM, E – y 'ж'. d MMM, E"}
+                }
+                GyMMMd{
+                    G{"G y 'ж'. d MMM – G y 'ж'. d MMM"}
+                    M{"G y 'ж'. d MMM – d MMM"}
+                    d{"G y 'ж'. d–d MMM"}
+                    y{"G y 'ж'. d MMM – y 'ж'. d MMM"}
+                }
+                H{
+                    H{"HH–HH"}
+                }
+                Hm{
+                    H{"HH:mm–HH:mm"}
+                    m{"HH:mm–HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm–HH:mm v"}
+                    m{"HH:mm–HH:mm v"}
+                }
+                Hv{
+                    H{"HH–HH v"}
+                }
+                M{
+                    M{"M–M"}
+                }
+                MEd{
+                    M{"dd.MM, E – dd.MM, E"}
+                    d{"dd.MM, E – dd.MM, E"}
+                }
+                MMM{
+                    M{"MMM–MMM"}
+                }
+                MMMEd{
+                    M{"d MMM, E – d MMM, E"}
+                    d{"d MMM, E – d MMM, E"}
+                }
+                MMMd{
+                    M{"d MMM – d MMM"}
+                    d{"d–d MMM"}
+                }
+                Md{
+                    M{"dd.MM – dd.MM"}
+                    d{"dd.MM – dd.MM"}
+                }
+                d{
+                    d{"d–d"}
+                }
+                fallback{"{0} - {1}"}
+                h{
+                    a{"h a – h a"}
+                    h{"h–h a"}
+                }
+                hm{
+                    a{"h:mm a – h:mm a"}
+                    h{"h:mm–h:mm a"}
+                    m{"h:mm–h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a – h:mm a v"}
+                    h{"h:mm–h:mm a v"}
+                    m{"h:mm–h:mm a v"}
+                }
+                hv{
+                    a{"h a – h a v"}
+                    h{"h–h a v"}
+                }
+                y{
+                    y{"y–y"}
+                }
+                yM{
+                    M{"MM.y – MM.y"}
+                    y{"MM.y – MM.y"}
+                }
+                yMEd{
+                    M{"dd.MM.y, E – dd.MM.y, E"}
+                    d{"dd.MM.y, E – dd.MM.y, E"}
+                    y{"dd.MM.y, E – dd.MM.y, E"}
+                }
+                yMMM{
+                    M{"y 'ж'. MMM–MMM"}
+                    y{"y 'ж'. MMM – y 'ж'. MMM"}
+                }
+                yMMMEd{
+                    M{"y 'ж'. d MMM, E – d MMM, E"}
+                    d{"y 'ж'. d MMM, E – y 'ж'. d MMM, E"}
+                    y{"y 'ж'. d MMM, E – y 'ж'. d MMM, E"}
+                }
+                yMMMM{
+                    M{"y 'ж'. MMMM – MMMM"}
+                    y{"y 'ж'. MMMM – y 'ж'. MMMM"}
+                }
+                yMMMd{
+                    M{"y 'ж'. d MMM – d MMM"}
+                    d{"y 'ж'. d–d MMM"}
+                    y{"y 'ж'. d MMM – y 'ж'. d MMM"}
+                }
+                yMd{
+                    M{"dd.MM.y – dd.MM.y"}
+                    d{"dd.MM.y – dd.MM.y"}
+                    y{"dd.MM.y – dd.MM.y"}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "қаң.",
+                        "ақп.",
+                        "нау.",
+                        "сәу.",
+                        "мам.",
+                        "мау.",
+                        "шіл.",
+                        "там.",
+                        "қыр.",
+                        "қаз.",
+                        "қар.",
+                        "жел.",
+                    }
+                    narrow{
+                        "Қ",
+                        "А",
+                        "Н",
+                        "С",
+                        "М",
+                        "М",
+                        "Ш",
+                        "Т",
+                        "Қ",
+                        "Қ",
+                        "Қ",
+                        "Ж",
+                    }
+                    wide{
+                        "қаңтар",
+                        "ақпан",
+                        "наурыз",
+                        "сәуір",
+                        "мамыр",
+                        "маусым",
+                        "шілде",
+                        "тамыз",
+                        "қыркүйек",
+                        "қазан",
+                        "қараша",
+                        "желтоқсан",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "қаң.",
+                        "ақп.",
+                        "нау.",
+                        "сәу.",
+                        "мам.",
+                        "мау.",
+                        "шіл.",
+                        "там.",
+                        "қыр.",
+                        "қаз.",
+                        "қар.",
+                        "жел.",
+                    }
+                    narrow{
+                        "Қ",
+                        "А",
+                        "Н",
+                        "С",
+                        "М",
+                        "М",
+                        "Ш",
+                        "Т",
+                        "Қ",
+                        "Қ",
+                        "Қ",
+                        "Ж",
+                    }
+                    wide{
+                        "Қаңтар",
+                        "Ақпан",
+                        "Наурыз",
+                        "Сәуір",
+                        "Мамыр",
+                        "Маусым",
+                        "Шілде",
+                        "Тамыз",
+                        "Қыркүйек",
+                        "Қазан",
+                        "Қараша",
+                        "Желтоқсан",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "І тқс.",
+                        "ІІ тқс.",
+                        "ІІІ тқс.",
+                        "IV тқс.",
+                    }
+                    narrow{
+                        "I",
+                        "II",
+                        "III",
+                        "IV",
+                    }
+                    wide{
+                        "І тоқсан",
+                        "ІІ тоқсан",
+                        "ІІІ тоқсан",
+                        "IV тоқсан",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "І тқс.",
+                        "ІІ тқс.",
+                        "ІІІ тқс.",
+                        "IV тқс.",
+                    }
+                    narrow{
+                        "I",
+                        "II",
+                        "III",
+                        "IV",
+                    }
+                    wide{
+                        "І тоқсан",
+                        "ІІ тоқсан",
+                        "ІІІ тоқсан",
+                        "IV тоқсан",
+                    }
+                }
+            }
+        }
+    }
+    characterLabel{
+        activities{"әрекет"}
+        african_scripts{"Африка жазулары"}
+        american_scripts{"Америка жазулары"}
+        animal{"жануар"}
+        animals_nature{"жануар немесе табиғат"}
+        arrows{"көрсеткі"}
+        body{"дене"}
+        box_drawing{"псевдографика"}
+        braille{"Брайль жазуы"}
+        building{"ғимарат"}
+        bullets_stars{"тізім маркерлері/жұлдыздар"}
+        consonantal_jamo{"дауыссыз чамо"}
+        currency_symbols{"валюта таңбалары"}
+        dash_connector{"сызықша/байланыс"}
+        digits{"цифрлар"}
+        dingbats{"дингбаттар"}
+        divination_symbols{"оккульттық таңбалар"}
+        downwards_arrows{"төмен бағытталған көрсеткілер"}
+        downwards_upwards_arrows{"төмен және жоғары бағытталған көрсеткілер"}
+        east_asian_scripts{"Шығыс Азия жазулары"}
+        emoji{"эмодзи"}
+        european_scripts{"Еуропа жазулары"}
+        female{"әйел"}
+        flag{"ту"}
+        flags{"тулар"}
+        food_drink{"тамақ пен сусын"}
+        format{"форматтау"}
+        format_whitespace{"форматтау және бос орын"}
+        full_width_form_variant{"толық енді форма нұсқалары"}
+        geometric_shapes{"геометриялық фигуралар"}
+        half_width_form_variant{"жарты енді форма нұсқалары"}
+        han_characters{"қытай иероглифтері"}
+        han_radicals{"иероглиф кілттері"}
+        hanja{"ханча"}
+        hanzi_simplified{"қытай иероглифтері (жеңілдетілген)"}
+        hanzi_traditional{"қытай иероглифтері (дәстүрлі)"}
+        heart{"жүрек"}
+        historic_scripts{"көне жазулар"}
+        ideographic_desc_characters{"иероглифтерді сипаттау таңбалары"}
+        japanese_kana{"жапондық қана жазуы"}
+        kanbun{"камбун"}
+        kanji{"кандзи"}
+        keycap{"перне"}
+        leftwards_arrows{"солға бағытталған көрсеткілер"}
+        leftwards_rightwards_arrows{"солға және оңға бағытталған көрсеткілер"}
+        letterlike_symbols{"әріптік таңбалар"}
+        limited_use{"қолданысы шектеулі"}
+        male{"еркек"}
+        math_symbols{"математикалық таңбалар"}
+        middle_eastern_scripts{"Таяу Шығыс жазулары"}
+        miscellaneous{"әр түрлі"}
+        modern_scripts{"қазіргі заман жазулары"}
+        modifier{"модификатор"}
+        musical_symbols{"музыкалық таңбалар"}
+        nature{"табиғат"}
+        nonspacing{"бос орынсыз"}
+        numbers{"сандар"}
+        objects{"нысандар"}
+        other{"басқа"}
+        paired{"жұптасқан"}
+        person{"адам"}
+        phonetic_alphabet{"фонетикалық әліпби"}
+        pictographs{"пиктограммалар"}
+        place{"орын"}
+        plant{"өсімдік"}
+        punctuation{"тыныс белгілері"}
+        rightwards_arrows{"оңға бағытталған көрсеткілер"}
+        sign_standard_symbols{"белгілер/стандартты таңбалар"}
+        small_form_variant{"кіші форма нұсқалары"}
+        smiley{"смайл"}
+        smileys_people{"смайлдар мен адамдар"}
+        south_asian_scripts{"Оңтүстік Азия жазулары"}
+        southeast_asian_scripts{"Оңтүстік-Шығыс Азия жазулары"}
+        spacing{"бос орын"}
+        sport{"спорт"}
+        symbols{"таңбалар"}
+        technical_symbols{"техникалық таңбалар"}
+        tone_marks{"екпін белгілері"}
+        travel{"саяхат"}
+        travel_places{"саяхат және орындар"}
+        upwards_arrows{"жоғары бағытталған көрсеткілер"}
+        variant_forms{"өзгермелі формалар"}
+        vocalic_jamo{"дауысты чамо"}
+        weather{"ауа райы"}
+        western_asian_scripts{"Батыс Азия жазулары"}
+        whitespace{"бос орын"}
+    }
+    delimiters{
+        alternateQuotationEnd{"”"}
+        alternateQuotationStart{"“"}
+        quotationEnd{"»"}
+        quotationStart{"«"}
+    }
+    fields{
+        day{
+            dn{"күн"}
+            relative{
+                "-1"{"кеше"}
+                "-2"{"алдыңгүні"}
+                "0"{"бүгін"}
+                "1"{"ертең"}
+                "2"{"бүрсігүні"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} күннен кейін"}
+                    other{"{0} күннен кейін"}
+                }
+                past{
+                    one{"{0} күн бұрын"}
+                    other{"{0} күн бұрын"}
+                }
+            }
+        }
+        day-narrow{
+            dn{"күн"}
+            relative{
+                "-1"{"кеше"}
+                "-2"{"алдыңғы күні"}
+                "0"{"бүгін"}
+                "1"{"ертең"}
+                "2"{"бүрсігүні"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} күннен кейін"}
+                    other{"{0} күннен кейін"}
+                }
+                past{
+                    one{"{0} күн бұрын"}
+                    other{"{0} күн бұрын"}
+                }
+            }
+        }
+        day-short{
+            dn{"күн"}
+            relative{
+                "-1"{"кеше"}
+                "-2"{"алдыңғы күні"}
+                "0"{"бүгін"}
+                "1"{"ертең"}
+                "2"{"бүрсігүні"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} күннен кейін"}
+                    other{"{0} күннен кейін"}
+                }
+                past{
+                    one{"{0} күн бұрын"}
+                    other{"{0} күн бұрын"}
+                }
+            }
+        }
+        dayOfYear{
+            dn{"жылдағы күн"}
+        }
+        dayOfYear-narrow{
+            dn{"жылдағы күн"}
+        }
+        dayOfYear-short{
+            dn{"жылдағы күн"}
+        }
+        dayperiod{
+            dn{"АМ/РМ"}
+        }
+        dayperiod-narrow{
+            dn{"АМ/РМ"}
+        }
+        dayperiod-short{
+            dn{"АМ/РМ"}
+        }
+        era{
+            dn{"дәуір"}
+        }
+        era-narrow{
+            dn{"дәуір"}
+        }
+        era-short{
+            dn{"дәуір"}
+        }
+        fri{
+            relative{
+                "-1"{"өткен жұма"}
+                "0"{"осы жұма"}
+                "1"{"келесі жұма"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} жұмадан кейін"}
+                    other{"{0} жұмадан кейін"}
+                }
+                past{
+                    one{"{0} жұма бұрын"}
+                    other{"{0} жұма бұрын"}
+                }
+            }
+        }
+        fri-narrow{
+            relative{
+                "-1"{"өткен жм"}
+                "0"{"осы жм"}
+                "1"{"келесі жм"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} жм кейін"}
+                    other{"{0} жм кейін"}
+                }
+                past{
+                    one{"{0} жм бұрын"}
+                    other{"{0} жм бұрын"}
+                }
+            }
+        }
+        fri-short{
+            relative{
+                "-1"{"өткен жұм."}
+                "0"{"осы жұм."}
+                "1"{"келесі жұм."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} жұм. кейін"}
+                    other{"{0} жұм. кейін"}
+                }
+                past{
+                    one{"{0} жұм. бұрын"}
+                    other{"{0} жұм. бұрын"}
+                }
+            }
+        }
+        hour{
+            dn{"сағат"}
+            relative{
+                "0"{"осы сағат"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} сағаттан кейін"}
+                    other{"{0} сағаттан кейін"}
+                }
+                past{
+                    one{"{0} сағат бұрын"}
+                    other{"{0} сағат бұрын"}
+                }
+            }
+        }
+        hour-narrow{
+            dn{"сағ"}
+            relativeTime{
+                future{
+                    one{"{0} сағ. кейін"}
+                    other{"{0} сағ. кейін"}
+                }
+                past{
+                    one{"{0} сағ. бұрын"}
+                    other{"{0} сағ. бұрын"}
+                }
+            }
+        }
+        hour-short{
+            dn{"сағ"}
+            relativeTime{
+                future{
+                    one{"{0} сағ. кейін"}
+                    other{"{0} сағ. кейін"}
+                }
+                past{
+                    one{"{0} сағ. бұрын"}
+                    other{"{0} сағ. бұрын"}
+                }
+            }
+        }
+        minute{
+            dn{"минут"}
+            relative{
+                "0"{"осы минут"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} минуттан кейін"}
+                    other{"{0} минуттан кейін"}
+                }
+                past{
+                    one{"{0} минут бұрын"}
+                    other{"{0} минут бұрын"}
+                }
+            }
+        }
+        minute-narrow{
+            dn{"мин"}
+            relativeTime{
+                future{
+                    one{"{0} мин. кейін"}
+                    other{"{0} мин. кейін"}
+                }
+                past{
+                    one{"{0} мин. бұрын"}
+                    other{"{0} мин. бұрын"}
+                }
+            }
+        }
+        minute-short{
+            dn{"мин"}
+            relativeTime{
+                future{
+                    one{"{0} мин. кейін"}
+                    other{"{0} мин. кейін"}
+                }
+                past{
+                    one{"{0} мин. бұрын"}
+                    other{"{0} мин. бұрын"}
+                }
+            }
+        }
+        mon{
+            relative{
+                "-1"{"өткен дүйсенбі"}
+                "0"{"осы дүйсенбі"}
+                "1"{"келесі дүйсенбі"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} дүйсенбіден кейін"}
+                    other{"{0} дүйсенбіден кейін"}
+                }
+                past{
+                    one{"{0} дүйсенбі бұрын"}
+                    other{"{0} дүйсенбі бұрын"}
+                }
+            }
+        }
+        mon-narrow{
+            relative{
+                "-1"{"өткен дс"}
+                "0"{"осы дс"}
+                "1"{"келесі дс"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} дс кейін"}
+                    other{"{0} дс кейін"}
+                }
+                past{
+                    one{"{0} дс бұрын"}
+                    other{"{0} дс бұрын"}
+                }
+            }
+        }
+        mon-short{
+            relative{
+                "-1"{"өткен дүй."}
+                "0"{"осы дүй."}
+                "1"{"келесі дүй."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} дүй. кейін"}
+                    other{"{0} дүй. кейін"}
+                }
+                past{
+                    one{"{0} дүй. бұрын"}
+                    other{"{0} дүй. бұрын"}
+                }
+            }
+        }
+        month{
+            dn{"ай"}
+            relative{
+                "-1"{"өткен ай"}
+                "0"{"осы ай"}
+                "1"{"келесі ай"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} айдан кейін"}
+                    other{"{0} айдан кейін"}
+                }
+                past{
+                    one{"{0} ай бұрын"}
+                    other{"{0} ай бұрын"}
+                }
+            }
+        }
+        month-narrow{
+            dn{"ай"}
+            relative{
+                "-1"{"өткен ай"}
+                "0"{"осы ай"}
+                "1"{"келесі ай"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} айдан кейін"}
+                    other{"{0} айдан кейін"}
+                }
+                past{
+                    one{"{0} ай бұрын"}
+                    other{"{0} ай бұрын"}
+                }
+            }
+        }
+        month-short{
+            dn{"ай"}
+            relative{
+                "-1"{"өткен ай"}
+                "0"{"осы ай"}
+                "1"{"келесі ай"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} айдан кейін"}
+                    other{"{0} айдан кейін"}
+                }
+                past{
+                    one{"{0} ай бұрын"}
+                    other{"{0} ай бұрын"}
+                }
+            }
+        }
+        quarter{
+            dn{"ширек"}
+            relative{
+                "-1"{"өткен тоқсан"}
+                "0"{"осы тоқсан"}
+                "1"{"келесі тоқсан"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} тоқсаннан кейін"}
+                    other{"{0} тоқсаннан кейін"}
+                }
+                past{
+                    one{"{0} тоқсан бұрын"}
+                    other{"{0} тоқсан бұрын"}
+                }
+            }
+        }
+        quarter-narrow{
+            dn{"ш."}
+            relativeTime{
+                future{
+                    one{"{0} тқс. кейін"}
+                    other{"{0} тқс. кейін"}
+                }
+                past{
+                    one{"{0} тқс. бұрын"}
+                    other{"{0} тқс. бұрын"}
+                }
+            }
+        }
+        quarter-short{
+            dn{"ш."}
+            relativeTime{
+                future{
+                    one{"{0} тқс. кейін"}
+                    other{"{0} тқс. кейін"}
+                }
+                past{
+                    one{"{0} тқс. бұрын"}
+                    other{"{0} тқс. бұрын"}
+                }
+            }
+        }
+        sat{
+            relative{
+                "-1"{"өткен сенбі"}
+                "0"{"осы сенбі"}
+                "1"{"келесі сенбі"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} сенбіден кейін"}
+                    other{"{0} сенбіден кейін"}
+                }
+                past{
+                    one{"{0} сенбі бұрын"}
+                    other{"{0} сенбі бұрын"}
+                }
+            }
+        }
+        sat-narrow{
+            relative{
+                "-1"{"өткен сб"}
+                "0"{"осы сб"}
+                "1"{"келесі сб"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} сб кейін"}
+                    other{"{0} сб кейін"}
+                }
+                past{
+                    one{"{0} сб бұрын"}
+                    other{"{0} сб бұрын"}
+                }
+            }
+        }
+        sat-short{
+            relative{
+                "-1"{"өткен сен."}
+                "0"{"осы сен."}
+                "1"{"келесі сен."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} сен. кейін"}
+                    other{"{0} сен. кейін"}
+                }
+                past{
+                    one{"{0} сен. бұрын"}
+                    other{"{0} сен. бұрын"}
+                }
+            }
+        }
+        second{
+            dn{"секунд"}
+            relative{
+                "0"{"қазір"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} секундтан кейін"}
+                    other{"{0} секундтан кейін"}
+                }
+                past{
+                    one{"{0} секунд бұрын"}
+                    other{"{0} секунд бұрын"}
+                }
+            }
+        }
+        second-narrow{
+            dn{"с"}
+            relativeTime{
+                future{
+                    one{"{0} сек. кейін"}
+                    other{"{0} сек. кейін"}
+                }
+                past{
+                    one{"{0} сек. бұрын"}
+                    other{"{0} сек. бұрын"}
+                }
+            }
+        }
+        second-short{
+            dn{"с"}
+            relativeTime{
+                future{
+                    one{"{0} сек. кейін"}
+                    other{"{0} сек. кейін"}
+                }
+                past{
+                    one{"{0} сек. бұрын"}
+                    other{"{0} сек. бұрын"}
+                }
+            }
+        }
+        sun{
+            relative{
+                "-1"{"өткен жексенбі"}
+                "0"{"осы жексенбі"}
+                "1"{"келесі жексенбі"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} жексенбіден кейін"}
+                    other{"{0} жексенбіден кейін"}
+                }
+                past{
+                    one{"{0} жексенбі бұрын"}
+                    other{"{0} жексенбі бұрын"}
+                }
+            }
+        }
+        sun-narrow{
+            relative{
+                "-1"{"өткен жс"}
+                "0"{"осы жс"}
+                "1"{"келесі жс"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} жс кейін"}
+                    other{"{0} жс кейін"}
+                }
+                past{
+                    one{"{0} жс бұрын"}
+                    other{"{0} жс бұрын"}
+                }
+            }
+        }
+        sun-short{
+            relative{
+                "-1"{"өткен жек."}
+                "0"{"осы жек."}
+                "1"{"келесі жек."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} жек. кейін"}
+                    other{"{0} жек. кейін"}
+                }
+                past{
+                    one{"{0} жек. бұрын"}
+                    other{"{0} жек. бұрын"}
+                }
+            }
+        }
+        thu{
+            relative{
+                "-1"{"өткен бейсенбі"}
+                "0"{"осы бейсенбі"}
+                "1"{"келесі бейсенбі"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} бейсенбіден кейін"}
+                    other{"{0} бейсенбіден кейін"}
+                }
+                past{
+                    one{"{0} бейсенбі бұрын"}
+                    other{"{0} бейсенбі бұрын"}
+                }
+            }
+        }
+        thu-narrow{
+            relative{
+                "-1"{"өткен бс"}
+                "0"{"осы бс"}
+                "1"{"келесі бс"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} бс кейін"}
+                    other{"{0} бс кейін"}
+                }
+                past{
+                    one{"{0} бс бұрын"}
+                    other{"{0} бс бұрын"}
+                }
+            }
+        }
+        thu-short{
+            relative{
+                "-1"{"өткен бей."}
+                "0"{"осы бей."}
+                "1"{"келесі бей."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} бей. кейін"}
+                    other{"{0} бей. кейін"}
+                }
+                past{
+                    one{"{0} бей. бұрын"}
+                    other{"{0} бей. бұрын"}
+                }
+            }
+        }
+        tue{
+            relative{
+                "-1"{"өткен сейсенбі"}
+                "0"{"осы сейсенбі"}
+                "1"{"келесі сейсенбі"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} сейсенбіден кейін"}
+                    other{"{0} сейсенбіден кейін"}
+                }
+                past{
+                    one{"{0} сейсенбі бұрын"}
+                    other{"{0} сейсенбі бұрын"}
+                }
+            }
+        }
+        tue-narrow{
+            relative{
+                "-1"{"өткен сс"}
+                "0"{"осы сс"}
+                "1"{"келесі сс"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} сс кейін"}
+                    other{"{0} сс кейін"}
+                }
+                past{
+                    one{"{0} сс бұрын"}
+                    other{"{0} сс бұрын"}
+                }
+            }
+        }
+        tue-short{
+            relative{
+                "-1"{"өткен сей."}
+                "0"{"осы сей."}
+                "1"{"келесі сей."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} сей. кейін"}
+                    other{"{0} сей. кейін"}
+                }
+                past{
+                    one{"{0} сей. бұрын"}
+                    other{"{0} сей. бұрын"}
+                }
+            }
+        }
+        wed{
+            relative{
+                "-1"{"өткен сәрсенбі"}
+                "0"{"осы сәрсенбі"}
+                "1"{"келесі сәрсенбі"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} сәрсенбіден кейін"}
+                    other{"{0} сәрсенбіден кейін"}
+                }
+                past{
+                    one{"{0} сәрсенбі бұрын"}
+                    other{"{0} сәрсенбі бұрын"}
+                }
+            }
+        }
+        wed-narrow{
+            relative{
+                "-1"{"өткен ср"}
+                "0"{"осы ср"}
+                "1"{"келесі ср"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ср кейін"}
+                    other{"{0} ср кейін"}
+                }
+                past{
+                    one{"{0} ср бұрын"}
+                    other{"{0} ср бұрын"}
+                }
+            }
+        }
+        wed-short{
+            relative{
+                "-1"{"өткен сәр."}
+                "0"{"осы сәр."}
+                "1"{"келесі сәр."}
+            }
+            relativeTime{
+                future{
+                    one{"{0} сәр. кейін"}
+                    other{"{0} сәр. кейін"}
+                }
+                past{
+                    one{"{0} сәр. бұрын"}
+                    other{"{0} сәр. бұрын"}
+                }
+            }
+        }
+        week{
+            dn{"апта"}
+            relative{
+                "-1"{"өткен апта"}
+                "0"{"осы апта"}
+                "1"{"келесі апта"}
+            }
+            relativePeriod{"{0} аптасы"}
+            relativeTime{
+                future{
+                    one{"{0} аптадан кейін"}
+                    other{"{0} аптадан кейін"}
+                }
+                past{
+                    one{"{0} апта бұрын"}
+                    other{"{0} апта бұрын"}
+                }
+            }
+        }
+        week-narrow{
+            dn{"ап."}
+            relativePeriod{"{0} аптасы"}
+            relativeTime{
+                future{
+                    one{"{0} ап. кейін"}
+                    other{"{0} ап. кейін"}
+                }
+                past{
+                    one{"{0} ап. бұрын"}
+                    other{"{0} ап. бұрын"}
+                }
+            }
+        }
+        week-short{
+            dn{"ап."}
+            relativePeriod{"{0} аптасы"}
+            relativeTime{
+                future{
+                    one{"{0} ап. кейін"}
+                    other{"{0} ап. кейін"}
+                }
+                past{
+                    one{"{0} ап. бұрын"}
+                    other{"{0} ап. бұрын"}
+                }
+            }
+        }
+        weekOfMonth{
+            dn{"айдағы апта"}
+        }
+        weekOfMonth-narrow{
+            dn{"айдағы апта"}
+        }
+        weekOfMonth-short{
+            dn{"айдағы апта"}
+        }
+        weekday{
+            dn{"апта күні"}
+        }
+        weekday-narrow{
+            dn{"апта күні"}
+        }
+        weekday-short{
+            dn{"апта күні"}
+        }
+        weekdayOfMonth{
+            dn{"айдағы апта күні"}
+        }
+        weekdayOfMonth-narrow{
+            dn{"айдағы ап. күні"}
+        }
+        weekdayOfMonth-short{
+            dn{"айдағы ап. күні"}
+        }
+        year{
+            dn{"жыл"}
+            relative{
+                "-1"{"былтырғы жыл"}
+                "0"{"биылғы жыл"}
+                "1"{"келесі жыл"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} жылдан кейін"}
+                    other{"{0} жылдан кейін"}
+                }
+                past{
+                    one{"{0} жыл бұрын"}
+                    other{"{0} жыл бұрын"}
+                }
+            }
+        }
+        year-narrow{
+            dn{"ж."}
+            relativeTime{
+                future{
+                    one{"{0} ж. кейін"}
+                    other{"{0} ж. кейін"}
+                }
+                past{
+                    one{"{0} ж. бұрын"}
+                    other{"{0} ж. бұрын"}
+                }
+            }
+        }
+        year-short{
+            dn{"ж."}
+            relativeTime{
+                future{
+                    one{"{0} ж. кейін"}
+                    other{"{0} ж. кейін"}
+                }
+                past{
+                    one{"{0} ж. бұрын"}
+                    other{"{0} ж. бұрын"}
+                }
+            }
+        }
+        zone{
+            dn{"уақыт белдеуі"}
+        }
+        zone-narrow{
+            dn{"уақ. белдеуі"}
+        }
+        zone-short{
+            dn{"уақ. белдеуі"}
+        }
+    }
+    listPattern{
+        or{
+            2{"{0} не {1}"}
+            end{"{0}, не болмаса {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        standard{
+            2{"{0} және {1}"}
+            end{"{0}, {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        standard-short{
+            2{"{0} және {1}"}
+        }
+        unit{
+            2{"{0} {1}"}
+            end{"{0} {1}"}
+            middle{"{0} {1}"}
+            start{"{0} {1}"}
+        }
+        unit-narrow{
+            2{"{0} {1}"}
+            end{"{0} {1}"}
+            middle{"{0} {1}"}
+            start{"{0} {1}"}
+        }
+        unit-short{
+            2{"{0} {1}"}
+            end{"{0} {1}"}
+            middle{"{0} {1}"}
+            start{"{0} {1}"}
+        }
+    }
+    measurementSystemNames{
+        UK{"Ағылшын"}
+        US{"Америкалық"}
+        metric{"Метрлік"}
+    }
+}

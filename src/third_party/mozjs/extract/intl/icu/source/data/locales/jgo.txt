@@ -1,0 +1,358 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+jgo{
+    AuxExemplarCharacters{"[e o q r x]"}
+    ExemplarCharacters{
+        "[a á â ǎ b c d ɛ {ɛ\u0301} {ɛ\u0300} {ɛ\u0302} {ɛ\u030C} {ɛ\u0304} f g h i í"
+        " î ǐ j k l m ḿ {m\u0300} {m\u0304} n ń ǹ {n\u0304} ŋ {ŋ\u0301} {ŋ\u0300} {ŋ"
+        "\u0304} ɔ {ɔ\u0301} {ɔ\u0302} {ɔ\u030C} p {pf} s {sh} t {ts} u ú û ǔ ʉ {ʉ"
+        "\u0301} {ʉ\u0302} {ʉ\u030C} {ʉ\u0308} v w ẅ y z ꞌ]"
+    }
+    ExemplarCharactersIndex{
+        "[A B C D Ɛ F G H I J K L M N Ŋ Ɔ P {Pf} S {Sh} T {Ts} U Ʉ {Ʉ\u0308} V W Ẅ Y "
+        "Z Ꞌ]"
+    }
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    ExemplarCharactersPunctuation{"[\\- ‑ , ; \\: ! ? . ‹ › « »]"}
+    MoreInformation{"?"}
+    NumberElements{
+        default{"latn"}
+        latn{
+            patterns{
+                currencyFormat{"¤ #,##0.00"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"#,##0%"}
+                scientificFormat{"#E0"}
+            }
+            symbols{
+                decimal{","}
+                exponential{"E"}
+                group{"."}
+                infinity{"∞"}
+                list{";"}
+                minusSign{"-"}
+                nan{"NaN"}
+                perMille{"‰"}
+                percentSign{"%"}
+                plusSign{"+"}
+            }
+        }
+        native{"latn"}
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, G y MMMM dd",
+                "G y MMMM d",
+                "G y MMM d",
+                "GGGGG y-MM-dd",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Ed{"E d"}
+                MEd{"E, d.M"}
+                Md{"d.M"}
+                yyyyMd{"M.d.y G"}
+            }
+            intervalFormats{
+                fallback{"{0} – {1}"}
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "mbaꞌmbaꞌ",
+                "ŋka mbɔ́t nji",
+            }
+            AmPmMarkersAbbr{
+                "mbaꞌmbaꞌ",
+                "ŋka mbɔ́t nji",
+            }
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "EEEE, y MMMM dd",
+                "y MMMM d",
+                "y MMM d",
+                "y-MM-dd",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                Ed{"E d"}
+                MEd{"E, d.M"}
+                Md{"d.M"}
+                yMd{"M.d.y"}
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Sɔ́ndi",
+                        "Mɔ́ndi",
+                        "Ápta Mɔ́ndi",
+                        "Wɛ́nɛsɛdɛ",
+                        "Tɔ́sɛdɛ",
+                        "Fɛlâyɛdɛ",
+                        "Sásidɛ",
+                    }
+                    narrow{
+                        "Sɔ́",
+                        "Mɔ́",
+                        "ÁM",
+                        "Wɛ́",
+                        "Tɔ́",
+                        "Fɛ",
+                        "Sá",
+                    }
+                    wide{
+                        "Sɔ́ndi",
+                        "Mɔ́ndi",
+                        "Ápta Mɔ́ndi",
+                        "Wɛ́nɛsɛdɛ",
+                        "Tɔ́sɛdɛ",
+                        "Fɛlâyɛdɛ",
+                        "Sásidɛ",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Sɔ́ndi",
+                        "Mɔ́ndi",
+                        "Ápta Mɔ́ndi",
+                        "Wɛ́nɛsɛdɛ",
+                        "Tɔ́sɛdɛ",
+                        "Fɛlâyɛdɛ",
+                        "Sásidɛ",
+                    }
+                    narrow{
+                        "Sɔ́",
+                        "Mɔ́",
+                        "ÁM",
+                        "Wɛ́",
+                        "Tɔ́",
+                        "Fɛ",
+                        "Sá",
+                    }
+                    wide{
+                        "Sɔ́ndi",
+                        "Mɔ́ndi",
+                        "Ápta Mɔ́ndi",
+                        "Wɛ́nɛsɛdɛ",
+                        "Tɔ́sɛdɛ",
+                        "Fɛlâyɛdɛ",
+                        "Sásidɛ",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "BCE",
+                    "CE",
+                }
+                wide{
+                    "tsɛttsɛt mɛŋguꞌ mi ɛ́ lɛɛnɛ Kɛlísɛtɔ gɔ ńɔ́",
+                    "tsɛttsɛt mɛŋguꞌ mi ɛ́ fúnɛ Kɛlísɛtɔ tɔ́ mɔ́",
+                }
+            }
+            intervalFormats{
+                fallback{"{0} – {1}"}
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "Nduŋmbi Saŋ",
+                        "Pɛsaŋ Pɛ́pá",
+                        "Pɛsaŋ Pɛ́tát",
+                        "Pɛsaŋ Pɛ́nɛ́kwa",
+                        "Pɛsaŋ Pataa",
+                        "Pɛsaŋ Pɛ́nɛ́ntúkú",
+                        "Pɛsaŋ Saambá",
+                        "Pɛsaŋ Pɛ́nɛ́fɔm",
+                        "Pɛsaŋ Pɛ́nɛ́pfúꞋú",
+                        "Pɛsaŋ Nɛgɛ́m",
+                        "Pɛsaŋ Ntsɔ̌pmɔ́",
+                        "Pɛsaŋ Ntsɔ̌ppá",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "Nduŋmbi Saŋ",
+                        "Pɛsaŋ Pɛ́pá",
+                        "Pɛsaŋ Pɛ́tát",
+                        "Pɛsaŋ Pɛ́nɛ́kwa",
+                        "Pɛsaŋ Pataa",
+                        "Pɛsaŋ Pɛ́nɛ́ntúkú",
+                        "Pɛsaŋ Saambá",
+                        "Pɛsaŋ Pɛ́nɛ́fɔm",
+                        "Pɛsaŋ Pɛ́nɛ́pfúꞋú",
+                        "Pɛsaŋ Nɛgɛ́m",
+                        "Pɛsaŋ Ntsɔ̌pmɔ́",
+                        "Pɛsaŋ Ntsɔ̌ppá",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Nduŋmbi Saŋ",
+                        "Pɛsaŋ Pɛ́pá",
+                        "Pɛsaŋ Pɛ́tát",
+                        "Pɛsaŋ Pɛ́nɛ́kwa",
+                        "Pɛsaŋ Pataa",
+                        "Pɛsaŋ Pɛ́nɛ́ntúkú",
+                        "Pɛsaŋ Saambá",
+                        "Pɛsaŋ Pɛ́nɛ́fɔm",
+                        "Pɛsaŋ Pɛ́nɛ́pfúꞋú",
+                        "Pɛsaŋ Nɛgɛ́m",
+                        "Pɛsaŋ Ntsɔ̌pmɔ́",
+                        "Pɛsaŋ Ntsɔ̌ppá",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "Nduŋmbi Saŋ",
+                        "Pɛsaŋ Pɛ́pá",
+                        "Pɛsaŋ Pɛ́tát",
+                        "Pɛsaŋ Pɛ́nɛ́kwa",
+                        "Pɛsaŋ Pataa",
+                        "Pɛsaŋ Pɛ́nɛ́ntúkú",
+                        "Pɛsaŋ Saambá",
+                        "Pɛsaŋ Pɛ́nɛ́fɔm",
+                        "Pɛsaŋ Pɛ́nɛ́pfúꞋú",
+                        "Pɛsaŋ Nɛgɛ́m",
+                        "Pɛsaŋ Ntsɔ̌pmɔ́",
+                        "Pɛsaŋ Ntsɔ̌ppá",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"›"}
+        alternateQuotationStart{"‹"}
+        quotationEnd{"»"}
+        quotationStart{"«"}
+    }
+    fields{
+        day{
+            relative{
+                "-1"{"yesterday"}
+                "0"{"lɔꞋɔ"}
+                "1"{"tomorrow"}
+            }
+            relativeTime{
+                future{
+                    one{"Nǔu lɛ́Ꞌ {0}"}
+                    other{"Nǔu lɛ́Ꞌ {0}"}
+                }
+                past{
+                    one{"Ɛ́ gɛ́ mɔ́ lɛ́Ꞌ {0}"}
+                    other{"Ɛ́ gɛ́ mɔ́ lɛ́Ꞌ {0}"}
+                }
+            }
+        }
+        hour{
+            relativeTime{
+                future{
+                    one{"nǔu háwa {0}"}
+                    other{"nǔu háwa {0}"}
+                }
+                past{
+                    one{"ɛ́ gɛ mɔ́ {0} háwa"}
+                    other{"ɛ́ gɛ mɔ́ {0} háwa"}
+                }
+            }
+        }
+        minute{
+            relativeTime{
+                future{
+                    one{"nǔu {0} minút"}
+                    other{"nǔu {0} minút"}
+                }
+                past{
+                    one{"ɛ́ gɛ́ mɔ́ minút {0}"}
+                    other{"ɛ́ gɛ́ mɔ́ minút {0}"}
+                }
+            }
+        }
+        month{
+            relativeTime{
+                future{
+                    one{"Nǔu {0} saŋ"}
+                    other{"Nǔu {0} saŋ"}
+                }
+                past{
+                    one{"ɛ́ gɛ́ mɔ́ pɛsaŋ {0}"}
+                    other{"ɛ́ gɛ́ mɔ́ pɛsaŋ {0}"}
+                }
+            }
+        }
+        week{
+            relativeTime{
+                future{
+                    one{"Nǔu ŋgap-mbi {0}"}
+                    other{"Nǔu ŋgap-mbi {0}"}
+                }
+                past{
+                    one{"Ɛ́ gɛ́ mɔ {0} ŋgap-mbi"}
+                    other{"Ɛ́ gɛ́ mɔ {0} ŋgap-mbi"}
+                }
+            }
+        }
+        year{
+            relativeTime{
+                future{
+                    one{"Nǔu ŋguꞋ {0}"}
+                    other{"Nǔu ŋguꞋ {0}"}
+                }
+                past{
+                    one{"Ɛ́gɛ́ mɔ́ ŋguꞋ {0}"}
+                    other{"Ɛ́gɛ́ mɔ́ ŋguꞋ {0}"}
+                }
+            }
+        }
+    }
+    listPattern{
+        standard{
+            2{"{0} pɔp {1}"}
+            end{"{0}, ḿbɛn ŋ́gɛ {1}"}
+            middle{"{0}, ŋ́gɛ {1}"}
+            start{"{0}, ŋ́gɛ {1}"}
+        }
+    }
+}

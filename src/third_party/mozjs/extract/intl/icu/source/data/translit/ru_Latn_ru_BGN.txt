@@ -1,0 +1,104 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: ru_Latn_ru_BGN.txt
+# Generated from CLDR
+#
+
+# BGN/PCGN 1947 System for Russian, in direction ru_Latn → ru
+# http://geonames.nga.mil/gns/html/Romanization/Romanization_Russian.pdf
+$prime = ʹ;
+$doublePrime = ʺ;
+$wordBoundary = [^[:L:][:M:][:N:]];
+$upperConsonant = [БВГДЖЙКЛМНПРСТФХЦЧШЩЭ];
+$lowerConsonant = [бвгджйклмнпрстфхцчшщэ];
+$consonant = [$upperConsonant $lowerConsonant];
+::NFC;
+[:Upper:] {$prime} [^[:Lower:]] → Ь;
+$prime → ь;
+[:Upper:] {$doublePrime} [^[:Lower:]] → Ъ;
+$doublePrime → ъ;
+K[Hh] → Х;
+k[Hh] → х;
+T·S → ТС;
+T·s → Тс;
+t·S → тС;
+t·s → тс;
+T[Ss] → Ц;
+t[Ss] → ц;
+C[Hh] → Ч;
+c[Hh] → ч;
+S[Hh]·C[Hh] → ШЧ;
+S[Hh]·c[Hh] → Шч;
+s[Hh]·C[Hh] → шЧ;
+s[Hh]·c[Hh] → шч;
+S[Hh][Cc][Hh] → Щ;
+s[Hh][Cc][Hh] → щ;
+S[Hh] → Ш;
+s[Hh] → ш;
+Y[Ee] → Е;
+y[Ee] → е;
+Y[Ëë] → Ё;
+y[Ëë] → ё;
+Y[Uu] → Ю;
+y[Uu] → ю;
+Y[Aa] → Я;
+y[Aa] → я;
+{yy} $wordBoundary → ый;
+$wordBoundary {Y} [^aeëiouyAEËIOUY] → Ы;
+$wordBoundary {y} [^aeëiouyAEËIOUY] → ы;
+$consonant {Y} → Ы;
+$consonant {y} → ы;
+Y → Й;
+y → й;
+$wordBoundary {E} → Э;
+$wordBoundary {e} → э;
+·E → Э;
+·e → э;
+E → Е;
+e → е;
+A → А;
+a → а;
+B → Б;
+b → б;
+V → В;
+v → в;
+G → Г;
+g → г;
+D → Д;
+d → д;
+Ë → Ё;
+ë → ё;
+Z[Hh] → Ж;
+z[Hh] → ж;
+Z → З;
+z → з;
+I → И;
+i → и;
+K → К;
+k → к;
+L → Л;
+l → л;
+M → М;
+m → м;
+N → Н;
+n → н;
+O → О;
+o → о;
+P → П;
+p → п;
+R → Р;
+r → р;
+S → С;
+s → с;
+T → Т;
+t → т;
+U → У;
+u → у;
+F → Ф;
+f → ф;
+·Y → Ы;
+·y → ы;
+· → ;
+

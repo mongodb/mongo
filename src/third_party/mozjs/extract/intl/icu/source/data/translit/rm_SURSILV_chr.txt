@@ -1,0 +1,11 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: rm_SURSILV_chr.txt
+# Generated from CLDR
+#
+
+::rm_SURSILV-rm_FONIPA_SURSILV;
+::und_FONIPA-chr;
+

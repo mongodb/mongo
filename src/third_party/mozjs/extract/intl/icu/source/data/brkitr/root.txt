@@ -1,0 +1,25 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+root{
+    Version{"39"}
+    boundaries{
+        grapheme:process(dependency){"char.brk"}
+        line:process(dependency){"line.brk"}
+        line_loose:process(dependency){"line_loose.brk"}
+        line_normal:process(dependency){"line_normal.brk"}
+        line_strict:process(dependency){"line.brk"}
+        sentence:process(dependency){"sent.brk"}
+        title:process(dependency){"title.brk"}
+        word:process(dependency){"word.brk"}
+    }
+    dictionaries{
+        Hani:process(dependency){"cjdict.dict"}
+        Hira:process(dependency){"cjdict.dict"}
+        Kana:process(dependency){"cjdict.dict"}
+        Khmr:process(dependency){"khmerdict.dict"}
+        Laoo:process(dependency){"laodict.dict"}
+        Mymr:process(dependency){"burmesedict.dict"}
+        Thai:process(dependency){"thaidict.dict"}
+    }
+}

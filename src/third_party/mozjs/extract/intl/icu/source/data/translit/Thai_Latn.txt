@@ -1,0 +1,16 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Thai_Latn.txt
+# Generated from CLDR
+#
+
+::[[:thai:] ก-\u0E3Aเ-๛];
+::NFD;
+::Thai-ThaiSemi;
+::Any-BreakInternal;
+::Thai-ThaiLogical;
+::ThaiLogical-Latin;
+::NFC;
+

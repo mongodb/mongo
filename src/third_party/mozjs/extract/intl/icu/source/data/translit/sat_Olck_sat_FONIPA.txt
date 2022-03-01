@@ -1,0 +1,181 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: sat_Olck_sat_FONIPA.txt
+# Generated from CLDR
+#
+
+# Santali (Ol Chiki) → Santali (International Phonetic Alphabet)
+# Output
+# ------
+# m mː n nː ɳ ɳː ɲ ɲː ŋ ŋː
+# p pʰ pʼ b bʰ t tʰ tʼ d dʰ ʈ ʈʰ ɖ ɖʰ c cʰ cʼ k kʰ kʼ ɡ ʔ
+# s sː h
+# d\u0361ʒ
+# ɽ r
+# l lː
+# w wː w\u0303 w\u0303ː
+#
+# i iː ĩ ĩː u uː ũ ũː
+# e eː ẽ ẽː ə əː ə\u0303 ə\u0303ː o oː õ õː
+# ɛ ɛː ɛ\u0303 ɛ\u0303ː ɔ ɔː ɔ\u0303 ɔ\u0303ː
+# a aː ã ãː
+# References
+# ----------
+# [1] Michael Everson: Final proposal to encode the Ol Chiki script
+#     in the UCS.  ISO/IEC JTC1/SC2/WG2 Working Group Document N2984R,
+#     September 21, 2005.  http://std.dkuug.dk/jtc1/sc2/wg2/docs/n2984.pdf
+#
+# [2] George L. Campbell: Compendium of the World's Languages.
+#     Volume 2: Ladakhi to Zuni. ISBN 0-415-20297-3.  Taylor & Francis, 2000.
+#     Pages 1454 to 1458.
+# Notes
+# -----
+# According to [1] (page 3), ᱽ can only follow the four ejective
+# consonants ᱵ /pʼ/, ᱡ /cʼ/, ᱫ /tʼ/, and ᱜ /kʼ/; these become
+# ᱵᱽ /b/, ᱫᱽ /d/, ᱡᱽ /d\u0361ʒ/, and ᱜᱽ /ɡ/.  In online texts, however,
+# we have occasionally encountered ᱽ following non-ejective plosives,
+# for example after ᱯ /p/. These might possibly be typos.  Our rules
+# try to be resilient and handle ᱯᱽ as /b/.
+#
+# According to [1] (page 2), U+1C7C PHAARKAA follows the four “glottal”
+# consonants ᱵ /pʼ/, ᱡ /cʼ/, ᱫ /tʼ/, and ᱜ /kʼ/ (these are actually
+# ejective, not glottal).  In online texts, however, we have frequently
+# encountered ᱼ following non-ejective consonants.
+$inword = [[:L:][:M:]];
+# Some online texts use a decomposed form of U+1C7A MU-GAAHLAA TTUDDAG.
+ᱹᱸ → ᱺ ;
+ᱸᱹ → ᱺ ;
+::null();
+# To simplify the rules below, enforce a uniform ordering of marks.
+ᱻᱹ → ᱹᱻ ;
+ᱻᱸ → ᱸᱻ ;
+ᱻᱺ → ᱺᱻ ;
+ᱼᱹ → ᱹᱼ ;
+ᱼᱸ → ᱸᱼ ;
+ᱼᱺ → ᱺᱼ ;
+::null();
+# Some online texts use U+1C7C PHAARKAA instead of U+1C7B RELAA for indicating
+# long phonemes, presumably because the graphemes look similar in some fonts.
+# Since phaarkaa is used for voicing ejectives and plosives (which cannot
+# be lenghtened), we rewrite phaarkaa to relaa.
+[ᱚᱟᱤᱩᱮᱳᱶᱢᱝᱞᱱ] [ᱹᱸᱺ]* {ᱼ} → ᱻ ;
+::null();
+ᱚᱹᱻ → ɔː ;
+ᱚᱹ → ɔ ;
+ᱚᱸᱻ → ɔ\u0303ː ;
+ᱚᱸ → ɔ\u0303 ;
+ᱚᱺᱻ → ɔ\u0303ː ;
+ᱚᱺ → ɔ\u0303 ;
+ᱚᱻ → ɔː ;
+ᱚ → ɔ ;
+ᱛᱼ → t ;
+ᱛᱷ → tʰ ;
+ᱛᱽ → d ;
+$inword {ᱛ} → d ;
+ᱛ → t ;
+ᱜᱼ → kʼ ;
+ᱜᱷ → kʰ ;
+ᱜᱽ → ɡ ;
+$inword {ᱜ} → ɡ ;
+ᱜ → kʼ ;
+ᱝᱻ → ŋː ;
+ᱝ → ŋ ;
+ᱞᱻ → lː ;
+ᱞ → l ;
+ᱟᱹᱻ → əː ;
+ᱟᱹ → ə ;
+ᱟᱸᱻ → ãː ;
+ᱟᱸ → ã ;
+ᱟᱺᱻ → ə\u0303ː ;
+ᱟᱺ → ə\u0303 ;
+ᱟᱻ → aː ;
+ᱟ → a ;
+ᱠᱼ → k ;
+ᱠᱷ → kʰ ;
+ᱠᱽ → ɡ ;
+ᱠ → k ;
+ᱡᱼ → cʼ ;
+ᱡᱷ → cʰ ;
+ᱡᱽ →  d\u0361ʒ ;
+$inword {ᱡ} →  d\u0361ʒ ;
+ᱡ → cʼ ;
+ᱢᱻ → mː ;
+ᱢ → m ;
+# According to [1], ᱣ is sometimes /v/ and sometimes /w/.
+# TODO: Find out if there is a rule for this.
+ᱣᱸ → w\u0303 ;
+ᱣ → w ;
+ᱤᱹᱻ → iː ;
+ᱤᱹ → i ;
+ᱤᱸᱻ → ĩː ;
+ᱤᱸ → ĩ ;
+ᱤᱺᱻ → ĩː ;
+ᱤᱺ → ĩ ;
+ᱤᱻ → iː ;
+ᱤ → i ;
+ᱥᱻ → sː ;
+ᱥ → s ;
+# According to [1], ᱦ is sometimes /h/ and sometimes /ʔ/.
+# TODO: Find out if there is a rule for this.
+ᱦ → h ;
+ᱧᱻ → ɲː ;
+ᱧ → ɲ ;
+ᱨᱻ → r ;
+ᱨ → r ;
+ᱩᱹᱻ → uː ;
+ᱩᱹ → u ;
+ᱩᱸᱻ → ũː ;
+ᱩᱸ → ũ ;
+ᱩᱺᱻ → ũː ;
+ᱩᱺ → ũ ;
+ᱩᱻ → uː ;
+ᱩ → u ;
+ᱪᱼ → c ;
+ᱪᱷ → cʰ ;
+ᱪᱽ →  d\u0361ʒ ;
+ᱪ → c ;
+ᱫᱼ → tʼ ;
+ᱫᱷ → tʰ ;
+ᱫᱽ → d ;
+$inword {ᱫ} → d ;
+ᱫ → tʼ ;
+ᱬᱻ → ɳː ;
+ᱬ → ɳ ;
+# TODO: ᱵᱷᱭᱨᱚᱵ → bʰhrɔb seems unlikely; would be good to verify.
+ᱭ → h ;
+ᱮᱹᱻ → ɛː ;
+ᱮᱹ → ɛ ;
+ᱮᱺᱻ → ɛ\u0303ː ;
+ᱮᱺ → ɛ\u0303 ;
+ᱮᱸᱻ → ẽː ;
+ᱮᱸ → ẽ ;
+ᱮᱻ → eː ;
+ᱮ → e ;
+ᱯᱼ → p ;
+ᱯᱷ → pʰ ;
+ᱯᱽ → b ;
+ᱯ → p ;
+ᱰᱷ → ɖʰ ;
+ᱰ → ɖ ;
+ᱱᱻ → nː ;
+ᱱ → n ;
+ᱲᱻ → ɽ ;
+ᱲ → ɽ ;
+ᱳᱸᱻ → õː ;
+ᱳᱸ → õ ;
+ᱳᱻ → oː ;
+ᱳ → o ;
+ᱴᱼ → ʈ ;
+ᱴᱷ → ʈʰ ;
+ᱴᱽ → ɖ ;
+ᱴ → ʈ ;
+ᱵᱼ → pʼ ;
+ᱵᱷ → bʰ ;
+ᱵᱽ → b ;
+$inword {ᱵ} → b ;
+ᱵ → pʼ ;
+ᱶᱻ → w\u0303ː ;
+ᱶ → w\u0303 ;
+

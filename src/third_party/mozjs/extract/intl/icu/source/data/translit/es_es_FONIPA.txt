@@ -1,0 +1,146 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: es_es_FONIPA.txt
+# Generated from CLDR
+#
+
+# Tranformation from Spanish to Spanish in IPA transcription (es_FONIPA).
+# Not fully phonemic, since we mark up allophonic variants of voiced stops,
+# e.g. we break down /b/ into [b] and [β].
+#
+# See e.g. "Ortografía de la lengua española" by Real Academia Española,
+# available in PDF format on the web (non-stable URL).
+#
+# Definitions.
+$bow = [-\ $] ;  # Beginning of word.
+$consonant = [bβdðfgɣʝklʎmnŋɲθprɾstʧx] ;
+$syll = '.' ;    # Syllable boundary.
+#
+#
+#
+#
+::NFC;
+::Lower;
+#
+#
+#
+#
+#
+# Word-initial cluster simplification.
+#
+$bow { ct → | t ;  # ctónico (?)
+$bow { cz → | z ;  # czar
+$bow { gn → | n ;  # gnomo
+$bow { mn → | n ;  # mnemotécnico
+$bow { ps → | s ;  # psicología
+$bow { pt → | t ;  # pterodáctilo
+$bow { x  → | s ;  # xilófono
+#
+#
+#
+# Vowels and glides.
+#
+$bow       { i                 → i ;
+$consonant { i } [ aáeé  oóuú] → j ;
+[aeo]      { i } [^aáeé  oóuú] → i\u032F ;
+i } [ aáeé  oóuú] → ʝ ;
+i                 → i ;
+#
+#
+[aeo]      { y } [^aáeéiíoóuú] → i\u032F ;
+y } [ aáeéiíoóuú] → ʝ ;
+y                 → i ;
+#
+#
+[aeo]      { u } [^aáeéiíoó  ] → u\u032F ;
+u } [ aáeéiíoó  ] → w ;
+ü } [   eéií    ] → w ;
+u                 → u ;
+ü                 → u ;  # Should not be needed, but just in case.
+#
+#
+[aá] → a ;
+[eé] → e ;
+í    → i ;
+[oó] → o ;
+ú    → u ;
+#
+#
+#
+# Consonants.
+#
+b → β ;
+cch → ʧ ;
+ch → ʧ ;
+cc } [^eéií] → k ;
+c } [eéií] → θ ;
+c → k ;
+d → ð ;
+f → f;
+gu } [eéiíy] → ɣ ;
+g } [eéiíy] → x ;
+g → ɣ ;
+hi } [aáeéoóuú] → ʝ ;
+h → $syll ;
+j → x ;
+k → k ;
+ll → ʎ ;
+l → l ;
+m → m ;
+n → n ;
+ñ → ɲ ;
+p → p ;
+qu } [eéiíy] → k ;
+q → k ;
+[-\ lns$] { r → r ;
+rr → r ;
+r → ɾ ;
+ss → s ;
+s → s ;
+tx → ʧ ;  # for loanwords from Basque, Catalan
+t → t ;
+v → β ;
+w → $syll w ;
+x } h?[aáeéiíoóuú$] → ks ;
+x } [^aáeéiíoóuú$] → s ;
+x → ks ;
+z → θ ;
+#
+#
+#
+# Second pass: phoneme-to-phone rules. Differentiation of /β/ into [b] and [β],
+# place assimilation of [n], etc.
+#
+::Null;
+#
+#
+[-\ ] → ;
+#
+#
+[mnɲŋ  $] { β → b ;
+[mnɲŋlʎ$] { ð → d ;
+[mnɲŋ  $] { ɣ → g ;
+#
+#
+n } [gɣk] → ŋ ;
+#
+#
+# Optional: Place assimilation of n before labial consonants.
+#
+# n } [bβpfm] → m ;
+#
+# Optional: Voicing of [s].
+#
+# s } [bβdð] → z ;
+# s } [gɣ][^ei] → z ;
+# s } [mnɲŋlʎrɾ] → z ;
+#
+# Optional: Lenition of [k] before [θ].
+#
+# k } θ → ɣ ;
+#
+#
+::NFC;
+

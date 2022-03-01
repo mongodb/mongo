@@ -1,0 +1,18 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+mt{
+    collations{
+        standard{
+            Sequence{
+                "[caseFirst upper]"
+                "&[before 1]c<ċ<<<Ċ"
+                "&[before 1]g<ġ<<<Ġ"
+                "&[before 1]h<għ<<<gĦ<<<Għ<<<GĦ"
+                "&[before 1]i<ħ<<<Ħ"
+                "&[before 1]z<ż<<<Ż"
+            }
+            Version{"39"}
+        }
+    }
+}

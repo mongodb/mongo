@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -9,6 +9,7 @@
 
 #include "jit/JitAllocPolicy.h"
 #include "js/HashTable.h"
+#include "js/Vector.h"
 
 namespace js {
 namespace jit {
@@ -20,108 +21,100 @@ class MPhi;
 class MIRGenerator;
 class MResumePoint;
 
-class ValueNumberer
-{
-    // Value numbering data.
-    class VisibleValues
-    {
-        // Hash policy for ValueSet.
-        struct ValueHasher
-        {
-            typedef const MDefinition* Lookup;
-            typedef MDefinition* Key;
-            static HashNumber hash(Lookup ins);
-            static bool match(Key k, Lookup l);
-            static void rekey(Key& k, Key newKey);
-        };
+class ValueNumberer {
+  // Value numbering data.
+  class VisibleValues {
+    // Hash policy for ValueSet.
+    struct ValueHasher {
+      using Lookup = const MDefinition*;
+      using Key = MDefinition*;
+      static HashNumber hash(Lookup ins);
+      static bool match(Key k, Lookup l);
+      static void rekey(Key& k, Key newKey);
+    };
 
-        typedef HashSet<MDefinition*, ValueHasher, JitAllocPolicy> ValueSet;
+    typedef HashSet<MDefinition*, ValueHasher, JitAllocPolicy> ValueSet;
 
-        ValueSet set_;        // Set of visible values
+    ValueSet set_;  // Set of visible values
 
-      public:
-        explicit VisibleValues(TempAllocator& alloc);
-        MOZ_MUST_USE bool init();
+   public:
+    explicit VisibleValues(TempAllocator& alloc);
 
-        typedef ValueSet::Ptr Ptr;
-        typedef ValueSet::AddPtr AddPtr;
+    using Ptr = ValueSet::Ptr;
+    using AddPtr = ValueSet::AddPtr;
 
-        Ptr findLeader(const MDefinition* def) const;
-        AddPtr findLeaderForAdd(MDefinition* def);
-        MOZ_MUST_USE bool add(AddPtr p, MDefinition* def);
-        void overwrite(AddPtr p, MDefinition* def);
-        void forget(const MDefinition* def);
-        void clear();
+    Ptr findLeader(const MDefinition* def) const;
+    AddPtr findLeaderForAdd(MDefinition* def);
+    [[nodiscard]] bool add(AddPtr p, MDefinition* def);
+    void overwrite(AddPtr p, MDefinition* def);
+    void forget(const MDefinition* def);
+    void clear();
 #ifdef DEBUG
-        bool has(const MDefinition* def) const;
+    bool has(const MDefinition* def) const;
 #endif
-    };
+  };
 
-    typedef Vector<MBasicBlock*, 4, JitAllocPolicy> BlockWorklist;
-    typedef Vector<MDefinition*, 4, JitAllocPolicy> DefWorklist;
+  typedef Vector<MBasicBlock*, 4, JitAllocPolicy> BlockWorklist;
+  typedef Vector<MDefinition*, 4, JitAllocPolicy> DefWorklist;
 
-    MIRGenerator* const mir_;
-    MIRGraph& graph_;
-    VisibleValues values_;            // Numbered values
-    DefWorklist deadDefs_;            // Worklist for deleting values
-    BlockWorklist remainingBlocks_;   // Blocks remaining with fewer preds
-    MDefinition* nextDef_;            // The next definition; don't discard
-    size_t totalNumVisited_;          // The number of blocks visited
-    bool rerun_;                      // Should we run another GVN iteration?
-    bool blocksRemoved_;              // Have any blocks been removed?
-    bool updateAliasAnalysis_;        // Do we care about AliasAnalysis?
-    bool dependenciesBroken_;         // Have we broken AliasAnalysis?
-    bool hasOSRFixups_;               // Have we created any OSR fixup blocks?
+  MIRGenerator* const mir_;
+  MIRGraph& graph_;
+  VisibleValues values_;           // Numbered values
+  DefWorklist deadDefs_;           // Worklist for deleting values
+  BlockWorklist remainingBlocks_;  // Blocks remaining with fewer preds
+  MDefinition* nextDef_;           // The next definition; don't discard
+  size_t totalNumVisited_;         // The number of blocks visited
+  bool rerun_;                     // Should we run another GVN iteration?
+  bool blocksRemoved_;             // Have any blocks been removed?
+  bool updateAliasAnalysis_;       // Do we care about AliasAnalysis?
+  bool dependenciesBroken_;        // Have we broken AliasAnalysis?
+  bool hasOSRFixups_;              // Have we created any OSR fixup blocks?
 
-    enum UseRemovedOption {
-        DontSetUseRemoved,
-        SetUseRemoved
-    };
+  enum ImplicitUseOption { DontSetImplicitUse, SetImplicitUse };
 
-    MOZ_MUST_USE bool handleUseReleased(MDefinition* def, UseRemovedOption useRemovedOption);
-    MOZ_MUST_USE bool discardDefsRecursively(MDefinition* def);
-    MOZ_MUST_USE bool releaseResumePointOperands(MResumePoint* resume);
-    MOZ_MUST_USE bool releaseAndRemovePhiOperands(MPhi* phi);
-    MOZ_MUST_USE bool releaseOperands(MDefinition* def);
-    MOZ_MUST_USE bool discardDef(MDefinition* def);
-    MOZ_MUST_USE bool processDeadDefs();
+  [[nodiscard]] bool handleUseReleased(MDefinition* def,
+                                       ImplicitUseOption implicitUseOption);
+  [[nodiscard]] bool discardDefsRecursively(MDefinition* def);
+  [[nodiscard]] bool releaseResumePointOperands(MResumePoint* resume);
+  [[nodiscard]] bool releaseAndRemovePhiOperands(MPhi* phi);
+  [[nodiscard]] bool releaseOperands(MDefinition* def);
+  [[nodiscard]] bool discardDef(MDefinition* def);
+  [[nodiscard]] bool processDeadDefs();
 
-    MOZ_MUST_USE bool fixupOSROnlyLoop(MBasicBlock* block, MBasicBlock* backedge);
-    MOZ_MUST_USE bool removePredecessorAndDoDCE(MBasicBlock* block, MBasicBlock* pred,
-                                                size_t predIndex);
-    MOZ_MUST_USE bool removePredecessorAndCleanUp(MBasicBlock* block, MBasicBlock* pred);
+  [[nodiscard]] bool fixupOSROnlyLoop(MBasicBlock* block);
+  [[nodiscard]] bool removePredecessorAndDoDCE(MBasicBlock* block,
+                                               MBasicBlock* pred,
+                                               size_t predIndex);
+  [[nodiscard]] bool removePredecessorAndCleanUp(MBasicBlock* block,
+                                                 MBasicBlock* pred);
 
-    MDefinition* simplified(MDefinition* def) const;
-    MDefinition* leader(MDefinition* def);
-    bool hasLeader(const MPhi* phi, const MBasicBlock* phiBlock) const;
-    bool loopHasOptimizablePhi(MBasicBlock* header) const;
+  MDefinition* simplified(MDefinition* def) const;
+  MDefinition* leader(MDefinition* def);
+  bool hasLeader(const MPhi* phi, const MBasicBlock* phiBlock) const;
+  bool loopHasOptimizablePhi(MBasicBlock* header) const;
 
-    MOZ_MUST_USE bool visitDefinition(MDefinition* def);
-    MOZ_MUST_USE bool visitControlInstruction(MBasicBlock* block);
-    MOZ_MUST_USE bool visitUnreachableBlock(MBasicBlock* block);
-    MOZ_MUST_USE bool visitBlock(MBasicBlock* block);
-    MOZ_MUST_USE bool visitDominatorTree(MBasicBlock* root);
-    MOZ_MUST_USE bool visitGraph();
+  [[nodiscard]] bool visitDefinition(MDefinition* def);
+  [[nodiscard]] bool visitControlInstruction(MBasicBlock* block);
+  [[nodiscard]] bool visitUnreachableBlock(MBasicBlock* block);
+  [[nodiscard]] bool visitBlock(MBasicBlock* block);
+  [[nodiscard]] bool visitDominatorTree(MBasicBlock* root);
+  [[nodiscard]] bool visitGraph();
 
-    MOZ_MUST_USE bool insertOSRFixups();
-    MOZ_MUST_USE bool cleanupOSRFixups();
+  [[nodiscard]] bool insertOSRFixups();
+  [[nodiscard]] bool cleanupOSRFixups();
 
-  public:
-    ValueNumberer(MIRGenerator* mir, MIRGraph& graph);
-    MOZ_MUST_USE bool init();
+ public:
+  ValueNumberer(MIRGenerator* mir, MIRGraph& graph);
 
-    enum UpdateAliasAnalysisFlag {
-        DontUpdateAliasAnalysis,
-        UpdateAliasAnalysis
-    };
+  enum UpdateAliasAnalysisFlag { DontUpdateAliasAnalysis, UpdateAliasAnalysis };
 
-    // Optimize the graph, performing expression simplification and
-    // canonicalization, eliminating statically fully-redundant expressions,
-    // deleting dead instructions, and removing unreachable blocks.
-    MOZ_MUST_USE bool run(UpdateAliasAnalysisFlag updateAliasAnalysis);
+  // Optimize the graph, performing expression simplification and
+  // canonicalization, eliminating statically fully-redundant expressions,
+  // deleting dead instructions, and removing unreachable blocks.
+  [[nodiscard]] bool run(UpdateAliasAnalysisFlag updateAliasAnalysis);
 };
 
-} // namespace jit
-} // namespace js
+}  // namespace jit
+}  // namespace js
 
 #endif /* jit_ValueNumbering_h */

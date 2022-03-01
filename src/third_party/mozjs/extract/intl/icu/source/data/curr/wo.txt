@@ -1,0 +1,92 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+wo{
+    Currencies{
+        BRL{
+            "R$",
+            "Real bu Bresil",
+        }
+        CNY{
+            "CN¥",
+            "Yuan bu Siin",
+        }
+        EUR{
+            "€",
+            "Euro",
+        }
+        GBP{
+            "£",
+            "Pound bu Grànd Brëtaañ",
+        }
+        INR{
+            "₹",
+            "Rupee bu End",
+        }
+        JPY{
+            "JP¥",
+            "Yen bu Sapoŋ",
+        }
+        RUB{
+            "RUB",
+            "Ruble bi Rsis",
+        }
+        USD{
+            "$",
+            "Dolaaru US",
+        }
+        XOF{
+            "F CFA",
+            "Franc CFA bu Afrik Sowwu-jant",
+        }
+        XXX{
+            "¤",
+            "Xaalis buñ Xamul",
+        }
+    }
+    Currencies%narrow{
+        BRL{"R$"}
+        CNY{"¥"}
+        EUR{"€"}
+        GBP{"£"}
+        INR{"₹"}
+        JPY{"¥"}
+        RUB{"₽"}
+        USD{"$"}
+    }
+    CurrencyPlurals{
+        BRL{
+            other{"Real yu Bresil"}
+        }
+        CNY{
+            other{"Yuan yu Siin"}
+        }
+        EUR{
+            other{"euro"}
+        }
+        GBP{
+            other{"Pound yu Grànd Brëtaañ"}
+        }
+        INR{
+            other{"Rupee yu End"}
+        }
+        JPY{
+            other{"Yen yu Sapoŋ"}
+        }
+        RUB{
+            other{"Ruble yu Risi"}
+        }
+        USD{
+            other{"Dolaari US"}
+        }
+        XOF{
+            other{"Franc CFA yu Afrik Sowwu-jant"}
+        }
+        XXX{
+            other{"(xaalis buñ xamul)"}
+        }
+    }
+    CurrencyUnitPatterns{
+        other{"{0} {1}"}
+    }
+}

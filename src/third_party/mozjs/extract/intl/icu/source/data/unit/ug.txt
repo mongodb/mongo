@@ -1,0 +1,603 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ug{
+    units{
+        acceleration{
+            g-force{
+                one{"{0} ئېغىرلىق كۈچى"}
+                other{"{0} ئېغىرلىق كۈچى"}
+            }
+        }
+        angle{
+            degree{
+                one{"{0} گىرادۇس"}
+                other{"{0} گىرادۇس"}
+            }
+        }
+        area{
+            acre{
+                one{"{0} ئىنگلىز موسى"}
+                other{"{0} ئىنگلىز موسى"}
+            }
+            hectare{
+                one{"{0} گېكتار"}
+                other{"{0} hectares"}
+            }
+            square-foot{
+                one{"{0} كۋادرات فۇت"}
+                other{"{0} كۋادرات فۇت"}
+            }
+            square-kilometer{
+                one{"{0} كۋادرات كىلومېتىر"}
+                other{"{0} كۋادرات كىلومېتىر"}
+            }
+            square-meter{
+                one{"{0} كۋادرات مېتىر"}
+                other{"{0} كۋادرات مېتىر"}
+            }
+            square-mile{
+                one{"{0} كۋادرات مىل"}
+                other{"{0} كۋادرات مىل"}
+            }
+        }
+        compound{
+            per{"{0}/{1}"}
+        }
+        duration{
+            day{
+                one{"{0} كۈن"}
+                other{"{0} كۈن"}
+            }
+            hour{
+                one{"{0} سائەت"}
+                other{"{0} سائەت"}
+            }
+            millisecond{
+                one{"{0} مىللى سېكۇنت"}
+                other{"{0} مىللى سېكۇنت"}
+            }
+            minute{
+                one{"{0} مىنۇت"}
+                other{"{0} مىنۇت"}
+            }
+            month{
+                one{"{0} ئاي"}
+                other{"{0} ئاي"}
+            }
+            second{
+                one{"{0} سېكۇنت"}
+                other{"{0} سېكۇنت"}
+            }
+            week{
+                one{"{0} ھەپتە"}
+                other{"{0} ھەپتە"}
+            }
+            year{
+                one{"{0} يىل"}
+                other{"{0} يىل"}
+            }
+        }
+        length{
+            centimeter{
+                one{"{0} سانتىمېتىر"}
+                other{"{0} سانتىمېتىر"}
+            }
+            foot{
+                one{"{0} فۇت"}
+                other{"{0} فۇت"}
+            }
+            inch{
+                one{"{0} ديۇيم"}
+                other{"{0} ديۇيم"}
+            }
+            kilometer{
+                one{"{0} كىلومېتىر"}
+                other{"{0} كىلومېتىر"}
+            }
+            light-year{
+                one{"{0} يورۇقلۇق يىلى"}
+                other{"{0} يورۇقلۇق يىلى"}
+            }
+            meter{
+                one{"{0} مېتىر"}
+                other{"{0} مېتىر"}
+            }
+            mile{
+                one{"{0} مىل"}
+                other{"{0} مىل"}
+            }
+            millimeter{
+                one{"{0} مىللىمېتىر"}
+                other{"{0} مىللىمېتىر"}
+            }
+            picometer{
+                one{"{0} پىكومېتىر"}
+                other{"{0} پىكومېتىر"}
+            }
+            yard{
+                one{"{0} يارد"}
+                other{"{0} يارد"}
+            }
+        }
+        mass{
+            gram{
+                one{"{0} گرام"}
+                other{"{0} گرام"}
+            }
+            kilogram{
+                one{"{0} كىلوگرام"}
+                other{"{0} كىلوگرام"}
+            }
+            ounce{
+                one{"{0} ئۇنسىيە"}
+                other{"{0} ئۇنسىيە"}
+            }
+            pound{
+                one{"{0} قاداق"}
+                other{"{0} قاداق"}
+            }
+        }
+        power{
+            horsepower{
+                one{"{0} ئات كۈچى"}
+                other{"{0} ئات كۈچى"}
+            }
+            kilowatt{
+                one{"{0} كىلوۋات"}
+                other{"{0} كىلوۋات"}
+            }
+            watt{
+                one{"{0} ۋات"}
+                other{"{0} ۋات"}
+            }
+        }
+        pressure{
+            hectopascal{
+                one{"{0} يۈز پاسكال"}
+                other{"{0} يۈز پاسكال"}
+            }
+            inch-ofhg{
+                one{"{0} ديۇيم سىماب تۈۋرۇكى"}
+                other{"{0} ديۇيم سىماب تۈۋرۇكى"}
+            }
+            millibar{
+                one{"{0} مىللىبار"}
+                other{"{0} مىللىبار"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                one{"{0} كىلومېتىر ھەر سائەت"}
+                other{"{0} كىلومېتىر ھەر سائەت"}
+            }
+            meter-per-second{
+                one{"{0} مېتىر ھەر سېكۇنت"}
+                other{"{0} مېتىر ھەر سېكۇنت"}
+            }
+            mile-per-hour{
+                one{"{0} مىل ھەر سائەت"}
+                other{"{0} مىل ھەر سائەت"}
+            }
+        }
+        temperature{
+            celsius{
+                one{"{0} سېلسىيە گرادۇس"}
+                other{"{0} سېلسىيە گرادۇس"}
+            }
+            fahrenheit{
+                one{"{0} فارېنگېيت گرادۇس"}
+                other{"{0} فارېنگېيت گرادۇس"}
+            }
+        }
+        volume{
+            cubic-kilometer{
+                one{"{0} كۇب كىلومېتىر"}
+                other{"{0} كۇب كىلومېتىر"}
+            }
+            cubic-mile{
+                one{"{0} كۇب مىل"}
+                other{"{0} كۇب مىل"}
+            }
+            liter{
+                one{"{0} لىتېر"}
+                other{"{0} لىتېر"}
+            }
+        }
+    }
+    unitsNarrow{
+        acceleration{
+            g-force{
+                one{"{0}G"}
+                other{"{0}Gs"}
+            }
+        }
+        angle{
+            degree{
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+        }
+        area{
+            acre{
+                one{"{0}ac"}
+                other{"{0}ac"}
+            }
+            hectare{
+                one{"{0}گېكتار"}
+                other{"{0}گېكتار"}
+            }
+            square-foot{
+                one{"{0}ft²"}
+                other{"{0}ft²"}
+            }
+            square-mile{
+                one{"{0}mi²"}
+                other{"{0}mi²"}
+            }
+        }
+        duration{
+            day{
+                one{"{0} كۈن"}
+                other{"{0} كۈن"}
+            }
+            hour{
+                one{"{0}h"}
+                other{"{0}h"}
+            }
+            millisecond{
+                one{"{0}ms"}
+                other{"{0}ms"}
+            }
+            minute{
+                one{"{0}m"}
+                other{"{0}m"}
+            }
+            month{
+                one{"{0} ئاي"}
+                other{"{0} ئاي"}
+            }
+            second{
+                one{"{0}s"}
+                other{"{0}s"}
+            }
+            week{
+                one{"{0} ھەپتە"}
+                other{"{0} ھەپتە"}
+            }
+            year{
+                one{"{0} يىل"}
+                other{"{0} يىل"}
+            }
+        }
+        length{
+            centimeter{
+                one{"{0}cm"}
+                other{"{0}cm"}
+            }
+            foot{
+                one{"{0}′"}
+                other{"{0}′"}
+            }
+            inch{
+                one{"{0}″"}
+                other{"{0}″"}
+            }
+            kilometer{
+                one{"{0}km"}
+                other{"{0}km"}
+            }
+            light-year{
+                one{"{0}ly"}
+                other{"{0}ly"}
+            }
+            meter{
+                one{"{0}m"}
+                other{"{0}m"}
+            }
+            mile{
+                one{"{0}mi"}
+                other{"{0}mi"}
+            }
+            millimeter{
+                one{"{0}mm"}
+                other{"{0}mm"}
+            }
+            picometer{
+                one{"{0}pm"}
+                other{"{0}pm"}
+            }
+            yard{
+                one{"{0}yd"}
+                other{"{0}yd"}
+            }
+        }
+        mass{
+            gram{
+                one{"{0}g"}
+                other{"{0}g"}
+            }
+            kilogram{
+                one{"{0}kg"}
+                other{"{0}kg"}
+            }
+            ounce{
+                one{"{0}oz"}
+                other{"{0}oz"}
+            }
+            pound{
+                one{"{0}#"}
+                other{"{0}#"}
+            }
+        }
+        power{
+            horsepower{
+                one{"{0}hp"}
+                other{"{0}hp"}
+            }
+            kilowatt{
+                one{"{0}kW"}
+                other{"{0}kW"}
+            }
+            watt{
+                one{"{0}W"}
+                other{"{0}W"}
+            }
+        }
+        pressure{
+            hectopascal{
+                one{"{0}hPa"}
+                other{"{0}hPa"}
+            }
+            inch-ofhg{
+                one{"{0}\u0022 Hg"}
+                other{"{0}\u0022 Hg"}
+            }
+            millibar{
+                one{"{0}mb"}
+                other{"{0}mb"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                one{"{0}kph"}
+                other{"{0}kph"}
+            }
+            meter-per-second{
+                one{"{0}m/s"}
+                other{"{0}m/s"}
+            }
+            mile-per-hour{
+                one{"{0}mph"}
+                other{"{0}mph"}
+            }
+        }
+        temperature{
+            celsius{
+                one{"{0}°"}
+                other{"{0}°"}
+            }
+            fahrenheit{
+                one{"{0}°F"}
+                other{"{0}°F"}
+            }
+        }
+        volume{
+            cubic-kilometer{
+                one{"{0}km³"}
+                other{"{0}km³"}
+            }
+            cubic-mile{
+                one{"{0}mi³"}
+                other{"{0}mi³"}
+            }
+            liter{
+                one{"{0}l"}
+                other{"{0}l"}
+            }
+        }
+    }
+    unitsShort{
+        acceleration{
+            g-force{
+                one{"{0} G"}
+                other{"{0} G"}
+            }
+        }
+        angle{
+            degree{
+                one{"{0} گىرادۇس"}
+                other{"{0} گىرادۇس"}
+            }
+        }
+        area{
+            acre{
+                one{"{0} ئىنگلىز موسى"}
+                other{"{0} ئىنگلىز موسى"}
+            }
+            hectare{
+                one{"{0} گېكتار"}
+                other{"{0} گېكتار"}
+            }
+            square-foot{
+                one{"{0} كۋادرات فۇت"}
+                other{"{0} كۋادرات فۇت"}
+            }
+            square-kilometer{
+                one{"{0} km²"}
+                other{"{0} km²"}
+            }
+            square-meter{
+                one{"{0} m²"}
+                other{"{0} m²"}
+            }
+            square-mile{
+                one{"{0} كۋادرات مىل"}
+                other{"{0} كۋادرات مىل"}
+            }
+        }
+        compound{
+            per{"{0}/{1}"}
+        }
+        duration{
+            day{
+                one{"{0} كۈن"}
+                other{"{0} كۈن"}
+            }
+            hour{
+                one{"{0} سائەت"}
+                other{"{0} سائەت"}
+            }
+            millisecond{
+                one{"{0} مىللىسېكۇنت"}
+                other{"{0} مىللىسېكۇنت"}
+            }
+            minute{
+                one{"{0} مىنۇت"}
+                other{"{0} مىنۇت"}
+            }
+            month{
+                one{"{0} ئاي"}
+                other{"{0} ئاي"}
+            }
+            second{
+                one{"{0} سېكۇنت"}
+                other{"{0} سېكۇنت"}
+            }
+            week{
+                one{"{0} ھەپتە"}
+                other{"{0} ھەپتە"}
+            }
+            year{
+                one{"{0} يىل"}
+                other{"{0} يىل"}
+            }
+        }
+        length{
+            centimeter{
+                one{"{0} سانتىمېتىر"}
+                other{"{0} سانتىمېتىر"}
+            }
+            foot{
+                one{"{0} پۇت"}
+                other{"{0} پۇت"}
+            }
+            inch{
+                one{"{0} ئىنگلىز چىسى"}
+                other{"{0} ئىنگلىز چىسى"}
+            }
+            kilometer{
+                one{"{0} كىلومېتىر"}
+                other{"{0} كىلومېتىر"}
+            }
+            light-year{
+                one{"{0} يورۇقلۇق يىلى"}
+                other{"{0} يورۇقلۇق يىلى"}
+            }
+            meter{
+                one{"{0} مېتىر"}
+                other{"{0} مېتىر"}
+            }
+            mile{
+                one{"{0} مىل"}
+                other{"{0} مىل"}
+            }
+            millimeter{
+                one{"{0} مىللىمېتىر"}
+                other{"{0} مىللىمېتىر"}
+            }
+            picometer{
+                one{"{0} پىكومېتىر"}
+                other{"{0} پىكومېتىر"}
+            }
+            yard{
+                one{"{0} يارد"}
+                other{"{0} يارد"}
+            }
+        }
+        mass{
+            gram{
+                one{"{0} g"}
+                other{"{0} g"}
+            }
+            kilogram{
+                one{"{0} kg"}
+                other{"{0} kg"}
+            }
+            ounce{
+                one{"{0} ئۇنسىيە"}
+                other{"{0} ئۇنسىيە"}
+            }
+            pound{
+                one{"{0} قاداق"}
+                other{"{0} قاداق"}
+            }
+        }
+        power{
+            horsepower{
+                one{"{0} ئات كۈچى"}
+                other{"{0} ئات كۈچى"}
+            }
+            kilowatt{
+                one{"{0} kW"}
+                other{"{0} kW"}
+            }
+            watt{
+                one{"{0} W"}
+                other{"{0} W"}
+            }
+        }
+        pressure{
+            hectopascal{
+                one{"{0} ھېكتوپاسكال"}
+                other{"{0} ھېكتوپاسكال"}
+            }
+            inch-ofhg{
+                one{"{0} inHg"}
+                other{"{0} inHg"}
+            }
+            millibar{
+                one{"{0} mbar"}
+                other{"{0} mbar"}
+            }
+        }
+        speed{
+            kilometer-per-hour{
+                one{"{0} سائەت/كىلومېتىر"}
+                other{"{0} سائەت/كىلومېتىر"}
+            }
+            meter-per-second{
+                one{"{0} سېكۇنت/مېتىر"}
+                other{"{0} سېكۇنت/مېتىر"}
+            }
+            mile-per-hour{
+                one{"{0} سائەت/مىل"}
+                other{"{0} سائەت/مىل"}
+            }
+        }
+        temperature{
+            celsius{
+                one{"{0}°C"}
+                other{"{0}°C"}
+            }
+            fahrenheit{
+                one{"{0}°F"}
+                other{"{0}°F"}
+            }
+        }
+        volume{
+            cubic-kilometer{
+                one{"{0} km³"}
+                other{"{0} km³"}
+            }
+            cubic-mile{
+                one{"{0} mi³"}
+                other{"{0} mi³"}
+            }
+            liter{
+                one{"{0} l"}
+                other{"{0} l"}
+            }
+        }
+    }
+}

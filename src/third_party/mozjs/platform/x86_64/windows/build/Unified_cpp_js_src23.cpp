@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "jit/shared/Lowering-shared.cpp"
+#include "vm/Runtime.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/shared/Lowering-shared.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Runtime.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/shared/Lowering-shared.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Runtime.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/x64/Assembler-x64.cpp"
+#include "vm/SavedStacks.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/x64/Assembler-x64.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SavedStacks.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/x64/Assembler-x64.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SavedStacks.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/x64/Bailouts-x64.cpp"
+#include "vm/Scope.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/x64/Bailouts-x64.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Scope.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/x64/Bailouts-x64.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Scope.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/x64/BaselineCompiler-x64.cpp"
+#include "vm/SelfHosting.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/x64/BaselineCompiler-x64.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/SelfHosting.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/x64/BaselineCompiler-x64.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/SelfHosting.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/x64/BaselineIC-x64.cpp"
+#include "vm/Shape.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/x64/BaselineIC-x64.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Shape.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/x64/BaselineIC-x64.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Shape.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "jit/x64/CodeGenerator-x64.cpp"
+#include "vm/ShapeZone.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/x64/CodeGenerator-x64.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ShapeZone.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "jit/x64/CodeGenerator-x64.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ShapeZone.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

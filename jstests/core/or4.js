@@ -64,7 +64,7 @@ assert.eq(4, coll.find({$or: [{a: 2}, {b: 3}]}).batchSize(2).toArray().length);
 assert.commandWorked(coll.insert({a: 1, b: 3}));
 assert.eq(4, coll.find({$or: [{a: 2}, {b: 3}]}).limit(4).toArray().length);
 
-assert.eq([1, 2], Array.sort(coll.distinct('a', {$or: [{a: 2}, {b: 3}]})));
+assert.eq([1, 2], coll.distinct('a', {$or: [{a: 2}, {b: 3}]}).sort());
 
 assert.commandWorked(coll.mapReduce(
     function() {

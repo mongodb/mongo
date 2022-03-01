@@ -19,77 +19,79 @@
 // are not redefined as compiler intrinsics. Fix that for the interlocked
 // functions that are used in this file.
 #if defined(_MSC_VER) && !defined(InterlockedExchangeAdd)
-#define InterlockedExchangeAdd(addend, value)                                  \
-  _InterlockedExchangeAdd((volatile long*)(addend), (long)(value))
+#  define InterlockedExchangeAdd(addend, value) \
+    _InterlockedExchangeAdd((volatile long*)(addend), (long)(value))
 #endif
 
 #if defined(_MSC_VER) && !defined(InterlockedIncrement)
-#define InterlockedIncrement(addend)                                           \
-  _InterlockedIncrement((volatile long*)(addend))
+#  define InterlockedIncrement(addend) \
+    _InterlockedIncrement((volatile long*)(addend))
 #endif
 
 // Wrapper for native condition variable APIs.
-struct mozilla::detail::ConditionVariableImpl::PlatformData
-{
+struct mozilla::detail::ConditionVariableImpl::PlatformData {
   CONDITION_VARIABLE cv_;
 };
 
-mozilla::detail::ConditionVariableImpl::ConditionVariableImpl()
-{
+mozilla::detail::ConditionVariableImpl::ConditionVariableImpl() {
   InitializeConditionVariable(&platformData()->cv_);
 }
 
-void
-mozilla::detail::ConditionVariableImpl::notify_one()
-{
+void mozilla::detail::ConditionVariableImpl::notify_one() {
   WakeConditionVariable(&platformData()->cv_);
 }
 
-void
-mozilla::detail::ConditionVariableImpl::notify_all()
-{
+void mozilla::detail::ConditionVariableImpl::notify_all() {
   WakeAllConditionVariable(&platformData()->cv_);
 }
 
-void
-mozilla::detail::ConditionVariableImpl::wait(MutexImpl& lock)
-{
+void mozilla::detail::ConditionVariableImpl::wait(MutexImpl& lock) {
   SRWLOCK* srwlock = &lock.platformData()->lock;
-  bool r = SleepConditionVariableSRW(&platformData()->cv_, srwlock, INFINITE, 0);
+  bool r =
+      SleepConditionVariableSRW(&platformData()->cv_, srwlock, INFINITE, 0);
   MOZ_RELEASE_ASSERT(r);
 }
 
-mozilla::detail::CVStatus
-mozilla::detail::ConditionVariableImpl::wait_for(MutexImpl& lock,
-                                                 const mozilla::TimeDuration& rel_time)
-{
+mozilla::CVStatus mozilla::detail::ConditionVariableImpl::wait_for(
+    MutexImpl& lock, const mozilla::TimeDuration& rel_time) {
+  if (rel_time == mozilla::TimeDuration::Forever()) {
+    wait(lock);
+    return CVStatus::NoTimeout;
+  }
+
   SRWLOCK* srwlock = &lock.platformData()->lock;
 
-  // Note that DWORD is unsigned, so we have to be careful to clamp at 0.
-  // If rel_time is Forever, then ToMilliseconds is +inf, which evaluates as
-  // greater than UINT32_MAX, resulting in the correct INFINITE wait.
+  // Note that DWORD is unsigned, so we have to be careful to clamp at 0. If
+  // rel_time is Forever, then ToMilliseconds is +inf, which evaluates as
+  // greater than UINT32_MAX, resulting in the correct INFINITE wait. We also
+  // don't want to round sub-millisecond waits to 0, as that wastes energy (see
+  // bug 1437167 comment 6), so we instead round submillisecond waits to 1ms.
   double msecd = rel_time.ToMilliseconds();
-  DWORD msec = msecd < 0.0
-               ? 0
-               : msecd > UINT32_MAX
-                 ? INFINITE
-                 : static_cast<DWORD>(msecd);
+  DWORD msec;
+  if (msecd < 0.0) {
+    msec = 0;
+  } else if (msecd > UINT32_MAX) {
+    msec = INFINITE;
+  } else {
+    msec = static_cast<DWORD>(msecd);
+    // Round submillisecond waits to 1ms.
+    if (msec == 0 && !rel_time.IsZero()) {
+      msec = 1;
+    }
+  }
 
   BOOL r = SleepConditionVariableSRW(&platformData()->cv_, srwlock, msec, 0);
-  if (r)
-    return CVStatus::NoTimeout;
+  if (r) return CVStatus::NoTimeout;
   MOZ_RELEASE_ASSERT(GetLastError() == ERROR_TIMEOUT);
   return CVStatus::Timeout;
 }
 
-mozilla::detail::ConditionVariableImpl::~ConditionVariableImpl()
-{
+mozilla::detail::ConditionVariableImpl::~ConditionVariableImpl() {
   // Native condition variables don't require cleanup.
 }
 
 inline mozilla::detail::ConditionVariableImpl::PlatformData*
-mozilla::detail::ConditionVariableImpl::platformData()
-{
+mozilla::detail::ConditionVariableImpl::platformData() {
   static_assert(sizeof platformData_ >= sizeof(PlatformData),
                 "platformData_ is too small");
   return reinterpret_cast<PlatformData*>(platformData_);

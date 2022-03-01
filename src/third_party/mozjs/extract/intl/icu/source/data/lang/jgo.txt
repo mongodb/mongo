@@ -1,0 +1,32 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+jgo{
+    Keys{
+        currency{"Ŋkáp"}
+        numbers{"Pɛnɔ́mba"}
+    }
+    Languages{
+        ar{"Alâbɛ"}
+        de{"Njáman"}
+        el{"Ŋgɛlɛ̂k"}
+        en{"Aŋgɛlúshi"}
+        fr{"Fɛlánci"}
+        jgo{"Ndaꞌa"}
+        und{"cú-pʉɔ yi pɛ́ ká kɛ́ jí"}
+        zh{"Shinwâ"}
+    }
+    Scripts{
+        Latn{"mík -ŋwaꞌnɛ yi ɛ́ líŋɛ́nɛ Latɛ̂ŋ"}
+        Zxxx{"ntúu yi pɛ́ ká ŋwaꞌnε"}
+        Zzzz{"ntɛ-ŋwaꞌnɛ yí pɛ́ ká kɛ́ jí"}
+    }
+    Types{
+        calendar{
+            gregorian{"mɛlɛ́ꞌ-mɛkát"}
+        }
+        numbers{
+            latn{"pɛnɔ́mba"}
+        }
+    }
+}

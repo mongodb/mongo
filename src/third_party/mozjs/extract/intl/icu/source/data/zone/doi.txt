@@ -1,0 +1,69 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+doi{
+    zoneStrings{
+        "Etc:UTC"{
+            ls{"तालमेली आलमी समां"}
+        }
+        "Etc:Unknown"{
+            ec{"अनजांता शैह्‌र"}
+        }
+        "Europe:Dublin"{
+            ld{"आयरिश मानक समां"}
+        }
+        "Europe:London"{
+            ld{"ब्रिटिश गर्मियें दा समां"}
+        }
+        "meta:America_Central"{
+            ld{"उत्तरी अमरीकी डेलाइट केंदरी समां"}
+            lg{"उत्तरी अमरीकी केंदरी समां"}
+            ls{"उत्तरी अमरीकी मानक केंदरी समां"}
+        }
+        "meta:America_Eastern"{
+            ld{"उत्तरी अमरीकी डेलाइट पूर्वी समां"}
+            lg{"उत्तरी अमरीकी पूर्वी समां"}
+            ls{"उत्तरी अमरीकी मानक पूर्वी समां"}
+        }
+        "meta:America_Mountain"{
+            ld{"उत्तरी अमरीकी डेलाइट माउंटेन समां"}
+            lg{"उत्तरी अमरीकी माउंटेन समां"}
+            ls{"उत्तरी अमरीकी मानक माउंटेन समां"}
+        }
+        "meta:America_Pacific"{
+            ld{"उत्तरी अमरीकी डेलाइट प्रशांत समां"}
+            lg{"उत्तरी अमरीकी प्रशांत समां"}
+            ls{"उत्तरी अमरीकी मानक प्रशांत समां"}
+        }
+        "meta:Atlantic"{
+            ld{"अटलांटिक डेलाइट समां"}
+            lg{"अटलांटिक समां"}
+            ls{"अटलांटिक मानक समां"}
+        }
+        "meta:Europe_Central"{
+            ld{"केंदरी यूरोपी गर्मियें दा समां"}
+            lg{"केंदरी यूरोपी समां"}
+            ls{"केंदरी यूरोपी मानक समां"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"उत्तरी यूरोपी गर्मियें दा समां"}
+            lg{"उत्तरी यूरोपी समां"}
+            ls{"उत्तरी यूरोपी मानक समां"}
+        }
+        "meta:Europe_Western"{
+            ld{"पच्छमी यूरोपी गर्मियें दा समां"}
+            lg{"पच्छमी यूरोपी समां"}
+            ls{"पच्छमी यूरोपी मानक समां"}
+        }
+        "meta:GMT"{
+            ls{"ग्रीनविच मीन टाइम"}
+        }
+        fallbackFormat{"{1} ({0})"}
+        gmtFormat{"GMT{0}"}
+        gmtZeroFormat{"GMT"}
+        hourFormat{"+HH:mm;-HH:mm"}
+        regionFormat{"{0} समां"}
+        regionFormatDaylight{"{0} डेलाइट समां"}
+        regionFormatStandard{"{0} मानक समां"}
+    }
+}

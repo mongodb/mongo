@@ -1,0 +1,36 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+en_001{
+    Keys{
+        colCaseLevel{"Case-Sensitive Sorting"}
+        colNormalization{"Normalised Sorting"}
+    }
+    Languages{
+        mus{"Creek"}
+        nds_NL{"West Low German"}
+        sah{"Yakut"}
+    }
+    Types{
+        colNormalization{
+            no{"Sort Without Normalisation"}
+            yes{"Sort Unicode Normalised"}
+        }
+        hc{
+            h11{"12-Hour System (0–11)"}
+            h12{"12-Hour System (1–12)"}
+            h23{"24-Hour System (0–23)"}
+            h24{"24-Hour System (1–24)"}
+        }
+    }
+    characterLabelPattern{
+        all{"{0} – all"}
+        compatibility{"{0} – compatibility"}
+        enclosed{"{0} – enclosed"}
+        extended{"{0} – extended"}
+        historic{"{0} – historic"}
+        miscellaneous{"{0} – miscellaneous"}
+        other{"{0} – other"}
+        scripts{"scripts – {0}"}
+    }
+}

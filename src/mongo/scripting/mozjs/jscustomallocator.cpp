@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include <cstddef>
+#include <js/Utility.h>
 #include <jscustomallocator.h>
 #include <type_traits>
 
@@ -196,19 +197,92 @@ size_t get_current(void* ptr) {
 }  // namespace sm
 }  // namespace mongo
 
-void* js_malloc(size_t bytes) {
+JS_PUBLIC_DATA arena_id_t js::MallocArena;
+JS_PUBLIC_DATA arena_id_t js::ArrayBufferContentsArena;
+JS_PUBLIC_DATA arena_id_t js::StringBufferArena;
+
+void* mongo_arena_malloc(arena_id_t arena, size_t bytes) {
+    return std::malloc(bytes);
+}
+
+void* mongo_arena_calloc(arena_id_t arena, size_t nmemb, size_t size) {
+    return std::calloc(nmemb, size);
+}
+
+void* mongo_arena_realloc(arena_id_t arena, void* p, size_t bytes) {
+    if (!p) {
+        return mongo_arena_malloc(arena, bytes);
+    }
+
+    if (!bytes) {
+        js_free(p);
+        return nullptr;
+    }
+
+    size_t current = mongo::sm::get_current(p);
+
+    if (current >= bytes) {
+        return p;
+    }
+
+    size_t tb = mongo::sm::total_bytes;
+
+    if (tb >= current) {
+        mongo::sm::total_bytes = tb - current;
+    }
+
+    return std::realloc(p, bytes);
+}
+
+void* js_arena_malloc(size_t arena, size_t bytes) {
+    JS_OOM_POSSIBLY_FAIL();
+    JS_CHECK_LARGE_ALLOC(bytes);
     return mongo::sm::wrap_alloc(
-        [](void* ptr, size_t b) { return std::malloc(b); }, nullptr, bytes);
+        [&](void* ptr, size_t b) { return mongo_arena_malloc(arena, bytes); }, nullptr, bytes);
+}
+
+void* js_malloc(size_t bytes) {
+    return js_arena_malloc(js::MallocArena, bytes);
+}
+
+void* js_arena_calloc(arena_id_t arena, size_t bytes) {
+    JS_OOM_POSSIBLY_FAIL();
+    JS_CHECK_LARGE_ALLOC(bytes);
+    return mongo::sm::wrap_alloc(
+        [&](void* ptr, size_t b) { return mongo_arena_calloc(arena, 1, b); }, nullptr, bytes);
+}
+
+void* js_arena_calloc(arena_id_t arena, size_t nmemb, size_t size) {
+    JS_OOM_POSSIBLY_FAIL();
+    JS_CHECK_LARGE_ALLOC(size);
+    return mongo::sm::wrap_alloc(
+        [&](void* ptr, size_t b) { return mongo_arena_calloc(arena, nmemb, size); },
+        nullptr,
+        size * nmemb);
 }
 
 void* js_calloc(size_t bytes) {
-    return mongo::sm::wrap_alloc(
-        [](void* ptr, size_t b) { return std::calloc(b, 1); }, nullptr, bytes);
+    return js_arena_calloc(js::MallocArena, bytes);
 }
 
 void* js_calloc(size_t nmemb, size_t size) {
+    return js_arena_calloc(js::MallocArena, nmemb, size);
+}
+
+void* js_arena_realloc(arena_id_t arena, void* p, size_t bytes) {
+    // realloc() with zero size is not portable, as some implementations may
+    // return nullptr on success and free |p| for this.  We assume nullptr
+    // indicates failure and that |p| is still valid.
+    MOZ_ASSERT(bytes != 0);
+
+    JS_OOM_POSSIBLY_FAIL();
+    JS_CHECK_LARGE_ALLOC(bytes);
     return mongo::sm::wrap_alloc(
-        [](void* ptr, size_t b) { return std::calloc(b, 1); }, nullptr, nmemb * size);
+        [&](void* ptr, size_t b) { return mongo_arena_realloc(arena, ptr, b); }, p, bytes);
+}
+
+void* js_realloc(void* p, size_t bytes) {
+    return js_arena_realloc(js::MallocArena, p, bytes);
 }
 
 void js_free(void* p) {
@@ -231,32 +305,10 @@ void js_free(void* p) {
         0);
 }
 
-void* js_realloc(void* p, size_t bytes) {
-    if (!p) {
-        return js_malloc(bytes);
-    }
-
-    if (!bytes) {
-        js_free(p);
-        return nullptr;
-    }
-
-    size_t current = mongo::sm::get_current(p);
-
-    if (current >= bytes) {
-        return p;
-    }
-
-    size_t tb = mongo::sm::total_bytes;
-
-    if (tb >= current) {
-        mongo::sm::total_bytes = tb - current;
-    }
-
-    return mongo::sm::wrap_alloc(
-        [](void* ptr, size_t b) { return std::realloc(ptr, b); }, p, bytes);
+void js::InitMallocAllocator() {
+    MallocArena = 0;
+    ArrayBufferContentsArena = 1;
+    StringBufferArena = 2;
 }
-
-void js::InitMallocAllocator() {}
 
 void js::ShutDownMallocAllocator() {}

@@ -1,0 +1,29 @@
+# https://unicode-org.atlassian.net/browse/ICU-21597
+#
+# https://github.com/unicode-org/icu/commit/b13be666cd354c4ff177906d779273d7cfc155c0.diff
+
+diff --git a/intl/icu/source/common/locid.cpp b/intl/icu/source/common/locid.cpp
+index 3c6e5b06690..4b7d21ee13d 100644
+--- a/intl/icu/source/common/locid.cpp
++++ b/intl/icu/source/common/locid.cpp
+@@ -1571,6 +1571,7 @@ AliasReplacer::replaceTransformedExtensions(
+             const char* tvalue = uprv_strchr(tkey, '-');
+             if (tvalue == nullptr) {
+                 status = U_ILLEGAL_ARGUMENT_ERROR;
++                return false;
+             }
+             const char* nextTKey = ultag_getTKeyStart(tvalue);
+             if (nextTKey != nullptr) {
+@@ -1591,8 +1592,11 @@ AliasReplacer::replaceTransformedExtensions(
+              }
+              const char* tfield = (const char*) tfields.elementAt(i);
+              const char* tvalue = uprv_strchr(tfield, '-');
++             if (tvalue == nullptr) {
++                 status = U_ILLEGAL_ARGUMENT_ERROR;
++                 return false;
++             }
+              // Split the "tkey-tvalue" pair string so that we can canonicalize the tvalue.
+-             U_ASSERT(tvalue != nullptr);
+              *((char*)tvalue++) = '\0'; // NULL terminate tkey
+              output.append(tfield, status).append('-', status);
+              const char* bcpTValue = ulocimp_toBcpType(tfield, tvalue, nullptr, nullptr);

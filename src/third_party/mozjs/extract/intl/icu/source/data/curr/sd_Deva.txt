@@ -1,0 +1,79 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sd_Deva{
+    %%Parent{"root"}
+    Currencies{
+        BRL{
+            "R$",
+            "बरजिलियन रियलु",
+        }
+        CNY{
+            "CN¥",
+            "चीना युआनु",
+        }
+        EUR{
+            "€",
+            "यूरो",
+        }
+        GBP{
+            "£",
+            "बरतानवी पाउंडु",
+        }
+        INR{
+            "₹",
+            "हिंदुस्तानी रुपयो",
+        }
+        JPY{
+            "¥",
+            "जापानी येनु",
+        }
+        RUB{
+            "RUB",
+            "रशियनु रुबलु",
+        }
+        USD{
+            "$",
+            "यूएस जो डॉलल",
+        }
+        XXX{
+            "¤",
+            "अणवाकुफु चालू सिक्को",
+        }
+    }
+    Currencies%narrow{
+        GBP{"£"}
+        RUB{"₽"}
+        USD{"$"}
+    }
+    CurrencyPlurals{
+        BRL{
+            one{"बरजिलियन रियलु"}
+            other{"बरजिलियन रियल"}
+        }
+        CNY{
+            one{"चीना युआनु"}
+            other{"चीना युआन"}
+        }
+        GBP{
+            one{"बरतानवी पाउंड"}
+            other{"बरतानवी पाउंड"}
+        }
+        JPY{
+            one{"जापानी येनु"}
+            other{"जापानी येन"}
+        }
+        RUB{
+            one{"रशियनु रुबलु"}
+            other{"रशियनु रुबल"}
+        }
+        USD{
+            one{"यूएस जो डॉलर"}
+            other{"यूएस जा डॉलर"}
+        }
+        XXX{
+            one{"अणवाकुफु चालू सिक्के जो एको"}
+            other{"अणवाकुफु चालू सिक्को"}
+        }
+    }
+}

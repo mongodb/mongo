@@ -1,0 +1,1359 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+pcm{
+    Currencies{
+        AED{
+            "AED",
+            "Yunaítẹ́d Áráb Ẹ́míréts Dírham",
+        }
+        AFN{
+            "AFN",
+            "Afgán Afgáni",
+        }
+        ALL{
+            "ALL",
+            "Albéniá Lẹk",
+        }
+        AMD{
+            "AMD",
+            "Armẹ́niá Dram",
+        }
+        ANG{
+            "ANG",
+            "Nẹ́dalánds Antílián Gílda",
+        }
+        AOA{
+            "AOA",
+            "Angólá Kwánza",
+        }
+        ARS{
+            "ARS",
+            "Ajẹntína Pẹ́so",
+        }
+        AUD{
+            "A$",
+            "Ọstréliá Dọ́la",
+        }
+        AWG{
+            "AWG",
+            "Arúba Flọ́rin",
+        }
+        AZN{
+            "AZN",
+            "Azẹrbaiján Mánat",
+        }
+        BAM{
+            "BAM",
+            "Bọ́sniá an Hẹzẹgovína Mak Wé Pẹ́sin Fít Chenj",
+        }
+        BBD{
+            "BBD",
+            "Barbédọs Dọ́la",
+        }
+        BDT{
+            "BDT",
+            "Bangladẹ́sh Táka",
+        }
+        BGN{
+            "BGN",
+            "Bọlgériá Lẹv",
+        }
+        BHD{
+            "BHD",
+            "Baréin Dínar",
+        }
+        BIF{
+            "BIF",
+            "Burúndí Frank",
+        }
+        BMD{
+            "BMD",
+            "Bẹmiúda Dọ́la",
+        }
+        BND{
+            "BND",
+            "Brunẹí Dọ́la",
+        }
+        BOB{
+            "BOB",
+            "Bolíviá Boliviáno",
+        }
+        BRL{
+            "R$",
+            "Brazíl Rẹal",
+        }
+        BSD{
+            "BSD",
+            "Bahámas Dọ́la",
+        }
+        BTN{
+            "BTN",
+            "Bután Ngúltrum",
+        }
+        BWP{
+            "BWP",
+            "Botswáná Púla",
+        }
+        BYN{
+            "BYN",
+            "Bẹlarús Rúbul",
+        }
+        BZD{
+            "BZD",
+            "Bẹliz Dọ́la",
+        }
+        CAD{
+            "KA$",
+            "Kánádá Dọ́la",
+        }
+        CDF{
+            "CDF",
+            "Kóngó Frank",
+        }
+        CHF{
+            "CHF",
+            "Swís Frank",
+        }
+        CLP{
+            "CLP",
+            "Chílí Pẹ́so",
+        }
+        CNH{
+            "CNH",
+            "Chaíná Yuan (ples-dẹm aúsaíd chaína)",
+        }
+        CNY{
+            "CN¥",
+            "Chaíná Yuan",
+        }
+        COP{
+            "COP",
+            "Kolómbiá Pẹ́so",
+        }
+        CRC{
+            "CRC",
+            "Kósta Ríka Kólọn",
+        }
+        CUC{
+            "CUC",
+            "Kiúbá Pẹ́so Wé Pẹ́sin Fít Chenj",
+        }
+        CUP{
+            "CUP",
+            "Kiúbá Pẹ́so",
+        }
+        CVE{
+            "CVE",
+            "Kép Vẹ́d Ẹskúdo",
+        }
+        CZK{
+            "CZK",
+            "Chẹ́k Kórúna",
+        }
+        DJF{
+            "DJF",
+            "Jibútí Frank",
+        }
+        DKK{
+            "DKK",
+            "Dẹ́nmák Króna",
+        }
+        DOP{
+            "DOP",
+            "Dọmíníkan Pẹ́so",
+        }
+        DZD{
+            "DZD",
+            "Aljíria Dínar",
+        }
+        EGP{
+            "EGP",
+            "Íjípt Paund",
+        }
+        ERN{
+            "ERN",
+            "Ẹritrẹá Nákfa",
+        }
+        ETB{
+            "ETB",
+            "Ẹtiópiá Berr",
+        }
+        EUR{
+            "€",
+            "Yúro",
+        }
+        FJD{
+            "FJD",
+            "Fíjí Dọ́la",
+        }
+        FKP{
+            "FKP",
+            "Fọlkland Aílands Paund",
+        }
+        GBP{
+            "£",
+            "Brítísh Páund",
+        }
+        GEL{
+            "GEL",
+            "Jọ́jiá Lári",
+        }
+        GHS{
+            "GHS",
+            "Ganá Sídi",
+        }
+        GIP{
+            "GIP",
+            "Jibrọ́lta Páund",
+        }
+        GMD{
+            "GMD",
+            "Gámbiá Dalási",
+        }
+        GNF{
+            "GNF",
+            "Gíní Frank",
+        }
+        GTQ{
+            "GTQ",
+            "Guátẹmála Kwuẹ́tzal",
+        }
+        GYD{
+            "GYD",
+            "Giyána Dọ́la",
+        }
+        HKD{
+            "HK$",
+            "Họng Kọ́ng Dọ́la",
+        }
+        HNL{
+            "HNL",
+            "Họndúrán Lẹmpíra",
+        }
+        HRK{
+            "HRK",
+            "Kroéshia Kúna",
+        }
+        HTG{
+            "HTG",
+            "Haíti Gourd",
+        }
+        HUF{
+            "HUF",
+            "Họngériá Fọ́rint",
+        }
+        IDR{
+            "IDR",
+            "Indoníshiá Rupia",
+        }
+        ILS{
+            "₪",
+            "Ízrẹ́l Niú Shẹ́kẹl",
+        }
+        INR{
+            "₹",
+            "Índiá Rúpi",
+        }
+        IQD{
+            "IQD",
+            "Irák Dínar",
+        }
+        IRR{
+            "IRR",
+            "Irán Rial",
+        }
+        ISK{
+            "ISK",
+            "Aíslánd Króna",
+        }
+        JMD{
+            "JMD",
+            "Jamaíka Dọla",
+        }
+        JOD{
+            "JOD",
+            "Jọ́dán Dínar",
+        }
+        JPY{
+            "JP¥",
+            "Japán Yẹn",
+        }
+        KES{
+            "KES",
+            "Kẹ́nyá Shílin",
+        }
+        KGS{
+            "KGS",
+            "Kẹjístan Som",
+        }
+        KHR{
+            "KHR",
+            "Kambódiá Riẹl",
+        }
+        KMF{
+            "KMF",
+            "Kọ́mọ́ros Frank",
+        }
+        KPW{
+            "KPW",
+            "Nọ́t Koriá Wọn",
+        }
+        KRW{
+            "₩",
+            "Saút Koriá Wọn",
+        }
+        KWD{
+            "KWD",
+            "Kuwét Dínar",
+        }
+        KYD{
+            "KYD",
+            "Kéman Aílands Dọla",
+        }
+        KZT{
+            "KZT",
+            "Kazakstan Tẹ́nj",
+        }
+        LAK{
+            "LAK",
+            "Laós Kip",
+        }
+        LBP{
+            "LBP",
+            "Lẹ́bánọ́n Paund",
+        }
+        LKR{
+            "LKR",
+            "Sri Lánká Rúpi",
+        }
+        LRD{
+            "LRD",
+            "Laibẹ́riá Dọ́la",
+        }
+        LYD{
+            "LYD",
+            "Líbia Dínar",
+        }
+        MAD{
+            "MAD",
+            "Morọko Dírham",
+        }
+        MDL{
+            "MDL",
+            "Mọldóva Lu",
+        }
+        MGA{
+            "MGA",
+            "Malagásí Ariári",
+        }
+        MKD{
+            "MKD",
+            "Masẹdónia Dínar",
+        }
+        MMK{
+            "MMK",
+            "Miánmá Kiat",
+        }
+        MNT{
+            "MNT",
+            "Mọngóliá Túgrik",
+        }
+        MOP{
+            "MOP",
+            "Makáo Pátáka",
+        }
+        MRU{
+            "MRU",
+            "Mọriténiá Uguíya",
+        }
+        MUR{
+            "MUR",
+            "Mọríshọ́s Rúpi",
+        }
+        MVR{
+            "MVR",
+            "Mọ́ldívs Rúfíya",
+        }
+        MWK{
+            "MWK",
+            "Maláwi ́Kwácha",
+        }
+        MXN{
+            "MX$",
+            "Mẹ́ksíko Pẹ́so",
+        }
+        MYR{
+            "MYR",
+            "Maléshiá Ríngit",
+        }
+        MZN{
+            "MZN",
+            "Mozámbík Métíkal",
+        }
+        NAD{
+            "NAD",
+            "Namíbiá Dọ́la",
+        }
+        NGN{
+            "₦",
+            "Naijíriá Naíra",
+        }
+        NIO{
+            "NIO",
+            "Nikarágwua Kordóba",
+        }
+        NOK{
+            "NOK",
+            "Nọ́wé Króna",
+        }
+        NPR{
+            "NPR",
+            "Nẹ́pál Rúpi",
+        }
+        NZD{
+            "NZ$",
+            "Niú Zílánd Dọ́las",
+        }
+        OMR{
+            "OMR",
+            "Omán Rial",
+        }
+        PAB{
+            "PAB",
+            "Pánáma Balbóa",
+        }
+        PEN{
+            "PEN",
+            "Pẹrúvián Sol",
+        }
+        PGK{
+            "PGK",
+            "Pápuá Niú Gíni Kína",
+        }
+        PHP{
+            "PHP",
+            "Fílípíns Píso",
+        }
+        PKR{
+            "PKR",
+            "Pakístán Rúpi",
+        }
+        PLN{
+            "PLN",
+            "Pólánd Zílọ́ti",
+        }
+        PYG{
+            "PYG",
+            "Páragwuá Guaráni",
+        }
+        QAR{
+            "QAR",
+            "Kata Ríal",
+        }
+        RON{
+            "RON",
+            "Roméniá Lu",
+        }
+        RSD{
+            "RSD",
+            "Sẹrbia Dínar",
+        }
+        RUB{
+            "RUB",
+            "Rọ́shiá Rúbul",
+        }
+        RWF{
+            "RWF",
+            "Ruwándá Frank",
+        }
+        SAR{
+            "SAR",
+            "Saúdí Arébiá Riyal",
+        }
+        SBD{
+            "SBD",
+            "Sólómọ́n Aílands Dọ́la",
+        }
+        SCR{
+            "SCR",
+            "Sẹ́chẹ́ls Rúpi",
+        }
+        SDG{
+            "SDG",
+            "Sudan Paund",
+        }
+        SEK{
+            "SEK",
+            "Swídẹ́n Króna",
+        }
+        SGD{
+            "SGD",
+            "Singapọ́ Dọ́la",
+        }
+        SHP{
+            "SHP",
+            "Sent Hẹlẹ́ná Paund",
+        }
+        SLL{
+            "SLL",
+            "Siẹ́ra Líoniá Liọn",
+        }
+        SOS{
+            "SOS",
+            "Sọmáliá Shílin",
+        }
+        SRD{
+            "SRD",
+            "Súrínám Dọla",
+        }
+        SSP{
+            "SSP",
+            "Saút Sudán Paund",
+        }
+        STN{
+            "STN",
+            "Sao Tómẹ & Prínsípẹ Dóbra",
+        }
+        SYP{
+            "SYP",
+            "Síriá Paund",
+        }
+        SZL{
+            "SZL",
+            "Swází Lilánjẹ́ni",
+        }
+        THB{
+            "THB",
+            "Taílánd Baht",
+        }
+        TJS{
+            "TJS",
+            "Tajíkstan Sómóni",
+        }
+        TMT{
+            "TMT",
+            "Tọkmẹ́nístán Mánat",
+        }
+        TND{
+            "TND",
+            "Tuníshia Dínar",
+        }
+        TOP{
+            "TOP",
+            "Tónga Pánga",
+        }
+        TRY{
+            "TRY",
+            "Tọ́kí Líra",
+        }
+        TTD{
+            "TTD",
+            "Trínídad & Tobágo Dọ́la",
+        }
+        TWD{
+            "NT$",
+            "Niú Taiwán Dọ́la",
+        }
+        TZS{
+            "TZS",
+            "Tanzániá Shílin",
+        }
+        UAH{
+            "UAH",
+            "Yukrẹín Rívnia",
+        }
+        UGX{
+            "UGX",
+            "Yugándá Shílin",
+        }
+        USD{
+            "US$",
+            "US Dọ́la",
+        }
+        UYU{
+            "UYU",
+            "Yurugwaí Pẹ́so",
+        }
+        UZS{
+            "UZS",
+            "Uzbẹ́kistan Som",
+        }
+        VES{
+            "VES",
+            "Vẹnẹzuẹlá Bolívar",
+        }
+        VND{
+            "₫",
+            "Viẹ́tnám Dọng",
+        }
+        VUV{
+            "VUV",
+            "Vanuátú Vátu",
+        }
+        WST{
+            "WST",
+            "Samóa Tála",
+        }
+        XAF{
+            "FCFA",
+            "Sẹ́ntrál Áfríká Frank",
+        }
+        XCD{
+            "EC$",
+            "Íst Karíbián Dọla",
+        }
+        XOF{
+            "F CFA",
+            "Wẹ́st Afríká Sẹ́fa Frank",
+        }
+        XPF{
+            "CFPF",
+            "Frẹ́nch Poliníshiá Frank",
+        }
+        XXX{
+            "¤",
+            "Mọní Wé Pípol Nọ No",
+        }
+        YER{
+            "YER",
+            "Yẹ́mẹ́n Rial",
+        }
+        ZAR{
+            "ZAR",
+            "Saút Áfríká Rand",
+        }
+        ZMW{
+            "ZMW",
+            "Zámbiá Kwácha",
+        }
+    }
+    Currencies%narrow{
+        AOA{"Kz"}
+        ARS{"$"}
+        AUD{"$"}
+        BAM{"KM"}
+        BBD{"$"}
+        BDT{"৳"}
+        BMD{"$"}
+        BND{"$"}
+        BOB{"Bs"}
+        BRL{"R$"}
+        BSD{"$"}
+        BWP{"P"}
+        BYN{"p."}
+        BZD{"$"}
+        CAD{"$"}
+        CLP{"$"}
+        CNY{"¥"}
+        COP{"$"}
+        CRC{"₡"}
+        CUC{"$"}
+        CUP{"$"}
+        CZK{"Kč"}
+        DKK{"kr"}
+        DOP{"$"}
+        EGP{"E£"}
+        EUR{"€"}
+        FJD{"$"}
+        FKP{"£"}
+        GBP{"£"}
+        GEL{"₾"}
+        GIP{"£"}
+        GNF{"FG"}
+        GTQ{"Q"}
+        GYD{"$"}
+        HKD{"$"}
+        HNL{"L"}
+        HRK{"kn"}
+        HUF{"Ft"}
+        IDR{"Rp"}
+        ILS{"₪"}
+        INR{"₹"}
+        ISK{"kr"}
+        JMD{"$"}
+        JPY{"¥"}
+        KHR{"៛"}
+        KMF{"CF"}
+        KPW{"₩"}
+        KRW{"₩"}
+        KYD{"$"}
+        KZT{"₸"}
+        LAK{"₭"}
+        LBP{"L£"}
+        LKR{"Rs"}
+        LRD{"$"}
+        MGA{"Ar"}
+        MMK{"K"}
+        MNT{"₮"}
+        MUR{"Rs"}
+        MXN{"$"}
+        MYR{"RM"}
+        NAD{"$"}
+        NGN{"₦"}
+        NIO{"C$"}
+        NOK{"kr"}
+        NPR{"Rs"}
+        NZD{"$"}
+        PHP{"₱"}
+        PKR{"Rs"}
+        PLN{"zł"}
+        PYG{"₲"}
+        RON{"lei"}
+        RUB{"₽"}
+        RWF{"RF"}
+        SBD{"$"}
+        SEK{"kr"}
+        SGD{"$"}
+        SHP{"£"}
+        SRD{"$"}
+        SSP{"£"}
+        STN{"Db"}
+        SYP{"£"}
+        THB{"฿"}
+        TOP{"T$"}
+        TRY{"₺"}
+        TTD{"$"}
+        TWD{"$"}
+        UAH{"₴"}
+        USD{"$"}
+        UYU{"$"}
+        VND{"₫"}
+        XCD{"$"}
+        ZAR{"R"}
+        ZMW{"ZK"}
+    }
+    Currencies%variant{
+        TRY{"TL"}
+    }
+    CurrencyPlurals{
+        AED{
+            one{"Yunaítẹ́d Áráb Ẹ́míréts dírham"}
+            other{"Yunaítẹ́d Áráb Ẹ́míréts dírhams"}
+        }
+        AFN{
+            one{"Afgán afgáni"}
+            other{"Afgán afgánis"}
+        }
+        ALL{
+            one{"Albéniá Lẹk"}
+            other{"Albéniá Lẹk"}
+        }
+        AMD{
+            one{"Armẹ́nia ́dram"}
+            other{"Armẹ́niá drams"}
+        }
+        ANG{
+            one{"Nẹ́dalánds Antílián Gílda"}
+            other{"Nẹ́dalánds Antílián Gílda"}
+        }
+        AOA{
+            one{"Angólá kwánza"}
+            other{"Angólá kwánzas"}
+        }
+        ARS{
+            one{"Ajẹntína Pẹ́so"}
+            other{"Ajẹntína Pẹ́so"}
+        }
+        AUD{
+            one{"Ọstréliá dọ́la"}
+            other{"Ọstréliá dọ́las"}
+        }
+        AWG{
+            one{"Arúba Flọ́rin"}
+            other{"Arúba Flọ́rin"}
+        }
+        AZN{
+            one{"Azẹrbaiján mánat"}
+            other{"Azẹrbaiján mánats"}
+        }
+        BAM{
+            one{"Bọ́sniá an Hẹzẹgovína Mak Wé Pẹ́sin Fít Chenj"}
+            other{"Bọ́sniá an Hẹzẹgovína Mak Wé Pẹ́sin Fít Chenj"}
+        }
+        BBD{
+            one{"Barbédọs Dọ́la"}
+            other{"Barbédọs Dọ́la"}
+        }
+        BDT{
+            one{"Bangladẹ́sh táka"}
+            other{"Bangladẹ́sh táka"}
+        }
+        BGN{
+            one{"Bọlgériá Lẹv"}
+            other{"Bọlgériá Lẹv"}
+        }
+        BHD{
+            one{"Baréin dínar"}
+            other{"Baréin dínars"}
+        }
+        BIF{
+            one{"Burúndí frank"}
+            other{"Burúndí franks"}
+        }
+        BMD{
+            one{"Bẹmiúda Dọ́la"}
+            other{"Bẹmiúda Dọ́la"}
+        }
+        BND{
+            one{"Brunẹí dọ́la"}
+            other{"Brunẹí dọ́las"}
+        }
+        BOB{
+            one{"Bolíviá Boliviáno"}
+            other{"Bolíviá Boliviáno"}
+        }
+        BRL{
+            one{"Brazíl Rẹal"}
+            other{"Brazíl Rẹal"}
+        }
+        BSD{
+            one{"Bahámas Dọ́la"}
+            other{"Bahámas Dọ́la"}
+        }
+        BTN{
+            one{"Bután ngúltrum"}
+            other{"Bután ngúltrums"}
+        }
+        BWP{
+            one{"Botswáná púla"}
+            other{"Botswáná púlas"}
+        }
+        BYN{
+            one{"Bẹlarús Rúbul"}
+            other{"Bẹlarús Rúbul"}
+        }
+        BZD{
+            one{"Bẹliz Dọ́la"}
+            other{"Bẹliz Dọ́la"}
+        }
+        CAD{
+            one{"Kánádá Dọ́la"}
+            other{"Kánádá Dọ́la"}
+        }
+        CDF{
+            one{"Kóngó frank"}
+            other{"Kóngó franks"}
+        }
+        CHF{
+            one{"Swís Frank"}
+            other{"Swís Frank"}
+        }
+        CLP{
+            one{"Chílí Pẹ́so"}
+            other{"Chílí Pẹ́so"}
+        }
+        CNH{
+            one{"Chaíná yuan (ples-dẹm aúsaíd chaína)"}
+            other{"Chaíná yuans (ples-dẹm aúsaíd chaína)"}
+        }
+        CNY{
+            one{"Chaíná yuan"}
+            other{"Chaíná yuans"}
+        }
+        COP{
+            one{"Kolómbiá pẹ́so"}
+            other{"Kolómbiá pẹ́sos"}
+        }
+        CRC{
+            one{"Kósta Ríka Kólọn"}
+            other{"Kósta Ríka Kólọn"}
+        }
+        CUC{
+            one{"Kiúbá Pẹ́so Wé Pẹ́sin Fít Chenj"}
+            other{"Kiúbá Pẹ́so Wé Pẹ́sin Fít Chenj"}
+        }
+        CUP{
+            one{"Kiúbá Pẹ́so"}
+            other{"Kiúbá Pẹ́so"}
+        }
+        CVE{
+            one{"Kép Vẹ́d ẹskúdo"}
+            other{"Kép Vẹ́d ẹskúdos"}
+        }
+        CZK{
+            one{"Chẹ́k Kórúna"}
+            other{"Chẹ́k Kórúna"}
+        }
+        DJF{
+            one{"Jibútí frank"}
+            other{"Jibútí franks"}
+        }
+        DKK{
+            one{"Dẹ́nmák Króna"}
+            other{"Dẹ́nmák Króna"}
+        }
+        DOP{
+            one{"Dọmíníkan Pẹ́so"}
+            other{"Dọmíníkan Pẹ́so"}
+        }
+        DZD{
+            one{"Aljíria Dínar"}
+            other{"Aljíria Dínar"}
+        }
+        EGP{
+            one{"Íjípt Paund"}
+            other{"Íjípt Paund"}
+        }
+        ERN{
+            one{"Ẹritrẹá nákfa"}
+            other{"Ẹritrẹá nákfas"}
+        }
+        ETB{
+            one{"Ẹtiópiá berr"}
+            other{"Ẹtiópiá berrs"}
+        }
+        EUR{
+            one{"eúro"}
+            other{"eúros"}
+        }
+        FJD{
+            one{"Fíjí dọ́la"}
+            other{"Fíjí dọ́las"}
+        }
+        FKP{
+            one{"Fọlkland Aílands paund"}
+            other{"Fọlkland Aílands paunds"}
+        }
+        GBP{
+            one{"Brítísh Páund"}
+            other{"Brítísh Páund"}
+        }
+        GEL{
+            one{"Jọ́jiá lári"}
+            other{"Jọ́jiá láris"}
+        }
+        GHS{
+            one{"Ganá sídi"}
+            other{"Ganá sídis"}
+        }
+        GIP{
+            one{"Jibrọ́lta Páund"}
+            other{"Jibrọ́lta Páund"}
+        }
+        GMD{
+            one{"Gámbiá dalási"}
+            other{"Gámbiá dalásis"}
+        }
+        GNF{
+            one{"Gíní frank"}
+            other{"Gíní franks"}
+        }
+        GTQ{
+            one{"Guátẹmála Kwuẹ́tzal"}
+            other{"Guátẹmála Kwuẹ́tzal"}
+        }
+        GYD{
+            one{"Giyána dọ́la"}
+            other{"Giyána dọ́las"}
+        }
+        HKD{
+            one{"Họng Kọ́ng dọ́la"}
+            other{"Họng Kọ́ng dọ́las"}
+        }
+        HNL{
+            one{"Họndúrán Lẹmpíra"}
+            other{"Họndúrán Lẹmpíra"}
+        }
+        HRK{
+            one{"Kroéshia Kúna"}
+            other{"Kroéshia Kúna"}
+        }
+        HTG{
+            one{"Haíti Gourd"}
+            other{"Haíti Gourd"}
+        }
+        HUF{
+            one{"Họngériá Fọ́rint"}
+            other{"Họngériá Fọ́rint"}
+        }
+        IDR{
+            one{"Indoníshiá rupia"}
+            other{"Indoníshiá rupias"}
+        }
+        ILS{
+            one{"Ízrẹ́l niú shẹ́kẹl"}
+            other{"Ízrẹ́l niú shẹ́kẹls"}
+        }
+        INR{
+            one{"Índiá rúpi"}
+            other{"Índiá rúpis"}
+        }
+        IQD{
+            one{"Irák dínar"}
+            other{"Irák dínars"}
+        }
+        IRR{
+            one{"Irán rial"}
+            other{"Irán rials"}
+        }
+        ISK{
+            one{"Aíslánd Króna"}
+            other{"Aíslánd Króna"}
+        }
+        JMD{
+            one{"Jamaíka Dọla"}
+            other{"Jamaíka Dọla"}
+        }
+        JOD{
+            one{"Jọ́dán dínar"}
+            other{"Jọ́dán dínars"}
+        }
+        JPY{
+            one{"Japán yẹn"}
+            other{"Japán yẹns"}
+        }
+        KES{
+            one{"Kẹ́nyá shílin"}
+            other{"Kẹ́nyá shílins"}
+        }
+        KGS{
+            one{"Kẹjístan som"}
+            other{"Kẹjístan soms"}
+        }
+        KHR{
+            one{"Kambódiá riẹl"}
+            other{"Kambódiá riẹls"}
+        }
+        KMF{
+            one{"Kọ́mọ́ros frank"}
+            other{"Kọ́mọ́ros franks"}
+        }
+        KPW{
+            one{"Nọ́t Koriá wọn"}
+            other{"Nọ́t Koriá wọns"}
+        }
+        KRW{
+            one{"Saút Koriá wọn"}
+            other{"Saút Koriá wọns"}
+        }
+        KWD{
+            one{"Kuwét dínar"}
+            other{"Kuwét dínars"}
+        }
+        KYD{
+            one{"Kéman Aílands Dọla"}
+            other{"Kéman Aílands Dọla"}
+        }
+        KZT{
+            one{"Kazakstan tẹ́nj"}
+            other{"Kazakstan tẹ́njs"}
+        }
+        LAK{
+            one{"Laós kip"}
+            other{"Laós kips"}
+        }
+        LBP{
+            one{"Lẹ́bánọ́n paund"}
+            other{"Lẹ́bánọ́n paunds"}
+        }
+        LKR{
+            one{"Sri Lánká rúpi"}
+            other{"Sri Lánká rúpis"}
+        }
+        LRD{
+            one{"Laibẹ́riá dọ́la"}
+            other{"Laibẹ́riá dọ́las"}
+        }
+        LYD{
+            one{"Líbia Dínar"}
+            other{"Líbia Dínar"}
+        }
+        MAD{
+            one{"Morọko Dírham"}
+            other{"Morọko Dírham"}
+        }
+        MDL{
+            one{"Mọldóva Lu"}
+            other{"Mọldóva Lu"}
+        }
+        MGA{
+            one{"Malagásí ariári"}
+            other{"Malagásí ariáris"}
+        }
+        MKD{
+            one{"Masẹdónia Dínar"}
+            other{"Masẹdónia Dínar"}
+        }
+        MMK{
+            one{"Miánmá kiat"}
+            other{"Miánmá kiats"}
+        }
+        MNT{
+            one{"Mọngóliá túgrik"}
+            other{"Mọngóliá túgriks"}
+        }
+        MOP{
+            one{"Makáo pátáka"}
+            other{"Makáo pátákas"}
+        }
+        MRU{
+            one{"Mọriténiá uguíya"}
+            other{"Mọriténiá uguíyas"}
+        }
+        MUR{
+            one{"Mọríshọ́s rúpi"}
+            other{"Mọríshọ́s rúpis"}
+        }
+        MVR{
+            one{"Mọ́ldívs rúfíya"}
+            other{"Mọ́ldívs rúfíyas"}
+        }
+        MWK{
+            one{"Maláwi ́kwácha"}
+            other{"Maláwí kwáchas"}
+        }
+        MXN{
+            one{"Mẹ́ksíko Pẹ́so"}
+            other{"Mẹ́ksíko Pẹ́so"}
+        }
+        MYR{
+            one{"Maléshiá ríngit"}
+            other{"Maléshiá ríngits"}
+        }
+        MZN{
+            one{"Mozámbík métíkal"}
+            other{"Mozámbík métíkals"}
+        }
+        NAD{
+            one{"Namíbiá dọ́la"}
+            other{"Namíbiá dọ́las"}
+        }
+        NGN{
+            one{"Naijíriá naíra"}
+            other{"Naijíriá naíras"}
+        }
+        NIO{
+            one{"Nikarágwua Kordóba"}
+            other{"Nikarágwua Kordóba"}
+        }
+        NOK{
+            one{"Nọ́wé Króna"}
+            other{"Nọ́wé Króna"}
+        }
+        NPR{
+            one{"Nẹ́pál rúpi"}
+            other{"Nẹ́pál rúpis"}
+        }
+        NZD{
+            one{"Niú Zílánd dọ́la"}
+            other{"Niú Zílánd dọ́las"}
+        }
+        OMR{
+            one{"Omán rial"}
+            other{"Omán rials"}
+        }
+        PAB{
+            one{"Pánáma Balbóa"}
+            other{"Pánáma Balbóa"}
+        }
+        PEN{
+            one{"Pẹrúvián Sol"}
+            other{"Pẹrúvián Sol"}
+        }
+        PGK{
+            one{"Pápuá Niú Gíni kína"}
+            other{"Pápuá Niú Gíni kínas"}
+        }
+        PHP{
+            one{"Fílípíns píso"}
+            other{"Fílípíns písos"}
+        }
+        PKR{
+            one{"Pakístán rúpi"}
+            other{"Pakístán rúpis"}
+        }
+        PLN{
+            one{"Pólánd Zílọ́ti"}
+            other{"Pólánd Zílọ́ti"}
+        }
+        PYG{
+            one{"Páragwuá Guaráni"}
+            other{"Páragwuá Guaráni"}
+        }
+        QAR{
+            one{"Kata ríal"}
+            other{"Kata ríals"}
+        }
+        RON{
+            one{"Roméniá Lu"}
+            other{"Roméniá Lu"}
+        }
+        RSD{
+            one{"Sẹrbia Dínar"}
+            other{"Sẹrbia Dínar"}
+        }
+        RUB{
+            one{"Rọ́shiá Rúbul"}
+            other{"Rọ́shiá Rúbul"}
+        }
+        RWF{
+            one{"Ruwándá frank"}
+            other{"Ruwándá franks"}
+        }
+        SAR{
+            one{"Saúdí Arébiá riyal"}
+            other{"Saúdí Arébiá riyals"}
+        }
+        SBD{
+            one{"Sólómọ́n Aílands dọ́la"}
+            other{"Sólómọ́n Aílands dọ́las"}
+        }
+        SCR{
+            one{"Sẹ́chẹ́ls rúpi"}
+            other{"Sẹ́chẹ́ls rúpis"}
+        }
+        SDG{
+            one{"Sudan Paund"}
+            other{"Sudan Paund"}
+        }
+        SEK{
+            one{"Swídẹ́n Króna"}
+            other{"Swídẹ́n Króna"}
+        }
+        SGD{
+            one{"Singapọ́ dọ́la"}
+            other{"Singapọ́ dọ́las"}
+        }
+        SHP{
+            one{"Sent Hẹlẹ́ná paund"}
+            other{"Sent Hẹlẹ́ná paunds"}
+        }
+        SLL{
+            one{"Siẹ́ra Líoniá liọn"}
+            other{"Siẹ́ra Líoniá liọns"}
+        }
+        SOS{
+            one{"Sọmáliá shílin"}
+            other{"Sọmáliá shílins"}
+        }
+        SRD{
+            one{"Súrínám Dọla"}
+            other{"Súrínám Dọla"}
+        }
+        SSP{
+            one{"Saút Sudán paund"}
+            other{"Saút Sudán paunds"}
+        }
+        STN{
+            one{"Sao Tómẹ & Prínsípẹ dóbra"}
+            other{"Sao Tómẹ & Prínsípẹ dóbras"}
+        }
+        SYP{
+            one{"Síriá paund"}
+            other{"Síriá paunds"}
+        }
+        SZL{
+            one{"Swází lilánjẹ́ni"}
+            other{"Swází ẹmalánjẹ́ni"}
+        }
+        THB{
+            one{"Taílánd baht"}
+            other{"Taílánd bahts"}
+        }
+        TJS{
+            one{"Tajíkstan sómóni"}
+            other{"Tajíkstan sómónis"}
+        }
+        TMT{
+            one{"Tọkmẹ́nístán mánat"}
+            other{"Tọkmẹ́nístán mánats"}
+        }
+        TND{
+            one{"Tuníshia Dínar"}
+            other{"Tuníshia Dínar"}
+        }
+        TOP{
+            one{"Tónga pánga"}
+            other{"Tónga pángas"}
+        }
+        TRY{
+            one{"Tọ́kí líra"}
+            other{"Tọ́kí líras"}
+        }
+        TTD{
+            one{"Trínídad & Tobágo Dọ́la"}
+            other{"Trínídad & Tobágo Dọ́la"}
+        }
+        TWD{
+            one{"Niú Taiwán dọ́la"}
+            other{"Niú Taiwán dọ́las"}
+        }
+        TZS{
+            one{"Tanzániá shílin"}
+            other{"Tanzániá shílins"}
+        }
+        UAH{
+            one{"Yukrẹín Rívnia"}
+            other{"Yukrẹín Rívnia"}
+        }
+        UGX{
+            one{"Yugándá shílin"}
+            other{"Yugándá shílins"}
+        }
+        USD{
+            one{"US Dọ́la"}
+            other{"Amẹ́ríká Dọ́la"}
+        }
+        UYU{
+            one{"Yurugwaí Pẹ́so"}
+            other{"Yurugwaí Pẹ́so"}
+        }
+        UZS{
+            one{"Uzbẹ́kistan som"}
+            other{"Uzbẹ́kistan soms"}
+        }
+        VES{
+            one{"Vẹnẹzuẹlá Bolívar"}
+            other{"Vẹnẹzuẹlá Bolívar"}
+        }
+        VND{
+            one{"Viẹ́tnám dọng"}
+            other{"Viẹ́tnám dọngs"}
+        }
+        VUV{
+            one{"Vanuátú vátu"}
+            other{"Vanuátú vátus"}
+        }
+        WST{
+            one{"Samóa tála"}
+            other{"Samóa tálas"}
+        }
+        XAF{
+            one{"Sẹ́ntrál Áfríká frank"}
+            other{"Sẹ́ntrál Áfríká franks"}
+        }
+        XCD{
+            one{"Íst Karíbián Dọla"}
+            other{"Íst Karíbián Dọla"}
+        }
+        XOF{
+            one{"Wẹ́st Afríká Sẹ́fa frank"}
+            other{"Wẹ́st Afríká Sẹ́fa franks"}
+        }
+        XPF{
+            one{"Frẹ́nch Poliníshiá frank"}
+            other{"Frẹ́nch Poliníshiá franks"}
+        }
+        XXX{
+            one{"Amaúnt dẹm raít fọ mọní wé pípol nọ no"}
+            other{"(mọní wé pípol nọ no)"}
+        }
+        YER{
+            one{"Yẹ́mẹ́n rial"}
+            other{"Yẹ́mẹ́n rials"}
+        }
+        ZAR{
+            one{"Saút Áfríká rand"}
+            other{"Saút Áfríká rands"}
+        }
+        ZMW{
+            one{"Zámbiá kwácha"}
+            other{"Zámbiá kwáchas"}
+        }
+    }
+    CurrencyUnitPatterns{
+        one{"{0} {1}"}
+        other{"{0} {1}"}
+    }
+}

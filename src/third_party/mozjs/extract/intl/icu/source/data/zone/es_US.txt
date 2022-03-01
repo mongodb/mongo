@@ -1,0 +1,147 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_US{
+    %%Parent{"es_419"}
+    zoneStrings{
+        "America:Fort_Nelson"{
+            ec{"Fort Nelson"}
+        }
+        "America:Nassau"{
+            ec{"Nassau"}
+        }
+        "America:St_Thomas"{
+            ec{"St. Thomas"}
+        }
+        "Asia:Pyongyang"{
+            ec{"Piongyang"}
+        }
+        "Europe:Astrakhan"{
+            ec{"Astrakhan"}
+        }
+        "Europe:Kirov"{
+            ec{"Kirov"}
+        }
+        "Europe:Ulyanovsk"{
+            ec{"Ulyanovsk"}
+        }
+        "Pacific:Honolulu"{
+            ec{"Honolulu"}
+            sd{"HDT"}
+            sg{"HST"}
+            ss{"HST"}
+        }
+        "Pacific:Wake"{
+            ec{"Wake"}
+        }
+        "meta:Alaska"{
+            sd{"AKDT"}
+            sg{"AKT"}
+            ss{"AKST"}
+        }
+        "meta:America_Central"{
+            sd{"CDT"}
+            sg{"CT"}
+            ss{"CST"}
+        }
+        "meta:America_Eastern"{
+            sd{"EDT"}
+            sg{"ET"}
+            ss{"EST"}
+        }
+        "meta:America_Mountain"{
+            ld{"hora de verano de las Montañas Rocosas"}
+            lg{"hora de las Montañas Rocosas"}
+            ls{"hora estándar de las Montañas Rocosas"}
+            sd{"MDT"}
+            sg{"MT"}
+            ss{"MST"}
+        }
+        "meta:America_Pacific"{
+            sd{"PDT"}
+            sg{"PT"}
+            ss{"PST"}
+        }
+        "meta:Apia"{
+            ld{"hora de verano de Apia"}
+            lg{"hora de Apia"}
+            ls{"hora estándar de Apia"}
+        }
+        "meta:Atlantic"{
+            sd{"ADT"}
+            sg{"AT"}
+            ss{"AST"}
+        }
+        "meta:Chamorro"{
+            ls{"hora de Chamorro"}
+        }
+        "meta:Cocos"{
+            ls{"hora de las Islas Cocos"}
+        }
+        "meta:Cook"{
+            ld{"hora de verano media de las Islas Cook"}
+            lg{"hora de las Islas Cook"}
+            ls{"hora estándar de las Islas Cook"}
+        }
+        "meta:Easter"{
+            ld{"hora de verano de la isla de Pascua"}
+            lg{"hora de la isla de Pascua"}
+            ls{"hora estándar de la isla de Pascua"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"hora de verano de Europa oriental"}
+            lg{"hora de Europa oriental"}
+            ls{"hora estándar de Europa oriental"}
+        }
+        "meta:Europe_Further_Eastern"{
+            ls{"hora del extremo oriental de Europa"}
+        }
+        "meta:Europe_Western"{
+            ld{"hora de verano de Europa occidental"}
+            lg{"hora de Europa occidental"}
+            ls{"hora estándar de Europa occidental"}
+        }
+        "meta:Falkland"{
+            ld{"hora de verano de las islas Malvinas"}
+            lg{"hora de las islas Malvinas"}
+            ls{"hora estándar de las islas Malvinas"}
+        }
+        "meta:Gilbert_Islands"{
+            ls{"hora de las islas Gilbert"}
+        }
+        "meta:Hawaii_Aleutian"{
+            sd{"HADT"}
+            sg{"HAT"}
+            ss{"HAST"}
+        }
+        "meta:Indian_Ocean"{
+            ls{"hora del Océano Índico"}
+        }
+        "meta:Macquarie"{
+            ls{"hora de la isla Macquarie"}
+        }
+        "meta:Marquesas"{
+            ls{"hora de las islas Marquesas"}
+        }
+        "meta:Marshall_Islands"{
+            ls{"hora de las Islas Marshall"}
+        }
+        "meta:Norfolk"{
+            ld{"hora de verano de la isla Norfolk"}
+            lg{"hora de la isla Norfolk"}
+            ls{"hora estándar de la isla Norfolk"}
+        }
+        "meta:Phoenix_Islands"{
+            ls{"hora de las islas Fénix"}
+        }
+        "meta:Pyongyang"{
+            ls{"hora de Pyongyang"}
+        }
+        "meta:Solomon"{
+            ls{"hora de las Islas Salomón"}
+        }
+        "meta:Wake"{
+            ls{"hora de la isla Wake"}
+        }
+    }
+}

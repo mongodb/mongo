@@ -1,0 +1,101 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+sr_Latn_BA{
+    units{
+        compound{
+            1024p8{"jobi{0}"}
+        }
+        duration{
+            century{
+                dnam{"vijekovi"}
+                few{"{0} vijeka"}
+                one{"{0} vijek"}
+                other{"{0} vijekova"}
+            }
+            month{
+                dnam{"mjeseci"}
+                few{"{0} mjeseca"}
+                one{"{0} mjesec"}
+                other{"{0} mjeseci"}
+                per{"{0} mjesečno"}
+            }
+            week{
+                dnam{"nedjelje"}
+                few{"{0} nedjelje"}
+                one{"{0} nedjelja"}
+                other{"{0} nedjelja"}
+                per{"{0} nedjeljno"}
+            }
+        }
+        length{
+            light-year{
+                dnam{"svjetlosne godine"}
+                few{"{0} svjetlosne godine"}
+                one{"{0} svjetlosna godina"}
+                other{"{0} svjetlosnih godina"}
+            }
+        }
+        mass{
+            grain{
+                dnam{"gran"}
+                few{"{0} grana"}
+                one{"{0} gran"}
+                other{"{0} granova"}
+            }
+        }
+    }
+    unitsNarrow{
+        volume{
+            barrel{
+                dnam{"bbl"}
+                few{"{0} bbl"}
+                one{"{0}bbl"}
+                other{"{0}bbl"}
+            }
+            dessert-spoon{
+                dnam{"d. kaš."}
+                few{"{0} d. kaš."}
+                one{"{0} d. kaš."}
+                other{"{0} d. kaš."}
+            }
+            dessert-spoon-imperial{
+                dnam{"i. d. k."}
+                few{"{0} i. d. k."}
+                one{"{0} i. d. k."}
+                other{"{0} i. d. k."}
+            }
+        }
+    }
+    unitsShort{
+        duration{
+            month{
+                dnam{"mjeseci"}
+                few{"{0} mjes."}
+                one{"{0} mjes."}
+                other{"{0} mjes."}
+            }
+        }
+        length{
+            light-year{
+                dnam{"svjetlosne god."}
+            }
+        }
+        mass{
+            grain{
+                dnam{"gran"}
+                few{"{0} grana"}
+                one{"{0} gran"}
+                other{"{0} granova"}
+            }
+        }
+        volume{
+            dessert-spoon{
+                dnam{"dstspn"}
+                few{"{0} dstspn"}
+                one{"{0} dstspn"}
+                other{"{0} dstspn"}
+            }
+        }
+    }
+}

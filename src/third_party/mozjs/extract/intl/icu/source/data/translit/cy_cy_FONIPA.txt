@@ -1,0 +1,196 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: cy_cy_FONIPA.txt
+# Generated from CLDR
+#
+
+# Transformation from Welsh (cy) to its IPA transcription (cy_FONIPA).
+# Based on description of Northern Welsh in:
+#
+# http://en.wikipedia.org/wiki/Welsh_orthography
+# http://en.wikipedia.org/wiki/Welsh_phonology
+#
+# Note that these rules are NOT complete: to be complete we would have to know
+# the morphological analysis of the word. For example, final ‹au› is pronounced
+# /a/ if it is the noun plural marker, otherwise it is /aɨ/. Similarly in
+# “llongyfarch” (‘congratulating’), the morphological decomposition — “llon +
+# cyfarch” — is needed to know that the ‹ng› is pronounced as /ŋg/, not as
+# /ŋ/.
+#
+# Author: Richard Sproat
+::Lower;
+::NFC;
+[’ [:P:]] → ;
+# Class definitions
+$end = [$ ];
+# Both orthographic and phonetic vowels
+$vowel = [aeiouwyâêîôûŵŷɑɨəɛɪɔʊ];
+# W is a placeholder for the glide -- see below
+$cons = [
+m {m\u0325} n {n\u0325} ŋ {ŋ\u030A}
+p b t d k ɡ
+f v θ ð s ʃ h χ
+l ɬ r {r\u0325}
+{d\u0361ʒ} g W w j
+];
+# Preprocessing of letters that sometimes occur
+k → c;
+v → f;
+x → s;
+z → s;
+::Null;
+# Consonant transductions:
+# Trigraphs
+ngh → ŋ\u030A;
+# Digraphs
+ch → χ;
+dd → ð;
+ff → f;
+ll → ɬ;
+mh → m\u0325;
+nh → n\u0325;
+ng → ŋ;
+ph → f;
+rh → r\u0325;
+th → θ;
+# Monographs
+b → b;
+c → k;
+d → d;
+f → v;
+g → ɡ;
+h → h;
+j → d\u0361ʒ;   # Loan words
+l → l;
+m → m;
+n → n;
+p → p;
+r → r;
+s → s;
+t → t;
+::Null;
+# Transduce ‹si› to /ʃ/ before vowels
+si} $vowel → ʃ;
+::Null;
+# Treatment of glides.
+# First transduce ‹i›, ‹w› to glides prior to vowels. With ‹w› we want to
+# do this also before /r,l/ after /ɡ/ (from Proto-Celtic *w) e.g. “gwlad”,
+# “gwraig”. However the “after g” environment must allow for the following
+# possibilities:
+#
+# ɡ → ŋ via nasal mutation
+# ɡ → 0 via soft mutation
+{i} $vowel → j;
+{w} $vowel → W; # Temporary register
+[ɡŋ] {w} [rl] $vowel → W;   # Plain or nasal mutation environment
+^ {w} [rl] $vowel → W;      # Soft mutation at the beginning of a word
+# Transduce accented ‹ẃ› to ‹w›: this is used to indicate when a ‹w› that would
+# normally be expected to be a glide, is instead a vowel:
+ẃ → w;
+::Null;
+# Stress placement, needed for vowel quality/quantity prediction
+# Basic rule of stress in Welsh is to place it on the penult,
+# except of course in monosyllables.
+{($vowel+ $cons+ $vowel+ $cons*)} $end → ˈ $1;  ## Polysyllabic words
+$end $cons* {($vowel+ $cons*)} $end → ˈ $1;     ## Monosyllabic words
+::Null;
+# Transduction of vowels
+# The first rule above overgenerates streams of stress marks. The rule below
+# cleans that up.
+ˈ+ → ˈ;
+# Diphthongs
+# Deal with ‹y› first since we also need to lengthen the /ɨ/ if that is in the
+# correct environment for lengthening.
+# ‹y› is /ɨ/ in final syllable, otherwise /ə/
+yw } $cons* $end → ɨu;
+yw → əu;
+y} $cons* $end → ɨ;
+y → ə;
+::Null;
+# Diphthongs in long environment
+# Final, or before word-final s
+ˈ { ɨu } s? $end → ɨːu;
+ˈ { aw } s? $end → ɑːu;
+ˈ { ew } s? $end → eːu;
+ˈ { oe } s? $end → ɔːɨ;
+ˈ { ou } s? $end → ɔːɨ;
+ˈ { wy } s? $end → uːɨ;
+# before b, ch, d, dd, g, f, ff, th followed by the end of a word
+# or a vowel
+ˈ { ɨu } [bχdðɡvfθ] $end → ɨːu;
+ˈ { aw } [bχdðɡvfθ] $end → ɑːu;
+ˈ { ew } [bχdðɡvfθ] $end → eːu;
+ˈ { oe } [bχdðɡvfθ] $end → ɔːɨ;
+ˈ { ou } [bχdðɡvfθ] $end → ɔːɨ;
+ˈ { wy } [bχdðɡvfθ] $end → uːɨ;
+ˈ { ɨu } [bχdðɡvfθ] $vowel → ɨːu;
+ˈ { aw } [bχdðɡvfθ] $vowel → ɑːu;
+ˈ { ew } [bχdðɡvfθ] $vowel → eːu;
+ˈ { oe } [bχdðɡvfθ] $vowel → ɔːɨ;
+ˈ { ou } [bχdðɡvfθ] $vowel → ɔːɨ;
+ˈ { wy } [bχdðɡvfθ] $vowel → uːɨ;
+# Diphthongs in other environments
+ae → ɑːɨ;
+ai → ai;
+au → aɨ; ## As plural ending /a/, but we can't predict this
+aw → au;
+ei → əi;
+eu → əɨ;
+ew → ɛu;
+ey → əɨ;
+iw → ɪu;
+oe → ɔɨ;
+oi → ɔi;
+ou → ɔɨ;
+uw → ɨu;
+wy → ʊɨ;
+# Long environments
+# Final, or before word-final s
+ˈ { ɨ } s? $end → ɨː;
+ˈ { a } s? $end → ɑː;
+ˈ { e } s? $end → eː;
+ˈ { i } s? $end → iː;
+ˈ { o } s? $end → oː;
+ˈ { u } s? $end → ɨː;
+ˈ { w } s? $end → uː;
+# before b, ch, d, dd, g, f, ff, th followed by the end of a word
+# or a vowel
+ˈ { ɨ } [bχdðɡvfθ] $end → ɨː;
+ˈ { a } [bχdðɡvfθ] $end → ɑː;
+ˈ { e } [bχdðɡvfθ] $end → eː;
+ˈ { i } [bχdðɡvfθ] $end → iː;
+ˈ { o } [bχdðɡvfθ] $end → oː;
+ˈ { u } [bχdðɡvfθ] $end → ɨː;
+ˈ { w } [bχdðɡvfθ] $end → uː;
+ˈ { ɨ } [bχdðɡvfθ] $vowel → ɨː;
+ˈ { a } [bχdðɡvfθ] $vowel → ɑː;
+ˈ { e } [bχdðɡvfθ] $vowel → eː;
+ˈ { i } [bχdðɡvfθ] $vowel → iː;
+ˈ { o } [bχdðɡvfθ] $vowel → oː;
+ˈ { u } [bχdðɡvfθ] $vowel → ɨː;
+ˈ { w } [bχdðɡvfθ] $vowel → uː;
+# Short environments
+a → a;
+e → ɛ;
+i → ɪ;
+o → ɔ;
+u → ɨ\u031E;
+w → ʊ;
+::Null;
+W → w;
+# Finally, deal with vowels that are marked as long with a circumflex
+# (“to bach”). Do this last because we don't want the other vowel
+# changes messing this up.
+â → ɑː;
+ê → eː;
+î → iː;
+ô → oː;
+û → ɨː;
+ŵ → uː;
+ŷ → ɨː;
+::Null;
+# Move IPA stress marker to start of syllable.
+([$cons w] [l ɬ r {r\u0325}]? j? w?) ˈ → ˈ $1;
+

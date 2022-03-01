@@ -1,0 +1,39 @@
+// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+
+{
+    "cldrVersion": "39",
+    "aliases": {
+        "ars": "ar_SA",
+        "in": "id",
+        "in_ID": "id_ID",
+        "iw": "he",
+        "iw_IL": "he_IL",
+        "mo": "ro",
+        "no_NO": "no",
+        "pa_IN": "pa_Guru_IN",
+        "sh": "sr_Latn",
+        "sh_BA": "sr_Latn_BA",
+        "sh_CS": "sr_Latn_RS",
+        "sh_YU": "sr_Latn_RS",
+        "sr_BA": "sr_Cyrl_BA",
+        "sr_ME": "sr_Cyrl_ME",
+        "sr_RS": "sr_Cyrl_RS",
+        "yue": "zh_Hant",
+        "yue_CN": "zh_Hans",
+        "yue_Hans": "zh_Hans",
+        "yue_Hans_CN": "zh_Hans",
+        "yue_Hant": "zh_Hant",
+        "zh_CN": "zh_Hans_CN",
+        "zh_HK": "zh_Hant_HK",
+        "zh_MO": "zh_Hant_MO",
+        "zh_SG": "zh_Hans_SG",
+        "zh_TW": "zh_Hant_TW"
+    },
+    "parents": {
+        "ff_Adlm": "root",
+        "nb": "no",
+        "nn": "no"
+    }
+}

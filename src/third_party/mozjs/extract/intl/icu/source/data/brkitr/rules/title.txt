@@ -1,0 +1,26 @@
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+#
+# Copyright (c) 2002-2015, International Business Machines Corporation and
+# others. All Rights Reserved.
+#
+#  Title Casing Break Rules
+#
+
+!!quoted_literals_only;
+
+$CaseIgnorable   = [[:Mn:][:Me:][:Cf:][:Lm:][:Sk:] \u0027 \u00AD \u2019];
+$Cased           = [[:Upper_Case:][:Lower_Case:][:Lt:]  - $CaseIgnorable];
+$NotCased        = [[^ $Cased] - $CaseIgnorable];
+
+#  If the iterator begins on a CaseIgnorable, advance it past it/them.
+#  This can occur at the start-of-text, or after application of the
+#  safe-reverse rule.
+
+($CaseIgnorable | $NotCased)*;
+
+#   Normal exact forward rule: beginning at the start of a word
+#         (at a cased character), advance through the word and through
+#         the uncased characters following the word.
+
+$Cased ($Cased | $CaseIgnorable)* ($NotCased | $CaseIgnorable)*;

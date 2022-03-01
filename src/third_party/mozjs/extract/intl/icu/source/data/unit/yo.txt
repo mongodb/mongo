@@ -1,0 +1,376 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+yo{
+    durationUnits{
+        hm{"h:mm"}
+        hms{"h:mm:ss"}
+        ms{"m:ss"}
+    }
+    units{
+        compound{
+            1024p1{"kibi{0}"}
+            1024p2{"mẹ́bì {0}"}
+            1024p3{"gíbí {0}"}
+            1024p4{"tẹbi {0}"}
+            1024p5{"pẹbi {0}"}
+            1024p6{"ẹ́síbì {0}"}
+            1024p7{"sẹ́bì {0}"}
+            1024p8{"yóòbù {0}"}
+        }
+        concentr{
+            permille{
+                other{"{0} ìdákan nínú ẹgbẹ̀rún"}
+            }
+        }
+        digital{
+            bit{
+                dnam{"àwọ́n bíìtì"}
+                other{"{0} àwọ́n bíìtì"}
+            }
+            byte{
+                dnam{"àwọ́n báìtì"}
+                other{"{0} àwọ́n báìtì"}
+            }
+            gigabit{
+                dnam{"àwọn gígábíìtì"}
+                other{"{0} àwọn gígábíìtì"}
+            }
+            gigabyte{
+                dnam{"àwọn gígábáìtì"}
+                other{"{0} àwọn gígábáìtì"}
+            }
+            kilobit{
+                dnam{"àwọn kílóbíìtì"}
+                other{"{0} àwọ́n kílóbíìtì"}
+            }
+            kilobyte{
+                dnam{"àwọn kílóbáìtì"}
+                other{"{0} àwọn kílóbáìtì"}
+            }
+            megabit{
+                dnam{"àwọn mégábíìtì"}
+                other{"{0} àwọn mégábíìtì"}
+            }
+            megabyte{
+                dnam{"àwọn mégábáìtì"}
+                other{"{0} àwọn mégábáìtì"}
+            }
+            petabyte{
+                dnam{"àwọn pẹ́tábáìtì"}
+                other{"{0} àwọn pẹ́tábáìtì"}
+            }
+            terabit{
+                dnam{"àwọn tẹ́rábíìtì"}
+                other{"{0} àwọn tẹ́rábíìtì"}
+            }
+            terabyte{
+                dnam{"àwọn tẹ́rábáìtì"}
+                other{"{0} àwọn tẹ́rábáìtì"}
+            }
+        }
+        duration{
+            century{
+                dnam{"ọ̀rúndún"}
+                other{"ọ̀rúndún {0}"}
+            }
+            day{
+                dnam{"ọjọ́"}
+                other{"ọj {0}"}
+                per{"{0}/ọj"}
+            }
+            decade{
+                dnam{"ẹ̀wádùn"}
+                other{"ẹ̀wádùn {0}"}
+            }
+            hour{
+                dnam{"wkt"}
+                other{"{0} wkt"}
+                per{"{0}/wkt"}
+            }
+            minute{
+                dnam{"ìṣ"}
+                other{"{0} ìṣ"}
+                per{"{0}/ìṣ"}
+            }
+            month{
+                dnam{"oṣù"}
+                other{"{0} oṣù"}
+                per{"{0}/oṣù"}
+            }
+            second{
+                dnam{"ìṣ àáy"}
+                other{"{0}ìṣ àáy"}
+                per{"{0}/ìṣ àáy"}
+            }
+            week{
+                dnam{"ọṣ"}
+                other{"{0} ọṣ"}
+                per{"{0}/ọṣ"}
+            }
+            year{
+                dnam{"ọ̀dún"}
+                other{"{0} ọd"}
+                per{"{0} ọd"}
+            }
+        }
+        graphics{
+            dot{
+                dnam{"dọ́ọ̀tì"}
+                other{"{0} dọ́ọ̀tì"}
+            }
+        }
+        length{
+            earth-radius{
+                dnam{"ìdinwọ̀n ayé"}
+                other{"{0} ìdinwọ̀n ayé"}
+            }
+        }
+        light{
+            candela{
+                dnam{"kandẹ́là"}
+                other{"{0} kandẹ́là"}
+            }
+            lumen{
+                dnam{"lumẹ́ẹ̀nì"}
+                other{"{0} lumẹ́ẹ̀nì"}
+            }
+        }
+        mass{
+            grain{
+                dnam{"giréènì"}
+                other{"{0} gíréènì"}
+            }
+        }
+        volume{
+            dessert-spoon{
+                dnam{"àmì ṣíbí oúnjẹ́ kékeré"}
+                other{"{0} àmì ṣíbí oúnjẹ́ kékeré"}
+            }
+            dessert-spoon-imperial{
+                dnam{"ṣíbí oúnjẹ kékeré"}
+                other{"{0} àmì oúnjẹ kékeré"}
+            }
+            dram{
+                dnam{"omi dírámù"}
+                other{"{0} àmì omi dírámù"}
+            }
+            drop{
+                dnam{"dírọ́pù"}
+                other{"{0} dírọ́pù"}
+            }
+            jigger{
+                dnam{"jígà"}
+                other{"{0} jígà"}
+            }
+            pinch{
+                dnam{"píńṣì"}
+                other{"{0} píńṣì"}
+            }
+            quart-imperial{
+                dnam{"ìdásímérin"}
+                other{"{0} ìdásímérin"}
+            }
+        }
+    }
+    unitsNarrow{
+        compound{
+            1024p1{"àmì Ki {0}"}
+            1024p2{"àmì Mi {0}"}
+            1024p3{"àmì Gi {0}"}
+            1024p4{"àmì Ti {0}"}
+            1024p5{"àmì Pí {0}"}
+            1024p6{"àmì Ei {0}"}
+            1024p7{"àmì Sí {0}"}
+            1024p8{"àmì Yí {0}"}
+        }
+        duration{
+            day{
+                dnam{"ọjọ́"}
+                other{"ọj {0}"}
+            }
+            hour{
+                dnam{"wkt"}
+                other{"{0} wkt"}
+            }
+            minute{
+                dnam{"ìṣ"}
+                other{"{0}/ìṣ"}
+            }
+            month{
+                dnam{"oṣù"}
+                other{"{0} oṣù"}
+            }
+            second{
+                dnam{"ìṣ àáy"}
+                other{"{0} ìṣ àáy"}
+            }
+            week{
+                dnam{"ọṣẹ́"}
+                other{"{0} ọṣ"}
+            }
+            year{
+                dnam{"ọd"}
+                other{"{0} ọd"}
+            }
+        }
+    }
+    unitsShort{
+        compound{
+            1024p1{"àmì Kí {0}"}
+            1024p2{"àmì Mi {0}"}
+            1024p3{"àmì Gi {0}"}
+            1024p4{"àmì Ti {0}"}
+            1024p5{"àmì Pi {0}"}
+            1024p6{"àmì Ei {0}"}
+            1024p7{"àmì Sí {0}"}
+            1024p8{"àmì {0}"}
+        }
+        concentr{
+            permille{
+                dnam{"ìdákan nínú ẹgbẹ̀rún"}
+                other{"{0} àmì ìdákan"}
+            }
+        }
+        digital{
+            bit{
+                dnam{"bíìtì"}
+                other{"{0} bíìtì"}
+            }
+            byte{
+                dnam{"báìtì"}
+                other{"{0} báìtì"}
+            }
+            gigabit{
+                dnam{"jíbíìtì"}
+                other{"{0}jíbíìtì"}
+            }
+            gigabyte{
+                dnam{"jíbáìtì"}
+                other{"{0} jíbáìtì"}
+            }
+            kilobit{
+                dnam{"kébiì"}
+                other{"{0} kébiì"}
+            }
+            kilobyte{
+                dnam{"kébáìtì"}
+                other{"{0} kébáìtì"}
+            }
+            megabit{
+                dnam{"ẹ́mbíìtì"}
+                other{"{0} ẹ́mbiì"}
+            }
+            megabyte{
+                dnam{"ẹ́mbáìtì"}
+            }
+            petabyte{
+                dnam{"Píbáìtì"}
+                other{"{0} Píbáìtì"}
+            }
+            terabyte{
+                dnam{"Tíbáìtì"}
+                other{"{0} Tíbáìtì"}
+            }
+        }
+        duration{
+            day{
+                dnam{"ọjọ́"}
+                other{"{0} ọj"}
+                per{"{0}/ọj"}
+            }
+            decade{
+                dnam{"ẹ̀wádùn"}
+                other{"ẹ̀wádún {0}"}
+            }
+            hour{
+                dnam{"wkt"}
+                other{"{0} wkt"}
+                per{"{0}/wkt"}
+            }
+            minute{
+                dnam{"ìṣ"}
+                other{"{0} ìṣ"}
+                per{"{0}/ìṣ"}
+            }
+            month{
+                dnam{"oṣù"}
+                other{"{0} oṣù"}
+                per{"{0}/oṣù"}
+            }
+            second{
+                dnam{"ìṣ àáy"}
+                other{"{0} ìṣ àáy"}
+                per{"{0} ìṣ àáy"}
+            }
+            week{
+                dnam{"ọṣ"}
+                other{"{0} ọṣ"}
+                per{"{0}/ọṣẹ̀"}
+            }
+            year{
+                dnam{"ọd"}
+                other{"{0} ọd"}
+                per{"{0}/ọd"}
+            }
+        }
+        graphics{
+            dot{
+                dnam{"dọ́ọ̀tì"}
+                other{"{0} dọ́ọ̀tì"}
+            }
+        }
+        length{
+            earth-radius{
+                dnam{"àmì ìdínwọ̀n ayé"}
+                other{"{0} àmì ìdínwọ̀n ayé"}
+            }
+        }
+        light{
+            candela{
+                dnam{"sídiì"}
+                other{"{0} sídiì"}
+            }
+            lumen{
+                dnam{"àmì lumẹ́ẹ̀nì"}
+                other{"{0} àmi lumẹ́ẹ̀nì"}
+            }
+        }
+        mass{
+            grain{
+                dnam{"gíréènì"}
+                other{"{0} gíréènì"}
+            }
+        }
+        volume{
+            dessert-spoon{
+                dnam{"ṣíbí oúnjẹ́ kékeré"}
+                other{"{0} ṣíbí oúnjẹ́ kékeré"}
+            }
+            dessert-spoon-imperial{
+                dnam{"àmì oúnjẹ kékeré"}
+                other{"{0} àmì oúnjẹ kékeré"}
+            }
+            dram{
+                dnam{"omi dírámù"}
+                other{"{0} àmì omi dírámù"}
+            }
+            drop{
+                dnam{"dírọ́pù"}
+                other{"{0} dírọ́pù"}
+            }
+            jigger{
+                dnam{"jígà"}
+                other{"{0} jígà"}
+            }
+            pinch{
+                dnam{"píńṣì"}
+                other{"{0} píńṣì"}
+            }
+            quart-imperial{
+                dnam{"àmì ìdásímérin"}
+                other{"{0} àmì ìdásímérin"}
+            }
+        }
+    }
+}

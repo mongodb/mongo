@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "gc/Marking.cpp"
+#include "builtin/streams/WritableStreamOperations.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "gc/Marking.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/WritableStreamOperations.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "gc/Marking.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/WritableStreamOperations.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "gc/Memory.cpp"
+#include "builtin/streams/WritableStreamWriterOperations.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "gc/Memory.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "builtin/streams/WritableStreamWriterOperations.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "gc/Memory.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "builtin/streams/WritableStreamWriterOperations.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "gc/Nursery.cpp"
+#include "ds/Bitmap.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "gc/Nursery.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "ds/Bitmap.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "gc/Nursery.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "ds/Bitmap.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "gc/PublicIterators.cpp"
+#include "ds/LifoAlloc.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "gc/PublicIterators.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "ds/LifoAlloc.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "gc/PublicIterators.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "ds/LifoAlloc.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "gc/RootMarking.cpp"
+#include "ds/MemoryProtectionExceptionHandler.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "gc/RootMarking.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "ds/MemoryProtectionExceptionHandler.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "gc/RootMarking.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "ds/MemoryProtectionExceptionHandler.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "gc/Statistics.cpp"
+#include "jsapi.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "gc/Statistics.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "jsapi.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "gc/Statistics.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "jsapi.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

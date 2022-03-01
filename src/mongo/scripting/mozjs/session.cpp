@@ -33,6 +33,8 @@
 
 #include "mongo/scripting/mozjs/session.h"
 
+#include <js/Object.h>
+
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/mozjs/bson.h"
 #include "mongo/scripting/mozjs/implscope.h"
@@ -105,7 +107,7 @@ SessionHolder::TransactionState transactionStateEnum(StringData name) {
 }
 
 SessionHolder* getHolder(JSObject* thisv) {
-    return static_cast<SessionHolder*>(JS_GetPrivate(thisv));
+    return static_cast<SessionHolder*>(JS::GetPrivate(thisv));
 }
 
 SessionHolder* getHolder(JS::CallArgs& args) {
@@ -138,7 +140,7 @@ void endSession(SessionHolder* holder) {
 
 }  // namespace
 
-void SessionInfo::finalize(js::FreeOp* fop, JSObject* obj) {
+void SessionInfo::finalize(JSFreeOp* fop, JSObject* obj) {
     auto holder = getHolder(obj);
 
     if (holder) {
@@ -231,7 +233,7 @@ void SessionInfo::make(JSContext* cx,
     auto scope = getScope(cx);
 
     scope->getProto<SessionInfo>().newObject(obj);
-    JS_SetPrivate(obj, scope->trackedNew<SessionHolder>(std::move(client), std::move(lsid)));
+    JS::SetPrivate(obj, scope->trackedNew<SessionHolder>(std::move(client), std::move(lsid)));
 }
 
 }  // namespace mozjs

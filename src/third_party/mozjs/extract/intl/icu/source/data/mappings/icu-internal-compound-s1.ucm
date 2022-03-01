@@ -1,0 +1,27 @@
+# Copyright (C) 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# *******************************************************************************
+# *
+# *   Copyright (C) 2010, International Business Machines
+# *   Corporation and others.  All Rights Reserved.
+# *
+# *******************************************************************************
+#
+# File created by JDKConverter2UCM.java
+#
+<code_set_name>               icu-internal-compound-s1
+<char_name_mask>              "AXXXX"
+<subchar>                     \x3f
+<uconv_class>                 "SBCS"
+
+CHARMAP
+<U003F> \x3F |2
+<U011E> \xD0 |0
+<U011F> \xF0 |0
+<U0130> \xDD |0
+<U0131> \xFD |0
+<U0218> \xAA |1
+<U0219> \xBA |1
+<U021A> \xDE |1
+<U021B> \xFE |1
+END CHARMAP

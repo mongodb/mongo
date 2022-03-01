@@ -1,0 +1,223 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+es_AR{
+    %%Parent{"es_419"}
+    NumberElements{
+        latn{
+            patterns{
+                accountingFormat{"¤ #,##0.00;(¤ #,##0.00)"}
+                currencyFormat{"¤ #,##0.00"}
+            }
+            symbols{
+                decimal{","}
+                group{"."}
+            }
+        }
+    }
+    calendar{
+        generic{
+            availableFormats{
+                MEd{"E d-M"}
+                yyyyM{"M-y G"}
+            }
+        }
+        gregorian{
+            availableFormats{
+                GyMMMEd{"E, d 'de' MMM 'de' y G"}
+                GyMMMd{"d MMM y G"}
+                Hmsv{"HH:mm:ss v"}
+                Hmsvvvv{"HH:mm:ss (vvvv)"}
+                Hmv{"HH:mm v"}
+                MEd{"E d-M"}
+                hms{"hh:mm:ss"}
+                yM{"M-y"}
+                yMEd{"E, d/M/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, d MMM y"}
+            }
+            dayNames{
+                format{
+                    narrow{
+                        "D",
+                        "L",
+                        "M",
+                        "M",
+                        "J",
+                        "V",
+                        "S",
+                    }
+                }
+            }
+            dayPeriod{
+                format{
+                    abbreviated{
+                        evening1{"tarde"}
+                        morning1{"madrugada"}
+                        morning2{"mañana"}
+                        night1{"noche"}
+                        noon{"mediodía"}
+                    }
+                    wide{
+                        evening1{"tarde"}
+                        morning1{"madrugada"}
+                        morning2{"mañana"}
+                        night1{"noche"}
+                        noon{"mediodía"}
+                    }
+                }
+                stand-alone{
+                    narrow{
+                        noon{"m."}
+                    }
+                }
+            }
+            intervalFormats{
+                H{
+                    H{"HH–HH"}
+                }
+                Hm{
+                    H{"HH:mm–HH:mm"}
+                    m{"HH:mm–HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm–HH:mm v"}
+                    m{"HH:mm–HH:mm v"}
+                }
+                Hv{
+                    H{"HH–HH v"}
+                }
+                MEd{
+                    M{"E dd/MM – E dd/MM"}
+                    d{"E dd/MM – E dd/MM"}
+                }
+                MMMEd{
+                    M{"E d 'de' MMM 'al' E d 'de' MMM"}
+                    d{"E d 'al' E d 'de' MMM"}
+                }
+                MMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM"}
+                    d{"dd – dd 'de' MM"}
+                }
+                Md{
+                    M{"dd/MM – dd/MM"}
+                    d{"dd/MM – dd/MM"}
+                }
+                fallback{"{0} a el {1}"}
+                h{
+                    a{"h a – h a"}
+                }
+                hm{
+                    h{"h:mm–h:mm a"}
+                    m{"h:mm–h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a – h:mm a v"}
+                }
+                hv{
+                    a{"h a – h a v"}
+                }
+                yM{
+                    M{"MM/y – MM/y"}
+                    y{"MM/y – MM/y"}
+                }
+                yMEd{
+                    M{"E, dd/MM/y – E, dd/MM/y"}
+                    d{"E, dd/MM/y – E, dd/MM/y"}
+                    y{"E, dd/MM/y – E, dd/MM/y"}
+                }
+                yMMM{
+                    y{"MMM 'de' y 'a' MMM 'de' y"}
+                }
+                yMMMEd{
+                    M{"E, d 'de' MMM 'al' E, d 'de' MMM 'de' y"}
+                    d{"E, d 'al' E, d 'de' MMM 'de' y"}
+                    y{"E, d 'de' MMM 'de' y 'al' E, d 'de' MMM 'de' y"}
+                }
+                yMMMM{
+                    M{"MMMM 'al' MMMM 'de' y"}
+                    y{"MMMM 'de' y 'al' MMMM 'de' y"}
+                }
+                yMMMd{
+                    M{"d 'de' MMM 'al' d 'de' MMM 'de' y"}
+                    y{"d 'de' MMM 'de' y 'al' d 'de' MMM 'de' y"}
+                }
+                yMd{
+                    M{"dd/MM/y – dd/MM/y"}
+                    d{"dd/MM/y – dd/MM/y"}
+                    y{"dd/MM/y – dd/MM/y"}
+                }
+            }
+            quarters{
+                format{
+                    wide{
+                        "1.er trimestre",
+                        "2.º trimestre",
+                        "3.er trimestre",
+                        "4.º trimestre",
+                    }
+                }
+                stand-alone{
+                    wide{
+                        "1.er trimestre",
+                        "2.º trimestre",
+                        "3.er trimestre",
+                        "4.º trimestre",
+                    }
+                }
+            }
+        }
+    }
+    fields{
+        day-narrow{
+            relativeTime{
+                future{
+                    one{"dentro de {0} días"}
+                    other{"dentro de {0} días"}
+                }
+                past{
+                    one{"hace {0} días"}
+                    other{"hace {0} días"}
+                }
+            }
+        }
+        day-short{
+            relativeTime{
+                future{
+                    one{"dentro de {0} días"}
+                    other{"dentro de {0} días"}
+                }
+                past{
+                    one{"hace {0} días"}
+                    other{"hace {0} días"}
+                }
+            }
+        }
+        second-narrow{
+            dn{"seg."}
+            relativeTime{
+                future{
+                    one{"dentro de {0} seg."}
+                    other{"dentro de {0} seg."}
+                }
+                past{
+                    one{"hace {0} seg."}
+                    other{"hace {0} seg."}
+                }
+            }
+        }
+        second-short{
+            dn{"seg."}
+            relativeTime{
+                future{
+                    one{"dentro de {0} seg."}
+                    other{"dentro de {0} seg."}
+                }
+                past{
+                    one{"hace {0} seg."}
+                    other{"hace {0} seg."}
+                }
+            }
+        }
+    }
+}

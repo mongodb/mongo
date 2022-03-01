@@ -1,0 +1,83 @@
+// Copyright (C) 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+//*******************************************************************************
+//*
+//*   Copyright (C) 1998-2010, International Business Machines
+//*   Corporation and others.  All Rights Reserved.
+//*
+//*******************************************************************************
+
+
+// This is a test resource to check new types of resources
+
+testtypes:table(nofallback)
+{
+    zerotest { "abc\u0000def" } // The length of this string should be 7, not 3
+    binarytest:bin { 000102030405060708090a0b0c0d0e } // Binary 15 bytes long 
+    onehundredtwentythree:int {123 } //
+    one:int { 1 } // number one
+    importtest:import { "importtest.bin" }
+    integerarray:intvector { 1, 2, 3, -3, 4, 5, 6, 7 } // an array of 32-bit integers
+    minusone:int {-1}  // number -1
+	plusone:int {1} // number 1
+	    
+    // Empties
+    emptyexplicitstring:string { "" }
+    emptystring { "" }
+    emptyintv:intvector { }
+    emptybin:bin { "" }
+    emptyint:int { "" }
+    emptytable:table { }
+    emptyarray:array 
+    {
+    }
+    testescape{ "tab:\t cr:\r ff:\f newline:\n backslash:\\\\ quote=\\\' doubleQuote=\\\" singlequoutes=''" }
+    
+    // genrb just includes the test as a string after converting to UTF-16
+        
+    testincludeUTF:include{ "riwords.txt" }
+    // No unescaping is done.
+    testinclude:include{ "translit_rules.txt" }
+
+    // Genrb failed parsing \u0075 sequence this tests it 
+    collations {
+      standard { 
+	Version{"x01"}
+	Sequence{ 
+		       "&'\u0075' = '\uFF55'" // LATIN SMALL LETTER U
+		}
+      }
+    }
+    
+    string{ }
+    stringTable{{}}
+    //nested table
+    menu {
+        file {
+		 open { "Open" }
+	         save { "Save" }
+	         exit { "Exit" }
+	     }
+      }
+    test_underscores{
+        "test message ...."
+    }
+    test_unescaping{"[ \\u0020 \\u00A0 \\u1680 \\u2000 \\u2001 \\u2002 \\u2003 \\u2004 \\u2005 \\u2006 \\u2007 "
+			"\\u2008 \\u2009 \\u200A \u200B \\u202F \u205F \\u3000 \u0000-\u001F \u007F \u0080-\u009F "
+			"\\u06DD \\u070F \\u180E \\u200C \\u200D \\u2028 \\u2029 \\u2060 \\u2061 \\u2062 \\u2063 "
+			"\\u206A-\\u206F \\uFEFF \\uFFF9-\uFFFC \U0001D173-\U0001D17A \U000F0000-\U000FFFFD "
+			"\U00100000-\U0010FFFD \uFDD0-\uFDEF \uFFFE-\uFFFF \U0001FFFE-\U0001FFFF \U0002FFFE-\U0002FFFF "
+			"\U0003FFFE-\U0003FFFF \U0004FFFE-\U0004FFFF \U0005FFFE-\U0005FFFF \U0006FFFE-\U0006FFFF "
+			"\U0007FFFE-\U0007FFFF \U0008FFFE-\U0008FFFF \U0009FFFE-\U0009FFFF \U000AFFFE-\U000AFFFF "
+			"\U000BFFFE-\U000BFFFF \U000CFFFE-\U000CFFFF \U000DFFFE-\U000DFFFF \U000EFFFE-\U000EFFFF "
+			"\U000FFFFE-\U000FFFFF \U0010FFFE-\U0010FFFF \uD800-\uDFFF \\uFFF9 \\uFFFA \\uFFFB "
+			"\uFFFC \uFFFD \u2FF0-\u2FFB \u0340 \u0341 \\u200E \\u200F \\u202A \\u202B \\u202C "
+			"\\u202D \\u202E \\u206A \\u206B \\u206C \\u206D \\u206E \\u206F \U000E0001 \U000E0020-\U000E007F "
+			"]"
+		   }
+            
+}
+
+//eof
+
+

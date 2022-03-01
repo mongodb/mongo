@@ -1,0 +1,139 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: blt_blt_FONIPA.txt
+# Generated from CLDR
+#
+
+# Output phonemes
+# ---------------
+# Nasals:           m mʷ n nʷ ɲ ɲʷ ŋ ŋʷ
+# Plosives:         p pʰ pʰʷ pʷ b t tʷ tʰ d dʷ k kʰ kʰʷ kʷ ɡ ɡʷ ʔ
+# Fricatives:       f fʷ v s sʷ h hʷ x xʷ
+# Other consonants: w j l
+# Affricates:       t\u0361ɕ t\u0361ɕʷ t\u0361ɕʰ t\u0361ɕʰʷ
+# Vowels:           i ɨ u ɛ e ə ɔ o a aː
+# Diphthongs:       iə\u032F ɨə\u032F uə\u032F ai\u032F
+# Tones:            ˨ ˧˥ ˨˩ ˥ ˦ ˧˩
+#
+#
+# Limitations
+# -----------
+# Currently, these rules only support tone marks, but not tone letters.
+#
+#
+# References
+# ----------
+# [1] Jim Brase, SIL International: Proposal to encode the Tai Viet script
+#     in the UCS. ISO/IEC JTC1/SC2/WG2 N3220. March 20, 2007.
+#     http://std.dkuug.dk/jtc1/sc2/wg2/docs/n3220.pdf
+#
+# [2] ScriptSource: Tai Viet Vowels.
+#     http://scriptsource.org/entry/eusd5ehysa
+#
+# [3] ScriptSource: Tai Viet Consonants.
+#     http://scriptsource.org/entry/lbwpkrqk7b
+#
+# [4] http://www.seasite.niu.edu/tai/TaiDam/tones.htm
+$LO = [ꪀ ꪂ ꪄ ꪆ ꪈ ꪊ ꪌ ꪎ ꪐ ꪒ ꪔ ꪖ ꪘ ꪚ ꪜ ꪞ ꪠ ꪢ ꪤ ꪦ ꪨ ꪪ ꪬ ꪮ];
+$HI = [ꪁ ꪃ ꪅ ꪇ ꪉ ꪋ ꪍ ꪏ ꪑ ꪓ ꪕ ꪗ ꪙ ꪛ ꪝ ꪟ ꪡ ꪣ ꪥ ꪧ ꪩ ꪫ ꪭ ꪯ];
+$C = [$LO $HI];
+$V1 = [ꪵ ꪶ ꪹ ꪻ ꪼ];  # vowels written before consonant
+$V2 = [ \uAAB0 \uAAB2 \uAAB3 \uAAB4 \uAAB7 \uAAB8 \uAABE];  # vowels written above or below consonant
+$V3 = [ꪱ ꪮ ꪺ ꪽ];  # vowels written after consonant
+$DIGRAPHS = [{ꪹ  \uAAB8} {ꪹ  \uAAB7} {ꪹ ꪱ}];
+$V12 = [$V1 $V2 $DIGRAPHS];
+$V123 = [$V12 $V3];
+$W = [ꪫ];  # labialization marker
+$F = [$C]; # syllable-final consonant
+$IPA_TONE = [˥ ˦ ˧ ˨ ˩];
+$NOT_IPA_TONE = [^$IPA_TONE];
+$BOUNDARY = [^[:L:][:M:][:N:]];
+# Consonants at the end of “checked” syllables.
+$CHK = [ꪜ ꪝ ꪞ ꪟ ꪔ ꪕ ꪖ ꪗ ꪀ ꪁ ꪂ ꪃ ꪮ ꪯ];
+# The Tai Viet script uses visual ordering. Convert to logical order.
+($V1) ($C $W?) → $2 $1;
+::null;
+# Special handling for stand-alone ꪽ ‘that’.
+$BOUNDARY {ꪽ} $BOUNDARY → nan˧˩;
+# Convert tones for checked syllables (those ending in /p/, /t/, /k/, /ʔ/)
+$LO $W? $V12 {($CHK)} → $1 ˧˥;  # Tone class 2: High-rising tone
+$LO $W? {($V3 $CHK)} → $1 ˧˥;  # Tone class 2: High-rising tone
+$HI $W? $V12 {($CHK)} → $1 ˦;  # Tone class 5: High-mid tone
+$HI $W? {($V3 $CHK)} → $1 ˦;  # Tone class 5: High-mid tone
+# Convert tones for unchecked syllables with vowels that are written
+# after the consonant (V3).
+# TODO: Also support tone letters, not just tone marks.
+$LO $W? { \uAABF ($V3 $F?)} → $1 ˧˥;  # Tone class 2: High-rising tone
+$LO $W? { \uAAC1 ($V3 $F?)} → $1 ˨˩;  # Tone class 3: Low-falling tone
+$HI $W? { \uAABF ($V3 $F?)} → $1 ˦;   # Tone class 5: High-mid tone
+$HI $W? { \uAAC1 ($V3 $F?)} → $1 ˧˩;  # Tone class 6: Mid-falling tone
+# Convert tones for unchecked syllables with vowels that are either written
+# before the consonant (V1) or vowels that are written above or below it (V2).
+# TODO: Also support tone letters, not just tone marks.
+$LO $W? $V12 { \uAABF ($F?)} → $1 ˧˥;  # Tone class 2: High-rising tone
+$LO $W? $V12 { \uAAC1 ($F?)} → $1 ˨˩;  # Tone class 3: Low-falling tone
+$HI $W? $V12 { \uAABF ($F?)} → $1 ˦;   # Tone class 5: High-mid tone
+$HI $W? $V12 { \uAAC1 ($F?)} → $1 ˧˩;  # Tone class 6: Mid-falling tone
+::null;
+{($LO $W? $V123 $F?)} $NOT_IPA_TONE → $1 ˨;  # Tone class 1: Low-mid tone.
+{($HI $W? $V123 $F?)} $NOT_IPA_TONE → $1 ˥;  # Tone class 4: High tone.
+::null;
+# Harden syllable-final consonants.
+$C $W? $V123 {ꪒ} → ꪔ;  # /d/ → /t/
+::null;
+# Convert labialization marker.
+$C {$W} $V123 → ʷ;
+::null;
+[ꪀ ꪁ] → k;
+[ꪂ ꪃ] → kʰ;  # Tai Dón; not used in Tai Dam according to [3]
+[ꪄ ꪅ] → x;
+[ꪆ ꪇ] → ɡ;  # only in loanwords, according to [3]
+[ꪈ ꪉ] → ŋ;
+[ꪊ ꪋ] → t\u0361ɕ;  # Tai Dón; not used in Tai Dam according to [3]
+[ꪌ ꪍ] → t\u0361ɕʰ;  # Tai Dón; not used in Tai Dam according to [3]
+[ꪎ ꪏ] → s;
+[ꪐ ꪑ] → ɲ;
+[ꪒ ꪓ] → d;
+[ꪔ ꪕ] → t;
+[ꪖ ꪗ] → tʰ;
+[ꪘ ꪙ] → n;
+[ꪚ ꪛ] → b;
+[ꪜ ꪝ] → p;
+[ꪞ ꪟ] → pʰ;  # Tai Dón; not used in Tai Dam according to [3]
+[ꪠ ꪡ] → f;
+[ꪢ ꪣ] → m;
+[ꪤ ꪥ] → j;
+[ꪦ ꪧ] → r;  # only in loanwords, according to [3]
+[ꪨ ꪩ] → l;
+{[ꪪ ꪫ]} $IPA_TONE → w;  # at the end of a syllable (before tone letters)
+[ꪪ ꪫ] → v;  # not at the end of a syllable
+[ꪬ ꪭ] → h;
+ʔ {[ꪮ ꪯ]} → ɔ;  # eg. ꪮꪮꪀ
+[ꪮ ꪯ] → ʔ;
+# Digraphs.
+ꪹ  \uAAB8 → e;
+ꪹ  \uAAB7 → ə;
+ꪹ ꪱ → aːw;
+# Vowels.
+\uAAB0 → a;
+ꪱ → aː;
+\uAAB2 → i;
+\uAAB3 → ɨ;
+\uAAB4 → u;
+ꪵ → ɛ;
+ꪶ → o;
+\uAAB7 → ɔ;
+ꪮ → ɔ;
+ꪺ → uə\u032F;
+ꪽ → an;
+ꪹ → ɨə\u032F;
+\uAAB8 → iə\u032F;
+ꪻ → əw;
+ꪼ → ai\u032F;
+\uAABE → am;
+# Word ligature symbols.
+ꫛ → kon˥;
+ꫜ → nɨŋ˦;
+

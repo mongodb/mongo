@@ -1,0 +1,59 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+mai{
+    zoneStrings{
+        "Etc:UTC"{
+            ls{"समन्वित वैश्विक समय"}
+        }
+        "Etc:Unknown"{
+            ec{"अज्ञात शहर"}
+        }
+        "meta:America_Central"{
+            ld{"उत्तरी अमेरिकी केंद्रीय डेलाइट समय"}
+            lg{"उत्तरी अमेरिकी केंद्रीय समय"}
+            ls{"उत्तरी अमेरिकी केंद्रीय मानक समय"}
+        }
+        "meta:America_Eastern"{
+            ld{"उत्तरी अमेरिकी पूर्वी डेलाइट समय"}
+            lg{"उत्तरी अमेरिकी पूर्वी समय"}
+            ls{"उत्तरी अमेरिकी पूर्वी मानक समय"}
+        }
+        "meta:America_Mountain"{
+            ld{"उत्तरी अमेरिकी माउंटेन डेलाइट समय"}
+            lg{"उत्तरी अमेरिकी माउंटेन समय"}
+            ls{"उत्तरी अमेरिकी माउंटेन मानक समय"}
+        }
+        "meta:America_Pacific"{
+            ld{"उत्तरी अमेरिकी प्रशांत डेलाइट समय"}
+            lg{"उत्तरी अमेरिकी प्रशांत समय"}
+            ls{"उत्तरी अमेरिकी प्रशांत मानक समय"}
+        }
+        "meta:Atlantic"{
+            ld{"अटलांटिक डेलाइट समय"}
+            lg{"अटलांटिक समय"}
+            ls{"अटलांटिक मानक समय"}
+        }
+        "meta:Europe_Central"{
+            ld{"मध्‍य यूरोपीय ग्रीष्‍मकालीन समय"}
+            lg{"मध्य यूरोपीय समय"}
+            ls{"मध्य यूरोपीय मानक समय"}
+        }
+        "meta:Europe_Eastern"{
+            ld{"पूर्वी यूरोपीय ग्रीष्मकालीन समय"}
+            lg{"पूर्वी यूरोपीय समय"}
+            ls{"पूर्वी यूरोपीय मानक समय"}
+        }
+        "meta:Europe_Western"{
+            ld{"पश्चिमी यूरोपीय ग्रीष्‍मकालीन समय"}
+            lg{"पश्चिमी यूरोपीय समय"}
+            ls{"पश्चिमी यूरोपीय मानक समय"}
+        }
+        "meta:GMT"{
+            ls{"ग्रीनविच मीन टाइम"}
+        }
+        regionFormat{"{0} समय"}
+        regionFormatDaylight{"{0} डेलाइट समय"}
+        regionFormatStandard{"{0} मानक समय"}
+    }
+}

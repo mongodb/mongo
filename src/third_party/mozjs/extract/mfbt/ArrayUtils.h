@@ -15,15 +15,20 @@
 #include "mozilla/Attributes.h"
 
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
+#  include <algorithm>
+#  include <type_traits>
 
-#include "mozilla/Alignment.h"
-#include "mozilla/Array.h"
-#include "mozilla/EnumeratedArray.h"
-#include "mozilla/TypeTraits.h"
+#  include "mozilla/Alignment.h"
 
 namespace mozilla {
+
+template <typename T, size_t Length>
+class Array;
+template <typename IndexType, IndexType SizeAsEnumValue, typename ValueType>
+class EnumeratedArray;
 
 /*
  * Safely subtract two pointers when it is known that aEnd >= aBegin, yielding a
@@ -37,10 +42,8 @@ namespace mozilla {
  * with the wrong sign even when the correct scaled distance would fit in a
  * ptrdiff_t.
  */
-template<class T>
-MOZ_ALWAYS_INLINE size_t
-PointerRangeSize(T* aBegin, T* aEnd)
-{
+template <class T>
+MOZ_ALWAYS_INLINE size_t PointerRangeSize(T* aBegin, T* aEnd) {
   MOZ_ASSERT(aEnd >= aBegin);
   return (size_t(aEnd) - size_t(aBegin)) / sizeof(T);
 }
@@ -51,24 +54,18 @@ PointerRangeSize(T* aBegin, T* aEnd)
  *
  * Beware of the implicit trailing '\0' when using this with string constants.
  */
-template<typename T, size_t N>
-constexpr size_t
-ArrayLength(T (&aArr)[N])
-{
+template <typename T, size_t N>
+constexpr size_t ArrayLength(T (&aArr)[N]) {
   return N;
 }
 
-template<typename T, size_t N>
-constexpr size_t
-ArrayLength(const Array<T, N>& aArr)
-{
+template <typename T, size_t N>
+constexpr size_t ArrayLength(const Array<T, N>& aArr) {
   return N;
 }
 
-template<typename E, E N, typename T>
-constexpr size_t
-ArrayLength(const EnumeratedArray<E, N, T>& aArr)
-{
+template <typename E, E N, typename T>
+constexpr size_t ArrayLength(const EnumeratedArray<E, N, T>& aArr) {
   return size_t(N);
 }
 
@@ -77,51 +74,52 @@ ArrayLength(const EnumeratedArray<E, N, T>& aArr)
  *
  * Beware of the implicit trailing '\0' when using this with string constants.
  */
-template<typename T, size_t N>
-constexpr T*
-ArrayEnd(T (&aArr)[N])
-{
+template <typename T, size_t N>
+constexpr T* ArrayEnd(T (&aArr)[N]) {
   return aArr + ArrayLength(aArr);
 }
 
-template<typename T, size_t N>
-constexpr T*
-ArrayEnd(Array<T, N>& aArr)
-{
+template <typename T, size_t N>
+constexpr T* ArrayEnd(Array<T, N>& aArr) {
   return &aArr[0] + ArrayLength(aArr);
 }
 
-template<typename T, size_t N>
-constexpr const T*
-ArrayEnd(const Array<T, N>& aArr)
-{
+template <typename T, size_t N>
+constexpr const T* ArrayEnd(const Array<T, N>& aArr) {
   return &aArr[0] + ArrayLength(aArr);
+}
+
+/**
+ * std::equal has subpar ergonomics.
+ */
+
+template <typename T, typename U, size_t N>
+bool ArrayEqual(const T (&a)[N], const U (&b)[N]) {
+  return std::equal(a, a + N, b);
+}
+
+template <typename T, typename U>
+bool ArrayEqual(const T* const a, const U* const b, const size_t n) {
+  return std::equal(a, a + n, b);
 }
 
 namespace detail {
 
-template<typename AlignType, typename Pointee,
-         typename = EnableIf<!IsVoid<AlignType>::value>>
-struct AlignedChecker
-{
-  static void
-  test(const Pointee* aPtr)
-  {
+template <typename AlignType, typename Pointee, typename = void>
+struct AlignedChecker {
+  static void test(const Pointee* aPtr) {
     MOZ_ASSERT((uintptr_t(aPtr) % MOZ_ALIGNOF(AlignType)) == 0,
                "performing a range-check with a misaligned pointer");
   }
 };
 
-template<typename AlignType, typename Pointee>
-struct AlignedChecker<AlignType, Pointee>
-{
-  static void
-  test(const Pointee* aPtr)
-  {
-  }
+template <typename AlignType, typename Pointee>
+struct AlignedChecker<AlignType, Pointee,
+                      std::enable_if_t<std::is_void_v<AlignType>>> {
+  static void test(const Pointee* aPtr) {}
 };
 
-} // namespace detail
+}  // namespace detail
 
 /**
  * Determines whether |aPtr| points at an object in the range [aBegin, aEnd).
@@ -136,13 +134,11 @@ struct AlignedChecker<AlignType, Pointee>
  * case no argument is required to be aligned (obviously, as void* implies no
  * particular alignment).
  */
-template<typename T, typename U>
-inline typename EnableIf<IsSame<T, U>::value ||
-                         IsBaseOf<T, U>::value ||
-                         IsVoid<T>::value,
-                         bool>::Type
-IsInRange(const T* aPtr, const U* aBegin, const U* aEnd)
-{
+template <typename T, typename U>
+inline std::enable_if_t<std::is_same_v<T, U> || std::is_base_of<T, U>::value ||
+                            std::is_void_v<T>,
+                        bool>
+IsInRange(const T* aPtr, const U* aBegin, const U* aEnd) {
   MOZ_ASSERT(aBegin <= aEnd);
   detail::AlignedChecker<U, T>::test(aPtr);
   detail::AlignedChecker<U, U>::test(aBegin);
@@ -156,12 +152,9 @@ IsInRange(const T* aPtr, const U* aBegin, const U* aEnd)
  * uintptr_t values.  As above, |aPtr| must be aligned, and |aBegin| and |aEnd|
  * must be aligned with respect to |T|.
  */
-template<typename T>
-inline bool
-IsInRange(const T* aPtr, uintptr_t aBegin, uintptr_t aEnd)
-{
-  return IsInRange(aPtr,
-                   reinterpret_cast<const T*>(aBegin),
+template <typename T>
+inline bool IsInRange(const T* aPtr, uintptr_t aBegin, uintptr_t aEnd) {
+  return IsInRange(aPtr, reinterpret_cast<const T*>(aBegin),
                    reinterpret_cast<const T*>(aEnd));
 }
 
@@ -186,9 +179,10 @@ char (&ArrayLengthHelper(T (&array)[N]))[N];
  * can't call ArrayLength() when it is not a C++11 constexpr function.
  */
 #ifdef __cplusplus
-#  define MOZ_ARRAY_LENGTH(array)   sizeof(mozilla::detail::ArrayLengthHelper(array))
+#  define MOZ_ARRAY_LENGTH(array) \
+    sizeof(mozilla::detail::ArrayLengthHelper(array))
 #else
-#  define MOZ_ARRAY_LENGTH(array)   (sizeof(array)/sizeof((array)[0]))
+#  define MOZ_ARRAY_LENGTH(array) (sizeof(array) / sizeof((array)[0]))
 #endif
 
 #endif /* mozilla_ArrayUtils_h */

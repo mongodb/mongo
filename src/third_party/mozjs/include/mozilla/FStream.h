@@ -19,9 +19,9 @@
 #include <ostream>
 #include <fstream>
 #if defined(__MINGW32__) && defined(__GLIBCXX__)
-#include "mozilla/UniquePtr.h"
-#include <fcntl.h>
-#include <ext/stdio_filebuf.h>
+#  include "mozilla/UniquePtr.h"
+#  include <fcntl.h>
+#  include <ext/stdio_filebuf.h>
 #endif
 
 namespace mozilla {
@@ -29,9 +29,8 @@ namespace mozilla {
 #if defined(__MINGW32__) && defined(__GLIBCXX__)
 // MinGW does not support wchar_t* overloads that are MSVC extension until
 // C++17, so we have to implement widechar wrappers using a GNU extension.
-class IFStream : public std::istream
-{
-public:
+class IFStream : public std::istream {
+ public:
   explicit IFStream(char16ptr_t filename, openmode mode = in);
 
   std::filebuf* rdbuf() const { return mFileBuf.get(); }
@@ -40,20 +39,16 @@ public:
   void open(char16ptr_t filename, openmode mode = in);
   void close() { mFileBuf && mFileBuf->close(); }
 
-private:
+ private:
   UniquePtr<std::filebuf> mFileBuf;
 };
 
-inline
-IFStream::IFStream(char16ptr_t filename, openmode mode)
-  : std::istream(nullptr)
-{
+inline IFStream::IFStream(char16ptr_t filename, openmode mode)
+    : std::istream(nullptr) {
   open(filename, mode);
 }
 
-inline void
-IFStream::open(char16ptr_t filename, openmode mode)
-{
+inline void IFStream::open(char16ptr_t filename, openmode mode) {
   int fmode = _O_RDONLY;
   if (mode & binary) {
     fmode |= _O_BINARY;
@@ -65,9 +60,8 @@ IFStream::open(char16ptr_t filename, openmode mode)
   std::istream::rdbuf(mFileBuf.get());
 }
 
-class OFStream : public std::ostream
-{
-public:
+class OFStream : public std::ostream {
+ public:
   explicit OFStream(char16ptr_t filename, openmode mode = out);
 
   std::filebuf* rdbuf() const { return mFileBuf.get(); }
@@ -76,20 +70,16 @@ public:
   void open(char16ptr_t filename, openmode mode = out);
   void close() { mFileBuf && mFileBuf->close(); }
 
-private:
+ private:
   UniquePtr<std::filebuf> mFileBuf;
 };
 
-inline
-OFStream::OFStream(char16ptr_t filename, openmode mode)
-  : std::ostream(nullptr)
-{
+inline OFStream::OFStream(char16ptr_t filename, openmode mode)
+    : std::ostream(nullptr) {
   open(filename, mode);
 }
 
-inline void
-OFStream::open(char16ptr_t filename, openmode mode)
-{
+inline void OFStream::open(char16ptr_t filename, openmode mode) {
   int fmode = _O_WRONLY;
   if (mode & binary) {
     fmode |= _O_BINARY;
@@ -105,26 +95,22 @@ OFStream::open(char16ptr_t filename, openmode mode)
 }
 
 #elif defined(XP_WIN)
-class IFStream : public std::ifstream
-{
-public:
+class IFStream : public std::ifstream {
+ public:
   explicit IFStream(char16ptr_t filename, openmode mode = in)
-    : std::ifstream(filename, mode) {}
+      : std::ifstream(filename, mode) {}
 
-  void open(char16ptr_t filename, openmode mode = in)
-  {
+  void open(char16ptr_t filename, openmode mode = in) {
     std::ifstream::open(filename, mode);
   }
 };
 
-class OFStream : public std::ofstream
-{
-public:
+class OFStream : public std::ofstream {
+ public:
   explicit OFStream(char16ptr_t filename, openmode mode = out)
-    : std::ofstream(filename, mode) {}
+      : std::ofstream(filename, mode) {}
 
-  void open(char16ptr_t filename, openmode mode = out)
-  {
+  void open(char16ptr_t filename, openmode mode = out) {
     std::ofstream::open(filename, mode);
   }
 };
@@ -133,6 +119,6 @@ using IFStream = std::ifstream;
 using OFStream = std::ofstream;
 #endif
 
-} // namespace mozilla
+}  // namespace mozilla
 
 #endif /* mozilla_FStream_h */

@@ -1,0 +1,37 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+brx{
+    units{
+        duration{
+            day{
+                one{"{0} सान"}
+                other{"{0} सान"}
+            }
+            hour{
+                one{"{0} रिंगा"}
+                other{"{0} घंटे"}
+            }
+            minute{
+                one{"{0} मिन."}
+                other{"{0} मिन."}
+            }
+            month{
+                one{"{0} महीना"}
+                other{"{0} महीने"}
+            }
+            second{
+                one{"{0} सेकं."}
+                other{"{0} सेकं."}
+            }
+            week{
+                one{"{0} सप्ताह"}
+                other{"{0} सप्ताह"}
+            }
+            year{
+                one{"{0} साल"}
+                other{"{0} साल"}
+            }
+        }
+    }
+}

@@ -1,0 +1,32 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+root{
+    Version{"39"}
+    characterLabelPattern{
+        all{"{0} — all"}
+        category-list{"{0}: {1}"}
+        compatibility{"{0} — compatibility"}
+        enclosed{"{0} — enclosed"}
+        extended{"{0} — extended"}
+        historic{"{0} — historic"}
+        miscellaneous{"{0} — miscellaneous"}
+        other{"{0} — other"}
+        scripts{"scripts — {0}"}
+        strokes{
+            other{"{0} strokes"}
+        }
+        subscript{"subscript {0}"}
+        superscript{"superscript {0}"}
+    }
+    codePatterns{
+        language{"{0}"}
+        script{"{0}"}
+        territory{"{0}"}
+    }
+    localeDisplayPattern{
+        keyTypePattern{"{0}: {1}"}
+        pattern{"{0} ({1})"}
+        separator{"{0}, {1}"}
+    }
+}

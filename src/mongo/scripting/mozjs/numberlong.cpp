@@ -33,6 +33,7 @@
 
 #include <boost/optional.hpp>
 #include <js/Conversions.h>
+#include <js/Object.h>
 
 #include "mongo/base/parse_number.h"
 #include "mongo/scripting/mozjs/implscope.h"
@@ -57,20 +58,20 @@ const JSFunctionSpec NumberLongInfo::methods[6] = {
 
 const char* const NumberLongInfo::className = "NumberLong";
 
-void NumberLongInfo::finalize(js::FreeOp* fop, JSObject* obj) {
-    auto numLong = static_cast<int64_t*>(JS_GetPrivate(obj));
+void NumberLongInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+    auto numLong = static_cast<int64_t*>(JS::GetPrivate(obj));
 
     if (numLong)
         getScope(fop)->trackedDelete(numLong);
 }
 
 int64_t NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleValue thisv) {
-    auto numLong = static_cast<int64_t*>(JS_GetPrivate(thisv.toObjectOrNull()));
+    auto numLong = static_cast<int64_t*>(JS::GetPrivate(thisv.toObjectOrNull()));
     return numLong ? *numLong : 0;
 }
 
 int64_t NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleObject thisv) {
-    auto numLong = static_cast<int64_t*>(JS_GetPrivate(thisv));
+    auto numLong = static_cast<int64_t*>(JS::GetPrivate(thisv));
     return numLong ? *numLong : 0;
 }
 
@@ -202,7 +203,7 @@ void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {
         numLong = (top << 32) + bot;
     }
 
-    JS_SetPrivate(thisv, scope->trackedNew<int64_t>(numLong));
+    JS::SetPrivate(thisv, scope->trackedNew<int64_t>(numLong));
 
     args.rval().setObjectOrNull(thisv);
 }

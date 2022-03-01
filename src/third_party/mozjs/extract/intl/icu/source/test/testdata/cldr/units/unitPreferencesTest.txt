@@ -1,0 +1,454 @@
+# Test data for unit preferences
+#  Copyright © 1991-2021 Unicode, Inc.
+#  For terms of use, see http://www.unicode.org/copyright.html
+#  Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the U.S. and other countries.
+#  CLDR data files are interpreted according to the LDML specification (http://unicode.org/reports/tr35/)
+#
+# Format:
+#	Quantity;	Usage;	Region;	Input (r);	Input (d);	Input Unit;	Output (r);	Output (d);	Output Unit
+#
+# Use: Convert the Input amount & unit according to the Usage and Region.
+#	 The result should match the Output amount and unit.
+#	 Both rational (r) and double64 (d) forms of the input and output amounts are supplied so that implementations
+#	 have two options for testing based on the precision in their implementations. For example:
+#	   3429 / 12500; 0.27432; meter;
+#	 The Output amount and Unit are repeated for mixed units. In such a case, only the smallest unit will have
+#	 both a rational and decimal amount; the others will have a single integer value, such as:
+#	   length; person-height; CA; 3429 / 12500; 0.27432; meter; 2; foot; 54 / 5; 10.8; inch
+#	 The input and output units are unit identifers; in particular, the output does not have further processing:
+#		 • no localization
+#		 • no adjustment for pluralization
+#		 • no formatted with the skeleton
+#		 • no suppression of zero values (for secondary -and- units such as pound in stone-and-pound)
+#
+# Generation: Set GENERATE_TESTS in TestUnits.java, and look at TestUnitPreferences results.
+
+area;	default;	001;	1100000;	1100000.0;	square-meter;	11 / 10;	1.1;	square-kilometer
+area;	default;	001;	1000000;	1000000.0;	square-meter;	1;	1.0;	square-kilometer
+area;	default;	001;	900000;	900000.0;	square-meter;	90;	90.0;	hectare
+area;	default;	001;	10000;	10000.0;	square-meter;	1;	1.0;	hectare
+area;	default;	001;	9000;	9000.0;	square-meter;	9000;	9000.0;	square-meter
+area;	default;	001;	1;	1.0;	square-meter;	1;	1.0;	square-meter
+area;	default;	001;	9 / 10;	0.9;	square-meter;	9000;	9000.0;	square-centimeter
+area;	default;	001;	1 / 10000;	1.0E-4;	square-meter;	1;	1.0;	square-centimeter
+area;	default;	001;	9 / 100000;	9.0E-5;	square-meter;	9 / 10;	0.9;	square-centimeter
+
+area;	default;	GB;	222577103232 / 78125;	2848986.9213696;	square-meter;	11 / 10;	1.1;	square-mile
+area;	default;	GB;	40468564224 / 15625;	2589988.110336;	square-meter;	1;	1.0;	square-mile
+area;	default;	GB;	182108539008 / 78125;	2330989.2993024;	square-meter;	576;	576.0;	acre
+area;	default;	GB;	316160658 / 78125;	4046.8564224;	square-meter;	1;	1.0;	acre
+area;	default;	GB;	1422722961 / 390625;	3642.17078016;	square-meter;	39204;	39204.0;	square-foot
+area;	default;	GB;	145161 / 1562500;	0.09290304;	square-meter;	1;	1.0;	square-foot
+area;	default;	GB;	1306449 / 15625000;	0.083612736;	square-meter;	648 / 5;	129.6;	square-inch
+area;	default;	GB;	16129 / 25000000;	6.4516E-4;	square-meter;	1;	1.0;	square-inch
+area;	default;	GB;	145161 / 250000000;	5.80644E-4;	square-meter;	9 / 10;	0.9;	square-inch
+
+area;	geograph;	001;	1100000;	1100000.0;	square-meter;	11 / 10;	1.1;	square-kilometer
+area;	geograph;	001;	1000000;	1000000.0;	square-meter;	1;	1.0;	square-kilometer
+area;	geograph;	001;	900000;	900000.0;	square-meter;	9 / 10;	0.9;	square-kilometer
+
+area;	geograph;	GB;	222577103232 / 78125;	2848986.9213696;	square-meter;	11 / 10;	1.1;	square-mile
+area;	geograph;	GB;	40468564224 / 15625;	2589988.110336;	square-meter;	1;	1.0;	square-mile
+area;	geograph;	GB;	182108539008 / 78125;	2330989.2993024;	square-meter;	9 / 10;	0.9;	square-mile
+
+area;	land;	001;	11000;	11000.0;	square-meter;	11 / 10;	1.1;	hectare
+area;	land;	001;	10000;	10000.0;	square-meter;	1;	1.0;	hectare
+area;	land;	001;	9000;	9000.0;	square-meter;	9 / 10;	0.9;	hectare
+
+area;	land;	GB;	1738883619 / 390625;	4451.54206464;	square-meter;	11 / 10;	1.1;	acre
+area;	land;	GB;	316160658 / 78125;	4046.8564224;	square-meter;	1;	1.0;	acre
+area;	land;	GB;	1422722961 / 390625;	3642.17078016;	square-meter;	9 / 10;	0.9;	acre
+
+concentration;	blood-glucose;	AG;	662435483600000000000000;	6.624354836E23;	item-per-cubic-meter;	11 / 10;	1.1;	millimole-per-liter
+concentration;	blood-glucose;	AG;	602214076000000000000000;	6.02214076E23;	item-per-cubic-meter;	1;	1.0;	millimole-per-liter
+concentration;	blood-glucose;	AG;	541992668400000000000000;	5.419926684E23;	item-per-cubic-meter;	9 / 10;	0.9;	millimole-per-liter
+
+concentration;	blood-glucose;	001;	66243548360000000000000000000 / 1801557;	3.67701651182838E22;	item-per-cubic-meter;	11 / 10;	1.1;	milligram-ofglucose-per-deciliter
+concentration;	blood-glucose;	001;	60221407600000000000000000000 / 1801557;	3.342742283480345E22;	item-per-cubic-meter;	1;	1.0;	milligram-ofglucose-per-deciliter
+concentration;	blood-glucose;	001;	6022140760000000000000000000 / 200173;	3.008468055132311E22;	item-per-cubic-meter;	9 / 10;	0.9;	milligram-ofglucose-per-deciliter
+
+concentration;	default;	001;	11 / 10;	1.1;	item-per-cubic-meter;	11 / 10;	1.1;	item-per-cubic-meter
+concentration;	default;	001;	1;	1.0;	item-per-cubic-meter;	1;	1.0;	item-per-cubic-meter
+concentration;	default;	001;	9 / 10;	0.9;	item-per-cubic-meter;	9 / 10;	0.9;	item-per-cubic-meter
+
+consumption;	default;	001;	11 / 1000000000;	1.1E-8;	cubic-meter-per-meter;	11 / 10;	1.1;	liter-per-100-kilometer
+consumption;	default;	001;	1 / 100000000;	1.0E-8;	cubic-meter-per-meter;	1;	1.0;	liter-per-100-kilometer
+consumption;	default;	001;	9 / 1000000000;	9.0E-9;	cubic-meter-per-meter;	9 / 10;	0.9;	liter-per-100-kilometer
+
+consumption;	vehicle-fuel;	001;	11 / 1000000000;	1.1E-8;	cubic-meter-per-meter;	11 / 10;	1.1;	liter-per-100-kilometer
+consumption;	vehicle-fuel;	001;	1 / 100000000;	1.0E-8;	cubic-meter-per-meter;	1;	1.0;	liter-per-100-kilometer
+consumption;	vehicle-fuel;	001;	9 / 1000000000;	9.0E-9;	cubic-meter-per-meter;	9 / 10;	0.9;	liter-per-100-kilometer
+
+consumption;	vehicle-fuel;	BR;	11 / 10000000;	1.1E-6;	cubic-meter-per-meter;	11 / 10;	1.1;	liter-per-kilometer
+consumption;	vehicle-fuel;	BR;	1 / 1000000;	1.0E-6;	cubic-meter-per-meter;	1;	1.0;	liter-per-kilometer
+consumption;	vehicle-fuel;	BR;	9 / 10000000;	9.0E-7;	cubic-meter-per-meter;	9 / 10;	0.9;	liter-per-kilometer
+
+consumption;	vehicle-fuel;	US;	112903 / 52800000000;	2.1383143939394E-6;	cubic-meter-per-meter;	11 / 10;	1.1;	mile-per-gallon
+consumption;	vehicle-fuel;	US;	112903 / 48000000000;	2.3521458333333E-6;	cubic-meter-per-meter;	1;	1.0;	mile-per-gallon
+consumption;	vehicle-fuel;	US;	112903 / 43200000000;	2.6134953703704E-6;	cubic-meter-per-meter;	9 / 10;	0.9;	mile-per-gallon
+
+consumption;	vehicle-fuel;	CA;	454609 / 177027840000;	2.5680085121075E-6;	cubic-meter-per-meter;	11 / 10;	1.1;	mile-per-gallon-imperial
+consumption;	vehicle-fuel;	CA;	454609 / 160934400000;	2.8248093633182E-6;	cubic-meter-per-meter;	1;	1.0;	mile-per-gallon-imperial
+consumption;	vehicle-fuel;	CA;	454609 / 144840960000;	3.1386770703536E-6;	cubic-meter-per-meter;	9 / 10;	0.9;	mile-per-gallon-imperial
+
+duration;	default;	001;	95040;	95040.0;	second;	11 / 10;	1.1;	day
+duration;	default;	001;	86400;	86400.0;	second;	1;	1.0;	day
+duration;	default;	001;	77760;	77760.0;	second;	108 / 5;	21.6;	hour
+duration;	default;	001;	3600;	3600.0;	second;	1;	1.0;	hour
+duration;	default;	001;	3240;	3240.0;	second;	54;	54.0;	minute
+duration;	default;	001;	60;	60.0;	second;	1;	1.0;	minute
+duration;	default;	001;	54;	54.0;	second;	54;	54.0;	second
+duration;	default;	001;	1;	1.0;	second;	1;	1.0;	second
+duration;	default;	001;	9 / 10;	0.9;	second;	900;	900.0;	millisecond
+duration;	default;	001;	1 / 1000;	0.001;	second;	1;	1.0;	millisecond
+duration;	default;	001;	9 / 10000;	9.0E-4;	second;	900;	900.0;	microsecond
+duration;	default;	001;	1 / 1000000;	1.0E-6;	second;	1;	1.0;	microsecond
+duration;	default;	001;	9 / 10000000;	9.0E-7;	second;	900;	900.0;	nanosecond
+duration;	default;	001;	1 / 1000000000;	1.0E-9;	second;	1;	1.0;	nanosecond
+duration;	default;	001;	9 / 10000000000;	9.0E-10;	second;	9 / 10;	0.9;	nanosecond
+
+duration;	media;	001;	66;	66.0;	second;	1;	minute;	6;	6.0;	second
+duration;	media;	001;	60;	60.0;	second;	1;	minute;	0;	0.0;	second
+duration;	media;	001;	54;	54.0;	second;	54;	54.0;	second
+duration;	media;	001;	1;	1.0;	second;	1;	1.0;	second
+duration;	media;	001;	9 / 10;	0.9;	second;	9 / 10;	0.9;	second
+
+energy;	default;	001;	3960000;	3960000.0;	kilogram-square-meter-per-square-second;	11 / 10;	1.1;	kilowatt-hour
+energy;	default;	001;	3600000;	3600000.0;	kilogram-square-meter-per-square-second;	1;	1.0;	kilowatt-hour
+energy;	default;	001;	3240000;	3240000.0;	kilogram-square-meter-per-square-second;	9 / 10;	0.9;	kilowatt-hour
+
+energy;	food;	US;	23012 / 5;	4602.4;	kilogram-square-meter-per-square-second;	11 / 10;	1.1;	foodcalorie
+energy;	food;	US;	4184;	4184.0;	kilogram-square-meter-per-square-second;	1;	1.0;	foodcalorie
+energy;	food;	US;	18828 / 5;	3765.6;	kilogram-square-meter-per-square-second;	9 / 10;	0.9;	foodcalorie
+
+energy;	food;	001;	23012 / 5;	4602.4;	kilogram-square-meter-per-square-second;	11 / 10;	1.1;	kilocalorie
+energy;	food;	001;	4184;	4184.0;	kilogram-square-meter-per-square-second;	1;	1.0;	kilocalorie
+energy;	food;	001;	18828 / 5;	3765.6;	kilogram-square-meter-per-square-second;	9 / 10;	0.9;	kilocalorie
+
+length;	default;	001;	1100;	1100.0;	meter;	11 / 10;	1.1;	kilometer
+length;	default;	001;	1000;	1000.0;	meter;	1;	1.0;	kilometer
+length;	default;	001;	900;	900.0;	meter;	900;	900.0;	meter
+length;	default;	001;	1;	1.0;	meter;	1;	1.0;	meter
+length;	default;	001;	9 / 10;	0.9;	meter;	90;	90.0;	centimeter
+length;	default;	001;	1 / 100;	0.01;	meter;	1;	1.0;	centimeter
+length;	default;	001;	9 / 1000;	0.009;	meter;	9 / 10;	0.9;	centimeter
+
+length;	default;	GB;	1106424 / 625;	1770.2784;	meter;	11 / 10;	1.1;	mile
+length;	default;	GB;	201168 / 125;	1609.344;	meter;	1;	1.0;	mile
+length;	default;	GB;	905256 / 625;	1448.4096;	meter;	4752;	4752.0;	foot
+length;	default;	GB;	381 / 1250;	0.3048;	meter;	1;	1.0;	foot
+length;	default;	GB;	3429 / 12500;	0.27432;	meter;	54 / 5;	10.8;	inch
+length;	default;	GB;	127 / 5000;	0.0254;	meter;	1;	1.0;	inch
+length;	default;	GB;	1143 / 50000;	0.02286;	meter;	9 / 10;	0.9;	inch
+
+length;	focal-length;	001;	11 / 10000;	0.0011;	meter;	11 / 10;	1.1;	millimeter
+length;	focal-length;	001;	1 / 1000;	0.001;	meter;	1;	1.0;	millimeter
+length;	focal-length;	001;	9 / 10000;	9.0E-4;	meter;	9 / 10;	0.9;	millimeter
+
+length;	person;	001;	11 / 1000;	0.011;	meter;	11 / 10;	1.1;	centimeter
+length;	person;	001;	1 / 100;	0.01;	meter;	1;	1.0;	centimeter
+length;	person;	001;	9 / 1000;	0.009;	meter;	9 / 10;	0.9;	centimeter
+
+length;	person;	CA;	1397 / 50000;	0.02794;	meter;	11 / 10;	1.1;	inch
+length;	person;	CA;	127 / 5000;	0.0254;	meter;	1;	1.0;	inch
+length;	person;	CA;	1143 / 50000;	0.02286;	meter;	9 / 10;	0.9;	inch
+
+length;	person-height;	001;	11 / 1000;	0.011;	meter;	11 / 10;	1.1;	centimeter
+length;	person-height;	001;	1 / 100;	0.01;	meter;	1;	1.0;	centimeter
+length;	person-height;	001;	9 / 1000;	0.009;	meter;	9 / 10;	0.9;	centimeter
+
+length;	person-height;	CA;	11811 / 12500;	0.94488;	meter;	3;	foot;	6 / 5;	1.2;	inch
+length;	person-height;	CA;	1143 / 1250;	0.9144;	meter;	3;	foot;	0;	0.0;	inch
+length;	person-height;	CA;	11049 / 12500;	0.88392;	meter;	174 / 5;	34.8;	inch
+length;	person-height;	CA;	127 / 5000;	0.0254;	meter;	1;	1.0;	inch
+length;	person-height;	CA;	1143 / 50000;	0.02286;	meter;	9 / 10;	0.9;	inch
+
+length;	person-height;	AT;	11 / 10;	1.1;	meter;	1;	meter;	10;	10.0;	centimeter
+length;	person-height;	AT;	1;	1.0;	meter;	1;	meter;	0;	0.0;	centimeter
+length;	person-height;	AT;	9 / 10;	0.9;	meter;	0;	meter;	90;	90.0;	centimeter
+
+length;	rainfall;	BR;	11 / 1000;	0.011;	meter;	11 / 10;	1.1;	centimeter
+length;	rainfall;	BR;	1 / 100;	0.01;	meter;	1;	1.0;	centimeter
+length;	rainfall;	BR;	9 / 1000;	0.009;	meter;	9 / 10;	0.9;	centimeter
+
+length;	rainfall;	US;	1397 / 50000;	0.02794;	meter;	11 / 10;	1.1;	inch
+length;	rainfall;	US;	127 / 5000;	0.0254;	meter;	1;	1.0;	inch
+length;	rainfall;	US;	1143 / 50000;	0.02286;	meter;	9 / 10;	0.9;	inch
+
+length;	rainfall;	001;	11 / 10000;	0.0011;	meter;	11 / 10;	1.1;	millimeter
+length;	rainfall;	001;	1 / 1000;	0.001;	meter;	1;	1.0;	millimeter
+length;	rainfall;	001;	9 / 10000;	9.0E-4;	meter;	9 / 10;	0.9;	millimeter
+
+length;	road;	001;	1000;	1000.0;	meter;	1;	1.0;	kilometer
+length;	road;	001;	900;	900.0;	meter;	9 / 10;	0.9;	kilometer
+length;	road;	001;	800;	800.0;	meter;	800;	800.0;	meter
+length;	road;	001;	300;	300.0;	meter;	300;	300.0;	meter
+length;	road;	001;	2999 / 10;	299.9;	meter;	2999 / 10;	299.9;	meter
+length;	road;	001;	10;	10.0;	meter;	10;	10.0;	meter
+length;	road;	001;	99 / 10;	9.9;	meter;	99 / 10;	9.9;	meter
+length;	road;	001;	1;	1.0;	meter;	1;	1.0;	meter
+length;	road;	001;	9 / 10;	0.9;	meter;	9 / 10;	0.9;	meter
+
+length;	road;	US;	603504 / 625;	965.6064;	meter;	3 / 5;	0.6;	mile
+length;	road;	US;	100584 / 125;	804.672;	meter;	1 / 2;	0.5;	mile
+length;	road;	US;	402336 / 625;	643.7376;	meter;	2112;	2112.0;	foot
+length;	road;	US;	762 / 25;	30.48;	meter;	100;	100.0;	foot
+length;	road;	US;	380619 / 12500;	30.44952;	meter;	999 / 10;	99.9;	foot
+length;	road;	US;	381 / 125;	3.048;	meter;	10;	10.0;	foot
+length;	road;	US;	37719 / 12500;	3.01752;	meter;	99 / 10;	9.9;	foot
+length;	road;	US;	381 / 1250;	0.3048;	meter;	1;	1.0;	foot
+length;	road;	US;	3429 / 12500;	0.27432;	meter;	9 / 10;	0.9;	foot
+
+length;	road;	GB;	603504 / 625;	965.6064;	meter;	3 / 5;	0.6;	mile
+length;	road;	GB;	100584 / 125;	804.672;	meter;	1 / 2;	0.5;	mile
+length;	road;	GB;	402336 / 625;	643.7376;	meter;	704;	704.0;	yard
+length;	road;	GB;	2286 / 25;	91.44;	meter;	100;	100.0;	yard
+length;	road;	GB;	1141857 / 12500;	91.34856;	meter;	999 / 10;	99.9;	yard
+length;	road;	GB;	1143 / 125;	9.144;	meter;	10;	10.0;	yard
+length;	road;	GB;	113157 / 12500;	9.05256;	meter;	99 / 10;	9.9;	yard
+length;	road;	GB;	1143 / 1250;	0.9144;	meter;	1;	1.0;	yard
+length;	road;	GB;	10287 / 12500;	0.82296;	meter;	9 / 10;	0.9;	yard
+
+length;	road;	SE;	11000;	11000.0;	meter;	11 / 10;	1.1;	mile-scandinavian
+length;	road;	SE;	10000;	10000.0;	meter;	1;	1.0;	mile-scandinavian
+length;	road;	SE;	9000;	9000.0;	meter;	9;	9.0;	kilometer
+length;	road;	SE;	1000;	1000.0;	meter;	1;	1.0;	kilometer
+length;	road;	SE;	900;	900.0;	meter;	900;	900.0;	meter
+length;	road;	SE;	300;	300.0;	meter;	300;	300.0;	meter
+length;	road;	SE;	2999 / 10;	299.9;	meter;	2999 / 10;	299.9;	meter
+length;	road;	SE;	10;	10.0;	meter;	10;	10.0;	meter
+length;	road;	SE;	99 / 10;	9.9;	meter;	99 / 10;	9.9;	meter
+length;	road;	SE;	1;	1.0;	meter;	1;	1.0;	meter
+length;	road;	SE;	9 / 10;	0.9;	meter;	9 / 10;	0.9;	meter
+
+length;	snowfall;	001;	11 / 1000;	0.011;	meter;	11 / 10;	1.1;	centimeter
+length;	snowfall;	001;	1 / 100;	0.01;	meter;	1;	1.0;	centimeter
+length;	snowfall;	001;	9 / 1000;	0.009;	meter;	9 / 10;	0.9;	centimeter
+
+length;	snowfall;	US;	1397 / 50000;	0.02794;	meter;	11 / 10;	1.1;	inch
+length;	snowfall;	US;	127 / 5000;	0.0254;	meter;	1;	1.0;	inch
+length;	snowfall;	US;	1143 / 50000;	0.02286;	meter;	9 / 10;	0.9;	inch
+
+length;	vehicle;	GB;	4191 / 12500;	0.33528;	meter;	1;	foot;	6 / 5;	1.2;	inch
+length;	vehicle;	GB;	381 / 1250;	0.3048;	meter;	1;	foot;	0;	0.0;	inch
+length;	vehicle;	GB;	3429 / 12500;	0.27432;	meter;	0;	foot;	54 / 5;	10.8;	inch
+
+length;	vehicle;	001;	11 / 10;	1.1;	meter;	11 / 10;	1.1;	meter
+length;	vehicle;	001;	1;	1.0;	meter;	1;	1.0;	meter
+length;	vehicle;	001;	9 / 10;	0.9;	meter;	9 / 10;	0.9;	meter
+
+length;	vehicle;	MX;	11 / 10;	1.1;	meter;	11 / 10;	1.1;	meter
+length;	vehicle;	MX;	1;	1.0;	meter;	1;	1.0;	meter
+length;	vehicle;	MX;	9 / 10;	0.9;	meter;	9 / 10;	0.9;	meter
+
+length;	visiblty;	001;	200;	200.0;	meter;	1 / 5;	0.2;	kilometer
+length;	visiblty;	001;	100;	100.0;	meter;	1 / 10;	0.1;	kilometer
+length;	visiblty;	001;	1;	1.0;	meter;	1;	1.0;	meter
+length;	visiblty;	001;	9 / 10;	0.9;	meter;	9 / 10;	0.9;	meter
+length;	visiblty;	001;	0;	0.0;	meter;	0;	0.0;	meter
+
+length;	visiblty;	DE;	11 / 10;	1.1;	meter;	11 / 10;	1.1;	meter
+length;	visiblty;	DE;	1;	1.0;	meter;	1;	1.0;	meter
+length;	visiblty;	DE;	9 / 10;	0.9;	meter;	9 / 10;	0.9;	meter
+
+length;	visiblty;	GB;	1106424 / 625;	1770.2784;	meter;	11 / 10;	1.1;	mile
+length;	visiblty;	GB;	201168 / 125;	1609.344;	meter;	1;	1.0;	mile
+length;	visiblty;	GB;	905256 / 625;	1448.4096;	meter;	4752;	4752.0;	foot
+length;	visiblty;	GB;	381 / 1250;	0.3048;	meter;	1;	1.0;	foot
+length;	visiblty;	GB;	3429 / 12500;	0.27432;	meter;	9 / 10;	0.9;	foot
+
+mass;	default;	001;	1100;	1100.0;	kilogram;	11 / 10;	1.1;	metric-ton
+mass;	default;	001;	1000;	1000.0;	kilogram;	1;	1.0;	metric-ton
+mass;	default;	001;	900;	900.0;	kilogram;	900;	900.0;	kilogram
+mass;	default;	001;	1;	1.0;	kilogram;	1;	1.0;	kilogram
+mass;	default;	001;	9 / 10;	0.9;	kilogram;	900;	900.0;	gram
+mass;	default;	001;	1 / 1000;	0.001;	kilogram;	1;	1.0;	gram
+mass;	default;	001;	9 / 10000;	9.0E-4;	kilogram;	900;	900.0;	milligram
+mass;	default;	001;	1 / 1000000;	1.0E-6;	kilogram;	1;	1.0;	milligram
+mass;	default;	001;	9 / 10000000;	9.0E-7;	kilogram;	900;	900.0;	microgram
+mass;	default;	001;	1 / 1000000000;	1.0E-9;	kilogram;	1;	1.0;	microgram
+mass;	default;	001;	9 / 10000000000;	9.0E-10;	kilogram;	9 / 10;	0.9;	microgram
+
+mass;	default;	GB;	498951607 / 500000;	997.903214;	kilogram;	11 / 10;	1.1;	ton
+mass;	default;	GB;	45359237 / 50000;	907.18474;	kilogram;	1;	1.0;	ton
+mass;	default;	GB;	408233133 / 500000;	816.466266;	kilogram;	1800;	1800.0;	pound
+mass;	default;	GB;	45359237 / 100000000;	0.45359237;	kilogram;	1;	1.0;	pound
+mass;	default;	GB;	408233133 / 1000000000;	0.408233133;	kilogram;	72 / 5;	14.4;	ounce
+mass;	default;	GB;	45359237 / 1600000000;	0.028349523125;	kilogram;	1;	1.0;	ounce
+mass;	default;	GB;	408233133 / 16000000000;	0.0255145708125;	kilogram;	9 / 10;	0.9;	ounce
+
+mass;	person;	001;	11 / 10;	1.1;	kilogram;	11 / 10;	1.1;	kilogram
+mass;	person;	001;	1;	1.0;	kilogram;	1;	1.0;	kilogram
+mass;	person;	001;	9 / 10;	0.9;	kilogram;	900;	900.0;	gram
+mass;	person;	001;	1 / 1000;	0.001;	kilogram;	1;	1.0;	gram
+mass;	person;	001;	9 / 10000;	9.0E-4;	kilogram;	9 / 10;	0.9;	gram
+
+mass;	person;	DZ;	11 / 10;	1.1;	kilogram;	11 / 10;	1.1;	kilogram
+mass;	person;	DZ;	1;	1.0;	kilogram;	1;	1.0;	kilogram
+mass;	person;	DZ;	9 / 10;	0.9;	kilogram;	900;	900.0;	gram
+
+mass;	person;	US;	498951607 / 1000000000;	0.498951607;	kilogram;	11 / 10;	1.1;	pound
+mass;	person;	US;	45359237 / 100000000;	0.45359237;	kilogram;	1;	1.0;	pound
+mass;	person;	US;	408233133 / 1000000000;	0.408233133;	kilogram;	0;	pound;	72 / 5;	14.4;	ounce
+
+mass;	person;	GB;	3492661249 / 500000000;	6.985322498;	kilogram;	1;	stone;	7 / 5;	1.4;	pound
+mass;	person;	GB;	317514659 / 50000000;	6.35029318;	kilogram;	1;	stone;	0;	0.0;	pound
+mass;	person;	GB;	2857631931 / 500000000;	5.715263862;	kilogram;	12;	pound;	48 / 5;	9.6;	ounce
+mass;	person;	GB;	45359237 / 100000000;	0.45359237;	kilogram;	1;	pound;	0;	0.0;	ounce
+mass;	person;	GB;	408233133 / 1000000000;	0.408233133;	kilogram;	0;	pound;	72 / 5;	14.4;	ounce
+
+mass;	person;	HK;	498951607 / 1000000000;	0.498951607;	kilogram;	1;	pound;	8 / 5;	1.6;	ounce
+mass;	person;	HK;	45359237 / 100000000;	0.45359237;	kilogram;	1;	pound;	0;	0.0;	ounce
+mass;	person;	HK;	408233133 / 1000000000;	0.408233133;	kilogram;	0;	pound;	72 / 5;	14.4;	ounce
+
+mass-density;	default;	001;	11 / 10;	1.1;	kilogram-per-cubic-meter;	11 / 10;	1.1;	kilogram-per-cubic-meter
+mass-density;	default;	001;	1;	1.0;	kilogram-per-cubic-meter;	1;	1.0;	kilogram-per-cubic-meter
+mass-density;	default;	001;	9 / 10;	0.9;	kilogram-per-cubic-meter;	9 / 10;	0.9;	kilogram-per-cubic-meter
+
+power;	default;	001;	1100000000;	1.1E9;	kilogram-square-meter-per-cubic-second;	11 / 10;	1.1;	gigawatt
+power;	default;	001;	1000000000;	1.0E9;	kilogram-square-meter-per-cubic-second;	1;	1.0;	gigawatt
+power;	default;	001;	900000000;	9.0E8;	kilogram-square-meter-per-cubic-second;	900;	900.0;	megawatt
+power;	default;	001;	1000000;	1000000.0;	kilogram-square-meter-per-cubic-second;	1;	1.0;	megawatt
+power;	default;	001;	900000;	900000.0;	kilogram-square-meter-per-cubic-second;	900;	900.0;	kilowatt
+power;	default;	001;	1000;	1000.0;	kilogram-square-meter-per-cubic-second;	1;	1.0;	kilowatt
+power;	default;	001;	900;	900.0;	kilogram-square-meter-per-cubic-second;	900;	900.0;	watt
+power;	default;	001;	1;	1.0;	kilogram-square-meter-per-cubic-second;	1;	1.0;	watt
+power;	default;	001;	9 / 10;	0.9;	kilogram-square-meter-per-cubic-second;	900;	900.0;	milliwatt
+power;	default;	001;	1 / 1000;	0.001;	kilogram-square-meter-per-cubic-second;	1;	1.0;	milliwatt
+power;	default;	001;	9 / 10000;	9.0E-4;	kilogram-square-meter-per-cubic-second;	9 / 10;	0.9;	milliwatt
+
+power;	engine;	001;	1100;	1100.0;	kilogram-square-meter-per-cubic-second;	11 / 10;	1.1;	kilowatt
+power;	engine;	001;	1000;	1000.0;	kilogram-square-meter-per-cubic-second;	1;	1.0;	kilowatt
+power;	engine;	001;	900;	900.0;	kilogram-square-meter-per-cubic-second;	9 / 10;	0.9;	kilowatt
+
+power;	engine;	GB;	410134929370248621 / 500000000000000;	820.2698587404972;	kilogram-square-meter-per-cubic-second;	11 / 10;	1.1;	horsepower
+power;	engine;	GB;	37284993579113511 / 50000000000000;	745.6998715822702;	kilogram-square-meter-per-cubic-second;	1;	1.0;	horsepower
+power;	engine;	GB;	335564942212021599 / 500000000000000;	671.1298844240432;	kilogram-square-meter-per-cubic-second;	9 / 10;	0.9;	horsepower
+
+pressure;	baromtrc;	001;	110;	110.0;	kilogram-per-meter-square-second;	11 / 10;	1.1;	hectopascal
+pressure;	baromtrc;	001;	100;	100.0;	kilogram-per-meter-square-second;	1;	1.0;	hectopascal
+pressure;	baromtrc;	001;	90;	90.0;	kilogram-per-meter-square-second;	9 / 10;	0.9;	hectopascal
+
+pressure;	baromtrc;	IN;	37250275043751 / 10000000000;	3725.0275043751;	kilogram-per-meter-square-second;	11 / 10;	1.1;	inch-ofhg
+pressure;	baromtrc;	IN;	3386388640341 / 1000000000;	3386.388640341;	kilogram-per-meter-square-second;	1;	1.0;	inch-ofhg
+pressure;	baromtrc;	IN;	30477497763069 / 10000000000;	3047.7497763069;	kilogram-per-meter-square-second;	9 / 10;	0.9;	inch-ofhg
+
+pressure;	baromtrc;	BR;	110;	110.0;	kilogram-per-meter-square-second;	11 / 10;	1.1;	millibar
+pressure;	baromtrc;	BR;	100;	100.0;	kilogram-per-meter-square-second;	1;	1.0;	millibar
+pressure;	baromtrc;	BR;	90;	90.0;	kilogram-per-meter-square-second;	9 / 10;	0.9;	millibar
+
+pressure;	baromtrc;	MX;	293309252313 / 2000000000;	146.6546261565;	kilogram-per-meter-square-second;	11 / 10;	1.1;	millimeter-ofhg
+pressure;	baromtrc;	MX;	26664477483 / 200000000;	133.322387415;	kilogram-per-meter-square-second;	1;	1.0;	millimeter-ofhg
+pressure;	baromtrc;	MX;	239980297347 / 2000000000;	119.9901486735;	kilogram-per-meter-square-second;	9 / 10;	0.9;	millimeter-ofhg
+
+pressure;	default;	001;	1100000;	1100000.0;	kilogram-per-meter-square-second;	11 / 10;	1.1;	megapascal
+pressure;	default;	001;	1000000;	1000000.0;	kilogram-per-meter-square-second;	1;	1.0;	megapascal
+pressure;	default;	001;	900000;	900000.0;	kilogram-per-meter-square-second;	900000;	900000.0;	pascal
+pressure;	default;	001;	1;	1.0;	kilogram-per-meter-square-second;	1;	1.0;	pascal
+pressure;	default;	001;	9 / 10;	0.9;	kilogram-per-meter-square-second;	9 / 10;	0.9;	pascal
+
+pressure;	default;	GB;	97860875535731 / 12903200000;	7584.233022485197;	kilogram-per-meter-square-second;	11 / 10;	1.1;	pound-force-per-square-inch
+pressure;	default;	GB;	8896443230521 / 1290320000;	6894.757293168361;	kilogram-per-meter-square-second;	1;	1.0;	pound-force-per-square-inch
+pressure;	default;	GB;	80067989074689 / 12903200000;	6205.281563851525;	kilogram-per-meter-square-second;	9 / 10;	0.9;	pound-force-per-square-inch
+
+speed;	default;	001;	11 / 36;	0.3055555555555556;	meter-per-second;	11 / 10;	1.1;	kilometer-per-hour
+speed;	default;	001;	5 / 18;	0.2777777777777778;	meter-per-second;	1;	1.0;	kilometer-per-hour
+speed;	default;	001;	1 / 4;	0.25;	meter-per-second;	9 / 10;	0.9;	kilometer-per-hour
+
+speed;	default;	GB;	15367 / 31250;	0.491744;	meter-per-second;	11 / 10;	1.1;	mile-per-hour
+speed;	default;	GB;	1397 / 3125;	0.44704;	meter-per-second;	1;	1.0;	mile-per-hour
+speed;	default;	GB;	12573 / 31250;	0.402336;	meter-per-second;	9 / 10;	0.9;	mile-per-hour
+
+speed;	wind;	001;	11 / 36;	0.3055555555555556;	meter-per-second;	11 / 10;	1.1;	kilometer-per-hour
+speed;	wind;	001;	5 / 18;	0.2777777777777778;	meter-per-second;	1;	1.0;	kilometer-per-hour
+speed;	wind;	001;	1 / 4;	0.25;	meter-per-second;	9 / 10;	0.9;	kilometer-per-hour
+
+speed;	wind;	FI;	11 / 10;	1.1;	meter-per-second;	11 / 10;	1.1;	meter-per-second
+speed;	wind;	FI;	1;	1.0;	meter-per-second;	1;	1.0;	meter-per-second
+speed;	wind;	FI;	9 / 10;	0.9;	meter-per-second;	9 / 10;	0.9;	meter-per-second
+
+speed;	wind;	US;	15367 / 31250;	0.491744;	meter-per-second;	11 / 10;	1.1;	mile-per-hour
+speed;	wind;	US;	1397 / 3125;	0.44704;	meter-per-second;	1;	1.0;	mile-per-hour
+speed;	wind;	US;	12573 / 31250;	0.402336;	meter-per-second;	9 / 10;	0.9;	mile-per-hour
+
+temperature;	default;	001;	1097 / 4;	274.25;	kelvin;	11 / 10;	1.1;	celsius
+temperature;	default;	001;	5483 / 20;	274.15;	kelvin;	1;	1.0;	celsius
+temperature;	default;	001;	5481 / 20;	274.05;	kelvin;	9 / 10;	0.9;	celsius
+
+temperature;	default;	US;	15359 / 60;	255.9833333333333;	kelvin;	11 / 10;	1.1;	fahrenheit
+temperature;	default;	US;	46067 / 180;	255.9277777777778;	kelvin;	1;	1.0;	fahrenheit
+temperature;	default;	US;	46057 / 180;	255.8722222222222;	kelvin;	9 / 10;	0.9;	fahrenheit
+
+temperature;	weather;	001;	1097 / 4;	274.25;	kelvin;	11 / 10;	1.1;	celsius
+temperature;	weather;	001;	5483 / 20;	274.15;	kelvin;	1;	1.0;	celsius
+temperature;	weather;	001;	5481 / 20;	274.05;	kelvin;	9 / 10;	0.9;	celsius
+
+temperature;	weather;	BS;	15359 / 60;	255.9833333333333;	kelvin;	11 / 10;	1.1;	fahrenheit
+temperature;	weather;	BS;	46067 / 180;	255.9277777777778;	kelvin;	1;	1.0;	fahrenheit
+temperature;	weather;	BS;	46057 / 180;	255.8722222222222;	kelvin;	9 / 10;	0.9;	fahrenheit
+
+volume;	default;	001;	11 / 10;	1.1;	cubic-meter;	11 / 10;	1.1;	cubic-meter
+volume;	default;	001;	1;	1.0;	cubic-meter;	1;	1.0;	cubic-meter
+volume;	default;	001;	9 / 10;	0.9;	cubic-meter;	900000;	900000.0;	cubic-centimeter
+volume;	default;	001;	1 / 1000000;	1.0E-6;	cubic-meter;	1;	1.0;	cubic-centimeter
+volume;	default;	001;	9 / 10000000;	9.0E-7;	cubic-meter;	9 / 10;	0.9;	cubic-centimeter
+
+volume;	default;	GB;	608369751 / 19531250000;	0.0311485312512;	cubic-meter;	11 / 10;	1.1;	cubic-foot
+volume;	default;	GB;	55306341 / 1953125000;	0.028316846592;	cubic-meter;	1;	1.0;	cubic-foot
+volume;	default;	GB;	497757069 / 19531250000;	0.0254851619328;	cubic-meter;	7776 / 5;	1555.2;	cubic-inch
+volume;	default;	GB;	2048383 / 125000000000;	1.6387064E-5;	cubic-meter;	1;	1.0;	cubic-inch
+volume;	default;	GB;	18435447 / 1250000000000;	1.47483576E-5;	cubic-meter;	9 / 10;	0.9;	cubic-inch
+
+volume;	fluid;	001;	11 / 10000;	0.0011;	cubic-meter;	11 / 10;	1.1;	liter
+volume;	fluid;	001;	1 / 1000;	0.001;	cubic-meter;	1;	1.0;	liter
+volume;	fluid;	001;	9 / 10000;	9.0E-4;	cubic-meter;	900;	900.0;	milliliter
+volume;	fluid;	001;	1 / 1000000;	1.0E-6;	cubic-meter;	1;	1.0;	milliliter
+volume;	fluid;	001;	9 / 10000000;	9.0E-7;	cubic-meter;	9 / 10;	0.9;	milliliter
+
+volume;	fluid;	US;	5204941203 / 1250000000000;	0.0041639529624;	cubic-meter;	11 / 10;	1.1;	gallon
+volume;	fluid;	US;	473176473 / 125000000000;	0.003785411784;	cubic-meter;	1;	1.0;	gallon
+volume;	fluid;	US;	4258588257 / 1250000000000;	0.0034068706056;	cubic-meter;	18 / 5;	3.6;	quart
+volume;	fluid;	US;	473176473 / 500000000000;	9.46352946E-4;	cubic-meter;	1;	1.0;	quart
+volume;	fluid;	US;	4258588257 / 5000000000000;	8.517176514E-4;	cubic-meter;	9 / 5;	1.8;	pint
+volume;	fluid;	US;	473176473 / 1000000000000;	4.73176473E-4;	cubic-meter;	1;	1.0;	pint
+volume;	fluid;	US;	4258588257 / 10000000000000;	4.258588257E-4;	cubic-meter;	9 / 5;	1.8;	cup
+volume;	fluid;	US;	473176473 / 2000000000000;	2.365882365E-4;	cubic-meter;	1;	1.0;	cup
+volume;	fluid;	US;	4258588257 / 20000000000000;	2.1292941285E-4;	cubic-meter;	36 / 5;	7.2;	fluid-ounce
+volume;	fluid;	US;	473176473 / 16000000000000;	2.95735295625E-5;	cubic-meter;	1;	1.0;	fluid-ounce
+volume;	fluid;	US;	4258588257 / 160000000000000;	2.661617660625E-5;	cubic-meter;	9 / 5;	1.8;	tablespoon
+volume;	fluid;	US;	473176473 / 32000000000000;	1.478676478125E-5;	cubic-meter;	1;	1.0;	tablespoon
+volume;	fluid;	US;	4258588257 / 320000000000000;	1.3308088303125E-5;	cubic-meter;	27 / 10;	2.7;	teaspoon
+volume;	fluid;	US;	157725491 / 32000000000000;	4.92892159375E-6;	cubic-meter;	1;	1.0;	teaspoon
+volume;	fluid;	US;	1419529419 / 320000000000000;	4.436029434375E-6;	cubic-meter;	9 / 10;	0.9;	teaspoon
+
+volume;	fluid;	GB;	5000699 / 1000000000;	0.005000699;	cubic-meter;	11 / 10;	1.1;	gallon-imperial
+volume;	fluid;	GB;	454609 / 100000000;	0.00454609;	cubic-meter;	1;	1.0;	gallon-imperial
+volume;	fluid;	GB;	4091481 / 1000000000;	0.004091481;	cubic-meter;	144;	144.0;	fluid-ounce-imperial
+volume;	fluid;	GB;	454609 / 16000000000;	2.84130625E-5;	cubic-meter;	1;	1.0;	fluid-ounce-imperial
+volume;	fluid;	GB;	4091481 / 160000000000;	2.557175625E-5;	cubic-meter;	9 / 10;	0.9;	fluid-ounce-imperial
+
+volume;	oil;	001;	109303765263 / 625000000000;	0.1748860244208;	cubic-meter;	11 / 10;	1.1;	barrel
+volume;	oil;	001;	9936705933 / 62500000000;	0.158987294928;	cubic-meter;	1;	1.0;	barrel
+volume;	oil;	001;	89430353397 / 625000000000;	0.1430885654352;	cubic-meter;	9 / 10;	0.9;	barrel
+
+volume;	vehicle;	US;	5204941203 / 1250000000000;	0.0041639529624;	cubic-meter;	11 / 10;	1.1;	gallon
+volume;	vehicle;	US;	473176473 / 125000000000;	0.003785411784;	cubic-meter;	1;	1.0;	gallon
+volume;	vehicle;	US;	4258588257 / 1250000000000;	0.0034068706056;	cubic-meter;	9 / 10;	0.9;	gallon
+
+volume;	vehicle;	001;	11 / 10000;	0.0011;	cubic-meter;	11 / 10;	1.1;	liter
+volume;	vehicle;	001;	1 / 1000;	0.001;	cubic-meter;	1;	1.0;	liter
+volume;	vehicle;	001;	9 / 10000;	9.0E-4;	cubic-meter;	9 / 10;	0.9;	liter
+
+year-duration;	default;	001;	11 / 10;	1.1;	year;	11 / 10;	1.1;	year
+year-duration;	default;	001;	1;	1.0;	year;	1;	1.0;	year
+year-duration;	default;	001;	9 / 10;	0.9;	year;	54 / 5;	10.8;	month
+year-duration;	default;	001;	1 / 12;	0.08333333333333333;	year;	1;	1.0;	month
+year-duration;	default;	001;	3 / 40;	0.075;	year;	9 / 10;	0.9;	month
+
+year-duration;	person-age;	001;	13 / 5;	2.6;	year;	13 / 5;	2.6;	year-person
+year-duration;	person-age;	001;	5 / 2;	2.5;	year;	5 / 2;	2.5;	year-person
+year-duration;	person-age;	001;	12 / 5;	2.4;	year;	2;	year-person;	24 / 5;	4.8;	month-person
+year-duration;	person-age;	001;	1;	1.0;	year;	1;	year-person;	0;	0.0;	month-person
+year-duration;	person-age;	001;	9 / 10;	0.9;	year;	54 / 5;	10.8;	month-person
+year-duration;	person-age;	001;	1 / 12;	0.08333333333333333;	year;	1;	1.0;	month-person
+year-duration;	person-age;	001;	3 / 40;	0.075;	year;	9 / 10;	0.9;	month-person

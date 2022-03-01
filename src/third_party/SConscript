@@ -145,7 +145,6 @@ if True:
         ],
         'FORCEINCLUDES' : [
             'js-config.h',
-            'js/RequiredDefines.h',
         ],
     }
 

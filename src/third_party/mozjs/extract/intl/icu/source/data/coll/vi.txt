@@ -1,0 +1,38 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+vi{
+    collations{
+        standard{
+            Sequence{
+                "[normalization on]"
+                "&̀<<̉<<̃<<́<<̣"
+                "&a<ă<<<Ă<â<<<Â"
+                "&d<đ<<<Đ"
+                "&e<ê<<<Ê"
+                "&o<ô<<<Ô<ơ<<<Ơ"
+                "&u<ư<<<Ư"
+            }
+            Version{"39"}
+        }
+        traditional{
+            Sequence{
+                "[normalization on]"
+                "&̀<<̉<<̃<<́<<̣"
+                "&a<ă<<<Ă<â<<<Â"
+                "&C<ch<<<Ch<<<CH"
+                "&d<đ<<<Đ"
+                "&e<ê<<<Ê"
+                "&G<gh<<<Gh<<<GH<gi<<<Gi<<<GI"
+                "&K<kh<<<Kh<<<KH"
+                "&N<nh<<<Nh<<<NH<ng<<<Ng<<<NG<ngh<<<Ngh<<<NGh<<<NGH"
+                "&o<ô<<<Ô<ơ<<<Ơ"
+                "&P<ph<<<Ph<<<PH"
+                "&Q<qu<<<Qu<<<QU"
+                "&T<th<<<Th<<<TH<tr<<<Tr<<<TR"
+                "&u<ư<<<Ư"
+            }
+            Version{"39"}
+        }
+    }
+}

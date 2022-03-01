@@ -1,4 +1,4 @@
 {
-    "configure-args": "--disable-ion --enable-warnings-as-errors",
+    "configure-args": "--disable-jit --enable-warnings-as-errors --enable-rust-simd",
     "optimize": true
 }

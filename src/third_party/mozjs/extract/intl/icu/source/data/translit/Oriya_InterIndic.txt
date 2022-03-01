@@ -1,0 +1,98 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Oriya_InterIndic.txt
+# Generated from CLDR
+#
+
+# Oriya-InterIndic
+#:: NFD (NFC) ;
+#ଡ\u0B3C→\uE05C;# LETTER RRA
+#ଢ\u0B3C→\uE05D;# LETTER RHA
+େ\u0B56→\uE048;# VOWEL SIGN AI
+ୋ→\uE04B;# VOWEL SIGN O
+ୌ→\uE04C;# VOWEL SIGN AU
+\u0B01→\uE001;      # SIGN CANDRABINDU
+ଂ→\uE002;      # SIGN ANUSVARA
+ଃ→\uE003;      # SIGN VISARGA
+ଅ→\uE005;      # LETTER A
+ଆ→\uE006;      # LETTER AA
+ଇ→\uE007;      # LETTER I
+ଈ→\uE008;      # LETTER II
+ଉ→\uE009;      # LETTER U
+ଊ→\uE00A;      # LETTER UU
+ଋ→\uE00B;      # LETTER VOCALIC R
+ଌ→\uE00C;      # LETTER VOCALIC L
+ଏ→\uE00F;      # LETTER E
+ଐ→\uE010;      # LETTER AI
+ଓ→\uE013;      # LETTER O
+ଔ→\uE014;      # LETTER AU
+କ→\uE015;      # LETTER KA
+ଖ→\uE016;      # LETTER KHA
+ଗ→\uE017;      # LETTER GA
+ଘ→\uE018;      # LETTER GHA
+ଙ→\uE019;      # LETTER NGA
+ଚ→\uE01A;      # LETTER CA
+ଛ→\uE01B;      # LETTER CHA
+ଜ→\uE01C;      # LETTER JA
+ଝ→\uE01D;      # LETTER JHA
+ଞ→\uE01E;      # LETTER NYA
+ଟ→\uE01F;      # LETTER TTA
+ଠ→\uE020;      # LETTER TTHA
+ଡ→\uE021;      # LETTER DDA
+ଢ→\uE022;      # LETTER DDHA
+ଣ→\uE023;      # LETTER NNA
+ତ→\uE024;      # LETTER TA
+ଥ→\uE025;      # LETTER THA
+ଦ→\uE026;      # LETTER DA
+ଧ→\uE027;      # LETTER DHA
+ନ→\uE028;      # LETTER NA
+ପ→\uE02A;      # LETTER PA
+ଫ→\uE02B;      # LETTER PHA
+ବ→\uE02C;      # LETTER BA
+ଭ→\uE02D;      # LETTER BHA
+ମ→\uE02E;      # LETTER MA
+ଯ→\uE02F;      # LETTER YA
+ର→\uE030;      # LETTER RA
+ଲ→\uE032;      # LETTER LA
+ଳ→\uE033;      # LETTER LLA
+ଵ→\uE035;      # LETTER VA
+ଶ→\uE036;      # LETTER SHA
+ଷ→\uE037;      # LETTER SSA
+ସ→\uE038;      # LETTER SA
+ହ→\uE039;      # LETTER HA
+\u0B3C→\uE03C;      # SIGN NUKTA
+ଽ→\uE03D;      # SIGN AVAGRAHA
+ା→\uE03E;      # VOWEL SIGN AA
+\u0B3F→\uE03F;      # VOWEL SIGN I
+ୀ→\uE040;      # VOWEL SIGN II
+\u0B41→\uE041;      # VOWEL SIGN U
+\u0B42→\uE042;      # VOWEL SIGN UU
+\u0B43→\uE043;      # VOWEL SIGN VOCALIC R
+େ→\uE047;      # VOWEL SIGN E
+#
+\u0B4D→\uE04D;      # SIGN VIRAMA
+\u0B56→\uE056;      # AI LENGTH MARK
+ୗ→\uE057;      # AU LENGTH MARK
+।→\uE064;      # DANDA
+॥→\uE065;      # DOUBLE DANDA
+#
+ୟ→\uE05F;      # LETTER YYA
+ୠ→\uE060;      # LETTER VOCALIC RR
+ୡ→\uE061;      # LETTER VOCALIC LL
+୦→\uE066;      # DIGIT ZERO
+୧→\uE067;      # DIGIT ONE
+୨→\uE068;      # DIGIT TWO
+୩→\uE069;      # DIGIT THREE
+୪→\uE06A;      # DIGIT FOUR
+୫→\uE06B;      # DIGIT FIVE
+୬→\uE06C;      # DIGIT SIX
+୭→\uE06D;      # DIGIT SEVEN
+୮→\uE06E;      # DIGIT EIGHT
+୯→\uE06F;      # DIGIT NINE
+୰→\uE07B;      # ISSHAR
+ୱ→\uE081;      # LETTER WA
+#    :: NFC (NFD) ;
+# eof
+

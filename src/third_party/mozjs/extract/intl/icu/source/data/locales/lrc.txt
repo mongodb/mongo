@@ -1,0 +1,403 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+lrc{
+    AuxExemplarCharacters{
+        "[\u200B\u200C\u200D\u200E\u200F \u064B \u064C \u064D \u064E \u064F \u0650 "
+        "\u0651 \u0652 \u0654 إ ة ك ه ى ي]"
+    }
+    ExemplarCharacters{
+        "[\u0659 \u065B آ أ ؤ ئ ا ب پ ت ث ج چ ح خ د ذ ر ز ژ س ش ص ض ط ظ ع غ ف ڤ ق ک گ"
+        " ل م ن ھ ە و ۉ ۊ ی ؽ]"
+    }
+    ExemplarCharactersIndex{"[آ ا ب پ ت ث ج چ ح خ د ذ ر ز ژ س ش ص ض ط ظ ع غ ف ق ک گ ل م ن ھ و ی]"}
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    ExemplarCharactersPunctuation{"[\\- ‐ ‑ ، ٫ ٬ ؛ \\: ! ؟ . … ‹ › « » ( ) \\[ \\] * / \\\\]"}
+    NumberElements{
+        arabext{
+            symbols{
+                timeSeparator{":"}
+            }
+        }
+        default{"arabext"}
+        latn{
+            patterns{
+                currencyFormat{"¤ #,##0.00"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"#,##0%"}
+                scientificFormat{"#E0"}
+            }
+            symbols{
+                decimal{"."}
+                group{","}
+                minusSign{"-"}
+                percentSign{"%"}
+                plusSign{"+"}
+            }
+        }
+        native{"arabext"}
+    }
+    calendar{
+        default{"persian"}
+        generic{
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "G y MMMM d, EEEE",
+                "G y MMMM d",
+                "G y MMM d",
+                "GGGGG y-MM-dd",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            intervalFormats{
+                fallback{"{0} – {1}"}
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "AM",
+                "PM",
+            }
+            AmPmMarkersAbbr{
+                "AM",
+                "PM",
+            }
+            DateTimePatterns{
+                "HH:mm:ss zzzz",
+                "HH:mm:ss z",
+                "HH:mm:ss",
+                "HH:mm",
+                "y MMMM d, EEEE",
+                "y MMMM d",
+                "y MMM d",
+                "y-MM-dd",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "Sun",
+                        "Mon",
+                        "Tue",
+                        "Wed",
+                        "Thu",
+                        "Fri",
+                        "Sat",
+                    }
+                    narrow{
+                        "S",
+                        "M",
+                        "T",
+                        "W",
+                        "T",
+                        "F",
+                        "S",
+                    }
+                    wide{
+                        "Sun",
+                        "Mon",
+                        "Tue",
+                        "Wed",
+                        "Thu",
+                        "Fri",
+                        "Sat",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "Sun",
+                        "Mon",
+                        "Tue",
+                        "Wed",
+                        "Thu",
+                        "Fri",
+                        "Sat",
+                    }
+                    narrow{
+                        "S",
+                        "M",
+                        "T",
+                        "W",
+                        "T",
+                        "F",
+                        "S",
+                    }
+                    wide{
+                        "Sun",
+                        "Mon",
+                        "Tue",
+                        "Wed",
+                        "Thu",
+                        "Fri",
+                        "Sat",
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "BCE",
+                    "CE",
+                }
+            }
+            intervalFormats{
+                fallback{"{0} – {1}"}
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "جانڤیە",
+                        "فئڤریە",
+                        "مارس",
+                        "آڤریل",
+                        "مئی",
+                        "جوٙأن",
+                        "جوٙلا",
+                        "آگوست",
+                        "سئپتامر",
+                        "ئوکتوڤر",
+                        "نوڤامر",
+                        "دئسامر",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "جانڤیە",
+                        "فئڤریە",
+                        "مارس",
+                        "آڤریل",
+                        "مئی",
+                        "جوٙأن",
+                        "جوٙلا",
+                        "آگوست",
+                        "سئپتامر",
+                        "ئوکتوڤر",
+                        "نوڤامر",
+                        "دئسامر",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "جانڤیە",
+                        "فئڤریە",
+                        "مارس",
+                        "آڤریل",
+                        "مئی",
+                        "جوٙأن",
+                        "جوٙلا",
+                        "آگوست",
+                        "سئپتامر",
+                        "ئوکتوڤر",
+                        "نوڤامر",
+                        "دئسامر",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "جانڤیە",
+                        "فئڤریە",
+                        "مارس",
+                        "آڤریل",
+                        "مئی",
+                        "جوٙأن",
+                        "جوٙلا",
+                        "آگوست",
+                        "سئپتامر",
+                        "ئوکتوڤر",
+                        "نوڤامر",
+                        "دئسامر",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "Q1",
+                        "Q2",
+                        "Q3",
+                        "Q4",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "Q1",
+                        "Q2",
+                        "Q3",
+                        "Q4",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "چارأک أڤأل",
+                        "Q2",
+                        "Q3",
+                        "Q4",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "چارأک أڤأل",
+                        "چارأک دویوم",
+                        "چارأک سئیوم",
+                        "چارأک چاروم",
+                    }
+                }
+            }
+        }
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"روٙز"}
+            relative{
+                "-1"{"دیروٙز"}
+                "0"{"أمروٙ"}
+                "1"{"شوٙصوٙ"}
+            }
+        }
+        day-narrow{
+            dn{"روٙز"}
+        }
+        day-short{
+            dn{"روٙز"}
+        }
+        dayperiod{
+            dn{"گات روٙز"}
+        }
+        era{
+            dn{"سأرۉ"}
+        }
+        hour{
+            dn{"ساأت"}
+        }
+        hour-narrow{
+            dn{"ساأت"}
+        }
+        hour-short{
+            dn{"ساأت"}
+        }
+        minute{
+            dn{"دئیقە"}
+        }
+        minute-narrow{
+            dn{"دئیقە"}
+        }
+        minute-short{
+            dn{"دئیقە"}
+        }
+        month{
+            dn{"ما"}
+        }
+        month-narrow{
+            dn{"ما"}
+        }
+        month-short{
+            dn{"ما"}
+        }
+        quarter{
+            dn{"چارأک"}
+        }
+        quarter-narrow{
+            dn{"چارأک"}
+        }
+        quarter-short{
+            dn{"چارأک"}
+        }
+        second{
+            dn{"ثانیە"}
+        }
+        second-narrow{
+            dn{"ثانیە"}
+        }
+        second-short{
+            dn{"ثانیە"}
+        }
+        week{
+            dn{"ھأفتە"}
+        }
+        week-narrow{
+            dn{"ھأفتە"}
+        }
+        week-short{
+            dn{"ھأفتە"}
+        }
+        weekday{
+            dn{"روٙز ھأفتە"}
+        }
+        year{
+            dn{"سال"}
+        }
+        year-narrow{
+            dn{"سال"}
+        }
+        year-short{
+            dn{"سال"}
+        }
+        zone{
+            dn{"راساگە"}
+        }
+    }
+    layout{
+        characters{"right-to-left"}
+        lines{"top-to-bottom"}
+    }
+    listPattern{
+        standard{
+            2{"{0}, {1}"}
+            end{"{0}, {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+    }
+    measurementSystemNames{
+        UK{"بئریتانیا گأپ"}
+        US{"ڤولاتیا یأکاگئرته"}
+        metric{"مئتری"}
+    }
+}

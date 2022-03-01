@@ -1,0 +1,2822 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+lo{
+    AuxExemplarCharacters{"[\u200B ໐ ໑ ໒ ໓ ໔ ໕ ໖ ໗ ໘ ໙]"}
+    Ellipsis{
+        final{"{0}…"}
+        initial{"…{0}"}
+        medial{"{0}…{1}"}
+        word-final{"{0} …"}
+        word-initial{"… {0}"}
+        word-medial{"{0} … {1}"}
+    }
+    ExemplarCharacters{
+        "[\u0EC8 \u0EC9 \u0ECA \u0ECB \u0ECC \u0ECD ໆ ກ ຂ ຄ ງ ຈ ສ ຊ ຍ ດ ຕ ຖ ທ ນ ບ ປ ຜ"
+        " ຝ ພ ຟ ມ ຢ ຣ ລ ວ ຫ ໜ ໝ ອ ຮ ຯ ະ \u0EB1 າ ຳ \u0EB4 \u0EB5 \u0EB6 \u0EB7 "
+        "\u0EB8 \u0EB9 \u0EBB \u0EBC ຽ ເ ແ ໂ ໃ ໄ]"
+    }
+    ExemplarCharactersIndex{
+        "[ກ ຂ ຄ ງ ຈ ສ ຊ ຍ ດ ຕ ຖ ທ ນ ບ ປ ຜ ຝ ພ ຟ ມ ຢ ຣ ລ ວ ຫ {ຫງ} {ຫຍ} {ຫນ} {ຫມ} {ຫລ} "
+        "{ຫວ} ອ ຮ]"
+    }
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    ExemplarCharactersPunctuation{
+        "[\\- ‐ ‑ – — , ; \\: ! ? . … ' ‘ ’ \u0022 “ ” ( ) \\[ \\] § @ * / \\& # † ‡ "
+        "′ ″]"
+    }
+    MoreInformation{"?"}
+    NumberElements{
+        default{"latn"}
+        laoo{
+            patternsLong{
+                decimalFormat{
+                    1000{
+                        other{"0ພັນ"}
+                    }
+                    10000{
+                        other{"00ພັນ"}
+                    }
+                    100000{
+                        other{"000ພັນ"}
+                    }
+                    1000000{
+                        other{"0ລ້ານ"}
+                    }
+                    10000000{
+                        other{"00ລ້ານ"}
+                    }
+                    100000000{
+                        other{"000ລ້ານ"}
+                    }
+                    1000000000{
+                        other{"0ພັນລ້ານ"}
+                    }
+                    10000000000{
+                        other{"00ພັນລ້ານ"}
+                    }
+                    100000000000{
+                        other{"000ພັນລ້ານ"}
+                    }
+                    1000000000000{
+                        other{"0000ພັນລ້ານ"}
+                    }
+                    10000000000000{
+                        other{"00ລ້ານລ້ານ"}
+                    }
+                    100000000000000{
+                        other{"000ລ້ານລ້ານ"}
+                    }
+                }
+            }
+            patternsShort{
+                decimalFormat{
+                    1000{
+                        other{"0ພັນ"}
+                    }
+                    10000{
+                        other{"00ພັນ"}
+                    }
+                    100000{
+                        other{"000ພັນ"}
+                    }
+                    1000000{
+                        other{"0ລ້ານ"}
+                    }
+                    10000000{
+                        other{"00ລ້ານ"}
+                    }
+                    100000000{
+                        other{"000ລ້ານ"}
+                    }
+                    1000000000{
+                        other{"0ຕື້"}
+                    }
+                    10000000000{
+                        other{"00ຕື້"}
+                    }
+                    100000000000{
+                        other{"000ຕື້"}
+                    }
+                    1000000000000{
+                        other{"0000ຕື້"}
+                    }
+                    10000000000000{
+                        other{"00ພັນຕື້"}
+                    }
+                    100000000000000{
+                        other{"000ພັນຕື້"}
+                    }
+                }
+            }
+        }
+        latn{
+            miscPatterns{
+                approximately{"~{0}"}
+                atLeast{"{0}+"}
+                atMost{"≤{0}"}
+                range{"{0}–{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00;¤-#,##0.00"}
+                currencyFormat{"¤#,##0.00;¤-#,##0.00"}
+                percentFormat{"#,##0%"}
+                scientificFormat{"#"}
+            }
+            patternsLong{
+                decimalFormat{
+                    1000{
+                        other{"0 ພັນ"}
+                    }
+                    10000{
+                        other{"00 ພັນ"}
+                    }
+                    100000{
+                        other{"0 ແສນ"}
+                    }
+                    1000000{
+                        other{"0 ລ້ານ"}
+                    }
+                    10000000{
+                        other{"00 ລ້ານ"}
+                    }
+                    100000000{
+                        other{"000 ລ້ານ"}
+                    }
+                    1000000000{
+                        other{"0 ຕື້"}
+                    }
+                    10000000000{
+                        other{"00 ຕື້"}
+                    }
+                    100000000000{
+                        other{"000 ຕື້"}
+                    }
+                    1000000000000{
+                        other{"0 ລ້ານລ້ານ"}
+                    }
+                    10000000000000{
+                        other{"00 ລ້ານລ້ານ"}
+                    }
+                    100000000000000{
+                        other{"000 ລ້ານລ້ານ"}
+                    }
+                }
+            }
+            patternsShort{
+                currencyFormat{
+                    1000{
+                        other{"¤0 ພັນ"}
+                    }
+                    10000{
+                        other{"¤00 ພັນ"}
+                    }
+                    100000{
+                        other{"¤000 ກີບ"}
+                    }
+                    1000000{
+                        other{"¤0 ລ້ານ"}
+                    }
+                    10000000{
+                        other{"¤00 ລ້ານ"}
+                    }
+                    100000000{
+                        other{"¤000 ລ້ານ"}
+                    }
+                    1000000000{
+                        other{"¤0 ຕື້"}
+                    }
+                    10000000000{
+                        other{"¤00 ຕື້"}
+                    }
+                    100000000000{
+                        other{"¤000 ຕື້"}
+                    }
+                    1000000000000{
+                        other{"¤0 ລ້ານລ້ານ"}
+                    }
+                    10000000000000{
+                        other{"¤00 ລ້ານລ້ານ"}
+                    }
+                    100000000000000{
+                        other{"¤000 ລ້ານລ້ານ"}
+                    }
+                }
+                decimalFormat{
+                    1000{
+                        other{"0 ພັນ"}
+                    }
+                    10000{
+                        other{"00 ພັນ"}
+                    }
+                    100000{
+                        other{"000 ກີບ"}
+                    }
+                    1000000{
+                        other{"0 ລ້ານ"}
+                    }
+                    10000000{
+                        other{"00 ລ້ານ"}
+                    }
+                    100000000{
+                        other{"000 ລ້ານ"}
+                    }
+                    1000000000{
+                        other{"0 ຕື້"}
+                    }
+                    10000000000{
+                        other{"00 ຕື້"}
+                    }
+                    100000000000{
+                        other{"000 ຕື້"}
+                    }
+                    1000000000000{
+                        other{"0 ລ້ານລ້ານ"}
+                    }
+                    10000000000000{
+                        other{"00ລລ"}
+                    }
+                    100000000000000{
+                        other{"000ລລ"}
+                    }
+                }
+            }
+            symbols{
+                decimal{","}
+                exponential{"E"}
+                group{"."}
+                infinity{"∞"}
+                list{";"}
+                nan{"ບໍ່​ແມ່ນ​ໂຕ​ເລກ"}
+                perMille{"‰"}
+                percentSign{"%"}
+            }
+        }
+        minimalPairs{
+            ordinal{
+                one{"ລ້ຽວຂວາໂຕທີ {0}."}
+                other{"ລ້ຽວຂວາທີ {0}."}
+            }
+            plural{
+                other{"{0} ມື້"}
+            }
+        }
+        native{"laoo"}
+    }
+    calendar{
+        buddhist{
+            eras{
+                abbreviated{
+                    "ພ.ສ.",
+                }
+            }
+        }
+        chinese{
+            DateTimePatterns{
+                "H ໂມງ m ນາທີ ss ວິນາທີ zzzz",
+                "H ໂມງ m ນາທີ ss ວິນາທີ z",
+                "H:mm:ss",
+                "H:mm",
+                "EEEE, U MMMM dd",
+                "U MMMM d",
+                "U MMM d",
+                "y-M-d",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            cyclicNameSets{
+                dayParts{
+                    format{
+                        abbreviated{
+                            "ຊີ",
+                            "ຊູ",
+                            "ຢິນ",
+                            "ເມົາ",
+                            "ເຊັນ",
+                            "ຊື່",
+                            "ວູ",
+                            "ເວີຍ",
+                            "ເຊິ່ນ",
+                            "ຢູ",
+                            "ຊູ່",
+                            "ໄຮ",
+                        }
+                    }
+                }
+                years{
+                    format{
+                        abbreviated{
+                            "ເຈຍ-ຊິ",
+                            "ຢີ-ຊູ",
+                            "ບິງ-ຢິນ",
+                            "ດິງ-ເມົາ",
+                            "ວູ-ເຊັນ",
+                            "ຈີ-ຊິ",
+                            "ແກງ-ວູ",
+                            "ຊິນ-ເວີຍ",
+                            "ເຣນ-ເຊນ",
+                            "ກຸຍ-ຢູ",
+                            "ໄຈ-ຊູ",
+                            "ຢີ-ໄຮ",
+                            "ບິງ-ຊີ",
+                            "ດິງ-ຊູ",
+                            "ວູ-ຢິນ",
+                            "ຈີ-ເມົາ",
+                            "ແກງ-ເຊນ",
+                            "ຊິນ-ຊິ",
+                            "ເຣນ-ວູ",
+                            "ກຸຍ-ເວີຍ",
+                            "ເຈຍ-ເຊນ",
+                            "ຢີ-ຢູ",
+                            "ບິງ-ຊູ",
+                            "ດິງ-ໄຫ",
+                            "ວູ-ຊິ",
+                            "ຈີ-ຊູ",
+                            "ເກງ-ຢິນ",
+                            "ຊິນ-ເມົາ",
+                            "ເຣນເຊິ່ນ",
+                            "ກຸຍ-ຊິ",
+                            "ໄຈ-ວູ",
+                            "ຢີ-ເວີຍ",
+                            "ບິງ-ເຊນ",
+                            "ດິງ-ຢູ",
+                            "ວູ-ຊູ",
+                            "ຈີ-ໄຫ",
+                            "ເກງ-ຊິ",
+                            "ຊິນ-ຊູ",
+                            "ເຣຍ-ຢິນ",
+                            "ກຸຍ-ເມົາ",
+                            "ໄຈ-ເຊນ",
+                            "ຢີ-ຊິ",
+                            "ບິງ-ວູ",
+                            "ດິງ-ເວີຍ",
+                            "ວູ-ເກນ",
+                            "ຈີ-ຢູ",
+                            "ເກງ-ຊູ",
+                            "ຊິນ-ໄຫ",
+                            "ເຣນ-ຊິ",
+                            "ກຸຍ-ຊູ",
+                            "ເຈຍ-ຢິນ",
+                            "ຢິ-ເມົາ",
+                            "ບິງເຊິ່ນ",
+                            "ດິງ-ຊິ",
+                            "ວູ-ວູ",
+                            "ຈີ-ເວີຍ",
+                            "ເກງ-ເຊນ",
+                            "ຊິນ-ຢູ",
+                            "ເຣນ-ຊູ",
+                            "ກຸຍຮ່າຍ",
+                        }
+                    }
+                }
+                zodiacs{
+                    format{
+                        abbreviated{
+                            "ໜູ",
+                            "ງົວຜູ້",
+                            "ເສືອ",
+                            "ກະຕ່າຍ",
+                            "ມັງກອນ",
+                            "ງູ",
+                            "ມ້າ",
+                            "ແກະ",
+                            "ລິງ",
+                            "ໄກ່ຜູ້",
+                            "ໝາ",
+                            "ໝູ",
+                        }
+                    }
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                }
+            }
+        }
+        coptic{
+            monthNames{
+                format{
+                    abbreviated{
+                        "ເທົາ",
+                        "ບາບາ",
+                        "ຮາໂຕ",
+                        "ເຄຍ",
+                        "ໂທບາ",
+                        "ອຳເຊີ",
+                        "ບາລຳຮາດ",
+                        "ບາລາມູດາ",
+                        "ບາສຮານ",
+                        "ເປົານາ",
+                        "ອີແປບ",
+                        "ມາສລາ",
+                        "ນາຊິວ",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                        "13",
+                    }
+                    wide{
+                        "ເທົາ",
+                        "ບາບາ",
+                        "ຮາໂຕ",
+                        "ເຄຍ",
+                        "ໂທບາ",
+                        "ອາເຊີ",
+                        "ບາລຳຮາດ",
+                        "ບາລາມູດາ",
+                        "ບາສຮານ",
+                        "ເປົານາ",
+                        "ອີແປບ",
+                        "ມາສລາ",
+                        "ນາຊີວ",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ເທົາ",
+                        "ບາບາ",
+                        "ຮາໂຕ",
+                        "ເຄຍ",
+                        "ໂທບາ",
+                        "ອຳເຊີ",
+                        "ບາລຳຮາດ",
+                        "ບາລາມູດາ",
+                        "ບາສຮານ",
+                        "ເປົານາ",
+                        "ອີແປບ",
+                        "ມາສລາ",
+                        "ນາຊີວ",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                        "13",
+                    }
+                    wide{
+                        "ເທົາ",
+                        "ບາບາ",
+                        "ຮາໂຕ",
+                        "ເຄຍ",
+                        "ໂທບາ",
+                        "ອຳເຊີ",
+                        "ບາລຳຮາດ",
+                        "ບາລາມູດາ",
+                        "ບາສຮານ",
+                        "ເປົານາ",
+                        "ອີແປບ",
+                        "ມາສລາ",
+                        "ນາຊີວ",
+                    }
+                }
+            }
+        }
+        ethiopic{
+            monthNames{
+                format{
+                    abbreviated{
+                        "ແມສເຄີແຣມ",
+                        "ເຕເກມ",
+                        "ເຮດາ",
+                        "ທາຊັສ",
+                        "ເທີ",
+                        "ເຍຄາທິດ",
+                        "ເມກາບິດ",
+                        "ເມຍເຊຍ",
+                        "ເຈນບອດ",
+                        "ເຊເນ",
+                        "ຮຳເລ",
+                        "ເນແຮສ໌",
+                        "ພາກູເມນ",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                        "13",
+                    }
+                    wide{
+                        "ແມສເຄີແຣມ",
+                        "ເຕເກມ",
+                        "ເຮດາ",
+                        "ທາຊັສ",
+                        "ເທີ",
+                        "ເຍຄາທິດ",
+                        "ເມກາບິດ",
+                        "ເມຍເຊຍ",
+                        "ເຈນບອດ",
+                        "ເຊເນ",
+                        "ຮຳເລ",
+                        "ເນແຮສ໌",
+                        "ພາກູເມນ",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ແມສເຄີແຣມ",
+                        "ເຕເກມ",
+                        "ເຮດາ",
+                        "ທາຊັສ",
+                        "ເທີ",
+                        "ເຍຄາທິດ",
+                        "ເມກາບິດ",
+                        "ເມຍເຊຍ",
+                        "ເຈນບອດ",
+                        "ເຊເນ",
+                        "ຮຳເລ",
+                        "ເນແຮສ໌",
+                        "ພາກູເມນ",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                        "13",
+                    }
+                    wide{
+                        "ແມສເຄີແຣມ",
+                        "ເຕເກມ",
+                        "ເຮດາ",
+                        "ທາຊັສ",
+                        "ເທີ",
+                        "ເຍຄາທິດ",
+                        "ເມກາບິດ",
+                        "ເມຍເຊຍ",
+                        "ເຈນບອດ",
+                        "ເຊເນ",
+                        "ຮຳເລ",
+                        "ເນແຮສ໌",
+                        "ພາກູເມນ",
+                    }
+                }
+            }
+        }
+        generic{
+            DateTimePatterns{
+                "H ໂມງ m ນາທີ ss ວິນາທີ zzzz",
+                "H ໂມງ m ນາທີ ss ວິນາທີ z",
+                "H:mm:ss",
+                "H:mm",
+                "EEEEທີ d MMMM y G",
+                "d MMMM y G",
+                "d MMM y G",
+                "d/M/y GGGGG",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                Bh{"h B"}
+                Bhm{"h:mm B"}
+                Bhms{"h:mm:ss B"}
+                E{"ccc"}
+                EBhm{"E h:mm B"}
+                EBhms{"E h:mm:ss B"}
+                EHm{"E HH:mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"E d"}
+                Ehm{"E h:mm a"}
+                Ehms{"E h:mm:ss a"}
+                Gy{"G y"}
+                GyMMM{"MMM y G"}
+                GyMMMEd{"E, MMM d, y G"}
+                GyMMMd{"G d MMM y"}
+                H{"HH"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, d/M"}
+                MMM{"LLL"}
+                MMMEd{"E d MMM"}
+                MMMMd{"MMMM d"}
+                MMMd{"d MMM"}
+                Md{"d/M"}
+                d{"d"}
+                h{"h ໂມງa"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                ms{"mm:ss"}
+                y{"G y"}
+                yyyy{"G y"}
+                yyyyM{"G M/y"}
+                yyyyMEd{"E, G d/M/y"}
+                yyyyMMM{"G MMM y"}
+                yyyyMMMEd{"E, G d MMM y"}
+                yyyyMMMM{"G MMMM y"}
+                yyyyMMMd{"G d MMM y"}
+                yyyyMd{"G d/M/y"}
+                yyyyQQQ{"G QQQ y"}
+                yyyyQQQQ{"G y QQQQ"}
+            }
+            intervalFormats{
+                GyM{
+                    G{"GGGGG M/y – GGGGG M/y"}
+                    M{"GGGGG M/y – M/y"}
+                    y{"GGGGG M/y – M/y"}
+                }
+                GyMEd{
+                    G{"E, d/M GGGGG y – E, d/M GGGGG y"}
+                    M{"E, d/M GGGGG y – E, d/M GGGGG y"}
+                    d{"E, d/M GGGGG y – E, d/M GGGGG y"}
+                }
+                GyMMMEd{
+                    G{"E, d MMM G y – E, d MMM G y"}
+                    M{"E, d MMM – E, d MMM G y"}
+                    d{"E, d MMM – E, d MMM G y"}
+                    y{"E, d MMM G y – E, d MMM G y"}
+                }
+                GyMMMd{
+                    G{"d MMM G y– d MMM G y"}
+                    M{"d MMM – d MMM G y"}
+                    y{"d MMM G y– d MMM G y"}
+                }
+                GyMd{
+                    G{"GGGGG d/M/y – GGGGG d/M/y"}
+                    M{"GGGGG d/M/y – d/M/y"}
+                    d{"GGGGG d/M/y – d/M/y"}
+                    y{"GGGGG d/M/y – d/M/y"}
+                }
+                H{
+                    H{"HH–HH"}
+                }
+                Hm{
+                    H{"HH:mm–HH:mm"}
+                    m{"HH:mm–HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm–HH:mm v"}
+                    m{"HH:mm–HH:mm v"}
+                }
+                Hv{
+                    H{"HH–HH v"}
+                }
+                M{
+                    M{"M–M"}
+                }
+                MEd{
+                    M{"E, dd-MM – E, dd-MM"}
+                    d{"E, dd-MM – E, dd-MM"}
+                }
+                MMM{
+                    M{"MMM – MMM"}
+                }
+                MMMEd{
+                    M{"E, d-MM – E, d-MM"}
+                    d{"E, d-MM – E, d-MM"}
+                }
+                MMMd{
+                    M{"d-MM – d-MM"}
+                    d{"MM-d – d"}
+                }
+                Md{
+                    M{"d/M – d/M"}
+                    d{"d/M – d/M"}
+                }
+                d{
+                    d{"d–d"}
+                }
+                fallback{"{0} – {1}"}
+                h{
+                    a{"h a – h a"}
+                    h{"h–h a"}
+                }
+                hm{
+                    a{"h:mm a – h:mm a"}
+                    h{"h:mm–h:mm a"}
+                    m{"h:mm–h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a – h:mm a v"}
+                    h{"h:mm–h:mm a v"}
+                    m{"h:mm–h:mm a v"}
+                }
+                hv{
+                    a{"h a – h a v"}
+                    h{"h–h a v"}
+                }
+                y{
+                    y{"G y–y"}
+                }
+                yM{
+                    M{"M/y – M/y GGGGG"}
+                    y{"M/y – M/y GGGGG"}
+                }
+                yMEd{
+                    M{"E, d/M/y – E, d/M/y GGGGG"}
+                    d{"E, d/M/y – E, d/M/y GGGGG"}
+                    y{"E, d/M/y – E, d/M/y GGGGG"}
+                }
+                yMMM{
+                    M{"MMM – MMM y G"}
+                    y{"MMM y – MMM y G"}
+                }
+                yMMMEd{
+                    M{"E, G dd-MM-y – E, dd-MM-y"}
+                    d{"E, G dd-MM-y – E, dd-MM-y"}
+                    y{"E, d MMM y – E, d MMM y G"}
+                }
+                yMMMM{
+                    M{"MMMM – MMMM y G"}
+                    y{"MMMM y – MMMM y G"}
+                }
+                yMMMd{
+                    M{"d MMM – d MMM, y G"}
+                    d{"d–d MMM, y G"}
+                    y{"d MMM y – d MMM y G"}
+                }
+                yMd{
+                    M{"d/M/y – d/M/y GGGGG"}
+                    d{"d/M/y – d/M/y GGGGG"}
+                    y{"d/M/y – d/M/y GGGGG"}
+                }
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "ກ່ອນທ່ຽງ",
+                "ຫຼັງທ່ຽງ",
+            }
+            AmPmMarkersAbbr{
+                "ກ່ອນທ່ຽງ",
+                "ຫຼັງທ່ຽງ",
+            }
+            DateTimePatterns{
+                "H ໂມງ m ນາທີ ss ວິນາທີ zzzz",
+                "H ໂມງ m ນາທີ ss ວິນາທີ z",
+                "H:mm:ss",
+                "H:mm",
+                "EEEE ທີ d MMMM G y",
+                "d MMMM y",
+                "d MMM y",
+                "d/M/y",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            appendItems{
+                Timezone{"{0} {1}"}
+            }
+            availableFormats{
+                Bh{"h B"}
+                Bhm{"h:mm B"}
+                Bhms{"h:mm:ss B"}
+                E{"ccc"}
+                EBhm{"E h:mm B"}
+                EBhms{"E h:mm:ss B"}
+                EHm{"E HH:mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"E, d"}
+                Ehm{"E h:mm a"}
+                Ehms{"E h:mm:ss a"}
+                Gy{"G y"}
+                GyMMM{"MMM, G y"}
+                GyMMMEd{"E d MMMM, G y"}
+                GyMMMd{"d MMMM, G y"}
+                H{"HH"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                Hmsv{"HH:mm:ss v"}
+                Hmv{"HH:mm v"}
+                M{"L"}
+                MEd{"E, d/M"}
+                MMM{"LLL"}
+                MMMEd{"E d MMM"}
+                MMMMW{
+                    other{"ອາທິດທີ່ W ຂອງເດືອນ M"}
+                }
+                MMMMd{"MMMM d"}
+                MMMd{"d MMM"}
+                Md{"d/M"}
+                d{"d"}
+                h{"h ໂມງa"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                hmsv{"h:mm:ss a v"}
+                hmv{"h:mm a v"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E, d/M/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E, d MMM y"}
+                yMMMM{"MMMM y"}
+                yMMMd{"d MMM y"}
+                yMd{"d/M/y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+                yw{
+                    other{"ອາທິດທີ່ w ຂອງປີ Y"}
+                }
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "ອາທິດ",
+                        "ຈັນ",
+                        "ອັງຄານ",
+                        "ພຸດ",
+                        "ພະຫັດ",
+                        "ສຸກ",
+                        "ເສົາ",
+                    }
+                    narrow{
+                        "ອາ",
+                        "ຈ",
+                        "ອ",
+                        "ພ",
+                        "ພຫ",
+                        "ສຸ",
+                        "ສ",
+                    }
+                    short{
+                        "ອາ.",
+                        "ຈ.",
+                        "ອ.",
+                        "ພ.",
+                        "ພຫ.",
+                        "ສຸ.",
+                        "ສ.",
+                    }
+                    wide{
+                        "ວັນອາທິດ",
+                        "ວັນຈັນ",
+                        "ວັນອັງຄານ",
+                        "ວັນພຸດ",
+                        "ວັນພະຫັດ",
+                        "ວັນສຸກ",
+                        "ວັນເສົາ",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ອາທິດ",
+                        "ຈັນ",
+                        "ອັງຄານ",
+                        "ພຸດ",
+                        "ພະຫັດ",
+                        "ສຸກ",
+                        "ເສົາ",
+                    }
+                    narrow{
+                        "ອາ",
+                        "ຈ",
+                        "ອ",
+                        "ພ",
+                        "ພຫ",
+                        "ສຸ",
+                        "ສ",
+                    }
+                    short{
+                        "ອາ.",
+                        "ຈ.",
+                        "ອ.",
+                        "ພ.",
+                        "ພຫ.",
+                        "ສຸ.",
+                        "ສ.",
+                    }
+                    wide{
+                        "ວັນອາທິດ",
+                        "ວັນຈັນ",
+                        "ວັນອັງຄານ",
+                        "ວັນພຸດ",
+                        "ວັນພະຫັດ",
+                        "ວັນສຸກ",
+                        "ວັນເສົາ",
+                    }
+                }
+            }
+            dayPeriod{
+                format{
+                    abbreviated{
+                        afternoon1{"ຕອນບ່າຍ"}
+                        evening1{"ຕອນແລງ"}
+                        midnight{"ທ່ຽງຄືນ"}
+                        morning1{"ຕອນເຊົ້າ"}
+                        night1{"ກາງຄືນ"}
+                        noon{"ຕອນທ່ຽງ"}
+                    }
+                    narrow{
+                        afternoon1{"ຕອນທ່ຽງ"}
+                        evening1{"ຕອນແລງ"}
+                        midnight{"ທ່ຽງຄືນ"}
+                        morning1{"ຕອນເຊົ້າ"}
+                        night1{"ກາງຄືນ"}
+                        noon{"ຕອນທ່ຽງ"}
+                    }
+                    wide{
+                        afternoon1{"ຕອນບ່າຍ"}
+                        evening1{"ຕອນແລງ"}
+                        midnight{"ທ່ຽງຄືນ"}
+                        morning1{"ຕອນເຊົ້າ"}
+                        night1{"ຕອນກາງຄືນ"}
+                        noon{"ຕອນທ່ຽງ"}
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        afternoon1{"ສວຍ"}
+                        am{"ກ່ອນທ່ຽງ"}
+                        evening1{"ແລງ"}
+                        midnight{"ທ່ຽງ​ຄືນ"}
+                        morning1{"​ເຊົ້າ"}
+                        night1{"​ກາງ​ຄືນ"}
+                        noon{"ທ່ຽງ"}
+                        pm{"ຫຼັງທ່ຽງ"}
+                    }
+                    narrow{
+                        afternoon1{"ສ"}
+                        evening1{"ແລງ"}
+                        morning1{"​ເຊົ້າ"}
+                        night1{"​ກາງ​ຄືນ"}
+                        noon{"ຕອນທ່ຽງ"}
+                    }
+                    wide{
+                        afternoon1{"ສວຍ"}
+                        am{"ກ່ອນທ່ຽງ"}
+                        evening1{"ແລງ"}
+                        midnight{"ທ່ຽງຄືນ"}
+                        morning1{"​ເຊົ້າ"}
+                        night1{"​ກາງ​ຄືນ"}
+                        noon{"ຕອນທ່ຽງ"}
+                        pm{"ຫຼັງທ່ຽງ"}
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "ກ່ອນ ຄ.ສ.",
+                    "ຄ.ສ.",
+                }
+                abbreviated%variant{
+                    "ກ່ອນຍຸກ ຄ.ສ",
+                    "ຍຸກ ຄ.ສ",
+                }
+                wide{
+                    "ກ່ອນຄຣິດສັກກະລາດ",
+                    "ຄຣິດສັກກະລາດ",
+                }
+                wide%variant{
+                    "ກ່ອນສາກົນສັກກະລາດ",
+                    "ສາກົນສັກກະລາດ",
+                }
+            }
+            intervalFormats{
+                Gy{
+                    G{"G y – G y"}
+                    y{"G y–y"}
+                }
+                GyM{
+                    G{"GGGGG MM/y – GGGGG MM/y"}
+                    M{"GGGGG MM/y – MM/y"}
+                    y{"GGGGG MM/y – MM/y"}
+                }
+                GyMEd{
+                    G{"GGGGG E, dd/MM/y – GGGGG E, dd/MM/y"}
+                    M{"GGGGG E, dd/MM/y – E, dd/MM/y"}
+                    d{"GGGGG E, dd/MM/y – E, dd/MM/y"}
+                    y{"GGGGG E, dd/MM/y – E, dd/MM/y"}
+                }
+                GyMMM{
+                    G{"G MM/y – G MM/y"}
+                    M{"G MM/y – MM"}
+                    y{"G MM/y – MM/y"}
+                }
+                GyMMMEd{
+                    G{"G E, dd/MM/y – G E, dd/MM/y"}
+                    M{"G E, dd/MM/y – E, dd/MM/y"}
+                    d{"G E, dd/MM/y – E, dd/MM/y"}
+                    y{"G E, dd/MM/y – E, dd/MM/y"}
+                }
+                GyMMMd{
+                    G{"G dd/MM/y– G dd/MM/y"}
+                    M{"G dd/MM/y – dd/MM"}
+                    d{"G d–d/MM/y"}
+                    y{"G dd/MM/y – dd/MM/y"}
+                }
+                GyMd{
+                    G{"GGGGG dd/MM/y – GGGGG dd/MM/y"}
+                    M{"GGGGG dd/MM/y – dd/MM/y"}
+                    d{"GGGGG dd/MM/y – dd/MM/y"}
+                    y{"GGGGG dd/MM/y – dd/MM/y"}
+                }
+                H{
+                    H{"HH–HH"}
+                }
+                Hm{
+                    H{"HH:mm–HH:mm"}
+                    m{"HH:mm–HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm–HH:mm v"}
+                    m{"HH:mm–HH:mm v"}
+                }
+                Hv{
+                    H{"HH–HH v"}
+                }
+                M{
+                    M{"M–M"}
+                }
+                MEd{
+                    M{"E, dd/MM – E, dd/MM"}
+                    d{"E, dd/MM – E, dd/MM"}
+                }
+                MMM{
+                    M{"LLL–LLL"}
+                }
+                MMMEd{
+                    M{"E, d/MM – E, d/MM"}
+                    d{"E, d/MM – E, d/MM"}
+                }
+                MMMd{
+                    M{"d/MM – d/MM"}
+                    d{"d/MM – d/MM"}
+                }
+                Md{
+                    M{"dd/MM – dd/MM"}
+                    d{"dd/MM – dd/MM"}
+                }
+                d{
+                    d{"d–d"}
+                }
+                fallback{"{0} – {1}"}
+                h{
+                    a{"h a – h a"}
+                    h{"h–h a"}
+                }
+                hm{
+                    a{"h:mm a – h:mm a"}
+                    h{"h:mm–h:mm a"}
+                    m{"h:mm–h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a – h:mm a v"}
+                    h{"h:mm–h:mm a v"}
+                    m{"h:mm–h:mm a v"}
+                }
+                hv{
+                    a{"h a – h a v"}
+                    h{"h–h a v"}
+                }
+                y{
+                    y{"y–y"}
+                }
+                yM{
+                    M{"MM/y – MM/y"}
+                    y{"y/MM – y/MM"}
+                }
+                yMEd{
+                    M{"E, dd/MM/y – E, dd/MM/y"}
+                    d{"E, dd/MM/y – E, dd/MM/y"}
+                    y{"E, dd/MM/y – E, dd/MM/y"}
+                }
+                yMMM{
+                    M{"MM/y – MM/y"}
+                    y{"MM/y – MM/y"}
+                }
+                yMMMEd{
+                    M{"E, dd/MM/y – E, dd/MM/y"}
+                    d{"E, dd/MM/y – E, dd/MM/y"}
+                    y{"E, dd/MM/y – E, dd/MM/y"}
+                }
+                yMMMM{
+                    M{"MM/y – MM"}
+                    y{"MM/y – MM/y"}
+                }
+                yMMMd{
+                    M{"d/MM/y – d/MM"}
+                    d{"d/MM/y – d/MM/y"}
+                    y{"dd/MM/y – dd/MM/y"}
+                }
+                yMd{
+                    M{"dd/MM/y – dd/MM/y"}
+                    d{"dd/MM/y – dd/MM/y"}
+                    y{"dd/MM/y – dd/MM/y"}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "ມ.ກ.",
+                        "ກ.ພ.",
+                        "ມ.ນ.",
+                        "ມ.ສ.",
+                        "ພ.ພ.",
+                        "ມິ.ຖ.",
+                        "ກ.ລ.",
+                        "ສ.ຫ.",
+                        "ກ.ຍ.",
+                        "ຕ.ລ.",
+                        "ພ.ຈ.",
+                        "ທ.ວ.",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "ມັງກອນ",
+                        "ກຸມພາ",
+                        "ມີນາ",
+                        "ເມສາ",
+                        "ພຶດສະພາ",
+                        "ມິຖຸນາ",
+                        "ກໍລະກົດ",
+                        "ສິງຫາ",
+                        "ກັນຍາ",
+                        "ຕຸລາ",
+                        "ພະຈິກ",
+                        "ທັນວາ",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ມ.ກ.",
+                        "ກ.ພ.",
+                        "ມ.ນ.",
+                        "ມ.ສ.",
+                        "ພ.ພ.",
+                        "ມິ.ຖ.",
+                        "ກ.ລ.",
+                        "ສ.ຫ.",
+                        "ກ.ຍ.",
+                        "ຕ.ລ.",
+                        "ພ.ຈ.",
+                        "ທ.ວ.",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "ມັງກອນ",
+                        "ກຸມພາ",
+                        "ມີນາ",
+                        "ເມສາ",
+                        "ພຶດສະພາ",
+                        "ມິຖຸນາ",
+                        "ກໍລະກົດ",
+                        "ສິງຫາ",
+                        "ກັນຍາ",
+                        "ຕຸລາ",
+                        "ພະຈິກ",
+                        "ທັນວາ",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    abbreviated{
+                        "ຕມ1",
+                        "ຕມ2",
+                        "ຕມ3",
+                        "ຕມ4",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "ໄຕຣມາດ 1",
+                        "ໄຕຣມາດ 2",
+                        "ໄຕຣມາດ 3",
+                        "ໄຕຣມາດ 4",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ຕ1",
+                        "ຕ2",
+                        "ຕ3",
+                        "ຕ4",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "ໄຕຣມາດ 1",
+                        "ໄຕຣມາດ 2",
+                        "ໄຕຣມາດ 3",
+                        "ໄຕຣມາດ 4",
+                    }
+                }
+            }
+        }
+        hebrew{
+            eras{
+                abbreviated{
+                    "AM",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "ທຣິດຣີ",
+                        "ເຮວານ",
+                        "ກິດເລບ",
+                        "ເຕເວດ",
+                        "ຊີວັດ",
+                        "ອາດາ I",
+                        "ອາດາ",
+                        "ນິດຊານ",
+                        "ອີຍາຣ",
+                        "ສີວານ",
+                        "ຕາມູ",
+                        "ເອບ",
+                        "ອີລູ",
+                        "ອາດາ II",
+                    }
+                    wide{
+                        "ທຣິດຣີ",
+                        "ເຮວານ",
+                        "ກິດເລບ",
+                        "ເຕເວດ",
+                        "ຊີວັດ",
+                        "ອາດາ I",
+                        "ອາດາ",
+                        "ນິດຊານ",
+                        "ອີຍາຣ",
+                        "ສີວານ",
+                        "ຕາມູ",
+                        "ເອບ",
+                        "ອີລູ",
+                        "ອາດາ II",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ທຣິດຣີ",
+                        "ເຮວານ",
+                        "ກິດເລບ",
+                        "ເຕເວດ",
+                        "ຊີວັດ",
+                        "ອາດາ I",
+                        "ອາດາ",
+                        "ນິດຊານ",
+                        "ອີຍາຣ",
+                        "ສີວານ",
+                        "ຕາມູ",
+                        "ເອບ",
+                        "ອີລູ",
+                        "ອາດາ II",
+                    }
+                    wide{
+                        "ທຣິດຣີ",
+                        "ເຮວານ",
+                        "ກິດເລບ",
+                        "ເຕເວດ",
+                        "ຊີວັດ",
+                        "ອາດາ I",
+                        "ອາດາ",
+                        "ນິດຊານ",
+                        "ອີຍາຣ",
+                        "ສີວານ",
+                        "ຕາມູ",
+                        "ເອບ",
+                        "ອີລູ",
+                        "ອາດາ II",
+                    }
+                }
+            }
+        }
+        indian{
+            eras{
+                abbreviated{
+                    "ມ.ສ.",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "ຈິຕຣາ",
+                        "ວິສາຂະ",
+                        "ເຊດຖາ",
+                        "ອັດສາ",
+                        "ສາຣາວານາ",
+                        "ພະຕຣາ",
+                        "ອັສວິຊາ",
+                        "ການຕິກາ",
+                        "ອັກຣາຮາຢານາ",
+                        "ປຸສາ",
+                        "ມາຄະ",
+                        "ຜາລກຸນີ",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "ຈິຕຣາ",
+                        "ວິສາຂະ",
+                        "ເຊດຖາ",
+                        "ອັດສາ",
+                        "ສາຣາວານາ",
+                        "ພະຕຣາ",
+                        "ອັສວິຊາ",
+                        "ການຕິກາ",
+                        "ອັກຣາຮາຢານາ",
+                        "ປຸສະຍາ",
+                        "ມາຄະ",
+                        "ຜາລກຸນີ",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ຈິຕຣາ",
+                        "ວິສາຂະ",
+                        "ເຊດຖາ",
+                        "ອັດສາ",
+                        "ສາຣາວານາ",
+                        "ພະຕຣາ",
+                        "ອັສວິຊາ",
+                        "ການຕິກາ",
+                        "ອັກຣາຮາຢານາ",
+                        "ປຸສະຍາ",
+                        "ມາຄະ",
+                        "ຜາລກຸນີ",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "ຈິຕຣາ",
+                        "ວິສາຂະ",
+                        "ເຊດຖາ",
+                        "ອັດສາ",
+                        "ສາຣາວານາ",
+                        "ພະຕຣາ",
+                        "ອັສວິຊາ",
+                        "ການຕິກາ",
+                        "ອັກຣາຮາຢານາ",
+                        "ປຸສະຍາ",
+                        "ມາຄະ",
+                        "ຜາລກຸນີ",
+                    }
+                }
+            }
+        }
+        islamic{
+            DateTimePatterns{
+                "H ໂມງ m ນາທີ ss ວິນາທີ zzzz",
+                "H ໂມງ m ນາທີ ss ວິນາທີ z",
+                "H:mm:ss",
+                "H:mm",
+                "EEEE, y MMMM dd",
+                "y MMMM d",
+                "y MMM d",
+                "y-MM-dd",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+                "{1}, {0}",
+            }
+            availableFormats{
+                H{"H"}
+                Hm{"H:mm"}
+                Hms{"HH:mm:ss"}
+                M{"L"}
+                MEd{"E, d/M"}
+                MMM{"LLL"}
+                MMMEd{"E MMM d"}
+                MMMd{"d MMM"}
+                Md{"d/M"}
+                d{"d"}
+                h{"ha"}
+                hm{"h mm a"}
+                hms{"h:mm:ss a"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"M/y"}
+                yMEd{"E M/d/y"}
+                yMMM{"MMM y"}
+                yMMMEd{"E,MMM d,y"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"QQQQ y"}
+            }
+            eras{
+                abbreviated{
+                    "AH",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "ມຸຮັດ",
+                        "ເຄາະ",
+                        "ຮອດບີ 1",
+                        "ຮອກບີ 2",
+                        "ນຸມາ 1",
+                        "ນຸມາ 2",
+                        "ເຮາະ",
+                        "ຊະອ໌",
+                        "ເຮາະມະ",
+                        "ເຊົາ",
+                        "ຊຸລກິອຸ",
+                        "ຊຸລຫິຈ",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "ມຸຣະຮອມ",
+                        "ຊາຟາຣ",
+                        "ຮອດບີ 1",
+                        "ຮອດບີ 2",
+                        "ຈຸມາດາ 1",
+                        "ຈຸມາດາ 2",
+                        "ຮາຈັບ",
+                        "ຊະບານ",
+                        "ຮາມາດອນ",
+                        "ເຊົາວັດ",
+                        "ດຸອັດກິດະ",
+                        "ດຸອັດກິຈະ",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ມຸຮັດ",
+                        "ເຄາະ",
+                        "ຮອກບີ 1",
+                        "ຮອກບີ 2",
+                        "ນຸມາ 1",
+                        "ນຸມາ 2",
+                        "ເຮາະ",
+                        "ຊາ",
+                        "ເຮາະມະ",
+                        "ເຊົາ",
+                        "ຊຸລກິອຸ",
+                        "ຊຸລຫິຈ",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "ມຸຣະຮອມ",
+                        "ຊາຟາຣ",
+                        "ຮອດບີ 1",
+                        "ຮອດບີ 2",
+                        "ຈຸມາດາ 1",
+                        "ຈຸມາດາ 2",
+                        "ຮາຈັບ",
+                        "ຊະບານ",
+                        "ຮາມາດອນ",
+                        "ເຊົາວັດ",
+                        "ດຸອັດກິດະ",
+                        "ດຸອັດກິຈະ",
+                    }
+                }
+            }
+        }
+        japanese{
+            eras{
+                abbreviated{
+                    "ທະອິກະ (645–650)",
+                    "ຮາກູຊິ (650–671)",
+                    "ຮາກູໂຮ (672–686)",
+                    "ຊູໂຊ (686–701)",
+                    "ທາອິໂຮ (701–704)",
+                    "ເຄອຸງ (704–708)",
+                    "ວະໂດ (708–715)",
+                    "ເຣອິກິ (715–717)",
+                    "ໂຢໂຣ (717–724)",
+                    "ຈິງກິ (724–729)",
+                    "ເທັມປຽວ (729–749)",
+                    "ເທັມປຽວ-ຄໍາໂປ (749–749)",
+                    "ເທັມປຽວ-ໂຊໂຮ (749–757)",
+                    "ເທັມປຽວ-ໂຮຈິ (757–765)",
+                    "ເທັມປຽວ-ຈິງໂງະ (765–767)",
+                    "ຈິງໂງະ-ເຄອຸງ (767–770)",
+                    "ໂຮກິ (770–780)",
+                    "ເທັນ-ໂອ (781–782)",
+                    "ເອັນຣຢາກຸ (782–806)",
+                    "ດາອິໂດ (806–810)",
+                    "ໂກນິນ (810–824)",
+                    "ເທັນໂຊ (824–834)",
+                    "ໂຊວະ (834–848)",
+                    "ກະໂຈ (848–851)",
+                    "ນິນຈູ (851–854)",
+                    "ສະອິໂກະ (854–857)",
+                    "ເທັນນານ (857–859)",
+                    "ໂຈງານ (859–877)",
+                    "ເກັນເກ (877–885)",
+                    "ນິນນາ (885–889)",
+                    "ກໍາປຽວ (889–898)",
+                    "ໂຊຕາອິ (898–901)",
+                    "ເອັນງິ (901–923)",
+                    "ເອັນໂຊ (923–931)",
+                    "ໂຊເຮ (931–938)",
+                    "ເທັນງຽວ (938–947)",
+                    "ເທັນຣຢາກູ (947–957)",
+                    "ເທັນໂຕະກຸ (957–961)",
+                    "ໂອວະ (961–964)",
+                    "ໂກໂຮ (964–968)",
+                    "ອານະ (968–970)",
+                    "ເທັນໂຣະກຸ (970–973)",
+                    "ເທັນ-ເອັນ (973–976)",
+                    "ໂຈເງັນ (976–978)",
+                    "ເທັນເງັນ (978–983)",
+                    "ເອການ (983–985)",
+                    "ການນະ (985–987)",
+                    "ເອ-ເອັນ (987–989)",
+                    "ເອໂຊ (989–990)",
+                    "ໂຊຣຢະກຸ (990–995)",
+                    "ໂຊໂຕະກຸ (995–999)",
+                    "ໂຊໂຮ (999–1004)",
+                    "ການໂກ (1004–1012)",
+                    "ໂຊຫວະ (1012–1017)",
+                    "ການນິງ (1017–1021)",
+                    "ຈິອານ (1021–1024)",
+                    "ມານຈຸ (1024–1028)",
+                    "ໂຊເງັນ (1028–1037)",
+                    "ໂຊເຣຢະກຸ (1037–1040)",
+                    "ໂຊຄິວ (1040–1044)",
+                    "ການໂຕະກຸ (1044–1046)",
+                    "ເອະໂຊ (1046–1053)",
+                    "ເທັນງິ (1053–1058)",
+                    "ໂກເຮ (1058–1065)",
+                    "ຈິເຣຢະກຸ (1065–1069)",
+                    "ເອັນຄິວ (1069–1074)",
+                    "ໂຊະໂຮ (1074–1077)",
+                    "ໂຊະເຣຢະກຸ (1077–1081)",
+                    "ເອໂຊະ (1081–1084)",
+                    "ໂອໂຕະກຸ (1084–1087)",
+                    "ການຈິ (1087–1094)",
+                    "ກາໂຊ (1094–1096)",
+                    "ເອະໂຊະ (1096–1097)",
+                    "ໂຊະໂຕະກຸ (1097–1099)",
+                    "ໂກະວະ (1099–1104)",
+                    "ໂຊະຈິ (1104–1106)",
+                    "ກາໂຊະ (1106–1108)",
+                    "ເທັນນິນ (1108–1110)",
+                    "ເທັນ-ອິ (1110–1113)",
+                    "ເອກິວ (1113–1118)",
+                    "ເຄັນ-ເອ (1118–1120)",
+                    "ໂຮະອານ (1120–1124)",
+                    "ເທັນຈິ (1124–1126)",
+                    "ດາອິຈິ (1126–1131)",
+                    "ເທັນໂຊະ (1131–1132)",
+                    "ໂຊະໂຊະ (1132–1135)",
+                    "ໂຮເອັນ (1135–1141)",
+                    "ເອຈິ (1141–1142)",
+                    "ໂກະຈິ (1142–1144)",
+                    "ເທັນໂຢະ (1144–1145)",
+                    "ຄິວອານ (1145–1151)",
+                    "ນິນເປ (1151–1154)",
+                    "ຄິວຈຸ (1154–1156)",
+                    "ໂຮເຄັນ (1156–1159)",
+                    "ເຮຈິ (1159–1160)",
+                    "ເອເຣຢະກຸ (1160–1161)",
+                    "ໂອໂຊ (1161–1163)",
+                    "ໂຊະການ (1163–1165)",
+                    "ເອມານ (1165–1166)",
+                    "ນິນ-ອານ (1166–1169)",
+                    "ກະໂອ (1169–1171)",
+                    "ໂຊະອານ (1171–1175)",
+                    "ອານເຄັນ (1175–1177)",
+                    "ຈິໂຊະ (1177–1181)",
+                    "ໂຢະວະ (1181–1182)",
+                    "ຈຸເອະ (1182–1184)",
+                    "ເຄັນເຣຢຸກິ (1184–1185)",
+                    "ບັນຈິ (1185–1190)",
+                    "ເກັນຄິວ (1190–1199)",
+                    "ໂຊຈິ (1199–1201)",
+                    "ເກັນນິນ (1201–1204)",
+                    "ເຄັນກິວ (1204–1206)",
+                    "ເກັນ-ເອະ (1206–1207)",
+                    "ໂຊະເຄັນ (1207–1211)",
+                    "ເກັນເຣຢະກຸ (1211–1213)",
+                    "ເກັນໂປະ (1213–1219)",
+                    "ໂຊະກິວ (1219–1222)",
+                    "ໂຈະໂອະ (1222–1224)",
+                    "ເຄັນນິນ (1224–1225)",
+                    "ກາໂຮກຸ (1225–1227)",
+                    "ອານເຕະ (1227–1229)",
+                    "ການກິ (1229–1232)",
+                    "ໂຈະເອະ (1232–1233)",
+                    "ເທັມປຸກຸ (1233–1234)",
+                    "ບັນເຣຢະກຸ (1234–1235)",
+                    "ກາເຕະ (1235–1238)",
+                    "ເຣຢະກຸນິນ (1238–1239)",
+                    "ເອັນ-ໂອ (1239–1240)",
+                    "ນິນຈີ (1240–1243)",
+                    "ຄານເຈນ (1243–1247)",
+                    "ໂຫຈີ (1247–1249)",
+                    "ເຄນໂຊ (1249–1256)",
+                    "ໂຄເຈນ (1256–1257)",
+                    "ໂຊກາ (1257–1259)",
+                    "ໂຊເກນ (1259–1260)",
+                    "ບຸນ-ໂອ (1260–1261)",
+                    "ໂຄໂຊ (1261–1264)",
+                    "ບຸນ-ອີ (1264–1275)",
+                    "ເຄນຈີ (1275–1278)",
+                    "ເຄິນ (1278–1288)",
+                    "ໂຊ (1288–1293)",
+                    "ອິນນິນ (1293–1299)",
+                    "ເຊີນ (1299–1302)",
+                    "ເຄນເຈນ (1302–1303)",
+                    "ຄາເຈນ (1303–1306)",
+                    "ໂຕກູຈິ (1306–1308)",
+                    "ອິນກິ (1308–1311)",
+                    "ໂອໂຊ (1300–1312)",
+                    "ໂຊວາ (1312–1317)",
+                    "ບຸນໂປ (1317–1319)",
+                    "ຈີໂນ (1319–1321)",
+                    "ເຈນກຽວ (1321–1324)",
+                    "ໂຊຊິ (1324–1326)",
+                    "ຄາຣາກິ (1326–1329)",
+                    "ເຈນໂຕກູ (1329–1331)",
+                    "ເຈນໂກ (1331–1334)",
+                    "ເກັມມຸ (1334–1336)",
+                    "ເອັນເຈັນ (1336–1340)",
+                    "ໂກໂກກຸ (1340–1346)",
+                    "ໂຊຊິ (1346–1370)",
+                    "ເຄນໂຕກຸ (1370–1372)",
+                    "ບຸນຊຸ (1372–1375)",
+                    "ເທັນຈຸ (1375–1379)",
+                    "ຄໍຢາກຸ (1379–1381)",
+                    "ໂກວາ (1381–1384)",
+                    "ເຈັນຊຸ (1384–1392)",
+                    "ມີໂຕກຸ (1384–1387)",
+                    "ກາກິ (1387–1389)",
+                    "ຄູ (1389–1390)",
+                    "ມິໂຕກຸ (1390–1394)",
+                    "ໂອອິ (1394–1428)",
+                    "ໂຊໂຊ (1428–1429)",
+                    "ອິກຽວ (1429–1441)",
+                    "ກາກິຊຸ (1441–1444)",
+                    "ບຸນ-ອານ (1444–1449)",
+                    "ໂຫໂຕກຸ (1449–1452)",
+                    "ກຽວໂຕກຸ (1452–1455)",
+                    "ເກໂຊ (1455–1457)",
+                    "ໂຊໂຣກຸ (1457–1460)",
+                    "ຄານໂຊ (1460–1466)",
+                    "ບຸນໂຊ (1466–1467)",
+                    "ໂອນິນ (1467–1469)",
+                    "ບຸນມິ (1469–1487)",
+                    "ໂຊກຽວ (1487–1489)",
+                    "ເອັນໂຕກຸ (1489–1492)",
+                    "ມິໂອ (1492–1501)",
+                    "ບຸນກິ (1501–1504)",
+                    "ອິໂຊ (1504–1521)",
+                    "ໄຕອິ (1521–1528)",
+                    "ກຽວໂຣກຸ (1528–1532)",
+                    "ເທັນມອນ (1532–1555)",
+                    "ໂກຈິ (1555–1558)",
+                    "ອິໂຣກຸ (1558–1570)",
+                    "ເຈັນກິ (1570–1573)",
+                    "ເທັນໂຊ (1573–1592)",
+                    "ບຸນໂຣກຸ (1592–1596)",
+                    "ຄິໂຊ (1596–1615)",
+                    "ເກັນວາ (1615–1624)",
+                    "ຄານ-ອິ (1624–1644)",
+                    "ໂຊໂຊ (1644–1648)",
+                    "ຄຽນ (1648–1652)",
+                    "ຊຸ (1652–1655)",
+                    "ເມຍຢາກຸ (1655–1658)",
+                    "ແມນຈິ (1658–1661)",
+                    "ການບຸນ (1661–1673)",
+                    "ເອັນໂປ (1673–1681)",
+                    "ເທັນວາ (1681–1684)",
+                    "ໂຈກຽວ (1684–1688)",
+                    "ເຈັນໂຣກຸ (1688–1704)",
+                    "ໂຫອິ (1704–1711)",
+                    "ຊຸຕຸກຸ (1711–1716)",
+                    "ກຽວຫຸ (1716–1736)",
+                    "ເຈັນບຸນ (1736–1741)",
+                    "ຄານໂປ (1741–1744)",
+                    "ເອັນກຽວ (1744–1748)",
+                    "ຄານ-ອິນ (1748–1751)",
+                    "ໂຫຢາກຸ (1751–1764)",
+                    "ເມຍວາ (1764–1772)",
+                    "ເອັນ-ອິ (1772–1781)",
+                    "ເທັນມິ (1781–1789)",
+                    "ຄານຊິ (1789–1801)",
+                    "ກຽວວາ (1801–1804)",
+                    "ບຸນກາ (1804–1818)",
+                    "ບຸນຊິ (1818–1830)",
+                    "ເທັນໂປ (1830–1844)",
+                    "ກຸກາ (1844–1848)",
+                    "ກາອິ (1848–1854)",
+                    "ແອັນຊິ (1854–1860)",
+                    "ແມັນ-ເອັນ (1860–1861)",
+                    "ບຸນກຸ (1861–1864)",
+                    "ເຈນຈີ (1864–1865)",
+                    "ຄີໂອ (1865–1868)",
+                    "ມີຈີ",
+                    "ໄຕໂຊ",
+                    "ໂຊວາ",
+                    "ຮີຊີ",
+                    "Reiwa",
+                }
+            }
+        }
+        persian{
+            eras{
+                abbreviated{
+                    "ປີເປີເຊຍ",
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "ຟາຣວາດິນ",
+                        "ອໍຣດີບີເຫຣດ",
+                        "ຄໍຣເດດ",
+                        "ແຕຣ",
+                        "ມໍຣເດດ",
+                        "ຊາຣຫິວາ",
+                        "ເມີ",
+                        "ອາບານ",
+                        "ອາຊາ",
+                        "ດີຣ",
+                        "ບຣາມານ",
+                        "ເອສຟານ",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "ຟຣາວາດິນ",
+                        "ອໍຣດີບີເຫຣດ",
+                        "ຄໍຣເດດ",
+                        "ແຕຣ",
+                        "ມໍຣເດດ",
+                        "ຊາຣຫິວາ",
+                        "ເມີ",
+                        "ອາບານ",
+                        "ອາຊາຣ",
+                        "ດີຣ",
+                        "ບຣາແມນ",
+                        "ເອສຟານ",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ຟຣາວາດິນ",
+                        "ອໍຣດີບີເຫຮດ",
+                        "ຄໍຣເດດ",
+                        "ແຕຣ",
+                        "ມໍຣເດດ",
+                        "ຊາຣລິວາ",
+                        "ເມີ",
+                        "ອາບານ",
+                        "ອາຊາ",
+                        "ດີຣ",
+                        "ບຣາມານ",
+                        "ເອສຟານ",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                        "5",
+                        "6",
+                        "7",
+                        "8",
+                        "9",
+                        "10",
+                        "11",
+                        "12",
+                    }
+                    wide{
+                        "ຟຣາວາດິນ",
+                        "ອໍຣດີບີເຫຣດ",
+                        "ຄໍຣເດດ",
+                        "ແຕຣ",
+                        "ມໍຣເດດ",
+                        "ຊາຣຫິວາ",
+                        "ເມີ",
+                        "ອາບານ",
+                        "ອາຊາຣ",
+                        "ດີຣ",
+                        "ບຣາແມນ",
+                        "ເອສຟານ",
+                    }
+                }
+            }
+        }
+        roc{
+            eras{
+                abbreviated{
+                    "ກ່ອນ R.O.C.",
+                    "R.O.C.",
+                }
+            }
+        }
+    }
+    characterLabel{
+        activities{"ການເຄື່ອນໄຫວ"}
+        african_scripts{"ແບບຂຽນອາຟຣິກັນ"}
+        american_scripts{"ແບບຂຽນອາເມຣິກັນ"}
+        animal{"ສັດ"}
+        animals_nature{"ສັດ ຫຼື ທຳມະຊາດ"}
+        arrows{"ລູກສອນ"}
+        body{"ຮ່າງກາຍ"}
+        box_drawing{"ການແຕ້ມກ່ອງ"}
+        braille{"ອັກສອນເບຣວ"}
+        building{"ຕຶກ"}
+        bullets_stars{"ຈຸດນຳ/ດາວ"}
+        consonantal_jamo{"ພະຍັນຊະນະຈາໂມ"}
+        currency_symbols{"ສັນຍາລັກສະກຸນເງິນ"}
+        dash_connector{"ຂີດ/ຕົວເຊື່ອມ"}
+        digits{"ຕົວເລກ"}
+        dingbats{"ຟອນສັນຍາລັກ"}
+        divination_symbols{"ສັນຍາລັກພະຍາກອນ"}
+        downwards_arrows{"ລູກສອນຊີ້ລົງ"}
+        downwards_upwards_arrows{"ລູກສອນຊີ້ຂຶ້ນລົງ"}
+        east_asian_scripts{"ແບບຂຽນຊາວເອເຊຍຕາເວັນອອກ"}
+        emoji{"ອີໂມຈິ"}
+        european_scripts{"ແບບຂຽນຢູໂຣບ"}
+        female{"ຍິງ"}
+        flag{"ທຸງ"}
+        flags{"ທຸງ"}
+        food_drink{"ອາຫານ ແລະ ເຄື່ອງດື່ມ"}
+        format{"ຮູບແບບ"}
+        format_whitespace{"ຮູບແບບ ແລະ ຊ່ອງຫວ່າງ"}
+        full_width_form_variant{"ຄ່າປ່ຽນຜັນຮູບແບບຄວາມກວ້າງເຕັມ"}
+        geometric_shapes{"ຮູບຊົງເລຂາຄະນິດ"}
+        half_width_form_variant{"ຄ່າປ່ຽນຜັນຮູບແບບຄວາມເຄິ່ງໜຶ່ງ"}
+        han_characters{"ຕົວອັກສອນຮັນ"}
+        han_radicals{"ໝວດຄຳອັກສອນຈີນ"}
+        hanja{"ຮັນຈາ"}
+        hanzi_simplified{"ຕົວອັກສອນຈີນ (ແບບງ່າຍ)"}
+        hanzi_traditional{"ຕົວອັກສອນຈີນ (ດັ້ງເດີມ)"}
+        heart{"ຫົວໃຈ"}
+        historic_scripts{"ແບບຂຽນປະຫວັດສາດ"}
+        ideographic_desc_characters{"ຕົວອັກສອນຄຳອະທິບາຍພາບສະແດງຄວາມໝາຍ"}
+        japanese_kana{"ຕົວອັກສອນຄານະຍີ່ປຸ່ນ"}
+        kanbun{"ຄັນບຸນ"}
+        kanji{"ຄັນຈິ"}
+        keycap{"ແປ້ນແຄັບ"}
+        leftwards_arrows{"ລູກສອນຊີ້ໄປຊ້າຍ"}
+        leftwards_rightwards_arrows{"ລູກສອນຊີ້ໄປຊ້າຍຂວາ"}
+        letterlike_symbols{"ສັນຍາລັກແບບຕົວຂຽນ"}
+        limited_use{"ໃຊ້ຈຳກັດ"}
+        male{"ຊາຍ"}
+        math_symbols{"ສັນຍາລັກເລກ"}
+        middle_eastern_scripts{"ແບບຂຽນຕາເວັນອອກກາງ"}
+        miscellaneous{"ເບັດຕະເລັດ"}
+        modern_scripts{"ແບບຂຽນສະໄໝໃໝ່"}
+        modifier{"ຕົວແກ້ໄຂ"}
+        musical_symbols{"ສັນຍາລັກດົນຕີ"}
+        nature{"ທຳມະຊາດ"}
+        nonspacing{"ບໍ່ມີຍະຫວ່າງ"}
+        numbers{"ຕົວເລກ"}
+        objects{"ວັດຖຸ"}
+        other{"ອື່ນໆ"}
+        paired{"ຈັບຄູ່ແລ້ວ"}
+        person{"ຄົນ"}
+        phonetic_alphabet{"ພະຍັນຊະນະການອອກສຽງ"}
+        pictographs{"ສັນຍາລັກຮູບພາບ"}
+        place{"ສະຖານທີ່"}
+        plant{"ພືດ"}
+        punctuation{"ເຄື່ອງໝາຍວັກຕອນ"}
+        rightwards_arrows{"ລູກສອນຊີ້ໄປຂວາ"}
+        sign_standard_symbols{"ສັນຍາລັກ ປ້າຍ/ມາດຕະຖານ"}
+        small_form_variant{"ຄວາມປ່ຽນຜັນຮູບແບບນ້ອຍ"}
+        smiley{"ຍິ້ມ"}
+        smileys_people{"ຮູບຍິ້ມ ແລະ ຄົນ"}
+        south_asian_scripts{"ແບບຂຽນຊາວເອເຊຍໃຕ້"}
+        southeast_asian_scripts{"ແບບຂຽນຊາວເອເຊຍຕາເວັນອອກສ່ຽງໃຕ້"}
+        spacing{"ຊ່ອງຫວ່າງ"}
+        sport{"ກິລາ"}
+        symbols{"ສັນຍາລັກ"}
+        technical_symbols{"ສັນຍາລັກທາງເຕັກນິກ"}
+        tone_marks{"ວັນນະຍຸດ"}
+        travel{"ທ່ອງທ່ຽວ"}
+        travel_places{"ທ່ອງທ່ຽວ ແລະ ສະຖານທີ່ຕ່າງໆ"}
+        upwards_arrows{"ລູກສອນຊີ້ຂຶ້ນເທິງ"}
+        variant_forms{"ຮູບແບບຄວາມປ່ຽນຜັນ"}
+        vocalic_jamo{"ຈາໂມທີ່ປະກອບດ້ວຍສຽງສະຫລະ"}
+        weather{"ສະພາບອາກາດ"}
+        western_asian_scripts{"ແບບຂຽນຊາວເອເຊຍຕາເວັນຕົກ"}
+        whitespace{"ຊ່ອງຫວ່າງ"}
+    }
+    delimiters{
+        alternateQuotationEnd{"’"}
+        alternateQuotationStart{"‘"}
+        quotationEnd{"”"}
+        quotationStart{"“"}
+    }
+    fields{
+        day{
+            dn{"ມື້"}
+            relative{
+                "-1"{"ມື້ວານ"}
+                "-2"{"ມື້ກ່ອນ"}
+                "0"{"ມື້ນີ້"}
+                "1"{"ມື້ອື່ນ"}
+                "2"{"ມື້ຮື"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ມື້"}
+                }
+                past{
+                    other{"{0} ມື້ກ່ອນ"}
+                }
+            }
+        }
+        day-narrow{
+            dn{"ມື້"}
+            relative{
+                "-1"{"ມື້ວານ"}
+                "-2"{"ມື້ກ່ອນ"}
+                "0"{"ມື້ນີ້"}
+                "1"{"ມື້ອື່ນ"}
+                "2"{"ມື້ຮື"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ມື້"}
+                }
+                past{
+                    other{"{0} ມື້ກ່ອນ"}
+                }
+            }
+        }
+        day-short{
+            dn{"ມື້"}
+            relative{
+                "-1"{"ມື້ວານ"}
+                "-2"{"ມື້ກ່ອນ"}
+                "0"{"ມື້ນີ້"}
+                "1"{"ມື້ອື່ນ"}
+                "2"{"ມື້ຮື"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ມື້"}
+                }
+                past{
+                    other{"{0} ມື້ກ່ອນ"}
+                }
+            }
+        }
+        dayOfYear{
+            dn{"ມື້ຂອງປີ"}
+        }
+        dayOfYear-narrow{
+            dn{"ມື້ຂອງປີ"}
+        }
+        dayOfYear-short{
+            dn{"ມື້ຂອງປີ"}
+        }
+        dayperiod{
+            dn{"ກ່ອນທ່ຽງ/ຫຼັງທ່ຽງ"}
+        }
+        dayperiod-narrow{
+            dn{"ກ່ອນທ່ຽງ/ຫຼັງທ່ຽງ"}
+        }
+        dayperiod-short{
+            dn{"ກ່ອນທ່ຽງ/ຫຼັງທ່ຽງ"}
+        }
+        era{
+            dn{"ສະໄໝ"}
+        }
+        era-narrow{
+            dn{"ສະໄໝ"}
+        }
+        era-short{
+            dn{"ສະໄໝ"}
+        }
+        fri{
+            relative{
+                "-1"{"ວັນສຸກແລ້ວ"}
+                "0"{"ວັນສຸກນີ້"}
+                "1"{"ວັນສຸກໜ້າ"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ວັນສຸກ"}
+                }
+                past{
+                    other{"{0} ວັນສຸກກ່ອນ"}
+                }
+            }
+        }
+        fri-narrow{
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ວັນສຸກ"}
+                }
+                past{
+                    other{"{0} ວັນສຸກກ່ອນ"}
+                }
+            }
+        }
+        fri-short{
+            relative{
+                "-1"{"ສຸກແລ້ວ"}
+                "0"{"ສຸກນີ້"}
+                "1"{"ສຸກໜ້າ"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ວັນສຸກ"}
+                }
+                past{
+                    other{"{0} ວັນສຸກກ່ອນ"}
+                }
+            }
+        }
+        hour{
+            dn{"ຊົ່ວໂມງ"}
+            relative{
+                "0"{"ຊົ່ວໂມງນີ້"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ຊົ່ວໂມງ"}
+                }
+                past{
+                    other{"{0} ຊົ່ວໂມງກ່ອນ"}
+                }
+            }
+        }
+        hour-narrow{
+            dn{"ຊມ."}
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ຊມ."}
+                }
+                past{
+                    other{"{0} ຊມ. ກ່ອນ"}
+                }
+            }
+        }
+        hour-short{
+            dn{"ຊມ."}
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ຊມ."}
+                }
+                past{
+                    other{"{0} ຊມ. ກ່ອນ"}
+                }
+            }
+        }
+        minute{
+            dn{"ນາທີ"}
+            relative{
+                "0"{"ນາທີນີ້"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ນາທີ"}
+                }
+                past{
+                    other{"{0} ນາທີກ່ອນ"}
+                }
+            }
+        }
+        minute-narrow{
+            dn{"ນທ."}
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ນທ."}
+                }
+                past{
+                    other{"{0} ນທ. ກ່ອນ"}
+                }
+            }
+        }
+        minute-short{
+            dn{"ນທ."}
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ນທ."}
+                }
+                past{
+                    other{"{0} ນທ. ກ່ອນ"}
+                }
+            }
+        }
+        mon{
+            relative{
+                "-1"{"ວັນຈັນແລ້ວ"}
+                "0"{"ວັນຈັນນີ້"}
+                "1"{"ວັນຈັນໜ້າ"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວັນຈັນ"}
+                }
+                past{
+                    other{"{0} ວັນຈັນກ່ອນ"}
+                }
+            }
+        }
+        mon-narrow{
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວັນຈັນ"}
+                }
+                past{
+                    other{"{0} ວັນຈັນກ່ອນ"}
+                }
+            }
+        }
+        mon-short{
+            relative{
+                "-1"{"ຈັນແລ້ວ"}
+                "0"{"ຈັນນີ້"}
+                "1"{"ຈັນໜ້າ"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວັນຈັນ"}
+                }
+                past{
+                    other{"{0} ວັນຈັນກ່ອນ"}
+                }
+            }
+        }
+        month{
+            dn{"ເດືອນ"}
+            relative{
+                "-1"{"ເດືອນແລ້ວ"}
+                "0"{"ເດືອນນີ້"}
+                "1"{"ເດືອນໜ້າ"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ເດືອນ"}
+                }
+                past{
+                    other{"{0} ເດືອນກ່ອນ"}
+                }
+            }
+        }
+        month-narrow{
+            dn{"ດ."}
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ດ."}
+                }
+                past{
+                    other{"{0} ດ. ກ່ອນ"}
+                }
+            }
+        }
+        month-short{
+            dn{"ດ."}
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ດ."}
+                }
+                past{
+                    other{"{0} ດ. ກ່ອນ"}
+                }
+            }
+        }
+        quarter{
+            dn{"ໄຕຣມາດ"}
+            relative{
+                "-1"{"ໄຕຣມາດກ່ອນໜ້າ"}
+                "0"{"ໄຕຣມາດນີ້"}
+                "1"{"ໄຕຣມາດໜ້າ"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ໄຕຣມາດ"}
+                }
+                past{
+                    other{"{0} ໄຕຣມາດກ່ອນ"}
+                }
+            }
+        }
+        quarter-narrow{
+            dn{"ຕມ."}
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ຕມ."}
+                }
+            }
+        }
+        quarter-short{
+            dn{"ຕມ."}
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ຕມ."}
+                }
+                past{
+                    other{"{0} ຕມ. ກ່ອນ"}
+                }
+            }
+        }
+        sat{
+            relative{
+                "-1"{"ວັນເສົາແລ້ວ"}
+                "0"{"ວັນເສົານີ້"}
+                "1"{"ວັນເສົາໜ້າ"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວັນເສົາ"}
+                }
+                past{
+                    other{"{0} ວັນເສົາກ່ອນ"}
+                }
+            }
+        }
+        sat-narrow{
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວັນເສົາ"}
+                }
+                past{
+                    other{"{0} ວັນເສົາກ່ອນ"}
+                }
+            }
+        }
+        sat-short{
+            relative{
+                "-1"{"ເສົາແລ້ວ"}
+                "0"{"ເສົານີ້"}
+                "1"{"ເສົາໜ້າ"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວັນເສົາ"}
+                }
+                past{
+                    other{"{0} ວັນເສົາກ່ອນ"}
+                }
+            }
+        }
+        second{
+            dn{"ວິນາທີ"}
+            relative{
+                "0"{"ຕອນນີ້"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ວິນາທີ"}
+                }
+                past{
+                    other{"{0} ວິນາທີກ່ອນ"}
+                }
+            }
+        }
+        second-narrow{
+            dn{"ວິ."}
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວິ."}
+                }
+                past{
+                    other{"{0} ວິ. ກ່ອນ"}
+                }
+            }
+        }
+        second-short{
+            dn{"ວິ."}
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວິ."}
+                }
+                past{
+                    other{"{0} ວິ. ກ່ອນ"}
+                }
+            }
+        }
+        sun{
+            relative{
+                "-1"{"ວັນອາທິດແລ້ວ"}
+                "0"{"ວັນອາທິດນີ້"}
+                "1"{"ວັນອາທິດໜ້າ"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວັນອາທິດ"}
+                }
+                past{
+                    other{"{0} ວັນອາທິດກ່ອນ"}
+                }
+            }
+        }
+        sun-narrow{
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວັນອາທິດ"}
+                }
+                past{
+                    other{"{0} ວັນອາທິດກ່ອນ"}
+                }
+            }
+        }
+        sun-short{
+            relative{
+                "-1"{"ວັນທິດແລ້ວ"}
+                "0"{"ວັນທິດນີ້"}
+                "1"{"ວັນທິດໜ້າ"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວັນອາທິດ"}
+                }
+                past{
+                    other{"{0} ວັນອາທິດກ່ອນ"}
+                }
+            }
+        }
+        thu{
+            relative{
+                "-1"{"ວັນພະຫັດແລ້ວ"}
+                "0"{"ວັນພະຫັດນີ້"}
+                "1"{"ວັນພະຫັດໜ້າ"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວັນພະຫັດ"}
+                }
+                past{
+                    other{"{0} ວັນພະຫັດກ່ອນ"}
+                }
+            }
+        }
+        thu-narrow{
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວັນພະຫັດ"}
+                }
+                past{
+                    other{"{0} ວັນພະຫັດກ່ອນ"}
+                }
+            }
+        }
+        thu-short{
+            relative{
+                "-1"{"ພະຫັດແລ້ວ"}
+                "0"{"ພະຫັດນີ້"}
+                "1"{"ພະຫັດໜ້າ"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວັນພະຫັດ"}
+                }
+                past{
+                    other{"{0} ວັນພະຫັດກ່ອນ"}
+                }
+            }
+        }
+        tue{
+            relative{
+                "-1"{"ວັນອັງຄານແລ້ວ"}
+                "0"{"ວັນອັງຄານນີ້"}
+                "1"{"ວັນອັງຄານໜ້າ"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວັນອັງຄານ"}
+                }
+                past{
+                    other{"{0} ວັນອັງຄານກ່ອນ"}
+                }
+            }
+        }
+        tue-narrow{
+            relative{
+                "-1"{"ອັງຄານແລ້ວ"}
+                "0"{"ອັງຄານນີ້"}
+                "1"{"ອັງຄານໜ້າ"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວັນອັງຄານ"}
+                }
+                past{
+                    other{"{0} ວັນອັງຄານກ່ອນ"}
+                }
+            }
+        }
+        tue-short{
+            relative{
+                "-1"{"ອັງຄານແລ້ວ"}
+                "0"{"ອັງຄານນີ້"}
+                "1"{"ອັງຄານໜ້າ"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວັນອັງຄານ"}
+                }
+                past{
+                    other{"{0} ວັນອັງຄານກ່ອນ"}
+                }
+            }
+        }
+        wed{
+            relative{
+                "-1"{"ວັນພຸດແລ້ວ"}
+                "0"{"ວັນພຸດນີ້"}
+                "1"{"ວັນພຸດໜ້າ"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວັນພຸດ"}
+                }
+                past{
+                    other{"{0} ວັນພຸດກ່ອນ"}
+                }
+            }
+        }
+        wed-narrow{
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວັນພຸດ"}
+                }
+                past{
+                    other{"{0} ວັນພຸດກ່ອນ"}
+                }
+            }
+        }
+        wed-short{
+            relative{
+                "-1"{"ພຸດແລ້ວ"}
+                "0"{"ພຸດນີ້"}
+                "1"{"ພຸດໜ້າ"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນ {0} ວັນພຸດ"}
+                }
+                past{
+                    other{"{0} ວັນພຸດກ່ອນ"}
+                }
+            }
+        }
+        week{
+            dn{"ອາທິດ"}
+            relative{
+                "-1"{"ອາທິດແລ້ວ"}
+                "0"{"ອາທິດນີ້"}
+                "1"{"ອາທິດໜ້າ"}
+            }
+            relativePeriod{"ອາທິດທີ {0}"}
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ອາທິດ"}
+                }
+                past{
+                    other{"{0} ອາທິດກ່ອນ"}
+                }
+            }
+        }
+        week-narrow{
+            dn{"ອ."}
+            relativePeriod{"ອາທິດທີ {0}"}
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ອທ."}
+                }
+                past{
+                    other{"{0} ອທ. ກ່ອນ"}
+                }
+            }
+        }
+        week-short{
+            dn{"ອ."}
+            relativePeriod{"ອາທິດທີ {0}"}
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ອທ."}
+                }
+                past{
+                    other{"{0} ອທ. ກ່ອນ"}
+                }
+            }
+        }
+        weekOfMonth{
+            dn{"ອາທິດຂອງເດືອນ"}
+        }
+        weekOfMonth-narrow{
+            dn{"ອທ ຂອງ ດ"}
+        }
+        weekOfMonth-short{
+            dn{"ອທ ຂອງ ດ"}
+        }
+        weekday{
+            dn{"ມື້ຂອງອາທິດ"}
+        }
+        weekday-narrow{
+            dn{"ມື້ຂອງອາທິດ"}
+        }
+        weekday-short{
+            dn{"ມື້ຂອງອາທິດ"}
+        }
+        weekdayOfMonth{
+            dn{"ມື້ເຮັດວຽກຂອງເດືອນ"}
+        }
+        weekdayOfMonth-narrow{
+            dn{"ມຮວ ຂອງ ດ"}
+        }
+        weekdayOfMonth-short{
+            dn{"ມຮວ ຂອງ ດ"}
+        }
+        year{
+            dn{"ປີ"}
+            relative{
+                "-1"{"ປີກາຍ"}
+                "0"{"ປີນີ້"}
+                "1"{"ປີໜ້າ"}
+            }
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ປີ"}
+                }
+                past{
+                    other{"{0} ປີກ່ອນ"}
+                }
+            }
+        }
+        year-narrow{
+            dn{"ປີ"}
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ປີ"}
+                }
+                past{
+                    other{"{0} ປີກ່ອນ"}
+                }
+            }
+        }
+        year-short{
+            dn{"ປີ"}
+            relativeTime{
+                future{
+                    other{"ໃນອີກ {0} ປີ"}
+                }
+                past{
+                    other{"{0} ປີກ່ອນ"}
+                }
+            }
+        }
+        zone{
+            dn{"ເຂດເວລາ"}
+        }
+        zone-narrow{
+            dn{"ເຂດເວລາ"}
+        }
+        zone-short{
+            dn{"ເຂດເວລາ"}
+        }
+    }
+    listPattern{
+        or{
+            2{"{0} ຫຼື {1}"}
+            end{"{0} ຫຼື {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        standard{
+            2{"{0} ແລະ {1}"}
+            end{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        standard-narrow{
+            end{"{0}, {1}"}
+        }
+        standard-short{
+            2{"{0} ແລະ {1}"}
+            end{"{0} ແລະ {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        unit{
+            2{"{0}, {1}"}
+            end{"{0}, {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+        unit-narrow{
+            2{"{0} {1}"}
+            end{"{0} {1}"}
+            middle{"{0} {1}"}
+            start{"{0} {1}"}
+        }
+        unit-short{
+            2{"{0}, {1}"}
+            end{"{0}, {1}"}
+            middle{"{0}, {1}"}
+            start{"{0}, {1}"}
+        }
+    }
+    measurementSystemNames{
+        UK{"ສະຫະລາດຊະອານາຈັກອັງກິດ"}
+        US{"ສະຫະລັດອາເມລິກາ"}
+        metric{"ເມທຣິກ"}
+    }
+}

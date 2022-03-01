@@ -1,0 +1,52 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ebu{
+    Languages{
+        ak{"Kĩakan"}
+        am{"Kĩamhari"}
+        ar{"Kĩarabu"}
+        be{"Kĩmbelarusi"}
+        bg{"Kĩbulgaria"}
+        bn{"Kĩbangla"}
+        cs{"Kĩcheki"}
+        de{"Kĩnjeremani"}
+        ebu{"Kĩembu"}
+        el{"Kĩngriki"}
+        en{"Kĩthungu"}
+        es{"Kĩhispania"}
+        fa{"Kĩanjemi"}
+        fr{"Kĩfaransa"}
+        ha{"Kĩhausa"}
+        hi{"Kĩhindĩ"}
+        hu{"Kĩhungari"}
+        id{"Kĩindonesia"}
+        ig{"Kĩigbo"}
+        it{"Kĩitaliano"}
+        ja{"Kĩnjapani"}
+        jv{"Kĩjava"}
+        km{"Kĩkambodia"}
+        ko{"Kĩkorea"}
+        ms{"Kĩmalesia"}
+        my{"Kĩburma"}
+        ne{"Kĩnepali"}
+        nl{"Kĩholanzi"}
+        pa{"Kĩpunjabi"}
+        pl{"Kĩpolandi"}
+        pt{"Kĩreno"}
+        ro{"Kĩromania"}
+        ru{"Kĩrusi"}
+        rw{"Kĩnyarwanda"}
+        so{"Kĩsomali"}
+        sv{"Kĩswidi"}
+        ta{"Kĩtamil"}
+        th{"Kĩtailandi"}
+        tr{"Kĩturuki"}
+        uk{"Kĩukrania"}
+        ur{"Kĩurdu"}
+        vi{"Kĩvietinamu"}
+        yo{"Kĩyoruba"}
+        zh{"Kĩchina"}
+        zu{"Kĩzulu"}
+    }
+}

@@ -1,0 +1,19 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+om{
+    Countries{
+        BR{"Brazil"}
+        CN{"China"}
+        DE{"Germany"}
+        ET{"Itoophiyaa"}
+        FR{"France"}
+        GB{"United Kingdom"}
+        IN{"India"}
+        IT{"Italy"}
+        JP{"Japan"}
+        KE{"Keeniyaa"}
+        RU{"Russia"}
+        US{"United States"}
+    }
+}

@@ -1,0 +1,236 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ur_IN{
+    NumberElements{
+        arabext{
+            patterns{
+                currencyFormat{"¤ #,##,##0.00"}
+            }
+        }
+        default{"arabext"}
+        latn{
+            miscPatterns{
+                atLeast{"{0}+"}
+            }
+        }
+    }
+    fields{
+        day-narrow{
+            relativeTime{
+                past{
+                    one{"{0} دن قبل"}
+                    other{"{0} دن قبل"}
+                }
+            }
+        }
+        day-short{
+            relativeTime{
+                future{
+                    one{"{0} دنوں میں"}
+                    other{"{0} دنوں میں"}
+                }
+            }
+        }
+        era{
+            dn{"دور"}
+        }
+        fri{
+            relative{
+                "-1"{"پچھلے جمعہ"}
+                "0"{"اس جمعہ"}
+                "1"{"اگلے جمعہ"}
+            }
+        }
+        hour-narrow{
+            relativeTime{
+                past{
+                    one{"{0} گھنٹہ قبل"}
+                    other{"{0} گھنٹے قبل"}
+                }
+            }
+        }
+        hour-short{
+            relativeTime{
+                past{
+                    one{"{0} گھنٹے قبل"}
+                    other{"{0} گھنٹے قبل"}
+                }
+            }
+        }
+        minute{
+            relativeTime{
+                past{
+                    one{"{0} منٹ قبل"}
+                    other{"{0} منٹ قبل"}
+                }
+            }
+        }
+        minute-narrow{
+            relativeTime{
+                past{
+                    one{"{0} منٹ قبل"}
+                    other{"{0} منٹ قبل"}
+                }
+            }
+        }
+        minute-short{
+            relativeTime{
+                past{
+                    one{"{0} منٹ قبل"}
+                    other{"{0} منٹ قبل"}
+                }
+            }
+        }
+        mon{
+            relative{
+                "-1"{"پچھلے سوموار"}
+                "0"{"اس سوموار"}
+                "1"{"اگلے سوموار"}
+            }
+        }
+        month{
+            relative{
+                "-1"{"گزشتہ ماہ"}
+                "0"{"اس ماہ"}
+                "1"{"اگلے ماہ"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ماہ میں"}
+                    other{"{0} ماہ میں"}
+                }
+                past{
+                    one{"{0} ماہ قبل"}
+                    other{"{0} ماہ قبل"}
+                }
+            }
+        }
+        month-narrow{
+            dn{"مہینہ"}
+            relativeTime{
+                past{
+                    one{"{0} ماہ قبل"}
+                    other{"{0} ماہ قبل"}
+                }
+            }
+        }
+        month-short{
+            dn{"مہینہ"}
+        }
+        second{
+            relativeTime{
+                past{
+                    one{"{0} سیکنڈ قبل"}
+                    other{"{0} سیکنڈ قبل"}
+                }
+            }
+        }
+        second-narrow{
+            relativeTime{
+                past{
+                    one{"{0} سیکنڈ قبل"}
+                    other{"{0} سیکنڈ قبل"}
+                }
+            }
+        }
+        second-short{
+            relativeTime{
+                past{
+                    one{"{0} سیکنڈ قبل"}
+                    other{"{0} سیکنڈ قبل"}
+                }
+            }
+        }
+        thu{
+            relative{
+                "-1"{"پچھلے جمعرات"}
+                "0"{"اس جمعرات"}
+                "1"{"اگلے جمعرات"}
+            }
+        }
+        tue{
+            relative{
+                "-1"{"پچھلے منگل"}
+                "0"{"اس منگل"}
+                "1"{"اگلے منگل"}
+            }
+        }
+        wed{
+            relative{
+                "-1"{"پچھلے بدھ"}
+                "0"{"اس بدھ"}
+                "1"{"اگلے بدھ"}
+            }
+        }
+        week{
+            relative{
+                "-1"{"گزشتہ ہفتہ"}
+                "0"{"اس ہفتہ"}
+                "1"{"اگلے ہفتہ"}
+            }
+            relativeTime{
+                future{
+                    one{"{0} ہفتہ میں"}
+                    other{"{0} ہفتوں میں"}
+                }
+                past{
+                    one{"{0} ہفتہ قبل"}
+                    other{"{0} ہفتے قبل"}
+                }
+            }
+        }
+        week-narrow{
+            relativeTime{
+                past{
+                    one{"{0} ہفتہ قبل"}
+                    other{"{0} ہفتے قبل"}
+                }
+            }
+        }
+        week-short{
+            relativeTime{
+                past{
+                    one{"{0} ہفتے قبل"}
+                    other{"{0} ہفتے قبل"}
+                }
+            }
+        }
+        year{
+            relativeTime{
+                future{
+                    one{"{0} سال میں"}
+                    other{"{0} سالوں میں"}
+                }
+            }
+        }
+        year-short{
+            relativeTime{
+                future{
+                    one{"{0} سال میں"}
+                    other{"{0} سالوں میں"}
+                }
+                past{
+                    one{"{0} سال پہلے"}
+                    other{"{0} سالوں پہلے"}
+                }
+            }
+        }
+    }
+    listPattern{
+        unit{
+            2{"{1}، {0}"}
+            end{"{1}، {0}"}
+        }
+        unit-narrow{
+            2{"{1} {0}"}
+            end{"{1} {0}"}
+            middle{"{1} {0}"}
+            start{"{1} {0}"}
+        }
+        unit-short{
+            2{"{1}، {0}"}
+            end{"{1}، {0}"}
+        }
+    }
+}

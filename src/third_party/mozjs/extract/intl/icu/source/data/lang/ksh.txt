@@ -1,0 +1,526 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ksh{
+    Keys{
+        calendar{"dä Kalländer"}
+        collation{"de Reijefollsch zom Zotiere"}
+        currency{"de Zoot Jeld"}
+        numbers{"de Nummere"}
+    }
+    Languages{
+        aa{"Afahresch"}
+        ab{"Abchahsesch"}
+        ace{"Aschenehsesch"}
+        ada{"Adangmesch"}
+        ady{"Adygehjsch"}
+        ae{"Avästahnesch"}
+        aeb{"Tonehsesch Arahbesch"}
+        af{"Afrikaans"}
+        afh{"Afrehihlesch"}
+        agq{"Aghehmesch"}
+        ain{"Aijnu"}
+        ak{"Akahnesch"}
+        akk{"Akahdesch"}
+        ale{"Ale’uhtesch"}
+        am{"Amhahresch"}
+        an{"Arrajonehsesch"}
+        ang{"Ahl Änglesch"}
+        anp{"Anjikahnesch"}
+        ar{"Arahbesch"}
+        ar_001{"Schtandatt Arahbesch"}
+        arp{"Arrappaho"}
+        arq{"Aljehresch Arahbesch"}
+        ary{"Marokahnesch Arahbesch"}
+        arz{"Äjiptesch Arahbesch"}
+        as{"Aßamehsesch"}
+        asa{"Pare"}
+        ase{"Amärrekahnesche Blendeschprohch"}
+        ast{"Astuhrejahnesch"}
+        av{"Avahresch"}
+        awa{"Awahdesch"}
+        ay{"Aimahresch"}
+        az{"Asserbaidschahnesch"}
+        az_Arab{"Södasserbaidschahnesch"}
+        ba{"Baschkihresch"}
+        bal{"Beluhtschesch"}
+        ban{"Balinehsesch"}
+        bar{"Bairesch"}
+        bas{"Basaa-Schprohche"}
+        be{"Wiißrußesch"}
+        bem{"Bemba"}
+        bez{"Bena"}
+        bg{"Bulljahresch"}
+        bho{"Bhohdschpuresch"}
+        bi{"Bislahmesch"}
+        bin{"Edo"}
+        bm{"Bambara"}
+        bn{"Bängjahlesch"}
+        bo{"Tibehtesch"}
+        bpy{"Bischnuprejahnesch"}
+        br{"Bettohnesch"}
+        bra{"Brahjesch"}
+        brh{"Brahuijesch"}
+        brx{"Boddo"}
+        bs{"Boßnesch"}
+        bua{"Burejahtesch"}
+        bug{"Bujinehsesch"}
+        byn{"Bilihnesch"}
+        ca{"Kattalahnesch"}
+        ce{"Tschätschehnesch"}
+        ceb{"Zebuwahnesch"}
+        cgg{"Kihja-Schprohch"}
+        ch{"Chamorru"}
+        chk{"Trukehsesch"}
+        chm{"Mahresch"}
+        cho{"Tschoktoh"}
+        chr{"Tschärrokeh"}
+        chy{"Tschäjänn"}
+        ckb{"Zäntrahl-Kurrdesch"}
+        co{"Korsesch"}
+        cop{"Koptesch"}
+        cs{"Tschäschesch"}
+        csb{"Kaschuhbesch"}
+        cu{"Kerscheßlahwesch"}
+        cv{"Tschowaschesch"}
+        cy{"Wallihsesch"}
+        da{"Dähnesch"}
+        dak{"Dakohtesch"}
+        dar{"Darjihnesch"}
+        dav{"Dawedahnesch"}
+        de{"Deutsch"}
+        de_AT{"Deutsch uß Öhßterich"}
+        de_CH{"Deutsch uß de Schweijz"}
+        dgr{"Dohjribesch"}
+        dje{"Djerma"}
+        dsb{"Niddersorbesch"}
+        dua{"Du’ala"}
+        dum{"Meddelnehderlängsch"}
+        dv{"Divehjesch"}
+        dyo{"Jola-Fonyisch"}
+        dz{"Butahnesch"}
+        dzg{"Dassajahnesch"}
+        ebu{"Kîembu"}
+        ee{"Ewe"}
+        efi{"Äffiksch"}
+        egl{"Emilijahnesch"}
+        egy{"Ahl Äjiptesch"}
+        eka{"Ekajukesch"}
+        el{"Jrihschesch"}
+        en{"Änglesch"}
+        en_AU{"Änglesch uß Außtrahlije"}
+        en_CA{"Änglesch uß Kanada"}
+        en_GB{"Änglesch uß Jruhßbrettannije"}
+        en_US{"Amärrekahnesch Änglesch"}
+        enm{"Meddelänglesch"}
+        eo{"Esperanto"}
+        es{"Schpahnesch"}
+        es_419{"Schpahnesch uß Latting-Ammärrika"}
+        es_ES{"Schpahnesch en Schpahneje"}
+        es_MX{"Schpahnesch en Mäxikoh"}
+        esu{"Zäntrahl-Juppik"}
+        et{"Äßnesch"}
+        eu{"Baskesch"}
+        ewo{"Ewonndo"}
+        fa{"Pärsesch"}
+        ff{"Fulfulde"}
+        fi{"Finnesch"}
+        fil{"Fillipihnesch"}
+        fj{"Fihdschesch"}
+        fo{"Färröhresch"}
+        fon{"Fohnesch"}
+        fr{"Franzühsesch"}
+        fr_CA{"Franzühsesch uß Kanada"}
+        fr_CH{"Franzühsesch uß de Schweijz"}
+        fur{"Frijauhlesch"}
+        fy{"Wäßfrihsesch"}
+        ga{"Ihresch"}
+        gaa{"Jah"}
+        gez{"Ji’is-Ahl-Ättejohpesch"}
+        gil{"Jillbättehsesch"}
+        gl{"Jallihzesch"}
+        gn{"Juwarahnesch"}
+        gor{"Jorontalohsch"}
+        gsw{"Schwitzerdütsch"}
+        gu{"Gutscharatesch"}
+        gv{"Mangx"}
+        ha{"Haußa"}
+        haw{"Hauajahnesch"}
+        he{"Hebrähjesch"}
+        hi{"Hinndi"}
+        hil{"Hiligaynon"}
+        hmn{"Hmong"}
+        hr{"Krowatesch"}
+        hsb{"Bovversorrbesch"}
+        ht{"Ha’iihtesch"}
+        hu{"Unnjarresch"}
+        hup{"Hupa"}
+        hy{"Armehnesch"}
+        hz{"Herrehro"}
+        ia{"de Interlingua"}
+        iba{"Ibahnesch"}
+        ibb{"Ibibio"}
+        id{"Indonehsesch"}
+        ig{"Igbo"}
+        ilo{"Ilokahnesch"}
+        inh{"Engjuschesch"}
+        io{"Ihdo"}
+        is{"Ißlänndesch"}
+        it{"Etalljähnesch"}
+        iu{"Inuktitut"}
+        izh{"Ingjrijahnesch"}
+        ja{"Japahnesch"}
+        jam{"Jamaikahnesch-Änglesch"}
+        jbo{"Lodschbahn"}
+        jgo{"Njomba"}
+        jpr{"Jühdesch-Pärsesch"}
+        jut{"Jüttesch"}
+        jv{"Javahnesch"}
+        ka{"Je’orjesch"}
+        kab{"Kabyhlesch"}
+        kam{"Kamba vun Kehnija"}
+        kbd{"Kabadihnesch"}
+        kde{"Chimakonde"}
+        kea{"Kapvärdesch"}
+        kfo{"Koro vun de Älfebeijnköß"}
+        kha{"Khasi"}
+        khq{"Kojra Tschihni"}
+        ki{"Rekohjo"}
+        kj{"Oschivambo"}
+        kk{"Kassakkesch"}
+        kkj{"Kako"}
+        kl{"Jröhnländesch"}
+        kln{"Kaländjihnesch"}
+        km{"Khmer"}
+        kmb{"Kimbundu"}
+        kn{"Kannada"}
+        ko{"Korrejaanesch"}
+        kok{"Kon’kahnesch"}
+        kpe{"Kpäle"}
+        kr{"Kanuhresch"}
+        krc{"Karatschaj-Balkahresch-Törkesch"}
+        krl{"Karehlesch"}
+        kru{"Korochesch"}
+        ks{"Kaschmihresch"}
+        ksf{"Bafijahnesch"}
+        ksh{"Kölsch"}
+        ku{"Kurrdesch"}
+        kum{"Kumykesch"}
+        kv{"Kohmesch"}
+        kw{"Kornesch"}
+        ky{"Kirjihsesch"}
+        la{"Lateijnesch"}
+        lad{"Ladihnesch"}
+        lag{"Lango"}
+        lah{"de Landa-Schprooche"}
+        lb{"Luxemborjesch"}
+        lez{"Lesjesch"}
+        lg{"Lugannda"}
+        li{"Lemburjesch"}
+        lkt{"Lakota"}
+        ln{"Lingjalla"}
+        lo{"Lahootesch"}
+        loz{"Silohzi"}
+        lrc{"Nood-Luhresch"}
+        lt{"Littouesch"}
+        lu{"Kiluba"}
+        lua{"Tschiluba"}
+        lun{"Schilunnda"}
+        luo{"Luo"}
+        luy{"Luhjesch"}
+        lv{"Lättesch"}
+        mdf{"Mokschah"}
+        mg{"Madajaßkesch"}
+        mh{"Maschallehsesch"}
+        mi{"Ma’ohresch"}
+        mk{"Mazedohnesch"}
+        ml{"Mallajalam"}
+        mn{"Mongjohlesch"}
+        mni{"Meitei-Manipuhresch"}
+        mr{"Marrahtesch"}
+        ms{"Mallaijesch"}
+        mt{"Maltehsesch"}
+        mua{"Mundang"}
+        mul{"-ongerscheidlijje Schprohche-"}
+        mus{"Krihk"}
+        mwl{"Mirandehsesch"}
+        my{"Burmehsesch"}
+        myv{"Ärsjahnesch"}
+        na{"Nauruhesch"}
+        nap{"Napolletahnesch"}
+        nb{"Norrwehjesch Bokmål"}
+        nd{"Nood-Ndebele"}
+        nds_NL{"Nehdersaksesch en de Nederläng"}
+        ne{"Nepallehsesch"}
+        new{"Newahresch"}
+        ng{"Ndongjahnesch"}
+        nl{"Holländesch"}
+        nl_BE{"Flähmesch"}
+        nmg{"Gyele"}
+        nn{"Neu Norrwehjesch"}
+        nnh{"Njijembohn"}
+        no{"Norrwehjesch"}
+        nog{"Nojal"}
+        nso{"Nood-Sohto"}
+        nv{"Navvacho"}
+        ny{"Schi-Schewa"}
+        or{"Oriija"}
+        os{"Oßeetesch"}
+        pa{"Panschaabesch"}
+        pl{"Pollnesch"}
+        ps{"Paschtuunesch"}
+        pt{"Pochtojesesch"}
+        pt_BR{"Brasilljaanesch Pochtojesesch"}
+        pt_PT{"Pochtojesesch uß Pochtojall"}
+        qu{"Kättschowa"}
+        quc{"K’ische’"}
+        rm{"Rätoromaanesch"}
+        rn{"K-Rundesch"}
+        ro{"Rumänesch"}
+        rof{"Kirombo"}
+        ru{"Rußßesch"}
+        rup{"Arromahnesch"}
+        rw{"Kinja-Ruandesch"}
+        sa{"Sanskrit"}
+        sah{"Jackutesch"}
+        sba{"Njambaij"}
+        sd{"Sinndi"}
+        se{"Nood-Lappländesch"}
+        ses{"Kojraboro Senni"}
+        sg{"Sangjo"}
+        sh{"Särbokowatesch"}
+        shi{"Taschelhittesch"}
+        si{"Singjaleesesch"}
+        sk{"ẞlovakesch"}
+        sl{"ẞloveenesch"}
+        sm{"Sammohanesch"}
+        smj{"Lule-Läppländesch"}
+        smn{"Inahri Lappländesch"}
+        sn{"Schi-Schona"}
+        so{"Somahlesch"}
+        sq{"Albahnesch"}
+        sr{"Särbesch"}
+        ss{"Si-Swatesch"}
+        st{"Söd-Sooto"}
+        su{"Sindanehsesch"}
+        sv{"Schwehdesch"}
+        sw{"Suahehlesch"}
+        swb{"Kommohresch"}
+        syr{"Sührejakkesch"}
+        ta{"Tamihlesch"}
+        te{"Telluhju"}
+        tet{"Tetumsch"}
+        tg{"Tadschihkesch"}
+        th{"Tailändesch"}
+        ti{"Tijrenejahnesch"}
+        tig{"Tigre"}
+        tk{"Törkmehnesch"}
+        tl{"Tajalloch"}
+        tlh{"Klingjohnesch"}
+        tn{"Se-Zwahnesch"}
+        to{"Tongjahnesch"}
+        tpi{"Tok Pisin"}
+        tr{"Törkesch"}
+        ts{"Xi-Zongjahnesch"}
+        tt{"Tattahresch"}
+        twq{"Tasawaq"}
+        ty{"Tahihtesch"}
+        tyv{"Tuvinijahnesch"}
+        tzm{"Tamasicht ussem meddlere Atlas"}
+        udm{"Udmuchtesch"}
+        ug{"Uj’juhresch"}
+        uk{"Ukrainesch"}
+        umb{"Umbundesch"}
+        und{"-onbikannte-Schprooch-"}
+        ur{"Urdu/Hindi"}
+        uz{"Ußbehkesch"}
+        ve{"Wenda"}
+        vi{"Vijätnammehsesch"}
+        vo{"Volapük"}
+        wa{"Walohnesch"}
+        wae{"Walserdütsch"}
+        wal{"Welahmo"}
+        war{"Waray-Waray"}
+        wo{"Woloff"}
+        xal{"Kalmükkesch"}
+        xh{"Isi-Khohsa"}
+        ybb{"Jämmbah"}
+        yi{"Jiddesch"}
+        yo{"Joruhba"}
+        yue{"Kanton-Schinehsesch"}
+        zh{"Schinehsesch (Mandarin)"}
+        zh_Hans{"Schinehsesch (eijfache Schreff)"}
+        zh_Hant{"Schinehsesch (tradizjonälle Schreff)"}
+        zu{"Suhlu"}
+        zun{"Suhñi"}
+        zxx{"kein Schprooch"}
+        zza{"Sahsajesch"}
+    }
+    Languages%short{
+        az{"Asehresch"}
+        en_GB{"Brettesch Änglesch"}
+        en_US{"Änglesch uß de USA"}
+    }
+    Scripts{
+        Arab{"arraabesche Schreff"}
+        Armn{"armeenesche Schreff"}
+        Beng{"bängjaalesche Schreff"}
+        Bopo{"schineeseche Ömschreff Bopomofo"}
+        Brai{"Blindeschreff"}
+        Cyrl{"kürrellesche Schreff"}
+        Deva{"indesche Devanajari-Schreff"}
+        Ethi{"ätejoopesche Schreff"}
+        Geor{"je’orrjesche Schreff"}
+        Grek{"jriischesche Schreff"}
+        Gujr{"jujaraatesche Schreff"}
+        Guru{"indesche Gurmukhi-Schreff"}
+        Hang{"korrejaanesche Schreff"}
+        Hani{"en schineesesche Schreff"}
+        Hans{"eijfacher"}
+        Hant{"tradizjonäll"}
+        Hebr{"hebrääjesche Schreff"}
+        Hira{"japaanesche Hiddajaana-Schreff"}
+        Jpan{"en japaanesche Schreff"}
+        Kana{"japaanesche Kattakaana-Schreff"}
+        Khmr{"Khmer-Schreff"}
+        Knda{"indesche Kannada-Schreff"}
+        Kore{"korrejaanesche Schreff udder en schineesesche Schreff"}
+        Laoo{"lahootesche Schreff"}
+        Latn{"lateinesche Schreff"}
+        Mlym{"indesche Malajalam-Schreff"}
+        Mong{"mongjoolesche Schreff"}
+        Mymr{"birmahnesche Schreff"}
+        Orya{"indesche Orija-Schreff"}
+        Sinh{"singjaleesesche Schreff"}
+        Taml{"tamiilesche Schreff"}
+        Telu{"indesche Telugu-Schreff"}
+        Thaa{"malledivesche Taana-Schreff"}
+        Thai{"tailändesche Schreff"}
+        Tibt{"tibeetesche Schreff"}
+        Zsym{"-Zeiche ävver kein Schreff-"}
+        Zxxx{"-jaa keij Schreff-"}
+        Zyyy{"-öhnß en Schreff-"}
+        Zzzz{"-onbikannte Schreff-"}
+    }
+    Scripts%stand-alone{
+        Hans{"eijfacher schineesesche Schreff"}
+        Hant{"tradizjonäll schineesesche Schreff"}
+    }
+    Types{
+        calendar{
+            buddhist{"buddistesche Kaländer"}
+            chinese{"schinehsesche Kalännder"}
+            coptic{"kopttesche Kaländer"}
+            dangi{"Dangikalännder"}
+            ethiopic{"ätejohpesche Kalännder"}
+            ethiopic-amete-alem{"ätejoopesche Amete Alem Kaländer"}
+            gregorian{"jrejorejahnesche Kalännder"}
+            hebrew{"jühdesche Kalännder"}
+            indian{"indesche Nazjonahl-Kaländer"}
+            islamic{"ißlaamesche Kaländer"}
+            islamic-civil{"wältlesche islaamesche Kaländer"}
+            japanese{"japaanesche Kaländer"}
+            persian{"pärsesche Kaländer"}
+            roc{"rotschineesesche Kaländer"}
+        }
+        collation{
+            big5han{"zoteert nohm tradizjonäll schineesesch Big5"}
+            dictionary{"zotehrt wi em Wööterbohch"}
+            ducet{"standattmähßesch zotehrt nohm Unicode"}
+            gb2312han{"zoteert nohm eijfacher schineesesch GB2312"}
+            phonebook{"zoteert wi em Tollefoonbooch"}
+            pinyin{"zoteert noh de Pinjin Ömschreff vum Schineesesch"}
+            search{"Söhke"}
+            standard{"Schtandatt"}
+            stroke{"zoteert noh de Stresche vum tradizjonäll schineesesch"}
+            traditional{"tradizjonäll zoteert"}
+            unihan{"zoteert noh de Radikaale un Stresche vum Schineesesch"}
+        }
+        numbers{
+            arab{"araabesche un indesche Zeffere"}
+            arabext{"ußjedehnt araabesche un indesche Zeffere"}
+            armn{"armeenesche Zahle"}
+            armnlow{"klein jeschrevve armeenesche Zahle"}
+            beng{"bängjaalesche Zeffere"}
+            deva{"Devanagari-Zeffere"}
+            ethi{"ätejoopesche Zahle"}
+            fullwide{"janz breede Zeffere"}
+            geor{"jeorjeesche Zahle"}
+            grek{"jriischesche Zahle"}
+            greklow{"klein jeschrevve jriischesche Zahle"}
+            gujr{"Jujarati-Zeffere"}
+            guru{"Jurmukhi-Zeffere"}
+            hanidec{"schineesesche Zehnerzahle"}
+            hans{"eijfache schineesesche Zahle"}
+            hansfin{"eijfache schineesesche Finanzzahle"}
+            hant{"tradizjonälle schineesesche Zahle"}
+            hantfin{"tradizjonälle schineesesche Finanzzahle"}
+            hebr{"hebräjesche Zahle"}
+            jpan{"japanesche Zahle"}
+            jpanfin{"japaanesche Finazzahle"}
+            khmr{"Khmer-Zeffere"}
+            knda{"Kannada-Zeffere"}
+            laoo{"laootesche Zeffere"}
+            latn{"wäßlejje Zeffere"}
+            mlym{"Malayalam-Zeffere"}
+            mong{"mongjoolesche Zeffere"}
+            mymr{"Myanmar-Zeffere"}
+            orya{"Oriya-Zeffere"}
+            roman{"römesche Zahle"}
+            romanlow{"klein jeschrevve römesche Zahle"}
+            taml{"tradizjonälle tamilesche Zahle"}
+            tamldec{"tamiilesche Zeffere"}
+            telu{"Teluju-Zeffere"}
+            thai{"thailändesche Zeffere"}
+            tibt{"tibetaanesche Zeffere"}
+        }
+    }
+    Variants{
+        1606NICT{"späätmeddelfranzüüsesch vör 1606"}
+        1694ACAD{"fröhneufranzüüsesch aff 1694"}
+        1901{"Schriefwiiß vun 1901 aff"}
+        1959ACAD{"akademesche Schriefwiiß vun 1959"}
+        1994{"resijanesch schtandatt Schriefwiiß vun 1994"}
+        1996{"Schriefwiiß vun 1996 aff"}
+        ALALC97{"de lateinesche Ömschreff ALA-LC vun 1997"}
+        AREVELA{"oß-armeensch"}
+        AREVMDA{"wäß-armeenesch"}
+        BAKU1926{"eijheijtlesch törkesch lateijnesch Allfabeet"}
+        BISKE{"zint jorjo’sche uder bila’sche reijanesche Dijaläk"}
+        BOONT{"boontlingsche Dijaläk"}
+        FONIPA{"IPA-Loutschreff"}
+        FONUPA{"UPA-Loutschreff"}
+        HEPBURN{"De Lateinesche Ömschreff noh Hepburn"}
+        HOGNORSK{"Huhnorrweejesch"}
+        KKCOR{"jemeinsam widderbeläf kornesche Schriefwiiß"}
+        LIPAW{"lipovazesch resijanesche Dijaläk"}
+        MONOTON{"monnotoonesch"}
+        NDYUKA{"ndyukanesche Dijaläk"}
+        NEDIS{"natisonesche Dijaläk"}
+        NJIVA{"gniva’sche uder njiva’sche reijanesche Dijaläk"}
+        OSOJS{"oseacco’sche uder osojanesche reijanesche Dijaläk"}
+        PAMAKA{"pamakanesche Dijaläk"}
+        PINYIN{"Pinjin-Ömschreff"}
+        POLYTON{"pollütoonesch"}
+        REVISED{"neu opjelate Schriefwiiß"}
+        ROZAJ{"resijanesche Dijaläk"}
+        SCOTLAND{"schottesche Dijaläk"}
+        SCOUSE{"scouse Dijaläk"}
+        SOLBA{"stolvizanesche uder solbizanesch reijanesche Dijaläk"}
+        TARASK{"Taraskijeviza-Schriefwiiß"}
+        UCCOR{"eijheijtlesch Schriefwiiß"}
+        UCRCOR{"eijheijtlesch, neu opjelate Schriefwiiß"}
+        VALENCIA{"valenzijaanesche Dijaläk"}
+        WADEGILE{"lateijnesche Ömschreff noh Wade-Giles"}
+    }
+    codePatterns{
+        language{"de Schprohch afjekööz met „{0}“"}
+        script{"de Schreff afjekööz met „{0}“"}
+        territory{"de Jähjend afjekööz met „{0}“"}
+    }
+    localeDisplayPattern{
+        keyTypePattern{"{0}: {1}"}
+        pattern{"{0} en {1}"}
+        separator{"{0} uß {1}"}
+    }
+}

@@ -1,0 +1,16 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ug{
+    collations{
+        standard{
+            Sequence{
+                "[reorder Arab]"
+                "&ا<ە<ب"
+                "&ك<گ<ڭ<ل"
+                "&ھ<و<ۇ<ۆ<ۈ<ۋ<ې<ى<ي"
+            }
+            Version{"39"}
+        }
+    }
+}

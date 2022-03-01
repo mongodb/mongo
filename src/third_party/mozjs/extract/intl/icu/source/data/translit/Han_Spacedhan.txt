@@ -1,0 +1,25 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: Han_Spacedhan.txt
+# Generated from CLDR
+#
+
+# Only intended for internal use
+# Make sure Han are normalized, including characters that contain them.
+# The first set in the filter is computed with http://unicode.org/cldr/utility/list-unicodeset.jsp?a=[:tonfkd:/XXX/:]-[:ideographic:]-[:sc=han:]
+# Where XXX is the resolved [:ideographic:][:sc=han:]. It needs updating with each Unicode release!
+:: [[㆒-㆟㈠-㉇㊀-㊰㋀-㋋㍘-㍰㍻-㍿㏠-㏾ 🈐-🈒🈔-🈺🉀-🉈🉐🉑][:ideographic:][:sc=han:]] nfkc;
+:: fullwidth-halfwidth;
+｡ → '.';
+$terminalPunct = [\.\,\:\;\?\!．，：？！｡、；[:Pe:][:Pf:]];
+$initialPunct = [:Ps:][:Pi:];
+# add space between any Han or terminal punctuation and letters, and
+# between letters and Han or initial punct
+[[:Ideographic:] $terminalPunct] {} [:Letter:] → ' ' ;
+[:Letter:] [:Mark:]* {} [[:Ideographic:] $initialPunct] → ' ' ;
+# remove spacing between ideographs and other letters
+← [:Ideographic:] { ' ' } [:Letter:] ;
+← [:Letter:] [:Mark:]* { ' ' } [:Ideographic:] ;
+

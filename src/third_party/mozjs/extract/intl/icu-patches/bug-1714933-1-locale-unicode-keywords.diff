@@ -1,0 +1,29 @@
+# https://unicode-org.atlassian.net/browse/ICU-21539
+#
+# https://github.com/unicode-org/icu/commit/45b893c1f9af9e541b8812c2073471e134aaf773.diff
+
+diff --git a/intl/icu/source/common/locid.cpp b/intl/icu/source/common/locid.cpp
+index 4fec17d14fd..02cd82a7b8e 100644
+--- a/intl/icu/source/common/locid.cpp
++++ b/intl/icu/source/common/locid.cpp
+@@ -2515,16 +2515,16 @@ class UnicodeKeywordEnumeration : public KeywordEnumeration {
+ 
+     virtual const char* next(int32_t* resultLength, UErrorCode& status) {
+         const char* legacy_key = KeywordEnumeration::next(nullptr, status);
+-        if (U_SUCCESS(status) && legacy_key != nullptr) {
++        while (U_SUCCESS(status) && legacy_key != nullptr) {
+             const char* key = uloc_toUnicodeLocaleKey(legacy_key);
+-            if (key == nullptr) {
+-                status = U_ILLEGAL_ARGUMENT_ERROR;
+-            } else {
++            if (key != nullptr) {
+                 if (resultLength != nullptr) {
+                     *resultLength = static_cast<int32_t>(uprv_strlen(key));
+                 }
+                 return key;
+             }
++            // Not a Unicode keyword, could be a t, x or other, continue to look at the next one.
++            legacy_key = KeywordEnumeration::next(nullptr, status);
+         }
+         if (resultLength != nullptr) *resultLength = 0;
+         return nullptr;

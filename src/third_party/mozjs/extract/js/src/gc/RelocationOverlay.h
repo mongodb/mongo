@@ -1,5 +1,5 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: set ts=8 sts=2 et sw=2 tw=80:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -12,92 +12,55 @@
 #define gc_RelocationOverlay_h
 
 #include "mozilla/Assertions.h"
-#include "mozilla/EndianUtils.h"
 
 #include <stdint.h>
 
-#include "js/HeapAPI.h"
-#include "vm/JSObject.h"
-#include "vm/Shape.h"
+#include "gc/Cell.h"
 
 namespace js {
 namespace gc {
-
-struct Cell;
 
 /*
  * This structure overlays a Cell that has been moved and provides a way to find
  * its new location. It's used during generational and compacting GC.
  */
-class RelocationOverlay
-{
-    /* See comment in js/public/HeapAPI.h. */
-    static const uint32_t Relocated = js::gc::Relocated;
+class RelocationOverlay : public Cell {
+ public:
+  /* The location the cell has been moved to, stored in the cell header. */
+  Cell* forwardingAddress() const {
+    MOZ_ASSERT(isForwarded());
+    return reinterpret_cast<Cell*>(header_ & ~RESERVED_MASK);
+  }
 
+ protected:
+  /* A list entry to track all relocated things. */
+  RelocationOverlay* next_;
 
-#if MOZ_LITTLE_ENDIAN
-    /*
-     * Keep the first 32 bits untouched. Use them to distinguish strings from
-     * objects in the nursery.
-     */
-    uint32_t preserve_;
+  explicit RelocationOverlay(Cell* dst);
 
-    /* Set to Relocated when moved. */
-    uint32_t magic_;
-#else
-    /*
-     * On big-endian, we need to reorder to keep preserve_ lined up with the
-     * low 32 bits of the aligned group_ pointer in JSObject.
-     */
-    uint32_t magic_;
-    uint32_t preserve_;
-#endif
+ public:
+  static const RelocationOverlay* fromCell(const Cell* cell) {
+    return static_cast<const RelocationOverlay*>(cell);
+  }
 
+  static RelocationOverlay* fromCell(Cell* cell) {
+    return static_cast<RelocationOverlay*>(cell);
+  }
 
+  static RelocationOverlay* forwardCell(Cell* src, Cell* dst);
 
-    /* The location |this| was moved to. */
-    Cell* newLocation_;
+  RelocationOverlay*& nextRef() {
+    MOZ_ASSERT(isForwarded());
+    return next_;
+  }
 
-    /* A list entry to track all relocated things. */
-    RelocationOverlay* next_;
-
-  public:
-    static const RelocationOverlay* fromCell(const Cell* cell) {
-        return reinterpret_cast<const RelocationOverlay*>(cell);
-    }
-
-    static RelocationOverlay* fromCell(Cell* cell) {
-        return reinterpret_cast<RelocationOverlay*>(cell);
-    }
-
-    bool isForwarded() const {
-        (void) preserve_; // Suppress warning
-        return magic_ == Relocated;
-    }
-
-    Cell* forwardingAddress() const {
-        MOZ_ASSERT(isForwarded());
-        return newLocation_;
-    }
-
-    void forwardTo(Cell* cell);
-
-    RelocationOverlay*& nextRef() {
-        MOZ_ASSERT(isForwarded());
-        return next_;
-    }
-
-    RelocationOverlay* next() const {
-        MOZ_ASSERT(isForwarded());
-        return next_;
-    }
-
-    static bool isCellForwarded(const Cell* cell) {
-        return fromCell(cell)->isForwarded();
-    }
+  RelocationOverlay* next() const {
+    MOZ_ASSERT(isForwarded());
+    return next_;
+  }
 };
 
-} // namespace gc
-} // namespace js
+}  // namespace gc
+}  // namespace js
 
 #endif /* gc_RelocationOverlay_h */

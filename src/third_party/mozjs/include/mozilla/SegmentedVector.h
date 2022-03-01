@@ -20,15 +20,20 @@
 #ifndef mozilla_SegmentedVector_h
 #define mozilla_SegmentedVector_h
 
-#include "mozilla/Alignment.h"
+#include <new>  // for placement new
+#include <utility>
+
 #include "mozilla/AllocPolicy.h"
 #include "mozilla/Array.h"
+#include "mozilla/Attributes.h"
 #include "mozilla/LinkedList.h"
 #include "mozilla/MemoryReporting.h"
-#include "mozilla/Move.h"
-#include "mozilla/TypeTraits.h"
+#include "mozilla/OperatorNewExtensions.h"
 
-#include <new>  // for placement new
+#ifdef IMPL_LIBXUL
+#  include "mozilla/Likely.h"
+#  include "mozilla/mozalloc_oom.h"
+#endif  // IMPL_LIBXUL
 
 namespace mozilla {
 
@@ -48,19 +53,27 @@ namespace mozilla {
 // The ideal size depends on how the SegmentedVector is used and the size of
 // |T|, but reasonable sizes include 1024, 4096 (the default), 8192, and 16384.
 //
-template<typename T,
-         size_t IdealSegmentSize = 4096,
-         typename AllocPolicy = MallocAllocPolicy>
-class SegmentedVector : private AllocPolicy
-{
-  template<size_t SegmentCapacity>
+template <typename T, size_t IdealSegmentSize = 4096,
+          typename AllocPolicy = MallocAllocPolicy>
+class SegmentedVector : private AllocPolicy {
+  template <size_t SegmentCapacity>
   struct SegmentImpl
-    : public mozilla::LinkedListElement<SegmentImpl<SegmentCapacity>>
-  {
+      : public mozilla::LinkedListElement<SegmentImpl<SegmentCapacity>> {
+   private:
+    uint32_t mLength;
+    alignas(T) MOZ_INIT_OUTSIDE_CTOR
+        unsigned char mData[sizeof(T) * SegmentCapacity];
+
+    // Some versions of GCC treat it as a -Wstrict-aliasing violation (ergo a
+    // -Werror compile error) to reinterpret_cast<> |mData| to |T*|, even
+    // through |void*|.  Placing the latter cast in these separate functions
+    // breaks the chain such that affected GCC versions no longer warn/error.
+    void* RawData() { return mData; }
+
+   public:
     SegmentImpl() : mLength(0) {}
 
-    ~SegmentImpl()
-    {
+    ~SegmentImpl() {
       for (uint32_t i = 0; i < mLength; i++) {
         (*this)[i].~T();
       }
@@ -68,48 +81,32 @@ class SegmentedVector : private AllocPolicy
 
     uint32_t Length() const { return mLength; }
 
-    T* Elems() { return reinterpret_cast<T*>(&mStorage.mBuf); }
+    T* Elems() { return reinterpret_cast<T*>(RawData()); }
 
-    T& operator[](size_t aIndex)
-    {
+    T& operator[](size_t aIndex) {
       MOZ_ASSERT(aIndex < mLength);
       return Elems()[aIndex];
     }
 
-    const T& operator[](size_t aIndex) const
-    {
+    const T& operator[](size_t aIndex) const {
       MOZ_ASSERT(aIndex < mLength);
       return Elems()[aIndex];
     }
 
-    template<typename U>
-    void Append(U&& aU)
-    {
+    template <typename U>
+    void Append(U&& aU) {
       MOZ_ASSERT(mLength < SegmentCapacity);
       // Pre-increment mLength so that the bounds-check in operator[] passes.
       mLength++;
       T* elem = &(*this)[mLength - 1];
-      new (elem) T(mozilla::Forward<U>(aU));
+      new (KnownNotNull, elem) T(std::forward<U>(aU));
     }
 
-    void PopLast()
-    {
+    void PopLast() {
       MOZ_ASSERT(mLength > 0);
       (*this)[mLength - 1].~T();
       mLength--;
     }
-
-    uint32_t mLength;
-
-    // The union ensures that the elements are appropriately aligned.
-    union Storage
-    {
-      char mBuf[sizeof(T) * SegmentCapacity];
-      mozilla::AlignedElem<MOZ_ALIGNOF(T)> mAlign;
-    } mStorage;
-
-    static_assert(MOZ_ALIGNOF(T) == MOZ_ALIGNOF(Storage),
-                  "SegmentedVector provides incorrect alignment");
   };
 
   // See how many we elements we can fit in a segment of IdealSegmentSize. If
@@ -117,32 +114,29 @@ class SegmentedVector : private AllocPolicy
   // kSingleElementSegmentSize already accounts for one element.
   static const size_t kSingleElementSegmentSize = sizeof(SegmentImpl<1>);
   static const size_t kSegmentCapacity =
-    kSingleElementSegmentSize <= IdealSegmentSize
-    ? (IdealSegmentSize - kSingleElementSegmentSize) / sizeof(T) + 1
-    : 1;
+      kSingleElementSegmentSize <= IdealSegmentSize
+          ? (IdealSegmentSize - kSingleElementSegmentSize) / sizeof(T) + 1
+          : 1;
 
-public:
+ public:
   typedef SegmentImpl<kSegmentCapacity> Segment;
 
   // The |aIdealSegmentSize| is only for sanity checking. If it's specified, we
   // check that the actual segment size is as close as possible to it. This
   // serves as a sanity check for SegmentedVectorCapacity's capacity
   // computation.
-  explicit SegmentedVector(size_t aIdealSegmentSize = 0)
-  {
+  explicit SegmentedVector(size_t aIdealSegmentSize = 0) {
     // The difference between the actual segment size and the ideal segment
     // size should be less than the size of a single element... unless the
     // ideal size was too small, in which case the capacity should be one.
     MOZ_ASSERT_IF(
-      aIdealSegmentSize != 0,
-      (sizeof(Segment) > aIdealSegmentSize && kSegmentCapacity == 1) ||
-      aIdealSegmentSize - sizeof(Segment) < sizeof(T));
+        aIdealSegmentSize != 0,
+        (sizeof(Segment) > aIdealSegmentSize && kSegmentCapacity == 1) ||
+            aIdealSegmentSize - sizeof(Segment) < sizeof(T));
   }
 
   SegmentedVector(SegmentedVector&& aOther)
-    : mSegments(mozilla::Move(aOther.mSegments))
-  {
-  }
+      : mSegments(std::move(aOther.mSegments)) {}
 
   ~SegmentedVector() { Clear(); }
 
@@ -150,11 +144,9 @@ public:
 
   // Note that this is O(n) rather than O(1), but the constant factor is very
   // small because it only has to do one addition per segment.
-  size_t Length() const
-  {
+  size_t Length() const {
     size_t n = 0;
-    for (auto segment = mSegments.getFirst();
-         segment;
+    for (auto segment = mSegments.getFirst(); segment;
          segment = segment->getNext()) {
       n += segment->Length();
     }
@@ -163,70 +155,70 @@ public:
 
   // Returns false if the allocation failed. (If you are using an infallible
   // allocation policy, use InfallibleAppend() instead.)
-  template<typename U>
-  MOZ_MUST_USE bool Append(U&& aU)
-  {
+  template <typename U>
+  [[nodiscard]] bool Append(U&& aU) {
     Segment* last = mSegments.getLast();
     if (!last || last->Length() == kSegmentCapacity) {
       last = this->template pod_malloc<Segment>(1);
       if (!last) {
         return false;
       }
-      new (last) Segment();
+      new (KnownNotNull, last) Segment();
       mSegments.insertBack(last);
     }
-    last->Append(mozilla::Forward<U>(aU));
+    last->Append(std::forward<U>(aU));
     return true;
   }
 
   // You should probably only use this instead of Append() if you are using an
   // infallible allocation policy. It will crash if the allocation fails.
-  template<typename U>
-  void InfallibleAppend(U&& aU)
-  {
-    bool ok = Append(mozilla::Forward<U>(aU));
+  template <typename U>
+  void InfallibleAppend(U&& aU) {
+    bool ok = Append(std::forward<U>(aU));
+
+#ifdef IMPL_LIBXUL
+    if (MOZ_UNLIKELY(!ok)) {
+      mozalloc_handle_oom(sizeof(Segment));
+    }
+#else
     MOZ_RELEASE_ASSERT(ok);
+#endif  // MOZ_INTERNAL_API
   }
 
-  void Clear()
-  {
+  void Clear() {
     Segment* segment;
     while ((segment = mSegments.popFirst())) {
       segment->~Segment();
-      this->free_(segment);
+      this->free_(segment, 1);
     }
   }
 
-  T& GetLast()
-  {
+  T& GetLast() {
     MOZ_ASSERT(!IsEmpty());
     Segment* last = mSegments.getLast();
     return (*last)[last->Length() - 1];
   }
 
-  const T& GetLast() const
-  {
+  const T& GetLast() const {
     MOZ_ASSERT(!IsEmpty());
     Segment* last = mSegments.getLast();
     return (*last)[last->Length() - 1];
   }
 
-  void PopLast()
-  {
+  void PopLast() {
     MOZ_ASSERT(!IsEmpty());
     Segment* last = mSegments.getLast();
     last->PopLast();
     if (!last->Length()) {
       mSegments.popLast();
       last->~Segment();
-      this->free_(last);
+      this->free_(last, 1);
     }
   }
 
   // Equivalent to calling |PopLast| |aNumElements| times, but potentially
   // more efficient.
-  void PopLastN(uint32_t aNumElements)
-  {
+  void PopLastN(uint32_t aNumElements) {
     MOZ_ASSERT(aNumElements <= Length());
 
     Segment* last;
@@ -252,7 +244,7 @@ public:
       // Destroying the segment destroys all elements contained therein.
       mSegments.popLast();
       last->~Segment();
-      this->free_(last);
+      this->free_(last, 1);
 
       MOZ_ASSERT(aNumElements >= segmentLen);
       aNumElements -= segmentLen;
@@ -283,39 +275,33 @@ public:
   // is supported, but removing is not!
   // If an iterator has entered Done() state, adding more entries to the
   // vector doesn't affect it.
-  class IterImpl
-  {
+  class IterImpl {
     friend class SegmentedVector;
 
     Segment* mSegment;
     size_t mIndex;
 
     explicit IterImpl(SegmentedVector* aVector, bool aFromFirst)
-      : mSegment(aFromFirst ? aVector->mSegments.getFirst() :
-                              aVector->mSegments.getLast())
-      , mIndex(aFromFirst ? 0 :
-                            (mSegment ? mSegment->Length() - 1 : 0))
-    {
+        : mSegment(aFromFirst ? aVector->mSegments.getFirst()
+                              : aVector->mSegments.getLast()),
+          mIndex(aFromFirst ? 0 : (mSegment ? mSegment->Length() - 1 : 0)) {
       MOZ_ASSERT_IF(mSegment, mSegment->Length() > 0);
     }
 
-  public:
+   public:
     bool Done() const { return !mSegment; }
 
-    T& Get()
-    {
+    T& Get() {
       MOZ_ASSERT(!Done());
       return (*mSegment)[mIndex];
     }
 
-    const T& Get() const
-    {
+    const T& Get() const {
       MOZ_ASSERT(!Done());
       return (*mSegment)[mIndex];
     }
 
-    void Next()
-    {
+    void Next() {
       MOZ_ASSERT(!Done());
       mIndex++;
       if (mIndex == mSegment->Length()) {
@@ -324,8 +310,7 @@ public:
       }
     }
 
-    void Prev()
-    {
+    void Prev() {
       MOZ_ASSERT(!Done());
       if (mIndex == 0) {
         mSegment = mSegment->getPrevious();
@@ -345,21 +330,19 @@ public:
   // it only measures the vector itself. If the vector elements contain
   // pointers to other memory blocks, those blocks must be measured separately
   // during a subsequent iteration over the vector.
-  size_t SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
-  {
+  size_t SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const {
     return mSegments.sizeOfExcludingThis(aMallocSizeOf);
   }
 
   // Like sizeOfExcludingThis(), but measures |this| as well.
-  size_t SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
-  {
+  size_t SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const {
     return aMallocSizeOf(this) + SizeOfExcludingThis(aMallocSizeOf);
   }
 
-private:
+ private:
   mozilla::LinkedList<Segment> mSegments;
 };
 
-} // namespace mozilla
+}  // namespace mozilla
 
 #endif /* mozilla_SegmentedVector_h */

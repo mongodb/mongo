@@ -1,0 +1,78 @@
+﻿# © 2016 and later: Unicode, Inc. and others.
+# License & terms of use: http://www.unicode.org/copyright.html
+# Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+#
+# File: ky_ky_FONIPA.txt
+# Generated from CLDR
+#
+
+# Transformation from Kyrgyz (ky) to its IPA transcription (ky_FONIPA).
+# http://en.wikipedia.org/wiki/Kyrgyz_alphabet#Correspondence_chart
+::Lower;
+::NFC;
+$consonant_sound = [bdfɡklmnŋpqrʁsʃtvzʒχ];
+аа → ɑː;
+а  → ɑ;
+б  → b;
+в  → v;
+{г} [аоуы]  → ʁ;
+г  → ɡ;
+дж → d\u0361ʒ;  # eg. Джамадан
+дд → dː;
+д  → d;
+[$] {е} → je;  # at the beginning of a word
+е  → e;
+ё  → jo;  # appears only in loanwords
+ж  → d\u0361ʒ;
+з  → z;
+ии → iː;
+и  → i;
+й  → j;
+кк → kː;
+[$] {к} [еёиɵүю] → ɡ;    # eg. кирет, кишиден, келди
+{к} [аоуы] → q;          # eg. чокусу, факультетин, нукура
+[ɑouɯ] ː? {к} → q;       # eg. Исак, Бирок, Кутлук, Ферганалык
+[y] $consonant_sound+ ː? {к} [$] → k; # eg. мүлк, түрк
+$consonant_sound {к} [$] → q; # eg. даңк, калк, кырк
+[ŋ] {к} → q;
+к → k;
+# TODO(sascha): Verify whether /lʲ/ is really phonemic in Kyrgyz;
+# is there really a minimal pair with /l/ versus /lʲ/?
+[eøy] ː? {л}к → lʲ;  # eg. мүлк, күлкү, өлкө, эзелки
+лл → lː;
+л  → l;
+мм → mː;
+м  → m;
+нн → nː;
+н  → n;
+ң  → ŋ;
+оо → oː;
+о  → o;
+өө → øː;
+ө  → ø;
+п  → p;
+р  → r;
+сс → sː;
+с  → s;
+тт → tː;
+тч → t\u0361ʃ;    # eg. екетчилерден
+т  → t;
+уу → uː;
+у  → u;
+үү → yː;
+ү  → y;
+ф  → f;     # only in loanwords
+х  → χ;
+ц  → t\u0361s;    # only in loanwords
+ч  → t\u0361ʃ;
+ш  → ʃ;
+щ  → ʃ t\u0361ʃ;  # only in loanwords
+ъ  → ;      # no phonemic value; appears only in loanwords
+ы  → ɯ;
+ь  → ;      # no phonemic value; appears only in loanwords
+ээ → eː;
+э  → e;
+ю  → ju;
+я  → jɑ;
+\-  → ' ';
+

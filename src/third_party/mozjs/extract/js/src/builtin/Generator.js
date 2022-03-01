@@ -72,7 +72,7 @@ function GeneratorReturn(val) {
 
 function InterpretGeneratorResume(gen, val, kind) {
     // If we want to resume a generator in the interpreter, the script containing
-    // the resumeGenerator/JSOP_RESUME also has to run in the interpreter. The
+    // the resumeGenerator/JSOp::Resume also has to run in the interpreter. The
     // forceInterpreter() call below compiles to a bytecode op that prevents us
     // from JITing this script.
     forceInterpreter();

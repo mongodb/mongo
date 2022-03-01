@@ -1,0 +1,112 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+yo_BJ{
+    Countries{
+        003{"Àríwá Amɛ́ríkà"}
+        005{"Gúúshù Amɛ́ríkà"}
+        009{"Òsɔ́ɔ́níà"}
+        011{"Ìwɔ̀ oorùn Afíríkà"}
+        013{"Ààrin Gbùgbùn Àmɛ́ríkà"}
+        019{"Amɛ́ríkà"}
+        021{"Apáàríwá Amɛ́ríkà"}
+        030{"Ìlà Òòrùn Eshíà"}
+        034{"Gúúshù Eshíà"}
+        035{"Gúúshù ìlà òòrùn Éshíà"}
+        039{"Gúúshù Yúróòpù"}
+        053{"Ɔshirélashíà"}
+        054{"Mɛlanéshíà"}
+        057{"Agbègbè Maikironéshíà"}
+        061{"Polineshíà"}
+        142{"Áshíà"}
+        143{"Ààrin Gbùngbùn Éshíà"}
+        145{"Ìwɔ̀ Òòrùn Eshíà"}
+        155{"Ìwɔ̀ Òòrùn Yúrópù"}
+        419{"Látín Amɛ́ríkà"}
+        AE{"Ɛmirate ti Awɔn Arabu"}
+        AS{"Sámóánì ti Orílɛ́ède Àméríkà"}
+        AX{"Àwɔn Erékùsù ti Åland"}
+        AZ{"Asɛ́bájánì"}
+        BA{"Bɔ̀síníà àti Ɛtisɛgófínà"}
+        BE{"Bégíɔ́mù"}
+        BJ{"Bɛ̀nɛ̀"}
+        BN{"Búrúnɛ́lì"}
+        BO{"Bɔ̀lífíyà"}
+        BW{"Bɔ̀tìsúwánà"}
+        BZ{"Bèlísɛ̀"}
+        CH{"switishilandi"}
+        CL{"Shílè"}
+        CN{"Sháínà"}
+        CZ{"Shɛ́ɛ́kì"}
+        DG{"Diego Gashia"}
+        DJ{"Díbɔ́ótì"}
+        DK{"Dɛ́mákì"}
+        EH{"Ìwɔ̀òòrùn Sàhárà"}
+        EU{"Àpapɔ̀ Yúróòpù"}
+        FO{"Àwɔn Erékùsù ti Faroe"}
+        GB{"Gɛ̀ɛ́sì"}
+        GE{"Gɔgia"}
+        GF{"Firenshi Guana"}
+        GS{"Gúúsù Georgia àti Gúúsù Àwɔn Erékùsù Sandwich"}
+        HK{"Agbègbè Ìshàkóso Ìshúná Hong Kong Tí Shánà Ń Darí"}
+        IC{"Ɛrékùsù Kánárì"}
+        IL{"Iserɛli"}
+        IS{"Ashilandi"}
+        JO{"Jɔdani"}
+        KG{"Kurishisitani"}
+        KP{"Guusu Kɔria"}
+        KR{"Ariwa Kɔria"}
+        KZ{"Kashashatani"}
+        LC{"Lushia"}
+        LI{"Lɛshitɛnisiteni"}
+        MH{"Etikun Máshali"}
+        MO{"Agbègbè Ìshàkóso Pàtàkì Macao"}
+        MZ{"Moshamibiku"}
+        NF{"Etikun Nɔ́úfókì"}
+        NO{"Nɔɔwii"}
+        NZ{"Shilandi Titun"}
+        OM{"Ɔɔma"}
+        PF{"Firenshi Polinesia"}
+        PM{"Pɛɛri ati mikuloni"}
+        PR{"Pɔto Riko"}
+        PS{"Agbègbè ara Palɛsítínì"}
+        PT{"Pɔ́túgà"}
+        QO{"Agbègbè Òshɔ́ɔ́níà"}
+        RU{"Rɔshia"}
+        SC{"Sheshɛlɛsi"}
+        SH{"Hɛlena"}
+        SN{"Sɛnɛga"}
+        ST{"Sao tomi ati piriishipi"}
+        SV{"Ɛɛsáfádò"}
+        SZ{"Sashiland"}
+        TC{"Tɔɔki ati Etikun Kakɔsi"}
+        TD{"Shààdì"}
+        TF{"Agbègbè Gúúsù Faranshé"}
+        TL{"ÌlàOòrùn Tímɔ̀"}
+        TM{"Tɔɔkimenisita"}
+        TN{"Tunishia"}
+        TR{"Tɔɔki"}
+        UM{"Àwɔn Erékùsù Kékèké Agbègbè US"}
+        UN{"Ìshɔ̀kan àgbáyé"}
+        US{"Amɛrikà"}
+        UZ{"Nshibɛkisitani"}
+        VC{"Fisɛnnti ati Genadina"}
+        VE{"Fɛnɛshuɛla"}
+        VI{"Etikun Fagini ti Amɛrika"}
+        VN{"Fɛtinami"}
+        WS{"Samɔ"}
+        XA{"ìsɔ̀rɔ̀sí irɔ́"}
+        XB{"ibi irɔ́"}
+        ZA{"Gúúshù Áfíríkà"}
+        ZM{"Shamibia"}
+        ZW{"Shimibabe"}
+        ZZ{"Àgbègbè àìmɔ̀"}
+    }
+    Countries%short{
+        PS{"Palɛsítínì"}
+    }
+    Countries%variant{
+        CZ{"Shɛ́ɛ́kì"}
+        TL{"Ìlà Òòrùn Tímɔ̀"}
+    }
+}

@@ -1,0 +1,428 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+pcm{
+    Keys{
+        calendar{"Kalẹ́nda"}
+        cf{"Haú To Arénj Mọní"}
+        collation{"Arénj Tins Wẹl"}
+        currency{"Mọní"}
+        hc{"Awá Saíkul (12 vs 24)"}
+        lb{"Laín Brẹk Staíl"}
+        ms{"Sístẹm fọ Mẹ́zhọ́mẹnt"}
+        numbers{"Nọ́mba-dẹm"}
+    }
+    Languages{
+        af{"Áfríkaans Lángwej"}
+        agq{"Aghẹ́m Lángwej"}
+        ak{"Akan Lángwej"}
+        am{"Amhárík Lángwej"}
+        ar{"Arábík Lángwej"}
+        ar_001{"Gẹ́nárál Arábík Lángwej fọ dís taim"}
+        as{"Asamíz Lángwej"}
+        asa{"Asu Lángwej"}
+        ast{"Astúriá Lángwej"}
+        az{"Azẹrbaijáni Lángwej"}
+        bas{"Básaa Lángwej"}
+        be{"Bẹlarúsiá Lángwej"}
+        bem{"Bẹ́mba Lángwej"}
+        bez{"Bẹ́na Lángwej"}
+        bg{"Bọlgériá Lángwej"}
+        bm{"Bambára Lángwej"}
+        bn{"Bángla Lángwej"}
+        bo{"Tibẹ́tan"}
+        br{"Brẹ́tọn Lángwej"}
+        brx{"Bódo Lángwej"}
+        bs{"Bọ́sniá Lángwej"}
+        ca{"Kátála Lángwej"}
+        ccp{"Chákma Lángwej"}
+        ce{"Chẹ́chẹn Lángwej"}
+        ceb{"Sẹbuáno Lángwej"}
+        cgg{"Chíga Lángwej"}
+        chr{"Chẹ́rókii Lángwej"}
+        ckb{"Mídúl Kọ́dish Lángwej"}
+        co{"Kọsíkan Lángwej"}
+        cs{"Chẹ́k Lángwej"}
+        cu{"Chọ́ch Slávik"}
+        cy{"Wẹlsh"}
+        da{"Dénísh Lángwej"}
+        dav{"Taíta"}
+        de{"Jámán Lángwej"}
+        de_AT{"Ọ́stria Jámán"}
+        de_CH{"Swítzaland Haí Jámán"}
+        dje{"Zármá"}
+        dsb{"Lówá Sorbiá"}
+        dua{"Duála Lángwej"}
+        dyo{"Jóla-Fónyi Lángwej"}
+        dz{"Zọ́ngka Lángwej"}
+        ebu{"Ẹmbu Lángwej"}
+        ee{"Ẹ́wẹ́ Lángwej"}
+        el{"Grík Lángwej"}
+        en{"Ínglish"}
+        en_AU{"Ọstréliá Ínglish"}
+        en_CA{"Kánáda Ínglish"}
+        en_GB{"Brítísh Ínglish"}
+        en_US{"Amẹ́ríka Ínglish"}
+        eo{"Ẹsperánto Lángwej"}
+        es{"Spánish Lángwej"}
+        es_419{"Látín Amẹ́ríka Spánish"}
+        es_ES{"Yúrop Spánish"}
+        es_MX{"Mẹ́ksiko Spánish"}
+        et{"Ẹstóniá Lángwej"}
+        eu{"Básk Lángwej"}
+        ewo{"Ẹwondo Lángwej"}
+        fa{"Pẹ́shiá Lángwej"}
+        fa_AF{"Dári"}
+        ff{"Fúlaní Lángwej"}
+        fi{"Fínísh Lángwej"}
+        fil{"Filipínó Lángwej"}
+        fo{"Fáróís Lángwej"}
+        fr{"Frẹ́nch Lángwej"}
+        fr_CA{"Kánádá Frẹnch"}
+        fr_CH{"Swítzalánd Frẹnch"}
+        fur{"Friúlián Lángwej"}
+        fy{"Wẹ́stán Frísiá Lángwej"}
+        ga{"Aírísh Lángwej"}
+        gd{"Gaelík Lángwej ọf Gael Pípol fọ Skọ́tland"}
+        gl{"Galísiá Lángwej"}
+        gsw{"Jámán Swis"}
+        gu{"Gujarátí Lángwej"}
+        guz{"Gusí Lángwej"}
+        gv{"Mánks Lángwej"}
+        ha{"Háusá Lángwej"}
+        haw{"Hawaii Lángwej"}
+        he{"Híbru Lángwej"}
+        hi{"Híndi Lángwej"}
+        hmn{"Mọ́ng Lángwej"}
+        hr{"Kroéshia Lángwej"}
+        hsb{"Sóbiá Lángwej di ọ́p-ọ́p wan"}
+        ht{"Haítí Kriol"}
+        hu{"Họngári Lángwej"}
+        hy{"Armẹ́niá Lángwej"}
+        ia{"Intalíngwuá Lángwej"}
+        id{"Indoníshia Lángwej"}
+        ig{"Igbo Lángwej"}
+        ii{"Síchuan Yi"}
+        is{"Aíslánd Lángwej"}
+        it{"Ítáli Lángwej"}
+        ja{"Japan Lángwej"}
+        jgo{"Ngómbá Lángwej"}
+        jmc{"Machámẹ́ Lángwej"}
+        jv{"Javáníz Lángwej"}
+        ka{"Jọ́jiá Lángwej"}
+        kab{"Kabail Lángwej"}
+        kam{"Kámbá Lángwej"}
+        kde{"Makọ́ndẹ́ Lángwej"}
+        kea{"Kábúvẹrdiánu Lángwej"}
+        khq{"Koyra Chíní Lángwej"}
+        ki{"Kikúyú Lángwej"}
+        kk{"Kazák Lángwej"}
+        kkj{"Kákó Lángwej"}
+        kl{"Kalálísút Lángwej"}
+        kln{"Kálẹ́njín Lángwej"}
+        km{"Kmaí Lángwej"}
+        kn{"Kánnáda Lángwej"}
+        ko{"Koriá Lángwej"}
+        kok{"Kónkéní Lángwej"}
+        ks{"Kashmírí Lángwej"}
+        ksb{"Shambala"}
+        ksf{"Bafiá Lángwej"}
+        ksh{"Kọlónián Lángwej"}
+        ku{"Kọ́dísh Lángwej"}
+        kw{"Kọ́nish Lángwej"}
+        ky{"Kiẹ́gíz Lángwej"}
+        la{"Látín Lángwej"}
+        lag{"Langi Lángwej"}
+        lb{"Lọ́ksémbọ́g Lángwej"}
+        lg{"Gánda Lángwej"}
+        lkt{"Lakótá Lángwej"}
+        ln{"Lingálá Lángwej"}
+        lo{"Láo Lángwej"}
+        lrc{"Nọ́tán Lúrí Lángwej"}
+        lt{"Lituéniá Lángwej"}
+        lu{"Lúbá-Katángá Lángwej"}
+        luo{"Luó Lángwej"}
+        luy{"Luyia Lángwej"}
+        lv{"Látvián Lángwej"}
+        mai{"Maítíli"}
+        mas{"Masaí Lángwej"}
+        mer{"Mẹ́rú Lángwej"}
+        mfe{"Morísiẹ́n Lángwej"}
+        mg{"Malagásí Lángwej"}
+        mgh{"Makúwá-Mító"}
+        mgo{"Mẹta’ Lángwej"}
+        mi{"Maórí Lángwej"}
+        mk{"Masẹdóniá Lángwej"}
+        ml{"Maléyálám Lángwej"}
+        mn{"Mọngóliá Lángwej"}
+        mni{"Manípuri"}
+        mr{"Marátí Lángwej"}
+        ms{"Malé Lángwej"}
+        mt{"Mọ́ltá Lángwej"}
+        mua{"Mundáng Lángwej"}
+        mul{"Plẹ́ntí Lángwej-dẹm"}
+        my{"Bọ́ma Lángwej"}
+        mzn{"Mazandẹrání Lángwej"}
+        naq{"Naámá Lángwej"}
+        nb{"Nọwẹ́jiá Bokmál Lángwej"}
+        nd{"Nọ́tán Ndẹbẹlẹ Lángwej"}
+        nds{"Ló Jámán Lángwej"}
+        ne{"Nẹpálí Lángwej"}
+        nl{"Dọch Lángwej"}
+        nl_BE{"Flẹ́mish Lángwej"}
+        nmg{"Kwasió Lángwej"}
+        nn{"Nọwẹ́jiá Niúnọsk"}
+        nnh{"Ngiẹ́mbọn Lángwej"}
+        nus{"Núa"}
+        ny{"Nyánja"}
+        nyn{"Nyankólẹ"}
+        om{"Orómó"}
+        or{"Ódiá"}
+        os{"Osẹ́tik"}
+        pa{"Punjábi"}
+        pcm{"Naijíriá Píjin"}
+        pl{"Pólánd Lángwej"}
+        prg{"Prúshia"}
+        ps{"Páshto"}
+        pt{"Pọtiugiz"}
+        pt_BR{"Brazíl Pọtiugíz"}
+        pt_PT{"Yúróp Pọtiugíz"}
+        qu{"Kẹchuá"}
+        rm{"Románsh"}
+        rn{"Rúndi"}
+        ro{"Romániá Lángwej"}
+        rof{"Rómbo"}
+        ru{"Rọshiá Lángwej"}
+        rw{"Kinyarwánda Lángwej"}
+        rwk{"Rwa"}
+        sa{"Sánskrit"}
+        sah{"Sakhá"}
+        saq{"Sambúru"}
+        sat{"Sántáli"}
+        sbp{"Sangu"}
+        sd{"Síndí"}
+        se{"Nọ́tán Sámí Lángwej"}
+        seh{"Sẹ́ná"}
+        ses{"Kóiraboró Sẹ́nní Lángwej"}
+        sg{"sàngo"}
+        shi{"Táchẹ́lit"}
+        si{"Sínhala"}
+        sk{"Slóvak"}
+        sl{"Slovẹ́niá Lángwej"}
+        sm{"Samóá Lángwej"}
+        smn{"Ínárí Sámí Lángwej"}
+        sn{"Shóna"}
+        so{"Sọmáli"}
+        sq{"Albéniá Lángwej"}
+        sr{"Sẹrbiá Lángwej"}
+        st{"Saútán Sóto"}
+        su{"Sọ́ndaniz"}
+        sv{"Suwídẹ́n Lángwej"}
+        sw{"Swahíli"}
+        ta{"tàmil"}
+        te{"Tẹlugu"}
+        teo{"Tẹ́so"}
+        tg{"Tájik"}
+        th{"Taí"}
+        ti{"Tigrínyá"}
+        tk{"Tọ́kmẹn"}
+        to{"Tóngan"}
+        tr{"Tọ́ki"}
+        tt{"Tatá"}
+        twq{"Tasawak"}
+        tzm{"Mídúl Atlás Támazígt Lángwej"}
+        ug{"Wiúgọ"}
+        uk{"Yukrénia"}
+        und{"Lángwej wé nóbọ́di sabi"}
+        ur{"Úrdú"}
+        uz{"Úzbẹk"}
+        vai{"Vaí"}
+        vi{"Viẹ́tnám Lángwej"}
+        vo{"Vólapiuk"}
+        vun{"Vúnjo"}
+        wae{"Wọ́lsa"}
+        wo{"Wólof"}
+        xh{"Kọ́sa"}
+        xog{"sóga"}
+        yav{"Yangbẹn"}
+        yi{"Yídish"}
+        yo{"Yorubá"}
+        yue{"Kántọn Lángwej"}
+        zgh{"Gẹ́nárál Morókó Támazígt Lángwej"}
+        zh{"Mandarín Chainíz Lángwej"}
+        zh_Hans{"Ízí Chainíz Lángwej"}
+        zh_Hant{"Tradíshọ́nál Chainíz Lángwej"}
+        zu{"Zúlu"}
+        zxx{"Nó Lángwéj Kọ́ntẹnt"}
+    }
+    Languages%long{
+        zh_Hans{"Ízí Mandarín Chainíz Lángwej"}
+        zh_Hant{"Tradíshọ́nál Mandarín Chainíz Lángwej"}
+    }
+    Languages%menu{
+        ckb{"Sẹ́ntrál Kọ́dísh Lángwej"}
+        yue{"Chainiz Kántọniz"}
+        zh{"Chainiz, Mandarin"}
+    }
+    Languages%short{
+        en_GB{"UK Ínglish"}
+        en_US{"US Ínglish"}
+    }
+    Languages%variant{
+        ckb{"Sorání Kọ́dísh Lángwej"}
+    }
+    Scripts{
+        Arab{"Arábík"}
+        Armn{"Armẹ́nia"}
+        Beng{"Bángla"}
+        Bopo{"Bopomófo"}
+        Brai{"Blaínd Pípol Raítín Sístẹm"}
+        Cyrl{"Sírílik"}
+        Deva{"Dẹvanágári"}
+        Ethi{"Ẹtiópik"}
+        Geor{"Jọ́jia"}
+        Grek{"Grík"}
+        Gujr{"Gujaráti"}
+        Guru{"Gúrmukhi"}
+        Hanb{"Han Wit Bopomófo"}
+        Hang{"Hángul"}
+        Hani{"Chainiz"}
+        Hans{"Ízí Chainíz Lángwej"}
+        Hant{"Nọ́mal"}
+        Hebr{"Híbrú"}
+        Hira{"Hiagána"}
+        Hrkt{"Pát ọf Japán Raítín Sístẹm"}
+        Jamo{"Jámo"}
+        Jpan{"Japan"}
+        Kana{"Katákána"}
+        Khmr{"Kemẹẹ"}
+        Knda{"Kánnad Raítín Sístẹm"}
+        Kore{"Koria"}
+        Laoo{"Lao"}
+        Latn{"Látin"}
+        Mlym{"Maléyálam"}
+        Mong{"Mọngólia"}
+        Mymr{"Miánmar"}
+        Orya{"Ódia"}
+        Sinh{"Sinhála"}
+        Taml{"Támil"}
+        Telu{"Tẹ́lúgu"}
+        Thaa{"Tána"}
+        Thai{"Taí"}
+        Tibt{"Tíbẹt"}
+        Zmth{"Matimátiks Sains"}
+        Zsye{"Ẹ́móji"}
+        Zsym{"Símbuls"}
+        Zxxx{"Wétín Dẹm Nó Rait"}
+        Zyyy{"Jẹ́náral"}
+        Zzzz{"Raítín Sístẹm Wé Nóbọ́di Sabí"}
+    }
+    Scripts%stand-alone{
+        Hans{"Ízí Chainíz Lang"}
+        Hant{"Nọ́mál Chainiz"}
+    }
+    Types{
+        calendar{
+            buddhist{"Búdíst Kalẹ́nda"}
+            chinese{"Chaíníz Kalẹ́nda"}
+            dangi{"Dangi Kalẹ́nda"}
+            ethiopic{"Ẹtiópiá Kalẹ́nda"}
+            gregorian{"Grẹ́górí Kalẹ́nda"}
+            hebrew{"Híbrú Kalẹ́nda"}
+            islamic{"Múslím Kalẹ́nda"}
+            iso8601{"ISO-8601 Kalẹ́nda"}
+            japanese{"Japán Kalẹ́nda"}
+            persian{"Pẹ́shia Kalẹ́nda"}
+            roc{"Ripọ́blík ọf Chaíná Kalẹ́nda"}
+        }
+        cf{
+            account{"Akáunt To Ték Arénj Mọní"}
+            standard{"Nọ́mál Wè To Arénj Mọní"}
+        }
+        collation{
+            ducet{"Yúníkód Mén Wè To Arénj Tins Wẹl"}
+            search{"Jẹ́nárál Sachin"}
+            standard{"Nọ́mál Wè To Arénj Tins Wẹl"}
+        }
+        hc{
+            h11{"12 Áwa Sístẹm (0–11)"}
+            h12{"12 Áwa Sístẹm (1–12)"}
+            h23{"24 Áwa Sístẹm (0–23)"}
+            h24{"24 Áwa Sístẹm (1–24)"}
+        }
+        lb{
+            loose{"Lúz Laín Brẹk Staíl"}
+            normal{"Nọ́mál Laín Brẹk Staíl"}
+            strict{"Fíksd Laín Brẹk Staíl"}
+        }
+        ms{
+            metric{"Mẹ́trík Sístẹm"}
+            uksystem{"Impẹ́riál Sístẹm fọ Mẹ́zhọ́mẹnt"}
+            ussystem{"US Sístẹm fọ Mẹ́zhọ́mẹnt"}
+        }
+        numbers{
+            arab{"Arábík Nọ́mba-dẹm"}
+            arabext{"Ẹstrá Arábík Nọ́mba-dẹm"}
+            armn{"Armẹ́niá Nọ́mba-dẹm"}
+            armnlow{"Smọ́l Taíp Armẹ́niá Nọ́mba-dẹm"}
+            beng{"Bánglá Nọ́mba-dẹm"}
+            deva{"Dẹvanágári Nọ́mba-dẹm"}
+            ethi{"Ẹtiópiá Nọ́mba-dẹm"}
+            fullwide{"Fúl-Waid Nọ́mba-dẹm"}
+            geor{"Jọ́jiá Nọ́mba-dẹm"}
+            grek{"Grík Nọ́mba-dẹm"}
+            greklow{"Smọ́l Taíp Grík Nọ́mba-dẹm"}
+            gujr{"Gujarátí Nọ́mba-dẹm"}
+            guru{"Gúrmukhi Nọ́mba-dẹm"}
+            hanidec{"Chainíz Nọ́mba-dẹm"}
+            hans{"Ízí Chainíz Nọ́mba-dẹm"}
+            hansfin{"Ízí Chainíz Mọní Nọ́mba-dẹm"}
+            hant{"Nọ́mál Chainíz Nọ́mba-dẹm"}
+            hantfin{"Nọ́mál Chainíz Mọní Nọ́mba-dẹm"}
+            hebr{"Híbru Nọ́mba-dẹm"}
+            jpan{"Japán Nọ́mba-dẹm"}
+            jpanfin{"Japán Mọní Nọ́mba-dẹm"}
+            khmr{"Kmai Nọ́mba-dẹm"}
+            knda{"Kánnád Nọ́mba-dẹm"}
+            laoo{"Lao Nọ́mba-dẹm"}
+            latn{"Wẹ́stán Nọ́mba-dẹm"}
+            mlym{"Maléyálam Nọ́mba-dẹm"}
+            mymr{"Miánma Nọ́mba-dẹm"}
+            orya{"Ódia Nọ́mba-dẹm"}
+            roman{"Rómán Nọ́mba-dẹm"}
+            romanlow{"Smọ́l Taíp Rómán Nọ́mba-dẹm"}
+            taml{"Nọ́mál Támíl Nọ́mba-dẹm"}
+            tamldec{"Támíl Nọ́mba-dẹm"}
+            telu{"Tẹ́lúgu Nọ́mba-dẹm"}
+            thai{"Taí Nọ́mba-dẹm"}
+            tibt{"Tíbẹt Nọ́mba-dẹm"}
+        }
+    }
+    characterLabelPattern{
+        all{"{0} — ọl"}
+        category-list{"{0}: {1}"}
+        compatibility{"{0} — Fít ích ọ́da"}
+        enclosed{"{0} — Sọráund"}
+        extended{"{0} — Strẹch"}
+        historic{"{0} — Impọ́tant"}
+        miscellaneous{"{0} — Dífrẹ́n Dífrẹ́n Tins"}
+        other{"{0} — Ọ́da"}
+        scripts{"Raítín Sístẹm-dẹm —{0}"}
+        strokes{
+            one{"{0}Strok"}
+            other{"{0}Strok"}
+        }
+        subscript{"sọ́bskript {0}"}
+        superscript{"Súpáskript {0}"}
+    }
+    codePatterns{
+        language{"Lángwej: {0}"}
+        script{"Haú to raít tins: {0}"}
+        territory{"Éria: {0}"}
+    }
+    localeDisplayPattern{
+        keyTypePattern{"{0}: {1}"}
+        pattern{"{0} ({1})"}
+        separator{"{0}, {1}"}
+    }
+}

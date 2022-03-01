@@ -1,0 +1,1443 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+ti{
+    AuxExemplarCharacters{
+        "[᎐ ᎑ ᎒ ᎓ ᎔ ᎕ ᎖ ᎗ ᎘ ᎙ ሇ ⶀ ᎀ ᎁ ᎂ ᎃ ⶁ ⶂ ⶃ ⶄ ቇ ᎄ ᎅ ᎆ ᎇ ⶅ ⶆ ⶇ ኇ ⶈ ⶉ ⶊ ኯ ዏ ⶋ ዯ ⶌ ዸ"
+        " ዹ ዺ ዻ ዼ ዽ ዾ ዿ ⶍ ⶎ ጏ ጘ ጙ ጚ ጛ ጜ ጝ ጞ ጟ ⶓ ⶔ ⶕ ⶖ ⶏ ⶐ ⶑ ᎈ ᎉ ᎊ ᎋ ᎌ ᎍ ᎎ ᎏ ⶒ ፘ ፙ ፚ ⶠ"
+        " ⶡ ⶢ ⶣ ⶤ ⶥ ⶦ ⶨ ⶩ ⶪ ⶫ ⶬ ⶭ ⶮ ⶰ ⶱ ⶲ ⶳ ⶴ ⶵ ⶶ ⶸ ⶹ ⶺ ⶻ ⶼ ⶽ ⶾ ⷀ ⷁ ⷂ ⷃ ⷄ ⷅ ⷆ ⷈ ⷉ ⷊ ⷋ"
+        " ⷌ ⷍ ⷎ ⷐ ⷑ ⷒ ⷓ ⷔ ⷕ ⷖ ⷘ ⷙ ⷚ ⷛ ⷜ ⷝ ⷞ]"
+    }
+    ExemplarCharacters{
+        "[\u135F ሀ-ሆ ለ-ቆ ቈ ቊ-ቍ ቐ-ቖ ቘ ቚ-ቝ በ-ኆ ኈ ኊ-ኍ ነ-ኮ ኰ ኲ-ኵ ኸ-ኾ ዀ ዂ-ዅ ወ-ዎ ዐ-ዖ ዘ-ዮ ደ-"
+        "ዷ ጀ-ጎ ጐ ጒ-ጕ ጠ-ፗ]"
+    }
+    ExemplarCharactersIndex{
+        "[ሀ ለ ሐ መ ሠ ረ ሰ ሸ ቀ ቈ ቐ ቘ በ ቨ ተ ቸ ኀ ኈ ነ ኘ አ ከ ኰ ኸ ዀ ወ ዐ ዘ ዠ የ ደ ጀ ገ ጐ ጠ ጨ ጰ ጸ"
+        " ፀ ፈ ፐ]"
+    }
+    ExemplarCharactersNumbers{"[\\- ‑ , . % ‰ + 0 1 2 3 4 5 6 7 8 9]"}
+    NumberElements{
+        default{"latn"}
+        latn{
+            miscPatterns{
+                approximately{"~{0}"}
+                atLeast{"⩾{0}"}
+                atMost{"≤{0}"}
+                range{"{0}–{1}"}
+            }
+            patterns{
+                accountingFormat{"¤#,##0.00"}
+                currencyFormat{"¤#,##0.00"}
+                decimalFormat{"#,##0.###"}
+                percentFormat{"#,##0%"}
+                scientificFormat{"#E0"}
+            }
+            patternsLong{
+                decimalFormat{
+                    1000{
+                        one{"0K"}
+                        other{"0K"}
+                    }
+                    10000{
+                        one{"00K"}
+                        other{"00K"}
+                    }
+                    100000{
+                        one{"000K"}
+                        other{"000K"}
+                    }
+                    1000000{
+                        one{"0M"}
+                        other{"0M"}
+                    }
+                    10000000{
+                        one{"00M"}
+                        other{"00M"}
+                    }
+                    100000000{
+                        one{"000M"}
+                        other{"000M"}
+                    }
+                    1000000000{
+                        one{"0G"}
+                        other{"0G"}
+                    }
+                    10000000000{
+                        one{"00G"}
+                        other{"00G"}
+                    }
+                    100000000000{
+                        one{"000G"}
+                        other{"000G"}
+                    }
+                    1000000000000{
+                        one{"0T"}
+                        other{"0T"}
+                    }
+                    10000000000000{
+                        one{"00T"}
+                        other{"00T"}
+                    }
+                    100000000000000{
+                        one{"000T"}
+                        other{"000T"}
+                    }
+                }
+            }
+            patternsShort{
+                currencyFormat{
+                    1000{
+                        one{"¤0K"}
+                        other{"¤0K"}
+                    }
+                    10000{
+                        one{"¤00K"}
+                        other{"¤00K"}
+                    }
+                    100000{
+                        one{"¤000K"}
+                        other{"¤000K"}
+                    }
+                    1000000{
+                        one{"¤0M"}
+                        other{"¤0M"}
+                    }
+                    10000000{
+                        one{"¤00M"}
+                        other{"¤00M"}
+                    }
+                    100000000{
+                        one{"¤000M"}
+                        other{"¤000M"}
+                    }
+                    1000000000{
+                        one{"¤0G"}
+                        other{"¤0G"}
+                    }
+                    10000000000{
+                        one{"¤00G"}
+                        other{"¤00G"}
+                    }
+                    100000000000{
+                        one{"¤000G"}
+                        other{"¤000G"}
+                    }
+                    1000000000000{
+                        one{"¤0T"}
+                        other{"¤0T"}
+                    }
+                    10000000000000{
+                        one{"¤00T"}
+                        other{"¤00T"}
+                    }
+                    100000000000000{
+                        one{"¤000T"}
+                        other{"¤000T"}
+                    }
+                }
+                decimalFormat{
+                    1000{
+                        one{"0K"}
+                        other{"0K"}
+                    }
+                    10000{
+                        one{"00K"}
+                        other{"00K"}
+                    }
+                    100000{
+                        one{"000K"}
+                        other{"000K"}
+                    }
+                    1000000{
+                        one{"0M"}
+                        other{"0M"}
+                    }
+                    10000000{
+                        one{"00M"}
+                        other{"00M"}
+                    }
+                    100000000{
+                        one{"000M"}
+                        other{"000M"}
+                    }
+                    1000000000{
+                        one{"0G"}
+                        other{"0G"}
+                    }
+                    10000000000{
+                        one{"00G"}
+                        other{"00G"}
+                    }
+                    100000000000{
+                        one{"000G"}
+                        other{"000G"}
+                    }
+                    1000000000000{
+                        one{"0T"}
+                        other{"0T"}
+                    }
+                    10000000000000{
+                        one{"00T"}
+                        other{"00T"}
+                    }
+                    100000000000000{
+                        one{"000T"}
+                        other{"000T"}
+                    }
+                }
+            }
+            symbols{
+                approximatelySign{"~"}
+                decimal{"."}
+                exponential{"E"}
+                group{","}
+                infinity{"∞"}
+                minusSign{"-"}
+                nan{"NaN"}
+                perMille{"‰"}
+                percentSign{"%"}
+                plusSign{"+"}
+                superscriptingExponent{"×"}
+                timeSeparator{":"}
+            }
+        }
+        minimumGroupingDigits{"1"}
+        native{"latn"}
+        traditional{"ethi"}
+    }
+    calendar{
+        generic{
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "G y MMMM d, EEEE",
+                "dd MMMM y G",
+                "dd-MMM-y G",
+                "dd/MM/yy GGGGG",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            availableFormats{
+                MMMMdd{"dd MMMM"}
+                MMdd{"dd/MM"}
+                yMM{"MM/y"}
+                yMMMM{"MMMM y"}
+                yQQQ{"QQQ y"}
+            }
+        }
+        gregorian{
+            AmPmMarkers{
+                "ቅድመ ፍርቂ-መዓልቲ",
+                "ደሕረ ፍርቀ-መዓልቲ",
+            }
+            AmPmMarkersAbbr{
+                "ቅ ፍር-መዓ",
+                "ደሕ ፍር-መዓ",
+            }
+            AmPmMarkersNarrow{
+                "ንጉሆ ሰዓተ",
+                "ድሕር ሰዓት",
+            }
+            DateTimePatterns{
+                "h:mm:ss a zzzz",
+                "h:mm:ss a z",
+                "h:mm:ss a",
+                "h:mm a",
+                "EEEE፣ dd MMMM መዓልቲ y G",
+                "dd MMMM y",
+                "dd-MMM-y",
+                "dd/MM/yy",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+                "{1} {0}",
+            }
+            appendItems{
+                Timezone{"{0} {1}"}
+            }
+            availableFormats{
+                Bh{"h B"}
+                Bhm{"h:mm B"}
+                Bhms{"h:mm:ss B"}
+                E{"ccc"}
+                EBhm{"E h:mm B"}
+                EBhms{"E h:mm:ss B"}
+                EHm{"E HH:mm"}
+                EHms{"E HH:mm:ss"}
+                Ed{"d, E"}
+                Ehm{"E h:mm a"}
+                Ehms{"E h:mm:ss a"}
+                Gy{"y G"}
+                GyMMM{"G y MMM"}
+                GyMMMEd{"G y MMM d, E"}
+                GyMMMd{"G y MMM d"}
+                H{"HH"}
+                Hm{"HH:mm"}
+                Hms{"HH:mm:ss"}
+                Hmsv{"HH:mm:ss v"}
+                Hmv{"HH:mm v"}
+                M{"L"}
+                MEd{"MM-dd, E"}
+                MMM{"LLL"}
+                MMMEd{"MMM d, E"}
+                MMMMW{
+                    one{"ሰሙን W ናይ MMMM"}
+                    other{"ሰሙን W ናይ MMMM"}
+                }
+                MMMMd{"MMMM d"}
+                MMMMdd{"dd MMMM"}
+                MMMd{"MMM d"}
+                MMdd{"dd/MM"}
+                Md{"MM-dd"}
+                d{"d"}
+                h{"h a"}
+                hm{"h:mm a"}
+                hms{"h:mm:ss a"}
+                hmsv{"h:mm:ss a v"}
+                hmv{"h:mm a v"}
+                ms{"mm:ss"}
+                y{"y"}
+                yM{"y-MM"}
+                yMEd{"y-MM-dd, E"}
+                yMM{"MM/y"}
+                yMMM{"y MMM"}
+                yMMMEd{"y MMM d, E"}
+                yMMMM{"MMMM y"}
+                yMMMd{"y MMM d"}
+                yMd{"y-MM-dd"}
+                yQQQ{"QQQ y"}
+                yQQQQ{"y QQQQ"}
+                yw{
+                    one{"መበል w ሰሙን ናይ Y"}
+                    other{"መበል w ሰሙን ናይ Y"}
+                }
+            }
+            dayNames{
+                format{
+                    abbreviated{
+                        "ሰን",
+                        "ሰኑ",
+                        "ሰሉ",
+                        "ረቡ",
+                        "ሓሙ",
+                        "ዓር",
+                        "ቀዳ",
+                    }
+                    narrow{
+                        "ሰ",
+                        "ሰ",
+                        "ሰ",
+                        "ረ",
+                        "ሓ",
+                        "ዓ",
+                        "ቀ",
+                    }
+                    short{
+                        "ሰን",
+                        "ሰኑ",
+                        "ሰሉ",
+                        "ረቡ",
+                        "ሓሙ",
+                        "ዓር",
+                        "ቀዳ",
+                    }
+                    wide{
+                        "ሰንበት",
+                        "ሰኑይ",
+                        "ሠሉስ",
+                        "ረቡዕ",
+                        "ኃሙስ",
+                        "ዓርቢ",
+                        "ቀዳም",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ሰን",
+                        "ሰኑ",
+                        "ሰሉ",
+                        "ረቡ",
+                        "ሓሙ",
+                        "ዓር",
+                        "ቀዳ",
+                    }
+                    narrow{
+                        "ሰ",
+                        "ሰ",
+                        "ሠ",
+                        "ረ",
+                        "ሓ",
+                        "ዓ",
+                        "ቀ",
+                    }
+                    short{
+                        "ሰን",
+                        "ሰኑ",
+                        "ሰሉ",
+                        "ረቡ",
+                        "ሓሙ",
+                        "ዓር",
+                        "ቀዳ",
+                    }
+                    wide{
+                        "ሰንበት",
+                        "ሰኑይ",
+                        "ሠሉስ",
+                        "ረቡዕ",
+                        "ኃሙስ",
+                        "ዓርቢ",
+                        "ቀዳም",
+                    }
+                }
+            }
+            dayPeriod{
+                stand-alone{
+                    abbreviated{
+                        am{"ቅ ፍር-መዓ"}
+                        pm{"ደሕ ፍር-መዓ"}
+                    }
+                    narrow{
+                        am{"ንጉሆ ሰዓተ"}
+                        pm{"ድሕር ሰዓት"}
+                    }
+                    wide{
+                        am{"ቅድመ ፍርቂ-መዓልቲ"}
+                        pm{"ደሕረ ፍርቀ-መዓልቲ"}
+                    }
+                }
+            }
+            eras{
+                abbreviated{
+                    "ዓ/ዓ",
+                    "ዓ/ም",
+                }
+                abbreviated%variant{
+                    "ቅ.ል.ክ",
+                    "ድ.ል.ክ",
+                }
+                wide{
+                    "ቅድመ ክርስቶስ",
+                    "ዓመተ ምህረት",
+                }
+                wide%variant{
+                    "ቅ.ል.ክ",
+                    "ድ.ል.ክ",
+                }
+            }
+            intervalFormats{
+                Bh{
+                    B{"h B – h B"}
+                    h{"h – h B"}
+                }
+                Bhm{
+                    B{"h:mm B – h:mm B"}
+                    h{"h:mm – h:mm B"}
+                    m{"h:mm – h:mm B"}
+                }
+                H{
+                    H{"HH–HH"}
+                }
+                Hm{
+                    H{"HH:mm–HH:mm"}
+                    m{"HH:mm–HH:mm"}
+                }
+                Hmv{
+                    H{"HH:mm–HH:mm v"}
+                    m{"HH:mm–HH:mm v"}
+                }
+                Hv{
+                    H{"HH–HH v"}
+                }
+                M{
+                    M{"MM–MM"}
+                }
+                MEd{
+                    M{"MM-dd, E – MM-dd, E"}
+                    d{"MM-dd, E – MM-dd, E"}
+                }
+                MMM{
+                    M{"LLL–LLL"}
+                }
+                MMMEd{
+                    M{"MMM d, E – MMM d, E"}
+                    d{"MMM d, E – MMM d, E"}
+                }
+                MMMd{
+                    M{"MMM d – MMM d"}
+                    d{"MMM d–d"}
+                }
+                Md{
+                    M{"MM-dd – MM-dd"}
+                    d{"MM-dd – MM-dd"}
+                }
+                d{
+                    d{"d–d"}
+                }
+                fallback{"{0} – {1}"}
+                h{
+                    a{"h a – h a"}
+                    h{"h–h a"}
+                }
+                hm{
+                    a{"h:mm a – h:mm a"}
+                    h{"h:mm–h:mm a"}
+                    m{"h:mm–h:mm a"}
+                }
+                hmv{
+                    a{"h:mm a – h:mm a v"}
+                    h{"h:mm–h:mm a v"}
+                    m{"h:mm–h:mm a v"}
+                }
+                hv{
+                    a{"h a – h a v"}
+                    h{"h–h a v"}
+                }
+                y{
+                    y{"y–y"}
+                }
+                yM{
+                    M{"y-MM – y-MM"}
+                    y{"y-MM – y-MM"}
+                }
+                yMEd{
+                    M{"y-MM-dd, E – y-MM-dd, E"}
+                    d{"y-MM-dd, E – y-MM-dd, E"}
+                    y{"y-MM-dd, E – y-MM-dd, E"}
+                }
+                yMMM{
+                    M{"y MMM–MMM"}
+                    y{"y MMM – y MMM"}
+                }
+                yMMMEd{
+                    M{"E, MMM d – E, MMM d, y"}
+                    d{"y MMM d, E – MMM d, E"}
+                    y{"E, MMM d, y – E, MMM d, y"}
+                }
+                yMMMM{
+                    M{"MMMM – MMMM y"}
+                    y{"MMMM y – MMMM y"}
+                }
+                yMMMd{
+                    M{"y MMM d – MMM d"}
+                    d{"y MMM d–d"}
+                    y{"y MMM d – y MMM d"}
+                }
+                yMd{
+                    M{"y-MM-dd – y-MM-dd"}
+                    d{"y-MM-dd – y-MM-dd"}
+                    y{"y-MM-dd – y-MM-dd"}
+                }
+            }
+            monthNames{
+                format{
+                    abbreviated{
+                        "ጥሪ",
+                        "ለካ",
+                        "መጋ",
+                        "ሚያ",
+                        "ግን",
+                        "ሰነ",
+                        "ሓም",
+                        "ነሓ",
+                        "መስ",
+                        "ጥቅ",
+                        "ሕዳ",
+                        "ታሕ",
+                    }
+                    narrow{
+                        "ጥ",
+                        "ለ",
+                        "መ",
+                        "ሚ",
+                        "ግ",
+                        "ሰ",
+                        "ሓ",
+                        "ነ",
+                        "መ",
+                        "ጥ",
+                        "ሕ",
+                        "ታ",
+                    }
+                    wide{
+                        "ጥሪ",
+                        "ለካቲት",
+                        "መጋቢት",
+                        "ሚያዝያ",
+                        "ግንቦት",
+                        "ሰነ",
+                        "ሓምለ",
+                        "ነሓሰ",
+                        "መስከረም",
+                        "ጥቅምቲ",
+                        "ሕዳር",
+                        "ታሕሳስ",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ጥሪ",
+                        "ለካ",
+                        "መጋ",
+                        "ሚያ",
+                        "ግን",
+                        "ሰነ",
+                        "ሓም",
+                        "ነሓ",
+                        "መስ",
+                        "ጥቅ",
+                        "ሕዳ",
+                        "ታሕ",
+                    }
+                    narrow{
+                        "ጥ",
+                        "ለ",
+                        "መ",
+                        "ሚ",
+                        "ግ",
+                        "ሰ",
+                        "ሓ",
+                        "ነ",
+                        "መ",
+                        "ጥ",
+                        "ሕ",
+                        "ታ",
+                    }
+                    wide{
+                        "ጥሪ",
+                        "ለካቲት",
+                        "መጋቢት",
+                        "ሚያዝያ",
+                        "ግንቦት",
+                        "ሰነ",
+                        "ሓምለ",
+                        "ነሓሰ",
+                        "መስከረም",
+                        "ጥቅምቲ",
+                        "ሕዳር",
+                        "ታሕሳስ",
+                    }
+                }
+            }
+            quarters{
+                format{
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "ቀዳማይ ርብዒ",
+                        "ካልኣይ ርብዒ",
+                        "ሳልሳይ ርብዒ",
+                        "ራብዓይ ርብዒ",
+                    }
+                }
+                stand-alone{
+                    abbreviated{
+                        "ር1",
+                        "ር2",
+                        "ር3",
+                        "ር4",
+                    }
+                    narrow{
+                        "1",
+                        "2",
+                        "3",
+                        "4",
+                    }
+                    wide{
+                        "ቀዳማይ ርብዒ",
+                        "ካልኣይ ርብዒ",
+                        "ሳልሳይ ርብዒ",
+                        "ራብዓይ ርብዒ",
+                    }
+                }
+            }
+        }
+    }
+    fields{
+        day{
+            dn{"መዓልቲ"}
+            relative{
+                "-1"{"ትማሊ"}
+                "0"{"ሎሚ"}
+                "1"{"ጽባሕ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} መዓልቲ"}
+                    other{"ኣብ {0} መዓልቲ"}
+                }
+                past{
+                    one{"ቅድሚ {0} መዓልቲ"}
+                    other{"ኣብ {0} መዓልቲ"}
+                }
+            }
+        }
+        day-narrow{
+            dn{"መዓልቲ"}
+            relativeTime{
+                future{
+                    one{"ኣብ {0} መዓልቲ"}
+                    other{"ኣብ {0} መዓልቲ"}
+                }
+                past{
+                    one{"ቅድሚ {0} መዓልቲ"}
+                    other{"ቅድሚ {0} መዓልቲ"}
+                }
+            }
+        }
+        day-short{
+            dn{"መዓልቲ"}
+            relativeTime{
+                future{
+                    one{"ኣብ {0} መዓልቲ"}
+                    other{"ኣብ {0} መዓልቲ"}
+                }
+                past{
+                    one{"ቅድሚ {0} መዓልቲ"}
+                    other{"ቅድሚ {0} መዓልቲ"}
+                }
+            }
+        }
+        dayOfYear{
+            dn{"መዓልቲ ናይ ዓመት"}
+        }
+        dayOfYear-narrow{
+            dn{"መዓልቲ ናይ ዓ."}
+        }
+        dayOfYear-short{
+            dn{"መዓልቲ ናይ ዓ."}
+        }
+        dayperiod{
+            dn{"ቅድመ ፍርቂ-መዓልቲ/ድሕሪ ፍርቂ-መዓልቲ"}
+        }
+        dayperiod-narrow{
+            dn{"ቅድመ ፍርቂ-መዓልቲ/ድሕሪ ፍርቂ-መዓልቲ"}
+        }
+        dayperiod-short{
+            dn{"ቅድመ ፍርቂ-መዓልቲ/ድሕሪ ፍርቂ-መዓልቲ"}
+        }
+        era{
+            dn{"ዘመን"}
+        }
+        era-narrow{
+            dn{"ዘመን"}
+        }
+        era-short{
+            dn{"ዘመን"}
+        }
+        fri{
+            relative{
+                "-1"{"ዝሓለፈ ዓርቢ"}
+                "0"{"ሎሚ ዓርቢ"}
+                "1"{"ዝመጽእ ዓርቢ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ዓርቢ"}
+                    other{"ኣብ {0} ዓርቢ"}
+                }
+                past{
+                    one{"ኣብ {0} ዓርቢ"}
+                    other{"ቅድሚ {0} ዓርቢ"}
+                }
+            }
+        }
+        fri-narrow{
+            relative{
+                "-1"{"ዝሓለፈ ዓርቢ"}
+                "0"{"ሎሚ ዓርቢ"}
+                "1"{"ዝመጽእ ዓርቢ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ዓርቢ"}
+                    other{"ኣብ {0} ዓርቢ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ዓርቢ"}
+                    other{"ቅድሚ {0} ዓርቢ"}
+                }
+            }
+        }
+        fri-short{
+            relative{
+                "-1"{"ዝሓለፈ ዓርቢ"}
+                "0"{"ሎሚ ዓርቢ"}
+                "1"{"ዝመጽእ ዓርቢ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ዓርቢ"}
+                    other{"ኣብ {0} ዓርቢ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ዓርቢ"}
+                    other{"ቅድሚ {0} ዓርቢ"}
+                }
+            }
+        }
+        hour{
+            dn{"ሰዓት"}
+            relative{
+                "0"{"ኣብዚ ሰዓት"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ሰዓት"}
+                    other{"ኣብ {0} ሰዓት"}
+                }
+                past{
+                    one{"ቅድሚ {0} ሰዓት"}
+                    other{"ቅድሚ {0} ሰዓት"}
+                }
+            }
+        }
+        hour-narrow{
+            dn{"ሰዓት"}
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ሰዓት"}
+                    other{"ኣብ {0} ሰዓት"}
+                }
+                past{
+                    one{"ቅድሚ {0} ሰዓት"}
+                    other{"ቅድሚ {0} ሰዓት"}
+                }
+            }
+        }
+        hour-short{
+            dn{"ሰዓት"}
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ሰዓት"}
+                    other{"ኣብ {0} ሰዓት"}
+                }
+                past{
+                    one{"ቅድሚ {0} ሰዓት"}
+                    other{"ቅድሚ {0} ሰዓት"}
+                }
+            }
+        }
+        minute{
+            dn{"ደቒቕ"}
+            relative{
+                "0"{"ኣብዚ ደቒቕ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ደቒቕ"}
+                    other{"ኣብ {0} ደቒቕ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ደቒቕ"}
+                    other{"ቅድሚ {0} ደቒቕ"}
+                }
+            }
+        }
+        minute-narrow{
+            dn{"ደቒ."}
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ደቒቕ"}
+                    other{"ኣብ {0} ደቒቕ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ደቒቕ"}
+                    other{"ቅድሚ {0} ደቒቕ"}
+                }
+            }
+        }
+        minute-short{
+            dn{"ደቒቕ"}
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ደቒቕ"}
+                    other{"ኣብ {0} ደቒቕ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ደቒቕ"}
+                    other{"ቅድሚ {0} ደቒቕ"}
+                }
+            }
+        }
+        mon{
+            relative{
+                "-1"{"ዝሓለፈ ሰኑይ"}
+                "0"{"ሎሚ ሰኑይ"}
+                "1"{"ዝመጽእ ሰኑይ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ሰኑይ"}
+                    other{"ኣብ {0} ሰኑይ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ሰኑይ"}
+                    other{"ቅድሚ {0} ሰኑይ"}
+                }
+            }
+        }
+        mon-narrow{
+            relative{
+                "-1"{"ዝሓለፈ ሰኑይ"}
+                "0"{"ሎሚ ሰኑይ"}
+                "1"{"ዝመጽእ ሰኑይ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ሰኑይ"}
+                    other{"ኣብ {0} ሰኑይ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ሰኑይ"}
+                    other{"ቅድሚ {0} ሰኑይ"}
+                }
+            }
+        }
+        mon-short{
+            relative{
+                "-1"{"ዝሓለፈ ሰኑይ"}
+                "0"{"ሎሚ ሰኑይ"}
+                "1"{"ዝመጽእ ሰኑይ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ሰኑይ"}
+                    other{"ኣብ {0} ሰኑይ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ሰኑይ"}
+                    other{"ቅድሚ {0} ሰኑይ"}
+                }
+            }
+        }
+        month{
+            dn{"ወርሒ"}
+            relative{
+                "-1"{"last month"}
+                "0"{"ህሉው ወርሒ"}
+                "1"{"ዝመጽእ ወርሒ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ወርሒ"}
+                    other{"ኣብ {0} ወርሒ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ወርሒ"}
+                    other{"ቅድሚ {0} ወርሒ"}
+                }
+            }
+        }
+        month-narrow{
+            dn{"ወርሒ"}
+            relative{
+                "-1"{"ዝሓለፈ ወርሒ"}
+                "0"{"ህሉው ወርሒ"}
+                "1"{"ዝመጽእ ወርሒ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ወርሒ"}
+                    other{"ኣብ {0} ወርሒ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ወርሒ"}
+                    other{"ቅድሚ {0} ወርሒ"}
+                }
+            }
+        }
+        month-short{
+            dn{"ወርሒ"}
+            relative{
+                "-1"{"ዝሓለፈ ወርሒ"}
+                "0"{"ህሉው ወርሒ"}
+                "1"{"ዝመጽእ ወርሒ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ወርሒ"}
+                    other{"ኣብ {0} ወርሒ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ወርሒ"}
+                    other{"ቅድሚ {0} ወርሒ"}
+                }
+            }
+        }
+        quarter{
+            dn{"ርብዒ"}
+            relative{
+                "-1"{"ዝሓለፈ ርብዒ"}
+                "0"{"ህሉው ርብዒ"}
+                "1"{"ዝመጽእ ርብዒ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ርብዒ"}
+                    other{"ኣብ {0} ርብዒ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ርብዒ"}
+                    other{"ቅድሚ {0} ርብዒ"}
+                }
+            }
+        }
+        quarter-narrow{
+            dn{"ርብዒ"}
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ርብዒ"}
+                    other{"ኣብ {0} ርብዒ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ርብዒ"}
+                    other{"ቅድሚ {0} ርብዒ"}
+                }
+            }
+        }
+        quarter-short{
+            dn{"ርብዒ"}
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ርብዒ"}
+                    other{"ኣብ {0} ርብዒ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ርብዒ"}
+                    other{"ቅድሚ {0} ርብዒ"}
+                }
+            }
+        }
+        sat{
+            relative{
+                "-1"{"ዝሓለፈ ቀዳም"}
+                "0"{"ሎሚ ቀዳም"}
+                "1"{"ዝመጽእ ቀዳም"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ቀዳም"}
+                    other{"ኣብ {0} ቀዳም"}
+                }
+                past{
+                    one{"ቅድሚ {0} ቀዳም"}
+                    other{"ቅድሚ {0} ቀዳም"}
+                }
+            }
+        }
+        sat-narrow{
+            relative{
+                "-1"{"ዝሓለፈ ቀዳም"}
+                "0"{"ሎሚ ቀዳም"}
+                "1"{"ዝመጽእ ቀዳም"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ቀዳም"}
+                    other{"ኣብ {0} ቀዳም"}
+                }
+                past{
+                    one{"ቅድሚ {0} ቀዳም"}
+                    other{"ቅድሚ {0} ቀዳም"}
+                }
+            }
+        }
+        sat-short{
+            relative{
+                "-1"{"ዝሓለፈ ቀዳም"}
+                "0"{"ሎሚ ቀዳም"}
+                "1"{"ዝመጽእ ቀዳም"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ቀዳም"}
+                    other{"ኣብ {0} ቀዳም"}
+                }
+                past{
+                    one{"ቅድሚ {0} ቀዳም"}
+                    other{"ቅድሚ {0} ቀዳም"}
+                }
+            }
+        }
+        second{
+            dn{"ካልኢት"}
+            relative{
+                "0"{"ሕጂ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ካልኢት"}
+                    other{"ኣብ {0} ካልኢት"}
+                }
+                past{
+                    one{"ቅድሚ {0} ካልኢት"}
+                    other{"ቅድሚ {0} ካልኢት"}
+                }
+            }
+        }
+        second-narrow{
+            dn{"ካልኢት"}
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ካልኢት"}
+                    other{"ኣብ {0} ካልኢት"}
+                }
+                past{
+                    one{"ቅድሚ {0} ካልኢት"}
+                    other{"ቅድሚ {0} ካልኢት"}
+                }
+            }
+        }
+        second-short{
+            dn{"ካልኢት"}
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ካልኢት"}
+                    other{"ኣብ {0} ካልኢት"}
+                }
+                past{
+                    one{"ቅድሚ {0} ካልኢት"}
+                    other{"ቅድሚ {0} ካልኢት"}
+                }
+            }
+        }
+        sun{
+            relative{
+                "-1"{"ዝሓለፈ ሰንበት"}
+                "0"{"ሎሚ ሰንበት"}
+                "1"{"ዝመጽእ ሰንበት"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ሰንበት"}
+                    other{"ኣብ {0} ሰንበት"}
+                }
+                past{
+                    one{"ቅድሚ {0} ሰንበት"}
+                    other{"ቅድሚ {0} ሰንበት"}
+                }
+            }
+        }
+        sun-narrow{
+            relative{
+                "-1"{"ዝሓለፈ ሰንበት"}
+                "0"{"ሎሚ ሰንበት"}
+                "1"{"ዝመጽእ ሰንበት"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ሰንበት"}
+                    other{"ኣብ {0} ሰንበት"}
+                }
+                past{
+                    one{"ቅድሚ {0} ሰንበት"}
+                    other{"ቅድሚ {0} ሰንበት"}
+                }
+            }
+        }
+        sun-short{
+            relative{
+                "-1"{"ዝሓለፈ ሰንበት"}
+                "0"{"ሎሚ ሰንበት"}
+                "1"{"ዝመጽእ ሰንበት"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ሰንበት"}
+                    other{"ኣብ {0} ሰንበት"}
+                }
+                past{
+                    one{"ቅድሚ {0} ሰንበት"}
+                    other{"ቅድሚ {0} ሰንበት"}
+                }
+            }
+        }
+        thu{
+            relative{
+                "-1"{"ዝሓለፈ ሓሙስ"}
+                "0"{"ሎሚ ሓሙስ"}
+                "1"{"ዝመጽእ ሓሙስ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ሓሙስ"}
+                    other{"ኣብ {0} ሓሙስ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ሓሙስ"}
+                    other{"ቅድሚ {0} ሓሙስ"}
+                }
+            }
+        }
+        thu-narrow{
+            relative{
+                "-1"{"ዝሓለፈ ሓሙስ"}
+                "0"{"ሎሚ ሓሙስ"}
+                "1"{"ዝመጽእ ሓሙስ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ሓሙስ"}
+                    other{"ኣብ {0} ሓሙስ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ሓሙስ"}
+                    other{"ቅድሚ {0} ሓሙስ"}
+                }
+            }
+        }
+        thu-short{
+            relative{
+                "-1"{"ዝሓለፈ ሓሙስ"}
+                "0"{"ሎሚ ሓሙስ"}
+                "1"{"ዝመጽእ ሓሙስ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ሓሙስ"}
+                    other{"ኣብ {0} ሓሙስ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ሓሙስ"}
+                    other{"ቅድሚ {0} ሓሙስ"}
+                }
+            }
+        }
+        tue{
+            relative{
+                "-1"{"ዝሓለፈ ሰሉስ"}
+                "0"{"ሎሚ ሰሉስ"}
+                "1"{"ዝመጽእ ሰሉስ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ሰሉስ"}
+                    other{"ኣብ {0} ሰሉስ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ሰሉስ"}
+                    other{"ቅድሚ {0} ሰሉስ"}
+                }
+            }
+        }
+        tue-narrow{
+            relative{
+                "-1"{"ዝሓለፈ ሰሉስ"}
+                "0"{"ሎሚ ሰሉስ"}
+                "1"{"ዝመጽእ ሰሉስ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ሰሉስ"}
+                    other{"ኣብ {0} ሰሉስ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ሰሉስ"}
+                    other{"ቅድሚ {0} ሰሉስ"}
+                }
+            }
+        }
+        tue-short{
+            relative{
+                "-1"{"ዝሓለፈ ሰሉስ"}
+                "0"{"ሎሚ ሰሉስ"}
+                "1"{"ዝመጽእ ሰሉስ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ሰሉስ"}
+                    other{"ኣብ {0} ሰሉስ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ሰሉስ"}
+                    other{"ቅድሚ {0} ሰሉስ"}
+                }
+            }
+        }
+        wed{
+            relative{
+                "-1"{"ዝሓለፈ ረቡዕ"}
+                "0"{"ሎሚ ረቡዕ"}
+                "1"{"ዝመጽእ ረቡዕ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ረቡዕ"}
+                    other{"ኣብ {0} ረቡዕ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ረቡዕ"}
+                    other{"ቅድሚ {0} ረቡዕ"}
+                }
+            }
+        }
+        wed-narrow{
+            relative{
+                "-1"{"ዝሓለፈ ረቡዕ"}
+                "0"{"ሎሚ ረቡዕ"}
+                "1"{"ዝመጽእ ረቡዕ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ረቡዕ"}
+                    other{"ኣብ {0} ረቡዕ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ረቡዕ"}
+                    other{"ቅድሚ {0} ረቡዕ"}
+                }
+            }
+        }
+        wed-short{
+            relative{
+                "-1"{"ዝሓለፈ ረቡዕ"}
+                "0"{"ሎሚ ረቡዕ"}
+                "1"{"ዝመጽእ ረቡዕ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ረቡዕ"}
+                    other{"ኣብ {0} ረቡዕ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ረቡዕ"}
+                    other{"ቅድሚ {0} ረቡዕ"}
+                }
+            }
+        }
+        week{
+            relative{
+                "-1"{"ዝሓለፈ ሰሙን"}
+                "0"{"ህሉው ሰሙን"}
+                "1"{"ዝመጽእ ሰሙን"}
+            }
+            relativePeriod{"ሰሙን ናይ {0}"}
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ሰሙን"}
+                    other{"ኣብ {0} ሰሙን"}
+                }
+                past{
+                    one{"ቅድሚ {0} ሰሙን"}
+                    other{"ቅድሚ {0} ሰሙን"}
+                }
+            }
+        }
+        week-narrow{
+            dn{"ሰሙን"}
+            relativePeriod{"ሰሙን ናይ {0}"}
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ሰሙን"}
+                    other{"ኣብ {0} ሰሙን"}
+                }
+                past{
+                    one{"ቅድሚ {0} ሰሙን"}
+                    other{"ቅድሚ {0} ሰሙን"}
+                }
+            }
+        }
+        week-short{
+            dn{"ሰሙን"}
+            relativePeriod{"ሰሙን ናይ {0}"}
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ሰሙን"}
+                    other{"ኣብ {0} ሰሙን"}
+                }
+                past{
+                    one{"ቅድሚ {0} ሰሙን"}
+                    other{"ቅድሚ {0} ሰሙን"}
+                }
+            }
+        }
+        weekOfMonth{
+            dn{"ሰሙን ናይ ወርሒ"}
+        }
+        weekOfMonth-short{
+            dn{"ሰሙ. ናይ ወር."}
+        }
+        weekday{
+            dn{"መዓልቲ ናይ ሰሙን"}
+        }
+        weekday-narrow{
+            dn{"መዓልቲ ናይ ሰ."}
+        }
+        weekday-short{
+            dn{"መዓልቲ ናይ ሰሙን"}
+        }
+        weekdayOfMonth{
+            dn{"መዓልታት ስራሕ ናይ ወርሒ"}
+        }
+        weekdayOfMonth-narrow{
+            dn{"መ.ስራሕ ናይ ወርሒ"}
+        }
+        weekdayOfMonth-short{
+            dn{"መዓልታት ስራሕ ናይ ወርሒ"}
+        }
+        year{
+            dn{"ዓመት"}
+            relative{
+                "-1"{"ዓሚ"}
+                "0"{"ሎሚ ዓመት"}
+                "1"{"ንዓመታ"}
+            }
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ዓ"}
+                    other{"ኣብ {0} ዓ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ዓ"}
+                    other{"ቅድሚ {0} ዓ"}
+                }
+            }
+        }
+        year-narrow{
+            dn{"ዓመት"}
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ዓ"}
+                    other{"ኣብ {0} ዓ"}
+                }
+                past{
+                    one{"ቅድሚ {0} ዓ"}
+                    other{"ቅድሚ {0} ዓ"}
+                }
+            }
+        }
+        year-short{
+            dn{"ዓመት"}
+            relativeTime{
+                future{
+                    one{"ኣብ {0} ዓ"}
+                    other{"ኣብ {0} ዓ"}
+                }
+                past{
+                    one{"ቅድሚ -{0} ዓ"}
+                    other{"ቅድሚ {0} ዓ"}
+                }
+            }
+        }
+        zone{
+            dn{"ክልል"}
+        }
+        zone-narrow{
+            dn{"ክልል"}
+        }
+        zone-short{
+            dn{"ክልል"}
+        }
+    }
+}

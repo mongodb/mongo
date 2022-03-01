@@ -1,0 +1,99 @@
+﻿// © 2016 and later: Unicode, Inc. and others.
+// License & terms of use: http://www.unicode.org/copyright.html
+// Generated using tools/cldr/cldr-to-icu/build-icu-data.xml
+to{
+    Currencies{
+        AUD{
+            "AUD$",
+            "Tola fakaʻaositelēlia",
+        }
+        EUR{
+            "€",
+            "ʻEulo",
+        }
+        FJD{
+            "FJD",
+            "Tola fakafisi",
+        }
+        NZD{
+            "NZD$",
+            "Tola fakanuʻusila",
+        }
+        PGK{
+            "PGK",
+            "Kina fakapapuaniukini",
+        }
+        SBD{
+            "SBD",
+            "Tola fakaʻotusolomone",
+        }
+        TOP{
+            "T$",
+            "Paʻanga fakatonga",
+        }
+        VUV{
+            "VUV",
+            "Vatu fakavanuatu",
+        }
+        WST{
+            "WST",
+            "Tala fakahaʻamoa",
+        }
+        XPF{
+            "CFPF",
+            "Falaniki fakapasifika",
+        }
+        XXX{
+            "¤",
+            "Pa’anga Ta’e’ilo",
+        }
+    }
+    Currencies%narrow{
+        AUD{"AU$"}
+        FJD{"F$"}
+        NZD{"NZ$"}
+        SBD{"S$"}
+        TOP{"T$"}
+    }
+    Currencies%variant{
+        GEL{"₾"}
+    }
+    CurrencyPlurals{
+        AUD{
+            other{"Tola fakaʻaositelēlia"}
+        }
+        EUR{
+            other{"ʻeulo"}
+        }
+        FJD{
+            other{"Tola fakafisi"}
+        }
+        NZD{
+            other{"Tola fakanuʻusila"}
+        }
+        PGK{
+            other{"Kina fakapapuaniukini"}
+        }
+        SBD{
+            other{"Tola fakaʻotusolomone"}
+        }
+        TOP{
+            other{"Paʻanga fakatonga"}
+        }
+        VUV{
+            other{"Vatu fakavanuatu"}
+        }
+        WST{
+            other{"Tala fakahaʻamoa"}
+        }
+        XPF{
+            other{"Falaniki fakapasifika"}
+        }
+        XXX{
+            other{"Pa’anga Ta’e’ilo"}
+        }
+    }
+    CurrencyUnitPatterns{
+        other{"{1} {0}"}
+    }
+}
