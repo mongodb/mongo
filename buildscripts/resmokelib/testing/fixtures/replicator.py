@@ -18,6 +18,8 @@ class ReplicatorFixture(interface.Fixture):
         self.executable = executable
         self.quiesce_period = quiesce_period
         self.cli_options = self.fixturelib.default_if_none(cli_options, {})
+        self.port = self.fixturelib.get_next_port(job_num)
+        self.set_cli_options({"port": self.port})
 
         # The running replicator process.
         self.replicator = None
@@ -124,7 +126,8 @@ class ReplicatorFixture(interface.Fixture):
 
     def get_node_info(self):
         """Return a list of NodeInfo objects."""
-        info = interface.NodeInfo(full_name=self.logger.full_name, name=self.logger.name, port=-1,
+        info = interface.NodeInfo(full_name=self.logger.full_name, name=self.logger.name,
+                                  port=self.port,
                                   pid=self.replicator.pid if self.replicator is not None else -1)
         return [info]
 
