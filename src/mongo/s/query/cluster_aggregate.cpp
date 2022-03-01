@@ -418,7 +418,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                 return cluster_aggregation_planner::runPipelineOnSpecificShardOnly(
                     expCtx,
                     namespaces,
-                    *targeter.cm,
+                    boost::none,
                     request.getExplain(),
                     aggregation_request_helper::serializeToCommandDoc(request),
                     privileges,

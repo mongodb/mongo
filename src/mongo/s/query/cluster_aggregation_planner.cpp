@@ -629,7 +629,7 @@ Status runPipelineOnPrimaryShard(const boost::intrusive_ptr<ExpressionContext>& 
     if (feature_flags::gFeatureFlagPerShardCursor.isEnabledAndIgnoreFCV()) {
         return runPipelineOnSpecificShardOnly(expCtx,
                                               namespaces,
-                                              cm,
+                                              boost::optional<DatabaseVersion>(cm.dbVersion()),
                                               explain,
                                               serializedCommand,
                                               privileges,
@@ -847,7 +847,7 @@ std::pair<BSONObj, boost::optional<UUID>> getCollationAndUUID(
 
 Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const ClusterAggregate::Namespaces& namespaces,
-                                      const ChunkManager& cm,
+                                      boost::optional<DatabaseVersion> dbVersion,
                                       boost::optional<ExplainOptions::Verbosity> explain,
                                       Document serializedCommand,
                                       const PrivilegeVector& privileges,
@@ -875,8 +875,9 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
         cmdObj = appendShardVersion(std::move(cmdObj), ChunkVersion::UNSHARDED());
     }
     if (!forPerShardCursor) {
-        // Per shard cursors should not send any shard version info.
-        cmdObj = appendDbVersionIfPresent(std::move(cmdObj), cm.dbVersion());
+        // Unless this is a per shard cursor, we need to send shard version info.
+        tassert(6377400, "Missing shard versioning information", dbVersion.has_value());
+        cmdObj = appendDbVersionIfPresent(std::move(cmdObj), *dbVersion);
     }
 
     MultiStatementTransactionRequestsSender ars(

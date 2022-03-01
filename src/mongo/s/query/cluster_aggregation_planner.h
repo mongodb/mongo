@@ -134,7 +134,7 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
  */
 Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       const ClusterAggregate::Namespaces& namespaces,
-                                      const ChunkManager& cm,
+                                      boost::optional<DatabaseVersion> dbVersion,
                                       boost::optional<ExplainOptions::Verbosity> explain,
                                       Document serializedCommand,
                                       const PrivilegeVector& privileges,
