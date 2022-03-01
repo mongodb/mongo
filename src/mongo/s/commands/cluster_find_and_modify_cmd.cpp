@@ -81,6 +81,18 @@ BSONObj appendLegacyRuntimeConstantsToCommandObject(OperationContext* opCtx,
     return origCmdObj.addField(rtcBSON.getField(kLegacyRuntimeConstantsField));
 }
 
+BSONObj stripWriteConcern(const BSONObj& cmdObj) {
+    BSONObjBuilder output;
+    for (const auto& elem : cmdObj) {
+        const auto name = elem.fieldNameStringData();
+        if (name == WriteConcernOptions::kWriteConcernField) {
+            continue;
+        }
+        output.append(elem);
+    }
+    return output.obj();
+}
+
 BSONObj getCollation(const BSONObj& cmdObj) {
     BSONElement collationElement;
     auto status = bsonExtractTypedField(cmdObj, "collation", BSONType::Object, &collationElement);

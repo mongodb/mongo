@@ -83,23 +83,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTarg
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants);
 
 /**
- * Consults the routing info to build requests for:
- * 1. If sharded, shards that own chunks for the namespace, or
- * 2. If unsharded, the primary shard for the database.
- *
- * If a shard is included in shardsToSkip, it will be excluded from the list returned to the
- * caller.
- */
-std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShards(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const ChunkManager& cm,
-    const std::set<ShardId>& shardsToSkip,
-    const BSONObj& cmdObj,
-    const BSONObj& query,
-    const BSONObj& collation);
-
-/**
  * Dispatches all the specified requests in parallel and waits until all complete, returning a
  * vector of the same size and positions as that of 'requests'.
  *
@@ -160,11 +143,6 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx,
                               const BSONObj& cmdObj);
 
 /**
- * Returns a copy of 'cmdObj' with the writeConcern removed.
- */
-BSONObj stripWriteConcern(const BSONObj& cmdObj);
-
-/**
  * Utility for dispatching unversioned commands to all shards in a cluster.
  *
  * Returns a non-OK status if a failure occurs on *this* node during execution. Otherwise, returns
@@ -189,8 +167,6 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShar
  * target by applying the passed-in query and collation to the local routing table cache.
  *
  * Does not retry on StaleConfigException.
- *
- * Return value is the same as scatterGatherUnversionedTargetAllShards().
  */
 std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     OperationContext* opCtx,
@@ -211,8 +187,6 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
  * Callers can specify shards to skip, even if these shards would be otherwise targeted.
  *
  * Allows StaleConfigException errors to append to the response list.
- *
- * Return value is the same as scatterGatherUnversionedTargetAllShards().
  */
 std::vector<AsyncRequestsSender::Response>
 scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
@@ -226,25 +200,6 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
     Shard::RetryPolicy retryPolicy,
     const BSONObj& query,
     const BSONObj& collation);
-
-/**
- * Utility for dispatching commands on a namespace, but with special hybrid versioning:
- * - If the namespace is unsharded, a version is attached (so this node can find out if its routing
- * table was stale, and the namespace is actually sharded), and only the primary shard is targeted.
- * - If the namespace is sharded, no version is attached, and the request is broadcast to all
- * shards.
- *
- * Does not retry on StaleConfigException.
- *
- * Return value is the same as scatterGatherUnversionedTargetAllShards().
- */
-std::vector<AsyncRequestsSender::Response> scatterGatherOnlyVersionIfUnsharded(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const BSONObj& cmdObj,
-    const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy,
-    const std::set<ErrorCodes::Error>& ignorableErrors = {});
 
 /**
  * Utility for dispatching commands against the primary of a database and attaching the appropriate

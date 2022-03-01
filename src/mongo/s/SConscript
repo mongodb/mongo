@@ -598,7 +598,6 @@ env.CppUnitTest(
     source=[
         'append_raw_responses_test.cpp',
         'balancer_configuration_test.cpp',
-        'build_versioned_requests_for_targeted_shards_test.cpp',
         'catalog_cache_refresh_test.cpp',
         'catalog_cache_test.cpp',
         'catalog/sharding_catalog_client_test.cpp',
