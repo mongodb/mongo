@@ -323,7 +323,7 @@ TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenSchedulerIsStopped) {
     }
 }
 
-TEST_F(BalancerCommandsSchedulerTest, CommandCanceledIfBalancerStops) {
+TEST_F(BalancerCommandsSchedulerTest, CommandCanceledIfUnsubmittedBeforeBalancerStops) {
     SemiFuture<void> futureResponse;
     {
         FailPointEnableBlock failPoint("pauseSubmissionsFailPoint");

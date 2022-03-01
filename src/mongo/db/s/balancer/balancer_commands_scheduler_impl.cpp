@@ -404,10 +404,7 @@ CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
 
     auto swRemoteCommandHandle =
         _executor->scheduleRemoteCommand(remoteCommand, onRemoteResponseReceived);
-    return (
-        swRemoteCommandHandle.isOK()
-            ? CommandSubmissionResult(params.id, distLockTaken, swRemoteCommandHandle.getValue())
-            : CommandSubmissionResult(params.id, distLockTaken, swRemoteCommandHandle.getStatus()));
+    return CommandSubmissionResult(params.id, distLockTaken, swRemoteCommandHandle.getStatus());
 }
 
 void BalancerCommandsSchedulerImpl::_applySubmissionResult(
@@ -430,10 +427,7 @@ void BalancerCommandsSchedulerImpl::_applyCommandResponse(
     UUID requestId, const executor::RemoteCommandResponse& response) {
     {
         stdx::lock_guard<Latch> lg(_mutex);
-        if (_state == SchedulerState::Stopping || _state == SchedulerState::Stopped) {
-            // Drop the response - the request is being cancelled in the worker thread.
-            return;
-        }
+        invariant(_state != SchedulerState::Stopped);
         auto requestIt = _requests.find(requestId);
         invariant(requestIt != _requests.end());
         auto& request = requestIt->second;
@@ -453,9 +447,14 @@ void BalancerCommandsSchedulerImpl::_applyCommandResponse(
 }
 
 void BalancerCommandsSchedulerImpl::_performDeferredCleanup(
-    OperationContext* opCtx, std::vector<RequestData>&& requestsHoldingResources) {
+    OperationContext* opCtx,
+    const stdx::unordered_map<UUID, RequestData, UUID::Hash>& requestsHoldingResources) {
+    if (requestsHoldingResources.empty()) {
+        return;
+    }
+
     DBDirectClient dbClient(opCtx);
-    for (const auto& request : requestsHoldingResources) {
+    for (const auto& [_, request] : requestsHoldingResources) {
         if (request.holdsDistributedLock()) {
             _distributedLocks.releaseFor(opCtx, request.getNamespace());
         }
@@ -463,9 +462,8 @@ void BalancerCommandsSchedulerImpl::_performDeferredCleanup(
             deletePersistedRecoveryInfo(dbClient, request.getCommandInfo());
         }
     }
-    if (!requestsHoldingResources.empty()) {
-        deferredCleanupCompletedCheckpoint.pauseWhileSet();
-    }
+
+    deferredCleanupCompletedCheckpoint.pauseWhileSet();
 }
 
 void BalancerCommandsSchedulerImpl::_workerThread() {
@@ -478,19 +476,18 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
 
     Client::initThread("BalancerCommandsScheduler");
     bool stopWorkerRequested = false;
-    stdx::unordered_map<UUID, RequestData, UUID::Hash> requestsToCleanUpOnExit;
     LOGV2(5847205, "Balancer scheduler thread started");
 
     while (!stopWorkerRequested) {
         std::vector<CommandSubmissionParameters> commandsToSubmit;
         std::vector<CommandSubmissionResult> submissionResults;
-        std::vector<RequestData> completedRequestsToCleanUp;
+        stdx::unordered_map<UUID, RequestData, UUID::Hash> completedRequestsToCleanUp;
 
         // 1. Check the internal state and plan for the actions to be taken ont this round.
         {
             stdx::unique_lock<Latch> ul(_mutex);
             invariant(_state != SchedulerState::Stopped);
-            _stateUpdatedCV.wait(ul, [this, &ul] {
+            _stateUpdatedCV.wait(ul, [this] {
                 return ((!_unsubmittedRequestIds.empty() &&
                          !MONGO_likely(pauseSubmissionsFailPoint.shouldFail())) ||
                         _state == SchedulerState::Stopping ||
@@ -499,30 +496,32 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
 
             for (const auto& requestId : _recentlyCompletedRequestIds) {
                 auto it = _requests.find(requestId);
-                completedRequestsToCleanUp.emplace_back(std::move(it->second));
+                completedRequestsToCleanUp.emplace(it->first, std::move(it->second));
                 _requests.erase(it);
             }
             _recentlyCompletedRequestIds.clear();
 
-            if (_state == SchedulerState::Stopping) {
-                // Reset the internal state and prepare to leave
-                _unsubmittedRequestIds.clear();
-                _requests.swap(requestsToCleanUpOnExit);
-                stopWorkerRequested = true;
-            } else {
-                // Pick up new commands to be submitted
-                for (const auto& requestId : _unsubmittedRequestIds) {
-                    const auto& requestData = _requests.at(requestId);
+            for (const auto& requestId : _unsubmittedRequestIds) {
+                auto& requestData = _requests.at(requestId);
+                if (_state != SchedulerState::Stopping) {
                     commandsToSubmit.push_back(requestData.getSubmissionParameters());
+                } else {
+                    requestData.setOutcome(
+                        Status(ErrorCodes::BalancerInterrupted,
+                               "Request cancelled - balancer scheduler is stopping"));
+                    completedRequestsToCleanUp.emplace(requestId, std::move(requestData));
+                    _requests.erase(requestId);
                 }
-                _unsubmittedRequestIds.clear();
             }
+            _unsubmittedRequestIds.clear();
+            stopWorkerRequested = _state == SchedulerState::Stopping;
         }
 
         // 2.a Free any resource acquired by already completed/aborted requests.
         {
             auto opCtxHolder = cc().makeOperationContext();
-            _performDeferredCleanup(opCtxHolder.get(), std::move(completedRequestsToCleanUp));
+            _performDeferredCleanup(opCtxHolder.get(), completedRequestsToCleanUp);
+            completedRequestsToCleanUp.clear();
         }
 
         // 2.b Serve the picked up requests, submitting their related commands.
@@ -532,11 +531,11 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
                 submissionInfo.commandInfo.get()->attachOperationMetadataTo(opCtxHolder.get());
             }
             submissionResults.push_back(_submit(opCtxHolder.get(), submissionInfo));
-            if (!submissionResults.back().context.isOK()) {
+            if (!submissionResults.back().outcome.isOK()) {
                 LOGV2(5847206,
                       "Submission for scheduler command request failed",
                       "reqId"_attr = submissionResults.back().id,
-                      "cause"_attr = submissionResults.back().context.getStatus());
+                      "cause"_attr = submissionResults.back().outcome);
             }
         }
 
@@ -548,18 +547,15 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
             }
         }
     }
-
-    // In case of clean exit, cancel all the pending/running command requests
-    // (but keep the related descriptor documents to ensure they will be reissued on recovery).
-    auto opCtxHolder = cc().makeOperationContext();
-    for (auto& idAndRequest : requestsToCleanUpOnExit) {
-        idAndRequest.second.setOutcome(Status(
-            ErrorCodes::BalancerInterrupted, "Request cancelled - balancer scheduler is stopping"));
-        const auto& cancelHandle = idAndRequest.second.getExecutionContext();
-        if (cancelHandle) {
-            _executor->cancel(*cancelHandle);
-        }
-        _distributedLocks.releaseFor(opCtxHolder.get(), idAndRequest.second.getNamespace());
+    // Wait for each outstanding command to complete, clean out its resources and leave.
+    {
+        stdx::unique_lock<Latch> ul(_mutex);
+        _stateUpdatedCV.wait(
+            ul, [this] { return (_requests.size() == _recentlyCompletedRequestIds.size()); });
+        auto opCtxHolder = cc().makeOperationContext();
+        _performDeferredCleanup(opCtxHolder.get(), _requests);
+        _requests.clear();
+        _recentlyCompletedRequestIds.clear();
     }
 }
 

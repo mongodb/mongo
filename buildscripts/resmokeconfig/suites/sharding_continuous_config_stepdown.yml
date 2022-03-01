@@ -134,7 +134,6 @@ selector:
   - jstests/sharding/autodiscover_config_rs_from_secondary.js
   - jstests/sharding/rs_stepdown_and_pooling.js
   - jstests/sharding/mongos_no_replica_set_refresh.js
-  - jstests/sharding/movechunk_interrupt_at_primary_stepdown.js
   - jstests/sharding/primary_config_server_blackholed_from_mongos.js
   - jstests/sharding/reconfig_fails_no_cwwc_set_sharding.js
   # Nothing is affected by config server step down

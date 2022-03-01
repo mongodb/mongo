@@ -399,21 +399,17 @@ struct CommandSubmissionParameters {
     const std::shared_ptr<CommandInfo> commandInfo;
 };
 
-
-using ExecutionContext = executor::TaskExecutor::CallbackHandle;
-
 /**
  * Helper data structure for storing the outcome of a Command submission.
  */
 struct CommandSubmissionResult {
-    CommandSubmissionResult(UUID id, bool acquiredDistLock, StatusWith<ExecutionContext>&& context)
-        : id(id), acquiredDistLock(acquiredDistLock), context(std::move(context)) {}
-    CommandSubmissionResult(CommandSubmissionResult&& rhs)
-        : id(rhs.id), acquiredDistLock(rhs.acquiredDistLock), context(std::move(rhs.context)) {}
+    CommandSubmissionResult(UUID id, bool acquiredDistLock, const Status& outcome)
+        : id(id), acquiredDistLock(acquiredDistLock), outcome(outcome) {}
+    CommandSubmissionResult(CommandSubmissionResult&& rhs) = default;
     CommandSubmissionResult(const CommandSubmissionResult& rhs) = delete;
     UUID id;
     bool acquiredDistLock;
-    StatusWith<ExecutionContext> context;
+    Status outcome;
 };
 
 /**
@@ -427,8 +423,7 @@ public:
           _completedOrAborted(false),
           _holdingDistLock(false),
           _commandInfo(std::move(commandInfo)),
-          _responsePromise{NonNullPromiseTag{}},
-          _executionContext(boost::none) {
+          _responsePromise{NonNullPromiseTag{}} {
         invariant(_commandInfo);
     }
 
@@ -437,8 +432,7 @@ public:
           _completedOrAborted(rhs._completedOrAborted),
           _holdingDistLock(rhs._holdingDistLock),
           _commandInfo(std::move(rhs._commandInfo)),
-          _responsePromise(std::move(rhs._responsePromise)),
-          _executionContext(std::move(rhs._executionContext)) {}
+          _responsePromise(std::move(rhs._responsePromise)) {}
 
     ~RequestData() = default;
 
@@ -458,19 +452,12 @@ public:
             // Keep the original outcome and continue the workflow.
             return Status::OK();
         }
-        auto submissionStatus = submissionResult.context.getStatus();
-        if (submissionStatus.isOK()) {
-            // store the execution context to be able to serve future cancel requests.
-            _executionContext = std::move(submissionResult.context.getValue());
-        } else {
+        const auto& submissionStatus = submissionResult.outcome;
+        if (!submissionStatus.isOK()) {
             // cascade the submission failure
             setOutcome(submissionStatus);
         }
         return submissionStatus;
-    }
-
-    const boost::optional<executor::TaskExecutor::CallbackHandle>& getExecutionContext() {
-        return _executionContext;
     }
 
     const CommandInfo& getCommandInfo() const {
@@ -512,8 +499,6 @@ private:
     std::shared_ptr<CommandInfo> _commandInfo;
 
     Promise<executor::RemoteCommandResponse> _responsePromise;
-
-    boost::optional<ExecutionContext> _executionContext;
 };
 
 /**
@@ -618,8 +603,9 @@ private:
 
     void _enqueueRequest(WithLock, RequestData&& request);
 
-    void _performDeferredCleanup(OperationContext* opCtx,
-                                 std::vector<RequestData>&& requestsHoldingResources);
+    void _performDeferredCleanup(
+        OperationContext* opCtx,
+        const stdx::unordered_map<UUID, RequestData, UUID::Hash>& requestsHoldingResources);
 
     CommandSubmissionResult _submit(OperationContext* opCtx,
                                     const CommandSubmissionParameters& data);
