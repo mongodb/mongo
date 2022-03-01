@@ -78,11 +78,8 @@ protected:
                         boost::none);
 
         if (!OperationShardingState::isOperationVersioned(opCtx)) {
-            const auto version = cm.getVersion(ShardId("0"));
-            BSONObjBuilder builder;
-            version.serializeToBSON(ChunkVersion::kShardVersionField, &builder);
-            auto& oss = OperationShardingState::get(opCtx);
-            oss.initializeClientRoutingVersionsFromCommand(kTestNss, builder.obj());
+            OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+                kTestNss, cm.getVersion(ShardId("0")), boost::none);
         }
 
         return CollectionMetadata(std::move(cm), ShardId("0"));

@@ -1551,8 +1551,6 @@ void ExecCommandDatabase::_initiateCommand() {
     // Once API params and txn state are set on opCtx, enforce the "requireApiVersion" setting.
     enforceRequireAPIVersion(opCtx, command);
 
-    auto& oss = OperationShardingState::get(opCtx);
-
     if (!opCtx->getClient()->isInDirectClient() &&
         readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern &&
         (iAmPrimary || (readConcernArgs.hasLevel() || readConcernArgs.getArgsAfterClusterTime()))) {
@@ -1567,7 +1565,18 @@ void ExecCommandDatabase::_initiateCommand() {
             ? bucketNss
             : _invocation->ns();
 
-        oss.initializeClientRoutingVersionsFromCommand(namespaceForSharding, request.body);
+        boost::optional<ChunkVersion> shardVersion;
+        if (auto shardVersionElem = request.body[ChunkVersion::kShardVersionField]) {
+            shardVersion = ChunkVersion::fromBSONPositionalOrNewerFormat(shardVersionElem);
+        }
+
+        boost::optional<DatabaseVersion> databaseVersion;
+        if (auto databaseVersionElem = request.body[DatabaseVersion::kDatabaseVersionField]) {
+            databaseVersion = DatabaseVersion(databaseVersionElem.Obj());
+        }
+
+        OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+            namespaceForSharding, shardVersion, databaseVersion);
     }
 
     _scoped = _execContext->behaviors->scopedOperationCompletionShardingActions(opCtx);

@@ -145,21 +145,14 @@ std::unique_ptr<CatalogCacheMock> createCatalogCacheMock(OperationContext* opCtx
 
     const auto [chunks, chunkManager] = createChunks(nShards, nChunks, shards);
 
-    // Necessary to make usages of 'CollectionShardingState::get(opCtx, nss);' work
+    ShardingState::get(opCtx->getServiceContext())->setInitialized(originatorShard, clusterId);
+
     CollectionShardingStateFactory::set(
         opCtx->getServiceContext(),
         std::make_unique<CollectionShardingStateFactoryShard>(opCtx->getServiceContext()));
 
-    // necessary to make ShardingState::get(_serviceContext)->enabled() return true
-    ShardingState::get(opCtx->getServiceContext())->setInitialized(originatorShard, clusterId);
-
-    BSONObjBuilder builder;
-    chunkManager.getVersion(originatorShard)
-        .serializeToBSON(ChunkVersion::kShardVersionField, &builder);
-    // necessary to set the _shardVersions and _databaseVersions to true. Which is needed to get
-    // `getCollectionDescription` to work
-    OperationShardingState::get(opCtx).initializeClientRoutingVersionsFromCommand(kNss,
-                                                                                  builder.obj());
+    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+        kNss, chunkManager.getVersion(originatorShard), boost::none);
 
     // Configuring the filtering metadata such that calls to getCollectionDescription return what we
     // want. Specifically the reshardingFields are what we use. Its specified by the chunkManager.

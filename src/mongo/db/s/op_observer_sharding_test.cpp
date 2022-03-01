@@ -48,10 +48,8 @@ void setCollectionFilteringMetadata(OperationContext* opCtx, CollectionMetadata 
     CollectionShardingRuntime::get(opCtx, kTestNss)
         ->setFilteringMetadata(opCtx, std::move(metadata));
 
-    BSONObjBuilder builder;
-    version.serializeToBSON(ChunkVersion::kShardVersionField, &builder);
-    auto& oss = OperationShardingState::get(opCtx);
-    oss.initializeClientRoutingVersionsFromCommand(kTestNss, builder.obj());
+    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+        kTestNss, version, boost::none);
 }
 
 class DocumentKeyStateTest : public ShardServerTestFixture {

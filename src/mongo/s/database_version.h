@@ -43,6 +43,12 @@ namespace mongo {
  */
 class DatabaseVersion : public DatabaseVersionBase {
 public:
+    /**
+     * The name for the database version information field, which shard-aware commands should
+     * include if they want to convey database version.
+     */
+    static constexpr StringData kDatabaseVersionField = "databaseVersion"_sd;
+
     using DatabaseVersionBase::getTimestamp;
 
     DatabaseVersion() = default;

@@ -86,22 +86,6 @@ public:
     };
 
     /**
-     * Parses shardVersion and databaseVersion from 'cmdObj' and stores the results in this object
-     * along with the given namespace that is associated with the versions. Does nothing if no
-     * shardVersion or databaseVersion is attached to the command.
-     *
-     * Expects 'cmdObj' to have format
-     * { ...,
-     *   shardVersion: [<version>, <epoch>],
-     *   databaseVersion: { uuid: <UUID>, version: <int> },
-     * ...}
-     *
-     * This initialization may only be performed once for the lifetime of the object, which
-     * coincides with the lifetime of the client's request.
-     */
-    void initializeClientRoutingVersionsFromCommand(NamespaceString nss, const BSONObj& cmdObj);
-
-    /**
      * Stores the given shardVersion and databaseVersion for the given namespace. Note: The shard
      * version for the given namespace stored in the OperationShardingState can be overwritten if it
      * has not been checked yet.

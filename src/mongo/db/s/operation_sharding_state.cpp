@@ -43,8 +43,6 @@ const Milliseconds kMaxWaitForMigrationCriticalSection = Minutes(5);
 // Max time to wait for the movePrimary critical section to complete
 const Milliseconds kMaxWaitForMovePrimaryCriticalSection = Minutes(5);
 
-// The name of the field in which the client attaches its database version.
-constexpr auto kDbVersionField = "databaseVersion"_sd;
 }  // namespace
 
 OperationShardingState::OperationShardingState() = default;
@@ -60,28 +58,6 @@ OperationShardingState& OperationShardingState::get(OperationContext* opCtx) {
 bool OperationShardingState::isOperationVersioned(OperationContext* opCtx) {
     const auto& oss = get(opCtx);
     return !oss._shardVersions.empty();
-}
-
-void OperationShardingState::initializeClientRoutingVersionsFromCommand(NamespaceString nss,
-                                                                        const BSONObj& cmdObj) {
-    boost::optional<ChunkVersion> shardVersion;
-    boost::optional<DatabaseVersion> dbVersion;
-    const auto shardVersionElem = cmdObj.getField(ChunkVersion::kShardVersionField);
-    if (!shardVersionElem.eoo()) {
-        shardVersion = ChunkVersion::fromBSONPositionalOrNewerFormat(shardVersionElem);
-    }
-
-    const auto dbVersionElem = cmdObj.getField(kDbVersionField);
-    if (!dbVersionElem.eoo()) {
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "expected databaseVersion element to be an object, got "
-                              << dbVersionElem,
-                dbVersionElem.type() == BSONType::Object);
-
-        dbVersion = DatabaseVersion(dbVersionElem.Obj());
-    }
-
-    initializeClientRoutingVersions(nss, shardVersion, dbVersion);
 }
 
 void OperationShardingState::initializeClientRoutingVersions(
