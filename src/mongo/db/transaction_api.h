@@ -119,6 +119,14 @@ public:
      */
     virtual SemiFuture<std::vector<BSONObj>> exhaustiveFind(
         const FindCommandRequest& cmd) const = 0;
+
+    /**
+     * Whether the implementation expects to work in the client transaction context. The API
+     * currently assumes the client transaction was always started in the server before the API is
+     * invoked, which is true for service entry point clients, but may not be true for all possible
+     * implementations.
+     */
+    virtual bool supportsClientTransactionContext() const = 0;
 };
 
 using Callback =
@@ -232,6 +240,10 @@ public:
 
     virtual SemiFuture<std::vector<BSONObj>> exhaustiveFind(
         const FindCommandRequest& cmd) const override;
+
+    virtual bool supportsClientTransactionContext() const override {
+        return true;
+    }
 
 private:
     ServiceContext* const _serviceContext;

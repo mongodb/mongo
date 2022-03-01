@@ -481,7 +481,7 @@ void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
 
     _sessionInfo.serialize(cmdBuilder);
 
-    if (_state == TransactionState::kInit && _execContext != ExecutionContext::kClientTransaction) {
+    if (_state == TransactionState::kInit) {
         _state = TransactionState::kStarted;
         _sessionInfo.setStartTransaction(boost::none);
         cmdBuilder->append(repl::ReadConcernArgs::kReadConcernFieldName, _readConcern);
@@ -585,8 +585,21 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
         // mongos because only mongod checks out a transaction session for retryable writes.
         invariant(isMongos(), "This case is not yet supported on a mongod");
     } else {
+        // Note that we don't want to include startTransaction or any first transaction command
+        // fields because we assume that if we're in a client transaction the component tracking
+        // transactions on the process must have already been started (e.g. TransactionRouter or
+        // TransactionParticipant), so when the API sends commands for this transacion that
+        // component will attach the correct fields if targeting new participants. This assumes this
+        // case always uses a client that runs commands against the local process service entry
+        // point, which we verify with this invariant.
+        invariant(_txnClient->supportsClientTransactionContext());
+
         _setSessionInfo(lg, *clientSession, *clientTxnNumber, boost::none /* startTransaction */);
         _execContext = ExecutionContext::kClientTransaction;
+
+        // Skip directly to the started state since we assume the client already started this
+        // transaction.
+        _state = TransactionState::kStarted;
     }
     _sessionInfo.setAutocommit(false);
 

@@ -158,6 +158,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    virtual bool supportsClientTransactionContext() const override {
+        return true;
+    }
+
     BSONObj getLastSentRequest() {
         return _lastSentRequest;
     }
@@ -1212,6 +1216,150 @@ TEST_F(TxnAPITest, ClientRetryableWrite_RetryableWriteWithoutStmtIdFails) {
             return SemiFuture<void>::makeReady();
         });
     ASSERT_EQ(swResult.getStatus(), ErrorCodes::duplicateCodeForTest(6410500));
+}
+
+TEST_F(TxnAPITest, ClientTransaction_UsesClientTransactionOptionsAndDoesNotCommitOnSuccess) {
+    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    opCtx()->setTxnNumber(5);
+    opCtx()->setInMultiDocumentTransaction();
+    resetTxnWithRetries();
+
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+            ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+            assertTxnMetadata(mockClient()->getLastSentRequest(),
+                              *opCtx()->getTxnNumber(),
+                              boost::none /* startTransaction */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
+            ASSERT_EQ(*opCtx()->getLogicalSessionId(), getLsid(mockClient()->getLastSentRequest()));
+
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT(swResult.getStatus().isOK());
+    ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+
+    // No commit should have been sent.
+    auto lastRequest = mockClient()->getLastSentRequest();
+    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "insert"_sd);
+}
+
+TEST_F(TxnAPITest, ClientTransaction_DoesNotAppendStartTransactionFields) {
+    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    opCtx()->setTxnNumber(5);
+    opCtx()->setInMultiDocumentTransaction();
+
+    auto readConcern = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+    repl::ReadConcernArgs::get(opCtx()) = readConcern;
+
+    auto writeConcernOptions =
+        WriteConcernOptions{1, WriteConcernOptions::SyncMode::JOURNAL, Milliseconds{100}};
+    opCtx()->setWriteConcern(writeConcernOptions);
+
+    resetTxnWithRetries();
+
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+            ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+            assertTxnMetadata(mockClient()->getLastSentRequest(),
+                              *opCtx()->getTxnNumber(),
+                              boost::none /* startTransaction */,
+                              boost::none /* readConcern */,
+                              boost::none /* writeConcern */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
+            ASSERT_EQ(*opCtx()->getLogicalSessionId(), getLsid(mockClient()->getLastSentRequest()));
+
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT(swResult.getStatus().isOK());
+    ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+
+    // No commit should have been sent.
+    auto lastRequest = mockClient()->getLastSentRequest();
+    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "insert"_sd);
+}
+
+TEST_F(TxnAPITest, ClientTransaction_DoesNotBestEffortAbortOnFailure) {
+    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    opCtx()->setTxnNumber(5);
+    opCtx()->setInMultiDocumentTransaction();
+    resetTxnWithRetries();
+
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+            ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+            assertTxnMetadata(mockClient()->getLastSentRequest(),
+                              *opCtx()->getTxnNumber(),
+                              boost::none /* startTransaction */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
+            ASSERT_EQ(*opCtx()->getLogicalSessionId(), getLsid(mockClient()->getLastSentRequest()));
+
+            // Trigger mock error retry to verify the API does not best effort abort.
+            uasserted(ErrorCodes::InternalError, "Mock error");
+
+            return SemiFuture<void>::makeReady();
+        });
+    // The error should have been propagated.
+    ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
+
+    // No best effort abort should have been sent.
+    auto lastRequest = mockClient()->getLastSentRequest();
+    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "insert"_sd);
+}
+
+TEST_F(TxnAPITest, ClientTransaction_DoesNotRetryOnTransientErrors) {
+    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    opCtx()->setTxnNumber(5);
+    opCtx()->setInMultiDocumentTransaction();
+    resetTxnWithRetries();
+
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+            ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+            assertTxnMetadata(mockClient()->getLastSentRequest(),
+                              *opCtx()->getTxnNumber(),
+                              boost::none /* startTransaction */);
+            assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
+            ASSERT_EQ(*opCtx()->getLogicalSessionId(), getLsid(mockClient()->getLastSentRequest()));
+
+            // Trigger transient error retry to verify the API does not retry.
+            uasserted(ErrorCodes::HostUnreachable, "Mock network error");
+
+            return SemiFuture<void>::makeReady();
+        });
+    // The transient error should have been propagated.
+    ASSERT_EQ(swResult.getStatus(), ErrorCodes::HostUnreachable);
+
+    // No best effort abort should have been sent.
+    auto lastRequest = mockClient()->getLastSentRequest();
+    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "insert"_sd);
 }
 
 }  // namespace
