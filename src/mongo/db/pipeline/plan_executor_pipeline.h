@@ -64,6 +64,15 @@ public:
         return _expCtx->ns;
     }
 
+    const std::vector<NamespaceStringOrUUID>& getSecondaryNamespaces() const final {
+        // Return a reference to an empty static array. This array will never contain any elements
+        // because even though a PlanExecutorPipeline can reference multiple collections, it never
+        // takes any locks over said namespaces (this is the responsibility of DocumentSources
+        // which internally manage their own PlanExecutors).
+        const static std::vector<NamespaceStringOrUUID> emptyNssVector;
+        return emptyNssVector;
+    }
+
     OperationContext* getOpCtx() const override {
         return _expCtx->opCtx;
     }

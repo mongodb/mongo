@@ -114,13 +114,12 @@ namespace {
  * Lookup stages are extracted from the pipeline when all of the following conditions are met:
  *    0. When the 'internalQueryForceClassicEngine' feature flag is 'false'.
  *    1. When the 'featureFlagSBELookupPushdown' feature flag is 'true'.
- *    2. When the 'internalEnableMultipleAutoGetCollections' flag is 'true'
- *    3. The $lookup uses only the 'localField'/'foreignField' syntax (no pipelines).
- *    4. The foreign collection is neither sharded nor a view.
+ *    2. The $lookup uses only the 'localField'/'foreignField' syntax (no pipelines).
+ *    3. The foreign collection is neither sharded nor a view.
  */
 std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleStagesForPushdown(
     const intrusive_ptr<ExpressionContext>& expCtx,
-    const MultiCollection& collections,
+    const MultipleCollectionAccessor& collections,
     const CanonicalQuery* cq,
     Pipeline* pipeline) {
     // We will eventually use the extracted group stages to populate 'CanonicalQuery::pipeline'
@@ -139,12 +138,15 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
 
     auto&& sources = pipeline->getSources();
 
+    const auto groupFeatureFlagEnabled = feature_flags::gFeatureFlagSBEGroupPushdown.isEnabled(
+        serverGlobalParams.featureCompatibility);
+    const auto lookupFeatureFlagEnabled =
+        feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV();
     for (auto itr = sources.begin(); itr != sources.end();) {
         // $group pushdown logic.
         if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(itr->get())) {
-            bool groupEligibleForPushdown = feature_flags::gFeatureFlagSBEGroupPushdown.isEnabled(
-                                                serverGlobalParams.featureCompatibility) &&
-                groupStage->sbeCompatible() && !groupStage->doingMerge();
+            bool groupEligibleForPushdown =
+                groupFeatureFlagEnabled && groupStage->sbeCompatible() && !groupStage->doingMerge();
             if (groupEligibleForPushdown) {
                 stagesForPushdown.push_back(std::make_unique<InnerPipelineStageImpl>(groupStage));
                 sources.erase(itr++);
@@ -155,22 +157,30 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
 
         // $lookup pushdown logic.
         if (auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(itr->get())) {
+            // If lookup pushdown isn't enabled, then neither this stage nor any subsequent stages
+            // will be eligible for pushdown. As such, we early return to avoid unnecessary work.
+            if (!lookupFeatureFlagEnabled) {
+                break;
+            }
+
             bool isForeignSharded = false;
-            bool isForeignView = false;
             const auto& fromNs = lookupStage->getFromNs();
             const auto& foreignColl = collections.lookupCollection(fromNs);
             if (foreignColl) {
                 isForeignSharded = foreignColl.isSharded();
-            } else {
-                // If the right hand side targets a namespace that we can't find in
-                // 'collections', we infer that it is targeting a view.
-                isForeignView = true;
             }
 
-            bool lookupEligibleForPushdown =
-                feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV() &&
-                internalEnableMultipleAutoGetCollections.load() && lookupStage->sbeCompatible() &&
-                !isForeignSharded && !isForeignView;
+            // When acquiring locks for multiple collections, it is the case that we can only
+            // determine whether any secondary collection is a view or is sharded, not which ones
+            // are a view or are sharded and which ones aren't. As such, if any secondary collection
+            // is a view or is sharded, no $lookup will be eligible for pushdown.
+            // Note that we still check 'isForeignSharded' because this flag will be accurate in
+            // the event that the main collection is a secondary collection.
+            // Also note that 'lookupStage->sbeCompatible()' encodes whether the foreign
+            // collection is a view.
+            bool lookupEligibleForPushdown = lookupFeatureFlagEnabled &&
+                lookupStage->sbeCompatible() && !isForeignSharded &&
+                !collections.isAnySecondaryNamespaceAViewOrSharded();
             if (lookupEligibleForPushdown) {
                 stagesForPushdown.push_back(std::make_unique<InnerPipelineStageImpl>(lookupStage));
                 sources.erase(itr++);
@@ -188,7 +198,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleSt
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExecutor(
     const intrusive_ptr<ExpressionContext>& expCtx,
-    const MultiCollection& collections,
+    const MultipleCollectionAccessor& collections,
     const NamespaceString& nss,
     BSONObj queryObj,
     BSONObj projectionObj,
@@ -662,7 +672,7 @@ PipelineD::buildInnerQueryExecutorSample(DocumentSourceSample* sampleStage,
 }
 
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-PipelineD::buildInnerQueryExecutor(const MultiCollection& collections,
+PipelineD::buildInnerQueryExecutor(const MultipleCollectionAccessor& collections,
                                    const NamespaceString& nss,
                                    const AggregateCommandRequest* aggRequest,
                                    Pipeline* pipeline) {
@@ -703,7 +713,7 @@ PipelineD::buildInnerQueryExecutor(const MultiCollection& collections,
 }
 
 void PipelineD::attachInnerQueryExecutorToPipeline(
-    const MultiCollection& collections,
+    const MultipleCollectionAccessor& collections,
     PipelineD::AttachExecutorCallback attachExecutorCallback,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     Pipeline* pipeline) {
@@ -717,7 +727,7 @@ void PipelineD::attachInnerQueryExecutorToPipeline(
 }
 
 void PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
-    const MultiCollection& collections,
+    const MultipleCollectionAccessor& collections,
     const NamespaceString& nss,
     const AggregateCommandRequest* aggRequest,
     Pipeline* pipeline) {
@@ -853,7 +863,7 @@ auto buildProjectionForPushdown(const DepsTracker& deps,
 }  // namespace
 
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-PipelineD::buildInnerQueryExecutorGeneric(const MultiCollection& collections,
+PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& collections,
                                           const NamespaceString& nss,
                                           const AggregateCommandRequest* aggRequest,
                                           Pipeline* pipeline) {
@@ -944,7 +954,7 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultiCollection& collections,
 }
 
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-PipelineD::buildInnerQueryExecutorGeoNear(const MultiCollection& collections,
+PipelineD::buildInnerQueryExecutorGeoNear(const MultipleCollectionAccessor& collections,
                                           const NamespaceString& nss,
                                           const AggregateCommandRequest* aggRequest,
                                           Pipeline* pipeline) {
@@ -1007,7 +1017,7 @@ PipelineD::buildInnerQueryExecutorGeoNear(const MultiCollection& collections,
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prepareExecutor(
     const intrusive_ptr<ExpressionContext>& expCtx,
-    const MultiCollection& collections,
+    const MultipleCollectionAccessor& collections,
     const NamespaceString& nss,
     Pipeline* pipeline,
     const boost::intrusive_ptr<DocumentSourceSort>& sortStage,

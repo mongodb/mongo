@@ -41,7 +41,7 @@
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/multi_collection.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor.h"
 
 namespace mongo {
@@ -94,7 +94,7 @@ public:
      * 'nullptr'.
      */
     static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-    buildInnerQueryExecutor(const MultiCollection& collections,
+    buildInnerQueryExecutor(const MultipleCollectionAccessor& collections,
                             const NamespaceString& nss,
                             const AggregateCommandRequest* aggRequest,
                             Pipeline* pipeline);
@@ -107,7 +107,7 @@ public:
      * collections.
      */
     static void attachInnerQueryExecutorToPipeline(
-        const MultiCollection& collection,
+        const MultipleCollectionAccessor& collection,
         AttachExecutorCallback attachExecutorCallback,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
         Pipeline* pipeline);
@@ -119,7 +119,7 @@ public:
      * can be created right after building the executor.
      */
     static void buildAndAttachInnerQueryExecutorToPipeline(
-        const MultiCollection& collections,
+        const MultipleCollectionAccessor& collections,
         const NamespaceString& nss,
         const AggregateCommandRequest* aggRequest,
         Pipeline* pipeline);
@@ -168,7 +168,7 @@ private:
      * the 'pipeline'.
      */
     static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-    buildInnerQueryExecutorGeneric(const MultiCollection& collections,
+    buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& collections,
                                    const NamespaceString& nss,
                                    const AggregateCommandRequest* aggRequest,
                                    Pipeline* pipeline);
@@ -177,8 +177,8 @@ private:
      * Creates a PlanExecutor to be used in the initial cursor source. This function will try to
      * push down the $sort, $project, $match and $limit stages into the PlanStage layer whenever
      * possible. In this case, these stages will be incorporated into the PlanExecutor. Note that
-     * this function takes a 'MultiCollection' because certain $lookup stages that reference
-     * multiple collections may be eligible for pushdown in the PlanExecutor.
+     * this function takes a 'MultipleCollectionAccessor' because certain $lookup stages that
+     * reference multiple collections may be eligible for pushdown in the PlanExecutor.
      *
      * Set 'rewrittenGroupStage' when the pipeline uses $match+$sort+$group stages that are
      * compatible with a DISTINCT_SCAN plan that visits the first document in each group
@@ -189,7 +189,7 @@ private:
      */
     static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const MultiCollection& collections,
+        const MultipleCollectionAccessor& collections,
         const NamespaceString& nss,
         Pipeline* pipeline,
         const boost::intrusive_ptr<DocumentSourceSort>& sortStage,
@@ -207,12 +207,12 @@ private:
      * defined on 'collections' does not exist, as the $geoNearCursor requires a 2d or 2dsphere
      * index.
      *
-     * Note that this method takes a 'MultiCollection' even though DocumentSourceGeoNearCursor
-     * only operates over a single collection because the underlying execution API expects a
-     * 'MultiCollection'.
+     * Note that this method takes a 'MultipleCollectionAccessor' even though
+     * DocumentSourceGeoNearCursor only operates over a single collection because the underlying
+     * execution API expects a 'MultipleCollectionAccessor'.
      */
     static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-    buildInnerQueryExecutorGeoNear(const MultiCollection& collections,
+    buildInnerQueryExecutorGeoNear(const MultipleCollectionAccessor& collections,
                                    const NamespaceString& nss,
                                    const AggregateCommandRequest* aggRequest,
                                    Pipeline* pipeline);

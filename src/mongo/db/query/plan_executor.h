@@ -170,6 +170,11 @@ public:
     virtual const NamespaceString& nss() const = 0;
 
     /**
+     * Returns a vector of secondary namespaces that are relevant to this executor.
+     */
+    virtual const std::vector<NamespaceStringOrUUID>& getSecondaryNamespaces() const = 0;
+
+    /**
      * Return the OperationContext that the plan is currently executing within.
      */
     virtual OperationContext* getOpCtx() const = 0;

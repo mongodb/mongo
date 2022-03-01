@@ -137,12 +137,15 @@ void DocumentSourceCursor::loadBatch() {
     PlanExecutor::ExecState state;
     Document resultObj;
 
-    // TODO SERVER-62798: Replace this with 'AutoGetCollectionMulti'.
     boost::optional<AutoGetCollectionForReadMaybeLockFree> autoColl;
     tassert(5565800,
             "Expected PlanExecutor to use an external lock policy",
             _exec->lockPolicy() == PlanExecutor::LockPolicy::kLockExternally);
-    autoColl.emplace(pExpCtx->opCtx, _exec->nss());
+    autoColl.emplace(pExpCtx->opCtx,
+                     _exec->nss(),
+                     AutoGetCollectionViewMode::kViewsForbidden,
+                     Date_t::max(),
+                     _exec->getSecondaryNamespaces());
     uassertStatusOK(repl::ReplicationCoordinator::get(pExpCtx->opCtx)
                         ->checkCanServeReadsFor(pExpCtx->opCtx, _exec->nss(), true));
 

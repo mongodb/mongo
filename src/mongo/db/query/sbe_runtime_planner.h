@@ -33,8 +33,9 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/query/all_indices_required_checker.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/multi_collection.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 
@@ -77,7 +78,7 @@ public:
 class BaseRuntimePlanner : public RuntimePlanner {
 public:
     BaseRuntimePlanner(OperationContext* opCtx,
-                       const MultiCollection& collections,
+                       const MultipleCollectionAccessor& collections,
                        const CanonicalQuery& cq,
                        const QueryPlannerParams& queryParams,
                        PlanYieldPolicySBE* yieldPolicy)
@@ -133,7 +134,7 @@ protected:
         size_t maxTrialPeriodNumReads);
 
     OperationContext* const _opCtx;
-    const MultiCollection& _collections;
+    const MultipleCollectionAccessor& _collections;
     const CanonicalQuery& _cq;
     const QueryPlannerParams _queryParams;
     PlanYieldPolicySBE* const _yieldPolicy;

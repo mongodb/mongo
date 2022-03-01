@@ -441,7 +441,7 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(Pipeline*
                      Date_t::max(),
                      AutoStatsTracker::LogMode::kUpdateTop);
 
-    MultiCollection holder{autoColl->getCollection()};
+    MultipleCollectionAccessor holder{autoColl->getCollection()};
     PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
         holder, expCtx->ns, nullptr, pipeline.get());
 

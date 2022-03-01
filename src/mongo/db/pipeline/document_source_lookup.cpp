@@ -1265,8 +1265,9 @@ intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
                                                     pExpCtx);
 
         // $lookup stages with local/foreignField specified are eligible for pushdown into SBE if
-        // the context allows it.
-        lookupStage->_sbeCompatible = pExpCtx->sbeCompatible;
+        // the context allows it and 'fromNs' does not correspond to a view.
+        lookupStage->_sbeCompatible = pExpCtx->sbeCompatible &&
+            pExpCtx->getResolvedNamespace(lookupStage->_fromNs).pipeline.empty();
         return lookupStage;
     }
 }

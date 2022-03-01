@@ -230,6 +230,14 @@ const NamespaceString& PlanExecutorImpl::nss() const {
     return _nss;
 }
 
+const std::vector<NamespaceStringOrUUID>& PlanExecutorImpl::getSecondaryNamespaces() const {
+    // Return a reference to an empty static array. This array will never contain any elements
+    // because a PlanExecutorImpl is only capable of executing against a single namespace. As
+    // such, it will never lock more than one namespace.
+    const static std::vector<NamespaceStringOrUUID> emptyNssVector;
+    return emptyNssVector;
+}
+
 OperationContext* PlanExecutorImpl::getOpCtx() const {
     return _opCtx;
 }

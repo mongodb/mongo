@@ -531,7 +531,7 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyEx
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     const LiteParsedPipeline& liteParsedPipeline,
     const NamespaceString& nss,
-    const MultiCollection& collections,
+    const MultipleCollectionAccessor& collections,
     const AggregateCommandRequest& request,
     CurOp* curOp,
     const std::function<void(void)>& resetContextFn) {
@@ -622,12 +622,17 @@ Status runAggregate(OperationContext* opCtx,
 
     // For operations on views, this will be the underlying namespace.
     NamespaceString nss = request.getNamespace();
-    stdx::unordered_set<NamespaceString> secondaryExecNssList;
 
     // Determine if this aggregation has foreign collections that the execution subsystem needs
     // to be aware of.
-    if (internalEnableMultipleAutoGetCollections.load()) {
-        liteParsedPipeline.getForeignExecutionNamespaces(secondaryExecNssList);
+    std::vector<NamespaceStringOrUUID> secondaryExecNssList;
+
+    // Taking locks over multiple collections is not supported in a transaction, nor is it
+    // supported outside of $lookup pushdown.
+    // TODO SERVER-64038: Remove this clause once MODE_IX multi-collection locking is supported.
+    if (!opCtx->inMultiDocumentTransaction() &&
+        feature_flags::gFeatureFlagSBELookupPushdown.isEnabledAndIgnoreFCV()) {
+        secondaryExecNssList = liteParsedPipeline.getForeignExecutionNamespaces();
     }
 
     // The collation to use for this aggregation. boost::optional to distinguish between the case
@@ -642,30 +647,24 @@ Status runAggregate(OperationContext* opCtx,
     // connection is out of date. If the namespace is a view, the lock will be released before
     // re-running the expanded aggregation.
     boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
-
-    // Vector of AutoGets for secondary collections. At the moment, this is internal to testing
-    // only because eventually, this will be replaced by 'AutoGetCollectionMulti'.
-    // TODO SERVER-62798: Replace this and the above AutoGet with 'AutoGetCollectionMulti'.
-    std::vector<std::unique_ptr<AutoGetCollectionForReadCommandMaybeLockFree>> secondaryCtx;
-    MultiCollection collections;
+    MultipleCollectionAccessor collections;
 
     auto initContext = [&](AutoGetCollectionViewMode m) -> void {
-        ctx.emplace(opCtx, nss, m);
-        for (const auto& ns : secondaryExecNssList) {
-            // Avoid locking the main namespace multiple times (we can't lock a secondary
-            // namespace multiple times because 'secondaryExecNssList is a set already). This
-            // emulates the behavior of 'AutoGetCollectionMulti'.
-            if (ns != nss) {
-                secondaryCtx.emplace_back(
-                    std::make_unique<AutoGetCollectionForReadCommandMaybeLockFree>(opCtx, ns, m));
-            }
-        }
-        collections = MultiCollection(ctx, secondaryCtx);
+        ctx.emplace(opCtx,
+                    nss,
+                    m,
+                    Date_t::max(),
+                    AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                    secondaryExecNssList);
+        collections = MultipleCollectionAccessor(opCtx,
+                                                 &ctx->getCollection(),
+                                                 ctx->getNss(),
+                                                 ctx->isAnySecondaryNamespaceAViewOrSharded(),
+                                                 secondaryExecNssList);
     };
 
     auto resetContext = [&]() -> void {
         ctx.reset();
-        secondaryCtx.clear();
         collections.clear();
     };
 
@@ -742,10 +741,9 @@ Status runAggregate(OperationContext* opCtx,
                 opCtx, request.getCollation().get_value_or(BSONObj()), nullptr);
             collatorToUse.emplace(std::move(collator));
             collatorToUseMatchesDefault = match;
-            tassert(6235101, "A collection-less aggregate should not take any locks", !ctx);
-            tassert(6235102,
-                    "A collection-less aggregate should not take any secondary locks",
-                    secondaryCtx.empty());
+            tassert(6235101,
+                    "A collection-less aggregate should not take any locks",
+                    ctx == boost::none);
         } else {
             // This is a regular aggregation. Lock the collection or view.
             initContext(AutoGetCollectionViewMode::kViewsPermitted);

@@ -45,7 +45,7 @@ namespace mongo::sbe {
 class CachedSolutionPlanner final : public BaseRuntimePlanner {
 public:
     CachedSolutionPlanner(OperationContext* opCtx,
-                          const MultiCollection& collections,
+                          const MultipleCollectionAccessor& collections,
                           const CanonicalQuery& cq,
                           const QueryPlannerParams& queryParams,
                           size_t decisionReads,

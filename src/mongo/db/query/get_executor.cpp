@@ -381,7 +381,9 @@ void fillOutPlannerParams(OperationContext* opCtx,
 }
 
 std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsInformation(
-    OperationContext* opCtx, const MultiCollection& collections, CanonicalQuery* canonicalQuery) {
+    OperationContext* opCtx,
+    const MultipleCollectionAccessor& collections,
+    CanonicalQuery* canonicalQuery) {
     std::map<NamespaceString, SecondaryCollectionInfo> infoMap;
     bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
     auto fillOutSecondaryInfo = [&](const NamespaceString& nss,
@@ -410,7 +412,7 @@ std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsIn
 }
 
 void fillOutPlannerParams(OperationContext* opCtx,
-                          const MultiCollection& collections,
+                          const MultipleCollectionAccessor& collections,
                           CanonicalQuery* canonicalQuery,
                           QueryPlannerParams* plannerParams) {
     fillOutPlannerParams(opCtx, collections.getMainCollection(), canonicalQuery, plannerParams);
@@ -983,7 +985,7 @@ public:
     using PrepareExecutionHelper::PrepareExecutionHelper;
 
     SlotBasedPrepareExecutionHelper(OperationContext* opCtx,
-                                    const MultiCollection& collections,
+                                    const MultipleCollectionAccessor& collections,
                                     CanonicalQuery* cq,
                                     PlanYieldPolicy* yieldPolicy,
                                     size_t plannerOptions)
@@ -1179,7 +1181,7 @@ protected:
     }
 
 private:
-    const MultiCollection& _collections;
+    const MultipleCollectionAccessor& _collections;
 };
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecutor(
@@ -1222,7 +1224,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecu
  */
 std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     OperationContext* opCtx,
-    const MultiCollection& collections,
+    const MultipleCollectionAccessor& collections,
     CanonicalQuery* canonicalQuery,
     size_t numSolutions,
     boost::optional<size_t> decisionWorks,
@@ -1293,7 +1295,7 @@ std::unique_ptr<PlanYieldPolicySBE> makeSbeYieldPolicy(
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExecutor(
     OperationContext* opCtx,
-    const MultiCollection& collections,
+    const MultipleCollectionAccessor& collections,
     std::unique_ptr<CanonicalQuery> cq,
     std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy requestedYieldPolicy,
@@ -1338,7 +1340,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
         return plan_executor_factory::make(opCtx,
                                            std::move(cq),
                                            std::move(candidates),
-                                           mainColl,
+                                           collections,
                                            plannerOptions,
                                            std::move(nss),
                                            std::move(yieldPolicy));
@@ -1364,7 +1366,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                        std::move(solutions[0]),
                                        std::move(roots[0]),
                                        {},
-                                       mainColl,
+                                       collections,
                                        plannerOptions,
                                        std::move(nss),
                                        std::move(yieldPolicy));
@@ -1373,7 +1375,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     OperationContext* opCtx,
-    const MultiCollection& collections,
+    const MultipleCollectionAccessor& collections,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
@@ -1399,7 +1401,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
-    MultiCollection multi{collection};
+    MultipleCollectionAccessor multi{collection};
     return getExecutor(opCtx,
                        multi,
                        std::move(canonicalQuery),
@@ -1414,7 +1416,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
     OperationContext* opCtx,
-    const MultiCollection& collections,
+    const MultipleCollectionAccessor& collections,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
     bool permitYield,
@@ -1442,7 +1444,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
     bool permitYield,
     size_t plannerOptions) {
-    MultiCollection multi{*coll};
+    MultipleCollectionAccessor multi{*coll};
     return getExecutorFind(opCtx,
                            multi,
                            std::move(canonicalQuery),

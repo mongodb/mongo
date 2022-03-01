@@ -120,15 +120,16 @@ public:
         }
 
         root->attachToOperationContext(opCtx);
-        exec = uassertStatusOK(plan_executor_factory::make(opCtx,
-                                                           std::move(cq),
-                                                           nullptr,
-                                                           {std::move(root), std::move(data)},
-                                                           {},
-                                                           &CollectionPtr::null,
-                                                           false, /* returnOwnedBson */
-                                                           nss,
-                                                           nullptr));
+        exec = uassertStatusOK(
+            plan_executor_factory::make(opCtx,
+                                        std::move(cq),
+                                        nullptr,
+                                        {std::move(root), std::move(data)},
+                                        {},
+                                        MultipleCollectionAccessor(CollectionPtr::null),
+                                        false, /* returnOwnedBson */
+                                        nss,
+                                        nullptr));
         for (long long objCount = 0; objCount < batchSize; objCount++) {
             BSONObj next;
             PlanExecutor::ExecState state = exec->getNext(&next, nullptr);

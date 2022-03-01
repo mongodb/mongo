@@ -8,3 +8,6 @@
 # Disable featureFlagRequireTenantID until all paths pass tenant id to TenantNamespace
 # and TenantDatabase constructors.
 - featureFlagRequireTenantID
+# Disable featureFlagSBELookupPushdown until integration tests can pass with basic SBE
+# lookup translation.
+- featureFlagSBELookupPushdown

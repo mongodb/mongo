@@ -67,6 +67,7 @@ public:
     virtual ~PlanExecutorImpl();
     CanonicalQuery* getCanonicalQuery() const final;
     const NamespaceString& nss() const final;
+    const std::vector<NamespaceStringOrUUID>& getSecondaryNamespaces() const final;
     OperationContext* getOpCtx() const final;
     void saveState() final;
     void restoreState(const RestoreContext& context) final;

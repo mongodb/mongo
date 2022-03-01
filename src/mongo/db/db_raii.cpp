@@ -898,6 +898,11 @@ const NamespaceString& AutoGetCollectionForReadCommandMaybeLockFree::getNss() co
     }
 }
 
+bool AutoGetCollectionForReadCommandMaybeLockFree::isAnySecondaryNamespaceAViewOrSharded() const {
+    return _autoGet ? _autoGet->isAnySecondaryNamespaceAViewOrSharded()
+                    : _autoGetLockFree->isAnySecondaryNamespaceAViewOrSharded();
+}
+
 AutoReadLockFree::AutoReadLockFree(OperationContext* opCtx, Date_t deadline)
     : _catalogStash(opCtx),
       _lockFreeReadsBlock(opCtx),

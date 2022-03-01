@@ -1,5 +1,7 @@
 /**
  * Tests basic functionality of pushing $lookup into the find layer.
+ *
+ * @tags: [requires_sharding]
  */
 (function() {
 "use strict";
@@ -13,10 +15,11 @@ const JoinAlgorithm = {
 };
 
 // Standalone cases.
-const conn = MongoRunner.runMongod({setParameter: "internalEnableMultipleAutoGetCollections=true"});
+const conn = MongoRunner.runMongod({setParameter: "featureFlagSBELookupPushdown=true"});
 assert.neq(null, conn, "mongod was unable to start up");
 const name = "lookup_pushdown";
-let db = conn.getDB(name);
+const foreignCollName = "foreign_lookup_pushdown";
+const viewName = "view_lookup_pushdown";
 
 function runTest(coll, pipeline, expectedCode, aggOptions = {}, errMsgRegex = null) {
     const options = Object.assign({pipeline, cursor: {}}, aggOptions);
@@ -34,14 +37,14 @@ function runTest(coll, pipeline, expectedCode, aggOptions = {}, errMsgRegex = nu
     }
 }
 
+let db = conn.getDB(name);
 if (!checkSBEEnabled(db, ["featureFlagSBELookupPushdown"])) {
-    jsTestLog("Skipping test because the sbe lookup pushdown feature flag is disabled");
+    jsTestLog("Skipping test because either the sbe lookup pushdown feature flag is disabled or" +
+              " sbe itself is disabled");
     MongoRunner.stopMongod(conn);
     return;
 }
 
-const foreignCollName = "foreign_lookup_pushdown";
-const viewName = "view_lookup_pushdown";
 let coll = db[name];
 assert.commandWorked(coll.insert({_id: 1, a: 2}));
 let foreignColl = db[foreignCollName];
@@ -52,6 +55,11 @@ let view = db[viewName];
 // Basic $lookup.
 runTest(coll,
         [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        JoinAlgorithm.NLJ /* expectedCode */);
+
+// $lookup against a non-existent foreign collection. This $lookup is expected to be pushed down.
+runTest(coll,
+        [{$lookup: {from: "nonexistentColl", localField: "a", foreignField: "b", as: "out"}}],
         JoinAlgorithm.NLJ /* expectedCode */);
 
 // Self join $lookup, no views.
@@ -108,7 +116,7 @@ runTest(coll,
         ],
         JoinAlgorithm.NLJ /* expectedCode */);
 
-// Consecutive $lookups (first is against view).
+// Consecutive $lookups, where the first $lookup is against a view.
 runTest(coll,
         [
             {$lookup: {from: viewName, localField: "a", foreignField: "b", as: "out"}},
@@ -116,13 +124,15 @@ runTest(coll,
         ],
         false /* expectedCode */);
 
-// Consecutive $lookups (first is against regular collection).
+// Consecutive $lookups, where the first $lookup is against a regular collection. Here, neither
+// $lookup is eligible for pushdown because currently, we can only know whether any secondary
+// collection is a view or a sharded collection.
 runTest(coll,
         [
             {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}},
             {$lookup: {from: viewName, localField: "a", foreignField: "b", as: "out"}}
         ],
-        JoinAlgorithm.NLJ /* expectedCode */);
+        false /* expectedCode */);
 
 // $lookup with pipeline.
 runTest(coll,
@@ -280,7 +290,7 @@ MongoRunner.stopMongod(conn);
 const st = new ShardingTest({
     shards: 2,
     mongos: 1,
-    other: {shardOptions: {setParameter: "internalEnableMultipleAutoGetCollections=true"}}
+    other: {shardOptions: {setParameter: "featureFlagSBELookupPushdown=true"}}
 });
 db = st.s.getDB(name);
 

@@ -47,9 +47,9 @@ public:
                     std::unique_ptr<CanonicalQuery> cq,
                     std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
                     sbe::CandidatePlans candidates,
-                    const CollectionPtr& collection,
                     bool returnOwnedBson,
                     NamespaceString nss,
+                    std::vector<NamespaceStringOrUUID> secondaryNssVector,
                     bool isOpen,
                     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
 
@@ -59,6 +59,10 @@ public:
 
     const NamespaceString& nss() const override {
         return _nss;
+    }
+
+    const std::vector<NamespaceStringOrUUID>& getSecondaryNamespaces() const final {
+        return _secondaryNssVector;
     }
 
     OperationContext* getOpCtx() const override {
@@ -148,6 +152,9 @@ private:
     OperationContext* _opCtx;
 
     NamespaceString _nss;
+
+    // Vector of secondary namespaces.
+    std::vector<NamespaceStringOrUUID> _secondaryNssVector{};
     const bool _mustReturnOwnedBson;
 
     // CompileCtx owns the instance pointed by _env, so we must keep it around.

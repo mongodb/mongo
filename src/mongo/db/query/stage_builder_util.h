@@ -52,7 +52,7 @@ std::unique_ptr<PlanStage> buildClassicExecutableTree(OperationContext* opCtx,
 
 std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>
 buildSlotBasedExecutableTree(OperationContext* opCtx,
-                             const MultiCollection& collections,
+                             const MultipleCollectionAccessor& collections,
                              const CanonicalQuery& cq,
                              const QuerySolution& solution,
                              PlanYieldPolicy* yieldPolicy);

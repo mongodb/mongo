@@ -269,7 +269,7 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
         nullptr /*solution*/,
         {std::move(sbePlan), std::move(data)},
         std::make_unique<ABTPrinter>(std::move(abtTree), phaseManager.getNodeToGroupPropsMap()),
-        &collection,
+        MultipleCollectionAccessor(collection),
         QueryPlannerParams::Options::DEFAULT,
         nss,
         std::move(yieldPolicy)));

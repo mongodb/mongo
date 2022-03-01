@@ -77,8 +77,8 @@ public:
     }
 
     /**
-     * Inserts the foreign collections(s) referenced by this stage that potentially will be involved
-     * in query execution, if any, into 'nssSet'. For example, consider the pipeline:
+     * Returns a vector of the foreign collections(s) referenced by this stage that potentially will
+     * be involved in query execution, if any. For example, consider the pipeline:
      *
      * [{$lookup: {from: "bar", localField: "a", foreignField: "b", as: "output"}},
      *  {$unionWith: {coll: "foo", pipeline: [...]}}].
@@ -87,10 +87,12 @@ public:
      * pushed down into the execution subsystem underneath the leading cursor stage, while "bar"
      * is considered one because "$lookup" can be pushed down in certain cases.
      */
-    void getForeignExecutionNamespaces(stdx::unordered_set<NamespaceString>& nssSet) const {
+    std::vector<NamespaceStringOrUUID> getForeignExecutionNamespaces() const {
+        stdx::unordered_set<NamespaceString> nssSet;
         for (auto&& spec : _stageSpecs) {
             spec->getForeignExecutionNamespaces(nssSet);
         }
+        return {nssSet.begin(), nssSet.end()};
     }
 
     /**

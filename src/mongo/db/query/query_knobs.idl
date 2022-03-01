@@ -693,13 +693,6 @@ server_parameters:
     validator:
         gt: 0
 
-  internalEnableMultipleAutoGetCollections:
-    description: "Test only parameter to enable taking multiple AutoGetCollections in runAggregate"
-    set_at: [ startup, runtime ]
-    cpp_varname: "internalEnableMultipleAutoGetCollections"
-    cpp_vartype: AtomicWord<bool>
-    default: false
-
   internalQueryEnableSamplingCardinalityEstimator:
     description: "Set to use the sampling-based method for estimating cardinality in the Cascades
     optimizer."

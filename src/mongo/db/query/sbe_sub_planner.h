@@ -45,7 +45,7 @@ namespace mongo::sbe {
 class SubPlanner final : public BaseRuntimePlanner {
 public:
     SubPlanner(OperationContext* opCtx,
-               const MultiCollection& collections,
+               const MultipleCollectionAccessor& collections,
                const CanonicalQuery& cq,
                const QueryPlannerParams& queryParams,
                PlanYieldPolicySBE* yieldPolicy)
