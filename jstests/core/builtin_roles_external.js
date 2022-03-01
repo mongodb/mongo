@@ -1,6 +1,6 @@
 /**
  * Attempting to enumerate roles on the $external database should return an empty set.
- * @tags: [requires_fcv_60,tenant_migration_incompatible]
+ * @tags: [multiversion_incompatible,tenant_migration_incompatible]
  */
 (function() {
 "use strict";
