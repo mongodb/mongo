@@ -1520,7 +1520,8 @@ in-memory state to what it was prior to the rollback in order to fulfill the dur
 of prepared transactions.
 
 At this point, the last applied and durable OpTimes still point to the divergent branch of history,
-so we must update them to be at the top of the oplog, which should be the `common point`.
+so we must update them to be at the top of the oplog (the latest entry in the oplog), which should
+be the `common point`.
 
 Now, we can trigger the rollback `OpObserver` and notify any external subsystems that a rollback has
 occurred. For example, the config server must update its shard registry in order to make sure it
@@ -1796,10 +1797,9 @@ happens during the backup, the backup cursor will be killed and initial sync wil
 attempt if it hasn't run out of attempts.
 
 Once we have caught up -- that is, after cloning the files, the lastAppliedOpTime of the sync source
-is within `fileBasedInitialSyncMaxLagSec` of the top of the oplog in the backup files we just
-finished cloning -- or exhausted our number of cycles, we stop the task which refreshes the backup
-cursor, and kill the backup cursor on the sync source.  The rest of FCBIS does not need the sync
-source; everything is local.
+is within `fileBasedInitialSyncMaxLagSec` of the top of the oplog (the latest entry in the oplog) in
+the backup files we just finished cloning -- or exhausted our number of cycles, we stop the task
+which refreshes the backup cursor, and kill the backup cursor on the sync source.  The rest of FCBIS does not need the sync source; everything is local.
 
 ### Cloning the files
 
@@ -1846,8 +1846,9 @@ In `_cleanUpLocalCollectionsAfterSync`, we do the following:
 
 After `_cleanUpLocalCollectionsAfterSync`, we release the global lock and call
 `_replicationStartupRecovery`.  This replays the oplog and sets the stable timestamp to the
-oplogTruncateAfterPoint, which will also be the top of the oplog after recovery.  At this point,
-once a checkpoint is taken, the files on disk will be correct for use in normal operation.
+oplogTruncateAfterPoint, which will also be the top of the oplog (the latest entry in the oplog)
+after recovery.  At this point, once a checkpoint is taken, the files on disk will be correct for
+use in normal operation.
 
 ## Moving the downloaded files to the dbpath
 
@@ -1896,7 +1897,8 @@ Once the files are moved, we switch storage one more time, back to the original 
 now has the downloaded files.  We use the `InitialSyncFileMover` to delete the move marker and
 the entire .initialsync directory; a restart of the server at or after this point will not
 involve any more FCBIS work. Then we release the global lock, and retrieve the last applied
-OpTime and WallTime from the top of the oplog in `_updateLastAppliedOptime`.
+OpTime and WallTime from the top of the oplog (the latest entry in the oplog) in 
+`_updateLastAppliedOptime`.
 
 The initial sync attempt is now considered successful, and we call `_finishCallback`.  This acts
 similarly to the end of logical initial sync.
@@ -2107,15 +2109,16 @@ inconsistency with the rest of the replica set.
 After truncating the oplog, the node will see if the recovery timestamp differs from the top of the
 newly truncated oplog. If it does, this means that there are oplog entries that must be applied to
 make the data consistent with the oplog. The node will apply all the operations starting at the
-recovery timestamp through the top of the oplog. The one exception is that it will not apply
-`prepareTransaction` oplog entries. Similar to how a node reconstructs prepared transactions during
-initial sync and rollback, the node will update the transactions table every time it sees a
-`prepareTransaction` oplog entry. Once the node has finished applying all the oplog entries through
-the top of the oplog, it will [reconstruct](#recovering-prepared-transactions) all transactions
-still in the prepare state.
+recovery timestamp through the top of the oplog (the latest entry in the oplog). The one exception
+is that it will not apply `prepareTransaction` oplog entries. Similar to how a node reconstructs
+prepared transactions during initial sync and rollback, the node will update the transactions table
+every time it sees a `prepareTransaction` oplog entry. Once the node has finished applying all the
+oplog entries through the top of the oplog, it will [reconstruct](#recovering-prepared-transactions)
+all transactions still in the prepare state.
 
 Finally, the node will finish loading the replica set configuration, set its `lastApplied` and
-`lastDurable` timestamps to the top of the oplog and start steady state replication.
+`lastDurable` timestamps to the top of the oplog (the latest entry in the oplog) and start steady
+state replication.
 
 ## Recover from Unstable Checkpoint
 We may not have a recovery timestamp if we need to recover from an **unstable checkpoint**. MongoDB
