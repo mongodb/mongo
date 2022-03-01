@@ -41,6 +41,9 @@ SPECIFIC_TASK_OVERRIDES = {
         "replica_sets_jscore_passthrough": timedelta(hours=2, minutes=30),
     },
     "ubuntu1804-debug-suggested": {"replica_sets_jscore_passthrough": timedelta(hours=3), },
+    "ubuntu1804-sbe-yielding-debug": {
+        "concurrency_replication_ubsan": timedelta(hours=2, minutes=30),
+    },
     "enterprise-rhel-80-64-bit-coverage": {
         "replica_sets_jscore_passthrough": timedelta(hours=2, minutes=30),
     },
