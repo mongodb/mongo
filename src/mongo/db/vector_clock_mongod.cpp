@@ -184,6 +184,30 @@ VectorClockMongoD::~VectorClockMongoD() = default;
 void VectorClockMongoD::onStepUpBegin(OperationContext* opCtx, long long term) {
     stdx::lock_guard lg(_mutex);
     _durableTime.reset();
+
+    // Initialize the config server's topology time to the maximum topology time from
+    // `config.shards` collection instead of using `Timestamp(0 ,0)`.
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        const auto maxTopologyTime{[&opCtx]() -> boost::optional<Timestamp> {
+            DBDirectClient client{opCtx};
+            FindCommandRequest findRequest{ShardType::ConfigNS};
+            findRequest.setSort(BSON(ShardType::topologyTime << -1));
+            findRequest.setLimit(1);
+            auto cursor{client.find(std::move(findRequest))};
+            invariant(cursor);
+            if (!cursor->more()) {
+                // No shards are available yet.
+                return boost::none;
+            }
+
+            const auto shardEntry{uassertStatusOK(ShardType::fromBSON(cursor->nextSafe()))};
+            return shardEntry.getTopologyTime();
+        }()};
+
+        if (maxTopologyTime) {
+            _advanceComponentTimeTo(Component::TopologyTime, LogicalTime(*maxTopologyTime));
+        }
+    }
 }
 
 void VectorClockMongoD::onStepDown() {
