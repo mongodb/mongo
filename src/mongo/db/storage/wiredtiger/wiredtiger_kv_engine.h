@@ -90,6 +90,9 @@ struct WiredTigerBackup {
     // cursor is already open.
     Mutex wtBackupDupCursorMutex = MONGO_MAKE_LATCH("WiredTigerKVEngine::wtBackupDupCursorMutex");
     stdx::condition_variable wtBackupDupCursorCV;
+
+    // This file flags there was an ongoing backup when an unclean shutdown happened.
+    inline static const std::string kOngoingBackupFile = "ongoingBackup.lock";
 };
 
 class WiredTigerKVEngine final : public KVEngine {

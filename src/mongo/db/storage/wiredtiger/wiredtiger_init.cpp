@@ -61,6 +61,8 @@
 namespace mongo {
 
 namespace {
+std::string kWiredTigerBackupFile = "WiredTiger.backup";
+
 class WiredTigerFactory : public StorageEngine::Factory {
 public:
     virtual ~WiredTigerFactory() {}
@@ -69,6 +71,20 @@ public:
                                                   const StorageEngineLockFile* lockFile) const {
         if (lockFile && lockFile->createdByUncleanShutdown()) {
             LOGV2_WARNING(22302, "Recovering data from the last clean checkpoint.");
+
+            // If we had an unclean shutdown during an ongoing backup remove WiredTiger.backup. This
+            // allows WT to use checkpoints taken while the backup cursor was open for recovery.
+            boost::filesystem::path basePath(storageGlobalParams.dbpath);
+            if (boost::filesystem::remove(basePath / WiredTigerBackup::kOngoingBackupFile)) {
+                if (boost::filesystem::remove(basePath / kWiredTigerBackupFile)) {
+                    LOGV2_INFO(
+                        5844600,
+                        "Removing WiredTiger.backup to allow recovery from any checkpoints taken "
+                        "during ongoing backup.");
+                } else {
+                    LOGV2_INFO(5844601, "WiredTiger.backup doesn't exist, cleanup not needed.");
+                }
+            }
         }
 
 #if defined(__linux__)

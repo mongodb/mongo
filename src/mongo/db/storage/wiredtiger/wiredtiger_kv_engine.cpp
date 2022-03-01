@@ -127,6 +127,11 @@ MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForImportIndex);
 
 const std::string kPinOldestTimestampAtStartupName = "_wt_startup";
 
+boost::filesystem::path getOngoingBackupPath() {
+    return boost::filesystem::path(storageGlobalParams.dbpath) /
+        WiredTigerBackup::kOngoingBackupFile;
+}
+
 }  // namespace
 
 bool WiredTigerFileVersion::shouldDowngrade(bool readOnly, bool hasRecoveryTimestamp) {
@@ -1274,6 +1279,10 @@ WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
 
     stdx::lock_guard<Latch> backupCursorLk(_wtBackup.wtBackupCursorMutex);
 
+    // Create ongoingBackup.lock file to signal recovery that it should delete WiredTiger.backup if
+    // we have an unclean shutdown with the cursor still open.
+    { boost::filesystem::ofstream ongoingBackup(getOngoingBackupPath()); }
+
     // Oplog truncation thread won't remove oplog since the checkpoint pinned by the backup cursor.
     stdx::lock_guard<Latch> lock(_oplogPinnedByBackupMutex);
     _oplogPinnedByBackup = Timestamp(_oplogNeededForCrashRecovery.load());
@@ -1291,6 +1300,7 @@ WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
     const std::string config = ss.str();
     int wtRet = session->open_cursor(session, "backup:", nullptr, config.c_str(), &cursor);
     if (wtRet != 0) {
+        boost::filesystem::remove(getOngoingBackupPath());
         return wtRCToStatus(wtRet, session);
     }
 
@@ -1323,6 +1333,8 @@ void WiredTigerKVEngine::endNonBlockingBackup(OperationContext* opCtx) {
     _wtBackup.dupCursor = nullptr;
     _wtBackup.logFilePathsSeenByExtendBackupCursor = {};
     _wtBackup.logFilePathsSeenByGetNextBatch = {};
+
+    boost::filesystem::remove(getOngoingBackupPath());
 }
 
 StatusWith<std::vector<std::string>> WiredTigerKVEngine::extendBackupCursor(
