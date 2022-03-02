@@ -33,7 +33,9 @@ This error is generated when the application attempts to insert a record with th
 existing record without the 'overwrite' configuration to WT_SESSION::open_cursor.
 
 @par <code>WT_ERROR</code>
-This error is returned when an error is not covered by a specific error return.
+This error is returned when an error is not covered by a specific error return. The operation may be
+retried; if a transaction is in progress, it should be rolled back and the operation retried in a
+new transaction.
 
 @par <code>WT_NOTFOUND</code>
 This error indicates an operation did not find a value to return. This includes cursor search and
@@ -46,7 +48,7 @@ exit immediately, no further WiredTiger calls are required (and further calls wi
 immediately fail).
 
 @par <code>WT_RUN_RECOVERY</code>
-This error is generated when wiredtiger_open is configured to return an error if recovery is
+This error is generated when ::wiredtiger_open is configured to return an error if recovery is
 required to use the database.
 
 @par <code>WT_CACHE_FULL</code>

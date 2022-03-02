@@ -31,8 +31,9 @@ errors = [
         'overwrite' configuration to WT_SESSION::open_cursor.'''),
     Error('WT_ERROR', -31802,
         'non-specific WiredTiger error', '''
-        This error is returned when an error is not covered by a
-        specific error return.'''),
+        This error is returned when an error is not covered by a specific error
+        return. The operation may be retried; if a transaction is in progress,
+        it should be rolled back and the operation retried in a new transaction.'''),
     Error('WT_NOTFOUND', -31803,
         'item not found', '''
         This error indicates an operation did not find a value to
@@ -49,8 +50,8 @@ errors = [
         'restart the operation (internal)', undoc=True),
     Error('WT_RUN_RECOVERY', -31806,
         'recovery must be run to continue', '''
-        This error is generated when wiredtiger_open is configured
-        to return an error if recovery is required to use the database.'''),
+        This error is generated when ::wiredtiger_open is configured to return
+        an error if recovery is required to use the database.'''),
     Error('WT_CACHE_FULL', -31807,
         'operation would overflow cache', '''
         This error is only generated when wiredtiger_open is configured

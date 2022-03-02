@@ -25,7 +25,7 @@ each of which is ordered by one or more columns.
 - @subpage timestamp_global_api
 - @subpage timestamp_txn_api
 - @subpage timestamp_prepare
-- @subpage timestamp_roundup
+- @subpage timestamp_prepare_roundup
 - @subpage timestamp_misc
 - @subpage explain_acid
 - @subpage explain_durability
