@@ -99,7 +99,7 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
 
         # Read the first update value with timestamp.
         self.assertEquals(cursor.reset(), 0)
-        session.begin_transaction('read_timestamp=' + self.timestamp_str(200))
+        session.begin_transaction('read_timestamp=' + self.timestamp_str(220))
         self.assertEquals(cursor.next(), 0)
         for i in range(1, 50):
             self.assertEquals(cursor.get_value(), ds.value(111))

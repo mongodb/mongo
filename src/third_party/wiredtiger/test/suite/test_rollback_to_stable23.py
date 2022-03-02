@@ -96,11 +96,11 @@ class test_rollback_to_stable23(test_rollback_to_stable_base):
         self.large_modifies(uri, 'T', ds, 3, 1, nrows, self.prepare, 60)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 20)
-        self.check(value_modQ, uri, nrows, None, 30)
-        self.check(value_modR, uri, nrows, None, 40)
-        self.check(value_modS, uri, nrows, None, 50)
-        self.check(value_modT, uri, nrows, None, 60)
+        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
+        self.check(value_modQ, uri, nrows, None, 31 if self.prepare else 30)
+        self.check(value_modR, uri, nrows, None, 41 if self.prepare else 40)
+        self.check(value_modS, uri, nrows, None, 51 if self.prepare else 50)
+        self.check(value_modT, uri, nrows, None, 61 if self.prepare else 60)
 
         # Pin stable to timestamp 60 if prepare otherwise 50.
         if self.prepare:

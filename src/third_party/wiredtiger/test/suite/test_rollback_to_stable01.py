@@ -229,12 +229,12 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
 
         self.large_updates(uri, valuea, ds, nrows, self.prepare, 10)
         # Check that all updates are seen.
-        self.check(valuea, uri, nrows, None, 10)
+        self.check(valuea, uri, nrows, None, 11 if self.prepare else 10)
 
         # Remove all keys with newer timestamp.
         self.large_removes(uri, ds, nrows, self.prepare, 20)
         # Check that the no keys should be visible.
-        self.check(valuea, uri, 0, nrows, 20)
+        self.check(valuea, uri, 0, nrows, 21 if self.prepare else 20)
 
         # Pin stable to timestamp 20 if prepare otherwise 10.
         if self.prepare:

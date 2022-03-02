@@ -123,19 +123,19 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         self.large_modifies(uri, 'Z', ds, 7, 1, nrows, self.prepare, 140)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 20)
-        self.check(value_modQ, uri, nrows, None, 30)
-        self.check(value_modR, uri, nrows, None, 40)
-        self.check(value_modS, uri, nrows, None, 50)
-        self.check(value_b, uri, nrows, None, 60)
-        self.check(value_c, uri, nrows, None, 70)
-        self.check(value_modT, uri, nrows, None, 80)
-        self.check(value_d, uri, nrows, None, 90)
-        self.check(value_modW, uri, nrows, None, 100)
-        self.check(value_a, uri, nrows, None, 110)
-        self.check(value_modX, uri, nrows, None, 120)
-        self.check(value_modY, uri, nrows, None, 130)
-        self.check(value_modZ, uri, nrows, None, 140)
+        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
+        self.check(value_modQ, uri, nrows, None, 31 if self.prepare else 30)
+        self.check(value_modR, uri, nrows, None, 41 if self.prepare else 40)
+        self.check(value_modS, uri, nrows, None, 51 if self.prepare else 50)
+        self.check(value_b, uri, nrows, None, 61 if self.prepare else 60)
+        self.check(value_c, uri, nrows, None, 71 if self.prepare else 70)
+        self.check(value_modT, uri, nrows, None, 81 if self.prepare else 80)
+        self.check(value_d, uri, nrows, None, 91 if self.prepare else 90)
+        self.check(value_modW, uri, nrows, None, 101 if self.prepare else 100)
+        self.check(value_a, uri, nrows, None, 111 if self.prepare else 110)
+        self.check(value_modX, uri, nrows, None, 121 if self.prepare else 120)
+        self.check(value_modY, uri, nrows, None, 131 if self.prepare else 130)
+        self.check(value_modZ, uri, nrows, None, 141 if self.prepare else 140)
 
         # Pin stable to timestamp 40 if prepare otherwise 30.
         if self.prepare:

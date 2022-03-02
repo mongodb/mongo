@@ -30,7 +30,7 @@ import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
-# test_flcs01.py
+# test_flcs02.py
 #
 # Test various cases of deleting values and expecting them to read back as 0,
 # in the presence of timestamps and history.
@@ -39,7 +39,7 @@ from wtscenario import make_scenarios
 # evict it explicitly, to make sure that the first section of the test exercises
 # in-memory update records. (Testing on an in-memory database does not have that
 # effect.)
-class test_flcs01(wttest.WiredTigerTestCase):
+class test_flcs02(wttest.WiredTigerTestCase):
     prepare_values = [
         ('no_prepare', dict(do_prepare=False)),
         ('prepare', dict(do_prepare=True))
@@ -134,21 +134,20 @@ class test_flcs01(wttest.WiredTigerTestCase):
             cursor.reset()
             self.session.rollback_transaction()
 
-        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(committs))
-        v = cursor[k]
-        self.assertEqual(v, 0)
-        cursor.reset()
-        self.check_next(cursor, k, 0)
-        self.check_prev(cursor, k, 0)
-        self.session.rollback_transaction()
+        def readat(readts):
+            self.session.begin_transaction('read_timestamp=' + self.timestamp_str(readts))
+            v = cursor[k]
+            self.assertEqual(v, 0)
+            cursor.reset()
+            self.check_next(cursor, k, 0)
+            self.check_prev(cursor, k, 0)
+            self.session.rollback_transaction()
 
-        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(committs + 5))
-        v = cursor[k]
-        self.assertEqual(v, 0)
-        cursor.reset()
-        self.check_next(cursor, k, 0)
-        self.check_prev(cursor, k, 0)
-        self.session.rollback_transaction()
+        if not self.do_prepare:
+            # Avoid reading between commit and durable.
+            readat(committs)
+        readat(committs+1)
+        readat(committs+5)
 
     def test_flcs(self):
         uri = "table:test_flcs02"
@@ -262,7 +261,8 @@ class test_flcs01(wttest.WiredTigerTestCase):
         self.session.rollback_transaction()
 
         # This should definitely have extended the table in the present.
-        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(50))
+        read_ts = 51 if self.do_prepare else 50
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
         v = cursor[appendkey2]
         self.assertEqual(v, 0)
         cursor.reset()
@@ -274,7 +274,7 @@ class test_flcs01(wttest.WiredTigerTestCase):
         self.evict(uri, 1, 1)
 
         # The committed zeros should still be there.
-        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(50))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
         v = cursor[updatekey2]
         self.assertEqual(v, 0)
         cursor.reset()
@@ -282,7 +282,7 @@ class test_flcs01(wttest.WiredTigerTestCase):
         self.check_prev(cursor, updatekey2, 0)
         self.session.rollback_transaction()
 
-        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(50))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
         v = cursor[appendkey2]
         self.assertEqual(v, 0)
         cursor.reset()

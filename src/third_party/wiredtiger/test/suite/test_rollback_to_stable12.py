@@ -83,7 +83,7 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
         self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, None, 20)
+        self.check(value_a, uri, nrows, None, 21 if self.prepare else 20)
 
         # Pin stable to timestamp 28 if prepare otherwise 20.
         # We prepare at commit_ts - 1 (so 29) and this is required to be strictly
