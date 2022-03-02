@@ -2097,12 +2097,18 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
     if (!btree->modified && !bulk)
         return (__wt_evict_file(session, WT_SYNC_DISCARD));
 
+#ifdef WT_STANDALONE_BUILD
     /*
      * Don't flush data from modified trees independent of system-wide checkpoint. Flushing trees
      * can lead to files that are inconsistent on disk after a crash.
      */
     if (btree->modified && !bulk && !metadata)
         return (__wt_set_return(session, EBUSY));
+#else
+    if (btree->modified && !bulk && !F_ISSET(btree, WT_BTREE_LOGGED) &&
+      (S2C(session)->txn_global.has_stable_timestamp || !metadata))
+        return (__wt_set_return(session, EBUSY));
+#endif
 
     /*
      * Make sure there isn't a potential race between backup copying the metadata and a checkpoint
