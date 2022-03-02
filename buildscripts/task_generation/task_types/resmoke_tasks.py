@@ -14,7 +14,7 @@ from buildscripts.task_generation.task_types.gentask_options import GenTaskOptio
 from buildscripts.task_generation.task_types.models.resmoke_task_model import ResmokeTask
 from buildscripts.task_generation.task_types.multiversion_decorator import MultiversionGenTaskDecorator, \
     MultiversionDecoratorParams
-from buildscripts.timeouts.timeout import TimeoutEstimate
+from buildscripts.task_generation.timeout import TimeoutEstimate
 
 LOGGER = structlog.getLogger(__name__)
 
