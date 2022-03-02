@@ -218,6 +218,7 @@ __wt_curtable_set_key(WT_CURSOR *cursor, ...)
 {
     WT_CURSOR **cp, *primary;
     WT_CURSOR_TABLE *ctable;
+    WT_DECL_RET;
     u_int i;
     va_list ap;
 
@@ -226,7 +227,8 @@ __wt_curtable_set_key(WT_CURSOR *cursor, ...)
     primary = *cp++;
 
     va_start(ap, cursor);
-    WT_IGNORE_RET(__wt_cursor_set_keyv(primary, cursor->flags, ap));
+    if ((ret = __wt_cursor_set_keyv(primary, cursor->flags, ap)) != 0)
+        WT_IGNORE_RET(__wt_panic(CUR2S(cursor), ret, "failed to set key"));
     va_end(ap);
 
     if (!F_ISSET(primary, WT_CURSTD_KEY_SET))

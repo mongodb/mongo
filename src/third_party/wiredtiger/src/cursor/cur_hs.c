@@ -322,6 +322,7 @@ __curhs_set_key(WT_CURSOR *cursor, ...)
 {
     WT_CURSOR *file_cursor;
     WT_CURSOR_HS *hs_cursor;
+    WT_DECL_RET;
     WT_ITEM *datastore_key;
     WT_SESSION_IMPL *session;
     wt_timestamp_t start_ts;
@@ -345,8 +346,9 @@ __curhs_set_key(WT_CURSOR *cursor, ...)
     F_SET(hs_cursor, WT_HS_CUR_BTREE_ID_SET);
     if (arg_count > 1) {
         datastore_key = va_arg(ap, WT_ITEM *);
-        WT_IGNORE_RET(__wt_buf_set(
-          session, hs_cursor->datastore_key, datastore_key->data, datastore_key->size));
+        if ((ret = __wt_buf_set(
+               session, hs_cursor->datastore_key, datastore_key->data, datastore_key->size)) != 0)
+            WT_IGNORE_RET(__wt_panic(session, ret, "failed to set the contents of buffer"));
         F_SET(hs_cursor, WT_HS_CUR_KEY_SET);
     } else {
         hs_cursor->datastore_key->data = NULL;
