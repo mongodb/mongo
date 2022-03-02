@@ -17,23 +17,30 @@ __logmgr_sync_cfg(WT_SESSION_IMPL *session, const char **cfg)
 {
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
+    uint32_t txn_logsync;
 
     conn = S2C(session);
 
+    /*
+     * Collect all the flag settings into a local variable and then assign into the connection after
+     * we're done so that there is no chance of another thread seeing an interim value while we're
+     * processing during a reconfigure.
+     */
+    txn_logsync = 0;
     WT_RET(__wt_config_gets(session, cfg, "transaction_sync.enabled", &cval));
     if (cval.val)
-        FLD_SET(conn->txn_logsync, WT_LOG_SYNC_ENABLED);
+        FLD_SET(txn_logsync, WT_LOG_SYNC_ENABLED);
     else
-        FLD_CLR(conn->txn_logsync, WT_LOG_SYNC_ENABLED);
+        FLD_CLR(txn_logsync, WT_LOG_SYNC_ENABLED);
 
     WT_RET(__wt_config_gets(session, cfg, "transaction_sync.method", &cval));
-    FLD_CLR(conn->txn_logsync, WT_LOG_DSYNC | WT_LOG_FLUSH | WT_LOG_FSYNC);
     if (WT_STRING_MATCH("dsync", cval.str, cval.len))
-        FLD_SET(conn->txn_logsync, WT_LOG_DSYNC | WT_LOG_FLUSH);
+        FLD_SET(txn_logsync, WT_LOG_DSYNC | WT_LOG_FLUSH);
     else if (WT_STRING_MATCH("fsync", cval.str, cval.len))
-        FLD_SET(conn->txn_logsync, WT_LOG_FSYNC);
+        FLD_SET(txn_logsync, WT_LOG_FSYNC);
     else if (WT_STRING_MATCH("none", cval.str, cval.len))
-        FLD_SET(conn->txn_logsync, WT_LOG_FLUSH);
+        FLD_SET(txn_logsync, WT_LOG_FLUSH);
+    WT_PUBLISH(conn->txn_logsync, txn_logsync);
     return (0);
 }
 

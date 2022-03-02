@@ -612,9 +612,6 @@ __posix_file_write(
               "%s: handle-write: pwrite: failed to write %" WT_SIZET_FMT
               " bytes at offset %" PRIuMAX,
               file_handle->name, chunk, (uintmax_t)offset);
-        if (session->debug_8392 != NULL)
-            WT_RET(__wt_msg(session, "pwrite: %s: %s: wrote at offset %" PRIu64 " len %" PRIu64,
-              file_handle->name, session->debug_8392, (uint64_t)offset, (uint64_t)len));
     }
     WT_STAT_CONN_INCRV(session, block_byte_write_syscall, len);
     return (0);
