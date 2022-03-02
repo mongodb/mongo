@@ -223,10 +223,9 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
         }
     }
 
-    // When in restore mode, views created on collections that weren't restored will be removed.
-    if (storageGlobalParams.restore) {
-        invariant(opCtx->lockState()->isW());
-
+    // When in restore mode, views created on collections that weren't restored will be removed. We
+    // only do this during startup when the global lock is held.
+    if (storageGlobalParams.restore && opCtx->lockState()->isW()) {
         // Refresh our copy of the catalog, since we may have modified it above.
         catalog = CollectionCatalog::get(opCtx);
         try {
