@@ -30,7 +30,7 @@ function runTest() {
     let cursor = cst.startWatchingAllChangesForCluster();
 
     assert.commandWorked(sourceDB.adminCommand({
-        renameCollection: coll.getFullName(),
+        renameCollection: sourceColl.getFullName(),
         to: targetDB[collName].getFullName(),
         dropTarget: true
     }));
